@@ -988,13 +988,6 @@
       "when": 1779362869833,
       "tag": "0140_awesome_sphinx",
       "breakpoints": true
-    },
-    {
-      "idx": 141,
-      "version": "7",
-      "when": 1779377671486,
-      "tag": "0141_keen_slapstick",
-      "breakpoints": true
     }
   ]
 }

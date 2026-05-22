@@ -1,6 +1,5 @@
 import pLimit from 'p-limit';
 import { captureException } from '@sentry/nextjs';
-import type { SQL } from 'drizzle-orm';
 import { ensureBotUserForOrg } from '@/lib/bot-users/bot-user-service';
 import {
   listDispatchableCodeReviewOwnerCandidates,
@@ -8,7 +7,10 @@ import {
 } from '../db/code-reviews';
 import { errorExceptInTest, logExceptInTest } from '@/lib/utils.server';
 import { tryDispatchPendingReviews } from './dispatch-pending-reviews';
-import { cronPendingCodeReviewUpdatedAfterSql } from './dispatch-constants';
+import {
+  cronPendingCodeReviewCreatedAtWindowSql,
+  type PendingCodeReviewCreatedAtWindow,
+} from './dispatch-constants';
 import type { Owner } from '../core';
 
 const OWNER_SCAN_LIMIT = 100;
@@ -42,7 +44,7 @@ async function resolveDispatchOwner(
 
 async function drainOwner(
   candidate: DispatchableCodeReviewOwnerCandidate,
-  pendingUpdatedAfter: SQL
+  pendingCreatedAtWindow: PendingCodeReviewCreatedAtWindow
 ): Promise<OwnerDrainOutcome> {
   try {
     const owner = await resolveDispatchOwner(candidate);
@@ -50,7 +52,7 @@ async function drainOwner(
       return { status: 'skipped-missing-bot' };
     }
 
-    const result = await tryDispatchPendingReviews(owner, { pendingUpdatedAfter });
+    const result = await tryDispatchPendingReviews(owner, { pendingCreatedAtWindow });
     return { status: 'processed', dispatched: result.dispatched };
   } catch (error) {
     errorExceptInTest('[dispatchPendingCodeReviewOwners] Owner drain failed', {
@@ -66,14 +68,14 @@ async function drainOwner(
 }
 
 export async function dispatchPendingCodeReviewOwners(): Promise<DispatchPendingCodeReviewOwnersSummary> {
-  const pendingUpdatedAfter = cronPendingCodeReviewUpdatedAfterSql();
+  const pendingCreatedAtWindow = cronPendingCodeReviewCreatedAtWindowSql();
   const candidates = await listDispatchableCodeReviewOwnerCandidates({
     limit: OWNER_SCAN_LIMIT,
-    pendingUpdatedAfter,
+    pendingCreatedAtWindow,
   });
   const limit = pLimit(OWNER_DISPATCH_CONCURRENCY);
   const outcomes = await Promise.all(
-    candidates.owners.map(candidate => limit(() => drainOwner(candidate, pendingUpdatedAfter)))
+    candidates.owners.map(candidate => limit(() => drainOwner(candidate, pendingCreatedAtWindow)))
   );
 
   const summary: DispatchPendingCodeReviewOwnersSummary = {

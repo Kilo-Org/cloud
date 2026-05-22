@@ -24,7 +24,7 @@ import {
 } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { listDispatchableCodeReviewOwnerCandidates } from '../db/code-reviews';
-import { cronPendingCodeReviewUpdatedAfterSql } from './dispatch-constants';
+import { cronPendingCodeReviewCreatedAtWindowSql } from './dispatch-constants';
 import { dispatchPendingCodeReviewOwners } from './dispatch-pending-code-review-owners';
 
 const REPO = `test-org/dispatch-owner-drain-${Date.now()}`;
@@ -170,38 +170,33 @@ describe('dispatch pending code review owners', () => {
     });
   });
 
-  it('bounds cron pending discovery by updated_at while still recovering stale queued work', async () => {
-    const oldIdleTimestamp = minutesAgo(180);
-    const oldCreatedRecentlyUpdatedCreatedAt = minutesAgo(240);
-    const oldCreatedRecentlyUpdatedUpdatedAt = minutesAgo(30);
-    const recentPendingTimestamp = minutesAgo(15);
+  it('bounds cron pending discovery by created_at while still recovering stale queued work', async () => {
+    const tooRecentPendingTimestamp = minutesAgo(30);
+    const eligiblePendingTimestamp = minutesAgo(65);
+    const tooOldPendingTimestamp = minutesAgo(90);
+    const recentlyUpdatedAt = minutesAgo(5);
     const oldQueuedCreatedAt = minutesAgo(360);
     const staleQueuedUpdatedAt = minutesAgo(10);
 
     await db.insert(cloud_agent_code_reviews).values([
-      // First user: only an idle pending review older than the cron cutoff
       reviewValues({
         owner: { type: 'user', id: firstUser.id },
         status: 'pending',
-        createdAt: oldIdleTimestamp,
-        updatedAt: oldIdleTimestamp,
+        createdAt: tooRecentPendingTimestamp,
+        updatedAt: tooRecentPendingTimestamp,
       }),
-      // Second user: old-created pending whose updated_at was refreshed
-      // recently (e.g. by a manual retry) — should still be reachable.
       reviewValues({
         owner: { type: 'user', id: secondUser.id },
         status: 'pending',
-        createdAt: oldCreatedRecentlyUpdatedCreatedAt,
-        updatedAt: oldCreatedRecentlyUpdatedUpdatedAt,
+        createdAt: eligiblePendingTimestamp,
+        updatedAt: recentlyUpdatedAt,
       }),
-      // First org: a recently created pending review.
       reviewValues({
         owner: { type: 'org', id: firstOrganizationId },
         status: 'pending',
-        createdAt: recentPendingTimestamp,
-        updatedAt: recentPendingTimestamp,
+        createdAt: tooOldPendingTimestamp,
+        updatedAt: recentlyUpdatedAt,
       }),
-      // Second org: stale queued recovery — must remain visible regardless of age.
       reviewValues({
         owner: { type: 'org', id: secondOrganizationId },
         status: 'queued',
@@ -212,34 +207,31 @@ describe('dispatch pending code review owners', () => {
 
     const result = await listDispatchableCodeReviewOwnerCandidates({
       limit: 10,
-      pendingUpdatedAfter: cronPendingCodeReviewUpdatedAfterSql(),
+      pendingCreatedAtWindow: cronPendingCodeReviewCreatedAtWindowSql(),
     });
 
     expect(result).toEqual({
       owners: [
         { type: 'org', id: secondOrganizationId },
         { type: 'user', id: secondUser.id },
-        { type: 'org', id: firstOrganizationId },
       ],
       hasMore: false,
     });
   });
 
-  it('drains owners with recently active pending work and skips idle pending owners', async () => {
+  it('drains owners with pending work inside the cron window and skips outside-window pending owners', async () => {
     await db.insert(cloud_agent_code_reviews).values([
-      // Idle pending older than the cron cutoff — owner should be skipped entirely.
       reviewValues({
         owner: { type: 'user', id: firstUser.id },
         status: 'pending',
-        createdAt: minutesAgo(180),
-        updatedAt: minutesAgo(180),
+        createdAt: minutesAgo(90),
+        updatedAt: minutesAgo(5),
       }),
-      // Recently active pending — owner should be drained.
       reviewValues({
         owner: { type: 'user', id: secondUser.id },
         status: 'pending',
-        createdAt: minutesAgo(30),
-        updatedAt: minutesAgo(30),
+        createdAt: minutesAgo(65),
+        updatedAt: minutesAgo(5),
       }),
     ]);
 
@@ -267,12 +259,12 @@ describe('dispatch pending code review owners', () => {
         id: secondUser.id,
         userId: secondUser.id,
       },
-      expect.objectContaining({ pendingUpdatedAfter: expect.anything() })
+      expect.objectContaining({ pendingCreatedAtWindow: expect.anything() })
     );
   });
 
   it('summarizes dispatch, recovered bot owners, no-op owners, and isolated owner failures', async () => {
-    const waitingTimestamp = minutesAgo(10);
+    const waitingTimestamp = minutesAgo(65);
     await db.insert(cloud_agent_code_reviews).values([
       reviewValues({
         owner: { type: 'user', id: firstUser.id },
@@ -282,17 +274,17 @@ describe('dispatch pending code review owners', () => {
       reviewValues({
         owner: { type: 'user', id: secondUser.id },
         status: 'pending',
-        createdAt: minutesAgo(9),
+        createdAt: minutesAgo(66),
       }),
       reviewValues({
         owner: { type: 'org', id: firstOrganizationId },
         status: 'pending',
-        createdAt: minutesAgo(8),
+        createdAt: minutesAgo(67),
       }),
       reviewValues({
         owner: { type: 'org', id: secondOrganizationId },
         status: 'pending',
-        createdAt: minutesAgo(7),
+        createdAt: minutesAgo(68),
       }),
     ]);
 

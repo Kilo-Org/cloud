@@ -33,11 +33,9 @@ import {
 } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { tryDispatchPendingReviews } from './dispatch-pending-reviews';
-import { cronPendingCodeReviewUpdatedAfterSql } from './dispatch-constants';
+import { cronPendingCodeReviewCreatedAtWindowSql } from './dispatch-constants';
 import {
   cancelSupersededReviewsForPR,
-  PENDING_DISPATCH_RETRY_EXHAUSTED_ERROR_MESSAGE,
-  resetCodeReviewForRetry,
   updateRepositoryReviewInstructionsMetadata,
 } from '../db/code-reviews';
 
@@ -506,37 +504,41 @@ describe('tryDispatchPendingReviews', () => {
     );
   });
 
-  it('dispatches old reviews after explicit retry under the cron pending cutoff', async () => {
-    const oldTimestamp = minutesAgo(150);
+  it('claims only pending rows created inside the cron window', async () => {
+    const tooRecentTimestamp = minutesAgo(30);
+    const eligibleTimestamp = minutesAgo(65);
+    const tooOldTimestamp = minutesAgo(90);
+    const recentlyUpdatedAt = minutesAgo(5);
     const owner = { type: 'user', id: testUser.id } satisfies ReviewOwner;
     await setTestUserBalance(DEFAULT_TIER_BALANCE_MICRODOLLARS);
 
-    const [review] = await db
+    const [tooRecentReview, eligibleReview, tooOldReview] = await db
       .insert(cloud_agent_code_reviews)
-      .values(
+      .values([
         reviewValues({
           owner,
           status: 'pending',
-          createdAt: oldTimestamp,
-          updatedAt: oldTimestamp,
-        })
-      )
+          createdAt: tooRecentTimestamp,
+          updatedAt: tooRecentTimestamp,
+        }),
+        reviewValues({
+          owner,
+          status: 'pending',
+          createdAt: eligibleTimestamp,
+          updatedAt: recentlyUpdatedAt,
+        }),
+        reviewValues({
+          owner,
+          status: 'pending',
+          createdAt: tooOldTimestamp,
+          updatedAt: recentlyUpdatedAt,
+        }),
+      ])
       .returning({ id: cloud_agent_code_reviews.id });
 
-    if (!review) {
-      throw new Error('Expected old retry review to be inserted');
+    if (!tooRecentReview || !eligibleReview || !tooOldReview) {
+      throw new Error('Expected pending reviews to be inserted');
     }
-
-    await db
-      .update(cloud_agent_code_reviews)
-      .set({
-        status: 'failed',
-        error_message: 'failed before retry',
-        completed_at: minutesAgo(120),
-      })
-      .where(eq(cloud_agent_code_reviews.id, review.id));
-
-    await resetCodeReviewForRetry(review.id);
 
     const result = await tryDispatchPendingReviews(
       {
@@ -544,84 +546,38 @@ describe('tryDispatchPendingReviews', () => {
         id: testUser.id,
         userId: testUser.id,
       },
-      { pendingUpdatedAfter: cronPendingCodeReviewUpdatedAfterSql() }
+      { pendingCreatedAtWindow: cronPendingCodeReviewCreatedAtWindowSql() }
     );
 
-    const storedReview = await db.query.cloud_agent_code_reviews.findFirst({
-      where: eq(cloud_agent_code_reviews.id, review.id),
+    const storedTooRecentReview = await db.query.cloud_agent_code_reviews.findFirst({
+      where: eq(cloud_agent_code_reviews.id, tooRecentReview.id),
+    });
+    const storedEligibleReview = await db.query.cloud_agent_code_reviews.findFirst({
+      where: eq(cloud_agent_code_reviews.id, eligibleReview.id),
+    });
+    const storedTooOldReview = await db.query.cloud_agent_code_reviews.findFirst({
+      where: eq(cloud_agent_code_reviews.id, tooOldReview.id),
     });
 
     expect(result).toEqual({ dispatched: 1, notDispatched: 0, activeCount: 1 });
-    expect(storedReview?.status).toBe('queued');
-    expect(storedReview?.created_at).toBe(oldTimestamp);
+    expect(storedTooRecentReview?.status).toBe('pending');
+    expect(storedEligibleReview?.status).toBe('queued');
+    expect(storedTooOldReview?.status).toBe('pending');
     expect(mockPrepareReviewPayload).toHaveBeenCalledWith({
-      reviewId: review.id,
-      owner: { type: 'user', id: testUser.id, userId: testUser.id },
-      agentConfig: { id: 'test-agent-config', config: {} },
-      platform: 'github',
-    });
-  });
-
-  it('skips idle old pending rows but claims old-created/recently-updated pending rows under the cron cutoff', async () => {
-    const idleTimestamp = minutesAgo(180);
-    const oldCreatedAt = minutesAgo(240);
-    const recentlyUpdatedAt = minutesAgo(30);
-    const owner = { type: 'user', id: testUser.id } satisfies ReviewOwner;
-    await setTestUserBalance(DEFAULT_TIER_BALANCE_MICRODOLLARS);
-
-    const [idleReview, refreshedReview] = await db
-      .insert(cloud_agent_code_reviews)
-      .values([
-        reviewValues({
-          owner,
-          status: 'pending',
-          createdAt: idleTimestamp,
-          updatedAt: idleTimestamp,
-        }),
-        reviewValues({
-          owner,
-          status: 'pending',
-          createdAt: oldCreatedAt,
-          updatedAt: recentlyUpdatedAt,
-        }),
-      ])
-      .returning({ id: cloud_agent_code_reviews.id });
-
-    if (!idleReview || !refreshedReview) {
-      throw new Error('Expected idle and refreshed pending reviews to be inserted');
-    }
-
-    const firstResult = await tryDispatchPendingReviews(
-      {
-        type: 'user',
-        id: testUser.id,
-        userId: testUser.id,
-      },
-      { pendingUpdatedAfter: cronPendingCodeReviewUpdatedAfterSql() }
-    );
-
-    const storedIdleReview = await db.query.cloud_agent_code_reviews.findFirst({
-      where: eq(cloud_agent_code_reviews.id, idleReview.id),
-    });
-    const storedRefreshedReview = await db.query.cloud_agent_code_reviews.findFirst({
-      where: eq(cloud_agent_code_reviews.id, refreshedReview.id),
-    });
-
-    expect(firstResult).toEqual({ dispatched: 1, notDispatched: 0, activeCount: 1 });
-    expect(storedIdleReview?.status).toBe('pending');
-    expect(storedRefreshedReview?.status).toBe('queued');
-    expect(mockPrepareReviewPayload).toHaveBeenCalledWith({
-      reviewId: refreshedReview.id,
+      reviewId: eligibleReview.id,
       owner: { type: 'user', id: testUser.id, userId: testUser.id },
       agentConfig: { id: 'test-agent-config', config: {} },
       platform: 'github',
     });
     expect(mockPrepareReviewPayload).not.toHaveBeenCalledWith(
-      expect.objectContaining({ reviewId: idleReview.id })
+      expect.objectContaining({ reviewId: tooRecentReview.id })
+    );
+    expect(mockPrepareReviewPayload).not.toHaveBeenCalledWith(
+      expect.objectContaining({ reviewId: tooOldReview.id })
     );
   });
 
-  it('recovers stale queued reviews regardless of age', async () => {
+  it('recovers stale queued reviews regardless of age under the cron window', async () => {
     const oldQueuedCreatedAt = minutesAgo(180);
     const staleQueuedUpdatedAt = minutesAgo(10);
     const owner = { type: 'user', id: testUser.id } satisfies ReviewOwner;
@@ -643,11 +599,14 @@ describe('tryDispatchPendingReviews', () => {
       throw new Error('Expected stale queued review to be inserted');
     }
 
-    const result = await tryDispatchPendingReviews({
-      type: 'user',
-      id: testUser.id,
-      userId: testUser.id,
-    });
+    const result = await tryDispatchPendingReviews(
+      {
+        type: 'user',
+        id: testUser.id,
+        userId: testUser.id,
+      },
+      { pendingCreatedAtWindow: cronPendingCodeReviewCreatedAtWindowSql() }
+    );
 
     const storedReview = await db.query.cloud_agent_code_reviews.findFirst({
       where: eq(cloud_agent_code_reviews.id, review.id),
@@ -1074,92 +1033,6 @@ describe('tryDispatchPendingReviews', () => {
       .limit(1);
     expect(mockGetReviewStatus).toHaveBeenCalledWith(review.id, attempt?.id);
     expect(storedReview?.status).toBe('pending');
-    expect(storedReview?.pending_dispatch_retry_count).toBe(1);
-  });
-
-  it('fails after exhausting the pending-dispatch no-state retry budget', async () => {
-    const recentTimestamp = minutesAgo(1);
-    const owner = { type: 'user', id: testUser.id } satisfies ReviewOwner;
-    await setTestUserBalance(DEFAULT_TIER_BALANCE_MICRODOLLARS);
-    mockDispatchReview.mockRejectedValue(new Error('Request timeout after 10000ms'));
-    mockGetReviewStatus.mockResolvedValue(null);
-
-    const [review] = await db
-      .insert(cloud_agent_code_reviews)
-      .values(
-        reviewValues({
-          owner,
-          status: 'pending',
-          createdAt: recentTimestamp,
-          updatedAt: recentTimestamp,
-        })
-      )
-      .returning({ id: cloud_agent_code_reviews.id });
-
-    if (!review) {
-      throw new Error('Expected review to be inserted');
-    }
-
-    const firstResult = await tryDispatchPendingReviews({
-      type: 'user',
-      id: testUser.id,
-      userId: testUser.id,
-    });
-
-    const afterFirstDispatch = await db.query.cloud_agent_code_reviews.findFirst({
-      where: eq(cloud_agent_code_reviews.id, review.id),
-    });
-    const attemptsAfterFirstDispatch = await db
-      .select()
-      .from(cloud_agent_code_review_attempts)
-      .where(eq(cloud_agent_code_review_attempts.code_review_id, review.id));
-    const firstAttempt = attemptsAfterFirstDispatch[0];
-
-    expect(firstResult).toEqual({
-      dispatched: 0,
-      notDispatched: 1,
-      activeCount: 0,
-    });
-    expect(afterFirstDispatch?.status).toBe('pending');
-    expect(afterFirstDispatch?.pending_dispatch_retry_count).toBe(1);
-    expect(attemptsAfterFirstDispatch).toHaveLength(1);
-    expect(firstAttempt?.status).toBe('queued');
-
-    const secondResult = await tryDispatchPendingReviews({
-      type: 'user',
-      id: testUser.id,
-      userId: testUser.id,
-    });
-
-    const storedReview = await db.query.cloud_agent_code_reviews.findFirst({
-      where: eq(cloud_agent_code_reviews.id, review.id),
-    });
-    const attempts = await db
-      .select()
-      .from(cloud_agent_code_review_attempts)
-      .where(eq(cloud_agent_code_review_attempts.code_review_id, review.id));
-
-    expect(secondResult).toEqual({
-      dispatched: 0,
-      notDispatched: 1,
-      activeCount: 0,
-    });
-    expect(storedReview?.status).toBe('failed');
-    expect(storedReview?.pending_dispatch_retry_count).toBe(1);
-    expect(storedReview?.error_message).toBe(PENDING_DISPATCH_RETRY_EXHAUSTED_ERROR_MESSAGE);
-    expect(storedReview?.completed_at).toEqual(expect.any(String));
-    expect(attempts).toHaveLength(1);
-    expect(attempts[0]).toEqual(
-      expect.objectContaining({
-        id: firstAttempt?.id,
-        status: 'failed',
-        error_message: PENDING_DISPATCH_RETRY_EXHAUSTED_ERROR_MESSAGE,
-        completed_at: expect.any(String),
-      })
-    );
-    expect(mockDispatchReview).toHaveBeenCalledTimes(2);
-    expect(mockGetReviewStatus).toHaveBeenNthCalledWith(1, review.id, firstAttempt?.id);
-    expect(mockGetReviewStatus).toHaveBeenNthCalledWith(2, review.id, firstAttempt?.id);
   });
 
   it('keeps a dispatch timeout claim when the Worker status probe also fails', async () => {

@@ -13,20 +13,7 @@ import {
   microdollar_usage,
   microdollar_usage_metadata,
 } from '@kilocode/db/schema';
-import {
-  eq,
-  and,
-  asc,
-  desc,
-  count,
-  ne,
-  inArray,
-  sql,
-  sum,
-  gte,
-  isNull,
-  type SQL,
-} from 'drizzle-orm';
+import { eq, and, asc, desc, count, ne, inArray, sql, sum, gte, isNull } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
 import type { CreateReviewParams, CodeReviewStatus, ListReviewsParams, Owner } from '../core';
 import type { CloudAgentCodeReview, CloudAgentCodeReviewAttempt } from '@kilocode/db/schema';
@@ -38,9 +25,9 @@ import {
   MAX_CONCURRENT_CODE_REVIEWS_PER_DEFAULT_USER,
   MAX_CONCURRENT_CODE_REVIEWS_PER_FUNDED_USER,
   MAX_CONCURRENT_CODE_REVIEWS_PER_ORG,
-  MAX_PENDING_DISPATCH_RETRIES,
   staleQueuedCodeReviewCutoffSql,
   staleRunningCodeReviewCutoffSql,
+  type PendingCodeReviewCreatedAtWindow,
 } from '../dispatch/dispatch-constants';
 
 type CodeReviewAttemptStatus = CodeReviewStatus;
@@ -63,14 +50,6 @@ type InfraRetryAttemptResult =
       reviewStatus: string;
       terminalReason: string | null;
     };
-
-export type ReleaseQueuedReviewClaimResult =
-  | { outcome: 'released'; pendingDispatchRetryCount: number }
-  | { outcome: 'exhausted'; pendingDispatchRetryCount: number }
-  | { outcome: 'claim-not-current' };
-
-export const PENDING_DISPATCH_RETRY_EXHAUSTED_ERROR_MESSAGE =
-  'Dispatch failed: Worker state was missing after the pending-dispatch retry budget was exhausted';
 
 type AttemptCallbackFields = {
   codeReviewId: string;
@@ -206,13 +185,13 @@ export async function getCodeReviewById(reviewId: string): Promise<CloudAgentCod
 export async function listDispatchableCodeReviewOwnerCandidates(
   params: {
     limit?: number;
-    pendingUpdatedAfter?: SQL;
+    pendingCreatedAtWindow?: PendingCodeReviewCreatedAtWindow;
   } = {}
 ): Promise<DispatchableCodeReviewOwnerCandidatesResult> {
   const limit = Math.max(1, Math.min(params.limit ?? 100, 1_000));
   const staleQueuedCutoff = staleQueuedCodeReviewCutoffSql();
   const staleRunningCutoff = staleRunningCodeReviewCutoffSql();
-  const { pendingUpdatedAfter } = params;
+  const { pendingCreatedAtWindow } = params;
 
   try {
     const result = await db.execute<{ owner_type: 'user' | 'org'; owner_id: string }>(sql`
@@ -228,7 +207,7 @@ export async function listDispatchableCodeReviewOwnerCandidates(
           ) AS owner_id,
           MIN(${cloud_agent_code_reviews.created_at}) AS oldest_reconsiderable_at
         FROM ${cloud_agent_code_reviews}
-        WHERE ${reconsiderableCodeReviewWorkCondition(staleQueuedCutoff, pendingUpdatedAfter)}
+        WHERE ${reconsiderableCodeReviewWorkCondition(staleQueuedCutoff, pendingCreatedAtWindow)}
         GROUP BY owner_type, owner_id
       ), active_work AS (
         SELECT
@@ -942,91 +921,31 @@ export async function updateCodeReviewStatusIfNonTerminal(
 
 export async function releaseQueuedReviewClaim(
   reviewId: string,
-  dispatchReservationId: string,
-  attemptId: string
-): Promise<ReleaseQueuedReviewClaimResult> {
+  dispatchReservationId: string
+): Promise<boolean> {
   try {
-    return await db.transaction(async tx => {
-      const now = new Date().toISOString();
-      const currentClaimCondition = () =>
+    const released = await db
+      .update(cloud_agent_code_reviews)
+      .set({
+        status: 'pending',
+        dispatch_reservation_id: null,
+        updated_at: new Date().toISOString(),
+      })
+      .where(
         and(
           eq(cloud_agent_code_reviews.id, reviewId),
           eq(cloud_agent_code_reviews.status, 'queued'),
           eq(cloud_agent_code_reviews.dispatch_reservation_id, dispatchReservationId),
           isNull(cloud_agent_code_reviews.session_id)
-        );
-
-      const [released] = await tx
-        .update(cloud_agent_code_reviews)
-        .set({
-          status: 'pending',
-          dispatch_reservation_id: null,
-          pending_dispatch_retry_count: sql`${cloud_agent_code_reviews.pending_dispatch_retry_count} + 1`,
-          updated_at: now,
-        })
-        .where(
-          and(
-            currentClaimCondition(),
-            sql`${cloud_agent_code_reviews.pending_dispatch_retry_count} < ${MAX_PENDING_DISPATCH_RETRIES}`
-          )
         )
-        .returning({
-          pendingDispatchRetryCount: cloud_agent_code_reviews.pending_dispatch_retry_count,
-        });
+      )
+      .returning({ id: cloud_agent_code_reviews.id });
 
-      if (released) {
-        return {
-          outcome: 'released',
-          pendingDispatchRetryCount: released.pendingDispatchRetryCount,
-        };
-      }
-
-      const [failed] = await tx
-        .update(cloud_agent_code_reviews)
-        .set({
-          status: 'failed',
-          error_message: PENDING_DISPATCH_RETRY_EXHAUSTED_ERROR_MESSAGE,
-          completed_at: now,
-          updated_at: now,
-        })
-        .where(
-          and(
-            currentClaimCondition(),
-            sql`${cloud_agent_code_reviews.pending_dispatch_retry_count} >= ${MAX_PENDING_DISPATCH_RETRIES}`
-          )
-        )
-        .returning({
-          pendingDispatchRetryCount: cloud_agent_code_reviews.pending_dispatch_retry_count,
-        });
-
-      if (!failed) {
-        return { outcome: 'claim-not-current' };
-      }
-
-      await tx
-        .update(cloud_agent_code_review_attempts)
-        .set({
-          status: 'failed',
-          error_message: PENDING_DISPATCH_RETRY_EXHAUSTED_ERROR_MESSAGE,
-          completed_at: now,
-          updated_at: now,
-        })
-        .where(
-          and(
-            eq(cloud_agent_code_review_attempts.code_review_id, reviewId),
-            eq(cloud_agent_code_review_attempts.id, attemptId)
-          )
-        );
-
-      return {
-        outcome: 'exhausted',
-        pendingDispatchRetryCount: failed.pendingDispatchRetryCount,
-      };
-    });
+    return released.length > 0;
   } catch (error) {
     captureException(error, {
       tags: { operation: 'releaseQueuedReviewClaim' },
-      extra: { reviewId, dispatchReservationId, attemptId },
+      extra: { reviewId, dispatchReservationId },
     });
     throw error;
   }
@@ -1381,7 +1300,6 @@ export async function resetCodeReviewForRetry(reviewId: string): Promise<void> {
         cli_session_id: null,
         error_message: null,
         terminal_reason: null,
-        pending_dispatch_retry_count: 0,
         check_run_id: null,
         started_at: null,
         completed_at: null,

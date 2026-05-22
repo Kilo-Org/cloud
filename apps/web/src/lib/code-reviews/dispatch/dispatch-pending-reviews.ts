@@ -16,7 +16,7 @@ import {
   kilocode_users,
   type CloudAgentCodeReview,
 } from '@kilocode/db/schema';
-import { eq, and, count, sql, inArray, type SQL } from 'drizzle-orm';
+import { eq, and, count, sql, inArray } from 'drizzle-orm';
 import type { Owner } from '../core';
 import { prepareReviewPayload } from '../triggers/prepare-review-payload';
 import { getAgentConfigForOwner } from '@/lib/agent-config/db/agent-configs';
@@ -43,6 +43,7 @@ import {
   MAX_CONCURRENT_CODE_REVIEWS_PER_ORG,
   staleQueuedCodeReviewCutoffSql,
   staleRunningCodeReviewCutoffSql,
+  type PendingCodeReviewCreatedAtWindow,
 } from './dispatch-constants';
 
 export type DispatchResult = {
@@ -54,11 +55,10 @@ export type DispatchResult = {
 export type TryDispatchPendingReviewsOptions = {
   /**
    * When provided, restricts pending work selection to reviews whose
-   * `updated_at` is at or after this cutoff. Used by the cron drain to bound
-   * how far back it will scan idle pending rows. Stale queued recovery
-   * remains unaffected by this gate.
+   * `created_at` is inside the cron recovery window. Direct dispatch paths
+   * leave this unset, and stale queued recovery remains unaffected.
    */
-  pendingUpdatedAfter?: SQL;
+  pendingCreatedAtWindow?: PendingCodeReviewCreatedAtWindow;
 };
 
 type ReservedReview = {
@@ -114,7 +114,7 @@ async function reservePendingReviewsForDispatch(
 
     const staleQueuedCutoff = staleQueuedCodeReviewCutoffSql();
     const staleRunningCutoff = staleRunningCodeReviewCutoffSql();
-    const { pendingUpdatedAfter } = options;
+    const { pendingCreatedAtWindow } = options;
     const ownerCondition = ownerReviewCondition(owner);
 
     const activeCountResult = await tx
@@ -145,7 +145,7 @@ async function reservePendingReviewsForDispatch(
       .where(
         and(
           ownerCondition,
-          reconsiderableCodeReviewWorkCondition(staleQueuedCutoff, pendingUpdatedAfter)
+          reconsiderableCodeReviewWorkCondition(staleQueuedCutoff, pendingCreatedAtWindow)
         )
       )
       .orderBy(
@@ -178,7 +178,7 @@ async function reservePendingReviewsForDispatch(
             cloud_agent_code_reviews.id,
             candidates.map(candidate => candidate.id)
           ),
-          reconsiderableCodeReviewWorkCondition(staleQueuedCutoff, pendingUpdatedAfter)
+          reconsiderableCodeReviewWorkCondition(staleQueuedCutoff, pendingCreatedAtWindow)
         )
       )
       .returning();
@@ -199,8 +199,8 @@ async function reservePendingReviewsForDispatch(
  *
  * The default unbounded behavior is intended for direct dispatch paths
  * (webhook, status callbacks, manual retrigger). The cron drain passes
- * `pendingUpdatedAfter` so it only scans recently active pending rows;
- * stale queued recovery still runs independently of that gate.
+ * `pendingCreatedAtWindow` so it only scans pending rows created inside the
+ * cron recovery window; stale queued recovery still runs independently.
  */
 export async function tryDispatchPendingReviews(
   owner: Owner,
@@ -395,33 +395,11 @@ async function handleAmbiguousDispatchFailure(
     const workerStatus = await codeReviewWorkerClient.getReviewStatus(review.id, attemptId);
 
     if (!workerStatus) {
-      const releaseResult = await releaseQueuedReviewClaim(
-        review.id,
-        dispatchReservationId,
-        attemptId
-      );
-
-      if (releaseResult.outcome === 'released') {
-        logExceptInTest('[dispatchReview] Worker has no DO state after dispatch failure', {
-          reviewId: review.id,
-          releaseOutcome: releaseResult.outcome,
-          pendingDispatchRetryCount: releaseResult.pendingDispatchRetryCount,
-        });
-      } else if (releaseResult.outcome === 'exhausted') {
-        errorExceptInTest(
-          '[dispatchReview] Worker has no DO state after pending-dispatch retries were exhausted',
-          {
-            reviewId: review.id,
-            attemptId,
-            pendingDispatchRetryCount: releaseResult.pendingDispatchRetryCount,
-          }
-        );
-      } else {
-        logExceptInTest('[dispatchReview] Worker has no DO state but claim is no longer current', {
-          reviewId: review.id,
-          attemptId,
-        });
-      }
+      const released = await releaseQueuedReviewClaim(review.id, dispatchReservationId);
+      logExceptInTest('[dispatchReview] Worker has no DO state after dispatch failure', {
+        reviewId: review.id,
+        released,
+      });
       return false;
     }
 

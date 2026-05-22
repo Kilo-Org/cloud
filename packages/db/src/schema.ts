@@ -3254,7 +3254,6 @@ export const cloud_agent_code_reviews = pgTable(
     // Review status
     status: text().notNull().default('pending'), // 'pending' | 'queued' | 'running' | 'completed' | 'failed' | 'cancelled' | 'interrupted'
     dispatch_reservation_id: text(),
-    pending_dispatch_retry_count: smallint().notNull().default(0),
     error_message: text(),
     terminal_reason: text(),
 

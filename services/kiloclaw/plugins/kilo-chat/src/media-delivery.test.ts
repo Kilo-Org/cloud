@@ -26,4 +26,18 @@ describe('loadOutboundMedia', () => {
       await rm(dir, { recursive: true, force: true });
     }
   });
+
+  it('passes custom mediaReadFile through to the OpenClaw media loader', async () => {
+    const media = await loadOutboundMedia('/virtual/generated.txt', {
+      mediaLocalRoots: 'any',
+      mediaReadFile: async filePath => {
+        expect(filePath).toBe('/virtual/generated.txt');
+        return Buffer.from('virtual plain text attachment');
+      },
+    });
+
+    expect(media.buffer.toString('utf8')).toBe('virtual plain text attachment');
+    expect(media.contentType).toBe('text/plain');
+    expect(media.fileName).toBe('generated.txt');
+  });
 });

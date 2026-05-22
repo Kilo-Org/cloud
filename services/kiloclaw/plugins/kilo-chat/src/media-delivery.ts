@@ -2,6 +2,7 @@ import {
   loadOutboundMediaFromUrl,
   type OutboundMediaLoadOptions,
 } from 'openclaw/plugin-sdk/outbound-media';
+import { basename, isAbsolute, resolve } from 'node:path';
 import type { ContentBlock, KiloChatClient } from './client.js';
 import { ATTACHMENT_MAX_BYTES } from './synced/schemas.js';
 
@@ -22,6 +23,27 @@ const DEFAULT_FILENAME_BY_MIME: Record<string, string> = {
   'audio/ogg': 'audio.ogg',
   'audio/wav': 'audio.wav',
   'application/pdf': 'document.pdf',
+};
+
+const MIME_BY_EXTENSION: Record<string, string> = {
+  txt: 'text/plain',
+  md: 'text/markdown',
+  csv: 'text/csv',
+  json: 'application/json',
+  pdf: 'application/pdf',
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  gif: 'image/gif',
+  webp: 'image/webp',
+  heic: 'image/heic',
+  heif: 'image/heif',
+  mp4: 'video/mp4',
+  mov: 'video/quicktime',
+  mp3: 'audio/mpeg',
+  m4a: 'audio/mp4',
+  ogg: 'audio/ogg',
+  wav: 'audio/wav',
 };
 
 export type LoadedOutboundMedia = {
@@ -68,10 +90,33 @@ function resolveFilename(contentType: string | undefined, suggested: string | un
   return 'file.bin';
 }
 
+function resolveLocalMediaPath(mediaUrl: string, context: OutboundMediaLoadContext): string {
+  const workspaceDir = context.mediaAccess?.workspaceDir;
+  if (workspaceDir && !isAbsolute(mediaUrl)) return resolve(workspaceDir, mediaUrl);
+  return mediaUrl;
+}
+
+function inferMimeFromFilename(fileName: string | undefined): string | undefined {
+  const extension = fileName?.split('.').pop()?.toLowerCase();
+  return extension ? MIME_BY_EXTENSION[extension] : undefined;
+}
+
 export async function loadOutboundMedia(
   mediaUrl: string,
   context: OutboundMediaLoadContext = {}
 ): Promise<LoadedOutboundMedia> {
+  const readFile = context.mediaReadFile ?? context.mediaAccess?.readFile;
+  if (readFile && !isHttpUrl(mediaUrl)) {
+    const filePath = resolveLocalMediaPath(mediaUrl, context);
+    const buffer = await readFile(filePath);
+    const fileName = basename(filePath) || undefined;
+    return {
+      buffer: Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer),
+      contentType: inferMimeFromFilename(fileName),
+      fileName,
+    };
+  }
+
   const channelMediaAccess = mediaAccessForChannelRead(context.mediaAccess);
   const loaded = await loadOutboundMediaFromUrl(mediaUrl, {
     maxBytes: ATTACHMENT_MAX_BYTES,

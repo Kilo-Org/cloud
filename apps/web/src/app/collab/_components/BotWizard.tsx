@@ -1,10 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, ArrowRight, CheckCircle2, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -27,6 +27,7 @@ import {
   isCheckingPlatformSetup,
   type PlatformSetupStatusMap,
 } from './setup-status';
+import { buildSetupPath, getInitialSetupState } from './setup-path';
 import { WorkspaceSelector, type WorkspaceSelection } from './WorkspaceSelector';
 
 const TOTAL_STEPS = 2;
@@ -34,10 +35,15 @@ type MissingPlatformWarning = 'chat' | 'code';
 
 export function BotWizard() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const setupSearch = searchParams.toString();
   const trpc = useTRPC();
-  const [stepIndex, setStepIndex] = useState(0);
+  const initialSetupState = getInitialSetupState(searchParams);
+  const [stepIndex, setStepIndex] = useState(initialSetupState.stepIndex);
   const [selected, setSelected] = useState<Set<PlatformId>>(new Set());
-  const [workspace, setWorkspace] = useState<WorkspaceSelection | null>(null);
+  const [workspace, setWorkspace] = useState<WorkspaceSelection | null>(
+    initialSetupState.workspace
+  );
   const [missingPlatformWarning, setMissingPlatformWarning] =
     useState<MissingPlatformWarning | null>(null);
 
@@ -71,7 +77,28 @@ export function BotWizard() {
     selected,
     setupStatuses
   );
-  const canAdvance = isWorkspaceStep ? workspace !== null : !isCheckingSetup;
+  const canAdvance = isWorkspaceStep ? workspace !== null : workspace !== null && !isCheckingSetup;
+
+  useEffect(() => {
+    const params = new URLSearchParams(setupSearch);
+    const nextSetupState = getInitialSetupState(params);
+    setStepIndex(nextSetupState.stepIndex);
+    setWorkspace(nextSetupState.workspace);
+    setMissingPlatformWarning(null);
+
+    if (params.has('step') && nextSetupState.stepIndex === 0) {
+      router.replace(buildSetupPath(nextSetupState), { scroll: false });
+    }
+  }, [router, setupSearch]);
+
+  const navigateToStep = (nextStepIndex: number, nextWorkspace: WorkspaceSelection | null) => {
+    setMissingPlatformWarning(null);
+    setWorkspace(nextWorkspace);
+    setStepIndex(nextStepIndex);
+    router.push(buildSetupPath({ stepIndex: nextStepIndex, workspace: nextWorkspace }), {
+      scroll: false,
+    });
+  };
 
   const handleToggle = (platformId: PlatformId) => {
     if (!canSelectPlatform(setupStatuses[platformId])) return;
@@ -88,6 +115,7 @@ export function BotWizard() {
   };
 
   const proceedToAuthorize = () => {
+    if (workspace === null) return;
     setMissingPlatformWarning(null);
     const params = new URLSearchParams();
     if (servicesToAuthorize.length > 0) {
@@ -104,7 +132,7 @@ export function BotWizard() {
   };
 
   const handleContinueWithoutRecommendedPlatform = () => {
-    if (isCheckingSetup) return;
+    if (isCheckingSetup || workspace === null) return;
 
     if (missingPlatformWarning === 'chat' && !hasCodePlatform) {
       setMissingPlatformWarning('code');
@@ -116,7 +144,8 @@ export function BotWizard() {
   const handleNext = () => {
     if (!canAdvance) return;
     if (isWorkspaceStep) {
-      setStepIndex(1);
+      if (workspace === null) return;
+      navigateToStep(1, workspace);
       return;
     }
     if (!hasChatPlatform) {
@@ -131,12 +160,11 @@ export function BotWizard() {
   };
 
   const handleWorkspaceSelect = (selection: WorkspaceSelection) => {
-    setWorkspace(selection);
-    setStepIndex(1);
+    navigateToStep(1, selection);
   };
 
   const handleBack = () => {
-    if (stepIndex > 0) setStepIndex(i => i - 1);
+    if (stepIndex > 0) navigateToStep(stepIndex - 1, workspace);
   };
 
   return (

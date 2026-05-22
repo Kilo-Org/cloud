@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AlertCircle, Check, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useRouter } from 'next/navigation';
@@ -37,13 +37,14 @@ export function AuthorizeFlow(props: AuthorizeFlowProps) {
 
   const services = serviceIds.map(id => getPlatform(id)).filter(p => p !== undefined);
   const current = services[index];
-  const isLast = index === services.length - 1;
-  const returnTo = buildReturnToPath({
-    serviceIds,
-    connectedServiceIds,
-    organizationId,
-    step: index,
-  });
+  const getAuthorizePath = (step: number) =>
+    buildReturnToPath({
+      serviceIds,
+      connectedServiceIds,
+      organizationId,
+      step,
+    });
+  const returnTo = getAuthorizePath(index);
   const oauthInput = {
     ...(organizationId ? { organizationId } : {}),
     returnTo,
@@ -63,13 +64,18 @@ export function AuthorizeFlow(props: AuthorizeFlowProps) {
   const isStartingOAuth =
     isFetchingSlackOAuthUrl || isFetchingDiscordOAuthUrl || isFetchingLinearOAuthUrl;
 
+  useEffect(() => {
+    setIndex(initialIndex);
+    setDone(initialIndex >= serviceIds.length);
+    setConnectionError(initialError ?? null);
+  }, [initialError, initialIndex, serviceIds.length]);
+
   const advance = () => {
+    const nextIndex = index + 1;
     setConnectionError(null);
-    if (isLast) {
-      setDone(true);
-      return;
-    }
-    setIndex(i => i + 1);
+    setIndex(nextIndex);
+    setDone(nextIndex >= services.length);
+    router.push(getAuthorizePath(nextIndex), { scroll: false });
   };
 
   const handleAuthorize = async () => {

@@ -3856,6 +3856,12 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
     //    leftJoin on subscriptions: a missing subscription row is fine (no
     //    access to preserve); `UQ_kiloclaw_subscriptions_instance` guarantees
     //    at most one subscription per instance, so the join stays 1:1.
+    // Every projected column must emit a UNIQUE name: this select becomes a
+    // derived table, and Drizzle does not alias subquery columns, so two
+    // `*.id` projections (`kiloclaw_instances.id` and `kiloclaw_subscriptions.id`)
+    // would both surface as `id` and make the outer SELECT ambiguous. Only
+    // `subscription_status` is consumed downstream, so the other subscription
+    // columns are not projected.
     const destroyedInstancesByLatest = db
       .selectDistinctOn([kiloclaw_instances.user_id, kiloclaw_instances.sandbox_id], {
         id: kiloclaw_instances.id,
@@ -3864,10 +3870,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         organization_id: kiloclaw_instances.organization_id,
         destroyed_at: kiloclaw_instances.destroyed_at,
         user_email: kilocode_users.google_user_email,
-        subscription_id: kiloclaw_subscriptions.id,
         subscription_status: kiloclaw_subscriptions.status,
-        subscription_suspended_at: kiloclaw_subscriptions.suspended_at,
-        subscription_trial_ends_at: kiloclaw_subscriptions.trial_ends_at,
       })
       .from(kiloclaw_instances)
       .leftJoin(kilocode_users, eq(kiloclaw_instances.user_id, kilocode_users.id))

@@ -25,6 +25,7 @@ import { UpstreamApiError } from '@/lib/trpc/init';
 const mockGetDebugStatus: jest.Mock<any, any> = jest.fn();
 const mockDestroyFlyMachine: jest.Mock<any, any> = jest.fn();
 const mockDestroyOrphanVolume: jest.Mock<any, any> = jest.fn();
+const mockScanOrphanVolumes: jest.Mock<any, any> = jest.fn();
 const mockGetKiloCliRunStatus: jest.Mock<any, any> = jest.fn();
 const mockCancelKiloCliRun: jest.Mock<any, any> = jest.fn();
 const mockStartKiloCliRun: jest.Mock<any, any> = jest.fn();
@@ -45,6 +46,7 @@ function mockKiloClawInternalClient() {
     getDebugStatus: mockGetDebugStatus,
     destroyFlyMachine: mockDestroyFlyMachine,
     destroyOrphanVolume: mockDestroyOrphanVolume,
+    scanOrphanVolumes: mockScanOrphanVolumes,
     getKiloCliRunStatus: mockGetKiloCliRunStatus,
     cancelKiloCliRun: mockCancelKiloCliRun,
     startKiloCliRun: mockStartKiloCliRun,
@@ -58,6 +60,7 @@ jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => ({
     getDebugStatus: mockGetDebugStatus,
     destroyFlyMachine: mockDestroyFlyMachine,
     destroyOrphanVolume: mockDestroyOrphanVolume,
+    scanOrphanVolumes: mockScanOrphanVolumes,
     getKiloCliRunStatus: mockGetKiloCliRunStatus,
     cancelKiloCliRun: mockCancelKiloCliRun,
     startKiloCliRun: mockStartKiloCliRun,
@@ -160,6 +163,7 @@ beforeEach(async () => {
   mockGetDebugStatus.mockReset();
   mockDestroyFlyMachine.mockReset();
   mockDestroyOrphanVolume.mockReset();
+  mockScanOrphanVolumes.mockReset();
   mockGetKiloCliRunStatus.mockReset();
   mockCancelKiloCliRun.mockReset();
   mockStartKiloCliRun.mockReset();
@@ -2821,6 +2825,72 @@ describe('admin.kiloclawInstances scheduled actions', () => {
 
       expect(otherTargetRows.length).toBeGreaterThan(0);
       expect(otherTargetRows.every(n => n.status === 'pending')).toBe(true);
+    });
+  });
+});
+
+describe('admin.kiloclawInstances.findOrphanVolumes', () => {
+  it('runs the deduplicated scan query and returns classified volumes', async () => {
+    // Regression: the dedup subquery becomes a derived table, so no two
+    // projected columns may emit the same name. This exercises that query
+    // against Postgres — a duplicate column makes the outer SELECT fail.
+    const destroyedAt = new Date(Date.now() - 30 * 86_400_000).toISOString();
+    const sandboxId = `ki_${crypto.randomUUID().replace(/-/g, '')}`;
+    const [instance] = await db
+      .insert(kiloclaw_instances)
+      .values({
+        id: crypto.randomUUID(),
+        user_id: regularUser.id,
+        sandbox_id: sandboxId,
+        destroyed_at: destroyedAt,
+      })
+      .returning({ id: kiloclaw_instances.id });
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: regularUser.id,
+      instance_id: instance.id,
+      plan: 'trial',
+      status: 'canceled',
+    });
+
+    mockScanOrphanVolumes.mockResolvedValue({
+      flyApp: 'inst-findorphans',
+      appExists: true,
+      expectedVolumeName: 'kiloclaw_findorphans',
+      doStatus: null,
+      doStatusError: null,
+      scanError: null,
+      volumes: [
+        {
+          id: 'vol_findorphans00000',
+          name: 'kiloclaw_findorphans',
+          state: 'created',
+          size_gb: 10,
+          region: 'ord',
+          attached_machine_id: null,
+          created_at: '2026-04-01T00:00:00.000Z',
+          nameMatchesInstance: true,
+          trackedByLiveDo: false,
+        },
+      ],
+    });
+
+    // A narrow window around this instance's destruction so the result is
+    // deterministic regardless of other rows in the test database.
+    const destroyedMs = Date.parse(destroyedAt);
+    const caller = await createCallerForUser(adminUser.id);
+    const result = await caller.admin.kiloclawInstances.findOrphanVolumes({
+      destroyedAfter: new Date(destroyedMs - 60_000).toISOString(),
+      destroyedBefore: new Date(destroyedMs + 60_000).toISOString(),
+    });
+
+    expect(result.errors).toEqual([]);
+    expect(result.scanned).toBe(1);
+    expect(result.volumes).toHaveLength(1);
+    expect(result.volumes[0]).toMatchObject({
+      instance_id: instance.id,
+      volume_id: 'vol_findorphans00000',
+      subscription_status: 'canceled',
+      classification: 'safe_destroy',
     });
   });
 });

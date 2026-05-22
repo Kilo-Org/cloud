@@ -7,7 +7,7 @@ import {
   dispatchQueuedImpactAdvocateRewardRedemptions,
   dispatchQueuedImpactConversionReports,
   processQueuedKiloClawReferralRewards,
-} from '@/lib/kiloclaw-referrals';
+} from '@/lib/impact/kiloclaw-referrals';
 import { sentryLogger } from '@/lib/utils.server';
 
 if (!CRON_SECRET) {

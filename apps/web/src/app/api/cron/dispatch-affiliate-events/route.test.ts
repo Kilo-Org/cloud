@@ -12,7 +12,7 @@ jest.mock('@/lib/impact/referral', () => ({
   dispatchQueuedImpactAdvocateRegistrationAttempts: jest.fn(),
 }));
 
-jest.mock('@/lib/kiloclaw-referrals', () => ({
+jest.mock('@/lib/impact/kiloclaw-referrals', () => ({
   dispatchQueuedImpactAdvocateRewardRedemptions: jest.fn(),
   dispatchQueuedImpactConversionReports: jest.fn(),
   processQueuedKiloClawReferralRewards: jest.fn(),
@@ -24,7 +24,7 @@ import {
   dispatchQueuedImpactAdvocateRewardRedemptions,
   dispatchQueuedImpactConversionReports,
   processQueuedKiloClawReferralRewards,
-} from '@/lib/kiloclaw-referrals';
+} from '@/lib/impact/kiloclaw-referrals';
 import { GET } from './route';
 
 const mockDispatchQueuedAffiliateEvents = jest.mocked(dispatchQueuedAffiliateEvents);

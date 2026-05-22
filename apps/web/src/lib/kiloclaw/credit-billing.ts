@@ -32,7 +32,7 @@ import {
   buildAffiliateEventDedupeKey,
   enqueueAffiliateEventForUser,
 } from '@/lib/impact/affiliate-events';
-import { processPersonalKiloClawPaidConversion } from '@/lib/kiloclaw-referrals';
+import { processPersonalKiloClawPaidConversion } from '@/lib/impact/kiloclaw-referrals';
 import { maybeIssueKiloPassBonusFromUsageThreshold } from '@/lib/kilo-pass/usage-triggered-bonus';
 import { getKiloPassStateForUser, type KiloPassSubscriptionState } from '@/lib/kilo-pass/state';
 import {

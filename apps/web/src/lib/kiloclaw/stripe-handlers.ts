@@ -35,7 +35,7 @@ import {
   buildAffiliateEventDedupeKey,
   enqueueAffiliateEventForUser,
 } from '@/lib/impact/affiliate-events';
-import { processPersonalKiloClawPaidConversion } from '@/lib/kiloclaw-referrals';
+import { processPersonalKiloClawPaidConversion } from '@/lib/impact/kiloclaw-referrals';
 import { IMPACT_ORDER_ID_MACRO } from '@/lib/impact';
 import {
   CurrentPersonalSubscriptionResolutionError,

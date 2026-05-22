@@ -64,7 +64,7 @@ import {
   processPersonalKiloClawPaidConversion,
   processQueuedKiloClawReferralRewards,
   resolveWinningAttributionTouch,
-} from '@/lib/kiloclaw-referrals';
+} from '@/lib/impact/kiloclaw-referrals';
 import { isImpactConfigured, reverseImpactAction, sendImpactConversionPayload } from '@/lib/impact';
 import {
   isImpactAdvocateConfigured,

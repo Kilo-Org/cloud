@@ -16,7 +16,7 @@ import { isIntroPriceId } from '@/lib/kiloclaw/stripe-price-ids.server';
 import { client as stripe } from '@/lib/stripe-client';
 import { enqueueAffiliateEventForUser } from '@/lib/impact/affiliate-events';
 import { logImpactReferralDebug } from '@/lib/impact/debug';
-import { processPersonalKiloClawPaidConversion } from '@/lib/kiloclaw-referrals';
+import { processPersonalKiloClawPaidConversion } from '@/lib/impact/kiloclaw-referrals';
 import { projectPendingKiloPassBonusMicrodollars } from '@/lib/kiloclaw/credit-billing';
 import { maybeIssueKiloPassBonusFromUsageThreshold } from '@/lib/kilo-pass/usage-triggered-bonus';
 

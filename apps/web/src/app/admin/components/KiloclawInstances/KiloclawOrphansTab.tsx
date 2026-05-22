@@ -406,8 +406,8 @@ function OrphanVolumesSection() {
 
   const toggleSelectAll = () => {
     const rows = scanResult?.volumes ?? [];
-    setSelectedVolumeIds(current =>
-      current.size >= rows.length && rows.length > 0
+    setSelectedVolumeIds(
+      selectedRows.length === rows.length && rows.length > 0
         ? new Set()
         : new Set(rows.map(v => v.volume_id))
     );

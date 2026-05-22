@@ -6,9 +6,37 @@ on:
   workflow_dispatch:
     inputs:
       worker:
-        description: 'Worker folder to deploy (e.g. services/app-builder)'
+        description: 'Worker to deploy'
         required: true
-        type: string
+        type: choice
+        options:
+          - services/ai-attribution
+          - services/app-builder
+          - services/auto-fix-infra
+          - services/auto-triage-infra
+          - services/cloud-agent
+          - services/cloud-agent-next
+          - services/code-review-infra
+          - services/db-proxy
+          - services/deploy-infra/builder
+          - services/deploy-infra/dispatcher
+          - services/event-service
+          - services/gastown
+          - services/git-token-service
+          - services/gmail-push
+          - services/images-mcp
+          - services/kilo-chat
+          - services/kilo-ops
+          - services/kiloclaw-billing
+          - services/kiloclaw-inbound-email
+          - services/model-eval-ingest
+          - services/notifications
+          - services/o11y
+          - services/security-auto-analysis
+          - services/security-sync
+          - services/session-ingest
+          - services/wasteland
+          - services/webhook-agent-ingest
 
 permissions:
   contents: read

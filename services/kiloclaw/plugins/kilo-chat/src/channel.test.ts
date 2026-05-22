@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { __pluginInternals, kiloChatPlugin } from './channel';
 
+const CONTROLLER_BASE = 'http://127.0.0.1:18789';
+
 function createMessageResponse(messageId = 'm42') {
   return {
     messageId,
@@ -137,10 +139,11 @@ describe('kilo-chat messaging adapter', () => {
 });
 
 describe('kilo-chat actions adapter', () => {
-  it('describeMessageTool returns all eight actions with openclaw-standard names', () => {
+  it('describeMessageTool returns Kilo Chat actions with openclaw-standard names', () => {
     const adapter = kiloChatPlugin.actions;
     expect(adapter).toBeDefined();
     const discovery = adapter!.describeMessageTool?.({ cfg: {} as never, accountId: null });
+    expect(discovery?.actions).toContain('send');
     expect(discovery?.actions).toContain('react');
     expect(discovery?.actions).toContain('read');
     expect(discovery?.actions).toContain('member-info');
@@ -169,6 +172,9 @@ describe('kilo-chat actions adapter', () => {
     expect(schema?.properties).toHaveProperty('before');
     expect(schema?.properties).toHaveProperty('memberId');
     expect(schema?.properties).toHaveProperty('userId');
+    expect(schema?.properties).toHaveProperty('buffer');
+    expect(schema?.properties).toHaveProperty('filename');
+    expect(schema?.properties).toHaveProperty('contentType');
     expect(schema?.properties?.memberId.description).toContain('member-info');
     expect(schema?.properties?.userId.description).toContain('memberId');
     expect(schema?.properties?.conversationId.description).toContain('compatibility alias');
@@ -200,6 +206,7 @@ describe('kilo-chat actions adapter', () => {
 
   it('supportsAction returns true for standard actions and false for unsupported ones', () => {
     const adapter = kiloChatPlugin.actions;
+    expect(adapter?.supportsAction?.({ action: 'send' as never })).toBe(true);
     expect(adapter?.supportsAction?.({ action: 'react' as never })).toBe(true);
     expect(adapter?.supportsAction?.({ action: 'read' as never })).toBe(true);
     expect(adapter?.supportsAction?.({ action: 'member-info' as never })).toBe(true);
@@ -218,5 +225,78 @@ describe('kilo-chat actions adapter', () => {
   it('resolveExecutionMode returns "local"', () => {
     const adapter = kiloChatPlugin.actions;
     expect(adapter?.resolveExecutionMode?.({ action: 'react' as never })).toBe('local');
+  });
+
+  it('handles send with a base64 buffer as an arbitrary attachment', async () => {
+    const calls: Array<{ url: string; init: RequestInit }> = [];
+    const fetchImpl = vi.fn(async (input: string | URL, init?: RequestInit) => {
+      const url = String(input);
+      calls.push({ url, init: init ?? {} });
+      if (url.endsWith('/_kilo/kilo-chat/attachments/init')) {
+        return new Response(
+          JSON.stringify({
+            attachmentId: '01JX0000000000000000000099',
+            putUrl: 'https://r2.example.com/upload?sig=xyz',
+            putHeaders: { 'content-type': 'text/plain' },
+            putUrlExpiresAt: 1_700_000_900,
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } }
+        );
+      }
+      if (url === 'https://r2.example.com/upload?sig=xyz') {
+        return new Response(null, { status: 200 });
+      }
+      if (url.endsWith('/_kilo/kilo-chat/send')) {
+        return new Response(JSON.stringify(createMessageResponse('m-buffer')), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      return new Response(`unexpected url ${url}`, { status: 599 });
+    }) as unknown as typeof fetch;
+
+    const originalEnv = { ...process.env };
+    process.env.OPENCLAW_GATEWAY_TOKEN = 'gwt';
+    process.env.KILOCLAW_CONTROLLER_URL = CONTROLLER_BASE;
+    __pluginInternals.fetchImpl = fetchImpl;
+    try {
+      const result = await kiloChatPlugin.actions!.handleAction!({
+        channel: 'kilo-chat',
+        action: 'send' as never,
+        cfg: {} as never,
+        params: {
+          conversationId: 'conv-1',
+          message: 'Here is a text file',
+          buffer: Buffer.from('plain text attachment').toString('base64'),
+          filename: 'random_text.txt',
+          contentType: 'text/plain',
+        },
+      });
+
+      expect(result.content[0].text).toContain('Sent message m-buffer');
+      expect(calls[0].url).toBe(`${CONTROLLER_BASE}/_kilo/kilo-chat/attachments/init`);
+      expect(JSON.parse(String(calls[0].init.body))).toEqual({
+        conversationId: 'conv-1',
+        mimeType: 'text/plain',
+        size: 21,
+        filename: 'random_text.txt',
+      });
+      expect(calls[1].url).toBe('https://r2.example.com/upload?sig=xyz');
+      expect(calls[1].init.body).toBeInstanceOf(Buffer);
+      expect((calls[1].init.body as Buffer).toString('utf8')).toBe('plain text attachment');
+      expect(JSON.parse(String(calls[2].init.body)).content).toEqual([
+        {
+          type: 'attachment',
+          attachmentId: '01JX0000000000000000000099',
+          mimeType: 'text/plain',
+          size: 21,
+          filename: 'random_text.txt',
+        },
+        { type: 'text', text: 'Here is a text file' },
+      ]);
+    } finally {
+      __pluginInternals.fetchImpl = undefined;
+      process.env = originalEnv;
+    }
   });
 });

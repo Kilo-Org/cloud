@@ -1,7 +1,10 @@
 import { type ComponentProps, useEffect, useState } from 'react';
 import { AppState, Keyboard, type KeyboardEvent, Platform, View } from 'react-native';
 
-import { resolveAppAwareKeyboardPadding } from './app-aware-keyboard-padding-state';
+import {
+  resolveAppAwareKeyboardPadding,
+  resolveKeyboardPaddingEventsForPlatform,
+} from './app-aware-keyboard-padding-state';
 
 function keyboardPaddingFromEvent(event: KeyboardEvent): number {
   return event.endCoordinates.height;
@@ -11,12 +14,13 @@ export function AppAwareKeyboardPaddingView({ style, ...props }: ComponentProps<
   const [keyboardPadding, setKeyboardPadding] = useState(0);
 
   useEffect(() => {
-    if (Platform.OS !== 'ios') {
+    const keyboardEvents = resolveKeyboardPaddingEventsForPlatform(Platform.OS);
+    if (keyboardEvents === null) {
       setKeyboardPadding(0);
       return undefined;
     }
 
-    const keyboardShowSubscription = Keyboard.addListener('keyboardWillShow', event => {
+    const keyboardShowSubscription = Keyboard.addListener(keyboardEvents.show, event => {
       setKeyboardPadding(currentPadding =>
         resolveAppAwareKeyboardPadding({
           currentPadding,
@@ -27,7 +31,7 @@ export function AppAwareKeyboardPaddingView({ style, ...props }: ComponentProps<
         })
       );
     });
-    const keyboardHideSubscription = Keyboard.addListener('keyboardWillHide', () => {
+    const keyboardHideSubscription = Keyboard.addListener(keyboardEvents.hide, () => {
       setKeyboardPadding(currentPadding =>
         resolveAppAwareKeyboardPadding({
           currentPadding,
@@ -51,7 +55,5 @@ export function AppAwareKeyboardPaddingView({ style, ...props }: ComponentProps<
     };
   }, []);
 
-  return (
-    <View {...props} style={[style, Platform.OS === 'ios' && { paddingBottom: keyboardPadding }]} />
-  );
+  return <View {...props} style={[style, { paddingBottom: keyboardPadding }]} />;
 }

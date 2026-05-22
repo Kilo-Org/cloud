@@ -1,9 +1,9 @@
-import { Type } from '@sinclair/typebox';
 import { readStringParam } from 'openclaw/plugin-sdk/agent-runtime';
 import {
   buildChannelOutboundSessionRoute,
   createChannelPluginBase,
   createChatChannelPlugin,
+  optionalStringEnum,
 } from 'openclaw/plugin-sdk/core';
 import type { ChannelMessageActionContext, OpenClawConfig } from 'openclaw/plugin-sdk/core';
 import { createKiloChatClient } from './client';
@@ -289,84 +289,10 @@ export const kiloChatPlugin = createChatChannelPlugin<ResolvedKiloChatAccount>({
         ] as const,
         schema: {
           properties: {
-            conversationId: Type.Optional(
-              Type.String({
-                description:
-                  'Kilo Chat conversation id. Prefer `target` for OpenClaw-native sends, but this is accepted as a compatibility alias for `send`, `read`, `react`, `edit`, `delete`, and `renameGroup` when not acting on the current conversation.',
-              })
-            ),
-            groupId: Type.Optional(
-              Type.String({
-                description:
-                  'Alias for `conversationId`. Accepted for `send`, `read`, `react`, `edit`, `delete`, and `renameGroup`; required for `renameGroup` if `conversationId` is omitted.',
-              })
-            ),
-            messageId: Type.Optional(
-              Type.String({
-                description:
-                  'Target Kilo Chat message id for `react`, `edit`, and `delete`. Defaults to the current inbound message when available.',
-              })
-            ),
-            message: Type.Optional(
-              Type.String({
-                description: 'Message body for `send` and replacement text for `edit`.',
-              })
-            ),
-            emoji: Type.Optional(
-              Type.String({
-                description: 'Actual emoji for `react`, for example 👍.',
-              })
-            ),
-            remove: Type.Optional(
-              Type.Boolean({
-                description: 'For `react`, remove the given emoji reaction instead of adding it.',
-              })
-            ),
-            name: Type.Optional(
-              Type.String({
-                description: 'Conversation title for `channel-create` or `renameGroup`.',
-              })
-            ),
-            limit: Type.Optional(
-              Type.Number({
-                description:
-                  'Maximum conversations or messages to return for `channel-list` or `read`.',
-              })
-            ),
-            before: Type.Optional(
-              Type.String({
-                description:
-                  'Pagination cursor for `read`; use the `nextCursor` returned by a previous read.',
-              })
-            ),
-            memberId: Type.Optional(
-              Type.String({
-                description:
-                  'Member/user id to inspect with `member-info`. Omit to list all members.',
-              })
-            ),
-            userId: Type.Optional(
-              Type.String({
-                description: 'Alias for `memberId` for `member-info`.',
-              })
-            ),
-            buffer: Type.Optional(
-              Type.String({
-                description:
-                  'Base64 attachment bytes for `send`. Kilo Chat accepts arbitrary attachment content types.',
-              })
-            ),
-            filename: Type.Optional(
-              Type.String({
-                description: 'Attachment filename when `send` includes `buffer`.',
-              })
-            ),
-            contentType: Type.Optional(
-              Type.String({
-                description:
-                  'Attachment MIME type when `send` includes `buffer`, for example `text/plain`.',
-              })
-            ),
+            conversationId: optionalStringEnum([], {
+              description:
+                'Kilo Chat conversation id. Prefer `target` for OpenClaw-native sends, but this is accepted as a compatibility alias for `send`, `read`, `react`, `edit`, `delete`, and `renameGroup` when not acting on the current conversation.',
+            }),
           },
           visibility: 'current-channel' as const,
         },

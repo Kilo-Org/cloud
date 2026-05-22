@@ -159,26 +159,53 @@ describe('kilo-chat actions adapter', () => {
     const discovery = adapter!.describeMessageTool?.({ cfg: {} as never, accountId: null });
     expect(discovery?.schema).toBeDefined();
     const schema = Array.isArray(discovery?.schema) ? discovery.schema[0] : discovery?.schema;
-    expect(schema?.properties).not.toHaveProperty('additionalMembers');
+    expect(schema?.properties).toEqual({
+      conversationId: expect.objectContaining({
+        type: 'string',
+        description: expect.stringContaining('compatibility alias'),
+      }),
+    });
     expect(schema?.properties).not.toHaveProperty('target');
-    expect(schema?.properties).toHaveProperty('conversationId');
-    expect(schema?.properties).toHaveProperty('groupId');
-    expect(schema?.properties).toHaveProperty('messageId');
-    expect(schema?.properties).toHaveProperty('message');
-    expect(schema?.properties).toHaveProperty('emoji');
-    expect(schema?.properties).toHaveProperty('remove');
-    expect(schema?.properties).toHaveProperty('name');
-    expect(schema?.properties).toHaveProperty('limit');
-    expect(schema?.properties).toHaveProperty('before');
-    expect(schema?.properties).toHaveProperty('memberId');
-    expect(schema?.properties).toHaveProperty('userId');
-    expect(schema?.properties).toHaveProperty('buffer');
-    expect(schema?.properties).toHaveProperty('filename');
-    expect(schema?.properties).toHaveProperty('contentType');
-    expect(schema?.properties?.memberId.description).toContain('member-info');
-    expect(schema?.properties?.userId.description).toContain('memberId');
-    expect(schema?.properties?.conversationId.description).toContain('compatibility alias');
+    expect(schema?.properties).not.toHaveProperty('message');
+    expect(schema?.properties).not.toHaveProperty('messageId');
+    expect(schema?.properties).not.toHaveProperty('emoji');
+    expect(schema?.properties).not.toHaveProperty('remove');
+    expect(schema?.properties).not.toHaveProperty('groupId');
+    expect(schema?.properties).not.toHaveProperty('name');
+    expect(schema?.properties).not.toHaveProperty('limit');
+    expect(schema?.properties).not.toHaveProperty('before');
+    expect(schema?.properties).not.toHaveProperty('memberId');
+    expect(schema?.properties).not.toHaveProperty('userId');
+    expect(schema?.properties).not.toHaveProperty('buffer');
+    expect(schema?.properties).not.toHaveProperty('filename');
+    expect(schema?.properties).not.toHaveProperty('contentType');
     expect(schema?.visibility).toBe('current-channel');
+  });
+
+  it('does not shadow OpenClaw core message-tool properties', () => {
+    const adapter = kiloChatPlugin.actions;
+    const discovery = adapter!.describeMessageTool?.({ cfg: {} as never, accountId: null });
+    const schema = Array.isArray(discovery?.schema) ? discovery.schema[0] : discovery?.schema;
+
+    // Core already owns these params. Re-declaring them from the plugin bundles
+    // another TypeBox implementation and can make optional core params required
+    // when OpenClaw builds the final message tool schema.
+    expect(Object.keys(schema?.properties ?? {})).toEqual(['conversationId']);
+  });
+
+  it('keeps attachment send params documented in Kilo Chat hints without schema shadowing', () => {
+    const adapter = kiloChatPlugin.actions;
+    const discovery = adapter!.describeMessageTool?.({ cfg: {} as never, accountId: null });
+    const schema = Array.isArray(discovery?.schema) ? discovery.schema[0] : discovery?.schema;
+    const hints = kiloChatPlugin.agentPrompt?.messageToolHints?.({
+      cfg: {} as never,
+      accountId: null,
+    });
+
+    expect(schema?.properties).toHaveProperty('conversationId');
+    expect(hints?.join('\n')).toContain('buffer');
+    expect(hints?.join('\n')).toContain('filename');
+    expect(hints?.join('\n')).toContain('contentType');
   });
 
   it('registers Kilo Chat conversation aliases for destination-bearing actions', () => {

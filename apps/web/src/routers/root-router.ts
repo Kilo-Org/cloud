@@ -13,6 +13,7 @@ import { cloudAgentRouter } from '@/routers/cloud-agent-router';
 import { cloudAgentNextRouter } from '@/routers/cloud-agent-next-router';
 import { githubAppsRouter } from '@/routers/github-apps-router';
 import { gitlabRouter } from '@/routers/gitlab-router';
+import { platformIntegrationsRouter } from '@/routers/platform-integrations-router';
 import { slackRouter } from '@/routers/slack-router';
 import { linearRouter } from '@/routers/linear-router';
 import { dolthubRouter } from '@/routers/dolthub-router';
@@ -52,6 +53,7 @@ export const rootRouter = createTRPCRouter({
   cliSessionsV2: cliSessionsV2Router,
   githubApps: githubAppsRouter,
   gitlab: gitlabRouter,
+  platformIntegrations: platformIntegrationsRouter,
   slack: slackRouter,
   linear: linearRouter,
   dolthub: dolthubRouter,

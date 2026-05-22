@@ -71,6 +71,10 @@ const mockCaptureMessage = jest.fn<any>();
 const mockAppendReviewSummaryFooter = jest.fn<any>();
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const mockRetryReviewFresh = jest.fn<any>();
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const mockSyncGitHubReviewMemorySubjects = jest.fn<any>();
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const mockSyncGitLabReviewMemorySubjects = jest.fn<any>();
 
 // --- Module mocks ---
 
@@ -136,6 +140,13 @@ jest.mock('@sentry/nextjs', () => ({
 
 jest.mock('@/lib/code-reviews/summary/usage-footer', () => ({
   appendReviewSummaryFooter: (...args: unknown[]) => mockAppendReviewSummaryFooter(...args),
+}));
+
+jest.mock('@/lib/code-reviews/review-memory/sync-subjects', () => ({
+  syncGitHubReviewMemorySubjects: (...args: unknown[]) =>
+    mockSyncGitHubReviewMemorySubjects(...args),
+  syncGitLabReviewMemorySubjects: (...args: unknown[]) =>
+    mockSyncGitLabReviewMemorySubjects(...args),
 }));
 
 jest.mock('@/lib/constants', () => ({
@@ -326,6 +337,8 @@ beforeEach(async () => {
   mockGetSessionUsageFromBilling.mockResolvedValue(null);
   mockUpdateCodeReviewUsage.mockResolvedValue(undefined);
   mockAppendReviewSummaryFooter.mockReturnValue('body with footer');
+  mockSyncGitHubReviewMemorySubjects.mockResolvedValue({ summarySynced: true, inlineSynced: 0 });
+  mockSyncGitLabReviewMemorySubjects.mockResolvedValue({ summarySynced: true, inlineSynced: 0 });
   ({ POST } = await import('./route'));
 });
 
@@ -1263,6 +1276,11 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         'body with footer',
         'standard'
       );
+      expect(mockSyncGitHubReviewMemorySubjects).toHaveBeenCalledWith({
+        review,
+        installationId: 'inst-1',
+        appType: 'standard',
+      });
     });
 
     it('updates completed GitLab summary with REVIEW.md guidance metadata when used', async () => {
@@ -1299,6 +1317,11 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         'body with footer',
         'https://gitlab.com'
       );
+      expect(mockSyncGitLabReviewMemorySubjects).toHaveBeenCalledWith({
+        review,
+        accessToken: 'mock-token',
+        instanceUrl: 'https://gitlab.com',
+      });
     });
 
     it('updates guidance footer when usage data is unavailable', async () => {
@@ -1336,6 +1359,11 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
 
       expect(mockAppendReviewSummaryFooter).not.toHaveBeenCalled();
       expect(mockUpdateKiloReviewComment).not.toHaveBeenCalled();
+      expect(mockSyncGitHubReviewMemorySubjects).toHaveBeenCalledWith({
+        review,
+        installationId: 'inst-1',
+        appType: 'standard',
+      });
     });
   });
 });

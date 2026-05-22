@@ -551,6 +551,8 @@ export async function fetchPRInlineComments(
     path: string;
     line: number | null;
     body: string;
+    htmlUrl: string | null;
+    diffHunk: string | null;
     isOutdated: boolean;
     user: { login: string };
   }>
@@ -563,6 +565,8 @@ export async function fetchPRInlineComments(
     path: string;
     line: number | null;
     body: string;
+    htmlUrl: string | null;
+    diffHunk: string | null;
     isOutdated: boolean;
     user: { login: string };
   }> = [];
@@ -585,6 +589,8 @@ export async function fetchPRInlineComments(
         path: c.path,
         line: c.line ?? null,
         body: c.body,
+        htmlUrl: c.html_url ?? null,
+        diffHunk: c.diff_hunk ?? null,
         isOutdated: c.position === null, // null position = outdated
         user: { login: c.user?.login ?? 'unknown' },
       }))

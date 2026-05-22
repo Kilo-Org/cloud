@@ -59,6 +59,10 @@ import { CALLBACK_TOKEN_SECRET } from '@/lib/config.server';
 import { verifyCallbackToken } from '@kilocode/worker-utils/callback-token';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { appendReviewSummaryFooter } from '@/lib/code-reviews/summary/usage-footer';
+import {
+  syncGitHubReviewMemorySubjects,
+  syncGitLabReviewMemorySubjects,
+} from '@/lib/code-reviews/review-memory/sync-subjects';
 import { APP_URL } from '@/lib/constants';
 import type { CloudAgentCodeReview, PlatformIntegration } from '@kilocode/db/schema';
 import type { GitHubAppType } from '@/lib/integrations/platforms/github/app-selector';
@@ -958,6 +962,23 @@ export async function POST(
                     }
                   );
                 }
+
+                try {
+                  await syncGitHubReviewMemorySubjects({
+                    review,
+                    installationId: integration.platform_installation_id,
+                    appType,
+                  });
+                } catch (subjectSyncError) {
+                  logExceptInTest('[code-review-status] Failed to sync GitHub review subjects:', {
+                    reviewId,
+                    error: subjectSyncError,
+                  });
+                  captureException(subjectSyncError, {
+                    tags: { source: 'code-review-status-review-memory-sync' },
+                    extra: { reviewId, platform },
+                  });
+                }
               }
             } else if (platform === PLATFORM.GITLAB) {
               const instanceUrl = getGitLabInstanceUrl(integration);
@@ -1047,6 +1068,23 @@ export async function POST(
                       tokensOut,
                     }
                   );
+                }
+
+                try {
+                  await syncGitLabReviewMemorySubjects({
+                    review,
+                    accessToken,
+                    instanceUrl,
+                  });
+                } catch (subjectSyncError) {
+                  logExceptInTest('[code-review-status] Failed to sync GitLab review subjects:', {
+                    reviewId,
+                    error: subjectSyncError,
+                  });
+                  captureException(subjectSyncError, {
+                    tags: { source: 'code-review-status-review-memory-sync' },
+                    extra: { reviewId, platform },
+                  });
                 }
               }
             }

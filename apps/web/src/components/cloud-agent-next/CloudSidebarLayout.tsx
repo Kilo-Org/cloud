@@ -67,7 +67,6 @@ export function CloudSidebarLayout({ organizationId, children }: CloudSidebarLay
     if (platformFilter.length === 0) return undefined;
     return platformFilter.flatMap(p => {
       switch (p) {
-        
         case 'cloud-agent':
           return ['cloud-agent', 'cloud-agent-web'];
         // Extension sessions are created from VS Code or agent-manager

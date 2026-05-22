@@ -42,6 +42,7 @@ catalog:
 
 minimumReleaseAge: 6842
 minimumReleaseAgeExclude:
+  - '@kilocode/*'
   - tsx
   - expo-dev-client
   - expo-dev-launcher

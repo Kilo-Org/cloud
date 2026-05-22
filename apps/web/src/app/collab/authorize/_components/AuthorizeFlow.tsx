@@ -11,6 +11,7 @@ import KiloLogo from '@/components/KiloLogo';
 import { useTRPC } from '@/lib/trpc/utils';
 import { useUser } from '@/hooks/useUser';
 import { getPlatform, type PlatformId, type PlatformOption } from '../../_components/platforms';
+import { buildReturnToPath } from './authorize-path';
 
 type ProgressListProps = {
   count: number;
@@ -19,13 +20,14 @@ type ProgressListProps = {
 
 type AuthorizeFlowProps = {
   serviceIds: PlatformId[];
+  connectedServiceIds: PlatformId[];
   organizationId?: string;
   initialIndex: number;
   initialError?: string;
 };
 
 export function AuthorizeFlow(props: AuthorizeFlowProps) {
-  const { serviceIds, organizationId, initialIndex, initialError } = props;
+  const { serviceIds, connectedServiceIds, organizationId, initialIndex, initialError } = props;
   const router = useRouter();
   const trpc = useTRPC();
   const { data: user } = useUser();
@@ -36,7 +38,12 @@ export function AuthorizeFlow(props: AuthorizeFlowProps) {
   const services = serviceIds.map(id => getPlatform(id)).filter(p => p !== undefined);
   const current = services[index];
   const isLast = index === services.length - 1;
-  const returnTo = buildReturnToPath({ serviceIds, organizationId, step: index });
+  const returnTo = buildReturnToPath({
+    serviceIds,
+    connectedServiceIds,
+    organizationId,
+    step: index,
+  });
   const oauthInput = {
     ...(organizationId ? { organizationId } : {}),
     returnTo,
@@ -99,7 +106,11 @@ export function AuthorizeFlow(props: AuthorizeFlowProps) {
   if (done || !current) {
     return (
       <div className="flex w-full flex-col items-center gap-12">
-        <Completed hasSelectedServices={services.length > 0} onContinue={() => router.push('/')} />
+        <Completed
+          hasSelectedServices={services.length > 0}
+          connectedServiceIds={connectedServiceIds}
+          onContinue={() => router.push('/')}
+        />
       </div>
     );
   }
@@ -159,20 +170,6 @@ export function AuthorizeFlow(props: AuthorizeFlowProps) {
       </AnimatePresence>
     </div>
   );
-}
-
-function buildReturnToPath({
-  serviceIds,
-  organizationId,
-  step,
-}: {
-  serviceIds: PlatformId[];
-  organizationId?: string;
-  step: number;
-}): string {
-  const params = new URLSearchParams({ services: serviceIds.join(','), step: step.toString() });
-  if (organizationId) params.set('organizationId', organizationId);
-  return `/collab/authorize?${params.toString()}`;
 }
 
 async function getOAuthUrl(
@@ -266,11 +263,15 @@ function ProgressList({ count, activeIndex }: ProgressListProps) {
 
 function Completed({
   hasSelectedServices,
+  connectedServiceIds,
   onContinue,
 }: {
   hasSelectedServices: boolean;
+  connectedServiceIds: PlatformId[];
   onContinue: () => void;
 }) {
+  const connectedServiceNames = connectedServiceIds.map(getPlatformName);
+
   return (
     <motion.section
       initial={{ opacity: 0, y: 8 }}
@@ -284,9 +285,7 @@ function Completed({
       <div className="flex w-full flex-col gap-4 text-center">
         <h1 className="text-2xl font-bold tracking-tight">Kilo is ready</h1>
         <p className="text-muted-foreground text-sm leading-relaxed">
-          {hasSelectedServices
-            ? 'Setup is complete. You can connect more services or fine-tune access from settings later.'
-            : 'No services were connected. You can connect chat, code, and issue tools from settings later.'}
+          {getCompletionDescription({ hasSelectedServices, connectedServiceNames })}
         </p>
       </div>
       <Button onClick={onContinue} size="lg" className="w-full">
@@ -294,4 +293,34 @@ function Completed({
       </Button>
     </motion.section>
   );
+}
+
+function getCompletionDescription({
+  hasSelectedServices,
+  connectedServiceNames,
+}: {
+  hasSelectedServices: boolean;
+  connectedServiceNames: string[];
+}): string {
+  if (hasSelectedServices) {
+    return 'Setup is complete. You can connect more services or fine-tune access from settings later.';
+  }
+
+  if (connectedServiceNames.length > 0) {
+    const serviceList = formatServiceList(connectedServiceNames);
+    const verb = connectedServiceNames.length === 1 ? 'is' : 'are';
+    return `${serviceList} ${verb} already set up. You can connect more services or fine-tune access from settings later.`;
+  }
+
+  return 'No services were connected. You can connect chat, code, and issue tools from settings later.';
+}
+
+function getPlatformName(platformId: PlatformId): string {
+  return getPlatform(platformId)?.name ?? platformId;
+}
+
+function formatServiceList(names: string[]): string {
+  if (names.length <= 1) return names[0] ?? 'Selected services';
+  if (names.length === 2) return `${names[0]} and ${names[1]}`;
+  return `${names.slice(0, -1).join(', ')}, and ${names[names.length - 1]}`;
 }

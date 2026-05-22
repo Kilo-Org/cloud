@@ -240,25 +240,28 @@ async function clearAutoResumeState(
 
 async function resolveActiveInstance(
   kiloUserId: string,
-  options: { instanceId?: string; sandboxId?: string }
+  options: { allowOrganization?: boolean; instanceId?: string; sandboxId?: string }
 ): Promise<ActiveInstance | null> {
+  const organizationFilter = options.allowOrganization
+    ? undefined
+    : isNull(kiloclaw_instances.organization_id);
   const instanceFilter = options.instanceId
     ? and(
         eq(kiloclaw_instances.id, options.instanceId),
         eq(kiloclaw_instances.user_id, kiloUserId),
-        isNull(kiloclaw_instances.organization_id),
+        organizationFilter,
         isNull(kiloclaw_instances.destroyed_at)
       )
     : options.sandboxId
       ? and(
           eq(kiloclaw_instances.user_id, kiloUserId),
           eq(kiloclaw_instances.sandbox_id, options.sandboxId),
-          isNull(kiloclaw_instances.organization_id),
+          organizationFilter,
           isNull(kiloclaw_instances.destroyed_at)
         )
       : and(
           eq(kiloclaw_instances.user_id, kiloUserId),
-          isNull(kiloclaw_instances.organization_id),
+          organizationFilter,
           isNull(kiloclaw_instances.destroyed_at)
         );
 
@@ -375,7 +378,11 @@ export async function completeAutoResumeIfReady(
   sandboxId: string,
   instanceId?: string
 ): Promise<{ instanceId: string | null; resumeCompleted: boolean }> {
-  const targetInstance = await resolveActiveInstance(kiloUserId, { instanceId, sandboxId });
+  const targetInstance = await resolveActiveInstance(kiloUserId, {
+    allowOrganization: true,
+    instanceId,
+    sandboxId,
+  });
   if (!targetInstance) {
     await clearAutoResumeState(kiloUserId, {
       instanceId,

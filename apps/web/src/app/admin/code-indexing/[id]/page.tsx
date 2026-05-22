@@ -1,6 +1,6 @@
 import { Suspense } from 'react';
 import { CodeIndexingDetail } from '@/app/admin/components/CodeIndexingDetail';
-import { getUserFromAuth } from '@/lib/user.server';
+import { getUserFromAuth } from '@/lib/user/server';
 
 export default async function CodeIndexingDetailPage({
   params,

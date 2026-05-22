@@ -9,7 +9,7 @@ import {
   AUTO_TOP_UP_THRESHOLD_DOLLARS,
   ORG_AUTO_TOP_UP_THRESHOLD_DOLLARS,
 } from '@/lib/autoTopUpConstants';
-import type { UserForBalance } from '@/lib/UserForBalance';
+import type { UserForBalance } from '@/lib/user/balance-types';
 import {
   credit_transactions,
   kilo_pass_issuance_items,

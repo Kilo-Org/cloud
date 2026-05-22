@@ -28,6 +28,7 @@ const localNetworkDevOrigins = [
   '10.*.*.*',
   '192.168.*.*',
   ...Array.from({ length: 16 }, (_, index) => `172.${16 + index}.*.*`),
+  ...(process.env.APP_URL_OVERRIDE ? [new URL(process.env.APP_URL_OVERRIDE).host] : []),
 ];
 
 /** @type {import('next').NextConfig} */

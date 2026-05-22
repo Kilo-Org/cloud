@@ -2,7 +2,7 @@ import { Suspense } from 'react';
 import { IntegrationsPageClient } from './IntegrationsPageClient';
 import { OrganizationByPageLayout } from '@/components/organizations/OrganizationByPageLayout';
 import { SetPageTitle } from '@/components/SetPageTitle';
-import { getUserFromAuthOrRedirect } from '@/lib/user.server';
+import { getUserFromAuthOrRedirect } from '@/lib/user/server';
 import { notFound } from 'next/navigation';
 import { ENABLE_DEPLOY_FEATURE } from '@/lib/constants';
 

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from '@jest/globals';
 import { NextResponse } from 'next/server';
-import { getUserFromAuth } from '@/lib/user.server';
+import { getUserFromAuth } from '@/lib/user/server';
 import { failureResult } from '@/lib/maybe-result';
 import type { User } from '@kilocode/db/schema';
 import {
@@ -34,7 +34,7 @@ jest.mock('@/lib/config.server', () => ({
   EXA_API_KEY: 'test-exa-key',
 }));
 
-jest.mock('@/lib/user.server');
+jest.mock('@/lib/user/server');
 jest.mock('@/lib/exa-usage');
 jest.mock('@/lib/organizations/organization-usage');
 

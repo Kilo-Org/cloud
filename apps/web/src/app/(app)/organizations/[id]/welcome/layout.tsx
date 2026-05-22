@@ -1,5 +1,5 @@
 import { getAuthorizedOrgContext } from '@/lib/organizations/organization-auth';
-import { signInUrlWithCallbackPath } from '@/lib/user.server';
+import { signInUrlWithCallbackPath } from '@/lib/user/server';
 import { redirect } from 'next/navigation';
 
 export default async function WelcomeLayout({

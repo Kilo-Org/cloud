@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { getUserFromAuthOrRedirect } from '@/lib/user.server';
+import { getUserFromAuthOrRedirect } from '@/lib/user/server';
 import { KiloCardLayout } from '@/components/KiloCardLayout';
 import { isValidCallbackPath } from '@/lib/getSignInCallbackUrl';
 import { CustomerSourceSurvey } from '@/components/CustomerSourceSurvey';

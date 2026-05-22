@@ -1,4 +1,4 @@
-import { getUserFromAuth } from '@/lib/user.server';
+import { getUserFromAuth } from '@/lib/user/server';
 import { redirect } from 'next/navigation';
 
 export type AuthPageProps = {

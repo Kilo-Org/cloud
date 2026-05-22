@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { pollDeviceAuthRequest, denyDeviceAuthRequest } from '@/lib/device-auth/device-auth';
-import { getUserFromAuth } from '@/lib/user.server';
+import { getUserFromAuth } from '@/lib/user/server';
 
 type RouteContext = {
   params: Promise<{ code: string }>;

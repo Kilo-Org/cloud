@@ -261,6 +261,49 @@ describe('instance lifecycle async resume', () => {
     );
   });
 
+  it('completes async auto-resume readiness for organization-owned instances', async () => {
+    const instanceId = '22222222-2222-4222-8222-222222222222';
+    const sandboxId = 'ki_22222222222242228222222222222222';
+    selectResultsQueue.push(
+      [{ id: instanceId, sandbox_id: sandboxId }],
+      [
+        {
+          status: 'active',
+          suspended_at: null,
+          auto_resume_requested_at: '2026-04-07T20:05:00.000Z',
+          auto_resume_retry_after: '2026-04-07T22:05:00.000Z',
+          auto_resume_attempt_count: 1,
+        },
+      ],
+      [
+        {
+          id: 'sub-org-1',
+          user_id: 'user-1',
+          instance_id: instanceId,
+          plan: 'standard',
+          status: 'active',
+          suspended_at: null,
+          destruction_deadline: null,
+          auto_resume_requested_at: '2026-04-07T20:05:00.000Z',
+          auto_resume_retry_after: '2026-04-07T22:05:00.000Z',
+          auto_resume_attempt_count: 1,
+        },
+      ]
+    );
+
+    const result = await completeAutoResumeIfReady('user-1', sandboxId, instanceId);
+
+    expect(result).toEqual({ instanceId, resumeCompleted: true });
+    expect(mockDb.transaction).toHaveBeenCalledTimes(1);
+    expect(txUpdateSetCalls[0]).toEqual({
+      suspended_at: null,
+      destruction_deadline: null,
+      auto_resume_requested_at: null,
+      auto_resume_retry_after: null,
+      auto_resume_attempt_count: 0,
+    });
+  });
+
   it('does not clear suspension state for a canceled subscription on stale ready callback', async () => {
     // Regression: a stopped instance suspended by subscription_expiry could be
     // woken by Fly Proxy if the worker proxied to it. The resulting controller

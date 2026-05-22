@@ -1,7 +1,7 @@
 import { createHmac } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { PYLON_IDENTITY_SECRET } from '@/lib/config.server';
-import { getUserFromAuth } from '@/lib/user.server';
+import { getUserFromAuth } from '@/lib/user/server';
 
 type IdentityResponse = { email: string; name: string; emailHash: string } | { error: string };
 

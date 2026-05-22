@@ -1,5 +1,5 @@
 import type { User } from '@kilocode/db/schema';
-import { getUserFromAuth } from '@/lib/user.server';
+import { getUserFromAuth } from '@/lib/user/server';
 import { NextResponse } from 'next/server';
 
 export async function GET(): Promise<NextResponse<{ error: string } | User>> {

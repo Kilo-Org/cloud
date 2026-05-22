@@ -1,6 +1,6 @@
 import { OrganizationByPageLayout } from '@/components/organizations/OrganizationByPageLayout';
 import { NewWastelandWizardClient } from '@/app/(app)/wasteland/new/NewWastelandWizardClient';
-import { getUserFromAuthOrRedirect } from '@/lib/user.server';
+import { getUserFromAuthOrRedirect } from '@/lib/user/server';
 
 export default async function OrgNewWastelandPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

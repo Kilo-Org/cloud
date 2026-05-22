@@ -3712,6 +3712,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     version: string;
     commit: string;
     openclawVersion?: string | null;
+    openclawCommit?: string | null;
+    apiVersion?: number;
+    capabilities?: string[];
   } | null> {
     await this.loadState();
     return gateway.getControllerVersion(this.s, this.env);

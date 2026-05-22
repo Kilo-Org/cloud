@@ -1,5 +1,5 @@
 import { Suspense } from 'react';
-import { getUserFromAuthOrRedirect } from '@/lib/user.server';
+import { getUserFromAuthOrRedirect } from '@/lib/user/server';
 import { DiscordIntegrationDetails } from '@/components/integrations/DiscordIntegrationDetails';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';

@@ -11,6 +11,7 @@ import {
   kilo_pass_subscriptions,
   microdollar_usage,
   microdollar_usage_daily,
+  user_affiliate_attributions,
 } from '@kilocode/db/schema';
 import {
   KiloPassCadence,
@@ -2905,7 +2906,7 @@ describe('kiloPassRouter', () => {
       ).rejects.toThrow('You already have an active Kilo Pass subscription.');
     });
 
-    it('creates a checkout session and returns its url', async () => {
+    it('creates a checkout session with empty affiliate metadata when attribution is absent', async () => {
       const stripeMock = getStripeMock();
       stripeMock.checkout.sessions.create.mockResolvedValue({
         url: 'https://stripe.example.test/checkout',
@@ -2941,6 +2942,7 @@ describe('kiloPassRouter', () => {
               kiloUserId: user.id,
               tier: 'tier_49',
               cadence: 'yearly',
+              affiliateTrackingId: '',
             },
           },
           metadata: {
@@ -2948,6 +2950,50 @@ describe('kiloPassRouter', () => {
             kiloUserId: user.id,
             tier: 'tier_49',
             cadence: 'yearly',
+            affiliateTrackingId: '',
+          },
+        })
+      );
+    });
+
+    it('includes affiliateTrackingId in checkout metadata when attribution exists', async () => {
+      const stripeMock = getStripeMock();
+      stripeMock.checkout.sessions.create.mockResolvedValue({
+        url: 'https://stripe.example.test/checkout',
+      });
+
+      const user = await insertTestUser({
+        google_user_email: 'kilo-pass-create-session-attributed@example.com',
+      });
+      await db.insert(user_affiliate_attributions).values({
+        user_id: user.id,
+        provider: 'impact',
+        tracking_id: 'impact-click-123',
+      });
+
+      const caller = await createCallerForUser(user.id);
+      await caller.kiloPass.createCheckoutSession({
+        tier: KiloPassTier.Tier49,
+        cadence: KiloPassCadence.Yearly,
+      });
+
+      expect(stripeMock.checkout.sessions.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          subscription_data: {
+            metadata: {
+              type: 'kilo-pass',
+              kiloUserId: user.id,
+              tier: 'tier_49',
+              cadence: 'yearly',
+              affiliateTrackingId: 'impact-click-123',
+            },
+          },
+          metadata: {
+            type: 'kilo-pass',
+            kiloUserId: user.id,
+            tier: 'tier_49',
+            cadence: 'yearly',
+            affiliateTrackingId: 'impact-click-123',
           },
         })
       );

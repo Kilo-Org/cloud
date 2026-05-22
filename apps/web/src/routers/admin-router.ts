@@ -76,7 +76,7 @@ import { sum } from 'drizzle-orm';
 import { CRON_SECRET } from '@/lib/config.server';
 import { APP_URL } from '@/lib/constants';
 import { revalidatePath } from 'next/cache';
-import { recomputeUserBalances } from '@/lib/recomputeUserBalances';
+import { recomputeUserBalances } from '@/lib/user/recompute-balances';
 import { getStripeInvoices } from '@/lib/stripe';
 import { client as stripeClient } from '@/lib/stripe-client';
 import { cancelAndRefundKiloPassForUser } from '@/lib/kilo-pass/cancel-and-refund';

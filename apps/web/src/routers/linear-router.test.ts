@@ -16,7 +16,7 @@ import { describe, test, expect, beforeAll } from '@jest/globals';
 import { TRPCError } from '@trpc/server';
 import type { User, Organization } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
-import { organizations } from '@kilocode/db/schema';
+import { organization_seats_purchases, organizations } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { createCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@/tests/helpers/user.helper';
@@ -30,6 +30,7 @@ describe('linearRouter authorization', () => {
   let outsider: User;
   let org: Organization;
   let trialExpiredOrg: Organization;
+  let trialExpiredPastDueOrg: Organization;
 
   beforeAll(async () => {
     owner = await insertTestUser({
@@ -67,6 +68,30 @@ describe('linearRouter authorization', () => {
         free_trial_end_at: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
       })
       .where(eq(organizations.id, trialExpiredOrg.id));
+
+    trialExpiredPastDueOrg = await createTestOrganization(
+      'Linear Trial Expired Past Due Org',
+      owner.id,
+      100_000,
+      undefined,
+      true
+    );
+    await db
+      .update(organizations)
+      .set({
+        free_trial_end_at: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+      })
+      .where(eq(organizations.id, trialExpiredPastDueOrg.id));
+    await db.insert(organization_seats_purchases).values({
+      organization_id: trialExpiredPastDueOrg.id,
+      subscription_stripe_id: 'sub_linear_past_due',
+      subscription_status: 'past_due',
+      seat_count: 2,
+      amount_usd: 42,
+      starts_at: '2026-04-01T00:00:00.000Z',
+      expires_at: '2027-04-01T00:00:00.000Z',
+      billing_cycle: 'yearly',
+    });
   });
 
   describe('getOAuthUrl', () => {
@@ -110,6 +135,15 @@ describe('linearRouter authorization', () => {
       await expect(
         caller.linear.getOAuthUrl({ organizationId: trialExpiredOrg.id })
       ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    });
+
+    test('hard-expired org with a past-due seat purchase can still mutate', async () => {
+      const caller = await createCallerForUser(owner.id);
+      const result = await caller.linear.getOAuthUrl({
+        organizationId: trialExpiredPastDueOrg.id,
+      });
+
+      expect(result.url).toMatch(/^https:\/\/linear\.app\/oauth\/authorize/);
     });
   });
 

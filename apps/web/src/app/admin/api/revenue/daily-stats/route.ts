@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { getUserFromAuth } from '@/lib/user.server';
+import { getUserFromAuth } from '@/lib/user/server';
 import type { RevenueKpiResponse } from '@/lib/revenueKpi';
 import { getRevenueKpiData } from '@/lib/revenueKpi';
 import { format, subDays } from 'date-fns';

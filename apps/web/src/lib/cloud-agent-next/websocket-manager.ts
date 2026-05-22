@@ -8,7 +8,7 @@ import {
 export type ConnectionState =
   | { status: 'disconnected' }
   | { status: 'connecting' }
-  | { status: 'connected'; executionId: string }
+  | { status: 'connected'; executionId: string | null }
   | { status: 'reconnecting'; lastEventId: number; attempt: number }
   | { status: 'refreshing_ticket' }
   | { status: 'error'; error: string; retryable: boolean };

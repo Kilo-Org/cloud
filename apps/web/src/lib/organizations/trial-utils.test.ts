@@ -1,5 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
-import { getOrgTrialStatusFromDays, getDaysRemainingInTrial } from './trial-utils';
+import type { OrganizationSeatsPurchase } from '@kilocode/db/schema';
+import {
+  classifyOrganizationEntitlement,
+  getOrgTrialStatusFromDays,
+  getDaysRemainingInTrial,
+} from './trial-utils';
 
 describe('getOrgTrialStatusFromDays', () => {
   it('returns trial_active for 8+ days remaining', () => {
@@ -79,4 +84,106 @@ describe('getDaysRemainingInTrial', () => {
     const nineteenDaysAgo = new Date(FIXED_NOW_MS - 19 * 24 * 60 * 60 * 1000).toISOString();
     expect(getDaysRemainingInTrial(null, nineteenDaysAgo)).toBe(-5);
   });
+});
+
+describe('classifyOrganizationEntitlement', () => {
+  const NOW = new Date('2026-05-18T12:00:00.000Z');
+  const hardExpiredTrialEnd = new Date(NOW.getTime() - 5 * 24 * 60 * 60 * 1000).toISOString();
+  const softExpiredTrialEnd = new Date(NOW.getTime() - 2 * 24 * 60 * 60 * 1000).toISOString();
+  type EntitlementOrganization = Parameters<
+    typeof classifyOrganizationEntitlement
+  >[0]['organization'];
+
+  function classify(
+    organizationOverrides: Partial<EntitlementOrganization> = {},
+    latestSeatPurchaseStatus: OrganizationSeatsPurchase['subscription_status'] | null = null
+  ) {
+    const { settings, ...organizationFields } = organizationOverrides;
+    const organization: EntitlementOrganization = {
+      created_at: '2026-05-01T12:00:00.000Z',
+      free_trial_end_at: hardExpiredTrialEnd,
+      require_seats: true,
+      ...organizationFields,
+      settings: {
+        ...settings,
+      },
+    };
+
+    return classifyOrganizationEntitlement({
+      organization,
+      latestSeatPurchaseStatus,
+      now: NOW,
+    });
+  }
+
+  it('marks hard-expired unentitled organizations as expired for enforcement', () => {
+    expect(classify()).toMatchObject({
+      bypassReason: null,
+      displayStatus: 'trial_expired_hard',
+      hasEntitlement: false,
+      hasPaidSeatEntitlement: false,
+      isTrialExpiredForEnforcement: true,
+      trialStatus: 'trial_expired_hard',
+    });
+  });
+
+  it('keeps soft-expired organizations entitled for server enforcement', () => {
+    expect(classify({ free_trial_end_at: softExpiredTrialEnd })).toMatchObject({
+      bypassReason: null,
+      displayStatus: 'trial_expired_soft',
+      hasEntitlement: true,
+      isTrialExpiredForEnforcement: false,
+      trialStatus: 'trial_expired_soft',
+    });
+  });
+
+  it.each([
+    'active',
+    'pending_cancel',
+    'incomplete',
+    'incomplete_expired',
+    'trialing',
+    'past_due',
+    'canceled',
+    'unpaid',
+    'paused',
+  ] satisfies OrganizationSeatsPurchase['subscription_status'][])(
+    'treats %s seat purchases as paid entitlement until ended',
+    subscriptionStatus => {
+      expect(classify({}, subscriptionStatus)).toMatchObject({
+        bypassReason: 'paid_seat_purchase',
+        displayStatus: 'subscribed',
+        hasEntitlement: true,
+        hasPaidSeatEntitlement: true,
+        isTrialExpiredForEnforcement: false,
+      });
+    }
+  );
+
+  it('does not treat ended seat purchases as paid entitlement', () => {
+    expect(classify({}, 'ended')).toMatchObject({
+      bypassReason: null,
+      displayStatus: 'trial_expired_hard',
+      hasEntitlement: false,
+      hasPaidSeatEntitlement: false,
+      isTrialExpiredForEnforcement: true,
+    });
+  });
+
+  it.each([
+    ['require_seats_disabled', { require_seats: false }],
+    ['oss_sponsorship', { settings: { oss_sponsorship_tier: 1 } }],
+    ['trial_messaging_suppressed', { settings: { suppress_trial_messaging: true } }],
+  ] satisfies Array<[string, Partial<EntitlementOrganization>]>)(
+    'reports %s bypasses as subscribed',
+    (bypassReason, organizationOverrides) => {
+      expect(classify(organizationOverrides)).toMatchObject({
+        bypassReason,
+        displayStatus: 'subscribed',
+        hasEntitlement: true,
+        hasPaidSeatEntitlement: false,
+        isTrialExpiredForEnforcement: false,
+      });
+    }
+  );
 });

@@ -1,6 +1,6 @@
 import { describe, test, expect } from '@jest/globals';
 import { insertTestUser } from './helpers/user.helper';
-import { getBalanceForUser } from '@/lib/user.balance';
+import { getBalanceForUser } from '@/lib/user/balance';
 
 // Mock next/server's after function which requires request context
 jest.mock('next/server', () => {

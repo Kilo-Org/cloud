@@ -1,5 +1,5 @@
 import { type User } from '@kilocode/db/schema';
-import { type BalanceForUser, getBalanceForUser } from './user.balance';
+import { type BalanceForUser, getBalanceForUser } from '@/lib/user/balance';
 import { FIRST_TOPUP_BONUS_AMOUNT, APP_URL } from '@/lib/constants';
 import { getUserOrganizationsWithSeats } from '@/lib/organizations/organizations';
 import type { UserOrganizationWithSeats } from '@/lib/organizations/organization-types';

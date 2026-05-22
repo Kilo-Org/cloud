@@ -5,9 +5,9 @@ import {
   type User,
 } from '@kilocode/db';
 
-import { processPersonalKiloClawPaidConversion } from '@/lib/kiloclaw-referrals';
+import { processPersonalKiloClawPaidConversion } from '@/lib/impact/kiloclaw-referrals';
 import { resolveCurrentPersonalSubscriptionRow } from '@/lib/kiloclaw/current-personal-subscription';
-import { getUserFromAuth } from '@/lib/user.server';
+import { getUserFromAuth } from '@/lib/user/server';
 
 // Test-fixture boundary: only the fields the route actually reads are
 // populated. Casting via Partial<T> -> T (rather than `as never` or
@@ -24,7 +24,7 @@ function subscriptionFixture(
   return overrides as Partial<KiloClawSubscription> as KiloClawSubscription;
 }
 
-jest.mock('@/lib/user.server', () => ({
+jest.mock('@/lib/user/server', () => ({
   getUserFromAuth: jest.fn(),
 }));
 
@@ -32,7 +32,7 @@ jest.mock('@/lib/kiloclaw/current-personal-subscription', () => ({
   resolveCurrentPersonalSubscriptionRow: jest.fn(),
 }));
 
-jest.mock('@/lib/kiloclaw-referrals', () => ({
+jest.mock('@/lib/impact/kiloclaw-referrals', () => ({
   processPersonalKiloClawPaidConversion: jest.fn(),
 }));
 

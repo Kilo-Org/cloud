@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { getUserFromAuth } from '@/lib/user.server';
+import { getUserFromAuth } from '@/lib/user/server';
 import { APP_URL } from '@/lib/constants';
 import { createLinearBotLinkState } from '@/lib/bot/linear-link-state';
 import { verifyLinearLinkToken } from '@/lib/bot/linear-link-token';

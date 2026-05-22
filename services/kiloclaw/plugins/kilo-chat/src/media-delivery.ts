@@ -2,6 +2,7 @@ import {
   loadOutboundMediaFromUrl,
   type OutboundMediaLoadOptions,
 } from 'openclaw/plugin-sdk/outbound-media';
+import { basename, isAbsolute, resolve } from 'node:path';
 import type { ContentBlock, KiloChatClient } from './client.js';
 import { ATTACHMENT_MAX_BYTES } from './synced/schemas.js';
 
@@ -22,6 +23,27 @@ const DEFAULT_FILENAME_BY_MIME: Record<string, string> = {
   'audio/ogg': 'audio.ogg',
   'audio/wav': 'audio.wav',
   'application/pdf': 'document.pdf',
+};
+
+const MIME_BY_EXTENSION: Record<string, string> = {
+  txt: 'text/plain',
+  md: 'text/markdown',
+  csv: 'text/csv',
+  json: 'application/json',
+  pdf: 'application/pdf',
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  gif: 'image/gif',
+  webp: 'image/webp',
+  heic: 'image/heic',
+  heif: 'image/heif',
+  mp4: 'video/mp4',
+  mov: 'video/quicktime',
+  mp3: 'audio/mpeg',
+  m4a: 'audio/mp4',
+  ogg: 'audio/ogg',
+  wav: 'audio/wav',
 };
 
 export type LoadedOutboundMedia = {
@@ -50,6 +72,16 @@ export function isHttpUrl(raw: string | undefined): boolean {
   }
 }
 
+function mediaAccessForChannelRead(
+  mediaAccess: OutboundMediaLoadOptions['mediaAccess'] | undefined
+): OutboundMediaLoadOptions['mediaAccess'] | undefined {
+  if (!mediaAccess) return undefined;
+  return {
+    ...(mediaAccess.localRoots ? { localRoots: mediaAccess.localRoots } : {}),
+    ...(mediaAccess.workspaceDir ? { workspaceDir: mediaAccess.workspaceDir } : {}),
+  };
+}
+
 function resolveFilename(contentType: string | undefined, suggested: string | undefined): string {
   if (suggested && suggested.length > 0) return suggested;
   if (contentType && DEFAULT_FILENAME_BY_MIME[contentType]) {
@@ -58,21 +90,97 @@ function resolveFilename(contentType: string | undefined, suggested: string | un
   return 'file.bin';
 }
 
+function resolveLocalMediaPath(mediaUrl: string, context: OutboundMediaLoadContext): string {
+  const workspaceDir = context.mediaAccess?.workspaceDir;
+  if (workspaceDir && !isAbsolute(mediaUrl)) return resolve(workspaceDir, mediaUrl);
+  return mediaUrl;
+}
+
+function inferMimeFromFilename(fileName: string | undefined): string | undefined {
+  const extension = fileName?.split('.').pop()?.toLowerCase();
+  return extension ? MIME_BY_EXTENSION[extension] : undefined;
+}
+
 export async function loadOutboundMedia(
   mediaUrl: string,
   context: OutboundMediaLoadContext = {}
 ): Promise<LoadedOutboundMedia> {
+  const readFile = context.mediaReadFile ?? context.mediaAccess?.readFile;
+  if (readFile && !isHttpUrl(mediaUrl)) {
+    const filePath = resolveLocalMediaPath(mediaUrl, context);
+    const buffer = await readFile(filePath);
+    const fileName = basename(filePath) || undefined;
+    return {
+      buffer: Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer),
+      contentType: inferMimeFromFilename(fileName),
+      fileName,
+    };
+  }
+
+  const channelMediaAccess = mediaAccessForChannelRead(context.mediaAccess);
   const loaded = await loadOutboundMediaFromUrl(mediaUrl, {
     maxBytes: ATTACHMENT_MAX_BYTES,
-    mediaAccess: context.mediaAccess,
-    mediaLocalRoots: context.mediaLocalRoots,
-    mediaReadFile: context.mediaReadFile,
+    mediaAccess: channelMediaAccess,
+    mediaLocalRoots: context.mediaLocalRoots ?? channelMediaAccess?.localRoots,
   });
   return {
     buffer: Buffer.isBuffer(loaded.buffer) ? loaded.buffer : Buffer.from(loaded.buffer),
     contentType: loaded.contentType,
     fileName: loaded.fileName,
   };
+}
+
+export async function sendKiloChatLoadedMediaMessage(params: {
+  client: Pick<KiloChatClient, 'createMessage' | 'initAttachment'>;
+  conversationId: string;
+  media: LoadedOutboundMedia;
+  caption?: string;
+  inReplyToMessageId?: string;
+  fetchImpl?: typeof fetch;
+}): Promise<{ messageId: string }> {
+  const caption = params.caption ?? '';
+  const mimeType = params.media.contentType ?? 'application/octet-stream';
+  const filename = resolveFilename(params.media.contentType, params.media.fileName);
+  const size = params.media.buffer.length;
+
+  const init = await params.client.initAttachment({
+    conversationId: params.conversationId,
+    mimeType,
+    size,
+    filename,
+  });
+
+  const putFetch = params.fetchImpl ?? fetch;
+  const putResponse = await putFetch(init.putUrl, {
+    method: 'PUT',
+    headers: init.putHeaders,
+    body: params.media.buffer,
+  });
+  if (!putResponse.ok) {
+    throw new Error(
+      `kilo-chat: R2 PUT responded ${putResponse.status}: ${await putResponse.text().catch(() => '')}`
+    );
+  }
+  void putResponse.body?.cancel();
+
+  const content: ContentBlock[] = [
+    {
+      type: 'attachment',
+      attachmentId: init.attachmentId,
+      mimeType,
+      size,
+      filename,
+    },
+  ];
+  if (caption.length > 0) {
+    content.push({ type: 'text', text: caption });
+  }
+
+  return await params.client.createMessage({
+    conversationId: params.conversationId,
+    content,
+    inReplyToMessageId: params.inReplyToMessageId,
+  });
 }
 
 export async function sendKiloChatMediaMessage(params: {
@@ -108,48 +216,12 @@ export async function sendKiloChatMediaMessage(params: {
     mediaLocalRoots: params.mediaLocalRoots,
     mediaReadFile: params.mediaReadFile,
   });
-  const mimeType = media.contentType ?? 'application/octet-stream';
-  const filename = resolveFilename(media.contentType, media.fileName);
-  const size = media.buffer.length;
-
-  const init = await params.client.initAttachment({
+  return sendKiloChatLoadedMediaMessage({
+    client: params.client,
     conversationId: params.conversationId,
-    mimeType,
-    size,
-    filename,
-  });
-
-  const putFetch = params.fetchImpl ?? fetch;
-  const putResponse = await putFetch(init.putUrl, {
-    method: 'PUT',
-    headers: init.putHeaders,
-    body: media.buffer,
-  });
-  if (!putResponse.ok) {
-    throw new Error(
-      `kilo-chat: R2 PUT responded ${putResponse.status}: ${await putResponse.text().catch(() => '')}`
-    );
-  }
-  // R2 returns an empty body on PUT — drain it just in case to avoid
-  // hanging the keep-alive connection.
-  void putResponse.body?.cancel();
-
-  const content: ContentBlock[] = [
-    {
-      type: 'attachment',
-      attachmentId: init.attachmentId,
-      mimeType,
-      size,
-      filename,
-    },
-  ];
-  if (caption.length > 0) {
-    content.push({ type: 'text', text: caption });
-  }
-
-  return await params.client.createMessage({
-    conversationId: params.conversationId,
-    content,
+    media,
+    caption,
     inReplyToMessageId: params.inReplyToMessageId,
+    fetchImpl: params.fetchImpl,
   });
 }

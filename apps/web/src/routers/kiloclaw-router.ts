@@ -97,7 +97,10 @@ import {
 import { client as stripe } from '@/lib/stripe-client';
 import { APP_URL } from '@/lib/constants';
 import { getAffiliateAttribution } from '@/lib/affiliate-attribution';
-import { buildAffiliateEventDedupeKey, enqueueAffiliateEventForUser } from '@/lib/affiliate-events';
+import {
+  buildAffiliateEventDedupeKey,
+  enqueueAffiliateEventForUser,
+} from '@/lib/impact/affiliate-events';
 import { clawAccessProcedure } from '@/lib/kiloclaw/access-gate';
 import { cancelCliRun, createCliRun, getCliRunStatus } from '@/lib/kiloclaw/cli-runs';
 import { KILOCLAW_EARLYBIRD_EXPIRY_DATE } from '@/lib/kiloclaw/constants';
@@ -4858,6 +4861,14 @@ export const kiloclawRouter = createTRPCRouter({
         tier: kiloPassTier,
         cadence: kiloPassCadence,
       });
+      const attribution = await getAffiliateAttribution(ctx.user.id, 'impact');
+      const sessionMetadata = {
+        type: 'kilo-pass',
+        kiloUserId: ctx.user.id,
+        tier: kiloPassTier,
+        cadence: kiloPassCadence,
+        affiliateTrackingId: attribution?.tracking_id ?? '',
+      };
 
       const session = await stripe.checkout.sessions.create({
         mode: 'subscription',
@@ -4876,19 +4887,9 @@ export const kiloclawRouter = createTRPCRouter({
         success_url: `${APP_URL}/payments/kilo-pass/awarding?session_id={CHECKOUT_SESSION_ID}&clawHostingPlan=${input.hostingPlan}&clawInstanceId=${anchorInstance.id}`,
         cancel_url: `${APP_URL}/claw?checkout=cancelled`,
         subscription_data: {
-          metadata: {
-            type: 'kilo-pass',
-            kiloUserId: ctx.user.id,
-            tier: kiloPassTier,
-            cadence: kiloPassCadence,
-          },
+          metadata: sessionMetadata,
         },
-        metadata: {
-          type: 'kilo-pass',
-          kiloUserId: ctx.user.id,
-          tier: kiloPassTier,
-          cadence: kiloPassCadence,
-        },
+        metadata: sessionMetadata,
       });
 
       return { url: typeof session.url === 'string' ? session.url : null };

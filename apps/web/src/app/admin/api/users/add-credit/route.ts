@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { getUserFromAuth } from '@/lib/user.server';
+import { getUserFromAuth } from '@/lib/user/server';
 import { grantCreditForCategory } from '@/lib/promotionalCredits';
 import type { AddCreditRequest } from '@/types/admin';
 import { db } from '@/lib/drizzle';

@@ -31,8 +31,11 @@ import PostHogClient from '@/lib/posthog';
 import { after } from 'next/server';
 import { IS_IN_AUTOMATED_TEST } from '@/lib/config.server';
 import { client as stripe } from '@/lib/stripe-client';
-import { buildAffiliateEventDedupeKey, enqueueAffiliateEventForUser } from '@/lib/affiliate-events';
-import { processPersonalKiloClawPaidConversion } from '@/lib/kiloclaw-referrals';
+import {
+  buildAffiliateEventDedupeKey,
+  enqueueAffiliateEventForUser,
+} from '@/lib/impact/affiliate-events';
+import { processPersonalKiloClawPaidConversion } from '@/lib/impact/kiloclaw-referrals';
 import { IMPACT_ORDER_ID_MACRO } from '@/lib/impact';
 import {
   CurrentPersonalSubscriptionResolutionError,
@@ -1472,8 +1475,16 @@ export async function handleKiloClawInvoicePaid(params: {
 
   // Stripe can emit paid $0 invoices with no charge. Use charge ID when present,
   // otherwise fall back to invoice ID so settlement still runs idempotently.
+  const invoiceCharge = 'charge' in invoice ? invoice.charge : null;
   const chargeId =
-    'charge' in invoice && typeof invoice.charge === 'string' ? invoice.charge : null;
+    typeof invoiceCharge === 'string'
+      ? invoiceCharge
+      : invoiceCharge &&
+          typeof invoiceCharge === 'object' &&
+          'id' in invoiceCharge &&
+          typeof invoiceCharge.id === 'string'
+        ? invoiceCharge.id
+        : null;
   const stripePaymentId = chargeId ?? invoice.id;
 
   // Resolve stripeSubscriptionId from parent subscription details
@@ -1581,7 +1592,7 @@ export async function handleKiloClawInvoicePaid(params: {
     amount_paid: invoice.amount_paid,
   });
 
-  if (invoice.amount_paid > 0 && chargeId) {
+  if (invoice.amount_paid > 0) {
     try {
       const reportingFields = getStripeFundedKiloClawReportingFields({
         plan,
@@ -1617,7 +1628,7 @@ export async function handleKiloClawInvoicePaid(params: {
           currencyCode: invoice.currency ?? 'usd',
           eventDate,
           ...reportingFields,
-          stripeChargeId: chargeId,
+          stripeChargeId: chargeId ?? undefined,
         });
       }
     } catch (error) {

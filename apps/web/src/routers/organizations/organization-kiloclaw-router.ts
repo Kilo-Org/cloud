@@ -64,6 +64,7 @@ import {
   organizationMemberProcedure,
   organizationMemberMutationProcedure,
 } from '@/routers/organizations/utils';
+import { requireOrganizationKiloClawComputeEntitlement } from '@/lib/organizations/trial-middleware';
 
 import PostHogClient from '@/lib/posthog';
 import { CHANGELOG_ENTRIES } from '@/app/(app)/claw/components/changelog-data';
@@ -462,14 +463,13 @@ export const organizationKiloclawRouter = createTRPCRouter({
 
   // ── Lifecycle ─────────────────────────────────────────────────
 
-  provision: organizationMemberMutationProcedure
+  provision: organizationMemberProcedure
     .input(updateConfigSchema)
     .mutation(async ({ ctx, input }) => {
+      await requireOrganizationKiloClawComputeEntitlement(input.organizationId);
       return await withKiloclawProvisionContextLock(
         getOrganizationProvisionLockKey(ctx.user.id, input.organizationId),
         async () => {
-          // TODO: org-specific kiloclaw billing gate — currently gated by
-          // organizationMemberMutationProcedure (requireActiveSubscriptionOrTrial for org)
           const existing = await getActiveOrgInstance(ctx.user.id, input.organizationId);
           if (existing) {
             throw new TRPCError({
@@ -538,9 +538,10 @@ export const organizationKiloclawRouter = createTRPCRouter({
       );
     }),
 
-  updateConfig: organizationMemberMutationProcedure
+  updateConfig: organizationMemberProcedure
     .input(updateConfigSchema)
     .mutation(async ({ ctx, input }) => {
+      await requireOrganizationKiloClawComputeEntitlement(input.organizationId);
       // Re-provision: same as provision but expects existing instance
       const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
 
@@ -598,7 +599,8 @@ export const organizationKiloclawRouter = createTRPCRouter({
       return result;
     }),
 
-  start: organizationMemberMutationProcedure.mutation(async ({ ctx, input }) => {
+  start: organizationMemberProcedure.mutation(async ({ ctx, input }) => {
+    await requireOrganizationKiloClawComputeEntitlement(input.organizationId);
     const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
     const client = new KiloClawInternalClient();
     const result = await client.start(ctx.user.id, workerInstanceId(instance), {
@@ -612,7 +614,7 @@ export const organizationKiloclawRouter = createTRPCRouter({
     return result;
   }),
 
-  stop: organizationMemberMutationProcedure.mutation(async ({ ctx, input }) => {
+  stop: organizationMemberProcedure.mutation(async ({ ctx, input }) => {
     const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
     const client = new KiloClawInternalClient();
     return client.stop(ctx.user.id, workerInstanceId(instance), {
@@ -620,7 +622,7 @@ export const organizationKiloclawRouter = createTRPCRouter({
     });
   }),
 
-  destroy: organizationMemberMutationProcedure.mutation(async ({ ctx, input }) => {
+  destroy: organizationMemberProcedure.mutation(async ({ ctx, input }) => {
     const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
     const destroyedRow = await markActiveInstanceDestroyed(ctx.user.id, instance.id);
     const client = new KiloClawInternalClient();
@@ -948,7 +950,7 @@ export const organizationKiloclawRouter = createTRPCRouter({
 
   // ── Machine operations ────────────────────────────────────────
 
-  restartMachine: organizationMemberMutationProcedure
+  restartMachine: organizationMemberProcedure
     .input(
       z.object({
         organizationId: z.uuid(),
@@ -965,6 +967,7 @@ export const organizationKiloclawRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      await requireOrganizationKiloClawComputeEntitlement(input.organizationId);
       const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
 
       // Pin consent gate. Symmetric with the personal user path: any pin
@@ -1028,7 +1031,8 @@ export const organizationKiloclawRouter = createTRPCRouter({
       });
     }),
 
-  restartOpenClaw: organizationMemberMutationProcedure.mutation(async ({ ctx, input }) => {
+  restartOpenClaw: organizationMemberProcedure.mutation(async ({ ctx, input }) => {
+    await requireOrganizationKiloClawComputeEntitlement(input.organizationId);
     const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
     const client = new KiloClawInternalClient();
     return client.restartGatewayProcess(ctx.user.id, workerInstanceId(instance));

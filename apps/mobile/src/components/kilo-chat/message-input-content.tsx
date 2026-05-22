@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AppState, type LayoutChangeEvent, type TextInput, View } from 'react-native';
+import { AppState, type LayoutChangeEvent, Platform, type TextInput, View } from 'react-native';
 import { type AttachmentBlock } from '@kilocode/kilo-chat';
 import { type QueuedAttachment } from '@kilocode/kilo-chat-hooks';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useTextHeight } from '@/components/agents/use-text-height';
 import { resolveMessageInputAppStateTransition } from './message-input-app-state';
@@ -77,6 +78,7 @@ export function MessageInputContent({
   onSendText?: MessageInputTextOnSend;
   onSendContentBlocks?: MessageInputContentBlocksOnSend;
 }) {
+  const { bottom } = useSafeAreaInsets();
   const valueRef = useRef(initialText);
   const [canSend, setCanSend] = useState(() =>
     canSubmitMessageInputContent({ text: initialText, readyAttachmentBlocks: editableAttachments })
@@ -241,7 +243,10 @@ export function MessageInputContent({
   return (
     <View
       style={{
-        paddingBottom: resolveMessageInputBottomPadding(),
+        paddingBottom: resolveMessageInputBottomPadding({
+          bottomSafeAreaInset: bottom,
+          platform: Platform.OS,
+        }),
       }}
       className="border-t border-border bg-background px-4 pt-2"
     >

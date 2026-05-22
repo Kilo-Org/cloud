@@ -1,6 +1,10 @@
 import { adminProcedure, createTRPCRouter, UpstreamApiError } from '@/lib/trpc/init';
 import { db } from '@/lib/drizzle';
-import { insertKiloClawSubscriptionChangeLog } from '@kilocode/db';
+import {
+  getOrphanVolumeContextProtections,
+  insertKiloClawSubscriptionChangeLog,
+  orphanVolumeSubscriptionContextKey,
+} from '@kilocode/db';
 import { createHash } from 'crypto';
 import {
   kiloclaw_instances,
@@ -38,6 +42,11 @@ import {
 } from '@/lib/kiloclaw/admin-audit-log';
 import { cancelCliRun, createCliRun, getCliRunStatus } from '@/lib/kiloclaw/cli-runs';
 import { clearTrialInactivityStopAfterStart } from '@/lib/kiloclaw/instance-lifecycle';
+import {
+  classifyOrphanVolume,
+  ORPHAN_VOLUME_GRACE_PERIOD_MS,
+  type OrphanVolumeClassification,
+} from '@/lib/kiloclaw/orphan-volume';
 import type {
   PlatformDebugStatusResponse,
   VolumeSnapshot,
@@ -70,6 +79,7 @@ import {
   sql,
   gte,
   lte,
+  lt,
   type SQL,
 } from 'drizzle-orm';
 
@@ -126,6 +136,20 @@ const DetectOrphansSchema = z.object({
   createdAfter: z.string().datetime(),
   /** ISO date string — only check instances created on or before this date. */
   createdBefore: z.string().datetime(),
+});
+
+const FindOrphanVolumesSchema = z.object({
+  /** ISO date string — only check instances destroyed on or after this date. */
+  destroyedAfter: z.string().datetime(),
+  /** ISO date string — only check instances destroyed on or before this date. */
+  destroyedBefore: z.string().datetime(),
+  /** Continue scanning older rows after a previous bounded batch. */
+  cursor: z
+    .object({
+      destroyedAt: z.string().datetime(),
+      id: z.string().uuid(),
+    })
+    .optional(),
 });
 
 const GetInstanceSchema = z.object({
@@ -3802,6 +3826,413 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       }
 
       return { success: true };
+    }),
+
+  // ── Orphan-volume reaper ──────────────────────────────────────────────
+  //
+  // Finds Fly volumes left behind by destroyed instances and lets an admin
+  // reap them one row at a time. Detection is anchored on the (soft-deleted,
+  // never hard-deleted) `kiloclaw_instances` row — the Fly app + volume name
+  // are derived deterministically from it by the worker, so a finalized DO
+  // with wiped storage does not impair correlation. Every safety check is
+  // re-run server-side in `destroyOrphanVolume` before anything is deleted.
+
+  // A mutation, not a query: this is an expensive admin-triggered fan-out
+  // (matches `detectOrphans`) — it must not auto-refetch on the client.
+  findOrphanVolumes: adminProcedure.input(FindOrphanVolumesSchema).mutation(async ({ input }) => {
+    const MAX_SCAN = 500;
+    const CONCURRENCY = 10;
+
+    // 1. The latest destroyed row per (user, sandbox), restricted to the
+    //    requested window.
+    //
+    //    `UQ_kiloclaw_instances_active` is a PARTIAL unique index — it only
+    //    covers live rows (`WHERE destroyed_at IS NULL`) — so a sandbox that
+    //    has been reprovisioned accumulates many destroyed `kiloclaw_instances`
+    //    rows that all share one `sandbox_id`, hence one Fly volume name.
+    //    Scanning each separately would surface the same volume once per row.
+    //
+    //    `selectDistinctOn` collapses them to the single most-recent destroyed
+    //    row per sandbox. It runs over ALL destroyed rows, NOT just the window,
+    //    so the row it keeps is the genuine latest destruction — the correct
+    //    `destroyed_at` to measure the grace period against. The window filter
+    //    is then applied to that latest row in the outer query, so a sandbox
+    //    whose latest destruction falls outside the window is omitted entirely
+    //    rather than represented by a stale older row (which would compute the
+    //    grace period from the wrong, earlier timestamp).
+    //
+    //    leftJoin on subscriptions: a missing subscription row is fine (no
+    //    access to preserve); `UQ_kiloclaw_subscriptions_instance` guarantees
+    //    at most one subscription per instance, so the join stays 1:1.
+    // Every projected column must emit a UNIQUE name: this select becomes a
+    // derived table, and Drizzle does not alias subquery columns, so two
+    // `*.id` projections (`kiloclaw_instances.id` and `kiloclaw_subscriptions.id`)
+    // would both surface as `id` and make the outer SELECT ambiguous. Only
+    // `subscription_status` is consumed downstream, so the other subscription
+    // columns are not projected.
+    const destroyedInstancesByLatest = db
+      .selectDistinctOn([kiloclaw_instances.user_id, kiloclaw_instances.sandbox_id], {
+        id: kiloclaw_instances.id,
+        user_id: kiloclaw_instances.user_id,
+        sandbox_id: kiloclaw_instances.sandbox_id,
+        organization_id: kiloclaw_instances.organization_id,
+        destroyed_at: kiloclaw_instances.destroyed_at,
+        user_email: kilocode_users.google_user_email,
+        subscription_status: kiloclaw_subscriptions.status,
+      })
+      .from(kiloclaw_instances)
+      .leftJoin(kilocode_users, eq(kiloclaw_instances.user_id, kilocode_users.id))
+      .leftJoin(
+        kiloclaw_subscriptions,
+        eq(kiloclaw_instances.id, kiloclaw_subscriptions.instance_id)
+      )
+      .where(isNotNull(kiloclaw_instances.destroyed_at))
+      .orderBy(
+        kiloclaw_instances.user_id,
+        kiloclaw_instances.sandbox_id,
+        desc(kiloclaw_instances.destroyed_at)
+      )
+      .as('destroyed_instances_by_latest');
+
+    // Apply the requested window to the deduplicated latest row, then order
+    // by recency and cap. Filtering here (not inside the subquery) is what
+    // guarantees the window is matched against each sandbox's genuine latest
+    // destruction. The optional cursor continues older rows from the last
+    // scanned `(destroyed_at, id)` tuple, preserving a deterministic 500-row
+    // batch limit without forcing admins to manually bisect date windows.
+    const cursorPredicate = input.cursor
+      ? or(
+          lt(destroyedInstancesByLatest.destroyed_at, input.cursor.destroyedAt),
+          and(
+            eq(destroyedInstancesByLatest.destroyed_at, input.cursor.destroyedAt),
+            lt(destroyedInstancesByLatest.id, input.cursor.id)
+          )
+        )
+      : undefined;
+
+    const instances = await db
+      .select()
+      .from(destroyedInstancesByLatest)
+      .where(
+        and(
+          gte(destroyedInstancesByLatest.destroyed_at, input.destroyedAfter),
+          lte(destroyedInstancesByLatest.destroyed_at, input.destroyedBefore),
+          cursorPredicate
+        )
+      )
+      .orderBy(desc(destroyedInstancesByLatest.destroyed_at), desc(destroyedInstancesByLatest.id))
+      .limit(MAX_SCAN + 1);
+
+    const capped = instances.length > MAX_SCAN;
+    const toScan = capped ? instances.slice(0, MAX_SCAN) : instances;
+    const lastScanned = toScan.at(-1);
+    const nextCursor =
+      capped && lastScanned?.destroyed_at
+        ? {
+            destroyedAt: new Date(lastScanned.destroyed_at).toISOString(),
+            id: lastScanned.id,
+          }
+        : null;
+
+    type VolumeRow = {
+      instance_id: string;
+      user_id: string;
+      user_email: string | null;
+      sandbox_id: string;
+      organization_id: string | null;
+      destroyed_at: string;
+      subscription_status: string | null;
+      fly_app: string;
+      volume_id: string;
+      volume_name: string;
+      volume_state: string;
+      volume_region: string;
+      volume_size_gb: number;
+      attached_machine_id: string | null;
+      volume_created_at: string;
+      do_status: string | null;
+      classification: OrphanVolumeClassification;
+    };
+    type ScanErrorRow = {
+      instance_id: string;
+      user_id: string;
+      user_email: string | null;
+      sandbox_id: string;
+      error: string;
+    };
+
+    if (toScan.length === 0) {
+      return {
+        volumes: [] as VolumeRow[],
+        errors: [] as ScanErrorRow[],
+        scanned: 0,
+        capped: false,
+        nextCursor: null,
+      };
+    }
+
+    const client = new KiloClawInternalClient();
+    const now = new Date();
+    const { accessGrantingContextKeys, pendingDestructionContextKeys } =
+      await getOrphanVolumeContextProtections(
+        db,
+        toScan.map(instance => ({
+          user_id: instance.user_id,
+          organization_id: instance.organization_id,
+        })),
+        now
+      );
+    const volumes: VolumeRow[] = [];
+    const errors: ScanErrorRow[] = [];
+
+    for (let i = 0; i < toScan.length; i += CONCURRENCY) {
+      const batch = toScan.slice(i, i + CONCURRENCY);
+      const results = await Promise.allSettled(
+        batch.map(instance =>
+          client.scanOrphanVolumes(instance.user_id, instance.id, instance.sandbox_id)
+        )
+      );
+
+      for (let j = 0; j < results.length; j++) {
+        const instance = batch[j];
+        const result = results[j];
+        if (!instance || !result) continue;
+
+        // The worker call itself failed — surface it so an empty result is
+        // never silently read as "no orphans".
+        if (result.status === 'rejected') {
+          errors.push({
+            instance_id: instance.id,
+            user_id: instance.user_id,
+            user_email: instance.user_email,
+            sandbox_id: instance.sandbox_id,
+            error: result.reason instanceof Error ? result.reason.message : 'Volume scan failed',
+          });
+          continue;
+        }
+
+        const scan = result.value;
+        // listVolumes failed inside the worker — same false-negative risk.
+        if (scan.scanError) {
+          errors.push({
+            instance_id: instance.id,
+            user_id: instance.user_id,
+            user_email: instance.user_email,
+            sandbox_id: instance.sandbox_id,
+            error: `Could not list Fly volumes: ${scan.scanError}`,
+          });
+          continue;
+        }
+        // The DO state could not be read, so a volume cannot be confirmed as
+        // an orphan. Surface it as an unscanned instance rather than silently
+        // dropping it from a results table that only shows confirmed orphans.
+        if (scan.doStatusError) {
+          errors.push({
+            instance_id: instance.id,
+            user_id: instance.user_id,
+            user_email: instance.user_email,
+            sandbox_id: instance.sandbox_id,
+            error: `Could not read Durable Object state: ${scan.doStatusError}`,
+          });
+          continue;
+        }
+
+        // destroyed_at is non-null here (the WHERE clause guarantees it).
+        const destroyedAt = instance.destroyed_at as string;
+        const graceElapsed =
+          now.getTime() - new Date(destroyedAt).getTime() > ORPHAN_VOLUME_GRACE_PERIOD_MS;
+        const contextKey = orphanVolumeSubscriptionContextKey({
+          user_id: instance.user_id,
+          organization_id: instance.organization_id,
+        });
+        const hasAccess = accessGrantingContextKeys.has(contextKey);
+        const destructionScheduled = pendingDestructionContextKeys.has(contextKey);
+
+        // Only volumes whose name exactly matches THIS instance are ours.
+        // A non-matching volume belongs to a different (possibly live)
+        // sandbox sharing the app and must never be surfaced as reapable.
+        for (const v of scan.volumes) {
+          if (!v.nameMatchesInstance) continue;
+
+          const classification = classifyOrphanVolume({
+            volumeState: v.state,
+            attachedMachineId: v.attached_machine_id,
+            trackedByLiveDo: v.trackedByLiveDo,
+            doStatus: scan.doStatus,
+            doStatusError: scan.doStatusError,
+            hasAccessGrantingSubscription: hasAccess,
+            destructionScheduled,
+            graceElapsed,
+          });
+          // Surface confirmed orphans ONLY. Every other classification —
+          // attached to a machine, live DO, active subscription, pending
+          // destruction, still in grace, Fly already reaping — is correctly
+          // not an orphan and is dropped rather than shown as a non-actionable
+          // row.
+          if (classification !== 'safe_destroy') {
+            continue;
+          }
+
+          volumes.push({
+            instance_id: instance.id,
+            user_id: instance.user_id,
+            user_email: instance.user_email,
+            sandbox_id: instance.sandbox_id,
+            organization_id: instance.organization_id,
+            destroyed_at: destroyedAt,
+            subscription_status: instance.subscription_status,
+            fly_app: scan.flyApp,
+            volume_id: v.id,
+            volume_name: v.name,
+            volume_state: v.state,
+            volume_region: v.region,
+            volume_size_gb: v.size_gb,
+            attached_machine_id: v.attached_machine_id,
+            volume_created_at: v.created_at,
+            do_status: scan.doStatus,
+            classification,
+          });
+        }
+      }
+    }
+
+    return { volumes, errors, scanned: toScan.length, capped, nextCursor };
+  }),
+
+  destroyOrphanVolume: adminProcedure
+    .input(
+      z.object({
+        instanceId: z.string().uuid(),
+        volumeId: z
+          .string()
+          .min(1)
+          .regex(/^vol_[a-zA-Z0-9]+$/, 'Invalid Fly volume ID'),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      // 1. Re-fetch the instance. Every DB-side guard is re-evaluated here —
+      //    the scan result the admin saw may be stale.
+      const [row] = await db
+        .select({
+          id: kiloclaw_instances.id,
+          user_id: kiloclaw_instances.user_id,
+          sandbox_id: kiloclaw_instances.sandbox_id,
+          organization_id: kiloclaw_instances.organization_id,
+          destroyed_at: kiloclaw_instances.destroyed_at,
+          // The latest `destroyed_at` across every destroyed row of this
+          // (user, sandbox). A reprovisioned sandbox has several destroyed
+          // rows sharing one Fly volume; the grace period runs from the most
+          // recent destruction, not whichever row the admin selected.
+          latest_sandbox_destroyed_at: sql<string | null>`(
+            select max(latest.destroyed_at)
+            from ${kiloclaw_instances} as latest
+            where latest.user_id = ${kiloclaw_instances.user_id}
+              and latest.sandbox_id = ${kiloclaw_instances.sandbox_id}
+              and latest.destroyed_at is not null
+          )`,
+        })
+        .from(kiloclaw_instances)
+        .where(eq(kiloclaw_instances.id, input.instanceId))
+        .limit(1);
+
+      if (!row) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Instance not found' });
+      }
+
+      // 2. The instance must be destroyed. This endpoint never touches a
+      //    volume belonging to a live instance.
+      if (row.destroyed_at === null) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Instance is not destroyed — orphan-volume cleanup does not apply',
+        });
+      }
+
+      // 3. Grace period, measured from the latest destruction of this
+      //    sandbox — give Fly + the DO sweep time to self-heal first.
+      const now = new Date();
+      const latestDestroyedAt = row.latest_sandbox_destroyed_at ?? row.destroyed_at;
+      const destroyedMsAgo = now.getTime() - new Date(latestDestroyedAt).getTime();
+      if (destroyedMsAgo <= ORPHAN_VOLUME_GRACE_PERIOD_MS) {
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message: 'Instance was destroyed too recently — wait out the 7-day grace period',
+        });
+      }
+
+      // 4. Subscription guard — never destroy data while this ownership
+      //    context still has access (active / unsuspended past_due / live trial),
+      //    or while the billing lifecycle reaper is still scheduled to destroy
+      //    it (a future `destruction_deadline`). Reprovision transfers move
+      //    access to a current successor row; a detached current row has no
+      //    resolvable context, so the shared lookup fails closed for the user.
+      const context = {
+        user_id: row.user_id,
+        organization_id: row.organization_id,
+      };
+      const { accessGrantingContextKeys, pendingDestructionContextKeys } =
+        await getOrphanVolumeContextProtections(db, [context], now);
+      const contextKey = orphanVolumeSubscriptionContextKey(context);
+      if (accessGrantingContextKeys.has(contextKey)) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'User has an access-granting subscription — volume preserved',
+        });
+      }
+      if (pendingDestructionContextKeys.has(contextKey)) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message:
+            'A billing destruction deadline is still pending — the lifecycle reaper will handle it',
+        });
+      }
+
+      console.log(
+        `[admin-kiloclaw] Orphan volume cleanup by admin ${ctx.user.id} (${ctx.user.google_user_email}) ` +
+          `instance=${row.id} volume=${input.volumeId} (user: ${row.user_id})`
+      );
+
+      // 5. Hand off to the worker, which re-verifies the Fly-side and
+      //    DO-side invariants (name match, quiescent state, no live DO
+      //    reference) before deleting.
+      let result: Awaited<ReturnType<KiloClawInternalClient['destroyOrphanVolume']>>;
+      try {
+        const client = new KiloClawInternalClient();
+        result = await client.destroyOrphanVolume(
+          row.user_id,
+          row.id,
+          row.sandbox_id,
+          input.volumeId
+        );
+      } catch (err) {
+        throwKiloclawAdminError(err, 'Failed to destroy orphan volume');
+      }
+
+      try {
+        await createKiloClawAdminAuditLog({
+          action: 'kiloclaw.orphan_volume.destroy',
+          actor_id: ctx.user.id,
+          actor_email: ctx.user.google_user_email,
+          actor_name: ctx.user.google_user_name,
+          target_user_id: row.user_id,
+          message: `Orphan volume destroyed: ${result.volumeId} (${result.volumeName})`,
+          metadata: {
+            instance_id: row.id,
+            sandbox_id: row.sandbox_id,
+            fly_app: result.flyApp,
+            volume_id: result.volumeId,
+            volume_name: result.volumeName,
+            already_gone: result.alreadyGone,
+          },
+        });
+      } catch (auditErr) {
+        console.error(
+          '[admin-kiloclaw] Failed to write audit log for orphan volume destroy:',
+          auditErr
+        );
+      }
+
+      return { success: true, ...result };
     }),
 
   setEarlyAccess: adminProcedure

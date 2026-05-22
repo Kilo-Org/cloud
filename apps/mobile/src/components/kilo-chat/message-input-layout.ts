@@ -42,6 +42,16 @@ export function resolveMessageInputHeight(contentHeight: number): number {
   return Math.min(Math.max(paddedHeight, MESSAGE_INPUT_MIN_HEIGHT), MESSAGE_INPUT_MAX_HEIGHT);
 }
 
-export function resolveMessageInputBottomPadding(): number {
+export function resolveMessageInputBottomPadding({
+  bottomSafeAreaInset = 0,
+  platform,
+}: {
+  bottomSafeAreaInset?: number;
+  platform?: 'android' | 'ios' | string;
+} = {}): number {
+  if (platform === 'android') {
+    return MESSAGE_INPUT_BOTTOM_CLEARANCE + Math.max(bottomSafeAreaInset, 0);
+  }
+
   return MESSAGE_INPUT_BOTTOM_CLEARANCE;
 }

@@ -8,6 +8,7 @@ export const BILLING_SWEEP_ORDER = [
   'credit_renewal',
   'interrupted_auto_resume',
   'trial_expiry',
+  'organization_trial_expiry',
   'subscription_expiry',
   'instance_destruction',
   'past_due_cleanup',
@@ -125,11 +126,38 @@ export type TrialExpiryQueueMessage =
   | TrialExpiryPageQueueMessage
   | TrialExpiryContinuationQueueMessage;
 
+export type OrganizationTrialExpiryPageQueueMessage = {
+  kind: 'organization_trial_expiry_page';
+  runId: string;
+  sweep: 'organization_trial_expiry';
+  cutoffTime?: string;
+  cursorSubscriptionId?: string;
+  cursorHardExpiryBoundary?: string;
+  pageBudget?: number;
+  wallClockBudgetMs?: number;
+};
+
+export type OrganizationTrialExpiryContinuationQueueMessage = {
+  kind: 'organization_trial_expiry_continuation';
+  runId: string;
+  sweep: 'organization_trial_expiry';
+  cutoffTime: string;
+  cursorSubscriptionId: string;
+  cursorHardExpiryBoundary: string;
+  pageBudget?: number;
+  wallClockBudgetMs?: number;
+};
+
+export type OrganizationTrialExpiryQueueMessage =
+  | OrganizationTrialExpiryPageQueueMessage
+  | OrganizationTrialExpiryContinuationQueueMessage;
+
 export type LifecycleProducerQueueMessage =
   | LifecycleQueueMessage
   | StandaloneInstanceDestructionQueueMessage
   | CreditRenewalQueueMessage
-  | TrialExpiryQueueMessage;
+  | TrialExpiryQueueMessage
+  | OrganizationTrialExpiryQueueMessage;
 
 export type TrialInactivityKickoffQueueMessage = {
   kind: 'trial_inactivity_stop';
@@ -155,6 +183,7 @@ export type BillingQueueMessage =
   | StandaloneInstanceDestructionQueueMessage
   | CreditRenewalQueueMessage
   | TrialExpiryQueueMessage
+  | OrganizationTrialExpiryQueueMessage
   | TrialInactivityQueueMessage;
 
 export type ServiceFetcher = {

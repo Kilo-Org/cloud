@@ -4,8 +4,8 @@ import { insertKiloClawSubscriptionChangeLog } from '@kilocode/db';
 
 import { db } from '@/lib/drizzle';
 import { resolveCurrentPersonalSubscriptionRow } from '@/lib/kiloclaw/current-personal-subscription';
-import { processPersonalKiloClawPaidConversion } from '@/lib/kiloclaw-referrals';
-import { getUserFromAuth } from '@/lib/user.server';
+import { processPersonalKiloClawPaidConversion } from '@/lib/impact/kiloclaw-referrals';
+import { getUserFromAuth } from '@/lib/user/server';
 
 const OverrideBodySchema = z.object({
   sourcePaymentId: z.string().min(1),

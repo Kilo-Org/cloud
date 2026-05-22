@@ -2,7 +2,7 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { getLinearOAuthUrl } from '@/lib/integrations/linear-service';
 import { createOAuthState } from '@/lib/integrations/oauth-state';
-import { getUserFromAuth } from '@/lib/user.server';
+import { getUserFromAuth } from '@/lib/user/server';
 
 export async function GET(request: NextRequest) {
   const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: false });

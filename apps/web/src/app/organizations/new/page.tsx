@@ -1,5 +1,5 @@
 import { Suspense } from 'react';
-import { getUserFromAuthOrRedirect } from '@/lib/user.server';
+import { getUserFromAuthOrRedirect } from '@/lib/user/server';
 import { CreateOrganizationPage } from '@/components/organizations/new/CreateOrganizationPage';
 
 export default async function Page() {

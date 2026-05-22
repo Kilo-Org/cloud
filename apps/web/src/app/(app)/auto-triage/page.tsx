@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import { isFeatureFlagEnabled } from '@/lib/posthog-feature-flags';
-import { getUserFromAuthOrRedirect } from '@/lib/user.server';
+import { getUserFromAuthOrRedirect } from '@/lib/user/server';
 import { AutoTriagePageClient } from './AutoTriagePageClient';
 
 type AutoTriagePageProps = {

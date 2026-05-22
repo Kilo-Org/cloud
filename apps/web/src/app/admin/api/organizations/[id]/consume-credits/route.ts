@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { getUserFromAuth } from '@/lib/user.server';
+import { getUserFromAuth } from '@/lib/user/server';
 import { getOrganizationById } from '@/lib/organizations/organizations';
 import { organizations } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';

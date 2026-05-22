@@ -1,4 +1,4 @@
-import { getUserFromAuthOrRedirect } from '@/lib/user.server';
+import { getUserFromAuthOrRedirect } from '@/lib/user/server';
 import { WastelandListPageClient } from './WastelandListPageClient';
 
 export default async function WastelandPage() {

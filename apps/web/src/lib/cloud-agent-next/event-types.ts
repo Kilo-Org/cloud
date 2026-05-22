@@ -10,7 +10,7 @@
  */
 export type CloudAgentEvent = {
   eventId: number;
-  executionId: string;
+  executionId: string | null;
   sessionId: string;
   streamEventType: string;
   timestamp: string;
@@ -58,7 +58,7 @@ export function isValidCloudAgentEvent(event: unknown): event is CloudAgentEvent
     'eventId' in event &&
     typeof event.eventId === 'number' &&
     'executionId' in event &&
-    typeof event.executionId === 'string' &&
+    (event.executionId === null || typeof event.executionId === 'string') &&
     'sessionId' in event &&
     typeof event.sessionId === 'string' &&
     'streamEventType' in event &&

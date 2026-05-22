@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import { createHash } from 'node:crypto';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { APP_URL } from '@/lib/constants';
-import { getUserFromAuth } from '@/lib/user.server';
+import { getUserFromAuth } from '@/lib/user/server';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import { getInstanceById } from '@/lib/kiloclaw/instance-registry';
 import { exchangeGoogleOAuthCode } from '@/lib/integrations/google-service';

@@ -12,7 +12,7 @@ import { sentryLogger } from '@/lib/utils.server';
 import { codeIndexingAdminRouter } from './code-indexing-admin-router';
 import { getOrganizationById } from '@/lib/organizations/organizations';
 import { getIndexStorage } from '@/lib/code-indexing/storage';
-import { getUserUUID } from '@/lib/user.server';
+import { getUserUUID } from '@/lib/user/server';
 import { findUserByEmail } from '@/lib/user';
 import { chunkCountToSizeKbSql } from '@/lib/code-indexing/util';
 import {

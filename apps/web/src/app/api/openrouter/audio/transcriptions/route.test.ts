@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterAll } from '@jest/globals';
-import { getUserFromAuth } from '@/lib/user.server';
+import { getUserFromAuth } from '@/lib/user/server';
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
 import type { User } from '@kilocode/db/schema';
 import { emitApiMetricsForResponse } from '@/lib/ai-gateway/o11y/api-metrics.server';
@@ -12,7 +12,7 @@ jest.mock('next/server', () => {
   };
 });
 
-jest.mock('@/lib/user.server');
+jest.mock('@/lib/user/server');
 jest.mock('@/lib/organizations/organization-usage');
 jest.mock('@/lib/ai-gateway/o11y/api-metrics.server', () => ({
   emitApiMetricsForResponse: jest.fn(),

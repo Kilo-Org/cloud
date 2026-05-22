@@ -10,7 +10,7 @@ import {
   legacySessionMessagesBaseSchema,
   migrateToGitHubSchema,
 } from '@/routers/app-builder/schemas';
-import { getBalanceForUser } from '@/lib/user.balance';
+import { getBalanceForUser } from '@/lib/user/balance';
 import { MIN_BALANCE_FOR_APP_BUILDER } from '@/lib/app-builder/constants';
 import { generateImageUploadUrl } from '@/lib/r2/cloud-agent-attachments';
 

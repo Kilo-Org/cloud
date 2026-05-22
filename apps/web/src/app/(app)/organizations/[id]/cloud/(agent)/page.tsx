@@ -1,5 +1,5 @@
 import { OrganizationByPageLayout } from '@/components/organizations/OrganizationByPageLayout';
-import { getUserFromAuthOrRedirect } from '@/lib/user.server';
+import { getUserFromAuthOrRedirect } from '@/lib/user/server';
 import { isFeatureFlagEnabledOrDevelopment } from '@/lib/posthog-feature-flags';
 import { NewSessionPanel } from '@/components/cloud-agent-next/NewSessionPanel';
 

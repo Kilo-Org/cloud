@@ -1,5 +1,5 @@
 import { connection, type NextRequest } from 'next/server';
-import { getUserFromAuth } from '@/lib/user.server';
+import { getUserFromAuth } from '@/lib/user/server';
 import { db } from '@/lib/drizzle';
 import { api_request_log } from '@kilocode/db/schema';
 import { and, gte, lte, eq, asc, gt, count } from 'drizzle-orm';

@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { getUserFromAuth } from '@/lib/user.server';
+import { getUserFromAuth } from '@/lib/user/server';
 import { getStripeTopUpCheckoutUrl } from '@/lib/stripe';
 import { MAXIMUM_TOP_UP_AMOUNT, MINIMUM_TOP_UP_AMOUNT } from '@/lib/constants';
 import { isValidReturnUrl } from '@/lib/payment-return-url';

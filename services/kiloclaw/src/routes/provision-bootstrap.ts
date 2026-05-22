@@ -11,9 +11,19 @@ const PLATFORM_BOOTSTRAP_ACTOR = {
   actorId: 'kiloclaw-platform-bootstrap',
 } as const;
 
+function getPropagatedHttpStatus(error: unknown): number | undefined {
+  if (typeof error !== 'object' || error === null || !('status' in error)) {
+    return undefined;
+  }
+
+  const status = error.status;
+  return typeof status === 'number' && status >= 400 && status < 600 ? status : undefined;
+}
+
 export class BootstrapProvisionFallbackError extends Error {
   rpcError: unknown;
   fallbackError: unknown;
+  status?: number;
 
   constructor(params: { rpcError: unknown; fallbackError: unknown }) {
     const fallbackMessage =
@@ -24,6 +34,7 @@ export class BootstrapProvisionFallbackError extends Error {
     this.name = 'BootstrapProvisionFallbackError';
     this.rpcError = params.rpcError;
     this.fallbackError = params.fallbackError;
+    this.status = getPropagatedHttpStatus(params.fallbackError);
   }
 }
 

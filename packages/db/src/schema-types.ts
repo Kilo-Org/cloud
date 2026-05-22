@@ -34,6 +34,7 @@ export enum KiloPassIssuanceItemKind {
   Base = 'base',
   Bonus = 'bonus',
   PromoFirstMonth50Pct = 'promo_first_month_50pct',
+  ReferralBonus = 'referral_bonus',
 }
 
 export enum KiloPassAuditLogAction {
@@ -274,21 +275,37 @@ export const AffiliateEventDeliveryState = {
 export type AffiliateEventDeliveryState =
   (typeof AffiliateEventDeliveryState)[keyof typeof AffiliateEventDeliveryState];
 
-export const KiloClawAttributionTouchType = {
+export const ImpactReferralProduct = {
+  KiloClaw: 'kiloclaw',
+  KiloPass: 'kilo_pass',
+} as const;
+
+export type ImpactReferralProduct =
+  (typeof ImpactReferralProduct)[keyof typeof ImpactReferralProduct];
+
+export const ImpactAdvocateProgramKey = {
+  KiloClaw: 'kiloclaw',
+  KiloPass: 'kilo_pass',
+} as const;
+
+export type ImpactAdvocateProgramKey =
+  (typeof ImpactAdvocateProgramKey)[keyof typeof ImpactAdvocateProgramKey];
+
+export const ImpactAttributionTouchType = {
   Affiliate: 'affiliate',
   Referral: 'referral',
 } as const;
 
-export type KiloClawAttributionTouchType =
-  (typeof KiloClawAttributionTouchType)[keyof typeof KiloClawAttributionTouchType];
+export type ImpactAttributionTouchType =
+  (typeof ImpactAttributionTouchType)[keyof typeof ImpactAttributionTouchType];
 
-export const KiloClawAttributionTouchProvider = {
+export const ImpactAttributionTouchProvider = {
   ImpactPerformance: 'impact_performance',
   ImpactAdvocate: 'impact_advocate',
 } as const;
 
-export type KiloClawAttributionTouchProvider =
-  (typeof KiloClawAttributionTouchProvider)[keyof typeof KiloClawAttributionTouchProvider];
+export type ImpactAttributionTouchProvider =
+  (typeof ImpactAttributionTouchProvider)[keyof typeof ImpactAttributionTouchProvider];
 
 export const ImpactAdvocateRegistrationState = {
   Pending: 'pending',
@@ -310,33 +327,33 @@ export const ImpactAdvocateAttemptDeliveryState = {
 export type ImpactAdvocateAttemptDeliveryState =
   (typeof ImpactAdvocateAttemptDeliveryState)[keyof typeof ImpactAdvocateAttemptDeliveryState];
 
-export const KiloClawReferralBeneficiaryRole = {
+export const ImpactReferralBeneficiaryRole = {
   Referrer: 'referrer',
   Referee: 'referee',
 } as const;
 
-export type KiloClawReferralBeneficiaryRole =
-  (typeof KiloClawReferralBeneficiaryRole)[keyof typeof KiloClawReferralBeneficiaryRole];
+export type ImpactReferralBeneficiaryRole =
+  (typeof ImpactReferralBeneficiaryRole)[keyof typeof ImpactReferralBeneficiaryRole];
 
-export const KiloClawReferralWinningTouchType = {
+export const ImpactReferralWinningTouchType = {
   Referral: 'referral',
   Affiliate: 'affiliate',
   None: 'none',
 } as const;
 
-export type KiloClawReferralWinningTouchType =
-  (typeof KiloClawReferralWinningTouchType)[keyof typeof KiloClawReferralWinningTouchType];
+export type ImpactReferralWinningTouchType =
+  (typeof ImpactReferralWinningTouchType)[keyof typeof ImpactReferralWinningTouchType];
 
-export const KiloClawReferralDecisionOutcome = {
+export const ImpactReferralDecisionOutcome = {
   Granted: 'granted',
   CapLimited: 'cap_limited',
   Disqualified: 'disqualified',
 } as const;
 
-export type KiloClawReferralDecisionOutcome =
-  (typeof KiloClawReferralDecisionOutcome)[keyof typeof KiloClawReferralDecisionOutcome];
+export type ImpactReferralDecisionOutcome =
+  (typeof ImpactReferralDecisionOutcome)[keyof typeof ImpactReferralDecisionOutcome];
 
-export const KiloClawReferralRewardStatus = {
+export const ImpactReferralRewardStatus = {
   Pending: 'pending',
   Earned: 'earned',
   Applied: 'applied',
@@ -346,8 +363,38 @@ export const KiloClawReferralRewardStatus = {
   ReviewRequired: 'review_required',
 } as const;
 
-export type KiloClawReferralRewardStatus =
-  (typeof KiloClawReferralRewardStatus)[keyof typeof KiloClawReferralRewardStatus];
+export type ImpactReferralRewardStatus =
+  (typeof ImpactReferralRewardStatus)[keyof typeof ImpactReferralRewardStatus];
+
+export const ImpactReferralRewardKind = {
+  KiloClawFreeMonth: 'kiloclaw_free_month',
+  KiloPassBonus: 'kilo_pass_bonus',
+} as const;
+
+export type ImpactReferralRewardKind =
+  (typeof ImpactReferralRewardKind)[keyof typeof ImpactReferralRewardKind];
+
+export const ImpactReferralPaymentProvider = {
+  Stripe: 'stripe',
+  Credits: 'credits',
+  AppStore: 'app_store',
+  GooglePlay: 'google_play',
+} as const;
+
+export type ImpactReferralPaymentProvider =
+  (typeof ImpactReferralPaymentProvider)[keyof typeof ImpactReferralPaymentProvider];
+
+export const KiloClawReferralBeneficiaryRole = ImpactReferralBeneficiaryRole;
+export type KiloClawReferralBeneficiaryRole = ImpactReferralBeneficiaryRole;
+
+export const KiloClawReferralWinningTouchType = ImpactReferralWinningTouchType;
+export type KiloClawReferralWinningTouchType = ImpactReferralWinningTouchType;
+
+export const KiloClawReferralDecisionOutcome = ImpactReferralDecisionOutcome;
+export type KiloClawReferralDecisionOutcome = ImpactReferralDecisionOutcome;
+
+export const KiloClawReferralRewardStatus = ImpactReferralRewardStatus;
+export type KiloClawReferralRewardStatus = ImpactReferralRewardStatus;
 
 export const ImpactConversionReportState = {
   Queued: 'queued',

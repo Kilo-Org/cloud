@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { getUserFromAuth } from '@/lib/user.server';
+import { getUserFromAuth } from '@/lib/user/server';
 import { findUserById, findUsersByIds } from '@/lib/user';
 import { getReferralCodeForUser, getReferralCodeUsages } from '@/lib/referral';
 import { db } from '@/lib/drizzle';

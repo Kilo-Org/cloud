@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/drizzle';
 import { payment_methods } from '@kilocode/db/schema';
 import { eq, desc } from 'drizzle-orm';
-import { getUserFromAuth } from '@/lib/user.server';
+import { getUserFromAuth } from '@/lib/user/server';
 
 export async function GET(
   req: NextRequest

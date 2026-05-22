@@ -28,8 +28,12 @@ import {
   autoResumeIfSuspended,
   clearTrialInactivityStopAfterTrialTransition,
 } from '@/lib/kiloclaw/instance-lifecycle';
-import { buildAffiliateEventDedupeKey, enqueueAffiliateEventForUser } from '@/lib/affiliate-events';
-import { processPersonalKiloClawPaidConversion } from '@/lib/kiloclaw-referrals';
+import {
+  buildAffiliateEventDedupeKey,
+  enqueueAffiliateEventForUser,
+} from '@/lib/impact/affiliate-events';
+import { processPersonalKiloClawPaidConversion } from '@/lib/impact/kiloclaw-referrals';
+import { ImpactReferralPaymentProvider } from '@kilocode/db/schema-types';
 import { maybeIssueKiloPassBonusFromUsageThreshold } from '@/lib/kilo-pass/usage-triggered-bonus';
 import { getKiloPassStateForUser, type KiloPassSubscriptionState } from '@/lib/kilo-pass/state';
 import {
@@ -309,6 +313,7 @@ async function enqueueCreditEnrollmentAffiliateEvents(params: {
     userId: params.userId,
     sourcePaymentId: params.saleOrderId,
     orderId: params.saleOrderId,
+    paymentProvider: ImpactReferralPaymentProvider.Credits,
     amount: params.saleAmountMicrodollars / 1_000_000,
     currencyCode: 'usd',
     itemCategory,
@@ -1358,17 +1363,26 @@ export async function enrollWithCredits(params: {
     throw new Error('Enrollment already processed for this billing period.');
   }
 
-  await enqueueCreditEnrollmentAffiliateEvents({
-    userId,
-    plan,
-    saleEntityId: saleDedupeKeyEntityId,
-    saleOrderId: deductionCategory,
-    saleAmountMicrodollars: costMicrodollars,
-    eventDate: now,
-    saleItemSku,
-    priceVersion: kiloclawPriceVersion,
-    trialEndEntityId,
-  });
+  try {
+    await enqueueCreditEnrollmentAffiliateEvents({
+      userId,
+      plan,
+      saleEntityId: saleDedupeKeyEntityId,
+      saleOrderId: deductionCategory,
+      saleAmountMicrodollars: costMicrodollars,
+      eventDate: now,
+      saleItemSku,
+      priceVersion: kiloclawPriceVersion,
+      trialEndEntityId,
+    });
+  } catch (error) {
+    logWarning('Affiliate enqueue failed after credit enrollment', {
+      user_id: userId,
+      instanceId,
+      deductionCategory,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 
   // Step 4: Post-transaction bonus evaluation (spec rule 6)
   try {

@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { PrefetchedOrganizations } from '@/app/(app)/components/PrefetchedOrganizations';
 import { KiloCardLayout } from '@/components/KiloCardLayout';
-import { getUserFromAuthOrRedirect } from '@/lib/user.server';
+import { getUserFromAuthOrRedirect } from '@/lib/user/server';
 import { BotWizard } from './_components/BotWizard';
 
 export const metadata: Metadata = {

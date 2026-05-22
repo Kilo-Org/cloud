@@ -1,4 +1,4 @@
-import { getProfileRedirectPath, getUserFromAuth } from '@/lib/user.server';
+import { getProfileRedirectPath, getUserFromAuth } from '@/lib/user/server';
 import { redirect } from 'next/navigation';
 
 export default async function Home() {

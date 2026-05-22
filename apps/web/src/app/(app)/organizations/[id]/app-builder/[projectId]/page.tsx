@@ -2,7 +2,7 @@ import { notFound, redirect } from 'next/navigation';
 import { AppBuilderPage } from '@/components/app-builder/AppBuilderPage';
 import { getAuthorizedOrgContext } from '@/lib/organizations/organization-auth';
 import { isFeatureFlagEnabled } from '@/lib/posthog-feature-flags';
-import { signInUrlWithCallbackPath } from '@/lib/user.server';
+import { signInUrlWithCallbackPath } from '@/lib/user/server';
 
 type Props = {
   params: Promise<{ id: string; projectId: string }>;

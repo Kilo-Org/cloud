@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { getUserFromAuth } from '@/lib/user.server';
+import { getUserFromAuth } from '@/lib/user/server';
 import { db } from '@/lib/drizzle';
 import { getEffectiveKiloClawSubscriptionForUser } from '@/lib/kiloclaw/access-state';
 import { kilocode_users, organization_memberships, organizations } from '@kilocode/db/schema';

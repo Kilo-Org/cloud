@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { getUserFromAuthOrRedirect } from '@/lib/user.server';
+import { getUserFromAuthOrRedirect } from '@/lib/user/server';
 import { resolveWastelandUpstreamForUser } from '@/lib/wasteland/server-resolve';
 
 export default async function OrgWastelandDashboardPage({

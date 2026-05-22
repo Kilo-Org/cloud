@@ -64,6 +64,7 @@ export type OrphanVolumeClassification =
   | 'do_alive'
   | 'do_check_failed'
   | 'subscription_active'
+  | 'destruction_scheduled'
   | 'within_grace';
 
 /**
@@ -79,6 +80,7 @@ export function classifyOrphanVolume(params: {
   doStatus: string | null;
   doStatusError: string | null;
   hasAccessGrantingSubscription: boolean;
+  destructionScheduled: boolean;
   graceElapsed: boolean;
 }): OrphanVolumeClassification {
   // Cannot confirm DO state → cannot rule out a live reference. Fail closed.
@@ -99,6 +101,10 @@ export function classifyOrphanVolume(params: {
   if (params.doStatus !== null) return 'do_alive';
   // The user still has product access; preserve their data.
   if (params.hasAccessGrantingSubscription) return 'subscription_active';
+  // A billing destruction deadline is still pending — the kiloclaw-billing
+  // lifecycle reaper is already scheduled to destroy this user's instance
+  // and its volume. Not a true orphan yet; only one if that reaper fails.
+  if (params.destructionScheduled) return 'destruction_scheduled';
   // Destroyed too recently — let Fly / the DO sweep self-heal first.
   if (!params.graceElapsed) return 'within_grace';
   return 'safe_destroy';

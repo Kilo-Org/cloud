@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { getUserFromAuth } from '@/lib/user.server';
+import { getUserFromAuth } from '@/lib/user/server';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import { captureException } from '@sentry/nextjs';
 import { createOAuthState } from '@/lib/integrations/oauth-state';

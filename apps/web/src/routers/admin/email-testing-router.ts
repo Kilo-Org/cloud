@@ -23,6 +23,8 @@ function fixtureTemplateVars(template: TemplateName): Record<string, string | Ra
   const orgId = 'fixture-org-id';
   const organization_url = `${NEXTAUTH_URL}/organizations/${orgId}`;
   const invoices_url = `${NEXTAUTH_URL}/organizations/${orgId}/payment-details`;
+  const organization_billing_url = invoices_url;
+  const organization_claw_url = `${NEXTAUTH_URL}/organizations/${orgId}/claw`;
   const integrations_url = `${NEXTAUTH_URL}/organizations/${orgId}/integrations`;
   const code_reviews_url = `${NEXTAUTH_URL}/organizations/${orgId}/code-reviews`;
 
@@ -126,6 +128,46 @@ function fixtureTemplateVars(template: TemplateName): Record<string, string | Ra
         claw_url: `${NEXTAUTH_URL}/claw`,
         instance_label: 'Research Claw',
         instance_id_short: '11111111',
+      };
+    case 'clawOrganizationTrialSuspendedBillingAuthority':
+      return {
+        organization_name: 'Acme Corp',
+        instance_label: 'Research Claw',
+        destruction_date: formatDate(new Date(Date.now() + 7 * 86_400_000)),
+        organization_billing_url,
+      };
+    case 'clawOrganizationTrialSuspendedUser':
+      return {
+        organization_name: 'Acme Corp',
+        instance_label: 'Research Claw',
+        destruction_date: formatDate(new Date(Date.now() + 7 * 86_400_000)),
+        organization_claw_url,
+      };
+    case 'clawOrganizationDestructionWarningBillingAuthority':
+      return {
+        organization_name: 'Acme Corp',
+        instance_label: 'Research Claw',
+        destruction_date: formatDate(new Date(Date.now() + 2 * 86_400_000)),
+        organization_billing_url,
+      };
+    case 'clawOrganizationDestructionWarningUser':
+      return {
+        organization_name: 'Acme Corp',
+        instance_label: 'Research Claw',
+        destruction_date: formatDate(new Date(Date.now() + 2 * 86_400_000)),
+        organization_claw_url,
+      };
+    case 'clawOrganizationInstanceDestroyedBillingAuthority':
+      return {
+        organization_name: 'Acme Corp',
+        instance_label: 'Research Claw',
+        organization_billing_url,
+      };
+    case 'clawOrganizationInstanceDestroyedUser':
+      return {
+        organization_name: 'Acme Corp',
+        instance_label: 'Research Claw',
+        organization_claw_url,
       };
     case 'clawEarlybirdEndingSoon':
       return { days_remaining: '14', expiry_date: '2026-09-26', claw_url: `${NEXTAUTH_URL}/claw` };

@@ -7,12 +7,12 @@ import { insertTestUser } from '@/tests/helpers/user.helper';
 import {
   impact_advocate_reward_redemptions,
   impact_conversion_reports,
-  kiloclaw_attribution_touches,
-  kiloclaw_referral_conversions,
-  kiloclaw_referral_reward_applications,
-  kiloclaw_referral_reward_decisions,
-  kiloclaw_referral_rewards,
-  kiloclaw_referrals,
+  impact_attribution_touches,
+  impact_referral_conversions,
+  impact_referral_reward_applications,
+  impact_referral_reward_decisions,
+  impact_referral_rewards,
+  impact_referrals,
   type User,
 } from '@kilocode/db/schema';
 
@@ -47,7 +47,7 @@ async function insertReferralInvestigationRow(params: {
     normalized_email: params.refereeEmail,
   });
   const [touch] = await db
-    .insert(kiloclaw_attribution_touches)
+    .insert(impact_attribution_touches)
     .values({
       dedupe_key: `touch-${params.sourcePaymentId}`,
       user_id: referee.id,
@@ -60,15 +60,15 @@ async function insertReferralInvestigationRow(params: {
       touched_at: '2026-04-01T00:00:00.000Z',
       expires_at: '2026-05-01T00:00:00.000Z',
     })
-    .returning({ id: kiloclaw_attribution_touches.id });
-  await db.insert(kiloclaw_referrals).values({
+    .returning({ id: impact_attribution_touches.id });
+  await db.insert(impact_referrals).values({
     referee_user_id: referee.id,
     referrer_user_id: referrer.id,
     source_touch_id: touch.id,
     impact_referral_id: 'RS-SUPPORT',
   });
   const [conversion] = await db
-    .insert(kiloclaw_referral_conversions)
+    .insert(impact_referral_conversions)
     .values({
       referee_user_id: referee.id,
       referrer_user_id: referrer.id,
@@ -79,9 +79,9 @@ async function insertReferralInvestigationRow(params: {
       disqualification_reason: params.disqualificationReason,
       converted_at: '2026-04-10T00:00:00.000Z',
     })
-    .returning({ id: kiloclaw_referral_conversions.id });
+    .returning({ id: impact_referral_conversions.id });
   const [decision] = await db
-    .insert(kiloclaw_referral_reward_decisions)
+    .insert(impact_referral_reward_decisions)
     .values({
       conversion_id: conversion.id,
       beneficiary_user_id: referrer.id,
@@ -90,11 +90,11 @@ async function insertReferralInvestigationRow(params: {
       reason: params.disqualificationReason,
       months_granted: params.qualified ? 1 : 0,
     })
-    .returning({ id: kiloclaw_referral_reward_decisions.id });
+    .returning({ id: impact_referral_reward_decisions.id });
 
   if (params.qualified) {
     const [reward] = await db
-      .insert(kiloclaw_referral_rewards)
+      .insert(impact_referral_rewards)
       .values({
         conversion_id: conversion.id,
         decision_id: decision.id,
@@ -105,8 +105,8 @@ async function insertReferralInvestigationRow(params: {
         earned_at: '2026-04-10T00:00:00.000Z',
         applied_at: '2026-04-10T00:05:00.000Z',
       })
-      .returning({ id: kiloclaw_referral_rewards.id });
-    await db.insert(kiloclaw_referral_reward_applications).values({
+      .returning({ id: impact_referral_rewards.id });
+    await db.insert(impact_referral_reward_applications).values({
       reward_id: reward.id,
       beneficiary_user_id: referrer.id,
       subscription_id: crypto.randomUUID(),

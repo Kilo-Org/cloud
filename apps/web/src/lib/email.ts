@@ -28,6 +28,16 @@ export const subjects = {
   clawSuspendedPayment: 'Action Required: KiloClaw Payment Overdue',
   clawDestructionWarning: 'Your KiloClaw Instance Will Be Deleted in 2 Days',
   clawInstanceDestroyed: 'Your KiloClaw Instance Has Been Deleted',
+  clawOrganizationTrialSuspendedBillingAuthority:
+    'Action Required: Organization KiloClaw Instance Suspended',
+  clawOrganizationTrialSuspendedUser: 'Organization KiloClaw Instance Suspended',
+  clawOrganizationDestructionWarningBillingAuthority:
+    'Action Required: Organization KiloClaw Instance Will Be Deleted in 2 Days',
+  clawOrganizationDestructionWarningUser:
+    'Organization KiloClaw Instance Will Be Deleted in 2 Days',
+  clawOrganizationInstanceDestroyedBillingAuthority:
+    'Organization KiloClaw Instance Has Been Deleted',
+  clawOrganizationInstanceDestroyedUser: 'Organization KiloClaw Instance Has Been Deleted',
   clawEarlybirdEndingSoon: 'Your KiloClaw Earlybird Access Ends Soon',
   clawEarlybirdExpiresTomorrow: 'Your KiloClaw Earlybird Access Expires Tomorrow',
   clawInstanceReady: 'Your KiloClaw Instance Is Ready',

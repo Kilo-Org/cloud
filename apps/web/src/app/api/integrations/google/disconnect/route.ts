@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { APP_URL } from '@/lib/constants';
-import { getUserFromAuth } from '@/lib/user.server';
+import { getUserFromAuth } from '@/lib/user/server';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import { getActiveInstance, getActiveOrgInstance } from '@/lib/kiloclaw/instance-registry';
 import {

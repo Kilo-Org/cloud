@@ -385,9 +385,11 @@ async function seedDeliveredImpactSignupEvent(
   email: string,
   conversionDate = new Date()
 ) {
-  const { recordAffiliateAttributionAndQueueParentEvent } = await import('@/lib/affiliate-events');
-  const { recordImpactAffiliateTouch } = await import('@/lib/impact-referral');
+  const { recordAffiliateAttributionAndQueueParentEvent } =
+    await import('@/lib/impact/affiliate-events');
+  const { recordImpactAffiliateTouch } = await import('@/lib/impact/referral');
   const eventDate = new Date(conversionDate.getTime() - 10 * 60_000);
+  const signupDeliveredAt = new Date(conversionDate.getTime() - 6 * 60_000);
 
   const parentEvent = await recordAffiliateAttributionAndQueueParentEvent({
     userId,
@@ -420,7 +422,7 @@ async function seedDeliveredImpactSignupEvent(
     .update(user_affiliate_events)
     .set({
       delivery_state: 'delivered',
-      claimed_at: null,
+      claimed_at: signupDeliveredAt.toISOString(),
       next_retry_at: null,
     })
     .where(eq(user_affiliate_events.id, parentEvent!.id));
@@ -2232,6 +2234,101 @@ describe('createKiloPassUpsellCheckout', () => {
     expect(stripeMock.checkout.sessions.create).toHaveBeenCalled();
   });
 
+  it('uses empty affiliateTrackingId in Kilo Pass upsell metadata when attribution is absent', async () => {
+    const instance = await createKiloclawInstance(user.id);
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: user.id,
+      instance_id: instance.id,
+      plan: 'trial',
+      status: 'trialing',
+      trial_started_at: new Date().toISOString(),
+      trial_ends_at: new Date(Date.now() + 7 * 86_400_000).toISOString(),
+      kiloclaw_price_version: LEGACY_KILOCLAW_PRICE_VERSION,
+    });
+    stripeMock.checkout.sessions.create.mockResolvedValue({
+      url: 'https://checkout.stripe.com/test',
+    });
+
+    const caller = await createCallerForUser(user.id);
+    await caller.kiloclaw.createKiloPassUpsellCheckout({
+      instanceId: instance.id,
+      tier: '19',
+      cadence: 'monthly',
+      hostingPlan: 'standard',
+    });
+
+    expect(stripeMock.checkout.sessions.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        subscription_data: {
+          metadata: {
+            type: 'kilo-pass',
+            kiloUserId: user.id,
+            tier: 'tier_19',
+            cadence: 'monthly',
+            affiliateTrackingId: '',
+          },
+        },
+        metadata: {
+          type: 'kilo-pass',
+          kiloUserId: user.id,
+          tier: 'tier_19',
+          cadence: 'monthly',
+          affiliateTrackingId: '',
+        },
+      })
+    );
+  });
+
+  it('includes affiliateTrackingId in Kilo Pass upsell metadata when attribution exists', async () => {
+    const instance = await createKiloclawInstance(user.id);
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: user.id,
+      instance_id: instance.id,
+      plan: 'trial',
+      status: 'trialing',
+      trial_started_at: new Date().toISOString(),
+      trial_ends_at: new Date(Date.now() + 7 * 86_400_000).toISOString(),
+      kiloclaw_price_version: LEGACY_KILOCLAW_PRICE_VERSION,
+    });
+    await db.insert(user_affiliate_attributions).values({
+      user_id: user.id,
+      provider: 'impact',
+      tracking_id: 'impact-click-123',
+    });
+    stripeMock.checkout.sessions.create.mockResolvedValue({
+      url: 'https://checkout.stripe.com/test',
+    });
+
+    const caller = await createCallerForUser(user.id);
+    await caller.kiloclaw.createKiloPassUpsellCheckout({
+      instanceId: instance.id,
+      tier: '19',
+      cadence: 'monthly',
+      hostingPlan: 'standard',
+    });
+
+    expect(stripeMock.checkout.sessions.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        subscription_data: {
+          metadata: {
+            type: 'kilo-pass',
+            kiloUserId: user.id,
+            tier: 'tier_19',
+            cadence: 'monthly',
+            affiliateTrackingId: 'impact-click-123',
+          },
+        },
+        metadata: {
+          type: 'kilo-pass',
+          kiloUserId: user.id,
+          tier: 'tier_19',
+          cadence: 'monthly',
+          affiliateTrackingId: 'impact-click-123',
+        },
+      })
+    );
+  });
+
   it('allows current Standard hosting when balance plus selected tier projection covers the first charge', async () => {
     const instance = await createKiloclawInstance(user.id);
     await db
@@ -3358,6 +3455,90 @@ describe('handleKiloClawInvoicePaid affiliate events', () => {
           itemCategory: 'kiloclaw-standard-2026-03-19',
           itemName: 'KiloClaw Standard Plan',
           orderId: 'in_affiliate_sale',
+        }),
+      })
+    );
+  });
+
+  it('enqueues sale affiliate events for positive attributed invoices without a charge id', async () => {
+    const paidAt = new Date('2026-04-09T10:00:00.000Z');
+    await seedDeliveredImpactSignupEvent(user.id, user.google_user_email, paidAt);
+
+    const [instance] = await db
+      .insert(kiloclaw_instances)
+      .values({ user_id: user.id, sandbox_id: sandboxIdFromUserId(user.id) })
+      .returning();
+
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: user.id,
+      instance_id: instance.id,
+      stripe_subscription_id: 'sub_invoice_paid_without_charge',
+      payment_source: 'stripe',
+      plan: 'standard',
+      status: 'active',
+      current_period_start: '2026-04-01T00:00:00.000Z',
+      current_period_end: '2026-05-01T00:00:00.000Z',
+      cancel_at_period_end: false,
+    });
+
+    stripeMock.subscriptions.retrieve.mockResolvedValue({
+      metadata: {
+        type: 'kiloclaw',
+        plan: 'standard',
+        kiloUserId: user.id,
+      },
+      schedule: null,
+      items: { data: [{ price: { id: 'price_standard' } }] },
+    });
+
+    await handleKiloClawInvoicePaid({
+      eventId: 'evt_invoice_paid_affiliate_without_charge',
+      invoice: {
+        id: 'in_affiliate_sale_without_charge',
+        amount_paid: 900,
+        currency: 'usd',
+        charge: null,
+        parent: {
+          subscription_details: {
+            subscription: 'sub_invoice_paid_without_charge',
+          },
+        },
+        lines: {
+          data: [
+            {
+              pricing: {
+                price_details: {
+                  price: 'price_standard',
+                },
+              },
+              period: {
+                start: Math.floor(new Date('2026-04-01T00:00:00.000Z').getTime() / 1000),
+                end: Math.floor(new Date('2026-05-01T00:00:00.000Z').getTime() / 1000),
+              },
+            },
+          ],
+        },
+        status_transitions: {
+          paid_at: Math.floor(paidAt.getTime() / 1000),
+        },
+      } as unknown as Stripe.Invoice,
+    });
+
+    const events = await db
+      .select()
+      .from(user_affiliate_events)
+      .where(eq(user_affiliate_events.user_id, user.id));
+
+    expect(events.map(event => event.event_type).sort()).toEqual(['sale', 'signup']);
+    expect(events.find(event => event.event_type === 'sale')).toEqual(
+      expect.objectContaining({
+        delivery_state: 'queued',
+        stripe_charge_id: null,
+        payload_json: expect.objectContaining({
+          amount: 9,
+          currencyCode: 'usd',
+          orderId: 'in_affiliate_sale_without_charge',
+          stripeChargeId: null,
         }),
       })
     );

@@ -18,6 +18,7 @@ Active.
 - Updated 2026-03-26 to add monthly billing cycle option.
 - Updated 2026-03-28 to document billing cycle change hardening.
 - Updated 2026-03-28/29 with spec audit fixes, definitions, and billing compliance implementation.
+- Updated 2026-05-18 to define organization KiloClaw hard-expiry lifecycle coupling.
 
 ## Conventions
 
@@ -477,6 +478,26 @@ grants billing access without consuming a seat.
 10. The system MUST exempt organizations with suppressed trial
     messaging (see Definitions) from trial expiration (treated as
     subscribed).
+11. Organization-managed KiloClaw trial-expiry enforcement MUST begin
+    only when the organization is hard-expired and lacks every qualifying
+    non-trial entitlement: an active subscription purchase, disabled
+    require-seats enforcement, OSS sponsorship, or suppressed trial
+    messaging.
+12. When rule 11 applies, the KiloClaw billing lifecycle MUST suspend the
+    affected organization-managed instances and assign a fresh destruction
+    deadline 7 days after suspension. The deadline MUST NOT be backdated to
+    the organization trial end timestamp.
+13. Before sending a destruction warning or destroying an organization-managed
+    KiloClaw instance under rule 12, the system MUST re-evaluate organization
+    entitlement. If entitlement has returned, it MUST cancel pending deletion,
+    restore access state, and trigger automatic compute resume instead of
+    warning or destroying the instance.
+14. If the destruction deadline passes while the organization is still
+    hard-expired and unentitled, the KiloClaw billing lifecycle MUST destroy the
+    affected instance according to the KiloClaw billing spec.
+15. These KiloClaw-specific lifecycle rules do not change the general
+    organization UI and mutation behavior for active, soft-expired, or
+    hard-expired trial stages defined above.
 
 ### Payment Processor Customer Management
 
@@ -518,6 +539,10 @@ grants billing access without consuming a seat.
 5. Email delivery failures MUST be logged and reported to error
    tracking but MUST NOT block or roll back the subscription
    operation.
+6. Organization KiloClaw hard-expiry suspension, destruction-warning, and
+   destroyed notifications MUST follow the organization-specific,
+   role-aware recipient and copy contract defined in the KiloClaw billing
+   spec.
 
 ## Error Handling
 
@@ -559,6 +584,15 @@ in the current codebase:
    purchase records. (Currently records gross only.)
 
 ## Changelog
+
+### 2026-05-18 -- Organization KiloClaw hard-expiry coupling
+
+- Defined hard-expired organization trial state as the KiloClaw destructive
+  enforcement boundary, while preserving the active subscription purchase and
+  trial-exemption contract.
+- Added fresh seven-day destruction grace, pre-destruction entitlement
+  revalidation, automatic recovery/compute resume, and KiloClaw notification
+  contract cross-reference.
 
 ### 2026-05-05 -- Mixed subscription line-item filtering
 

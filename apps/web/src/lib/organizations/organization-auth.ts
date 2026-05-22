@@ -1,5 +1,5 @@
 import 'server-only';
-import { getUserFromAuth } from '@/lib/user.server';
+import { getUserFromAuth } from '@/lib/user/server';
 import type { Organization, User } from '@kilocode/db/schema';
 import { organization_memberships, organizations } from '@kilocode/db/schema';
 import { NextResponse } from 'next/server';

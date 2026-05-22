@@ -5,7 +5,7 @@ import {
   type AnalyticsEngineResponse,
   type ControllerTelemetryRow,
 } from '@/lib/kiloclaw/disk-usage';
-import { getUserFromAuth } from '@/lib/user.server';
+import { getUserFromAuth } from '@/lib/user/server';
 
 export async function GET(
   request: NextRequest

@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { KiloCardLayout } from '@/components/KiloCardLayout';
-import { getUserFromAuthOrRedirect } from '@/lib/user.server';
+import { getUserFromAuthOrRedirect } from '@/lib/user/server';
 import { ALL_PLATFORM_IDS, type PlatformId } from '../_components/platforms';
 import { AuthorizeFlow } from './_components/AuthorizeFlow';
 
@@ -81,6 +81,7 @@ export default async function CollabAuthorizePage({ searchParams }: AppPageProps
 
   const params = await searchParams;
   const services = parseServices(params?.services);
+  const connectedServices = parseServices(params?.connected);
   const organizationId = Array.isArray(params?.organizationId)
     ? params.organizationId[0]
     : params?.organizationId;
@@ -93,6 +94,7 @@ export default async function CollabAuthorizePage({ searchParams }: AppPageProps
     <KiloCardLayout bare className="max-w-xl" contentClassName="">
       <AuthorizeFlow
         serviceIds={services}
+        connectedServiceIds={connectedServices}
         organizationId={organizationId}
         initialIndex={initialIndex}
         initialError={initialError}

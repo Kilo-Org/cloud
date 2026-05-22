@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { getUserFromAuth } from '@/lib/user.server';
+import { getUserFromAuth } from '@/lib/user/server';
 
 export default async function KiloClawSuccessLayout({ children }: { children: React.ReactNode }) {
   const { user } = await getUserFromAuth({ adminOnly: false });

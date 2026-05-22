@@ -92,3 +92,5 @@ export type {
 
 export { isValidGitUrl, sanitizeGitUrl, parseGitUrl, repoFullNameFromGitUrl } from './git-url.js';
 export type { RepoCoordinates } from './git-url.js';
+
+export { KILO_MODEL_PREFIX, unprefixKiloGatewayModelId } from './kilo-model-id.js';

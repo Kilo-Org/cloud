@@ -301,6 +301,9 @@ export async function getControllerVersion(
   version: string;
   commit: string;
   openclawVersion?: string | null;
+  openclawCommit?: string | null;
+  apiVersion?: number;
+  capabilities?: string[];
 } | null> {
   try {
     return await callGatewayController(

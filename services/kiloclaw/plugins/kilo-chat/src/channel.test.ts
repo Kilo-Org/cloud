@@ -207,6 +207,8 @@ describe('kilo-chat actions adapter', () => {
     expect(hints?.join('\n')).toContain('buffer');
     expect(hints?.join('\n')).toContain('filename');
     expect(hints?.join('\n')).toContain('contentType');
+    expect(hints?.join('\n')).toContain('arbitrary local file types');
+    expect(hints?.join('\n')).toContain('Do not use `upload-file` with a local `filePath`');
   });
 
   it('registers Kilo Chat conversation aliases for destination-bearing actions', () => {

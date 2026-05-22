@@ -4,12 +4,13 @@ import { useEffect } from 'react';
 import { toast } from 'sonner';
 import { ReviewConfigForm } from '@/components/code-reviews/ReviewConfigForm';
 import { CodeReviewJobsCard } from '@/components/code-reviews/CodeReviewJobsCard';
+import { ReviewMemoryPanel } from '@/components/code-reviews/ReviewMemoryPanel';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { SetPageTitle } from '@/components/SetPageTitle';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Rocket, ExternalLink, Settings2, ListChecks } from 'lucide-react';
+import { Brain, Rocket, ExternalLink, Settings2, ListChecks } from 'lucide-react';
 import { useTRPC } from '@/lib/trpc/utils';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
@@ -153,7 +154,7 @@ export function ReviewAgentPageClient({
 
           {/* GitHub Configuration Tabs */}
           <Tabs defaultValue="config" className="w-full">
-            <TabsList className="grid w-full max-w-2xl grid-cols-2">
+            <TabsList className="grid w-full max-w-3xl grid-cols-3">
               <TabsTrigger value="config" className="flex items-center gap-2">
                 <Settings2 className="h-4 w-4" />
                 Config
@@ -165,6 +166,14 @@ export function ReviewAgentPageClient({
               >
                 <ListChecks className="h-4 w-4" />
                 Jobs
+              </TabsTrigger>
+              <TabsTrigger
+                value="memory"
+                className="flex items-center gap-2"
+                disabled={!isGitHubAppInstalled}
+              >
+                <Brain className="h-4 w-4" />
+                Memory
               </TabsTrigger>
             </TabsList>
 
@@ -185,6 +194,10 @@ export function ReviewAgentPageClient({
                   </AlertDescription>
                 </Alert>
               )}
+            </TabsContent>
+
+            <TabsContent value="memory" className="mt-6 space-y-4">
+              <ReviewMemoryPanel platform="github" />
             </TabsContent>
           </Tabs>
         </TabsContent>
@@ -213,7 +226,7 @@ export function ReviewAgentPageClient({
 
           {/* GitLab Configuration Tabs */}
           <Tabs defaultValue="config" className="w-full">
-            <TabsList className="grid w-full max-w-2xl grid-cols-2">
+            <TabsList className="grid w-full max-w-3xl grid-cols-3">
               <TabsTrigger value="config" className="flex items-center gap-2">
                 <Settings2 className="h-4 w-4" />
                 Config
@@ -225,6 +238,14 @@ export function ReviewAgentPageClient({
               >
                 <ListChecks className="h-4 w-4" />
                 Jobs
+              </TabsTrigger>
+              <TabsTrigger
+                value="memory"
+                className="flex items-center gap-2"
+                disabled={!isGitLabConnected}
+              >
+                <Brain className="h-4 w-4" />
+                Memory
               </TabsTrigger>
             </TabsList>
 
@@ -260,6 +281,10 @@ export function ReviewAgentPageClient({
                   </AlertDescription>
                 </Alert>
               )}
+            </TabsContent>
+
+            <TabsContent value="memory" className="mt-6 space-y-4">
+              <ReviewMemoryPanel platform="gitlab" />
             </TabsContent>
           </Tabs>
         </TabsContent>

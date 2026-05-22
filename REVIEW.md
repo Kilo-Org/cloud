@@ -1,5 +1,22 @@
 # Code Review Instructions
 
+# ABSOLUTE RULE: RESPECT THE PR'S STATED INTENT
+
+**Never raise an issue about the stated goal, scope, or design decisions of a PR** unless the approach introduces an unsafe condition (data loss, security vulnerability, correctness bug that contradicts the PR's own objectives).
+
+This is the highest-priority rule and overrides all other review guidance.
+
+**What this means in practice:**
+
+- If the PR description explicitly states a trade-off, limitation, or deferred concern — **do not flag it as an issue**. The author is already aware of it.
+- If the PR intentionally narrows scope (e.g. "existing rows will need a one-time cleanup") — **do not flag the out-of-scope items**.
+- If an approach differs from how you might have solved it but still meets the PR's stated goal safely — **do not flag it**.
+- Design decisions, architectural choices, and intentional scope boundaries described in the PR description must be treated as accepted constraints, not open questions.
+
+**The only exception:** If the described approach is objectively unsafe — e.g. it will cause data loss, introduce a security vulnerability, or produce incorrect behaviour contrary to the PR's own stated goals — flag it with a CRITICAL comment explaining the specific unsafe condition.
+
+> **Example of a violation of this rule:** A PR says "Existing old idle pending rows need manual retry or a one-time cleanup if we want to move them." Flagging this as an issue (e.g. "old rows will become invisible after deploy") is incorrect — the author already acknowledged this and it is part of the intentional design. Do not raise it.
+
 # WHAT TO REVIEW
 
 **Flag these (high confidence only):**

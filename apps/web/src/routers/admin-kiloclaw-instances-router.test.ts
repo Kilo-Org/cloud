@@ -2951,6 +2951,109 @@ describe('admin.kiloclawInstances.findOrphanVolumes', () => {
     });
   });
 
+  it('scans production-shaped timestamp rows inside a narrow same-day ISO window', async () => {
+    const destroyedAt = '2026-05-15 10:06:30.976+00';
+    const sandboxId = `ki_${crypto.randomUUID().replace(/-/g, '')}`;
+    const [instance] = await db
+      .insert(kiloclaw_instances)
+      .values({
+        id: crypto.randomUUID(),
+        user_id: regularUser.id,
+        sandbox_id: sandboxId,
+        destroyed_at: destroyedAt,
+      })
+      .returning({ id: kiloclaw_instances.id });
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: regularUser.id,
+      instance_id: instance.id,
+      plan: 'trial',
+      status: 'canceled',
+    });
+
+    mockScanOrphanVolumes.mockResolvedValue({
+      flyApp: 'inst-narrow-window',
+      appExists: true,
+      expectedVolumeName: 'kiloclaw_narrow_window',
+      doStatus: null,
+      doStatusError: null,
+      scanError: null,
+      volumes: [
+        {
+          id: 'vol_narrowwindow000',
+          name: 'kiloclaw_narrow_window',
+          state: 'created',
+          size_gb: 10,
+          region: 'ord',
+          attached_machine_id: null,
+          created_at: '2026-05-11T15:22:38.841Z',
+          nameMatchesInstance: true,
+          trackedByLiveDo: false,
+        },
+      ],
+    });
+
+    const caller = await createCallerForUser(adminUser.id);
+    const result = await caller.admin.kiloclawInstances.findOrphanVolumes({
+      destroyedAfter: '2026-05-15T10:00:00.000Z',
+      destroyedBefore: '2026-05-15T10:15:00.000Z',
+    });
+
+    expect(result.errors).toEqual([]);
+    expect(result.scanned).toBe(1);
+    expect(mockScanOrphanVolumes).toHaveBeenCalledWith(regularUser.id, instance.id, sandboxId);
+    expect(result.volumes).toHaveLength(1);
+    expect(result.volumes[0]).toMatchObject({
+      instance_id: instance.id,
+      volume_id: 'vol_narrowwindow000',
+      classification: 'safe_destroy',
+    });
+  });
+
+  it('scans an in-window destruction even when the same sandbox was destroyed later', async () => {
+    const inWindowDestroyedAt = new Date(Date.now() - 10 * 86_400_000);
+    const laterDestroyedAt = new Date(inWindowDestroyedAt.getTime() + 60_000);
+    const sandboxId = `ki_${crypto.randomUUID().replace(/-/g, '')}`;
+    const inWindowInstanceId = crypto.randomUUID();
+    await db.insert(kiloclaw_instances).values([
+      {
+        id: inWindowInstanceId,
+        user_id: regularUser.id,
+        sandbox_id: sandboxId,
+        destroyed_at: inWindowDestroyedAt.toISOString().replace('T', ' ').replace('Z', '+00'),
+      },
+      {
+        id: crypto.randomUUID(),
+        user_id: regularUser.id,
+        sandbox_id: sandboxId,
+        destroyed_at: laterDestroyedAt.toISOString().replace('T', ' ').replace('Z', '+00'),
+      },
+    ]);
+
+    mockScanOrphanVolumes.mockResolvedValue({
+      flyApp: 'inst-reprovisioned-window',
+      appExists: true,
+      expectedVolumeName: 'kiloclaw_reprovisioned_window',
+      doStatus: null,
+      doStatusError: null,
+      scanError: null,
+      volumes: [],
+    });
+
+    const caller = await createCallerForUser(adminUser.id);
+    const result = await caller.admin.kiloclawInstances.findOrphanVolumes({
+      destroyedAfter: new Date(inWindowDestroyedAt.getTime() - 1_000).toISOString(),
+      destroyedBefore: new Date(inWindowDestroyedAt.getTime() + 1_000).toISOString(),
+    });
+
+    expect(result.errors).toEqual([]);
+    expect(result.scanned).toBe(1);
+    expect(mockScanOrphanVolumes).toHaveBeenCalledWith(
+      regularUser.id,
+      inWindowInstanceId,
+      sandboxId
+    );
+  });
+
   it('excludes volumes that are not confirmed orphans', async () => {
     const destroyedAt = new Date(Date.now() - 30 * 86_400_000).toISOString();
     const [instance] = await db

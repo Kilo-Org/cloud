@@ -77,7 +77,7 @@ import {
 import type { ProviderId } from '../schemas/instance-config';
 import { doKeyFromActiveInstance, resolveDoKeyForUser } from '../lib/instance-routing';
 import { getInstanceById, getInstanceByIdIncludingDestroyed, getWorkerDb } from '../db';
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, isNull, sql } from 'drizzle-orm';
 import { volumeNameFromSandboxId } from '../durable-objects/machine-config';
 import { fallbackAppNameForRestore } from '../durable-objects/kiloclaw-instance/postgres';
 import { getAppKey } from '../durable-objects/kiloclaw-instance/types';
@@ -4042,6 +4042,17 @@ platform.post('/admin/orphan-volume-destroy', async c => {
       sandboxId: kiloclaw_instances.sandbox_id,
       organizationId: kiloclaw_instances.organization_id,
       destroyedAt: kiloclaw_instances.destroyed_at,
+      // The latest `destroyed_at` across every destroyed row of this
+      // (user, sandbox). A reprovisioned sandbox has several destroyed rows
+      // sharing one Fly volume; the grace period must run from the most
+      // recent destruction, not whichever row the caller happened to submit.
+      latestSandboxDestroyedAt: sql<string | null>`(
+        select max(latest.destroyed_at)
+        from ${kiloclaw_instances} as latest
+        where latest.user_id = ${kiloclaw_instances.user_id}
+          and latest.sandbox_id = ${kiloclaw_instances.sandbox_id}
+          and latest.destroyed_at is not null
+      )`,
     })
     .from(kiloclaw_instances)
     .where(eq(kiloclaw_instances.id, instanceId))
@@ -4063,8 +4074,12 @@ platform.post('/admin/orphan-volume-destroy', async c => {
   if (instance.destroyedAt === null) {
     return c.json({ error: 'Instance is not destroyed; its volume is not an orphan' }, 409);
   }
-  // Gate B — grace period. Give Fly's reaper and the DO sweep time to act.
-  if (Date.now() - new Date(instance.destroyedAt).getTime() <= ORPHAN_VOLUME_GRACE_PERIOD_MS) {
+  // Gate B — grace period, measured from the LATEST destruction of this
+  // sandbox. A reprovisioned sandbox has several destroyed rows sharing one
+  // Fly volume; the volume's cleanup clock runs from the most recent
+  // destruction, so an older submitted row must not shorten the grace.
+  const latestDestroyedAt = instance.latestSandboxDestroyedAt ?? instance.destroyedAt;
+  if (Date.now() - new Date(latestDestroyedAt).getTime() <= ORPHAN_VOLUME_GRACE_PERIOD_MS) {
     return c.json({ error: 'Instance is still within the orphan-volume grace period' }, 409);
   }
   // Gate C — never destroy data while this ownership context still has

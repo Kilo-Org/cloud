@@ -3835,20 +3835,23 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
     const MAX_SCAN = 500;
     const CONCURRENCY = 10;
 
-    // 1. Destroyed instances in the window, deduplicated to one row per
-    //    (user, sandbox).
+    // 1. The latest destroyed row per (user, sandbox), restricted to the
+    //    requested window.
     //
     //    `UQ_kiloclaw_instances_active` is a PARTIAL unique index — it only
     //    covers live rows (`WHERE destroyed_at IS NULL`) — so a sandbox that
     //    has been reprovisioned accumulates many destroyed `kiloclaw_instances`
-    //    rows that all share one `sandbox_id`. Every one of them derives the
-    //    SAME Fly volume name, so scanning each separately would surface the
-    //    same volume once per destroyed row (the duplicate-rows bug).
+    //    rows that all share one `sandbox_id`, hence one Fly volume name.
+    //    Scanning each separately would surface the same volume once per row.
     //
-    //    `selectDistinctOn` keeps only the most recently destroyed row per
-    //    sandbox. That row's `destroyed_at` is also the correct one to
-    //    measure the grace period against: the volume stayed in use until
-    //    the last instance backed by it was destroyed.
+    //    `selectDistinctOn` collapses them to the single most-recent destroyed
+    //    row per sandbox. It runs over ALL destroyed rows, NOT just the window,
+    //    so the row it keeps is the genuine latest destruction — the correct
+    //    `destroyed_at` to measure the grace period against. The window filter
+    //    is then applied to that latest row in the outer query, so a sandbox
+    //    whose latest destruction falls outside the window is omitted entirely
+    //    rather than represented by a stale older row (which would compute the
+    //    grace period from the wrong, earlier timestamp).
     //
     //    leftJoin on subscriptions: a missing subscription row is fine (no
     //    access to preserve); `UQ_kiloclaw_subscriptions_instance` guarantees
@@ -3872,13 +3875,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         kiloclaw_subscriptions,
         eq(kiloclaw_instances.id, kiloclaw_subscriptions.instance_id)
       )
-      .where(
-        and(
-          isNotNull(kiloclaw_instances.destroyed_at),
-          gte(kiloclaw_instances.destroyed_at, input.destroyedAfter),
-          lte(kiloclaw_instances.destroyed_at, input.destroyedBefore)
-        )
-      )
+      .where(isNotNull(kiloclaw_instances.destroyed_at))
       .orderBy(
         kiloclaw_instances.user_id,
         kiloclaw_instances.sandbox_id,
@@ -3886,11 +3883,19 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       )
       .as('destroyed_instances_by_latest');
 
-    // Wrap the dedup in a subquery so the recency ordering and the scan cap
-    // apply to unique sandboxes, not raw rows.
+    // Apply the requested window to the deduplicated latest row, then order
+    // by recency and cap. Filtering here (not inside the subquery) is what
+    // guarantees the window is matched against each sandbox's genuine latest
+    // destruction.
     const instances = await db
       .select()
       .from(destroyedInstancesByLatest)
+      .where(
+        and(
+          gte(destroyedInstancesByLatest.destroyed_at, input.destroyedAfter),
+          lte(destroyedInstancesByLatest.destroyed_at, input.destroyedBefore)
+        )
+      )
       .orderBy(desc(destroyedInstancesByLatest.destroyed_at))
       .limit(MAX_SCAN + 1);
 
@@ -4068,6 +4073,17 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
           sandbox_id: kiloclaw_instances.sandbox_id,
           organization_id: kiloclaw_instances.organization_id,
           destroyed_at: kiloclaw_instances.destroyed_at,
+          // The latest `destroyed_at` across every destroyed row of this
+          // (user, sandbox). A reprovisioned sandbox has several destroyed
+          // rows sharing one Fly volume; the grace period runs from the most
+          // recent destruction, not whichever row the admin selected.
+          latest_sandbox_destroyed_at: sql<string | null>`(
+            select max(latest.destroyed_at)
+            from ${kiloclaw_instances} as latest
+            where latest.user_id = ${kiloclaw_instances.user_id}
+              and latest.sandbox_id = ${kiloclaw_instances.sandbox_id}
+              and latest.destroyed_at is not null
+          )`,
         })
         .from(kiloclaw_instances)
         .where(eq(kiloclaw_instances.id, input.instanceId))
@@ -4086,9 +4102,11 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         });
       }
 
-      // 3. Grace period — give Fly + the DO sweep time to self-heal first.
+      // 3. Grace period, measured from the latest destruction of this
+      //    sandbox — give Fly + the DO sweep time to self-heal first.
       const now = new Date();
-      const destroyedMsAgo = now.getTime() - new Date(row.destroyed_at).getTime();
+      const latestDestroyedAt = row.latest_sandbox_destroyed_at ?? row.destroyed_at;
+      const destroyedMsAgo = now.getTime() - new Date(latestDestroyedAt).getTime();
       if (destroyedMsAgo <= ORPHAN_VOLUME_GRACE_PERIOD_MS) {
         throw new TRPCError({
           code: 'PRECONDITION_FAILED',

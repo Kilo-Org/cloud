@@ -2892,6 +2892,37 @@ describe('admin.kiloclawInstances.destroyOrphanVolume', () => {
     expect(mockDestroyOrphanVolume).not.toHaveBeenCalled();
   });
 
+  it('rejects when a newer destruction of the same sandbox is within grace', async () => {
+    // The submitted row was destroyed long ago, but the sandbox was
+    // reprovisioned and destroyed again recently. Grace runs from the latest
+    // destruction, so the older row must not reap the shared volume early.
+    const sandboxId = `ki_${crypto.randomUUID().replace(/-/g, '')}`;
+    const [oldInstance] = await db
+      .insert(kiloclaw_instances)
+      .values({
+        id: crypto.randomUUID(),
+        user_id: regularUser.id,
+        sandbox_id: sandboxId,
+        destroyed_at: daysAgo(30),
+      })
+      .returning({ id: kiloclaw_instances.id });
+    await db.insert(kiloclaw_instances).values({
+      id: crypto.randomUUID(),
+      user_id: regularUser.id,
+      sandbox_id: sandboxId,
+      destroyed_at: daysAgo(2),
+    });
+
+    const caller = await createCallerForUser(adminUser.id);
+    await expect(
+      caller.admin.kiloclawInstances.destroyOrphanVolume({
+        instanceId: oldInstance.id,
+        volumeId: VOLUME_ID,
+      })
+    ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
+    expect(mockDestroyOrphanVolume).not.toHaveBeenCalled();
+  });
+
   it('rejects when the user has an access-granting subscription', async () => {
     const instanceId = await insertDestroyedInstance({
       destroyedAt: daysAgo(30),

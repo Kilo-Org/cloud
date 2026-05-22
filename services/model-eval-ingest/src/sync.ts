@@ -1,5 +1,6 @@
 import type { WorkerDb } from '@kilocode/db/client';
 import { model_eval_ingestions, modelStats } from '@kilocode/db/schema';
+import { kiloGatewayModelIdCandidates } from '@kilocode/worker-utils/kilo-model-id';
 import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import {
   PromotionRecordSchema,
@@ -13,7 +14,6 @@ import {
 
 const PROMOTION_PULL_LIMIT = 1000;
 const MICRODOLLARS_PER_DOLLAR = 1_000_000;
-const KILO_MODEL_PREFIX = 'kilo/';
 
 export function usdToMicrodollars(value: number | null): number | null {
   return value === null ? null : Math.round(value * MICRODOLLARS_PER_DOLLAR);
@@ -45,17 +45,6 @@ export type PromotionStore = {
   writeKiloBenchBenchmarks(modelStatsId: string, benchmarks: KiloBenchBenchmarks): Promise<void>;
 };
 
-function getUnprefixedKiloModel(model: string): string | undefined {
-  if (!model.startsWith(KILO_MODEL_PREFIX)) return undefined;
-  const unprefixedModel = model.slice(KILO_MODEL_PREFIX.length);
-  return unprefixedModel.includes('/') ? unprefixedModel : undefined;
-}
-
-function modelStatsTargetCandidates(model: string): string[] {
-  const unprefixedModel = getUnprefixedKiloModel(model);
-  return unprefixedModel ? [model, unprefixedModel] : [model];
-}
-
 export function createPromotionStore(db: WorkerDb): PromotionStore {
   return {
     async getLatestPromotedAtMs(): Promise<number> {
@@ -74,7 +63,7 @@ export function createPromotionStore(db: WorkerDb): PromotionStore {
 
       const lookupModels = new Set<string>();
       for (const model of promotionModels) {
-        for (const candidate of modelStatsTargetCandidates(model)) lookupModels.add(candidate);
+        for (const candidate of kiloGatewayModelIdCandidates(model)) lookupModels.add(candidate);
       }
 
       const targets = await db
@@ -85,7 +74,7 @@ export function createPromotionStore(db: WorkerDb): PromotionStore {
       const resolvedTargets = new Map<string, ModelStatsTarget>();
 
       for (const model of promotionModels) {
-        for (const candidate of modelStatsTargetCandidates(model)) {
+        for (const candidate of kiloGatewayModelIdCandidates(model)) {
           const target = targetsByModel.get(candidate);
           if (!target) continue;
           resolvedTargets.set(model, target);

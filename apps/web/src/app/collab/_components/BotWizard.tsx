@@ -45,53 +45,17 @@ export function BotWizard() {
   const setupInput = workspace?.type === 'org' ? { organizationId: workspace.id } : undefined;
   const shouldCheckSetup = workspace !== null && !isWorkspaceStep;
 
-  const githubSetup = useQuery(
-    trpc.githubApps.getInstallation.queryOptions(setupInput, { enabled: shouldCheckSetup })
-  );
-  const gitlabSetup = useQuery(
-    trpc.gitlab.getInstallation.queryOptions(setupInput, { enabled: shouldCheckSetup })
-  );
-  const slackSetup = useQuery(
-    trpc.slack.getInstallation.queryOptions(setupInput, { enabled: shouldCheckSetup })
-  );
-  const discordSetup = useQuery(
-    trpc.discord.getInstallation.queryOptions(setupInput, { enabled: shouldCheckSetup })
-  );
-  const linearSetup = useQuery(
-    trpc.linear.getInstallation.queryOptions(setupInput, { enabled: shouldCheckSetup })
+  const setupQuery = useQuery(
+    trpc.platformIntegrations.listSetupStatus.queryOptions(setupInput, {
+      enabled: shouldCheckSetup,
+    })
   );
 
   const setupStatuses = buildPlatformSetupStatuses({
-    github: {
-      data: githubSetup.data,
-      isError: githubSetup.isError,
-      isFetching: githubSetup.isFetching,
-      isLoading: githubSetup.isLoading,
-    },
-    gitlab: {
-      data: gitlabSetup.data,
-      isError: gitlabSetup.isError,
-      isFetching: gitlabSetup.isFetching,
-      isLoading: gitlabSetup.isLoading,
-    },
-    slack: {
-      data: slackSetup.data,
-      isError: slackSetup.isError,
-      isFetching: slackSetup.isFetching,
-      isLoading: slackSetup.isLoading,
-    },
-    discord: {
-      data: discordSetup.data,
-      isError: discordSetup.isError,
-      isFetching: discordSetup.isFetching,
-      isLoading: discordSetup.isLoading,
-    },
-    linear: {
-      data: linearSetup.data,
-      isError: linearSetup.isError,
-      isFetching: linearSetup.isFetching,
-      isLoading: linearSetup.isLoading,
-    },
+    data: setupQuery.data,
+    isError: setupQuery.isError,
+    isFetching: setupQuery.isFetching,
+    isLoading: setupQuery.isLoading,
   });
 
   const isCheckingSetup = isCheckingPlatformSetup(setupStatuses);

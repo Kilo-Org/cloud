@@ -10,21 +10,13 @@ import { CHAT_PLATFORM_IDS, CODE_PLATFORM_IDS, type PlatformId } from './platfor
 describe('collab setup status', () => {
   test('marks installed integrations as already set up with account details', () => {
     const statuses = buildPlatformSetupStatuses({
-      slack: {
-        data: { installed: true, installation: { teamName: 'Kilo Team' } },
-        isError: false,
-        isLoading: false,
-      },
-      github: {
-        data: { installed: true, installation: { accountLogin: 'kilocode' } },
-        isError: false,
-        isLoading: false,
-      },
-      linear: {
-        data: { installed: false, installation: null },
-        isError: false,
-        isLoading: false,
-      },
+      data: [
+        { platform: 'slack', installed: true, installation: { teamName: 'Kilo Team' } },
+        { platform: 'github', installed: true, installation: { accountLogin: 'kilocode' } },
+        { platform: 'linear', installed: false, installation: null },
+      ],
+      isError: false,
+      isLoading: false,
     });
 
     expect(statuses.slack).toEqual({
@@ -41,7 +33,11 @@ describe('collab setup status', () => {
   });
 
   test('keeps services without an authorization path out of selection', () => {
-    const statuses = buildPlatformSetupStatuses({});
+    const statuses = buildPlatformSetupStatuses({
+      data: [],
+      isError: false,
+      isLoading: false,
+    });
     const selected: PlatformId[] = ['microsoft-teams', 'google-chat', 'slack'];
 
     expect(statuses['microsoft-teams']).toEqual({
@@ -57,16 +53,12 @@ describe('collab setup status', () => {
 
   test('counts already set up services toward chat and code coverage', () => {
     const statuses = buildPlatformSetupStatuses({
-      slack: {
-        data: { installed: true, installation: { teamName: 'Kilo Team' } },
-        isError: false,
-        isLoading: false,
-      },
-      gitlab: {
-        data: { installed: true, installation: { accountLogin: 'kilocode' } },
-        isError: false,
-        isLoading: false,
-      },
+      data: [
+        { platform: 'slack', installed: true, installation: { teamName: 'Kilo Team' } },
+        { platform: 'gitlab', installed: true, installation: { accountLogin: 'kilocode' } },
+      ],
+      isError: false,
+      isLoading: false,
     });
 
     expect(hasAnyConfiguredOrSelectedPlatform(CHAT_PLATFORM_IDS, [], statuses)).toBe(true);
@@ -75,16 +67,12 @@ describe('collab setup status', () => {
 
   test('filters connected services out of the authorization queue', () => {
     const statuses = buildPlatformSetupStatuses({
-      slack: {
-        data: { installed: true, installation: { teamName: 'Kilo Team' } },
-        isError: false,
-        isLoading: false,
-      },
-      github: {
-        data: { installed: false, installation: null },
-        isError: false,
-        isLoading: false,
-      },
+      data: [
+        { platform: 'slack', installed: true, installation: { teamName: 'Kilo Team' } },
+        { platform: 'github', installed: false, installation: null },
+      ],
+      isError: false,
+      isLoading: false,
     });
 
     expect(getConnectedPlatformIds(statuses)).toEqual(['slack']);
@@ -93,12 +81,10 @@ describe('collab setup status', () => {
 
   test('treats background refetches as checking before using cached setup status', () => {
     const statuses = buildPlatformSetupStatuses({
-      github: {
-        data: { installed: false, installation: null },
-        isError: false,
-        isFetching: true,
-        isLoading: false,
-      },
+      data: [{ platform: 'github', installed: false, installation: null }],
+      isError: false,
+      isFetching: true,
+      isLoading: false,
     });
 
     expect(statuses.github).toEqual({ kind: 'checking', label: 'Checking' });

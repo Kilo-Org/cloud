@@ -1,6 +1,7 @@
 import type { PlatformId } from './platforms';
 
 export type PlatformInstallation = {
+  platform: Exclude<PlatformId, 'microsoft-teams' | 'google-chat'>;
   installed: boolean;
   installation: {
     accountLogin?: string | null;
@@ -11,7 +12,7 @@ export type PlatformInstallation = {
 };
 
 export type PlatformInstallationQueryState = {
-  data: PlatformInstallation | undefined;
+  data: readonly PlatformInstallation[] | undefined;
   isError: boolean;
   isFetching?: boolean;
   isLoading: boolean;
@@ -25,8 +26,6 @@ export type PlatformSetupStatus =
   | { kind: 'unknown'; label: 'Could not check' };
 
 export type PlatformSetupStatusMap = Record<PlatformId, PlatformSetupStatus>;
-
-type PlatformInstallationQueries = Partial<Record<PlatformId, PlatformInstallationQueryState>>;
 
 const PLATFORM_ORDER: PlatformId[] = [
   'slack',
@@ -56,17 +55,21 @@ function getConnectedAccountLabel(
 
 export function getPlatformSetupStatus(
   platformId: PlatformId,
-  query: PlatformInstallationQueryState | undefined
+  query: PlatformInstallationQueryState
 ): PlatformSetupStatus {
   if (platformId === 'microsoft-teams' || platformId === 'google-chat') {
     return { kind: 'unavailable', label: 'Not available yet' };
   }
 
-  if (query?.isLoading || query?.isFetching) return { kind: 'checking', label: 'Checking' };
-  if (query?.isError) return { kind: 'unknown', label: 'Could not check' };
+  if (query.isLoading || query.isFetching) return { kind: 'checking', label: 'Checking' };
+  if (query.isError) return { kind: 'unknown', label: 'Could not check' };
 
-  if (query?.data?.installed) {
-    const detail = getConnectedAccountLabel(platformId, query.data.installation);
+  const integration = query.data?.find(
+    installedIntegration => installedIntegration.platform === platformId
+  );
+
+  if (integration?.installed) {
+    const detail = getConnectedAccountLabel(platformId, integration.installation);
     return detail
       ? { kind: 'connected', label: 'Already set up', detail }
       : { kind: 'connected', label: 'Already set up' };
@@ -76,16 +79,16 @@ export function getPlatformSetupStatus(
 }
 
 export function buildPlatformSetupStatuses(
-  queries: PlatformInstallationQueries
+  query: PlatformInstallationQueryState
 ): PlatformSetupStatusMap {
   return {
-    slack: getPlatformSetupStatus('slack', queries.slack),
-    discord: getPlatformSetupStatus('discord', queries.discord),
-    'microsoft-teams': getPlatformSetupStatus('microsoft-teams', queries['microsoft-teams']),
-    'google-chat': getPlatformSetupStatus('google-chat', queries['google-chat']),
-    github: getPlatformSetupStatus('github', queries.github),
-    gitlab: getPlatformSetupStatus('gitlab', queries.gitlab),
-    linear: getPlatformSetupStatus('linear', queries.linear),
+    slack: getPlatformSetupStatus('slack', query),
+    discord: getPlatformSetupStatus('discord', query),
+    'microsoft-teams': getPlatformSetupStatus('microsoft-teams', query),
+    'google-chat': getPlatformSetupStatus('google-chat', query),
+    github: getPlatformSetupStatus('github', query),
+    gitlab: getPlatformSetupStatus('gitlab', query),
+    linear: getPlatformSetupStatus('linear', query),
   };
 }
 

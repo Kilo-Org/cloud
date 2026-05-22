@@ -676,4 +676,124 @@ describe('EventServiceClient', () => {
       vi.useRealTimers();
     });
   });
+
+  describe('onConnected', () => {
+    it('fires on first connect', async () => {
+      const client = makeClient();
+      const calls: number[] = [];
+      client.onConnected(() => calls.push(1));
+      await client.connect();
+      expect(calls).toHaveLength(1);
+    });
+
+    it('fires on reconnect after the connection drops', async () => {
+      vi.useFakeTimers();
+      try {
+        const client = makeClient();
+        const calls: number[] = [];
+        client.onConnected(() => calls.push(1));
+
+        await client.connect();
+        expect(calls).toHaveLength(1);
+
+        lastMockWs.triggerClose();
+        await vi.advanceTimersByTimeAsync(2000);
+        // second WS opens via the global stub
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(allMockWs).toHaveLength(2);
+        expect(calls).toHaveLength(2);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('fires immediately if called while already connected', async () => {
+      const client = makeClient();
+      await client.connect();
+      expect(client.isConnected()).toBe(true);
+
+      const calls: number[] = [];
+      client.onConnected(() => calls.push(1));
+      // Should have fired synchronously
+      expect(calls).toHaveLength(1);
+    });
+
+    it('unsubscribe stops further firings', async () => {
+      vi.useFakeTimers();
+      try {
+        const client = makeClient();
+        const calls: number[] = [];
+        const off = client.onConnected(() => calls.push(1));
+
+        await client.connect();
+        expect(calls).toHaveLength(1);
+
+        off();
+
+        lastMockWs.triggerClose();
+        await vi.advanceTimersByTimeAsync(2000);
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(allMockWs).toHaveLength(2);
+        // No additional calls after unsubscribe
+        expect(calls).toHaveLength(1);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('multiple handlers all fire independently', async () => {
+      const client = makeClient();
+      const callsA: number[] = [];
+      const callsB: number[] = [];
+      client.onConnected(() => callsA.push(1));
+      client.onConnected(() => callsB.push(1));
+      await client.connect();
+      expect(callsA).toHaveLength(1);
+      expect(callsB).toHaveLength(1);
+    });
+
+    it('does NOT fire on disconnect', async () => {
+      const client = makeClient();
+      const calls: number[] = [];
+      client.onConnected(() => calls.push(1));
+
+      await client.connect();
+      expect(calls).toHaveLength(1);
+
+      client.disconnect();
+      // Still only one call
+      expect(calls).toHaveLength(1);
+    });
+
+    it('handler registered before synchronous fire — still fires on reconnect even if first call throws', async () => {
+      vi.useFakeTimers();
+      try {
+        const client = makeClient();
+        await client.connect();
+        expect(client.isConnected()).toBe(true);
+
+        let callCount = 0;
+        // Subscribe while already connected — the handler throws on its first (synchronous) call.
+        expect(() => {
+          client.onConnected(() => {
+            callCount++;
+            if (callCount === 1) throw new Error('first call throws');
+          });
+        }).toThrow('first call throws');
+
+        // The handler must have been added to the set before the synchronous fire,
+        // so it should still fire when the connection drops and recovers.
+        lastMockWs.triggerClose();
+        await vi.advanceTimersByTimeAsync(2000);
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(allMockWs).toHaveLength(2);
+        expect(callCount).toBe(2);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
 });

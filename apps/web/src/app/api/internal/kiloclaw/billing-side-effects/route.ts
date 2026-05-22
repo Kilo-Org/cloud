@@ -20,7 +20,7 @@ import { processPersonalKiloClawPaidConversion } from '@/lib/kiloclaw-referrals'
 import { projectPendingKiloPassBonusMicrodollars } from '@/lib/kiloclaw/credit-billing';
 import { maybeIssueKiloPassBonusFromUsageThreshold } from '@/lib/kilo-pass/usage-triggered-bonus';
 
-const billingTemplateNames = [
+const personalBillingTemplateNames = [
   'clawSuspendedTrial',
   'clawSuspendedSubscription',
   'clawSuspendedPayment',
@@ -34,6 +34,20 @@ const billingTemplateNames = [
   'clawComplementaryInferenceEnded',
 ] as const;
 
+const organizationBillingTemplateNames = [
+  'clawOrganizationTrialSuspendedBillingAuthority',
+  'clawOrganizationTrialSuspendedUser',
+  'clawOrganizationDestructionWarningBillingAuthority',
+  'clawOrganizationDestructionWarningUser',
+  'clawOrganizationInstanceDestroyedBillingAuthority',
+  'clawOrganizationInstanceDestroyedUser',
+] as const;
+
+const billingTemplateNames = [
+  ...personalBillingTemplateNames,
+  ...organizationBillingTemplateNames,
+] as const;
+
 type BillingSideEffectLogFields = BillingCorrelationContext & {
   billingFlow: typeof BILLING_FLOW;
   billingComponent: 'side_effects';
@@ -43,6 +57,7 @@ type BillingSideEffectLogFields = BillingCorrelationContext & {
   durationMs?: number;
   userId?: string;
   instanceId?: string;
+  organizationId?: string;
   stripeSubscriptionId?: string;
   templateName?: (typeof billingTemplateNames)[number];
   statusCode?: number;
@@ -83,17 +98,202 @@ function secretMatches(provided: string | null, expected: string): boolean {
   return timingSafeEqual(providedBuffer, expectedBuffer);
 }
 
+function hasOrganizationDestinationPath(
+  destinationUrl: string,
+  organizationId: string,
+  suffix: 'claw' | 'payment-details'
+): boolean {
+  return new URL(destinationUrl).pathname === `/organizations/${organizationId}/${suffix}`;
+}
+
+const OrganizationLifecycleIdentitySchema = {
+  to: z.email(),
+  userId: z.string().min(1),
+  instanceId: z.string().min(1),
+  organizationId: z.string().min(1),
+};
+
+const OrganizationLifecycleBillingAuthorityVarsSchema = z.object({
+  organization_name: z.string().min(1),
+  instance_label: z.string().min(1),
+  destruction_date: z.string().min(1),
+  organization_billing_url: z.url(),
+});
+
+const OrganizationLifecycleUserVarsSchema = z.object({
+  organization_name: z.string().min(1),
+  instance_label: z.string().min(1),
+  destruction_date: z.string().min(1),
+  organization_claw_url: z.url(),
+});
+
+const OrganizationLifecycleDestroyedBillingAuthorityVarsSchema = z.object({
+  organization_name: z.string().min(1),
+  instance_label: z.string().min(1),
+  organization_billing_url: z.url(),
+});
+
+const OrganizationLifecycleDestroyedUserVarsSchema = z.object({
+  organization_name: z.string().min(1),
+  instance_label: z.string().min(1),
+  organization_claw_url: z.url(),
+});
+
+const OrganizationTrialSuspendedBillingAuthorityInputSchema = z
+  .object({
+    ...OrganizationLifecycleIdentitySchema,
+    templateName: z.literal('clawOrganizationTrialSuspendedBillingAuthority'),
+    templateVars: OrganizationLifecycleBillingAuthorityVarsSchema,
+  })
+  .superRefine((input, ctx) => {
+    if (
+      !hasOrganizationDestinationPath(
+        input.templateVars.organization_billing_url,
+        input.organizationId,
+        'payment-details'
+      )
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['templateVars', 'organization_billing_url'],
+        message: 'Organization billing CTA must target the organization payment details page.',
+      });
+    }
+  });
+
+const OrganizationTrialSuspendedUserInputSchema = z
+  .object({
+    ...OrganizationLifecycleIdentitySchema,
+    templateName: z.literal('clawOrganizationTrialSuspendedUser'),
+    templateVars: OrganizationLifecycleUserVarsSchema,
+  })
+  .superRefine((input, ctx) => {
+    if (
+      !hasOrganizationDestinationPath(
+        input.templateVars.organization_claw_url,
+        input.organizationId,
+        'claw'
+      )
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['templateVars', 'organization_claw_url'],
+        message: 'Organization KiloClaw CTA must target the organization KiloClaw page.',
+      });
+    }
+  });
+
+const OrganizationDestructionWarningBillingAuthorityInputSchema = z
+  .object({
+    ...OrganizationLifecycleIdentitySchema,
+    templateName: z.literal('clawOrganizationDestructionWarningBillingAuthority'),
+    templateVars: OrganizationLifecycleBillingAuthorityVarsSchema,
+  })
+  .superRefine((input, ctx) => {
+    if (
+      !hasOrganizationDestinationPath(
+        input.templateVars.organization_billing_url,
+        input.organizationId,
+        'payment-details'
+      )
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['templateVars', 'organization_billing_url'],
+        message: 'Organization billing CTA must target the organization payment details page.',
+      });
+    }
+  });
+
+const OrganizationDestructionWarningUserInputSchema = z
+  .object({
+    ...OrganizationLifecycleIdentitySchema,
+    templateName: z.literal('clawOrganizationDestructionWarningUser'),
+    templateVars: OrganizationLifecycleUserVarsSchema,
+  })
+  .superRefine((input, ctx) => {
+    if (
+      !hasOrganizationDestinationPath(
+        input.templateVars.organization_claw_url,
+        input.organizationId,
+        'claw'
+      )
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['templateVars', 'organization_claw_url'],
+        message: 'Organization KiloClaw CTA must target the organization KiloClaw page.',
+      });
+    }
+  });
+
+const OrganizationInstanceDestroyedBillingAuthorityInputSchema = z
+  .object({
+    ...OrganizationLifecycleIdentitySchema,
+    templateName: z.literal('clawOrganizationInstanceDestroyedBillingAuthority'),
+    templateVars: OrganizationLifecycleDestroyedBillingAuthorityVarsSchema,
+  })
+  .superRefine((input, ctx) => {
+    if (
+      !hasOrganizationDestinationPath(
+        input.templateVars.organization_billing_url,
+        input.organizationId,
+        'payment-details'
+      )
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['templateVars', 'organization_billing_url'],
+        message: 'Organization billing CTA must target the organization payment details page.',
+      });
+    }
+  });
+
+const OrganizationInstanceDestroyedUserInputSchema = z
+  .object({
+    ...OrganizationLifecycleIdentitySchema,
+    templateName: z.literal('clawOrganizationInstanceDestroyedUser'),
+    templateVars: OrganizationLifecycleDestroyedUserVarsSchema,
+  })
+  .superRefine((input, ctx) => {
+    if (
+      !hasOrganizationDestinationPath(
+        input.templateVars.organization_claw_url,
+        input.organizationId,
+        'claw'
+      )
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['templateVars', 'organization_claw_url'],
+        message: 'Organization KiloClaw CTA must target the organization KiloClaw page.',
+      });
+    }
+  });
+
+const SendEmailInputSchema = z.union([
+  z.object({
+    to: z.email(),
+    templateName: z.enum(personalBillingTemplateNames),
+    templateVars: z.record(z.string(), z.string()),
+    subjectOverride: z.string().min(1).optional(),
+    userId: z.string().min(1).optional(),
+    instanceId: z.string().min(1).optional(),
+  }),
+  z.discriminatedUnion('templateName', [
+    OrganizationTrialSuspendedBillingAuthorityInputSchema,
+    OrganizationTrialSuspendedUserInputSchema,
+    OrganizationDestructionWarningBillingAuthorityInputSchema,
+    OrganizationDestructionWarningUserInputSchema,
+    OrganizationInstanceDestroyedBillingAuthorityInputSchema,
+    OrganizationInstanceDestroyedUserInputSchema,
+  ]),
+]);
+
 const BodySchema = z.discriminatedUnion('action', [
   z.object({
     action: z.literal('send_email'),
-    input: z.object({
-      to: z.email(),
-      templateName: z.enum(billingTemplateNames),
-      templateVars: z.record(z.string(), z.string()),
-      subjectOverride: z.string().min(1).optional(),
-      userId: z.string().min(1).optional(),
-      instanceId: z.string().min(1).optional(),
-    }),
+    input: SendEmailInputSchema,
   }),
   z.object({
     action: z.literal('trigger_user_auto_top_up'),
@@ -166,6 +366,7 @@ const BodySchema = z.discriminatedUnion('action', [
 function getActionLogFields(body: z.infer<typeof BodySchema>): {
   userId?: string;
   instanceId?: string;
+  organizationId?: string;
   stripeSubscriptionId?: string;
   templateName?: (typeof billingTemplateNames)[number];
 } {
@@ -174,6 +375,7 @@ function getActionLogFields(body: z.infer<typeof BodySchema>): {
       return {
         userId: body.input.userId,
         instanceId: body.input.instanceId,
+        organizationId: 'organizationId' in body.input ? body.input.organizationId : undefined,
         templateName: body.input.templateName,
       };
     case 'trigger_user_auto_top_up':

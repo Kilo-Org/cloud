@@ -1,3 +1,5 @@
+import React from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import {
   createKiloClawSignupDisplay,
   deriveBannerState,
@@ -6,6 +8,7 @@ import {
   type ClawBillingStatus,
   type KiloPassUpsellActivationPreview,
 } from './billing-types';
+import { BillingBanner } from './BillingBanner';
 
 const emptyUpsellPreview: KiloPassUpsellActivationPreview = {
   eligible: false,
@@ -159,6 +162,52 @@ describe('KiloClaw billing display helpers', () => {
     expect(formatKiloClawPlanPrice({ plan: 'commit', priceVersion: '2026-05-10' })).toBe(
       '$306/6-month commit'
     );
+  });
+});
+
+describe('BillingBanner credit renewal recovery', () => {
+  it('routes pure-credit past-due subscriptions to credit top-up', () => {
+    const html = renderToStaticMarkup(
+      React.createElement(BillingBanner, {
+        billing: createBillingStatus({
+          subscription: {
+            status: 'past_due',
+            hasStripeFunding: false,
+            paymentSource: 'credits',
+          },
+        }),
+        onSubscribeClick: () => undefined,
+        onReactivateClick: () => undefined,
+        onUpdatePaymentClick: () => undefined,
+      })
+    );
+
+    expect(html).toContain('Your credit balance is insufficient for the next renewal.');
+    expect(html).toContain('Add Credits');
+    expect(html).toContain('href="/credits"');
+    expect(html).not.toContain('Update Payment');
+  });
+
+  it('keeps Stripe-funded hybrid past-due subscriptions on payment recovery', () => {
+    const html = renderToStaticMarkup(
+      React.createElement(BillingBanner, {
+        billing: createBillingStatus({
+          subscription: {
+            status: 'past_due',
+            hasStripeFunding: true,
+            paymentSource: 'credits',
+          },
+        }),
+        onSubscribeClick: () => undefined,
+        onReactivateClick: () => undefined,
+        onUpdatePaymentClick: () => undefined,
+      })
+    );
+
+    expect(html).toContain('Your subscription payment failed.');
+    expect(html).toContain('Update Payment');
+    expect(html).not.toContain('href="/credits"');
+    expect(html).not.toContain('Add Credits');
   });
 });
 

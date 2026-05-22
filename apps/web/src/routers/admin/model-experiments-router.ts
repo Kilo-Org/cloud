@@ -1,7 +1,9 @@
 import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import { db } from '@/lib/drizzle';
 import {
+  microdollar_usage,
   model_experiment,
+  model_experiment_request,
   model_experiment_variant,
   model_experiment_variant_version,
 } from '@kilocode/db/schema';
@@ -286,6 +288,53 @@ export const adminModelExperimentsRouter = createTRPCRouter({
         .orderBy(desc(model_experiment.created_at));
       return { items: rows };
     }),
+
+  listRequests: adminProcedure.query(async () => {
+    const rows = await db
+      .select({
+        usageId: model_experiment_request.usage_id,
+        createdAt: model_experiment_request.created_at,
+        experimentId: model_experiment.id,
+        experimentName: model_experiment.name,
+        publicModelId: model_experiment.public_model_id,
+        variantId: model_experiment_variant.id,
+        variantLabel: model_experiment_variant.label,
+        variantVersionId: model_experiment_variant_version.id,
+        allocationSubject: model_experiment_request.allocation_subject,
+        clientRequestId: model_experiment_request.client_request_id,
+        requestKind: model_experiment_request.request_kind,
+        requestBodySha256: model_experiment_request.request_body_sha256,
+        wasTruncated: model_experiment_request.was_truncated,
+        userId: microdollar_usage.kilo_user_id,
+        organizationId: microdollar_usage.organization_id,
+        requestedModel: microdollar_usage.requested_model,
+        upstreamModel: microdollar_usage.model,
+        provider: microdollar_usage.provider,
+        inferenceProvider: microdollar_usage.inference_provider,
+        inputTokens: microdollar_usage.input_tokens,
+        outputTokens: microdollar_usage.output_tokens,
+        cacheWriteTokens: microdollar_usage.cache_write_tokens,
+        cacheHitTokens: microdollar_usage.cache_hit_tokens,
+        costMicrodollars: microdollar_usage.cost,
+        cacheDiscountMicrodollars: microdollar_usage.cache_discount,
+        hasError: microdollar_usage.has_error,
+      })
+      .from(model_experiment_request)
+      .innerJoin(microdollar_usage, eq(model_experiment_request.usage_id, microdollar_usage.id))
+      .innerJoin(
+        model_experiment_variant_version,
+        eq(model_experiment_request.variant_version_id, model_experiment_variant_version.id)
+      )
+      .innerJoin(
+        model_experiment_variant,
+        eq(model_experiment_variant_version.variant_id, model_experiment_variant.id)
+      )
+      .innerJoin(model_experiment, eq(model_experiment_variant.experiment_id, model_experiment.id))
+      .orderBy(desc(model_experiment_request.created_at))
+      .limit(100);
+
+    return { items: rows };
+  }),
 
   get: adminProcedure.input(idSchema).query(async ({ input }) => {
     const experiment = await loadExperimentOrThrow(input.id);

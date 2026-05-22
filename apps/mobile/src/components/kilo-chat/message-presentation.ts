@@ -1,6 +1,10 @@
 import {
+  type AttachmentBlock,
+  contentBlocksPreviewText,
+  contentBlocksToText,
   type ConversationDetailResponse,
   type CreateMessageRequest,
+  type InputContentBlock,
   type Message,
   type ReplyToMessageSnapshot,
 } from '@kilocode/kilo-chat';
@@ -13,24 +17,32 @@ export type MessageAuthorMember = ConversationDetailResponse['members'][number];
 
 type BuildSendMessageVariablesInput = {
   conversationId: string;
-  text: string;
+  content: InputContentBlock[];
   clientId: string;
   inReplyToMessageId?: string;
 };
 
-export function buildSendMessageVariables({
-  conversationId,
-  text,
-  clientId,
-  inReplyToMessageId,
-}: BuildSendMessageVariablesInput): SendMessageVariables {
-  const content: CreateMessageRequest['content'] = [{ type: 'text', text }];
+export function buildSendMessageVariables(
+  input: BuildSendMessageVariablesInput
+): SendMessageVariables {
   return {
-    conversationId,
-    content,
-    clientId,
-    ...(inReplyToMessageId ? { inReplyToMessageId } : {}),
+    conversationId: input.conversationId,
+    content: input.content,
+    clientId: input.clientId,
+    ...(input.inReplyToMessageId ? { inReplyToMessageId: input.inReplyToMessageId } : {}),
   };
+}
+
+export function getEditableAttachmentBlocks(message: Message): AttachmentBlock[] {
+  return message.content.filter((block): block is AttachmentBlock => block.type === 'attachment');
+}
+
+export function getVisibleEditableAttachmentBlocks(
+  attachments: readonly AttachmentBlock[],
+  removedAttachmentIds: readonly string[]
+): AttachmentBlock[] {
+  const removedAttachmentIdSet = new Set(removedAttachmentIds);
+  return attachments.filter(attachment => !removedAttachmentIdSet.has(attachment.attachmentId));
 }
 
 export function createSendMessageClientId(): string {
@@ -46,15 +58,6 @@ function expoCryptoPrng(): number {
   return byte / 255;
 }
 
-function contentBlocksToPreviewText(content: Message['content']): string {
-  const preview = content
-    .filter(block => block.type === 'text')
-    .map(block => block.text)
-    .join('\n')
-    .trim();
-  return preview || 'Message';
-}
-
 export function getReplyPreviewText(replyToMessage: ReplyPreviewSource): string {
   if (replyToMessage.deleted) {
     return '[deleted message]';
@@ -62,7 +65,7 @@ export function getReplyPreviewText(replyToMessage: ReplyPreviewSource): string 
   if ('previewText' in replyToMessage) {
     return replyToMessage.previewText ?? 'Message';
   }
-  return contentBlocksToPreviewText(replyToMessage.content);
+  return contentBlocksPreviewText(replyToMessage.content) || 'Message';
 }
 
 export function getDeliveryFailureLabel(message: Message): string | null {
@@ -82,7 +85,7 @@ export function canToggleReaction(message: Message, currentUserId: string | null
 }
 
 export function canCopyMessage(message: Message): boolean {
-  return !message.deleted && contentBlocksToPreviewText(message.content).trim().length > 0;
+  return !message.deleted && contentBlocksToText(message.content).trim().length > 0;
 }
 
 export function isMessageEdited(message: Message): boolean {

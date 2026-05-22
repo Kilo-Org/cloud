@@ -52,7 +52,7 @@ describe('Usage deduction for migrated users', () => {
     );
 
     const contextInfo = extractUsageContextInfo(usageContext);
-    const { core, metadata } = toInsertableDbUsageRecord(usageStats, contextInfo);
+    const { core, metadata } = await toInsertableDbUsageRecord(usageStats, contextInfo);
 
     const result = await insertUsageRecord(core, metadata);
 
@@ -77,7 +77,7 @@ describe('Usage deduction for migrated users', () => {
     const usageContext = createMockUsageContext(user.id, user.google_user_email, 0);
 
     const contextInfo = extractUsageContextInfo(usageContext);
-    const { core, metadata } = toInsertableDbUsageRecord(usageStats, contextInfo);
+    const { core, metadata } = await toInsertableDbUsageRecord(usageStats, contextInfo);
 
     const result = await insertUsageRecord(core, metadata);
 
@@ -106,7 +106,7 @@ describe('Usage deduction for migrated users', () => {
       const usageContext = createMockUsageContext(user.id, user.google_user_email, currentUsage);
 
       const contextInfo = extractUsageContextInfo(usageContext);
-      const { core, metadata } = toInsertableDbUsageRecord(usageStats, contextInfo);
+      const { core, metadata } = await toInsertableDbUsageRecord(usageStats, contextInfo);
 
       const result = await insertUsageRecord(core, metadata);
       expect(result).not.toBeNull();
@@ -134,7 +134,7 @@ describe('Usage deduction for migrated users', () => {
     const usageContext = createMockUsageContext(user.id, user.google_user_email, 0);
 
     const contextInfo = extractUsageContextInfo(usageContext);
-    const { core, metadata } = toInsertableDbUsageRecord(usageStats, contextInfo);
+    const { core, metadata } = await toInsertableDbUsageRecord(usageStats, contextInfo);
 
     await insertUsageRecord(core, metadata);
 

@@ -17,7 +17,7 @@
   },
   "rules": [{ "type": "Text", "globs": ["**/*.sql"], "fallthrough": true }],
 
-  "r2_buckets": [{ "binding": "MEDIA_BUCKET", "bucket_name": "kilo-chat-media" }],
+  "r2_buckets": [{ "binding": "MEDIA_BUCKET", "bucket_name": "kilo-chat-media", "remote": true }],
   "routes": [
     {
       "pattern": "chat.kiloapps.io",

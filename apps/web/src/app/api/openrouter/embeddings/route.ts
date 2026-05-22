@@ -8,7 +8,7 @@ import { debugSaveProxyRequest } from '@/lib/debugUtils';
 import { captureException, setTag, startInactiveSpan } from '@sentry/nextjs';
 import { getUserFromAuth } from '@/lib/user.server';
 import { sentryRootSpan } from '@/lib/getRootSpan';
-import { isFreeModel } from '@/lib/ai-gateway/models';
+import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
 import {
   captureProxyError,
   checkOrganizationModelRestrictions,
@@ -132,7 +132,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   const tokenSource: string | undefined = authTokenSource;
 
   if (authFailedResponse) {
-    if (!isFreeModel(requestedModelLowerCased)) {
+    if (!(await isFreeModel(requestedModelLowerCased))) {
       return NextResponse.json(
         {
           error: {
@@ -199,7 +199,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   if (!isAnonymousContext(user)) {
     const { balance, settings, plan } = await getBalanceAndOrgSettings(organizationId, user);
 
-    if (balance <= 0 && !isFreeModel(requestedModelLowerCased) && !userByok) {
+    if (balance <= 0 && !(await isFreeModel(requestedModelLowerCased)) && !userByok) {
       return await usageLimitExceededResponse(user, balance);
     }
 

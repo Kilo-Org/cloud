@@ -780,6 +780,109 @@ describe('bootstrapProvisionSubscription concurrent insert race', () => {
     });
   });
 
+  it('resolves org provisioning entitlement for a hard-expired org with paid seat state', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-18T12:00:00.000Z'));
+    const { db } = createFreshInsertDb({
+      selectRows: [
+        [
+          {
+            created_at: '2026-04-01T00:00:00.000Z',
+            free_trial_end_at: '2026-05-01T00:00:00.000Z',
+            require_seats: true,
+            settings: {},
+          },
+        ],
+        [{ subscriptionStatus: 'past_due' }],
+      ],
+      insertFirstReturningRows: [],
+      reselectAfterConflictRows: [],
+    });
+    mockGetWorkerDb.mockReturnValue(db);
+
+    try {
+      await expect(
+        resolveProvisionEntitlement(createEnv(), {
+          userId: 'user-1',
+          orgId: '22222222-2222-4222-8222-222222222222',
+        })
+      ).resolves.toEqual({
+        priceVersion: '2026-03-19',
+        selfServiceInstanceType: 'perf-1-3',
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('rejects org provisioning entitlement for a hard-expired unentitled org', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-18T12:00:00.000Z'));
+    const { db } = createFreshInsertDb({
+      selectRows: [
+        [
+          {
+            created_at: '2026-04-01T00:00:00.000Z',
+            free_trial_end_at: '2026-05-01T00:00:00.000Z',
+            require_seats: true,
+            settings: {},
+          },
+        ],
+        [],
+      ],
+      insertFirstReturningRows: [],
+      reselectAfterConflictRows: [],
+    });
+    mockGetWorkerDb.mockReturnValue(db);
+
+    try {
+      await expect(
+        resolveProvisionEntitlement(createEnv(), {
+          userId: 'user-1',
+          orgId: '22222222-2222-4222-8222-222222222222',
+        })
+      ).rejects.toThrow('Organization KiloClaw entitlement has expired.');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('rejects org bootstrap when entitlement disappears before managed row creation', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-18T12:00:00.000Z'));
+    const { db, insertValues } = createFreshInsertDb({
+      selectRows: [],
+      txSelectRows: [
+        [{ id: 'instance-new', destroyedAt: null }],
+        [
+          {
+            created_at: '2026-04-01T00:00:00.000Z',
+            free_trial_end_at: '2026-05-01T00:00:00.000Z',
+            require_seats: true,
+            settings: {},
+          },
+        ],
+        [],
+      ],
+      insertFirstReturningRows: [],
+      reselectAfterConflictRows: [],
+    });
+    mockGetWorkerDb.mockReturnValue(db);
+
+    try {
+      await expect(
+        bootstrapProvisionSubscription(createEnv(), {
+          userId: 'user-1',
+          instanceId: 'instance-new',
+          orgId: '22222222-2222-4222-8222-222222222222',
+        })
+      ).rejects.toThrow('Organization KiloClaw entitlement has expired.');
+      expect(insertValues).toHaveLength(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('personal fresh-insert creates a current-version one-day trial', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-05-12T00:00:00.000Z'));
@@ -1026,10 +1129,13 @@ describe('bootstrapProvisionSubscription concurrent insert race', () => {
         [{ id: 'instance-new', destroyedAt: null }],
         [
           {
-            createdAt: '2026-04-01T00:00:00.000Z',
-            freeTrialEndAt: null,
+            created_at: '2026-04-01T00:00:00.000Z',
+            free_trial_end_at: '2099-01-01T00:00:00.000Z',
+            require_seats: true,
+            settings: {},
           },
         ],
+        [],
         [winnerRow],
         [
           {

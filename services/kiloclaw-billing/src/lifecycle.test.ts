@@ -22,13 +22,16 @@ vi.mock('./snowflake.js', () => ({
 }));
 
 import {
+  buildOrganizationKiloClawLifecycleNotification,
   processCreditRenewalDiscovery,
   processCreditRenewalItem,
+  processOrganizationTrialExpiryPage,
   processTrialExpiryPage,
   processTrialInactivityStopCandidate,
   recordCreditRenewalTerminalFailure,
   runCreditRenewalSweep,
   runSweep,
+  selectOrganizationKiloClawLifecycleRecipients,
 } from './lifecycle.js';
 import type { BillingWorkerEnv } from './types.js';
 
@@ -255,9 +258,13 @@ function createTestBillingSummary() {
     trial_warnings: 0,
     earlybird_warnings: 0,
     sweep1_trial_expiry: 0,
+    organization_trial_expiry_suspensions: 0,
+    organization_trial_entitlement_recoveries: 0,
     sweep2_subscription_expiry: 0,
     destruction_warnings: 0,
+    organization_destruction_warnings: 0,
     sweep3_instance_destruction: 0,
+    organization_instance_destructions: 0,
     sweep4_past_due_cleanup: 0,
     sweep5_intro_schedules_repaired: 0,
     complementary_inference_ended_emails: 0,
@@ -328,6 +335,73 @@ function trialExpiryRow(overrides: Partial<Record<string, unknown>> = {}) {
     organization_id: null,
     email: 'user-1@example.com',
     trial_ends_at: '2026-04-17T00:00:00.000Z',
+    ...overrides,
+  };
+}
+
+function organizationTrialExpiryRow(overrides: Partial<Record<string, unknown>> = {}) {
+  return {
+    id: '11111111-1111-4111-8111-111111111111',
+    user_id: 'user-1',
+    instance_id: '22222222-2222-4222-8222-222222222222',
+    sandbox_id: 'ki_22222222222242228222222222222222',
+    instance_destroyed_at: null,
+    instance_name: 'Research Claw',
+    plan: 'standard',
+    organization_id: '33333333-3333-4333-8333-333333333333',
+    organization_name: 'Acme Corp',
+    organization_created_at: '2026-04-01T00:00:00.000Z',
+    organization_free_trial_end_at: '2026-04-15T00:00:00.000Z',
+    organization_require_seats: true,
+    organization_settings: {},
+    latest_seat_purchase_status: null,
+    hard_expiry_boundary: '2026-04-18T00:00:00.000Z',
+    email: 'user-1@example.com',
+    ...overrides,
+  };
+}
+
+function organizationDestructionWarningRow(overrides: Partial<Record<string, unknown>> = {}) {
+  return {
+    id: '44444444-4444-4444-8444-444444444444',
+    user_id: 'user-1',
+    email: 'user-1@example.com',
+    destruction_deadline: '2099-04-15T10:00:00.000Z',
+    instance_id: '22222222-2222-4222-8222-222222222222',
+    instance_name: 'Research Claw',
+    instance_destroyed_at: null,
+    organization_id: '33333333-3333-4333-8333-333333333333',
+    organization_name: 'Acme Corp',
+    organization_created_at: '2026-04-01T00:00:00.000Z',
+    organization_free_trial_end_at: '2026-04-15T00:00:00.000Z',
+    organization_require_seats: true,
+    organization_settings: {},
+    latest_seat_purchase_status: null,
+    plan: 'standard',
+    credit_renewal_at: null,
+    ...overrides,
+  };
+}
+
+function organizationDestructionCandidateRow(overrides: Partial<Record<string, unknown>> = {}) {
+  return {
+    id: '55555555-5555-4555-8555-555555555555',
+    user_id: 'user-1',
+    instance_id: '22222222-2222-4222-8222-222222222222',
+    sandbox_id: 'ki_22222222222242228222222222222222',
+    instance_name: 'Research Claw',
+    instance_destroyed_at: null,
+    organization_id: '33333333-3333-4333-8333-333333333333',
+    organization_name: 'Acme Corp',
+    organization_created_at: '2026-04-01T00:00:00.000Z',
+    organization_free_trial_end_at: '2026-04-15T00:00:00.000Z',
+    organization_require_seats: true,
+    organization_settings: {},
+    latest_seat_purchase_status: null,
+    plan: 'standard',
+    status: 'canceled',
+    email: 'user-1@example.com',
+    credit_renewal_at: null,
     ...overrides,
   };
 }
@@ -1297,6 +1371,40 @@ describe('credit renewal fanout queue processing', () => {
     expect(summary.sweep4_past_due_cleanup).toBe(1);
     expect(summary.errors).toBe(0);
   });
+
+  it('skips organization-managed rows in personal past-due cleanup', async () => {
+    const { db, updates, inserts } = createMockDb([
+      [
+        {
+          id: 'org-past-due-sub',
+          user_id: 'org-past-due-user',
+          instance_id: 'org-past-due-instance',
+          sandbox_id: 'ki_orgpastdue000000000000000000',
+          instance_destroyed_at: null,
+          organization_id: 'org-past-due',
+          email: 'org-past-due@example.com',
+          credit_renewal_at: '2026-06-01T00:00:00.000Z',
+        },
+      ],
+    ]);
+    mockGetWorkerDb.mockReturnValue(db);
+    const kiloclawFetch = vi.fn();
+
+    const summary = await runSweep(
+      createEnv(kiloclawFetch),
+      {
+        runId: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+        sweep: 'past_due_cleanup',
+      },
+      1
+    );
+
+    expect(summary.sweep4_past_due_cleanup).toBe(0);
+    expect(summary.errors).toBe(0);
+    expect(kiloclawFetch).not.toHaveBeenCalled();
+    expect(updates).toEqual([]);
+    expect(inserts).toEqual([]);
+  });
 });
 
 describe('interrupted auto-resume sweep', () => {
@@ -1496,6 +1604,56 @@ describe('interrupted auto-resume sweep', () => {
         auto_resume_retry_after: null,
         auto_resume_attempt_count: 0,
       },
+    ]);
+  });
+
+  it('retries restored organization instances with the organization recovery start reason', async () => {
+    const instanceId = '22222222-2222-4222-8222-222222222222';
+    const sandboxId = 'ki_22222222222242228222222222222222';
+    const { db, updates } = createMockDb([
+      [
+        {
+          id: 'sub-org-resume',
+          user_id: 'user-1',
+          instance_id: instanceId,
+          organization_id: '33333333-3333-4333-8333-333333333333',
+          suspended_at: null,
+          auto_resume_requested_at: '2026-04-21T10:00:00.000Z',
+          auto_resume_retry_after: '2026-04-21T12:00:00.000Z',
+          auto_resume_attempt_count: 1,
+        },
+      ],
+      [{ id: instanceId, sandbox_id: sandboxId }],
+    ]);
+    mockGetWorkerDb.mockReturnValue(db);
+    const fetch = vi.fn(async (request: RequestInfo | URL) => {
+      const sentRequest = request instanceof Request ? request : new Request(String(request));
+      await expect(sentRequest.json()).resolves.toEqual({
+        userId: 'user-1',
+        reason: 'organization_trial_access_restored',
+      });
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    });
+
+    const summary = await runSweep(
+      createEnv(fetch),
+      {
+        runId: 'dededede-dede-4ded-8ded-dededededede',
+        sweep: 'interrupted_auto_resume',
+      },
+      1
+    );
+
+    expect(summary.interrupted_auto_resume_requests).toBe(1);
+    expect(summary.errors).toBe(0);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(updates).toEqual([
+      expect.objectContaining({
+        auto_resume_attempt_count: 2,
+      }),
     ]);
   });
 
@@ -1875,11 +2033,280 @@ describe('trial expiry sweep', () => {
   });
 });
 
+describe('organization trial expiry sweep', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetWorkerDb.mockReset();
+    loggedValues = [];
+    vi.spyOn(console, 'log').mockImplementation((value?: unknown) => {
+      loggedValues.push(value);
+    });
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    vi.spyOn(globalThis, 'fetch').mockImplementation(
+      async () =>
+        new Response(JSON.stringify({ sent: true }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        })
+    );
+  });
+
+  it('suspends expired unentitled organization instances with fresh grace and organization notifications', async () => {
+    const row = organizationTrialExpiryRow();
+    const { db, updates, inserts } = createMockDb(
+      [
+        [row],
+        [row],
+        [
+          {
+            id: row.id,
+            user_id: row.user_id,
+            instance_id: row.instance_id,
+            status: 'active',
+            suspended_at: null,
+            destruction_deadline: null,
+          },
+        ],
+        [{ userId: 'owner-1', email: 'owner@example.com' }],
+      ],
+      {
+        updateReturningRows: [
+          [
+            {
+              id: row.id,
+              user_id: row.user_id,
+              instance_id: row.instance_id,
+              status: 'canceled',
+              suspended_at: '2026-05-18T00:00:00.000Z',
+              destruction_deadline: '2026-05-25T00:00:00.000Z',
+            },
+          ],
+        ],
+      }
+    );
+    mockGetWorkerDb.mockReturnValue(db);
+    const stopFetch = vi.fn(
+      async (_request: RequestInfo | URL) =>
+        new Response(
+          JSON.stringify({
+            ok: true,
+            stopped: true,
+            previousStatus: 'running',
+            currentStatus: 'stopped',
+            stoppedAt: Date.parse('2026-05-18T00:00:00.000Z'),
+          }),
+          {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          }
+        )
+    );
+    const { env } = createEnvWithQueueMocks(stopFetch);
+
+    const result = await processOrganizationTrialExpiryPage(env, {
+      kind: 'organization_trial_expiry_page',
+      runId: '81818181-8181-4818-8818-818181818181',
+      sweep: 'organization_trial_expiry',
+    });
+
+    expect(result.summary.organization_trial_expiry_suspensions).toBe(1);
+    expect(result.summary.errors).toBe(0);
+    expect(result.summary.emails_sent).toBe(2);
+    expect(result.continuationEnqueued).toBe(false);
+    expect(stopFetch).toHaveBeenCalledTimes(1);
+    const stopRequest = stopFetch.mock.calls[0]?.[0];
+    expect(stopRequest).toBeInstanceOf(Request);
+    if (!(stopRequest instanceof Request)) {
+      throw new Error('expected Request');
+    }
+    expect(await stopRequest.json()).toEqual({
+      userId: 'user-1',
+      reason: 'organization_trial_expiry',
+    });
+
+    const suspensionUpdate = updates.find(
+      update =>
+        update.status === 'canceled' &&
+        typeof update.suspended_at === 'string' &&
+        typeof update.destruction_deadline === 'string'
+    );
+    expect(suspensionUpdate).toBeDefined();
+    if (!suspensionUpdate || typeof suspensionUpdate.destruction_deadline !== 'string') {
+      throw new Error('expected organization suspension update');
+    }
+    const freshDeadlineAt = Date.parse(suspensionUpdate.destruction_deadline);
+    const expectedGraceDeadlineAt = Date.now() + 7 * 24 * 60 * 60 * 1000;
+    expect(Math.abs(freshDeadlineAt - expectedGraceDeadlineAt)).toBeLessThan(5_000);
+    expect(freshDeadlineAt).toBeGreaterThan(Date.parse(row.hard_expiry_boundary));
+    expect(inserts).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          action: 'suspended',
+          reason: 'organization_trial_expired',
+        }),
+        {
+          user_id: 'user-1',
+          instance_id: row.instance_id,
+          email_type: 'claw_org_trial_suspended',
+        },
+        {
+          user_id: 'owner-1',
+          instance_id: row.instance_id,
+          email_type: 'claw_org_trial_suspended',
+        },
+      ])
+    );
+
+    const emailBodies = vi
+      .mocked(globalThis.fetch)
+      .mock.calls.map(([, init]) => JSON.parse(typeof init?.body === 'string' ? init.body : '{}'));
+    expect(emailBodies).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          action: 'send_email',
+          input: expect.objectContaining({
+            to: 'user-1@example.com',
+            templateName: 'clawOrganizationTrialSuspendedUser',
+            organizationId: row.organization_id,
+          }),
+        }),
+        expect.objectContaining({
+          action: 'send_email',
+          input: expect.objectContaining({
+            to: 'owner@example.com',
+            templateName: 'clawOrganizationTrialSuspendedBillingAuthority',
+            organizationId: row.organization_id,
+          }),
+        }),
+      ])
+    );
+    expect(
+      findLogRecord('Suspended organization KiloClaw instance after hard-expired trial')
+    ).toMatchObject({
+      event: 'organization_trial_expiry_suspension',
+      outcome: 'completed',
+      subscriptionId: row.id,
+      userId: row.user_id,
+      instanceId: row.instance_id,
+      organizationId: row.organization_id,
+      notificationSentCount: 2,
+    });
+    expect(findLogRecord('Processed organization-trial-expiry page')).toMatchObject({
+      event: 'organization_trial_expiry_page',
+      summary: expect.objectContaining({
+        organization_trial_expiry_suspensions: 1,
+      }),
+    });
+  });
+
+  it('skips organization trial expiry when entitlement returns after candidate selection', async () => {
+    const staleCandidate = organizationTrialExpiryRow();
+    const currentRow = organizationTrialExpiryRow({ latest_seat_purchase_status: 'active' });
+    const { db, updates, inserts } = createMockDb([[staleCandidate], [currentRow]]);
+    mockGetWorkerDb.mockReturnValue(db);
+    const stopFetch = vi.fn();
+    const { env } = createEnvWithQueueMocks(stopFetch);
+
+    const result = await processOrganizationTrialExpiryPage(env, {
+      kind: 'organization_trial_expiry_page',
+      runId: '83838383-8383-4838-8838-838383838383',
+      sweep: 'organization_trial_expiry',
+    });
+
+    expect(result.summary.organization_trial_expiry_suspensions).toBe(0);
+    expect(result.summary.errors).toBe(0);
+    expect(stopFetch).not.toHaveBeenCalled();
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+    expect(updates).toEqual([]);
+    expect(inserts).toEqual([]);
+  });
+
+  it('skips paid, exempt, and still-trialing organization rows after entitlement revalidation', async () => {
+    const paidRow = organizationTrialExpiryRow({
+      id: '91919191-9191-4919-8919-919191919191',
+      latest_seat_purchase_status: 'past_due',
+    });
+    const exemptRow = organizationTrialExpiryRow({
+      id: 'a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1',
+      organization_id: '44444444-4444-4444-8444-444444444444',
+      organization_require_seats: false,
+    });
+    const trialingRow = organizationTrialExpiryRow({
+      id: 'b2b2b2b2-b2b2-4b2b-8b2b-b2b2b2b2b2b2',
+      organization_id: '55555555-5555-4555-8555-555555555555',
+      organization_free_trial_end_at: '2099-05-18T00:00:00.000Z',
+      hard_expiry_boundary: '2099-05-21T00:00:00.000Z',
+    });
+    const { db, updates, inserts } = createMockDb([
+      [paidRow, exemptRow, trialingRow],
+      [paidRow],
+      [exemptRow],
+      [trialingRow],
+    ]);
+    mockGetWorkerDb.mockReturnValue(db);
+    const stopFetch = vi.fn();
+    const { env } = createEnvWithQueueMocks(stopFetch);
+
+    const result = await processOrganizationTrialExpiryPage(env, {
+      kind: 'organization_trial_expiry_page',
+      runId: '92929292-9292-4929-8929-929292929292',
+      sweep: 'organization_trial_expiry',
+    });
+
+    expect(result.summary.organization_trial_expiry_suspensions).toBe(0);
+    expect(result.summary.errors).toBe(0);
+    expect(stopFetch).not.toHaveBeenCalled();
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+    expect(updates).toEqual([]);
+    expect(inserts).toEqual([]);
+  });
+
+  it('processes only the organization page budget and enqueues a cursor continuation', async () => {
+    const first = organizationTrialExpiryRow({
+      id: 'c3c3c3c3-c3c3-4c3c-8c3c-c3c3c3c3c3c3',
+      organization_free_trial_end_at: '2099-05-18T00:00:00.000Z',
+      hard_expiry_boundary: '2026-04-18 00:00:00+00',
+    });
+    const second = organizationTrialExpiryRow({
+      id: 'd4d4d4d4-d4d4-4d4d-8d4d-d4d4d4d4d4d4',
+      organization_free_trial_end_at: '2099-05-18T00:00:00.000Z',
+      hard_expiry_boundary: '2026-04-19T00:00:00.000Z',
+    });
+    const { db } = createMockDb([[first, second], [first]]);
+    mockGetWorkerDb.mockReturnValue(db);
+    const { env, lifecycleSend } = createEnvWithQueueMocks(vi.fn());
+
+    const result = await processOrganizationTrialExpiryPage(env, {
+      kind: 'organization_trial_expiry_page',
+      runId: 'a3a3a3a3-a3a3-4a3a-8a3a-a3a3a3a3a3a3',
+      sweep: 'organization_trial_expiry',
+      cutoffTime: '2026-05-18T00:00:00.000Z',
+      pageBudget: 1,
+    });
+
+    expect(result.summary.organization_trial_expiry_suspensions).toBe(0);
+    expect(result.continuationEnqueued).toBe(true);
+    expect(lifecycleSend).toHaveBeenCalledWith({
+      kind: 'organization_trial_expiry_continuation',
+      runId: 'a3a3a3a3-a3a3-4a3a-8a3a-a3a3a3a3a3a3',
+      sweep: 'organization_trial_expiry',
+      cutoffTime: '2026-05-18T00:00:00.000Z',
+      cursorSubscriptionId: first.id,
+      cursorHardExpiryBoundary: '2026-04-18T00:00:00.000Z',
+      pageBudget: 1,
+      wallClockBudgetMs: undefined,
+    });
+  });
+});
+
 describe('destruction warning sweep', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetWorkerDb.mockReset();
-    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    loggedValues = [];
+    vi.spyOn(console, 'log').mockImplementation((value?: unknown) => {
+      loggedValues.push(value);
+    });
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
     vi.spyOn(globalThis, 'fetch').mockImplementation(
       async () =>
@@ -1921,7 +2348,7 @@ describe('destruction warning sweep', () => {
     expect(summary.destruction_warnings).toBe(1);
     expect(summary.emails_sent).toBe(1);
     expect(selectBuilders[0]?.innerJoin).toHaveBeenCalledTimes(2);
-    expect(selectBuilders[0]?.leftJoin).not.toHaveBeenCalled();
+    expect(selectBuilders[0]?.leftJoin).toHaveBeenCalledTimes(1);
     expect(inserts).toEqual([
       {
         user_id: 'user-1',
@@ -2056,6 +2483,244 @@ describe('destruction warning sweep', () => {
     ]);
     expect(globalThis.fetch).not.toHaveBeenCalled();
   });
+
+  it('sends organization destruction warnings while entitlement remains absent', async () => {
+    const row = organizationDestructionWarningRow();
+    const { db, inserts } = createMockDb([
+      [row],
+      [{ userId: 'owner-1', email: 'owner@example.com' }],
+    ]);
+    mockGetWorkerDb.mockReturnValue(db);
+
+    const summary = await runSweep(
+      createEnv(vi.fn()),
+      {
+        runId: '18181818-1818-4818-8818-181818181818',
+        sweep: 'destruction_warning',
+      },
+      1
+    );
+
+    expect(summary.errors).toBe(0);
+    expect(summary.destruction_warnings).toBe(1);
+    expect(summary.organization_destruction_warnings).toBe(1);
+    expect(summary.emails_sent).toBe(2);
+    expect(inserts).toEqual(
+      expect.arrayContaining([
+        {
+          user_id: 'user-1',
+          instance_id: row.instance_id,
+          email_type: 'claw_org_destruction_warning',
+        },
+        {
+          user_id: 'owner-1',
+          instance_id: row.instance_id,
+          email_type: 'claw_org_destruction_warning',
+        },
+      ])
+    );
+
+    const bodies = vi
+      .mocked(globalThis.fetch)
+      .mock.calls.map(([, init]) => JSON.parse(typeof init?.body === 'string' ? init.body : '{}'));
+    expect(bodies).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          action: 'send_email',
+          input: expect.objectContaining({
+            to: 'user-1@example.com',
+            templateName: 'clawOrganizationDestructionWarningUser',
+            organizationId: row.organization_id,
+          }),
+        }),
+        expect.objectContaining({
+          action: 'send_email',
+          input: expect.objectContaining({
+            to: 'owner@example.com',
+            templateName: 'clawOrganizationDestructionWarningBillingAuthority',
+            organizationId: row.organization_id,
+          }),
+        }),
+      ])
+    );
+    expect(findLogRecord('Sent organization KiloClaw destruction warning')).toMatchObject({
+      event: 'organization_destruction_warning',
+      outcome: 'completed',
+      subscriptionId: row.id,
+      userId: row.user_id,
+      instanceId: row.instance_id,
+      organizationId: row.organization_id,
+      notificationSentCount: 2,
+    });
+  });
+
+  it('recovers organization subscriptions before warning when entitlement returns', async () => {
+    const row = organizationDestructionWarningRow({ latest_seat_purchase_status: 'past_due' });
+    const { db, txUpdates, updates, txDeletes, txInserts } = createMockDb(
+      [
+        [row],
+        [
+          {
+            id: row.id,
+            user_id: row.user_id,
+            instance_id: row.instance_id,
+            status: 'canceled',
+            suspended_at: '2026-05-18T00:00:00.000Z',
+            destruction_deadline: row.destruction_deadline,
+          },
+        ],
+        [{ id: row.instance_id, sandbox_id: 'ki_22222222222242228222222222222222' }],
+      ],
+      {
+        txUpdateReturningRows: [
+          [
+            {
+              id: row.id,
+              user_id: row.user_id,
+              instance_id: row.instance_id,
+              status: 'active',
+              suspended_at: null,
+              destruction_deadline: null,
+            },
+          ],
+        ],
+      }
+    );
+    mockGetWorkerDb.mockReturnValue(db);
+    const kiloclawFetch = vi.fn(async (request: RequestInfo | URL) => {
+      const sentRequest = request instanceof Request ? request : new Request(String(request));
+      await expect(sentRequest.json()).resolves.toEqual({
+        userId: 'user-1',
+        reason: 'organization_trial_access_restored',
+      });
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    });
+
+    const summary = await runSweep(
+      createEnv(kiloclawFetch),
+      {
+        runId: '19191919-1919-4919-8919-191919191919',
+        sweep: 'destruction_warning',
+      },
+      1
+    );
+
+    expect(summary.errors).toBe(0);
+    expect(summary.organization_trial_entitlement_recoveries).toBe(1);
+    expect(summary.organization_destruction_warnings).toBe(0);
+    expect(summary.emails_sent).toBe(0);
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+    expect(txDeletes).toHaveLength(1);
+    expect(txUpdates).toEqual([
+      expect.objectContaining({
+        status: 'active',
+        suspended_at: null,
+        destruction_deadline: null,
+        auto_resume_requested_at: expect.any(String),
+        auto_resume_retry_after: null,
+        auto_resume_attempt_count: 0,
+      }),
+    ]);
+    expect(txInserts).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          actor_id: 'billing-lifecycle-job',
+          action: 'reactivated',
+          reason: 'organization_entitlement_recovered',
+        }),
+      ])
+    );
+    expect(kiloclawFetch).toHaveBeenCalledTimes(1);
+    expect(updates).toEqual([
+      expect.objectContaining({
+        auto_resume_requested_at: expect.any(String),
+        auto_resume_retry_after: expect.any(String),
+        auto_resume_attempt_count: 1,
+      }),
+    ]);
+    expect(
+      findLogRecord('Recovered organization KiloClaw instance after entitlement returned')
+    ).toMatchObject({
+      event: 'organization_trial_entitlement_recovery',
+      outcome: 'completed',
+      subscriptionId: row.id,
+      userId: row.user_id,
+      instanceId: row.instance_id,
+      organizationId: row.organization_id,
+    });
+  });
+
+  it('keeps restored organization deletion canceled when compute restart dispatch fails', async () => {
+    const row = organizationDestructionWarningRow({ organization_require_seats: false });
+    const { db, txUpdates, updates } = createMockDb(
+      [
+        [row],
+        [
+          {
+            id: row.id,
+            user_id: row.user_id,
+            instance_id: row.instance_id,
+            status: 'canceled',
+            suspended_at: '2026-05-18T00:00:00.000Z',
+            destruction_deadline: row.destruction_deadline,
+          },
+        ],
+        [{ id: row.instance_id, sandbox_id: 'ki_22222222222242228222222222222222' }],
+      ],
+      {
+        txUpdateReturningRows: [
+          [
+            {
+              id: row.id,
+              user_id: row.user_id,
+              instance_id: row.instance_id,
+              status: 'active',
+              suspended_at: null,
+              destruction_deadline: null,
+            },
+          ],
+        ],
+      }
+    );
+    mockGetWorkerDb.mockReturnValue(db);
+    const kiloclawFetch = vi.fn(
+      async () =>
+        new Response('start failed', {
+          status: 500,
+          headers: { 'content-type': 'text/plain' },
+        })
+    );
+
+    const summary = await runSweep(
+      createEnv(kiloclawFetch),
+      {
+        runId: '1a1a1a1a-1a1a-4a1a-8a1a-1a1a1a1a1a1a',
+        sweep: 'destruction_warning',
+      },
+      1
+    );
+
+    expect(summary.errors).toBe(1);
+    expect(summary.organization_trial_entitlement_recoveries).toBe(1);
+    expect(summary.organization_destruction_warnings).toBe(0);
+    expect(txUpdates).toEqual([
+      expect.objectContaining({
+        status: 'active',
+        suspended_at: null,
+        destruction_deadline: null,
+      }),
+    ]);
+    expect(updates).toEqual([
+      expect.objectContaining({
+        auto_resume_requested_at: expect.any(String),
+        auto_resume_retry_after: expect.any(String),
+        auto_resume_attempt_count: 1,
+      }),
+    ]);
+  });
 });
 
 describe('trial warning sweep', () => {
@@ -2071,6 +2736,41 @@ describe('trial warning sweep', () => {
           headers: { 'content-type': 'application/json' },
         })
     );
+  });
+
+  it('skips organization-managed rows in personal trial warning delivery', async () => {
+    const instanceId = '43434343-4343-4343-8343-434343434343';
+    const { db, inserts } = createMockDb([
+      [
+        {
+          id: 'sub-org-trial-warning',
+          user_id: 'user-org-trial-warning',
+          instance_id: instanceId,
+          instance_destroyed_at: null,
+          instance_sandbox_id: 'ki_43434343434343438343434343434343',
+          organization_id: 'org-trial-warning',
+          email: 'org-trial-warning@example.com',
+          trial_ends_at: new Date(Date.now() + 2 * 86_400_000).toISOString(),
+          kiloclaw_price_version: '2026-03-19',
+        },
+      ],
+    ]);
+    mockGetWorkerDb.mockReturnValue(db);
+
+    const summary = await runSweep(
+      createEnv(vi.fn()),
+      {
+        runId: '43434343-4343-4343-8343-434343434340',
+        sweep: 'trial_warning',
+      },
+      1
+    );
+
+    expect(summary.errors).toBe(0);
+    expect(summary.trial_warnings).toBe(0);
+    expect(summary.emails_sent).toBe(0);
+    expect(inserts).toEqual([]);
+    expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 
   it('does not send the 2-day warning for current-price one-day trials', async () => {
@@ -2716,6 +3416,246 @@ describe('instance destruction sweep', () => {
     expect(updates).toHaveLength(0);
     expect(inserts).toHaveLength(0);
     expect(deletes).toHaveLength(0);
+  });
+
+  it('destroys expired organization instances while entitlement remains absent', async () => {
+    const row = organizationDestructionCandidateRow();
+    const { db, updates, txUpdates, inserts, deletes } = createMockDb([
+      [row],
+      [row],
+      [
+        {
+          id: row.instance_id,
+          userId: row.user_id,
+          sandboxId: row.sandbox_id,
+          organizationId: row.organization_id,
+          name: row.instance_name,
+          inboundEmailEnabled: false,
+          destroyedAt: null,
+        },
+      ],
+      [{ id: row.id, user_id: row.user_id, instance_id: row.instance_id }],
+      [{ userId: 'owner-1', email: 'owner@example.com' }],
+    ]);
+    mockGetWorkerDb.mockReturnValue(db);
+    const destroyFetch = vi.fn(async (request: RequestInfo | URL) => {
+      const sentRequest = request instanceof Request ? request : new Request(String(request));
+      await expect(sentRequest.json()).resolves.toEqual({
+        userId: 'user-1',
+        reason: 'destruction_deadline_elapsed',
+      });
+      return new Response(JSON.stringify(destroyResponse()), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    });
+
+    const summary = await runSweep(
+      createEnv(destroyFetch),
+      {
+        runId: '20202020-2020-4020-8020-202020202020',
+        sweep: 'instance_destruction',
+      },
+      1
+    );
+
+    expect(summary.errors).toBe(0);
+    expect(summary.sweep3_instance_destruction).toBe(1);
+    expect(summary.organization_instance_destructions).toBe(1);
+    expect(summary.emails_sent).toBe(2);
+    expect(destroyFetch).toHaveBeenCalledTimes(1);
+    expect(txUpdates[0]?.destroyed_at).toEqual(expect.any(String));
+    expect(updates).toEqual([{ destruction_deadline: null }]);
+    expect(deletes).toHaveLength(1);
+    expect(inserts).toEqual(
+      expect.arrayContaining([
+        {
+          user_id: 'user-1',
+          instance_id: row.instance_id,
+          email_type: 'claw_org_instance_destroyed',
+        },
+        {
+          user_id: 'owner-1',
+          instance_id: row.instance_id,
+          email_type: 'claw_org_instance_destroyed',
+        },
+        expect.objectContaining({
+          actor_id: 'billing-lifecycle-job',
+          action: 'status_changed',
+          reason: 'instance_destroyed',
+        }),
+      ])
+    );
+    expect(
+      findLogRecord('Destroyed organization KiloClaw instance after grace elapsed')
+    ).toMatchObject({
+      event: 'organization_instance_destruction',
+      outcome: 'completed',
+      subscriptionId: row.id,
+      userId: row.user_id,
+      instanceId: row.instance_id,
+      organizationId: row.organization_id,
+      notificationSentCount: 2,
+    });
+  });
+
+  it('recovers organization subscriptions before destruction when entitlement returns', async () => {
+    const row = organizationDestructionCandidateRow({ latest_seat_purchase_status: 'active' });
+    const { db, txUpdates, updates, txDeletes } = createMockDb(
+      [
+        [row],
+        [row],
+        [
+          {
+            id: row.id,
+            user_id: row.user_id,
+            instance_id: row.instance_id,
+            status: 'canceled',
+            suspended_at: '2026-05-18T00:00:00.000Z',
+            destruction_deadline: '2026-05-17T00:00:00.000Z',
+          },
+        ],
+        [{ id: row.instance_id, sandbox_id: row.sandbox_id }],
+      ],
+      {
+        txUpdateReturningRows: [
+          [
+            {
+              id: row.id,
+              user_id: row.user_id,
+              instance_id: row.instance_id,
+              status: 'active',
+              suspended_at: null,
+              destruction_deadline: null,
+            },
+          ],
+        ],
+      }
+    );
+    mockGetWorkerDb.mockReturnValue(db);
+    const startFetch = vi.fn(async (request: RequestInfo | URL) => {
+      const sentRequest = request instanceof Request ? request : new Request(String(request));
+      await expect(sentRequest.json()).resolves.toEqual({
+        userId: 'user-1',
+        reason: 'organization_trial_access_restored',
+      });
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    });
+
+    const summary = await runSweep(
+      createEnv(startFetch),
+      {
+        runId: '21212121-2121-4212-8212-212121212121',
+        sweep: 'instance_destruction',
+      },
+      1
+    );
+
+    expect(summary.errors).toBe(0);
+    expect(summary.sweep3_instance_destruction).toBe(0);
+    expect(summary.organization_instance_destructions).toBe(0);
+    expect(summary.organization_trial_entitlement_recoveries).toBe(1);
+    expect(startFetch).toHaveBeenCalledTimes(1);
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+    expect(txDeletes).toHaveLength(1);
+    expect(txUpdates).toEqual([
+      expect.objectContaining({
+        status: 'active',
+        suspended_at: null,
+        destruction_deadline: null,
+      }),
+    ]);
+    expect(updates).toEqual([
+      expect.objectContaining({
+        auto_resume_requested_at: expect.any(String),
+        auto_resume_retry_after: expect.any(String),
+        auto_resume_attempt_count: 1,
+      }),
+    ]);
+  });
+
+  it('recovers instead of destroying when organization entitlement returns after destruction candidate selection', async () => {
+    const staleCandidate = organizationDestructionCandidateRow();
+    const currentRow = organizationDestructionCandidateRow({
+      latest_seat_purchase_status: 'active',
+    });
+    const { db, txUpdates, updates, txDeletes } = createMockDb(
+      [
+        [staleCandidate],
+        [currentRow],
+        [
+          {
+            id: currentRow.id,
+            user_id: currentRow.user_id,
+            instance_id: currentRow.instance_id,
+            status: 'canceled',
+            suspended_at: '2026-05-18T00:00:00.000Z',
+            destruction_deadline: '2026-05-17T00:00:00.000Z',
+          },
+        ],
+        [{ id: currentRow.instance_id, sandbox_id: currentRow.sandbox_id }],
+      ],
+      {
+        txUpdateReturningRows: [
+          [
+            {
+              id: currentRow.id,
+              user_id: currentRow.user_id,
+              instance_id: currentRow.instance_id,
+              status: 'active',
+              suspended_at: null,
+              destruction_deadline: null,
+            },
+          ],
+        ],
+      }
+    );
+    mockGetWorkerDb.mockReturnValue(db);
+    const startFetch = vi.fn(async (request: RequestInfo | URL) => {
+      const sentRequest = request instanceof Request ? request : new Request(String(request));
+      await expect(sentRequest.json()).resolves.toEqual({
+        userId: 'user-1',
+        reason: 'organization_trial_access_restored',
+      });
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    });
+
+    const summary = await runSweep(
+      createEnv(startFetch),
+      {
+        runId: '23232323-2323-4232-8232-232323232323',
+        sweep: 'instance_destruction',
+      },
+      1
+    );
+
+    expect(summary.errors).toBe(0);
+    expect(summary.sweep3_instance_destruction).toBe(0);
+    expect(summary.organization_instance_destructions).toBe(0);
+    expect(summary.organization_trial_entitlement_recoveries).toBe(1);
+    expect(startFetch).toHaveBeenCalledTimes(1);
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+    expect(txDeletes).toHaveLength(1);
+    expect(txUpdates).toEqual([
+      expect.objectContaining({
+        status: 'active',
+        suspended_at: null,
+        destruction_deadline: null,
+      }),
+    ]);
+    expect(updates).toEqual([
+      expect.objectContaining({
+        auto_resume_requested_at: expect.any(String),
+        auto_resume_retry_after: expect.any(String),
+        auto_resume_attempt_count: 1,
+      }),
+    ]);
   });
 });
 
@@ -5266,6 +6206,40 @@ describe('subscription expiry sweep', () => {
     expect(updates).toEqual([]);
     expect(inserts).toEqual([]);
   });
+
+  it('skips organization-managed rows in personal subscription expiry cleanup', async () => {
+    const { db, updates, inserts } = createMockDb([
+      [
+        {
+          id: 'org-expired-sub',
+          user_id: 'org-expired-user',
+          instance_id: 'org-expired-instance',
+          sandbox_id: 'ki_orgexpired0000000000000000000',
+          instance_destroyed_at: null,
+          organization_id: 'org-expired',
+          email: 'org-expired@example.com',
+          credit_renewal_at: null,
+        },
+      ],
+    ]);
+    mockGetWorkerDb.mockReturnValue(db);
+    const fetch = vi.fn();
+
+    const summary = await runSweep(
+      createEnv(fetch),
+      {
+        runId: '96969696-9696-4969-8969-969696969697',
+        sweep: 'subscription_expiry',
+      },
+      1
+    );
+
+    expect(summary.sweep2_subscription_expiry).toBe(0);
+    expect(summary.errors).toBe(0);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(updates).toEqual([]);
+    expect(inserts).toEqual([]);
+  });
 });
 
 describe('soft-deleted user lifecycle exclusion', () => {
@@ -5344,6 +6318,79 @@ describe('trial inactivity stop sweep', () => {
       loggedValues.push(value);
     });
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  });
+
+  it('filters organization-managed rows from trial inactivity discovery SQL', async () => {
+    const { db, selectBuilders } = createMockDb([[]]);
+    mockGetWorkerDb.mockReturnValue(db);
+    const { env, trialInactivitySendBatch } = createEnvWithQueueMocks(vi.fn());
+
+    const summary = await runSweep(
+      env,
+      {
+        runId: '75757575-7575-4757-8757-757575757570',
+        sweep: 'trial_inactivity_stop',
+      },
+      1
+    );
+
+    const trialInactivityWhere = selectBuilders[0]?.where.mock.calls[0]?.[0];
+    expect(trialInactivityWhere).toBeDefined();
+    if (!trialInactivityWhere) {
+      throw new Error('expected trial inactivity discovery query predicate');
+    }
+
+    const actualDbModule = await vi.importActual<typeof DbModule>('@kilocode/db');
+    const trialInactivitySql = actualDbModule
+      .getWorkerDb('postgres://unused:unused@localhost:0/unused')
+      .select()
+      .from(actualDbModule.kiloclaw_subscriptions)
+      .where(trialInactivityWhere)
+      .toSQL().sql;
+
+    expect(trialInactivitySql).toMatch(/"kiloclaw_instances"\."organization_id"\s+is null/i);
+    expect(summary.trial_inactivity_candidates).toBe(0);
+    expect(summary.trial_inactivity_stop_messages_enqueued).toBe(0);
+    expect(trialInactivitySendBatch).not.toHaveBeenCalled();
+  });
+
+  it('filters organization-managed rows from trial inactivity stop-candidate SQL', async () => {
+    const { db, selectBuilders, updates } = createMockDb([[]]);
+    mockGetWorkerDb.mockReturnValue(db);
+    const fetch = vi.fn();
+
+    const summary = await processTrialInactivityStopCandidate(
+      createEnv(fetch),
+      {
+        kind: 'trial_inactivity_stop_candidate',
+        runId: '74747474-7474-4747-8747-747474747470',
+        sweep: 'trial_inactivity_stop_candidate',
+        subscriptionId: 'sub-org-filter',
+        userId: 'user-org-filter',
+        instanceId: '74747474-7474-4747-8747-747474747474',
+      },
+      1
+    );
+
+    const trialInactivityWhere = selectBuilders[0]?.where.mock.calls[0]?.[0];
+    expect(trialInactivityWhere).toBeDefined();
+    if (!trialInactivityWhere) {
+      throw new Error('expected trial inactivity stop-candidate query predicate');
+    }
+
+    const actualDbModule = await vi.importActual<typeof DbModule>('@kilocode/db');
+    const trialInactivitySql = actualDbModule
+      .getWorkerDb('postgres://unused:unused@localhost:0/unused')
+      .select()
+      .from(actualDbModule.kiloclaw_subscriptions)
+      .where(trialInactivityWhere)
+      .toSQL().sql;
+
+    expect(trialInactivitySql).toMatch(/"kiloclaw_instances"\."organization_id"\s+is null/i);
+    expect(summary.trial_inactivity_candidates).toBe(0);
+    expect(summary.trial_inactivity_stops).toBe(0);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(updates).toEqual([]);
   });
 
   it('does not enqueue stop-candidate work for current one-day trial instances', async () => {
@@ -5700,5 +6747,115 @@ describe('trial inactivity stop sweep', () => {
         }),
       ])
     );
+  });
+});
+
+describe('organization KiloClaw lifecycle notification contract', () => {
+  it('deduplicates overlapping recipients and keeps billing-authority guidance', () => {
+    expect(
+      selectOrganizationKiloClawLifecycleRecipients({
+        associatedUser: { userId: 'user-owner', email: 'owner@example.com' },
+        billingAuthorities: [
+          { userId: 'user-owner', email: 'owner@example.com' },
+          { userId: 'user-billing', email: 'billing@example.com' },
+        ],
+      })
+    ).toEqual([
+      {
+        userId: 'user-owner',
+        email: 'owner@example.com',
+        audience: 'billing_authority',
+      },
+      {
+        userId: 'user-billing',
+        email: 'billing@example.com',
+        audience: 'billing_authority',
+      },
+    ]);
+  });
+
+  it('builds billing-authority suspension payloads with org billing routing and dedupe metadata', () => {
+    expect(
+      buildOrganizationKiloClawLifecycleNotification({
+        backendBaseUrl: 'https://app.kilo.ai',
+        recipient: {
+          userId: 'owner-123',
+          email: 'owner@example.com',
+          audience: 'billing_authority',
+        },
+        context: {
+          event: 'trial_suspended',
+          organizationId: 'org-123',
+          organizationName: 'Acme Corp',
+          instanceId: 'instance-456',
+          instanceLabel: 'Research Claw',
+          destructionDate: 'May 25, 2026',
+        },
+      })
+    ).toEqual({
+      emailType: 'claw_org_trial_suspended',
+      templateName: 'clawOrganizationTrialSuspendedBillingAuthority',
+      templateVars: {
+        organization_name: 'Acme Corp',
+        instance_label: 'Research Claw',
+        destruction_date: 'May 25, 2026',
+        organization_billing_url: 'https://app.kilo.ai/organizations/org-123/payment-details',
+      },
+      userId: 'owner-123',
+      userEmail: 'owner@example.com',
+      entityFields: {
+        instanceId: 'instance-456',
+        organizationId: 'org-123',
+      },
+    });
+  });
+
+  it('builds associated-user warning and destroyed payloads with organization KiloClaw routing', () => {
+    const recipient = {
+      userId: 'member-123',
+      email: 'member@example.com',
+      audience: 'associated_user' as const,
+    };
+    const baseContext = {
+      organizationId: 'org-123',
+      organizationName: 'Acme Corp',
+      instanceId: 'instance-456',
+      instanceLabel: 'Research Claw',
+    };
+
+    expect(
+      buildOrganizationKiloClawLifecycleNotification({
+        backendBaseUrl: 'https://app.kilo.ai',
+        recipient,
+        context: {
+          ...baseContext,
+          event: 'destruction_warning',
+          destructionDate: 'May 25, 2026',
+        },
+      })
+    ).toMatchObject({
+      emailType: 'claw_org_destruction_warning',
+      templateName: 'clawOrganizationDestructionWarningUser',
+      templateVars: {
+        organization_claw_url: 'https://app.kilo.ai/organizations/org-123/claw',
+      },
+    });
+
+    expect(
+      buildOrganizationKiloClawLifecycleNotification({
+        backendBaseUrl: 'https://app.kilo.ai',
+        recipient,
+        context: {
+          ...baseContext,
+          event: 'instance_destroyed',
+        },
+      })
+    ).toMatchObject({
+      emailType: 'claw_org_instance_destroyed',
+      templateName: 'clawOrganizationInstanceDestroyedUser',
+      templateVars: {
+        organization_claw_url: 'https://app.kilo.ai/organizations/org-123/claw',
+      },
+    });
   });
 });

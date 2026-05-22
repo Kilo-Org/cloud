@@ -9,6 +9,8 @@
  *   - generated override shape and merge behavior
  */
 
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
 import {
   bringUpDevContainer,
@@ -29,6 +31,31 @@ const mockSessionExec = (impl: (cmd: string) => { exitCode: number; stdout?: str
   ({
     exec: vi.fn(async (cmd: string) => impl(cmd)),
   }) as unknown as ExecutionSession;
+
+describe('sandbox image versions', () => {
+  it('keeps the DIND sandbox server aligned with the Cloudflare sandbox SDK', () => {
+    const packageJson = JSON.parse(
+      readFileSync(fileURLToPath(new URL('../../package.json', import.meta.url).href), 'utf8')
+    ) as { dependencies: Record<string, string> };
+    const sandboxVersion = packageJson.dependencies['@cloudflare/sandbox'];
+    const dockerfile = readFileSync(
+      fileURLToPath(new URL('../../Dockerfile', import.meta.url).href),
+      'utf8'
+    );
+    const devDockerfile = readFileSync(
+      fileURLToPath(new URL('../../Dockerfile.dev', import.meta.url).href),
+      'utf8'
+    );
+    const dindDockerfile = readFileSync(
+      fileURLToPath(new URL('../../Dockerfile.dind', import.meta.url).href),
+      'utf8'
+    );
+
+    expect(dockerfile).toContain(`FROM docker.io/cloudflare/sandbox:${sandboxVersion}`);
+    expect(devDockerfile).toContain(`FROM docker.io/cloudflare/sandbox:${sandboxVersion}`);
+    expect(dindDockerfile).toContain(`ARG SANDBOX_VERSION="${sandboxVersion}"`);
+  });
+});
 
 describe('detectDevContainer', () => {
   it('returns null when no devcontainer file exists', async () => {
@@ -576,6 +603,9 @@ describe('buildRestoreCommand', () => {
       runtimeEnv: {
         KILOCODE_TOKEN_FILE: '/home/agent_xyz/.local/share/kilo/session-restore-token',
         KILO_SESSION_INGEST_URL: 'https://ingest.example',
+        XDG_DATA_HOME: '/home/agent_xyz/.local/share',
+        XDG_CONFIG_HOME: '/home/agent_xyz/.config',
+        XDG_CACHE_HOME: '/home/agent_xyz/.cache',
       },
       devContainer: {
         containerId: 'cont-id',
@@ -594,6 +624,12 @@ describe('buildRestoreCommand', () => {
     expect(command).toContain('/home/agent_xyz/.local/share/kilo/session-restore-token');
     expect(command).toContain('KILO_SESSION_INGEST_URL=');
     expect(command).toContain('https://ingest.example');
+    expect(command).toContain('XDG_DATA_HOME=');
+    expect(command).toContain('/home/agent_xyz/.local/share');
+    expect(command).toContain('XDG_CONFIG_HOME=');
+    expect(command).toContain('/home/agent_xyz/.config');
+    expect(command).toContain('XDG_CACHE_HOME=');
+    expect(command).toContain('/home/agent_xyz/.cache');
     expect(command).toContain('/opt/kilo-cloud/kilo-restore-session.js');
     expect(command).toContain('/workspaces/repo');
   });

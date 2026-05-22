@@ -21,7 +21,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import {
@@ -88,6 +88,19 @@ function BYOKDescription() {
       Supply your own key provider API keys. Your Kilo balance will not be used when using these
       providers: you will be billed by the provider directly.
     </p>
+  );
+}
+
+function BYOKSetupGuideLink() {
+  return (
+    <a
+      href="https://kilo.ai/docs/getting-started/byok"
+      target="_blank"
+      rel="noopener noreferrer"
+      className="text-muted-foreground hover:text-foreground text-sm underline underline-offset-4 transition-colors"
+    >
+      View the BYOK setup guide
+    </a>
   );
 }
 
@@ -293,11 +306,16 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
         <BYOKDescription />
         <Card>
           <CardHeader>
-            <CardTitle>BYOK API Keys</CardTitle>
+            <div className="flex flex-col gap-2">
+              <CardTitle>BYOK API Keys</CardTitle>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="text-muted-foreground">Loading...</div>
           </CardContent>
+          <CardFooter>
+            <BYOKSetupGuideLink />
+          </CardFooter>
         </Card>
       </div>
     );
@@ -317,8 +335,10 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
     <div className="space-y-4">
       <BYOKDescription />
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-          <CardTitle>BYOK API Keys</CardTitle>
+        <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0 pb-4">
+          <div className="flex flex-col gap-2">
+            <CardTitle>BYOK API Keys</CardTitle>
+          </div>
           <Button onClick={() => setIsDialogOpen(true)} size="sm">
             <Plus className="mr-2 h-4 w-4" />
             Add Key
@@ -622,6 +642,9 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        <CardFooter>
+          <BYOKSetupGuideLink />
+        </CardFooter>
       </Card>
     </div>
   );

@@ -147,7 +147,7 @@ describe('Organization Usage Functions', () => {
       const user = await insertTestUser();
       const organization = await createTestOrganization('Test Org', user.id, 50000);
 
-      const usage = createOrganizationUsage(5000, user.id, organization.id);
+      const usage = await createOrganizationUsage(5000, user.id, organization.id);
       await ingestOrganizationTokenUsage(usage);
 
       // Verify balance was reduced
@@ -159,7 +159,7 @@ describe('Organization Usage Functions', () => {
       const user = await insertTestUser();
       const organization = await createTestOrganization('Test Org', user.id, 40000);
 
-      const usage = createOrganizationUsage(0, user.id, organization.id);
+      const usage = await createOrganizationUsage(0, user.id, organization.id);
       await ingestOrganizationTokenUsage(usage);
 
       // Verify balance unchanged
@@ -171,7 +171,7 @@ describe('Organization Usage Functions', () => {
       const user = await insertTestUser();
       const organization = await createTestOrganization('Test Org', user.id, 1000000);
 
-      const usage = createOrganizationUsage(500000, user.id, organization.id);
+      const usage = await createOrganizationUsage(500000, user.id, organization.id);
       await ingestOrganizationTokenUsage(usage);
 
       // Verify balance was reduced by large amount
@@ -183,7 +183,7 @@ describe('Organization Usage Functions', () => {
       const user = await insertTestUser();
       const organization = await createTestOrganization('Test Org', user.id, 5000);
 
-      const usage = createOrganizationUsage(10000, user.id, organization.id);
+      const usage = await createOrganizationUsage(10000, user.id, organization.id);
       await ingestOrganizationTokenUsage(usage);
 
       // Verify balance went negative
@@ -195,9 +195,9 @@ describe('Organization Usage Functions', () => {
       const user = await insertTestUser();
       const organization = await createTestOrganization('Test Org', user.id, 100000);
 
-      const usage1Record = createOrganizationUsage(10000, user.id, organization.id);
-      const usage2Record = createOrganizationUsage(15000, user.id, organization.id);
-      const usage3Record = createOrganizationUsage(5000, user.id, organization.id);
+      const usage1Record = await createOrganizationUsage(10000, user.id, organization.id);
+      const usage2Record = await createOrganizationUsage(15000, user.id, organization.id);
+      const usage3Record = await createOrganizationUsage(5000, user.id, organization.id);
       await ingestOrganizationTokenUsage(usage1Record);
       await ingestOrganizationTokenUsage(usage2Record);
       await ingestOrganizationTokenUsage(usage3Record);
@@ -216,11 +216,11 @@ describe('Organization Usage Functions', () => {
       await addUserToOrganization(organization.id, member1.id, 'member');
       await addUserToOrganization(organization.id, member2.id, 'owner');
 
-      const ownerUsageRecord = createOrganizationUsage(10000, owner.id, organization.id);
+      const ownerUsageRecord = await createOrganizationUsage(10000, owner.id, organization.id);
       await ingestOrganizationTokenUsage(ownerUsageRecord);
-      const member1UsageRecord = createOrganizationUsage(12000, member1.id, organization.id);
+      const member1UsageRecord = await createOrganizationUsage(12000, member1.id, organization.id);
       await ingestOrganizationTokenUsage(member1UsageRecord);
-      const member2UsageRecord = createOrganizationUsage(8000, member2.id, organization.id);
+      const member2UsageRecord = await createOrganizationUsage(8000, member2.id, organization.id);
       await ingestOrganizationTokenUsage(member2UsageRecord);
 
       // Verify total deduction from all members
@@ -234,7 +234,7 @@ describe('Organization Usage Functions', () => {
       const org2 = await createTestOrganization('Org 2', user.id, 60000);
 
       // Ingest usage for org1 only
-      const usage = createOrganizationUsage(10000, user.id, org1.id);
+      const usage = await createOrganizationUsage(10000, user.id, org1.id);
       await ingestOrganizationTokenUsage(usage);
 
       // Verify org1 balance was reduced
@@ -251,7 +251,7 @@ describe('Organization Usage Functions', () => {
       const nonExistentOrgId = '00000000-0000-0000-0000-000000000000';
 
       // Should complete without error even for non-existent organization (new behavior)
-      const usage = createOrganizationUsage(5000, user.id, nonExistentOrgId);
+      const usage = await createOrganizationUsage(5000, user.id, nonExistentOrgId);
       await ingestOrganizationTokenUsage(usage);
     });
 
@@ -268,7 +268,7 @@ describe('Organization Usage Functions', () => {
       // Wait a bit to ensure timestamp difference
       await new Promise(resolve => setTimeout(resolve, 10));
 
-      const usage = createOrganizationUsage(5000, user.id, organization.id);
+      const usage = await createOrganizationUsage(5000, user.id, organization.id);
       await ingestOrganizationTokenUsage(usage);
 
       // Get updated updated_at
@@ -297,8 +297,8 @@ describe('Organization Usage Functions', () => {
       const numberOfUsages = 20;
       const expectedTotalCost = costPerUsage * numberOfUsages; // 100k total
 
-      const usagePromises = Array.from({ length: numberOfUsages }, () => {
-        const usage = createOrganizationUsage(costPerUsage, user.id, organization.id);
+      const usagePromises = Array.from({ length: numberOfUsages }, async () => {
+        const usage = await createOrganizationUsage(costPerUsage, user.id, organization.id);
         return ingestOrganizationTokenUsage(usage);
       });
 
@@ -329,7 +329,7 @@ describe('Organization Usage Functions', () => {
       expect(memberBalance.balance).toBe(0.1); // Same organization balance
 
       // Owner uses tokens
-      const ownerUsageRecord = createOrganizationUsage(20000, owner.id, organization.id);
+      const ownerUsageRecord = await createOrganizationUsage(20000, owner.id, organization.id);
       await ingestOrganizationTokenUsage(ownerUsageRecord);
 
       // Verify balance after owner usage
@@ -339,7 +339,7 @@ describe('Organization Usage Functions', () => {
       expect(memberBalance.balance).toBe(0.08); // Same organization balance
 
       // Member uses tokens
-      const memberUsageRecord = createOrganizationUsage(15000, member.id, organization.id);
+      const memberUsageRecord = await createOrganizationUsage(15000, member.id, organization.id);
       await ingestOrganizationTokenUsage(memberUsageRecord);
 
       // Verify final balance
@@ -869,7 +869,7 @@ describe('microdollars_used tracking', () => {
     const user = await insertTestUser();
     const organization = await createTestOrganization('Test Org', user.id, 50000);
 
-    const usage = createOrganizationUsage(5000, user.id, organization.id);
+    const usage = await createOrganizationUsage(5000, user.id, organization.id);
     await ingestOrganizationTokenUsage(usage);
 
     const [org] = await db
@@ -884,9 +884,9 @@ describe('microdollars_used tracking', () => {
     const user = await insertTestUser();
     const organization = await createTestOrganization('Test Org', user.id, 100000);
 
-    const usage1 = createOrganizationUsage(10000, user.id, organization.id);
-    const usage2 = createOrganizationUsage(15000, user.id, organization.id);
-    const usage3 = createOrganizationUsage(5000, user.id, organization.id);
+    const usage1 = await createOrganizationUsage(10000, user.id, organization.id);
+    const usage2 = await createOrganizationUsage(15000, user.id, organization.id);
+    const usage3 = await createOrganizationUsage(5000, user.id, organization.id);
 
     await ingestOrganizationTokenUsage(usage1);
     await ingestOrganizationTokenUsage(usage2);
@@ -909,9 +909,9 @@ describe('microdollars_used tracking', () => {
     await addUserToOrganization(organization.id, member1.id, 'member');
     await addUserToOrganization(organization.id, member2.id, 'owner');
 
-    const ownerUsage = createOrganizationUsage(10000, owner.id, organization.id);
-    const member1Usage = createOrganizationUsage(12000, member1.id, organization.id);
-    const member2Usage = createOrganizationUsage(8000, member2.id, organization.id);
+    const ownerUsage = await createOrganizationUsage(10000, owner.id, organization.id);
+    const member1Usage = await createOrganizationUsage(12000, member1.id, organization.id);
+    const member2Usage = await createOrganizationUsage(8000, member2.id, organization.id);
 
     await ingestOrganizationTokenUsage(ownerUsage);
     await ingestOrganizationTokenUsage(member1Usage);
@@ -930,8 +930,8 @@ describe('microdollars_used tracking', () => {
     const org1 = await createTestOrganization('Org 1', user.id, 50000);
     const org2 = await createTestOrganization('Org 2', user.id, 60000);
 
-    const org1Usage = createOrganizationUsage(10000, user.id, org1.id);
-    const org2Usage = createOrganizationUsage(15000, user.id, org2.id);
+    const org1Usage = await createOrganizationUsage(10000, user.id, org1.id);
+    const org2Usage = await createOrganizationUsage(15000, user.id, org2.id);
 
     await ingestOrganizationTokenUsage(org1Usage);
     await ingestOrganizationTokenUsage(org2Usage);
@@ -954,7 +954,7 @@ describe('microdollars_used tracking', () => {
     const user = await insertTestUser();
     const organization = await createTestOrganization('Test Org', user.id, 40000);
 
-    const usage = createOrganizationUsage(0, user.id, organization.id);
+    const usage = await createOrganizationUsage(0, user.id, organization.id);
     await ingestOrganizationTokenUsage(usage);
 
     const [org] = await db
@@ -969,7 +969,7 @@ describe('microdollars_used tracking', () => {
     const user = await insertTestUser();
     const organization = await createTestOrganization('Test Org', user.id, 1000000);
 
-    const usage = createOrganizationUsage(500000, user.id, organization.id);
+    const usage = await createOrganizationUsage(500000, user.id, organization.id);
     await ingestOrganizationTokenUsage(usage);
 
     const [org] = await db
@@ -986,7 +986,7 @@ describe('microdollars_used tracking', () => {
     const organization = await createTestOrganization('Test Org', user.id, initialBalance);
 
     const usageCost = 25000;
-    const usage = createOrganizationUsage(usageCost, user.id, organization.id);
+    const usage = await createOrganizationUsage(usageCost, user.id, organization.id);
     await ingestOrganizationTokenUsage(usage);
 
     const [org] = await db
@@ -1017,8 +1017,8 @@ describe('microdollars_used tracking', () => {
     const numberOfUsages = 20;
     const expectedTotalUsed = costPerUsage * numberOfUsages; // 100k total
 
-    const usagePromises = Array.from({ length: numberOfUsages }, () => {
-      const usage = createOrganizationUsage(costPerUsage, user.id, organization.id);
+    const usagePromises = Array.from({ length: numberOfUsages }, async () => {
+      const usage = await createOrganizationUsage(costPerUsage, user.id, organization.id);
       return ingestOrganizationTokenUsage(usage);
     });
 
@@ -1045,7 +1045,7 @@ describe('microdollars_used tracking', () => {
     const nonExistentOrgId = '00000000-0000-0000-0000-000000000000';
 
     // Should complete without error even for non-existent organization
-    const usage = createOrganizationUsage(5000, user.id, nonExistentOrgId);
+    const usage = await createOrganizationUsage(5000, user.id, nonExistentOrgId);
     await expect(ingestOrganizationTokenUsage(usage)).resolves.not.toThrow();
 
     // Verify that trying to query the non-existent organization returns nothing

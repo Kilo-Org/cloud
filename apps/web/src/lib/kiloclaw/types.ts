@@ -514,6 +514,8 @@ export type ControllerVersionResponse =
       commit: string | null;
       openclawVersion?: string | null;
       openclawCommit?: string | null;
+      apiVersion?: number;
+      capabilities?: string[];
     }
   | InstanceNotRunningSentinel;
 
@@ -602,6 +604,18 @@ export type MorningBriefingActionResponse = {
   error?: string;
 };
 
+/**
+ * Response from `POST /api/platform/morning-briefing/onboarding-briefing`.
+ * `conversationId` is the "Today's briefing" conversation the post-onboarding
+ * chat redirect routes the user into.
+ */
+export type OnboardingBriefingResponse = {
+  ok: boolean;
+  conversationId?: string;
+  alreadyStarted?: boolean;
+  error?: string;
+};
+
 export type MorningBriefingInterestsResponse = {
   ok: boolean;
   interestTopics?: string[];
@@ -684,6 +698,55 @@ export type ReassociateVolumeResponse = {
   previousVolumeId: string | null;
   newVolumeId: string;
   newRegion: string;
+};
+
+/** Every Fly volume lifecycle state, mirrored from `services/kiloclaw/src/fly/types.ts`. */
+export type FlyVolumeState =
+  | 'created'
+  | 'attached'
+  | 'detached'
+  | 'pending_destroy'
+  | 'destroying'
+  | 'destroyed';
+
+/** A Fly volume annotated by the orphan-volume scan (one row of the scan result). */
+export type OrphanVolumeScanVolume = {
+  id: string;
+  name: string;
+  state: FlyVolumeState;
+  size_gb: number;
+  region: string;
+  attached_machine_id: string | null;
+  created_at: string;
+  /** True when the volume name exactly matches the scanned instance's volume. */
+  nameMatchesInstance: boolean;
+  /** True when a live Durable Object still references this volume ID. */
+  trackedByLiveDo: boolean;
+};
+
+/** Response from GET /api/platform/admin/orphan-volume-scan */
+export type OrphanVolumeScanResponse = {
+  flyApp: string;
+  /** False when the Fly app itself is gone (its volumes are gone with it). */
+  appExists: boolean;
+  expectedVolumeName: string;
+  /** The DO status, or null when the DO was finalized / never provisioned. */
+  doStatus: string | null;
+  /** Set when the DO debug-state call failed — detection cannot be trusted. */
+  doStatusError: string | null;
+  /** Set when listVolumes failed — an empty list here is NOT "no orphans". */
+  scanError: string | null;
+  volumes: OrphanVolumeScanVolume[];
+};
+
+/** Response from POST /api/platform/admin/orphan-volume-destroy */
+export type OrphanVolumeDestroyResponse = {
+  ok: true;
+  flyApp: string;
+  volumeId: string;
+  volumeName: string;
+  /** True when the volume was already gone (concurrent deletion) — still a success. */
+  alreadyGone: boolean;
 };
 
 /** Metadata persisted alongside an active admin size override. */

@@ -2,7 +2,7 @@
 
 import { X } from 'lucide-react';
 import type { Message } from '@kilocode/kilo-chat';
-import { contentBlocksToText } from '@kilocode/kilo-chat';
+import { contentBlocksPreviewText } from '@kilocode/kilo-chat';
 
 type ReplyPreviewProps = {
   message: Message;
@@ -19,7 +19,7 @@ export function ReplyPreview({
 }: ReplyPreviewProps) {
   const text = message.deleted
     ? 'original message deleted'
-    : contentBlocksToText(message.content).slice(0, 100);
+    : contentBlocksPreviewText(message.content).slice(0, 100);
 
   return (
     <div className="border-border bg-muted/50 flex items-center gap-2 border-t px-4 py-2">

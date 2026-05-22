@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+  buildKiloSessionXdgEnv,
   dockerSocketEnv,
   dockerSocketEnvParts,
   resolveDockerSocketPath,
@@ -76,6 +77,16 @@ describe('dockerSocketEnv', () => {
   it('parameterises the socket path', () => {
     expect(dockerSocketEnv('/run/user/1000/docker.sock')).toEqual({
       DOCKER_HOST: 'unix:///run/user/1000/docker.sock',
+    });
+  });
+});
+
+describe('buildKiloSessionXdgEnv', () => {
+  it('roots Kilo XDG directories under the session home', () => {
+    expect(buildKiloSessionXdgEnv('/home/agent_xyz')).toEqual({
+      XDG_DATA_HOME: '/home/agent_xyz/.local/share',
+      XDG_CONFIG_HOME: '/home/agent_xyz/.config',
+      XDG_CACHE_HOME: '/home/agent_xyz/.cache',
     });
   });
 });

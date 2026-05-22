@@ -388,7 +388,7 @@ export async function handleMergeRequestCodeReview(
       logExceptInTest(`Dispatch attempt for ${project.path_with_namespace}!${mr.iid}`, {
         reviewId,
         dispatched: dispatchResult.dispatched,
-        pending: dispatchResult.pending,
+        notDispatched: dispatchResult.notDispatched,
         activeCount: dispatchResult.activeCount,
       });
     } catch (dispatchError) {

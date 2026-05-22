@@ -36,7 +36,7 @@ import {
   parseImpactAffiliateTouchFromUrl,
   parseImpactReferralTouchFromUrl,
 } from '@/lib/impact-referral-utils';
-import { isOrganizationHardLocked } from '@/lib/organizations/trial-utils';
+import { classifyOrganizationEntitlement } from '@/lib/organizations/trial-utils';
 import { getMostRecentSeatPurchase } from '@/lib/organizations/organization-seats';
 import { secondsInDay } from 'date-fns/constants';
 import type { AdapterUser } from 'next-auth/adapters';
@@ -1133,8 +1133,12 @@ export async function getProfileRedirectPath(user: User) {
   const singleOrg = await getSingleUserOrganization(user.id);
   if (singleOrg) {
     const latestPurchase = await getMostRecentSeatPurchase(singleOrg.id);
-    const hasActiveSubscription = latestPurchase?.subscription_status === 'active';
-    if (isOrganizationHardLocked(singleOrg, hasActiveSubscription)) {
+    const classification = classifyOrganizationEntitlement({
+      organization: singleOrg,
+      latestSeatPurchaseStatus: latestPurchase?.subscription_status ?? null,
+      now: new Date(),
+    });
+    if (classification.isTrialExpiredForEnforcement) {
       return '/profile';
     }
     return `/organizations/${singleOrg.id}`;

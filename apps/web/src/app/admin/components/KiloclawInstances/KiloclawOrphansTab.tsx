@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { format, subDays } from 'date-fns';
 import Link from 'next/link';
-import { AlertTriangle, Loader2, Search, Trash2 } from 'lucide-react';
+import { AlertTriangle, HardDrive, Loader2, Search, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTRPC } from '@/lib/trpc/utils';
 import { useKiloclawInstanceEvents } from '@/app/admin/api/kiloclaw-analytics/hooks';
@@ -38,6 +38,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
+import type { OrphanVolumeClassification } from '@/lib/kiloclaw/orphan-volume';
 import { EventLabelCell, formatRelativeTime } from './shared';
 
 type OrphanRow = {
@@ -141,6 +142,486 @@ function TroubleshootingEventsDialog({
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+type OrphanVolumeRow = {
+  instance_id: string;
+  user_id: string;
+  user_email: string | null;
+  sandbox_id: string;
+  organization_id: string | null;
+  destroyed_at: string;
+  subscription_status: string | null;
+  fly_app: string;
+  volume_id: string;
+  volume_name: string;
+  volume_state: string;
+  volume_region: string;
+  volume_size_gb: number;
+  attached_machine_id: string | null;
+  volume_created_at: string;
+  do_status: string | null;
+  classification: OrphanVolumeClassification;
+};
+
+type OrphanVolumeScanErrorRow = {
+  instance_id: string;
+  user_id: string;
+  user_email: string | null;
+  sandbox_id: string;
+  error: string;
+};
+
+type OrphanVolumeScanResult = {
+  volumes: OrphanVolumeRow[];
+  errors: OrphanVolumeScanErrorRow[];
+  scanned: number;
+  capped: boolean;
+};
+
+/** Human-readable label + visual tone for each volume classification. */
+const VOLUME_CLASSIFICATION_DISPLAY: Record<
+  OrphanVolumeClassification,
+  { label: string; tone: 'safe' | 'warn' | 'danger' | 'muted'; help: string }
+> = {
+  safe_destroy: {
+    label: 'Safe to destroy',
+    tone: 'safe',
+    help: 'Unattached, no live DO, subscription inactive, past the 7-day grace period.',
+  },
+  fly_reaping: {
+    label: 'Fly is reaping',
+    tone: 'muted',
+    help: 'Volume is already in a pending_destroy / destroying state — Fly will remove it.',
+  },
+  attached: {
+    label: 'Attached to machine',
+    tone: 'danger',
+    help: 'Volume still backs a machine. Destroy the machine first (force-destroy flow).',
+  },
+  do_tracked: {
+    label: 'Live DO references it',
+    tone: 'danger',
+    help: 'A live Durable Object still tracks this volume ID. Resolve the DO state first.',
+  },
+  do_alive: {
+    label: 'DO still alive',
+    tone: 'warn',
+    help: 'The instance is destroyed in the DB but its Durable Object is still alive. Investigate.',
+  },
+  do_check_failed: {
+    label: 'DO state unknown',
+    tone: 'danger',
+    help: 'Could not confirm Durable Object state — refusing to classify as safe.',
+  },
+  subscription_active: {
+    label: 'Active subscription',
+    tone: 'warn',
+    help: 'User still has an access-granting subscription — data preserved.',
+  },
+  within_grace: {
+    label: 'Within 7-day grace',
+    tone: 'muted',
+    help: 'Instance was destroyed less than 7 days ago. Recheck after the grace period.',
+  },
+};
+
+function VolumeClassificationBadge({
+  classification,
+}: {
+  classification: OrphanVolumeClassification;
+}) {
+  const { label, tone, help } = VOLUME_CLASSIFICATION_DISPLAY[classification];
+  const className =
+    tone === 'safe'
+      ? 'border-emerald-500/30 bg-emerald-500/15 text-emerald-400'
+      : tone === 'warn'
+        ? 'border-amber-500/30 bg-amber-500/15 text-amber-400'
+        : tone === 'danger'
+          ? 'border-red-500/30 bg-red-500/15 text-red-400'
+          : undefined;
+  return (
+    <Badge variant="outline" className={className} title={help}>
+      {label}
+    </Badge>
+  );
+}
+
+function OrphanVolumesSection() {
+  const trpc = useTRPC();
+
+  const [destroyedAfterInput, setDestroyedAfterInput] = useState(
+    toDatetimeLocalInput(subDays(new Date(), 90))
+  );
+  const [destroyedBeforeInput, setDestroyedBeforeInput] = useState(
+    toDatetimeLocalInput(new Date())
+  );
+  const [scanResult, setScanResult] = useState<OrphanVolumeScanResult | null>(null);
+  const [destroyTarget, setDestroyTarget] = useState<OrphanVolumeRow | null>(null);
+  const [showErrors, setShowErrors] = useState(false);
+
+  const findOrphanVolumes = useMutation(
+    trpc.admin.kiloclawInstances.findOrphanVolumes.mutationOptions({
+      onSuccess: result => {
+        setScanResult(result);
+        const safe = result.volumes.filter(v => v.classification === 'safe_destroy').length;
+        toast.success(
+          `Scanned ${result.scanned} destroyed instances — ${result.volumes.length} volume(s) found, ${safe} safe to destroy`
+        );
+      },
+      onError: err => {
+        toast.error(`Failed to scan for orphan volumes: ${err.message}`);
+      },
+    })
+  );
+
+  const destroyOrphanVolume = useMutation(
+    trpc.admin.kiloclawInstances.destroyOrphanVolume.mutationOptions({
+      onSuccess: (result, variables) => {
+        toast.success(
+          result.alreadyGone
+            ? 'Volume was already gone — removed from the list'
+            : 'Orphan volume destroyed'
+        );
+        setScanResult(current =>
+          current
+            ? {
+                ...current,
+                volumes: current.volumes.filter(volume => volume.volume_id !== variables.volumeId),
+              }
+            : current
+        );
+        setDestroyTarget(null);
+      },
+      onError: err => {
+        toast.error(`Failed to destroy volume: ${err.message}`);
+      },
+    })
+  );
+
+  const summary = useMemo(() => {
+    const volumes = scanResult?.volumes ?? [];
+    return {
+      scanned: scanResult?.scanned ?? 0,
+      total: volumes.length,
+      safe: volumes.filter(v => v.classification === 'safe_destroy').length,
+      errors: scanResult?.errors.length ?? 0,
+    };
+  }, [scanResult]);
+
+  const handleScan = () => {
+    if (!destroyedAfterInput || !destroyedBeforeInput) {
+      toast.error('Please choose both start and end times');
+      return;
+    }
+    const destroyedAfter = toIsoFromDatetimeLocal(destroyedAfterInput);
+    const destroyedBefore = toIsoFromDatetimeLocal(destroyedBeforeInput);
+    if (new Date(destroyedAfter) > new Date(destroyedBefore)) {
+      toast.error('Start time must be before end time');
+      return;
+    }
+    findOrphanVolumes.mutate({ destroyedAfter, destroyedBefore });
+  };
+
+  return (
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <HardDrive className="h-5 w-5" />
+            Orphan Volume Reaper
+          </CardTitle>
+          <CardDescription>
+            Scan destroyed KiloClaw instances for Fly volumes that were never cleaned up. A volume
+            is only marked <span className="font-medium">Safe to destroy</span> when it is
+            unattached, no live Durable Object references it, the user has no active subscription,
+            and the instance has been destroyed for more than 7 days.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          <div className="flex flex-wrap items-end gap-4">
+            <div className="flex min-w-[220px] flex-col gap-2">
+              <label htmlFor="orphan-volumes-destroyed-after" className="text-sm font-medium">
+                Destroyed After
+              </label>
+              <Input
+                id="orphan-volumes-destroyed-after"
+                type="datetime-local"
+                value={destroyedAfterInput}
+                onChange={e => setDestroyedAfterInput(e.target.value)}
+              />
+            </div>
+            <div className="flex min-w-[220px] flex-col gap-2">
+              <label htmlFor="orphan-volumes-destroyed-before" className="text-sm font-medium">
+                Destroyed Before
+              </label>
+              <Input
+                id="orphan-volumes-destroyed-before"
+                type="datetime-local"
+                value={destroyedBeforeInput}
+                onChange={e => setDestroyedBeforeInput(e.target.value)}
+              />
+            </div>
+            <Button onClick={handleScan} disabled={findOrphanVolumes.isPending}>
+              {findOrphanVolumes.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Scanning...
+                </>
+              ) : (
+                <>
+                  <Search className="mr-2 h-4 w-4" />
+                  Scan Volumes
+                </>
+              )}
+            </Button>
+          </div>
+
+          {scanResult && (
+            <div className="grid gap-4 md:grid-cols-4">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Instances Scanned</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{summary.scanned}</div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Volumes Found</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{summary.total}</div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Safe to Destroy</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-emerald-400">{summary.safe}</div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Scan Errors</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{summary.errors}</div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {scanResult?.capped && (
+            <Alert>
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription>
+                Results capped at 500 instances. Narrow the date range to scan all matching
+                instances.
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {scanResult && scanResult.errors.length > 0 && (
+            <Alert>
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription>
+                <div className="flex flex-col gap-2">
+                  <span>
+                    {scanResult.errors.length} instance(s) could not be fully scanned — their
+                    volumes are <span className="font-medium">not</span> shown below, so treat this
+                    scan as incomplete.
+                  </span>
+                  <button
+                    type="button"
+                    className="self-start text-xs underline"
+                    onClick={() => setShowErrors(v => !v)}
+                  >
+                    {showErrors ? 'Hide details' : 'Show details'}
+                  </button>
+                  {showErrors && (
+                    <ul className="flex flex-col gap-1">
+                      {scanResult.errors.map(err => (
+                        <li key={err.instance_id} className="font-mono text-xs">
+                          {err.user_email || err.user_id} / {err.sandbox_id}: {err.error}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </AlertDescription>
+            </Alert>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Detected Orphan Volumes</CardTitle>
+          <CardDescription>
+            Fly volumes still present for destroyed instances. The destroy action is only available
+            for volumes that pass every safety check.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {!scanResult ? (
+            <p className="text-muted-foreground text-sm">
+              Choose a date range and run a scan to inspect destroyed instances.
+            </p>
+          ) : scanResult.volumes.length === 0 ? (
+            <p className="text-muted-foreground text-sm">No orphan volumes found.</p>
+          ) : (
+            <div className="rounded-lg border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>User</TableHead>
+                    <TableHead>Fly App / Volume</TableHead>
+                    <TableHead>Region / Size</TableHead>
+                    <TableHead>Volume State</TableHead>
+                    <TableHead>DO Status</TableHead>
+                    <TableHead>Destroyed</TableHead>
+                    <TableHead>Subscription</TableHead>
+                    <TableHead>Classification</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {scanResult.volumes.map(volume => (
+                    <TableRow key={volume.volume_id}>
+                      <TableCell>
+                        <Link
+                          href={`/admin/users/${encodeURIComponent(volume.user_id)}`}
+                          className="text-blue-600 hover:underline"
+                        >
+                          {volume.user_email || volume.user_id}
+                        </Link>
+                        <div className="text-muted-foreground font-mono text-xs">
+                          {volume.sandbox_id}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <a
+                          href={`https://fly.io/apps/${volume.fly_app}/volumes`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-mono text-xs text-blue-600 hover:underline"
+                        >
+                          {volume.fly_app}
+                        </a>
+                        <div className="text-muted-foreground font-mono text-xs">
+                          {volume.volume_id}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-xs">
+                        {volume.volume_region} / {volume.volume_size_gb} GB
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="font-mono text-xs">
+                          {volume.volume_state}
+                        </Badge>
+                        {volume.attached_machine_id && (
+                          <div className="text-muted-foreground mt-1 font-mono text-xs">
+                            → {volume.attached_machine_id}
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-xs">{volume.do_status ?? 'finalized'}</TableCell>
+                      <TableCell title={new Date(volume.destroyed_at).toLocaleString()}>
+                        {formatRelativeTime(volume.destroyed_at)}
+                      </TableCell>
+                      <TableCell>
+                        {volume.subscription_status ? (
+                          <Badge
+                            variant="outline"
+                            title="Subscription attached to this destroyed instance. The access check also considers successor subscriptions in the same context."
+                            className={
+                              volume.subscription_status === 'active' ||
+                              volume.subscription_status === 'trialing'
+                                ? 'border-amber-500/30 bg-amber-500/15 text-amber-400'
+                                : undefined
+                            }
+                          >
+                            {volume.subscription_status}
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground text-sm">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <VolumeClassificationBadge classification={volume.classification} />
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {volume.classification === 'safe_destroy' ? (
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => setDestroyTarget(volume)}
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Destroy
+                          </Button>
+                        ) : (
+                          <span className="text-muted-foreground text-xs">—</span>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <AlertDialog open={!!destroyTarget} onOpenChange={open => !open && setDestroyTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Destroy orphan volume?</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="flex flex-col gap-2">
+                <span>
+                  This permanently deletes Fly volume{' '}
+                  <span className="font-mono">{destroyTarget?.volume_id}</span> (
+                  {destroyTarget?.volume_size_gb} GB in {destroyTarget?.volume_region}) from app{' '}
+                  <span className="font-mono">{destroyTarget?.fly_app}</span>.
+                </span>
+                <span>
+                  Owner: {destroyTarget?.user_email || destroyTarget?.user_id}. The worker
+                  re-verifies the volume name, state, and Durable Object references before deleting.
+                </span>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={destroyOrphanVolume.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={destroyOrphanVolume.isPending || !destroyTarget}
+              onClick={e => {
+                e.preventDefault();
+                if (!destroyTarget) return;
+                destroyOrphanVolume.mutate({
+                  instanceId: destroyTarget.instance_id,
+                  volumeId: destroyTarget.volume_id,
+                });
+              }}
+            >
+              {destroyOrphanVolume.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Destroying...
+                </>
+              ) : (
+                'Destroy volume'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
 
@@ -410,6 +891,8 @@ export function KiloclawOrphansTab() {
           )}
         </CardContent>
       </Card>
+
+      <OrphanVolumesSection />
 
       <TroubleshootingEventsDialog
         sandboxId={selectedSandboxId}

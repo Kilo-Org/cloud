@@ -422,8 +422,10 @@ export async function startController(env: NodeJS.ProcessEnv = process.env): Pro
   // kilo-chat channel: the controller forwards its own per-sandbox gateway
   // token directly to the kilo-chat Worker. No kiloclaw Worker middleman.
   let kiloChatHealthProbe: KiloChatHealthProbe | undefined;
+  let includeKiloChatCapabilities = false;
   const kiloChatBaseUrl = env.KILOCHAT_BASE_URL || undefined;
   if (env.KILOCLAW_SANDBOX_ID && kiloChatBaseUrl) {
+    includeKiloChatCapabilities = true;
     kiloChatHealthProbe = startKiloChatHealthProbe({ kiloChatBaseUrl });
     const kiloChatOpts = {
       expectedToken: config.expectedToken,
@@ -459,7 +461,8 @@ export async function startController(env: NodeJS.ProcessEnv = process.env): Pro
     supervisor,
     config.expectedToken,
     controllerState,
-    kiloChatHealthProbe
+    kiloChatHealthProbe,
+    { includeKiloChatCapabilities }
   );
   registerGatewayRoutes(honoApp, supervisor, config.expectedToken);
   registerMorningBriefingRoutes(honoApp, supervisor, config.expectedToken);

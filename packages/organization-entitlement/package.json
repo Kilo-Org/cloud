@@ -1,0 +1,29 @@
+{
+  "name": "@kilocode/organization-entitlement",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Shared organization trial and seat entitlement classification",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsgo --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "@typescript/native-preview": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "keywords": [
+    "organizations",
+    "entitlement",
+    "trial"
+  ],
+  "author": "Kilo Code",
+  "license": "MIT"
+}

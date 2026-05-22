@@ -420,6 +420,7 @@ export function useKiloClawMutations() {
         },
       })
     ),
+    startOnboardingBriefing: useMutation(trpc.kiloclaw.startOnboardingBriefing.mutationOptions()),
     updateBriefingInterests: useMutation(
       trpc.kiloclaw.updateBriefingInterests.mutationOptions({
         onSuccess: async () => {

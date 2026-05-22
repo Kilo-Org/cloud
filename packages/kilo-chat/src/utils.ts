@@ -2,11 +2,58 @@ import { decodeTime } from 'ulid';
 import type { z } from 'zod';
 
 import { conversationCursorSchema } from './schemas';
-import type { ReplyToMessageSnapshot } from './types';
+import type { AttachmentBlock, InputContentBlock, ReplyToMessageSnapshot } from './types';
+
+const FILE_SIZE_UNITS = ['B', 'KB', 'MB', 'GB'] as const;
 
 /** Extract the millisecond timestamp encoded in a ULID. */
 export function ulidToTimestamp(ulid: string): number {
   return decodeTime(ulid);
+}
+
+export function formatFileSize(bytes: number): string {
+  let value = bytes;
+  let unitIndex = 0;
+
+  while (value >= 1024 && unitIndex < FILE_SIZE_UNITS.length - 1) {
+    value /= 1024;
+    unitIndex += 1;
+  }
+
+  if (unitIndex === 0) {
+    return `${Math.round(value)} ${FILE_SIZE_UNITS[unitIndex]}`;
+  }
+
+  const rounded = Math.round(value * 100) / 100;
+  return `${rounded} ${FILE_SIZE_UNITS[unitIndex]}`;
+}
+
+export function remainingEditableAttachments(
+  originalAttachments: readonly AttachmentBlock[],
+  removedAttachmentIds: Iterable<string>
+): AttachmentBlock[] {
+  const removedAttachmentIdSet = new Set(removedAttachmentIds);
+  return originalAttachments.filter(
+    attachment => !removedAttachmentIdSet.has(attachment.attachmentId)
+  );
+}
+
+export function buildMessageEditContent({
+  text,
+  originalAttachments,
+  removedAttachmentIds,
+}: {
+  text: string;
+  originalAttachments: readonly AttachmentBlock[];
+  removedAttachmentIds: Iterable<string>;
+}): InputContentBlock[] {
+  const trimmedText = text.trim();
+  const textBlocks: InputContentBlock[] =
+    trimmedText.length > 0 ? [{ type: 'text', text: trimmedText }] : [];
+  return [
+    ...textBlocks,
+    ...remainingEditableAttachments(originalAttachments, removedAttachmentIds),
+  ];
 }
 
 /**
@@ -67,12 +114,33 @@ export function contentBlocksToText(content: Array<{ type: string; text?: string
     .join('');
 }
 
+type PreviewBlock = { type: string; text?: string; filename?: string; mimeType?: string };
+
+/**
+ * Short, human-readable single-line preview of a message's content blocks.
+ * Falls back to attachment filenames (or a mime-typed descriptor) when no
+ * text is present, so attachment-only messages don't render as empty strings
+ * in reply previews, conversation list previews, etc.
+ */
+export function contentBlocksPreviewText(content: Array<PreviewBlock>): string {
+  const text = contentBlocksToText(content).trim();
+  if (text) return text;
+  const attachments = content.filter(
+    (b): b is { type: 'attachment'; filename?: string; mimeType?: string } =>
+      b.type === 'attachment'
+  );
+  if (attachments.length === 0) return '';
+  return attachments
+    .map(a => a.filename || (a.mimeType?.startsWith('image/') ? 'Image' : 'Attachment'))
+    .join(', ');
+}
+
 const REPLY_PREVIEW_MAX_CHARS = 160;
 
 type ReplySnapshotParent = {
   senderId: string;
   deleted: boolean;
-  content: Array<{ type: string; text?: string }>;
+  content: Array<PreviewBlock>;
 };
 
 export function buildReplyToMessageSnapshot(
@@ -87,7 +155,7 @@ export function buildReplyToMessageSnapshot(
     return { messageId, senderId: parent.senderId, deleted: true, previewText: null };
   }
 
-  const preview = contentBlocksToText(parent.content).trim();
+  const preview = contentBlocksPreviewText(parent.content);
   return {
     messageId,
     senderId: parent.senderId,

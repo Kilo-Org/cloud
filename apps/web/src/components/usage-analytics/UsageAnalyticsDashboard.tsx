@@ -271,8 +271,13 @@ export function UsageAnalyticsDashboard({
     if (!effectiveOrgId) return [];
     const fromBreakdown = userBreakdown?.breakdown.map(b => b.key) ?? [];
     const fromFilters = [...filters.userIds, ...filters.excludedUserIds];
-    return Array.from(new Set([...fromBreakdown, ...fromFilters]));
-  }, [userBreakdown, effectiveOrgId, filters.userIds, filters.excludedUserIds]);
+    const fromTable =
+      tableData?.rows.flatMap(row => {
+        const userId = row.dimensions.user;
+        return userId ? [userId] : [];
+      }) ?? [];
+    return Array.from(new Set([...fromBreakdown, ...fromFilters, ...fromTable]));
+  }, [userBreakdown, effectiveOrgId, filters.userIds, filters.excludedUserIds, tableData]);
   const { data: userResolution } = useResolveOrgUsers(effectiveOrgId, userIds);
   const userLabelFor = useCallback(
     (value: string) => {

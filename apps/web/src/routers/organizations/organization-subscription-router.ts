@@ -14,7 +14,7 @@ import {
   getMostRecentEndedSeatPurchase,
   getOrganizationSeatUsage,
 } from '@/lib/organizations/organization-seats';
-import { organization_seats_purchases } from '@kilocode/db/schema';
+import { organization_seats_purchases, type OrganizationSeatsPurchase } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
 import { and, eq, desc, ne } from 'drizzle-orm';
 import { getOrganizationById } from '@/lib/organizations/organizations';
@@ -53,9 +53,17 @@ const OrganizationSubscriptionResponseSchema = z.object({
   seatsUsed: z.number(),
   totalSeats: z.number(),
   paidSeatItemId: z.string().nullable(),
+  latestSeatPurchaseStatus: z.custom<OrganizationSeatsPurchase['subscription_status']>().nullable(),
+});
+
+const OrganizationSeatPurchaseStatusResponseSchema = z.object({
+  latestSeatPurchaseStatus: z.custom<OrganizationSeatsPurchase['subscription_status']>().nullable(),
 });
 
 type OrganizationSubscriptionResponse = z.infer<typeof OrganizationSubscriptionResponseSchema>;
+type OrganizationSeatPurchaseStatusResponse = z.infer<
+  typeof OrganizationSeatPurchaseStatusResponseSchema
+>;
 
 const SubscriptionActionResponseSchema = z.object({
   success: z.boolean(),
@@ -105,6 +113,7 @@ export const organizationsSubscriptionRouter = createTRPCRouter({
           seatsUsed: usages.used,
           totalSeats: usages.total,
           paidSeatItemId: null,
+          latestSeatPurchaseStatus: null,
         };
       }
 
@@ -124,7 +133,23 @@ export const organizationsSubscriptionRouter = createTRPCRouter({
       const paidSeatItemId =
         subscription?.items.data.find(item => KNOWN_SEAT_PRICE_IDS.has(item.price.id))?.id ?? null;
 
-      return { subscription, seatsUsed: usages.used, totalSeats: usages.total, paidSeatItemId };
+      return {
+        subscription,
+        seatsUsed: usages.used,
+        totalSeats: usages.total,
+        paidSeatItemId,
+        latestSeatPurchaseStatus: latestPurchase.subscription_status,
+      };
+    }),
+
+  getLatestSeatPurchaseStatus: organizationMemberProcedure
+    .input(OrganizationIdInputSchema)
+    .output(OrganizationSeatPurchaseStatusResponseSchema)
+    .query(async ({ input }): Promise<OrganizationSeatPurchaseStatusResponse> => {
+      const latestPurchase = await getMostRecentSeatPurchase(input.organizationId);
+      return {
+        latestSeatPurchaseStatus: latestPurchase?.subscription_status ?? null,
+      };
     }),
 
   getResubscribeDefaults: organizationMemberProcedure

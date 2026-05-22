@@ -156,6 +156,93 @@ describe('POST /api/internal/kiloclaw/billing-side-effects', () => {
     expect(JSON.stringify(consoleLogSpy.mock.calls)).not.toContain('user@example.com');
   });
 
+  it('accepts organization trial suspension emails with billing-authority context', async () => {
+    const response = await POST(
+      createRequest({
+        action: 'send_email',
+        input: {
+          to: 'owner@example.com',
+          templateName: 'clawOrganizationTrialSuspendedBillingAuthority',
+          templateVars: {
+            organization_name: 'Acme Corp',
+            instance_label: 'Research Claw',
+            destruction_date: 'May 25, 2026',
+            organization_billing_url: 'https://app.kilo.ai/organizations/org-123/payment-details',
+          },
+          userId: 'owner-123',
+          instanceId: 'instance-456',
+          organizationId: 'org-123',
+        },
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockSendEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        templateName: 'clawOrganizationTrialSuspendedBillingAuthority',
+        userId: 'owner-123',
+        instanceId: 'instance-456',
+        organizationId: 'org-123',
+      })
+    );
+    expect(findJsonLog(consoleLogSpy, 'Starting billing side effect request')).toEqual(
+      expect.objectContaining({
+        userId: 'owner-123',
+        instanceId: 'instance-456',
+        organizationId: 'org-123',
+        templateName: 'clawOrganizationTrialSuspendedBillingAuthority',
+      })
+    );
+    expect(JSON.stringify(consoleLogSpy.mock.calls)).not.toContain('owner@example.com');
+  });
+
+  it('rejects organization lifecycle email CTAs that point at personal KiloClaw', async () => {
+    const response = await POST(
+      createRequest({
+        action: 'send_email',
+        input: {
+          to: 'member@example.com',
+          templateName: 'clawOrganizationTrialSuspendedUser',
+          templateVars: {
+            organization_name: 'Acme Corp',
+            instance_label: 'Research Claw',
+            destruction_date: 'May 25, 2026',
+            organization_claw_url: 'https://app.kilo.ai/claw',
+          },
+          userId: 'member-123',
+          instanceId: 'instance-456',
+          organizationId: 'org-123',
+        },
+      })
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({ error: 'Invalid body' });
+    expect(mockSendEmail).not.toHaveBeenCalled();
+  });
+
+  it('rejects organization lifecycle emails without dedupe-compatible identifiers', async () => {
+    const response = await POST(
+      createRequest({
+        action: 'send_email',
+        input: {
+          to: 'owner@example.com',
+          templateName: 'clawOrganizationInstanceDestroyedBillingAuthority',
+          templateVars: {
+            organization_name: 'Acme Corp',
+            instance_label: 'Research Claw',
+            organization_billing_url: 'https://app.kilo.ai/organizations/org-123/payment-details',
+          },
+          organizationId: 'org-123',
+        },
+      })
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({ error: 'Invalid body' });
+    expect(mockSendEmail).not.toHaveBeenCalled();
+  });
+
   it('logs failed side effects with safe identifiers', async () => {
     mockMaybePerformAutoTopUp.mockRejectedValueOnce(new Error('auto top-up unavailable'));
 

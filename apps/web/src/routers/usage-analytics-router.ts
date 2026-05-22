@@ -637,9 +637,11 @@ const TableOutputSchema = z.object({
 // User list (for org context)
 // ---------------------------------------------------------------------------
 
+const MAX_USER_LABEL_LOOKUP_IDS = 1_000;
+
 const UserListInputSchema = z.object({
   organizationId: z.uuid(),
-  userIds: z.array(z.string()).max(200),
+  userIds: z.array(z.string()).max(MAX_USER_LABEL_LOOKUP_IDS),
 });
 
 const UserListOutputSchema = z.object({
@@ -1061,7 +1063,7 @@ export const usageAnalyticsRouter = createTRPCRouter({
 
   /**
    * Look up user names and emails for a set of user IDs that belong to an org.
-   * Used by the UI to decorate per-user breakdowns.
+   * Used by the UI to decorate per-user breakdowns, filters, and table rows.
    *
    * Only returns users that are active or invited members of `organizationId`
    * to prevent callers from enumerating arbitrary kilocode_users PII.

@@ -389,6 +389,7 @@ async function seedDeliveredImpactSignupEvent(
     await import('@/lib/impact/affiliate-events');
   const { recordImpactAffiliateTouch } = await import('@/lib/impact/referral');
   const eventDate = new Date(conversionDate.getTime() - 10 * 60_000);
+  const signupDeliveredAt = new Date(conversionDate.getTime() - 6 * 60_000);
 
   const parentEvent = await recordAffiliateAttributionAndQueueParentEvent({
     userId,
@@ -421,7 +422,7 @@ async function seedDeliveredImpactSignupEvent(
     .update(user_affiliate_events)
     .set({
       delivery_state: 'delivered',
-      claimed_at: null,
+      claimed_at: signupDeliveredAt.toISOString(),
       next_retry_at: null,
     })
     .where(eq(user_affiliate_events.id, parentEvent!.id));

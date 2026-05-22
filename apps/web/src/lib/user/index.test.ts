@@ -67,6 +67,12 @@ import {
   impact_conversion_reports,
   github_branch_pull_requests,
   model_eval_ingestions,
+  code_review_feedback_subjects,
+  code_review_feedback_events,
+  code_review_memory_aggregation_state,
+  code_review_memory_aggregation_runs,
+  code_review_memory_proposals,
+  code_review_memory_proposal_evidence,
 } from '@kilocode/db/schema';
 import { eq, count, sql } from 'drizzle-orm';
 import {
@@ -137,6 +143,12 @@ describe('User', () => {
     await db.delete(security_audit_log);
     await db.delete(kiloclaw_admin_audit_logs);
     await db.delete(model_eval_ingestions);
+    await db.delete(code_review_memory_proposal_evidence);
+    await db.delete(code_review_memory_proposals);
+    await db.delete(code_review_feedback_events);
+    await db.delete(code_review_feedback_subjects);
+    await db.delete(code_review_memory_aggregation_runs);
+    await db.delete(code_review_memory_aggregation_state);
     await db.delete(kiloclaw_scheduled_action_targets);
     await db.delete(kiloclaw_scheduled_action_stages);
     await db.delete(kiloclaw_scheduled_actions);
@@ -447,6 +459,144 @@ describe('User', () => {
       expect(softDeleted!.is_admin).toBe(false);
       // Stripe customer ID should be preserved
       expect(softDeleted!.stripe_customer_id).toBe(user.stripe_customer_id);
+    });
+
+    it('should delete user-owned review memory and anonymize retained proposal actors', async () => {
+      const user = await insertTestUser({ google_user_email: 'review-memory-delete@example.com' });
+      const orgId = randomUUID();
+
+      await db.insert(organizations).values({
+        id: orgId,
+        name: 'Review Memory Soft Delete Org',
+        stripe_customer_id: `stripe-org-${orgId}`,
+        plan: 'teams',
+      });
+
+      const [subject] = await db
+        .insert(code_review_feedback_subjects)
+        .values({
+          owned_by_user_id: user.id,
+          platform: 'github',
+          subject_type: 'summary_comment',
+          external_id: 'summary-1',
+          repo_full_name: 'owner/repo',
+          state: 'active',
+        })
+        .returning();
+      const [event] = await db
+        .insert(code_review_feedback_events)
+        .values({
+          owned_by_user_id: user.id,
+          platform: 'github',
+          subject_id: subject.id,
+          repo_full_name: 'owner/repo',
+          event_source: 'sync',
+          signal_kind: 'negative_reaction',
+          sentiment: 'negative',
+          strength: 2,
+          dedupe_hash: `soft-delete-${randomUUID()}`,
+        })
+        .returning();
+      const [run] = await db
+        .insert(code_review_memory_aggregation_runs)
+        .values({
+          owned_by_user_id: user.id,
+          platform: 'github',
+          repo_full_name: 'owner/repo',
+          model_slug: 'test/model',
+          trigger: 'manual',
+        })
+        .returning();
+      const [proposal] = await db
+        .insert(code_review_memory_proposals)
+        .values({
+          owned_by_user_id: user.id,
+          platform: 'github',
+          repo_full_name: 'owner/repo',
+          aggregation_run_id: run.id,
+          proposal_type: 'suppress',
+          title: 'Reduce noisy comments',
+          rationale: 'Maintainers rejected repeated findings.',
+          proposed_markdown: '### Review guidance: Reduce noisy comments',
+          dedupe_key: `user-owned-${randomUUID()}`,
+        })
+        .returning();
+      await db.insert(code_review_memory_proposal_evidence).values({
+        proposal_id: proposal.id,
+        feedback_event_id: event.id,
+        evidence_role: 'primary',
+      });
+      await db.insert(code_review_memory_aggregation_state).values({
+        owned_by_user_id: user.id,
+        platform: 'github',
+        repo_full_name: 'owner/repo',
+        fresh_event_count: 1,
+        fresh_weight: 2,
+      });
+
+      const [orgProposal] = await db
+        .insert(code_review_memory_proposals)
+        .values({
+          owned_by_organization_id: orgId,
+          platform: 'github',
+          repo_full_name: 'owner/repo',
+          proposal_type: 'clarify',
+          title: 'Clarify guidance',
+          rationale: 'Org-owned proposal keeps aggregate data.',
+          proposed_markdown: '### Review guidance: Clarify guidance',
+          dedupe_key: `org-owned-${randomUUID()}`,
+          edited_by_user_id: user.id,
+          approved_by_user_id: user.id,
+          rejected_by_user_id: user.id,
+        })
+        .returning();
+
+      await softDeleteUser(user.id);
+
+      await expect(
+        db
+          .select({ count: count() })
+          .from(code_review_feedback_subjects)
+          .where(eq(code_review_feedback_subjects.owned_by_user_id, user.id))
+          .then(r => r[0].count)
+      ).resolves.toBe(0);
+      await expect(
+        db
+          .select({ count: count() })
+          .from(code_review_feedback_events)
+          .where(eq(code_review_feedback_events.owned_by_user_id, user.id))
+          .then(r => r[0].count)
+      ).resolves.toBe(0);
+      await expect(
+        db
+          .select({ count: count() })
+          .from(code_review_memory_proposals)
+          .where(eq(code_review_memory_proposals.owned_by_user_id, user.id))
+          .then(r => r[0].count)
+      ).resolves.toBe(0);
+      await expect(
+        db
+          .select({ count: count() })
+          .from(code_review_memory_aggregation_runs)
+          .where(eq(code_review_memory_aggregation_runs.owned_by_user_id, user.id))
+          .then(r => r[0].count)
+      ).resolves.toBe(0);
+      await expect(
+        db
+          .select({ count: count() })
+          .from(code_review_memory_aggregation_state)
+          .where(eq(code_review_memory_aggregation_state.owned_by_user_id, user.id))
+          .then(r => r[0].count)
+      ).resolves.toBe(0);
+
+      const [retainedOrgProposal] = await db
+        .select()
+        .from(code_review_memory_proposals)
+        .where(eq(code_review_memory_proposals.id, orgProposal.id));
+      expect(retainedOrgProposal).toBeDefined();
+      expect(retainedOrgProposal.edited_by_user_id).toBeNull();
+      expect(retainedOrgProposal.approved_by_user_id).toBeNull();
+      expect(retainedOrgProposal.rejected_by_user_id).toBeNull();
     });
 
     it('should rotate and scrub App Store account-linked Kilo Pass data', async () => {

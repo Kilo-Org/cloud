@@ -46,6 +46,11 @@ import {
   slack_bot_requests,
   bot_requests,
   cloud_agent_code_reviews,
+  code_review_feedback_subjects,
+  code_review_feedback_events,
+  code_review_memory_aggregation_state,
+  code_review_memory_aggregation_runs,
+  code_review_memory_proposals,
   kiloclaw_instances,
   kiloclaw_composio_identities,
   kiloclaw_google_oauth_connections,
@@ -1030,6 +1035,21 @@ export async function softDeleteUser(userId: string) {
     await tx
       .delete(cloud_agent_code_reviews)
       .where(eq(cloud_agent_code_reviews.owned_by_user_id, userId));
+    await tx
+      .delete(code_review_memory_proposals)
+      .where(eq(code_review_memory_proposals.owned_by_user_id, userId));
+    await tx
+      .delete(code_review_feedback_events)
+      .where(eq(code_review_feedback_events.owned_by_user_id, userId));
+    await tx
+      .delete(code_review_feedback_subjects)
+      .where(eq(code_review_feedback_subjects.owned_by_user_id, userId));
+    await tx
+      .delete(code_review_memory_aggregation_runs)
+      .where(eq(code_review_memory_aggregation_runs.owned_by_user_id, userId));
+    await tx
+      .delete(code_review_memory_aggregation_state)
+      .where(eq(code_review_memory_aggregation_state.owned_by_user_id, userId));
     await tx.delete(device_auth_requests).where(eq(device_auth_requests.kilo_user_id, userId));
     await tx.delete(auto_top_up_configs).where(eq(auto_top_up_configs.owned_by_user_id, userId));
     await tx.delete(kiloclaw_access_codes).where(eq(kiloclaw_access_codes.kilo_user_id, userId));
@@ -1072,6 +1092,19 @@ export async function softDeleteUser(userId: string) {
     await tx
       .delete(github_branch_pull_requests)
       .where(eq(github_branch_pull_requests.owned_by_user_id, userId));
+
+    await tx
+      .update(code_review_memory_proposals)
+      .set({ edited_by_user_id: null })
+      .where(eq(code_review_memory_proposals.edited_by_user_id, userId));
+    await tx
+      .update(code_review_memory_proposals)
+      .set({ approved_by_user_id: null })
+      .where(eq(code_review_memory_proposals.approved_by_user_id, userId));
+    await tx
+      .update(code_review_memory_proposals)
+      .set({ rejected_by_user_id: null })
+      .where(eq(code_review_memory_proposals.rejected_by_user_id, userId));
 
     // Code indexing data
     await tx.delete(source_embeddings).where(eq(source_embeddings.kilo_user_id, userId));

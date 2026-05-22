@@ -97,6 +97,21 @@ import type {
   StoredModel,
   GatewayApiKind,
   ContributorChampionTier,
+  ReviewMemoryPlatform,
+  ReviewMemorySubjectType,
+  ReviewMemorySubjectState,
+  ReviewMemoryFeedbackEventSource,
+  ReviewMemorySignalKind,
+  ReviewMemorySentiment,
+  ReviewMemoryEventAggregationState,
+  ReviewMemoryAggregationScopeStatus,
+  ReviewMemoryAggregationRunTrigger,
+  ReviewMemoryAggregationRunStatus,
+  ReviewMemoryProposalScopeKind,
+  ReviewMemoryProposalType,
+  ReviewMemoryProposalStatus,
+  ReviewMemoryChangeRequestType,
+  ReviewMemoryEvidenceRole,
 } from './schema-types';
 import type { AnyPgColumn as DrizzleAnyPgColumn } from 'drizzle-orm/pg-core';
 import { INSTANCE_TYPE_VALUES } from '@kilocode/kiloclaw-instance-tiers';
@@ -3362,6 +3377,330 @@ export const cloud_agent_code_review_attempts = pgTable(
 );
 
 export type CloudAgentCodeReviewAttempt = typeof cloud_agent_code_review_attempts.$inferSelect;
+
+export const code_review_feedback_subjects = pgTable(
+  'code_review_feedback_subjects',
+  {
+    id: idPrimaryKeyColumn,
+    owned_by_organization_id: uuid().references(() => organizations.id, { onDelete: 'cascade' }),
+    owned_by_user_id: text().references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    platform: text().$type<ReviewMemoryPlatform>().notNull(),
+    platform_integration_id: uuid().references(() => platform_integrations.id, {
+      onDelete: 'set null',
+    }),
+    code_review_id: uuid().references(() => cloud_agent_code_reviews.id, { onDelete: 'set null' }),
+    subject_type: text().$type<ReviewMemorySubjectType>().notNull(),
+    external_id: text().notNull(),
+    external_thread_id: text(),
+    external_url: text(),
+    repo_full_name: text().notNull(),
+    platform_project_id: integer(),
+    pr_number: integer(),
+    pr_url: text(),
+    head_sha: text(),
+    file_path: text(),
+    line_number: integer(),
+    diff_hunk: text(),
+    body_excerpt: text(),
+    severity: text(),
+    finding_title: text(),
+    finding_fingerprint: text(),
+    state: text().$type<ReviewMemorySubjectState>().notNull().default('unknown'),
+    first_seen_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    last_seen_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    uniqueIndex('UQ_code_review_feedback_subjects_platform_external').on(
+      table.platform,
+      table.repo_full_name,
+      table.subject_type,
+      table.external_id
+    ),
+    index('idx_code_review_feedback_subjects_owned_by_org_id').on(table.owned_by_organization_id),
+    index('idx_code_review_feedback_subjects_owned_by_user_id').on(table.owned_by_user_id),
+    index('idx_code_review_feedback_subjects_platform_repo').on(
+      table.platform,
+      table.repo_full_name
+    ),
+    index('idx_code_review_feedback_subjects_pr').on(table.repo_full_name, table.pr_number),
+    index('idx_code_review_feedback_subjects_code_review_id').on(table.code_review_id),
+    index('idx_code_review_feedback_subjects_fingerprint').on(table.finding_fingerprint),
+    index('idx_code_review_feedback_subjects_state').on(table.state),
+    index('idx_code_review_feedback_subjects_thread').on(table.external_thread_id),
+    index('idx_code_review_feedback_subjects_last_seen_at').on(table.last_seen_at),
+    check(
+      'code_review_feedback_subjects_owner_check',
+      sql`(
+        (${table.owned_by_user_id} IS NOT NULL AND ${table.owned_by_organization_id} IS NULL) OR
+        (${table.owned_by_user_id} IS NULL AND ${table.owned_by_organization_id} IS NOT NULL)
+      )`
+    ),
+  ]
+);
+
+export type CodeReviewFeedbackSubject = typeof code_review_feedback_subjects.$inferSelect;
+
+export const code_review_feedback_events = pgTable(
+  'code_review_feedback_events',
+  {
+    id: idPrimaryKeyColumn,
+    owned_by_organization_id: uuid().references(() => organizations.id, { onDelete: 'cascade' }),
+    owned_by_user_id: text().references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    platform: text().$type<ReviewMemoryPlatform>().notNull(),
+    platform_integration_id: uuid().references(() => platform_integrations.id, {
+      onDelete: 'set null',
+    }),
+    subject_id: uuid().references(() => code_review_feedback_subjects.id, { onDelete: 'set null' }),
+    code_review_id: uuid().references(() => cloud_agent_code_reviews.id, { onDelete: 'set null' }),
+    repo_full_name: text().notNull(),
+    platform_project_id: integer(),
+    pr_number: integer(),
+    pr_url: text(),
+    event_source: text().$type<ReviewMemoryFeedbackEventSource>().notNull(),
+    signal_kind: text().$type<ReviewMemorySignalKind>().notNull(),
+    sentiment: text().$type<ReviewMemorySentiment>().notNull(),
+    strength: smallint().notNull().default(1),
+    external_event_id: text(),
+    dedupe_hash: text().notNull(),
+    external_url: text(),
+    evidence_excerpt: text(),
+    metadata: jsonb().$type<Record<string, unknown>>().notNull().default({}),
+    aggregation_state: text().$type<ReviewMemoryEventAggregationState>().notNull().default('fresh'),
+    occurred_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    uniqueIndex('UQ_code_review_feedback_events_external_event_id')
+      .on(table.external_event_id)
+      .where(isNotNull(table.external_event_id)),
+    uniqueIndex('UQ_code_review_feedback_events_dedupe_hash').on(table.dedupe_hash),
+    index('idx_code_review_feedback_events_owned_by_org_id').on(table.owned_by_organization_id),
+    index('idx_code_review_feedback_events_owned_by_user_id').on(table.owned_by_user_id),
+    index('idx_code_review_feedback_events_platform_repo').on(table.platform, table.repo_full_name),
+    index('idx_code_review_feedback_events_subject_id').on(table.subject_id),
+    index('idx_code_review_feedback_events_code_review_id').on(table.code_review_id),
+    index('idx_code_review_feedback_events_sentiment').on(table.sentiment),
+    index('idx_code_review_feedback_events_signal_kind').on(table.signal_kind),
+    index('idx_code_review_feedback_events_aggregation_state').on(table.aggregation_state),
+    index('idx_code_review_feedback_events_created_at').on(table.created_at),
+    check(
+      'code_review_feedback_events_owner_check',
+      sql`(
+        (${table.owned_by_user_id} IS NOT NULL AND ${table.owned_by_organization_id} IS NULL) OR
+        (${table.owned_by_user_id} IS NULL AND ${table.owned_by_organization_id} IS NOT NULL)
+      )`
+    ),
+    check('code_review_feedback_events_strength_check', sql`${table.strength} > 0`),
+  ]
+);
+
+export type CodeReviewFeedbackEvent = typeof code_review_feedback_events.$inferSelect;
+
+export const code_review_memory_aggregation_state = pgTable(
+  'code_review_memory_aggregation_state',
+  {
+    id: idPrimaryKeyColumn,
+    owned_by_organization_id: uuid().references(() => organizations.id, { onDelete: 'cascade' }),
+    owned_by_user_id: text().references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    platform: text().$type<ReviewMemoryPlatform>().notNull(),
+    repo_full_name: text().notNull(),
+    platform_project_id: integer(),
+    last_successful_run_at: timestamp({ withTimezone: true, mode: 'string' }),
+    last_attempted_run_at: timestamp({ withTimezone: true, mode: 'string' }),
+    last_included_event_created_at: timestamp({ withTimezone: true, mode: 'string' }),
+    fresh_event_count: integer().notNull().default(0),
+    fresh_weight: integer().notNull().default(0),
+    fresh_distinct_subject_count: integer().notNull().default(0),
+    fresh_distinct_pr_count: integer().notNull().default(0),
+    next_eligible_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    status: text().$type<ReviewMemoryAggregationScopeStatus>().notNull().default('idle'),
+    claimed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    claim_token: text(),
+    last_model_slug: text(),
+    last_error_message: text(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    uniqueIndex('UQ_code_review_memory_aggregation_state_org_scope')
+      .on(table.owned_by_organization_id, table.platform, table.repo_full_name)
+      .where(isNotNull(table.owned_by_organization_id)),
+    uniqueIndex('UQ_code_review_memory_aggregation_state_user_scope')
+      .on(table.owned_by_user_id, table.platform, table.repo_full_name)
+      .where(isNotNull(table.owned_by_user_id)),
+    index('idx_code_review_memory_aggregation_state_status').on(table.status),
+    index('idx_code_review_memory_aggregation_state_next_eligible_at').on(table.next_eligible_at),
+    index('idx_code_review_memory_aggregation_state_fresh_counts').on(
+      table.fresh_event_count,
+      table.fresh_weight
+    ),
+    check(
+      'code_review_memory_aggregation_state_owner_check',
+      sql`(
+        (${table.owned_by_user_id} IS NOT NULL AND ${table.owned_by_organization_id} IS NULL) OR
+        (${table.owned_by_user_id} IS NULL AND ${table.owned_by_organization_id} IS NOT NULL)
+      )`
+    ),
+  ]
+);
+
+export type CodeReviewMemoryAggregationState =
+  typeof code_review_memory_aggregation_state.$inferSelect;
+
+export const code_review_memory_aggregation_runs = pgTable(
+  'code_review_memory_aggregation_runs',
+  {
+    id: idPrimaryKeyColumn,
+    owned_by_organization_id: uuid().references(() => organizations.id, { onDelete: 'cascade' }),
+    owned_by_user_id: text().references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    platform: text().$type<ReviewMemoryPlatform>().notNull(),
+    repo_full_name: text().notNull(),
+    platform_project_id: integer(),
+    model_slug: text().notNull(),
+    trigger: text().$type<ReviewMemoryAggregationRunTrigger>().notNull(),
+    input_event_count: integer().notNull().default(0),
+    input_subject_count: integer().notNull().default(0),
+    input_cluster_count: integer().notNull().default(0),
+    fresh_event_cutoff_at: timestamp({ withTimezone: true, mode: 'string' }),
+    status: text().$type<ReviewMemoryAggregationRunStatus>().notNull().default('running'),
+    skip_reason: text(),
+    tokens_in: integer(),
+    tokens_out: integer(),
+    total_cost_musd: integer(),
+    error_message: text(),
+    started_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    completed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    index('idx_code_review_memory_aggregation_runs_owned_by_org_id').on(
+      table.owned_by_organization_id
+    ),
+    index('idx_code_review_memory_aggregation_runs_owned_by_user_id').on(table.owned_by_user_id),
+    index('idx_code_review_memory_aggregation_runs_scope').on(table.platform, table.repo_full_name),
+    index('idx_code_review_memory_aggregation_runs_status').on(table.status),
+    index('idx_code_review_memory_aggregation_runs_created_at').on(table.created_at),
+    check(
+      'code_review_memory_aggregation_runs_owner_check',
+      sql`(
+        (${table.owned_by_user_id} IS NOT NULL AND ${table.owned_by_organization_id} IS NULL) OR
+        (${table.owned_by_user_id} IS NULL AND ${table.owned_by_organization_id} IS NOT NULL)
+      )`
+    ),
+  ]
+);
+
+export type CodeReviewMemoryAggregationRun =
+  typeof code_review_memory_aggregation_runs.$inferSelect;
+
+export const code_review_memory_proposals = pgTable(
+  'code_review_memory_proposals',
+  {
+    id: idPrimaryKeyColumn,
+    owned_by_organization_id: uuid().references(() => organizations.id, { onDelete: 'cascade' }),
+    owned_by_user_id: text().references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    platform: text().$type<ReviewMemoryPlatform>().notNull(),
+    platform_integration_id: uuid().references(() => platform_integrations.id, {
+      onDelete: 'set null',
+    }),
+    repo_full_name: text().notNull(),
+    platform_project_id: integer(),
+    aggregation_run_id: uuid().references(() => code_review_memory_aggregation_runs.id, {
+      onDelete: 'set null',
+    }),
+    target_file_path: text().notNull().default('REVIEW.md'),
+    scope_kind: text().$type<ReviewMemoryProposalScopeKind>().notNull().default('repository'),
+    scope_value: text(),
+    proposal_type: text().$type<ReviewMemoryProposalType>().notNull(),
+    status: text().$type<ReviewMemoryProposalStatus>().notNull().default('open'),
+    title: text().notNull(),
+    rationale: text().notNull(),
+    proposed_markdown: text().notNull(),
+    dedupe_key: text().notNull(),
+    llm_confidence: real(),
+    positive_count: integer().notNull().default(0),
+    negative_count: integer().notNull().default(0),
+    neutral_count: integer().notNull().default(0),
+    distinct_pr_count: integer().notNull().default(0),
+    distinct_subject_count: integer().notNull().default(0),
+    contradictory_count: integer().notNull().default(0),
+    edited_by_user_id: text().references(() => kilocode_users.id, { onDelete: 'set null' }),
+    approved_by_user_id: text().references(() => kilocode_users.id, { onDelete: 'set null' }),
+    rejected_by_user_id: text().references(() => kilocode_users.id, { onDelete: 'set null' }),
+    approved_at: timestamp({ withTimezone: true, mode: 'string' }),
+    rejected_at: timestamp({ withTimezone: true, mode: 'string' }),
+    change_request_type: text().$type<ReviewMemoryChangeRequestType>(),
+    branch_name: text(),
+    change_request_number: integer(),
+    change_request_url: text(),
+    change_request_error_message: text(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    index('idx_code_review_memory_proposals_owned_by_org_id').on(table.owned_by_organization_id),
+    index('idx_code_review_memory_proposals_owned_by_user_id').on(table.owned_by_user_id),
+    index('idx_code_review_memory_proposals_platform_repo_status').on(
+      table.platform,
+      table.repo_full_name,
+      table.status
+    ),
+    index('idx_code_review_memory_proposals_proposal_type').on(table.proposal_type),
+    index('idx_code_review_memory_proposals_created_at').on(table.created_at),
+    uniqueIndex('UQ_code_review_memory_proposals_org_active_dedupe')
+      .on(table.owned_by_organization_id, table.platform, table.repo_full_name, table.dedupe_key)
+      .where(
+        sql`${table.owned_by_organization_id} IS NOT NULL AND ${table.status} IN ('open', 'edited', 'approved', 'opening_change_request', 'change_request_opened')`
+      ),
+    uniqueIndex('UQ_code_review_memory_proposals_user_active_dedupe')
+      .on(table.owned_by_user_id, table.platform, table.repo_full_name, table.dedupe_key)
+      .where(
+        sql`${table.owned_by_user_id} IS NOT NULL AND ${table.status} IN ('open', 'edited', 'approved', 'opening_change_request', 'change_request_opened')`
+      ),
+    check(
+      'code_review_memory_proposals_owner_check',
+      sql`(
+        (${table.owned_by_user_id} IS NOT NULL AND ${table.owned_by_organization_id} IS NULL) OR
+        (${table.owned_by_user_id} IS NULL AND ${table.owned_by_organization_id} IS NOT NULL)
+      )`
+    ),
+  ]
+);
+
+export type CodeReviewMemoryProposal = typeof code_review_memory_proposals.$inferSelect;
+
+export const code_review_memory_proposal_evidence = pgTable(
+  'code_review_memory_proposal_evidence',
+  {
+    proposal_id: uuid()
+      .notNull()
+      .references(() => code_review_memory_proposals.id, { onDelete: 'cascade' }),
+    feedback_event_id: uuid()
+      .notNull()
+      .references(() => code_review_feedback_events.id, { onDelete: 'cascade' }),
+    evidence_role: text().$type<ReviewMemoryEvidenceRole>().notNull().default('supporting'),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    primaryKey({ columns: [table.proposal_id, table.feedback_event_id] }),
+    index('idx_code_review_memory_proposal_evidence_feedback_event_id').on(table.feedback_event_id),
+    index('idx_code_review_memory_proposal_evidence_role').on(table.evidence_role),
+  ]
+);
+
+export type CodeReviewMemoryProposalEvidence =
+  typeof code_review_memory_proposal_evidence.$inferSelect;
 
 export const cliSessions = pgTable(
   'cli_sessions',

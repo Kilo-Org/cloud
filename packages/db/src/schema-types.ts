@@ -1201,3 +1201,111 @@ export const CODE_REVIEW_BENIGN_TERMINAL_REASONS = [
 ] as const satisfies readonly CodeReviewTerminalReason[];
 
 export type CodeReviewBenignTerminalReason = (typeof CODE_REVIEW_BENIGN_TERMINAL_REASONS)[number];
+
+// --- Review Memory ---
+
+export const REVIEW_MEMORY_PLATFORMS = ['github', 'gitlab'] as const;
+export type ReviewMemoryPlatform = (typeof REVIEW_MEMORY_PLATFORMS)[number];
+
+export const REVIEW_MEMORY_SUBJECT_TYPES = [
+  'inline_comment',
+  'summary_comment',
+  'review',
+  'discussion',
+] as const;
+export type ReviewMemorySubjectType = (typeof REVIEW_MEMORY_SUBJECT_TYPES)[number];
+
+export const REVIEW_MEMORY_SUBJECT_STATES = [
+  'active',
+  'outdated',
+  'resolved',
+  'dismissed',
+  'unknown',
+] as const;
+export type ReviewMemorySubjectState = (typeof REVIEW_MEMORY_SUBJECT_STATES)[number];
+
+export const REVIEW_MEMORY_FEEDBACK_EVENT_SOURCES = [
+  'github_webhook',
+  'gitlab_webhook',
+  'auto_fix',
+  'backfill',
+  'sync',
+] as const;
+export type ReviewMemoryFeedbackEventSource = (typeof REVIEW_MEMORY_FEEDBACK_EVENT_SOURCES)[number];
+
+export const REVIEW_MEMORY_SIGNAL_KINDS = [
+  'positive_reaction',
+  'negative_reaction',
+  'corrective_reply',
+  'supportive_reply',
+  'review_dismissed',
+  'thread_resolved',
+  'thread_unresolved',
+  'autofix_requested',
+  'autofix_completed',
+  'autofix_failed',
+  'comment_outdated',
+  'mr_approved',
+  'mr_unapproved',
+  'pr_approved',
+  'pr_changes_requested',
+] as const;
+export type ReviewMemorySignalKind = (typeof REVIEW_MEMORY_SIGNAL_KINDS)[number];
+
+export const REVIEW_MEMORY_SENTIMENTS = ['positive', 'negative', 'neutral'] as const;
+export type ReviewMemorySentiment = (typeof REVIEW_MEMORY_SENTIMENTS)[number];
+
+export const REVIEW_MEMORY_EVENT_AGGREGATION_STATES = ['fresh', 'included', 'ignored'] as const;
+export type ReviewMemoryEventAggregationState =
+  (typeof REVIEW_MEMORY_EVENT_AGGREGATION_STATES)[number];
+
+export const REVIEW_MEMORY_AGGREGATION_SCOPE_STATUSES = [
+  'idle',
+  'eligible',
+  'running',
+  'failed',
+] as const;
+export type ReviewMemoryAggregationScopeStatus =
+  (typeof REVIEW_MEMORY_AGGREGATION_SCOPE_STATUSES)[number];
+
+export const REVIEW_MEMORY_AGGREGATION_RUN_TRIGGERS = ['cron', 'manual', 'backfill'] as const;
+export type ReviewMemoryAggregationRunTrigger =
+  (typeof REVIEW_MEMORY_AGGREGATION_RUN_TRIGGERS)[number];
+
+export const REVIEW_MEMORY_AGGREGATION_RUN_STATUSES = [
+  'running',
+  'completed',
+  'failed',
+  'skipped',
+] as const;
+export type ReviewMemoryAggregationRunStatus =
+  (typeof REVIEW_MEMORY_AGGREGATION_RUN_STATUSES)[number];
+
+export const REVIEW_MEMORY_PROPOSAL_SCOPE_KINDS = [
+  'repository',
+  'path_glob',
+  'file',
+  'language',
+] as const;
+export type ReviewMemoryProposalScopeKind = (typeof REVIEW_MEMORY_PROPOSAL_SCOPE_KINDS)[number];
+
+export const REVIEW_MEMORY_PROPOSAL_TYPES = ['suppress', 'clarify', 'narrow', 'reinforce'] as const;
+export type ReviewMemoryProposalType = (typeof REVIEW_MEMORY_PROPOSAL_TYPES)[number];
+
+export const REVIEW_MEMORY_PROPOSAL_STATUSES = [
+  'open',
+  'edited',
+  'approved',
+  'rejected',
+  'opening_change_request',
+  'change_request_opened',
+  'change_request_failed',
+  'superseded',
+] as const;
+export type ReviewMemoryProposalStatus = (typeof REVIEW_MEMORY_PROPOSAL_STATUSES)[number];
+
+export const REVIEW_MEMORY_CHANGE_REQUEST_TYPES = ['github_pr', 'gitlab_mr'] as const;
+export type ReviewMemoryChangeRequestType = (typeof REVIEW_MEMORY_CHANGE_REQUEST_TYPES)[number];
+
+export const REVIEW_MEMORY_EVIDENCE_ROLES = ['primary', 'supporting', 'contradictory'] as const;
+export type ReviewMemoryEvidenceRole = (typeof REVIEW_MEMORY_EVIDENCE_ROLES)[number];

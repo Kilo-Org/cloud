@@ -493,7 +493,7 @@ describe('WrapperSupervisor', () => {
 
   it('does not clear idle reconciliation fields after wrapper identity changes', async () => {
     let replacedRuntimeState = false;
-    let storageForHook: MemoryStorage | undefined;
+    const storageForHook: { current?: MemoryStorage } = {};
     const harness = createHarness(
       [
         liveRuntimeState({
@@ -507,7 +507,7 @@ describe('WrapperSupervisor', () => {
           beforeList: async prefix => {
             if (replacedRuntimeState || !prefix.startsWith('session_message:')) return;
             replacedRuntimeState = true;
-            await storageForHook?.put('wrapper_runtime_state', {
+            await storageForHook.current?.put('wrapper_runtime_state', {
               wrapperGeneration: 5,
               wrapperConnectionId: 'conn_replacement',
               wrapperRunId: WRAPPER_RUN_ID,
@@ -519,7 +519,7 @@ describe('WrapperSupervisor', () => {
         },
       }
     );
-    storageForHook = harness.storage;
+    storageForHook.current = harness.storage;
 
     await harness.supervisor.runMaintenance(10_000);
 

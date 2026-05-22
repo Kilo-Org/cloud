@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { type JotaiStore } from 'cloud-agent-sdk';
+import { createStore } from 'jotai';
 
 const mocks = vi.hoisted(() => ({
   createSessionManager: vi.fn(config => ({ config })),
@@ -24,7 +24,12 @@ vi.mock('@/components/agents/mode-options', () => ({
 
 vi.mock('@/components/agents/mobile-session-diagnostics', () => ({
   formatSafeCloudAgentFailureDiagnostic: vi.fn(() => null),
-  withCloudAgentDiagnostics: vi.fn((_operation, _organizationId, run) => run()),
+  withCloudAgentDiagnostics: vi.fn(
+    async <T>(_operation: string, _organizationId: string | undefined, run: () => Promise<T>) => {
+      const result = await run();
+      return result;
+    }
+  ),
 }));
 
 vi.mock('@/lib/config', () => ({
@@ -73,7 +78,7 @@ describe('createMobileAgentSessionManager', () => {
       runtimeState: null,
     });
 
-    createMobileAgentSessionManager({ store: {} as JotaiStore });
+    createMobileAgentSessionManager({ store: createStore() });
 
     const config = mocks.createSessionManager.mock.calls[0]?.[0] as CapturedSessionManagerConfig;
     const session = await config.fetchSession('ses_123');

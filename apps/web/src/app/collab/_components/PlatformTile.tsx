@@ -143,10 +143,7 @@ function SetupStatusBadge({
   return (
     <span
       aria-hidden="true"
-      className={cn(
-        'grid size-5 place-items-center rounded-full transition-opacity duration-150',
-        selected ? 'bg-primary text-primary-foreground opacity-100' : 'opacity-0'
-      )}
+      className="grid size-5 place-items-center rounded-full opacity-0 transition-opacity duration-150"
     >
       <Check className="size-3" strokeWidth={3} />
     </span>

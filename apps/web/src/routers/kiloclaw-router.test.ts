@@ -19,7 +19,7 @@ import {
   kiloclaw_inbound_email_aliases,
   kiloclaw_inbound_email_reserved_aliases,
   kiloclaw_instances,
-  impact_referral_touches,
+  impact_attribution_touches,
   impact_referrals,
   impact_referral_conversions,
   impact_referral_reward_applications,
@@ -827,7 +827,7 @@ describe('kiloclawRouter getReferralRewardSummary', () => {
       normalized_email: params.refereeEmail,
     });
     const [touch] = await db
-      .insert(impact_referral_touches)
+      .insert(impact_attribution_touches)
       .values({
         dedupe_key: `summary-relationship-touch-${params.refereeEmail}`,
         user_id: referee.id,
@@ -841,7 +841,7 @@ describe('kiloclawRouter getReferralRewardSummary', () => {
         touched_at: '2026-04-01T00:00:00.000Z',
         expires_at: '2026-05-01T00:00:00.000Z',
       })
-      .returning({ id: impact_referral_touches.id });
+      .returning({ id: impact_attribution_touches.id });
     await db.insert(impact_referrals).values({
       referee_user_id: referee.id,
       referrer_user_id: params.referrerId,

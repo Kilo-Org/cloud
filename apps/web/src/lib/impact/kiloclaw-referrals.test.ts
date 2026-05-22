@@ -44,7 +44,7 @@ import {
   impact_advocate_participants,
   impact_advocate_reward_redemptions,
   impact_conversion_reports,
-  impact_referral_touches,
+  impact_attribution_touches,
   kiloclaw_instances,
   impact_referral_conversions,
   impact_referral_reward_applications,
@@ -55,7 +55,7 @@ import {
   kilocode_users,
   referral_codes,
   user_affiliate_attributions,
-  type KiloClawAttributionTouch,
+  type ImpactAttributionTouch,
 } from '@kilocode/db/schema';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import {
@@ -86,8 +86,8 @@ const mockReverseImpactAction = jest.mocked(reverseImpactAction);
 const mockStripeSubscriptionUpdate = jest.mocked(stripeClient.subscriptions.update);
 
 function makeTouch(
-  overrides: Partial<KiloClawAttributionTouch> & Pick<KiloClawAttributionTouch, 'touch_type'>
-): KiloClawAttributionTouch {
+  overrides: Partial<ImpactAttributionTouch> & Pick<ImpactAttributionTouch, 'touch_type'>
+): ImpactAttributionTouch {
   const touchedAt = overrides.touched_at ?? '2026-04-01T00:00:00.000Z';
   return {
     id: overrides.id ?? randomUUID(),
@@ -241,7 +241,7 @@ describe('kiloclaw referrals', () => {
     await db.delete(impact_referral_reward_decisions).where(sql`true`);
     await db.delete(impact_referral_conversions).where(sql`true`);
     await db.delete(user_affiliate_attributions).where(sql`true`);
-    await db.delete(impact_referral_touches).where(sql`true`);
+    await db.delete(impact_attribution_touches).where(sql`true`);
     await db.delete(credit_transactions).where(sql`true`);
     await db.delete(kiloclaw_subscription_change_log).where(sql`true`);
     await db.delete(kiloclaw_subscriptions).where(sql`true`);
@@ -465,7 +465,7 @@ describe('kiloclaw referrals', () => {
         credit_category: sourcePaymentId,
       });
       const affiliateTouchId = '11111111-1111-4111-8111-111111111111';
-      await db.insert(impact_referral_touches).values({
+      await db.insert(impact_attribution_touches).values({
         id: affiliateTouchId,
         dedupe_key: 'affiliate-touch',
         user_id: user.id,
@@ -500,8 +500,8 @@ describe('kiloclaw referrals', () => {
 
       const [touch] = await db
         .select()
-        .from(impact_referral_touches)
-        .where(eq(impact_referral_touches.id, affiliateTouchId));
+        .from(impact_attribution_touches)
+        .where(eq(impact_attribution_touches.id, affiliateTouchId));
       expect(touch.sale_attributed_at).toBeTruthy();
       expect(mockSendImpactConversionPayload).not.toHaveBeenCalled();
     });
@@ -527,7 +527,7 @@ describe('kiloclaw referrals', () => {
         description: 'KiloClaw standard enrollment',
         credit_category: sourcePaymentId,
       });
-      await db.insert(impact_referral_touches).values({
+      await db.insert(impact_attribution_touches).values({
         id: '22222222-2222-4222-8222-222222222222',
         dedupe_key: 'referral-touch',
         user_id: referee.id,
@@ -631,7 +631,7 @@ describe('kiloclaw referrals', () => {
         description: 'KiloClaw standard enrollment',
         credit_category: sourcePaymentId,
       });
-      await db.insert(impact_referral_touches).values({
+      await db.insert(impact_attribution_touches).values({
         id: 'abababab-abab-4bab-8bab-abababababab',
         dedupe_key: 'referral-code-touch',
         user_id: referee.id,
@@ -691,7 +691,7 @@ describe('kiloclaw referrals', () => {
         description: 'KiloClaw standard enrollment',
         credit_category: sourcePaymentId,
       });
-      await db.insert(impact_referral_touches).values({
+      await db.insert(impact_attribution_touches).values({
         id: 'cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd',
         dedupe_key: 'signup-race-referral-touch',
         user_id: referee.id,
@@ -754,7 +754,7 @@ describe('kiloclaw referrals', () => {
         description: 'KiloClaw standard enrollment',
         credit_category: sourcePaymentId,
       });
-      await db.insert(impact_referral_touches).values({
+      await db.insert(impact_attribution_touches).values({
         id: '12121212-1212-4212-8212-121212121212',
         dedupe_key: 'terminal-report-referral-touch',
         user_id: referee.id,
@@ -826,7 +826,7 @@ describe('kiloclaw referrals', () => {
           description: 'KiloClaw standard enrollment',
           credit_category: sourcePaymentId,
         });
-        await db.insert(impact_referral_touches).values({
+        await db.insert(impact_attribution_touches).values({
           id: '77777777-7777-4777-8777-777777777777',
           dedupe_key: 'missing-config-referral-touch',
           user_id: referee.id,
@@ -929,7 +929,7 @@ describe('kiloclaw referrals', () => {
         description: 'KiloClaw standard enrollment',
         credit_category: sourcePaymentId,
       });
-      await db.insert(impact_referral_touches).values({
+      await db.insert(impact_attribution_touches).values({
         id: '33333333-3333-4333-8333-333333333333',
         dedupe_key: 'late-referral-touch',
         user_id: referee.id,
@@ -995,7 +995,7 @@ describe('kiloclaw referrals', () => {
         provider: 'impact',
         tracking_id: 'impact-click-123',
       });
-      await db.insert(impact_referral_touches).values({
+      await db.insert(impact_attribution_touches).values({
         id: '88888888-8888-4888-8888-888888888888',
         dedupe_key: 'affiliate-touch-without-sale',
         user_id: referee.id,
@@ -1057,7 +1057,7 @@ describe('kiloclaw referrals', () => {
         provider: 'impact',
         tracking_id: 'impact-click-456',
       });
-      await db.insert(impact_referral_touches).values({
+      await db.insert(impact_attribution_touches).values({
         id: '99999999-9999-4999-8999-999999999999',
         dedupe_key: 'affiliate-touch-with-sale',
         user_id: referee.id,
@@ -1197,7 +1197,7 @@ describe('kiloclaw referrals', () => {
         description: 'KiloClaw standard enrollment',
         credit_category: 'kiloclaw-subscription:instance-override-eligible:2026-04',
       });
-      await db.insert(impact_referral_touches).values({
+      await db.insert(impact_attribution_touches).values({
         id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
         dedupe_key: 'override-eligible-affiliate-touch',
         user_id: referee.id,
@@ -1255,7 +1255,7 @@ describe('kiloclaw referrals', () => {
         description: 'KiloClaw standard enrollment',
         credit_category: sourcePaymentId,
       });
-      await db.insert(impact_referral_touches).values({
+      await db.insert(impact_attribution_touches).values({
         id: '44444444-4444-4444-8444-444444444444',
         dedupe_key: 'pending-referral-touch',
         user_id: referee.id,
@@ -1390,7 +1390,7 @@ describe('kiloclaw referrals', () => {
         description: 'KiloClaw standard enrollment',
         credit_category: sourcePaymentId,
       });
-      await db.insert(impact_referral_touches).values({
+      await db.insert(impact_attribution_touches).values({
         id: '54545454-5454-4545-8545-545454545454',
         dedupe_key: 'stripe-failure-referral-touch',
         user_id: referee.id,
@@ -1463,7 +1463,7 @@ describe('kiloclaw referrals', () => {
         description: 'KiloClaw standard enrollment',
         credit_category: sourcePaymentId,
       });
-      await db.insert(impact_referral_touches).values({
+      await db.insert(impact_attribution_touches).values({
         id: '55555555-5555-4555-8555-555555555555',
         dedupe_key: 'stripe-referral-touch',
         user_id: referee.id,
@@ -1528,7 +1528,7 @@ describe('kiloclaw referrals', () => {
         description: 'KiloClaw standard enrollment',
         credit_category: sourcePaymentId,
       });
-      await db.insert(impact_referral_touches).values({
+      await db.insert(impact_attribution_touches).values({
         id: '66666666-6666-4666-8666-666666666666',
         dedupe_key: 'reversal-referral-touch',
         user_id: referee.id,

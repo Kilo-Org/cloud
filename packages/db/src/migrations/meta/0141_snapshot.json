@@ -1,5 +1,5 @@
 {
-  "id": "284a5e26-760c-4ada-bf47-4140f43aa00f",
+  "id": "c4f8d059-dc5b-4fa0-9e74-a4003be49393",
   "prevId": "8164d94c-7070-484e-a062-84779df93922",
   "version": "7",
   "dialect": "postgresql",
@@ -8811,6 +8811,299 @@
       },
       "isRLSEnabled": false
     },
+    "public.impact_attribution_touches": {
+      "name": "impact_attribution_touches",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "product": {
+          "name": "product",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'kiloclaw'"
+        },
+        "program_key": {
+          "name": "program_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'kiloclaw'"
+        },
+        "dedupe_key": {
+          "name": "dedupe_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "anonymous_id": {
+          "name": "anonymous_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "touch_type": {
+          "name": "touch_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "provider": {
+          "name": "provider",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "opaque_tracking_value": {
+          "name": "opaque_tracking_value",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tracking_value_length": {
+          "name": "tracking_value_length",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "is_tracking_value_accepted": {
+          "name": "is_tracking_value_accepted",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "rs_code": {
+          "name": "rs_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rs_share_medium": {
+          "name": "rs_share_medium",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rs_engagement_medium": {
+          "name": "rs_engagement_medium",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "im_ref": {
+          "name": "im_ref",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "landing_path": {
+          "name": "landing_path",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "utm_source": {
+          "name": "utm_source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "utm_medium": {
+          "name": "utm_medium",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "utm_campaign": {
+          "name": "utm_campaign",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "utm_term": {
+          "name": "utm_term",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "utm_content": {
+          "name": "utm_content",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "touched_at": {
+          "name": "touched_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sale_attributed_at": {
+          "name": "sale_attributed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "IDX_impact_attribution_touches_product_user_id": {
+          "name": "IDX_impact_attribution_touches_product_user_id",
+          "columns": [
+            {
+              "expression": "product",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_impact_attribution_touches_user_id": {
+          "name": "IDX_impact_attribution_touches_user_id",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_impact_attribution_touches_anonymous_id": {
+          "name": "IDX_impact_attribution_touches_anonymous_id",
+          "columns": [
+            {
+              "expression": "anonymous_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_impact_attribution_touches_expires_at": {
+          "name": "IDX_impact_attribution_touches_expires_at",
+          "columns": [
+            {
+              "expression": "expires_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_impact_attribution_touches_sale_attributed_at": {
+          "name": "IDX_impact_attribution_touches_sale_attributed_at",
+          "columns": [
+            {
+              "expression": "sale_attributed_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "impact_attribution_touches_user_id_kilocode_users_id_fk": {
+          "name": "impact_attribution_touches_user_id_kilocode_users_id_fk",
+          "tableFrom": "impact_attribution_touches",
+          "tableTo": "kilocode_users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "UQ_impact_attribution_touches_dedupe_key": {
+          "name": "UQ_impact_attribution_touches_dedupe_key",
+          "nullsNotDistinct": false,
+          "columns": [
+            "dedupe_key"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "impact_attribution_touches_product_check": {
+          "name": "impact_attribution_touches_product_check",
+          "value": "\"impact_attribution_touches\".\"product\" IN ('kiloclaw', 'kilo_pass')"
+        },
+        "impact_attribution_touches_program_key_check": {
+          "name": "impact_attribution_touches_program_key_check",
+          "value": "\"impact_attribution_touches\".\"program_key\" IN ('kiloclaw', 'kilo_pass')"
+        },
+        "impact_attribution_touches_touch_type_check": {
+          "name": "impact_attribution_touches_touch_type_check",
+          "value": "\"impact_attribution_touches\".\"touch_type\" IN ('affiliate', 'referral')"
+        },
+        "impact_attribution_touches_provider_check": {
+          "name": "impact_attribution_touches_provider_check",
+          "value": "\"impact_attribution_touches\".\"provider\" IN ('impact_performance', 'impact_advocate')"
+        },
+        "impact_attribution_touches_tracking_value_length_non_negative_check": {
+          "name": "impact_attribution_touches_tracking_value_length_non_negative_check",
+          "value": "\"impact_attribution_touches\".\"tracking_value_length\" >= 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
     "public.impact_conversion_reports": {
       "name": "impact_conversion_reports",
       "schema": "",
@@ -9116,10 +9409,10 @@
           "onDelete": "set null",
           "onUpdate": "cascade"
         },
-        "impact_referral_conversions_source_touch_id_impact_referral_touches_id_fk": {
-          "name": "impact_referral_conversions_source_touch_id_impact_referral_touches_id_fk",
+        "impact_referral_conversions_source_touch_id_impact_attribution_touches_id_fk": {
+          "name": "impact_referral_conversions_source_touch_id_impact_attribution_touches_id_fk",
           "tableFrom": "impact_referral_conversions",
-          "tableTo": "impact_referral_touches",
+          "tableTo": "impact_attribution_touches",
           "columnsFrom": [
             "source_touch_id"
           ],
@@ -9777,299 +10070,6 @@
       },
       "isRLSEnabled": false
     },
-    "public.impact_referral_touches": {
-      "name": "impact_referral_touches",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "pg_catalog.gen_random_uuid()"
-        },
-        "product": {
-          "name": "product",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'kiloclaw'"
-        },
-        "program_key": {
-          "name": "program_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "default": "'kiloclaw'"
-        },
-        "dedupe_key": {
-          "name": "dedupe_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "anonymous_id": {
-          "name": "anonymous_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "user_id": {
-          "name": "user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "touch_type": {
-          "name": "touch_type",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "provider": {
-          "name": "provider",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "opaque_tracking_value": {
-          "name": "opaque_tracking_value",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "tracking_value_length": {
-          "name": "tracking_value_length",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "is_tracking_value_accepted": {
-          "name": "is_tracking_value_accepted",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": true
-        },
-        "rs_code": {
-          "name": "rs_code",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "rs_share_medium": {
-          "name": "rs_share_medium",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "rs_engagement_medium": {
-          "name": "rs_engagement_medium",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "im_ref": {
-          "name": "im_ref",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "landing_path": {
-          "name": "landing_path",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "utm_source": {
-          "name": "utm_source",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "utm_medium": {
-          "name": "utm_medium",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "utm_campaign": {
-          "name": "utm_campaign",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "utm_term": {
-          "name": "utm_term",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "utm_content": {
-          "name": "utm_content",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "touched_at": {
-          "name": "touched_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "expires_at": {
-          "name": "expires_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "sale_attributed_at": {
-          "name": "sale_attributed_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "IDX_impact_referral_touches_product_user_id": {
-          "name": "IDX_impact_referral_touches_product_user_id",
-          "columns": [
-            {
-              "expression": "product",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "IDX_impact_referral_touches_user_id": {
-          "name": "IDX_impact_referral_touches_user_id",
-          "columns": [
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "IDX_impact_referral_touches_anonymous_id": {
-          "name": "IDX_impact_referral_touches_anonymous_id",
-          "columns": [
-            {
-              "expression": "anonymous_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "IDX_impact_referral_touches_expires_at": {
-          "name": "IDX_impact_referral_touches_expires_at",
-          "columns": [
-            {
-              "expression": "expires_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "IDX_impact_referral_touches_sale_attributed_at": {
-          "name": "IDX_impact_referral_touches_sale_attributed_at",
-          "columns": [
-            {
-              "expression": "sale_attributed_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "impact_referral_touches_user_id_kilocode_users_id_fk": {
-          "name": "impact_referral_touches_user_id_kilocode_users_id_fk",
-          "tableFrom": "impact_referral_touches",
-          "tableTo": "kilocode_users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "cascade"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "UQ_impact_referral_touches_dedupe_key": {
-          "name": "UQ_impact_referral_touches_dedupe_key",
-          "nullsNotDistinct": false,
-          "columns": [
-            "dedupe_key"
-          ]
-        }
-      },
-      "policies": {},
-      "checkConstraints": {
-        "impact_referral_touches_product_check": {
-          "name": "impact_referral_touches_product_check",
-          "value": "\"impact_referral_touches\".\"product\" IN ('kiloclaw', 'kilo_pass')"
-        },
-        "impact_referral_touches_program_key_check": {
-          "name": "impact_referral_touches_program_key_check",
-          "value": "\"impact_referral_touches\".\"program_key\" IN ('kiloclaw', 'kilo_pass')"
-        },
-        "impact_referral_touches_touch_type_check": {
-          "name": "impact_referral_touches_touch_type_check",
-          "value": "\"impact_referral_touches\".\"touch_type\" IN ('affiliate', 'referral')"
-        },
-        "impact_referral_touches_provider_check": {
-          "name": "impact_referral_touches_provider_check",
-          "value": "\"impact_referral_touches\".\"provider\" IN ('impact_performance', 'impact_advocate')"
-        },
-        "impact_referral_touches_tracking_value_length_non_negative_check": {
-          "name": "impact_referral_touches_tracking_value_length_non_negative_check",
-          "value": "\"impact_referral_touches\".\"tracking_value_length\" >= 0"
-        }
-      },
-      "isRLSEnabled": false
-    },
     "public.impact_referrals": {
       "name": "impact_referrals",
       "schema": "",
@@ -10179,10 +10179,10 @@
           "onDelete": "set null",
           "onUpdate": "cascade"
         },
-        "impact_referrals_source_touch_id_impact_referral_touches_id_fk": {
-          "name": "impact_referrals_source_touch_id_impact_referral_touches_id_fk",
+        "impact_referrals_source_touch_id_impact_attribution_touches_id_fk": {
+          "name": "impact_referrals_source_touch_id_impact_attribution_touches_id_fk",
           "tableFrom": "impact_referrals",
-          "tableTo": "impact_referral_touches",
+          "tableTo": "impact_attribution_touches",
           "columnsFrom": [
             "source_touch_id"
           ],

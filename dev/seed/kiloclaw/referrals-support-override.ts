@@ -1,7 +1,7 @@
 import { credit_transactions, kiloclaw_attribution_touches } from '@kilocode/db/schema';
 import {
-  KiloClawAttributionTouchProvider,
-  KiloClawAttributionTouchType,
+  ImpactAttributionTouchProvider,
+  ImpactAttributionTouchType,
 } from '@kilocode/db/schema-types';
 
 import { getSeedDb } from '../lib/db';
@@ -95,8 +95,8 @@ export async function run(): Promise<SeedResult> {
     .values({
       dedupe_key: `${seedLabelForScenario(SCENARIO)}:touch:affiliate`,
       user_id: refereeUserId,
-      touch_type: KiloClawAttributionTouchType.Affiliate,
-      provider: KiloClawAttributionTouchProvider.ImpactPerformance,
+      touch_type: ImpactAttributionTouchType.Affiliate,
+      provider: ImpactAttributionTouchProvider.ImpactPerformance,
       opaque_tracking_value: `${seedLabelForScenario(SCENARIO)}:im-ref`,
       tracking_value_length: 50,
       is_tracking_value_accepted: true,
@@ -112,8 +112,8 @@ export async function run(): Promise<SeedResult> {
     .values({
       dedupe_key: `${seedLabelForScenario(SCENARIO)}:touch:referral`,
       user_id: refereeUserId,
-      touch_type: KiloClawAttributionTouchType.Referral,
-      provider: KiloClawAttributionTouchProvider.ImpactAdvocate,
+      touch_type: ImpactAttributionTouchType.Referral,
+      provider: ImpactAttributionTouchProvider.ImpactAdvocate,
       opaque_tracking_value: `${seedLabelForScenario(SCENARIO)}:cookie`,
       tracking_value_length: 48,
       is_tracking_value_accepted: true,

@@ -291,27 +291,21 @@ export const ImpactAdvocateProgramKey = {
 export type ImpactAdvocateProgramKey =
   (typeof ImpactAdvocateProgramKey)[keyof typeof ImpactAdvocateProgramKey];
 
-export const ImpactReferralTouchType = {
+export const ImpactAttributionTouchType = {
   Affiliate: 'affiliate',
   Referral: 'referral',
 } as const;
 
-export type ImpactReferralTouchType =
-  (typeof ImpactReferralTouchType)[keyof typeof ImpactReferralTouchType];
+export type ImpactAttributionTouchType =
+  (typeof ImpactAttributionTouchType)[keyof typeof ImpactAttributionTouchType];
 
-export const ImpactReferralTouchProvider = {
+export const ImpactAttributionTouchProvider = {
   ImpactPerformance: 'impact_performance',
   ImpactAdvocate: 'impact_advocate',
 } as const;
 
-export type ImpactReferralTouchProvider =
-  (typeof ImpactReferralTouchProvider)[keyof typeof ImpactReferralTouchProvider];
-
-export const KiloClawAttributionTouchType = ImpactReferralTouchType;
-export type KiloClawAttributionTouchType = ImpactReferralTouchType;
-
-export const KiloClawAttributionTouchProvider = ImpactReferralTouchProvider;
-export type KiloClawAttributionTouchProvider = ImpactReferralTouchProvider;
+export type ImpactAttributionTouchProvider =
+  (typeof ImpactAttributionTouchProvider)[keyof typeof ImpactAttributionTouchProvider];
 
 export const ImpactAdvocateRegistrationState = {
   Pending: 'pending',

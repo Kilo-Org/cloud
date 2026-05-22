@@ -55,8 +55,8 @@ import {
   AffiliateEventDeliveryState,
   ImpactReferralProduct,
   ImpactAdvocateProgramKey,
-  ImpactReferralTouchType,
-  ImpactReferralTouchProvider,
+  ImpactAttributionTouchType,
+  ImpactAttributionTouchProvider,
   ImpactAdvocateRegistrationState,
   ImpactAdvocateAttemptDeliveryState,
   ImpactReferralBeneficiaryRole,
@@ -157,8 +157,8 @@ export const SCHEMA_CHECK_ENUMS = {
   AffiliateEventDeliveryState,
   ImpactReferralProduct,
   ImpactAdvocateProgramKey,
-  ImpactReferralTouchType,
-  ImpactReferralTouchProvider,
+  ImpactAttributionTouchType,
+  ImpactAttributionTouchProvider,
   ImpactAdvocateRegistrationState,
   ImpactAdvocateAttemptDeliveryState,
   ImpactReferralBeneficiaryRole,
@@ -481,8 +481,8 @@ export const deleted_user_email_tombstones = pgTable('deleted_user_email_tombsto
 
 export type DeletedUserEmailTombstone = typeof deleted_user_email_tombstones.$inferSelect;
 
-export const impact_referral_touches = pgTable(
-  'impact_referral_touches',
+export const impact_attribution_touches = pgTable(
+  'impact_attribution_touches',
   {
     id: uuid()
       .default(sql`pg_catalog.gen_random_uuid()`)
@@ -501,8 +501,8 @@ export const impact_referral_touches = pgTable(
       onDelete: 'set null',
       onUpdate: 'cascade',
     }),
-    touch_type: text().notNull().$type<ImpactReferralTouchType>(),
-    provider: text().notNull().$type<ImpactReferralTouchProvider>(),
+    touch_type: text().notNull().$type<ImpactAttributionTouchType>(),
+    provider: text().notNull().$type<ImpactAttributionTouchProvider>(),
     opaque_tracking_value: text(),
     tracking_value_length: integer().notNull(),
     is_tracking_value_accepted: boolean().notNull().default(true),
@@ -522,37 +522,36 @@ export const impact_referral_touches = pgTable(
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
   },
   table => [
-    unique('UQ_impact_referral_touches_dedupe_key').on(table.dedupe_key),
-    index('IDX_impact_referral_touches_product_user_id').on(table.product, table.user_id),
-    index('IDX_impact_referral_touches_user_id').on(table.user_id),
-    index('IDX_impact_referral_touches_anonymous_id').on(table.anonymous_id),
-    index('IDX_impact_referral_touches_expires_at').on(table.expires_at),
-    index('IDX_impact_referral_touches_sale_attributed_at').on(table.sale_attributed_at),
-    enumCheck('impact_referral_touches_product_check', table.product, ImpactReferralProduct),
+    unique('UQ_impact_attribution_touches_dedupe_key').on(table.dedupe_key),
+    index('IDX_impact_attribution_touches_product_user_id').on(table.product, table.user_id),
+    index('IDX_impact_attribution_touches_user_id').on(table.user_id),
+    index('IDX_impact_attribution_touches_anonymous_id').on(table.anonymous_id),
+    index('IDX_impact_attribution_touches_expires_at').on(table.expires_at),
+    index('IDX_impact_attribution_touches_sale_attributed_at').on(table.sale_attributed_at),
+    enumCheck('impact_attribution_touches_product_check', table.product, ImpactReferralProduct),
     enumCheck(
-      'impact_referral_touches_program_key_check',
+      'impact_attribution_touches_program_key_check',
       table.program_key,
       ImpactAdvocateProgramKey
     ),
     enumCheck(
-      'impact_referral_touches_touch_type_check',
+      'impact_attribution_touches_touch_type_check',
       table.touch_type,
-      ImpactReferralTouchType
+      ImpactAttributionTouchType
     ),
     enumCheck(
-      'impact_referral_touches_provider_check',
+      'impact_attribution_touches_provider_check',
       table.provider,
-      ImpactReferralTouchProvider
+      ImpactAttributionTouchProvider
     ),
     check(
-      'impact_referral_touches_tracking_value_length_non_negative_check',
+      'impact_attribution_touches_tracking_value_length_non_negative_check',
       sql`${table.tracking_value_length} >= 0`
     ),
   ]
 );
 
-export type ImpactReferralTouch = typeof impact_referral_touches.$inferSelect;
-export type KiloClawAttributionTouch = ImpactReferralTouch;
+export type ImpactAttributionTouch = typeof impact_attribution_touches.$inferSelect;
 
 export const impact_advocate_participants = pgTable(
   'impact_advocate_participants',
@@ -691,7 +690,7 @@ export const impact_referrals = pgTable(
       onDelete: 'set null',
       onUpdate: 'cascade',
     }),
-    source_touch_id: uuid().references(() => impact_referral_touches.id, {
+    source_touch_id: uuid().references(() => impact_attribution_touches.id, {
       onDelete: 'set null',
       onUpdate: 'cascade',
     }),
@@ -727,7 +726,7 @@ export const impact_referral_conversions = pgTable(
       onDelete: 'set null',
       onUpdate: 'cascade',
     }),
-    source_touch_id: uuid().references(() => impact_referral_touches.id, {
+    source_touch_id: uuid().references(() => impact_attribution_touches.id, {
       onDelete: 'set null',
       onUpdate: 'cascade',
     }),

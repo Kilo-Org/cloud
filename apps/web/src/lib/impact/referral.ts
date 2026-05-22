@@ -20,15 +20,15 @@ import {
   deleted_user_email_tombstones,
   impact_advocate_participants,
   impact_advocate_registration_attempts,
-  impact_referral_touches,
+  impact_attribution_touches,
   type User,
 } from '@kilocode/db/schema';
 import {
   ImpactAdvocateAttemptDeliveryState,
   ImpactAdvocateProgramKey,
   ImpactAdvocateRegistrationState,
-  KiloClawAttributionTouchProvider,
-  KiloClawAttributionTouchType,
+  ImpactAttributionTouchProvider,
+  ImpactAttributionTouchType,
 } from '@kilocode/db/schema-types';
 import { and, asc, eq, lte, ne, or, sql } from 'drizzle-orm';
 
@@ -100,21 +100,21 @@ export async function recordImpactAffiliateTouch(params: {
   const database = getDatabaseClient(params.database);
   const dedupeKey = buildHashedDedupeKey([
     touchIdentity(params),
-    KiloClawAttributionTouchType.Affiliate,
-    KiloClawAttributionTouchProvider.ImpactPerformance,
+    ImpactAttributionTouchType.Affiliate,
+    ImpactAttributionTouchProvider.ImpactPerformance,
     params.touch.trackingId,
     params.touch.landingPath,
     touchMinuteBucket(params.touch.touchedAt),
   ]);
 
   const [insertedTouch] = await database
-    .insert(impact_referral_touches)
+    .insert(impact_attribution_touches)
     .values({
       dedupe_key: dedupeKey,
       anonymous_id: params.anonymousId ?? null,
       user_id: params.userId ?? null,
-      touch_type: KiloClawAttributionTouchType.Affiliate,
-      provider: KiloClawAttributionTouchProvider.ImpactPerformance,
+      touch_type: ImpactAttributionTouchType.Affiliate,
+      provider: ImpactAttributionTouchProvider.ImpactPerformance,
       opaque_tracking_value: params.touch.trackingId,
       tracking_value_length: params.touch.trackingValueLength,
       is_tracking_value_accepted: params.touch.isTrackingValueAccepted,
@@ -128,8 +128,8 @@ export async function recordImpactAffiliateTouch(params: {
       touched_at: params.touch.touchedAt.toISOString(),
       expires_at: params.touch.expiresAt.toISOString(),
     })
-    .onConflictDoNothing({ target: [impact_referral_touches.dedupe_key] })
-    .returning({ id: impact_referral_touches.id });
+    .onConflictDoNothing({ target: [impact_attribution_touches.dedupe_key] })
+    .returning({ id: impact_attribution_touches.id });
 
   logImpactReferralDebug(
     insertedTouch
@@ -155,8 +155,8 @@ export async function recordImpactReferralTouch(params: {
   const database = getDatabaseClient(params.database);
   const dedupeKey = buildHashedDedupeKey([
     touchIdentity(params),
-    KiloClawAttributionTouchType.Referral,
-    KiloClawAttributionTouchProvider.ImpactAdvocate,
+    ImpactAttributionTouchType.Referral,
+    ImpactAttributionTouchProvider.ImpactAdvocate,
     params.touch.opaqueTrackingValue,
     params.touch.rsCode,
     params.touch.landingPath,
@@ -164,13 +164,13 @@ export async function recordImpactReferralTouch(params: {
   ]);
 
   const [insertedTouch] = await database
-    .insert(impact_referral_touches)
+    .insert(impact_attribution_touches)
     .values({
       dedupe_key: dedupeKey,
       anonymous_id: params.anonymousId ?? null,
       user_id: params.userId ?? null,
-      touch_type: KiloClawAttributionTouchType.Referral,
-      provider: KiloClawAttributionTouchProvider.ImpactAdvocate,
+      touch_type: ImpactAttributionTouchType.Referral,
+      provider: ImpactAttributionTouchProvider.ImpactAdvocate,
       opaque_tracking_value: params.touch.opaqueTrackingValue,
       tracking_value_length: params.touch.trackingValueLength,
       is_tracking_value_accepted: params.touch.isTrackingValueAccepted,
@@ -186,8 +186,8 @@ export async function recordImpactReferralTouch(params: {
       touched_at: params.touch.touchedAt.toISOString(),
       expires_at: params.touch.expiresAt.toISOString(),
     })
-    .onConflictDoNothing({ target: [impact_referral_touches.dedupe_key] })
-    .returning({ id: impact_referral_touches.id });
+    .onConflictDoNothing({ target: [impact_attribution_touches.dedupe_key] })
+    .returning({ id: impact_attribution_touches.id });
 
   logImpactReferralDebug(
     insertedTouch

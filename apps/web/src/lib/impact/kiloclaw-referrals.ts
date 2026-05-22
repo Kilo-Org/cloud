@@ -31,7 +31,7 @@ import {
   impact_advocate_participants,
   impact_advocate_reward_redemptions,
   impact_conversion_reports,
-  impact_referral_touches,
+  impact_attribution_touches,
   impact_referral_conversions,
   impact_referral_reward_applications,
   impact_referral_reward_decisions,
@@ -41,7 +41,7 @@ import {
   kiloclaw_subscriptions,
   kilocode_users,
   referral_codes,
-  type KiloClawAttributionTouch,
+  type ImpactAttributionTouch,
   type KiloClawSubscription,
 } from '@kilocode/db/schema';
 import {
@@ -51,7 +51,7 @@ import {
   ImpactReferralPaymentProvider,
   ImpactReferralProduct,
   ImpactReferralRewardKind,
-  KiloClawAttributionTouchType,
+  ImpactAttributionTouchType,
   KiloClawReferralBeneficiaryRole,
   KiloClawReferralDecisionOutcome,
   KiloClawReferralRewardStatus,
@@ -63,18 +63,18 @@ type DatabaseClient = typeof db | DrizzleTransaction;
 type WinningAttributionResolution =
   | {
       winner: 'referral';
-      referralTouch: KiloClawAttributionTouch;
-      affiliateTouch: KiloClawAttributionTouch | null;
+      referralTouch: ImpactAttributionTouch;
+      affiliateTouch: ImpactAttributionTouch | null;
     }
   | {
       winner: 'affiliate';
-      affiliateTouch: KiloClawAttributionTouch;
-      referralTouch: KiloClawAttributionTouch | null;
+      affiliateTouch: ImpactAttributionTouch;
+      referralTouch: ImpactAttributionTouch | null;
     }
   | {
       winner: 'none';
-      affiliateTouch: KiloClawAttributionTouch | null;
-      referralTouch: KiloClawAttributionTouch | null;
+      affiliateTouch: ImpactAttributionTouch | null;
+      referralTouch: ImpactAttributionTouch | null;
     };
 
 export type KiloClawPaidConversionDisposition = {
@@ -150,11 +150,11 @@ function referralDisqualificationReason(reason: string): string {
   return `referral_${reason}`;
 }
 
-function hasAcceptedTrackingValue(touch: KiloClawAttributionTouch): boolean {
+function hasAcceptedTrackingValue(touch: ImpactAttributionTouch): boolean {
   return touch.is_tracking_value_accepted && Boolean(touch.opaque_tracking_value?.trim());
 }
 
-function isTouchValidAtConversion(touch: KiloClawAttributionTouch, convertedAt: Date): boolean {
+function isTouchValidAtConversion(touch: ImpactAttributionTouch, convertedAt: Date): boolean {
   return (
     hasAcceptedTrackingValue(touch) &&
     new Date(touch.touched_at).getTime() <= convertedAt.getTime() &&
@@ -163,20 +163,20 @@ function isTouchValidAtConversion(touch: KiloClawAttributionTouch, convertedAt: 
 }
 
 export function resolveWinningAttributionTouch(params: {
-  touches: KiloClawAttributionTouch[];
+  touches: ImpactAttributionTouch[];
   convertedAt: Date;
 }): WinningAttributionResolution {
   const validReferralTouches = params.touches
     .filter(
       touch =>
-        touch.touch_type === KiloClawAttributionTouchType.Referral &&
+        touch.touch_type === ImpactAttributionTouchType.Referral &&
         isTouchValidAtConversion(touch, params.convertedAt)
     )
     .sort((a, b) => new Date(a.touched_at).getTime() - new Date(b.touched_at).getTime());
   const validAffiliateTouches = params.touches
     .filter(
       touch =>
-        touch.touch_type === KiloClawAttributionTouchType.Affiliate &&
+        touch.touch_type === ImpactAttributionTouchType.Affiliate &&
         isTouchValidAtConversion(touch, params.convertedAt)
     )
     .sort((a, b) => new Date(a.touched_at).getTime() - new Date(b.touched_at).getTime());
@@ -258,27 +258,30 @@ async function findAcceptedUserTouches(params: {
   userId: string;
   convertedAt: Date;
   database: DatabaseClient;
-}): Promise<KiloClawAttributionTouch[]> {
+}): Promise<ImpactAttributionTouch[]> {
   return await params.database
     .select()
-    .from(impact_referral_touches)
+    .from(impact_attribution_touches)
     .where(
       and(
-        eq(impact_referral_touches.product, ImpactReferralProduct.KiloClaw),
-        eq(impact_referral_touches.user_id, params.userId),
-        lte(impact_referral_touches.touched_at, params.convertedAt.toISOString())
+        eq(impact_attribution_touches.product, ImpactReferralProduct.KiloClaw),
+        eq(impact_attribution_touches.user_id, params.userId),
+        lte(impact_attribution_touches.touched_at, params.convertedAt.toISOString())
       )
     )
-    .orderBy(asc(impact_referral_touches.touched_at), asc(impact_referral_touches.created_at));
+    .orderBy(
+      asc(impact_attribution_touches.touched_at),
+      asc(impact_attribution_touches.created_at)
+    );
 }
 
-function buildOpaqueReferralIdentifierFromTouch(touch: KiloClawAttributionTouch): string | null {
+function buildOpaqueReferralIdentifierFromTouch(touch: ImpactAttributionTouch): string | null {
   const referralIdentifier = buildImpactReferralId(touch)?.trim();
   return referralIdentifier ? referralIdentifier : null;
 }
 
 async function resolveReferrerUserIdFromReferralTouch(params: {
-  referralTouch: KiloClawAttributionTouch;
+  referralTouch: ImpactAttributionTouch;
   database: DatabaseClient;
 }): Promise<string | null> {
   const opaqueReferralIdentifier = buildOpaqueReferralIdentifierFromTouch(params.referralTouch);
@@ -312,7 +315,7 @@ async function resolveReferrerUserIdFromReferralTouch(params: {
 
 function wasReferralTouchCapturedDuringSignup(params: {
   userCreatedAt: string;
-  referralTouch: KiloClawAttributionTouch;
+  referralTouch: ImpactAttributionTouch;
 }): boolean {
   if (!params.referralTouch.landing_path) {
     return false;
@@ -380,11 +383,11 @@ async function markAffiliateTouchSaleAttributed(params: {
   convertedAt: Date;
 }): Promise<void> {
   await params.database
-    .update(impact_referral_touches)
+    .update(impact_attribution_touches)
     .set({
-      sale_attributed_at: sql`COALESCE(${impact_referral_touches.sale_attributed_at}, ${params.convertedAt.toISOString()}::timestamptz)`,
+      sale_attributed_at: sql`COALESCE(${impact_attribution_touches.sale_attributed_at}, ${params.convertedAt.toISOString()}::timestamptz)`,
     })
-    .where(eq(impact_referral_touches.id, params.affiliateTouchId));
+    .where(eq(impact_attribution_touches.id, params.affiliateTouchId));
 }
 
 async function lockReferrerRewardCapacity(
@@ -429,14 +432,14 @@ async function hasSaleAttributedAffiliateTouch(params: {
   database: DatabaseClient;
 }): Promise<boolean> {
   const [touch] = await params.database
-    .select({ id: impact_referral_touches.id })
-    .from(impact_referral_touches)
+    .select({ id: impact_attribution_touches.id })
+    .from(impact_attribution_touches)
     .where(
       and(
-        eq(impact_referral_touches.product, ImpactReferralProduct.KiloClaw),
-        eq(impact_referral_touches.user_id, params.userId),
-        eq(impact_referral_touches.touch_type, KiloClawAttributionTouchType.Affiliate),
-        sql`${impact_referral_touches.sale_attributed_at} IS NOT NULL`
+        eq(impact_attribution_touches.product, ImpactReferralProduct.KiloClaw),
+        eq(impact_attribution_touches.user_id, params.userId),
+        eq(impact_attribution_touches.touch_type, ImpactAttributionTouchType.Affiliate),
+        sql`${impact_attribution_touches.sale_attributed_at} IS NOT NULL`
       )
     )
     .limit(1);
@@ -1485,7 +1488,7 @@ async function upsertReferralRelationship(params: {
     });
 }
 
-function buildImpactReferralId(touch: KiloClawAttributionTouch): string | null {
+function buildImpactReferralId(touch: ImpactAttributionTouch): string | null {
   return touch.rs_code?.trim() || touch.opaque_tracking_value?.trim() || null;
 }
 
@@ -1853,10 +1856,10 @@ export async function processPersonalKiloClawPaidConversion(params: {
       sourcePaymentId: params.sourcePaymentId,
       touchCount: touches.length,
       affiliateTouchCount: touches.filter(
-        touch => touch.touch_type === KiloClawAttributionTouchType.Affiliate
+        touch => touch.touch_type === ImpactAttributionTouchType.Affiliate
       ).length,
       referralTouchCount: touches.filter(
-        touch => touch.touch_type === KiloClawAttributionTouchType.Referral
+        touch => touch.touch_type === ImpactAttributionTouchType.Referral
       ).length,
       winner: resolution.winner,
       affiliateTouchId: resolution.affiliateTouch?.id ?? null,

@@ -7,7 +7,7 @@ import { db } from '@/lib/drizzle';
 import {
   impact_advocate_reward_redemptions,
   impact_conversion_reports,
-  impact_referral_touches,
+  impact_attribution_touches,
   impact_referral_conversions,
   impact_referral_reward_applications,
   impact_referral_reward_decisions,
@@ -175,20 +175,20 @@ async function investigateReferrer(search: string): Promise<ReferralInvestigatio
       refereeId: kilocode_users.id,
       refereeEmail: kilocode_users.google_user_email,
       refereeName: kilocode_users.google_user_name,
-      touchId: impact_referral_touches.id,
-      touchProvider: impact_referral_touches.provider,
-      touchType: impact_referral_touches.touch_type,
-      landingPath: impact_referral_touches.landing_path,
-      rsCode: impact_referral_touches.rs_code,
-      imRef: impact_referral_touches.im_ref,
-      touchedAt: impact_referral_touches.touched_at,
-      expiresAt: impact_referral_touches.expires_at,
+      touchId: impact_attribution_touches.id,
+      touchProvider: impact_attribution_touches.provider,
+      touchType: impact_attribution_touches.touch_type,
+      landingPath: impact_attribution_touches.landing_path,
+      rsCode: impact_attribution_touches.rs_code,
+      imRef: impact_attribution_touches.im_ref,
+      touchedAt: impact_attribution_touches.touched_at,
+      expiresAt: impact_attribution_touches.expires_at,
     })
     .from(impact_referrals)
     .innerJoin(kilocode_users, eq(kilocode_users.id, impact_referrals.referee_user_id))
     .leftJoin(
-      impact_referral_touches,
-      eq(impact_referral_touches.id, impact_referrals.source_touch_id)
+      impact_attribution_touches,
+      eq(impact_attribution_touches.id, impact_referrals.source_touch_id)
     )
     .where(
       and(

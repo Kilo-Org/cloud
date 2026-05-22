@@ -55,7 +55,7 @@ import {
   agent_environment_profile_mcp_servers,
   agent_environment_profile_skills,
   deleted_user_email_tombstones,
-  impact_referral_touches,
+  impact_attribution_touches,
   impact_advocate_participants,
   impact_advocate_registration_attempts,
   impact_referrals,
@@ -112,7 +112,7 @@ describe('User', () => {
     await db.delete(user_auth_provider);
     await db.delete(user_affiliate_attributions);
     await db.delete(user_affiliate_events);
-    await db.delete(impact_referral_touches);
+    await db.delete(impact_attribution_touches);
     await db.delete(impact_advocate_registration_attempts);
     await db.delete(impact_advocate_participants);
     await db.delete(impact_conversion_reports);
@@ -641,7 +641,7 @@ describe('User', () => {
       const decisionId = randomUUID();
       const rewardId = randomUUID();
 
-      await db.insert(impact_referral_touches).values({
+      await db.insert(impact_attribution_touches).values({
         id: touchId,
         dedupe_key: 'touch-dedupe',
         user_id: user.id,
@@ -745,8 +745,8 @@ describe('User', () => {
 
       const [touchCount] = await db
         .select({ count: count() })
-        .from(impact_referral_touches)
-        .where(eq(impact_referral_touches.user_id, user.id));
+        .from(impact_attribution_touches)
+        .where(eq(impact_attribution_touches.user_id, user.id));
       expect(touchCount.count).toBe(0);
 
       const [participantCount] = await db

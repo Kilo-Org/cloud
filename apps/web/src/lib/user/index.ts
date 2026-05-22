@@ -67,7 +67,7 @@ import {
   contributor_champion_memberships,
   contributor_champion_contributors,
   credit_campaigns,
-  impact_referral_touches,
+  impact_attribution_touches,
   impact_advocate_participants,
   impact_referrals,
   impact_referral_conversions,
@@ -927,7 +927,9 @@ export async function softDeleteUser(userId: string) {
       .delete(user_affiliate_attributions)
       .where(eq(user_affiliate_attributions.user_id, userId));
     await tx.delete(user_affiliate_events).where(eq(user_affiliate_events.user_id, userId));
-    await tx.delete(impact_referral_touches).where(eq(impact_referral_touches.user_id, userId));
+    await tx
+      .delete(impact_attribution_touches)
+      .where(eq(impact_attribution_touches.user_id, userId));
     await tx
       .delete(impact_advocate_participants)
       .where(eq(impact_advocate_participants.user_id, userId));

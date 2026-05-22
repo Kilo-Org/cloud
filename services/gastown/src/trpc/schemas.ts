@@ -32,6 +32,13 @@ export const RigOutput = z.object({
 });
 
 // Bead (output shape, after transforms)
+export const FailureReasonOutput = z.object({
+  code: z.string(),
+  message: z.string(),
+  details: z.string().optional(),
+  source: z.string(),
+});
+
 export const BeadOutput = z.object({
   bead_id: z.string(),
   type: z.enum(['issue', 'message', 'escalation', 'merge_request', 'convoy', 'molecule', 'agent']),
@@ -48,6 +55,7 @@ export const BeadOutput = z.object({
   created_at: z.string(),
   updated_at: z.string(),
   closed_at: z.string().nullable(),
+  failure_reason: FailureReasonOutput.nullable().optional().default(null),
 });
 
 // Agent

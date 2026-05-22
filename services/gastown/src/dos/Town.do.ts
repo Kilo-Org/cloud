@@ -1185,8 +1185,16 @@ export class TownDO extends DurableObject<Env> {
     return beadOps.getBead(this.sql, beadId);
   }
 
+  async getBeadWithFailureReason(beadId: string): Promise<beadOps.BeadWithFailureReason | null> {
+    return beadOps.getBeadWithFailureReason(this.sql, beadId);
+  }
+
   async listBeads(filter: BeadFilter): Promise<Bead[]> {
     return beadOps.listBeads(this.sql, filter);
+  }
+
+  async listBeadsWithFailureReasons(filter: BeadFilter): Promise<beadOps.BeadWithFailureReason[]> {
+    return beadOps.listBeadsWithFailureReasons(this.sql, filter);
   }
 
   async updateBeadStatus(

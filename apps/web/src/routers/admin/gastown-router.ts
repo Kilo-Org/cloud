@@ -38,7 +38,7 @@ const UserRigRecord = z.object({
 const BeadRecord = z.object({
   bead_id: z.string(),
   type: z.enum(['issue', 'message', 'escalation', 'merge_request', 'convoy', 'molecule', 'agent']),
-  status: z.enum(['open', 'in_progress', 'closed', 'failed']),
+  status: z.enum(['open', 'in_progress', 'in_review', 'closed', 'failed']),
   title: z.string(),
   body: z.string().nullable(),
   rig_id: z.string().nullable(),
@@ -51,6 +51,16 @@ const BeadRecord = z.object({
   created_at: z.string(),
   updated_at: z.string(),
   closed_at: z.string().nullable(),
+  failure_reason: z
+    .object({
+      code: z.string(),
+      message: z.string(),
+      details: z.string().optional(),
+      source: z.string(),
+    })
+    .nullable()
+    .optional()
+    .default(null),
 });
 
 const AgentRecord = z.object({
@@ -506,7 +516,7 @@ export const adminGastownRouter = createTRPCRouter({
     .input(
       z.object({
         townId: z.string().uuid(),
-        status: z.enum(['open', 'in_progress', 'closed', 'failed']).optional(),
+        status: z.enum(['open', 'in_progress', 'in_review', 'closed', 'failed']).optional(),
         type: z
           .enum(['issue', 'message', 'escalation', 'merge_request', 'convoy', 'molecule', 'agent'])
           .optional(),

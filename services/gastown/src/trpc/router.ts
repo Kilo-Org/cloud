@@ -1784,7 +1784,7 @@ export const gastownRouter = router({
     .input(
       z.object({
         townId: z.string().uuid(),
-        status: z.enum(['open', 'in_progress', 'closed', 'failed']).optional(),
+        status: z.enum(['open', 'in_progress', 'in_review', 'closed', 'failed']).optional(),
         type: z
           .enum(['issue', 'message', 'escalation', 'merge_request', 'convoy', 'molecule', 'agent'])
           .optional(),
@@ -1794,7 +1794,7 @@ export const gastownRouter = router({
     .output(z.array(RpcBeadOutput))
     .query(async ({ ctx, input }) => {
       const townStub = getTownDOStub(ctx.env, input.townId);
-      return townStub.listBeads({
+      return townStub.listBeadsWithFailureReasons({
         status: input.status,
         type: input.type,
         limit: input.limit,
@@ -1837,11 +1837,14 @@ export const gastownRouter = router({
     .output(RpcBeadOutput)
     .mutation(async ({ ctx, input }) => {
       const townStub = getTownDOStub(ctx.env, input.townId);
-      return townStub.updateBeadStatus(input.beadId, 'failed', 'admin', {
+      await townStub.updateBeadStatus(input.beadId, 'failed', 'admin', {
         code: 'admin_force_fail',
         message: 'Manually failed by admin',
         source: 'admin',
       });
+      const bead = await townStub.getBeadWithFailureReason(input.beadId);
+      if (!bead) throw new TRPCError({ code: 'NOT_FOUND', message: 'Bead not found after update' });
+      return bead;
     }),
 
   adminGetAlarmStatus: adminProcedure
@@ -1876,7 +1879,7 @@ export const gastownRouter = router({
     .output(RpcBeadOutput.nullable())
     .query(async ({ ctx, input }) => {
       const townStub = getTownDOStub(ctx.env, input.townId);
-      return townStub.getBeadAsync(input.beadId);
+      return townStub.getBeadWithFailureReason(input.beadId);
     }),
 
   adminBulkDeleteBeads: adminProcedure

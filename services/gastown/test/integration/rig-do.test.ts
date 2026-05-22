@@ -49,6 +49,26 @@ describe('TownDO', () => {
       expect(result).toBeNull();
     });
 
+    it('should preserve failed bead reasons after later field updates', async () => {
+      const bead = await town.createBead({ type: 'issue', title: 'Failure reason test' });
+      const failureReason = {
+        code: 'test_failure',
+        message: 'The test failed',
+        details: 'regression coverage',
+        source: 'admin',
+      };
+
+      await town.updateBeadStatus(bead.bead_id, 'failed', 'system', failureReason);
+
+      for (let i = 0; i < 21; i++) {
+        await town.updateBead(bead.bead_id, { title: `Failure reason test ${i}` }, 'system');
+      }
+
+      const failedBead = await town.getBeadWithFailureReason(bead.bead_id);
+
+      expect(failedBead?.failure_reason).toEqual(failureReason);
+    });
+
     it('should list beads with filters', async () => {
       await town.createBead({ type: 'issue', title: 'Issue 1' });
       await town.createBead({ type: 'message', title: 'Message 1' });

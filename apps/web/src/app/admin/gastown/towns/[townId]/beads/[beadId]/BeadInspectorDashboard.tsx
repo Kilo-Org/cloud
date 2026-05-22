@@ -24,6 +24,7 @@ import { ArrowLeft } from 'lucide-react';
 const STATUS_COLORS: Record<string, string> = {
   open: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
   in_progress: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
+  in_review: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
   closed: 'bg-green-500/10 text-green-400 border-green-500/20',
   failed: 'bg-red-500/10 text-red-400 border-red-500/20',
 };
@@ -260,6 +261,28 @@ export function BeadInspectorDashboard({ townId, beadId }: { townId: string; bea
                       Title
                     </dt>
                     <dd>{bead.title}</dd>
+                  </div>
+                )}
+                {bead.status === 'failed' && (
+                  <div className="col-span-2 md:col-span-3">
+                    <dt className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+                      Failure Reason
+                    </dt>
+                    {bead.failure_reason ? (
+                      <dd className="mt-1 rounded-md border border-red-500/20 bg-red-500/5 p-3">
+                        <p className="text-sm text-red-200">{bead.failure_reason.message}</p>
+                        <p className="text-muted-foreground mt-1 font-mono text-xs">
+                          {bead.failure_reason.code} · {bead.failure_reason.source}
+                        </p>
+                        {bead.failure_reason.details && (
+                          <pre className="text-muted-foreground mt-2 max-h-48 overflow-auto whitespace-pre-wrap rounded bg-black/20 p-2 font-mono text-xs">
+                            {bead.failure_reason.details}
+                          </pre>
+                        )}
+                      </dd>
+                    ) : (
+                      <dd className="text-muted-foreground">No failure reason recorded.</dd>
+                    )}
                   </div>
                 )}
               </dl>

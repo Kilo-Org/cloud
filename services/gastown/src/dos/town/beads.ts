@@ -54,6 +54,17 @@ import type {
 import type { BeadEventType } from '../../db/tables/bead-events.table';
 import type { FailureReason } from './types';
 
+export type BeadWithFailureReason = Bead & { failure_reason: FailureReason | null };
+
+const FailureReasonMetadata = z.object({
+  failure_reason: z.object({
+    code: z.string(),
+    message: z.string(),
+    details: z.string().optional(),
+    source: z.string(),
+  }),
+});
+
 function generateId(): string {
   return crypto.randomUUID();
 }
@@ -261,6 +272,56 @@ export function listBeads(sql: SqlStorage, filter: BeadFilter): Bead[] {
   ];
 
   return BeadRecord.array().parse(rows);
+}
+
+function extractFailureReason(metadata: Record<string, unknown>): FailureReason | null {
+  const parsed = FailureReasonMetadata.safeParse(metadata);
+  return parsed.success ? parsed.data.failure_reason : null;
+}
+
+function failureReasonForBead(sql: SqlStorage, beadId: string): FailureReason | null {
+  const events = BeadEventRecord.pick({ metadata: true })
+    .array()
+    .parse([
+      ...query(
+        sql,
+        /* sql */ `
+          SELECT ${bead_events.metadata}
+          FROM ${bead_events}
+          WHERE ${bead_events.bead_id} = ?
+            AND ${bead_events.event_type} = 'status_changed'
+            AND ${bead_events.new_value} = 'failed'
+          ORDER BY ${bead_events.created_at} DESC
+          LIMIT 1
+        `,
+        [beadId]
+      ),
+    ]);
+
+  const event = events[0];
+  return event ? extractFailureReason(event.metadata) : null;
+}
+
+function attachFailureReason(sql: SqlStorage, bead: Bead): BeadWithFailureReason {
+  return {
+    ...bead,
+    failure_reason: bead.status === 'failed' ? failureReasonForBead(sql, bead.bead_id) : null,
+  };
+}
+
+export function getBeadWithFailureReason(
+  sql: SqlStorage,
+  beadId: string
+): BeadWithFailureReason | null {
+  const bead = getBead(sql, beadId);
+  return bead ? attachFailureReason(sql, bead) : null;
+}
+
+export function listBeadsWithFailureReasons(
+  sql: SqlStorage,
+  filter: BeadFilter
+): BeadWithFailureReason[] {
+  return listBeads(sql, filter).map(bead => attachFailureReason(sql, bead));
 }
 
 export function updateBeadStatus(

@@ -27,7 +27,7 @@ import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
 import { Trash2 } from 'lucide-react';
 
-const beadStatuses = ['open', 'in_progress', 'closed', 'failed'] as const;
+const beadStatuses = ['open', 'in_progress', 'in_review', 'closed', 'failed'] as const;
 type BeadStatus = (typeof beadStatuses)[number];
 
 const beadTypes = [
@@ -44,6 +44,7 @@ type BeadType = (typeof beadTypes)[number];
 const STATUS_COLORS: Record<BeadStatus, string> = {
   open: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
   in_progress: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
+  in_review: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
   closed: 'bg-green-500/10 text-green-400 border-green-500/20',
   failed: 'bg-red-500/10 text-red-400 border-red-500/20',
 };
@@ -239,6 +240,7 @@ export function BeadsTab({ townId }: { townId: string }) {
                 <SelectItem value="all">All statuses</SelectItem>
                 <SelectItem value="open">Open</SelectItem>
                 <SelectItem value="in_progress">In Progress</SelectItem>
+                <SelectItem value="in_review">In Review</SelectItem>
                 <SelectItem value="closed">Closed</SelectItem>
                 <SelectItem value="failed">Failed</SelectItem>
               </SelectContent>
@@ -321,6 +323,9 @@ export function BeadsTab({ townId }: { townId: string }) {
                   <th className="text-muted-foreground pb-2 text-left font-medium">Bead</th>
                   <th className="text-muted-foreground pb-2 text-left font-medium">Type</th>
                   <th className="text-muted-foreground pb-2 text-left font-medium">Status</th>
+                  <th className="text-muted-foreground pb-2 text-left font-medium">
+                    Failure Reason
+                  </th>
                   <th className="text-muted-foreground pb-2 text-left font-medium">Agent</th>
                   <th className="text-muted-foreground pb-2 text-left font-medium">Created</th>
                   <th className="text-muted-foreground pb-2 text-right font-medium">Actions</th>
@@ -352,6 +357,22 @@ export function BeadsTab({ townId }: { townId: string }) {
                       <Badge variant="outline" className={STATUS_COLORS[bead.status]}>
                         {bead.status}
                       </Badge>
+                    </td>
+                    <td className="py-2 pr-4">
+                      {bead.status === 'failed' && bead.failure_reason ? (
+                        <div className="max-w-72" title={bead.failure_reason.details}>
+                          <p className="truncate text-sm text-red-300">
+                            {bead.failure_reason.message}
+                          </p>
+                          <p className="text-muted-foreground font-mono text-xs">
+                            {bead.failure_reason.code} · {bead.failure_reason.source}
+                          </p>
+                        </div>
+                      ) : bead.status === 'failed' ? (
+                        <span className="text-muted-foreground text-xs">No reason recorded</span>
+                      ) : (
+                        <span className="text-muted-foreground text-xs">—</span>
+                      )}
                     </td>
                     <td className="py-2 pr-4">
                       {bead.assignee_agent_bead_id ? (

@@ -739,7 +739,7 @@ async function applyReferralRewardById(
         // Mirror the conversion-time invariant: a Referrer reward that lands
         // in Pending because the referrer is no longer on an eligible paid
         // personal subscription MUST carry the 12-month expiry from earned_at
-        // (see .specs/kiloclaw-referrals.md rule 66). Without this back-fill,
+        // (see .specs/impact-referrals.md KiloClaw product rules). Without this back-fill,
         // a reward earned during a brief eligible window and then orphaned
         // when the referrer churns would have expires_at = NULL forever.
         const shouldBackfillExpiresAt =

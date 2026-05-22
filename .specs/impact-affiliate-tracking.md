@@ -82,10 +82,10 @@ Price-versioned KiloClaw billing does not change affiliate eligibility, attribut
 triggers. SALE amounts continue to use the monetized amount reported by KiloClaw billing. Product reporting values must
 stay stable enough to distinguish KiloClaw plan family and Kilo Pass tier/cadence without relying on invoice display text.
 
-For KiloClaw conversions also governed by `.specs/kiloclaw-referrals.md`, that referral spec's conversion-time
-referral-priority rules override this document's default first-touch affiliate behavior for the initial paid conversion
-decision. This document remains authoritative for affiliate event eligibility, delivery sequencing, and affiliate
-renewal reporting after the winning attribution is established.
+For conversions also governed by `.specs/impact-referrals.md`, that referral spec's conversion-time referral-priority
+rules override this document's default first-touch affiliate behavior for the initial paid conversion decision. This
+document remains authoritative for affiliate event eligibility, delivery sequencing, and affiliate renewal reporting
+after the winning attribution is established.
 
 ## Rules
 

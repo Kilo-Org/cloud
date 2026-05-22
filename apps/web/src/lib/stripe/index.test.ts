@@ -75,8 +75,8 @@ import {
   user_affiliate_events,
 } from '@kilocode/db/schema';
 import { db, auto_deleted_at } from '@/lib/drizzle';
-import { insertTestUser } from './helpers/user.helper';
-import { createTestPaymentMethod } from './helpers/payment-method.helper';
+import { insertTestUser } from '@/tests/helpers/user.helper';
+import { createTestPaymentMethod } from '@/tests/helpers/payment-method.helper';
 import { eq, and, count } from 'drizzle-orm';
 import type Stripe from 'stripe';
 import { createOrganization } from '@/lib/organizations/organizations';

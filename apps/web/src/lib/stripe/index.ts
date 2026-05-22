@@ -1,7 +1,7 @@
 import { getEnvVariable } from '@/lib/dotenvx';
 import 'server-only'; // This file imports the database and can therefore only be used on the server side.
 import Stripe from 'stripe';
-import { client } from './stripe-client';
+import { client } from '@/lib/stripe-client';
 import { captureException } from '@sentry/nextjs';
 import { db, auto_deleted_at } from '@/lib/drizzle';
 import type { User, PaymentMethod, Organization } from '@kilocode/db/schema';
@@ -15,16 +15,16 @@ import {
 } from '@kilocode/db/schema';
 import { and, eq, inArray, isNull, ne, not, or, sql } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
-import type { FraudDetectionHeaders } from './utils';
-import { EmptyFraudDetectionHeaders, toNonNullish } from './utils';
+import type { FraudDetectionHeaders } from '@/lib/utils';
+import { EmptyFraudDetectionHeaders, toNonNullish } from '@/lib/utils';
 import { logExceptInTest, sentryLogger, warnExceptInTest } from '@/lib/utils.server';
-import { APP_URL } from './constants';
+import { APP_URL } from '@/lib/constants';
 import {
   AUTO_TOP_UP_THRESHOLD_DOLLARS,
   DEFAULT_ORG_AUTO_TOP_UP_AMOUNT_CENTS,
   SYSTEM_AUTO_TOP_UP_USER_ID,
-} from './autoTopUpConstants';
-import { findUserByStripeCustomerId } from './user';
+} from '@/lib/autoTopUpConstants';
+import { findUserByStripeCustomerId } from '@/lib/user';
 import type { UnifiedInvoice } from '@/types/billing';
 import type { StripeConfig } from '@/lib/credits';
 import { processTopUp } from '@/lib/credits';

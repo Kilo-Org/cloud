@@ -7,7 +7,7 @@ import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
-const PLATFORM_FILTERS = ['cloud-agent', 'extension', 'cli', 'slack', 'other'] as const;
+const PLATFORM_FILTERS = ['cloud-agent', 'extension', 'gastown', 'cli', 'slack', 'other'] as const;
 const chipScrollContentStyle = { paddingHorizontal: 22, paddingVertical: 8, gap: 8 };
 
 export type ProjectFilterOption = {
@@ -56,6 +56,9 @@ function platformFilterLabel(p: string): string {
     }
     case 'other': {
       return 'Other';
+    }
+    case 'gastown': {
+      return 'Gastown';
     }
     default: {
       return p;

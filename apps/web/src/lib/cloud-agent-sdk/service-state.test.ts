@@ -1269,7 +1269,7 @@ describe('createServiceState', () => {
       expect(cb).toHaveBeenCalledTimes(2);
     });
 
-    it('cloud.message.failed with reason=exhausted records failure with attempts', () => {
+    it('cloud.message.failed with reason=exhausted clears pending entry', () => {
       const state = createServiceState(makeConfig());
 
       state.process({ type: 'cloud.message.queued', messageId: 'm1' });
@@ -1281,50 +1281,51 @@ describe('createServiceState', () => {
         attempts: 5,
       });
 
-      expect(state.getPendingMessages().get('m1')).toEqual({
-        status: 'failed',
+      expect(state.getPendingMessages().has('m1')).toBe(false);
+    });
+
+    it('cloud.message.failed with reason=interrupted clears pending entry', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({ type: 'cloud.message.queued', messageId: 'm1' });
+      state.process({
+        type: 'cloud.message.failed',
+        messageId: 'm1',
+        error: 'Pending queued message interrupted by user',
+        reason: 'interrupted',
+      });
+
+      expect(state.getPendingMessages().has('m1')).toBe(false);
+    });
+
+    it('cloud.message.failed with reason=execution clears pending entry', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({ type: 'cloud.message.queued', messageId: 'm1' });
+      state.process({
+        type: 'cloud.message.failed',
+        messageId: 'm1',
+        error: 'boom',
+        reason: 'execution',
+      });
+
+      expect(state.getPendingMessages().has('m1')).toBe(false);
+    });
+
+    it('cloud.message.queued can repopulate an entry after a failed event', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({ type: 'cloud.message.queued', messageId: 'm1' });
+      state.process({
+        type: 'cloud.message.failed',
+        messageId: 'm1',
         error: 'flush failed',
         reason: 'exhausted',
         attempts: 5,
       });
-    });
-
-    it('cloud.message.failed with reason=interrupted records failure', () => {
-      const state = createServiceState(makeConfig());
-
       state.process({ type: 'cloud.message.queued', messageId: 'm1' });
-      state.process({
-        type: 'cloud.message.failed',
-        messageId: 'm1',
-        error: 'Pending queued message interrupted by user',
-        reason: 'interrupted',
-      });
 
-      expect(state.getPendingMessages().get('m1')).toEqual({
-        status: 'failed',
-        error: 'Pending queued message interrupted by user',
-        reason: 'interrupted',
-        attempts: undefined,
-      });
-    });
-
-    it('cloud.message.failed with reason=execution records failure', () => {
-      const state = createServiceState(makeConfig());
-
-      state.process({ type: 'cloud.message.queued', messageId: 'm1' });
-      state.process({
-        type: 'cloud.message.failed',
-        messageId: 'm1',
-        error: 'boom',
-        reason: 'execution',
-      });
-
-      expect(state.getPendingMessages().get('m1')).toEqual({
-        status: 'failed',
-        error: 'boom',
-        reason: 'execution',
-        attempts: undefined,
-      });
+      expect(state.getPendingMessages().get('m1')).toEqual({ status: 'queued' });
     });
 
     it('notifies subscribers on failed', () => {

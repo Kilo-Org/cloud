@@ -34,8 +34,12 @@ type MessageEvent = {
 const WRAPPER_RUN_ID = 'wr_supervisor';
 const WRAPPER_CONNECTION_ID = 'conn_supervisor';
 const MESSAGE_ID = 'msg_018f1e2d3c4bSupvMsgAbCdEfG';
+const NEWER_MESSAGE_ID = 'msg_018f1e2d3c4bNewerMsgAbCdEF';
 
-function createMemoryStorage(initialEntries?: Array<[string, unknown]>): MemoryStorage {
+function createMemoryStorage(
+  initialEntries?: Array<[string, unknown]>,
+  options?: { beforeList?: (prefix: string) => Promise<void> }
+): MemoryStorage {
   const store = new Map(initialEntries ?? []);
   return {
     async get<T = unknown>(key: string): Promise<T | undefined> {
@@ -50,6 +54,7 @@ function createMemoryStorage(initialEntries?: Array<[string, unknown]>): MemoryS
       }
     },
     async list<T = unknown>({ prefix }: { prefix: string }): Promise<Map<string, T>> {
+      await options?.beforeList?.(prefix);
       return new Map(
         Array.from(store.entries()).filter(([key]) => key.startsWith(prefix)) as Array<[string, T]>
       );
@@ -92,9 +97,10 @@ function createHarness(
     getExecution?: (
       executionId: ExecutionMetadata['executionId']
     ) => Promise<ExecutionMetadata | null>;
+    storageHooks?: { beforeList?: (prefix: string) => Promise<void> };
   }
 ) {
-  const storage = createMemoryStorage(initialEntries);
+  const storage = createMemoryStorage(initialEntries, options?.storageHooks);
   const events: MessageEvent[] = [];
   const callbackJobs: CallbackJob[] = [];
   const sentPings: string[] = [];
@@ -298,6 +304,126 @@ describe('WrapperSupervisor', () => {
     expect(harness.callbackJobs[0].payload.gateResult).toBeUndefined();
   });
 
+  it('releases a gate-waiting callback when disconnect grace expires after wrapper generation changed', async () => {
+    const harness = createHarness(
+      [
+        liveRuntimeState({ wrapperGeneration: 5, wrapperConnectionId: 'conn_new_generation' }),
+        [
+          'disconnect_grace',
+          {
+            wrapperRunId: WRAPPER_RUN_ID,
+            disconnectedAt: 1_000,
+            wsCloseCode: 1006,
+            wsCloseReason: 'socket closed before wrapper terminal',
+            wrapperGeneration: 4,
+            wrapperConnectionId: WRAPPER_CONNECTION_ID,
+          },
+        ],
+      ],
+      {
+        metadata: {
+          ...createMetadata(),
+          finalization: { gateThreshold: 'warning' },
+        },
+      }
+    );
+    await putSessionMessageState(harness.storage, {
+      ...acceptedMessage(),
+      callbackRequired: true,
+      callbackTarget: { url: 'https://example.com/stale-generation-release' },
+    });
+    await harness.settlementOutbox.terminalizeSessionMessageOnce(MESSAGE_ID, {
+      kind: 'completed',
+      completionSource: 'assistant_message_event',
+    });
+
+    await harness.supervisor.runMaintenance(11_001);
+
+    expect(harness.callbackJobs).toHaveLength(1);
+    expect(harness.callbackJobs[0].payload).toMatchObject({
+      messageId: MESSAGE_ID,
+      status: 'completed',
+    });
+    await expect(harness.storage.get('disconnect_grace')).resolves.toBeUndefined();
+  });
+
+  it('does not release a newer wrapper run gate callback for stale disconnect grace', async () => {
+    const oldWrapperRunId = 'wr_stale_grace';
+    const newerWrapperRunId = 'wr_newer_gate_wait';
+    const harness = createHarness(
+      [
+        liveRuntimeState({
+          wrapperRunId: newerWrapperRunId,
+          wrapperGeneration: 5,
+          wrapperConnectionId: 'conn_new_generation',
+        }),
+        [
+          'disconnect_grace',
+          {
+            wrapperRunId: oldWrapperRunId,
+            disconnectedAt: 1_000,
+            wsCloseCode: 1006,
+            wsCloseReason: 'old socket closed before wrapper terminal',
+            wrapperGeneration: 4,
+            wrapperConnectionId: WRAPPER_CONNECTION_ID,
+          },
+        ],
+      ],
+      {
+        metadata: {
+          ...createMetadata(),
+          finalization: { gateThreshold: 'warning' },
+        },
+      }
+    );
+    await putSessionMessageState(harness.storage, {
+      ...acceptedMessage(NEWER_MESSAGE_ID),
+      wrapperRunId: newerWrapperRunId,
+      callbackRequired: true,
+      callbackTarget: { url: 'https://example.com/newer-gate-wait' },
+    });
+    await harness.settlementOutbox.terminalizeSessionMessageOnce(NEWER_MESSAGE_ID, {
+      kind: 'completed',
+      completionSource: 'assistant_message_event',
+    });
+
+    await harness.supervisor.runMaintenance(11_001);
+
+    expect(harness.callbackJobs).toHaveLength(0);
+    await expect(harness.settlementOutbox.isWaitingForWrapperTerminalGateResult()).resolves.toBe(
+      true
+    );
+    await expect(harness.storage.get('disconnect_grace')).resolves.toBeUndefined();
+  });
+
+  it('increments the wrapper generation when disconnect grace fails accepted messages', async () => {
+    const harness = createHarness([liveRuntimeState()]);
+    await putSessionMessageState(harness.storage, acceptedMessage());
+    await harness.supervisor.onDisconnected({
+      disconnected: {
+        wrapperRunId: WRAPPER_RUN_ID,
+        wrapperGeneration: 4,
+        wrapperConnectionId: WRAPPER_CONNECTION_ID,
+      },
+      wsCloseCode: 1006,
+      wsCloseReason: 'socket closed',
+    });
+
+    const grace = await harness.storage.get<{ disconnectedAt: number }>('disconnect_grace');
+    if (!grace) throw new Error('Expected disconnect grace to be persisted');
+    await harness.supervisor.runMaintenance(grace.disconnectedAt + 10_001);
+
+    await expect(getSessionMessageState(harness.storage, MESSAGE_ID)).resolves.toMatchObject({
+      status: 'failed',
+      failureReason: 'wrapper_disconnected',
+      completionSource: 'wrapper_failure',
+    });
+    await expect(getWrapperRuntimeState(harness.storage)).resolves.toMatchObject({
+      wrapperGeneration: 5,
+    });
+    expect(harness.stops).toEqual(['unhealthy-wrapper']);
+  });
+
   it('rejects a stale wrapper run before reconnect grace can be cancelled', async () => {
     const harness = createHarness([
       liveRuntimeState(),
@@ -362,6 +488,47 @@ describe('WrapperSupervisor', () => {
       failureReason: 'missing_assistant_reply',
       error: 'No assistant reply found after idle timeout',
       completionSource: 'idle_reconciliation',
+    });
+  });
+
+  it('does not clear idle reconciliation fields after wrapper identity changes', async () => {
+    let replacedRuntimeState = false;
+    let storageForHook: MemoryStorage | undefined;
+    const harness = createHarness(
+      [
+        liveRuntimeState({
+          lastWrapperIdleAt: 1_000,
+          idleReconcileAfter: 9_000,
+          wrapperIdleDeadlineAt: 50_000,
+        }),
+      ],
+      {
+        storageHooks: {
+          beforeList: async prefix => {
+            if (replacedRuntimeState || !prefix.startsWith('session_message:')) return;
+            replacedRuntimeState = true;
+            await storageForHook?.put('wrapper_runtime_state', {
+              wrapperGeneration: 5,
+              wrapperConnectionId: 'conn_replacement',
+              wrapperRunId: WRAPPER_RUN_ID,
+              lastWrapperIdleAt: 2_000,
+              idleReconcileAfter: 12_000,
+              wrapperIdleDeadlineAt: 60_000,
+            });
+          },
+        },
+      }
+    );
+    storageForHook = harness.storage;
+
+    await harness.supervisor.runMaintenance(10_000);
+
+    await expect(getWrapperRuntimeState(harness.storage)).resolves.toMatchObject({
+      wrapperGeneration: 5,
+      wrapperConnectionId: 'conn_replacement',
+      lastWrapperIdleAt: 2_000,
+      idleReconcileAfter: 12_000,
+      wrapperIdleDeadlineAt: 60_000,
     });
   });
 

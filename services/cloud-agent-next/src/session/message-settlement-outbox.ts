@@ -58,6 +58,7 @@ export type MessageSettlementOutbox = {
   ): Promise<{ changed: boolean; state: SessionMessageState | null }>;
   observeWrapperTerminalForIdleBatch(gateResult?: 'pass' | 'fail'): Promise<void>;
   releaseWrapperTerminalWaitForIdleBatch(): Promise<void>;
+  releaseWrapperTerminalWaitForIdleBatchForWrapperRun(wrapperRunId: string): Promise<boolean>;
   isWaitingForWrapperTerminalGateResult(): Promise<boolean>;
   finalizeIdleBatchCallbackIfReady(options?: FinalizeIdleBatchCallbackOptions): Promise<void>;
   retryPendingCallbacks(now: number): Promise<void>;
@@ -199,12 +200,31 @@ export function createMessageSettlementOutbox(
     const batch = await getCurrentIdleBatchCallbackState();
     if (!batch) return;
 
+    await releaseWrapperTerminalWaitForIdleBatchState(batch);
+  }
+
+  async function releaseWrapperTerminalWaitForIdleBatchState(
+    batch: IdleBatchCallbackState
+  ): Promise<void> {
     const now = Date.now();
     await storage.put(idleBatchCallbackKey(batch.batchId), {
       ...batch,
       wrapperTerminalWaitReleasedAt: now,
       updatedAt: now,
     } satisfies IdleBatchCallbackState);
+  }
+
+  async function releaseWrapperTerminalWaitForIdleBatchForWrapperRun(
+    wrapperRunId: string
+  ): Promise<boolean> {
+    const batch = await getCurrentIdleBatchCallbackState();
+    if (!batch?.representativeMessageId) return false;
+
+    const representative = await getSessionMessageState(storage, batch.representativeMessageId);
+    if (representative?.wrapperRunId !== wrapperRunId) return false;
+
+    await releaseWrapperTerminalWaitForIdleBatchState(batch);
+    return true;
   }
 
   async function isWaitingForWrapperTerminalGateResult(): Promise<boolean> {
@@ -279,11 +299,13 @@ export function createMessageSettlementOutbox(
 
     if (!state.callbackTarget || !callbackQueue) {
       if (state.callbackRequired) {
+        const retryAt = Date.now() + CALLBACK_ENQUEUE_RETRY_DELAY_MS;
         const error = !state.callbackTarget
           ? 'Missing callback target'
           : 'Callback queue not available';
         state.callbackLastError = error;
         state.callbackAttempts = (state.callbackAttempts ?? 0) + 1;
+        state.callbackRetryAt = retryAt;
         await putSessionMessageState(storage, state);
         logger
           .withFields({
@@ -292,7 +314,7 @@ export function createMessageSettlementOutbox(
             error,
           })
           .error('Cannot enqueue message callback job');
-        await requestAlarmAtOrBefore(Date.now() + CALLBACK_ENQUEUE_RETRY_DELAY_MS);
+        await requestAlarmAtOrBefore(retryAt);
       }
       return;
     }
@@ -502,6 +524,7 @@ export function createMessageSettlementOutbox(
     terminalizeSessionMessageOnce,
     observeWrapperTerminalForIdleBatch,
     releaseWrapperTerminalWaitForIdleBatch,
+    releaseWrapperTerminalWaitForIdleBatchForWrapperRun,
     isWaitingForWrapperTerminalGateResult,
     finalizeIdleBatchCallbackIfReady,
     retryPendingCallbacks,

@@ -282,6 +282,7 @@ export async function bindSessionContext(
     if (state.isConnected) {
       await deps.closeConnection();
     }
+    deps.resetLifecycle();
   }
   return null;
 }

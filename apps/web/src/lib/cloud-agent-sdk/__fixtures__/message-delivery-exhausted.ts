@@ -6,7 +6,7 @@ const { createEvent } = createEventHelpers();
 const messageDeliveryExhausted: Fixture = {
   name: 'message-delivery-exhausted',
   description:
-    'cloud.message.queued followed by cloud.message.failed with reason=exhausted surfaces a failed delivery state',
+    'cloud.message.queued followed by cloud.message.failed with reason=exhausted clears pending delivery state',
   events: [
     createEvent('cloud.message.queued', {
       messageId: 'msg-queued-1',
@@ -25,14 +25,7 @@ const messageDeliveryExhausted: Fixture = {
   expected: {
     messageIds: [],
     parts: {},
-    pendingMessages: {
-      'msg-queued-1': {
-        status: 'failed',
-        error: 'Failed to flush queued message after 5 attempts',
-        reason: 'exhausted',
-        attempts: 5,
-      },
-    },
+    pendingMessages: {},
   },
 };
 

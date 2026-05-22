@@ -288,7 +288,7 @@ export function createMobileAgentSessionManager({
         isPreparingAsync: Boolean(rs && !rs.preparedAt),
         prompt: rs?.prompt ?? null,
         initialMessageId: rs?.initialMessageId ?? null,
-        associatedPr: null,
+        associatedPr: sessionResult.associatedPr,
         runtimeAgents: rs?.runtimeAgents,
       };
     },

@@ -37,10 +37,12 @@ type QueueEvent = {
 type Terminalization = {
   messageId: string;
   params: TerminalizeParams;
+  options?: { allowIdleBatchWithoutObservedIdle?: boolean };
 };
 
 function createMemoryStorage(
-  initialEntries?: Array<[string, unknown]>
+  initialEntries?: Array<[string, unknown]>,
+  options?: { failPutPrefix?: string }
 ): SessionMessageQueueStorage {
   const store = new Map(initialEntries ?? []);
   return {
@@ -48,6 +50,9 @@ function createMemoryStorage(
       return store.get(key) as T | undefined;
     },
     async put(key, value) {
+      if (options?.failPutPrefix && key.startsWith(options.failPutPrefix)) {
+        throw new Error(`failed to put ${options.failPutPrefix}`);
+      }
       store.set(key, value);
     },
     async delete(keys) {
@@ -109,8 +114,9 @@ function createContext(metadata = createMetadata()): ExecutionDeliveryContext {
 function createQueueHarness(options?: {
   metadata?: SessionMetadata | null;
   deliver?: (plan: MessageDeliveryPlan) => Promise<QueueSessionMessageResult>;
+  storage?: SessionMessageQueueStorage;
 }) {
-  const storage = createMemoryStorage();
+  const storage = options?.storage ?? createMemoryStorage();
   const events: QueueEvent[] = [];
   const alarmDeadlines: number[] = [];
   const terminalizations: Terminalization[] = [];
@@ -145,8 +151,8 @@ function createQueueHarness(options?: {
       insertAndBroadcastMessageEvent: event => {
         events.push(event);
       },
-      terminalizeSessionMessageOnce: async (messageId, params) => {
-        terminalizations.push({ messageId, params });
+      terminalizeSessionMessageOnce: async (messageId, params, options) => {
+        terminalizations.push({ messageId, params, options });
       },
       requestAlarmAtOrBefore: async deadline => {
         alarmDeadlines.push(deadline);
@@ -341,10 +347,45 @@ describe('flushNextPendingSessionMessage', () => {
     expect(result).toMatchObject({
       type: 'failure',
       exhausted: true,
-      remainingCount: 0,
+      remainingCount: 1,
       nextFlushAttemptAt: undefined,
     });
-    expect((await storage.list({ prefix: 'pending_message:' })).size).toBe(0);
+    expect((await storage.list({ prefix: 'pending_message:' })).size).toBe(1);
+  });
+
+  it('terminalizes mode validation failures without consuming retry budget', async () => {
+    const storage = createMemoryStorage();
+    const message = createPendingSessionMessage({
+      messageId: 'msg_018f1e2d3c4bAAAAAAAAAAAAAA',
+      role: 'user',
+      content: 'queued prompt',
+      createdAt: 1,
+      executionOptions: { mode: 'bad-mode', model: 'queued-model' },
+    });
+    await storePendingSessionMessage(storage, message);
+    const deliver = vi.fn<(_plan: MessageDeliveryPlan) => Promise<QueueSessionMessageResult>>();
+
+    const result = await flushNextPendingSessionMessage({
+      storage,
+      now: 10,
+      drainPolicy: 'ensure-wrapper',
+      hasCurrentRuntimeExecution: async () => false,
+      getDeliveryContext: async () => createContext(),
+      validateModeAgainstRuntimeAgents: () => 'Unknown runtime mode bad-mode',
+      deliver,
+    });
+
+    expect(result).toMatchObject({
+      type: 'failure',
+      exhausted: true,
+      nextFlushAttemptAt: undefined,
+      remainingCount: 1,
+    });
+    if (result.type !== 'failure') return;
+    expect(result.attempts).toBe(1);
+    expect(result.message.lastFlushError).toBe('Unknown runtime mode bad-mode');
+    expect(deliver).not.toHaveBeenCalled();
+    expect(await listPendingSessionMessages(storage)).toHaveLength(1);
   });
 });
 
@@ -431,6 +472,70 @@ describe('SessionMessageQueue', () => {
     expect(harness.events).toHaveLength(0);
   });
 
+  it('persists the pending intent before queued state admission', async () => {
+    const storage = createMemoryStorage(undefined, { failPutPrefix: 'session_message:' });
+    const harness = createQueueHarness({ storage });
+
+    const result = await harness.queue.enqueue({
+      kind: 'user-message',
+      userId: 'user_test' as UserId,
+      turn: { type: 'prompt', id: FIRST_MESSAGE_ID, prompt: 'survive state write failure' },
+    });
+
+    expect(result).toMatchObject({ success: false, code: 'INTERNAL' });
+    expect((await listPendingSessionMessages(storage)).map(message => message.messageId)).toEqual([
+      FIRST_MESSAGE_ID,
+    ]);
+    expect(harness.events).toHaveLength(0);
+  });
+
+  it('repairs missing queued state from a pending callback-enabled message on retry', async () => {
+    const callbackTarget = {
+      url: 'https://callback.example.com/session',
+      headers: { 'x-callback-id': 'callback-1' },
+    };
+    const harness = createQueueHarness({
+      metadata: createMetadata({ callback: { target: callbackTarget } }),
+    });
+    await storePendingSessionMessage(
+      harness.storage,
+      createPendingSessionMessage({
+        messageId: FIRST_MESSAGE_ID,
+        role: 'user',
+        content: 'survived without queued state',
+        createdAt: 123,
+        callbackSnapshot: { required: true, target: callbackTarget },
+        executionOptions: { mode: 'plan', model: 'queued-model', variant: 'beta' },
+      })
+    );
+
+    const result = await harness.queue.enqueue({
+      kind: 'user-message',
+      userId: 'user_test' as UserId,
+      turn: { type: 'prompt', id: FIRST_MESSAGE_ID, prompt: 'survived without queued state' },
+    });
+
+    const repairedState = await getSessionMessageState(harness.storage, FIRST_MESSAGE_ID);
+    expect(result).toEqual({
+      success: true,
+      status: 'started',
+      messageId: FIRST_MESSAGE_ID,
+      delivery: 'queued',
+    });
+    expect(repairedState).toMatchObject({
+      messageId: FIRST_MESSAGE_ID,
+      status: 'queued',
+      prompt: 'survived without queued state',
+      createdAt: 123,
+      queuedAt: 123,
+      callbackRequired: true,
+      callbackTarget,
+      agent: { mode: 'plan', model: 'queued-model', variant: 'beta' },
+    });
+    expect(harness.events).toHaveLength(0);
+    expect(harness.alarmDeadlines).toHaveLength(0);
+  });
+
   it('hands exhausted queued delivery to settlement terminalization', async () => {
     const harness = createQueueHarness({
       deliver: async () => ({ success: false, code: 'BAD_REQUEST', error: 'invalid queued turn' }),
@@ -454,8 +559,10 @@ describe('SessionMessageQueue', () => {
           completionSource: 'delivery_failure',
           attempts: 1,
         },
+        options: { allowIdleBatchWithoutObservedIdle: true },
       },
     ]);
+    expect(await listPendingSessionMessages(harness.storage)).toHaveLength(0);
   });
 
   it('builds reconnect snapshots for pending and never-accepted terminal queued messages', async () => {
@@ -553,6 +660,7 @@ describe('SessionMessageQueue', () => {
           error: 'Pending queued message interrupted by user',
           completionSource: 'interrupt',
         },
+        options: { allowIdleBatchWithoutObservedIdle: true },
       },
       {
         messageId: SECOND_MESSAGE_ID,
@@ -561,6 +669,36 @@ describe('SessionMessageQueue', () => {
           error: 'Pending queued message interrupted by user',
           completionSource: 'interrupt',
         },
+        options: { allowIdleBatchWithoutObservedIdle: true },
+      },
+    ]);
+  });
+
+  it('terminalizes interrupted callback-required queued messages as idle-batch eligible', async () => {
+    const harness = createQueueHarness({
+      metadata: createMetadata({
+        callback: {
+          target: { url: 'https://callback.example.com/session' },
+        },
+      }),
+    });
+    await harness.queue.enqueue({
+      kind: 'user-message',
+      userId: 'user_test' as UserId,
+      turn: { type: 'prompt', id: FIRST_MESSAGE_ID, prompt: 'callback queued prompt' },
+    });
+
+    await harness.queue.interruptPendingQueuedMessages();
+
+    expect(harness.terminalizations).toEqual([
+      {
+        messageId: FIRST_MESSAGE_ID,
+        params: {
+          kind: 'interrupted',
+          error: 'Pending queued message interrupted by user',
+          completionSource: 'interrupt',
+        },
+        options: { allowIdleBatchWithoutObservedIdle: true },
       },
     ]);
   });

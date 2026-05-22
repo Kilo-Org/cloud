@@ -287,6 +287,7 @@ export function createLifecycleManager(
           if (state.isActive) {
             logToFile(`drain aborted — wrapper became active again during drain`);
             isDraining = false;
+            isAborted = false;
             drainTimeout = null;
             return;
           }

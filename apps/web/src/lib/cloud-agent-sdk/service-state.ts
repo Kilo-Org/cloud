@@ -319,7 +319,7 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
       reason: event.reason,
       attempts: event.attempts,
     };
-    pendingMessages.set(event.messageId, deliveryState);
+    pendingMessages.delete(event.messageId);
     config.onMessageFailed?.(event.messageId, deliveryState);
     notify();
   }

@@ -133,7 +133,7 @@ function toFailureResult(
   return {
     type: 'failure',
     ...failure,
-    remainingCount: failure.exhausted ? totalCount - 1 : totalCount,
+    remainingCount: totalCount,
   };
 }
 
@@ -160,7 +160,7 @@ function buildMessageDeliveryPlan(
   const modeInput = intent.agent.mode;
   const modeCheck = validateModeAgainstRuntimeAgents(context.metadata, modeInput);
   if (modeCheck) {
-    throw new Error(modeCheck);
+    throw new MessageDeliveryPlanValidationError(modeCheck);
   }
 
   const model = normalizeKilocodeModel(intent.agent.model);
@@ -189,6 +189,15 @@ function buildMessageDeliveryPlan(
       kiloSessionId: context.kiloSessionId,
     },
   } satisfies MessageDeliveryPlan;
+}
+
+class MessageDeliveryPlanValidationError extends Error {
+  readonly code = 'BAD_REQUEST' as const;
+
+  constructor(message: string) {
+    super(message);
+    this.name = 'MessageDeliveryPlanValidationError';
+  }
 }
 
 export async function flushNextPendingSessionMessage(params: {
@@ -273,7 +282,12 @@ export async function flushNextPendingSessionMessage(params: {
     if (error instanceof PendingFlushRecordedError) {
       return toFailureResult(error.failure, totalCount);
     }
-    const code = isSandboxWorkspaceProbeTimeoutError(error) ? 'INTERNAL' : undefined;
+    const code =
+      error instanceof MessageDeliveryPlanValidationError
+        ? error.code
+        : isSandboxWorkspaceProbeTimeoutError(error)
+          ? 'INTERNAL'
+          : undefined;
     const failure = await recordPendingFlushFailure(
       params.storage,
       message,
@@ -394,6 +408,7 @@ export function createSessionMessageQueue(
 
     const existingMessage = await getQueuedMessageByMessageId(storage, messageId);
     if (existingMessage) {
+      await repairMissingQueuedStateFromPendingMessage(existingMessage);
       return buildStartResult(existingMessage.messageId, 'queued');
     }
 
@@ -402,6 +417,36 @@ export function createSessionMessageQueue(
     }
 
     return undefined;
+  }
+
+  async function repairMissingQueuedStateFromPendingMessage(
+    message: PendingSessionMessage
+  ): Promise<void> {
+    const metadata = await getMetadata();
+    const intent = resolvePendingSessionMessageIntent(message, {
+      mode: metadata?.agent?.mode,
+      model: metadata?.agent?.model,
+      variant: metadata?.agent?.variant,
+      autoCommit: metadata?.finalization?.autoCommit,
+      condenseOnComplete: metadata?.finalization?.condenseOnComplete,
+    } satisfies PendingSessionExecutionDefaults);
+
+    if (!intent) {
+      logger
+        .withFields({ sessionId: getSessionIdForLogs(), messageId: message.messageId })
+        .warn('Pending queued message is missing enough state to repair message state');
+      return;
+    }
+
+    const callbackSnapshot =
+      message.callbackSnapshot ??
+      (metadata?.callback?.target
+        ? { required: true, target: metadata.callback.target }
+        : undefined);
+    await putSessionMessageState(
+      storage,
+      createQueuedSessionMessageState(intent, callbackSnapshot, message.createdAt)
+    );
   }
 
   async function admitIntent(intent: SessionMessageIntent): Promise<QueueSessionMessageResult> {
@@ -418,9 +463,9 @@ export function createSessionMessageQueue(
       ? { required: true, target: callbackTarget }
       : undefined;
 
+    await enqueuePendingSessionMessageIntent(storage, intent, Date.now(), callbackSnapshot);
     const messageState = createQueuedSessionMessageState(intent, callbackSnapshot);
     await putSessionMessageState(storage, messageState);
-    await enqueuePendingSessionMessageIntent(storage, intent, Date.now());
 
     const sessionId = await requireSessionId();
     insertAndBroadcastMessageEvent({
@@ -550,7 +595,7 @@ export function createSessionMessageQueue(
             requestedFinalization?.condenseOnComplete ?? metadata.finalization?.condenseOnComplete,
         },
       };
-      return admitIntent(intent);
+      return await admitIntent(intent);
     } catch (error) {
       if (isExecutionError(error)) {
         if (error.retryable) {
@@ -631,6 +676,11 @@ export function createSessionMessageQueue(
         },
         { allowIdleBatchWithoutObservedIdle: true }
       );
+      await deletePendingSessionMessageByMessageId(storage, flushResult.message.messageId);
+      return {
+        retryAt: undefined,
+        remainingPendingCount: Math.max(0, flushResult.remainingCount - 1),
+      };
     }
     return {
       retryAt: flushResult.nextFlushAttemptAt,
@@ -675,11 +725,15 @@ export function createSessionMessageQueue(
       await afterClear(clearedMessages);
     }
     for (const message of clearedMessages) {
-      await terminalizeSessionMessageOnce(message.messageId, {
-        kind: 'interrupted',
-        error: 'Pending queued message interrupted by user',
-        completionSource: 'interrupt',
-      });
+      await terminalizeSessionMessageOnce(
+        message.messageId,
+        {
+          kind: 'interrupted',
+          error: 'Pending queued message interrupted by user',
+          completionSource: 'interrupt',
+        },
+        { allowIdleBatchWithoutObservedIdle: true }
+      );
     }
     return clearedMessages;
   }
@@ -697,9 +751,10 @@ export function createSessionMessageQueue(
 export async function enqueuePendingSessionMessageIntent(
   storage: SessionQueueStorage,
   intent: SessionMessageIntent,
-  createdAt = Date.now()
+  createdAt = Date.now(),
+  callbackSnapshot?: PendingSessionMessage['callbackSnapshot']
 ): Promise<PendingSessionMessage> {
-  const message = createPendingSessionMessageFromIntent(intent, createdAt);
+  const message = createPendingSessionMessageFromIntent(intent, createdAt, callbackSnapshot);
   await storePendingSessionMessage(storage, message);
   return message;
 }

@@ -223,6 +223,12 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     error?: string,
     gateResult?: 'pass' | 'fail'
   ): Promise<void> {
+    // TODO(cleanup): This is a rollout-only compatibility adapter for
+    // pre-message-queue executions that still complete through
+    // updateExecutionStatus(addExecution(...)). Once old in-flight wrappers and
+    // Durable Object state have drained, remove this path and rely exclusively
+    // on MessageSettlementOutbox, where deprecated executionId is just a
+    // messageId alias.
     const { messageId } = execution;
     const metadata = await this.getMetadata();
     const callbackQueue = this.env.CALLBACK_QUEUE;
@@ -248,6 +254,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     const payload: CallbackJob['payload'] = {
       sessionId,
       cloudAgentSessionId: sessionId,
+      executionId: execution.executionId,
       status,
       errorMessage: error,
       lastSeenBranch: metadata.repository?.upstreamBranch,
@@ -266,28 +273,25 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       payload,
     };
 
-    // Fire-and-forget enqueue - don't block execution completion
-    callbackQueue
-      .send(callbackJob)
-      .then(() => {
-        logger
-          .withFields({
-            sessionId,
-            messageId,
-            status,
-            callbackTarget: this.redactCallbackTargetUrl(callbackTarget.url),
-          })
-          .info('Callback job enqueued');
-      })
-      .catch(err => {
-        logger
-          .withFields({
-            sessionId,
-            messageId,
-            error: err instanceof Error ? err.message : String(err),
-          })
-          .error('Failed to enqueue callback job');
-      });
+    try {
+      await callbackQueue.send(callbackJob);
+      logger
+        .withFields({
+          sessionId,
+          messageId,
+          status,
+          callbackTarget: this.redactCallbackTargetUrl(callbackTarget.url),
+        })
+        .info('Callback job enqueued');
+    } catch (err) {
+      logger
+        .withFields({
+          sessionId,
+          messageId,
+          error: err instanceof Error ? err.message : String(err),
+        })
+        .error('Failed to enqueue callback job');
+    }
   }
 
   constructor(ctx: DurableObjectState, env: WorkerEnv) {

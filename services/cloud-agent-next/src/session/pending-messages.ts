@@ -5,7 +5,8 @@ import type {
   SessionMessageIntent,
 } from '../execution/types.js';
 import { renderExecutionTurnContent } from '../execution/types.js';
-import { ImagesSchema, type Images } from '../persistence/schemas.js';
+import { logger } from '../logger.js';
+import { CallbackTargetSchema, ImagesSchema, type Images } from '../persistence/schemas.js';
 import { Limits } from '../schema.js';
 import { MESSAGE_ID_FORMAT_DESCRIPTION, MESSAGE_ID_PATTERN } from './message-id.js';
 
@@ -45,6 +46,13 @@ const PendingSessionMessageTurnSchema = z.discriminatedUnion('type', [
     .strict(),
 ]);
 
+const PendingSessionMessageCallbackSnapshotSchema = z
+  .object({
+    required: z.boolean(),
+    target: CallbackTargetSchema.optional(),
+  })
+  .strict();
+
 export type PendingSessionMessageExecutionOptions = z.infer<
   typeof PendingSessionMessageExecutionOptionsSchema
 >;
@@ -60,6 +68,7 @@ export const PendingSessionMessageSchema = z
     createdAt: z.number(),
     callbackUrl: z.string().optional(),
     callbackMetadata: z.unknown().optional(),
+    callbackSnapshot: PendingSessionMessageCallbackSnapshotSchema.optional(),
     // executionKind is intentionally absent — kept in .passthrough() to safely
     // deserialize any messages written by an older deployment while a migration
     // window is open, but never read or acted upon.
@@ -136,10 +145,9 @@ async function listPendingMessageEntries(
     if (!result.success) {
       // Malformed records are invisible to queue operations but stay in storage,
       // so log the key and issue to aid diagnosis of bad writes or schema drift.
-      console.warn('Skipping invalid pending-message entry', {
-        key,
-        issues: result.error.issues,
-      });
+      logger
+        .withFields({ key, issues: JSON.stringify(result.error.issues) })
+        .warn('Skipping invalid pending-message entry');
       return [];
     }
     return [{ key, message: result.data }];
@@ -156,6 +164,7 @@ export function createPendingSessionMessage(params: {
   createdAt: number;
   callbackUrl?: string;
   callbackMetadata?: unknown;
+  callbackSnapshot?: z.infer<typeof PendingSessionMessageCallbackSnapshotSchema>;
   executionOptions?: PendingSessionMessageExecutionOptions;
 }): PendingSessionMessage {
   const message = {
@@ -169,7 +178,8 @@ export function createPendingSessionMessage(params: {
 
 export function createPendingSessionMessageFromIntent(
   intent: SessionMessageIntent,
-  createdAt = Date.now()
+  createdAt = Date.now(),
+  callbackSnapshot?: z.infer<typeof PendingSessionMessageCallbackSnapshotSchema>
 ): PendingSessionMessage {
   return createPendingSessionMessage({
     messageId: intent.turn.messageId,
@@ -185,6 +195,7 @@ export function createPendingSessionMessageFromIntent(
           },
     images: intent.turn.type === 'prompt' ? intent.turn.images : undefined,
     createdAt,
+    callbackSnapshot,
     executionOptions: {
       mode: intent.agent.mode,
       model: intent.agent.model,
@@ -314,11 +325,13 @@ export async function recordPendingFlushFailure(
     // Thrown errors without a known code are treated as retryable by default
     // to preserve pre-existing behavior, but logged so unclassified flush
     // failures stay observable and can be reclassified later.
-    console.warn('Pending flush failure with unknown error code; treating as retryable', {
-      messageId: message.messageId,
-      attempts: (message.flushAttempts ?? 0) + 1,
-      error,
-    });
+    logger
+      .withFields({
+        messageId: message.messageId,
+        attempts: (message.flushAttempts ?? 0) + 1,
+        error,
+      })
+      .warn('Pending flush failure with unknown error code; treating as retryable');
   }
   const attempts = (message.flushAttempts ?? 0) + 1;
   const retryDelays =
@@ -337,9 +350,7 @@ export async function recordPendingFlushFailure(
   // non-canonical key (e.g. during migration), so a simple put-overwrite would
   // leave the old key behind and create a duplicate.
   await deletePendingSessionMessageByMessageId(storage, message.messageId);
-  if (!exhausted) {
-    await storePendingSessionMessage(storage, updated);
-  }
+  await storePendingSessionMessage(storage, updated);
 
   return { message: updated, attempts, exhausted, nextFlushAttemptAt };
 }

@@ -85,6 +85,7 @@ function acceptedMessageState(
 
 function createHarness(options?: {
   sendCallback?: (job: CallbackJob) => Promise<void>;
+  callbackQueueAvailable?: boolean;
   hasObservedWrapperIdle?: boolean;
   metadata?: SessionMetadata;
 }) {
@@ -109,7 +110,8 @@ function createHarness(options?: {
       getMetadata: async () => currentMetadata,
       requireSessionId: async () => currentMetadata.identity.sessionId,
       resolveCallbackSessionId: async currentMetadata => currentMetadata?.identity.sessionId ?? '',
-      getCallbackQueue: () => ({ send: sendCallback }),
+      getCallbackQueue: () =>
+        options?.callbackQueueAvailable === false ? undefined : { send: sendCallback },
       getAssistantMessageForUserMessage: () => null,
       insertAndBroadcastMessageEvent: event => {
         events.push(event);
@@ -266,6 +268,46 @@ describe('MessageSettlementOutbox', () => {
     const persisted = await getSessionMessageState(harness.storage, firstMessageId);
     const deadline = await harness.outbox.nextCallbackDeadline();
     expect(persisted?.callbackLastError).toBe('queue down');
+    expect(persisted?.callbackAttempts).toBe(1);
+    expect(persisted?.callbackRetryAt).toBe(deadline);
+    expect(harness.alarmDeadlines).toEqual([deadline]);
+  });
+
+  it('persists enqueue retry state when the callback queue is unavailable', async () => {
+    const harness = createHarness({ callbackQueueAvailable: false });
+    await putSessionMessageState(
+      harness.storage,
+      acceptedMessageState(firstMessageId, { url: 'https://example.com/retry' })
+    );
+
+    await harness.outbox.terminalizeSessionMessageOnce(firstMessageId, {
+      kind: 'completed',
+      completionSource: 'assistant_message_event',
+    });
+
+    const persisted = await getSessionMessageState(harness.storage, firstMessageId);
+    const deadline = await harness.outbox.nextCallbackDeadline();
+    expect(persisted?.callbackLastError).toBe('Callback queue not available');
+    expect(persisted?.callbackAttempts).toBe(1);
+    expect(persisted?.callbackRetryAt).toBe(deadline);
+    expect(harness.alarmDeadlines).toEqual([deadline]);
+  });
+
+  it('persists enqueue retry state when the callback target is missing', async () => {
+    const harness = createHarness();
+    await putSessionMessageState(harness.storage, {
+      ...acceptedMessageState(firstMessageId),
+      callbackRequired: true,
+    });
+
+    await harness.outbox.terminalizeSessionMessageOnce(firstMessageId, {
+      kind: 'completed',
+      completionSource: 'assistant_message_event',
+    });
+
+    const persisted = await getSessionMessageState(harness.storage, firstMessageId);
+    const deadline = await harness.outbox.nextCallbackDeadline();
+    expect(persisted?.callbackLastError).toBe('Missing callback target');
     expect(persisted?.callbackAttempts).toBe(1);
     expect(persisted?.callbackRetryAt).toBe(deadline);
     expect(harness.alarmDeadlines).toEqual([deadline]);

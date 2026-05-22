@@ -379,7 +379,7 @@ describe('recordPendingFlushFailure', () => {
     expect(result.nextFlushAttemptAt).toBeUndefined();
   });
 
-  it('removes the message from storage when exhausted', async () => {
+  it('keeps exhausted messages in storage for caller terminalization', async () => {
     const storage = createMemoryStorage();
     const message = makeMessage();
     await storePendingSessionMessage(storage, message);
@@ -390,7 +390,13 @@ describe('recordPendingFlushFailure', () => {
     });
 
     const listed = await listPendingSessionMessages(storage);
-    expect(listed).toHaveLength(0);
+    expect(listed).toHaveLength(1);
+    expect(listed[0]).toMatchObject({
+      messageId: message.messageId,
+      flushAttempts: 1,
+      lastFlushError: 'bad',
+      nextFlushAttemptAt: undefined,
+    });
   });
 
   it('keeps the message in storage when not exhausted', async () => {

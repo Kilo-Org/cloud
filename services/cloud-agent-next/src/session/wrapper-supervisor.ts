@@ -116,6 +116,7 @@ export type WrapperSupervisorDependencies = {
     | 'terminalizeSessionMessageOnce'
     | 'observeWrapperTerminalForIdleBatch'
     | 'releaseWrapperTerminalWaitForIdleBatch'
+    | 'releaseWrapperTerminalWaitForIdleBatchForWrapperRun'
     | 'isWaitingForWrapperTerminalGateResult'
     | 'finalizeIdleBatchCallbackIfReady'
   >;
@@ -215,6 +216,29 @@ export function createWrapperSupervisor(
     if (!graceState) return;
     if (executionId && graceState.executionId !== executionId) return;
     await storage.delete(DISCONNECT_GRACE_KEY);
+  }
+
+  async function releaseWrapperTerminalWaitForIdleBatch(): Promise<void> {
+    await messageSettlementOutbox.releaseWrapperTerminalWaitForIdleBatch();
+    await messageSettlementOutbox.finalizeIdleBatchCallbackIfReady({
+      allowWithoutObservedIdle: true,
+    });
+  }
+
+  async function releaseWrapperTerminalWaitForIdleBatchForWrapperRun(
+    wrapperRunId?: string
+  ): Promise<void> {
+    if (!wrapperRunId) return;
+
+    const released =
+      await messageSettlementOutbox.releaseWrapperTerminalWaitForIdleBatchForWrapperRun(
+        wrapperRunId
+      );
+    if (!released) return;
+
+    await messageSettlementOutbox.finalizeIdleBatchCallbackIfReady({
+      allowWithoutObservedIdle: true,
+    });
   }
 
   async function checkReconnect(input: WrapperReconnectInput): Promise<WrapperReconnectDecision> {
@@ -416,12 +440,14 @@ export function createWrapperSupervisor(
       graceState.wrapperGeneration !== undefined &&
       state.wrapperGeneration !== graceState.wrapperGeneration
     ) {
+      await releaseWrapperTerminalWaitForIdleBatchForWrapperRun(wrapperRunId);
       return;
     }
     if (
       graceState.wrapperConnectionId !== undefined &&
       state.wrapperConnectionId !== graceState.wrapperConnectionId
     ) {
+      await releaseWrapperTerminalWaitForIdleBatchForWrapperRun(wrapperRunId);
       return;
     }
 
@@ -445,10 +471,7 @@ export function createWrapperSupervisor(
         logger
           .withFields({ wrapperRunId })
           .info('No accepted messages during grace period — skipping failure');
-        await messageSettlementOutbox.releaseWrapperTerminalWaitForIdleBatch();
-        await messageSettlementOutbox.finalizeIdleBatchCallbackIfReady({
-          allowWithoutObservedIdle: true,
-        });
+        await releaseWrapperTerminalWaitForIdleBatch();
         return;
       }
 
@@ -463,15 +486,16 @@ export function createWrapperSupervisor(
           completionSource: 'wrapper_failure',
         });
       }
-      await clearWrapperRuntimeIdentity(storage, {
-        wrapperGeneration: state.wrapperGeneration,
-        wrapperConnectionId: state.wrapperConnectionId,
-      });
+      await clearWrapperRuntimeIdentity(
+        storage,
+        {
+          wrapperGeneration: state.wrapperGeneration,
+          wrapperConnectionId: state.wrapperConnectionId,
+        },
+        { incrementGeneration: true }
+      );
       await agentRuntime.stopWrapperProcess('unhealthy-wrapper');
-      await messageSettlementOutbox.releaseWrapperTerminalWaitForIdleBatch();
-      await messageSettlementOutbox.finalizeIdleBatchCallbackIfReady({
-        allowWithoutObservedIdle: true,
-      });
+      await releaseWrapperTerminalWaitForIdleBatch();
       return;
     }
 
@@ -620,12 +644,11 @@ export function createWrapperSupervisor(
 
     const acceptedMessages = await listNonTerminalAcceptedMessages(storage, state.wrapperRunId);
     if (acceptedMessages.length === 0) {
-      if (state.lastWrapperIdleAt !== undefined || state.idleReconcileAfter !== undefined) {
-        await storage.put('wrapper_runtime_state', {
-          ...state,
-          lastWrapperIdleAt: undefined,
-          idleReconcileAfter: undefined,
-        });
+      if (
+        state.wrapperConnectionId &&
+        (state.lastWrapperIdleAt !== undefined || state.idleReconcileAfter !== undefined)
+      ) {
+        await clearWrapperIdleState(storage, state.wrapperGeneration, state.wrapperConnectionId);
       }
       return;
     }
@@ -739,10 +762,7 @@ export function createWrapperSupervisor(
         { incrementGeneration: true }
       );
     }
-    await messageSettlementOutbox.releaseWrapperTerminalWaitForIdleBatch();
-    await messageSettlementOutbox.finalizeIdleBatchCallbackIfReady({
-      allowWithoutObservedIdle: true,
-    });
+    await releaseWrapperTerminalWaitForIdleBatch();
     await agentRuntime.stopWrapperProcess('keep-warm-expired');
   }
 

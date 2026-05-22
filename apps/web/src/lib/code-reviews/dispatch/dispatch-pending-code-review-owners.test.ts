@@ -24,7 +24,6 @@ import {
 } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { listDispatchableCodeReviewOwnerCandidates } from '../db/code-reviews';
-import { cronPendingCodeReviewCreatedAfterSql } from './dispatch-constants';
 import { dispatchPendingCodeReviewOwners } from './dispatch-pending-code-review-owners';
 
 const REPO = `test-org/dispatch-owner-drain-${Date.now()}`;
@@ -170,7 +169,7 @@ describe('dispatch pending code review owners', () => {
     });
   });
 
-  it('filters cron owner candidates to recent pending work while keeping stale queued recovery', async () => {
+  it('includes old pending owner candidates and stale queued recovery', async () => {
     const oldPendingTimestamp = minutesAgo(150);
     const recentPendingTimestamp = minutesAgo(30);
     const oldQueuedCreatedAt = minutesAgo(240);
@@ -197,19 +196,19 @@ describe('dispatch pending code review owners', () => {
 
     const result = await listDispatchableCodeReviewOwnerCandidates({
       limit: 10,
-      pendingCreatedAfter: cronPendingCodeReviewCreatedAfterSql(),
     });
 
     expect(result).toEqual({
       owners: [
         { type: 'org', id: firstOrganizationId },
+        { type: 'user', id: firstUser.id },
         { type: 'user', id: secondUser.id },
       ],
       hasMore: false,
     });
   });
 
-  it('does not drain owners that only have pending work older than the cron cutoff', async () => {
+  it('drains owners with old pending work', async () => {
     await db.insert(cloud_agent_code_reviews).values([
       reviewValues({
         owner: { type: 'user', id: firstUser.id },
@@ -232,19 +231,25 @@ describe('dispatch pending code review owners', () => {
     const summary = await dispatchPendingCodeReviewOwners();
 
     expect(summary).toEqual({
-      ownersConsidered: 1,
-      ownersProcessed: 1,
+      ownersConsidered: 2,
+      ownersProcessed: 2,
       ownersWithNoNewDispatch: 0,
       ownersSkippedMissingBotUsers: 0,
       coordinatorFailures: 0,
-      reviewsDispatched: 1,
+      reviewsDispatched: 2,
       hasMoreCandidateOwners: false,
     });
-    expect(mockTryDispatchPendingReviews).toHaveBeenCalledTimes(1);
-    expect(mockTryDispatchPendingReviews).toHaveBeenCalledWith(
-      { type: 'user', id: secondUser.id, userId: secondUser.id },
-      expect.objectContaining({ pendingCreatedAfter: expect.any(Object) })
-    );
+    expect(mockTryDispatchPendingReviews).toHaveBeenCalledTimes(2);
+    expect(mockTryDispatchPendingReviews).toHaveBeenCalledWith({
+      type: 'user',
+      id: firstUser.id,
+      userId: firstUser.id,
+    });
+    expect(mockTryDispatchPendingReviews).toHaveBeenCalledWith({
+      type: 'user',
+      id: secondUser.id,
+      userId: secondUser.id,
+    });
   });
 
   it('summarizes dispatch, recovered bot owners, no-op owners, and isolated owner failures', async () => {
@@ -296,9 +301,6 @@ describe('dispatch pending code review owners', () => {
       hasMoreCandidateOwners: false,
     });
     expect(mockTryDispatchPendingReviews).toHaveBeenCalledTimes(4);
-    for (const call of mockTryDispatchPendingReviews.mock.calls) {
-      expect(call[1]).toEqual(expect.objectContaining({ pendingCreatedAfter: expect.any(Object) }));
-    }
     expect(mockEnsureBotUserForOrg).toHaveBeenCalledWith(firstOrganizationId, 'code-review');
     expect(mockEnsureBotUserForOrg).toHaveBeenCalledWith(secondOrganizationId, 'code-review');
   });

@@ -1,5 +1,5 @@
 import { cloud_agent_code_reviews } from '@kilocode/db/schema';
-import { sql } from 'drizzle-orm';
+import { sql, type SQL } from 'drizzle-orm';
 
 export const MAX_CONCURRENT_CODE_REVIEWS_PER_ORG = 20;
 export const MAX_CONCURRENT_CODE_REVIEWS_PER_FUNDED_USER = 3;
@@ -9,6 +9,7 @@ export const FUNDED_CODE_REVIEW_BALANCE_THRESHOLD_MICRODOLLARS = 5_000_000;
 export const STALE_QUEUED_CODE_REVIEW_MINUTES = 5;
 export const STALE_RUNNING_CODE_REVIEW_MINUTES = 90;
 export const MAX_PENDING_DISPATCH_RETRIES = 1;
+export const CRON_PENDING_CODE_REVIEW_MAX_IDLE_HOURS = 2;
 
 export function staleQueuedCodeReviewCutoffSql() {
   return sql`now() - interval '${sql.raw(String(STALE_QUEUED_CODE_REVIEW_MINUTES))} minutes'`;
@@ -18,11 +19,23 @@ export function staleRunningCodeReviewCutoffSql() {
   return sql`now() - interval '${sql.raw(String(STALE_RUNNING_CODE_REVIEW_MINUTES))} minutes'`;
 }
 
+export function cronPendingCodeReviewUpdatedAfterSql() {
+  return sql`now() - interval '${sql.raw(String(CRON_PENDING_CODE_REVIEW_MAX_IDLE_HOURS))} hours'`;
+}
+
 export function reconsiderableCodeReviewWorkCondition(
-  staleQueuedCutoff = staleQueuedCodeReviewCutoffSql()
+  staleQueuedCutoff = staleQueuedCodeReviewCutoffSql(),
+  pendingUpdatedAfter?: SQL
 ) {
+  const pendingClause = pendingUpdatedAfter
+    ? sql`(
+        ${cloud_agent_code_reviews.status} = 'pending'
+        AND ${cloud_agent_code_reviews.updated_at} >= ${pendingUpdatedAfter}
+      )`
+    : sql`${cloud_agent_code_reviews.status} = 'pending'`;
+
   return sql`(
-    ${cloud_agent_code_reviews.status} = 'pending'
+    ${pendingClause}
     OR (
       ${cloud_agent_code_reviews.status} = 'queued'
       AND ${cloud_agent_code_reviews.updated_at} < ${staleQueuedCutoff}

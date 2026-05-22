@@ -1,5 +1,6 @@
 import pLimit from 'p-limit';
 import { captureException } from '@sentry/nextjs';
+import type { SQL } from 'drizzle-orm';
 import { ensureBotUserForOrg } from '@/lib/bot-users/bot-user-service';
 import {
   listDispatchableCodeReviewOwnerCandidates,
@@ -7,6 +8,7 @@ import {
 } from '../db/code-reviews';
 import { errorExceptInTest, logExceptInTest } from '@/lib/utils.server';
 import { tryDispatchPendingReviews } from './dispatch-pending-reviews';
+import { cronPendingCodeReviewUpdatedAfterSql } from './dispatch-constants';
 import type { Owner } from '../core';
 
 const OWNER_SCAN_LIMIT = 100;
@@ -39,7 +41,8 @@ async function resolveDispatchOwner(
 }
 
 async function drainOwner(
-  candidate: DispatchableCodeReviewOwnerCandidate
+  candidate: DispatchableCodeReviewOwnerCandidate,
+  pendingUpdatedAfter: SQL
 ): Promise<OwnerDrainOutcome> {
   try {
     const owner = await resolveDispatchOwner(candidate);
@@ -47,7 +50,7 @@ async function drainOwner(
       return { status: 'skipped-missing-bot' };
     }
 
-    const result = await tryDispatchPendingReviews(owner);
+    const result = await tryDispatchPendingReviews(owner, { pendingUpdatedAfter });
     return { status: 'processed', dispatched: result.dispatched };
   } catch (error) {
     errorExceptInTest('[dispatchPendingCodeReviewOwners] Owner drain failed', {
@@ -63,12 +66,14 @@ async function drainOwner(
 }
 
 export async function dispatchPendingCodeReviewOwners(): Promise<DispatchPendingCodeReviewOwnersSummary> {
+  const pendingUpdatedAfter = cronPendingCodeReviewUpdatedAfterSql();
   const candidates = await listDispatchableCodeReviewOwnerCandidates({
     limit: OWNER_SCAN_LIMIT,
+    pendingUpdatedAfter,
   });
   const limit = pLimit(OWNER_DISPATCH_CONCURRENCY);
   const outcomes = await Promise.all(
-    candidates.owners.map(candidate => limit(() => drainOwner(candidate)))
+    candidates.owners.map(candidate => limit(() => drainOwner(candidate, pendingUpdatedAfter)))
   );
 
   const summary: DispatchPendingCodeReviewOwnersSummary = {

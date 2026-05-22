@@ -24,6 +24,7 @@ import {
 } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { listDispatchableCodeReviewOwnerCandidates } from '../db/code-reviews';
+import { cronPendingCodeReviewUpdatedAfterSql } from './dispatch-constants';
 import { dispatchPendingCodeReviewOwners } from './dispatch-pending-code-review-owners';
 
 const REPO = `test-org/dispatch-owner-drain-${Date.now()}`;
@@ -169,25 +170,40 @@ describe('dispatch pending code review owners', () => {
     });
   });
 
-  it('includes old pending owner candidates and stale queued recovery', async () => {
-    const oldPendingTimestamp = minutesAgo(150);
-    const recentPendingTimestamp = minutesAgo(30);
-    const oldQueuedCreatedAt = minutesAgo(240);
+  it('bounds cron pending discovery by updated_at while still recovering stale queued work', async () => {
+    const oldIdleTimestamp = minutesAgo(180);
+    const oldCreatedRecentlyUpdatedCreatedAt = minutesAgo(240);
+    const oldCreatedRecentlyUpdatedUpdatedAt = minutesAgo(30);
+    const recentPendingTimestamp = minutesAgo(15);
+    const oldQueuedCreatedAt = minutesAgo(360);
     const staleQueuedUpdatedAt = minutesAgo(10);
 
     await db.insert(cloud_agent_code_reviews).values([
+      // First user: only an idle pending review older than the cron cutoff
       reviewValues({
         owner: { type: 'user', id: firstUser.id },
         status: 'pending',
-        createdAt: oldPendingTimestamp,
+        createdAt: oldIdleTimestamp,
+        updatedAt: oldIdleTimestamp,
       }),
+      // Second user: old-created pending whose updated_at was refreshed
+      // recently (e.g. by a manual retry) — should still be reachable.
       reviewValues({
         owner: { type: 'user', id: secondUser.id },
         status: 'pending',
-        createdAt: recentPendingTimestamp,
+        createdAt: oldCreatedRecentlyUpdatedCreatedAt,
+        updatedAt: oldCreatedRecentlyUpdatedUpdatedAt,
       }),
+      // First org: a recently created pending review.
       reviewValues({
         owner: { type: 'org', id: firstOrganizationId },
+        status: 'pending',
+        createdAt: recentPendingTimestamp,
+        updatedAt: recentPendingTimestamp,
+      }),
+      // Second org: stale queued recovery — must remain visible regardless of age.
+      reviewValues({
+        owner: { type: 'org', id: secondOrganizationId },
         status: 'queued',
         createdAt: oldQueuedCreatedAt,
         updatedAt: staleQueuedUpdatedAt,
@@ -196,29 +212,34 @@ describe('dispatch pending code review owners', () => {
 
     const result = await listDispatchableCodeReviewOwnerCandidates({
       limit: 10,
+      pendingUpdatedAfter: cronPendingCodeReviewUpdatedAfterSql(),
     });
 
     expect(result).toEqual({
       owners: [
-        { type: 'org', id: firstOrganizationId },
-        { type: 'user', id: firstUser.id },
+        { type: 'org', id: secondOrganizationId },
         { type: 'user', id: secondUser.id },
+        { type: 'org', id: firstOrganizationId },
       ],
       hasMore: false,
     });
   });
 
-  it('drains owners with old pending work', async () => {
+  it('drains owners with recently active pending work and skips idle pending owners', async () => {
     await db.insert(cloud_agent_code_reviews).values([
+      // Idle pending older than the cron cutoff — owner should be skipped entirely.
       reviewValues({
         owner: { type: 'user', id: firstUser.id },
         status: 'pending',
-        createdAt: minutesAgo(150),
+        createdAt: minutesAgo(180),
+        updatedAt: minutesAgo(180),
       }),
+      // Recently active pending — owner should be drained.
       reviewValues({
         owner: { type: 'user', id: secondUser.id },
         status: 'pending',
         createdAt: minutesAgo(30),
+        updatedAt: minutesAgo(30),
       }),
     ]);
 
@@ -231,25 +252,23 @@ describe('dispatch pending code review owners', () => {
     const summary = await dispatchPendingCodeReviewOwners();
 
     expect(summary).toEqual({
-      ownersConsidered: 2,
-      ownersProcessed: 2,
+      ownersConsidered: 1,
+      ownersProcessed: 1,
       ownersWithNoNewDispatch: 0,
       ownersSkippedMissingBotUsers: 0,
       coordinatorFailures: 0,
-      reviewsDispatched: 2,
+      reviewsDispatched: 1,
       hasMoreCandidateOwners: false,
     });
-    expect(mockTryDispatchPendingReviews).toHaveBeenCalledTimes(2);
-    expect(mockTryDispatchPendingReviews).toHaveBeenCalledWith({
-      type: 'user',
-      id: firstUser.id,
-      userId: firstUser.id,
-    });
-    expect(mockTryDispatchPendingReviews).toHaveBeenCalledWith({
-      type: 'user',
-      id: secondUser.id,
-      userId: secondUser.id,
-    });
+    expect(mockTryDispatchPendingReviews).toHaveBeenCalledTimes(1);
+    expect(mockTryDispatchPendingReviews).toHaveBeenCalledWith(
+      {
+        type: 'user',
+        id: secondUser.id,
+        userId: secondUser.id,
+      },
+      expect.objectContaining({ pendingUpdatedAfter: expect.anything() })
+    );
   });
 
   it('summarizes dispatch, recovered bot owners, no-op owners, and isolated owner failures', async () => {

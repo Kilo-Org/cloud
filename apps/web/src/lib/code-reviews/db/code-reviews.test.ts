@@ -372,6 +372,39 @@ describe('releaseQueuedReviewClaim', () => {
     expect(storedReview?.status).toBe('pending');
     expect(storedReview?.pending_dispatch_retry_count).toBe(0);
   });
+
+  it('preserves created_at and refreshes updated_at when resetting for retry', async () => {
+    const { reviewId } = await createQueuedReview();
+    const originalCreatedAt = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
+    const staleUpdatedAt = new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString();
+
+    await db
+      .update(cloud_agent_code_reviews)
+      .set({
+        status: 'failed',
+        error_message: 'failed before retry',
+        completed_at: new Date().toISOString(),
+        created_at: originalCreatedAt,
+        updated_at: staleUpdatedAt,
+      })
+      .where(eq(cloud_agent_code_reviews.id, reviewId));
+
+    await resetCodeReviewForRetry(reviewId);
+
+    const storedReview = await db.query.cloud_agent_code_reviews.findFirst({
+      where: eq(cloud_agent_code_reviews.id, reviewId),
+    });
+
+    if (!storedReview) {
+      throw new Error('Expected stored review after retry reset');
+    }
+
+    expect(storedReview.created_at).toBe(originalCreatedAt);
+    expect(storedReview.updated_at).not.toBe(staleUpdatedAt);
+    expect(new Date(storedReview.updated_at).getTime()).toBeGreaterThan(
+      new Date(staleUpdatedAt).getTime()
+    );
+  });
 });
 
 describe('findPreviousCompletedReview', () => {

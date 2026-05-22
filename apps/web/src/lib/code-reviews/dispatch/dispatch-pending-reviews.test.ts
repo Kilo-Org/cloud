@@ -33,6 +33,7 @@ import {
 } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { tryDispatchPendingReviews } from './dispatch-pending-reviews';
+import { cronPendingCodeReviewUpdatedAfterSql } from './dispatch-constants';
 import {
   cancelSupersededReviewsForPR,
   PENDING_DISPATCH_RETRY_EXHAUSTED_ERROR_MESSAGE,
@@ -505,7 +506,7 @@ describe('tryDispatchPendingReviews', () => {
     );
   });
 
-  it('dispatches old reviews after explicit retry', async () => {
+  it('dispatches old reviews after explicit retry under the cron pending cutoff', async () => {
     const oldTimestamp = minutesAgo(150);
     const owner = { type: 'user', id: testUser.id } satisfies ReviewOwner;
     await setTestUserBalance(DEFAULT_TIER_BALANCE_MICRODOLLARS);
@@ -537,11 +538,14 @@ describe('tryDispatchPendingReviews', () => {
 
     await resetCodeReviewForRetry(review.id);
 
-    const result = await tryDispatchPendingReviews({
-      type: 'user',
-      id: testUser.id,
-      userId: testUser.id,
-    });
+    const result = await tryDispatchPendingReviews(
+      {
+        type: 'user',
+        id: testUser.id,
+        userId: testUser.id,
+      },
+      { pendingUpdatedAfter: cronPendingCodeReviewUpdatedAfterSql() }
+    );
 
     const storedReview = await db.query.cloud_agent_code_reviews.findFirst({
       where: eq(cloud_agent_code_reviews.id, review.id),
@@ -556,6 +560,65 @@ describe('tryDispatchPendingReviews', () => {
       agentConfig: { id: 'test-agent-config', config: {} },
       platform: 'github',
     });
+  });
+
+  it('skips idle old pending rows but claims old-created/recently-updated pending rows under the cron cutoff', async () => {
+    const idleTimestamp = minutesAgo(180);
+    const oldCreatedAt = minutesAgo(240);
+    const recentlyUpdatedAt = minutesAgo(30);
+    const owner = { type: 'user', id: testUser.id } satisfies ReviewOwner;
+    await setTestUserBalance(DEFAULT_TIER_BALANCE_MICRODOLLARS);
+
+    const [idleReview, refreshedReview] = await db
+      .insert(cloud_agent_code_reviews)
+      .values([
+        reviewValues({
+          owner,
+          status: 'pending',
+          createdAt: idleTimestamp,
+          updatedAt: idleTimestamp,
+        }),
+        reviewValues({
+          owner,
+          status: 'pending',
+          createdAt: oldCreatedAt,
+          updatedAt: recentlyUpdatedAt,
+        }),
+      ])
+      .returning({ id: cloud_agent_code_reviews.id });
+
+    if (!idleReview || !refreshedReview) {
+      throw new Error('Expected idle and refreshed pending reviews to be inserted');
+    }
+
+    const firstResult = await tryDispatchPendingReviews(
+      {
+        type: 'user',
+        id: testUser.id,
+        userId: testUser.id,
+      },
+      { pendingUpdatedAfter: cronPendingCodeReviewUpdatedAfterSql() }
+    );
+
+    const storedIdleReview = await db.query.cloud_agent_code_reviews.findFirst({
+      where: eq(cloud_agent_code_reviews.id, idleReview.id),
+    });
+    const storedRefreshedReview = await db.query.cloud_agent_code_reviews.findFirst({
+      where: eq(cloud_agent_code_reviews.id, refreshedReview.id),
+    });
+
+    expect(firstResult).toEqual({ dispatched: 1, notDispatched: 0, activeCount: 1 });
+    expect(storedIdleReview?.status).toBe('pending');
+    expect(storedRefreshedReview?.status).toBe('queued');
+    expect(mockPrepareReviewPayload).toHaveBeenCalledWith({
+      reviewId: refreshedReview.id,
+      owner: { type: 'user', id: testUser.id, userId: testUser.id },
+      agentConfig: { id: 'test-agent-config', config: {} },
+      platform: 'github',
+    });
+    expect(mockPrepareReviewPayload).not.toHaveBeenCalledWith(
+      expect.objectContaining({ reviewId: idleReview.id })
+    );
   });
 
   it('recovers stale queued reviews regardless of age', async () => {

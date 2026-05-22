@@ -13,7 +13,20 @@ import {
   microdollar_usage,
   microdollar_usage_metadata,
 } from '@kilocode/db/schema';
-import { eq, and, asc, desc, count, ne, inArray, sql, sum, gte, isNull } from 'drizzle-orm';
+import {
+  eq,
+  and,
+  asc,
+  desc,
+  count,
+  ne,
+  inArray,
+  sql,
+  sum,
+  gte,
+  isNull,
+  type SQL,
+} from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
 import type { CreateReviewParams, CodeReviewStatus, ListReviewsParams, Owner } from '../core';
 import type { CloudAgentCodeReview, CloudAgentCodeReviewAttempt } from '@kilocode/db/schema';
@@ -193,11 +206,13 @@ export async function getCodeReviewById(reviewId: string): Promise<CloudAgentCod
 export async function listDispatchableCodeReviewOwnerCandidates(
   params: {
     limit?: number;
+    pendingUpdatedAfter?: SQL;
   } = {}
 ): Promise<DispatchableCodeReviewOwnerCandidatesResult> {
   const limit = Math.max(1, Math.min(params.limit ?? 100, 1_000));
   const staleQueuedCutoff = staleQueuedCodeReviewCutoffSql();
   const staleRunningCutoff = staleRunningCodeReviewCutoffSql();
+  const { pendingUpdatedAfter } = params;
 
   try {
     const result = await db.execute<{ owner_type: 'user' | 'org'; owner_id: string }>(sql`
@@ -213,7 +228,7 @@ export async function listDispatchableCodeReviewOwnerCandidates(
           ) AS owner_id,
           MIN(${cloud_agent_code_reviews.created_at}) AS oldest_reconsiderable_at
         FROM ${cloud_agent_code_reviews}
-        WHERE ${reconsiderableCodeReviewWorkCondition(staleQueuedCutoff)}
+        WHERE ${reconsiderableCodeReviewWorkCondition(staleQueuedCutoff, pendingUpdatedAfter)}
         GROUP BY owner_type, owner_id
       ), active_work AS (
         SELECT

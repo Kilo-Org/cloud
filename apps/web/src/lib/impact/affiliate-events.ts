@@ -16,7 +16,7 @@ import {
   reverseImpactAction,
   sendImpactConversionPayload,
 } from '@/lib/impact';
-import { logImpactReferralDebug } from '@/lib/impact-debug';
+import { logImpactReferralDebug } from '@/lib/impact/debug';
 import { sentryLogger } from '@/lib/utils.server';
 import {
   kilocode_users,

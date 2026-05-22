@@ -31,7 +31,10 @@ import PostHogClient from '@/lib/posthog';
 import { after } from 'next/server';
 import { IS_IN_AUTOMATED_TEST } from '@/lib/config.server';
 import { client as stripe } from '@/lib/stripe-client';
-import { buildAffiliateEventDedupeKey, enqueueAffiliateEventForUser } from '@/lib/affiliate-events';
+import {
+  buildAffiliateEventDedupeKey,
+  enqueueAffiliateEventForUser,
+} from '@/lib/impact/affiliate-events';
 import { processPersonalKiloClawPaidConversion } from '@/lib/kiloclaw-referrals';
 import { IMPACT_ORDER_ID_MACRO } from '@/lib/impact';
 import {

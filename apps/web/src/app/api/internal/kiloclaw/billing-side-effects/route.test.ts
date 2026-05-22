@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { send as sendEmail } from '@/lib/email';
 import { maybePerformAutoTopUp } from '@/lib/autoTopUp';
-import { enqueueAffiliateEventForUser } from '@/lib/affiliate-events';
+import { enqueueAffiliateEventForUser } from '@/lib/impact/affiliate-events';
 import { processPersonalKiloClawPaidConversion } from '@/lib/kiloclaw-referrals';
 
 jest.mock('@/lib/config.server', () => ({
@@ -32,7 +32,7 @@ jest.mock('@/lib/stripe-client', () => ({
   },
 }));
 
-jest.mock('@/lib/affiliate-events', () => ({
+jest.mock('@/lib/impact/affiliate-events', () => ({
   enqueueAffiliateEventForUser: jest.fn(),
 }));
 

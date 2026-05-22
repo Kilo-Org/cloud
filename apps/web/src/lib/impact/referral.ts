@@ -9,13 +9,13 @@ import {
   isImpactAdvocateConfigured,
   sendImpactAdvocateRegisterParticipantPayload,
   type ImpactAdvocateRegisterParticipantPayload,
-} from '@/lib/impact-advocate';
-import { logImpactReferralDebug } from '@/lib/impact-debug';
+} from '@/lib/impact/advocate';
+import { logImpactReferralDebug } from '@/lib/impact/debug';
 import {
   redactLandingPathForLogs,
   type ParsedImpactAffiliateTouch,
   type ParsedImpactReferralTouch,
-} from '@/lib/impact-referral-utils';
+} from '@/lib/impact/referral-utils';
 import {
   deleted_user_email_tombstones,
   impact_advocate_participants,

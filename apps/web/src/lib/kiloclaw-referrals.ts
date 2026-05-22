@@ -19,9 +19,9 @@ import {
   sendImpactAdvocateRewardLookupPayload,
   sendImpactAdvocateRewardRedemptionPayload,
   type ImpactAdvocateDispatchResult,
-} from '@/lib/impact-advocate';
-import { logImpactReferralDebug } from '@/lib/impact-debug';
-import { hashNormalizedEmailForDeletionTombstone } from '@/lib/impact-referral';
+} from '@/lib/impact/advocate';
+import { logImpactReferralDebug } from '@/lib/impact/debug';
+import { hashNormalizedEmailForDeletionTombstone } from '@/lib/impact/referral';
 import { resolveCurrentPersonalSubscriptionRow } from '@/lib/kiloclaw/current-personal-subscription';
 import { client as stripe } from '@/lib/stripe-client';
 import { insertKiloClawSubscriptionChangeLog } from '@kilocode/db';

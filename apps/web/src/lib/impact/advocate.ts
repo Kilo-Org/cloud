@@ -12,7 +12,7 @@ import {
   IMPACT_ADVOCATE_TENANT_ALIAS,
   IMPACT_ADVOCATE_WIDGET_ID,
 } from '@/lib/config.server';
-import { logImpactReferralDebug, truncateForLog } from '@/lib/impact-debug';
+import { logImpactReferralDebug, truncateForLog } from '@/lib/impact/debug';
 
 /**
  * SaaSquatch / Impact Advocate expects locale tags formatted as `en_US`,

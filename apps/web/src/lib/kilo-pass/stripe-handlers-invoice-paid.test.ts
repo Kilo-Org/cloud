@@ -22,7 +22,7 @@ import { KiloPassTier } from '@/lib/kilo-pass/enums';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { and, eq } from 'drizzle-orm';
 import type Stripe from 'stripe';
-import type * as affiliateEventsModule from '@/lib/affiliate-events';
+import type * as affiliateEventsModule from '@/lib/impact/affiliate-events';
 import { randomUUID } from 'node:crypto';
 
 function ensureKiloPassStripePriceIdEnv(): void {
@@ -186,7 +186,8 @@ function kiloPassMetadata(params: {
 }
 
 async function seedDeliveredImpactSignupEvent(userId: string, email: string): Promise<void> {
-  const { recordAffiliateAttributionAndQueueParentEvent } = await import('@/lib/affiliate-events');
+  const { recordAffiliateAttributionAndQueueParentEvent } =
+    await import('@/lib/impact/affiliate-events');
   const parentEvent = await recordAffiliateAttributionAndQueueParentEvent({
     userId,
     provider: 'impact',
@@ -202,7 +203,7 @@ async function seedDeliveredImpactSignupEvent(userId: string, email: string): Pr
     .update(user_affiliate_events)
     .set({
       delivery_state: 'delivered',
-      claimed_at: null,
+      claimed_at: '2026-04-09T09:55:00.000Z',
       next_retry_at: null,
     })
     .where(eq(user_affiliate_events.id, parentEvent.id));
@@ -848,8 +849,10 @@ describe('handleKiloPassInvoicePaid', () => {
 
     try {
       jest.resetModules();
-      jest.doMock('@/lib/affiliate-events', () => {
-        const actual = jest.requireActual<typeof affiliateEventsModule>('@/lib/affiliate-events');
+      jest.doMock('@/lib/impact/affiliate-events', () => {
+        const actual = jest.requireActual<typeof affiliateEventsModule>(
+          '@/lib/impact/affiliate-events'
+        );
         return {
           __esModule: true,
           ...actual,
@@ -906,7 +909,7 @@ describe('handleKiloPassInvoicePaid', () => {
       });
       expect(issuance).toBeTruthy();
     } finally {
-      jest.dontMock('@/lib/affiliate-events');
+      jest.dontMock('@/lib/impact/affiliate-events');
       jest.resetModules();
     }
   });

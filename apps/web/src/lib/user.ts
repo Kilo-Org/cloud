@@ -96,19 +96,19 @@ import {
 } from '@/lib/ai-gateway/providerHash';
 import { normalizeEmail } from '@/lib/utils';
 import { extractEmailDomain } from '@/lib/email-domain';
-import { recordAffiliateAttributionAndQueueParentEvent } from '@/lib/affiliate-events';
-import { logImpactReferralDebug } from '@/lib/impact-debug';
+import { recordAffiliateAttributionAndQueueParentEvent } from '@/lib/impact/affiliate-events';
+import { logImpactReferralDebug } from '@/lib/impact/debug';
 import {
   createDeletedUserEmailTombstone,
   queueImpactAdvocateParticipantRegistration,
   recordImpactAffiliateTouch,
   recordImpactReferralTouch,
-} from '@/lib/impact-referral';
+} from '@/lib/impact/referral';
 import {
   redactLandingPathForLogs,
   type ParsedImpactAffiliateTouch,
   type ParsedImpactReferralTouch,
-} from '@/lib/impact-referral-utils';
+} from '@/lib/impact/referral-utils';
 import { redactStoreAccountLinkedJson } from '@/lib/kilo-pass/store-payload-redaction';
 
 const workos = new WorkOS(WORKOS_API_KEY);

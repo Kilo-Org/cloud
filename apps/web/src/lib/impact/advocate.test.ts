@@ -30,7 +30,7 @@ describe('impact advocate', () => {
     process.env.IMPACT_ADVOCATE_AUTH_TOKEN = 'secret';
     process.env.IMPACT_ADVOCATE_ACCOUNT_SID = 'account-sid';
 
-    const { buildImpactAdvocateRegisterParticipantPayload } = await import('@/lib/impact-advocate');
+    const { buildImpactAdvocateRegisterParticipantPayload } = await import('@/lib/impact/advocate');
 
     expect(
       buildImpactAdvocateRegisterParticipantPayload({
@@ -57,7 +57,7 @@ describe('impact advocate', () => {
     process.env.IMPACT_ADVOCATE_ACCOUNT_SID = 'impact-account-sid';
     process.env.IMPACT_ADVOCATE_WIDGET_ID = '51699';
 
-    const { getImpactAdvocateWidgetId } = await import('@/lib/impact-advocate');
+    const { getImpactAdvocateWidgetId } = await import('@/lib/impact/advocate');
 
     expect(getImpactAdvocateWidgetId()).toBe('p/51699/w/referrerWidget');
   });
@@ -73,7 +73,7 @@ describe('impact advocate', () => {
     const {
       buildImpactAdvocateRegisterParticipantPayload,
       issueImpactAdvocateVerifiedAccessToken,
-    } = await import('@/lib/impact-advocate');
+    } = await import('@/lib/impact/advocate');
 
     buildImpactAdvocateRegisterParticipantPayload({
       user: { id: 'user_123', google_user_email: 'referee@example.com' },
@@ -105,7 +105,7 @@ describe('impact advocate', () => {
     process.env.IMPACT_ADVOCATE_WIDGET_ID = 'p/51699/w/referrerWidget';
 
     const { getImpactAdvocateWidgetId, issueImpactAdvocateVerifiedAccessToken } =
-      await import('@/lib/impact-advocate');
+      await import('@/lib/impact/advocate');
 
     const token = issueImpactAdvocateVerifiedAccessToken(
       { id: 'user_123', google_user_email: 'referrer@example.com' },
@@ -146,7 +146,7 @@ describe('impact advocate', () => {
     );
     global.fetch = fetchMock;
 
-    const { sendImpactAdvocateRewardLookupPayload } = await import('@/lib/impact-advocate');
+    const { sendImpactAdvocateRewardLookupPayload } = await import('@/lib/impact/advocate');
     const result = await sendImpactAdvocateRewardLookupPayload({
       accountId: 'user@example.com',
       userId: 'user@example.com',
@@ -186,7 +186,7 @@ describe('impact advocate', () => {
       .mockResolvedValue(new Response('{"ok":true}', { status: 200 }));
     global.fetch = fetchMock;
 
-    const { sendImpactAdvocateRewardRedemptionPayload } = await import('@/lib/impact-advocate');
+    const { sendImpactAdvocateRewardRedemptionPayload } = await import('@/lib/impact/advocate');
     const result = await sendImpactAdvocateRewardRedemptionPayload({
       rewardId: 'reward-123',
       amount: 1,
@@ -210,7 +210,7 @@ describe('impact advocate', () => {
   });
 
   it('strips legacy programId and normalises locale at send time', async () => {
-    const { sanitizeRegisterParticipantPayloadForWire } = await import('@/lib/impact-advocate');
+    const { sanitizeRegisterParticipantPayloadForWire } = await import('@/lib/impact/advocate');
 
     // Legacy persisted shape: extra programId, BCP 47 locale, plus an unknown
     // garbage field. Sanitiser must produce SaaSquatch-acceptable JSON.
@@ -238,7 +238,7 @@ describe('impact advocate', () => {
   describe('extractAdvocateReferralCodeFromUpsertResponse', () => {
     it('returns the program-scoped code from a SaaSquatch upsert response', async () => {
       const { extractAdvocateReferralCodeFromUpsertResponse } =
-        await import('@/lib/impact-advocate');
+        await import('@/lib/impact/advocate');
 
       const body = JSON.stringify({
         id: 'hash',
@@ -253,7 +253,7 @@ describe('impact advocate', () => {
 
     it('returns null for missing program, malformed JSON, empty bodies, or non-string codes', async () => {
       const { extractAdvocateReferralCodeFromUpsertResponse } =
-        await import('@/lib/impact-advocate');
+        await import('@/lib/impact/advocate');
 
       expect(extractAdvocateReferralCodeFromUpsertResponse(null, '51699')).toBeNull();
       expect(extractAdvocateReferralCodeFromUpsertResponse('', '51699')).toBeNull();

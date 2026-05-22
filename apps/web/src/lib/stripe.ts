@@ -55,7 +55,7 @@ import {
   handleKiloClawScheduleEvent,
   handleKiloClawInvoicePaid,
 } from '@/lib/kiloclaw/stripe-handlers';
-import { enqueueImpactSaleReversalForCharge } from '@/lib/affiliate-events';
+import { enqueueImpactSaleReversalForCharge } from '@/lib/impact/affiliate-events';
 import { markPersonalKiloClawReferralPaymentAdverse } from '@/lib/kiloclaw-referrals';
 import { invoiceLooksLikeKiloClawByPriceId } from '@/lib/kiloclaw/stripe-invoice-classifier.server';
 import { reportEvents } from '@/lib/ai-gateway/abuse-service';

@@ -11,8 +11,8 @@ jest.mock('@/lib/impact', () => {
   };
 });
 
-jest.mock('@/lib/impact-advocate', () => {
-  const actual = jest.requireActual('@/lib/impact-advocate');
+jest.mock('@/lib/impact/advocate', () => {
+  const actual = jest.requireActual('@/lib/impact/advocate');
   return {
     ...actual,
     isImpactAdvocateConfigured: jest.fn(() => true),
@@ -70,7 +70,7 @@ import {
   isImpactAdvocateConfigured,
   sendImpactAdvocateRewardLookupPayload,
   sendImpactAdvocateRewardRedemptionPayload,
-} from '@/lib/impact-advocate';
+} from '@/lib/impact/advocate';
 import { client as stripeClient } from '@/lib/stripe-client';
 
 const mockIsImpactConfigured = jest.mocked(isImpactConfigured);

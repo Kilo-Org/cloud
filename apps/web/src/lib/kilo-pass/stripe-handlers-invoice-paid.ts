@@ -48,7 +48,10 @@ import {
   computeMonthlyKiloPassStreak,
   updateKiloPassThresholdAfterBaseCredits,
 } from '@/lib/kilo-pass/subscription-accounting';
-import { buildAffiliateEventDedupeKey, enqueueAffiliateEventForUser } from '@/lib/affiliate-events';
+import {
+  buildAffiliateEventDedupeKey,
+  enqueueAffiliateEventForUser,
+} from '@/lib/impact/affiliate-events';
 import { sentryLogger } from '@/lib/utils.server';
 
 const logWarning = sentryLogger('kilo-pass-stripe', 'warning');

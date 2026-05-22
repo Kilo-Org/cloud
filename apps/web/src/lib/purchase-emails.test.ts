@@ -55,7 +55,7 @@ jest.mock('@/lib/kilo-pass/usage-triggered-bonus', () => ({
   maybeIssueKiloPassBonusFromUsageThreshold: jest.fn(async () => {}),
 }));
 
-jest.mock('@/lib/affiliate-events', () => ({
+jest.mock('@/lib/impact/affiliate-events', () => ({
   enqueueAffiliateEventForUser: jest.fn(async () => {}),
   buildAffiliateEventDedupeKey: jest.fn(() => 'test-dedupe-key'),
   recordAffiliateAttributionAndQueueParentEvent: jest.fn(async () => {}),

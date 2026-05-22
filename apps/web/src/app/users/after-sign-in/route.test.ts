@@ -13,11 +13,11 @@ jest.mock('@/lib/affiliate-attribution', () => ({
   getAffiliateAttribution: jest.fn(),
 }));
 
-jest.mock('@/lib/affiliate-events', () => ({
+jest.mock('@/lib/impact/affiliate-events', () => ({
   recordAffiliateAttributionAndQueueParentEvent: jest.fn(),
 }));
 
-jest.mock('@/lib/impact-referral', () => ({
+jest.mock('@/lib/impact/referral', () => ({
   countryCodeFromHeaders: jest.fn(() => null),
   localeFromHeaders: jest.fn(() => null),
   queueImpactAdvocateParticipantRegistration: jest.fn(),
@@ -25,7 +25,7 @@ jest.mock('@/lib/impact-referral', () => ({
   recordImpactReferralTouch: jest.fn(),
 }));
 
-jest.mock('@/lib/impact-debug', () => ({
+jest.mock('@/lib/impact/debug', () => ({
   logImpactReferralDebug: jest.fn(),
 }));
 
@@ -41,7 +41,7 @@ jest.mock('@/lib/credit-campaigns', () => ({
 }));
 
 import { getAffiliateAttribution } from '@/lib/affiliate-attribution';
-import { recordAffiliateAttributionAndQueueParentEvent } from '@/lib/affiliate-events';
+import { recordAffiliateAttributionAndQueueParentEvent } from '@/lib/impact/affiliate-events';
 import { getUserFromAuth } from '@/lib/user.server';
 import { GET } from './route';
 

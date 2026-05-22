@@ -3,25 +3,25 @@ import { isValidCallbackPath } from '@/lib/getSignInCallbackUrl';
 import { maybeInterceptWithSurvey } from '@/lib/survey-redirect';
 import PostHogClient from '@/lib/posthog';
 import { getAffiliateAttribution } from '@/lib/affiliate-attribution';
-import { recordAffiliateAttributionAndQueueParentEvent } from '@/lib/affiliate-events';
-import { logImpactReferralDebug } from '@/lib/impact-debug';
+import { recordAffiliateAttributionAndQueueParentEvent } from '@/lib/impact/affiliate-events';
+import { logImpactReferralDebug } from '@/lib/impact/debug';
 import {
   IMPACT_APP_TRACKED_CLICK_ID_COOKIE,
   IMPACT_CLICK_ID_COOKIE,
   resolveImpactAffiliateTrackingId,
-} from '@/lib/impact-affiliate-utils';
+} from '@/lib/impact/affiliate-utils';
 import {
   countryCodeFromHeaders,
   localeFromHeaders,
   queueImpactAdvocateParticipantRegistration,
   recordImpactAffiliateTouch,
   recordImpactReferralTouch,
-} from '@/lib/impact-referral';
+} from '@/lib/impact/referral';
 import {
   parseImpactAffiliateTouchFromUrl,
   parseImpactReferralTouchFromUrl,
   redactLandingPathForLogs,
-} from '@/lib/impact-referral-utils';
+} from '@/lib/impact/referral-utils';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { APP_URL } from '@/lib/constants';

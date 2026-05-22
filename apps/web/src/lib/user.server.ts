@@ -29,13 +29,13 @@ import { allow_fake_login, ORGANIZATION_ID_HEADER } from './constants';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { verifyAndConsumeMagicLinkToken } from '@/lib/auth/magic-link-tokens';
 import { redirect } from 'next/navigation';
-import { IMPACT_CLICK_ID_COOKIE } from '@/lib/impact-affiliate-utils';
-import { logImpactReferralDebug } from '@/lib/impact-debug';
-import { countryCodeFromHeaders, localeFromHeaders } from '@/lib/impact-referral';
+import { IMPACT_CLICK_ID_COOKIE } from '@/lib/impact/affiliate-utils';
+import { logImpactReferralDebug } from '@/lib/impact/debug';
+import { countryCodeFromHeaders, localeFromHeaders } from '@/lib/impact/referral';
 import {
   parseImpactAffiliateTouchFromUrl,
   parseImpactReferralTouchFromUrl,
-} from '@/lib/impact-referral-utils';
+} from '@/lib/impact/referral-utils';
 import { classifyOrganizationEntitlement } from '@/lib/organizations/trial-utils';
 import { getMostRecentSeatPurchase } from '@/lib/organizations/organization-seats';
 import { secondsInDay } from 'date-fns/constants';

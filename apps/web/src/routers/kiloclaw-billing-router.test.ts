@@ -385,8 +385,9 @@ async function seedDeliveredImpactSignupEvent(
   email: string,
   conversionDate = new Date()
 ) {
-  const { recordAffiliateAttributionAndQueueParentEvent } = await import('@/lib/affiliate-events');
-  const { recordImpactAffiliateTouch } = await import('@/lib/impact-referral');
+  const { recordAffiliateAttributionAndQueueParentEvent } =
+    await import('@/lib/impact/affiliate-events');
+  const { recordImpactAffiliateTouch } = await import('@/lib/impact/referral');
   const eventDate = new Date(conversionDate.getTime() - 10 * 60_000);
 
   const parentEvent = await recordAffiliateAttributionAndQueueParentEvent({

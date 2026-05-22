@@ -6,7 +6,7 @@ import {
   IMPACT_SIGNUP_FALLBACK_MAX_ACCOUNT_AGE_MS,
   resolveImpactAffiliateTrackingId,
   shouldTrackImpactSignupFallback,
-} from '@/lib/impact-affiliate-utils';
+} from '@/lib/impact/affiliate-utils';
 
 describe('impact affiliate utils', () => {
   describe('cookie contract', () => {

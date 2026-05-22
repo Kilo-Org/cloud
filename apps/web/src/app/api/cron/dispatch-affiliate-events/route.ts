@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 
 import { CRON_SECRET } from '@/lib/config.server';
-import { dispatchQueuedAffiliateEvents } from '@/lib/affiliate-events';
-import { dispatchQueuedImpactAdvocateRegistrationAttempts } from '@/lib/impact-referral';
+import { dispatchQueuedAffiliateEvents } from '@/lib/impact/affiliate-events';
+import { dispatchQueuedImpactAdvocateRegistrationAttempts } from '@/lib/impact/referral';
 import {
   dispatchQueuedImpactAdvocateRewardRedemptions,
   dispatchQueuedImpactConversionReports,

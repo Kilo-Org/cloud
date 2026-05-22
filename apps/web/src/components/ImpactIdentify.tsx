@@ -2,8 +2,8 @@
 
 import { useEffect } from 'react';
 import { useUser } from '@/hooks/useUser';
-import { logImpactReferralDebug } from '@/lib/impact-debug';
-import { IMPACT_CUSTOM_PROFILE_ID_STORAGE_KEY } from '@/lib/impact-referral-utils';
+import { logImpactReferralDebug } from '@/lib/impact/debug';
+import { IMPACT_CUSTOM_PROFILE_ID_STORAGE_KEY } from '@/lib/impact/referral-utils';
 
 async function sha1Hex(value: string): Promise<string> {
   const normalized = value.trim().toLowerCase();

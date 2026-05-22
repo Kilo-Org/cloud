@@ -64,7 +64,7 @@ describe('affiliate-events', () => {
       buildAffiliateEventDedupeKey,
       enqueueAffiliateEventForUser,
       recordAffiliateAttributionAndQueueParentEvent,
-    } = await import('@/lib/affiliate-events');
+    } = await import('@/lib/impact/affiliate-events');
 
     const parentEvent = await recordAffiliateAttributionAndQueueParentEvent({
       userId: user.id,
@@ -113,7 +113,7 @@ describe('affiliate-events', () => {
   }) {
     const stripeChargeId = params?.stripeChargeId ?? 'ch_sale_test_123';
     const { user } = await createQueuedSaleEvent({ stripeChargeId });
-    const { dispatchQueuedAffiliateEvents } = await import('@/lib/affiliate-events');
+    const { dispatchQueuedAffiliateEvents } = await import('@/lib/impact/affiliate-events');
 
     global.fetch = jest.fn().mockResolvedValue(
       params?.saleResponse === 'queued'
@@ -152,7 +152,7 @@ describe('affiliate-events', () => {
       buildAffiliateEventDedupeKey,
       enqueueAffiliateEventForUser,
       recordAffiliateAttributionAndQueueParentEvent,
-    } = await import('@/lib/affiliate-events');
+    } = await import('@/lib/impact/affiliate-events');
 
     await recordAffiliateAttributionAndQueueParentEvent({
       userId: user.id,
@@ -209,7 +209,7 @@ describe('affiliate-events', () => {
       dispatchQueuedAffiliateEvents,
       enqueueAffiliateEventForUser,
       recordAffiliateAttributionAndQueueParentEvent,
-    } = await import('@/lib/affiliate-events');
+    } = await import('@/lib/impact/affiliate-events');
 
     const parentEvent = await recordAffiliateAttributionAndQueueParentEvent({
       userId: user.id,
@@ -273,7 +273,7 @@ describe('affiliate-events', () => {
       dispatchQueuedAffiliateEvents,
       enqueueAffiliateEventForUser,
       recordAffiliateAttributionAndQueueParentEvent,
-    } = await import('@/lib/affiliate-events');
+    } = await import('@/lib/impact/affiliate-events');
 
     const parentEvent = await recordAffiliateAttributionAndQueueParentEvent({
       userId: user.id,
@@ -335,7 +335,7 @@ describe('affiliate-events', () => {
       buildAffiliateEventDedupeKey,
       enqueueAffiliateEventForUser,
       recordAffiliateAttributionAndQueueParentEvent,
-    } = await import('@/lib/affiliate-events');
+    } = await import('@/lib/impact/affiliate-events');
 
     const parentEvent = await recordAffiliateAttributionAndQueueParentEvent({
       userId: user.id,
@@ -364,7 +364,7 @@ describe('affiliate-events', () => {
     delete process.env.IMPACT_AUTH_TOKEN;
     delete process.env.IMPACT_CAMPAIGN_ID;
     jest.resetModules();
-    const { dispatchQueuedAffiliateEvents } = await import('@/lib/affiliate-events');
+    const { dispatchQueuedAffiliateEvents } = await import('@/lib/impact/affiliate-events');
     const fetchMock: typeof fetch = jest.fn(async () => new Response('', { status: 200 }));
     global.fetch = fetchMock;
 
@@ -400,7 +400,7 @@ describe('affiliate-events', () => {
       dispatchQueuedAffiliateEvents,
       enqueueAffiliateEventForUser,
       recordAffiliateAttributionAndQueueParentEvent,
-    } = await import('@/lib/affiliate-events');
+    } = await import('@/lib/impact/affiliate-events');
 
     const parentEvent = await recordAffiliateAttributionAndQueueParentEvent({
       userId: user.id,
@@ -458,7 +458,7 @@ describe('affiliate-events', () => {
   it('requeues 5xx failures with backoff', async () => {
     const user = await insertTestUser();
     const { dispatchQueuedAffiliateEvents, recordAffiliateAttributionAndQueueParentEvent } =
-      await import('@/lib/affiliate-events');
+      await import('@/lib/impact/affiliate-events');
 
     await recordAffiliateAttributionAndQueueParentEvent({
       userId: user.id,
@@ -494,7 +494,7 @@ describe('affiliate-events', () => {
   it('marks 4xx failures as failed', async () => {
     const user = await insertTestUser();
     const { dispatchQueuedAffiliateEvents, recordAffiliateAttributionAndQueueParentEvent } =
-      await import('@/lib/affiliate-events');
+      await import('@/lib/impact/affiliate-events');
 
     await recordAffiliateAttributionAndQueueParentEvent({
       userId: user.id,
@@ -539,7 +539,7 @@ describe('affiliate-events', () => {
   it('reclaims stale sending rows before dispatching', async () => {
     const user = await insertTestUser();
     const { dispatchQueuedAffiliateEvents, recordAffiliateAttributionAndQueueParentEvent } =
-      await import('@/lib/affiliate-events');
+      await import('@/lib/impact/affiliate-events');
 
     const parentEvent = await recordAffiliateAttributionAndQueueParentEvent({
       userId: user.id,
@@ -580,7 +580,7 @@ describe('affiliate-events', () => {
       dispatchQueuedAffiliateEvents,
       enqueueAffiliateEventForUser,
       recordAffiliateAttributionAndQueueParentEvent,
-    } = await import('@/lib/affiliate-events');
+    } = await import('@/lib/impact/affiliate-events');
 
     const parentEvent = await recordAffiliateAttributionAndQueueParentEvent({
       userId: user.id,
@@ -673,7 +673,7 @@ describe('affiliate-events', () => {
 
   it('blocks sale reversal until parent sale is delivered', async () => {
     const { user, saleEvent } = await createQueuedSaleEvent();
-    const { enqueueImpactSaleReversalForCharge } = await import('@/lib/affiliate-events');
+    const { enqueueImpactSaleReversalForCharge } = await import('@/lib/impact/affiliate-events');
 
     await enqueueImpactSaleReversalForCharge({
       stripeChargeId: 'ch_sale_test_123',
@@ -696,7 +696,7 @@ describe('affiliate-events', () => {
   it('resolves queued sale submission to action id before reversal dispatch', async () => {
     const { user, saleEvent } = await createDeliveredSaleEvent({ saleResponse: 'queued' });
     const { dispatchQueuedAffiliateEvents, enqueueImpactSaleReversalForCharge } =
-      await import('@/lib/affiliate-events');
+      await import('@/lib/impact/affiliate-events');
 
     await enqueueImpactSaleReversalForCharge({
       stripeChargeId: 'ch_sale_test_123',
@@ -750,7 +750,7 @@ describe('affiliate-events', () => {
 
   it('queues reversal when delivered sale identity remains recoverable from payload', async () => {
     const { user, saleEvent } = await createDeliveredSaleEvent({ saleResponse: 'immediate' });
-    const { enqueueImpactSaleReversalForCharge } = await import('@/lib/affiliate-events');
+    const { enqueueImpactSaleReversalForCharge } = await import('@/lib/impact/affiliate-events');
 
     await db
       .update(user_affiliate_events)
@@ -784,7 +784,7 @@ describe('affiliate-events', () => {
     const { user, saleEvent } = await createQueuedSaleEvent({
       stripeChargeId: 'ch_unrecoverable_sale_mapping',
     });
-    const { enqueueImpactSaleReversalForCharge } = await import('@/lib/affiliate-events');
+    const { enqueueImpactSaleReversalForCharge } = await import('@/lib/impact/affiliate-events');
 
     await db
       .update(user_affiliate_events)
@@ -822,7 +822,7 @@ describe('affiliate-events', () => {
   it('dispatches a full Impact action rejection for a partial sale dispute', async () => {
     const { user } = await createDeliveredSaleEvent({ saleResponse: 'immediate' });
     const { dispatchQueuedAffiliateEvents, enqueueImpactSaleReversalForCharge } =
-      await import('@/lib/affiliate-events');
+      await import('@/lib/impact/affiliate-events');
 
     await enqueueImpactSaleReversalForCharge({
       stripeChargeId: 'ch_sale_test_123',
@@ -866,7 +866,7 @@ describe('affiliate-events', () => {
     jest.resetModules();
 
     const { dispatchQueuedAffiliateEvents, enqueueImpactSaleReversalForCharge } =
-      await import('@/lib/affiliate-events');
+      await import('@/lib/impact/affiliate-events');
 
     await enqueueImpactSaleReversalForCharge({
       stripeChargeId: 'ch_sale_test_123',
@@ -891,7 +891,7 @@ describe('affiliate-events', () => {
   it('omits provider response bodies from permanent queued-sale reversal resolution logs', async () => {
     const { user } = await createDeliveredSaleEvent({ saleResponse: 'queued' });
     const { dispatchQueuedAffiliateEvents, enqueueImpactSaleReversalForCharge } =
-      await import('@/lib/affiliate-events');
+      await import('@/lib/impact/affiliate-events');
 
     await enqueueImpactSaleReversalForCharge({
       stripeChargeId: 'ch_sale_test_123',
@@ -930,7 +930,7 @@ describe('affiliate-events', () => {
   it('retries sale reversal on retryable upstream failure', async () => {
     const { user } = await createDeliveredSaleEvent({ saleResponse: 'immediate' });
     const { dispatchQueuedAffiliateEvents, enqueueImpactSaleReversalForCharge } =
-      await import('@/lib/affiliate-events');
+      await import('@/lib/impact/affiliate-events');
 
     await enqueueImpactSaleReversalForCharge({
       stripeChargeId: 'ch_sale_test_123',
@@ -960,7 +960,7 @@ describe('affiliate-events', () => {
   it('fails sale reversal permanently on client failure', async () => {
     const { user } = await createDeliveredSaleEvent({ saleResponse: 'immediate' });
     const { dispatchQueuedAffiliateEvents, enqueueImpactSaleReversalForCharge } =
-      await import('@/lib/affiliate-events');
+      await import('@/lib/impact/affiliate-events');
 
     await enqueueImpactSaleReversalForCharge({
       stripeChargeId: 'ch_sale_test_123',
@@ -999,7 +999,7 @@ describe('affiliate-events', () => {
   it('fails blocked sale reversal when parent sale fails permanently', async () => {
     const { user, saleEvent } = await createQueuedSaleEvent();
     const { dispatchQueuedAffiliateEvents, enqueueImpactSaleReversalForCharge } =
-      await import('@/lib/affiliate-events');
+      await import('@/lib/impact/affiliate-events');
 
     await enqueueImpactSaleReversalForCharge({
       stripeChargeId: 'ch_sale_test_123',
@@ -1028,7 +1028,7 @@ describe('affiliate-events', () => {
 
   it('dedupes duplicate disputes for same stripe charge', async () => {
     const { user } = await createDeliveredSaleEvent({ saleResponse: 'immediate' });
-    const { enqueueImpactSaleReversalForCharge } = await import('@/lib/affiliate-events');
+    const { enqueueImpactSaleReversalForCharge } = await import('@/lib/impact/affiliate-events');
 
     await enqueueImpactSaleReversalForCharge({
       stripeChargeId: 'ch_sale_test_123',
@@ -1055,7 +1055,7 @@ describe('affiliate-events', () => {
 
   it('persists dispute when sale row is missing and materializes reversal once sale appears', async () => {
     const { enqueueImpactSaleReversalForCharge, dispatchQueuedAffiliateEvents } =
-      await import('@/lib/affiliate-events');
+      await import('@/lib/impact/affiliate-events');
 
     // Dispute arrives before invoice.paid has recorded the sale row.
     const deferredResult = await enqueueImpactSaleReversalForCharge({

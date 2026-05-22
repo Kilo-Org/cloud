@@ -57,7 +57,7 @@ describe('impact referral participant registration dispatch', () => {
     const {
       dispatchQueuedImpactAdvocateRegistrationAttempts,
       queueImpactAdvocateParticipantRegistration,
-    } = await import('@/lib/impact-referral');
+    } = await import('@/lib/impact/referral');
 
     await queueImpactAdvocateParticipantRegistration({
       user,
@@ -146,7 +146,7 @@ describe('impact referral participant registration dispatch', () => {
     const {
       dispatchQueuedImpactAdvocateRegistrationAttempts,
       queueImpactAdvocateParticipantRegistration,
-    } = await import('@/lib/impact-referral');
+    } = await import('@/lib/impact/referral');
 
     await queueImpactAdvocateParticipantRegistration({
       user,
@@ -216,7 +216,7 @@ describe('impact referral participant registration dispatch', () => {
     const {
       dispatchQueuedImpactAdvocateRegistrationAttempts,
       queueImpactAdvocateParticipantRegistration,
-    } = await import('@/lib/impact-referral');
+    } = await import('@/lib/impact/referral');
 
     const referralTouch = {
       opaqueTrackingValue: 'sq-cookie',
@@ -284,7 +284,7 @@ describe('impact referral participant registration dispatch', () => {
     const {
       dispatchQueuedImpactAdvocateRegistrationAttempts,
       queueImpactAdvocateParticipantRegistration,
-    } = await import('@/lib/impact-referral');
+    } = await import('@/lib/impact/referral');
 
     await queueImpactAdvocateParticipantRegistration({
       user,
@@ -377,7 +377,7 @@ describe('impact referral participant registration dispatch', () => {
       const {
         dispatchQueuedImpactAdvocateRegistrationAttempts,
         queueImpactAdvocateParticipantRegistration,
-      } = await import('@/lib/impact-referral');
+      } = await import('@/lib/impact/referral');
 
       await queueImpactAdvocateParticipantRegistration({
         user: newUser,
@@ -447,7 +447,7 @@ describe('impact referral participant registration dispatch', () => {
       const {
         dispatchQueuedImpactAdvocateRegistrationAttempts,
         queueImpactAdvocateSelfRegistration,
-      } = await import('@/lib/impact-referral');
+      } = await import('@/lib/impact/referral');
 
       await queueImpactAdvocateSelfRegistration({
         user,
@@ -503,7 +503,7 @@ describe('impact referral participant registration dispatch', () => {
         normalized_email: 'advocate@example.com',
       });
 
-      const { queueImpactAdvocateSelfRegistration } = await import('@/lib/impact-referral');
+      const { queueImpactAdvocateSelfRegistration } = await import('@/lib/impact/referral');
 
       await queueImpactAdvocateSelfRegistration({ user });
       await queueImpactAdvocateSelfRegistration({ user });
@@ -531,7 +531,7 @@ describe('impact referral participant registration dispatch', () => {
         registered_at: new Date('2026-04-01T00:00:00.000Z').toISOString(),
       });
 
-      const { queueImpactAdvocateSelfRegistration } = await import('@/lib/impact-referral');
+      const { queueImpactAdvocateSelfRegistration } = await import('@/lib/impact/referral');
       await queueImpactAdvocateSelfRegistration({ user });
 
       const attempts = await db.select().from(impact_advocate_registration_attempts);

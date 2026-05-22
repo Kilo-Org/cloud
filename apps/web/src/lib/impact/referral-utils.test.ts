@@ -7,7 +7,7 @@ import {
   redactLandingPathForLogs,
   redactOpaqueTrackingValueForLogs,
   sanitizeOpaqueTrackingValue,
-} from '@/lib/impact-referral-utils';
+} from '@/lib/impact/referral-utils';
 
 describe('impact referral utils', () => {
   it('accepts opaque tracking values within the configured limit', () => {

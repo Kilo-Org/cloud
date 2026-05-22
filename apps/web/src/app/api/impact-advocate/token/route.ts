@@ -7,12 +7,12 @@ import { getUserFromAuth } from '@/lib/user.server';
 import {
   getImpactAdvocateWidgetId,
   issueImpactAdvocateVerifiedAccessToken,
-} from '@/lib/impact-advocate';
+} from '@/lib/impact/advocate';
 import {
   countryCodeFromHeaders,
   localeFromHeaders,
   queueImpactAdvocateSelfRegistration,
-} from '@/lib/impact-referral';
+} from '@/lib/impact/referral';
 
 /**
  * Internal Kilo referral code (kept for legacy/internal attribution flows in

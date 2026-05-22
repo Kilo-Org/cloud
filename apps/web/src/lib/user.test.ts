@@ -76,7 +76,7 @@ import {
   findUsersByIds,
   createOrUpdateUser,
 } from './user';
-import { hashNormalizedEmailForDeletionTombstone } from '@/lib/impact-referral';
+import { hashNormalizedEmailForDeletionTombstone } from '@/lib/impact/referral';
 import { createTestPaymentMethod } from '@/tests/helpers/payment-method.helper';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { forceImmediateExpirationRecomputation } from '@/lib/balanceCache';
@@ -89,7 +89,7 @@ import {
   KiloPassTier,
 } from '@/lib/kilo-pass/enums';
 import { SecurityAuditLogAction } from '@/lib/security-agent/core/enums';
-import { recordAffiliateAttributionAndQueueParentEvent } from '@/lib/affiliate-events';
+import { recordAffiliateAttributionAndQueueParentEvent } from '@/lib/impact/affiliate-events';
 
 jest.mock('@/lib/stripe-client', () => ({
   createStripeCustomer: jest.fn(async ({ metadata }: { metadata: { kiloUserId: string } }) => ({
@@ -98,7 +98,7 @@ jest.mock('@/lib/stripe-client', () => ({
   deleteStripeCustomer: jest.fn(async () => {}),
 }));
 
-jest.mock('@/lib/affiliate-events', () => ({
+jest.mock('@/lib/impact/affiliate-events', () => ({
   recordAffiliateAttributionAndQueueParentEvent: jest.fn(async () => null),
 }));
 

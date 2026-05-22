@@ -1133,7 +1133,7 @@ describe('processStripePaymentEventHook', () => {
       stripe_charge_id: 'ch_kilo_pass_deferred_materialization',
     });
 
-    const { dispatchQueuedAffiliateEvents } = await import('@/lib/affiliate-events');
+    const { dispatchQueuedAffiliateEvents } = await import('@/lib/impact/affiliate-events');
     await dispatchQueuedAffiliateEvents();
 
     const pendingRows = await db.select().from(pending_impact_sale_reversals);

@@ -12,7 +12,10 @@ import {
   type KiloClawSubscription,
 } from '@kilocode/db';
 import { kiloclaw_subscriptions, kiloclaw_instances, kilocode_users } from '@kilocode/db/schema';
-import type { KiloClawSubscriptionStatus } from '@kilocode/db/schema-types';
+import {
+  ImpactReferralPaymentProvider,
+  type KiloClawSubscriptionStatus,
+} from '@kilocode/db/schema-types';
 import {
   getClawPlanForStripePriceId,
   getStripePriceIdForClawPlan,
@@ -1607,6 +1610,7 @@ export async function handleKiloClawInvoicePaid(params: {
         userId: metadata.kiloUserId,
         sourcePaymentId: invoice.id,
         orderId: invoice.id,
+        paymentProvider: ImpactReferralPaymentProvider.Stripe,
         amount: invoice.amount_paid / 100,
         currencyCode: invoice.currency ?? 'usd',
         convertedAt: eventDate,

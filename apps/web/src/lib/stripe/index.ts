@@ -57,6 +57,7 @@ import {
 } from '@/lib/kiloclaw/stripe-handlers';
 import { enqueueImpactSaleReversalForCharge } from '@/lib/impact/affiliate-events';
 import { markPersonalKiloClawReferralPaymentAdverse } from '@/lib/impact/kiloclaw-referrals';
+import { ImpactReferralPaymentProvider } from '@kilocode/db/schema-types';
 import { invoiceLooksLikeKiloClawByPriceId } from '@/lib/kiloclaw/stripe-invoice-classifier.server';
 import { reportEvents } from '@/lib/ai-gateway/abuse-service';
 import {
@@ -903,6 +904,7 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
       if (affiliateDisputeCharge.saleKind === 'kiloclaw') {
         await markPersonalKiloClawReferralPaymentAdverse({
           sourcePaymentId: affiliateDisputeCharge.invoiceId,
+          paymentProvider: ImpactReferralPaymentProvider.Stripe,
           reason: 'chargeback',
           occurredAt: new Date(dispute.created * 1000),
         });
@@ -923,6 +925,7 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
 
       await markPersonalKiloClawReferralPaymentAdverse({
         sourcePaymentId: kiloClawCharge.invoiceId,
+        paymentProvider: ImpactReferralPaymentProvider.Stripe,
         reason: 'refund',
         occurredAt: new Date(charge.created * 1000),
       });
@@ -945,6 +948,7 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
 
       await markPersonalKiloClawReferralPaymentAdverse({
         sourcePaymentId: kiloClawCharge.invoiceId,
+        paymentProvider: ImpactReferralPaymentProvider.Stripe,
         reason: 'fraud',
         occurredAt: new Date(charge.created * 1000),
       });

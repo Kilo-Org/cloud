@@ -2,7 +2,7 @@ import {
   referral_codes,
   referral_code_usages,
   credit_transactions,
-  kiloclaw_referral_conversions,
+  impact_referral_conversions,
   kilocode_users,
 } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
@@ -22,7 +22,7 @@ describe('referrals', () => {
     // eslint-disable-next-line drizzle/enforce-delete-with-where
     await db.delete(referral_code_usages);
     // eslint-disable-next-line drizzle/enforce-delete-with-where
-    await db.delete(kiloclaw_referral_conversions);
+    await db.delete(impact_referral_conversions);
     // eslint-disable-next-line drizzle/enforce-delete-with-where
     await db.delete(credit_transactions);
     // eslint-disable-next-line drizzle/enforce-delete-with-where
@@ -347,7 +347,7 @@ describe('referrals', () => {
         redeeming_kilo_user_id: redeemingUser.id,
         referring_kilo_user_id: referringUser.id,
       });
-      await db.insert(kiloclaw_referral_conversions).values({
+      await db.insert(impact_referral_conversions).values({
         referee_user_id: redeemingUser.id,
         referrer_user_id: referringUser.id,
         source_payment_id: 'kiloclaw-payment-1',

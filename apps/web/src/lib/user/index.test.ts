@@ -55,14 +55,14 @@ import {
   agent_environment_profile_mcp_servers,
   agent_environment_profile_skills,
   deleted_user_email_tombstones,
-  kiloclaw_attribution_touches,
+  impact_referral_touches,
   impact_advocate_participants,
   impact_advocate_registration_attempts,
-  kiloclaw_referrals,
-  kiloclaw_referral_conversions,
-  kiloclaw_referral_reward_decisions,
-  kiloclaw_referral_rewards,
-  kiloclaw_referral_reward_applications,
+  impact_referrals,
+  impact_referral_conversions,
+  impact_referral_reward_decisions,
+  impact_referral_rewards,
+  impact_referral_reward_applications,
   impact_advocate_reward_redemptions,
   impact_conversion_reports,
   github_branch_pull_requests,
@@ -112,16 +112,16 @@ describe('User', () => {
     await db.delete(user_auth_provider);
     await db.delete(user_affiliate_attributions);
     await db.delete(user_affiliate_events);
-    await db.delete(kiloclaw_attribution_touches);
+    await db.delete(impact_referral_touches);
     await db.delete(impact_advocate_registration_attempts);
     await db.delete(impact_advocate_participants);
     await db.delete(impact_conversion_reports);
     await db.delete(impact_advocate_reward_redemptions);
-    await db.delete(kiloclaw_referral_reward_applications);
-    await db.delete(kiloclaw_referral_rewards);
-    await db.delete(kiloclaw_referral_reward_decisions);
-    await db.delete(kiloclaw_referral_conversions);
-    await db.delete(kiloclaw_referrals);
+    await db.delete(impact_referral_reward_applications);
+    await db.delete(impact_referral_rewards);
+    await db.delete(impact_referral_reward_decisions);
+    await db.delete(impact_referral_conversions);
+    await db.delete(impact_referrals);
     await db.delete(deleted_user_email_tombstones);
     await db.delete(payment_methods);
     await db.delete(kilo_pass_store_events);
@@ -641,7 +641,7 @@ describe('User', () => {
       const decisionId = randomUUID();
       const rewardId = randomUUID();
 
-      await db.insert(kiloclaw_attribution_touches).values({
+      await db.insert(impact_referral_touches).values({
         id: touchId,
         dedupe_key: 'touch-dedupe',
         user_id: user.id,
@@ -668,12 +668,12 @@ describe('User', () => {
         cookie_value_length: 9,
         delivery_state: 'queued',
       });
-      await db.insert(kiloclaw_referrals).values({
+      await db.insert(impact_referrals).values({
         referee_user_id: user.id,
         referrer_user_id: referrer.id,
         source_touch_id: touchId,
       });
-      await db.insert(kiloclaw_referral_conversions).values({
+      await db.insert(impact_referral_conversions).values({
         id: conversionId,
         referee_user_id: user.id,
         referrer_user_id: referrer.id,
@@ -683,7 +683,7 @@ describe('User', () => {
         qualified: true,
         converted_at: '2026-04-23T00:00:00.000Z',
       });
-      await db.insert(kiloclaw_referral_reward_decisions).values({
+      await db.insert(impact_referral_reward_decisions).values({
         id: decisionId,
         conversion_id: conversionId,
         beneficiary_user_id: user.id,
@@ -691,7 +691,7 @@ describe('User', () => {
         outcome: 'granted',
         months_granted: 1,
       });
-      await db.insert(kiloclaw_referral_rewards).values({
+      await db.insert(impact_referral_rewards).values({
         id: rewardId,
         conversion_id: conversionId,
         decision_id: decisionId,
@@ -701,7 +701,7 @@ describe('User', () => {
         status: 'pending',
         earned_at: '2026-04-23T00:00:00.000Z',
       });
-      await db.insert(kiloclaw_referral_reward_applications).values({
+      await db.insert(impact_referral_reward_applications).values({
         reward_id: rewardId,
         beneficiary_user_id: user.id,
         previous_renewal_boundary: '2026-05-01T00:00:00.000Z',
@@ -745,8 +745,8 @@ describe('User', () => {
 
       const [touchCount] = await db
         .select({ count: count() })
-        .from(kiloclaw_attribution_touches)
-        .where(eq(kiloclaw_attribution_touches.user_id, user.id));
+        .from(impact_referral_touches)
+        .where(eq(impact_referral_touches.user_id, user.id));
       expect(touchCount.count).toBe(0);
 
       const [participantCount] = await db
@@ -763,8 +763,8 @@ describe('User', () => {
 
       const [conversionCount] = await db
         .select({ count: count() })
-        .from(kiloclaw_referral_conversions)
-        .where(eq(kiloclaw_referral_conversions.referee_user_id, user.id));
+        .from(impact_referral_conversions)
+        .where(eq(impact_referral_conversions.referee_user_id, user.id));
       expect(conversionCount.count).toBe(0);
     });
 

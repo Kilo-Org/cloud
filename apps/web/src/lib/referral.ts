@@ -1,7 +1,7 @@
 import 'server-only';
 import assert from 'node:assert';
 import {
-  kiloclaw_referral_conversions,
+  impact_referral_conversions,
   referral_code_usages,
   referral_codes,
 } from '@kilocode/db/schema';
@@ -57,9 +57,9 @@ const referringReferralPromoCode = referralReferringBonus.credit_category;
 
 export async function processReferralTopUp(redeemingKiloUserId: string) {
   const [kiloclawReferralConversion] = await db
-    .select({ id: kiloclaw_referral_conversions.id })
-    .from(kiloclaw_referral_conversions)
-    .where(eq(kiloclaw_referral_conversions.referee_user_id, redeemingKiloUserId))
+    .select({ id: impact_referral_conversions.id })
+    .from(impact_referral_conversions)
+    .where(eq(impact_referral_conversions.referee_user_id, redeemingKiloUserId))
     .limit(1);
   if (kiloclawReferralConversion) {
     return;

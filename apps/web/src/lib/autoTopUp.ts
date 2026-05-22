@@ -72,6 +72,7 @@ async function shouldWaitForKiloPassBonusCredits(kiloUserId: string): Promise<bo
       inArray(kilo_pass_issuance_items.kind, [
         KiloPassIssuanceItemKind.Bonus,
         KiloPassIssuanceItemKind.PromoFirstMonth50Pct,
+        KiloPassIssuanceItemKind.ReferralBonus,
       ])
     ),
   });

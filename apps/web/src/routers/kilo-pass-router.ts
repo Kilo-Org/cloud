@@ -68,6 +68,7 @@ const KiloPassCreditHistoryEntrySchema = z.object({
     KiloPassIssuanceItemKind.Base,
     KiloPassIssuanceItemKind.Bonus,
     KiloPassIssuanceItemKind.PromoFirstMonth50Pct,
+    KiloPassIssuanceItemKind.ReferralBonus,
   ]),
   description: z.string(),
 });
@@ -388,6 +389,7 @@ async function getIsBonusUnlockedForSubscriptionId(subscriptionId: string): Prom
       inArray(kilo_pass_issuance_items.kind, [
         KiloPassIssuanceItemKind.Bonus,
         KiloPassIssuanceItemKind.PromoFirstMonth50Pct,
+        KiloPassIssuanceItemKind.ReferralBonus,
       ])
     ),
   });

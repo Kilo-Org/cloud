@@ -36,10 +36,10 @@ import {
   kiloclaw_earlybird_purchases,
   kiloclaw_subscriptions,
   kiloclaw_instances,
-  kiloclaw_referrals,
-  kiloclaw_referral_conversions,
-  kiloclaw_referral_reward_applications,
-  kiloclaw_referral_rewards,
+  impact_referrals,
+  impact_referral_conversions,
+  impact_referral_reward_applications,
+  impact_referral_rewards,
   kiloclaw_email_log,
   kiloclaw_cli_runs,
   kiloclaw_scheduled_actions,
@@ -52,6 +52,7 @@ import {
   organizations,
 } from '@kilocode/db/schema';
 import { and, asc, eq, ne, desc, isNull, inArray, sql, like, or } from 'drizzle-orm';
+import { ImpactReferralProduct, ImpactReferralRewardKind } from '@kilocode/db/schema-types';
 import { alias } from 'drizzle-orm/pg-core';
 import { deleteWorkerTrigger } from '@/lib/webhook-agent/webhook-agent-client';
 import { sentryLogger } from '@/lib/utils.server';
@@ -1996,25 +1997,31 @@ async function getCustomerReferralRewardSummary(
 ): Promise<KiloclawReferralRewardSummary> {
   const rows = await db
     .select({
-      role: kiloclaw_referral_rewards.beneficiary_role,
-      status: kiloclaw_referral_rewards.status,
-      monthsGranted: kiloclaw_referral_rewards.months_granted,
-      earnedAt: kiloclaw_referral_rewards.earned_at,
-      appliedAt: kiloclaw_referral_rewards.applied_at,
-      expiresAt: kiloclaw_referral_rewards.expires_at,
-      reviewReason: kiloclaw_referral_rewards.review_reason,
-      applicationAppliedAt: kiloclaw_referral_reward_applications.applied_at,
-      applicationSubscriptionId: kiloclaw_referral_reward_applications.subscription_id,
-      previousRenewalBoundary: kiloclaw_referral_reward_applications.previous_renewal_boundary,
-      newRenewalBoundary: kiloclaw_referral_reward_applications.new_renewal_boundary,
+      role: impact_referral_rewards.beneficiary_role,
+      status: impact_referral_rewards.status,
+      monthsGranted: impact_referral_rewards.months_granted,
+      earnedAt: impact_referral_rewards.earned_at,
+      appliedAt: impact_referral_rewards.applied_at,
+      expiresAt: impact_referral_rewards.expires_at,
+      reviewReason: impact_referral_rewards.review_reason,
+      applicationAppliedAt: impact_referral_reward_applications.applied_at,
+      applicationSubscriptionId: impact_referral_reward_applications.subscription_id,
+      previousRenewalBoundary: impact_referral_reward_applications.previous_renewal_boundary,
+      newRenewalBoundary: impact_referral_reward_applications.new_renewal_boundary,
     })
-    .from(kiloclaw_referral_rewards)
+    .from(impact_referral_rewards)
     .leftJoin(
-      kiloclaw_referral_reward_applications,
-      eq(kiloclaw_referral_reward_applications.reward_id, kiloclaw_referral_rewards.id)
+      impact_referral_reward_applications,
+      eq(impact_referral_reward_applications.reward_id, impact_referral_rewards.id)
     )
-    .where(eq(kiloclaw_referral_rewards.beneficiary_user_id, userId))
-    .orderBy(desc(kiloclaw_referral_rewards.earned_at), desc(kiloclaw_referral_rewards.created_at));
+    .where(
+      and(
+        eq(impact_referral_rewards.product, ImpactReferralProduct.KiloClaw),
+        eq(impact_referral_rewards.reward_kind, ImpactReferralRewardKind.KiloClawFreeMonth),
+        eq(impact_referral_rewards.beneficiary_user_id, userId)
+      )
+    )
+    .orderBy(desc(impact_referral_rewards.earned_at), desc(impact_referral_rewards.created_at));
 
   const rewards = rows.map(row => ({
     role: row.role,
@@ -2040,19 +2047,25 @@ async function getCustomerReferralRewardSummary(
   const referredRows = await db
     .select({
       refereeEmail: kilocode_users.google_user_email,
-      qualified: kiloclaw_referral_conversions.qualified,
+      qualified: impact_referral_conversions.qualified,
     })
-    .from(kiloclaw_referrals)
-    .innerJoin(kilocode_users, eq(kilocode_users.id, kiloclaw_referrals.referee_user_id))
+    .from(impact_referrals)
+    .innerJoin(kilocode_users, eq(kilocode_users.id, impact_referrals.referee_user_id))
     .leftJoin(
-      kiloclaw_referral_conversions,
+      impact_referral_conversions,
       and(
-        eq(kiloclaw_referral_conversions.referee_user_id, kiloclaw_referrals.referee_user_id),
-        eq(kiloclaw_referral_conversions.referrer_user_id, userId)
+        eq(impact_referral_conversions.product, ImpactReferralProduct.KiloClaw),
+        eq(impact_referral_conversions.referee_user_id, impact_referrals.referee_user_id),
+        eq(impact_referral_conversions.referrer_user_id, userId)
       )
     )
-    .where(eq(kiloclaw_referrals.referrer_user_id, userId))
-    .orderBy(desc(kiloclaw_referrals.created_at));
+    .where(
+      and(
+        eq(impact_referrals.product, ImpactReferralProduct.KiloClaw),
+        eq(impact_referrals.referrer_user_id, userId)
+      )
+    )
+    .orderBy(desc(impact_referrals.created_at));
   const referredPeople = referredRows
     .filter(row => row.qualified !== false)
     .map(row => ({
@@ -2088,29 +2101,32 @@ async function getAppliedReferralRewardsForSubscription(params: {
 }): Promise<KiloclawSubscriptionReferralRewards> {
   const rows = await db
     .select({
-      role: kiloclaw_referral_rewards.beneficiary_role,
-      appliedAt: kiloclaw_referral_reward_applications.applied_at,
-      monthsGranted: kiloclaw_referral_rewards.months_granted,
-      previousRenewalBoundary: kiloclaw_referral_reward_applications.previous_renewal_boundary,
-      newRenewalBoundary: kiloclaw_referral_reward_applications.new_renewal_boundary,
+      role: impact_referral_rewards.beneficiary_role,
+      appliedAt: impact_referral_reward_applications.applied_at,
+      monthsGranted: impact_referral_rewards.months_granted,
+      previousRenewalBoundary: impact_referral_reward_applications.previous_renewal_boundary,
+      newRenewalBoundary: impact_referral_reward_applications.new_renewal_boundary,
     })
-    .from(kiloclaw_referral_reward_applications)
+    .from(impact_referral_reward_applications)
     .innerJoin(
-      kiloclaw_referral_rewards,
-      eq(kiloclaw_referral_rewards.id, kiloclaw_referral_reward_applications.reward_id)
+      impact_referral_rewards,
+      eq(impact_referral_rewards.id, impact_referral_reward_applications.reward_id)
     )
     .where(
       and(
-        eq(kiloclaw_referral_reward_applications.subscription_id, params.subscriptionId),
-        eq(kiloclaw_referral_reward_applications.beneficiary_user_id, params.userId),
-        eq(kiloclaw_referral_rewards.applies_to_subscription_id, params.subscriptionId),
-        eq(kiloclaw_referral_rewards.beneficiary_user_id, params.userId),
-        eq(kiloclaw_referral_rewards.status, 'applied')
+        eq(impact_referral_reward_applications.product, ImpactReferralProduct.KiloClaw),
+        eq(impact_referral_reward_applications.subscription_id, params.subscriptionId),
+        eq(impact_referral_reward_applications.beneficiary_user_id, params.userId),
+        eq(impact_referral_rewards.product, ImpactReferralProduct.KiloClaw),
+        eq(impact_referral_rewards.reward_kind, ImpactReferralRewardKind.KiloClawFreeMonth),
+        eq(impact_referral_rewards.applies_to_subscription_id, params.subscriptionId),
+        eq(impact_referral_rewards.beneficiary_user_id, params.userId),
+        eq(impact_referral_rewards.status, 'applied')
       )
     )
     .orderBy(
-      asc(kiloclaw_referral_reward_applications.applied_at),
-      asc(kiloclaw_referral_reward_applications.created_at)
+      asc(impact_referral_reward_applications.applied_at),
+      asc(impact_referral_reward_applications.created_at)
     );
 
   return {

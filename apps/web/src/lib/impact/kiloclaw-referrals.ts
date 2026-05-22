@@ -31,12 +31,12 @@ import {
   impact_advocate_participants,
   impact_advocate_reward_redemptions,
   impact_conversion_reports,
-  kiloclaw_attribution_touches,
-  kiloclaw_referral_conversions,
-  kiloclaw_referral_reward_applications,
-  kiloclaw_referral_reward_decisions,
-  kiloclaw_referral_rewards,
-  kiloclaw_referrals,
+  impact_referral_touches,
+  impact_referral_conversions,
+  impact_referral_reward_applications,
+  impact_referral_reward_decisions,
+  impact_referral_rewards,
+  impact_referrals,
   kiloclaw_subscription_change_log,
   kiloclaw_subscriptions,
   kilocode_users,
@@ -45,8 +45,12 @@ import {
   type KiloClawSubscription,
 } from '@kilocode/db/schema';
 import {
+  ImpactAdvocateProgramKey,
   ImpactAdvocateRewardRedemptionState,
   ImpactConversionReportState,
+  ImpactReferralPaymentProvider,
+  ImpactReferralProduct,
+  ImpactReferralRewardKind,
   KiloClawAttributionTouchType,
   KiloClawReferralBeneficiaryRole,
   KiloClawReferralDecisionOutcome,
@@ -257,17 +261,15 @@ async function findAcceptedUserTouches(params: {
 }): Promise<KiloClawAttributionTouch[]> {
   return await params.database
     .select()
-    .from(kiloclaw_attribution_touches)
+    .from(impact_referral_touches)
     .where(
       and(
-        eq(kiloclaw_attribution_touches.user_id, params.userId),
-        lte(kiloclaw_attribution_touches.touched_at, params.convertedAt.toISOString())
+        eq(impact_referral_touches.product, ImpactReferralProduct.KiloClaw),
+        eq(impact_referral_touches.user_id, params.userId),
+        lte(impact_referral_touches.touched_at, params.convertedAt.toISOString())
       )
     )
-    .orderBy(
-      asc(kiloclaw_attribution_touches.touched_at),
-      asc(kiloclaw_attribution_touches.created_at)
-    );
+    .orderBy(asc(impact_referral_touches.touched_at), asc(impact_referral_touches.created_at));
 }
 
 function buildOpaqueReferralIdentifierFromTouch(touch: KiloClawAttributionTouch): string | null {
@@ -287,7 +289,12 @@ async function resolveReferrerUserIdFromReferralTouch(params: {
   const [participant] = await params.database
     .select({ userId: impact_advocate_participants.user_id })
     .from(impact_advocate_participants)
-    .where(eq(impact_advocate_participants.opaque_referral_identifier, opaqueReferralIdentifier))
+    .where(
+      and(
+        eq(impact_advocate_participants.program_key, ImpactAdvocateProgramKey.KiloClaw),
+        eq(impact_advocate_participants.opaque_referral_identifier, opaqueReferralIdentifier)
+      )
+    )
     .limit(1);
 
   if (participant) {
@@ -373,11 +380,11 @@ async function markAffiliateTouchSaleAttributed(params: {
   convertedAt: Date;
 }): Promise<void> {
   await params.database
-    .update(kiloclaw_attribution_touches)
+    .update(impact_referral_touches)
     .set({
-      sale_attributed_at: sql`COALESCE(${kiloclaw_attribution_touches.sale_attributed_at}, ${params.convertedAt.toISOString()}::timestamptz)`,
+      sale_attributed_at: sql`COALESCE(${impact_referral_touches.sale_attributed_at}, ${params.convertedAt.toISOString()}::timestamptz)`,
     })
-    .where(eq(kiloclaw_attribution_touches.id, params.affiliateTouchId));
+    .where(eq(impact_referral_touches.id, params.affiliateTouchId));
 }
 
 async function lockReferrerRewardCapacity(
@@ -395,17 +402,22 @@ async function getGrantedReferrerMonths(
 ): Promise<number> {
   const [result] = await database
     .select({
-      totalMonths: sql<number>`COALESCE(SUM(${kiloclaw_referral_reward_decisions.months_granted}), 0)`,
+      totalMonths: sql<number>`COALESCE(SUM(${impact_referral_reward_decisions.months_granted}), 0)`,
     })
-    .from(kiloclaw_referral_reward_decisions)
+    .from(impact_referral_reward_decisions)
     .where(
       and(
-        eq(kiloclaw_referral_reward_decisions.beneficiary_user_id, referrerUserId),
+        eq(impact_referral_reward_decisions.product, ImpactReferralProduct.KiloClaw),
         eq(
-          kiloclaw_referral_reward_decisions.beneficiary_role,
+          impact_referral_reward_decisions.reward_kind,
+          ImpactReferralRewardKind.KiloClawFreeMonth
+        ),
+        eq(impact_referral_reward_decisions.beneficiary_user_id, referrerUserId),
+        eq(
+          impact_referral_reward_decisions.beneficiary_role,
           KiloClawReferralBeneficiaryRole.Referrer
         ),
-        eq(kiloclaw_referral_reward_decisions.outcome, KiloClawReferralDecisionOutcome.Granted)
+        eq(impact_referral_reward_decisions.outcome, KiloClawReferralDecisionOutcome.Granted)
       )
     );
 
@@ -417,13 +429,14 @@ async function hasSaleAttributedAffiliateTouch(params: {
   database: DatabaseClient;
 }): Promise<boolean> {
   const [touch] = await params.database
-    .select({ id: kiloclaw_attribution_touches.id })
-    .from(kiloclaw_attribution_touches)
+    .select({ id: impact_referral_touches.id })
+    .from(impact_referral_touches)
     .where(
       and(
-        eq(kiloclaw_attribution_touches.user_id, params.userId),
-        eq(kiloclaw_attribution_touches.touch_type, KiloClawAttributionTouchType.Affiliate),
-        sql`${kiloclaw_attribution_touches.sale_attributed_at} IS NOT NULL`
+        eq(impact_referral_touches.product, ImpactReferralProduct.KiloClaw),
+        eq(impact_referral_touches.user_id, params.userId),
+        eq(impact_referral_touches.touch_type, KiloClawAttributionTouchType.Affiliate),
+        sql`${impact_referral_touches.sale_attributed_at} IS NOT NULL`
       )
     )
     .limit(1);
@@ -685,11 +698,18 @@ async function applyReferralRewardById(
   const result = await db.transaction(async tx => {
     const [reward] = await tx
       .select()
-      .from(kiloclaw_referral_rewards)
-      .where(eq(kiloclaw_referral_rewards.id, rewardId))
+      .from(impact_referral_rewards)
+      .where(eq(impact_referral_rewards.id, rewardId))
       .limit(1);
 
     if (!reward) {
+      return 'noop';
+    }
+
+    if (
+      reward.product !== ImpactReferralProduct.KiloClaw ||
+      reward.reward_kind !== ImpactReferralRewardKind.KiloClawFreeMonth
+    ) {
       return 'noop';
     }
 
@@ -710,12 +730,12 @@ async function applyReferralRewardById(
       now.getTime() >= new Date(reward.expires_at).getTime()
     ) {
       await tx
-        .update(kiloclaw_referral_rewards)
+        .update(impact_referral_rewards)
         .set({
           status: KiloClawReferralRewardStatus.Expired,
           review_reason: getRewardApplicationReason('inactive_referrer_expired'),
         })
-        .where(eq(kiloclaw_referral_rewards.id, reward.id));
+        .where(eq(impact_referral_rewards.id, reward.id));
       return 'expired';
     }
 
@@ -746,7 +766,7 @@ async function applyReferralRewardById(
           reward.beneficiary_role === KiloClawReferralBeneficiaryRole.Referrer &&
           reward.expires_at === null;
         await tx
-          .update(kiloclaw_referral_rewards)
+          .update(impact_referral_rewards)
           .set({
             status: KiloClawReferralRewardStatus.Pending,
             ...(shouldBackfillExpiresAt
@@ -755,7 +775,7 @@ async function applyReferralRewardById(
                 }
               : {}),
           })
-          .where(eq(kiloclaw_referral_rewards.id, reward.id));
+          .where(eq(impact_referral_rewards.id, reward.id));
       }
       return 'pending';
     }
@@ -772,9 +792,9 @@ async function applyReferralRewardById(
       );
       if (reward.status === KiloClawReferralRewardStatus.Pending) {
         await tx
-          .update(kiloclaw_referral_rewards)
+          .update(impact_referral_rewards)
           .set({ status: KiloClawReferralRewardStatus.Earned })
-          .where(eq(kiloclaw_referral_rewards.id, reward.id));
+          .where(eq(impact_referral_rewards.id, reward.id));
       }
       return 'pending';
     }
@@ -795,9 +815,9 @@ async function applyReferralRewardById(
       );
       if (reward.status === KiloClawReferralRewardStatus.Pending) {
         await tx
-          .update(kiloclaw_referral_rewards)
+          .update(impact_referral_rewards)
           .set({ status: KiloClawReferralRewardStatus.Earned })
-          .where(eq(kiloclaw_referral_rewards.id, reward.id));
+          .where(eq(impact_referral_rewards.id, reward.id));
       }
       return 'pending';
     }
@@ -842,7 +862,7 @@ async function applyReferralRewardById(
     }
 
     const [appliedReward] = await tx
-      .update(kiloclaw_referral_rewards)
+      .update(impact_referral_rewards)
       .set({
         status: KiloClawReferralRewardStatus.Applied,
         applies_to_subscription_id: subscription.id,
@@ -851,15 +871,15 @@ async function applyReferralRewardById(
       })
       .where(
         and(
-          eq(kiloclaw_referral_rewards.id, reward.id),
+          eq(impact_referral_rewards.id, reward.id),
           or(
-            eq(kiloclaw_referral_rewards.status, KiloClawReferralRewardStatus.Earned),
-            eq(kiloclaw_referral_rewards.status, KiloClawReferralRewardStatus.Pending)
+            eq(impact_referral_rewards.status, KiloClawReferralRewardStatus.Earned),
+            eq(impact_referral_rewards.status, KiloClawReferralRewardStatus.Pending)
           ),
-          sql`${kiloclaw_referral_rewards.applied_at} IS NULL`
+          sql`${impact_referral_rewards.applied_at} IS NULL`
         )
       )
-      .returning({ id: kiloclaw_referral_rewards.id });
+      .returning({ id: impact_referral_rewards.id });
 
     if (!appliedReward) {
       return 'noop';
@@ -875,13 +895,13 @@ async function applyReferralRewardById(
     });
 
     const [existingApplication] = await tx
-      .select({ id: kiloclaw_referral_reward_applications.id })
-      .from(kiloclaw_referral_reward_applications)
-      .where(eq(kiloclaw_referral_reward_applications.reward_id, reward.id))
+      .select({ id: impact_referral_reward_applications.id })
+      .from(impact_referral_reward_applications)
+      .where(eq(impact_referral_reward_applications.reward_id, reward.id))
       .limit(1);
 
     if (!existingApplication) {
-      await tx.insert(kiloclaw_referral_reward_applications).values({
+      await tx.insert(impact_referral_reward_applications).values({
         reward_id: reward.id,
         beneficiary_user_id: reward.beneficiary_user_id,
         subscription_id: subscription.id,
@@ -923,20 +943,22 @@ export async function processQueuedKiloClawReferralRewards(params?: {
 }): Promise<ReferralRewardProcessingSummary> {
   const limit = params?.limit ?? 100;
   const pendingRows = await db
-    .select({ id: kiloclaw_referral_rewards.id })
-    .from(kiloclaw_referral_rewards)
+    .select({ id: impact_referral_rewards.id })
+    .from(impact_referral_rewards)
     .where(
       and(
+        eq(impact_referral_rewards.product, ImpactReferralProduct.KiloClaw),
+        eq(impact_referral_rewards.reward_kind, ImpactReferralRewardKind.KiloClawFreeMonth),
         or(
-          eq(kiloclaw_referral_rewards.status, KiloClawReferralRewardStatus.Pending),
-          eq(kiloclaw_referral_rewards.status, KiloClawReferralRewardStatus.Earned)
+          eq(impact_referral_rewards.status, KiloClawReferralRewardStatus.Pending),
+          eq(impact_referral_rewards.status, KiloClawReferralRewardStatus.Earned)
         ),
         params?.beneficiaryUserIds?.length
-          ? inArray(kiloclaw_referral_rewards.beneficiary_user_id, params.beneficiaryUserIds)
+          ? inArray(impact_referral_rewards.beneficiary_user_id, params.beneficiaryUserIds)
           : undefined
       )
     )
-    .orderBy(asc(kiloclaw_referral_rewards.earned_at), asc(kiloclaw_referral_rewards.created_at))
+    .orderBy(asc(impact_referral_rewards.earned_at), asc(impact_referral_rewards.created_at))
     .limit(limit);
 
   const summary: ReferralRewardProcessingSummary = {
@@ -971,18 +993,25 @@ async function queueImpactAdvocateRewardRedemption(params: {
 }): Promise<void> {
   const [reward] = await params.database
     .select({
-      id: kiloclaw_referral_rewards.id,
-      beneficiaryUserId: kiloclaw_referral_rewards.beneficiary_user_id,
-      monthsGranted: kiloclaw_referral_rewards.months_granted,
-      status: kiloclaw_referral_rewards.status,
+      id: impact_referral_rewards.id,
+      beneficiaryUserId: impact_referral_rewards.beneficiary_user_id,
+      monthsGranted: impact_referral_rewards.months_granted,
+      status: impact_referral_rewards.status,
+      product: impact_referral_rewards.product,
+      rewardKind: impact_referral_rewards.reward_kind,
       email: kilocode_users.google_user_email,
     })
-    .from(kiloclaw_referral_rewards)
-    .innerJoin(kilocode_users, eq(kilocode_users.id, kiloclaw_referral_rewards.beneficiary_user_id))
-    .where(eq(kiloclaw_referral_rewards.id, params.rewardId))
+    .from(impact_referral_rewards)
+    .innerJoin(kilocode_users, eq(kilocode_users.id, impact_referral_rewards.beneficiary_user_id))
+    .where(eq(impact_referral_rewards.id, params.rewardId))
     .limit(1);
 
-  if (!reward || reward.status !== KiloClawReferralRewardStatus.Applied) {
+  if (
+    !reward ||
+    reward.status !== KiloClawReferralRewardStatus.Applied ||
+    reward.product !== ImpactReferralProduct.KiloClaw ||
+    reward.rewardKind !== ImpactReferralRewardKind.KiloClawFreeMonth
+  ) {
     return;
   }
 
@@ -1346,12 +1375,18 @@ export async function markPersonalKiloClawReferralPaymentAdverse(params: {
   sourcePaymentId: string;
   reason: AdverseReferralPaymentReason;
   occurredAt: Date;
+  paymentProvider?: ImpactReferralPaymentProvider;
 }): Promise<AdverseReferralPaymentSummary> {
+  const paymentProvider = params.paymentProvider ?? ImpactReferralPaymentProvider.Credits;
   let impactReportId: string | null = null;
 
   const summary = await db.transaction(async tx => {
-    const conversion = await tx.query.kiloclaw_referral_conversions.findFirst({
-      where: eq(kiloclaw_referral_conversions.source_payment_id, params.sourcePaymentId),
+    const conversion = await tx.query.impact_referral_conversions.findFirst({
+      where: and(
+        eq(impact_referral_conversions.product, ImpactReferralProduct.KiloClaw),
+        eq(impact_referral_conversions.payment_provider, paymentProvider),
+        eq(impact_referral_conversions.source_payment_id, params.sourcePaymentId)
+      ),
     });
 
     if (!conversion) {
@@ -1364,8 +1399,8 @@ export async function markPersonalKiloClawReferralPaymentAdverse(params: {
 
     const rewards = await tx
       .select()
-      .from(kiloclaw_referral_rewards)
-      .where(eq(kiloclaw_referral_rewards.conversion_id, conversion.id));
+      .from(impact_referral_rewards)
+      .where(eq(impact_referral_rewards.conversion_id, conversion.id));
 
     let canceledRewards = 0;
     let reviewRequiredRewards = 0;
@@ -1375,24 +1410,24 @@ export async function markPersonalKiloClawReferralPaymentAdverse(params: {
         reward.status === KiloClawReferralRewardStatus.Earned
       ) {
         await tx
-          .update(kiloclaw_referral_rewards)
+          .update(impact_referral_rewards)
           .set({
             status: KiloClawReferralRewardStatus.Canceled,
             review_reason: getAdversePaymentReason(params.reason),
           })
-          .where(eq(kiloclaw_referral_rewards.id, reward.id));
+          .where(eq(impact_referral_rewards.id, reward.id));
         canceledRewards++;
         continue;
       }
 
       if (reward.status === KiloClawReferralRewardStatus.Applied) {
         await tx
-          .update(kiloclaw_referral_rewards)
+          .update(impact_referral_rewards)
           .set({
             status: KiloClawReferralRewardStatus.ReviewRequired,
             review_reason: getAdversePaymentReason(params.reason),
           })
-          .where(eq(kiloclaw_referral_rewards.id, reward.id));
+          .where(eq(impact_referral_rewards.id, reward.id));
         reviewRequiredRewards++;
       }
     }
@@ -1432,15 +1467,16 @@ async function upsertReferralRelationship(params: {
   database: DatabaseClient;
 }): Promise<void> {
   await params.database
-    .insert(kiloclaw_referrals)
+    .insert(impact_referrals)
     .values({
+      product: ImpactReferralProduct.KiloClaw,
       referee_user_id: params.refereeUserId,
       referrer_user_id: params.referrerUserId,
       source_touch_id: params.sourceTouchId,
       impact_referral_id: params.impactReferralId,
     })
     .onConflictDoUpdate({
-      target: [kiloclaw_referrals.referee_user_id],
+      target: [impact_referrals.product, impact_referrals.referee_user_id],
       set: {
         referrer_user_id: params.referrerUserId,
         source_touch_id: params.sourceTouchId,
@@ -1647,6 +1683,7 @@ export async function processPersonalKiloClawPaidConversion(params: {
   userId: string;
   sourcePaymentId: string;
   orderId: string;
+  paymentProvider?: ImpactReferralPaymentProvider;
   amount: number;
   currencyCode: string;
   itemCategory: string;
@@ -1655,11 +1692,15 @@ export async function processPersonalKiloClawPaidConversion(params: {
   convertedAt: Date;
   qualificationContext?: PaidConversionQualificationContext;
 }): Promise<KiloClawPaidConversionDisposition> {
+  const paymentProvider = params.paymentProvider ?? ImpactReferralPaymentProvider.Credits;
+  const referralSaleDedupeKey = `impact-referral-sale:${ImpactReferralProduct.KiloClaw}:${paymentProvider}:${params.sourcePaymentId}`;
+
   logImpactReferralDebug(
     'Processing personal KiloClaw paid conversion for Impact referral attribution',
     {
       userId: params.userId,
       sourcePaymentId: params.sourcePaymentId,
+      paymentProvider,
       orderId: params.orderId,
       amount: params.amount,
       currencyCode: params.currencyCode,
@@ -1672,8 +1713,12 @@ export async function processPersonalKiloClawPaidConversion(params: {
   let impactReportId: string | null = null;
   const rewardBeneficiaryUserIds = new Set<string>();
   const disposition = await db.transaction(async tx => {
-    const existingConversion = await tx.query.kiloclaw_referral_conversions.findFirst({
-      where: eq(kiloclaw_referral_conversions.source_payment_id, params.sourcePaymentId),
+    const existingConversion = await tx.query.impact_referral_conversions.findFirst({
+      where: and(
+        eq(impact_referral_conversions.product, ImpactReferralProduct.KiloClaw),
+        eq(impact_referral_conversions.payment_provider, paymentProvider),
+        eq(impact_referral_conversions.source_payment_id, params.sourcePaymentId)
+      ),
     });
 
     if (existingConversion) {
@@ -1689,8 +1734,8 @@ export async function processPersonalKiloClawPaidConversion(params: {
 
       if (canReprocessWithAdminOverride) {
         await tx
-          .delete(kiloclaw_referral_conversions)
-          .where(eq(kiloclaw_referral_conversions.id, existingConversion.id));
+          .delete(impact_referral_conversions)
+          .where(eq(impact_referral_conversions.id, existingConversion.id));
       } else {
         return {
           shouldEnqueueAffiliateSale:
@@ -1820,18 +1865,19 @@ export async function processPersonalKiloClawPaidConversion(params: {
 
     if (resolution.winner === 'none') {
       const [conversion] = await tx
-        .insert(kiloclaw_referral_conversions)
+        .insert(impact_referral_conversions)
         .values({
           referee_user_id: params.userId,
           referrer_user_id: null,
           source_touch_id: null,
           winning_touch_type: KiloClawReferralWinningTouchType.None,
           source_payment_id: params.sourcePaymentId,
+          payment_provider: paymentProvider,
           qualified: false,
           disqualification_reason: referralDisqualificationReason('no_valid_attribution'),
           converted_at: params.convertedAt.toISOString(),
         })
-        .returning({ id: kiloclaw_referral_conversions.id });
+        .returning({ id: impact_referral_conversions.id });
 
       return {
         shouldEnqueueAffiliateSale: false,
@@ -1849,18 +1895,19 @@ export async function processPersonalKiloClawPaidConversion(params: {
       });
 
       const [conversion] = await tx
-        .insert(kiloclaw_referral_conversions)
+        .insert(impact_referral_conversions)
         .values({
           referee_user_id: params.userId,
           referrer_user_id: null,
           source_touch_id: resolution.affiliateTouch.id,
           winning_touch_type: KiloClawReferralWinningTouchType.Affiliate,
           source_payment_id: params.sourcePaymentId,
+          payment_provider: paymentProvider,
           qualified: false,
           disqualification_reason: referralDisqualificationReason('affiliate_won'),
           converted_at: params.convertedAt.toISOString(),
         })
-        .returning({ id: kiloclaw_referral_conversions.id });
+        .returning({ id: impact_referral_conversions.id });
 
       return {
         shouldEnqueueAffiliateSale: true,
@@ -1911,18 +1958,19 @@ export async function processPersonalKiloClawPaidConversion(params: {
             : referralDisqualificationReason('self_referral');
 
       const [conversion] = await tx
-        .insert(kiloclaw_referral_conversions)
+        .insert(impact_referral_conversions)
         .values({
           referee_user_id: params.userId,
           referrer_user_id: referrerUserId,
           source_touch_id: resolution.referralTouch.id,
           winning_touch_type: KiloClawReferralWinningTouchType.Referral,
           source_payment_id: params.sourcePaymentId,
+          payment_provider: paymentProvider,
           qualified: false,
           disqualification_reason: disqualificationReason,
           converted_at: params.convertedAt.toISOString(),
         })
-        .returning({ id: kiloclaw_referral_conversions.id });
+        .returning({ id: impact_referral_conversions.id });
 
       return {
         shouldEnqueueAffiliateSale: false,
@@ -1940,18 +1988,19 @@ export async function processPersonalKiloClawPaidConversion(params: {
       });
 
       const [conversion] = await tx
-        .insert(kiloclaw_referral_conversions)
+        .insert(impact_referral_conversions)
         .values({
           referee_user_id: params.userId,
           referrer_user_id: referrerUserId,
           source_touch_id: resolution.referralTouch.id,
           winning_touch_type: KiloClawReferralWinningTouchType.Referral,
           source_payment_id: params.sourcePaymentId,
+          payment_provider: paymentProvider,
           qualified: false,
           disqualification_reason: disqualificationReason,
           converted_at: params.convertedAt.toISOString(),
         })
-        .returning({ id: kiloclaw_referral_conversions.id });
+        .returning({ id: impact_referral_conversions.id });
 
       if (!conversion) {
         throw new Error(
@@ -1959,7 +2008,7 @@ export async function processPersonalKiloClawPaidConversion(params: {
         );
       }
 
-      await tx.insert(kiloclaw_referral_reward_decisions).values([
+      await tx.insert(impact_referral_reward_decisions).values([
         {
           conversion_id: conversion.id,
           beneficiary_user_id: params.userId,
@@ -1995,7 +2044,7 @@ export async function processPersonalKiloClawPaidConversion(params: {
         .insert(impact_conversion_reports)
         .values({
           conversion_id: conversion.id,
-          dedupe_key: `impact-referral-sale:${params.sourcePaymentId}`,
+          dedupe_key: referralSaleDedupeKey,
           action_tracker_id: IMPACT_ACTION_TRACKER_IDS.sale,
           order_id: params.orderId,
           state: ImpactConversionReportState.Failed,
@@ -2021,18 +2070,19 @@ export async function processPersonalKiloClawPaidConversion(params: {
     const referrerAtCap = referrerGrantedMonths >= 12;
 
     const [conversion] = await tx
-      .insert(kiloclaw_referral_conversions)
+      .insert(impact_referral_conversions)
       .values({
         referee_user_id: params.userId,
         referrer_user_id: referrerUserId,
         source_touch_id: resolution.referralTouch.id,
         winning_touch_type: KiloClawReferralWinningTouchType.Referral,
         source_payment_id: params.sourcePaymentId,
+        payment_provider: paymentProvider,
         qualified: true,
         disqualification_reason: null,
         converted_at: params.convertedAt.toISOString(),
       })
-      .returning({ id: kiloclaw_referral_conversions.id });
+      .returning({ id: impact_referral_conversions.id });
 
     if (!conversion) {
       throw new Error(`Failed to create referral conversion for payment ${params.sourcePaymentId}`);
@@ -2048,7 +2098,7 @@ export async function processPersonalKiloClawPaidConversion(params: {
     );
 
     const [refereeDecision, referrerDecision] = await tx
-      .insert(kiloclaw_referral_reward_decisions)
+      .insert(impact_referral_reward_decisions)
       .values([
         {
           conversion_id: conversion.id,
@@ -2070,13 +2120,13 @@ export async function processPersonalKiloClawPaidConversion(params: {
         },
       ])
       .returning({
-        id: kiloclaw_referral_reward_decisions.id,
-        beneficiary_user_id: kiloclaw_referral_reward_decisions.beneficiary_user_id,
-        beneficiary_role: kiloclaw_referral_reward_decisions.beneficiary_role,
-        outcome: kiloclaw_referral_reward_decisions.outcome,
+        id: impact_referral_reward_decisions.id,
+        beneficiary_user_id: impact_referral_reward_decisions.beneficiary_user_id,
+        beneficiary_role: impact_referral_reward_decisions.beneficiary_role,
+        outcome: impact_referral_reward_decisions.outcome,
       });
 
-    await tx.insert(kiloclaw_referral_rewards).values(
+    await tx.insert(impact_referral_rewards).values(
       [refereeDecision, referrerDecision]
         .filter(decision => decision.outcome === KiloClawReferralDecisionOutcome.Granted)
         .map(decision => ({
@@ -2119,7 +2169,7 @@ export async function processPersonalKiloClawPaidConversion(params: {
       .insert(impact_conversion_reports)
       .values({
         conversion_id: conversion.id,
-        dedupe_key: `impact-referral-sale:${params.sourcePaymentId}`,
+        dedupe_key: referralSaleDedupeKey,
         action_tracker_id: IMPACT_ACTION_TRACKER_IDS.sale,
         order_id: params.orderId,
         state: ImpactConversionReportState.Queued,
@@ -2131,10 +2181,7 @@ export async function processPersonalKiloClawPaidConversion(params: {
     const existingReport =
       report ??
       (await tx.query.impact_conversion_reports.findFirst({
-        where: eq(
-          impact_conversion_reports.dedupe_key,
-          `impact-referral-sale:${params.sourcePaymentId}`
-        ),
+        where: eq(impact_conversion_reports.dedupe_key, referralSaleDedupeKey),
         columns: { id: true },
       }));
     impactReportId = existingReport?.id ?? null;

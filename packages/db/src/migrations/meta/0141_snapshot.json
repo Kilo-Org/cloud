@@ -1,5 +1,5 @@
 {
-  "id": "6c272a2d-43c8-45ca-be34-3bf49a7316ee",
+  "id": "fb385356-42e2-40e6-ab22-d65a180c6697",
   "prevId": "8164d94c-7070-484e-a062-84779df93922",
   "version": "7",
   "dialect": "postgresql",
@@ -8269,7 +8269,6 @@
           "notNull": true,
           "default": "pg_catalog.gen_random_uuid()"
         },
-<<<<<<< HEAD
         "program_key": {
           "name": "program_key",
           "type": "text",
@@ -8277,8 +8276,6 @@
           "notNull": true,
           "default": "'kiloclaw'"
         },
-=======
->>>>>>> 1321cfbed (fix(kilo-pass): regenerate migration after rebase onto main)
         "user_id": {
           "name": "user_id",
           "type": "text",
@@ -8368,7 +8365,6 @@
         }
       },
       "indexes": {
-<<<<<<< HEAD
         "UQ_impact_advocate_participants_program_referral_identifier": {
           "name": "UQ_impact_advocate_participants_program_referral_identifier",
           "columns": [
@@ -8391,8 +8387,6 @@
           "method": "btree",
           "with": {}
         },
-=======
->>>>>>> 1321cfbed (fix(kilo-pass): regenerate migration after rebase onto main)
         "IDX_impact_advocate_participants_registration_state": {
           "name": "IDX_impact_advocate_participants_registration_state",
           "columns": [
@@ -8426,7 +8420,6 @@
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
-<<<<<<< HEAD
         "UQ_impact_advocate_participants_program_user": {
           "name": "UQ_impact_advocate_participants_program_user",
           "nullsNotDistinct": false,
@@ -8434,32 +8427,14 @@
             "program_key",
             "user_id"
           ]
-=======
-        "UQ_impact_advocate_participants_user_id": {
-          "name": "UQ_impact_advocate_participants_user_id",
-          "nullsNotDistinct": false,
-          "columns": [
-            "user_id"
-          ]
-        },
-        "UQ_impact_advocate_participants_opaque_referral_identifier": {
-          "name": "UQ_impact_advocate_participants_opaque_referral_identifier",
-          "nullsNotDistinct": false,
-          "columns": [
-            "opaque_referral_identifier"
-          ]
->>>>>>> 1321cfbed (fix(kilo-pass): regenerate migration after rebase onto main)
         }
       },
       "policies": {},
       "checkConstraints": {
-<<<<<<< HEAD
         "impact_advocate_participants_program_key_check": {
           "name": "impact_advocate_participants_program_key_check",
           "value": "\"impact_advocate_participants\".\"program_key\" IN ('kiloclaw', 'kilo_pass')"
         },
-=======
->>>>>>> 1321cfbed (fix(kilo-pass): regenerate migration after rebase onto main)
         "impact_advocate_participants_registration_state_check": {
           "name": "impact_advocate_participants_registration_state_check",
           "value": "\"impact_advocate_participants\".\"registration_state\" IN ('pending', 'retrying', 'registered', 'failed')"
@@ -8478,7 +8453,6 @@
           "notNull": true,
           "default": "pg_catalog.gen_random_uuid()"
         },
-<<<<<<< HEAD
         "program_key": {
           "name": "program_key",
           "type": "text",
@@ -8486,8 +8460,6 @@
           "notNull": true,
           "default": "'kiloclaw'"
         },
-=======
->>>>>>> 1321cfbed (fix(kilo-pass): regenerate migration after rebase onto main)
         "participant_id": {
           "name": "participant_id",
           "type": "uuid",
@@ -8630,13 +8602,10 @@
       },
       "policies": {},
       "checkConstraints": {
-<<<<<<< HEAD
         "impact_advocate_registration_attempts_program_key_check": {
           "name": "impact_advocate_registration_attempts_program_key_check",
           "value": "\"impact_advocate_registration_attempts\".\"program_key\" IN ('kiloclaw', 'kilo_pass')"
         },
-=======
->>>>>>> 1321cfbed (fix(kilo-pass): regenerate migration after rebase onto main)
         "impact_advocate_registration_attempts_delivery_state_check": {
           "name": "impact_advocate_registration_attempts_delivery_state_check",
           "value": "\"impact_advocate_registration_attempts\".\"delivery_state\" IN ('queued', 'sending', 'succeeded', 'failed')"
@@ -8785,17 +8754,10 @@
         }
       },
       "foreignKeys": {
-<<<<<<< HEAD
         "impact_advocate_reward_redemptions_reward_id_impact_referral_rewards_id_fk": {
           "name": "impact_advocate_reward_redemptions_reward_id_impact_referral_rewards_id_fk",
           "tableFrom": "impact_advocate_reward_redemptions",
           "tableTo": "impact_referral_rewards",
-=======
-        "impact_advocate_reward_redemptions_reward_id_kiloclaw_referral_rewards_id_fk": {
-          "name": "impact_advocate_reward_redemptions_reward_id_kiloclaw_referral_rewards_id_fk",
-          "tableFrom": "impact_advocate_reward_redemptions",
-          "tableTo": "kiloclaw_referral_rewards",
->>>>>>> 1321cfbed (fix(kilo-pass): regenerate migration after rebase onto main)
           "columnsFrom": [
             "reward_id"
           ],
@@ -8849,7 +8811,6 @@
       },
       "isRLSEnabled": false
     },
-<<<<<<< HEAD
     "public.impact_attribution_touches": {
       "name": "impact_attribution_touches",
       "schema": "",
@@ -9143,8 +9104,6 @@
       },
       "isRLSEnabled": false
     },
-=======
->>>>>>> 1321cfbed (fix(kilo-pass): regenerate migration after rebase onto main)
     "public.impact_conversion_reports": {
       "name": "impact_conversion_reports",
       "schema": "",
@@ -9272,17 +9231,10 @@
         }
       },
       "foreignKeys": {
-<<<<<<< HEAD
         "impact_conversion_reports_conversion_id_impact_referral_conversions_id_fk": {
           "name": "impact_conversion_reports_conversion_id_impact_referral_conversions_id_fk",
           "tableFrom": "impact_conversion_reports",
           "tableTo": "impact_referral_conversions",
-=======
-        "impact_conversion_reports_conversion_id_kiloclaw_referral_conversions_id_fk": {
-          "name": "impact_conversion_reports_conversion_id_kiloclaw_referral_conversions_id_fk",
-          "tableFrom": "impact_conversion_reports",
-          "tableTo": "kiloclaw_referral_conversions",
->>>>>>> 1321cfbed (fix(kilo-pass): regenerate migration after rebase onto main)
           "columnsFrom": [
             "conversion_id"
           ],
@@ -9316,7 +9268,6 @@
       },
       "isRLSEnabled": false
     },
-<<<<<<< HEAD
     "public.impact_referral_conversions": {
       "name": "impact_referral_conversions",
       "schema": "",
@@ -10262,8 +10213,6 @@
       },
       "isRLSEnabled": false
     },
-=======
->>>>>>> 1321cfbed (fix(kilo-pass): regenerate migration after rebase onto main)
     "public.ja4_digest": {
       "name": "ja4_digest",
       "schema": "",
@@ -10618,11 +10567,7 @@
       "checkConstraints": {
         "kilo_pass_audit_log_action_check": {
           "name": "kilo_pass_audit_log_action_check",
-<<<<<<< HEAD
           "value": "\"kilo_pass_audit_log\".\"action\" IN ('stripe_webhook_received', 'kilo_pass_invoice_paid_handled', 'store_purchase_completed', 'store_notification_received', 'store_subscription_renewed', 'store_subscription_canceled', 'store_subscription_expired', 'store_subscription_refunded', 'base_credits_issued', 'bonus_credits_issued', 'bonus_credits_skipped_idempotent', 'first_month_50pct_promo_issued', 'yearly_monthly_base_cron_started', 'yearly_monthly_base_cron_completed', 'issue_yearly_remaining_credits', 'yearly_monthly_bonus_cron_started', 'yearly_monthly_bonus_cron_completed')"
-=======
-          "value": "\"kilo_pass_audit_log\".\"action\" IN ('stripe_webhook_received', 'kilo_pass_invoice_paid_handled', 'store_purchase_completed', 'store_notification_received', 'store_subscription_renewed', 'store_subscription_canceled', 'store_subscription_expired', 'store_subscription_refunded', 'base_credits_issued', 'bonus_credits_issued', 'bonus_credits_skipped_idempotent', 'first_month_50pct_promo_issued', 'yearly_monthly_base_cron_started', 'yearly_monthly_base_cron_completed', 'issue_yearly_remaining_credits', 'duplicate_card_subscription_canceled', 'yearly_monthly_bonus_cron_started', 'yearly_monthly_bonus_cron_completed')"
->>>>>>> 1321cfbed (fix(kilo-pass): regenerate migration after rebase onto main)
         },
         "kilo_pass_audit_log_result_check": {
           "name": "kilo_pass_audit_log_result_check",
@@ -10777,11 +10722,7 @@
         },
         "kilo_pass_issuance_items_kind_check": {
           "name": "kilo_pass_issuance_items_kind_check",
-<<<<<<< HEAD
           "value": "\"kilo_pass_issuance_items\".\"kind\" IN ('base', 'bonus', 'promo_first_month_50pct', 'referral_bonus')"
-=======
-          "value": "\"kilo_pass_issuance_items\".\"kind\" IN ('base', 'bonus', 'promo_first_month_50pct')"
->>>>>>> 1321cfbed (fix(kilo-pass): regenerate migration after rebase onto main)
         }
       },
       "isRLSEnabled": false
@@ -12187,259 +12128,6 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-<<<<<<< HEAD
-=======
-    "public.kiloclaw_attribution_touches": {
-      "name": "kiloclaw_attribution_touches",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "pg_catalog.gen_random_uuid()"
-        },
-        "dedupe_key": {
-          "name": "dedupe_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "anonymous_id": {
-          "name": "anonymous_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "user_id": {
-          "name": "user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "touch_type": {
-          "name": "touch_type",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "provider": {
-          "name": "provider",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "opaque_tracking_value": {
-          "name": "opaque_tracking_value",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "tracking_value_length": {
-          "name": "tracking_value_length",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "is_tracking_value_accepted": {
-          "name": "is_tracking_value_accepted",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": true
-        },
-        "rs_code": {
-          "name": "rs_code",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "rs_share_medium": {
-          "name": "rs_share_medium",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "rs_engagement_medium": {
-          "name": "rs_engagement_medium",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "im_ref": {
-          "name": "im_ref",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "landing_path": {
-          "name": "landing_path",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "utm_source": {
-          "name": "utm_source",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "utm_medium": {
-          "name": "utm_medium",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "utm_campaign": {
-          "name": "utm_campaign",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "utm_term": {
-          "name": "utm_term",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "utm_content": {
-          "name": "utm_content",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "touched_at": {
-          "name": "touched_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "expires_at": {
-          "name": "expires_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "sale_attributed_at": {
-          "name": "sale_attributed_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "IDX_kiloclaw_attribution_touches_user_id": {
-          "name": "IDX_kiloclaw_attribution_touches_user_id",
-          "columns": [
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "IDX_kiloclaw_attribution_touches_anonymous_id": {
-          "name": "IDX_kiloclaw_attribution_touches_anonymous_id",
-          "columns": [
-            {
-              "expression": "anonymous_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "IDX_kiloclaw_attribution_touches_expires_at": {
-          "name": "IDX_kiloclaw_attribution_touches_expires_at",
-          "columns": [
-            {
-              "expression": "expires_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "IDX_kiloclaw_attribution_touches_sale_attributed_at": {
-          "name": "IDX_kiloclaw_attribution_touches_sale_attributed_at",
-          "columns": [
-            {
-              "expression": "sale_attributed_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "kiloclaw_attribution_touches_user_id_kilocode_users_id_fk": {
-          "name": "kiloclaw_attribution_touches_user_id_kilocode_users_id_fk",
-          "tableFrom": "kiloclaw_attribution_touches",
-          "tableTo": "kilocode_users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "cascade"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "UQ_kiloclaw_attribution_touches_dedupe_key": {
-          "name": "UQ_kiloclaw_attribution_touches_dedupe_key",
-          "nullsNotDistinct": false,
-          "columns": [
-            "dedupe_key"
-          ]
-        }
-      },
-      "policies": {},
-      "checkConstraints": {
-        "kiloclaw_attribution_touches_touch_type_check": {
-          "name": "kiloclaw_attribution_touches_touch_type_check",
-          "value": "\"kiloclaw_attribution_touches\".\"touch_type\" IN ('affiliate', 'referral')"
-        },
-        "kiloclaw_attribution_touches_provider_check": {
-          "name": "kiloclaw_attribution_touches_provider_check",
-          "value": "\"kiloclaw_attribution_touches\".\"provider\" IN ('impact_performance', 'impact_advocate')"
-        },
-        "kiloclaw_attribution_touches_tracking_value_length_non_negative_check": {
-          "name": "kiloclaw_attribution_touches_tracking_value_length_non_negative_check",
-          "value": "\"kiloclaw_attribution_touches\".\"tracking_value_length\" >= 0"
-        }
-      },
-      "isRLSEnabled": false
-    },
->>>>>>> 1321cfbed (fix(kilo-pass): regenerate migration after rebase onto main)
     "public.kiloclaw_cli_runs": {
       "name": "kiloclaw_cli_runs",
       "schema": "",
@@ -13936,768 +13624,6 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-<<<<<<< HEAD
-=======
-    "public.kiloclaw_referral_conversions": {
-      "name": "kiloclaw_referral_conversions",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "pg_catalog.gen_random_uuid()"
-        },
-        "referee_user_id": {
-          "name": "referee_user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "referrer_user_id": {
-          "name": "referrer_user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "source_touch_id": {
-          "name": "source_touch_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "winning_touch_type": {
-          "name": "winning_touch_type",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "source_payment_id": {
-          "name": "source_payment_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "qualified": {
-          "name": "qualified",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "disqualification_reason": {
-          "name": "disqualification_reason",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "converted_at": {
-          "name": "converted_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "IDX_kiloclaw_referral_conversions_referee_user_id": {
-          "name": "IDX_kiloclaw_referral_conversions_referee_user_id",
-          "columns": [
-            {
-              "expression": "referee_user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "IDX_kiloclaw_referral_conversions_referrer_user_id": {
-          "name": "IDX_kiloclaw_referral_conversions_referrer_user_id",
-          "columns": [
-            {
-              "expression": "referrer_user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "kiloclaw_referral_conversions_referee_user_id_kilocode_users_id_fk": {
-          "name": "kiloclaw_referral_conversions_referee_user_id_kilocode_users_id_fk",
-          "tableFrom": "kiloclaw_referral_conversions",
-          "tableTo": "kilocode_users",
-          "columnsFrom": [
-            "referee_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "cascade"
-        },
-        "kiloclaw_referral_conversions_referrer_user_id_kilocode_users_id_fk": {
-          "name": "kiloclaw_referral_conversions_referrer_user_id_kilocode_users_id_fk",
-          "tableFrom": "kiloclaw_referral_conversions",
-          "tableTo": "kilocode_users",
-          "columnsFrom": [
-            "referrer_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "cascade"
-        },
-        "kiloclaw_referral_conversions_source_touch_id_kiloclaw_attribution_touches_id_fk": {
-          "name": "kiloclaw_referral_conversions_source_touch_id_kiloclaw_attribution_touches_id_fk",
-          "tableFrom": "kiloclaw_referral_conversions",
-          "tableTo": "kiloclaw_attribution_touches",
-          "columnsFrom": [
-            "source_touch_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "cascade"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "UQ_kiloclaw_referral_conversions_source_payment_id": {
-          "name": "UQ_kiloclaw_referral_conversions_source_payment_id",
-          "nullsNotDistinct": false,
-          "columns": [
-            "source_payment_id"
-          ]
-        }
-      },
-      "policies": {},
-      "checkConstraints": {
-        "kiloclaw_referral_conversions_winning_touch_type_check": {
-          "name": "kiloclaw_referral_conversions_winning_touch_type_check",
-          "value": "\"kiloclaw_referral_conversions\".\"winning_touch_type\" IN ('referral', 'affiliate', 'none')"
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "public.kiloclaw_referral_reward_applications": {
-      "name": "kiloclaw_referral_reward_applications",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "pg_catalog.gen_random_uuid()"
-        },
-        "reward_id": {
-          "name": "reward_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "beneficiary_user_id": {
-          "name": "beneficiary_user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "subscription_id": {
-          "name": "subscription_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "previous_renewal_boundary": {
-          "name": "previous_renewal_boundary",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "new_renewal_boundary": {
-          "name": "new_renewal_boundary",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "local_operation_id": {
-          "name": "local_operation_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "stripe_operation_id": {
-          "name": "stripe_operation_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "stripe_idempotency_key": {
-          "name": "stripe_idempotency_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "applied_at": {
-          "name": "applied_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "IDX_kiloclaw_referral_reward_applications_reward_id": {
-          "name": "IDX_kiloclaw_referral_reward_applications_reward_id",
-          "columns": [
-            {
-              "expression": "reward_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "IDX_kiloclaw_referral_reward_applications_beneficiary_user_id": {
-          "name": "IDX_kiloclaw_referral_reward_applications_beneficiary_user_id",
-          "columns": [
-            {
-              "expression": "beneficiary_user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "kiloclaw_referral_reward_applications_reward_id_kiloclaw_referral_rewards_id_fk": {
-          "name": "kiloclaw_referral_reward_applications_reward_id_kiloclaw_referral_rewards_id_fk",
-          "tableFrom": "kiloclaw_referral_reward_applications",
-          "tableTo": "kiloclaw_referral_rewards",
-          "columnsFrom": [
-            "reward_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "cascade"
-        },
-        "kiloclaw_referral_reward_applications_beneficiary_user_id_kilocode_users_id_fk": {
-          "name": "kiloclaw_referral_reward_applications_beneficiary_user_id_kilocode_users_id_fk",
-          "tableFrom": "kiloclaw_referral_reward_applications",
-          "tableTo": "kilocode_users",
-          "columnsFrom": [
-            "beneficiary_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "cascade"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.kiloclaw_referral_reward_decisions": {
-      "name": "kiloclaw_referral_reward_decisions",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "pg_catalog.gen_random_uuid()"
-        },
-        "conversion_id": {
-          "name": "conversion_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "beneficiary_user_id": {
-          "name": "beneficiary_user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "beneficiary_role": {
-          "name": "beneficiary_role",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "outcome": {
-          "name": "outcome",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "reason": {
-          "name": "reason",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "months_granted": {
-          "name": "months_granted",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "IDX_kiloclaw_referral_reward_decisions_beneficiary_user_id": {
-          "name": "IDX_kiloclaw_referral_reward_decisions_beneficiary_user_id",
-          "columns": [
-            {
-              "expression": "beneficiary_user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "kiloclaw_referral_reward_decisions_conversion_id_kiloclaw_referral_conversions_id_fk": {
-          "name": "kiloclaw_referral_reward_decisions_conversion_id_kiloclaw_referral_conversions_id_fk",
-          "tableFrom": "kiloclaw_referral_reward_decisions",
-          "tableTo": "kiloclaw_referral_conversions",
-          "columnsFrom": [
-            "conversion_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "cascade"
-        },
-        "kiloclaw_referral_reward_decisions_beneficiary_user_id_kilocode_users_id_fk": {
-          "name": "kiloclaw_referral_reward_decisions_beneficiary_user_id_kilocode_users_id_fk",
-          "tableFrom": "kiloclaw_referral_reward_decisions",
-          "tableTo": "kilocode_users",
-          "columnsFrom": [
-            "beneficiary_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "cascade"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "UQ_kiloclaw_referral_reward_decisions_conversion_role": {
-          "name": "UQ_kiloclaw_referral_reward_decisions_conversion_role",
-          "nullsNotDistinct": false,
-          "columns": [
-            "conversion_id",
-            "beneficiary_role"
-          ]
-        }
-      },
-      "policies": {},
-      "checkConstraints": {
-        "kiloclaw_referral_reward_decisions_beneficiary_role_check": {
-          "name": "kiloclaw_referral_reward_decisions_beneficiary_role_check",
-          "value": "\"kiloclaw_referral_reward_decisions\".\"beneficiary_role\" IN ('referrer', 'referee')"
-        },
-        "kiloclaw_referral_reward_decisions_outcome_check": {
-          "name": "kiloclaw_referral_reward_decisions_outcome_check",
-          "value": "\"kiloclaw_referral_reward_decisions\".\"outcome\" IN ('granted', 'cap_limited', 'disqualified')"
-        },
-        "kiloclaw_referral_reward_decisions_months_granted_non_negative_check": {
-          "name": "kiloclaw_referral_reward_decisions_months_granted_non_negative_check",
-          "value": "\"kiloclaw_referral_reward_decisions\".\"months_granted\" >= 0"
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "public.kiloclaw_referral_rewards": {
-      "name": "kiloclaw_referral_rewards",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "pg_catalog.gen_random_uuid()"
-        },
-        "conversion_id": {
-          "name": "conversion_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "decision_id": {
-          "name": "decision_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "beneficiary_user_id": {
-          "name": "beneficiary_user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "beneficiary_role": {
-          "name": "beneficiary_role",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "months_granted": {
-          "name": "months_granted",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 1
-        },
-        "status": {
-          "name": "status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'pending'"
-        },
-        "applies_to_subscription_id": {
-          "name": "applies_to_subscription_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "earned_at": {
-          "name": "earned_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "applied_at": {
-          "name": "applied_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "reversed_at": {
-          "name": "reversed_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "expires_at": {
-          "name": "expires_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "review_reason": {
-          "name": "review_reason",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "IDX_kiloclaw_referral_rewards_beneficiary_user_id": {
-          "name": "IDX_kiloclaw_referral_rewards_beneficiary_user_id",
-          "columns": [
-            {
-              "expression": "beneficiary_user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "IDX_kiloclaw_referral_rewards_status": {
-          "name": "IDX_kiloclaw_referral_rewards_status",
-          "columns": [
-            {
-              "expression": "status",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "kiloclaw_referral_rewards_conversion_id_kiloclaw_referral_conversions_id_fk": {
-          "name": "kiloclaw_referral_rewards_conversion_id_kiloclaw_referral_conversions_id_fk",
-          "tableFrom": "kiloclaw_referral_rewards",
-          "tableTo": "kiloclaw_referral_conversions",
-          "columnsFrom": [
-            "conversion_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "cascade"
-        },
-        "kiloclaw_referral_rewards_decision_id_kiloclaw_referral_reward_decisions_id_fk": {
-          "name": "kiloclaw_referral_rewards_decision_id_kiloclaw_referral_reward_decisions_id_fk",
-          "tableFrom": "kiloclaw_referral_rewards",
-          "tableTo": "kiloclaw_referral_reward_decisions",
-          "columnsFrom": [
-            "decision_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "cascade"
-        },
-        "kiloclaw_referral_rewards_beneficiary_user_id_kilocode_users_id_fk": {
-          "name": "kiloclaw_referral_rewards_beneficiary_user_id_kilocode_users_id_fk",
-          "tableFrom": "kiloclaw_referral_rewards",
-          "tableTo": "kilocode_users",
-          "columnsFrom": [
-            "beneficiary_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "cascade"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "UQ_kiloclaw_referral_rewards_conversion_role": {
-          "name": "UQ_kiloclaw_referral_rewards_conversion_role",
-          "nullsNotDistinct": false,
-          "columns": [
-            "conversion_id",
-            "beneficiary_role"
-          ]
-        },
-        "UQ_kiloclaw_referral_rewards_decision_id": {
-          "name": "UQ_kiloclaw_referral_rewards_decision_id",
-          "nullsNotDistinct": false,
-          "columns": [
-            "decision_id"
-          ]
-        }
-      },
-      "policies": {},
-      "checkConstraints": {
-        "kiloclaw_referral_rewards_beneficiary_role_check": {
-          "name": "kiloclaw_referral_rewards_beneficiary_role_check",
-          "value": "\"kiloclaw_referral_rewards\".\"beneficiary_role\" IN ('referrer', 'referee')"
-        },
-        "kiloclaw_referral_rewards_status_check": {
-          "name": "kiloclaw_referral_rewards_status_check",
-          "value": "\"kiloclaw_referral_rewards\".\"status\" IN ('pending', 'earned', 'applied', 'reversed', 'expired', 'canceled', 'review_required')"
-        },
-        "kiloclaw_referral_rewards_months_granted_positive_check": {
-          "name": "kiloclaw_referral_rewards_months_granted_positive_check",
-          "value": "\"kiloclaw_referral_rewards\".\"months_granted\" > 0"
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "public.kiloclaw_referrals": {
-      "name": "kiloclaw_referrals",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "pg_catalog.gen_random_uuid()"
-        },
-        "referee_user_id": {
-          "name": "referee_user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "referrer_user_id": {
-          "name": "referrer_user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "source_touch_id": {
-          "name": "source_touch_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "impact_referral_id": {
-          "name": "impact_referral_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "IDX_kiloclaw_referrals_referrer_user_id": {
-          "name": "IDX_kiloclaw_referrals_referrer_user_id",
-          "columns": [
-            {
-              "expression": "referrer_user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "IDX_kiloclaw_referrals_source_touch_id": {
-          "name": "IDX_kiloclaw_referrals_source_touch_id",
-          "columns": [
-            {
-              "expression": "source_touch_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "kiloclaw_referrals_referee_user_id_kilocode_users_id_fk": {
-          "name": "kiloclaw_referrals_referee_user_id_kilocode_users_id_fk",
-          "tableFrom": "kiloclaw_referrals",
-          "tableTo": "kilocode_users",
-          "columnsFrom": [
-            "referee_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "cascade"
-        },
-        "kiloclaw_referrals_referrer_user_id_kilocode_users_id_fk": {
-          "name": "kiloclaw_referrals_referrer_user_id_kilocode_users_id_fk",
-          "tableFrom": "kiloclaw_referrals",
-          "tableTo": "kilocode_users",
-          "columnsFrom": [
-            "referrer_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "cascade"
-        },
-        "kiloclaw_referrals_source_touch_id_kiloclaw_attribution_touches_id_fk": {
-          "name": "kiloclaw_referrals_source_touch_id_kiloclaw_attribution_touches_id_fk",
-          "tableFrom": "kiloclaw_referrals",
-          "tableTo": "kiloclaw_attribution_touches",
-          "columnsFrom": [
-            "source_touch_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "cascade"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "UQ_kiloclaw_referrals_referee_user_id": {
-          "name": "UQ_kiloclaw_referrals_referee_user_id",
-          "nullsNotDistinct": false,
-          "columns": [
-            "referee_user_id"
-          ]
-        }
-      },
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
->>>>>>> 1321cfbed (fix(kilo-pass): regenerate migration after rebase onto main)
     "public.kiloclaw_scheduled_action_notifications": {
       "name": "kiloclaw_scheduled_action_notifications",
       "schema": "",
@@ -24800,8 +23726,4 @@
     "schemas": {},
     "tables": {}
   }
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> 1321cfbed (fix(kilo-pass): regenerate migration after rebase onto main)

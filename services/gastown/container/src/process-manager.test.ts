@@ -14,18 +14,16 @@ vi.mock('./agent-runner', () => ({
     (kilocodeToken: string, model: string, smallModel: string, organizationId?: string) =>
       JSON.stringify({ kilocodeToken, model, smallModel, organizationId })
   ),
-  buildKiloAuthEnv: vi.fn(
-    (kilocodeToken?: string, organizationId?: string | null) => {
-      const authEnv: Record<string, string> = { KILO_PLATFORM: 'gastown' };
-      if (kilocodeToken) {
-        authEnv.KILO_AUTH_CONTENT = JSON.stringify({ kilo: { type: 'api', key: kilocodeToken } });
-      }
-      if (organizationId) {
-        authEnv.KILO_ORG_ID = organizationId;
-      }
-      return authEnv;
+  buildKiloAuthEnv: vi.fn((kilocodeToken?: string, organizationId?: string | null) => {
+    const authEnv: Record<string, string> = { KILO_PLATFORM: 'gastown' };
+    if (kilocodeToken) {
+      authEnv.KILO_AUTH_CONTENT = JSON.stringify({ kilo: { type: 'api', key: kilocodeToken } });
     }
-  ),
+    if (organizationId) {
+      authEnv.KILO_ORG_ID = organizationId;
+    }
+    return authEnv;
+  }),
   resolveGitCredentials: vi.fn(),
   writeMayorSystemPromptToAgentsMd: vi.fn(),
   ensureMayorWorkspaceForTown: vi.fn(async (_townId: string) => TEST_WORKSPACE),
@@ -288,9 +286,7 @@ describe('awaitHydration', () => {
       });
       expect(env?.KILO_CONFIG_CONTENT).toBeTruthy();
       expect(env?.KILO_PLATFORM).toBe('gastown');
-      expect(env?.KILO_AUTH_CONTENT).toBe(
-        JSON.stringify({ kilo: { type: 'api', key: 'kc-tok' } })
-      );
+      expect(env?.KILO_AUTH_CONTENT).toBe(JSON.stringify({ kilo: { type: 'api', key: 'kc-tok' } }));
       expect(env?.KILO_ORG_ID).toBeUndefined();
     } finally {
       globalThis.fetch = originalFetch;

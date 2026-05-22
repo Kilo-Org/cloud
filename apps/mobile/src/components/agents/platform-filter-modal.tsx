@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils';
 const PLATFORM_FILTERS = [
   'cloud-agent',
   'extension',
+  'gastown',
   'cli',
   'slack',
   'github',
@@ -79,6 +80,9 @@ function platformFilterLabel(p: string): string {
     }
     case 'other': {
       return 'Other';
+    }
+    case 'gastown': {
+      return 'Gastown';
     }
     default: {
       return p;

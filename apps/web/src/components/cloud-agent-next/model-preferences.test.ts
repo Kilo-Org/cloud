@@ -116,6 +116,7 @@ describe('devcontainer preference helpers', () => {
   it('parses only true as enabled', () => {
     expect(parseDevcontainerEnabled('true')).toBe(true);
     expect(parseDevcontainerEnabled('false')).toBe(false);
+    expect(parseDevcontainerEnabled('1')).toBe(false);
     expect(parseDevcontainerEnabled(null)).toBe(false);
   });
 });

@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
-import { useSession } from 'next-auth/react';
 import { useAtom, useSetAtom } from 'jotai';
 import { toast } from 'sonner';
 import {
@@ -49,7 +48,6 @@ import { VariantCombobox } from '@/components/shared/VariantCombobox';
 import { thinkingEffortLabel } from '@/lib/code-reviews/core/model-variants';
 import { InsufficientBalanceBanner } from '@/components/shared/InsufficientBalanceBanner';
 import { ProfilePickerPopover } from '@/components/cloud-agent/ProfilePickerPopover';
-import { Switch } from '@/components/ui/switch';
 import { Popover, PopoverContent, PopoverTrigger, PopoverAnchor } from '@/components/ui/popover';
 import {
   Command as UICommand,
@@ -112,15 +110,7 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const commandListRef = useRef<HTMLDivElement>(null);
-  const { data: session } = useSession();
-  const isAdmin = session?.isAdmin === true;
-  const [devcontainer, setDevcontainerState] = useState(() =>
-    isDevcontainerAvailable ? getDevcontainerEnabled() : false
-  );
-  const setDevcontainer = useCallback((enabled: boolean) => {
-    setDevcontainerState(enabled);
-    setDevcontainerEnabled(enabled);
-  }, []);
+  const [devcontainer, setDevcontainer] = useState(false);
   const { mutateAsync: personalUploadUrl } = useMutation(
     trpc.cloudAgentNext.getImageUploadUrl.mutationOptions()
   );
@@ -208,6 +198,16 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
     resetSessionForm();
   }, [resetSessionForm]);
 
+  useEffect(() => {
+    setDevcontainer(getDevcontainerEnabled());
+  }, []);
+
+  const handleDevcontainerChange = useCallback((enabled: boolean) => {
+    setDevcontainer(enabled);
+    setDevcontainerEnabled(enabled);
+  }, []);
+
+  const effectiveDevcontainer = isDevcontainerAvailable && devcontainer;
   const availableVariants = modelOptions.find(m => m.id === model)?.variants ?? [];
 
   // ---------------------------------------------------------------------------
@@ -700,7 +700,7 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
               },
             }
           : {}),
-        ...(devcontainer ? { devcontainer: true } : {}),
+        ...(effectiveDevcontainer ? { devcontainer: true } : {}),
       };
       let result: { kiloSessionId: string; cloudAgentSessionId: string };
 
@@ -760,7 +760,7 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
       setIsPreparing(false);
     }
   }, [
-    devcontainer,
+    effectiveDevcontainer,
     imageUpload,
     displayModel,
     // `displayVariant` is what we actually submit; raw `variant` is only read
@@ -1245,39 +1245,30 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
             </PopoverContent>
           </Popover>
 
-          {/* Profile chip — bottom right */}
-          <ProfilePickerPopover
-            organizationId={organizationId}
-            selectedOverrideProfileId={selectedProfileId}
-            onOverrideProfileSelect={setSelectedProfileId}
-            repoFullName={selectedRepo || undefined}
-            platform={selectedPlatform}
-          />
-        </div>
-        {isAdmin && isDevcontainerAvailable && (
-          <div className="flex justify-end">
-            <div className={cn('flex items-center gap-2', isPreparing && 'opacity-70')}>
-              <div className="min-w-0 text-right">
-                <label
-                  htmlFor="devcontainer"
-                  className="block cursor-pointer text-xs leading-none font-medium"
-                >
-                  Dev container support
-                </label>
-                <p id="devcontainer-description" className="text-muted-foreground mt-1 text-xs">
-                  Experimental. Turn on for this session.
-                </p>
-              </div>
-              <Switch
-                id="devcontainer"
-                checked={devcontainer}
-                onCheckedChange={setDevcontainer}
-                disabled={isPreparing}
-                aria-describedby="devcontainer-description"
-              />
-            </div>
+          <div className="flex shrink-0 items-center gap-2">
+            {effectiveDevcontainer && (
+              <span className="text-muted-foreground inline-flex shrink-0 items-center rounded-md border border-border/50 bg-muted/30 px-2 py-1 text-xs">
+                Dev container on
+              </span>
+            )}
+            <ProfilePickerPopover
+              organizationId={organizationId}
+              selectedOverrideProfileId={selectedProfileId}
+              onOverrideProfileSelect={setSelectedProfileId}
+              repoFullName={selectedRepo || undefined}
+              platform={selectedPlatform}
+              devcontainerToggle={
+                isDevcontainerAvailable
+                  ? {
+                      checked: effectiveDevcontainer,
+                      disabled: isPreparing,
+                      onCheckedChange: handleDevcontainerChange,
+                    }
+                  : undefined
+              }
+            />
           </div>
-        )}
+        </div>
       </div>
     </div>
   );

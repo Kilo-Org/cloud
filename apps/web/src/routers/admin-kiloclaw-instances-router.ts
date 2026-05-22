@@ -3867,7 +3867,10 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
     // destruction across all time so grace-period safety is measured from the
     // most recent volume use, not just from the selected row.
     // Timestamps are cast explicitly so ISO inputs and Postgres timestamp text
-    // are compared as timestamptz values in every runtime.
+    // are compared as timestamptz values in every runtime. The outer SELECT
+    // formats timestamps as strict ISO 8601 (to_char with AT TIME ZONE 'UTC')
+    // so downstream code never has to parse Postgres's space-separated text
+    // representation (e.g. "2026-05-15 10:06:30.976+00").
     const cursorPredicate = input.cursor
       ? sql`
           and (
@@ -3886,8 +3889,8 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         ranked.user_id,
         ranked.sandbox_id,
         ranked.organization_id,
-        ranked.destroyed_at::text as destroyed_at,
-        ranked.latest_sandbox_destroyed_at::text as latest_sandbox_destroyed_at,
+        to_char(ranked.destroyed_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as destroyed_at,
+        to_char(ranked.latest_sandbox_destroyed_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as latest_sandbox_destroyed_at,
         ranked.user_email,
         ranked.subscription_status
       from (
@@ -3925,7 +3928,9 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
     const nextCursor =
       capped && lastScanned?.destroyed_at
         ? {
-            destroyedAt: new Date(lastScanned.destroyed_at).toISOString(),
+            // destroyed_at is already ISO 8601 (formatted by to_char in the
+            // query above) so no Date round-trip is needed here.
+            destroyedAt: lastScanned.destroyed_at,
             id: lastScanned.id,
           }
         : null;
@@ -4022,7 +4027,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         // The DO state could not be read, so a volume cannot be confirmed as
         // an orphan. Surface it as an unscanned instance rather than silently
         // dropping it from a results table that only shows confirmed orphans.
-        if (scan.doStatusError) {
+        if (scan.doStatusError !== null) {
           errors.push({
             instance_id: instance.id,
             user_id: instance.user_id,

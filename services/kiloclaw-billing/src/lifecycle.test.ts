@@ -2056,6 +2056,7 @@ describe('organization trial expiry sweep', () => {
     const { db, updates, inserts } = createMockDb(
       [
         [row],
+        [row],
         [
           {
             id: row.id,
@@ -2198,25 +2199,49 @@ describe('organization trial expiry sweep', () => {
     });
   });
 
+  it('skips organization trial expiry when entitlement returns after candidate selection', async () => {
+    const staleCandidate = organizationTrialExpiryRow();
+    const currentRow = organizationTrialExpiryRow({ latest_seat_purchase_status: 'active' });
+    const { db, updates, inserts } = createMockDb([[staleCandidate], [currentRow]]);
+    mockGetWorkerDb.mockReturnValue(db);
+    const stopFetch = vi.fn();
+    const { env } = createEnvWithQueueMocks(stopFetch);
+
+    const result = await processOrganizationTrialExpiryPage(env, {
+      kind: 'organization_trial_expiry_page',
+      runId: '83838383-8383-4838-8838-838383838383',
+      sweep: 'organization_trial_expiry',
+    });
+
+    expect(result.summary.organization_trial_expiry_suspensions).toBe(0);
+    expect(result.summary.errors).toBe(0);
+    expect(stopFetch).not.toHaveBeenCalled();
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+    expect(updates).toEqual([]);
+    expect(inserts).toEqual([]);
+  });
+
   it('skips paid, exempt, and still-trialing organization rows after entitlement revalidation', async () => {
+    const paidRow = organizationTrialExpiryRow({
+      id: '91919191-9191-4919-8919-919191919191',
+      latest_seat_purchase_status: 'past_due',
+    });
+    const exemptRow = organizationTrialExpiryRow({
+      id: 'a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1',
+      organization_id: '44444444-4444-4444-8444-444444444444',
+      organization_require_seats: false,
+    });
+    const trialingRow = organizationTrialExpiryRow({
+      id: 'b2b2b2b2-b2b2-4b2b-8b2b-b2b2b2b2b2b2',
+      organization_id: '55555555-5555-4555-8555-555555555555',
+      organization_free_trial_end_at: '2099-05-18T00:00:00.000Z',
+      hard_expiry_boundary: '2099-05-21T00:00:00.000Z',
+    });
     const { db, updates, inserts } = createMockDb([
-      [
-        organizationTrialExpiryRow({
-          id: '91919191-9191-4919-8919-919191919191',
-          latest_seat_purchase_status: 'past_due',
-        }),
-        organizationTrialExpiryRow({
-          id: 'a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1',
-          organization_id: '44444444-4444-4444-8444-444444444444',
-          organization_require_seats: false,
-        }),
-        organizationTrialExpiryRow({
-          id: 'b2b2b2b2-b2b2-4b2b-8b2b-b2b2b2b2b2b2',
-          organization_id: '55555555-5555-4555-8555-555555555555',
-          organization_free_trial_end_at: '2099-05-18T00:00:00.000Z',
-          hard_expiry_boundary: '2099-05-21T00:00:00.000Z',
-        }),
-      ],
+      [paidRow, exemptRow, trialingRow],
+      [paidRow],
+      [exemptRow],
+      [trialingRow],
     ]);
     mockGetWorkerDb.mockReturnValue(db);
     const stopFetch = vi.fn();
@@ -2247,7 +2272,7 @@ describe('organization trial expiry sweep', () => {
       organization_free_trial_end_at: '2099-05-18T00:00:00.000Z',
       hard_expiry_boundary: '2026-04-19T00:00:00.000Z',
     });
-    const { db } = createMockDb([[first, second]]);
+    const { db } = createMockDb([[first, second], [first]]);
     mockGetWorkerDb.mockReturnValue(db);
     const { env, lifecycleSend } = createEnvWithQueueMocks(vi.fn());
 
@@ -3397,6 +3422,7 @@ describe('instance destruction sweep', () => {
     const row = organizationDestructionCandidateRow();
     const { db, updates, txUpdates, inserts, deletes } = createMockDb([
       [row],
+      [row],
       [
         {
           id: row.instance_id,
@@ -3478,6 +3504,7 @@ describe('instance destruction sweep', () => {
     const { db, txUpdates, updates, txDeletes } = createMockDb(
       [
         [row],
+        [row],
         [
           {
             id: row.id,
@@ -3522,6 +3549,87 @@ describe('instance destruction sweep', () => {
       createEnv(startFetch),
       {
         runId: '21212121-2121-4212-8212-212121212121',
+        sweep: 'instance_destruction',
+      },
+      1
+    );
+
+    expect(summary.errors).toBe(0);
+    expect(summary.sweep3_instance_destruction).toBe(0);
+    expect(summary.organization_instance_destructions).toBe(0);
+    expect(summary.organization_trial_entitlement_recoveries).toBe(1);
+    expect(startFetch).toHaveBeenCalledTimes(1);
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+    expect(txDeletes).toHaveLength(1);
+    expect(txUpdates).toEqual([
+      expect.objectContaining({
+        status: 'active',
+        suspended_at: null,
+        destruction_deadline: null,
+      }),
+    ]);
+    expect(updates).toEqual([
+      expect.objectContaining({
+        auto_resume_requested_at: expect.any(String),
+        auto_resume_retry_after: expect.any(String),
+        auto_resume_attempt_count: 1,
+      }),
+    ]);
+  });
+
+  it('recovers instead of destroying when organization entitlement returns after destruction candidate selection', async () => {
+    const staleCandidate = organizationDestructionCandidateRow();
+    const currentRow = organizationDestructionCandidateRow({
+      latest_seat_purchase_status: 'active',
+    });
+    const { db, txUpdates, updates, txDeletes } = createMockDb(
+      [
+        [staleCandidate],
+        [currentRow],
+        [
+          {
+            id: currentRow.id,
+            user_id: currentRow.user_id,
+            instance_id: currentRow.instance_id,
+            status: 'canceled',
+            suspended_at: '2026-05-18T00:00:00.000Z',
+            destruction_deadline: '2026-05-17T00:00:00.000Z',
+          },
+        ],
+        [{ id: currentRow.instance_id, sandbox_id: currentRow.sandbox_id }],
+      ],
+      {
+        txUpdateReturningRows: [
+          [
+            {
+              id: currentRow.id,
+              user_id: currentRow.user_id,
+              instance_id: currentRow.instance_id,
+              status: 'active',
+              suspended_at: null,
+              destruction_deadline: null,
+            },
+          ],
+        ],
+      }
+    );
+    mockGetWorkerDb.mockReturnValue(db);
+    const startFetch = vi.fn(async (request: RequestInfo | URL) => {
+      const sentRequest = request instanceof Request ? request : new Request(String(request));
+      await expect(sentRequest.json()).resolves.toEqual({
+        userId: 'user-1',
+        reason: 'organization_trial_access_restored',
+      });
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    });
+
+    const summary = await runSweep(
+      createEnv(startFetch),
+      {
+        runId: '23232323-2323-4232-8232-232323232323',
         sweep: 'instance_destruction',
       },
       1

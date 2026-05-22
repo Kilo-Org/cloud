@@ -409,7 +409,6 @@ describe('instance lifecycle async resume', () => {
     expect(txInsertValues).toHaveLength(0);
   });
 
-
   it('clears auto-resume state when readiness arrives after the instance is already gone', async () => {
     const instanceId = '11111111-1111-4111-8111-111111111111';
     const sandboxId = 'ki_11111111111141118111111111111111';

@@ -213,6 +213,16 @@ type OrganizationRecoveryRow = OrganizationEntitlementLifecycleFields & {
   instance_id: string | null;
 };
 
+type OrganizationDestructionRow = OrganizationRecoveryRow & {
+  sandbox_id: string | null;
+  instance_name: string | null;
+  instance_destroyed_at: string | null;
+  plan: KiloClawPlan;
+  status: KiloClawSubscriptionStatus;
+  email: string;
+  credit_renewal_at: string | null;
+};
+
 type KiloPassProjectionSubscriptionRow = KiloPassBonusProjectionSubscription &
   KiloPassSubscriptionProjectionCandidate & {
     id: string;
@@ -2822,6 +2832,105 @@ function latestOrganizationSeatPurchaseStatusExpression() {
   )`;
 }
 
+function organizationHardExpiryBoundaryExpression() {
+  return sql<string>`coalesce(${organizations.free_trial_end_at}, ${organizations.created_at} + interval '14 days') + interval '3 days'`;
+}
+
+async function loadCurrentOrganizationTrialExpiryRow(
+  database: Pick<WorkerDb, 'select'>,
+  subscriptionId: string
+): Promise<OrganizationTrialExpiryRow | null> {
+  const [row] = await database
+    .select({
+      id: kiloclaw_subscriptions.id,
+      user_id: kiloclaw_subscriptions.user_id,
+      instance_id: kiloclaw_subscriptions.instance_id,
+      sandbox_id: kiloclaw_instances.sandbox_id,
+      instance_destroyed_at: kiloclaw_instances.destroyed_at,
+      instance_name: kiloclaw_instances.name,
+      plan: kiloclaw_subscriptions.plan,
+      organization_id: kiloclaw_instances.organization_id,
+      organization_name: organizations.name,
+      organization_created_at: organizations.created_at,
+      organization_free_trial_end_at: organizations.free_trial_end_at,
+      organization_require_seats: organizations.require_seats,
+      organization_settings: organizations.settings,
+      latest_seat_purchase_status: latestOrganizationSeatPurchaseStatusExpression().as(
+        'latest_seat_purchase_status'
+      ),
+      hard_expiry_boundary: organizationHardExpiryBoundaryExpression().as('hard_expiry_boundary'),
+      email: kilocode_users.google_user_email,
+    })
+    .from(kiloclaw_subscriptions)
+    .innerJoin(kilocode_users, eq(kiloclaw_subscriptions.user_id, kilocode_users.id))
+    .innerJoin(kiloclaw_instances, eq(kiloclaw_subscriptions.instance_id, kiloclaw_instances.id))
+    .innerJoin(organizations, eq(kiloclaw_instances.organization_id, organizations.id))
+    .where(
+      and(
+        eq(kiloclaw_subscriptions.id, subscriptionId),
+        eq(kiloclaw_subscriptions.status, 'active'),
+        currentSubscriptionRowFilter(),
+        isNull(kiloclaw_subscriptions.suspended_at),
+        isNotNull(kiloclaw_subscriptions.instance_id),
+        isNotNull(kiloclaw_instances.sandbox_id),
+        isNull(kiloclaw_instances.destroyed_at),
+        isNotNull(kiloclaw_instances.organization_id)
+      )
+    )
+    .limit(1);
+
+  return row ?? null;
+}
+
+async function loadCurrentOrganizationDestructionRow(
+  database: Pick<WorkerDb, 'select'>,
+  subscriptionId: string,
+  now: string
+): Promise<OrganizationDestructionRow | null> {
+  const [row] = await database
+    .select({
+      id: kiloclaw_subscriptions.id,
+      user_id: kiloclaw_subscriptions.user_id,
+      instance_id: kiloclaw_subscriptions.instance_id,
+      sandbox_id: kiloclaw_instances.sandbox_id,
+      instance_name: kiloclaw_instances.name,
+      instance_destroyed_at: kiloclaw_instances.destroyed_at,
+      organization_id: kiloclaw_instances.organization_id,
+      organization_name: organizations.name,
+      organization_created_at: organizations.created_at,
+      organization_free_trial_end_at: organizations.free_trial_end_at,
+      organization_require_seats: organizations.require_seats,
+      organization_settings: organizations.settings,
+      latest_seat_purchase_status: latestOrganizationSeatPurchaseStatusExpression().as(
+        'latest_seat_purchase_status'
+      ),
+      plan: kiloclaw_subscriptions.plan,
+      status: kiloclaw_subscriptions.status,
+      email: kilocode_users.google_user_email,
+      credit_renewal_at: kiloclaw_subscriptions.credit_renewal_at,
+    })
+    .from(kiloclaw_subscriptions)
+    .innerJoin(kilocode_users, eq(kiloclaw_subscriptions.user_id, kilocode_users.id))
+    .innerJoin(kiloclaw_instances, eq(kiloclaw_subscriptions.instance_id, kiloclaw_instances.id))
+    .innerJoin(organizations, eq(kiloclaw_instances.organization_id, organizations.id))
+    .where(
+      and(
+        eq(kiloclaw_subscriptions.id, subscriptionId),
+        lt(kiloclaw_subscriptions.destruction_deadline, now),
+        currentSubscriptionRowFilter(),
+        isNotNull(kiloclaw_subscriptions.suspended_at),
+        inArray(kiloclaw_subscriptions.status, ['canceled', 'past_due', 'unpaid']),
+        isNotNull(kiloclaw_subscriptions.instance_id),
+        isNotNull(kiloclaw_instances.sandbox_id),
+        isNull(kiloclaw_instances.destroyed_at),
+        isNotNull(kiloclaw_instances.organization_id)
+      )
+    )
+    .limit(1);
+
+  return row ?? null;
+}
+
 async function loadOrganizationKiloClawBillingAuthorities(
   database: Pick<WorkerDb, 'select'>,
   organizationId: string
@@ -3032,29 +3141,59 @@ async function processOrganizationTrialExpiryRow(
     return;
   }
 
+  const currentRow = await loadCurrentOrganizationTrialExpiryRow(database, row.id);
+  if (!currentRow) {
+    logSkippedSubscriptionRow(
+      'Skipping organization trial expiry because candidate is no longer eligible',
+      row,
+      {
+        reason: 'candidate_no_longer_eligible',
+        organizationId: row.organization_id,
+      }
+    );
+    return;
+  }
+  const organizationId = currentRow.organization_id;
+  const instanceId = currentRow.instance_id;
+  if (!organizationId || !instanceId) {
+    logSkippedSubscriptionRow(
+      'Skipping organization trial expiry without current organization instance context',
+      currentRow,
+      {
+        reason: 'missing_current_organization_instance_context',
+        organizationId: organizationId ?? row.organization_id,
+      }
+    );
+    return;
+  }
+
   const entitlement = classifyOrganizationEntitlement({
     organization: {
-      created_at: row.organization_created_at,
-      free_trial_end_at: row.organization_free_trial_end_at,
-      require_seats: row.organization_require_seats,
-      settings: row.organization_settings,
+      created_at: currentRow.organization_created_at,
+      free_trial_end_at: currentRow.organization_free_trial_end_at,
+      require_seats: currentRow.organization_require_seats,
+      settings: currentRow.organization_settings,
     },
-    latestSeatPurchaseStatus: row.latest_seat_purchase_status,
+    latestSeatPurchaseStatus: currentRow.latest_seat_purchase_status,
     now: new Date(processedAt),
   });
 
   if (!entitlement.isTrialExpiredForEnforcement) {
-    logSkippedSubscriptionRow('Skipping organization trial expiry for entitled organization', row, {
-      reason: entitlement.bypassReason ?? entitlement.trialStatus,
-      organizationId: row.organization_id,
-    });
+    logSkippedSubscriptionRow(
+      'Skipping organization trial expiry for entitled organization',
+      currentRow,
+      {
+        reason: entitlement.bypassReason ?? entitlement.trialStatus,
+        organizationId: currentRow.organization_id,
+      }
+    );
     return;
   }
 
-  await stopInstanceForEnforcement(env, context, row, 'organization_trial_expiry');
+  await stopInstanceForEnforcement(env, context, currentRow, 'organization_trial_expiry');
 
   const destructionDeadline = new Date(Date.now() + DESTRUCTION_GRACE_DAYS * MS_PER_DAY);
-  const before = await getSubscriptionById(database, row.id);
+  const before = await getSubscriptionById(database, currentRow.id);
   const [updated] = await database
     .update(kiloclaw_subscriptions)
     .set({
@@ -3062,11 +3201,11 @@ async function processOrganizationTrialExpiryRow(
       suspended_at: processedAt,
       destruction_deadline: destructionDeadline.toISOString(),
     })
-    .where(eq(kiloclaw_subscriptions.id, row.id))
+    .where(eq(kiloclaw_subscriptions.id, currentRow.id))
     .returning();
 
   await insertLifecycleChangeLogBestEffort(database, {
-    subscriptionId: row.id,
+    subscriptionId: currentRow.id,
     action: 'suspended',
     reason: 'organization_trial_expired',
     before,
@@ -3075,24 +3214,24 @@ async function processOrganizationTrialExpiryRow(
 
   const billingAuthorities = await loadOrganizationKiloClawBillingAuthorities(
     database,
-    row.organization_id
+    organizationId
   );
   const recipients = selectOrganizationKiloClawLifecycleRecipients({
     associatedUser: {
-      userId: row.user_id,
-      email: row.email,
+      userId: currentRow.user_id,
+      email: currentRow.email,
     },
     billingAuthorities,
   });
   const notificationContext = {
     event: 'trial_suspended',
-    organizationId: row.organization_id,
-    organizationName: row.organization_name,
-    instanceId: row.instance_id,
+    organizationId,
+    organizationName: currentRow.organization_name,
+    instanceId,
     instanceLabel: formatInstanceLabel({
-      instanceName: row.instance_name,
-      instanceId: row.instance_id,
-      plan: row.plan,
+      instanceName: currentRow.instance_name,
+      instanceId,
+      plan: currentRow.plan,
     }),
     destructionDate: formatDateForEmail(destructionDeadline),
   } satisfies OrganizationKiloClawLifecycleNotificationContext;
@@ -3127,10 +3266,10 @@ async function processOrganizationTrialExpiryRow(
   log('info', 'Suspended organization KiloClaw instance after hard-expired trial', {
     event: 'organization_trial_expiry_suspension',
     outcome: 'completed',
-    subscriptionId: row.id,
-    userId: row.user_id,
-    instanceId: row.instance_id,
-    organizationId: row.organization_id,
+    subscriptionId: currentRow.id,
+    userId: currentRow.user_id,
+    instanceId,
+    organizationId,
     notificationSentCount,
   });
 }
@@ -3519,34 +3658,81 @@ async function runInstanceDestructionSweep(
         continue;
       }
 
+      let destructionRow = row;
       if (row.organization_id) {
-        const entitlement = classifyOrganizationLifecycleEntitlement(row, new Date(now));
-        if (!entitlement || !row.organization_name) {
+        const currentRow = await loadCurrentOrganizationDestructionRow(database, row.id, now);
+        if (!currentRow) {
           logSkippedSubscriptionRow(
-            'Skipping organization instance destruction without entitlement context',
+            'Skipping organization instance destruction because candidate is no longer eligible',
             row,
             {
-              reason: 'missing_organization_entitlement_context',
+              reason: 'candidate_no_longer_eligible',
               organizationId: row.organization_id,
             }
           );
           continue;
         }
 
+        if (!currentRow.organization_id || !currentRow.instance_id || !currentRow.sandbox_id) {
+          logSkippedSubscriptionRow(
+            'Skipping organization instance destruction without current organization instance context',
+            currentRow,
+            {
+              reason: 'missing_current_organization_instance_context',
+              organizationId: currentRow.organization_id ?? row.organization_id,
+            }
+          );
+          continue;
+        }
+
+        destructionRow = currentRow;
+        const entitlement = classifyOrganizationLifecycleEntitlement(currentRow, new Date(now));
+        if (!entitlement || !currentRow.organization_name) {
+          logSkippedSubscriptionRow(
+            'Skipping organization instance destruction without entitlement context',
+            currentRow,
+            {
+              reason: 'missing_organization_entitlement_context',
+              organizationId: currentRow.organization_id,
+            }
+          );
+          continue;
+        }
+
         if (!entitlement.isTrialExpiredForEnforcement) {
-          await recoverOrganizationTrialEntitlement(database, env, context, summary, row, now);
+          await recoverOrganizationTrialEntitlement(
+            database,
+            env,
+            context,
+            summary,
+            currentRow,
+            now
+          );
           continue;
         }
       }
 
-      if (await hasUnresolvedTerminalRenewalFailureForBoundary(database, row)) {
+      const destructionInstanceId = destructionRow.instance_id;
+      const destructionSandboxId = destructionRow.sandbox_id;
+      if (!destructionInstanceId || !destructionSandboxId) {
+        logSkippedSubscriptionRow(
+          'Skipping instance destruction without current instance context',
+          destructionRow,
+          {
+            reason: 'missing_current_instance_context',
+          }
+        );
         continue;
       }
 
-      await destroyInstanceForEnforcement(env, context, row);
+      if (await hasUnresolvedTerminalRenewalFailureForBoundary(database, destructionRow)) {
+        continue;
+      }
 
-      if (row.instance_id) {
-        const instanceId = row.instance_id;
+      await destroyInstanceForEnforcement(env, context, destructionRow);
+
+      if (destructionRow.instance_id) {
+        const instanceId = destructionInstanceId;
         await database.transaction(async tx => {
           await markInstanceDestroyedWithPersonalSubscriptionCollapse({
             actor: LIFECYCLE_ACTOR,
@@ -3567,20 +3753,20 @@ async function runInstanceDestructionSweep(
               });
             },
             reason: 'destroy_path_inline_collapse',
-            userId: row.user_id,
+            userId: destructionRow.user_id,
           });
         });
       }
 
-      const before = await getSubscriptionById(database, row.id);
+      const before = await getSubscriptionById(database, destructionRow.id);
       const [updated] = await database
         .update(kiloclaw_subscriptions)
         .set({ destruction_deadline: null })
-        .where(eq(kiloclaw_subscriptions.id, row.id))
+        .where(eq(kiloclaw_subscriptions.id, destructionRow.id))
         .returning();
 
       await insertLifecycleChangeLogBestEffort(database, {
-        subscriptionId: row.id,
+        subscriptionId: destructionRow.id,
         action: 'status_changed',
         reason: 'instance_destroyed',
         before,
@@ -3588,7 +3774,7 @@ async function runInstanceDestructionSweep(
       });
 
       let organizationNotificationSentCount = 0;
-      if (row.organization_id && row.organization_name) {
+      if (destructionRow.organization_id && destructionRow.organization_name) {
         const sentCount = await sendOrganizationKiloClawLifecycleNotifications(
           database,
           env,
@@ -3596,18 +3782,18 @@ async function runInstanceDestructionSweep(
           summary,
           {
             associatedUser: {
-              userId: row.user_id,
-              email: row.email,
+              userId: destructionRow.user_id,
+              email: destructionRow.email,
             },
             notificationContext: {
               event: 'instance_destroyed',
-              organizationId: row.organization_id,
-              organizationName: row.organization_name,
-              instanceId: row.instance_id,
+              organizationId: destructionRow.organization_id,
+              organizationName: destructionRow.organization_name,
+              instanceId: destructionInstanceId,
               instanceLabel: formatInstanceLabel({
-                instanceName: row.instance_name,
-                instanceId: row.instance_id,
-                plan: row.plan,
+                instanceName: destructionRow.instance_name,
+                instanceId: destructionInstanceId,
+                plan: destructionRow.plan,
               }),
             },
           }
@@ -3617,10 +3803,10 @@ async function runInstanceDestructionSweep(
           log('info', 'Organization instance destroyed notification was already delivered', {
             event: 'organization_instance_destroyed_notification_skipped',
             outcome: 'skipped',
-            subscriptionId: row.id,
-            userId: row.user_id,
-            instanceId: row.instance_id,
-            organizationId: row.organization_id,
+            subscriptionId: destructionRow.id,
+            userId: destructionRow.user_id,
+            instanceId: destructionInstanceId,
+            organizationId: destructionRow.organization_id,
           });
         }
       } else {
@@ -3628,14 +3814,14 @@ async function runInstanceDestructionSweep(
           database,
           env,
           context,
-          row.user_id,
-          row.email,
+          destructionRow.user_id,
+          destructionRow.email,
           'claw_instance_destroyed',
           'clawInstanceDestroyed',
           { claw_url: clawUrl },
           summary,
           undefined,
-          { instanceId: row.instance_id }
+          { instanceId: destructionInstanceId }
         );
       }
 
@@ -3643,29 +3829,32 @@ async function runInstanceDestructionSweep(
         .delete(kiloclaw_email_log)
         .where(
           and(
-            eq(kiloclaw_email_log.user_id, row.user_id),
+            eq(kiloclaw_email_log.user_id, destructionRow.user_id),
             or(
               and(
-                eq(kiloclaw_email_log.instance_id, row.instance_id),
+                eq(kiloclaw_email_log.instance_id, destructionInstanceId),
                 eq(kiloclaw_email_log.email_type, 'claw_instance_ready')
               ),
               and(
                 isNull(kiloclaw_email_log.instance_id),
-                eq(kiloclaw_email_log.email_type, legacyInstanceReadyEmailType(row.sandbox_id))
+                eq(
+                  kiloclaw_email_log.email_type,
+                  legacyInstanceReadyEmailType(destructionSandboxId)
+                )
               )
             )
           )
         );
 
-      if (row.organization_id) {
+      if (destructionRow.organization_id) {
         summary.organization_instance_destructions++;
         log('info', 'Destroyed organization KiloClaw instance after grace elapsed', {
           event: 'organization_instance_destruction',
           outcome: 'completed',
-          subscriptionId: row.id,
-          userId: row.user_id,
-          instanceId: row.instance_id,
-          organizationId: row.organization_id,
+          subscriptionId: destructionRow.id,
+          userId: destructionRow.user_id,
+          instanceId: destructionInstanceId,
+          organizationId: destructionRow.organization_id,
           notificationSentCount: organizationNotificationSentCount,
         });
       }

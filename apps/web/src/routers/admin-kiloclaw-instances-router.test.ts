@@ -2830,6 +2830,63 @@ describe('admin.kiloclawInstances scheduled actions', () => {
 });
 
 describe('admin.kiloclawInstances.findOrphanVolumes', () => {
+  it('returns a cursor for continuing older capped scan batches', async () => {
+    const destroyedAt = new Date(Date.now() - 30 * 86_400_000).toISOString();
+    const instanceIds = Array.from(
+      { length: 501 },
+      (_, i) => `00000000-0000-4000-8000-${i.toString().padStart(12, '0')}`
+    );
+    await db.insert(kiloclaw_instances).values(
+      instanceIds.map((id, i) => ({
+        id,
+        user_id: regularUser.id,
+        sandbox_id: `ki_cursor_${i.toString().padStart(4, '0')}`,
+        destroyed_at: destroyedAt,
+      }))
+    );
+
+    mockScanOrphanVolumes.mockResolvedValue({
+      flyApp: 'inst-cursor',
+      appExists: true,
+      expectedVolumeName: 'kiloclaw_cursor',
+      doStatus: null,
+      doStatusError: null,
+      scanError: null,
+      volumes: [],
+    });
+
+    const destroyedMs = Date.parse(destroyedAt);
+    const caller = await createCallerForUser(adminUser.id);
+    const firstBatch = await caller.admin.kiloclawInstances.findOrphanVolumes({
+      destroyedAfter: new Date(destroyedMs - 60_000).toISOString(),
+      destroyedBefore: new Date(destroyedMs + 60_000).toISOString(),
+    });
+
+    expect(firstBatch.scanned).toBe(500);
+    expect(firstBatch.capped).toBe(true);
+    expect(firstBatch.nextCursor).toEqual({
+      destroyedAt,
+      id: '00000000-0000-4000-8000-000000000001',
+    });
+    expect(mockScanOrphanVolumes).toHaveBeenCalledTimes(500);
+    const firstBatchInstanceIds = new Set(
+      mockScanOrphanVolumes.mock.calls.map(([, instanceId]) => instanceId)
+    );
+
+    mockScanOrphanVolumes.mockClear();
+    const secondBatch = await caller.admin.kiloclawInstances.findOrphanVolumes({
+      destroyedAfter: new Date(destroyedMs - 60_000).toISOString(),
+      destroyedBefore: new Date(destroyedMs + 60_000).toISOString(),
+      cursor: firstBatch.nextCursor ?? undefined,
+    });
+
+    expect(secondBatch.scanned).toBe(1);
+    expect(secondBatch.capped).toBe(false);
+    expect(secondBatch.nextCursor).toBeNull();
+    expect(mockScanOrphanVolumes).toHaveBeenCalledTimes(1);
+    expect(firstBatchInstanceIds.has(mockScanOrphanVolumes.mock.calls[0][1])).toBe(false);
+  });
+
   it('runs the deduplicated scan query and returns classified volumes', async () => {
     // Regression: the dedup subquery becomes a derived table, so no two
     // projected columns may emit the same name. This exercises that query

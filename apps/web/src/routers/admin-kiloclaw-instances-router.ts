@@ -79,6 +79,7 @@ import {
   sql,
   gte,
   lte,
+  lt,
   type SQL,
 } from 'drizzle-orm';
 
@@ -142,6 +143,13 @@ const FindOrphanVolumesSchema = z.object({
   destroyedAfter: z.string().datetime(),
   /** ISO date string — only check instances destroyed on or before this date. */
   destroyedBefore: z.string().datetime(),
+  /** Continue scanning older rows after a previous bounded batch. */
+  cursor: z
+    .object({
+      destroyedAt: z.string().datetime(),
+      id: z.string().uuid(),
+    })
+    .optional(),
 });
 
 const GetInstanceSchema = z.object({
@@ -3889,21 +3897,42 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
     // Apply the requested window to the deduplicated latest row, then order
     // by recency and cap. Filtering here (not inside the subquery) is what
     // guarantees the window is matched against each sandbox's genuine latest
-    // destruction.
+    // destruction. The optional cursor continues older rows from the last
+    // scanned `(destroyed_at, id)` tuple, preserving a deterministic 500-row
+    // batch limit without forcing admins to manually bisect date windows.
+    const cursorPredicate = input.cursor
+      ? or(
+          lt(destroyedInstancesByLatest.destroyed_at, input.cursor.destroyedAt),
+          and(
+            eq(destroyedInstancesByLatest.destroyed_at, input.cursor.destroyedAt),
+            lt(destroyedInstancesByLatest.id, input.cursor.id)
+          )
+        )
+      : undefined;
+
     const instances = await db
       .select()
       .from(destroyedInstancesByLatest)
       .where(
         and(
           gte(destroyedInstancesByLatest.destroyed_at, input.destroyedAfter),
-          lte(destroyedInstancesByLatest.destroyed_at, input.destroyedBefore)
+          lte(destroyedInstancesByLatest.destroyed_at, input.destroyedBefore),
+          cursorPredicate
         )
       )
-      .orderBy(desc(destroyedInstancesByLatest.destroyed_at))
+      .orderBy(desc(destroyedInstancesByLatest.destroyed_at), desc(destroyedInstancesByLatest.id))
       .limit(MAX_SCAN + 1);
 
     const capped = instances.length > MAX_SCAN;
     const toScan = capped ? instances.slice(0, MAX_SCAN) : instances;
+    const lastScanned = toScan.at(-1);
+    const nextCursor =
+      capped && lastScanned?.destroyed_at
+        ? {
+            destroyedAt: new Date(lastScanned.destroyed_at).toISOString(),
+            id: lastScanned.id,
+          }
+        : null;
 
     type VolumeRow = {
       instance_id: string;
@@ -3938,6 +3967,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         errors: [] as ScanErrorRow[],
         scanned: 0,
         capped: false,
+        nextCursor: null,
       };
     }
 
@@ -4066,7 +4096,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       }
     }
 
-    return { volumes, errors, scanned: toScan.length, capped };
+    return { volumes, errors, scanned: toScan.length, capped, nextCursor };
   }),
 
   destroyOrphanVolume: adminProcedure

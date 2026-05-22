@@ -179,6 +179,7 @@ type OrphanVolumeScanResult = {
   errors: OrphanVolumeScanErrorRow[];
   scanned: number;
   capped: boolean;
+  nextCursor: { destroyedAt: string; id: string } | null;
 };
 
 /** Human-readable label + visual tone for each volume classification. */
@@ -263,27 +264,61 @@ function OrphanVolumesSection() {
   const [destroyedBeforeInput, setDestroyedBeforeInput] = useState(
     toDatetimeLocalInput(new Date())
   );
+  const [scanWindow, setScanWindow] = useState<{
+    destroyedAfter: string;
+    destroyedBefore: string;
+  } | null>(null);
   const [scanResult, setScanResult] = useState<OrphanVolumeScanResult | null>(null);
   const [destroyTarget, setDestroyTarget] = useState<OrphanVolumeRow | null>(null);
   const [showErrors, setShowErrors] = useState(false);
   const [selectedVolumeIds, setSelectedVolumeIds] = useState<Set<string>>(new Set());
   const [bulkConfirmOpen, setBulkConfirmOpen] = useState(false);
   const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null);
+  const [isContinuingScan, setIsContinuingScan] = useState(false);
 
   const findOrphanVolumes = useMutation(
     trpc.admin.kiloclawInstances.findOrphanVolumes.mutationOptions({
-      onSuccess: result => {
-        setScanResult(result);
-        setSelectedVolumeIds(new Set());
-        toast.success(
-          `Scanned ${result.scanned} destroyed instance(s) — ${result.volumes.length} orphan volume(s) found`
-        );
+      onSuccess: (result, variables) => {
+        if (variables.cursor) {
+          setScanResult(current => {
+            if (!current) return result;
+            const volumesById = new Map(current.volumes.map(volume => [volume.volume_id, volume]));
+            for (const volume of result.volumes) {
+              volumesById.set(volume.volume_id, volume);
+            }
+            return {
+              volumes: [...volumesById.values()],
+              errors: [...current.errors, ...result.errors],
+              scanned: current.scanned + result.scanned,
+              capped: result.capped,
+              nextCursor: result.nextCursor,
+            };
+          });
+          toast.success(
+            `Scanned ${result.scanned} more destroyed instance(s) — ${result.volumes.length} additional orphan volume(s) found`
+          );
+        } else {
+          setScanResult(result);
+          setScanWindow({
+            destroyedAfter: variables.destroyedAfter,
+            destroyedBefore: variables.destroyedBefore,
+          });
+          setSelectedVolumeIds(new Set());
+          toast.success(
+            `Scanned ${result.scanned} destroyed instance(s) — ${result.volumes.length} orphan volume(s) found`
+          );
+        }
+      },
+      onSettled: () => {
+        setIsContinuingScan(false);
       },
       onError: err => {
         toast.error(`Failed to scan for orphan volumes: ${err.message}`);
       },
     })
   );
+
+  const scanInProgress = findOrphanVolumes.isPending;
 
   const destroyOrphanVolume = useMutation(
     trpc.admin.kiloclawInstances.destroyOrphanVolume.mutationOptions({
@@ -345,6 +380,16 @@ function OrphanVolumesSection() {
       return;
     }
     findOrphanVolumes.mutate({ destroyedAfter, destroyedBefore });
+  };
+
+  const handleContinueScan = () => {
+    if (!scanResult?.nextCursor || !scanWindow) return;
+    setIsContinuingScan(true);
+    findOrphanVolumes.mutate({
+      destroyedAfter: scanWindow.destroyedAfter,
+      destroyedBefore: scanWindow.destroyedBefore,
+      cursor: scanResult.nextCursor,
+    });
   };
 
   const toggleVolume = (volumeId: string) => {
@@ -447,8 +492,8 @@ function OrphanVolumesSection() {
                 onChange={e => setDestroyedBeforeInput(e.target.value)}
               />
             </div>
-            <Button onClick={handleScan} disabled={findOrphanVolumes.isPending || bulkInProgress}>
-              {findOrphanVolumes.isPending ? (
+            <Button onClick={handleScan} disabled={scanInProgress || bulkInProgress}>
+              {scanInProgress && !isContinuingScan ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Scanning...
@@ -491,12 +536,32 @@ function OrphanVolumesSection() {
             </div>
           )}
 
-          {scanResult?.capped && (
+          {scanResult?.nextCursor && (
             <Alert>
               <AlertTriangle className="h-4 w-4" />
               <AlertDescription>
-                Results capped at 500 instances. Narrow the date range to scan all matching
-                instances.
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <span>
+                    This batch was capped at 500 instances. Continue scanning older destroyed
+                    instances in the same date window to check the full range.
+                  </span>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={handleContinueScan}
+                    disabled={scanInProgress || bulkInProgress}
+                  >
+                    {scanInProgress && isContinuingScan ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Scanning older...
+                      </>
+                    ) : (
+                      'Continue older'
+                    )}
+                  </Button>
+                </div>
               </AlertDescription>
             </Alert>
           )}
@@ -549,7 +614,7 @@ function OrphanVolumesSection() {
               <Button
                 variant="destructive"
                 onClick={() => setBulkConfirmOpen(true)}
-                disabled={bulkInProgress}
+                disabled={bulkInProgress || scanInProgress}
               >
                 {bulkInProgress ? (
                   <>
@@ -583,7 +648,7 @@ function OrphanVolumesSection() {
                     <TableHead className="w-10">
                       <Checkbox
                         aria-label="Select all orphan volumes"
-                        disabled={bulkInProgress}
+                        disabled={bulkInProgress || scanInProgress}
                         checked={
                           selectedRows.length === 0
                             ? false
@@ -611,7 +676,7 @@ function OrphanVolumesSection() {
                       <TableCell>
                         <Checkbox
                           aria-label={`Select volume ${volume.volume_id}`}
-                          disabled={bulkInProgress}
+                          disabled={bulkInProgress || scanInProgress}
                           checked={selectedVolumeIds.has(volume.volume_id)}
                           onCheckedChange={() => toggleVolume(volume.volume_id)}
                         />
@@ -684,7 +749,7 @@ function OrphanVolumesSection() {
                         <Button
                           variant="destructive"
                           size="sm"
-                          disabled={bulkInProgress}
+                          disabled={bulkInProgress || scanInProgress}
                           onClick={() => setDestroyTarget(volume)}
                         >
                           <Trash2 className="mr-2 h-4 w-4" />

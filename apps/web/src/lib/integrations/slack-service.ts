@@ -16,11 +16,8 @@ import {
   createAllowPredicateFromRestrictions,
   hasActiveModelRestrictions,
 } from '@/lib/model-allow.server';
-import { KILO_AUTO_FREE_MODEL } from '@/lib/ai-gateway/auto-model';
+import { DEFAULT_BOT_MODEL } from '@/lib/bot/constants';
 import { getEffectiveModelRestrictions } from '@/lib/organizations/model-restrictions';
-
-// Default model for Slack integrations - separate from the global platform default
-const SLACK_DEFAULT_MODEL = KILO_AUTO_FREE_MODEL.id;
 
 export class SlackWorkspaceAlreadyConnectedError extends Error {
   constructor(teamName: string) {
@@ -220,11 +217,11 @@ export async function upsertSlackInstallation({
   }
 
   // For org integrations, get a model that respects org access policy.
-  // For user integrations, use the Slack-specific default model
+  // For user integrations, use the shared bot default model.
   const defaultModel =
     owner.type === 'org'
-      ? await getDefaultAllowedModel(owner.id, SLACK_DEFAULT_MODEL)
-      : SLACK_DEFAULT_MODEL;
+      ? await getDefaultAllowedModel(owner.id, DEFAULT_BOT_MODEL)
+      : DEFAULT_BOT_MODEL;
 
   const metadata = {
     ...(existing?.metadata && typeof existing.metadata === 'object' ? existing.metadata : {}),

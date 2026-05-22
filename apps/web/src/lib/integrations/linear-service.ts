@@ -16,14 +16,8 @@ import {
   createAllowPredicateFromRestrictions,
   hasActiveModelRestrictions,
 } from '@/lib/model-allow.server';
-import { KILO_AUTO_FRONTIER_MODEL } from '@/lib/ai-gateway/auto-model';
+import { DEFAULT_BOT_MODEL } from '@/lib/bot/constants';
 import { getEffectiveModelRestrictions } from '@/lib/organizations/model-restrictions';
-
-// Default model for Linear integrations. Intentionally diverges from
-// Slack (which uses KILO_AUTO_FREE_MODEL) — Linear runs in agent-sessions
-// mode where each @-mention spawns a long-running session, so the
-// frontier model is preferred for quality over the lower-cost default.
-const LINEAR_DEFAULT_MODEL = KILO_AUTO_FRONTIER_MODEL.id;
 
 // OAuth scopes requested when installing Kilo into a Linear workspace.
 // `app:mentionable` combined with `actor=app` gives us an app-actor install
@@ -379,8 +373,8 @@ export async function upsertLinearInstallation(
 
   const defaultModel =
     owner.type === 'org'
-      ? await getDefaultAllowedModel(owner.id, LINEAR_DEFAULT_MODEL)
-      : LINEAR_DEFAULT_MODEL;
+      ? await getDefaultAllowedModel(owner.id, DEFAULT_BOT_MODEL)
+      : DEFAULT_BOT_MODEL;
 
   const existingMetadata =
     existing?.metadata && typeof existing.metadata === 'object' ? existing.metadata : {};

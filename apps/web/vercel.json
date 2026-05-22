@@ -53,6 +53,10 @@
       "schedule": "*/10 * * * *"
     },
     {
+      "path": "/api/cron/aggregate-review-memory",
+      "schedule": "0 4 * * *"
+    },
+    {
       "path": "/api/cron/exa-partition-maintenance",
       "schedule": "0 0 1 * *"
     },

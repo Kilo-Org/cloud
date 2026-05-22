@@ -22,6 +22,7 @@ import type {
   ReviewMemoryChangeRequestType,
   ReviewMemoryEvidenceRole,
   ReviewMemoryFeedbackEventSource,
+  ReviewMemoryEventAggregationState,
   ReviewMemoryPlatform,
   ReviewMemoryProposalScopeKind,
   ReviewMemoryProposalStatus,
@@ -559,6 +560,101 @@ export async function updateAggregationRunStatus(input: {
   return run;
 }
 
+export type ClaimEligibleAggregationStatesInput = {
+  limit?: number;
+  minFreshEvents: number;
+  minFreshWeight: number;
+  minDistinctSubjects: number;
+  minDistinctPrs: number;
+  staleAfterMs: number;
+  now?: Date;
+};
+
+export async function claimEligibleAggregationStates(
+  input: ClaimEligibleAggregationStatesInput
+): Promise<CodeReviewMemoryAggregationState[]> {
+  const now = input.now ?? new Date();
+  const staleBefore = new Date(now.getTime() - input.staleAfterMs).toISOString();
+  const limit = Math.max(1, Math.min(input.limit ?? 10, 50));
+  const result = await db.execute<CodeReviewMemoryAggregationState>(sql`
+    WITH candidates AS (
+      SELECT id
+      FROM ${code_review_memory_aggregation_state}
+      WHERE (
+        status IN ('eligible', 'failed')
+        AND next_eligible_at <= ${now.toISOString()}
+        AND (fresh_event_count >= ${input.minFreshEvents} OR fresh_weight >= ${input.minFreshWeight})
+        AND (
+          fresh_distinct_subject_count >= ${input.minDistinctSubjects}
+          OR fresh_distinct_pr_count >= ${input.minDistinctPrs}
+        )
+      ) OR (
+        status = 'running'
+        AND claimed_at IS NOT NULL
+        AND claimed_at <= ${staleBefore}
+      )
+      ORDER BY fresh_weight DESC, fresh_event_count DESC, updated_at ASC, id ASC
+      FOR UPDATE SKIP LOCKED
+      LIMIT ${limit}
+    )
+    UPDATE ${code_review_memory_aggregation_state} state
+    SET
+      status = 'running',
+      claimed_at = ${now.toISOString()},
+      claim_token = gen_random_uuid()::text,
+      last_attempted_run_at = ${now.toISOString()},
+      last_error_message = NULL,
+      updated_at = ${now.toISOString()}
+    FROM candidates
+    WHERE state.id = candidates.id
+    RETURNING state.*
+  `);
+
+  return result.rows;
+}
+
+export async function finishClaimedAggregationState(input: {
+  stateId: string;
+  claimToken: string;
+  status: Extract<ReviewMemoryAggregationScopeStatus, 'idle' | 'failed'>;
+  nextEligibleAt: string;
+  lastSuccessfulRunAt?: string | null;
+  lastModelSlug?: string | null;
+  lastErrorMessage?: string | null;
+  database?: ReviewMemoryDatabase;
+}): Promise<CodeReviewMemoryAggregationState | null> {
+  const database = databaseOrDefault(input.database);
+  const updateValues: Partial<typeof code_review_memory_aggregation_state.$inferInsert> = {
+    status: input.status,
+    claimed_at: null,
+    claim_token: null,
+    next_eligible_at: input.nextEligibleAt,
+    updated_at: new Date().toISOString(),
+  };
+  if (input.lastSuccessfulRunAt !== undefined) {
+    updateValues.last_successful_run_at = input.lastSuccessfulRunAt;
+  }
+  if (input.lastModelSlug !== undefined) {
+    updateValues.last_model_slug = input.lastModelSlug;
+  }
+  if (input.lastErrorMessage !== undefined) {
+    updateValues.last_error_message = input.lastErrorMessage;
+  }
+
+  const [state] = await database
+    .update(code_review_memory_aggregation_state)
+    .set(updateValues)
+    .where(
+      and(
+        eq(code_review_memory_aggregation_state.id, input.stateId),
+        eq(code_review_memory_aggregation_state.claim_token, input.claimToken)
+      )
+    )
+    .returning();
+
+  return state ?? null;
+}
+
 export type UpsertProposalInput = {
   owner: ReviewMemoryOwner;
   platform: ReviewMemoryPlatform;
@@ -746,6 +842,19 @@ export async function markFeedbackEventsIncluded(input: {
   await database
     .update(code_review_feedback_events)
     .set({ aggregation_state: 'included' })
+    .where(inArray(code_review_feedback_events.id, input.eventIds));
+}
+
+export async function markFeedbackEventsAggregationState(input: {
+  eventIds: string[];
+  aggregationState: ReviewMemoryEventAggregationState;
+  database?: ReviewMemoryDatabase;
+}): Promise<void> {
+  if (input.eventIds.length === 0) return;
+  const database = databaseOrDefault(input.database);
+  await database
+    .update(code_review_feedback_events)
+    .set({ aggregation_state: input.aggregationState })
     .where(inArray(code_review_feedback_events.id, input.eventIds));
 }
 

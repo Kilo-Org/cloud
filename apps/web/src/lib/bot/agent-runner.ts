@@ -7,6 +7,7 @@ import {
 } from '@/lib/bot/constants';
 import { botPlatforms, type BotPlatform } from '@/lib/bot/platforms';
 import { buildPrSignature } from '@/lib/bot/pr-signature';
+import type { PrCreationStrategy } from '@/lib/bot/pr-creation-strategy';
 import {
   linkBotRequestToSession,
   recordBotRequestCloudAgentSession,
@@ -57,6 +58,7 @@ type RunBotAgentParams = {
   user: User;
   botRequestId: string;
   prompt: string;
+  prCreationStrategy?: PrCreationStrategy;
   /** Pre-uploaded image attachments from the user's message (already in R2). */
   images?: Images;
   completedStepCount?: number;
@@ -305,6 +307,7 @@ This tool returns an acknowledgement immediately. The final Cloud Agent result w
             },
             {
               prSignature,
+              prCreationStrategy: params.prCreationStrategy,
               chatPlatform,
               currentStep,
               images: params.images,

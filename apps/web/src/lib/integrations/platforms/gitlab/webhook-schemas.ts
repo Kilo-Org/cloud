@@ -247,6 +247,8 @@ export const NoteEventPayloadSchema = z.object({
     line_code: z.string().nullable().optional(),
     commit_id: z.string().nullable().optional(),
     noteable_id: z.number().nullable().optional(),
+    noteable_iid: z.number().nullable().optional(),
+    discussion_id: z.string().nullable().optional(),
     system: z.boolean().optional(),
     st_diff: z
       .object({

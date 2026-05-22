@@ -24,8 +24,11 @@ import {
 } from '@/lib/bot/request-logging';
 import { parseBotCallbackStep } from '@/lib/bot/step-budget';
 import { runBotAgent, type BotAgentMessageLike } from '@/lib/bot/agent-runner';
+import { detectPrCreationStrategy } from '@/lib/bot/pr-creation-strategy';
 import { botPlatforms } from '@/lib/bot/platforms';
 import { getPlatformIntegrationById } from '@/lib/bot/platform-helpers';
+import { createGitLabSyntheticThread, parseGitLabThreadId } from '@/lib/bot/platforms/gitlab';
+import { PLATFORM } from '@/lib/integrations/core/constants';
 import { findUserById } from '@/lib/user';
 import type { Thread } from 'chat';
 
@@ -178,6 +181,23 @@ async function startBotThreadTyping(params: {
   });
 }
 
+async function resolveCallbackThread(params: {
+  threadId: string;
+  platformIntegration: PlatformIntegration;
+}): Promise<Thread> {
+  if (params.platformIntegration.platform === PLATFORM.GITLAB) {
+    const context = parseGitLabThreadId(params.threadId);
+    if (!context) throw new Error(`Could not parse GitLab callback thread ${params.threadId}`);
+    return createGitLabSyntheticThread({
+      context,
+      platformIntegration: params.platformIntegration,
+    });
+  }
+
+  await bot.initialize();
+  return bot.thread(params.threadId);
+}
+
 async function continueBotAgentAfterCallback(params: {
   botRequestId: string;
   requestRow: Awaited<ReturnType<typeof getBotRequest>>;
@@ -225,10 +245,12 @@ async function continueBotAgentAfterCallback(params: {
       return await runBotAgent({
         thread: params.thread,
         message: callbackMessage,
+        rawMessage: originalMessage ?? undefined,
         platformIntegration: params.platformIntegration,
         user,
         botRequestId: params.botRequestId,
         prompt: params.continuationPrompt,
+        prCreationStrategy: detectPrCreationStrategy(params.requestRow.user_message),
         completedStepCount: params.completedStepCount,
         initialSteps: params.requestRow.steps ?? [],
       });
@@ -886,8 +908,10 @@ export async function POST(
         const platformIntegration = await getPlatformIntegrationById(
           requestRow.platform_integration_id
         );
-        await bot.initialize();
-        const thread = bot.thread(requestRow.platform_thread_id);
+        const thread = await resolveCallbackThread({
+          threadId: requestRow.platform_thread_id,
+          platformIntegration,
+        });
 
         if (childSessionStatus && trackedCallbackSession) {
           try {

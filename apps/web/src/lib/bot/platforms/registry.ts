@@ -2,6 +2,7 @@ import type { GitHubAdapter } from '@chat-adapter/github';
 import type { LinearAdapter } from '@chat-adapter/linear';
 import type { SlackAdapter } from '@chat-adapter/slack';
 import { createGitHubBotPlatform } from '@/lib/bot/platforms/github';
+import { createGitLabBotPlatform } from '@/lib/bot/platforms/gitlab';
 import { createLinearBotPlatform } from '@/lib/bot/platforms/linear';
 import { createSlackBotPlatform } from '@/lib/bot/platforms/slack';
 import type { BotPlatform } from '@/lib/bot/platforms/types';
@@ -26,6 +27,7 @@ function createPlatformMap(platforms: BotPlatform[]): Map<string, BotPlatform> {
 export function createBotPlatformRegistry(params: BotPlatformRegistryParams): BotPlatformRegistry {
   const platformMap = createPlatformMap([
     createGitHubBotPlatform(params.githubAdapter),
+    createGitLabBotPlatform(),
     createSlackBotPlatform(params.slackAdapter),
     createLinearBotPlatform(params.linearAdapter),
   ]);

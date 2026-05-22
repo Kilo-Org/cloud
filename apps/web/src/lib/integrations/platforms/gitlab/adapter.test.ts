@@ -6,6 +6,8 @@ import {
   searchGitLabProjects,
   normalizeGitLabSearchQuery,
   fetchGitLabRootTextFileAtRef,
+  createProjectWebhook,
+  updateProjectWebhook,
 } from './adapter';
 
 // Mock fetch globally
@@ -102,6 +104,64 @@ describe('GitLab OAuth endpoint safety', () => {
       refreshGitLabOAuthToken('refresh-token', 'https://attacker.example')
     ).rejects.toThrow('Custom GitLab OAuth credentials are required for self-hosted instances');
     expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it('can build reduced-scope authorization URLs for bot account linking', () => {
+    const url = new URL(
+      buildGitLabOAuthUrl(
+        'signed-state',
+        'https://gitlab.com',
+        { clientId: 'client', clientSecret: 'secret' },
+        ['read_user']
+      )
+    );
+
+    expect(url.searchParams.get('scope')).toBe('read_user');
+  });
+});
+
+describe('GitLab project webhooks', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+  });
+
+  it('enables note events when creating project webhooks', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ id: 123, created_at: '2026-05-01T00:00:00Z' }),
+    });
+
+    await createProjectWebhook(
+      'token',
+      123,
+      'https://app.example.com/api/webhooks/gitlab',
+      'secret'
+    );
+
+    const [, init] = mockFetch.mock.calls[0];
+    const body = JSON.parse(init.body);
+    expect(body.merge_requests_events).toBe(true);
+    expect(body.note_events).toBe(true);
+  });
+
+  it('enables note events when updating project webhooks', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ id: 456, created_at: '2026-05-01T00:00:00Z' }),
+    });
+
+    await updateProjectWebhook(
+      'token',
+      123,
+      456,
+      'https://app.example.com/api/webhooks/gitlab',
+      'secret'
+    );
+
+    const [, init] = mockFetch.mock.calls[0];
+    const body = JSON.parse(init.body);
+    expect(body.merge_requests_events).toBe(true);
+    expect(body.note_events).toBe(true);
   });
 });
 

@@ -1,6 +1,7 @@
 import { createBotRequest, updateBotRequest } from '@/lib/bot/request-logging';
 import { runBotAgent } from '@/lib/bot/agent-runner';
 import { extractAndUploadImages } from '@/lib/bot/images';
+import { detectPrCreationStrategy } from '@/lib/bot/pr-creation-strategy';
 import type { PlatformIntegration, User } from '@kilocode/db';
 import type { Message, Thread } from 'chat';
 import { captureException } from '@sentry/nextjs';
@@ -88,6 +89,7 @@ async function processMessage({
       user,
       botRequestId,
       prompt: message.text,
+      prCreationStrategy: detectPrCreationStrategy(message.text),
       images,
     });
 

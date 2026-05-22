@@ -300,6 +300,7 @@ export async function disconnectGitLabIntegration(owner: Owner) {
     configured_webhooks: existingMetadata.configured_webhooks,
     // PRESERVE project tokens (they're still valid on GitLab)
     project_tokens: existingMetadata.project_tokens,
+    bot_enabled: existingMetadata.bot_enabled,
   };
 
   await db
@@ -419,6 +420,7 @@ export type GitLabIntegrationMetadata = {
   >;
   /** Project Access Tokens per project (keyed by project ID) */
   project_tokens?: Record<string, StoredProjectAccessToken>;
+  bot_enabled?: boolean;
 };
 
 /**
@@ -875,6 +877,7 @@ export async function connectWithPAT(
         : existingMetadata.webhook_secret || randomBytes(32).toString('hex'),
       configured_webhooks: isInstanceChange ? undefined : existingMetadata.configured_webhooks,
       project_tokens: isInstanceChange ? undefined : existingMetadata.project_tokens,
+      bot_enabled: existingMetadata.bot_enabled === false ? false : true,
     };
 
     await db
@@ -936,6 +939,7 @@ export async function connectWithPAT(
     gitlab_instance_url: instanceUrl,
     webhook_secret: webhookSecret,
     auth_type: 'pat',
+    bot_enabled: true,
   };
 
   // 5. Create integration

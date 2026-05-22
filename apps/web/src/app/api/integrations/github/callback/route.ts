@@ -389,6 +389,7 @@ export async function GET(request: NextRequest) {
           ? new Date(installation.created_at).toISOString()
           : new Date().toISOString(),
         githubAppType: appType,
+        metadata: { bot_enabled: true },
       });
     }
 

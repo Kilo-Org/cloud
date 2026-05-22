@@ -1,5 +1,6 @@
 const mockIssuesGetFn = jest.fn();
 const mockIssuesListCommentsFn = jest.fn();
+const mockPullsGetFn = jest.fn();
 const mockPullsListReviewCommentsFn = jest.fn();
 const mockGenerateGitHubInstallationTokenFn = jest.fn();
 
@@ -15,6 +16,10 @@ function mockPullsListReviewComments(...args: unknown[]) {
   return mockPullsListReviewCommentsFn(...args);
 }
 
+function mockPullsGet(...args: unknown[]) {
+  return mockPullsGetFn(...args);
+}
+
 function mockGenerateGitHubInstallationToken(...args: unknown[]) {
   return mockGenerateGitHubInstallationTokenFn(...args);
 }
@@ -26,6 +31,7 @@ jest.mock('@octokit/rest', () => ({
       listComments: mockIssuesListComments,
     },
     pulls: {
+      get: mockPullsGet,
       listReviewComments: mockPullsListReviewComments,
     },
   })),
@@ -266,6 +272,14 @@ describe('createGitHubBotPlatform.getConversationContext', () => {
       token: 'ghs_test',
       expires_at: 'never',
     });
+    mockPullsGetFn.mockResolvedValue({
+      data: {
+        base: { ref: 'main', sha: 'base-sha', repo: { full_name: 'Kilo-Org/on-call' } },
+        head: { ref: 'feature/on-call', sha: 'head-sha', repo: { full_name: 'Kilo-Org/on-call' } },
+        html_url: 'https://github.com/Kilo-Org/on-call/pull/37',
+        user: { login: 'RSO' },
+      },
+    });
     mockPullsListReviewCommentsFn.mockResolvedValue({ data: [], headers: {} });
   });
 
@@ -315,6 +329,49 @@ describe('createGitHubBotPlatform.getConversationContext', () => {
     expect(context).not.toContain('<github_comment id="101"');
     expect(context).toContain('Comment that triggered this bot run:');
     expect(context).toContain('@kilocode-dev Please fix this');
+    expect(mockPullsGetFn).not.toHaveBeenCalled();
+  });
+
+  it('includes GitHub pull request base and head branch context', async () => {
+    mockIssuesGetFn.mockResolvedValue({
+      data: {
+        body: 'Pull request description.',
+        html_url: 'https://github.com/Kilo-Org/on-call/pull/37',
+        number: 37,
+        pull_request: {},
+        state: 'open',
+        title: 'Update on-call runbook',
+        user: { login: 'RSO' },
+      },
+    });
+    mockIssuesListCommentsFn.mockResolvedValue({ data: [], headers: {} });
+    mockPullsGetFn.mockResolvedValue({
+      data: {
+        base: { ref: 'main', sha: 'abc1234567890000', repo: { full_name: 'Kilo-Org/on-call' } },
+        head: { ref: 'fix/review', sha: 'def1234567890000', repo: { full_name: 'fork/on-call' } },
+        html_url: 'https://github.com/Kilo-Org/on-call/pull/37',
+        user: { login: 'alice' },
+      },
+    });
+
+    const context = await githubPlatform.getConversationContext({
+      thread: createThread({ id: 'github:Kilo-Org/on-call:37' }),
+      triggerMessage: createMessage({
+        id: '301',
+        text: '@kilocode-dev open a new PR for this',
+      }),
+      platformIntegration: createIntegration(),
+    });
+
+    expect(mockPullsGetFn).toHaveBeenCalledWith({
+      owner: 'Kilo-Org',
+      repo: 'on-call',
+      pull_number: 37,
+    });
+    expect(context).toContain('- Base branch: Kilo-Org/on-call:main (abc123456789)');
+    expect(context).toContain('- Head branch: fork/on-call:fix/review (def123456789)');
+    expect(context).toContain('- Pull request author: alice');
+    expect(context).toContain('create a fresh branch from the PR base branch');
   });
 
   it('fetches only the newest issue comments in a single request', async () => {

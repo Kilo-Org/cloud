@@ -13,7 +13,10 @@ import {
   fetchGitLabProjects,
   calculateTokenExpiry,
 } from '@/lib/integrations/platforms/gitlab/adapter';
-import { normalizeInstanceUrl } from '@/lib/integrations/gitlab-service';
+import {
+  normalizeInstanceUrl,
+  type GitLabIntegrationMetadata,
+} from '@/lib/integrations/gitlab-service';
 import { resetCodeReviewConfigForOwner } from '@/lib/agent-config/db/agent-configs';
 import { APP_URL } from '@/lib/constants';
 import { createHash, randomBytes } from 'crypto';
@@ -23,12 +26,117 @@ import {
   verifyGitLabOAuthState,
 } from '@/lib/integrations/platforms/gitlab/oauth-state';
 import { getGitLabOAuthCredentials } from '@/lib/integrations/platforms/gitlab/oauth-credentials';
+import {
+  type VerifiedGitLabBotLinkState,
+  verifyGitLabBotLinkState,
+} from '@/lib/bot/gitlab-link-state';
+import {
+  canKiloUserAccessPlatformIntegration,
+  getPlatformIntegrationById,
+} from '@/lib/bot/platform-helpers';
+import { botPlatforms } from '@/lib/bot/platforms';
+import { bot } from '@/lib/bot';
+import { linkKiloUser } from '@/lib/bot-identity';
 
 /**
  * Generates a secure random webhook secret for GitLab webhook verification
  */
 function generateWebhookSecret(): string {
   return randomBytes(32).toString('hex');
+}
+
+function htmlPage(title: string, message: string, status = 200): Response {
+  return new Response(
+    `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>${title}</title></head>
+<body style="font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0">
+<div style="text-align:center">
+  <h1>${title}</h1>
+  <p>${message}</p>
+</div>
+</body></html>`,
+    { status, headers: { 'content-type': 'text/html; charset=utf-8' } }
+  );
+}
+
+async function handleGitLabBotLinkCallback(
+  request: NextRequest,
+  user: { id: string },
+  state: VerifiedGitLabBotLinkState
+): Promise<Response> {
+  const searchParams = request.nextUrl.searchParams;
+  const error = searchParams.get('error');
+  const code = searchParams.get('code');
+
+  if (error) {
+    captureMessage('GitLab bot-link OAuth error', {
+      level: 'warning',
+      tags: { endpoint: 'gitlab/callback', source: 'gitlab_bot_link' },
+      extra: { error },
+    });
+    return htmlPage(
+      'Link Failed',
+      'GitLab returned an OAuth error. Please return to GitLab and try again.',
+      400
+    );
+  }
+
+  if (!code) {
+    return htmlPage(
+      'Link Failed',
+      'GitLab did not return an authorization code. Please try again.',
+      400
+    );
+  }
+
+  if (state.userId !== user.id) {
+    return htmlPage(
+      'Link Failed',
+      'This GitLab link request was started by another Kilo user.',
+      403
+    );
+  }
+
+  const integration = await getPlatformIntegrationById(state.platformIntegrationId).catch(
+    () => null
+  );
+
+  if (!integration || integration.platform !== PLATFORM.GITLAB) {
+    return htmlPage('Link Failed', 'No matching GitLab integration was found.', 404);
+  }
+
+  if (!botPlatforms.require(PLATFORM.GITLAB).isEnabledForBot(integration)) {
+    return htmlPage('Link Unavailable', 'GitLab linking is not enabled for this integration.', 404);
+  }
+
+  if (!(await canKiloUserAccessPlatformIntegration(integration, user.id))) {
+    return htmlPage('Link Failed', 'You do not have access to this GitLab integration.', 403);
+  }
+
+  const metadata = integration.metadata as GitLabIntegrationMetadata | null;
+  const instanceUrl = metadata?.gitlab_instance_url || DEFAULT_GITLAB_OAUTH_INSTANCE_URL;
+  const customCredentials =
+    metadata?.client_id && metadata.client_secret
+      ? { clientId: metadata.client_id, clientSecret: metadata.client_secret }
+      : undefined;
+  const tokens = await exchangeGitLabOAuthCode(code, instanceUrl, customCredentials);
+  const gitlabUser = await fetchGitLabUser(tokens.access_token, instanceUrl);
+
+  await bot.initialize();
+  await linkKiloUser(
+    bot.getState(),
+    {
+      platform: PLATFORM.GITLAB,
+      teamId: integration.id,
+      userId: gitlabUser.id.toString(),
+    },
+    user.id
+  );
+
+  return htmlPage(
+    'GitLab account linked',
+    `GitLab account ${gitlabUser.username} has been linked to your Kilo account.<br>You can return to GitLab and mention Kilo again.`
+  );
 }
 
 function buildGitLabRedirectPath(
@@ -84,6 +192,11 @@ export async function GET(request: NextRequest) {
     const code = searchParams.get('code');
     const state = searchParams.get('state');
     const error = searchParams.get('error');
+
+    const botLinkState = verifyGitLabBotLinkState(state);
+    if (botLinkState) {
+      return await handleGitLabBotLinkCallback(request, user, botLinkState);
+    }
 
     const verifiedState = verifyGitLabOAuthState(state);
     if (!verifiedState) {
@@ -197,6 +310,7 @@ export async function GET(request: NextRequest) {
         instanceUrl !== DEFAULT_GITLAB_OAUTH_INSTANCE_URL ? instanceUrl : undefined,
       webhook_secret: webhookSecret,
       auth_type: 'oauth',
+      bot_enabled: existingMetadata?.bot_enabled === false ? false : true,
       // Only preserve webhooks/tokens if same instance
       configured_webhooks: isInstanceChange ? undefined : existingMetadata?.configured_webhooks,
       project_tokens: isInstanceChange ? undefined : existingMetadata?.project_tokens,

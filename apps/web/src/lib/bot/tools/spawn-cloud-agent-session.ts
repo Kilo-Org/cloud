@@ -19,6 +19,10 @@ import type { Images } from '@/lib/images-schema';
 import { APP_URL } from '@/lib/constants';
 import { CALLBACK_TOKEN_SECRET } from '@/lib/config.server';
 import { parseBotCallbackStep } from '@/lib/bot/step-budget';
+import {
+  buildForceNewPrInstruction,
+  type PrCreationStrategy,
+} from '@/lib/bot/pr-creation-strategy';
 import { resolveBotSessionProfile } from '@/lib/bot/tools/resolve-bot-session-profile';
 import { ownerFromIntegration } from '@/lib/integrations/core/owner';
 import type { Owner } from '@/lib/integrations/core/types';
@@ -98,7 +102,13 @@ export default async function spawnCloudAgentSession(
   ticketUserId: string,
   botRequestId: string,
   onSessionReady?: RunSessionInput['onSessionReady'],
-  options?: { prSignature?: string; chatPlatform?: string; currentStep?: number; images?: Images }
+  options?: {
+    prSignature?: string;
+    prCreationStrategy?: PrCreationStrategy;
+    chatPlatform?: string;
+    currentStep?: number;
+    images?: Images;
+  }
 ): Promise<SpawnCloudAgentResult> {
   console.log('[KiloBot] spawnCloudAgentSession called with args:', JSON.stringify(args, null, 2));
 
@@ -128,6 +138,10 @@ export default async function spawnCloudAgentSession(
   }
 
   let prompt = args.prompt;
+
+  if (options?.prCreationStrategy === 'force-new') {
+    prompt += buildForceNewPrInstruction(chatPlatform);
+  }
 
   // Append PR/MR signature to the prompt if available
   if (options?.prSignature) {

@@ -210,6 +210,7 @@ export const githubAppsRouter = createTRPCRouter({
       scopes: installationDetails.events,
       repositoryAccess: installationDetails.repository_selection,
       installedAt: installationDetails.created_at,
+      metadata: { bot_enabled: true },
     });
 
     const repositories = await fetchGitHubRepositories(installationId, appType);
@@ -266,6 +267,7 @@ export const githubAppsRouter = createTRPCRouter({
         repositoryAccess: installationDetails.repository_selection,
         installedAt: installationDetails.created_at,
         githubAppType: appType,
+        metadata: { bot_enabled: true },
       });
 
       const integration = await getIntegrationForOwner(owner, 'github');

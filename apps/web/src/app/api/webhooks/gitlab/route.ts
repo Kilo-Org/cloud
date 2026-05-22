@@ -1,11 +1,18 @@
 import type { NextRequest } from 'next/server';
-import { NextResponse } from 'next/server';
+import { after, NextResponse } from 'next/server';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { verifyGitLabWebhookToken } from '@/lib/integrations/platforms/gitlab/adapter';
-import { MergeRequestPayloadSchema } from '@/lib/integrations/platforms/gitlab/webhook-schemas';
+import {
+  MergeRequestPayloadSchema,
+  NoteEventPayloadSchema,
+} from '@/lib/integrations/platforms/gitlab/webhook-schemas';
 import { findGitLabIntegrationByWebhookToken } from '@/lib/integrations/db/platform-integrations';
-import { handleMergeRequest } from '@/lib/integrations/platforms/gitlab/webhook-handlers';
+import {
+  handleGitLabNoteBotMention,
+  handleMergeRequest,
+} from '@/lib/integrations/platforms/gitlab/webhook-handlers';
 import { PLATFORM, GITLAB_EVENT, GITLAB_ACTION } from '@/lib/integrations/core/constants';
+import { hasGitLabBotMention } from '@/lib/bot/platforms/gitlab';
 import { logExceptInTest } from '@/lib/utils.server';
 import { logWebhookEvent, updateWebhookEvent } from '@/lib/integrations/db/webhook-events';
 import type { Owner } from '@/lib/integrations/core/types';
@@ -170,7 +177,68 @@ export async function POST(request: NextRequest) {
 
     // Handle Note (comment) events (for future use - e.g., responding to review comments)
     if (eventType === GITLAB_EVENT.NOTE) {
-      logExceptInTest('Note event received, not yet implemented');
+      const parseResult = NoteEventPayloadSchema.safeParse(payload);
+      if (!parseResult.success) {
+        logExceptInTest('Invalid note payload:', parseResult.error);
+        captureMessage('Invalid GitLab note webhook payload structure', {
+          level: 'error',
+          tags: { source: 'gitlab_webhook_validation', event: 'note' },
+          extra: { errors: parseResult.error.issues },
+        });
+        return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
+      }
+
+      const notePayload = parseResult.data;
+      if (
+        notePayload.object_attributes.system === true ||
+        notePayload.object_attributes.noteable_type !== 'MergeRequest' ||
+        !notePayload.merge_request ||
+        !hasGitLabBotMention(notePayload.object_attributes.note)
+      ) {
+        return NextResponse.json({ message: 'Event received' }, { status: 200 });
+      }
+
+      const logResult = await logWebhook('bot_mention');
+      if (logResult.isDuplicate) {
+        return NextResponse.json({ message: 'Duplicate event' }, { status: 200 });
+      }
+
+      after(async () => {
+        try {
+          await handleGitLabNoteBotMention(notePayload, integration);
+          if (logResult.webhookEventId) {
+            await updateWebhookEvent(logResult.webhookEventId, {
+              processed: true,
+              processed_at: new Date().toISOString(),
+              handlers_triggered: ['bot_mention'],
+              errors: null,
+            });
+          }
+        } catch (error) {
+          logExceptInTest('Error handling GitLab note bot mention:', error);
+          captureException(error, {
+            tags: { source: 'gitlab_webhook_note_bot_mention' },
+            extra: { integrationId: integration.id, projectId: notePayload.project_id },
+          });
+          if (logResult.webhookEventId) {
+            await updateWebhookEvent(logResult.webhookEventId, {
+              processed: false,
+              processed_at: new Date().toISOString(),
+              handlers_triggered: ['bot_mention'],
+              errors: [
+                {
+                  handler: 'bot_mention',
+                  message: error instanceof Error ? error.message : String(error),
+                  ...(error instanceof Error && error.stack ? { stack: error.stack } : {}),
+                },
+              ],
+            }).catch(updateError => {
+              logExceptInTest('Error updating failed webhook event:', updateError);
+            });
+          }
+        }
+      });
+
       return NextResponse.json({ message: 'Event received' }, { status: 200 });
     }
 

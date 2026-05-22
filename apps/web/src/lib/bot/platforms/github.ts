@@ -89,6 +89,21 @@ type GitHubIssueLike = {
   user?: { login?: string } | null;
 };
 
+type GitHubPullRequestLike = {
+  base?: {
+    ref?: string;
+    sha?: string;
+    repo?: { full_name?: string | null } | null;
+  } | null;
+  head?: {
+    ref?: string;
+    sha?: string;
+    repo?: { full_name?: string | null } | null;
+  } | null;
+  html_url?: string;
+  user?: { login?: string } | null;
+};
+
 type GitHubIssueComment = {
   body?: string | null;
   created_at?: string | null;
@@ -267,6 +282,29 @@ async function fetchReviewThreadContext(
   };
 }
 
+async function fetchPullRequestDetails(
+  octokit: Octokit,
+  coordinates: GitHubThreadCoordinates
+): Promise<GitHubPullRequestLike> {
+  const response = await octokit.pulls.get({
+    owner: coordinates.owner,
+    repo: coordinates.repo,
+    pull_number: coordinates.number,
+  });
+  return response.data;
+}
+
+function formatBranchRef(branch: {
+  ref?: string;
+  sha?: string;
+  repo?: { full_name?: string | null } | null;
+}): string {
+  const repo = branch.repo?.full_name ? `${sanitizeForDelimiters(branch.repo.full_name)}:` : '';
+  const ref = sanitizeForDelimiters(branch.ref ?? 'unknown');
+  const sha = branch.sha ? ` (${branch.sha.slice(0, 12)})` : '';
+  return `${repo}${ref}${sha}`;
+}
+
 function isGitHubBotEnabledForIntegration(integration: PlatformIntegration): boolean {
   const metadata = integration.metadata as { bot_enabled?: boolean } | null;
   return metadata?.bot_enabled === true;
@@ -344,6 +382,9 @@ export function createGitHubBotPlatform(githubAdapter: GitHubInstallationLookup)
       const issue: GitHubIssueLike = issueResponse.data;
       const itemType = issue.pull_request ? 'pull request' : 'issue';
       const itemLabel = issue.pull_request ? 'Pull request' : 'Issue';
+      const pullRequest = issue.pull_request
+        ? await fetchPullRequestDetails(octokit, coordinates)
+        : null;
       const trigger = formatTriggerMessage(triggerMessage, MAX_GITHUB_COMMENT_LENGTH);
       const comments = issueComments
         .filter(comment => comment.id.toString() !== triggerMessage.id)
@@ -360,6 +401,24 @@ export function createGitHubBotPlatform(githubAdapter: GitHubInstallationLookup)
 
       if (coordinates.reviewCommentId !== null) {
         lines.push(`- Review comment thread id: ${coordinates.reviewCommentId}`);
+      }
+
+      if (pullRequest) {
+        if (pullRequest.html_url && pullRequest.html_url !== issue.html_url) {
+          lines.push(`- Pull request URL: ${pullRequest.html_url}`);
+        }
+        if (pullRequest.base) {
+          lines.push(`- Base branch: ${formatBranchRef(pullRequest.base)}`);
+        }
+        if (pullRequest.head) {
+          lines.push(`- Head branch: ${formatBranchRef(pullRequest.head)}`);
+        }
+        if (pullRequest.user?.login) {
+          lines.push(`- Pull request author: ${sanitizeForDelimiters(pullRequest.user.login)}`);
+        }
+        lines.push(
+          '- New PR guidance: if the requester asks for a new or separate PR, create a fresh branch from the PR base branch and avoid pushing to or modifying the current PR head branch unless the requester names a different target.'
+        );
       }
 
       lines.push(

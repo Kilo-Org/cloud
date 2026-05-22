@@ -5,3 +5,4 @@
  */
 
 export { handleMergeRequest, handleMergeRequestCodeReview } from './merge-request-handler';
+export { handleGitLabNoteBotMention } from './bot-note-handler';

@@ -13,6 +13,27 @@ import type { IntegrationStatus } from '../core/constants';
 import { PendingInstallationMetadataWrapperSchema } from '../core/schemas';
 import type { GitHubAppType } from '../platforms/github/app-selector';
 
+function mergeIntegrationMetadata(
+  existingMetadata: unknown,
+  metadataUpdates: Record<string, unknown> | undefined
+): Record<string, unknown> | null {
+  const existing =
+    existingMetadata && typeof existingMetadata === 'object' && !Array.isArray(existingMetadata)
+      ? (existingMetadata as Record<string, unknown>)
+      : {};
+
+  if (!metadataUpdates) {
+    return Object.keys(existing).length > 0 ? existing : null;
+  }
+
+  const merged = { ...existing, ...metadataUpdates };
+  if (existing.bot_enabled === false && metadataUpdates.bot_enabled === true) {
+    merged.bot_enabled = false;
+  }
+
+  return merged;
+}
+
 /**
  * Finds a platform integration by installation ID
  */
@@ -273,6 +294,7 @@ export async function createPendingIntegration({
   }
 
   const metadata = {
+    bot_enabled: true,
     pending_approval: {
       requester,
       github_requester: githubRequester,
@@ -396,7 +418,11 @@ export async function autoCompleteInstallation({
   const parseResult = PendingInstallationMetadataWrapperSchema.safeParse(existingMetadata);
   const pendingApproval = parseResult.success ? parseResult.data.pending_approval : undefined;
 
+  const preservedMetadata = { ...(existingMetadata ?? {}) };
+  delete preservedMetadata.pending_approval;
   const completedMetadata = {
+    ...preservedMetadata,
+    bot_enabled: existingMetadata.bot_enabled === false ? false : true,
     completed_installation: {
       requester: pendingApproval?.requester,
       github_requester: pendingApproval?.github_requester,
@@ -544,6 +570,7 @@ export async function upsertPlatformIntegrationForOwner(
     repositories?: PlatformRepository[] | null;
     installedAt?: string;
     githubAppType?: GitHubAppType;
+    metadata?: Record<string, unknown>;
   }
 ) {
   // Build ownership condition based on owner type
@@ -566,6 +593,8 @@ export async function upsertPlatformIntegrationForOwner(
     .limit(1);
 
   if (existing) {
+    const metadata = mergeIntegrationMetadata(existing.metadata, data.metadata);
+
     // Update existing integration
     await db
       .update(platform_integrations)
@@ -578,6 +607,7 @@ export async function upsertPlatformIntegrationForOwner(
         integration_status: INTEGRATION_STATUS.ACTIVE,
         repositories: data.repositories || null,
         github_app_type: data.githubAppType || existing.github_app_type,
+        ...(metadata ? { metadata } : {}),
         updated_at: new Date().toISOString(),
       })
       .where(eq(platform_integrations.id, existing.id));
@@ -598,6 +628,7 @@ export async function upsertPlatformIntegrationForOwner(
       repositories: data.repositories || null,
       installed_at: data.installedAt || new Date().toISOString(),
       github_app_type: data.githubAppType || 'standard',
+      metadata: data.metadata ?? null,
     });
   }
 }

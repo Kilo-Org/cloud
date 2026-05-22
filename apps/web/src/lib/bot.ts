@@ -2,14 +2,7 @@ import { Chat, type Message, type Thread } from 'chat';
 import type { GitHubAdapter } from '@chat-adapter/github';
 import type { LinearAdapter } from '@chat-adapter/linear';
 import type { SlackAdapter } from '@chat-adapter/slack';
-import { captureException } from '@sentry/nextjs';
-import { resolveKiloUserId, unlinkKiloUser } from '@/lib/bot-identity';
-import {
-  canKiloUserAccessPlatformIntegration,
-  getPlatformIntegration,
-} from '@/lib/bot/platform-helpers';
-import { findUserById } from '@/lib/user';
-import { processLinkedMessage } from '@/lib/bot/run';
+import { handleIncomingBotMention } from '@/lib/bot/handle-mention';
 import { createChatState } from '@/lib/bot/state';
 import { githubAdapter } from '@/lib/bot/github-adapter';
 import { linearAdapter } from '@/lib/bot/linear-adapter';
@@ -41,71 +34,7 @@ function createKiloBot(
     thread: Thread,
     message: Message
   ): Promise<void> {
-    const botPlatform = botPlatforms.requireByAdapter(thread.adapter);
-    const identity = await botPlatform.getIdentity({ thread, message });
-    const [platformIntegration, kiloUserId] = await Promise.all([
-      getPlatformIntegration(identity),
-      resolveKiloUserId(chatBot.getState(), identity),
-    ]);
-
-    if (!platformIntegration) {
-      captureException(new Error('No active platform integration found'), {
-        extra: { platform: identity.platform, teamId: identity.teamId },
-      });
-      return;
-    }
-
-    if (!botPlatform.isEnabledForBot(platformIntegration)) {
-      return;
-    }
-
-    if (!(await botPlatform.canHandleMessage({ thread, message, platformIntegration }))) {
-      return;
-    }
-
-    if (!kiloUserId) {
-      await botPlatform.promptLinkAccount({
-        thread,
-        message,
-        identity,
-        platformIntegration,
-        state: chatBot.getState(),
-      });
-      return;
-    }
-
-    const user = await findUserById(kiloUserId);
-
-    if (!user) {
-      await unlinkKiloUser(chatBot.getState(), identity);
-      await botPlatform.promptLinkAccount({
-        thread,
-        message,
-        identity,
-        platformIntegration,
-        state: chatBot.getState(),
-      });
-      return;
-    }
-
-    if (!(await canKiloUserAccessPlatformIntegration(platformIntegration, user.id))) {
-      await unlinkKiloUser(chatBot.getState(), identity);
-      await botPlatform.promptLinkAccount({
-        thread,
-        message,
-        identity,
-        platformIntegration,
-        state: chatBot.getState(),
-      });
-      return;
-    }
-
-    try {
-      await processLinkedMessage({ thread, message, platformIntegration, user });
-    } catch (error) {
-      console.error('[Bot] Unhandled error in message handler:', error);
-      await thread.post({ markdown: 'Sorry, something went wrong while processing your message.' });
-    }
+    await handleIncomingBotMention({ thread, message, state: chatBot.getState() });
   });
 
   chatBot.onAction(async event => {

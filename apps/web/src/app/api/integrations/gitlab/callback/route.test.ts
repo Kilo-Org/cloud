@@ -2,8 +2,24 @@ import { beforeEach, describe, expect, test } from '@jest/globals';
 import { NextRequest } from 'next/server';
 import { getUserFromAuth } from '@/lib/user.server';
 import { createGitLabOAuthState } from '@/lib/integrations/platforms/gitlab/oauth-state';
-import { exchangeGitLabOAuthCode } from '@/lib/integrations/platforms/gitlab/adapter';
+import { createGitLabBotLinkState } from '@/lib/bot/gitlab-link-state';
+import { linkKiloUser } from '@/lib/bot-identity';
+import {
+  canKiloUserAccessPlatformIntegration,
+  getPlatformIntegrationById,
+} from '@/lib/bot/platform-helpers';
+import {
+  exchangeGitLabOAuthCode,
+  fetchGitLabUser,
+} from '@/lib/integrations/platforms/gitlab/adapter';
 import { getGitLabOAuthCredentials } from '@/lib/integrations/platforms/gitlab/oauth-credentials';
+import { PLATFORM } from '@/lib/integrations/core/constants';
+import type { StateAdapter } from 'chat';
+
+const mockIsEnabledForBot = jest.fn();
+const mockBotInitialize = jest.fn();
+const mockState = { state: true } as unknown as StateAdapter;
+const mockBotGetState = jest.fn(() => mockState);
 
 jest.mock('@/lib/user.server');
 jest.mock('@/lib/drizzle', () => ({ db: {} }));
@@ -22,6 +38,24 @@ jest.mock('@/lib/integrations/platforms/gitlab/adapter', () => ({
   fetchGitLabProjects: jest.fn(),
   calculateTokenExpiry: jest.fn(),
 }));
+jest.mock('@/lib/bot/platform-helpers', () => ({
+  canKiloUserAccessPlatformIntegration: jest.fn(),
+  getPlatformIntegrationById: jest.fn(),
+}));
+jest.mock('@/lib/bot/platforms', () => ({
+  botPlatforms: {
+    require: jest.fn(() => ({ isEnabledForBot: mockIsEnabledForBot })),
+  },
+}));
+jest.mock('@/lib/bot', () => ({
+  bot: {
+    initialize: (...args: unknown[]) => mockBotInitialize(...args),
+    getState: () => mockBotGetState(),
+  },
+}));
+jest.mock('@/lib/bot-identity', () => ({
+  linkKiloUser: jest.fn(),
+}));
 jest.mock('@/lib/integrations/platforms/gitlab/oauth-credentials', () => ({
   getGitLabOAuthCredentials: jest.fn(),
 }));
@@ -32,7 +66,13 @@ jest.mock('@sentry/nextjs', () => ({
 
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
 const mockedExchangeGitLabOAuthCode = jest.mocked(exchangeGitLabOAuthCode);
+const mockedFetchGitLabUser = jest.mocked(fetchGitLabUser);
 const mockedGetGitLabOAuthCredentials = jest.mocked(getGitLabOAuthCredentials);
+const mockedGetPlatformIntegrationById = jest.mocked(getPlatformIntegrationById);
+const mockedCanKiloUserAccessPlatformIntegration = jest.mocked(
+  canKiloUserAccessPlatformIntegration
+);
+const mockedLinkKiloUser = jest.mocked(linkKiloUser);
 
 const USER_ID = '034489e8-19e0-4479-9d69-2edad719e847';
 const OTHER_USER_ID = 'c00b91a1-6959-4b04-9ef8-e8d37b340f4a';
@@ -56,6 +96,21 @@ describe('GET /api/integrations/gitlab/callback', () => {
       authFailedResponse: null,
     } as never);
     mockedGetGitLabOAuthCredentials.mockResolvedValue(null);
+    mockedGetPlatformIntegrationById.mockResolvedValue({
+      id: 'pi_gitlab_1',
+      platform: PLATFORM.GITLAB,
+      metadata: { bot_enabled: true, gitlab_instance_url: 'https://gitlab.example.com' },
+    } as never);
+    mockedCanKiloUserAccessPlatformIntegration.mockResolvedValue(true);
+    mockIsEnabledForBot.mockReturnValue(true);
+    mockedExchangeGitLabOAuthCode.mockResolvedValue({
+      access_token: 'gitlab-oauth-token',
+    } as never);
+    mockedFetchGitLabUser.mockResolvedValue({
+      id: 123,
+      username: 'rso',
+      name: 'RSO',
+    } as never);
   });
 
   test('rejects attacker-controlled raw state before exchanging an OAuth code', async () => {
@@ -158,6 +213,40 @@ describe('GET /api/integrations/gitlab/callback', () => {
         clientId: 'self-hosted-client',
         clientSecret: 'self-hosted-secret',
       }
+    );
+  });
+
+  test('links a GitLab user for bot-link callbacks without running install flow', async () => {
+    const state = createGitLabBotLinkState({
+      userId: USER_ID,
+      platformIntegrationId: 'pi_gitlab_1',
+    });
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest(
+        `/api/integrations/gitlab/callback?code=anything&state=${encodeURIComponent(state)}`
+      )
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.text()).resolves.toContain('GitLab account linked');
+    expect(mockedExchangeGitLabOAuthCode).toHaveBeenCalledWith(
+      'anything',
+      'https://gitlab.example.com',
+      undefined
+    );
+    expect(mockedFetchGitLabUser).toHaveBeenCalledWith(
+      'gitlab-oauth-token',
+      'https://gitlab.example.com'
+    );
+    expect(mockedLinkKiloUser).toHaveBeenCalledWith(
+      mockState,
+      {
+        platform: PLATFORM.GITLAB,
+        teamId: 'pi_gitlab_1',
+        userId: '123',
+      },
+      USER_ID
     );
   });
 });

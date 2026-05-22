@@ -82,7 +82,8 @@ export type GitLabOAuthCredentials = {
 export function buildGitLabOAuthUrl(
   state: string,
   instanceUrl: string = DEFAULT_GITLAB_URL,
-  customCredentials?: GitLabOAuthCredentials
+  customCredentials?: GitLabOAuthCredentials,
+  scopes: readonly string[] = GITLAB_OAUTH_SCOPES
 ): string {
   if (instanceUrl !== DEFAULT_GITLAB_URL && !customCredentials) {
     throw new Error('Custom GitLab OAuth credentials are required for self-hosted instances');
@@ -99,7 +100,7 @@ export function buildGitLabOAuthUrl(
     redirect_uri: GITLAB_REDIRECT_URI,
     response_type: 'code',
     state,
-    scope: GITLAB_OAUTH_SCOPES.join(' '),
+    scope: scopes.join(' '),
   });
 
   return `${instanceUrl}/oauth/authorize?${params.toString()}`;
@@ -729,7 +730,7 @@ export async function createProjectWebhook(
       issues_events: false,
       confidential_issues_events: false,
       tag_push_events: false,
-      note_events: false,
+      note_events: true,
       confidential_note_events: false,
       job_events: false,
       pipeline_events: false,
@@ -811,7 +812,7 @@ export async function updateProjectWebhook(
         issues_events: false,
         confidential_issues_events: false,
         tag_push_events: false,
-        note_events: false,
+        note_events: true,
         confidential_note_events: false,
         job_events: false,
         pipeline_events: false,
@@ -1216,7 +1217,7 @@ export async function createMRNote(
   mrIid: number,
   body: string,
   instanceUrl: string = DEFAULT_GITLAB_URL
-): Promise<void> {
+): Promise<GitLabNote> {
   const encodedProjectId =
     typeof projectId === 'string' ? encodeURIComponent(projectId) : projectId;
 
@@ -1237,7 +1238,148 @@ export async function createMRNote(
     throw new Error(`GitLab MR note creation failed: ${response.status} ${error}`);
   }
 
-  logExceptInTest('[createMRNote] Created note', { projectId, mrIid });
+  const note = (await response.json()) as GitLabNote;
+
+  logExceptInTest('[createMRNote] Created note', { projectId, mrIid, noteId: note.id });
+
+  return note;
+}
+
+export async function replyToMRDiscussion(
+  accessToken: string,
+  projectId: string | number,
+  mrIid: number,
+  discussionId: string,
+  body: string,
+  instanceUrl: string = DEFAULT_GITLAB_URL
+): Promise<GitLabNote> {
+  const encodedProjectId =
+    typeof projectId === 'string' ? encodeURIComponent(projectId) : projectId;
+  const response = await fetch(
+    `${instanceUrl}/api/v4/projects/${encodedProjectId}/merge_requests/${mrIid}/discussions/${encodeURIComponent(discussionId)}/notes`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ body }),
+    }
+  );
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`GitLab MR discussion reply failed: ${response.status} ${error}`);
+  }
+
+  const note = (await response.json()) as GitLabNote;
+  logExceptInTest('[replyToMRDiscussion] Created discussion reply', {
+    projectId,
+    mrIid,
+    discussionId,
+    noteId: note.id,
+  });
+  return note;
+}
+
+export async function fetchMergeRequest(
+  accessToken: string,
+  projectId: string | number,
+  mrIid: number,
+  instanceUrl: string = DEFAULT_GITLAB_URL
+): Promise<GitLabMergeRequest> {
+  const encodedProjectId =
+    typeof projectId === 'string' ? encodeURIComponent(projectId) : projectId;
+  const response = await fetch(
+    `${instanceUrl}/api/v4/projects/${encodedProjectId}/merge_requests/${mrIid}`,
+    {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    }
+  );
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`GitLab MR fetch failed: ${response.status} ${error}`);
+  }
+
+  return (await response.json()) as GitLabMergeRequest;
+}
+
+export async function fetchMRNotes(
+  accessToken: string,
+  projectId: string | number,
+  mrIid: number,
+  instanceUrl: string = DEFAULT_GITLAB_URL,
+  perPage: number = 12
+): Promise<GitLabNote[]> {
+  const encodedProjectId =
+    typeof projectId === 'string' ? encodeURIComponent(projectId) : projectId;
+  const response = await fetch(
+    `${instanceUrl}/api/v4/projects/${encodedProjectId}/merge_requests/${mrIid}/notes?sort=desc&order_by=created_at&per_page=${perPage}`,
+    {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    }
+  );
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`GitLab MR notes fetch failed: ${response.status} ${error}`);
+  }
+
+  return ((await response.json()) as GitLabNote[]).sort((a, b) => {
+    const aTime = Date.parse(a.created_at);
+    const bTime = Date.parse(b.created_at);
+    if (aTime !== bTime) return aTime - bTime;
+    return a.id - b.id;
+  });
+}
+
+export async function fetchMRNote(
+  accessToken: string,
+  projectId: string | number,
+  mrIid: number,
+  noteId: number,
+  instanceUrl: string = DEFAULT_GITLAB_URL
+): Promise<GitLabNote> {
+  const encodedProjectId =
+    typeof projectId === 'string' ? encodeURIComponent(projectId) : projectId;
+  const response = await fetch(
+    `${instanceUrl}/api/v4/projects/${encodedProjectId}/merge_requests/${mrIid}/notes/${noteId}`,
+    {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    }
+  );
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`GitLab MR note fetch failed: ${response.status} ${error}`);
+  }
+
+  return (await response.json()) as GitLabNote;
+}
+
+export async function fetchMRDiscussion(
+  accessToken: string,
+  projectId: string | number,
+  mrIid: number,
+  discussionId: string,
+  instanceUrl: string = DEFAULT_GITLAB_URL
+): Promise<GitLabDiscussion> {
+  const encodedProjectId =
+    typeof projectId === 'string' ? encodeURIComponent(projectId) : projectId;
+  const response = await fetch(
+    `${instanceUrl}/api/v4/projects/${encodedProjectId}/merge_requests/${mrIid}/discussions/${encodeURIComponent(discussionId)}`,
+    {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    }
+  );
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`GitLab MR discussion fetch failed: ${response.status} ${error}`);
+  }
+
+  return (await response.json()) as GitLabDiscussion;
 }
 
 /**

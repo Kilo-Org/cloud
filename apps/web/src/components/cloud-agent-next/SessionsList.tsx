@@ -1,7 +1,7 @@
 'use client';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Bot, Clock, Cloud, GitBranch, Puzzle, Terminal } from 'lucide-react';
+import { Bot, Clock, Cloud, GitBranch, Puzzle, Terminal, Workflow } from 'lucide-react';
 import type { StoredSession } from './types';
 import { TimeAgo } from '@/components/shared/TimeAgo';
 import Link from 'next/link';
@@ -69,22 +69,29 @@ export function SessionsList({ sessions, organizationId, onSessionClick }: Sessi
               Agent Manager
             </span>
           );
-        } else if (platform === 'slack') {
-          badge = (
-            <span className="inline-flex shrink-0 items-center gap-1 rounded bg-emerald-500/20 px-2 py-0.5 text-xs font-medium text-emerald-400">
-              <Bot className="h-3 w-3" />
-              Slack
-            </span>
-          );
-        } else {
-          // Default to Extension badge for unknown, vscode, etc.
-          badge = (
-            <span className="inline-flex shrink-0 items-center gap-1 rounded bg-purple-500/20 px-2 py-0.5 text-xs font-medium text-purple-400">
-              <Puzzle className="h-3 w-3" />
-              Extension
-            </span>
-          );
-        }
+} else if (platform === 'slack') {
+            badge = (
+              <span className="inline-flex shrink-0 items-center gap-1 rounded bg-emerald-500/20 px-2 py-0.5 text-xs font-medium text-emerald-400">
+                <Bot className="h-3 w-3" />
+                Slack
+              </span>
+            );
+          } else if (platform === 'gastown') {
+            badge = (
+              <span className="inline-flex shrink-0 items-center gap-1 rounded bg-amber-500/20 px-2 py-0.5 text-xs font-medium text-amber-400">
+                <Workflow className="h-3 w-3" />
+                Gastown
+              </span>
+            );
+          } else {
+            // Default to Extension badge for unknown, vscode, etc.
+            badge = (
+              <span className="inline-flex shrink-0 items-center gap-1 rounded bg-purple-500/20 px-2 py-0.5 text-xs font-medium text-purple-400">
+                <Puzzle className="h-3 w-3" />
+                Extension
+              </span>
+            );
+          }
 
         const cardContent = (
           <Card className="hover:bg-accent cursor-pointer transition-colors">

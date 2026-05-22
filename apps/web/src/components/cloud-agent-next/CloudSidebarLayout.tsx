@@ -63,6 +63,7 @@ export function CloudSidebarLayout({ organizationId, children }: CloudSidebarLay
         case 'extension':
           return ['vscode', 'agent-manager'];
         default:
+          // Handles platforms like 'gastown' by passing through unchanged
           return [p];
       }
     });

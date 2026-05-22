@@ -36,6 +36,7 @@ import { tryDispatchPendingReviews } from './dispatch-pending-reviews';
 import {
   cancelSupersededReviewsForPR,
   PENDING_DISPATCH_RETRY_EXHAUSTED_ERROR_MESSAGE,
+  resetCodeReviewForRetry,
   updateRepositoryReviewInstructionsMetadata,
 } from '../db/code-reviews';
 
@@ -502,6 +503,59 @@ describe('tryDispatchPendingReviews', () => {
     expect(mockPrepareReviewPayload).not.toHaveBeenCalledWith(
       expect.objectContaining({ reviewId: recentPendingReview.id })
     );
+  });
+
+  it('dispatches old reviews after explicit retry', async () => {
+    const oldTimestamp = minutesAgo(150);
+    const owner = { type: 'user', id: testUser.id } satisfies ReviewOwner;
+    await setTestUserBalance(DEFAULT_TIER_BALANCE_MICRODOLLARS);
+
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        reviewValues({
+          owner,
+          status: 'pending',
+          createdAt: oldTimestamp,
+          updatedAt: oldTimestamp,
+        })
+      )
+      .returning({ id: cloud_agent_code_reviews.id });
+
+    if (!review) {
+      throw new Error('Expected old retry review to be inserted');
+    }
+
+    await db
+      .update(cloud_agent_code_reviews)
+      .set({
+        status: 'failed',
+        error_message: 'failed before retry',
+        completed_at: minutesAgo(120),
+      })
+      .where(eq(cloud_agent_code_reviews.id, review.id));
+
+    await resetCodeReviewForRetry(review.id);
+
+    const result = await tryDispatchPendingReviews({
+      type: 'user',
+      id: testUser.id,
+      userId: testUser.id,
+    });
+
+    const storedReview = await db.query.cloud_agent_code_reviews.findFirst({
+      where: eq(cloud_agent_code_reviews.id, review.id),
+    });
+
+    expect(result).toEqual({ dispatched: 1, notDispatched: 0, activeCount: 1 });
+    expect(storedReview?.status).toBe('queued');
+    expect(storedReview?.created_at).toBe(oldTimestamp);
+    expect(mockPrepareReviewPayload).toHaveBeenCalledWith({
+      reviewId: review.id,
+      owner: { type: 'user', id: testUser.id, userId: testUser.id },
+      agentConfig: { id: 'test-agent-config', config: {} },
+      platform: 'github',
+    });
   });
 
   it('recovers stale queued reviews regardless of age', async () => {

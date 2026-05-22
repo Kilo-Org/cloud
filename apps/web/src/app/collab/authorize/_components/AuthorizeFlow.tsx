@@ -100,6 +100,7 @@ export function AuthorizeFlow(props: AuthorizeFlowProps) {
   };
 
   const handleSkip = () => {
+    if (isStartingOAuth) return;
     advance();
   };
 
@@ -161,7 +162,8 @@ export function AuthorizeFlow(props: AuthorizeFlowProps) {
             <button
               type="button"
               onClick={handleSkip}
-              className="text-muted-foreground hover:text-foreground text-sm underline-offset-4 hover:underline"
+              disabled={isStartingOAuth}
+              className="text-muted-foreground hover:text-foreground disabled:text-muted-foreground/60 text-sm underline-offset-4 hover:underline disabled:cursor-not-allowed disabled:no-underline"
             >
               Skip for now
             </button>

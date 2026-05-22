@@ -151,6 +151,6 @@ ALTER TABLE "impact_referral_rewards" ADD CONSTRAINT "impact_referral_rewards_pr
 ALTER TABLE "impact_referral_rewards" ADD CONSTRAINT "impact_referral_rewards_beneficiary_role_check" CHECK ("impact_referral_rewards"."beneficiary_role" IN ('referrer', 'referee'));--> statement-breakpoint
 ALTER TABLE "impact_referral_rewards" ADD CONSTRAINT "impact_referral_rewards_reward_kind_check" CHECK ("impact_referral_rewards"."reward_kind" IN ('kiloclaw_free_month', 'kilo_pass_bonus'));--> statement-breakpoint
 ALTER TABLE "impact_referral_rewards" ADD CONSTRAINT "impact_referral_rewards_status_check" CHECK ("impact_referral_rewards"."status" IN ('pending', 'earned', 'applied', 'reversed', 'expired', 'canceled', 'review_required'));--> statement-breakpoint
-ALTER TABLE "impact_referral_rewards" ADD CONSTRAINT "impact_referral_rewards_months_granted_positive_check" CHECK ("impact_referral_rewards"."months_granted" > 0);--> statement-breakpoint
+ALTER TABLE "impact_referral_rewards" ADD CONSTRAINT "impact_referral_rewards_months_granted_non_negative_check" CHECK ("impact_referral_rewards"."months_granted" >= 0);--> statement-breakpoint
 ALTER TABLE "impact_referrals" ADD CONSTRAINT "impact_referrals_product_check" CHECK ("impact_referrals"."product" IN ('kiloclaw', 'kilo_pass'));--> statement-breakpoint
 UPDATE "impact_referral_conversions" SET "payment_provider" = 'stripe' WHERE "product" = 'kiloclaw' AND "source_payment_id" LIKE 'in\_%' ESCAPE '\';

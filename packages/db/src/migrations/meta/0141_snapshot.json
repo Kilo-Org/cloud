@@ -1,5 +1,5 @@
 {
-  "id": "c4f8d059-dc5b-4fa0-9e74-a4003be49393",
+  "id": "fb385356-42e2-40e6-ab22-d65a180c6697",
   "prevId": "8164d94c-7070-484e-a062-84779df93922",
   "version": "7",
   "dialect": "postgresql",
@@ -10063,9 +10063,9 @@
           "name": "impact_referral_rewards_status_check",
           "value": "\"impact_referral_rewards\".\"status\" IN ('pending', 'earned', 'applied', 'reversed', 'expired', 'canceled', 'review_required')"
         },
-        "impact_referral_rewards_months_granted_positive_check": {
-          "name": "impact_referral_rewards_months_granted_positive_check",
-          "value": "\"impact_referral_rewards\".\"months_granted\" > 0"
+        "impact_referral_rewards_months_granted_non_negative_check": {
+          "name": "impact_referral_rewards_months_granted_non_negative_check",
+          "value": "\"impact_referral_rewards\".\"months_granted\" >= 0"
         }
       },
       "isRLSEnabled": false

@@ -927,8 +927,8 @@ export const impact_referral_rewards = pgTable(
       .onDelete('set null')
       .onUpdate('cascade'),
     check(
-      'impact_referral_rewards_months_granted_positive_check',
-      sql`${table.months_granted} > 0`
+      'impact_referral_rewards_months_granted_non_negative_check',
+      sql`${table.months_granted} >= 0`
     ),
   ]
 );

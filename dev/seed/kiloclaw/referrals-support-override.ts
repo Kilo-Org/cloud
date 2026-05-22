@@ -1,4 +1,4 @@
-import { credit_transactions, kiloclaw_attribution_touches } from '@kilocode/db/schema';
+import { credit_transactions, impact_attribution_touches } from '@kilocode/db/schema';
 import {
   ImpactAttributionTouchProvider,
   ImpactAttributionTouchType,
@@ -91,7 +91,7 @@ export async function run(): Promise<SeedResult> {
   });
 
   const [affiliateTouch] = await db
-    .insert(kiloclaw_attribution_touches)
+    .insert(impact_attribution_touches)
     .values({
       dedupe_key: `${seedLabelForScenario(SCENARIO)}:touch:affiliate`,
       user_id: refereeUserId,
@@ -105,10 +105,10 @@ export async function run(): Promise<SeedResult> {
       touched_at: '2026-04-10T12:00:00.000Z',
       expires_at: '2026-05-10T12:00:00.000Z',
     })
-    .returning({ id: kiloclaw_attribution_touches.id });
+    .returning({ id: impact_attribution_touches.id });
 
   const [referralTouch] = await db
-    .insert(kiloclaw_attribution_touches)
+    .insert(impact_attribution_touches)
     .values({
       dedupe_key: `${seedLabelForScenario(SCENARIO)}:touch:referral`,
       user_id: refereeUserId,
@@ -124,7 +124,7 @@ export async function run(): Promise<SeedResult> {
       touched_at: '2026-04-11T09:00:00.000Z',
       expires_at: '2026-05-11T09:00:00.000Z',
     })
-    .returning({ id: kiloclaw_attribution_touches.id });
+    .returning({ id: impact_attribution_touches.id });
 
   console.log(
     `[${SEED_SCOPE}] Inserting a manual-adjustment payment record ready for admin override processing`

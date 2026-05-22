@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import { describe, expect, it, vi } from 'vitest';
 import { __pluginInternals, kiloChatPlugin } from './channel';
 
@@ -257,6 +258,22 @@ describe('kilo-chat actions adapter', () => {
   it('resolveExecutionMode returns "local"', () => {
     const adapter = kiloChatPlugin.actions;
     expect(adapter?.resolveExecutionMode?.({ action: 'react' as never })).toBe('local');
+  });
+
+  it('routes send actions before constructing the shared action client', async () => {
+    const source = await readFile(new URL('./channel.ts', import.meta.url), 'utf8');
+    const handleActionIndex = source.indexOf(
+      'handleAction: async (ctx: ChannelMessageActionContext)'
+    );
+    const sendBranchIndex = source.indexOf(
+      "if (ctx.action === 'send' || ctx.action === 'upload-file')",
+      handleActionIndex
+    );
+    const sharedClientIndex = source.indexOf('const client = makeClient();', handleActionIndex);
+
+    expect(handleActionIndex).toBeGreaterThanOrEqual(0);
+    expect(sendBranchIndex).toBeGreaterThan(handleActionIndex);
+    expect(sharedClientIndex).toBeGreaterThan(sendBranchIndex);
   });
 
   it('handles send with a base64 buffer as an arbitrary attachment', async () => {

@@ -325,10 +325,10 @@ export const kiloChatPlugin = createChatChannelPlugin<ResolvedKiloChatAccount>({
         action === 'channel-create',
       resolveExecutionMode: () => 'local' as const,
       handleAction: async (ctx: ChannelMessageActionContext) => {
-        const client = makeClient();
         if (ctx.action === 'send' || ctx.action === 'upload-file') {
           return handleKiloChatSendAction(ctx);
         }
+        const client = makeClient();
         if (ctx.action === 'read') {
           return handleKiloChatReadAction({
             params: ctx.params,

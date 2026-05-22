@@ -1,5 +1,5 @@
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
-import { type ExecApprovalDecision, type Message } from '@kilocode/kilo-chat';
+import { type ExecApprovalDecision, type KiloChatClient, type Message } from '@kilocode/kilo-chat';
 import { type PendingAction, pendingActionGroupIdForMessage } from '@kilocode/kilo-chat-hooks';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import {
@@ -26,6 +26,8 @@ import { type MessageAuthorMember, resolveMessageAuthorLabel } from './message-p
 const listStyle = { flex: 1 } satisfies ViewStyle;
 
 type Props = {
+  client: KiloChatClient;
+  conversationId: string;
   messages: Message[];
   currentUserId: string | null;
   members?: readonly MessageAuthorMember[];
@@ -41,6 +43,8 @@ type Props = {
 };
 
 export function MessageList({
+  client,
+  conversationId,
   messages,
   currentUserId,
   members,
@@ -175,6 +179,8 @@ export function MessageList({
 
           return (
             <MessageBubble
+              client={client}
+              conversationId={conversationId}
               message={item}
               currentUserId={currentUserId}
               isFromMe={currentUserId !== null && item.senderId === currentUserId}

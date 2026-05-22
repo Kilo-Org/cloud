@@ -20,6 +20,18 @@ Follow the official Expo guide to set up the development environment: https://do
 
 The dev server (`pnpm start`) is always started by the user — do not start it yourself.
 
+## Tmux Services
+
+The user typically has a `tmux` session running with all backend services and the Expo dev server in separate windows (e.g., `kilo-chat`, `kiloclaw`, `nextjs`, `postgres`, `redis`, etc.). When debugging mobile issues that touch the backend, inspect the relevant window's logs to confirm what the server actually received:
+
+```bash
+tmux ls                                       # list sessions
+tmux list-windows -t <session>                # list windows
+tmux capture-pane -p -t <session>:<window> -S -200   # last 200 lines of a window
+```
+
+If `tmux ls` shows no session, tell the user the expected services aren't running and ask them to start the tmux session before continuing — don't try to start services yourself.
+
 ## Commands
 
 ```bash
@@ -40,6 +52,22 @@ npx expo install --dev <package-name>   # devDependencies
 ```
 
 After installing or upgrading dependencies, run `pnpx expo-doctor` and fix any issues it reports (version mismatches, duplicate deps, etc.).
+
+## Injected Workspace Packages
+
+Some workspace packages are listed under `dependenciesMeta` with `"injected": true` (currently `@kilocode/kilo-chat-hooks`). pnpm **copies** these into `apps/mobile/node_modules/.pnpm/.../node_modules/@kilocode/...` at install time instead of symlinking — so edits to the source under `packages/<pkg>/src/` are NOT picked up by Metro until you re-inject:
+
+```bash
+pnpm install --filter kilo-app...   # refreshes the injected copies
+```
+
+After re-injecting, also clear the Metro cache (it has the old bundled module hashed):
+
+```bash
+rm -rf "$TMPDIR/metro-cache" "$TMPDIR"/metro-file-map-*
+```
+
+…then restart Metro and force-kill the iOS app so the dev client pulls a fresh bundle. Symptom when you forget: edits to event-service, kilo-chat, etc. show up on device, but edits to an injected package don't — including `console.log` lines you just added.
 
 ## Implementation Principles
 

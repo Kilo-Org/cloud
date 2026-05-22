@@ -396,6 +396,7 @@ export const KiloClawAdminAuditAction = z.enum([
   'kiloclaw.cli_run.start',
   'kiloclaw.cli_run.cancel',
   'kiloclaw.orphan.destroy',
+  'kiloclaw.orphan_volume.destroy',
   'kiloclaw.instances.bulk_change_version',
   'kiloclaw.scheduled_action.created',
   'kiloclaw.fleet_upgrade.created',

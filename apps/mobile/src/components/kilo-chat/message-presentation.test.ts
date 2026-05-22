@@ -3,11 +3,14 @@ import { createMessageRequestSchema, type Message } from '@kilocode/kilo-chat';
 
 import {
   buildSendMessageVariables,
+  canCopyMessage,
   canShowReactionPills,
   canToggleReaction,
   createSendMessageClientId,
   getDeliveryFailureLabel,
+  getEditableAttachmentBlocks,
   getReplyPreviewText,
+  getVisibleEditableAttachmentBlocks,
   isMessageEdited,
   isMessageTextSelectionEnabled,
   resolveMessageAuthorLabel,
@@ -54,27 +57,98 @@ describe('buildSendMessageVariables', () => {
   it('builds variables accepted by the create message request schema', () => {
     const variables = buildSendMessageVariables({
       conversationId: '01ARZ3NDEKTSV4RRFFQ69G5FAV',
-      text: 'mobile message',
+      content: [{ type: 'text', text: 'mobile message' }],
       clientId: createSendMessageClientId(),
     });
 
     expect(createMessageRequestSchema.safeParse(variables).success).toBe(true);
   });
 
-  it('includes inReplyToMessageId when sending a reply', () => {
+  it('includes explicit content blocks and inReplyToMessageId when sending a reply', () => {
     expect(
       buildSendMessageVariables({
         conversationId: 'conversation-1',
-        text: 'reply body',
+        content: [
+          { type: 'text', text: 'reply body' },
+          {
+            type: 'attachment',
+            attachmentId: '01HV0000000000000000000001',
+            mimeType: 'image/png',
+            size: 123,
+            filename: 'photo.png',
+          },
+        ],
         clientId: 'client-1',
         inReplyToMessageId: 'parent-1',
       })
     ).toEqual({
       conversationId: 'conversation-1',
-      content: [{ type: 'text', text: 'reply body' }],
+      content: [
+        { type: 'text', text: 'reply body' },
+        {
+          type: 'attachment',
+          attachmentId: '01HV0000000000000000000001',
+          mimeType: 'image/png',
+          size: 123,
+          filename: 'photo.png',
+        },
+      ],
       clientId: 'client-1',
       inReplyToMessageId: 'parent-1',
     });
+  });
+});
+
+describe('getEditableAttachmentBlocks', () => {
+  it('returns only attachment content blocks from the original message', () => {
+    expect(
+      getEditableAttachmentBlocks(
+        message({
+          content: [
+            { type: 'text', text: 'with attachment' },
+            {
+              type: 'attachment',
+              attachmentId: '01HV0000000000000000000001',
+              mimeType: 'image/png',
+              size: 123,
+              filename: 'photo.png',
+            },
+          ],
+        })
+      )
+    ).toEqual([
+      {
+        type: 'attachment',
+        attachmentId: '01HV0000000000000000000001',
+        mimeType: 'image/png',
+        size: 123,
+        filename: 'photo.png',
+      },
+    ]);
+  });
+
+  it('filters removed editable attachment ids', () => {
+    const firstAttachment = {
+      type: 'attachment',
+      attachmentId: '01HV0000000000000000000001',
+      mimeType: 'image/png',
+      size: 123,
+      filename: 'photo.png',
+    } as const;
+    const secondAttachment = {
+      type: 'attachment',
+      attachmentId: '01HV0000000000000000000002',
+      mimeType: 'application/pdf',
+      size: 456,
+      filename: 'brief.pdf',
+    } as const;
+
+    expect(
+      getVisibleEditableAttachmentBlocks(
+        [firstAttachment, secondAttachment],
+        [firstAttachment.attachmentId]
+      )
+    ).toEqual([secondAttachment]);
   });
 });
 
@@ -83,6 +157,24 @@ describe('getReplyPreviewText', () => {
     expect(getReplyPreviewText(message({ content: [{ type: 'text', text: 'parent text' }] }))).toBe(
       'parent text'
     );
+  });
+
+  it('uses attachment filenames for loaded attachment-only parent previews', () => {
+    expect(
+      getReplyPreviewText(
+        message({
+          content: [
+            {
+              type: 'attachment',
+              attachmentId: '01HV0000000000000000000001',
+              mimeType: 'image/png',
+              size: 123,
+              filename: 'photo.png',
+            },
+          ],
+        })
+      )
+    ).toBe('photo.png');
   });
 
   it('uses a deleted-message label for deleted parents', () => {
@@ -110,6 +202,26 @@ describe('getDeliveryFailureLabel', () => {
 describe('isMessageTextSelectionEnabled', () => {
   it('disables native text selection for chat messages', () => {
     expect(isMessageTextSelectionEnabled()).toBe(false);
+  });
+});
+
+describe('canCopyMessage', () => {
+  it('hides copy for attachment-only messages', () => {
+    expect(
+      canCopyMessage(
+        message({
+          content: [
+            {
+              type: 'attachment',
+              attachmentId: '01HV0000000000000000000001',
+              mimeType: 'image/png',
+              size: 123,
+              filename: 'photo.png',
+            },
+          ],
+        })
+      )
+    ).toBe(false);
   });
 });
 

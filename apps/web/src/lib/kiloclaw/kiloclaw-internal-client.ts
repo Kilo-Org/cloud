@@ -42,6 +42,7 @@ import type {
   OpenclawConfigResponse,
   MorningBriefingStatusResponse,
   MorningBriefingActionResponse,
+  OnboardingBriefingResponse,
   MorningBriefingInterestsResponse,
   MorningBriefingUserLocationResponse,
   MorningBriefingReadResponse,
@@ -52,6 +53,8 @@ import type {
   GmailNotificationsResponse,
   CandidateVolumesResponse,
   ReassociateVolumeResponse,
+  OrphanVolumeScanResponse,
+  OrphanVolumeDestroyResponse,
   ResizeMachineResponse,
   SetAdminMachineSizeOverrideResponse,
   ClearAdminMachineSizeOverrideResponse,
@@ -426,6 +429,22 @@ export class KiloClawInternalClient {
       {
         method: 'POST',
         body: JSON.stringify({ userId }),
+      },
+      { userId }
+    );
+  }
+
+  async startOnboardingBriefing(
+    userId: string,
+    settingsHref: string,
+    instanceId?: string
+  ): Promise<OnboardingBriefingResponse> {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
+    return this.request(
+      `/api/platform/morning-briefing/onboarding-briefing${params}`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ userId, settingsHref }),
       },
       { userId }
     );
@@ -1035,6 +1054,42 @@ export class KiloClawInternalClient {
     return this.request(`/api/platform/candidate-volumes?${params.toString()}`, undefined, {
       userId,
     });
+  }
+
+  /**
+   * Scan a destroyed instance's Fly app for orphaned volumes. Read-only.
+   * The worker derives the Fly app + expected volume name from the instance
+   * identity, so callers never compute Fly resource names themselves.
+   */
+  async scanOrphanVolumes(
+    userId: string,
+    instanceId: string,
+    sandboxId: string
+  ): Promise<OrphanVolumeScanResponse> {
+    const params = new URLSearchParams({ userId, instanceId, sandboxId });
+    return this.request(`/api/platform/admin/orphan-volume-scan?${params.toString()}`, undefined, {
+      userId,
+    });
+  }
+
+  /**
+   * Destroy a single orphaned Fly volume. The worker re-verifies every
+   * Fly/DO-side invariant before deleting — see the route for the guards.
+   */
+  async destroyOrphanVolume(
+    userId: string,
+    instanceId: string,
+    sandboxId: string,
+    volumeId: string
+  ): Promise<OrphanVolumeDestroyResponse> {
+    return this.request(
+      '/api/platform/admin/orphan-volume-destroy',
+      {
+        method: 'POST',
+        body: JSON.stringify({ userId, instanceId, sandboxId, volumeId }),
+      },
+      { userId }
+    );
   }
 
   async reassociateVolume(

@@ -10,6 +10,7 @@ import {
 import { DurableObject } from 'cloudflare:workers';
 import { z } from 'zod';
 import { logger } from '../util/logger';
+import { headObject } from '../util/presigner';
 import {
   deliverToBot,
   deliverActionExecutedToBot,
@@ -354,7 +355,7 @@ export class ConversationDO extends DurableObject<Env> {
     rows: readonly StoredAttachmentRow[]
   ): Promise<{ code: 'conflict'; error: string } | null> {
     for (const row of rows) {
-      const object = await this.env.MEDIA_BUCKET.head(row.r2_key);
+      const object = await this.headUploadedAttachmentObject(row.r2_key);
       if (!object) {
         return { code: 'conflict', error: 'Attachment upload is missing' };
       }
@@ -366,6 +367,33 @@ export class ConversationDO extends DurableObject<Env> {
       }
     }
     return null;
+  }
+
+  private async headUploadedAttachmentObject(key: string): Promise<{ size: number } | null> {
+    const object = await this.env.MEDIA_BUCKET.head(key);
+    if (object) return { size: object.size };
+
+    // Local dev can upload through a presigned R2 URL before Wrangler's remote
+    // R2 binding sees the object. Fall back to the same S3-compatible API path
+    // used for the upload so we still reject truly missing objects.
+    const [accessKeyId, secretAccessKey] = await Promise.all([
+      this.env.R2_ACCESS_KEY_ID.get().catch(() => null),
+      this.env.R2_SECRET_ACCESS_KEY.get().catch(() => null),
+    ]);
+    if (!accessKeyId || !secretAccessKey) return null;
+
+    try {
+      return await headObject({
+        accountId: this.env.R2_ACCOUNT_ID,
+        bucket: this.env.R2_BUCKET_NAME,
+        accessKeyId,
+        secretAccessKey,
+        key,
+      });
+    } catch (err) {
+      logger.warn('remote R2 HEAD fallback failed', { key, error: String(err) });
+      return null;
+    }
   }
 
   private canonicalizeAttachmentBlocks(

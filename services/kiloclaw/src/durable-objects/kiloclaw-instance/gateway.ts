@@ -16,6 +16,7 @@ import {
   MorningBriefingStatusResponseSchema,
   MorningBriefingActionResponseSchema,
   MorningBriefingInterestsResponseSchema,
+  OnboardingBriefingResponseSchema,
   MorningBriefingUserLocationResponseSchema,
   MorningBriefingReadResponseSchema,
   OpenclawWorkspaceImportResponseSchema,
@@ -300,6 +301,9 @@ export async function getControllerVersion(
   version: string;
   commit: string;
   openclawVersion?: string | null;
+  openclawCommit?: string | null;
+  apiVersion?: number;
+  capabilities?: string[];
 } | null> {
   try {
     return await callGatewayController(
@@ -621,6 +625,28 @@ export async function runMorningBriefing(
       MorningBriefingActionResponseSchema,
       {},
       { timeoutMs: 120_000 }
+    );
+  } catch (error) {
+    if (isErrorUnknownRoute(error)) return null;
+    throw error;
+  }
+}
+
+export async function startOnboardingBriefing(
+  state: InstanceMutableState,
+  env: KiloClawEnv,
+  settingsHref?: string
+): Promise<z.infer<typeof OnboardingBriefingResponseSchema> | null> {
+  try {
+    // Returns fast: the plugin creates the conversation + loading bubble and
+    // generates the briefing fire-and-forget, so the default timeout is fine.
+    return await callGatewayController(
+      state,
+      env,
+      '/_kilo/morning-briefing/onboarding-briefing',
+      'POST',
+      OnboardingBriefingResponseSchema,
+      settingsHref ? { settingsHref } : {}
     );
   } catch (error) {
     if (isErrorUnknownRoute(error)) return null;

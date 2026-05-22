@@ -531,6 +531,9 @@ export function useOrgKiloClawMutations(
       },
     })
   );
+  const rawStartOnboardingBriefing = useMutation(
+    trpc.organizations.kiloclaw.startOnboardingBriefing.mutationOptions()
+  );
   const rawUpdateBriefingInterests = useMutation(
     trpc.organizations.kiloclaw.updateBriefingInterests.mutationOptions({
       onSuccess: async () => {
@@ -579,6 +582,7 @@ export function useOrgKiloClawMutations(
     enableMorningBriefing: bind(rawEnableMorningBriefing),
     disableMorningBriefing: bindVoid(rawDisableMorningBriefing),
     runMorningBriefing: bindVoid(rawRunMorningBriefing),
+    startOnboardingBriefing: bindVoid(rawStartOnboardingBriefing),
     updateBriefingInterests: bind(rawUpdateBriefingInterests),
     updateUserLocation: bind(rawUpdateUserLocation),
     startKiloCliRun: bind(rawStartKiloCliRun),

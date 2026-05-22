@@ -1,5 +1,6 @@
 import {
   formatKiloclawPrice,
+  formatPaymentSummary,
   getKiloclawDisplayStatus,
   getKiloclawStatusNote,
   isKiloclawPendingSettlement,
@@ -15,6 +16,27 @@ describe('KiloClaw subscription helpers', () => {
     expect(formatKiloclawPrice({ plan: 'commit', priceVersion: '2026-05-10' })).toBe(
       '$306/6-month commit'
     );
+  });
+
+  it('labels Stripe-funded hybrid subscriptions as Stripe', () => {
+    expect(
+      formatPaymentSummary({
+        paymentSource: 'stripe',
+        hasStripeFunding: true,
+      })
+    ).toBe('Stripe');
+    expect(
+      formatPaymentSummary({
+        paymentSource: 'credits',
+        hasStripeFunding: true,
+      })
+    ).toBe('Stripe');
+    expect(
+      formatPaymentSummary({
+        paymentSource: 'credits',
+        hasStripeFunding: false,
+      })
+    ).toBe('Credits');
   });
 
   it('marks pending settlement rows explicitly for display', () => {

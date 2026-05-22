@@ -8,6 +8,8 @@ import {
   kiloclaw_instances,
   kiloclaw_subscription_change_log,
   kiloclaw_subscriptions,
+  organization_seats_purchases,
+  organizations,
 } from '@kilocode/db/schema';
 import { bootstrapProvisionSubscriptionWithDb } from '../../../../../services/kiloclaw-billing/src/provision-bootstrap-shared';
 
@@ -19,6 +21,125 @@ const BOOTSTRAP_ACTOR = {
 describe('bootstrapProvisionSubscriptionWithDb organization replacement', () => {
   beforeEach(async () => {
     await cleanupDbForTest();
+  });
+
+  it('rejects managed bootstrap for hard-expired unentitled organizations without writing billing rows', async () => {
+    const user = await insertTestUser({
+      google_user_email: 'org-bootstrap-hard-expired@example.com',
+    });
+    const organization = await createTestOrganization('Hard Expired Org', user.id, 0);
+    const instanceId = crypto.randomUUID();
+
+    await db
+      .update(organizations)
+      .set({ free_trial_end_at: '2020-01-01T00:00:00.000Z' })
+      .where(eq(organizations.id, organization.id));
+    await db.insert(kiloclaw_instances).values({
+      id: instanceId,
+      user_id: user.id,
+      organization_id: organization.id,
+      sandbox_id: `ki_${instanceId.replaceAll('-', '')}`,
+    });
+
+    await expect(
+      bootstrapProvisionSubscriptionWithDb({
+        db,
+        input: { userId: user.id, instanceId, orgId: organization.id },
+        actor: BOOTSTRAP_ACTOR,
+      })
+    ).rejects.toThrow('Organization KiloClaw entitlement has expired.');
+
+    const subscriptions = await db
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.instance_id, instanceId));
+    const logs = await db.select().from(kiloclaw_subscription_change_log);
+
+    expect(subscriptions).toHaveLength(0);
+    expect(logs).toHaveLength(0);
+  });
+
+  it('keeps managed bootstrap for hard-expired organizations with a non-ended seat purchase', async () => {
+    const user = await insertTestUser({
+      google_user_email: 'org-bootstrap-paid-hard-expired@example.com',
+    });
+    const organization = await createTestOrganization('Paid Hard Expired Org', user.id, 0);
+    const instanceId = crypto.randomUUID();
+
+    await db
+      .update(organizations)
+      .set({ free_trial_end_at: '2020-01-01T00:00:00.000Z' })
+      .where(eq(organizations.id, organization.id));
+    await db.insert(organization_seats_purchases).values({
+      organization_id: organization.id,
+      subscription_stripe_id: 'sub_paid_hard_expired',
+      seat_count: 1,
+      amount_usd: 72,
+      starts_at: '2026-05-01T00:00:00.000Z',
+      expires_at: '2026-06-01T00:00:00.000Z',
+      subscription_status: 'past_due',
+    });
+    await db.insert(kiloclaw_instances).values({
+      id: instanceId,
+      user_id: user.id,
+      organization_id: organization.id,
+      sandbox_id: `ki_${instanceId.replaceAll('-', '')}`,
+    });
+
+    const subscription = await bootstrapProvisionSubscriptionWithDb({
+      db,
+      input: { userId: user.id, instanceId, orgId: organization.id },
+      actor: BOOTSTRAP_ACTOR,
+    });
+
+    expect(subscription).toEqual(
+      expect.objectContaining({
+        instance_id: instanceId,
+        payment_source: 'credits',
+        plan: 'standard',
+        status: 'active',
+      })
+    );
+  });
+
+  it('keeps managed bootstrap for hard-expired organizations with trial enforcement disabled', async () => {
+    const user = await insertTestUser({
+      google_user_email: 'org-bootstrap-exempt-hard-expired@example.com',
+    });
+    const organization = await createTestOrganization(
+      'Exempt Hard Expired Org',
+      user.id,
+      0,
+      undefined,
+      false
+    );
+    const instanceId = crypto.randomUUID();
+
+    await db
+      .update(organizations)
+      .set({ free_trial_end_at: '2020-01-01T00:00:00.000Z' })
+      .where(eq(organizations.id, organization.id));
+    await db.insert(kiloclaw_instances).values({
+      id: instanceId,
+      user_id: user.id,
+      organization_id: organization.id,
+      sandbox_id: `ki_${instanceId.replaceAll('-', '')}`,
+    });
+
+    const subscription = await bootstrapProvisionSubscriptionWithDb({
+      db,
+      input: { userId: user.id, instanceId, orgId: organization.id },
+      actor: BOOTSTRAP_ACTOR,
+    });
+
+    expect(subscription).toEqual(
+      expect.objectContaining({
+        instance_id: instanceId,
+        payment_source: 'credits',
+        plan: 'standard',
+        status: 'active',
+      })
+    );
   });
 
   it('transfers destroyed org predecessors to the new live row without touching personal or other-org rows', async () => {

@@ -42,6 +42,14 @@ import type {
   conversationStatusRecordSchema,
   getBotStatusResponseSchema,
   getConversationStatusResponseSchema,
+  requestBotStatusResponseSchema,
+  attachmentInitRequestSchema,
+  attachmentInitResponseSchema,
+  attachmentGetUrlRequestSchema,
+  attachmentGetUrlResponseSchema,
+  attachmentMetadataSchema,
+  attachmentBlockSchema,
+  inputContentBlockSchema,
 } from './schemas';
 import type {
   messageCreatedEventSchema,
@@ -143,3 +151,13 @@ export type BotStatusRecord = z.infer<typeof botStatusRecordSchema>;
 export type ConversationStatusRecord = z.infer<typeof conversationStatusRecordSchema>;
 export type GetBotStatusResponse = z.infer<typeof getBotStatusResponseSchema>;
 export type GetConversationStatusResponse = z.infer<typeof getConversationStatusResponseSchema>;
+export type RequestBotStatusResponse = z.infer<typeof requestBotStatusResponseSchema>;
+
+// ── Attachments ─────────────────────────────────────────────────────
+export type InputContentBlock = z.infer<typeof inputContentBlockSchema>;
+export type AttachmentInitRequest = z.infer<typeof attachmentInitRequestSchema>;
+export type AttachmentInitResponse = z.infer<typeof attachmentInitResponseSchema>;
+export type AttachmentGetUrlRequest = z.infer<typeof attachmentGetUrlRequestSchema>;
+export type AttachmentGetUrlResponse = z.infer<typeof attachmentGetUrlResponseSchema>;
+export type AttachmentMetadata = z.infer<typeof attachmentMetadataSchema>;
+export type AttachmentBlock = z.infer<typeof attachmentBlockSchema>;

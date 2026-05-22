@@ -24,7 +24,9 @@ const OverrideBodySchema = z.object({
 });
 
 function derivePaymentProvider(sourcePaymentId: string): ImpactReferralPaymentProvider {
-  return sourcePaymentId.startsWith('in_')
+  return sourcePaymentId.startsWith('in_') ||
+    sourcePaymentId.startsWith('pi_') ||
+    sourcePaymentId.startsWith('ch_')
     ? ImpactReferralPaymentProvider.Stripe
     : ImpactReferralPaymentProvider.Credits;
 }

@@ -157,6 +157,32 @@ describe('POST /admin/api/users/[id]/kiloclaw-referral-eligibility', () => {
     });
   });
 
+  it.each(['pi_123', 'ch_123'])(
+    'derives Stripe provider for %s source payment IDs',
+    async sourcePaymentId => {
+      await POST(
+        createRequest({
+          sourcePaymentId,
+          orderId: sourcePaymentId,
+          amount: 9,
+          currencyCode: 'usd',
+          itemCategory: 'kiloclaw-standard',
+          itemName: 'KiloClaw Standard Plan',
+          convertedAt: '2026-04-09T00:00:00.000Z',
+          sourceType: 'manual_adjustment',
+        }),
+        { params: Promise.resolve({ id: 'user_123' }) }
+      );
+
+      expect(mockProcessPersonalKiloClawPaidConversion).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sourcePaymentId,
+          paymentProvider: ImpactReferralPaymentProvider.Stripe,
+        })
+      );
+    }
+  );
+
   it('uses an explicit payment provider when supplied', async () => {
     await POST(
       createRequest({

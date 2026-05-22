@@ -68,7 +68,7 @@ import {
   github_branch_pull_requests,
   model_eval_ingestions,
 } from '@kilocode/db/schema';
-import { eq, count } from 'drizzle-orm';
+import { eq, count, sql } from 'drizzle-orm';
 import {
   softDeleteUser,
   SoftDeletePreconditionError,
@@ -89,6 +89,7 @@ import {
   KiloPassTier,
 } from '@/lib/kilo-pass/enums';
 import { SecurityAuditLogAction } from '@/lib/security-agent/core/enums';
+import { recordAffiliateAttributionAndQueueParentEvent } from '@/lib/affiliate-events';
 
 jest.mock('@/lib/stripe-client', () => ({
   createStripeCustomer: jest.fn(async ({ metadata }: { metadata: { kiloUserId: string } }) => ({
@@ -96,6 +97,14 @@ jest.mock('@/lib/stripe-client', () => ({
   })),
   deleteStripeCustomer: jest.fn(async () => {}),
 }));
+
+jest.mock('@/lib/affiliate-events', () => ({
+  recordAffiliateAttributionAndQueueParentEvent: jest.fn(async () => null),
+}));
+
+const mockRecordAffiliateAttributionAndQueueParentEvent = jest.mocked(
+  recordAffiliateAttributionAndQueueParentEvent
+);
 
 describe('User', () => {
   // Shared cleanup for all tests in this suite to prevent data pollution
@@ -166,6 +175,10 @@ describe('User', () => {
   });
 
   describe('createOrUpdateUser', () => {
+    beforeEach(() => {
+      mockRecordAffiliateAttributionAndQueueParentEvent.mockResolvedValue(null);
+    });
+
     it('stores the signup IP for new users', async () => {
       const headers = new Headers({ 'x-forwarded-for': '203.0.113.25, 10.0.0.1' });
 
@@ -330,6 +343,52 @@ describe('User', () => {
       expect(result.success).toBe(false);
       if (result.success) return;
       expect(result.error).toBe('EMAIL-ALREADY-USED');
+    });
+
+    it('keeps signup available when affiliate attribution persistence fails', async () => {
+      const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+      mockRecordAffiliateAttributionAndQueueParentEvent.mockImplementationOnce(async args => {
+        if (args.database) {
+          await args.database.execute(sql`select * from missing_affiliate_attribution_test_table`);
+        }
+        throw new Error('affiliate attribution unavailable');
+      });
+
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: 'affiliate-failure@example.com',
+          google_user_name: 'Affiliate Failure',
+          google_user_image_url: 'https://example.com/avatar.png',
+          hosted_domain: null,
+          provider: 'google',
+          provider_account_id: 'google-affiliate-failure',
+        },
+        undefined,
+        false,
+        undefined,
+        'impact-click-123'
+      );
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.user.google_user_email).toBe('affiliate-failure@example.com');
+      expect(mockRecordAffiliateAttributionAndQueueParentEvent).toHaveBeenCalledTimes(1);
+      expect(
+        mockRecordAffiliateAttributionAndQueueParentEvent.mock.calls[0]?.[0]
+      ).not.toHaveProperty('database');
+      expect(
+        await db.query.kilocode_users.findFirst({
+          where: eq(kilocode_users.id, result.user.id),
+        })
+      ).toBeDefined();
+      expect(consoleError).toHaveBeenCalledWith(
+        '[user] failed to persist affiliate attribution during signup',
+        expect.objectContaining({
+          userId: result.user.id,
+          error: 'affiliate attribution unavailable',
+        })
+      );
+      consoleError.mockRestore();
     });
   });
 

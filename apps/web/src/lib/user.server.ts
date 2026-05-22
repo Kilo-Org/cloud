@@ -724,7 +724,26 @@ const authOptions: NextAuthOptions = {
         const requestHeaders = await headers();
 
         if (accountInfo.provider === 'workos') {
-          return processSSOUserLogin(accountInfo, requestHeaders);
+          const { affiliateTrackingId, trackingContext } = !isAccountLinking
+            ? await getImpactTrackingContextFromAuthFlow(requestHeaders)
+            : { affiliateTrackingId: null, trackingContext: {} };
+
+          logImpactReferralDebug(
+            'Auth flow forwarding Impact tracking context to SSO user upsert',
+            {
+              provider: accountInfo.provider,
+              affiliateTrackingIdPresent: Boolean(affiliateTrackingId?.trim()),
+              affiliateTouchPresent: Boolean(trackingContext.affiliateTouch),
+              referralTouchPresent: Boolean(trackingContext.referralTouch),
+            }
+          );
+
+          return processSSOUserLogin(
+            accountInfo,
+            requestHeaders,
+            affiliateTrackingId,
+            trackingContext
+          );
         }
 
         // Validate Turnstile JWT for real OAuth logins (not fake logins or email auth)

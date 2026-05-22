@@ -1,4 +1,4 @@
-import type { CreateOrUpdateUserArgs } from '@/lib/user';
+import type { CreateOrUpdateUserArgs, CreateOrUpdateUserTrackingContext } from '@/lib/user';
 import { createOrUpdateUser } from '@/lib/user';
 import { WORKOS_API_KEY } from '@/lib/config.server';
 import { WorkOS } from '@workos-inc/node';
@@ -17,7 +17,9 @@ const workos = new WorkOS(WORKOS_API_KEY);
 
 async function processSSOInternal(
   args: CreateOrUpdateUserArgs,
-  requestHeaders?: Headers
+  requestHeaders?: Headers,
+  affiliateTrackingId?: string | null,
+  trackingContext?: CreateOrUpdateUserTrackingContext
 ): Promise<string | true> {
   if (args.provider !== 'workos') {
     throw new Error('Only SSO logins supported');
@@ -51,7 +53,14 @@ async function processSSOInternal(
     );
   }
 
-  const res = await createOrUpdateUser(args, undefined, true, requestHeaders);
+  const res = await createOrUpdateUser(
+    args,
+    undefined,
+    true,
+    requestHeaders,
+    affiliateTrackingId,
+    trackingContext
+  );
   if (!res.success) {
     if (res.error === 'SIGNUP-RATE-LIMITED' || res.error === 'EMAIL-ALREADY-USED') {
       return `${SSO_SIGNIN_PATH}?error=${res.error}`;
@@ -102,9 +111,14 @@ async function processSSOInternal(
   return true;
 }
 
-export async function processSSOUserLogin(args: CreateOrUpdateUserArgs, requestHeaders?: Headers) {
+export async function processSSOUserLogin(
+  args: CreateOrUpdateUserArgs,
+  requestHeaders?: Headers,
+  affiliateTrackingId?: string | null,
+  trackingContext?: CreateOrUpdateUserTrackingContext
+) {
   try {
-    return await processSSOInternal(args, requestHeaders);
+    return await processSSOInternal(args, requestHeaders, affiliateTrackingId, trackingContext);
   } catch (error) {
     console.error('Error processing SSO login:', error);
     captureException(error, {

@@ -443,6 +443,17 @@ async function promoteBlockedChildren(
       ${sql.identifier(user_affiliate_events.claimed_at.name)} = NULL
     WHERE ${user_affiliate_events.parent_event_id} = ${parentEventId}::uuid
       AND ${user_affiliate_events.delivery_state} = 'blocked'
+      AND EXISTS (
+        SELECT 1
+        FROM ${user_affiliate_events} AS parent_event
+        WHERE parent_event.id = ${parentEventId}::uuid
+          AND (
+            ${user_affiliate_events.event_type} = 'sale_reversal'
+            OR parent_event.provider <> 'impact'
+            OR parent_event.event_type <> 'signup'
+            OR parent_event.claimed_at IS NOT NULL
+          )
+      )
       AND (
         ${user_affiliate_events.event_type} <> 'sale_reversal'
         OR EXISTS (
@@ -491,6 +502,12 @@ async function reconcileBlockedChildrenWithDeliveredParents(
         FROM ${user_affiliate_events} AS parent_event
         WHERE parent_event.id = ${user_affiliate_events.parent_event_id}
           AND parent_event.delivery_state = 'delivered'
+          AND (
+            ${user_affiliate_events.event_type} = 'sale_reversal'
+            OR parent_event.provider <> 'impact'
+            OR parent_event.event_type <> 'signup'
+            OR parent_event.claimed_at IS NOT NULL
+          )
           AND (
             ${user_affiliate_events.event_type} <> 'sale_reversal'
             OR parent_event.impact_action_id IS NOT NULL
@@ -614,8 +631,10 @@ async function claimQueuedEvents(
                 ${user_affiliate_events.event_type} = 'sale_reversal'
                 OR parent_event.provider <> 'impact'
                 OR parent_event.event_type <> 'signup'
-                OR parent_event.claimed_at IS NULL
-                OR parent_event.claimed_at <= ${impactParentProcessedBefore}::timestamptz
+                OR (
+                  parent_event.claimed_at IS NOT NULL
+                  AND parent_event.claimed_at <= ${impactParentProcessedBefore}::timestamptz
+                )
               )
           )
         )
@@ -919,6 +938,11 @@ export async function enqueueAffiliateEventForUser(
             FROM ${user_affiliate_events}
             WHERE ${user_affiliate_events.id} = ${parentEvent.id}::uuid
               AND ${user_affiliate_events.delivery_state} = 'delivered'
+              AND (
+                ${user_affiliate_events.provider} <> 'impact'
+                OR ${user_affiliate_events.event_type} <> 'signup'
+                OR ${user_affiliate_events.claimed_at} IS NOT NULL
+              )
           )
           THEN 'queued'
           ELSE 'blocked'

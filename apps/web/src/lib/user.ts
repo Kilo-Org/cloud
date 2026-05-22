@@ -394,6 +394,100 @@ async function fireAuthEvent(
   });
 }
 
+async function recordSignupImpactTracking(args: {
+  user: User;
+  affiliateTrackingId?: string | null;
+  trackingContext?: CreateOrUpdateUserTrackingContext;
+}) {
+  const { user, affiliateTrackingId, trackingContext } = args;
+
+  if (affiliateTrackingId?.trim()) {
+    try {
+      logImpactReferralDebug('Signup recording Impact affiliate attribution and parent event', {
+        userId: user.id,
+        trackingIdLength: affiliateTrackingId.trim().length,
+      });
+      await recordAffiliateAttributionAndQueueParentEvent({
+        userId: user.id,
+        provider: 'impact',
+        trackingId: affiliateTrackingId,
+        customerEmail: user.google_user_email,
+        eventDate: new Date(user.created_at),
+      });
+    } catch (error) {
+      console.error('[user] failed to persist affiliate attribution during signup', {
+        userId: user.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  if (trackingContext?.affiliateTouch) {
+    try {
+      logImpactReferralDebug('Signup recording Impact affiliate touch', {
+        userId: user.id,
+        anonymousIdPresent: Boolean(trackingContext.anonymousId?.trim()),
+        landingPath: redactLandingPathForLogs(trackingContext.affiliateTouch.landingPath),
+        trackingValueLength: trackingContext.affiliateTouch.trackingValueLength,
+        isTrackingValueAccepted: trackingContext.affiliateTouch.isTrackingValueAccepted,
+      });
+      await recordImpactAffiliateTouch({
+        userId: user.id,
+        anonymousId: trackingContext.anonymousId ?? null,
+        touch: trackingContext.affiliateTouch,
+      });
+    } catch (error) {
+      console.error('[user] failed to record affiliate touch during signup', {
+        userId: user.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  if (trackingContext?.referralTouch) {
+    try {
+      logImpactReferralDebug('Signup recording Impact Advocate referral touch', {
+        userId: user.id,
+        anonymousIdPresent: Boolean(trackingContext.anonymousId?.trim()),
+        landingPath: redactLandingPathForLogs(trackingContext.referralTouch.landingPath),
+        rsCodePresent: Boolean(trackingContext.referralTouch.rsCode?.trim()),
+        trackingValueLength: trackingContext.referralTouch.trackingValueLength,
+        isTrackingValueAccepted: trackingContext.referralTouch.isTrackingValueAccepted,
+      });
+      await recordImpactReferralTouch({
+        userId: user.id,
+        anonymousId: trackingContext.anonymousId ?? null,
+        touch: trackingContext.referralTouch,
+      });
+    } catch (error) {
+      console.error('[user] failed to record referral touch during signup', {
+        userId: user.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+
+    try {
+      logImpactReferralDebug('Signup queueing Impact Advocate participant registration', {
+        userId: user.id,
+        landingPath: redactLandingPathForLogs(trackingContext.referralTouch.landingPath),
+        localePresent: Boolean(trackingContext.locale?.trim()),
+        countryCode: trackingContext.countryCode ?? null,
+      });
+      await queueImpactAdvocateParticipantRegistration({
+        user,
+        referralTouch: trackingContext.referralTouch,
+        locale: trackingContext.locale,
+        countryCode: trackingContext.countryCode,
+      });
+    } catch (error) {
+      console.error('[user] failed to enqueue Impact Advocate registration during signup', {
+        userId: user.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+}
+
 export async function createOrUpdateUser(
   args: CreateOrUpdateUserArgs,
   turnstile_guid: UUID | undefined,
@@ -545,96 +639,6 @@ export async function createOrUpdateUser(
         hosted_domain: args.hosted_domain,
       });
 
-      if (affiliateTrackingId?.trim()) {
-        try {
-          logImpactReferralDebug('Signup recording Impact affiliate attribution and parent event', {
-            userId: inserted.id,
-            trackingIdLength: affiliateTrackingId.trim().length,
-          });
-          await recordAffiliateAttributionAndQueueParentEvent({
-            database: tx,
-            userId: inserted.id,
-            provider: 'impact',
-            trackingId: affiliateTrackingId,
-            customerEmail: inserted.google_user_email,
-            eventDate: new Date(inserted.created_at),
-          });
-        } catch (error) {
-          console.error('[user] failed to persist affiliate attribution during signup', {
-            userId: inserted.id,
-            error: error instanceof Error ? error.message : String(error),
-          });
-        }
-      }
-
-      if (trackingContext?.affiliateTouch) {
-        try {
-          logImpactReferralDebug('Signup recording Impact affiliate touch', {
-            userId: inserted.id,
-            anonymousIdPresent: Boolean(trackingContext.anonymousId?.trim()),
-            landingPath: redactLandingPathForLogs(trackingContext.affiliateTouch.landingPath),
-            trackingValueLength: trackingContext.affiliateTouch.trackingValueLength,
-            isTrackingValueAccepted: trackingContext.affiliateTouch.isTrackingValueAccepted,
-          });
-          await recordImpactAffiliateTouch({
-            database: tx,
-            userId: inserted.id,
-            anonymousId: trackingContext.anonymousId ?? null,
-            touch: trackingContext.affiliateTouch,
-          });
-        } catch (error) {
-          console.error('[user] failed to record affiliate touch during signup', {
-            userId: inserted.id,
-            error: error instanceof Error ? error.message : String(error),
-          });
-        }
-      }
-
-      if (trackingContext?.referralTouch) {
-        try {
-          logImpactReferralDebug('Signup recording Impact Advocate referral touch', {
-            userId: inserted.id,
-            anonymousIdPresent: Boolean(trackingContext.anonymousId?.trim()),
-            landingPath: redactLandingPathForLogs(trackingContext.referralTouch.landingPath),
-            rsCodePresent: Boolean(trackingContext.referralTouch.rsCode?.trim()),
-            trackingValueLength: trackingContext.referralTouch.trackingValueLength,
-            isTrackingValueAccepted: trackingContext.referralTouch.isTrackingValueAccepted,
-          });
-          await recordImpactReferralTouch({
-            database: tx,
-            userId: inserted.id,
-            anonymousId: trackingContext.anonymousId ?? null,
-            touch: trackingContext.referralTouch,
-          });
-        } catch (error) {
-          console.error('[user] failed to record referral touch during signup', {
-            userId: inserted.id,
-            error: error instanceof Error ? error.message : String(error),
-          });
-        }
-
-        try {
-          logImpactReferralDebug('Signup queueing Impact Advocate participant registration', {
-            userId: inserted.id,
-            landingPath: redactLandingPathForLogs(trackingContext.referralTouch.landingPath),
-            localePresent: Boolean(trackingContext.locale?.trim()),
-            countryCode: trackingContext.countryCode ?? null,
-          });
-          await queueImpactAdvocateParticipantRegistration({
-            database: tx,
-            user: inserted,
-            referralTouch: trackingContext.referralTouch,
-            locale: trackingContext.locale,
-            countryCode: trackingContext.countryCode,
-          });
-        } catch (error) {
-          console.error('[user] failed to enqueue Impact Advocate registration during signup', {
-            userId: inserted.id,
-            error: error instanceof Error ? error.message : String(error),
-          });
-        }
-      }
-
       return successResult({ user: inserted });
     });
   } catch (error) {
@@ -655,6 +659,12 @@ export async function createOrUpdateUser(
     return txResult;
   }
   const savedUser = txResult.user;
+
+  await recordSignupImpactTracking({
+    user: savedUser,
+    affiliateTrackingId,
+    trackingContext,
+  });
 
   void fireAuthEvent(savedUser, 'signup', args.provider, requestHeaders);
 

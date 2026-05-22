@@ -251,17 +251,18 @@ export async function GET(request: NextRequest) {
     }
   }
 
+  let impactAffiliateAttributionProcessed = false;
   if (user && affiliateTrackingId) {
-    const existingAttribution = await getAffiliateAttribution(user.id, 'impact');
+    try {
+      const existingAttribution = await getAffiliateAttribution(user.id, 'impact');
 
-    logImpactReferralDebug('After sign-in checked Impact affiliate attribution row', {
-      userId: user.id,
-      existingAttributionPresent: Boolean(existingAttribution),
-      trackingIdLength: affiliateTrackingId.length,
-    });
+      logImpactReferralDebug('After sign-in checked Impact affiliate attribution row', {
+        userId: user.id,
+        existingAttributionPresent: Boolean(existingAttribution),
+        trackingIdLength: affiliateTrackingId.length,
+      });
 
-    if (!existingAttribution) {
-      try {
+      if (!existingAttribution) {
         await recordAffiliateAttributionAndQueueParentEvent({
           userId: user.id,
           provider: 'impact',
@@ -269,12 +270,13 @@ export async function GET(request: NextRequest) {
           customerEmail: user.google_user_email,
           eventDate: new Date(),
         });
-      } catch (error) {
-        console.error('[after-sign-in] failed to persist affiliate attribution', {
-          userId: user.id,
-          error: error instanceof Error ? error.message : String(error),
-        });
       }
+      impactAffiliateAttributionProcessed = true;
+    } catch (error) {
+      console.error('[after-sign-in] failed to persist affiliate attribution', {
+        userId: user.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
   }
 
@@ -285,7 +287,7 @@ export async function GET(request: NextRequest) {
   // because one already existed). Without this guard, an unauthenticated
   // hit would burn the marker and suppress the fallback on the next real
   // sign-in.
-  if (user && impactCookieValue) {
+  if (user && impactCookieValue && impactAffiliateAttributionProcessed) {
     logImpactReferralDebug('After sign-in setting app-tracked Impact click cookie marker', {
       userId: user.id,
       impactCookieValueLength: impactCookieValue.length,

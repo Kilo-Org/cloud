@@ -13,6 +13,12 @@ import type {
   PromotionTuple,
 } from './types.js';
 
+function unprefixedGatewayModel(model: string): string {
+  if (!model.startsWith('kilo/')) return model;
+  const unprefixedModel = model.slice('kilo/'.length);
+  return unprefixedModel.includes('/') ? unprefixedModel : model;
+}
+
 class MemoryPromotionStore implements PromotionStore {
   readonly rows = new Map<string, { promotion: PromotionRecord; modelStatsId: string | null }>();
   readonly cache = new Map<string, KiloBenchBenchmarks>();
@@ -31,7 +37,8 @@ class MemoryPromotionStore implements PromotionStore {
   async findModelStatsTargets(models: string[]): Promise<Map<string, ModelStatsTarget>> {
     return new Map(
       models.flatMap(model => {
-        const target = this.modelStats.get(model);
+        const target =
+          this.modelStats.get(model) ?? this.modelStats.get(unprefixedGatewayModel(model));
         return target ? [[model, target]] : [];
       })
     );
@@ -145,6 +152,52 @@ describe('syncPromotionsFromBench', () => {
       nTotalTrials: 4,
     });
     expect(cache?.overallScore).toBe(0.5625);
+  });
+
+  it('joins kilo-prefixed promotion models to unprefixed model stats targets', async () => {
+    const store = new MemoryPromotionStore([
+      { id: 'model-stats-openrouter', model: 'openai/gpt-5.5' },
+    ]);
+    const bench = new MemoryBenchDashboard([promotion({ bench_eval_name: 'prefixed-model' })]);
+
+    const result = await syncPromotionsFromBench(bench, store);
+
+    expect(result).toEqual({ inserted: 1, alreadyHad: 0, cacheRecomputes: 1, fetched: 1 });
+    expect(store.rows.get('prefixed-model')?.modelStatsId).toBe('model-stats-openrouter');
+    expect(store.cache.get('model-stats-openrouter')?.evals['terminal-bench']).toBeDefined();
+  });
+
+  it('joins gateway-prefixed Kilo provider models to their model stats targets', async () => {
+    const store = new MemoryPromotionStore([
+      { id: 'model-stats-kilo-provider', model: 'kilo/special-model' },
+    ]);
+    const bench = new MemoryBenchDashboard([
+      promotion({
+        bench_eval_name: 'prefixed-kilo-provider-model',
+        model: 'kilo/kilo/special-model',
+      }),
+    ]);
+
+    const result = await syncPromotionsFromBench(bench, store);
+
+    expect(result).toEqual({ inserted: 1, alreadyHad: 0, cacheRecomputes: 1, fetched: 1 });
+    expect(store.rows.get('prefixed-kilo-provider-model')?.modelStatsId).toBe(
+      'model-stats-kilo-provider'
+    );
+    expect(store.cache.get('model-stats-kilo-provider')?.evals['terminal-bench']).toBeDefined();
+  });
+
+  it('does not strip a single Kilo provider prefix into a bare model id', async () => {
+    const store = new MemoryPromotionStore([{ id: 'model-stats-bare', model: 'special-model' }]);
+    const bench = new MemoryBenchDashboard([
+      promotion({ bench_eval_name: 'single-kilo-provider-model', model: 'kilo/special-model' }),
+    ]);
+
+    const result = await syncPromotionsFromBench(bench, store);
+
+    expect(result).toEqual({ inserted: 1, alreadyHad: 0, cacheRecomputes: 0, fetched: 1 });
+    expect(store.rows.get('single-kilo-provider-model')?.modelStatsId).toBeNull();
+    expect(store.cache.size).toBe(0);
   });
 
   it('does not duplicate rows on an idempotent rerun', async () => {

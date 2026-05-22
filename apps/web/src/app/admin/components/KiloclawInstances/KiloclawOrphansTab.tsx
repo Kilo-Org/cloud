@@ -335,13 +335,14 @@ function OrphanVolumesSection() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <HardDrive className="h-5 w-5" />
-            Orphan Volume Reaper
+            Leftover Volume Cleanup
           </CardTitle>
           <CardDescription>
-            Scan destroyed KiloClaw instances for Fly volumes that were never cleaned up. A volume
-            is only marked <span className="font-medium">Safe to destroy</span> when it is
-            unattached, no live Durable Object references it, the user has no active subscription,
-            and the instance has been destroyed for more than 7 days.
+            Scan destroyed KiloClaw instances for the Fly volumes they left behind. Only rows marked{' '}
+            <span className="font-medium">Safe to destroy</span> are reapable orphans: unattached,
+            no live Durable Object, no access-granting subscription, and destroyed more than 7 days
+            ago. Other rows are listed for triage and cannot be destroyed here. Volumes Fly is
+            already reaping, and instances still inside the grace period, are omitted.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
@@ -465,10 +466,12 @@ function OrphanVolumesSection() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Detected Orphan Volumes</CardTitle>
+          <CardTitle>Volumes for Destroyed Instances</CardTitle>
           <CardDescription>
-            Fly volumes still present for destroyed instances. The destroy action is only available
-            for volumes that pass every safety check.
+            Fly volumes still present for destroyed instances. Only{' '}
+            <span className="font-medium">Safe to destroy</span> rows are true orphans with a
+            destroy action; every other row is shown so you can see what is stranded and why it was
+            withheld.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -477,7 +480,9 @@ function OrphanVolumesSection() {
               Choose a date range and run a scan to inspect destroyed instances.
             </p>
           ) : scanResult.volumes.length === 0 ? (
-            <p className="text-muted-foreground text-sm">No orphan volumes found.</p>
+            <p className="text-muted-foreground text-sm">
+              No leftover volumes found for destroyed instances in this window.
+            </p>
           ) : (
             <div className="rounded-lg border">
               <Table>

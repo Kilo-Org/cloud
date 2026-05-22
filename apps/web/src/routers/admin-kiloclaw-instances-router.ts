@@ -4004,6 +4004,24 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
           if (!v.nameMatchesInstance) continue;
           if (v.state === 'destroyed') continue; // already gone — noise
 
+          const classification = classifyOrphanVolume({
+            volumeState: v.state,
+            attachedMachineId: v.attached_machine_id,
+            trackedByLiveDo: v.trackedByLiveDo,
+            doStatus: scan.doStatus,
+            doStatusError: scan.doStatusError,
+            hasAccessGrantingSubscription: hasAccess,
+            destructionScheduled,
+            graceElapsed,
+          });
+          // Omit transient, self-healing rows: Fly is already reaping the
+          // volume, or the instance is still inside the grace period. Neither
+          // is actionable here and both resolve without admin intervention,
+          // so listing them is just noise.
+          if (classification === 'fly_reaping' || classification === 'within_grace') {
+            continue;
+          }
+
           volumes.push({
             instance_id: instance.id,
             user_id: instance.user_id,
@@ -4021,16 +4039,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
             attached_machine_id: v.attached_machine_id,
             volume_created_at: v.created_at,
             do_status: scan.doStatus,
-            classification: classifyOrphanVolume({
-              volumeState: v.state,
-              attachedMachineId: v.attached_machine_id,
-              trackedByLiveDo: v.trackedByLiveDo,
-              doStatus: scan.doStatus,
-              doStatusError: scan.doStatusError,
-              hasAccessGrantingSubscription: hasAccess,
-              destructionScheduled,
-              graceElapsed,
-            }),
+            classification,
           });
         }
       }

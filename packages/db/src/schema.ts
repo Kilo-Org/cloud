@@ -3314,10 +3314,6 @@ export const cloud_agent_code_reviews = pgTable(
         (${table.owned_by_user_id} IS NULL AND ${table.owned_by_organization_id} IS NOT NULL)
       )`
     ),
-    check(
-      'cloud_agent_code_reviews_pending_dispatch_retry_count_check',
-      sql`${table.pending_dispatch_retry_count} >= 0 AND ${table.pending_dispatch_retry_count} <= 4`
-    ),
   ]
 );
 

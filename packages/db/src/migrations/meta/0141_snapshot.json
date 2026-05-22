@@ -4967,10 +4967,6 @@
         "cloud_agent_code_reviews_owner_check": {
           "name": "cloud_agent_code_reviews_owner_check",
           "value": "(\n        (\"cloud_agent_code_reviews\".\"owned_by_user_id\" IS NOT NULL AND \"cloud_agent_code_reviews\".\"owned_by_organization_id\" IS NULL) OR\n        (\"cloud_agent_code_reviews\".\"owned_by_user_id\" IS NULL AND \"cloud_agent_code_reviews\".\"owned_by_organization_id\" IS NOT NULL)\n      )"
-        },
-        "cloud_agent_code_reviews_pending_dispatch_retry_count_check": {
-          "name": "cloud_agent_code_reviews_pending_dispatch_retry_count_check",
-          "value": "\"cloud_agent_code_reviews\".\"pending_dispatch_retry_count\" >= 0 AND \"cloud_agent_code_reviews\".\"pending_dispatch_retry_count\" <= 4"
         }
       },
       "isRLSEnabled": false

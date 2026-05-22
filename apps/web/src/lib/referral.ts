@@ -5,6 +5,7 @@ import {
   referral_code_usages,
   referral_codes,
 } from '@kilocode/db/schema';
+import { ImpactReferralProduct } from '@kilocode/db/schema-types';
 import { db } from '@/lib/drizzle';
 import { eq, and, count, sql, isNull, isNotNull } from 'drizzle-orm';
 import { captureMessage } from '@sentry/nextjs';
@@ -59,7 +60,12 @@ export async function processReferralTopUp(redeemingKiloUserId: string) {
   const [kiloclawReferralConversion] = await db
     .select({ id: impact_referral_conversions.id })
     .from(impact_referral_conversions)
-    .where(eq(impact_referral_conversions.referee_user_id, redeemingKiloUserId))
+    .where(
+      and(
+        eq(impact_referral_conversions.product, ImpactReferralProduct.KiloClaw),
+        eq(impact_referral_conversions.referee_user_id, redeemingKiloUserId)
+      )
+    )
     .limit(1);
   if (kiloclawReferralConversion) {
     return;

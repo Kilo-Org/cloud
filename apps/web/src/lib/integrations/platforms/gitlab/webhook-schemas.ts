@@ -175,6 +175,12 @@ export const MergeRequestPayloadSchema = z.object({
           current: z.array(GitLabLabelSchema).optional(),
         })
         .optional(),
+      blocking_discussions_resolved: z
+        .object({
+          previous: z.boolean().optional(),
+          current: z.boolean().optional(),
+        })
+        .optional(),
     })
     .optional(),
   assignees: z.array(GitLabUserSchema).optional(),
@@ -238,6 +244,8 @@ export const NoteEventPayloadSchema = z.object({
   object_attributes: z.object({
     id: z.number(),
     note: z.string(),
+    action: z.enum(['create', 'update']).optional(),
+    discussion_id: z.string().optional(),
     noteable_type: z.enum(['Commit', 'MergeRequest', 'Issue', 'Snippet']),
     author_id: z.number(),
     created_at: z.string(),
@@ -302,6 +310,44 @@ export const NoteEventPayloadSchema = z.object({
 });
 
 export type NoteEventPayload = z.infer<typeof NoteEventPayloadSchema>;
+
+const GitLabNoteReferenceSchema = z.object({
+  id: z.number(),
+  note: z.string().optional(),
+  body: z.string().optional(),
+  url: z.string().optional(),
+  noteable_type: z.string().optional(),
+  position: z
+    .object({
+      old_path: z.string().optional(),
+      new_path: z.string().optional(),
+      old_line: z.number().nullable().optional(),
+      new_line: z.number().nullable().optional(),
+    })
+    .nullable()
+    .optional(),
+});
+
+export const EmojiEventPayloadSchema = z.object({
+  object_kind: z.literal('emoji'),
+  event_type: z.string().optional(),
+  user: GitLabUserSchema,
+  project_id: z.number().optional(),
+  project: GitLabProjectSchema,
+  object_attributes: z.object({
+    id: z.number(),
+    name: z.string(),
+    action: z.enum(['award', 'revoke', 'create', 'created', 'delete', 'deleted']).optional(),
+    awardable_type: z.string(),
+    awardable_id: z.number(),
+    created_at: z.string().optional(),
+    updated_at: z.string().optional(),
+  }),
+  merge_request: MergeRequestObjectAttributesSchema.optional(),
+  note: GitLabNoteReferenceSchema.optional(),
+});
+
+export type EmojiEventPayload = z.infer<typeof EmojiEventPayloadSchema>;
 
 /**
  * Pipeline Event Webhook Payload Schema (for future use)

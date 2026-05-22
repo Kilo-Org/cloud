@@ -108,6 +108,7 @@ export const GITLAB_EVENT = {
 
   // Note (comment) events
   NOTE: 'Note Hook',
+  EMOJI: 'Emoji Hook',
 
   // Issue events
   ISSUE: 'Issue Hook',

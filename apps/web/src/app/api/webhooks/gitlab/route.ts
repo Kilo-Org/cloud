@@ -2,7 +2,11 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { verifyGitLabWebhookToken } from '@/lib/integrations/platforms/gitlab/adapter';
-import { MergeRequestPayloadSchema } from '@/lib/integrations/platforms/gitlab/webhook-schemas';
+import {
+  EmojiEventPayloadSchema,
+  MergeRequestPayloadSchema,
+  NoteEventPayloadSchema,
+} from '@/lib/integrations/platforms/gitlab/webhook-schemas';
 import { findGitLabIntegrationByWebhookToken } from '@/lib/integrations/db/platform-integrations';
 import { handleMergeRequest } from '@/lib/integrations/platforms/gitlab/webhook-handlers';
 import { PLATFORM, GITLAB_EVENT, GITLAB_ACTION } from '@/lib/integrations/core/constants';
@@ -10,6 +14,25 @@ import { logExceptInTest } from '@/lib/utils.server';
 import { logWebhookEvent, updateWebhookEvent } from '@/lib/integrations/db/webhook-events';
 import type { Owner } from '@/lib/integrations/core/types';
 import { redactSensitiveHeaders } from '@kilocode/worker-utils/redact-headers';
+import {
+  handleGitLabEmojiFeedback,
+  handleGitLabMergeRequestFeedback,
+  handleGitLabNoteFeedback,
+} from '@/lib/code-reviews/review-memory/gitlab-feedback';
+
+type WebhookHandlerError = {
+  message: string;
+  handler: string;
+  stack?: string;
+};
+
+function toWebhookHandlerError(handler: string, error: unknown): WebhookHandlerError {
+  return {
+    message: error instanceof Error ? error.message : String(error),
+    handler,
+    stack: error instanceof Error ? error.stack : undefined,
+  };
+}
 
 /**
  * GitLab Webhook Handler
@@ -143,7 +166,22 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ message: 'Duplicate event' }, { status: 200 });
       }
 
+      const errors: WebhookHandlerError[] = [];
       const result = await handleMergeRequest(parseResult.data, integration);
+
+      try {
+        await handleGitLabMergeRequestFeedback({
+          payload: parseResult.data,
+          integration,
+          deliveryId: eventSignature,
+        });
+      } catch (error) {
+        logExceptInTest('Error recording GitLab merge request feedback:', error);
+        captureException(error, {
+          tags: { source: 'gitlab_webhook_review_memory_feedback' },
+        });
+        errors.push(toWebhookHandlerError('review_memory_feedback', error));
+      }
 
       // Mark webhook event as processed
       if (logResult.webhookEventId) {
@@ -151,8 +189,8 @@ export async function POST(request: NextRequest) {
           await updateWebhookEvent(logResult.webhookEventId, {
             processed: true,
             processed_at: new Date().toISOString(),
-            handlers_triggered: ['code_review'],
-            errors: null,
+            handlers_triggered: ['code_review', 'review_memory_feedback'],
+            errors: errors.length > 0 ? errors : null,
           });
         } catch (error) {
           logExceptInTest('Error updating webhook event:', error);
@@ -168,9 +206,103 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: 'Event received' }, { status: 200 });
     }
 
-    // Handle Note (comment) events (for future use - e.g., responding to review comments)
+    // Handle Note (comment) events for review memory feedback
     if (eventType === GITLAB_EVENT.NOTE) {
-      logExceptInTest('Note event received, not yet implemented');
+      const parseResult = NoteEventPayloadSchema.safeParse(payload);
+      if (!parseResult.success) {
+        logExceptInTest('Invalid note payload:', parseResult.error);
+        captureMessage('Invalid GitLab webhook payload structure', {
+          level: 'error',
+          tags: { source: 'gitlab_webhook_validation', event: 'note' },
+          extra: { errors: parseResult.error.issues },
+        });
+        return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
+      }
+
+      const action = parseResult.data.object_attributes.action ?? 'note';
+      const logResult = await logWebhook(action);
+      if (logResult.isDuplicate) {
+        return NextResponse.json({ message: 'Duplicate event' }, { status: 200 });
+      }
+
+      const errors: WebhookHandlerError[] = [];
+      try {
+        await handleGitLabNoteFeedback({
+          payload: parseResult.data,
+          integration,
+          deliveryId: eventSignature,
+        });
+      } catch (error) {
+        logExceptInTest('Error recording GitLab note feedback:', error);
+        captureException(error, {
+          tags: { source: 'gitlab_webhook_review_memory_feedback' },
+        });
+        errors.push(toWebhookHandlerError('review_memory_feedback', error));
+      }
+
+      if (logResult.webhookEventId) {
+        try {
+          await updateWebhookEvent(logResult.webhookEventId, {
+            processed: true,
+            processed_at: new Date().toISOString(),
+            handlers_triggered: ['review_memory_feedback'],
+            errors: errors.length > 0 ? errors : null,
+          });
+        } catch (error) {
+          logExceptInTest('Error updating webhook event:', error);
+        }
+      }
+
+      return NextResponse.json({ message: 'Event received' }, { status: 200 });
+    }
+
+    // Handle Emoji events for review memory feedback
+    if (eventType === GITLAB_EVENT.EMOJI) {
+      const parseResult = EmojiEventPayloadSchema.safeParse(payload);
+      if (!parseResult.success) {
+        logExceptInTest('Invalid emoji payload:', parseResult.error);
+        captureMessage('Invalid GitLab webhook payload structure', {
+          level: 'error',
+          tags: { source: 'gitlab_webhook_validation', event: 'emoji' },
+          extra: { errors: parseResult.error.issues },
+        });
+        return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
+      }
+
+      const action = parseResult.data.object_attributes.action ?? 'emoji';
+      const logResult = await logWebhook(action);
+      if (logResult.isDuplicate) {
+        return NextResponse.json({ message: 'Duplicate event' }, { status: 200 });
+      }
+
+      const errors: WebhookHandlerError[] = [];
+      try {
+        await handleGitLabEmojiFeedback({
+          payload: parseResult.data,
+          integration,
+          deliveryId: eventSignature,
+        });
+      } catch (error) {
+        logExceptInTest('Error recording GitLab emoji feedback:', error);
+        captureException(error, {
+          tags: { source: 'gitlab_webhook_review_memory_feedback' },
+        });
+        errors.push(toWebhookHandlerError('review_memory_feedback', error));
+      }
+
+      if (logResult.webhookEventId) {
+        try {
+          await updateWebhookEvent(logResult.webhookEventId, {
+            processed: true,
+            processed_at: new Date().toISOString(),
+            handlers_triggered: ['review_memory_feedback'],
+            errors: errors.length > 0 ? errors : null,
+          });
+        } catch (error) {
+          logExceptInTest('Error updating webhook event:', error);
+        }
+      }
+
       return NextResponse.json({ message: 'Event received' }, { status: 200 });
     }
 

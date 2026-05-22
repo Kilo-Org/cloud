@@ -636,6 +636,7 @@ export type GitLabWebhook = {
   merge_requests_events: boolean;
   tag_push_events: boolean;
   note_events: boolean;
+  emoji_events?: boolean;
   confidential_note_events: boolean;
   job_events: boolean;
   pipeline_events: boolean;
@@ -729,7 +730,8 @@ export async function createProjectWebhook(
       issues_events: false,
       confidential_issues_events: false,
       tag_push_events: false,
-      note_events: false,
+      note_events: true,
+      emoji_events: true,
       confidential_note_events: false,
       job_events: false,
       pipeline_events: false,
@@ -811,7 +813,8 @@ export async function updateProjectWebhook(
         issues_events: false,
         confidential_issues_events: false,
         tag_push_events: false,
-        note_events: false,
+        note_events: true,
+        emoji_events: true,
         confidential_note_events: false,
         job_events: false,
         pipeline_events: false,

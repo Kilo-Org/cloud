@@ -6,6 +6,8 @@ import {
   searchGitLabProjects,
   normalizeGitLabSearchQuery,
   fetchGitLabRootTextFileAtRef,
+  createProjectWebhook,
+  updateProjectWebhook,
 } from './adapter';
 
 // Mock fetch globally
@@ -617,5 +619,98 @@ describe('fetchGitLabRootTextFileAtRef', () => {
     await expect(
       fetchGitLabRootTextFileAtRef('test-token', 'group/project', 'REVIEW.md', 'main')
     ).rejects.toThrow('GitLab repository file fetch failed: 500');
+  });
+});
+
+describe('GitLab webhook management', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+  });
+
+  function webhookResponse() {
+    return {
+      id: 10,
+      url: 'https://app.example.com/api/webhooks/gitlab',
+      project_id: 123,
+      push_events: false,
+      push_events_branch_filter: '',
+      issues_events: false,
+      confidential_issues_events: false,
+      merge_requests_events: true,
+      tag_push_events: false,
+      note_events: true,
+      emoji_events: true,
+      confidential_note_events: false,
+      job_events: false,
+      pipeline_events: false,
+      wiki_page_events: false,
+      deployment_events: false,
+      releases_events: false,
+      subgroup_events: false,
+      member_events: false,
+      enable_ssl_verification: true,
+      created_at: '2026-01-01T00:00:00.000Z',
+    };
+  }
+
+  it('creates project webhooks with note and emoji events enabled', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => webhookResponse(),
+    });
+
+    await createProjectWebhook(
+      'test-token',
+      123,
+      'https://app.example.com/api/webhooks/gitlab',
+      'secret'
+    );
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      'https://gitlab.com/api/v4/projects/123/hooks',
+      expect.objectContaining({
+        method: 'POST',
+        body: expect.any(String),
+      })
+    );
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body as string) as Record<string, unknown>;
+    expect(body).toEqual(
+      expect.objectContaining({
+        merge_requests_events: true,
+        note_events: true,
+        emoji_events: true,
+      })
+    );
+  });
+
+  it('updates project webhooks with note and emoji events enabled', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => webhookResponse(),
+    });
+
+    await updateProjectWebhook(
+      'test-token',
+      123,
+      10,
+      'https://app.example.com/api/webhooks/gitlab',
+      'secret'
+    );
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      'https://gitlab.com/api/v4/projects/123/hooks/10',
+      expect.objectContaining({
+        method: 'PUT',
+        body: expect.any(String),
+      })
+    );
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body as string) as Record<string, unknown>;
+    expect(body).toEqual(
+      expect.objectContaining({
+        merge_requests_events: true,
+        note_events: true,
+        emoji_events: true,
+      })
+    );
   });
 });

@@ -239,6 +239,67 @@ export async function findFeedbackSubject(
   return subject ?? null;
 }
 
+export type FindFeedbackSubjectByExternalThreadInput = {
+  owner: ReviewMemoryOwner;
+  platform: ReviewMemoryPlatform;
+  repoFullName: string;
+  subjectType: ReviewMemorySubjectType;
+  externalThreadId: string;
+  database?: ReviewMemoryDatabase;
+};
+
+export async function findFeedbackSubjectByExternalThreadId(
+  input: FindFeedbackSubjectByExternalThreadInput
+): Promise<CodeReviewFeedbackSubject | null> {
+  const database = databaseOrDefault(input.database);
+  const [subject] = await database
+    .select()
+    .from(code_review_feedback_subjects)
+    .where(
+      and(
+        subjectOwnerWhere(input.owner),
+        eq(code_review_feedback_subjects.platform, input.platform),
+        eq(code_review_feedback_subjects.repo_full_name, input.repoFullName),
+        eq(code_review_feedback_subjects.subject_type, input.subjectType),
+        eq(code_review_feedback_subjects.external_thread_id, input.externalThreadId)
+      )
+    )
+    .limit(1);
+
+  return subject ?? null;
+}
+
+export type ListFeedbackSubjectsForPullRequestInput = {
+  owner: ReviewMemoryOwner;
+  platform: ReviewMemoryPlatform;
+  repoFullName: string;
+  prNumber: number;
+  subjectTypes?: ReviewMemorySubjectType[];
+  database?: ReviewMemoryDatabase;
+};
+
+export async function listFeedbackSubjectsForPullRequest(
+  input: ListFeedbackSubjectsForPullRequestInput
+): Promise<CodeReviewFeedbackSubject[]> {
+  const database = databaseOrDefault(input.database);
+  const conditions = [
+    subjectOwnerWhere(input.owner),
+    eq(code_review_feedback_subjects.platform, input.platform),
+    eq(code_review_feedback_subjects.repo_full_name, input.repoFullName),
+    eq(code_review_feedback_subjects.pr_number, input.prNumber),
+  ] satisfies SQL[];
+
+  if (input.subjectTypes && input.subjectTypes.length > 0) {
+    conditions.push(inArray(code_review_feedback_subjects.subject_type, input.subjectTypes));
+  }
+
+  return await database
+    .select()
+    .from(code_review_feedback_subjects)
+    .where(and(...conditions))
+    .orderBy(desc(code_review_feedback_subjects.last_seen_at));
+}
+
 export type RecordFeedbackEventInput = {
   owner: ReviewMemoryOwner;
   platform: ReviewMemoryPlatform;

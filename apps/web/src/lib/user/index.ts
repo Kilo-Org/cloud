@@ -80,7 +80,7 @@ import {
   model_eval_ingestions,
 } from '@kilocode/db/schema';
 import { eq, and, inArray, isNotNull, isNull, sql, or, gte, count } from 'drizzle-orm';
-import { allow_fake_login, IS_DEVELOPMENT } from './constants';
+import { allow_fake_login, IS_DEVELOPMENT } from '@/lib/constants';
 import type { AuthErrorType } from '@/lib/auth/constants';
 import { hosted_domain_specials } from '@/lib/auth/constants';
 import { strict as assert } from 'node:assert';

@@ -1,6 +1,6 @@
 import 'server-only';
 import { NextResponse } from 'next/server';
-import { getUserFromAuth } from '@/lib/user.server';
+import { getUserFromAuth } from '@/lib/user/server';
 import { generateApiToken } from '@/lib/tokens';
 import { getUserOrgMemberships } from '@/lib/organizations/organizations';
 

@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { getUserFromAuth } from '@/lib/user.server';
+import { getUserFromAuth } from '@/lib/user/server';
 import { BlockedNotification } from '@/components/auth/BlockedNotification';
 
 export default async function AccountBlockedPage() {

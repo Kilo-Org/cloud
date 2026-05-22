@@ -1,5 +1,5 @@
 import 'server-only';
-import { getUserFromAuth } from '@/lib/user.server';
+import { getUserFromAuth } from '@/lib/user/server';
 import { initTRPC, TRPCError } from '@trpc/server';
 import type { User } from '@kilocode/db/schema';
 import * as z from 'zod';

@@ -4,7 +4,7 @@ jest.mock('@/lib/constants', () => ({
   APP_URL: 'http://localhost:3000',
 }));
 
-jest.mock('@/lib/user.server', () => ({
+jest.mock('@/lib/user/server', () => ({
   getProfileRedirectPath: jest.fn(async () => '/users/profile'),
   getUserFromAuth: jest.fn(),
 }));
@@ -42,7 +42,7 @@ jest.mock('@/lib/credit-campaigns', () => ({
 
 import { getAffiliateAttribution } from '@/lib/affiliate-attribution';
 import { recordAffiliateAttributionAndQueueParentEvent } from '@/lib/impact/affiliate-events';
-import { getUserFromAuth } from '@/lib/user.server';
+import { getUserFromAuth } from '@/lib/user/server';
 import { GET } from './route';
 
 const mockGetAffiliateAttribution = jest.mocked(getAffiliateAttribution);

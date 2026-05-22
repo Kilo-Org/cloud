@@ -6,7 +6,7 @@ import {
   exa_usage_log,
 } from '@kilocode/db/schema';
 import { eq, and } from 'drizzle-orm';
-import { recomputeUserBalances, computeUserBalanceUpdates } from './recomputeUserBalances';
+import { recomputeUserBalances, computeUserBalanceUpdates } from './recompute-balances';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 
 describe('recomputeUserBalances', () => {

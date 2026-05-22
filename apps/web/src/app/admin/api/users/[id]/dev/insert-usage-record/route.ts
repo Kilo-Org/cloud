@@ -2,7 +2,7 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
 
-import { getUserFromAuth } from '@/lib/user.server';
+import { getUserFromAuth } from '@/lib/user/server';
 import { findUserById } from '@/lib/user';
 import { forceImmediateExpirationRecomputation } from '@/lib/balanceCache';
 import { insertUsageRecord } from '@/lib/ai-gateway/processUsage';

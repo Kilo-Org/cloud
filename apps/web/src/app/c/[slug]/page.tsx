@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { Clock, UserCheck } from 'lucide-react';
-import { getUserFromAuth } from '@/lib/user.server';
+import { getUserFromAuth } from '@/lib/user/server';
 import { KiloCardLayout } from '@/components/KiloCardLayout';
 import { Button } from '@/components/ui/button';
 import {

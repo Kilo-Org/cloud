@@ -38,7 +38,7 @@ jest.mock('@sentry/nextjs', () => ({
 }));
 
 import { createOrUpdateUser } from '@/lib/user';
-import { processSSOUserLogin } from './sso-user';
+import { processSSOUserLogin } from './sso';
 
 const mockCreateOrUpdateUser = jest.mocked(createOrUpdateUser);
 const { mockWorkOSInstance } = jest.requireMock('@workos-inc/node') as {

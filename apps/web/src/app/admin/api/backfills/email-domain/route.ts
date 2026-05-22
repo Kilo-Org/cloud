@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getUserFromAuth } from '@/lib/user.server';
+import { getUserFromAuth } from '@/lib/user/server';
 import { db } from '@/lib/drizzle';
 import { kilocode_users } from '@kilocode/db';
 import { and, isNull, count, not, or, sql, like } from 'drizzle-orm';

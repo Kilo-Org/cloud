@@ -1,4 +1,4 @@
-import { getUserFromAuthOrRedirect } from '@/lib/user.server';
+import { getUserFromAuthOrRedirect } from '@/lib/user/server';
 import { redirect } from 'next/navigation';
 import { resolveWastelandUpstreamForUser } from '@/lib/wasteland/server-resolve';
 import { RigsClient } from './RigsClient';

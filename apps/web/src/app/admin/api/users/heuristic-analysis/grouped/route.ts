@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { getUserFromAuth } from '@/lib/user.server';
+import { getUserFromAuth } from '@/lib/user/server';
 import { db } from '@/lib/drizzle';
 import { sql } from 'drizzle-orm';
 import type { GroupByDimension, GroupedData, HeuristicAnalysisResponse } from '../types';

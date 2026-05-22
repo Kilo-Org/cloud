@@ -1,5 +1,5 @@
 import { Suspense } from 'react';
-import { getUserFromAuthOrRedirect } from '@/lib/user.server';
+import { getUserFromAuthOrRedirect } from '@/lib/user/server';
 import { GitLabIntegrationDetails } from '@/components/integrations/GitLabIntegrationDetails';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';

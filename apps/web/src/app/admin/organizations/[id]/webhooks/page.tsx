@@ -1,4 +1,4 @@
-import { getUserFromAuth } from '@/lib/user.server';
+import { getUserFromAuth } from '@/lib/user/server';
 import { redirect } from 'next/navigation';
 import { AdminWebhookTriggersList } from '@/app/admin/webhooks/AdminWebhookTriggersList';
 import { db } from '@/lib/drizzle';

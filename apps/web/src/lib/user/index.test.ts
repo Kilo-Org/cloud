@@ -75,7 +75,7 @@ import {
   findUserById,
   findUsersByIds,
   createOrUpdateUser,
-} from './user';
+} from '@/lib/user';
 import { hashNormalizedEmailForDeletionTombstone } from '@/lib/impact/referral';
 import { createTestPaymentMethod } from '@/tests/helpers/payment-method.helper';
 import { insertTestUser } from '@/tests/helpers/user.helper';

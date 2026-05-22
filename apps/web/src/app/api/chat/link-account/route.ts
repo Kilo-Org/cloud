@@ -8,7 +8,7 @@ import {
   verifyLinkToken,
   type PlatformIdentity,
 } from '@/lib/bot-identity';
-import { getUserFromAuth } from '@/lib/user.server';
+import { getUserFromAuth } from '@/lib/user/server';
 import {
   canKiloUserAccessPlatformIntegration,
   getPlatformIntegration,

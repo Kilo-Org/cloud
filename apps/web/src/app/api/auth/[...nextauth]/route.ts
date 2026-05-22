@@ -1,4 +1,4 @@
-import { nextAuthHttpHandler } from '@/lib/user.server';
+import { nextAuthHttpHandler } from '@/lib/user/server';
 import { NextRequest } from 'next/server';
 
 // GitHub recently started appending `&iss=https://github.com/login/oauth` to

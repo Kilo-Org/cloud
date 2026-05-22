@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { getUserFromAuth } from '@/lib/user.server';
+import { getUserFromAuth } from '@/lib/user/server';
 import { redeemSelfServicePromoCode } from '@/lib/promotionalCredits';
 import { promoCreditCategoriesByKey } from '@/lib/promoCreditCategories';
 

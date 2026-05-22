@@ -1,5 +1,5 @@
 import { OrganizationAdminDashboard } from '@/app/admin/components/OrganizationAdmin/OrganizationAdminDashboard';
-import { getUserFromAuth } from '@/lib/user.server';
+import { getUserFromAuth } from '@/lib/user/server';
 import { redirect } from 'next/navigation';
 
 export default async function OrganizationDetailPage({

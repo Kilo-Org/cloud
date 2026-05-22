@@ -7,7 +7,7 @@ import {
   uuidSchema,
   parseSignInRedirectContext,
   getProfileRedirectPath,
-} from './user.server';
+} from './server';
 import { db } from '@/lib/drizzle';
 import { organization_seats_purchases, organizations } from '@kilocode/db/schema';
 import type { Organization, User } from '@kilocode/db/schema';

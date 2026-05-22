@@ -1,11 +1,11 @@
 import { getEnvVariable } from '@/lib/dotenvx';
 import 'server-only';
-import { validateAuthorizationHeader, JWT_TOKEN_VERSION } from './tokens';
+import { validateAuthorizationHeader, JWT_TOKEN_VERSION } from '@/lib/tokens';
 import { NextResponse } from 'next/server';
 import { cookies, headers } from 'next/headers';
 
-import type { CreateOrUpdateUserArgs, CreateOrUpdateUserTrackingContext } from './user';
-import { findUserById, createOrUpdateUser, findAndSyncExistingUser } from './user';
+import type { CreateOrUpdateUserArgs, CreateOrUpdateUserTrackingContext } from '@/lib/user';
+import { findUserById, createOrUpdateUser, findAndSyncExistingUser } from '@/lib/user';
 import { db, readDb } from '@/lib/drizzle';
 import type {
   NextAuthOptions,
@@ -25,7 +25,7 @@ import DiscordProvider from 'next-auth/providers/discord';
 import WorkOSProvider from 'next-auth/providers/workos';
 import AppleProvider from 'next-auth/providers/apple';
 import CredentialsProvider from 'next-auth/providers/credentials';
-import { allow_fake_login, ORGANIZATION_ID_HEADER } from './constants';
+import { allow_fake_login, ORGANIZATION_ID_HEADER } from '@/lib/constants';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { verifyAndConsumeMagicLinkToken } from '@/lib/auth/magic-link-tokens';
 import { redirect } from 'next/navigation';
@@ -83,7 +83,7 @@ import {
 import jwt from 'jsonwebtoken';
 import type { UUID } from 'node:crypto';
 import { logExceptInTest, sentryLogger } from '@/lib/utils.server';
-import { processSSOUserLogin } from '@/lib/sso-user';
+import { processSSOUserLogin } from '@/lib/user/sso';
 import { getLowerDomainFromEmail } from '@/lib/utils';
 import { z } from 'zod';
 import { v5 as uuidv5 } from 'uuid';

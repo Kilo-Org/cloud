@@ -451,6 +451,12 @@ async function pathExists(p: string): Promise<boolean> {
   }
 }
 
+async function localBranchExists(repo: string, branch: string): Promise<boolean> {
+  return exec('git', ['show-ref', '--verify', '--quiet', `refs/heads/${branch}`], repo)
+    .then(() => true)
+    .catch(() => false);
+}
+
 async function repoDir(rigId: string): Promise<string> {
   validatePathSegment(rigId, 'rigId');
   const dir = resolve(WORKSPACE_ROOT, rigId, 'repo');
@@ -582,6 +588,7 @@ export function createWorktree(options: WorktreeOptions): Promise<string> {
 }
 
 async function createWorktreeInner(options: WorktreeOptions): Promise<string> {
+  validateBranchName(options.branch, 'branch');
   const repo = await repoDir(options.rigId);
   const dir = await worktreeDir(options.rigId, options.branch);
 
@@ -611,29 +618,32 @@ async function createWorktreeInner(options: WorktreeOptions): Promise<string> {
     );
   }
 
-  // When a startPoint is provided (e.g. a convoy feature branch), create
-  // the new branch from that ref so the agent begins with the latest
-  // merged work from upstream. Without a startPoint, try to track the
-  // remote branch or fall back to the repo's current HEAD.
-  const startPoint = options.startPoint;
-  try {
-    if (startPoint) {
-      await exec('git', ['branch', options.branch, startPoint], repo);
-    } else {
-      await exec('git', ['branch', '--track', options.branch, `origin/${options.branch}`], repo);
-    }
-  } catch {
-    // Fall back to origin/<defaultBranch> so we always branch from the
-    // latest remote tip rather than the repo's local HEAD (which may be
-    // stale in a --no-checkout bare clone).
-    const fallback = options.defaultBranch ? `origin/${options.defaultBranch}` : undefined;
-    if (fallback) {
-      await exec('git', ['branch', options.branch, fallback], repo);
-    } else {
-      await exec('git', ['branch', options.branch], repo);
+  if (!(await localBranchExists(repo, options.branch))) {
+    // When a startPoint is provided (e.g. a convoy feature branch), create
+    // the new branch from that ref so the agent begins with the latest
+    // merged work from upstream. Without a startPoint, try to track the
+    // remote branch or fall back to the repo's current HEAD.
+    const startPoint = options.startPoint;
+    try {
+      if (startPoint) {
+        await exec('git', ['branch', options.branch, startPoint], repo);
+      } else {
+        await exec('git', ['branch', '--track', options.branch, `origin/${options.branch}`], repo);
+      }
+    } catch {
+      // Fall back to origin/<defaultBranch> so we always branch from the
+      // latest remote tip rather than the repo's local HEAD (which may be
+      // stale in a --no-checkout bare clone).
+      const fallback = options.defaultBranch ? `origin/${options.defaultBranch}` : undefined;
+      if (fallback) {
+        await exec('git', ['branch', options.branch, fallback], repo);
+      } else {
+        await exec('git', ['branch', options.branch], repo);
+      }
     }
   }
 
+  await exec('git', ['worktree', 'prune'], repo).catch(() => {});
   await exec('git', ['worktree', 'add', dir, options.branch], repo);
   console.log(`Created worktree for branch ${options.branch} at ${dir}`);
   return dir;

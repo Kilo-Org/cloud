@@ -44,9 +44,8 @@ type GitLabOAuthConnectOptions = {
  *
  * Query parameters:
  * - organizationId: (optional) Organization ID for org-owned integrations
- * - instanceUrl: (optional) Self-hosted GitLab instance URL
- * - clientId: (optional) Custom OAuth client ID for self-hosted instances
- * - clientSecret: (optional) Custom OAuth client secret for self-hosted instances
+ * - instanceUrl: (optional) Self-hosted GitLab instance URL (custom credentials must be sent via POST)
+ * - returnTo: (optional) Relative path to return to after OAuth
  */
 export async function handleGitLabOAuthConnect(request: NextRequest) {
   const organizationId = request.nextUrl.searchParams.get('organizationId');

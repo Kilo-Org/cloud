@@ -54,6 +54,7 @@ export async function fetchFreshContainerToken(): Promise<string | null> {
 
   if (!apiUrl || !townId || !currentToken) {
     log.warn('token_refresh.skipped_missing_env', {
+      townId: townId ?? null,
       hasApiUrl: !!apiUrl,
       hasTownId: !!townId,
       hasCurrentToken: !!currentToken,
@@ -75,6 +76,7 @@ export async function fetchFreshContainerToken(): Promise<string | null> {
     if (!resp.ok) {
       const text = await resp.text().catch(() => '');
       log.warn('token_refresh.fetch_failed', {
+        townId,
         status: resp.status,
         durationMs: Date.now() - t0,
         body: text.slice(0, 200),
@@ -87,14 +89,15 @@ export async function fetchFreshContainerToken(): Promise<string | null> {
         ? (body as { data?: { token?: unknown } }).data?.token
         : undefined;
     if (typeof token !== 'string' || token.length === 0) {
-      log.warn('token_refresh.invalid_response', { durationMs: Date.now() - t0 });
+      log.warn('token_refresh.invalid_response', { townId, durationMs: Date.now() - t0 });
       return null;
     }
     process.env.GASTOWN_CONTAINER_TOKEN = token;
-    log.info('token_refresh.succeeded', { durationMs: Date.now() - t0 });
+    log.info('token_refresh.succeeded', { townId, durationMs: Date.now() - t0 });
     return token;
   } catch (err) {
     log.warn('token_refresh.network_error', {
+      townId,
       error: err instanceof Error ? err.message : String(err),
       durationMs: Date.now() - t0,
     });
@@ -124,6 +127,7 @@ export async function refreshTokenIfNearExpiry(thresholdMs = 30 * 60_000): Promi
     return;
   }
   log.info('token_refresh.boot_near_expiry', {
+    townId: process.env.GASTOWN_TOWN_ID ?? null,
     msUntilExpiry: msLeft,
     thresholdMs,
   });

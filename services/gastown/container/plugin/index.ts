@@ -105,9 +105,17 @@ export const GastownPlugin: Plugin = async ({ client }) => {
   // Best-effort logging — never let telemetry failures break tool execution
   async function log(level: 'info' | 'error', message: string) {
     console.log(`${SERVICE} ${level}: ${message}`);
+    const townId = process.env.GASTOWN_TOWN_ID;
 
     try {
-      await client.app.log({ body: { service: SERVICE, level, message } });
+      await client.app.log({
+        body: {
+          service: SERVICE,
+          level,
+          message,
+          ...(townId ? { extra: { townId } } : {}),
+        },
+      });
     } catch {
       // Swallow — logging is non-critical
     }

@@ -71,6 +71,7 @@ const IDLE_TIMER_IGNORE_EVENTS = new Set([
 
 let nextPort = 4096;
 const startTime = Date.now();
+const TOWN_ID = process.env.GASTOWN_TOWN_ID ?? null;
 
 // Set to true when drainAll() starts — prevents new agent starts and
 // lets the drain loop nudge agents that transition to running mid-drain.
@@ -163,6 +164,7 @@ function markMayorReadyOnce(): void {
   if (mayorReadyAt !== null) return;
   mayorReadyAt = new Date().toISOString();
   log.info('mayor.ready', {
+    townId: TOWN_ID,
     containerUptimeMs: getUptime(),
     mayorReadyAt,
   });
@@ -405,6 +407,7 @@ async function saveDbSnapshot(
       );
       log.error('mayor.snapshot_failed', {
         event: 'mayor.snapshot_failed',
+        townId,
         agentId,
         role,
         durationMs: Date.now() - t0,
@@ -430,6 +433,7 @@ async function saveDbSnapshot(
       console.warn(`${MANAGER_LOG} Failed to save DB snapshot for ${agentId}: ${resp.status}`);
       log.error('mayor.snapshot_failed', {
         event: 'mayor.snapshot_failed',
+        townId,
         agentId,
         role,
         durationMs: Date.now() - t0,
@@ -444,6 +448,7 @@ async function saveDbSnapshot(
     );
     log.info('mayor.snapshot_saved', {
       event: 'mayor.snapshot_saved',
+      townId,
       agentId,
       role,
       durationMs: Date.now() - t0,
@@ -458,6 +463,7 @@ async function saveDbSnapshot(
     console.warn(`${MANAGER_LOG} DB snapshot save failed for agent ${agentId}:`, err);
     log.error('mayor.snapshot_failed', {
       event: 'mayor.snapshot_failed',
+      townId,
       agentId,
       role,
       durationMs: Date.now() - t0,
@@ -973,6 +979,7 @@ async function subscribeToEvents(
   const exitAgent = () => {
     if (agent.status !== 'running') return;
     log.info('agent.exit', {
+      townId: agent.townId,
       agentId: agent.agentId,
       name: agent.name,
       reason: 'completed',
@@ -1073,6 +1080,7 @@ async function subscribeToEvents(
   } catch (err) {
     if (!controller.signal.aborted) {
       log.error('agent.stream_error', {
+        townId: agent.townId,
         agentId: agent.agentId,
         error: err instanceof Error ? err.message : String(err),
       });
@@ -1197,6 +1205,7 @@ async function startAgentImpl(
     }
     const tDbDone = Date.now();
     log.info('agent.startup_phase', {
+      townId: request.townId,
       agentId: request.agentId,
       phase: 'db_hydrated',
       elapsedMs: tDbDone - t0,
@@ -1214,6 +1223,7 @@ async function startAgentImpl(
     agent.serverPort = port;
     const tSdkDone = Date.now();
     log.info('agent.startup_phase', {
+      townId: request.townId,
       agentId: request.agentId,
       phase: 'sdk_ready',
       elapsedMs: tSdkDone - t0,
@@ -1276,6 +1286,7 @@ async function startAgentImpl(
     agent.sessionId = sessionId;
     const tSessionDone = Date.now();
     log.info('agent.startup_phase', {
+      townId: request.townId,
       agentId: request.agentId,
       phase: 'session_created',
       elapsedMs: tSessionDone - t0,
@@ -1352,6 +1363,7 @@ async function startAgentImpl(
     agent.messageCount = 1;
 
     log.info('agent.start', {
+      townId: request.townId,
       agentId: request.agentId,
       role: request.role,
       name: request.name,
@@ -1360,6 +1372,7 @@ async function startAgentImpl(
     });
 
     log.info('agent.startup_complete', {
+      townId: request.townId,
       agentId: request.agentId,
       totalMs: Date.now() - t0,
       containerUptimeMs: getUptime(),
@@ -1462,6 +1475,7 @@ export async function stopAgent(agentId: string): Promise<void> {
     }
   } catch (err) {
     log.warn('agent.stop_failed', {
+      townId: agent.townId,
       agentId,
       error: err instanceof Error ? err.message : String(err),
     });
@@ -1469,7 +1483,12 @@ export async function stopAgent(agentId: string): Promise<void> {
 
   agent.status = 'exited';
   agent.exitReason = 'stopped';
-  log.info('agent.exit', { agentId, reason: 'stopped', exitReason: 'stopped' });
+  log.info('agent.exit', {
+    townId: agent.townId,
+    agentId,
+    reason: 'stopped',
+    exitReason: 'stopped',
+  });
   broadcastEvent(agentId, 'agent.exited', { reason: 'stopped' });
   syncRegistry();
 
@@ -1504,6 +1523,7 @@ export async function sendMessage(agentId: string, prompt: string): Promise<void
     });
   } catch (err) {
     log.error('agent.send_failed', {
+      townId: agent.townId,
       agentId,
       error: err instanceof Error ? err.message : String(err),
     });
@@ -1793,6 +1813,7 @@ export async function refreshTokenForAllAgents(): Promise<
         }
       } catch (err) {
         log.warn('refresh_token.session_list_failed', {
+          townId: agent.townId,
           agentId: agent.agentId,
           error: err instanceof Error ? err.message : String(err),
         });
@@ -1810,6 +1831,7 @@ export async function refreshTokenForAllAgents(): Promise<
           oldInstance.server.close();
         } catch (err) {
           log.warn('refresh_token.old_server_close_failed', {
+            townId: agent.townId,
             agentId: agent.agentId,
             error: err instanceof Error ? err.message : String(err),
           });
@@ -1834,6 +1856,7 @@ export async function refreshTokenForAllAgents(): Promise<
 
       const durationMs = Date.now() - t0;
       log.info('refresh_token.agent_restarted', {
+        townId: agent.townId,
         agentId: agent.agentId,
         role: agent.role,
         name: agent.name,
@@ -1880,6 +1903,7 @@ export async function refreshTokenForAllAgents(): Promise<
           current.server.close();
         } catch (closeErr) {
           log.warn('refresh_token.fresh_close_failed', {
+            townId: agent.townId,
             agentId: agent.agentId,
             error: closeErr instanceof Error ? closeErr.message : String(closeErr),
           });
@@ -1890,6 +1914,7 @@ export async function refreshTokenForAllAgents(): Promise<
           agent.sessionId = oldSessionId;
         }
         log.warn('refresh_token.fresh_rolled_back', {
+          townId: agent.townId,
           agentId: agent.agentId,
           oldPort,
           error: message,
@@ -1913,6 +1938,7 @@ export async function refreshTokenForAllAgents(): Promise<
       if (pendingEnsure) {
         const reapWorkdir = agent.workdir;
         const reapAgentId = agent.agentId;
+        const reapTownId = agent.townId;
         const reapOldInstance = oldInstance;
         pendingEnsure.then(
           ({ port: orphanPort }) => {
@@ -1926,11 +1952,13 @@ export async function refreshTokenForAllAgents(): Promise<
               orphan.server.close();
             } catch (closeErr) {
               log.warn('refresh_token.orphan_close_failed', {
+                townId: reapTownId,
                 agentId: reapAgentId,
                 error: closeErr instanceof Error ? closeErr.message : String(closeErr),
               });
             }
             log.warn('refresh_token.orphan_reaped', {
+              townId: reapTownId,
               agentId: reapAgentId,
               orphanPort,
             });
@@ -1942,6 +1970,7 @@ export async function refreshTokenForAllAgents(): Promise<
         );
       }
       log.error('refresh_token.agent_restarted', {
+        townId: agent.townId,
         agentId: agent.agentId,
         role: agent.role,
         name: agent.name,
@@ -2537,6 +2566,7 @@ export async function drainAll(): Promise<void> {
           console.error(`${DRAIN_LOG} snapshot timeout/failure for ${agent.agentId}:`, err);
           log.error('mayor.snapshot_failed', {
             event: 'mayor.snapshot_failed',
+            townId: agent.townId,
             agentId: agent.agentId,
             role: agent.role,
             error: err instanceof Error ? err.message : String(err),
@@ -2613,6 +2643,7 @@ export async function stopAll(): Promise<void> {
           console.error(`[stop-all] snapshot timeout/failure for ${agent.agentId}:`, err);
           log.error('mayor.snapshot_failed', {
             event: 'mayor.snapshot_failed',
+            townId: agent.townId,
             agentId: agent.agentId,
             role: agent.role,
             error: err instanceof Error ? err.message : String(err),

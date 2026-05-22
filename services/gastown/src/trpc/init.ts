@@ -1,5 +1,7 @@
 import { initTRPC, TRPCError } from '@trpc/server';
+import { z } from 'zod';
 import { writeEvent } from '../util/analytics.util';
+import { logger } from '../util/log.util';
 
 import type { JwtOrgMembership } from '../middleware/auth.middleware';
 
@@ -17,12 +19,23 @@ const t = initTRPC.context<TRPCContext>().create();
 
 export const router = t.router;
 
+const RawInputWithTownId = z.object({ townId: z.string().uuid() }).passthrough();
+
+function getTownIdFromInput(input: unknown): string | undefined {
+  const parsed = RawInputWithTownId.safeParse(input);
+  return parsed.success ? parsed.data.townId : undefined;
+}
+
 /**
  * Analytics middleware — wraps every tRPC procedure to emit an analytics
  * event with timing and error capture. Runs before auth so even rejected
  * requests are tracked.
  */
-const analyticsProcedure = t.procedure.use(async ({ ctx, path, type, next }) => {
+const analyticsProcedure = t.procedure.use(async ({ ctx, getRawInput, path, type, next }) => {
+  const rawInput = await getRawInput();
+  const townId = getTownIdFromInput(rawInput);
+  if (townId) logger.setTags({ townId });
+
   const start = performance.now();
   let error: string | undefined;
   try {

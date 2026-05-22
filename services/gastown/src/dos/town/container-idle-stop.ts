@@ -54,6 +54,7 @@ export async function stopContainerIfIdle(deps: IdleStopDeps): Promise<void> {
     state = await stub.getState();
   } catch (err) {
     logger.warn('stopContainerIfIdle: getState() failed', {
+      townId,
       error: err instanceof Error ? err.message : String(err),
     });
     return;
@@ -73,6 +74,7 @@ export async function stopContainerIfIdle(deps: IdleStopDeps): Promise<void> {
     deps.writeEventFn({ event: 'container.idle_stop', townId, reason });
   } catch (err) {
     logger.warn('stopContainerIfIdle: stop() failed', {
+      townId,
       error: err instanceof Error ? err.message : String(err),
     });
     deps.writeEventFn({

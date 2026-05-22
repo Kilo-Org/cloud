@@ -20,6 +20,7 @@ import { writeEvent } from '../util/analytics.util';
 import { TownConfigSchema, TownConfigUpdateSchema, RigOverrideConfigSchema } from '../types';
 import { resolveModel } from '../dos/town/config';
 import type { UserRigRecord } from '../db/tables/user-rigs.table';
+import { logger } from '../util/log.util';
 import {
   RpcTownOutput,
   RpcRigOutput,
@@ -64,7 +65,7 @@ async function refreshGitCredentials(
 
   const result = await env.GIT_TOKEN_SERVICE.getTokenForRepo({ githubRepo, userId, orgId });
   if (!result.success) {
-    console.warn(`[gastown-trpc] git credential refresh failed: ${result.reason}`);
+    logger.warn('[gastown-trpc] git credential refresh failed', { townId, reason: result.reason });
     return;
   }
 
@@ -113,7 +114,10 @@ async function refreshFirstGithubRigCredentials(params: {
       durationMs: Date.now() - start,
       error: err instanceof Error ? err.message : String(err),
     });
-    console.warn('[gastown-trpc] ensureMayor: git credential refresh failed', err);
+    logger.warn('[gastown-trpc] ensureMayor: git credential refresh failed', {
+      townId: params.townId,
+      error: err instanceof Error ? err.message : String(err),
+    });
   }
 }
 
@@ -348,9 +352,15 @@ async function verifyRigOwnership(env: Env, ctx: TRPCContext, rigId: string, tow
   throw new TRPCError({ code: 'NOT_FOUND', message: 'Rig not found' });
 }
 
-async function mintKilocodeToken(env: Env, user: { id: string; api_token_pepper: string | null }) {
+async function mintKilocodeToken(
+  env: Env,
+  user: { id: string; api_token_pepper: string | null },
+  townId?: string
+) {
   if (!env.NEXTAUTH_SECRET) {
-    console.error('[mintKilocodeToken] NEXTAUTH_SECRET not configured');
+    logger.error('[mintKilocodeToken] NEXTAUTH_SECRET not configured', {
+      ...(townId ? { townId } : {}),
+    });
     throw new TRPCError({
       code: 'INTERNAL_SERVER_ERROR',
       message: 'Internal server error',
@@ -358,7 +368,9 @@ async function mintKilocodeToken(env: Env, user: { id: string; api_token_pepper:
   }
   const secret = await resolveSecret(env.NEXTAUTH_SECRET);
   if (!secret) {
-    console.error('[mintKilocodeToken] failed to resolve NEXTAUTH_SECRET from Secrets Store');
+    logger.error('[mintKilocodeToken] failed to resolve NEXTAUTH_SECRET from Secrets Store', {
+      ...(townId ? { townId } : {}),
+    });
     throw new TRPCError({
       code: 'INTERNAL_SERVER_ERROR',
       message: 'Internal server error',
@@ -381,7 +393,7 @@ export const gastownRouter = router({
       const town = await userStub.createTown({ name: input.name, owner_user_id: user.id });
 
       // Store kilocode token so agents can auth with the Kilo LLM gateway
-      const kilocodeToken = await mintKilocodeToken(ctx.env, user);
+      const kilocodeToken = await mintKilocodeToken(ctx.env, user, town.id);
       const townStub = getTownDOStub(ctx.env, town.id);
       await townStub.setTownId(town.id);
       await townStub.updateTownConfig({
@@ -523,7 +535,7 @@ export const gastownRouter = router({
       // a non-owner member adds a rig, keep the existing town token.
       let kilocodeToken: string | undefined;
       if (credentialUserId === user.id) {
-        kilocodeToken = await mintKilocodeToken(ctx.env, user);
+        kilocodeToken = await mintKilocodeToken(ctx.env, user, input.townId);
         await townStub.updateTownConfig({ kilocode_token: kilocodeToken });
       }
 
@@ -537,7 +549,10 @@ export const gastownRouter = router({
           townConfig.organization_id
         );
       } catch (err) {
-        console.warn('[gastown-trpc] createRig: git credential refresh failed', err);
+        logger.warn('[gastown-trpc] createRig: git credential refresh failed', {
+          townId: input.townId,
+          error: err instanceof Error ? err.message : String(err),
+        });
       }
 
       const rig = await ownerStub.createRig({
@@ -567,10 +582,11 @@ export const gastownRouter = router({
           defaultBranch: input.defaultBranch,
         });
       } catch (err) {
-        console.error(
-          `[gastown-trpc] createRig: Town DO configure FAILED for rig ${rig.id}, rolling back:`,
-          err
-        );
+        logger.error('[gastown-trpc] createRig: Town DO configure FAILED, rolling back', {
+          townId: input.townId,
+          rigId: rig.id,
+          error: err instanceof Error ? err.message : String(err),
+        });
         try {
           await ownerStub.deleteRig(rig.id);
         } catch {
@@ -878,7 +894,10 @@ export const gastownRouter = router({
           townConfig.organization_id
         );
       } catch (err) {
-        console.warn('[gastown-trpc] sling: git credential refresh failed', err);
+        logger.warn('[gastown-trpc] sling: git credential refresh failed', {
+          townId: rig.town_id,
+          error: err instanceof Error ? err.message : String(err),
+        });
       }
 
       const townStub = getTownDOStub(ctx.env, rig.town_id);
@@ -927,9 +946,12 @@ export const gastownRouter = router({
       // Mayor notification can start a container — use waitUntil so the Worker
       // stays alive until the RPC completes without blocking the HTTP response.
       ctx.executionCtx.waitUntil(
-        townStub
-          .notifyMayorOfNewBead(bead.bead_id, rig.id, input.title, input.body)
-          .catch(err => console.warn('[gastown-trpc] createBead: mayor notification failed', err))
+        townStub.notifyMayorOfNewBead(bead.bead_id, rig.id, input.title, input.body).catch(err =>
+          logger.warn('[gastown-trpc] createBead: mayor notification failed', {
+            townId: rig.town_id,
+            error: err instanceof Error ? err.message : String(err),
+          })
+        )
       );
 
       return bead;
@@ -1255,7 +1277,10 @@ export const gastownRouter = router({
       try {
         await townStub.syncConfigToContainer();
       } catch (err) {
-        console.warn('[gastown-trpc] updateTownConfig: syncConfigToContainer failed:', err);
+        logger.warn('[gastown-trpc] updateTownConfig: syncConfigToContainer failed', {
+          townId: input.townId,
+          error: err instanceof Error ? err.message : String(err),
+        });
       }
 
       // Rewrite the mayor's AGENTS.md when custom instructions change so the
@@ -1266,7 +1291,10 @@ export const gastownRouter = router({
         try {
           await townStub.updateMayorSystemPrompt();
         } catch (err) {
-          console.warn('[gastown-trpc] updateTownConfig: updateMayorSystemPrompt failed:', err);
+          logger.warn('[gastown-trpc] updateTownConfig: updateMayorSystemPrompt failed', {
+            townId: input.townId,
+            error: err instanceof Error ? err.message : String(err),
+          });
         }
       }
 
@@ -1287,7 +1315,10 @@ export const gastownRouter = router({
         try {
           await townStub.updateMayorModel(newMayorModel, result.small_model ?? undefined);
         } catch (err) {
-          console.warn('[gastown-trpc] updateTownConfig: updateMayorModel failed:', err);
+          logger.warn('[gastown-trpc] updateTownConfig: updateMayorModel failed', {
+            townId: input.townId,
+            error: err instanceof Error ? err.message : String(err),
+          });
         }
       }
 
@@ -1344,7 +1375,7 @@ export const gastownRouter = router({
           tokenUser = userFromCtx(ctx);
         }
       }
-      const newKilocodeToken = await mintKilocodeToken(ctx.env, tokenUser);
+      const newKilocodeToken = await mintKilocodeToken(ctx.env, tokenUser, input.townId);
       await townStub.updateTownConfig({ kilocode_token: newKilocodeToken });
       await townStub.syncConfigToContainer();
     }),
@@ -1557,7 +1588,7 @@ export const gastownRouter = router({
 
       // Mint kilocode token so the mayor can start without waiting for rig creation
       const user = userFromCtx(ctx);
-      const kilocodeToken = await mintKilocodeToken(ctx.env, user);
+      const kilocodeToken = await mintKilocodeToken(ctx.env, user, town.id);
 
       const townStub = getTownDOStub(ctx.env, town.id);
       await townStub.setTownId(town.id);
@@ -1587,10 +1618,10 @@ export const gastownRouter = router({
         const townStub = getTownDOStub(ctx.env, input.townId);
         await townStub.destroy();
       } catch (err) {
-        console.error(
-          `[gastown-trpc] deleteOrgTown: failed to destroy Town DO for ${input.townId}:`,
-          err
-        );
+        logger.error('[gastown-trpc] deleteOrgTown: failed to destroy Town DO', {
+          townId: input.townId,
+          error: err instanceof Error ? err.message : String(err),
+        });
       }
 
       await stub.deleteTown(input.townId);
@@ -1638,7 +1669,7 @@ export const gastownRouter = router({
       const credentialUserId = townConfig.owner_user_id ?? ctx.userId;
       let kilocodeToken: string | undefined;
       if (credentialUserId === ctx.userId) {
-        kilocodeToken = await mintKilocodeToken(ctx.env, userFromCtx(ctx));
+        kilocodeToken = await mintKilocodeToken(ctx.env, userFromCtx(ctx), input.townId);
         await townStub.updateTownConfig({ kilocode_token: kilocodeToken });
       }
 
@@ -1652,7 +1683,10 @@ export const gastownRouter = router({
           townConfig.organization_id
         );
       } catch (err) {
-        console.warn('[gastown-trpc] createOrgRig: git credential refresh failed', err);
+        logger.warn('[gastown-trpc] createOrgRig: git credential refresh failed', {
+          townId: input.townId,
+          error: err instanceof Error ? err.message : String(err),
+        });
       }
 
       const rig = await orgStub.createRig({
@@ -1680,10 +1714,11 @@ export const gastownRouter = router({
           defaultBranch: input.defaultBranch,
         });
       } catch (err) {
-        console.error(
-          `[gastown-trpc] createOrgRig: Town DO configure FAILED for rig ${rig.id}, rolling back:`,
-          err
-        );
+        logger.error('[gastown-trpc] createOrgRig: Town DO configure FAILED, rolling back', {
+          townId: input.townId,
+          rigId: rig.id,
+          error: err instanceof Error ? err.message : String(err),
+        });
         try {
           await orgStub.deleteRig(rig.id);
         } catch {

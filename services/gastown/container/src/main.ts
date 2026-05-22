@@ -76,6 +76,7 @@ setInterval(() => {
     });
   } catch (err) {
     log.warn('container.memory_usage_failed', {
+      townId: townIdForLogs(),
       error: err instanceof Error ? err.message : String(err),
     });
   }

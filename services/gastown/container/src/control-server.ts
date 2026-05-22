@@ -291,6 +291,7 @@ app.post('/refresh-token', async c => {
 
   const activeAgents = listAgents().filter(a => a.status === 'running' || a.status === 'starting');
   log.info('refresh_token.received', {
+    townId: process.env.GASTOWN_TOWN_ID ?? null,
     agentCount: activeAgents.length,
     agentIds: activeAgents.map(a => a.agentId),
   });
@@ -299,6 +300,7 @@ app.post('/refresh-token', async c => {
   const results = await refreshTokenForAllAgents();
   const successCount = results.filter(r => r.success).length;
   log.info('refresh_token.completed', {
+    townId: process.env.GASTOWN_TOWN_ID ?? null,
     agentCount: results.length,
     successCount,
     failureCount: results.length - successCount,
@@ -829,6 +831,7 @@ app.post('/agents/:agentId/pty', async c => {
         const reuseAgent = getAgentStatus(agentId);
         if (reuseAgent) {
           log.info('agent.pty_connected', {
+            townId: reuseAgent.townId,
             agentId,
             containerUptimeMs: getUptime(),
             agentUptimeMs: Date.now() - new Date(reuseAgent.startedAt).getTime(),
@@ -889,6 +892,7 @@ app.post('/agents/:agentId/pty', async c => {
   );
   if (createResp.ok) {
     log.info('agent.pty_connected', {
+      townId: agent.townId,
       agentId,
       containerUptimeMs: getUptime(),
       agentUptimeMs: Date.now() - new Date(agent.startedAt).getTime(),

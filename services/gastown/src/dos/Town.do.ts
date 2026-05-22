@@ -3515,6 +3515,7 @@ export class TownDO extends DurableObject<Env> {
         )
         .catch(err =>
           console.warn(`${TOWN_LOG} slingConvoy: createConvoyBranch failed (non-fatal)`, {
+            townId: this.townId,
             error: err instanceof Error ? err.message : String(err),
           })
         );
@@ -3997,7 +3998,7 @@ export class TownDO extends DurableObject<Env> {
   // ══════════════════════════════════════════════════════════════════
 
   async alarm(): Promise<void> {
-    return withLogTags({ source: 'Town.do' }, async () => {
+    return withLogTags({ source: 'Town.do', tags: { townId: this.townId } }, async () => {
       await this._alarm();
     });
   }

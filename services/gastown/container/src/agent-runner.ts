@@ -580,6 +580,7 @@ export async function runAgent(originalRequest: StartAgentRequest): Promise<Mana
     await verifyGitCredentials(workdir, request.gitUrl, envVars);
 
     log.info('agent.startup_phase', {
+      townId: request.townId,
       agentId: request.agentId,
       phase: 'git_done',
       elapsedMs: Date.now() - t0,

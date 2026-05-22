@@ -10,7 +10,7 @@ import { getTownDOStub } from './dos/Town.do';
 import { TownConfigUpdateSchema } from './types';
 import { resError } from './util/res.util';
 import { writeEvent } from './util/analytics.util';
-import { logger } from './util/log.util';
+import { logger, withLogTags } from './util/log.util';
 import {
   authMiddleware,
   agentOnlyMiddleware,
@@ -173,6 +173,11 @@ export type GastownEnv = {
 const app = new Hono<GastownEnv>();
 const LOCAL_DEV_HOSTNAMES = new Set(['localhost', '127.0.0.1', '[::1]']);
 
+function getTownIdFromPath(pathname: string): string | undefined {
+  const match = pathname.match(/(?:^|\/)towns\/([^/]+)/);
+  return match?.[1];
+}
+
 async function cfAccessDebugMiddleware(c: Context<GastownEnv>, next: () => Promise<void>) {
   const hostname = new URL(c.req.url).hostname;
   if (c.env.ENVIRONMENT === 'development' && LOCAL_DEV_HOSTNAMES.has(hostname)) {
@@ -185,8 +190,10 @@ async function cfAccessDebugMiddleware(c: Context<GastownEnv>, next: () => Promi
       audience: c.env.CF_ACCESS_AUD,
     });
   } catch (e) {
-    console.warn(`CF Access validation failed ${e instanceof Error ? e.message : 'unknown'}`, {
-      error: e,
+    const townId = getTownIdFromPath(new URL(c.req.url).pathname);
+    logger.warn(`CF Access validation failed ${e instanceof Error ? e.message : 'unknown'}`, {
+      ...(townId ? { townId } : {}),
+      error: e instanceof Error ? e.message : String(e),
     });
     return c.json({ success: false, error: 'Unauthorized' }, 401);
   }
@@ -214,6 +221,11 @@ app.use('/api/orgs/:orgId/*', async (c, next) => {
   await next();
 });
 app.use('/api/towns/:townId/*', async (c, next) => {
+  const townId = c.req.param('townId');
+  if (townId) logger.setTags({ townId });
+  await next();
+});
+app.use('/debug/towns/:townId/*', async (c, next) => {
   const townId = c.req.param('townId');
   if (townId) logger.setTags({ townId });
   await next();
@@ -259,6 +271,11 @@ app.use('/api/towns/:townId/rigs/:rigId/agents/:agentId/*', async (c, next) => {
   await next();
 });
 app.use('/api/mayor/:townId/tools/rigs/:rigId/agents/:agentId/*', async (c, next) => {
+  const agentId = c.req.param('agentId');
+  if (agentId) logger.setTags({ agentId });
+  await next();
+});
+app.use('/api/towns/:townId/container/agents/:agentId/*', async (c, next) => {
   const agentId = c.req.param('agentId');
   if (agentId) logger.setTags({ agentId });
   await next();
@@ -1357,7 +1374,10 @@ app.use(
       orgMemberships: c.get('kiloOrgMemberships') ?? [],
     }),
     onError: ({ error, path }: { error: Error; path?: string }) => {
-      console.error(`[gastown-trpc] error on ${path ?? 'unknown'}:`, error.message);
+      logger.error('[gastown-trpc] error', {
+        path: path ?? 'unknown',
+        error: error.message,
+      });
       if (!(error instanceof TRPCError)) {
         Sentry.captureException(error);
       }
@@ -1370,7 +1390,12 @@ app.use(
 app.notFound(c => c.json(resError('Not found'), 404));
 
 app.onError((err, c) => {
-  console.error('Unhandled error', { error: err.message, stack: err.stack });
+  const townId = getTownIdFromPath(new URL(c.req.url).pathname);
+  logger.error('Unhandled error', {
+    ...(townId ? { townId } : {}),
+    error: err.message,
+    stack: err.stack,
+  });
   Sentry.captureException(err);
   return c.json(resError('Internal server error'), 500);
 });
@@ -1409,9 +1434,11 @@ export default withSentry(
         if (streamMatch) {
           const townId = streamMatch[1];
           const agentId = streamMatch[2];
-          console.log(`[gastown-worker] WS upgrade (stream): townId=${townId} agentId=${agentId}`);
-          const stub = getTownContainerStub(env, townId);
-          return stub.fetch(request);
+          return withLogTags({ source: 'gastown-worker', tags: { townId, agentId } }, async () => {
+            logger.info('WS upgrade stream');
+            const stub = getTownContainerStub(env, townId);
+            return stub.fetch(request);
+          });
         }
 
         // PTY terminal connection
@@ -1420,20 +1447,22 @@ export default withSentry(
           const townId = ptyMatch[1];
           const agentId = ptyMatch[2];
           const ptyId = ptyMatch[3];
-          console.log(
-            `[gastown-worker] WS upgrade (pty): townId=${townId} agentId=${agentId} ptyId=${ptyId}`
-          );
-          const stub = getTownContainerStub(env, townId);
-          return stub.fetch(request);
+          return withLogTags({ source: 'gastown-worker', tags: { townId, agentId } }, async () => {
+            logger.info('WS upgrade pty', { ptyId });
+            const stub = getTownContainerStub(env, townId);
+            return stub.fetch(request);
+          });
         }
 
         // Town alarm status (real-time push)
         const statusMatch = url.pathname.match(WS_STATUS_PATTERN);
         if (statusMatch) {
           const townId = statusMatch[1];
-          console.log(`[gastown-worker] WS upgrade (status): townId=${townId}`);
-          const stub = getTownDOStub(env, townId);
-          return stub.fetch(request);
+          return withLogTags({ source: 'gastown-worker', tags: { townId } }, async () => {
+            logger.info('WS upgrade status');
+            const stub = getTownDOStub(env, townId);
+            return stub.fetch(request);
+          });
         }
       }
 

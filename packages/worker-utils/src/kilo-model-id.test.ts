@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   KILO_MODEL_PREFIX,
-  kiloGatewayModelIdCandidates,
   normalizeKiloModelId,
   unprefixKiloGatewayModelId,
 } from './kilo-model-id.js';
@@ -25,18 +24,5 @@ describe('kilo model ids', () => {
     expect(unprefixKiloGatewayModelId('kilo/openai/gpt-5.5')).toBe('openai/gpt-5.5');
     expect(unprefixKiloGatewayModelId('kilo/kilo/special-model')).toBe('kilo/special-model');
     expect(unprefixKiloGatewayModelId('kilo/special-model')).toBeUndefined();
-  });
-
-  it('orders exact model stats candidates before fallback candidates', () => {
-    expect(kiloGatewayModelIdCandidates('openai/gpt-5.5')).toEqual(['openai/gpt-5.5']);
-    expect(kiloGatewayModelIdCandidates('kilo/openai/gpt-5.5')).toEqual([
-      'kilo/openai/gpt-5.5',
-      'openai/gpt-5.5',
-    ]);
-    expect(kiloGatewayModelIdCandidates('kilo/kilo/special-model')).toEqual([
-      'kilo/kilo/special-model',
-      'kilo/special-model',
-    ]);
-    expect(kiloGatewayModelIdCandidates('kilo/special-model')).toEqual(['kilo/special-model']);
   });
 });

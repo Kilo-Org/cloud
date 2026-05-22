@@ -95,7 +95,6 @@ export type { RepoCoordinates } from './git-url.js';
 
 export {
   KILO_MODEL_PREFIX,
-  kiloGatewayModelIdCandidates,
   normalizeKiloModelId,
   unprefixKiloGatewayModelId,
 } from './kilo-model-id.js';

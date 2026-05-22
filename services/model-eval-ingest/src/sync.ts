@@ -1,6 +1,6 @@
 import type { WorkerDb } from '@kilocode/db/client';
 import { model_eval_ingestions, modelStats } from '@kilocode/db/schema';
-import { kiloGatewayModelIdCandidates } from '@kilocode/worker-utils/kilo-model-id';
+import { unprefixKiloGatewayModelId } from '@kilocode/worker-utils/kilo-model-id';
 import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import {
   PromotionRecordSchema,
@@ -45,6 +45,11 @@ export type PromotionStore = {
   writeKiloBenchBenchmarks(modelStatsId: string, benchmarks: KiloBenchBenchmarks): Promise<void>;
 };
 
+function modelStatsTargetCandidates(model: string): string[] {
+  const unprefixedModel = unprefixKiloGatewayModelId(model);
+  return unprefixedModel ? [model, unprefixedModel] : [model];
+}
+
 export function createPromotionStore(db: WorkerDb): PromotionStore {
   return {
     async getLatestPromotedAtMs(): Promise<number> {
@@ -63,7 +68,7 @@ export function createPromotionStore(db: WorkerDb): PromotionStore {
 
       const lookupModels = new Set<string>();
       for (const model of promotionModels) {
-        for (const candidate of kiloGatewayModelIdCandidates(model)) lookupModels.add(candidate);
+        for (const candidate of modelStatsTargetCandidates(model)) lookupModels.add(candidate);
       }
 
       const targets = await db
@@ -74,7 +79,7 @@ export function createPromotionStore(db: WorkerDb): PromotionStore {
       const resolvedTargets = new Map<string, ModelStatsTarget>();
 
       for (const model of promotionModels) {
-        for (const candidate of kiloGatewayModelIdCandidates(model)) {
+        for (const candidate of modelStatsTargetCandidates(model)) {
           const target = targetsByModel.get(candidate);
           if (!target) continue;
           resolvedTargets.set(model, target);

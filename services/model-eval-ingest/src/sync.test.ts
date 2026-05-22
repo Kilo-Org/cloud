@@ -5,7 +5,7 @@ import {
   usdToMicrodollars,
   type PromotionStore,
 } from './sync.js';
-import { kiloGatewayModelIdCandidates } from '@kilocode/worker-utils/kilo-model-id';
+import { unprefixKiloGatewayModelId } from '@kilocode/worker-utils/kilo-model-id';
 import type {
   KiloBenchBenchmarks,
   LatestPromotion,
@@ -13,6 +13,11 @@ import type {
   PromotionRecord,
   PromotionTuple,
 } from './types.js';
+
+function modelStatsTargetCandidates(model: string): string[] {
+  const unprefixedModel = unprefixKiloGatewayModelId(model);
+  return unprefixedModel ? [model, unprefixedModel] : [model];
+}
 
 class MemoryPromotionStore implements PromotionStore {
   readonly rows = new Map<string, { promotion: PromotionRecord; modelStatsId: string | null }>();
@@ -33,7 +38,7 @@ class MemoryPromotionStore implements PromotionStore {
     return new Map(
       models.flatMap(model => {
         let target: ModelStatsTarget | undefined;
-        for (const candidate of kiloGatewayModelIdCandidates(model)) {
+        for (const candidate of modelStatsTargetCandidates(model)) {
           target = this.modelStats.get(candidate);
           if (target) break;
         }

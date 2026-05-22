@@ -3993,6 +3993,19 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
           });
           continue;
         }
+        // The DO state could not be read, so a volume cannot be confirmed as
+        // an orphan. Surface it as an unscanned instance rather than silently
+        // dropping it from a results table that only shows confirmed orphans.
+        if (scan.doStatusError) {
+          errors.push({
+            instance_id: instance.id,
+            user_id: instance.user_id,
+            user_email: instance.user_email,
+            sandbox_id: instance.sandbox_id,
+            error: `Could not read Durable Object state: ${scan.doStatusError}`,
+          });
+          continue;
+        }
 
         // destroyed_at is non-null here (the WHERE clause guarantees it).
         const destroyedAt = instance.destroyed_at as string;
@@ -4010,7 +4023,6 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         // sandbox sharing the app and must never be surfaced as reapable.
         for (const v of scan.volumes) {
           if (!v.nameMatchesInstance) continue;
-          if (v.state === 'destroyed') continue; // already gone — noise
 
           const classification = classifyOrphanVolume({
             volumeState: v.state,
@@ -4022,11 +4034,12 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
             destructionScheduled,
             graceElapsed,
           });
-          // Omit transient, self-healing rows: Fly is already reaping the
-          // volume, or the instance is still inside the grace period. Neither
-          // is actionable here and both resolve without admin intervention,
-          // so listing them is just noise.
-          if (classification === 'fly_reaping' || classification === 'within_grace') {
+          // Surface confirmed orphans ONLY. Every other classification —
+          // attached to a machine, live DO, active subscription, pending
+          // destruction, still in grace, Fly already reaping — is correctly
+          // not an orphan and is dropped rather than shown as a non-actionable
+          // row.
+          if (classification !== 'safe_destroy') {
             continue;
           }
 

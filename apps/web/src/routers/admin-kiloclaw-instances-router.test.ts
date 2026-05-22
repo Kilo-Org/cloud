@@ -2893,6 +2893,86 @@ describe('admin.kiloclawInstances.findOrphanVolumes', () => {
       classification: 'safe_destroy',
     });
   });
+
+  it('excludes volumes that are not confirmed orphans', async () => {
+    const destroyedAt = new Date(Date.now() - 30 * 86_400_000).toISOString();
+    const [instance] = await db
+      .insert(kiloclaw_instances)
+      .values({
+        id: crypto.randomUUID(),
+        user_id: regularUser.id,
+        sandbox_id: `ki_${crypto.randomUUID().replace(/-/g, '')}`,
+        destroyed_at: destroyedAt,
+      })
+      .returning({ id: kiloclaw_instances.id });
+
+    // The volume is still attached to a machine — not an orphan.
+    mockScanOrphanVolumes.mockResolvedValue({
+      flyApp: 'inst-attached',
+      appExists: true,
+      expectedVolumeName: 'kiloclaw_attached',
+      doStatus: null,
+      doStatusError: null,
+      scanError: null,
+      volumes: [
+        {
+          id: 'vol_attached00000000',
+          name: 'kiloclaw_attached',
+          state: 'attached',
+          size_gb: 10,
+          region: 'ord',
+          attached_machine_id: 'm-still-here',
+          created_at: '2026-04-01T00:00:00.000Z',
+          nameMatchesInstance: true,
+          trackedByLiveDo: false,
+        },
+      ],
+    });
+
+    const destroyedMs = Date.parse(destroyedAt);
+    const caller = await createCallerForUser(adminUser.id);
+    const result = await caller.admin.kiloclawInstances.findOrphanVolumes({
+      destroyedAfter: new Date(destroyedMs - 60_000).toISOString(),
+      destroyedBefore: new Date(destroyedMs + 60_000).toISOString(),
+    });
+
+    expect(result.scanned).toBe(1);
+    expect(result.errors).toEqual([]);
+    expect(result.volumes.some(v => v.instance_id === instance.id)).toBe(false);
+  });
+
+  it('reports instances whose Durable Object state could not be read', async () => {
+    const destroyedAt = new Date(Date.now() - 30 * 86_400_000).toISOString();
+    const [instance] = await db
+      .insert(kiloclaw_instances)
+      .values({
+        id: crypto.randomUUID(),
+        user_id: regularUser.id,
+        sandbox_id: `ki_${crypto.randomUUID().replace(/-/g, '')}`,
+        destroyed_at: destroyedAt,
+      })
+      .returning({ id: kiloclaw_instances.id });
+
+    mockScanOrphanVolumes.mockResolvedValue({
+      flyApp: 'inst-dofail',
+      appExists: true,
+      expectedVolumeName: 'kiloclaw_dofail',
+      doStatus: null,
+      doStatusError: 'getDebugState failed',
+      scanError: null,
+      volumes: [],
+    });
+
+    const destroyedMs = Date.parse(destroyedAt);
+    const caller = await createCallerForUser(adminUser.id);
+    const result = await caller.admin.kiloclawInstances.findOrphanVolumes({
+      destroyedAfter: new Date(destroyedMs - 60_000).toISOString(),
+      destroyedBefore: new Date(destroyedMs + 60_000).toISOString(),
+    });
+
+    expect(result.volumes).toEqual([]);
+    expect(result.errors.some(e => e.instance_id === instance.id)).toBe(true);
+  });
 });
 
 describe('admin.kiloclawInstances.destroyOrphanVolume', () => {

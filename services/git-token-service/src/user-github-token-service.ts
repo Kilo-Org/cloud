@@ -2,6 +2,7 @@ import { getWorkerDb, type WorkerDb } from '@kilocode/db/client';
 import { user_github_app_tokens } from '@kilocode/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { Octokit } from '@octokit/rest';
+import { decryptWithSymmetricKey } from '@kilocode/encryption';
 import type { GitHubAppType } from './github-token-service';
 
 function getOctokitStatus(e: unknown): number | undefined {
@@ -88,7 +89,6 @@ export class UserGitHubTokenService {
     }
 
     // 2. Decrypt the access token
-    const { decryptWithSymmetricKey } = await import('@kilocode/encryption');
     const token = decryptWithSymmetricKey(
       row.access_token_encrypted,
       this.env.USER_GH_APP_TOKEN_ENCRYPTION_KEY

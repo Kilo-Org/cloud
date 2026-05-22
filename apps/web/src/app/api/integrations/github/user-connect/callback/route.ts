@@ -6,16 +6,11 @@ import { getGitHubAppCredentials } from '@/lib/integrations/platforms/github/app
 import { verifyOAuthState, safeReturnTo } from '@/lib/integrations/platforms/github/oauth-state';
 import { db } from '@/lib/drizzle';
 import { user_github_app_tokens } from '@kilocode/db/schema';
-import { USER_GH_APP_TOKEN_ENCRYPTION_KEY } from '@/lib/config.server';
+import { getEnvVariable } from '@/lib/dotenvx';
 import { encryptWithSymmetricKey } from '@/lib/encryption';
 import { captureException } from '@sentry/nextjs';
 
-type GitHubConnectError =
-  | 'exchange_failed'
-  | 'access_denied'
-  | 'expired_state'
-  | 'invalid_state'
-  | 'unknown';
+type GitHubConnectError = 'exchange_failed' | 'access_denied' | 'invalid_state' | 'unknown';
 
 function errorRedirect(error: GitHubConnectError, returnTo: string, requestUrl: string): Response {
   const url = new URL(safeReturnTo(returnTo), requestUrl);
@@ -101,7 +96,10 @@ export async function GET(request: NextRequest) {
     }
 
     // 4. Encrypt and persist
-    const encryptedToken = encryptWithSymmetricKey(accessToken, USER_GH_APP_TOKEN_ENCRYPTION_KEY);
+    const encryptedToken = encryptWithSymmetricKey(
+      accessToken,
+      getEnvVariable('USER_GH_APP_TOKEN_ENCRYPTION_KEY')
+    );
 
     await db
       .insert(user_github_app_tokens)

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, test } from '@jest/globals';
 import { NextRequest } from 'next/server';
 import { GET } from './route';
 import { db, cleanupDbForTest } from '@/lib/drizzle';
@@ -35,11 +35,6 @@ jest.mock('@octokit/rest', () => ({
   })),
 }));
 
-// Key is 32 bytes: base64("12345678901234567890123456789012")
-jest.mock('@/lib/config.server', () => ({
-  USER_GH_APP_TOKEN_ENCRYPTION_KEY: 'MTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTI=',
-}));
-
 const { verifyOAuthState } = jest.requireMock('@/lib/integrations/platforms/github/oauth-state');
 const { exchangeWebFlowCode } = jest.requireMock('@octokit/oauth-methods');
 
@@ -49,11 +44,19 @@ function makeRequest(url: string) {
 
 const TEST_USER_ID = 'user-123';
 
+// Key is 32 bytes: base64("12345678901234567890123456789012")
+const TEST_ENCRYPTION_KEY = 'MTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTI=';
+
 describe('GitHub user-connect callback', () => {
   beforeEach(async () => {
+    process.env.USER_GH_APP_TOKEN_ENCRYPTION_KEY = TEST_ENCRYPTION_KEY;
     await cleanupDbForTest();
     jest.clearAllMocks();
     await insertTestUser({ id: TEST_USER_ID });
+  });
+
+  afterEach(() => {
+    delete process.env.USER_GH_APP_TOKEN_ENCRYPTION_KEY;
   });
 
   test('redirects with invalid_state when state verification fails', async () => {
@@ -118,14 +121,13 @@ describe('GitHub user-connect callback', () => {
   });
 
   test('onConflictDoUpdate overwrites existing row and resets revoked_at', async () => {
-    const encryptionKey = 'MTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTI=';
     const { encryptWithSymmetricKey } = await import('@/lib/encryption');
     await db.insert(user_github_app_tokens).values({
       kilo_user_id: 'user-123',
       github_app_type: 'standard',
       github_user_id: '999',
       github_login: 'old-login',
-      access_token_encrypted: encryptWithSymmetricKey('old-token', encryptionKey),
+      access_token_encrypted: encryptWithSymmetricKey('old-token', TEST_ENCRYPTION_KEY),
       access_token_expires_at: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
       revoked_at: new Date().toISOString(),
       revocation_reason: 'user_revoked',

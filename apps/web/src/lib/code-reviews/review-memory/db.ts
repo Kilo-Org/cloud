@@ -16,6 +16,7 @@ import type {
   CodeReviewMemoryProposal,
 } from '@kilocode/db/schema';
 import type {
+  ReviewMemoryAggregationScopeStatus,
   ReviewMemoryAggregationRunStatus,
   ReviewMemoryAggregationRunTrigger,
   ReviewMemoryChangeRequestType,
@@ -389,7 +390,8 @@ export async function refreshAggregationStateForScope(
     .limit(1);
 
   const eventCount = rollup?.eventCount ?? 0;
-  const status = existing?.status === 'running' ? 'running' : eventCount > 0 ? 'eligible' : 'idle';
+  const status: ReviewMemoryAggregationScopeStatus =
+    existing?.status === 'running' ? 'running' : eventCount > 0 ? 'eligible' : 'idle';
   const now = new Date().toISOString();
   const stateValues = {
     fresh_event_count: eventCount,
@@ -419,7 +421,6 @@ export async function refreshAggregationStateForScope(
       ...ownerColumns(input.owner),
       platform: input.platform,
       repo_full_name: input.repoFullName,
-      platform_project_id: input.platformProjectId ?? null,
       ...stateValues,
       next_eligible_at: now,
     })

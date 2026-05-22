@@ -41,6 +41,7 @@ export const GITHUB_EVENT = {
   PULL_REQUEST_REVIEW: 'pull_request_review',
   PULL_REQUEST_REVIEW_COMMENT: 'pull_request_review_comment',
   PULL_REQUEST_REVIEW_THREAD: 'pull_request_review_thread',
+  REACTION: 'reaction',
 
   // Push and commit events
   PUSH: 'push',
@@ -83,6 +84,8 @@ export const GITHUB_ACTION = {
   // Review actions
   SUBMITTED: 'submitted',
   DISMISSED: 'dismissed',
+  RESOLVED: 'resolved',
+  UNRESOLVED: 'unresolved',
 
   // Workflow actions
   REQUESTED: 'requested',

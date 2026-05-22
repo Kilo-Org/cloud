@@ -115,7 +115,7 @@ export function parseReviewFindingMetadata(body: string): {
   };
 }
 
-function isLikelyKiloInlineReviewBody(body: string): boolean {
+export function isLikelyKiloInlineReviewBody(body: string): boolean {
   if (body.includes(KILO_REVIEW_MARKER)) return true;
   const { severity } = parseReviewFindingMetadata(body);
   if (severity) return true;

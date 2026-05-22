@@ -13,6 +13,8 @@ import {
   IssuePayloadSchema,
   PullRequestReviewCommentPayloadSchema,
   PullRequestReviewPayloadSchema,
+  PullRequestReviewThreadPayloadSchema,
+  ReactionPayloadSchema,
 } from '@/lib/integrations/platforms/github/webhook-schemas';
 import { findIntegrationByInstallationId } from '@/lib/integrations/db/platform-integrations';
 import {
@@ -34,6 +36,26 @@ import { logWebhookEvent, updateWebhookEvent } from '@/lib/integrations/db/webho
 import type { Owner } from '@/lib/integrations/core/types';
 import type { GitHubAppType } from './app-selector';
 import { redactSensitiveHeaders } from '@kilocode/worker-utils/redact-headers';
+import {
+  handleGitHubReactionFeedback,
+  handleGitHubReviewCommentFeedback,
+  handleGitHubReviewFeedback,
+  handleGitHubReviewThreadFeedback,
+} from '@/lib/code-reviews/review-memory/github-feedback';
+
+type WebhookHandlerError = {
+  message: string;
+  handler: string;
+  stack?: string;
+};
+
+function toWebhookHandlerError(handler: string, error: unknown): WebhookHandlerError {
+  return {
+    message: error instanceof Error ? error.message : String(error),
+    handler,
+    stack: error instanceof Error ? error.stack : undefined,
+  };
+}
 
 /**
  * Shared GitHub App Webhook Handler
@@ -496,44 +518,51 @@ export async function handleGitHubWebhook(
           ? ({ kind: 'user', userId: integration.owned_by_user_id } as const)
           : null;
 
-      if (upsertOwner) {
-        after(async () => {
+      after(async () => {
+        const errors: WebhookHandlerError[] = [];
+        const handlersTriggered: string[] = [];
+
+        if (upsertOwner) {
+          handlersTriggered.push('cli_session_pr_review_upsert');
           try {
             await upsertCliSessionPullRequestReviewFromWebhook(parseResult.data, upsertOwner);
-            if (logResult.webhookEventId) {
-              await updateWebhookEvent(logResult.webhookEventId, {
-                processed: true,
-                processed_at: new Date().toISOString(),
-                handlers_triggered: ['cli_session_pr_review_upsert'],
-                errors: null,
-              });
-            }
           } catch (error) {
             logExceptInTest(`Error handling pull_request_review${logSuffix}:`, error);
             captureException(error, {
               tags: { source: `${sentryPrefix}webhook_pr_review` },
             });
-            if (logResult.webhookEventId) {
-              try {
-                await updateWebhookEvent(logResult.webhookEventId, {
-                  processed: true,
-                  processed_at: new Date().toISOString(),
-                  handlers_triggered: ['cli_session_pr_review_upsert'],
-                  errors: [
-                    {
-                      message: error instanceof Error ? error.message : String(error),
-                      handler: 'cli_session_pr_review_upsert',
-                      stack: error instanceof Error ? error.stack : undefined,
-                    },
-                  ],
-                });
-              } catch {
-                // Best-effort logging
-              }
-            }
+            errors.push(toWebhookHandlerError('cli_session_pr_review_upsert', error));
           }
-        });
-      }
+        }
+
+        handlersTriggered.push('review_memory_feedback');
+        try {
+          await handleGitHubReviewFeedback({
+            payload: parseResult.data,
+            integration,
+            deliveryId: eventSignature,
+          });
+        } catch (error) {
+          logExceptInTest(`Error recording pull_request_review feedback${logSuffix}:`, error);
+          captureException(error, {
+            tags: { source: `${sentryPrefix}webhook_review_memory_feedback` },
+          });
+          errors.push(toWebhookHandlerError('review_memory_feedback', error));
+        }
+
+        if (logResult.webhookEventId) {
+          try {
+            await updateWebhookEvent(logResult.webhookEventId, {
+              processed: true,
+              processed_at: new Date().toISOString(),
+              handlers_triggered: handlersTriggered,
+              errors: errors.length > 0 ? errors : null,
+            });
+          } catch {
+            // Best-effort logging
+          }
+        }
+      });
 
       return NextResponse.json({ message: 'Event received' }, { status: 200 });
     }
@@ -572,38 +601,151 @@ export async function handleGitHubWebhook(
 
       // Process asynchronously to return 200 within GitHub's timeout
       after(async () => {
+        const errors: WebhookHandlerError[] = [];
         try {
           await handlePRReviewComment(parseResult.data, integration);
-          if (logResult.webhookEventId) {
-            await updateWebhookEvent(logResult.webhookEventId, {
-              processed: true,
-              processed_at: new Date().toISOString(),
-              handlers_triggered: ['pr_review_comment_fix'],
-              errors: null,
-            });
-          }
         } catch (error) {
           logExceptInTest(`Error handling PR review comment${logSuffix}:`, error);
           captureException(error, {
             tags: { source: `${sentryPrefix}webhook_pr_review_comment` },
           });
-          if (logResult.webhookEventId) {
-            try {
-              await updateWebhookEvent(logResult.webhookEventId, {
-                processed: true,
-                processed_at: new Date().toISOString(),
-                handlers_triggered: ['pr_review_comment_fix'],
-                errors: [
-                  {
-                    message: error instanceof Error ? error.message : String(error),
-                    handler: 'pr_review_comment_fix',
-                    stack: error instanceof Error ? error.stack : undefined,
-                  },
-                ],
-              });
-            } catch {
-              // Best-effort logging
-            }
+          errors.push(toWebhookHandlerError('pr_review_comment_fix', error));
+        }
+
+        try {
+          await handleGitHubReviewCommentFeedback({
+            payload: parseResult.data,
+            integration,
+            deliveryId: eventSignature,
+          });
+        } catch (error) {
+          logExceptInTest(`Error recording PR review comment feedback${logSuffix}:`, error);
+          captureException(error, {
+            tags: { source: `${sentryPrefix}webhook_review_memory_feedback` },
+          });
+          errors.push(toWebhookHandlerError('review_memory_feedback', error));
+        }
+
+        if (logResult.webhookEventId) {
+          try {
+            await updateWebhookEvent(logResult.webhookEventId, {
+              processed: true,
+              processed_at: new Date().toISOString(),
+              handlers_triggered: ['pr_review_comment_fix', 'review_memory_feedback'],
+              errors: errors.length > 0 ? errors : null,
+            });
+          } catch (error) {
+            logExceptInTest(`Error updating webhook event${logSuffix}:`, error);
+          }
+        }
+      });
+
+      return NextResponse.json({ message: 'Event received' }, { status: 200 });
+    }
+
+    // Handle reaction events for review memory feedback
+    if (eventType === GITHUB_EVENT.REACTION) {
+      const parseResult = ReactionPayloadSchema.safeParse(payload);
+      if (!parseResult.success) {
+        logExceptInTest(`Invalid reaction payload${logSuffix}:`, parseResult.error);
+        captureMessage('Invalid GitHub webhook payload structure', {
+          level: 'error',
+          tags: { source: `${sentryPrefix}webhook_validation`, event: 'reaction' },
+          extra: { errors: parseResult.error.issues },
+        });
+        return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
+      }
+
+      const action = parseResult.data.action;
+      const logResult = await logWebhook(integration, action);
+      if (logResult.isDuplicate) {
+        return NextResponse.json({ message: 'Duplicate event' }, { status: 200 });
+      }
+
+      after(async () => {
+        const errors: WebhookHandlerError[] = [];
+        try {
+          await handleGitHubReactionFeedback({
+            payload: parseResult.data,
+            integration,
+            deliveryId: eventSignature,
+          });
+        } catch (error) {
+          logExceptInTest(`Error recording reaction feedback${logSuffix}:`, error);
+          captureException(error, {
+            tags: { source: `${sentryPrefix}webhook_review_memory_feedback` },
+          });
+          errors.push(toWebhookHandlerError('review_memory_feedback', error));
+        }
+
+        if (logResult.webhookEventId) {
+          try {
+            await updateWebhookEvent(logResult.webhookEventId, {
+              processed: true,
+              processed_at: new Date().toISOString(),
+              handlers_triggered: ['review_memory_feedback'],
+              errors: errors.length > 0 ? errors : null,
+            });
+          } catch (error) {
+            logExceptInTest(`Error updating webhook event${logSuffix}:`, error);
+          }
+        }
+      });
+
+      return NextResponse.json({ message: 'Event received' }, { status: 200 });
+    }
+
+    // Handle pull_request_review_thread events for review memory feedback
+    if (eventType === GITHUB_EVENT.PULL_REQUEST_REVIEW_THREAD) {
+      const parseResult = PullRequestReviewThreadPayloadSchema.safeParse(payload);
+      if (!parseResult.success) {
+        logExceptInTest(
+          `Invalid pull_request_review_thread payload${logSuffix}:`,
+          parseResult.error
+        );
+        captureMessage('Invalid GitHub webhook payload structure', {
+          level: 'error',
+          tags: {
+            source: `${sentryPrefix}webhook_validation`,
+            event: 'pull_request_review_thread',
+          },
+          extra: { errors: parseResult.error.issues },
+        });
+        return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
+      }
+
+      const action = parseResult.data.action;
+      const logResult = await logWebhook(integration, action);
+      if (logResult.isDuplicate) {
+        return NextResponse.json({ message: 'Duplicate event' }, { status: 200 });
+      }
+
+      after(async () => {
+        const errors: WebhookHandlerError[] = [];
+        try {
+          await handleGitHubReviewThreadFeedback({
+            payload: parseResult.data,
+            integration,
+            deliveryId: eventSignature,
+          });
+        } catch (error) {
+          logExceptInTest(`Error recording review thread feedback${logSuffix}:`, error);
+          captureException(error, {
+            tags: { source: `${sentryPrefix}webhook_review_memory_feedback` },
+          });
+          errors.push(toWebhookHandlerError('review_memory_feedback', error));
+        }
+
+        if (logResult.webhookEventId) {
+          try {
+            await updateWebhookEvent(logResult.webhookEventId, {
+              processed: true,
+              processed_at: new Date().toISOString(),
+              handlers_triggered: ['review_memory_feedback'],
+              errors: errors.length > 0 ? errors : null,
+            });
+          } catch (error) {
+            logExceptInTest(`Error updating webhook event${logSuffix}:`, error);
           }
         }
       });

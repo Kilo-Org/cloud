@@ -59,7 +59,7 @@ export function CloudSidebarLayout({ organizationId, children }: CloudSidebarLay
         // 'cloud-agent-web' is a variant of the cloud agent
         case 'cloud-agent':
           return ['cloud-agent', 'cloud-agent-web'];
-        // Extension sessions are created from VS Code or agent-manager
+
         case 'extension':
           return ['vscode', 'agent-manager'];
         default:

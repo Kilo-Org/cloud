@@ -363,7 +363,6 @@ export async function handleKiloPassInvoicePaid(params: {
     context: null,
   };
 
-
   // Track context for failure audit logging
   let kiloUserIdForAudit: string | null = null;
   let kiloPassSubscriptionIdForAudit: string | null = null;
@@ -516,6 +515,7 @@ export async function handleKiloPassInvoicePaid(params: {
           .set({ status: 'canceled', ended_at: dayjs().utc().toISOString() })
           .where(eq(kilo_pass_subscriptions.id, kiloPassSubscriptionId));
 
+        affiliateSaleState.context = null;
         kiloUserIdForCache = null;
         return { kiloUserId, stripeInvoiceId: invoice.id };
       }

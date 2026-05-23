@@ -6,7 +6,12 @@ import {
 import type { ProviderId } from '@/lib/ai-gateway/providers/types';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 
-export type KiloExclusiveModelFlag = 'reasoning' | 'vision' | 'stealth' | 'vercel-routing';
+export type KiloExclusiveModelFlag =
+  | 'reasoning'
+  | 'vision'
+  | 'stealth'
+  | 'vercel-routing'
+  | 'requires-data-collection';
 
 export type Usage = {
   uncachedInputTokens: number;

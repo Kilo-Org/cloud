@@ -52,7 +52,7 @@ export default {
     id: 'martian',
     apiUrl: 'https://api.withmartian.com/v1',
     apiKey: getEnvVariable('MARTIAN_API_KEY'),
-    supportedChatApis: ['responses'],
+    supportedChatApis: ['responses', 'messages'],
     transformRequest() {},
   },
   MISTRAL: {

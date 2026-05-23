@@ -1,7 +1,9 @@
 import { describe, test, expect } from '@jest/globals';
-import { autoFreeModels, kiloExclusiveModels } from './models';
+import { autoFreeModels, kiloExclusiveModels, requiresKiloDataCollection } from './models';
 import { isFreeModel } from './is-free-model';
 import { getInferenceProvider } from './providers/kilo-exclusive-model';
+import { claude_opus_4_7_stealth_model } from './providers/anthropic.constants';
+import { qwen36_plus_model } from './providers/qwen';
 
 describe('isFreeModel', () => {
   describe('free models', () => {
@@ -52,6 +54,16 @@ describe('isFreeModel', () => {
       for (const model of kiloExclusiveModels) {
         expect(() => getInferenceProvider(model)).not.toThrow();
       }
+    });
+
+    test('routes the discounted Claude Opus offering through the stealth provider identity', () => {
+      expect(getInferenceProvider(claude_opus_4_7_stealth_model)).toBe('stealth');
+      expect(claude_opus_4_7_stealth_model.public_id).toBe('stealth/claude-opus-4.7');
+    });
+
+    test('requires data collection for paid training-enabled offerings', () => {
+      expect(requiresKiloDataCollection(claude_opus_4_7_stealth_model.public_id)).toBe(true);
+      expect(requiresKiloDataCollection(qwen36_plus_model.public_id)).toBe(false);
     });
 
     test('all Kilo exclusive models should have either no pricing or valid pricing', () => {

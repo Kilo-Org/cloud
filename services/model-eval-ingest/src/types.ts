@@ -9,7 +9,6 @@ export const PromotionRecordSchema = z.object({
   task_source: z.string().min(1),
   n_total_trials: z.number().int().nonnegative(),
   n_attempts: z.number().int().positive().nullable().optional(),
-  n_trials_with_cost: z.number().int().nonnegative().nullable().optional(),
   total_score: z.number().finite(),
   overall_score: z.number().finite(),
   n_errored: z.number().int().nonnegative(),
@@ -40,7 +39,6 @@ export type KiloBenchEval = {
   avgExecutionMs: number | null;
   nTotalTrials: number;
   nAttempts: number | null;
-  nTrialsWithCost: number | null;
   avgAttemptCostUsd: number | null;
   avgAttemptInputTokens: number | null;
   avgAttemptOutputTokens: number | null;
@@ -65,7 +63,6 @@ export type LatestPromotion = {
   avgExecutionMs: number | null;
   nTotalTrials: number;
   nAttempts: number | null;
-  nTrialsWithCost: number | null;
   totalCostMicrodollars: number | null;
   totalInputTokens: number | null;
   totalOutputTokens: number | null;

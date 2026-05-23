@@ -51,7 +51,6 @@ function storedPromotionValues({ promotion, modelStatsId }: PromotionInsert) {
     task_source: promotion.task_source,
     n_total_trials: promotion.n_total_trials,
     n_attempts: promotion.n_attempts ?? null,
-    n_trials_with_cost: promotion.n_trials_with_cost ?? null,
     total_score: promotion.total_score,
     overall_score: promotion.overall_score,
     n_errored: promotion.n_errored,
@@ -169,7 +168,6 @@ export function createPromotionStore(db: WorkerDb): PromotionStore {
           avgExecutionMs: model_eval_ingestions.avg_execution_ms,
           nTotalTrials: model_eval_ingestions.n_total_trials,
           nAttempts: model_eval_ingestions.n_attempts,
-          nTrialsWithCost: model_eval_ingestions.n_trials_with_cost,
           totalCostMicrodollars: model_eval_ingestions.total_cost_microdollars,
           totalInputTokens: model_eval_ingestions.total_input_tokens,
           totalOutputTokens: model_eval_ingestions.total_output_tokens,
@@ -236,7 +234,6 @@ export function buildKiloBenchBenchmarks(rows: LatestPromotion[]): KiloBenchBenc
       avgExecutionMs: row.avgExecutionMs,
       nTotalTrials: row.nTotalTrials,
       nAttempts: row.nAttempts,
-      nTrialsWithCost: row.nTrialsWithCost,
       avgAttemptCostUsd: microdollarsToUsd(
         averagePerAttempt(row.totalCostMicrodollars, row.nAttempts)
       ),

@@ -2524,6 +2524,8 @@ export const platform_integrations = pgTable(
     repository_access: text(), // nullable for pending installations
     repositories: jsonb().$type<PlatformRepository[]>(),
     repositories_synced_at: timestamp({ withTimezone: true, mode: 'string' }),
+    auth_invalid_at: timestamp({ withTimezone: true, mode: 'string' }),
+    auth_invalid_reason: text(),
 
     // Metadata for storing additional platform-specific data (e.g., pending approval info)
     metadata: jsonb(),

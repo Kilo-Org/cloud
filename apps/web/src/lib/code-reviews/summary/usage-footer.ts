@@ -5,6 +5,7 @@
 
 const USAGE_FOOTER_MARKER = '<!-- kilo-usage -->';
 const REVIEW_GUIDANCE_FOOTER_MARKER = '<!-- kilo-review-guidance -->';
+const REVIEW_MEMORY_FOOTER_MARKER = '<!-- kilo-review-memory -->';
 
 type UsageFooterData = {
   model: string;
@@ -16,6 +17,11 @@ type ReviewGuidanceFooterData = {
   used: boolean;
   ref: string | null;
   truncated: boolean;
+};
+
+export type ReviewMemoryFooterData = {
+  proposalCount: number;
+  url: string;
 };
 
 /**
@@ -51,11 +57,17 @@ export function buildReviewGuidanceFooter(guidance: ReviewGuidanceFooterData): s
   return `${REVIEW_GUIDANCE_FOOTER_MARKER}\n<sub>Review guidance: REVIEW.md from base branch${ref}${truncated}</sub>`;
 }
 
+export function buildReviewMemoryFooter(memory: ReviewMemoryFooterData): string {
+  const proposalLabel = memory.proposalCount === 1 ? 'proposal' : 'proposals';
+  return `${REVIEW_MEMORY_FOOTER_MARKER}\n<sub>Review memory: <a href="${escapeHtml(memory.url)}">${memory.proposalCount} open ${proposalLabel}</a> to improve REVIEW.md guidance</sub>`;
+}
+
 export function appendReviewSummaryFooter(
   existingBody: string,
   footer: {
     usage?: UsageFooterData;
     reviewGuidance?: ReviewGuidanceFooterData;
+    reviewMemory?: ReviewMemoryFooterData;
   }
 ): string {
   const footerLines: string[] = [];
@@ -70,6 +82,10 @@ export function appendReviewSummaryFooter(
     footerLines.push(buildReviewGuidanceFooter(footer.reviewGuidance));
   }
 
+  if (footer.reviewMemory && footer.reviewMemory.proposalCount > 0) {
+    footerLines.push(buildReviewMemoryFooter(footer.reviewMemory));
+  }
+
   const bodyWithoutFooter = stripReviewSummaryFooter(existingBody);
 
   if (footerLines.length === 0) {
@@ -80,7 +96,7 @@ export function appendReviewSummaryFooter(
 }
 
 export function stripReviewSummaryFooter(existingBody: string): string {
-  const markers = [USAGE_FOOTER_MARKER, REVIEW_GUIDANCE_FOOTER_MARKER];
+  const markers = [USAGE_FOOTER_MARKER, REVIEW_GUIDANCE_FOOTER_MARKER, REVIEW_MEMORY_FOOTER_MARKER];
   const markerIdx = Math.max(...markers.map(marker => existingBody.lastIndexOf(marker)));
 
   if (markerIdx === -1) {
@@ -129,7 +145,8 @@ function findBackendFooterStart(body: string, markerIdx: number): number | null 
     }
     if (
       !footerContent.includes(USAGE_FOOTER_MARKER) &&
-      !footerContent.includes(REVIEW_GUIDANCE_FOOTER_MARKER)
+      !footerContent.includes(REVIEW_GUIDANCE_FOOTER_MARKER) &&
+      !footerContent.includes(REVIEW_MEMORY_FOOTER_MARKER)
     ) {
       continue;
     }
@@ -142,7 +159,11 @@ function findBackendFooterStart(body: string, markerIdx: number): number | null 
 }
 
 function isBackendFooterContent(content: string): boolean {
-  const allowedMarkers = new Set([USAGE_FOOTER_MARKER, REVIEW_GUIDANCE_FOOTER_MARKER]);
+  const allowedMarkers = new Set([
+    USAGE_FOOTER_MARKER,
+    REVIEW_GUIDANCE_FOOTER_MARKER,
+    REVIEW_MEMORY_FOOTER_MARKER,
+  ]);
   const lines = content.split('\n').map(line => line.trim());
 
   return lines.every(line => {

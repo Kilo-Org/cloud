@@ -20,6 +20,7 @@ import { GitLabLogo } from '@/components/auth/GitLabLogo';
 import { GitHubLogo } from '@/components/auth/GitHubLogo';
 
 type Platform = 'github' | 'gitlab';
+type InnerTab = 'config' | 'jobs' | 'memory';
 
 type ReviewAgentPageClientProps = {
   userId: string;
@@ -27,12 +28,14 @@ type ReviewAgentPageClientProps = {
   successMessage?: string;
   errorMessage?: string;
   initialPlatform?: Platform;
+  initialTab?: InnerTab;
 };
 
 export function ReviewAgentPageClient({
   successMessage,
   errorMessage,
   initialPlatform = 'github',
+  initialTab = 'config',
 }: ReviewAgentPageClientProps) {
   const trpc = useTRPC();
   const router = useRouter();
@@ -153,7 +156,7 @@ export function ReviewAgentPageClient({
           )}
 
           {/* GitHub Configuration Tabs */}
-          <Tabs defaultValue="config" className="w-full">
+          <Tabs defaultValue={initialTab} className="w-full">
             <TabsList className="grid w-full max-w-3xl grid-cols-3">
               <TabsTrigger value="config" className="flex items-center gap-2">
                 <Settings2 className="h-4 w-4" />
@@ -225,7 +228,7 @@ export function ReviewAgentPageClient({
           )}
 
           {/* GitLab Configuration Tabs */}
-          <Tabs defaultValue="config" className="w-full">
+          <Tabs defaultValue={initialTab} className="w-full">
             <TabsList className="grid w-full max-w-3xl grid-cols-3">
               <TabsTrigger value="config" className="flex items-center gap-2">
                 <Settings2 className="h-4 w-4" />

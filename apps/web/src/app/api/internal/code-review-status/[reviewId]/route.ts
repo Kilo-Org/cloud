@@ -60,6 +60,10 @@ import { verifyCallbackToken } from '@kilocode/worker-utils/callback-token';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { appendReviewSummaryFooter } from '@/lib/code-reviews/summary/usage-footer';
 import {
+  countActionableProposals,
+  type ReviewMemoryOwner,
+} from '@/lib/code-reviews/review-memory/db';
+import {
   syncGitHubReviewMemorySubjects,
   syncGitLabReviewMemorySubjects,
 } from '@/lib/code-reviews/review-memory/sync-subjects';
@@ -97,6 +101,37 @@ type CloudAgentNextCallbackPayload = {
   lastSeenBranch?: string;
   gateResult?: 'pass' | 'fail';
 };
+
+function reviewMemoryOwnerFromReview(review: CloudAgentCodeReview): ReviewMemoryOwner | null {
+  if (review.owned_by_organization_id) {
+    return { type: 'org', id: review.owned_by_organization_id };
+  }
+  if (review.owned_by_user_id) {
+    return { type: 'user', id: review.owned_by_user_id };
+  }
+  return null;
+}
+
+async function getReviewMemoryFooterData(review: CloudAgentCodeReview) {
+  const owner = reviewMemoryOwnerFromReview(review);
+  if (!owner) return undefined;
+
+  const platform = review.platform === PLATFORM.GITLAB ? 'gitlab' : 'github';
+  const proposalCount = await countActionableProposals({
+    owner,
+    platform,
+    repoFullName: review.repo_full_name,
+  });
+  if (proposalCount === 0) return undefined;
+
+  const params = new URLSearchParams({
+    platform,
+    tab: 'memory',
+    repo: review.repo_full_name,
+  });
+  const path = owner.type === 'org' ? `/organizations/${owner.id}/code-reviews` : '/code-reviews';
+  return { proposalCount, url: `${APP_URL}${path}?${params.toString()}` };
+}
 
 type StatusUpdatePayload = OrchestratorPayload | CloudAgentNextCallbackPayload;
 
@@ -925,8 +960,9 @@ export async function POST(
                     ? { model, tokensIn, tokensOut }
                     : undefined;
                 const reviewGuidance = getReviewGuidanceFooterData(review);
+                const reviewMemory = await getReviewMemoryFooterData(review);
 
-                if (usage || reviewGuidance.used) {
+                if (usage || reviewGuidance.used || reviewMemory) {
                   const existing = await findKiloReviewComment(
                     integration.platform_installation_id,
                     repoOwner,
@@ -935,10 +971,12 @@ export async function POST(
                     appType
                   );
                   if (existing) {
-                    const updatedBody = appendReviewSummaryFooter(existing.body, {
+                    const footer = {
                       usage,
                       reviewGuidance,
-                    });
+                      ...(reviewMemory ? { reviewMemory } : {}),
+                    };
+                    const updatedBody = appendReviewSummaryFooter(existing.body, footer);
                     await updateKiloReviewComment(
                       integration.platform_installation_id,
                       repoOwner,
@@ -1033,8 +1071,9 @@ export async function POST(
                     ? { model, tokensIn, tokensOut }
                     : undefined;
                 const reviewGuidance = getReviewGuidanceFooterData(review);
+                const reviewMemory = await getReviewMemoryFooterData(review);
 
-                if (usage || reviewGuidance.used) {
+                if (usage || reviewGuidance.used || reviewMemory) {
                   const existing = await findKiloReviewNote(
                     accessToken,
                     review.repo_full_name,
@@ -1042,10 +1081,12 @@ export async function POST(
                     instanceUrl
                   );
                   if (existing) {
-                    const updatedBody = appendReviewSummaryFooter(existing.body, {
+                    const footer = {
                       usage,
                       reviewGuidance,
-                    });
+                      ...(reviewMemory ? { reviewMemory } : {}),
+                    };
+                    const updatedBody = appendReviewSummaryFooter(existing.body, footer);
                     await updateKiloReviewNote(
                       accessToken,
                       review.repo_full_name,

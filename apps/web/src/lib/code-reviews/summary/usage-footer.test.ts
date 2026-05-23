@@ -1,6 +1,7 @@
 import {
   appendReviewSummaryFooter,
   appendUsageFooter,
+  buildReviewMemoryFooter,
   buildReviewGuidanceFooter,
   buildUsageFooter,
   stripReviewSummaryFooter,
@@ -69,6 +70,19 @@ describe('appendReviewSummaryFooter', () => {
     expect(result).toContain('<!-- kilo-review-guidance -->');
     expect(result).toContain('Review guidance: REVIEW.md from base branch `main`');
     expect(result.match(/^---$/gm)?.length).toBe(1);
+  });
+
+  it('appends review memory proposal links in the managed footer', () => {
+    const result = appendReviewSummaryFooter('body', {
+      reviewMemory: {
+        proposalCount: 2,
+        url: 'https://app.kilo.ai/code-reviews?platform=github&tab=memory&repo=owner%2Frepo',
+      },
+    });
+
+    expect(result).toContain('<!-- kilo-review-memory -->');
+    expect(result).toContain('2 open proposals');
+    expect(result).toContain('tab=memory');
   });
 
   it('replaces old footer content with exactly one usage marker and one guidance marker', () => {
@@ -163,6 +177,19 @@ describe('appendUsageFooter', () => {
   });
 });
 
+describe('buildReviewMemoryFooter', () => {
+  it('escapes review memory URLs', () => {
+    const footer = buildReviewMemoryFooter({
+      proposalCount: 1,
+      url: 'https://x.test/?a=<tag>&b=1',
+    });
+
+    expect(footer).toContain('<!-- kilo-review-memory -->');
+    expect(footer).toContain('1 open proposal');
+    expect(footer).toContain('&lt;tag&gt;&amp;b=1');
+  });
+});
+
 describe('stripReviewSummaryFooter', () => {
   it('removes backend usage and guidance footer', () => {
     const body = [
@@ -173,6 +200,8 @@ describe('stripReviewSummaryFooter', () => {
       '<sub>Reviewed by model · 100 tokens</sub>',
       '<!-- kilo-review-guidance -->',
       '<sub>Review guidance: REVIEW.md from base branch `main`</sub>',
+      '<!-- kilo-review-memory -->',
+      '<sub>Review memory: <a href="https://app.kilo.ai/code-reviews?tab=memory">1 open proposal</a></sub>',
     ].join('\n');
 
     expect(stripReviewSummaryFooter(body)).toBe('summary body');

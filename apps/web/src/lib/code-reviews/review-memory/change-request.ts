@@ -437,7 +437,7 @@ function buildChangeRequestBody(
 function publicErrorMessage(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
   return message
-    .replace(/Bearer\s+[A-Za-z0-9._~+\/-]+/gi, 'Bearer [redacted]')
-    .replace(/token[=:]\s*[A-Za-z0-9._~+\/-]+/gi, 'token=[redacted]')
+    .replace(/Bearer\s+[A-Za-z0-9._~+/-]+/gi, 'Bearer [redacted]')
+    .replace(/token[=:]\s*[A-Za-z0-9._~+/-]+/gi, 'token=[redacted]')
     .slice(0, 1_000);
 }

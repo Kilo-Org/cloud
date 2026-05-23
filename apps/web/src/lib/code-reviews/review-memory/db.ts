@@ -78,12 +78,6 @@ function aggregationStateOwnerWhere(owner: ReviewMemoryOwner): SQL {
     : eq(code_review_memory_aggregation_state.owned_by_user_id, owner.id);
 }
 
-function aggregationRunOwnerWhere(owner: ReviewMemoryOwner): SQL {
-  return owner.type === 'org'
-    ? eq(code_review_memory_aggregation_runs.owned_by_organization_id, owner.id)
-    : eq(code_review_memory_aggregation_runs.owned_by_user_id, owner.id);
-}
-
 function proposalOwnerWhere(owner: ReviewMemoryOwner): SQL {
   return owner.type === 'org'
     ? eq(code_review_memory_proposals.owned_by_organization_id, owner.id)

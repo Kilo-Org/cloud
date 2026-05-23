@@ -552,6 +552,136 @@ export async function fetchGitLabRootTextFileAtRef(
   return await response.text();
 }
 
+export async function fetchGitLabProjectDetails(
+  accessToken: string,
+  projectId: string | number,
+  instanceUrl: string = DEFAULT_GITLAB_URL
+): Promise<GitLabProject> {
+  const encodedProjectId =
+    typeof projectId === 'string' ? encodeURIComponent(projectId) : projectId;
+  const baseUrl = instanceUrl.replace(/\/$/, '');
+  const response = await fetch(`${baseUrl}/api/v4/projects/${encodedProjectId}`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    logExceptInTest('GitLab project fetch failed:', { status: response.status, error });
+    throw new Error(`GitLab project fetch failed: ${response.status}`);
+  }
+
+  return (await response.json()) as GitLabProject;
+}
+
+export async function createGitLabBranch(
+  accessToken: string,
+  projectId: string | number,
+  branchName: string,
+  ref: string,
+  instanceUrl: string = DEFAULT_GITLAB_URL
+): Promise<void> {
+  const encodedProjectId =
+    typeof projectId === 'string' ? encodeURIComponent(projectId) : projectId;
+  const baseUrl = instanceUrl.replace(/\/$/, '');
+  const params = new URLSearchParams({ branch: branchName, ref });
+  const response = await fetch(
+    `${baseUrl}/api/v4/projects/${encodedProjectId}/repository/branches?${params.toString()}`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    }
+  );
+
+  if (response.ok) return;
+
+  const error = await response.text();
+  if ((response.status === 400 || response.status === 409) && /already exists/i.test(error)) {
+    return;
+  }
+
+  throw new Error(`GitLab branch creation failed: ${response.status} ${error}`);
+}
+
+export async function createOrUpdateGitLabTextFile(
+  accessToken: string,
+  projectId: string | number,
+  branch: string,
+  filePath: string,
+  content: string,
+  commitMessage: string,
+  action: 'create' | 'update',
+  instanceUrl: string = DEFAULT_GITLAB_URL
+): Promise<void> {
+  const encodedProjectId =
+    typeof projectId === 'string' ? encodeURIComponent(projectId) : projectId;
+  const baseUrl = instanceUrl.replace(/\/$/, '');
+  const response = await fetch(
+    `${baseUrl}/api/v4/projects/${encodedProjectId}/repository/commits`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        branch,
+        commit_message: commitMessage,
+        actions: [
+          {
+            action,
+            file_path: filePath,
+            content,
+          },
+        ],
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`GitLab commit creation failed: ${response.status} ${error}`);
+  }
+}
+
+export async function createGitLabMergeRequest(
+  accessToken: string,
+  projectId: string | number,
+  sourceBranch: string,
+  targetBranch: string,
+  title: string,
+  description: string,
+  instanceUrl: string = DEFAULT_GITLAB_URL
+): Promise<{ number: number; url: string }> {
+  const encodedProjectId =
+    typeof projectId === 'string' ? encodeURIComponent(projectId) : projectId;
+  const baseUrl = instanceUrl.replace(/\/$/, '');
+  const response = await fetch(`${baseUrl}/api/v4/projects/${encodedProjectId}/merge_requests`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      source_branch: sourceBranch,
+      target_branch: targetBranch,
+      title,
+      description,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`GitLab merge request creation failed: ${response.status} ${error}`);
+  }
+
+  const mergeRequest = (await response.json()) as { iid: number; web_url: string };
+  return { number: mergeRequest.iid, url: mergeRequest.web_url };
+}
+
 /**
  * Calculates the expiration timestamp from GitLab OAuth response
  *

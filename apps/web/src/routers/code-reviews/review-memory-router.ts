@@ -1,6 +1,11 @@
 import { createTRPCRouter, baseProcedure, type TRPCContext } from '@/lib/trpc/init';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
+import type { OrganizationRole } from '@/lib/organizations/organization-types';
 import { dispatchReviewMemoryAggregationCron } from '@/lib/code-reviews/review-memory/aggregation';
+import {
+  approveAndOpenReviewMemoryChangeRequest,
+  ReviewMemoryChangeRequestError,
+} from '@/lib/code-reviews/review-memory/change-request';
 import {
   countActionableProposals,
   getReviewMemoryProposal,
@@ -40,10 +45,11 @@ const PlatformOwnerInputSchema = OwnerInputSchema.extend({
 
 async function ownerFromInput(
   ctx: TRPCContext,
-  input: z.infer<typeof OwnerInputSchema>
+  input: z.infer<typeof OwnerInputSchema>,
+  organizationRoles?: OrganizationRole[]
 ): Promise<ReviewMemoryOwner> {
   if (input.organizationId) {
-    await ensureOrganizationAccess(ctx, input.organizationId);
+    await ensureOrganizationAccess(ctx, input.organizationId, organizationRoles);
     return { type: 'org', id: input.organizationId };
   }
 
@@ -160,6 +166,28 @@ export const reviewMemoryRouter = createTRPCRouter({
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Review memory proposal not found' });
       }
       return proposal;
+    }),
+
+  approveAndOpenChangeRequest: baseProcedure
+    .input(OwnerInputSchema.extend({ proposalId: z.uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const owner = await ownerFromInput(ctx, input, ['owner', 'billing_manager']);
+      try {
+        return await approveAndOpenReviewMemoryChangeRequest({
+          owner,
+          proposalId: input.proposalId,
+          approvedByUser: {
+            id: ctx.user.id,
+            email: ctx.user.google_user_email,
+            name: ctx.user.google_user_name,
+          },
+        });
+      } catch (error) {
+        if (error instanceof ReviewMemoryChangeRequestError) {
+          throw new TRPCError({ code: error.code, message: error.message });
+        }
+        throw error;
+      }
     }),
 
   triggerAnalysis: baseProcedure

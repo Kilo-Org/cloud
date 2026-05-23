@@ -6,6 +6,10 @@ import {
   searchGitLabProjects,
   normalizeGitLabSearchQuery,
   fetchGitLabRootTextFileAtRef,
+  fetchGitLabProjectDetails,
+  createGitLabBranch,
+  createOrUpdateGitLabTextFile,
+  createGitLabMergeRequest,
   createProjectWebhook,
   updateProjectWebhook,
 } from './adapter';
@@ -619,6 +623,85 @@ describe('fetchGitLabRootTextFileAtRef', () => {
     await expect(
       fetchGitLabRootTextFileAtRef('test-token', 'group/project', 'REVIEW.md', 'main')
     ).rejects.toThrow('GitLab repository file fetch failed: 500');
+  });
+});
+
+describe('Review Memory GitLab write helpers', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+  });
+
+  it('fetches project details from a self-hosted instance', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ id: 123, default_branch: 'main', path_with_namespace: 'group/project' }),
+    });
+
+    await expect(
+      fetchGitLabProjectDetails('test-token', 'group/project', 'https://gitlab.example.com/')
+    ).resolves.toEqual(expect.objectContaining({ default_branch: 'main' }));
+    expect(mockFetch).toHaveBeenCalledWith(
+      'https://gitlab.example.com/api/v4/projects/group%2Fproject',
+      expect.objectContaining({ headers: { Authorization: 'Bearer test-token' } })
+    );
+  });
+
+  it('creates a branch from the default branch', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: true, text: async () => '' });
+
+    await createGitLabBranch('test-token', 123, 'kilo/review-memory/abc123', 'main');
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      'https://gitlab.com/api/v4/projects/123/repository/branches?branch=kilo%2Freview-memory%2Fabc123&ref=main',
+      expect.objectContaining({ method: 'POST' })
+    );
+  });
+
+  it('commits a REVIEW.md update', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: true, text: async () => '' });
+
+    await createOrUpdateGitLabTextFile(
+      'test-token',
+      123,
+      'kilo/review-memory/abc123',
+      'REVIEW.md',
+      '## Review memory\n',
+      'docs(review): update REVIEW.md guidance',
+      'update'
+    );
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      'https://gitlab.com/api/v4/projects/123/repository/commits',
+      expect.objectContaining({ method: 'POST', body: expect.any(String) })
+    );
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body as string) as Record<string, unknown>;
+    expect(body).toEqual(
+      expect.objectContaining({
+        branch: 'kilo/review-memory/abc123',
+        commit_message: 'docs(review): update REVIEW.md guidance',
+      })
+    );
+  });
+
+  it('opens a merge request', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        iid: 4,
+        web_url: 'https://gitlab.com/group/project/-/merge_requests/4',
+      }),
+    });
+
+    await expect(
+      createGitLabMergeRequest(
+        'test-token',
+        123,
+        'kilo/review-memory/abc123',
+        'main',
+        'docs(review): update REVIEW.md guidance',
+        'body'
+      )
+    ).resolves.toEqual({ number: 4, url: 'https://gitlab.com/group/project/-/merge_requests/4' });
   });
 });
 

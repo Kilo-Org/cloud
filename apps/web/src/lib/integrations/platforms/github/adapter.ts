@@ -645,6 +645,7 @@ type GitHubRepositoryContent = {
   type?: string;
   content?: string;
   encoding?: string;
+  sha?: string;
 };
 
 export function decodeGitHubBase64Content(content: string): string {
@@ -687,6 +688,108 @@ export async function fetchGitHubRootTextFileAtRef(params: {
     }
     throw error;
   }
+}
+
+export async function fetchGitHubRepositoryDefaultBranch(params: {
+  token: string;
+  owner: string;
+  repo: string;
+}): Promise<string> {
+  const { token, owner, repo } = params;
+  const octokit = new Octokit({ auth: token });
+  const { data } = await octokit.repos.get({ owner, repo });
+  return data.default_branch;
+}
+
+export async function createGitHubBranch(params: {
+  token: string;
+  owner: string;
+  repo: string;
+  branchName: string;
+  baseBranch: string;
+}): Promise<void> {
+  const { token, owner, repo, branchName, baseBranch } = params;
+  const octokit = new Octokit({ auth: token });
+  const { data: baseRef } = await octokit.git.getRef({
+    owner,
+    repo,
+    ref: `heads/${baseBranch}`,
+  });
+
+  try {
+    await octokit.git.createRef({
+      owner,
+      repo,
+      ref: `refs/heads/${branchName}`,
+      sha: baseRef.object.sha,
+    });
+  } catch (error) {
+    if (isHttpError(error) && error.status === 422) {
+      return;
+    }
+    throw error;
+  }
+}
+
+export async function createOrUpdateGitHubRootTextFile(params: {
+  token: string;
+  owner: string;
+  repo: string;
+  path: string;
+  branch: string;
+  message: string;
+  content: string;
+}): Promise<void> {
+  const { token, owner, repo, path, branch, message, content } = params;
+  const octokit = new Octokit({ auth: token });
+  let sha: string | undefined;
+
+  try {
+    const { data } = await octokit.repos.getContent({ owner, repo, path, ref: branch });
+    if (!Array.isArray(data)) {
+      const existing = data as GitHubRepositoryContent;
+      if (existing.type === 'file') {
+        sha = existing.sha;
+      }
+    }
+  } catch (error) {
+    if (!isHttpError(error) || error.status !== 404) {
+      throw error;
+    }
+  }
+
+  await octokit.repos.createOrUpdateFileContents({
+    owner,
+    repo,
+    path,
+    branch,
+    message,
+    content: Buffer.from(content, 'utf8').toString('base64'),
+    ...(sha ? { sha } : {}),
+  });
+}
+
+export async function createGitHubPullRequest(params: {
+  token: string;
+  owner: string;
+  repo: string;
+  title: string;
+  body: string;
+  headBranch: string;
+  baseBranch: string;
+}): Promise<{ number: number; url: string }> {
+  const { token, owner, repo, title, body, headBranch, baseBranch } = params;
+  const octokit = new Octokit({ auth: token });
+  const { data } = await octokit.pulls.create({
+    owner,
+    repo,
+    title,
+    body,
+    head: headBranch,
+    base: baseBranch,
+  });
+
+  return { number: data.number, url: data.html_url };
 }
 
 /**

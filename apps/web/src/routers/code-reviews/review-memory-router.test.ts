@@ -1,9 +1,27 @@
 /* eslint-disable drizzle/enforce-delete-with-where */
 const mockDispatchReviewMemoryAggregationCron = jest.fn();
+const mockApproveAndOpenReviewMemoryChangeRequest = jest.fn();
 
 jest.mock('@/lib/code-reviews/review-memory/aggregation', () => ({
   dispatchReviewMemoryAggregationCron: () => mockDispatchReviewMemoryAggregationCron(),
 }));
+
+jest.mock('@/lib/code-reviews/review-memory/change-request', () => {
+  class ReviewMemoryChangeRequestError extends Error {
+    constructor(
+      public readonly code: 'NOT_FOUND' | 'BAD_REQUEST' | 'CONFLICT',
+      message: string
+    ) {
+      super(message);
+    }
+  }
+
+  return {
+    ReviewMemoryChangeRequestError,
+    approveAndOpenReviewMemoryChangeRequest: (...args: unknown[]) =>
+      mockApproveAndOpenReviewMemoryChangeRequest(...args),
+  };
+});
 
 import { db } from '@/lib/drizzle';
 import { createCallerForUser } from '@/routers/test-utils';
@@ -43,6 +61,13 @@ describe('reviewMemoryRouter', () => {
       failed: 0,
       proposals: 1,
     });
+    mockApproveAndOpenReviewMemoryChangeRequest.mockImplementation(
+      async (input: { proposalId: string }) => ({
+        id: input.proposalId,
+        status: 'change_request_opened',
+        change_request_url: 'https://github.com/acme/widgets/pull/7',
+      })
+    );
   });
 
   async function seedProposal(owner: ReviewMemoryOwner) {
@@ -151,5 +176,31 @@ describe('reviewMemoryRouter', () => {
       })
     );
     expect(mockDispatchReviewMemoryAggregationCron).toHaveBeenCalledTimes(1);
+  });
+
+  it('approves proposals through the change-request workflow', async () => {
+    const user = await insertTestUser();
+    const owner = { type: 'user' as const, id: user.id };
+    const proposal = await seedProposal(owner);
+    const caller = await createCallerForUser(user.id);
+
+    await expect(
+      caller.reviewMemory.approveAndOpenChangeRequest({ proposalId: proposal.id })
+    ).resolves.toEqual(
+      expect.objectContaining({
+        id: proposal.id,
+        status: 'change_request_opened',
+        change_request_url: 'https://github.com/acme/widgets/pull/7',
+      })
+    );
+    expect(mockApproveAndOpenReviewMemoryChangeRequest).toHaveBeenCalledWith({
+      owner,
+      proposalId: proposal.id,
+      approvedByUser: {
+        id: user.id,
+        email: user.google_user_email,
+        name: user.google_user_name,
+      },
+    });
   });
 });

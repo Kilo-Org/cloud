@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Brain, RefreshCw, Sparkles } from 'lucide-react';
+import { Brain, ExternalLink, RefreshCw, Sparkles } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -23,6 +23,8 @@ const ACTIVE_PROPOSAL_STATUSES: ReviewMemoryProposalStatus[] = [
   'open',
   'edited',
   'approved',
+  'opening_change_request',
+  'change_request_opened',
   'change_request_failed',
 ];
 
@@ -97,8 +99,21 @@ export function ReviewMemoryPanel({ organizationId, platform }: ReviewMemoryPane
       onError: error => toast.error('Could not dismiss proposal', { description: error.message }),
     })
   );
+  const approveAndOpenChangeRequest = useMutation(
+    trpc.reviewMemory.approveAndOpenChangeRequest.mutationOptions({
+      onSuccess: async proposal => {
+        toast.success(platform === 'github' ? 'Pull request opened' : 'Merge request opened', {
+          description: proposal.change_request_url ?? undefined,
+        });
+        await invalidateReviewMemory();
+      },
+      onError: error =>
+        toast.error('Could not open REVIEW.md change request', { description: error.message }),
+    })
+  );
 
   const isLoading = summaryQuery.isLoading || proposalsQuery.isLoading;
+  const changeRequestLabel = platform === 'github' ? 'PR' : 'MR';
 
   return (
     <div className="space-y-6">
@@ -115,6 +130,7 @@ export function ReviewMemoryPanel({ organizationId, platform }: ReviewMemoryPane
           </div>
           <Button
             size="sm"
+            variant="secondary"
             disabled={!analysisRepo || triggerAnalysis.isPending}
             onClick={() => {
               if (analysisRepo)
@@ -253,13 +269,57 @@ export function ReviewMemoryPanel({ organizationId, platform }: ReviewMemoryPane
                     </>
                   ) : (
                     <>
-                      <Button size="sm" variant="secondary" onClick={() => setIsEditing(true)}>
+                      {selectedProposal.change_request_url ? (
+                        <Button size="sm" variant="secondary" asChild>
+                          <a
+                            href={selectedProposal.change_request_url}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            View {changeRequestLabel}
+                            <ExternalLink className="size-4" />
+                          </a>
+                        </Button>
+                      ) : (
+                        <Button
+                          size="sm"
+                          disabled={
+                            approveAndOpenChangeRequest.isPending ||
+                            selectedProposal.status === 'opening_change_request'
+                          }
+                          onClick={() =>
+                            approveAndOpenChangeRequest.mutate({
+                              ...ownerInput,
+                              proposalId: selectedProposal.id,
+                            })
+                          }
+                        >
+                          {selectedProposal.status === 'opening_change_request'
+                            ? `Opening ${changeRequestLabel}...`
+                            : selectedProposal.status === 'change_request_failed'
+                              ? `Retry REVIEW.md ${changeRequestLabel}`
+                              : `Open REVIEW.md ${changeRequestLabel}`}
+                        </Button>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        disabled={
+                          selectedProposal.status === 'opening_change_request' ||
+                          selectedProposal.status === 'change_request_opened'
+                        }
+                        onClick={() => setIsEditing(true)}
+                      >
                         Edit
                       </Button>
                       <Button
                         size="sm"
                         variant="outline"
-                        disabled={rejectProposal.isPending}
+                        disabled={
+                          rejectProposal.isPending ||
+                          selectedProposal.status === 'opening_change_request' ||
+                          selectedProposal.status === 'change_request_opened'
+                        }
                         onClick={() =>
                           rejectProposal.mutate({ ...ownerInput, proposalId: selectedProposal.id })
                         }

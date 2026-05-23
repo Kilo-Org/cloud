@@ -134,6 +134,8 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
       }
 
       const hasPermissions = hasSecurityReviewPermissions(integration);
+      // UI reauthorization state is intentionally time-invariant: once GitHub returns
+      // auth-invalid, keep prompting until a sync or install-refresh path clears the flag.
       const hasEffectivePermissions = hasPermissions && !integration.auth_invalid_at;
 
       return {

@@ -116,6 +116,10 @@ async function clearIntegrationAuthInvalid(platformIntegrationId: string): Promi
       error,
       platformIntegrationId,
     });
+    captureException(error, {
+      tags: { operation: 'clearIntegrationAuthInvalid' },
+      extra: { platformIntegrationId },
+    });
   }
 }
 

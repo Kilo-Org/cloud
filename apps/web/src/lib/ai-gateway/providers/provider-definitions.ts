@@ -53,7 +53,11 @@ export default {
     apiUrl: 'https://api.withmartian.com/v1',
     apiKey: getEnvVariable('MARTIAN_API_KEY'),
     supportedChatApis: ['responses', 'messages'],
-    transformRequest() {},
+    transformRequest(context) {
+      if (context.request.kind === 'messages') {
+        delete context.request.body.provider;
+      }
+    },
   },
   MISTRAL: {
     id: 'mistral',

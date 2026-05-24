@@ -38,6 +38,7 @@ const forbiddenFreeModelIds: ReadonlySet<string> = new Set([
   'qwen/qwen3-next-80b-a3b-instruct:free',
   'qwen/qwen3.6-plus-preview:free',
   'qwen/qwen3.6-plus:free',
+  'stepfun/step-3.5-flash:free', // provider removed the free model
   'upstage/solar-pro-3:free',
   'xiaomi/mimo-v2-omni:free',
   'xiaomi/mimo-v2-pro:free',

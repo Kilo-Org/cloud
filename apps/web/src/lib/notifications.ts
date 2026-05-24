@@ -67,7 +67,7 @@ const normalUnconditionalNotifications: KiloNotification[] = [
     showIn: ['extension'],
     expiresAt: '2026-03-09T08:00:00Z',
   },
-  {
+   {
     id: 'nvidia-nemotron-3-super-launch-mar-11',
     title: 'NVIDIA Nemotron 3 Super is live in Kilo!',
     message:
@@ -79,6 +79,14 @@ const normalUnconditionalNotifications: KiloNotification[] = [
     suggestModelId: 'nvidia/nemotron-3-super-120b-a12b:free',
     showIn: ['extension', 'cli'],
     expiresAt: '2026-03-25T08:00:00Z',
+  },
+  {
+    id: 'step-fun-free-removed',
+    title: 'StepFun 3.5 Flash Free Removed',
+    message:
+      'The provider removed the free model. Please try another model like Nemotron.',
+    suggestModelId: 'nvidia/nemotron-3-super-120b-a12b:free',
+    showIn: ['extension', 'cli'],
   },
 ];
 

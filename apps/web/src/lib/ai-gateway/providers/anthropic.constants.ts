@@ -30,7 +30,7 @@ export const claude_opus_4_7_stealth_model: KiloExclusiveModel = {
   internal_id: 'anthropic/claude-opus-4-7:optimized',
   display_name: 'Stealth: Claude Opus 4.7 (20% off)',
   description:
-    "Trains on your data. This third-party-served variant of Claude Opus 4.7 is offered at 20% lower cost than standard Claude Opus 4.7 pricing and is not served by Anthropic or Kilo Code. Your prompts and completions may be retained and used to train or improve the provider's services.",
+    "Your prompts and completions may be retained and used to train or improve the provider's services. This third-party-served variant of Claude Opus 4.7 is offered at 20% lower cost than standard Claude Opus 4.7 pricing and is not served by Anthropic or Kilo Code.",
   status: 'public',
   context_length: 1_000_000,
   max_completion_tokens: 128_000,

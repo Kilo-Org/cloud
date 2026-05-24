@@ -20,6 +20,19 @@ describe('createWrapperKiloClient prompt handoff', () => {
     vi.unstubAllGlobals();
   });
 
+  it('throws when the command SDK response contains an error result', async () => {
+    const sdkClient = {
+      session: {
+        command: vi.fn().mockResolvedValue({ error: { message: 'command rejected' } }),
+      },
+    } as unknown as SDKClient;
+    const client = createWrapperKiloClient(sdkClient, 'http://127.0.0.1:0', workspacePath);
+
+    await expect(
+      client.sendCommand({ sessionId: 'kilo_sess', command: 'compact', messageId: 'msg_command' })
+    ).rejects.toThrow('Command for session kilo_sess failed: command rejected');
+  });
+
   it('throws when the SDK async prompt response contains an error', async () => {
     vi.stubGlobal(
       'fetch',

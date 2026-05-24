@@ -15,7 +15,6 @@ import {
   type WrapperReconnectDecision,
   type WrapperSupervisorStorage,
 } from './wrapper-supervisor.js';
-import type { ExecutionMetadata } from './types.js';
 import { getWrapperRuntimeState } from './wrapper-runtime-state.js';
 
 vi.mock('@cloudflare/sandbox', () => ({
@@ -29,6 +28,7 @@ type MessageEvent = {
   streamEventType: string;
   payload: string;
   timestamp: number;
+  entityId: string;
 };
 
 const WRAPPER_RUN_ID = 'wr_supervisor';
@@ -94,9 +94,6 @@ function createHarness(
   initialEntries?: Array<[string, unknown]>,
   options?: {
     metadata?: SessionMetadata;
-    getExecution?: (
-      executionId: ExecutionMetadata['executionId']
-    ) => Promise<ExecutionMetadata | null>;
     storageHooks?: { beforeList?: (prefix: string) => Promise<void> };
   }
 ) {
@@ -117,15 +114,14 @@ function createHarness(
       },
     }),
     getAssistantMessageForUserMessage: () => null,
-    insertAndBroadcastMessageEvent: event => {
-      events.push(event);
+    ensureTerminalMessageEvent: event => {
+      if (!events.some(existing => existing.entityId === event.entityId)) events.push(event);
     },
     hasObservedWrapperIdle: async () => true,
     requestAlarmAtOrBefore: async () => {},
     getSessionIdForLogs: () => currentMetadata.identity.sessionId,
   });
   const requestPendingDrainIfNeeded = vi.fn().mockResolvedValue(false);
-  const failExecution = vi.fn().mockResolvedValue(true);
   const supervisor = createWrapperSupervisor({
     storage,
     agentRuntime: {
@@ -141,10 +137,7 @@ function createHarness(
     sessionMessageQueue: { requestPendingDrainIfNeeded },
     getMetadata: async () => currentMetadata,
     getAssistantMessageForUserMessage: () => null,
-    getCurrentRuntimeExecutionId: async () => null,
-    getExecution: options?.getExecution ?? (async () => null),
     hasActiveIngestConnection: async () => false,
-    failExecution,
     clearInterruptRequest: async () => {},
     getSessionIdForLogs: () => currentMetadata.identity.sessionId,
   });
@@ -155,7 +148,6 @@ function createHarness(
     callbackJobs,
     sentPings,
     stops,
-    failExecution,
     requestPendingDrainIfNeeded,
     settlementOutbox,
     supervisor,
@@ -210,29 +202,6 @@ describe('WrapperSupervisor', () => {
       wrapperConnectionId: WRAPPER_CONNECTION_ID,
     });
     await expect(harness.storage.get('disconnect_grace')).resolves.toBeUndefined();
-  });
-
-  it('starts legacy executionId-only disconnect grace for an active compatibility execution', async () => {
-    const executionId = 'exc_legacy_disconnect';
-    const harness = createHarness(undefined, {
-      getExecution: async requestedExecutionId => ({
-        executionId: requestedExecutionId,
-        status: 'running',
-        startedAt: 1_000,
-        mode: 'code',
-        streamingMode: 'websocket',
-      }),
-    });
-
-    await harness.supervisor.onDisconnected({
-      disconnected: { executionId },
-      wsCloseCode: 1006,
-      wsCloseReason: 'legacy ingest socket closed',
-    });
-
-    await expect(harness.storage.get('disconnect_grace')).resolves.toMatchObject({
-      executionId,
-    });
   });
 
   it('starts disconnect grace while a completed gate callback still waits for wrapper terminal state', async () => {
@@ -396,9 +365,13 @@ describe('WrapperSupervisor', () => {
     await expect(harness.storage.get('disconnect_grace')).resolves.toBeUndefined();
   });
 
-  it('increments the wrapper generation when disconnect grace fails accepted messages', async () => {
+  it('fails accepted current work without redispatch after its fenced wrapper disconnects and no authoritative query remains', async () => {
     const harness = createHarness([liveRuntimeState()]);
     await putSessionMessageState(harness.storage, acceptedMessage());
+    await putSessionMessageState(harness.storage, {
+      ...acceptedMessage(NEWER_MESSAGE_ID),
+      wrapperRunId: 'wr_other_run',
+    });
     await harness.supervisor.onDisconnected({
       disconnected: {
         wrapperRunId: WRAPPER_RUN_ID,
@@ -418,9 +391,15 @@ describe('WrapperSupervisor', () => {
       failureReason: 'wrapper_disconnected',
       completionSource: 'wrapper_failure',
     });
+    await expect(getSessionMessageState(harness.storage, NEWER_MESSAGE_ID)).resolves.toMatchObject({
+      status: 'accepted',
+      wrapperRunId: 'wr_other_run',
+    });
     await expect(getWrapperRuntimeState(harness.storage)).resolves.toMatchObject({
       wrapperGeneration: 5,
     });
+    expect(harness.requestPendingDrainIfNeeded).not.toHaveBeenCalled();
+    expect(harness.events.map(event => event.streamEventType)).toEqual(['cloud.message.failed']);
     expect(harness.stops).toEqual(['unhealthy-wrapper']);
   });
 
@@ -450,7 +429,61 @@ describe('WrapperSupervisor', () => {
     await expect(harness.storage.get('disconnect_grace')).resolves.toBeDefined();
   });
 
-  it('fails accepted messages and cleans up an unhealthy no-output wrapper', async () => {
+  it('ignores a terminal event attributed to a non-current wrapper run', async () => {
+    const newerRunId = 'wr_newer_current';
+    const harness = createHarness([liveRuntimeState({ wrapperRunId: newerRunId })]);
+    await putSessionMessageState(harness.storage, {
+      ...acceptedMessage(),
+      wrapperRunId: newerRunId,
+    });
+
+    await harness.supervisor.onTerminalEvent({
+      wrapperRunId: WRAPPER_RUN_ID,
+      status: 'interrupted',
+      error: 'stale interrupted event',
+    });
+
+    await expect(getSessionMessageState(harness.storage, MESSAGE_ID)).resolves.toMatchObject({
+      status: 'accepted',
+      wrapperRunId: newerRunId,
+    });
+    expect(harness.requestPendingDrainIfNeeded).not.toHaveBeenCalled();
+    expect(harness.events).toHaveLength(0);
+  });
+
+  it.each([
+    { status: 'failed' as const, expected: 'failed' as const },
+    { status: 'interrupted' as const, expected: 'interrupted' as const },
+  ])(
+    'settles only matching-run messages on current $status terminal events',
+    async ({ status, expected }) => {
+      const otherRunId = 'wr_other_run';
+      const otherMessageId = NEWER_MESSAGE_ID;
+      const harness = createHarness([liveRuntimeState()]);
+      await putSessionMessageState(harness.storage, acceptedMessage());
+      await putSessionMessageState(harness.storage, {
+        ...acceptedMessage(otherMessageId),
+        wrapperRunId: otherRunId,
+      });
+
+      await harness.supervisor.onTerminalEvent({
+        wrapperRunId: WRAPPER_RUN_ID,
+        status,
+        error: 'terminal event',
+      });
+
+      await expect(getSessionMessageState(harness.storage, MESSAGE_ID)).resolves.toMatchObject({
+        status: expected,
+      });
+      await expect(getSessionMessageState(harness.storage, otherMessageId)).resolves.toMatchObject({
+        status: 'accepted',
+        wrapperRunId: otherRunId,
+      });
+      expect(harness.requestPendingDrainIfNeeded).toHaveBeenCalledOnce();
+    }
+  );
+
+  it('fails accepted current work on liveness expiry without redispatch when no wrapper-local Kilo query remains', async () => {
     const harness = createHarness([
       liveRuntimeState({ noOutputDeadlineAt: 9_000, nextPingAt: 30_000 }),
     ]);
@@ -467,6 +500,7 @@ describe('WrapperSupervisor', () => {
       completionSource: 'wrapper_failure',
     });
     expect(runtimeState.wrapperConnectionId).toBeUndefined();
+    expect(harness.requestPendingDrainIfNeeded).not.toHaveBeenCalled();
     expect(harness.stops).toEqual(['unhealthy-wrapper']);
     expect(harness.events.map(event => event.streamEventType)).toEqual(['cloud.message.failed']);
   });

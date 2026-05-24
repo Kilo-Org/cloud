@@ -19,12 +19,25 @@ const wrapperRuntimeStateSchema = z.object({
   pingDeadlineAt: z.number().int().nonnegative().optional(),
   nextPingAt: z.number().int().nonnegative().optional(),
   noOutputDeadlineAt: z.number().int().nonnegative().optional(),
-  wrapperExecutionId: z.string().optional(),
-  acceptedMessageId: z.string().optional(),
-  acceptedExecutionId: z.string().optional(),
 });
 
 export type WrapperRuntimeState = z.infer<typeof wrapperRuntimeStateSchema>;
+
+export type ActiveWrapperRuntimeState = WrapperRuntimeState & {
+  wrapperRunId: string;
+  wrapperConnectionId: string;
+};
+
+export function isActiveWrapperRuntimeState(
+  state: WrapperRuntimeState
+): state is ActiveWrapperRuntimeState {
+  return Boolean(state.wrapperConnectionId && state.wrapperRunId);
+}
+
+export function hasCompleteWrapperIdentity(state: WrapperRuntimeState): boolean {
+  const hasIdentityField = Boolean(state.wrapperConnectionId || state.wrapperRunId);
+  return !hasIdentityField || Boolean(state.wrapperConnectionId && state.wrapperRunId);
+}
 
 export const emptyWrapperRuntimeState = (): WrapperRuntimeState => ({
   wrapperGeneration: 0,
@@ -35,11 +48,15 @@ export async function getWrapperRuntimeState(
 ): Promise<WrapperRuntimeState> {
   const stored = await storage.get(WRAPPER_RUNTIME_STATE_KEY);
   const parsed = wrapperRuntimeStateSchema.safeParse(stored);
-  return parsed.success ? parsed.data : emptyWrapperRuntimeState();
+  if (!parsed.success) return emptyWrapperRuntimeState();
+  if (!hasCompleteWrapperIdentity(parsed.data)) {
+    return { wrapperGeneration: parsed.data.wrapperGeneration };
+  }
+  return parsed.data;
 }
 
 export type AllocatedWrapperRuntimeState = {
-  state: WrapperRuntimeState;
+  state: ActiveWrapperRuntimeState;
   allocatedNewIdentity: boolean;
 };
 
@@ -48,70 +65,41 @@ export async function allocateWrapperRuntimeState(
   now = Date.now()
 ): Promise<AllocatedWrapperRuntimeState> {
   const current = await getWrapperRuntimeState(storage);
-  if (current.wrapperConnectionId) {
+  if (isActiveWrapperRuntimeState(current)) {
     const next = {
-      wrapperGeneration: current.wrapperGeneration,
-      wrapperConnectionId: current.wrapperConnectionId,
-      wrapperRunId: current.wrapperRunId,
+      ...current,
       lastWrapperConnectedAt: now,
-    } satisfies WrapperRuntimeState;
+    } satisfies ActiveWrapperRuntimeState;
     await storage.put(WRAPPER_RUNTIME_STATE_KEY, next);
     return { state: next, allocatedNewIdentity: false };
   }
 
+  try {
+    await storage.delete('disconnect_grace');
+  } catch {
+    // Obsolete grace cleanup is best-effort; fresh fenced work must proceed.
+  }
   const next = {
     wrapperGeneration: current.wrapperGeneration + 1,
     wrapperConnectionId: crypto.randomUUID(),
     wrapperRunId: `wr_${crypto.randomUUID().replace(/-/g, '')}`,
     lastWrapperConnectedAt: now,
-  } satisfies WrapperRuntimeState;
+  } satisfies ActiveWrapperRuntimeState;
   await storage.put(WRAPPER_RUNTIME_STATE_KEY, next);
   return { state: next, allocatedNewIdentity: true };
 }
 
-export type WrapperRuntimeFence = {
+export type WrapperConnectionFence = {
   wrapperGeneration?: number;
   wrapperConnectionId?: string;
 };
 
 export async function clearWrapperRuntimeIdentity(
   storage: DurableObjectStorage,
-  fence: WrapperRuntimeFence = {},
+  fence: WrapperConnectionFence = {},
   opts: { incrementGeneration?: boolean } = {}
 ): Promise<WrapperRuntimeState | null> {
   const current = await getWrapperRuntimeState(storage);
-  if (
-    fence.wrapperGeneration !== undefined &&
-    current.wrapperGeneration !== fence.wrapperGeneration
-  ) {
-    return null;
-  }
-  if (
-    fence.wrapperConnectionId !== undefined &&
-    current.wrapperConnectionId !== fence.wrapperConnectionId
-  ) {
-    return null;
-  }
-
-  const next = {
-    wrapperGeneration: opts.incrementGeneration
-      ? current.wrapperGeneration + 1
-      : current.wrapperGeneration,
-  } satisfies WrapperRuntimeState;
-  await storage.put(WRAPPER_RUNTIME_STATE_KEY, next);
-  return next;
-}
-
-export async function clearWrapperRuntimeIdentityForExecution(
-  storage: DurableObjectStorage,
-  executionId: string,
-  fence: WrapperRuntimeFence = {},
-  opts: { incrementGeneration?: boolean } = {}
-): Promise<WrapperRuntimeState | null> {
-  const current = await getWrapperRuntimeState(storage);
-  if (current.wrapperExecutionId !== executionId && current.acceptedExecutionId !== executionId) {
-    return null;
-  }
   if (
     fence.wrapperGeneration !== undefined &&
     current.wrapperGeneration !== fence.wrapperGeneration
@@ -191,7 +179,7 @@ async function updateIfCurrent(
 
 export async function recordWrapperAcceptedMessage(
   storage: DurableObjectStorage,
-  allocated: WrapperRuntimeState,
+  allocated: ActiveWrapperRuntimeState,
   noOutputDeadlineAt: number,
   nextPingAt: number
 ): Promise<void> {
@@ -203,34 +191,6 @@ export async function recordWrapperAcceptedMessage(
     allocated.wrapperConnectionId,
     current => ({
       ...current,
-      noOutputDeadlineAt,
-      nextPingAt:
-        current.pingDeadlineAt === undefined ? (current.nextPingAt ?? nextPingAt) : undefined,
-      lastWrapperIdleAt: undefined,
-      idleReconcileAfter: undefined,
-      wrapperIdleDeadlineAt: undefined,
-    })
-  );
-}
-
-export async function recordWrapperAcceptedMessageLegacy(
-  storage: DurableObjectStorage,
-  allocated: WrapperRuntimeState,
-  messageId: string,
-  executionId: string,
-  noOutputDeadlineAt: number,
-  nextPingAt: number
-): Promise<void> {
-  if (!allocated.wrapperConnectionId) return;
-
-  await updateIfCurrent(
-    storage,
-    allocated.wrapperGeneration,
-    allocated.wrapperConnectionId,
-    current => ({
-      ...current,
-      acceptedMessageId: messageId,
-      acceptedExecutionId: executionId,
       noOutputDeadlineAt,
       nextPingAt:
         current.pingDeadlineAt === undefined ? (current.nextPingAt ?? nextPingAt) : undefined,
@@ -243,7 +203,7 @@ export async function recordWrapperAcceptedMessageLegacy(
 
 export async function recordWrapperReadyLease(
   storage: DurableObjectStorage,
-  allocated: WrapperRuntimeState,
+  allocated: ActiveWrapperRuntimeState,
   now = Date.now(),
   wrapperIdleDeadlineAt = now + READY_ONLY_IDLE_MS
 ): Promise<void> {
@@ -301,8 +261,8 @@ export async function recordRootSessionIdle(
  *
  * Refreshes `noOutputDeadlineAt` so mid-execution stalls are caught: without
  * this, the deadline would be cleared forever after the first event, and a
- * wrapper whose kilo-server SSE subscription silently stalls would block
- * queued work until the 30-min max-runtime cap.
+ * wrapper whose kilo-server SSE subscription silently stalls would remain
+ * live without failing its accepted messages.
  */
 export async function recordMeaningfulWrapperOutput(
   storage: DurableObjectStorage,

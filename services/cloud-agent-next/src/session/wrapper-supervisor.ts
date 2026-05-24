@@ -1,6 +1,6 @@
+import { z } from 'zod';
 import { logger } from '../logger.js';
 import type { SessionMetadata } from '../persistence/session-metadata.js';
-import type { ExecutionId } from '../types/ids.js';
 import type { AgentRuntime } from './agent-runtime.js';
 import { WRAPPER_NO_OUTPUT_TIMEOUT_MS, WRAPPER_PING_INTERVAL_MS } from './agent-runtime.js';
 import type { MessageSettlementOutbox } from './message-settlement-outbox.js';
@@ -10,20 +10,21 @@ import {
   listNonTerminalAcceptedMessages,
   type SessionMessageStorage,
 } from './session-message-state.js';
-import type { ExecutionMetadata, LatestAssistantMessage } from './types.js';
+import type { LatestAssistantMessage } from './types.js';
 import {
   clearCurrentWrapperRuntimeFailureState,
   clearCurrentWrapperRuntimeLivenessState,
   clearWrapperIdleState,
   clearWrapperRuntimeIdentity,
   getWrapperRuntimeState,
+  hasCompleteWrapperIdentity,
   IDLE_RECONCILIATION_GRACE_MS,
   isCurrentWrapperConnection,
   markWrapperPingSent,
   recordMeaningfulWrapperOutput,
   recordRootSessionIdle,
   recordWrapperPong,
-  type WrapperRuntimeFence,
+  type WrapperConnectionFence,
   type WrapperRuntimeState,
 } from './wrapper-runtime-state.js';
 
@@ -31,15 +32,16 @@ const DISCONNECT_GRACE_MS = 10_000;
 const WRAPPER_PING_TIMEOUT_MS = 30_000;
 const DISCONNECT_GRACE_KEY = 'disconnect_grace';
 
-type DisconnectGraceState = {
-  executionId?: ExecutionId;
-  wrapperRunId?: string;
-  disconnectedAt: number;
-  wsCloseCode: number;
-  wsCloseReason: string;
-  wrapperGeneration?: number;
-  wrapperConnectionId?: string;
-};
+const disconnectGraceStateSchema = z.object({
+  wrapperRunId: z.string(),
+  disconnectedAt: z.number(),
+  wsCloseCode: z.number(),
+  wsCloseReason: z.string(),
+  wrapperGeneration: z.number().int().nonnegative(),
+  wrapperConnectionId: z.string(),
+});
+
+type DisconnectGraceState = z.infer<typeof disconnectGraceStateSchema>;
 
 type DisconnectGraceFence = {
   wrapperGeneration?: number;
@@ -58,10 +60,9 @@ export type WrapperReconnectDecision =
 
 export type WrapperDisconnectedInput = {
   disconnected: {
-    executionId?: ExecutionId;
-    wrapperRunId?: string;
-    wrapperGeneration?: number;
-    wrapperConnectionId?: string;
+    wrapperRunId: string;
+    wrapperGeneration: number;
+    wrapperConnectionId: string;
   };
   wsCloseCode: number;
   wsCloseReason: string;
@@ -74,21 +75,13 @@ export type WrapperTerminalEvent = {
   gateResult?: 'pass' | 'fail';
 };
 
-type PersistedExecutionFailure = {
-  executionId: ExecutionId;
-  status: 'failed';
-  error: string;
-  streamEventType: string;
-  streamPayload?: Record<string, unknown>;
-};
-
 export type WrapperSupervisorStorage = DurableObjectStorage &
   SessionQueueStorage &
   SessionMessageStorage;
 
 export type WrapperSupervisor = {
   checkReconnect(input: WrapperReconnectInput): Promise<WrapperReconnectDecision>;
-  recordReconnectAccepted(fence: WrapperRuntimeFence): Promise<void>;
+  recordReconnectAccepted(fence: WrapperConnectionFence): Promise<void>;
   isCurrentConnection(wrapperGeneration: number, wrapperConnectionId: string): Promise<boolean>;
   observePong(wrapperGeneration: number, wrapperConnectionId: string, now: number): Promise<void>;
   observeMeaningfulOutput(
@@ -103,7 +96,7 @@ export type WrapperSupervisor = {
   ): Promise<void>;
   onDisconnected(input: WrapperDisconnectedInput): Promise<void>;
   onTerminalEvent(params: WrapperTerminalEvent): Promise<void>;
-  clearDisconnectGraceForExecution(executionId?: ExecutionId): Promise<void>;
+  clearDisconnectGrace(): Promise<void>;
   runMaintenance(now: number): Promise<void>;
   nextMaintenanceDeadlines(): Promise<number[]>;
 };
@@ -127,15 +120,11 @@ export type WrapperSupervisorDependencies = {
     kiloSessionId: string,
     parentMessageId: string
   ) => LatestAssistantMessage | null;
-  getCurrentRuntimeExecutionId: () => Promise<ExecutionId | null>;
-  getExecution: (executionId: ExecutionId) => Promise<ExecutionMetadata | null>;
   hasActiveIngestConnection: (params: {
-    executionId?: ExecutionId;
-    wrapperRunId?: string;
-    wrapperGeneration?: number;
-    wrapperConnectionId?: string;
+    wrapperRunId: string;
+    wrapperGeneration: number;
+    wrapperConnectionId: string;
   }) => Promise<boolean>;
-  failExecution: (params: PersistedExecutionFailure) => Promise<boolean>;
   clearInterruptRequest: () => Promise<void>;
   getSessionIdForLogs: () => string | undefined;
 };
@@ -196,25 +185,33 @@ export function createWrapperSupervisor(
     sessionMessageQueue,
     getMetadata,
     getAssistantMessageForUserMessage,
-    getCurrentRuntimeExecutionId,
-    getExecution,
     hasActiveIngestConnection,
-    failExecution,
     clearInterruptRequest,
     getSessionIdForLogs,
   } = dependencies;
 
+  async function readDisconnectGrace(): Promise<DisconnectGraceState | undefined> {
+    const stored = await storage.get<unknown>(DISCONNECT_GRACE_KEY);
+    const parsed = disconnectGraceStateSchema.safeParse(stored);
+    if (parsed.success) return parsed.data;
+    if (stored !== undefined) {
+      try {
+        await storage.delete(DISCONNECT_GRACE_KEY);
+      } catch {
+        // Invalid pre-fence grace state must not block current wrapper work.
+      }
+    }
+    return undefined;
+  }
+
   async function cancelDisconnectGrace(fence?: DisconnectGraceFence): Promise<void> {
-    const graceState = await storage.get<DisconnectGraceState>(DISCONNECT_GRACE_KEY);
+    const graceState = await readDisconnectGrace();
     if (!graceState) return;
     if (!matchesDisconnectGraceFence(graceState, fence)) return;
     await storage.delete(DISCONNECT_GRACE_KEY);
   }
 
-  async function clearDisconnectGraceForExecution(executionId?: ExecutionId): Promise<void> {
-    const graceState = await storage.get<DisconnectGraceState>(DISCONNECT_GRACE_KEY);
-    if (!graceState) return;
-    if (executionId && graceState.executionId !== executionId) return;
+  async function clearDisconnectGrace(): Promise<void> {
     await storage.delete(DISCONNECT_GRACE_KEY);
   }
 
@@ -260,7 +257,7 @@ export function createWrapperSupervisor(
     return { accepted: true };
   }
 
-  async function recordReconnectAccepted(fence: WrapperRuntimeFence): Promise<void> {
+  async function recordReconnectAccepted(fence: WrapperConnectionFence): Promise<void> {
     await cancelDisconnectGrace(fence);
   }
 
@@ -322,7 +319,6 @@ export function createWrapperSupervisor(
     logger
       .withFields({
         sessionId: getSessionIdForLogs(),
-        executionId: disconnected.executionId,
         wrapperRunId: disconnected.wrapperRunId,
         wsCloseCode,
         wsCloseReason,
@@ -330,38 +326,27 @@ export function createWrapperSupervisor(
       })
       .warn('Wrapper disconnected — starting grace period before marking as failed');
 
-    await storage.put(DISCONNECT_GRACE_KEY, {
-      executionId: disconnected.executionId,
-      wrapperRunId: disconnected.wrapperRunId,
-      disconnectedAt: now,
-      wsCloseCode,
-      wsCloseReason,
-      wrapperGeneration: disconnected.wrapperGeneration,
-      wrapperConnectionId: disconnected.wrapperConnectionId,
-    } satisfies DisconnectGraceState);
+    await storage.put(
+      DISCONNECT_GRACE_KEY,
+      disconnectGraceStateSchema.parse({
+        wrapperRunId: disconnected.wrapperRunId,
+        disconnectedAt: now,
+        wsCloseCode,
+        wsCloseReason,
+        wrapperGeneration: disconnected.wrapperGeneration,
+        wrapperConnectionId: disconnected.wrapperConnectionId,
+      })
+    );
   }
 
   async function onDisconnected(input: WrapperDisconnectedInput): Promise<void> {
     const { disconnected } = input;
     const state = await getWrapperRuntimeState(storage);
     const isCurrentDisconnectedConnection =
-      disconnected.wrapperGeneration === undefined || disconnected.wrapperConnectionId === undefined
-        ? state.wrapperConnectionId === undefined
-        : state.wrapperGeneration === disconnected.wrapperGeneration &&
-          state.wrapperConnectionId === disconnected.wrapperConnectionId;
+      state.wrapperRunId === disconnected.wrapperRunId &&
+      state.wrapperGeneration === disconnected.wrapperGeneration &&
+      state.wrapperConnectionId === disconnected.wrapperConnectionId;
     if (!isCurrentDisconnectedConnection) return;
-
-    if (!disconnected.wrapperRunId) {
-      // Rollout-only compatibility for wrappers that reconnect with executionId
-      // instead of the current fenced wrapper-run identity.
-      if (!disconnected.executionId) return;
-      const legacyExecution = await getExecution(disconnected.executionId);
-      if (legacyExecution?.status !== 'pending' && legacyExecution?.status !== 'running') {
-        return;
-      }
-      await startDisconnectGrace(input);
-      return;
-    }
 
     const acceptedMessages = await listNonTerminalAcceptedMessages(
       storage,
@@ -374,34 +359,15 @@ export function createWrapperSupervisor(
     await startDisconnectGrace(input);
   }
 
-  async function handleUnhealthyWrapper(
-    state: WrapperRuntimeState,
-    error: string,
-    fallbackExecutionId?: ExecutionId
-  ): Promise<void> {
+  async function handleUnhealthyWrapper(state: WrapperRuntimeState, error: string): Promise<void> {
     logger
       .withFields({
         sessionId: getSessionIdForLogs(),
         wrapperRunId: state.wrapperRunId,
         wrapperGeneration: state.wrapperGeneration,
         wrapperConnectionId: state.wrapperConnectionId,
-        hasFallbackExecutionId: fallbackExecutionId !== undefined,
       })
       .warn('Handling unhealthy wrapper runtime');
-
-    const executionId =
-      state.acceptedExecutionId ?? state.wrapperExecutionId ?? fallbackExecutionId;
-    if (executionId) {
-      const execution = await getExecution(executionId as ExecutionId);
-      if (execution?.status === 'pending' || execution?.status === 'running') {
-        await failExecution({
-          executionId: executionId as ExecutionId,
-          status: 'failed',
-          error,
-          streamEventType: 'error',
-        });
-      }
-    }
 
     const acceptedMessages = await listNonTerminalAcceptedMessages(storage, state.wrapperRunId);
     for (const message of acceptedMessages) {
@@ -429,117 +395,79 @@ export function createWrapperSupervisor(
   }
 
   async function checkDisconnectGrace(now: number): Promise<void> {
-    const graceState = await storage.get<DisconnectGraceState>(DISCONNECT_GRACE_KEY);
+    const graceState = await readDisconnectGrace();
     if (!graceState) return;
     if (now - graceState.disconnectedAt < DISCONNECT_GRACE_MS) return;
 
     await storage.delete(DISCONNECT_GRACE_KEY);
-    const { executionId, wrapperRunId, wsCloseCode, wsCloseReason } = graceState;
+    const { wrapperRunId } = graceState;
     const state = await getWrapperRuntimeState(storage);
     if (
-      graceState.wrapperGeneration !== undefined &&
+      state.wrapperRunId !== wrapperRunId ||
       state.wrapperGeneration !== graceState.wrapperGeneration
     ) {
       await releaseWrapperTerminalWaitForIdleBatchForWrapperRun(wrapperRunId);
       return;
     }
-    if (
-      graceState.wrapperConnectionId !== undefined &&
-      state.wrapperConnectionId !== graceState.wrapperConnectionId
-    ) {
+    if (state.wrapperConnectionId !== graceState.wrapperConnectionId) {
       await releaseWrapperTerminalWaitForIdleBatchForWrapperRun(wrapperRunId);
       return;
     }
 
     if (
       await hasActiveIngestConnection({
-        executionId,
         wrapperRunId,
         wrapperGeneration: graceState.wrapperGeneration,
         wrapperConnectionId: graceState.wrapperConnectionId,
       })
     ) {
       logger
-        .withFields({ executionId, wrapperRunId })
+        .withFields({ wrapperRunId })
         .info('Wrapper reconnected during grace period — skipping failure');
       return;
     }
 
-    if (wrapperRunId && !executionId) {
-      const acceptedMessages = await listNonTerminalAcceptedMessages(storage, wrapperRunId);
-      if (acceptedMessages.length === 0) {
-        logger
-          .withFields({ wrapperRunId })
-          .info('No accepted messages during grace period — skipping failure');
-        await releaseWrapperTerminalWaitForIdleBatch();
-        return;
-      }
-
+    const acceptedMessages = await listNonTerminalAcceptedMessages(storage, wrapperRunId);
+    if (acceptedMessages.length === 0) {
       logger
-        .withFields({ wrapperRunId, messageCount: acceptedMessages.length })
-        .warn('Grace period expired — failing accepted messages');
-      for (const message of acceptedMessages) {
-        await messageSettlementOutbox.terminalizeSessionMessageOnce(message.messageId, {
-          kind: 'failed',
-          reason: 'wrapper_disconnected',
-          error: 'Wrapper disconnected',
-          completionSource: 'wrapper_failure',
-        });
-      }
-      await clearWrapperRuntimeIdentity(
-        storage,
-        {
-          wrapperGeneration: state.wrapperGeneration,
-          wrapperConnectionId: state.wrapperConnectionId,
-        },
-        { incrementGeneration: true }
-      );
-      await agentRuntime.stopWrapperProcess('unhealthy-wrapper');
+        .withFields({ wrapperRunId })
+        .info('No accepted messages during grace period - skipping failure');
       await releaseWrapperTerminalWaitForIdleBatch();
       return;
     }
 
-    if (!executionId) return;
-    const currentExecution = await getExecution(executionId);
-    if (
-      !currentExecution ||
-      (currentExecution.status !== 'running' && currentExecution.status !== 'pending')
-    ) {
-      logger
-        .withFields({
-          executionId,
-          status: currentExecution?.status,
-        })
-        .info('Execution no longer active during grace period — skipping failure');
-      return;
+    logger
+      .withFields({ wrapperRunId, messageCount: acceptedMessages.length })
+      .warn('Grace period expired - failing accepted messages');
+    for (const message of acceptedMessages) {
+      await messageSettlementOutbox.terminalizeSessionMessageOnce(message.messageId, {
+        kind: 'failed',
+        reason: 'wrapper_disconnected',
+        error: 'Wrapper disconnected',
+        completionSource: 'wrapper_failure',
+      });
     }
-
-    logger.withFields({ executionId }).warn('Grace period expired — marking execution as failed');
-    await failExecution({
-      executionId,
-      status: 'failed',
-      error: 'Wrapper disconnected',
-      streamEventType: 'wrapper_disconnected',
-      streamPayload: { wsCloseCode, wsCloseReason },
-    });
+    await clearWrapperRuntimeIdentity(
+      storage,
+      {
+        wrapperGeneration: state.wrapperGeneration,
+        wrapperConnectionId: state.wrapperConnectionId,
+      },
+      { incrementGeneration: true }
+    );
+    await agentRuntime.stopWrapperProcess('unhealthy-wrapper');
+    await releaseWrapperTerminalWaitForIdleBatch();
   }
 
-  async function hasActiveWrapperWork(state: WrapperRuntimeState): Promise<{
-    runtimeExecutionId: ExecutionId | null;
-    hasAcceptedMessages: boolean;
-  }> {
-    const runtimeExecutionId = await getCurrentRuntimeExecutionId();
-    const hasAcceptedMessages =
-      (await listNonTerminalAcceptedMessages(storage, state.wrapperRunId)).length > 0;
-    return { runtimeExecutionId, hasAcceptedMessages };
+  async function hasActiveWrapperWork(state: WrapperRuntimeState): Promise<boolean> {
+    return (await listNonTerminalAcceptedMessages(storage, state.wrapperRunId)).length > 0;
   }
 
   async function getNextWrapperLivenessDeadline(): Promise<number | undefined> {
     const state = await getWrapperRuntimeState(storage);
     if (!state.wrapperConnectionId) return undefined;
 
-    const { runtimeExecutionId, hasAcceptedMessages } = await hasActiveWrapperWork(state);
-    if (!runtimeExecutionId && !hasAcceptedMessages) {
+    if (!(await hasActiveWrapperWork(state))) {
       const hasLivenessFields =
         state.noOutputDeadlineAt !== undefined ||
         state.pingDeadlineAt !== undefined ||
@@ -568,8 +496,7 @@ export function createWrapperSupervisor(
       state.nextPingAt !== undefined;
     if (!hasLivenessDeadline || !state.wrapperConnectionId) return false;
 
-    const { runtimeExecutionId, hasAcceptedMessages } = await hasActiveWrapperWork(state);
-    if (!runtimeExecutionId && !hasAcceptedMessages) {
+    if (!(await hasActiveWrapperWork(state))) {
       await clearCurrentWrapperRuntimeLivenessState(
         storage,
         state.wrapperGeneration,
@@ -588,11 +515,7 @@ export function createWrapperSupervisor(
           noOutputDeadlineAt: state.noOutputDeadlineAt,
         })
         .warn('Wrapper liveness no-output deadline expired');
-      await handleUnhealthyWrapper(
-        state,
-        'Wrapper accepted the message but produced no output',
-        runtimeExecutionId ?? undefined
-      );
+      await handleUnhealthyWrapper(state, 'Wrapper accepted the message but produced no output');
       return true;
     }
 
@@ -606,11 +529,7 @@ export function createWrapperSupervisor(
           pingDeadlineAt: state.pingDeadlineAt,
         })
         .warn('Wrapper liveness ping deadline expired');
-      await handleUnhealthyWrapper(
-        state,
-        'Wrapper did not respond to liveness ping',
-        runtimeExecutionId ?? undefined
-      );
+      await handleUnhealthyWrapper(state, 'Wrapper did not respond to liveness ping');
       return true;
     }
 
@@ -619,9 +538,8 @@ export function createWrapperSupervisor(
       state.nextPingAt !== undefined &&
       now >= state.nextPingAt
     ) {
-      const ingestTagId = state.wrapperRunId ?? runtimeExecutionId;
-      if (ingestTagId) {
-        agentRuntime.sendPing(ingestTagId);
+      if (state.wrapperRunId) {
+        agentRuntime.sendPing(state.wrapperRunId);
       }
       await markWrapperPingSent(
         storage,
@@ -770,6 +688,17 @@ export function createWrapperSupervisor(
     const { wrapperRunId, status, error, gateResult } = params;
     const sessionId = getSessionIdForLogs();
     const state = await getWrapperRuntimeState(storage);
+    if (
+      !hasCompleteWrapperIdentity(state) ||
+      !state.wrapperRunId ||
+      state.wrapperRunId !== wrapperRunId ||
+      !state.wrapperConnectionId
+    ) {
+      logger
+        .withFields({ sessionId, wrapperRunId, status })
+        .warn('Ignoring non-current wrapper terminal event');
+      return;
+    }
 
     logger
       .withFields({
@@ -802,26 +731,24 @@ export function createWrapperSupervisor(
       }
     }
 
-    if (state.wrapperRunId === wrapperRunId) {
-      if (status === 'completed') {
-        const acceptedMessages = await listNonTerminalAcceptedMessages(storage, wrapperRunId);
-        if (acceptedMessages.length === 0) {
-          await clearWrapperRuntimeIdentity(storage, {
-            wrapperGeneration: state.wrapperGeneration,
-            wrapperConnectionId: state.wrapperConnectionId,
-          });
-          await clearInterruptRequest();
-        }
-      } else {
+    if (status === 'completed') {
+      const acceptedMessages = await listNonTerminalAcceptedMessages(storage, wrapperRunId);
+      if (acceptedMessages.length === 0) {
         await clearWrapperRuntimeIdentity(storage, {
           wrapperGeneration: state.wrapperGeneration,
           wrapperConnectionId: state.wrapperConnectionId,
         });
         await clearInterruptRequest();
       }
+    } else {
+      await clearWrapperRuntimeIdentity(storage, {
+        wrapperGeneration: state.wrapperGeneration,
+        wrapperConnectionId: state.wrapperConnectionId,
+      });
+      await clearInterruptRequest();
     }
 
-    await clearDisconnectGraceForExecution();
+    await clearDisconnectGrace();
     await messageSettlementOutbox.observeWrapperTerminalForIdleBatch(gateResult);
     await messageSettlementOutbox.finalizeIdleBatchCallbackIfReady({
       allowWithoutObservedIdle: true,
@@ -843,7 +770,7 @@ export function createWrapperSupervisor(
       deadlines.push(livenessDeadline);
     }
 
-    const graceState = await storage.get<DisconnectGraceState>(DISCONNECT_GRACE_KEY);
+    const graceState = await readDisconnectGrace();
     if (graceState) {
       deadlines.push(graceState.disconnectedAt + DISCONNECT_GRACE_MS);
     }
@@ -868,7 +795,7 @@ export function createWrapperSupervisor(
     observeRootIdle,
     onDisconnected,
     onTerminalEvent,
-    clearDisconnectGraceForExecution,
+    clearDisconnectGrace,
     runMaintenance,
     nextMaintenanceDeadlines,
   };

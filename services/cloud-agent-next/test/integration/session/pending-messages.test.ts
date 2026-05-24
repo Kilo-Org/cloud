@@ -120,7 +120,7 @@ describe('pending session messages', () => {
     });
 
     expect(found?.messageId).toBe('msg_018f1e2d3c4bCliReqAbCdEfGh');
-    expect(found?.executionId).toBe('exc_compatibility');
+    expect(found?.legacyExecutionId).toBe('exc_compatibility');
   });
 
   it('ignores invalid stored entries', async () => {
@@ -228,7 +228,7 @@ describe('pending session messages', () => {
       const now = Date.now();
       await instance.ctx.storage.setAlarm(now - 120_000);
       const staleAlarm = await instance.ctx.storage.getAlarm();
-      const queueResult = await instance.queueSessionMessage(
+      const queueResult = await instance.admitSubmittedMessage(
         queueUserMessageInput({
           userId,
           prompt: 'refresh stale pending drain alarm',
@@ -239,7 +239,7 @@ describe('pending session messages', () => {
       return { now, staleAlarm, queueResult, refreshedAlarm };
     });
 
-    expect(result.queueResult).toMatchObject({ success: true, delivery: 'queued' });
+    expect(result.queueResult).toMatchObject({ success: true, outcome: 'queued' });
     expect(result.staleAlarm).toBeDefined();
     expect(result.refreshedAlarm).toBeGreaterThan(result.staleAlarm ?? result.now);
   });
@@ -388,7 +388,8 @@ describe('pending session messages', () => {
     expect(result.pending[0]?.flushAttempts).toBe(1);
     expect(result.pending[0]?.lastFlushError).toBe('execution add failed');
     expect(result.pending[0]?.nextFlushAttemptAt).toBeGreaterThan(Date.now());
-    expect(result.alarm).toBe(result.pending[0]?.nextFlushAttemptAt);
+    expect(result.alarm).toBeLessThanOrEqual(result.pending[0]?.nextFlushAttemptAt ?? 0);
+    expect(result.alarm).toBeGreaterThan(Date.now());
   });
 
   it('records a failed flush attempt and schedules a delayed retry', async () => {
@@ -437,64 +438,8 @@ describe('pending session messages', () => {
     expect(result.pending[0]?.flushAttempts).toBe(1);
     expect(result.pending[0]?.lastFlushError).toBe('wrapper unavailable');
     expect(result.pending[0]?.nextFlushAttemptAt).toBeGreaterThan(Date.now());
-    expect(result.alarm).toBe(result.pending[0]?.nextFlushAttemptAt);
-  });
-
-  it('schedules wrapper liveness before a delayed pending retry without one-second churn', async () => {
-    const userId = 'user_pending_retry_liveness';
-    const sessionId = 'agent_pending_retry_liveness';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
-
-    const result = await runInDurableObject(stub, async instance => {
-      const now = Date.now();
-      const livenessDeadline = now + 5_000;
-      const pendingRetryAt = now + 15_000;
-      await registerReadySession(instance, {
-        sessionId,
-        userId,
-        kiloSessionId: '57575757-5757-4575-8575-575757575757',
-        prompt: 'prepared prompt',
-        mode: 'code',
-        model: 'test-model',
-        kilocodeToken: 'token-followup',
-        gitUrl: 'https://example.com/repo.git',
-        gitToken: 'old-token',
-      });
-      await instance.addExecution({
-        executionId: 'exc_liveness_before_pending',
-        mode: 'code',
-        streamingMode: 'websocket',
-        ingestToken: 'exc_liveness_before_pending',
-        messageId: 'msg_018f1e2d3c4bLiveBeforePend',
-      });
-      await instance.ctx.storage.put('wrapper_runtime_state', {
-        wrapperGeneration: 1,
-        wrapperConnectionId: 'conn_liveness_before_pending',
-        wrapperExecutionId: 'exc_liveness_before_pending',
-        acceptedExecutionId: 'exc_liveness_before_pending',
-        nextPingAt: livenessDeadline,
-      });
-      await storePendingSessionMessage(
-        instance.ctx.storage,
-        createMessage({
-          messageId: 'msg_018f1e2d3c4bDelayRetryPend',
-          executionId: 'exc_delay_retry_pending',
-          content: 'retry later',
-          createdAt: 1,
-          nextFlushAttemptAt: pendingRetryAt,
-        })
-      );
-
-      await instance.alarm();
-      const alarm = await instance.ctx.storage.getAlarm();
-      return { alarm, livenessDeadline, pendingRetryAt, now };
-    });
-
-    expect(result.alarm).toBeGreaterThanOrEqual(result.livenessDeadline);
-    expect(result.alarm).toBeLessThan(result.pendingRetryAt);
-    expect(result.alarm).toBeGreaterThan(result.now + 1_000);
+    expect(result.alarm).toBeLessThanOrEqual(result.pending[0]?.nextFlushAttemptAt ?? 0);
+    expect(result.alarm).toBeGreaterThan(Date.now());
   });
 
   it('exhausts failed flush retries, emits cloud.message.failed, and removes the pending message', async () => {
@@ -525,7 +470,7 @@ describe('pending session messages', () => {
           messageId: 'msg_018f1e2d3c4bAAAAAAAAAAAAAA',
           content: 'flush until exhausted',
           createdAt: 1,
-          flushAttempts: 4,
+          flushAttempts: 1,
           nextFlushAttemptAt: Date.now() - 1,
         })
       );
@@ -649,7 +594,7 @@ describe('pending session messages', () => {
     ]);
   });
 
-  it('interrupt with pending-only and no current runtime execution returns success', async () => {
+  it('interrupt with pending-only ignores stranded legacy execution identity', async () => {
     const userId = 'user_pending_interrupt_only';
     const sessionId = 'agent_pending_interrupt_only';
     const stub = env.CLOUD_AGENT_SESSION.get(
@@ -666,6 +611,16 @@ describe('pending session messages', () => {
         model: 'test-model',
         kilocodeToken: 'token-followup',
       });
+      await instance.addExecution({
+        executionId: 'exc_stranded_interrupt',
+        mode: 'code',
+        streamingMode: 'websocket',
+        ingestToken: 'exc_stranded_interrupt',
+      });
+      await instance.updateExecutionStatus({
+        executionId: 'exc_stranded_interrupt',
+        status: 'running',
+      });
       await storePendingSessionMessage(
         instance.ctx.storage,
         createMessage({
@@ -678,16 +633,273 @@ describe('pending session messages', () => {
 
       const interrupt = await instance.interruptExecution();
       const pending = await listPendingSessionMessages(instance.ctx.storage);
-      const currentRuntimeExecution = await instance.getCurrentRuntimeExecution();
-      return { interrupt, pending, currentRuntimeExecution };
+      const strandedLegacyExecution = await instance.getCurrentRuntimeExecution();
+      return { interrupt, pending, strandedLegacyExecution };
     });
 
     expect(result.interrupt).toEqual({ success: true, executionId: undefined });
     expect(result.pending).toHaveLength(0);
-    expect(result.currentRuntimeExecution).toBeNull();
+    expect(result.strandedLegacyExecution?.executionId).toBe('exc_stranded_interrupt');
   });
 
-  it('interrupt with current wrapper runtime execution sends kill and clears queued messages', async () => {
+  it('retains queued pending anchors when the interrupted state write fails', async () => {
+    const userId = 'user_pending_interrupt_transition_failure';
+    const sessionId = 'agent_pending_interrupt_transition_failure';
+    const stub = env.CLOUD_AGENT_SESSION.get(
+      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
+    );
+
+    const result = await runInDurableObject(stub, async instance => {
+      await registerReadySession(instance, {
+        sessionId,
+        userId,
+        kiloSessionId: '96969696-9696-4969-8969-969696969696',
+        prompt: 'prepared prompt',
+        mode: 'code',
+        model: 'test-model',
+        kilocodeToken: 'token-interrupt-transition-failure',
+      });
+      const messageId = 'msg_018f1e2d3c4bIntrPutFailABC';
+      await storePendingSessionMessage(
+        instance.ctx.storage,
+        createMessage({ messageId, content: 'still recoverable', createdAt: 1 })
+      );
+      await putSessionMessageState(instance.ctx.storage, {
+        messageId,
+        status: 'queued',
+        prompt: 'still recoverable',
+        createdAt: 1,
+        queuedAt: 1,
+      });
+      const originalPut = instance.ctx.storage.put.bind(instance.ctx.storage);
+      let failStateTransition = true;
+      instance.ctx.storage.put = async (key, value) => {
+        if (
+          failStateTransition &&
+          key === `session_message:${messageId}` &&
+          typeof value === 'object' &&
+          value !== null &&
+          'status' in value &&
+          value.status === 'interrupted'
+        ) {
+          failStateTransition = false;
+          throw new Error('interrupted state put failed');
+        }
+        return originalPut(key, value);
+      };
+
+      await expect(instance.interruptExecution()).rejects.toThrow('interrupted state put failed');
+      instance.ctx.storage.put = originalPut;
+      return {
+        pending: await listPendingSessionMessages(instance.ctx.storage),
+        message: await getSessionMessageState(instance.ctx.storage, messageId),
+      };
+    });
+
+    expect(result.pending.map(message => message.messageId)).toEqual([
+      'msg_018f1e2d3c4bIntrPutFailABC',
+    ]);
+    expect(result.message?.status).toBe('queued');
+  });
+
+  it('retains accepted wrapper ownership when its interrupted state write fails', async () => {
+    const userId = 'user_accepted_interrupt_transition_failure';
+    const sessionId = 'agent_accepted_interrupt_transition_failure';
+    const stub = env.CLOUD_AGENT_SESSION.get(
+      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
+    );
+
+    const result = await runInDurableObject(stub, async instance => {
+      await registerReadySession(instance, {
+        sessionId,
+        userId,
+        kiloSessionId: '97979797-9797-4979-8979-979797979797',
+        prompt: 'prepared prompt',
+        mode: 'code',
+        model: 'test-model',
+        kilocodeToken: 'token-accepted-transition-failure',
+      });
+      const messageId = 'msg_018f1e2d3c4bAcptPutFailABC';
+      await instance.ctx.storage.put('wrapper_runtime_state', {
+        wrapperGeneration: 1,
+        wrapperConnectionId: 'conn_interrupt_transition_failure',
+        wrapperRunId: 'wr_interrupt_transition_failure',
+      });
+      await putSessionMessageState(instance.ctx.storage, {
+        messageId,
+        status: 'accepted',
+        prompt: 'owned by wrapper',
+        createdAt: 1,
+        acceptedAt: 2,
+        wrapperRunId: 'wr_interrupt_transition_failure',
+      });
+      const originalPut = instance.ctx.storage.put.bind(instance.ctx.storage);
+      let failStateTransition = true;
+      instance.ctx.storage.put = async (key, value) => {
+        if (
+          failStateTransition &&
+          key === `session_message:${messageId}` &&
+          typeof value === 'object' &&
+          value !== null &&
+          'status' in value &&
+          value.status === 'interrupted'
+        ) {
+          failStateTransition = false;
+          throw new Error('accepted interrupted state put failed');
+        }
+        return originalPut(key, value);
+      };
+
+      await expect(instance.interruptExecution()).rejects.toThrow(
+        'accepted interrupted state put failed'
+      );
+      instance.ctx.storage.put = originalPut;
+      return {
+        message: await getSessionMessageState(instance.ctx.storage, messageId),
+        runtime: await instance.ctx.storage.get('wrapper_runtime_state'),
+      };
+    });
+
+    expect(result.message?.status).toBe('accepted');
+    expect(result.runtime).toMatchObject({
+      wrapperGeneration: 1,
+      wrapperConnectionId: 'conn_interrupt_transition_failure',
+      wrapperRunId: 'wr_interrupt_transition_failure',
+    });
+  });
+
+  it('interrupt remains durable when terminal effects and runtime stop fail once', async () => {
+    const userId = 'user_pending_interrupt_failure';
+    const sessionId = 'agent_pending_interrupt_failure';
+    const stub = env.CLOUD_AGENT_SESSION.get(
+      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
+    );
+
+    const result = await runInDurableObject(stub, async instance => {
+      await registerReadySession(instance, {
+        sessionId,
+        userId,
+        kiloSessionId: '94949494-9494-4949-8949-949494949494',
+        prompt: 'prepared prompt',
+        mode: 'code',
+        model: 'test-model',
+        kilocodeToken: 'token-interrupt-failure',
+        callbackTarget: { url: 'https://example.com/repair-interrupt' },
+      });
+      await instance.ctx.storage.put('wrapper_runtime_state', {
+        wrapperGeneration: 1,
+        wrapperConnectionId: 'conn_interrupt_failure',
+        wrapperRunId: 'wr_interrupt_failure',
+      });
+      const acceptedId = 'msg_018f1e2d3c4bIntrFailAcptAB';
+      const pendingId = 'msg_018f1e2d3c4bIntrFailPndABC';
+      await putSessionMessageState(instance.ctx.storage, {
+        messageId: acceptedId,
+        status: 'accepted',
+        prompt: 'accepted',
+        createdAt: 1,
+        acceptedAt: 1,
+        wrapperRunId: 'wr_interrupt_failure',
+        callbackRequired: true,
+        callbackTarget: { url: 'https://example.com/repair-interrupt' },
+      });
+      await storePendingSessionMessage(
+        instance.ctx.storage,
+        createMessage({
+          messageId: pendingId,
+          content: 'pending',
+          createdAt: 2,
+        })
+      );
+      await putSessionMessageState(instance.ctx.storage, {
+        messageId: pendingId,
+        status: 'queued',
+        prompt: 'pending',
+        createdAt: 2,
+        queuedAt: 2,
+        callbackRequired: true,
+        callbackTarget: { url: 'https://example.com/repair-interrupt' },
+      });
+      let failTerminalEffect = true;
+      const originalEnsure = (instance as any).ensureTerminalMessageEvent.bind(instance);
+      (instance as any).ensureTerminalMessageEvent = (params: unknown) => {
+        if (failTerminalEffect) {
+          failTerminalEffect = false;
+          throw new Error('interrupt terminal event failed');
+        }
+        originalEnsure(params);
+      };
+      instance['stopCurrentWrapperProcess'] = async () => {
+        throw new Error('stop failed');
+      };
+
+      const interrupt = await instance.interruptExecution();
+      await instance.alarm();
+      return {
+        interrupt,
+        pending: await listPendingSessionMessages(instance.ctx.storage),
+        accepted: await getSessionMessageState(instance.ctx.storage, acceptedId),
+        queued: await getSessionMessageState(instance.ctx.storage, pendingId),
+        runtime: await instance.ctx.storage.get('wrapper_runtime_state'),
+      };
+    });
+
+    expect(result.interrupt).toEqual({ success: true, executionId: undefined });
+    expect(result.pending).toHaveLength(0);
+    expect(result.accepted?.status).toBe('interrupted');
+    expect(result.queued?.status).toBe('interrupted');
+    expect(result.runtime).toEqual({ wrapperGeneration: 2 });
+  });
+
+  it('interrupt with accepted work and no live socket fences and stops current wrapper runtime', async () => {
+    const userId = 'user_pending_interrupt_no_socket';
+    const sessionId = 'agent_pending_interrupt_no_socket';
+    const stub = env.CLOUD_AGENT_SESSION.get(
+      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
+    );
+
+    const result = await runInDurableObject(stub, async instance => {
+      const stopped: string[] = [];
+      instance['stopCurrentWrapperProcess'] = async reason => {
+        stopped.push(reason);
+        return true;
+      };
+      await registerReadySession(instance, {
+        sessionId,
+        userId,
+        kiloSessionId: '89898989-8989-4898-8989-898989898989',
+        prompt: 'prepared prompt',
+        mode: 'code',
+        model: 'test-model',
+        kilocodeToken: 'token-followup',
+      });
+      await instance.ctx.storage.put('wrapper_runtime_state', {
+        wrapperGeneration: 1,
+        wrapperConnectionId: 'conn_interrupt_missing',
+        wrapperRunId: 'wr_interrupt_missing',
+      });
+      await putSessionMessageState(instance.ctx.storage, {
+        messageId: 'msg_018f1e2d3c4bNoSockMsgAbCdE',
+        status: 'accepted',
+        prompt: 'active message',
+        createdAt: 1,
+        acceptedAt: 1,
+        wrapperRunId: 'wr_interrupt_missing',
+      });
+
+      const interrupt = await instance.interruptExecution();
+      const runtimeState = await instance.ctx.storage.get<{ wrapperGeneration: number }>(
+        'wrapper_runtime_state'
+      );
+      return { interrupt, runtimeState, stopped };
+    });
+
+    expect(result.interrupt).toEqual({ success: true, executionId: undefined });
+    expect(result.runtimeState).toEqual({ wrapperGeneration: 2 });
+    expect(result.stopped).toEqual(['user-interrupt']);
+  });
+
+  it('interrupt with a live fenced socket sends kill then fences accepted work', async () => {
     const userId = 'user_pending_interrupt_active';
     const sessionId = 'agent_pending_interrupt_active';
     const stub = env.CLOUD_AGENT_SESSION.get(
@@ -696,8 +908,9 @@ describe('pending session messages', () => {
 
     const result = await runInDurableObject(stub, async instance => {
       const sentCommands: unknown[] = [];
-      instance.sendToWrapper = (_ingestTagId, command) => {
+      instance.sendToWrapper = (_ingestTagId, command, _fence) => {
         sentCommands.push(command);
+        return true;
       };
       await registerReadySession(instance, {
         sessionId,
@@ -708,19 +921,18 @@ describe('pending session messages', () => {
         model: 'test-model',
         kilocodeToken: 'token-followup',
       });
-      await instance.addExecution({
-        executionId: 'exc_interrupt_active',
-        mode: 'code',
-        streamingMode: 'websocket',
-        ingestToken: 'exc_interrupt_active',
-        messageId: 'msg_018f1e2d3c4bAcceptActAbCdE',
-      });
       await instance.ctx.storage.put('wrapper_runtime_state', {
         wrapperGeneration: 1,
         wrapperConnectionId: 'conn_interrupt_active',
-        wrapperExecutionId: 'exc_interrupt_active',
-        acceptedMessageId: 'msg_018f1e2d3c4bAcceptActAbCdE',
-        acceptedExecutionId: 'exc_interrupt_active',
+        wrapperRunId: 'wr_interrupt_active',
+      });
+      await putSessionMessageState(instance.ctx.storage, {
+        messageId: 'msg_018f1e2d3c4bAcceptActAbCdE',
+        status: 'accepted',
+        prompt: 'active message',
+        createdAt: 1,
+        acceptedAt: 1,
+        wrapperRunId: 'wr_interrupt_active',
       });
       await storePendingSessionMessage(
         instance.ctx.storage,
@@ -734,18 +946,101 @@ describe('pending session messages', () => {
 
       const interrupt = await instance.interruptExecution();
       const pending = await listPendingSessionMessages(instance.ctx.storage);
-      const currentRuntimeExecution = await instance.getCurrentRuntimeExecution();
-      return { interrupt, pending, currentRuntimeExecution, sentCommands };
+      const accepted = await listNonTerminalAcceptedMessages(instance.ctx.storage);
+      const runtimeState = await instance.ctx.storage.get<{ wrapperGeneration: number }>(
+        'wrapper_runtime_state'
+      );
+      return { interrupt, pending, accepted, sentCommands, runtimeState };
     });
 
-    expect(result.interrupt.success).toBe(true);
-    expect(result.interrupt.executionId).toBe('exc_interrupt_active');
+    expect(result.interrupt).toEqual({ success: true, executionId: undefined });
     expect(result.sentCommands).toEqual([{ type: 'kill', signal: 'SIGTERM' }]);
     expect(result.pending).toHaveLength(0);
-    expect(result.currentRuntimeExecution?.messageId).toBe('msg_018f1e2d3c4bAcceptActAbCdE');
+    expect(result.accepted).toHaveLength(0);
+    expect(result.runtimeState).toEqual({ wrapperGeneration: 2 });
   });
 
-  it('defers pending messages on debounce cadence while current runtime execution exists', async () => {
+  it('ignores late terminal events from the fenced run after current interrupt', async () => {
+    const userId = 'user_pending_interrupt_late';
+    const sessionId = 'agent_pending_interrupt_late';
+    const stub = env.CLOUD_AGENT_SESSION.get(
+      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
+    );
+
+    const result = await runInDurableObject(stub, async instance => {
+      instance['stopCurrentWrapperProcess'] = async () => true;
+      await registerReadySession(instance, {
+        sessionId,
+        userId,
+        kiloSessionId: '91919191-9191-4919-8919-919191919191',
+        prompt: 'prepared prompt',
+        mode: 'code',
+        model: 'test-model',
+        kilocodeToken: 'token-followup',
+      });
+      await instance.ctx.storage.put('wrapper_runtime_state', {
+        wrapperGeneration: 1,
+        wrapperConnectionId: 'conn_interrupt_late',
+        wrapperRunId: 'wr_interrupt_late',
+      });
+      await putSessionMessageState(instance.ctx.storage, {
+        messageId: 'msg_018f1e2d3c4bLateMsgAbCdEfG',
+        status: 'accepted',
+        prompt: 'interrupted work',
+        createdAt: 1,
+        acceptedAt: 1,
+        wrapperRunId: 'wr_interrupt_late',
+      });
+
+      await instance.interruptExecution();
+      await instance.handleWrapperTerminalEvent({
+        wrapperRunId: 'wr_interrupt_late',
+        status: 'completed',
+      });
+      return getSessionMessageState(instance.ctx.storage, 'msg_018f1e2d3c4bLateMsgAbCdEfG');
+    });
+
+    expect(result?.status).toBe('interrupted');
+  });
+
+  it('derives accepted current work health from fenced liveness deadlines', async () => {
+    const userId = 'user_pending_health_fence';
+    const sessionId = 'agent_pending_health_fence';
+    const stub = env.CLOUD_AGENT_SESSION.get(
+      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
+    );
+
+    const result = await runInDurableObject(stub, async instance => {
+      await putSessionMessageState(instance.ctx.storage, {
+        messageId: 'msg_018f1e2d3c4bHealthFenceAbC',
+        status: 'accepted',
+        prompt: 'active',
+        createdAt: 1,
+        acceptedAt: 1,
+        wrapperRunId: 'wr_health_fence',
+      });
+      await instance.ctx.storage.put('wrapper_runtime_state', {
+        wrapperGeneration: 1,
+        wrapperConnectionId: 'conn_health_fence',
+        wrapperRunId: 'wr_health_fence',
+        noOutputDeadlineAt: Date.now() + 60_000,
+      });
+      const healthy = await instance.getCurrentMessageWork();
+      await instance.ctx.storage.put('wrapper_runtime_state', {
+        wrapperGeneration: 1,
+        wrapperConnectionId: 'conn_health_fence',
+        wrapperRunId: 'wr_health_fence',
+        noOutputDeadlineAt: Date.now() - 1,
+      });
+      const stale = await instance.getCurrentMessageWork();
+      return { healthy, stale };
+    });
+
+    expect(result.healthy?.health).toBe('healthy');
+    expect(result.stale?.health).toBe('stale');
+  });
+
+  it('drains a pending current message while another accepted message shares the fenced wrapper run', async () => {
     const userId = 'user_pending_flush_active';
     const sessionId = 'agent_pending_flush_active';
     const stub = env.CLOUD_AGENT_SESSION.get(
@@ -771,18 +1066,11 @@ describe('pending session messages', () => {
         gitUrl: 'https://example.com/repo.git',
         gitToken: 'old-token',
       });
-      await instance.addExecution({
-        executionId: 'exc_active_flush',
-        mode: 'code',
-        streamingMode: 'websocket',
-        ingestToken: 'exc_active_flush',
-      });
       await instance.ctx.storage.put('wrapper_runtime_state', {
         wrapperGeneration: 1,
         wrapperConnectionId: 'conn_active_flush',
         wrapperRunId: 'wr_active_flush',
-        wrapperExecutionId: 'exc_active_flush',
-        acceptedExecutionId: 'exc_active_flush',
+        lastWrapperMessageAt: Date.now(),
       });
       await putSessionMessageState(instance.ctx.storage, {
         messageId: 'msg_018f1e2d3c4bActBusyRunAbCd',
@@ -811,20 +1099,23 @@ describe('pending session messages', () => {
         })
       );
 
-      const beforeAlarm = Date.now();
       await instance.alarm();
       const pending = await listPendingSessionMessages(instance.ctx.storage);
-      const alarm = await instance.ctx.storage.getAlarm();
-      return { callCount, pending, alarm, beforeAlarm };
+      const accepted = await listNonTerminalAcceptedMessages(
+        instance.ctx.storage,
+        'wr_active_flush'
+      );
+      return { callCount, pending, accepted };
     });
 
-    expect(result.callCount).toBe(0);
+    expect(result.callCount).toBe(1);
     expect(result.pending.map(message => message.messageId)).toEqual([
-      'msg_018f1e2d3c4bActFlushOneAbC',
       'msg_018f1e2d3c4bActFlushTwoAbC',
     ]);
-    expect(result.alarm).toBeGreaterThanOrEqual(result.beforeAlarm + 1_000);
-    expect(result.alarm).toBeLessThan(result.beforeAlarm + 10_000);
+    expect(result.accepted.map(message => message.messageId)).toEqual([
+      'msg_018f1e2d3c4bActBusyRunAbCd',
+      'msg_018f1e2d3c4bActFlushOneAbC',
+    ]);
   });
 
   it('metadata-not-ready flush keeps pending and schedules retry', async () => {
@@ -920,74 +1211,6 @@ describe('pending session messages', () => {
       gateResult: 'pass',
       delivery: 'sent',
       accepted: true,
-    });
-  });
-
-  it('legacy reconnect complete terminalizes its accepted execution message', async () => {
-    const userId = 'user_legacy_reconnect_complete';
-    const sessionId = 'agent_legacy_reconnect_complete';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
-
-    const result = await runInDurableObject(stub, async instance => {
-      await registerReadySession(instance, {
-        sessionId,
-        userId,
-        prompt: 'prepared prompt',
-        mode: 'code',
-        model: 'test-model',
-        kilocodeToken: 'token-legacy-reconnect-complete',
-      });
-      await instance.addExecution({
-        executionId: 'exc_legacy_reconnect_complete',
-        mode: 'code',
-        streamingMode: 'websocket',
-        ingestToken: 'exc_legacy_reconnect_complete',
-        messageId: 'msg_018f1e2d3c4bLegacyDoneAbC',
-      });
-      await instance.updateExecutionStatus({
-        executionId: 'exc_legacy_reconnect_complete',
-        status: 'running',
-      });
-
-      const handler = await instance['getIngestHandler']();
-      const ws = {
-        deserializeAttachment: () => ({
-          executionId: 'exc_legacy_reconnect_complete',
-          connectedAt: Date.now(),
-          kiloSessionState: { captured: false },
-          lastHeartbeatUpdate: Date.now(),
-          lastEventAtUpdate: Date.now(),
-        }),
-        serializeAttachment: () => {},
-        send: () => {},
-      } as unknown as WebSocket;
-
-      await handler.handleIngestMessage(
-        ws,
-        JSON.stringify({
-          streamEventType: 'complete',
-          data: { exitCode: 0 },
-          timestamp: new Date().toISOString(),
-        })
-      );
-
-      const execution = await instance.getExecution('exc_legacy_reconnect_complete');
-      const eventQueries = createEventQueries(
-        drizzle(instance.ctx.storage, { logger: false }),
-        instance.ctx.storage.sql
-      );
-      const events = eventQueries.findByFilters({ eventTypes: ['cloud.message.completed'] });
-      return { execution, events };
-    });
-
-    expect(result.execution?.status).toBe('completed');
-    expect(result.events).toHaveLength(1);
-    expect(JSON.parse(result.events[0].payload)).toMatchObject({
-      messageId: 'msg_018f1e2d3c4bLegacyDoneAbC',
-      executionId: 'exc_legacy_reconnect_complete',
-      status: 'completed',
     });
   });
 
@@ -1142,7 +1365,7 @@ describe('pending session messages', () => {
         callbackTarget: { url: 'https://example.com/callback' },
         initialMessageId: 'msg_018f1e2d3c4bTermInitMsgABC',
       });
-      const startResult = await instance.queueSessionMessage(
+      const startResult = await instance.admitPreparedInitialMessage(
         queueRegisteredInitialInput({ userId })
       );
       await instance.alarm();
@@ -1224,7 +1447,7 @@ describe('pending session messages', () => {
     });
   });
 
-  it('completion schedules and advances the next pending message', async () => {
+  it('alarm drains the next pending message through current message acceptance', async () => {
     const userId = 'user_pending_completion';
     const sessionId = 'agent_pending_completion';
     const stub = env.CLOUD_AGENT_SESSION.get(
@@ -1250,18 +1473,6 @@ describe('pending session messages', () => {
         gitUrl: 'https://example.com/repo.git',
         gitToken: 'old-token',
       });
-      await instance.addExecution({
-        executionId: 'exc_completion_active',
-        mode: 'code',
-        streamingMode: 'websocket',
-        ingestToken: 'exc_completion_active',
-      });
-      await instance.ctx.storage.put('wrapper_runtime_state', {
-        wrapperGeneration: 1,
-        wrapperConnectionId: 'conn_completion_active',
-        wrapperExecutionId: 'exc_completion_active',
-        acceptedExecutionId: 'exc_completion_active',
-      });
       await storePendingSessionMessage(
         instance.ctx.storage,
         createMessage({
@@ -1272,7 +1483,6 @@ describe('pending session messages', () => {
         })
       );
 
-      await instance.onExecutionComplete('exc_completion_active', 'completed');
       await instance.alarm();
       const pending = await listPendingSessionMessages(instance.ctx.storage);
       const acceptedMessages = await listNonTerminalAcceptedMessages(instance.ctx.storage);
@@ -1283,6 +1493,307 @@ describe('pending session messages', () => {
     expect(result.pending).toHaveLength(0);
     expect(result.acceptedMessages).toHaveLength(1);
     expect(result.acceptedMessages[0]?.messageId).toBe('msg_018f1e2d3c4bComplNextAbCdE');
+  });
+
+  it('does not redeliver exhausted work when terminal effect processing fails once', async () => {
+    const userId = 'user_pending_exhaust_repair';
+    const sessionId = 'agent_pending_exhaust_repair';
+    const stub = env.CLOUD_AGENT_SESSION.get(
+      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
+    );
+
+    const result = await runInDurableObject(stub, async (instance, state) => {
+      let deliveryAttempts = 0;
+      (instance as any).orchestrator = {
+        execute: async () => {
+          deliveryAttempts += 1;
+          throw new Error('wrapper unavailable');
+        },
+      };
+      await registerReadySession(instance, {
+        sessionId,
+        userId,
+        kiloSessionId: 'd4d4d4d4-d4d4-4d4d-8d4d-d4d4d4d4d4d4',
+        prompt: 'prepared prompt',
+        mode: 'code',
+        model: 'test-model',
+        kilocodeToken: 'token-exhaust-repair',
+      });
+      const messageId = 'msg_018f1e2d3c4bExhstRprAAAAA1';
+      await putSessionMessageState(instance.ctx.storage, {
+        messageId,
+        status: 'queued',
+        prompt: 'retry exhaust repair',
+        createdAt: Date.now(),
+        queuedAt: Date.now(),
+      });
+      await storePendingSessionMessage(
+        instance.ctx.storage,
+        createMessage({
+          messageId,
+          content: 'retry exhaust repair',
+          createdAt: 1,
+          flushAttempts: 1,
+          nextFlushAttemptAt: Date.now() - 1,
+        })
+      );
+      const originalEnsure = (instance as any).ensureTerminalMessageEvent.bind(instance);
+      let failTerminalEvent = true;
+      (instance as any).ensureTerminalMessageEvent = (params: unknown) => {
+        if (failTerminalEvent) {
+          failTerminalEvent = false;
+          throw new Error('terminal effects unavailable');
+        }
+        originalEnsure(params);
+      };
+
+      await instance.alarm();
+      await instance.alarm();
+      const pending = await listPendingSessionMessages(instance.ctx.storage);
+      const terminal = await getSessionMessageState(instance.ctx.storage, messageId);
+      const events = createEventQueries(
+        drizzle(state.storage, { logger: false }),
+        state.storage.sql
+      ).findByFilters({ eventTypes: ['cloud.message.failed'] });
+      return { deliveryAttempts, pending, terminal, events };
+    });
+
+    expect(result.deliveryAttempts).toBe(1);
+    expect(result.pending).toHaveLength(0);
+    expect(result.terminal?.status).toBe('failed');
+    expect(result.events).toHaveLength(1);
+  });
+
+  it('does not redeliver after exhausted pending disposition survives terminal state put failure', async () => {
+    const userId = 'user_pending_exhaust_state_failure';
+    const sessionId = 'agent_pending_exhaust_state_failure';
+    const stub = env.CLOUD_AGENT_SESSION.get(
+      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
+    );
+
+    const result = await runInDurableObject(stub, async instance => {
+      const callbacks: Array<{ payload: { messageId?: string; status: string } }> = [];
+      let deliveryAttempts = 0;
+      (
+        instance.env as typeof instance.env & {
+          CALLBACK_QUEUE: {
+            send: (job: { payload: { messageId?: string; status: string } }) => Promise<void>;
+          };
+        }
+      ).CALLBACK_QUEUE = {
+        send: async job => {
+          callbacks.push(job);
+        },
+      };
+      (instance as any).orchestrator = {
+        execute: async () => {
+          deliveryAttempts += 1;
+          throw new Error('wrapper exhaust state failure');
+        },
+      };
+      await registerReadySession(instance, {
+        sessionId,
+        userId,
+        kiloSessionId: 'e5e5e5e5-e5e5-4e5e-8e5e-e5e5e5e5e5e5',
+        prompt: 'state failure exhausted prompt',
+        mode: 'code',
+        model: 'test-model',
+        kilocodeToken: 'token-exhaust-state-failure',
+        callbackTarget: { url: 'https://example.com/exhaust-state-failure' },
+      });
+      const messageId = 'msg_018f1e2d3c4bExhstStateFail';
+      await instance.admitSubmittedMessage(
+        queueUserMessageInput({ userId, prompt: 'state failure exhausted prompt', messageId })
+      );
+      const pending = (await listPendingSessionMessages(instance.ctx.storage))[0];
+      if (!pending) throw new Error('Expected pending message');
+      await storePendingSessionMessage(instance.ctx.storage, {
+        ...pending,
+        flushAttempts: 1,
+        nextFlushAttemptAt: Date.now() - 1,
+      });
+      const originalPut = instance.ctx.storage.put.bind(instance.ctx.storage);
+      let failTerminalStatePut = true;
+      instance.ctx.storage.put = async (key, value) => {
+        if (
+          failTerminalStatePut &&
+          key === `session_message:${messageId}` &&
+          typeof value === 'object' &&
+          value !== null &&
+          'status' in value &&
+          value.status === 'failed'
+        ) {
+          failTerminalStatePut = false;
+          throw new Error('failed state put after exhaustion');
+        }
+        return originalPut(key, value);
+      };
+
+      await instance.alarm();
+      instance.ctx.storage.put = originalPut;
+      const afterFailure = await listPendingSessionMessages(instance.ctx.storage);
+      await instance.alarm();
+      return {
+        deliveryAttempts,
+        callbacks,
+        afterFailure,
+        pending: await listPendingSessionMessages(instance.ctx.storage),
+        terminal: await getSessionMessageState(instance.ctx.storage, messageId),
+      };
+    });
+
+    expect(result.deliveryAttempts).toBe(1);
+    expect(result.afterFailure[0]?.deliveryDisposition).toBe('terminalization-pending');
+    expect(result.pending).toHaveLength(0);
+    expect(result.terminal?.status).toBe('failed');
+    expect(result.callbacks).toHaveLength(1);
+  });
+
+  it('continues a partially failed multi-message interrupt without dispatching captured work', async () => {
+    const userId = 'user_pending_interrupt_batch_failure';
+    const sessionId = 'agent_pending_interrupt_batch_failure';
+    const stub = env.CLOUD_AGENT_SESSION.get(
+      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
+    );
+
+    const result = await runInDurableObject(stub, async instance => {
+      let deliveryAttempts = 0;
+      (instance as any).orchestrator = {
+        execute: async () => {
+          deliveryAttempts += 1;
+          throw new Error('must not dispatch canceled work');
+        },
+      };
+      await registerReadySession(instance, {
+        sessionId,
+        userId,
+        kiloSessionId: 'e6e6e6e6-e6e6-4e6e-8e6e-e6e6e6e6e6e6',
+        prompt: 'interrupt batch prompt',
+        mode: 'code',
+        model: 'test-model',
+        kilocodeToken: 'token-interrupt-batch-failure',
+      });
+      const firstId = 'msg_018f1e2d3c4bIntrBatchFirst';
+      const secondId = 'msg_018f1e2d3c4bIntrBatchSecnd';
+      for (const [messageId, createdAt] of [
+        [firstId, 1],
+        [secondId, 2],
+      ] as const) {
+        await storePendingSessionMessage(
+          instance.ctx.storage,
+          createMessage({ messageId, content: messageId, createdAt })
+        );
+        await putSessionMessageState(instance.ctx.storage, {
+          messageId,
+          status: 'queued',
+          prompt: messageId,
+          createdAt,
+          queuedAt: createdAt,
+        });
+      }
+      const originalPut = instance.ctx.storage.put.bind(instance.ctx.storage);
+      let failSecondInterrupt = true;
+      instance.ctx.storage.put = async (key, value) => {
+        if (
+          failSecondInterrupt &&
+          key === `session_message:${secondId}` &&
+          typeof value === 'object' &&
+          value !== null &&
+          'status' in value &&
+          value.status === 'interrupted'
+        ) {
+          failSecondInterrupt = false;
+          throw new Error('second interrupted state put failed');
+        }
+        return originalPut(key, value);
+      };
+
+      await expect(instance.interruptExecution()).rejects.toThrow(
+        'second interrupted state put failed'
+      );
+      instance.ctx.storage.put = originalPut;
+      const anchored = await listPendingSessionMessages(instance.ctx.storage);
+      await instance.alarm();
+      return {
+        deliveryAttempts,
+        anchored,
+        first: await getSessionMessageState(instance.ctx.storage, firstId),
+        second: await getSessionMessageState(instance.ctx.storage, secondId),
+        pending: await listPendingSessionMessages(instance.ctx.storage),
+      };
+    });
+
+    expect(result.deliveryAttempts).toBe(0);
+    expect(result.anchored).toHaveLength(2);
+    expect(result.anchored.map(message => message.messageId)).toEqual([
+      'msg_018f1e2d3c4bIntrBatchFirst',
+      'msg_018f1e2d3c4bIntrBatchSecnd',
+    ]);
+    expect(result.first?.status).toBe('interrupted');
+    expect(result.second?.status).toBe('interrupted');
+    expect(result.pending).toHaveLength(0);
+  });
+
+  it('enqueues callback-required delivery exhaustion in the terminalization alarm pass', async () => {
+    const userId = 'user_pending_exhaust_callback_progress';
+    const sessionId = 'agent_pending_exhaust_callback_progress';
+    const stub = env.CLOUD_AGENT_SESSION.get(
+      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
+    );
+
+    const result = await runInDurableObject(stub, async instance => {
+      const callbacks: Array<{ payload: { messageId?: string; status: string } }> = [];
+      (
+        instance.env as typeof instance.env & {
+          CALLBACK_QUEUE: {
+            send: (job: { payload: { messageId?: string; status: string } }) => Promise<void>;
+          };
+        }
+      ).CALLBACK_QUEUE = {
+        send: async job => {
+          callbacks.push(job);
+        },
+      };
+      (instance as any).orchestrator = {
+        execute: async () => {
+          throw new Error('wrapper cannot accept exhausted callback');
+        },
+      };
+      await registerReadySession(instance, {
+        sessionId,
+        userId,
+        kiloSessionId: 'e4e4e4e4-e4e4-4e4e-8e4e-e4e4e4e4e4e4',
+        prompt: 'callback exhausted prompt',
+        mode: 'code',
+        model: 'test-model',
+        kilocodeToken: 'token-exhaust-callback-progress',
+        callbackTarget: { url: 'https://example.com/exhaust-progress' },
+      });
+      const messageId = 'msg_018f1e2d3c4bExhstCbProgABC';
+      await instance.admitSubmittedMessage(
+        queueUserMessageInput({ userId, prompt: 'callback exhausted prompt', messageId })
+      );
+      const pending = (await listPendingSessionMessages(instance.ctx.storage))[0];
+      if (!pending) throw new Error('Expected pending message');
+      await storePendingSessionMessage(instance.ctx.storage, {
+        ...pending,
+        flushAttempts: 1,
+        nextFlushAttemptAt: Date.now() - 1,
+      });
+
+      await instance.alarm();
+      return {
+        callbacks,
+        state: await getSessionMessageState(instance.ctx.storage, messageId),
+      };
+    });
+
+    expect(result.state?.status).toBe('failed');
+    expect(result.callbacks).toHaveLength(1);
+    expect(result.callbacks[0].payload).toMatchObject({
+      messageId: 'msg_018f1e2d3c4bExhstCbProgABC',
+      status: 'failed',
+    });
   });
 
   it('terminalizes session message state when delivery retries exhaust', async () => {
@@ -1321,7 +1832,7 @@ describe('pending session messages', () => {
           messageId: 'msg_018f1e2d3c4bExhstTrmAAAAA1',
           content: 'flush until exhausted',
           createdAt: 1,
-          flushAttempts: 4,
+          flushAttempts: 1,
           nextFlushAttemptAt: Date.now() - 1,
         })
       );
@@ -1348,7 +1859,7 @@ describe('pending session messages', () => {
       status: 'failed',
       failureReason: 'exhausted',
       completionSource: 'delivery_failure',
-      attempts: 5,
+      attempts: 2,
     });
     const failedEvent = result.events.find(
       event => event.stream_event_type === 'cloud.message.failed'
@@ -1357,7 +1868,7 @@ describe('pending session messages', () => {
     expect(failedEvent?.payload).toMatchObject({
       messageId: 'msg_018f1e2d3c4bExhstTrmAAAAA1',
       reason: 'exhausted',
-      attempts: 5,
+      attempts: 2,
       completionSource: 'delivery_failure',
     });
   });
@@ -1437,7 +1948,7 @@ describe('pending session messages', () => {
     });
   });
 
-  it('re-queues a failed message id as a fresh attempt instead of returning stale queued ack', async () => {
+  it('rejects reuse of a failed message id and admits a fresh identity', async () => {
     const userId = 'user_pending_retry_terminal';
     const sessionId = 'agent_pending_retry_terminal';
     const stub = env.CLOUD_AGENT_SESSION.get(
@@ -1472,7 +1983,7 @@ describe('pending session messages', () => {
           messageId: 'msg_018f1e2d3c4bRtryTrmAAAAA12',
           content: 'flush until exhausted',
           createdAt: 1,
-          flushAttempts: 4,
+          flushAttempts: 1,
           nextFlushAttemptAt: Date.now() - 1,
         })
       );
@@ -1484,7 +1995,7 @@ describe('pending session messages', () => {
         'msg_018f1e2d3c4bRtryTrmAAAAA12'
       );
 
-      const retryResult = await instance.queueSessionMessage(
+      const retryResult = await instance.admitSubmittedMessage(
         queueUserMessageInput({
           userId,
           prompt: 'retry same message',
@@ -1492,17 +2003,30 @@ describe('pending session messages', () => {
         })
       );
 
-      const retriedState = await getSessionMessageState(
+      const terminalStateAfterRetry = await getSessionMessageState(
         instance.ctx.storage,
         'msg_018f1e2d3c4bRtryTrmAAAAA12'
       );
+      const newMessageResult = await instance.admitSubmittedMessage(
+        queueUserMessageInput({
+          userId,
+          prompt: 'new message identity',
+          messageId: 'msg_018f1e2d3c4bRtryTrmBBBBB12',
+        })
+      );
+      const newState = await getSessionMessageState(
+        instance.ctx.storage,
+        'msg_018f1e2d3c4bRtryTrmBBBBB12'
+      );
 
-      return { messageState, retryResult, retriedState };
+      return { messageState, retryResult, terminalStateAfterRetry, newMessageResult, newState };
     });
 
     expect(result.messageState?.status).toBe('failed');
-    expect(result.retryResult.success).toBe(true);
-    expect(result.retriedState?.status).toBe('queued');
+    expect(result.retryResult).toMatchObject({ success: false, code: 'BAD_REQUEST' });
+    expect(result.terminalStateAfterRetry?.status).toBe('failed');
+    expect(result.newMessageResult).toMatchObject({ success: true });
+    expect(result.newState?.status).toBe('queued');
   });
 
   it('callback-required failed delivery is visible to listMessagesWithPendingCallbacks', async () => {
@@ -1541,7 +2065,7 @@ describe('pending session messages', () => {
           messageId: 'msg_018f1e2d3c4bCbVsblAAAAAAAA',
           content: 'flush until exhausted',
           createdAt: 1,
-          flushAttempts: 4,
+          flushAttempts: 1,
           nextFlushAttemptAt: Date.now() - 1,
         })
       );

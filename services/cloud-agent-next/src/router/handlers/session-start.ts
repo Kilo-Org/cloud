@@ -1,29 +1,29 @@
 /**
  * New primary public surface for creating a cloud-agent session.
  *
- * `start` registers a session, schedules async preparation, AND queues the
- * initial user message atomically. Callers no longer need to chain
- * `prepareSession` → `initiateFromKilocodeSessionV2` — a single call sets up
- * the entire delivery pipeline. The alarm-driven flusher delivers the queued
- * message once preparation completes.
+ * After its external ownership-row prerequisite is created, `start` sends one
+ * grouped command to the session Durable Object to persist registration metadata
+ * and durably admit the canonical initial user turn. The alarm-driven flusher
+ * delivers that queued message once preparation completes.
  *
- * Auth: user-token only (`protectedProcedure`). The entire lifecycle
- * (register + queue) is user-scoped and safe to expose to authenticated
- * browser clients, matching the auth surface of `send`.
+ * Auth: user-token only (`protectedProcedure`). Personal sessions are user-scoped;
+ * organization context is membership-checked before profile resolution or any
+ * session ownership state is created.
  */
 import { protectedProcedure } from '../auth.js';
+import { TRPCError } from '@trpc/server';
+import { organization_memberships } from '@kilocode/db/schema';
+import type { WorkerDb } from '@kilocode/db/client';
+import { and, eq } from 'drizzle-orm';
 import { logger, withLogTags } from '../../logger.js';
+import { getPgDb } from '../../db/pg.js';
 import type * as z from 'zod';
 import { StartSessionInput, StartSessionOutput } from '../schemas.js';
+import { startNewSession } from '../../session/session-registration.js';
 import {
-  ensureSessionRegistered,
-  executionTurnSubmissionFromAcceptedTurn,
-} from '../../session/session-registration.js';
-import { queueMessage } from '../../session/queue-message.js';
-import {
-  applyProfileResolution,
   assertModeAvailableForProfile,
-  resolveProfileForSessionCreateRequest,
+  profileResolutionPolicyForSessionCreateOrigin,
+  resolveEffectiveSessionConfiguration,
 } from './session-prepare.js';
 import type { SessionCreateRequest } from '../../session/session-requests.js';
 
@@ -69,51 +69,71 @@ function startInputToSessionCreateRequest(
   };
 }
 
+async function assertOrganizationMembership(
+  db: WorkerDb,
+  userId: string,
+  organizationId: string
+): Promise<void> {
+  const [membership] = await db
+    .select({ id: organization_memberships.id })
+    .from(organization_memberships)
+    .where(
+      and(
+        eq(organization_memberships.organization_id, organizationId),
+        eq(organization_memberships.kilo_user_id, userId)
+      )
+    )
+    .limit(1);
+
+  if (!membership) {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'You do not have access to this organization',
+    });
+  }
+}
+
 const startSessionHandler = protectedProcedure
   .input(StartSessionInput)
   .output(StartSessionOutput)
   .mutation(async ({ input, ctx }) => {
     return withLogTags({ source: 'start' }, async () => {
       const request = startInputToSessionCreateRequest(input);
-      const resolved = await resolveProfileForSessionCreateRequest(ctx, request);
-      const requestWithProfile = applyProfileResolution(request, resolved);
+      const organizationId = request.options?.kilocodeOrganizationId;
+      let db: WorkerDb | undefined;
+      if (organizationId) {
+        db = getPgDb(ctx.env);
+        await assertOrganizationMembership(db, ctx.userId, organizationId);
+      }
+
+      const policy = profileResolutionPolicyForSessionCreateOrigin(
+        input.options?.createdOnPlatform
+      );
+      const requestWithProfile = await resolveEffectiveSessionConfiguration(
+        ctx,
+        request,
+        policy,
+        db
+      );
       assertModeAvailableForProfile(
         requestWithProfile.agent.mode,
         requestWithProfile.profile?.resolved ?? {}
       );
 
-      const registration = await ensureSessionRegistered(requestWithProfile, {
+      const registration = await startNewSession(requestWithProfile, {
         env: ctx.env,
         userId: ctx.userId,
         authToken: ctx.authToken,
         botId: ctx.botId,
       });
-
-      const ack = await queueMessage(
-        {
-          // Unified start queues its accepted turn directly; only the legacy prepare flow uses registered-initial.
-          kind: 'user-message',
-          cloudAgentSessionId: registration.cloudAgentSessionId,
-          turn: executionTurnSubmissionFromAcceptedTurn(registration.initialTurn),
-          agent: requestWithProfile.agent,
-          finalization: requestWithProfile.finalization,
-        },
-        { env: ctx.env, userId: ctx.userId, botId: ctx.botId }
-      );
-
-      if (ack.delivery !== 'queued') {
-        logger
-          .withFields({ delivery: ack.delivery })
-          .warn('Unexpected delivery state for initial message on fresh session');
-      }
+      const ack = registration.admission;
 
       logger
         .withFields({
           cloudAgentSessionId: registration.cloudAgentSessionId,
           kiloSessionId: registration.kiloSessionId,
           messageId: ack.messageId,
-          delivery: ack.delivery,
-          wrapperRunId: ack.wrapperRunId,
+          delivery: 'queued',
         })
         .info('Session started, initial message queued');
 
@@ -121,8 +141,7 @@ const startSessionHandler = protectedProcedure
         cloudAgentSessionId: registration.cloudAgentSessionId,
         kiloSessionId: registration.kiloSessionId,
         messageId: ack.messageId,
-        delivery: ack.delivery,
-        wrapperRunId: ack.wrapperRunId,
+        delivery: 'queued',
       };
     });
   });

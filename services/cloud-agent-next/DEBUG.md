@@ -20,9 +20,9 @@ Use this guide when a local Cloud Agent flow stalls, a sandbox behaves unexpecte
 Useful Worker-log landmarks include:
 
 - `Queueing cloud-agent message through Durable Object`
-- `Durable Object queueSessionMessage received`
+- `Queued message event persisted and pending flush scheduled`
 - `Pending session message flush attempt starting`
-- `Delivering pending execution to wrapper`
+- `AgentRuntime delivering pending message to wrapper`
 - `ExecutionOrchestrator starting execution`
 - `Workspace warmth probe completed`
 - `Wrapper session readiness completed`

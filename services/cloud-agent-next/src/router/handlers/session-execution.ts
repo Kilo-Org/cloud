@@ -4,7 +4,8 @@
  *
  * `initiateFromKilocodeSessionV2` queues the first message on a session that
  * was registered via `prepareSession`. Callers do not pass a prompt, so the
- * handler sends an explicit `registered-initial` command.
+ * handler calls the retained prepared-initial admission adapter, which resolves
+ * the stored initial turn before invoking current durable admission.
  *
  * `sendMessageV2` queues follow-up messages with full configuration
  * overrides (mode, model, variant, autoCommit, etc.).
@@ -20,6 +21,7 @@ import {
 } from '../schemas.js';
 import type { SessionId } from '../../types/ids.js';
 import { queueMessage } from '../../session/queue-message.js';
+import { admitLegacyPreparedInitialMessage } from '../../session/legacy-prepared-admission.js';
 import type {
   AgentSelectionOverride,
   ExecutionTurnSubmission,
@@ -45,11 +47,8 @@ export function createSessionExecutionV2Handlers() {
           logger.setTags({ userId: ctx.userId, sessionId, preparedSession: true });
           logger.info('Initiating V2 session from prepared session');
 
-          const ack = await queueMessage(
-            {
-              kind: 'registered-initial',
-              cloudAgentSessionId: input.cloudAgentSessionId,
-            },
+          const ack = await admitLegacyPreparedInitialMessage(
+            { cloudAgentSessionId: input.cloudAgentSessionId },
             { env: ctx.env, userId: ctx.userId, botId: ctx.botId }
           );
           return withLegacyExecutionId(ack);
@@ -106,7 +105,6 @@ export function createSessionExecutionV2Handlers() {
 
           const ack = await queueMessage(
             {
-              kind: 'user-message',
               cloudAgentSessionId: input.cloudAgentSessionId,
               turn,
               agent,

@@ -2,20 +2,23 @@ import { describe, expect, it, vi } from 'vitest';
 import { TRPCError } from '@trpc/server';
 
 import { queueMessage } from './queue-message.js';
-import type { QueueSessionMessageRequest, QueueSessionMessageResult } from '../execution/types.js';
+import type {
+  SessionMessageAdmissionResult,
+  SubmittedSessionMessageRequest,
+} from '../execution/types.js';
 import type { Env } from '../types.js';
 import type { SessionId } from '../types/ids.js';
 
 type QueueMessageEnv = Pick<Env, 'CLOUD_AGENT_SESSION'>;
 
-function makeDoStub(result: QueueSessionMessageResult): {
+function makeDoStub(result: SessionMessageAdmissionResult): {
   stub: unknown;
-  queueSessionMessage: ReturnType<typeof vi.fn>;
+  admitSubmittedMessage: ReturnType<typeof vi.fn>;
 } {
-  const queueSessionMessage = vi.fn().mockResolvedValue(result);
+  const admitSubmittedMessage = vi.fn().mockResolvedValue(result);
   return {
-    stub: { queueSessionMessage },
-    queueSessionMessage,
+    stub: { admitSubmittedMessage },
+    admitSubmittedMessage,
   };
 }
 
@@ -30,16 +33,15 @@ function makeEnv(stub: unknown): QueueMessageEnv {
 
 describe('queueMessage', () => {
   it('returns the DO result mapped to an ExecutionResponse on success', async () => {
-    const { stub, queueSessionMessage } = makeDoStub({
+    const { stub, admitSubmittedMessage } = makeDoStub({
       success: true,
-      status: 'started',
+      outcome: 'queued',
+      compatibilityDelivery: 'queued',
       messageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
-      delivery: 'queued',
     });
 
     const response = await queueMessage(
       {
-        kind: 'user-message',
         cloudAgentSessionId: 'agent_1234' as SessionId,
         turn: { type: 'prompt', prompt: 'hello' },
       },
@@ -50,56 +52,71 @@ describe('queueMessage', () => {
     );
 
     expect(response.cloudAgentSessionId).toBe('agent_1234');
+    expect(response.status).toBe('started');
     expect(response.delivery).toBe('queued');
     expect(response.streamUrl).toBe('/stream?cloudAgentSessionId=agent_1234');
-    expect(queueSessionMessage).toHaveBeenCalledTimes(1);
-    const request = queueSessionMessage.mock.calls[0]?.[0] as
-      | QueueSessionMessageRequest
+    expect(admitSubmittedMessage).toHaveBeenCalledTimes(1);
+    const request = admitSubmittedMessage.mock.calls[0]?.[0] as
+      | SubmittedSessionMessageRequest
       | undefined;
     expect(request).toMatchObject({
-      kind: 'user-message',
       userId: 'user_abc',
       turn: { type: 'prompt', prompt: 'hello' },
     });
-    expect(request?.kind === 'user-message' ? request.turn.id : undefined).toBeUndefined();
+    expect(request?.turn.id).toBeUndefined();
   });
 
-  it('forwards the caller messageId when provided', async () => {
-    const { stub, queueSessionMessage } = makeDoStub({
+  it('projects an already runtime-accepted replay as sent at the public seam', async () => {
+    const { stub } = makeDoStub({
       success: true,
-      status: 'started',
+      outcome: 'queued',
+      compatibilityDelivery: 'sent',
       messageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
-      delivery: 'queued',
     });
 
-    await queueMessage(
+    const response = await queueMessage(
       {
-        kind: 'user-message',
         cloudAgentSessionId: 'agent_y' as SessionId,
         turn: { type: 'prompt', id: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn', prompt: 'hello' },
       },
       { env: makeEnv(stub) as Env, userId: 'user_a' }
     );
 
-    const request = queueSessionMessage.mock.calls[0]?.[0] as
-      | QueueSessionMessageRequest
-      | undefined;
-    expect(request?.kind === 'user-message' ? request.turn.id : undefined).toBe(
-      'msg_018f1e2d3c4bAbCdEfGhIjKlMn'
-    );
+    expect(response).toMatchObject({ status: 'started', delivery: 'sent' });
   });
 
-  it('forwards the composed user-message payload to the Durable Object', async () => {
-    const { stub, queueSessionMessage } = makeDoStub({
+  it('forwards the caller messageId when provided', async () => {
+    const { stub, admitSubmittedMessage } = makeDoStub({
       success: true,
-      status: 'started',
+      outcome: 'queued',
+      compatibilityDelivery: 'queued',
       messageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
-      delivery: 'queued',
     });
 
     await queueMessage(
       {
-        kind: 'user-message',
+        cloudAgentSessionId: 'agent_y' as SessionId,
+        turn: { type: 'prompt', id: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn', prompt: 'hello' },
+      },
+      { env: makeEnv(stub) as Env, userId: 'user_a' }
+    );
+
+    const request = admitSubmittedMessage.mock.calls[0]?.[0] as
+      | SubmittedSessionMessageRequest
+      | undefined;
+    expect(request?.turn.id).toBe('msg_018f1e2d3c4bAbCdEfGhIjKlMn');
+  });
+
+  it('forwards the composed user-message payload to the Durable Object', async () => {
+    const { stub, admitSubmittedMessage } = makeDoStub({
+      success: true,
+      outcome: 'queued',
+      compatibilityDelivery: 'queued',
+      messageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
+    });
+
+    await queueMessage(
+      {
         cloudAgentSessionId: 'agent_payload' as SessionId,
         turn: {
           type: 'prompt',
@@ -115,8 +132,7 @@ describe('queueMessage', () => {
       { env: makeEnv(stub) as Env, userId: 'user_payload', botId: 'bot_payload' }
     );
 
-    expect(queueSessionMessage).toHaveBeenCalledWith({
-      kind: 'user-message',
+    expect(admitSubmittedMessage).toHaveBeenCalledWith({
       userId: 'user_payload',
       botId: 'bot_payload',
       turn: {
@@ -138,7 +154,6 @@ describe('queueMessage', () => {
     await expect(
       queueMessage(
         {
-          kind: 'user-message',
           cloudAgentSessionId: 'agent_x' as SessionId,
           turn: { type: 'prompt', prompt: 'x' },
         },
@@ -152,7 +167,6 @@ describe('queueMessage', () => {
     await expect(
       queueMessage(
         {
-          kind: 'user-message',
           cloudAgentSessionId: 'agent_x' as SessionId,
           turn: { type: 'prompt', prompt: 'x' },
         },
@@ -166,7 +180,6 @@ describe('queueMessage', () => {
     await expect(
       queueMessage(
         {
-          kind: 'user-message',
           cloudAgentSessionId: 'agent_x' as SessionId,
           turn: { type: 'prompt', prompt: 'x' },
         },
@@ -180,7 +193,6 @@ describe('queueMessage', () => {
     await expect(
       queueMessage(
         {
-          kind: 'user-message',
           cloudAgentSessionId: 'agent_x' as SessionId,
           turn: { type: 'prompt', prompt: 'x' },
         },
@@ -198,7 +210,6 @@ describe('queueMessage', () => {
     await expect(
       queueMessage(
         {
-          kind: 'user-message',
           cloudAgentSessionId: 'agent_x' as SessionId,
           turn: { type: 'prompt', prompt: 'x' },
         },
@@ -209,7 +220,6 @@ describe('queueMessage', () => {
     try {
       await queueMessage(
         {
-          kind: 'user-message',
           cloudAgentSessionId: 'agent_x' as SessionId,
           turn: { type: 'prompt', prompt: 'x' },
         },

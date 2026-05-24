@@ -11,7 +11,7 @@ import { SessionService } from '../../../src/session-service.js';
 import type {
   ExecutionPlan,
   ExecutionResult,
-  MessageDeliveryPlan,
+  FencedWrapperDispatchRequest,
   ModelConfig,
   WorkspaceDeliveryPlan,
   WrapperRunFence,
@@ -339,13 +339,13 @@ describe('WrapperRunFence types', () => {
       wrapperGeneration: 1,
       wrapperConnectionId: 'conn_123',
     };
-    const wrapper: MessageDeliveryPlan['wrapper'] = {
+    const wrapper: FencedWrapperDispatchRequest['wrapper'] = {
       kiloSessionId: 'kilo_sess_456',
       fence,
     };
 
     expect(wrapper.kiloSessionId).toBe('kilo_sess_456');
-    expect(wrapper.fence?.wrapperRunId).toBe('wr_123');
+    expect(wrapper.fence.wrapperRunId).toBe('wr_123');
   });
 });
 
@@ -368,6 +368,11 @@ describe('ExecutionPlan types', () => {
       workspace: createWorkspaceDeliveryPlan(),
       wrapper: {
         kiloSessionId: 'kilo_sess_456',
+        fence: {
+          wrapperRunId: 'wr_plan_type',
+          wrapperGeneration: 1,
+          wrapperConnectionId: 'conn_plan_type',
+        },
       },
     };
 

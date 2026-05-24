@@ -3,8 +3,9 @@ import { SANDBOX_SLEEP_AFTER_SECONDS } from '../core/lease.js';
 import { ExecutionOrchestrator } from '../execution/orchestrator.js';
 import type {
   ExecutionResult,
-  MessageDeliveryPlan,
-  QueueSessionMessageResult,
+  FencedWrapperDispatchRequest,
+  MessageDeliveryRequest,
+  MessageDeliveryResult,
   WorkspaceReady,
 } from '../execution/types.js';
 import { logger } from '../logger.js';
@@ -37,7 +38,7 @@ type RuntimeWrapperStopper = (sandbox: SandboxInstance, sessionId: string) => Pr
 
 export type AgentRuntimeOrchestrator = {
   execute(
-    plan: MessageDeliveryPlan,
+    plan: FencedWrapperDispatchRequest,
     options?: {
       onProgress?: (step: string, message: string) => void;
       onWorkspaceReady?: (ready: WorkspaceReady) => Promise<void>;
@@ -47,7 +48,7 @@ export type AgentRuntimeOrchestrator = {
 
 export type AgentRuntimeAcceptedDelivery = {
   acceptedAt: number;
-  wrapperRunId?: string;
+  wrapperRunId: string;
 };
 
 export type AgentRuntimeSendHooks = {
@@ -56,13 +57,14 @@ export type AgentRuntimeSendHooks = {
   onAccepted?: (delivery: AgentRuntimeAcceptedDelivery) => Promise<void>;
 };
 
-export type AgentRuntimeStopReason = 'idle-timeout' | 'unhealthy-wrapper' | 'keep-warm-expired';
+export type AgentRuntimeStopReason =
+  | 'idle-timeout'
+  | 'unhealthy-wrapper'
+  | 'keep-warm-expired'
+  | 'user-interrupt';
 
 export type AgentRuntime = {
-  send(
-    plan: MessageDeliveryPlan,
-    hooks?: AgentRuntimeSendHooks
-  ): Promise<QueueSessionMessageResult>;
+  send(plan: MessageDeliveryRequest, hooks?: AgentRuntimeSendHooks): Promise<MessageDeliveryResult>;
   requestSnapshot(): Promise<void>;
   interruptWrapper(): Promise<{ commandSent: boolean }>;
   sendPing(ingestTagId: string): void;
@@ -75,36 +77,31 @@ export type AgentRuntimeDependencies = {
   env: WorkerEnv;
   getMetadata: () => Promise<SessionMetadata | null>;
   getSessionIdForLogs: () => string | undefined;
-  resolveLegacyIngestTagId: () => Promise<string | null>;
-  sendToWrapper: (ingestTagId: string, command: WrapperCommand) => void;
+  sendToWrapper: (
+    ingestTagId: string,
+    command: WrapperCommand,
+    fence?: { wrapperGeneration: number; wrapperConnectionId: string }
+  ) => boolean;
   getOrchestratorOverride?: () => AgentRuntimeOrchestrator | undefined;
   resolveSandbox?: RuntimeSandboxResolver;
   stopRuntimeWrapper?: RuntimeWrapperStopper;
 };
 
-function buildStartedResult(
+function buildRuntimeAcceptanceResult(
   messageId: string,
-  wrapperRunId: string | undefined
-): QueueSessionMessageResult {
+  wrapperRunId: string
+): MessageDeliveryResult {
   return {
     success: true,
-    status: 'started',
+    outcome: 'accepted',
     messageId,
-    delivery: 'sent',
-    ...(wrapperRunId ? { wrapperRunId } : {}),
+    wrapperRunId,
   };
 }
 
 export function createAgentRuntime(dependencies: AgentRuntimeDependencies): AgentRuntime {
-  const {
-    storage,
-    env,
-    getMetadata,
-    getSessionIdForLogs,
-    resolveLegacyIngestTagId,
-    sendToWrapper,
-    getOrchestratorOverride,
-  } = dependencies;
+  const { storage, env, getMetadata, getSessionIdForLogs, sendToWrapper, getOrchestratorOverride } =
+    dependencies;
   const resolveSandbox: RuntimeSandboxResolver =
     dependencies.resolveSandbox ??
     ((sandboxId, options) => getSandbox(getSandboxNamespace(env, sandboxId), sandboxId, options));
@@ -133,14 +130,13 @@ export function createAgentRuntime(dependencies: AgentRuntimeDependencies): Agen
 
   async function resolveIngestTagId(): Promise<string | null> {
     const runtimeState = await getWrapperRuntimeState(storage);
-    if (runtimeState.wrapperRunId) return runtimeState.wrapperRunId;
-    return resolveLegacyIngestTagId();
+    return runtimeState.wrapperRunId ?? null;
   }
 
   async function send(
-    plan: MessageDeliveryPlan,
+    plan: MessageDeliveryRequest,
     hooks: AgentRuntimeSendHooks = {}
-  ): Promise<QueueSessionMessageResult> {
+  ): Promise<MessageDeliveryResult> {
     const { sessionId } = plan.scope;
     const { turn, agent } = plan;
     const { state: wrapperRuntimeState, allocatedNewIdentity } =
@@ -158,21 +154,17 @@ export function createAgentRuntime(dependencies: AgentRuntimeDependencies): Agen
       })
       .info('AgentRuntime delivering pending message to wrapper');
 
-    const fencedPlan = {
+    const fencedPlan: FencedWrapperDispatchRequest = {
       ...plan,
       wrapper: {
         ...plan.wrapper,
         fence: {
+          wrapperRunId: wrapperRuntimeState.wrapperRunId,
           wrapperGeneration: wrapperRuntimeState.wrapperGeneration,
-          ...(wrapperRuntimeState.wrapperConnectionId
-            ? { wrapperConnectionId: wrapperRuntimeState.wrapperConnectionId }
-            : {}),
-          ...(wrapperRuntimeState.wrapperRunId
-            ? { wrapperRunId: wrapperRuntimeState.wrapperRunId }
-            : {}),
+          wrapperConnectionId: wrapperRuntimeState.wrapperConnectionId,
         },
       },
-    } satisfies MessageDeliveryPlan;
+    };
 
     let wrapperReady = false;
     try {
@@ -215,7 +207,7 @@ export function createAgentRuntime(dependencies: AgentRuntimeDependencies): Agen
           nextPingAt: acceptedAt + WRAPPER_PING_INTERVAL_MS,
         })
         .info('AgentRuntime wrapper accepted pending session message');
-      return buildStartedResult(turn.messageId, wrapperRuntimeState.wrapperRunId);
+      return buildRuntimeAcceptanceResult(turn.messageId, wrapperRuntimeState.wrapperRunId);
     } catch (error) {
       logger
         .withFields({
@@ -232,6 +224,21 @@ export function createAgentRuntime(dependencies: AgentRuntimeDependencies): Agen
         logger
           .withFields({ sessionId, messageId: turn.messageId })
           .debug('Cleared newly allocated runtime wrapper state after failed delivery');
+      } else if (!allocatedNewIdentity) {
+        const currentState = await getWrapperRuntimeState(storage);
+        if (
+          currentState.wrapperGeneration === wrapperRuntimeState.wrapperGeneration &&
+          currentState.wrapperConnectionId === wrapperRuntimeState.wrapperConnectionId &&
+          currentState.wrapperRunId === wrapperRuntimeState.wrapperRunId
+        ) {
+          logger
+            .withFields({
+              sessionId,
+              messageId: turn.messageId,
+              wrapperRunId: currentState.wrapperRunId,
+            })
+            .debug('Preserved existing runtime liveness after failed hot delivery');
+        }
       }
       throw error;
     }
@@ -253,10 +260,20 @@ export function createAgentRuntime(dependencies: AgentRuntimeDependencies): Agen
   }
 
   async function interruptWrapper(): Promise<{ commandSent: boolean }> {
-    const ingestTagId = await resolveIngestTagId();
-    if (!ingestTagId) return { commandSent: false };
-    sendToWrapper(ingestTagId, { type: 'kill', signal: 'SIGTERM' });
-    return { commandSent: true };
+    const runtimeState = await getWrapperRuntimeState(storage);
+    if (!runtimeState.wrapperRunId || !runtimeState.wrapperConnectionId) {
+      return { commandSent: false };
+    }
+    return {
+      commandSent: sendToWrapper(
+        runtimeState.wrapperRunId,
+        { type: 'kill', signal: 'SIGTERM' },
+        {
+          wrapperGeneration: runtimeState.wrapperGeneration,
+          wrapperConnectionId: runtimeState.wrapperConnectionId,
+        }
+      ),
+    };
   }
 
   function sendPing(ingestTagId: string): void {

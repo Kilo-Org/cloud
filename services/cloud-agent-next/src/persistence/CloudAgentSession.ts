@@ -28,7 +28,6 @@ import {
   type LeaseAcquireError,
 } from '../session/queries/index.js';
 import {
-  isExecutionId,
   type ExecutionId,
   type EventSourceId,
   type EventId,
@@ -59,12 +58,16 @@ import type { StoredEvent } from '../websocket/types.js';
 import type { WrapperCommand, CloudStatusData } from '../shared/protocol.js';
 import { commandsOrDefault, type SlashCommandInfo } from '../shared/slash-commands.js';
 import type {
+  AcceptedExecutionTurn,
   AgentSelection,
   ExecutionDeliveryContext,
   ExecutionTurnSubmission,
-  MessageDeliveryPlan,
-  QueueSessionMessageRequest,
-  QueueSessionMessageResult,
+  MessageDeliveryRequest,
+  AdmitAcceptedSessionMessageRequest,
+  LegacyRegisteredInitialAdmissionRequest,
+  MessageDeliveryResult,
+  SessionMessageAdmissionResult,
+  SubmittedSessionMessageRequest,
   SessionFinalization,
 } from '../execution/types.js';
 import { renderExecutionTurnContent } from '../execution/types.js';
@@ -74,7 +77,11 @@ import { generateSandboxId } from '../sandbox-id.js';
 import { validateStreamTicket } from '../auth.js';
 import { resolveTerminalWrapperClient, type TerminalWrapperClient } from '../terminal/access.js';
 import type { WrapperPty } from '../kilo/wrapper-client.js';
-import { countPendingSessionMessages } from '../session/pending-messages.js';
+import {
+  countPendingSessionMessages,
+  findPendingSessionMessageByMessageId,
+  resolvePendingSessionMessageIntent,
+} from '../session/pending-messages.js';
 import {
   createSessionMessageQueue,
   PENDING_FLUSH_DEBOUNCE_MS,
@@ -123,7 +130,6 @@ const LAST_ACTIVITY_KEY = 'last_activity';
 const KILO_SERVER_IDLE_TIMEOUT_MS_DEFAULT = 15 * 60 * 1000;
 
 /** Default per-execution wall-clock deadline: 60 minutes */
-const DEFAULT_MAX_RUNTIME_MS = 3_600_000;
 
 type TerminalSizeInput = {
   cols: number;
@@ -196,6 +202,45 @@ type GroupedRegisterSessionInput = {
     'sandboxId' | 'shallow' | 'devcontainerRequested'
   >;
 };
+
+type CreateSessionWithInitialAdmissionInput = Omit<GroupedRegisterSessionInput, 'message'> & {
+  message: {
+    initialTurn: AcceptedExecutionTurn;
+  };
+};
+
+function isSameAcceptedInitialTurn(
+  metadata: SessionMetadata,
+  initialTurn: AcceptedExecutionTurn
+): boolean {
+  const stored = metadata.initialMessage;
+  if (!stored || stored.id !== initialTurn.messageId) return false;
+  if (initialTurn.type === 'command') {
+    return (
+      stored.turn?.type === 'command' &&
+      stored.turn.command === initialTurn.command &&
+      stored.turn.arguments === initialTurn.arguments
+    );
+  }
+  return (
+    stored.turn?.type === 'prompt' &&
+    stored.turn.prompt === initialTurn.prompt &&
+    JSON.stringify(stored.turn.images) === JSON.stringify(initialTurn.images)
+  );
+}
+
+function isSameInitialAdmissionConfiguration(
+  metadata: SessionMetadata,
+  input: CreateSessionWithInitialAdmissionInput
+): boolean {
+  return (
+    metadata.agent?.mode === input.agent.mode &&
+    metadata.agent.model === input.agent.model &&
+    metadata.agent.variant === input.agent.variant &&
+    metadata.finalization?.autoCommit === input.finalization?.autoCommit &&
+    metadata.finalization?.condenseOnComplete === input.finalization?.condenseOnComplete
+  );
+}
 
 export class CloudAgentSession extends DurableObject<WorkerEnv> {
   private executionQueries: ExecutionQueries;
@@ -380,8 +425,8 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
             kiloSessionId,
             parentMessageId
           ),
-        insertAndBroadcastMessageEvent: event => {
-          this.insertAndBroadcastEvent({
+        ensureTerminalMessageEvent: event => {
+          this.ensureTerminalMessageEvent({
             executionId: '' as EventSourceId,
             ...event,
           });
@@ -405,8 +450,8 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         env: this.env,
         getMetadata: () => this.getMetadata(),
         getSessionIdForLogs: () => this.sessionId,
-        resolveLegacyIngestTagId: () => this.getRawWrapperRuntimeExecutionId(),
-        sendToWrapper: (ingestTagId, command) => this.sendToWrapper(ingestTagId, command),
+        sendToWrapper: (ingestTagId, command, fence) =>
+          this.sendToWrapper(ingestTagId, command, fence),
         getOrchestratorOverride: () => this.orchestrator,
       });
     }
@@ -431,11 +476,8 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
             kiloSessionId,
             parentMessageId
           ),
-        getCurrentRuntimeExecutionId: () => this.getRawWrapperRuntimeExecutionId(),
-        getExecution: executionId => this.executionQueries.get(executionId),
         hasActiveIngestConnection: async params =>
           (await this.getIngestHandler()).hasActiveConnection(params),
-        failExecution: params => this.failExecution(params),
         clearInterruptRequest: () => this.executionQueries.clearInterrupt(),
         getSessionIdForLogs: () => this.sessionId,
       });
@@ -476,35 +518,20 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         requireSessionId: () => this.requireSessionId(),
         validateModeAgainstRuntimeAgents,
         getDeliveryContext: () => this.getPendingMessageDeliveryContext(),
-        hasCurrentRuntimeExecution: async () => (await this.getCurrentRuntimeExecution()) !== null,
-        hasActiveAcceptedWrapperMessages: async () => {
-          const state = await getWrapperRuntimeState(this.ctx.storage);
-          if (!state.wrapperConnectionId) return false;
-          return (
-            (await listNonTerminalAcceptedMessages(this.ctx.storage, state.wrapperRunId)).length > 0
-          );
-        },
-        isLegacyAcceptedMessageRunning: async messageId => {
-          const state = await getWrapperRuntimeState(this.ctx.storage);
-          if (state.acceptedMessageId !== messageId || !state.acceptedExecutionId) {
-            return false;
-          }
-          const acceptedExecution = await this.executionQueries.get(
-            state.acceptedExecutionId as ExecutionId
-          );
-          return Boolean(
-            acceptedExecution && this.isCurrentRuntimeStatus(acceptedExecution.status)
-          );
-        },
         deliver: plan => this.executeDirectly(plan),
-        insertAndBroadcastMessageEvent: event => {
-          this.insertAndBroadcastEvent({
+        ensureQueuedMessageEvent: event => {
+          this.ensureQueuedMessageEvent({
             executionId: '' as EventSourceId,
             ...event,
           });
         },
-        terminalizeSessionMessageOnce: (messageId, params, options) =>
-          this.terminalizeSessionMessageOnce(messageId, params, options),
+        ensureAcceptedMessageEffects: messageId => this.ensureAcceptedMessageEffects(messageId),
+        persistTerminalTransition: (messageId, params, options) =>
+          this.getMessageSettlementOutbox().persistTerminalTransition(messageId, params, options),
+        repairTerminalMessageEffects: messageId =>
+          this.getMessageSettlementOutbox().repairTerminalMessageEffects(messageId),
+        finalizeTerminalCallbackEffects: options =>
+          this.getMessageSettlementOutbox().finalizeIdleBatchCallbackIfReady(options),
         requestAlarmAtOrBefore: deadline => this.scheduleAlarmAtOrBefore(deadline),
         getSessionIdForLogs: () => this.sessionId,
       });
@@ -533,29 +560,13 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       const doContext: IngestDOContext = {
         updateKiloSessionId: (id: string) => this.updateKiloSessionId(id),
         updateUpstreamBranch: (branch: string) => this.updateUpstreamBranch(branch),
-        // Rollout-only executionId ingest reconnect adapters. Keep adjacent so
-        // the pre-fenced compatibility path can be removed as one deletion.
-        getLegacyIngestExecution: executionId => {
-          if (!isExecutionId(executionId)) return Promise.resolve(null);
-          return this.getExecution(executionId);
-        },
-        transitionLegacyExecutionToRunning: async executionId => {
-          await this.updateExecutionStatus({ executionId, status: 'running' });
-        },
-        handleLegacyExecutionTerminal: async (executionId, terminal) => {
-          await this.onExecutionComplete(
-            executionId,
-            terminal.status,
-            terminal.error,
-            terminal.gateResult
-          );
-        },
         setAvailableCommands: (commands: SlashCommandInfo[]) => this.setAvailableCommands(commands),
         wrapperSupervisor: this.getWrapperSupervisor(),
         keepContainerAlive: () => {
           void this.keepContainerAlive();
         },
-        terminalizeSessionMessageOnce: async (messageId, params) => {
+        terminalizeSessionMessageOnce: async (messageId, params, wrapperRunId) => {
+          await this.ensureAcceptedMessageBeforeTerminal(messageId, wrapperRunId);
           await this.terminalizeSessionMessageOnce(messageId, params as TerminalizeParams);
         },
       };
@@ -763,6 +774,60 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     });
   }
 
+  private ensureTerminalMessageEvent(params: {
+    executionId: EventSourceId;
+    sessionId: string;
+    streamEventType: string;
+    payload: string;
+    timestamp: number;
+    entityId: string;
+  }): void {
+    const eventId = this.eventQueries.insertUnique({
+      executionId: params.executionId,
+      sessionId: params.sessionId,
+      streamEventType: params.streamEventType,
+      payload: params.payload,
+      timestamp: params.timestamp,
+      entityId: params.entityId,
+    });
+    if (eventId === null) return;
+    this.broadcastEvent({
+      id: eventId,
+      execution_id: params.executionId,
+      session_id: params.sessionId,
+      stream_event_type: params.streamEventType,
+      payload: params.payload,
+      timestamp: params.timestamp,
+    });
+  }
+
+  private ensureQueuedMessageEvent(params: {
+    executionId: EventSourceId;
+    sessionId: string;
+    streamEventType: string;
+    payload: string;
+    timestamp: number;
+    entityId: string;
+  }): void {
+    const eventId = this.eventQueries.insertUnique({
+      executionId: params.executionId,
+      sessionId: params.sessionId,
+      streamEventType: params.streamEventType,
+      payload: params.payload,
+      timestamp: params.timestamp,
+      entityId: params.entityId,
+    });
+    if (eventId === null) return;
+    this.broadcastEvent({
+      id: eventId,
+      execution_id: params.executionId,
+      session_id: params.sessionId,
+      stream_event_type: params.streamEventType,
+      payload: params.payload,
+      timestamp: params.timestamp,
+    });
+  }
+
   /**
    * Broadcast an event to connected /stream clients without persisting it.
    * Used for transient progress events (e.g. `preparing`) that have no
@@ -790,24 +855,11 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
    * Used to populate the `connected` event on WebSocket upgrade.
    */
   private async deriveCloudStatus(): Promise<CloudStatusData['cloudStatus'] | null> {
-    const runtimeExecutionId = await this.getCurrentWrapperRuntimeExecutionId();
-    if (!runtimeExecutionId) {
-      const metadata = await this.getMetadata();
-      if (metadata?.lifecycle.preparedAt) return { type: 'ready' };
+    const metadata = await this.getMetadata();
+    if (metadata?.lifecycle.preparedAt) return { type: 'ready' };
 
-      const pendingCount = await countPendingSessionMessages(this.ctx.storage);
-      return pendingCount > 0 ? { type: 'preparing' } : null;
-    }
-
-    const exec = await this.executionQueries.get(runtimeExecutionId);
-    if (!exec) return null;
-
-    if (exec.status === 'pending') {
-      return { type: 'preparing' };
-    }
-
-    // Running executions mean the agent has control - infrastructure is ready
-    return { type: 'ready' };
+    const pendingCount = await countPendingSessionMessages(this.ctx.storage);
+    return pendingCount > 0 ? { type: 'preparing' } : null;
   }
 
   /**
@@ -816,9 +868,10 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
    * volatile catch-up state — nothing here is persisted into the event log.
    *
    * Pending messages (including the initial message) live under
-   * `pending_message:*` with their real executionId. These are the messages a
-   * reconnecting client would otherwise miss entirely because the client opts
-   * out of event-log replay.
+   * `pending_message:*` with their durable `messageId`. Legacy V2 responses may
+   * project that identity as `executionId`, but no separate current execution
+   * identity exists in this snapshot path. These are the messages a reconnecting
+   * client would otherwise miss because the client opts out of event-log replay.
    */
   private async deriveQueuedMessages(): Promise<QueuedMessageSnapshot[]> {
     return this.getSessionMessageQueue().snapshotForStreamConnect();
@@ -1024,14 +1077,34 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
    * Send a command to the wrapper via its ingest WebSocket connection.
    * Used for bidirectional communication (kill, ping).
    *
-   * @param ingestTagId - Wrapper run or legacy execution tag on the ingest socket.
+   * @param ingestTagId - Fenced wrapper run tag on the ingest socket.
    * @param command - The command to send (kill, ping)
    */
-  sendToWrapper(ingestTagId: string, command: WrapperCommand): void {
+  sendToWrapper(
+    ingestTagId: string,
+    command: WrapperCommand,
+    fence?: { wrapperGeneration: number; wrapperConnectionId: string }
+  ): boolean {
     const wrappers = this.ctx.getWebSockets(`ingest:${ingestTagId}`);
+    let sent = false;
     for (const ws of wrappers) {
+      if (fence) {
+        const attachment: unknown = ws.deserializeAttachment();
+        if (
+          !attachment ||
+          typeof attachment !== 'object' ||
+          !('wrapperGeneration' in attachment) ||
+          !('wrapperConnectionId' in attachment) ||
+          attachment.wrapperGeneration !== fence.wrapperGeneration ||
+          attachment.wrapperConnectionId !== fence.wrapperConnectionId
+        ) {
+          continue;
+        }
+      }
       ws.send(JSON.stringify(command));
+      sent = true;
     }
+    return sent;
   }
 
   /**
@@ -1045,48 +1118,100 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
   }
 
   /**
-   * Interrupt the current wrapper runtime execution by sending a kill command to the wrapper.
-   * Returns success/failure status.
+   * Interrupt accepted current wrapper-run messages and queued delivery work.
+   * The optional `executionId` result remains for legacy response compatibility.
    *
    * @returns Result indicating if the interrupt was initiated
    */
+  private async interruptAcceptedWrapperMessages(): Promise<{
+    acceptedMessageCount: number;
+    wrapperCommandSent: boolean;
+  }> {
+    const state = await getWrapperRuntimeState(this.ctx.storage);
+    const acceptedMessages = await listNonTerminalAcceptedMessages(
+      this.ctx.storage,
+      state.wrapperRunId
+    );
+    for (const msg of acceptedMessages) {
+      const transition = await this.getMessageSettlementOutbox().persistTerminalTransition(
+        msg.messageId,
+        {
+          kind: 'interrupted',
+          error: 'Message interrupted by user',
+          completionSource: 'interrupt',
+        },
+        { allowIdleBatchWithoutObservedIdle: true }
+      );
+      if (!transition.state || transition.state.status !== 'interrupted') {
+        throw new Error(`Failed to persist interrupted transition for message ${msg.messageId}`);
+      }
+      try {
+        await this.getMessageSettlementOutbox().repairTerminalMessageEffects(msg.messageId);
+      } catch (error) {
+        logger
+          .withFields({
+            sessionId: this.sessionId,
+            messageId: msg.messageId,
+            error: error instanceof Error ? error.message : String(error),
+          })
+          .warn(
+            'Accepted message interruption effects incomplete; alarm repair will continue recovery'
+          );
+        await this.scheduleAlarmAtOrBefore(Date.now() + 1_000);
+      }
+    }
+
+    const interrupt = await this.getAgentRuntime().interruptWrapper();
+    if (acceptedMessages.length > 0 && state.wrapperConnectionId) {
+      await clearWrapperRuntimeIdentity(
+        this.ctx.storage,
+        {
+          wrapperGeneration: state.wrapperGeneration,
+          wrapperConnectionId: state.wrapperConnectionId,
+        },
+        { incrementGeneration: true }
+      );
+      try {
+        await this.stopCurrentWrapperProcess('user-interrupt');
+      } catch (error) {
+        logger
+          .withFields({
+            sessionId: this.sessionId,
+            error: error instanceof Error ? error.message : String(error),
+          })
+          .warn('Failed to stop interrupted wrapper process after fencing');
+      }
+    }
+    return {
+      acceptedMessageCount: acceptedMessages.length,
+      wrapperCommandSent: interrupt.commandSent,
+    };
+  }
+
   async interruptExecution(): Promise<{
     success: boolean;
     executionId?: ExecutionId;
     message?: string;
   }> {
-    const runtimeExecutionId = await this.getCurrentWrapperRuntimeExecutionId();
-    const targetExecutionId = runtimeExecutionId ?? undefined;
     let acceptedMessageCount = 0;
     let wrapperCommandSent = false;
     const clearedMessages = await this.getSessionMessageQueue().interruptPendingQueuedMessages(
       async () => {
-        const state = await getWrapperRuntimeState(this.ctx.storage);
-        const acceptedMessages = await listNonTerminalAcceptedMessages(
-          this.ctx.storage,
-          state.wrapperRunId
-        );
-        acceptedMessageCount = acceptedMessages.length;
-        for (const msg of acceptedMessages) {
-          await this.terminalizeSessionMessageOnce(msg.messageId, {
-            kind: 'interrupted',
-            error: 'Message interrupted by user',
-            completionSource: 'interrupt',
-          });
-        }
-
-        const interrupt = await this.getAgentRuntime().interruptWrapper();
-        wrapperCommandSent = interrupt.commandSent;
+        const acceptedInterruption = await this.interruptAcceptedWrapperMessages();
+        acceptedMessageCount = acceptedInterruption.acceptedMessageCount;
+        wrapperCommandSent = acceptedInterruption.wrapperCommandSent;
       }
     );
 
     await this.finalizeIdleBatchCallbackIfReady({ allowWithoutObservedIdle: true });
 
     if (!wrapperCommandSent && clearedMessages.length === 0 && acceptedMessageCount === 0) {
-      return { success: false, message: 'No current runtime execution or pending queued messages' };
+      return { success: false, message: 'No accepted wrapper messages or pending queued messages' };
     }
 
-    return { success: true, executionId: targetExecutionId };
+    // Current interrupt success intentionally does not expose arbitrary legacy
+    // execution rows as the identity of message-native work.
+    return { success: true, executionId: undefined };
   }
 
   private async getTerminalClient(): Promise<OperationResult<{ client: TerminalWrapperClient }>> {
@@ -1292,6 +1417,79 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     return { success: true };
   }
 
+  /**
+   * Register metadata and admit the initial accepted turn through one DO-owned
+   * command. These storage steps are intentionally staged: if initial durable
+   * admission is rejected after metadata is stored (for example if capacity is
+   * exhausted), metadata remains registered and the caller receives a failure
+   * so the Worker can attempt best-effort `onlyIfEmpty` deletion of its external
+   * ownership-row prerequisite. Retrying this command with the same canonical
+   * initial message ID and immutable intent resumes admission or replays its
+   * existing acknowledgment. This method does not assert a cross-record storage
+   * transaction.
+   */
+  async createSessionWithInitialAdmission(
+    input: CreateSessionWithInitialAdmissionInput
+  ): Promise<SessionMessageAdmissionResult> {
+    const initialTurn = input.message.initialTurn;
+    const admitInitialTurn = () =>
+      this.getSessionMessageQueue().admitAcceptedMessage({
+        userId: input.identity.userId as UserId,
+        botId: input.identity.botId,
+        turn: initialTurn,
+        agent: input.agent,
+        finalization: input.finalization,
+      });
+    const existingMetadata = await this.getMetadata();
+    if (existingMetadata) {
+      if (!isSameAcceptedInitialTurn(existingMetadata, initialTurn)) {
+        return {
+          success: false,
+          code: 'BAD_REQUEST',
+          error: 'Initial turn does not match registered session intent',
+        };
+      }
+      if (!isSameInitialAdmissionConfiguration(existingMetadata, input)) {
+        return {
+          success: false,
+          code: 'BAD_REQUEST',
+          error: 'Initial admission configuration does not match registered session intent',
+        };
+      }
+      return admitInitialTurn();
+    }
+
+    const registration = await this.registerSession({
+      ...input,
+      message: {
+        initialMessageId: initialTurn.messageId,
+        turn:
+          initialTurn.type === 'prompt'
+            ? {
+                type: 'prompt',
+                id: initialTurn.messageId,
+                prompt: initialTurn.prompt,
+                images: initialTurn.images,
+              }
+            : {
+                type: 'command',
+                id: initialTurn.messageId,
+                command: initialTurn.command,
+                arguments: initialTurn.arguments,
+              },
+      },
+    });
+    if (!registration.success) {
+      return {
+        success: false,
+        code: 'INTERNAL',
+        error: registration.error ?? 'Failed to register session',
+      };
+    }
+
+    return admitInitialTurn();
+  }
+
   async tryUpdate(updates: { callbackTarget?: CallbackTarget | null }): Promise<OperationResult> {
     const metadata = await this.getMetadata();
 
@@ -1454,9 +1652,11 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
    */
   async alarm(): Promise<void> {
     const now = Date.now();
+    const alarmAtStart = await this.ctx.storage.getAlarm();
 
     let pendingFlushRetryAt: number | undefined;
     let remainingPendingCount: number | undefined;
+    let alarmWorkFailed = false;
 
     try {
       // Check if session should be deleted due to inactivity (90 days)
@@ -1473,10 +1673,22 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
 
       await this.getWrapperSupervisor().runMaintenance(now);
 
+      try {
+        await this.getMessageSettlementOutbox().repairTerminalEffects();
+      } catch (error) {
+        logger
+          .withFields({
+            sessionId: this.sessionId,
+            error: error instanceof Error ? error.message : String(error),
+          })
+          .warn('Terminal effect repair failed; scheduled retry will continue recovery');
+      }
       await this.retryPendingCallbacks(now);
+      await this.getSessionMessageQueue().recoverPendingInterruption(async () => {
+        await this.interruptAcceptedWrapperMessages();
+      });
 
       // Run cleanup tasks
-      await this.checkMaxRuntime(now);
       this.cleanupOldEvents(now);
       this.cleanupExpiredLeases(now);
       await this.cleanupIdleKiloServer(now);
@@ -1485,6 +1697,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       pendingFlushRetryAt = flushOneResult.retryAt;
       remainingPendingCount = flushOneResult.remainingPendingCount;
     } catch (error) {
+      alarmWorkFailed = true;
       logger
         .withFields({
           doId: this.ctx.id.toString(),
@@ -1504,6 +1717,9 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       const pendingCount = remainingPendingCount ?? 0;
       const currentTime = Date.now();
       const deadlines = await this.getNextAlarmDeadlines();
+      if (alarmWorkFailed) {
+        deadlines.push(currentTime + PENDING_FLUSH_DEBOUNCE_MS);
+      }
       if (pendingFlushRetryAt !== undefined) {
         deadlines.push(pendingFlushRetryAt);
       }
@@ -1513,6 +1729,16 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         if (clampedDeadline < nextAlarmAt) {
           nextAlarmAt = clampedDeadline;
         }
+      }
+
+      const existingAlarm = await this.ctx.storage.getAlarm();
+      if (
+        existingAlarm !== null &&
+        existingAlarm !== alarmAtStart &&
+        existingAlarm > currentTime &&
+        existingAlarm < nextAlarmAt
+      ) {
+        nextAlarmAt = existingAlarm;
       }
 
       if (
@@ -1566,58 +1792,6 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
    */
   private async updateLastActivity(): Promise<void> {
     await this.ctx.storage.put(LAST_ACTIVITY_KEY, Date.now());
-  }
-
-  private async getRawWrapperRuntimeExecutionId(): Promise<ExecutionId | null> {
-    const state = await getWrapperRuntimeState(this.ctx.storage);
-    const legacyExecutionId = state.acceptedExecutionId ?? state.wrapperExecutionId;
-    if (!legacyExecutionId) return null;
-    const execution = await this.executionQueries.get(legacyExecutionId as ExecutionId);
-    return execution && this.isCurrentRuntimeStatus(execution.status)
-      ? (legacyExecutionId as ExecutionId)
-      : null;
-  }
-
-  private isCurrentRuntimeStatus(status: ExecutionStatus): status is 'pending' | 'running' {
-    return status === 'pending' || status === 'running';
-  }
-
-  private async getCurrentWrapperRuntimeExecutionId(): Promise<ExecutionId | null> {
-    const execution = await this.getCurrentRuntimeExecution();
-    return execution?.executionId ?? null;
-  }
-
-  private async getMaxRuntimeExecution(): Promise<ExecutionMetadata | null> {
-    const execution = await this.getCurrentRuntimeExecution();
-    return execution?.status === 'running' ? execution : null;
-  }
-
-  /**
-   * Fail a running execution that has exceeded its wall-clock deadline
-   * (DEFAULT_MAX_RUNTIME_MS = 60 min).
-   */
-  private async checkMaxRuntime(now: number): Promise<void> {
-    const execution = await this.getMaxRuntimeExecution();
-    if (!execution) return;
-
-    if (now - execution.startedAt >= DEFAULT_MAX_RUNTIME_MS) {
-      logger
-        .withFields({
-          sessionId: this.sessionId,
-          executionId: execution.executionId,
-          startedAt: execution.startedAt,
-          maxRuntimeMs: DEFAULT_MAX_RUNTIME_MS,
-          elapsedMs: now - execution.startedAt,
-        })
-        .info('Marking execution as failed — exceeded maximum runtime');
-
-      await this.failExecution({
-        executionId: execution.executionId,
-        status: 'failed',
-        error: 'Execution exceeded maximum runtime',
-        streamEventType: 'error',
-      });
-    }
   }
 
   /**
@@ -1791,18 +1965,30 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     });
   }
 
-  private async emitSessionMessageSent(messageId: string): Promise<void> {
+  private async ensureAcceptedMessageEffects(
+    messageId: string,
+    acceptedAt = Date.now()
+  ): Promise<void> {
     const sessionId = await this.requireSessionId();
-    this.insertAndBroadcastEvent({
+    const eventId = this.eventQueries.insertUnique({
       executionId: '' as EventSourceId,
+      entityId: `sent-message/${messageId}`,
       sessionId,
       streamEventType: 'cloud.message.sent',
-      payload: JSON.stringify({
-        messageId,
-        delivery: 'sent',
-      }),
+      payload: JSON.stringify({ messageId, delivery: 'sent' }),
       timestamp: Date.now(),
     });
+    if (eventId !== null) {
+      this.broadcastEvent({
+        id: eventId,
+        execution_id: '' as EventSourceId,
+        session_id: sessionId,
+        stream_event_type: 'cloud.message.sent',
+        payload: JSON.stringify({ messageId, delivery: 'sent' }),
+        timestamp: Date.now(),
+      });
+    }
+    await this.recordSessionInitiatedIfNeeded(acceptedAt);
   }
 
   private async finalizeIdleBatchCallbackIfReady(options?: {
@@ -1823,6 +2009,69 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     return this.getMessageSettlementOutbox().terminalizeSessionMessageOnce(messageId, params, opts);
   }
 
+  private async ensureAcceptedMessageBeforeTerminal(
+    messageId: string,
+    wrapperRunId: string
+  ): Promise<void> {
+    const runtimeState = await getWrapperRuntimeState(this.ctx.storage);
+    if (runtimeState.wrapperRunId !== wrapperRunId) return;
+
+    const state = await getSessionMessageState(this.ctx.storage, messageId);
+    if (
+      state?.status === 'completed' ||
+      state?.status === 'failed' ||
+      state?.status === 'interrupted'
+    ) {
+      return;
+    }
+    if (state?.status === 'accepted') {
+      if (state.wrapperRunId !== wrapperRunId) return;
+      await this.ensureAcceptedMessageEffects(messageId, state.acceptedAt ?? Date.now());
+      return;
+    }
+
+    const pending = await findPendingSessionMessageByMessageId(this.ctx.storage, messageId);
+    if (!state && !pending) return;
+
+    const acceptedAt = Date.now();
+    if (state?.status === 'queued') {
+      await markMessageAccepted(this.ctx.storage, messageId, wrapperRunId, acceptedAt);
+    } else if (pending) {
+      const context = await this.getPendingMessageDeliveryContext();
+      const intent = resolvePendingSessionMessageIntent(pending, {
+        mode: context?.metadata.agent?.mode,
+        model: context?.metadata.agent?.model,
+        variant: context?.metadata.agent?.variant,
+        autoCommit: context?.metadata.finalization?.autoCommit,
+        condenseOnComplete: context?.metadata.finalization?.condenseOnComplete,
+      });
+      await putSessionMessageState(this.ctx.storage, {
+        messageId,
+        status: 'accepted',
+        prompt: pending.content,
+        createdAt: pending.createdAt,
+        queuedAt: pending.createdAt,
+        acceptedAt,
+        wrapperRunId,
+        callbackRequired: pending.callbackSnapshot?.required,
+        callbackTarget: pending.callbackSnapshot?.target,
+        admissionSnapshot: intent,
+      });
+    }
+    try {
+      await this.ensureAcceptedMessageEffects(messageId, acceptedAt);
+    } catch (error) {
+      logger
+        .withFields({
+          sessionId: this.sessionId,
+          messageId,
+          error: error instanceof Error ? error.message : String(error),
+        })
+        .warn('Accepted terminal message effects incomplete; alarm repair will continue recovery');
+      await this.scheduleAlarmAtOrBefore(Date.now() + 1_000);
+    }
+  }
+
   async updateExecutionStatus(
     params: UpdateExecutionStatusParams,
     opts?: { suppressCallback?: boolean }
@@ -1835,22 +2084,6 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     const result = await this.executionQueries.updateStatus(params);
 
     if (result.ok && this.isTerminalStatus(params.status)) {
-      const state = await getWrapperRuntimeState(this.ctx.storage);
-      if (state.wrapperConnectionId) {
-        const isCurrentExecution =
-          state.wrapperExecutionId === params.executionId ||
-          state.acceptedExecutionId === params.executionId;
-        if (isCurrentExecution) {
-          await clearWrapperRuntimeIdentity(
-            this.ctx.storage,
-            {
-              wrapperGeneration: state.wrapperGeneration,
-              wrapperConnectionId: state.wrapperConnectionId,
-            },
-            { incrementGeneration: true }
-          );
-        }
-      }
       if (!opts?.suppressCallback) {
         await this.emitAcceptedMessageTerminalEvent(result.value, params, params.status);
         await this.enqueueCallbackNotification(
@@ -1888,13 +2121,8 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
   }): Promise<boolean> {
     const { executionId, status, error, streamEventType, streamPayload } = params;
 
-    // Terminal cleanup must clear fenced disconnect grace as well as unfenced legacy grace.
-    await this.getWrapperSupervisor().clearDisconnectGraceForExecution(executionId);
-
-    const stateBeforeUpdate = await getWrapperRuntimeState(this.ctx.storage);
-    const wasCurrentRuntimeExecution =
-      stateBeforeUpdate.wrapperExecutionId === executionId ||
-      stateBeforeUpdate.acceptedExecutionId === executionId;
+    // The RPC remains for public execution compatibility; current wrapper-run
+    // cleanup is owned by message supervision rather than legacy execution IDs.
 
     // 1. Update status (enqueues callback notification on terminal unless suppressed)
     const statusResult = await this.updateExecutionStatus(
@@ -1914,16 +2142,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       return false;
     }
 
-    // 2. Clear interrupt only if this was the current runtime execution.
-    if (wasCurrentRuntimeExecution) {
-      await clearWrapperRuntimeIdentity(this.ctx.storage, {
-        wrapperGeneration: stateBeforeUpdate.wrapperGeneration,
-        wrapperConnectionId: stateBeforeUpdate.wrapperConnectionId,
-      });
-      await this.executionQueries.clearInterrupt();
-    }
-
-    // 4. Broadcast to /stream clients
+    // 2. Broadcast to /stream clients
     const sessionId = await this.requireSessionId();
     this.insertAndBroadcastEvent({
       executionId,
@@ -1958,12 +2177,6 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
 
   private async getNextAlarmDeadlines(): Promise<number[]> {
     const deadlines = await this.getWrapperSupervisor().nextMaintenanceDeadlines();
-
-    const maxRuntimeExecution = await this.getMaxRuntimeExecution();
-    if (maxRuntimeExecution) {
-      const maxRuntimeDeadline = maxRuntimeExecution.startedAt + DEFAULT_MAX_RUNTIME_MS;
-      deadlines.push(maxRuntimeDeadline);
-    }
 
     const nextCallbackDeadline = await this.getMessageSettlementOutbox().nextCallbackDeadline();
     if (nextCallbackDeadline !== undefined) {
@@ -2051,12 +2264,50 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     return this.executionQueries.getAll();
   }
 
+  /**
+   * Retained response-shape compatibility surface for status, health, and
+   * interrupt callers. This reads active legacy execution records only; it is
+   * intentionally not used by current message drain, fencing, or supervision.
+   */
   async getCurrentRuntimeExecution(): Promise<ExecutionMetadata | null> {
-    const executionId = await this.getRawWrapperRuntimeExecutionId();
-    if (!executionId) return null;
+    const executions = await this.executionQueries.getAll();
+    return (
+      executions.find(
+        execution => execution.status === 'pending' || execution.status === 'running'
+      ) ?? null
+    );
+  }
 
-    const execution = await this.executionQueries.get(executionId);
-    return execution && this.isCurrentRuntimeStatus(execution.status) ? execution : null;
+  /**
+   * Represent message-native queued/accepted work through existing health
+   * response fields without recreating an execution-backed runtime identity.
+   */
+  async getCurrentMessageWork(): Promise<{
+    messageId: string;
+    status: 'pending' | 'running';
+    health: 'healthy' | 'stale';
+  } | null> {
+    const accepted = await listNonTerminalAcceptedMessages(this.ctx.storage);
+    const [firstAccepted] = accepted;
+    if (!firstAccepted) {
+      const pending = await countPendingSessionMessages(this.ctx.storage);
+      if (pending === 0) return null;
+      const queued = await this.getSessionMessageQueue().snapshotForStreamConnect();
+      const first = queued.find(message => !message.terminalFailure);
+      return first ? { messageId: first.messageId, status: 'pending', health: 'healthy' } : null;
+    }
+    const runtime = await getWrapperRuntimeState(this.ctx.storage);
+    const now = Date.now();
+    const currentFenceMatches =
+      runtime.wrapperRunId === firstAccepted.wrapperRunId && Boolean(runtime.wrapperConnectionId);
+    const expired =
+      (runtime.noOutputDeadlineAt !== undefined && now >= runtime.noOutputDeadlineAt) ||
+      (runtime.pingDeadlineAt !== undefined && now >= runtime.pingDeadlineAt);
+    return {
+      messageId: firstAccepted.messageId,
+      status: 'running',
+      health: currentFenceMatches && !expired ? 'healthy' : 'stale',
+    };
   }
 
   /**
@@ -2131,10 +2382,66 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
   // Direct Execution Methods
   // ---------------------------------------------------------------------------
 
-  async queueSessionMessage(
-    request: QueueSessionMessageRequest
-  ): Promise<QueueSessionMessageResult> {
-    return this.getSessionMessageQueue().enqueue(request);
+  async admitSubmittedMessage(
+    request: SubmittedSessionMessageRequest
+  ): Promise<SessionMessageAdmissionResult> {
+    return this.getSessionMessageQueue().admitSubmittedMessage(request);
+  }
+
+  async admitPreparedInitialMessage(
+    request: LegacyRegisteredInitialAdmissionRequest
+  ): Promise<SessionMessageAdmissionResult> {
+    const metadata = await this.getMetadata();
+    if (!metadata) return { success: false, code: 'NOT_FOUND', error: 'Session not found' };
+    const initialMessage = metadata.initialMessage;
+    if (!initialMessage?.id) {
+      return { success: false, code: 'BAD_REQUEST', error: 'No prompt provided' };
+    }
+    const turn: AdmitAcceptedSessionMessageRequest['turn'] | undefined =
+      initialMessage.turn?.type === 'command'
+        ? {
+            type: 'command',
+            messageId: initialMessage.id,
+            command: initialMessage.turn.command,
+            arguments: initialMessage.turn.arguments,
+          }
+        : initialMessage.turn?.type === 'prompt'
+          ? {
+              type: 'prompt',
+              messageId: initialMessage.id,
+              prompt: initialMessage.turn.prompt,
+              images: initialMessage.turn.images,
+            }
+          : initialMessage.prompt
+            ? {
+                type: 'prompt',
+                messageId: initialMessage.id,
+                prompt: initialMessage.prompt,
+                images: initialMessage.images,
+              }
+            : undefined;
+    if (!turn) return { success: false, code: 'BAD_REQUEST', error: 'No prompt provided' };
+    if (!metadata.agent?.mode || !metadata.agent.model) {
+      return {
+        success: false,
+        code: 'BAD_REQUEST',
+        error: 'No model specified and session has no default model',
+      };
+    }
+    return this.getSessionMessageQueue().admitAcceptedMessage({
+      userId: request.userId,
+      botId: request.botId,
+      turn,
+      agent: {
+        mode: metadata.agent.mode,
+        model: metadata.agent.model,
+        variant: metadata.agent.variant,
+      },
+      finalization: {
+        autoCommit: metadata.finalization?.autoCommit,
+        condenseOnComplete: metadata.finalization?.condenseOnComplete,
+      },
+    });
   }
 
   private async flushOnePendingSessionMessage(): Promise<{
@@ -2145,44 +2452,54 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
   }
 
   private async recordRuntimeAcceptedMessage(
-    plan: MessageDeliveryPlan,
+    plan: MessageDeliveryRequest,
     delivery: AgentRuntimeAcceptedDelivery
   ): Promise<void> {
     const { turn } = plan;
     const sessionId = plan.scope.sessionId;
     const { acceptedAt, wrapperRunId } = delivery;
 
-    if (wrapperRunId) {
-      const existingState = await getSessionMessageState(this.ctx.storage, turn.messageId);
-      if (existingState && existingState.status === 'queued') {
-        await markMessageAccepted(this.ctx.storage, turn.messageId, wrapperRunId, acceptedAt);
-        logger
-          .withFields({ sessionId, messageId: turn.messageId, wrapperRunId })
-          .info('Session message transitioned from queued to accepted');
-      } else if (!existingState) {
-        await putSessionMessageState(this.ctx.storage, {
-          messageId: turn.messageId,
-          status: 'accepted',
-          prompt: renderExecutionTurnContent(turn),
-          createdAt: acceptedAt,
-          queuedAt: acceptedAt,
-          acceptedAt,
-          wrapperRunId,
-        });
-        logger
-          .withFields({ sessionId, messageId: turn.messageId, wrapperRunId })
-          .warn('Accepted session message state was missing and has been reconstructed');
-      }
+    const existingState = await getSessionMessageState(this.ctx.storage, turn.messageId);
+    if (existingState && existingState.status === 'queued') {
+      await markMessageAccepted(this.ctx.storage, turn.messageId, wrapperRunId, acceptedAt);
+      logger
+        .withFields({ sessionId, messageId: turn.messageId, wrapperRunId })
+        .info('Session message transitioned from queued to accepted');
+    } else if (!existingState) {
+      const pending = await findPendingSessionMessageByMessageId(this.ctx.storage, turn.messageId);
+      const intent = pending
+        ? resolvePendingSessionMessageIntent(pending, {
+            mode: plan.agent.mode,
+            model: plan.agent.model,
+            variant: plan.agent.variant,
+            autoCommit: plan.finalization?.autoCommit,
+            condenseOnComplete: plan.finalization?.condenseOnComplete,
+          })
+        : undefined;
+      await putSessionMessageState(this.ctx.storage, {
+        messageId: turn.messageId,
+        status: 'accepted',
+        prompt: pending?.content ?? renderExecutionTurnContent(turn),
+        createdAt: pending?.createdAt ?? acceptedAt,
+        queuedAt: pending?.createdAt ?? acceptedAt,
+        acceptedAt,
+        wrapperRunId,
+        callbackRequired: pending?.callbackSnapshot?.required,
+        callbackTarget: pending?.callbackSnapshot?.target,
+        admissionSnapshot: intent,
+      });
+      logger
+        .withFields({ sessionId, messageId: turn.messageId, wrapperRunId })
+        .warn('Accepted session message state was missing and has been reconstructed');
     }
 
-    await this.emitSessionMessageSent(turn.messageId);
-    await this.recordSessionInitiatedIfNeeded(acceptedAt);
+    await this.ensureAcceptedMessageEffects(turn.messageId, acceptedAt);
   }
 
   /**
    * Deliver one pending message through the shared wrapper delivery path.
    */
-  private async executeDirectly(plan: MessageDeliveryPlan): Promise<QueueSessionMessageResult> {
+  private async executeDirectly(plan: MessageDeliveryRequest): Promise<MessageDeliveryResult> {
     const sessionId = plan.scope.sessionId;
     const eventSourceId = '' as EventSourceId;
 
@@ -2231,7 +2548,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         messageId: plan.turn.messageId,
         wrapperRunId: result.success ? result.wrapperRunId : undefined,
       })
-      .info('Execution started successfully');
+      .info('Wrapper accepted delivered session message');
 
     return result;
   }
@@ -2239,8 +2556,8 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
   /**
    * Called when an execution completes (successfully, failed, or interrupted).
    *
-   * Updates the execution status and clears the current wrapper runtime execution.
-   * Schedules a pending-message flush if more work is waiting.
+   * Updates retained legacy execution status and schedules a pending-message
+   * flush if more work is waiting. Current wrapper-run supervision is separate.
    *
    * @param executionId - ID of the completed execution
    * @param status - Final status of the execution
@@ -2253,22 +2570,16 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     gateResult?: 'pass' | 'fail'
   ): Promise<void> {
     const sessionId = await this.resolveSessionId();
-    const stateBeforeUpdate = await getWrapperRuntimeState(this.ctx.storage);
     logger
       .withFields({
         sessionId,
         executionId,
         status,
         error,
-        wrapperRunId: stateBeforeUpdate.wrapperRunId,
       })
       .info('onExecutionComplete called');
 
-    const wasCurrentRuntimeExecution =
-      stateBeforeUpdate.wrapperExecutionId === executionId ||
-      stateBeforeUpdate.acceptedExecutionId === executionId;
-
-    // Update execution status
+    // Update retained legacy execution status without affecting current wrapper-run identity.
     const updateResult = await this.updateExecutionStatus({
       executionId,
       status,
@@ -2281,14 +2592,6 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       logger
         .withFields({ sessionId, executionId, error: updateResult.error })
         .warn('Failed to update execution status');
-    }
-
-    if (wasCurrentRuntimeExecution) {
-      await clearWrapperRuntimeIdentity(this.ctx.storage, {
-        wrapperGeneration: stateBeforeUpdate.wrapperGeneration,
-        wrapperConnectionId: stateBeforeUpdate.wrapperConnectionId,
-      });
-      await this.executionQueries.clearInterrupt();
     }
 
     await this.getSessionMessageQueue().requestPendingDrainIfNeeded();

@@ -32,7 +32,6 @@ const sendMessageHandler = protectedProcedure
 
       const ack = await queueMessage(
         {
-          kind: 'user-message',
           cloudAgentSessionId: input.cloudAgentSessionId,
           turn: {
             type: 'prompt',

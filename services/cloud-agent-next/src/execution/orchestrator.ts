@@ -13,9 +13,9 @@ import type {
 } from '../types.js';
 import type { CloudAgentSession } from '../persistence/CloudAgentSession.js';
 import type {
-  ExecutionPlan,
   ExecutionResult,
-  MessageDeliveryPlan,
+  FencedLegacyExecutionRequest,
+  FencedWrapperDispatchRequest,
   WorkspaceReady,
 } from './types.js';
 import { ExecutionError } from './errors.js';
@@ -94,7 +94,7 @@ export class ExecutionOrchestrator {
    * @throws ExecutionError with appropriate code on failure (no internal retry)
    */
   async execute(
-    plan: MessageDeliveryPlan | ExecutionPlan,
+    plan: FencedWrapperDispatchRequest | FencedLegacyExecutionRequest,
     options?: {
       onProgress?: (step: string, message: string) => void;
       onWorkspaceReady?: (ready: WorkspaceReady) => Promise<void>;
@@ -149,7 +149,9 @@ export class ExecutionOrchestrator {
     );
   }
 
-  private requiresPreparedDevcontainerRuntime(plan: MessageDeliveryPlan | ExecutionPlan): boolean {
+  private requiresPreparedDevcontainerRuntime(
+    plan: FencedWrapperDispatchRequest | FencedLegacyExecutionRequest
+  ): boolean {
     return (
       plan.workspace.metadata.workspace?.devcontainerRequested === true ||
       plan.workspace.metadata.devcontainer !== undefined
@@ -158,7 +160,7 @@ export class ExecutionOrchestrator {
 
   private async executeWithPreparedDevcontainerWorkspace(
     sandbox: SandboxInstance,
-    plan: MessageDeliveryPlan | ExecutionPlan,
+    plan: FencedWrapperDispatchRequest | FencedLegacyExecutionRequest,
     prepared: Awaited<ReturnType<SessionService['buildWrapperSessionReadyAndPromptRequests']>>,
     options?: {
       onProgress?: (step: string, message: string) => void;
@@ -257,7 +259,7 @@ export class ExecutionOrchestrator {
 
   private async executeWithWrapperBootstrap(
     sandbox: SandboxInstance,
-    plan: MessageDeliveryPlan | ExecutionPlan,
+    plan: FencedWrapperDispatchRequest | FencedLegacyExecutionRequest,
     options?: {
       onProgress?: (step: string, message: string) => void;
       onWorkspaceReady?: (ready: WorkspaceReady) => Promise<void>;
@@ -398,12 +400,14 @@ export class ExecutionOrchestrator {
     }
   }
 
-  private getCreatedOnPlatform(plan: MessageDeliveryPlan | ExecutionPlan): string | undefined {
+  private getCreatedOnPlatform(
+    plan: FencedWrapperDispatchRequest | FencedLegacyExecutionRequest
+  ): string | undefined {
     return plan.workspace.metadata?.identity?.createdOnPlatform;
   }
 
   private getToolOverrides(
-    plan: MessageDeliveryPlan | ExecutionPlan
+    plan: FencedWrapperDispatchRequest | FencedLegacyExecutionRequest
   ): Record<string, boolean> | undefined {
     return this.getCreatedOnPlatform(plan) === 'code-review'
       ? CODE_REVIEW_DISABLED_TOOLS

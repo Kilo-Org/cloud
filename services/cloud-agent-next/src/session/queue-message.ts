@@ -1,20 +1,17 @@
 /**
  * Queue a user message on an existing cloud-agent session.
  *
- * Shared by:
- *  - the new `send` handler (full options)
- *  - the new `start` handler (initial message at registration time)
- *  - the legacy `sendMessageV2` proxy (full options)
- *  - the legacy `initiateFromKilocodeSessionV2` proxy (`registered-initial`)
+ * Shared by current follow-up admission and the retained legacy follow-up
+ * endpoint. Prepared initial replay is isolated in `legacy-prepared-admission`.
  *
- * Returns an HTTP-friendly shape ready to hand back to tRPC.
+ * Returns the explicitly compatibility-projected public acknowledgment shape.
  */
 import { TRPCError } from '@trpc/server';
 
 import type {
   QueueExecutionTurnCommand,
-  QueueSessionMessageRequest,
-  QueueSessionMessageResult,
+  SessionMessageAdmissionResult,
+  SubmittedSessionMessageRequest,
   RetryableResultCode,
 } from '../execution/types.js';
 import type { SessionId, UserId } from '../types/ids.js';
@@ -37,7 +34,7 @@ function isRetryableCode(code: string): code is RetryableResultCode {
 }
 
 type NonRetryableCode = Exclude<
-  Extract<QueueSessionMessageResult, { success: false }>['code'],
+  Extract<SessionMessageAdmissionResult, { success: false }>['code'],
   RetryableResultCode
 >;
 
@@ -50,8 +47,8 @@ const PERMANENT_CODE_TO_TRPC: Record<NonRetryableCode, TRPCCodeName> = {
   INTERNAL: 'INTERNAL_SERVER_ERROR',
 };
 
-function throwQueueSessionMessageError(
-  result: Extract<QueueSessionMessageResult, { success: false }>
+export function throwAdmissionError(
+  result: Extract<SessionMessageAdmissionResult, { success: false }>
 ): never {
   if (isRetryableCode(result.code)) {
     throw new TRPCError({
@@ -71,14 +68,7 @@ function throwQueueSessionMessageError(
 
 export type QueueMessageInput = {
   cloudAgentSessionId: string;
-} & (
-  | {
-      kind: 'registered-initial';
-    }
-  | ({
-      kind: 'user-message';
-    } & QueueExecutionTurnCommand)
-);
+} & QueueExecutionTurnCommand;
 
 export type QueueMessageContext = {
   env: Env;
@@ -87,11 +77,24 @@ export type QueueMessageContext = {
 };
 
 /**
- * Enqueue a user message via `CloudAgentSession.queueSessionMessage`.
+ * Admit a user message via `CloudAgentSession.admitSubmittedMessage`.
  *
- * Throws a TRPCError on failure. Returns the same shape as the legacy
- * QueueAckResponse so callers can hand it back directly.
+ * Throws a TRPCError on failure and projects durable admission into the public
+ * compatibility response, including `delivery: 'sent'` for accepted replays.
  */
+export function projectAdmissionToPublicAck(
+  sessionId: SessionId,
+  result: Extract<SessionMessageAdmissionResult, { success: true }>
+): QueueAckResponse {
+  return {
+    cloudAgentSessionId: sessionId,
+    status: 'started',
+    streamUrl: `/stream?cloudAgentSessionId=${sessionId}`,
+    messageId: result.messageId,
+    delivery: result.compatibilityDelivery,
+  };
+}
+
 export async function queueMessage(
   input: QueueMessageInput,
   ctx: QueueMessageContext
@@ -99,54 +102,37 @@ export async function queueMessage(
   const sessionId = input.cloudAgentSessionId as SessionId;
   const doKey = `${ctx.userId}:${sessionId}`;
   const doId = ctx.env.CLOUD_AGENT_SESSION.idFromName(doKey);
+  const request: SubmittedSessionMessageRequest = {
+    userId: ctx.userId as UserId,
+    botId: ctx.botId,
+    turn: {
+      ...input.turn,
+      id: input.turn.id ?? undefined,
+    },
+    agent: input.agent,
+    finalization: input.finalization,
+  };
 
-  const startRequest: QueueSessionMessageRequest =
-    input.kind === 'registered-initial'
-      ? {
-          kind: 'registered-initial',
-          userId: ctx.userId as UserId,
-          botId: ctx.botId,
-        }
-      : {
-          kind: 'user-message',
-          userId: ctx.userId as UserId,
-          botId: ctx.botId,
-          turn: {
-            ...input.turn,
-            id: input.turn.id ?? undefined,
-          },
-          agent: input.agent,
-          finalization: input.finalization,
-        };
-
-  const startResult = await withDORetry<
+  const result = await withDORetry<
     DurableObjectStub<CloudAgentSession>,
-    QueueSessionMessageResult
+    SessionMessageAdmissionResult
   >(
     () => ctx.env.CLOUD_AGENT_SESSION.get(doId),
-    stub => stub.queueSessionMessage(startRequest),
-    'queueSessionMessage'
+    stub => stub.admitSubmittedMessage(request),
+    'admitSubmittedMessage'
   );
 
-  if (!startResult.success) {
+  if (!result.success) {
     logger
       .withFields({
         sessionId,
         userId: ctx.userId,
-        kind: input.kind,
-        resultCode: startResult.code,
-        retryable: isRetryableCode(startResult.code),
+        resultCode: result.code,
+        retryable: isRetryableCode(result.code),
       })
-      .warn('Cloud-agent Durable Object rejected message queue request');
-    throwQueueSessionMessageError(startResult);
+      .warn('Cloud-agent Durable Object rejected message admission request');
+    throwAdmissionError(result);
   }
 
-  return {
-    cloudAgentSessionId: sessionId,
-    status: startResult.status,
-    streamUrl: `/stream?cloudAgentSessionId=${sessionId}`,
-    messageId: startResult.messageId,
-    delivery: startResult.delivery,
-    wrapperRunId: startResult.wrapperRunId,
-  };
+  return projectAdmissionToPublicAck(sessionId, result);
 }

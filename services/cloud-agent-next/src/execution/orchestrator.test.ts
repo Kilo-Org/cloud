@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as WrapperClientModule from '../kilo/wrapper-client.js';
 import type { Env, SandboxInstance } from '../types.js';
-import type { MessageDeliveryPlan } from './types.js';
+import type { FencedWrapperDispatchRequest } from './types.js';
 
 const {
   ensureBootstrapWrapperMock,
@@ -55,7 +55,7 @@ const baseMetadata = {
     version: 1,
     timestamp: 1,
   },
-} satisfies MessageDeliveryPlan['workspace']['metadata'];
+} satisfies FencedWrapperDispatchRequest['workspace']['metadata'];
 
 const basePlan = {
   scope: {
@@ -83,7 +83,7 @@ const basePlan = {
       wrapperConnectionId: 'conn_test',
     },
   },
-} satisfies MessageDeliveryPlan;
+} satisfies FencedWrapperDispatchRequest;
 
 function buildPreparedRequests() {
   const session = {
@@ -188,7 +188,7 @@ describe('ExecutionOrchestrator split wrapper bootstrap', () => {
           },
         },
       },
-    } satisfies MessageDeliveryPlan;
+    } satisfies FencedWrapperDispatchRequest;
 
     await orchestrator.execute(plan);
 
@@ -282,7 +282,7 @@ describe('ExecutionOrchestrator split wrapper bootstrap', () => {
           },
         },
       },
-    } satisfies MessageDeliveryPlan;
+    } satisfies FencedWrapperDispatchRequest;
     buildWrapperSessionReadyAndPromptRequestsMock.mockResolvedValueOnce(prepared);
     prepareWorkspaceMock.mockResolvedValueOnce({
       ready: {
@@ -341,7 +341,7 @@ describe('ExecutionOrchestrator split wrapper bootstrap', () => {
         autoCommit: true,
         condenseOnComplete: false,
       },
-    } satisfies MessageDeliveryPlan;
+    } satisfies FencedWrapperDispatchRequest;
     const commandRequest = {
       command: 'compact',
       args: '--aggressive',

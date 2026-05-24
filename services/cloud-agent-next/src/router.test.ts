@@ -60,6 +60,7 @@ type MockSessionStub = {
   markAsInterrupted?: ReturnType<typeof vi.fn>;
   interruptExecution?: ReturnType<typeof vi.fn>;
   getCurrentRuntimeExecution?: ReturnType<typeof vi.fn>;
+  getCurrentMessageWork?: ReturnType<typeof vi.fn>;
   getMetadata?: ReturnType<typeof vi.fn>;
   getActiveExecutionId?: ReturnType<typeof vi.fn>;
   getExecution?: ReturnType<typeof vi.fn>;
@@ -782,11 +783,15 @@ describe('router sessionId validation', () => {
       let caller: ReturnType<typeof appRouter.createCaller>;
       let cloudAgentSession: MockCAS;
       let mockGetMetadata: ReturnType<typeof vi.fn>;
+      let mockGetCurrentRuntimeExecution: ReturnType<typeof vi.fn>;
+      let mockGetCurrentMessageWork: ReturnType<typeof vi.fn>;
 
       beforeEach(() => {
         vi.clearAllMocks();
 
         mockGetMetadata = vi.fn();
+        mockGetCurrentRuntimeExecution = vi.fn().mockResolvedValue(null);
+        mockGetCurrentMessageWork = vi.fn().mockResolvedValue(null);
 
         // Mock context
         mockContext = {
@@ -802,7 +807,8 @@ describe('router sessionId validation', () => {
               idFromName: vi.fn((id: string) => ({ id })),
               get: vi.fn(() => ({
                 getMetadata: mockGetMetadata,
-                getCurrentRuntimeExecution: vi.fn().mockResolvedValue(null),
+                getCurrentRuntimeExecution: mockGetCurrentRuntimeExecution,
+                getCurrentMessageWork: mockGetCurrentMessageWork,
               })),
             } as unknown as TRPCContext['env']['CLOUD_AGENT_SESSION'],
             SESSION_INGEST: {
@@ -890,6 +896,42 @@ describe('router sessionId validation', () => {
 
           // Verify DO was accessed with correct key
           expect(cloudAgentSession.idFromName).toHaveBeenCalledWith(`test-user-123:${sessionId}`);
+        });
+
+        it('does not expose stranded legacy execution rows as current session work', async () => {
+          const sessionId: SessionId = 'agent_10101010-1010-1010-1010-101010101010';
+          mockGetMetadata.mockResolvedValue(
+            legacySessionMetadata({ version: 1, sessionId, userId: 'test-user-123', timestamp: 1 })
+          );
+          mockGetCurrentRuntimeExecution.mockResolvedValue({
+            executionId: 'exc_stranded',
+            status: 'running',
+            startedAt: 1,
+          });
+
+          const result = await caller.getSession({ cloudAgentSessionId: sessionId });
+
+          expect(result.execution).toBeNull();
+        });
+
+        it('projects current accepted message work into the existing execution-shaped field', async () => {
+          const sessionId: SessionId = 'agent_20202020-2020-2020-2020-202020202020';
+          mockGetMetadata.mockResolvedValue(
+            legacySessionMetadata({ version: 1, sessionId, userId: 'test-user-123', timestamp: 1 })
+          );
+          mockGetCurrentMessageWork.mockResolvedValue({
+            messageId: 'msg_018f1e2d3c4bHydrateMsgAbCdE',
+            status: 'running',
+            health: 'healthy',
+          });
+
+          const result = await caller.getSession({ cloudAgentSessionId: sessionId });
+
+          expect(result.execution).toMatchObject({
+            id: 'msg_018f1e2d3c4bHydrateMsgAbCdE',
+            status: 'running',
+            health: 'healthy',
+          });
         });
 
         it('should work for personal account sessions (no orgId)', async () => {
@@ -1040,6 +1082,7 @@ describe('router sessionId validation', () => {
       let cloudAgentSession: MockCAS;
       let mockGetMetadata: ReturnType<typeof vi.fn>;
       let mockGetCurrentRuntimeExecution: ReturnType<typeof vi.fn>;
+      let mockGetCurrentMessageWork: ReturnType<typeof vi.fn>;
       let mockListProcesses: ReturnType<typeof vi.fn>;
 
       beforeEach(() => {
@@ -1047,6 +1090,7 @@ describe('router sessionId validation', () => {
 
         mockGetMetadata = vi.fn();
         mockGetCurrentRuntimeExecution = vi.fn().mockResolvedValue(null);
+        mockGetCurrentMessageWork = vi.fn().mockResolvedValue(null);
         mockListProcesses = vi.fn().mockResolvedValue([]);
 
         mockContext = {
@@ -1063,6 +1107,7 @@ describe('router sessionId validation', () => {
               get: vi.fn(() => ({
                 getMetadata: mockGetMetadata,
                 getCurrentRuntimeExecution: mockGetCurrentRuntimeExecution,
+                getCurrentMessageWork: mockGetCurrentMessageWork,
               })),
             } as unknown as TRPCContext['env']['CLOUD_AGENT_SESSION'],
             SESSION_INGEST: {
@@ -1114,7 +1159,107 @@ describe('router sessionId validation', () => {
         expect(mockListProcesses).toHaveBeenCalled();
       });
 
-      it('returns stale execution health for a stale running execution', async () => {
+      it('reports pending message-native work as active through existing health fields', async () => {
+        const sessionId: SessionId = 'agent_77777777-7777-7777-7777-777777777777';
+        mockGetMetadata.mockResolvedValue(
+          legacySessionMetadata({
+            version: 123456789,
+            sessionId,
+            userId: 'test-user-123',
+            timestamp: 123456789,
+          })
+        );
+        mockGetCurrentMessageWork.mockResolvedValue({
+          messageId: 'msg_018f1e2d3c4bHealthMsgAbCdEf',
+          status: 'pending',
+          health: 'healthy',
+        });
+
+        const result = await caller.getSessionHealth({ cloudAgentSessionId: sessionId });
+
+        expect(result).toMatchObject({
+          cloudAgentSessionId: sessionId,
+          executionHealth: 'healthy',
+          activeExecutionId: 'msg_018f1e2d3c4bHealthMsgAbCdEf',
+          activeExecutionStatus: 'pending',
+        });
+      });
+
+      it('reports accepted message-native work as running through existing health fields', async () => {
+        const sessionId: SessionId = 'agent_66666666-6666-6666-6666-666666666666';
+        mockGetMetadata.mockResolvedValue(
+          legacySessionMetadata({
+            version: 123456789,
+            sessionId,
+            userId: 'test-user-123',
+            timestamp: 123456789,
+          })
+        );
+        mockGetCurrentMessageWork.mockResolvedValue({
+          messageId: 'msg_018f1e2d3c4bHealthRunAbCdEf',
+          status: 'running',
+          health: 'healthy',
+        });
+
+        const result = await caller.getSessionHealth({ cloudAgentSessionId: sessionId });
+
+        expect(result).toMatchObject({
+          executionHealth: 'healthy',
+          activeExecutionId: 'msg_018f1e2d3c4bHealthRunAbCdEf',
+          activeExecutionStatus: 'running',
+        });
+      });
+
+      it('reports accepted message-native work as stale when its fenced liveness expired', async () => {
+        const sessionId: SessionId = 'agent_55555555-5555-5555-5555-555555555555';
+        mockGetMetadata.mockResolvedValue(
+          legacySessionMetadata({
+            version: 123456789,
+            sessionId,
+            userId: 'test-user-123',
+            timestamp: 123456789,
+          })
+        );
+        mockGetCurrentMessageWork.mockResolvedValue({
+          messageId: 'msg_018f1e2d3c4bHealthOldAbCdEf',
+          status: 'running',
+          health: 'stale',
+        });
+
+        const result = await caller.getSessionHealth({ cloudAgentSessionId: sessionId });
+
+        expect(result).toMatchObject({
+          executionHealth: 'stale',
+          activeExecutionId: 'msg_018f1e2d3c4bHealthOldAbCdEf',
+          activeExecutionStatus: 'running',
+        });
+      });
+
+      it('ignores stranded legacy execution rows when no current message work is active', async () => {
+        const sessionId: SessionId = 'agent_99999999-9999-9999-9999-999999999999';
+        mockGetMetadata.mockResolvedValue(
+          legacySessionMetadata({
+            version: 123456789,
+            sessionId,
+            userId: 'test-user-123',
+            timestamp: 123456789,
+          })
+        );
+        mockGetCurrentRuntimeExecution.mockResolvedValue({
+          executionId: 'exc_stranded',
+          status: 'running',
+          startedAt: Date.now() - 20 * 60 * 1000,
+          mode: 'code',
+          streamingMode: 'websocket',
+          lastHeartbeat: Date.now() - 11 * 60 * 1000,
+        });
+
+        const result = await caller.getSessionHealth({ cloudAgentSessionId: sessionId });
+
+        expect(result).toMatchObject({ executionHealth: 'none', activeExecutionId: undefined });
+      });
+
+      it('reports current message work without consulting stranded execution freshness', async () => {
         const sessionId: SessionId = 'agent_99999999-9999-9999-9999-999999999999';
         const activeExecutionId = 'exc_stale_execution';
         mockGetMetadata.mockResolvedValue(
@@ -1126,13 +1271,10 @@ describe('router sessionId validation', () => {
             timestamp: 123456789,
           })
         );
-        mockGetCurrentRuntimeExecution.mockResolvedValue({
-          executionId: activeExecutionId,
+        mockGetCurrentMessageWork.mockResolvedValue({
+          messageId: activeExecutionId,
           status: 'running',
-          startedAt: Date.now() - 20 * 60 * 1000,
-          mode: 'code',
-          streamingMode: 'websocket',
-          lastHeartbeat: Date.now() - 11 * 60 * 1000,
+          health: 'healthy',
         });
 
         const result = await caller.getSessionHealth({ cloudAgentSessionId: sessionId });
@@ -1140,11 +1282,11 @@ describe('router sessionId validation', () => {
         expect(result).toMatchObject({
           cloudAgentSessionId: sessionId,
           sandboxStatus: 'healthy',
-          executionHealth: 'stale',
+          executionHealth: 'healthy',
           activeExecutionId,
           activeExecutionStatus: 'running',
         });
-        expect(mockGetCurrentRuntimeExecution).toHaveBeenCalled();
+        expect(mockGetCurrentRuntimeExecution).not.toHaveBeenCalled();
       });
 
       it('returns NOT_FOUND for missing session metadata', async () => {
@@ -1398,11 +1540,17 @@ describe('legacy V2 execution response compatibility', () => {
   const acceptedMessageId = 'msg_018f1e2d3c4bAbCdEfGhIjKlMn';
 
   function createLegacyExecutionCaller() {
-    const queueSessionMessage = vi.fn().mockResolvedValue({
+    const admitPreparedInitialMessage = vi.fn().mockResolvedValue({
       success: true,
-      status: 'started',
+      outcome: 'queued',
+      compatibilityDelivery: 'queued',
       messageId: acceptedMessageId,
-      delivery: 'queued',
+    });
+    const admitSubmittedMessage = vi.fn().mockResolvedValue({
+      success: true,
+      outcome: 'queued',
+      compatibilityDelivery: 'queued',
+      messageId: acceptedMessageId,
     });
     const context = {
       userId: 'test-user-123',
@@ -1412,12 +1560,16 @@ describe('legacy V2 execution response compatibility', () => {
       env: {
         CLOUD_AGENT_SESSION: {
           idFromName: vi.fn((id: string) => ({ id })),
-          get: vi.fn(() => ({ queueSessionMessage })),
+          get: vi.fn(() => ({ admitPreparedInitialMessage, admitSubmittedMessage })),
         },
       },
     } as unknown as TRPCContext;
 
-    return { caller: appRouter.createCaller(context), queueSessionMessage };
+    return {
+      caller: appRouter.createCaller(context),
+      admitPreparedInitialMessage,
+      admitSubmittedMessage,
+    };
   }
 
   it('initiateFromKilocodeSessionV2 returns executionId as the queued messageId', async () => {
@@ -1429,6 +1581,30 @@ describe('legacy V2 execution response compatibility', () => {
 
     expect(result.messageId).toBe(acceptedMessageId);
     expect(result.executionId).toBe(acceptedMessageId);
+  });
+
+  it('sendMessageV2 preserves sent delivery when a runtime-accepted admission is replayed', async () => {
+    const { caller, admitSubmittedMessage } = createLegacyExecutionCaller();
+    admitSubmittedMessage.mockResolvedValue({
+      success: true,
+      outcome: 'queued',
+      compatibilityDelivery: 'sent',
+      messageId: acceptedMessageId,
+    });
+
+    const result = await caller.sendMessageV2({
+      cloudAgentSessionId: validSessionId,
+      messageId: acceptedMessageId,
+      prompt: 'follow up',
+      mode: 'code',
+      model: 'test-model',
+    });
+
+    expect(result).toMatchObject({
+      status: 'started',
+      delivery: 'sent',
+      executionId: acceptedMessageId,
+    });
   });
 
   it('sendMessageV2 returns executionId as the accepted messageId', async () => {
@@ -1446,7 +1622,7 @@ describe('legacy V2 execution response compatibility', () => {
   });
 
   it('sendMessageV2 accepts deprecated token fields without queueing token overrides', async () => {
-    const { caller, queueSessionMessage } = createLegacyExecutionCaller();
+    const { caller, admitSubmittedMessage } = createLegacyExecutionCaller();
 
     await caller.sendMessageV2({
       cloudAgentSessionId: validSessionId,
@@ -1457,9 +1633,8 @@ describe('legacy V2 execution response compatibility', () => {
       gitToken: 'deprecated-git-token',
     });
 
-    const request = queueSessionMessage.mock.calls[0]?.[0];
+    const request = admitSubmittedMessage.mock.calls[0]?.[0];
     expect(request).toMatchObject({
-      kind: 'user-message',
       turn: {
         type: 'prompt',
         id: undefined,
@@ -1471,7 +1646,7 @@ describe('legacy V2 execution response compatibility', () => {
   });
 
   it('sendMessageV2 queues structured commands without flattening them into prompt text', async () => {
-    const { caller, queueSessionMessage } = createLegacyExecutionCaller();
+    const { caller, admitSubmittedMessage } = createLegacyExecutionCaller();
 
     await caller.sendMessageV2({
       cloudAgentSessionId: validSessionId,
@@ -1482,9 +1657,8 @@ describe('legacy V2 execution response compatibility', () => {
       },
     });
 
-    expect(queueSessionMessage).toHaveBeenCalledWith(
+    expect(admitSubmittedMessage).toHaveBeenCalledWith(
       expect.objectContaining({
-        kind: 'user-message',
         turn: {
           type: 'command',
           id: undefined,

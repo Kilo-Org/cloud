@@ -40,13 +40,6 @@ function createFakeDOContext(): IngestDOContext {
   return {
     updateKiloSessionId: vi.fn().mockResolvedValue(undefined),
     updateUpstreamBranch: vi.fn().mockResolvedValue(undefined),
-    getLegacyIngestExecution: vi.fn().mockImplementation(async (executionId: string) => ({
-      executionId,
-      status: 'running',
-      ingestToken: executionId,
-    })),
-    transitionLegacyExecutionToRunning: vi.fn().mockResolvedValue(undefined),
-    handleLegacyExecutionTerminal: vi.fn().mockResolvedValue(undefined),
     setAvailableCommands: vi.fn().mockResolvedValue(undefined),
     wrapperSupervisor: {
       checkReconnect: vi.fn().mockResolvedValue({ accepted: true }),
@@ -56,7 +49,6 @@ function createFakeDOContext(): IngestDOContext {
       observeMeaningfulOutput: vi.fn().mockResolvedValue(undefined),
       observeRootIdle: vi.fn().mockResolvedValue(undefined),
       onTerminalEvent: vi.fn().mockResolvedValue(undefined),
-      clearDisconnectGraceForExecution: vi.fn().mockResolvedValue(undefined),
     },
   };
 }
@@ -75,6 +67,8 @@ function makeAttachment(overrides?: Partial<IngestAttachment>): IngestAttachment
   const now = Date.now();
   return {
     wrapperRunId: WRAPPER_RUN_ID,
+    wrapperGeneration: 1,
+    wrapperConnectionId: 'conn-1',
     connectedAt: now,
     kiloSessionState: { captured: false },
     lastHeartbeatUpdate: now,
@@ -107,7 +101,30 @@ describe('createIngestHandler', () => {
       await expect(handler.handleIngestClose(ws)).resolves.toBeNull();
     });
 
-    it('returns wrapperRunId when no other ingest sockets remain', async () => {
+    it('quarantines an obsolete hibernated attachment without reporting disconnect', async () => {
+      const state = createFakeState();
+      const doContext = createFakeDOContext();
+      const handler = createIngestHandler(
+        state,
+        createFakeEventQueries(),
+        SESSION_ID,
+        vi.fn(),
+        doContext
+      );
+      const ws = createFakeWebSocket({
+        executionId: 'exc_predeploy',
+        connectedAt: Date.now(),
+        kiloSessionState: { captured: false },
+        lastHeartbeatUpdate: Date.now(),
+        lastEventAtUpdate: 0,
+      });
+
+      await expect(handler.handleIngestClose(ws)).resolves.toBeNull();
+      expect(doContext.wrapperSupervisor.isCurrentConnection).not.toHaveBeenCalled();
+      expect(state.getWebSockets).not.toHaveBeenCalled();
+    });
+
+    it('returns current fenced wrapper attribution when no other ingest sockets remain', async () => {
       const state = createFakeState();
       vi.mocked(state.getWebSockets).mockReturnValue([]);
 
@@ -122,34 +139,10 @@ describe('createIngestHandler', () => {
 
       await expect(handler.handleIngestClose(ws)).resolves.toEqual({
         wrapperRunId: WRAPPER_RUN_ID,
-        wrapperGeneration: undefined,
-        wrapperConnectionId: undefined,
+        wrapperGeneration: 1,
+        wrapperConnectionId: 'conn-1',
       });
       expect(state.getWebSockets).toHaveBeenCalledWith(`ingest:${WRAPPER_RUN_ID}`);
-    });
-
-    it('returns legacy executionId-only attribution when that compatibility socket closes', async () => {
-      const state = createFakeState();
-      vi.mocked(state.getWebSockets).mockReturnValue([]);
-
-      const handler = createIngestHandler(
-        state,
-        createFakeEventQueries(),
-        SESSION_ID,
-        vi.fn(),
-        createFakeDOContext()
-      );
-      const ws = createFakeWebSocket(
-        makeAttachment({ executionId: 'exc_legacy_close', wrapperRunId: undefined })
-      );
-
-      await expect(handler.handleIngestClose(ws)).resolves.toEqual({
-        executionId: 'exc_legacy_close',
-        wrapperRunId: undefined,
-        wrapperGeneration: undefined,
-        wrapperConnectionId: undefined,
-      });
-      expect(state.getWebSockets).toHaveBeenCalledWith('ingest:exc_legacy_close');
     });
 
     it('returns null when a replacement ingest socket exists', async () => {
@@ -173,24 +166,6 @@ describe('createIngestHandler', () => {
     // The positive case through the full handleIngestRequest → handleIngestClose
     // flow requires WebSocketPair and state.acceptWebSocket — Cloudflare Worker
     // APIs unavailable in vitest Node. That path is covered by integration tests.
-  });
-
-  it('reports active legacy executionId-only ingest sockets through the compatibility probe', () => {
-    const state = createFakeState();
-    const existingSocket = createFakeWebSocket(
-      makeAttachment({ executionId: 'exc_legacy_active', wrapperRunId: undefined })
-    );
-    vi.mocked(state.getWebSockets).mockReturnValue([existingSocket]);
-    const handler = createIngestHandler(
-      state,
-      createFakeEventQueries(),
-      SESSION_ID,
-      vi.fn(),
-      createFakeDOContext()
-    );
-
-    expect(handler.hasActiveConnection({ executionId: 'exc_legacy_active' })).toBe(true);
-    expect(state.getWebSockets).toHaveBeenCalledWith('ingest:exc_legacy_active');
   });
 
   describe('handleIngestMessage — persistence routing', () => {
@@ -530,6 +505,37 @@ describe('createIngestHandler', () => {
   });
 
   describe('wrapper fencing', () => {
+    it('quarantines obsolete hibernated attachment messages without terminal side effects', async () => {
+      const eventQueries = createFakeEventQueries();
+      const broadcastFn = vi.fn();
+      const doContext = createFakeDOContext();
+      const handler = createIngestHandler(
+        createFakeState(),
+        eventQueries,
+        SESSION_ID,
+        broadcastFn,
+        doContext
+      );
+      const ws = createFakeWebSocket({
+        executionId: 'exc_predeploy',
+        connectedAt: Date.now(),
+        kiloSessionState: { captured: false },
+        lastHeartbeatUpdate: Date.now(),
+        lastEventAtUpdate: 0,
+      });
+
+      await handler.handleIngestMessage(
+        ws,
+        makeStreamMessage('interrupted', { reason: 'old run' })
+      );
+
+      expect(ws.close).toHaveBeenCalledWith(4401, 'Obsolete wrapper connection');
+      expect(eventQueries.insert).not.toHaveBeenCalled();
+      expect(broadcastFn).not.toHaveBeenCalled();
+      expect(doContext.wrapperSupervisor.onTerminalEvent).not.toHaveBeenCalled();
+      expect(doContext.wrapperSupervisor.isCurrentConnection).not.toHaveBeenCalled();
+    });
+
     it('ignores stale fenced socket messages', async () => {
       const eventQueries = createFakeEventQueries();
       const broadcastFn = vi.fn();
@@ -691,7 +697,11 @@ describe('createIngestHandler', () => {
   describe('hasActiveConnection', () => {
     it('returns true when getWebSockets finds ingest sockets', () => {
       const state = createFakeState();
-      vi.mocked(state.getWebSockets).mockReturnValue([createFakeWebSocket()]);
+      vi.mocked(state.getWebSockets).mockReturnValue([
+        createFakeWebSocket(
+          makeAttachment({ wrapperGeneration: 1, wrapperConnectionId: 'conn-1' })
+        ),
+      ]);
 
       const handler = createIngestHandler(
         state,
@@ -701,7 +711,13 @@ describe('createIngestHandler', () => {
         createFakeDOContext()
       );
 
-      expect(handler.hasActiveConnection({ wrapperRunId: WRAPPER_RUN_ID })).toBe(true);
+      expect(
+        handler.hasActiveConnection({
+          wrapperRunId: WRAPPER_RUN_ID,
+          wrapperGeneration: 1,
+          wrapperConnectionId: 'conn-1',
+        })
+      ).toBe(true);
       expect(state.getWebSockets).toHaveBeenCalledWith(`ingest:${WRAPPER_RUN_ID}`);
     });
 
@@ -717,7 +733,13 @@ describe('createIngestHandler', () => {
         createFakeDOContext()
       );
 
-      expect(handler.hasActiveConnection({ wrapperRunId: WRAPPER_RUN_ID })).toBe(false);
+      expect(
+        handler.hasActiveConnection({
+          wrapperRunId: WRAPPER_RUN_ID,
+          wrapperGeneration: 1,
+          wrapperConnectionId: 'conn-1',
+        })
+      ).toBe(false);
     });
   });
 
@@ -816,6 +838,8 @@ describe('createIngestHandler', () => {
         lastHeartbeatUpdate: now,
         lastEventAtUpdate: 0,
         wrapperRunId: WRAPPER_RUN_ID,
+        wrapperGeneration: 1,
+        wrapperConnectionId: 'conn-1',
         ...overrides,
       };
     }
@@ -898,7 +922,8 @@ describe('createIngestHandler', () => {
           kind: 'completed',
           assistantMessageId: 'asst_222',
           completionSource: 'assistant_message_event',
-        })
+        }),
+        WRAPPER_RUN_ID
       );
     });
 
@@ -940,7 +965,8 @@ describe('createIngestHandler', () => {
           assistantMessageId: 'asst_333',
           completionSource: 'assistant_message_event',
           error: 'rate limit exceeded',
-        })
+        }),
+        WRAPPER_RUN_ID
       );
     });
 
@@ -982,7 +1008,8 @@ describe('createIngestHandler', () => {
           assistantMessageId: 'asst_object_completed',
           completionSource: 'assistant_message_event',
           error: 'provider failed',
-        })
+        }),
+        WRAPPER_RUN_ID
       );
     });
 
@@ -1023,7 +1050,8 @@ describe('createIngestHandler', () => {
           assistantMessageId: 'asst_object_pending',
           completionSource: 'assistant_message_event',
           error: 'provider failed early',
-        })
+        }),
+        WRAPPER_RUN_ID
       );
     });
 
@@ -1065,7 +1093,8 @@ describe('createIngestHandler', () => {
       expect(doContext.terminalizeSessionMessageOnce).toHaveBeenCalledTimes(2);
       expect(doContext.terminalizeSessionMessageOnce).toHaveBeenCalledWith(
         'msg_user_444',
-        expect.objectContaining({ kind: 'completed' })
+        expect.objectContaining({ kind: 'completed' }),
+        WRAPPER_RUN_ID
       );
     });
 
@@ -1169,43 +1198,20 @@ describe('createIngestHandler', () => {
       }
     );
 
-    it('routes legacy executionId-only ingest through compatibility validation', async () => {
-      const getLegacyIngestExecution = vi.fn().mockResolvedValue(null);
+    it('rejects executionId-only ingest without a fenced wrapper run', async () => {
       const handler = createIngestHandler(
         createFakeState(),
         createFakeEventQueries(),
         SESSION_ID,
         vi.fn(),
-        {
-          ...createFakeDOContext(),
-          getLegacyIngestExecution,
-        } as IngestDOContext
+        createFakeDOContext()
       );
 
       const response = await handler.handleIngestRequest(
         makeIngestRequest({ executionId: 'exc_legacy_unknown' })
       );
-      expect(response.status).toBe(404);
-      expect(await response.text()).toBe('Execution not found');
-      expect(getLegacyIngestExecution).toHaveBeenCalledWith('exc_legacy_unknown');
+      expect(response.status).toBe(400);
+      expect(await response.text()).toBe('Missing wrapperRunId parameter');
     });
-
-    itWithWebSocketPair(
-      'accepts legacy ingest reconnect with executionId and no wrapperRunId',
-      async () => {
-        const handler = createIngestHandler(
-          createFakeState(),
-          createFakeEventQueries(),
-          SESSION_ID,
-          vi.fn(),
-          createFakeDOContext()
-        );
-
-        const response = await handler.handleIngestRequest(
-          makeIngestRequest({ executionId: 'exc_legacy_reconnect' })
-        );
-        expect(response.status).toBe(101);
-      }
-    );
   });
 });

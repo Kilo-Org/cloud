@@ -5,8 +5,9 @@ import { countPendingSessionMessages, type SessionQueueStorage } from './pending
 import {
   getSessionMessageState,
   listNonTerminalAcceptedMessages,
+  listTerminalMessagesWithPendingEffects,
   putSessionMessageState,
-  terminalizeMessageOnce,
+  terminalizeMessageOnce as persistTerminalStateTransition,
   type SessionMessageState,
   type SessionMessageStorage,
   type TerminalizeParams,
@@ -22,6 +23,7 @@ type IdleBatchCallbackState = {
   createdAt: number;
   updatedAt: number;
   representativeMessageId?: string;
+  allowWithoutObservedIdle?: boolean;
   wrapperTerminalObservedAt?: number;
   wrapperTerminalWaitReleasedAt?: number;
   finalizedAt?: number;
@@ -36,6 +38,7 @@ type PersistedMessageEvent = {
   streamEventType: string;
   payload: string;
   timestamp: number;
+  entityId: string;
 };
 
 export type MessageSettlementOutboxStorage = SessionQueueStorage & SessionMessageStorage;
@@ -51,6 +54,12 @@ export type TerminalizeSessionMessageOptions = {
 };
 
 export type MessageSettlementOutbox = {
+  persistTerminalTransition(
+    messageId: string,
+    params: TerminalizeParams,
+    opts?: TerminalizeSessionMessageOptions
+  ): Promise<{ changed: boolean; state: SessionMessageState | null }>;
+  repairTerminalMessageEffects(messageId: string): Promise<void>;
   terminalizeSessionMessageOnce(
     messageId: string,
     params: TerminalizeParams,
@@ -61,6 +70,7 @@ export type MessageSettlementOutbox = {
   releaseWrapperTerminalWaitForIdleBatchForWrapperRun(wrapperRunId: string): Promise<boolean>;
   isWaitingForWrapperTerminalGateResult(): Promise<boolean>;
   finalizeIdleBatchCallbackIfReady(options?: FinalizeIdleBatchCallbackOptions): Promise<void>;
+  repairTerminalEffects(): Promise<boolean>;
   retryPendingCallbacks(now: number): Promise<void>;
   nextCallbackDeadline(): Promise<number | undefined>;
 };
@@ -76,7 +86,7 @@ export type MessageSettlementOutboxDependencies = {
     kiloSessionId: string,
     parentMessageId: string
   ) => LatestAssistantMessage | null;
-  insertAndBroadcastMessageEvent: (event: PersistedMessageEvent) => void;
+  ensureTerminalMessageEvent: (event: PersistedMessageEvent) => void;
   hasObservedWrapperIdle: () => Promise<boolean>;
   requestAlarmAtOrBefore: (deadline: number) => Promise<void>;
   getSessionIdForLogs: () => string | undefined;
@@ -117,7 +127,7 @@ export function createMessageSettlementOutbox(
     resolveCallbackSessionId,
     getCallbackQueue,
     getAssistantMessageForUserMessage,
-    insertAndBroadcastMessageEvent,
+    ensureTerminalMessageEvent,
     hasObservedWrapperIdle,
     requestAlarmAtOrBefore,
     getSessionIdForLogs,
@@ -157,13 +167,26 @@ export function createMessageSettlementOutbox(
     return state;
   }
 
-  async function recordIdleBatchCallbackCandidate(state: SessionMessageState): Promise<void> {
+  async function recordIdleBatchCallbackCandidate(
+    state: SessionMessageState,
+    allowWithoutObservedIdle = false
+  ): Promise<void> {
     if (!state.callbackRequired) return;
 
     const batch = await openIdleBatchCallbackState(state.messageId);
+    const currentRepresentative = batch.representativeMessageId
+      ? await getSessionMessageState(storage, batch.representativeMessageId)
+      : undefined;
+    const candidateTime = state.terminalAt ?? state.createdAt;
+    const currentTime = currentRepresentative
+      ? (currentRepresentative.terminalAt ?? currentRepresentative.createdAt)
+      : -1;
+    const representativeMessageId =
+      candidateTime >= currentTime ? state.messageId : batch.representativeMessageId;
     const updated: IdleBatchCallbackState = {
       ...batch,
-      representativeMessageId: state.messageId,
+      representativeMessageId,
+      allowWithoutObservedIdle: batch.allowWithoutObservedIdle || allowWithoutObservedIdle,
       updatedAt: Date.now(),
     };
     await storage.put(idleBatchCallbackKey(updated.batchId), updated);
@@ -250,7 +273,8 @@ export function createMessageSettlementOutbox(
     if (extra?.gateResult !== undefined) {
       payload.gateResult = extra.gateResult;
     }
-    insertAndBroadcastMessageEvent({
+    ensureTerminalMessageEvent({
+      entityId: `terminal-message/${state.messageId}`,
       sessionId,
       streamEventType: 'cloud.message.completed',
       payload: JSON.stringify(payload),
@@ -280,7 +304,8 @@ export function createMessageSettlementOutbox(
     } else if (state.error) {
       payload.error = state.error;
     }
-    insertAndBroadcastMessageEvent({
+    ensureTerminalMessageEvent({
+      entityId: `terminal-message/${state.messageId}`,
       sessionId,
       streamEventType: 'cloud.message.failed',
       payload: JSON.stringify(payload),
@@ -462,15 +487,93 @@ export function createMessageSettlementOutbox(
     return states;
   }
 
+  async function applyTerminalEffects(state: SessionMessageState): Promise<void> {
+    if (state.terminalEffects?.event !== 'accounted') {
+      if (state.status === 'completed') {
+        await emitSessionMessageCompleted(state, { gateResult: state.gateResult });
+      } else if (state.status === 'failed' || state.status === 'interrupted') {
+        await emitSessionMessageFailed(state, { error: state.error });
+      }
+      await putSessionMessageState(storage, {
+        ...state,
+        terminalEffects: {
+          event: 'accounted',
+          callback:
+            state.terminalEffects?.callback ??
+            (state.callbackRequired
+              ? {
+                  disposition: 'pending',
+                  allowWithoutObservedIdle:
+                    state.completionSource === 'interrupt' ||
+                    state.completionSource === 'delivery_failure',
+                }
+              : { disposition: 'not-required' }),
+        },
+      });
+      state = (await getSessionMessageState(storage, state.messageId)) ?? state;
+    }
+
+    if (state.terminalEffects?.callback.disposition === 'pending') {
+      await recordIdleBatchCallbackCandidate(
+        state,
+        state.terminalEffects.callback.allowWithoutObservedIdle
+      );
+      await putSessionMessageState(storage, {
+        ...state,
+        terminalEffects: {
+          event: 'accounted',
+          callback: {
+            ...state.terminalEffects.callback,
+            disposition: 'accounted',
+          },
+        },
+      });
+    }
+  }
+
+  async function repairTerminalEffects(): Promise<boolean> {
+    const terminalStates = await listTerminalMessagesWithPendingEffects(storage);
+    try {
+      for (const state of terminalStates) {
+        await applyTerminalEffects(state);
+      }
+      const batch = await getCurrentIdleBatchCallbackState();
+      if (batch) {
+        await finalizeIdleBatchCallbackIfReady({
+          allowWithoutObservedIdle: batch.allowWithoutObservedIdle,
+        });
+      }
+    } catch (error) {
+      await requestAlarmAtOrBefore(Date.now() + 1_000);
+      throw error;
+    }
+    return terminalStates.length > 0;
+  }
+
+  async function persistTerminalTransition(
+    messageId: string,
+    params: TerminalizeParams,
+    opts?: TerminalizeSessionMessageOptions
+  ): Promise<{ changed: boolean; state: SessionMessageState | null }> {
+    return persistTerminalStateTransition(storage, messageId, params, {
+      suppressCallback: opts?.suppressCallback,
+      allowIdleBatchWithoutObservedIdle: opts?.allowIdleBatchWithoutObservedIdle,
+    });
+  }
+
+  async function repairTerminalMessageEffects(messageId: string): Promise<void> {
+    const state = await getSessionMessageState(storage, messageId);
+    if (!state) return;
+    await applyTerminalEffects(state);
+  }
+
   async function terminalizeSessionMessageOnce(
     messageId: string,
     params: TerminalizeParams,
     opts?: TerminalizeSessionMessageOptions
   ): Promise<{ changed: boolean; state: SessionMessageState | null }> {
-    const result = await terminalizeMessageOnce(storage, messageId, params);
-    if (!result.changed || !result.state) {
-      return result;
-    }
+    const result = await persistTerminalTransition(messageId, params, opts);
+    if (!result.state) return result;
 
     const { state } = result;
     logger
@@ -485,20 +588,17 @@ export function createMessageSettlementOutbox(
       })
       .info('Session message terminalized');
 
-    if (state.status === 'completed') {
-      await emitSessionMessageCompleted(state, { gateResult: opts?.gateResult });
-    } else if (state.status === 'failed' || state.status === 'interrupted') {
-      await emitSessionMessageFailed(state, { error: state.error });
-    }
+    try {
+      await applyTerminalEffects(state);
 
-    if (state.callbackRequired && !opts?.suppressCallback) {
-      await recordIdleBatchCallbackCandidate(state);
-    }
-
-    if (!opts?.suppressCallback) {
-      await finalizeIdleBatchCallbackIfReady({
-        allowWithoutObservedIdle: opts?.allowIdleBatchWithoutObservedIdle,
-      });
+      if (!opts?.suppressCallback) {
+        await finalizeIdleBatchCallbackIfReady({
+          allowWithoutObservedIdle: opts?.allowIdleBatchWithoutObservedIdle,
+        });
+      }
+    } catch (error) {
+      await requestAlarmAtOrBefore(Date.now() + 1_000);
+      throw error;
     }
 
     return result;
@@ -521,12 +621,15 @@ export function createMessageSettlementOutbox(
   }
 
   return {
+    persistTerminalTransition,
+    repairTerminalMessageEffects,
     terminalizeSessionMessageOnce,
     observeWrapperTerminalForIdleBatch,
     releaseWrapperTerminalWaitForIdleBatch,
     releaseWrapperTerminalWaitForIdleBatchForWrapperRun,
     isWaitingForWrapperTerminalGateResult,
     finalizeIdleBatchCallbackIfReady,
+    repairTerminalEffects,
     retryPendingCallbacks,
     nextCallbackDeadline,
   };

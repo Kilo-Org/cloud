@@ -1,7 +1,8 @@
 import type { CallbackTarget, ExecutionCallbackPayload } from './types.js';
 import { logger } from '../logger.js';
 
-const MAX_ATTEMPTS = 5;
+/** Initial callback delivery plus configured Queue redeliveries. Keep wrangler consumer max_retries in sync. */
+export const CALLBACK_DELIVERY_MAX_ATTEMPTS = 5;
 const BASE_BACKOFF_SECONDS = 60;
 const DELIVERY_TIMEOUT_MS = 10_000;
 
@@ -70,7 +71,7 @@ export async function deliverCallbackJob(
     return { type: 'success' };
   }
 
-  if (attempts < MAX_ATTEMPTS && shouldRetry(result.status)) {
+  if (attempts < CALLBACK_DELIVERY_MAX_ATTEMPTS && shouldRetry(result.status)) {
     const delaySeconds = BASE_BACKOFF_SECONDS * 2 ** (attempts - 1);
     logger
       .withFields({

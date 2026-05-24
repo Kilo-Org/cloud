@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Env, SandboxInstance } from '../types.js';
-import type { MessageDeliveryPlan, WorkspaceReady } from '../execution/types.js';
+import type {
+  FencedWrapperDispatchRequest,
+  MessageDeliveryRequest,
+  WorkspaceReady,
+} from '../execution/types.js';
 import { createAgentRuntime } from './agent-runtime.js';
 import { getWrapperRuntimeState } from './wrapper-runtime-state.js';
 import type { SessionMetadata } from '../persistence/session-metadata.js';
@@ -55,7 +59,7 @@ function createMetadata(): SessionMetadata {
   } satisfies SessionMetadata;
 }
 
-function createPlan(metadata = createMetadata()): MessageDeliveryPlan {
+function createPlan(metadata = createMetadata()): MessageDeliveryRequest {
   return {
     scope: {
       sessionId: 'agent_runtime',
@@ -77,7 +81,7 @@ function createPlan(metadata = createMetadata()): MessageDeliveryPlan {
     wrapper: {
       kiloSessionId: 'kilo_runtime',
     },
-  } satisfies MessageDeliveryPlan;
+  } satisfies MessageDeliveryRequest;
 }
 
 function createWorkspaceReady(): WorkspaceReady {
@@ -94,11 +98,11 @@ describe('AgentRuntime', () => {
   it('fences grouped delivery, records wrapper readiness, and returns the existing queue result shape', async () => {
     const storage = createMemoryStorage();
     const ready = createWorkspaceReady();
-    const deliveredPlans: MessageDeliveryPlan[] = [];
+    const deliveredPlans: FencedWrapperDispatchRequest[] = [];
     const orchestrator = {
       execute: vi.fn(
         async (
-          plan: MessageDeliveryPlan,
+          plan: FencedWrapperDispatchRequest,
           options?: {
             onProgress?: (step: string, message: string) => void;
             onWorkspaceReady?: (workspace: WorkspaceReady) => Promise<void>;
@@ -113,15 +117,14 @@ describe('AgentRuntime', () => {
     };
     const progress: Array<{ step: string; message: string }> = [];
     const workspaces: WorkspaceReady[] = [];
-    const accepted: Array<{ acceptedAt: number; wrapperRunId?: string }> = [];
+    const accepted: Array<{ acceptedAt: number; wrapperRunId: string }> = [];
     const runtime = createAgentRuntime({
       storage,
       env: {} as Env,
       getMetadata: async () => createMetadata(),
       getOrchestratorOverride: () => orchestrator,
       getSessionIdForLogs: () => 'agent_runtime',
-      resolveLegacyIngestTagId: async () => null,
-      sendToWrapper: () => {},
+      sendToWrapper: () => false,
     });
 
     const result = await runtime.send(createPlan(), {
@@ -140,9 +143,8 @@ describe('AgentRuntime', () => {
 
     expect(result).toMatchObject({
       success: true,
-      status: 'started',
+      outcome: 'accepted',
       messageId: 'msg_018f1e2d3c4bRuntimeAbCdEfG',
-      delivery: 'sent',
     });
     if (!result.success) return;
     expect(deliveredPlan?.wrapper.fence).toEqual({
@@ -164,6 +166,45 @@ describe('AgentRuntime', () => {
     expect(wrapperState.nextPingAt).toEqual(expect.any(Number));
   });
 
+  it('preserves accepted-message liveness when a hot follow-up fails before acceptance', async () => {
+    const storage = createMemoryStorage([
+      [
+        'wrapper_runtime_state',
+        {
+          wrapperGeneration: 3,
+          wrapperConnectionId: 'conn_hot',
+          wrapperRunId: 'wr_hot',
+          noOutputDeadlineAt: 9_000,
+          pingDeadlineAt: 8_000,
+          nextPingAt: 7_000,
+        },
+      ],
+    ]);
+    const runtime = createAgentRuntime({
+      storage,
+      env: {} as Env,
+      getMetadata: async () => createMetadata(),
+      getOrchestratorOverride: () => ({
+        execute: async () => {
+          throw new Error('hot follow-up failed');
+        },
+      }),
+      getSessionIdForLogs: () => 'agent_runtime',
+      sendToWrapper: () => false,
+    });
+
+    await expect(runtime.send(createPlan())).rejects.toThrow('hot follow-up failed');
+
+    await expect(getWrapperRuntimeState(storage)).resolves.toMatchObject({
+      wrapperGeneration: 3,
+      wrapperConnectionId: 'conn_hot',
+      wrapperRunId: 'wr_hot',
+      noOutputDeadlineAt: 9_000,
+      pingDeadlineAt: 8_000,
+      nextPingAt: 7_000,
+    });
+  });
+
   it('clears a newly allocated wrapper fence when delivery fails before readiness', async () => {
     const storage = createMemoryStorage();
     const runtime = createAgentRuntime({
@@ -176,8 +217,7 @@ describe('AgentRuntime', () => {
         },
       }),
       getSessionIdForLogs: () => 'agent_runtime',
-      resolveLegacyIngestTagId: async () => null,
-      sendToWrapper: () => {},
+      sendToWrapper: () => false,
     });
 
     await expect(runtime.send(createPlan())).rejects.toThrow('wrapper unavailable');
@@ -196,15 +236,15 @@ describe('AgentRuntime', () => {
         },
       ],
     ]);
-    const commands: Array<{ ingestTagId: string; command: unknown }> = [];
+    const commands: Array<{ ingestTagId: string; command: unknown; fence?: unknown }> = [];
     const runtime = createAgentRuntime({
       storage,
       env: {} as Env,
       getMetadata: async () => createMetadata(),
       getSessionIdForLogs: () => 'agent_runtime',
-      resolveLegacyIngestTagId: async () => 'exec_legacy',
-      sendToWrapper: (ingestTagId, command) => {
-        commands.push({ ingestTagId, command });
+      sendToWrapper: (ingestTagId, command, fence) => {
+        commands.push({ ingestTagId, command, fence });
+        return true;
       },
     });
 
@@ -212,9 +252,31 @@ describe('AgentRuntime', () => {
     await expect(runtime.interruptWrapper()).resolves.toEqual({ commandSent: true });
 
     expect(commands).toEqual([
-      { ingestTagId: 'wr_runtime', command: { type: 'request_snapshot' } },
-      { ingestTagId: 'wr_runtime', command: { type: 'kill', signal: 'SIGTERM' } },
+      { ingestTagId: 'wr_runtime', command: { type: 'request_snapshot' }, fence: undefined },
+      {
+        ingestTagId: 'wr_runtime',
+        command: { type: 'kill', signal: 'SIGTERM' },
+        fence: { wrapperGeneration: 3, wrapperConnectionId: 'conn_runtime' },
+      },
     ]);
+  });
+
+  it('reports interrupt command unsent when no matching live wrapper socket exists', async () => {
+    const storage = createMemoryStorage([
+      [
+        'wrapper_runtime_state',
+        { wrapperGeneration: 3, wrapperConnectionId: 'conn_runtime', wrapperRunId: 'wr_runtime' },
+      ],
+    ]);
+    const runtime = createAgentRuntime({
+      storage,
+      env: {} as Env,
+      getMetadata: async () => createMetadata(),
+      getSessionIdForLogs: () => 'agent_runtime',
+      sendToWrapper: () => false,
+    });
+
+    await expect(runtime.interruptWrapper()).resolves.toEqual({ commandSent: false });
   });
 
   it('keeps and stops the resolved sandbox runtime through transport controls', async () => {
@@ -226,8 +288,7 @@ describe('AgentRuntime', () => {
       env: {} as Env,
       getMetadata: async () => createMetadata(),
       getSessionIdForLogs: () => 'agent_runtime',
-      resolveLegacyIngestTagId: async () => null,
-      sendToWrapper: () => {},
+      sendToWrapper: () => false,
       resolveSandbox: () => sandbox,
       stopRuntimeWrapper,
     });

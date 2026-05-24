@@ -20,8 +20,6 @@ function asCloudStatusDerivingInstance(instance: object): CloudStatusDerivingIns
 }
 
 const MSG_INITIAL_PENDING = 'msg_018f1e2d3c4bAaBbCcDdEeFfHh';
-const MSG_RUNTIME_PENDING = 'msg_018f1e2d3c4bIiJjKkLlMmNnOo';
-const MSG_RUNTIME_RUNNING = 'msg_018f1e2d3c4bPpQqRrSsTtUuVv';
 const userId = 'user_cloud_status_derive';
 
 describe('deriveCloudStatus (/stream connected bootstrap)', () => {
@@ -86,85 +84,6 @@ describe('deriveCloudStatus (/stream connected bootstrap)', () => {
         mode: 'code',
         model: 'claude',
       });
-
-      return asCloudStatusDerivingInstance(instance).deriveCloudStatus();
-    });
-
-    expect(cloudStatus).toEqual({ type: 'ready' });
-  });
-
-  it('keeps pending current runtime execution mapped to preparing', async () => {
-    const sessionId = 'agent_cloud_status_derive_runtime_pending';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
-
-    const cloudStatus = await runInDurableObject(stub, async instance => {
-      await registerReadySession(instance, {
-        sessionId,
-        userId,
-        prompt: 'prepared prompt',
-        mode: 'code',
-        model: 'claude',
-      });
-      const executionId = 'exc_cloud_status_runtime_pending';
-      const addResult = await instance.addExecution({
-        executionId,
-        mode: 'code',
-        streamingMode: 'websocket',
-        ingestToken: executionId,
-        messageId: MSG_RUNTIME_PENDING,
-      });
-      expect(addResult.ok).toBe(true);
-      await instance.ctx.storage.put('wrapper_runtime_state', {
-        wrapperGeneration: 1,
-        wrapperConnectionId: 'conn_cloud_status_pending',
-        wrapperExecutionId: executionId,
-        acceptedMessageId: MSG_RUNTIME_PENDING,
-        acceptedExecutionId: executionId,
-      });
-
-      return asCloudStatusDerivingInstance(instance).deriveCloudStatus();
-    });
-
-    expect(cloudStatus).toEqual({ type: 'preparing' });
-  });
-
-  it('keeps running current runtime execution mapped to ready', async () => {
-    const sessionId = 'agent_cloud_status_derive_runtime_running';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
-
-    const cloudStatus = await runInDurableObject(stub, async instance => {
-      await registerReadySession(instance, {
-        sessionId,
-        userId,
-        prompt: 'prepared prompt',
-        mode: 'code',
-        model: 'claude',
-      });
-      const executionId = 'exc_cloud_status_runtime_running';
-      const addResult = await instance.addExecution({
-        executionId,
-        mode: 'code',
-        streamingMode: 'websocket',
-        ingestToken: executionId,
-        messageId: MSG_RUNTIME_RUNNING,
-      });
-      expect(addResult.ok).toBe(true);
-      await instance.ctx.storage.put('wrapper_runtime_state', {
-        wrapperGeneration: 1,
-        wrapperConnectionId: 'conn_cloud_status_running',
-        wrapperExecutionId: executionId,
-        acceptedMessageId: MSG_RUNTIME_RUNNING,
-        acceptedExecutionId: executionId,
-      });
-      const statusResult = await instance.updateExecutionStatus({
-        executionId,
-        status: 'running',
-      });
-      expect(statusResult.ok).toBe(true);
 
       return asCloudStatusDerivingInstance(instance).deriveCloudStatus();
     });

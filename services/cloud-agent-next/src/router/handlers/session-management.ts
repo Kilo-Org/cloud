@@ -22,7 +22,6 @@ import {
   GetLatestAssistantMessageInput,
   GetLatestAssistantMessageOutput,
 } from '../schemas.js';
-import { computeExecutionHealth } from '../../core/execution.js';
 import { readProfileBundle } from '../../session-profile.js';
 import type { CloudAgentSession } from '../../persistence/CloudAgentSession.js';
 import type { CloudAgentSessionState } from '../../persistence/types.js';
@@ -228,9 +227,9 @@ export function createSessionManagementHandlers() {
                 .withFields({
                   message:
                     interruptResult.message ??
-                    'No current runtime execution or pending queued messages',
+                    'No accepted current messages or pending queued messages',
                 })
-                .info('No current runtime execution or pending queued messages to interrupt');
+                .info('No accepted current messages or pending queued messages to interrupt');
             }
 
             const targetExecutionId = interruptResult.executionId;
@@ -370,36 +369,11 @@ export function createSessionManagementHandlers() {
             });
           }
 
-          // Fetch current wrapper runtime execution state from DO
-          const runtimeExecution = await withDORetry(
+          const currentWork = await withDORetry(
             getStub,
-            s => s.getCurrentRuntimeExecution(),
-            'getCurrentRuntimeExecution'
+            s => s.getCurrentMessageWork(),
+            'getCurrentMessageWork'
           );
-
-          let currentRuntimeStatus:
-            | 'pending'
-            | 'running'
-            | 'completed'
-            | 'failed'
-            | 'interrupted'
-            | null = null;
-          let execution: {
-            startedAt: number;
-            lastHeartbeat?: number;
-            processId?: string;
-            error?: string;
-          } | null = null;
-
-          if (runtimeExecution) {
-            currentRuntimeStatus = runtimeExecution.status;
-            execution = {
-              startedAt: runtimeExecution.startedAt,
-              lastHeartbeat: runtimeExecution.lastHeartbeat,
-              processId: runtimeExecution.processId,
-              error: runtimeExecution.error,
-            };
-          }
 
           // Compute sandboxId for log correlation
           const sessionMetadata = metadata;
@@ -417,16 +391,6 @@ export function createSessionManagementHandlers() {
 
           logger.setTags({ sandboxId, orgId: sessionMetadata.identity.orgId ?? '(personal)' });
           logger.info('Session metadata retrieved successfully');
-
-          // Compute execution health if there's a current runtime execution
-          const executionHealth =
-            execution && currentRuntimeStatus
-              ? computeExecutionHealth(
-                  currentRuntimeStatus,
-                  execution.startedAt,
-                  execution.lastHeartbeat
-                )
-              : null;
 
           // Sanitize and return safe fields only (no tokens/secrets)
           const repositoryFields = publicRepositoryFields(sessionMetadata);
@@ -457,19 +421,19 @@ export function createSessionManagementHandlers() {
               variant: agent.config.variant,
             })),
 
-            // Execution status (grouped for cleaner API)
-            execution:
-              runtimeExecution && currentRuntimeStatus && execution
-                ? {
-                    id: runtimeExecution.executionId,
-                    status: currentRuntimeStatus,
-                    startedAt: execution.startedAt,
-                    lastHeartbeat: execution.lastHeartbeat ?? null,
-                    processId: execution.processId ?? null,
-                    error: execution.error ?? null,
-                    health: executionHealth ?? 'unknown',
-                  }
-                : null,
+            // Preserve the execution-shaped public field using only current
+            // message-native activity; stranded execution-era rows are not current work.
+            execution: currentWork
+              ? {
+                  id: currentWork.messageId,
+                  status: currentWork.status,
+                  startedAt: sessionMetadata.lifecycle.timestamp,
+                  lastHeartbeat: null,
+                  processId: null,
+                  error: null,
+                  health: currentWork.health,
+                }
+              : null,
 
             // Lifecycle timestamps (critical for idempotency)
             preparedAt: sessionMetadata.lifecycle.preparedAt,
@@ -527,20 +491,16 @@ export function createSessionManagementHandlers() {
 
           logger.setTags({ sandboxId, orgId: metadata.identity.orgId ?? '(personal)' });
 
-          const activeExecution = await withDORetry(
+          // Stranded legacy execution rows from pre-message deployments do not
+          // represent resumable current work and must not gate continuation.
+          const activeMessageWork = await withDORetry(
             getStub,
-            s => s.getCurrentRuntimeExecution(),
-            'getCurrentRuntimeExecution'
+            s => s.getCurrentMessageWork(),
+            'getCurrentMessageWork'
           );
-          const activeExecutionId = activeExecution?.executionId;
-
-          const executionHealth = activeExecution
-            ? (computeExecutionHealth(
-                activeExecution.status,
-                activeExecution.startedAt,
-                activeExecution.lastHeartbeat
-              ) ?? 'unknown')
-            : 'none';
+          const activeExecutionId = activeMessageWork?.messageId;
+          const activeExecutionStatus = activeMessageWork?.status;
+          const executionHealth = activeMessageWork?.health ?? 'none';
 
           const sandbox = getSandbox(getSandboxNamespace(env, sandboxId), sandboxId);
           let sandboxStatus: 'healthy' | 'unreachable' = 'healthy';
@@ -557,7 +517,7 @@ export function createSessionManagementHandlers() {
             sandboxStatus,
             executionHealth,
             activeExecutionId: activeExecutionId ?? undefined,
-            activeExecutionStatus: activeExecution?.status,
+            activeExecutionStatus,
           });
 
           return {
@@ -566,7 +526,7 @@ export function createSessionManagementHandlers() {
             sandboxStatus,
             executionHealth,
             activeExecutionId: activeExecutionId ?? undefined,
-            activeExecutionStatus: activeExecution?.status,
+            activeExecutionStatus,
           };
         });
       }),

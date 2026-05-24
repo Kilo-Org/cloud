@@ -1,12 +1,12 @@
 import { TRPCError } from '@trpc/server';
 import type {
   ExecutionDeliveryContext,
-  ExecutionTurnSubmission,
-  MessageDeliveryPlan,
-  QueueSessionMessageRequest,
-  QueueSessionMessageResult,
+  AdmitAcceptedSessionMessageRequest,
+  MessageDeliveryRequest,
+  MessageDeliveryResult,
+  SessionMessageAdmissionResult,
   SessionMessageIntent,
-  StartExecutionDelivery,
+  SubmittedSessionMessageRequest,
 } from '../execution/types.js';
 import { renderExecutionTurnContent } from '../execution/types.js';
 import { isExecutionError } from '../execution/errors.js';
@@ -24,7 +24,6 @@ import {
   listPendingSessionMessages,
   findPendingSessionMessageByMessageId,
   deletePendingSessionMessageByMessageId,
-  clearPendingSessionMessages,
   checkPendingSessionMessageCapacity,
   recordPendingFlushFailure,
   resolvePendingSessionMessageIntent,
@@ -50,6 +49,13 @@ export const PENDING_FLUSH_DEBOUNCE_MS = 1_000;
 
 export type SessionMessageQueueStorage = SessionQueueStorage & SessionMessageStorage;
 
+const INTERRUPT_PENDING_BATCH_KEY = 'session_message_interrupt_pending_batch';
+
+type PendingInterruptBatch = {
+  messageIds: string[];
+  createdAt: number;
+};
+
 export type PendingFlushFailure = {
   type: 'failure';
   message: PendingSessionMessage;
@@ -72,8 +78,6 @@ export type PendingFlushDelivered = {
 
 export type PendingFlushResult = PendingFlushFailure | PendingFlushSkipped | PendingFlushDelivered;
 
-export type DrainPolicy = 'hot-only' | 'ensure-wrapper';
-
 type PersistedQueuedMessageEvent = {
   sessionId: string;
   streamEventType: string;
@@ -91,12 +95,20 @@ export type PendingMessageDrainResult = {
 };
 
 export type SessionMessageQueue = {
-  enqueue(request: QueueSessionMessageRequest): Promise<QueueSessionMessageResult>;
+  admitSubmittedMessage(
+    request: SubmittedSessionMessageRequest
+  ): Promise<SessionMessageAdmissionResult>;
+  admitAcceptedMessage(
+    request: AdmitAcceptedSessionMessageRequest
+  ): Promise<SessionMessageAdmissionResult>;
   drainNextPendingMessage(): Promise<PendingMessageDrainResult>;
   snapshotForStreamConnect(): Promise<QueuedMessageSnapshot[]>;
   interruptPendingQueuedMessages(
-    afterClear?: (messages: PendingSessionMessage[]) => Promise<void>
+    afterTransition?: (messages: PendingSessionMessage[]) => Promise<void>
   ): Promise<PendingSessionMessage[]>;
+  recoverPendingInterruption(
+    afterTransition?: (messages: PendingSessionMessage[]) => Promise<void>
+  ): Promise<boolean>;
   requestPendingDrain(): Promise<void>;
   requestPendingDrainIfNeeded(): Promise<boolean>;
 };
@@ -107,16 +119,21 @@ export type SessionMessageQueueDependencies = {
   requireSessionId: () => Promise<string>;
   validateModeAgainstRuntimeAgents: (metadata: SessionMetadata, mode: string) => string | null;
   getDeliveryContext: () => Promise<ExecutionDeliveryContext | null>;
-  hasCurrentRuntimeExecution: () => Promise<boolean>;
-  hasActiveAcceptedWrapperMessages: () => Promise<boolean>;
-  isLegacyAcceptedMessageRunning: (messageId: string) => Promise<boolean>;
-  deliver: (plan: MessageDeliveryPlan) => Promise<QueueSessionMessageResult>;
-  insertAndBroadcastMessageEvent: (event: PersistedQueuedMessageEvent) => void;
-  terminalizeSessionMessageOnce: (
+  deliver: (plan: MessageDeliveryRequest) => Promise<MessageDeliveryResult>;
+  ensureQueuedMessageEvent: (event: PersistedQueuedMessageEvent & { entityId: string }) => void;
+  ensureAcceptedMessageEffects: (messageId: string) => Promise<void>;
+  persistTerminalTransition: (
     messageId: string,
     params: TerminalizeParams,
     options?: QueueTerminalizationOptions
-  ) => Promise<unknown>;
+  ) => Promise<{
+    changed: boolean;
+    state: { status: 'queued' | 'accepted' | 'completed' | 'failed' | 'interrupted' } | null;
+  }>;
+  repairTerminalMessageEffects: (messageId: string) => Promise<void>;
+  finalizeTerminalCallbackEffects: (options?: {
+    allowWithoutObservedIdle?: boolean;
+  }) => Promise<void>;
   requestAlarmAtOrBefore: (deadline: number) => Promise<void>;
   getSessionIdForLogs: () => string | undefined;
 };
@@ -152,15 +169,15 @@ function getPendingFlushPolicy(
   return !hasWorkspaceFields && totalCount >= 1 ? 'cold-init' : 'warm-followup';
 }
 
-function buildMessageDeliveryPlan(
+function buildMessageDeliveryRequest(
   intent: SessionMessageIntent,
   context: ExecutionDeliveryContext,
   validateModeAgainstRuntimeAgents: SessionMessageQueueDependencies['validateModeAgainstRuntimeAgents']
-): MessageDeliveryPlan {
+): MessageDeliveryRequest {
   const modeInput = intent.agent.mode;
   const modeCheck = validateModeAgainstRuntimeAgents(context.metadata, modeInput);
   if (modeCheck) {
-    throw new MessageDeliveryPlanValidationError(modeCheck);
+    throw new MessageDeliveryRequestValidationError(modeCheck);
   }
 
   const model = normalizeKilocodeModel(intent.agent.model);
@@ -188,33 +205,60 @@ function buildMessageDeliveryPlan(
     wrapper: {
       kiloSessionId: context.kiloSessionId,
     },
-  } satisfies MessageDeliveryPlan;
+  } satisfies MessageDeliveryRequest;
 }
 
-class MessageDeliveryPlanValidationError extends Error {
+class MessageDeliveryRequestValidationError extends Error {
   readonly code = 'BAD_REQUEST' as const;
 
   constructor(message: string) {
     super(message);
-    this.name = 'MessageDeliveryPlanValidationError';
+    this.name = 'MessageDeliveryRequestValidationError';
   }
 }
 
 export async function flushNextPendingSessionMessage(params: {
   storage: SessionMessageQueueStorage;
   now: number;
-  drainPolicy: DrainPolicy;
-  hasCurrentRuntimeExecution: () => Promise<boolean>;
   getDeliveryContext: () => Promise<ExecutionDeliveryContext | null>;
   validateModeAgainstRuntimeAgents: SessionMessageQueueDependencies['validateModeAgainstRuntimeAgents'];
-  deliver: (plan: MessageDeliveryPlan) => Promise<QueueSessionMessageResult>;
+  deliver: (plan: MessageDeliveryRequest) => Promise<MessageDeliveryResult>;
+  repairQueuedMessageEffects?: (intent: SessionMessageIntent) => Promise<void>;
+  ensureAcceptedMessageEffects?: (messageId: string) => Promise<void>;
 }): Promise<PendingFlushResult> {
-  const messages = await listPendingSessionMessages(params.storage);
+  const context = await params.getDeliveryContext();
+  const messages = await listPendingSessionMessages(
+    params.storage,
+    context
+      ? {
+          mode: context.metadata.agent?.mode,
+          model: context.metadata.agent?.model,
+          variant: context.metadata.agent?.variant,
+          autoCommit: context.metadata.finalization?.autoCommit,
+          condenseOnComplete: context.metadata.finalization?.condenseOnComplete,
+        }
+      : undefined
+  );
   const [message] = messages;
   const totalCount = messages.length;
 
   if (!message) {
     return { type: 'skipped', remainingCount: 0 };
+  }
+
+  const existingState = await getSessionMessageState(params.storage, message.messageId);
+  if (existingState?.status === 'accepted') {
+    await params.ensureAcceptedMessageEffects?.(message.messageId);
+    await deletePendingSessionMessageByMessageId(params.storage, message.messageId);
+    return { type: 'delivered', remainingCount: Math.max(0, totalCount - 1) };
+  }
+  if (
+    existingState?.status === 'completed' ||
+    existingState?.status === 'failed' ||
+    existingState?.status === 'interrupted'
+  ) {
+    await deletePendingSessionMessageByMessageId(params.storage, message.messageId);
+    return { type: 'delivered', remainingCount: Math.max(0, totalCount - 1) };
   }
 
   if (shouldSkipPendingFlush(message, params.now)) {
@@ -225,13 +269,16 @@ export async function flushNextPendingSessionMessage(params: {
     };
   }
 
-  // ensure-wrapper drain cannot start another wrapper while execution work is
-  // active. hot-only drain intentionally keeps feeding the connected wrapper.
-  if (params.drainPolicy === 'ensure-wrapper' && (await params.hasCurrentRuntimeExecution())) {
-    return { type: 'skipped', remainingCount: totalCount };
+  if (message.deliveryDisposition === 'terminalization-pending') {
+    return {
+      type: 'failure',
+      message,
+      attempts: message.flushAttempts ?? 0,
+      exhausted: true,
+      remainingCount: totalCount,
+    };
   }
 
-  const context = await params.getDeliveryContext();
   const policy = getPendingFlushPolicy(totalCount, context);
   if (!context) {
     const failure = await recordPendingFlushFailure(
@@ -263,8 +310,25 @@ export async function flushNextPendingSessionMessage(params: {
     return toFailureResult(failure, totalCount);
   }
 
+  if (!existingState) {
+    const callbackSnapshot =
+      message.callbackSnapshot ??
+      (context.metadata.callback?.target
+        ? { required: true, target: context.metadata.callback.target }
+        : undefined);
+    await putSessionMessageState(
+      params.storage,
+      createQueuedSessionMessageState(intent, callbackSnapshot, message.createdAt)
+    );
+  }
+  await params.repairQueuedMessageEffects?.(intent);
+
   try {
-    const plan = buildMessageDeliveryPlan(intent, context, params.validateModeAgainstRuntimeAgents);
+    const plan = buildMessageDeliveryRequest(
+      intent,
+      context,
+      params.validateModeAgainstRuntimeAgents
+    );
     const startResult = await params.deliver(plan);
     if (!startResult.success) {
       const failure = await recordPendingFlushFailure(
@@ -283,7 +347,7 @@ export async function flushNextPendingSessionMessage(params: {
       return toFailureResult(error.failure, totalCount);
     }
     const code =
-      error instanceof MessageDeliveryPlanValidationError
+      error instanceof MessageDeliveryRequestValidationError
         ? error.code
         : isSandboxWorkspaceProbeTimeoutError(error)
           ? 'INTERNAL'
@@ -306,23 +370,21 @@ class PendingFlushRecordedError extends Error {
   }
 }
 
-function buildStartResult(
+function buildAdmissionAck(
   messageId: string,
-  delivery: StartExecutionDelivery = 'sent',
-  wrapperRunId?: string
-): QueueSessionMessageResult {
+  compatibilityDelivery: 'queued' | 'sent' = 'queued'
+): SessionMessageAdmissionResult {
   return {
     success: true,
-    status: 'started',
+    outcome: 'queued',
+    compatibilityDelivery,
     messageId,
-    delivery,
-    ...(wrapperRunId ? { wrapperRunId } : {}),
   };
 }
 
 function mapTRPCCodeToResultCode(
   trpcCode: string
-): Extract<QueueSessionMessageResult, { success: false }>['code'] {
+): Extract<SessionMessageAdmissionResult, { success: false }>['code'] {
   switch (trpcCode) {
     case 'BAD_REQUEST':
       return 'BAD_REQUEST';
@@ -342,23 +404,23 @@ export function createSessionMessageQueue(
     requireSessionId,
     validateModeAgainstRuntimeAgents,
     getDeliveryContext,
-    hasCurrentRuntimeExecution,
-    hasActiveAcceptedWrapperMessages,
-    isLegacyAcceptedMessageRunning,
     deliver,
-    insertAndBroadcastMessageEvent,
-    terminalizeSessionMessageOnce,
+    ensureQueuedMessageEvent,
+    ensureAcceptedMessageEffects,
+    persistTerminalTransition,
+    repairTerminalMessageEffects,
+    finalizeTerminalCallbackEffects,
     requestAlarmAtOrBefore,
     getSessionIdForLogs,
   } = dependencies;
 
-  function buildStartError(
-    code: Extract<QueueSessionMessageResult, { success: false }>['code'],
+  function buildAdmissionError(
+    code: Extract<SessionMessageAdmissionResult, { success: false }>['code'],
     error: string
-  ): QueueSessionMessageResult {
+  ): SessionMessageAdmissionResult {
     logger
       .withFields({ sessionId: getSessionIdForLogs(), code })
-      .warn('Building failed queueSessionMessage result');
+      .warn('Building failed session message admission result');
     return {
       success: false,
       code,
@@ -366,14 +428,14 @@ export function createSessionMessageQueue(
     };
   }
 
-  async function checkPendingQueueCapacity(): Promise<QueueSessionMessageResult | undefined> {
+  async function checkPendingQueueCapacity(): Promise<SessionMessageAdmissionResult | undefined> {
     const capacity = await checkPendingSessionMessageCapacity(storage);
     if (capacity.available) return undefined;
 
     logger
       .withFields({ sessionId: getSessionIdForLogs() })
       .warn('Pending session message queue is full');
-    return buildStartError(
+    return buildAdmissionError(
       'PENDING_QUEUE_FULL',
       capacity.message ?? 'Pending message queue is full'
     );
@@ -390,33 +452,118 @@ export function createSessionMessageQueue(
     return true;
   }
 
-  async function getExistingStartResultForMessageId(
-    messageId: string
-  ): Promise<QueueSessionMessageResult | undefined> {
+  async function completeQueuedAdmissionEffects(intent: SessionMessageIntent): Promise<void> {
+    const sessionId = await requireSessionId();
+    ensureQueuedMessageEvent({
+      entityId: `queued-message/${intent.turn.messageId}`,
+      sessionId,
+      streamEventType: 'cloud.message.queued',
+      payload: JSON.stringify({
+        messageId: intent.turn.messageId,
+        content: renderExecutionTurnContent(intent.turn),
+        delivery: 'queued',
+      }),
+      timestamp: Date.now(),
+    });
+    await requestPendingDrain();
+    logger
+      .withFields({ sessionId, messageId: intent.turn.messageId })
+      .info('Queued message event persisted and pending flush scheduled');
+  }
+
+  async function getExistingAdmissionAckForMessageId(
+    messageId: string,
+    requestedIntent?: SessionMessageIntent
+  ): Promise<SessionMessageAdmissionResult | undefined> {
+    const pendingMessage = await getQueuedMessageByMessageId(storage, messageId);
+    const metadata = pendingMessage ? await getMetadata() : undefined;
+    const persistedIntent = pendingMessage
+      ? resolvePendingSessionMessageIntent(pendingMessage, {
+          mode: metadata?.agent?.mode,
+          model: metadata?.agent?.model,
+          variant: metadata?.agent?.variant,
+          autoCommit: metadata?.finalization?.autoCommit,
+          condenseOnComplete: metadata?.finalization?.condenseOnComplete,
+        } satisfies PendingSessionExecutionDefaults)
+      : undefined;
     const messageState = await getSessionMessageState(storage, messageId);
+    if (
+      messageState?.status === 'completed' ||
+      messageState?.status === 'failed' ||
+      messageState?.status === 'interrupted'
+    ) {
+      return buildAdmissionError(
+        'BAD_REQUEST',
+        'Message ID is already terminal; submit a new message ID'
+      );
+    }
+    if (
+      requestedIntent &&
+      messageState &&
+      !matchesAdmissionConstraints(requestedIntent, messageState)
+    ) {
+      return buildAdmissionError('BAD_REQUEST', 'Message intent does not match admitted message');
+    }
+    if (
+      requestedIntent &&
+      !messageState &&
+      persistedIntent &&
+      !sameMessageIntent(requestedIntent, persistedIntent)
+    ) {
+      return buildAdmissionError('BAD_REQUEST', 'Message intent does not match admitted message');
+    }
+
     if (messageState) {
       if (messageState.status === 'queued') {
-        return buildStartResult(messageId, 'queued');
+        const repairIntent = persistedIntent ?? requestedIntent;
+        if (repairIntent) await completeQueuedAdmissionEffects(repairIntent);
+        return buildAdmissionAck(messageId);
       }
-      if (messageState.status === 'accepted' || messageState.status === 'completed') {
-        return buildStartResult(messageId, 'sent');
-      }
-      if (messageState.status === 'failed' || messageState.status === 'interrupted') {
-        return undefined;
+      if (messageState.status === 'accepted') {
+        return buildAdmissionAck(messageId, 'sent');
       }
     }
 
-    const existingMessage = await getQueuedMessageByMessageId(storage, messageId);
-    if (existingMessage) {
-      await repairMissingQueuedStateFromPendingMessage(existingMessage);
-      return buildStartResult(existingMessage.messageId, 'queued');
-    }
-
-    if (await isLegacyAcceptedMessageRunning(messageId)) {
-      return buildStartResult(messageId, 'sent');
+    if (pendingMessage) {
+      await repairMissingQueuedStateFromPendingMessage(pendingMessage);
+      const repairIntent = persistedIntent ?? requestedIntent;
+      if (repairIntent) await completeQueuedAdmissionEffects(repairIntent);
+      return buildAdmissionAck(pendingMessage.messageId);
     }
 
     return undefined;
+  }
+
+  function sameMessageIntent(left: SessionMessageIntent, right: SessionMessageIntent): boolean {
+    return (
+      JSON.stringify(left.turn) === JSON.stringify(right.turn) &&
+      left.agent.mode === right.agent.mode &&
+      left.agent.model === right.agent.model &&
+      left.agent.variant === right.agent.variant &&
+      left.finalization?.autoCommit === right.finalization?.autoCommit &&
+      left.finalization?.condenseOnComplete === right.finalization?.condenseOnComplete
+    );
+  }
+
+  function matchesAdmissionConstraints(
+    requested: SessionMessageIntent,
+    state: NonNullable<Awaited<ReturnType<typeof getSessionMessageState>>>
+  ): boolean {
+    if (state.admissionSnapshot) return sameMessageIntent(requested, state.admissionSnapshot);
+    const legacy = state.legacyAdmissionConstraints;
+    if (!legacy) return true;
+    return (
+      (legacy.turn === undefined ||
+        JSON.stringify(requested.turn) === JSON.stringify(legacy.turn)) &&
+      (legacy.agent === undefined ||
+        ((legacy.agent.mode === undefined || requested.agent.mode === legacy.agent.mode) &&
+          (legacy.agent.model === undefined || requested.agent.model === legacy.agent.model) &&
+          (legacy.agent.variant === undefined ||
+            requested.agent.variant === legacy.agent.variant))) &&
+      (legacy.finalization === undefined ||
+        (requested.finalization?.autoCommit === legacy.finalization.autoCommit &&
+          requested.finalization?.condenseOnComplete === legacy.finalization.condenseOnComplete))
+    );
   }
 
   async function repairMissingQueuedStateFromPendingMessage(
@@ -449,9 +596,9 @@ export function createSessionMessageQueue(
     );
   }
 
-  async function admitIntent(intent: SessionMessageIntent): Promise<QueueSessionMessageResult> {
+  async function admitIntent(intent: SessionMessageIntent): Promise<SessionMessageAdmissionResult> {
     const { turn } = intent;
-    const idempotentResult = await getExistingStartResultForMessageId(turn.messageId);
+    const idempotentResult = await getExistingAdmissionAckForMessageId(turn.messageId, intent);
     if (idempotentResult) return idempotentResult;
 
     const capacityError = await checkPendingQueueCapacity();
@@ -466,104 +613,88 @@ export function createSessionMessageQueue(
     await enqueuePendingSessionMessageIntent(storage, intent, Date.now(), callbackSnapshot);
     const messageState = createQueuedSessionMessageState(intent, callbackSnapshot);
     await putSessionMessageState(storage, messageState);
-
-    const sessionId = await requireSessionId();
-    insertAndBroadcastMessageEvent({
-      sessionId,
-      streamEventType: 'cloud.message.queued',
-      payload: JSON.stringify({
-        messageId: turn.messageId,
-        content: renderExecutionTurnContent(turn),
-        delivery: 'queued',
-      }),
-      timestamp: Date.now(),
-    });
-    await requestPendingDrain();
-    logger
-      .withFields({ sessionId, messageId: turn.messageId })
-      .info('Queued message event persisted and pending flush scheduled');
-    return buildStartResult(turn.messageId, 'queued');
+    await completeQueuedAdmissionEffects(intent);
+    return buildAdmissionAck(turn.messageId);
   }
 
-  async function enqueue(request: QueueSessionMessageRequest): Promise<QueueSessionMessageResult> {
+  async function admitAcceptedMessage(
+    request: AdmitAcceptedSessionMessageRequest
+  ): Promise<SessionMessageAdmissionResult> {
     await requireSessionId();
-    const requestedMessageId = request.kind === 'user-message' ? request.turn.id : undefined;
+    if (!isCanonicalMessageId(request.turn.messageId)) {
+      return buildAdmissionError('BAD_REQUEST', MESSAGE_ID_FORMAT_DESCRIPTION);
+    }
+
+    const metadata = await getMetadata();
+    if (!metadata) {
+      return buildAdmissionError('NOT_FOUND', 'Session not found');
+    }
+
+    const modeCheck = validateModeAgainstRuntimeAgents(metadata, request.agent.mode);
+    if (modeCheck) {
+      return buildAdmissionError('BAD_REQUEST', modeCheck);
+    }
+    const model = normalizeKilocodeModel(request.agent.model);
+    if (!model) {
+      return buildAdmissionError(
+        'BAD_REQUEST',
+        'No model specified and session has no default model'
+      );
+    }
+
+    return admitIntent({
+      turn: request.turn,
+      agent: {
+        ...request.agent,
+        model: model.replace(/^kilo\//, ''),
+      },
+      finalization: request.finalization,
+    });
+  }
+
+  async function admitSubmittedMessage(
+    request: SubmittedSessionMessageRequest
+  ): Promise<SessionMessageAdmissionResult> {
+    await requireSessionId();
+    const requestedMessageId = request.turn.id;
     if (
       requestedMessageId !== undefined &&
       requestedMessageId !== null &&
       !isCanonicalMessageId(requestedMessageId)
     ) {
-      return buildStartError('BAD_REQUEST', MESSAGE_ID_FORMAT_DESCRIPTION);
+      return buildAdmissionError('BAD_REQUEST', MESSAGE_ID_FORMAT_DESCRIPTION);
     }
 
     try {
       const metadata = await getMetadata();
       if (!metadata) {
-        return buildStartError('NOT_FOUND', 'Session not found');
+        return buildAdmissionError('NOT_FOUND', 'Session not found');
       }
 
-      const initialMessage = metadata.initialMessage;
-      const registeredInitialTurn: ExecutionTurnSubmission | undefined =
-        initialMessage?.turn?.type === 'command'
-          ? {
-              type: 'command',
-              id: initialMessage.id,
-              command: initialMessage.turn.command,
-              arguments: initialMessage.turn.arguments,
-            }
-          : initialMessage?.turn?.type === 'prompt'
-            ? {
-                type: 'prompt',
-                id: initialMessage.id,
-                prompt: initialMessage.turn.prompt,
-                images: initialMessage.turn.images,
-              }
-            : initialMessage?.prompt
-              ? {
-                  type: 'prompt',
-                  id: initialMessage.id,
-                  prompt: initialMessage.prompt,
-                  images: initialMessage.images,
-                }
-              : undefined;
-      const explicitTurn =
-        request.kind === 'registered-initial' ? registeredInitialTurn : request.turn;
-      const messageId =
-        request.kind === 'registered-initial'
-          ? (metadata.initialMessage?.id ?? requestedMessageId ?? createMessageId())
-          : (requestedMessageId ?? createMessageId());
+      const explicitTurn = request.turn;
+      const messageId = requestedMessageId ?? createMessageId();
       if (!isCanonicalMessageId(messageId)) {
-        return buildStartError('BAD_REQUEST', MESSAGE_ID_FORMAT_DESCRIPTION);
+        return buildAdmissionError('BAD_REQUEST', MESSAGE_ID_FORMAT_DESCRIPTION);
       }
 
-      const idempotentResult = await getExistingStartResultForMessageId(messageId);
-      if (idempotentResult) return idempotentResult;
-
-      const capacityError = await checkPendingQueueCapacity();
-      if (capacityError) return capacityError;
-
-      if (!explicitTurn) {
-        return buildStartError('BAD_REQUEST', 'No prompt provided');
-      }
       if (explicitTurn.type === 'prompt' && !explicitTurn.prompt) {
-        return buildStartError('BAD_REQUEST', 'No prompt provided');
+        return buildAdmissionError('BAD_REQUEST', 'No prompt provided');
       }
       if (explicitTurn.type === 'command' && explicitTurn.images !== undefined) {
-        return buildStartError('BAD_REQUEST', 'Images cannot be attached to slash commands');
+        return buildAdmissionError('BAD_REQUEST', 'Images cannot be attached to slash commands');
       }
 
-      const requestedAgent = request.kind === 'user-message' ? request.agent : undefined;
-      const requestedFinalization =
-        request.kind === 'user-message' ? request.finalization : undefined;
+      const requestedAgent = request.agent;
+      const requestedFinalization = request.finalization;
       const modeInput = requestedAgent?.mode ?? metadata.agent?.mode ?? 'code';
       const modeCheck = validateModeAgainstRuntimeAgents(metadata, modeInput);
       if (modeCheck) {
-        return buildStartError('BAD_REQUEST', modeCheck);
+        return buildAdmissionError('BAD_REQUEST', modeCheck);
       }
       const model = normalizeKilocodeModel(requestedAgent?.model ?? metadata.agent?.model);
       const variant = requestedAgent?.variant ?? metadata.agent?.variant;
       if (!model) {
-        return buildStartError(
+        return buildAdmissionError(
           'BAD_REQUEST',
           'No model specified and session has no default model'
         );
@@ -595,36 +726,41 @@ export function createSessionMessageQueue(
             requestedFinalization?.condenseOnComplete ?? metadata.finalization?.condenseOnComplete,
         },
       };
+      const existingAdmission = await getExistingAdmissionAckForMessageId(messageId, intent);
+      if (existingAdmission) return existingAdmission;
+      const capacityError = await checkPendingQueueCapacity();
+      if (capacityError) return capacityError;
       return await admitIntent(intent);
     } catch (error) {
       if (isExecutionError(error)) {
         if (error.retryable) {
-          return buildStartError(
-            error.code as Extract<QueueSessionMessageResult, { success: false }>['code'],
+          return buildAdmissionError(
+            error.code as Extract<SessionMessageAdmissionResult, { success: false }>['code'],
             error.message
           );
         }
-        return buildStartError('INTERNAL', error.message);
+        return buildAdmissionError('INTERNAL', error.message);
       }
       if (error instanceof TRPCError) {
-        return buildStartError(mapTRPCCodeToResultCode(error.code), error.message);
+        return buildAdmissionError(mapTRPCCodeToResultCode(error.code), error.message);
       }
-      return buildStartError('INTERNAL', error instanceof Error ? error.message : String(error));
+      return buildAdmissionError(
+        'INTERNAL',
+        error instanceof Error ? error.message : String(error)
+      );
     }
   }
 
   async function drainNextPendingMessage(): Promise<PendingMessageDrainResult> {
     const now = Date.now();
-    const hasAcceptedWrapperMessages = await hasActiveAcceptedWrapperMessages();
     const flushResult = await flushNextPendingSessionMessage({
       storage,
       now,
-      drainPolicy: hasAcceptedWrapperMessages ? 'hot-only' : 'ensure-wrapper',
-      hasCurrentRuntimeExecution: async () =>
-        (await hasCurrentRuntimeExecution()) || (await hasActiveAcceptedWrapperMessages()),
       getDeliveryContext,
       validateModeAgainstRuntimeAgents,
       deliver,
+      repairQueuedMessageEffects: completeQueuedAdmissionEffects,
+      ensureAcceptedMessageEffects,
     });
 
     if (flushResult.type === 'skipped') {
@@ -635,10 +771,8 @@ export function createSessionMessageQueue(
         };
       }
 
-      const shouldRetrySkippedDrain =
-        flushResult.remainingCount > 0 && (await hasCurrentRuntimeExecution());
       return {
-        retryAt: shouldRetrySkippedDrain ? now + PENDING_FLUSH_DEBOUNCE_MS : undefined,
+        retryAt: undefined,
         remainingPendingCount: flushResult.remainingCount,
       };
     }
@@ -665,7 +799,7 @@ export function createSessionMessageQueue(
       })
       .warn('Failed to flush pending session message');
     if (flushResult.exhausted) {
-      await terminalizeSessionMessageOnce(
+      await persistTerminalTransition(
         flushResult.message.messageId,
         {
           kind: 'failed',
@@ -676,7 +810,30 @@ export function createSessionMessageQueue(
         },
         { allowIdleBatchWithoutObservedIdle: true }
       );
-      await deletePendingSessionMessageByMessageId(storage, flushResult.message.messageId);
+      try {
+        await deletePendingSessionMessageByMessageId(storage, flushResult.message.messageId);
+      } catch (error) {
+        logger
+          .withFields({
+            sessionId: getSessionIdForLogs(),
+            messageId: flushResult.message.messageId,
+            error: error instanceof Error ? error.message : String(error),
+          })
+          .warn('Failed to remove terminal pending message; later drain will quarantine it');
+      }
+      try {
+        await repairTerminalMessageEffects(flushResult.message.messageId);
+        await finalizeTerminalCallbackEffects({ allowWithoutObservedIdle: true });
+      } catch (error) {
+        logger
+          .withFields({
+            sessionId: getSessionIdForLogs(),
+            messageId: flushResult.message.messageId,
+            error: error instanceof Error ? error.message : String(error),
+          })
+          .warn('Terminal delivery-failure effects remain pending for alarm repair');
+        await requestAlarmAtOrBefore(Date.now() + 1_000);
+      }
       return {
         retryAt: undefined,
         remainingPendingCount: Math.max(0, flushResult.remainingCount - 1),
@@ -717,15 +874,26 @@ export function createSessionMessageQueue(
     ].sort((left, right) => left.timestamp - right.timestamp);
   }
 
-  async function interruptPendingQueuedMessages(
-    afterClear?: (messages: PendingSessionMessage[]) => Promise<void>
-  ): Promise<PendingSessionMessage[]> {
-    const clearedMessages = await clearPendingSessionMessages(storage);
-    if (afterClear) {
-      await afterClear(clearedMessages);
-    }
-    for (const message of clearedMessages) {
-      await terminalizeSessionMessageOnce(
+  async function persistPendingInterruptBatch(messages: PendingSessionMessage[]): Promise<void> {
+    const existing = await storage.get<PendingInterruptBatch>(INTERRUPT_PENDING_BATCH_KEY);
+    if (existing) return;
+    await storage.put(INTERRUPT_PENDING_BATCH_KEY, {
+      messageIds: messages.map(message => message.messageId),
+      createdAt: Date.now(),
+    } satisfies PendingInterruptBatch);
+    await requestAlarmAtOrBefore(Date.now() + PENDING_FLUSH_DEBOUNCE_MS);
+  }
+
+  async function settlePendingInterruptBatch(
+    capturedMessages: PendingSessionMessage[],
+    afterTransition?: (messages: PendingSessionMessage[]) => Promise<void>
+  ): Promise<void> {
+    for (const message of capturedMessages) {
+      const existing = await getSessionMessageState(storage, message.messageId);
+      if (!existing) {
+        await repairMissingQueuedStateFromPendingMessage(message);
+      }
+      const durableTransition = await persistTerminalTransition(
         message.messageId,
         {
           kind: 'interrupted',
@@ -734,15 +902,63 @@ export function createSessionMessageQueue(
         },
         { allowIdleBatchWithoutObservedIdle: true }
       );
+      if (!durableTransition.state || durableTransition.state.status !== 'interrupted') {
+        throw new Error(
+          `Failed to persist interrupted transition for message ${message.messageId}`
+        );
+      }
+      try {
+        await repairTerminalMessageEffects(message.messageId);
+      } catch (error) {
+        logger
+          .withFields({
+            sessionId: getSessionIdForLogs(),
+            messageId: message.messageId,
+            error: error instanceof Error ? error.message : String(error),
+          })
+          .warn('Interrupted message effects incomplete; alarm repair will continue recovery');
+        await requestAlarmAtOrBefore(Date.now() + 1_000);
+      }
     }
-    return clearedMessages;
+    if (afterTransition) {
+      await afterTransition(capturedMessages);
+    }
+    for (const message of capturedMessages) {
+      await deletePendingSessionMessageByMessageId(storage, message.messageId);
+    }
+    await storage.delete(INTERRUPT_PENDING_BATCH_KEY);
+  }
+
+  async function recoverPendingInterruption(
+    afterTransition?: (messages: PendingSessionMessage[]) => Promise<void>
+  ): Promise<boolean> {
+    const marker = await storage.get<PendingInterruptBatch>(INTERRUPT_PENDING_BATCH_KEY);
+    if (!marker) return false;
+    const pending = await listPendingSessionMessages(storage);
+    const captured = marker.messageIds.flatMap(messageId => {
+      const message = pending.find(candidate => candidate.messageId === messageId);
+      return message ? [message] : [];
+    });
+    await settlePendingInterruptBatch(captured, afterTransition);
+    return true;
+  }
+
+  async function interruptPendingQueuedMessages(
+    afterTransition?: (messages: PendingSessionMessage[]) => Promise<void>
+  ): Promise<PendingSessionMessage[]> {
+    const capturedMessages = await listPendingSessionMessages(storage);
+    await persistPendingInterruptBatch(capturedMessages);
+    await settlePendingInterruptBatch(capturedMessages, afterTransition);
+    return capturedMessages;
   }
 
   return {
-    enqueue,
+    admitSubmittedMessage,
+    admitAcceptedMessage,
     drainNextPendingMessage,
     snapshotForStreamConnect,
     interruptPendingQueuedMessages,
+    recoverPendingInterruption,
     requestPendingDrain,
     requestPendingDrainIfNeeded,
   };

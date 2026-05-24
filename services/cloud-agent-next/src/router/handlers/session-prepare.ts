@@ -4,10 +4,9 @@
  * or that pass `autoInitiate: true` to enqueue the initial message in one
  * call (apps/web NewSessionPanel, mobile session manager).
  *
- * `prepareSession` registers full session metadata and returns immediately.
- * When `autoInitiate: true`, it also queues the initial user message so the
- * alarm-driven flusher delivers it once preparation completes - matching the
- * behaviour the unified `start` endpoint provides in a single call.
+ * `prepareSession` registers full session metadata and returns immediately in
+ * the retained split flow. When `autoInitiate: true`, it delegates creation and
+ * canonical initial admission to the same grouped primitive used by `start`.
  *
  * `updateSession` is retained because `services/code-review-infra` still
  * uses it to rewrite `callbackTarget` before a session-continuation
@@ -15,6 +14,7 @@
  * execution-scoped callback target override on `send`.
  */
 import { TRPCError } from '@trpc/server';
+import type { WorkerDb } from '@kilocode/db/client';
 import type * as z from 'zod';
 import {
   mergeProfileConfiguration,
@@ -36,11 +36,7 @@ import {
   UpdateSessionOutput,
   isBuiltinMode,
 } from '../schemas.js';
-import {
-  ensureSessionRegistered,
-  executionTurnSubmissionFromAcceptedTurn,
-} from '../../session/session-registration.js';
-import { queueMessage } from '../../session/queue-message.js';
+import { registerNewSession, startNewSession } from '../../session/session-registration.js';
 import { getPgDb } from '../../db/pg.js';
 import type { Env } from '../../types.js';
 import type { SessionProfileBundle } from '../../session-profile.js';
@@ -53,6 +49,21 @@ type SessionPrepareHandlers = {
 
 const CLOUD_AGENT_WEB_PLATFORM = 'cloud-agent-web';
 
+export type ProfileResolutionPolicy = {
+  defaultProfileResolution: 'explicit-profile-only' | 'include-web-defaults';
+};
+
+export function profileResolutionPolicyForSessionCreateOrigin(
+  createdOnPlatform: string | undefined
+): ProfileResolutionPolicy {
+  return {
+    defaultProfileResolution:
+      createdOnPlatform === CLOUD_AGENT_WEB_PLATFORM
+        ? 'include-web-defaults'
+        : 'explicit-profile-only',
+  };
+}
+
 type PrepareInput = z.infer<typeof PrepareSessionInput>;
 
 function repoFullNameForBindingLookup(input: SessionCreateRequest): string | undefined {
@@ -63,12 +74,14 @@ function repoFullNameForBindingLookup(input: SessionCreateRequest): string | und
   return undefined;
 }
 
-export async function resolveProfileForSessionCreateRequest(
+async function resolveProfileForSessionCreateRequest(
   ctx: { env: Pick<Env, 'HYPERDRIVE'>; userId: string },
-  input: SessionCreateRequest
+  input: SessionCreateRequest,
+  policy: ProfileResolutionPolicy,
+  db?: WorkerDb
 ): Promise<MergeProfileConfigurationResult | null> {
   const shouldResolve =
-    !!input.profile?.id || input.options?.createdOnPlatform === CLOUD_AGENT_WEB_PLATFORM;
+    input.profile?.id !== undefined || policy.defaultProfileResolution === 'include-web-defaults';
   if (!shouldResolve) return null;
 
   const owner: ProfileOwner = input.options?.kilocodeOrganizationId
@@ -78,7 +91,7 @@ export async function resolveProfileForSessionCreateRequest(
   const overrides = input.profile?.overrides;
 
   try {
-    return await mergeProfileConfiguration(getPgDb(ctx.env), {
+    return await mergeProfileConfiguration(db ?? getPgDb(ctx.env), {
       profileId: input.profile?.id,
       owner,
       userId,
@@ -104,7 +117,7 @@ export async function resolveProfileForSessionCreateRequest(
   }
 }
 
-export function applyProfileResolution(
+function applyProfileResolution(
   input: SessionCreateRequest,
   resolved: MergeProfileConfigurationResult | null
 ): SessionCreateRequest {
@@ -141,6 +154,16 @@ export function applyProfileResolution(
       },
     },
   };
+}
+
+export async function resolveEffectiveSessionConfiguration(
+  ctx: { env: Pick<Env, 'HYPERDRIVE'>; userId: string },
+  input: SessionCreateRequest,
+  policy: ProfileResolutionPolicy,
+  db?: WorkerDb
+): Promise<SessionCreateRequest> {
+  const resolved = await resolveProfileForSessionCreateRequest(ctx, input, policy, db);
+  return applyProfileResolution(input, resolved);
 }
 
 export function assertModeAvailableForProfile(mode: string, profile: SessionProfileBundle): void {
@@ -264,8 +287,8 @@ const prepareSessionHandler = internalApiProtectedProcedure
   .mutation(async ({ input, ctx }) => {
     return withLogTags({ source: 'prepareSession' }, async () => {
       const request = prepareInputToSessionCreateRequest(input);
-      const resolved = await resolveProfileForSessionCreateRequest(ctx, request);
-      const requestWithProfile = applyProfileResolution(request, resolved);
+      const policy = profileResolutionPolicyForSessionCreateOrigin(input.createdOnPlatform);
+      const requestWithProfile = await resolveEffectiveSessionConfiguration(ctx, request, policy);
       assertModeAvailableForProfile(
         requestWithProfile.agent.mode,
         requestWithProfile.profile?.resolved ?? {}
@@ -288,34 +311,20 @@ const prepareSessionHandler = internalApiProtectedProcedure
         });
       }
 
-      const result = await ensureSessionRegistered(requestWithProfile, {
-        env: ctx.env,
-        userId: ctx.userId,
-        authToken: ctx.authToken,
-        botId: ctx.botId,
-      });
-
-      if (input.autoInitiate === true) {
-        const ack = await queueMessage(
-          {
-            kind: 'user-message',
-            cloudAgentSessionId: result.cloudAgentSessionId,
-            turn: executionTurnSubmissionFromAcceptedTurn(result.initialTurn),
-            agent: requestWithProfile.agent,
-            finalization: {
-              autoCommit: input.autoCommit,
-              condenseOnComplete: input.condenseOnComplete,
-            },
-          },
-          { env: ctx.env, userId: ctx.userId, botId: ctx.botId }
-        );
-
-        if (ack.delivery !== 'queued') {
-          logger
-            .withFields({ delivery: ack.delivery })
-            .warn('Unexpected delivery state for initial message on fresh session');
-        }
-      }
+      const result =
+        input.autoInitiate === true
+          ? await startNewSession(requestWithProfile, {
+              env: ctx.env,
+              userId: ctx.userId,
+              authToken: ctx.authToken,
+              botId: ctx.botId,
+            })
+          : await registerNewSession(requestWithProfile, {
+              env: ctx.env,
+              userId: ctx.userId,
+              authToken: ctx.authToken,
+              botId: ctx.botId,
+            });
 
       return {
         cloudAgentSessionId: result.cloudAgentSessionId,

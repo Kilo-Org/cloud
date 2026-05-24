@@ -15,7 +15,8 @@ import { mintApiToken, mintStreamTicket, type TestUser } from './auth.js';
  * Which tRPC surface the driver exercises.
  *
  * - `unified`: the new `start` / `send` procedures that replace the legacy
- *   prepare+initiate dance with a single atomic call.
+ *   prepare+initiate dance with one grouped start operation after its external
+ *   ownership-row prerequisite succeeds.
  * - `legacy`:  the existing `prepareSession` + `initiateFromKilocodeSessionV2`
  *   / `sendMessageV2` procedures the web UI still uses today. Keeping both
  *   covered means a regression in either surface is caught by the harness.

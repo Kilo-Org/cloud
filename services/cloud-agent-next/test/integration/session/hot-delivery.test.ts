@@ -22,7 +22,7 @@ import {
   type SessionMessageState,
 } from '../../../src/session/session-message-state.js';
 import { allocateWrapperRuntimeState } from '../../../src/session/wrapper-runtime-state.js';
-import type { MessageDeliveryPlan } from '../../../src/execution/types.js';
+import type { FencedWrapperDispatchRequest } from '../../../src/execution/types.js';
 import { registerReadySession } from '../../helpers/session-setup.js';
 
 describe('hot delivery — DO integration', () => {
@@ -40,9 +40,9 @@ describe('hot delivery — DO integration', () => {
     const followUpMessageId = 'msg_018f1e2d3c4bHotDeliv0001Ab';
 
     const result = await runInDurableObject(stub, async instance => {
-      const capturedPlans: MessageDeliveryPlan[] = [];
+      const capturedPlans: FencedWrapperDispatchRequest[] = [];
       (instance as any).orchestrator = {
-        execute: async (plan: MessageDeliveryPlan) => {
+        execute: async (plan: FencedWrapperDispatchRequest) => {
           capturedPlans.push(plan);
           return { messageId: plan.turn.messageId, kiloSessionId: 'kilo_hot_test' };
         },

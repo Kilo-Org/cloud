@@ -494,9 +494,16 @@ export const PrepareSessionOutput = z.object({
  * Input schema for the unified `start` endpoint.
  *
  * `start` is the collapsed replacement for the legacy
- * `prepareSession + initiateFromKilocodeSessionV2` pair.
- * It queues the initial user message atomically with session registration,
- * then lets the alarm-driven flusher deliver it once preparation completes.
+ * `prepareSession + initiateFromKilocodeSessionV2` pair. After the external
+ * ownership row is created, one Durable Object command registers metadata and
+ * attempts durable initial-turn admission; the alarm-driven flusher delivers
+ * an admitted message once preparation completes. If admission is rejected
+ * after metadata registration, the endpoint fails and attempts best-effort
+ * `onlyIfEmpty` deletion of the external ownership row. Retried transport errors
+ * reuse the canonical message identity; unrecovered unknown outcomes retain state
+ * and may require operational cleanup because the DO commit result is unknown.
+ * This contract claims neither a distributed transaction nor an unimplemented
+ * cross-record DO storage transaction.
  *
  * The input schema is intentionally a subset of `PrepareSessionInput`.
  * Refinements are shared so validation rules stay aligned.
@@ -566,9 +573,9 @@ export type ProfileInput = z.infer<typeof ProfileInputSchema>;
  * Input schema for the unified `start` endpoint.
  *
  * `start` is the collapsed replacement for the legacy
- * `prepareSession + initiateFromKilocodeSessionV2` pair.
- * It queues the initial user message atomically with session registration,
- * then lets the alarm-driven flusher deliver it once preparation completes.
+ * `prepareSession + initiateFromKilocodeSessionV2` pair. Its Durable Object
+ * receives registration plus canonical initial admission through one grouped
+ * command after the external ownership prerequisite succeeds.
  */
 export const StartSessionInput = z
   .object({
@@ -689,11 +696,11 @@ export const SandboxStatusSchema = z
 
 export const SessionHealthExecutionSchema = z
   .enum(['healthy', 'unknown', 'stale', 'none'])
-  .describe('Health status for the active execution, or none when no execution is active');
+  .describe('Health status for active execution-compatible work, or none when no work is active');
 
 export const ActiveExecutionStatusSchema = z
   .enum(['pending', 'running', 'completed', 'failed', 'interrupted'])
-  .describe('Current status of the active execution');
+  .describe('Current status of active legacy execution or message-native work');
 
 export const GetSessionHealthInput = z.object({
   cloudAgentSessionId: sessionIdSchema.describe('Cloud-agent session ID to inspect'),
@@ -705,22 +712,25 @@ export const GetSessionHealthOutput = z.object({
   sandboxStatus: SandboxStatusSchema,
   executionHealth: SessionHealthExecutionSchema,
   activeExecutionStatus: ActiveExecutionStatusSchema.optional(),
-  activeExecutionId: z.string().optional(),
+  activeExecutionId: z
+    .string()
+    .optional()
+    .describe('Compatibility identity for active work: legacy executionId or current messageId'),
 });
 
 export type GetSessionHealthResponse = z.infer<typeof GetSessionHealthOutput>;
 
 /**
- * Execution status object for getSession response.
- * Groups all execution-related fields for cleaner API response.
+ * Compatibility activity object for getSession response.
+ * Preserves its execution-shaped surface while projecting current message-native work.
  */
 export const ExecutionStatusSchema = z
   .object({
-    id: z.string().describe('Execution ID for the current pending or running runtime execution'),
+    id: z.string().describe('Compatibility identity for current message-native work'),
     status: z
       .enum(['pending', 'running', 'completed', 'failed', 'interrupted'])
-      .describe('Current status of the execution'),
-    startedAt: z.number().describe('Timestamp when execution started'),
+      .describe('Current message-native activity status'),
+    startedAt: z.number().describe('Compatibility activity timestamp'),
     lastHeartbeat: z
       .number()
       .nullable()
@@ -732,7 +742,7 @@ export const ExecutionStatusSchema = z
       .describe('Health status: healthy (<1min heartbeat), unknown (1-10min), stale (>10min)'),
   })
   .nullable()
-  .describe('Current runtime execution status (null if none)');
+  .describe('Current message-native activity projection (null if none)');
 
 /**
  * Output schema for getSession endpoint.
@@ -837,16 +847,16 @@ export const GetLatestAssistantMessageOutput = z.object({
 export type GetLatestAssistantMessageResponse = z.infer<typeof GetLatestAssistantMessageOutput>;
 
 /**
- * Response schema for V2 execution endpoints.
- * Returns acknowledgment when the message is accepted for immediate wrapper delivery
- * or queued for later delivery.
+ * Compatibility response schema for public send/V2 endpoints.
+ * `status: started` remains an external adapter projection; a queued response
+ * acknowledges durable admission and does not claim wrapper execution started.
  */
 export const ExecutionResponse = z.object({
   cloudAgentSessionId: z.string().describe('Cloud agent session ID'),
-  status: z.literal('started').describe('Execution has started'),
+  status: z.literal('started').describe('Compatibility acknowledgment value'),
   streamUrl: z.string().describe('WebSocket URL for streaming output'),
-  messageId: MessageIdSchema.describe('Message ID accepted by delivery'),
-  delivery: z.enum(['sent', 'queued']).describe('How the message was accepted for delivery'),
+  messageId: MessageIdSchema.describe('Durably admitted message ID'),
+  delivery: z.enum(['sent', 'queued']).describe('Compatibility delivery state'),
   wrapperRunId: z
     .string()
     .optional()

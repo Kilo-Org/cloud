@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { CallbackTarget } from '../callbacks/index.js';
 import type { ExecutionMode, SessionMessageIntent } from '../execution/types.js';
 import { renderExecutionTurnContent } from '../execution/types.js';
+import { ImagesSchema } from '../persistence/schemas.js';
 import { MESSAGE_ID_FORMAT_DESCRIPTION, MESSAGE_ID_PATTERN } from './message-id.js';
 
 const SESSION_MESSAGE_STATE_PREFIX = 'session_message:';
@@ -15,10 +16,31 @@ export type SessionMessageCompletionSource =
   | 'interrupt'
   | 'delivery_failure';
 
+export type LegacyAdmissionConstraints = {
+  turn?: SessionMessageIntent['turn'];
+  agent?: {
+    mode?: ExecutionMode;
+    model?: string;
+    variant?: string;
+  };
+  finalization?: SessionMessageIntent['finalization'];
+};
+
+export type TerminalCallbackEffectAccounting =
+  | { disposition: 'pending' | 'accounted'; allowWithoutObservedIdle: boolean }
+  | { disposition: 'not-required' | 'suppressed' };
+
+export type TerminalEffectAccounting = {
+  event: 'pending' | 'accounted';
+  callback: TerminalCallbackEffectAccounting;
+};
+
 export type SessionMessageState = {
   messageId: string;
   status: SessionMessageStatus;
   prompt: string;
+  admissionSnapshot?: SessionMessageIntent;
+  legacyAdmissionConstraints?: LegacyAdmissionConstraints;
   createdAt: number;
   queuedAt?: number;
   acceptedAt?: number;
@@ -37,6 +59,7 @@ export type SessionMessageState = {
   callbackLastError?: string;
   callbackAttempts?: number;
   callbackRetryAt?: number;
+  terminalEffects?: TerminalEffectAccounting;
   agent?: {
     mode?: ExecutionMode;
     model?: string;
@@ -53,6 +76,66 @@ export const SessionMessageStateSchema = z
     messageId: z.string().regex(MESSAGE_ID_PATTERN, MESSAGE_ID_FORMAT_DESCRIPTION),
     status: z.enum(['queued', 'accepted', 'completed', 'failed', 'interrupted']),
     prompt: z.string(),
+    admissionSnapshot: z
+      .object({
+        turn: z.discriminatedUnion('type', [
+          z.object({
+            type: z.literal('prompt'),
+            messageId: z.string(),
+            prompt: z.string(),
+            images: ImagesSchema.optional(),
+          }),
+          z.object({
+            type: z.literal('command'),
+            messageId: z.string(),
+            command: z.string(),
+            arguments: z.string(),
+          }),
+        ]),
+        agent: z.object({ mode: z.string(), model: z.string(), variant: z.string().optional() }),
+        finalization: z
+          .object({
+            autoCommit: z.boolean().optional(),
+            condenseOnComplete: z.boolean().optional(),
+          })
+          .optional(),
+      })
+      .optional(),
+    legacyAdmissionConstraints: z
+      .object({
+        turn: z
+          .discriminatedUnion('type', [
+            z.object({
+              type: z.literal('prompt'),
+              messageId: z.string(),
+              prompt: z.string(),
+              images: ImagesSchema.optional(),
+            }),
+            z.object({
+              type: z.literal('command'),
+              messageId: z.string(),
+              command: z.string(),
+              arguments: z.string(),
+            }),
+          ])
+          .optional(),
+        agent: z
+          .object({
+            mode: z.string().optional(),
+            model: z.string().optional(),
+            variant: z.string().optional(),
+          })
+          .optional(),
+        finalization: z
+          .object({
+            autoCommit: z.boolean().optional(),
+            condenseOnComplete: z.boolean().optional(),
+          })
+          .optional(),
+      })
+      .optional(),
+    turn: z.unknown().optional(),
+    images: ImagesSchema.optional(),
     createdAt: z.number(),
     queuedAt: z.number().optional(),
     acceptedAt: z.number().optional(),
@@ -84,6 +167,18 @@ export const SessionMessageStateSchema = z
     callbackLastError: z.string().optional(),
     callbackAttempts: z.number().int().nonnegative().optional(),
     callbackRetryAt: z.number().optional(),
+    terminalEffects: z
+      .object({
+        event: z.enum(['pending', 'accounted']),
+        callback: z.union([
+          z.object({
+            disposition: z.enum(['pending', 'accounted']),
+            allowWithoutObservedIdle: z.boolean(),
+          }),
+          z.object({ disposition: z.enum(['not-required', 'suppressed']) }),
+        ]),
+      })
+      .optional(),
     agent: z
       .object({
         mode: z.string().optional(),
@@ -124,7 +219,52 @@ export async function getSessionMessageState(
     });
     return undefined;
   }
-  return result.data;
+  const state = result.data;
+  const currentState = { ...state };
+
+  delete currentState.turn;
+  delete currentState.images;
+  delete currentState.agent;
+  delete currentState.finalization;
+  if (state.admissionSnapshot) return currentState;
+  const legacy = raw as {
+    turn?: unknown;
+    agent?: { mode?: string; model?: string; variant?: string };
+    finalization?: SessionMessageIntent['finalization'];
+  };
+  const parsedTurn = z
+    .discriminatedUnion('type', [
+      z.object({
+        type: z.literal('prompt'),
+        messageId: z.string(),
+        prompt: z.string(),
+        images: ImagesSchema.optional(),
+      }),
+      z.object({
+        type: z.literal('command'),
+        messageId: z.string(),
+        command: z.string(),
+        arguments: z.string(),
+      }),
+    ])
+    .safeParse(legacy.turn);
+  const constraints: LegacyAdmissionConstraints = {
+    turn: parsedTurn.success ? parsedTurn.data : undefined,
+    agent:
+      legacy.agent &&
+      (legacy.agent.mode !== undefined ||
+        legacy.agent.model !== undefined ||
+        legacy.agent.variant !== undefined)
+        ? {
+            mode: legacy.agent.mode,
+            model: legacy.agent.model,
+            variant: legacy.agent.variant,
+          }
+        : undefined,
+    finalization: legacy.finalization,
+  };
+  if (!constraints.turn && !constraints.agent && !constraints.finalization) return currentState;
+  return { ...currentState, legacyAdmissionConstraints: constraints };
 }
 
 export async function putSessionMessageState(
@@ -146,16 +286,11 @@ export function createQueuedSessionMessageState(
     messageId: intent.turn.messageId,
     status: 'queued',
     prompt: renderExecutionTurnContent(intent.turn),
+    admissionSnapshot: intent,
     createdAt: now,
     queuedAt: now,
     callbackRequired: callbackSnapshot?.required ?? false,
     callbackTarget: callbackSnapshot?.target,
-    agent: {
-      mode: intent.agent.mode,
-      model: intent.agent.model,
-      variant: intent.agent.variant,
-    },
-    finalization: intent.finalization,
   };
 }
 
@@ -306,6 +441,34 @@ export async function listMessagesWithPendingCallbacks(
   );
 }
 
+export async function listTerminalMessagesWithPendingEffects(
+  storage: SessionMessageStorage
+): Promise<SessionMessageState[]> {
+  const entries = await listSessionMessageStates(storage);
+  return entries
+    .flatMap(state => {
+      if (!isTerminalStatus(state.status)) return [];
+      const normalized =
+        state.terminalEffects || !state.callbackRequired || state.callbackEnqueuedAt
+          ? state
+          : {
+              ...state,
+              terminalEffects: {
+                event: 'accounted' as const,
+                callback: { disposition: 'pending' as const, allowWithoutObservedIdle: false },
+              },
+            };
+      if (!normalized.terminalEffects) return [];
+      return normalized.terminalEffects.event !== 'accounted' ||
+        normalized.terminalEffects.callback.disposition === 'pending'
+        ? [normalized]
+        : [];
+    })
+    .sort(
+      (left, right) => (left.terminalAt ?? left.createdAt) - (right.terminalAt ?? right.createdAt)
+    );
+}
+
 async function listSessionMessageStates(
   storage: SessionMessageStorage
 ): Promise<SessionMessageState[]> {
@@ -319,6 +482,11 @@ async function listSessionMessageStates(
     return [result.data];
   });
 }
+
+export type TerminalizeEffectOptions = {
+  suppressCallback?: boolean;
+  allowIdleBatchWithoutObservedIdle?: boolean;
+};
 
 export type TerminalizeParams =
   | {
@@ -340,12 +508,26 @@ export async function terminalizeMessageOnce(
   storage: SessionMessageStorage,
   messageId: string,
   params: TerminalizeParams,
-  now = Date.now()
+  effectsOrNow: TerminalizeEffectOptions | number = {},
+  at = Date.now()
 ): Promise<{ changed: boolean; state: SessionMessageState | null }> {
+  const effects = typeof effectsOrNow === 'number' ? {} : effectsOrNow;
+  const now = typeof effectsOrNow === 'number' ? effectsOrNow : at;
   const state = await getSessionMessageState(storage, messageId);
   if (!state) return { changed: false, state: null };
   if (isTerminalStatus(state.status)) return { changed: false, state };
 
+  const terminalEffects: TerminalEffectAccounting = {
+    event: 'pending',
+    callback: effects.suppressCallback
+      ? { disposition: 'suppressed' }
+      : state.callbackRequired
+        ? {
+            disposition: 'pending',
+            allowWithoutObservedIdle: effects.allowIdleBatchWithoutObservedIdle ?? false,
+          }
+        : { disposition: 'not-required' },
+  };
   let updated: SessionMessageState;
   if (params.kind === 'completed') {
     updated = {
@@ -355,6 +537,7 @@ export async function terminalizeMessageOnce(
       assistantMessageId: params.assistantMessageId,
       completionSource: params.completionSource,
       gateResult: params.gateResult,
+      terminalEffects,
     };
   } else if (params.kind === 'failed') {
     updated = {
@@ -365,6 +548,7 @@ export async function terminalizeMessageOnce(
       error: params.error,
       completionSource: params.completionSource,
       attempts: params.attempts,
+      terminalEffects,
     };
   } else {
     updated = {
@@ -374,6 +558,7 @@ export async function terminalizeMessageOnce(
       failureReason: 'interrupted',
       error: params.error,
       completionSource: params.completionSource ?? 'interrupt',
+      terminalEffects,
     };
   }
 

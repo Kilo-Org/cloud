@@ -64,7 +64,10 @@ import {
   type WrapperSessionReadyRequest,
   type WrapperWorkspaceReady,
 } from './shared/wrapper-bootstrap.js';
-import type { ExecutionPlan, MessageDeliveryPlan, WrapperRunFence } from './execution/types.js';
+import type {
+  FencedLegacyExecutionRequest,
+  FencedWrapperDispatchRequest,
+} from './execution/types.js';
 import { normalizeAgentMode } from './schema.js';
 
 const SETUP_COMMAND_TIMEOUT_SECONDS = 300; // 5 minutes
@@ -1976,7 +1979,9 @@ export class SessionService {
       },
       messages: [],
     });
-    const importFilePath = `/tmp/kilo-empty-session-${kiloSessionId}.json`;
+    const importFilePath = options.devcontainer
+      ? `${options.sessionHome}/tmp/kilo-empty-session-${kiloSessionId}.json`
+      : `/tmp/kilo-empty-session-${kiloSessionId}.json`;
     await sandbox.writeFile(importFilePath, minimalSessionJson);
     const restoreTokenFilePath = options.devcontainer
       ? await writeRestoreTokenFile(sandbox, session, options.sessionHome, options.kilocodeToken)
@@ -2008,10 +2013,15 @@ export class SessionService {
       }
     })();
     if (restoreResult.exitCode !== 0) {
-      throw new SessionSnapshotRestoreError(
-        `Session bootstrap failed: exit ${restoreResult.exitCode}`,
-        parseRestoreScriptOutput(restoreResult.stdout)?.code
-      );
+      const parsed = parseRestoreScriptOutput(restoreResult.stdout);
+      const detail = [
+        `exit ${restoreResult.exitCode}`,
+        parsed?.step && `step=${parsed.step}`,
+        parsed?.error && `error=${parsed.error}`,
+      ]
+        .filter(Boolean)
+        .join(', ');
+      throw new SessionSnapshotRestoreError(`Session bootstrap failed: ${detail}`, parsed?.code);
     }
   }
 
@@ -2393,27 +2403,15 @@ export type PrepareWorkspaceOptions = {
 
 export type BuildWrapperSessionReadyAndPromptRequestsOptions = {
   env: PersistenceEnv;
-  plan: MessageDeliveryPlan | ExecutionPlan;
+  plan: FencedWrapperDispatchRequest | FencedLegacyExecutionRequest;
 };
-
-function requireWrapperRunFence(fence: Partial<WrapperRunFence> | undefined): WrapperRunFence {
-  if (!fence?.wrapperRunId || fence.wrapperGeneration === undefined || !fence.wrapperConnectionId) {
-    throw ExecutionError.invalidRequest('Wrapper fence fields are required for wrapper bootstrap');
-  }
-
-  return {
-    wrapperRunId: fence.wrapperRunId,
-    wrapperGeneration: fence.wrapperGeneration,
-    wrapperConnectionId: fence.wrapperConnectionId,
-  };
-}
 
 function buildWrapperSessionBinding(options: {
   workerUrl?: string;
   kilocodeToken: string;
   userId: string;
   sessionId: string;
-  wrapper: MessageDeliveryPlan['wrapper'];
+  wrapper: FencedWrapperDispatchRequest['wrapper'];
   upstreamBranch?: string;
 }): WrapperSessionReadyRequest['session'] {
   const { workerUrl, kilocodeToken, userId, sessionId, wrapper, upstreamBranch } = options;
@@ -2421,7 +2419,6 @@ function buildWrapperSessionBinding(options: {
     throw ExecutionError.invalidRequest('WORKER_URL is required for wrapper bootstrap');
   }
 
-  const fence = requireWrapperRunFence(wrapper.fence);
   const wsUrl = new URL(workerUrl);
   wsUrl.protocol = wsUrl.protocol === 'https:' ? 'wss:' : 'ws:';
   wsUrl.pathname = `/sessions/${encodeURIComponent(userId)}/${sessionId}/ingest`;
@@ -2429,9 +2426,9 @@ function buildWrapperSessionBinding(options: {
   return {
     ingestUrl: wsUrl.toString(),
     workerAuthToken: kilocodeToken,
-    wrapperRunId: fence.wrapperRunId,
-    wrapperGeneration: fence.wrapperGeneration,
-    wrapperConnectionId: fence.wrapperConnectionId,
+    wrapperRunId: wrapper.fence.wrapperRunId,
+    wrapperGeneration: wrapper.fence.wrapperGeneration,
+    wrapperConnectionId: wrapper.fence.wrapperConnectionId,
     ...(upstreamBranch ? { upstreamBranch } : {}),
   };
 }

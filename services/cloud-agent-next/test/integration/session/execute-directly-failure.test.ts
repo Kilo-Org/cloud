@@ -1,18 +1,16 @@
 /**
  * Integration test for the executeDirectly catch-block fix in CloudAgentSession.
  *
- * When the orchestrator throws during executeDirectly, the execution must be
- * marked as failed (with a callback notification enqueued) and a synthetic
- * error stream event must be persisted — before the error propagates to the
- * queueSessionMessage outer catch which returns { success: false }.
+ * When the orchestrator throws during delivery, message lifecycle state must
+ * record the failed delivery path and any required callback notification before
+ * the admission/drain boundary reports failure.
  */
 
 import { env, runInDurableObject, listDurableObjectIds } from 'cloudflare:test';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { createEventQueries } from '../../../src/session/queries/events.js';
-import type { ExecutionId } from '../../../src/types/ids.js';
-import type { MessageDeliveryPlan } from '../../../src/execution/types.js';
+import type { FencedWrapperDispatchRequest } from '../../../src/execution/types.js';
 import { listPendingSessionMessages } from '../../../src/session/pending-messages.js';
 import {
   getWrapperRuntimeState,
@@ -31,79 +29,6 @@ describe('executeDirectly failure handling', () => {
   beforeEach(async () => {
     const ids = await listDurableObjectIds(env.CLOUD_AGENT_SESSION);
     await Promise.all(ids.map(id => env.CLOUD_AGENT_SESSION.get(id).deleteSession()));
-  });
-
-  it('terminal execution clears wrapper liveness deadlines before alarm reschedules', async () => {
-    const userId = 'user_terminal_liveness';
-    const sessionId = 'agent_terminal_liveness';
-    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
-    const stub = env.CLOUD_AGENT_SESSION.get(doId);
-
-    const result = await runInDurableObject(stub, async instance => {
-      await registerReadySession(instance, {
-        sessionId,
-        userId,
-        orgId: 'org_terminal_liveness',
-        kiloSessionId: 'bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb',
-        prompt: 'initial prompt',
-        mode: 'code',
-        model: 'test-model',
-        kilocodeToken: 'token-terminal-liveness',
-      });
-
-      const executionId = 'exec_terminal_liveness' as ExecutionId;
-      const addResult = await instance.addExecution({
-        executionId,
-        mode: 'code',
-        streamingMode: 'websocket',
-        ingestToken: executionId,
-        messageId: 'msg_018f1e2d3c4bTermRunAbCdEfG',
-      });
-      expect(addResult.ok).toBe(true);
-
-      const state = await recordWrapperPong(
-        instance.ctx.storage,
-        0,
-        'missing',
-        Date.now(),
-        Date.now() + 60_000
-      );
-      expect(state).toBeNull();
-
-      await instance.ctx.storage.put('wrapper_runtime_state', {
-        wrapperGeneration: 1,
-        wrapperConnectionId: 'conn_terminal',
-        wrapperExecutionId: executionId,
-        acceptedMessageId: 'msg_018f1e2d3c4bTermRunAbCdEfG',
-        acceptedExecutionId: executionId,
-        noOutputDeadlineAt: Date.now() - 1,
-        pingDeadlineAt: Date.now() - 1,
-        nextPingAt: Date.now() - 1,
-      });
-
-      await instance.updateExecutionStatus({
-        executionId,
-        status: 'completed',
-        completedAt: Date.now(),
-      });
-      await instance.alarm();
-
-      return {
-        currentRuntimeExecution: await instance.getCurrentRuntimeExecution(),
-        wrapperRuntimeState: await getWrapperRuntimeState(instance.ctx.storage),
-        alarm: await instance.ctx.storage.getAlarm(),
-      };
-    });
-
-    expect(result.currentRuntimeExecution).toBeNull();
-    expect(result.wrapperRuntimeState.wrapperGeneration).toBe(2);
-    expect(result.wrapperRuntimeState.wrapperConnectionId).toBeUndefined();
-    expect(result.wrapperRuntimeState.acceptedMessageId).toBeUndefined();
-    expect(result.wrapperRuntimeState.acceptedExecutionId).toBeUndefined();
-    expect(result.wrapperRuntimeState.noOutputDeadlineAt).toBeUndefined();
-    expect(result.wrapperRuntimeState.pingDeadlineAt).toBeUndefined();
-    expect(result.wrapperRuntimeState.nextPingAt).toBeUndefined();
-    expect(result.alarm).toBeGreaterThan(Date.now() + 1_000);
   });
 
   it('wrapper heartbeat does not reset the no-output deadline', async () => {
@@ -128,30 +53,19 @@ describe('executeDirectly failure handling', () => {
         kilocodeToken: 'token-liveness-heartbeat',
       });
 
-      const executionId = 'exec_liveness_heartbeat' as ExecutionId;
-      await instance.addExecution({
-        executionId,
-        mode: 'code',
-        streamingMode: 'websocket',
-        ingestToken: executionId,
-        messageId: 'msg_018f1e2d3c4bHeartRunAbCdEf',
-      });
       const originalDeadline = Date.now() + 5_000;
       await instance.ctx.storage.put('wrapper_runtime_state', {
         wrapperGeneration: 1,
         wrapperConnectionId: 'conn_heartbeat',
-        wrapperExecutionId: executionId,
-        acceptedMessageId: 'msg_018f1e2d3c4bHeartRunAbCdEf',
-        acceptedExecutionId: executionId,
+        wrapperRunId: 'wr_heartbeat',
         noOutputDeadlineAt: originalDeadline,
         nextPingAt: Date.now() + 60_000,
       });
-      await instance.updateExecutionStatus({ executionId, status: 'running' });
 
       const handler = await instance['getIngestHandler']();
       const ws = {
         deserializeAttachment: () => ({
-          executionId,
+          wrapperRunId: 'wr_heartbeat',
           connectedAt: Date.now(),
           kiloSessionState: { captured: false },
           lastHeartbeatUpdate: 0,
@@ -172,13 +86,11 @@ describe('executeDirectly failure handling', () => {
         })
       );
 
-      const execution = await instance.getExecution(executionId);
       const wrapperRuntimeState = await getWrapperRuntimeState(instance.ctx.storage);
-      return { execution, wrapperRuntimeState, originalDeadline };
+      return { wrapperRuntimeState, originalDeadline };
     });
 
-    expect(result.execution?.status).toBe('running');
-    // Heartbeats are keepalives, not forward progress — they must not push the
+    // Heartbeats are keepalives, not forward progress - they must not push the
     // no-output deadline forward, otherwise a stalled wrapper sending only
     // heartbeats would never be caught.
     expect(result.wrapperRuntimeState.noOutputDeadlineAt).toBe(result.originalDeadline);
@@ -202,30 +114,19 @@ describe('executeDirectly failure handling', () => {
         kilocodeToken: 'token-liveness-refresh',
       });
 
-      const executionId = 'exec_liveness_refresh' as ExecutionId;
-      await instance.addExecution({
-        executionId,
-        mode: 'code',
-        streamingMode: 'websocket',
-        ingestToken: executionId,
-        messageId: 'msg_018f1e2d3c4bRefreshAbCdEf',
-      });
       const staleDeadline = Date.now() + 1_000;
       await instance.ctx.storage.put('wrapper_runtime_state', {
         wrapperGeneration: 1,
         wrapperConnectionId: 'conn_refresh',
-        wrapperExecutionId: executionId,
-        acceptedMessageId: 'msg_018f1e2d3c4bRefreshAbCdEf',
-        acceptedExecutionId: executionId,
+        wrapperRunId: 'wr_refresh',
         noOutputDeadlineAt: staleDeadline,
         nextPingAt: Date.now() + 60_000,
       });
-      await instance.updateExecutionStatus({ executionId, status: 'running' });
 
       const handler = await instance['getIngestHandler']();
       const ws = {
         deserializeAttachment: () => ({
-          executionId,
+          wrapperRunId: 'wr_refresh',
           connectedAt: Date.now(),
           kiloSessionState: { captured: false },
           lastHeartbeatUpdate: 0,
@@ -253,192 +154,6 @@ describe('executeDirectly failure handling', () => {
     expect(result.wrapperRuntimeState.noOutputDeadlineAt).toBeGreaterThan(result.staleDeadline);
   });
 
-  it('wrapper no-output liveness failure fails accepted message before deadline cleanup and preserves queued messages', async () => {
-    const userId = 'user_liveness_no_output';
-    const sessionId = 'agent_liveness_no_output';
-    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
-    const stub = env.CLOUD_AGENT_SESSION.get(doId);
-
-    const result = await runInDurableObject(stub, async (instance, state) => {
-      const stoppedWrappers: string[] = [];
-      instance['stopCurrentWrapperProcess'] = async () => {
-        stoppedWrappers.push('stopped');
-      };
-      const interruptSpy = vi.spyOn(instance, 'interruptExecution');
-
-      await registerReadySession(instance, {
-        sessionId,
-        userId,
-        orgId: 'org_liveness_no_output',
-        kiloSessionId: 'cccccccc-cccc-4ccc-cccc-cccccccccccc',
-        prompt: 'initial prompt',
-        mode: 'code',
-        model: 'test-model',
-        kilocodeToken: 'token-liveness-no-output',
-      });
-
-      const executionId = 'exec_liveness_no_output' as ExecutionId;
-      await instance.addExecution({
-        executionId,
-        mode: 'code',
-        streamingMode: 'websocket',
-        ingestToken: executionId,
-        messageId: 'msg_018f1e2d3c4bNoOutputAbCdEf',
-      });
-      await instance.ctx.storage.put('pending_message:0000000000000001:queued', {
-        messageId: 'msg_018f1e2d3c4bQueueSurvAbCdE',
-        executionId: 'exec_queued_survives',
-        role: 'user',
-        content: 'queued survives',
-        createdAt: Date.now(),
-      });
-      const expiredAt = Date.now() - 1;
-      await instance.ctx.storage.put('wrapper_runtime_state', {
-        wrapperGeneration: 1,
-        wrapperConnectionId: 'conn_no_output',
-        wrapperExecutionId: executionId,
-        acceptedMessageId: 'msg_018f1e2d3c4bNoOutputAbCdEf',
-        acceptedExecutionId: executionId,
-        noOutputDeadlineAt: expiredAt,
-        lastHeartbeatUpdate: expiredAt - 10 * 60_000,
-      });
-      await instance.updateExecutionStatus({ executionId, status: 'running' });
-      await instance.updateExecutionHeartbeat(executionId, expiredAt - 10 * 60_000);
-
-      await instance.alarm();
-
-      const execution = await instance.getExecution(executionId);
-      const pending = await listPendingSessionMessages(instance.ctx.storage);
-      const db = drizzle(state.storage, { logger: false });
-      const eventQueries = createEventQueries(db, state.storage.sql);
-      const events = eventQueries.findByFilters({ executionIds: [executionId] });
-      return {
-        execution,
-        pending,
-        events,
-        stoppedWrappers,
-        interruptCalls: interruptSpy.mock.calls.length,
-        alarm: await instance.ctx.storage.getAlarm(),
-        wrapperRuntimeState: await getWrapperRuntimeState(instance.ctx.storage),
-      };
-    });
-
-    expect(result.execution?.status).toBe('failed');
-    expect(result.execution?.error).toBe('Wrapper accepted the message but produced no output');
-    expect(result.pending.map(message => message.messageId)).toEqual([
-      'msg_018f1e2d3c4bQueueSurvAbCdE',
-    ]);
-    expect(result.wrapperRuntimeState.wrapperConnectionId).toBeUndefined();
-    expect(result.wrapperRuntimeState.noOutputDeadlineAt).toBeUndefined();
-    expect(result.wrapperRuntimeState.pingDeadlineAt).toBeUndefined();
-    expect(result.wrapperRuntimeState.nextPingAt).toBeUndefined();
-    expect(result.alarm).toBeGreaterThanOrEqual(Date.now() + 900);
-    expect(result.interruptCalls).toBe(0);
-    expect(result.stoppedWrappers).toEqual(['stopped']);
-    const failedEvents = result.events.filter(
-      event => event.stream_event_type === 'cloud.message.failed'
-    );
-    expect(failedEvents).toHaveLength(1);
-    expect(JSON.parse(failedEvents[0].payload)).toMatchObject({
-      messageId: 'msg_018f1e2d3c4bNoOutputAbCdEf',
-      executionId: 'exec_liveness_no_output',
-      status: 'failed',
-      error: 'Wrapper accepted the message but produced no output',
-      delivery: 'sent',
-      accepted: true,
-    });
-  });
-
-  it('wrapper ping timeout liveness failure fails accepted message and preserves queued messages', async () => {
-    const userId = 'user_liveness_ping';
-    const sessionId = 'agent_liveness_ping';
-    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
-    const stub = env.CLOUD_AGENT_SESSION.get(doId);
-
-    const result = await runInDurableObject(stub, async (instance, state) => {
-      instance['stopCurrentWrapperProcess'] = async () => {};
-      const interruptSpy = vi.spyOn(instance, 'interruptExecution');
-
-      await registerReadySession(instance, {
-        sessionId,
-        userId,
-        orgId: 'org_liveness_ping',
-        kiloSessionId: 'dddddddd-dddd-4ddd-dddd-dddddddddddd',
-        prompt: 'initial prompt',
-        mode: 'code',
-        model: 'test-model',
-        kilocodeToken: 'token-liveness-ping',
-      });
-
-      const executionId = 'exec_liveness_ping' as ExecutionId;
-      await instance.addExecution({
-        executionId,
-        mode: 'code',
-        streamingMode: 'websocket',
-        ingestToken: executionId,
-        messageId: 'msg_018f1e2d3c4bPingFailAbCdEf',
-      });
-      await instance.ctx.storage.put(
-        'pending_message:0000000000000001:msg_018f1e2d3c4bQueueSurvAbCdE',
-        {
-          messageId: 'msg_018f1e2d3c4bQueueSurvAbCdE',
-          executionId: 'exec_queued_survives',
-          role: 'user',
-          content: 'queued survives',
-          createdAt: Date.now(),
-        }
-      );
-      await instance.ctx.storage.put('wrapper_runtime_state', {
-        wrapperGeneration: 1,
-        wrapperConnectionId: 'conn_ping',
-        wrapperExecutionId: executionId,
-        acceptedMessageId: 'msg_018f1e2d3c4bPingFailAbCdEf',
-        acceptedExecutionId: executionId,
-        pingDeadlineAt: Date.now() - 1,
-      });
-      await instance.updateExecutionStatus({ executionId, status: 'running' });
-
-      await instance.alarm();
-
-      const execution = await instance.getExecution(executionId);
-      const pending = await listPendingSessionMessages(instance.ctx.storage);
-      const db = drizzle(state.storage, { logger: false });
-      const eventQueries = createEventQueries(db, state.storage.sql);
-      const events = eventQueries.findByFilters({ executionIds: [executionId] });
-      return {
-        execution,
-        pending,
-        events,
-        interruptCalls: interruptSpy.mock.calls.length,
-        alarm: await instance.ctx.storage.getAlarm(),
-        wrapperRuntimeState: await getWrapperRuntimeState(instance.ctx.storage),
-      };
-    });
-
-    expect(result.execution?.status).toBe('failed');
-    expect(result.execution?.error).toBe('Wrapper did not respond to liveness ping');
-    expect(result.pending.map(message => message.messageId)).toEqual([
-      'msg_018f1e2d3c4bQueueSurvAbCdE',
-    ]);
-    expect(result.wrapperRuntimeState.wrapperConnectionId).toBeUndefined();
-    expect(result.wrapperRuntimeState.pingDeadlineAt).toBeUndefined();
-    expect(result.wrapperRuntimeState.nextPingAt).toBeUndefined();
-    expect(result.alarm).toBeGreaterThanOrEqual(Date.now() + 900);
-    expect(result.interruptCalls).toBe(0);
-    const failedEvents = result.events.filter(
-      event => event.stream_event_type === 'cloud.message.failed'
-    );
-    expect(failedEvents).toHaveLength(1);
-    expect(JSON.parse(failedEvents[0].payload)).toMatchObject({
-      messageId: 'msg_018f1e2d3c4bPingFailAbCdEf',
-      executionId: 'exec_liveness_ping',
-      status: 'failed',
-      error: 'Wrapper did not respond to liveness ping',
-      delivery: 'sent',
-      accepted: true,
-    });
-  });
-
   it('queued flush pre-start failure retries cleanly with the original execution and message ids', async () => {
     const userId = 'user_exec_direct_fail';
     const sessionId = 'agent_exec_direct_fail';
@@ -448,7 +163,7 @@ describe('executeDirectly failure handling', () => {
     const result = await runInDurableObject(stub, async (instance, state) => {
       let attemptCount = 0;
       (instance as any).orchestrator = {
-        execute: async (plan: MessageDeliveryPlan) => {
+        execute: async (plan: FencedWrapperDispatchRequest) => {
           attemptCount += 1;
           if (attemptCount === 1) {
             throw new Error('Sandbox connect failed');
@@ -477,7 +192,7 @@ describe('executeDirectly failure handling', () => {
         messageId: 'msg_018f1e2d3c4bFailMsgAbCdEfG',
       });
 
-      const startResult = await instance.queueSessionMessage(request);
+      const startResult = await instance.admitSubmittedMessage(request);
       const pendingAfterStart = await listPendingSessionMessages(instance.ctx.storage);
 
       await instance.alarm();
@@ -489,8 +204,15 @@ describe('executeDirectly failure handling', () => {
       const retriableMessage = pendingAfterAlarm[0];
       if (retriableMessage) {
         await instance.ctx.storage.put('pending_message:0000000000000001:retry-fix', {
-          ...retriableMessage,
-          nextFlushAttemptAt: Date.now() - 1,
+          version: 2,
+          intent: retriableMessage.intent,
+          delivery: {
+            queuedAt: retriableMessage.createdAt,
+            flushAttempts: retriableMessage.flushAttempts,
+            nextFlushAttemptAt: Date.now() - 1,
+            lastFlushError: retriableMessage.lastFlushError,
+          },
+          callbackSnapshot: retriableMessage.callbackSnapshot,
         });
         await instance.ctx.storage.delete(
           'pending_message:0000000000000001:msg_018f1e2d3c4bFailMsgAbCdEfG'
@@ -523,7 +245,7 @@ describe('executeDirectly failure handling', () => {
 
     expect(result.startResult.success).toBe(true);
     if (!result.startResult.success) return;
-    expect(result.startResult.delivery).toBe('queued');
+    expect(result.startResult.outcome).toBe('queued');
     expect(result.pendingAfterStart.map(message => message.messageId)).toEqual([
       'msg_018f1e2d3c4bFailMsgAbCdEfG',
     ]);
@@ -536,7 +258,6 @@ describe('executeDirectly failure handling', () => {
     expect(result.executionsAfterFirstAlarm).toEqual([]);
     expect(result.wrapperRuntimeState.wrapperGeneration).toBe(2);
     expect(result.wrapperRuntimeState.wrapperConnectionId).toBeUndefined();
-    expect(result.wrapperRuntimeState.wrapperExecutionId).toBeUndefined();
 
     expect(result.attemptCount).toBe(2);
     expect(result.pendingAfterRetry).toHaveLength(0);
@@ -795,7 +516,7 @@ describe('hot delivery failure preserves existing wrapper identity', () => {
 
     const result = await runInDurableObject(stub, async instance => {
       (instance as any).orchestrator = {
-        execute: async (plan: MessageDeliveryPlan) => {
+        execute: async (plan: FencedWrapperDispatchRequest) => {
           throw new Error('Sandbox connect failed');
         },
       };
@@ -846,7 +567,7 @@ describe('hot delivery failure preserves existing wrapper identity', () => {
         messageId: 'msg_018f1e2d3c4bHotFailMsgAbCd',
       });
 
-      await instance.queueSessionMessage(request);
+      await instance.admitSubmittedMessage(request);
 
       await instance.alarm();
 
@@ -881,7 +602,7 @@ describe('hot delivery failure preserves existing wrapper identity', () => {
 
     const result = await runInDurableObject(stub, async instance => {
       (instance as any).orchestrator = {
-        execute: async (plan: MessageDeliveryPlan) => {
+        execute: async (plan: FencedWrapperDispatchRequest) => {
           throw new Error('Sandbox connect failed');
         },
       };
@@ -905,7 +626,7 @@ describe('hot delivery failure preserves existing wrapper identity', () => {
         messageId: 'msg_018f1e2d3c4bColdFailMsAbCd',
       });
 
-      await instance.queueSessionMessage(request);
+      await instance.admitSubmittedMessage(request);
 
       const preAlarmState = await getWrapperRuntimeState(instance.ctx.storage);
 

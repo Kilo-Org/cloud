@@ -9,7 +9,7 @@ import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import {
   allocateWrapperRuntimeState,
   clearAllocatedWrapperRuntimeState,
-  clearWrapperRuntimeIdentityForExecution,
+  clearWrapperRuntimeIdentity,
   getWrapperRuntimeState,
   READY_ONLY_IDLE_MS,
   recordWrapperAcceptedMessage,
@@ -246,10 +246,11 @@ describe('wrapper runtime state', () => {
       put: async (key: string, value: unknown) => {
         storage.set(key, value);
       },
+      delete: async (key: string) => storage.delete(key),
     } as unknown as DurableObjectStorage;
   };
 
-  it('sanitizes liveness state when reusing the same wrapper allocation', async () => {
+  it('preserves active liveness state when reusing the same wrapper allocation', async () => {
     const durableStorage = createStorage();
 
     const { state: allocated } = await allocateWrapperRuntimeState(durableStorage, 1_000);
@@ -268,9 +269,9 @@ describe('wrapper runtime state', () => {
 
     expect(reused.wrapperGeneration).toBe(allocated.wrapperGeneration);
     expect(reused.wrapperConnectionId).toBe(allocated.wrapperConnectionId);
-    expect(stored.noOutputDeadlineAt).toBeUndefined();
+    expect(stored.noOutputDeadlineAt).toBe(10_000);
     expect(stored.pingDeadlineAt).toBeUndefined();
-    expect(stored.nextPingAt).toBeUndefined();
+    expect(stored.nextPingAt).toBe(62_000);
   });
 
   it('does not let stale terminal cleanup clear a newer wrapper runtime state', async () => {
@@ -284,9 +285,8 @@ describe('wrapper runtime state', () => {
     if (!current.wrapperConnectionId) throw new Error('expected current wrapper connection ID');
     await recordWrapperAcceptedMessage(durableStorage, current, 10_000, 61_000);
 
-    const cleared = await clearWrapperRuntimeIdentityForExecution(
+    const cleared = await clearWrapperRuntimeIdentity(
       durableStorage,
-      'exec_stale',
       {
         wrapperGeneration: stale.wrapperGeneration,
         wrapperConnectionId: stale.wrapperConnectionId,
@@ -305,6 +305,42 @@ describe('wrapper runtime state', () => {
       nextPingAt: 61_000,
     });
     expect(stored.wrapperIdleDeadlineAt).toBeUndefined();
+  });
+
+  it('allocates a fresh fenced identity instead of reusing an obsolete execution-era record', async () => {
+    const durableStorage = createStorage();
+    await durableStorage.put('wrapper_runtime_state', {
+      wrapperGeneration: 7,
+      wrapperConnectionId: 'conn_legacy',
+      acceptedExecutionId: 'exc_legacy',
+    });
+
+    const allocated = await allocateWrapperRuntimeState(durableStorage, 4_000);
+    const stored = await getWrapperRuntimeState(durableStorage);
+
+    expect(allocated.allocatedNewIdentity).toBe(true);
+    expect(allocated.state.wrapperGeneration).toBe(8);
+    expect(allocated.state.wrapperConnectionId).not.toBe('conn_legacy');
+    expect(allocated.state.wrapperRunId).toMatch(/^wr_/);
+    expect(stored).toEqual(allocated.state);
+  });
+
+  it('allocates fresh current identity even when obsolete grace cleanup fails', async () => {
+    const durableStorage = createStorage();
+    await durableStorage.put('wrapper_runtime_state', {
+      wrapperGeneration: 5,
+      wrapperConnectionId: 'conn_legacy',
+      acceptedExecutionId: 'exc_legacy',
+    });
+    durableStorage.delete = async () => {
+      throw new Error('cleanup unavailable');
+    };
+
+    const allocated = await allocateWrapperRuntimeState(durableStorage, 4_000);
+
+    expect(allocated.allocatedNewIdentity).toBe(true);
+    expect(allocated.state.wrapperGeneration).toBe(6);
+    expect(allocated.state.wrapperRunId).toMatch(/^wr_/);
   });
 
   it('reports allocatedNewIdentity=true for cold allocation and false for hot reuse', async () => {

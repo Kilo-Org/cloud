@@ -88,9 +88,12 @@ function createHarness(options?: {
   callbackQueueAvailable?: boolean;
   hasObservedWrapperIdle?: boolean;
   metadata?: SessionMetadata;
+  failTerminalEventOnce?: boolean;
 }) {
   const storage = createMemoryStorage();
   const events: PersistedMessageEvent[] = [];
+  const terminalEventIds = new Set<string>();
+  let failTerminalEvent = options?.failTerminalEventOnce ?? false;
   const callbackJobs: CallbackJob[] = [];
   const alarmDeadlines: number[] = [];
   const currentMetadata = options?.metadata ?? metadata;
@@ -113,7 +116,13 @@ function createHarness(options?: {
       getCallbackQueue: () =>
         options?.callbackQueueAvailable === false ? undefined : { send: sendCallback },
       getAssistantMessageForUserMessage: () => null,
-      insertAndBroadcastMessageEvent: event => {
+      ensureTerminalMessageEvent: event => {
+        if (failTerminalEvent) {
+          failTerminalEvent = false;
+          throw new Error('terminal event insert failed');
+        }
+        if (terminalEventIds.has(event.entityId)) return;
+        terminalEventIds.add(event.entityId);
         events.push(event);
       },
       hasObservedWrapperIdle: async () => options?.hasObservedWrapperIdle ?? true,
@@ -152,6 +161,137 @@ describe('MessageSettlementOutbox', () => {
       assistantMessageId: 'assistant_one',
       completionSource: 'assistant_message_event',
     });
+  });
+
+  it('repairs a persisted terminal state after terminal event insertion fails once', async () => {
+    const harness = createHarness({ failTerminalEventOnce: true });
+    await putSessionMessageState(harness.storage, acceptedMessageState(firstMessageId));
+
+    await expect(
+      harness.outbox.terminalizeSessionMessageOnce(firstMessageId, {
+        kind: 'completed',
+        completionSource: 'assistant_message_event',
+      })
+    ).rejects.toThrow('terminal event insert failed');
+    const afterFailure = await getSessionMessageState(harness.storage, firstMessageId);
+    expect(afterFailure?.status).toBe('completed');
+    expect(afterFailure?.terminalEffects?.event).toBe('pending');
+    expect(harness.alarmDeadlines).toHaveLength(1);
+
+    await harness.outbox.repairTerminalEffects();
+    await harness.outbox.repairTerminalEffects();
+
+    const repaired = await getSessionMessageState(harness.storage, firstMessageId);
+    expect(repaired?.terminalEffects?.event).toBe('accounted');
+    expect(harness.events).toHaveLength(1);
+  });
+
+  it('does not replay a terminal event for predecessor terminal state without effect markers', async () => {
+    const harness = createHarness();
+    await putSessionMessageState(harness.storage, {
+      ...acceptedMessageState(firstMessageId, { url: 'https://example.com/predecessor' }),
+      status: 'completed',
+      terminalAt: 10,
+      completionSource: 'assistant_message_event',
+    });
+
+    await harness.outbox.repairTerminalEffects();
+
+    expect(harness.events).toHaveLength(0);
+    expect(harness.callbackJobs).toHaveLength(1);
+  });
+
+  it('repairs terminal callback association after persisted terminal state was left incomplete', async () => {
+    const harness = createHarness();
+    await putSessionMessageState(harness.storage, {
+      ...acceptedMessageState(firstMessageId, { url: 'https://example.com/repair' }),
+      status: 'completed',
+      terminalAt: 10,
+      completionSource: 'assistant_message_event',
+      terminalEffects: {
+        event: 'accounted',
+        callback: { disposition: 'pending', allowWithoutObservedIdle: true },
+      },
+    });
+
+    await harness.outbox.repairTerminalEffects();
+
+    const repaired = await getSessionMessageState(harness.storage, firstMessageId);
+    expect(repaired?.terminalEffects?.callback.disposition).toBe('accounted');
+    expect(harness.callbackJobs).toHaveLength(1);
+  });
+
+  it('repairs callback candidates in terminal order even when scanned in reverse order', async () => {
+    const harness = createHarness();
+    await putSessionMessageState(harness.storage, {
+      ...acceptedMessageState(firstMessageId, { url: 'https://example.com/first' }),
+      status: 'completed',
+      terminalAt: 10,
+      completionSource: 'assistant_message_event',
+      terminalEffects: {
+        event: 'accounted',
+        callback: { disposition: 'pending', allowWithoutObservedIdle: true },
+      },
+    });
+    await putSessionMessageState(harness.storage, {
+      ...acceptedMessageState(secondMessageId, { url: 'https://example.com/second' }),
+      status: 'failed',
+      terminalAt: 20,
+      completionSource: 'wrapper_failure',
+      failureReason: 'assistant_error',
+      terminalEffects: {
+        event: 'accounted',
+        callback: { disposition: 'pending', allowWithoutObservedIdle: true },
+      },
+    });
+
+    await harness.outbox.repairTerminalEffects();
+
+    expect(harness.callbackJobs).toHaveLength(1);
+    expect(harness.callbackJobs[0].target.url).toBe('https://example.com/second');
+  });
+
+  it('keeps a repaired gate-waiting terminal callback blocked until gate wait is released', async () => {
+    const harness = createHarness({
+      metadata: { ...metadata, finalization: { gateThreshold: 'warning' } },
+    });
+    await putSessionMessageState(harness.storage, {
+      ...acceptedMessageState(firstMessageId, { url: 'https://example.com/gate-repair' }),
+      status: 'completed',
+      terminalAt: 10,
+      completionSource: 'assistant_message_event',
+      terminalEffects: {
+        event: 'accounted',
+        callback: { disposition: 'pending', allowWithoutObservedIdle: true },
+      },
+    });
+
+    await harness.outbox.repairTerminalEffects();
+    expect(harness.callbackJobs).toHaveLength(0);
+
+    await harness.outbox.releaseWrapperTerminalWaitForIdleBatch();
+    await harness.outbox.repairTerminalEffects();
+    expect(harness.callbackJobs).toHaveLength(1);
+    expect(harness.callbackJobs[0].payload.gateResult).toBeUndefined();
+  });
+
+  it('preserves allow-without-idle while repairing interrupt callback effects', async () => {
+    const harness = createHarness({ hasObservedWrapperIdle: false });
+    await putSessionMessageState(harness.storage, {
+      ...acceptedMessageState(firstMessageId, { url: 'https://example.com/interrupt-repair' }),
+      status: 'interrupted',
+      terminalAt: 10,
+      completionSource: 'interrupt',
+      terminalEffects: {
+        event: 'accounted',
+        callback: { disposition: 'pending', allowWithoutObservedIdle: true },
+      },
+    });
+
+    await harness.outbox.repairTerminalEffects();
+
+    expect(harness.callbackJobs).toHaveLength(1);
+    expect(harness.callbackJobs[0].payload.status).toBe('interrupted');
   });
 
   it('enqueues only the last callback-relevant terminal message in an idle batch', async () => {

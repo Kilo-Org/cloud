@@ -17,12 +17,16 @@ import {
   PENDING_SESSION_MESSAGE_LIMIT,
   type SessionQueueStorage,
   type PendingSessionMessage,
+  type LegacyPendingSessionMessage,
 } from './pending-messages.js';
 import type { SessionMessageIntent } from '../execution/types.js';
 
-function createMemoryStorage(initialEntries?: Array<[string, unknown]>): SessionQueueStorage {
+type MemoryQueueStorage = SessionQueueStorage & { store: Map<string, unknown> };
+
+function createMemoryStorage(initialEntries?: Array<[string, unknown]>): MemoryQueueStorage {
   const store = new Map(initialEntries ?? []);
   return {
+    store,
     async get<T = unknown>(key: string) {
       return store.get(key) as T | undefined;
     },
@@ -44,7 +48,7 @@ function createMemoryStorage(initialEntries?: Array<[string, unknown]>): Session
 
 const BASE_MSG_ID = 'msg_018f1e2d3c4bAbCdEfGhIjKlMn';
 
-function makeMessage(overrides: Partial<PendingSessionMessage> = {}): PendingSessionMessage {
+function makeMessage(overrides: Partial<LegacyPendingSessionMessage> = {}): PendingSessionMessage {
   return createPendingSessionMessage({
     messageId: BASE_MSG_ID,
     role: 'user',
@@ -58,7 +62,6 @@ describe('createPendingSessionMessage', () => {
   it('creates a valid message with required fields', () => {
     const message = makeMessage();
     expect(message.messageId).toBe(BASE_MSG_ID);
-    expect(message.role).toBe('user');
     expect(message.content).toBe('hello');
     expect(message.createdAt).toBe(1);
   });
@@ -71,25 +74,53 @@ describe('createPendingSessionMessage', () => {
       executionOptions: { mode: 'code', model: 'gpt-4' },
     });
     expect(message.clientRequestId).toBe('client-1');
-    expect(message.callbackUrl).toBe('https://example.com/cb');
-    expect(message.callbackMetadata).toEqual({ key: 'value' });
-    expect(message.executionOptions).toEqual({ mode: 'code', model: 'gpt-4' });
+    expect(message.legacy?.callbackUrl).toBe('https://example.com/cb');
+    expect(message.legacy?.callbackMetadata).toEqual({ key: 'value' });
+    expect(message.legacy?.executionOptions).toEqual({ mode: 'code', model: 'gpt-4' });
   });
 
   it('omits empty executionOptions', () => {
     const message = makeMessage({ executionOptions: {} });
-    expect(message.executionOptions).toBeUndefined();
+    expect(message.legacy?.executionOptions).toBeUndefined();
   });
 
   it('omits executionOptions with only undefined values', () => {
     const message = makeMessage({
       executionOptions: { mode: undefined, model: undefined },
     });
-    expect(message.executionOptions).toBeUndefined();
+    expect(message.legacy?.executionOptions).toBeUndefined();
   });
 });
 
 describe('createPendingSessionMessageFromIntent', () => {
+  it('writes one nested V2 intent record without legacy flat compatibility fields', async () => {
+    const storage = createMemoryStorage();
+    const intent: SessionMessageIntent = {
+      turn: {
+        type: 'prompt',
+        messageId: 'msg_018f1e2d3c4bNestedAbCdEfGh',
+        prompt: 'nested intent',
+      },
+      agent: { mode: 'code', model: 'claude' },
+      finalization: { autoCommit: true },
+    };
+
+    await storePendingSessionMessage(storage, createPendingSessionMessageFromIntent(intent, 42));
+    const entries = await storage.list<unknown>({ prefix: 'pending_message:' });
+    const [stored] = entries.values();
+
+    expect(stored).toEqual({
+      version: 2,
+      intent,
+      delivery: { queuedAt: 42 },
+    });
+    expect(stored).not.toHaveProperty('content');
+    expect(stored).not.toHaveProperty('executionOptions');
+    expect(stored).not.toHaveProperty('executionId');
+    expect(stored).not.toHaveProperty('clientRequestId');
+    expect(stored).not.toHaveProperty('callbackUrl');
+  });
+
   it('creates a message from a session message intent', () => {
     const intent: SessionMessageIntent = {
       turn: {
@@ -108,21 +139,11 @@ describe('createPendingSessionMessageFromIntent', () => {
     const message = createPendingSessionMessageFromIntent(intent, 42);
 
     expect(message).toMatchObject({
+      version: 2,
       messageId: 'msg_018f1e2d3c4bIntentAbCdEfGh',
-      role: 'user',
       content: 'write tests',
-      images: {
-        path: '123e4567-e89b-12d3-a456-426614174000',
-        files: ['123e4567-e89b-12d3-a456-426614174001.png'],
-      },
       createdAt: 42,
-      executionOptions: {
-        mode: 'plan',
-        model: 'claude',
-        variant: 'thinking',
-        autoCommit: true,
-        condenseOnComplete: false,
-      },
+      intent,
     });
   });
 });
@@ -310,7 +331,7 @@ describe('shouldSkipPendingFlush', () => {
 });
 
 describe('recordPendingFlushFailure', () => {
-  it('applies warm-followup retry backoff', async () => {
+  it('schedules only one warm-followup retry', async () => {
     const storage = createMemoryStorage();
     let message = makeMessage();
     await storePendingSessionMessage(storage, message);
@@ -318,7 +339,7 @@ describe('recordPendingFlushFailure', () => {
     const delays: (number | undefined)[] = [];
     const now = 100_000;
 
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 2; i++) {
       const result = await recordPendingFlushFailure(storage, message, 'error', now, {
         policy: 'warm-followup',
         code: 'WORKSPACE_SETUP_FAILED',
@@ -329,10 +350,10 @@ describe('recordPendingFlushFailure', () => {
       message = result.message;
     }
 
-    expect(delays).toEqual([2_000, 4_000, 8_000, 15_000, undefined]);
+    expect(delays).toEqual([2_000, undefined]);
   });
 
-  it('applies cold-init retry backoff', async () => {
+  it('schedules only one cold-init retry', async () => {
     const storage = createMemoryStorage();
     let message = makeMessage();
     await storePendingSessionMessage(storage, message);
@@ -340,7 +361,7 @@ describe('recordPendingFlushFailure', () => {
     const delays: (number | undefined)[] = [];
     const now = 100_000;
 
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 2; i++) {
       const result = await recordPendingFlushFailure(storage, message, 'error', now, {
         policy: 'cold-init',
         code: 'SANDBOX_CONNECT_FAILED',
@@ -351,18 +372,7 @@ describe('recordPendingFlushFailure', () => {
       message = result.message;
     }
 
-    expect(delays).toEqual([
-      2_000,
-      4_000,
-      8_000,
-      16_000,
-      32_000,
-      60_000,
-      60_000,
-      60_000,
-      120_000,
-      undefined,
-    ]);
+    expect(delays).toEqual([2_000, undefined]);
   });
 
   it('exhausts immediately for non-retryable codes', async () => {
@@ -396,7 +406,27 @@ describe('recordPendingFlushFailure', () => {
       flushAttempts: 1,
       lastFlushError: 'bad',
       nextFlushAttemptAt: undefined,
+      deliveryDisposition: 'terminalization-pending',
     });
+  });
+
+  it('persists terminalization-pending disposition only once retry budget is exhausted', async () => {
+    const storage = createMemoryStorage();
+    let message = makeMessage();
+    await storePendingSessionMessage(storage, message);
+
+    const retry = await recordPendingFlushFailure(storage, message, 'retry', 100_000, {
+      policy: 'warm-followup',
+      code: 'WORKSPACE_SETUP_FAILED',
+    });
+    message = retry.message;
+    expect(message.deliveryDisposition).toBeUndefined();
+
+    const exhausted = await recordPendingFlushFailure(storage, message, 'bad', 100_000, {
+      policy: 'warm-followup',
+      code: 'BAD_REQUEST',
+    });
+    expect(exhausted.message.deliveryDisposition).toBe('terminalization-pending');
   });
 
   it('keeps the message in storage when not exhausted', async () => {
@@ -431,7 +461,64 @@ describe('recordPendingFlushFailure', () => {
 
     const listed = await listPendingSessionMessages(storage);
     expect(listed).toHaveLength(1);
-    expect(listed[0]?.images).toEqual(images);
+    expect(listed[0]?.legacy?.images).toEqual(images);
+  });
+
+  it('preserves the original pending intent when retry replacement write fails', async () => {
+    const storage = createMemoryStorage();
+    const message = createPendingSessionMessageFromIntent(
+      {
+        turn: { type: 'prompt', messageId: BASE_MSG_ID, prompt: 'durable original' },
+        agent: { mode: 'code', model: 'test-model' },
+      },
+      1
+    );
+    await storePendingSessionMessage(storage, message);
+    const original = Array.from(storage.store.values())[0];
+    storage.put = async () => {
+      throw new Error('replacement write failed');
+    };
+
+    await expect(
+      recordPendingFlushFailure(storage, message, 'transient', 100_000, {
+        policy: 'warm-followup',
+        code: 'WORKSPACE_SETUP_FAILED',
+      })
+    ).rejects.toThrow('replacement write failed');
+
+    expect(Array.from(storage.store.values())).toEqual([original]);
+  });
+
+  it('retains a rewritten durable copy when duplicate cleanup fails', async () => {
+    const storage = createMemoryStorage();
+    const message = createPendingSessionMessageFromIntent(
+      {
+        turn: { type: 'prompt', messageId: BASE_MSG_ID, prompt: 'durable original' },
+        agent: { mode: 'code', model: 'test-model' },
+      },
+      1
+    );
+    await storePendingSessionMessage(storage, message);
+    await storage.put('pending_message:0000000000000002:duplicate', {
+      version: 2,
+      intent: message.intent,
+      delivery: { queuedAt: 2 },
+    });
+    storage.delete = async () => {
+      throw new Error('duplicate cleanup failed');
+    };
+
+    const result = await recordPendingFlushFailure(storage, message, 'transient', 100_000, {
+      policy: 'warm-followup',
+      code: 'WORKSPACE_SETUP_FAILED',
+    });
+
+    expect(result.attempts).toBe(1);
+    expect((await listPendingSessionMessages(storage)).length).toBeGreaterThanOrEqual(1);
+    const firstStored = Array.from(storage.store.values())[0] as {
+      delivery?: { flushAttempts?: number };
+    };
+    expect(firstStored.delivery?.flushAttempts).toBe(1);
   });
 
   it('treats undefined code as retryable', async () => {

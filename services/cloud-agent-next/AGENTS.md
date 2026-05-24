@@ -57,7 +57,7 @@ Git tokens (GitHub App installation tokens, managed GitLab tokens) are resolved 
 - `src/router/handlers/session-prepare.ts` - Legacy `prepareSession` adapter
 - `src/router/handlers/session-execution.ts` - Legacy V2 queue adapters
 - `src/session/session-requests.ts` - Grouped internal session request types
-- `src/session/session-registration.ts` - Shared grouped session registration
+- `src/session/session-registration.ts` - Grouped start creation/admission and legacy registration-only creation
 - `src/session/queue-message.ts` - Shared grouped queue command helper
 - `src/session-service.ts` - Sandbox/workspace lifecycle orchestration
 - `src/workspace.ts` - Workspace setup and git operations
@@ -111,11 +111,20 @@ This pattern blocks API endpoints from running for external contributors who don
 
 ### Cloud Agent Architecture
 
-- Treat `messageId` as the primary user-message identity. Legacy `executionId` exists only as a compatibility alias in V2 response paths.
+- Treat `messageId` as the durable user-message identity. Queued/accepted admission may replay idempotently, but completed/failed/interrupted IDs are final and must not be re-admitted. Legacy `executionId` exists only as a compatibility alias in V2 response paths.
 - Public legacy endpoints may accept flat input, but handlers should adapt that input at the boundary into grouped `SessionCreateRequest` or `QueueMessageInput`.
 - New session metadata writes must use grouped `SessionMetadata` with `metadataSchemaVersion: 2`.
 - Legacy flat metadata reads are allowed only inside `src/persistence/session-metadata.ts` via `parseSessionMetadata`. Application code should consume current grouped metadata only.
-- Queueing is explicit: use `kind: "registered-initial"` when initiating the persisted initial message, and `kind: "user-message"` when the request carries a prompt.
+- Grouped `start` sends its already accepted canonical initial turn through `createSessionWithInitialAdmission`; retries must preserve the stored immutable intent and complete queue event/drain side effects without duplicate queue events. Current admission accepts submitted or already-canonical turns only; the retained legacy prepared-session adapter reconstructs stored initial turns before admission.
+- New pending-message writes use a versioned record containing one nested immutable `SessionMessageIntent`, delivery retry state, and callback snapshot; flat pending rows are decoded only inside `src/session/pending-messages.ts`.
+- `SessionMessageState` owns lifecycle/outbox status, terminal effect accounting, and a named immutable `admissionSnapshot` only for post-pending replay validation and recovery; predecessor records normalize into partial `legacyAdmissionConstraints` and never fabricate missing immutable input. Terminal and accepted/sent effects are repairable from pending/alarm replay and events use deterministic uniqueness.
+- Wrapper handoff is currently at-least-once under ambiguous delivery failures: the wrapper forwards prompt/command submissions directly to Kilo and does not query Kilo to suppress or recover duplicate `messageId` submissions. Duplicate prompt/command processing is an accepted edge-case trade-off until Kilo provides an atomic submit-or-return-existing contract.
+- Once accepted work has no pending residue and its fenced wrapper runtime/socket is gone, current DO/Worker interfaces have no bounded authoritative Kilo terminal query. Disconnect or liveness expiry therefore terminalizes remaining accepted work as wrapper failure without redispatch; adding an authoritative Kilo recovery contract is separate lifecycle capability work.
+- Callback delivery retry policy is paired with `wrangler.jsonc`: `CALLBACK_DELIVERY_MAX_ATTEMPTS` includes the initial attempt, and each Cloud Agent Next callback queue consumer must configure `max_retries` for the remaining redeliveries.
+- Queue/drain emits unfenced `MessageDeliveryRequest`; only `AgentRuntime` may allocate/reuse current identity and construct `FencedWrapperDispatchRequest` with complete `WrapperRunFence` for downstream dispatch.
+- Session creation selects an explicit `ProfileResolutionPolicy` at the handler boundary; only the `include-web-defaults` policy resolves web default/repository-bound profile layers without an explicit profile id.
+- Public `start` must authorize any supplied `kilocodeOrganizationId` against `organization_memberships` before resolving profile layers or creating session ownership state. Balance validation is billing-only and `x-skip-balance-check` must never bypass organization authorization.
+- Current wrapper identity is fenced `wrapperRunId` plus generation/connection; do not reintroduce execution-ID-only reconnect, supervision, or pending-drain blocking. Legacy endpoint/result/callback `executionId` fields remain boundary compatibility aliases only.
 - The DO should remain a durable coordinator: queue messages, persist metadata/events, fence wrapper connections, schedule alarms, prepare/restore sandbox state, and hand work to the wrapper.
 - Put Kilo/job behavior in `wrapper/` or Kilo SDK integration code when it does not require durable DO coordination.
 - Avoid growing `CloudAgentSession.ts` with product behavior that can live in the wrapper, Kilo SDK layer, or a small helper module.

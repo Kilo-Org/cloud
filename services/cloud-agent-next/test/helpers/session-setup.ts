@@ -1,7 +1,10 @@
 import { expect } from 'vitest';
 import type { CloudAgentSession } from '../../src/persistence/CloudAgentSession.js';
 import type { CallbackTarget } from '../../src/callbacks/index.js';
-import type { QueueSessionMessageRequest } from '../../src/execution/types.js';
+import type {
+  LegacyRegisteredInitialAdmissionRequest,
+  SubmittedSessionMessageRequest,
+} from '../../src/execution/types.js';
 import type { AgentMode } from '../../src/schema.js';
 import type { Images } from '../../src/router/schemas.js';
 import type { SessionProfileBundle } from '../../src/session-profile.js';
@@ -152,9 +155,8 @@ export function groupedRegisterSessionInput(input: TestRegisterSessionInput): Re
 
 export function queueUserMessageInput(
   input: QueueSessionUserMessageInput
-): QueueSessionMessageRequest {
+): SubmittedSessionMessageRequest {
   return {
-    kind: 'user-message',
     userId: input.userId,
     botId: input.botId,
     turn: {
@@ -178,9 +180,8 @@ export function queueUserMessageInput(
 export function queueRegisteredInitialInput(input: {
   userId: string;
   botId?: string;
-}): QueueSessionMessageRequest {
+}): LegacyRegisteredInitialAdmissionRequest {
   return {
-    kind: 'registered-initial',
     userId: input.userId,
     botId: input.botId,
   };

@@ -1,7 +1,7 @@
 /**
  * Phase 8: Execution-id removal tests.
  *
- * New-path messages (started via queueSessionMessage -> MessageDeliveryPlan)
+ * New-path messages (admitted via admitSubmittedMessage -> FencedWrapperDispatchRequest)
  * must NOT synthesize execution IDs, create execution metadata rows, or expose
  * fake execution IDs in event payloads or API responses.
  *
@@ -23,7 +23,7 @@ import {
   getWrapperRuntimeState,
 } from '../../../src/session/wrapper-runtime-state.js';
 import { createEventQueries } from '../../../src/session/queries/events.js';
-import type { MessageDeliveryPlan } from '../../../src/execution/types.js';
+import type { FencedWrapperDispatchRequest } from '../../../src/execution/types.js';
 import { queueUserMessageInput, registerReadySession } from '../../helpers/session-setup.js';
 
 describe('execution-id removal - queue and start response', () => {
@@ -32,7 +32,7 @@ describe('execution-id removal - queue and start response', () => {
     await Promise.all(ids.map(id => env.CLOUD_AGENT_SESSION.get(id).deleteSession()));
   });
 
-  it('new-path queueSessionMessage start result omits executionId', async () => {
+  it('new-path admission result omits executionId', async () => {
     const userId = 'user_noexec_start';
     const sessionId = 'agent_noexec_start';
     const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
@@ -56,7 +56,7 @@ describe('execution-id removal - queue and start response', () => {
         messageId: 'msg_018f1e2d3c4bNoExecStartMsg',
       });
 
-      const startResult = await instance.queueSessionMessage(request);
+      const startResult = await instance.admitSubmittedMessage(request);
       return { startResult };
     });
 
@@ -66,10 +66,10 @@ describe('execution-id removal - queue and start response', () => {
     // executionId must be absent from the start response
     expect(result.startResult).not.toHaveProperty('executionId');
     expect(result.startResult.messageId).toBe('msg_018f1e2d3c4bNoExecStartMsg');
-    expect(result.startResult.delivery).toBe('queued');
+    expect(result.startResult.outcome).toBe('queued');
   });
 
-  it('new-path pending message has no executionId', async () => {
+  it('new-path pending message persists canonical V2 intent without executionId', async () => {
     const userId = 'user_noexec_pending';
     const sessionId = 'agent_noexec_pending';
     const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
@@ -93,7 +93,7 @@ describe('execution-id removal - queue and start response', () => {
         messageId: 'msg_018f1e2d3c4bPendNoExecIdXY',
       });
 
-      const startResult = await instance.queueSessionMessage(request);
+      const startResult = await instance.admitSubmittedMessage(request);
       const pending = await listPendingSessionMessages(instance.ctx.storage);
       return { startResult, pending };
     });
@@ -102,8 +102,16 @@ describe('execution-id removal - queue and start response', () => {
     if (!result.startResult.success) return;
 
     expect(result.pending).toHaveLength(1);
-    // Pending message must not have an executionId for new-path messages
-    expect(result.pending[0]?.executionId).toBeUndefined();
+    expect(result.pending[0]).not.toHaveProperty('legacyExecutionId');
+    expect(result.pending[0]?.intent).toEqual({
+      turn: {
+        type: 'prompt',
+        messageId: 'msg_018f1e2d3c4bPendNoExecIdXY',
+        prompt: 'follow up',
+      },
+      agent: { mode: 'code', model: 'test-model', variant: undefined },
+      finalization: { autoCommit: undefined, condenseOnComplete: undefined },
+    });
   });
 });
 
@@ -120,9 +128,9 @@ describe('execution-id removal - flush does not create execution rows', () => {
     const stub = env.CLOUD_AGENT_SESSION.get(doId);
 
     const result = await runInDurableObject(stub, async instance => {
-      let capturedPlan: MessageDeliveryPlan | null = null;
+      let capturedPlan: FencedWrapperDispatchRequest | null = null;
       (instance as any).orchestrator = {
-        execute: async (plan: MessageDeliveryPlan) => {
+        execute: async (plan: FencedWrapperDispatchRequest) => {
           capturedPlan = plan;
           return { messageId: plan.turn.messageId, kiloSessionId: 'kilo_flush_test' };
         },
@@ -147,7 +155,7 @@ describe('execution-id removal - flush does not create execution rows', () => {
         messageId: 'msg_018f1e2d3c4bNoExecFlushAbC',
       });
 
-      const startResult = await instance.queueSessionMessage(request);
+      const startResult = await instance.admitSubmittedMessage(request);
 
       // Trigger alarm to flush the pending message
       await instance.alarm();
@@ -172,6 +180,132 @@ describe('execution-id removal - flush does not create execution rows', () => {
     expect(result.capturedPlan).not.toHaveProperty('executionId');
   });
 
+  it('repairs accepted pending residue with one sent event and no wrapper redispatch', async () => {
+    const userId = 'user_noexec_sent_repair';
+    const sessionId = 'agent_noexec_sent_repair';
+    const stub = env.CLOUD_AGENT_SESSION.get(
+      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
+    );
+
+    const result = await runInDurableObject(stub, async (instance, doState) => {
+      let dispatches = 0;
+      (instance as any).orchestrator = {
+        execute: async () => {
+          dispatches += 1;
+          throw new Error('must not redispatch accepted residue');
+        },
+      };
+      await registerReadySession(instance, {
+        sessionId,
+        userId,
+        orgId: 'org_noexec_sent_repair',
+        kiloSessionId: '56565656-5656-4565-8565-565656565656',
+        prompt: 'initial prompt',
+        mode: 'code',
+        model: 'test-model',
+        kilocodeToken: 'token-noexec-repair',
+        gitUrl: 'https://example.com/repo.git',
+        gitToken: 'git-token',
+      });
+      const messageId = 'msg_018f1e2d3c4bSentRepairAbCd';
+      await instance.admitSubmittedMessage(
+        queueUserMessageInput({ userId, prompt: 'repair me', messageId })
+      );
+      await putSessionMessageState(instance.ctx.storage, {
+        messageId,
+        status: 'accepted',
+        prompt: 'repair me',
+        createdAt: 1,
+        queuedAt: 1,
+        acceptedAt: 2,
+        wrapperRunId: 'wr_accepted_repair',
+      });
+
+      await instance.alarm();
+      await instance.alarm();
+      const events = createEventQueries(
+        drizzle(doState.storage, { logger: false }),
+        doState.storage.sql
+      ).findByFilters({ eventTypes: ['cloud.message.sent'] });
+      return {
+        dispatches,
+        events,
+        pending: await listPendingSessionMessages(instance.ctx.storage),
+      };
+    });
+
+    expect(result.dispatches).toBe(0);
+    expect(result.pending).toHaveLength(0);
+    expect(result.events).toHaveLength(1);
+  });
+
+  it('retries sent-event repair from accepted pending residue without wrapper redispatch', async () => {
+    const userId = 'user_noexec_sent_retry';
+    const sessionId = 'agent_noexec_sent_retry';
+    const stub = env.CLOUD_AGENT_SESSION.get(
+      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
+    );
+
+    const result = await runInDurableObject(stub, async (instance, doState) => {
+      let dispatches = 0;
+      (instance as any).orchestrator = {
+        execute: async () => {
+          dispatches += 1;
+          throw new Error('no dispatch');
+        },
+      };
+      await registerReadySession(instance, {
+        sessionId,
+        userId,
+        kiloSessionId: '57575757-5757-4575-8575-575757575757',
+        prompt: 'initial',
+        mode: 'code',
+        model: 'test-model',
+        kilocodeToken: 'token-noexec-sent-retry',
+      });
+      const messageId = 'msg_018f1e2d3c4bSentRtryAbCdEF';
+      await instance.admitSubmittedMessage(
+        queueUserMessageInput({ userId, prompt: 'repair retry', messageId })
+      );
+      await putSessionMessageState(instance.ctx.storage, {
+        messageId,
+        status: 'accepted',
+        prompt: 'repair retry',
+        createdAt: 1,
+        queuedAt: 1,
+        acceptedAt: 2,
+        wrapperRunId: 'wr_accepted_retry',
+      });
+      const realInsertUnique = instance['eventQueries'].insertUnique.bind(instance['eventQueries']);
+      let failSent = true;
+      instance['eventQueries'].insertUnique = params => {
+        if (failSent && params.entityId === `sent-message/${messageId}`) {
+          failSent = false;
+          throw new Error('sent insert failed');
+        }
+        return realInsertUnique(params);
+      };
+      await instance.alarm();
+      const pendingAfterFailure = await listPendingSessionMessages(instance.ctx.storage);
+      await instance.alarm();
+      const events = createEventQueries(
+        drizzle(doState.storage, { logger: false }),
+        doState.storage.sql
+      ).findByFilters({ eventTypes: ['cloud.message.sent'] });
+      return {
+        dispatches,
+        pendingAfterFailure,
+        pending: await listPendingSessionMessages(instance.ctx.storage),
+        events,
+      };
+    });
+
+    expect(result.dispatches).toBe(0);
+    expect(result.pendingAfterFailure).toHaveLength(1);
+    expect(result.pending).toHaveLength(0);
+    expect(result.events).toHaveLength(1);
+  });
+
   it('new-path flush delivers message and emits queued and sent events without executionId', async () => {
     const userId = 'user_noexec_result';
     const sessionId = 'agent_noexec_result';
@@ -180,7 +314,7 @@ describe('execution-id removal - flush does not create execution rows', () => {
 
     const result = await runInDurableObject(stub, async (instance, doState) => {
       (instance as any).orchestrator = {
-        execute: async (plan: MessageDeliveryPlan) => ({
+        execute: async (plan: FencedWrapperDispatchRequest) => ({
           messageId: plan.turn.messageId,
           kiloSessionId: 'kilo_result_test',
         }),
@@ -205,7 +339,7 @@ describe('execution-id removal - flush does not create execution rows', () => {
         messageId: 'msg_018f1e2d3c4bResultNoExecXX',
       });
 
-      await instance.queueSessionMessage(request);
+      await instance.admitSubmittedMessage(request);
       await instance.alarm();
 
       const wrapperState = await getWrapperRuntimeState(instance.ctx.storage);
@@ -278,7 +412,7 @@ describe('execution-id removal - stream events do not expose fake executionIds',
         messageId: 'msg_018f1e2d3c4bStreamNoexec01',
       });
 
-      await instance.queueSessionMessage(request);
+      await instance.admitSubmittedMessage(request);
 
       const db = drizzle(doState.storage, { logger: false });
       const eventQueries = createEventQueries(db, doState.storage.sql);
@@ -376,9 +510,9 @@ describe('execution-id removal - stream events do not expose fake executionIds',
         prompt: 'interrupt me',
         messageId: 'msg_018f1e2d3c4bIntrptNoexecAB',
       });
-      const startResult = await instance.queueSessionMessage(request);
+      const startResult = await instance.admitSubmittedMessage(request);
       if (!startResult.success) {
-        throw new Error(`queueSessionMessage failed: ${JSON.stringify(startResult)}`);
+        throw new Error(`admitSubmittedMessage failed: ${JSON.stringify(startResult)}`);
       }
 
       // Trigger interrupt which clears pending messages

@@ -68,8 +68,10 @@ describe('createQueuedSessionMessageState', () => {
     expect(state.queuedAt).toBe(1000);
     expect(state.callbackRequired).toBe(false);
     expect(state.callbackTarget).toBeUndefined();
-    expect(state.agent).toEqual({ mode: 'code', model: 'default-model', variant: undefined });
-    expect(state.finalization).toBeUndefined();
+    expect(state.admissionSnapshot).toEqual(createIntent(VALID_MESSAGE_ID, 'hello'));
+    expect(state).not.toHaveProperty('turn');
+    expect(state).not.toHaveProperty('agent');
+    expect(state).not.toHaveProperty('finalization');
   });
 
   it('snapshots callback target when provided', () => {
@@ -83,15 +85,18 @@ describe('createQueuedSessionMessageState', () => {
     expect(state.callbackTarget).toEqual(target);
   });
 
-  it('records agent config', () => {
+  it('records immutable admission intent as one named snapshot', () => {
     const state = createQueuedSessionMessageState(
       createIntent(VALID_MESSAGE_ID, 'test', {
         agent: { mode: 'code', model: 'gpt-4', variant: 'fast' },
         finalization: { autoCommit: true, condenseOnComplete: false },
       })
     );
-    expect(state.agent).toEqual({ mode: 'code', model: 'gpt-4', variant: 'fast' });
-    expect(state.finalization).toEqual({ autoCommit: true, condenseOnComplete: false });
+    expect(state.admissionSnapshot).toEqual({
+      turn: { type: 'prompt', messageId: VALID_MESSAGE_ID, prompt: 'test' },
+      agent: { mode: 'code', model: 'gpt-4', variant: 'fast' },
+      finalization: { autoCommit: true, condenseOnComplete: false },
+    });
   });
 });
 
@@ -106,6 +111,70 @@ describe('getSessionMessageState / putSessionMessageState', () => {
     await putSessionMessageState(storage, state);
     const loaded = await getSessionMessageState(storage, VALID_MESSAGE_ID);
     expect(loaded).toEqual(state);
+  });
+
+  it('normalizes legacy copied immutable fields into partial replay constraints', async () => {
+    const storage = createFakeStorage();
+    await storage.put(`session_message:${VALID_MESSAGE_ID}`, {
+      messageId: VALID_MESSAGE_ID,
+      status: 'accepted',
+      prompt: 'legacy prompt',
+      createdAt: 1000,
+      acceptedAt: 2000,
+      agent: { mode: 'plan', model: 'legacy-model', variant: 'beta' },
+      finalization: { autoCommit: true },
+    });
+
+    const loaded = await getSessionMessageState(storage, VALID_MESSAGE_ID);
+
+    expect(loaded?.admissionSnapshot).toBeUndefined();
+    expect(loaded?.legacyAdmissionConstraints).toEqual({
+      agent: { mode: 'plan', model: 'legacy-model', variant: 'beta' },
+      finalization: { autoCommit: true },
+    });
+    expect(loaded).not.toHaveProperty('agent');
+    expect(loaded).not.toHaveProperty('finalization');
+  });
+
+  it('normalizes a legacy stored turn as an additional partial replay constraint', async () => {
+    const storage = createFakeStorage();
+    await storage.put(`session_message:${VALID_MESSAGE_ID}`, {
+      messageId: VALID_MESSAGE_ID,
+      status: 'accepted',
+      prompt: 'legacy prompt',
+      turn: { type: 'prompt', messageId: VALID_MESSAGE_ID, prompt: 'legacy prompt' },
+      createdAt: 1000,
+      acceptedAt: 2000,
+      agent: { mode: 'plan', model: 'legacy-model' },
+    });
+
+    const loaded = await getSessionMessageState(storage, VALID_MESSAGE_ID);
+
+    expect(loaded?.legacyAdmissionConstraints?.turn).toEqual({
+      type: 'prompt',
+      messageId: VALID_MESSAGE_ID,
+      prompt: 'legacy prompt',
+    });
+  });
+
+  it('prefers a current admission snapshot over conflicting legacy copied fields', async () => {
+    const storage = createFakeStorage();
+    const current = createIntent(VALID_MESSAGE_ID, 'current prompt');
+    await storage.put(`session_message:${VALID_MESSAGE_ID}`, {
+      messageId: VALID_MESSAGE_ID,
+      status: 'accepted',
+      prompt: 'current prompt',
+      admissionSnapshot: current,
+      agent: { mode: 'plan', model: 'legacy-model' },
+      createdAt: 1000,
+      acceptedAt: 2000,
+    });
+
+    const loaded = await getSessionMessageState(storage, VALID_MESSAGE_ID);
+
+    expect(loaded?.admissionSnapshot).toEqual(current);
+    expect(loaded?.legacyAdmissionConstraints).toBeUndefined();
+    expect(loaded).not.toHaveProperty('agent');
   });
 
   it('returns undefined for unknown messageId', async () => {
@@ -295,10 +364,15 @@ describe('terminalizeMessageOnce', () => {
       storage,
       VALID_MESSAGE_ID,
       { kind: 'completed', completionSource: 'assistant_message_event' },
+      {},
       3000
     );
     expect(result.changed).toBe(true);
     expect(result.state!.status).toBe('completed');
+    expect(result.state!.terminalEffects).toEqual({
+      event: 'pending',
+      callback: { disposition: 'not-required' },
+    });
   });
 
   it('does not double-terminalize and reports changed=false', async () => {
@@ -540,6 +614,6 @@ describe('idempotency', () => {
     expect(loaded).toEqual(state);
     expect(loaded!.callbackRequired).toBe(true);
     expect(loaded!.callbackTarget).toEqual(target);
-    expect(loaded!.agent).toEqual({ mode: 'code', model: 'gpt-4' });
+    expect(loaded!.admissionSnapshot?.agent).toEqual({ mode: 'code', model: 'gpt-4' });
   });
 });

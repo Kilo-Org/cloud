@@ -62,7 +62,7 @@ import { SessionService, fetchSessionMetadata } from './session-service.js';
 import type { CloudAgentSessionState, PersistenceEnv } from './persistence/types.js';
 import { parseSessionMetadata } from './persistence/session-metadata.js';
 import type { ExecutionSession, SandboxInstance, SessionId } from './types.js';
-import type { MessageDeliveryPlan } from './execution/types.js';
+import type { FencedWrapperDispatchRequest } from './execution/types.js';
 
 type MockExecutionSession = ExecutionSession & {
   exec: ReturnType<typeof vi.fn>;
@@ -277,6 +277,50 @@ describe('SessionService.prepareWorkspace', () => {
       wrapperPort: 4173,
       configPath: '.devcontainer/devcontainer.json',
     });
+    expect(sandbox.writeFile).toHaveBeenCalledWith(
+      '/home/agent_test/tmp/kilo-empty-session-kilo-session.json',
+      expect.any(String)
+    );
+    const bootstrapCall = session.exec.mock.calls.find(
+      ([command]) => typeof command === 'string' && command.includes('kilo-restore-session.js')
+    );
+    expect(bootstrapCall?.[0]).toContain(
+      '/home/agent_test/tmp/kilo-empty-session-kilo-session.json'
+    );
+  });
+
+  it('reports the failing fresh-session bootstrap step', async () => {
+    const session = createSession(false);
+    session.exec.mockImplementation(async (command: string) => {
+      if (command.includes('kilo-restore-session.js')) {
+        return {
+          exitCode: 1,
+          stdout: JSON.stringify({
+            ok: false,
+            step: 'diffs',
+            error: 'failed to parse snapshot JSON',
+            code: null,
+          }),
+          stderr: '',
+        };
+      }
+      return { exitCode: 0, stdout: '', stderr: '' };
+    });
+    const sandbox = createSandbox(session);
+
+    await expect(
+      new SessionService().prepareWorkspace({
+        sandbox,
+        sandboxId: 'usr-abcdef',
+        userId: 'user_test',
+        sessionId: 'agent_test' as SessionId,
+        env: createEnv(),
+        metadata: createMetadata(),
+        kilocodeModel: 'test-model',
+      })
+    ).rejects.toThrow(
+      'Session bootstrap failed: exit 1, step=diffs, error=failed to parse snapshot JSON'
+    );
   });
 
   it('restores devcontainer sessions with session-scoped Kilo XDG paths', async () => {
@@ -697,7 +741,7 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
             wrapperConnectionId: 'conn_devcontainer',
           },
         },
-      } satisfies MessageDeliveryPlan,
+      } satisfies FencedWrapperDispatchRequest,
     });
 
     expect(result.readyRequest.devcontainer).toEqual({ requested: true });
@@ -746,7 +790,7 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
             wrapperConnectionId: 'conn_test',
           },
         },
-      } satisfies MessageDeliveryPlan,
+      } satisfies FencedWrapperDispatchRequest,
     });
 
     expect(workspaceMocks.setupWorkspace).not.toHaveBeenCalled();

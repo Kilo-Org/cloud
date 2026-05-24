@@ -92,7 +92,7 @@ export type AgentSelection = ModelChoice & {
   mode: ExecutionMode;
 };
 
-/** Partial agent fields accepted as a per-turn override. */
+/** Partial agent fields merged with registered session defaults during admission. */
 export type AgentSelectionOverride = {
   mode?: ExecutionMode;
   model?: string;
@@ -156,8 +156,8 @@ export type MessageRequest = {
  * Durable intent for a user message queued in the session.
  *
  * Stored in pending-queue records and used as the canonical internal
- * representation of what the user asked. Does NOT store full ExecutionPlan
- * or mutable workspace metadata - those are resolved at delivery time from
+ * representation of what the user asked. Does NOT store a fenced dispatch
+ * request or mutable workspace metadata - those are resolved at delivery time from
  * current session state.
  */
 export type SessionMessageIntent = {
@@ -196,18 +196,26 @@ export type QueueExecutionTurnCommand = {
   finalization?: TurnFinalization;
 };
 
-/** Explicit command payload for queuing a message via the session DO. */
-export type QueueSessionMessageRequest =
-  | {
-      kind: 'registered-initial';
-      userId: UserId;
-      botId?: string;
-    }
-  | ({
-      kind: 'user-message';
-      userId: UserId;
-      botId?: string;
-    } & QueueExecutionTurnCommand);
+/** Current-path submitted message before durable admission resolves identity/defaults. */
+export type SubmittedSessionMessageRequest = {
+  userId: UserId;
+  botId?: string;
+} & QueueExecutionTurnCommand;
+
+/** Already-canonical current message intent admitted without recreating its turn identity. */
+export type AdmitAcceptedSessionMessageRequest = {
+  userId: UserId;
+  botId?: string;
+  turn: AcceptedExecutionTurn;
+  agent: AgentSelection;
+  finalization?: TurnFinalization;
+};
+
+/** Retained legacy command requesting admission of the stored prepared initial turn. */
+export type LegacyRegisteredInitialAdmissionRequest = {
+  userId: UserId;
+  botId?: string;
+};
 
 /**
  * Retryable error codes that map to 503 Service Unavailable.
@@ -219,41 +227,39 @@ export type RetryableResultCode =
   | 'KILO_SERVER_FAILED'
   | 'WRAPPER_START_FAILED';
 
-/**
- * Delivery mode for an accepted V2 start request.
- * - sent: the wrapper accepted the message synchronously with HTTP 200.
- * - queued: the DO accepted and stored the message for later delivery.
- */
-export type StartExecutionDelivery = 'sent' | 'queued';
+export type AdmissionFailure = {
+  success: false;
+  code: 'NOT_FOUND' | 'BAD_REQUEST' | 'INTERNAL' | 'PENDING_QUEUE_FULL' | RetryableResultCode;
+  error: string;
+};
 
-/**
- * Result of starting a V2 execution.
- *
- * Error codes:
- * - SANDBOX_CONNECT_FAILED, WORKSPACE_SETUP_FAILED, KILO_SERVER_FAILED, WRAPPER_START_FAILED: 503 Service Unavailable
- * - NOT_FOUND: 404 Not Found
- * - BAD_REQUEST: 400 Bad Request
- * - INTERNAL: 500 Internal Server Error
- */
-export type QueueSessionMessageResult =
-  | {
-      success: true;
-      status: 'started';
-      messageId: string;
-      delivery: StartExecutionDelivery;
-      wrapperRunId?: string;
-    }
-  | {
-      success: false;
-      code: 'NOT_FOUND' | 'BAD_REQUEST' | 'INTERNAL' | 'PENDING_QUEUE_FULL' | RetryableResultCode;
-      error: string;
-    };
+/** Durable acknowledgement that a message intent is stored for asynchronous delivery. */
+export type DurableAdmissionAck = {
+  success: true;
+  outcome: 'queued';
+  messageId: string;
+  compatibilityDelivery: 'queued' | 'sent';
+};
 
-/** @deprecated Use QueueSessionMessageRequest */
-export type StartExecutionV2Request = QueueSessionMessageRequest;
+/** Runtime acknowledgement that the fenced wrapper accepted a delivered message. */
+export type RuntimeAcceptanceResult = {
+  success: true;
+  outcome: 'accepted';
+  messageId: string;
+  wrapperRunId: string;
+};
 
-/** @deprecated Use QueueSessionMessageResult */
-export type StartExecutionV2Result = QueueSessionMessageResult;
+export type SessionMessageAdmissionResult = DurableAdmissionAck | AdmissionFailure;
+export type MessageDeliveryResult = RuntimeAcceptanceResult | AdmissionFailure;
+
+/** Compatibility request retained only for external schema/type imports. */
+export type QueueSessionMessageRequest = SubmittedSessionMessageRequest;
+/** Compatibility result retained only for external schema/type imports. */
+export type QueueSessionMessageResult = SessionMessageAdmissionResult;
+/** @deprecated Use SubmittedSessionMessageRequest. */
+export type StartExecutionV2Request = SubmittedSessionMessageRequest;
+/** @deprecated Use SessionMessageAdmissionResult. */
+export type StartExecutionV2Result = SessionMessageAdmissionResult;
 
 // ---------------------------------------------------------------------------
 // Delivery Plan Components
@@ -291,43 +297,43 @@ export type WrapperRunFence = {
   wrapperConnectionId: string;
 };
 
-export type WrapperDeliveryBinding = {
+export type WrapperDeliveryTarget = {
   kiloSessionId?: string;
-  fence?: Partial<WrapperRunFence>;
+};
+
+export type FencedWrapperDeliveryBinding = WrapperDeliveryTarget & {
+  fence: WrapperRunFence;
 };
 
 // ---------------------------------------------------------------------------
-// Message Delivery Plan (new path - no executionId)
+// Message Delivery Boundary
 // ---------------------------------------------------------------------------
 
-/**
- * Delivery plan for a queued user message.
- *
- * Runtime delivery is grouped by concern so the wrapper adapter has one
- * accepted turn, agent selection, workspace, and wrapper fence to project.
- */
-export type MessageDeliveryPlan = {
+type DeliveryRequestBase = {
   scope: Pick<SessionScope, 'sessionId' | 'userId' | 'orgId'>;
   turn: AcceptedExecutionTurn;
   agent: AgentSelection;
   finalization?: TurnFinalization;
   workspace: WorkspaceDeliveryPlan;
-  wrapper: WrapperDeliveryBinding;
 };
 
-// ---------------------------------------------------------------------------
-// Execution Plan (legacy - new code should prefer MessageDeliveryPlan)
-// ---------------------------------------------------------------------------
+/** Durable queued message handed to AgentRuntime before runtime identity allocation. */
+export type MessageDeliveryRequest = DeliveryRequestBase & {
+  wrapper: WrapperDeliveryTarget;
+};
 
-/**
- * Compatibility plan for execution-ID survivors.
- *
- * It is structurally the message-first delivery plan plus only the legacy
- * execution identity, so those paths cannot drift in runtime fields.
- */
-export type ExecutionPlan = MessageDeliveryPlan & {
+/** Wrapper dispatch request after AgentRuntime has allocated a complete active fence. */
+export type FencedWrapperDispatchRequest = DeliveryRequestBase & {
+  wrapper: FencedWrapperDeliveryBinding;
+};
+
+/** Compatibility dispatch request for still-used execution-record orchestration tests. */
+export type FencedLegacyExecutionRequest = FencedWrapperDispatchRequest & {
   executionId: ExecutionId;
 };
+
+/** @deprecated Use FencedLegacyExecutionRequest. */
+export type ExecutionPlan = FencedLegacyExecutionRequest;
 
 // ---------------------------------------------------------------------------
 // Execution Result

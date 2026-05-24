@@ -229,7 +229,8 @@
       {
         "queue": "cloud-agent-next-callback-queue",
         "max_batch_size": 5,
-        "max_retries": 0,
+        // Keep aligned with CALLBACK_DELIVERY_MAX_ATTEMPTS = initial attempt + 4 redeliveries.
+        "max_retries": 4,
       },
     ],
   },
@@ -350,7 +351,8 @@
           {
             "queue": "cloud-agent-next-callback-queue-dev",
             "max_batch_size": 5,
-            "max_retries": 0,
+            // Keep aligned with CALLBACK_DELIVERY_MAX_ATTEMPTS = initial attempt + 4 redeliveries.
+            "max_retries": 4,
           },
         ],
       },

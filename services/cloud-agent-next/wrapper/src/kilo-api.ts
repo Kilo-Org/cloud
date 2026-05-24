@@ -265,6 +265,11 @@ export function createWrapperKiloClient(
           ...(opts.messageId !== undefined ? { messageID: opts.messageId } : {}),
         },
       });
+      if (result.error !== undefined) {
+        throw new Error(
+          `Command for session ${opts.sessionId} failed: ${formatSdkError(result.error)}`
+        );
+      }
       return result.data;
     },
 

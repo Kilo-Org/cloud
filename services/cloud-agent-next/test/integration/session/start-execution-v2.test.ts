@@ -4,7 +4,11 @@
 
 import { env, runInDurableObject } from 'cloudflare:test';
 import { describe, it, expect } from 'vitest';
-import { listPendingSessionMessages } from '../../../src/session/pending-messages.js';
+import {
+  createPendingSessionMessage,
+  listPendingSessionMessages,
+  storePendingSessionMessage,
+} from '../../../src/session/pending-messages.js';
 import { listNonTerminalAcceptedMessages } from '../../../src/session/session-message-state.js';
 import {
   groupedRegisterSessionInput,
@@ -13,7 +17,175 @@ import {
   registerReadySession,
 } from '../../helpers/session-setup.js';
 
-describe('CloudAgentSession.queueSessionMessage', () => {
+describe('CloudAgentSession message admission', () => {
+  it('admits the already accepted initial turn through grouped session creation', async () => {
+    const userId = 'user_grouped_start' as const;
+    const sessionId = 'agent_grouped_start' as const;
+    const messageId = 'msg_018f1e2d3c4bInitMsgAbCdEfG';
+    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
+    const stub = env.CLOUD_AGENT_SESSION.get(doId);
+
+    const result = await runInDurableObject(stub, async instance => {
+      const admitted = await instance.createSessionWithInitialAdmission({
+        ...groupedRegisterSessionInput({
+          sessionId,
+          userId,
+          prompt: 'admit my first turn',
+          mode: 'code',
+          model: 'test-model',
+          kiloSessionId: '11111111-1111-4111-9111-111111111111',
+          kilocodeToken: 'token-grouped-start',
+        }),
+        message: {
+          initialTurn: {
+            type: 'prompt',
+            messageId,
+            prompt: 'admit my first turn',
+          },
+        },
+      });
+      const pending = await listPendingSessionMessages(instance.ctx.storage);
+      const metadata = await instance.getMetadata();
+      return { admitted, pending, metadata };
+    });
+
+    expect(result.admitted).toMatchObject({
+      success: true,
+      messageId,
+      outcome: 'queued',
+      compatibilityDelivery: 'queued',
+      compatibilityDelivery: 'queued',
+    });
+    expect(result.metadata?.initialMessage?.id).toBe(messageId);
+    expect(result.pending).toHaveLength(1);
+    expect(result.pending[0]?.messageId).toBe(messageId);
+    expect(result.pending[0]?.content).toBe('admit my first turn');
+  });
+
+  it('surfaces initial admission failure after retaining registered DO metadata', async () => {
+    const userId = 'user_grouped_start_failure' as const;
+    const sessionId = 'agent_grouped_start_failure' as const;
+    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
+    const stub = env.CLOUD_AGENT_SESSION.get(doId);
+
+    const result = await runInDurableObject(stub, async instance => {
+      for (let index = 0; index < 10; index++) {
+        await storePendingSessionMessage(
+          instance.ctx.storage,
+          createPendingSessionMessage({
+            messageId: `msg_018f1e2d3c4b${String(index).padStart(14, 'A')}`,
+            role: 'user',
+            content: `existing pending ${index}`,
+            createdAt: index,
+          })
+        );
+      }
+      const admitted = await instance.createSessionWithInitialAdmission({
+        ...groupedRegisterSessionInput({
+          sessionId,
+          userId,
+          prompt: 'reject this admission',
+          mode: 'code',
+          model: 'test-model',
+          kiloSessionId: '12121212-1212-4212-9212-121212121212',
+          kilocodeToken: 'token-grouped-start-failure',
+        }),
+        message: {
+          initialTurn: {
+            type: 'prompt',
+            messageId: 'msg_018f1e2d3c4bOverMsgAbCdEfG',
+            prompt: 'reject this admission',
+          },
+        },
+      });
+      const pending = await listPendingSessionMessages(instance.ctx.storage);
+      const metadata = await instance.getMetadata();
+      return { admitted, pending, metadata };
+    });
+
+    expect(result.admitted).toMatchObject({ success: false, code: 'PENDING_QUEUE_FULL' });
+    expect(result.metadata?.identity.sessionId).toBe(sessionId);
+    expect(result.pending).toHaveLength(10);
+    expect(result.pending.some(message => message.content === 'reject this admission')).toBe(false);
+  });
+
+  it('replays a retried grouped admission with the same canonical initial message identity', async () => {
+    const userId = 'user_grouped_start_retry' as const;
+    const sessionId = 'agent_grouped_start_retry' as const;
+    const messageId = 'msg_018f1e2d3c4bBoundMsgAbCdEf';
+    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
+    const stub = env.CLOUD_AGENT_SESSION.get(doId);
+    const input = {
+      ...groupedRegisterSessionInput({
+        sessionId,
+        userId,
+        prompt: 'retry grouped admission',
+        mode: 'code',
+        model: 'test-model',
+        kiloSessionId: '13131313-1313-4313-9313-131313131313',
+        kilocodeToken: 'token-grouped-start-retry',
+      }),
+      message: {
+        initialTurn: {
+          type: 'prompt' as const,
+          messageId,
+          prompt: 'retry grouped admission',
+        },
+      },
+    };
+
+    const result = await runInDurableObject(stub, async instance => {
+      const first = await instance.createSessionWithInitialAdmission(input);
+      const second = await instance.createSessionWithInitialAdmission(input);
+      return { first, second, pending: await listPendingSessionMessages(instance.ctx.storage) };
+    });
+
+    expect(result.first).toMatchObject({ success: true, messageId, outcome: 'queued' });
+    expect(result.second).toEqual(result.first);
+    expect(result.pending).toHaveLength(1);
+    expect(result.pending[0]?.messageId).toBe(messageId);
+  });
+
+  it('rejects a grouped replay that changes the immutable initial intent', async () => {
+    const userId = 'user_grouped_start_mismatch' as const;
+    const sessionId = 'agent_grouped_start_mismatch' as const;
+    const messageId = 'msg_018f1e2d3c4bMismatAbCdEfGh';
+    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
+    const stub = env.CLOUD_AGENT_SESSION.get(doId);
+
+    const result = await runInDurableObject(stub, async instance => {
+      const original = {
+        ...groupedRegisterSessionInput({
+          sessionId,
+          userId,
+          prompt: 'original prompt',
+          mode: 'code',
+          model: 'test-model',
+          kiloSessionId: '14141414-1414-4414-9414-141414141414',
+          kilocodeToken: 'token-grouped-start-mismatch',
+        }),
+        message: {
+          initialTurn: { type: 'prompt' as const, messageId, prompt: 'original prompt' },
+        },
+      };
+      const first = await instance.createSessionWithInitialAdmission(original);
+      const replay = await instance.createSessionWithInitialAdmission({
+        ...original,
+        message: {
+          initialTurn: { type: 'prompt', messageId, prompt: 'different prompt' },
+        },
+        agent: { ...original.agent, model: 'different-model' },
+      });
+      return { first, replay, pending: await listPendingSessionMessages(instance.ctx.storage) };
+    });
+
+    expect(result.first).toMatchObject({ success: true, messageId, outcome: 'queued' });
+    expect(result.replay).toMatchObject({ success: false, code: 'BAD_REQUEST' });
+    expect(result.pending).toHaveLength(1);
+    expect(result.pending[0]?.content).toBe('original prompt');
+    expect(result.pending[0]?.intent?.agent.model).toBe('test-model');
+  });
+
   it('persists repaired DIND devcontainer workspace readiness metadata', async () => {
     const userId = 'user_devcontainer_ready' as const;
     const sessionId = 'agent_devcontainer_ready' as const;
@@ -86,7 +258,7 @@ describe('CloudAgentSession.queueSessionMessage', () => {
           devcontainerRequested: true,
         },
       });
-      await instance.queueSessionMessage(
+      await instance.admitSubmittedMessage(
         queueUserMessageInput({
           userId,
           prompt: 'prepare devcontainer execution',
@@ -141,7 +313,7 @@ describe('CloudAgentSession.queueSessionMessage', () => {
         messageId: 'msg_018f1e2d3c4bInitMsgAbCdEfG',
       });
 
-      const startResult = await instance.queueSessionMessage(request);
+      const startResult = await instance.admitSubmittedMessage(request);
       const pending = await listPendingSessionMessages(instance.ctx.storage);
       return { startResult, plan: capturedPlan, pending };
     });
@@ -149,7 +321,7 @@ describe('CloudAgentSession.queueSessionMessage', () => {
     expect(result.startResult.success).toBe(true);
     if (!result.startResult.success) return;
 
-    expect(result.startResult.delivery).toBe('queued');
+    expect(result.startResult.outcome).toBe('queued');
     expect(result.startResult.messageId).toBe('msg_018f1e2d3c4bInitMsgAbCdEfG');
     expect(result.plan).toBeNull();
     expect(result.pending).toHaveLength(1);
@@ -192,7 +364,7 @@ describe('CloudAgentSession.queueSessionMessage', () => {
         messageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
       });
 
-      const startResult = await instance.queueSessionMessage(request);
+      const startResult = await instance.admitSubmittedMessage(request);
       const metadata = await instance.getMetadata();
       const pending = await listPendingSessionMessages(instance.ctx.storage);
       return { startResult, metadata, plan: capturedPlan, pending };
@@ -201,9 +373,8 @@ describe('CloudAgentSession.queueSessionMessage', () => {
     expect(result.startResult.success).toBe(true);
     if (!result.startResult.success) return;
 
-    expect(result.startResult.status).toBe('started');
     expect(result.startResult.messageId).toBe('msg_018f1e2d3c4bAbCdEfGhIjKlMn');
-    expect(result.startResult.delivery).toBe('queued');
+    expect(result.startResult.outcome).toBe('queued');
     expect(result.metadata?.repository?.token).toBe('old-token');
     expect(result.plan).toBeNull();
     expect(result.pending).toHaveLength(1);
@@ -243,7 +414,7 @@ describe('CloudAgentSession.queueSessionMessage', () => {
         gitToken: 'old-token',
       });
 
-      const startResult = await instance.queueSessionMessage(
+      const startResult = await instance.admitSubmittedMessage(
         queueUserMessageInput({
           userId,
           prompt: 'followup prompt',
@@ -276,7 +447,7 @@ describe('CloudAgentSession.queueSessionMessage', () => {
     if (!result.startResult.success) return;
 
     expect(result.pendingBeforeAlarm).toHaveLength(1);
-    expect(result.startResult.delivery).toBe('queued');
+    expect(result.startResult.outcome).toBe('queued');
     expect(result.pending).toHaveLength(0);
     expect(result.metadata?.repository?.token).toBe('old-token');
     expect(result.acceptedMessages).toHaveLength(1);
@@ -337,7 +508,7 @@ describe('CloudAgentSession.queueSessionMessage', () => {
         messageId: 'msg_018F1e2d3c4bAbCdEfGhIjKlMn',
       });
 
-      const startResult = await instance.queueSessionMessage(request);
+      const startResult = await instance.admitSubmittedMessage(request);
       return { startResult, plan: capturedPlan };
     });
 
@@ -382,7 +553,7 @@ describe('CloudAgentSession.queueSessionMessage', () => {
         messageId: 'msg_018f1e2d3c4bBoundMsgAbCdEf',
       });
 
-      const startResult = await instance.queueSessionMessage(request);
+      const startResult = await instance.admitSubmittedMessage(request);
       const pending = await listPendingSessionMessages(instance.ctx.storage);
       return { startResult, plan: capturedPlan, pending };
     });
@@ -391,7 +562,7 @@ describe('CloudAgentSession.queueSessionMessage', () => {
     if (!result.startResult.success) return;
 
     expect(result.startResult.messageId).toBe('msg_018f1e2d3c4bBoundMsgAbCdEf');
-    expect(result.startResult.delivery).toBe('queued');
+    expect(result.startResult.outcome).toBe('queued');
     expect(result.plan).toBeNull();
     expect(result.pending[0]?.messageId).toBe('msg_018f1e2d3c4bBoundMsgAbCdEf');
   });
@@ -416,7 +587,7 @@ describe('CloudAgentSession.queueSessionMessage', () => {
       });
 
       for (let index = 0; index < 10; index++) {
-        await instance.queueSessionMessage(
+        await instance.admitSubmittedMessage(
           queueUserMessageInput({
             userId,
             prompt: `queued ${index}`,
@@ -425,7 +596,7 @@ describe('CloudAgentSession.queueSessionMessage', () => {
         );
       }
 
-      const overflowResult = await instance.queueSessionMessage(
+      const overflowResult = await instance.admitSubmittedMessage(
         queueUserMessageInput({
           userId,
           prompt: 'queued overflow',
@@ -433,10 +604,10 @@ describe('CloudAgentSession.queueSessionMessage', () => {
         })
       );
       const metadata = await instance.getMetadata();
-      const duplicateResult = await instance.queueSessionMessage(
+      const duplicateResult = await instance.admitSubmittedMessage(
         queueUserMessageInput({
           userId,
-          prompt: 'duplicate queued 0',
+          prompt: 'queued 0',
           messageId: 'msg_018f1e2d3c4bAAAAAAAAAAAAA0',
         })
       );
@@ -452,7 +623,7 @@ describe('CloudAgentSession.queueSessionMessage', () => {
     expect(result.metadata?.repository?.token).toBe('old-token');
     expect(result.duplicateResult.success).toBe(true);
     if (!result.duplicateResult.success) return;
-    expect(result.duplicateResult.delivery).toBe('queued');
+    expect(result.duplicateResult.outcome).toBe('queued');
     expect(result.duplicateResult.messageId).toBe('msg_018f1e2d3c4bAAAAAAAAAAAAA0');
     expect(result.metadataAfterDuplicate?.repository?.token).toBe('old-token');
     expect(result.pending).toHaveLength(10);
@@ -489,7 +660,7 @@ describe('CloudAgentSession.queueSessionMessage', () => {
       });
       await instance.ctx.storage.put('wrapper_runtime_state', { wrapperGeneration: 99 });
 
-      const startResult = await instance.queueSessionMessage(
+      const startResult = await instance.admitPreparedInitialMessage(
         queueRegisteredInitialInput({ userId })
       );
       const pending = await listPendingSessionMessages(instance.ctx.storage);
@@ -503,7 +674,7 @@ describe('CloudAgentSession.queueSessionMessage', () => {
 
     expect(result.startResult.success).toBe(true);
     if (!result.startResult.success) return;
-    expect(result.startResult.delivery).toBe('queued');
+    expect(result.startResult.outcome).toBe('queued');
     expect(result.callCount).toBe(0);
     expect(result.pending).toHaveLength(1);
     expect(result.pending[0]?.messageId).toBe('msg_018f1e2d3c4bPrepStaleAbCdE');
@@ -530,10 +701,10 @@ describe('CloudAgentSession.queueSessionMessage', () => {
         initialMessageId,
       });
 
-      const firstResult = await instance.queueSessionMessage(
+      const firstResult = await instance.admitPreparedInitialMessage(
         queueRegisteredInitialInput({ userId })
       );
-      const retryResult = await instance.queueSessionMessage(
+      const retryResult = await instance.admitPreparedInitialMessage(
         queueRegisteredInitialInput({ userId })
       );
       const pending = await listPendingSessionMessages(instance.ctx.storage);
@@ -570,7 +741,7 @@ describe('CloudAgentSession.queueSessionMessage', () => {
         initialMessageId,
       });
 
-      const startResult = await instance.queueSessionMessage(
+      const startResult = await instance.admitPreparedInitialMessage(
         queueRegisteredInitialInput({ userId })
       );
       const pending = await listPendingSessionMessages(instance.ctx.storage);
@@ -609,7 +780,7 @@ describe('CloudAgentSession.queueSessionMessage', () => {
         },
       });
 
-      const startResult = await instance.queueSessionMessage(
+      const startResult = await instance.admitPreparedInitialMessage(
         queueRegisteredInitialInput({ userId })
       );
       const pending = await listPendingSessionMessages(instance.ctx.storage);
@@ -624,15 +795,18 @@ describe('CloudAgentSession.queueSessionMessage', () => {
     expect(result.pending[0]).toMatchObject({
       messageId: initialMessageId,
       content: '/compact --aggressive',
-      turn: {
-        type: 'command',
-        command: 'compact',
-        arguments: '--aggressive',
+      intent: {
+        turn: {
+          type: 'command',
+          messageId: initialMessageId,
+          command: 'compact',
+          arguments: '--aggressive',
+        },
       },
     });
   });
 
-  it('queues follow-up while runtime is busy without calling orchestrator inline', async () => {
+  it('queues follow-up for later drain while current fenced wrapper work exists', async () => {
     const userId = 'user_exec_active_followup' as const;
     const sessionId = 'agent_exec_active_followup' as const;
     const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
@@ -657,21 +831,13 @@ describe('CloudAgentSession.queueSessionMessage', () => {
         gitUrl: 'https://example.com/repo.git',
         gitToken: 'old-token',
       });
-      await instance.addExecution({
-        executionId: 'exc_active_followup',
-        mode: 'code',
-        streamingMode: 'websocket',
-        ingestToken: 'exc_active_followup',
-      });
       await instance.ctx.storage.put('wrapper_runtime_state', {
         wrapperGeneration: 1,
         wrapperConnectionId: 'conn-active-followup',
-        wrapperExecutionId: 'exc_active_followup',
-        acceptedMessageId: 'msg_018f1e2d3c4bBusyRunAbCdEfG',
-        acceptedExecutionId: 'exc_active_followup',
+        wrapperRunId: 'wr-active-followup',
       });
 
-      const startResult = await instance.queueSessionMessage(
+      const startResult = await instance.admitSubmittedMessage(
         queueUserMessageInput({
           userId,
           prompt: 'queue while active',
@@ -684,13 +850,13 @@ describe('CloudAgentSession.queueSessionMessage', () => {
 
     expect(result.startResult.success).toBe(true);
     if (!result.startResult.success) return;
-    expect(result.startResult.delivery).toBe('queued');
+    expect(result.startResult.outcome).toBe('queued');
     expect(result.callCount).toBe(0);
     expect(result.pending).toHaveLength(1);
     expect(result.pending[0]?.messageId).toBe('msg_018f1e2d3c4bActQueAbCdEfGh');
   });
 
-  it('returns sent idempotently when retrying an active accepted messageId', async () => {
+  it('returns durable admission idempotently when retrying an accepted messageId', async () => {
     const userId = 'user_exec_active_retry' as const;
     const sessionId = 'agent_exec_active_retry' as const;
     const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
@@ -715,7 +881,7 @@ describe('CloudAgentSession.queueSessionMessage', () => {
         gitUrl: 'https://example.com/repo.git',
         gitToken: 'old-token',
       });
-      await instance.queueSessionMessage(
+      await instance.admitSubmittedMessage(
         queueUserMessageInput({
           userId,
           prompt: 'accept once',
@@ -723,10 +889,10 @@ describe('CloudAgentSession.queueSessionMessage', () => {
         })
       );
       await instance.alarm();
-      const retryResult = await instance.queueSessionMessage(
+      const retryResult = await instance.admitSubmittedMessage(
         queueUserMessageInput({
           userId,
-          prompt: 'accept once retry',
+          prompt: 'accept once',
           messageId: 'msg_018f1e2d3c4bActRetAbCdEfGh',
         })
       );
@@ -736,7 +902,8 @@ describe('CloudAgentSession.queueSessionMessage', () => {
 
     expect(result.retryResult.success).toBe(true);
     if (!result.retryResult.success) return;
-    expect(result.retryResult.delivery).toBe('sent');
+    expect(result.retryResult.outcome).toBe('queued');
+    expect(result.retryResult.compatibilityDelivery).toBe('sent');
     expect(result.pending).toHaveLength(0);
     expect(result.callCount).toBe(1);
   });
@@ -760,7 +927,7 @@ describe('CloudAgentSession.queueSessionMessage', () => {
         gitToken: 'old-token',
       });
 
-      const startResult = await instance.queueSessionMessage(
+      const startResult = await instance.admitSubmittedMessage(
         queueUserMessageInput({
           userId,
           prompt: 'bad model',

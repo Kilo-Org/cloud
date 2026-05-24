@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import type {
   ExecutionDeliveryContext,
-  MessageDeliveryPlan,
-  QueueSessionMessageResult,
+  MessageDeliveryRequest,
+  MessageDeliveryResult,
 } from '../execution/types.js';
 import type { SessionMetadata } from '../persistence/session-metadata.js';
 import { SANDBOX_WORKSPACE_PROBE_TIMEOUT_MESSAGE } from '../sandbox-recovery.js';
@@ -14,6 +14,7 @@ import {
 } from './session-message-queue.js';
 import {
   createPendingSessionMessage,
+  createPendingSessionMessageFromIntent,
   listPendingSessionMessages,
   PENDING_SESSION_MESSAGE_LIMIT,
   recordPendingFlushFailure,
@@ -113,21 +114,29 @@ function createContext(metadata = createMetadata()): ExecutionDeliveryContext {
 
 function createQueueHarness(options?: {
   metadata?: SessionMetadata | null;
-  deliver?: (plan: MessageDeliveryPlan) => Promise<QueueSessionMessageResult>;
+  deliver?: (plan: MessageDeliveryRequest) => Promise<MessageDeliveryResult>;
   storage?: SessionMessageQueueStorage;
+  failQueuedEventOnce?: boolean;
+  failAlarmOnce?: boolean;
+  failTerminalizationOnce?: boolean;
+  ensureAcceptedMessageEffects?: (messageId: string) => Promise<void>;
 }) {
   const storage = options?.storage ?? createMemoryStorage();
   const events: QueueEvent[] = [];
+  const admittedEventMessageIds = new Set<string>();
   const alarmDeadlines: number[] = [];
+  const finalizedTerminalCallbacks: Array<{ allowWithoutObservedIdle?: boolean } | undefined> = [];
+  let failQueuedEvent = options?.failQueuedEventOnce ?? false;
+  let failAlarm = options?.failAlarmOnce ?? false;
+  let failTerminalization = options?.failTerminalizationOnce ?? false;
   const terminalizations: Terminalization[] = [];
   const metadata = options?.metadata === undefined ? createMetadata() : options.metadata;
   const deliver = vi.fn(
     options?.deliver ??
-      (async (plan: MessageDeliveryPlan): Promise<QueueSessionMessageResult> => ({
+      (async (plan: MessageDeliveryRequest): Promise<MessageDeliveryResult> => ({
         success: true,
-        status: 'started',
+        outcome: 'accepted',
         messageId: plan.turn.messageId,
-        delivery: 'sent',
         wrapperRunId: 'wr_test',
       }))
   );
@@ -136,6 +145,7 @@ function createQueueHarness(options?: {
     storage,
     events,
     alarmDeadlines,
+    finalizedTerminalCallbacks,
     terminalizations,
     deliver,
     queue: createSessionMessageQueue({
@@ -144,17 +154,37 @@ function createQueueHarness(options?: {
       requireSessionId: async () => metadata?.identity.sessionId ?? 'agent_test',
       validateModeAgainstRuntimeAgents: () => null,
       getDeliveryContext: async () => (metadata ? createContext(metadata) : null),
-      hasCurrentRuntimeExecution: async () => false,
-      hasActiveAcceptedWrapperMessages: async () => false,
-      isLegacyAcceptedMessageRunning: async () => false,
       deliver,
-      insertAndBroadcastMessageEvent: event => {
+      ensureQueuedMessageEvent: event => {
+        if (failQueuedEvent) {
+          failQueuedEvent = false;
+          throw new Error('failed to persist queued event');
+        }
+        const payload = JSON.parse(event.payload) as { messageId?: string };
+        const messageId = payload.messageId;
+        if (messageId && admittedEventMessageIds.has(messageId)) return;
         events.push(event);
+        if (messageId) admittedEventMessageIds.add(messageId);
       },
-      terminalizeSessionMessageOnce: async (messageId, params, options) => {
+      ensureAcceptedMessageEffects:
+        options?.ensureAcceptedMessageEffects ?? (async () => undefined),
+      persistTerminalTransition: async (messageId, params, options) => {
+        if (failTerminalization) {
+          failTerminalization = false;
+          throw new Error('terminal transition failed');
+        }
         terminalizations.push({ messageId, params, options });
+        return { changed: true, state: { status: params.kind } };
+      },
+      repairTerminalMessageEffects: async () => undefined,
+      finalizeTerminalCallbackEffects: async options => {
+        finalizedTerminalCallbacks.push(options);
       },
       requestAlarmAtOrBefore: async deadline => {
+        if (failAlarm) {
+          failAlarm = false;
+          throw new Error('failed to schedule prompt drain');
+        }
         alarmDeadlines.push(deadline);
       },
       getSessionIdForLogs: () => metadata?.identity.sessionId,
@@ -166,7 +196,7 @@ const FIRST_MESSAGE_ID = 'msg_018f1e2d3c4bAbCdEfGhIjKlMn';
 const SECOND_MESSAGE_ID = 'msg_018f1e2d3c4bBBBBBBBBBBBBBB';
 
 describe('recordPendingFlushFailure backoff progression', () => {
-  it('applies warm follow-up retry backoff', async () => {
+  it('schedules only one warm follow-up retry', async () => {
     const storage = createMemoryStorage();
     let message = createPendingSessionMessage({
       messageId: 'msg_018f1e2d3c4bBackoffAbCdEfG',
@@ -179,7 +209,7 @@ describe('recordPendingFlushFailure backoff progression', () => {
     const delays: (number | undefined)[] = [];
     const now = 100_000;
 
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 2; i++) {
       const result = await recordPendingFlushFailure(storage, message, 'test error', now, {
         policy: 'warm-followup',
         code: 'WORKSPACE_SETUP_FAILED',
@@ -190,10 +220,10 @@ describe('recordPendingFlushFailure backoff progression', () => {
       message = result.message;
     }
 
-    expect(delays).toEqual([2_000, 4_000, 8_000, 15_000, undefined]);
+    expect(delays).toEqual([2_000, undefined]);
   });
 
-  it('applies extended cold-init retry backoff', async () => {
+  it('schedules only one cold-init retry', async () => {
     const storage = createMemoryStorage();
     let message = createPendingSessionMessage({
       messageId: 'msg_018f1e2d3c4bColdInitAbCdEf',
@@ -206,7 +236,7 @@ describe('recordPendingFlushFailure backoff progression', () => {
     const delays: (number | undefined)[] = [];
     const now = 100_000;
 
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 2; i++) {
       const result = await recordPendingFlushFailure(storage, message, 'test error', now, {
         policy: 'cold-init',
         code: 'WORKSPACE_SETUP_FAILED',
@@ -217,18 +247,7 @@ describe('recordPendingFlushFailure backoff progression', () => {
       message = result.message;
     }
 
-    expect(delays).toEqual([
-      2_000,
-      4_000,
-      8_000,
-      16_000,
-      32_000,
-      60_000,
-      60_000,
-      60_000,
-      120_000,
-      undefined,
-    ]);
+    expect(delays).toEqual([2_000, undefined]);
   });
 
   it('does not retry non-retryable failure codes', async () => {
@@ -271,7 +290,7 @@ describe('flushNextPendingSessionMessage', () => {
     await storePendingSessionMessage(storage, message);
 
     const deliver = vi
-      .fn<(_plan: MessageDeliveryPlan) => Promise<QueueSessionMessageResult>>()
+      .fn<(_plan: MessageDeliveryRequest) => Promise<MessageDeliveryResult>>()
       .mockResolvedValueOnce({
         success: false,
         code: 'WORKSPACE_SETUP_FAILED',
@@ -279,16 +298,14 @@ describe('flushNextPendingSessionMessage', () => {
       })
       .mockResolvedValueOnce({
         success: true,
-        status: 'started',
+        outcome: 'accepted',
         messageId: FIRST_MESSAGE_ID,
-        delivery: 'sent',
+        wrapperRunId: 'wr_test',
       });
 
     const first = await flushNextPendingSessionMessage({
       storage,
       now: 10,
-      drainPolicy: 'ensure-wrapper',
-      hasCurrentRuntimeExecution: async () => false,
       getDeliveryContext: async () => createContext(),
       validateModeAgainstRuntimeAgents: () => null,
       deliver,
@@ -302,8 +319,6 @@ describe('flushNextPendingSessionMessage', () => {
     const second = await flushNextPendingSessionMessage({
       storage,
       now: first.nextFlushAttemptAt ?? 20,
-      drainPolicy: 'ensure-wrapper',
-      hasCurrentRuntimeExecution: async () => false,
       getDeliveryContext: async () => createContext(),
       validateModeAgainstRuntimeAgents: () => null,
       deliver,
@@ -320,6 +335,36 @@ describe('flushNextPendingSessionMessage', () => {
     expect((await storage.list({ prefix: 'pending_message:' })).size).toBe(0);
   });
 
+  it('delivers the next current message without execution-runtime blocking', async () => {
+    const storage = createMemoryStorage();
+    await storePendingSessionMessage(
+      storage,
+      createPendingSessionMessage({
+        messageId: FIRST_MESSAGE_ID,
+        role: 'user',
+        content: 'send through fenced runtime',
+        createdAt: 1,
+      })
+    );
+    const deliver = vi.fn().mockResolvedValue({
+      success: true,
+      outcome: 'accepted',
+      messageId: FIRST_MESSAGE_ID,
+      wrapperRunId: 'wr_current',
+    });
+
+    const result = await flushNextPendingSessionMessage({
+      storage,
+      now: 10,
+      getDeliveryContext: async () => createContext(),
+      validateModeAgainstRuntimeAgents: () => null,
+      deliver,
+    });
+
+    expect(result).toEqual({ type: 'delivered', remainingCount: 0 });
+    expect(deliver).toHaveBeenCalledOnce();
+  });
+
   it('terminalizes a queued flush after a stale sandbox workspace probe timeout', async () => {
     const storage = createMemoryStorage();
     const message = createPendingSessionMessage({
@@ -331,14 +376,12 @@ describe('flushNextPendingSessionMessage', () => {
     await storePendingSessionMessage(storage, message);
 
     const deliver = vi
-      .fn<(_plan: MessageDeliveryPlan) => Promise<QueueSessionMessageResult>>()
+      .fn<(_plan: MessageDeliveryRequest) => Promise<MessageDeliveryResult>>()
       .mockRejectedValue(new Error(`${SANDBOX_WORKSPACE_PROBE_TIMEOUT_MESSAGE} after 30000ms`));
 
     const result = await flushNextPendingSessionMessage({
       storage,
       now: 10,
-      drainPolicy: 'ensure-wrapper',
-      hasCurrentRuntimeExecution: async () => false,
       getDeliveryContext: async () => createContext(),
       validateModeAgainstRuntimeAgents: () => null,
       deliver,
@@ -363,13 +406,11 @@ describe('flushNextPendingSessionMessage', () => {
       executionOptions: { mode: 'bad-mode', model: 'queued-model' },
     });
     await storePendingSessionMessage(storage, message);
-    const deliver = vi.fn<(_plan: MessageDeliveryPlan) => Promise<QueueSessionMessageResult>>();
+    const deliver = vi.fn<(_plan: MessageDeliveryRequest) => Promise<MessageDeliveryResult>>();
 
     const result = await flushNextPendingSessionMessage({
       storage,
       now: 10,
-      drainPolicy: 'ensure-wrapper',
-      hasCurrentRuntimeExecution: async () => false,
       getDeliveryContext: async () => createContext(),
       validateModeAgainstRuntimeAgents: () => 'Unknown runtime mode bad-mode',
       deliver,
@@ -393,21 +434,20 @@ describe('SessionMessageQueue', () => {
   it('admits a durable queued message once and replays the original acknowledgement', async () => {
     const harness = createQueueHarness();
     const request = {
-      kind: 'user-message' as const,
       userId: 'user_test' as UserId,
       turn: { type: 'prompt' as const, id: FIRST_MESSAGE_ID, prompt: 'queue this prompt' },
     };
 
-    const admitted = await harness.queue.enqueue(request);
-    const replay = await harness.queue.enqueue(request);
+    const admitted = await harness.queue.admitSubmittedMessage(request);
+    const replay = await harness.queue.admitSubmittedMessage(request);
     const pending = await listPendingSessionMessages(harness.storage);
     const messageState = await getSessionMessageState(harness.storage, FIRST_MESSAGE_ID);
 
     expect(admitted).toEqual({
       success: true,
-      status: 'started',
+      outcome: 'queued',
+      compatibilityDelivery: 'queued',
       messageId: FIRST_MESSAGE_ID,
-      delivery: 'queued',
     });
     expect(replay).toEqual(admitted);
     expect(pending.map(message => message.messageId)).toEqual([FIRST_MESSAGE_ID]);
@@ -418,14 +458,258 @@ describe('SessionMessageQueue', () => {
       content: 'queue this prompt',
       delivery: 'queued',
     });
+    expect(harness.alarmDeadlines).toHaveLength(2);
+  });
+
+  it('repairs submitted admission event/drain effects after an event persistence failure', async () => {
+    const harness = createQueueHarness({ failQueuedEventOnce: true });
+    const request = {
+      userId: 'user_test' as UserId,
+      turn: { type: 'prompt' as const, id: FIRST_MESSAGE_ID, prompt: 'repair submission' },
+    };
+
+    const failed = await harness.queue.admitSubmittedMessage(request);
+    const replay = await harness.queue.admitSubmittedMessage(request);
+
+    expect(failed).toMatchObject({ success: false, code: 'INTERNAL' });
+    expect(replay).toMatchObject({ success: true, messageId: FIRST_MESSAGE_ID });
+    expect(harness.events).toHaveLength(1);
     expect(harness.alarmDeadlines).toHaveLength(1);
+  });
+
+  it('repairs submitted admission drain scheduling without duplicating queued event', async () => {
+    const harness = createQueueHarness({ failAlarmOnce: true });
+    const request = {
+      userId: 'user_test' as UserId,
+      turn: { type: 'prompt' as const, id: FIRST_MESSAGE_ID, prompt: 'repair drain' },
+    };
+
+    const failed = await harness.queue.admitSubmittedMessage(request);
+    const replay = await harness.queue.admitSubmittedMessage(request);
+
+    expect(failed).toMatchObject({ success: false, code: 'INTERNAL' });
+    expect(replay).toMatchObject({ success: true, messageId: FIRST_MESSAGE_ID });
+    expect(harness.events).toHaveLength(1);
+    expect(harness.alarmDeadlines).toHaveLength(1);
+  });
+
+  it('rejects a conflicting submitted replay for an admitted message identity', async () => {
+    const harness = createQueueHarness();
+    await harness.queue.admitSubmittedMessage({
+      userId: 'user_test' as UserId,
+      turn: { type: 'prompt', id: FIRST_MESSAGE_ID, prompt: 'original prompt' },
+      agent: { mode: 'plan', model: 'queued-model' },
+      finalization: { autoCommit: true },
+    });
+
+    const replay = await harness.queue.admitSubmittedMessage({
+      userId: 'user_test' as UserId,
+      turn: { type: 'prompt', id: FIRST_MESSAGE_ID, prompt: 'changed prompt' },
+      agent: { mode: 'code', model: 'default-model' },
+      finalization: { autoCommit: false },
+    });
+
+    expect(replay).toMatchObject({ success: false, code: 'BAD_REQUEST' });
+  });
+
+  it('accepts replay matching predecessor partial immutable constraints without a stored turn', async () => {
+    const harness = createQueueHarness();
+    await harness.storage.put(`session_message:${FIRST_MESSAGE_ID}`, {
+      messageId: FIRST_MESSAGE_ID,
+      status: 'accepted',
+      prompt: 'unrecoverable old prompt',
+      createdAt: 1,
+      acceptedAt: 2,
+      agent: { mode: 'code', model: 'default-model', variant: 'stable' },
+      finalization: { autoCommit: true, condenseOnComplete: false },
+    });
+
+    const result = await harness.queue.admitSubmittedMessage({
+      userId: 'user_test' as UserId,
+      turn: {
+        type: 'prompt',
+        id: FIRST_MESSAGE_ID,
+        prompt: 'new request payload unavailable to compare',
+      },
+      agent: { mode: 'code', model: 'default-model', variant: 'stable' },
+      finalization: { autoCommit: true, condenseOnComplete: false },
+    });
+
+    expect(result).toMatchObject({ success: true, compatibilityDelivery: 'sent' });
+  });
+
+  it.each([
+    {
+      agent: { mode: 'plan' as const, model: 'default-model', variant: 'stable' },
+      finalization: { autoCommit: true, condenseOnComplete: false },
+    },
+    {
+      agent: { mode: 'code' as const, model: 'changed-model', variant: 'stable' },
+      finalization: { autoCommit: true, condenseOnComplete: false },
+    },
+    {
+      agent: { mode: 'code' as const, model: 'default-model', variant: 'changed' },
+      finalization: { autoCommit: true, condenseOnComplete: false },
+    },
+    {
+      agent: { mode: 'code' as const, model: 'default-model', variant: 'stable' },
+      finalization: { autoCommit: false, condenseOnComplete: false },
+    },
+  ])('rejects replay changing predecessor stored immutable configuration', async change => {
+    const harness = createQueueHarness();
+    await harness.storage.put(`session_message:${FIRST_MESSAGE_ID}`, {
+      messageId: FIRST_MESSAGE_ID,
+      status: 'accepted',
+      prompt: 'unrecoverable old prompt',
+      createdAt: 1,
+      acceptedAt: 2,
+      agent: { mode: 'code', model: 'default-model', variant: 'stable' },
+      finalization: { autoCommit: true, condenseOnComplete: false },
+    });
+
+    const result = await harness.queue.admitSubmittedMessage({
+      userId: 'user_test' as UserId,
+      turn: { type: 'prompt', id: FIRST_MESSAGE_ID, prompt: 'anything' },
+      agent: change.agent,
+      finalization: change.finalization,
+    });
+
+    expect(result).toMatchObject({ success: false, code: 'BAD_REQUEST' });
+  });
+
+  it('rejects replay changing a known legacy stored turn payload', async () => {
+    const harness = createQueueHarness();
+    await harness.storage.put(`session_message:${FIRST_MESSAGE_ID}`, {
+      messageId: FIRST_MESSAGE_ID,
+      status: 'accepted',
+      prompt: 'original',
+      turn: { type: 'prompt', messageId: FIRST_MESSAGE_ID, prompt: 'original' },
+      createdAt: 1,
+      acceptedAt: 2,
+      agent: { mode: 'code', model: 'default-model' },
+    });
+
+    const result = await harness.queue.admitSubmittedMessage({
+      userId: 'user_test' as UserId,
+      turn: { type: 'prompt', id: FIRST_MESSAGE_ID, prompt: 'changed' },
+      agent: { mode: 'code', model: 'default-model' },
+    });
+
+    expect(result).toMatchObject({ success: false, code: 'BAD_REQUEST' });
+  });
+
+  it.each(['completed', 'failed', 'interrupted'] as const)(
+    'rejects same identity admission after terminal status %s without new effects',
+    async status => {
+      const harness = createQueueHarness();
+      await putSessionMessageState(harness.storage, {
+        ...createQueuedSessionMessageState({
+          turn: { type: 'prompt', messageId: FIRST_MESSAGE_ID, prompt: 'terminal prompt' },
+          agent: { mode: 'code', model: 'default-model' },
+        }),
+        status,
+        terminalAt: 12,
+        completionSource: status === 'completed' ? 'assistant_message_event' : 'wrapper_failure',
+        callbackEnqueuedAt: 13,
+      });
+
+      const result = await harness.queue.admitSubmittedMessage({
+        userId: 'user_test' as UserId,
+        turn: { type: 'prompt', id: FIRST_MESSAGE_ID, prompt: 'terminal prompt' },
+      });
+
+      expect(result).toMatchObject({ success: false, code: 'BAD_REQUEST' });
+      expect(harness.events).toHaveLength(0);
+      expect(harness.alarmDeadlines).toHaveLength(0);
+      expect(await listPendingSessionMessages(harness.storage)).toHaveLength(0);
+      await expect(
+        getSessionMessageState(harness.storage, FIRST_MESSAGE_ID)
+      ).resolves.toMatchObject({
+        status,
+        terminalAt: 12,
+        callbackEnqueuedAt: 13,
+      });
+    }
+  );
+
+  it('admits a new identity after a previous identity terminalized', async () => {
+    const harness = createQueueHarness();
+    await putSessionMessageState(harness.storage, {
+      ...createQueuedSessionMessageState({
+        turn: { type: 'prompt', messageId: FIRST_MESSAGE_ID, prompt: 'old terminal prompt' },
+        agent: { mode: 'code', model: 'default-model' },
+      }),
+      status: 'failed',
+      terminalAt: 12,
+      completionSource: 'wrapper_failure',
+    });
+
+    const result = await harness.queue.admitSubmittedMessage({
+      userId: 'user_test' as UserId,
+      turn: { type: 'prompt', id: SECOND_MESSAGE_ID, prompt: 'new prompt' },
+    });
+
+    expect(result).toMatchObject({ success: true, messageId: SECOND_MESSAGE_ID });
+    expect(harness.events).toHaveLength(1);
+  });
+
+  it('repairs a queued admission whose queued event failed before prompt drain scheduling', async () => {
+    const harness = createQueueHarness({ failQueuedEventOnce: true });
+    const request = {
+      userId: 'user_test' as UserId,
+      turn: { type: 'prompt' as const, messageId: FIRST_MESSAGE_ID, prompt: 'repair admission' },
+      agent: { mode: 'code' as const, model: 'default-model' },
+    };
+
+    await expect(harness.queue.admitAcceptedMessage(request)).rejects.toThrow(
+      'failed to persist queued event'
+    );
+    const replay = await harness.queue.admitAcceptedMessage(request);
+
+    expect(replay).toMatchObject({
+      success: true,
+      outcome: 'queued',
+      compatibilityDelivery: 'queued',
+      messageId: FIRST_MESSAGE_ID,
+    });
+    expect(harness.events).toHaveLength(1);
+    expect(harness.alarmDeadlines).toHaveLength(1);
+  });
+
+  it('reschedules prompt drain without duplicating a persisted queued event on retry', async () => {
+    const harness = createQueueHarness({ failAlarmOnce: true });
+    const request = {
+      userId: 'user_test' as UserId,
+      turn: { type: 'prompt' as const, messageId: FIRST_MESSAGE_ID, prompt: 'repair drain' },
+      agent: { mode: 'code' as const, model: 'default-model' },
+    };
+
+    await expect(harness.queue.admitAcceptedMessage(request)).rejects.toThrow(
+      'failed to schedule prompt drain'
+    );
+    const replay = await harness.queue.admitAcceptedMessage(request);
+
+    expect(replay).toMatchObject({
+      success: true,
+      outcome: 'queued',
+      compatibilityDelivery: 'queued',
+      messageId: FIRST_MESSAGE_ID,
+    });
+    expect(harness.events).toHaveLength(1);
+    expect(harness.alarmDeadlines).toHaveLength(1);
+  });
+
+  it('has no registered-initial replay command on its current admission interface', () => {
+    const harness = createQueueHarness();
+
+    expect(harness.queue).not.toHaveProperty('enqueue');
+    expect(harness.queue).not.toHaveProperty('admitRegisteredInitial');
   });
 
   it('rejects command turns with images instead of dropping attachments', async () => {
     const harness = createQueueHarness();
 
-    const result = await harness.queue.enqueue({
-      kind: 'user-message',
+    const result = await harness.queue.admitSubmittedMessage({
       userId: 'user_test' as UserId,
       turn: {
         type: 'command',
@@ -462,8 +746,7 @@ describe('SessionMessageQueue', () => {
       );
     }
 
-    const result = await harness.queue.enqueue({
-      kind: 'user-message',
+    const result = await harness.queue.admitSubmittedMessage({
       userId: 'user_test' as UserId,
       turn: { type: 'prompt', id: FIRST_MESSAGE_ID, prompt: 'overflow' },
     });
@@ -476,8 +759,7 @@ describe('SessionMessageQueue', () => {
     const storage = createMemoryStorage(undefined, { failPutPrefix: 'session_message:' });
     const harness = createQueueHarness({ storage });
 
-    const result = await harness.queue.enqueue({
-      kind: 'user-message',
+    const result = await harness.queue.admitSubmittedMessage({
       userId: 'user_test' as UserId,
       turn: { type: 'prompt', id: FIRST_MESSAGE_ID, prompt: 'survive state write failure' },
     });
@@ -505,22 +787,29 @@ describe('SessionMessageQueue', () => {
         content: 'survived without queued state',
         createdAt: 123,
         callbackSnapshot: { required: true, target: callbackTarget },
-        executionOptions: { mode: 'plan', model: 'queued-model', variant: 'beta' },
+        executionOptions: {
+          mode: 'plan',
+          model: 'queued-model',
+          variant: 'beta',
+          autoCommit: false,
+          condenseOnComplete: false,
+        },
       })
     );
 
-    const result = await harness.queue.enqueue({
-      kind: 'user-message',
+    const result = await harness.queue.admitSubmittedMessage({
       userId: 'user_test' as UserId,
       turn: { type: 'prompt', id: FIRST_MESSAGE_ID, prompt: 'survived without queued state' },
+      agent: { mode: 'plan', model: 'queued-model', variant: 'beta' },
+      finalization: { autoCommit: false, condenseOnComplete: false },
     });
 
     const repairedState = await getSessionMessageState(harness.storage, FIRST_MESSAGE_ID);
     expect(result).toEqual({
       success: true,
-      status: 'started',
+      outcome: 'queued',
+      compatibilityDelivery: 'queued',
       messageId: FIRST_MESSAGE_ID,
-      delivery: 'queued',
     });
     expect(repairedState).toMatchObject({
       messageId: FIRST_MESSAGE_ID,
@@ -530,18 +819,195 @@ describe('SessionMessageQueue', () => {
       queuedAt: 123,
       callbackRequired: true,
       callbackTarget,
-      agent: { mode: 'plan', model: 'queued-model', variant: 'beta' },
+      admissionSnapshot: {
+        agent: { mode: 'plan', model: 'queued-model', variant: 'beta' },
+      },
     });
-    expect(harness.events).toHaveLength(0);
-    expect(harness.alarmDeadlines).toHaveLength(0);
+    expect(repairedState).not.toHaveProperty('agent');
+    expect(repairedState).not.toHaveProperty('finalization');
+    expect(harness.events).toHaveLength(1);
+    expect(harness.alarmDeadlines).toHaveLength(1);
+  });
+
+  it('retries queued effect completion before dispatch when reconstructed queued state already exists', async () => {
+    let dispatchCount = 0;
+    const harness = createQueueHarness({
+      failQueuedEventOnce: true,
+      deliver: async plan => {
+        dispatchCount += 1;
+        return {
+          success: true,
+          outcome: 'accepted',
+          messageId: plan.turn.messageId,
+          wrapperRunId: 'wr_test',
+        };
+      },
+    });
+    const intent = {
+      turn: { type: 'prompt' as const, messageId: FIRST_MESSAGE_ID, prompt: 'repair before send' },
+      agent: { mode: 'code', model: 'default-model' },
+    };
+    await storePendingSessionMessage(
+      harness.storage,
+      createPendingSessionMessageFromIntent(intent)
+    );
+
+    await expect(harness.queue.drainNextPendingMessage()).rejects.toThrow(
+      'failed to persist queued event'
+    );
+    expect(dispatchCount).toBe(0);
+    expect((await getSessionMessageState(harness.storage, FIRST_MESSAGE_ID))?.status).toBe(
+      'queued'
+    );
+
+    await harness.queue.drainNextPendingMessage();
+
+    expect(dispatchCount).toBe(1);
+    expect(harness.events).toHaveLength(1);
+  });
+
+  it('repairs queued lifecycle effects from pending intent before wrapper dispatch', async () => {
+    const dispatchObservations: Array<{ status?: string; queuedEventCount: number }> = [];
+    const harness = createQueueHarness({
+      deliver: async plan => {
+        dispatchObservations.push({
+          status: (await getSessionMessageState(harness.storage, plan.turn.messageId))?.status,
+          queuedEventCount: harness.events.length,
+        });
+        return {
+          success: true,
+          outcome: 'accepted',
+          messageId: plan.turn.messageId,
+          wrapperRunId: 'wr_test',
+        };
+      },
+    });
+    await storePendingSessionMessage(
+      harness.storage,
+      createPendingSessionMessageFromIntent({
+        turn: { type: 'prompt', messageId: FIRST_MESSAGE_ID, prompt: 'recover before dispatch' },
+        agent: { mode: 'code', model: 'default-model' },
+      })
+    );
+
+    await harness.queue.drainNextPendingMessage();
+
+    expect(dispatchObservations).toEqual([{ status: 'queued', queuedEventCount: 1 }]);
+    expect(harness.alarmDeadlines).toHaveLength(1);
+  });
+
+  it('keeps accepted pending residue when sent-effect repair fails so a later drain can retry it', async () => {
+    const deliver = vi.fn().mockResolvedValue({
+      success: true,
+      outcome: 'accepted',
+      messageId: FIRST_MESSAGE_ID,
+      wrapperRunId: 'wr_test',
+    });
+    const harness = createQueueHarness({
+      deliver,
+      ensureAcceptedMessageEffects: async () => {
+        throw new Error('sent event unavailable');
+      },
+    });
+    await storePendingSessionMessage(
+      harness.storage,
+      createPendingSessionMessageFromIntent({
+        turn: { type: 'prompt', messageId: FIRST_MESSAGE_ID, prompt: 'already accepted' },
+        agent: { mode: 'code', model: 'default-model' },
+      })
+    );
+    await putSessionMessageState(harness.storage, {
+      ...createQueuedSessionMessageState({
+        turn: { type: 'prompt', messageId: FIRST_MESSAGE_ID, prompt: 'already accepted' },
+        agent: { mode: 'code', model: 'default-model' },
+      }),
+      status: 'accepted',
+      acceptedAt: 3,
+      wrapperRunId: 'wr_existing',
+    });
+
+    await expect(harness.queue.drainNextPendingMessage()).rejects.toThrow('sent event unavailable');
+
+    expect(deliver).not.toHaveBeenCalled();
+    expect(await listPendingSessionMessages(harness.storage)).toHaveLength(1);
+  });
+
+  it('cleans accepted pending residue and repairs sent effects without redelivery', async () => {
+    const repaired: string[] = [];
+    const deliver = vi.fn().mockResolvedValue({
+      success: true,
+      outcome: 'accepted',
+      messageId: FIRST_MESSAGE_ID,
+      wrapperRunId: 'wr_test',
+    });
+    const harness = createQueueHarness({
+      deliver,
+      ensureAcceptedMessageEffects: async messageId => {
+        repaired.push(messageId);
+      },
+    });
+    await storePendingSessionMessage(
+      harness.storage,
+      createPendingSessionMessageFromIntent({
+        turn: { type: 'prompt', messageId: FIRST_MESSAGE_ID, prompt: 'already accepted' },
+        agent: { mode: 'code', model: 'default-model' },
+      })
+    );
+    await putSessionMessageState(harness.storage, {
+      ...createQueuedSessionMessageState({
+        turn: { type: 'prompt', messageId: FIRST_MESSAGE_ID, prompt: 'already accepted' },
+        agent: { mode: 'code', model: 'default-model' },
+      }),
+      status: 'accepted',
+      acceptedAt: 3,
+      wrapperRunId: 'wr_existing',
+    });
+
+    await harness.queue.drainNextPendingMessage();
+
+    expect(deliver).not.toHaveBeenCalled();
+    expect(repaired).toEqual([FIRST_MESSAGE_ID]);
+    expect(await listPendingSessionMessages(harness.storage)).toHaveLength(0);
+  });
+
+  it('cleans a stale pending row for terminal lifecycle state without redelivery', async () => {
+    const deliver = vi.fn().mockResolvedValue({
+      success: true,
+      outcome: 'accepted',
+      messageId: FIRST_MESSAGE_ID,
+      wrapperRunId: 'wr_test',
+    });
+    const harness = createQueueHarness({ deliver });
+    await storePendingSessionMessage(
+      harness.storage,
+      createPendingSessionMessageFromIntent({
+        turn: { type: 'prompt', messageId: FIRST_MESSAGE_ID, prompt: 'must not redeliver' },
+        agent: { mode: 'code', model: 'default-model' },
+      })
+    );
+    await putSessionMessageState(harness.storage, {
+      ...createQueuedSessionMessageState({
+        turn: { type: 'prompt', messageId: FIRST_MESSAGE_ID, prompt: 'must not redeliver' },
+        agent: { mode: 'code', model: 'default-model' },
+      }),
+      status: 'failed',
+      terminalAt: 3,
+      completionSource: 'delivery_failure',
+      terminalEffects: { event: 'pending', callback: { disposition: 'not-required' } },
+    });
+
+    const drain = await harness.queue.drainNextPendingMessage();
+
+    expect(deliver).not.toHaveBeenCalled();
+    expect(await listPendingSessionMessages(harness.storage)).toHaveLength(0);
+    expect(drain.remainingPendingCount).toBe(0);
   });
 
   it('hands exhausted queued delivery to settlement terminalization', async () => {
     const harness = createQueueHarness({
       deliver: async () => ({ success: false, code: 'BAD_REQUEST', error: 'invalid queued turn' }),
     });
-    await harness.queue.enqueue({
-      kind: 'user-message',
+    await harness.queue.admitSubmittedMessage({
       userId: 'user_test' as UserId,
       turn: { type: 'prompt', id: FIRST_MESSAGE_ID, prompt: 'terminalize me' },
     });
@@ -563,6 +1029,7 @@ describe('SessionMessageQueue', () => {
       },
     ]);
     expect(await listPendingSessionMessages(harness.storage)).toHaveLength(0);
+    expect(harness.finalizedTerminalCallbacks).toEqual([{ allowWithoutObservedIdle: true }]);
   });
 
   it('builds reconnect snapshots for pending and never-accepted terminal queued messages', async () => {
@@ -621,7 +1088,7 @@ describe('SessionMessageQueue', () => {
     ]);
   });
 
-  it('clears and terminalizes pending queued work on interrupt handoff', async () => {
+  it('terminalizes pending queued work before deleting it during interrupt handoff', async () => {
     const harness = createQueueHarness();
     const first = createPendingSessionMessage({
       messageId: FIRST_MESSAGE_ID,
@@ -643,8 +1110,8 @@ describe('SessionMessageQueue', () => {
         FIRST_MESSAGE_ID,
         SECOND_MESSAGE_ID,
       ]);
-      expect(await listPendingSessionMessages(harness.storage)).toEqual([]);
-      expect(harness.terminalizations).toEqual([]);
+      expect(await listPendingSessionMessages(harness.storage)).toEqual([first, second]);
+      expect(harness.terminalizations).toHaveLength(2);
     });
 
     expect(cleared.map((message: PendingSessionMessage) => message.messageId)).toEqual([
@@ -674,6 +1141,33 @@ describe('SessionMessageQueue', () => {
     ]);
   });
 
+  it('retains pending intent and fails interruption when durable state transition fails', async () => {
+    const harness = createQueueHarness({ failTerminalizationOnce: true });
+    const first = createPendingSessionMessage({
+      messageId: FIRST_MESSAGE_ID,
+      role: 'user',
+      content: 'first pending',
+      createdAt: 1,
+    });
+    const second = createPendingSessionMessage({
+      messageId: SECOND_MESSAGE_ID,
+      role: 'user',
+      content: 'second pending',
+      createdAt: 2,
+    });
+    await storePendingSessionMessage(harness.storage, first);
+    await storePendingSessionMessage(harness.storage, second);
+
+    await expect(harness.queue.interruptPendingQueuedMessages()).rejects.toThrow(
+      'terminal transition failed'
+    );
+
+    expect(harness.terminalizations).toHaveLength(0);
+    expect(
+      (await listPendingSessionMessages(harness.storage)).map(message => message.messageId)
+    ).toEqual([FIRST_MESSAGE_ID, SECOND_MESSAGE_ID]);
+  });
+
   it('terminalizes interrupted callback-required queued messages as idle-batch eligible', async () => {
     const harness = createQueueHarness({
       metadata: createMetadata({
@@ -682,8 +1176,7 @@ describe('SessionMessageQueue', () => {
         },
       }),
     });
-    await harness.queue.enqueue({
-      kind: 'user-message',
+    await harness.queue.admitSubmittedMessage({
       userId: 'user_test' as UserId,
       turn: { type: 'prompt', id: FIRST_MESSAGE_ID, prompt: 'callback queued prompt' },
     });

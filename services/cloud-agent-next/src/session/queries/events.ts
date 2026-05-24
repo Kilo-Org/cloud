@@ -252,6 +252,23 @@ export function createEventQueries(db: DrizzleSqliteDODatabase, rawSql: SqlStora
       return row.id;
     },
 
+    insertUnique(params: UpsertEventParams): EventId | null {
+      const row = db
+        .insert(events)
+        .values({
+          execution_id: params.executionId,
+          session_id: params.sessionId,
+          stream_event_type: params.streamEventType,
+          payload: params.payload,
+          timestamp: params.timestamp,
+          entity_id: params.entityId,
+        })
+        .onConflictDoNothing({ target: events.entity_id })
+        .returning({ id: events.id })
+        .get();
+      return row?.id ?? null;
+    },
+
     findByFilters(filters: EventQueryFilters): StoredEvent[] {
       const conditions = buildConditions(filters);
       const where = conditions.length > 0 ? and(...conditions) : undefined;

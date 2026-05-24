@@ -1,9 +1,14 @@
 import { describe, test, expect } from '@jest/globals';
-import { autoFreeModels, kiloExclusiveModels, requiresKiloDataCollection } from './models';
+import {
+  autoFreeModels,
+  findKiloExclusiveModel,
+  kiloExclusiveModels,
+  requiresKiloDataCollection,
+} from './models';
 import { isFreeModel } from './is-free-model';
 import { getInferenceProvider } from './providers/kilo-exclusive-model';
 import { claude_opus_4_7_stealth_model } from './providers/anthropic.constants';
-import { qwen36_plus_model } from './providers/qwen';
+import { isAlibabaDirectModel, qwen36_plus_model, qwen37_max_model } from './providers/qwen';
 
 describe('isFreeModel', () => {
   describe('free models', () => {
@@ -59,6 +64,14 @@ describe('isFreeModel', () => {
     test('routes the discounted Claude Opus offering through the stealth provider identity', () => {
       expect(getInferenceProvider(claude_opus_4_7_stealth_model)).toBe('stealth');
       expect(claude_opus_4_7_stealth_model.public_id).toBe('stealth/claude-opus-4.7');
+    });
+
+    test('routes Qwen3.7 Max directly through Alibaba', () => {
+      expect(findKiloExclusiveModel(qwen37_max_model.public_id)).toBe(qwen37_max_model);
+      expect(isAlibabaDirectModel(qwen37_max_model.public_id)).toBe(true);
+      expect(qwen37_max_model.gateway).toBe('alibaba');
+      expect(qwen37_max_model.internal_id).toBe('qwen3.7-max');
+      expect(getInferenceProvider(qwen37_max_model)).toBe('alibaba');
     });
 
     test('requires data collection for paid training-enabled offerings', () => {

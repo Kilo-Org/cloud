@@ -287,12 +287,38 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     );
   }
 
-  // Capture model classification once; provider selection may additionally
-  // make this specific request free by resolving a funded experiment route.
   const [isExperimentCandidate, isIntrinsicallyFreeModel] = await Promise.all([
     isPublicIdExperimented(originalModelIdLowerCased),
     isFreeModel(originalModelIdLowerCased),
   ]);
+
+  // For FREE models: check rate limit, log at start.
+  // Server-side products (cloud-agent, code-review, app-builder) rate-limit
+  // per user when the request comes from Cloudflare IPs (Kilo infrastructure).
+  // All other products rate-limit per IP (fast pre-auth path).
+  const isRateLimitedFreeModelRequest =
+    isKiloExclusiveFreeModel(originalModelIdLowerCased) ||
+    autoModel === KILO_AUTO_FREE_MODEL.id ||
+    isExperimentCandidate;
+  if (isRateLimitedFreeModelRequest) {
+    const rateLimit = await resolveRateLimit(feature, ipAddress, authPromise);
+    if (rateLimit instanceof NextResponse) return rateLimit;
+
+    if (!rateLimit.result.allowed) {
+      console.warn(
+        `Free model rate limit exceeded, ${rateLimit.subject}, model: ${originalModelIdLowerCased}, request count: ${rateLimit.result.requestCount}`
+      );
+      return NextResponse.json(
+        {
+          error: 'Rate limit exceeded',
+          error_type: ProxyErrorType.rate_limit_exceeded,
+          message:
+            'Free model usage limit reached. Please try again later or upgrade to a paid model.',
+        },
+        { status: 429 }
+      );
+    }
+  }
 
   // Now check auth
   const authSpan = startInactiveSpan({ name: 'auth-check' });
@@ -317,7 +343,32 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       return paidModelAuthRequiredResponse();
     }
 
-    // Provider selection validates whether a candidate request is actually funded.
+    const promotionLimit = await checkPromotionLimit(ipAddress);
+
+    if (!promotionLimit.allowed) {
+      console.warn(
+        `Promotion model limit exceeded, ip: ${ipAddress}, ` +
+          `model: ${originalModelIdLowerCased}, ` +
+          `requests: ${promotionLimit.requestCount}/${PROMOTION_MAX_REQUESTS} ` +
+          `in ${PROMOTION_WINDOW_HOURS}h window`
+      );
+
+      return NextResponse.json(
+        {
+          error: {
+            code: PROMOTION_MODEL_LIMIT_REACHED,
+            message:
+              'Sign up for free to continue and explore 500 other models. ' +
+              'Takes 2 minutes, no credit card required. Or come back later.',
+          },
+          error_type: ProxyErrorType.promotion_limit_reached,
+        },
+        { status: 401 } // TODO: Change to 429 once the extension supports it (see kilocode errorUtils.ts)
+      );
+    }
+
+    // Anonymous access for a possibly free request; provider selection below
+    // rejects stale experiment membership before any paid fallback is sent.
     user = createAnonymousContext(ipAddress);
     organizationId = undefined;
     botId = undefined;
@@ -333,6 +384,15 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     return storeAndPreviousResponseIdIsNotSupported();
   }
 
+  // Log to free_model_usage for rate limiting (at request start, before processing)
+  if (isRateLimitedFreeModelRequest) {
+    await logFreeModelRequest(
+      ipAddress,
+      originalModelIdLowerCased,
+      isAnonymousContext(user) ? undefined : user.id
+    );
+  }
+
   // Use new shared helper for fraud & project headers
   const { fraudHeaders, projectId } = extractFraudAndProjectHeaders(request);
   const providerResult = await getProvider({
@@ -343,7 +403,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     taskId,
     clientIp: ipAddress ?? null,
     machineId: machineIdHeader,
-    isExperimentCandidate,
   });
   if (providerResult.kind === 'not-found') {
     // Paused experiment for this public id — return a local model-unavailable
@@ -368,66 +427,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   // provider selection. It does not make ordinary fallback routing free.
   if (isAnonymousContext(user) && !isFreeRequest) {
     return paidModelAuthRequiredResponse();
-  }
-
-  // Provider-funded routes join the free-model rate-limiting path only after
-  // provider selection; stale membership cannot rate-limit or log paid fallback traffic.
-  const isRateLimitedFreeModelRequest =
-    isKiloExclusiveFreeModel(originalModelIdLowerCased) ||
-    autoModel === KILO_AUTO_FREE_MODEL.id ||
-    providerFunded;
-  if (isRateLimitedFreeModelRequest) {
-    const rateLimit = await resolveRateLimit(feature, ipAddress, authPromise);
-    if (rateLimit instanceof NextResponse) return rateLimit;
-
-    if (!rateLimit.result.allowed) {
-      console.warn(
-        `Free model rate limit exceeded, ${rateLimit.subject}, model: ${originalModelIdLowerCased}, request count: ${rateLimit.result.requestCount}`
-      );
-      return NextResponse.json(
-        {
-          error: 'Rate limit exceeded',
-          error_type: ProxyErrorType.rate_limit_exceeded,
-          message:
-            'Free model usage limit reached. Please try again later or upgrade to a paid model.',
-        },
-        { status: 429 }
-      );
-    }
-  }
-
-  if (isAnonymousContext(user)) {
-    const promotionLimit = await checkPromotionLimit(ipAddress);
-
-    if (!promotionLimit.allowed) {
-      console.warn(
-        `Promotion model limit exceeded, ip: ${ipAddress}, ` +
-          `model: ${originalModelIdLowerCased}, ` +
-          `requests: ${promotionLimit.requestCount}/${PROMOTION_MAX_REQUESTS} ` +
-          `in ${PROMOTION_WINDOW_HOURS}h window`
-      );
-
-      return NextResponse.json(
-        {
-          error: {
-            code: PROMOTION_MODEL_LIMIT_REACHED,
-            message:
-              'Sign up for free to continue and explore 500 other models. ' +
-              'Takes 2 minutes, no credit card required. Or come back later.',
-          },
-          error_type: ProxyErrorType.promotion_limit_reached,
-        },
-        { status: 401 } // TODO: Change to 429 once the extension supports it (see kilocode errorUtils.ts)
-      );
-    }
-  }
-
-  if (isRateLimitedFreeModelRequest) {
-    await logFreeModelRequest(
-      ipAddress,
-      originalModelIdLowerCased,
-      isAnonymousContext(user) ? undefined : user.id
-    );
   }
 
   // Request-level data-collection opt-out: a caller can set

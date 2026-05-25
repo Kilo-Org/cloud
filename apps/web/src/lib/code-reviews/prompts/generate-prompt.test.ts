@@ -135,7 +135,6 @@ const baseConfig = {
   focus_areas: [],
   custom_instructions: '',
   model_slug: 'test-model',
-  max_review_time_minutes: 30,
 } satisfies CodeReviewAgentConfig;
 
 describe('generateReviewPrompt', () => {

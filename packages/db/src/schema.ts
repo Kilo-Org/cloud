@@ -2831,7 +2831,6 @@ export const agent_configs = pgTable(
     //   "review_style": "balanced",
     //   "focus_areas": ["security", "performance"],
     //   "model_slug": "anthropic/claude-4.5-sonnet",
-    //   "max_review_time_minutes": 10,
     //   "custom_instructions": "..."
     // }
     config: jsonb().$type<CodeReviewAgentConfig | Record<string, unknown>>().notNull().default({}),

@@ -826,7 +826,6 @@ export const CodeReviewAgentConfigSchema = z.object({
   focus_areas: z.array(z.string()),
   auto_approve_minor: z.boolean().optional(),
   custom_instructions: z.string().nullable().optional(),
-  max_review_time_minutes: z.number().int().positive(),
   model_slug: z.string(),
   // Thinking effort variant name (e.g. "high", "max", "thinking") — null means model default
   thinking_effort: z

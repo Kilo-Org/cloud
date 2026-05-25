@@ -614,8 +614,24 @@ These constraints exist because of how the gateway is built today. The spec must
 - Identifier-less traffic; under v1 such requests fail closed as temporarily unavailable because missing IP is treated as a gateway invariant violation.
 - A/B variants spanning entirely different public model ids.
 - Client-visible variant ids or variant-aware UI behavior.
+- Response-side rewriting of the served `internal_id` back to the requested `public_id` for experiment traffic — see "Followup: rewrite checkpoint identity in experiment responses" below.
 - Partner trace export, redaction, HMAC webhooks, partner auth, and warehouse coordination (see [Part 2](./experimental-models-2.md)).
 - Replay bundles, SWE-bench/OpenHands adapters, and held-out replay-eval service (see [Part 2](./experimental-models-2.md)).
+
+## Followup: rewrite checkpoint identity in experiment responses
+
+Surfaced in PR #3325 review (P1). Experiment routing rewrites the outbound request to the variant's `upstream.internal_id` (in `buildDirectProvider`, applied via `body.model` before the partner fetch), but the response is returned to the client unchanged.
+
+The existing response-rewriting branch in `apps/web/src/app/api/openrouter/[...path]/route.ts:715,733` only runs for `kilo-exclusive` free traffic flowing through OpenRouter or Vercel — experiment providers carry `provider.id === 'custom'` and bypass it. As a result, OpenAI- and Anthropic-shape partner responses echo `internal_id` in the JSON body and in streaming `model:` events, disclosing the served checkpoint and variant to the client.
+
+This violates the client-blinding requirement from the Accepted Design ("Clients keep sending the same public model id" — line 112) and from the spec ("client blinding" — `Phase 6 — Specs + Tests`). A user could diff response payloads across requests to deduce their bucket assignment and observe checkpoint hot-swaps.
+
+Fix: rewrite `model` back to the requested `public_id` in experiment responses on the way out, mirroring the existing kilo-exclusive rewrite. Both response shapes need coverage:
+
+- Non-streaming JSON: replace `model` in the parsed body before returning.
+- Streaming SSE/event-stream: rewrite the per-chunk `model` field in chat-completions deltas, Anthropic `message_start` / `message_delta` events, and Responses-API `response.created` / `response.completed` events. The existing `rewriteFreeModelResponse_*` helpers in `apps/web/src/lib/ai-gateway/providers/openrouter/responses.ts` (and siblings) already implement this for the gateway-routed path; experiment traffic should reuse the same rewriters keyed on `experiment` rather than provider id, or the predicate at `route.ts:715` should be widened to "rewrite when the served model id differs from the requested public id" so the kilo-exclusive and experiment paths share one rule.
+
+Targeted test: end-to-end an experimented chat-completions and messages request, assert the streamed and final-JSON `model` values match the requested public id and never the variant's `internal_id`.
 
 ## Followup: unify direct-upstream routing abstraction
 

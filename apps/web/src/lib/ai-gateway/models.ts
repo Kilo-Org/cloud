@@ -10,6 +10,7 @@ import {
 } from '@/lib/ai-gateway/auto-model';
 import {
   CLAUDE_OPUS_CURRENT_MODEL_ID,
+  CLAUDE_OPUS_STEALTH_MODEL_ID,
   claude_opus_4_7_stealth_model,
   claude_sonnet_clawsetup_model,
   CLAUDE_SONNET_CURRENT_MODEL_ID,
@@ -50,6 +51,7 @@ export const preferredModels = [
   KILO_AUTO_FREE_MODEL.id,
   ...autoFreeModels,
   CLAUDE_OPUS_CURRENT_MODEL_ID,
+  CLAUDE_OPUS_STEALTH_MODEL_ID,
   KIMI_CURRENT_MODEL_ID,
   CLAUDE_SONNET_CURRENT_MODEL_ID,
   GPT_CURRENT_MODEL_ID,

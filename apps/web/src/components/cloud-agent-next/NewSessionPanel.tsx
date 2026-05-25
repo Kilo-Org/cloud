@@ -457,11 +457,29 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
       return;
     }
 
-    if (unifiedRepositories.length !== 1) return;
+    if (
+      isLoadingGitHubRepos ||
+      isLoadingGitLabRepos ||
+      githubRepoError ||
+      gitlabRepoError ||
+      unifiedRepositories.length !== 1
+    ) {
+      return;
+    }
     const onlyRepository = unifiedRepositories[0];
     if (!onlyRepository) return;
     handleRepoSelect(onlyRepository.fullName, false);
-  }, [recentRepos, unifiedRepositories, selectedRepo, isRepoUserSelected, handleRepoSelect]);
+  }, [
+    recentRepos,
+    unifiedRepositories,
+    selectedRepo,
+    isRepoUserSelected,
+    handleRepoSelect,
+    isLoadingGitHubRepos,
+    isLoadingGitLabRepos,
+    githubRepoError,
+    gitlabRepoError,
+  ]);
 
   // ---------------------------------------------------------------------------
   // Auto-select repo from pasted GitHub/GitLab URLs

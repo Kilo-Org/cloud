@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getUserFromAuth } from '@/lib/user/server';
 import { db } from '@/lib/drizzle';
 import { kilocode_users } from '@kilocode/db';
-import { isNull, count, sql } from 'drizzle-orm';
+import { and, isNull, count, not, or, sql, like } from 'drizzle-orm';
 import { normalizeEmail } from '@/lib/utils';
 
 export type NormalizedEmailCountsResponse = {
@@ -14,6 +14,15 @@ export type NormalizedEmailBackfillResponse = {
   remaining: boolean;
 };
 
+// Exclude GDPR-deleted users whose derived email values are intentionally cleared.
+export const normalizedEmailBackfillCandidates = and(
+  isNull(kilocode_users.normalized_email),
+  or(
+    isNull(kilocode_users.blocked_reason),
+    not(like(kilocode_users.blocked_reason, 'soft-deleted at %'))
+  )
+);
+
 export async function GET(): Promise<
   NextResponse<NormalizedEmailCountsResponse | { error: string }>
 > {
@@ -23,7 +32,7 @@ export async function GET(): Promise<
   const [result] = await db
     .select({ count: count() })
     .from(kilocode_users)
-    .where(isNull(kilocode_users.normalized_email));
+    .where(normalizedEmailBackfillCandidates);
 
   return NextResponse.json({ missing: result?.count ?? 0 });
 }
@@ -43,7 +52,7 @@ export async function POST(): Promise<
     const rows = await db
       .select({ id: kilocode_users.id, google_user_email: kilocode_users.google_user_email })
       .from(kilocode_users)
-      .where(isNull(kilocode_users.normalized_email))
+      .where(normalizedEmailBackfillCandidates)
       .limit(BATCH_SIZE);
 
     if (rows.length === 0) break;

@@ -23,6 +23,7 @@ export type BotUserForToken = {
 const WEBHOOK_BOT_ID_PREFIX = 'bot-webhook';
 const WEBHOOK_BOT_EMAIL_SUFFIX = 'webhook-bot';
 const WEBHOOK_BOT_DISPLAY_NAME = 'Webhook Bot';
+const BOT_EMAIL_DOMAIN = 'kilocode.internal';
 const BOT_AVATAR_PLACEHOLDER =
   'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDgiIGhlaWdodD0iNDgiIHZpZXdCb3g9IjAgMCA0OCA0OCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48Y2lyY2xlIGN4PSIyNCIgY3k9IjI0IiByPSIyNCIgZmlsbD0iIzY2NjY2NiIvPjwvc3ZnPg==';
 
@@ -31,7 +32,7 @@ export function generateBotUserId(organizationId: string): string {
 }
 
 export function generateBotUserEmail(organizationId: string): string {
-  return `${WEBHOOK_BOT_EMAIL_SUFFIX}-${organizationId}@kilocode.internal`;
+  return `${WEBHOOK_BOT_EMAIL_SUFFIX}-${organizationId}@${BOT_EMAIL_DOMAIN}`;
 }
 
 function generateApiTokenPepper(): string {
@@ -145,6 +146,8 @@ export async function ensureBotUserForOrg(db: WorkerDb, orgId: string): Promise<
   await db.insert(kilocode_users).values({
     id: botId,
     google_user_email: botEmail,
+    normalized_email: botEmail,
+    email_domain: BOT_EMAIL_DOMAIN,
     google_user_name: WEBHOOK_BOT_DISPLAY_NAME,
     google_user_image_url: BOT_AVATAR_PLACEHOLDER,
     stripe_customer_id: stripeCustomerId,

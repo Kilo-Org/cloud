@@ -5,6 +5,8 @@ import { kilocode_users, organization_memberships, type User } from '@kilocode/d
 import { eq, and } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
 import { logExceptInTest, errorExceptInTest } from '@/lib/utils.server';
+import { normalizeEmail } from '@/lib/utils';
+import { extractEmailDomain } from '@/lib/email-domain';
 import crypto from 'crypto';
 import type { BotType } from './types';
 import { generateBotUserId, generateBotUserEmail, getBotDisplayName } from './types';
@@ -53,6 +55,8 @@ async function createBotUser(organizationId: string, botType: BotType): Promise<
     .values({
       id: botId,
       google_user_email: botEmail,
+      normalized_email: normalizeEmail(botEmail),
+      email_domain: extractEmailDomain(botEmail),
       google_user_name: botName,
       google_user_image_url:
         'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDgiIGhlaWdodD0iNDgiIHZpZXdCb3g9IjAgMCA0OCA0OCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48Y2lyY2xlIGN4PSIyNCIgY3k9IjI0IiByPSIyNCIgZmlsbD0iIzY2NjY2NiIvPjwvc3ZnPg==', // Gray circle placeholder

@@ -384,15 +384,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     return storeAndPreviousResponseIdIsNotSupported();
   }
 
-  // Log to free_model_usage for rate limiting (at request start, before processing)
-  if (isRateLimitedFreeModelRequest) {
-    await logFreeModelRequest(
-      ipAddress,
-      originalModelIdLowerCased,
-      isAnonymousContext(user) ? undefined : user.id
-    );
-  }
-
   // Use new shared helper for fraud & project headers
   const { fraudHeaders, projectId } = extractFraudAndProjectHeaders(request);
   const providerResult = await getProvider({
@@ -427,6 +418,14 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   // provider selection. It does not make ordinary fallback routing free.
   if (isAnonymousContext(user) && !isFreeRequest) {
     return paidModelAuthRequiredResponse();
+  }
+
+  if (isRateLimitedFreeModelRequest) {
+    await logFreeModelRequest(
+      ipAddress,
+      originalModelIdLowerCased,
+      isAnonymousContext(user) ? undefined : user.id
+    );
   }
 
   // Request-level data-collection opt-out: a caller can set

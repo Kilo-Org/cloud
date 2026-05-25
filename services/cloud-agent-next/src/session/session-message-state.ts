@@ -419,7 +419,7 @@ type NeverAcceptedTerminalQueuedMessageState = SessionMessageState & {
   status: 'failed' | 'interrupted';
 };
 
-export async function listNeverAcceptedTerminalQueuedMessages(
+export async function listReconnectVisibleTerminalQueuedMessages(
   storage: SessionMessageStorage
 ): Promise<NeverAcceptedTerminalQueuedMessageState[]> {
   const entries = await listSessionMessageStates(storage);
@@ -428,7 +428,14 @@ export async function listNeverAcceptedTerminalQueuedMessages(
       state.acceptedAt === undefined &&
       state.queuedAt !== undefined &&
       (state.status === 'failed' || state.status === 'interrupted') &&
-      (state.completionSource === 'delivery_failure' || state.completionSource === 'interrupt')
+      (state.completionSource === 'delivery_failure' || state.completionSource === 'interrupt') &&
+      !entries.some(
+        laterState =>
+          (laterState.acceptedAt !== undefined ||
+            laterState.status === 'accepted' ||
+            laterState.status === 'completed') &&
+          (laterState.queuedAt ?? laterState.createdAt) > (state.queuedAt ?? state.createdAt)
+      )
   );
 }
 

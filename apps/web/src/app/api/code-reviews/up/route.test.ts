@@ -165,7 +165,9 @@ describe('GET /api/code-reviews/up', () => {
       .values([
         reviewValues({ status: 'failed', terminal_reason: 'timeout' }),
         reviewValues({ status: 'failed', terminal_reason: 'timeout' }),
-        ...Array.from({ length: 18 }, () => reviewValues()),
+        reviewValues({ status: 'failed', terminal_reason: 'timeout' }),
+        reviewValues({ status: 'failed', terminal_reason: 'timeout' }),
+        ...Array.from({ length: 16 }, () => reviewValues()),
       ]);
 
     const response = await GET(makeRequest('kilo-code-reviews-health-check'));
@@ -179,12 +181,12 @@ describe('GET /api/code-reviews/up', () => {
           kind: 'error_spike',
           label: 'Error Spike',
           severity: 'ticket',
-          rate: 0.1,
+          rate: 0.2,
           startedCount: 20,
-          errorCount: 2,
+          errorCount: 4,
           windowMinutes: 30,
           topReason: 'timeout',
-          topReasonCount: 2,
+          topReasonCount: 4,
           adminUrl: expect.stringContaining('/admin/code-reviews'),
           runbookUrl: CODE_REVIEW_RUNBOOK_URL,
         },
@@ -200,7 +202,13 @@ describe('GET /api/code-reviews/up', () => {
         terminal_reason: null,
         error_message: 'Model not found: kilo/retired-model',
       }),
-      ...Array.from({ length: 18 }, () => reviewValues()),
+      reviewValues({ status: 'cancelled', terminal_reason: 'model_not_found' }),
+      reviewValues({
+        status: 'failed',
+        terminal_reason: null,
+        error_message: 'Model not found: kilo/another-retired-model',
+      }),
+      ...Array.from({ length: 16 }, () => reviewValues()),
     ]);
 
     const response = await GET(makeRequest('kilo-code-reviews-health-check'));
@@ -216,7 +224,9 @@ describe('GET /api/code-reviews/up', () => {
       .values([
         reviewValues({ status: 'failed', error_message: 'Repository not found' }),
         reviewValues({ status: 'failed', error_message: 'Session not found' }),
-        ...Array.from({ length: 18 }, () => reviewValues()),
+        reviewValues({ status: 'failed', error_message: 'Checkout failed' }),
+        reviewValues({ status: 'failed', error_message: 'GitHub unavailable' }),
+        ...Array.from({ length: 16 }, () => reviewValues()),
       ]);
 
     const response = await GET(makeRequest('kilo-code-reviews-health-check'));
@@ -225,7 +235,7 @@ describe('GET /api/code-reviews/up', () => {
     const body = await response.json();
     expect(body).toMatchObject({
       healthy: false,
-      alerts: [expect.objectContaining({ kind: 'error_spike', errorCount: 2 })],
+      alerts: [expect.objectContaining({ kind: 'error_spike', errorCount: 4, rate: 0.2 })],
     });
   });
 
@@ -258,6 +268,8 @@ describe('GET /api/code-reviews/up', () => {
           completed_at: minutesAgo(10),
         })
       ),
+      reviewValues({ status: 'failed', terminal_reason: 'timeout' }),
+      reviewValues({ status: 'failed', terminal_reason: 'timeout' }),
       reviewValues({ status: 'failed', terminal_reason: 'timeout' }),
       reviewValues({ status: 'failed', terminal_reason: 'timeout' }),
       reviewValues({ status: 'failed', terminal_reason: 'timeout' }),

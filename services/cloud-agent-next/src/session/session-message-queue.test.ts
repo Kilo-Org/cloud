@@ -1088,6 +1088,92 @@ describe('SessionMessageQueue', () => {
     ]);
   });
 
+  it('omits a reconnect delivery failure after a later turn completed', async () => {
+    const harness = createQueueHarness();
+    await putSessionMessageState(harness.storage, {
+      ...createQueuedSessionMessageState(
+        {
+          turn: {
+            type: 'prompt',
+            messageId: FIRST_MESSAGE_ID,
+            prompt: 'failed before acceptance',
+          },
+          agent: { mode: 'code', model: 'default-model' },
+        },
+        undefined,
+        10
+      ),
+      status: 'failed',
+      terminalAt: 30,
+      completionSource: 'delivery_failure',
+      failureReason: 'exhausted',
+      error: 'delivery exhausted',
+      attempts: 1,
+    });
+    await putSessionMessageState(harness.storage, {
+      ...createQueuedSessionMessageState(
+        {
+          turn: {
+            type: 'prompt',
+            messageId: SECOND_MESSAGE_ID,
+            prompt: 'delivered later',
+          },
+          agent: { mode: 'code', model: 'default-model' },
+        },
+        undefined,
+        40
+      ),
+      status: 'completed',
+      acceptedAt: 50,
+      terminalAt: 60,
+      completionSource: 'assistant_message_event',
+    });
+
+    await expect(harness.queue.snapshotForStreamConnect()).resolves.toEqual([]);
+  });
+
+  it('omits a reconnect delivery failure while a later turn is accepted', async () => {
+    const harness = createQueueHarness();
+    await putSessionMessageState(harness.storage, {
+      ...createQueuedSessionMessageState(
+        {
+          turn: {
+            type: 'prompt',
+            messageId: FIRST_MESSAGE_ID,
+            prompt: 'failed before acceptance',
+          },
+          agent: { mode: 'code', model: 'default-model' },
+        },
+        undefined,
+        10
+      ),
+      status: 'failed',
+      terminalAt: 30,
+      completionSource: 'delivery_failure',
+      failureReason: 'exhausted',
+      error: 'delivery exhausted',
+      attempts: 1,
+    });
+    await putSessionMessageState(harness.storage, {
+      ...createQueuedSessionMessageState(
+        {
+          turn: {
+            type: 'prompt',
+            messageId: SECOND_MESSAGE_ID,
+            prompt: 'currently running',
+          },
+          agent: { mode: 'code', model: 'default-model' },
+        },
+        undefined,
+        40
+      ),
+      status: 'accepted',
+      acceptedAt: 50,
+    });
+
+    await expect(harness.queue.snapshotForStreamConnect()).resolves.toEqual([]);
+  });
+
   it('terminalizes pending queued work before deleting it during interrupt handoff', async () => {
     const harness = createQueueHarness();
     const first = createPendingSessionMessage({

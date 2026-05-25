@@ -70,6 +70,27 @@ const TOKENS_128K = 128 * 1024;
 const TOKENS_256K = 256 * 1024;
 const TOKENS_1M = 1024 * 1024;
 
+export const qwen37_max_model: KiloExclusiveModel = {
+  public_id: 'qwen/qwen3.7-max',
+  display_name: 'Qwen: Qwen3.7 Max',
+  description:
+    "Qwen3.7-Max is the flagship model in Alibaba's Qwen3.7 series. It is designed for agent-centric workloads, with particular strengths in coding, office and productivity tasks, and long-horizon autonomous execution.",
+  context_length: 1_000_000,
+  max_completion_tokens: 65_536,
+  status: 'public',
+  flags: ['reasoning'],
+  gateway: 'alibaba',
+  internal_id: 'qwen3.7-max',
+  pricing: makeFlatPricing({
+    prompt_per_million: 2.5,
+    completion_per_million: 7.5,
+    input_cache_read_per_million: 0.25,
+    input_cache_write_per_million: 3.125,
+  }),
+  exclusive_to: [],
+  inference_provider_restriction: [],
+};
+
 export const qwen36_plus_model: KiloExclusiveModel = {
   public_id: 'qwen/qwen3.6-plus',
   display_name: 'Qwen: Qwen3.6 Plus',
@@ -197,6 +218,7 @@ export const qwen36_27b_model: KiloExclusiveModel = {
 };
 
 export const alibabaDirectModels: ReadonlyArray<KiloExclusiveModel> = [
+  qwen37_max_model,
   qwen36_plus_model,
   qwen36_flash_model,
   qwen36_max_preview_model,

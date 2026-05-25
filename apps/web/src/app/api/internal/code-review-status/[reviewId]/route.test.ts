@@ -17,6 +17,9 @@ const mockGetCodeReviewById = jest.fn() as jest.MockedFunction<
 const mockUpdateCodeReviewStatus = jest.fn() as jest.MockedFunction<
   typeof codeReviewsDbModule.updateCodeReviewStatus
 >;
+const mockUpdateCodeReviewStatusIfNonTerminal = jest.fn() as jest.MockedFunction<
+  typeof codeReviewsDbModule.updateCodeReviewStatusIfNonTerminal
+>;
 const mockUpdateCodeReviewUsage = jest.fn() as jest.MockedFunction<
   typeof codeReviewsDbModule.updateCodeReviewUsage
 >;
@@ -71,11 +74,6 @@ const mockCaptureMessage = jest.fn<any>();
 const mockAppendReviewSummaryFooter = jest.fn<any>();
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const mockRetryReviewFresh = jest.fn<any>();
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const mockDbExecute = jest.fn<any>();
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const mockDbTransaction = jest.fn<any>();
-type MockDbTransactionCallback = (tx: { execute: typeof mockDbExecute }) => Promise<unknown>;
 
 // --- Module mocks ---
 
@@ -86,6 +84,7 @@ jest.mock('@/lib/config.server', () => ({
 jest.mock('@/lib/code-reviews/db/code-reviews', () => ({
   getCodeReviewById: mockGetCodeReviewById,
   updateCodeReviewStatus: mockUpdateCodeReviewStatus,
+  updateCodeReviewStatusIfNonTerminal: mockUpdateCodeReviewStatusIfNonTerminal,
   updateCodeReviewUsage: mockUpdateCodeReviewUsage,
   getSessionUsageFromBilling: mockGetSessionUsageFromBilling,
   updateCodeReviewAttemptForCallback: mockUpdateCodeReviewAttemptForCallback,
@@ -145,13 +144,6 @@ jest.mock('@/lib/code-reviews/summary/usage-footer', () => ({
 
 jest.mock('@/lib/constants', () => ({
   APP_URL: 'https://test.kilo.ai',
-}));
-
-jest.mock('@/lib/drizzle', () => ({
-  db: {
-    transaction: mockDbTransaction,
-  },
-  sql: (jest.requireActual('drizzle-orm') as { sql: unknown }).sql,
 }));
 
 jest.mock('@/lib/integrations/core/constants', () => ({
@@ -337,11 +329,8 @@ beforeEach(async () => {
   mockUpdateKiloReviewNote.mockResolvedValue(undefined);
   mockGetSessionUsageFromBilling.mockResolvedValue(null);
   mockUpdateCodeReviewUsage.mockResolvedValue(undefined);
+  mockUpdateCodeReviewStatusIfNonTerminal.mockResolvedValue(true);
   mockAppendReviewSummaryFooter.mockReturnValue('body with footer');
-  mockDbExecute.mockResolvedValue({ rows: [] });
-  mockDbTransaction.mockImplementation(async (callback: MockDbTransactionCallback) =>
-    callback({ execute: mockDbExecute })
-  );
   ({ POST } = await import('./route'));
 });
 
@@ -529,7 +518,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
           terminalReason: 'model_not_found',
         })
       );
-      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+      expect(mockUpdateCodeReviewStatusIfNonTerminal).toHaveBeenCalledWith(
         REVIEW_ID,
         'cancelled',
         expect.objectContaining({
@@ -549,7 +538,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         makeParams(REVIEW_ID)
       );
 
-      expect(mockUpdateCodeReviewStatus).toHaveBeenLastCalledWith(
+      expect(mockUpdateCodeReviewStatusIfNonTerminal).toHaveBeenLastCalledWith(
         REVIEW_ID,
         'cancelled',
         expect.objectContaining({ terminalReason: 'model_not_found' })
@@ -1375,7 +1364,6 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         makeParams(REVIEW_ID)
       );
 
-      expect(mockDbTransaction).toHaveBeenCalledTimes(1);
       expect(mockFindKiloReviewComment).toHaveBeenCalledWith(
         'inst-1',
         'owner',
@@ -1433,7 +1421,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       );
 
       expect(response.status).toBe(200);
-      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+      expect(mockUpdateCodeReviewStatusIfNonTerminal).toHaveBeenCalledWith(
         REVIEW_ID,
         'cancelled',
         expect.objectContaining({ terminalReason: 'model_not_found' })
@@ -1466,10 +1454,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       );
 
       jest.clearAllMocks();
-      mockDbExecute.mockResolvedValue({ rows: [] });
-      mockDbTransaction.mockImplementation(async (callback: MockDbTransactionCallback) =>
-        callback({ execute: mockDbExecute })
-      );
+      mockUpdateCodeReviewStatusIfNonTerminal.mockResolvedValue(true);
       mockGetCodeReviewById.mockResolvedValue(
         makeReview({ platform: 'gitlab', platform_project_id: 42, check_run_id: null })
       );
@@ -1493,9 +1478,13 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       expect(mockCreateMRNote).not.toHaveBeenCalled();
     });
 
-    it('serializes summary upserts before parent terminal persistence', async () => {
+    it('claims the terminal update before publishing a model-unavailable summary', async () => {
       const callOrder: string[] = [];
       mockGetCodeReviewById.mockResolvedValue(makeReview());
+      mockUpdateCodeReviewStatusIfNonTerminal.mockImplementation(async () => {
+        callOrder.push('update-parent');
+        return true;
+      });
       mockFindKiloReviewComment.mockImplementation(async () => {
         callOrder.push('find-summary');
         return null;
@@ -1503,17 +1492,28 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       mockCreatePRComment.mockImplementation(async () => {
         callOrder.push('create-summary');
       });
-      mockUpdateCodeReviewStatus.mockImplementation(async () => {
-        callOrder.push('update-parent');
-      });
 
       await POST(
         makeRequest({ status: 'failed', errorMessage: 'Model not found: kilo/retired-model' }),
         makeParams(REVIEW_ID)
       );
 
-      expect(mockDbExecute).toHaveBeenCalled();
-      expect(callOrder).toEqual(['find-summary', 'create-summary', 'update-parent']);
+      expect(callOrder).toEqual(['update-parent', 'find-summary', 'create-summary']);
+    });
+
+    it('does not publish a duplicate summary if another callback claimed cancellation', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+      mockUpdateCodeReviewStatusIfNonTerminal.mockResolvedValue(false);
+
+      const response = await POST(
+        makeRequest({ status: 'failed', errorMessage: 'Model not found: kilo/retired-model' }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockFindKiloReviewComment).not.toHaveBeenCalled();
+      expect(mockCreatePRComment).not.toHaveBeenCalled();
+      expect(mockUpdateCodeReviewStatus).not.toHaveBeenCalled();
     });
   });
 

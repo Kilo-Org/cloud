@@ -20,6 +20,7 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import {
   updateCodeReviewStatus,
+  updateCodeReviewStatusIfNonTerminal,
   updateCodeReviewUsage,
   getCodeReviewById,
   getSessionUsageFromBilling,
@@ -54,7 +55,6 @@ import {
   getValidGitLabToken,
   getStoredProjectAccessToken,
 } from '@/lib/integrations/gitlab-service';
-import { db, sql } from '@/lib/drizzle';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { CALLBACK_TOKEN_SECRET } from '@/lib/config.server';
 import { verifyCallbackToken } from '@kilocode/worker-utils/callback-token';
@@ -436,84 +436,79 @@ async function upsertModelNotFoundSummary(
   gitlabAccessToken?: string
 ): Promise<void> {
   const platform = review.platform || 'github';
-  const lockKey = `code-review-model-not-found-summary:${platform}:${review.repo_full_name}:${review.pr_number}`;
 
-  await db.transaction(async tx => {
-    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`);
+  if (platform === 'github' && integration.platform_installation_id) {
+    const [repoOwner, repoName] = review.repo_full_name.split('/');
+    const appType: GitHubAppType = integration.github_app_type || 'standard';
+    const existing = await findKiloReviewComment(
+      integration.platform_installation_id,
+      repoOwner,
+      repoName,
+      review.pr_number,
+      appType
+    );
 
-    if (platform === 'github' && integration.platform_installation_id) {
-      const [repoOwner, repoName] = review.repo_full_name.split('/');
-      const appType: GitHubAppType = integration.github_app_type || 'standard';
-      const existing = await findKiloReviewComment(
+    if (existing) {
+      await updateKiloReviewComment(
+        integration.platform_installation_id,
+        repoOwner,
+        repoName,
+        existing.commentId,
+        MODEL_NOT_FOUND_SUMMARY_BODY,
+        appType
+      );
+    } else {
+      await createPRComment(
         integration.platform_installation_id,
         repoOwner,
         repoName,
         review.pr_number,
+        MODEL_NOT_FOUND_SUMMARY_BODY,
         appType
       );
-
-      if (existing) {
-        await updateKiloReviewComment(
-          integration.platform_installation_id,
-          repoOwner,
-          repoName,
-          existing.commentId,
-          MODEL_NOT_FOUND_SUMMARY_BODY,
-          appType
-        );
-      } else {
-        await createPRComment(
-          integration.platform_installation_id,
-          repoOwner,
-          repoName,
-          review.pr_number,
-          MODEL_NOT_FOUND_SUMMARY_BODY,
-          appType
-        );
-      }
-
-      logExceptInTest(
-        `[code-review-status] Upserted model unavailable summary on ${review.repo_full_name}#${review.pr_number}`
-      );
-      return;
     }
 
-    if (platform === PLATFORM.GITLAB) {
-      const instanceUrl = getGitLabInstanceUrl(integration);
-      const accessToken =
-        gitlabAccessToken ??
-        (await resolveGitLabAccessToken(integration, review.platform_project_id));
-      const existing = await findKiloReviewNote(
+    logExceptInTest(
+      `[code-review-status] Upserted model unavailable summary on ${review.repo_full_name}#${review.pr_number}`
+    );
+    return;
+  }
+
+  if (platform === PLATFORM.GITLAB) {
+    const instanceUrl = getGitLabInstanceUrl(integration);
+    const accessToken =
+      gitlabAccessToken ??
+      (await resolveGitLabAccessToken(integration, review.platform_project_id));
+    const existing = await findKiloReviewNote(
+      accessToken,
+      review.repo_full_name,
+      review.pr_number,
+      instanceUrl
+    );
+
+    if (existing) {
+      await updateKiloReviewNote(
         accessToken,
         review.repo_full_name,
         review.pr_number,
+        existing.noteId,
+        MODEL_NOT_FOUND_SUMMARY_BODY,
         instanceUrl
       );
-
-      if (existing) {
-        await updateKiloReviewNote(
-          accessToken,
-          review.repo_full_name,
-          review.pr_number,
-          existing.noteId,
-          MODEL_NOT_FOUND_SUMMARY_BODY,
-          instanceUrl
-        );
-      } else {
-        await createMRNote(
-          accessToken,
-          review.repo_full_name,
-          review.pr_number,
-          MODEL_NOT_FOUND_SUMMARY_BODY,
-          instanceUrl
-        );
-      }
-
-      logExceptInTest(
-        `[code-review-status] Upserted model unavailable summary on GitLab MR ${review.repo_full_name}!${review.pr_number}`
+    } else {
+      await createMRNote(
+        accessToken,
+        review.repo_full_name,
+        review.pr_number,
+        MODEL_NOT_FOUND_SUMMARY_BODY,
+        instanceUrl
       );
     }
-  });
+
+    logExceptInTest(
+      `[code-review-status] Upserted model unavailable summary on GitLab MR ${review.repo_full_name}!${review.pr_number}`
+    );
+  }
 }
 
 /**
@@ -913,27 +908,7 @@ export async function POST(
       }
     }
 
-    if (
-      integration &&
-      status === 'cancelled' &&
-      isModelNotFoundCodeReviewTerminalReason(terminalReason, errorMessage)
-    ) {
-      try {
-        await upsertModelNotFoundSummary(review, integration, gitlabAccessToken);
-      } catch (summaryError) {
-        logExceptInTest(
-          '[code-review-status] Failed to upsert model unavailable summary:',
-          summaryError
-        );
-        captureException(summaryError, {
-          tags: { source: 'code-review-status-model-not-found-summary' },
-          extra: { reviewId, platform: review.platform || 'github' },
-        });
-      }
-    }
-
-    // Update review status in database
-    await updateCodeReviewStatus(reviewId, status, {
+    const parentStatusUpdates = {
       sessionId,
       cliSessionId,
       errorMessage,
@@ -948,7 +923,44 @@ export async function POST(
         status === 'completed' || status === 'failed' || status === 'cancelled'
           ? new Date()
           : undefined,
-    });
+    };
+
+    if (
+      integration &&
+      status === 'cancelled' &&
+      isModelNotFoundCodeReviewTerminalReason(terminalReason, errorMessage)
+    ) {
+      const claimedTerminalUpdate = await updateCodeReviewStatusIfNonTerminal(
+        reviewId,
+        status,
+        parentStatusUpdates
+      );
+      if (!claimedTerminalUpdate) {
+        logExceptInTest(
+          '[code-review-status] Model unavailable cancellation was already persisted, skipping summary upsert',
+          { reviewId }
+        );
+        return NextResponse.json({
+          success: true,
+          message: 'Review already in terminal state',
+        });
+      }
+
+      try {
+        await upsertModelNotFoundSummary(review, integration, gitlabAccessToken);
+      } catch (summaryError) {
+        logExceptInTest(
+          '[code-review-status] Failed to upsert model unavailable summary:',
+          summaryError
+        );
+        captureException(summaryError, {
+          tags: { source: 'code-review-status-model-not-found-summary' },
+          extra: { reviewId, platform: review.platform || 'github' },
+        });
+      }
+    } else {
+      await updateCodeReviewStatus(reviewId, status, parentStatusUpdates);
+    }
 
     logExceptInTest('[code-review-status] Updated review status', {
       reviewId,

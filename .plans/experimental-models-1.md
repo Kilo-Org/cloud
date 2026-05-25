@@ -16,8 +16,8 @@
 | Phase 2 — Gateway Header Capture | [done] | Gateway captures `x-kilo-request`, `x-kilo-session`, and `x-kilocode-machineid`, and passes the client request id, session id, machine id, and client IP into routing/usage context. |
 | Phase 3 — Variant Picker + Routing | [done] | Experimented public ids route through the deterministic picker, load routing details from Postgres after Redis membership pre-check, and go directly to the selected partner upstream. |
 | Phase 4 — Usage, Metrics, Reporting | [done-core] | Attribution rows and R2 prompt bodies are written after microdollar usage. Admin request log reads the rows inline. Live aggregate reporting and `model_experiment_request_stats` are deferred until a report consumer needs them. |
-| Phase 5 — Admin tRPC + UI | [done-core] | Admin CRUD, state transitions, variant version hot-swap, key rotation, UI tab, and request log exist. `getLiveStats` and prompt inflation via `getPromptByHash` are still deferred. |
-| Phase 6 — Specs + Tests | [partial] | Router, picker, prompt persistence, partitioning, and soft-delete policy tests exist. Durable spec file `.specs/model-experiments.md` and AGENTS registration are still owed. |
+| Phase 5 — Admin tRPC + UI | [done-core] | Admin CRUD, state transitions, variant version hot-swap, key rotation, UI tab, request log, and prompt-body download exist. `getLiveStats` and inline prompt inflation via tRPC are still deferred. |
+| Phase 6 — Specs + Tests | [done-core] | Durable rules now live in `.specs/model-experiments.md` and are registered in `AGENTS.md`. Router, picker, prompt persistence, partitioning, and soft-delete policy tests exist; response client-blinding tests remain with the response-rewrite follow-up below. |
 
 **Current schema:**
 
@@ -82,7 +82,7 @@ Operational consequence: admin mutations that move experiments into or out of ro
 **Phase 5 — deferred:**
 
 - `getLiveStats(id)` tRPC procedure — still deferred until a real aggregate reporting consumer needs a stable query/result shape.
-- `getPromptByHash(sha)` tRPC procedure and admin prompt inflation — R2 helpers exist, but the admin UI renders hashes/sentinels rather than inflating prompt content.
+- Inline prompt inflation via a `getPromptByHash(sha)` tRPC procedure — R2 helpers exist, and admins can already download captured bodies through the request browser.
 
 > **Scope: preview/experimental models only.** This system exists to A/B test
 > unreleased model checkpoints in partnership with model providers. It is **not**
@@ -100,19 +100,9 @@ Operational consequence: admin mutations that move experiments into or out of ro
 
 Run A/B tests against model checkpoints in partnership with model providers, especially during preview / early development. Providers should be able to compare variants on real production traffic while Kilo can deliver clean per-checkpoint results without exposing experiment assignment to clients.
 
-### Accepted Design
+### Durable Rules
 
-| Area | Decision |
-|---|---|
-| Experiment scope | One experiment targets one public model id (`public_id`) and swaps the upstream checkpoint (`internal_id`) behind it. Clients keep sending the same public model id. |
-| Allocation | N variants with positive integer weights (no sum constraint). Bucketing is deterministic on the first available subject: `kilo_user_id` → `machine_id` → `client_ip`. Missing all allocation subjects is an invariant violation and returns temporarily unavailable. |
-| Anonymous traffic | Anonymous / free-tier traffic is bucketed when `machine_id` or IP is available. `machine` and `ip` cohorts are less stable than authenticated `user` cohorts, so every request records `allocation_subject` for reporting filters. A request with no IP is treated as a gateway bug and fails closed. |
-| Client blinding | Variant id is not disclosed to the client. No `x-kilo-experiment`, no `x-kilo-variant`, and no payload field. Provider reports receive aggregate variant/checkpoint labels only. |
-| Checkpoint replacement | A provider may replace the upstream config (`internal_id`, `base_url`, `api_key`, transforms) on a live variant without ending the experiment, as long as variant slots and weights are unchanged. Users stay pinned to the same variant slot. |
-| Structural edits | Adding/removing variants or changing weights is allowed only before activation. After activation, structural changes require a new experiment because they shift bucket ranges and corrupt longitudinal cohorts. Hot-swapping a checkpoint is not structural; it is a new `model_experiment_variant_version` row under an existing variant slot. |
-| Per-request snapshot | Experimented requests get one row in `model_experiment_request`, keyed by `usage_id`. That row stores the exact checkpoint selected at routing time. Users are pinned to a variant slot, not necessarily to the same checkpoint forever; if variant A moves from `rc1` to `rc2`, old rows remain attributable to `rc1` and new rows to `rc2`. |
-| Feedback attribution | Gateway stores `x-kilo-request` as `model_experiment_request.client_request_id`. PostHog `Feedback Submitted.parentMessageID` joins to that value, and the experiment request row carries the variant/checkpoint snapshot. |
-| Storage | Experiment definitions and routing details live in Postgres. Gateway hot-path pre-checks use an admin-maintained Redis membership key plus a short in-process cache. |
+The durable business rules and invariants now live in `.specs/model-experiments.md`. This plan records implementation history, current state, and follow-up engineering work. If the plan and spec disagree on product behavior, update the spec first and then adjust this plan to match.
 
 ### Existing Building Blocks
 
@@ -234,37 +224,7 @@ Fields deliberately **not** included (and why): `organization_ids` (the experime
 
 `model_experiment_variant` is the slot identity (label, weight, allocation share). `model_experiment_variant_version` is the immutable RC instance held by that slot at a point in time. Hot-swapping an RC is a pure INSERT into `model_experiment_variant_version`; the variant row is not modified. The "current version of variant V at time T" is computed as `SELECT ... FROM model_experiment_variant_version WHERE variant_id = V AND effective_at <= T ORDER BY effective_at DESC, id DESC LIMIT 1` (id used as deterministic tiebreaker for ties at the same millisecond). The picker loads routing details from Postgres after the Redis membership pre-check says the public id is experimented. Old version rows are never modified or deleted, so per-request attribution stays exact via the `variant_version_id` FK on `model_experiment_request` with no snapshot columns and no date-comparison joins. `experiment_id` is reachable via `variant_version_id → variant_id → experiment_id`; storing it on the request row would be denormalization, omitted unless query plans show it's needed.
 
-Admin-router invariants:
-
-- Active experiments must have at least two variants, each with `weight > 0`. No sum constraint — bucketing uses `getRandomNumber(seed, sumOfWeights)` and cumulative walk; UI shows per-variant share as `weight / sum(weights)`.
-- Active experiments must have every variant with at least one `model_experiment_variant_version` row whose `effective_at <= now()`. Future-dated versions don't count toward "ready to route."
-- Only one routing-relevant experiment can exist per `public_model_id` at a time, where "routing-relevant" means status in (`active`, `paused`). Enforced by partial unique index `WHERE status IN ('active', 'paused')`. `completed` and `draft` are unconstrained — you can have a completed historical experiment alongside a draft replacement queued up, or multiple completed historicals.
-- Variants in any non-terminal state (`draft`, `active`, `paused`) may change `label` (cosmetic) and may receive a new `model_experiment_variant_version` insert (the hot-swap operation).
-- Variants may not change `weight` or experiment structure (add/remove) after activation. Structural edits are draft-only; once an experiment has been activated, create a new experiment instead. Hot-swapping a checkpoint is not structural because it inserts a new `model_experiment_variant_version` row under an existing variant slot.
-- `model_experiment_variant_version` rows are immutable once created; no UPDATE on `upstream` or any other version field. New RC = new version row.
-- Requests with no allocation subject (`userId`, `machineId`, or `clientIp`) are treated as an invariant violation. The picker logs/captures the condition and returns `unavailable` so the route responds with temporarily unavailable instead of assigning a non-random fallback bucket.
-- Hot-swap semantics across states: inserting a new version (with `effective_at <= now()`) preserves every user's _bucket_ (the `variant_id` slot is determined by the deterministic seed `model_exp_${experimentId}_${subject}_${value}` and is unaffected) but serves the new RC under that slot. This is true on `draft`, `active`, and `paused` experiments. **Reports MUST group by `variant_version_id` to keep RC-level metrics clean across hot-swaps.** "Same bucket" means "same slot," not "same RC."
-
-Status state machine:
-
-```
-draft        ─activate→ active           (validation: ≥2 variants, weight > 0, every variant has ≥1 version with effective_at <= now(), no other (active|paused) per public_id)
-active       ─pause→    paused
-paused       ─activate→ active           (same validation; users return to same bucket via deterministic seed; if hot-swaps occurred during pause they now serve the new RC under the same slot)
-active       ─complete→ completed        (terminal/historical: removed from experiment routing; use paused, not completed, to block traffic temporarily)
-paused       ─complete→ completed
-draft        ─delete→   (row removed; only allowed on draft)
-[no other transitions; completed is intent-terminal]
-```
-
-Routing behavior per status:
-
-- `draft`: experiment is invisible to the gateway; requests to the public id route as if no experiment exists.
-- `active`: gateway buckets and rewrites per the experiment.
-- `paused`: requests to the experimented public id receive a local 404/model-unavailable response. They do **not** silently fall through to default routing — that would deliver unexperimented traffic under a public id whose pricing/availability contract was set up for the experiment.
-- `completed`: historical/non-routing. Completed experiments are removed from the routing-relevant index and caches so a completed experiment can coexist with a draft or active replacement on the same `public_model_id`. Do not use `completed` as a traffic-blocking state; keep the experiment `paused` until the preview public id is removed from discovery/routing or a replacement experiment is active.
-
-Archive: `is_archived` is an orthogonal boolean. Archiving hides the experiment from default admin lists but doesn't change routing or status. Archiving an `active` experiment is forbidden (DB-level CHECK + admin-router guard); archive any non-active state freely. Unarchive is allowed.
+The status machine, activation rules, structural-edit restrictions, hot-swap semantics, and routing behavior by status are specified in `.specs/model-experiments.md`. The implementation enforces those rules through DB constraints where practical and admin-router guards for stateful validations.
 
 `model_experiment_request` stores experiment attribution only for requests where an experiment was actually applied, with a direct one-to-one link to the usage row.
 
@@ -278,7 +238,7 @@ Experiment- and variant-level reports go through join: `request → variant_vers
 
 `model_experiment_request.created_at` and `usage_id` match the linked `microdollar_usage` row exactly. The gateway uses JS-side identity values so the same `usageId`/`createdAt` are written to both usage and experiment-attribution rows without relying on Postgres timestamp text round-tripping.
 
-`model_experiment_request` stores **only hashes or reserved sentinel values** for prompts, never prompt content. The bodies live in R2 (see Prompt Storage below), keyed by sha256. Storing only hashes keeps the Postgres row tiny (~80 bytes overhead beyond the existing attribution columns), keeps PG TOAST out of the picture entirely, and lets the experiment data wipe cleanly without coordinating with the primary datastore.
+`model_experiment_request` stores only hashes or reserved sentinel values for prompts, never prompt content. The bodies live in R2, keyed by sha256.
 
 No backfill is required because pre-experiment traffic has no side-table row.
 
@@ -300,72 +260,14 @@ This keeps retention drops partition-friendly before partner traffic can grow th
 
 ### Prompt Storage (R2)
 
-Full canonical post-`transformRequest` request bodies are stored in a dedicated R2 bucket using a **content-addressed** pattern: each unique blob is written once under its sha256 hex digest as the object key, and Postgres event rows reference only the hash. This piggybacks on the existing R2 setup in `apps/web` (`apps/web/src/lib/r2/client.ts` already configures the singleton `S3Client` against R2 via `@aws-sdk/client-s3`).
+The implemented prompt store uses content-addressed R2 objects referenced by `model_experiment_request.request_body_sha256`. The durable retention and wipe policy is specified in `.specs/model-experiments.md`; this section keeps only implementation-specific notes.
 
-**Bucket layout: one bucket per environment.**
-
-- New env var: `R2_EXPERIMENT_PROMPTS_BUCKET_NAME`.
-- Dev value: `kilo-experiment-prompts-dev`.
-- Prod value: `kilo-experiment-prompts-prod`.
-- The two buckets are fully isolated — no cross-env keys, no cross-env reads. Set up the same way `R2_CLI_SESSIONS_BUCKET_NAME` and `CLOUD_AGENT_R2_ATTACHMENTS_BUCKET_NAME` are configured today.
-- New helper module: `apps/web/src/lib/r2/experiment-prompts.ts`. Exports `putPromptIfAbsent(content: string): Promise<string>` (returns the sha256 used as the object key; uses `HeadObjectCommand` to check existence, then `PutObjectCommand` to upload — same pattern as `copyBlobs` in `apps/web/src/lib/r2/cli-sessions.ts:156`) and `getPromptByHash(sha: string): Promise<string | null>` (read via `GetObjectCommand` + `transformToString()`).
-
-**What is stored in R2:**
-
-- One object per full canonical post-`transformRequest` request body. Object key = sha256 hex of the serialized body. There is no separate system-prompt object in v1; the full transformed body is the source of truth.
-
-**What is stored in Postgres (`model_experiment_request`):**
-
-- The existing attribution columns (`usage_id`, `variant_version_id`, `allocation_subject`, `client_request_id`, `created_at`) plus `request_kind`, `request_body_sha256`, and `was_truncated` on the same row. One row per experimented request, linked one-to-one to `microdollar_usage` by `usage_id` and keyed physically by `(usage_id, created_at)` for partitioning.
-- `request_body_sha256` is never null. It contains either a 64-character lowercase sha256 hex digest or a reserved sentinel value.
-- Reserved sentinel values:
-  - `__failed__`: R2 storage failed. The attribution row still lands.
-  - `__deleted__`: prompt reference was intentionally wiped while retaining experiment attribution.
-- The table never holds prompt content; prompt fields are small fixed-size additions to the existing attribution row.
-
-**Size caps and truncation.**
-
-- Request-body cap: 4 MB measured as UTF-8 bytes. Beyond this the serialized body is truncated to a deterministic valid-UTF-8 prefix before hashing; `was_truncated = true`.
-- 4 MB comfortably exceeds the bytes needed by most current requests while bounding what the async `after()` path retains.
-- Caps live as constants in `apps/web/src/lib/ai-gateway/experiments/persist.ts` so they are easy to bump.
-
-**Capture + write path** (capture runs before upstream fetch; R2 writes run inside the same `after()` hook as `accountForMicrodollarUsage`, after the microdollar write):
-
-1. After `applyProviderSpecificLogic` / `provider.transformRequest` has produced the canonical upstream request body, call `buildExperimentPromptCapture(requestBodyParsed.body)` before `upstreamRequest`.
-2. `buildExperimentPromptCapture` serializes the full request body, records `requestKind`, applies the 4 MB cap, and returns only the bounded string plus `was_truncated`.
-3. Store that bounded prompt capture on `MicrodollarUsageContext`; do **not** retain a `structuredClone` of the full uncapped request body through the async `after()` path.
-4. In the `after()` hook, compute sha256 and call `putPromptIfAbsent(content)` which `HEAD`s and only `PUT`s on miss.
-5. Insert one row in `model_experiment_request` with the attribution columns, `request_kind`, and the resulting prompt hash or sentinel (single statement, single round-trip).
-
-- Prompt storage is best-effort analytics. Use the sha256 for a successful put/already-existing object and `__failed__` when R2 write fails. Log/capture the failure without prompt content. The `model_experiment_request` attribution row still lands when the microdollar usage row exists.
-
-**Read path** (out-of-band, never on the request hot path):
-
-- New tRPC procedure `admin.modelExperiments.getPromptByHash(sha: string): Promise<{ content: string } | null>` that reads via `getPromptByHash`. Admin-gated, same gate as the rest of the experiment admin surface. It accepts only 64-character lowercase hex hashes; sentinel values are rendered by the caller without touching R2.
-- For partner export / partner replay (Part 2), the same `getPromptByHash` is used to materialize blobs into the export bundle.
-- Page-level dedup at read time: collect distinct hashes per result page, batch-fetch, join in memory.
-
-**GDPR and consent.**
-
-- Prompts collected for model experiments are treated as user-authorized experiment data submitted under explicit opt-in to the dedicated preview/experiment model, not as part of the default PII dataset governed by `microdollar_usage_metadata` soft-delete.
-- The opt-in copy for each preview model must disclose that prompts may be retained for experiment analysis and partner evaluation, and that users are responsible for not submitting PII, secrets, customer data, or other sensitive content they do not want retained under that experiment policy. v1 must not run a real partner experiment until that model-specific opt-in/disclosure exists.
-- Prompts collected under experiment opt-in use a dedicated experiment retention policy and are not governed by the default `microdollar_usage_metadata` soft-delete policy.
-- Concretely: `softDeleteUser` does **not** delete `model_experiment_request` rows and does **not** delete the referencing R2 objects. The `on delete cascade` on `usage_id` only fires if the underlying `microdollar_usage` row is hard-deleted (which `softDeleteUser` does not do today). A dedicated experiment-data wipe path removes prompt references by setting prompt hash columns to `__deleted__`, then relying on R2 GC for blob cleanup.
-- The spec documents this explicitly as the policy. A test in `apps/web/src/lib/user/index.test.ts` locks the policy in code: after `softDeleteUser` runs, an experiment-attributed user's `model_experiment_request` row and `request_body_sha256` are still present.
-
-**Wipe semantics.**
-
-- `TRUNCATE model_experiment_request` is independent of `microdollar_usage` and safe to run; this also drops attribution. To wipe only prompts while keeping attribution, run `UPDATE model_experiment_request SET request_body_sha256 = '__deleted__'` (optionally scoped to specific experiments).
-- After wiping rows or replacing hashes with sentinels, R2 objects are orphaned. Run a periodic GC sweep (cron / one-off) that lists the bucket and deletes any object whose key does not appear in the distinct set of hash columns filtered to 64-character lowercase hex values.
-- Deleting an entire experiment's prompts: `UPDATE model_experiment_request SET request_body_sha256 = '__deleted__' WHERE variant_version_id IN (...experiment's versions...)`, then run the GC sweep. To also drop attribution, `DELETE FROM model_experiment_request WHERE variant_version_id IN (...)` first.
-- Automatic retention-window enforcement is not part of v1. The schema makes it a straightforward follow-up: a scheduled job can select experiment request rows by `created_at` and experiment-specific retention policy, replace real prompt hashes with `__deleted__`, and then rely on the same R2 orphan GC to remove unreferenced blobs.
-
-**Why R2 (not KV, not Vercel Blob, not Postgres).**
-
-- **R2** is already used elsewhere in `apps/web` (cli-sessions, cloud-agent-attachments). Same `S3Client`, same credential type, same env-var pattern.
-- **R2 storage cost** ($0.015/GB-mo) is ~33× cheaper than Cloudflare KV ($0.50/GB-mo) at this access pattern (write-once, read rarely, no edge-distribution benefit). KV is optimized for hot, small, globally-replicated config data — the wrong shape for bulk prompt blobs.
-- **Vercel Blob** is ~3× more expensive than R2 at this workload and adds another vendor surface.
-- **Postgres** would also work and is functionally free at v1 scale, but offloading multi-MB blobs to R2 keeps the primary DB lean (no TOAST traffic on hot paths) and gives a clean independent retention/wipe knob from the start. The "swap to R2 later" migration is avoided.
+- Env var: `R2_EXPERIMENT_PROMPTS_BUCKET_NAME`.
+- Buckets: `kilo-experiment-prompts-dev` and `kilo-experiment-prompts-prod`.
+- Helper module: `apps/web/src/lib/r2/experiment-prompts.ts` with `putPromptIfAbsent`, `putPromptOrNull`, `getPromptByHash`, and `sha256Hex`.
+- Current capture path: `buildExperimentPromptCapture` serializes the canonical post-transform request body, records `requestKind`, applies the current 4 MB implementation cap, and stores the bounded capture on `MicrodollarUsageContext` for the async `after()` write.
+- Write path: `persistExperimentAttribution` stores the prompt body best-effort in R2, then inserts the attribution row with a real hash or reserved sentinel. Prompt-storage failures are reported but do not roll back billing.
+- Read path: the admin request browser exposes captured prompt bodies through `apps/web/src/app/admin/api/model-experiments/download/route.ts`, which reads by hash via `getPromptByHash`.
 
 ### Phase 2 — Gateway Header Capture
 
@@ -505,104 +407,34 @@ Use the same admin gate as existing gateway-config pages. For UI work, follow th
 
 ### Phase 6 — Specs + Tests
 
-Add `.specs/model-experiments.md` and register it in the `AGENTS.md` specs table. The spec should be the durable source of truth for scope, bucketing, mutability, telemetry fields, feedback joins, caching behavior, client blinding, anonymous allocation caveats, the reporting caveats listed above (intended-vs-served-checkpoint single-shot assumption, message-level `COUNT(DISTINCT client_request_id)` rule, error-rate undercount), and v1 exclusions.
+`.specs/model-experiments.md` is now the durable source of truth and is registered in the `AGENTS.md` specs table.
 
-Targeted tests:
-
-- Variant picker determinism by `userId`, `machineId`, and `clientIp`.
-- Allocation-subject precedence and recorded `allocationSubject`.
-- Weighted distribution sanity and bucket-boundary behavior.
-- Null return when no routing-relevant experiment exists; not-found return when the experiment is paused; unavailable return when no allocation subject exists on an active experiment.
-- End-to-end gateway integration for an experimented public id: assert the upstream `fetch` URL starts with the variant's `upstream.base_url` (NOT OpenRouter or Vercel), `Authorization` header carries `Bearer ${upstream.api_key}`, and `body.model` equals `upstream.internal_id`.
-- Usage persistence creates a `model_experiment_request` row with `usage_id`, `variant_version_id`, `allocation_subject`, and `client_request_id`.
-- Hot-swap test: `swapVariantVersion` inserts a new `model_experiment_variant_version` row with a different `upstream` (different `internal_id` and/or `base_url`), the picker (after cache invalidation) resolves to the new version, and old `model_experiment_request` rows still resolve through their old `variant_version_id` to the original `upstream`.
-- Two-variant routing: distinct seeds bucket to distinct variants, each request lands on the corresponding variant's `upstream.base_url`.
-- Tiebreaker test: two `swapVariantVersion` calls landing at the same millisecond produce two version rows; "current" is determined by `(effective_at desc, id desc)` deterministically.
-- `model_experiment_request.created_at` exactly matches the referenced `microdollar_usage.created_at`.
-- Admin activation validation, active-experiment uniqueness, cache invalidation, and live-edit restrictions.
-- State machine: every allowed transition succeeds, every disallowed transition returns a clear error. `setArchived(activeId, true)` rejects.
-- Paused experiment requests to the experimented public id return a local 404/model-unavailable response and do not reach upstream. Completed experiments are absent from routing caches; verify completion removes the public id from `EXPERIMENTED_PUBLIC_IDS_REDIS_KEY` unless another active/paused experiment for that id exists.
-- Anonymous request with machine id is bucketed; request with no allocation subject returns temporarily unavailable and does not reach upstream; BYOK request to a non-experimented id is unaffected.
-- API key never leaks: `getLiveStats`, `list`, `get`, `listRequests`, and any future reporting view never return `encrypted_api_key` or any plaintext form. Snapshot test on JSON responses; SQL-level test if/when `model_experiment_request_stats` is added.
-- Encryption round-trip: a key submitted via `swapVariantVersion`/`rotateApiKey` is stored as `EncryptedData` JSONB, is decrypted correctly by the gateway picker/provider path, and the resulting plaintext is what reaches `buildDirectProvider` as `apiKey` (assert via mock `fetch` capturing the `Authorization` header).
-- Rotation: `rotateApiKey` inserts a new version row, subsequent routing uses the new key, and old request rows still resolve to the prior version (with the old encrypted key intact in the DB).
-- Missing `BYOK_ENCRYPTION_KEY`: `swapVariantVersion`/`rotateApiKey` reject; `getRoutingExperimentForPublicId` returns `unavailable` for active/paused experiments and the route returns "temporarily unavailable" instead of falling through.
-- Bypass routing: an experimented public id never produces a `fetch` against OpenRouter (`openrouter.ai`) or the Vercel AI gateway, regardless of `shouldRouteToVercel` state.
-- Membership key maintenance: activating/pausing/completing an experiment correctly adds/removes its `public_model_id` from `EXPERIMENTED_PUBLIC_IDS_REDIS_KEY`.
-- Custom-LLM regression: existing `kilo-internal/...` traffic still routes correctly via the refactored `buildDirectProvider` helper.
-- Prompt storage write path: an experimented request produces exactly one row in `model_experiment_request`, with `request_kind` and `request_body_sha256` populated as either a real 64-character hash or reserved sentinel. Real hashes point to R2 objects with content matching the canonical post-`transformRequest` bytes.
-- Content-addressing dedup: two requests with byte-identical transformed bodies produce two `model_experiment_request` rows pointing at the same real `request_body_sha256`, and the final R2 object content is correct. Do not assert an exact `PUT` count because concurrent `HEAD`/`PUT` calls can race harmlessly.
-- Prompt write decoupling: simulating an R2 `PUT` failure does not roll back the `microdollar_usage` write; the `model_experiment_request` row still lands with `__failed__`, and Sentry is notified.
-- Truncation: a serialized request body exceeding 4 MB of UTF-8 is truncated deterministically to valid UTF-8, the resulting hash is stable across runs, and `was_truncated = true` is recorded.
-- `getPromptByHash` admin tRPC procedure returns the original content for a known hash and `null` for an unknown hash; sentinel values are rejected or handled before the tRPC call, and non-admin callers are rejected.
-- Soft-delete policy: after `softDeleteUser` runs against a user who participated in an experiment, that user's `model_experiment_request` rows are still present, including `request_body_sha256`. (Locks the consent-based retention policy in code.)
+Implemented test coverage includes the core picker, routing, admin state machine/cache maintenance, prompt persistence, partitioning, and soft-delete policy. Remaining targeted coverage is tracked with concrete follow-ups, especially response client-blinding tests in the response-rewrite section below.
 
 ## Caching, Privacy, and Logging
 
-- Prompt-cache behavior needs no change. `applyTrackingIds` salts by provider/user/task, while upstream providers key on `(model, cache_key)`, so different internal checkpoints naturally separate caches.
-- `model_experiment`, `model_experiment_variant`, `model_experiment_variant_version`, and `model_experiment_request` hold no direct PII.
-- The prompt-hash column on `model_experiment_request` and the R2 prompt bucket together hold user-authorized experiment data. The opt-in disclosure places responsibility on users not to submit PII, secrets, customer data, or other sensitive content they do not want retained for experiment analysis or partner evaluation. Retention is governed by explicit experiment opt-in and the dedicated experiment retention policy, not the default `microdollar_usage_metadata` soft-delete policy (see Prompt Storage > GDPR and consent). Automatic retention-window enforcement is a follow-up, not v1. The policy is locked in by a test in `apps/web/src/lib/user/index.test.ts` asserting that `softDeleteUser` does not delete experiment attribution rows or prompt hashes.
-- `client_request_id` is opaque and per-message. It is joinable to user activity through `model_experiment_request.usage_id`. The `on delete cascade` on `usage_id` only fires for hard deletes of `microdollar_usage`, which `softDeleteUser` does not perform.
-- Do not log full request bodies for experimental traffic into `api_request_log`. The dedicated R2 prompt store is the only persistence mechanism for experiment prompt content; `api_request_log` remains allowlist-only and unrelated to experiments.
-- Do not put `client_request_id` or experiment fields into Sentry input payloads; keep them to usage/metrics storage.
-- `upstream.api_key` MUST never be logged, returned by tRPC reads, included in error messages, included in Sentry breadcrumbs, or persisted outside the encrypted JSONB column. See "API Keys" section.
+The durable privacy, retention, and logging rules now live in `.specs/model-experiments.md`. Implementation-specific note: prompt-cache behavior needed no change because `applyTrackingIds` salts by provider/user/task, while upstream providers key on `(model, cache_key)`, so different internal checkpoints naturally separate caches.
 
 ## API Keys
 
-The partner-issued upstream API key for each variant version is handled with the same primitives as BYOK keys.
-
-- **Encryption helper.** Reuses `encryptApiKey` / `decryptApiKey` from `apps/web/src/lib/ai-gateway/byok/encryption.ts:12,47` (Node `crypto` AES-256-GCM, 12-byte random IV, 256-bit key from `BYOK_ENCRYPTION_KEY` env var via `apps/web/src/lib/config.server.ts:93`). No new encryption module, no new env var.
-- **Storage.** Sibling column on `model_experiment_variant_version`: `encrypted_api_key jsonb not null`, typed as `EncryptedData` (`packages/db/src/schema-types.ts:374`). Identical to `byok_api_keys.encrypted_api_key`. Not stored inside the `upstream` JSONB so that "never read the key" can be enforced at the column level (reporting view, admin response shapers, and Drizzle selects can simply omit it).
-- **Decryption point: selected variant only.** The routing path loads encrypted version rows and decrypts the selected variant's `encrypted_api_key` when building the direct upstream provider. Redis membership never contains plaintext partner keys. `BYOK_ENCRYPTION_KEY` is required by server config; if key-touching code cannot decrypt, routing fails closed with "temporarily unavailable" rather than falling through.
-- **Hard never-read via admin APIs.** No tRPC endpoint returns the plaintext or ciphertext to the client. The admin UI shows only a "configured" indicator and the version's `created_at` (effectively last-rotated). To rotate, you submit a new key — you cannot retrieve the existing one. This matches BYOK behavior.
-- **Rotation = new version insert.** A `rotateApiKey(variantId, newApiKey)` mutation inserts a new `model_experiment_variant_version` row with the same `upstream` blob and a freshly encrypted `encrypted_api_key`, `effective_at = now()`. No special UPDATE path. Version rows are immutable — no exception for keys.
-- **Admin gate.** Same gate as gateway-config / custom-llms admin pages. No dedicated role or two-person review for v1.
-- **Audit trail.** None beyond `model_experiment_variant_version.created_by` + `created_at`. Adding a dedicated audit log is deferred until compliance asks.
-- **Never logged or exported.** Excluded from tRPC responses, any future `model_experiment_request_stats` reporting view, Sentry breadcrumbs/payloads, upstream-error normalization (strip `Authorization` from any echoed request context), Drizzle query logs (ensure no `SELECT *` admin queries against this table), and Part 2 partner trace exports (allowlist-only — explicit test).
-- **Historical retention.** Old version rows keep their old `encrypted_api_key`. The key remains in the DB indefinitely. If a partner revokes a key after rotation, the ciphertext is still recoverable from a DB dump in principle; v1 accepts this. A future `tombstoneVersionKey(versionId)` mutation can null/replace the column for compliance — out of scope here.
+Partner API keys reuse the BYOK encryption primitives and live only in `model_experiment_variant_version.encrypted_api_key`. Admin reads omit that column; routing decrypts only the selected variant version. The non-leakage rule is specified in `.specs/model-experiments.md`.
 
 ## Reporting Caveats
 
-These constraints exist because of how the gateway is built today. The spec must document them so report consumers (and providers) interpret numbers correctly.
-
-- **Intended vs served checkpoint.** The gateway is single-shot: no upstream retry, no model fallback, and the upstream `base_url` + `internal_id` are bound once at provider-resolution time. Therefore the upstream config resolved through `model_experiment_request.variant_version_id → model_experiment_variant_version.upstream` reflects both the intended and the served checkpoint. If gateway-level retry/fallback across upstreams is ever introduced, this assumption breaks and `model_experiment_request` would need a served-upstream snapshot column (or a separate served-version FK).
-- **Message-level dedup.** `client_request_id` is `MessageV2.User.id` from the kilocode client (`kilocode/packages/opencode/src/session/llm.ts` L407) — stable across all HTTP attempts and tool-loop iterations within a single user message. Message-level reports (per-message thumbs-up rate, error rate per user message, etc.) MUST use `COUNT(DISTINCT client_request_id)` for the denominator to avoid inflating numbers when an agentic turn produces many gateway calls under one user message.
-- **Error-rate undercount (accepted v1 limitation).** `model_experiment_request` is written only after the linked `microdollar_usage` row exists. Today `microdollar_usage` is _not_ written for several failure modes, so those failures will be **invisible in experiment reports**:
-  - `fetch` throws (DNS, connection reset) — error bubbles out before `after()`.
-  - 10-minute upstream timeouts and client-cancelled requests — same path.
-  - Upstream 402 remapped to "temporarily unavailable" (`route.ts` ~L568–581 returns before usage accounting).
-  - Upstream 5xx with null body or non-streaming with non-JSON body.
-  - Streaming 5xx with any body, and 4xx with parseable body, _do_ produce a row with `has_error=true` and zero tokens.
-
-  v1 accepts this and documents it: experiment error-rate reports systematically undercount the worst failure modes (timeouts, fetch errors, 402, null-body 5xx). For early-development checkpoints, supplement experiment reports with upstream alerting and Sentry on the relevant `inference_provider`. A future iteration may move `model_experiment_request` to a two-phase write (insert eagerly after variant selection, update with `usage_id` later) to capture all failures, or fix `microdollar_usage` to always write on error; both are out of scope here.
-
-- **No Analytics Engine dimensions in v1.** The o11y pipeline (`services/o11y`) does not get experiment dimensions in v1. Any AE-backed dashboard (Grafana etc.) will not slice by experiment/variant/RC. Admin reporting is Postgres-only through inline Drizzle queries today; add `model_experiment_request_stats` when a real aggregate consumer appears. If/when a real AE consumer appears, a follow-up adds the fields to `api-metrics-schema.json`, `api-metrics-routes.ts`, `api-metrics.server.ts`, `o11y-analytics.ts`, the o11y tests, and (likely) recreates the pipeline stream via `wrangler.jsonc`.
+The durable reporting caveats are specified in `.specs/model-experiments.md`. Implementation follow-ups remain: add `model_experiment_request_stats`, `getLiveStats`, or Analytics Engine dimensions only when a concrete reporting consumer needs them.
 
 ## Risk Areas
 
 - Routing order: variant selection must happen inside `getProvider`, before `route.ts` runs org-model-restriction and direct-routing policy checks. Experiment traffic is treated as free/provider-funded through `isFreeModel`; server-side organization policy checks still run before upstream fetch.
-- Historical attribution: reports must group by `model_experiment_request.variant_version_id` (immutable FK to the exact RC served) and resolve `upstream` through the version row. Never compute "current version of variant X" as part of a historical report; that's mutable.
-- Anonymous allocation stability: `machine` and `ip` cohorts are lower-confidence than `user`; reports must expose/filter by `allocation_subject`. Identifier-less traffic is not routed or recorded; it fails closed as temporarily unavailable.
-- Structural edits: weight/add/remove operations are only legal on `draft` experiments. Once activated, structural changes require a brand-new experiment — there is no `paused → draft` transition because data collected under one bucket layout cannot be carried over to a different one. Hot-swap (new RC under existing slot) is not structural and is allowed in any non-terminal state.
-- Cache invalidation: admin mutations that affect routing must keep `EXPERIMENTED_PUBLIC_IDS_REDIS_KEY` in sync with active/paused experiments. Routing details are loaded from Postgres after the membership pre-check; plaintext API keys are not cached in Redis.
-- API key handling: see dedicated section.
-- Provider blinding: provider-facing exports must not include `kilo_user_id` or user-identifying fields.
+- Client blinding: response rewriting is still tracked below because direct experiment providers currently expose the served upstream `internal_id` in some response shapes.
 - R2 prompt-store credential exposure: the same `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` already used by `apps/web/src/lib/r2/client.ts` is reused. Adding an experiment-prompts bucket extends the blast radius of those credentials. Acceptable for v1 because the same trust boundary already covers cli-sessions and cloud-agent-attachments. If/when scoped per-bucket credentials become available cheaply, narrow them.
-- Prerequisite (before first real partner experiment): model-specific opt-in/disclosure that tells users prompts may be retained for experiment analysis and partner evaluation. Flagged in the spec under "Prerequisites."
+- Before the first real partner experiment, model-specific opt-in/disclosure must exist as specified in `.specs/model-experiments.md`.
 
 > Partner-specific risks (cross-model session contamination, capture fidelity) are covered in [Part 2](./experimental-models-2.md).
 
 ## v1 Exclusions
 
-- Per-variant pricing. Variants under one `public_id` share current public-id pricing.
-- BYOK traffic.
-- Custom LLM traffic (`kilo-internal/...`).
-- Identifier-less traffic; under v1 such requests fail closed as temporarily unavailable because missing IP is treated as a gateway invariant violation.
-- A/B variants spanning entirely different public model ids.
-- Client-visible variant ids or variant-aware UI behavior.
-- Response-side rewriting of the served `internal_id` back to the requested `public_id` for experiment traffic — see "Followup: rewrite checkpoint identity in experiment responses" below.
-- Partner trace export, redaction, HMAC webhooks, partner auth, and warehouse coordination (see [Part 2](./experimental-models-2.md)).
-- Replay bundles, SWE-bench/OpenHands adapters, and held-out replay-eval service (see [Part 2](./experimental-models-2.md)).
+See `.specs/model-experiments.md` for durable v1 exclusions. Partner trace export, redaction, HMAC webhooks, partner auth, warehouse coordination, replay bundles, SWE-bench/OpenHands adapters, and held-out replay-eval service are covered in [Part 2](./experimental-models-2.md).
 
 ## Followup: rewrite checkpoint identity in experiment responses
 
@@ -610,7 +442,7 @@ Experiment routing rewrites the outbound request to the variant's `upstream.inte
 
 The existing response-rewriting branch in `apps/web/src/app/api/openrouter/[...path]/route.ts:715,733` only runs for `kilo-exclusive` free traffic flowing through OpenRouter or Vercel — experiment providers carry `provider.id === 'custom'` and bypass it. As a result, OpenAI- and Anthropic-shape partner responses echo `internal_id` in the JSON body and in streaming `model:` events, disclosing the served checkpoint and variant to the client.
 
-This violates the client-blinding requirement from the Accepted Design ("Clients keep sending the same public model id" — line 112) and from the spec ("client blinding" — `Phase 6 — Specs + Tests`). A user could diff response payloads across requests to deduce their bucket assignment and observe checkpoint hot-swaps.
+This violates the client-blinding requirement in `.specs/model-experiments.md`. A user could diff response payloads across requests to deduce their bucket assignment and observe checkpoint hot-swaps.
 
 Fix: rewrite `model` back to the requested `public_id` in experiment responses on the way out, mirroring the existing kilo-exclusive rewrite. Both response shapes need coverage:
 

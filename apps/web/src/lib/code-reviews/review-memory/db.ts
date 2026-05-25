@@ -536,17 +536,21 @@ export async function updateAggregationRunStatus(input: {
   database?: ReviewMemoryDatabase;
 }): Promise<CodeReviewMemoryAggregationRun> {
   const database = databaseOrDefault(input.database);
+  const updateValues: Partial<typeof code_review_memory_aggregation_runs.$inferInsert> = {
+    status: input.status,
+    skip_reason: input.skipReason ?? null,
+    tokens_in: input.tokensIn ?? null,
+    tokens_out: input.tokensOut ?? null,
+    error_message: input.errorMessage ?? null,
+    completed_at: input.status === 'running' ? null : new Date().toISOString(),
+  };
+  if (input.totalCostMusd !== undefined) {
+    updateValues.total_cost_musd = input.totalCostMusd;
+  }
+
   const [run] = await database
     .update(code_review_memory_aggregation_runs)
-    .set({
-      status: input.status,
-      skip_reason: input.skipReason ?? null,
-      tokens_in: input.tokensIn ?? null,
-      tokens_out: input.tokensOut ?? null,
-      total_cost_musd: input.totalCostMusd ?? null,
-      error_message: input.errorMessage ?? null,
-      completed_at: input.status === 'running' ? null : new Date().toISOString(),
-    })
+    .set(updateValues)
     .where(eq(code_review_memory_aggregation_runs.id, input.runId))
     .returning();
 

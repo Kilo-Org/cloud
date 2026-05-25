@@ -106,7 +106,6 @@ export type ReviewMemoryAggregationGeneratorResult = {
   opportunities: ReviewMemoryAggregationOpportunity[];
   tokensIn?: number | null;
   tokensOut?: number | null;
-  totalCostMusd?: number | null;
 };
 
 export type DispatchReviewMemoryAggregationSummary = {
@@ -507,7 +506,6 @@ async function processClaimedAggregationScope(
       status: 'completed',
       tokensIn: generation.tokensIn,
       tokensOut: generation.tokensOut,
-      totalCostMusd: generation.totalCostMusd,
     });
     await finishClaimedAggregationState({
       stateId: state.id,

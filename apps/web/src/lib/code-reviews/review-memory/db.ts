@@ -1038,7 +1038,11 @@ export async function updateReviewMemoryProposal(input: {
       updated_at: new Date().toISOString(),
     })
     .where(
-      and(proposalOwnerWhere(input.owner), eq(code_review_memory_proposals.id, input.proposalId))
+      and(
+        proposalOwnerWhere(input.owner),
+        eq(code_review_memory_proposals.id, input.proposalId),
+        inArray(code_review_memory_proposals.status, ACTIONABLE_REVIEW_MEMORY_PROPOSAL_STATUSES)
+      )
     )
     .returning();
 

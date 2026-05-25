@@ -96,7 +96,10 @@ export async function approveAndOpenReviewMemoryChangeRequest(
   });
 
   if (!openingProposal) {
-    throw new ReviewMemoryChangeRequestError('NOT_FOUND', 'Review memory proposal not found');
+    throw new ReviewMemoryChangeRequestError(
+      'CONFLICT',
+      'Review memory proposal is already being opened.'
+    );
   }
 
   try {

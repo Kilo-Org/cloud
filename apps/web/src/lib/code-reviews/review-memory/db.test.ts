@@ -12,6 +12,7 @@ import {
 import { count, eq } from 'drizzle-orm';
 import {
   listProposalEvidence,
+  markProposalOpeningChangeRequest,
   recordFeedbackEvent,
   upsertFeedbackSubject,
   upsertReviewMemoryProposal,
@@ -174,5 +175,39 @@ describe('review memory db helpers', () => {
     expect(evidence).toHaveLength(1);
     expect(evidence[0].feedbackEvent.id).toBe(event.event.id);
     expect(evidence[0].role).toBe('primary');
+  });
+
+  it('does not mark a proposal opening twice', async () => {
+    const user = await insertTestUser();
+    const owner = { type: 'user' as const, id: user.id };
+    const proposal = await upsertReviewMemoryProposal({
+      owner,
+      platform: 'github',
+      repoFullName: 'owner/repo',
+      proposalType: 'clarify',
+      scopeKind: 'repository',
+      title: 'Clarify noisy guidance',
+      rationale: 'Maintainers corrected the same guidance.',
+      proposedMarkdown: '### Review guidance: Clarify noisy guidance',
+      dedupeKey: 'clarify-noisy-guidance-opening',
+    });
+
+    const opening = await markProposalOpeningChangeRequest({
+      owner,
+      proposalId: proposal.id,
+      approvedByUserId: user.id,
+      changeRequestType: 'github_pr',
+      branchName: 'kilo/review-memory/test',
+    });
+    const duplicateOpening = await markProposalOpeningChangeRequest({
+      owner,
+      proposalId: proposal.id,
+      approvedByUserId: user.id,
+      changeRequestType: 'github_pr',
+      branchName: 'kilo/review-memory/test-again',
+    });
+
+    expect(opening?.status).toBe('opening_change_request');
+    expect(duplicateOpening).toBeNull();
   });
 });

@@ -103,6 +103,10 @@ describe('code-review command guard policy', () => {
     expect(bashPermissions['git fetch *']).toBe('allow');
     expect(bashPermissions['git pull']).toBe('allow');
     expect(bashPermissions['git pull *']).toBe('allow');
+    expect(bashPermissions['git push']).toBe('deny');
+    expect(bashPermissions['git push *']).toBe('deny');
+    expect(bashPermissions['git commit']).toBe('deny');
+    expect(bashPermissions['git commit *']).toBe('deny');
     expect(bashPermissions['glab mr merge']).toBe('deny');
     expect(bashPermissions['glab mr merge *']).toBe('deny');
     expect(bashPermissions['glab auth']).toBe('deny');

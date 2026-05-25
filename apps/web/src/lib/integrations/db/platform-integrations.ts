@@ -127,6 +127,8 @@ export async function upsertPlatformIntegration(data: {
         repository_access: sql`EXCLUDED.repository_access`,
         integration_status: sql`EXCLUDED.integration_status`,
         repositories: sql`EXCLUDED.repositories`,
+        auth_invalid_at: null,
+        auth_invalid_reason: null,
         updated_at: sql`now()`,
       },
     });
@@ -145,6 +147,8 @@ export async function updateIntegrationRepositories(
     .set({
       repositories,
       repositories_synced_at: new Date().toISOString(),
+      auth_invalid_at: null,
+      auth_invalid_reason: null,
       updated_at: new Date().toISOString(),
     })
     .where(
@@ -167,6 +171,8 @@ export async function updateRepositoriesForIntegration(
     .set({
       repositories,
       repositories_synced_at: new Date().toISOString(),
+      auth_invalid_at: null,
+      auth_invalid_reason: null,
       updated_at: new Date().toISOString(),
     })
     .where(eq(platform_integrations.id, integrationId));
@@ -416,6 +422,8 @@ export async function autoCompleteInstallation({
       scopes: installationData.events,
       installed_at: new Date(installationData.created_at).toISOString(),
       metadata: completedMetadata,
+      auth_invalid_at: null,
+      auth_invalid_reason: null,
       updated_at: new Date().toISOString(),
     })
     .where(eq(platform_integrations.id, integrationId));
@@ -578,6 +586,8 @@ export async function upsertPlatformIntegrationForOwner(
         integration_status: INTEGRATION_STATUS.ACTIVE,
         repositories: data.repositories || null,
         github_app_type: data.githubAppType || existing.github_app_type,
+        auth_invalid_at: null,
+        auth_invalid_reason: null,
         updated_at: new Date().toISOString(),
       })
       .where(eq(platform_integrations.id, existing.id));

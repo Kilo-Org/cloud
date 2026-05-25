@@ -38,7 +38,7 @@ import {
 import {
   createQueuedSessionMessageState,
   getSessionMessageState,
-  listNeverAcceptedTerminalQueuedMessages,
+  listReconnectVisibleTerminalQueuedMessages,
   putSessionMessageState,
   type SessionMessageStorage,
   type TerminalizeParams,
@@ -848,7 +848,7 @@ export function createSessionMessageQueue(
   async function snapshotForStreamConnect(): Promise<QueuedMessageSnapshot[]> {
     const pending = await listPendingSessionMessages(storage);
     const pendingMessageIds = new Set(pending.map(message => message.messageId));
-    const terminalQueued = await listNeverAcceptedTerminalQueuedMessages(storage);
+    const terminalQueued = await listReconnectVisibleTerminalQueuedMessages(storage);
 
     return [
       ...pending.map(message => ({

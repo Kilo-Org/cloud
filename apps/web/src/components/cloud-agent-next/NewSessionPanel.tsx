@@ -169,6 +169,7 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
   const [variant, setVariant] = useState<string | undefined>(undefined);
   const [isModelUserSelected, setIsModelUserSelected] = useState(false);
   const [isRepoUserSelected, setIsRepoUserSelected] = useState(false);
+  const [showRepositoryRequiredMessage, setShowRepositoryRequiredMessage] = useState(false);
   const [isPreparing, setIsPreparing] = useState(false);
   const [imageMessageUuid, setImageMessageUuid] = useState(() => crypto.randomUUID());
 
@@ -437,6 +438,7 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
   const handleRepoSelect = useCallback(
     (repoFullName: string, userInitiated = true) => {
       setSelectedRepo(repoFullName);
+      setShowRepositoryRequiredMessage(false);
       if (userInitiated) setIsRepoUserSelected(true);
       const repo = unifiedRepositories.find(r => r.fullName === repoFullName);
       if (repo?.platform) {
@@ -447,14 +449,40 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
   );
 
   // ---------------------------------------------------------------------------
-  // Auto-select repo from last session (most recently used)
+  // Auto-select repo from last session, or the only available repository
   // ---------------------------------------------------------------------------
   useEffect(() => {
-    if (selectedRepo || isRepoUserSelected || recentRepos.length === 0) return;
+    if (selectedRepo || isRepoUserSelected) return;
+
     const firstRecent = recentRepos[0];
-    if (!firstRecent) return;
-    handleRepoSelect(firstRecent.fullName, false);
-  }, [recentRepos, selectedRepo, isRepoUserSelected, handleRepoSelect]);
+    if (firstRecent) {
+      handleRepoSelect(firstRecent.fullName, false);
+      return;
+    }
+
+    if (
+      isLoadingGitHubRepos ||
+      isLoadingGitLabRepos ||
+      githubRepoError ||
+      gitlabRepoError ||
+      unifiedRepositories.length !== 1
+    ) {
+      return;
+    }
+    const onlyRepository = unifiedRepositories[0];
+    if (!onlyRepository) return;
+    handleRepoSelect(onlyRepository.fullName, false);
+  }, [
+    recentRepos,
+    unifiedRepositories,
+    selectedRepo,
+    isRepoUserSelected,
+    handleRepoSelect,
+    isLoadingGitHubRepos,
+    isLoadingGitLabRepos,
+    githubRepoError,
+    gitlabRepoError,
+  ]);
 
   // ---------------------------------------------------------------------------
   // Auto-select repo from pasted GitHub/GitLab URLs
@@ -472,6 +500,7 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
       if (!match) continue;
 
       setSelectedRepo(match.fullName);
+      setShowRepositoryRequiredMessage(false);
       const platform = detectGitPlatform(url);
       if (platform) {
         setSelectedPlatform(platform);
@@ -654,7 +683,7 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
   const handleStartSession = useCallback(async () => {
     if (!prompt.trim() || imageUpload.hasUploadingImages) return;
     if (!selectedRepo) {
-      toast.error('Please select a repository');
+      setShowRepositoryRequiredMessage(true);
       return;
     }
 
@@ -1110,9 +1139,20 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
               disabled={isPreparing}
               className="h-8 w-8 rounded-lg"
               title="Attach images"
+              aria-label="Attach images"
             >
               <Paperclip className="h-4 w-4" />
             </UIButton>
+            {showRepositoryRequiredMessage && (
+              <p
+                id="new-session-repository-required"
+                className="flex shrink-0 items-center gap-1 text-xs text-amber-400"
+                role="alert"
+              >
+                <AlertCircle className="h-3 w-3 shrink-0" />
+                Select a repository
+              </p>
+            )}
             <UIButton
               type="button"
               variant="primary"
@@ -1120,6 +1160,10 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
               onClick={() => void handleStartSession()}
               disabled={!isFormValid || isPreparing || imageUpload.hasUploadingImages}
               className="h-8 w-8 rounded-lg"
+              aria-describedby={
+                showRepositoryRequiredMessage ? 'new-session-repository-required' : undefined
+              }
+              aria-label="Start session"
             >
               <Send className="h-4 w-4" />
             </UIButton>

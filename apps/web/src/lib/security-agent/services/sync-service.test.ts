@@ -4,7 +4,10 @@ import type * as parserModule from '../parsers/dependabot-parser';
 import type * as findingsDbModule from '../db/security-findings';
 import type * as configDbModule from '../db/security-config';
 import type * as analysisDbModule from '../db/security-analysis';
-import type { syncDependabotAlertsForRepo as syncDependabotAlertsForRepoType } from './sync-service';
+import type {
+  syncAllReposForOwner as syncAllReposForOwnerType,
+  syncDependabotAlertsForRepo as syncDependabotAlertsForRepoType,
+} from './sync-service';
 
 const mockFetchAllDependabotAlerts = jest.fn() as jest.MockedFunction<
   typeof dependabotApiModule.fetchAllDependabotAlerts
@@ -34,6 +37,17 @@ const mockDequeueSupersededFindings = jest.fn() as jest.MockedFunction<
   typeof analysisDbModule.dequeueSupersededFindings
 >;
 const mockSyncLogger = jest.fn();
+const mockCaptureException = jest.fn();
+const mockErrorExceptInTest = jest.fn();
+const mockWarnExceptInTest = jest.fn();
+let mockIntegrationAuthInvalidAt: string | null = null;
+const mockDbLimit = jest.fn(async () => [{ authInvalidAt: mockIntegrationAuthInvalidAt }]);
+const mockDbWhereSelect = jest.fn((_condition: unknown) => ({ limit: mockDbLimit }));
+const mockDbFrom = jest.fn((_table: unknown) => ({ where: mockDbWhereSelect }));
+const mockDbSelect = jest.fn((_selection?: unknown) => ({ from: mockDbFrom }));
+const mockDbUpdateWhere = jest.fn(async (_condition: unknown) => undefined);
+const mockDbSet = jest.fn((_values: unknown) => ({ where: mockDbUpdateWhere }));
+const mockDbUpdate = jest.fn((_table: unknown) => ({ set: mockDbSet }));
 
 jest.mock('../github/dependabot-api', () => ({
   fetchAllDependabotAlerts: mockFetchAllDependabotAlerts,
@@ -59,10 +73,38 @@ jest.mock('../db/security-analysis', () => ({
   dequeueSupersededFindings: mockDequeueSupersededFindings,
 }));
 
-jest.mock('@/lib/drizzle', () => ({ db: {} }));
-jest.mock('@kilocode/db/schema', () => ({ platform_integrations: {}, agent_configs: {} }));
+jest.mock('@/lib/drizzle', () => ({
+  db: {
+    select: mockDbSelect,
+    update: mockDbUpdate,
+  },
+}));
+jest.mock('@kilocode/db/schema', () => ({
+  platform_integrations: {
+    id: 'platform_integrations.id',
+    auth_invalid_at: 'platform_integrations.auth_invalid_at',
+  },
+  agent_configs: {
+    agent_type: 'agent_configs.agent_type',
+    platform: 'agent_configs.platform',
+    owned_by_organization_id: 'agent_configs.owned_by_organization_id',
+    owned_by_user_id: 'agent_configs.owned_by_user_id',
+    runtime_state: 'agent_configs.runtime_state',
+  },
+}));
+jest.mock('drizzle-orm', () => ({
+  and: jest.fn(() => 'and'),
+  eq: jest.fn(() => 'eq'),
+  isNotNull: jest.fn(() => 'isNotNull'),
+  sql: jest.fn(() => 'sql'),
+}));
 jest.mock('../github/permissions', () => ({ hasSecurityReviewPermissions: () => true }));
-jest.mock('@/lib/utils.server', () => ({ sentryLogger: () => mockSyncLogger }));
+jest.mock('@sentry/nextjs', () => ({ captureException: mockCaptureException }));
+jest.mock('@/lib/utils.server', () => ({
+  sentryLogger: () => mockSyncLogger,
+  errorExceptInTest: mockErrorExceptInTest,
+  warnExceptInTest: mockWarnExceptInTest,
+}));
 jest.mock('./audit-log-service', () => ({
   logSecurityAudit: jest.fn(),
   SecurityAuditLogAction: { SyncCompleted: 'sync_completed' },
@@ -70,14 +112,16 @@ jest.mock('./audit-log-service', () => ({
 jest.mock('../posthog-tracking', () => ({ trackSecurityAgentFullSync: jest.fn() }));
 
 let syncDependabotAlertsForRepo: typeof syncDependabotAlertsForRepoType;
+let syncAllReposForOwner: typeof syncAllReposForOwnerType;
 
 beforeAll(async () => {
-  ({ syncDependabotAlertsForRepo } = await import('./sync-service'));
+  ({ syncAllReposForOwner, syncDependabotAlertsForRepo } = await import('./sync-service'));
 });
 
 describe('sync-service queue enqueue wiring', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockIntegrationAuthInvalidAt = null;
     mockFetchAllDependabotAlerts.mockResolvedValue({ status: 'success', alerts: [] });
     mockParseDependabotAlerts.mockReturnValue([
       {
@@ -210,5 +254,124 @@ describe('sync-service queue enqueue wiring', () => {
         unknown_severity_count: 0,
       })
     );
+  });
+
+  it('handles all auth_invalid repos without throwing, freshness advancement, or Sentry capture', async () => {
+    mockFetchAllDependabotAlerts.mockResolvedValue({ status: 'auth_invalid' });
+
+    await expect(
+      syncAllReposForOwner({
+        owner: { userId: 'user-1' },
+        platformIntegrationId: 'integration-1',
+        installationId: 'inst-1',
+        repositories: ['acme/widgets', 'acme/api', 'acme/web'],
+      })
+    ).resolves.toEqual(
+      expect.objectContaining({
+        errors: 0,
+        authInvalid: 1,
+        authInvalidRepos: ['acme/widgets'],
+        reauthRequired: true,
+      })
+    );
+
+    expect(mockFetchAllDependabotAlerts).toHaveBeenCalledTimes(1);
+    expect(mockCaptureException).not.toHaveBeenCalled();
+    expect(mockDbSet.mock.calls.map(call => call[0])).not.toContainEqual(
+      expect.objectContaining({ runtime_state: expect.anything() })
+    );
+  });
+
+  it('does not advance freshness for mixed success and auth_invalid repos', async () => {
+    mockFetchAllDependabotAlerts
+      .mockResolvedValueOnce({ status: 'success', alerts: [] })
+      .mockResolvedValueOnce({ status: 'auth_invalid' });
+    mockParseDependabotAlerts.mockReturnValue([]);
+
+    const result = await syncAllReposForOwner({
+      owner: { userId: 'user-1' },
+      platformIntegrationId: 'integration-1',
+      installationId: 'inst-1',
+      repositories: ['acme/widgets', 'acme/api', 'acme/web'],
+    });
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        errors: 0,
+        authInvalid: 1,
+        reauthRequired: true,
+      })
+    );
+    expect(mockFetchAllDependabotAlerts).toHaveBeenCalledTimes(2);
+    expect(mockDbSet.mock.calls.map(call => call[0])).not.toContainEqual(
+      expect.objectContaining({ runtime_state: expect.anything() })
+    );
+  });
+
+  it('marks the installation auth-invalid after a 401-derived fetch result', async () => {
+    mockFetchAllDependabotAlerts.mockResolvedValue({ status: 'auth_invalid' });
+
+    await syncAllReposForOwner({
+      owner: { userId: 'user-1' },
+      platformIntegrationId: 'integration-1',
+      installationId: 'inst-1',
+      repositories: ['acme/widgets'],
+    });
+
+    expect(mockDbSet).toHaveBeenCalledWith(
+      expect.objectContaining({
+        auth_invalid_at: expect.any(String),
+        auth_invalid_reason: 'github_dependabot_401',
+      })
+    );
+  });
+
+  it('refreshes expired auth-invalid state after GitHub still returns 401', async () => {
+    mockIntegrationAuthInvalidAt = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+    mockFetchAllDependabotAlerts.mockResolvedValue({ status: 'auth_invalid' });
+
+    const result = await syncAllReposForOwner({
+      owner: { userId: 'user-1' },
+      platformIntegrationId: 'integration-1',
+      installationId: 'inst-1',
+      repositories: ['acme/widgets'],
+    });
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        authInvalid: 1,
+        authInvalidRepos: ['acme/widgets'],
+        reauthRequired: true,
+      })
+    );
+    expect(mockFetchAllDependabotAlerts).toHaveBeenCalledTimes(1);
+    expect(mockDbSet).toHaveBeenCalledWith(
+      expect.objectContaining({
+        auth_invalid_at: expect.any(String),
+        auth_invalid_reason: 'github_dependabot_401',
+      })
+    );
+  });
+
+  it('short-circuits recent auth-invalid installations without GitHub calls', async () => {
+    mockIntegrationAuthInvalidAt = new Date().toISOString();
+
+    const result = await syncAllReposForOwner({
+      owner: { userId: 'user-1' },
+      platformIntegrationId: 'integration-1',
+      installationId: 'inst-1',
+      repositories: ['acme/widgets', 'acme/api'],
+    });
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        authInvalid: 2,
+        authInvalidRepos: ['acme/widgets', 'acme/api'],
+        reauthRequired: true,
+      })
+    );
+    expect(mockFetchAllDependabotAlerts).not.toHaveBeenCalled();
+    expect(mockDbUpdate).not.toHaveBeenCalled();
+    expect(mockCaptureException).not.toHaveBeenCalled();
   });
 });

@@ -78,7 +78,7 @@ Experiment attribution rows MUST NOT store prompt content in Postgres. They stor
 
 Prompt bodies are stored as full canonical post-transform request bodies in a dedicated per-environment R2 bucket, content-addressed by lowercase sha256. There is one full-body prompt object per unique bounded body; v1 does not store a separate system-prompt object.
 
-Prompt capture is bounded analytics data. The serialized body MUST be capped before it is retained for asynchronous persistence, with deterministic valid-UTF-8 truncation and `was_truncated` recording whether truncation occurred. R2 writes are best-effort: attribution rows SHOULD still land when prompt storage fails, using a reserved sentinel.
+Prompt capture is analytics data. Implementations MAY cap the serialized body before retaining it for asynchronous persistence. If truncation is applied, it MUST be deterministic, preserve valid UTF-8, and record `was_truncated = true`. R2 writes are best-effort: attribution rows SHOULD still land when prompt storage fails, using a reserved sentinel.
 
 Valid prompt references are a 64-character lowercase sha256 hex digest or a reserved sentinel. Reserved sentinels are:
 

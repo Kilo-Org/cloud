@@ -108,6 +108,7 @@ export type WrapperSupervisor = {
     now: number
   ): Promise<void>;
   onDisconnected(input: WrapperDisconnectedInput): Promise<void>;
+  onRuntimeInvalidationStarted(fence: WrapperRunFence): Promise<void>;
   onRuntimeInvalidated(fence: WrapperRunFence): Promise<void>;
   onTerminalEvent(params: WrapperTerminalEvent): Promise<void>;
   clearDisconnectGrace(): Promise<void>;
@@ -253,6 +254,7 @@ export function createWrapperSupervisor(
   }
 
   function destroyedRuntimeInvalidationKey(invalidated: WrapperRunFence): string {
+    // Allocation never reuses a generation/connection pair for another wrapper run in this DO.
     return `${DESTROYED_RUNTIME_INVALIDATION_PREFIX}${invalidated.wrapperGeneration}:${invalidated.wrapperConnectionId}`;
   }
 
@@ -482,7 +484,33 @@ export function createWrapperSupervisor(
     }
   }
 
+  async function onRuntimeInvalidationStarted(invalidated: WrapperRunFence): Promise<void> {
+    const state = await getWrapperRuntimeState(storage);
+    const matchesCurrentRuntime =
+      state.wrapperRunId === invalidated.wrapperRunId &&
+      state.wrapperGeneration === invalidated.wrapperGeneration &&
+      state.wrapperConnectionId === invalidated.wrapperConnectionId;
+    if (!matchesCurrentRuntime) {
+      throw new Error('Cannot prepare sandbox destruction for a stale wrapper runtime');
+    }
+
+    const pendingInvalidation = destroyedRuntimeInvalidationSchema.parse({
+      ...invalidated,
+      invalidatedAt: Date.now(),
+    });
+    await storage.put(destroyedRuntimeInvalidationKey(pendingInvalidation), pendingInvalidation);
+  }
+
   async function onRuntimeInvalidated(invalidated: WrapperRunFence): Promise<void> {
+    const key = destroyedRuntimeInvalidationKey(invalidated);
+    const storedInvalidation = destroyedRuntimeInvalidationSchema.safeParse(
+      await storage.get<unknown>(key)
+    );
+    if (storedInvalidation.success) {
+      await settleDestroyedRuntimeInvalidation(key, storedInvalidation.data);
+      return;
+    }
+
     const state = await getWrapperRuntimeState(storage);
     const matchesCurrentRuntime =
       state.wrapperRunId === invalidated.wrapperRunId &&
@@ -507,7 +535,6 @@ export function createWrapperSupervisor(
       ...invalidated,
       invalidatedAt: Date.now(),
     });
-    const key = destroyedRuntimeInvalidationKey(pendingInvalidation);
     await storage.put(key, pendingInvalidation);
     await settleDestroyedRuntimeInvalidation(key, pendingInvalidation);
   }
@@ -939,6 +966,7 @@ export function createWrapperSupervisor(
     observeMeaningfulOutput,
     observeRootIdle,
     onDisconnected,
+    onRuntimeInvalidationStarted,
     onRuntimeInvalidated,
     onTerminalEvent,
     clearDisconnectGrace,

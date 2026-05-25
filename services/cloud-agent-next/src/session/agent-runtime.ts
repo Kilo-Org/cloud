@@ -44,7 +44,11 @@ export type AgentRuntimeOrchestrator = {
     options?: {
       onProgress?: (step: string, message: string) => void;
       onWorkspaceReady?: (ready: WorkspaceReady) => Promise<void>;
+      onSandboxDestroying?: (invalidation: PreparationInfrastructureInvalidation) => Promise<void>;
       onSandboxDestroyed?: (invalidation: PreparationInfrastructureInvalidation) => Promise<void>;
+      onSandboxDestructionUncertain?: (
+        invalidation: PreparationInfrastructureInvalidation
+      ) => Promise<void>;
     }
   ): Promise<ExecutionResult>;
 };
@@ -58,6 +62,7 @@ export type AgentRuntimeSendHooks = {
   onProgress?: (step: string, message: string) => void;
   onWorkspaceReady?: (ready: WorkspaceReady) => Promise<void>;
   onAccepted?: (delivery: AgentRuntimeAcceptedDelivery) => Promise<void>;
+  onRuntimeInvalidationStarted?: (fence: WrapperRunFence) => Promise<void>;
   onRuntimeInvalidated?: (fence: WrapperRunFence) => Promise<void>;
 };
 
@@ -188,7 +193,21 @@ export function createAgentRuntime(dependencies: AgentRuntimeDependencies): Agen
             .info('AgentRuntime wrapper workspace reported ready');
           await hooks.onWorkspaceReady?.(ready);
         },
+        onSandboxDestroying: async () => {
+          await hooks.onRuntimeInvalidationStarted?.({
+            wrapperRunId: wrapperRuntimeState.wrapperRunId,
+            wrapperGeneration: wrapperRuntimeState.wrapperGeneration,
+            wrapperConnectionId: wrapperRuntimeState.wrapperConnectionId,
+          });
+        },
         onSandboxDestroyed: async () => {
+          await hooks.onRuntimeInvalidated?.({
+            wrapperRunId: wrapperRuntimeState.wrapperRunId,
+            wrapperGeneration: wrapperRuntimeState.wrapperGeneration,
+            wrapperConnectionId: wrapperRuntimeState.wrapperConnectionId,
+          });
+        },
+        onSandboxDestructionUncertain: async () => {
           await hooks.onRuntimeInvalidated?.({
             wrapperRunId: wrapperRuntimeState.wrapperRunId,
             wrapperGeneration: wrapperRuntimeState.wrapperGeneration,

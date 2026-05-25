@@ -220,6 +220,7 @@ describe('AgentRuntime', () => {
       ],
     ]);
     const error = new Error('hot follow-up destroyed its sandbox');
+    const invalidationStartedFences: WrapperRunFence[] = [];
     const invalidatedFences: WrapperRunFence[] = [];
     const runtime = createAgentRuntime({
       storage,
@@ -229,15 +230,20 @@ describe('AgentRuntime', () => {
         execute: async (
           _plan: FencedWrapperDispatchRequest,
           options?: {
+            onSandboxDestroying?: (
+              invalidation: PreparationInfrastructureInvalidation
+            ) => Promise<void>;
             onSandboxDestroyed?: (
               invalidation: PreparationInfrastructureInvalidation
             ) => Promise<void>;
           }
         ) => {
-          await options?.onSandboxDestroyed?.({
-            failureType: 'sandbox_workspace_probe_timeout',
+          const invalidation = {
+            failureType: 'sandbox_workspace_probe_timeout' as const,
             error,
-          });
+          };
+          await options?.onSandboxDestroying?.(invalidation);
+          await options?.onSandboxDestroyed?.(invalidation);
           throw error;
         },
       }),
@@ -247,12 +253,22 @@ describe('AgentRuntime', () => {
 
     await expect(
       runtime.send(createPlan(), {
+        onRuntimeInvalidationStarted: async fence => {
+          invalidationStartedFences.push(fence);
+        },
         onRuntimeInvalidated: async fence => {
           invalidatedFences.push(fence);
         },
       })
     ).rejects.toBe(error);
 
+    expect(invalidationStartedFences).toEqual([
+      {
+        wrapperRunId: 'wr_hot',
+        wrapperGeneration: 3,
+        wrapperConnectionId: 'conn_hot',
+      },
+    ]);
     expect(invalidatedFences).toEqual([
       {
         wrapperRunId: 'wr_hot',

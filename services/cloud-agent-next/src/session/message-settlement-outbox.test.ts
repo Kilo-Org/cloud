@@ -251,6 +251,38 @@ describe('MessageSettlementOutbox', () => {
     expect(harness.callbackJobs[0].target.url).toBe('https://example.com/second');
   });
 
+  it('defers a ready callback while an unrelated callback-free terminal effect is pending', async () => {
+    const harness = createHarness();
+    await putSessionMessageState(
+      harness.storage,
+      acceptedMessageState(firstMessageId, { url: 'https://example.com/ready' })
+    );
+    await putSessionMessageState(harness.storage, {
+      ...acceptedMessageState(secondMessageId),
+      wrapperRunId: 'wr_unrelated',
+    });
+
+    await harness.outbox.terminalizeSessionMessageOnce(firstMessageId, {
+      kind: 'completed',
+      completionSource: 'assistant_message_event',
+    });
+    await harness.outbox.persistTerminalTransition(secondMessageId, {
+      kind: 'failed',
+      reason: 'wrapper_failure',
+      completionSource: 'wrapper_failure',
+    });
+    await harness.outbox.finalizeIdleBatchCallbackIfReady({
+      allowWithoutObservedIdle: true,
+    });
+
+    expect(harness.callbackJobs).toHaveLength(0);
+
+    await harness.outbox.repairTerminalEffects();
+
+    expect(harness.callbackJobs).toHaveLength(1);
+    expect(harness.callbackJobs[0].target.url).toBe('https://example.com/ready');
+  });
+
   it('keeps a repaired gate-waiting terminal callback blocked until gate wait is released', async () => {
     const harness = createHarness({
       metadata: { ...metadata, finalization: { gateThreshold: 'warning' } },

@@ -2531,6 +2531,8 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
           throw new Error(readyResult.error ?? 'Failed to record session readiness');
         }
       },
+      onRuntimeInvalidationStarted: fence =>
+        this.getWrapperSupervisor().onRuntimeInvalidationStarted(fence),
       onRuntimeInvalidated: fence => this.getWrapperSupervisor().onRuntimeInvalidated(fence),
       onAccepted: delivery => this.recordRuntimeAcceptedMessage(plan, delivery),
     });

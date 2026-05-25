@@ -232,6 +232,8 @@ export function createMessageSettlementOutbox(
     const now = Date.now();
     await storage.put(idleBatchCallbackKey(batch.batchId), {
       ...batch,
+      // A released runtime may never report idle after terminal-effect repair resumes later.
+      allowWithoutObservedIdle: true,
       wrapperTerminalWaitReleasedAt: now,
       updatedAt: now,
     } satisfies IdleBatchCallbackState);
@@ -442,6 +444,9 @@ export function createMessageSettlementOutbox(
 
     const acceptedMessages = await listNonTerminalAcceptedMessages(storage);
     if (acceptedMessages.length > 0) return;
+
+    const pendingTerminalEffects = await listTerminalMessagesWithPendingEffects(storage);
+    if (pendingTerminalEffects.length > 0) return;
 
     if (!options?.allowWithoutObservedIdle && !(await hasObservedWrapperIdle())) {
       return;

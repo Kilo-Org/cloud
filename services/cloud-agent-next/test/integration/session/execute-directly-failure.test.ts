@@ -612,15 +612,20 @@ describe('hot delivery failure preserves existing wrapper identity', () => {
         execute: async (
           _plan: FencedWrapperDispatchRequest,
           options?: {
+            onSandboxDestroying?: (
+              invalidation: PreparationInfrastructureInvalidation
+            ) => Promise<void>;
             onSandboxDestroyed?: (
               invalidation: PreparationInfrastructureInvalidation
             ) => Promise<void>;
           }
         ) => {
-          await options?.onSandboxDestroyed?.({
-            failureType: 'sandbox_workspace_probe_timeout',
+          const invalidation = {
+            failureType: 'sandbox_workspace_probe_timeout' as const,
             error: deliveryError,
-          });
+          };
+          await options?.onSandboxDestroying?.(invalidation);
+          await options?.onSandboxDestroyed?.(invalidation);
           throw deliveryError;
         },
       };

@@ -518,6 +518,135 @@ describe('WrapperSupervisor', () => {
     expect(harness.events.map(event => event.streamEventType)).toEqual(['cloud.message.failed']);
   });
 
+  it('persists destruction intent until runtime invalidation settles it', async () => {
+    const harness = createHarness([liveRuntimeState()]);
+    const fence = {
+      wrapperRunId: WRAPPER_RUN_ID,
+      wrapperGeneration: 4,
+      wrapperConnectionId: WRAPPER_CONNECTION_ID,
+    };
+
+    await harness.supervisor.onRuntimeInvalidationStarted(fence);
+
+    await expect(
+      harness.storage.list({ prefix: 'destroyed_runtime_invalidation:' })
+    ).resolves.toHaveProperty('size', 1);
+    await expect(getWrapperRuntimeState(harness.storage)).resolves.toMatchObject(fence);
+
+    await harness.supervisor.onRuntimeInvalidated(fence);
+
+    await expect(
+      harness.storage.list({ prefix: 'destroyed_runtime_invalidation:' })
+    ).resolves.toHaveProperty('size', 0);
+    await expect(getWrapperRuntimeState(harness.storage)).resolves.toEqual({
+      wrapperGeneration: 5,
+    });
+  });
+
+  it('recovers persisted destruction intent after post-destruction settlement fails', async () => {
+    let terminalEventError: Error | undefined = new Error('terminal event persistence failed');
+    const harness = createHarness([liveRuntimeState()], {
+      terminalEventError: () => terminalEventError,
+    });
+    const fence = {
+      wrapperRunId: WRAPPER_RUN_ID,
+      wrapperGeneration: 4,
+      wrapperConnectionId: WRAPPER_CONNECTION_ID,
+    };
+    await putSessionMessageState(harness.storage, acceptedMessage());
+
+    await harness.supervisor.onRuntimeInvalidationStarted(fence);
+    await expect(harness.supervisor.onRuntimeInvalidated(fence)).rejects.toThrow(
+      'terminal event persistence failed'
+    );
+
+    await expect(
+      harness.storage.list({ prefix: 'destroyed_runtime_invalidation:' })
+    ).resolves.toHaveProperty('size', 1);
+    await expect(getWrapperRuntimeState(harness.storage)).resolves.toEqual({
+      wrapperGeneration: 5,
+    });
+
+    terminalEventError = undefined;
+    await harness.supervisor.runMaintenance(Date.now());
+    await harness.settlementOutbox.repairTerminalEffects();
+    await harness.supervisor.runMaintenance(Date.now());
+
+    await expect(
+      harness.storage.list({ prefix: 'destroyed_runtime_invalidation:' })
+    ).resolves.toHaveProperty('size', 0);
+    expect(harness.events.map(event => event.streamEventType)).toEqual(['cloud.message.failed']);
+  });
+
+  it('rejects destruction intent for a stale fence', async () => {
+    const harness = createHarness([
+      liveRuntimeState({
+        wrapperRunId: 'wr_replacement',
+        wrapperGeneration: 5,
+        wrapperConnectionId: 'conn_replacement',
+      }),
+    ]);
+
+    await expect(
+      harness.supervisor.onRuntimeInvalidationStarted({
+        wrapperRunId: WRAPPER_RUN_ID,
+        wrapperGeneration: 4,
+        wrapperConnectionId: WRAPPER_CONNECTION_ID,
+      })
+    ).rejects.toThrow('Cannot prepare sandbox destruction for a stale wrapper runtime');
+
+    await expect(
+      harness.storage.list({ prefix: 'destroyed_runtime_invalidation:' })
+    ).resolves.toHaveProperty('size', 0);
+    await expect(getWrapperRuntimeState(harness.storage)).resolves.toMatchObject({
+      wrapperRunId: 'wr_replacement',
+      wrapperGeneration: 5,
+      wrapperConnectionId: 'conn_replacement',
+    });
+  });
+
+  it('does not finalize an earlier callback while destroyed-runtime terminal effects are pending', async () => {
+    let terminalEventError: Error | undefined;
+    const harness = createHarness([liveRuntimeState()], {
+      metadata: {
+        ...createMetadata(),
+        finalization: { gateThreshold: 'warning' },
+      },
+      terminalEventError: () => terminalEventError,
+      hasObservedWrapperIdle: async () => false,
+    });
+    await putSessionMessageState(harness.storage, {
+      ...acceptedMessage(),
+      callbackRequired: true,
+      callbackTarget: { url: 'https://example.com/already-completed' },
+    });
+    await harness.settlementOutbox.terminalizeSessionMessageOnce(MESSAGE_ID, {
+      kind: 'completed',
+      completionSource: 'assistant_message_event',
+    });
+    await putSessionMessageState(harness.storage, {
+      ...acceptedMessage(NEWER_MESSAGE_ID),
+      callbackRequired: true,
+      callbackTarget: { url: 'https://example.com/destroyed-later' },
+    });
+    terminalEventError = new Error('later terminal event persistence failed');
+
+    await expect(
+      harness.supervisor.onRuntimeInvalidated({
+        wrapperRunId: WRAPPER_RUN_ID,
+        wrapperGeneration: 4,
+        wrapperConnectionId: WRAPPER_CONNECTION_ID,
+      })
+    ).rejects.toThrow('later terminal event persistence failed');
+
+    expect(harness.callbackJobs).toHaveLength(0);
+    terminalEventError = undefined;
+    await harness.settlementOutbox.repairTerminalEffects();
+
+    expect(harness.callbackJobs).toHaveLength(1);
+    expect(harness.callbackJobs[0].target.url).toBe('https://example.com/destroyed-later');
+  });
+
   it('invalidates a destroyed fence before fallible terminal effects are repaired', async () => {
     let terminalEventError: Error | undefined = new Error('terminal event persistence failed');
     const harness = createHarness([liveRuntimeState()], {

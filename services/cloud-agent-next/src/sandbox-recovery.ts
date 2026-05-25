@@ -15,7 +15,11 @@ type RecoveryContext = {
   sandboxId: string;
   sessionId?: string;
   phase: string;
+  onSandboxDestroying?: (invalidation: PreparationInfrastructureInvalidation) => Promise<void>;
   onSandboxDestroyed?: (invalidation: PreparationInfrastructureInvalidation) => Promise<void>;
+  onSandboxDestructionUncertain?: (
+    invalidation: PreparationInfrastructureInvalidation
+  ) => Promise<void>;
 };
 
 export type PreparationInfrastructureFailure =
@@ -354,29 +358,68 @@ export async function withPreparationInfrastructureRecovery<T>(
     return await operation();
   } catch (error) {
     const failure = getPreparationInfrastructureFailure(error);
-    const destroyed = await destroySandboxAfterPreparationInfrastructureFailure(context, error);
-    if (destroyed && failure && context.onSandboxDestroyed) {
-      logger
-        .withFields({
-          sandboxId: context.sandboxId,
-          sessionId: context.sessionId,
-          phase: context.phase,
-          failureType: failure.type,
-          logTag: 'preparation_sandbox_destruction_notified',
-        })
-        .info('Reporting destroyed sandbox after preparation infrastructure failure');
-      try {
-        await context.onSandboxDestroyed({
+    const invalidation = failure
+      ? {
           failureType: failure.type,
           error,
-        });
+        }
+      : undefined;
+
+    if (invalidation && context.onSandboxDestroying) {
+      try {
+        await context.onSandboxDestroying(invalidation);
       } catch (notificationError) {
         logger
           .withFields({
             sandboxId: context.sandboxId,
             sessionId: context.sessionId,
             phase: context.phase,
-            failureType: failure.type,
+            failureType: invalidation.failureType,
+            originalError: getErrorMessage(error),
+            error: getErrorMessage(notificationError),
+            logTag: 'preparation_sandbox_destruction_prepare_failed',
+          })
+          .error('Failed to durably prepare sandbox destruction; preserving sandbox runtime');
+        throw error;
+      }
+    }
+
+    const destroyed = await destroySandboxAfterPreparationInfrastructureFailure(context, error);
+    if (!destroyed && invalidation && context.onSandboxDestructionUncertain) {
+      try {
+        await context.onSandboxDestructionUncertain(invalidation);
+      } catch (notificationError) {
+        logger
+          .withFields({
+            sandboxId: context.sandboxId,
+            sessionId: context.sessionId,
+            phase: context.phase,
+            failureType: invalidation.failureType,
+            error: getErrorMessage(notificationError),
+            logTag: 'preparation_sandbox_destruction_uncertain_notification_failed',
+          })
+          .error('Failed to invalidate runtime after uncertain sandbox destruction outcome');
+      }
+    }
+    if (destroyed && invalidation && context.onSandboxDestroyed) {
+      logger
+        .withFields({
+          sandboxId: context.sandboxId,
+          sessionId: context.sessionId,
+          phase: context.phase,
+          failureType: invalidation.failureType,
+          logTag: 'preparation_sandbox_destruction_notified',
+        })
+        .info('Reporting destroyed sandbox after preparation infrastructure failure');
+      try {
+        await context.onSandboxDestroyed(invalidation);
+      } catch (notificationError) {
+        logger
+          .withFields({
+            sandboxId: context.sandboxId,
+            sessionId: context.sessionId,
+            phase: context.phase,
+            failureType: invalidation.failureType,
             error: getErrorMessage(notificationError),
             logTag: 'preparation_sandbox_destruction_notification_failed',
           })

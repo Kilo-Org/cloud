@@ -200,8 +200,10 @@ describe('sandbox recovery', () => {
     expect(mockInfo).toHaveBeenCalledWith('Destroyed sandbox after workspace Git probe timeout');
   });
 
-  it('does not report sandbox destruction when destructive recovery fails', async () => {
+  it('invalidates a prepared runtime when sandbox destruction outcome is uncertain', async () => {
     const sandbox = { destroy: vi.fn().mockRejectedValue(new Error('destroy failed')) };
+    const onSandboxDestroying = vi.fn().mockResolvedValue(undefined);
+    const onSandboxDestructionUncertain = vi.fn().mockResolvedValue(undefined);
     const onSandboxDestroyed = vi.fn().mockResolvedValue(undefined);
     const error = new Error(`${SANDBOX_WORKSPACE_PROBE_TIMEOUT_MESSAGE} after 30000ms`);
 
@@ -212,6 +214,8 @@ describe('sandbox recovery', () => {
           sandboxId: 'ses-test',
           sessionId: 'agent_test',
           phase: 'asyncPreparation',
+          onSandboxDestroying,
+          onSandboxDestructionUncertain,
           onSandboxDestroyed,
         },
         async () => {
@@ -220,8 +224,44 @@ describe('sandbox recovery', () => {
       )
     ).rejects.toBe(error);
 
+    expect(onSandboxDestroying).toHaveBeenCalledOnce();
     expect(sandbox.destroy).toHaveBeenCalledOnce();
+    expect(onSandboxDestructionUncertain).toHaveBeenCalledOnce();
     expect(onSandboxDestroyed).not.toHaveBeenCalled();
+  });
+
+  it('does not destroy a sandbox when invalidation intent cannot be recorded', async () => {
+    const sandbox = { destroy: vi.fn().mockResolvedValue(undefined) };
+    const onSandboxDestroying = vi.fn().mockRejectedValue(new Error('storage put failed'));
+    const onSandboxDestroyed = vi.fn().mockResolvedValue(undefined);
+    const error = new Error(`${SANDBOX_WORKSPACE_PROBE_TIMEOUT_MESSAGE} after 30000ms`);
+
+    await expect(
+      withPreparationInfrastructureRecovery(
+        {
+          sandbox,
+          sandboxId: 'ses-test',
+          sessionId: 'agent_test',
+          phase: 'asyncPreparation',
+          onSandboxDestroying,
+          onSandboxDestroyed,
+        },
+        async () => {
+          throw error;
+        }
+      )
+    ).rejects.toBe(error);
+
+    expect(onSandboxDestroying).toHaveBeenCalledOnce();
+    expect(sandbox.destroy).not.toHaveBeenCalled();
+    expect(onSandboxDestroyed).not.toHaveBeenCalled();
+    expect(mockWithFields).toHaveBeenCalledWith(
+      expect.objectContaining({
+        error: 'storage put failed',
+        originalError: error.message,
+        logTag: 'preparation_sandbox_destruction_prepare_failed',
+      })
+    );
   });
 
   it('keeps the original error when destroyed-sandbox notification fails', async () => {

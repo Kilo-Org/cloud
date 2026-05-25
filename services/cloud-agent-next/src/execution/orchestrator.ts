@@ -99,7 +99,11 @@ export class ExecutionOrchestrator {
     options?: {
       onProgress?: (step: string, message: string) => void;
       onWorkspaceReady?: (ready: WorkspaceReady) => Promise<void>;
+      onSandboxDestroying?: (invalidation: PreparationInfrastructureInvalidation) => Promise<void>;
       onSandboxDestroyed?: (invalidation: PreparationInfrastructureInvalidation) => Promise<void>;
+      onSandboxDestructionUncertain?: (
+        invalidation: PreparationInfrastructureInvalidation
+      ) => Promise<void>;
     }
   ): Promise<ExecutionResult> {
     const executionId = 'executionId' in plan ? plan.executionId : undefined;
@@ -146,7 +150,9 @@ export class ExecutionOrchestrator {
         sandboxId,
         sessionId,
         phase: 'executionWorkspacePreparation',
+        onSandboxDestroying: options?.onSandboxDestroying,
         onSandboxDestroyed: options?.onSandboxDestroyed,
+        onSandboxDestructionUncertain: options?.onSandboxDestructionUncertain,
       },
       () => this.executeWithWrapperBootstrap(sandbox, plan, options)
     );

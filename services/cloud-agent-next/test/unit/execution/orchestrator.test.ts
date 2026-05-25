@@ -446,15 +446,19 @@ describe('ExecutionOrchestrator bootstrap execution', () => {
     expect(sandbox.destroy).toHaveBeenCalledOnce();
   });
 
-  it('reports sandbox destruction when the warm workspace probe stalls', async () => {
+  it('records invalidation intent before destroying a sandbox whose warm probe stalls', async () => {
     vi.useFakeTimers();
     const { sandbox } = createMockSandbox({ workspaceWarm: true });
     sandbox.exec.mockImplementationOnce(() => new Promise(() => {}));
     stubWrapperBootstrap();
     const orchestrator = createOrchestrator(sandbox);
+    const onSandboxDestroying = vi.fn().mockResolvedValue(undefined);
     const onSandboxDestroyed = vi.fn().mockResolvedValue(undefined);
 
-    const execution = orchestrator.execute(createExecutionPlan(), { onSandboxDestroyed });
+    const execution = orchestrator.execute(createExecutionPlan(), {
+      onSandboxDestroying,
+      onSandboxDestroyed,
+    });
     const rejection = expect(execution).rejects.toThrow(
       'Sandbox workspace Git probe timed out before wrapper bootstrap'
     );
@@ -462,10 +466,17 @@ describe('ExecutionOrchestrator bootstrap execution', () => {
 
     await rejection;
     expect(sandbox.destroy).toHaveBeenCalledOnce();
+    expect(onSandboxDestroying).toHaveBeenCalledWith({
+      failureType: 'sandbox_workspace_probe_timeout',
+      error: expect.any(Error),
+    });
     expect(onSandboxDestroyed).toHaveBeenCalledWith({
       failureType: 'sandbox_workspace_probe_timeout',
       error: expect.any(Error),
     });
+    expect(onSandboxDestroying.mock.invocationCallOrder[0]).toBeLessThan(
+      sandbox.destroy.mock.invocationCallOrder[0]
+    );
     expect(sandbox.destroy.mock.invocationCallOrder[0]).toBeLessThan(
       onSandboxDestroyed.mock.invocationCallOrder[0]
     );

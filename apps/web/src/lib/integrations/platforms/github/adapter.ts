@@ -444,6 +444,9 @@ export async function exchangeGitHubOAuthCode(
   };
 }
 
+const KILO_REVIEW_COMMENTS_PER_PAGE = 100;
+const MAX_KILO_REVIEW_COMMENT_PAGES = 5;
+
 /**
  * Finds an existing Kilo review comment on a PR
  * Looks for the <!-- kilo-review --> marker in issue comments
@@ -461,13 +464,22 @@ export async function findKiloReviewComment(
   const tokenData = await generateGitHubInstallationToken(installationId, appType);
   const octokit = new Octokit({ auth: tokenData.token });
 
-  // Fetch all issue comments (PR comments are issue comments in GitHub API)
-  const comments = await octokit.paginate(octokit.issues.listComments, {
-    owner,
-    repo,
-    issue_number: prNumber,
-    per_page: 100,
-  });
+  const comments: Array<{ id: number; body?: string | null; updated_at: string }> = [];
+  let reachedScanLimit = false;
+
+  for (let page = 1; page <= MAX_KILO_REVIEW_COMMENT_PAGES; page++) {
+    const { data: pageComments } = await octokit.issues.listComments({
+      owner,
+      repo,
+      issue_number: prNumber,
+      per_page: KILO_REVIEW_COMMENTS_PER_PAGE,
+      page,
+    });
+    comments.push(...pageComments);
+
+    if (pageComments.length < KILO_REVIEW_COMMENTS_PER_PAGE) break;
+    reachedScanLimit = page === MAX_KILO_REVIEW_COMMENT_PAGES;
+  }
 
   logExceptInTest('[findKiloReviewComment] Fetched comments', {
     owner,
@@ -493,6 +505,10 @@ export async function findKiloReviewComment(
       detectionMethod: 'marker',
     });
     return { commentId: latestComment.id, body: latestComment.body || '' };
+  }
+
+  if (reachedScanLimit) {
+    throw new Error('Kilo review comment lookup exceeded the safe issue-comment scan limit');
   }
 
   logExceptInTest('[findKiloReviewComment] No existing Kilo review comment found', {

@@ -8,13 +8,11 @@ process.env.GITHUB_APP_PRIVATE_KEY = 'test-private-key';
 process.env.GITHUB_LITE_APP_ID = 'test-lite-app-id';
 process.env.GITHUB_LITE_APP_PRIVATE_KEY = 'test-lite-private-key';
 
-const mockPaginate = jest.fn();
 const mockListComments = jest.fn();
 
 jest.mock('@octokit/rest', () => ({
   Octokit: jest.fn().mockImplementation(() => ({
     issues: { listComments: mockListComments },
-    paginate: mockPaginate,
   })),
 }));
 
@@ -25,40 +23,68 @@ jest.mock('@octokit/auth-app', () => ({
 import { findKiloReviewComment } from './adapter';
 
 beforeEach(() => {
-  mockPaginate.mockReset();
   mockListComments.mockReset();
 });
 
 describe('findKiloReviewComment', () => {
   it('finds a marked Kilo review comment across paginated issue comments', async () => {
-    mockPaginate.mockResolvedValueOnce([
-      {
-        id: 1,
-        body: 'ordinary discussion',
-        updated_at: '2026-05-01T00:00:00Z',
-      },
-      {
-        id: 2,
-        body: '<!-- kilo-review -->\n## Code Review Summary\nOlder summary',
-        updated_at: '2026-05-02T00:00:00Z',
-      },
-      {
-        id: 3,
-        body: '<!-- kilo-review -->\n## Code Review Summary\nLatest summary',
-        updated_at: '2026-05-03T00:00:00Z',
-      },
-    ]);
+    mockListComments
+      .mockResolvedValueOnce({
+        data: Array.from({ length: 100 }, (_, index) => ({
+          id: index + 1,
+          body: 'ordinary discussion',
+          updated_at: '2026-05-01T00:00:00Z',
+        })),
+      })
+      .mockResolvedValueOnce({
+        data: [
+          {
+            id: 101,
+            body: '<!-- kilo-review -->\n## Code Review Summary\nOlder summary',
+            updated_at: '2026-05-02T00:00:00Z',
+          },
+          {
+            id: 102,
+            body: '<!-- kilo-review -->\n## Code Review Summary\nLatest summary',
+            updated_at: '2026-05-03T00:00:00Z',
+          },
+        ],
+      });
 
     await expect(findKiloReviewComment('42', 'acme', 'widgets', 7)).resolves.toEqual({
-      commentId: 3,
+      commentId: 102,
       body: '<!-- kilo-review -->\n## Code Review Summary\nLatest summary',
     });
 
-    expect(mockPaginate).toHaveBeenCalledWith(mockListComments, {
+    expect(mockListComments).toHaveBeenNthCalledWith(1, {
       owner: 'acme',
       repo: 'widgets',
       issue_number: 7,
       per_page: 100,
+      page: 1,
     });
+    expect(mockListComments).toHaveBeenNthCalledWith(2, {
+      owner: 'acme',
+      repo: 'widgets',
+      issue_number: 7,
+      per_page: 100,
+      page: 2,
+    });
+  });
+
+  it('stops instead of creating a duplicate after the safe scan limit', async () => {
+    mockListComments.mockResolvedValue({
+      data: Array.from({ length: 100 }, (_, index) => ({
+        id: index + 1,
+        body: 'ordinary discussion',
+        updated_at: '2026-05-01T00:00:00Z',
+      })),
+    });
+
+    await expect(findKiloReviewComment('42', 'acme', 'widgets', 7)).rejects.toThrow(
+      'safe issue-comment scan limit'
+    );
+
+    expect(mockListComments).toHaveBeenCalledTimes(5);
   });
 });

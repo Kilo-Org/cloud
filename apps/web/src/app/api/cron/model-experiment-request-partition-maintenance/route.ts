@@ -45,13 +45,22 @@ export async function GET(request: Request) {
     }
   }
 
-  const { rows: fallbackRows } = await db.execute<{ has_rows: boolean }>(
-    sql`SELECT EXISTS (SELECT 1 FROM "model_experiment_request_default" LIMIT 1) AS "has_rows"`
-  );
-  if (fallbackRows[0]?.has_rows) {
-    const message = 'Default partition contains request rows that require reassignment';
+  try {
+    const { rows: fallbackRows } = await db.execute<{ has_rows: boolean }>(
+      sql`SELECT EXISTS (SELECT 1 FROM "model_experiment_request_default" LIMIT 1) AS "has_rows"`
+    );
+    if (fallbackRows[0]?.has_rows) {
+      const message = 'Default partition contains request rows that require reassignment';
+      console.error(`[model-experiment-request-partition-maintenance] ${message}`);
+      captureMessage(message, {
+        tags: { source: 'model-experiment-request-partition-maintenance' },
+      });
+      errors.push(message);
+    }
+  } catch (error) {
+    const message = `Failed to check default partition: ${error instanceof Error ? error.message : String(error)}`;
     console.error(`[model-experiment-request-partition-maintenance] ${message}`);
-    captureMessage(message, { tags: { source: 'model-experiment-request-partition-maintenance' } });
+    captureException(error, { tags: { source: 'model-experiment-request-partition-maintenance' } });
     errors.push(message);
   }
 

@@ -57,6 +57,10 @@
       "schedule": "0 0 1 * *"
     },
     {
+      "path": "/api/cron/model-experiment-request-partition-maintenance",
+      "schedule": "0 0 1 * *"
+    },
+    {
       "path": "/api/cron/cleanup-free-model-usage",
       "schedule": "0 * * * *"
     }

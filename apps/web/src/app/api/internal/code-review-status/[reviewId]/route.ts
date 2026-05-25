@@ -198,7 +198,6 @@ function isRetryableInfraFailure(
 ): boolean {
   if (status !== 'failed') return false;
   if (terminalReason === 'billing') return false;
-  if (terminalReason === 'model_not_found') return false;
   if (isBillingCodeReviewTerminalReason(terminalReason, errorMessage)) return false;
   if (isModelNotFoundCodeReviewTerminalReason(terminalReason, errorMessage)) return false;
 

@@ -784,6 +784,8 @@ export class SoftDeletePreconditionError extends Error {
  * - stytch_fingerprints (abuse detection)
  * - referral_code_usages (financial, references anonymized user)
  * - kiloclaw_subscriptions, kiloclaw_earlybird_purchases, kiloclaw_email_log (retained records)
+ * - model_experiment_request (experiment attribution and prompt hashes retained
+ *   under the dedicated experiment retention policy)
  * - kiloclaw_scheduled_action_targets (retained operational records;
  * - transactional_email_log (retained outbox marker, financial record;
  *   user_id FK references the anonymized kilocode_users row and optional

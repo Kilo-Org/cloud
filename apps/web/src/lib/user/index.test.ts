@@ -67,6 +67,11 @@ import {
   impact_conversion_reports,
   github_branch_pull_requests,
   model_eval_ingestions,
+  microdollar_usage,
+  model_experiment,
+  model_experiment_variant,
+  model_experiment_variant_version,
+  model_experiment_request,
 } from '@kilocode/db/schema';
 import { eq, count, sql } from 'drizzle-orm';
 import {
@@ -151,6 +156,11 @@ describe('User', () => {
     await db.delete(organization_user_limits);
     await db.delete(organization_memberships);
     await db.delete(free_model_usage);
+    await db.delete(model_experiment_request);
+    await db.delete(model_experiment_variant_version);
+    await db.delete(model_experiment_variant);
+    await db.delete(model_experiment);
+    await db.delete(microdollar_usage);
     await db.delete(user_feedback);
     await db.delete(cloud_agent_feedback);
     await db.delete(user_admin_notes);
@@ -1870,6 +1880,91 @@ describe('User', () => {
           .where(eq(credit_transactions.kilo_user_id, user.id))
           .then(r => r[0].count)
       ).toBe(1);
+    });
+
+    it('should preserve model experiment attribution and prompt hashes', async () => {
+      const user = await insertTestUser();
+      const usageId = randomUUID();
+      const createdAt = '2026-05-25T12:00:00.000Z';
+      const requestBodySha256 = 'a'.repeat(64);
+
+      await db.insert(microdollar_usage).values({
+        id: usageId,
+        kilo_user_id: user.id,
+        cost: 0,
+        input_tokens: 100,
+        output_tokens: 50,
+        cache_write_tokens: 0,
+        cache_hit_tokens: 0,
+        created_at: createdAt,
+        provider: 'custom',
+        model: 'partner/checkpoint-rc1',
+        requested_model: 'kilo/preview-experiment-test',
+        has_error: false,
+      });
+
+      const [experiment] = await db
+        .insert(model_experiment)
+        .values({
+          public_model_id: 'kilo/preview-experiment-test',
+          name: 'Soft-delete retention test',
+          status: 'active',
+          created_by_user_id: user.id,
+        })
+        .returning({ id: model_experiment.id });
+      if (!experiment) throw new Error('Failed to insert model experiment');
+
+      const [variant] = await db
+        .insert(model_experiment_variant)
+        .values({
+          experiment_id: experiment.id,
+          label: 'A',
+          weight: 1,
+        })
+        .returning({ id: model_experiment_variant.id });
+      if (!variant) throw new Error('Failed to insert model experiment variant');
+
+      const [variantVersion] = await db
+        .insert(model_experiment_variant_version)
+        .values({
+          variant_id: variant.id,
+          upstream: {
+            internal_id: 'partner/checkpoint-rc1',
+            base_url: 'https://partner.example.com/v1',
+          },
+          encrypted_api_key: { iv: 'iv', data: 'data', authTag: 'authTag' },
+          created_by: user.id,
+        })
+        .returning({ id: model_experiment_variant_version.id });
+      if (!variantVersion) throw new Error('Failed to insert model experiment variant version');
+
+      await db.insert(model_experiment_request).values({
+        usage_id: usageId,
+        variant_version_id: variantVersion.id,
+        allocation_subject: 'user',
+        client_request_id: 'client-message-id',
+        request_kind: 'chat_completions',
+        request_body_sha256: requestBodySha256,
+        was_truncated: false,
+        created_at: createdAt,
+      });
+
+      await softDeleteUser(user.id);
+
+      const [usage] = await db
+        .select()
+        .from(microdollar_usage)
+        .where(eq(microdollar_usage.id, usageId));
+      expect(usage?.kilo_user_id).toBe(user.id);
+
+      const [attribution] = await db
+        .select()
+        .from(model_experiment_request)
+        .where(eq(model_experiment_request.usage_id, usageId));
+      if (!attribution) throw new Error('Expected model experiment attribution to be retained');
+      expect(attribution.request_body_sha256).toBe(requestBodySha256);
+      expect(attribution.client_request_id).toBe('client-message-id');
+      expect(new Date(attribution.created_at).toISOString()).toBe(createdAt);
     });
 
     it('should preserve Kilo Pass subscriptions and issuance chain', async () => {

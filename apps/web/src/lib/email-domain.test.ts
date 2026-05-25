@@ -48,6 +48,7 @@ describe('extractEmailDomain', () => {
     // tldts treats the final label as a public suffix when unknown.
     expect(extractEmailDomain('alice@host.madeuptld')).toBe('host.madeuptld');
     expect(extractEmailDomain('alice@sub.host.madeuptld')).toBe('host.madeuptld');
+    expect(extractEmailDomain('bot@kilocode.internal')).toBe('kilocode.internal');
   });
 
   it('falls back to `<host>.invalid` when tldts cannot resolve a registrable domain (e.g. IP)', () => {

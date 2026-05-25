@@ -19,12 +19,14 @@ See also [Part 2: Partner Trace Export and Replay Roadmap](./experimental-models
 
 ### Schema
 
-- `model_experiment` stores experiment metadata and status, with a partial unique index on `public_model_id` for routing statuses.
-- `model_experiment_variant` stores stable variant slots with labels and positive weights.
-- `model_experiment_variant_version` stores immutable upstream configurations and encrypted partner API keys.
-- `model_experiment_request` stores request attribution, partitioned by `created_at`, keyed by `(usage_id, created_at)`, and linked to `microdollar_usage` by `usage_id`.
-- `ExperimentUpstreamSchema` validates upstream JSON in app code at `apps/web/src/lib/ai-gateway/experiments/upstream-schema.ts`.
-- `request_body_sha256` is the single content-addressed prompt-body reference; prompt content is not stored in Postgres.
+Schema lives in `packages/db/src/schema.ts`. The implementation adds these tables:
+
+- `model_experiment`
+- `model_experiment_variant`
+- `model_experiment_variant_version`
+- `model_experiment_request`
+
+Upstream JSON validation lives in `apps/web/src/lib/ai-gateway/experiments/upstream-schema.ts`.
 
 Deferred schema/reporting work:
 

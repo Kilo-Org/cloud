@@ -169,24 +169,24 @@ Add and update tests:
 
 ## Files Changed (Summary)
 
-| File                                                            | Change                                                                                                                   |
-| --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `.specs/kiloclaw-billing.md`                                    | Add credit enrollment intro pricing rule                                                                                 |
-| `src/app/(app)/claw/components/billing/billing-types.ts`        | Add `STANDARD_FIRST_MONTH_MICRODOLLARS` constant, add `creditIntroEligible` to type                                      |
-| `src/lib/kiloclaw/credit-billing.ts`                            | Add `KILOCLAW_STANDARD_FIRST_MONTH_MICRODOLLARS`, add `hadPaidSubscription` param to `enrollWithCredits`, use intro cost |
-| `src/routers/kiloclaw-router.ts`                                | Query existing sub for intro eligibility in `enrollWithCredits` handler; add `creditIntroEligible` to billing status     |
-| `src/app/(app)/claw/components/billing/PlanSelectionDialog.tsx` | Update `CreditEnrollmentSection` to show intro price when eligible                                                       |
-| `src/app/(app)/claw/components/billing/WelcomePage.tsx`         | Update `CreditEnrollmentBanner` to show intro price when eligible                                                        |
-| `src/routers/kiloclaw-billing-router.test.ts`                   | Add/update tests for intro pricing                                                                                       |
+| File | Change |
+|---|---|
+| `.specs/kiloclaw-billing.md` | Add credit enrollment intro pricing rule |
+| `src/app/(app)/claw/components/billing/billing-types.ts` | Add `STANDARD_FIRST_MONTH_MICRODOLLARS` constant, add `creditIntroEligible` to type |
+| `src/lib/kiloclaw/credit-billing.ts` | Add `KILOCLAW_STANDARD_FIRST_MONTH_MICRODOLLARS`, add `hadPaidSubscription` param to `enrollWithCredits`, use intro cost |
+| `src/routers/kiloclaw-router.ts` | Query existing sub for intro eligibility in `enrollWithCredits` handler; add `creditIntroEligible` to billing status |
+| `src/app/(app)/claw/components/billing/PlanSelectionDialog.tsx` | Update `CreditEnrollmentSection` to show intro price when eligible |
+| `src/app/(app)/claw/components/billing/WelcomePage.tsx` | Update `CreditEnrollmentBanner` to show intro price when eligible |
+| `src/routers/kiloclaw-billing-router.test.ts` | Add/update tests for intro pricing |
 
 ## Files NOT Changed
 
-| File                                          | Why                                                                                       |
-| --------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| `src/lib/kiloclaw/billing-lifecycle-cron.ts`  | Renewals always use full price — no intro discount on renewals                            |
-| `src/lib/kiloclaw/stripe-handlers.ts`         | Stripe intro price logic unchanged                                                        |
-| `src/lib/kiloclaw/stripe-price-ids.server.ts` | No new Stripe prices needed                                                               |
-| `KiloPassAwardingCreditsClient.tsx`           | Auto-enrollment callback calls same `enrollWithCredits` mutation — benefits automatically |
+| File | Why |
+|---|---|
+| `src/lib/kiloclaw/billing-lifecycle-cron.ts` | Renewals always use full price — no intro discount on renewals |
+| `src/lib/kiloclaw/stripe-handlers.ts` | Stripe intro price logic unchanged |
+| `src/lib/kiloclaw/stripe-price-ids.server.ts` | No new Stripe prices needed |
+| `KiloPassAwardingCreditsClient.tsx` | Auto-enrollment callback calls same `enrollWithCredits` mutation — benefits automatically |
 
 ## Verification
 

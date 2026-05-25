@@ -161,13 +161,13 @@ conversion, local referral rewards are authoritative and affiliate SALE reportin
 5. The system MUST use existing Impact Performance conversion action tracker IDs for lifecycle reporting where
    applicable:
 
-   | Event       | ActionTrackerId | Referral use                                      |
-   | ----------- | --------------- | ------------------------------------------------- |
-   | VISIT       | 71668           | Affiliate/visit reporting where applicable        |
-   | SIGNUP      | 71655           | New user creation with attribution                |
-   | TRIAL_START | 71656           | KiloClaw trial subscription becomes active        |
-   | TRIAL_END   | 71658           | KiloClaw trial subscription ends                  |
-   | SALE        | 71659           | KiloClaw monetized period or Kilo Pass conversion |
+   | Event | ActionTrackerId | Referral use |
+   |---|---|---|
+   | VISIT | 71668 | Affiliate/visit reporting where applicable |
+   | SIGNUP | 71655 | New user creation with attribution |
+   | TRIAL_START | 71656 | KiloClaw trial subscription becomes active |
+   | TRIAL_END | 71658 | KiloClaw trial subscription ends |
+   | SALE | 71659 | KiloClaw monetized period or Kilo Pass conversion |
 
 6. Impact Advocate API credentials MUST remain server-side and MUST NOT be exposed to the browser.
 
@@ -296,14 +296,14 @@ conversion, local referral rewards are authoritative and affiliate SALE reportin
 
 47. The system MUST implement at least these attribution outcomes:
 
-| Scenario                                                                  | Expected winner |
-| ------------------------------------------------------------------------- | --------------- |
-| Affiliate first, referral second, both valid, no prior affiliate SALE     | Referral        |
-| Affiliate first, referral second, both valid, affiliate SALE before touch | Affiliate       |
-| Referral first, affiliate second, both valid, no prior affiliate SALE     | Referral        |
-| Only affiliate valid                                                      | Affiliate       |
-| Only referral valid                                                       | Referral        |
-| All touches expired or invalid                                            | None            |
+| Scenario | Expected winner |
+|---|---|
+| Affiliate first, referral second, both valid, no prior affiliate SALE | Referral |
+| Affiliate first, referral second, both valid, affiliate SALE before touch | Affiliate |
+| Referral first, affiliate second, both valid, no prior affiliate SALE | Referral |
+| Only affiliate valid | Affiliate |
+| Only referral valid | Referral |
+| All touches expired or invalid | None |
 
 48. Attribution resolution for referral rewards MUST happen at conversion time, not only at signup time.
 

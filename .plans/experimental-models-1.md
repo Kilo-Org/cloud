@@ -10,14 +10,14 @@
     [todo]       not started
 -->
 
-| Phase                               | Status      | Current State                                                                                                                                                                                                                               |
-| ----------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Phase 1 — Schema + Migration        | [done]      | Experiment tables exist. `model_experiment_request` is monthly range-partitioned on `created_at`, uses primary key `(usage_id, created_at)`, and stores one full-body prompt hash plus `request_kind`.                                      |
-| Phase 2 — Gateway Header Capture    | [done]      | Gateway captures `x-kilo-request`, `x-kilo-session`, and `x-kilocode-machineid`, and passes the client request id, session id, machine id, and client IP into routing/usage context.                                                        |
-| Phase 3 — Variant Picker + Routing  | [done]      | Experimented public ids route through the deterministic picker, load routing details from Postgres after Redis membership pre-check, and go directly to the selected partner upstream.                                                      |
-| Phase 4 — Usage, Metrics, Reporting | [done-core] | Attribution rows and R2 prompt bodies are written after microdollar usage. Admin request log reads the rows inline. Live aggregate reporting and `model_experiment_request_stats` are deferred until a report consumer needs them.          |
-| Phase 5 — Admin tRPC + UI           | [done-core] | Admin CRUD, state transitions, variant version hot-swap, key rotation, UI tab, and request log exist. Request log shows existing prompt-prefix metadata; `getLiveStats` and full prompt inflation via `getPromptByHash` are still deferred. |
-| Phase 6 — Specs + Tests             | [partial]   | Router, picker, prompt persistence, partitioning, and soft-delete policy tests exist. Durable spec file `.specs/model-experiments.md` and AGENTS registration are still owed.                                                               |
+| Phase | Status | Current State |
+|---|---|---|
+| Phase 1 — Schema + Migration | [done] | Experiment tables exist. `model_experiment_request` is monthly range-partitioned on `created_at`, uses primary key `(usage_id, created_at)`, and stores one full-body prompt hash plus `request_kind`. |
+| Phase 2 — Gateway Header Capture | [done] | Gateway captures `x-kilo-request`, `x-kilo-session`, and `x-kilocode-machineid`, and passes the client request id, session id, machine id, and client IP into routing/usage context. |
+| Phase 3 — Variant Picker + Routing | [done] | Experimented public ids route through the deterministic picker, load routing details from Postgres after Redis membership pre-check, and go directly to the selected partner upstream. |
+| Phase 4 — Usage, Metrics, Reporting | [done-core] | Attribution rows and R2 prompt bodies are written after microdollar usage. Admin request log reads the rows inline. Live aggregate reporting and `model_experiment_request_stats` are deferred until a report consumer needs them. |
+| Phase 5 — Admin tRPC + UI | [done-core] | Admin CRUD, state transitions, variant version hot-swap, key rotation, UI tab, and request log exist. `getLiveStats` and prompt inflation via `getPromptByHash` are still deferred. |
+| Phase 6 — Specs + Tests | [partial] | Router, picker, prompt persistence, partitioning, and soft-delete policy tests exist. Durable spec file `.specs/model-experiments.md` and AGENTS registration are still owed. |
 
 **Current schema:**
 
@@ -72,7 +72,7 @@ Operational consequence: admin mutations that move experiments into or out of ro
 - `apps/web/src/lib/ai-gateway/experiments/upstream-schema.ts` — `ExperimentUpstreamSchema` (strict subset of `CustomLlmDefinitionSchema`, no `api_key`, no `extra_headers`).
 - `apps/web/src/lib/redis-keys.ts` — `EXPERIMENTED_PUBLIC_IDS_REDIS_KEY` helper used by Phase 3 membership checks and admin recomputation on routing-affecting status changes.
 - `apps/web/src/lib/redis.ts` — includes `redisDel(key)` helper.
-- `apps/web/src/routers/admin/model-experiments-router.ts` — full CRUD + state machine (`activate`, `pause`, `complete`, `setArchived`, `delete`-on-draft) + variant ops (`addVariant`, `removeVariant`, `updateVariantLabel`, `swapVariantVersion`, `rotateApiKey`). All routing-affecting mutations invalidate per-public-id cache and recompute the membership set. Request-log rows include the existing `microdollar_usage_metadata.user_prompt_prefix`, `system_prompt_prefix.system_prompt_prefix`, and `system_prompt_length` fields for compact admin previews. `encrypted_api_key` is **never** selected by `list`/`get`/`swapVariantVersion`/`rotateApiKey` — admin response shapers explicitly enumerate non-key columns. `BYOK_ENCRYPTION_KEY` missing → `INTERNAL_SERVER_ERROR` on key-touching ops.
+- `apps/web/src/routers/admin/model-experiments-router.ts` — full CRUD + state machine (`activate`, `pause`, `complete`, `setArchived`, `delete`-on-draft) + variant ops (`addVariant`, `removeVariant`, `updateVariantLabel`, `swapVariantVersion`, `rotateApiKey`). All routing-affecting mutations invalidate per-public-id cache and recompute the membership set. `encrypted_api_key` is **never** selected by `list`/`get`/`swapVariantVersion`/`rotateApiKey` — admin response shapers explicitly enumerate non-key columns. `BYOK_ENCRYPTION_KEY` missing → `INTERNAL_SERVER_ERROR` on key-touching ops.
 - Wired into `apps/web/src/routers/admin-router.ts` as `trpc.admin.modelExperiments.*`.
 - `apps/web/src/app/admin/api/model-experiments/hooks.ts` — react-query hooks for every procedure.
 - `apps/web/src/app/admin/model-experiments/ModelExperimentsContent.tsx` — list + detail (inline) + create dialog + add-variant dialog + Monaco-based hot-swap dialog (validates `ExperimentUpstreamSchema` strict before submit) + rotate-key dialog. Status badges, share = `weight / sum(weights)`, structural-edit lock for non-draft.
@@ -82,7 +82,7 @@ Operational consequence: admin mutations that move experiments into or out of ro
 **Phase 5 — deferred:**
 
 - `getLiveStats(id)` tRPC procedure — still deferred until a real aggregate reporting consumer needs a stable query/result shape.
-- `getPromptByHash(sha)` tRPC procedure and full admin prompt inflation — R2 helpers exist, but the admin UI only renders existing prompt-prefix metadata plus the captured-body download action.
+- `getPromptByHash(sha)` tRPC procedure and admin prompt inflation — R2 helpers exist, but the admin UI renders hashes/sentinels rather than inflating prompt content.
 
 > **Scope: preview/experimental models only.** This system exists to A/B test
 > unreleased model checkpoints in partnership with model providers. It is **not**
@@ -102,17 +102,17 @@ Run A/B tests against model checkpoints in partnership with model providers, esp
 
 ### Accepted Design
 
-| Area                   | Decision                                                                                                                                                                                                                                                                                                                                         |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Experiment scope       | One experiment targets one public model id (`public_id`) and swaps the upstream checkpoint (`internal_id`) behind it. Clients keep sending the same public model id.                                                                                                                                                                             |
-| Allocation             | N variants with positive integer weights (no sum constraint). Bucketing is deterministic on the first available subject: `kilo_user_id` → `machine_id` → `client_ip`. Missing all allocation subjects is an invariant violation and returns temporarily unavailable.                                                                             |
-| Anonymous traffic      | Anonymous / free-tier traffic is bucketed when `machine_id` or IP is available. `machine` and `ip` cohorts are less stable than authenticated `user` cohorts, so every request records `allocation_subject` for reporting filters. A request with no IP is treated as a gateway bug and fails closed.                                            |
-| Client blinding        | Variant id is not disclosed to the client. No `x-kilo-experiment`, no `x-kilo-variant`, and no payload field. Provider reports receive aggregate variant/checkpoint labels only.                                                                                                                                                                 |
-| Checkpoint replacement | A provider may replace the upstream config (`internal_id`, `base_url`, `api_key`, transforms) on a live variant without ending the experiment, as long as variant slots and weights are unchanged. Users stay pinned to the same variant slot.                                                                                                   |
-| Structural edits       | Adding/removing variants or changing weights is allowed only before activation. After activation, structural changes require a new experiment because they shift bucket ranges and corrupt longitudinal cohorts. Hot-swapping a checkpoint is not structural; it is a new `model_experiment_variant_version` row under an existing variant slot. |
-| Per-request snapshot   | Experimented requests get one row in `model_experiment_request`, keyed by `usage_id`. That row stores the exact checkpoint selected at routing time. Users are pinned to a variant slot, not necessarily to the same checkpoint forever; if variant A moves from `rc1` to `rc2`, old rows remain attributable to `rc1` and new rows to `rc2`.    |
-| Feedback attribution   | Gateway stores `x-kilo-request` as `model_experiment_request.client_request_id`. PostHog `Feedback Submitted.parentMessageID` joins to that value, and the experiment request row carries the variant/checkpoint snapshot.                                                                                                                       |
-| Storage                | Experiment definitions and routing details live in Postgres. Gateway hot-path pre-checks use an admin-maintained Redis membership key plus a short in-process cache.                                                                                                                                                                             |
+| Area | Decision |
+|---|---|
+| Experiment scope | One experiment targets one public model id (`public_id`) and swaps the upstream checkpoint (`internal_id`) behind it. Clients keep sending the same public model id. |
+| Allocation | N variants with positive integer weights (no sum constraint). Bucketing is deterministic on the first available subject: `kilo_user_id` → `machine_id` → `client_ip`. Missing all allocation subjects is an invariant violation and returns temporarily unavailable. |
+| Anonymous traffic | Anonymous / free-tier traffic is bucketed when `machine_id` or IP is available. `machine` and `ip` cohorts are less stable than authenticated `user` cohorts, so every request records `allocation_subject` for reporting filters. A request with no IP is treated as a gateway bug and fails closed. |
+| Client blinding | Variant id is not disclosed to the client. No `x-kilo-experiment`, no `x-kilo-variant`, and no payload field. Provider reports receive aggregate variant/checkpoint labels only. |
+| Checkpoint replacement | A provider may replace the upstream config (`internal_id`, `base_url`, `api_key`, transforms) on a live variant without ending the experiment, as long as variant slots and weights are unchanged. Users stay pinned to the same variant slot. |
+| Structural edits | Adding/removing variants or changing weights is allowed only before activation. After activation, structural changes require a new experiment because they shift bucket ranges and corrupt longitudinal cohorts. Hot-swapping a checkpoint is not structural; it is a new `model_experiment_variant_version` row under an existing variant slot. |
+| Per-request snapshot | Experimented requests get one row in `model_experiment_request`, keyed by `usage_id`. That row stores the exact checkpoint selected at routing time. Users are pinned to a variant slot, not necessarily to the same checkpoint forever; if variant A moves from `rc1` to `rc2`, old rows remain attributable to `rc1` and new rows to `rc2`. |
+| Feedback attribution | Gateway stores `x-kilo-request` as `model_experiment_request.client_request_id`. PostHog `Feedback Submitted.parentMessageID` joins to that value, and the experiment request row carries the variant/checkpoint snapshot. |
+| Storage | Experiment definitions and routing details live in Postgres. Gateway hot-path pre-checks use an admin-maintained Redis membership key plus a short in-process cache. |
 
 ### Existing Building Blocks
 

@@ -36,12 +36,12 @@ Each Durable Object instance has its own isolated SQLite database. Migrations ap
 
 ## Workers using this pattern
 
-| Worker                            | Description                  |
-| --------------------------------- | ---------------------------- |
-| `cloud-agent`                     | Agent orchestration          |
-| `cloud-agent-next`                | Next-gen agent orchestration |
-| `cloudflare-ai-attribution`       | AI code attribution          |
-| `cloudflare-app-builder`          | App builder                  |
-| `cloudflare-o11y`                 | Observability                |
-| `cloudflare-session-ingest`       | Session ingestion            |
-| `cloudflare-webhook-agent-ingest` | Webhook agent ingestion      |
+| Worker | Description |
+|---|---|
+| `cloud-agent` | Agent orchestration |
+| `cloud-agent-next` | Next-gen agent orchestration |
+| `cloudflare-ai-attribution` | AI code attribution |
+| `cloudflare-app-builder` | App builder |
+| `cloudflare-o11y` | Observability |
+| `cloudflare-session-ingest` | Session ingestion |
+| `cloudflare-webhook-agent-ingest` | Webhook agent ingestion |

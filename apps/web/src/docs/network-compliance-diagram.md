@@ -274,14 +274,14 @@ sequenceDiagram
 
 ### **Data Protection & Privacy**
 
-| Service         | Data Type                                    | Location      | Compliance            |
-| --------------- | -------------------------------------------- | ------------- | --------------------- |
-| **Supabase**    | User profiles, usage data, organization data | EU/US regions | GDPR, SOC 2           |
-| **Stytch**      | Device fingerprints, fraud scores            | US            | SOC 2, Privacy Shield |
-| **Stripe**      | Payment data, customer billing info          | Global        | PCI DSS, GDPR         |
-| **Sentry**      | Error logs, performance data                 | US/EU         | GDPR, SOC 2           |
-| **PostHog**     | Analytics events, feature flags              | US/EU         | GDPR                  |
-| **Customer.io** | Email addresses, communication preferences   | US            | GDPR, CAN-SPAM        |
+| Service | Data Type | Location | Compliance |
+|---|---|---|---|
+| **Supabase** | User profiles, usage data, organization data | EU/US regions | GDPR, SOC 2 |
+| **Stytch** | Device fingerprints, fraud scores | US | SOC 2, Privacy Shield |
+| **Stripe** | Payment data, customer billing info | Global | PCI DSS, GDPR |
+| **Sentry** | Error logs, performance data | US/EU | GDPR, SOC 2 |
+| **PostHog** | Analytics events, feature flags | US/EU | GDPR |
+| **Customer.io** | Email addresses, communication preferences | US | GDPR, CAN-SPAM |
 
 ### **Security Measures**
 
@@ -359,14 +359,14 @@ HTTPS Endpoints:
 
 ### **Risk Assessment**
 
-| Risk Level | Component           | Mitigation                                  |
-| ---------- | ------------------- | ------------------------------------------- |
-| **HIGH**   | Payment Processing  | Stripe PCI DSS compliance, no local storage |
-| **HIGH**   | AI Model Access     | Rate limiting, usage quotas, authentication |
-| **MEDIUM** | User Authentication | Multi-factor options, fraud detection       |
-| **MEDIUM** | Data Storage        | Encrypted connections, regular backups      |
-| **LOW**    | Analytics           | Anonymized data, GDPR compliance            |
-| **LOW**    | Error Reporting     | Sanitized logs, no PII in errors            |
+| Risk Level | Component | Mitigation |
+|---|---|---|
+| **HIGH** | Payment Processing | Stripe PCI DSS compliance, no local storage |
+| **HIGH** | AI Model Access | Rate limiting, usage quotas, authentication |
+| **MEDIUM** | User Authentication | Multi-factor options, fraud detection |
+| **MEDIUM** | Data Storage | Encrypted connections, regular backups |
+| **LOW** | Analytics | Anonymized data, GDPR compliance |
+| **LOW** | Error Reporting | Sanitized logs, no PII in errors |
 
 ---
 

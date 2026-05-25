@@ -96,13 +96,13 @@ family created for that scenario.
 
 Per-run overrides via env vars:
 
-| Var            | Default                                                       |
-| -------------- | ------------------------------------------------------------- |
-| `WORKER_URL`   | `http://localhost:8794`                                       |
-| `FAKE_LLM_URL` | `http://localhost:8811` (host-side view)                      |
-| `E2E_GIT_URL`  | `https://github.com/octocat/Hello-World.git`                  |
-| `E2E_MODEL`    | `kilo/fake-deterministic` (the only model the fake serves)    |
-| `DATABASE_URL` | Optional direct database URL override for this harness        |
+| Var | Default |
+|---|---|
+| `WORKER_URL` | `http://localhost:8794` |
+| `FAKE_LLM_URL` | `http://localhost:8811` (host-side view) |
+| `E2E_GIT_URL` | `https://github.com/octocat/Hello-World.git` |
+| `E2E_MODEL` | `kilo/fake-deterministic` (the only model the fake serves) |
+| `DATABASE_URL` | Optional direct database URL override for this harness |
 | `POSTGRES_URL` | Repo database fallback loaded from root `.env.local` / `.env` |
 
 If `DATABASE_URL` is unset, the standalone TSX driver loads root `.env.local`
@@ -122,14 +122,14 @@ A conversation directive is embedded in the user-visible prompt as
 from the last user message and dispatches the matching scenario. The
 source of directive truth is `test/e2e/fake-llm-server.ts`.
 
-| Directive       | Behavior                                                                                                                                           |
-| --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `echo:<text>`   | One SSE chunk with `delta.content = <text>`, then `finish_reason: stop`, then `[DONE]`.                                                            |
-| `slow:<n>:<ms>` | `n` content chunks `<ms>` apart, then stop + `[DONE]`. Used for pacing/timing probes.                                                              |
-| `idle`          | One empty-delta chunk, then stop + `[DONE]`.                                                                                                       |
-| `hang`          | Opens the SSE stream but emits nothing and never closes. Drives abort/timeout paths.                                                               |
-| `error:<msg>`   | HTTP 402 with OpenAI-shaped error body carrying `<msg>`. Exercises kilo's error propagation.                                                       |
-| `gate:<tag>`    | Opens the SSE stream, emits no chunks, blocks until the driver calls `POST /test/release?tag=<tag>`. On release, emits `"done"` + stop + `[DONE]`. |
+| Directive | Behavior |
+|---|---|
+| `echo:<text>` | One SSE chunk with `delta.content = <text>`, then `finish_reason: stop`, then `[DONE]`. |
+| `slow:<n>:<ms>` | `n` content chunks `<ms>` apart, then stop + `[DONE]`. Used for pacing/timing probes. |
+| `idle` | One empty-delta chunk, then stop + `[DONE]`. |
+| `hang` | Opens the SSE stream but emits nothing and never closes. Drives abort/timeout paths. |
+| `error:<msg>` | HTTP 402 with OpenAI-shaped error body carrying `<msg>`. Exercises kilo's error propagation. |
+| `gate:<tag>` | Opens the SSE stream, emits no chunks, blocks until the driver calls `POST /test/release?tag=<tag>`. On release, emits `"done"` + stop + `[DONE]`. |
 
 Unknown or missing directives produce HTTP 402 with
 `unknown fake scenario: <name>` — easy to spot in fake-LLM logs.
@@ -152,27 +152,27 @@ These are wrapped by `releaseGate()`, `waitForGateEngaged()`, and
 
 ## Lifecycle scenarios
 
-| Lifecycle                  | What it does                                                                                                                                         |
-| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `cold`                     | Fresh session; verify a new per-session sandbox appears and the conversation completes.                                                              |
-| `hot`                      | Warmup with `echo:warmup`, then send the real prompt on the same session. Same container.                                                            |
-| `followup`                 | Same as `hot` today; kept distinct for future resume-path splits.                                                                                    |
-| `cold-hot`                 | One cold turn plus `echo:hot`, `slow:3:50`, and `echo:followup` hot turns on the same session/sandbox.                                               |
-| `external-kill`            | Warmup, `docker kill` the sandbox, send another prompt, verify recovery/failure.                                                                     |
-| `kill-mid-flight`          | Cold `hang`, kill while pending, verify DO surfaces disconnect/error.                                                                                |
-| `queue-while-busy`         | Block on `gate:<tag>`, enqueue two echoes, release the gate, assert FIFO delivery through `cloud.message.*` events.                                  |
-| `queue-rapid-fire-no-gate` | Send immediate follow-ups behind `echo:first` and assert they reach their terminal FIFO state without gate coordination.                             |
-| `queue-overflow`           | Block on `gate:overflow`, fill the pending queue until enqueue fails with HTTP 429, release gate, drain.                                             |
-| `queue-interrupt-clears`   | Block on `gate:<tag>`, enqueue two, `interruptSession`, assert `cloud.message.failed` with `reason: 'interrupted'` for each.                         |
-| `llm-error`                | Return fake provider HTTP 402 and assert the turn reaches a failed terminal event instead of hanging.                                                |
-| `chunked-streaming`        | Stream delayed fake chunks and assert multiple downstream `message.part.delta` events survive.                                                       |
-| `empty-response`           | Run `idle`, assert completion, and assert no downstream `message.part.delta` is emitted.                                                             |
-| `interrupt-mid-stream`     | Interrupt an actively gated fake request and assert the active message is interrupted, not a queued message.                                         |
-| `unknown-model`            | Use a model absent from the fake catalogue and require both the model error event and a terminal event.                                              |
-| `waiters-clean`            | Complete a normal fake turn, then assert the fake server has no parked waiters or live responses.                                                    |
-| `callback-completion`      | Stand up local HTTP sink, register `callbackTarget.url`, run `echo:done`, assert the sink received `status: 'completed'`.                            |
-| `callback-batch-followup`  | Queue two turns behind a gated callback session, assert one callback for the final queued turn, then assert a later hot turn emits a fresh callback. |
-| `callback-interrupt`       | Local HTTP sink + gated active turn + `interruptSession`, assert callback fires with `status: 'interrupted'`.                                        |
+| Lifecycle | What it does |
+|---|---|
+| `cold` | Fresh session; verify a new per-session sandbox appears and the conversation completes. |
+| `hot` | Warmup with `echo:warmup`, then send the real prompt on the same session. Same container. |
+| `followup` | Same as `hot` today; kept distinct for future resume-path splits. |
+| `cold-hot` | One cold turn plus `echo:hot`, `slow:3:50`, and `echo:followup` hot turns on the same session/sandbox. |
+| `external-kill` | Warmup, `docker kill` the sandbox, send another prompt, verify recovery/failure. |
+| `kill-mid-flight` | Cold `hang`, kill while pending, verify DO surfaces disconnect/error. |
+| `queue-while-busy` | Block on `gate:<tag>`, enqueue two echoes, release the gate, assert FIFO delivery through `cloud.message.*` events. |
+| `queue-rapid-fire-no-gate` | Send immediate follow-ups behind `echo:first` and assert they reach their terminal FIFO state without gate coordination. |
+| `queue-overflow` | Block on `gate:overflow`, fill the pending queue until enqueue fails with HTTP 429, release gate, drain. |
+| `queue-interrupt-clears` | Block on `gate:<tag>`, enqueue two, `interruptSession`, assert `cloud.message.failed` with `reason: 'interrupted'` for each. |
+| `llm-error` | Return fake provider HTTP 402 and assert the turn reaches a failed terminal event instead of hanging. |
+| `chunked-streaming` | Stream delayed fake chunks and assert multiple downstream `message.part.delta` events survive. |
+| `empty-response` | Run `idle`, assert completion, and assert no downstream `message.part.delta` is emitted. |
+| `interrupt-mid-stream` | Interrupt an actively gated fake request and assert the active message is interrupted, not a queued message. |
+| `unknown-model` | Use a model absent from the fake catalogue and require both the model error event and a terminal event. |
+| `waiters-clean` | Complete a normal fake turn, then assert the fake server has no parked waiters or live responses. |
+| `callback-completion` | Stand up local HTTP sink, register `callbackTarget.url`, run `echo:done`, assert the sink received `status: 'completed'`. |
+| `callback-batch-followup` | Queue two turns behind a gated callback session, assert one callback for the final queued turn, then assert a later hot turn emits a fresh callback. |
+| `callback-interrupt` | Local HTTP sink + gated active turn + `interruptSession`, assert callback fires with `status: 'interrupted'`. |
 
 ### API dimension
 

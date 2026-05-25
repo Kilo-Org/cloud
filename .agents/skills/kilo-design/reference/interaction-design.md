@@ -60,16 +60,16 @@ any interactive control from scratch, check these locations first:
 
 Every interactive element needs these states designed:
 
-| State        | When                          | Visual treatment            |
-| ------------ | ----------------------------- | --------------------------- |
-| **Default**  | At rest                       | Base styling                |
-| **Hover**    | Pointer over (not touch)      | Subtle lift, color shift    |
-| **Focus**    | Keyboard / programmatic focus | Visible ring (see below)    |
-| **Active**   | Being pressed                 | Pressed in, darker          |
-| **Disabled** | Not interactive               | Reduced opacity, no pointer |
-| **Loading**  | Processing                    | Spinner, skeleton           |
-| **Error**    | Invalid state                 | Red border, icon, message   |
-| **Success**  | Completed                     | Green check, confirmation   |
+| State | When | Visual treatment |
+|---|---|---|
+| **Default** | At rest | Base styling |
+| **Hover** | Pointer over (not touch) | Subtle lift, color shift |
+| **Focus** | Keyboard / programmatic focus | Visible ring (see below) |
+| **Active** | Being pressed | Pressed in, darker |
+| **Disabled** | Not interactive | Reduced opacity, no pointer |
+| **Loading** | Processing | Spinner, skeleton |
+| **Error** | Invalid state | Red border, icon, message |
+| **Success** | Completed | Green check, confirmation |
 
 Common miss: designing hover without focus, or vice versa. Keyboard users
 never see hover states.

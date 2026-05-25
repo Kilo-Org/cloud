@@ -11,12 +11,12 @@ Build stateful, coordinated applications on Cloudflare's edge using Durable Obje
 
 Your knowledge of Durable Objects APIs and configuration may be outdated. **Prefer retrieval over pre-training** for any Durable Objects task.
 
-| Resource       | URL                                                               |
-| -------------- | ----------------------------------------------------------------- |
-| Docs           | https://developers.cloudflare.com/durable-objects/                |
-| API Reference  | https://developers.cloudflare.com/durable-objects/api/            |
+| Resource | URL |
+|---|---|
+| Docs | https://developers.cloudflare.com/durable-objects/ |
+| API Reference | https://developers.cloudflare.com/durable-objects/api/ |
 | Best Practices | https://developers.cloudflare.com/durable-objects/best-practices/ |
-| Examples       | https://developers.cloudflare.com/durable-objects/examples/       |
+| Examples | https://developers.cloudflare.com/durable-objects/examples/ |
 
 Fetch the relevant doc page when implementing features.
 
@@ -41,13 +41,13 @@ Search: `blockConcurrencyWhile`, `idFromName`, `getByName`, `setAlarm`, `sql.exe
 
 ### Use Durable Objects For
 
-| Need                      | Example                                           |
-| ------------------------- | ------------------------------------------------- |
-| Coordination              | Chat rooms, multiplayer games, collaborative docs |
-| Strong consistency        | Inventory, booking systems, turn-based games      |
-| Per-entity storage        | Multi-tenant SaaS, per-user data                  |
-| Persistent connections    | WebSockets, real-time notifications               |
-| Scheduled work per entity | Subscription renewals, game timeouts              |
+| Need | Example |
+|---|---|
+| Coordination | Chat rooms, multiplayer games, collaborative docs |
+| Strong consistency | Inventory, booking systems, turn-based games |
+| Per-entity storage | Multi-tenant SaaS, per-user data |
+| Persistent connections | WebSockets, real-time notifications |
+| Scheduled work per entity | Subscription renewals, game timeouts |
 
 ### Do NOT Use For
 

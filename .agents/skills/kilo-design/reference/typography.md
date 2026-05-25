@@ -7,10 +7,10 @@
 
 Kilo's fonts are already chosen and loaded. Do not introduce new families.
 
-| Family         | CSS variable       | Use                                                        |
-| -------------- | ------------------ | ---------------------------------------------------------- |
-| Inter          | `--font-sans`      | Default product UI, buttons, labels, body                  |
-| Roboto Mono    | `--font-mono`      | Code tokens, identifiers, metadata                         |
+| Family | CSS variable | Use |
+|---|---|---|
+| Inter | `--font-sans` | Default product UI, buttons, labels, body |
+| Roboto Mono | `--font-mono` | Code tokens, identifiers, metadata |
 | JetBrains Mono | `--font-jetbrains` | Terminal and code-editor surfaces (class `font-jetbrains`) |
 
 Kilo-specific rules:
@@ -62,13 +62,13 @@ The common mistake: too many font sizes that are too close together (14, 15,
 **Use fewer sizes with more contrast.** A five-size system covers most
 product UI:
 
-| Role | Typical ratio | Kilo Tailwind | Use case                |
-| ---- | ------------- | ------------- | ----------------------- |
-| xs   | 0.75rem       | `text-xs`     | Captions, legal, helper |
-| sm   | 0.875rem      | `text-sm`     | Secondary UI, metadata  |
-| base | 1rem          | `text-base`   | Body text               |
-| lg   | 1.125–1.25rem | `text-lg`     | Subheadings, lead text  |
-| xl+  | 1.5rem and up | `text-xl`+    | Page titles, hero       |
+| Role | Typical ratio | Kilo Tailwind | Use case |
+|---|---|---|---|
+| xs | 0.75rem | `text-xs` | Captions, legal, helper |
+| sm | 0.875rem | `text-sm` | Secondary UI, metadata |
+| base | 1rem | `text-base` | Body text |
+| lg | 1.125–1.25rem | `text-lg` | Subheadings, lead text |
+| xl+ | 1.5rem and up | `text-xl`+ | Page titles, hero |
 
 Pick a ratio (1.25 major third, 1.333 perfect fourth, 1.5 perfect fifth)
 and commit. Do not mix multiple scales.

@@ -14,15 +14,15 @@ This skill contains content adapted from the Impeccable project.
 The following files under `reference/` are derivative works based on
 corresponding files in `pbakaus/impeccable` at `source/skills/impeccable/reference/`:
 
-| Local file                        | Upstream source                                                                                          |
-| --------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| `reference/typography.md`         | https://github.com/pbakaus/impeccable/blob/main/source/skills/impeccable/reference/typography.md         |
+| Local file | Upstream source |
+|---|---|
+| `reference/typography.md` | https://github.com/pbakaus/impeccable/blob/main/source/skills/impeccable/reference/typography.md |
 | `reference/color-and-contrast.md` | https://github.com/pbakaus/impeccable/blob/main/source/skills/impeccable/reference/color-and-contrast.md |
-| `reference/spatial-design.md`     | https://github.com/pbakaus/impeccable/blob/main/source/skills/impeccable/reference/spatial-design.md     |
-| `reference/motion-design.md`      | https://github.com/pbakaus/impeccable/blob/main/source/skills/impeccable/reference/motion-design.md      |
+| `reference/spatial-design.md` | https://github.com/pbakaus/impeccable/blob/main/source/skills/impeccable/reference/spatial-design.md |
+| `reference/motion-design.md` | https://github.com/pbakaus/impeccable/blob/main/source/skills/impeccable/reference/motion-design.md |
 | `reference/interaction-design.md` | https://github.com/pbakaus/impeccable/blob/main/source/skills/impeccable/reference/interaction-design.md |
-| `reference/responsive-design.md`  | https://github.com/pbakaus/impeccable/blob/main/source/skills/impeccable/reference/responsive-design.md  |
-| `reference/ux-writing.md`         | https://github.com/pbakaus/impeccable/blob/main/source/skills/impeccable/reference/ux-writing.md         |
+| `reference/responsive-design.md` | https://github.com/pbakaus/impeccable/blob/main/source/skills/impeccable/reference/responsive-design.md |
+| `reference/ux-writing.md` | https://github.com/pbakaus/impeccable/blob/main/source/skills/impeccable/reference/ux-writing.md |
 
 Each of these files has been modified to:
 

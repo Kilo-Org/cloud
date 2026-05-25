@@ -75,16 +75,16 @@ bot.onSubscribedMessage(async (thread, message) => {
 
 ## Event handlers
 
-| Handler                    | Trigger                                           |
-| -------------------------- | ------------------------------------------------- |
-| `onNewMention`             | Bot @-mentioned in unsubscribed thread            |
-| `onSubscribedMessage`      | Any message in subscribed thread                  |
-| `onNewMessage(regex)`      | Messages matching pattern in unsubscribed threads |
-| `onSlashCommand("/cmd")`   | Slash command invocations                         |
-| `onReaction(emojis)`       | Emoji reactions added/removed                     |
-| `onAction(actionId)`       | Button clicks and dropdown selections             |
-| `onAssistantThreadStarted` | Slack Assistants API thread opened                |
-| `onAppHomeOpened`          | Slack App Home tab opened                         |
+| Handler | Trigger |
+|---|---|
+| `onNewMention` | Bot @-mentioned in unsubscribed thread |
+| `onSubscribedMessage` | Any message in subscribed thread |
+| `onNewMessage(regex)` | Messages matching pattern in unsubscribed threads |
+| `onSlashCommand("/cmd")` | Slash command invocations |
+| `onReaction(emojis)` | Emoji reactions added/removed |
+| `onAction(actionId)` | Button clicks and dropdown selections |
+| `onAssistantThreadStarted` | Slack Assistants API thread opened |
+| `onAppHomeOpened` | Slack App Home tab opened |
 
 ## Streaming
 
@@ -122,18 +122,18 @@ await thread.post(
 
 ## Packages
 
-| Package                       | Purpose                       |
-| ----------------------------- | ----------------------------- |
-| `chat`                        | Core SDK                      |
-| `@chat-adapter/slack`         | Slack                         |
-| `@chat-adapter/teams`         | Microsoft Teams               |
-| `@chat-adapter/gchat`         | Google Chat                   |
-| `@chat-adapter/discord`       | Discord                       |
-| `@chat-adapter/github`        | GitHub Issues                 |
-| `@chat-adapter/linear`        | Linear Issues                 |
-| `@chat-adapter/state-redis`   | Redis state (production)      |
-| `@chat-adapter/state-ioredis` | ioredis state (alternative)   |
-| `@chat-adapter/state-memory`  | In-memory state (development) |
+| Package | Purpose |
+|---|---|
+| `chat` | Core SDK |
+| `@chat-adapter/slack` | Slack |
+| `@chat-adapter/teams` | Microsoft Teams |
+| `@chat-adapter/gchat` | Google Chat |
+| `@chat-adapter/discord` | Discord |
+| `@chat-adapter/github` | GitHub Issues |
+| `@chat-adapter/linear` | Linear Issues |
+| `@chat-adapter/state-redis` | Redis state (production) |
+| `@chat-adapter/state-ioredis` | ioredis state (alternative) |
+| `@chat-adapter/state-memory` | In-memory state (development) |
 
 ## Changesets (Release Flow)
 

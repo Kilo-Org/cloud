@@ -22,12 +22,12 @@ Do **not** try to instrument every possible interaction. Instrument the decision
 
 ### What is missing
 
-| Gap                                                                                             | Impact                                                        |
-| ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
-| **No activation funnel events**: welcome pages, repo connection, first session have no tracking | Cannot measure or optimize signup-to-value path               |
-| **Cloud Agent, Code Review, App Builder have zero client events**                               | Three priority products are invisible in product analytics    |
-| **Inconsistent `organizationId`** on client events                                              | Cannot segment product usage by org without server-side joins |
-| **Inconsistent `distinctId`**: email in some server events, `kilo_user_id` in others            | Identity fragmentation in PostHog                             |
+| Gap | Impact |
+|---|---|
+| **No activation funnel events**: welcome pages, repo connection, first session have no tracking | Cannot measure or optimize signup-to-value path |
+| **Cloud Agent, Code Review, App Builder have zero client events** | Three priority products are invisible in product analytics |
+| **Inconsistent `organizationId`** on client events | Cannot segment product usage by org without server-side joins |
+| **Inconsistent `distinctId`**: email in some server events, `kilo_user_id` in others | Identity fragmentation in PostHog |
 
 ---
 
@@ -141,14 +141,14 @@ This 900-line component is the primary Cloud Agent interaction surface. Zero Pos
 
 Add:
 | Event | Trigger | Properties |
-|-------|---------|------------|
+|---|---|---|
 | `cloud_agent_session_started` | User submits a new session (form submit) | `model`, `mode`, `has_repo`, `organizationId` |
 | `cloud_agent_repo_selected` | User selects a repository in the session form | `repo_source` (github/gitlab), `organizationId` |
 | `cloud_agent_model_changed` | User changes model selection | `model`, `previous_model` |
 
 On the sessions list page (`src/app/(app)/cloud/sessions/`):
 | Event | Trigger | Properties |
-|-------|---------|------------|
+|---|---|---|
 | `cloud_agent_session_opened` | User clicks into an existing session | `session_id`, `organizationId` |
 
 ### 3b. Code Review — `src/app/(app)/code-reviews/ReviewAgentPageClient.tsx`
@@ -157,7 +157,7 @@ On the sessions list page (`src/app/(app)/cloud/sessions/`):
 
 Add:
 | Event | Trigger | Properties |
-|-------|---------|------------|
+|---|---|---|
 | `code_review_configured` | User saves review configuration | `platform` (github/gitlab), `organizationId` |
 | `code_review_integration_connected` | User completes GitHub/GitLab integration setup | `platform`, `organizationId` |
 | `code_review_job_viewed` | User opens a specific review result | `review_id`, `organizationId` |
@@ -168,7 +168,7 @@ Add:
 
 Add:
 | Event | Trigger | Properties |
-|-------|---------|------------|
+|---|---|---|
 | `app_builder_project_created` | User starts a new project | `organizationId` |
 | `app_builder_message_sent` | User sends a prompt in the chat pane | `organizationId`, `has_existing_project: boolean` |
 | `app_builder_deployed` | User deploys the app | `organizationId` |
@@ -185,13 +185,13 @@ The sidebar (`PersonalAppSidebar.tsx`, `OrganizationAppSidebar.tsx`) has zero cl
 
 These are valuable but lower priority. Defer until Phases 1–3 are validated.
 
-| Improvement                                                                             | Rationale                                                                                                                                                                                                                                                                                                                                                                                               |
-| --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Worker-level lifecycle events** (cloud-agent, app-builder, code-review-infra workers) | 15+ workers have zero analytics. Even `task_started` / `task_completed` / `task_failed` with duration would close major server-side visibility gaps. Requires adding PostHog HTTP calls to Cloudflare Workers (same pattern as KiloClaw controller in `kiloclaw/src/routes/controller.ts:149`).                                                                                                         |
-| **Event naming taxonomy**                                                               | Current names mix conventions (`start_free_trial` vs `claw_trial_started`). Adopt `product_action` format consistently (e.g., `cloud_agent_session_started`, `code_review_configured`). Phase 2 and 3 events above already follow this convention.                                                                                                                                                      |
-| **Cross-domain identity resolution**                                                    | Marketing landing pages (kilo.ai) and app (app.kilo.ai) use separate PostHog anonymous IDs. PostHog supports cross-subdomain tracking via `cross_subdomain_cookie: true`, but this only works for subdomains of the same root domain. If marketing pages are on a different domain entirely, server-side identity linking via the backend (e.g., passing a token through the redirect URL) is required. |
-| **Expansion tracking**                                                                  | Events for invite accepted, seat count changed, plan upgrade completed (not just clicked), BYOK key added. These answer "how do orgs grow?"                                                                                                                                                                                                                                                             |
-| **DataLayer enrichment**                                                                | `src/components/DataLayerProvider.tsx` pushes email/name/is_new_user only. Add `organizationId`, `plan`, `created_at` for richer GTM attribution.                                                                                                                                                                                                                                                       |
+| Improvement | Rationale |
+|---|---|
+| **Worker-level lifecycle events** (cloud-agent, app-builder, code-review-infra workers) | 15+ workers have zero analytics. Even `task_started` / `task_completed` / `task_failed` with duration would close major server-side visibility gaps. Requires adding PostHog HTTP calls to Cloudflare Workers (same pattern as KiloClaw controller in `kiloclaw/src/routes/controller.ts:149`). |
+| **Event naming taxonomy** | Current names mix conventions (`start_free_trial` vs `claw_trial_started`). Adopt `product_action` format consistently (e.g., `cloud_agent_session_started`, `code_review_configured`). Phase 2 and 3 events above already follow this convention. |
+| **Cross-domain identity resolution** | Marketing landing pages (kilo.ai) and app (app.kilo.ai) use separate PostHog anonymous IDs. PostHog supports cross-subdomain tracking via `cross_subdomain_cookie: true`, but this only works for subdomains of the same root domain. If marketing pages are on a different domain entirely, server-side identity linking via the backend (e.g., passing a token through the redirect URL) is required. |
+| **Expansion tracking** | Events for invite accepted, seat count changed, plan upgrade completed (not just clicked), BYOK key added. These answer "how do orgs grow?" |
+| **DataLayer enrichment** | `src/components/DataLayerProvider.tsx` pushes email/name/is_new_user only. Add `organizationId`, `plan`, `created_at` for richer GTM attribution. |
 
 ## Success Criteria
 

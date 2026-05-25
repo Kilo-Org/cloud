@@ -35,12 +35,12 @@ packages/db/src/schema.ts (lines 566-600)
 
 **Indexes:**
 
-| Name                                    | Columns                    | Condition                           |
-| --------------------------------------- | -------------------------- | ----------------------------------- |
-| `idx_created_at`                        | `created_at`               | -                                   |
-| `idx_abuse_classification`              | `abuse_classification`     | -                                   |
-| `idx_kilo_user_id_created_at2`          | `kilo_user_id, created_at` | -                                   |
-| `idx_microdollar_usage_organization_id` | `organization_id`          | `WHERE organization_id IS NOT NULL` |
+| Name | Columns | Condition |
+|---|---|---|
+| `idx_created_at` | `created_at` | - |
+| `idx_abuse_classification` | `abuse_classification` | - |
+| `idx_kilo_user_id_created_at2` | `kilo_user_id, created_at` | - |
+| `idx_microdollar_usage_organization_id` | `organization_id` | `WHERE organization_id IS NOT NULL` |
 
 ## Current Hotspots
 
@@ -57,19 +57,19 @@ packages/db/src/schema.ts (lines 566-600)
 
 ### Slow query sources
 
-| File                                                                     | Query Pattern                                                     | Date Filter?        |
-| ------------------------------------------------------------------------ | ----------------------------------------------------------------- | ------------------- |
-| `src/app/api/profile/usage/route.ts:63-68`                               | SUM(cost), COUNT(\*), SUM(tokens) grouped by DATE(created_at)     | **None**            |
-| `src/routers/user-router.ts:162-169`                                     | SUM(cost), COUNT(\*), SUM(tokens) for autocomplete model          | **None**            |
-| `src/routers/kilo-pass-router.ts:190-202`                                | SUM(cost) for billing period                                      | Bounded range       |
-| `src/routers/kilo-pass-router.ts:268-279`                                | SUM(cost) last 3 months                                           | Lower bound only    |
-| `src/routers/organizations/organization-router.ts:282-295`               | SUM(cost), COUNT(id), SUM(tokens) last 30 days                    | Lower bound only    |
-| `src/routers/organizations/organization-usage-details-router.ts:158-188` | SUM/COUNT grouped by time bucket, model, provider, project + JOIN | Bounded range       |
-| `src/routers/organizations/organization-usage-details-router.ts:296-319` | SUM/COUNT grouped by date, user, model + JOIN                     | Lower bound or none |
-| `src/routers/organizations/organization-usage-details-router.ts:345-357` | SUM(cost), COUNT(\*), SUM(tokens) for org autocomplete model      | **None**            |
-| `src/app/admin/api/abuse/daily-stats/route.ts:38-45`                     | SUM(CASE WHEN abuse) grouped by day, 7-day window                 | Lower bound only    |
-| `src/app/admin/api/abuse/stats/route.ts:35-54`                           | SUM/COUNT 1h and 24h windows                                      | Lower bound only    |
-| `src/app/admin/api/abuse/hourly-stats/route.ts:36-45`                    | SUM(CASE WHEN abuse) grouped by hour, 12h window                  | Lower bound only    |
+| File | Query Pattern | Date Filter? |
+|---|---|---|
+| `src/app/api/profile/usage/route.ts:63-68` | SUM(cost), COUNT(\*), SUM(tokens) grouped by DATE(created_at) | **None** |
+| `src/routers/user-router.ts:162-169` | SUM(cost), COUNT(\*), SUM(tokens) for autocomplete model | **None** |
+| `src/routers/kilo-pass-router.ts:190-202` | SUM(cost) for billing period | Bounded range |
+| `src/routers/kilo-pass-router.ts:268-279` | SUM(cost) last 3 months | Lower bound only |
+| `src/routers/organizations/organization-router.ts:282-295` | SUM(cost), COUNT(id), SUM(tokens) last 30 days | Lower bound only |
+| `src/routers/organizations/organization-usage-details-router.ts:158-188` | SUM/COUNT grouped by time bucket, model, provider, project + JOIN | Bounded range |
+| `src/routers/organizations/organization-usage-details-router.ts:296-319` | SUM/COUNT grouped by date, user, model + JOIN | Lower bound or none |
+| `src/routers/organizations/organization-usage-details-router.ts:345-357` | SUM(cost), COUNT(\*), SUM(tokens) for org autocomplete model | **None** |
+| `src/app/admin/api/abuse/daily-stats/route.ts:38-45` | SUM(CASE WHEN abuse) grouped by day, 7-day window | Lower bound only |
+| `src/app/admin/api/abuse/stats/route.ts:35-54` | SUM/COUNT 1h and 24h windows | Lower bound only |
+| `src/app/admin/api/abuse/hourly-stats/route.ts:36-45` | SUM(CASE WHEN abuse) grouped by hour, 12h window | Lower bound only |
 
 ## Success Criteria
 
@@ -440,21 +440,21 @@ Documented for reference if growth continues beyond the rollup threshold:
 
 ## Rollout Summary
 
-| Step | Phase                                                         | Deploy independently?     | Requires migration? | Risk     |
-| ---- | ------------------------------------------------------------- | ------------------------- | ------------------- | -------- |
-| 1    | 1a: Add query timing and tagging                              | Yes                       | No                  | None     |
-| 2    | 1b: Enforce scoped statement timeouts                         | Yes                       | No                  | Low      |
-| 3    | 1c: Route read-only microdollar_usage aggregations to replica | Yes                       | No                  | Very low |
-| 4    | 2a: Profile usage period selector (API + UI)                  | Yes (behind flag)         | No                  | Medium   |
-| 5    | 2b: User autocomplete period param                            | With step 4 (behind flag) | No                  | Medium   |
-| 6    | 2c: Org autocomplete date bound                               | Yes                       | No                  | Low      |
-| 7    | 2d: Standardize ranged queries                                | Yes                       | No                  | Very low |
-| 8    | 2e: Feature flag rollout                                      | After validating 4-7      | No                  | Low      |
-| 9    | 3a: User covering index                                       | Yes                       | Yes (CONCURRENTLY)  | Low      |
-| 10   | 3b: Org covering index                                        | Yes                       | Yes (CONCURRENTLY)  | Low      |
-| 11   | 3c: Measure write amplification                               | After 9+10                | No                  | N/A      |
-| 12   | 3d: Drop old indexes                                          | After verifying 9+10+11   | Yes                 | Low      |
-| 13   | Phase 4: Reassess                                             | After measuring 1-3       | No                  | N/A      |
-| 14   | Phase 5: Rollups                                              | Only if justified         | Yes                 | High     |
+| Step | Phase | Deploy independently? | Requires migration? | Risk |
+|---|---|---|---|---|
+| 1 | 1a: Add query timing and tagging | Yes | No | None |
+| 2 | 1b: Enforce scoped statement timeouts | Yes | No | Low |
+| 3 | 1c: Route read-only microdollar_usage aggregations to replica | Yes | No | Very low |
+| 4 | 2a: Profile usage period selector (API + UI) | Yes (behind flag) | No | Medium |
+| 5 | 2b: User autocomplete period param | With step 4 (behind flag) | No | Medium |
+| 6 | 2c: Org autocomplete date bound | Yes | No | Low |
+| 7 | 2d: Standardize ranged queries | Yes | No | Very low |
+| 8 | 2e: Feature flag rollout | After validating 4-7 | No | Low |
+| 9 | 3a: User covering index | Yes | Yes (CONCURRENTLY) | Low |
+| 10 | 3b: Org covering index | Yes | Yes (CONCURRENTLY) | Low |
+| 11 | 3c: Measure write amplification | After 9+10 | No | N/A |
+| 12 | 3d: Drop old indexes | After verifying 9+10+11 | Yes | Low |
+| 13 | Phase 4: Reassess | After measuring 1-3 | No | N/A |
+| 14 | Phase 5: Rollups | Only if justified | Yes | High |
 
 Each step can be deployed, measured, and verified before proceeding to the next.

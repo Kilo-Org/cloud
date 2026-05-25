@@ -282,16 +282,16 @@ The single concession to atmosphere is the cloud-agent chat surface — terminal
 
 **Status colors follow one rigid pattern.** Every status badge is `bg-{color}-500/20 text-{color}-400 ring-1 ring-{color}-500/20`. The translucent fill + matching ring + brighter foreground is the system's most recognizable micro-pattern. Color assignments are fixed by domain, not by mood:
 
-| Color   | Domain                           |
-| ------- | -------------------------------- |
-| Blue    | Cloud sessions (neutral default) |
-| Purple  | VS Code Extension                |
-| Zinc    | CLI                              |
-| Emerald | Slack                            |
-| Orange  | Agent Manager                    |
-| Green   | Success, "new" badges            |
-| Yellow  | Warnings                         |
-| Red     | Destructive, errors              |
+| Color | Domain |
+|---|---|
+| Blue | Cloud sessions (neutral default) |
+| Purple | VS Code Extension |
+| Zinc | CLI |
+| Emerald | Slack |
+| Orange | Agent Manager |
+| Green | Success, "new" badges |
+| Yellow | Warnings |
+| Red | Destructive, errors |
 
 Do not invent new status hues. Do not use status colors outside this badge pattern (e.g. don't use `red-500` as a button background — use `destructive` semantics through the dialog system).
 

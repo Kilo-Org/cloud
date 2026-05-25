@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { env } from 'cloudflare:test';
+import { describe, it, expect, vi } from 'vitest';
+import { env, runInDurableObject } from 'cloudflare:test';
 import { ulid } from 'ulid';
 import type { ConversationDO } from '../do/conversation-do';
 import { bootstrapConversationForTest, putUploadedAttachmentObject, unwrap } from './helpers';
@@ -73,6 +73,63 @@ describe('ConversationDO.createMessage with attachment blocks', () => {
     }
     const linked = await unwrap(stub.getAttachmentForRead({ requesterId: 'user-A', attachmentId }));
     expect(linked.row).not.toBeNull();
+  });
+
+  it('links an attachment when the remote R2 object exists but the local binding cannot see it', async () => {
+    const conversationId = ulid();
+    const stub = getDO(conversationId);
+    await bootstrapConversationForTest(stub, { conversationId, creatorId: 'user-A' });
+    const { attachmentId } = await unwrap(
+      stub.initAttachment({
+        uploaderId: 'user-A',
+        mimeType: 'text/plain',
+        size: 42,
+        filename: 'remote.txt',
+      })
+    );
+
+    const fetchSpy = vi.fn(async (request: RequestInfo | URL) => {
+      const req = new Request(request);
+      expect(req.method).toBe('HEAD');
+      return new Response(null, { status: 200, headers: { 'Content-Length': '42' } });
+    });
+    vi.stubGlobal('fetch', fetchSpy);
+    try {
+      const result = await runInDurableObject(stub, async instance => {
+        const bucket = instance.env.MEDIA_BUCKET as unknown as {
+          head: typeof instance.env.MEDIA_BUCKET.head;
+        };
+        const originalHead = bucket.head;
+        const originalAccessKeyGet = instance.env.R2_ACCESS_KEY_ID.get;
+        const originalSecretKeyGet = instance.env.R2_SECRET_ACCESS_KEY.get;
+        bucket.head = vi.fn(async () => null);
+        instance.env.R2_ACCESS_KEY_ID.get = vi.fn(async () => 'AKIA-TEST');
+        instance.env.R2_SECRET_ACCESS_KEY.get = vi.fn(async () => 'SECRET-TEST');
+        try {
+          return await instance.createMessage({
+            senderId: 'user-A',
+            content: [
+              {
+                type: 'attachment',
+                attachmentId,
+                mimeType: 'text/plain',
+                size: 42,
+                filename: 'remote.txt',
+              },
+            ],
+          });
+        } finally {
+          bucket.head = originalHead;
+          instance.env.R2_ACCESS_KEY_ID.get = originalAccessKeyGet;
+          instance.env.R2_SECRET_ACCESS_KEY.get = originalSecretKeyGet;
+        }
+      });
+
+      expect(result.ok).toBe(true);
+      expect(fetchSpy).toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it('uses stored attachment metadata in message content', async () => {

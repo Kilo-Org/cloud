@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test } from '@jest/globals';
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserFromAuth } from '@/lib/user.server';
+import { getUserFromAuth } from '@/lib/user/server';
 import { createLinearBotLinkState } from '@/lib/bot/linear-link-state';
 import { verifyLinearLinkToken } from '@/lib/bot/linear-link-token';
 import {
@@ -13,7 +13,7 @@ import { failureResult } from '@/lib/maybe-result';
 
 const mockIsEnabledForBot = jest.fn();
 
-jest.mock('@/lib/user.server');
+jest.mock('@/lib/user/server');
 jest.mock('@/lib/bot/linear-link-state');
 jest.mock('@/lib/bot/linear-link-token');
 jest.mock('@/lib/bot/platform-helpers');

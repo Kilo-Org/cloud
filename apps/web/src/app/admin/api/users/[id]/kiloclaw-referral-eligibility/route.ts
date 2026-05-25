@@ -1,11 +1,12 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
 import { insertKiloClawSubscriptionChangeLog } from '@kilocode/db';
+import { ImpactReferralPaymentProvider } from '@kilocode/db/schema-types';
 
 import { db } from '@/lib/drizzle';
 import { resolveCurrentPersonalSubscriptionRow } from '@/lib/kiloclaw/current-personal-subscription';
-import { processPersonalKiloClawPaidConversion } from '@/lib/kiloclaw-referrals';
-import { getUserFromAuth } from '@/lib/user.server';
+import { processPersonalKiloClawPaidConversion } from '@/lib/impact/kiloclaw-referrals';
+import { getUserFromAuth } from '@/lib/user/server';
 
 const OverrideBodySchema = z.object({
   sourcePaymentId: z.string().min(1),
@@ -15,9 +16,20 @@ const OverrideBodySchema = z.object({
   itemCategory: z.string().min(1),
   itemName: z.string().min(1),
   itemSku: z.string().min(1).optional(),
+  paymentProvider: z
+    .enum([ImpactReferralPaymentProvider.Credits, ImpactReferralPaymentProvider.Stripe])
+    .optional(),
   convertedAt: z.string().datetime(),
   sourceType: z.enum(['test', 'fraudulent', 'admin_created', 'manual_adjustment']),
 });
+
+function derivePaymentProvider(sourcePaymentId: string): ImpactReferralPaymentProvider {
+  return sourcePaymentId.startsWith('in_') ||
+    sourcePaymentId.startsWith('pi_') ||
+    sourcePaymentId.startsWith('ch_')
+    ? ImpactReferralPaymentProvider.Stripe
+    : ImpactReferralPaymentProvider.Credits;
+}
 
 /**
  * Admin-only support route for explicitly marking an otherwise excluded
@@ -66,6 +78,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     userId,
     sourcePaymentId: body.data.sourcePaymentId,
     orderId: body.data.orderId,
+    paymentProvider: body.data.paymentProvider ?? derivePaymentProvider(body.data.sourcePaymentId),
     amount: body.data.amount,
     currencyCode: body.data.currencyCode,
     itemCategory: body.data.itemCategory,

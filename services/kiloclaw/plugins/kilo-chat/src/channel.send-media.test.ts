@@ -25,6 +25,121 @@ function withEnv(fn: () => Promise<void>): Promise<void> {
 }
 
 describe('kilo-chat outbound.sendMedia', () => {
+  it('sends an inline MEDIA URL as text without uploading an attachment', async () => {
+    const calls: Array<{ url: string; init: RequestInit }> = [];
+    const fetchImpl = vi.fn(async (input: string | URL, init?: RequestInit) => {
+      const url = String(input);
+      calls.push({ url, init: init ?? {} });
+      if (url.endsWith('/_kilo/kilo-chat/send')) {
+        return new Response(
+          JSON.stringify({
+            messageId: 'm-url-1',
+            message: {
+              id: 'm-url-1',
+              senderId: 'bot-1',
+              content: [{ type: 'text' as const, text: 'https://example.com/report.pdf' }],
+              inReplyToMessageId: null,
+              replyTo: null,
+              updatedAt: null,
+              clientUpdatedAt: null,
+              deleted: false,
+              deliveryFailed: false,
+              reactions: [],
+            },
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } }
+        );
+      }
+      return new Response(`unexpected url ${url}`, { status: 599 });
+    }) as unknown as typeof fetch;
+    const loadMediaImpl = vi.fn(
+      async (): Promise<LoadedMedia> => ({
+        buffer: Buffer.from([1]),
+        contentType: 'application/octet-stream',
+        fileName: 'report.pdf',
+      })
+    );
+
+    await withEnv(async () => {
+      __pluginInternals.fetchImpl = fetchImpl;
+      __pluginInternals.loadMediaImpl = loadMediaImpl;
+      try {
+        const result = await kiloChatPlugin.outbound!.sendMedia!({
+          cfg: {} as never,
+          to: 'conv-xyz',
+          text: '',
+          mediaUrl: 'https://example.com/report.pdf',
+        } as never);
+
+        expect(result.messageId).toBe('m-url-1');
+        expect(loadMediaImpl).not.toHaveBeenCalled();
+        expect(calls).toHaveLength(1);
+        expect(calls[0].url).toBe(`${CONTROLLER_BASE}/_kilo/kilo-chat/send`);
+        const sendBody = JSON.parse(String(calls[0].init.body));
+        expect(sendBody.content).toEqual([
+          { type: 'text', text: 'https://example.com/report.pdf' },
+        ]);
+      } finally {
+        __pluginInternals.fetchImpl = undefined;
+        __pluginInternals.loadMediaImpl = undefined;
+      }
+    });
+  });
+
+  it('sends text plus an inline MEDIA URL as two text blocks without uploading an attachment', async () => {
+    const calls: Array<{ url: string; init: RequestInit }> = [];
+    const fetchImpl = vi.fn(async (input: string | URL, init?: RequestInit) => {
+      const url = String(input);
+      calls.push({ url, init: init ?? {} });
+      if (url.endsWith('/_kilo/kilo-chat/send')) {
+        return new Response(
+          JSON.stringify({
+            messageId: 'm-url-2',
+            message: {
+              id: 'm-url-2',
+              senderId: 'bot-1',
+              content: [
+                { type: 'text' as const, text: 'Here is the link' },
+                { type: 'text' as const, text: 'https://example.com/report.pdf' },
+              ],
+              inReplyToMessageId: null,
+              replyTo: null,
+              updatedAt: null,
+              clientUpdatedAt: null,
+              deleted: false,
+              deliveryFailed: false,
+              reactions: [],
+            },
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } }
+        );
+      }
+      return new Response(`unexpected url ${url}`, { status: 599 });
+    }) as unknown as typeof fetch;
+
+    await withEnv(async () => {
+      __pluginInternals.fetchImpl = fetchImpl;
+      try {
+        await kiloChatPlugin.outbound!.sendMedia!({
+          cfg: {} as never,
+          to: 'conv-xyz',
+          text: 'Here is the link',
+          mediaUrl: 'https://example.com/report.pdf',
+          replyToId: 'parent-1',
+        } as never);
+
+        const sendBody = JSON.parse(String(calls[0].init.body));
+        expect(sendBody.inReplyToMessageId).toBe('parent-1');
+        expect(sendBody.content).toEqual([
+          { type: 'text', text: 'Here is the link' },
+          { type: 'text', text: 'https://example.com/report.pdf' },
+        ]);
+      } finally {
+        __pluginInternals.fetchImpl = undefined;
+      }
+    });
+  });
+
   it('loads media, initAttachment, PUTs to R2, then createMessage with attachment block', async () => {
     const calls: Array<{ url: string; init: RequestInit }> = [];
     const fetchImpl = vi.fn(async (input: string | URL, init?: RequestInit) => {
@@ -36,6 +151,7 @@ describe('kilo-chat outbound.sendMedia', () => {
             attachmentId: ATTACHMENT_ULID,
             putUrl: PUT_URL,
             putHeaders: { 'content-type': 'image/png', 'content-length': '3' },
+            putUrlExpiresAt: 1_700_000_900,
           }),
           { status: 200, headers: { 'content-type': 'application/json' } }
         );
@@ -83,7 +199,7 @@ describe('kilo-chat outbound.sendMedia', () => {
           cfg: {} as never,
           to: 'conv-xyz',
           text: 'caption text',
-          mediaUrl: 'https://elsewhere.example/x.png',
+          mediaUrl: './x.png',
         } as never);
 
         expect(result.messageId).toBe('m-att-1');
@@ -142,6 +258,7 @@ describe('kilo-chat outbound.sendMedia', () => {
             attachmentId: ATTACHMENT_ULID,
             putUrl: PUT_URL,
             putHeaders: {},
+            putUrlExpiresAt: 1_700_000_900,
           }),
           { status: 200 }
         );
@@ -183,7 +300,7 @@ describe('kilo-chat outbound.sendMedia', () => {
           cfg: {} as never,
           to: 'conv-xyz',
           text: '',
-          mediaUrl: 'https://elsewhere.example/x.jpg',
+          mediaUrl: './x.jpg',
         } as never);
 
         const sendCall = calls.find(c => c.url.endsWith('/_kilo/kilo-chat/send'))!;
@@ -213,6 +330,7 @@ describe('kilo-chat outbound.sendMedia', () => {
             attachmentId: ATTACHMENT_ULID,
             putUrl: PUT_URL,
             putHeaders: {},
+            putUrlExpiresAt: 1_700_000_900,
           }),
           { status: 200 }
         );
@@ -238,7 +356,7 @@ describe('kilo-chat outbound.sendMedia', () => {
             cfg: {} as never,
             to: 'conv-xyz',
             text: '',
-            mediaUrl: 'https://elsewhere.example/x.png',
+            mediaUrl: './x.png',
           } as never)
         ).rejects.toThrow(/403/);
       } finally {
@@ -259,6 +377,7 @@ describe('kilo-chat outbound.sendMedia', () => {
             attachmentId: ATTACHMENT_ULID,
             putUrl: PUT_URL,
             putHeaders: {},
+            putUrlExpiresAt: 1_700_000_900,
           }),
           { status: 200 }
         );
@@ -300,7 +419,7 @@ describe('kilo-chat outbound.sendMedia', () => {
           cfg: {} as never,
           to: 'conv-xyz',
           text: '',
-          mediaUrl: 'https://elsewhere.example/x.png',
+          mediaUrl: './x.png',
           replyToId: 'parent-1',
         } as never);
         const sendCall = calls.find(c => c.url.endsWith('/_kilo/kilo-chat/send'))!;

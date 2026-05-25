@@ -74,6 +74,19 @@ describe('POST /stop', () => {
     expect(stop).toHaveBeenCalledWith({ reason: 'trial_inactivity' });
   });
 
+  it('accepts organization trial-expiry stop reason', async () => {
+    const { env, stop } = makeEnv();
+    const { path, init } = postJson('/stop?instanceId=11111111-1111-4111-8111-111111111111', {
+      userId: 'user-1',
+      reason: 'organization_trial_expiry',
+    });
+
+    const response = await platform.request(path, init, env);
+
+    expect(response.status).toBe(200);
+    expect(stop).toHaveBeenCalledWith({ reason: 'organization_trial_expiry' });
+  });
+
   it('keeps the stop call backward-compatible when no reason is provided', async () => {
     const { env, stop } = makeEnv();
     const { path, init } = postJson('/stop', {

@@ -2,7 +2,7 @@ import {
   referral_codes,
   referral_code_usages,
   credit_transactions,
-  kiloclaw_referral_conversions,
+  impact_referral_conversions,
   kilocode_users,
 } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
@@ -13,6 +13,7 @@ import {
 } from '@/lib/referral';
 import { eq, sql } from 'drizzle-orm';
 import { referralRedeemingBonus, referralReferringBonus } from '@/lib/promoCreditCategories';
+import { ImpactReferralProduct } from '@kilocode/db/schema-types';
 import { REFERRAL_BONUS_AMOUNT } from '@/lib/constants';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 
@@ -22,7 +23,7 @@ describe('referrals', () => {
     // eslint-disable-next-line drizzle/enforce-delete-with-where
     await db.delete(referral_code_usages);
     // eslint-disable-next-line drizzle/enforce-delete-with-where
-    await db.delete(kiloclaw_referral_conversions);
+    await db.delete(impact_referral_conversions);
     // eslint-disable-next-line drizzle/enforce-delete-with-where
     await db.delete(credit_transactions);
     // eslint-disable-next-line drizzle/enforce-delete-with-where
@@ -327,6 +328,52 @@ describe('referrals', () => {
       expect(creditTransactions).toHaveLength(0);
     });
 
+    it('grants legacy referral-code credits when only a Kilo Pass referral conversion exists', async () => {
+      const redeemingUser = await insertTestUser({
+        google_user_email: 'kilo-pass-referee@example.com',
+        google_user_name: 'Kilo Pass Referee',
+        google_user_image_url: 'https://example.com/kilo-pass-referee.jpg',
+        stripe_customer_id: 'cus_test_kilo_pass_referee',
+      });
+      const referringUser = await insertTestUser({
+        google_user_email: 'kilo-pass-referrer@example.com',
+        google_user_name: 'Kilo Pass Referrer',
+        google_user_image_url: 'https://example.com/kilo-pass-referrer.jpg',
+        stripe_customer_id: 'cus_test_kilo_pass_referrer',
+      });
+
+      const { code } = await getReferralCodeForUser(referringUser.id);
+      await db.insert(referral_code_usages).values({
+        code,
+        redeeming_kilo_user_id: redeemingUser.id,
+        referring_kilo_user_id: referringUser.id,
+      });
+      await db.insert(impact_referral_conversions).values({
+        product: ImpactReferralProduct.KiloPass,
+        referee_user_id: redeemingUser.id,
+        referrer_user_id: referringUser.id,
+        source_payment_id: 'kilo-pass-payment-1',
+        winning_touch_type: 'referral',
+        qualified: true,
+        converted_at: new Date().toISOString(),
+      });
+
+      await processReferralTopUp(redeemingUser.id);
+
+      const legacyCredits = await db
+        .select()
+        .from(credit_transactions)
+        .where(eq(credit_transactions.kilo_user_id, redeemingUser.id));
+      expect(legacyCredits).toHaveLength(1);
+      expect(legacyCredits[0].credit_category).toBe(referralRedeemingBonus.credit_category);
+
+      const [usage] = await db
+        .select()
+        .from(referral_code_usages)
+        .where(eq(referral_code_usages.redeeming_kilo_user_id, redeemingUser.id));
+      expect(usage?.paid_at).not.toBeNull();
+    });
+
     it('does not grant legacy referral-code credits when a kiloclaw referral conversion exists', async () => {
       const redeemingUser = await insertTestUser({
         google_user_email: 'kiloclaw-referee@example.com',
@@ -347,7 +394,7 @@ describe('referrals', () => {
         redeeming_kilo_user_id: redeemingUser.id,
         referring_kilo_user_id: referringUser.id,
       });
-      await db.insert(kiloclaw_referral_conversions).values({
+      await db.insert(impact_referral_conversions).values({
         referee_user_id: redeemingUser.id,
         referrer_user_id: referringUser.id,
         source_payment_id: 'kiloclaw-payment-1',

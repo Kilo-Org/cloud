@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@kilocode/db": "workspace:*",
+    "@kilocode/organization-entitlement": "workspace:*",
     "@kilocode/worker-utils": "workspace:*",
     "date-fns": "4.1.0",
     "drizzle-orm": "catalog:",

@@ -1,6 +1,6 @@
 import { Suspense } from 'react';
 import { redirect } from 'next/navigation';
-import { getUserFromAuth } from '@/lib/user.server';
+import { getUserFromAuth } from '@/lib/user/server';
 import { AppBuilderProjectDetail } from '../../components/AppBuilder/AppBuilderProjectDetail';
 
 export default async function AppBuilderProjectDetailPage({

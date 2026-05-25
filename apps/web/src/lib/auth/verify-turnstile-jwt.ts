@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { cookies, headers } from 'next/headers';
 import jwt from 'jsonwebtoken';
 import { NEXTAUTH_SECRET } from '@/lib/config.server';
-import type { TurnstileJwtPayload } from '@/lib/user.server';
+import type { TurnstileJwtPayload } from '@/lib/user/server';
 import { sentryLogger } from '@/lib/utils.server';
 
 /**

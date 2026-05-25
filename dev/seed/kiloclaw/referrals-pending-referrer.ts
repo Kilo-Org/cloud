@@ -10,8 +10,8 @@ import {
 } from '@kilocode/db/schema';
 import {
   ImpactConversionReportState,
-  KiloClawAttributionTouchProvider,
-  KiloClawAttributionTouchType,
+  ImpactAttributionTouchProvider,
+  ImpactAttributionTouchType,
   KiloClawReferralBeneficiaryRole,
   KiloClawReferralDecisionOutcome,
   KiloClawReferralRewardStatus,
@@ -112,8 +112,8 @@ export async function run(): Promise<SeedResult> {
     .values({
       dedupe_key: `${seedLabelForScenario(SCENARIO)}:touch:referral`,
       user_id: refereeUserId,
-      touch_type: KiloClawAttributionTouchType.Referral,
-      provider: KiloClawAttributionTouchProvider.ImpactAdvocate,
+      touch_type: ImpactAttributionTouchType.Referral,
+      provider: ImpactAttributionTouchProvider.ImpactAdvocate,
       opaque_tracking_value: `${seedLabelForScenario(SCENARIO)}:cookie`,
       tracking_value_length: 44,
       is_tracking_value_accepted: true,

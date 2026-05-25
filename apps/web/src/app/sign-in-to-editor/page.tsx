@@ -2,7 +2,7 @@ import { OpenCodeEditor } from '@/components/auth/OpenCodeEditor';
 import { DelayedLinks } from '@/components/auth/DelayedLinks';
 import { getExtensionUrl } from '@/components/auth/getExtensionUrl';
 import { generateApiToken } from '@/lib/tokens';
-import { getUserFromAuthOrRedirect } from '@/lib/user.server';
+import { getUserFromAuthOrRedirect } from '@/lib/user/server';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { KiloCardLayout } from '@/components/KiloCardLayout';

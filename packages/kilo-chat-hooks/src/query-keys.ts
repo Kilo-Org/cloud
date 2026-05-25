@@ -16,5 +16,5 @@ export const messagesKey = (conversationId: string | null) =>
 export const botStatusKey = (sandboxId: string | null) =>
   ['kilo-chat', 'bot-status', sandboxId] as const;
 
-export const botStatusRequestKey = (sandboxId: string | null) =>
-  ['kilo-chat', 'bot-status-request', sandboxId] as const;
+export const attachmentUrlKey = (conversationId: string | null, attachmentId: string | null) =>
+  ['kilo-chat', 'attachment-url', conversationId, attachmentId] as const;

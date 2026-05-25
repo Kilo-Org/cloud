@@ -1,4 +1,4 @@
-FROM docker.io/cloudflare/sandbox:0.6.9
+FROM docker.io/cloudflare/sandbox:0.6.11
 
 # Set command timeout to 10 min
 ENV COMMAND_TIMEOUT_MS=600000
@@ -44,8 +44,8 @@ RUN mise install go@1.25.4
 RUN mise use -g node@24 ruby@3.3 hugo@0.152.2 go@1.25.4
 
 # Build tool versions
-ARG OPENNEXTJS_VERSION=1.14.8
-ARG WRANGLER_VERSION=4.58.0
+ARG OPENNEXTJS_VERSION=1.19.11
+ARG WRANGLER_VERSION=4.90.1
 # Install build tools (opennext, wrangler) to a fixed location that's independent of
 # the active Node.js version. This avoids needing to reinstall when mise switches Node versions.
 ENV BUILD_TOOLS_DIR=/opt/build-tools

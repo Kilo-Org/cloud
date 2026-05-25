@@ -47,6 +47,10 @@ import {
   computeMonthlyKiloPassStreak,
   updateKiloPassThresholdAfterBaseCredits,
 } from '@/lib/kilo-pass/subscription-accounting';
+import {
+  enqueueKiloPassAffiliateSaleForInvoice,
+  type KiloPassAffiliateSaleContext,
+} from '@/lib/kilo-pass/affiliate-sale';
 
 async function maybeIssueYearlyRemainingCredits(params: {
   tx: DrizzleTransaction;
@@ -169,7 +173,7 @@ async function maybeIssueYearlyRemainingCredits(params: {
     }
   );
 
-  let existingCreditTransactionId;
+  let existingCreditTransactionId: string | undefined;
   if (!topUpOk) {
     existingCreditTransactionId = (
       await tx
@@ -213,11 +217,19 @@ export async function handleKiloPassInvoicePaid(params: {
 }): Promise<void> {
   const { eventId, invoice, stripe } = params;
 
-  // Strong predicate: classify Kilo Pass invoices using our known Kilo Pass price IDs.
-  if (!invoiceLooksLikeKiloPassByPriceId(invoice)) return;
+  const metadataFromInvoice = getKiloPassMetadataFromStripeMetadata(
+    invoice.parent?.subscription_details?.metadata
+  );
+
+  // Prefer known Kilo Pass price IDs while preserving eligible metadata-backed
+  // invoice handling when Stripe did not surface the matching price line.
+  if (!invoiceLooksLikeKiloPassByPriceId(invoice) && !metadataFromInvoice) return;
 
   let didMutateBalance = false;
   let kiloUserIdForCache: string | null = null;
+  const affiliateSaleState: { context: KiloPassAffiliateSaleContext | null } = {
+    context: null,
+  };
 
   // Track context for failure audit logging
   let kiloUserIdForAudit: string | null = null;
@@ -226,10 +238,6 @@ export async function handleKiloPassInvoicePaid(params: {
 
   try {
     await db.transaction(async tx => {
-      const metadataFromInvoice = getKiloPassMetadataFromStripeMetadata(
-        invoice.parent?.subscription_details?.metadata
-      );
-
       const subscription = await getInvoiceSubscription({ invoice, stripe });
       if (!subscription) {
         throw new KiloPassError('Kilo Pass invoice has no subscription reference', {
@@ -278,6 +286,12 @@ export async function handleKiloPassInvoicePaid(params: {
       kiloUserIdForCache = kiloUserId;
       kiloUserIdForAudit = kiloUserId;
       stripeSubscriptionIdForAudit = subscription.id;
+      affiliateSaleState.context = {
+        userId: kiloUserId,
+        tier,
+        cadence,
+        ...(priceMetadata ? { itemSku: priceMetadata.priceId } : {}),
+      };
 
       await appendKiloPassAuditLog(tx, {
         action: KiloPassAuditLogAction.StripeWebhookReceived,
@@ -453,6 +467,13 @@ export async function handleKiloPassInvoicePaid(params: {
 
     throw error;
   }
+
+  await enqueueKiloPassAffiliateSaleForInvoice({
+    eventId,
+    invoice,
+    stripe,
+    context: affiliateSaleState.context,
+  });
 
   if (didMutateBalance && kiloUserIdForCache !== null) {
     await forceImmediateExpirationRecomputation(kiloUserIdForCache);

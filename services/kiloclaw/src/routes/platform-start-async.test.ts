@@ -98,6 +98,25 @@ describe('POST /start-async', () => {
     });
   });
 
+  it('accepts organization entitlement restoration start reasons', async () => {
+    const { env, startAsync } = makeEnv();
+    const { path, init } = postJson(
+      '/start-async?instanceId=11111111-1111-4111-8111-111111111111',
+      {
+        userId: 'user-1',
+        reason: 'organization_trial_access_restored',
+      }
+    );
+
+    const response = await platform.request(path, init, env);
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ ok: true });
+    expect(startAsync).toHaveBeenCalledWith('user-1', {
+      reason: 'organization_trial_access_restored',
+    });
+  });
+
   it('logs billing-correlated async start requests with propagated context', async () => {
     const { env } = makeEnv();
     const { path, init } = postJson(

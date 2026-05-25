@@ -3712,6 +3712,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     version: string;
     commit: string;
     openclawVersion?: string | null;
+    openclawCommit?: string | null;
+    apiVersion?: number;
+    capabilities?: string[];
   } | null> {
     await this.loadState();
     return gateway.getControllerVersion(this.s, this.env);
@@ -3904,6 +3907,17 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   async runMorningBriefing() {
     await this.loadState();
     return gateway.runMorningBriefing(this.s, this.env);
+  }
+
+  /**
+   * Create (or return) the "Today's briefing" conversation and start the
+   * in-chat onboarding briefing. Returns fast — generation runs in the
+   * plugin background. `settingsHref` is the org-aware Settings link the
+   * worker derived for the "Connect more" items.
+   */
+  async startOnboardingBriefing(settingsHref?: string) {
+    await this.loadState();
+    return gateway.startOnboardingBriefing(this.s, this.env, settingsHref);
   }
 
   /**

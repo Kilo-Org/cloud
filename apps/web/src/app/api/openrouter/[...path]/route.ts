@@ -23,13 +23,14 @@ import { isPublicIdExperimented } from '@/lib/ai-gateway/experiments/membership'
 import { upstreamRequest } from '@/lib/ai-gateway/providers/upstream-request';
 import { debugSaveProxyRequest } from '@/lib/debugUtils';
 import { setTag, startInactiveSpan } from '@sentry/nextjs';
-import { getUserFromAuth } from '@/lib/user.server';
+import { getUserFromAuth } from '@/lib/user/server';
 import { sentryRootSpan } from '@/lib/getRootSpan';
 import {
   isDeadFreeModel,
   isExcludedForFeature,
   isKiloExclusiveFreeModel,
   isKiloStealthModel,
+  requiresKiloDataCollection,
 } from '@/lib/ai-gateway/models';
 import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
 import {
@@ -554,7 +555,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   });
 
   if (
-    isKiloExclusiveFreeModel(originalModelIdLowerCased) &&
+    requiresKiloDataCollection(originalModelIdLowerCased) &&
     !isFreePromptTrainingAllowed(requestBodyParsed.body.provider)
   ) {
     return dataCollectionRequiredResponse();

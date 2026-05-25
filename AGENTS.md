@@ -123,10 +123,13 @@ Business-rule specs live in `.specs/`. Before making **any** changes to a domain
 | ---------------------------------------- | ------------------------------------------------------------------- |
 | `.specs/kiloclaw-billing.md`             | KiloClaw billing, pricing, invoicing, usage metering, payment flows |
 | `.specs/kiloclaw-billing-lifecycle.md`   | KiloClaw billing lifecycle — credit-renewal orchestration safety    |
-| `.specs/kiloclaw-datamodel.md`           | KiloClaw data model — instance/subscription tables, invariants      |
+| `.specs/kiloclaw-composio.md`            | KiloClaw Composio credential provisioning, injection, and sharing   |
 | `.specs/kiloclaw-controller.md`          | KiloClaw controller/machine lifecycle, bootstrap, Docker image      |
+| `.specs/kiloclaw-datamodel.md`           | KiloClaw data model — instance/subscription tables, invariants      |
+| `.specs/subscription-center.md`          | Subscription Center ownership, states, and user-facing behavior     |
 | `.specs/team-enterprise-seat-billing.md` | Team and Enterprise seat billing, subscription management           |
 | `.specs/impact-affiliate-tracking.md`    | Impact.com affiliate conversion tracking                            |
+| `.specs/impact-referrals.md`             | Impact.com Advocate referral programs for KiloClaw and Kilo Pass    |
 
 ## Stripe Subscription Schedules
 

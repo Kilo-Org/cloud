@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { getUserFromAuth, isUserBlacklistedByDomain } from '@/lib/user.server';
+import { getUserFromAuth, isUserBlacklistedByDomain } from '@/lib/user/server';
 import type { UsersApiResponse, SortableField, UserTableProps } from '@/types/admin';
 import { sortableFields } from '@/types/admin';
 import { describePaymentMethods, getPaymentStatusByUserIds } from '@/lib/admin-utils-serverside';

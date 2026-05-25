@@ -2,7 +2,7 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { after } from 'next/server';
 import * as z from 'zod';
-import { getUserFromAuth } from '@/lib/user.server';
+import { getUserFromAuth } from '@/lib/user/server';
 import { captureException } from '@sentry/nextjs';
 import {
   ShellSecurityRequestSchema,

@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
 import { AppBuilderPage } from '@/components/app-builder/AppBuilderPage';
 import { isFeatureFlagEnabled } from '@/lib/posthog-feature-flags';
-import { getUserFromAuthOrRedirect } from '@/lib/user.server';
+import { getUserFromAuthOrRedirect } from '@/lib/user/server';
 
 type Props = {
   params: Promise<{ projectId: string }>;

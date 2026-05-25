@@ -4,7 +4,7 @@ import { NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import { randomUUID } from 'crypto';
 import { assertNotNullish } from '@/lib/utils';
-import type { TurnstileJwtPayload } from '@/lib/user.server';
+import type { TurnstileJwtPayload } from '@/lib/user/server';
 
 // JWT secret for signing Turnstile verification tokens
 const JWT_SECRET = NEXTAUTH_SECRET;

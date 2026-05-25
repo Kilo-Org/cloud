@@ -2,7 +2,7 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { getSlackOAuthUrl } from '@/lib/integrations/slack-service';
 import { createOAuthState } from '@/lib/integrations/oauth-state';
-import { getUserFromAuth } from '@/lib/user.server';
+import { getUserFromAuth } from '@/lib/user/server';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 
 type RouteContext = {

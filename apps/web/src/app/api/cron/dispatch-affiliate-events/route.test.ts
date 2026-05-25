@@ -4,27 +4,27 @@ jest.mock('@/lib/config.server', () => ({
   CRON_SECRET: 'cron-secret',
 }));
 
-jest.mock('@/lib/affiliate-events', () => ({
+jest.mock('@/lib/impact/affiliate-events', () => ({
   dispatchQueuedAffiliateEvents: jest.fn(),
 }));
 
-jest.mock('@/lib/impact-referral', () => ({
+jest.mock('@/lib/impact/referral', () => ({
   dispatchQueuedImpactAdvocateRegistrationAttempts: jest.fn(),
 }));
 
-jest.mock('@/lib/kiloclaw-referrals', () => ({
+jest.mock('@/lib/impact/kiloclaw-referrals', () => ({
   dispatchQueuedImpactAdvocateRewardRedemptions: jest.fn(),
   dispatchQueuedImpactConversionReports: jest.fn(),
   processQueuedKiloClawReferralRewards: jest.fn(),
 }));
 
-import { dispatchQueuedAffiliateEvents } from '@/lib/affiliate-events';
-import { dispatchQueuedImpactAdvocateRegistrationAttempts } from '@/lib/impact-referral';
+import { dispatchQueuedAffiliateEvents } from '@/lib/impact/affiliate-events';
+import { dispatchQueuedImpactAdvocateRegistrationAttempts } from '@/lib/impact/referral';
 import {
   dispatchQueuedImpactAdvocateRewardRedemptions,
   dispatchQueuedImpactConversionReports,
   processQueuedKiloClawReferralRewards,
-} from '@/lib/kiloclaw-referrals';
+} from '@/lib/impact/kiloclaw-referrals';
 import { GET } from './route';
 
 const mockDispatchQueuedAffiliateEvents = jest.mocked(dispatchQueuedAffiliateEvents);

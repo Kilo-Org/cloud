@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { getUserFromAuth } from '@/lib/user.server';
+import { getUserFromAuth } from '@/lib/user/server';
 import { softDeleteUserExternalServices } from '@/lib/external-services';
 import { softDeleteUser, SoftDeletePreconditionError, findUserById } from '@/lib/user';
 import { captureException } from '@sentry/nextjs';

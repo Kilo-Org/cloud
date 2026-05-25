@@ -23,7 +23,7 @@ import { eq, and, asc, gt } from 'drizzle-orm';
 import { type Result, failureResult, successResult } from '@/lib/maybe-result';
 import { computeExpiration } from '@/lib/creditExpiration';
 import { bulkUpdate } from '@/lib/utils/bulkUpdate';
-import { mergeSortedByCreatedAt } from '@/lib/recomputeUserBalances';
+import { mergeSortedByCreatedAt } from '@/lib/user/recompute-balances';
 
 type OrganizationBalanceUpdates = {
   org: Pick<

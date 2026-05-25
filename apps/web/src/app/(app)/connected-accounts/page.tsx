@@ -1,4 +1,4 @@
-import { getUserFromAuthOrRedirect } from '@/lib/user.server';
+import { getUserFromAuthOrRedirect } from '@/lib/user/server';
 import { PageLayout } from '@/components/PageLayout';
 import { LoginMethodsWrapper } from '@/components/profile/LoginMethodsWrapper';
 

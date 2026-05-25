@@ -1,6 +1,6 @@
 import { Suspense } from 'react';
 import { redirect } from 'next/navigation';
-import { getUserFromAuth } from '@/lib/user.server';
+import { getUserFromAuth } from '@/lib/user/server';
 import { KiloclawInstanceDetail } from '../../components/KiloclawInstances/KiloclawInstanceDetail';
 
 export default async function KiloclawInstanceDetailPage({

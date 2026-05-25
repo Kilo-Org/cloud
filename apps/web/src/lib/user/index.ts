@@ -1,0 +1,1494 @@
+import { createStripeCustomer, deleteStripeCustomer } from '@/lib/stripe-client';
+import { randomUUID } from 'crypto';
+import { createTimer } from '@/lib/timer';
+import PostHogClient from '@/lib/posthog';
+import { captureException, captureMessage } from '@sentry/nextjs';
+import { db, type DrizzleTransaction } from '@/lib/drizzle';
+import { WORKOS_API_KEY } from '@/lib/config.server';
+import { WorkOS } from '@workos-inc/node';
+import type { User } from '@kilocode/db/schema';
+import { reportAuthEvent, reportEvents } from '@/lib/ai-gateway/abuse-service';
+import {
+  payment_methods,
+  kilocode_users,
+  user_affiliate_attributions,
+  user_affiliate_events,
+  user_admin_notes,
+  user_auth_provider,
+  kilo_pass_store_events,
+  kilo_pass_store_purchases,
+  kilo_pass_subscriptions,
+  cloud_agent_webhook_triggers,
+  enrichment_data,
+  source_embeddings,
+  code_indexing_search,
+  code_indexing_manifest,
+  referral_codes,
+  organizations,
+  organization_memberships,
+  organization_user_limits,
+  organization_user_usage,
+  organization_invitations,
+  organization_membership_removals,
+  organization_audit_logs,
+  magic_link_tokens,
+  device_auth_requests,
+  auto_top_up_configs,
+  platform_integrations,
+  byok_api_keys,
+  agent_configs,
+  webhook_events,
+  agent_environment_profiles,
+  security_findings,
+  security_audit_log,
+  auto_triage_tickets,
+  auto_fix_tickets,
+  slack_bot_requests,
+  bot_requests,
+  cloud_agent_code_reviews,
+  kiloclaw_instances,
+  kiloclaw_composio_identities,
+  kiloclaw_google_oauth_connections,
+  kiloclaw_inbound_email_aliases,
+  kiloclaw_access_codes,
+  user_period_cache,
+  user_feedback,
+  app_builder_feedback,
+  cloud_agent_feedback,
+  free_model_usage,
+  security_advisor_scans,
+  kilo_pass_scheduled_changes,
+  security_analysis_owner_state,
+  kiloclaw_subscriptions,
+  kiloclaw_admin_audit_logs,
+  kiloclaw_cli_runs,
+  user_push_tokens,
+  contributor_champion_events,
+  contributor_champion_memberships,
+  contributor_champion_contributors,
+  credit_campaigns,
+  impact_attribution_touches,
+  impact_advocate_participants,
+  impact_referrals,
+  impact_referral_conversions,
+  impact_referral_reward_decisions,
+  impact_referral_rewards,
+  impact_referral_reward_applications,
+  impact_advocate_reward_redemptions,
+  impact_conversion_reports,
+  github_branch_pull_requests,
+  model_eval_ingestions,
+} from '@kilocode/db/schema';
+import { eq, and, inArray, isNotNull, isNull, sql, or, gte, count } from 'drizzle-orm';
+import { allow_fake_login, IS_DEVELOPMENT } from '@/lib/constants';
+import type { AuthErrorType } from '@/lib/auth/constants';
+import { hosted_domain_specials } from '@/lib/auth/constants';
+import { strict as assert } from 'node:assert';
+import type { OptionalError, Result } from '@/lib/maybe-result';
+import { failureResult, successResult, trpcFailure } from '@/lib/maybe-result';
+import type { TRPCError } from '@trpc/server';
+import type { UUID } from 'node:crypto';
+import { checkDiscordGuildMembership } from '@/lib/integrations/discord-guild-membership';
+import type { AuthProviderId } from '@/lib/auth/provider-metadata';
+import {
+  generateOpenRouterUpstreamSafetyIdentifier,
+  generateVercelDownstreamSafetyIdentifier,
+} from '@/lib/ai-gateway/providerHash';
+import { normalizeEmail } from '@/lib/utils';
+import { extractEmailDomain } from '@/lib/email-domain';
+import { recordAffiliateAttributionAndQueueParentEvent } from '@/lib/impact/affiliate-events';
+import { logImpactReferralDebug } from '@/lib/impact/debug';
+import {
+  createDeletedUserEmailTombstone,
+  queueImpactAdvocateParticipantRegistration,
+  recordImpactAffiliateTouch,
+  recordImpactReferralTouch,
+} from '@/lib/impact/referral';
+import {
+  redactLandingPathForLogs,
+  type ParsedImpactAffiliateTouch,
+  type ParsedImpactReferralTouch,
+} from '@/lib/impact/referral-utils';
+import { redactStoreAccountLinkedJson } from '@/lib/kilo-pass/store-payload-redaction';
+
+const workos = new WorkOS(WORKOS_API_KEY);
+
+/**
+ * @param fromDb - Database instance to use (defaults to primary db, pass readDb for replica)
+ */
+export async function findUserById(
+  userId: string,
+  fromDb: typeof db = db
+): Promise<User | undefined> {
+  return await fromDb.query.kilocode_users.findFirst({
+    where: eq(kilocode_users.id, userId),
+  });
+}
+
+export async function findUsersByIds(userIds: string[]): Promise<Map<string, User>> {
+  if (userIds.length === 0) return new Map();
+  const uniqueUserIds = [...new Set(userIds)];
+  const users = await db.query.kilocode_users.findMany({
+    where: inArray(kilocode_users.id, uniqueUserIds),
+  });
+
+  return new Map(users.map(u => [u.id, u]));
+}
+
+export async function findUserByStripeCustomerId(
+  stripeCustomerId: string
+): Promise<User | undefined> {
+  return await db.query.kilocode_users.findFirst({
+    where: eq(kilocode_users.stripe_customer_id, stripeCustomerId),
+  });
+}
+
+const posthogClient = PostHogClient();
+if (process.env.NEXT_PUBLIC_POSTHOG_DEBUG) {
+  posthogClient.debug();
+}
+
+// Per-IP signup rate limit. Two overlapping windows so an IP can absorb a
+// one-off spike (e.g. meetup where 100 people sign up from the same NAT in a
+// single day) while still bounding sustained abuse. Passing requires both:
+//   - <= 100 signups in the last 24h (burst)
+//   - <= 150 signups in the last 30d  (sustained, averages ~5/day)
+// After a full burst day, only ~50 more signups are allowed over the next
+// 29 days, and the burst day must roll out of the 30d window before the IP
+// can spike again.
+const SIGNUP_BURST_MAX = 100;
+const SIGNUP_BURST_WINDOW_MS = 24 * 60 * 60 * 1000;
+const SIGNUP_SUSTAINED_MAX = 150;
+const SIGNUP_SUSTAINED_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
+
+function getSignupIp(requestHeaders?: Headers): string | null {
+  return requestHeaders?.get('x-forwarded-for')?.split(',')[0]?.trim() || null;
+}
+
+async function countSignupsFromIpSince(
+  signupIp: string,
+  sinceIso: string,
+  tx: DrizzleTransaction
+): Promise<number> {
+  const [result] = await tx
+    .select({ count: count() })
+    .from(kilocode_users)
+    .where(and(eq(kilocode_users.signup_ip, signupIp), gte(kilocode_users.created_at, sinceIso)));
+  return result?.count ?? 0;
+}
+
+async function checkSignupIpRateLimit(
+  signupIp: string | null,
+  tx: DrizzleTransaction
+): Promise<Result<null, AuthErrorType>> {
+  if (IS_DEVELOPMENT) return successResult(null);
+  if (!signupIp) return successResult(null);
+
+  const now = Date.now();
+  const burstWindowStart = new Date(now - SIGNUP_BURST_WINDOW_MS).toISOString();
+  const sustainedWindowStart = new Date(now - SIGNUP_SUSTAINED_WINDOW_MS).toISOString();
+
+  const burstCount = await countSignupsFromIpSince(signupIp, burstWindowStart, tx);
+  const sustainedCount = await countSignupsFromIpSince(signupIp, sustainedWindowStart, tx);
+
+  if (burstCount < SIGNUP_BURST_MAX && sustainedCount < SIGNUP_SUSTAINED_MAX) {
+    return successResult(null);
+  }
+
+  console.warn('[auth] Signup rejected due to per-IP rate limit', {
+    ip_address: signupIp,
+    existing_accounts_24h: burstCount,
+    existing_accounts_30d: sustainedCount,
+    max_signups_24h: SIGNUP_BURST_MAX,
+    max_signups_30d: SIGNUP_SUSTAINED_MAX,
+  });
+
+  return failureResult('SIGNUP-RATE-LIMITED');
+}
+
+async function checkNormalizedEmailUnique(
+  normalizedEmail: string,
+  tx: DrizzleTransaction
+): Promise<Result<null, AuthErrorType>> {
+  const [existing] = await tx
+    .select({ id: kilocode_users.id })
+    .from(kilocode_users)
+    .where(eq(kilocode_users.normalized_email, normalizedEmail))
+    .limit(1);
+
+  if (!existing) return successResult(null);
+
+  console.warn('[auth] Signup rejected: normalized_email already in use', {
+    normalized_email: normalizedEmail,
+    existing_user_id: existing.id,
+  });
+
+  return failureResult('EMAIL-ALREADY-USED');
+}
+
+/**
+ * Determines if a user should have admin privileges based on their email and hosted domain.
+ * Centralized logic ensures all auth providers (Google, magic link, GitHub, etc.) get
+ * consistent admin status based on the same rules.
+ */
+function shouldBeAdmin(email: string, hosted_domain: string | null): boolean {
+  return (
+    (hosted_domain === hosted_domain_specials.kilocode_admin &&
+      email.endsWith('@' + hosted_domain_specials.kilocode_admin)) ||
+    (allow_fake_login &&
+      hosted_domain === hosted_domain_specials.fake_devonly &&
+      email.endsWith('@admin.example.com'))
+  );
+}
+
+export type CreateOrUpdateUserArgs = {
+  google_user_email: string;
+  google_user_name: string;
+  google_user_image_url: string;
+  hosted_domain: string | null;
+  provider: AuthProviderId;
+  provider_account_id: string;
+  display_name?: string | null;
+};
+
+export type CreateOrUpdateUserTrackingContext = {
+  affiliateTouch?: ParsedImpactAffiliateTouch | null;
+  referralTouch?: ParsedImpactReferralTouch | null;
+  anonymousId?: string | null;
+  locale?: string | null;
+  countryCode?: string | null;
+};
+
+export async function findAndSyncExistingUser(args: CreateOrUpdateUserArgs) {
+  const timer = createTimer();
+  const existing_kilo_user_id = await findUserIdByAuthProvider(
+    args.provider,
+    args.provider_account_id
+  );
+  if (!existing_kilo_user_id) {
+    return null;
+  }
+
+  const existingUser = await findUserById(existing_kilo_user_id);
+  assert(existingUser, `User not found for kiloUserId: ${existing_kilo_user_id}`);
+
+  if (existingUser.hosted_domain !== args.hosted_domain) {
+    //This really should only affect legacy users.
+    await db
+      .update(kilocode_users)
+      .set({ hosted_domain: args.hosted_domain })
+      .where(eq(kilocode_users.id, existingUser.id));
+    console.log(
+      `Updated hosted_domain for user ${existingUser.id}: ${existingUser.hosted_domain} -> ${args.hosted_domain}`
+    );
+    existingUser.hosted_domain = args.hosted_domain;
+  }
+
+  // Sync display_name from OAuth on every sign-in
+  if (args.display_name) {
+    await db
+      .update(user_auth_provider)
+      .set({ display_name: args.display_name })
+      .where(
+        and(
+          eq(user_auth_provider.kilo_user_id, existingUser.id),
+          eq(user_auth_provider.provider, args.provider),
+          eq(user_auth_provider.provider_account_id, args.provider_account_id)
+        )
+      );
+  }
+
+  timer.log(`findFirst user with id ${existingUser.id}`);
+  return existingUser;
+}
+
+export async function findUserByEmail(email: string): Promise<User | undefined> {
+  return await db.query.kilocode_users.findFirst({
+    where: eq(kilocode_users.google_user_email, email),
+  });
+}
+
+async function fireAuthEvent(
+  user: Pick<
+    User,
+    | 'id'
+    | 'google_user_email'
+    | 'created_at'
+    | 'hosted_domain'
+    | 'signup_ip'
+    | 'is_admin'
+    | 'is_bot'
+    | 'blocked_at'
+    | 'completed_welcome_form'
+    | 'linkedin_url'
+    | 'github_url'
+    | 'discord_server_membership_verified_at'
+    | 'customer_source'
+    | 'cohorts'
+    | 'has_validation_stytch'
+    | 'has_validation_novel_card_with_hold'
+  >,
+  eventType: 'signup' | 'signin',
+  provider: AuthProviderId,
+  requestHeaders?: Headers
+) {
+  if (!requestHeaders) return;
+
+  const enrichmentResult = await Promise.all([
+    db
+      .select({ provider: user_auth_provider.provider })
+      .from(user_auth_provider)
+      .where(eq(user_auth_provider.kilo_user_id, user.id)),
+    db
+      .select({
+        organization_id: organization_memberships.organization_id,
+        role: organization_memberships.role,
+        plan: organizations.plan,
+        sso_domain: organizations.sso_domain,
+        free_trial_end_at: organizations.free_trial_end_at,
+      })
+      .from(organization_memberships)
+      .innerJoin(organizations, eq(organization_memberships.organization_id, organizations.id))
+      .where(
+        and(eq(organization_memberships.kilo_user_id, user.id), isNull(organizations.deleted_at))
+      ),
+  ]).catch(() => null);
+
+  // DB enrichment failures must not abort auth telemetry; fall through with empty arrays
+  const authProviderRows = enrichmentResult?.[0] ?? [];
+  const membershipRows = enrichmentResult?.[1] ?? [];
+
+  void reportAuthEvent({
+    kilo_user_id: user.id,
+    event_type: eventType,
+    email: user.google_user_email,
+    account_created_at: user.created_at,
+    ip_address: requestHeaders.get('x-forwarded-for'),
+    geo_city: requestHeaders.get('x-vercel-ip-city'),
+    geo_country: requestHeaders.get('x-vercel-ip-country'),
+    ja4_digest: requestHeaders.get('x-vercel-ja4-digest'),
+    user_agent: requestHeaders.get('user-agent'),
+    auth_method: provider,
+    hosted_domain: user.hosted_domain,
+    signup_ip: user.signup_ip,
+    signup_geo_country: null, // not stored on user; set at signup time only via request headers
+    is_admin: user.is_admin,
+    is_bot: user.is_bot,
+    is_blocked: user.blocked_at != null,
+    completed_welcome_form: user.completed_welcome_form,
+    has_linkedin_url: user.linkedin_url != null,
+    has_github_url: user.github_url != null,
+    has_discord_verified: user.discord_server_membership_verified_at != null,
+    customer_source: user.customer_source,
+    cohorts: Object.keys(user.cohorts),
+    has_validation_stytch: user.has_validation_stytch,
+    has_validation_novel_card_with_hold: user.has_validation_novel_card_with_hold,
+    auth_providers: authProviderRows.map(r => r.provider),
+    org_memberships: membershipRows.map(m => ({
+      organization_id: m.organization_id,
+      role: m.role,
+      plan: m.plan,
+      has_sso: m.sso_domain != null,
+      in_free_trial: m.free_trial_end_at != null && new Date(m.free_trial_end_at) > new Date(),
+    })),
+  });
+}
+
+async function recordSignupImpactTracking(args: {
+  user: User;
+  affiliateTrackingId?: string | null;
+  trackingContext?: CreateOrUpdateUserTrackingContext;
+}) {
+  const { user, affiliateTrackingId, trackingContext } = args;
+
+  if (affiliateTrackingId?.trim()) {
+    try {
+      logImpactReferralDebug('Signup recording Impact affiliate attribution and parent event', {
+        userId: user.id,
+        trackingIdLength: affiliateTrackingId.trim().length,
+      });
+      await recordAffiliateAttributionAndQueueParentEvent({
+        userId: user.id,
+        provider: 'impact',
+        trackingId: affiliateTrackingId,
+        customerEmail: user.google_user_email,
+        eventDate: new Date(user.created_at),
+      });
+    } catch (error) {
+      console.error('[user] failed to persist affiliate attribution during signup', {
+        userId: user.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  if (trackingContext?.affiliateTouch) {
+    try {
+      logImpactReferralDebug('Signup recording Impact affiliate touch', {
+        userId: user.id,
+        anonymousIdPresent: Boolean(trackingContext.anonymousId?.trim()),
+        landingPath: redactLandingPathForLogs(trackingContext.affiliateTouch.landingPath),
+        trackingValueLength: trackingContext.affiliateTouch.trackingValueLength,
+        isTrackingValueAccepted: trackingContext.affiliateTouch.isTrackingValueAccepted,
+      });
+      await recordImpactAffiliateTouch({
+        userId: user.id,
+        anonymousId: trackingContext.anonymousId ?? null,
+        touch: trackingContext.affiliateTouch,
+      });
+    } catch (error) {
+      console.error('[user] failed to record affiliate touch during signup', {
+        userId: user.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  if (trackingContext?.referralTouch) {
+    try {
+      logImpactReferralDebug('Signup recording Impact Advocate referral touch', {
+        userId: user.id,
+        anonymousIdPresent: Boolean(trackingContext.anonymousId?.trim()),
+        landingPath: redactLandingPathForLogs(trackingContext.referralTouch.landingPath),
+        rsCodePresent: Boolean(trackingContext.referralTouch.rsCode?.trim()),
+        trackingValueLength: trackingContext.referralTouch.trackingValueLength,
+        isTrackingValueAccepted: trackingContext.referralTouch.isTrackingValueAccepted,
+      });
+      await recordImpactReferralTouch({
+        userId: user.id,
+        anonymousId: trackingContext.anonymousId ?? null,
+        touch: trackingContext.referralTouch,
+      });
+    } catch (error) {
+      console.error('[user] failed to record referral touch during signup', {
+        userId: user.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+
+    try {
+      logImpactReferralDebug('Signup queueing Impact Advocate participant registration', {
+        userId: user.id,
+        landingPath: redactLandingPathForLogs(trackingContext.referralTouch.landingPath),
+        localePresent: Boolean(trackingContext.locale?.trim()),
+        countryCode: trackingContext.countryCode ?? null,
+      });
+      await queueImpactAdvocateParticipantRegistration({
+        user,
+        referralTouch: trackingContext.referralTouch,
+        locale: trackingContext.locale,
+        countryCode: trackingContext.countryCode,
+      });
+    } catch (error) {
+      console.error('[user] failed to enqueue Impact Advocate registration during signup', {
+        userId: user.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+}
+
+export async function createOrUpdateUser(
+  args: CreateOrUpdateUserArgs,
+  turnstile_guid: UUID | undefined,
+  autoLinkToExistingUser: boolean = false,
+  requestHeaders?: Headers,
+  affiliateTrackingId?: string | null,
+  trackingContext?: CreateOrUpdateUserTrackingContext
+): Promise<Result<{ user: User; isNew: boolean }, AuthErrorType>> {
+  const existingUser = await findAndSyncExistingUser(args);
+  if (existingUser) {
+    void fireAuthEvent(existingUser, 'signin', args.provider, requestHeaders);
+
+    // User signed in or is being updated
+    posthogClient.capture({
+      distinctId: existingUser.google_user_email,
+      event: 'user_signed_in',
+      properties: {
+        name: existingUser.google_user_name,
+        hosted_domain: existingUser.hosted_domain,
+        provider: args.provider,
+        id: existingUser.id,
+      },
+    });
+    return successResult({ user: existingUser, isNew: false });
+  }
+
+  // check to see if we have a user with the same email
+  const userByEmail = await findUserByEmail(args.google_user_email);
+  if (userByEmail) {
+    const existingProviders = await getUserAuthProviders(userByEmail.id);
+    const hasThisProvider = existingProviders.some(p => p.provider === args.provider);
+    const onlyHasFakeLogin =
+      existingProviders.length === 1 && existingProviders[0].provider === 'fake-login';
+    const hasNoProviders = existingProviders.length === 0;
+
+    // Link this new provider to the existing user if they don't already have it.
+    // fake-login is placeholder auth (dev-only) - always allow upgrading from it.
+    // Otherwise, only link if autoLinkToExistingUser AND one of:
+    //   - User has no providers (clean slate after admin reset)
+    //   - Provider is WorkOS/fake-login (special upgrade paths)
+    const isUpgradeProvider = args.provider === 'workos' || args.provider === 'fake-login';
+    const shouldLink =
+      !hasThisProvider &&
+      (onlyHasFakeLogin || (autoLinkToExistingUser && (hasNoProviders || isUpgradeProvider)));
+
+    if (shouldLink) {
+      // WorkOS SSO: Remove existing OAuth providers to enforce single sign-on
+      if (args.provider === 'workos' && !hasNoProviders) {
+        await db
+          .delete(user_auth_provider)
+          .where(eq(user_auth_provider.kilo_user_id, userByEmail.id));
+      }
+
+      const linkResult = await linkAccountToExistingUser(userByEmail.id, args);
+      if (!linkResult.success) {
+        return { success: false, error: linkResult.error };
+      }
+      void fireAuthEvent(userByEmail, 'signin', args.provider, requestHeaders);
+      // Successfully linked account, return the existing user
+      posthogClient.capture({
+        distinctId: userByEmail.google_user_email,
+        event: 'user_signed_in_with_different_id_and_auto_linked',
+        properties: {
+          existing_name: userByEmail.google_user_name,
+          existing_hosted_domain: userByEmail.hosted_domain,
+          existing_id: userByEmail.id,
+          new_provider: args.provider,
+          new_provider_account_id: args.provider_account_id,
+          new_name: args.google_user_name,
+          new_email: args.google_user_email,
+          new_image_url: args.google_user_image_url,
+          new_hosted_domain: args.hosted_domain,
+        },
+      });
+      return successResult({ user: userByEmail, isNew: false });
+    } else {
+      // User signed in with a different ID, but same email
+      posthogClient.capture({
+        distinctId: userByEmail.google_user_email,
+        event: 'user_signed_in_with_different_id',
+        properties: {
+          existing_name: userByEmail.google_user_name,
+          existing_hosted_domain: userByEmail.hosted_domain,
+          existing_id: userByEmail.id,
+          new_provider: args.provider,
+          new_provider_account_id: args.provider_account_id,
+          new_name: args.google_user_name,
+          new_email: args.google_user_email,
+          new_image_url: args.google_user_image_url,
+          new_hosted_domain: args.hosted_domain,
+        },
+      });
+      return failureResult('DIFFERENT-OAUTH');
+    }
+  }
+
+  if (turnstile_guid && (await findUserById(turnstile_guid)))
+    throw new Error('Abuser warning: turnstile guid reuse detected ' + turnstile_guid);
+
+  const signupIp = getSignupIp(requestHeaders);
+  const newUserId = turnstile_guid ?? randomUUID();
+
+  // New user creation path — Stripe customer is created before the DB
+  // transaction because stripe_customer_id is NOT NULL. If the transaction
+  // fails (rate limit, constraint violation, etc.) we clean up the Stripe
+  // customer to prevent orphans.
+  const stripeCustomer = await createStripeCustomer({
+    email: args.google_user_email,
+    name: args.google_user_name,
+    metadata: { kiloUserId: newUserId },
+  });
+
+  const newUser = {
+    id: newUserId,
+    google_user_email: args.google_user_email,
+    google_user_name: args.google_user_name,
+    google_user_image_url: args.google_user_image_url,
+    hosted_domain: args.hosted_domain,
+    is_admin: shouldBeAdmin(args.google_user_email, args.hosted_domain),
+    stripe_customer_id: stripeCustomer.id,
+    signup_ip: signupIp,
+    openrouter_upstream_safety_identifier: generateOpenRouterUpstreamSafetyIdentifier(newUserId),
+    vercel_downstream_safety_identifier: generateVercelDownstreamSafetyIdentifier(newUserId),
+    normalized_email: normalizeEmail(args.google_user_email),
+    email_domain: extractEmailDomain(args.google_user_email),
+  } satisfies typeof kilocode_users.$inferInsert;
+
+  type TxResult = Result<{ user: User }, AuthErrorType>;
+  let txResult: TxResult;
+  let caughtError: unknown;
+  try {
+    txResult = await db.transaction(async tx => {
+      const signupRateLimitResult = await checkSignupIpRateLimit(signupIp, tx);
+      if (!signupRateLimitResult.success) return signupRateLimitResult;
+
+      const dedupResult = await checkNormalizedEmailUnique(newUser.normalized_email, tx);
+      if (!dedupResult.success) return dedupResult;
+
+      const [inserted] = await tx.insert(kilocode_users).values(newUser).returning();
+      assert(inserted, 'Failed to save new user');
+
+      await tx.insert(user_auth_provider).values({
+        kilo_user_id: inserted.id,
+        provider: args.provider,
+        provider_account_id: args.provider_account_id,
+        avatar_url: args.google_user_image_url,
+        email: args.google_user_email,
+        display_name: args.display_name ?? null,
+        hosted_domain: args.hosted_domain,
+      });
+
+      return successResult({ user: inserted });
+    });
+  } catch (error) {
+    caughtError = error;
+    txResult = failureResult('SYSTEM_ERROR');
+  }
+
+  // Clean up the Stripe customer when signup didn't succeed (thrown error
+  // or returned failure like rate-limit rejection).
+  if (!txResult.success) {
+    deleteStripeCustomer(stripeCustomer.id).catch(cleanupErr =>
+      captureException(cleanupErr, {
+        tags: { source: 'signup-stripe-cleanup' },
+        extra: { stripeCustomerId: stripeCustomer.id },
+      })
+    );
+    if (caughtError) throw caughtError;
+    return txResult;
+  }
+  const savedUser = txResult.user;
+
+  await recordSignupImpactTracking({
+    user: savedUser,
+    affiliateTrackingId,
+    trackingContext,
+  });
+
+  void fireAuthEvent(savedUser, 'signup', args.provider, requestHeaders);
+
+  // User created event in PostHog
+  posthogClient.capture({
+    event: 'user_created',
+    distinctId: savedUser.google_user_email,
+    properties: {
+      id: savedUser.id,
+      google_user_email: savedUser.google_user_email,
+      google_user_name: savedUser.google_user_name,
+      created_at: savedUser.created_at,
+      hosted_domain: savedUser.hosted_domain,
+      stripe_customer_id: savedUser.stripe_customer_id,
+      provider: args.provider,
+      $set_once: {
+        user_id: savedUser.id,
+        email: savedUser.google_user_email,
+        name: savedUser.google_user_name,
+        user_created_at: savedUser.created_at,
+        hosted_domain: savedUser.hosted_domain,
+        stripe_id: savedUser.stripe_customer_id,
+      },
+    },
+  });
+
+  // Set up user identification via user ID
+  posthogClient.alias({ distinctId: savedUser.google_user_email, alias: savedUser.id });
+
+  await tryVerifyDiscordGuildMembership(args.provider, args.provider_account_id, savedUser.id);
+
+  return successResult({ user: savedUser, isNew: true });
+}
+
+export async function linkAccountToExistingUser(
+  existingKiloUserId: string,
+  authProviderData: CreateOrUpdateUserArgs
+): Promise<Result<{ user: User }, AuthErrorType>> {
+  // Verify the existing user exists
+  const existingUser = await findUserById(existingKiloUserId);
+  if (!existingUser) return failureResult('USER-NOT-FOUND');
+
+  // Link the new auth provider to the existing user
+  const linkResult = await linkAuthProviderToUser({
+    kilo_user_id: existingKiloUserId,
+    provider: authProviderData.provider,
+    provider_account_id: authProviderData.provider_account_id,
+    email: authProviderData.google_user_email,
+    avatar_url: authProviderData.google_user_image_url,
+    display_name: authProviderData.display_name ?? null,
+    hosted_domain: authProviderData.hosted_domain,
+  });
+
+  if (!linkResult.success) {
+    captureException(new Error(`Account linking failed: ${linkResult.error}`), {
+      tags: {
+        operation: 'account_linking',
+        provider: authProviderData.provider,
+      },
+      extra: {
+        existing_user_id: existingKiloUserId,
+        provider_email: authProviderData.google_user_email,
+        provider_account_id: authProviderData.provider_account_id,
+        error_code: linkResult.error,
+      },
+    });
+
+    return linkResult;
+  }
+
+  await tryVerifyDiscordGuildMembership(
+    authProviderData.provider,
+    authProviderData.provider_account_id,
+    existingKiloUserId
+  );
+
+  // Log the account linking event
+  posthogClient.capture({
+    distinctId: existingUser.google_user_email,
+    event: 'account_linked',
+    properties: {
+      existing_user_id: existingKiloUserId,
+      linked_provider: authProviderData.provider,
+      linked_email: authProviderData.google_user_email,
+      linked_hosted_domain: authProviderData.hosted_domain,
+    },
+  });
+
+  return successResult({ user: existingUser });
+}
+
+/**
+ * Error thrown when soft-delete preconditions are not met.
+ */
+export class SoftDeletePreconditionError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'SoftDeletePreconditionError';
+  }
+}
+
+/**
+ * Soft-delete a user: anonymize PII, scrub related data, but keep the
+ * user row and financial/billing records intact.
+ *
+ * Preconditions (will throw SoftDeletePreconditionError if violated):
+ * - User must not have an active, non-cancelling Kilo Pass subscription
+ * - User must not have a live KiloClaw subscription (active, past_due, unpaid, or trialing)
+ *
+ * What is kept:
+ * - The kilocode_users row (anonymized)
+ * - Stripe link (stripe_customer_id unchanged)
+ * - credit_transactions, microdollar_usage (billing records)
+ * - kilo_pass_subscriptions/issuances/issuance_items (financial)
+ * - cli_sessions, shared_cli_sessions, cli_sessions_v2 (session history)
+ * - deployments, app_builder_projects (user assets)
+ * - stytch_fingerprints (abuse detection)
+ * - referral_code_usages (financial, references anonymized user)
+ * - kiloclaw_subscriptions, kiloclaw_earlybird_purchases, kiloclaw_email_log (retained records)
+ * - kiloclaw_scheduled_action_targets (retained operational records;
+ * - transactional_email_log (retained outbox marker, financial record;
+ *   user_id FK references the anonymized kilocode_users row and optional
+ *   organization_id references the organization — no direct PII)
+ *
+ * What is scrubbed/deleted:
+ * - PII on the user row (email, name, avatar, urls)
+ * - user_auth_provider (auth links with email/avatar)
+ * - enrichment_data (GitHub/LinkedIn/Clay PII)
+ * - user_admin_notes
+ * - referral_codes (user's own code)
+ * - magic_link_tokens (email-based)
+ * - organization_memberships (removed from all orgs)
+ * - organization_membership_removals (tombstones deleted; removed_by anonymized)
+ * - organization_invitations (sent by user + addressed to user's email)
+ * - organization_user_limits/usage
+ * - organization_audit_logs (actor PII nulled)
+ * - kiloclaw_admin_audit_logs (actor PII nulled, target_user_id anonymized)
+ * - model_eval_ingestions (promoter email anonymized)
+ * - credit_campaigns (created_by_kilo_user_id anonymized)
+ * - payment_methods (soft-deleted, address/name/IP fields nulled)
+ * - App Store account token and retained Kilo Pass store purchase/event token fields
+ * - user_feedback / app_builder_feedback / free_model_usage (FK nulled)
+ * - Various user-owned resources (platform_integrations, byok_api_keys,
+ *   agent_configs, webhook_events, code_indexing_*, source_embeddings,
+ *   cloud_agent_webhook_triggers, agent_environment_profiles,
+ *   security_findings, security_analysis_owner_state,
+ *   security_analysis_queue (via cascade when security_findings are deleted),
+ *   auto_triage/fix_tickets, slack_bot_requests, bot_requests,
+ *   cloud_agent_code_reviews, device_auth_requests, auto_top_up_configs,
+ *   kiloclaw_instances/inbound_email_aliases/access_codes, user_period_cache,
+ *   kilo_pass_scheduled_changes)
+ * - kiloclaw_instances.admin_size_override JSONB (contains admin actorEmail
+ *   + free-form reason; cleared on the deleted user's retained destroyed
+ *   instances, AND on any other instances where this user was the admin
+ *   actor — since their email and any reason text they wrote is their PII
+ *   regardless of which instance the override targeted)
+ */
+export async function softDeleteUser(userId: string) {
+  const user = await findUserById(userId);
+  if (!user) return; // Nothing to do for non-existent user
+
+  // Grab the original email before we anonymize — needed for cleanup of
+  // magic_link_tokens and organization_invitations addressed to this user.
+  const originalEmail = user.google_user_email;
+  const originalAppStoreAccountToken = user.app_store_account_token;
+
+  await db.transaction(async tx => {
+    // ── Precondition checks (inside tx to avoid TOCTOU races) ──────────
+    const activeSubscriptions = await tx
+      .select({ id: kilo_pass_subscriptions.id })
+      .from(kilo_pass_subscriptions)
+      .where(
+        and(
+          eq(kilo_pass_subscriptions.kilo_user_id, userId),
+          eq(kilo_pass_subscriptions.status, 'active'),
+          eq(kilo_pass_subscriptions.cancel_at_period_end, false)
+        )
+      );
+
+    if (activeSubscriptions.length > 0) {
+      throw new SoftDeletePreconditionError(
+        `User ${userId} has an active Kilo Pass subscription. Cancel the subscription before deleting the account.`
+      );
+    }
+
+    // Block soft-delete for any live KiloClaw subscription. This includes
+    // trialing — the user may have a running Fly instance, and deleting the
+    // row without destroying the instance would orphan it.
+    const liveClawSubscriptions = await tx
+      .select({ id: kiloclaw_subscriptions.id, status: kiloclaw_subscriptions.status })
+      .from(kiloclaw_subscriptions)
+      .where(
+        and(
+          eq(kiloclaw_subscriptions.user_id, userId),
+          inArray(kiloclaw_subscriptions.status, ['active', 'past_due', 'unpaid', 'trialing'])
+        )
+      );
+
+    if (liveClawSubscriptions.length > 0) {
+      throw new SoftDeletePreconditionError(
+        `User ${userId} has a live KiloClaw subscription (${liveClawSubscriptions[0].status}). Cancel the subscription before deleting the account.`
+      );
+    }
+
+    const activeClawInstances = await tx
+      .select({ id: kiloclaw_instances.id })
+      .from(kiloclaw_instances)
+      .where(and(eq(kiloclaw_instances.user_id, userId), isNull(kiloclaw_instances.destroyed_at)))
+      .limit(1);
+
+    if (activeClawInstances.length > 0) {
+      throw new SoftDeletePreconditionError(
+        `User ${userId} still has an active KiloClaw instance. Destroy the instance before deleting the account.`
+      );
+    }
+
+    // Pre-0090 users can have NULL normalized_email but a real google_user_email.
+    // Fall back to google_user_email so the tombstone hash still gets recorded
+    // before the row below anonymizes both columns; otherwise a previously
+    // deleted user could re-register and qualify as a referee.
+    await createDeletedUserEmailTombstone({
+      database: tx,
+      normalizedEmail: user.normalized_email ?? user.google_user_email ?? null,
+    });
+
+    // ── 1. Anonymize the user row ────────────────────────────────────────
+    await tx
+      .update(kilocode_users)
+      .set({
+        google_user_email: `deleted+${userId}@deleted.invalid`,
+        normalized_email: null,
+        email_domain: null,
+        google_user_name: 'Deleted User',
+        google_user_image_url: '',
+        hosted_domain: null,
+        linkedin_url: null,
+        github_url: null,
+        discord_server_membership_verified_at: null,
+        api_token_pepper: randomUUID(),
+        web_session_pepper: randomUUID(),
+        app_store_account_token: randomUUID(),
+        default_model: null,
+        blocked_reason: `soft-deleted at ${new Date().toISOString()}`,
+        blocked_at: null,
+        blocked_by_kilo_user_id: null,
+        auto_top_up_enabled: false,
+        completed_welcome_form: false,
+        cohorts: {},
+        is_admin: false,
+        customer_source: null,
+        signup_ip: null,
+      })
+      .where(eq(kilocode_users.id, userId));
+
+    // ── 2. Hard-delete PII tables ────────────────────────────────────────
+    await tx.delete(user_auth_provider).where(eq(user_auth_provider.kilo_user_id, userId));
+    await tx.delete(enrichment_data).where(eq(enrichment_data.user_id, userId));
+    await tx.delete(user_admin_notes).where(eq(user_admin_notes.kilo_user_id, userId));
+    await tx
+      .delete(user_affiliate_attributions)
+      .where(eq(user_affiliate_attributions.user_id, userId));
+    await tx.delete(user_affiliate_events).where(eq(user_affiliate_events.user_id, userId));
+    await tx
+      .delete(impact_attribution_touches)
+      .where(eq(impact_attribution_touches.user_id, userId));
+    await tx
+      .delete(impact_advocate_participants)
+      .where(eq(impact_advocate_participants.user_id, userId));
+    await tx
+      .delete(impact_referral_reward_applications)
+      .where(eq(impact_referral_reward_applications.beneficiary_user_id, userId));
+    await tx
+      .delete(impact_advocate_reward_redemptions)
+      .where(eq(impact_advocate_reward_redemptions.beneficiary_user_id, userId));
+    await tx
+      .delete(impact_referral_rewards)
+      .where(eq(impact_referral_rewards.beneficiary_user_id, userId));
+    await tx
+      .delete(impact_referral_reward_decisions)
+      .where(eq(impact_referral_reward_decisions.beneficiary_user_id, userId));
+    await tx.delete(impact_conversion_reports).where(
+      sql`${impact_conversion_reports.conversion_id} IN (
+          SELECT c.id FROM ${impact_referral_conversions} c
+          WHERE c.referee_user_id = ${userId} OR c.referrer_user_id = ${userId}
+        )`
+    );
+    await tx
+      .delete(impact_referral_conversions)
+      .where(
+        or(
+          eq(impact_referral_conversions.referee_user_id, userId),
+          eq(impact_referral_conversions.referrer_user_id, userId)
+        )
+      );
+    await tx
+      .delete(impact_referrals)
+      .where(
+        or(
+          eq(impact_referrals.referee_user_id, userId),
+          eq(impact_referrals.referrer_user_id, userId)
+        )
+      );
+    await tx.delete(referral_codes).where(eq(referral_codes.kilo_user_id, userId));
+    await tx.delete(magic_link_tokens).where(eq(magic_link_tokens.email, originalEmail));
+
+    // Remove from organizations
+    await tx
+      .delete(organization_memberships)
+      .where(eq(organization_memberships.kilo_user_id, userId));
+    // Remove membership removal tombstones for this user
+    await tx
+      .delete(organization_membership_removals)
+      .where(eq(organization_membership_removals.kilo_user_id, userId));
+    await tx
+      .update(kilocode_users)
+      .set({ blocked_by_kilo_user_id: null })
+      .where(eq(kilocode_users.blocked_by_kilo_user_id, userId));
+    // Anonymize removed_by references where this user removed others
+    await tx
+      .update(organization_membership_removals)
+      .set({ removed_by: null })
+      .where(eq(organization_membership_removals.removed_by, userId));
+    // Delete invitations sent BY this user and invitations sent TO this user's email
+    await tx
+      .delete(organization_invitations)
+      .where(eq(organization_invitations.invited_by, userId));
+    await tx
+      .delete(organization_invitations)
+      .where(eq(organization_invitations.email, originalEmail));
+    await tx
+      .delete(organization_user_limits)
+      .where(eq(organization_user_limits.kilo_user_id, userId));
+    await tx
+      .delete(organization_user_usage)
+      .where(eq(organization_user_usage.kilo_user_id, userId));
+
+    // User-owned resources (these would have been CASCADE-deleted if we
+    // deleted the user row, but since we keep it, we delete them explicitly)
+
+    // cloud_agent_webhook_triggers has RESTRICT FK on agent_environment_profiles,
+    // so delete triggers before profiles
+    await tx
+      .delete(cloud_agent_webhook_triggers)
+      .where(eq(cloud_agent_webhook_triggers.user_id, userId));
+    await tx
+      .delete(agent_environment_profiles)
+      .where(eq(agent_environment_profiles.owned_by_user_id, userId));
+
+    await tx
+      .delete(platform_integrations)
+      .where(eq(platform_integrations.owned_by_user_id, userId));
+    await tx.delete(byok_api_keys).where(eq(byok_api_keys.kilo_user_id, userId));
+    await tx.delete(agent_configs).where(eq(agent_configs.owned_by_user_id, userId));
+    await tx.delete(webhook_events).where(eq(webhook_events.owned_by_user_id, userId));
+    await tx
+      .delete(security_analysis_owner_state)
+      .where(eq(security_analysis_owner_state.owned_by_user_id, userId));
+    await tx.delete(security_findings).where(eq(security_findings.owned_by_user_id, userId));
+    await tx.delete(auto_fix_tickets).where(eq(auto_fix_tickets.owned_by_user_id, userId));
+    await tx.delete(auto_triage_tickets).where(eq(auto_triage_tickets.owned_by_user_id, userId));
+    await tx.delete(slack_bot_requests).where(eq(slack_bot_requests.owned_by_user_id, userId));
+    await tx.delete(bot_requests).where(eq(bot_requests.created_by, userId));
+    await tx
+      .delete(cloud_agent_code_reviews)
+      .where(eq(cloud_agent_code_reviews.owned_by_user_id, userId));
+    await tx.delete(device_auth_requests).where(eq(device_auth_requests.kilo_user_id, userId));
+    await tx.delete(auto_top_up_configs).where(eq(auto_top_up_configs.owned_by_user_id, userId));
+    await tx.delete(kiloclaw_access_codes).where(eq(kiloclaw_access_codes.kilo_user_id, userId));
+    await tx
+      .update(kiloclaw_cli_runs)
+      .set({ initiated_by_admin_id: null })
+      .where(eq(kiloclaw_cli_runs.initiated_by_admin_id, userId));
+    await tx.delete(kiloclaw_cli_runs).where(eq(kiloclaw_cli_runs.user_id, userId));
+    await tx
+      .delete(kiloclaw_composio_identities)
+      .where(eq(kiloclaw_composio_identities.user_id, userId));
+    // Remove stored Google OAuth credentials for all instances owned by this user.
+    await tx
+      .delete(kiloclaw_google_oauth_connections)
+      .where(
+        inArray(
+          kiloclaw_google_oauth_connections.instance_id,
+          tx
+            .select({ id: kiloclaw_instances.id })
+            .from(kiloclaw_instances)
+            .where(eq(kiloclaw_instances.user_id, userId))
+        )
+      );
+    await tx
+      .delete(kiloclaw_inbound_email_aliases)
+      .where(
+        inArray(
+          kiloclaw_inbound_email_aliases.instance_id,
+          tx
+            .select({ id: kiloclaw_instances.id })
+            .from(kiloclaw_instances)
+            .where(eq(kiloclaw_instances.user_id, userId))
+        )
+      );
+    await tx.delete(user_push_tokens).where(eq(user_push_tokens.user_id, userId));
+    await tx.delete(user_period_cache).where(eq(user_period_cache.kilo_user_id, userId));
+    await tx
+      .delete(kilo_pass_scheduled_changes)
+      .where(eq(kilo_pass_scheduled_changes.kilo_user_id, userId));
+    await tx
+      .delete(github_branch_pull_requests)
+      .where(eq(github_branch_pull_requests.owned_by_user_id, userId));
+
+    // Code indexing data
+    await tx.delete(source_embeddings).where(eq(source_embeddings.kilo_user_id, userId));
+    await tx.delete(code_indexing_search).where(eq(code_indexing_search.kilo_user_id, userId));
+    await tx.delete(code_indexing_manifest).where(eq(code_indexing_manifest.kilo_user_id, userId));
+
+    // ── 3. Anonymize PII in retained tables ──────────────────────────────
+
+    const storePurchases = await tx
+      .select({
+        id: kilo_pass_store_purchases.id,
+        rawPayloadJson: kilo_pass_store_purchases.raw_payload_json,
+      })
+      .from(kilo_pass_store_purchases)
+      .where(eq(kilo_pass_store_purchases.kilo_user_id, userId));
+
+    for (const purchase of storePurchases) {
+      await tx
+        .update(kilo_pass_store_purchases)
+        .set({
+          app_account_token: null,
+          purchase_token: null,
+          raw_payload_json: redactStoreAccountLinkedJson(purchase.rawPayloadJson),
+        })
+        .where(eq(kilo_pass_store_purchases.id, purchase.id));
+    }
+
+    const storeEvents = await tx
+      .select({
+        id: kilo_pass_store_events.id,
+        payloadJson: kilo_pass_store_events.payload_json,
+      })
+      .from(kilo_pass_store_events)
+      .where(eq(kilo_pass_store_events.app_account_token, originalAppStoreAccountToken));
+
+    for (const event of storeEvents) {
+      await tx
+        .update(kilo_pass_store_events)
+        .set({
+          app_account_token: null,
+          payload_json: redactStoreAccountLinkedJson(event.payloadJson),
+        })
+        .where(eq(kilo_pass_store_events.id, event.id));
+    }
+
+    // kiloclaw_instances.admin_size_override JSONB carries actorEmail (an
+    // admin's address) and a free-form reason (often referencing a ticket
+    // or the customer scenario). Clear it on:
+    //   (a) this user's retained destroyed instances — keeping the user's
+    //       deletion clean of any reason text written about their incident;
+    //   (b) ANY instance where this user was the admin actor — their email
+    //       and reason text are their PII regardless of whose instance it
+    //       targeted, so they need to be scrubbed when the actor is deleted.
+    // The denormalized read-cache loses the audit trail, but the canonical
+    // record lives in `kiloclaw_admin_audit_logs` (whose actor PII is
+    // anonymized below by the same flow).
+    await tx
+      .update(kiloclaw_instances)
+      .set({ admin_size_override: null })
+      .where(
+        or(
+          eq(kiloclaw_instances.user_id, userId),
+          sql`${kiloclaw_instances.admin_size_override}->>'actorId' = ${userId}`
+        )
+      );
+
+    // Organization audit logs: keep the log entries, strip actor PII
+    await tx
+      .update(organization_audit_logs)
+      .set({ actor_email: null, actor_name: null })
+      .where(eq(organization_audit_logs.actor_id, userId));
+
+    // Security audit logs: keep org-owned entries, strip actor PII
+    // (user-owned entries are cascade-deleted via owned_by_user_id FK)
+    await tx
+      .update(security_audit_log)
+      .set({ actor_email: null, actor_name: null })
+      .where(eq(security_audit_log.actor_id, userId));
+
+    // KiloClaw admin audit logs: strip PII where user is the actor
+    await tx
+      .update(kiloclaw_admin_audit_logs)
+      .set({ actor_email: null, actor_name: null })
+      .where(eq(kiloclaw_admin_audit_logs.actor_id, userId));
+
+    // KiloClaw admin audit logs: strip PII where user is the target
+    await tx
+      .update(kiloclaw_admin_audit_logs)
+      .set({ target_user_id: 'deleted-user' })
+      .where(eq(kiloclaw_admin_audit_logs.target_user_id, userId));
+
+    await tx
+      .update(model_eval_ingestions)
+      .set({ promoted_by_email: `deleted+${userId}@deleted.invalid` })
+      .where(sql`lower(${model_eval_ingestions.promoted_by_email}) = lower(${originalEmail})`);
+
+    // Credit campaigns: strip the creator-admin reference. The campaigns
+    // themselves are retained (they represent ongoing marketing relationships
+    // and audit of granted credits), but the link back to the deleted user
+    // is anonymized to match the other actor-column patterns above.
+    await tx
+      .update(credit_campaigns)
+      .set({ created_by_kilo_user_id: 'deleted-user' })
+      .where(eq(credit_campaigns.created_by_kilo_user_id, userId));
+
+    // Payment methods: soft-delete and strip address/name/IP fields
+    await tx
+      .update(payment_methods)
+      .set({
+        deleted_at: sql`now()`,
+        name: null,
+        address_line1: null,
+        address_line2: null,
+        address_city: null,
+        address_state: null,
+        address_zip: null,
+        address_country: null,
+        http_x_forwarded_for: null,
+        http_x_vercel_ip_city: null,
+        http_x_vercel_ip_country: null,
+        http_x_vercel_ip_latitude: null,
+        http_x_vercel_ip_longitude: null,
+        http_x_vercel_ja4_digest: null,
+      })
+      .where(eq(payment_methods.user_id, userId));
+
+    // Contributor champions: anonymize email PII and nullify user link
+    // Clear events linked through membership
+    await tx
+      .update(contributor_champion_events)
+      .set({ github_author_email: null })
+      .where(
+        sql`${contributor_champion_events.contributor_id} IN (
+          SELECT m.contributor_id FROM contributor_champion_memberships m
+          WHERE m.linked_kilo_user_id = ${userId}
+        )`
+      );
+    // Also clear events matched by email directly (covers un-enrolled contributors).
+    // Use originalEmail captured before the user row was anonymized — the subquery
+    // would resolve to the already-overwritten deleted+<id>@deleted.invalid address.
+    await tx
+      .update(contributor_champion_events)
+      .set({ github_author_email: null })
+      .where(
+        sql`lower(${contributor_champion_events.github_author_email}) = lower(${originalEmail})`
+      );
+    await tx
+      .update(contributor_champion_memberships)
+      .set({ linked_kilo_user_id: null })
+      .where(eq(contributor_champion_memberships.linked_kilo_user_id, userId));
+    // Clear manual_email for manually-enrolled contributors linked to this user
+    // (either by exact email match OR via membership link)
+    await tx
+      .update(contributor_champion_contributors)
+      .set({ manual_email: null })
+      .where(
+        or(
+          sql`lower(${contributor_champion_contributors.manual_email}) = lower(${originalEmail})`,
+          sql`${contributor_champion_contributors.id} IN (
+            SELECT m.contributor_id FROM contributor_champion_memberships m
+            WHERE m.linked_kilo_user_id = ${userId}
+          )`
+        )
+      );
+
+    // ── 4. Nullify FK references ─────────────────────────────────────────
+    await tx
+      .update(user_feedback)
+      .set({ kilo_user_id: null })
+      .where(eq(user_feedback.kilo_user_id, userId));
+    await tx
+      .update(app_builder_feedback)
+      .set({ kilo_user_id: null })
+      .where(eq(app_builder_feedback.kilo_user_id, userId));
+    await tx
+      .update(cloud_agent_feedback)
+      .set({ kilo_user_id: null })
+      .where(eq(cloud_agent_feedback.kilo_user_id, userId));
+    await tx
+      .update(free_model_usage)
+      .set({ kilo_user_id: null })
+      .where(eq(free_model_usage.kilo_user_id, userId));
+    await tx
+      .update(security_advisor_scans)
+      .set({ kilo_user_id: 'deleted', public_ip: null })
+      .where(eq(security_advisor_scans.kilo_user_id, userId));
+  });
+
+  void reportEvents({ events: [{ type: 'user.deleted', data: { kilo_user_id: userId } }] });
+}
+
+// We always stytch approve users who accept organization invites
+// so they don't get dumped onto the stych flow after accepting and get
+// free credits
+export async function ensureHasValidStytch(id: User['id']) {
+  await db
+    .update(kilocode_users)
+    .set({ has_validation_stytch: true })
+    .where(eq(kilocode_users.id, id));
+}
+
+// Auth Provider Management Functions
+
+export type UserAuthProvider = typeof user_auth_provider.$inferSelect;
+
+export async function getUserAuthProviders(kiloUserId: string): Promise<UserAuthProvider[]> {
+  return await db
+    .select()
+    .from(user_auth_provider)
+    .where(eq(user_auth_provider.kilo_user_id, kiloUserId))
+    .orderBy(user_auth_provider.created_at);
+}
+
+export async function getOAuthDisplayNames(userId: string): Promise<Map<AuthProviderId, string>> {
+  const rows = await db
+    .select({
+      provider: user_auth_provider.provider,
+      display_name: user_auth_provider.display_name,
+    })
+    .from(user_auth_provider)
+    .where(
+      and(eq(user_auth_provider.kilo_user_id, userId), isNotNull(user_auth_provider.display_name))
+    );
+  return new Map(rows.map(r => [r.provider, r.display_name ?? '']));
+}
+
+export async function findUserIdByAuthProvider(
+  provider: AuthProviderId,
+  providerAccountId: string
+) {
+  const result = await db.query.user_auth_provider.findFirst({
+    where: and(
+      eq(user_auth_provider.provider, provider),
+      eq(user_auth_provider.provider_account_id, providerAccountId)
+    ),
+    columns: { kilo_user_id: true },
+  });
+  return result?.kilo_user_id ?? null;
+}
+
+/**
+ * Get all auth providers for a user by email.
+ * Returns all providers the user has linked, categorized by type.
+ * Used for provider selection UI when user has multiple sign-in options.
+ *
+ * @param email - Any email linked to the user's account
+ * @returns Object with user's providers and SSO info, or null if no account exists
+ */
+export async function getAllUserProviders(email: string): Promise<{
+  kiloUserId: string;
+  providers: AuthProviderId[];
+  primaryEmail: string;
+  workosHostedDomain?: string;
+} | null> {
+  const lowerEmail = email.toLowerCase().trim();
+
+  // Get all auth providers that share the same kilo_user_id as any provider with this email.
+  // This uses a correlated subquery to find the user ID and get all their providers in a single query.
+  const providers = await db
+    .select()
+    .from(user_auth_provider)
+    .where(
+      eq(
+        user_auth_provider.kilo_user_id,
+        db
+          .select({ id: user_auth_provider.kilo_user_id })
+          .from(user_auth_provider)
+          .where(eq(user_auth_provider.email, lowerEmail))
+          .limit(1)
+      )
+    )
+    .orderBy(user_auth_provider.created_at);
+
+  if (providers.length === 0) {
+    return null;
+  }
+
+  const kiloUserId = providers[0].kilo_user_id;
+  const user = await findUserById(kiloUserId);
+  if (!user) {
+    return null;
+  }
+
+  const workosProvider = providers.find(p => p.provider === 'workos');
+
+  return {
+    kiloUserId,
+    providers: providers.map(p => p.provider),
+    primaryEmail: user.google_user_email,
+    workosHostedDomain: workosProvider?.hosted_domain ?? undefined,
+  };
+}
+
+/**
+ * Look up WorkOS organization by domain.
+ * Returns the organization if exactly one is found, or the first one if multiple exist.
+ * Logs warnings for edge cases (multiple orgs, zero orgs).
+ *
+ * @param domain - The domain to look up
+ * @returns The WorkOS organization, or null if not found
+ */
+export async function getWorkOSOrganization(domain: string) {
+  const orgResult = await workos.organizations.listOrganizations({ domains: [domain] });
+
+  if (orgResult.data.length === 1) {
+    return orgResult.data[0];
+  }
+
+  if (orgResult.data.length > 1) {
+    captureMessage(
+      `Multiple WorkOS organizations found for domain, using first one: ${domain} (count: ${orgResult.data.length})`,
+      'warning'
+    );
+    return orgResult.data[0];
+  }
+
+  return null;
+}
+
+type LinkAuthErrors = 'ACCOUNT-ALREADY-LINKED' | 'PROVIDER-ALREADY-LINKED' | 'LINKING-FAILED';
+export type LinkAuthProviderResult = OptionalError<LinkAuthErrors>;
+
+export type AuthProviderLinking = Omit<UserAuthProvider, 'created_at'>;
+
+export async function linkAuthProviderToUser(
+  authProviderData: AuthProviderLinking
+): Promise<LinkAuthProviderResult> {
+  const kiloUserId = authProviderData.kilo_user_id;
+  // Check if this provider account is already linked to another user
+  const existing_kilo_user_id = await findUserIdByAuthProvider(
+    authProviderData.provider,
+    authProviderData.provider_account_id
+  );
+
+  if (existing_kilo_user_id && existing_kilo_user_id !== kiloUserId) {
+    return failureResult('ACCOUNT-ALREADY-LINKED');
+  }
+
+  // Check if user already has this provider linked
+  const userProviders = await getUserAuthProviders(kiloUserId);
+  const hasProvider = userProviders.some(p => p.provider === authProviderData.provider);
+
+  if (hasProvider) {
+    return failureResult('PROVIDER-ALREADY-LINKED');
+  }
+
+  const [newAuthProvider] = await db
+    .insert(user_auth_provider)
+    .values(authProviderData)
+    .returning();
+
+  if (!newAuthProvider) {
+    return failureResult('LINKING-FAILED');
+  }
+
+  return successResult();
+}
+
+async function tryVerifyDiscordGuildMembership(
+  provider: AuthProviderId,
+  providerAccountId: string,
+  kiloUserId: string
+) {
+  if (provider !== 'discord') return;
+  try {
+    const isMember = await checkDiscordGuildMembership(providerAccountId);
+    if (isMember) {
+      await db
+        .update(kilocode_users)
+        .set({ discord_server_membership_verified_at: new Date().toISOString() })
+        .where(eq(kilocode_users.id, kiloUserId));
+    }
+  } catch (error) {
+    captureException(error, {
+      tags: { operation: 'discord_server_membership_verification' },
+      extra: { kiloUserId },
+    });
+  }
+}
+
+export async function unlinkAuthProviderFromUser(
+  kiloUserId: string,
+  provider: AuthProviderId
+): Promise<OptionalError<TRPCError>> {
+  // Safety check: ensure user has at least 2 auth providers before unlinking
+  const userProviders = await getUserAuthProviders(kiloUserId);
+
+  if (userProviders.length <= 1)
+    return trpcFailure({
+      code: 'BAD_REQUEST',
+      message: 'Cannot unlink the last authentication method',
+    });
+
+  const providerToUnlink = userProviders.find(p => p.provider === provider);
+  if (!providerToUnlink) {
+    return trpcFailure({
+      code: 'BAD_REQUEST',
+      message: `User does not have a linked ${provider} account`,
+    });
+  }
+
+  await db
+    .delete(user_auth_provider)
+    .where(
+      and(
+        eq(user_auth_provider.kilo_user_id, kiloUserId),
+        eq(user_auth_provider.provider, provider)
+      )
+    );
+
+  // Clear Discord guild membership verification when unlinking Discord
+  if (provider === 'discord') {
+    await db
+      .update(kilocode_users)
+      .set({ discord_server_membership_verified_at: null })
+      .where(eq(kilocode_users.id, kiloUserId));
+  }
+
+  return successResult();
+}

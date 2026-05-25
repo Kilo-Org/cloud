@@ -8,6 +8,7 @@ import type {
   ContentBlock,
   EditMessageRequest,
   ExecApprovalDecision,
+  InputContentBlock,
 } from '@kilocode/kilo-chat';
 import {
   useMessages,
@@ -98,6 +99,7 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
     kiloChatClient,
   } = useKiloChatContext();
   const botStatus = useBotStatus();
+  const hasAttachmentsCapability = (botStatus?.capabilities ?? []).includes('attachments');
   const presence = botStatus ? { online: botStatus.online, lastAt: botStatus.at } : undefined;
   const ctxUsage = useConversationStatus(conversationId);
   const queryClient = useQueryClient();
@@ -362,13 +364,13 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
   }
 
   const handleSend = useCallback(
-    async (text: string, inReplyToMessageId?: string): Promise<boolean> => {
+    async (blocks: InputContentBlock[], inReplyToMessageId?: string): Promise<boolean> => {
       autoScrollRef.current = true;
       setShowScrollButton(false);
       try {
         await sendMessage.mutateAsync({
           conversationId,
-          content: [{ type: 'text', text }],
+          content: blocks,
           inReplyToMessageId,
           clientId: ulid(),
         });
@@ -578,6 +580,7 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
                 onExecuteAction={handleExecuteAction}
                 pendingActionGroupId={pendingActionGroupIdForMessage(pendingAction, msg.id)}
                 currentUserId={currentUserId}
+                conversationId={conversationId}
               />
             ))}
           </div>
@@ -603,6 +606,7 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
       {/* Input */}
       <MessageInput
         key={conversationId}
+        conversationId={conversationId}
         onSend={handleSend}
         onTyping={sendTyping}
         replyingTo={replyingTo}
@@ -611,6 +615,7 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
         currentUserId={currentUserId}
         canSend={canSend}
         disabledReason={sendDisabledReason}
+        hasAttachmentsCapability={hasAttachmentsCapability}
       />
     </div>
   );

@@ -302,6 +302,95 @@ test('bonus issuance creates expiry and correct baseline microdollars_used', asy
   expect(expiry.toISOString()).toBe(new Date('2026-03-01T00:00:00.000Z').toISOString());
 });
 
+test('bonus issuance skips when a referral bonus item already exists', async () => {
+  const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
+  const { subscriptionId } = await createTestSubscription({
+    kiloUserId: user.id,
+    tier: KiloPassTier.Tier49,
+    cadence: KiloPassCadence.Monthly,
+  });
+
+  const issueMonth = computeIssueMonth(dayjs('2026-02-15T12:00:00.000Z'));
+  const { issuanceId } = await db.transaction(async tx => {
+    return await createOrGetIssuanceHeader(tx, {
+      subscriptionId,
+      issueMonth,
+      source: KiloPassIssuanceSource.Cron,
+    });
+  });
+
+  const [referralBonusTransaction] = await db
+    .insert(credit_transactions)
+    .values({
+      kilo_user_id: user.id,
+      amount_microdollars: 10_000_000,
+      is_free: true,
+      description: 'Existing referral bonus',
+      credit_category: 'kilo-pass-referral-bonus',
+    })
+    .returning({ id: credit_transactions.id });
+
+  if (!referralBonusTransaction) throw new Error('Expected referral bonus transaction');
+
+  await db.insert(kilo_pass_issuance_items).values({
+    kilo_pass_issuance_id: issuanceId,
+    kind: KiloPassIssuanceItemKind.ReferralBonus,
+    credit_transaction_id: referralBonusTransaction.id,
+    amount_usd: 10,
+  });
+
+  const result = await db.transaction(async tx => {
+    return await issueBonusCreditsForIssuance(tx, {
+      issuanceId,
+      subscriptionId,
+      kiloUserId: user.id,
+      baseAmountUsd: KILO_PASS_TIER_CONFIG.tier_49.monthlyPriceUsd,
+      bonusPercentApplied: 0.1,
+      description: `kilo-pass-bonus-referral-skip-${Date.now()}-${Math.random()}`,
+    });
+  });
+
+  expect(result).toEqual({
+    wasIssued: false,
+    issuanceItemId: null,
+    creditTransactionId: null,
+    amountUsd: 0,
+    amountMicrodollars: 0,
+  });
+
+  const bonusItems = await db
+    .select({ id: kilo_pass_issuance_items.id })
+    .from(kilo_pass_issuance_items)
+    .where(
+      and(
+        eq(kilo_pass_issuance_items.kilo_pass_issuance_id, issuanceId),
+        eq(kilo_pass_issuance_items.kind, KiloPassIssuanceItemKind.Bonus)
+      )
+    );
+  expect(bonusItems).toHaveLength(0);
+
+  const skipAuditLogs = await db
+    .select({
+      result: kilo_pass_audit_log.result,
+      payload: kilo_pass_audit_log.payload_json,
+    })
+    .from(kilo_pass_audit_log)
+    .where(
+      and(
+        eq(kilo_pass_audit_log.related_monthly_issuance_id, issuanceId),
+        eq(kilo_pass_audit_log.action, KiloPassAuditLogAction.BonusCreditsSkippedIdempotent)
+      )
+    );
+
+  expect(skipAuditLogs).toHaveLength(1);
+  expect(skipAuditLogs[0]).toMatchObject({ result: KiloPassAuditLogResult.SkippedIdempotent });
+  expect(skipAuditLogs[0].payload).toEqual(
+    expect.objectContaining({
+      reason: 'existing_referral_bonus_item',
+    })
+  );
+});
+
 test('monthly cadence: bonus expiry is end of the subscription month (period end), not month end', async () => {
   const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
   const startedAt = '2025-04-04T00:00:00.000Z';

@@ -10,6 +10,7 @@ import {
 } from '@/lib/ai-gateway/auto-model';
 import {
   CLAUDE_OPUS_CURRENT_MODEL_ID,
+  claude_opus_4_7_stealth_model,
   claude_sonnet_clawsetup_model,
   CLAUDE_SONNET_CURRENT_MODEL_ID,
 } from '@/lib/ai-gateway/providers/anthropic.constants';
@@ -80,8 +81,18 @@ export const kiloExclusiveModels = [
   seed_20_code_free_model,
   ...alibabaDirectModels,
   claude_sonnet_clawsetup_model,
+  claude_opus_4_7_stealth_model,
   stepfun_35_flash_free_model,
 ] as KiloExclusiveModel[];
+
+export function requiresKiloDataCollection(model: string): boolean {
+  return kiloExclusiveModels.some(
+    m =>
+      m.public_id === model &&
+      m.status !== 'disabled' &&
+      (!m.pricing || m.flags.includes('requires-data-collection'))
+  );
+}
 
 export function isKiloStealthModel(model: string): boolean {
   return kiloExclusiveModels.some(m => m.public_id === model && m.flags.includes('stealth'));

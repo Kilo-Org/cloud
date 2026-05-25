@@ -1,4 +1,4 @@
-import { getUserFromAuthOrRedirect } from '@/lib/user.server';
+import { getUserFromAuthOrRedirect } from '@/lib/user/server';
 import { AutoFixPageClient } from './AutoFixPageClient';
 import { isFeatureFlagEnabled } from '@/lib/posthog-feature-flags';
 import { notFound } from 'next/navigation';

@@ -9,6 +9,7 @@ export default defineConfig({
   plugins: [
     cloudflareTest({
       wrangler: { configPath: './wrangler.jsonc' },
+      remoteBindings: false,
       miniflare: {
         // Point the KILOCLAW service binding at the stub worker below.
         // It must be a named worker reference (not a plain Response function)

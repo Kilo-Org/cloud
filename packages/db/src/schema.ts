@@ -53,14 +53,18 @@ import {
   AffiliateProvider,
   AffiliateEventType,
   AffiliateEventDeliveryState,
-  KiloClawAttributionTouchType,
-  KiloClawAttributionTouchProvider,
+  ImpactReferralProduct,
+  ImpactAdvocateProgramKey,
+  ImpactAttributionTouchType,
+  ImpactAttributionTouchProvider,
   ImpactAdvocateRegistrationState,
   ImpactAdvocateAttemptDeliveryState,
-  KiloClawReferralBeneficiaryRole,
-  KiloClawReferralWinningTouchType,
-  KiloClawReferralDecisionOutcome,
-  KiloClawReferralRewardStatus,
+  ImpactReferralBeneficiaryRole,
+  ImpactReferralWinningTouchType,
+  ImpactReferralDecisionOutcome,
+  ImpactReferralRewardStatus,
+  ImpactReferralRewardKind,
+  ImpactReferralPaymentProvider,
   ImpactConversionReportState,
   ImpactAdvocateRewardRedemptionState,
 } from './schema-types';
@@ -151,14 +155,18 @@ export const SCHEMA_CHECK_ENUMS = {
   AffiliateProvider,
   AffiliateEventType,
   AffiliateEventDeliveryState,
-  KiloClawAttributionTouchType,
-  KiloClawAttributionTouchProvider,
+  ImpactReferralProduct,
+  ImpactAdvocateProgramKey,
+  ImpactAttributionTouchType,
+  ImpactAttributionTouchProvider,
   ImpactAdvocateRegistrationState,
   ImpactAdvocateAttemptDeliveryState,
-  KiloClawReferralBeneficiaryRole,
-  KiloClawReferralWinningTouchType,
-  KiloClawReferralDecisionOutcome,
-  KiloClawReferralRewardStatus,
+  ImpactReferralBeneficiaryRole,
+  ImpactReferralWinningTouchType,
+  ImpactReferralDecisionOutcome,
+  ImpactReferralRewardStatus,
+  ImpactReferralRewardKind,
+  ImpactReferralPaymentProvider,
   ImpactConversionReportState,
   ImpactAdvocateRewardRedemptionState,
 } as const;
@@ -473,21 +481,28 @@ export const deleted_user_email_tombstones = pgTable('deleted_user_email_tombsto
 
 export type DeletedUserEmailTombstone = typeof deleted_user_email_tombstones.$inferSelect;
 
-export const kiloclaw_attribution_touches = pgTable(
-  'kiloclaw_attribution_touches',
+export const impact_attribution_touches = pgTable(
+  'impact_attribution_touches',
   {
     id: uuid()
       .default(sql`pg_catalog.gen_random_uuid()`)
       .primaryKey()
       .notNull(),
+    product: text()
+      .notNull()
+      .$type<ImpactReferralProduct>()
+      .default(ImpactReferralProduct.KiloClaw),
+    program_key: text()
+      .$type<ImpactAdvocateProgramKey>()
+      .default(ImpactAdvocateProgramKey.KiloClaw),
     dedupe_key: text().notNull(),
     anonymous_id: text(),
     user_id: text().references(() => kilocode_users.id, {
       onDelete: 'set null',
       onUpdate: 'cascade',
     }),
-    touch_type: text().notNull().$type<KiloClawAttributionTouchType>(),
-    provider: text().notNull().$type<KiloClawAttributionTouchProvider>(),
+    touch_type: text().notNull().$type<ImpactAttributionTouchType>(),
+    provider: text().notNull().$type<ImpactAttributionTouchProvider>(),
     opaque_tracking_value: text(),
     tracking_value_length: integer().notNull(),
     is_tracking_value_accepted: boolean().notNull().default(true),
@@ -507,29 +522,36 @@ export const kiloclaw_attribution_touches = pgTable(
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
   },
   table => [
-    unique('UQ_kiloclaw_attribution_touches_dedupe_key').on(table.dedupe_key),
-    index('IDX_kiloclaw_attribution_touches_user_id').on(table.user_id),
-    index('IDX_kiloclaw_attribution_touches_anonymous_id').on(table.anonymous_id),
-    index('IDX_kiloclaw_attribution_touches_expires_at').on(table.expires_at),
-    index('IDX_kiloclaw_attribution_touches_sale_attributed_at').on(table.sale_attributed_at),
+    unique('UQ_impact_attribution_touches_dedupe_key').on(table.dedupe_key),
+    index('IDX_impact_attribution_touches_product_user_id').on(table.product, table.user_id),
+    index('IDX_impact_attribution_touches_user_id').on(table.user_id),
+    index('IDX_impact_attribution_touches_anonymous_id').on(table.anonymous_id),
+    index('IDX_impact_attribution_touches_expires_at').on(table.expires_at),
+    index('IDX_impact_attribution_touches_sale_attributed_at').on(table.sale_attributed_at),
+    enumCheck('impact_attribution_touches_product_check', table.product, ImpactReferralProduct),
     enumCheck(
-      'kiloclaw_attribution_touches_touch_type_check',
-      table.touch_type,
-      KiloClawAttributionTouchType
+      'impact_attribution_touches_program_key_check',
+      table.program_key,
+      ImpactAdvocateProgramKey
     ),
     enumCheck(
-      'kiloclaw_attribution_touches_provider_check',
+      'impact_attribution_touches_touch_type_check',
+      table.touch_type,
+      ImpactAttributionTouchType
+    ),
+    enumCheck(
+      'impact_attribution_touches_provider_check',
       table.provider,
-      KiloClawAttributionTouchProvider
+      ImpactAttributionTouchProvider
     ),
     check(
-      'kiloclaw_attribution_touches_tracking_value_length_non_negative_check',
+      'impact_attribution_touches_tracking_value_length_non_negative_check',
       sql`${table.tracking_value_length} >= 0`
     ),
   ]
 );
 
-export type KiloClawAttributionTouch = typeof kiloclaw_attribution_touches.$inferSelect;
+export type ImpactAttributionTouch = typeof impact_attribution_touches.$inferSelect;
 
 export const impact_advocate_participants = pgTable(
   'impact_advocate_participants',
@@ -538,6 +560,10 @@ export const impact_advocate_participants = pgTable(
       .default(sql`pg_catalog.gen_random_uuid()`)
       .primaryKey()
       .notNull(),
+    program_key: text()
+      .notNull()
+      .$type<ImpactAdvocateProgramKey>()
+      .default(ImpactAdvocateProgramKey.KiloClaw),
     user_id: text()
       .notNull()
       .references(() => kilocode_users.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
@@ -562,11 +588,16 @@ export const impact_advocate_participants = pgTable(
       .$onUpdateFn(() => sql`now()`),
   },
   table => [
-    unique('UQ_impact_advocate_participants_user_id').on(table.user_id),
-    unique('UQ_impact_advocate_participants_opaque_referral_identifier').on(
-      table.opaque_referral_identifier
-    ),
+    unique('UQ_impact_advocate_participants_program_user').on(table.program_key, table.user_id),
+    uniqueIndex('UQ_impact_advocate_participants_program_referral_identifier')
+      .on(table.program_key, table.opaque_referral_identifier)
+      .where(sql`${table.opaque_referral_identifier} IS NOT NULL`),
     index('IDX_impact_advocate_participants_registration_state').on(table.registration_state),
+    enumCheck(
+      'impact_advocate_participants_program_key_check',
+      table.program_key,
+      ImpactAdvocateProgramKey
+    ),
     enumCheck(
       'impact_advocate_participants_registration_state_check',
       table.registration_state,
@@ -584,6 +615,10 @@ export const impact_advocate_registration_attempts = pgTable(
       .default(sql`pg_catalog.gen_random_uuid()`)
       .primaryKey()
       .notNull(),
+    program_key: text()
+      .notNull()
+      .$type<ImpactAdvocateProgramKey>()
+      .default(ImpactAdvocateProgramKey.KiloClaw),
     participant_id: uuid()
       .notNull()
       .references(() => impact_advocate_participants.id, {
@@ -614,6 +649,11 @@ export const impact_advocate_registration_attempts = pgTable(
     index('IDX_impact_advocate_registration_attempts_participant_id').on(table.participant_id),
     index('IDX_impact_advocate_registration_attempts_delivery_state').on(table.delivery_state),
     enumCheck(
+      'impact_advocate_registration_attempts_program_key_check',
+      table.program_key,
+      ImpactAdvocateProgramKey
+    ),
+    enumCheck(
       'impact_advocate_registration_attempts_delivery_state_check',
       table.delivery_state,
       ImpactAdvocateAttemptDeliveryState
@@ -632,13 +672,17 @@ export const impact_advocate_registration_attempts = pgTable(
 export type ImpactAdvocateRegistrationAttempt =
   typeof impact_advocate_registration_attempts.$inferSelect;
 
-export const kiloclaw_referrals = pgTable(
-  'kiloclaw_referrals',
+export const impact_referrals = pgTable(
+  'impact_referrals',
   {
     id: uuid()
       .default(sql`pg_catalog.gen_random_uuid()`)
       .primaryKey()
       .notNull(),
+    product: text()
+      .notNull()
+      .$type<ImpactReferralProduct>()
+      .default(ImpactReferralProduct.KiloClaw),
     referee_user_id: text()
       .notNull()
       .references(() => kilocode_users.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
@@ -646,7 +690,7 @@ export const kiloclaw_referrals = pgTable(
       onDelete: 'set null',
       onUpdate: 'cascade',
     }),
-    source_touch_id: uuid().references(() => kiloclaw_attribution_touches.id, {
+    source_touch_id: uuid().references(() => impact_attribution_touches.id, {
       onDelete: 'set null',
       onUpdate: 'cascade',
     }),
@@ -654,21 +698,27 @@ export const kiloclaw_referrals = pgTable(
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
   },
   table => [
-    unique('UQ_kiloclaw_referrals_referee_user_id').on(table.referee_user_id),
-    index('IDX_kiloclaw_referrals_referrer_user_id').on(table.referrer_user_id),
-    index('IDX_kiloclaw_referrals_source_touch_id').on(table.source_touch_id),
+    unique('UQ_impact_referrals_product_referee_user_id').on(table.product, table.referee_user_id),
+    index('IDX_impact_referrals_referrer_user_id').on(table.referrer_user_id),
+    index('IDX_impact_referrals_source_touch_id').on(table.source_touch_id),
+    enumCheck('impact_referrals_product_check', table.product, ImpactReferralProduct),
   ]
 );
 
-export type KiloClawReferral = typeof kiloclaw_referrals.$inferSelect;
+export type ImpactReferral = typeof impact_referrals.$inferSelect;
+export type KiloClawReferral = ImpactReferral;
 
-export const kiloclaw_referral_conversions = pgTable(
-  'kiloclaw_referral_conversions',
+export const impact_referral_conversions = pgTable(
+  'impact_referral_conversions',
   {
     id: uuid()
       .default(sql`pg_catalog.gen_random_uuid()`)
       .primaryKey()
       .notNull(),
+    product: text()
+      .notNull()
+      .$type<ImpactReferralProduct>()
+      .default(ImpactReferralProduct.KiloClaw),
     referee_user_id: text()
       .notNull()
       .references(() => kilocode_users.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
@@ -676,11 +726,15 @@ export const kiloclaw_referral_conversions = pgTable(
       onDelete: 'set null',
       onUpdate: 'cascade',
     }),
-    source_touch_id: uuid().references(() => kiloclaw_attribution_touches.id, {
+    source_touch_id: uuid().references(() => impact_attribution_touches.id, {
       onDelete: 'set null',
       onUpdate: 'cascade',
     }),
-    winning_touch_type: text().notNull().$type<KiloClawReferralWinningTouchType>(),
+    winning_touch_type: text().notNull().$type<ImpactReferralWinningTouchType>(),
+    payment_provider: text()
+      .notNull()
+      .$type<ImpactReferralPaymentProvider>()
+      .default(ImpactReferralPaymentProvider.Credits),
     source_payment_id: text().notNull(),
     qualified: boolean().notNull().default(false),
     disqualification_reason: text(),
@@ -688,97 +742,142 @@ export const kiloclaw_referral_conversions = pgTable(
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
   },
   table => [
-    unique('UQ_kiloclaw_referral_conversions_source_payment_id').on(table.source_payment_id),
-    index('IDX_kiloclaw_referral_conversions_referee_user_id').on(table.referee_user_id),
-    index('IDX_kiloclaw_referral_conversions_referrer_user_id').on(table.referrer_user_id),
+    unique('UQ_impact_referral_conversions_product_payment_source').on(
+      table.product,
+      table.payment_provider,
+      table.source_payment_id
+    ),
+    index('IDX_impact_referral_conversions_referee_user_id').on(table.referee_user_id),
+    index('IDX_impact_referral_conversions_referrer_user_id').on(table.referrer_user_id),
+    enumCheck('impact_referral_conversions_product_check', table.product, ImpactReferralProduct),
     enumCheck(
-      'kiloclaw_referral_conversions_winning_touch_type_check',
+      'impact_referral_conversions_winning_touch_type_check',
       table.winning_touch_type,
-      KiloClawReferralWinningTouchType
+      ImpactReferralWinningTouchType
+    ),
+    enumCheck(
+      'impact_referral_conversions_payment_provider_check',
+      table.payment_provider,
+      ImpactReferralPaymentProvider
     ),
   ]
 );
 
-export type KiloClawReferralConversion = typeof kiloclaw_referral_conversions.$inferSelect;
+export type ImpactReferralConversion = typeof impact_referral_conversions.$inferSelect;
+export type KiloClawReferralConversion = ImpactReferralConversion;
 
-export const kiloclaw_referral_reward_decisions = pgTable(
-  'kiloclaw_referral_reward_decisions',
+export const impact_referral_reward_decisions = pgTable(
+  'impact_referral_reward_decisions',
   {
     id: uuid()
       .default(sql`pg_catalog.gen_random_uuid()`)
       .primaryKey()
       .notNull(),
+    product: text()
+      .notNull()
+      .$type<ImpactReferralProduct>()
+      .default(ImpactReferralProduct.KiloClaw),
     conversion_id: uuid()
       .notNull()
-      .references(() => kiloclaw_referral_conversions.id, {
+      .references(() => impact_referral_conversions.id, {
         onDelete: 'cascade',
         onUpdate: 'cascade',
       }),
     beneficiary_user_id: text()
       .notNull()
       .references(() => kilocode_users.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
-    beneficiary_role: text().notNull().$type<KiloClawReferralBeneficiaryRole>(),
-    outcome: text().notNull().$type<KiloClawReferralDecisionOutcome>(),
+    beneficiary_role: text().notNull().$type<ImpactReferralBeneficiaryRole>(),
+    outcome: text().notNull().$type<ImpactReferralDecisionOutcome>(),
     reason: text(),
+    reward_kind: text()
+      .notNull()
+      .$type<ImpactReferralRewardKind>()
+      .default(ImpactReferralRewardKind.KiloClawFreeMonth),
     months_granted: integer().notNull().default(0),
+    reward_percent: decimal({ precision: 6, scale: 4, mode: 'number' }),
+    source_tier: text(),
+    reward_amount_usd: decimal({ precision: 12, scale: 2, mode: 'number' }),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
   },
   table => [
-    unique('UQ_kiloclaw_referral_reward_decisions_conversion_role').on(
+    unique('UQ_impact_referral_reward_decisions_conversion_role').on(
       table.conversion_id,
       table.beneficiary_role
     ),
-    index('IDX_kiloclaw_referral_reward_decisions_beneficiary_user_id').on(
-      table.beneficiary_user_id
+    index('IDX_impact_referral_reward_decisions_beneficiary_user_id').on(table.beneficiary_user_id),
+    enumCheck(
+      'impact_referral_reward_decisions_product_check',
+      table.product,
+      ImpactReferralProduct
     ),
     enumCheck(
-      'kiloclaw_referral_reward_decisions_beneficiary_role_check',
+      'impact_referral_reward_decisions_beneficiary_role_check',
       table.beneficiary_role,
-      KiloClawReferralBeneficiaryRole
+      ImpactReferralBeneficiaryRole
     ),
     enumCheck(
-      'kiloclaw_referral_reward_decisions_outcome_check',
+      'impact_referral_reward_decisions_outcome_check',
       table.outcome,
-      KiloClawReferralDecisionOutcome
+      ImpactReferralDecisionOutcome
+    ),
+    enumCheck(
+      'impact_referral_reward_decisions_reward_kind_check',
+      table.reward_kind,
+      ImpactReferralRewardKind
     ),
     check(
-      'kiloclaw_referral_reward_decisions_months_granted_non_negative_check',
+      'impact_referral_reward_decisions_months_granted_non_negative_check',
       sql`${table.months_granted} >= 0`
     ),
   ]
 );
 
-export type KiloClawReferralRewardDecision = typeof kiloclaw_referral_reward_decisions.$inferSelect;
+export type ImpactReferralRewardDecision = typeof impact_referral_reward_decisions.$inferSelect;
+export type KiloClawReferralRewardDecision = ImpactReferralRewardDecision;
 
-export const kiloclaw_referral_rewards = pgTable(
-  'kiloclaw_referral_rewards',
+export const impact_referral_rewards = pgTable(
+  'impact_referral_rewards',
   {
     id: uuid()
       .default(sql`pg_catalog.gen_random_uuid()`)
       .primaryKey()
       .notNull(),
+    product: text()
+      .notNull()
+      .$type<ImpactReferralProduct>()
+      .default(ImpactReferralProduct.KiloClaw),
     conversion_id: uuid()
       .notNull()
-      .references(() => kiloclaw_referral_conversions.id, {
+      .references(() => impact_referral_conversions.id, {
         onDelete: 'cascade',
         onUpdate: 'cascade',
       }),
     decision_id: uuid()
       .notNull()
-      .references(() => kiloclaw_referral_reward_decisions.id, {
+      .references(() => impact_referral_reward_decisions.id, {
         onDelete: 'cascade',
         onUpdate: 'cascade',
       }),
     beneficiary_user_id: text()
       .notNull()
       .references(() => kilocode_users.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
-    beneficiary_role: text().notNull().$type<KiloClawReferralBeneficiaryRole>(),
+    beneficiary_role: text().notNull().$type<ImpactReferralBeneficiaryRole>(),
+    reward_kind: text()
+      .notNull()
+      .$type<ImpactReferralRewardKind>()
+      .default(ImpactReferralRewardKind.KiloClawFreeMonth),
     months_granted: integer().notNull().default(1),
+    reward_percent: decimal({ precision: 6, scale: 4, mode: 'number' }),
+    source_tier: text(),
+    reward_amount_usd: decimal({ precision: 12, scale: 2, mode: 'number' }),
     status: text()
       .notNull()
-      .$type<KiloClawReferralRewardStatus>()
-      .default(KiloClawReferralRewardStatus.Pending),
+      .$type<ImpactReferralRewardStatus>()
+      .default(ImpactReferralRewardStatus.Pending),
     applies_to_subscription_id: uuid(),
+    applies_to_kilo_pass_subscription_id: uuid(),
+    consumed_kilo_pass_issuance_id: uuid(),
+    consumed_kilo_pass_issuance_item_id: uuid(),
     earned_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
     applied_at: timestamp({ withTimezone: true, mode: 'string' }),
     reversed_at: timestamp({ withTimezone: true, mode: 'string' }),
@@ -787,38 +886,70 @@ export const kiloclaw_referral_rewards = pgTable(
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
   },
   table => [
-    unique('UQ_kiloclaw_referral_rewards_conversion_role').on(
+    unique('UQ_impact_referral_rewards_conversion_role').on(
       table.conversion_id,
       table.beneficiary_role
     ),
-    unique('UQ_kiloclaw_referral_rewards_decision_id').on(table.decision_id),
-    index('IDX_kiloclaw_referral_rewards_beneficiary_user_id').on(table.beneficiary_user_id),
-    index('IDX_kiloclaw_referral_rewards_status').on(table.status),
+    unique('UQ_impact_referral_rewards_decision_id').on(table.decision_id),
+    index('IDX_impact_referral_rewards_beneficiary_user_id').on(table.beneficiary_user_id),
+    index('IDX_impact_referral_rewards_status').on(table.status),
+    enumCheck('impact_referral_rewards_product_check', table.product, ImpactReferralProduct),
     enumCheck(
-      'kiloclaw_referral_rewards_beneficiary_role_check',
+      'impact_referral_rewards_beneficiary_role_check',
       table.beneficiary_role,
-      KiloClawReferralBeneficiaryRole
+      ImpactReferralBeneficiaryRole
     ),
-    enumCheck('kiloclaw_referral_rewards_status_check', table.status, KiloClawReferralRewardStatus),
+    enumCheck(
+      'impact_referral_rewards_reward_kind_check',
+      table.reward_kind,
+      ImpactReferralRewardKind
+    ),
+    enumCheck('impact_referral_rewards_status_check', table.status, ImpactReferralRewardStatus),
+    foreignKey({
+      columns: [table.applies_to_kilo_pass_subscription_id],
+      foreignColumns: [kilo_pass_subscriptions.id],
+      name: 'FK_impact_referral_rewards_kilo_pass_subscription',
+    })
+      .onDelete('set null')
+      .onUpdate('cascade'),
+    foreignKey({
+      columns: [table.consumed_kilo_pass_issuance_id],
+      foreignColumns: [kilo_pass_issuances.id],
+      name: 'FK_impact_referral_rewards_kilo_pass_issuance',
+    })
+      .onDelete('set null')
+      .onUpdate('cascade'),
+    foreignKey({
+      columns: [table.consumed_kilo_pass_issuance_item_id],
+      foreignColumns: [kilo_pass_issuance_items.id],
+      name: 'FK_impact_referral_rewards_kilo_pass_issuance_item',
+    })
+      .onDelete('set null')
+      .onUpdate('cascade'),
     check(
-      'kiloclaw_referral_rewards_months_granted_positive_check',
-      sql`${table.months_granted} > 0`
+      'impact_referral_rewards_months_granted_non_negative_check',
+      sql`${table.months_granted} >= 0`
     ),
   ]
 );
 
-export type KiloClawReferralReward = typeof kiloclaw_referral_rewards.$inferSelect;
+export type ImpactReferralReward = typeof impact_referral_rewards.$inferSelect;
+export type KiloClawReferralReward = ImpactReferralReward;
 
-export const kiloclaw_referral_reward_applications = pgTable(
-  'kiloclaw_referral_reward_applications',
+export const impact_referral_reward_applications = pgTable(
+  'impact_referral_reward_applications',
   {
     id: uuid()
       .default(sql`pg_catalog.gen_random_uuid()`)
       .primaryKey()
       .notNull(),
+    product: text()
+      .notNull()
+      .$type<ImpactReferralProduct>()
+      .default(ImpactReferralProduct.KiloClaw),
     reward_id: uuid()
       .notNull()
-      .references(() => kiloclaw_referral_rewards.id, {
+      .references(() => impact_referral_rewards.id, {
         onDelete: 'cascade',
         onUpdate: 'cascade',
       }),
@@ -835,15 +966,21 @@ export const kiloclaw_referral_reward_applications = pgTable(
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
   },
   table => [
-    index('IDX_kiloclaw_referral_reward_applications_reward_id').on(table.reward_id),
-    index('IDX_kiloclaw_referral_reward_applications_beneficiary_user_id').on(
+    index('IDX_impact_referral_reward_applications_reward_id').on(table.reward_id),
+    index('IDX_impact_referral_reward_applications_beneficiary_user_id').on(
       table.beneficiary_user_id
+    ),
+    enumCheck(
+      'impact_referral_reward_applications_product_check',
+      table.product,
+      ImpactReferralProduct
     ),
   ]
 );
 
-export type KiloClawReferralRewardApplication =
-  typeof kiloclaw_referral_reward_applications.$inferSelect;
+export type ImpactReferralRewardApplication =
+  typeof impact_referral_reward_applications.$inferSelect;
+export type KiloClawReferralRewardApplication = ImpactReferralRewardApplication;
 
 export const impact_advocate_reward_redemptions = pgTable(
   'impact_advocate_reward_redemptions',
@@ -854,7 +991,7 @@ export const impact_advocate_reward_redemptions = pgTable(
       .notNull(),
     reward_id: uuid()
       .notNull()
-      .references(() => kiloclaw_referral_rewards.id, {
+      .references(() => impact_referral_rewards.id, {
         onDelete: 'cascade',
         onUpdate: 'cascade',
       }),
@@ -908,7 +1045,7 @@ export const impact_conversion_reports = pgTable(
       .default(sql`pg_catalog.gen_random_uuid()`)
       .primaryKey()
       .notNull(),
-    conversion_id: uuid().references(() => kiloclaw_referral_conversions.id, {
+    conversion_id: uuid().references(() => impact_referral_conversions.id, {
       onDelete: 'set null',
       onUpdate: 'cascade',
     }),

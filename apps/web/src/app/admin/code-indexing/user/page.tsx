@@ -1,6 +1,6 @@
 import { Suspense } from 'react';
 import { UserCodeIndexingDetail } from '@/app/admin/components/UserCodeIndexingDetail';
-import { getUserFromAuth } from '@/lib/user.server';
+import { getUserFromAuth } from '@/lib/user/server';
 import { redirect } from 'next/navigation';
 
 export default async function UserCodeIndexingDetailPage({

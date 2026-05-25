@@ -33,6 +33,24 @@ describe('message input layout', () => {
     expect(resolveMessageInputBottomPadding()).toBe(8);
   });
 
+  it('adds Android bottom safe-area clearance so the composer sits above native controls', () => {
+    expect(
+      resolveMessageInputBottomPadding({
+        bottomSafeAreaInset: 24,
+        platform: 'android',
+      })
+    ).toBe(32);
+  });
+
+  it('keeps iOS composer bottom padding controlled by the existing keyboard wrapper', () => {
+    expect(
+      resolveMessageInputBottomPadding({
+        bottomSafeAreaInset: 24,
+        platform: 'ios',
+      })
+    ).toBe(8);
+  });
+
   it('caps the visible composer text area at five lines', () => {
     const expectedMaxHeight =
       MESSAGE_INPUT_LINE_HEIGHT * MESSAGE_INPUT_MAX_VISIBLE_LINES + MESSAGE_INPUT_VERTICAL_INSET;

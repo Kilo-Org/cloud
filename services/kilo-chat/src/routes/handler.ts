@@ -639,6 +639,7 @@ export async function handleAttachmentInit(c: HonoCtx) {
     attachmentId: init.attachmentId,
     putUrl: url,
     putHeaders: headers,
+    putUrlExpiresAt: Math.floor(Date.now() / 1000) + PUT_URL_TTL_SECONDS,
   });
 }
 
@@ -705,7 +706,7 @@ export async function handleAttachmentGetUrl(c: HonoCtx) {
     mimeType: row.mimeType,
     size: row.size,
     filename: row.filename,
-    expiresAt: Date.now() + GET_URL_TTL_SECONDS * 1000,
+    expiresAt: Math.floor(Date.now() / 1000) + GET_URL_TTL_SECONDS,
   });
 }
 

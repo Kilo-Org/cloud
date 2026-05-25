@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test } from '@jest/globals';
 import { NextRequest } from 'next/server';
-import { getUserFromAuth } from '@/lib/user.server';
+import { getUserFromAuth } from '@/lib/user/server';
 import { verifyOAuthState, createOAuthState } from '@/lib/integrations/oauth-state';
 import { bot } from '@/lib/bot';
 import {
@@ -28,7 +28,7 @@ jest.mock('@linear/sdk', () => ({
     },
   })),
 }));
-jest.mock('@/lib/user.server');
+jest.mock('@/lib/user/server');
 jest.mock('@/lib/bot', () => ({
   bot: {
     initialize: jest.fn(async () => undefined),

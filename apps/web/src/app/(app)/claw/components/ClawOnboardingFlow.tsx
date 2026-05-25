@@ -811,8 +811,32 @@ function ClawOnboardingFlowInner({
     }
     hasRedirectedToChat.current = true;
     posthog?.capture('claw_setup_open_chat_clicked', { auto_redirect: true });
-    router.push(`${basePath}/chat`);
-  }, [flowState.renderStep, flowState.gatewayReady, basePath, router, posthog]);
+
+    // Only a freshly-onboarded user (`create-first` mode) gets the morning
+    // briefing as their first chat message. Returning users resolving to
+    // `complete` in `post-provisioning` mode just go straight to chat.
+    if (mode !== 'create-first') {
+      router.push(`${basePath}/chat`);
+      return;
+    }
+
+    // Kick off the in-chat onboarding briefing: this creates the "Today's
+    // briefing" conversation and starts generation, then we route the user
+    // straight into it. Best effort — any failure falls back to the plain
+    // chat redirect (PR-1 behavior) so onboarding never gets stuck here.
+    void (async () => {
+      let target = `${basePath}/chat`;
+      try {
+        const result = await mutations.startOnboardingBriefing.mutateAsync();
+        if (result?.conversationId) {
+          target = `${basePath}/chat/${result.conversationId}`;
+        }
+      } catch {
+        // Fall through to the plain chat redirect.
+      }
+      router.push(target);
+    })();
+  }, [flowState.renderStep, flowState.gatewayReady, basePath, router, posthog, mode, mutations]);
 
   function provisionInstance(
     userLocation?: string,

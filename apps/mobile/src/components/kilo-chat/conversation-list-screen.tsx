@@ -1,5 +1,5 @@
 import { FlashList } from '@shopify/flash-list';
-import { useBotStatus } from '@kilocode/kilo-chat-hooks';
+import { useBotStatus, useEventServiceClient } from '@kilocode/kilo-chat-hooks';
 import * as Haptics from 'expo-haptics';
 import { type Href, useRouter } from 'expo-router';
 import { Plus, Settings2 } from 'lucide-react-native';
@@ -91,6 +91,7 @@ export function ConversationListScreen({ sandboxId, sandboxLabel }: Props) {
   const colors = useThemeColors();
   const { bottom } = useSafeAreaInsets();
   const client = useKiloChatClient();
+  const eventClient = useEventServiceClient();
   const listQuery = useConversations(client, sandboxId);
   const createConversation = useCreateConversation(client);
   const leaveConversation = useLeaveConversation(client);
@@ -119,7 +120,7 @@ export function ConversationListScreen({ sandboxId, sandboxLabel }: Props) {
   );
 
   useInstancePresence(sandboxId);
-  useBotStatus(client, sandboxId);
+  useBotStatus(client, eventClient, sandboxId);
 
   function handleRowPress(conversationId: string) {
     void Haptics.selectionAsync();

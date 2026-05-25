@@ -2,7 +2,7 @@
 
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { MessageSquare, Plus, Terminal, X } from 'lucide-react';
+import { MessageSquare, Terminal, X } from 'lucide-react';
 import { CHAT_TAB_ID, terminalTabId } from './terminal-tabs';
 import type { TerminalWorkspaceTab, WorkspaceTabId } from './terminal-tabs';
 
@@ -39,6 +39,8 @@ export function CloudAgentWorkspaceTabs({
   onCloseTerminal: (terminalId: string) => void;
   className?: string;
 }) {
+  const chatActive = activeTabId === CHAT_TAB_ID;
+
   return (
     <div
       role="tablist"
@@ -48,11 +50,15 @@ export function CloudAgentWorkspaceTabs({
       <Button
         type="button"
         size="sm"
-        variant={activeTabId === CHAT_TAB_ID ? 'secondary' : 'ghost'}
-        className="h-8 shrink-0 gap-2"
+        variant={chatActive ? 'secondary' : 'ghost'}
+        className={cn(
+          'h-8 shrink-0 gap-2',
+          chatActive ? 'cursor-default hover:bg-secondary' : 'cursor-pointer'
+        )}
         role="tab"
-        aria-selected={activeTabId === CHAT_TAB_ID}
-        onClick={() => onSelectTab(CHAT_TAB_ID)}
+        aria-selected={chatActive}
+        aria-disabled={chatActive || undefined}
+        onClick={chatActive ? undefined : () => onSelectTab(CHAT_TAB_ID)}
       >
         <MessageSquare className="h-4 w-4" />
         <span>Chat</span>
@@ -78,8 +84,12 @@ export function CloudAgentWorkspaceTabs({
               type="button"
               role="tab"
               aria-selected={active}
-              className="flex h-full min-w-0 items-center gap-2 rounded-l-md px-2 text-sm font-medium"
-              onClick={() => onSelectTab(tabId)}
+              aria-disabled={active || undefined}
+              className={cn(
+                'flex h-full min-w-0 items-center gap-2 rounded-l-md px-2 text-sm font-medium focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+                active ? 'cursor-default' : 'cursor-pointer'
+              )}
+              onClick={active ? undefined : () => onSelectTab(tabId)}
             >
               <Terminal className="h-4 w-4 shrink-0" />
               <span className="max-w-32 truncate">{tab.title}</span>
@@ -88,7 +98,7 @@ export function CloudAgentWorkspaceTabs({
             <button
               type="button"
               aria-label={`Close ${tab.title}`}
-              className="hover:bg-muted flex h-full w-7 shrink-0 items-center justify-center rounded-r-md"
+              className="hover:bg-muted flex h-full w-7 shrink-0 cursor-pointer items-center justify-center rounded-r-md focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
               onClick={() => onCloseTerminal(tab.id)}
             >
               <X className="h-3.5 w-3.5" />
@@ -100,13 +110,15 @@ export function CloudAgentWorkspaceTabs({
       {canCreateTerminal && (
         <Button
           type="button"
-          size="icon"
+          size="sm"
           variant="ghost"
-          className="h-8 w-8 shrink-0"
-          aria-label="New terminal"
+          className="text-muted-foreground hover:text-foreground h-8 shrink-0 gap-2 px-2"
           onClick={onCreateTerminal}
         >
-          <Plus className="h-4 w-4" />
+          <span aria-hidden="true" className="font-jetbrains text-xs">
+            {'>_'}
+          </span>
+          <span>New terminal</span>
         </Button>
       )}
     </div>

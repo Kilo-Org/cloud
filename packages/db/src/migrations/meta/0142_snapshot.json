@@ -1,5 +1,5 @@
 {
-  "id": "4dfa9950-9e36-4685-87b8-90d5c1d19142",
+  "id": "6d601c9e-e9e6-4e60-bbae-a3e035ce0d3f",
   "prevId": "fb385356-42e2-40e6-ab22-d65a180c6697",
   "version": "7",
   "dialect": "postgresql",
@@ -10567,7 +10567,7 @@
       "checkConstraints": {
         "kilo_pass_audit_log_action_check": {
           "name": "kilo_pass_audit_log_action_check",
-          "value": "\"kilo_pass_audit_log\".\"action\" IN ('stripe_webhook_received', 'kilo_pass_invoice_paid_handled', 'store_purchase_completed', 'store_notification_received', 'store_subscription_renewed', 'store_subscription_canceled', 'store_subscription_expired', 'store_subscription_refunded', 'base_credits_issued', 'bonus_credits_issued', 'bonus_credits_skipped_idempotent', 'first_month_50pct_promo_issued', 'yearly_monthly_base_cron_started', 'yearly_monthly_base_cron_completed', 'issue_yearly_remaining_credits', 'duplicate_card_subscription_canceled', 'yearly_monthly_bonus_cron_started', 'yearly_monthly_bonus_cron_completed')"
+          "value": "\"kilo_pass_audit_log\".\"action\" IN ('stripe_webhook_received', 'kilo_pass_invoice_paid_handled', 'store_purchase_completed', 'store_notification_received', 'store_subscription_renewed', 'store_subscription_canceled', 'store_subscription_expired', 'store_subscription_refunded', 'base_credits_issued', 'bonus_credits_issued', 'bonus_credits_skipped_idempotent', 'first_month_50pct_promo_issued', 'yearly_monthly_base_cron_started', 'yearly_monthly_base_cron_completed', 'issue_yearly_remaining_credits', 'yearly_monthly_bonus_cron_started', 'yearly_monthly_bonus_cron_completed')"
         },
         "kilo_pass_audit_log_result_check": {
           "name": "kilo_pass_audit_log_result_check",
@@ -16947,7 +16947,7 @@
         "usage_id": {
           "name": "usage_id",
           "type": "uuid",
-          "primaryKey": true,
+          "primaryKey": false,
           "notNull": true
         },
         "variant_version_id": {
@@ -17062,7 +17062,15 @@
           "onUpdate": "no action"
         }
       },
-      "compositePrimaryKeys": {},
+      "compositePrimaryKeys": {
+        "model_experiment_request_usage_id_created_at_pk": {
+          "name": "model_experiment_request_usage_id_created_at_pk",
+          "columns": [
+            "usage_id",
+            "created_at"
+          ]
+        }
+      },
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {

@@ -1,6 +1,7 @@
 import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import { db } from '@/lib/drizzle';
 import {
+  kilocode_users,
   microdollar_usage,
   model_experiment,
   model_experiment_request,
@@ -365,7 +366,9 @@ export const adminModelExperimentsRouter = createTRPCRouter({
           requestBodySha256: model_experiment_request.request_body_sha256,
           wasTruncated: model_experiment_request.was_truncated,
           userId: microdollar_usage.kilo_user_id,
-          organizationId: microdollar_usage.organization_id,
+          userName: kilocode_users.google_user_name,
+          userEmail: kilocode_users.google_user_email,
+          userImageUrl: kilocode_users.google_user_image_url,
           requestedModel: microdollar_usage.requested_model,
           upstreamModel: microdollar_usage.model,
           provider: microdollar_usage.provider,
@@ -380,6 +383,7 @@ export const adminModelExperimentsRouter = createTRPCRouter({
         })
         .from(model_experiment_request)
         .innerJoin(microdollar_usage, eq(model_experiment_request.usage_id, microdollar_usage.id))
+        .leftJoin(kilocode_users, eq(microdollar_usage.kilo_user_id, kilocode_users.id))
         .innerJoin(
           model_experiment_variant_version,
           eq(model_experiment_request.variant_version_id, model_experiment_variant_version.id)

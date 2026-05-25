@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, type FormEvent } from 'react';
+import Link from 'next/link';
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Download } from 'lucide-react';
 import {
   type ModelExperimentRequestFilters,
@@ -8,6 +9,7 @@ import {
   useModelExperimentRequests,
   useModelExperiments,
 } from '@/app/admin/api/model-experiments/hooks';
+import { UserAvatarLink } from '@/app/admin/components/UserAvatarLink';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -35,6 +37,7 @@ import {
 
 const ALL = '__all__';
 const DEFAULT_PAGE_SIZE: PageSize = 25;
+const MODEL_EXPERIMENTS_TAB = '/admin/gateway?tab=model-experiments';
 const INITIAL_FILTERS: ModelExperimentRequestFilters = {
   page: 1,
   limit: DEFAULT_PAGE_SIZE,
@@ -79,12 +82,55 @@ function isBodyState(value: string): value is ModelExperimentRequestFilters['bod
   );
 }
 
-function HashCell({ value }: { value: string }) {
-  const display = value.length > 18 ? `${value.slice(0, 18)}…` : value;
+function experimentHref(experimentId: string): string {
+  return `${MODEL_EXPERIMENTS_TAB}&experimentId=${encodeURIComponent(experimentId)}`;
+}
+
+function isAnonymousUserId(userId: string): boolean {
+  return userId.startsWith('anon:');
+}
+
+function UserLink({
+  userId,
+  userName,
+  userEmail,
+  userImageUrl,
+}: {
+  userId: string;
+  userName: string | null;
+  userEmail: string | null;
+  userImageUrl: string | null;
+}) {
+  if (isAnonymousUserId(userId)) {
+    return <span className="font-mono text-xs">{userId}</span>;
+  }
+
+  if (userName && userEmail && userImageUrl) {
+    return (
+      <UserAvatarLink
+        user={{
+          id: userId,
+          google_user_name: userName,
+          google_user_email: userEmail,
+          google_user_image_url: userImageUrl,
+        }}
+        className="flex items-center gap-2"
+        avatarClassName="h-6 w-6 shrink-0"
+        nameClassName="truncate"
+        displayFormat="name"
+      />
+    );
+  }
+
+  const label = userName ?? userEmail ?? userId;
   return (
-    <span className="font-mono text-xs" title={value}>
-      {display}
-    </span>
+    <Link
+      href={`/admin/users/${encodeURIComponent(userId)}`}
+      className="hover:text-foreground font-medium underline-offset-4 hover:underline"
+      title={userEmail ?? userId}
+    >
+      {label}
+    </Link>
   );
 }
 
@@ -341,8 +387,8 @@ export function ModelExperimentRequestsContent() {
             className="max-w-md font-mono"
             value={clientRequestId}
             onChange={event => setClientRequestId(event.target.value)}
-            placeholder="Exact client request ID"
-            aria-label="Filter by client request ID"
+            placeholder="Exact Kilo request ID"
+            aria-label="Filter by Kilo request ID"
           />
           <Button type="submit">Apply</Button>
           <Button type="button" variant="outline" onClick={resetFilters}>
@@ -373,10 +419,11 @@ export function ModelExperimentRequestsContent() {
                   <TableHead>Created</TableHead>
                   <TableHead>Experiment</TableHead>
                   <TableHead>Variant</TableHead>
+                  <TableHead>Routing</TableHead>
                   <TableHead>Request</TableHead>
                   <TableHead>Usage</TableHead>
                   <TableHead>Captured body</TableHead>
-                  <TableHead>User / org</TableHead>
+                  <TableHead>User</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -386,18 +433,23 @@ export function ModelExperimentRequestsContent() {
                       {formatDate(row.createdAt)}
                     </TableCell>
                     <TableCell className="min-w-56 align-top">
-                      <div className="font-medium">{row.experimentName}</div>
+                      <Link
+                        href={experimentHref(row.experimentId)}
+                        className="hover:text-foreground font-medium underline-offset-4 hover:underline"
+                      >
+                        {row.experimentName}
+                      </Link>
                       <div className="text-muted-foreground font-mono text-xs">
                         {row.publicModelId}
-                      </div>
-                      <div className="text-muted-foreground mt-1 font-mono text-xs">
-                        {row.experimentId}
                       </div>
                     </TableCell>
                     <TableCell className="min-w-48 align-top">
                       <div className="font-medium">{row.variantLabel}</div>
-                      <div className="text-muted-foreground font-mono text-xs">
-                        {row.variantVersionId}
+                    </TableCell>
+                    <TableCell className="min-w-56 align-top text-xs">
+                      <div>Provider: {formatNullable(row.inferenceProvider ?? row.provider)}</div>
+                      <div className="text-muted-foreground font-mono">
+                        {formatNullable(row.requestedModel)} → {formatNullable(row.upstreamModel)}
                       </div>
                     </TableCell>
                     <TableCell className="min-w-48 align-top">
@@ -407,9 +459,8 @@ export function ModelExperimentRequestsContent() {
                         {row.wasTruncated ? <Badge variant="destructive">truncated</Badge> : null}
                       </div>
                       <div className="text-muted-foreground mt-1 text-xs">
-                        Client: {formatNullable(row.clientRequestId)}
+                        Kilo request: {formatNullable(row.clientRequestId)}
                       </div>
-                      <div className="text-muted-foreground font-mono text-xs">{row.usageId}</div>
                     </TableCell>
                     <TableCell className="min-w-48 align-top text-sm tabular-nums">
                       <div>
@@ -427,25 +478,18 @@ export function ModelExperimentRequestsContent() {
                       {row.hasError ? <Badge variant="destructive">error</Badge> : null}
                     </TableCell>
                     <TableCell className="min-w-48 align-top">
-                      <div className="mb-2">
-                        <HashCell value={row.requestBodySha256} />
-                      </div>
                       <PromptDownload
                         usageId={row.usageId}
                         requestBodySha256={row.requestBodySha256}
                       />
                     </TableCell>
-                    <TableCell className="min-w-56 align-top text-xs">
-                      <div className="font-mono">{row.userId}</div>
-                      <div className="text-muted-foreground font-mono">
-                        {formatNullable(row.organizationId)}
-                      </div>
-                      <div className="text-muted-foreground mt-1">
-                        {formatNullable(row.provider)} / {formatNullable(row.inferenceProvider)}
-                      </div>
-                      <div className="text-muted-foreground font-mono">
-                        {formatNullable(row.requestedModel)} → {formatNullable(row.upstreamModel)}
-                      </div>
+                    <TableCell className="min-w-48 align-top text-sm">
+                      <UserLink
+                        userId={row.userId}
+                        userName={row.userName}
+                        userEmail={row.userEmail}
+                        userImageUrl={row.userImageUrl}
+                      />
                     </TableCell>
                   </TableRow>
                 ))}

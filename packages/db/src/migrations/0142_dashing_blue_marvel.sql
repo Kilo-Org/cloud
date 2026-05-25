@@ -24,8 +24,6 @@ CREATE TABLE "model_experiment_request_2026_06" PARTITION OF "model_experiment_r
 CREATE TABLE "model_experiment_request_2026_07" PARTITION OF "model_experiment_request"
 	FOR VALUES FROM ('2026-07-01') TO ('2026-08-01');
 --> statement-breakpoint
-CREATE TABLE "model_experiment_request_default" PARTITION OF "model_experiment_request" DEFAULT;
---> statement-breakpoint
 ALTER TABLE "model_experiment_request" ADD CONSTRAINT "model_experiment_request_usage_id_microdollar_usage_id_fk" FOREIGN KEY ("usage_id") REFERENCES "public"."microdollar_usage"("id") ON DELETE cascade ON UPDATE no action;
 --> statement-breakpoint
 ALTER TABLE "model_experiment_request" ADD CONSTRAINT "model_experiment_request_variant_version_id_model_experiment_variant_version_id_fk" FOREIGN KEY ("variant_version_id") REFERENCES "public"."model_experiment_variant_version"("id") ON DELETE no action ON UPDATE no action;

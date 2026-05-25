@@ -2,6 +2,18 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
+import type { PageSize } from '@/types/pagination';
+
+export type ModelExperimentRequestFilters = {
+  page: number;
+  limit: PageSize;
+  experimentId?: string;
+  variantId?: string;
+  clientRequestId?: string;
+  requestKind?: 'chat_completions' | 'messages' | 'responses';
+  outcome: 'all' | 'success' | 'error';
+  bodyState: 'all' | 'available' | 'truncated' | 'failed' | 'deleted';
+};
 
 export function useModelExperiments(includeArchived = false) {
   const trpc = useTRPC();
@@ -16,9 +28,9 @@ export function useModelExperiment(id: string | null) {
   });
 }
 
-export function useModelExperimentRequests() {
+export function useModelExperimentRequests(filters: ModelExperimentRequestFilters) {
   const trpc = useTRPC();
-  return useQuery(trpc.admin.modelExperiments.listRequests.queryOptions());
+  return useQuery(trpc.admin.modelExperiments.listRequests.queryOptions(filters));
 }
 
 function useInvalidate() {

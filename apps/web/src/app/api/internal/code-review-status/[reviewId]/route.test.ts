@@ -151,7 +151,7 @@ jest.mock('@/lib/drizzle', () => ({
   db: {
     transaction: mockDbTransaction,
   },
-  sql: jest.requireActual<typeof import('drizzle-orm')>('drizzle-orm').sql,
+  sql: (jest.requireActual('drizzle-orm') as { sql: unknown }).sql,
 }));
 
 jest.mock('@/lib/integrations/core/constants', () => ({

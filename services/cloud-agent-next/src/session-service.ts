@@ -73,7 +73,7 @@ import { normalizeAgentMode } from './schema.js';
 const SETUP_COMMAND_TIMEOUT_SECONDS = 300; // 5 minutes
 const DEFAULT_DENIED_COMMAND_PATTERNS = ['rm -rf', 'sudo rm', 'mkfs', 'dd if='];
 
-// Keep in sync with: cloud-agent/src/workspace.ts, cloudflare-code-review-infra/src/code-review-orchestrator.ts
+// Keep in sync with: cloudflare-code-review-infra/src/code-review-orchestrator.ts
 // mkdir and touch are intentionally allowed for agent scratch space during analysis
 const CODE_REVIEW_ALLOWED_COMMANDS = [
   'ls',
@@ -90,7 +90,18 @@ const CODE_REVIEW_ALLOWED_COMMANDS = [
   'nl',
   'jq',
   'git',
-  'gh',
+  'git fetch',
+  'git pull',
+  'gh pr diff',
+  'gh pr view',
+  'gh api repos/*/issues/*/comments --input*',
+  'gh api repos/*/issues/comments/* -X PATCH*',
+  'gh api repos/*/pulls/*/reviews --input*',
+  'glab mr diff',
+  'glab mr view',
+  'glab api --method POST *merge_requests/*/notes*',
+  'glab api --method PUT *merge_requests/*/notes/*',
+  'glab api --method POST *merge_requests/*/discussions*',
   'whoami',
   'date',
   'stat',
@@ -148,8 +159,14 @@ const CODE_REVIEW_DENIED_COMMAND_PATTERNS = [
   'tmux',
   'screen',
   'git add',
+  'git branch',
+  'git clean',
   'git commit',
+  'git config',
+  'git mv',
   'git push',
+  'git restore',
+  'git rm',
   'git merge',
   'git rebase',
   'git cherry-pick',
@@ -158,6 +175,7 @@ const CODE_REVIEW_DENIED_COMMAND_PATTERNS = [
   'git switch',
   'git stash',
   'git tag',
+  'git worktree',
   'git am',
   'git apply',
   'git remote set-url',
@@ -172,6 +190,19 @@ const CODE_REVIEW_DENIED_COMMAND_PATTERNS = [
   'gh issue',
   'gh repo create',
   'gh repo fork',
+  'glab auth',
+  'glab mr approve',
+  'glab mr close',
+  'glab mr create',
+  'glab mr delete',
+  'glab mr merge',
+  'glab mr reopen',
+  'glab mr update',
+  'glab repo',
+  'glab issue',
+  'glab pipeline',
+  'glab release',
+  'glab variable',
   'npm test',
   'pnpm test',
   'bun test',
@@ -180,13 +211,13 @@ const CODE_REVIEW_DENIED_COMMAND_PATTERNS = [
   'vitest',
 ];
 
-type CommandGuardPolicy = {
+export type CommandGuardPolicy = {
   policyName: string;
   allowed: string[];
   denied: string[];
 };
 
-function getCommandGuardPolicy(createdOnPlatform?: string): CommandGuardPolicy | null {
+export function getCommandGuardPolicy(createdOnPlatform?: string): CommandGuardPolicy | null {
   if (createdOnPlatform !== 'code-review') {
     return null;
   }
@@ -196,6 +227,23 @@ function getCommandGuardPolicy(createdOnPlatform?: string): CommandGuardPolicy |
     allowed: CODE_REVIEW_ALLOWED_COMMANDS,
     denied: [...DEFAULT_DENIED_COMMAND_PATTERNS, ...CODE_REVIEW_DENIED_COMMAND_PATTERNS],
   };
+}
+
+export function buildCommandGuardBashPermissions(
+  commandGuardPolicy: CommandGuardPolicy
+): Record<string, string> {
+  // Denies are inserted after allows so exact duplicates still fail closed;
+  // more-specific denied sub-commands also override broader allowed commands in the CLI matcher.
+  const bashPermissions: Record<string, string> = {};
+  for (const cmd of commandGuardPolicy.allowed) {
+    bashPermissions[cmd] = 'allow';
+    bashPermissions[`${cmd} *`] = 'allow';
+  }
+  for (const cmd of commandGuardPolicy.denied) {
+    bashPermissions[cmd] = 'deny';
+    bashPermissions[`${cmd} *`] = 'deny';
+  }
+  return bashPermissions;
 }
 
 class SessionSnapshotRestoreError extends Error {
@@ -971,18 +1019,7 @@ export class SessionService {
     };
 
     if (commandGuardPolicy) {
-      // Build bash permission rules from guard policy. Denies are inserted after
-      // allows so exact duplicates still fail closed; more-specific denied
-      // sub-commands also override broader allowed commands in the CLI matcher.
-      const bashPermissions: Record<string, string> = {};
-      for (const cmd of commandGuardPolicy.allowed) {
-        bashPermissions[cmd] = 'allow';
-        bashPermissions[`${cmd} *`] = 'allow';
-      }
-      for (const cmd of commandGuardPolicy.denied) {
-        bashPermissions[cmd] = 'deny';
-        bashPermissions[`${cmd} *`] = 'deny';
-      }
+      const bashPermissions = buildCommandGuardBashPermissions(commandGuardPolicy);
 
       // Parity with old autoApproval config:
       //   read: allow  (was read.enabled: true)

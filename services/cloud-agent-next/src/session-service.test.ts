@@ -58,7 +58,12 @@ vi.mock('./kilo/devcontainer.js', async importActual => ({
 }));
 vi.mock('./kilo/ports.js', () => portMocks);
 
-import { SessionService, fetchSessionMetadata } from './session-service.js';
+import {
+  SessionService,
+  buildCommandGuardBashPermissions,
+  fetchSessionMetadata,
+  getCommandGuardPolicy,
+} from './session-service.js';
 import type { CloudAgentSessionState, PersistenceEnv } from './persistence/types.js';
 import { parseSessionMetadata } from './persistence/session-metadata.js';
 import type { ExecutionSession, SandboxInstance, SessionId } from './types.js';
@@ -68,6 +73,42 @@ type MockExecutionSession = ExecutionSession & {
   exec: ReturnType<typeof vi.fn>;
   gitCheckout: ReturnType<typeof vi.fn>;
 };
+
+describe('code-review command guard policy', () => {
+  it('allows required review publication and remote refresh commands while denying repository mutation', () => {
+    const policy = getCommandGuardPolicy('code-review');
+    if (!policy) throw new Error('Expected code-review command guard policy');
+
+    const bashPermissions = buildCommandGuardBashPermissions(policy);
+
+    expect(bashPermissions['glab']).toBeUndefined();
+    expect(bashPermissions['glab *']).toBeUndefined();
+    expect(bashPermissions['gh']).toBeUndefined();
+    expect(bashPermissions['gh *']).toBeUndefined();
+
+    expect(bashPermissions['glab mr diff']).toBe('allow');
+    expect(bashPermissions['glab mr diff *']).toBe('allow');
+    expect(bashPermissions['glab api --method POST *merge_requests/*/notes*']).toBe('allow');
+    expect(bashPermissions['glab api --method PUT *merge_requests/*/notes/*']).toBe('allow');
+    expect(bashPermissions['glab api --method POST *merge_requests/*/discussions*']).toBe('allow');
+
+    expect(bashPermissions['gh pr diff']).toBe('allow');
+    expect(bashPermissions['gh api repos/*/issues/*/comments --input*']).toBe('allow');
+    expect(bashPermissions['gh api repos/*/issues/comments/* -X PATCH*']).toBe('allow');
+    expect(bashPermissions['gh api repos/*/pulls/*/reviews --input*']).toBe('allow');
+
+    expect(bashPermissions['git']).toBe('allow');
+    expect(bashPermissions['git *']).toBe('allow');
+    expect(bashPermissions['git fetch']).toBe('allow');
+    expect(bashPermissions['git fetch *']).toBe('allow');
+    expect(bashPermissions['git pull']).toBe('allow');
+    expect(bashPermissions['git pull *']).toBe('allow');
+    expect(bashPermissions['glab mr merge']).toBe('deny');
+    expect(bashPermissions['glab mr merge *']).toBe('deny');
+    expect(bashPermissions['glab auth']).toBe('deny');
+    expect(bashPermissions['glab auth *']).toBe('deny');
+  });
+});
 
 function createSession(repoExists = false): MockExecutionSession {
   const exec = vi.fn(async (command: string) => {

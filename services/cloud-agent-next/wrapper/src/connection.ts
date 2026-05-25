@@ -39,6 +39,26 @@ function isInteractiveStatusType(statusType: string | undefined): boolean {
   return statusType === 'question' || statusType === 'permission';
 }
 
+function permissionCategoryFromProperties(properties: Record<string, unknown>): string {
+  const permission = properties.permission;
+  if (isRecord(permission)) {
+    const type = permission.type;
+    if (typeof type === 'string') return type;
+    const tool = permission.tool;
+    if (typeof tool === 'string') return tool;
+  }
+
+  if (typeof permission !== 'string') return 'unknown';
+  const normalized = permission.toLowerCase();
+  if (normalized.includes('glab')) return 'bash:glab';
+  if (normalized.includes('gh ')) return 'bash:gh';
+  if (normalized.includes('git ')) return 'bash:git';
+  if (normalized.includes('bash')) return 'bash';
+  if (normalized.includes('edit')) return 'edit';
+  if (normalized.includes('web')) return 'web';
+  return 'unknown';
+}
+
 function getActivitySessionID(
   eventType: string,
   properties: Record<string, unknown>
@@ -86,9 +106,21 @@ function rejectCodeReviewQuestion(
 
 function rejectCodeReviewPermission(
   permissionId: string | undefined,
+  properties: Record<string, unknown>,
+  state: WrapperState,
   kiloClient: WrapperKiloClient
 ): void {
   if (!permissionId) return;
+  logToFile(
+    JSON.stringify({
+      message: 'code_review_permission_rejected',
+      agentSessionId: state.currentSession?.agentSessionId,
+      kiloSessionId: state.currentSession?.kiloSessionId,
+      permissionCategory: permissionCategoryFromProperties(properties),
+      policy: 'code-review-read-only',
+      reason: 'non-interactive-unapproved',
+    })
+  );
   kiloClient
     .answerPermission(permissionId, 'reject', CODE_REVIEW_PERMISSION_REJECTION_MESSAGE)
     .catch(err => {
@@ -931,7 +963,7 @@ export function createConnectionManager(
           if (eventType === 'permission.asked') {
             const permId = typeof properties.id === 'string' ? properties.id : undefined;
             if (isCodeReviewJob(state)) {
-              rejectCodeReviewPermission(permId, config.kiloClient);
+              rejectCodeReviewPermission(permId, properties, state, config.kiloClient);
               callbacks.onSseEvent?.();
               continue;
             }

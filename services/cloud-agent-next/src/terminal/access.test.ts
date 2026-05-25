@@ -33,7 +33,17 @@ describe('validateTerminalMetadata', () => {
     expect(result).toEqual({ success: true, data: { metadata: baseMetadata } });
   });
 
-  it('rejects sessions created by non-interactive platforms', () => {
+  it('allows prepared Slack-created cloud-agent sessions', () => {
+    const metadata = {
+      ...baseMetadata,
+      identity: { ...baseMetadata.identity, createdOnPlatform: 'slack' },
+    };
+    const result = validateTerminalMetadata(metadata, baseMetadata.identity.sessionId);
+
+    expect(result).toEqual({ success: true, data: { metadata } });
+  });
+
+  it('rejects sessions created by unsupported platforms', () => {
     const result = validateTerminalMetadata(
       {
         ...baseMetadata,

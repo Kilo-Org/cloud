@@ -3,43 +3,43 @@
 ## Implementation Status (read this first)
 
 <!--
-  Update this block when phases land. Format:
-    [done]  in main, with PR/commit ref
-    [merged-pending] PR open, awaiting merge
-    [in-progress] partially landed, see notes
-    [todo] not started
+  Update this block when phase status changes. Format:
+    [done]       implemented
+    [done-core]  core implementation exists; explicit follow-ups remain
+    [partial]    some implementation/tests exist; durable work remains
+    [todo]       not started
 -->
 
-| Phase                               | Status      | Notes                                                                                                                                                                                                                                 |
-| ----------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Phase 1 — Schema + Migration        | [done]      | Core schema landed in #3299. Prompt schema simplification landed in #3358. Monthly partitioning is on stacked PR #3445 (`0142_dashing_blue_marvel.sql`).                                                                              |
-| Phase 2 — Gateway Header Capture    | [done]      | Landed in #3325, merged to main.                                                                                                                                                                                                      |
-| Phase 3 — Variant Picker + Routing  | [done]      | Landed in #3325, merged to main.                                                                                                                                                                                                      |
-| Phase 4 — Usage, Metrics, Reporting | [done-core] | R2 helper, bounded full-body capture, attribution persistence, and after-hook wiring landed in #3325. `model_experiment_request_stats` / live aggregate reporting remain deferred until a real report consumer needs the exact shape. |
-| Phase 5 — Admin tRPC + UI           | [done-core] | CRUD router + UI tab landed in #3302. Request log query/UI landed with #3325. `getLiveStats` and admin prompt inflation via `getPromptByHash` remain deferred.                                                                        |
-| Phase 6 — Specs + Tests             | [partial]   | Router, picker, prompt persistence, and partitioning tests exist across #3302/#3325/#3445. Durable spec file `.specs/model-experiments.md`, AGENTS registration, and soft-delete policy test are still owed.                          |
+| Phase                               | Status      | Current State                                                                                                                                                                                                                      |
+| ----------------------------------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Phase 1 — Schema + Migration        | [done]      | Experiment tables exist. `model_experiment_request` is monthly range-partitioned on `created_at`, uses primary key `(usage_id, created_at)`, and stores one full-body prompt hash plus `request_kind`.                             |
+| Phase 2 — Gateway Header Capture    | [done]      | Gateway captures `x-kilo-request`, `x-kilo-session`, and `x-kilocode-machineid`, and passes the client request id, session id, machine id, and client IP into routing/usage context.                                               |
+| Phase 3 — Variant Picker + Routing  | [done]      | Experimented public ids route through the deterministic picker, load routing details from Postgres after Redis membership pre-check, and go directly to the selected partner upstream.                                             |
+| Phase 4 — Usage, Metrics, Reporting | [done-core] | Attribution rows and R2 prompt bodies are written after microdollar usage. Admin request log reads the rows inline. Live aggregate reporting and `model_experiment_request_stats` are deferred until a report consumer needs them. |
+| Phase 5 — Admin tRPC + UI           | [done-core] | Admin CRUD, state transitions, variant version hot-swap, key rotation, UI tab, and request log exist. `getLiveStats` and prompt inflation via `getPromptByHash` are still deferred.                                                |
+| Phase 6 — Specs + Tests             | [partial]   | Router, picker, prompt persistence, and partitioning tests exist. Durable spec file `.specs/model-experiments.md`, AGENTS registration, and soft-delete policy test are still owed.                                                |
 
-**Phase 1 — concrete output (landed in `packages/db/src/schema.ts` + `0134_black_union_jack.sql`):**
+**Current schema:**
 
 - `model_experiment` table with partial unique index on `public_model_id` where status in (`active`, `paused`), status CHECK, and "active not archived" CHECK.
 - `model_experiment_variant` table with `(experiment_id, label)` unique constraint and `weight > 0` CHECK.
 - `model_experiment_variant_version` table with `(variant_id, effective_at desc)` index. `upstream` is plain `jsonb` (validation by `ExperimentUpstreamSchema` in app code). `encrypted_api_key` is `jsonb` typed `EncryptedData` (matches `byok_api_keys.encrypted_api_key`).
-- `model_experiment_request` table initially landed with `usage_id` as PK/FK to `microdollar_usage(id) on delete cascade`, `(variant_version_id, created_at)` index, partial index on `client_request_id` where not null, allocation-subject CHECK, and prompt hash CHECKs.
+- `model_experiment_request` table is monthly range-partitioned on `created_at`, with primary key `(usage_id, created_at)`, `usage_id` FK to `microdollar_usage(id) on delete cascade`, `(variant_version_id, created_at)` index, partial index on `client_request_id` where not null, allocation-subject CHECK, request-kind CHECK, and `request_body_sha256` hash/sentinel CHECK.
 - Drizzle types exported: `ModelExperiment` / `New…`, `ModelExperimentVariant` / `New…`, `ModelExperimentVariantVersion` / `New…`, `ModelExperimentRequest` / `New…`.
+- `ExperimentUpstreamSchema` lives in `apps/web/src/lib/ai-gateway/experiments/upstream-schema.ts` and validates the `upstream` JSONB app-side.
+- `request_body_sha256` is the single content-addressed prompt-body reference; there is no separate system-prompt hash column.
 
-**Later Phase 1/schema updates:**
+**Remaining schema/reporting work:**
 
-- ~~`ExperimentUpstreamSchema` zod schema (lives in app code, not in `packages/db`).~~ Landed with Phase 5 admin work in `apps/web/src/lib/ai-gateway/experiments/upstream-schema.ts`.
-- #3358 simplified `model_experiment_request` prompt storage: dropped `system_prompt_sha256` / `__absent__`, added `request_kind`, and made `request_body_sha256` the single content-addressed prompt-body reference.
-- #3445 converts `model_experiment_request` to monthly range partitioning on `created_at`, with composite primary key `(usage_id, created_at)` and a cron route that provisions the current month plus two months ahead. The migration intentionally drops/recreates the empty table rather than copying data.
-- The `model_experiment_request_stats` reporting view — explicitly deferred. See Phase 4d note below.
+- The `model_experiment_request_stats` reporting view is deferred. See Phase 4d note below.
+- Automatic retention-window enforcement and prompt-orphan R2 GC are deferred follow-ups.
 
-**Phase 2 — concrete output (in PR #3325):**
+**Phase 2 — current output:**
 
 - `apps/web/src/app/api/openrouter/[...path]/route.ts` — extracts `x-kilo-request` into `clientRequestId` and `x-kilo-session` as fallback for `session_id` when `x-kilocode-taskid` is absent. Captures `x-kilocode-machineid` once into `machineIdHeader` and threads it (plus the resolved client IP) into `getProvider`.
 - `apps/web/src/lib/ai-gateway/processUsage.types.ts` — extends `MicrodollarUsageContext` with optional `clientRequestId`, `modelExperimentVariantVersionId`, `modelExperimentAllocationSubject`, and `experimentPromptCapture`. Optional so the dozens of construction sites in routes/tests/helpers don't need touching. Adds `ExperimentPromptCapture` type.
 
-**Phase 3 — concrete output (in PR #3325):**
+**Phase 3 — current output:**
 
 - `apps/web/src/lib/ai-gateway/experiments/build-direct-provider.ts` — `buildDirectProvider(input)` + `inferSupportedChatApis(...)`. Used by both the new experiment branch and the existing `kilo-internal/...` (custom_llm2) path so direct-to-upstream traffic shares one implementation. Custom_llm passes `extra_headers`; experiments deliberately don't (excluded from `ExperimentUpstreamSchema`).
 - `apps/web/src/lib/ai-gateway/experiments/membership.ts` — Redis-backed membership pre-check with a short in-process cache. It is split away from Drizzle-using routing code so free-model checks can import it without pulling server-only database modules into client-reachable bundles.
@@ -49,40 +49,40 @@
 - `apps/web/src/lib/ai-gateway/providers/apply-provider-specific-logic.ts` — accepts an optional options bag with `skipKiloExclusiveModelSettings` so the registry's `internal_id`/provider rewrite doesn't override the variant's upstream. Generic provider-specific request fixes and `provider.transformRequest` still run.
 - `apps/web/src/lib/ai-gateway/auto-model/resolution.ts` — no auto-router changes. `autoFreeModels` and the frontier preset list are hand-curated and don't overlap with experiment preview ids; the explicit-opt-in property is preserved by construction. Avoids paying per-candidate Redis membership checks on every `kilo-auto/free` request.
 
-**Phase 4a–c — concrete output (in PR #3325):**
+**Phase 4a–c — current output:**
 
 - `apps/web/src/lib/r2/experiment-prompts.ts` — `putPromptIfAbsent(content)` / `putPromptOrNull(content)` under sha256 hex keys for automatic dedup, `getPromptByHash(sha)` for out-of-band reads with strict 64-char hex validation, and `sha256Hex(content)`. Prompt put failures translate to the `__failed__` sentinel.
 - `apps/web/src/lib/r2/client.ts` — adds `R2_EXPERIMENT_PROMPTS_BUCKET_NAME` env var and `r2ExperimentPromptsBucketName` export. Per-environment buckets `kilo-experiment-prompts-dev` / `kilo-experiment-prompts-prod`.
 - `apps/web/src/lib/ai-gateway/experiments/persist.ts` — `buildExperimentPromptCapture(request)` serializes the full canonical post-`transformRequest` body as one content-addressed blob, records `requestKind`, and caps the serialized UTF-8 payload at 4 MB with deterministic valid-UTF-8 truncation. `persistExperimentAttribution(input)` does one best-effort R2 put and inserts one row into `model_experiment_request` with `request_body_sha256` set to either the real hash or `__failed__`; errors are reported and swallowed so attribution never rolls back billing.
-- `apps/web/src/lib/ai-gateway/processUsage.ts` — `logMicrodollarUsage` and `processTokenData` now return `{ usageId, createdAt }` so the experiment attribution row keys onto the same usage row. Existing callers ignoring the return value are unaffected.
+- `apps/web/src/lib/ai-gateway/processUsage.ts` — `logMicrodollarUsage` and `processTokenData` return `{ usageId, createdAt }` so the experiment attribution row keys onto the same usage row. Existing callers ignoring the return value are unaffected.
 - `apps/web/src/lib/ai-gateway/llm-proxy-helpers.ts` — `accountForMicrodollarUsage` chains `persistExperimentAttribution` after the microdollar write inside the same `after()` hook, only for experimented requests.
 
-**Phase 4d — explicitly deferred:**
+**Phase 4d — deferred:**
 
-The `model_experiment_request_stats` reporting view was implemented and reverted out of PR #3325 because there is no consumer yet. The two real arguments for the view are (a) centralizing the 4-table join + JSON extraction and (b) physically excluding `upstream->>'api_key'` at the column level so any consumer of the view cannot leak the key. (a) is also achievable inline with Drizzle queries, and (b) can be enforced with a code-review rule + grep test until a real consumer materializes. Re-add when `getLiveStats` (Phase 5 deferred) or another report needs it; by then the right column set will be obvious.
+Add `model_experiment_request_stats` when `getLiveStats` or another aggregate report needs a stable column set. The view should centralize the request → variant version → variant → experiment join and expose only non-key columns such as `upstream->>'internal_id'`, `upstream->>'base_url'`, `variant_label`, and `experiment_id`. It must not select `encrypted_api_key` or any plaintext key.
 
-**Membership cache — current shape:**
+**Membership cache:**
 
-The stale-cache follow-up originally recorded during #3325 review is no longer the landed design. The current code keeps `EXPERIMENTED_PUBLIC_IDS_REDIS_KEY` as the admin-maintained membership set and wraps Redis reads in a short in-process cache (`apps/web/src/lib/ai-gateway/experiments/membership.ts`). If Redis is empty, corrupt, or unavailable, `isPublicIdExperimented(publicId)` treats that as no experimented public ids rather than doing per-miss Postgres fallback queries on the hot path. This preserves the cache's purpose: most requests are non-experiment requests, so a DB lookup on every negative membership result is not acceptable.
+The gateway keeps `EXPERIMENTED_PUBLIC_IDS_REDIS_KEY` as the admin-maintained membership set and wraps Redis reads in a short in-process cache (`apps/web/src/lib/ai-gateway/experiments/membership.ts`). If Redis is empty, corrupt, or unavailable, `isPublicIdExperimented(publicId)` treats that as no experimented public ids rather than doing per-miss Postgres fallback queries on the hot path. This preserves the cache's purpose: most requests are non-experiment requests, so a DB lookup on every negative membership result is not acceptable.
 
 Operational consequence: admin mutations that move experiments into or out of routing states must recompute the membership key successfully. The gateway then reads experiment routing details from Postgres only after membership says a public id is experimented.
 
-**Phase 5 — concrete output (in PR — see status table for branch/PR):**
+**Phase 5 — current output:**
 
 - `apps/web/src/lib/ai-gateway/experiments/upstream-schema.ts` — `ExperimentUpstreamSchema` (strict subset of `CustomLlmDefinitionSchema`, no `api_key`, no `extra_headers`).
 - `apps/web/src/lib/redis-keys.ts` — `EXPERIMENTED_PUBLIC_IDS_REDIS_KEY` helper used by Phase 3 membership checks and admin recomputation on routing-affecting status changes.
-- `apps/web/src/lib/redis.ts` — added `redisDel(key)` helper.
+- `apps/web/src/lib/redis.ts` — includes `redisDel(key)` helper.
 - `apps/web/src/routers/admin/model-experiments-router.ts` — full CRUD + state machine (`activate`, `pause`, `complete`, `setArchived`, `delete`-on-draft) + variant ops (`addVariant`, `removeVariant`, `updateVariantLabel`, `swapVariantVersion`, `rotateApiKey`). All routing-affecting mutations invalidate per-public-id cache and recompute the membership set. `encrypted_api_key` is **never** selected by `list`/`get`/`swapVariantVersion`/`rotateApiKey` — admin response shapers explicitly enumerate non-key columns. `BYOK_ENCRYPTION_KEY` missing → `INTERNAL_SERVER_ERROR` on key-touching ops.
 - Wired into `apps/web/src/routers/admin-router.ts` as `trpc.admin.modelExperiments.*`.
 - `apps/web/src/app/admin/api/model-experiments/hooks.ts` — react-query hooks for every procedure.
 - `apps/web/src/app/admin/model-experiments/ModelExperimentsContent.tsx` — list + detail (inline) + create dialog + add-variant dialog + Monaco-based hot-swap dialog (validates `ExperimentUpstreamSchema` strict before submit) + rotate-key dialog. Status badges, share = `weight / sum(weights)`, structural-edit lock for non-draft.
-- `apps/web/src/app/admin/gateway/page.tsx` — added "Model Experiments" as the fourth tab inside `/admin/gateway`.
+- `apps/web/src/app/admin/gateway/page.tsx` — includes "Model Experiments" as the fourth tab inside `/admin/gateway`.
 - `apps/web/src/app/admin/model-experiments/page.tsx` — redirects to `/admin/gateway?tab=model-experiments` (mirrors `custom-llms`).
 
-**Phase 5 — deferred (still owed by later PRs):**
+**Phase 5 — deferred:**
 
 - `getLiveStats(id)` tRPC procedure — still deferred until a real aggregate reporting consumer needs a stable query/result shape.
-- `getPromptByHash(sha)` tRPC procedure and admin prompt inflation — R2 helpers now exist, but the admin UI still renders hashes/sentinels rather than inflating prompt content.
+- `getPromptByHash(sha)` tRPC procedure and admin prompt inflation — R2 helpers exist, but the admin UI renders hashes/sentinels rather than inflating prompt content.
 
 > **Scope: preview/experimental models only.** This system exists to A/B test
 > unreleased model checkpoints in partnership with model providers. It is **not**
@@ -200,7 +200,7 @@ model_experiment_variant_version
 
 model_experiment_request
   usage_id                        uuid fk → microdollar_usage(id) on delete cascade
-  primary key                     (usage_id, created_at) -- partition-compatible in #3445
+  primary key                     (usage_id, created_at) -- required because the table partitions by created_at
   variant_version_id              uuid not null fk → model_experiment_variant_version(id)
   allocation_subject              text not null -- user | machine | ip
   client_request_id               text nullable
@@ -270,26 +270,26 @@ Archive: `is_archived` is an orthogonal boolean. Archiving hides the experiment 
 
 Indexes for `model_experiment_request`:
 
-- Primary key / unique reference: `(usage_id, created_at)` after #3445 partitioning. `usage_id` remains the one-to-one FK to `microdollar_usage(id)`.
+- Primary key / unique reference: `(usage_id, created_at)`. `usage_id` remains the one-to-one FK to `microdollar_usage(id)`.
 - `(variant_version_id, created_at)` for per-RC reports (the primary checkpoint-level grouping).
 - Partial index on `client_request_id` where not null for feedback joins.
 
 Experiment- and variant-level reports go through join: `request → variant_version → variant → experiment`. The served upstream config is read from `model_experiment_variant_version.upstream` JSONB; reports surface `upstream->>'internal_id'` and (where useful) `upstream->>'base_url'`. **Never select `upstream->>'api_key'` in any reporting view, admin query, or response payload.** If query plans show the join hop is hot, add a covering index or denormalize `variant_id` and/or `experiment_id` onto the request row later — defer until measured.
 
-`model_experiment_request.created_at` and `usage_id` match the linked `microdollar_usage` row exactly. #3325 uses JS-side identity values so the same `usageId`/`createdAt` are written to both usage and experiment-attribution rows without relying on Postgres timestamp text round-tripping.
+`model_experiment_request.created_at` and `usage_id` match the linked `microdollar_usage` row exactly. The gateway uses JS-side identity values so the same `usageId`/`createdAt` are written to both usage and experiment-attribution rows without relying on Postgres timestamp text round-tripping.
 
 `model_experiment_request` stores **only hashes or reserved sentinel values** for prompts, never prompt content. The bodies live in R2 (see Prompt Storage below), keyed by sha256. Storing only hashes keeps the Postgres row tiny (~80 bytes overhead beyond the existing attribution columns), keeps PG TOAST out of the picture entirely, and lets the experiment data wipe cleanly without coordinating with the primary datastore.
 
 No backfill is required because pre-experiment traffic has no side-table row.
 
-**Partitioning (landed in #3445).** `model_experiment_request` is a Postgres declarative-partitioned table partitioned by range on `created_at` (monthly partitions). Phase 1 landed it as a plain table for simplicity; #3445 converted it before request rows existed in production:
+**Partitioning.** `model_experiment_request` is a Postgres declarative-partitioned table partitioned by range on `created_at` (monthly partitions):
 
 - Volume scales with experimented preview traffic, not gated by billing — once a partner experiment runs at production volume, the table grows fastest of any new schema added by this plan.
 - Retention drops become `DETACH PARTITION` + `DROP TABLE` (O(1), no bloat) instead of large `DELETE`/`UPDATE` sweeps; the prompt-wipe sentinel update path stays the same but operates on much smaller per-partition working sets.
 - The existing access patterns are partition-pruning friendly: every reporting query and the `(variant_version_id, created_at)` index include `created_at`, and the `usage_id` PK / `client_request_id` partial index can be enforced as partitioned indexes (the PK becomes `(usage_id, created_at)` to satisfy the partition-key-in-PK rule, with the FK to `microdollar_usage(id)` retained on `usage_id`).
 - The `usage_id → microdollar_usage(id) on delete cascade` FK still works against the partitioned table. PostgreSQL requires the primary key to include the partition key, so the PK is `(usage_id, created_at)`.
 
-Mechanics used by #3445:
+Physical shape and maintenance:
 
 1. Drop/recreate the still-empty `model_experiment_request` table as `PARTITION BY RANGE (created_at)` with PK `(usage_id, created_at)` and the same CHECKs/indexes redeclared as partitioned indexes.
 2. Create monthly partitions for May, June, and July 2026 in migration `0142_dashing_blue_marvel.sql`.
@@ -312,7 +312,7 @@ Full canonical post-`transformRequest` request bodies are stored in a dedicated 
 
 **What is stored in R2:**
 
-- One object per full canonical post-`transformRequest` request body. Object key = sha256 hex of the serialized body. #3358 intentionally removed the split-system-message micro-optimization because it had no measured benefit and created a chat-completions-only persistence branch.
+- One object per full canonical post-`transformRequest` request body. Object key = sha256 hex of the serialized body. There is no separate system-prompt object in v1; the full transformed body is the source of truth.
 
 **What is stored in Postgres (`model_experiment_request`):**
 
@@ -375,7 +375,7 @@ In `apps/web/src/app/api/openrouter/[...path]/route.ts`:
 - Capture `x-kilo-session` as a fallback for `session_id` when `x-kilocode-taskid` is absent.
 - Reuse the existing machine-id extraction; do not introduce a new header.
 - Pass `clientRequestId` through `MicrodollarUsageContext` and persist it in `model_experiment_request` only when an experiment is applied.
-- Note on context mutation: current `route.ts` calls `getProvider` before constructing `MicrodollarUsageContext`. `getProvider` must therefore return experiment metadata alongside the provider result, and `route.ts` assigns `modelExperimentVariantVersionId`, `modelExperimentAllocationSubject`, `clientRequestId`, and the bounded prompt capture onto `usageContext` after it is constructed. The existing code already mutates `usageContext` later for fields such as `ttfb_ms`, `status_code`, and `abuse_request_id`; experiment fields follow that route-level mutation pattern rather than mutating context from inside `getProvider`.
+- Note on context mutation: `route.ts` calls `getProvider` before constructing `MicrodollarUsageContext`. `getProvider` must therefore return experiment metadata alongside the provider result, and `route.ts` assigns `modelExperimentVariantVersionId`, `modelExperimentAllocationSubject`, `clientRequestId`, and the bounded prompt capture onto `usageContext` after it is constructed. The existing code already mutates `usageContext` later for fields such as `ttfb_ms`, `status_code`, and `abuse_request_id`; experiment fields follow that route-level mutation pattern rather than mutating context from inside `getProvider`.
 
 ### Phase 3 — Variant Picker + Routing
 
@@ -399,9 +399,10 @@ Add `apps/web/src/lib/ai-gateway/experiments/`:
 
 - `build-direct-provider.ts`
   - `buildDirectProvider(upstream)`: returns the same `Provider` shape that `getProvider`'s `kilo-internal/...` branch returns today (`apps/web/src/lib/ai-gateway/providers/get-provider.ts`): `{ id: 'custom', apiUrl: upstream.base_url, apiKey: upstream.api_key, supportedChatApis: inferSupportedChatApis(upstream.opencode_settings?.ai_sdk_provider, upstream.openclaw_settings?.api_adapter), transformRequest }`. The existing `kilo-internal` branch is refactored to call this same builder (passing the relevant fields from the `custom_llm2` row) so both code paths share one implementation. `bypassAccessCheck: true` remains on the `getProvider` result object, not on the `Provider`.
-    Integration in `getProvider` (`apps/web/src/lib/ai-gateway/providers/get-provider.ts`) and `route.ts`:
 
-- Extend `getProvider`'s return type with optional experiment routing metadata, because `route.ts` constructs `MicrodollarUsageContext` after `getProvider` returns. A new branch is added near the top of `getProvider`, after the BYOK branches and **before** the `kilo-internal/...` branch and the `kiloExclusiveModels` lookup. Pseudocode:
+Integration in `getProvider` (`apps/web/src/lib/ai-gateway/providers/get-provider.ts`) and `route.ts`:
+
+- `getProvider` returns optional experiment routing metadata, because `route.ts` constructs `MicrodollarUsageContext` after `getProvider` returns. The experiment branch runs near the top of `getProvider`, after the BYOK branches and **before** the `kilo-internal/...` branch and the `kiloExclusiveModels` lookup. Pseudocode:
   ```ts
   if (await isPublicIdExperimented(requestedModel)) {
     const selection = await pickModelExperimentVariant({
@@ -488,7 +489,7 @@ Add `apps/web/src/routers/admin/model-experiments-router.ts` with:
 - Variant methods: `addVariant` and `removeVariant` are allowed only on `draft` (structural). `updateVariantLabel` is allowed in any non-terminal state. `swapVariantVersion(variantId, { upstream, apiKey })` is allowed in any non-terminal state (`draft`, `active`, `paused`); validates `upstream` against `ExperimentUpstreamSchema` (strict), calls `encryptApiKey(apiKey, BYOK_ENCRYPTION_KEY)`, and inserts a new `model_experiment_variant_version` row with `effective_at = now()`. `rotateApiKey(variantId, apiKey)` is sugar that calls `swapVariantVersion` with the latest version's `upstream` and the new key. Both reject when `BYOK_ENCRYPTION_KEY` is unset (`INTERNAL_SERVER_ERROR`, mirroring `byok-router.ts:202`). No UPDATE on the variant row is needed — "current version" is derived.
 - Guardrails: activation validates `weight > 0` per variant, ≥2 variants, every variant has at least one version with `effective_at <= now()`, and (active|paused) uniqueness per `public_model_id`. Weight or structural edits after activation are rejected; create a new experiment instead. Hot-swap and label edits are the only live mutations. `model_experiment_variant_version` rows are insert-only — no UPDATE or DELETE endpoints. `setArchived(id, true)` rejects when status is `active`.
 - Admin response shape: `get(id)` and `list()` MUST NOT return `encrypted_api_key` or any plaintext key. Admin queries explicitly select non-key columns (no `SELECT *`). The UI shows a "configured" indicator + the version's `created_at` as a proxy for last-rotated. Reading raw keys is impossible via tRPC by design; the only consumer of `decryptApiKey` for experiment versions is the gateway route/picker path for the selected variant.
-- Cache maintenance for mutations that affect routing states: recompute `EXPERIMENTED_PUBLIC_IDS_REDIS_KEY` (`SELECT public_model_id FROM model_experiment WHERE status IN ('active', 'paused')`) and rewrite it as a JSON array string on every transition into or out of (active, paused). Routing details are loaded from Postgres; there is no per-public-id Redis payload cache in the landed design.
+- Cache maintenance for mutations that affect routing states: recompute `EXPERIMENTED_PUBLIC_IDS_REDIS_KEY` (`SELECT public_model_id FROM model_experiment WHERE status IN ('active', 'paused')`) and rewrite it as a JSON array string on every transition into or out of (active, paused). Routing details are loaded from Postgres; there is no per-public-id Redis payload cache.
 - Paused experiments: gateway returns a local 404/model-unavailable response for requests to the experimented public id. Completed experiments are historical/non-routing and are not included in gateway caches. The not-found mapping lives in `pick-variant.ts`/`getProvider` so the gateway can short-circuit before upstream resolution.
 - `getLiveStats(id)`: aggregate recent requests/errors/p50-p95 latency grouped by `variant_version_id`, with `variant.label` and `upstream->>'internal_id'` resolved for display. Token aggregates per RC (input/output) included; `cost_mUsd` excluded for v1 per the pricing decision.
 - `getPromptByHash(sha: string): Promise<{ content: string } | null>`: admin-gated tRPC procedure that reads from R2 via `getPromptByHash` (`apps/web/src/lib/r2/experiment-prompts.ts`). Accepts only 64-character lowercase hex hashes and returns `null` if the object doesn't exist. Used by the admin UI to inflate real hashes from `model_experiment_request` rows on demand; sentinel values are rendered without an R2 read. Page-level dedup at the call site: collect distinct real hashes, batch-fetch, join in memory.
@@ -605,7 +606,7 @@ These constraints exist because of how the gateway is built today. The spec must
 
 ## Followup: rewrite checkpoint identity in experiment responses
 
-Surfaced in PR #3325 review (P1). Experiment routing rewrites the outbound request to the variant's `upstream.internal_id` (in `buildDirectProvider`, applied via `body.model` before the partner fetch), but the response is returned to the client unchanged.
+Experiment routing rewrites the outbound request to the variant's `upstream.internal_id` (in `buildDirectProvider`, applied via `body.model` before the partner fetch), but the response is returned to the client unchanged.
 
 The existing response-rewriting branch in `apps/web/src/app/api/openrouter/[...path]/route.ts:715,733` only runs for `kilo-exclusive` free traffic flowing through OpenRouter or Vercel — experiment providers carry `provider.id === 'custom'` and bypass it. As a result, OpenAI- and Anthropic-shape partner responses echo `internal_id` in the JSON body and in streaming `model:` events, disclosing the served checkpoint and variant to the client.
 

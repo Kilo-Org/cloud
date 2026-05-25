@@ -38,7 +38,10 @@ const NEWER_MESSAGE_ID = 'msg_018f1e2d3c4bNewerMsgAbCdEF';
 
 function createMemoryStorage(
   initialEntries?: Array<[string, unknown]>,
-  options?: { beforeList?: (prefix: string) => Promise<void> }
+  options?: {
+    beforeList?: (prefix: string) => Promise<void>;
+    beforePut?: (key: string, value: unknown) => Promise<void>;
+  }
 ): MemoryStorage {
   const store = new Map(initialEntries ?? []);
   return {
@@ -46,6 +49,7 @@ function createMemoryStorage(
       return store.get(key) as T | undefined;
     },
     async put(key: string, value: unknown): Promise<void> {
+      await options?.beforePut?.(key, value);
       store.set(key, value);
     },
     async delete(keys: string | string[]): Promise<void> {
@@ -94,7 +98,12 @@ function createHarness(
   initialEntries?: Array<[string, unknown]>,
   options?: {
     metadata?: SessionMetadata;
-    storageHooks?: { beforeList?: (prefix: string) => Promise<void> };
+    storageHooks?: {
+      beforeList?: (prefix: string) => Promise<void>;
+      beforePut?: (key: string, value: unknown) => Promise<void>;
+    };
+    terminalEventError?: () => Error | undefined;
+    hasObservedWrapperIdle?: () => Promise<boolean>;
   }
 ) {
   const storage = createMemoryStorage(initialEntries, options?.storageHooks);
@@ -115,9 +124,11 @@ function createHarness(
     }),
     getAssistantMessageForUserMessage: () => null,
     ensureTerminalMessageEvent: event => {
+      const terminalEventError = options?.terminalEventError?.();
+      if (terminalEventError) throw terminalEventError;
       if (!events.some(existing => existing.entityId === event.entityId)) events.push(event);
     },
-    hasObservedWrapperIdle: async () => true,
+    hasObservedWrapperIdle: options?.hasObservedWrapperIdle ?? (async () => true),
     requestAlarmAtOrBefore: async () => {},
     getSessionIdForLogs: () => currentMetadata.identity.sessionId,
   });
@@ -482,6 +493,295 @@ describe('WrapperSupervisor', () => {
       expect(harness.requestPendingDrainIfNeeded).toHaveBeenCalledOnce();
     }
   );
+
+  it('fails accepted work and invalidates its current fence when its sandbox was destroyed', async () => {
+    const harness = createHarness([liveRuntimeState()]);
+    await putSessionMessageState(harness.storage, acceptedMessage());
+
+    await harness.supervisor.onRuntimeInvalidated({
+      wrapperRunId: WRAPPER_RUN_ID,
+      wrapperGeneration: 4,
+      wrapperConnectionId: WRAPPER_CONNECTION_ID,
+    });
+
+    await expect(getSessionMessageState(harness.storage, MESSAGE_ID)).resolves.toMatchObject({
+      status: 'failed',
+      failureReason: 'wrapper_failure',
+      error: 'Wrapper runtime was destroyed during workspace preparation',
+      completionSource: 'wrapper_failure',
+    });
+    await expect(getWrapperRuntimeState(harness.storage)).resolves.toEqual({
+      wrapperGeneration: 5,
+    });
+    expect(harness.requestPendingDrainIfNeeded).not.toHaveBeenCalled();
+    expect(harness.stops).toEqual([]);
+    expect(harness.events.map(event => event.streamEventType)).toEqual(['cloud.message.failed']);
+  });
+
+  it('invalidates a destroyed fence before fallible terminal effects are repaired', async () => {
+    let terminalEventError: Error | undefined = new Error('terminal event persistence failed');
+    const harness = createHarness([liveRuntimeState()], {
+      terminalEventError: () => terminalEventError,
+    });
+    await putSessionMessageState(harness.storage, acceptedMessage());
+    await putSessionMessageState(harness.storage, acceptedMessage(NEWER_MESSAGE_ID));
+
+    await expect(
+      harness.supervisor.onRuntimeInvalidated({
+        wrapperRunId: WRAPPER_RUN_ID,
+        wrapperGeneration: 4,
+        wrapperConnectionId: WRAPPER_CONNECTION_ID,
+      })
+    ).rejects.toThrow('terminal event persistence failed');
+
+    await expect(getWrapperRuntimeState(harness.storage)).resolves.toEqual({
+      wrapperGeneration: 5,
+    });
+    await expect(getSessionMessageState(harness.storage, MESSAGE_ID)).resolves.toMatchObject({
+      status: 'failed',
+      failureReason: 'wrapper_failure',
+      completionSource: 'wrapper_failure',
+    });
+    await expect(getSessionMessageState(harness.storage, NEWER_MESSAGE_ID)).resolves.toMatchObject({
+      status: 'failed',
+      failureReason: 'wrapper_failure',
+      completionSource: 'wrapper_failure',
+    });
+    await expect(
+      harness.storage.list({ prefix: 'destroyed_runtime_invalidation:' })
+    ).resolves.toHaveProperty('size', 1);
+
+    terminalEventError = undefined;
+    await harness.supervisor.runMaintenance(Date.now());
+    await harness.settlementOutbox.repairTerminalEffects();
+    await harness.supervisor.runMaintenance(Date.now());
+
+    await expect(
+      harness.storage.list({ prefix: 'destroyed_runtime_invalidation:' })
+    ).resolves.toHaveProperty('size', 0);
+    expect(harness.events).toHaveLength(2);
+  });
+
+  it('releases callback work after destroyed-runtime terminal effects are repaired', async () => {
+    let terminalEventError: Error | undefined = new Error('terminal event persistence failed');
+    const harness = createHarness([liveRuntimeState()], {
+      terminalEventError: () => terminalEventError,
+      hasObservedWrapperIdle: async () => false,
+    });
+    await putSessionMessageState(harness.storage, {
+      ...acceptedMessage(),
+      callbackRequired: true,
+      callbackTarget: { url: 'https://example.com/destroyed-runtime-repair' },
+    });
+
+    await expect(
+      harness.supervisor.onRuntimeInvalidated({
+        wrapperRunId: WRAPPER_RUN_ID,
+        wrapperGeneration: 4,
+        wrapperConnectionId: WRAPPER_CONNECTION_ID,
+      })
+    ).rejects.toThrow('terminal event persistence failed');
+
+    terminalEventError = undefined;
+    await harness.supervisor.runMaintenance(Date.now());
+    await harness.settlementOutbox.repairTerminalEffects();
+
+    expect(harness.callbackJobs).toHaveLength(0);
+    await expect(
+      harness.storage.list({ prefix: 'destroyed_runtime_invalidation:' })
+    ).resolves.toHaveProperty('size', 1);
+
+    await harness.supervisor.runMaintenance(Date.now());
+
+    expect(harness.callbackJobs).toHaveLength(1);
+    expect(harness.callbackJobs[0].payload).toMatchObject({
+      messageId: MESSAGE_ID,
+      status: 'failed',
+    });
+    await expect(
+      harness.storage.list({ prefix: 'destroyed_runtime_invalidation:' })
+    ).resolves.toHaveProperty('size', 0);
+  });
+
+  it('does not release a newer wrapper run gate callback while recovering an old destroyed runtime', async () => {
+    const oldWrapperRunId = 'wr_destroyed_old';
+    const newerWrapperRunId = 'wr_newer_after_destroy';
+    const harness = createHarness(
+      [
+        liveRuntimeState({
+          wrapperRunId: newerWrapperRunId,
+          wrapperGeneration: 5,
+          wrapperConnectionId: 'conn_newer_after_destroy',
+        }),
+        [
+          'destroyed_runtime_invalidation:4:conn_destroyed_old',
+          {
+            wrapperRunId: oldWrapperRunId,
+            wrapperGeneration: 4,
+            wrapperConnectionId: 'conn_destroyed_old',
+            invalidatedAt: 1_000,
+          },
+        ],
+      ],
+      {
+        metadata: {
+          ...createMetadata(),
+          finalization: { gateThreshold: 'warning' },
+        },
+      }
+    );
+    await putSessionMessageState(harness.storage, {
+      ...acceptedMessage(NEWER_MESSAGE_ID),
+      wrapperRunId: newerWrapperRunId,
+      callbackRequired: true,
+      callbackTarget: { url: 'https://example.com/newer-after-destroy' },
+    });
+    await harness.settlementOutbox.terminalizeSessionMessageOnce(NEWER_MESSAGE_ID, {
+      kind: 'completed',
+      completionSource: 'assistant_message_event',
+    });
+
+    await harness.supervisor.runMaintenance(11_001);
+
+    expect(harness.callbackJobs).toHaveLength(0);
+    await expect(harness.settlementOutbox.isWaitingForWrapperTerminalGateResult()).resolves.toBe(
+      true
+    );
+    await expect(
+      harness.storage.list({ prefix: 'destroyed_runtime_invalidation:' })
+    ).resolves.toHaveProperty('size', 0);
+  });
+
+  it('retries destroyed-runtime settlement after accepted-message discovery fails', async () => {
+    let failAcceptedMessageScan = true;
+    const harness = createHarness([liveRuntimeState()], {
+      storageHooks: {
+        beforeList: async prefix => {
+          if (failAcceptedMessageScan && prefix.startsWith('session_message:')) {
+            failAcceptedMessageScan = false;
+            throw new Error('accepted-message scan failed');
+          }
+        },
+      },
+    });
+    await putSessionMessageState(harness.storage, acceptedMessage());
+
+    await expect(
+      harness.supervisor.onRuntimeInvalidated({
+        wrapperRunId: WRAPPER_RUN_ID,
+        wrapperGeneration: 4,
+        wrapperConnectionId: WRAPPER_CONNECTION_ID,
+      })
+    ).rejects.toThrow('accepted-message scan failed');
+
+    await expect(getWrapperRuntimeState(harness.storage)).resolves.toEqual({
+      wrapperGeneration: 5,
+    });
+    await expect(
+      harness.storage.list({ prefix: 'destroyed_runtime_invalidation:' })
+    ).resolves.toHaveProperty('size', 1);
+    await expect(harness.supervisor.nextMaintenanceDeadlines()).resolves.toEqual([
+      expect.any(Number),
+    ]);
+
+    await harness.supervisor.runMaintenance(Date.now());
+
+    await expect(getSessionMessageState(harness.storage, MESSAGE_ID)).resolves.toMatchObject({
+      status: 'failed',
+      failureReason: 'wrapper_failure',
+      completionSource: 'wrapper_failure',
+    });
+    await expect(
+      harness.storage.list({ prefix: 'destroyed_runtime_invalidation:' })
+    ).resolves.toHaveProperty('size', 0);
+  });
+
+  it('retries all destroyed-runtime terminal transitions after one state write fails', async () => {
+    let failTerminalStateWrite = true;
+    const harness = createHarness([liveRuntimeState()], {
+      storageHooks: {
+        beforePut: async (key, value) => {
+          if (
+            failTerminalStateWrite &&
+            key.startsWith('session_message:') &&
+            typeof value === 'object' &&
+            value !== null &&
+            'status' in value &&
+            value.status === 'failed'
+          ) {
+            failTerminalStateWrite = false;
+            throw new Error('terminal state write failed');
+          }
+        },
+      },
+    });
+    await putSessionMessageState(harness.storage, acceptedMessage());
+    await putSessionMessageState(harness.storage, acceptedMessage(NEWER_MESSAGE_ID));
+
+    await expect(
+      harness.supervisor.onRuntimeInvalidated({
+        wrapperRunId: WRAPPER_RUN_ID,
+        wrapperGeneration: 4,
+        wrapperConnectionId: WRAPPER_CONNECTION_ID,
+      })
+    ).rejects.toThrow('terminal state write failed');
+
+    await expect(getWrapperRuntimeState(harness.storage)).resolves.toEqual({
+      wrapperGeneration: 5,
+    });
+    await expect(
+      harness.storage.list({ prefix: 'destroyed_runtime_invalidation:' })
+    ).resolves.toHaveProperty('size', 1);
+
+    await harness.supervisor.runMaintenance(Date.now());
+
+    await expect(getSessionMessageState(harness.storage, MESSAGE_ID)).resolves.toMatchObject({
+      status: 'failed',
+      failureReason: 'wrapper_failure',
+      completionSource: 'wrapper_failure',
+    });
+    await expect(getSessionMessageState(harness.storage, NEWER_MESSAGE_ID)).resolves.toMatchObject({
+      status: 'failed',
+      failureReason: 'wrapper_failure',
+      completionSource: 'wrapper_failure',
+    });
+    await expect(
+      harness.storage.list({ prefix: 'destroyed_runtime_invalidation:' })
+    ).resolves.toHaveProperty('size', 0);
+  });
+
+  it('ignores destroyed-runtime invalidation from a stale wrapper fence', async () => {
+    const newerRunId = 'wr_newer_runtime';
+    const harness = createHarness([
+      liveRuntimeState({
+        wrapperRunId: newerRunId,
+        wrapperGeneration: 5,
+        wrapperConnectionId: 'conn_newer_runtime',
+      }),
+    ]);
+    await putSessionMessageState(harness.storage, {
+      ...acceptedMessage(NEWER_MESSAGE_ID),
+      wrapperRunId: newerRunId,
+    });
+
+    await harness.supervisor.onRuntimeInvalidated({
+      wrapperRunId: WRAPPER_RUN_ID,
+      wrapperGeneration: 4,
+      wrapperConnectionId: WRAPPER_CONNECTION_ID,
+    });
+
+    await expect(getSessionMessageState(harness.storage, NEWER_MESSAGE_ID)).resolves.toMatchObject({
+      status: 'accepted',
+      wrapperRunId: newerRunId,
+    });
+    await expect(getWrapperRuntimeState(harness.storage)).resolves.toMatchObject({
+      wrapperRunId: newerRunId,
+      wrapperGeneration: 5,
+      wrapperConnectionId: 'conn_newer_runtime',
+    });
+    expect(harness.events).toHaveLength(0);
+    expect(harness.stops).toEqual([]);
+  });
 
   it('fails accepted current work on liveness expiry without redispatch when no wrapper-local Kilo query remains', async () => {
     const harness = createHarness([

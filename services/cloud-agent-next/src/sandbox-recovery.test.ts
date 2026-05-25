@@ -169,8 +169,9 @@ describe('sandbox recovery', () => {
     );
   });
 
-  it('destroys sandbox when a workspace Git probe times out before bootstrap', async () => {
+  it('reports sandbox destruction when a workspace Git probe times out before bootstrap', async () => {
     const sandbox = { destroy: vi.fn().mockResolvedValue(undefined) };
+    const onSandboxDestroyed = vi.fn().mockResolvedValue(undefined);
     const error = new Error(`${SANDBOX_WORKSPACE_PROBE_TIMEOUT_MESSAGE} after 30000ms`);
 
     await expect(
@@ -180,6 +181,7 @@ describe('sandbox recovery', () => {
           sandboxId: 'ses-test',
           sessionId: 'agent_test',
           phase: 'asyncPreparation',
+          onSandboxDestroyed,
         },
         async () => {
           throw error;
@@ -188,10 +190,86 @@ describe('sandbox recovery', () => {
     ).rejects.toBe(error);
 
     expect(sandbox.destroy).toHaveBeenCalledOnce();
+    expect(onSandboxDestroyed).toHaveBeenCalledWith({
+      failureType: 'sandbox_workspace_probe_timeout',
+      error,
+    });
     expect(mockError).toHaveBeenCalledWith(
       'Sandbox workspace Git probe timed out; destroying sandbox'
     );
     expect(mockInfo).toHaveBeenCalledWith('Destroyed sandbox after workspace Git probe timeout');
+  });
+
+  it('does not report sandbox destruction when destructive recovery fails', async () => {
+    const sandbox = { destroy: vi.fn().mockRejectedValue(new Error('destroy failed')) };
+    const onSandboxDestroyed = vi.fn().mockResolvedValue(undefined);
+    const error = new Error(`${SANDBOX_WORKSPACE_PROBE_TIMEOUT_MESSAGE} after 30000ms`);
+
+    await expect(
+      withPreparationInfrastructureRecovery(
+        {
+          sandbox,
+          sandboxId: 'ses-test',
+          sessionId: 'agent_test',
+          phase: 'asyncPreparation',
+          onSandboxDestroyed,
+        },
+        async () => {
+          throw error;
+        }
+      )
+    ).rejects.toBe(error);
+
+    expect(sandbox.destroy).toHaveBeenCalledOnce();
+    expect(onSandboxDestroyed).not.toHaveBeenCalled();
+  });
+
+  it('keeps the original error when destroyed-sandbox notification fails', async () => {
+    const sandbox = { destroy: vi.fn().mockResolvedValue(undefined) };
+    const onSandboxDestroyed = vi.fn().mockRejectedValue(new Error('notification failed'));
+    const error = new Error(`${SANDBOX_WORKSPACE_PROBE_TIMEOUT_MESSAGE} after 30000ms`);
+
+    await expect(
+      withPreparationInfrastructureRecovery(
+        {
+          sandbox,
+          sandboxId: 'ses-test',
+          sessionId: 'agent_test',
+          phase: 'asyncPreparation',
+          onSandboxDestroyed,
+        },
+        async () => {
+          throw error;
+        }
+      )
+    ).rejects.toBe(error);
+
+    expect(sandbox.destroy).toHaveBeenCalledOnce();
+    expect(onSandboxDestroyed).toHaveBeenCalledOnce();
+  });
+
+  it('does not report unrelated preparation failures as sandbox destruction', async () => {
+    const sandbox = { destroy: vi.fn().mockResolvedValue(undefined) };
+    const onSandboxDestroyed = vi.fn().mockResolvedValue(undefined);
+    const error = new Error('Git clone failed');
+
+    await expect(
+      withPreparationInfrastructureRecovery(
+        {
+          sandbox,
+          sandboxId: 'ses-test',
+          sessionId: 'agent_test',
+          phase: 'asyncPreparation',
+          onSandboxDestroyed,
+        },
+        async () => {
+          throw error;
+        }
+      )
+    ).rejects.toBe(error);
+
+    expect(sandbox.destroy).not.toHaveBeenCalled();
+    expect(onSandboxDestroyed).not.toHaveBeenCalled();
   });
 
   it('does not destroy sandbox for unrelated errors', async () => {

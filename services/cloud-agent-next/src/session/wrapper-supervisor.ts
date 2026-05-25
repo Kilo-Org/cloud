@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { WrapperRunFence } from '../execution/types.js';
 import { logger } from '../logger.js';
 import type { SessionMetadata } from '../persistence/session-metadata.js';
 import type { AgentRuntime } from './agent-runtime.js';
@@ -8,6 +9,8 @@ import { countPendingSessionMessages, type SessionQueueStorage } from './pending
 import type { SessionMessageQueue } from './session-message-queue.js';
 import {
   listNonTerminalAcceptedMessages,
+  listTerminalMessagesWithPendingEffects,
+  type SessionMessageState,
   type SessionMessageStorage,
 } from './session-message-state.js';
 import type { LatestAssistantMessage } from './types.js';
@@ -31,6 +34,16 @@ import {
 const DISCONNECT_GRACE_MS = 10_000;
 const WRAPPER_PING_TIMEOUT_MS = 30_000;
 const DISCONNECT_GRACE_KEY = 'disconnect_grace';
+const DESTROYED_RUNTIME_INVALIDATION_PREFIX = 'destroyed_runtime_invalidation:';
+
+const destroyedRuntimeInvalidationSchema = z.object({
+  wrapperRunId: z.string(),
+  wrapperGeneration: z.number().int().nonnegative(),
+  wrapperConnectionId: z.string(),
+  invalidatedAt: z.number().int().nonnegative(),
+});
+
+type DestroyedRuntimeInvalidation = z.infer<typeof destroyedRuntimeInvalidationSchema>;
 
 const disconnectGraceStateSchema = z.object({
   wrapperRunId: z.string(),
@@ -95,6 +108,7 @@ export type WrapperSupervisor = {
     now: number
   ): Promise<void>;
   onDisconnected(input: WrapperDisconnectedInput): Promise<void>;
+  onRuntimeInvalidated(fence: WrapperRunFence): Promise<void>;
   onTerminalEvent(params: WrapperTerminalEvent): Promise<void>;
   clearDisconnectGrace(): Promise<void>;
   runMaintenance(now: number): Promise<void>;
@@ -238,6 +252,26 @@ export function createWrapperSupervisor(
     });
   }
 
+  function destroyedRuntimeInvalidationKey(invalidated: WrapperRunFence): string {
+    return `${DESTROYED_RUNTIME_INVALIDATION_PREFIX}${invalidated.wrapperGeneration}:${invalidated.wrapperConnectionId}`;
+  }
+
+  async function listDestroyedRuntimeInvalidations(): Promise<
+    Array<{ key: string; invalidation: DestroyedRuntimeInvalidation }>
+  > {
+    const entries = await storage.list<unknown>({ prefix: DESTROYED_RUNTIME_INVALIDATION_PREFIX });
+    const invalidations: Array<{ key: string; invalidation: DestroyedRuntimeInvalidation }> = [];
+    for (const [key, stored] of entries) {
+      const parsed = destroyedRuntimeInvalidationSchema.safeParse(stored);
+      if (!parsed.success) {
+        await storage.delete(key);
+        continue;
+      }
+      invalidations.push({ key, invalidation: parsed.data });
+    }
+    return invalidations;
+  }
+
   async function checkReconnect(input: WrapperReconnectInput): Promise<WrapperReconnectDecision> {
     const runtimeState = await getWrapperRuntimeState(storage);
     if (runtimeState.wrapperRunId !== input.wrapperRunId) {
@@ -359,6 +393,125 @@ export function createWrapperSupervisor(
     await startDisconnectGrace(input);
   }
 
+  async function failAcceptedMessagesForLostRuntime(
+    acceptedMessages: SessionMessageState[],
+    error: string,
+    releaseWrapperRunId?: string
+  ): Promise<void> {
+    const terminalizationErrors: unknown[] = [];
+    for (const message of acceptedMessages) {
+      try {
+        await messageSettlementOutbox.terminalizeSessionMessageOnce(message.messageId, {
+          kind: 'failed',
+          reason: 'wrapper_failure',
+          error,
+          completionSource: 'wrapper_failure',
+        });
+      } catch (terminalizationError) {
+        terminalizationErrors.push(terminalizationError);
+      }
+    }
+    try {
+      if (releaseWrapperRunId) {
+        await releaseWrapperTerminalWaitForIdleBatchForWrapperRun(releaseWrapperRunId);
+      } else {
+        await releaseWrapperTerminalWaitForIdleBatch();
+      }
+    } catch (releaseError) {
+      terminalizationErrors.push(releaseError);
+    }
+
+    if (terminalizationErrors.length > 0) {
+      throw terminalizationErrors[0];
+    }
+  }
+
+  async function settleDestroyedRuntimeInvalidation(
+    key: string,
+    invalidated: DestroyedRuntimeInvalidation
+  ): Promise<void> {
+    const state = await getWrapperRuntimeState(storage);
+    const matchesCurrentRuntime =
+      state.wrapperRunId === invalidated.wrapperRunId &&
+      state.wrapperGeneration === invalidated.wrapperGeneration &&
+      state.wrapperConnectionId === invalidated.wrapperConnectionId;
+    let clearedCurrentRuntime = false;
+    if (matchesCurrentRuntime) {
+      const clearedState = await clearWrapperRuntimeIdentity(
+        storage,
+        {
+          wrapperGeneration: invalidated.wrapperGeneration,
+          wrapperConnectionId: invalidated.wrapperConnectionId,
+        },
+        { incrementGeneration: true }
+      );
+      clearedCurrentRuntime = clearedState !== null;
+    }
+
+    const acceptedMessages = await listNonTerminalAcceptedMessages(
+      storage,
+      invalidated.wrapperRunId
+    );
+    if (clearedCurrentRuntime) {
+      logger
+        .withFields({
+          sessionId: getSessionIdForLogs(),
+          wrapperRunId: invalidated.wrapperRunId,
+          wrapperGeneration: invalidated.wrapperGeneration,
+          wrapperConnectionId: invalidated.wrapperConnectionId,
+          acceptedMessageCount: acceptedMessages.length,
+        })
+        .warn('Invalidated destroyed wrapper runtime');
+    }
+    await failAcceptedMessagesForLostRuntime(
+      acceptedMessages,
+      'Wrapper runtime was destroyed during workspace preparation',
+      invalidated.wrapperRunId
+    );
+    const pendingTerminalEffects = await listTerminalMessagesWithPendingEffects(storage);
+    if (pendingTerminalEffects.some(message => message.wrapperRunId === invalidated.wrapperRunId)) {
+      return;
+    }
+    await storage.delete(key);
+  }
+
+  async function recoverDestroyedRuntimeInvalidations(): Promise<void> {
+    const pendingInvalidations = await listDestroyedRuntimeInvalidations();
+    for (const { key, invalidation } of pendingInvalidations) {
+      await settleDestroyedRuntimeInvalidation(key, invalidation);
+    }
+  }
+
+  async function onRuntimeInvalidated(invalidated: WrapperRunFence): Promise<void> {
+    const state = await getWrapperRuntimeState(storage);
+    const matchesCurrentRuntime =
+      state.wrapperRunId === invalidated.wrapperRunId &&
+      state.wrapperGeneration === invalidated.wrapperGeneration &&
+      state.wrapperConnectionId === invalidated.wrapperConnectionId;
+    if (!matchesCurrentRuntime) {
+      logger
+        .withFields({
+          sessionId: getSessionIdForLogs(),
+          wrapperRunId: invalidated.wrapperRunId,
+          wrapperGeneration: invalidated.wrapperGeneration,
+          wrapperConnectionId: invalidated.wrapperConnectionId,
+          currentWrapperRunId: state.wrapperRunId,
+          currentWrapperGeneration: state.wrapperGeneration,
+          currentWrapperConnectionId: state.wrapperConnectionId,
+        })
+        .info('Ignored stale destroyed wrapper runtime invalidation');
+      return;
+    }
+
+    const pendingInvalidation = destroyedRuntimeInvalidationSchema.parse({
+      ...invalidated,
+      invalidatedAt: Date.now(),
+    });
+    const key = destroyedRuntimeInvalidationKey(pendingInvalidation);
+    await storage.put(key, pendingInvalidation);
+    await settleDestroyedRuntimeInvalidation(key, pendingInvalidation);
+  }
+
   async function handleUnhealthyWrapper(state: WrapperRuntimeState, error: string): Promise<void> {
     logger
       .withFields({
@@ -370,18 +523,7 @@ export function createWrapperSupervisor(
       .warn('Handling unhealthy wrapper runtime');
 
     const acceptedMessages = await listNonTerminalAcceptedMessages(storage, state.wrapperRunId);
-    for (const message of acceptedMessages) {
-      await messageSettlementOutbox.terminalizeSessionMessageOnce(message.messageId, {
-        kind: 'failed',
-        reason: 'wrapper_failure',
-        error,
-        completionSource: 'wrapper_failure',
-      });
-    }
-    await messageSettlementOutbox.releaseWrapperTerminalWaitForIdleBatch();
-    await messageSettlementOutbox.finalizeIdleBatchCallbackIfReady({
-      allowWithoutObservedIdle: true,
-    });
+    await failAcceptedMessagesForLostRuntime(acceptedMessages, error);
 
     if (state.wrapperConnectionId) {
       await clearCurrentWrapperRuntimeFailureState(
@@ -757,6 +899,7 @@ export function createWrapperSupervisor(
   }
 
   async function runMaintenance(now: number): Promise<void> {
+    await recoverDestroyedRuntimeInvalidations();
     await checkDisconnectGrace(now);
     await checkWrapperLiveness(now);
     await checkIdleReconciliation(now);
@@ -765,6 +908,8 @@ export function createWrapperSupervisor(
 
   async function nextMaintenanceDeadlines(): Promise<number[]> {
     const deadlines: number[] = [];
+    const pendingInvalidations = await listDestroyedRuntimeInvalidations();
+    deadlines.push(...pendingInvalidations.map(({ invalidation }) => invalidation.invalidatedAt));
     const livenessDeadline = await getNextWrapperLivenessDeadline();
     if (livenessDeadline !== undefined) {
       deadlines.push(livenessDeadline);
@@ -794,6 +939,7 @@ export function createWrapperSupervisor(
     observeMeaningfulOutput,
     observeRootIdle,
     onDisconnected,
+    onRuntimeInvalidated,
     onTerminalEvent,
     clearDisconnectGrace,
     runMaintenance,

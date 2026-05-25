@@ -5,14 +5,20 @@ type DestroyableSandbox = {
   destroy(): Promise<void>;
 };
 
+export type PreparationInfrastructureInvalidation = {
+  failureType: PreparationInfrastructureFailure['type'];
+  error: unknown;
+};
+
 type RecoveryContext = {
   sandbox: DestroyableSandbox;
   sandboxId: string;
   sessionId?: string;
   phase: string;
+  onSandboxDestroyed?: (invalidation: PreparationInfrastructureInvalidation) => Promise<void>;
 };
 
-type PreparationInfrastructureFailure =
+export type PreparationInfrastructureFailure =
   | {
       type: 'sandbox_internal_server_error';
       error: unknown;
@@ -347,7 +353,36 @@ export async function withPreparationInfrastructureRecovery<T>(
   try {
     return await operation();
   } catch (error) {
-    await destroySandboxAfterPreparationInfrastructureFailure(context, error);
+    const failure = getPreparationInfrastructureFailure(error);
+    const destroyed = await destroySandboxAfterPreparationInfrastructureFailure(context, error);
+    if (destroyed && failure && context.onSandboxDestroyed) {
+      logger
+        .withFields({
+          sandboxId: context.sandboxId,
+          sessionId: context.sessionId,
+          phase: context.phase,
+          failureType: failure.type,
+          logTag: 'preparation_sandbox_destruction_notified',
+        })
+        .info('Reporting destroyed sandbox after preparation infrastructure failure');
+      try {
+        await context.onSandboxDestroyed({
+          failureType: failure.type,
+          error,
+        });
+      } catch (notificationError) {
+        logger
+          .withFields({
+            sandboxId: context.sandboxId,
+            sessionId: context.sessionId,
+            phase: context.phase,
+            failureType: failure.type,
+            error: getErrorMessage(notificationError),
+            logTag: 'preparation_sandbox_destruction_notification_failed',
+          })
+          .error('Failed to report destroyed sandbox after preparation infrastructure failure');
+      }
+    }
     throw error;
   }
 }

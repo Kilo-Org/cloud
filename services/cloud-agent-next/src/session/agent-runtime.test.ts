@@ -4,7 +4,9 @@ import type {
   FencedWrapperDispatchRequest,
   MessageDeliveryRequest,
   WorkspaceReady,
+  WrapperRunFence,
 } from '../execution/types.js';
+import type { PreparationInfrastructureInvalidation } from '../sandbox-recovery.js';
 import { createAgentRuntime } from './agent-runtime.js';
 import { getWrapperRuntimeState } from './wrapper-runtime-state.js';
 import type { SessionMetadata } from '../persistence/session-metadata.js';
@@ -203,6 +205,61 @@ describe('AgentRuntime', () => {
       pingDeadlineAt: 8_000,
       nextPingAt: 7_000,
     });
+  });
+
+  it('reports the reused wrapper fence when destructive recovery fails a hot delivery', async () => {
+    const storage = createMemoryStorage([
+      [
+        'wrapper_runtime_state',
+        {
+          wrapperGeneration: 3,
+          wrapperConnectionId: 'conn_hot',
+          wrapperRunId: 'wr_hot',
+          noOutputDeadlineAt: 9_000,
+        },
+      ],
+    ]);
+    const error = new Error('hot follow-up destroyed its sandbox');
+    const invalidatedFences: WrapperRunFence[] = [];
+    const runtime = createAgentRuntime({
+      storage,
+      env: {} as Env,
+      getMetadata: async () => createMetadata(),
+      getOrchestratorOverride: () => ({
+        execute: async (
+          _plan: FencedWrapperDispatchRequest,
+          options?: {
+            onSandboxDestroyed?: (
+              invalidation: PreparationInfrastructureInvalidation
+            ) => Promise<void>;
+          }
+        ) => {
+          await options?.onSandboxDestroyed?.({
+            failureType: 'sandbox_workspace_probe_timeout',
+            error,
+          });
+          throw error;
+        },
+      }),
+      getSessionIdForLogs: () => 'agent_runtime',
+      sendToWrapper: () => false,
+    });
+
+    await expect(
+      runtime.send(createPlan(), {
+        onRuntimeInvalidated: async fence => {
+          invalidatedFences.push(fence);
+        },
+      })
+    ).rejects.toBe(error);
+
+    expect(invalidatedFences).toEqual([
+      {
+        wrapperRunId: 'wr_hot',
+        wrapperGeneration: 3,
+        wrapperConnectionId: 'conn_hot',
+      },
+    ]);
   });
 
   it('clears a newly allocated wrapper fence when delivery fails before readiness', async () => {

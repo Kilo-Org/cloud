@@ -31,6 +31,7 @@ import { withDORetry } from '../utils/do-retry.js';
 import { withTimeout } from '@kilocode/worker-utils';
 import {
   SANDBOX_WORKSPACE_PROBE_TIMEOUT_MESSAGE,
+  type PreparationInfrastructureInvalidation,
   withPreparationInfrastructureRecovery,
 } from '../sandbox-recovery.js';
 import { checkDiskAndCleanBeforeSetup } from '../workspace.js';
@@ -98,6 +99,7 @@ export class ExecutionOrchestrator {
     options?: {
       onProgress?: (step: string, message: string) => void;
       onWorkspaceReady?: (ready: WorkspaceReady) => Promise<void>;
+      onSandboxDestroyed?: (invalidation: PreparationInfrastructureInvalidation) => Promise<void>;
     }
   ): Promise<ExecutionResult> {
     const executionId = 'executionId' in plan ? plan.executionId : undefined;
@@ -144,6 +146,7 @@ export class ExecutionOrchestrator {
         sandboxId,
         sessionId,
         phase: 'executionWorkspacePreparation',
+        onSandboxDestroyed: options?.onSandboxDestroyed,
       },
       () => this.executeWithWrapperBootstrap(sandbox, plan, options)
     );

@@ -11,6 +11,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { createEventQueries } from '../../../src/session/queries/events.js';
 import type { FencedWrapperDispatchRequest } from '../../../src/execution/types.js';
+import type { PreparationInfrastructureInvalidation } from '../../../src/sandbox-recovery.js';
 import { listPendingSessionMessages } from '../../../src/session/pending-messages.js';
 import {
   getWrapperRuntimeState,
@@ -19,6 +20,7 @@ import {
   recordWrapperAcceptedMessage,
 } from '../../../src/session/wrapper-runtime-state.js';
 import {
+  getSessionMessageState,
   listNonTerminalAcceptedMessages,
   putSessionMessageState,
   type SessionMessageState,
@@ -592,6 +594,151 @@ describe('hot delivery failure preserves existing wrapper identity', () => {
     expect(result.acceptedMessages).toHaveLength(1);
     expect(result.acceptedMessages[0]?.messageId).toBe('msg_018f1e2d3c4bHotFailAccAbCd');
     expect(result.acceptedMessages[0]?.status).toBe('accepted');
+  });
+
+  it('invalidates a destroyed hot wrapper runtime without reclassifying the failed delivery', async () => {
+    const userId = 'user_hot_destroyed_identity';
+    const sessionId = 'agent_hot_destroyed_identity';
+    const priorMessageId = 'msg_018f1e2d3c4bHotDstAccAbCdE';
+    const followUpMessageId = 'msg_018f1e2d3c4bHotDstMsgAbCdE';
+    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
+    const stub = env.CLOUD_AGENT_SESSION.get(doId);
+
+    const result = await runInDurableObject(stub, async (instance, state) => {
+      const deliveryError = new Error(
+        'Sandbox workspace Git probe timed out before wrapper bootstrap'
+      );
+      (instance as any).orchestrator = {
+        execute: async (
+          _plan: FencedWrapperDispatchRequest,
+          options?: {
+            onSandboxDestroyed?: (
+              invalidation: PreparationInfrastructureInvalidation
+            ) => Promise<void>;
+          }
+        ) => {
+          await options?.onSandboxDestroyed?.({
+            failureType: 'sandbox_workspace_probe_timeout',
+            error: deliveryError,
+          });
+          throw deliveryError;
+        },
+      };
+
+      await registerReadySession(instance, {
+        sessionId,
+        userId,
+        orgId: 'org_hot_destroyed_identity',
+        kiloSessionId: '55555555-6666-4555-8555-555555555555',
+        prompt: 'initial prompt',
+        mode: 'code',
+        model: 'test-model',
+        kilocodeToken: 'token-hot-destroyed-identity',
+        gitUrl: 'https://example.com/repo.git',
+        gitToken: 'git-token',
+      });
+
+      const { state: wrapperState } = await allocateWrapperRuntimeState(instance.ctx.storage);
+      const originalRunId = wrapperState.wrapperRunId;
+      const originalConnectionId = wrapperState.wrapperConnectionId;
+      const originalGeneration = wrapperState.wrapperGeneration;
+      await putSessionMessageState(instance.ctx.storage, {
+        messageId: priorMessageId,
+        status: 'accepted',
+        prompt: 'running task in destroyed runtime',
+        createdAt: 1,
+        acceptedAt: 1,
+        wrapperRunId: originalRunId,
+      });
+      await recordWrapperAcceptedMessage(
+        instance.ctx.storage,
+        wrapperState,
+        Date.now() + 30 * 60_000,
+        Date.now() + 60_000
+      );
+      await instance.ctx.storage.put('wrapper_runtime_state', {
+        ...(await getWrapperRuntimeState(instance.ctx.storage)),
+        lastWrapperMessageAt: Date.now(),
+      });
+
+      await instance.admitSubmittedMessage(
+        queueUserMessageInput({
+          userId,
+          prompt: 'hot follow-up that destroys its sandbox',
+          messageId: followUpMessageId,
+        })
+      );
+      await instance.alarm();
+
+      const destroyedRuntimeState = await getWrapperRuntimeState(instance.ctx.storage);
+      const priorMessageState = await getSessionMessageState(instance.ctx.storage, priorMessageId);
+      const followUpMessageState = await getSessionMessageState(
+        instance.ctx.storage,
+        followUpMessageId
+      );
+      const pendingMessages = await listPendingSessionMessages(instance.ctx.storage);
+      const { state: replacementState } = await allocateWrapperRuntimeState(instance.ctx.storage);
+      const db = drizzle(state.storage, { logger: false });
+      const eventQueries = createEventQueries(db, state.storage.sql);
+      const allEvents = eventQueries.findByFilters({});
+
+      return {
+        allEvents,
+        destroyedRuntimeState,
+        followUpMessageId,
+        followUpMessageState,
+        originalConnectionId,
+        originalGeneration,
+        originalRunId,
+        pendingMessages,
+        priorMessageState,
+        replacementState,
+      };
+    });
+
+    expect(result.priorMessageState).toMatchObject({
+      status: 'failed',
+      failureReason: 'wrapper_failure',
+      error: 'Wrapper runtime was destroyed during workspace preparation',
+      completionSource: 'wrapper_failure',
+    });
+    expect(result.destroyedRuntimeState.wrapperRunId).toBeUndefined();
+    expect(result.destroyedRuntimeState.wrapperConnectionId).toBeUndefined();
+    expect(result.destroyedRuntimeState.wrapperGeneration).toBeGreaterThan(
+      result.originalGeneration
+    );
+    expect(result.followUpMessageState).toMatchObject({
+      status: 'failed',
+      failureReason: 'exhausted',
+      error: 'Sandbox workspace Git probe timed out before wrapper bootstrap',
+      completionSource: 'delivery_failure',
+    });
+    expect(result.pendingMessages).toHaveLength(0);
+    expect(result.replacementState.wrapperRunId).not.toBe(result.originalRunId);
+    expect(result.replacementState.wrapperConnectionId).not.toBe(result.originalConnectionId);
+    expect(result.replacementState.wrapperGeneration).toBeGreaterThan(
+      result.destroyedRuntimeState.wrapperGeneration
+    );
+    const failedEvents = result.allEvents.filter(
+      event => event.stream_event_type === 'cloud.message.failed'
+    );
+    expect(failedEvents).toHaveLength(2);
+    expect(failedEvents.map(event => JSON.parse(event.payload))).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          messageId: priorMessageId,
+          status: 'failed',
+          error: 'Wrapper runtime was destroyed during workspace preparation',
+          delivery: 'sent',
+          accepted: true,
+        }),
+        expect.objectContaining({
+          messageId: result.followUpMessageId,
+          status: 'failed',
+          error: 'Sandbox workspace Git probe timed out before wrapper bootstrap',
+        }),
+      ])
+    );
   });
 
   it('failed cold delivery clears newly allocated wrapper identity', async () => {

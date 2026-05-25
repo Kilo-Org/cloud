@@ -7,8 +7,10 @@ import type {
   MessageDeliveryRequest,
   MessageDeliveryResult,
   WorkspaceReady,
+  WrapperRunFence,
 } from '../execution/types.js';
 import { logger } from '../logger.js';
+import type { PreparationInfrastructureInvalidation } from '../sandbox-recovery.js';
 import { stopWrapper } from '../kilo/wrapper-manager.js';
 import type { SessionMetadata } from '../persistence/session-metadata.js';
 import { generateSandboxId, getSandboxNamespace } from '../sandbox-id.js';
@@ -42,6 +44,7 @@ export type AgentRuntimeOrchestrator = {
     options?: {
       onProgress?: (step: string, message: string) => void;
       onWorkspaceReady?: (ready: WorkspaceReady) => Promise<void>;
+      onSandboxDestroyed?: (invalidation: PreparationInfrastructureInvalidation) => Promise<void>;
     }
   ): Promise<ExecutionResult>;
 };
@@ -55,6 +58,7 @@ export type AgentRuntimeSendHooks = {
   onProgress?: (step: string, message: string) => void;
   onWorkspaceReady?: (ready: WorkspaceReady) => Promise<void>;
   onAccepted?: (delivery: AgentRuntimeAcceptedDelivery) => Promise<void>;
+  onRuntimeInvalidated?: (fence: WrapperRunFence) => Promise<void>;
 };
 
 export type AgentRuntimeStopReason =
@@ -183,6 +187,13 @@ export function createAgentRuntime(dependencies: AgentRuntimeDependencies): Agen
             })
             .info('AgentRuntime wrapper workspace reported ready');
           await hooks.onWorkspaceReady?.(ready);
+        },
+        onSandboxDestroyed: async () => {
+          await hooks.onRuntimeInvalidated?.({
+            wrapperRunId: wrapperRuntimeState.wrapperRunId,
+            wrapperGeneration: wrapperRuntimeState.wrapperGeneration,
+            wrapperConnectionId: wrapperRuntimeState.wrapperConnectionId,
+          });
         },
       });
 

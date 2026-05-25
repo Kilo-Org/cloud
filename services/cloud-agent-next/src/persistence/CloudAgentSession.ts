@@ -138,6 +138,15 @@ type TerminalSizeInput = {
 
 type TerminalCreateInput = Partial<TerminalSizeInput>;
 
+type UniqueMessageEventParams = {
+  executionId: EventSourceId;
+  sessionId: string;
+  streamEventType: string;
+  payload: string;
+  timestamp: number;
+  entityId: string;
+};
+
 function validateModeAgainstRuntimeAgents(
   metadata: SessionMetadata,
   mode = metadata.agent?.mode
@@ -520,7 +529,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         getDeliveryContext: () => this.getPendingMessageDeliveryContext(),
         deliver: plan => this.executeDirectly(plan),
         ensureQueuedMessageEvent: event => {
-          this.ensureQueuedMessageEvent({
+          this.ensureUniqueMessageEvent({
             executionId: '' as EventSourceId,
             ...event,
           });
@@ -774,14 +783,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     });
   }
 
-  private ensureTerminalMessageEvent(params: {
-    executionId: EventSourceId;
-    sessionId: string;
-    streamEventType: string;
-    payload: string;
-    timestamp: number;
-    entityId: string;
-  }): void {
+  private ensureUniqueMessageEvent(params: UniqueMessageEventParams): void {
     const eventId = this.eventQueries.insertUnique({
       executionId: params.executionId,
       sessionId: params.sessionId,
@@ -801,31 +803,8 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     });
   }
 
-  private ensureQueuedMessageEvent(params: {
-    executionId: EventSourceId;
-    sessionId: string;
-    streamEventType: string;
-    payload: string;
-    timestamp: number;
-    entityId: string;
-  }): void {
-    const eventId = this.eventQueries.insertUnique({
-      executionId: params.executionId,
-      sessionId: params.sessionId,
-      streamEventType: params.streamEventType,
-      payload: params.payload,
-      timestamp: params.timestamp,
-      entityId: params.entityId,
-    });
-    if (eventId === null) return;
-    this.broadcastEvent({
-      id: eventId,
-      execution_id: params.executionId,
-      session_id: params.sessionId,
-      stream_event_type: params.streamEventType,
-      payload: params.payload,
-      timestamp: params.timestamp,
-    });
+  private ensureTerminalMessageEvent(params: UniqueMessageEventParams): void {
+    this.ensureUniqueMessageEvent(params);
   }
 
   /**

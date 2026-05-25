@@ -4,14 +4,6 @@
 
 This spec defines the business rules and invariants for model experiments. It is the source of truth for what future implementation, refactor, admin, reporting, and retention changes must preserve. It deliberately avoids prescribing internal handler names or UI layout details except where those choices enforce a business rule.
 
-## Status
-
-Draft -- created 2026-05-25.
-
-## Conventions
-
-The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED", "MAY", and "OPTIONAL" in this document are to be interpreted as described in BCP 14 [RFC 2119] [RFC 8174] when, and only when, they appear in all capitals, as shown here.
-
 ## Scope
 
 Model experiments exist only to A/B test preview or otherwise experimental model checkpoints in partnership with model providers. They are not a general-purpose traffic-splitting or rollout mechanism for production models.

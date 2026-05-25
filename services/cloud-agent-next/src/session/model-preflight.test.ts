@@ -111,4 +111,20 @@ describe('model preflight for stored sessions', () => {
 
     expect(assertKiloModelAvailable).not.toHaveBeenCalled();
   });
+
+  it('leaves incomplete legacy prepared metadata for admission to reject', async () => {
+    vi.mocked(fetchSessionMetadata).mockResolvedValue({
+      ...metadata,
+      initialMessage: { id: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn' },
+    });
+
+    await preflightPreparedInitialPromptModel({
+      env,
+      userId: 'user-1',
+      cloudAgentSessionId: metadata.identity.sessionId,
+      procedure: 'initiateFromKilocodeSessionV2',
+    });
+
+    expect(assertKiloModelAvailable).not.toHaveBeenCalled();
+  });
 });

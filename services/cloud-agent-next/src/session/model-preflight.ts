@@ -56,6 +56,7 @@ export async function preflightPreparedInitialPromptModel(
   const metadata = await requireSessionMetadata(input);
   const turn = metadata.initialMessage?.turn;
   if (turn?.type === 'command') return;
+  // Admission retains the existing `No prompt provided` error for incomplete legacy metadata.
   if (turn?.type !== 'prompt' && metadata.initialMessage?.prompt === undefined) return;
   await assertModelFromStoredContext(input, metadata, metadata.agent?.model);
 }

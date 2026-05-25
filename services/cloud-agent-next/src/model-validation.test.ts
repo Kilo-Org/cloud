@@ -199,6 +199,12 @@ describe('buildKiloOverrideValidationUrl', () => {
     expect(buildKiloOverrideValidationUrl('http://localhost:8811/api', 'org-1')).toBe(
       'http://localhost:8811/api/organizations/org-1/models/validate'
     );
+    expect(buildKiloOverrideValidationUrl('http://localhost:8811/api', 'org/a?b=c')).toBe(
+      'http://localhost:8811/api/organizations/org%2Fa%3Fb%3Dc/models/validate'
+    );
+    expect(buildKiloOverrideValidationUrl('http://localhost:8811', 'org/a?b=c')).toBe(
+      'http://localhost:8811/api/organizations/org%2Fa%3Fb%3Dc/models/validate'
+    );
     expect(
       buildKiloOverrideValidationUrl('http://localhost:8811/api/organizations/org-1', 'org-1')
     ).toBe('http://localhost:8811/api/organizations/org-1/models/validate');

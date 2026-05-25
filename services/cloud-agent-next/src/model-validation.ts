@@ -124,11 +124,12 @@ export function buildKiloOverrideValidationUrl(
   const trimmed = baseURL.replace(/\/+$/, '');
   let modelsBaseUrl: string;
   if (organizationId) {
+    const encodedOrganizationId = encodeURIComponent(organizationId);
     modelsBaseUrl = trimmed.includes('/api/organizations/')
       ? trimmed
       : trimmed.endsWith('/api')
-        ? `${trimmed}/organizations/${organizationId}`
-        : `${trimmed}/api/organizations/${organizationId}`;
+        ? `${trimmed}/organizations/${encodedOrganizationId}`
+        : `${trimmed}/api/organizations/${encodedOrganizationId}`;
   } else {
     modelsBaseUrl = trimmed.includes('/openrouter')
       ? trimmed

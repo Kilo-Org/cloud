@@ -11,10 +11,9 @@ type TerminalStatusSummary = {
   statusText: string;
 };
 
-function statusDotClass(status: TerminalStatusSummary['status'] | 'chat-active'): string {
+function statusDotClass(status: TerminalStatusSummary['status']): string {
   if (status === 'connected') return 'bg-emerald-500';
   if (status === 'error' || status === 'exited') return 'bg-destructive';
-  if (status === 'chat-active') return 'bg-primary';
   return 'bg-amber-500';
 }
 
@@ -22,7 +21,6 @@ export function CloudAgentWorkspaceTabs({
   activeTabId,
   terminals,
   terminalStatuses,
-  chatNeedsAttention,
   canCreateTerminal,
   onSelectTab,
   onCreateTerminal,
@@ -32,7 +30,6 @@ export function CloudAgentWorkspaceTabs({
   activeTabId: WorkspaceTabId;
   terminals: TerminalWorkspaceTab[];
   terminalStatuses: Record<string, TerminalStatusSummary | undefined>;
-  chatNeedsAttention: boolean;
   canCreateTerminal: boolean;
   onSelectTab: (tabId: WorkspaceTabId) => void;
   onCreateTerminal: () => void;
@@ -62,9 +59,6 @@ export function CloudAgentWorkspaceTabs({
       >
         <MessageSquare className="h-4 w-4" />
         <span>Chat</span>
-        {chatNeedsAttention && (
-          <span className={cn('h-2 w-2 rounded-full', statusDotClass('chat-active'))} />
-        )}
       </Button>
 
       {terminals.map(tab => {

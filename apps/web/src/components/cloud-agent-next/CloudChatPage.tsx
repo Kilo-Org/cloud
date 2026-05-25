@@ -443,8 +443,6 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
     []
   );
 
-  const chatNeedsAttention = Boolean(activeQuestion || activePermission || statusIndicator);
-
   const terminalPaneMap = workspaceTabs.terminals.map(tab => {
     const active = terminalTabId(tab.id) === workspaceTabs.activeTabId;
     return (
@@ -661,9 +659,6 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
                         activeTabId={workspaceTabs.activeTabId}
                         terminals={workspaceTabs.terminals}
                         terminalStatuses={terminalStatuses}
-                        chatNeedsAttention={
-                          chatNeedsAttention && workspaceTabs.activeTabId !== CHAT_TAB_ID
-                        }
                         canCreateTerminal={canOpenTerminal}
                         onSelectTab={handleSelectWorkspaceTab}
                         onCreateTerminal={handleCreateTerminalTab}

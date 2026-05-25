@@ -3,10 +3,12 @@ import { db } from '@/lib/drizzle';
 import {
   kilocode_users,
   microdollar_usage,
+  microdollar_usage_metadata,
   model_experiment,
   model_experiment_request,
   model_experiment_variant,
   model_experiment_variant_version,
+  system_prompt_prefix,
 } from '@kilocode/db/schema';
 import { encryptApiKey } from '@/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
@@ -380,9 +382,23 @@ export const adminModelExperimentsRouter = createTRPCRouter({
           costMicrodollars: microdollar_usage.cost,
           cacheDiscountMicrodollars: microdollar_usage.cache_discount,
           hasError: microdollar_usage.has_error,
+          userPromptPrefix: microdollar_usage_metadata.user_prompt_prefix,
+          systemPromptPrefix: system_prompt_prefix.system_prompt_prefix,
+          systemPromptLength: microdollar_usage_metadata.system_prompt_length,
         })
         .from(model_experiment_request)
         .innerJoin(microdollar_usage, eq(model_experiment_request.usage_id, microdollar_usage.id))
+        .leftJoin(
+          microdollar_usage_metadata,
+          eq(model_experiment_request.usage_id, microdollar_usage_metadata.id)
+        )
+        .leftJoin(
+          system_prompt_prefix,
+          eq(
+            microdollar_usage_metadata.system_prompt_prefix_id,
+            system_prompt_prefix.system_prompt_prefix_id
+          )
+        )
         .leftJoin(kilocode_users, eq(microdollar_usage.kilo_user_id, kilocode_users.id))
         .innerJoin(
           model_experiment_variant_version,

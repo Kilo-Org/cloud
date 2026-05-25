@@ -2,7 +2,14 @@
 
 import { useState, type FormEvent } from 'react';
 import Link from 'next/link';
-import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Download } from 'lucide-react';
+import {
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  Download,
+  Eye,
+} from 'lucide-react';
 import {
   type ModelExperimentRequestFilters,
   useModelExperiment,
@@ -13,6 +20,7 @@ import { UserAvatarLink } from '@/app/admin/components/UserAvatarLink';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   Select,
   SelectContent,
@@ -60,6 +68,10 @@ function formatTokens(value: number): string {
 function formatMicrodollars(value: number | null): string {
   if (value === null) return '—';
   return value.toLocaleString();
+}
+
+function formatPromptLength(value: number | null): string {
+  return value === null ? 'unknown length' : `${value.toLocaleString()} chars`;
 }
 
 function isRequestKind(
@@ -158,6 +170,53 @@ function PromptDownload({
         Download JSON
       </a>
     </Button>
+  );
+}
+
+function PromptPreview({
+  userPromptPrefix,
+  systemPromptPrefix,
+  systemPromptLength,
+}: {
+  userPromptPrefix: string | null;
+  systemPromptPrefix: string | null;
+  systemPromptLength: number | null;
+}) {
+  if (!userPromptPrefix && !systemPromptPrefix) {
+    return <div className="text-muted-foreground text-xs">No prompt preview captured</div>;
+  }
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button variant="ghost" size="icon" aria-label="Preview" title="Preview">
+          <Eye />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent
+        align="end"
+        className="flex w-[min(36rem,calc(100vw-2rem))] flex-col gap-3 text-xs"
+      >
+        {systemPromptPrefix ? (
+          <div>
+            <div className="text-muted-foreground mb-1 font-medium">
+              System prefix · {formatPromptLength(systemPromptLength)}
+            </div>
+            <pre className="bg-muted/40 border-border text-muted-foreground max-h-56 overflow-auto rounded-md border px-2 py-1.5 font-mono whitespace-pre-wrap">
+              {systemPromptPrefix}
+            </pre>
+          </div>
+        ) : null}
+        {userPromptPrefix ? (
+          <div>
+            <div className="text-muted-foreground mb-1 font-medium">User prefix</div>
+            <pre className="bg-muted/40 border-border max-h-56 overflow-auto rounded-md border px-2 py-1.5 font-mono whitespace-pre-wrap">
+              {userPromptPrefix}
+            </pre>
+          </div>
+        ) : null}
+      </PopoverContent>
+    </Popover>
   );
 }
 
@@ -422,7 +481,7 @@ export function ModelExperimentRequestsContent() {
                   <TableHead>Routing</TableHead>
                   <TableHead>Request</TableHead>
                   <TableHead>Usage</TableHead>
-                  <TableHead>Captured body</TableHead>
+                  <TableHead>Prompt</TableHead>
                   <TableHead>User</TableHead>
                 </TableRow>
               </TableHeader>
@@ -478,10 +537,17 @@ export function ModelExperimentRequestsContent() {
                       {row.hasError ? <Badge variant="destructive">error</Badge> : null}
                     </TableCell>
                     <TableCell className="min-w-48 align-top">
-                      <PromptDownload
-                        usageId={row.usageId}
-                        requestBodySha256={row.requestBodySha256}
-                      />
+                      <div className="flex flex-wrap items-center gap-2">
+                        <PromptPreview
+                          userPromptPrefix={row.userPromptPrefix}
+                          systemPromptPrefix={row.systemPromptPrefix}
+                          systemPromptLength={row.systemPromptLength}
+                        />
+                        <PromptDownload
+                          usageId={row.usageId}
+                          requestBodySha256={row.requestBodySha256}
+                        />
+                      </div>
                     </TableCell>
                     <TableCell className="min-w-48 align-top text-sm">
                       <UserLink

@@ -210,7 +210,7 @@ describe('GET /api/code-reviews/up', () => {
     expect(body).toMatchObject({ healthy: true, alerts: [] });
   });
 
-  it('returns healthy when non-model not-found failures are below the unknown-error threshold', async () => {
+  it('still returns an error-spike alert for non-model not-found failures', async () => {
     await db
       .insert(cloud_agent_code_reviews)
       .values([
@@ -221,29 +221,11 @@ describe('GET /api/code-reviews/up', () => {
 
     const response = await GET(makeRequest('kilo-code-reviews-health-check'));
 
-    expect(response.status).toBe(200);
-    const body = await response.json();
-    expect(body).toMatchObject({ healthy: true, alerts: [] });
-  });
-
-  it('still returns an error-spike alert for non-model not-found failures at 20%', async () => {
-    await db
-      .insert(cloud_agent_code_reviews)
-      .values([
-        reviewValues({ status: 'failed', error_message: 'Repository not found' }),
-        reviewValues({ status: 'failed', error_message: 'Session not found' }),
-        reviewValues({ status: 'failed', error_message: 'Checkout failed' }),
-        reviewValues({ status: 'failed', error_message: 'GitHub unavailable' }),
-        ...Array.from({ length: 16 }, () => reviewValues()),
-      ]);
-
-    const response = await GET(makeRequest('kilo-code-reviews-health-check'));
-
     expect(response.status).toBe(503);
     const body = await response.json();
     expect(body).toMatchObject({
       healthy: false,
-      alerts: [expect.objectContaining({ kind: 'error_spike', errorCount: 4, rate: 0.2 })],
+      alerts: [expect.objectContaining({ kind: 'error_spike', errorCount: 2 })],
     });
   });
 

@@ -8,7 +8,6 @@ import {
   SLOW_REVIEW_DURATION_MINUTES,
   SLOW_REVIEW_RATE_THRESHOLD,
   SLOW_REVIEW_WINDOW_MINUTES,
-  UNKNOWN_ERROR_SPIKE_RATE_THRESHOLD,
 } from './thresholds';
 
 type AlertingDb = Pick<typeof defaultDb, 'execute'>;
@@ -47,7 +46,6 @@ type SlowReviewsRow = {
 type ErrorSpikeRow = {
   started_count: CountValue;
   error_count: CountValue;
-  unknown_error_count: CountValue;
   top_reason: string | null;
   top_reason_count: CountValue;
 };
@@ -63,15 +61,6 @@ const systemFailureSql = sql`(
 const modelNotFoundSql = sql`(
   COALESCE(terminal_reason, '') = 'model_not_found'
   OR COALESCE(error_message, '') ILIKE '%model not found%'
-)`;
-const countedSystemFailureSql = sql`(
-  ${systemFailureSql}
-  AND COALESCE(terminal_reason, '') NOT IN ${benignTerminalReasonsSql}
-  AND NOT ${modelNotFoundSql}
-)`;
-const unknownSystemFailureSql = sql`(
-  ${countedSystemFailureSql}
-  AND COALESCE(terminal_reason, '') = ''
 )`;
 
 const startedReviewsCteSql = sql`
@@ -149,15 +138,20 @@ export async function evaluateErrorSpike(database: AlertingDb): Promise<CodeRevi
     ), top_reason AS (
       SELECT COALESCE(NULLIF(terminal_reason, ''), 'unknown') AS reason, COUNT(*) AS count
       FROM windowed
-      WHERE ${countedSystemFailureSql}
+      WHERE ${systemFailureSql}
+        AND COALESCE(terminal_reason, '') NOT IN ${benignTerminalReasonsSql}
+        AND NOT ${modelNotFoundSql}
       GROUP BY 1
       ORDER BY 2 DESC, 1 ASC
       LIMIT 1
     )
     SELECT
       COUNT(*) AS started_count,
-      COUNT(*) FILTER (WHERE ${countedSystemFailureSql}) AS error_count,
-      COUNT(*) FILTER (WHERE ${unknownSystemFailureSql}) AS unknown_error_count,
+      COUNT(*) FILTER (
+        WHERE ${systemFailureSql}
+          AND COALESCE(terminal_reason, '') NOT IN ${benignTerminalReasonsSql}
+          AND NOT ${modelNotFoundSql}
+      ) AS error_count,
       (SELECT reason FROM top_reason) AS top_reason,
       (SELECT count FROM top_reason) AS top_reason_count
     FROM windowed
@@ -166,17 +160,9 @@ export async function evaluateErrorSpike(database: AlertingDb): Promise<CodeRevi
   const row = result.rows[0];
   const startedCount = toNumber(row?.started_count);
   const errorCount = toNumber(row?.error_count);
-  const unknownErrorCount = toNumber(row?.unknown_error_count);
-  const knownErrorCount = Math.max(errorCount - unknownErrorCount, 0);
   const currentRate = rate(errorCount, startedCount);
-  const knownErrorRate = rate(knownErrorCount, startedCount);
-  const unknownErrorRate = rate(unknownErrorCount, startedCount);
 
-  if (
-    startedCount === 0 ||
-    (knownErrorRate < ERROR_SPIKE_RATE_THRESHOLD &&
-      unknownErrorRate < UNKNOWN_ERROR_SPIKE_RATE_THRESHOLD)
-  ) {
+  if (startedCount === 0 || currentRate < ERROR_SPIKE_RATE_THRESHOLD) {
     return { tripped: false };
   }
 

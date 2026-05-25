@@ -42,13 +42,12 @@ export function normalizePrBadgeState(state: string): PrBadgeState {
  * palette, suitable for use with `color-mix()` inline styles.
  */
 export function prAccentColor(state: PrBadgeState, reviewDecision: ReviewDecision | null): string {
-  if (state === 'merged') return 'var(--color-purple-400)';
-  if (state === 'closed') return 'var(--color-zinc-400)';
+  if (state === 'merged') return 'var(--color-violet-400)';
+  if (state === 'closed') return 'var(--color-red-400)';
   if (state === 'draft') return 'var(--color-zinc-400)';
-  // open: tint by review decision
-  if (reviewDecision === 'approved') return 'var(--color-emerald-400)';
+  // Agent Manager uses amber for requested changes and emerald for other open PRs.
   if (reviewDecision === 'changes_requested') return 'var(--color-amber-400)';
-  return 'var(--color-zinc-400)';
+  return 'var(--color-emerald-400)';
 }
 
 /**

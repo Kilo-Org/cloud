@@ -20,17 +20,17 @@ describe('normalizePrBadgeState', () => {
 });
 
 describe('prAccentColor', () => {
-  test('merged returns purple', () => {
-    expect(prAccentColor('merged', null)).toBe('var(--color-purple-400)');
+  test('merged returns Agent Manager violet', () => {
+    expect(prAccentColor('merged', null)).toBe('var(--color-violet-400)');
   });
-  test('closed returns zinc', () => {
-    expect(prAccentColor('closed', null)).toBe('var(--color-zinc-400)');
+  test('closed returns red', () => {
+    expect(prAccentColor('closed', null)).toBe('var(--color-red-400)');
   });
   test('draft returns zinc', () => {
     expect(prAccentColor('draft', null)).toBe('var(--color-zinc-400)');
   });
-  test('open with no review decision returns zinc', () => {
-    expect(prAccentColor('open', null)).toBe('var(--color-zinc-400)');
+  test('open with no review decision returns emerald', () => {
+    expect(prAccentColor('open', null)).toBe('var(--color-emerald-400)');
   });
   test('open approved returns emerald', () => {
     expect(prAccentColor('open', 'approved')).toBe('var(--color-emerald-400)');
@@ -38,8 +38,8 @@ describe('prAccentColor', () => {
   test('open changes_requested returns amber', () => {
     expect(prAccentColor('open', 'changes_requested')).toBe('var(--color-amber-400)');
   });
-  test('open review_required returns zinc', () => {
-    expect(prAccentColor('open', 'review_required')).toBe('var(--color-zinc-400)');
+  test('open review_required returns emerald without pending check data', () => {
+    expect(prAccentColor('open', 'review_required')).toBe('var(--color-emerald-400)');
   });
 });
 

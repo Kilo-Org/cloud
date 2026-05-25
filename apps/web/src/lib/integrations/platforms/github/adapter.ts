@@ -698,7 +698,7 @@ function isHttpError(error: unknown): error is { status: number; message: string
 export type AssociatedPullRequest = {
   number: number;
   htmlUrl: string;
-  state: 'open' | 'closed' | 'merged';
+  state: 'open' | 'closed' | 'merged' | 'draft';
   title: string;
   headSha: string;
   updatedAt: string; // ISO
@@ -809,7 +809,13 @@ export async function fetchPullRequestForBranch(params: {
     const chosen = prs.find(pr => pr.state === 'open') ?? prs[0];
 
     const state: AssociatedPullRequest['state'] =
-      chosen.merged_at != null ? 'merged' : chosen.state === 'open' ? 'open' : 'closed';
+      chosen.merged_at != null
+        ? 'merged'
+        : chosen.state === 'open' && chosen.draft
+          ? 'draft'
+          : chosen.state === 'open'
+            ? 'open'
+            : 'closed';
 
     return {
       number: chosen.number,

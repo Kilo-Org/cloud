@@ -13,7 +13,14 @@ const REPO = 'acme/widgets';
 // Matches what the webhook handler will store after normalizing clone_url.
 const NORMALIZED_GIT_URL = `https://github.com/${REPO}`;
 
-type Action = 'opened' | 'reopened' | 'edited' | 'synchronize' | 'closed' | 'ready_for_review';
+type Action =
+  | 'opened'
+  | 'reopened'
+  | 'edited'
+  | 'synchronize'
+  | 'closed'
+  | 'ready_for_review'
+  | 'converted_to_draft';
 
 function makePayload(overrides: {
   action: Action;
@@ -21,6 +28,7 @@ function makePayload(overrides: {
   prUrl?: string;
   state?: 'open' | 'closed';
   merged?: boolean;
+  draft?: boolean;
   headRef: string;
   headSha: string;
   title?: string;
@@ -36,6 +44,7 @@ function makePayload(overrides: {
       title: overrides.title ?? 'test PR',
       state: overrides.state ?? 'open',
       merged: overrides.merged,
+      draft: overrides.draft,
       html_url: overrides.prUrl ?? `https://github.com/${repo}/pull/${overrides.prNumber}`,
       user: { id: 1, login: 'octocat', avatar_url: 'https://example.com/a.png' },
       head: {
@@ -182,6 +191,27 @@ describe('upsertCliSessionPullRequestsFromWebhook', () => {
       pr_head_sha: 'sha-alpha',
       owned_by_organization_id: null,
     });
+  });
+
+  it('inserts a draft state for an opened draft pull request', async () => {
+    const branch = 'feature/draft-open';
+    await seedSession({ branch, owner: testOwner });
+
+    const written = await upsertCliSessionPullRequestsFromWebhook(
+      makePayload({
+        action: 'opened',
+        prNumber: 110,
+        state: 'open',
+        draft: true,
+        headRef: branch,
+        headSha: 'sha-draft-open',
+      }),
+      testOwner
+    );
+
+    expect(written).toBe(1);
+    const rows = await readUserRow({ userId: testUserId, branch });
+    expect(rows[0].pr_state).toBe('draft');
   });
 
   it('writes exactly one row per (repo, branch, tenant) regardless of how many deliveries fire', async () => {
@@ -331,21 +361,68 @@ describe('upsertCliSessionPullRequestsFromWebhook', () => {
     expect(rows[0].pr_head_sha).toBe('sha-delta-2');
   });
 
-  it('ignores unrelated actions such as ready_for_review', async () => {
+  it('updates a draft PR to open when it becomes ready for review', async () => {
+    const branch = 'feature/ready-for-review';
+    await seedSession({ branch, owner: testOwner });
+    await upsertCliSessionPullRequestsFromWebhook(
+      makePayload({
+        action: 'opened',
+        prNumber: 109,
+        state: 'open',
+        draft: true,
+        headRef: branch,
+        headSha: 'sha-ready-draft',
+      }),
+      testOwner
+    );
+
     const written = await upsertCliSessionPullRequestsFromWebhook(
       makePayload({
         action: 'ready_for_review',
         prNumber: 109,
         state: 'open',
-        headRef: 'feature/ignored',
-        headSha: 'sha-eta',
+        draft: false,
+        headRef: branch,
+        headSha: 'sha-ready-open',
       }),
       testOwner
     );
-    expect(written).toBe(0);
 
-    const rows = await readUserRow({ userId: testUserId, branch: 'feature/ignored' });
-    expect(rows).toHaveLength(0);
+    expect(written).toBe(1);
+    const rows = await readUserRow({ userId: testUserId, branch });
+    expect(rows[0].pr_state).toBe('open');
+  });
+
+  it('updates an open PR to draft when it is converted to draft', async () => {
+    const branch = 'feature/converted-to-draft';
+    await seedSession({ branch, owner: testOwner });
+    await upsertCliSessionPullRequestsFromWebhook(
+      makePayload({
+        action: 'opened',
+        prNumber: 111,
+        state: 'open',
+        draft: false,
+        headRef: branch,
+        headSha: 'sha-open',
+      }),
+      testOwner
+    );
+
+    const written = await upsertCliSessionPullRequestsFromWebhook(
+      makePayload({
+        action: 'converted_to_draft',
+        prNumber: 111,
+        state: 'open',
+        draft: true,
+        headRef: branch,
+        headSha: 'sha-draft',
+      }),
+      testOwner
+    );
+
+    expect(written).toBe(1);
+    const rows = await readUserRow({ userId: testUserId, branch });
+    expect(rows[0].pr_state).toBe('draft');
   });
 
   it('does not demote pr_state=merged back to open on an out-of-order redelivery', async () => {
@@ -417,6 +494,37 @@ describe('upsertCliSessionPullRequestsFromWebhook', () => {
         state: 'open',
         headRef: branch,
         headSha: 'sha-201',
+      }),
+      testOwner
+    );
+
+    const rows = await readUserRow({ userId: testUserId, branch });
+    expect(rows[0].pr_state).toBe('closed');
+  });
+
+  it('does not demote pr_state=closed to draft on a stale converted_to_draft delivery', async () => {
+    const branch = 'feature/monotonic-closed-draft';
+    await seedSession({ branch, owner: testOwner });
+
+    await upsertCliSessionPullRequestsFromWebhook(
+      makePayload({
+        action: 'closed',
+        prNumber: 207,
+        state: 'closed',
+        merged: false,
+        headRef: branch,
+        headSha: 'sha-207',
+      }),
+      testOwner
+    );
+    await upsertCliSessionPullRequestsFromWebhook(
+      makePayload({
+        action: 'converted_to_draft',
+        prNumber: 207,
+        state: 'open',
+        draft: true,
+        headRef: branch,
+        headSha: 'sha-207-stale',
       }),
       testOwner
     );
@@ -519,12 +627,43 @@ describe('upsertCliSessionPullRequestsFromWebhook', () => {
     expect(rows[0].pr_state).toBe('merged');
   });
 
+  it('does not regress pr_state from merged -> draft on stale converted_to_draft delivery', async () => {
+    const branch = 'feature/monotonic-merged-draft';
+    await seedSession({ branch, owner: testOwner });
+
+    await upsertCliSessionPullRequestsFromWebhook(
+      makePayload({
+        action: 'closed',
+        prNumber: 206,
+        state: 'closed',
+        merged: true,
+        headRef: branch,
+        headSha: 'sha-206',
+      }),
+      testOwner
+    );
+    await upsertCliSessionPullRequestsFromWebhook(
+      makePayload({
+        action: 'converted_to_draft',
+        prNumber: 206,
+        state: 'open',
+        draft: true,
+        headRef: branch,
+        headSha: 'sha-206-stale',
+      }),
+      testOwner
+    );
+
+    const rows = await readUserRow({ userId: testUserId, branch });
+    expect(rows[0].pr_state).toBe('merged');
+  });
+
   it('still allows legitimate closed -> merged transitions', async () => {
     const branch = 'feature/close-then-merge';
     await seedSession({ branch, owner: testOwner });
 
-    // Some PRs emit closed(merged:false) then closed(merged:true) — the second
-    // should still be applied because we only block `open` downgrades.
+    // Some PRs emit closed(merged:false) then closed(merged:true) - the second
+    // still applies because terminal-state guards only block stale active states.
     await upsertCliSessionPullRequestsFromWebhook(
       makePayload({
         action: 'closed',

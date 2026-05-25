@@ -14,7 +14,7 @@ export function PrStateBadge({ state }: { state: PrBadgeState }) {
   return (
     <span
       style={{
-        backgroundColor: `color-mix(in oklch, ${accent} 15%, transparent)`,
+        backgroundColor: `color-mix(in oklch, ${accent} 20%, transparent)`,
         color: accent,
       }}
       className="inline-flex shrink-0 items-center gap-1 rounded px-2 py-0.5 text-xs font-medium"

@@ -48,11 +48,11 @@ type PrBadgeProps = {
  * Visual mapping:
  *   - `open` + approved          → emerald + CircleCheck
  *   - `open` + changes_requested → amber   + CircleX
- *   - `open` + review_required   → zinc    + GitPullRequest
- *   - `open` + no decision       → zinc    + GitPullRequest
+ *   - `open` + review_required   → emerald + GitPullRequest
+ *   - `open` + no decision       → emerald + GitPullRequest
  *   - `draft`                    → zinc    + GitPullRequestDraft
- *   - `merged`                   → purple  + GitMerge
- *   - `closed`                   → zinc    + GitPullRequestClosed
+ *   - `merged`                   → violet  + GitMerge
+ *   - `closed`                   → red     + GitPullRequestClosed
  */
 export const PrBadge = forwardRef<HTMLButtonElement, PrBadgeProps>(function PrBadge(
   { pr, className, style, ...rest },
@@ -69,12 +69,11 @@ export const PrBadge = forwardRef<HTMLButtonElement, PrBadgeProps>(function PrBa
       aria-label={`${STATE_ARIA_LABELS[state]} #${pr.number}`}
       {...rest}
       style={{
-        backgroundColor: `color-mix(in oklch, ${accent} 15%, transparent)`,
         color: accent,
         ...style,
       }}
       className={cn(
-        'inline-flex shrink-0 items-center gap-1 rounded-md py-0.5 pr-1.5 pl-1 text-[11px] font-medium tabular-nums transition-colors focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none',
+        'inline-flex shrink-0 items-center gap-1 rounded-md bg-[color-mix(in_oklch,currentColor_20%,transparent)] py-0.5 pr-1.5 pl-1 text-[11px] font-medium tabular-nums transition-colors hover:bg-[color-mix(in_oklch,currentColor_25%,transparent)] focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none',
         className
       )}
     >

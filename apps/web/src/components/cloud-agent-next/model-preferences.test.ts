@@ -3,12 +3,16 @@ import {
   appendCloudAgentNextLocalTestModel,
   getDevcontainerEnabledStorageKey,
   getLastUsedModelStorageKey,
+  getLastUsedRepoStorageKey,
   getLastUsedVariantsStorageKey,
   getPreferredInitialModel,
+  getPreferredInitialRepo,
   getPreferredInitialVariant,
   parseDevcontainerEnabled,
+  parseLastUsedRepo,
 } from './model-preferences';
 import type { ModelOption } from '@/components/shared/ModelCombobox';
+import type { RepositoryOption } from '@/components/shared/RepositoryCombobox';
 
 const modelOptions = [
   { id: 'anthropic/claude-sonnet-4.5', name: 'Claude Sonnet 4.5' },
@@ -105,6 +109,81 @@ describe('getLastUsedVariantsStorageKey', () => {
     expect(getLastUsedVariantsStorageKey('org_123')).toBe(
       'cloud-agent:last-used-variants:organization:org_123'
     );
+  });
+});
+
+describe('repository preference', () => {
+  it('uses separate keys for personal and organization contexts', () => {
+    expect(getLastUsedRepoStorageKey()).toBe('cloud-agent:last-used-repo:personal');
+    expect(getLastUsedRepoStorageKey('org_123')).toBe(
+      'cloud-agent:last-used-repo:organization:org_123'
+    );
+  });
+
+  it('restores the repository full name and platform from stored data', () => {
+    expect(parseLastUsedRepo('{"fullName":"kilo/cloud","platform":"gitlab"}')).toEqual({
+      fullName: 'kilo/cloud',
+      platform: 'gitlab',
+    });
+  });
+
+  it('ignores malformed stored data', () => {
+    expect(parseLastUsedRepo('{"fullName":"kilo/cloud","platform":"invalid"}')).toBeNull();
+    expect(parseLastUsedRepo('{"platform":"github"}')).toBeNull();
+    expect(parseLastUsedRepo('not json')).toBeNull();
+    expect(parseLastUsedRepo(null)).toBeNull();
+  });
+
+  it('restores the matching provider when full names overlap', () => {
+    const githubRepo = {
+      id: 1,
+      fullName: 'kilo/cloud',
+      platform: 'github',
+    } satisfies RepositoryOption;
+    const gitlabRepo = {
+      id: 2,
+      fullName: 'kilo/cloud',
+      platform: 'gitlab',
+    } satisfies RepositoryOption;
+
+    expect(
+      getPreferredInitialRepo({
+        availableRepos: [githubRepo, gitlabRepo],
+        recentRepos: [githubRepo],
+        lastUsedRepo: { fullName: 'kilo/cloud', platform: 'gitlab' },
+        isLoadingGitHubRepos: false,
+        isLoadingGitLabRepos: false,
+      })
+    ).toEqual(gitlabRepo);
+  });
+
+  it('waits for the saved provider before falling back to a recent repository', () => {
+    const recentRepo = {
+      id: 1,
+      fullName: 'kilo/recent',
+      platform: 'github',
+    } satisfies RepositoryOption;
+    const lastUsedRepo = { fullName: 'kilo/saved', platform: 'gitlab' } as const;
+
+    expect(
+      getPreferredInitialRepo({
+        availableRepos: [recentRepo],
+        recentRepos: [recentRepo],
+        lastUsedRepo,
+        isLoadingGitHubRepos: false,
+        isLoadingGitLabRepos: true,
+      })
+    ).toBeUndefined();
+
+    expect(
+      getPreferredInitialRepo({
+        availableRepos: [recentRepo],
+        recentRepos: [recentRepo],
+        lastUsedRepo,
+        isLoadingGitHubRepos: false,
+        isLoadingGitLabRepos: false,
+      })
+    ).toEqual(recentRepo);
   });
 });
 

@@ -134,6 +134,7 @@ describe('admin.modelExperiments — basic CRUD', () => {
 
     const requests = await caller.admin.modelExperiments.listRequests();
 
+    expect(requests.pagination).toEqual({ page: 1, limit: 25, total: 1, totalPages: 1 });
     expect(requests.items[0]).toEqual(
       expect.objectContaining({
         usageId,
@@ -155,6 +156,118 @@ describe('admin.modelExperiments — basic CRUD', () => {
         outputTokens: 45,
       })
     );
+  });
+
+  it('paginates and filters request attribution rows for investigation', async () => {
+    const first = await makeDraftWithTwoVariants('kilo/preview-filter-first');
+    const second = await makeDraftWithTwoVariants('kilo/preview-filter-second');
+    const [firstVersion] = await db
+      .select({ id: model_experiment_variant_version.id })
+      .from(model_experiment_variant_version)
+      .where(eq(model_experiment_variant_version.variant_id, first.variantA.id))
+      .limit(1);
+    const [secondVersion] = await db
+      .select({ id: model_experiment_variant_version.id })
+      .from(model_experiment_variant_version)
+      .where(eq(model_experiment_variant_version.variant_id, second.variantA.id))
+      .limit(1);
+    expect(firstVersion).toBeDefined();
+    expect(secondVersion).toBeDefined();
+
+    const firstUsageId = randomUUID();
+    const secondUsageId = randomUUID();
+    await db.insert(microdollar_usage).values([
+      {
+        id: firstUsageId,
+        kilo_user_id: 'filter-user-one',
+        cost: 0,
+        input_tokens: 1,
+        output_tokens: 1,
+        cache_write_tokens: 0,
+        cache_hit_tokens: 0,
+        has_error: false,
+      },
+      {
+        id: secondUsageId,
+        kilo_user_id: 'filter-user-two',
+        cost: 0,
+        input_tokens: 1,
+        output_tokens: 1,
+        cache_write_tokens: 0,
+        cache_hit_tokens: 0,
+        has_error: true,
+      },
+    ]);
+    await db.insert(model_experiment_request).values([
+      {
+        usage_id: firstUsageId,
+        variant_version_id: firstVersion.id,
+        allocation_subject: 'user',
+        client_request_id: 'client-success',
+        request_kind: 'responses',
+        request_body_sha256: 'a'.repeat(64),
+        was_truncated: false,
+      },
+      {
+        usage_id: secondUsageId,
+        variant_version_id: secondVersion.id,
+        allocation_subject: 'user',
+        client_request_id: 'client-error',
+        request_kind: 'messages',
+        request_body_sha256: '__failed__',
+        was_truncated: false,
+      },
+    ]);
+
+    const additionalUsageIds = Array.from({ length: 9 }, () => randomUUID());
+    await db.insert(microdollar_usage).values(
+      additionalUsageIds.map(id => ({
+        id,
+        kilo_user_id: 'filter-user-one',
+        cost: 0,
+        input_tokens: 1,
+        output_tokens: 1,
+        cache_write_tokens: 0,
+        cache_hit_tokens: 0,
+        has_error: false,
+      }))
+    );
+    await db.insert(model_experiment_request).values(
+      additionalUsageIds.map(id => ({
+        usage_id: id,
+        variant_version_id: firstVersion.id,
+        allocation_subject: 'user' as const,
+        client_request_id: 'client-success',
+        request_kind: 'responses' as const,
+        request_body_sha256: 'a'.repeat(64),
+        was_truncated: false,
+      }))
+    );
+
+    const firstPage = await first.caller.admin.modelExperiments.listRequests({
+      page: 1,
+      limit: 10,
+    });
+    const secondPage = await first.caller.admin.modelExperiments.listRequests({
+      page: 2,
+      limit: 10,
+    });
+    expect(firstPage.items).toHaveLength(10);
+    expect(secondPage.items).toHaveLength(1);
+    expect(firstPage.pagination).toEqual({ page: 1, limit: 10, total: 11, totalPages: 2 });
+    expect(firstPage.items.map(item => item.usageId)).not.toContain(secondPage.items[0].usageId);
+
+    const filtered = await first.caller.admin.modelExperiments.listRequests({
+      page: 1,
+      limit: 25,
+      experimentId: second.experimentId,
+      clientRequestId: 'client-error',
+      requestKind: 'messages',
+      outcome: 'error',
+      bodyState: 'failed',
+    });
+    expect(filtered.items.map(item => item.usageId)).toEqual([secondUsageId]);
+    expect(filtered.pagination.total).toBe(1);
   });
 
   it('rejects delete unless status is draft', async () => {

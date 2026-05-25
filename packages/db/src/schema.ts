@@ -6460,7 +6460,9 @@ export const model_experiment_variant_version = pgTable(
 export type ModelExperimentVariantVersion = typeof model_experiment_variant_version.$inferSelect;
 export type NewModelExperimentVariantVersion = typeof model_experiment_variant_version.$inferInsert;
 
-// One row per experimented request, keyed on usage_id (1:1 with microdollar_usage).
+// One row per experimented request, linked 1:1 to microdollar_usage by usage_id.
+// The physical table is monthly range-partitioned on created_at; PostgreSQL
+// therefore requires the primary key to include created_at as well as usage_id.
 // Stores attribution + a single R2 prompt hash for the post-`transformRequest`
 // upstream body. `request_body_sha256` holds either a 64-char lowercase hex
 // digest pointing at an R2 object, or one of the reserved sentinels:
@@ -6471,7 +6473,6 @@ export const model_experiment_request = pgTable(
   'model_experiment_request',
   {
     usage_id: uuid()
-      .primaryKey()
       .notNull()
       .references(() => microdollar_usage.id, { onDelete: 'cascade' }),
     variant_version_id: uuid()
@@ -6488,6 +6489,7 @@ export const model_experiment_request = pgTable(
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
   },
   table => [
+    primaryKey({ columns: [table.usage_id, table.created_at] }),
     index('IDX_model_experiment_request_variant_version_created_at').on(
       table.variant_version_id,
       table.created_at

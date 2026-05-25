@@ -1,6 +1,7 @@
 import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import { db } from '@/lib/drizzle';
 import {
+  kilocode_users,
   microdollar_usage,
   model_experiment,
   model_experiment_request,
@@ -13,7 +14,7 @@ import { ExperimentUpstreamSchema } from '@/lib/ai-gateway/experiments/upstream-
 import { EXPERIMENTED_PUBLIC_IDS_REDIS_KEY } from '@/lib/redis-keys';
 import { redisSet } from '@/lib/redis';
 import { TRPCError } from '@trpc/server';
-import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, inArray, sql } from 'drizzle-orm';
 import * as z from 'zod';
 
 type TrpcErrorCode = ConstructorParameters<typeof TRPCError>[0]['code'];
@@ -267,6 +268,19 @@ const SetArchivedSchema = idSchema.extend({
   archived: z.boolean(),
 });
 
+const ListRequestsSchema = z
+  .object({
+    page: z.number().int().min(1).default(1),
+    limit: z.union([z.literal(10), z.literal(25), z.literal(50), z.literal(100)]).default(25),
+    experimentId: z.string().uuid().optional(),
+    variantId: z.string().uuid().optional(),
+    clientRequestId: z.string().trim().min(1).max(200).optional(),
+    requestKind: z.enum(['chat_completions', 'messages', 'responses']).optional(),
+    outcome: z.enum(['all', 'success', 'error']).default('all'),
+    bodyState: z.enum(['all', 'available', 'truncated', 'failed', 'deleted']).default('all'),
+  })
+  .optional();
+
 export const adminModelExperimentsRouter = createTRPCRouter({
   // ---- Experiment-level ------------------------------------------------
 
@@ -282,51 +296,122 @@ export const adminModelExperimentsRouter = createTRPCRouter({
       return { items: rows };
     }),
 
-  listRequests: adminProcedure.query(async () => {
-    const rows = await db
-      .select({
-        usageId: model_experiment_request.usage_id,
-        createdAt: model_experiment_request.created_at,
-        experimentId: model_experiment.id,
-        experimentName: model_experiment.name,
-        publicModelId: model_experiment.public_model_id,
-        variantId: model_experiment_variant.id,
-        variantLabel: model_experiment_variant.label,
-        variantVersionId: model_experiment_variant_version.id,
-        allocationSubject: model_experiment_request.allocation_subject,
-        clientRequestId: model_experiment_request.client_request_id,
-        requestKind: model_experiment_request.request_kind,
-        requestBodySha256: model_experiment_request.request_body_sha256,
-        wasTruncated: model_experiment_request.was_truncated,
-        userId: microdollar_usage.kilo_user_id,
-        organizationId: microdollar_usage.organization_id,
-        requestedModel: microdollar_usage.requested_model,
-        upstreamModel: microdollar_usage.model,
-        provider: microdollar_usage.provider,
-        inferenceProvider: microdollar_usage.inference_provider,
-        inputTokens: microdollar_usage.input_tokens,
-        outputTokens: microdollar_usage.output_tokens,
-        cacheWriteTokens: microdollar_usage.cache_write_tokens,
-        cacheHitTokens: microdollar_usage.cache_hit_tokens,
-        costMicrodollars: microdollar_usage.cost,
-        cacheDiscountMicrodollars: microdollar_usage.cache_discount,
-        hasError: microdollar_usage.has_error,
-      })
-      .from(model_experiment_request)
-      .innerJoin(microdollar_usage, eq(model_experiment_request.usage_id, microdollar_usage.id))
-      .innerJoin(
-        model_experiment_variant_version,
-        eq(model_experiment_request.variant_version_id, model_experiment_variant_version.id)
-      )
-      .innerJoin(
-        model_experiment_variant,
-        eq(model_experiment_variant_version.variant_id, model_experiment_variant.id)
-      )
-      .innerJoin(model_experiment, eq(model_experiment_variant.experiment_id, model_experiment.id))
-      .orderBy(desc(model_experiment_request.created_at))
-      .limit(100);
+  listRequests: adminProcedure.input(ListRequestsSchema).query(async ({ input }) => {
+    const page = input?.page ?? 1;
+    const limit = input?.limit ?? 25;
+    const offset = (page - 1) * limit;
+    const conditions = [sql`true`];
 
-    return { items: rows };
+    if (input?.experimentId) {
+      conditions.push(eq(model_experiment.id, input.experimentId));
+    }
+    if (input?.variantId) {
+      conditions.push(eq(model_experiment_variant.id, input.variantId));
+    }
+    if (input?.clientRequestId) {
+      conditions.push(eq(model_experiment_request.client_request_id, input.clientRequestId));
+    }
+    if (input?.requestKind) {
+      conditions.push(eq(model_experiment_request.request_kind, input.requestKind));
+    }
+    if (input?.outcome === 'success') {
+      conditions.push(eq(microdollar_usage.has_error, false));
+    } else if (input?.outcome === 'error') {
+      conditions.push(eq(microdollar_usage.has_error, true));
+    }
+    if (input?.bodyState === 'available') {
+      conditions.push(
+        sql`${model_experiment_request.request_body_sha256} NOT IN ('__failed__', '__deleted__')`
+      );
+    } else if (input?.bodyState === 'truncated') {
+      conditions.push(eq(model_experiment_request.was_truncated, true));
+    } else if (input?.bodyState === 'failed') {
+      conditions.push(eq(model_experiment_request.request_body_sha256, '__failed__'));
+    } else if (input?.bodyState === 'deleted') {
+      conditions.push(eq(model_experiment_request.request_body_sha256, '__deleted__'));
+    }
+
+    const filter = and(...conditions);
+    const [totals, rows] = await Promise.all([
+      db
+        .select({ total: count() })
+        .from(model_experiment_request)
+        .innerJoin(microdollar_usage, eq(model_experiment_request.usage_id, microdollar_usage.id))
+        .innerJoin(
+          model_experiment_variant_version,
+          eq(model_experiment_request.variant_version_id, model_experiment_variant_version.id)
+        )
+        .innerJoin(
+          model_experiment_variant,
+          eq(model_experiment_variant_version.variant_id, model_experiment_variant.id)
+        )
+        .innerJoin(
+          model_experiment,
+          eq(model_experiment_variant.experiment_id, model_experiment.id)
+        )
+        .where(filter),
+      db
+        .select({
+          usageId: model_experiment_request.usage_id,
+          createdAt: model_experiment_request.created_at,
+          experimentId: model_experiment.id,
+          experimentName: model_experiment.name,
+          publicModelId: model_experiment.public_model_id,
+          variantId: model_experiment_variant.id,
+          variantLabel: model_experiment_variant.label,
+          variantVersionId: model_experiment_variant_version.id,
+          allocationSubject: model_experiment_request.allocation_subject,
+          clientRequestId: model_experiment_request.client_request_id,
+          requestKind: model_experiment_request.request_kind,
+          requestBodySha256: model_experiment_request.request_body_sha256,
+          wasTruncated: model_experiment_request.was_truncated,
+          userId: microdollar_usage.kilo_user_id,
+          userName: kilocode_users.google_user_name,
+          userEmail: kilocode_users.google_user_email,
+          userImageUrl: kilocode_users.google_user_image_url,
+          requestedModel: microdollar_usage.requested_model,
+          upstreamModel: microdollar_usage.model,
+          provider: microdollar_usage.provider,
+          inferenceProvider: microdollar_usage.inference_provider,
+          inputTokens: microdollar_usage.input_tokens,
+          outputTokens: microdollar_usage.output_tokens,
+          cacheWriteTokens: microdollar_usage.cache_write_tokens,
+          cacheHitTokens: microdollar_usage.cache_hit_tokens,
+          costMicrodollars: microdollar_usage.cost,
+          cacheDiscountMicrodollars: microdollar_usage.cache_discount,
+          hasError: microdollar_usage.has_error,
+        })
+        .from(model_experiment_request)
+        .innerJoin(microdollar_usage, eq(model_experiment_request.usage_id, microdollar_usage.id))
+        .leftJoin(kilocode_users, eq(microdollar_usage.kilo_user_id, kilocode_users.id))
+        .innerJoin(
+          model_experiment_variant_version,
+          eq(model_experiment_request.variant_version_id, model_experiment_variant_version.id)
+        )
+        .innerJoin(
+          model_experiment_variant,
+          eq(model_experiment_variant_version.variant_id, model_experiment_variant.id)
+        )
+        .innerJoin(
+          model_experiment,
+          eq(model_experiment_variant.experiment_id, model_experiment.id)
+        )
+        .where(filter)
+        .orderBy(desc(model_experiment_request.created_at), desc(model_experiment_request.usage_id))
+        .limit(limit)
+        .offset(offset),
+    ]);
+
+    const total = totals[0]?.total ?? 0;
+    return {
+      items: rows,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
   }),
 
   get: adminProcedure.input(idSchema).query(async ({ input }) => {

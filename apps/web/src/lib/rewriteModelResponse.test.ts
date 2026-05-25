@@ -1,5 +1,6 @@
 import {
   rewriteFreeModelResponse_ChatCompletions,
+  rewriteFreeModelResponse_Messages,
   rewriteFreeModelResponse_Responses,
 } from './rewriteModelResponse';
 
@@ -60,6 +61,59 @@ describe('experiment response model rewriting', () => {
     expect(text).toContain(publicModelId);
     expect(text).not.toContain(upstreamInternalId);
     expect(text).toContain('data: [DONE]');
+  });
+
+  it('rewrites messages JSON model ids to the requested public id', async () => {
+    const upstreamResponse = new Response(
+      JSON.stringify({
+        id: 'msg-test',
+        type: 'message',
+        role: 'assistant',
+        model: upstreamInternalId,
+        content: [],
+        stop_reason: 'end_turn',
+        stop_sequence: null,
+        usage: { input_tokens: 1, output_tokens: 1 },
+      }),
+      { headers: { 'content-type': 'application/json' } }
+    );
+
+    const rewritten = await rewriteFreeModelResponse_Messages(upstreamResponse, publicModelId);
+
+    const text = await responseText(rewritten);
+    expect(text).toContain(publicModelId);
+    expect(text).not.toContain(upstreamInternalId);
+    expect(JSON.parse(text).model).toBe(publicModelId);
+  });
+
+  it('rewrites messages SSE model ids to the requested public id', async () => {
+    const upstreamResponse = sseResponse([
+      `event: message_start\ndata: ${JSON.stringify({
+        type: 'message_start',
+        message: {
+          id: 'msg-test',
+          type: 'message',
+          role: 'assistant',
+          model: upstreamInternalId,
+          content: [],
+          stop_reason: null,
+          stop_sequence: null,
+          usage: { input_tokens: 1, output_tokens: 0 },
+        },
+      })}\n\n`,
+      `event: content_block_delta\ndata: ${JSON.stringify({
+        type: 'content_block_delta',
+        index: 0,
+        delta: { type: 'text_delta', text: 'hello' },
+      })}\n\n`,
+    ]);
+
+    const rewritten = await rewriteFreeModelResponse_Messages(upstreamResponse, publicModelId);
+
+    const text = await responseText(rewritten);
+    expect(text).toContain(publicModelId);
+    expect(text).not.toContain(upstreamInternalId);
+    expect(text).toContain('event: message_start');
   });
 
   it('rewrites responses JSON model ids to the requested public id', async () => {

@@ -30,11 +30,16 @@ describe('review memory aggregation', () => {
     await db.delete(kilocode_users);
   });
 
-  async function seedSubject(owner: ReviewMemoryOwner, externalId: string, prNumber: number) {
+  async function seedSubject(
+    owner: ReviewMemoryOwner,
+    externalId: string,
+    prNumber: number,
+    repoFullName = 'acme/widgets'
+  ) {
     return await upsertFeedbackSubject({
       owner,
       platform: 'github',
-      repoFullName: 'acme/widgets',
+      repoFullName,
       subjectType: 'inline_comment',
       externalId,
       prNumber,
@@ -47,11 +52,11 @@ describe('review memory aggregation', () => {
     });
   }
 
-  async function seedActionableFeedback(owner: ReviewMemoryOwner) {
+  async function seedActionableFeedback(owner: ReviewMemoryOwner, repoFullName = 'acme/widgets') {
     const subjects = await Promise.all([
-      seedSubject(owner, '101', 1),
-      seedSubject(owner, '102', 2),
-      seedSubject(owner, '103', 3),
+      seedSubject(owner, `${repoFullName}-101`, 1, repoFullName),
+      seedSubject(owner, `${repoFullName}-102`, 2, repoFullName),
+      seedSubject(owner, `${repoFullName}-103`, 3, repoFullName),
     ]);
     const events = [];
     for (let i = 0; i < 5; i += 1) {
@@ -60,14 +65,14 @@ describe('review memory aggregation', () => {
         owner,
         platform: 'github',
         subjectId: subject.id,
-        repoFullName: 'acme/widgets',
+        repoFullName,
         prNumber: subject.pr_number,
         prUrl: subject.pr_url,
         eventSource: 'github_webhook',
         signalKind: 'corrective_reply',
         sentiment: 'negative',
         strength: 3,
-        externalEventId: `aggregation-actionable-${i}`,
+        externalEventId: `aggregation-actionable-${repoFullName}-${i}`,
         evidenceExcerpt: `False positive feedback ${i}`,
       });
       events.push(result.event);
@@ -154,6 +159,38 @@ describe('review memory aggregation', () => {
 
     const [run] = await db.select().from(code_review_memory_aggregation_runs);
     expect(run).toEqual(expect.objectContaining({ status: 'completed', tokens_in: 100 }));
+  });
+
+  it('claims only the requested aggregation state', async () => {
+    const targetUser = await insertTestUser();
+    const otherUser = await insertTestUser();
+    const targetOwner = { type: 'user' as const, id: targetUser.id };
+    const otherOwner = { type: 'user' as const, id: otherUser.id };
+    await seedActionableFeedback(targetOwner, 'acme/target');
+    await seedActionableFeedback(otherOwner, 'acme/other');
+
+    const [targetState] = await db
+      .select()
+      .from(code_review_memory_aggregation_state)
+      .where(eq(code_review_memory_aggregation_state.repo_full_name, 'acme/target'));
+    const generateOpportunities = jest.fn(async () => ({ opportunities: [] }));
+
+    const summary = await dispatchReviewMemoryAggregationCron({
+      stateId: targetState.id,
+      limit: 1,
+      generateOpportunities,
+    });
+
+    expect(summary).toEqual({ claimed: 1, completed: 1, skipped: 0, failed: 0, proposals: 0 });
+    expect(generateOpportunities).toHaveBeenCalledWith(
+      expect.objectContaining({ repoFullName: 'acme/target' })
+    );
+
+    const [otherState] = await db
+      .select()
+      .from(code_review_memory_aggregation_state)
+      .where(eq(code_review_memory_aggregation_state.repo_full_name, 'acme/other'));
+    expect(otherState.status).toBe('eligible');
   });
 
   it('skips weak MR-level-only feedback without calling the model', async () => {

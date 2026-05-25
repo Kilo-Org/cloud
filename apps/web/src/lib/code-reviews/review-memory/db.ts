@@ -556,6 +556,7 @@ export async function updateAggregationRunStatus(input: {
 
 export type ClaimEligibleAggregationStatesInput = {
   limit?: number;
+  stateId?: string;
   minFreshEvents: number;
   minFreshWeight: number;
   minDistinctSubjects: number;
@@ -570,23 +571,29 @@ export async function claimEligibleAggregationStates(
   const now = input.now ?? new Date();
   const staleBefore = new Date(now.getTime() - input.staleAfterMs).toISOString();
   const limit = Math.max(1, Math.min(input.limit ?? 10, 50));
+  const stateIdFilter = input.stateId ? sql`AND id = ${input.stateId}::uuid` : sql``;
   const result = await db.execute<CodeReviewMemoryAggregationState>(sql`
     WITH candidates AS (
       SELECT id
       FROM ${code_review_memory_aggregation_state}
-      WHERE (
-        status IN ('eligible', 'failed')
-        AND next_eligible_at <= ${now.toISOString()}
-        AND (fresh_event_count >= ${input.minFreshEvents} OR fresh_weight >= ${input.minFreshWeight})
+      WHERE
+        TRUE
+        ${stateIdFilter}
         AND (
-          fresh_distinct_subject_count >= ${input.minDistinctSubjects}
-          OR fresh_distinct_pr_count >= ${input.minDistinctPrs}
+          (
+            status IN ('eligible', 'failed')
+            AND next_eligible_at <= ${now.toISOString()}
+            AND (fresh_event_count >= ${input.minFreshEvents} OR fresh_weight >= ${input.minFreshWeight})
+            AND (
+              fresh_distinct_subject_count >= ${input.minDistinctSubjects}
+              OR fresh_distinct_pr_count >= ${input.minDistinctPrs}
+            )
+          ) OR (
+            status = 'running'
+            AND claimed_at IS NOT NULL
+            AND claimed_at <= ${staleBefore}
+          )
         )
-      ) OR (
-        status = 'running'
-        AND claimed_at IS NOT NULL
-        AND claimed_at <= ${staleBefore}
-      )
       ORDER BY fresh_weight DESC, fresh_event_count DESC, updated_at ASC, id ASC
       FOR UPDATE SKIP LOCKED
       LIMIT ${limit}

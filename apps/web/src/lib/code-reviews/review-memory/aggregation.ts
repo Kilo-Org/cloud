@@ -125,6 +125,7 @@ type ProcessAggregationScopeResult = {
 
 export type DispatchReviewMemoryAggregationOptions = {
   limit?: number;
+  stateId?: string;
   now?: Date;
   generateOpportunities?: (
     input: ReviewMemoryAggregationGeneratorInput
@@ -555,6 +556,7 @@ export async function dispatchReviewMemoryAggregationCron(
     options.generateOpportunities ?? generateReviewMemoryOpportunitiesWithGateway;
   const claimed = await claimEligibleAggregationStates({
     limit: options.limit ?? 10,
+    stateId: options.stateId,
     minFreshEvents: REVIEW_MEMORY_AGGREGATION_THRESHOLDS.minFreshEvents,
     minFreshWeight: REVIEW_MEMORY_AGGREGATION_THRESHOLDS.minFreshWeight,
     minDistinctSubjects: REVIEW_MEMORY_AGGREGATION_THRESHOLDS.minDistinctSubjects,

@@ -205,7 +205,7 @@ export const reviewMemoryRouter = createTRPCRouter({
         repoFullName: input.repoFullName,
         platformProjectId: input.platformProjectId,
       });
-      const summary = await dispatchReviewMemoryAggregationCron({ limit: 1 });
+      const summary = await dispatchReviewMemoryAggregationCron({ limit: 1, stateId: state.id });
       return { state, summary };
     }),
 });

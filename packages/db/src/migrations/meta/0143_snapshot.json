@@ -1,5 +1,5 @@
 {
-  "id": "e90cd609-cd22-477b-8a7e-7f73aa5be9f8",
+  "id": "9963e2c2-fbb5-48cc-b448-7ff279d87c75",
   "prevId": "6d601c9e-e9e6-4e60-bbae-a3e035ce0d3f",
   "version": "7",
   "dialect": "postgresql",
@@ -10567,7 +10567,7 @@
       "checkConstraints": {
         "kilo_pass_audit_log_action_check": {
           "name": "kilo_pass_audit_log_action_check",
-          "value": "\"kilo_pass_audit_log\".\"action\" IN ('stripe_webhook_received', 'kilo_pass_invoice_paid_handled', 'store_purchase_completed', 'store_notification_received', 'store_subscription_renewed', 'store_subscription_canceled', 'store_subscription_expired', 'store_subscription_refunded', 'base_credits_issued', 'bonus_credits_issued', 'bonus_credits_skipped_idempotent', 'first_month_50pct_promo_issued', 'yearly_monthly_base_cron_started', 'yearly_monthly_base_cron_completed', 'issue_yearly_remaining_credits', 'duplicate_card_subscription_canceled', 'yearly_monthly_bonus_cron_started', 'yearly_monthly_bonus_cron_completed')"
+          "value": "\"kilo_pass_audit_log\".\"action\" IN ('stripe_webhook_received', 'kilo_pass_invoice_paid_handled', 'store_purchase_completed', 'store_notification_received', 'store_subscription_renewed', 'store_subscription_canceled', 'store_subscription_expired', 'store_subscription_refunded', 'base_credits_issued', 'bonus_credits_issued', 'bonus_credits_skipped_idempotent', 'first_month_50pct_promo_issued', 'yearly_monthly_base_cron_started', 'yearly_monthly_base_cron_completed', 'issue_yearly_remaining_credits', 'yearly_monthly_bonus_cron_started', 'yearly_monthly_bonus_cron_completed')"
         },
         "kilo_pass_audit_log_result_check": {
           "name": "kilo_pass_audit_log_result_check",
@@ -18827,6 +18827,18 @@
         "repositories_synced_at": {
           "name": "repositories_synced_at",
           "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "auth_invalid_at": {
+          "name": "auth_invalid_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "auth_invalid_reason": {
+          "name": "auth_invalid_reason",
+          "type": "text",
           "primaryKey": false,
           "notNull": false
         },

@@ -918,7 +918,18 @@ export async function POST(
       status === 'cancelled' &&
       isModelNotFoundCodeReviewTerminalReason(terminalReason, errorMessage)
     ) {
-      await upsertModelNotFoundSummary(review, integration, gitlabAccessToken);
+      try {
+        await upsertModelNotFoundSummary(review, integration, gitlabAccessToken);
+      } catch (summaryError) {
+        logExceptInTest(
+          '[code-review-status] Failed to upsert model unavailable summary:',
+          summaryError
+        );
+        captureException(summaryError, {
+          tags: { source: 'code-review-status-model-not-found-summary' },
+          extra: { reviewId, platform: review.platform || 'github' },
+        });
+      }
     }
 
     // Update review status in database

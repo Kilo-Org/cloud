@@ -1422,6 +1422,30 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       expect(mockCreatePRComment).not.toHaveBeenCalled();
     });
 
+    it('persists the cancellation if the model-unavailable summary fails to publish', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+      mockFindKiloReviewComment.mockResolvedValue(null);
+      mockCreatePRComment.mockRejectedValue(new Error('GitHub unavailable'));
+
+      const response = await POST(
+        makeRequest({ status: 'failed', errorMessage: 'Model not found: kilo/retired-model' }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+        REVIEW_ID,
+        'cancelled',
+        expect.objectContaining({ terminalReason: 'model_not_found' })
+      );
+      expect(mockCaptureException).toHaveBeenCalledWith(
+        expect.any(Error),
+        expect.objectContaining({
+          tags: { source: 'code-review-status-model-not-found-summary' },
+        })
+      );
+    });
+
     it('creates and updates the canonical GitLab note through the same summary path', async () => {
       mockGetCodeReviewById.mockResolvedValue(
         makeReview({ platform: 'gitlab', platform_project_id: 42, check_run_id: null })

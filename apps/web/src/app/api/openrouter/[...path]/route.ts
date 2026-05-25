@@ -718,7 +718,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   const isStealthModelRequiringNameRemoval =
     provider.id !== 'martian' && isKiloStealthModel(originalModelIdLowerCased);
 
-  if (isFreeModelRequiringCostRemoval || isStealthModelRequiringNameRemoval) {
+  if (experiment || isFreeModelRequiringCostRemoval || isStealthModelRequiringNameRemoval) {
     if (requestBodyParsed.kind === 'chat_completions') {
       return rewriteFreeModelResponse_ChatCompletions(response, originalModelIdLowerCased);
     }

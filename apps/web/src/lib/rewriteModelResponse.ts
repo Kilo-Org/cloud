@@ -59,6 +59,7 @@ export async function rewriteFreeModelResponse_ChatCompletions(response: Respons
         controller.close();
         return;
       }
+      const encoder = new TextEncoder();
 
       let doneReceived = false;
       const parser = createParser({
@@ -89,10 +90,10 @@ export async function rewriteFreeModelResponse_ChatCompletions(response: Respons
             rewriteUsage(json.usage);
           }
 
-          controller.enqueue('data: ' + JSON.stringify(json) + '\n\n');
+          controller.enqueue(encoder.encode('data: ' + JSON.stringify(json) + '\n\n'));
         },
         onComment() {
-          controller.enqueue(': KILO PROCESSING\n\n');
+          controller.enqueue(encoder.encode(': KILO PROCESSING\n\n'));
         },
       });
 
@@ -101,7 +102,7 @@ export async function rewriteFreeModelResponse_ChatCompletions(response: Respons
         const { done, value } = await reader.read();
         if (done) {
           if (doneReceived) {
-            controller.enqueue('data: [DONE]\n\n');
+            controller.enqueue(encoder.encode('data: [DONE]\n\n'));
           }
           controller.close();
           break;
@@ -179,6 +180,7 @@ export async function rewriteFreeModelResponse_Messages(response: Response, mode
         controller.close();
         return;
       }
+      const encoder = new TextEncoder();
 
       const parser = createParser({
         onEvent(event: EventSourceMessage) {
@@ -209,10 +211,10 @@ export async function rewriteFreeModelResponse_Messages(response: Response, mode
           }
 
           const eventLine = event.event ? 'event: ' + event.event + '\n' : '';
-          controller.enqueue(eventLine + 'data: ' + JSON.stringify(json) + '\n\n');
+          controller.enqueue(encoder.encode(eventLine + 'data: ' + JSON.stringify(json) + '\n\n'));
         },
         onComment() {
-          controller.enqueue(': KILO PROCESSING\n\n');
+          controller.enqueue(encoder.encode(': KILO PROCESSING\n\n'));
         },
       });
 
@@ -278,6 +280,7 @@ export async function rewriteFreeModelResponse_Responses(response: Response, mod
         controller.close();
         return;
       }
+      const encoder = new TextEncoder();
 
       let doneReceived = false;
       const parser = createParser({
@@ -295,10 +298,10 @@ export async function rewriteFreeModelResponse_Responses(response: Response, mod
               rewriteUsage(json.response.usage);
             }
           }
-          controller.enqueue('data: ' + JSON.stringify(json) + '\n\n');
+          controller.enqueue(encoder.encode('data: ' + JSON.stringify(json) + '\n\n'));
         },
         onComment() {
-          controller.enqueue(': KILO PROCESSING\n\n');
+          controller.enqueue(encoder.encode(': KILO PROCESSING\n\n'));
         },
       });
 
@@ -307,7 +310,7 @@ export async function rewriteFreeModelResponse_Responses(response: Response, mod
         const { done, value } = await reader.read();
         if (done) {
           if (doneReceived) {
-            controller.enqueue('data: [DONE]\n\n');
+            controller.enqueue(encoder.encode('data: [DONE]\n\n'));
           }
           controller.close();
           break;

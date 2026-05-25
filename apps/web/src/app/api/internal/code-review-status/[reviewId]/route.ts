@@ -54,6 +54,7 @@ import {
   getValidGitLabToken,
   getStoredProjectAccessToken,
 } from '@/lib/integrations/gitlab-service';
+import { db, sql } from '@/lib/drizzle';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { CALLBACK_TOKEN_SECRET } from '@/lib/config.server';
 import { verifyCallbackToken } from '@kilocode/worker-utils/callback-token';
@@ -139,6 +140,14 @@ function normalizePayload(raw: StatusUpdatePayload): {
     terminalReason = 'billing';
   }
 
+  if (
+    (raw.status === 'failed' || raw.status === 'interrupted') &&
+    isModelNotFoundCodeReviewTerminalReason(terminalReason, raw.errorMessage)
+  ) {
+    status = 'cancelled';
+    terminalReason = 'model_not_found';
+  }
+
   if (!terminalReason && raw.status === 'interrupted') {
     terminalReason = 'interrupted';
   }
@@ -171,6 +180,17 @@ function isBillingCodeReviewTerminalReason(
   );
 }
 
+function isModelNotFoundCodeReviewTerminalReason(
+  terminalReason?: CodeReviewTerminalReason,
+  errorMessage?: string | null
+): boolean {
+  if (terminalReason === 'model_not_found') {
+    return true;
+  }
+
+  return /\bmodel\s+not\s+found\b/i.test(errorMessage ?? '');
+}
+
 function isRetryableInfraFailure(
   status: 'running' | 'completed' | 'failed' | 'cancelled',
   terminalReason?: CodeReviewTerminalReason,
@@ -178,7 +198,9 @@ function isRetryableInfraFailure(
 ): boolean {
   if (status !== 'failed') return false;
   if (terminalReason === 'billing') return false;
+  if (terminalReason === 'model_not_found') return false;
   if (isBillingCodeReviewTerminalReason(terminalReason, errorMessage)) return false;
+  if (isModelNotFoundCodeReviewTerminalReason(terminalReason, errorMessage)) return false;
 
   const message = errorMessage?.toLowerCase();
   if (!message) return false;
@@ -206,6 +228,17 @@ function isSupersededReview(review: CloudAgentCodeReview): boolean {
 }
 
 const BILLING_NOTICE_MARKER = '<!-- kilo-billing-notice -->';
+const MODEL_NOT_FOUND_SUMMARY_URL = 'https://app.kilo.ai/code-reviews';
+const MODEL_NOT_FOUND_CHECK_TITLE = 'Selected model is no longer available';
+const MODEL_NOT_FOUND_STATUS_SUMMARY = `The review did not run because the selected model is no longer available. Choose another model in Kilo Code review settings: ${MODEL_NOT_FOUND_SUMMARY_URL}`;
+const MODEL_NOT_FOUND_GITLAB_DESCRIPTION = `Selected model is no longer available. Choose another model: ${MODEL_NOT_FOUND_SUMMARY_URL}`;
+
+const MODEL_NOT_FOUND_SUMMARY_BODY = `<!-- kilo-review -->
+## Code Review Summary
+
+The review did not run because the selected model is no longer available.
+
+Choose another model in Kilo Code review settings: ${MODEL_NOT_FOUND_SUMMARY_URL}`;
 
 const BILLING_NOTICE_BODY = `${BILLING_NOTICE_MARKER}
 **Kilo Code Review could not run — your account is out of credits.**
@@ -308,6 +341,9 @@ function mapStatusToCheckRun(
   const reviewFailed = reviewStatus === 'completed' && gateResult === 'fail';
   const billingFailure =
     reviewStatus === 'failed' && isBillingCodeReviewTerminalReason(terminalReason, errorMessage);
+  const modelNotFoundCancellation =
+    reviewStatus === 'cancelled' &&
+    isModelNotFoundCodeReviewTerminalReason(terminalReason, errorMessage);
 
   const conclusionMap: Record<string, CheckRunConclusion> = {
     completed: reviewFailed ? 'failure' : 'success',
@@ -319,7 +355,9 @@ function mapStatusToCheckRun(
     running: 'Kilo Code Review in progress',
     completed: reviewFailed ? 'Kilo Code Review found issues' : 'Kilo Code Review completed',
     failed: billingFailure ? 'Insufficient credits to run review' : 'Kilo Code Review failed',
-    cancelled: 'Kilo Code Review cancelled',
+    cancelled: modelNotFoundCancellation
+      ? MODEL_NOT_FOUND_CHECK_TITLE
+      : 'Kilo Code Review cancelled',
   };
 
   const summaryMap: Record<string, string> = {
@@ -332,7 +370,7 @@ function mapStatusToCheckRun(
       : errorMessage
         ? `Review failed: ${errorMessage}`
         : 'Review failed.',
-    cancelled: 'Review was cancelled.',
+    cancelled: modelNotFoundCancellation ? MODEL_NOT_FOUND_STATUS_SUMMARY : 'Review was cancelled.',
   };
 
   return {
@@ -371,6 +409,12 @@ function getGitLabStatusDescription(
     return 'Kilo Code Review found issues that require attention';
   }
   if (reviewStatus === 'completed') return 'Kilo Code Review completed';
+  if (
+    reviewStatus === 'cancelled' &&
+    isModelNotFoundCodeReviewTerminalReason(terminalReason, errorMessage)
+  ) {
+    return MODEL_NOT_FOUND_GITLAB_DESCRIPTION;
+  }
   if (reviewStatus === 'cancelled') return 'Kilo Code Review cancelled';
   if (
     reviewStatus === 'failed' &&
@@ -384,6 +428,92 @@ function getGitLabStatusDescription(
   }
   if (reviewStatus === 'failed') return 'Kilo Code Review failed';
   return undefined;
+}
+
+async function upsertModelNotFoundSummary(
+  review: CloudAgentCodeReview,
+  integration: PlatformIntegration,
+  gitlabAccessToken?: string
+): Promise<void> {
+  const platform = review.platform || 'github';
+  const lockKey = `code-review-model-not-found-summary:${platform}:${review.repo_full_name}:${review.pr_number}`;
+
+  await db.transaction(async tx => {
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`);
+
+    if (platform === 'github' && integration.platform_installation_id) {
+      const [repoOwner, repoName] = review.repo_full_name.split('/');
+      const appType: GitHubAppType = integration.github_app_type || 'standard';
+      const existing = await findKiloReviewComment(
+        integration.platform_installation_id,
+        repoOwner,
+        repoName,
+        review.pr_number,
+        appType
+      );
+
+      if (existing) {
+        await updateKiloReviewComment(
+          integration.platform_installation_id,
+          repoOwner,
+          repoName,
+          existing.commentId,
+          MODEL_NOT_FOUND_SUMMARY_BODY,
+          appType
+        );
+      } else {
+        await createPRComment(
+          integration.platform_installation_id,
+          repoOwner,
+          repoName,
+          review.pr_number,
+          MODEL_NOT_FOUND_SUMMARY_BODY,
+          appType
+        );
+      }
+
+      logExceptInTest(
+        `[code-review-status] Upserted model unavailable summary on ${review.repo_full_name}#${review.pr_number}`
+      );
+      return;
+    }
+
+    if (platform === PLATFORM.GITLAB) {
+      const instanceUrl = getGitLabInstanceUrl(integration);
+      const accessToken =
+        gitlabAccessToken ??
+        (await resolveGitLabAccessToken(integration, review.platform_project_id));
+      const existing = await findKiloReviewNote(
+        accessToken,
+        review.repo_full_name,
+        review.pr_number,
+        instanceUrl
+      );
+
+      if (existing) {
+        await updateKiloReviewNote(
+          accessToken,
+          review.repo_full_name,
+          review.pr_number,
+          existing.noteId,
+          MODEL_NOT_FOUND_SUMMARY_BODY,
+          instanceUrl
+        );
+      } else {
+        await createMRNote(
+          accessToken,
+          review.repo_full_name,
+          review.pr_number,
+          MODEL_NOT_FOUND_SUMMARY_BODY,
+          instanceUrl
+        );
+      }
+
+      logExceptInTest(
+        `[code-review-status] Upserted model unavailable summary on GitLab MR ${review.repo_full_name}!${review.pr_number}`
+      );
+    }
+  });
 }
 
 /**
@@ -781,6 +911,14 @@ export async function POST(
           throw gateCheckError;
         }
       }
+    }
+
+    if (
+      integration &&
+      status === 'cancelled' &&
+      isModelNotFoundCodeReviewTerminalReason(terminalReason, errorMessage)
+    ) {
+      await upsertModelNotFoundSummary(review, integration, gitlabAccessToken);
     }
 
     // Update review status in database

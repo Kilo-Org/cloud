@@ -118,6 +118,7 @@ export type CloudAgentInterruptOutput = {
  */
 export type CloudAgentTerminalReason =
   | 'billing'
+  | 'model_not_found'
   | 'user_cancelled'
   | 'superseded'
   | 'interrupted'

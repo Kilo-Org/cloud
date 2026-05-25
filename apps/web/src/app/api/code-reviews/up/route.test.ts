@@ -192,6 +192,43 @@ describe('GET /api/code-reviews/up', () => {
     });
   });
 
+  it('returns healthy when model-not-found rows reach the error-spike threshold', async () => {
+    await db.insert(cloud_agent_code_reviews).values([
+      reviewValues({ status: 'cancelled', terminal_reason: 'model_not_found' }),
+      reviewValues({
+        status: 'failed',
+        terminal_reason: null,
+        error_message: 'Model not found: kilo/retired-model',
+      }),
+      ...Array.from({ length: 18 }, () => reviewValues()),
+    ]);
+
+    const response = await GET(makeRequest('kilo-code-reviews-health-check'));
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body).toMatchObject({ healthy: true, alerts: [] });
+  });
+
+  it('still returns an error-spike alert for non-model not-found failures', async () => {
+    await db
+      .insert(cloud_agent_code_reviews)
+      .values([
+        reviewValues({ status: 'failed', error_message: 'Repository not found' }),
+        reviewValues({ status: 'failed', error_message: 'Session not found' }),
+        ...Array.from({ length: 18 }, () => reviewValues()),
+      ]);
+
+    const response = await GET(makeRequest('kilo-code-reviews-health-check'));
+
+    expect(response.status).toBe(503);
+    const body = await response.json();
+    expect(body).toMatchObject({
+      healthy: false,
+      alerts: [expect.objectContaining({ kind: 'error_spike', errorCount: 2 })],
+    });
+  });
+
   it('ignores stale queued rows for health', async () => {
     await db.insert(cloud_agent_code_reviews).values(
       Array.from({ length: 20 }, () =>

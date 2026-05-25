@@ -71,6 +71,11 @@ const mockCaptureMessage = jest.fn<any>();
 const mockAppendReviewSummaryFooter = jest.fn<any>();
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const mockRetryReviewFresh = jest.fn<any>();
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const mockDbExecute = jest.fn<any>();
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const mockDbTransaction = jest.fn<any>();
+type MockDbTransactionCallback = (tx: { execute: typeof mockDbExecute }) => Promise<unknown>;
 
 // --- Module mocks ---
 
@@ -140,6 +145,13 @@ jest.mock('@/lib/code-reviews/summary/usage-footer', () => ({
 
 jest.mock('@/lib/constants', () => ({
   APP_URL: 'https://test.kilo.ai',
+}));
+
+jest.mock('@/lib/drizzle', () => ({
+  db: {
+    transaction: mockDbTransaction,
+  },
+  sql: jest.requireActual<typeof import('drizzle-orm')>('drizzle-orm').sql,
 }));
 
 jest.mock('@/lib/integrations/core/constants', () => ({
@@ -326,6 +338,10 @@ beforeEach(async () => {
   mockGetSessionUsageFromBilling.mockResolvedValue(null);
   mockUpdateCodeReviewUsage.mockResolvedValue(undefined);
   mockAppendReviewSummaryFooter.mockReturnValue('body with footer');
+  mockDbExecute.mockResolvedValue({ rows: [] });
+  mockDbTransaction.mockImplementation(async (callback: MockDbTransactionCallback) =>
+    callback({ execute: mockDbExecute })
+  );
   ({ POST } = await import('./route'));
 });
 
@@ -490,6 +506,76 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
           errorMessage: 'User cancelled the review',
           terminalReason: 'interrupted',
         })
+      );
+    });
+
+    it('reclassifies failed model-not-found callbacks as cancelled while preserving the error message', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+      mockFindKiloReviewComment.mockResolvedValue(null);
+
+      const response = await POST(
+        makeRequest({
+          status: 'failed',
+          errorMessage: 'Model not found: kilo/retired-model',
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockUpdateCodeReviewAttemptForCallback).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: 'cancelled',
+          errorMessage: 'Model not found: kilo/retired-model',
+          terminalReason: 'model_not_found',
+        })
+      );
+      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+        REVIEW_ID,
+        'cancelled',
+        expect.objectContaining({
+          errorMessage: 'Model not found: kilo/retired-model',
+          terminalReason: 'model_not_found',
+        })
+      );
+      expect(mockCreateInfraRetryAttemptIfMissing).not.toHaveBeenCalled();
+      expect(mockRetryReviewFresh).not.toHaveBeenCalled();
+    });
+
+    it('recognizes model-not-found messages case-insensitively but not generic not-found messages', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+
+      await POST(
+        makeRequest({ status: 'failed', errorMessage: 'MODEL NOT FOUND: kilo/retired-model' }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(mockUpdateCodeReviewStatus).toHaveBeenLastCalledWith(
+        REVIEW_ID,
+        'cancelled',
+        expect.objectContaining({ terminalReason: 'model_not_found' })
+      );
+
+      jest.clearAllMocks();
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+      mockUpdateCodeReviewAttemptForCallback.mockImplementation(async params =>
+        makeAttempt({
+          status: params.status,
+          error_message: params.errorMessage ?? null,
+          terminal_reason: params.terminalReason ?? null,
+        })
+      );
+      mockGetLatestCodeReviewAttempt.mockResolvedValue(makeAttempt());
+      mockGetIntegrationById.mockResolvedValue(makeIntegration());
+
+      await POST(
+        makeRequest({ status: 'failed', errorMessage: 'Repository not found' }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(mockUpdateCodeReviewStatus).toHaveBeenLastCalledWith(
+        REVIEW_ID,
+        'failed',
+        expect.objectContaining({ terminalReason: undefined })
       );
     });
 
@@ -1227,6 +1313,183 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         expect.stringContaining('switch to a free model'),
         'standard'
       );
+    });
+  });
+
+  describe('model-not-found provider output', () => {
+    it('updates GitHub check runs with actionable cancelled copy', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+      mockFindKiloReviewComment.mockResolvedValue(null);
+
+      await POST(
+        makeRequest({ status: 'failed', errorMessage: 'Model not found: kilo/retired-model' }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(mockUpdateCheckRun).toHaveBeenCalledWith(
+        'inst-1',
+        'owner',
+        'repo',
+        12345,
+        expect.objectContaining({
+          status: 'completed',
+          conclusion: 'cancelled',
+          output: expect.objectContaining({
+            title: 'Selected model is no longer available',
+            summary: expect.stringContaining('https://app.kilo.ai/code-reviews'),
+          }),
+        }),
+        'standard'
+      );
+    });
+
+    it('updates GitLab commit status with actionable cancelled copy', async () => {
+      mockGetCodeReviewById.mockResolvedValue(
+        makeReview({ platform: 'gitlab', platform_project_id: 42, check_run_id: null })
+      );
+      mockFindKiloReviewNote.mockResolvedValue(null);
+
+      await POST(
+        makeRequest({ status: 'failed', errorMessage: 'Model not found: kilo/retired-model' }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(mockSetCommitStatus).toHaveBeenCalledWith(
+        'mock-token',
+        42,
+        'abc123',
+        'canceled',
+        expect.objectContaining({
+          description: expect.stringContaining('https://app.kilo.ai/code-reviews'),
+        }),
+        'https://gitlab.com'
+      );
+    });
+
+    it('creates the canonical GitHub summary when absent', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+      mockFindKiloReviewComment.mockResolvedValue(null);
+
+      await POST(
+        makeRequest({ status: 'failed', errorMessage: 'Model not found: kilo/retired-model' }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(mockDbTransaction).toHaveBeenCalledTimes(1);
+      expect(mockFindKiloReviewComment).toHaveBeenCalledWith(
+        'inst-1',
+        'owner',
+        'repo',
+        1,
+        'standard'
+      );
+      expect(mockCreatePRComment).toHaveBeenCalledWith(
+        'inst-1',
+        'owner',
+        'repo',
+        1,
+        expect.stringContaining('<!-- kilo-review -->'),
+        'standard'
+      );
+      expect(mockCreatePRComment).toHaveBeenCalledWith(
+        'inst-1',
+        'owner',
+        'repo',
+        1,
+        expect.stringContaining('https://app.kilo.ai/code-reviews'),
+        'standard'
+      );
+      expect(mockHasPRCommentWithMarker).not.toHaveBeenCalled();
+    });
+
+    it('updates the canonical GitHub summary when present', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+      mockFindKiloReviewComment.mockResolvedValue({ commentId: 123, body: 'old summary' });
+
+      await POST(
+        makeRequest({ status: 'failed', errorMessage: 'Model not found: kilo/retired-model' }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(mockUpdateKiloReviewComment).toHaveBeenCalledWith(
+        'inst-1',
+        'owner',
+        'repo',
+        123,
+        expect.stringContaining('selected model is no longer available'),
+        'standard'
+      );
+      expect(mockCreatePRComment).not.toHaveBeenCalled();
+    });
+
+    it('creates and updates the canonical GitLab note through the same summary path', async () => {
+      mockGetCodeReviewById.mockResolvedValue(
+        makeReview({ platform: 'gitlab', platform_project_id: 42, check_run_id: null })
+      );
+      mockFindKiloReviewNote.mockResolvedValue(null);
+
+      await POST(
+        makeRequest({ status: 'failed', errorMessage: 'Model not found: kilo/retired-model' }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(mockCreateMRNote).toHaveBeenCalledWith(
+        'mock-token',
+        'owner/repo',
+        1,
+        expect.stringContaining('<!-- kilo-review -->'),
+        'https://gitlab.com'
+      );
+
+      jest.clearAllMocks();
+      mockDbExecute.mockResolvedValue({ rows: [] });
+      mockDbTransaction.mockImplementation(async (callback: MockDbTransactionCallback) =>
+        callback({ execute: mockDbExecute })
+      );
+      mockGetCodeReviewById.mockResolvedValue(
+        makeReview({ platform: 'gitlab', platform_project_id: 42, check_run_id: null })
+      );
+      mockGetLatestCodeReviewAttempt.mockResolvedValue(makeAttempt());
+      mockGetIntegrationById.mockResolvedValue(makeIntegration());
+      mockFindKiloReviewNote.mockResolvedValue({ noteId: 321, body: 'old summary' });
+
+      await POST(
+        makeRequest({ status: 'failed', errorMessage: 'Model not found: kilo/retired-model' }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(mockUpdateKiloReviewNote).toHaveBeenCalledWith(
+        'mock-token',
+        'owner/repo',
+        1,
+        321,
+        expect.stringContaining('https://app.kilo.ai/code-reviews'),
+        'https://gitlab.com'
+      );
+      expect(mockCreateMRNote).not.toHaveBeenCalled();
+    });
+
+    it('serializes summary upserts before parent terminal persistence', async () => {
+      const callOrder: string[] = [];
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+      mockFindKiloReviewComment.mockImplementation(async () => {
+        callOrder.push('find-summary');
+        return null;
+      });
+      mockCreatePRComment.mockImplementation(async () => {
+        callOrder.push('create-summary');
+      });
+      mockUpdateCodeReviewStatus.mockImplementation(async () => {
+        callOrder.push('update-parent');
+      });
+
+      await POST(
+        makeRequest({ status: 'failed', errorMessage: 'Model not found: kilo/retired-model' }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(mockDbExecute).toHaveBeenCalled();
+      expect(callOrder).toEqual(['find-summary', 'create-summary', 'update-parent']);
     });
   });
 

@@ -462,7 +462,7 @@ export async function findKiloReviewComment(
   const octokit = new Octokit({ auth: tokenData.token });
 
   // Fetch all issue comments (PR comments are issue comments in GitHub API)
-  const { data: comments } = await octokit.issues.listComments({
+  const comments = await octokit.paginate(octokit.issues.listComments, {
     owner,
     repo,
     issue_number: prNumber,

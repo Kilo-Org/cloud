@@ -228,12 +228,54 @@ describe('code review alert detectors', () => {
   it('excludes benign terminal reasons from error-spike counts', async () => {
     await insertReviews([
       reviewValues({ status: 'failed', terminal_reason: 'billing' }),
+      reviewValues({ status: 'cancelled', terminal_reason: 'model_not_found' }),
       reviewValues({ status: 'cancelled', terminal_reason: 'user_cancelled' }),
       reviewValues({ status: 'cancelled', terminal_reason: 'superseded' }),
-      ...Array.from({ length: 17 }, () => reviewValues()),
+      ...Array.from({ length: 16 }, () => reviewValues()),
     ]);
 
     await expect(evaluateErrorSpike(db)).resolves.toEqual({ tripped: false });
+  });
+
+  it('excludes legacy model-not-found failed rows from error-spike counts', async () => {
+    await insertReviews([
+      reviewValues({
+        status: 'failed',
+        terminal_reason: null,
+        error_message: 'Model not found: x',
+      }),
+      reviewValues({
+        status: 'failed',
+        terminal_reason: null,
+        error_message: 'model not found: y',
+      }),
+      ...Array.from({ length: 18 }, () => reviewValues()),
+    ]);
+
+    await expect(evaluateErrorSpike(db)).resolves.toEqual({ tripped: false });
+  });
+
+  it('continues counting non-model not-found failures as errors', async () => {
+    await insertReviews([
+      reviewValues({
+        status: 'failed',
+        terminal_reason: null,
+        error_message: 'Repository not found',
+      }),
+      reviewValues({ status: 'failed', terminal_reason: null, error_message: 'Session not found' }),
+      ...Array.from({ length: 18 }, () => reviewValues()),
+    ]);
+
+    await expect(evaluateErrorSpike(db)).resolves.toMatchObject({
+      tripped: true,
+      details: {
+        kind: 'error_spike',
+        startedCount: 20,
+        errorCount: 2,
+        topReason: 'unknown',
+        topReasonCount: 2,
+      },
+    });
   });
 
   it('counts interrupted and cancelled interrupted reviews as error spikes', async () => {

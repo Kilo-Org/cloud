@@ -83,10 +83,14 @@ function createSession(repoExists = false): MockExecutionSession {
   return { exec, gitCheckout } as unknown as MockExecutionSession;
 }
 
-function createSandbox(session: ExecutionSession, repoExists = false): SandboxInstance {
+function createSandbox(
+  session: ExecutionSession,
+  repoExists = false,
+  writeFile = vi.fn().mockResolvedValue(undefined)
+): SandboxInstance {
   return {
     createSession: vi.fn().mockResolvedValue(session),
-    writeFile: vi.fn().mockResolvedValue(undefined),
+    writeFile,
     mkdir: vi.fn().mockResolvedValue(undefined),
     exec: vi.fn(async (command: string) => {
       if (command.includes('test -d') && command.includes('.git')) {
@@ -227,7 +231,8 @@ describe('SessionService.prepareWorkspace', () => {
 
   it('hydrates requested devcontainer metadata while preparing a cold DIND workspace', async () => {
     const session = createSession(false);
-    const sandbox = createSandbox(session);
+    const writeFile = vi.fn().mockResolvedValue(undefined);
+    const sandbox = createSandbox(session, false, writeFile);
     const metadata = {
       ...createMetadata(),
       workspace: {
@@ -277,7 +282,7 @@ describe('SessionService.prepareWorkspace', () => {
       wrapperPort: 4173,
       configPath: '.devcontainer/devcontainer.json',
     });
-    expect(sandbox.writeFile).toHaveBeenCalledWith(
+    expect(writeFile).toHaveBeenCalledWith(
       '/home/agent_test/tmp/kilo-empty-session-kilo-session.json',
       expect.any(String)
     );

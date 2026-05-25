@@ -2,9 +2,9 @@ name: Check markdown table padding
 on:
   pull_request:
     paths:
-      - "**/*.md"
-      - "script/check-md-table-padding.ts"
-      - ".github/workflows/check-md-table-padding.yml"
+      - '**/*.md'
+      - 'script/check-md-table-padding.ts'
+      - '.github/workflows/check-md-table-padding.yml'
   workflow_dispatch:
 jobs:
   check:

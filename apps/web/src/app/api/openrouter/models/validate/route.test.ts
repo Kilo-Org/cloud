@@ -4,8 +4,8 @@ import type { OpenRouterModel } from '@/lib/organizations/organization-types';
 import { getEnhancedOpenRouterModels } from '@/lib/ai-gateway/providers/openrouter';
 import { getUserFromAuth } from '@/lib/user/server';
 import { getDirectByokModelsForUser } from '@/lib/ai-gateway/providers/direct-byok';
-import { getAvailableModelsForOrganization } from '@/lib/organizations/organization-models';
 import { listAvailableExperimentModels } from '@/lib/ai-gateway/experiments/list-available-experiment-models';
+import { ORGANIZATION_ID_HEADER } from '@/lib/constants';
 import { POST } from './route';
 
 jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
@@ -16,9 +16,6 @@ jest.mock('@/lib/ai-gateway/providers/openrouter', () => ({
 jest.mock('@/lib/ai-gateway/providers/direct-byok', () => ({
   getDirectByokModelsForUser: jest.fn(),
 }));
-jest.mock('@/lib/organizations/organization-models', () => ({
-  getAvailableModelsForOrganization: jest.fn(),
-}));
 jest.mock('@/lib/ai-gateway/experiments/list-available-experiment-models', () => ({
   listAvailableExperimentModels: jest.fn(),
 }));
@@ -26,7 +23,6 @@ jest.mock('@/lib/ai-gateway/experiments/list-available-experiment-models', () =>
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
 const mockedGetEnhancedOpenRouterModels = jest.mocked(getEnhancedOpenRouterModels);
 const mockedGetDirectByokModelsForUser = jest.mocked(getDirectByokModelsForUser);
-const mockedGetAvailableModelsForOrganization = jest.mocked(getAvailableModelsForOrganization);
 const mockedListAvailableExperimentModels = jest.mocked(listAvailableExperimentModels);
 
 function makeModel(id: string): OpenRouterModel {
@@ -47,9 +43,10 @@ function makeModel(id: string): OpenRouterModel {
   };
 }
 
-function request(modelId: string) {
+function request(modelId: string, headers?: HeadersInit) {
   return new NextRequest('http://localhost:3000/api/openrouter/models/validate', {
     method: 'POST',
+    headers,
     body: JSON.stringify({ modelId }),
   });
 }
@@ -64,7 +61,6 @@ describe('POST /api/openrouter/models/validate', () => {
     } as never);
     mockedGetEnhancedOpenRouterModels.mockResolvedValue({ data: [makeModel('available/model')] });
     mockedGetDirectByokModelsForUser.mockResolvedValue([]);
-    mockedGetAvailableModelsForOrganization.mockResolvedValue(null);
     mockedListAvailableExperimentModels.mockResolvedValue([]);
   });
 
@@ -93,6 +89,19 @@ describe('POST /api/openrouter/models/validate', () => {
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ valid: true });
+  });
+
+  test('rejects organization-scoped validation through the personal endpoint', async () => {
+    const response = await POST(
+      request('available/model', { [ORGANIZATION_ID_HEADER]: 'organization-id' })
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: 'Organization-scoped validation must use /api/organizations/[id]/models/validate',
+    });
+    expect(mockedGetUserFromAuth).not.toHaveBeenCalled();
+    expect(mockedGetEnhancedOpenRouterModels).not.toHaveBeenCalled();
   });
 
   test('returns a service failure when catalog construction fails', async () => {

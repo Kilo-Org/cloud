@@ -2,8 +2,9 @@ import { NextResponse } from 'next/server';
 import { getUserFromAuth } from '@/lib/user/server';
 import { db } from '@/lib/drizzle';
 import { kilocode_users } from '@kilocode/db';
-import { and, isNull, count, not, or, sql, like } from 'drizzle-orm';
+import { isNull, count, or, sql } from 'drizzle-orm';
 import { normalizeEmail } from '@/lib/utils';
+import { canonicalizeDeletedUserEmail } from '@/lib/user/deleted-email';
 
 export type NormalizedEmailCountsResponse = {
   missing: number;
@@ -14,13 +15,9 @@ export type NormalizedEmailBackfillResponse = {
   remaining: boolean;
 };
 
-// Exclude GDPR-deleted users whose derived email values are intentionally cleared.
-export const normalizedEmailBackfillCandidates = and(
+export const normalizedEmailBackfillCandidates = or(
   isNull(kilocode_users.normalized_email),
-  or(
-    isNull(kilocode_users.blocked_reason),
-    not(like(kilocode_users.blocked_reason, 'soft-deleted at %'))
-  )
+  sql`${kilocode_users.google_user_email} = 'deleted+' || ${kilocode_users.id} || '@deleted.invalid'`
 );
 
 export async function GET(): Promise<
@@ -57,18 +54,23 @@ export async function POST(): Promise<
 
     if (rows.length === 0) break;
 
-    const updates = rows.map(row => ({
-      id: row.id,
-      normalized_email: normalizeEmail(row.google_user_email),
-    }));
+    const updates = rows.map(row => {
+      const email = canonicalizeDeletedUserEmail(row.id, row.google_user_email);
+      return {
+        id: row.id,
+        google_user_email: email,
+        normalized_email: normalizeEmail(email),
+      };
+    });
 
     await db.execute(sql`
       UPDATE ${kilocode_users}
-      SET normalized_email = email_updates.normalized_email
+      SET google_user_email = email_updates.google_user_email,
+          normalized_email = email_updates.normalized_email
       FROM (VALUES ${sql.join(
-        updates.map(u => sql`(${u.id}, ${u.normalized_email})`),
+        updates.map(u => sql`(${u.id}, ${u.google_user_email}, ${u.normalized_email})`),
         sql`, `
-      )}) AS email_updates(id, normalized_email)
+      )}) AS email_updates(id, google_user_email, normalized_email)
       WHERE ${kilocode_users.id} = email_updates.id
     `);
 

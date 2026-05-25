@@ -417,9 +417,9 @@ describe('User', () => {
 
       const softDeleted = await findUserById(user.id);
       expect(softDeleted).toBeDefined();
-      expect(softDeleted!.google_user_email).toBe(`deleted+${user.id}@deleted.invalid`);
-      expect(softDeleted!.normalized_email).toBeNull();
-      expect(softDeleted!.email_domain).toBeNull();
+      expect(softDeleted!.google_user_email).toBe(`deleted-${user.id}@deleted.invalid`);
+      expect(softDeleted!.normalized_email).toBe(`deleted-${user.id}@deleted.invalid`);
+      expect(softDeleted!.email_domain).toBe('deleted.invalid');
       expect(softDeleted!.google_user_name).toBe('Deleted User');
       expect(softDeleted!.google_user_image_url).toBe('');
       expect(softDeleted!.hosted_domain).toBeNull();
@@ -1235,7 +1235,7 @@ describe('User', () => {
       const anonymized = rows.find(row => row.benchEvalName === 'soft-delete-promoter-eval');
       const retained = rows.find(row => row.benchEvalName === 'retained-promoter-eval');
 
-      expect(anonymized?.promoterEmail).toBe(`deleted+${promoter.id}@deleted.invalid`);
+      expect(anonymized?.promoterEmail).toBe(`deleted-${promoter.id}@deleted.invalid`);
       expect(retained?.promoterEmail).toBe(otherPromoter.google_user_email);
     });
 

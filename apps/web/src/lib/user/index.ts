@@ -96,6 +96,7 @@ import {
 } from '@/lib/ai-gateway/providerHash';
 import { normalizeEmail } from '@/lib/utils';
 import { extractEmailDomain } from '@/lib/email-domain';
+import { getDeletedUserEmail } from './deleted-email';
 import { recordAffiliateAttributionAndQueueParentEvent } from '@/lib/impact/affiliate-events';
 import { logImpactReferralDebug } from '@/lib/impact/debug';
 import {
@@ -790,7 +791,7 @@ export class SoftDeletePreconditionError extends Error {
  *   organization_id references the organization — no direct PII)
  *
  * What is scrubbed/deleted:
- * - PII on the user row (email, name, avatar, urls)
+ * - PII on the user row (email replaced with a synthetic tombstone; name, avatar, urls cleared)
  * - user_auth_provider (auth links with email/avatar)
  * - enrichment_data (GitHub/LinkedIn/Clay PII)
  * - user_admin_notes
@@ -891,12 +892,13 @@ export async function softDeleteUser(userId: string) {
     });
 
     // ── 1. Anonymize the user row ────────────────────────────────────────
+    const deletedEmail = getDeletedUserEmail(userId);
     await tx
       .update(kilocode_users)
       .set({
-        google_user_email: `deleted+${userId}@deleted.invalid`,
-        normalized_email: null,
-        email_domain: null,
+        google_user_email: deletedEmail,
+        normalized_email: normalizeEmail(deletedEmail),
+        email_domain: extractEmailDomain(deletedEmail),
         google_user_name: 'Deleted User',
         google_user_image_url: '',
         hosted_domain: null,
@@ -1165,7 +1167,7 @@ export async function softDeleteUser(userId: string) {
 
     await tx
       .update(model_eval_ingestions)
-      .set({ promoted_by_email: `deleted+${userId}@deleted.invalid` })
+      .set({ promoted_by_email: deletedEmail })
       .where(sql`lower(${model_eval_ingestions.promoted_by_email}) = lower(${originalEmail})`);
 
     // Credit campaigns: strip the creator-admin reference. The campaigns
@@ -1211,7 +1213,7 @@ export async function softDeleteUser(userId: string) {
       );
     // Also clear events matched by email directly (covers un-enrolled contributors).
     // Use originalEmail captured before the user row was anonymized — the subquery
-    // would resolve to the already-overwritten deleted+<id>@deleted.invalid address.
+    // would resolve to the already-overwritten synthetic deletion address.
     await tx
       .update(contributor_champion_events)
       .set({ github_author_email: null })

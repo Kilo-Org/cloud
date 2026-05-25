@@ -23,7 +23,9 @@ export type BotUserForToken = {
 const WEBHOOK_BOT_ID_PREFIX = 'bot-webhook';
 const WEBHOOK_BOT_EMAIL_SUFFIX = 'webhook-bot';
 const WEBHOOK_BOT_DISPLAY_NAME = 'Webhook Bot';
-const BOT_EMAIL_DOMAIN = 'kilocode.internal';
+const BOT_EMAIL_HOST = 'kilocode.internal';
+// Matches the web app's extractEmailDomain fallback for the internal host.
+const BOT_EMAIL_DOMAIN = 'kilocode.internal.invalid';
 const BOT_AVATAR_PLACEHOLDER =
   'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDgiIGhlaWdodD0iNDgiIHZpZXdCb3g9IjAgMCA0OCA0OCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48Y2lyY2xlIGN4PSIyNCIgY3k9IjI0IiByPSIyNCIgZmlsbD0iIzY2NjY2NiIvPjwvc3ZnPg==';
 
@@ -32,7 +34,7 @@ export function generateBotUserId(organizationId: string): string {
 }
 
 export function generateBotUserEmail(organizationId: string): string {
-  return `${WEBHOOK_BOT_EMAIL_SUFFIX}-${organizationId}@${BOT_EMAIL_DOMAIN}`;
+  return `${WEBHOOK_BOT_EMAIL_SUFFIX}-${organizationId}@${BOT_EMAIL_HOST}`;
 }
 
 function generateApiTokenPepper(): string {

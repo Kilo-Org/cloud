@@ -33,7 +33,7 @@ describe('emailDomainBackfillCandidates', () => {
     expect(rows.map(r => r.id)).not.toContain(user.id);
   });
 
-  it('excludes soft-deleted users so the GDPR email_domain=null invariant is preserved', async () => {
+  it('does not select newly soft-deleted users because their tombstone domain is stored', async () => {
     const user = await insertTestUser({ email_domain: 'example.com' });
 
     await softDeleteUser(user.id);
@@ -41,7 +41,7 @@ describe('emailDomainBackfillCandidates', () => {
       .select()
       .from(kilocode_users)
       .where(eq(kilocode_users.id, user.id));
-    expect(softDeleted[0].email_domain).toBeNull();
+    expect(softDeleted[0].email_domain).toBe('deleted.invalid');
     expect(softDeleted[0].blocked_reason).toMatch(/^soft-deleted at /);
 
     const rows = await db
@@ -50,6 +50,23 @@ describe('emailDomainBackfillCandidates', () => {
       .where(emailDomainBackfillCandidates);
 
     expect(rows.map(r => r.id)).not.toContain(user.id);
+  });
+
+  it('includes legacy soft-deleted users missing a tombstone domain', async () => {
+    const userId = 'legacy-deleted-user';
+    const user = await insertTestUser({
+      id: userId,
+      google_user_email: `deleted+${userId}@deleted.invalid`,
+      email_domain: null,
+      blocked_reason: 'soft-deleted at 2026-01-15T12:00:00.000Z',
+    });
+
+    const rows = await db
+      .select({ id: kilocode_users.id })
+      .from(kilocode_users)
+      .where(emailDomainBackfillCandidates);
+
+    expect(rows.map(r => r.id)).toContain(user.id);
   });
 
   it('still includes users blocked for other reasons', async () => {

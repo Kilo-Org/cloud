@@ -19,7 +19,6 @@ import {
   buildDirectProvider,
   inferSupportedChatApis,
 } from '@/lib/ai-gateway/experiments/build-direct-provider';
-import { isPublicIdExperimented } from '@/lib/ai-gateway/experiments/membership';
 import {
   pickModelExperimentVariant,
   type AllocationSubject,
@@ -171,10 +170,21 @@ export type GetProviderInput = {
   /** Machine identifier from `x-kilocode-machineid`. Used as the machine-
    *  cohort allocation subject for experiment routing. */
   machineId: string | null;
+  /** Membership snapshot resolved by the route before admission checks. */
+  isExperimentCandidate: boolean;
 };
 
 export async function getProvider(input: GetProviderInput): Promise<GetProviderResult> {
-  const { requestedModel, request, user, organizationId, taskId, clientIp, machineId } = input;
+  const {
+    requestedModel,
+    request,
+    user,
+    organizationId,
+    taskId,
+    clientIp,
+    machineId,
+    isExperimentCandidate,
+  } = input;
 
   const directByokByok = await checkDirectBYOK(user, requestedModel, organizationId);
   if (directByokByok) {
@@ -194,8 +204,7 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
   // Model experiment routing for dedicated preview public ids. Runs before
   // `kilo-internal/...` and the `kiloExclusiveModels` lookup so an
   // experimented public id never falls through to OpenRouter/Vercel.
-  const experimented = await isPublicIdExperimented(requestedModel);
-  if (experimented === true) {
+  if (isExperimentCandidate) {
     const userId = isAnonymousContext(user) ? null : user.id;
     const selection = await pickModelExperimentVariant({
       publicModelId: requestedModel,

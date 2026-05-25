@@ -8,6 +8,7 @@ import {
   mapToUsageStats,
   logMicrodollarUsage,
   processOpenRouterUsage,
+  processTokenData,
   stripNulBytesInPlace,
   toInsertableDbUsageRecord,
 } from './processUsage';
@@ -383,6 +384,7 @@ describe('logMicrodollarUsage', () => {
       editor_name: null,
       machine_id: null,
       user_byok: false,
+      provider_funded: false,
       has_tools: false,
       feature: 'vscode-extension',
       session_id: null,
@@ -510,6 +512,79 @@ describe('logMicrodollarUsage', () => {
     expect(usageRecord?.has_error).toBe(true);
     expect(usageRecord?.model).toBe('openai/gpt-4.1');
     expect(metadataRecord?.has_middle_out_transform).toBe(false);
+  });
+
+  test('zeroes selected provider-funded traffic using the persisted route decision', async () => {
+    const user = await insertTestUser({
+      id: 'test-provider-funded-user',
+      microdollars_used: 2000,
+      google_user_email: 'provider-funded@example.com',
+    });
+    const usageStats: MicrodollarUsageStats = {
+      ...BASE_USAGE_STATS,
+      messageId: 'test-provider-funded-msg',
+      cost_mUsd: 500,
+      cacheDiscount_mUsd: 25,
+      is_byok: false,
+    };
+    const usageContext: MicrodollarUsageContext = {
+      ...createBaseUsageContext(user),
+      requested_model: 'preview/provider-funded-model',
+      provider_funded: true,
+    };
+
+    await processTokenData(usageStats, usageContext);
+
+    const metadataRecord = await db.query.microdollar_usage_metadata.findFirst({
+      where: eq(microdollar_usage_metadata.message_id, 'test-provider-funded-msg'),
+    });
+    const usageRecord = metadataRecord
+      ? await db.query.microdollar_usage.findFirst({
+          where: eq(microdollar_usage.id, metadataRecord.id),
+        })
+      : undefined;
+    const updatedUser = await findUserById(user.id);
+
+    expect(usageRecord?.cost).toBe(0);
+    expect(usageRecord?.cache_discount).toBe(0);
+    expect(metadataRecord?.market_cost).toBe(500);
+    expect(metadataRecord?.is_free).toBe(true);
+    expect(updatedUser?.microdollars_used).toBe(2000);
+  });
+
+  test('bills ordinary traffic without a persisted provider-funded decision', async () => {
+    const user = await insertTestUser({
+      id: 'test-non-funded-preview-user',
+      microdollars_used: 2000,
+      google_user_email: 'non-funded-preview@example.com',
+    });
+    const usageStats: MicrodollarUsageStats = {
+      ...BASE_USAGE_STATS,
+      messageId: 'test-non-funded-preview-msg',
+      cost_mUsd: 500,
+      is_byok: false,
+    };
+    const usageContext: MicrodollarUsageContext = {
+      ...createBaseUsageContext(user),
+      requested_model: 'preview/provider-funded-model',
+      provider_funded: false,
+    };
+
+    await processTokenData(usageStats, usageContext);
+
+    const metadataRecord = await db.query.microdollar_usage_metadata.findFirst({
+      where: eq(microdollar_usage_metadata.message_id, 'test-non-funded-preview-msg'),
+    });
+    const usageRecord = metadataRecord
+      ? await db.query.microdollar_usage.findFirst({
+          where: eq(microdollar_usage.id, metadataRecord.id),
+        })
+      : undefined;
+    const updatedUser = await findUserById(user.id);
+
+    expect(usageRecord?.cost).toBe(500);
+    expect(metadataRecord?.is_free).toBe(false);
+    expect(updatedUser?.microdollars_used).toBe(2500);
   });
 
   test('stores 3 usage records with overlapping data and tests metadata deduplication', async () => {
@@ -943,6 +1018,7 @@ describe('toInsertableDbUsageRecord NUL-byte sanitization', () => {
       editor_name: 'vscode',
       machine_id: 'machine',
       user_byok: false,
+      provider_funded: false,
       has_tools: false,
       feature: null,
       session_id: 'session',

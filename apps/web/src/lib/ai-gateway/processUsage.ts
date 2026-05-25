@@ -132,6 +132,7 @@ export function extractUsageContextInfo(usageContext: MicrodollarUsageContext) {
     api_kind: usageContext.api_kind,
     machine_id: usageContext.machine_id,
     is_user_byok: usageContext.user_byok,
+    provider_funded: usageContext.provider_funded,
     has_tools: usageContext.has_tools,
     feature: usageContext.feature,
     session_id: usageContext.session_id,
@@ -178,8 +179,15 @@ export async function toInsertableDbUsageRecord(
   const id = randomUUID();
   const created_at = new Date().toISOString();
 
-  const { kilo_user_id, organization_id, project_id, provider, ttfb_ms, ...metadataFromContext } =
-    usageContextInfo;
+  const {
+    kilo_user_id,
+    organization_id,
+    project_id,
+    provider,
+    ttfb_ms,
+    provider_funded,
+    ...metadataFromContext
+  } = usageContextInfo;
 
   const core: MicrodollarUsage = {
     id,
@@ -215,7 +223,7 @@ export async function toInsertableDbUsageRecord(
     streamed: usageStats.streamed,
     cancelled: usageStats.cancelled,
     market_cost: usageStats.market_cost ?? null,
-    is_free: await isFreeModel(usageContextInfo.requested_model),
+    is_free: provider_funded || (await isFreeModel(usageContextInfo.requested_model)),
   };
 
   // Legacy heuristic classification removed - abuse_classification is now handled
@@ -1018,16 +1026,20 @@ export async function processTokenData(
     usageStats.cost_mUsd = calculateKiloExclusiveCost_mUsd(kiloExclusiveModel, usageStats);
   }
 
-  // Report upstream cost to abuse service BEFORE zeroing for free/BYOK
+  // Report upstream cost to abuse service BEFORE zeroing for free/BYOK/provider-funded traffic
   // (abuse service needs actual spend for heuristics like free_tier_exhausted)
   reportAbuseCost(usageContext, usageStats).catch(error => {
     console.error('[Abuse] Failed to report cost:', error);
   });
 
-  // Preserve the real cost before zeroing for free/BYOK
+  // Preserve the real cost before zeroing for free/BYOK/provider-funded traffic.
   usageStats.market_cost = usageStats.cost_mUsd;
 
-  if ((await isFreeModel(usageContext.requested_model)) || usageContext.user_byok) {
+  if (
+    usageContext.provider_funded ||
+    (await isFreeModel(usageContext.requested_model)) ||
+    usageContext.user_byok
+  ) {
     usageStats.cost_mUsd = 0;
     usageStats.cacheDiscount_mUsd = 0;
   }
@@ -1048,6 +1060,7 @@ async function useGenerationLookup(
   const isSuccessStatusCode = (usageStats?.status_code ?? 200) < 400;
   const hasOutputTokens = (usageStats?.outputTokens ?? 0) > 0;
   const hasCostWhenPaid =
+    usageContext.provider_funded ||
     (await isFreeModel(usageContext.requested_model)) ||
     usageContext.user_byok ||
     (usageStats?.cost_mUsd ?? 0) > 0;

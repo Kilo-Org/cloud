@@ -114,6 +114,7 @@ describe('isFreeModel', () => {
       expect(await isFreeModel('claude-3.7-sonnet')).toBe(false);
       expect(await isFreeModel('anthropic/claude-sonnet-4')).toBe(false);
       expect(await isFreeModel('google/gemini-2.5-pro')).toBe(false);
+      expect(await isFreeModel('preview/provider-funded-model')).toBe(false);
     });
 
     test('should return false for models with "free" in the middle', async () => {

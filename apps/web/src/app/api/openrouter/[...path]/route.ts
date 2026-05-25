@@ -104,6 +104,19 @@ const MAX_TOKENS_LIMIT = 99999999999; // GPT4.1 default is ~32k
 const PAID_MODEL_AUTH_REQUIRED = 'PAID_MODEL_AUTH_REQUIRED';
 const PROMOTION_MODEL_LIMIT_REACHED = 'PROMOTION_MODEL_LIMIT_REACHED';
 
+function paidModelAuthRequiredResponse() {
+  return NextResponse.json(
+    {
+      error: {
+        code: PAID_MODEL_AUTH_REQUIRED,
+        message: 'You need to sign in to use this model.',
+      },
+      error_type: ProxyErrorType.paid_model_auth_required,
+    },
+    { status: 401 }
+  );
+}
+
 function validatePath(
   url: URL
 ):
@@ -274,14 +287,95 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     );
   }
 
-  // For FREE models: check rate limit, log at start.
-  // Server-side products (cloud-agent, code-review, app-builder) rate-limit
-  // per user when the request comes from Cloudflare IPs (Kilo infrastructure).
-  // All other products rate-limit per IP (fast pre-auth path).
+  // Membership is only a routing eligibility snapshot. A request is not
+  // provider-funded unless provider selection resolves an active variant.
+  const isExperimentCandidate = await isPublicIdExperimented(originalModelIdLowerCased);
+
+  // Now check auth
+  const authSpan = startInactiveSpan({ name: 'auth-check' });
+  const {
+    user: maybeUser,
+    authFailedResponse,
+    organizationId: authOrganizationId,
+    botId: authBotId,
+    tokenSource: authTokenSource,
+  } = await authPromise;
+  authSpan.end();
+
+  let user: typeof maybeUser | AnonymousUserContext;
+  let organizationId: string | undefined = authOrganizationId;
+  let botId: string | undefined = authBotId;
+  let tokenSource: string | undefined = authTokenSource;
+
+  if (authFailedResponse) {
+    // A potential experiment request must reach provider selection before we
+    // know whether this specific request is provider-funded.
+    if (!(await isFreeModel(originalModelIdLowerCased)) && !isExperimentCandidate) {
+      return paidModelAuthRequiredResponse();
+    }
+
+    // Provider selection validates whether a candidate request is actually funded.
+    user = createAnonymousContext(ipAddress);
+    organizationId = undefined;
+    botId = undefined;
+    tokenSource = undefined;
+  } else {
+    user = maybeUser;
+  }
+
+  if (
+    requestBodyParsed.kind === 'responses' &&
+    (requestBodyParsed.body.store || requestBodyParsed.body.previous_response_id)
+  ) {
+    return storeAndPreviousResponseIdIsNotSupported();
+  }
+
+  // Use new shared helper for fraud & project headers
+  const { fraudHeaders, projectId } = extractFraudAndProjectHeaders(request);
+  const providerResult = await getProvider({
+    requestedModel: originalModelIdLowerCased,
+    request: requestBodyParsed,
+    user,
+    organizationId,
+    taskId,
+    clientIp: ipAddress ?? null,
+    machineId: machineIdHeader,
+    isExperimentCandidate,
+  });
+  if (providerResult.kind === 'not-found') {
+    // Paused experiment for this public id — return a local model-unavailable
+    // response instead of silently falling through to default routing.
+    return modelDoesNotExistResponse();
+  }
+  if (providerResult.kind === 'unavailable') {
+    return temporarilyUnavailableResponse();
+  }
+  const {
+    provider,
+    userByok,
+    bypassAccessCheck,
+    skipProviderPin,
+    skipKiloExclusiveModelSettings,
+    experiment,
+  } = providerResult;
+  const providerFunded = experiment !== undefined;
+
+  // A stale experiment-membership hit can allow an anonymous request as far as
+  // provider selection. It does not make ordinary fallback routing free.
+  if (
+    isAnonymousContext(user) &&
+    !providerFunded &&
+    !(await isFreeModel(originalModelIdLowerCased))
+  ) {
+    return paidModelAuthRequiredResponse();
+  }
+
+  // Provider-funded routes join the free-model rate-limiting path only after
+  // provider selection; stale membership cannot rate-limit or log paid fallback traffic.
   const isRateLimitedFreeModelRequest =
     isKiloExclusiveFreeModel(originalModelIdLowerCased) ||
     autoModel === KILO_AUTO_FREE_MODEL.id ||
-    (await isPublicIdExperimented(originalModelIdLowerCased));
+    providerFunded;
   if (isRateLimitedFreeModelRequest) {
     const rateLimit = await resolveRateLimit(feature, ipAddress, authPromise);
     if (rateLimit instanceof NextResponse) return rateLimit;
@@ -302,38 +396,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     }
   }
 
-  // Now check auth
-  const authSpan = startInactiveSpan({ name: 'auth-check' });
-  const {
-    user: maybeUser,
-    authFailedResponse,
-    organizationId: authOrganizationId,
-    botId: authBotId,
-    tokenSource: authTokenSource,
-  } = await authPromise;
-  authSpan.end();
-
-  let user: typeof maybeUser | AnonymousUserContext;
-  let organizationId: string | undefined = authOrganizationId;
-  let botId: string | undefined = authBotId;
-  let tokenSource: string | undefined = authTokenSource;
-
-  if (authFailedResponse) {
-    // No valid auth
-    if (!(await isFreeModel(originalModelIdLowerCased))) {
-      // Paid model requires authentication
-      return NextResponse.json(
-        {
-          error: {
-            code: PAID_MODEL_AUTH_REQUIRED,
-            message: 'You need to sign in to use this model.',
-          },
-          error_type: ProxyErrorType.paid_model_auth_required,
-        },
-        { status: 401 }
-      );
-    }
-
+  if (isAnonymousContext(user)) {
     const promotionLimit = await checkPromotionLimit(ipAddress);
 
     if (!promotionLimit.allowed) {
@@ -357,24 +420,8 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
         { status: 401 } // TODO: Change to 429 once the extension supports it (see kilocode errorUtils.ts)
       );
     }
-
-    // Anonymous access for free model (already rate-limited above)
-    user = createAnonymousContext(ipAddress);
-    organizationId = undefined;
-    botId = undefined;
-    tokenSource = undefined;
-  } else {
-    user = maybeUser;
   }
 
-  if (
-    requestBodyParsed.kind === 'responses' &&
-    (requestBodyParsed.body.store || requestBodyParsed.body.previous_response_id)
-  ) {
-    return storeAndPreviousResponseIdIsNotSupported();
-  }
-
-  // Log to free_model_usage for rate limiting (at request start, before processing)
   if (isRateLimitedFreeModelRequest) {
     await logFreeModelRequest(
       ipAddress,
@@ -382,34 +429,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       isAnonymousContext(user) ? undefined : user.id
     );
   }
-
-  // Use new shared helper for fraud & project headers
-  const { fraudHeaders, projectId } = extractFraudAndProjectHeaders(request);
-  const providerResult = await getProvider({
-    requestedModel: originalModelIdLowerCased,
-    request: requestBodyParsed,
-    user,
-    organizationId,
-    taskId,
-    clientIp: ipAddress ?? null,
-    machineId: machineIdHeader,
-  });
-  if (providerResult.kind === 'not-found') {
-    // Paused experiment for this public id — return a local model-unavailable
-    // response instead of silently falling through to default routing.
-    return modelDoesNotExistResponse();
-  }
-  if (providerResult.kind === 'unavailable') {
-    return temporarilyUnavailableResponse();
-  }
-  const {
-    provider,
-    userByok,
-    bypassAccessCheck,
-    skipProviderPin,
-    skipKiloExclusiveModelSettings,
-    experiment,
-  } = providerResult;
 
   // Request-level data-collection opt-out: a caller can set
   // `provider.data_collection: 'deny'` or `provider.zdr: true` on any
@@ -482,6 +501,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     editor_name: extractHeaderAndLimitLength(request, 'x-kilocode-editorname'),
     machine_id: machineIdHeader,
     user_byok: !!userByok,
+    provider_funded: providerFunded,
     has_tools: (requestBodyParsed.body.tools?.length ?? 0) > 0,
     botId,
     tokenSource,
@@ -499,7 +519,12 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   if (!isAnonymousContext(user) && !bypassAccessCheck) {
     const { balance, settings, plan } = await balanceAndSettingsPromise;
 
-    if (balance <= 0 && !(await isFreeModel(originalModelIdLowerCased)) && !userByok) {
+    if (
+      balance <= 0 &&
+      !providerFunded &&
+      !(await isFreeModel(originalModelIdLowerCased)) &&
+      !userByok
+    ) {
       return await usageLimitExceededResponse(user, balance);
     }
 
@@ -540,8 +565,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   if (experiment) {
     usageContext.modelExperimentVariantVersionId = experiment.variantVersionId;
     usageContext.modelExperimentAllocationSubject = experiment.allocationSubject;
-    // Cost zeroing for experiment traffic is handled by `isFreeModel`, which
-    // returns true for experimented public ids.
   }
 
   sentryRootSpan()?.setAttribute(

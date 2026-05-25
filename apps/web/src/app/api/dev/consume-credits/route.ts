@@ -89,6 +89,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       editor_name: null,
       machine_id: null,
       user_byok: false,
+      provider_funded: false,
       has_tools: false,
       feature: null,
       session_id: null,

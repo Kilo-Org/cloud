@@ -129,6 +129,8 @@ export type MicrodollarUsageContext = {
   machine_id: string | null;
   /** True if user/org is using their own API key - cost should be zeroed out */
   user_byok: boolean;
+  /** True when provider selection routed this request through a provider-funded path. */
+  provider_funded: boolean;
   has_tools: boolean;
   botId?: string;
   tokenSource?: string;

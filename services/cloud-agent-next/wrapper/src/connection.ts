@@ -51,7 +51,7 @@ function permissionCategoryFromProperties(properties: Record<string, unknown>): 
   if (typeof permission !== 'string') return 'unknown';
   const normalized = permission.toLowerCase();
   if (normalized.includes('glab')) return 'bash:glab';
-  if (normalized.includes('gh ')) return 'bash:gh';
+  if (normalized === 'gh' || normalized.includes('gh ')) return 'bash:gh';
   if (normalized.includes('git ')) return 'bash:git';
   if (normalized.includes('bash')) return 'bash';
   if (normalized.includes('edit')) return 'edit';

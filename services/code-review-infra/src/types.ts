@@ -104,6 +104,7 @@ export const InternalStatusResponseSchema = z.object({
     .enum([
       'billing',
       'model_not_found',
+      'model_not_allowed',
       'user_cancelled',
       'superseded',
       'interrupted',

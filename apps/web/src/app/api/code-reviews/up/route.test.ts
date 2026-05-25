@@ -14,6 +14,7 @@ import { eq } from 'drizzle-orm';
 import { GET } from './route';
 
 const REPO = `test-org/code-review-up-${Date.now()}`;
+const MODEL_NOT_ALLOWED_ERROR = 'Not Found: The requested model is not allowed for your team.';
 type CodeReviewInsert = typeof cloud_agent_code_reviews.$inferInsert;
 
 function minutesAgo(minutes: number): string {
@@ -192,15 +193,21 @@ describe('GET /api/code-reviews/up', () => {
     });
   });
 
-  it('returns healthy when model-not-found rows reach the error-spike threshold', async () => {
+  it('returns healthy when model-unavailable rows reach the error-spike threshold', async () => {
     await db.insert(cloud_agent_code_reviews).values([
       reviewValues({ status: 'cancelled', terminal_reason: 'model_not_found' }),
+      reviewValues({ status: 'cancelled', terminal_reason: 'model_not_allowed' }),
       reviewValues({
         status: 'failed',
         terminal_reason: null,
         error_message: 'Model not found: kilo/retired-model',
       }),
-      ...Array.from({ length: 18 }, () => reviewValues()),
+      reviewValues({
+        status: 'failed',
+        terminal_reason: null,
+        error_message: MODEL_NOT_ALLOWED_ERROR,
+      }),
+      ...Array.from({ length: 16 }, () => reviewValues()),
     ]);
 
     const response = await GET(makeRequest('kilo-code-reviews-health-check'));

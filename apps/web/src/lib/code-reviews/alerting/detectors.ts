@@ -58,9 +58,12 @@ const systemFailureSql = sql`(
   status IN ('failed', 'interrupted')
   OR (status = 'cancelled' AND terminal_reason IS NOT NULL)
 )`;
-const modelNotFoundSql = sql`(
+const modelUnavailableSql = sql`(
   COALESCE(terminal_reason, '') = 'model_not_found'
+  OR COALESCE(terminal_reason, '') = 'model_not_allowed'
   OR COALESCE(error_message, '') ILIKE '%model not found%'
+  OR COALESCE(error_message, '') ILIKE '%requested model is not allowed for your team%'
+  OR COALESCE(error_message, '') ILIKE '%model not allowed for your team%'
 )`;
 
 const startedReviewsCteSql = sql`
@@ -140,7 +143,7 @@ export async function evaluateErrorSpike(database: AlertingDb): Promise<CodeRevi
       FROM windowed
       WHERE ${systemFailureSql}
         AND COALESCE(terminal_reason, '') NOT IN ${benignTerminalReasonsSql}
-        AND NOT ${modelNotFoundSql}
+        AND NOT ${modelUnavailableSql}
       GROUP BY 1
       ORDER BY 2 DESC, 1 ASC
       LIMIT 1
@@ -150,7 +153,7 @@ export async function evaluateErrorSpike(database: AlertingDb): Promise<CodeRevi
       COUNT(*) FILTER (
         WHERE ${systemFailureSql}
           AND COALESCE(terminal_reason, '') NOT IN ${benignTerminalReasonsSql}
-          AND NOT ${modelNotFoundSql}
+          AND NOT ${modelUnavailableSql}
       ) AS error_count,
       (SELECT reason FROM top_reason) AS top_reason,
       (SELECT count FROM top_reason) AS top_reason_count

@@ -154,6 +154,7 @@ jest.mock('@/lib/integrations/core/constants', () => ({
 
 const CALLBACK_SECRET = 'test-callback-token-secret';
 const REVIEW_ID = '00000000-0000-0000-0000-000000000001';
+const MODEL_NOT_ALLOWED_ERROR = 'Not Found: The requested model is not allowed for your team.';
 let defaultCallbackToken: string;
 
 function makeRequest(
@@ -526,6 +527,38 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         expect.objectContaining({
           errorMessage: 'Model not found: kilo/retired-model',
           terminalReason: 'model_not_found',
+        })
+      );
+      expect(mockCreateInfraRetryAttemptIfMissing).not.toHaveBeenCalled();
+      expect(mockRetryReviewFresh).not.toHaveBeenCalled();
+    });
+
+    it('reclassifies failed model-not-allowed callbacks as cancelled while preserving the error message', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+      mockFindKiloReviewComment.mockResolvedValue(null);
+
+      const response = await POST(
+        makeRequest({
+          status: 'failed',
+          errorMessage: MODEL_NOT_ALLOWED_ERROR,
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockUpdateCodeReviewAttemptForCallback).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: 'cancelled',
+          errorMessage: MODEL_NOT_ALLOWED_ERROR,
+          terminalReason: 'model_not_allowed',
+        })
+      );
+      expect(mockUpdateCodeReviewStatusIfNonTerminal).toHaveBeenCalledWith(
+        REVIEW_ID,
+        'cancelled',
+        expect.objectContaining({
+          errorMessage: MODEL_NOT_ALLOWED_ERROR,
+          terminalReason: 'model_not_allowed',
         })
       );
       expect(mockCreateInfraRetryAttemptIfMissing).not.toHaveBeenCalled();
@@ -1307,7 +1340,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
     });
   });
 
-  describe('model-not-found provider output', () => {
+  describe('model-unavailable provider output', () => {
     it('updates GitHub check runs with actionable cancelled copy', async () => {
       mockGetCodeReviewById.mockResolvedValue(makeReview());
       mockFindKiloReviewComment.mockResolvedValue(null);
@@ -1353,6 +1386,70 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         expect.objectContaining({
           description: expect.stringContaining('https://app.kilo.ai/code-reviews'),
         }),
+        'https://gitlab.com'
+      );
+    });
+
+    it('updates GitHub check runs and summary with model-not-allowed copy', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+      mockFindKiloReviewComment.mockResolvedValue(null);
+
+      await POST(
+        makeRequest({ status: 'failed', errorMessage: MODEL_NOT_ALLOWED_ERROR }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(mockUpdateCheckRun).toHaveBeenCalledWith(
+        'inst-1',
+        'owner',
+        'repo',
+        12345,
+        expect.objectContaining({
+          status: 'completed',
+          conclusion: 'cancelled',
+          output: expect.objectContaining({
+            title: 'Selected model is not allowed for your team',
+            summary: expect.stringContaining('Choose an allowed model'),
+          }),
+        }),
+        'standard'
+      );
+      expect(mockCreatePRComment).toHaveBeenCalledWith(
+        'inst-1',
+        'owner',
+        'repo',
+        1,
+        expect.stringContaining('selected model is not allowed for your team'),
+        'standard'
+      );
+    });
+
+    it('updates GitLab commit status and summary with model-not-allowed copy', async () => {
+      mockGetCodeReviewById.mockResolvedValue(
+        makeReview({ platform: 'gitlab', platform_project_id: 42, check_run_id: null })
+      );
+      mockFindKiloReviewNote.mockResolvedValue(null);
+
+      await POST(
+        makeRequest({ status: 'failed', errorMessage: MODEL_NOT_ALLOWED_ERROR }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(mockSetCommitStatus).toHaveBeenCalledWith(
+        'mock-token',
+        42,
+        'abc123',
+        'canceled',
+        expect.objectContaining({
+          description: expect.stringContaining('Selected model is not allowed for your team'),
+        }),
+        'https://gitlab.com'
+      );
+      expect(mockCreateMRNote).toHaveBeenCalledWith(
+        'mock-token',
+        'owner/repo',
+        1,
+        expect.stringContaining('selected model is not allowed for your team'),
         'https://gitlab.com'
       );
     });

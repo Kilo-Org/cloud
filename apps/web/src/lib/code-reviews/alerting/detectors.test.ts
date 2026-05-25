@@ -5,6 +5,7 @@ import { eq } from 'drizzle-orm';
 import { evaluateErrorSpike, evaluateSlowReviews } from './detectors';
 
 const REPO = `test-org/code-review-alerts-${Date.now()}`;
+const MODEL_NOT_ALLOWED_ERROR = 'Not Found: The requested model is not allowed for your team.';
 type CodeReviewInsert = typeof cloud_agent_code_reviews.$inferInsert;
 
 function minutesAgo(minutes: number): string {
@@ -229,15 +230,16 @@ describe('code review alert detectors', () => {
     await insertReviews([
       reviewValues({ status: 'failed', terminal_reason: 'billing' }),
       reviewValues({ status: 'cancelled', terminal_reason: 'model_not_found' }),
+      reviewValues({ status: 'cancelled', terminal_reason: 'model_not_allowed' }),
       reviewValues({ status: 'cancelled', terminal_reason: 'user_cancelled' }),
       reviewValues({ status: 'cancelled', terminal_reason: 'superseded' }),
-      ...Array.from({ length: 16 }, () => reviewValues()),
+      ...Array.from({ length: 15 }, () => reviewValues()),
     ]);
 
     await expect(evaluateErrorSpike(db)).resolves.toEqual({ tripped: false });
   });
 
-  it('excludes legacy model-not-found failed rows from error-spike counts', async () => {
+  it('excludes legacy model-unavailable failed rows from error-spike counts', async () => {
     await insertReviews([
       reviewValues({
         status: 'failed',
@@ -249,7 +251,17 @@ describe('code review alert detectors', () => {
         terminal_reason: null,
         error_message: 'model not found: y',
       }),
-      ...Array.from({ length: 18 }, () => reviewValues()),
+      reviewValues({
+        status: 'failed',
+        terminal_reason: null,
+        error_message: MODEL_NOT_ALLOWED_ERROR,
+      }),
+      reviewValues({
+        status: 'failed',
+        terminal_reason: null,
+        error_message: 'Model not allowed for your team.',
+      }),
+      ...Array.from({ length: 16 }, () => reviewValues()),
     ]);
 
     await expect(evaluateErrorSpike(db)).resolves.toEqual({ tripped: false });

@@ -97,6 +97,11 @@ type CloudAgentNextCallbackPayload = {
 
 type StatusUpdatePayload = OrchestratorPayload | CloudAgentNextCallbackPayload;
 
+type ModelUnavailableTerminalReason = Extract<
+  CodeReviewTerminalReason,
+  'model_not_found' | 'model_not_allowed'
+>;
+
 /**
  * Normalize a payload from either the orchestrator or cloud-agent-next callback
  * into the common format expected by the update logic.
@@ -140,12 +145,13 @@ function normalizePayload(raw: StatusUpdatePayload): {
     terminalReason = 'billing';
   }
 
-  if (
-    (raw.status === 'failed' || raw.status === 'interrupted') &&
-    isModelNotFoundCodeReviewTerminalReason(terminalReason, raw.errorMessage)
-  ) {
+  const modelUnavailableTerminalReason = getModelUnavailableCodeReviewTerminalReason(
+    terminalReason,
+    raw.errorMessage
+  );
+  if ((raw.status === 'failed' || raw.status === 'interrupted') && modelUnavailableTerminalReason) {
     status = 'cancelled';
-    terminalReason = 'model_not_found';
+    terminalReason = modelUnavailableTerminalReason;
   }
 
   if (!terminalReason && raw.status === 'interrupted') {
@@ -180,15 +186,26 @@ function isBillingCodeReviewTerminalReason(
   );
 }
 
-function isModelNotFoundCodeReviewTerminalReason(
+function getModelUnavailableCodeReviewTerminalReason(
   terminalReason?: CodeReviewTerminalReason,
   errorMessage?: string | null
-): boolean {
-  if (terminalReason === 'model_not_found') {
-    return true;
+): ModelUnavailableTerminalReason | undefined {
+  if (terminalReason === 'model_not_found' || terminalReason === 'model_not_allowed') {
+    return terminalReason;
   }
 
-  return /\bmodel\s+not\s+found\b/i.test(errorMessage ?? '');
+  const message = errorMessage ?? '';
+  if (/\bmodel\s+not\s+found\b/i.test(message)) {
+    return 'model_not_found';
+  }
+  if (
+    /\brequested\s+model\s+is\s+not\s+allowed\s+for\s+your\s+team\b/i.test(message) ||
+    /\bmodel\s+not\s+allowed\s+for\s+your\s+team\b/i.test(message)
+  ) {
+    return 'model_not_allowed';
+  }
+
+  return undefined;
 }
 
 function isRetryableInfraFailure(
@@ -199,7 +216,7 @@ function isRetryableInfraFailure(
   if (status !== 'failed') return false;
   if (terminalReason === 'billing') return false;
   if (isBillingCodeReviewTerminalReason(terminalReason, errorMessage)) return false;
-  if (isModelNotFoundCodeReviewTerminalReason(terminalReason, errorMessage)) return false;
+  if (getModelUnavailableCodeReviewTerminalReason(terminalReason, errorMessage)) return false;
 
   const message = errorMessage?.toLowerCase();
   if (!message) return false;
@@ -227,17 +244,40 @@ function isSupersededReview(review: CloudAgentCodeReview): boolean {
 }
 
 const BILLING_NOTICE_MARKER = '<!-- kilo-billing-notice -->';
-const MODEL_NOT_FOUND_SUMMARY_URL = 'https://app.kilo.ai/code-reviews';
-const MODEL_NOT_FOUND_CHECK_TITLE = 'Selected model is no longer available';
-const MODEL_NOT_FOUND_STATUS_SUMMARY = `The review did not run because the selected model is no longer available. Choose another model in Kilo Code review settings: ${MODEL_NOT_FOUND_SUMMARY_URL}`;
-const MODEL_NOT_FOUND_GITLAB_DESCRIPTION = `Selected model is no longer available. Choose another model: ${MODEL_NOT_FOUND_SUMMARY_URL}`;
+const MODEL_UNAVAILABLE_SUMMARY_URL = 'https://app.kilo.ai/code-reviews';
 
-const MODEL_NOT_FOUND_SUMMARY_BODY = `<!-- kilo-review -->
+const MODEL_UNAVAILABLE_COPY = {
+  model_not_found: {
+    checkTitle: 'Selected model is no longer available',
+    statusSummary: `The review did not run because the selected model is no longer available. Choose another model in Kilo Code review settings: ${MODEL_UNAVAILABLE_SUMMARY_URL}`,
+    gitlabDescription: `Selected model is no longer available. Choose another model: ${MODEL_UNAVAILABLE_SUMMARY_URL}`,
+    summaryBody: `<!-- kilo-review -->
 ## Code Review Summary
 
 The review did not run because the selected model is no longer available.
 
-Choose another model in Kilo Code review settings: ${MODEL_NOT_FOUND_SUMMARY_URL}`;
+Choose another model in Kilo Code review settings: ${MODEL_UNAVAILABLE_SUMMARY_URL}`,
+  },
+  model_not_allowed: {
+    checkTitle: 'Selected model is not allowed for your team',
+    statusSummary: `The review did not run because the selected model is not allowed for your team. Choose an allowed model in Kilo Code review settings: ${MODEL_UNAVAILABLE_SUMMARY_URL}`,
+    gitlabDescription: `Selected model is not allowed for your team. Choose an allowed model: ${MODEL_UNAVAILABLE_SUMMARY_URL}`,
+    summaryBody: `<!-- kilo-review -->
+## Code Review Summary
+
+The review did not run because the selected model is not allowed for your team.
+
+Choose an allowed model in Kilo Code review settings: ${MODEL_UNAVAILABLE_SUMMARY_URL}`,
+  },
+} satisfies Record<
+  ModelUnavailableTerminalReason,
+  {
+    checkTitle: string;
+    statusSummary: string;
+    gitlabDescription: string;
+    summaryBody: string;
+  }
+>;
 
 const BILLING_NOTICE_BODY = `${BILLING_NOTICE_MARKER}
 **Kilo Code Review could not run — your account is out of credits.**
@@ -340,9 +380,10 @@ function mapStatusToCheckRun(
   const reviewFailed = reviewStatus === 'completed' && gateResult === 'fail';
   const billingFailure =
     reviewStatus === 'failed' && isBillingCodeReviewTerminalReason(terminalReason, errorMessage);
-  const modelNotFoundCancellation =
-    reviewStatus === 'cancelled' &&
-    isModelNotFoundCodeReviewTerminalReason(terminalReason, errorMessage);
+  const modelUnavailableReason =
+    reviewStatus === 'cancelled'
+      ? getModelUnavailableCodeReviewTerminalReason(terminalReason, errorMessage)
+      : undefined;
 
   const conclusionMap: Record<string, CheckRunConclusion> = {
     completed: reviewFailed ? 'failure' : 'success',
@@ -354,8 +395,8 @@ function mapStatusToCheckRun(
     running: 'Kilo Code Review in progress',
     completed: reviewFailed ? 'Kilo Code Review found issues' : 'Kilo Code Review completed',
     failed: billingFailure ? 'Insufficient credits to run review' : 'Kilo Code Review failed',
-    cancelled: modelNotFoundCancellation
-      ? MODEL_NOT_FOUND_CHECK_TITLE
+    cancelled: modelUnavailableReason
+      ? MODEL_UNAVAILABLE_COPY[modelUnavailableReason].checkTitle
       : 'Kilo Code Review cancelled',
   };
 
@@ -369,7 +410,9 @@ function mapStatusToCheckRun(
       : errorMessage
         ? `Review failed: ${errorMessage}`
         : 'Review failed.',
-    cancelled: modelNotFoundCancellation ? MODEL_NOT_FOUND_STATUS_SUMMARY : 'Review was cancelled.',
+    cancelled: modelUnavailableReason
+      ? MODEL_UNAVAILABLE_COPY[modelUnavailableReason].statusSummary
+      : 'Review was cancelled.',
   };
 
   return {
@@ -408,11 +451,14 @@ function getGitLabStatusDescription(
     return 'Kilo Code Review found issues that require attention';
   }
   if (reviewStatus === 'completed') return 'Kilo Code Review completed';
-  if (
-    reviewStatus === 'cancelled' &&
-    isModelNotFoundCodeReviewTerminalReason(terminalReason, errorMessage)
-  ) {
-    return MODEL_NOT_FOUND_GITLAB_DESCRIPTION;
+  if (reviewStatus === 'cancelled') {
+    const modelUnavailableReason = getModelUnavailableCodeReviewTerminalReason(
+      terminalReason,
+      errorMessage
+    );
+    if (modelUnavailableReason) {
+      return MODEL_UNAVAILABLE_COPY[modelUnavailableReason].gitlabDescription;
+    }
   }
   if (reviewStatus === 'cancelled') return 'Kilo Code Review cancelled';
   if (
@@ -429,12 +475,14 @@ function getGitLabStatusDescription(
   return undefined;
 }
 
-async function upsertModelNotFoundSummary(
+async function upsertModelUnavailableSummary(
   review: CloudAgentCodeReview,
   integration: PlatformIntegration,
+  terminalReason: ModelUnavailableTerminalReason,
   gitlabAccessToken?: string
 ): Promise<void> {
   const platform = review.platform || 'github';
+  const summaryBody = MODEL_UNAVAILABLE_COPY[terminalReason].summaryBody;
 
   if (platform === 'github' && integration.platform_installation_id) {
     const [repoOwner, repoName] = review.repo_full_name.split('/');
@@ -453,7 +501,7 @@ async function upsertModelNotFoundSummary(
         repoOwner,
         repoName,
         existing.commentId,
-        MODEL_NOT_FOUND_SUMMARY_BODY,
+        summaryBody,
         appType
       );
     } else {
@@ -462,7 +510,7 @@ async function upsertModelNotFoundSummary(
         repoOwner,
         repoName,
         review.pr_number,
-        MODEL_NOT_FOUND_SUMMARY_BODY,
+        summaryBody,
         appType
       );
     }
@@ -491,7 +539,7 @@ async function upsertModelNotFoundSummary(
         review.repo_full_name,
         review.pr_number,
         existing.noteId,
-        MODEL_NOT_FOUND_SUMMARY_BODY,
+        summaryBody,
         instanceUrl
       );
     } else {
@@ -499,7 +547,7 @@ async function upsertModelNotFoundSummary(
         accessToken,
         review.repo_full_name,
         review.pr_number,
-        MODEL_NOT_FOUND_SUMMARY_BODY,
+        summaryBody,
         instanceUrl
       );
     }
@@ -924,11 +972,11 @@ export async function POST(
           : undefined,
     };
 
-    if (
-      integration &&
-      status === 'cancelled' &&
-      isModelNotFoundCodeReviewTerminalReason(terminalReason, errorMessage)
-    ) {
+    const modelUnavailableReason =
+      status === 'cancelled'
+        ? getModelUnavailableCodeReviewTerminalReason(terminalReason, errorMessage)
+        : undefined;
+    if (integration && modelUnavailableReason) {
       const claimedTerminalUpdate = await updateCodeReviewStatusIfNonTerminal(
         reviewId,
         status,
@@ -946,7 +994,12 @@ export async function POST(
       }
 
       try {
-        await upsertModelNotFoundSummary(review, integration, gitlabAccessToken);
+        await upsertModelUnavailableSummary(
+          review,
+          integration,
+          modelUnavailableReason,
+          gitlabAccessToken
+        );
       } catch (summaryError) {
         logExceptInTest(
           '[code-review-status] Failed to upsert model unavailable summary:',

@@ -13,6 +13,7 @@ import { eq } from 'drizzle-orm';
 const REPO = `test-org/admin-code-review-wait-${Date.now()}`;
 const START_DATE = '2035-01-01T00:00:00.000Z';
 const END_DATE = '2035-01-20T00:00:00.000Z';
+const MODEL_NOT_ALLOWED_ERROR = 'Not Found: The requested model is not allowed for your team.';
 
 type ReviewOwner = { type: 'user'; id: string } | { type: 'org'; id: string };
 type FilterInput = {
@@ -361,6 +362,19 @@ describe('adminCodeReviewsRouter', () => {
       reviewValues({
         owner,
         status: 'failed',
+        createdAt: timestamp(715),
+        errorMessage: MODEL_NOT_ALLOWED_ERROR,
+      }),
+      reviewValues({
+        owner,
+        status: 'cancelled',
+        createdAt: timestamp(718),
+        terminalReason: 'model_not_allowed',
+        errorMessage: MODEL_NOT_ALLOWED_ERROR,
+      }),
+      reviewValues({
+        owner,
+        status: 'failed',
         createdAt: timestamp(720),
         terminalReason: 'timeout',
         errorMessage: 'Execution timed out',
@@ -377,24 +391,30 @@ describe('adminCodeReviewsRouter', () => {
       ...filterInput(),
       errorMessage: 'Model not found: kilo/retired-model',
     });
+    const modelAllowedSessions = await caller.admin.codeReviews.getErrorSessions({
+      ...filterInput(),
+      errorMessage: MODEL_NOT_ALLOWED_ERROR,
+    });
     const segmentation = await caller.admin.codeReviews.getUserSegmentation(filterInput());
 
     expect(overview).toMatchObject({
-      totalReviews: 4,
+      totalReviews: 6,
       completedCount: 1,
       failedCount: 1,
-      cancelledCount: 2,
+      cancelledCount: 4,
     });
-    expect(daily[0]).toMatchObject({ completed: 1, failed: 1, cancelled: 2 });
+    expect(daily[0]).toMatchObject({ completed: 1, failed: 1, cancelled: 4 });
     expect(cancellations).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ reason: 'Model no longer available', count: 2 }),
+        expect.objectContaining({ reason: 'Model not allowed for team', count: 2 }),
       ])
     );
     expect(errors.details).toEqual([
       expect.objectContaining({ errorType: 'Execution timed out', count: 1 }),
     ]);
     expect(modelSessions).toEqual([]);
+    expect(modelAllowedSessions).toEqual([]);
     expect(segmentation.ownershipBreakdown[0]).toMatchObject({ failed: 1 });
   });
 
@@ -436,6 +456,25 @@ describe('adminCodeReviewsRouter', () => {
         code_review_id: review.id,
         attempt_number: 3,
         status: 'failed',
+        error_message: MODEL_NOT_ALLOWED_ERROR,
+        created_at: timestamp(706),
+        started_at: timestamp(706),
+        completed_at: timestamp(706),
+      },
+      {
+        code_review_id: review.id,
+        attempt_number: 4,
+        status: 'cancelled',
+        terminal_reason: 'model_not_allowed',
+        error_message: MODEL_NOT_ALLOWED_ERROR,
+        created_at: timestamp(706),
+        started_at: timestamp(706),
+        completed_at: timestamp(706),
+      },
+      {
+        code_review_id: review.id,
+        attempt_number: 5,
+        status: 'failed',
         terminal_reason: 'timeout',
         error_message: 'Execution timed out',
         created_at: timestamp(707),
@@ -444,7 +483,7 @@ describe('adminCodeReviewsRouter', () => {
       },
       {
         code_review_id: review.id,
-        attempt_number: 4,
+        attempt_number: 6,
         status: 'completed',
         created_at: timestamp(710),
         started_at: timestamp(711),
@@ -462,24 +501,30 @@ describe('adminCodeReviewsRouter', () => {
       ...input,
       errorMessage: 'Model not found: kilo/retired-model',
     });
+    const modelAllowedSessions = await caller.admin.codeReviews.getErrorSessions({
+      ...input,
+      errorMessage: MODEL_NOT_ALLOWED_ERROR,
+    });
     const segmentation = await caller.admin.codeReviews.getUserSegmentation(input);
 
     expect(overview).toMatchObject({
-      totalReviews: 4,
+      totalReviews: 6,
       completedCount: 1,
       failedCount: 1,
-      cancelledCount: 2,
+      cancelledCount: 4,
     });
-    expect(daily[0]).toMatchObject({ completed: 1, failed: 1, cancelled: 2 });
+    expect(daily[0]).toMatchObject({ completed: 1, failed: 1, cancelled: 4 });
     expect(cancellations).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ reason: 'Model no longer available', count: 2 }),
+        expect.objectContaining({ reason: 'Model not allowed for team', count: 2 }),
       ])
     );
     expect(errors.details).toEqual([
       expect.objectContaining({ errorType: 'Execution timed out', count: 1 }),
     ]);
     expect(modelSessions).toEqual([]);
+    expect(modelAllowedSessions).toEqual([]);
     expect(segmentation.ownershipBreakdown[0]).toMatchObject({ failed: 1 });
   });
 

@@ -46,6 +46,21 @@ const isModelNotFoundAttempt = sql`(
   OR ${cloud_agent_code_review_attempts.error_message} ILIKE '%model not found%'
 )`;
 
+const isModelNotAllowed = sql`(
+  ${cloud_agent_code_reviews.terminal_reason} = 'model_not_allowed'
+  OR ${cloud_agent_code_reviews.error_message} ILIKE '%requested model is not allowed for your team%'
+  OR ${cloud_agent_code_reviews.error_message} ILIKE '%model not allowed for your team%'
+)`;
+
+const isModelNotAllowedAttempt = sql`(
+  ${cloud_agent_code_review_attempts.terminal_reason} = 'model_not_allowed'
+  OR ${cloud_agent_code_review_attempts.error_message} ILIKE '%requested model is not allowed for your team%'
+  OR ${cloud_agent_code_review_attempts.error_message} ILIKE '%model not allowed for your team%'
+)`;
+
+const isModelUnavailable = sql`(${isModelNotFound} OR ${isModelNotAllowed})`;
+const isModelUnavailableAttempt = sql`(${isModelNotFoundAttempt} OR ${isModelNotAllowedAttempt})`;
+
 /**
  * SQL condition to exclude billing errors from failure metrics.
  * Uses COALESCE to handle NULL error_message (NULL NOT LIKE returns NULL, not TRUE).
@@ -62,11 +77,17 @@ const excludeBillingAttemptErrors = sql`COALESCE(${cloud_agent_code_review_attem
   AND COALESCE(${cloud_agent_code_review_attempts.error_message}, '') NOT ILIKE '%add credits%'
   AND COALESCE(${cloud_agent_code_review_attempts.error_message}, '') NOT ILIKE '%Credits Required%'`;
 
-const excludeModelNotFound = sql`COALESCE(${cloud_agent_code_reviews.terminal_reason}, '') <> 'model_not_found'
-  AND COALESCE(${cloud_agent_code_reviews.error_message}, '') NOT ILIKE '%model not found%'`;
+const excludeModelUnavailableReview = sql`COALESCE(${cloud_agent_code_reviews.terminal_reason}, '') <> 'model_not_found'
+  AND COALESCE(${cloud_agent_code_reviews.terminal_reason}, '') <> 'model_not_allowed'
+  AND COALESCE(${cloud_agent_code_reviews.error_message}, '') NOT ILIKE '%model not found%'
+  AND COALESCE(${cloud_agent_code_reviews.error_message}, '') NOT ILIKE '%requested model is not allowed for your team%'
+  AND COALESCE(${cloud_agent_code_reviews.error_message}, '') NOT ILIKE '%model not allowed for your team%'`;
 
-const excludeModelNotFoundAttempt = sql`COALESCE(${cloud_agent_code_review_attempts.terminal_reason}, '') <> 'model_not_found'
-  AND COALESCE(${cloud_agent_code_review_attempts.error_message}, '') NOT ILIKE '%model not found%'`;
+const excludeModelUnavailableAttempt = sql`COALESCE(${cloud_agent_code_review_attempts.terminal_reason}, '') <> 'model_not_found'
+  AND COALESCE(${cloud_agent_code_review_attempts.terminal_reason}, '') <> 'model_not_allowed'
+  AND COALESCE(${cloud_agent_code_review_attempts.error_message}, '') NOT ILIKE '%model not found%'
+  AND COALESCE(${cloud_agent_code_review_attempts.error_message}, '') NOT ILIKE '%requested model is not allowed for your team%'
+  AND COALESCE(${cloud_agent_code_review_attempts.error_message}, '') NOT ILIKE '%model not allowed for your team%'`;
 
 /**
  * Categorize error messages into high-level buckets via SQL CASE WHEN.
@@ -298,10 +319,10 @@ export const adminCodeReviewsRouter = createTRPCRouter({
         : excludeBillingErrors;
     const excludeModelUnavailable =
       input.retryAccountingMode === 'all_attempts'
-        ? excludeModelNotFoundAttempt
-        : excludeModelNotFound;
+        ? excludeModelUnavailableAttempt
+        : excludeModelUnavailableReview;
     const modelUnavailable =
-      input.retryAccountingMode === 'all_attempts' ? isModelNotFoundAttempt : isModelNotFound;
+      input.retryAccountingMode === 'all_attempts' ? isModelUnavailableAttempt : isModelUnavailable;
     const durationStartedAt =
       input.retryAccountingMode === 'all_attempts'
         ? cloud_agent_code_review_attempts.started_at
@@ -416,10 +437,10 @@ export const adminCodeReviewsRouter = createTRPCRouter({
         : excludeBillingErrors;
     const excludeModelUnavailable =
       input.retryAccountingMode === 'all_attempts'
-        ? excludeModelNotFoundAttempt
-        : excludeModelNotFound;
+        ? excludeModelUnavailableAttempt
+        : excludeModelUnavailableReview;
     const modelUnavailable =
-      input.retryAccountingMode === 'all_attempts' ? isModelNotFoundAttempt : isModelNotFound;
+      input.retryAccountingMode === 'all_attempts' ? isModelUnavailableAttempt : isModelUnavailable;
 
     const query = db
       .select({
@@ -471,7 +492,7 @@ export const adminCodeReviewsRouter = createTRPCRouter({
         : cloud_agent_code_reviews;
 
     const modelUnavailable =
-      input.retryAccountingMode === 'all_attempts' ? isModelNotFoundAttempt : isModelNotFound;
+      input.retryAccountingMode === 'all_attempts' ? isModelUnavailableAttempt : isModelUnavailable;
 
     const conditions = [
       sql`(${statusTable.status} = 'cancelled' OR (${statusTable.status} = 'failed' AND ${modelUnavailable}))`,
@@ -479,6 +500,7 @@ export const adminCodeReviewsRouter = createTRPCRouter({
     ] as SQL[];
 
     const cancellationReasonExpr = sql<string>`CASE
+      WHEN ${statusTable.terminal_reason} = 'model_not_allowed' OR ${statusTable.error_message} ILIKE '%requested model is not allowed for your team%' OR ${statusTable.error_message} ILIKE '%model not allowed for your team%' THEN 'Model not allowed for team'
       WHEN ${statusTable.terminal_reason} = 'model_not_found' OR ${statusTable.error_message} ILIKE '%model not found%' THEN 'Model no longer available'
       WHEN ${statusTable.terminal_reason} = 'superseded' OR ${statusTable.error_message} ILIKE '%superseded%' THEN 'Superseded by new commit'
       WHEN ${statusTable.error_message} ILIKE '%stream timeout%' THEN 'Stream timeout'
@@ -540,8 +562,8 @@ export const adminCodeReviewsRouter = createTRPCRouter({
         : excludeBillingErrors;
     const excludeModelUnavailable =
       input.retryAccountingMode === 'all_attempts'
-        ? excludeModelNotFoundAttempt
-        : excludeModelNotFound;
+        ? excludeModelUnavailableAttempt
+        : excludeModelUnavailableReview;
 
     const conditions = [
       eq(statusTable.status, 'failed'),
@@ -637,8 +659,8 @@ export const adminCodeReviewsRouter = createTRPCRouter({
         : excludeBillingErrors;
     const excludeModelUnavailable =
       input.retryAccountingMode === 'all_attempts'
-        ? excludeModelNotFoundAttempt
-        : excludeModelNotFound;
+        ? excludeModelUnavailableAttempt
+        : excludeModelUnavailableReview;
 
     const conditions = [
       eq(statusTable.status, 'failed'),
@@ -726,8 +748,8 @@ export const adminCodeReviewsRouter = createTRPCRouter({
         : excludeBillingErrors;
     const excludeModelUnavailable =
       input.retryAccountingMode === 'all_attempts'
-        ? excludeModelNotFoundAttempt
-        : excludeModelNotFound;
+        ? excludeModelUnavailableAttempt
+        : excludeModelUnavailableReview;
     const waitCondition =
       input.retryAccountingMode === 'all_attempts'
         ? validAttemptStartedWaitCondition

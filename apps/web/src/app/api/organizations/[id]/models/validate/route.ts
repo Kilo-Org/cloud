@@ -4,7 +4,6 @@ import * as z from 'zod';
 import { handleTRPCRequest } from '@/lib/trpc-route-handler';
 import { FEATURE_HEADER, validateFeatureHeader } from '@/lib/feature-detection';
 import { filterByFeature } from '@/lib/ai-gateway/models';
-import { isKiloAgentModelAvailable } from '@/lib/ai-gateway/validate-kilo-agent-model.server';
 
 const BodySchema = z.object({ modelId: z.string().trim().min(1) });
 
@@ -34,9 +33,8 @@ export async function POST(
 
   return handleTRPCRequest<ValidationResult>(request, async caller => {
     const result = await caller.organizations.settings.listAvailableModels({ organizationId });
-    const available = isKiloAgentModelAvailable(
-      bodyResult.data.modelId,
-      filterByFeature(result.data, feature)
+    const available = filterByFeature(result.data, feature).some(
+      model => model.id === bodyResult.data.modelId
     );
     return available ? { valid: true } : { valid: false, reason: 'unavailable' };
   });

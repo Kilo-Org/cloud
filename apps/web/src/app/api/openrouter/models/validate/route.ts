@@ -9,7 +9,6 @@ import { FEATURE_HEADER, validateFeatureHeader } from '@/lib/feature-detection';
 import { ORGANIZATION_ID_HEADER } from '@/lib/constants';
 import { filterByFeature } from '@/lib/ai-gateway/models';
 import { listAvailableExperimentModels } from '@/lib/ai-gateway/experiments/list-available-experiment-models';
-import { isKiloAgentModelAvailable } from '@/lib/ai-gateway/validate-kilo-agent-model.server';
 
 const BodySchema = z.object({ modelId: z.string().trim().min(1) });
 
@@ -54,10 +53,10 @@ export async function POST(request: NextRequest) {
     }
     const byokModels = auth?.user ? await getDirectByokModelsForUser(auth.user.id) : [];
     const experimentModels = await listAvailableExperimentModels();
-    const available = isKiloAgentModelAvailable(
-      bodyResult.data.modelId,
-      filterByFeature(models.data.concat(byokModels, experimentModels), feature)
-    );
+    const available = filterByFeature(
+      models.data.concat(byokModels, experimentModels),
+      feature
+    ).some(model => model.id === bodyResult.data.modelId);
     return NextResponse.json(available ? { valid: true } : { valid: false, reason: 'unavailable' });
   } catch (error) {
     captureException(error, {

@@ -287,9 +287,12 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     );
   }
 
-  // Membership is only a routing eligibility snapshot. A request is not
-  // provider-funded unless provider selection resolves an active variant.
-  const isExperimentCandidate = await isPublicIdExperimented(originalModelIdLowerCased);
+  // Capture model classification once; provider selection may additionally
+  // make this specific request free by resolving a funded experiment route.
+  const [isExperimentCandidate, isIntrinsicallyFreeModel] = await Promise.all([
+    isPublicIdExperimented(originalModelIdLowerCased),
+    isFreeModel(originalModelIdLowerCased),
+  ]);
 
   // Now check auth
   const authSpan = startInactiveSpan({ name: 'auth-check' });
@@ -310,7 +313,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   if (authFailedResponse) {
     // A potential experiment request must reach provider selection before we
     // know whether this specific request is provider-funded.
-    if (!(await isFreeModel(originalModelIdLowerCased)) && !isExperimentCandidate) {
+    if (!isIntrinsicallyFreeModel && !isExperimentCandidate) {
       return paidModelAuthRequiredResponse();
     }
 
@@ -359,14 +362,11 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     experiment,
   } = providerResult;
   const providerFunded = experiment !== undefined;
+  const isFreeRequest = isIntrinsicallyFreeModel || providerFunded;
 
   // A stale experiment-membership hit can allow an anonymous request as far as
   // provider selection. It does not make ordinary fallback routing free.
-  if (
-    isAnonymousContext(user) &&
-    !providerFunded &&
-    !(await isFreeModel(originalModelIdLowerCased))
-  ) {
+  if (isAnonymousContext(user) && !isFreeRequest) {
     return paidModelAuthRequiredResponse();
   }
 
@@ -501,7 +501,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     editor_name: extractHeaderAndLimitLength(request, 'x-kilocode-editorname'),
     machine_id: machineIdHeader,
     user_byok: !!userByok,
-    provider_funded: providerFunded,
+    is_free: isFreeRequest,
     has_tools: (requestBodyParsed.body.tools?.length ?? 0) > 0,
     botId,
     tokenSource,
@@ -519,12 +519,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   if (!isAnonymousContext(user) && !bypassAccessCheck) {
     const { balance, settings, plan } = await balanceAndSettingsPromise;
 
-    if (
-      balance <= 0 &&
-      !providerFunded &&
-      !(await isFreeModel(originalModelIdLowerCased)) &&
-      !userByok
-    ) {
+    if (balance <= 0 && !isFreeRequest && !userByok) {
       return await usageLimitExceededResponse(user, balance);
     }
 

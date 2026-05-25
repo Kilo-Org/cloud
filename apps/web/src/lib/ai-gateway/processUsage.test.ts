@@ -384,7 +384,7 @@ describe('logMicrodollarUsage', () => {
       editor_name: null,
       machine_id: null,
       user_byok: false,
-      provider_funded: false,
+      is_free: false,
       has_tools: false,
       feature: 'vscode-extension',
       session_id: null,
@@ -530,7 +530,7 @@ describe('logMicrodollarUsage', () => {
     const usageContext: MicrodollarUsageContext = {
       ...createBaseUsageContext(user),
       requested_model: 'preview/provider-funded-model',
-      provider_funded: true,
+      is_free: true,
     };
 
     await processTokenData(usageStats, usageContext);
@@ -567,7 +567,7 @@ describe('logMicrodollarUsage', () => {
     const usageContext: MicrodollarUsageContext = {
       ...createBaseUsageContext(user),
       requested_model: 'preview/provider-funded-model',
-      provider_funded: false,
+      is_free: false,
     };
 
     await processTokenData(usageStats, usageContext);
@@ -1018,7 +1018,7 @@ describe('toInsertableDbUsageRecord NUL-byte sanitization', () => {
       editor_name: 'vscode',
       machine_id: 'machine',
       user_byok: false,
-      provider_funded: false,
+      is_free: false,
       has_tools: false,
       feature: null,
       session_id: 'session',

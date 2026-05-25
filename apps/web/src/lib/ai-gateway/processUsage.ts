@@ -22,7 +22,6 @@ import { sentryRootSpan } from '../getRootSpan';
 import { ingestOrganizationTokenUsage } from '@/lib/organizations/organization-usage';
 import type { ProviderId } from '@/lib/ai-gateway/providers/types';
 import { findKiloExclusiveModel, isKiloStealthModel } from '@/lib/ai-gateway/models';
-import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
 import { sentryLogger } from '@/lib/utils.server';
 import { maybeIssueKiloPassBonusFromUsageThreshold } from '@/lib/kilo-pass/usage-triggered-bonus';
 import { getEffectiveKiloPassThreshold } from '@/lib/kilo-pass/threshold';
@@ -132,7 +131,7 @@ export function extractUsageContextInfo(usageContext: MicrodollarUsageContext) {
     api_kind: usageContext.api_kind,
     machine_id: usageContext.machine_id,
     is_user_byok: usageContext.user_byok,
-    provider_funded: usageContext.provider_funded,
+    is_free: usageContext.is_free,
     has_tools: usageContext.has_tools,
     feature: usageContext.feature,
     session_id: usageContext.session_id,
@@ -185,7 +184,7 @@ export async function toInsertableDbUsageRecord(
     project_id,
     provider,
     ttfb_ms,
-    provider_funded,
+    is_free,
     ...metadataFromContext
   } = usageContextInfo;
 
@@ -223,7 +222,7 @@ export async function toInsertableDbUsageRecord(
     streamed: usageStats.streamed,
     cancelled: usageStats.cancelled,
     market_cost: usageStats.market_cost ?? null,
-    is_free: provider_funded || (await isFreeModel(usageContextInfo.requested_model)),
+    is_free,
   };
 
   // Legacy heuristic classification removed - abuse_classification is now handled
@@ -1026,20 +1025,16 @@ export async function processTokenData(
     usageStats.cost_mUsd = calculateKiloExclusiveCost_mUsd(kiloExclusiveModel, usageStats);
   }
 
-  // Report upstream cost to abuse service BEFORE zeroing for free/BYOK/provider-funded traffic
+  // Report upstream cost to abuse service BEFORE zeroing for free/BYOK traffic
   // (abuse service needs actual spend for heuristics like free_tier_exhausted)
   reportAbuseCost(usageContext, usageStats).catch(error => {
     console.error('[Abuse] Failed to report cost:', error);
   });
 
-  // Preserve the real cost before zeroing for free/BYOK/provider-funded traffic.
+  // Preserve the real cost before zeroing for free/BYOK traffic.
   usageStats.market_cost = usageStats.cost_mUsd;
 
-  if (
-    usageContext.provider_funded ||
-    (await isFreeModel(usageContext.requested_model)) ||
-    usageContext.user_byok
-  ) {
+  if (usageContext.is_free || usageContext.user_byok) {
     usageStats.cost_mUsd = 0;
     usageStats.cacheDiscount_mUsd = 0;
   }
@@ -1060,10 +1055,7 @@ async function useGenerationLookup(
   const isSuccessStatusCode = (usageStats?.status_code ?? 200) < 400;
   const hasOutputTokens = (usageStats?.outputTokens ?? 0) > 0;
   const hasCostWhenPaid =
-    usageContext.provider_funded ||
-    (await isFreeModel(usageContext.requested_model)) ||
-    usageContext.user_byok ||
-    (usageStats?.cost_mUsd ?? 0) > 0;
+    usageContext.is_free || usageContext.user_byok || (usageStats?.cost_mUsd ?? 0) > 0;
   return isGatewayProvider && isSuccessStatusCode && (!hasOutputTokens || !hasCostWhenPaid);
 }
 

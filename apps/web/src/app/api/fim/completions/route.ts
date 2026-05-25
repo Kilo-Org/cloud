@@ -158,6 +158,7 @@ export async function POST(request: NextRequest) {
   const userByok = organizationId
     ? await getBYOKforOrganization(readDb, organizationId, [byokProviderKey])
     : await getBYOKforUser(readDb, user.id, [byokProviderKey]);
+  const isFreeRequest = await isFreeModel(requestBody.model);
 
   const usageContext: MicrodollarUsageContext = {
     api_kind: 'fim_completions',
@@ -177,7 +178,7 @@ export async function POST(request: NextRequest) {
     editor_name: extractHeaderAndLimitLength(request, 'x-kilocode-editorname'),
     machine_id: extractHeaderAndLimitLength(request, 'x-kilocode-machineid'),
     user_byok: !!userByok,
-    provider_funded: false,
+    is_free: isFreeRequest,
     has_tools: false,
     feature: validateFeatureHeader(request.headers.get(FEATURE_HEADER)),
     session_id: taskId ?? null,
@@ -191,7 +192,7 @@ export async function POST(request: NextRequest) {
   // slight replication lag, and provides lower latency for US users
   const { balance, settings, plan } = await getBalanceAndOrgSettings(organizationId, user, readDb);
 
-  if (balance <= 0 && !(await isFreeModel(requestBody.model)) && !userByok) {
+  if (balance <= 0 && !isFreeRequest && !userByok) {
     return NextResponse.json(
       {
         error: { message: 'Insufficient credits' },

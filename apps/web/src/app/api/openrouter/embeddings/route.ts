@@ -102,6 +102,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   const requestedModel = requestBodyParsed.model.trim();
   const requestedModelLowerCased = requestedModel.toLowerCase();
+  const isFreeRequest = await isFreeModel(requestedModelLowerCased);
 
   // Extract IP for all requests (needed for free model rate limiting)
   const ipAddress = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
@@ -132,7 +133,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   const tokenSource: string | undefined = authTokenSource;
 
   if (authFailedResponse) {
-    if (!(await isFreeModel(requestedModelLowerCased))) {
+    if (!isFreeRequest) {
       return NextResponse.json(
         {
           error: {
@@ -183,7 +184,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     editor_name: extractHeaderAndLimitLength(request, 'x-kilocode-editorname'),
     machine_id: extractHeaderAndLimitLength(request, 'x-kilocode-machineid'),
     user_byok: !!userByok,
-    provider_funded: false,
+    is_free: isFreeRequest,
     has_tools: false,
     botId,
     tokenSource,
@@ -200,7 +201,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   if (!isAnonymousContext(user)) {
     const { balance, settings, plan } = await getBalanceAndOrgSettings(organizationId, user);
 
-    if (balance <= 0 && !(await isFreeModel(requestedModelLowerCased)) && !userByok) {
+    if (balance <= 0 && !isFreeRequest && !userByok) {
       return await usageLimitExceededResponse(user, balance);
     }
 

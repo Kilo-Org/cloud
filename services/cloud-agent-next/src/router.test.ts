@@ -17,6 +17,18 @@ const { getSandboxIdForSessionMock, metadataMock } = vi.hoisted(() => ({
   metadataMock: vi.fn(),
 }));
 
+const { preflightExistingPromptModelMock, preflightPreparedInitialPromptModelMock } = vi.hoisted(
+  () => ({
+    preflightExistingPromptModelMock: vi.fn(),
+    preflightPreparedInitialPromptModelMock: vi.fn(),
+  })
+);
+
+vi.mock('./session/model-preflight.js', () => ({
+  preflightExistingPromptModel: preflightExistingPromptModelMock,
+  preflightPreparedInitialPromptModel: preflightPreparedInitialPromptModelMock,
+}));
+
 vi.mock('./session-service.js', () => ({
   generateSessionId: vi.fn(() => 'agent_12345678-1234-1234-1234-123456789abc'),
   fetchSessionMetadata: vi.fn(),
@@ -1539,6 +1551,13 @@ describe('legacy V2 execution response compatibility', () => {
   const validSessionId = 'agent_12345678-1234-1234-1234-123456789abc';
   const acceptedMessageId = 'msg_018f1e2d3c4bAbCdEfGhIjKlMn';
 
+  beforeEach(() => {
+    preflightExistingPromptModelMock.mockReset();
+    preflightPreparedInitialPromptModelMock.mockReset();
+    preflightExistingPromptModelMock.mockResolvedValue(undefined);
+    preflightPreparedInitialPromptModelMock.mockResolvedValue(undefined);
+  });
+
   function createLegacyExecutionCaller() {
     const admitPreparedInitialMessage = vi.fn().mockResolvedValue({
       success: true,
@@ -1583,6 +1602,18 @@ describe('legacy V2 execution response compatibility', () => {
     expect(result.executionId).toBe(acceptedMessageId);
   });
 
+  it('rejects unavailable prepared prompt models before initial admission', async () => {
+    const { caller, admitPreparedInitialMessage } = createLegacyExecutionCaller();
+    preflightPreparedInitialPromptModelMock.mockRejectedValue(
+      new TRPCError({ code: 'BAD_REQUEST', message: 'Selected model is not available' })
+    );
+
+    await expect(
+      caller.initiateFromKilocodeSessionV2({ cloudAgentSessionId: validSessionId })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    expect(admitPreparedInitialMessage).not.toHaveBeenCalled();
+  });
+
   it('sendMessageV2 preserves sent delivery when a runtime-accepted admission is replayed', async () => {
     const { caller, admitSubmittedMessage } = createLegacyExecutionCaller();
     admitSubmittedMessage.mockResolvedValue({
@@ -1619,6 +1650,38 @@ describe('legacy V2 execution response compatibility', () => {
 
     expect(result.messageId).toBe(acceptedMessageId);
     expect(result.executionId).toBe(acceptedMessageId);
+  });
+
+  it('rejects unavailable prompt sends before V2 message admission', async () => {
+    const { caller, admitSubmittedMessage } = createLegacyExecutionCaller();
+    preflightExistingPromptModelMock.mockRejectedValue(
+      new TRPCError({ code: 'BAD_REQUEST', message: 'Selected model is not available' })
+    );
+
+    await expect(
+      caller.sendMessageV2({
+        cloudAgentSessionId: validSessionId,
+        prompt: 'follow up',
+        mode: 'code',
+        model: 'missing/model',
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    expect(admitSubmittedMessage).not.toHaveBeenCalled();
+  });
+
+  it('rejects unavailable unified prompt sends before message admission', async () => {
+    const { caller, admitSubmittedMessage } = createLegacyExecutionCaller();
+    preflightExistingPromptModelMock.mockRejectedValue(
+      new TRPCError({ code: 'BAD_REQUEST', message: 'Selected model is not available' })
+    );
+
+    await expect(
+      caller.send({
+        cloudAgentSessionId: validSessionId,
+        message: { prompt: 'follow up' },
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    expect(admitSubmittedMessage).not.toHaveBeenCalled();
   });
 
   it('sendMessageV2 accepts deprecated token fields without queueing token overrides', async () => {
@@ -1667,5 +1730,6 @@ describe('legacy V2 execution response compatibility', () => {
         },
       })
     );
+    expect(preflightExistingPromptModelMock).not.toHaveBeenCalled();
   });
 });

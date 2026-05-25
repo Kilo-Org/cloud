@@ -11,7 +11,7 @@ import type {
 import { renderExecutionTurnContent } from '../execution/types.js';
 import { isExecutionError } from '../execution/errors.js';
 import { logger } from '../logger.js';
-import { normalizeKilocodeModel } from '../persistence/model-utils.js';
+import { dispatchedKilocodeModelId } from '../persistence/model-utils.js';
 import type { SessionMetadata } from '../persistence/session-metadata.js';
 import { isSandboxWorkspaceProbeTimeoutError } from '../sandbox-recovery.js';
 import {
@@ -180,7 +180,7 @@ function buildMessageDeliveryRequest(
     throw new MessageDeliveryRequestValidationError(modeCheck);
   }
 
-  const model = normalizeKilocodeModel(intent.agent.model);
+  const model = dispatchedKilocodeModelId(intent.agent.model);
   if (!model) {
     throw new Error('Session is missing a valid model');
   }
@@ -195,7 +195,7 @@ function buildMessageDeliveryRequest(
     agent: {
       ...intent.agent,
       mode: modeInput,
-      model: model.replace(/^kilo\//, ''),
+      model,
     },
     finalization: intent.finalization,
     workspace: {
@@ -634,7 +634,7 @@ export function createSessionMessageQueue(
     if (modeCheck) {
       return buildAdmissionError('BAD_REQUEST', modeCheck);
     }
-    const model = normalizeKilocodeModel(request.agent.model);
+    const model = dispatchedKilocodeModelId(request.agent.model);
     if (!model) {
       return buildAdmissionError(
         'BAD_REQUEST',
@@ -646,7 +646,7 @@ export function createSessionMessageQueue(
       turn: request.turn,
       agent: {
         ...request.agent,
-        model: model.replace(/^kilo\//, ''),
+        model,
       },
       finalization: request.finalization,
     });
@@ -691,7 +691,7 @@ export function createSessionMessageQueue(
       if (modeCheck) {
         return buildAdmissionError('BAD_REQUEST', modeCheck);
       }
-      const model = normalizeKilocodeModel(requestedAgent?.model ?? metadata.agent?.model);
+      const model = dispatchedKilocodeModelId(requestedAgent?.model ?? metadata.agent?.model);
       const variant = requestedAgent?.variant ?? metadata.agent?.variant;
       if (!model) {
         return buildAdmissionError(
@@ -717,7 +717,7 @@ export function createSessionMessageQueue(
               },
         agent: {
           mode: modeInput,
-          model: model.replace(/^kilo\//, ''),
+          model,
           variant,
         },
         finalization: {

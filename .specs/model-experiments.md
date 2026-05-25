@@ -50,7 +50,7 @@ Routing behavior by status:
 - `paused`: gateway returns a local model-unavailable response for the experimented public id and MUST NOT silently fall through to default model routing.
 - `completed`: historical and non-routing; removed from routing membership and eligible to coexist with a draft or active replacement for the same public id.
 
-Activation MUST validate that the experiment has at least two variants, every variant has positive weight, every variant has a current version effective at or before activation time, and no other active or paused experiment targets the same public id.
+Activation MUST validate that the experiment has at least one variant, every variant has positive weight, every variant has a current version effective at or before activation time, and no other active or paused experiment targets the same public id.
 
 Archiving is orthogonal to status. Archiving MUST NOT change routing behavior. Active experiments MUST NOT be archived.
 

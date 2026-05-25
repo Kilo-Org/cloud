@@ -337,7 +337,7 @@ describe('sandbox recovery', () => {
         sessionId: 'agent_test',
         phase: 'asyncPreparation',
       },
-      new Error('Git clone failed')
+      getPreparationInfrastructureFailure(new Error('Git clone failed'))
     );
 
     expect(destroyed).toBe(false);

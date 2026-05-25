@@ -261,9 +261,8 @@ export async function destroySandboxAfterInternalServerError(
 
 export async function destroySandboxAfterPreparationInfrastructureFailure(
   context: RecoveryContext,
-  error: unknown
+  failure: PreparationInfrastructureFailure | undefined
 ): Promise<boolean> {
-  const failure = getPreparationInfrastructureFailure(error);
   if (!failure) {
     return false;
   }
@@ -384,7 +383,7 @@ export async function withPreparationInfrastructureRecovery<T>(
       }
     }
 
-    const destroyed = await destroySandboxAfterPreparationInfrastructureFailure(context, error);
+    const destroyed = await destroySandboxAfterPreparationInfrastructureFailure(context, failure);
     if (!destroyed && invalidation && context.onSandboxDestructionUncertain) {
       try {
         await context.onSandboxDestructionUncertain(invalidation);

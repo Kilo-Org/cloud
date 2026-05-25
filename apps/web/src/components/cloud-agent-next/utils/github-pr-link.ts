@@ -4,18 +4,6 @@
 
 export type ReviewDecision = 'approved' | 'changes_requested' | 'review_required';
 
-/** GitHub check-run / status-check conclusion values. */
-export type ChecksStatus =
-  | 'pending'
-  | 'success'
-  | 'failure'
-  | 'neutral'
-  | 'skipped'
-  | 'action_required'
-  | 'cancelled'
-  | 'timed_out'
-  | 'stale';
-
 export type AssociatedPr = {
   url: string;
   number: number;

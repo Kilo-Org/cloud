@@ -9,6 +9,7 @@ const forbiddenFreeModelIds: ReadonlySet<string> = new Set([
   'bytedance-seed/dola-seed-2.0-pro:free',
   'cognitivecomputations/dolphin-mistral-24b-venice-edition:free',
   'deepseek/deepseek-r1-0528:free',
+  'deepseek/deepseek-v4-flash:free',
   'giga-potato',
   'giga-potato-thinking',
   'google/gemma-3-12b-it:free',

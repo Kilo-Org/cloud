@@ -7,7 +7,11 @@ import {
 } from './models';
 import { isFreeModel } from './is-free-model';
 import { getInferenceProvider } from './providers/kilo-exclusive-model';
-import { claude_opus_4_7_stealth_model } from './providers/anthropic.constants';
+import {
+  claude_opus_4_7_stealth_model,
+  claude_sonnet_4_6_stealth_model,
+  claude_opus_4_6_stealth_model,
+} from './providers/anthropic.constants';
 import { isAlibabaDirectModel, qwen36_plus_model, qwen37_max_model } from './providers/qwen';
 
 describe('isFreeModel', () => {
@@ -64,6 +68,10 @@ describe('isFreeModel', () => {
     test('routes the discounted Claude Opus offering through the stealth provider identity', () => {
       expect(getInferenceProvider(claude_opus_4_7_stealth_model)).toBe('stealth');
       expect(claude_opus_4_7_stealth_model.public_id).toBe('stealth/claude-opus-4.7');
+      expect(getInferenceProvider(claude_sonnet_4_6_stealth_model)).toBe('stealth');
+      expect(claude_sonnet_4_6_stealth_model.public_id).toBe('stealth/claude-sonnet-4.6');
+      expect(getInferenceProvider(claude_opus_4_6_stealth_model)).toBe('stealth');
+      expect(claude_opus_4_6_stealth_model.public_id).toBe('stealth/claude-opus-4.6');
     });
 
     test('routes Qwen3.7 Max directly through Alibaba', () => {
@@ -76,6 +84,8 @@ describe('isFreeModel', () => {
 
     test('requires data collection for paid training-enabled offerings', () => {
       expect(requiresKiloDataCollection(claude_opus_4_7_stealth_model.public_id)).toBe(true);
+      expect(requiresKiloDataCollection(claude_sonnet_4_6_stealth_model.public_id)).toBe(true);
+      expect(requiresKiloDataCollection(claude_opus_4_6_stealth_model.public_id)).toBe(true);
       expect(requiresKiloDataCollection(qwen36_plus_model.public_id)).toBe(false);
     });
 

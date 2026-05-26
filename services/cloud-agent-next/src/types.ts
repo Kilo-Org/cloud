@@ -73,6 +73,8 @@ export type SessionContext = {
   gitUrl?: string;
   /** Token for generic git authentication (e.g., GitLab token) */
   gitToken?: string;
+  /** Whether the GitLab token was resolved from a managed OAuth integration */
+  gitlabTokenManaged?: boolean;
   /** Git platform type for correct token/env var handling */
   platform?: 'github' | 'gitlab';
   envVars?: Record<string, string>;

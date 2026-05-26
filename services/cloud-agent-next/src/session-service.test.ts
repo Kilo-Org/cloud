@@ -752,6 +752,42 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     portMocks.randomPort.mockReturnValue(4173);
   });
 
+  async function buildPromptWrapperRequests(metadata: CloudAgentSessionState) {
+    const service = new SessionService();
+    const env = createEnv();
+    env.WORKER_URL = 'https://cloud-agent.example.com';
+
+    return service.buildWrapperSessionReadyAndPromptRequests({
+      env,
+      plan: {
+        scope: {
+          sessionId: 'agent_test',
+          userId: 'user_test',
+        },
+        turn: {
+          type: 'prompt',
+          messageId: 'msg_018f1e2d3c4bGitLabEnvAAAA',
+          prompt: 'Do the work',
+        },
+        agent: {
+          mode: 'code',
+          model: 'test-model',
+        },
+        workspace: {
+          sandboxId: 'usr-abcdef',
+          metadata,
+        },
+        wrapper: {
+          fence: {
+            wrapperRunId: 'wr_gitlab_env',
+            wrapperGeneration: 2,
+            wrapperConnectionId: 'conn_gitlab_env',
+          },
+        },
+      } satisfies FencedWrapperDispatchRequest,
+    });
+  }
+
   it('passes persisted devcontainer intent to the active wrapper readiness request', async () => {
     const service = new SessionService();
     const env = createEnv();
@@ -882,6 +918,9 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     expect(result.promptRequest).not.toHaveProperty('materialized');
     expect(result.readyRequest.materialized.env.PUBLIC_VALUE).toBe('visible');
     expect(result.readyRequest.materialized.env.KILOCODE_TOKEN).toBe('kilo-token');
+    expect(result.readyRequest.materialized.env.GITLAB_TOKEN).toBe('resolved-gitlab-token');
+    expect(result.readyRequest.materialized.env.GITLAB_HOST).toBe('gitlab.com');
+    expect(result.readyRequest.materialized.env.GLAB_IS_OAUTH2).toBe('true');
     expect(result.readyRequest.session.workerAuthToken).toBe('kilo-token');
     expect(result.readyRequest.session.wrapperRunId).toBe('wr_test');
     expect(result.readyRequest).not.toHaveProperty('message');
@@ -906,6 +945,76 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     expect(result.promptRequest).not.toHaveProperty('prompt');
     expect(result.promptRequest).not.toHaveProperty('attachments');
     expect(result.promptRequest.session).toEqual(result.readyRequest.session);
+  });
+
+  it('materializes OAuth bearer mode with a self-managed GitLab host', async () => {
+    const result = await buildPromptWrapperRequests(
+      createMetadata({
+        gitUrl: 'https://gitlab.example.com:8443/acme/repo.git',
+        platform: 'gitlab',
+      })
+    );
+
+    expect(result.ready).toMatchObject({
+      gitToken: 'resolved-gitlab-token',
+      gitlabTokenManaged: true,
+    });
+    expect(result.readyRequest.repo).toMatchObject({
+      kind: 'git',
+      url: 'https://gitlab.example.com:8443/acme/repo.git',
+      token: 'resolved-gitlab-token',
+      platform: 'gitlab',
+    });
+    expect(result.readyRequest.materialized.env.GITLAB_TOKEN).toBe('resolved-gitlab-token');
+    expect(result.readyRequest.materialized.env.GITLAB_HOST).toBe('gitlab.example.com:8443');
+    expect(result.readyRequest.materialized.env.GLAB_IS_OAUTH2).toBe('true');
+  });
+
+  it('preserves an explicit profile GLAB_IS_OAUTH2 value when injecting a managed GitLab token', async () => {
+    const result = await buildPromptWrapperRequests(
+      createMetadata({
+        envVars: {
+          GLAB_IS_OAUTH2: 'false',
+        },
+      })
+    );
+
+    expect(result.ready).toMatchObject({
+      gitToken: 'resolved-gitlab-token',
+      gitlabTokenManaged: true,
+    });
+    expect(result.readyRequest.repo).toMatchObject({
+      token: 'resolved-gitlab-token',
+      platform: 'gitlab',
+    });
+    expect(result.readyRequest.materialized.env.GITLAB_TOKEN).toBe('resolved-gitlab-token');
+    expect(result.readyRequest.materialized.env.GITLAB_HOST).toBe('gitlab.com');
+    expect(result.readyRequest.materialized.env.GLAB_IS_OAUTH2).toBe('false');
+  });
+
+  it('does not use OAuth bearer mode for inferred legacy GitLab tokens', async () => {
+    const result = await buildPromptWrapperRequests(
+      createMetadata({
+        gitUrl: 'https://gitlab.com/acme/repo.git',
+        gitToken: 'generic-git-token',
+        platform: undefined,
+        gitlabTokenManaged: undefined,
+      })
+    );
+
+    expect(tokenMocks.resolveManagedGitLabToken).not.toHaveBeenCalled();
+    expect(result.ready).toMatchObject({
+      gitToken: 'generic-git-token',
+      gitlabTokenManaged: undefined,
+    });
+    expect(result.readyRequest.repo).toMatchObject({
+      kind: 'git',
+      url: 'https://gitlab.com/acme/repo.git',
+      token: 'generic-git-token',
+    });
+    expect(result.readyRequest.materialized.env.GITLAB_TOKEN).toBe('generic-git-token');
+    expect(result.readyRequest.materialized.env.GITLAB_HOST).toBe('gitlab.com');
+    expect(result.readyRequest.materialized.env.GLAB_IS_OAUTH2).toBeUndefined();
   });
 });
 

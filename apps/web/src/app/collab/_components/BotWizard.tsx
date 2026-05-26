@@ -38,14 +38,11 @@ export function BotWizard() {
   const searchParams = useSearchParams();
   const setupSearch = searchParams.toString();
   const trpc = useTRPC();
-  const initialSetupState = getInitialSetupState(searchParams);
-  const [stepIndex, setStepIndex] = useState(initialSetupState.stepIndex);
+  const [setupState, setSetupState] = useState(() => getInitialSetupState(searchParams));
   const [selected, setSelected] = useState<Set<PlatformId>>(new Set());
-  const [workspace, setWorkspace] = useState<WorkspaceSelection | null>(
-    initialSetupState.workspace
-  );
   const [missingPlatformWarning, setMissingPlatformWarning] =
     useState<MissingPlatformWarning | null>(null);
+  const { stepIndex, workspace } = setupState;
 
   const isWorkspaceStep = stepIndex === 0;
   const setupInput = workspace?.type === 'org' ? { organizationId: workspace.id } : undefined;
@@ -82,8 +79,7 @@ export function BotWizard() {
   useEffect(() => {
     const params = new URLSearchParams(setupSearch);
     const nextSetupState = getInitialSetupState(params);
-    setStepIndex(nextSetupState.stepIndex);
-    setWorkspace(nextSetupState.workspace);
+    setSetupState(nextSetupState);
     setMissingPlatformWarning(null);
 
     if (params.has('step') && nextSetupState.stepIndex === 0) {
@@ -92,10 +88,10 @@ export function BotWizard() {
   }, [router, setupSearch]);
 
   const navigateToStep = (nextStepIndex: number, nextWorkspace: WorkspaceSelection | null) => {
+    const nextSetupState = { stepIndex: nextStepIndex, workspace: nextWorkspace };
     setMissingPlatformWarning(null);
-    setWorkspace(nextWorkspace);
-    setStepIndex(nextStepIndex);
-    router.push(buildSetupPath({ stepIndex: nextStepIndex, workspace: nextWorkspace }), {
+    setSetupState(nextSetupState);
+    router.push(buildSetupPath(nextSetupState), {
       scroll: false,
     });
   };

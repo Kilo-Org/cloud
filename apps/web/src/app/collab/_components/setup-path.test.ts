@@ -15,7 +15,6 @@ describe('collab setup path', () => {
         workspace: {
           type: 'org',
           id: '0c06733d-0f2c-42ec-921b-c312fb190427',
-          name: 'Kilo Team',
         },
       })
     ).toBe('/collab?step=1&organizationId=0c06733d-0f2c-42ec-921b-c312fb190427');
@@ -27,6 +26,18 @@ describe('collab setup path', () => {
     expect(getInitialSetupState(params)).toEqual({
       stepIndex: 1,
       workspace: { type: 'personal' },
+    });
+  });
+
+  test('restores organization workspace state from URL', () => {
+    const params = new URLSearchParams({
+      step: '1',
+      organizationId: '0c06733d-0f2c-42ec-921b-c312fb190427',
+    });
+
+    expect(getInitialSetupState(params)).toEqual({
+      stepIndex: 1,
+      workspace: { type: 'org', id: '0c06733d-0f2c-42ec-921b-c312fb190427' },
     });
   });
 });

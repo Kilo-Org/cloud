@@ -10,7 +10,7 @@ export function getSetupStepIndex(searchParams: SearchParamReader): number {
 
 export function getSetupWorkspace(searchParams: SearchParamReader): WorkspaceSelection | null {
   const organizationId = searchParams.get('organizationId');
-  if (organizationId) return { type: 'org', id: organizationId, name: '' };
+  if (organizationId) return { type: 'org', id: organizationId };
   if (getSetupStepIndex(searchParams) === 1) return { type: 'personal' };
   return null;
 }

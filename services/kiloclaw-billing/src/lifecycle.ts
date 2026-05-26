@@ -707,6 +707,56 @@ async function insertLifecycleChangeLogBestEffort(
   }
 }
 
+/**
+ * Clear `destruction_deadline` on a subscription whose instance has already
+ * been cleaned up via some other path (`instance_id IS NULL`), so the
+ * destruction sweep stops re-selecting it on every cron.
+ *
+ * The destruction sweep selects candidates ordered by `destruction_deadline
+ * ASC, id ASC` with `LIMIT INSTANCE_DESTRUCTION_BATCH_SIZE`, then per-row
+ * checks `!row.instance_id` and `continue`s. Without this cleanup, the same
+ * detached rows stay at the head of the queue forever and every row behind
+ * them is starved — production saw 25k+ overdue real rows stuck behind a
+ * head of ~50 detached rows for 40 days. Clearing the deadline is the same
+ * final step the happy-path destroy does once the underlying resources are
+ * gone.
+ *
+ * The UPDATE is guarded so a concurrent re-attach or re-clear cannot race:
+ *   - `instance_id IS NULL` — only clear rows that are still detached.
+ *   - `destruction_deadline IS NOT NULL` — skip rows already cleared.
+ * A no-op UPDATE returns no row, and we skip the change-log write.
+ */
+async function clearDetachedSubscriptionDestructionDeadlineBestEffort(
+  database: WorkerDb,
+  subscriptionId: string,
+  reason: string
+): Promise<void> {
+  const before = await getSubscriptionById(database, subscriptionId);
+  const [after] = await database
+    .update(kiloclaw_subscriptions)
+    .set({ destruction_deadline: null })
+    .where(
+      and(
+        eq(kiloclaw_subscriptions.id, subscriptionId),
+        isNull(kiloclaw_subscriptions.instance_id),
+        isNotNull(kiloclaw_subscriptions.destruction_deadline)
+      )
+    )
+    .returning();
+
+  if (!after) {
+    return;
+  }
+
+  await insertLifecycleChangeLogBestEffort(database, {
+    subscriptionId,
+    action: 'status_changed',
+    reason,
+    before,
+    after,
+  });
+}
+
 function logSkippedSubscriptionRow(
   message: string,
   row: {
@@ -3643,6 +3693,15 @@ async function runInstanceDestructionSweep(
           {
             reason: 'missing_instance_id',
           }
+        );
+        // The row has nothing to destroy (its instance was cleaned up via
+        // another path). Clear `destruction_deadline` so the candidate query
+        // stops re-selecting it and starving everything behind it in the
+        // FIFO queue. See `clearDetachedSubscriptionDestructionDeadlineBestEffort`.
+        await clearDetachedSubscriptionDestructionDeadlineBestEffort(
+          database,
+          row.id,
+          'detached_subscription_no_instance'
         );
         continue;
       }

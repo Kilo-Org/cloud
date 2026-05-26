@@ -3020,6 +3020,90 @@ describe('instance destruction sweep', () => {
     );
   });
 
+  it('clears destruction_deadline on a detached subscription row instead of starving the queue', async () => {
+    // Regression: a subscription with `destruction_deadline < now()` but
+    // `instance_id IS NULL` (its instance was already destroyed via some
+    // other path) has nothing left for this sweep to destroy. Before this
+    // fix the loop logged "missing_instance_id" and `continue`d without
+    // clearing the deadline, so the same detached row stayed at the head
+    // of the FIFO candidate query forever — production saw 25k+ real
+    // overdue rows starve for 40 days behind ~50 detached rows.
+    //
+    // The fix clears `destruction_deadline = null` (guarded by
+    // `instance_id IS NULL` and `destruction_deadline IS NOT NULL` to be
+    // race-safe) so the row falls out of the candidate set on the first
+    // encounter, and writes a change-log entry for the audit trail.
+    const subscriptionId = 'sub-detached-1';
+    const detachedBefore = {
+      id: subscriptionId,
+      user_id: 'user-detached',
+      instance_id: null,
+      destruction_deadline: '2026-04-17T18:41:17.736Z',
+    };
+    const detachedAfter = { ...detachedBefore, destruction_deadline: null };
+    const { db, updates, txUpdates, inserts, deletes } = createMockDb(
+      [
+        // 1. Destruction candidates: a single detached row at the head.
+        [
+          {
+            id: subscriptionId,
+            user_id: 'user-detached',
+            instance_id: null,
+            sandbox_id: null,
+            organization_id: null,
+            status: 'canceled',
+            email: 'detached@example.com',
+          },
+        ],
+        // 2. `getSubscriptionById` from the cleanup helper (before snapshot).
+        [detachedBefore],
+      ],
+      { updateReturningRows: [[detachedAfter]] }
+    );
+    mockGetWorkerDb.mockReturnValue(db);
+    const fetch = vi.fn();
+
+    const summary = await runSweep(
+      createEnv(fetch),
+      {
+        runId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+        sweep: 'instance_destruction',
+      },
+      1
+    );
+
+    expect(summary.errors).toBe(0);
+    expect(summary.sweep3_instance_destruction).toBe(0);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+    // The guarded UPDATE fired exactly once, clearing destruction_deadline.
+    expect(updates).toEqual([{ destruction_deadline: null }]);
+    expect(txUpdates).toHaveLength(0);
+    expect(deletes).toHaveLength(0);
+    // A change-log row was written tagged with the dedicated reason so this
+    // cleanup is auditable.
+    expect(inserts).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          subscription_id: subscriptionId,
+          actor_id: 'billing-lifecycle-job',
+          action: 'status_changed',
+          reason: 'detached_subscription_no_instance',
+        }),
+      ])
+    );
+    // The pre-existing skip log is still emitted for operator visibility.
+    expect(loggedValues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          message: 'Skipping instance destruction for detached subscription row',
+          reason: 'missing_instance_id',
+          subscriptionId,
+        }),
+      ])
+    );
+  });
+
   it('keeps DB/email cleanup unchanged when platform destroy succeeds', async () => {
     const instanceId = '11111111-1111-4111-8111-111111111111';
     const { db, updates, txUpdates, inserts, deletes, selectBuilders } = createMockDb([

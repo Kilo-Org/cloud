@@ -847,6 +847,7 @@ export class SessionService {
     githubToken?: string;
     gitUrl?: string;
     gitToken?: string;
+    gitlabTokenManaged?: boolean;
     upstreamBranch?: string;
     branchName?: string;
     envVars?: Record<string, string>;
@@ -875,6 +876,7 @@ export class SessionService {
       githubToken: options.githubToken,
       gitUrl: options.gitUrl,
       gitToken: options.gitToken,
+      gitlabTokenManaged: options.gitlabTokenManaged,
       platform: options.platform,
       envVars: options.envVars,
     };
@@ -903,6 +905,7 @@ export class SessionService {
       appendSystemPrompt: opts.appendSystemPrompt,
       gitUrl: context.gitUrl,
       gitToken: context.gitToken,
+      gitlabTokenManaged: context.gitlabTokenManaged,
       platform: context.platform,
       profile: effectiveProfile,
     });
@@ -923,6 +926,7 @@ export class SessionService {
       appendSystemPrompt,
       gitUrl,
       gitToken,
+      gitlabTokenManaged,
       platform,
       profile,
     } = opts;
@@ -1116,7 +1120,7 @@ export class SessionService {
     // Set GITLAB_TOKEN for GitLab repos, respecting user overrides
     if (gitToken && effectivePlatform === 'gitlab' && !baseEnvVars.GITLAB_TOKEN) {
       envVars.GITLAB_TOKEN = gitToken;
-      if (baseEnvVars.GLAB_IS_OAUTH2 === undefined) {
+      if (gitlabTokenManaged === true && baseEnvVars.GLAB_IS_OAUTH2 === undefined) {
         envVars.GLAB_IS_OAUTH2 = 'true';
       }
       if (!baseEnvVars.GITLAB_HOST) {
@@ -1329,6 +1333,7 @@ export class SessionService {
       githubToken: resolvedTokens.githubToken,
       gitUrl: git?.url,
       gitToken: resolvedTokens.gitToken,
+      gitlabTokenManaged: resolvedTokens.gitlabTokenManaged,
       upstreamBranch: metadata.repository?.upstreamBranch,
       branchName,
       envVars: profile.envVars,
@@ -1350,6 +1355,7 @@ export class SessionService {
       appendSystemPrompt: metadata.agent?.appendSystemPrompt,
       gitUrl: git?.url,
       gitToken: resolvedTokens.gitToken,
+      gitlabTokenManaged: resolvedTokens.gitlabTokenManaged,
       platform,
       profile,
     });
@@ -1547,6 +1553,7 @@ export class SessionService {
       githubToken: resolvedTokens.githubToken,
       gitUrl: git?.url,
       gitToken: resolvedTokens.gitToken,
+      gitlabTokenManaged: resolvedTokens.gitlabTokenManaged,
       upstreamBranch: metadata.repository?.upstreamBranch,
       branchName,
       envVars: readProfileBundle(metadata).envVars,
@@ -2409,6 +2416,7 @@ type GetSaferEnvVarsOptions = {
   appendSystemPrompt?: string;
   gitUrl?: string;
   gitToken?: string;
+  gitlabTokenManaged?: boolean;
   platform?: 'github' | 'gitlab';
   profile?: SessionProfileBundle;
 };

@@ -991,6 +991,31 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     expect(result.readyRequest.materialized.env.GITLAB_HOST).toBe('gitlab.com');
     expect(result.readyRequest.materialized.env.GLAB_IS_OAUTH2).toBe('false');
   });
+
+  it('does not use OAuth bearer mode for inferred legacy GitLab tokens', async () => {
+    const result = await buildPromptWrapperRequests(
+      createMetadata({
+        gitUrl: 'https://gitlab.com/acme/repo.git',
+        gitToken: 'generic-git-token',
+        platform: undefined,
+        gitlabTokenManaged: undefined,
+      })
+    );
+
+    expect(tokenMocks.resolveManagedGitLabToken).not.toHaveBeenCalled();
+    expect(result.ready).toMatchObject({
+      gitToken: 'generic-git-token',
+      gitlabTokenManaged: undefined,
+    });
+    expect(result.readyRequest.repo).toMatchObject({
+      kind: 'git',
+      url: 'https://gitlab.com/acme/repo.git',
+      token: 'generic-git-token',
+    });
+    expect(result.readyRequest.materialized.env.GITLAB_TOKEN).toBe('generic-git-token');
+    expect(result.readyRequest.materialized.env.GITLAB_HOST).toBe('gitlab.com');
+    expect(result.readyRequest.materialized.env.GLAB_IS_OAUTH2).toBeUndefined();
+  });
 });
 
 describe('fetchSessionMetadata', () => {

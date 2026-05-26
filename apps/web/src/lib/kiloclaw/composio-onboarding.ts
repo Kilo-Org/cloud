@@ -30,7 +30,7 @@ export type ComposioConnectionStatus = 'not_configured' | 'disconnected' | 'conn
 
 export type ComposioSandboxConfigSource = KiloClawComposioInstanceConfigSource | null;
 
-export type ProvisionComposioConfigToMark = { source: 'manual' | 'managed' } | null;
+export type ProvisionComposioConfigToMark = { source: 'manual' } | null;
 
 export function composioSecretsPatchSource(
   secrets: Record<string, string | null>
@@ -122,63 +122,18 @@ function validateManualComposioProvisionSecrets(secrets: Record<string, string>)
   }
 }
 
-async function getReusableManagedComposioIdentityForProvision(params: {
-  scope: ComposioOwnerScope;
-  instanceId?: string | null;
-}): Promise<Awaited<ReturnType<typeof getActiveManagedComposioIdentity>>> {
-  const identity = await getActiveManagedComposioIdentity(params.scope);
-  if (!identity) return null;
-
-  if (params.instanceId) {
-    const currentSource = await getComposioInstanceConfigSource(params.instanceId);
-    if (currentSource === 'managed') return identity;
-    return null;
-  }
-
-  return identity.row.google_calendar_connected_account_id ? identity : null;
-}
-
 export async function buildComposioProvisionSecrets(params: {
-  scope: ComposioOwnerScope;
-  instanceId?: string | null;
   secrets?: Record<string, string>;
-  skipIncompleteManagedConnection?: boolean;
 }): Promise<{
   secrets?: Record<string, string>;
   configToMark: ProvisionComposioConfigToMark;
 }> {
-  if (hasComposioProvisionSecrets(params.secrets)) {
-    validateManualComposioProvisionSecrets(params.secrets ?? {});
-    return { secrets: params.secrets, configToMark: { source: 'manual' } };
+  if (!hasComposioProvisionSecrets(params.secrets)) {
+    return { secrets: params.secrets, configToMark: null };
   }
 
-  if (!params.instanceId) {
-    const pendingIdentity = await getActiveManagedComposioIdentity(params.scope);
-    if (pendingIdentity && !pendingIdentity.row.google_calendar_connected_account_id) {
-      if (params.skipIncompleteManagedConnection) {
-        return { secrets: params.secrets, configToMark: null };
-      }
-      throw new TRPCError({
-        code: 'CONFLICT',
-        message: 'Managed Composio connection is still completing',
-      });
-    }
-  }
-
-  const identity = await getReusableManagedComposioIdentityForProvision({
-    scope: params.scope,
-    instanceId: params.instanceId,
-  });
-  if (!identity) return { secrets: params.secrets, configToMark: null };
-
-  return {
-    secrets: {
-      ...(params.secrets ?? {}),
-      composioUserApiKey: identity.userApiKey,
-      composioOrg: identity.org,
-    },
-    configToMark: { source: 'managed' },
-  };
+  validateManualComposioProvisionSecrets(params.secrets ?? {});
+  return { secrets: params.secrets, configToMark: { source: 'manual' } };
 }
 
 export async function completeManagedComposioGoogleCalendarConnection(params: {

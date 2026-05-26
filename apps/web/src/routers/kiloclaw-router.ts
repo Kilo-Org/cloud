@@ -851,7 +851,6 @@ const updateConfigSchema = z.object({
   kilocodeDefaultModel: kilocodeDefaultModelSchema.nullable().optional(),
   userTimezone: userTimezoneSchema.nullable().optional(),
   userLocation: userLocationSchema.nullable().optional(),
-  skipIncompleteManagedComposioConnection: z.boolean().optional(),
 });
 
 const updateKiloCodeConfigSchema = z.object({
@@ -1116,10 +1115,7 @@ async function provisionInstance(
   executor: typeof db | DrizzleTransaction = db
 ) {
   const composioProvision = await buildComposioProvisionSecrets({
-    scope: { ownerType: 'user', userId: user.id },
-    instanceId: params.instanceId,
     secrets: input.secrets,
-    skipIncompleteManagedConnection: input.skipIncompleteManagedComposioConnection,
   });
 
   const encryptedSecrets = encryptProvisionSecretsForWorker(composioProvision.secrets);
@@ -1164,11 +1160,6 @@ async function provisionInstance(
 
   if (composioProvision.configToMark?.source === 'manual') {
     await markComposioInstanceConfig({ instanceId: result.instanceId, source: 'manual' });
-  } else if (composioProvision.configToMark?.source === 'managed') {
-    await markComposioInstanceConfig({
-      instanceId: result.instanceId,
-      source: 'managed',
-    });
   }
 
   return result;

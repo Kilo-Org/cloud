@@ -12,6 +12,10 @@ export type GitLabLookupParams = {
   orgId?: string;
 };
 
+export type AuthorizedGitLabIntegrationLookupParams = GitLabLookupParams & {
+  integrationId?: string;
+};
+
 export type GitLabIntegrationMetadata = {
   access_token?: string;
   refresh_token?: string;
@@ -20,6 +24,12 @@ export type GitLabIntegrationMetadata = {
   client_id?: string;
   client_secret?: string;
   auth_type?: 'oauth' | 'pat';
+  project_tokens?: Record<string, { token: string }>;
+};
+
+export type GitLabCodeReviewTokenLookupParams = GitLabLookupParams & {
+  integrationId: string;
+  projectId: number;
 };
 
 type GitLabLookupSuccess = {
@@ -35,6 +45,17 @@ type GitLabLookupFailure = {
 
 export type GitLabLookupResult = GitLabLookupSuccess | GitLabLookupFailure;
 
+export type GitLabCodeReviewTokenLookupResult =
+  | { success: true; token: string; instanceUrl: string }
+  | {
+      success: false;
+      reason:
+        | GitLabLookupFailure['reason']
+        | 'invalid_integration_id'
+        | 'invalid_project_id'
+        | 'no_project_token';
+    };
+
 const GitLabMetadataSchema = z
   .object({
     access_token: z.string().optional(),
@@ -44,8 +65,54 @@ const GitLabMetadataSchema = z
     client_id: z.string().optional(),
     client_secret: z.string().optional(),
     auth_type: z.enum(['oauth', 'pat']).optional(),
+    project_tokens: z
+      .record(z.string(), z.object({ token: z.string().min(1) }).passthrough())
+      .optional(),
   })
   .passthrough();
+
+export function buildAuthorizedGitLabIntegrationQuery(
+  db: WorkerDb,
+  params: AuthorizedGitLabIntegrationLookupParams
+) {
+  return db
+    .select({
+      id: platform_integrations.id,
+      metadata: platform_integrations.metadata,
+    })
+    .from(platform_integrations)
+    .leftJoin(
+      organization_memberships,
+      and(
+        eq(
+          platform_integrations.owned_by_organization_id,
+          organization_memberships.organization_id
+        ),
+        eq(organization_memberships.kilo_user_id, params.userId)
+      )
+    )
+    .innerJoin(
+      kilocode_users,
+      and(eq(kilocode_users.id, params.userId), isNull(kilocode_users.blocked_reason))
+    )
+    .where(
+      and(
+        eq(platform_integrations.platform, 'gitlab'),
+        eq(platform_integrations.integration_status, 'active'),
+        params.integrationId ? eq(platform_integrations.id, params.integrationId) : undefined,
+        params.orgId
+          ? and(
+              eq(platform_integrations.owned_by_organization_id, sql`${params.orgId}::uuid`),
+              isNotNull(organization_memberships.id)
+            )
+          : and(
+              isNotNull(platform_integrations.owned_by_user_id),
+              eq(platform_integrations.owned_by_user_id, params.userId)
+            )
+      )
+    )
+    .limit(1);
+}
 
 export class GitLabLookupService {
   private db: WorkerDb | null = null;
@@ -67,6 +134,12 @@ export class GitLabLookupService {
   }
 
   async findGitLabIntegration(params: GitLabLookupParams): Promise<GitLabLookupResult> {
+    return this.findAuthorizedGitLabIntegration(params);
+  }
+
+  private async findAuthorizedGitLabIntegration(
+    params: AuthorizedGitLabIntegrationLookupParams
+  ): Promise<GitLabLookupResult> {
     if (!this.isConfigured()) {
       return { success: false, reason: 'database_not_configured' };
     }
@@ -75,44 +148,7 @@ export class GitLabLookupService {
       return { success: false, reason: 'invalid_org_id' };
     }
 
-    const db = this.getDb();
-
-    const rows = await db
-      .select({
-        id: platform_integrations.id,
-        metadata: platform_integrations.metadata,
-      })
-      .from(platform_integrations)
-      .leftJoin(
-        organization_memberships,
-        and(
-          eq(
-            platform_integrations.owned_by_organization_id,
-            organization_memberships.organization_id
-          ),
-          eq(organization_memberships.kilo_user_id, params.userId)
-        )
-      )
-      .innerJoin(
-        kilocode_users,
-        and(eq(kilocode_users.id, params.userId), isNull(kilocode_users.blocked_reason))
-      )
-      .where(
-        and(
-          eq(platform_integrations.platform, 'gitlab'),
-          eq(platform_integrations.integration_status, 'active'),
-          params.orgId
-            ? and(
-                eq(platform_integrations.owned_by_organization_id, sql`${params.orgId}::uuid`),
-                isNotNull(organization_memberships.id)
-              )
-            : and(
-                isNotNull(platform_integrations.owned_by_user_id),
-                eq(platform_integrations.owned_by_user_id, params.userId)
-              )
-        )
-      )
-      .limit(1);
+    const rows = await buildAuthorizedGitLabIntegrationQuery(this.getDb(), params);
 
     if (rows.length === 0) {
       return { success: false, reason: 'no_integration_found' };
@@ -125,6 +161,33 @@ export class GitLabLookupService {
       success: true,
       integrationId: row.id,
       metadata,
+    };
+  }
+
+  async findGitLabCodeReviewToken(
+    params: GitLabCodeReviewTokenLookupParams
+  ): Promise<GitLabCodeReviewTokenLookupResult> {
+    if (!z.string().uuid().safeParse(params.integrationId).success) {
+      return { success: false, reason: 'invalid_integration_id' };
+    }
+    if (!Number.isSafeInteger(params.projectId) || params.projectId <= 0) {
+      return { success: false, reason: 'invalid_project_id' };
+    }
+
+    const integration = await this.findAuthorizedGitLabIntegration(params);
+    if (!integration.success) {
+      return integration;
+    }
+
+    const projectToken = integration.metadata.project_tokens?.[String(params.projectId)];
+    if (!projectToken) {
+      return { success: false, reason: 'no_project_token' };
+    }
+
+    return {
+      success: true,
+      token: projectToken.token,
+      instanceUrl: integration.metadata.gitlab_instance_url || 'https://gitlab.com',
     };
   }
 }

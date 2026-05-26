@@ -183,6 +183,73 @@ describe('CloudAgentNextFetchClient billing error detection', () => {
   });
 });
 
+describe('CloudAgentNextFetchClient internal GitLab code-review transport', () => {
+  const gitlabCodeReviewTokenRef = {
+    integrationId: '123e4567-e89b-12d3-a456-426614174011',
+    projectId: 456,
+  };
+
+  it('posts a token reference during session preparation', async () => {
+    const fetchMock = mockFetch(200, {
+      result: { data: { cloudAgentSessionId: 'agent_123', kiloSessionId: 'ses_123' } },
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const client = createCloudAgentNextFetchClient(BASE_URL);
+
+    await client.prepareSession(
+      { Authorization: 'Bearer token' },
+      {
+        prompt: 'review',
+        mode: 'code',
+        model: 'test-model',
+        gitUrl: 'https://gitlab.example.test/acme/repo.git',
+        platform: 'gitlab',
+        gitlabCodeReviewTokenRef,
+      }
+    );
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      `${BASE_URL}/trpc/prepareSession`,
+      expect.objectContaining({
+        body: JSON.stringify({
+          prompt: 'review',
+          mode: 'code',
+          model: 'test-model',
+          gitUrl: 'https://gitlab.example.test/acme/repo.git',
+          platform: 'gitlab',
+          gitlabCodeReviewTokenRef,
+        }),
+      })
+    );
+  });
+
+  it('posts a token reference when upgrading a continued session', async () => {
+    const fetchMock = mockFetch(200, { result: { data: { success: true } } });
+    vi.stubGlobal('fetch', fetchMock);
+    const client = createCloudAgentNextFetchClient(BASE_URL);
+
+    await client.updateSession(
+      { Authorization: 'Bearer token' },
+      {
+        cloudAgentSessionId: 'agent_123',
+        gitlabCodeReviewTokenRef,
+        gitlabCodeReviewRepositoryUrl: 'https://gitlab.example.test/acme/repo.git',
+      }
+    );
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      `${BASE_URL}/trpc/updateSession`,
+      expect.objectContaining({
+        body: JSON.stringify({
+          cloudAgentSessionId: 'agent_123',
+          gitlabCodeReviewTokenRef,
+          gitlabCodeReviewRepositoryUrl: 'https://gitlab.example.test/acme/repo.git',
+        }),
+      })
+    );
+  });
+});
+
 describe('CloudAgentNextFetchClient getSessionHealth', () => {
   it('posts to getSessionHealth and parses a healthy response', async () => {
     const fetchMock = mockFetch(200, {

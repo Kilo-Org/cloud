@@ -12,6 +12,7 @@ import {
   type SessionMetadata,
 } from './session-metadata.js';
 import { readProfileBundle, type SessionProfileBundle } from '../session-profile.js';
+import type { GitLabCodeReviewTokenRef } from './schemas.js';
 import type { CallbackJob, CallbackTarget } from '../callbacks/index.js';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { logger } from '../logger.js';
@@ -187,6 +188,7 @@ type GroupedRegisterSessionInput = {
         type: 'gitlab';
         url: string;
         branch?: string;
+        gitlabCodeReviewTokenRef?: GitLabCodeReviewTokenRef;
       }
     | {
         type: 'git';
@@ -208,6 +210,19 @@ type CreateSessionWithInitialAdmissionInput = Omit<GroupedRegisterSessionInput, 
     initialTurn: AcceptedExecutionTurn;
   };
 };
+
+type GitLabRepositoryMetadata = Extract<
+  NonNullable<SessionMetadata['repository']>,
+  { type: 'gitlab' }
+>;
+
+function withoutManagedGitLabMarker(
+  repository: GitLabRepositoryMetadata
+): GitLabRepositoryMetadata {
+  const updated = { ...repository };
+  delete updated.gitlabTokenManaged;
+  return updated;
+}
 
 function isSameAcceptedInitialTurn(
   metadata: SessionMetadata,
@@ -1328,6 +1343,17 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       return { success: false, error: 'Session already registered' };
     }
 
+    if (
+      input.repository?.type === 'gitlab' &&
+      input.repository.gitlabCodeReviewTokenRef !== undefined &&
+      input.identity.createdOnPlatform !== 'code-review'
+    ) {
+      return {
+        success: false,
+        error: 'GitLab code-review token references require a code-review session origin',
+      };
+    }
+
     const now = Date.now();
     const repository: SessionMetadata['repository'] =
       input.repository?.type === 'github'
@@ -1342,6 +1368,9 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
               url: input.repository.url,
               platform: 'gitlab',
               upstreamBranch: input.repository.branch,
+              ...(input.repository.gitlabCodeReviewTokenRef
+                ? { gitlabCodeReviewTokenRef: input.repository.gitlabCodeReviewTokenRef }
+                : {}),
             }
           : input.repository?.type === 'git'
             ? {
@@ -1490,7 +1519,11 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     return admitInitialTurn();
   }
 
-  async tryUpdate(updates: { callbackTarget?: CallbackTarget | null }): Promise<OperationResult> {
+  async tryUpdate(updates: {
+    callbackTarget?: CallbackTarget | null;
+    gitlabCodeReviewTokenRef?: GitLabCodeReviewTokenRef;
+    gitlabCodeReviewRepositoryUrl?: string;
+  }): Promise<OperationResult> {
     const metadata = await this.getMetadata();
 
     if (!metadata) {
@@ -1500,8 +1533,45 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     const allKeys = Object.keys(updates).filter(
       k => updates[k as keyof typeof updates] !== undefined
     );
-    if (allKeys.some(key => key !== 'callbackTarget')) {
-      return { success: false, error: 'Only callbackTarget can be updated' };
+    if (
+      allKeys.some(
+        key =>
+          key !== 'callbackTarget' &&
+          key !== 'gitlabCodeReviewTokenRef' &&
+          key !== 'gitlabCodeReviewRepositoryUrl'
+      )
+    ) {
+      return {
+        success: false,
+        error:
+          'Only callbackTarget, gitlabCodeReviewTokenRef, and gitlabCodeReviewRepositoryUrl can be updated',
+      };
+    }
+
+    if (updates.gitlabCodeReviewTokenRef !== undefined) {
+      if (
+        metadata.identity.createdOnPlatform !== 'code-review' ||
+        metadata.repository?.type !== 'gitlab'
+      ) {
+        return {
+          success: false,
+          error: 'GitLab code-review token references require a GitLab code-review session',
+        };
+      }
+      if (
+        updates.gitlabCodeReviewRepositoryUrl === undefined ||
+        metadata.repository.url !== updates.gitlabCodeReviewRepositoryUrl
+      ) {
+        return {
+          success: false,
+          error: 'GitLab code-review session repository does not match the token reference update',
+        };
+      }
+    } else if (updates.gitlabCodeReviewRepositoryUrl !== undefined) {
+      return {
+        success: false,
+        error: 'GitLab code-review repository URL requires a token reference update',
+      };
     }
 
     const updated: SessionMetadata = { ...metadata };
@@ -1509,6 +1579,12 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       delete updated.callback;
     } else if (updates.callbackTarget !== undefined) {
       updated.callback = { target: updates.callbackTarget };
+    }
+    if (updates.gitlabCodeReviewTokenRef !== undefined && metadata.repository?.type === 'gitlab') {
+      updated.repository = {
+        ...withoutManagedGitLabMarker(metadata.repository),
+        gitlabCodeReviewTokenRef: updates.gitlabCodeReviewTokenRef,
+      };
     }
     const now = Date.now();
     updated.lifecycle = {
@@ -1568,11 +1644,13 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
             githubAppType: input.githubAppType ?? metadata.repository.githubAppType,
           }
         : metadata.repository?.type === 'gitlab'
-          ? {
-              ...metadata.repository,
-              gitlabTokenManaged:
-                input.gitlabTokenManaged ?? metadata.repository.gitlabTokenManaged,
-            }
+          ? metadata.repository.gitlabCodeReviewTokenRef
+            ? withoutManagedGitLabMarker(metadata.repository)
+            : {
+                ...metadata.repository,
+                gitlabTokenManaged:
+                  input.gitlabTokenManaged ?? metadata.repository.gitlabTokenManaged,
+              }
           : metadata.repository;
 
     const updated: SessionMetadata = {

@@ -284,6 +284,47 @@ describe('session metadata boundary', () => {
     });
   });
 
+  it('parses and serializes a current GitLab code-review token reference', () => {
+    const current = {
+      metadataSchemaVersion: 2 as const,
+      identity: {
+        sessionId: 'agent_gitlab_review',
+        userId: 'user_123',
+        createdOnPlatform: 'code-review',
+      },
+      auth: {},
+      repository: {
+        type: 'gitlab' as const,
+        url: 'https://gitlab.com/acme/repo.git',
+        platform: 'gitlab' as const,
+        gitlabCodeReviewTokenRef: {
+          integrationId: '123e4567-e89b-12d3-a456-426614174011',
+          projectId: 42,
+        },
+      },
+      lifecycle: { version: 1, timestamp: 1 },
+    };
+
+    expect(parseSessionMetadata(current)).toEqual(current);
+    expect(serializeSessionMetadata(current)).toEqual(current);
+  });
+
+  it('rejects an invalid GitLab code-review token reference in current metadata', () => {
+    expect(() =>
+      parseSessionMetadata({
+        metadataSchemaVersion: 2,
+        identity: { sessionId: 'agent_gitlab_review', userId: 'user_123' },
+        auth: {},
+        repository: {
+          type: 'gitlab',
+          url: 'https://gitlab.com/acme/repo.git',
+          gitlabCodeReviewTokenRef: { integrationId: 'invalid', projectId: 0 },
+        },
+        lifecycle: { version: 1, timestamp: 1 },
+      })
+    ).toThrow('Invalid current session metadata');
+  });
+
   it('preserves legacy generic git tokens in grouped repository metadata', () => {
     const metadata = parseSessionMetadata({
       version: 1,

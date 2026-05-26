@@ -41,6 +41,7 @@ vi.mock('./workspace.js', () => ({
 const tokenMocks = vi.hoisted(() => ({
   resolveGitHubTokenForRepo: vi.fn(),
   resolveManagedGitLabToken: vi.fn(),
+  resolveGitLabCodeReviewToken: vi.fn(),
 }));
 const devcontainerMocks = vi.hoisted(() => ({
   bringUpDevContainer: vi.fn(),
@@ -179,6 +180,11 @@ function createEnv(metadata?: CloudAgentSessionState | null): PersistenceEnv {
         token: 'resolved-gitlab-token',
         instanceUrl: 'https://gitlab.com',
       }),
+      getGitLabCodeReviewToken: vi.fn().mockResolvedValue({
+        success: true,
+        token: 'resolved-project-token',
+        instanceUrl: 'https://gitlab.com',
+      }),
     },
   } satisfies PersistenceEnv;
 }
@@ -196,6 +202,32 @@ function createMetadata(overrides: Record<string, unknown> = {}): CloudAgentSess
     gitToken: 'git-token',
     platform: 'gitlab',
     ...overrides,
+  });
+}
+
+function createGitLabCodeReviewMetadata(): CloudAgentSessionState {
+  return parseSessionMetadata({
+    metadataSchemaVersion: 2,
+    identity: {
+      sessionId: 'agent_test',
+      userId: 'user_test',
+      createdOnPlatform: 'code-review',
+    },
+    auth: {
+      kilocodeToken: 'kilo-token',
+      kiloSessionId: 'kilo-session',
+    },
+    repository: {
+      type: 'gitlab',
+      url: 'https://gitlab.com/acme/repo.git',
+      platform: 'gitlab',
+      gitlabCodeReviewTokenRef: {
+        integrationId: '123e4567-e89b-12d3-a456-426614174011',
+        projectId: 42,
+      },
+    },
+    agent: { mode: 'code', model: 'kilo/test-model' },
+    lifecycle: { version: 1, timestamp: 1 },
   });
 }
 
@@ -224,6 +256,11 @@ describe('SessionService.prepareWorkspace', () => {
     tokenMocks.resolveManagedGitLabToken.mockResolvedValue({
       success: true,
       token: 'resolved-gitlab-token',
+    });
+    tokenMocks.resolveGitLabCodeReviewToken.mockResolvedValue({
+      success: true,
+      token: 'resolved-project-token',
+      instanceUrl: 'https://gitlab.com',
     });
     devcontainerMocks.detectDevContainer.mockResolvedValue(null);
     devcontainerMocks.bringUpDevContainer.mockReset();
@@ -681,6 +718,36 @@ describe('SessionService.prepareWorkspace', () => {
     );
   });
 
+  it('refreshes a warm GitLab code-review remote with the referenced project token', async () => {
+    const session = createSession(true);
+    const sandbox = createSandbox(session, true);
+
+    await new SessionService().prepareWorkspace({
+      sandbox,
+      sandboxId: 'usr-abcdef',
+      userId: 'user_test',
+      sessionId: 'agent_test' as SessionId,
+      env: createEnv(),
+      metadata: createGitLabCodeReviewMetadata(),
+      kilocodeModel: 'test-model',
+    });
+
+    expect(tokenMocks.resolveGitLabCodeReviewToken).toHaveBeenCalledWith(expect.any(Object), {
+      userId: 'user_test',
+      orgId: undefined,
+      integrationId: '123e4567-e89b-12d3-a456-426614174011',
+      projectId: 42,
+    });
+    expect(tokenMocks.resolveManagedGitLabToken).not.toHaveBeenCalled();
+    expect(workspaceMocks.updateGitRemoteToken).toHaveBeenCalledWith(
+      session,
+      '/workspace/user/sessions/agent_test',
+      'https://gitlab.com/acme/repo.git',
+      'resolved-project-token',
+      'gitlab'
+    );
+  });
+
   it('refreshes the warm fast path GitHub remote when repo lookup resolves a managed token', async () => {
     const session = createSession(true);
     const sandbox = createSandbox(session, true);
@@ -746,6 +813,11 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     tokenMocks.resolveManagedGitLabToken.mockResolvedValue({
       success: true,
       token: 'resolved-gitlab-token',
+    });
+    tokenMocks.resolveGitLabCodeReviewToken.mockResolvedValue({
+      success: true,
+      token: 'resolved-project-token',
+      instanceUrl: 'https://gitlab.com',
     });
     devcontainerMocks.detectDevContainer.mockResolvedValue(null);
     devcontainerMocks.bringUpDevContainer.mockReset();
@@ -990,6 +1062,67 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     expect(result.readyRequest.materialized.env.GITLAB_TOKEN).toBe('resolved-gitlab-token');
     expect(result.readyRequest.materialized.env.GITLAB_HOST).toBe('gitlab.com');
     expect(result.readyRequest.materialized.env.GLAB_IS_OAUTH2).toBe('false');
+  });
+
+  it('materializes referenced GitLab code-review project tokens with OAuth bearer mode disabled', async () => {
+    const result = await buildPromptWrapperRequests(createGitLabCodeReviewMetadata());
+
+    expect(tokenMocks.resolveGitLabCodeReviewToken).toHaveBeenCalledWith(expect.any(Object), {
+      userId: 'user_test',
+      orgId: undefined,
+      integrationId: '123e4567-e89b-12d3-a456-426614174011',
+      projectId: 42,
+    });
+    expect(tokenMocks.resolveManagedGitLabToken).not.toHaveBeenCalled();
+    expect(result.readyRequest.repo).toMatchObject({
+      kind: 'git',
+      token: 'resolved-project-token',
+      platform: 'gitlab',
+      refreshRemote: true,
+    });
+    expect(result.readyRequest.materialized.env.GITLAB_TOKEN).toBe('resolved-project-token');
+    expect(result.readyRequest.materialized.env.GLAB_IS_OAUTH2).toBe('false');
+  });
+
+  it('fails referenced GitLab code-review token lookup without managed-token fallback', async () => {
+    tokenMocks.resolveGitLabCodeReviewToken.mockResolvedValueOnce({
+      success: false,
+      reason: 'no_project_token',
+    });
+
+    await expect(buildPromptWrapperRequests(createGitLabCodeReviewMetadata())).rejects.toThrow(
+      'GitLab code-review project token lookup failed (no_project_token)'
+    );
+    expect(tokenMocks.resolveManagedGitLabToken).not.toHaveBeenCalled();
+  });
+
+  it('rejects a project token resolved from a different GitLab instance', async () => {
+    tokenMocks.resolveGitLabCodeReviewToken.mockResolvedValueOnce({
+      success: true,
+      token: 'wrong-instance-project-token',
+      instanceUrl: 'https://gitlab-other.example.com',
+    });
+
+    await expect(buildPromptWrapperRequests(createGitLabCodeReviewMetadata())).rejects.toThrow(
+      'GitLab code-review project token instance does not match the session repository'
+    );
+    expect(tokenMocks.resolveManagedGitLabToken).not.toHaveBeenCalled();
+  });
+
+  it('rejects referenced project tokens on sessions without code-review origin', async () => {
+    const metadata = {
+      ...createGitLabCodeReviewMetadata(),
+      identity: {
+        ...createGitLabCodeReviewMetadata().identity,
+        createdOnPlatform: 'cloud-agent-web',
+      },
+    } satisfies CloudAgentSessionState;
+
+    await expect(buildPromptWrapperRequests(metadata)).rejects.toThrow(
+      'GitLab code-review token reference is invalid for this session origin'
+    );
+    expect(tokenMocks.resolveGitLabCodeReviewToken).not.toHaveBeenCalled();
+    expect(tokenMocks.resolveManagedGitLabToken).not.toHaveBeenCalled();
   });
 
   it('does not use OAuth bearer mode for inferred legacy GitLab tokens', async () => {

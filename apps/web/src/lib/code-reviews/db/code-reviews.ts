@@ -1444,20 +1444,37 @@ export async function cancelSupersededReviewsForPR(
   }
 }
 
+export type GitLabReviewContinuationScope = {
+  integrationId: string;
+  projectId: number;
+};
+
 /**
  * Finds the most recent completed review for the same PR with a different SHA.
  * Used for incremental reviews: returns the previous HEAD SHA so the agent
  * can diff against it instead of re-reviewing the entire PR.
  * Also returns session_id (nullable) so the caller can derive both the
  * incremental diff base and the session continuation target from a single row.
+ * GitLab continuation requires the exact integration and project identity so
+ * equivalent project paths on separate GitLab instances never share sessions.
  */
 export async function findPreviousCompletedReview(
   repoFullName: string,
   prNumber: number,
   excludeSha: string,
-  platform: string = 'github'
+  platform: string = 'github',
+  gitLabScope?: GitLabReviewContinuationScope
 ): Promise<{ head_sha: string; session_id: string | null } | null> {
   try {
+    const gitLabScopeFilter =
+      platform === 'gitlab'
+        ? gitLabScope
+          ? and(
+              eq(cloud_agent_code_reviews.platform_integration_id, gitLabScope.integrationId),
+              eq(cloud_agent_code_reviews.platform_project_id, gitLabScope.projectId)
+            )
+          : sql`false`
+        : undefined;
     const [review] = await db
       .select({
         head_sha: cloud_agent_code_reviews.head_sha,
@@ -1469,6 +1486,7 @@ export async function findPreviousCompletedReview(
           eq(cloud_agent_code_reviews.repo_full_name, repoFullName),
           eq(cloud_agent_code_reviews.pr_number, prNumber),
           eq(cloud_agent_code_reviews.platform, platform),
+          gitLabScopeFilter,
           ne(cloud_agent_code_reviews.head_sha, excludeSha),
           eq(cloud_agent_code_reviews.status, 'completed')
         )
@@ -1480,7 +1498,7 @@ export async function findPreviousCompletedReview(
   } catch (error) {
     captureException(error, {
       tags: { operation: 'findPreviousCompletedReview' },
-      extra: { repoFullName, prNumber, excludeSha, platform },
+      extra: { repoFullName, prNumber, excludeSha, platform, gitLabScope },
     });
     throw error;
   }

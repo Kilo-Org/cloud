@@ -12,6 +12,7 @@
  *   POST /getTokenForRepo - { githubRepo, userId, orgId? }
  *   POST /getToken - { installationId, appType? }
  *   POST /getGitLabToken - { userId, orgId? }
+ *   POST /getGitLabCodeReviewToken - { userId, orgId?, integrationId, projectId }
  */
 import type {
   GitTokenRPCEntrypoint,
@@ -19,6 +20,8 @@ import type {
   GetTokenForRepoResult,
   GetGitLabTokenParams,
   GetGitLabTokenResult,
+  GetGitLabCodeReviewTokenParams,
+  GetGitLabCodeReviewTokenResult,
 } from '../src/index.js';
 import type { GitHubAppType } from '../src/github-token-service.js';
 
@@ -58,6 +61,16 @@ export default {
         return Response.json(result);
       }
 
+      if (url.pathname === '/getGitLabCodeReviewToken' && request.method === 'POST') {
+        const body = (await request.json()) as GetGitLabCodeReviewTokenParams;
+        const result: GetGitLabCodeReviewTokenResult =
+          await env.GIT_TOKEN_SERVICE.getGitLabCodeReviewToken(body);
+        if (!result.success) {
+          return Response.json(result, { status: 404 });
+        }
+        return Response.json(result);
+      }
+
       return Response.json(
         {
           error: 'Not Found',
@@ -65,6 +78,7 @@ export default {
             'POST /getTokenForRepo - { githubRepo, userId, orgId? }',
             'POST /getToken - { installationId, appType? }',
             'POST /getGitLabToken - { userId, orgId? }',
+            'POST /getGitLabCodeReviewToken - { userId, orgId?, integrationId, projectId }',
           ],
         },
         { status: 404 }

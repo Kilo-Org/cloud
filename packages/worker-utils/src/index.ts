@@ -29,6 +29,7 @@ export { createCloudAgentNextFetchClient } from './cloud-agent-next-client.js';
 export type {
   CloudAgentNextFetchClient,
   CallbackTarget,
+  GitLabCodeReviewTokenRef,
   CloudAgentTerminalReason,
   CloudAgentPrepareSessionInput,
   CloudAgentPrepareSessionOutput,

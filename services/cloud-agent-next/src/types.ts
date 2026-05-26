@@ -56,6 +56,8 @@ export type SandboxId =
 /** Unique identifier for a session within a sandbox */
 export type SessionId = `agent_${string}`;
 
+export type GitLabCredentialSource = 'managed-integration' | 'code-review-project-access-token';
+
 export type SessionContext = {
   sandboxId: SandboxId;
   sessionId: SessionId;
@@ -75,6 +77,8 @@ export type SessionContext = {
   gitToken?: string;
   /** Whether the GitLab token was resolved from a managed OAuth integration */
   gitlabTokenManaged?: boolean;
+  /** Runtime source for a server-resolved GitLab credential. */
+  gitlabCredentialSource?: GitLabCredentialSource;
   /** Git platform type for correct token/env var handling */
   platform?: 'github' | 'gitlab';
   envVars?: Record<string, string>;
@@ -117,6 +121,19 @@ type GetGitLabTokenResult =
         | 'token_expired_no_refresh';
     };
 
+type GetGitLabCodeReviewTokenResult =
+  | { success: true; token: string; instanceUrl: string }
+  | {
+      success: false;
+      reason:
+        | 'database_not_configured'
+        | 'no_integration_found'
+        | 'invalid_org_id'
+        | 'invalid_integration_id'
+        | 'invalid_project_id'
+        | 'no_project_token';
+    };
+
 export type GitTokenService = {
   getTokenForRepo(params: {
     githubRepo: string;
@@ -125,6 +142,12 @@ export type GitTokenService = {
   }): Promise<GetTokenForRepoResult>;
   getToken(installationId: string, appType?: 'standard' | 'lite'): Promise<string>;
   getGitLabToken(params: { userId: string; orgId?: string }): Promise<GetGitLabTokenResult>;
+  getGitLabCodeReviewToken(params: {
+    userId: string;
+    orgId?: string;
+    integrationId: string;
+    projectId: number;
+  }): Promise<GetGitLabCodeReviewTokenResult>;
 };
 
 export type Env = {

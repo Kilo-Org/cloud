@@ -443,6 +443,10 @@ describe('prepareSession endpoint', () => {
       model: 'claude-3',
       gitUrl: 'https://gitlab.com/acme/repo.git',
       gitToken: 'caller-gitlab-token',
+      gitlabCodeReviewTokenRef: {
+        integrationId: '123e4567-e89b-12d3-a456-426614174011',
+        projectId: 42,
+      },
       platform: 'gitlab',
       upstreamBranch: 'feature/gitlab',
     });
@@ -456,6 +460,41 @@ describe('prepareSession endpoint', () => {
         },
       })
     );
+  });
+
+  it('persists a non-secret GitLab code-review token reference without persisting a caller token', async () => {
+    const doStub = createMockDOStub();
+    const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
+
+    await caller.prepareSession({
+      prompt: 'Test GitLab review prompt',
+      mode: 'code',
+      model: 'claude-3',
+      gitUrl: 'https://gitlab.com/acme/repo.git',
+      gitToken: 'caller-gitlab-token',
+      gitlabCodeReviewTokenRef: {
+        integrationId: '123e4567-e89b-12d3-a456-426614174011',
+        projectId: 42,
+      },
+      platform: 'gitlab',
+      createdOnPlatform: 'code-review',
+      upstreamBranch: 'feature/gitlab',
+    });
+
+    expect(doStub.registerSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        repository: {
+          type: 'gitlab',
+          url: 'https://gitlab.com/acme/repo.git',
+          branch: 'feature/gitlab',
+          gitlabCodeReviewTokenRef: {
+            integrationId: '123e4567-e89b-12d3-a456-426614174011',
+            projectId: 42,
+          },
+        },
+      })
+    );
+    expect(doStub.registerSession.mock.calls[0]?.[0].repository).not.toHaveProperty('token');
   });
 
   it('preserves caller gitToken for generic git repositories', async () => {
@@ -970,6 +1009,29 @@ describe('updateSession endpoint', () => {
     });
   });
 
+  it('forwards a GitLab code-review token reference for continuation upgrade', async () => {
+    const doStub = createMockDOStub();
+    const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
+
+    await caller.updateSession({
+      cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc' as SessionId,
+      gitlabCodeReviewTokenRef: {
+        integrationId: '123e4567-e89b-12d3-a456-426614174011',
+        projectId: 42,
+      },
+      gitlabCodeReviewRepositoryUrl: 'https://gitlab.com/acme/repo.git',
+    });
+
+    expect(doStub.tryUpdate).toHaveBeenCalledWith({
+      callbackTarget: undefined,
+      gitlabCodeReviewTokenRef: {
+        integrationId: '123e4567-e89b-12d3-a456-426614174011',
+        projectId: 42,
+      },
+      gitlabCodeReviewRepositoryUrl: 'https://gitlab.com/acme/repo.git',
+    });
+  });
+
   it('passes null callbackTarget through for clearing', async () => {
     const doStub = createMockDOStub();
     const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
@@ -1025,7 +1087,41 @@ describe('schema validation', () => {
     ).toBe(false);
   });
 
-  it('restricts updateSession to callbackTarget', () => {
+  it('validates GitLab code-review token references on internal inputs', () => {
+    const gitlabCodeReviewTokenRef = {
+      integrationId: '123e4567-e89b-12d3-a456-426614174011',
+      projectId: 42,
+    };
+    expect(
+      schemas.PrepareSessionInput.safeParse({
+        prompt: 'Review',
+        mode: 'code',
+        model: 'claude-3',
+        gitUrl: 'https://gitlab.com/acme/repo.git',
+        platform: 'gitlab',
+        createdOnPlatform: 'code-review',
+        gitlabCodeReviewTokenRef,
+      }).success
+    ).toBe(true);
+    expect(
+      schemas.UpdateSessionInput.safeParse({
+        cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc',
+        gitlabCodeReviewTokenRef,
+        gitlabCodeReviewRepositoryUrl: 'https://gitlab.com/acme/repo.git',
+      }).success
+    ).toBe(true);
+    expect(
+      schemas.PrepareSessionInput.safeParse({
+        prompt: 'Review',
+        mode: 'code',
+        model: 'claude-3',
+        gitUrl: 'https://gitlab.com/acme/repo.git',
+        gitlabCodeReviewTokenRef: { integrationId: 'not-a-uuid', projectId: 0 },
+      }).success
+    ).toBe(false);
+  });
+
+  it('restricts updateSession to supported internal updates', () => {
     expect(
       schemas.UpdateSessionInput.safeParse({
         cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc',

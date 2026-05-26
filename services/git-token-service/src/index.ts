@@ -1,6 +1,10 @@
 import { WorkerEntrypoint } from 'cloudflare:workers';
 import { GitHubTokenService, type GitHubAppType } from './github-token-service.js';
-import { GitLabLookupService } from './gitlab-lookup-service.js';
+import {
+  GitLabLookupService,
+  type GitLabCodeReviewTokenLookupParams,
+  type GitLabCodeReviewTokenLookupResult,
+} from './gitlab-lookup-service.js';
 import { GitLabTokenService } from './gitlab-token-service.js';
 import { InstallationLookupService } from './installation-lookup-service.js';
 
@@ -52,6 +56,9 @@ export type GetGitLabTokenFailure = {
 };
 
 export type GetGitLabTokenResult = GetGitLabTokenSuccess | GetGitLabTokenFailure;
+
+export type GetGitLabCodeReviewTokenParams = GitLabCodeReviewTokenLookupParams;
+export type GetGitLabCodeReviewTokenResult = GitLabCodeReviewTokenLookupResult;
 
 export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
   private githubService: GitHubTokenService;
@@ -130,6 +137,16 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
     }
 
     return this.gitlabTokenService.getToken(integration.integrationId, integration.metadata);
+  }
+
+  /**
+   * Resolve the stored project access token selected for a GitLab code review.
+   * This does not fall back to an integration-level user credential.
+   */
+  async getGitLabCodeReviewToken(
+    params: GetGitLabCodeReviewTokenParams
+  ): Promise<GetGitLabCodeReviewTokenResult> {
+    return this.gitlabLookupService.findGitLabCodeReviewToken(params);
   }
 }
 

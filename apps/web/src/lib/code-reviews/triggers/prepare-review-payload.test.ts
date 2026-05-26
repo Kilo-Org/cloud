@@ -254,13 +254,32 @@ describe('prepareReviewPayload', () => {
       )
       .returning();
 
-    await prepareReviewPayload({
+    const payload = await prepareReviewPayload({
       reviewId: review.id,
       owner: { type: 'user', id: testUser.id, userId: testUser.id },
       agentConfig: { config: baseAgentConfig },
       platform: 'gitlab',
     });
 
+    expect(payload.sessionInput).toMatchObject({
+      gitUrl: `https://gitlab.example.com/${REPO}.git`,
+      gitToken: 'gitlab-project-token',
+      platform: 'gitlab',
+      gitlabCodeReviewTokenRef: {
+        integrationId: gitlabIntegration.id,
+        projectId: 456,
+      },
+    });
+    expect(mockFindPreviousCompletedReview).toHaveBeenCalledWith(
+      REPO,
+      123,
+      'headsha123',
+      'gitlab',
+      {
+        integrationId: gitlabIntegration.id,
+        projectId: 456,
+      }
+    );
     expect(mockFetchGitLabRootTextFileAtRef).toHaveBeenCalledWith(
       'gitlab-project-token',
       REPO,
@@ -495,6 +514,7 @@ describe('prepareReviewPayload', () => {
       platform: 'github',
       upstreamBranch: 'refs/pull/1234/head',
     });
+    expect(payload.sessionInput.gitlabCodeReviewTokenRef).toBeUndefined();
   });
 
   it('does not continue previous cloud-agent sessions for GitHub pull-ref reviews', async () => {

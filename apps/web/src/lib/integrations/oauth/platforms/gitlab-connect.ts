@@ -44,31 +44,40 @@ type GitLabOAuthConnectOptions = {
  *
  * Query parameters:
  * - organizationId: (optional) Organization ID for org-owned integrations
- * - instanceUrl: (optional) Self-hosted GitLab instance URL (custom credentials must be sent via POST)
+ * - instanceUrl: (optional) Self-hosted GitLab instance URL
+ * - clientId/clientSecret: (temporary, authenticated GET compatibility) Self-hosted OAuth credentials
  * - returnTo: (optional) Relative path to return to after OAuth
  */
 export async function handleGitLabOAuthConnect(request: NextRequest) {
-  const organizationId = request.nextUrl.searchParams.get('organizationId');
+  const searchParams = request.nextUrl.searchParams;
+  const organizationId = searchParams.get('organizationId');
 
   try {
     const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
     if (authFailedResponse) {
+      const hasLegacyQueryCredentials =
+        searchParams.has('clientId') || searchParams.has('clientSecret');
+
       return redirectToSignInForOAuthConnect(
         request,
-        request.nextUrl.searchParams.has('clientSecret')
-          ? buildGitLabDetailCallbackPath(organizationId)
-          : undefined
+        hasLegacyQueryCredentials ? buildGitLabDetailCallbackPath(organizationId) : undefined
       );
     }
 
-    const searchParams = request.nextUrl.searchParams;
     const instanceUrl = searchParams.get('instanceUrl') || undefined;
+    const clientId = searchParams.get('clientId') || undefined;
+    const clientSecret = searchParams.get('clientSecret') || undefined;
     const returnToParam = searchParams.get('returnTo') || undefined;
     const returnTo = returnToParam ? validateReturnPath(returnToParam) : null;
+    const legacyQueryCredentials =
+      clientId && clientSecret ? { clientId, clientSecret } : undefined;
 
     const oauthUrl = await buildGitLabConnectOAuthUrl(user, {
       organizationId,
       instanceUrl,
+      // Temporary rollout compatibility for old client bundles that sent
+      // self-hosted GitLab credentials through an authenticated GET.
+      ...legacyQueryCredentials,
       returnTo,
     });
 

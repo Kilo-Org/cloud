@@ -14,6 +14,7 @@ import {
   getWorkerDb,
   insertKiloClawSubscriptionChangeLog,
   recordTerminalRenewalFailure,
+  serializeKiloClawSubscriptionSnapshot,
   supersedeTerminalRenewalFailuresForBoundary,
   type KiloClawSubscription,
   type Organization,
@@ -40,6 +41,7 @@ import {
   kilo_pass_subscriptions,
   kiloclaw_email_log,
   kiloclaw_instances,
+  kiloclaw_subscription_change_log,
   kiloclaw_subscriptions,
   kilocode_users,
   organization_memberships,
@@ -708,9 +710,9 @@ async function insertLifecycleChangeLogBestEffort(
 }
 
 /**
- * Clear `destruction_deadline` on a subscription whose instance has already
- * been cleaned up via some other path (`instance_id IS NULL`), so the
- * destruction sweep stops re-selecting it on every cron.
+ * Clear `destruction_deadline` on a batch of subscriptions whose instances
+ * have already been cleaned up via some other path (`instance_id IS NULL`),
+ * so the destruction sweep stops re-selecting them on every cron.
  *
  * The destruction sweep selects candidates ordered by `destruction_deadline
  * ASC, id ASC` with `LIMIT INSTANCE_DESTRUCTION_BATCH_SIZE`, then per-row
@@ -724,37 +726,65 @@ async function insertLifecycleChangeLogBestEffort(
  * The UPDATE is guarded so a concurrent re-attach or re-clear cannot race:
  *   - `instance_id IS NULL` — only clear rows that are still detached.
  *   - `destruction_deadline IS NOT NULL` — skip rows already cleared.
- * A no-op UPDATE returns no row, and we skip the change-log write.
+ * Rows that match neither guard are silently skipped (no changelog entry).
+ * Changelog entries for all cleared rows are written in a single bulk INSERT.
  */
 async function clearDetachedSubscriptionDestructionDeadlineBestEffort(
   database: WorkerDb,
-  subscriptionId: string,
+  subscriptionIds: string[],
   reason: string
 ): Promise<void> {
-  const before = await getSubscriptionById(database, subscriptionId);
-  const [after] = await database
+  if (subscriptionIds.length === 0) {
+    return;
+  }
+
+  // Bulk SELECT for before-snapshots (used in the audit changelog).
+  const befores = await database
+    .select()
+    .from(kiloclaw_subscriptions)
+    .where(inArray(kiloclaw_subscriptions.id, subscriptionIds));
+
+  // Single guarded UPDATE — rows already cleared or re-attached are skipped.
+  const cleared = await database
     .update(kiloclaw_subscriptions)
     .set({ destruction_deadline: null })
     .where(
       and(
-        eq(kiloclaw_subscriptions.id, subscriptionId),
+        inArray(kiloclaw_subscriptions.id, subscriptionIds),
         isNull(kiloclaw_subscriptions.instance_id),
         isNotNull(kiloclaw_subscriptions.destruction_deadline)
       )
     )
     .returning();
 
-  if (!after) {
+  if (cleared.length === 0) {
     return;
   }
 
-  await insertLifecycleChangeLogBestEffort(database, {
-    subscriptionId,
-    action: 'status_changed',
+  // Bulk changelog INSERT — one round-trip for the entire batch.
+  const beforeMap = new Map(befores.map(s => [s.id, s]));
+  const changeLogEntries = cleared.map(after => ({
+    subscription_id: after.id,
+    actor_type: LIFECYCLE_ACTOR.actorType,
+    actor_id: LIFECYCLE_ACTOR.actorId,
+    action: 'status_changed' as KiloClawSubscriptionChangeAction,
     reason,
-    before,
-    after,
-  });
+    before_state: serializeKiloClawSubscriptionSnapshot(beforeMap.get(after.id) ?? null),
+    after_state: serializeKiloClawSubscriptionSnapshot(after),
+  }));
+
+  try {
+    await database.insert(kiloclaw_subscription_change_log).values(changeLogEntries);
+  } catch (error) {
+    log('error', 'Failed to write lifecycle subscription change log for detached subscriptions', {
+      event: 'subscription_change_log_failed',
+      outcome: 'failed',
+      actor_id: LIFECYCLE_ACTOR.actorId,
+      action: 'status_changed' as KiloClawSubscriptionChangeAction,
+      reason,
+      error: errorMessage(error),
+    });
+  }
 }
 
 function logSkippedSubscriptionRow(
@@ -3673,6 +3703,11 @@ async function runInstanceDestructionSweep(
     .orderBy(asc(kiloclaw_subscriptions.destruction_deadline), asc(kiloclaw_subscriptions.id))
     .limit(INSTANCE_DESTRUCTION_BATCH_SIZE);
 
+  // Collect detached row IDs for a single bulk clear after the loop,
+  // avoiding O(n) DB round-trips per row. See
+  // `clearDetachedSubscriptionDestructionDeadlineBestEffort`.
+  const detachedSubscriptionIds: string[] = [];
+
   for (const row of destructionCandidates) {
     try {
       if (isSoftDeletedUserEmail(row.email)) continue;
@@ -3694,15 +3729,8 @@ async function runInstanceDestructionSweep(
             reason: 'missing_instance_id',
           }
         );
-        // The row has nothing to destroy (its instance was cleaned up via
-        // another path). Clear `destruction_deadline` so the candidate query
-        // stops re-selecting it and starving everything behind it in the
-        // FIFO queue. See `clearDetachedSubscriptionDestructionDeadlineBestEffort`.
-        await clearDetachedSubscriptionDestructionDeadlineBestEffort(
-          database,
-          row.id,
-          'detached_subscription_no_instance'
-        );
+        // Bulk-cleared after the loop — see detachedSubscriptionIds below.
+        detachedSubscriptionIds.push(row.id);
         continue;
       }
 
@@ -3821,16 +3849,27 @@ async function runInstanceDestructionSweep(
       const [updated] = await database
         .update(kiloclaw_subscriptions)
         .set({ destruction_deadline: null })
-        .where(eq(kiloclaw_subscriptions.id, destructionRow.id))
+        .where(
+          and(
+            eq(kiloclaw_subscriptions.id, destructionRow.id),
+            isNotNull(kiloclaw_subscriptions.destruction_deadline)
+          )
+        )
         .returning();
 
-      await insertLifecycleChangeLogBestEffort(database, {
-        subscriptionId: destructionRow.id,
-        action: 'status_changed',
-        reason: 'instance_destroyed',
-        before,
-        after: updated ?? null,
-      });
+      // Only write changelog when the UPDATE actually changed a row.
+      // A concurrent clear (e.g. clearDetachedSubscriptionDestructionDeadlineBestEffort)
+      // can race here; without this guard the log would record a phantom
+      // `instance_destroyed` event with identical before/after states.
+      if (updated) {
+        await insertLifecycleChangeLogBestEffort(database, {
+          subscriptionId: destructionRow.id,
+          action: 'status_changed',
+          reason: 'instance_destroyed',
+          before,
+          after: updated,
+        });
+      }
 
       let organizationNotificationSentCount = 0;
       if (destructionRow.organization_id && destructionRow.organization_name) {
@@ -3926,6 +3965,14 @@ async function runInstanceDestructionSweep(
       });
     }
   }
+
+  // Bulk-clear destruction_deadline for all detached rows collected above.
+  // A single SELECT + UPDATE + INSERT replaces O(n) per-row round-trips.
+  await clearDetachedSubscriptionDestructionDeadlineBestEffort(
+    database,
+    detachedSubscriptionIds,
+    'detached_subscription_no_instance'
+  );
 }
 
 async function runPastDueCleanupSweep(

@@ -3029,10 +3029,10 @@ describe('instance destruction sweep', () => {
     // of the FIFO candidate query forever — production saw 25k+ real
     // overdue rows starve for 40 days behind ~50 detached rows.
     //
-    // The fix clears `destruction_deadline = null` (guarded by
-    // `instance_id IS NULL` and `destruction_deadline IS NOT NULL` to be
-    // race-safe) so the row falls out of the candidate set on the first
-    // encounter, and writes a change-log entry for the audit trail.
+    // The fix collects all detached IDs during the loop, then after the
+    // loop issues a single bulk SELECT + guarded bulk UPDATE + single
+    // bulk changelog INSERT — 3 DB round-trips total regardless of how
+    // many detached rows are in the batch.
     const subscriptionId = 'sub-detached-1';
     const detachedBefore = {
       id: subscriptionId,
@@ -3055,7 +3055,7 @@ describe('instance destruction sweep', () => {
             email: 'detached@example.com',
           },
         ],
-        // 2. `getSubscriptionById` from the cleanup helper (before snapshot).
+        // 2. Bulk SELECT for before-snapshots in the cleanup helper.
         [detachedBefore],
       ],
       { updateReturningRows: [[detachedAfter]] }
@@ -3076,13 +3076,14 @@ describe('instance destruction sweep', () => {
     expect(summary.sweep3_instance_destruction).toBe(0);
     expect(fetch).not.toHaveBeenCalled();
     expect(globalThis.fetch).not.toHaveBeenCalled();
-    // The guarded UPDATE fired exactly once, clearing destruction_deadline.
+    // The single guarded bulk UPDATE fired, clearing destruction_deadline.
     expect(updates).toEqual([{ destruction_deadline: null }]);
     expect(txUpdates).toHaveLength(0);
     expect(deletes).toHaveLength(0);
-    // A change-log row was written tagged with the dedicated reason so this
-    // cleanup is auditable.
-    expect(inserts).toEqual(
+    // The bulk INSERT wrote changelog entries as an array in a single call.
+    // inserts[0] is the values array passed to db.insert().values([...]).
+    expect(inserts).toHaveLength(1);
+    expect(inserts[0]).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           subscription_id: subscriptionId,

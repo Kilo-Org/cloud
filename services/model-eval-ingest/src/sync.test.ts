@@ -59,13 +59,15 @@ class MemoryPromotionStore implements PromotionStore {
     return inserted;
   }
 
-  async refreshPromotions(
-    promotions: Array<{ promotion: PromotionRecord; modelStatsId: string | null }>
-  ): Promise<void> {
-    for (const { promotion, modelStatsId } of promotions) {
-      if (!this.rows.has(promotion.bench_eval_name)) continue;
-      this.rows.set(promotion.bench_eval_name, { promotion, modelStatsId });
-    }
+  async refreshPromotion({
+    promotion,
+    modelStatsId,
+  }: {
+    promotion: PromotionRecord;
+    modelStatsId: string | null;
+  }): Promise<void> {
+    if (!this.rows.has(promotion.bench_eval_name)) return;
+    this.rows.set(promotion.bench_eval_name, { promotion, modelStatsId });
   }
 
   async listLatestPromotions(

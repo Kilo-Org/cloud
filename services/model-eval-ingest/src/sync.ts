@@ -73,7 +73,7 @@ export type PromotionStore = {
   getLatestPromotedAtMs(): Promise<number>;
   findModelStatsTargets(models: string[]): Promise<Map<string, ModelStatsTarget>>;
   insertPromotions(promotions: PromotionInsert[]): Promise<Set<string>>;
-  refreshPromotions(promotions: PromotionInsert[]): Promise<void>;
+  refreshPromotion(promotion: PromotionInsert): Promise<void>;
   listLatestPromotions(tuple: Omit<PromotionTuple, 'modelStatsId'>): Promise<LatestPromotion[]>;
   writeKiloBenchBenchmarks(modelStatsId: string, benchmarks: KiloBenchBenchmarks): Promise<void>;
 };
@@ -140,13 +140,11 @@ export function createPromotionStore(db: WorkerDb): PromotionStore {
       return new Set(inserted.map(row => row.benchEvalName));
     },
 
-    async refreshPromotions(promotions: PromotionInsert[]): Promise<void> {
-      for (const promotion of promotions) {
-        await db
-          .update(model_eval_ingestions)
-          .set(storedPromotionValues(promotion))
-          .where(eq(model_eval_ingestions.bench_eval_name, promotion.promotion.bench_eval_name));
-      }
+    async refreshPromotion(promotion: PromotionInsert): Promise<void> {
+      await db
+        .update(model_eval_ingestions)
+        .set(storedPromotionValues(promotion))
+        .where(eq(model_eval_ingestions.bench_eval_name, promotion.promotion.bench_eval_name));
     },
 
     async listLatestPromotions(
@@ -288,11 +286,12 @@ export async function syncPromotionsFromBench(
   });
   const insertedPromotionNames = await store.insertPromotions(promotionsToInsert);
   if (opts.promotionName != null) {
-    await store.refreshPromotions(
-      promotionsToInsert.filter(
-        ({ promotion }) => !insertedPromotionNames.has(promotion.bench_eval_name)
-      )
+    const promotionToRefresh = promotionsToInsert.find(
+      ({ promotion }) => !insertedPromotionNames.has(promotion.bench_eval_name)
     );
+    if (promotionToRefresh) {
+      await store.refreshPromotion(promotionToRefresh);
+    }
   }
 
   for (const promotion of promotions) {

@@ -121,9 +121,8 @@ async function getAffiliateDisputeChargeContext(
   chargeId: string,
   preFetchedCharge?: Stripe.Charge & { invoice?: string | Stripe.Invoice | null }
 ): Promise<AffiliateDisputeChargeContext | null> {
-  const charge =
-    preFetchedCharge ??
-    (await client.charges.retrieve(chargeId, { expand: ['invoice'] }));
+  const charge: Stripe.Charge & { invoice?: string | Stripe.Invoice | null } =
+    preFetchedCharge ?? (await client.charges.retrieve(chargeId, { expand: ['invoice'] }));
   const invoice = charge.invoice;
   if (!invoice || typeof invoice === 'string') {
     return null;

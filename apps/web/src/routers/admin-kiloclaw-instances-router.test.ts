@@ -3288,34 +3288,39 @@ describe('admin.kiloclawInstances.destroyOrphanVolume', () => {
       google_user_email: `unrelated-recent-${Math.random()}@example.com`,
       is_admin: false,
     });
-    await db.insert(kiloclaw_instances).values({
-      id: crypto.randomUUID(),
-      user_id: otherUser.id,
-      sandbox_id: `ki_${crypto.randomUUID().replace(/-/g, '')}`,
-      destroyed_at: daysAgo(1),
-    });
-    const targetInstanceId = await insertDestroyedInstance({ destroyedAt: daysAgo(30) });
-    mockDestroyOrphanVolume.mockResolvedValue({
-      ok: true,
-      flyApp: 'inst-scoped',
-      volumeId: VOLUME_ID,
-      volumeName: 'kiloclaw_scoped',
-      alreadyGone: false,
-    });
-    const caller = await createCallerForUser(adminUser.id);
+    // The outer afterEach only cleans `regularUser` / `adminUser` /
+    // `cliRunUser`, so this unrelated user must be cleaned up explicitly. A
+    // try/finally guarantees the cleanup runs even when an assertion in the
+    // body throws — otherwise a failing run would leave the row in the table
+    // and pollute subsequent tests.
+    try {
+      await db.insert(kiloclaw_instances).values({
+        id: crypto.randomUUID(),
+        user_id: otherUser.id,
+        sandbox_id: `ki_${crypto.randomUUID().replace(/-/g, '')}`,
+        destroyed_at: daysAgo(1),
+      });
+      const targetInstanceId = await insertDestroyedInstance({ destroyedAt: daysAgo(30) });
+      mockDestroyOrphanVolume.mockResolvedValue({
+        ok: true,
+        flyApp: 'inst-scoped',
+        volumeId: VOLUME_ID,
+        volumeName: 'kiloclaw_scoped',
+        alreadyGone: false,
+      });
+      const caller = await createCallerForUser(adminUser.id);
 
-    const result = await caller.admin.kiloclawInstances.destroyOrphanVolume({
-      instanceId: targetInstanceId,
-      volumeId: VOLUME_ID,
-    });
+      const result = await caller.admin.kiloclawInstances.destroyOrphanVolume({
+        instanceId: targetInstanceId,
+        volumeId: VOLUME_ID,
+      });
 
-    expect(result).toMatchObject({ success: true });
-    expect(mockDestroyOrphanVolume).toHaveBeenCalledTimes(1);
-
-    // afterEach cleans by `regularUser` / `adminUser` / `cliRunUser`; this
-    // unrelated user's instance must be cleaned up explicitly.
-    await db.delete(kiloclaw_instances).where(eq(kiloclaw_instances.user_id, otherUser.id));
-    await db.delete(kilocode_users).where(eq(kilocode_users.id, otherUser.id));
+      expect(result).toMatchObject({ success: true });
+      expect(mockDestroyOrphanVolume).toHaveBeenCalledTimes(1);
+    } finally {
+      await db.delete(kiloclaw_instances).where(eq(kiloclaw_instances.user_id, otherUser.id));
+      await db.delete(kilocode_users).where(eq(kilocode_users.id, otherUser.id));
+    }
   });
 
   it('rejects when the user has an access-granting subscription', async () => {

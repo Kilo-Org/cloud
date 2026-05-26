@@ -20,8 +20,11 @@ import {
   LegacyExecutionResponse,
 } from '../schemas.js';
 import type { SessionId } from '../../types/ids.js';
-import { queueMessage } from '../../session/queue-message.js';
-import { admitLegacyPreparedInitialMessage } from '../../session/legacy-prepared-admission.js';
+import { queueMessage, replayMessageIfAlreadyAdmitted } from '../../session/queue-message.js';
+import {
+  admitLegacyPreparedInitialMessage,
+  replayLegacyPreparedInitialMessageIfAlreadyAdmitted,
+} from '../../session/legacy-prepared-admission.js';
 import type {
   AgentSelectionOverride,
   ExecutionTurnSubmission,
@@ -52,6 +55,12 @@ export function createSessionExecutionV2Handlers() {
           logger.info('Initiating V2 session from prepared session');
           const admissionInput = { cloudAgentSessionId: input.cloudAgentSessionId };
           const admissionContext = { env: ctx.env, userId: ctx.userId, botId: ctx.botId };
+          const replay = await replayLegacyPreparedInitialMessageIfAlreadyAdmitted(
+            admissionInput,
+            admissionContext
+          );
+          if (replay) return withLegacyExecutionId(replay);
+
           await preflightPreparedInitialPromptModel({
             env: ctx.env,
             userId: ctx.userId,
@@ -123,6 +132,9 @@ export function createSessionExecutionV2Handlers() {
           };
           const admissionContext = { env: ctx.env, userId: ctx.userId, botId: ctx.botId };
           if (turn.type === 'prompt') {
+            const replay = await replayMessageIfAlreadyAdmitted(queuedMessage, admissionContext);
+            if (replay) return withLegacyExecutionId(replay);
+
             await preflightExistingPromptModel({
               env: ctx.env,
               userId: ctx.userId,

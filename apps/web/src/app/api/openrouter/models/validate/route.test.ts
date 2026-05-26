@@ -116,6 +116,41 @@ describe('POST /api/openrouter/models/validate', () => {
     });
   });
 
+  test('loads authenticated auxiliary catalogs concurrently', async () => {
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: { id: 'user-id' },
+      organizationId: null,
+      authFailedResponse: null,
+    } as never);
+    mockedGetEnhancedOpenRouterModels.mockResolvedValue({ data: [] });
+    let markByokStarted: (() => void) | undefined;
+    const byokStarted = new Promise<void>(resolve => {
+      markByokStarted = resolve;
+    });
+    type DirectByokModels = Awaited<ReturnType<typeof getDirectByokModelsForUser>>;
+    let resolveByok: ((models: DirectByokModels) => void) | undefined;
+    const byokPending = new Promise<DirectByokModels>(resolve => {
+      resolveByok = resolve;
+    });
+    mockedGetDirectByokModelsForUser.mockImplementation(() => {
+      if (!markByokStarted) throw new Error('BYOK start signal was not initialized');
+      markByokStarted();
+      return byokPending;
+    });
+    mockedListAvailableExperimentModels.mockResolvedValue([makeModel('experiment/model')]);
+
+    const responsePromise = POST(request('experiment/model'));
+    await byokStarted;
+    const finishByok = resolveByok;
+    if (!finishByok) throw new Error('BYOK lookup did not start');
+    try {
+      expect(mockedListAvailableExperimentModels).toHaveBeenCalledTimes(1);
+    } finally {
+      finishByok([]);
+      await responsePromise;
+    }
+  });
+
   test('rejects an invalid body without reading a catalog', async () => {
     const response = await POST(
       new NextRequest('http://localhost:3000/api/openrouter/models/validate', {

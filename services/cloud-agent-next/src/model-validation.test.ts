@@ -93,6 +93,68 @@ describe('model validation', () => {
     }
   });
 
+  it('falls back to the existing official catalog while the validation route rolls out', async () => {
+    fetchMock
+      .mockResolvedValueOnce(new Response(null, { status: 404 }))
+      .mockResolvedValueOnce(Response.json({ data: [{ id: 'available/model' }] }));
+
+    await assertKiloModelAvailable({
+      env: { KILOCODE_BACKEND_BASE_URL: 'https://api.kilo.test' } as Env,
+      submittedModel: 'available/model',
+      procedure: 'send',
+    });
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      'https://api.kilo.test/api/openrouter/models/validate'
+    );
+    expect(fetchMock.mock.calls[1]?.[0]).toBe('https://api.kilo.test/api/openrouter/models');
+    expect(fetchMock.mock.calls[1]?.[1]).toMatchObject({ method: 'GET' });
+  });
+
+  it('keeps organization scope when using the official rollout fallback', async () => {
+    fetchMock
+      .mockResolvedValueOnce(new Response(null, { status: 404 }))
+      .mockResolvedValueOnce(Response.json({ data: [{ id: 'available/model' }] }));
+
+    await assertKiloModelAvailable({
+      env: officialEnv,
+      submittedModel: 'available/model',
+      procedure: 'send',
+    });
+
+    expect(fetchMock.mock.calls[1]?.[0]).toBe(
+      'https://api.kilo.test/api/organizations/override-org/models'
+    );
+  });
+
+  it('rejects a model absent from the official rollout fallback catalog', async () => {
+    fetchMock
+      .mockResolvedValueOnce(new Response(null, { status: 404 }))
+      .mockResolvedValueOnce(Response.json({ data: [{ id: 'other/model' }] }));
+
+    await expect(
+      assertKiloModelAvailable({
+        env: { KILOCODE_BACKEND_BASE_URL: 'https://api.kilo.test' } as Env,
+        submittedModel: 'missing/model',
+        procedure: 'send',
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+  });
+
+  it('does not fall back to official catalogs for an override endpoint 404', async () => {
+    fetchMock.mockResolvedValueOnce(new Response(null, { status: 404 }));
+
+    await expect(
+      assertKiloModelAvailable({
+        env: { KILO_OPENROUTER_BASE: 'http://localhost:8811/api' } as Env,
+        submittedModel: 'available/model',
+        procedure: 'send',
+      })
+    ).rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE' });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it('retries an unauthorized scoped validation against the public catalog', async () => {
     fetchMock
       .mockResolvedValueOnce(new Response(null, { status: 401 }))

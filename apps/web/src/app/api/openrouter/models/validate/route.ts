@@ -51,8 +51,10 @@ export async function POST(request: NextRequest) {
     if (!Array.isArray(models.data)) {
       throw new Error('Model catalog returned invalid data');
     }
-    const byokModels = auth?.user ? await getDirectByokModelsForUser(auth.user.id) : [];
-    const experimentModels = await listAvailableExperimentModels();
+    const [byokModels, experimentModels] = await Promise.all([
+      auth?.user ? getDirectByokModelsForUser(auth.user.id) : [],
+      listAvailableExperimentModels(),
+    ]);
     const available = filterByFeature(
       models.data.concat(byokModels, experimentModels),
       feature

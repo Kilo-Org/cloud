@@ -10,7 +10,7 @@
 import { protectedProcedure } from '../auth.js';
 import { logger, withLogTags } from '../../logger.js';
 import { SendMessageInput, ExecutionResponse } from '../schemas.js';
-import { queueMessage } from '../../session/queue-message.js';
+import { queueMessage, replayMessageIfAlreadyAdmitted } from '../../session/queue-message.js';
 import type { SessionId } from '../../types/ids.js';
 import { preflightExistingPromptModel } from '../../session/model-preflight.js';
 
@@ -42,6 +42,9 @@ const sendMessageHandler = protectedProcedure
         finalization: input.finalization,
       };
       const admissionContext = { env: ctx.env, userId: ctx.userId, botId: ctx.botId };
+      const replay = await replayMessageIfAlreadyAdmitted(queuedMessage, admissionContext);
+      if (replay) return replay;
+
       await preflightExistingPromptModel({
         env: ctx.env,
         userId: ctx.userId,

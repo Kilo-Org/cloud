@@ -2382,10 +2382,25 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
   // Direct Execution Methods
   // ---------------------------------------------------------------------------
 
+  async hasMessageAdmission(messageId: string): Promise<boolean> {
+    return this.getSessionMessageQueue().hasMessageAdmission(messageId);
+  }
+
   async admitSubmittedMessage(
     request: SubmittedSessionMessageRequest
   ): Promise<SessionMessageAdmissionResult> {
     return this.getSessionMessageQueue().admitSubmittedMessage(request);
+  }
+
+  async replayPreparedInitialMessage(
+    request: LegacyRegisteredInitialAdmissionRequest
+  ): Promise<SessionMessageAdmissionResult | undefined> {
+    const metadata = await this.getMetadata();
+    const messageId = metadata?.initialMessage?.id;
+    if (!messageId || !(await this.getSessionMessageQueue().hasMessageAdmission(messageId))) {
+      return undefined;
+    }
+    return this.admitPreparedInitialMessage(request);
   }
 
   async admitPreparedInitialMessage(

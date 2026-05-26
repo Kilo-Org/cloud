@@ -95,6 +95,7 @@ export type PendingMessageDrainResult = {
 };
 
 export type SessionMessageQueue = {
+  hasMessageAdmission(messageId: string): Promise<boolean>;
   admitSubmittedMessage(
     request: SubmittedSessionMessageRequest
   ): Promise<SessionMessageAdmissionResult>;
@@ -469,6 +470,12 @@ export function createSessionMessageQueue(
     logger
       .withFields({ sessionId, messageId: intent.turn.messageId })
       .info('Queued message event persisted and pending flush scheduled');
+  }
+
+  async function hasMessageAdmission(messageId: string): Promise<boolean> {
+    const pendingMessage = await getQueuedMessageByMessageId(storage, messageId);
+    if (pendingMessage) return true;
+    return (await getSessionMessageState(storage, messageId)) !== undefined;
   }
 
   async function getExistingAdmissionAckForMessageId(
@@ -953,6 +960,7 @@ export function createSessionMessageQueue(
   }
 
   return {
+    hasMessageAdmission,
     admitSubmittedMessage,
     admitAcceptedMessage,
     drainNextPendingMessage,

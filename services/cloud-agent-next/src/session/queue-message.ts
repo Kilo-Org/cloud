@@ -95,6 +95,25 @@ export function projectAdmissionToPublicAck(
   };
 }
 
+export async function replayMessageIfAlreadyAdmitted(
+  input: QueueMessageInput,
+  ctx: QueueMessageContext
+): Promise<QueueAckResponse | undefined> {
+  const messageId = input.turn.id;
+  if (messageId === undefined || messageId === null) return undefined;
+
+  const sessionId = input.cloudAgentSessionId as SessionId;
+  const doId = ctx.env.CLOUD_AGENT_SESSION.idFromName(`${ctx.userId}:${sessionId}`);
+  const alreadyAdmitted = await withDORetry<DurableObjectStub<CloudAgentSession>, boolean>(
+    () => ctx.env.CLOUD_AGENT_SESSION.get(doId),
+    stub => stub.hasMessageAdmission(messageId),
+    'hasMessageAdmission'
+  );
+  if (!alreadyAdmitted) return undefined;
+
+  return queueMessage(input, ctx);
+}
+
 export async function queueMessage(
   input: QueueMessageInput,
   ctx: QueueMessageContext

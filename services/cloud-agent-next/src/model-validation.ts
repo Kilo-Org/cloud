@@ -43,6 +43,10 @@ const officialValidationResponseSchema = z.union([
   z.object({ valid: z.literal(false), reason: z.literal('unavailable') }),
 ]);
 
+const officialCatalogResponseSchema = z.object({
+  data: z.array(z.object({ id: z.string() })),
+});
+
 function effectiveCatalogContext(input: AssertKiloModelAvailableInput): EffectiveCatalogContext {
   return {
     token: input.env.KILOCODE_TOKEN_OVERRIDE ?? input.originalToken,
@@ -87,6 +91,42 @@ function officialValidationUrl(
     : `${backendUrl}/api/openrouter/models/validate`;
 }
 
+function officialCatalogUrl(env: ModelValidationEnv, organizationId: string | undefined): string {
+  const backendUrl = (env.KILOCODE_BACKEND_BASE_URL ?? DEFAULT_BACKEND_URL).replace(/\/+$/, '');
+  return organizationId
+    ? `${backendUrl}/api/organizations/${encodeURIComponent(organizationId)}/models`
+    : `${backendUrl}/api/openrouter/models`;
+}
+
+async function validateFromExistingOfficialCatalog(
+  env: ModelValidationEnv,
+  modelId: string,
+  context: EffectiveCatalogContext
+): Promise<ModelValidationResult> {
+  const response = await fetchWithTimeout(officialCatalogUrl(env, context.organizationId), {
+    method: 'GET',
+    headers: requestHeaders(context),
+  });
+  if (!response) return { type: 'validation-unavailable', source: 'official' };
+  if (response.status === 401 && (context.token || context.organizationId)) {
+    return validateFromOfficialSource(env, modelId, anonymousCatalogContext(context.feature));
+  }
+  if (response.status === 403) return { type: 'access-denied', source: 'official' };
+  if (!response.ok) return { type: 'validation-unavailable', source: 'official' };
+
+  let body: unknown;
+  try {
+    body = await response.json();
+  } catch {
+    return { type: 'validation-unavailable', source: 'official' };
+  }
+  const parsed = officialCatalogResponseSchema.safeParse(body);
+  if (!parsed.success) return { type: 'validation-unavailable', source: 'official' };
+  return parsed.data.data.some(model => model.id === modelId)
+    ? { type: 'valid', source: 'official' }
+    : { type: 'unavailable-model', source: 'official' };
+}
+
 async function validateFromOfficialSource(
   env: ModelValidationEnv,
   modelId: string,
@@ -98,6 +138,9 @@ async function validateFromOfficialSource(
     body: JSON.stringify({ modelId }),
   });
   if (!response) return { type: 'validation-unavailable', source: 'official' };
+  if (response.status === 404) {
+    return validateFromExistingOfficialCatalog(env, modelId, context);
+  }
   if (response.status === 401 && (context.token || context.organizationId)) {
     return validateFromOfficialSource(env, modelId, anonymousCatalogContext(context.feature));
   }

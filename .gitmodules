@@ -1,3 +1,3 @@
 [submodule ".kilo/design"]
 	path = .kilo/design
-	url = git@github.com:Kilo-Org/kilo-design.git
+	url = https://github.com/Kilo-Org/kilo-design.git

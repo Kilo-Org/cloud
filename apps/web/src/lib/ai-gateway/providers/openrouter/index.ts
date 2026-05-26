@@ -20,6 +20,9 @@ import {
 } from '@/lib/ai-gateway/providers/model-settings';
 import { AUTO_MODELS } from '@/lib/ai-gateway/auto-model';
 import { ATTRIBUTION_HEADERS } from '@/lib/ai-gateway/providers/openrouter/attribution-headers';
+import { getOpenRouterModelsMetadata } from '@/lib/ai-gateway/providers/gateway-models-cache';
+import { getPreferredProviderOrder } from '@/lib/ai-gateway/providers/apply-provider-specific-logic';
+import { normalizeInferenceProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 
 // Re-export from shared module for backwards compatibility
 export { normalizeModelId } from '@/lib/ai-gateway/model-utils';
@@ -84,6 +87,7 @@ function formatName(model: OpenRouterModel, preferredIndex: number) {
 
 async function enhancedModelList(models: OpenRouterModel[]) {
   const autoModels = buildAutoModels();
+  const endpointsMetadata = await getOpenRouterModelsMetadata();
   const enhancedModels = await Promise.all(
     models
       .filter(
@@ -91,6 +95,16 @@ async function enhancedModelList(models: OpenRouterModel[]) {
           !kiloExclusiveModels.some(m => m.public_id === model.id) &&
           !isForbiddenFreeModel(model.id)
       )
+      .map(model => {
+        const preferredProvider = normalizeInferenceProviderId(
+          getPreferredProviderOrder(model.id).at(0)
+        );
+        const endpoints = endpointsMetadata[model.id]?.endpoints ?? [];
+        const pricing = endpoints.find(
+          e => normalizeInferenceProviderId(e.tag) === preferredProvider
+        )?.pricing;
+        return pricing ? { ...model, pricing } : model;
+      })
       .concat(
         kiloExclusiveModels
           .filter(m => m.status === 'public')

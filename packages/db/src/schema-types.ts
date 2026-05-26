@@ -1182,6 +1182,18 @@ export const ModelsSchema = z.object({ data: z.array(ModelSchema) });
 export const EndpointSchema = z.object({
   tag: z.string(),
   context_length: z.number(),
+  pricing: z
+    .object({
+      prompt: z.string(),
+      completion: z.string(),
+      image: z.string().optional(),
+      request: z.string().optional(),
+      input_cache_read: z.string().optional(),
+      input_cache_write: z.string().optional(),
+      web_search: z.string().optional(),
+      internal_reasoning: z.string().optional(),
+    })
+    .optional(),
 });
 
 export const EndpointsSchema = z.object({

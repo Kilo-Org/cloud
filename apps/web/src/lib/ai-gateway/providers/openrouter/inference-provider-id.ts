@@ -190,11 +190,18 @@ const openRouterToVercelInferenceProviderMapping = {
     VercelNonUserByokInferenceProviderIdSchema.enum.togetherai,
 } as Record<string, VercelInferenceProviderId | undefined>;
 
-export function openRouterToVercelInferenceProviderId(providerId: string) {
+export function normalizeInferenceProviderId(providerId: string): string;
+export function normalizeInferenceProviderId(
+  providerId: string | undefined,
+): string | undefined;
+export function normalizeInferenceProviderId(providerId: string | undefined) {
+  if (!providerId) return providerId;
   const slashIndex = providerId.indexOf('/');
-  const normalizedProviderId = (
-    slashIndex >= 0 ? providerId.slice(0, slashIndex) : providerId
-  ).toLowerCase();
+  return (slashIndex >= 0 ? providerId.slice(0, slashIndex) : providerId).toLowerCase();
+}
+
+export function openRouterToVercelInferenceProviderId(providerId: string) {
+  const normalizedProviderId = normalizeInferenceProviderId(providerId);
   return openRouterToVercelInferenceProviderMapping[normalizedProviderId] ?? normalizedProviderId;
 }
 

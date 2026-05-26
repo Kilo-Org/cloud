@@ -2,7 +2,7 @@ import { describe, it, expect } from '@jest/globals';
 import { buildUpstreamBody } from './embedding-request';
 
 describe('buildUpstreamBody', () => {
-  it('should forward supported fields and strip client-only, Mistral-specific, and deprecated fields', () => {
+  it('should forward supported fields and strip native Mistral fields', () => {
     const result = buildUpstreamBody({
       model: 'google/text-embedding-004',
       input: ['text1', 'text2'],
@@ -19,13 +19,27 @@ describe('buildUpstreamBody', () => {
       model: 'google/text-embedding-004',
       input: ['text1', 'text2'],
       encoding_format: 'float',
+      dimensions: 768,
       safety_identifier: 'hash-abc',
       provider: { order: ['Google'] },
       input_type: 'search_document',
     });
-    expect(result).not.toHaveProperty('dimensions');
     expect(result).not.toHaveProperty('output_dtype');
     expect(result).not.toHaveProperty('output_dimension');
+  });
+
+  it('should keep Codestral embedding dimensions for the upstream provider', () => {
+    const result = buildUpstreamBody({
+      model: 'mistralai/codestral-embed-2505',
+      input: ['function add(a, b) { return a + b; }'],
+      dimensions: 256,
+    });
+
+    expect(result).toEqual({
+      model: 'mistralai/codestral-embed-2505',
+      input: ['function add(a, b) { return a + b; }'],
+      dimensions: 256,
+    });
   });
 
   it('should strip the deprecated user field', () => {

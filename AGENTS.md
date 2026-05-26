@@ -37,7 +37,7 @@ Target a specific test file: `pnpm test -- <path>`. Run tests for a specific ser
 
 ## apps/web UI Work
 
-Before making or reviewing UI changes under `apps/web` — components, routes/pages, layouts, styling, Storybook, visual polish, UX copy, interaction states, responsive behavior, theming, or accessibility — read `design.md` and use `.agents/skills/kilo-design/SKILL.md`. This applies even when the prompt does not explicitly mention design. Skip only for backend-only or non-visual logic changes.
+Before making or reviewing UI changes under `apps/web` — components, routes/pages, layouts, styling, Storybook, visual polish, UX copy, interaction states, responsive behavior, theming, or accessibility — read `DESIGN.md` and use `.agents/skills/kilo-design/SKILL.md`. This applies even when the prompt does not explicitly mention design. Skip only for backend-only or non-visual logic changes.
 
 ## Coding Standards
 

@@ -107,7 +107,7 @@ function setUserAuth() {
   });
 }
 
-function classifyResult(action: 'block' | 'rate-limit' | 'quarantine-3' | null) {
+function classifyResult(action: 'block' | 'rate-limit' | 'quarantine-1' | 'quarantine-2' | 'quarantine-3' | null) {
   return {
     verdict: 'ALLOW' as const,
     risk_score: 0,
@@ -210,6 +210,68 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
     expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.model).toBe(
       'nvidia/nemotron-3-super-120b-a12b:free'
     );
+  });
+
+  it('applies quarantine-1 latency without model rewrite', async () => {
+    jest.useFakeTimers();
+    mockedClassifyAbuse.mockResolvedValue(classifyResult('quarantine-1'));
+
+    const { POST } = await import('./route');
+    const responsePromise = POST(makeRequest(makeBody()) as never);
+
+    await jest.advanceTimersByTimeAsync(1999);
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+
+    await jest.advanceTimersByTimeAsync(1);
+    const response = await responsePromise;
+
+    expect(response.status).toBe(200);
+    expect(mockedGetProvider).toHaveBeenCalledTimes(1);
+    expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.model).toBe('openai/gpt-4o');
+  });
+
+  it('applies quarantine-2 latency without model rewrite', async () => {
+    jest.useFakeTimers();
+    mockedClassifyAbuse.mockResolvedValue(classifyResult('quarantine-2'));
+
+    const { POST } = await import('./route');
+    const responsePromise = POST(makeRequest(makeBody()) as never);
+
+    await jest.advanceTimersByTimeAsync(5999);
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+
+    await jest.advanceTimersByTimeAsync(1);
+    const response = await responsePromise;
+
+    expect(response.status).toBe(200);
+    expect(mockedGetProvider).toHaveBeenCalledTimes(1);
+    expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.model).toBe('openai/gpt-4o');
+  });
+
+  it('applies delay before returning error when quarantine-3 model-override provider fails', async () => {
+    jest.useFakeTimers();
+    mockedClassifyAbuse.mockResolvedValue(classifyResult('quarantine-3'));
+    mockedGetProvider
+      .mockResolvedValueOnce({
+        kind: 'provider',
+        provider,
+        userByok: null,
+        bypassAccessCheck: false,
+      })
+      .mockResolvedValueOnce({ kind: 'not-found' });
+
+    const { POST } = await import('./route');
+    const responsePromise = POST(makeRequest(makeBody()) as never);
+
+    await jest.advanceTimersByTimeAsync(5999);
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+
+    await jest.advanceTimersByTimeAsync(1);
+    const response = await responsePromise;
+
+    expect(response.status).toBe(404);
+    expect(mockedGetProvider).toHaveBeenCalledTimes(2);
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
 
   it('adds latency without rewriting quarantine-3 BYOK requests', async () => {

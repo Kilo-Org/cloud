@@ -502,9 +502,15 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       machineId: machineIdHeader,
     });
     if (providerResult.kind === 'not-found') {
+      if (rulesEngineDecision.delayMs > 0) {
+        await sleepForRulesEngineAction(rulesEngineDecision.delayMs);
+      }
       return modelDoesNotExistResponse();
     }
     if (providerResult.kind === 'unavailable') {
+      if (rulesEngineDecision.delayMs > 0) {
+        await sleepForRulesEngineAction(rulesEngineDecision.delayMs);
+      }
       return temporarilyUnavailableResponse();
     }
 

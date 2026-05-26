@@ -594,10 +594,14 @@ Then run one of:
   - Runs the packaged image against the real Kilo Gateway with `kilocode/kilo-auto/free`, verifying Control UI proxying, packaged Kilo Chat loading, and one live agent turn.
   - Reads `KILOCODE_API_KEY` from the environment, or falls back locally to the active `kilocodeToken` and matching organization scope in `~/.kilocode/cli/config.json`. The token value is not logged or mounted into the container.
   - Uses a generated non-sensitive nonce prompt because Auto Free can route to upstream providers that log prompts.
-  - Add `--upgrade` with `IMAGE_BEFORE` and `IMAGE_AFTER` to repeat the live checks after restarting on the same temporary `/root` volume.
+  - Add `--upgrade` with `IMAGE_BEFORE` and `IMAGE_AFTER` to repeat the live checks after restarting on the same temporary `/root` volume. Set `EXPECTED_VERSION_BEFORE` and `EXPECTED_VERSION_AFTER` to assert the images contain the intended OpenClaw versions.
   - This is an opt-in/manual live validation; it is not a deterministic CI smoke or an image-promotion gate.
+- `bash scripts/controller-openclaw-upgrade-smoke-test.sh`
+  - One-command workflow for an OpenClaw version-bump branch: builds the baseline image from `origin/main`, builds the candidate image from the current checkout's Dockerfile, then runs the persisted-root live smoke with version assertions.
+  - The wrapper fails if the Dockerfile pin has not changed. To validate only the wrapper mechanics outside a bump branch, explicitly set `ALLOW_SAME_OPENCLAW_VERSION=true`.
+  - Set `BASE_REF` when the upgrade baseline is not `origin/main`; set `IMAGE_BEFORE` and `IMAGE_AFTER` to choose the temporary local image tags.
 
-All scripts support overrides via env vars (`IMAGE`, `PORT`, `TOKEN`). The live provider smoke also accepts `KILOCODE_API_KEY`, `KILOCODE_ORGANIZATION_ID`, `KILOCODE_CONFIG_PATH`, `KILOCODE_SMOKE_MODEL`, `IMAGE_BEFORE`, and `IMAGE_AFTER`.
+All scripts support overrides via env vars (`IMAGE`, `PORT`, `TOKEN`). The live provider smoke also accepts `KILOCODE_API_KEY`, `KILOCODE_ORGANIZATION_ID`, `KILOCODE_CONFIG_PATH`, `KILOCODE_SMOKE_MODEL`, `IMAGE_BEFORE`, `IMAGE_AFTER`, `EXPECTED_VERSION_BEFORE`, and `EXPECTED_VERSION_AFTER`.
 
 ## Admin Panel
 

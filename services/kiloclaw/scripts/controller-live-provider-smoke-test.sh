@@ -13,6 +13,8 @@ PORT="${PORT:-18791}"
 TOKEN="${TOKEN:-live-smoke-token}"
 KILOCODE_CONFIG_PATH="${KILOCODE_CONFIG_PATH:-$HOME/.kilocode/cli/config.json}"
 KILOCODE_SMOKE_MODEL="${KILOCODE_SMOKE_MODEL:-kilocode/kilo-auto/free}"
+EXPECTED_VERSION_BEFORE="${EXPECTED_VERSION_BEFORE:-}"
+EXPECTED_VERSION_AFTER="${EXPECTED_VERSION_AFTER:-}"
 MODE="fresh"
 
 source "$SCRIPT_DIR/controller-smoke-helpers.sh"
@@ -27,6 +29,10 @@ Kilo CLI locally so ~/.kilocode/cli/config.json contains an active token.
 
 Options:
   --upgrade  Boot IMAGE_BEFORE, then IMAGE_AFTER on the same temporary /root.
+
+Optional version assertions:
+  EXPECTED_VERSION_AFTER   Expected OpenClaw version for the candidate/final image.
+  EXPECTED_VERSION_BEFORE  Expected OpenClaw version for --upgrade baseline image.
 EOF
 }
 
@@ -191,6 +197,19 @@ PY
   check "configured live smoke model" "$KILOCODE_SMOKE_MODEL" "$model"
 }
 
+assert_openclaw_version() {
+  local expected="$1"
+  local output
+  local actual
+
+  if [ -z "$expected" ]; then
+    return
+  fi
+  output=$(docker exec "$CID" openclaw --version 2>/dev/null || true)
+  actual=$(python3 -c 'import re, sys; match = re.search(r"OpenClaw\s+(\S+)", sys.stdin.read()); print(match.group(1) if match else "")' <<< "$output")
+  check "OpenClaw version" "$expected" "$actual"
+}
+
 assert_gateway_status() {
   local code
   code=$(curl -s -o /dev/null -w "%{http_code}" \
@@ -279,11 +298,13 @@ print("nonce returned")
 run_phase() {
   local label="$1"
   local image="$2"
+  local expected_version="$3"
 
   echo
   echo "=== $label: $image ==="
   start_container "$image"
   wait_for_ready "$label"
+  assert_openclaw_version "$expected_version"
   assert_gateway_status
   assert_control_ui_proxy
   assert_configured_model
@@ -303,10 +324,10 @@ else
 fi
 
 if [ "$MODE" = "upgrade" ]; then
-  run_phase "before-image" "$IMAGE_BEFORE"
-  run_phase "after-image persisted-root" "$IMAGE_AFTER"
+  run_phase "before-image" "$IMAGE_BEFORE" "$EXPECTED_VERSION_BEFORE"
+  run_phase "after-image persisted-root" "$IMAGE_AFTER" "$EXPECTED_VERSION_AFTER"
 else
-  run_phase "candidate-image" "$IMAGE_AFTER"
+  run_phase "candidate-image" "$IMAGE_AFTER" "$EXPECTED_VERSION_AFTER"
 fi
 
 echo

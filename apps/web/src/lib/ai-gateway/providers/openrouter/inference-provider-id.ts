@@ -191,9 +191,7 @@ const openRouterToVercelInferenceProviderMapping = {
 } as Record<string, VercelInferenceProviderId | undefined>;
 
 export function normalizeInferenceProviderId(providerId: string): string;
-export function normalizeInferenceProviderId(
-  providerId: string | undefined,
-): string | undefined;
+export function normalizeInferenceProviderId(providerId: string | undefined): string | undefined;
 export function normalizeInferenceProviderId(providerId: string | undefined) {
   if (!providerId) return providerId;
   const slashIndex = providerId.indexOf('/');

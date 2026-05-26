@@ -88,23 +88,23 @@ assert_kilo_chat_webhook_route() {
     -H "x-kiloclaw-proxy-token: $token" \
     -H "Authorization: Bearer $token" \
     -H "Content-Type: application/json" \
-    --data 'not-json' \
+    --data '{"type":"smoke.probe"}' \
     "http://127.0.0.1:${port}/plugins/kilo-chat/webhook" 2>/dev/null || true)
 
-  check "kilo-chat webhook invalid JSON -> 400" "400" "$code"
+  check "kilo-chat webhook unknown event -> 400" "400" "$code"
 
   if body_check=$(python3 -c '
 import json
 import sys
 
 doc = json.load(open(sys.argv[1]))
-if doc.get("error") != "Invalid JSON":
+if doc.get("error") != "Unknown webhook type":
     raise SystemExit(doc)
-print("Invalid JSON")
+print("Unknown webhook type")
 ' "$body_file" 2>&1); then
-    check "kilo-chat webhook error body" "Invalid JSON" "$body_check"
+    check "kilo-chat webhook error body" "Unknown webhook type" "$body_check"
   else
-    check "kilo-chat webhook error body" "Invalid JSON" "failed"
+    check "kilo-chat webhook error body" "Unknown webhook type" "failed"
     echo "  details: $body_check"
     echo "  body: $(cat "$body_file")"
   fi

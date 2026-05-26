@@ -11,6 +11,7 @@ import type { KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
 import { controllerVersionOk, gatewayStatusOk } from '@/lib/kiloclaw/types';
 import { useKiloClawGatewayStatus, useKiloClawMutations } from '@/hooks/useKiloClaw';
 import { useOrgKiloClawGatewayStatus, useOrgKiloClawMutations } from '@/hooks/useOrgKiloClaw';
+import { useUser } from '@/hooks/useUser';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -118,8 +119,12 @@ function ClawOnboardingFlowInner({
   const personalMutations = useKiloClawMutations();
   const orgMutations = useOrgKiloClawMutations(organizationId ?? '');
   const mutations = organizationId ? orgMutations : personalMutations;
+  const { data: currentUser, isPending: userIsPending } = useUser();
+  const searchParams = useSearchParams();
+  const isCalendarResume = searchParams?.get('step') === 'calendar';
+  const calendarEligibilityPending = userIsPending && isCalendarResume;
 
-  const hasCalendarStep = true;
+  const hasCalendarStep = currentUser?.is_admin === true || calendarEligibilityPending;
   // Morning briefing is generally available — the Interests step shows for
   // all users (it still gates on controller version below).
   // Gate on controller version. The plugin route that backs
@@ -215,7 +220,6 @@ function ClawOnboardingFlowInner({
   const posthog = usePostHog();
   const router = useRouter();
   const pathname = usePathname();
-  const searchParams = useSearchParams();
 
   // Save bot identity and exec preset as soon as the instance row exists.
   // This closes the tab-close window where customizations entered during the
@@ -518,7 +522,10 @@ function ClawOnboardingFlowInner({
         connectUrl={connectUrl}
         isConnected={isConnected}
         connectedAccountEmail={connectedEmail}
-        readyToConnect={flowState.instanceStatus !== null && onboardingSaves.ready}
+        interactionDisabled={calendarEligibilityPending}
+        readyToConnect={
+          !calendarEligibilityPending && flowState.instanceStatus !== null && onboardingSaves.ready
+        }
         onConnectClick={() => {
           posthog?.capture('claw_setup_calendar_connect_clicked', { skipped: false });
         }}

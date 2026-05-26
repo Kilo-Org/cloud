@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
   let organizationId: string | undefined;
 
   try {
-    const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
+    const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: true });
     if (authFailedResponse) {
       return NextResponse.redirect(new URL('/users/sign_in', APP_URL));
     }

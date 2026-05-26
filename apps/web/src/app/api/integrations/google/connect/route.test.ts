@@ -98,7 +98,7 @@ describe('GET /api/integrations/google/connect', () => {
     );
     expect(mockedGetActiveInstance).toHaveBeenCalledWith(USER_ID);
     expect(mockedGetActiveOrgInstance).not.toHaveBeenCalled();
-    expect(mockedGetUserFromAuth).toHaveBeenCalledWith({ adminOnly: false });
+    expect(mockedGetUserFromAuth).toHaveBeenCalledWith({ adminOnly: true });
     expect(mockedCreateGoogleOAuthState).toHaveBeenCalledWith(
       {
         owner: { type: 'user', id: USER_ID },

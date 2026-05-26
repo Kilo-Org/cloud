@@ -118,10 +118,12 @@ function getAffiliateDisputeSaleKind(invoice: Stripe.Invoice): AffiliateDisputeS
 }
 
 async function getAffiliateDisputeChargeContext(
-  chargeId: string
+  chargeId: string,
+  preFetchedCharge?: Stripe.Charge & { invoice?: string | Stripe.Invoice | null }
 ): Promise<AffiliateDisputeChargeContext | null> {
-  const charge: Stripe.Charge & { invoice?: string | Stripe.Invoice | null } =
-    await client.charges.retrieve(chargeId, { expand: ['invoice'] });
+  const charge =
+    preFetchedCharge ??
+    (await client.charges.retrieve(chargeId, { expand: ['invoice'] }));
   const invoice = charge.invoice;
   if (!invoice || typeof invoice === 'string') {
     return null;
@@ -159,11 +161,12 @@ async function reportChargeBackedStripeAbuseEvent(params: {
   charge: StripeReference;
   paymentIntent?: StripeReference;
   data: Record<string, unknown>;
+  preFetchedCharge?: Stripe.Charge | null;
 }) {
   const chargeId = stripeReferenceId(params.charge);
-  let charge: Stripe.Charge | null = null;
+  let charge: Stripe.Charge | null = params.preFetchedCharge ?? null;
 
-  if (chargeId) {
+  if (!charge && chargeId) {
     try {
       charge = await client.charges.retrieve(chargeId);
     } catch (error) {
@@ -194,7 +197,7 @@ async function reportChargeBackedStripeAbuseEvent(params: {
         }),
       },
     ],
-  });
+  }).catch(captureException);
 }
 
 if (!APP_URL) throw new Error('APP_URL constant is not set');
@@ -928,6 +931,12 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
       const chargeId =
         typeof dispute.charge === 'string' ? dispute.charge : (dispute.charge?.id ?? null);
 
+      let disputeCharge: (Stripe.Charge & { invoice?: string | Stripe.Invoice | null }) | null =
+        null;
+      if (chargeId) {
+        disputeCharge = await client.charges.retrieve(chargeId, { expand: ['invoice'] });
+      }
+
       void reportChargeBackedStripeAbuseEvent({
         abuseEventType: 'stripe.charge.dispute.created',
         eventId: event.id,
@@ -936,13 +945,17 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
         charge: chargeId,
         paymentIntent: dispute.payment_intent,
         data: { dispute: dispute.id },
+        preFetchedCharge: disputeCharge,
       });
 
       if (!chargeId) {
         break;
       }
 
-      const affiliateDisputeCharge = await getAffiliateDisputeChargeContext(chargeId);
+      const affiliateDisputeCharge = await getAffiliateDisputeChargeContext(
+        chargeId,
+        disputeCharge ?? undefined
+      );
       if (!affiliateDisputeCharge) {
         break;
       }
@@ -1254,7 +1267,7 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
               type: event.type,
               charge: charge.id,
               customer: stripeReferenceId(charge.customer),
-              decline_code: charge.outcome?.reason ?? charge.failure_code,
+              decline_code: charge.failure_code ?? charge.outcome?.reason,
             }),
           },
         ],

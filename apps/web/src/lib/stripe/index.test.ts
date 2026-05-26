@@ -344,6 +344,7 @@ async function waitForReportEventsCall() {
     if (reportEventsMock.mock.calls.length > 0) return;
     await new Promise(resolve => setImmediate(resolve));
   }
+  throw new Error('Timed out waiting for reportEvents to be called');
 }
 
 describe('ensurePaymentMethodStored', () => {

@@ -1,22 +1,16 @@
 /**
  * Types for the cloud-agent execution system.
  *
- * This module defines the core types for direct execution without queuing.
+ * This module defines the core types for queue-first acceptance and wrapper delivery.
  *
- * NOTE: Queue-specific types (ExecutionMessage, WrapperLaunchPlan) have been removed
- * as part of the migration to direct execution.
+ * NOTE: Legacy worker-queue types (ExecutionMessage, WrapperLaunchPlan) have been removed.
  */
 
 import type { ExecutionId, SessionId, UserId } from '../types/ids.js';
 import type { AgentMode } from '../schema.js';
-import type { Images, EncryptedSecrets as SchemaEncryptedSecrets } from '../router/schemas.js';
-import type {
-  MCPServerConfig,
-  RuntimeSkill,
-  RuntimeAgent,
-  RuntimeKiloCommand,
-} from '../persistence/types.js';
-import type { SessionProfileBundle } from '../session-profile.js';
+import type { Images } from '../router/schemas.js';
+import type { SessionMetadata } from '../persistence/session-metadata.js';
+import type { CloudAgentSessionState } from '../persistence/types.js';
 
 // ---------------------------------------------------------------------------
 // Execution Modes
@@ -29,174 +23,199 @@ export type ExecutionMode = AgentMode;
 export type StreamingMode = 'sse' | 'websocket';
 
 // ---------------------------------------------------------------------------
-// Token Resume Context (for DO token management)
+// Parameter Bundles
 // ---------------------------------------------------------------------------
 
-/**
- * Resume context for follow-up executions (token management).
- * Used by CloudAgentSession DO for managing authentication tokens.
- */
-export type TokenResumeContext = {
+/** Identity fields shared across most session operations. */
+export type SessionScope = {
+  userId: UserId;
+  orgId?: string;
+  sessionId: SessionId;
+  botId?: string;
+};
+
+/** Prompt text and optional images before message identity concerns are added. */
+export type PromptContent = {
+  prompt: string;
+  images?: Images;
+};
+
+/** Prompt input submitted before queue admission settles the message identity. */
+export type PromptSubmission = PromptContent & {
+  id?: string | null;
+};
+
+export type PromptExecutionTurnSubmission = PromptSubmission & {
+  type: 'prompt';
+};
+
+export type CommandExecutionTurnSubmission = {
+  type: 'command';
+  id?: string | null;
+  command: string;
+  arguments: string;
+  images?: Images;
+};
+
+export type ExecutionTurnSubmission =
+  | PromptExecutionTurnSubmission
+  | CommandExecutionTurnSubmission;
+
+/** Prompt turn after queue admission has selected the durable message identity. */
+export type AcceptedPromptTurn = PromptContent & {
+  type: 'prompt';
+  messageId: string;
+};
+
+export type AcceptedCommandTurn = {
+  type: 'command';
+  messageId: string;
+  command: string;
+  arguments: string;
+};
+
+export type AcceptedExecutionTurn = AcceptedPromptTurn | AcceptedCommandTurn;
+
+export function renderExecutionTurnContent(turn: AcceptedExecutionTurn): string {
+  if (turn.type === 'prompt') return turn.prompt;
+  return turn.arguments.length > 0 ? `/${turn.command} ${turn.arguments}` : `/${turn.command}`;
+}
+
+/** Resolved model plus optional variant. */
+export type ModelChoice = {
+  model: string;
+  variant?: string;
+};
+
+/** Fully resolved agent selection. */
+export type AgentSelection = ModelChoice & {
+  mode: ExecutionMode;
+};
+
+/** Partial agent fields merged with registered session defaults during admission. */
+export type AgentSelectionOverride = {
+  mode?: ExecutionMode;
+  model?: string;
+  variant?: string;
+};
+
+/** Finalization behavior applicable to a single delivered turn. */
+export type TurnFinalization = {
+  autoCommit?: boolean;
+  condenseOnComplete?: boolean;
+};
+
+/** Session policy extends per-turn finalization with session-only gates. */
+export type SessionFinalization = TurnFinalization & {
+  gateThreshold?: 'off' | 'all' | 'warning' | 'critical';
+};
+
+/** Workspace location on a sandbox - available after preparation. */
+export type WorkspaceLocation = {
+  sandboxId: string;
+  workspacePath: string;
+  sessionHome: string;
+  branchName: string;
+  upstreamBranch?: string;
+};
+
+/** Repository source - discriminated by hosting provider. */
+export type RepoSource =
+  | { kind: 'github'; repo: string; token?: string }
+  | { kind: 'gitlab'; url: string; token?: string; managed: boolean };
+
+/** Authentication tokens for the Kilocode runtime. */
+export type AuthBundle = {
   kilocodeToken: string;
-  kilocodeModel: string;
-  githubToken?: string;
-  gitToken?: string;
+  kilocodeModel?: string;
+};
+
+/** Session-level execution configuration. */
+export type SessionConfig = {
+  mode: ExecutionMode;
+  model: string;
+  variant?: string;
+  autoCommit?: boolean;
+  condenseOnComplete?: boolean;
+  appendSystemPrompt?: string;
+  images?: Images;
+};
+
+/** A single user message to deliver to the agent. */
+export type MessageRequest = {
+  messageId: string;
+  prompt: string;
+  executionOptions?: AgentSelectionOverride & TurnFinalization;
 };
 
 // ---------------------------------------------------------------------------
-// Initialize Context (for session initialization)
+// Session Message Intent
 // ---------------------------------------------------------------------------
 
 /**
- * Context for initializing a new session on first execution.
- * Contains all parameters needed to set up workspace, clone repos, etc.
- * Used by CloudAgentSession DO for the initiate flow.
+ * Durable intent for a user message queued in the session.
+ *
+ * Stored in pending-queue records and used as the canonical internal
+ * representation of what the user asked. Does NOT store a fenced dispatch
+ * request or mutable workspace metadata - those are resolved at delivery time from
+ * current session state.
  */
-export type InitializeContext = {
-  /** Kilocode authentication token */
-  kilocodeToken: string;
-  /** Model to use for Kilocode CLI */
-  kilocodeModel?: string;
-  /** GitHub repository to clone (e.g., "owner/repo") */
-  githubRepo?: string;
-  /** GitHub Personal Access Token for private repos */
-  githubToken?: string;
-  /** Generic Git URL to clone */
-  gitUrl?: string;
-  /** Git token for authentication */
-  gitToken?: string;
-  /**
-   * Profile-derived configuration snapshot (envVars, encryptedSecrets,
-   * setupCommands, mcpServers, runtimeSkills, runtimeAgents). Adding a new
-   * profile field is a single-line change in {@link SessionProfileBundle}.
-   */
-  profile?: SessionProfileBundle;
-  /** Branch to checkout (if not session-specific) */
-  upstreamBranch?: string;
-  /** Bot ID for sandbox isolation */
-  botId?: string;
-  /**
-   * Existing Kilo session ID (for prepared sessions).
-   * When set, the CLI will resume this session instead of creating a new one.
-   */
+export type SessionMessageIntent = {
+  turn: AcceptedExecutionTurn;
+  agent: AgentSelection;
+  finalization?: TurnFinalization;
+};
+
+// ---------------------------------------------------------------------------
+// Delivery Context
+// ---------------------------------------------------------------------------
+
+/**
+ * Context for delivering a queued message to the wrapper.
+ *
+ * Built from current session metadata at delivery time; captures the
+ * snapshot needed by the orchestrator and wrapper.
+ */
+export type ExecutionDeliveryContext = {
+  sessionId: SessionId;
+  userId: UserId;
+  orgId?: string;
+  sandboxId: string;
   kiloSessionId?: string;
-  /**
-   * Flag indicating this is a prepared session (via prepareSession flow).
-   * When true, use initiateFromKiloSession instead of initiate,
-   * and skip linking (backend already linked during prepareSession).
-   */
-  isPreparedSession?: boolean;
-  /** GitHub App type for selecting correct credentials and slug */
-  githubAppType?: 'standard' | 'lite';
-  /** Git platform type for correct token/env var handling */
-  platform?: 'github' | 'gitlab';
-  createdOnPlatform?: string;
+  metadata: SessionMetadata;
 };
 
 // ---------------------------------------------------------------------------
 // V2 Request/Response Types (for DO methods and tRPC handlers)
 // ---------------------------------------------------------------------------
 
-/**
- * Common fields shared by all execution request types.
- */
-type BaseExecutionRequest = {
+/** Turn payload preserved by the queue seam before the DO accepts a durable turn. */
+export type QueueExecutionTurnCommand = {
+  turn: ExecutionTurnSubmission;
+  agent?: AgentSelectionOverride;
+  finalization?: TurnFinalization;
+};
+
+/** Current-path submitted message before durable admission resolves identity/defaults. */
+export type SubmittedSessionMessageRequest = {
+  userId: UserId;
+  botId?: string;
+} & QueueExecutionTurnCommand;
+
+/** Already-canonical current message intent admitted without recreating its turn identity. */
+export type AdmitAcceptedSessionMessageRequest = {
+  userId: UserId;
+  botId?: string;
+  turn: AcceptedExecutionTurn;
+  agent: AgentSelection;
+  finalization?: TurnFinalization;
+};
+
+/** Retained legacy command requesting admission of the stored prepared initial turn. */
+export type LegacyRegisteredInitialAdmissionRequest = {
   userId: UserId;
   botId?: string;
 };
-
-/**
- * Request for initiating a new session (full initialization).
- */
-type InitiateExecutionRequest = BaseExecutionRequest & {
-  kind: 'initiate';
-  authToken: string;
-  prompt: string;
-  mode: ExecutionMode;
-  model: string;
-  variant?: string;
-  githubRepo?: string;
-  githubToken?: string;
-  gitUrl?: string;
-  gitToken?: string;
-  envVars?: Record<string, string>;
-  encryptedSecrets?: SchemaEncryptedSecrets;
-  setupCommands?: string[];
-  mcpServers?: Record<string, MCPServerConfig>;
-  runtimeSkills?: readonly RuntimeSkill[];
-  runtimeAgents?: readonly RuntimeAgent[];
-  kiloCommands?: readonly RuntimeKiloCommand[];
-  autoCommit?: boolean;
-  condenseOnComplete?: boolean;
-  upstreamBranch?: string;
-  orgId?: string;
-  /** Git platform type for correct token/env var handling */
-  platform?: 'github' | 'gitlab';
-  createdOnPlatform?: string;
-};
-
-/**
- * Request for initiating a prepared session.
- */
-type InitiatePreparedRequest = BaseExecutionRequest & {
-  kind: 'initiatePrepared';
-  authToken?: string;
-  messageId?: string;
-};
-
-/**
- * Discriminated payload for follow-up execution.
- *
- * Kept as a typed bundle so call sites stop juggling loose `prompt|command|args`
- * fields across five+ functions. The orchestrator's only branch point on this
- * union is the final wrapper call (prompt vs structured command).
- */
-export type PromptExecutionPayload = {
-  type: 'prompt';
-  prompt: string;
-  /** Defaults to the session's stored mode when omitted. */
-  mode?: ExecutionMode;
-  /** Defaults to the session's stored model when omitted. */
-  model?: string;
-  variant?: string;
-};
-
-export type CommandExecutionPayload = {
-  type: 'command';
-  /** Kilo command name (e.g. "review"). */
-  command: string;
-  /**
-   * Verbatim args string passed after the command name. Kilo expands
-   * `$1`, `$2`, `$ARGUMENTS` against the template server-side.
-   */
-  arguments: string;
-};
-
-export type ExecutionPayload = PromptExecutionPayload | CommandExecutionPayload;
-
-/**
- * Request for follow-up message on existing session.
- */
-type FollowupExecutionRequest = BaseExecutionRequest & {
-  kind: 'followup';
-  payload: ExecutionPayload;
-  autoCommit?: boolean;
-  condenseOnComplete?: boolean;
-  messageId?: string;
-  images?: Images;
-  tokenOverrides?: {
-    githubToken?: string;
-    gitToken?: string;
-  };
-};
-
-/**
- * Request payload for starting a V2 execution.
- */
-export type StartExecutionV2Request =
-  | InitiateExecutionRequest
-  | InitiatePreparedRequest
-  | FollowupExecutionRequest;
 
 /**
  * Retryable error codes that map to 503 Service Unavailable.
@@ -208,191 +227,113 @@ export type RetryableResultCode =
   | 'KILO_SERVER_FAILED'
   | 'WRAPPER_START_FAILED';
 
-/**
- * Result of starting a V2 execution.
- * Returns 409 Conflict if an execution is already in progress.
- *
- * Error codes:
- * - EXECUTION_IN_PROGRESS: 409 Conflict (another execution is running)
- * - SANDBOX_CONNECT_FAILED, WORKSPACE_SETUP_FAILED, KILO_SERVER_FAILED, WRAPPER_START_FAILED: 503 Service Unavailable
- * - NOT_FOUND: 404 Not Found
- * - BAD_REQUEST: 400 Bad Request
- * - INTERNAL: 500 Internal Server Error
- */
-export type StartExecutionV2Result =
-  | {
-      success: true;
-      executionId: ExecutionId;
-      status: 'started';
-    }
-  | {
-      success: false;
-      code:
-        | 'NOT_FOUND'
-        | 'BAD_REQUEST'
-        | 'INTERNAL'
-        | 'EXECUTION_IN_PROGRESS'
-        | RetryableResultCode;
-      error: string;
-      /** For EXECUTION_IN_PROGRESS, the currently active execution ID */
-      activeExecutionId?: ExecutionId;
-    };
+export type AdmissionFailure = {
+  success: false;
+  code: 'NOT_FOUND' | 'BAD_REQUEST' | 'INTERNAL' | 'PENDING_QUEUE_FULL' | RetryableResultCode;
+  error: string;
+};
+
+/** Durable acknowledgement that a message intent is stored for asynchronous delivery. */
+export type DurableAdmissionAck = {
+  success: true;
+  outcome: 'queued';
+  messageId: string;
+  compatibilityDelivery: 'queued' | 'sent';
+};
+
+/** Runtime acknowledgement that the fenced wrapper accepted a delivered message. */
+export type RuntimeAcceptanceResult = {
+  success: true;
+  outcome: 'accepted';
+  messageId: string;
+  wrapperRunId: string;
+};
+
+export type SessionMessageAdmissionResult = DurableAdmissionAck | AdmissionFailure;
+export type MessageDeliveryResult = RuntimeAcceptanceResult | AdmissionFailure;
+
+/** Compatibility request retained only for external schema/type imports. */
+export type QueueSessionMessageRequest = SubmittedSessionMessageRequest;
+/** Compatibility result retained only for external schema/type imports. */
+export type QueueSessionMessageResult = SessionMessageAdmissionResult;
+/** @deprecated Use SubmittedSessionMessageRequest. */
+export type StartExecutionV2Request = SubmittedSessionMessageRequest;
+/** @deprecated Use SessionMessageAdmissionResult. */
+export type StartExecutionV2Result = SessionMessageAdmissionResult;
 
 // ---------------------------------------------------------------------------
-// Workspace Plan
+// Delivery Plan Components
 // ---------------------------------------------------------------------------
 
-/**
- * Context needed to resume an existing workspace (no clone needed).
- */
-export type ResumeContext = {
-  kiloSessionId: string;
+export type WorkspaceDeliveryPlan = {
+  sandboxId: string;
+  metadata: SessionMetadata;
+};
+
+export type WorkspaceReady = {
   workspacePath: string;
-  kilocodeToken: string;
-  kilocodeModel?: string;
+  sandboxId: string;
+  sessionHome: string;
   branchName: string;
-  /** GitHub token for token refresh (optional) */
-  githubToken?: string;
-  /** Git token for non-GitHub repos (optional) */
-  gitToken?: string;
-  createdOnPlatform?: string;
-};
-
-/**
- * Context for initializing a new workspace.
- */
-export type InitContext = {
-  githubRepo?: string;
-  gitUrl?: string;
-  githubToken?: string;
-  gitToken?: string;
-  upstreamBranch?: string;
-  kiloSessionId?: string;
-  isPreparedSession?: boolean;
-  /** Kilocode API token */
-  kilocodeToken: string;
-  /** Kilocode model to use */
-  kilocodeModel?: string;
-  /**
-   * Profile-derived configuration snapshot (envVars, encryptedSecrets,
-   * setupCommands, mcpServers, runtimeSkills, runtimeAgents).
-   */
-  profile?: SessionProfileBundle;
-  /** Bot ID for bot-specific sessions */
-  botId?: string;
-  /** GitHub app type for determining which app to use */
-  githubAppType?: 'lite' | 'standard';
-  /** Git platform type for correct token/env var handling */
-  platform?: 'github' | 'gitlab';
-  createdOnPlatform?: string;
-};
-
-/**
- * Existing metadata for prepared sessions.
- */
-export type ExistingSessionMetadata = {
-  workspacePath: string;
   kiloSessionId: string;
-  branchName: string;
-  sandboxId?: string;
-  sessionHome?: string;
-  devcontainer?: {
-    workspacePath: string;
-    innerWorkspaceFolder: string;
-    wrapperPort: number;
-    configPath: string;
-  };
-  upstreamBranch?: string;
-  appendSystemPrompt?: string;
-  /**
-   * Profile snapshot stored on the session at prepare time. Used by the
-   * fast path to re-inject MCP servers, runtime skills, and runtime modes
-   * when recreating the sandbox session.
-   */
-  profile?: SessionProfileBundle;
-  /** GitHub repo (for token updates) */
-  githubRepo?: string;
-  /** Git URL (for token updates) */
-  gitUrl?: string;
-  createdOnPlatform?: string;
+  githubInstallationId?: string;
+  githubAppType?: 'standard' | 'lite';
+  gitToken?: string;
+  gitlabTokenManaged?: boolean;
+  devcontainer?: CloudAgentSessionState['devcontainer'];
 };
 
 /**
- * Plan for workspace preparation.
- * Determines whether to resume existing workspace or set up new one.
- */
-export type WorkspacePlan =
-  | {
-      shouldPrepare: false;
-      sandboxId: string;
-      resumeContext: ResumeContext;
-      existingMetadata?: ExistingSessionMetadata;
-    }
-  | {
-      shouldPrepare: true;
-      sandboxId?: string;
-      initContext: InitContext;
-      existingMetadata?: ExistingSessionMetadata;
-    };
-
-// ---------------------------------------------------------------------------
-// Wrapper Plan
-// ---------------------------------------------------------------------------
-
-/**
- * Model configuration for the AI model to use.
+ * Model configuration used by wrapper HTTP DTOs, not runtime delivery plans.
  */
 export type ModelConfig = {
   providerID?: string;
   modelID: string;
 };
 
-/**
- * Plan for wrapper execution.
- */
-export type WrapperPlan = {
+export type WrapperRunFence = {
+  wrapperRunId: string;
+  wrapperGeneration: number;
+  wrapperConnectionId: string;
+};
+
+export type WrapperDeliveryTarget = {
   kiloSessionId?: string;
-  kiloSessionTitle?: string;
-  model?: ModelConfig;
-  variant?: string;
-  autoCommit?: boolean;
-  condenseOnComplete?: boolean;
+};
+
+export type FencedWrapperDeliveryBinding = WrapperDeliveryTarget & {
+  fence: WrapperRunFence;
 };
 
 // ---------------------------------------------------------------------------
-// Execution Plan
+// Message Delivery Boundary
 // ---------------------------------------------------------------------------
 
-/**
- * Complete plan for executing a prompt or slash command.
- * Contains all information needed to set up and execute.
- */
-export type ExecutionPlan = {
-  /** Unique execution ID (exc_<ulid> format) */
+type DeliveryRequestBase = {
+  scope: Pick<SessionScope, 'sessionId' | 'userId' | 'orgId'>;
+  turn: AcceptedExecutionTurn;
+  agent: AgentSelection;
+  finalization?: TurnFinalization;
+  workspace: WorkspaceDeliveryPlan;
+};
+
+/** Durable queued message handed to AgentRuntime before runtime identity allocation. */
+export type MessageDeliveryRequest = DeliveryRequestBase & {
+  wrapper: WrapperDeliveryTarget;
+};
+
+/** Wrapper dispatch request after AgentRuntime has allocated a complete active fence. */
+export type FencedWrapperDispatchRequest = DeliveryRequestBase & {
+  wrapper: FencedWrapperDeliveryBinding;
+};
+
+/** Compatibility dispatch request for still-used execution-record orchestration tests. */
+export type FencedLegacyExecutionRequest = FencedWrapperDispatchRequest & {
   executionId: ExecutionId;
-  /** Cloud-agent session ID */
-  sessionId: SessionId;
-  /** User who owns this execution */
-  userId: UserId;
-  /** Organization ID (optional) */
-  orgId?: string;
-  /** What the user asked the agent to do (free-text prompt or structured slash command). */
-  payload: ExecutionPayload;
-  /**
-   * Execution mode. For prompt payloads this is the picked agent. For command
-   * payloads this is the session's existing mode (used for logger tags;
-   * kilo applies the command's own `agent` override).
-   */
-  mode: AgentMode;
-  /** Workspace preparation plan */
-  workspace: WorkspacePlan;
-  /** Wrapper configuration plan */
-  wrapper: WrapperPlan;
-  /** Optional image attachments (prompt payloads only). */
-  images?: Images;
-  /** Optional message ID for correlating the request */
-  messageId?: string;
 };
+
+/** @deprecated Use FencedLegacyExecutionRequest. */
+export type ExecutionPlan = FencedLegacyExecutionRequest;
 
 // ---------------------------------------------------------------------------
 // Execution Result

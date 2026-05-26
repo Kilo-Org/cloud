@@ -8,7 +8,8 @@ import type { SlashCommandInfo } from './slash-commands.js';
  *   autocommit_started, autocommit_completed
  *
  * From DO -> /stream clients:
- *   All of the above, plus wrapper_disconnected, wrapper_reconnected, preparing
+ *   All of the above, plus wrapper_disconnected, wrapper_reconnected, preparing,
+ *   cloud.message.queued, cloud.message.sent, cloud.message.completed, cloud.message.failed
  */
 export type StreamEventType =
   // Wrapper -> DO (execution lifecycle)
@@ -28,9 +29,14 @@ export type StreamEventType =
   | 'wrapper_disconnected' // Wrapper WebSocket closed unexpectedly
   | 'wrapper_reconnected' // Wrapper reconnected successfully
   // DO -> /stream clients (async preparation progress)
-  | 'preparing' // Async preparation step progress (autoInitiate flow)
+  | 'preparing' // Lazy workspace preparation step progress
   // DO -> /stream clients (cloud infrastructure lifecycle)
   | 'cloud.status' // Cloud infrastructure status (preparing/ready/finalizing/error)
+  // DO -> /stream clients (session message queue)
+  | 'cloud.message.queued' // User message accepted into the pending queue
+  | 'cloud.message.sent' // Queued user message delivered to Kilo
+  | 'cloud.message.completed' // Accepted user message completed execution
+  | 'cloud.message.failed' // User message delivery failed or was canceled before completion
   | 'connected' // Sent on WebSocket connect with current service state
   // Wrapper -> DO -> /stream clients (slash command catalog)
   | 'commands.available'; // Catalog of kilo slash commands available in this session
@@ -106,8 +112,7 @@ export type PreparingStep =
   | 'failed';
 
 /**
- * Data included in 'preparing' events (async preparation progress).
- * Emitted by the DO during startPreparationAsync to report progress to /stream clients.
+ * Data included in 'preparing' events (workspace preparation progress).
  */
 export type PreparingEventData = {
   step: PreparingStep;

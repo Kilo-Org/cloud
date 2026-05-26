@@ -1,9 +1,10 @@
 'use client';
 
 import { useCallback } from 'react';
-import { Scissors, Image, FileText, AlertCircle } from 'lucide-react';
+import { Scissors, Image, FileText, AlertCircle, Clock } from 'lucide-react';
 import { TimeAgo } from '@/components/shared/TimeAgo';
 import type { AssistantMessage } from '@/types/opencode.gen';
+import type { MessageDeliveryState } from '@/lib/cloud-agent-sdk';
 import type { StoredMessage, Part, CompactionPart } from './types';
 import {
   isUserMessage,
@@ -17,7 +18,9 @@ import type { FilePart } from './types';
 import { PartRenderer } from './PartRenderer';
 import type { OpenChildSession } from './ChildSessionSection';
 import { CopyMessageButton } from '@/components/shared/CopyMessageButton';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { stripImageContext } from '@/lib/app-builder/message-utils';
+import { getDeliveryBadge, type DeliveryBadge } from './delivery-badge';
 
 import LinkifyIt from 'linkify-it';
 
@@ -144,9 +147,41 @@ function getAssistantErrorMessage(error: NonNullable<AssistantMessage['error']>)
   return 'An error occurred while generating a response';
 }
 
+function DeliveryStatusIcon({ badge }: { badge: DeliveryBadge }) {
+  const tooltipLabel = badge.title ? `${badge.label}: ${badge.title}` : badge.label;
+  const className =
+    badge.tone === 'error'
+      ? 'border-destructive/40 text-destructive'
+      : 'border-border text-muted-foreground';
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span
+          aria-label={tooltipLabel}
+          className={`bg-card ring-background focus-visible:ring-ring focus-visible:ring-offset-background absolute -right-2 -bottom-2 z-10 inline-flex size-6 items-center justify-center rounded-full border ring-2 transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none ${className}`}
+          role="img"
+          tabIndex={0}
+        >
+          {badge.tone === 'error' ? (
+            <AlertCircle className="size-3.5" />
+          ) : (
+            <Clock className="size-3.5" />
+          )}
+        </span>
+      </TooltipTrigger>
+      <TooltipContent side="top" sideOffset={6} className="max-w-xs text-xs">
+        {tooltipLabel}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
 type MessageBubbleProps = {
   message: StoredMessage;
   isStreaming?: boolean;
+  /** Delivery state for this message, if any (surfaced via cloud.message.* events). */
+  deliveryState?: MessageDeliveryState;
   /** Function to get messages for a child session ID */
   getChildMessages?: (sessionId: string) => StoredMessage[];
   onOpenChildSession?: OpenChildSession;
@@ -161,11 +196,13 @@ type MessageBubbleProps = {
 export function MessageBubble({
   message,
   isStreaming: isStreamingProp,
+  deliveryState,
   getChildMessages,
   onOpenChildSession,
 }: MessageBubbleProps) {
   const isStreaming = isStreamingProp ?? isMessageStreaming(message);
   const timestamp = message.info.time.created;
+  const deliveryBadge = getDeliveryBadge(deliveryState);
 
   const getTextForCopy = useCallback(
     () =>
@@ -194,11 +231,14 @@ export function MessageBubble({
 
     return (
       <div className="group/msg flex flex-col items-end py-2">
-        <div className="mb-1 flex items-center gap-2 opacity-0 transition-opacity group-hover/msg:opacity-100">
-          {userContent && <CopyMessageButton getText={getTextForCopy} />}
-          <TimeAgo timestamp={timestamp} className="text-muted-foreground/50 text-xs" />
+        <div className="mb-1 flex items-center gap-2">
+          <div className="flex items-center gap-2 opacity-0 transition-opacity group-hover/msg:opacity-100">
+            {userContent && <CopyMessageButton getText={getTextForCopy} />}
+            <TimeAgo timestamp={timestamp} className="text-muted-foreground/50 text-xs" />
+          </div>
         </div>
-        <div className="bg-primary text-primary-foreground max-w-[95%] rounded-lg p-3 sm:max-w-[85%] md:max-w-[80%] md:p-4">
+        <div className="bg-primary text-primary-foreground relative max-w-[95%] rounded-lg p-3 sm:max-w-[85%] md:max-w-[80%] md:p-4">
+          {deliveryBadge && <DeliveryStatusIcon badge={deliveryBadge} />}
           {userContent && (
             <p className="overflow-wrap-anywhere text-sm wrap-break-word whitespace-pre-wrap">
               <TextWithLinks text={userContent} />

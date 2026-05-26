@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import { OrganizationByPageLayout } from '@/components/organizations/OrganizationByPageLayout';
 import { RigsClient } from '@/app/(app)/wasteland/by-id/[wastelandId]/rigs/RigsClient';
-import { getUserFromAuthOrRedirect } from '@/lib/user.server';
+import { getUserFromAuthOrRedirect } from '@/lib/user/server';
 import { resolveWastelandUpstreamForUser } from '@/lib/wasteland/server-resolve';
 
 export default async function OrgRigsPage({

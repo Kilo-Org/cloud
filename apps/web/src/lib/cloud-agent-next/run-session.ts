@@ -5,7 +5,7 @@ import { createWebSocketManager } from './websocket-manager';
 import { createEventProcessor, type ProcessedMessage } from './processor';
 import type { CloudAgentEvent, StreamError } from './event-types';
 import type { CloudAgentNextClient } from './cloud-agent-client';
-import type { PrepareSessionInput, InitiateFromPreparedSessionInput } from './cloud-agent-client';
+import type { PrepareSessionInput } from './cloud-agent-client';
 
 /**
  * Server-side helper for running a cloud-agent-next session to completion.
@@ -96,8 +96,6 @@ export type RunSessionInput = {
   client: CloudAgentNextClient;
   /** Fields forwarded to prepareSession. */
   prepareInput: PrepareSessionInput;
-  /** Partial override for initiateFromPreparedSession (e.g. kilocodeOrganizationId). */
-  initiateInput?: Omit<InitiateFromPreparedSessionInput, 'cloudAgentSessionId'>;
   /** Payload fields for signing the WebSocket stream ticket. */
   ticketPayload: Pick<StreamTicketPayload, 'userId' | 'organizationId'>;
   /** Stream timeout in ms (default: 15 minutes). */
@@ -145,7 +143,6 @@ export async function runSessionToCompletion(input: RunSessionInput): Promise<Ru
   const {
     client,
     prepareInput,
-    initiateInput,
     ticketPayload,
     logPrefix = '[CloudAgentNext]',
     onSessionReady,
@@ -187,7 +184,6 @@ export async function runSessionToCompletion(input: RunSessionInput): Promise<Ru
   try {
     const initiated = await client.initiateFromPreparedSession({
       cloudAgentSessionId: sessionId,
-      ...initiateInput,
     });
     streamUrl = initiated.streamUrl;
   } catch (error) {
@@ -314,6 +310,15 @@ export async function runSessionToCompletion(input: RunSessionInput): Promise<Ru
           statusMessages.push(`Session interrupted: ${reason}`);
           hasError = true;
           errorMessage = reason;
+          resolveOnce();
+          break;
+        }
+        case 'cloud.message.failed': {
+          const data = event.data as { error?: string };
+          const text = data?.error ?? 'Queued message delivery failed';
+          statusMessages.push(`Message failed before execution: ${text}`);
+          hasError = true;
+          errorMessage = text;
           resolveOnce();
           break;
         }

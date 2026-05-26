@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test } from '@jest/globals';
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserFromAuth } from '@/lib/user.server';
+import { getUserFromAuth } from '@/lib/user/server';
 import { createGitHubBotLinkState, verifyGitHubBotLinkState } from '@/lib/bot/github-link-state';
 import { verifyGitHubLinkToken } from '@/lib/bot/github-link-token';
 import { getGitHubAppCredentials } from '@/lib/integrations/platforms/github/app-selector';
@@ -10,7 +10,7 @@ import { failureResult } from '@/lib/maybe-result';
 
 const mockIsEnabledForBot = jest.fn();
 
-jest.mock('@/lib/user.server');
+jest.mock('@/lib/user/server');
 jest.mock('@/lib/bot/github-link-state');
 jest.mock('@/lib/bot/github-link-token');
 jest.mock('@/lib/integrations/platforms/github/app-selector');

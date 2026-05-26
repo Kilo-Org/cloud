@@ -27,6 +27,7 @@ import {
   MAX_CONCURRENT_CODE_REVIEWS_PER_ORG,
   staleQueuedCodeReviewCutoffSql,
   staleRunningCodeReviewCutoffSql,
+  type PendingCodeReviewCreatedAtWindow,
 } from '../dispatch/dispatch-constants';
 
 type CodeReviewAttemptStatus = CodeReviewStatus;
@@ -184,11 +185,13 @@ export async function getCodeReviewById(reviewId: string): Promise<CloudAgentCod
 export async function listDispatchableCodeReviewOwnerCandidates(
   params: {
     limit?: number;
+    pendingCreatedAtWindow?: PendingCodeReviewCreatedAtWindow;
   } = {}
 ): Promise<DispatchableCodeReviewOwnerCandidatesResult> {
   const limit = Math.max(1, Math.min(params.limit ?? 100, 1_000));
   const staleQueuedCutoff = staleQueuedCodeReviewCutoffSql();
   const staleRunningCutoff = staleRunningCodeReviewCutoffSql();
+  const { pendingCreatedAtWindow } = params;
 
   try {
     const result = await db.execute<{ owner_type: 'user' | 'org'; owner_id: string }>(sql`
@@ -204,7 +207,7 @@ export async function listDispatchableCodeReviewOwnerCandidates(
           ) AS owner_id,
           MIN(${cloud_agent_code_reviews.created_at}) AS oldest_reconsiderable_at
         FROM ${cloud_agent_code_reviews}
-        WHERE ${reconsiderableCodeReviewWorkCondition(staleQueuedCutoff)}
+        WHERE ${reconsiderableCodeReviewWorkCondition(staleQueuedCutoff, pendingCreatedAtWindow)}
         GROUP BY owner_type, owner_id
       ), active_work AS (
         SELECT

@@ -1,26 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-
-vi.mock('@cloudflare/sandbox', () => ({
-  getSandbox: vi.fn(),
-}));
-
-const { mockTimeoutWarn, mockTimeoutWithFields, mockTimeoutWithTags } = vi.hoisted(() => {
-  const warn = vi.fn();
-  const loggerChain = { warn, info: vi.fn(), error: vi.fn(), debug: vi.fn() };
-  const withFields = vi.fn(() => loggerChain);
-  const withTags = vi.fn(() => ({ ...loggerChain, withFields }));
-  return {
-    mockTimeoutWarn: warn,
-    mockTimeoutWithFields: withFields,
-    mockTimeoutWithTags: withTags,
-  };
-});
+import type * as DevContainerModule from './kilo/devcontainer.js';
 
 vi.mock('./logger.js', () => ({
   logger: {
     setTags: vi.fn(),
-    withTags: mockTimeoutWithTags,
-    withFields: vi.fn(() => ({ warn: vi.fn(), error: vi.fn(), info: vi.fn(), debug: vi.fn() })),
+    withTags: vi.fn(() => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() })),
+    withFields: vi.fn(() => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() })),
     info: vi.fn(),
     warn: vi.fn(),
     error: vi.fn(),
@@ -30,4514 +15,1014 @@ vi.mock('./logger.js', () => ({
     descriptor,
 }));
 
-vi.mock('./workspace.js', () => {
-  const setupWorkspace = vi.fn();
-  const cloneGitHubRepo = vi.fn();
-  const cloneGitRepo = vi.fn();
-  const manageBranch = vi.fn();
-  const restoreWorkspace = vi.fn();
-  const checkDiskAndCleanBeforeSetup = vi.fn().mockResolvedValue(undefined);
-  const cleanupWorkspace = vi.fn().mockResolvedValue(undefined);
-
-  return {
-    setupWorkspace,
-    cloneGitHubRepo,
-    cloneGitRepo,
-    manageBranch,
-    restoreWorkspace,
-    checkDiskAndCleanBeforeSetup,
-    cleanupWorkspace,
-    getBaseWorkspacePath: (orgId: string, userId: string) => `/workspace/${orgId}/${userId}`,
-    getSessionHomePath: (sessionId: string) => `/home/${sessionId}`,
-    getSessionWorkspacePath: (orgId: string, userId: string, sessionId: string) =>
-      `/workspace/${orgId}/${userId}/sessions/${sessionId}`,
-    getKilocodeCliDir: (sessionHome: string) => `${sessionHome}/.kilocode/cli`,
-    getKilocodeTasksDir: (sessionHome: string) => `${sessionHome}/.kilocode/cli/global/tasks`,
-    getKilocodeLogsDir: (sessionHome: string) => `${sessionHome}/.kilocode/cli/logs`,
-    FAST_SANDBOX_COMMAND_TIMEOUT_MS: 30000,
-    GIT_COMMAND_TIMEOUT_MS: 120000,
-  };
-});
-
-const { mockBringUpDevContainer } = vi.hoisted(() => ({
-  mockBringUpDevContainer: vi.fn(),
+const workspaceMocks = vi.hoisted(() => ({
+  checkDiskAndCleanBeforeSetup: vi.fn().mockResolvedValue(undefined),
+  cleanupWorkspace: vi.fn().mockResolvedValue(undefined),
+  cloneGitHubRepo: vi.fn().mockResolvedValue(undefined),
+  cloneGitRepo: vi.fn().mockResolvedValue(undefined),
+  manageBranch: vi.fn().mockResolvedValue('session/agent_test'),
+  setupWorkspace: vi.fn().mockResolvedValue({
+    workspacePath: '/workspace/user/sessions/agent_test',
+    sessionHome: '/home/agent_test',
+  }),
+  updateGitRemoteToken: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('./kilo/devcontainer.js', async importActual => {
-  const actual = await importActual<typeof DevContainerModule>();
-  return {
-    ...actual,
-    bringUpDevContainer: mockBringUpDevContainer,
-  };
+vi.mock('./workspace.js', () => ({
+  ...workspaceMocks,
+  getSessionHomePath: (sessionId: string) => `/home/${sessionId}`,
+  // Match the hardcoded `setupWorkspace` mock return so tests can assert on a
+  // stable workspacePath; the shape stays representative of the real path.
+  getSessionWorkspacePath: (_orgId: string | undefined, _userId: string, _sessionId: string) =>
+    '/workspace/user/sessions/agent_test',
+  GIT_COMMAND_TIMEOUT_MS: 120_000,
+}));
+
+const tokenMocks = vi.hoisted(() => ({
+  resolveGitHubTokenForRepo: vi.fn(),
+  resolveManagedGitLabToken: vi.fn(),
+}));
+const devcontainerMocks = vi.hoisted(() => ({
+  bringUpDevContainer: vi.fn(),
+  detectDevContainer: vi.fn(),
+}));
+const portMocks = vi.hoisted(() => ({
+  randomPort: vi.fn(() => 4173),
+}));
+
+vi.mock('./services/git-token-service-client.js', () => tokenMocks);
+vi.mock('./kilo/devcontainer.js', async importActual => ({
+  ...(await importActual<typeof DevContainerModule>()),
+  bringUpDevContainer: devcontainerMocks.bringUpDevContainer,
+  detectDevContainer: devcontainerMocks.detectDevContainer,
+}));
+vi.mock('./kilo/ports.js', () => portMocks);
+
+import {
+  SessionService,
+  buildCommandGuardBashPermissions,
+  fetchSessionMetadata,
+  getCommandGuardPolicy,
+} from './session-service.js';
+import type { CloudAgentSessionState, PersistenceEnv } from './persistence/types.js';
+import { parseSessionMetadata } from './persistence/session-metadata.js';
+import type { ExecutionSession, SandboxInstance, SessionId } from './types.js';
+import type { FencedWrapperDispatchRequest } from './execution/types.js';
+
+type MockExecutionSession = ExecutionSession & {
+  exec: ReturnType<typeof vi.fn>;
+  gitCheckout: ReturnType<typeof vi.fn>;
+};
+
+describe('code-review command guard policy', () => {
+  it('allows required review publication and remote refresh commands while denying repository mutation', () => {
+    const policy = getCommandGuardPolicy('code-review');
+    if (!policy) throw new Error('Expected code-review command guard policy');
+
+    const bashPermissions = buildCommandGuardBashPermissions(policy);
+
+    expect(bashPermissions['glab']).toBeUndefined();
+    expect(bashPermissions['glab *']).toBeUndefined();
+    expect(bashPermissions['gh']).toBeUndefined();
+    expect(bashPermissions['gh *']).toBeUndefined();
+
+    expect(bashPermissions['glab mr diff']).toBe('allow');
+    expect(bashPermissions['glab mr diff *']).toBe('allow');
+    expect(bashPermissions['glab api --method POST *merge_requests/*/notes*']).toBe('allow');
+    expect(bashPermissions['glab api --method PUT *merge_requests/*/notes/*']).toBe('allow');
+    expect(bashPermissions['glab api --method POST *merge_requests/*/discussions*']).toBe('allow');
+
+    expect(bashPermissions['gh pr diff']).toBe('allow');
+    expect(bashPermissions['gh api repos/*/issues/*/comments --input*']).toBe('allow');
+    expect(bashPermissions['gh api repos/*/issues/comments/* -X PATCH*']).toBe('allow');
+    expect(bashPermissions['gh api repos/*/pulls/*/reviews --input*']).toBe('allow');
+
+    expect(bashPermissions['git']).toBe('allow');
+    expect(bashPermissions['git *']).toBe('allow');
+    expect(bashPermissions['git fetch']).toBe('allow');
+    expect(bashPermissions['git fetch *']).toBe('allow');
+    expect(bashPermissions['git pull']).toBe('allow');
+    expect(bashPermissions['git pull *']).toBe('allow');
+    expect(bashPermissions['git push']).toBe('deny');
+    expect(bashPermissions['git push *']).toBe('deny');
+    expect(bashPermissions['git commit']).toBe('deny');
+    expect(bashPermissions['git commit *']).toBe('deny');
+    expect(bashPermissions['glab mr merge']).toBe('deny');
+    expect(bashPermissions['glab mr merge *']).toBe('deny');
+    expect(bashPermissions['glab auth']).toBe('deny');
+    expect(bashPermissions['glab auth *']).toBe('deny');
+  });
 });
 
-import {
-  setupWorkspace as mockSetupWorkspace,
-  cloneGitHubRepo as mockCloneGitHubRepo,
-  manageBranch as mockManageBranch,
-  restoreWorkspace as mockRestoreWorkspace,
-  cleanupWorkspace as mockCleanupWorkspace,
-} from './workspace.js';
-import {
-  backendUrlForSandbox,
-  buildAgentEntryFromRuntimeAgent,
-  InvalidSessionMetadataError,
-  runSetupCommands,
-  SessionService,
-} from './session-service.js';
-import type { SandboxInstance, SessionId, SessionContext, ExecutionSession } from './types.js';
-import type { PersistenceEnv, CloudAgentSessionState } from './persistence/types.js';
-import type * as DevContainerModule from './kilo/devcontainer.js';
-
-describe('SessionService', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockBringUpDevContainer.mockReset();
-    mockTimeoutWarn.mockClear();
-    mockTimeoutWithFields.mockClear();
-    mockTimeoutWithTags.mockClear();
-    (mockEnv.SESSION_INGEST as unknown as { fetch: ReturnType<typeof vi.fn> }).fetch = vi
-      .fn()
-      .mockResolvedValue(new Response(JSON.stringify({ info: {}, messages: [] })));
+function createSession(repoExists = false): MockExecutionSession {
+  const exec = vi.fn(async (command: string) => {
+    if (command.includes('test -d') && command.includes('.git')) {
+      return { exitCode: repoExists ? 0 : 1, stdout: repoExists ? 'exists\n' : '', stderr: '' };
+    }
+    if (command.includes('kilo-restore-session.js')) {
+      return { exitCode: 0, stdout: JSON.stringify({ ok: true }), stderr: '' };
+    }
+    return { exitCode: 0, stdout: '', stderr: '' };
   });
+  const gitCheckout = vi.fn().mockResolvedValue({ success: true, exitCode: 0 });
+  return { exec, gitCheckout } as unknown as MockExecutionSession;
+}
 
-  const mockedSetupWorkspace = vi.mocked(mockSetupWorkspace);
-  const mockedRestoreWorkspace = vi.mocked(mockRestoreWorkspace);
+function createSandbox(
+  session: ExecutionSession,
+  repoExists = false,
+  writeFile = vi.fn().mockResolvedValue(undefined)
+): SandboxInstance {
+  return {
+    createSession: vi.fn().mockResolvedValue(session),
+    writeFile,
+    mkdir: vi.fn().mockResolvedValue(undefined),
+    exec: vi.fn(async (command: string) => {
+      if (command.includes('test -d') && command.includes('.git')) {
+        return { exitCode: repoExists ? 0 : 1, stdout: repoExists ? 'exists\n' : '', stderr: '' };
+      }
+      return { exitCode: 0, stdout: '', stderr: '' };
+    }),
+  } as unknown as SandboxInstance;
+}
 
-  // Mock environment for tests
-  const mockEnv: PersistenceEnv = {
-    Sandbox: {} as unknown as PersistenceEnv['Sandbox'],
+function createEnv(metadata?: CloudAgentSessionState | null): PersistenceEnv {
+  return {
+    Sandbox: {} as PersistenceEnv['Sandbox'],
     CLOUD_AGENT_SESSION: {
-      idFromName: vi.fn().mockReturnValue('mock-id' as unknown as DurableObjectId),
-      get: vi.fn().mockReturnValue({
-        getMetadata: vi.fn().mockResolvedValue({
-          version: 12345,
-          sessionId: 'test',
-          orgId: 'org',
-          userId: 'user',
-          timestamp: 12345,
-        }),
+      idFromName: vi.fn(() => 'do-id' as unknown as DurableObjectId),
+      get: vi.fn(() => ({
+        getMetadata: vi.fn().mockResolvedValue(metadata ?? null),
         updateMetadata: vi.fn().mockResolvedValue(undefined),
-        deleteSession: vi.fn().mockResolvedValue(undefined),
-      }),
+      })),
     } as unknown as PersistenceEnv['CLOUD_AGENT_SESSION'],
-    NEXTAUTH_SECRET: 'mock-secret',
     SESSION_INGEST: {
       fetch: vi.fn(),
+      createSessionForCloudAgent: vi.fn().mockResolvedValue(undefined),
+      deleteSessionForCloudAgent: vi.fn().mockResolvedValue(undefined),
     } as unknown as PersistenceEnv['SESSION_INGEST'],
+    NEXTAUTH_SECRET: 'secret',
     INTERNAL_API_SECRET_PROD: {
-      get: vi.fn().mockResolvedValue('test-secret'),
+      get: vi.fn().mockResolvedValue('internal-secret'),
     } as unknown as PersistenceEnv['INTERNAL_API_SECRET_PROD'],
-  };
+    GIT_TOKEN_SERVICE: {
+      getToken: vi.fn().mockResolvedValue('installation-token'),
+      getTokenForRepo: vi.fn().mockResolvedValue({
+        success: true,
+        token: 'resolved-gh-token',
+        installationId: '123',
+        accountLogin: 'acme',
+        appType: 'standard',
+      }),
+      getGitLabToken: vi.fn().mockResolvedValue({
+        success: true,
+        token: 'resolved-gitlab-token',
+        instanceUrl: 'https://gitlab.com',
+      }),
+    },
+  } satisfies PersistenceEnv;
+}
 
-  const createMetadataEnv = (
-    overrides?: Partial<{
-      getMetadata: ReturnType<typeof vi.fn>;
-      updateMetadata: ReturnType<typeof vi.fn>;
-      updateUpstreamBranch: ReturnType<typeof vi.fn>;
-      deleteSession: ReturnType<typeof vi.fn>;
-    }>
-  ) => {
-    const metadataStub = {
-      getMetadata: vi.fn().mockResolvedValue(null),
-      updateMetadata: vi.fn().mockResolvedValue(undefined),
-      updateUpstreamBranch: vi.fn().mockResolvedValue(undefined),
-      deleteSession: vi.fn().mockResolvedValue(undefined),
-      ...overrides,
-    } as unknown as ReturnType<PersistenceEnv['CLOUD_AGENT_SESSION']['get']>;
-
-    const env: PersistenceEnv = {
-      ...mockEnv,
-      KILO_SESSION_INGEST_URL: 'https://session-ingest.example.com',
-      CLOUD_AGENT_SESSION: {
-        idFromName: vi.fn(() => 'mock-do-id' as unknown as DurableObjectId),
-        get: vi.fn().mockReturnValue(metadataStub),
-      } as unknown as PersistenceEnv['CLOUD_AGENT_SESSION'],
-    };
-
-    return { env, metadataStub };
-  };
-
-  describe('initiate', () => {
-    it('provisions workspace, clones repo, and creates session branch directly', async () => {
-      const fakeSession = {
-        exec: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-        deleteFile: vi.fn().mockResolvedValue(undefined),
-      };
-      const sandboxCreateSession = vi.fn().mockResolvedValue(fakeSession);
-      const sandbox = {
-        createSession: sandboxCreateSession,
-        mkdir: vi.fn().mockResolvedValue(undefined),
-        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-      } as unknown as SandboxInstance;
-      const sessionId: SessionId = 'agent_test_123';
-      mockedSetupWorkspace.mockResolvedValue({
-        workspacePath: `/workspace/org/user/sessions/${sessionId}`,
-        sessionHome: `/home/${sessionId}`,
-      });
-
-      const service = new SessionService();
-      const result = await service.initiate({
-        sandbox,
-        sandboxId: 'org__user',
-        orgId: 'org',
-        userId: 'user',
-        sessionId,
-        kilocodeToken: 'token',
-        kilocodeModel: 'test-model',
-        githubRepo: 'acme/repo',
-        env: mockEnv,
-      });
-
-      expect(mockSetupWorkspace).toHaveBeenCalledWith(sandbox, 'user', 'org', sessionId);
-      expect(sandboxCreateSession).toHaveBeenCalledWith({
-        name: sessionId,
-        env: {
-          HOME: `/home/${sessionId}`,
-          SESSION_ID: sessionId,
-          SESSION_HOME: `/home/${sessionId}`,
-          KILOCODE_TOKEN: 'token',
-          KILOCODE_ORGANIZATION_ID: 'org',
-          KILO_PLATFORM: 'cloud-agent',
-          KILO_DISABLE_AUTOUPDATE: 'true',
-          KILOCODE_FEATURE: 'cloud-agent',
-          OPENCODE_CONFIG_CONTENT: `{"permission":{"external_directory":{"*":"deny","/tmp/${sessionId}/**":"allow","/workspace/org/user/sessions/${sessionId}/**":"allow","/home/${sessionId}/.kilocode/skills/**":"allow"},"question":"deny","read":"allow","edit":"allow","glob":"allow","grep":"allow","list":"allow","bash":"allow","task":"allow","webfetch":"allow","websearch":"allow","codesearch":"allow","lsp":"allow","skill":"allow","todowrite":"allow","todoread":"allow","suggest":"deny"},"provider":{"kilo":{"options":{"apiKey":"token","kilocodeToken":"token","kilocodeOrganizationId":"org"}}},"autoupdate":false,"snapshot":false,"model":"kilo/test-model"}`,
-          KILO_CONFIG_CONTENT: `{"permission":{"external_directory":{"*":"deny","/tmp/${sessionId}/**":"allow","/workspace/org/user/sessions/${sessionId}/**":"allow","/home/${sessionId}/.kilocode/skills/**":"allow"},"question":"deny","read":"allow","edit":"allow","glob":"allow","grep":"allow","list":"allow","bash":"allow","task":"allow","webfetch":"allow","websearch":"allow","codesearch":"allow","lsp":"allow","skill":"allow","todowrite":"allow","todoread":"allow","suggest":"deny"},"provider":{"kilo":{"options":{"apiKey":"token","kilocodeToken":"token","kilocodeOrganizationId":"org"}}},"autoupdate":false,"snapshot":false,"model":"kilo/test-model"}`,
-        },
-        cwd: `/workspace/org/user/sessions/${sessionId}`,
-      });
-      expect(mockCloneGitHubRepo).toHaveBeenCalledWith(
-        fakeSession,
-        `/workspace/org/user/sessions/${sessionId}`,
-        'acme/repo',
-        undefined,
-        { GITHUB_APP_SLUG: undefined, GITHUB_APP_BOT_USER_ID: undefined },
-        undefined
-      );
-      // For session branches, manageBranch should NOT be called
-      expect(mockManageBranch).not.toHaveBeenCalled();
-      // Instead, session.exec should be called with git checkout -b
-      expect(fakeSession.exec).toHaveBeenCalledWith(
-        expect.stringContaining(`git checkout -b 'session/${sessionId}'`),
-        expect.any(Object)
-      );
-      expect(result.context.sessionId).toBe(sessionId);
-    });
-
-    it('does not restore session snapshot during initiate (no curl/import)', async () => {
-      const fakeSession = {
-        exec: vi.fn().mockResolvedValue({ success: true, exitCode: 0, stdout: '', stderr: '' }),
-        gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-        deleteFile: vi.fn().mockResolvedValue(undefined),
-      };
-      const sandboxCreateSession = vi.fn().mockResolvedValue(fakeSession);
-      const sandbox = {
-        createSession: sandboxCreateSession,
-        mkdir: vi.fn().mockResolvedValue(undefined),
-        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-      } as unknown as SandboxInstance;
-      const sessionId: SessionId = 'agent_restore_test_skip';
-      mockedSetupWorkspace.mockResolvedValue({
-        workspacePath: `/workspace/org/user/sessions/${sessionId}`,
-        sessionHome: `/home/${sessionId}`,
-      });
-
-      const service = new SessionService();
-      await service.initiate({
-        sandbox,
-        sandboxId: 'org__user',
-        orgId: 'org',
-        userId: 'user',
-        sessionId,
-        kilocodeToken: 'token',
-        kilocodeModel: 'test-model',
-        githubRepo: 'acme/repo',
-        env: mockEnv,
-      });
-
-      // No curl, kilo import, or restore script should run during initiate
-      const curlCalls = fakeSession.exec.mock.calls.filter(
-        (args: string[]) => typeof args[0] === 'string' && args[0].includes('curl')
-      );
-      expect(curlCalls).toHaveLength(0);
-      expect(fakeSession.exec).not.toHaveBeenCalledWith(
-        `kilo import "/tmp/kilo-session-export-${sessionId}.json"`
-      );
-      const restoreCalls = fakeSession.exec.mock.calls.filter(
-        (args: string[]) =>
-          typeof args[0] === 'string' && args[0].includes('kilo-restore-session.js')
-      );
-      expect(restoreCalls).toHaveLength(0);
-    });
-
-    it('uses manageBranch for upstream branches during initiate', async () => {
-      const fakeSession = {
-        exec: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-        deleteFile: vi.fn().mockResolvedValue(undefined),
-      };
-      const sandboxCreateSession = vi.fn().mockResolvedValue(fakeSession);
-      const sandbox = {
-        createSession: sandboxCreateSession,
-        mkdir: vi.fn().mockResolvedValue(undefined),
-        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-      } as unknown as SandboxInstance;
-      const sessionId: SessionId = 'agent_test_456';
-      mockedSetupWorkspace.mockResolvedValue({
-        workspacePath: `/workspace/org/user/sessions/${sessionId}`,
-        sessionHome: `/home/${sessionId}`,
-      });
-
-      const service = new SessionService();
-      const upstreamBranch = 'feature/my-branch';
-      await service.initiate({
-        sandbox,
-        sandboxId: 'org__user',
-        orgId: 'org',
-        userId: 'user',
-        sessionId,
-        kilocodeToken: 'token',
-        kilocodeModel: 'test-model',
-        githubRepo: 'acme/repo',
-        env: mockEnv,
-        upstreamBranch,
-      });
-
-      // For upstream branches, manageBranch SHOULD be called
-      expect(mockManageBranch).toHaveBeenCalledWith(
-        fakeSession,
-        `/workspace/org/user/sessions/${sessionId}`,
-        upstreamBranch,
-        true
-      );
-      // git checkout -b should NOT be called directly
-      expect(fakeSession.exec).not.toHaveBeenCalledWith(expect.stringContaining('git checkout -b'));
-    });
+function createMetadata(overrides: Record<string, unknown> = {}): CloudAgentSessionState {
+  return parseSessionMetadata({
+    version: 1,
+    sessionId: 'agent_test',
+    userId: 'user_test',
+    timestamp: 1,
+    kilocodeToken: 'kilo-token',
+    kiloSessionId: 'kilo-session',
+    model: 'kilo/test-model',
+    gitUrl: 'https://gitlab.com/acme/repo.git',
+    gitToken: 'git-token',
+    platform: 'gitlab',
+    ...overrides,
   });
-
-  describe('resume', () => {
-    it('resumes existing session (warm start)', async () => {
-      const fakeSession = {
-        exec: vi.fn().mockResolvedValue({ success: true, stdout: 'exists' }),
-        gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-        deleteFile: vi.fn().mockResolvedValue(undefined),
-      };
-      const sandboxCreateSession = vi.fn().mockResolvedValue(fakeSession);
-      const sandbox = {
-        createSession: sandboxCreateSession,
-        mkdir: vi.fn().mockResolvedValue(undefined),
-        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-      } as unknown as SandboxInstance;
-      const service = new SessionService();
-      const sessionId: SessionId = 'agent_test_456';
-      const result = await service.resume({
-        sandbox,
-        sandboxId: 'org__user',
-        orgId: 'org',
-        userId: 'user',
-        sessionId,
-        kilocodeToken: 'token',
-        kilocodeModel: 'test-model',
-        env: mockEnv,
-      });
-
-      expect(sandboxCreateSession).toHaveBeenCalledWith({
-        name: sessionId,
-        env: {
-          HOME: `/home/${sessionId}`,
-          SESSION_ID: sessionId,
-          SESSION_HOME: `/home/${sessionId}`,
-          KILOCODE_TOKEN: 'token',
-          KILOCODE_ORGANIZATION_ID: 'org',
-          KILO_PLATFORM: 'cloud-agent',
-          KILO_DISABLE_AUTOUPDATE: 'true',
-          KILOCODE_FEATURE: 'cloud-agent',
-          OPENCODE_CONFIG_CONTENT: `{"permission":{"external_directory":{"*":"deny","/tmp/${sessionId}/**":"allow","/workspace/org/user/sessions/${sessionId}/**":"allow","/home/${sessionId}/.kilocode/skills/**":"allow"},"question":"deny","read":"allow","edit":"allow","glob":"allow","grep":"allow","list":"allow","bash":"allow","task":"allow","webfetch":"allow","websearch":"allow","codesearch":"allow","lsp":"allow","skill":"allow","todowrite":"allow","todoread":"allow","suggest":"deny"},"provider":{"kilo":{"options":{"apiKey":"token","kilocodeToken":"token","kilocodeOrganizationId":"org"}}},"autoupdate":false,"snapshot":false,"model":"kilo/test-model"}`,
-          KILO_CONFIG_CONTENT: `{"permission":{"external_directory":{"*":"deny","/tmp/${sessionId}/**":"allow","/workspace/org/user/sessions/${sessionId}/**":"allow","/home/${sessionId}/.kilocode/skills/**":"allow"},"question":"deny","read":"allow","edit":"allow","glob":"allow","grep":"allow","list":"allow","bash":"allow","task":"allow","webfetch":"allow","websearch":"allow","codesearch":"allow","lsp":"allow","skill":"allow","todowrite":"allow","todoread":"allow","suggest":"deny"},"provider":{"kilo":{"options":{"apiKey":"token","kilocodeToken":"token","kilocodeOrganizationId":"org"}}},"autoupdate":false,"snapshot":false,"model":"kilo/test-model"}`,
-        },
-        cwd: `/workspace/org/user/sessions/${sessionId}`,
-      });
-      // manageBranch should NOT be called when repo exists (warm start)
-      expect(mockManageBranch).not.toHaveBeenCalled();
-      expect(result.context.sessionId).toBe(sessionId);
-    });
-
-    it('refreshes upstream branch for warm prepared resumes', async () => {
-      const fakeSession = {
-        exec: vi.fn().mockResolvedValue({ success: true, stdout: 'exists' }),
-        gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-        deleteFile: vi.fn().mockResolvedValue(undefined),
-      };
-      const sandbox = {
-        createSession: vi.fn().mockResolvedValue(fakeSession),
-        mkdir: vi.fn().mockResolvedValue(undefined),
-        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-      } as unknown as SandboxInstance;
-      const sessionId: SessionId = 'agent_test_upstream_resume';
-      const metadata: CloudAgentSessionState = {
-        version: 123456789,
-        sessionId,
-        orgId: 'org',
-        userId: 'user',
-        timestamp: 123456789,
-        githubRepo: 'acme/repo',
-        upstreamBranch: 'refs/pull/42/head',
-      };
-      const { env: testEnv } = createMetadataEnv({
-        getMetadata: vi.fn().mockResolvedValue(metadata),
-      });
-
-      const service = new SessionService();
-      await service.resume({
-        sandbox,
-        sandboxId: 'org__user',
-        orgId: 'org',
-        userId: 'user',
-        sessionId,
-        kilocodeToken: 'token',
-        kilocodeModel: 'test-model',
-        env: testEnv,
-      });
-
-      expect(mockManageBranch).toHaveBeenCalledWith(
-        fakeSession,
-        `/workspace/org/user/sessions/${sessionId}`,
-        'refs/pull/42/head',
-        true
-      );
-      expect(mockRestoreWorkspace).not.toHaveBeenCalled();
-    });
-
-    it('uses a fresh GitHub token for GH_TOKEN when metadata has no token', async () => {
-      const fakeSession = {
-        exec: vi.fn().mockResolvedValue({ success: true, stdout: 'exists' }),
-        gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-        deleteFile: vi.fn().mockResolvedValue(undefined),
-      };
-      const sandboxCreateSession = vi.fn().mockResolvedValue(fakeSession);
-      const sandbox = {
-        createSession: sandboxCreateSession,
-        mkdir: vi.fn().mockResolvedValue(undefined),
-        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-      } as unknown as SandboxInstance;
-      const metadata = {
-        version: 123456789,
-        sessionId: 'agent_resume_fresh_gh_token',
-        orgId: 'org',
-        userId: 'user',
-        timestamp: 123456789,
-        githubRepo: 'acme/repo',
-      };
-      const { env: testEnv } = createMetadataEnv({
-        getMetadata: vi.fn().mockResolvedValue(metadata),
-      });
-
-      const service = new SessionService();
-      const result = await service.resume({
-        sandbox,
-        sandboxId: 'org__user',
-        orgId: 'org',
-        userId: 'user',
-        sessionId: 'agent_resume_fresh_gh_token',
-        kilocodeToken: 'token',
-        kilocodeModel: 'test-model',
-        env: testEnv,
-        githubToken: 'fresh-github-token',
-      });
-
-      expect(result.context.githubToken).toBe('fresh-github-token');
-      expect(sandboxCreateSession).toHaveBeenCalledWith(
-        expect.objectContaining({
-          env: expect.objectContaining({
-            GH_TOKEN: 'fresh-github-token',
-          }) as unknown,
-        })
-      );
-    });
-
-    it('keeps metadata GH_TOKEN env override when a fresh GitHub token is provided', async () => {
-      const fakeSession = {
-        exec: vi.fn().mockResolvedValue({ success: true, stdout: 'exists' }),
-        gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-        deleteFile: vi.fn().mockResolvedValue(undefined),
-      };
-      const sandboxCreateSession = vi.fn().mockResolvedValue(fakeSession);
-      const sandbox = {
-        createSession: sandboxCreateSession,
-        mkdir: vi.fn().mockResolvedValue(undefined),
-        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-      } as unknown as SandboxInstance;
-      const metadata = {
-        version: 123456789,
-        sessionId: 'agent_resume_gh_token_override',
-        orgId: 'org',
-        userId: 'user',
-        timestamp: 123456789,
-        githubRepo: 'acme/repo',
-        envVars: { GH_TOKEN: 'user-provided-token' },
-      };
-      const { env: testEnv } = createMetadataEnv({
-        getMetadata: vi.fn().mockResolvedValue(metadata),
-      });
-
-      const service = new SessionService();
-      const result = await service.resume({
-        sandbox,
-        sandboxId: 'org__user',
-        orgId: 'org',
-        userId: 'user',
-        sessionId: 'agent_resume_gh_token_override',
-        kilocodeToken: 'token',
-        kilocodeModel: 'test-model',
-        env: testEnv,
-        githubToken: 'fresh-github-token',
-      });
-
-      expect(result.context.githubToken).toBe('fresh-github-token');
-      expect(sandboxCreateSession).toHaveBeenCalledWith(
-        expect.objectContaining({
-          env: expect.objectContaining({
-            GH_TOKEN: 'user-provided-token',
-          }) as unknown,
-        })
-      );
-    });
-  });
-
-  describe('resume with conditional reclone', () => {
-    const sessionId: SessionId = 'agent_test_789';
-    const orgId = 'org123';
-    const userId = 'user456';
-
-    it('should reclone repository when workspace is missing and metadata exists', async () => {
-      const fakeSession = {
-        exec: vi
-          .fn()
-          .mockResolvedValueOnce({ success: true, exitCode: 1, stdout: '', stderr: '' }) // repo check fails
-          .mockResolvedValue({ success: true, exitCode: 0 }), // subsequent calls succeed
-        gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-        deleteFile: vi.fn().mockResolvedValue(undefined),
-      };
-      const sandbox = {
-        createSession: vi.fn().mockResolvedValue(fakeSession),
-        mkdir: vi.fn().mockResolvedValue(undefined),
-        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-      } as unknown as SandboxInstance;
-
-      const mockDOGetMetadata = vi.fn();
-      const testEnv = {
-        ...mockEnv,
-        KILO_SESSION_INGEST_URL: 'https://session-ingest.example.com',
-        CLOUD_AGENT_SESSION: {
-          idFromName: vi.fn(() => 'mock-do-id' as unknown as DurableObjectId),
-          get: vi.fn(() => ({
-            getMetadata: mockDOGetMetadata,
-            updateMetadata: vi.fn().mockResolvedValue(undefined),
-            deleteSession: vi.fn().mockResolvedValue(undefined),
-          })),
-        } as unknown as PersistenceEnv['CLOUD_AGENT_SESSION'],
-      };
-
-      // Mock: DO returns metadata with repo info
-      const metadata = {
-        version: 123456789,
-        sessionId,
-        orgId,
-        userId,
-        timestamp: 123456789,
-        githubRepo: 'facebook/react',
-        githubToken: 'test-token',
-        kiloSessionId: 'ses_test_kilo_session_id_0001',
-      };
-      mockDOGetMetadata.mockResolvedValue(metadata);
-
-      const service = new SessionService();
-      const result = await service.resume({
-        sandbox,
-        sandboxId: `${orgId}__${userId}`,
-        orgId,
-        userId,
-        sessionId,
-        kilocodeToken: 'test-token',
-        kilocodeModel: 'test-model',
-        env: testEnv,
-      });
-
-      // Verify restoreWorkspace was called with correct options
-      expect(mockRestoreWorkspace).toHaveBeenCalledWith(
-        fakeSession,
-        `/workspace/${orgId}/${userId}/sessions/${sessionId}`,
-        `session/${sessionId}`,
-        expect.objectContaining({
-          githubRepo: 'facebook/react',
-          githubToken: 'test-token',
-        })
-      );
-
-      // Verify context includes repo info
-      expect(result.context.githubRepo).toBe('facebook/react');
-      expect(result.context.githubToken).toBe('test-token');
-    });
-
-    it('logs timeout during resume repo existence check', async () => {
-      const fakeSession = {
-        exec: vi.fn().mockRejectedValueOnce(new Error('Command timeout after 30000ms')),
-        gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-        deleteFile: vi.fn().mockResolvedValue(undefined),
-      };
-      const sandbox = {
-        createSession: vi.fn().mockResolvedValue(fakeSession),
-        mkdir: vi.fn().mockResolvedValue(undefined),
-        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-      } as unknown as SandboxInstance;
-
-      const service = new SessionService();
-      await expect(
-        service.resume({
-          sandbox,
-          sandboxId: `${orgId}__${userId}`,
-          orgId,
-          userId,
-          sessionId,
-          kilocodeToken: 'test-token',
-          kilocodeModel: 'test-model',
-          env: mockEnv,
-        })
-      ).rejects.toThrow('Command timeout after 30000ms');
-
-      expect(mockTimeoutWithTags).toHaveBeenCalledWith({ logTag: 'sandbox-operation-timeout' });
-      expect(mockTimeoutWithFields).toHaveBeenCalledWith(
-        expect.objectContaining({
-          operation: 'session.resume.repoExists',
-          timeoutMs: 30000,
-          timeoutLayer: 'exec',
-          error: 'Command timeout after 30000ms',
-        })
-      );
-      expect(mockTimeoutWarn).toHaveBeenCalledWith('Sandbox operation timed out');
-    });
-
-    it('should use fresh githubToken from request instead of stale metadata token during reclone', async () => {
-      const fakeSession = {
-        exec: vi
-          .fn()
-          .mockResolvedValueOnce({ success: true, exitCode: 1, stdout: '', stderr: '' }) // repo check fails
-          .mockResolvedValue({ success: true, exitCode: 0 }), // subsequent calls succeed
-        gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-        deleteFile: vi.fn().mockResolvedValue(undefined),
-      };
-      const sandbox = {
-        createSession: vi.fn().mockResolvedValue(fakeSession),
-        mkdir: vi.fn().mockResolvedValue(undefined),
-        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-      } as unknown as SandboxInstance;
-
-      const mockDOGetMetadata = vi.fn();
-      const testEnv = {
-        ...mockEnv,
-        KILO_SESSION_INGEST_URL: 'https://session-ingest.example.com',
-        CLOUD_AGENT_SESSION: {
-          idFromName: vi.fn(() => 'mock-do-id' as unknown as DurableObjectId),
-          get: vi.fn(() => ({
-            getMetadata: mockDOGetMetadata,
-            updateMetadata: vi.fn().mockResolvedValue(undefined),
-            deleteSession: vi.fn().mockResolvedValue(undefined),
-          })),
-        } as unknown as PersistenceEnv['CLOUD_AGENT_SESSION'],
-      };
-
-      // Mock: DO returns metadata with STALE token
-      const kiloSessionId = 'ses_test_kilo_session_id_0001';
-      const metadata = {
-        version: 123456789,
-        sessionId,
-        orgId,
-        userId,
-        timestamp: 123456789,
-        githubRepo: 'facebook/react',
-        githubToken: 'test-token',
-        kiloSessionId,
-      };
-      mockDOGetMetadata.mockResolvedValue(metadata);
-
-      const service = new SessionService();
-      const freshToken = 'fresh-token-from-request';
-      await service.resume({
-        sandbox,
-        sandboxId: `${orgId}__${userId}`,
-        orgId,
-        userId,
-        sessionId,
-        kilocodeToken: 'test-token',
-        kilocodeModel: 'test-model',
-        env: testEnv,
-        // Pass fresh token from request
-        githubToken: freshToken,
-      });
-
-      // Verify restoreWorkspace was called with FRESH token, not stale metadata token
-      expect(mockRestoreWorkspace).toHaveBeenCalledWith(
-        fakeSession,
-        `/workspace/${orgId}/${userId}/sessions/${sessionId}`,
-        `session/${sessionId}`,
-        expect.objectContaining({
-          githubRepo: 'facebook/react',
-          githubToken: freshToken, // Should use fresh token, not 'stale-token-from-metadata'
-        })
-      );
-    });
-
-    it('should fall back to metadata token when no fresh token provided during reclone', async () => {
-      const fakeSession = {
-        exec: vi
-          .fn()
-          .mockResolvedValueOnce({ success: true, exitCode: 1, stdout: '', stderr: '' }) // repo check fails
-          .mockResolvedValue({ success: true, exitCode: 0 }), // subsequent calls succeed
-        gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-        deleteFile: vi.fn().mockResolvedValue(undefined),
-      };
-      const sandbox = {
-        createSession: vi.fn().mockResolvedValue(fakeSession),
-        mkdir: vi.fn().mockResolvedValue(undefined),
-        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-      } as unknown as SandboxInstance;
-
-      const mockDOGetMetadata = vi.fn();
-      const testEnv = {
-        ...mockEnv,
-        KILO_SESSION_INGEST_URL: 'https://session-ingest.example.com',
-        CLOUD_AGENT_SESSION: {
-          idFromName: vi.fn(() => 'mock-do-id' as unknown as DurableObjectId),
-          get: vi.fn(() => ({
-            getMetadata: mockDOGetMetadata,
-            updateMetadata: vi.fn().mockResolvedValue(undefined),
-            deleteSession: vi.fn().mockResolvedValue(undefined),
-          })),
-        } as unknown as PersistenceEnv['CLOUD_AGENT_SESSION'],
-      };
-
-      // Mock: DO returns metadata with token
-      const metadata = {
-        version: 123456789,
-        sessionId,
-        orgId,
-        userId,
-        timestamp: 123456789,
-        githubRepo: 'facebook/react',
-        githubToken: 'metadata-token',
-        kiloSessionId: 'ses_test_kilo_session_id_0001',
-      };
-      mockDOGetMetadata.mockResolvedValue(metadata);
-
-      const service = new SessionService();
-      await service.resume({
-        sandbox,
-        sandboxId: `${orgId}__${userId}`,
-        orgId,
-        userId,
-        sessionId,
-        kilocodeToken: 'test-token',
-        kilocodeModel: 'test-model',
-        env: testEnv,
-        // No fresh token provided
-      });
-
-      // Verify restoreWorkspace was called with metadata token as fallback
-      expect(mockRestoreWorkspace).toHaveBeenCalledWith(
-        fakeSession,
-        `/workspace/${orgId}/${userId}/sessions/${sessionId}`,
-        `session/${sessionId}`,
-        expect.objectContaining({
-          githubRepo: 'facebook/react',
-          githubToken: 'metadata-token', // Should fall back to metadata token
-        })
-      );
-    });
-
-    it('should throw error when workspace is missing and no metadata exists', async () => {
-      const mockDOGetMetadata = vi.fn();
-      const fakeSession = {
-        exec: vi.fn().mockResolvedValue({ success: true, exitCode: 1, stdout: '', stderr: '' }),
-      };
-      const sandbox = {
-        createSession: vi.fn().mockResolvedValue(fakeSession),
-        mkdir: vi.fn().mockResolvedValue(undefined),
-        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-      } as unknown as SandboxInstance;
-
-      const testEnv = {
-        ...mockEnv,
-        KILO_SESSION_INGEST_URL: 'https://session-ingest.example.com',
-        CLOUD_AGENT_SESSION: {
-          idFromName: vi.fn(() => 'mock-do-id' as unknown as DurableObjectId),
-          get: vi.fn(() => ({
-            getMetadata: mockDOGetMetadata,
-            updateMetadata: vi.fn().mockResolvedValue(undefined),
-            deleteSession: vi.fn().mockResolvedValue(undefined),
-          })),
-        } as unknown as PersistenceEnv['CLOUD_AGENT_SESSION'],
-      };
-
-      // Mock: DO returns null
-      mockDOGetMetadata.mockResolvedValue(null);
-
-      const service = new SessionService();
-      await expect(
-        service.resume({
-          sandbox,
-          sandboxId: `${orgId}__${userId}`,
-          orgId,
-          userId,
-          sessionId,
-          kilocodeToken: 'test-token',
-          kilocodeModel: 'test-model',
-          env: testEnv,
-        })
-      ).rejects.toThrow('workspace is missing and metadata could not be retrieved');
-    });
-
-    it('restores workspace then session snapshot when workspace is missing', async () => {
-      const mockDOGetMetadata = vi.fn();
-      const envWithIngest: PersistenceEnv = {
-        ...mockEnv,
-        KILO_SESSION_INGEST_URL: 'https://session-ingest.example.com',
-        CLOUD_AGENT_SESSION: {
-          idFromName: vi.fn(() => 'mock-do-id' as unknown as DurableObjectId),
-          get: vi.fn(() => ({
-            getMetadata: mockDOGetMetadata,
-            updateMetadata: vi.fn().mockResolvedValue(undefined),
-            deleteSession: vi.fn().mockResolvedValue(undefined),
-          })),
-        } as unknown as PersistenceEnv['CLOUD_AGENT_SESSION'],
-      };
-      const fakeSession = {
-        exec: vi
-          .fn()
-          .mockResolvedValueOnce({ success: true, exitCode: 1, stdout: '', stderr: '' }) // repo check fails
-          .mockResolvedValue({
-            success: true,
-            exitCode: 0,
-            stdout: JSON.stringify({
-              ok: true,
-              downloaded: true,
-              imported: true,
-              diffs: { applied: 0, skipped: 0, total: 0 },
-            }),
-            stderr: '',
-          }), // restore script + any subsequent calls
-        gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-        deleteFile: vi.fn().mockResolvedValue(undefined),
-      };
-      const sandboxWriteFile = vi.fn().mockResolvedValue(undefined);
-      const sandbox = {
-        createSession: vi.fn().mockResolvedValue(fakeSession),
-        mkdir: vi.fn().mockResolvedValue(undefined),
-        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
-        writeFile: sandboxWriteFile,
-      } as unknown as SandboxInstance;
-
-      const kiloSessionId = 'ses_test_kilo_session_id_0001';
-      const metadata = {
-        version: 123456789,
-        sessionId,
-        orgId,
-        userId,
-        timestamp: 123456789,
-        githubRepo: 'facebook/react',
-        githubToken: 'test-token',
-        kiloSessionId,
-      };
-      mockDOGetMetadata.mockResolvedValue(metadata);
-
-      const service = new SessionService();
-      const result = await service.resume({
-        sandbox,
-        sandboxId: `${orgId}__${userId}`,
-        orgId,
-        userId,
-        sessionId,
-        kilocodeToken: 'test-token',
-        kilocodeModel: 'test-model',
-        env: envWithIngest,
-      });
-
-      // Verify restore script was called (instead of curl)
-      const restoreCall = fakeSession.exec.mock.calls.find(
-        (args: string[]) =>
-          typeof args[0] === 'string' && args[0].includes('kilo-restore-session.js')
-      );
-      expect(restoreCall).toBeDefined();
-      expect(restoreCall![0]).toContain(kiloSessionId);
-      expect(restoreCall![0]).toContain(`/workspace/${orgId}/${userId}/sessions/${sessionId}`);
-
-      expect(result.context.githubRepo).toBe('facebook/react');
-      expect(result.context.githubToken).toBe('test-token');
-
-      // Verify restoreWorkspace (git clone) ran before restore script
-      const restoreScriptCallIndex = fakeSession.exec.mock.calls.findIndex(
-        (args: string[]) =>
-          typeof args[0] === 'string' && args[0].includes('kilo-restore-session.js')
-      );
-      expect(restoreScriptCallIndex).toBeGreaterThanOrEqual(0);
-      const restoreWorkspaceOrder = mockedRestoreWorkspace.mock.invocationCallOrder[0];
-      const restoreScriptOrder = fakeSession.exec.mock.invocationCallOrder[restoreScriptCallIndex];
-      expect(restoreWorkspaceOrder).toBeLessThan(restoreScriptOrder);
-
-      // Verify writeAuthFile ran before restore script
-      const authWriteCallIndex = sandboxWriteFile.mock.calls.findIndex(
-        (args: string[]) => typeof args[0] === 'string' && args[0].includes('auth.json')
-      );
-      expect(authWriteCallIndex).toBeGreaterThanOrEqual(0);
-      const authWriteOrder = sandboxWriteFile.mock.invocationCallOrder[authWriteCallIndex];
-      expect(authWriteOrder).toBeLessThan(restoreScriptOrder);
-    });
-
-    it('runs restore script in sandbox during cold start', async () => {
-      const mockDOGetMetadata = vi.fn();
-      const envWithIngest: PersistenceEnv = {
-        ...mockEnv,
-        KILO_SESSION_INGEST_URL: 'https://session-ingest.example.com',
-        CLOUD_AGENT_SESSION: {
-          idFromName: vi.fn(() => 'mock-do-id' as unknown as DurableObjectId),
-          get: vi.fn(() => ({
-            getMetadata: mockDOGetMetadata,
-            updateMetadata: vi.fn().mockResolvedValue(undefined),
-            deleteSession: vi.fn().mockResolvedValue(undefined),
-          })),
-        } as unknown as PersistenceEnv['CLOUD_AGENT_SESSION'],
-      };
-      const fakeSession = {
-        exec: vi
-          .fn()
-          .mockResolvedValueOnce({ success: true, exitCode: 1, stdout: '', stderr: '' }) // repo check
-          .mockResolvedValue({
-            success: true,
-            exitCode: 0,
-            stdout: JSON.stringify({
-              ok: true,
-              downloaded: true,
-              imported: true,
-              diffs: { applied: 3, skipped: 0, total: 3 },
-            }),
-            stderr: '',
-          }),
-        gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-        deleteFile: vi.fn().mockResolvedValue(undefined),
-      };
-      const sandbox = {
-        createSession: vi.fn().mockResolvedValue(fakeSession),
-        mkdir: vi.fn().mockResolvedValue(undefined),
-        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-      } as unknown as SandboxInstance;
-
-      const kiloSessionId = 'ses_test_kilo_session_id_0001';
-      const metadata = {
-        version: 123456789,
-        sessionId,
-        orgId,
-        userId,
-        timestamp: 123456789,
-        githubRepo: 'facebook/react',
-        githubToken: 'test-token',
-        kiloSessionId,
-      };
-      mockDOGetMetadata.mockResolvedValue(metadata);
-
-      const service = new SessionService();
-      await service.resume({
-        sandbox,
-        sandboxId: `${orgId}__${userId}`,
-        orgId,
-        userId,
-        sessionId,
-        kilocodeToken: 'test-token',
-        kilocodeModel: 'test-model',
-        env: envWithIngest,
-      });
-
-      // Verify restore script was called with correct args
-      const restoreCall = fakeSession.exec.mock.calls.find(
-        (args: string[]) =>
-          typeof args[0] === 'string' && args[0].includes('kilo-restore-session.js')
-      );
-      expect(restoreCall).toBeDefined();
-      expect(restoreCall![0]).toContain(kiloSessionId);
-      expect(restoreCall![0]).toContain(`/workspace/${orgId}/${userId}/sessions/${sessionId}`);
-
-      // No diff script should be written to sandbox
-      const diffScriptWriteCall = fakeSession.writeFile.mock.calls.find(
-        (args: string[]) => typeof args[0] === 'string' && args[0].includes('kilo-apply-diffs')
-      );
-      expect(diffScriptWriteCall).toBeUndefined();
-
-      // No curl call
-      const curlCalls = fakeSession.exec.mock.calls.filter(
-        (args: string[]) => typeof args[0] === 'string' && args[0].includes('curl')
-      );
-      expect(curlCalls).toHaveLength(0);
-    });
-
-    it('uses a token file instead of argv for devcontainer cold-start restore', async () => {
-      const mockDOGetMetadata = vi.fn();
-      const envWithIngest: PersistenceEnv = {
-        ...mockEnv,
-        KILO_SESSION_INGEST_URL: 'https://session-ingest.example.com',
-        CLOUD_AGENT_SESSION: {
-          idFromName: vi.fn(() => 'mock-do-id' as unknown as DurableObjectId),
-          get: vi.fn(() => ({
-            getMetadata: mockDOGetMetadata,
-            updateMetadata: vi.fn().mockResolvedValue(undefined),
-            deleteSession: vi.fn().mockResolvedValue(undefined),
-          })),
-        } as unknown as PersistenceEnv['CLOUD_AGENT_SESSION'],
-      };
-      const fakeSession = {
-        exec: vi.fn().mockImplementation((cmd: string) => {
-          if (cmd.includes('test -d') && cmd.includes('.git')) {
-            return Promise.resolve({ success: true, exitCode: 1, stdout: '', stderr: '' });
-          }
-          if (cmd.includes('kilo-restore-session.js')) {
-            return Promise.resolve({
-              success: true,
-              exitCode: 0,
-              stdout: JSON.stringify({
-                ok: true,
-                downloaded: true,
-                imported: true,
-                diffs: { applied: 0, skipped: 0, total: 0 },
-              }),
-              stderr: '',
-            });
-          }
-          return Promise.resolve({ success: true, exitCode: 0, stdout: '', stderr: '' });
-        }),
-        gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-        deleteFile: vi.fn().mockResolvedValue(undefined),
-      };
-      const sandboxWriteFile = vi.fn().mockResolvedValue(undefined);
-      const sandbox = {
-        createSession: vi.fn().mockResolvedValue(fakeSession),
-        mkdir: vi.fn().mockResolvedValue(undefined),
-        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
-        writeFile: sandboxWriteFile,
-      } as unknown as SandboxInstance;
-
-      const kiloSessionId = 'ses_test_kilo_session_id_0001';
-      const token = 'super-secret-token';
-      const metadata: CloudAgentSessionState = {
-        version: 123456789,
-        sessionId,
-        orgId,
-        userId,
-        timestamp: 123456789,
-        githubRepo: 'facebook/react',
-        githubToken: 'test-token',
-        kiloSessionId,
-        devcontainer: {
-          workspacePath: `/workspace/${orgId}/${userId}/sessions/${sessionId}`,
-          innerWorkspaceFolder: '/workspaces/react',
-          wrapperPort: 43001,
-          configPath: '.devcontainer/devcontainer.json',
-        },
-        profile: { setupCommands: ['pnpm install'] },
-      };
-      mockDOGetMetadata.mockResolvedValue(metadata);
-      mockBringUpDevContainer.mockResolvedValue({
-        containerId: 'cont-id',
-        innerWorkspaceFolder: '/workspaces/react',
-        workspacePath: metadata.devcontainer!.workspacePath,
-        agentSessionId: sessionId,
-        overrideConfigPath: `/tmp/devcontainer-override-${sessionId}/devcontainer.json`,
-        teardown: vi.fn(),
-      });
-
-      const service = new SessionService();
-      await service.resume({
-        sandbox,
-        sandboxId: `${orgId}__${userId}`,
-        orgId,
-        userId,
-        sessionId,
-        kilocodeToken: token,
-        kilocodeModel: 'test-model',
-        env: envWithIngest,
-      });
-
-      const tokenPath = `/home/${sessionId}/.local/share/kilo/session-restore-token`;
-      expect(sandboxWriteFile).toHaveBeenCalledWith(tokenPath, token);
-
-      const restoreCall = fakeSession.exec.mock.calls.find(
-        (args: string[]) =>
-          typeof args[0] === 'string' && args[0].includes('kilo-restore-session.js')
-      );
-      expect(restoreCall).toBeDefined();
-      expect(restoreCall![0]).toContain('KILOCODE_TOKEN_FILE=');
-      expect(restoreCall![0]).toContain(tokenPath);
-      expect(restoreCall![0]).toContain('XDG_DATA_HOME=');
-      expect(restoreCall![0]).toContain(`/home/${sessionId}/.local/share`);
-      expect(restoreCall![0]).toContain('XDG_CONFIG_HOME=');
-      expect(restoreCall![0]).toContain(`/home/${sessionId}/.config`);
-      expect(restoreCall![0]).toContain('XDG_CACHE_HOME=');
-      expect(restoreCall![0]).toContain(`/home/${sessionId}/.cache`);
-      expect(restoreCall![0]).not.toContain('KILOCODE_TOKEN=');
-      expect(restoreCall![0]).not.toContain(token);
-
-      expect(
-        fakeSession.exec.mock.calls.some((args: string[]) => args[0] === `chmod 600 '${tokenPath}'`)
-      ).toBe(true);
-      expect(
-        fakeSession.exec.mock.calls.some((args: string[]) => args[0] === `rm -f '${tokenPath}'`)
-      ).toBe(true);
-      expect(
-        fakeSession.exec.mock.calls.some(
-          (args: string[]) =>
-            typeof args[0] === 'string' &&
-            args[0].includes('devcontainer exec') &&
-            args[0].includes('pnpm install')
-        )
-      ).toBe(true);
-    });
-
-    it('completes cold start when restore script reports no diffs', async () => {
-      const mockDOGetMetadata = vi.fn();
-      const envWithIngest: PersistenceEnv = {
-        ...mockEnv,
-        KILO_SESSION_INGEST_URL: 'https://session-ingest.example.com',
-        CLOUD_AGENT_SESSION: {
-          idFromName: vi.fn(() => 'mock-do-id' as unknown as DurableObjectId),
-          get: vi.fn(() => ({
-            getMetadata: mockDOGetMetadata,
-            updateMetadata: vi.fn().mockResolvedValue(undefined),
-            deleteSession: vi.fn().mockResolvedValue(undefined),
-          })),
-        } as unknown as PersistenceEnv['CLOUD_AGENT_SESSION'],
-      };
-      const fakeSession = {
-        exec: vi
-          .fn()
-          .mockResolvedValueOnce({ success: true, exitCode: 1, stdout: '', stderr: '' }) // repo check
-          .mockResolvedValue({
-            success: true,
-            exitCode: 0,
-            stdout: JSON.stringify({
-              ok: true,
-              downloaded: true,
-              imported: true,
-              diffs: { applied: 0, skipped: 0, total: 0 },
-            }),
-            stderr: '',
-          }),
-        gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-        deleteFile: vi.fn().mockResolvedValue(undefined),
-      };
-      const sandbox = {
-        createSession: vi.fn().mockResolvedValue(fakeSession),
-        mkdir: vi.fn().mockResolvedValue(undefined),
-        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-      } as unknown as SandboxInstance;
-
-      const kiloSessionId = 'ses_test_kilo_session_id_0001';
-      const metadata = {
-        version: 123456789,
-        sessionId,
-        orgId,
-        userId,
-        timestamp: 123456789,
-        githubRepo: 'facebook/react',
-        githubToken: 'test-token',
-        kiloSessionId,
-      };
-      mockDOGetMetadata.mockResolvedValue(metadata);
-
-      const service = new SessionService();
-      // Should not throw — zero diffs is handled gracefully
-      await service.resume({
-        sandbox,
-        sandboxId: `${orgId}__${userId}`,
-        orgId,
-        userId,
-        sessionId,
-        kilocodeToken: 'test-token',
-        kilocodeModel: 'test-model',
-        env: envWithIngest,
-      });
-
-      // Verify restore script was called (not curl)
-      const restoreCall = fakeSession.exec.mock.calls.find(
-        (args: string[]) =>
-          typeof args[0] === 'string' && args[0].includes('kilo-restore-session.js')
-      );
-      expect(restoreCall).toBeDefined();
-    });
-
-    it('throws when restore script fails with 404 (session not found)', async () => {
-      const mockDOGetMetadata = vi.fn();
-      const envWithIngest: PersistenceEnv = {
-        ...mockEnv,
-        KILO_SESSION_INGEST_URL: 'https://session-ingest.example.com',
-        CLOUD_AGENT_SESSION: {
-          idFromName: vi.fn(() => 'mock-do-id' as unknown as DurableObjectId),
-          get: vi.fn(() => ({
-            getMetadata: mockDOGetMetadata,
-            updateMetadata: vi.fn().mockResolvedValue(undefined),
-            deleteSession: vi.fn().mockResolvedValue(undefined),
-          })),
-        } as unknown as PersistenceEnv['CLOUD_AGENT_SESSION'],
-      };
-      const fakeSession = {
-        exec: vi
-          .fn()
-          .mockResolvedValueOnce({ success: true, exitCode: 1, stdout: '', stderr: '' }) // repo check
-          .mockResolvedValueOnce({
-            success: true,
-            exitCode: 1,
-            stdout: JSON.stringify({
-              ok: false,
-              error: 'snapshot not found (404)',
-              code: 404,
-              step: 'download',
-            }),
-            stderr: 'restore-session: snapshot not found (404)',
-          }) // restore script fails with 404
-          .mockResolvedValue({ success: true, exitCode: 0, stdout: '', stderr: '' }),
-        gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-        deleteFile: vi.fn().mockResolvedValue(undefined),
-      };
-      const sandbox = {
-        createSession: vi.fn().mockResolvedValue(fakeSession),
-        mkdir: vi.fn().mockResolvedValue(undefined),
-        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-      } as unknown as SandboxInstance;
-
-      const kiloSessionId = 'ses_test_kilo_session_id_0001';
-      const metadata = {
-        version: 123456789,
-        sessionId,
-        orgId,
-        userId,
-        timestamp: 123456789,
-        githubRepo: 'facebook/react',
-        githubToken: 'test-token',
-        kiloSessionId,
-      };
-      mockDOGetMetadata.mockResolvedValue(metadata);
-
-      const service = new SessionService();
-      await expect(
-        service.resume({
-          sandbox,
-          sandboxId: `${orgId}__${userId}`,
-          orgId,
-          userId,
-          sessionId,
-          kilocodeToken: 'test-token',
-          kilocodeModel: 'test-model',
-          env: envWithIngest,
-        })
-      ).rejects.toThrow('session not found');
-    });
-
-    it('removes workspace when kilo import fails during cold start so retry can reclone', async () => {
-      const mockDOGetMetadata = vi.fn();
-      const envWithIngest: PersistenceEnv = {
-        ...mockEnv,
-        CLOUD_AGENT_SESSION: {
-          idFromName: vi.fn(() => 'mock-do-id' as unknown as DurableObjectId),
-          get: vi.fn(() => ({
-            getMetadata: mockDOGetMetadata,
-            updateMetadata: vi.fn().mockResolvedValue(undefined),
-            deleteSession: vi.fn().mockResolvedValue(undefined),
-          })),
-        } as unknown as PersistenceEnv['CLOUD_AGENT_SESSION'],
-      };
-      const fakeSession = {
-        exec: vi.fn().mockImplementation((cmd: string) => {
-          if (cmd.includes('test -d') && cmd.includes('.git')) {
-            return Promise.resolve({ success: true, exitCode: 1, stdout: '', stderr: '' });
-          }
-          if (cmd.includes('kilo-restore-session')) {
-            return Promise.resolve({
-              success: false,
-              exitCode: 1,
-              stdout: '{"error":"import failed"}',
-              stderr: 'restore script failed',
-            });
-          }
-          return Promise.resolve({ success: true, exitCode: 0, stdout: '', stderr: '' });
-        }),
-        gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-        deleteFile: vi.fn().mockResolvedValue(undefined),
-      };
-      const sandboxExec = vi.fn().mockResolvedValue({ exitCode: 0 });
-      const sandbox = {
-        createSession: vi.fn().mockResolvedValue(fakeSession),
-        mkdir: vi.fn().mockResolvedValue(undefined),
-        exec: sandboxExec,
-        writeFile: vi.fn().mockResolvedValue(undefined),
-      } as unknown as SandboxInstance;
-
-      const kiloSessionId = 'ses_test_kilo_session_id_0001';
-      const metadata = {
-        version: 123456789,
-        sessionId,
-        orgId,
-        userId,
-        timestamp: 123456789,
-        githubRepo: 'facebook/react',
-        githubToken: 'test-token',
-        kiloSessionId,
-      };
-      mockDOGetMetadata.mockResolvedValue(metadata);
-
-      const service = new SessionService();
-      await expect(
-        service.resume({
-          sandbox,
-          sandboxId: `${orgId}__${userId}`,
-          orgId,
-          userId,
-          sessionId,
-          kilocodeToken: 'test-token',
-          kilocodeModel: 'test-model',
-          env: envWithIngest,
-        })
-      ).rejects.toThrow('Cold-start session restore failed');
-
-      const workspacePath = `/workspace/${orgId}/${userId}/sessions/${sessionId}`;
-      const sessionHome = `/home/${sessionId}`;
-      expect(mockCleanupWorkspace).toHaveBeenCalledWith(fakeSession, workspacePath, sessionHome);
-    });
-
-    it('removes workspace when SessionSnapshotRestoreError (404) is thrown', async () => {
-      const mockDOGetMetadata = vi.fn();
-      const envWithIngest: PersistenceEnv = {
-        ...mockEnv,
-        CLOUD_AGENT_SESSION: {
-          idFromName: vi.fn(() => 'mock-do-id' as unknown as DurableObjectId),
-          get: vi.fn(() => ({
-            getMetadata: mockDOGetMetadata,
-            updateMetadata: vi.fn().mockResolvedValue(undefined),
-            deleteSession: vi.fn().mockResolvedValue(undefined),
-          })),
-        } as unknown as PersistenceEnv['CLOUD_AGENT_SESSION'],
-      };
-      const fakeSession = {
-        exec: vi.fn().mockImplementation((cmd: string) => {
-          if (cmd.includes('test -d') && cmd.includes('.git')) {
-            return Promise.resolve({ success: true, exitCode: 1, stdout: '', stderr: '' });
-          }
-          if (cmd.includes('kilo-restore-session')) {
-            return Promise.resolve({
-              success: false,
-              exitCode: 1,
-              stdout: JSON.stringify({ code: 404, error: 'session not found' }),
-              stderr: '',
-            });
-          }
-          return Promise.resolve({ success: true, exitCode: 0, stdout: '', stderr: '' });
-        }),
-        gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-        deleteFile: vi.fn().mockResolvedValue(undefined),
-      };
-      const sandboxExec = vi.fn().mockResolvedValue({ exitCode: 0 });
-      const sandbox = {
-        createSession: vi.fn().mockResolvedValue(fakeSession),
-        mkdir: vi.fn().mockResolvedValue(undefined),
-        exec: sandboxExec,
-        writeFile: vi.fn().mockResolvedValue(undefined),
-      } as unknown as SandboxInstance;
-
-      const kiloSessionId = 'ses_test_kilo_session_id_0001';
-      const metadata = {
-        version: 123456789,
-        sessionId,
-        orgId,
-        userId,
-        timestamp: 123456789,
-        githubRepo: 'facebook/react',
-        githubToken: 'test-token',
-        kiloSessionId,
-      };
-      mockDOGetMetadata.mockResolvedValue(metadata);
-
-      const service = new SessionService();
-      await expect(
-        service.resume({
-          sandbox,
-          sandboxId: `${orgId}__${userId}`,
-          orgId,
-          userId,
-          sessionId,
-          kilocodeToken: 'test-token',
-          kilocodeModel: 'test-model',
-          env: envWithIngest,
-        })
-      ).rejects.toThrow('session not found');
-
-      const workspacePath = `/workspace/${orgId}/${userId}/sessions/${sessionId}`;
-      const sessionHome = `/home/${sessionId}`;
-      expect(mockCleanupWorkspace).toHaveBeenCalledWith(fakeSession, workspacePath, sessionHome);
-    });
-
-    it('removes workspace when restoreWorkspace (clone/branch) fails during cold start', async () => {
-      mockedRestoreWorkspace.mockRejectedValueOnce(new Error('branch checkout failed'));
-
-      const mockDOGetMetadata = vi.fn();
-      const envWithIngest: PersistenceEnv = {
-        ...mockEnv,
-        CLOUD_AGENT_SESSION: {
-          idFromName: vi.fn(() => 'mock-do-id' as unknown as DurableObjectId),
-          get: vi.fn(() => ({
-            getMetadata: mockDOGetMetadata,
-            updateMetadata: vi.fn().mockResolvedValue(undefined),
-            deleteSession: vi.fn().mockResolvedValue(undefined),
-          })),
-        } as unknown as PersistenceEnv['CLOUD_AGENT_SESSION'],
-      };
-      const fakeSession = {
-        exec: vi
-          .fn()
-          .mockResolvedValueOnce({ success: true, exitCode: 1, stdout: '', stderr: '' })
-          .mockResolvedValue({ success: true, exitCode: 0, stdout: '', stderr: '' }),
-        gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-        deleteFile: vi.fn().mockResolvedValue(undefined),
-      };
-      const sandbox = {
-        createSession: vi.fn().mockResolvedValue(fakeSession),
-        mkdir: vi.fn().mockResolvedValue(undefined),
-        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-      } as unknown as SandboxInstance;
-
-      const kiloSessionId = 'ses_test_kilo_session_id_0001';
-      const metadata = {
-        version: 123456789,
-        sessionId,
-        orgId,
-        userId,
-        timestamp: 123456789,
-        githubRepo: 'facebook/react',
-        githubToken: 'test-token',
-        kiloSessionId,
-      };
-      mockDOGetMetadata.mockResolvedValue(metadata);
-
-      const service = new SessionService();
-      await expect(
-        service.resume({
-          sandbox,
-          sandboxId: `${orgId}__${userId}`,
-          orgId,
-          userId,
-          sessionId,
-          kilocodeToken: 'test-token',
-          kilocodeModel: 'test-model',
-          env: envWithIngest,
-        })
-      ).rejects.toThrow('branch checkout failed');
-
-      const workspacePath = `/workspace/${orgId}/${userId}/sessions/${sessionId}`;
-      const sessionHome = `/home/${sessionId}`;
-      expect(mockCleanupWorkspace).toHaveBeenCalledWith(fakeSession, workspacePath, sessionHome);
-    });
-  });
-
-  describe('Environment Variable Injection', () => {
-    it('should inject envVars into session environment', async () => {
-      const fakeSession = {
-        exec: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-        deleteFile: vi.fn().mockResolvedValue(undefined),
-      };
-      const sandboxCreateSession = vi.fn().mockResolvedValue(fakeSession);
-      const sandbox = {
-        createSession: sandboxCreateSession,
-        mkdir: vi.fn().mockResolvedValue(undefined),
-        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-      } as unknown as SandboxInstance;
-      const sessionId: SessionId = 'agent_envtest_123';
-      mockedSetupWorkspace.mockResolvedValue({
-        workspacePath: `/workspace/org/user/sessions/${sessionId}`,
-        sessionHome: `/home/${sessionId}`,
-      });
-
-      const service = new SessionService();
-      const envVars = {
-        API_KEY: 'test-key-123',
-        DATABASE_URL: 'postgres://localhost:5432/test',
-        NODE_ENV: 'development',
-      };
-
-      await service.initiate({
-        sandbox,
-        sandboxId: 'org__user',
-        orgId: 'org',
-        userId: 'user',
-        sessionId,
-        kilocodeToken: 'token',
-        kilocodeModel: 'test-model',
-        githubRepo: 'acme/repo',
-        env: mockEnv,
-        profile: { envVars },
-      });
-
-      expect(sandboxCreateSession).toHaveBeenCalledWith({
-        name: sessionId,
-        env: {
-          HOME: `/home/${sessionId}`,
-          SESSION_ID: sessionId,
-          SESSION_HOME: `/home/${sessionId}`,
-          KILOCODE_TOKEN: 'token',
-          KILOCODE_ORGANIZATION_ID: 'org',
-          KILO_PLATFORM: 'cloud-agent',
-          KILO_DISABLE_AUTOUPDATE: 'true',
-          KILOCODE_FEATURE: 'cloud-agent',
-          OPENCODE_CONFIG_CONTENT: `{"permission":{"external_directory":{"*":"deny","/tmp/${sessionId}/**":"allow","/workspace/org/user/sessions/${sessionId}/**":"allow","/home/${sessionId}/.kilocode/skills/**":"allow"},"question":"deny","read":"allow","edit":"allow","glob":"allow","grep":"allow","list":"allow","bash":"allow","task":"allow","webfetch":"allow","websearch":"allow","codesearch":"allow","lsp":"allow","skill":"allow","todowrite":"allow","todoread":"allow","suggest":"deny"},"provider":{"kilo":{"options":{"apiKey":"token","kilocodeToken":"token","kilocodeOrganizationId":"org"}}},"autoupdate":false,"snapshot":false,"model":"kilo/test-model"}`,
-          KILO_CONFIG_CONTENT: `{"permission":{"external_directory":{"*":"deny","/tmp/${sessionId}/**":"allow","/workspace/org/user/sessions/${sessionId}/**":"allow","/home/${sessionId}/.kilocode/skills/**":"allow"},"question":"deny","read":"allow","edit":"allow","glob":"allow","grep":"allow","list":"allow","bash":"allow","task":"allow","webfetch":"allow","websearch":"allow","codesearch":"allow","lsp":"allow","skill":"allow","todowrite":"allow","todoread":"allow","suggest":"deny"},"provider":{"kilo":{"options":{"apiKey":"token","kilocodeToken":"token","kilocodeOrganizationId":"org"}}},"autoupdate":false,"snapshot":false,"model":"kilo/test-model"}`,
-          API_KEY: 'test-key-123',
-          DATABASE_URL: 'postgres://localhost:5432/test',
-          NODE_ENV: 'development',
-        },
-        cwd: `/workspace/org/user/sessions/${sessionId}`,
-      });
-    });
-
-    it('translates worker-local backend URLs before injecting sandbox environment', async () => {
-      const fakeSession = {
-        exec: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-        deleteFile: vi.fn().mockResolvedValue(undefined),
-      };
-      const sandboxCreateSession = vi.fn().mockResolvedValue(fakeSession);
-      const sandbox = {
-        createSession: sandboxCreateSession,
-        mkdir: vi.fn().mockResolvedValue(undefined),
-        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-      } as unknown as SandboxInstance;
-      const sessionId: SessionId = 'agent_local_backend_url';
-      mockedSetupWorkspace.mockResolvedValue({
-        workspacePath: `/workspace/org/user/sessions/${sessionId}`,
-        sessionHome: `/home/${sessionId}`,
-      });
-
-      const service = new SessionService();
-      await service.initiate({
-        sandbox,
-        sandboxId: 'org__user',
-        orgId: 'org',
-        userId: 'user',
-        sessionId,
-        kilocodeToken: 'token',
-        kilocodeModel: 'test-model',
-        githubRepo: 'acme/repo',
-        env: {
-          ...mockEnv,
-          KILOCODE_BACKEND_BASE_URL: 'http://localhost:3000',
-          KILO_OPENROUTER_BASE: 'http://localhost:3000/api',
-        },
-      });
-
-      const callArgs = sandboxCreateSession.mock.calls[0]?.[0] as { env: Record<string, string> };
-      expect(callArgs.env.KILOCODE_BACKEND_BASE_URL).toBe('http://host.docker.internal:3000');
-      expect(callArgs.env.KILO_API_URL).toBe('http://host.docker.internal:3000');
-
-      const configContent = JSON.parse(callArgs.env.KILO_CONFIG_CONTENT) as {
-        provider: { kilo: { options: { baseURL?: string } } };
-      };
-      expect(configContent.provider.kilo.options.baseURL).toBe(
-        'http://host.docker.internal:3000/api'
-      );
-    });
-
-    it('should handle special characters in env var values', async () => {
-      const fakeSession = {
-        exec: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-        deleteFile: vi.fn().mockResolvedValue(undefined),
-      };
-      const sandboxCreateSession = vi.fn().mockResolvedValue(fakeSession);
-      const sandbox = {
-        createSession: sandboxCreateSession,
-        mkdir: vi.fn().mockResolvedValue(undefined),
-        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-      } as unknown as SandboxInstance;
-      const sessionId: SessionId = 'agent_special_chars';
-      mockedSetupWorkspace.mockResolvedValue({
-        workspacePath: `/workspace/org/user/sessions/${sessionId}`,
-        sessionHome: `/home/${sessionId}`,
-      });
-
-      const service = new SessionService();
-      const envVars = {
-        PASSWORD: 'p@ssw0rd!#$%',
-        JSON_CONFIG: '{"key":"value with spaces"}',
-        PATH_WITH_COLON: '/usr/bin:/usr/local/bin',
-      };
-
-      await service.initiate({
-        sandbox,
-        sandboxId: 'org__user',
-        orgId: 'org',
-        userId: 'user',
-        sessionId,
-        kilocodeToken: 'token',
-        kilocodeModel: 'test-model',
-        githubRepo: 'acme/repo',
-        env: mockEnv,
-        profile: { envVars },
-      });
-
-      expect(sandboxCreateSession).toHaveBeenCalledWith({
-        name: sessionId,
-        env: expect.objectContaining({
-          PASSWORD: 'p@ssw0rd!#$%',
-          JSON_CONFIG: '{"key":"value with spaces"}',
-          PATH_WITH_COLON: '/usr/bin:/usr/local/bin',
-        }) as unknown,
-        cwd: `/workspace/org/user/sessions/${sessionId}`,
-      });
-    });
-
-    it('should work without envVars (optional)', async () => {
-      const fakeSession = {
-        exec: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-        deleteFile: vi.fn().mockResolvedValue(undefined),
-      };
-      const sandboxCreateSession = vi.fn().mockResolvedValue(fakeSession);
-      const sandbox = {
-        createSession: sandboxCreateSession,
-        mkdir: vi.fn().mockResolvedValue(undefined),
-        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-      } as unknown as SandboxInstance;
-      const sessionId: SessionId = 'agent_no_env';
-      mockedSetupWorkspace.mockResolvedValue({
-        workspacePath: `/workspace/org/user/sessions/${sessionId}`,
-        sessionHome: `/home/${sessionId}`,
-      });
-
-      const service = new SessionService();
-      await service.initiate({
-        sandbox,
-        sandboxId: 'org__user',
-        orgId: 'org',
-        userId: 'user',
-        sessionId,
-        kilocodeToken: 'token',
-        kilocodeModel: 'test-model',
-        githubRepo: 'acme/repo',
-        env: mockEnv,
-        // No envVars provided
-      });
-
-      expect(sandboxCreateSession).toHaveBeenCalledWith({
-        name: sessionId,
-        env: {
-          HOME: `/home/${sessionId}`,
-          SESSION_ID: sessionId,
-          SESSION_HOME: `/home/${sessionId}`,
-          KILOCODE_TOKEN: 'token',
-          KILOCODE_ORGANIZATION_ID: 'org',
-          KILO_PLATFORM: 'cloud-agent',
-          KILO_DISABLE_AUTOUPDATE: 'true',
-          KILOCODE_FEATURE: 'cloud-agent',
-          OPENCODE_CONFIG_CONTENT: `{"permission":{"external_directory":{"*":"deny","/tmp/${sessionId}/**":"allow","/workspace/org/user/sessions/${sessionId}/**":"allow","/home/${sessionId}/.kilocode/skills/**":"allow"},"question":"deny","read":"allow","edit":"allow","glob":"allow","grep":"allow","list":"allow","bash":"allow","task":"allow","webfetch":"allow","websearch":"allow","codesearch":"allow","lsp":"allow","skill":"allow","todowrite":"allow","todoread":"allow","suggest":"deny"},"provider":{"kilo":{"options":{"apiKey":"token","kilocodeToken":"token","kilocodeOrganizationId":"org"}}},"autoupdate":false,"snapshot":false,"model":"kilo/test-model"}`,
-          KILO_CONFIG_CONTENT: `{"permission":{"external_directory":{"*":"deny","/tmp/${sessionId}/**":"allow","/workspace/org/user/sessions/${sessionId}/**":"allow","/home/${sessionId}/.kilocode/skills/**":"allow"},"question":"deny","read":"allow","edit":"allow","glob":"allow","grep":"allow","list":"allow","bash":"allow","task":"allow","webfetch":"allow","websearch":"allow","codesearch":"allow","lsp":"allow","skill":"allow","todowrite":"allow","todoread":"allow","suggest":"deny"},"provider":{"kilo":{"options":{"apiKey":"token","kilocodeToken":"token","kilocodeOrganizationId":"org"}}},"autoupdate":false,"snapshot":false,"model":"kilo/test-model"}`,
-        },
-        cwd: `/workspace/org/user/sessions/${sessionId}`,
-      });
-    });
-  });
-
-  describe('Question Tool Permission for Non-Interactive Platforms', () => {
-    const setupForPlatformTest = () => {
-      const fakeSession = {
-        exec: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-        deleteFile: vi.fn().mockResolvedValue(undefined),
-      };
-      const sandboxCreateSession = vi.fn().mockResolvedValue(fakeSession);
-      const sandbox = {
-        createSession: sandboxCreateSession,
-        mkdir: vi.fn().mockResolvedValue(undefined),
-        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-      } as unknown as SandboxInstance;
-      return { sandbox, sandboxCreateSession };
-    };
-
-    const getConfigContent = (sandboxCreateSession: ReturnType<typeof vi.fn>) => {
-      const callArgs = sandboxCreateSession.mock.calls[0][0] as { env: Record<string, string> };
-      return JSON.parse(callArgs.env.KILO_CONFIG_CONTENT) as {
-        permission: {
-          question?: string;
-          suggest?: string;
-          external_directory?: Record<string, string>;
-        };
-      };
-    };
-
-    it.each(['cloud-agent-web'])(
-      'should NOT include question:deny for interactive platform %s',
-      async createdOnPlatform => {
-        const { sandbox, sandboxCreateSession } = setupForPlatformTest();
-        const sessionId: SessionId = 'agent_interactive_test';
-        mockedSetupWorkspace.mockResolvedValue({
-          workspacePath: `/workspace/org/user/sessions/${sessionId}`,
-          sessionHome: `/home/${sessionId}`,
-        });
-
-        const service = new SessionService();
-        await service.initiate({
-          sandbox,
-          sandboxId: 'org__user',
-          orgId: 'org',
-          userId: 'user',
-          sessionId,
-          kilocodeToken: 'token',
-          kilocodeModel: 'test-model',
-          githubRepo: 'acme/repo',
-          env: mockEnv,
-          createdOnPlatform,
-        });
-
-        const config = getConfigContent(sandboxCreateSession);
-        expect(config.permission).not.toHaveProperty('question');
-      }
-    );
-
-    it.each([
-      'cloud-agent',
-      'app-builder',
-      'slack',
-      'security-agent',
-      'webhook',
-      'code-review',
-      'auto-triage',
-      'autofix',
-    ])('should include question:deny for non-interactive platform %s', async createdOnPlatform => {
-      const { sandbox, sandboxCreateSession } = setupForPlatformTest();
-      const sessionId: SessionId = 'agent_noninteractive_test';
-      mockedSetupWorkspace.mockResolvedValue({
-        workspacePath: `/workspace/org/user/sessions/${sessionId}`,
-        sessionHome: `/home/${sessionId}`,
-      });
-
-      const service = new SessionService();
-      await service.initiate({
-        sandbox,
-        sandboxId: 'org__user',
-        orgId: 'org',
-        userId: 'user',
-        sessionId,
-        kilocodeToken: 'token',
-        kilocodeModel: 'test-model',
-        githubRepo: 'acme/repo',
-        env: mockEnv,
-        createdOnPlatform,
-      });
-
-      const config = getConfigContent(sandboxCreateSession);
-      expect(config.permission.question).toBe('deny');
-    });
-
-    it.each([
-      'cloud-agent-web',
-      'cloud-agent',
-      'app-builder',
-      'slack',
-      'security-agent',
-      'webhook',
-      'code-review',
-      'auto-triage',
-      'autofix',
-    ])('should deny suggest tool for platform %s', async createdOnPlatform => {
-      const { sandbox, sandboxCreateSession } = setupForPlatformTest();
-      const sessionId: SessionId = 'agent_suggest_permission_test';
-      mockedSetupWorkspace.mockResolvedValue({
-        workspacePath: `/workspace/org/user/sessions/${sessionId}`,
-        sessionHome: `/home/${sessionId}`,
-      });
-
-      const service = new SessionService();
-      await service.initiate({
-        sandbox,
-        sandboxId: 'org__user',
-        orgId: 'org',
-        userId: 'user',
-        sessionId,
-        kilocodeToken: 'token',
-        kilocodeModel: 'test-model',
-        githubRepo: 'acme/repo',
-        env: mockEnv,
-        createdOnPlatform,
-      });
-
-      const config = getConfigContent(sandboxCreateSession);
-      expect(config.permission.suggest).toBe('deny');
-    });
-
-    it('should include read-only command guard policy for code-review sessions', async () => {
-      const { sandbox, sandboxCreateSession } = setupForPlatformTest();
-      const sessionId: SessionId = 'agent_code_review_policy_test';
-      mockedSetupWorkspace.mockResolvedValue({
-        workspacePath: `/workspace/org/user/sessions/${sessionId}`,
-        sessionHome: `/home/${sessionId}`,
-      });
-
-      const service = new SessionService();
-      await service.initiate({
-        sandbox,
-        sandboxId: 'org__user',
-        orgId: 'org',
-        userId: 'user',
-        sessionId,
-        kilocodeToken: 'token',
-        kilocodeModel: 'test-model',
-        githubRepo: 'acme/repo',
-        env: mockEnv,
-        createdOnPlatform: 'code-review',
-      });
-
-      const callArgs = sandboxCreateSession.mock.calls[0][0] as { env: Record<string, string> };
-      const configContent = JSON.parse(callArgs.env.KILO_CONFIG_CONTENT) as {
-        permission?: {
-          bash?: Record<string, string>;
-          edit?: string;
-          read?: string;
-        };
-      };
-
-      expect(configContent.permission?.bash?.ls).toBe('allow');
-      expect(configContent.permission?.bash?.pwd).toBe('allow');
-      expect(configContent.permission?.bash?.git).toBe('allow');
-      expect(configContent.permission?.bash?.gh).toBe('allow');
-      for (const command of ['wc', 'sort', 'uniq', 'cut', 'tr', 'nl', 'jq', 'stat', 'file']) {
-        expect(configContent.permission?.bash?.[command]).toBe('allow');
-        expect(configContent.permission?.bash?.[`${command} *`]).toBe('allow');
-      }
-      expect(configContent.permission?.bash?.sed).toBe('allow');
-      expect(configContent.permission?.bash?.['ls *']).toBe('allow');
-      expect(configContent.permission?.bash?.['git *']).toBe('allow');
-      expect(configContent.permission?.bash?.['gh *']).toBe('allow');
-      expect(configContent.permission?.bash?.['sed *']).toBe('allow');
-      expect(configContent.permission?.bash?.['sed -i']).toBe('deny');
-      expect(configContent.permission?.bash?.['sed -i *']).toBe('deny');
-      expect(configContent.permission?.bash?.['sed -*i']).toBe('deny');
-      expect(configContent.permission?.bash?.['sed -*i *']).toBe('deny');
-      expect(configContent.permission?.bash?.['sed --in-place']).toBe('deny');
-      expect(configContent.permission?.bash?.['sed --in-place *']).toBe('deny');
-      expect(configContent.permission?.bash?.['sed --in-place*']).toBe('deny');
-      expect(configContent.permission?.bash?.['sed --in-place* *']).toBe('deny');
-      expect(configContent.permission?.bash?.['sed * -i']).toBe('deny');
-      expect(configContent.permission?.bash?.['sed * -i *']).toBe('deny');
-      expect(configContent.permission?.bash?.['sed * -*i']).toBe('deny');
-      expect(configContent.permission?.bash?.['sed * -*i *']).toBe('deny');
-      expect(configContent.permission?.bash?.['sed * --in-place*']).toBe('deny');
-      expect(configContent.permission?.bash?.['sed * --in-place* *']).toBe('deny');
-      expect(configContent.permission?.bash?.['sort -o']).toBe('deny');
-      expect(configContent.permission?.bash?.['sort -o *']).toBe('deny');
-      expect(configContent.permission?.bash?.['sort -o*']).toBe('deny');
-      expect(configContent.permission?.bash?.['sort -o* *']).toBe('deny');
-      expect(configContent.permission?.bash?.['sort -*o']).toBe('deny');
-      expect(configContent.permission?.bash?.['sort -*o *']).toBe('deny');
-      expect(configContent.permission?.bash?.['sort --output']).toBe('deny');
-      expect(configContent.permission?.bash?.['sort --output *']).toBe('deny');
-      expect(configContent.permission?.bash?.['sort --output*']).toBe('deny');
-      expect(configContent.permission?.bash?.['sort --output* *']).toBe('deny');
-      expect(configContent.permission?.bash?.['sort * -o']).toBe('deny');
-      expect(configContent.permission?.bash?.['sort * -o *']).toBe('deny');
-      expect(configContent.permission?.bash?.['sort * -o*']).toBe('deny');
-      expect(configContent.permission?.bash?.['sort * -o* *']).toBe('deny');
-      expect(configContent.permission?.bash?.['sort * -*o']).toBe('deny');
-      expect(configContent.permission?.bash?.['sort * -*o *']).toBe('deny');
-      expect(configContent.permission?.bash?.['sort * --output']).toBe('deny');
-      expect(configContent.permission?.bash?.['sort * --output *']).toBe('deny');
-      expect(configContent.permission?.bash?.['sort * --output*']).toBe('deny');
-      expect(configContent.permission?.bash?.['sort * --output* *']).toBe('deny');
-      expect(configContent.permission?.bash?.['uniq * *']).toBe('deny');
-      expect(configContent.permission?.bash?.['uniq * * *']).toBe('deny');
-      expect(configContent.permission?.bash?.['git commit *']).toBe('deny');
-      expect(configContent.permission?.bash?.['git commit']).toBe('deny');
-      expect(configContent.permission?.bash?.['gh pr merge *']).toBe('deny');
-      expect(configContent.permission?.bash?.['gh pr merge']).toBe('deny');
-      expect(configContent.permission?.bash?.bash).toBe('deny');
-      expect(configContent.permission?.bash?.['bash *']).toBe('deny');
-      expect(configContent.permission?.bash?.['vim *']).toBe('deny');
-      expect(configContent.permission?.bash?.['gh auth login *']).toBe('deny');
-      expect(configContent.permission?.edit).toBe('deny');
-      expect(configContent.permission?.read).toBe('allow');
-
-      expect(callArgs.env.CI).toBe('true');
-      expect(callArgs.env.GIT_TERMINAL_PROMPT).toBe('0');
-      expect(callArgs.env.GH_PROMPT_DISABLED).toBe('1');
-      expect(callArgs.env.PAGER).toBe('cat');
-      expect(callArgs.env.GIT_PAGER).toBe('cat');
-    });
-  });
-
-  describe('GH_TOKEN Auto-Setting', () => {
-    it('should set GH_TOKEN from githubToken when provided', async () => {
-      const fakeSession = {
-        exec: vi.fn().mockResolvedValue({ exitCode: 0, stdout: '', stderr: '' }),
-        gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-        deleteFile: vi.fn().mockResolvedValue(undefined),
-      };
-      const sandboxCreateSession = vi.fn().mockResolvedValue(fakeSession);
-      const sandbox = {
-        createSession: sandboxCreateSession,
-        mkdir: vi.fn().mockResolvedValue(undefined),
-        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-      } as unknown as SandboxInstance;
-      const sessionId: SessionId = 'agent_gh_token_test';
-      mockedSetupWorkspace.mockResolvedValue({
-        workspacePath: `/workspace/org/user/sessions/${sessionId}`,
-        sessionHome: `/home/${sessionId}`,
-      });
-
-      const service = new SessionService();
-      const githubToken = 'ghp_test123';
-
-      await service.initiate({
-        sandbox,
-        sandboxId: 'org__user',
-        orgId: 'org',
-        userId: 'user',
-        sessionId,
-        kilocodeToken: 'token',
-        kilocodeModel: 'test-model',
-        githubRepo: 'acme/repo',
-        githubToken,
-        env: mockEnv,
-      });
-
-      expect(sandboxCreateSession).toHaveBeenCalledWith(
-        expect.objectContaining({
-          env: expect.objectContaining({
-            GH_TOKEN: 'ghp_test123',
-          }) as unknown,
-        })
-      );
-    });
-
-    it('should NOT overwrite user-provided GH_TOKEN', async () => {
-      const fakeSession = {
-        exec: vi.fn().mockResolvedValue({ exitCode: 0, stdout: '', stderr: '' }),
-        gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-        deleteFile: vi.fn().mockResolvedValue(undefined),
-      };
-      const sandboxCreateSession = vi.fn().mockResolvedValue(fakeSession);
-      const sandbox = {
-        createSession: sandboxCreateSession,
-        mkdir: vi.fn().mockResolvedValue(undefined),
-        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-      } as unknown as SandboxInstance;
-      const sessionId: SessionId = 'agent_gh_token_override';
-      mockedSetupWorkspace.mockResolvedValue({
-        workspacePath: `/workspace/org/user/sessions/${sessionId}`,
-        sessionHome: `/home/${sessionId}`,
-      });
-
-      const service = new SessionService();
-      const githubToken = 'ghp_auto_token';
-      const userProvidedToken = 'ghp_user_token';
-
-      await service.initiate({
-        sandbox,
-        sandboxId: 'org__user',
-        orgId: 'org',
-        userId: 'user',
-        sessionId,
-        kilocodeToken: 'token',
-        kilocodeModel: 'test-model',
-        githubRepo: 'acme/repo',
-        githubToken,
-        profile: {
-          envVars: {
-            GH_TOKEN: userProvidedToken,
-          },
-        },
-        env: mockEnv,
-      });
-
-      // Should use user-provided value, not githubToken
-      expect(sandboxCreateSession).toHaveBeenCalledWith(
-        expect.objectContaining({
-          env: expect.objectContaining({
-            GH_TOKEN: userProvidedToken,
-          }) as unknown,
-        })
-      );
-    });
-
-    it('should NOT set GH_TOKEN when githubToken is not provided', async () => {
-      const fakeSession = {
-        exec: vi.fn().mockResolvedValue({ exitCode: 0, stdout: '', stderr: '' }),
-        gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-        deleteFile: vi.fn().mockResolvedValue(undefined),
-      };
-      const sandboxCreateSession = vi.fn().mockResolvedValue(fakeSession);
-      const sandbox = {
-        createSession: sandboxCreateSession,
-        mkdir: vi.fn().mockResolvedValue(undefined),
-        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-      } as unknown as SandboxInstance;
-      const sessionId: SessionId = 'agent_no_gh_token';
-      mockedSetupWorkspace.mockResolvedValue({
-        workspacePath: `/workspace/org/user/sessions/${sessionId}`,
-        sessionHome: `/home/${sessionId}`,
-      });
-
-      const service = new SessionService();
-
-      await service.initiate({
-        sandbox,
-        sandboxId: 'org__user',
-        orgId: 'org',
-        userId: 'user',
-        sessionId,
-        kilocodeToken: 'token',
-        kilocodeModel: 'test-model',
-        githubRepo: 'acme/repo',
-        // No githubToken provided
-        env: mockEnv,
-      });
-
-      const callArgs = sandboxCreateSession.mock.calls[0][0] as { env: Record<string, string> };
-      expect(callArgs.env).not.toHaveProperty('GH_TOKEN');
-    });
-
-    it('should NOT set GH_TOKEN when githubToken is empty string', async () => {
-      const fakeSession = {
-        exec: vi.fn().mockResolvedValue({ exitCode: 0, stdout: '', stderr: '' }),
-        gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-        deleteFile: vi.fn().mockResolvedValue(undefined),
-      };
-      const sandboxCreateSession = vi.fn().mockResolvedValue(fakeSession);
-      const sandbox = {
-        createSession: sandboxCreateSession,
-        mkdir: vi.fn().mockResolvedValue(undefined),
-        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-      } as unknown as SandboxInstance;
-      const sessionId: SessionId = 'agent_empty_gh_token';
-      mockedSetupWorkspace.mockResolvedValue({
-        workspacePath: `/workspace/org/user/sessions/${sessionId}`,
-        sessionHome: `/home/${sessionId}`,
-      });
-
-      const service = new SessionService();
-
-      await service.initiate({
-        sandbox,
-        sandboxId: 'org__user',
-        orgId: 'org',
-        userId: 'user',
-        sessionId,
-        kilocodeToken: 'token',
-        kilocodeModel: 'test-model',
-        githubRepo: 'acme/repo',
-        githubToken: '', // Empty string
-        env: mockEnv,
-      });
-
-      const callArgs = sandboxCreateSession.mock.calls[0][0] as { env: Record<string, string> };
-      expect(callArgs.env).not.toHaveProperty('GH_TOKEN');
-    });
-
-    it('should NOT set GH_TOKEN when gitUrl is used even if githubToken is provided', async () => {
-      const fakeSession = {
-        exec: vi.fn().mockResolvedValue({ exitCode: 0, stdout: '', stderr: '' }),
-        gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-        deleteFile: vi.fn().mockResolvedValue(undefined),
-      };
-      const sandboxCreateSession = vi.fn().mockResolvedValue(fakeSession);
-      const sandbox = {
-        createSession: sandboxCreateSession,
-        mkdir: vi.fn().mockResolvedValue(undefined),
-        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-      } as unknown as SandboxInstance;
-      const sessionId: SessionId = 'agent_giturl_with_ghtoken';
-      mockedSetupWorkspace.mockResolvedValue({
-        workspacePath: `/workspace/org/user/sessions/${sessionId}`,
-        sessionHome: `/home/${sessionId}`,
-      });
-
-      const service = new SessionService();
-
-      await service.initiate({
-        sandbox,
-        sandboxId: 'org__user',
-        orgId: 'org',
-        userId: 'user',
-        sessionId,
-        kilocodeToken: 'token',
-        kilocodeModel: 'test-model',
-        gitUrl: 'https://gitlab.com/acme/repo.git', // Using gitUrl, NOT githubRepo
-        githubToken: 'ghp_should_be_ignored', // githubToken provided but should be ignored
-        env: mockEnv,
-      });
-
-      // Should NOT set GH_TOKEN because this is not a GitHub repo (no githubRepo)
-      const callArgs = sandboxCreateSession.mock.calls[0][0] as { env: Record<string, string> };
-      expect(callArgs.env).not.toHaveProperty('GH_TOKEN');
-    });
-  });
-
-  describe('GITLAB_TOKEN / GLAB_IS_OAUTH2 Auto-Setting', () => {
-    function setupSandbox(sessionId: SessionId) {
-      const fakeSession = {
-        exec: vi.fn().mockResolvedValue({ exitCode: 0, stdout: '', stderr: '' }),
-        gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-        deleteFile: vi.fn().mockResolvedValue(undefined),
-      };
-      const sandboxCreateSession = vi.fn().mockResolvedValue(fakeSession);
-      const sandbox = {
-        createSession: sandboxCreateSession,
-        mkdir: vi.fn().mockResolvedValue(undefined),
-        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-      } as unknown as SandboxInstance;
-      mockedSetupWorkspace.mockResolvedValue({
-        workspacePath: `/workspace/org/user/sessions/${sessionId}`,
-        sessionHome: `/home/${sessionId}`,
-      });
-      return { sandbox, sandboxCreateSession };
-    }
-
-    // glab >=1.82.0 sends GITLAB_TOKEN as `Authorization: Bearer $token` when
-    // GLAB_IS_OAUTH2=true, otherwise as `PRIVATE-TOKEN: $token`. GitLab rejects
-    // OAuth tokens sent via PRIVATE-TOKEN with 401; PATs accept both. Setting
-    // GLAB_IS_OAUTH2=true unconditionally works for every token type we inject.
-    it('sets GITLAB_TOKEN, GITLAB_HOST, and GLAB_IS_OAUTH2 for GitLab sessions', async () => {
-      const sessionId: SessionId = 'agent_gitlab_token';
-      const { sandbox, sandboxCreateSession } = setupSandbox(sessionId);
-
-      await new SessionService().initiate({
-        sandbox,
-        sandboxId: 'org__user',
-        orgId: 'org',
-        userId: 'user',
-        sessionId,
-        kilocodeToken: 'token',
-        kilocodeModel: 'test-model',
-        gitUrl: 'https://gitlab.com/acme/repo.git',
-        gitToken: 'access-token',
-        platform: 'gitlab',
-        env: mockEnv,
-      });
-
-      const callArgs = sandboxCreateSession.mock.calls[0][0] as { env: Record<string, string> };
-      expect(callArgs.env.GITLAB_TOKEN).toBe('access-token');
-      expect(callArgs.env.GITLAB_HOST).toBe('gitlab.com');
-      expect(callArgs.env.GLAB_IS_OAUTH2).toBe('true');
-    });
-
-    it('does not overwrite user-provided GLAB_IS_OAUTH2 env var', async () => {
-      const sessionId: SessionId = 'agent_gitlab_user_override';
-      const { sandbox, sandboxCreateSession } = setupSandbox(sessionId);
-
-      await new SessionService().initiate({
-        sandbox,
-        sandboxId: 'org__user',
-        orgId: 'org',
-        userId: 'user',
-        sessionId,
-        kilocodeToken: 'token',
-        kilocodeModel: 'test-model',
-        gitUrl: 'https://gitlab.com/acme/repo.git',
-        gitToken: 'access-token',
-        platform: 'gitlab',
-        profile: { envVars: { GLAB_IS_OAUTH2: 'false' } },
-        env: mockEnv,
-      });
-
-      const callArgs = sandboxCreateSession.mock.calls[0][0] as { env: Record<string, string> };
-      expect(callArgs.env.GLAB_IS_OAUTH2).toBe('false');
-    });
-
-    it('picks up self-managed GitLab host from the gitUrl', async () => {
-      const sessionId: SessionId = 'agent_gitlab_selfhosted';
-      const { sandbox, sandboxCreateSession } = setupSandbox(sessionId);
-
-      await new SessionService().initiate({
-        sandbox,
-        sandboxId: 'org__user',
-        orgId: 'org',
-        userId: 'user',
-        sessionId,
-        kilocodeToken: 'token',
-        kilocodeModel: 'test-model',
-        gitUrl: 'https://gitlab.acme.internal/team/repo.git',
-        gitToken: 'access-token',
-        platform: 'gitlab',
-        env: mockEnv,
-      });
-
-      const callArgs = sandboxCreateSession.mock.calls[0][0] as { env: Record<string, string> };
-      expect(callArgs.env.GITLAB_HOST).toBe('gitlab.acme.internal');
-    });
-  });
-
-  describe('Setup Commands Execution', () => {
-    it('runs setup commands inside an existing devcontainer with the runtime env', async () => {
-      const exec = vi.fn().mockResolvedValue({ exitCode: 0, stdout: '', stderr: '' });
-      const writeFile = vi.fn().mockResolvedValue(undefined);
-      const session = { exec, writeFile } as unknown as ExecutionSession;
-      const context = {
-        sessionHome: '/home/agent_devcontainer_setup',
-        workspacePath: '/workspace/org/user/sessions/agent_devcontainer_setup',
-      } as SessionContext;
-
-      await runSetupCommands(session, context, ['pnpm install'], true, {
-        devcontainer: {
-          containerId: 'container-id',
-          innerWorkspaceFolder: '/workspaces/repo',
-          workspacePath: context.workspacePath,
-          agentSessionId: 'agent_devcontainer_setup',
-          overrideConfigPath:
-            '/tmp/devcontainer-override-agent_devcontainer_setup/devcontainer.json',
-          teardown: vi.fn(),
-        },
-        dockerEnv: { DOCKER_HOST: 'unix:///run/user/1000/docker.sock' },
-        runtimeEnv: {
-          PROFILE_TOKEN: 'secret-value',
-          INVALID_ENV_NAME: undefined,
-        },
-      });
-
-      expect(writeFile).toHaveBeenCalledWith(
-        expect.stringMatching(
-          /^\/home\/agent_devcontainer_setup\/tmp\/kilo-setup-env-agent_devcontainer_setup-\d+\.sh$/
-        ),
-        "export PROFILE_TOKEN='secret-value'\n"
-      );
-      expect(exec).toHaveBeenCalledWith(
-        expect.stringContaining('devcontainer exec'),
-        expect.objectContaining({
-          cwd: context.workspacePath,
-          env: { DOCKER_HOST: 'unix:///run/user/1000/docker.sock' },
-        })
-      );
-      const setupCommand = exec.mock.calls[0]?.[0];
-      expect(setupCommand).toContain('/workspaces/repo');
-      expect(setupCommand).toContain('pnpm install');
-      expect(setupCommand).toContain('. ');
-      expect(setupCommand).toContain('/home/agent_devcontainer_setup/tmp/kilo-setup-env-');
-      expect(setupCommand).not.toContain('secret-value');
-      expect(setupCommand).toContain(
-        "--config '/tmp/devcontainer-override-agent_devcontainer_setup/devcontainer.json'"
-      );
-      expect(exec).toHaveBeenLastCalledWith(expect.stringContaining('rm -f'), expect.anything());
-    });
-
-    it('should continue executing commands when one fails during resume (lenient)', async () => {
-      const metadata = {
-        version: 123456789,
-        sessionId: 'agent_setup_test',
-        orgId: 'org',
-        userId: 'user',
-        timestamp: 123456789,
-        githubRepo: 'acme/repo',
-        setupCommands: ['npm install', 'npm run build', 'npm test'],
-        kiloSessionId: 'ses_test_kilo_session_id_0001',
-      };
-
-      const { env: testEnv } = createMetadataEnv({
-        getMetadata: vi.fn().mockResolvedValue(metadata),
-      });
-
-      const fakeSession = {
-        exec: vi
-          .fn()
-          .mockResolvedValueOnce({ success: true, exitCode: 0, stdout: '' }) // repo check - no .git
-          .mockResolvedValueOnce({
-            success: true,
-            exitCode: 0,
-            stdout: JSON.stringify({
-              ok: true,
-              downloaded: true,
-              imported: true,
-              diffs: { applied: 0, skipped: 0, total: 0 },
-            }),
-            stderr: '',
-          }) // restore script
-          .mockResolvedValueOnce({ success: true, exitCode: 0, stdout: 'command 1 ok', stderr: '' }) // npm install
-          .mockResolvedValueOnce({
-            success: false,
-            exitCode: 1,
-            stdout: '',
-            stderr: 'command 2 failed',
-          }) // npm run build fails
-          .mockResolvedValueOnce({
-            success: true,
-            exitCode: 0,
-            stdout: 'command 3 ok',
-            stderr: '',
-          }), // npm test
-        gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-        deleteFile: vi.fn().mockResolvedValue(undefined),
-      };
-      const sandbox = {
-        createSession: vi.fn().mockResolvedValue(fakeSession),
-        mkdir: vi.fn().mockResolvedValue(undefined),
-        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-      } as unknown as SandboxInstance;
-
-      const service = new SessionService();
-      const sessionId: SessionId = 'agent_setup_test';
-
-      // Should not throw even though middle command fails during resume (lenient mode)
-      await service.resume({
-        sandbox,
-        sandboxId: 'org__user',
-        orgId: 'org',
-        userId: 'user',
-        sessionId,
-        kilocodeToken: 'token',
-        kilocodeModel: 'test-model',
-        env: testEnv,
-      });
-
-      // 1 repo check + 1 restore script + 3 setup commands = 5
-      expect(fakeSession.exec).toHaveBeenCalledTimes(5);
-      expect(fakeSession.exec).toHaveBeenNthCalledWith(
-        3,
-        'npm install',
-        expect.objectContaining({ cwd: `/workspace/org/user/sessions/${sessionId}` })
-      );
-      expect(fakeSession.exec).toHaveBeenNthCalledWith(
-        4,
-        'npm run build',
-        expect.objectContaining({ cwd: `/workspace/org/user/sessions/${sessionId}` })
-      );
-      expect(fakeSession.exec).toHaveBeenNthCalledWith(
-        5,
-        'npm test',
-        expect.objectContaining({ cwd: `/workspace/org/user/sessions/${sessionId}` })
-      );
-    });
-
-    it('should throw immediately when command fails during initiate (fail-fast)', async () => {
-      const setupCommands = [
-        'npm install', // succeeds
-        'npm install -g fake-package', // fails - should throw here
-        'echo "never runs"', // should not execute
-      ];
-
-      const fakeSession = {
-        exec: vi
-          .fn()
-          .mockResolvedValueOnce({ exitCode: 0, stdout: 'installed', stderr: '' }) // git checkout -b succeeds
-          .mockResolvedValueOnce({ exitCode: 0, stdout: 'installed', stderr: '' }) // npm install succeeds
-          .mockResolvedValueOnce({
-            exitCode: 1,
-            stdout: 'npm output before failure',
-            stderr: 'ERR! 404 Not Found',
-          }), // npm install -g fails
-        gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-        deleteFile: vi.fn().mockResolvedValue(undefined),
-      };
-      const sandboxCreateSession = vi.fn().mockResolvedValue(fakeSession);
-      const sandbox = {
-        createSession: sandboxCreateSession,
-        mkdir: vi.fn().mockResolvedValue(undefined),
-        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-      } as unknown as SandboxInstance;
-      const sessionId: SessionId = 'agent_failfast_test';
-      mockedSetupWorkspace.mockResolvedValue({
-        workspacePath: `/workspace/org/user/sessions/${sessionId}`,
-        sessionHome: `/home/${sessionId}`,
-      });
-
-      const service = new SessionService();
-
-      // Should throw when second command fails
-      await expect(
-        service.initiate({
-          sandbox,
-          sandboxId: 'org__user',
-          orgId: 'org',
-          userId: 'user',
-          sessionId,
-          kilocodeToken: 'token',
-          kilocodeModel: 'test-model',
-          githubRepo: 'acme/repo',
-          env: mockEnv,
-          profile: { setupCommands },
-        })
-      ).rejects.toMatchObject({
-        name: 'SetupCommandFailedError',
-        command: 'npm install -g fake-package',
-        exitCode: 1,
-        stderr: 'ERR! 404 Not Found',
-        stdout: 'npm output before failure',
-      });
-
-      // Verify only three calls: git checkout -b + first setup command + second setup command that failed
-      expect(fakeSession.exec).toHaveBeenCalledTimes(3);
-    });
-
-    it('should execute commands in workspace directory', async () => {
-      const fakeSession = {
-        exec: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-        deleteFile: vi.fn().mockResolvedValue(undefined),
-      };
-      const sandboxCreateSession = vi.fn().mockResolvedValue(fakeSession);
-      const sandbox = {
-        createSession: sandboxCreateSession,
-        mkdir: vi.fn().mockResolvedValue(undefined),
-        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-      } as unknown as SandboxInstance;
-      const sessionId: SessionId = 'agent_cwd_test';
-      const workspacePath = `/workspace/org/user/sessions/${sessionId}`;
-      mockedSetupWorkspace.mockResolvedValue({
-        workspacePath,
-        sessionHome: `/home/${sessionId}`,
-      });
-
-      const service = new SessionService();
-      await service.initiate({
-        sandbox,
-        sandboxId: 'org__user',
-        orgId: 'org',
-        userId: 'user',
-        sessionId,
-        kilocodeToken: 'token',
-        kilocodeModel: 'test-model',
-        githubRepo: 'acme/repo',
-        env: mockEnv,
-        profile: { setupCommands: ['pwd', 'ls -la'] },
-      });
-
-      expect(fakeSession.exec).toHaveBeenCalledWith(
-        'pwd',
-        expect.objectContaining({ cwd: workspacePath })
-      );
-      expect(fakeSession.exec).toHaveBeenCalledWith(
-        'ls -la',
-        expect.objectContaining({ cwd: workspacePath })
-      );
-    });
-
-    it('should handle empty setupCommands array gracefully', async () => {
-      const fakeSession = {
-        exec: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-        deleteFile: vi.fn().mockResolvedValue(undefined),
-      };
-      const sandboxCreateSession = vi.fn().mockResolvedValue(fakeSession);
-      const sandbox = {
-        createSession: sandboxCreateSession,
-        mkdir: vi.fn().mockResolvedValue(undefined),
-        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-      } as unknown as SandboxInstance;
-      const sessionId: SessionId = 'agent_empty_commands';
-      mockedSetupWorkspace.mockResolvedValue({
-        workspacePath: `/workspace/org/user/sessions/${sessionId}`,
-        sessionHome: `/home/${sessionId}`,
-      });
-
-      const service = new SessionService();
-      await service.initiate({
-        sandbox,
-        sandboxId: 'org__user',
-        orgId: 'org',
-        userId: 'user',
-        sessionId,
-        kilocodeToken: 'token',
-        kilocodeModel: 'test-model',
-        githubRepo: 'acme/repo',
-        env: mockEnv,
-        profile: { setupCommands: [] }, // Empty array
-      });
-
-      // exec should only be called once for git checkout -b, not for setup commands
-      expect(fakeSession.exec).toHaveBeenCalledTimes(1);
-      expect(fakeSession.exec).toHaveBeenCalledWith(
-        expect.stringContaining('git checkout -b'),
-        expect.any(Object)
-      );
-    });
-  });
-
-  describe('MCP Config in KILO_CONFIG_CONTENT', () => {
-    it('should include MCP servers in KILO_CONFIG_CONTENT env var', async () => {
-      const fakeSession = {
-        exec: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-        deleteFile: vi.fn().mockResolvedValue(undefined),
-      };
-      const sandboxCreateSession = vi.fn().mockResolvedValue(fakeSession);
-      const sandbox = {
-        createSession: sandboxCreateSession,
-        mkdir: vi.fn().mockResolvedValue(undefined),
-        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-      } as unknown as SandboxInstance;
-      const sessionId: SessionId = 'agent_mcp_test';
-      mockedSetupWorkspace.mockResolvedValue({
-        workspacePath: `/workspace/org/user/sessions/${sessionId}`,
-        sessionHome: `/home/${sessionId}`,
-      });
-
-      const service = new SessionService();
-      const mcpServers = {
-        puppeteer: {
-          type: 'local' as const,
-          command: ['npx', '-y', '@modelcontextprotocol/server-puppeteer'],
-        },
-      };
-
-      await service.initiate({
-        sandbox,
-        sandboxId: 'org__user',
-        orgId: 'org',
-        userId: 'user',
-        sessionId,
-        kilocodeToken: 'token',
-        kilocodeModel: 'test-model',
-        githubRepo: 'acme/repo',
-        env: mockEnv,
-        profile: { mcpServers },
-      });
-
-      const callArgs = sandboxCreateSession.mock.calls[0][0] as { env: Record<string, string> };
-      const configContent = JSON.parse(callArgs.env.KILO_CONFIG_CONTENT) as {
-        mcp: Record<string, unknown>;
-      };
-      expect(configContent.mcp).toBeDefined();
-      expect(configContent.mcp.puppeteer).toEqual({
-        type: 'local',
-        command: ['npx', '-y', '@modelcontextprotocol/server-puppeteer'],
-      });
-    });
-
-    it('should not include mcp key when mcpServers is empty', async () => {
-      const fakeSession = {
-        exec: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-        deleteFile: vi.fn().mockResolvedValue(undefined),
-      };
-      const sandboxCreateSession = vi.fn().mockResolvedValue(fakeSession);
-      const sandbox = {
-        createSession: sandboxCreateSession,
-        mkdir: vi.fn().mockResolvedValue(undefined),
-        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-      } as unknown as SandboxInstance;
-      const sessionId: SessionId = 'agent_empty_mcp';
-      mockedSetupWorkspace.mockResolvedValue({
-        workspacePath: `/workspace/org/user/sessions/${sessionId}`,
-        sessionHome: `/home/${sessionId}`,
-      });
-
-      const service = new SessionService();
-      await service.initiate({
-        sandbox,
-        sandboxId: 'org__user',
-        orgId: 'org',
-        userId: 'user',
-        sessionId,
-        kilocodeToken: 'token',
-        kilocodeModel: 'test-model',
-        githubRepo: 'acme/repo',
-        env: mockEnv,
-        profile: { mcpServers: {} }, // Empty object
-      });
-
-      const callArgs = sandboxCreateSession.mock.calls[0][0] as { env: Record<string, string> };
-      const configContent = JSON.parse(callArgs.env.KILO_CONFIG_CONTENT) as {
-        mcp?: Record<string, unknown>;
-      };
-      expect(configContent.mcp).toBeUndefined();
-    });
-
-    it('should pass local and remote MCP configs directly to KILO_CONFIG_CONTENT', async () => {
-      const fakeSession = {
-        exec: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-        deleteFile: vi.fn().mockResolvedValue(undefined),
-      };
-      const sandboxCreateSession = vi.fn().mockResolvedValue(fakeSession);
-      const sandbox = {
-        createSession: sandboxCreateSession,
-        mkdir: vi.fn().mockResolvedValue(undefined),
-        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-      } as unknown as SandboxInstance;
-      const sessionId: SessionId = 'agent_mcp_json';
-      mockedSetupWorkspace.mockResolvedValue({
-        workspacePath: `/workspace/org/user/sessions/${sessionId}`,
-        sessionHome: `/home/${sessionId}`,
-      });
-
-      const service = new SessionService();
-      const mcpServers = {
-        'server-1': {
-          type: 'local' as const,
-          command: ['node', 'server.js'],
-        },
-        'server-2': {
-          type: 'remote' as const,
-          url: 'https://example.com/mcp',
-        },
-      };
-
-      await service.initiate({
-        sandbox,
-        sandboxId: 'org__user',
-        orgId: 'org',
-        userId: 'user',
-        sessionId,
-        kilocodeToken: 'token',
-        kilocodeModel: 'test-model',
-        githubRepo: 'acme/repo',
-        env: mockEnv,
-        profile: { mcpServers },
-      });
-
-      const callArgs = sandboxCreateSession.mock.calls[0][0] as { env: Record<string, string> };
-      const configContent = JSON.parse(callArgs.env.KILO_CONFIG_CONTENT) as {
-        mcp: Record<string, unknown>;
-      };
-      expect(configContent.mcp['server-1']).toEqual({
-        type: 'local',
-        command: ['node', 'server.js'],
-      });
-      expect(configContent.mcp['server-2']).toEqual({
-        type: 'remote',
-        url: 'https://example.com/mcp',
-      });
-    });
-
-    it('should pass enabled and timeout fields directly', async () => {
-      const fakeSession = {
-        exec: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-        deleteFile: vi.fn().mockResolvedValue(undefined),
-      };
-      const sandboxCreateSession = vi.fn().mockResolvedValue(fakeSession);
-      const sandbox = {
-        createSession: sandboxCreateSession,
-        mkdir: vi.fn().mockResolvedValue(undefined),
-        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-      } as unknown as SandboxInstance;
-      const sessionId: SessionId = 'agent_mcp_fields';
-      mockedSetupWorkspace.mockResolvedValue({
-        workspacePath: `/workspace/org/user/sessions/${sessionId}`,
-        sessionHome: `/home/${sessionId}`,
-      });
-
-      const service = new SessionService();
-      const mcpServers = {
-        'disabled-server': {
-          type: 'local' as const,
-          command: ['test'],
-          enabled: false,
-          timeout: 30000,
-        },
-      };
-
-      await service.initiate({
-        sandbox,
-        sandboxId: 'org__user',
-        orgId: 'org',
-        userId: 'user',
-        sessionId,
-        kilocodeToken: 'token',
-        kilocodeModel: 'test-model',
-        githubRepo: 'acme/repo',
-        env: mockEnv,
-        profile: { mcpServers },
-      });
-
-      const callArgs = sandboxCreateSession.mock.calls[0][0] as { env: Record<string, string> };
-      const configContent = JSON.parse(callArgs.env.KILO_CONFIG_CONTENT) as {
-        mcp: Record<string, unknown>;
-      };
-      expect(configContent.mcp['disabled-server']).toEqual({
-        type: 'local',
-        command: ['test'],
-        enabled: false,
-        timeout: 30000,
-      });
-    });
-
-    it('passes plain-string MCP env values straight through without requiring a private key', async () => {
-      const fakeSession = {
-        exec: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-        deleteFile: vi.fn().mockResolvedValue(undefined),
-      };
-      const sandboxCreateSession = vi.fn().mockResolvedValue(fakeSession);
-      const sandbox = {
-        createSession: sandboxCreateSession,
-        mkdir: vi.fn().mockResolvedValue(undefined),
-        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-      } as unknown as SandboxInstance;
-      const sessionId: SessionId = 'agent_mcp_plain_env';
-      mockedSetupWorkspace.mockResolvedValue({
-        workspacePath: `/workspace/org/user/sessions/${sessionId}`,
-        sessionHome: `/home/${sessionId}`,
-      });
-
-      const service = new SessionService();
-      const mcpServers = {
-        config: {
-          type: 'local' as const,
-          command: ['node', 'server.js'],
-          environment: { LOCALE: 'en-US', PORT: '4000' },
-        },
-        publicRemote: {
-          type: 'remote' as const,
-          url: 'https://example.com/mcp',
-          headers: { 'X-Region': 'eu-west-1' },
-        },
-      };
-
-      // No AGENT_ENV_VARS_PRIVATE_KEY in env — must still succeed because no envelopes are present.
-      await service.initiate({
-        sandbox,
-        sandboxId: 'org__user',
-        orgId: 'org',
-        userId: 'user',
-        sessionId,
-        kilocodeToken: 'token',
-        kilocodeModel: 'test-model',
-        githubRepo: 'acme/repo',
-        env: mockEnv,
-        profile: { mcpServers },
-      });
-
-      const callArgs = sandboxCreateSession.mock.calls[0][0] as { env: Record<string, string> };
-      const configContent = JSON.parse(callArgs.env.KILO_CONFIG_CONTENT) as {
-        mcp: Record<string, unknown>;
-      };
-      expect(configContent.mcp.config).toEqual({
-        type: 'local',
-        command: ['node', 'server.js'],
-        environment: { LOCALE: 'en-US', PORT: '4000' },
-      });
-      expect(configContent.mcp.publicRemote).toEqual({
-        type: 'remote',
-        url: 'https://example.com/mcp',
-        headers: { 'X-Region': 'eu-west-1' },
-      });
-    });
-  });
-
-  describe('Kilo Commands in KILO_CONFIG_CONTENT', () => {
-    it('should include kilo commands in KILO_CONFIG_CONTENT.command', async () => {
-      const fakeSession = {
-        exec: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-        deleteFile: vi.fn().mockResolvedValue(undefined),
-      };
-      const sandboxCreateSession = vi.fn().mockResolvedValue(fakeSession);
-      const sandbox = {
-        createSession: sandboxCreateSession,
-        mkdir: vi.fn().mockResolvedValue(undefined),
-        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-      } as unknown as SandboxInstance;
-      const sessionId: SessionId = 'agent_kilo_cmd_test';
-      mockedSetupWorkspace.mockResolvedValue({
-        workspacePath: `/workspace/org/user/sessions/${sessionId}`,
-        sessionHome: `/home/${sessionId}`,
-      });
-
-      const service = new SessionService();
-      const kiloCommands = [
-        {
-          name: 'commit',
-          template: 'Create a git commit with $ARGUMENTS',
-          description: 'Commit changes',
-          subtask: false,
-        },
-        {
-          name: 'review-pr',
-          template: 'Review the current PR',
-          agent: 'code',
-          model: 'kilo/claude-sonnet-4-20250514',
-          subtask: true,
-        },
-      ];
-
-      await service.initiate({
-        sandbox,
-        sandboxId: 'org__user',
-        orgId: 'org',
-        userId: 'user',
-        sessionId,
-        kilocodeToken: 'token',
-        kilocodeModel: 'test-model',
-        githubRepo: 'acme/repo',
-        env: mockEnv,
-        profile: { kiloCommands },
-      });
-
-      const callArgs = sandboxCreateSession.mock.calls[0][0] as { env: Record<string, string> };
-      const configContent = JSON.parse(callArgs.env.KILO_CONFIG_CONTENT) as {
-        command: Record<string, unknown>;
-      };
-      expect(configContent.command).toBeDefined();
-      expect(configContent.command.commit).toEqual({
-        template: 'Create a git commit with $ARGUMENTS',
-        description: 'Commit changes',
-        subtask: false,
-      });
-      expect(configContent.command['review-pr']).toEqual({
-        template: 'Review the current PR',
-        agent: 'code',
-        model: 'kilo/claude-sonnet-4-20250514',
-        subtask: true,
-      });
-    });
-
-    it('should not include command key when kiloCommands is empty', async () => {
-      const fakeSession = {
-        exec: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-        deleteFile: vi.fn().mockResolvedValue(undefined),
-      };
-      const sandboxCreateSession = vi.fn().mockResolvedValue(fakeSession);
-      const sandbox = {
-        createSession: sandboxCreateSession,
-        mkdir: vi.fn().mockResolvedValue(undefined),
-        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-      } as unknown as SandboxInstance;
-      const sessionId: SessionId = 'agent_empty_kilo_cmd';
-      mockedSetupWorkspace.mockResolvedValue({
-        workspacePath: `/workspace/org/user/sessions/${sessionId}`,
-        sessionHome: `/home/${sessionId}`,
-      });
-
-      const service = new SessionService();
-      await service.initiate({
-        sandbox,
-        sandboxId: 'org__user',
-        orgId: 'org',
-        userId: 'user',
-        sessionId,
-        kilocodeToken: 'token',
-        kilocodeModel: 'test-model',
-        githubRepo: 'acme/repo',
-        env: mockEnv,
-        profile: { kiloCommands: [] },
-      });
-
-      const callArgs = sandboxCreateSession.mock.calls[0][0] as { env: Record<string, string> };
-      const configContent = JSON.parse(callArgs.env.KILO_CONFIG_CONTENT) as {
-        command?: Record<string, unknown>;
-      };
-      expect(configContent.command).toBeUndefined();
-    });
-
-    it('should omit null/undefined optional fields from command entries', async () => {
-      const fakeSession = {
-        exec: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-        deleteFile: vi.fn().mockResolvedValue(undefined),
-      };
-      const sandboxCreateSession = vi.fn().mockResolvedValue(fakeSession);
-      const sandbox = {
-        createSession: sandboxCreateSession,
-        mkdir: vi.fn().mockResolvedValue(undefined),
-        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-      } as unknown as SandboxInstance;
-      const sessionId: SessionId = 'agent_minimal_kilo_cmd';
-      mockedSetupWorkspace.mockResolvedValue({
-        workspacePath: `/workspace/org/user/sessions/${sessionId}`,
-        sessionHome: `/home/${sessionId}`,
-      });
-
-      const service = new SessionService();
-      const kiloCommands = [
-        {
-          name: 'test',
-          template: 'Do the thing',
-        },
-      ];
-
-      await service.initiate({
-        sandbox,
-        sandboxId: 'org__user',
-        orgId: 'org',
-        userId: 'user',
-        sessionId,
-        kilocodeToken: 'token',
-        kilocodeModel: 'test-model',
-        githubRepo: 'acme/repo',
-        env: mockEnv,
-        profile: { kiloCommands },
-      });
-
-      const callArgs = sandboxCreateSession.mock.calls[0][0] as { env: Record<string, string> };
-      const configContent = JSON.parse(callArgs.env.KILO_CONFIG_CONTENT) as {
-        command: Record<string, unknown>;
-      };
-      expect(configContent.command.test).toEqual({
-        template: 'Do the thing',
-        subtask: false,
-      });
-    });
-  });
-
-  describe('Metadata Persistence', () => {
-    it('should save metadata including envVars, setupCommands, and mcpServers', async () => {
-      const updateMetadata = vi.fn().mockResolvedValue(undefined);
-      const { env: testEnv } = createMetadataEnv({
-        updateMetadata,
-      });
-
-      const fakeSession = {
-        exec: vi.fn().mockResolvedValue({ success: true, exitCode: 0, stdout: '', stderr: '' }),
-        gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-        deleteFile: vi.fn().mockResolvedValue(undefined),
-      };
-      const sandbox = {
-        createSession: vi.fn().mockResolvedValue(fakeSession),
-        mkdir: vi.fn().mockResolvedValue(undefined),
-        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-      } as unknown as SandboxInstance;
-      const sessionId: SessionId = 'agent_metadata_save';
-      mockedSetupWorkspace.mockResolvedValue({
-        workspacePath: `/workspace/org/user/sessions/${sessionId}`,
-        sessionHome: `/home/${sessionId}`,
-      });
-
-      const service = new SessionService();
-      const envVars = { API_KEY: 'test-123' };
-      const setupCommands = ['npm install', 'npm build'];
-      const mcpServers = {
-        test: { type: 'local' as const, command: ['test-server'] },
-      };
-
-      await service.initiate({
-        sandbox,
-        sandboxId: 'org__user',
-        orgId: 'org',
-        userId: 'user',
-        sessionId,
-        kilocodeToken: 'token',
-        kilocodeModel: 'test-model',
-        githubRepo: 'acme/repo',
-        env: testEnv,
-        profile: { envVars, setupCommands, mcpServers },
-      });
-
-      // Verify metadata was saved with profile-derived fields nested
-      // under `profile` (the flat form is no longer written).
-      expect(updateMetadata).toHaveBeenCalledWith(
-        expect.objectContaining({
-          sessionId,
-          orgId: 'org',
-          userId: 'user',
-          githubRepo: 'acme/repo',
-          profile: expect.objectContaining({
-            envVars: { API_KEY: 'test-123' },
-            setupCommands: ['npm install', 'npm build'],
-            mcpServers: {
-              test: { type: 'local', command: ['test-server'] },
-            },
-          }) as unknown,
-        })
-      );
-    });
-
-    it('should load metadata with all fields correctly', async () => {
-      const metadata = {
-        version: 123456789,
-        sessionId: 'agent_metadata_load',
-        orgId: 'org',
-        userId: 'user',
-        timestamp: 123456789,
-        githubRepo: 'facebook/react',
-        githubToken: 'test-token',
-        envVars: { DATABASE_URL: 'postgres://localhost' },
-        setupCommands: ['pnpm install'],
-        mcpServers: { github: { type: 'local' as const, command: ['mcp-github'] } },
-      };
-
-      const { env: testEnv } = createMetadataEnv({
-        getMetadata: vi.fn().mockResolvedValue(metadata),
-      });
-
-      const fakeSession = {
-        exec: vi.fn().mockResolvedValue({ success: true, exitCode: 0, stdout: 'exists' }),
-        gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-      };
-      const sandbox = {
-        createSession: vi.fn().mockResolvedValue(fakeSession),
-        mkdir: vi.fn().mockResolvedValue(undefined),
-        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-      } as unknown as SandboxInstance;
-
-      const service = new SessionService();
-      const result = await service.resume({
-        sandbox,
-        sandboxId: 'org__user',
-        orgId: 'org',
-        userId: 'user',
-        sessionId: 'agent_metadata_load',
-        kilocodeToken: 'token',
-        kilocodeModel: 'test-model',
-        env: testEnv,
-      });
-
-      // Verify metadata was loaded and applied to context
-      expect(result.context.githubRepo).toBe('facebook/react');
-      expect(result.context.githubToken).toBe('test-token');
-      expect(result.context.envVars).toEqual({ DATABASE_URL: 'postgres://localhost' });
-    });
-
-    it('should round-trip metadata (save then load returns same data)', async () => {
-      let savedMetadata: CloudAgentSessionState | undefined;
-      const getMetadata = vi.fn().mockImplementation(async () => savedMetadata ?? null);
-      const updateMetadata = vi.fn().mockImplementation(async (data: CloudAgentSessionState) => {
-        savedMetadata = data;
-      });
-
-      const { env: testEnv } = createMetadataEnv({
-        getMetadata,
-        updateMetadata,
-      });
-
-      const fakeSession = {
-        exec: vi.fn().mockResolvedValue({ success: true, exitCode: 0, stdout: 'exists' }),
-        gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-        deleteFile: vi.fn().mockResolvedValue(undefined),
-      };
-      const sandbox = {
-        createSession: vi.fn().mockResolvedValue(fakeSession),
-        mkdir: vi.fn().mockResolvedValue(undefined),
-        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-      } as unknown as SandboxInstance;
-      const sessionId: SessionId = 'agent_roundtrip';
-      mockedSetupWorkspace.mockResolvedValue({
-        workspacePath: `/workspace/org/user/sessions/${sessionId}`,
-        sessionHome: `/home/${sessionId}`,
-      });
-
-      const originalData = {
-        envVars: { KEY1: 'value1', KEY2: 'value2' },
-        setupCommands: ['command1', 'command2'],
-        mcpServers: { server1: { type: 'local' as const, command: ['test'] } },
-      };
-
-      const service = new SessionService();
-
-      // Save
-      await service.initiate({
-        sandbox,
-        sandboxId: 'org__user',
-        orgId: 'org',
-        userId: 'user',
-        sessionId,
-        kilocodeToken: 'token',
-        kilocodeModel: 'test-model',
-        githubRepo: 'acme/repo',
-        env: testEnv,
-        profile: originalData,
-      });
-
-      // Load
-      const result = await service.resume({
-        sandbox,
-        sandboxId: 'org__user',
-        orgId: 'org',
-        userId: 'user',
-        sessionId,
-        kilocodeToken: 'token',
-        kilocodeModel: 'test-model',
-        env: testEnv,
-      });
-
-      // Verify round-trip — writers now emit the nested profile form
-      expect(result.context.envVars).toEqual(originalData.envVars);
-      expect(savedMetadata).toBeDefined();
-      expect(savedMetadata?.profile?.setupCommands).toEqual(originalData.setupCommands);
-      expect(savedMetadata?.profile?.mcpServers?.server1).toEqual({
-        type: 'local',
-        command: ['test'],
-      });
-    });
-  });
-
-  describe('Invalid Metadata Handling', () => {
-    it('throws when Durable Object returns invalid metadata during resume', async () => {
-      const { env: testEnv } = createMetadataEnv({
-        getMetadata: vi.fn().mockResolvedValue({ invalid: true }),
-      });
-
-      const sandbox = {
-        mkdir: vi.fn().mockResolvedValue(undefined),
-      } as unknown as SandboxInstance;
-
-      const service = new SessionService();
-      await expect(
-        service.resume({
-          sandbox,
-          sandboxId: 'org__user',
-          orgId: 'org',
-          userId: 'user',
-          sessionId: 'agent_invalid',
-          kilocodeToken: 'token',
-          kilocodeModel: 'test-model',
-          env: testEnv,
-        })
-      ).rejects.toBeInstanceOf(InvalidSessionMetadataError);
-    });
-
-    it('throws when fetching sandbox id encounters invalid metadata', async () => {
-      const { env: testEnv } = createMetadataEnv({
-        getMetadata: vi.fn().mockResolvedValue({ invalid: true }),
-      });
-
-      const service = new SessionService();
-      await expect(
-        service.getSandboxIdForSession(testEnv, 'user', 'agent_invalid' as SessionId)
-      ).rejects.toBeInstanceOf(InvalidSessionMetadataError);
-    });
-  });
-
-  describe('Resume Flow with Setup Commands and MCP Settings', () => {
-    it('should re-run setup commands from metadata on resume', async () => {
-      const metadata = {
-        version: 123456789,
-        sessionId: 'agent_resume_setup',
-        orgId: 'org',
-        userId: 'user',
-        timestamp: 123456789,
-        githubRepo: 'acme/repo',
-        setupCommands: ['npm install', 'npm run build'],
-        kiloSessionId: 'ses_test_kilo_session_id_0001',
-      };
-
-      const { env: testEnv } = createMetadataEnv({
-        getMetadata: vi.fn().mockResolvedValue(metadata),
-      });
-
-      const fakeSession = {
-        exec: vi.fn().mockResolvedValue({ success: true, exitCode: 0, stdout: '' }), // repo doesn't exist
-        gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-        deleteFile: vi.fn().mockResolvedValue(undefined),
-      };
-      const sandbox = {
-        createSession: vi.fn().mockResolvedValue(fakeSession),
-        mkdir: vi.fn().mockResolvedValue(undefined),
-        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-      } as unknown as SandboxInstance;
-
-      const service = new SessionService();
-      await service.resume({
-        sandbox,
-        sandboxId: 'org__user',
-        orgId: 'org',
-        userId: 'user',
-        sessionId: 'agent_resume_setup',
-        kilocodeToken: 'token',
-        kilocodeModel: 'test-model',
-        env: testEnv,
-      });
-
-      // Verify setup commands were re-run (because repo didn't exist, triggering reclone)
-      expect(fakeSession.exec).toHaveBeenCalledWith('npm install', expect.any(Object));
-      expect(fakeSession.exec).toHaveBeenCalledWith('npm run build', expect.any(Object));
-    });
-
-    it('should include MCP config in KILO_CONFIG_CONTENT on resume', async () => {
-      const metadata = {
-        version: 123456789,
-        sessionId: 'agent_resume_mcp',
-        orgId: 'org',
-        userId: 'user',
-        timestamp: 123456789,
-        githubRepo: 'acme/repo',
-        kiloSessionId: 'ses_test_kilo_session_id_0001',
-        mcpServers: {
-          puppeteer: {
-            type: 'local' as const,
-            command: ['npx', '-y', '@modelcontextprotocol/server-puppeteer'],
-          },
-        },
-      };
-
-      const { env: testEnv } = createMetadataEnv({
-        getMetadata: vi.fn().mockResolvedValue(metadata),
-      });
-
-      const fakeSession = {
-        exec: vi.fn().mockResolvedValue({ success: true, exitCode: 0, stdout: '' }), // repo doesn't exist
-        gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-        deleteFile: vi.fn().mockResolvedValue(undefined),
-      };
-      const sandboxCreateSession = vi.fn().mockResolvedValue(fakeSession);
-      const sandbox = {
-        createSession: sandboxCreateSession,
-        mkdir: vi.fn().mockResolvedValue(undefined),
-        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-      } as unknown as SandboxInstance;
-
-      const service = new SessionService();
-      await service.resume({
-        sandbox,
-        sandboxId: 'org__user',
-        orgId: 'org',
-        userId: 'user',
-        sessionId: 'agent_resume_mcp',
-        kilocodeToken: 'token',
-        kilocodeModel: 'test-model',
-        env: testEnv,
-      });
-
-      // Verify MCP config is passed through directly in KILO_CONFIG_CONTENT
-      const callArgs = sandboxCreateSession.mock.calls[0][0] as { env: Record<string, string> };
-      const configContent = JSON.parse(callArgs.env.KILO_CONFIG_CONTENT) as {
-        mcp: Record<string, unknown>;
-      };
-      expect(configContent.mcp).toBeDefined();
-      expect(configContent.mcp.puppeteer).toEqual({
-        type: 'local',
-        command: ['npx', '-y', '@modelcontextprotocol/server-puppeteer'],
-      });
-    });
-
-    it('should restore envVars to context on resume', async () => {
-      const metadata = {
-        version: 123456789,
-        sessionId: 'agent_resume_env',
-        orgId: 'org',
-        userId: 'user',
-        timestamp: 123456789,
-        githubRepo: 'acme/repo',
-        envVars: {
-          API_KEY: 'restored-key',
-          DATABASE_URL: 'postgres://restored',
-        },
-      };
-
-      const { env: testEnv } = createMetadataEnv({
-        getMetadata: vi.fn().mockResolvedValue(metadata),
-      });
-
-      const fakeSession = {
-        exec: vi.fn().mockResolvedValue({ success: true, exitCode: 0, stdout: 'exists' }),
-        gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-      };
-      const sandboxCreateSession = vi.fn().mockResolvedValue(fakeSession);
-      const sandbox = {
-        createSession: sandboxCreateSession,
-        mkdir: vi.fn().mockResolvedValue(undefined),
-        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-      } as unknown as SandboxInstance;
-
-      const service = new SessionService();
-      await service.resume({
-        sandbox,
-        sandboxId: 'org__user',
-        orgId: 'org',
-        userId: 'user',
-        sessionId: 'agent_resume_env',
-        kilocodeToken: 'token',
-        kilocodeModel: 'test-model',
-        env: testEnv,
-      });
-
-      // Verify envVars were restored when creating session
-      expect(sandboxCreateSession).toHaveBeenCalledWith({
-        name: 'agent_resume_env',
-        env: expect.objectContaining({
-          API_KEY: 'restored-key',
-          DATABASE_URL: 'postgres://restored',
-        }) as unknown,
-        cwd: expect.any(String) as unknown,
-      });
-    });
-
-    it('should handle resume with all features combined', async () => {
-      const metadata = {
-        version: 123456789,
-        sessionId: 'agent_resume_all',
-        orgId: 'org',
-        userId: 'user',
-        timestamp: 123456789,
-        githubRepo: 'acme/repo',
-        envVars: { API_KEY: 'test' },
-        setupCommands: ['npm install'],
-        mcpServers: { test: { type: 'local' as const, command: ['test-server'] } },
-        kiloSessionId: 'ses_test_kilo_session_id_0001',
-      };
-
-      const { env: testEnv } = createMetadataEnv({
-        getMetadata: vi.fn().mockResolvedValue(metadata),
-      });
-
-      const fakeSession = {
-        exec: vi.fn().mockResolvedValue({ success: true, exitCode: 0, stdout: '' }), // repo doesn't exist
-        gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-        deleteFile: vi.fn().mockResolvedValue(undefined),
-      };
-      const sandboxCreateSession = vi.fn().mockResolvedValue(fakeSession);
-      const sandbox = {
-        createSession: sandboxCreateSession,
-        mkdir: vi.fn().mockResolvedValue(undefined),
-        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-      } as unknown as SandboxInstance;
-
-      const service = new SessionService();
-      await service.resume({
-        sandbox,
-        sandboxId: 'org__user',
-        orgId: 'org',
-        userId: 'user',
-        sessionId: 'agent_resume_all',
-        kilocodeToken: 'token',
-        kilocodeModel: 'test-model',
-        env: testEnv,
-      });
-
-      // Verify envVars restored
-      expect(sandboxCreateSession).toHaveBeenCalledWith(
-        expect.objectContaining({
-          env: expect.objectContaining({ API_KEY: 'test' }) as unknown,
-        })
-      );
-
-      // Verify setup commands re-run (because repo didn't exist, triggering reclone)
-      expect(fakeSession.exec).toHaveBeenCalledWith('npm install', expect.any(Object) as unknown);
-
-      // Verify MCP config passed through directly in KILO_CONFIG_CONTENT
-      const callArgs = sandboxCreateSession.mock.calls[0][0] as { env: Record<string, string> };
-      const configContent = JSON.parse(callArgs.env.KILO_CONFIG_CONTENT) as {
-        mcp: Record<string, unknown>;
-      };
-      expect(configContent.mcp).toBeDefined();
-      expect(configContent.mcp.test).toEqual({
-        type: 'local',
-        command: ['test-server'],
-      });
-    });
-  });
-
-  describe('Bot Isolation and Personal Account Support', () => {
-    describe('getSandboxIdForSession with botId', () => {
-      it('should reconstruct sandboxId with bot prefix when metadata contains botId', async () => {
-        const service = new SessionService();
-        const userId = 'user-456';
-        const sessionId: SessionId = 'agent_test-session';
-
-        const mockMetadata = {
-          orgId: 'org-123',
-          userId,
-          botId: 'reviewer',
-          sessionId,
-          version: 123,
-          timestamp: Date.now(),
-        };
-
-        mockEnv.CLOUD_AGENT_SESSION.get = vi.fn(() => ({
-          getMetadata: vi.fn().mockResolvedValue(mockMetadata),
-        })) as unknown as typeof mockEnv.CLOUD_AGENT_SESSION.get;
-
-        const sandboxId = await service.getSandboxIdForSession(mockEnv, userId, sessionId);
-
-        expect(sandboxId).toMatch(/^bot-[0-9a-f]{48}$/);
-        expect(sandboxId.length).toBe(52);
-      });
-
-      it('should reconstruct sandboxId with org prefix when metadata has no botId', async () => {
-        const service = new SessionService();
-        const userId = 'user-456';
-        const sessionId: SessionId = 'agent_test-session';
-
-        const mockMetadata = {
-          orgId: 'org-123',
-          userId,
-          sessionId,
-          version: 123,
-          timestamp: Date.now(),
-        };
-
-        mockEnv.CLOUD_AGENT_SESSION.get = vi.fn(() => ({
-          getMetadata: vi.fn().mockResolvedValue(mockMetadata),
-        })) as unknown as typeof mockEnv.CLOUD_AGENT_SESSION.get;
-
-        const sandboxId = await service.getSandboxIdForSession(mockEnv, userId, sessionId);
-
-        expect(sandboxId).toMatch(/^org-[0-9a-f]{48}$/);
-        expect(sandboxId.length).toBe(52);
-      });
-
-      it('should reconstruct sandboxId with usr prefix for personal accounts', async () => {
-        const service = new SessionService();
-        const userId = 'abc-123';
-        const sessionId: SessionId = 'agent_test-session';
-
-        const mockMetadata = {
-          orgId: undefined,
-          userId,
-          sessionId,
-          version: 123,
-          timestamp: Date.now(),
-        };
-
-        mockEnv.CLOUD_AGENT_SESSION.get = vi.fn(() => ({
-          getMetadata: vi.fn().mockResolvedValue(mockMetadata),
-        })) as unknown as typeof mockEnv.CLOUD_AGENT_SESSION.get;
-
-        const sandboxId = await service.getSandboxIdForSession(mockEnv, userId, sessionId);
-
-        expect(sandboxId).toMatch(/^usr-[0-9a-f]{48}$/);
-        expect(sandboxId.length).toBe(52);
-      });
-
-      it('should reconstruct sandboxId with ubt prefix for personal bot', async () => {
-        const service = new SessionService();
-        const userId = 'abc-123';
-        const sessionId: SessionId = 'agent_test-session';
-
-        const mockMetadata = {
-          orgId: undefined,
-          userId,
-          botId: 'reviewer',
-          sessionId,
-          version: 123,
-          timestamp: Date.now(),
-        };
-
-        mockEnv.CLOUD_AGENT_SESSION.get = vi.fn(() => ({
-          getMetadata: vi.fn().mockResolvedValue(mockMetadata),
-        })) as unknown as typeof mockEnv.CLOUD_AGENT_SESSION.get;
-
-        const sandboxId = await service.getSandboxIdForSession(mockEnv, userId, sessionId);
-
-        expect(sandboxId).toMatch(/^ubt-[0-9a-f]{48}$/);
-        expect(sandboxId.length).toBe(52);
-      });
-    });
-  });
-
-  describe('interrupt', () => {
-    it('should kill processes matching the workspace path', async () => {
-      const sessionId: SessionId = 'agent_interrupt_test';
-      const workspacePath = `/workspace/org/user/sessions/${sessionId}`;
-
-      const sessionContext = {
-        sessionId,
-        workspacePath,
-        sandboxId: 'org__user',
-        sessionHome: `/home/${sessionId}`,
-        branchName: `session/${sessionId}`,
-        userId: 'user',
-        orgId: 'org',
-      } as SessionContext;
-
-      // Mock processes with matching workspace path
-      const mockProcesses = [
-        {
-          id: 'proc1',
-          status: 'running',
-          command: `kilocode exec --workspace=${workspacePath} --mode code`,
-        },
-        {
-          id: 'proc2',
-          status: 'running',
-          command: `kilocode exec --workspace=${workspacePath} --mode architect`,
-        },
-      ];
-
-      const mockKillProcess = vi.fn().mockResolvedValue(undefined);
-      const mockSession = {
-        killProcess: mockKillProcess,
-      } as unknown as ExecutionSession;
-
-      const mockSandbox = {
-        listProcesses: vi.fn().mockResolvedValue(mockProcesses),
-      } as unknown as SandboxInstance;
-
-      const result = await SessionService.interrupt(mockSandbox, mockSession, sessionContext);
-
-      expect(result.success).toBe(true);
-      expect(result.processesFound).toBe(true);
-      expect(mockKillProcess).toHaveBeenCalledTimes(2);
-      expect(mockKillProcess).toHaveBeenCalledWith('proc1', 'SIGTERM');
-      expect(mockKillProcess).toHaveBeenCalledWith('proc2', 'SIGTERM');
-    });
-
-    it('should NOT kill processes from other workspaces', async () => {
-      const sessionId: SessionId = 'agent_my_session';
-      const workspacePath = `/workspace/org/user/sessions/${sessionId}`;
-
-      const sessionContext = {
-        sessionId,
-        workspacePath,
-        sandboxId: 'org__user',
-        sessionHome: `/home/${sessionId}`,
-        branchName: `session/${sessionId}`,
-        userId: 'user',
-        orgId: 'org',
-      } as SessionContext;
-
-      const mockProcesses = [
-        {
-          id: 'proc1',
-          status: 'running',
-          command: `kilocode exec --workspace=${workspacePath} --mode code`,
-        },
-        {
-          id: 'proc2',
-          status: 'running',
-          command:
-            'kilocode exec --workspace=/workspace/org/other/sessions/other_session --mode code',
-        },
-        {
-          id: 'proc3',
-          status: 'running',
-          command: 'kilocode exec --workspace=/different/path --mode architect',
-        },
-      ];
-
-      const mockKillProcess = vi.fn().mockResolvedValue(undefined);
-      const mockSession = {
-        killProcess: mockKillProcess,
-      } as unknown as ExecutionSession;
-
-      const mockSandbox = {
-        listProcesses: vi.fn().mockResolvedValue(mockProcesses),
-      } as unknown as SandboxInstance;
-
-      const result = await SessionService.interrupt(mockSandbox, mockSession, sessionContext);
-
-      // Should only kill proc1 (the one matching our workspace)
-      expect(result.success).toBe(true);
-      expect(result.processesFound).toBe(true);
-      expect(mockKillProcess).toHaveBeenCalledTimes(1);
-      expect(mockKillProcess).toHaveBeenCalledWith('proc1', 'SIGTERM');
-    });
-
-    it('should only kill running processes', async () => {
-      const sessionId: SessionId = 'agent_running_test';
-      const workspacePath = `/workspace/org/user/sessions/${sessionId}`;
-
-      const sessionContext = {
-        sessionId,
-        workspacePath,
-        sandboxId: 'org__user',
-        sessionHome: `/home/${sessionId}`,
-        branchName: `session/${sessionId}`,
-        userId: 'user',
-        orgId: 'org',
-      } as SessionContext;
-
-      const mockProcesses = [
-        {
-          id: 'proc1',
-          status: 'running',
-          command: `kilocode exec --workspace=${workspacePath} --mode code`,
-        },
-        {
-          id: 'proc2',
-          status: 'stopped',
-          command: `kilocode exec --workspace=${workspacePath} --mode code`,
-        },
-        {
-          id: 'proc3',
-          status: 'exited',
-          command: `kilocode exec --workspace=${workspacePath} --mode architect`,
-        },
-      ];
-
-      const mockKillProcess = vi.fn().mockResolvedValue(undefined);
-      const mockSession = {
-        killProcess: mockKillProcess,
-      } as unknown as ExecutionSession;
-
-      const mockSandbox = {
-        listProcesses: vi.fn().mockResolvedValue(mockProcesses),
-      } as unknown as SandboxInstance;
-
-      const result = await SessionService.interrupt(mockSandbox, mockSession, sessionContext);
-
-      // Should only kill proc1 (status='running')
-      expect(result.success).toBe(true);
-      expect(result.processesFound).toBe(true);
-      expect(mockKillProcess).toHaveBeenCalledTimes(1);
-      expect(mockKillProcess).toHaveBeenCalledWith('proc1', 'SIGTERM');
-    });
-
-    it('should only kill kilocode processes', async () => {
-      const sessionId: SessionId = 'agent_process_filter';
-      const workspacePath = `/workspace/org/user/sessions/${sessionId}`;
-
-      const sessionContext = {
-        sessionId,
-        workspacePath,
-        sandboxId: 'org__user',
-        sessionHome: `/home/${sessionId}`,
-        branchName: `session/${sessionId}`,
-        userId: 'user',
-        orgId: 'org',
-      } as SessionContext;
-
-      const mockProcesses = [
-        {
-          id: 'proc1',
-          status: 'running',
-          command: `kilocode exec --workspace=${workspacePath} --mode code`,
-        },
-        {
-          id: 'proc2',
-          status: 'running',
-          command: `node server.js --workspace=${workspacePath}`,
-        },
-        {
-          id: 'proc3',
-          status: 'running',
-          command: `bash --workspace=${workspacePath}`,
-        },
-        {
-          id: 'proc4',
-          status: 'running',
-          command: `/usr/bin/python3 app.py --workspace=${workspacePath}`,
-        },
-      ];
-
-      const mockKillProcess = vi.fn().mockResolvedValue(undefined);
-      const mockSession = {
-        killProcess: mockKillProcess,
-      } as unknown as ExecutionSession;
-
-      const mockSandbox = {
-        listProcesses: vi.fn().mockResolvedValue(mockProcesses),
-      } as unknown as SandboxInstance;
-
-      const result = await SessionService.interrupt(mockSandbox, mockSession, sessionContext);
-
-      // Should only kill proc1 (contains 'kilocode')
-      expect(result.success).toBe(true);
-      expect(result.processesFound).toBe(true);
-      expect(mockKillProcess).toHaveBeenCalledTimes(1);
-      expect(mockKillProcess).toHaveBeenCalledWith('proc1', 'SIGTERM');
-    });
-
-    it('should return success=true when no processes found', async () => {
-      const sessionId: SessionId = 'agent_no_procs';
-      const workspacePath = `/workspace/org/user/sessions/${sessionId}`;
-
-      const sessionContext = {
-        sessionId,
-        workspacePath,
-        sandboxId: 'org__user',
-        sessionHome: `/home/${sessionId}`,
-        branchName: `session/${sessionId}`,
-        userId: 'user',
-        orgId: 'org',
-      } as SessionContext;
-
-      const mockProcesses: never[] = [];
-
-      const mockKillProcess = vi.fn();
-      const mockSession = {
-        killProcess: mockKillProcess,
-      } as unknown as ExecutionSession;
-
-      const mockSandbox = {
-        listProcesses: vi.fn().mockResolvedValue(mockProcesses),
-      } as unknown as SandboxInstance;
-
-      const result = await SessionService.interrupt(mockSandbox, mockSession, sessionContext);
-
-      expect(result.success).toBe(true);
-      expect(result.processesFound).toBe(false);
-      expect(result.message).toContain('No running kilocode processes found');
-      expect(mockKillProcess).not.toHaveBeenCalled();
-    });
-
-    it('should handle partial kill failures gracefully', async () => {
-      const sessionId: SessionId = 'agent_partial_fail';
-      const workspacePath = `/workspace/org/user/sessions/${sessionId}`;
-
-      const sessionContext = {
-        sessionId,
-        workspacePath,
-        sandboxId: 'org__user',
-        sessionHome: `/home/${sessionId}`,
-        branchName: `session/${sessionId}`,
-        userId: 'user',
-        orgId: 'org',
-      } as SessionContext;
-
-      const mockProcesses = [
-        {
-          id: 'proc1',
-          status: 'running',
-          command: `kilocode exec --workspace=${workspacePath} --mode code`,
-        },
-        {
-          id: 'proc2',
-          status: 'running',
-          command: `kilocode exec --workspace=${workspacePath} --mode architect`,
-        },
-        {
-          id: 'proc3',
-          status: 'running',
-          command: `kilocode exec --workspace=${workspacePath} --mode debug`,
-        },
-      ];
-
-      // Mock killProcess to succeed for proc1, fail for proc2, succeed for proc3
-      const mockKillProcess = vi
-        .fn()
-        .mockResolvedValueOnce(undefined) // proc1 succeeds
-        .mockRejectedValueOnce(new Error('Permission denied')) // proc2 fails
-        .mockResolvedValueOnce(undefined); // proc3 succeeds
-
-      const mockSession = {
-        killProcess: mockKillProcess,
-      } as unknown as ExecutionSession;
-
-      const mockSandbox = {
-        listProcesses: vi.fn().mockResolvedValue(mockProcesses),
-      } as unknown as SandboxInstance;
-
-      const result = await SessionService.interrupt(mockSandbox, mockSession, sessionContext);
-
-      expect(result.success).toBe(true); // success because at least one was killed
-      expect(result.processesFound).toBe(true);
-      expect(result.message).toContain('killed 2 process(es)');
-      expect(result.message).toContain('1 failed');
-      expect(mockKillProcess).toHaveBeenCalledTimes(3);
-    });
-  });
-
-  describe('initiateFromKiloSession', () => {
-    it('should setup workspace and clone repo without creating session branch', async () => {
-      const { env: testEnv } = createMetadataEnv({
-        updateMetadata: vi.fn().mockResolvedValue(undefined),
-      });
-
-      const fakeSession = {
-        exec: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-        deleteFile: vi.fn().mockResolvedValue(undefined),
-      };
-      const sandboxCreateSession = vi.fn().mockResolvedValue(fakeSession);
-      const sandbox = {
-        createSession: sandboxCreateSession,
-        mkdir: vi.fn().mockResolvedValue(undefined),
-        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-      } as unknown as SandboxInstance;
-      const sessionId: SessionId = 'agent_kilo_session_test';
-      const kiloSessionId = '123e4567-e89b-12d3-a456-426614174000';
-      mockedSetupWorkspace.mockResolvedValue({
-        workspacePath: `/workspace/org/user/sessions/${sessionId}`,
-        sessionHome: `/home/${sessionId}`,
-      });
-
-      const service = new SessionService();
-      const result = await service.initiateFromKiloSession({
-        sandbox,
-        sandboxId: 'org__user',
-        orgId: 'org',
-        userId: 'user',
-        sessionId,
-        kilocodeToken: 'token',
-        kilocodeModel: 'test-model',
-        kiloSessionId,
-        githubRepo: 'acme/repo',
-        env: testEnv,
-      });
-
-      // Should setup workspace
-      expect(mockSetupWorkspace).toHaveBeenCalledWith(sandbox, 'user', 'org', sessionId);
-
-      // Should clone repo
-      expect(mockCloneGitHubRepo).toHaveBeenCalledWith(
-        fakeSession,
-        `/workspace/org/user/sessions/${sessionId}`,
-        'acme/repo',
-        undefined,
-        { GITHUB_APP_SLUG: undefined, GITHUB_APP_BOT_USER_ID: undefined }
-      );
-
-      // Should NOT create session branch (kilo session manages its own branch)
-      expect(fakeSession.exec).not.toHaveBeenCalledWith(expect.stringContaining('git checkout -b'));
-      expect(mockManageBranch).not.toHaveBeenCalled();
-
-      expect(result.context.sessionId).toBe(sessionId);
-    });
-
-    it('should save kiloSessionId in metadata', async () => {
-      const updateMetadata = vi.fn().mockResolvedValue(undefined);
-      const { env: testEnv } = createMetadataEnv({
-        updateMetadata,
-      });
-
-      const fakeSession = {
-        exec: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-        deleteFile: vi.fn().mockResolvedValue(undefined),
-      };
-      const sandbox = {
-        createSession: vi.fn().mockResolvedValue(fakeSession),
-        mkdir: vi.fn().mockResolvedValue(undefined),
-        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-      } as unknown as SandboxInstance;
-      const sessionId: SessionId = 'agent_kilo_metadata_test';
-      const kiloSessionId = '123e4567-e89b-12d3-a456-426614174000';
-      mockedSetupWorkspace.mockResolvedValue({
-        workspacePath: `/workspace/org/user/sessions/${sessionId}`,
-        sessionHome: `/home/${sessionId}`,
-      });
-
-      const service = new SessionService();
-      await service.initiateFromKiloSession({
-        sandbox,
-        sandboxId: 'org__user',
-        orgId: 'org',
-        userId: 'user',
-        sessionId,
-        kilocodeToken: 'token',
-        kilocodeModel: 'test-model',
-        kiloSessionId,
-        githubRepo: 'acme/repo',
-        env: testEnv,
-      });
-
-      // Verify metadata was saved with kiloSessionId
-      expect(updateMetadata).toHaveBeenCalledWith(
-        expect.objectContaining({
-          sessionId,
-          kiloSessionId,
-          githubRepo: 'acme/repo',
-        })
-      );
-    });
-
-    it('should run setup commands after clone', async () => {
-      const { env: testEnv } = createMetadataEnv({
-        updateMetadata: vi.fn().mockResolvedValue(undefined),
-      });
-
-      const fakeSession = {
-        exec: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-        deleteFile: vi.fn().mockResolvedValue(undefined),
-      };
-      const sandbox = {
-        createSession: vi.fn().mockResolvedValue(fakeSession),
-        mkdir: vi.fn().mockResolvedValue(undefined),
-        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-      } as unknown as SandboxInstance;
-      const sessionId: SessionId = 'agent_kilo_setup_test';
-      const kiloSessionId = '123e4567-e89b-12d3-a456-426614174000';
-      mockedSetupWorkspace.mockResolvedValue({
-        workspacePath: `/workspace/org/user/sessions/${sessionId}`,
-        sessionHome: `/home/${sessionId}`,
-      });
-
-      const service = new SessionService();
-      await service.initiateFromKiloSession({
-        sandbox,
-        sandboxId: 'org__user',
-        orgId: 'org',
-        userId: 'user',
-        sessionId,
-        kilocodeToken: 'token',
-        kilocodeModel: 'test-model',
-        kiloSessionId,
-        githubRepo: 'acme/repo',
-        env: testEnv,
-        profile: { setupCommands: ['npm install', 'npm run build'] },
-      });
-
-      // Verify setup commands were run
-      expect(fakeSession.exec).toHaveBeenCalledWith('npm install', expect.any(Object));
-      expect(fakeSession.exec).toHaveBeenCalledWith('npm run build', expect.any(Object));
-    });
-  });
-
-  describe('captureAndStoreBranch', () => {
-    it('should capture current branch and update metadata', async () => {
-      const updateUpstreamBranch = vi.fn().mockResolvedValue(undefined);
-      const existingMetadata = {
-        version: 123456789,
-        sessionId: 'agent_branch_capture',
-        orgId: 'org',
-        userId: 'user',
-        timestamp: 123456789,
-        githubRepo: 'acme/repo',
-      };
-      const { env: testEnv } = createMetadataEnv({
-        getMetadata: vi.fn().mockResolvedValue(existingMetadata),
-        updateUpstreamBranch,
-      });
-
-      const mockExec = vi.fn().mockResolvedValue({
-        exitCode: 0,
-        stdout: 'feature/my-branch\n',
-        stderr: '',
-      });
-      const fakeSession = {
-        exec: mockExec,
-      } as unknown as ExecutionSession;
-
-      const context: SessionContext = {
-        sessionId: 'agent_branch_capture' as SessionId,
-        workspacePath: '/workspace/org/user/sessions/agent_branch_capture',
-        sandboxId: 'org__user',
-        sessionHome: '/home/agent_branch_capture',
-        branchName: 'session/agent_branch_capture',
-        userId: 'user',
-        orgId: 'org',
-      };
-
-      const service = new SessionService();
-      await service['captureAndStoreBranch'](fakeSession, context, testEnv);
-
-      // Verify git branch command was executed
-      expect(mockExec).toHaveBeenCalledWith(
-        'cd /workspace/org/user/sessions/agent_branch_capture && git branch --show-current'
-      );
-
-      // Verify updateUpstreamBranch was called with the captured branch
-      expect(updateUpstreamBranch).toHaveBeenCalledWith('feature/my-branch');
-    });
-
-    it('should handle git command failure gracefully', async () => {
-      const updateMetadata = vi.fn().mockResolvedValue(undefined);
-      const { env: testEnv } = createMetadataEnv({
-        getMetadata: vi.fn().mockResolvedValue(null),
-        updateMetadata,
-      });
-
-      const mockExec = vi.fn().mockResolvedValue({
-        exitCode: 1,
-        stdout: '',
-        stderr: 'fatal: not a git repository',
-      });
-      const fakeSession = {
-        exec: mockExec,
-      } as unknown as ExecutionSession;
-
-      const context: SessionContext = {
-        sessionId: 'agent_branch_fail' as SessionId,
-        workspacePath: '/workspace/org/user/sessions/agent_branch_fail',
-        sandboxId: 'org__user',
-        sessionHome: '/home/agent_branch_fail',
-        branchName: 'session/agent_branch_fail',
-        userId: 'user',
-        orgId: 'org',
-      };
-
-      const service = new SessionService();
-      // Should not throw, just log warning
-      await service['captureAndStoreBranch'](fakeSession, context, testEnv);
-
-      // Should not update metadata when git command fails
-      expect(updateMetadata).not.toHaveBeenCalled();
-    });
-
-    it('should handle empty branch name gracefully', async () => {
-      const updateMetadata = vi.fn().mockResolvedValue(undefined);
-      const { env: testEnv } = createMetadataEnv({
-        getMetadata: vi.fn().mockResolvedValue(null),
-        updateMetadata,
-      });
-
-      const mockExec = vi.fn().mockResolvedValue({
-        exitCode: 0,
-        stdout: '   \n', // Whitespace only
-        stderr: '',
-      });
-      const fakeSession = {
-        exec: mockExec,
-      } as unknown as ExecutionSession;
-
-      const context: SessionContext = {
-        sessionId: 'agent_empty_branch' as SessionId,
-        workspacePath: '/workspace/org/user/sessions/agent_empty_branch',
-        sandboxId: 'org__user',
-        sessionHome: '/home/agent_empty_branch',
-        branchName: 'session/agent_empty_branch',
-        userId: 'user',
-        orgId: 'org',
-      };
-
-      const service = new SessionService();
-      await service['captureAndStoreBranch'](fakeSession, context, testEnv);
-
-      // Should not update metadata when branch name is empty
-      expect(updateMetadata).not.toHaveBeenCalled();
-    });
-
-    it('should handle exec throwing an error gracefully', async () => {
-      const updateMetadata = vi.fn().mockResolvedValue(undefined);
-      const { env: testEnv } = createMetadataEnv({
-        getMetadata: vi.fn().mockResolvedValue(null),
-        updateMetadata,
-      });
-
-      const mockExec = vi.fn().mockRejectedValue(new Error('Connection lost'));
-      const fakeSession = {
-        exec: mockExec,
-      } as unknown as ExecutionSession;
-
-      const context: SessionContext = {
-        sessionId: 'agent_exec_error' as SessionId,
-        workspacePath: '/workspace/org/user/sessions/agent_exec_error',
-        sandboxId: 'org__user',
-        sessionHome: '/home/agent_exec_error',
-        branchName: 'session/agent_exec_error',
-        userId: 'user',
-        orgId: 'org',
-      };
-
-      const service = new SessionService();
-      // Should not throw, just log warning
-      await service['captureAndStoreBranch'](fakeSession, context, testEnv);
-
-      // Should not update metadata when exec throws
-      expect(updateMetadata).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('saveSessionMetadata preserves prepared session fields', () => {
-    it('should preserve preparedAt, initiatedAt, prompt, mode, model, autoCommit when existingMetadata is provided', async () => {
-      // Existing metadata with prepared session fields
-      const existingMetadata: CloudAgentSessionState = {
-        version: 123456789,
-        sessionId: 'agent_preserve_test',
-        orgId: 'org',
-        userId: 'user',
-        timestamp: 123456789,
-        githubRepo: 'acme/repo',
-        // Prepared session fields that must be preserved
-        preparedAt: 1700000000000,
-        initiatedAt: 1700000001000,
-        prompt: 'Original prompt from prepareSession',
-        mode: 'code',
-        model: 'claude-3-opus',
-        autoCommit: true,
-        kiloSessionId: '123e4567-e89b-12d3-a456-426614174000',
-      };
-
-      const updateMetadata = vi.fn().mockResolvedValue(undefined);
-      const { env: testEnv } = createMetadataEnv({
-        getMetadata: vi.fn().mockResolvedValue(existingMetadata),
-        updateMetadata,
-      });
-
-      const fakeSession = {
-        exec: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-        deleteFile: vi.fn().mockResolvedValue(undefined),
-      };
-      const sandbox = {
-        createSession: vi.fn().mockResolvedValue(fakeSession),
-        mkdir: vi.fn().mockResolvedValue(undefined),
-        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-      } as unknown as SandboxInstance;
-      const sessionId: SessionId = 'agent_preserve_test';
-      mockedSetupWorkspace.mockResolvedValue({
-        workspacePath: `/workspace/org/user/sessions/${sessionId}`,
-        sessionHome: `/home/${sessionId}`,
-      });
-
-      const service = new SessionService();
-      await service.initiateFromKiloSession({
-        sandbox,
-        sandboxId: 'org__user',
-        orgId: 'org',
-        userId: 'user',
-        sessionId,
-        kilocodeToken: 'token',
-        kilocodeModel: 'test-model',
-        kiloSessionId: '123e4567-e89b-12d3-a456-426614174000',
-        githubRepo: 'acme/repo',
-        env: testEnv,
-        // Pass existingMetadata to trigger the merge behavior
-        existingMetadata,
-      });
-
-      // Verify updateMetadata was called with preserved fields
-      expect(updateMetadata).toHaveBeenCalledWith(
-        expect.objectContaining({
-          // These fields should be preserved from existingMetadata
-          preparedAt: 1700000000000,
-          initiatedAt: 1700000001000,
-          prompt: 'Original prompt from prepareSession',
-          mode: 'code',
-          model: 'claude-3-opus',
-          autoCommit: true,
-          // These fields should be updated
-          sessionId,
-          orgId: 'org',
-          userId: 'user',
-          githubRepo: 'acme/repo',
-          kiloSessionId: '123e4567-e89b-12d3-a456-426614174000',
-        })
-      );
-    });
-
-    it('should NOT have prepared fields when existingMetadata is not provided (legacy flow)', async () => {
-      const updateMetadata = vi.fn().mockResolvedValue(undefined);
-      const { env: testEnv } = createMetadataEnv({
-        getMetadata: vi.fn().mockResolvedValue(null),
-        updateMetadata,
-      });
-
-      const fakeSession = {
-        exec: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-        deleteFile: vi.fn().mockResolvedValue(undefined),
-      };
-      const sandbox = {
-        createSession: vi.fn().mockResolvedValue(fakeSession),
-        mkdir: vi.fn().mockResolvedValue(undefined),
-        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-      } as unknown as SandboxInstance;
-      const sessionId: SessionId = 'agent_legacy_test';
-      mockedSetupWorkspace.mockResolvedValue({
-        workspacePath: `/workspace/org/user/sessions/${sessionId}`,
-        sessionHome: `/home/${sessionId}`,
-      });
-
-      const service = new SessionService();
-      await service.initiateFromKiloSession({
-        sandbox,
-        sandboxId: 'org__user',
-        orgId: 'org',
-        userId: 'user',
-        sessionId,
-        kilocodeToken: 'token',
-        kilocodeModel: 'test-model',
-        kiloSessionId: '123e4567-e89b-12d3-a456-426614174000',
-        githubRepo: 'acme/repo',
-        env: testEnv,
-        // No existingMetadata - legacy flow
-      });
-
-      // Verify updateMetadata was called WITHOUT prepared fields
-      const savedMetadata = updateMetadata.mock.calls[0]?.[0] as CloudAgentSessionState;
-      expect(savedMetadata).toBeDefined();
-      expect(savedMetadata.preparedAt).toBeUndefined();
-      expect(savedMetadata.initiatedAt).toBeUndefined();
-      expect(savedMetadata.prompt).toBeUndefined();
-      expect(savedMetadata.mode).toBeUndefined();
-      expect(savedMetadata.model).toBeUndefined();
-      expect(savedMetadata.autoCommit).toBeUndefined();
-    });
-  });
-
-  describe('isPreparedSession branch management logic', () => {
-    it('uses manageBranch when prepared session has upstreamBranch', async () => {
-      // Existing metadata with preparedAt AND upstreamBranch
-      const existingMetadata: CloudAgentSessionState = {
-        version: 123456789,
-        sessionId: 'agent_upstream_test',
-        orgId: 'org',
-        userId: 'user',
-        timestamp: 123456789,
-        githubRepo: 'acme/repo',
-        preparedAt: 1700000000000, // This makes isPreparedSession = true
-        initiatedAt: 1700000001000,
-        upstreamBranch: 'feature/my-branch', // This triggers manageBranch path
-        prompt: 'Test prompt',
-        mode: 'code',
-        model: 'claude-3',
-        kiloSessionId: '123e4567-e89b-12d3-a456-426614174000',
-      };
-
-      const updateMetadata = vi.fn().mockResolvedValue(undefined);
-      const { env: testEnv } = createMetadataEnv({
-        getMetadata: vi.fn().mockResolvedValue(existingMetadata),
-        updateMetadata,
-      });
-
-      const fakeSession = {
-        exec: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-        deleteFile: vi.fn().mockResolvedValue(undefined),
-      };
-      const sandbox = {
-        createSession: vi.fn().mockResolvedValue(fakeSession),
-        mkdir: vi.fn().mockResolvedValue(undefined),
-        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-      } as unknown as SandboxInstance;
-      const sessionId: SessionId = 'agent_upstream_test';
-      mockedSetupWorkspace.mockResolvedValue({
-        workspacePath: `/workspace/org/user/sessions/${sessionId}`,
-        sessionHome: `/home/${sessionId}`,
-      });
-
-      const service = new SessionService();
-      await service.initiateFromKiloSession({
-        sandbox,
-        sandboxId: 'org__user',
-        orgId: 'org',
-        userId: 'user',
-        sessionId,
-        kilocodeToken: 'token',
-        kilocodeModel: 'test-model',
-        kiloSessionId: '123e4567-e89b-12d3-a456-426614174000',
-        githubRepo: 'acme/repo',
-        env: testEnv,
-        existingMetadata,
-      });
-
-      // For prepared sessions with upstreamBranch, manageBranch SHOULD be called
-      expect(mockManageBranch).toHaveBeenCalledWith(
-        fakeSession,
-        `/workspace/org/user/sessions/${sessionId}`,
-        'feature/my-branch', // branchName = upstreamBranch when provided
-        true
-      );
-
-      // git checkout -b should NOT be called directly
-      expect(fakeSession.exec).not.toHaveBeenCalledWith(expect.stringContaining('git checkout -b'));
-    });
-
-    it('creates session branch directly when prepared session has no upstreamBranch', async () => {
-      // Existing metadata with preparedAt but NO upstreamBranch
-      const existingMetadata: CloudAgentSessionState = {
-        version: 123456789,
-        sessionId: 'agent_session_branch_test',
-        orgId: 'org',
-        userId: 'user',
-        timestamp: 123456789,
-        githubRepo: 'acme/repo',
-        preparedAt: 1700000000000, // This makes isPreparedSession = true
-        initiatedAt: 1700000001000,
-        // NO upstreamBranch - should create session branch
-        prompt: 'Test prompt',
-        mode: 'code',
-        model: 'claude-3',
-        kiloSessionId: '123e4567-e89b-12d3-a456-426614174000',
-      };
-
-      const updateMetadata = vi.fn().mockResolvedValue(undefined);
-      const { env: testEnv } = createMetadataEnv({
-        getMetadata: vi.fn().mockResolvedValue(existingMetadata),
-        updateMetadata,
-      });
-
-      const fakeSession = {
-        exec: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-        deleteFile: vi.fn().mockResolvedValue(undefined),
-      };
-      const sandbox = {
-        createSession: vi.fn().mockResolvedValue(fakeSession),
-        mkdir: vi.fn().mockResolvedValue(undefined),
-        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-      } as unknown as SandboxInstance;
-      const sessionId: SessionId = 'agent_session_branch_test';
-      mockedSetupWorkspace.mockResolvedValue({
-        workspacePath: `/workspace/org/user/sessions/${sessionId}`,
-        sessionHome: `/home/${sessionId}`,
-      });
-
-      const service = new SessionService();
-      await service.initiateFromKiloSession({
-        sandbox,
-        sandboxId: 'org__user',
-        orgId: 'org',
-        userId: 'user',
-        sessionId,
-        kilocodeToken: 'token',
-        kilocodeModel: 'test-model',
-        kiloSessionId: '123e4567-e89b-12d3-a456-426614174000',
-        githubRepo: 'acme/repo',
-        env: testEnv,
-        existingMetadata,
-      });
-
-      // manageBranch should NOT be called (no upstreamBranch)
-      expect(mockManageBranch).not.toHaveBeenCalled();
-
-      // git checkout -b SHOULD be called to create session branch
-      expect(fakeSession.exec).toHaveBeenCalledWith(
-        expect.stringContaining(`git checkout -b 'session/${sessionId}'`),
-        expect.any(Object)
-      );
-    });
-
-    it('skips branch operations for legacy CLI resumes (no preparedAt)', async () => {
-      // NO existingMetadata passed - simulates legacy CLI resume where
-      // preparedAt won't be set
-      const { env: testEnv } = createMetadataEnv({
-        getMetadata: vi.fn().mockResolvedValue(null),
-        updateMetadata: vi.fn().mockResolvedValue(undefined),
-      });
-
-      const fakeSession = {
-        exec: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-        deleteFile: vi.fn().mockResolvedValue(undefined),
-      };
-      const sandbox = {
-        createSession: vi.fn().mockResolvedValue(fakeSession),
-        mkdir: vi.fn().mockResolvedValue(undefined),
-        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-      } as unknown as SandboxInstance;
-      const sessionId: SessionId = 'agent_legacy_cli_test';
-      mockedSetupWorkspace.mockResolvedValue({
-        workspacePath: `/workspace/org/user/sessions/${sessionId}`,
-        sessionHome: `/home/${sessionId}`,
-      });
-
-      const service = new SessionService();
-      await service.initiateFromKiloSession({
-        sandbox,
-        sandboxId: 'org__user',
-        orgId: 'org',
-        userId: 'user',
-        sessionId,
-        kilocodeToken: 'token',
-        kilocodeModel: 'test-model',
-        kiloSessionId: '123e4567-e89b-12d3-a456-426614174000',
-        githubRepo: 'acme/repo',
-        env: testEnv,
-        // NO existingMetadata - legacy flow
-      });
-
-      // manageBranch should NOT be called (CLI manages its own branch)
-      expect(mockManageBranch).not.toHaveBeenCalled();
-
-      // git checkout -b should NOT be called (CLI manages its own branch)
-      expect(fakeSession.exec).not.toHaveBeenCalledWith(expect.stringContaining('git checkout -b'));
-    });
-
-    it('skips branch operations when existingMetadata has no preparedAt (explicit legacy)', async () => {
-      // existingMetadata WITHOUT preparedAt - this is a legacy session
-      const legacyMetadata: CloudAgentSessionState = {
-        version: 123456789,
-        sessionId: 'agent_legacy_explicit_test',
-        orgId: 'org',
-        userId: 'user',
-        timestamp: 123456789,
-        githubRepo: 'acme/repo',
-        // NO preparedAt - makes isPreparedSession = false
-        kiloSessionId: '123e4567-e89b-12d3-a456-426614174000',
-      };
-
-      const updateMetadata = vi.fn().mockResolvedValue(undefined);
-      const { env: testEnv } = createMetadataEnv({
-        getMetadata: vi.fn().mockResolvedValue(legacyMetadata),
-        updateMetadata,
-      });
-
-      const fakeSession = {
-        exec: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-        deleteFile: vi.fn().mockResolvedValue(undefined),
-      };
-      const sandbox = {
-        createSession: vi.fn().mockResolvedValue(fakeSession),
-        mkdir: vi.fn().mockResolvedValue(undefined),
-        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-      } as unknown as SandboxInstance;
-      const sessionId: SessionId = 'agent_legacy_explicit_test';
-      mockedSetupWorkspace.mockResolvedValue({
-        workspacePath: `/workspace/org/user/sessions/${sessionId}`,
-        sessionHome: `/home/${sessionId}`,
-      });
-
-      const service = new SessionService();
-      await service.initiateFromKiloSession({
-        sandbox,
-        sandboxId: 'org__user',
-        orgId: 'org',
-        userId: 'user',
-        sessionId,
-        kilocodeToken: 'token',
-        kilocodeModel: 'test-model',
-        kiloSessionId: '123e4567-e89b-12d3-a456-426614174000',
-        githubRepo: 'acme/repo',
-        env: testEnv,
-        existingMetadata: legacyMetadata,
-      });
-
-      // manageBranch should NOT be called
-      expect(mockManageBranch).not.toHaveBeenCalled();
-
-      // git checkout -b should NOT be called (legacy CLI manages its own branch)
-      expect(fakeSession.exec).not.toHaveBeenCalledWith(expect.stringContaining('git checkout -b'));
-    });
-  });
-});
-
-describe('buildAgentEntryFromRuntimeAgent', () => {
-  it('normalizes model with kilo/ prefix when not already prefixed', () => {
-    const result = buildAgentEntryFromRuntimeAgent({
-      slug: 'test-agent',
-      name: 'Test Agent',
-      config: { model: 'anthropic/claude-opus-4.7', mode: 'subagent' },
-    });
-    expect(result.model).toBe('kilo/anthropic/claude-opus-4.7');
-  });
-
-  it('does not double-prefix models that already have kilo/', () => {
-    const result = buildAgentEntryFromRuntimeAgent({
-      slug: 'test-agent',
-      name: 'Test Agent',
-      config: { model: 'kilo/code', mode: 'subagent' },
-    });
-    expect(result.model).toBe('kilo/code');
-  });
-
-  it('handles null model', () => {
-    const result = buildAgentEntryFromRuntimeAgent({
-      slug: 'test-agent',
-      name: 'Test Agent',
-      config: { model: null, mode: 'subagent' },
-    });
-    expect(result.model).toBeUndefined();
-  });
-
-  it('handles undefined model', () => {
-    const result = buildAgentEntryFromRuntimeAgent({
-      slug: 'test-agent',
-      name: 'Test Agent',
-      config: { mode: 'subagent' },
-    });
-    expect(result.model).toBeUndefined();
-  });
-
-  it('passes through other config fields unchanged', () => {
-    const result = buildAgentEntryFromRuntimeAgent({
-      slug: 'test-agent',
-      name: 'Test Agent',
-      config: {
-        model: 'anthropic/claude-sonnet-4',
-        mode: 'subagent',
-        temperature: 0.7,
-        prompt: 'You are a test agent',
+}
+
+describe('SessionService.prepareWorkspace', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    workspaceMocks.checkDiskAndCleanBeforeSetup.mockResolvedValue(undefined);
+    workspaceMocks.cleanupWorkspace.mockResolvedValue(undefined);
+    workspaceMocks.cloneGitHubRepo.mockResolvedValue(undefined);
+    workspaceMocks.cloneGitRepo.mockResolvedValue(undefined);
+    workspaceMocks.manageBranch.mockResolvedValue('session/agent_test');
+    workspaceMocks.setupWorkspace.mockResolvedValue({
+      workspacePath: '/workspace/user/sessions/agent_test',
+      sessionHome: '/home/agent_test',
+    });
+    workspaceMocks.updateGitRemoteToken.mockResolvedValue(undefined);
+    tokenMocks.resolveGitHubTokenForRepo.mockResolvedValue({
+      success: true,
+      value: {
+        token: 'resolved-gh-token',
+        installationId: '123',
+        accountLogin: 'acme',
+        appType: 'standard',
       },
     });
-    expect(result.model).toBe('kilo/anthropic/claude-sonnet-4');
-    expect(result.temperature).toBe(0.7);
-    expect(result.prompt).toBe('You are a test agent');
-    expect(result.mode).toBe('subagent');
+    tokenMocks.resolveManagedGitLabToken.mockResolvedValue({
+      success: true,
+      token: 'resolved-gitlab-token',
+    });
+    devcontainerMocks.detectDevContainer.mockResolvedValue(null);
+    devcontainerMocks.bringUpDevContainer.mockReset();
+    portMocks.randomPort.mockReturnValue(4173);
+  });
+
+  it('prepares a cold workspace and returns ready metadata', async () => {
+    const session = createSession(false);
+    const sandbox = createSandbox(session);
+    const metadata = createMetadata({ upstreamBranch: 'main', setupCommands: ['pnpm install'] });
+    const progress = vi.fn();
+
+    const result = await new SessionService().prepareWorkspace({
+      sandbox,
+      sandboxId: 'usr-abcdef',
+      userId: 'user_test',
+      sessionId: 'agent_test' as SessionId,
+      env: createEnv(),
+      metadata,
+      kilocodeModel: 'test-model',
+      onProgress: progress,
+    });
+
+    expect(workspaceMocks.cloneGitRepo).toHaveBeenCalledWith(
+      session,
+      '/workspace/user/sessions/agent_test',
+      'https://gitlab.com/acme/repo.git',
+      'resolved-gitlab-token',
+      undefined,
+      { platform: 'gitlab' }
+    );
+    expect(workspaceMocks.manageBranch).toHaveBeenCalledWith(
+      session,
+      '/workspace/user/sessions/agent_test',
+      'main',
+      true
+    );
+    expect(progress).toHaveBeenCalledWith('kilo_session', 'Importing session…');
+    expect(progress).toHaveBeenCalledWith('setup_commands', 'Running setup commands…');
+    expect(result.ready).toMatchObject({
+      workspacePath: '/workspace/user/sessions/agent_test',
+      sandboxId: 'usr-abcdef',
+      sessionHome: '/home/agent_test',
+      branchName: 'main',
+      kiloSessionId: 'kilo-session',
+      gitToken: 'resolved-gitlab-token',
+      gitlabTokenManaged: true,
+    });
+  });
+
+  it('hydrates requested devcontainer metadata while preparing a cold DIND workspace', async () => {
+    const session = createSession(false);
+    const writeFile = vi.fn().mockResolvedValue(undefined);
+    const sandbox = createSandbox(session, false, writeFile);
+    const metadata = {
+      ...createMetadata(),
+      workspace: {
+        sandboxId: 'dind-abcdef' as const,
+        devcontainerRequested: true,
+      },
+    } satisfies CloudAgentSessionState;
+    const devcontainerHandle = {
+      containerId: 'container-dev',
+      innerWorkspaceFolder: '/workspaces/repo',
+      workspacePath: '/workspace/user/sessions/agent_test',
+      agentSessionId: 'agent_test',
+      overrideConfigPath: '/tmp/devcontainer-override-agent_test/devcontainer.json',
+      teardown: vi.fn().mockResolvedValue(undefined),
+    };
+    devcontainerMocks.detectDevContainer.mockResolvedValue({
+      configPath: '.devcontainer/devcontainer.json',
+    });
+    devcontainerMocks.bringUpDevContainer.mockResolvedValue(devcontainerHandle);
+
+    const result = await new SessionService().prepareWorkspace({
+      sandbox,
+      sandboxId: 'dind-abcdef',
+      userId: 'user_test',
+      sessionId: 'agent_test' as SessionId,
+      env: createEnv(),
+      metadata,
+      kilocodeModel: 'test-model',
+    });
+
+    expect(devcontainerMocks.detectDevContainer).toHaveBeenCalledWith(
+      session,
+      '/workspace/user/sessions/agent_test'
+    );
+    expect(devcontainerMocks.bringUpDevContainer).toHaveBeenCalledWith(
+      session,
+      expect.objectContaining({
+        workspacePath: '/workspace/user/sessions/agent_test',
+        wrapperPort: 4173,
+        configPath: '.devcontainer/devcontainer.json',
+      })
+    );
+    expect(result.devcontainer).toBe(devcontainerHandle);
+    expect(result.ready.devcontainer).toEqual({
+      workspacePath: '/workspace/user/sessions/agent_test',
+      innerWorkspaceFolder: '/workspaces/repo',
+      wrapperPort: 4173,
+      configPath: '.devcontainer/devcontainer.json',
+    });
+    expect(writeFile).toHaveBeenCalledWith(
+      '/home/agent_test/tmp/kilo-empty-session-kilo-session.json',
+      expect.any(String)
+    );
+    const bootstrapCall = session.exec.mock.calls.find(
+      ([command]) => typeof command === 'string' && command.includes('kilo-restore-session.js')
+    );
+    expect(bootstrapCall?.[0]).toContain(
+      '/home/agent_test/tmp/kilo-empty-session-kilo-session.json'
+    );
+  });
+
+  it('reports the failing fresh-session bootstrap step', async () => {
+    const session = createSession(false);
+    session.exec.mockImplementation(async (command: string) => {
+      if (command.includes('kilo-restore-session.js')) {
+        return {
+          exitCode: 1,
+          stdout: JSON.stringify({
+            ok: false,
+            step: 'diffs',
+            error: 'failed to parse snapshot JSON',
+            code: null,
+          }),
+          stderr: '',
+        };
+      }
+      return { exitCode: 0, stdout: '', stderr: '' };
+    });
+    const sandbox = createSandbox(session);
+
+    await expect(
+      new SessionService().prepareWorkspace({
+        sandbox,
+        sandboxId: 'usr-abcdef',
+        userId: 'user_test',
+        sessionId: 'agent_test' as SessionId,
+        env: createEnv(),
+        metadata: createMetadata(),
+        kilocodeModel: 'test-model',
+      })
+    ).rejects.toThrow(
+      'Session bootstrap failed: exit 1, step=diffs, error=failed to parse snapshot JSON'
+    );
+  });
+
+  it('restores devcontainer sessions with session-scoped Kilo XDG paths', async () => {
+    const session = createSession(false);
+    const sandbox = createSandbox(session);
+    const metadata = {
+      ...createMetadata({ preparedAt: 1 }),
+      workspace: {
+        sandboxId: 'dind-abcdef' as const,
+        devcontainerRequested: true,
+      },
+    } satisfies CloudAgentSessionState;
+    const devcontainerHandle = {
+      containerId: 'container-dev',
+      innerWorkspaceFolder: '/workspaces/repo',
+      workspacePath: '/workspace/user/sessions/agent_test',
+      agentSessionId: 'agent_test',
+      overrideConfigPath: '/tmp/devcontainer-override-agent_test/devcontainer.json',
+      teardown: vi.fn().mockResolvedValue(undefined),
+    };
+    devcontainerMocks.detectDevContainer.mockResolvedValue({
+      configPath: '.devcontainer/devcontainer.json',
+    });
+    devcontainerMocks.bringUpDevContainer.mockResolvedValue(devcontainerHandle);
+
+    await new SessionService().prepareWorkspace({
+      sandbox,
+      sandboxId: 'dind-abcdef',
+      userId: 'user_test',
+      sessionId: 'agent_test' as SessionId,
+      env: createEnv(),
+      metadata,
+      kilocodeModel: 'test-model',
+    });
+
+    const restoreCall = session.exec.mock.calls.find(
+      ([command]) => typeof command === 'string' && command.includes('kilo-restore-session.js')
+    );
+    expect(restoreCall).toBeDefined();
+    const restoreCommand = restoreCall?.[0];
+    expect(restoreCommand).toContain('KILOCODE_TOKEN_FILE=');
+    expect(restoreCommand).toContain('/home/agent_test/.local/share/kilo/session-restore-token');
+    expect(restoreCommand).toContain('XDG_DATA_HOME=');
+    expect(restoreCommand).toContain('/home/agent_test/.local/share');
+    expect(restoreCommand).toContain('XDG_CONFIG_HOME=');
+    expect(restoreCommand).toContain('/home/agent_test/.config');
+    expect(restoreCommand).toContain('XDG_CACHE_HOME=');
+    expect(restoreCommand).toContain('/home/agent_test/.cache');
+    expect(restoreCommand).not.toContain('KILOCODE_TOKEN=');
+  });
+
+  it('refreshes the warm fast path GitHub remote with repo lookup token when legacy metadata stored a token', async () => {
+    const session = createSession(true);
+    const sandbox = createSandbox(session, true);
+    const metadata = createMetadata({
+      githubRepo: 'acme/repo',
+      githubToken: 'old-gh-token',
+      gitUrl: undefined,
+      gitToken: undefined,
+      platform: 'github',
+      workspacePath: '/workspace/user/sessions/agent_test',
+      sessionHome: '/home/agent_test',
+      branchName: 'session/agent_test',
+      sandboxId: 'usr-abcdef',
+    });
+
+    await new SessionService().prepareWorkspace({
+      sandbox,
+      sandboxId: 'usr-abcdef',
+      userId: 'user_test',
+      sessionId: 'agent_test' as SessionId,
+      env: createEnv(),
+      metadata,
+      kilocodeModel: 'test-model',
+    });
+
+    expect(workspaceMocks.cloneGitHubRepo).not.toHaveBeenCalled();
+    expect(tokenMocks.resolveGitHubTokenForRepo).toHaveBeenCalledWith(
+      expect.objectContaining({
+        GIT_TOKEN_SERVICE: expect.any(Object),
+      }),
+      {
+        githubRepo: 'acme/repo',
+        userId: 'user_test',
+        orgId: undefined,
+      }
+    );
+    expect(workspaceMocks.updateGitRemoteToken).toHaveBeenCalledWith(
+      session,
+      '/workspace/user/sessions/agent_test',
+      'https://github.com/acme/repo.git',
+      'resolved-gh-token'
+    );
+  });
+
+  it('uses stored generic git tokens without managed provider lookup', async () => {
+    const session = createSession(false);
+    const sandbox = createSandbox(session);
+    const metadata = createMetadata({
+      gitUrl: 'https://git.example.com/acme/repo.git',
+      gitToken: 'generic-git-token',
+      platform: undefined,
+      gitlabTokenManaged: undefined,
+    });
+
+    await new SessionService().prepareWorkspace({
+      sandbox,
+      sandboxId: 'usr-abcdef',
+      userId: 'user_test',
+      sessionId: 'agent_test' as SessionId,
+      env: createEnv(),
+      metadata,
+      kilocodeModel: 'test-model',
+    });
+
+    expect(workspaceMocks.cloneGitRepo).toHaveBeenCalledWith(
+      session,
+      '/workspace/user/sessions/agent_test',
+      'https://git.example.com/acme/repo.git',
+      'generic-git-token',
+      undefined,
+      { platform: undefined }
+    );
+    expect(tokenMocks.resolveManagedGitLabToken).not.toHaveBeenCalled();
+    expect(tokenMocks.resolveGitHubTokenForRepo).not.toHaveBeenCalled();
+  });
+
+  it('restores persisted devcontainer runtime metadata on the warm fast path', async () => {
+    const session = createSession(true);
+    const sandbox = createSandbox(session, true);
+    const metadata = createMetadata({
+      workspacePath: '/workspace/user/sessions/agent_test',
+      sessionHome: '/home/agent_test',
+      branchName: 'session/agent_test',
+      sandboxId: 'dind-abcdef',
+      devcontainer: {
+        workspacePath: '/workspace/user/sessions/agent_test',
+        innerWorkspaceFolder: '/workspaces/repo',
+        wrapperPort: 4173,
+        configPath: '.devcontainer/devcontainer.json',
+      },
+    });
+    const devcontainerHandle = {
+      containerId: 'container-dev-warm',
+      innerWorkspaceFolder: '/workspaces/repo',
+      workspacePath: '/workspace/user/sessions/agent_test',
+      agentSessionId: 'agent_test',
+      overrideConfigPath: '/tmp/devcontainer-override-agent_test/devcontainer.json',
+      teardown: vi.fn().mockResolvedValue(undefined),
+    };
+    devcontainerMocks.bringUpDevContainer.mockResolvedValue(devcontainerHandle);
+
+    const result = await new SessionService().prepareWorkspace({
+      sandbox,
+      sandboxId: 'dind-abcdef',
+      userId: 'user_test',
+      sessionId: 'agent_test' as SessionId,
+      env: createEnv(),
+      metadata,
+      kilocodeModel: 'test-model',
+    });
+
+    expect(devcontainerMocks.bringUpDevContainer).toHaveBeenCalledWith(
+      session,
+      expect.objectContaining({
+        workspacePath: '/workspace/user/sessions/agent_test',
+        wrapperPort: 4173,
+      })
+    );
+    expect(result.devcontainer).toBe(devcontainerHandle);
+    expect(result.ready.devcontainer).toEqual(metadata.devcontainer);
+  });
+
+  it('hydrates requested devcontainer metadata on the warm fast path when runtime metadata is missing', async () => {
+    const session = createSession(true);
+    const sandbox = createSandbox(session, true);
+    const metadata = {
+      ...createMetadata({
+        workspacePath: '/workspace/user/sessions/agent_test',
+        sessionHome: '/home/agent_test',
+        branchName: 'session/agent_test',
+        sandboxId: 'dind-abcdef',
+      }),
+      workspace: {
+        sandboxId: 'dind-abcdef' as const,
+        devcontainerRequested: true,
+      },
+    } satisfies CloudAgentSessionState;
+    const devcontainerHandle = {
+      containerId: 'container-dev-warm-detected',
+      innerWorkspaceFolder: '/workspaces/repo',
+      workspacePath: '/workspace/user/sessions/agent_test',
+      agentSessionId: 'agent_test',
+      overrideConfigPath: '/tmp/devcontainer-override-agent_test/devcontainer.json',
+      teardown: vi.fn().mockResolvedValue(undefined),
+    };
+    devcontainerMocks.detectDevContainer.mockResolvedValue({
+      configPath: '.devcontainer/devcontainer.json',
+    });
+    devcontainerMocks.bringUpDevContainer.mockResolvedValue(devcontainerHandle);
+
+    const result = await new SessionService().prepareWorkspace({
+      sandbox,
+      sandboxId: 'dind-abcdef',
+      userId: 'user_test',
+      sessionId: 'agent_test' as SessionId,
+      env: createEnv(),
+      metadata,
+      kilocodeModel: 'test-model',
+    });
+
+    expect(devcontainerMocks.detectDevContainer).toHaveBeenCalledWith(
+      session,
+      '/workspace/user/sessions/agent_test'
+    );
+    expect(devcontainerMocks.bringUpDevContainer).toHaveBeenCalledWith(
+      session,
+      expect.objectContaining({
+        workspacePath: '/workspace/user/sessions/agent_test',
+        wrapperPort: 4173,
+        configPath: '.devcontainer/devcontainer.json',
+      })
+    );
+    expect(result.devcontainer).toBe(devcontainerHandle);
+    expect(result.ready.devcontainer).toEqual({
+      workspacePath: '/workspace/user/sessions/agent_test',
+      innerWorkspaceFolder: '/workspaces/repo',
+      wrapperPort: 4173,
+      configPath: '.devcontainer/devcontainer.json',
+    });
+  });
+
+  it('refreshes the warm fast path git remote with a fresh GitHub installation token', async () => {
+    const session = createSession(true);
+    const sandbox = createSandbox(session, true);
+    const getTokenMock = vi.fn().mockResolvedValue('installation-token');
+    const env = createEnv();
+    env.GIT_TOKEN_SERVICE = {
+      ...env.GIT_TOKEN_SERVICE,
+      getToken: getTokenMock,
+    } as PersistenceEnv['GIT_TOKEN_SERVICE'];
+    const metadata = createMetadata({
+      githubRepo: 'acme/repo',
+      githubToken: 'stale-installation-token',
+      githubInstallationId: '123',
+      githubAppType: 'standard',
+      gitUrl: undefined,
+      gitToken: undefined,
+      platform: 'github',
+      workspacePath: '/workspace/user/sessions/agent_test',
+      sessionHome: '/home/agent_test',
+      branchName: 'session/agent_test',
+      sandboxId: 'usr-abcdef',
+    });
+
+    await new SessionService().prepareWorkspace({
+      sandbox,
+      sandboxId: 'usr-abcdef',
+      userId: 'user_test',
+      sessionId: 'agent_test' as SessionId,
+      env,
+      metadata,
+      kilocodeModel: 'test-model',
+    });
+
+    expect(workspaceMocks.cloneGitHubRepo).not.toHaveBeenCalled();
+    expect(getTokenMock).toHaveBeenCalledWith('123', 'standard');
+    expect(workspaceMocks.updateGitRemoteToken).toHaveBeenCalledWith(
+      session,
+      '/workspace/user/sessions/agent_test',
+      'https://github.com/acme/repo.git',
+      'installation-token'
+    );
+  });
+
+  it('refreshes the warm fast path git remote with a fresh managed GitLab token even when legacy metadata opted out', async () => {
+    const session = createSession(true);
+    const sandbox = createSandbox(session, true);
+    const metadata = createMetadata({
+      gitUrl: 'https://gitlab.com/acme/repo.git',
+      gitToken: 'stale-gitlab-token',
+      platform: 'gitlab',
+      gitlabTokenManaged: false,
+      workspacePath: '/workspace/user/sessions/agent_test',
+      sessionHome: '/home/agent_test',
+      branchName: 'session/agent_test',
+      sandboxId: 'usr-abcdef',
+    });
+
+    await new SessionService().prepareWorkspace({
+      sandbox,
+      sandboxId: 'usr-abcdef',
+      userId: 'user_test',
+      sessionId: 'agent_test' as SessionId,
+      env: createEnv(),
+      metadata,
+      kilocodeModel: 'test-model',
+    });
+
+    expect(workspaceMocks.cloneGitRepo).not.toHaveBeenCalled();
+    expect(tokenMocks.resolveManagedGitLabToken).toHaveBeenCalled();
+    expect(workspaceMocks.updateGitRemoteToken).toHaveBeenCalledWith(
+      session,
+      '/workspace/user/sessions/agent_test',
+      'https://gitlab.com/acme/repo.git',
+      'resolved-gitlab-token',
+      'gitlab'
+    );
+  });
+
+  it('refreshes the warm fast path GitHub remote when repo lookup resolves a managed token', async () => {
+    const session = createSession(true);
+    const sandbox = createSandbox(session, true);
+    const metadata = createMetadata({
+      githubRepo: 'acme/repo',
+      githubToken: 'user-supplied-token',
+      githubInstallationId: undefined,
+      gitUrl: undefined,
+      gitToken: undefined,
+      platform: 'github',
+      workspacePath: '/workspace/user/sessions/agent_test',
+      sessionHome: '/home/agent_test',
+      branchName: 'session/agent_test',
+      sandboxId: 'usr-abcdef',
+    });
+
+    await new SessionService().prepareWorkspace({
+      sandbox,
+      sandboxId: 'usr-abcdef',
+      userId: 'user_test',
+      sessionId: 'agent_test' as SessionId,
+      env: createEnv(),
+      metadata,
+      kilocodeModel: 'test-model',
+    });
+
+    expect(workspaceMocks.updateGitRemoteToken).toHaveBeenCalledWith(
+      session,
+      '/workspace/user/sessions/agent_test',
+      'https://github.com/acme/repo.git',
+      'resolved-gh-token'
+    );
+  });
+
+  it('throws when required metadata is missing', async () => {
+    const metadata = createMetadata({ kilocodeToken: undefined });
+
+    await expect(
+      new SessionService().prepareWorkspace({
+        sandbox: createSandbox(createSession()),
+        sandboxId: 'usr-abcdef',
+        userId: 'user_test',
+        sessionId: 'agent_test' as SessionId,
+        env: createEnv(),
+        metadata,
+      })
+    ).rejects.toThrow('Missing kilocodeToken in session metadata');
   });
 });
 
-describe('backendUrlForSandbox', () => {
-  it.each([
-    ['http://localhost:3000', 'http://host.docker.internal:3000'],
-    ['http://127.0.0.1:3000', 'http://host.docker.internal:3000'],
-    ['http://localhost:3000/api', 'http://host.docker.internal:3000/api'],
-    ['https://api.kilo.ai', 'https://api.kilo.ai'],
-    ['not-a-url', 'not-a-url'],
-  ])('maps %s to %s', (input, expected) => {
-    expect(backendUrlForSandbox(input)).toBe(expected);
+describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    tokenMocks.resolveGitHubTokenForRepo.mockResolvedValue({
+      success: true,
+      value: {
+        token: 'resolved-gh-token',
+        installationId: '123',
+        accountLogin: 'acme',
+        appType: 'standard',
+      },
+    });
+    tokenMocks.resolveManagedGitLabToken.mockResolvedValue({
+      success: true,
+      token: 'resolved-gitlab-token',
+    });
+    devcontainerMocks.detectDevContainer.mockResolvedValue(null);
+    devcontainerMocks.bringUpDevContainer.mockReset();
+    portMocks.randomPort.mockReturnValue(4173);
+  });
+
+  async function buildPromptWrapperRequests(metadata: CloudAgentSessionState) {
+    const service = new SessionService();
+    const env = createEnv();
+    env.WORKER_URL = 'https://cloud-agent.example.com';
+
+    return service.buildWrapperSessionReadyAndPromptRequests({
+      env,
+      plan: {
+        scope: {
+          sessionId: 'agent_test',
+          userId: 'user_test',
+        },
+        turn: {
+          type: 'prompt',
+          messageId: 'msg_018f1e2d3c4bGitLabEnvAAAA',
+          prompt: 'Do the work',
+        },
+        agent: {
+          mode: 'code',
+          model: 'test-model',
+        },
+        workspace: {
+          sandboxId: 'usr-abcdef',
+          metadata,
+        },
+        wrapper: {
+          fence: {
+            wrapperRunId: 'wr_gitlab_env',
+            wrapperGeneration: 2,
+            wrapperConnectionId: 'conn_gitlab_env',
+          },
+        },
+      } satisfies FencedWrapperDispatchRequest,
+    });
+  }
+
+  it('passes persisted devcontainer intent to the active wrapper readiness request', async () => {
+    const service = new SessionService();
+    const env = createEnv();
+    env.WORKER_URL = 'https://cloud-agent.example.com';
+    const metadata = {
+      ...createMetadata(),
+      workspace: {
+        sandboxId: 'dind-abcdef' as const,
+        devcontainerRequested: true,
+      },
+    } satisfies CloudAgentSessionState;
+
+    const result = await service.buildWrapperSessionReadyAndPromptRequests({
+      env,
+      plan: {
+        scope: {
+          sessionId: 'agent_test',
+          userId: 'user_test',
+        },
+        turn: {
+          type: 'prompt',
+          messageId: 'msg_018f1e2d3c4bDevReadyAbCdEF',
+          prompt: 'Use the devcontainer runtime',
+        },
+        agent: {
+          mode: 'code',
+          model: 'test-model',
+        },
+        workspace: {
+          sandboxId: 'dind-abcdef',
+          metadata,
+        },
+        wrapper: {
+          fence: {
+            wrapperRunId: 'wr_devcontainer',
+            wrapperGeneration: 2,
+            wrapperConnectionId: 'conn_devcontainer',
+          },
+        },
+      } satisfies FencedWrapperDispatchRequest,
+    });
+
+    expect(result.readyRequest.devcontainer).toEqual({ requested: true });
+    expect(result.ready.devcontainer).toBeUndefined();
+  });
+
+  it('materializes workspace setup and prompt delivery into separate wrapper requests', async () => {
+    const service = new SessionService();
+    const env = createEnv();
+    env.WORKER_URL = 'https://cloud-agent.example.com';
+    const metadata = createMetadata({
+      setupCommands: ['pnpm install'],
+      envVars: { PUBLIC_VALUE: 'visible' },
+      upstreamBranch: 'main',
+    });
+
+    const result = await service.buildWrapperSessionReadyAndPromptRequests({
+      env,
+      plan: {
+        scope: {
+          sessionId: 'agent_test',
+          userId: 'user_test',
+        },
+        turn: {
+          type: 'prompt',
+          messageId: 'msg_018f1e2d3c4bPayloadTestAAAA',
+          prompt: 'Do the work',
+        },
+        agent: {
+          mode: 'code',
+          model: 'test-model',
+          variant: 'thinking',
+        },
+        finalization: {
+          autoCommit: true,
+          condenseOnComplete: false,
+        },
+        workspace: {
+          sandboxId: 'usr-abcdef',
+          metadata,
+        },
+        wrapper: {
+          fence: {
+            wrapperRunId: 'wr_test',
+            wrapperGeneration: 2,
+            wrapperConnectionId: 'conn_test',
+          },
+        },
+      } satisfies FencedWrapperDispatchRequest,
+    });
+
+    expect(workspaceMocks.setupWorkspace).not.toHaveBeenCalled();
+    expect(workspaceMocks.cloneGitRepo).not.toHaveBeenCalled();
+    expect(result.ready).toMatchObject({
+      workspacePath: '/workspace/user/sessions/agent_test',
+      sandboxId: 'usr-abcdef',
+      sessionHome: '/home/agent_test',
+      branchName: 'main',
+      kiloSessionId: 'kilo-session',
+      gitToken: 'resolved-gitlab-token',
+      gitlabTokenManaged: true,
+    });
+    expect(result.readyRequest).toMatchObject({
+      agentSessionId: 'agent_test',
+      userId: 'user_test',
+      sandboxId: 'usr-abcdef',
+      kiloSessionId: 'kilo-session',
+      workspace: {
+        workspacePath: '/workspace/user/sessions/agent_test',
+        sessionHome: '/home/agent_test',
+        branchName: 'main',
+        upstreamBranch: 'main',
+      },
+      repo: {
+        kind: 'git',
+        url: 'https://gitlab.com/acme/repo.git',
+        token: 'resolved-gitlab-token',
+        platform: 'gitlab',
+      },
+      materialized: {
+        setupCommands: ['pnpm install'],
+      },
+    });
+    expect(result.readyRequest).not.toHaveProperty('prompt');
+    expect(result.type).toBe('prompt');
+    if (result.type !== 'prompt') throw new Error('Expected prompt delivery request');
+    expect(result.promptRequest).not.toHaveProperty('workspace');
+    expect(result.promptRequest).not.toHaveProperty('materialized');
+    expect(result.readyRequest.materialized.env.PUBLIC_VALUE).toBe('visible');
+    expect(result.readyRequest.materialized.env.KILOCODE_TOKEN).toBe('kilo-token');
+    expect(result.readyRequest.materialized.env.GITLAB_TOKEN).toBe('resolved-gitlab-token');
+    expect(result.readyRequest.materialized.env.GITLAB_HOST).toBe('gitlab.com');
+    expect(result.readyRequest.materialized.env.GLAB_IS_OAUTH2).toBe('true');
+    expect(result.readyRequest.session.workerAuthToken).toBe('kilo-token');
+    expect(result.readyRequest.session.wrapperRunId).toBe('wr_test');
+    expect(result.readyRequest).not.toHaveProperty('message');
+    expect(result.readyRequest).not.toHaveProperty('agent');
+    expect(result.readyRequest).not.toHaveProperty('finalization');
+    expect(result.promptRequest).toMatchObject({
+      message: {
+        id: 'msg_018f1e2d3c4bPayloadTestAAAA',
+        prompt: 'Do the work',
+      },
+      agent: {
+        model: { modelID: 'test-model' },
+        variant: 'thinking',
+        mode: 'code',
+      },
+      finalization: {
+        autoCommit: true,
+        condenseOnComplete: false,
+      },
+    });
+    expect(result.promptRequest).not.toHaveProperty('messageId');
+    expect(result.promptRequest).not.toHaveProperty('prompt');
+    expect(result.promptRequest).not.toHaveProperty('attachments');
+    expect(result.promptRequest.session).toEqual(result.readyRequest.session);
+  });
+
+  it('materializes OAuth bearer mode with a self-managed GitLab host', async () => {
+    const result = await buildPromptWrapperRequests(
+      createMetadata({
+        gitUrl: 'https://gitlab.example.com:8443/acme/repo.git',
+        platform: 'gitlab',
+      })
+    );
+
+    expect(result.ready).toMatchObject({
+      gitToken: 'resolved-gitlab-token',
+      gitlabTokenManaged: true,
+    });
+    expect(result.readyRequest.repo).toMatchObject({
+      kind: 'git',
+      url: 'https://gitlab.example.com:8443/acme/repo.git',
+      token: 'resolved-gitlab-token',
+      platform: 'gitlab',
+    });
+    expect(result.readyRequest.materialized.env.GITLAB_TOKEN).toBe('resolved-gitlab-token');
+    expect(result.readyRequest.materialized.env.GITLAB_HOST).toBe('gitlab.example.com:8443');
+    expect(result.readyRequest.materialized.env.GLAB_IS_OAUTH2).toBe('true');
+  });
+
+  it('preserves an explicit profile GLAB_IS_OAUTH2 value when injecting a managed GitLab token', async () => {
+    const result = await buildPromptWrapperRequests(
+      createMetadata({
+        envVars: {
+          GLAB_IS_OAUTH2: 'false',
+        },
+      })
+    );
+
+    expect(result.ready).toMatchObject({
+      gitToken: 'resolved-gitlab-token',
+      gitlabTokenManaged: true,
+    });
+    expect(result.readyRequest.repo).toMatchObject({
+      token: 'resolved-gitlab-token',
+      platform: 'gitlab',
+    });
+    expect(result.readyRequest.materialized.env.GITLAB_TOKEN).toBe('resolved-gitlab-token');
+    expect(result.readyRequest.materialized.env.GITLAB_HOST).toBe('gitlab.com');
+    expect(result.readyRequest.materialized.env.GLAB_IS_OAUTH2).toBe('false');
+  });
+
+  it('does not use OAuth bearer mode for inferred legacy GitLab tokens', async () => {
+    const result = await buildPromptWrapperRequests(
+      createMetadata({
+        gitUrl: 'https://gitlab.com/acme/repo.git',
+        gitToken: 'generic-git-token',
+        platform: undefined,
+        gitlabTokenManaged: undefined,
+      })
+    );
+
+    expect(tokenMocks.resolveManagedGitLabToken).not.toHaveBeenCalled();
+    expect(result.ready).toMatchObject({
+      gitToken: 'generic-git-token',
+      gitlabTokenManaged: undefined,
+    });
+    expect(result.readyRequest.repo).toMatchObject({
+      kind: 'git',
+      url: 'https://gitlab.com/acme/repo.git',
+      token: 'generic-git-token',
+    });
+    expect(result.readyRequest.materialized.env.GITLAB_TOKEN).toBe('generic-git-token');
+    expect(result.readyRequest.materialized.env.GITLAB_HOST).toBe('gitlab.com');
+    expect(result.readyRequest.materialized.env.GLAB_IS_OAUTH2).toBeUndefined();
+  });
+});
+
+describe('fetchSessionMetadata', () => {
+  it('returns parsed metadata from the session DO', async () => {
+    const metadata = createMetadata();
+    const env = createEnv(metadata);
+
+    await expect(fetchSessionMetadata(env, 'user_test', 'agent_test')).resolves.toEqual(metadata);
   });
 });

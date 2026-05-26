@@ -1,4 +1,4 @@
-import { getUserFromAuth } from '@/lib/user.server';
+import { getUserFromAuth } from '@/lib/user/server';
 import UnauthorizedPage from './unauthorized/page';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import { AppSidebar } from './components/AppSidebar';

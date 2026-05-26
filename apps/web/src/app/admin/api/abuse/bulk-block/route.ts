@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import * as z from 'zod';
-import { getUserFromAuth } from '@/lib/user.server';
+import { getUserFromAuth } from '@/lib/user/server';
 import { bulkBlockUsers, type BulkBlockResponse } from '@/lib/abuse/bulkBlock';
 
 const schema = z.object({

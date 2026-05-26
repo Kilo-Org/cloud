@@ -17,6 +17,7 @@ import type {
   SuggestionAction,
   SuggestionState,
   CloudStatus,
+  MessageDeliveryState,
 } from './types';
 
 type ServiceStateConfig = {
@@ -49,6 +50,15 @@ type ServiceStateConfig = {
   onPreparationReady?: () => void;
   /** Fired when async preparation fails (preparing step === 'failed'). */
   onPreparationFailed?: (message: string) => void;
+  /** Fired when the server acknowledges a user message was queued. */
+  onMessageQueued?: (messageId: string) => void;
+  /** Fired when a queued user message's execution terminates in 'completed'. */
+  onMessageCompleted?: (messageId: string) => void;
+  /** Fired when a queued user message fails delivery or its execution fails. */
+  onMessageFailed?: (
+    messageId: string,
+    state: Extract<MessageDeliveryState, { status: 'failed' }>
+  ) => void;
 };
 
 type ServiceState = {
@@ -60,6 +70,7 @@ type ServiceState = {
   getPermission(): PermissionState | null;
   getSuggestion(): SuggestionState | null;
   getSessionInfo(): SessionInfo | null;
+  getPendingMessages(): ReadonlyMap<string, MessageDeliveryState>;
   snapshot(): ServiceStateSnapshot;
   /** Set activity directly (for transport lifecycle events like connecting/disconnected). */
   setActivity(activity: SessionActivity): void;
@@ -82,6 +93,7 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
   let question: QuestionState | null = null;
   let permission: PermissionState | null = null;
   let suggestion: SuggestionState | null = null;
+  const pendingMessages = new Map<string, MessageDeliveryState>();
 
   // Tracks whether we've received a terminal stopped event (error/interrupted/disconnected).
   // While terminated, session.error events are suppressed as aftershocks.
@@ -277,6 +289,41 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
     notify();
   }
 
+  function processMessageQueued(
+    event: Extract<ServiceEvent, { type: 'cloud.message.queued' }>
+  ): void {
+    pendingMessages.set(event.messageId, { status: 'queued' });
+    config.onMessageQueued?.(event.messageId);
+    notify();
+  }
+
+  function processMessageSent(event: Extract<ServiceEvent, { type: 'cloud.message.sent' }>): void {
+    pendingMessages.delete(event.messageId);
+    notify();
+  }
+
+  function processMessageCompleted(
+    event: Extract<ServiceEvent, { type: 'cloud.message.completed' }>
+  ): void {
+    pendingMessages.delete(event.messageId);
+    config.onMessageCompleted?.(event.messageId);
+    notify();
+  }
+
+  function processMessageFailed(
+    event: Extract<ServiceEvent, { type: 'cloud.message.failed' }>
+  ): void {
+    const deliveryState: Extract<MessageDeliveryState, { status: 'failed' }> = {
+      status: 'failed',
+      error: event.error,
+      reason: event.reason,
+      attempts: event.attempts,
+    };
+    pendingMessages.delete(event.messageId);
+    config.onMessageFailed?.(event.messageId, deliveryState);
+    notify();
+  }
+
   function processConnected(event: Extract<ServiceEvent, { type: 'connected' }>): void {
     // Set activity from sessionStatus. When sessionStatus is absent (server
     // has no execution-derived state yet), default to idle — we know the
@@ -332,6 +379,10 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
 
     // Clear terminated on connected
     terminated = false;
+
+    // Clear pending-message delivery state — replayed cloud.message.queued
+    // events following the snapshot will repopulate it with the current truth.
+    pendingMessages.clear();
 
     notify();
   }
@@ -396,6 +447,18 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
       case 'connected':
         processConnected(event);
         break;
+      case 'cloud.message.queued':
+        processMessageQueued(event);
+        break;
+      case 'cloud.message.sent':
+        processMessageSent(event);
+        break;
+      case 'cloud.message.completed':
+        processMessageCompleted(event);
+        break;
+      case 'cloud.message.failed':
+        processMessageFailed(event);
+        break;
       case 'session.idle':
       case 'session.turn.close':
       case 'warning':
@@ -414,6 +477,7 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
     getPermission: () => permission,
     getSuggestion: () => suggestion,
     getSessionInfo: () => sessionInfo,
+    getPendingMessages: () => pendingMessages,
 
     snapshot: () => ({
       activity,
@@ -423,6 +487,7 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
       question,
       permission,
       suggestion,
+      pendingMessages,
     }),
 
     setActivity(next: SessionActivity): void {
@@ -455,6 +520,7 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
       question = null;
       permission = null;
       suggestion = null;
+      pendingMessages.clear();
       terminated = false;
       notify();
     },

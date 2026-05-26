@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { getUserFromAuth } from '@/lib/user.server';
+import { getUserFromAuth } from '@/lib/user/server';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { getPlatformOAuthConnectPath } from '@/lib/integrations/oauth/paths';
 

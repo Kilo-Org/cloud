@@ -1,6 +1,6 @@
 import { StripeSessionStatusChecker } from '@/components/payment/StripeSessionStatusChecker';
 import { STRIPE_SUB_QUERY_STRING_KEY } from '@/lib/organizations/constants';
-import { getUserFromAuthOrRedirect } from '@/lib/user.server';
+import { getUserFromAuthOrRedirect } from '@/lib/user/server';
 import assert from 'assert';
 
 export default async function Page({

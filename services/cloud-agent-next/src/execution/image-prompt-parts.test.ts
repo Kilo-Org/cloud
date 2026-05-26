@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  assertR2AttachmentDownloadConfigured,
-  buildImageFileParts,
-  buildImagePromptParts,
-} from './image-prompt-parts.js';
+import { assertR2AttachmentDownloadConfigured, buildImageFileParts } from './image-prompt-parts.js';
 import { ExecutionError } from './errors.js';
 import type { Images } from '../router/schemas.js';
 import type { Env } from '../types.js';
@@ -36,22 +32,6 @@ describe('buildImageFileParts', () => {
         mime: 'image/jpeg',
         url: 'file:///tmp/second.jpeg',
         filename: '22222222-2222-4222-8222-222222222222.jpeg',
-      },
-    ]);
-  });
-});
-
-describe('buildImagePromptParts', () => {
-  it('prepends the text prompt before image file parts', () => {
-    const fileParts = buildImageFileParts(images, ['/tmp/first.png']);
-
-    expect(buildImagePromptParts('Describe this image', fileParts)).toEqual([
-      { type: 'text', text: 'Describe this image' },
-      {
-        type: 'file',
-        mime: 'image/png',
-        url: 'file:///tmp/first.png',
-        filename: '11111111-1111-4111-8111-111111111111.png',
       },
     ]);
   });

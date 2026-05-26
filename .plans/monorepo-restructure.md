@@ -387,21 +387,21 @@ These cannot be done in code and must be done manually:
 
 ## Risks and Mitigations
 
-| Risk                                          | Mitigation                                                                                                                                                                        |
-| --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Git history fragmentation from `git mv`       | Use `git mv` for all moves to preserve history tracking. Git is good at detecting renames.                                                                                        |
-| Vercel deployment breaks                      | Update Vercel root directory setting IMMEDIATELY after merge. Consider coordinating merge timing.                                                                                 |
-| pnpm resolution breaks                        | Run `pnpm install` after every structural change to catch issues early                                                                                                            |
-| Import paths break                            | The `@/*` alias stays the same (relative to tsconfig). Cross-package `workspace:*` deps use package names, not paths.                                                             |
-| CI workflows fail on first run                | Have the workflow updates in the same commit as the directory moves                                                                                                               |
-| `.env` not found by Next.js                   | Next.js loads `.env` from its project root -- moving it to `apps/web/.env` is correct                                                                                             |
-| EAS builds break for kilo-app                 | Coordinate with mobile team; update EAS config post-merge if needed                                                                                                               |
-| `scripts/` shell scripts have hardcoded paths | Rewrite `changed-workspaces.sh` and `lint-all.sh` to expand workspace globs (Phase 6). Update `typecheck-all.sh` root tsgo path (Phase 2).                                        |
-| Lint scripts break across all workspaces      | Every workspace's `lint` script hardcodes its root-relative path. Rewrite all 20+ `package.json` lint entries and `scripts/lint-all.sh` in the same commit as the directory moves |
-| Root CI entrypoints disappear                 | Keep root aliases (`drizzle`, `test:e2e`, `dependency-cycle-check`) that delegate to the correct workspace, so workflows don't need simultaneous updates                          |
-| Merge conflict volume at execution time       | Execute the restructure on a fresh branch from main, not incrementally on a long-lived branch                                                                                     |
-| `@kilocode/trpc` build ordering               | `scripts/typecheck-all.sh` conditionally rebuilds trpc before workspace typechecks. This ordering must be preserved.                                                              |
-| `typecheck-all.sh` hardcoded package name     | The script excludes `kilocode-backend` in 4 places. Phase 2 renames this to `web` — both must be updated in the same commit.                                                      |
+| Risk | Mitigation |
+|---|---|
+| Git history fragmentation from `git mv` | Use `git mv` for all moves to preserve history tracking. Git is good at detecting renames. |
+| Vercel deployment breaks | Update Vercel root directory setting IMMEDIATELY after merge. Consider coordinating merge timing. |
+| pnpm resolution breaks | Run `pnpm install` after every structural change to catch issues early |
+| Import paths break | The `@/*` alias stays the same (relative to tsconfig). Cross-package `workspace:*` deps use package names, not paths. |
+| CI workflows fail on first run | Have the workflow updates in the same commit as the directory moves |
+| `.env` not found by Next.js | Next.js loads `.env` from its project root -- moving it to `apps/web/.env` is correct |
+| EAS builds break for kilo-app | Coordinate with mobile team; update EAS config post-merge if needed |
+| `scripts/` shell scripts have hardcoded paths | Rewrite `changed-workspaces.sh` and `lint-all.sh` to expand workspace globs (Phase 6). Update `typecheck-all.sh` root tsgo path (Phase 2). |
+| Lint scripts break across all workspaces | Every workspace's `lint` script hardcodes its root-relative path. Rewrite all 20+ `package.json` lint entries and `scripts/lint-all.sh` in the same commit as the directory moves |
+| Root CI entrypoints disappear | Keep root aliases (`drizzle`, `test:e2e`, `dependency-cycle-check`) that delegate to the correct workspace, so workflows don't need simultaneous updates |
+| Merge conflict volume at execution time | Execute the restructure on a fresh branch from main, not incrementally on a long-lived branch |
+| `@kilocode/trpc` build ordering | `scripts/typecheck-all.sh` conditionally rebuilds trpc before workspace typechecks. This ordering must be preserved. |
+| `typecheck-all.sh` hardcoded package name | The script excludes `kilocode-backend` in 4 places. Phase 2 renames this to `web` — both must be updated in the same commit. |
 
 ## Out of Scope (for future PRs)
 

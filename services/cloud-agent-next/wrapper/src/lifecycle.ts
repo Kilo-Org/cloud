@@ -65,6 +65,10 @@ export type LifecycleManager = {
   stop: () => void;
   /** Called when a message completes - checks if idle */
   onMessageComplete: (messageId: string) => void;
+  /** Called when the root Kilo session reaches idle. */
+  onSessionIdle: () => void;
+  /** Called when the root Kilo session emits activity after idle. */
+  onRootSessionActivity: () => void;
   /** Called to trigger drain and close sequence */
   triggerDrainAndClose: () => void;
   /** Signal completion for post-processing waiters (called by connection on completion events) */
@@ -73,8 +77,6 @@ export type LifecycleManager = {
   setAborted: () => void;
   /** Reset lifecycle state for a new execution (clears isAborted, isDraining, etc.) */
   reset: () => void;
-  /** Set per-turn config (called by prompt handler before each turn) */
-  setPerTurnConfig: (turnConfig: PerTurnConfig) => void;
   /** Called by connection manager on every SSE event to reset the transport timer */
   onSseEvent: () => void;
 };
@@ -93,12 +95,7 @@ export function createLifecycleManager(
   let drainTimeout: ReturnType<typeof setTimeout> | null = null;
   let isDraining = false;
   let isAborted = false;
-
-  // Per-turn config, set by the prompt handler before each turn
-  let perTurn: PerTurnConfig = {
-    autoCommit: false,
-    condenseOnComplete: false,
-  };
+  let rootSessionIdleBarrierPresent = false;
 
   // Completion waiter for post-processing tasks (auto-commit, condense)
   let postProcessingResolve: (() => void) | null = null;
@@ -113,7 +110,7 @@ export function createLifecycleManager(
 
   function resetSseTransportTimer(): void {
     clearSseTransportTimer();
-    if (!state.hasJob) return;
+    if (!state.hasSession) return;
     sseTransportTimer = setTimeout(() => {
       logToFile('SSE transport timeout — reconnecting event subscription');
       deps.reconnectEventSubscription();
@@ -136,18 +133,21 @@ export function createLifecycleManager(
    * Run post-completion tasks (auto-commit, condense).
    */
   async function runPostCompletionTasks(): Promise<void> {
-    const job = state.currentJob;
-    if (!job) return;
+    const session = state.currentSession;
+    if (!session) return;
 
-    // Skip post-completion tasks when aborted — the execution already failed
-    // (e.g. disconnect, fatal error) so auto-commit/condense on partial work is unsafe
-    if (isAborted) {
-      logToFile('skipping post-completion tasks — execution was aborted');
+    const msgConfig = state.completedMessageConfig ?? state.activeMessageConfig;
+    if (!msgConfig) {
+      logToFile('no message config for post-completion tasks — skipping');
       return;
     }
 
-    // Run auto-commit if enabled
-    if (perTurn.autoCommit) {
+    if (isAborted) {
+      logToFile('skipping post-completion tasks — session was aborted');
+      return;
+    }
+
+    if (msgConfig.autoCommit) {
       logToFile('running auto-commit');
       try {
         const autoCommitController = new AbortController();
@@ -162,7 +162,7 @@ export function createLifecycleManager(
           onEvent: event => state.sendToIngest(event),
           kiloClient,
           messageId: state.lastAssistantMessageId ?? undefined,
-          upstreamBranch: perTurn.upstreamBranch,
+          upstreamBranch: msgConfig.upstreamBranch,
           signal: autoCommitController.signal,
         }).finally(() => clearTimeout(timeout));
         if (autoCommitTimedOut && !result.success) {
@@ -188,7 +188,6 @@ export function createLifecycleManager(
       }
     }
 
-    // Completion/abort helpers are only needed for condense (which still uses the prompt-based approach)
     const expectCompletion = () => {
       postProcessingCompleted = false;
       postProcessingResolve = null;
@@ -203,14 +202,13 @@ export function createLifecycleManager(
 
     const wasAborted = () => isAborted;
 
-    // Run condense if enabled
-    if (perTurn.condenseOnComplete) {
+    if (msgConfig.condenseOnComplete) {
       logToFile('running condense');
       try {
         await runCondenseOnComplete({
           workspacePath: config.workspacePath,
-          kiloSessionId: job.kiloSessionId,
-          model: perTurn.model,
+          kiloSessionId: session.kiloSessionId,
+          model: msgConfig.model,
           onEvent: event => state.sendToIngest(event),
           kiloClient,
           expectCompletion,
@@ -245,16 +243,9 @@ export function createLifecycleManager(
     // complete event → drain delay → close connections.
     void (async () => {
       try {
-        // 1. Post-completion tasks (auto-commit, condense)
-        try {
-          await runPostCompletionTasks();
-        } catch (err) {
-          logToFile(
-            `post-completion tasks failed: ${err instanceof Error ? err.message : String(err)}`
-          );
-        }
+        await runPostCompletionTasks();
 
-        // 2. Final log upload
+        // Final log upload
         const uploader = state.logUploader;
         if (uploader) {
           try {
@@ -268,30 +259,38 @@ export function createLifecycleManager(
         }
       } finally {
         // 3. Send complete event (always runs, even if upload/post-processing failed)
-        const job = state.currentJob;
-        if (job && !isAborted) {
+        const session = state.currentSession;
+        if (session && !isAborted) {
           const currentBranch = await getCurrentBranch(config.workspacePath, 10_000).catch(
             () => ''
           );
+          const gateResult = state.consumeObservedGateResult();
           logToFile(
-            `sending complete event for executionId=${job.executionId} branch=${currentBranch || '(none)'}`
+            `sending complete event for kiloSessionId=${session.kiloSessionId} branch=${currentBranch || '(none)'}`
           );
           state.sendToIngest({
             streamEventType: 'complete',
             data: {
               exitCode: 0,
-              executionId: job.executionId,
-              kiloSessionId: job.kiloSessionId,
+              kiloSessionId: session.kiloSessionId,
               ...(currentBranch ? { currentBranch } : {}),
+              ...(gateResult ? { gateResult } : {}),
             },
             timestamp: new Date().toISOString(),
           });
-        } else if (job && isAborted) {
-          logToFile('skipping complete event — execution was aborted');
+        } else if (session && isAborted) {
+          logToFile('skipping complete event — session was aborted');
         }
 
-        // 4. Drain delay, then close connections
+        // 4. Drain delay, then close connections (if no new messages arrived)
         drainTimeout = setTimeout(() => {
+          if (state.isActive) {
+            logToFile(`drain aborted — wrapper became active again during drain`);
+            isDraining = false;
+            isAborted = false;
+            drainTimeout = null;
+            return;
+          }
           logToFile('drain complete, closing connections');
           deps
             .closeConnections()
@@ -301,22 +300,46 @@ export function createLifecycleManager(
             .finally(() => {
               isDraining = false;
               drainTimeout = null;
+              state.clearSession();
             });
         }, DRAIN_DELAY_MS);
       }
     })();
   }
 
+  function maybeFinalizeIdleBatch(): void {
+    if (!state.isIdle || !deps.isConnected() || !rootSessionIdleBarrierPresent) {
+      return;
+    }
+    triggerDrainAndClose();
+  }
+
   /**
    * Handle message completion.
    */
   function onMessageComplete(messageId: string): void {
-    logToFile(`message complete: messageId=${messageId}`);
-    state.setActive(false);
-
-    if (state.isIdle && deps.isConnected()) {
-      triggerDrainAndClose();
+    const completedConfig = state.getMessageConfig(messageId);
+    const completedInfo = state.completeMessage(messageId);
+    if (completedInfo) {
+      logToFile(
+        `message complete: messageId=${completedInfo.messageId}, pending: [${state.pendingMessageIds.join(',')}]`
+      );
     }
+
+    if (completedInfo && completedConfig && state.hasSession) {
+      state.setCompletedMessageConfig(completedConfig);
+    }
+
+    maybeFinalizeIdleBatch();
+  }
+
+  function onSessionIdle(): void {
+    rootSessionIdleBarrierPresent = true;
+    maybeFinalizeIdleBatch();
+  }
+
+  function onRootSessionActivity(): void {
+    rootSessionIdleBarrierPresent = false;
   }
 
   return {
@@ -336,6 +359,8 @@ export function createLifecycleManager(
     },
 
     onMessageComplete,
+    onSessionIdle,
+    onRootSessionActivity,
     triggerDrainAndClose,
     signalCompletion,
 
@@ -343,15 +368,13 @@ export function createLifecycleManager(
       isAborted = true;
     },
 
-    setPerTurnConfig: (turnConfig: PerTurnConfig) => {
-      perTurn = turnConfig;
-    },
-
     reset: () => {
       isAborted = false;
       isDraining = false;
+      rootSessionIdleBarrierPresent = false;
       postProcessingCompleted = false;
       postProcessingResolve = null;
+      state.clearCompletedMessageConfig();
       clearSseTransportTimer();
       if (drainTimeout) {
         clearTimeout(drainTimeout);

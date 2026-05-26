@@ -11,7 +11,7 @@ import { generateSandboxId, getSandboxNamespace } from '../sandbox-id.js';
 import { WRAPPER_VERSION } from '../shared/wrapper-version.js';
 import type { Env, SandboxId, SandboxInstance } from '../types.js';
 
-const TERMINAL_SESSION_PLATFORMS = new Set(['cloud-agent', 'cloud-agent-web']);
+const TERMINAL_SESSION_PLATFORMS = new Set(['cloud-agent', 'cloud-agent-web', 'slack']);
 
 export function isTerminalSessionPlatform(platform: string | undefined): boolean {
   return platform !== undefined && TERMINAL_SESSION_PLATFORMS.has(platform);
@@ -25,18 +25,18 @@ export function validateTerminalMetadata(
     return { success: false, error: 'Session not found' };
   }
 
-  if (metadata.sessionId !== sessionId) {
+  if (metadata.identity.sessionId !== sessionId) {
     return { success: false, error: 'Invalid terminal session' };
   }
 
-  if (!metadata.preparedAt || !metadata.workspacePath) {
+  if (!metadata.lifecycle.preparedAt || !metadata.workspace?.workspacePath) {
     return {
       success: false,
       error: 'Terminal is only available after the workspace is prepared',
     };
   }
 
-  if (!isTerminalSessionPlatform(metadata.createdOnPlatform)) {
+  if (!isTerminalSessionPlatform(metadata.identity.createdOnPlatform)) {
     return {
       success: false,
       error: 'Terminal is only available for interactive Cloud Agent sessions',
@@ -94,16 +94,16 @@ export async function resolveTerminalWrapperClient(
 
   const { metadata } = metadataResult.data;
   const sandboxId =
-    metadata.sandboxId ??
+    metadata.workspace?.sandboxId ??
     (await generateSandboxId(
       params.env.PER_SESSION_SANDBOX_ORG_IDS,
-      metadata.orgId,
-      metadata.userId,
-      metadata.sessionId,
-      metadata.botId
+      metadata.identity.orgId,
+      metadata.identity.userId,
+      metadata.identity.sessionId,
+      metadata.identity.botId
     ));
   const sandbox = deps.getSandboxInstance({ env: params.env, sandboxId });
-  const wrapper = await deps.findWrapperForSession(sandbox, metadata.sessionId);
+  const wrapper = await deps.findWrapperForSession(sandbox, metadata.identity.sessionId);
 
   if (!wrapper) {
     return {

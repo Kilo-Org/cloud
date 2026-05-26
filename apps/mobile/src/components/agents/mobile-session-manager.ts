@@ -289,6 +289,7 @@ export function createMobileAgentSessionManager({
         prompt: rs?.prompt ?? null,
         initialMessageId: rs?.initialMessageId ?? null,
         associatedPr: sessionResult.associatedPr,
+        runtimeAgents: rs?.runtimeAgents,
       };
     },
   });

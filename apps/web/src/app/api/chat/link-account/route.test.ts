@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, test } from '@jest/globals';
 import { NextRequest } from 'next/server';
 import { bot } from '@/lib/bot';
 import { verifyLinkToken, linkKiloUser } from '@/lib/bot-identity';
-import { getUserFromAuth } from '@/lib/user.server';
+import { getUserFromAuth } from '@/lib/user/server';
 import {
   canKiloUserAccessPlatformIntegration,
   getPlatformIntegration,
@@ -31,7 +31,7 @@ jest.mock('@/lib/bot-identity', () => ({
   linkKiloUser: jest.fn(async () => undefined),
   consumeLinkAccountContext: jest.fn(async () => true),
 }));
-jest.mock('@/lib/user.server');
+jest.mock('@/lib/user/server');
 jest.mock('@/lib/bot/platform-helpers');
 jest.mock('@/lib/bot/platforms', () => ({
   botPlatforms: {

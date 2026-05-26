@@ -408,8 +408,8 @@ export async function handleGitHubWebhook(
       // whose (git_url, git_branch) matches AND that are owned by this
       // installation's tenant. Runs for all pull_request actions (including
       // `closed`), independently of the code-review routing below. The upsert
-      // itself guards against demoting `closed`/`merged` back to `open` so
-      // that even out-of-order deliveries stay monotonic. Wrapped in after()
+      // itself guards against demoting `closed`/`merged` back to active states
+      // so that even out-of-order deliveries stay monotonic. Wrapped in after()
       // to avoid blocking the webhook response — when a matching session is on
       // a supported platform the function makes an outbound GitHub GraphQL
       // call, which can add significant latency.

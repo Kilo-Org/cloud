@@ -1,7 +1,21 @@
-import { dirname } from 'node:path';
+/**
+ * Legacy session preparation handlers - kept as thin proxies for existing
+ * callers that still chain `prepareSession` + `initiateFromKilocodeSessionV2`,
+ * or that pass `autoInitiate: true` to enqueue the initial message in one
+ * call (apps/web NewSessionPanel, mobile session manager).
+ *
+ * `prepareSession` registers full session metadata and returns immediately in
+ * the retained split flow. When `autoInitiate: true`, it delegates creation and
+ * canonical initial admission to the same grouped primitive used by `start`.
+ *
+ * `updateSession` is retained because `services/code-review-infra` still
+ * uses it to rewrite `callbackTarget` before a session-continuation
+ * `sendMessageV2`. It will be removed once that flow migrates to an
+ * execution-scoped callback target override on `send`.
+ */
 import { TRPCError } from '@trpc/server';
+import type { WorkerDb } from '@kilocode/db/client';
 import type * as z from 'zod';
-import { getSandbox } from '@cloudflare/sandbox';
 import {
   mergeProfileConfiguration,
   profileMcpServersToClientRecord,
@@ -11,17 +25,8 @@ import {
   type MergeProfileConfigurationResult,
   type ProfileOwner,
 } from '@kilocode/cloud-agent-profile';
+import { repoFullNameFromGitUrl } from '@kilocode/worker-utils/git-url';
 import { logger, withLogTags } from '../../logger.js';
-import {
-  generateSessionId,
-  SessionService,
-  SetupCommandFailedError,
-  determineBranchName,
-  runSetupCommands,
-  writeAuthFile,
-  writeGlobalRules,
-} from '../../session-service.js';
-import type { SessionProfileBundle } from '../../session-profile.js';
 
 import { internalApiProtectedProcedure } from '../auth.js';
 import {
@@ -31,91 +36,78 @@ import {
   UpdateSessionOutput,
   isBuiltinMode,
 } from '../schemas.js';
-import { generateSandboxId, getSandboxNamespace } from '../../sandbox-id.js';
-import {
-  BranchNotFoundError,
-  checkDiskAndCleanBeforeSetup,
-  cloneGitHubRepo,
-  cloneGitRepo,
-  GitRepositoryNotFoundError,
-  manageBranch,
-  setupWorkspace,
-} from '../../workspace.js';
-import { WrapperClient } from '../../kilo/wrapper-client.js';
-import { withDORetry } from '../../utils/do-retry.js';
-import { generateKiloSessionId } from '../../utils/kilo-session-id.js';
-import { SANDBOX_SLEEP_AFTER_SECONDS } from '../../core/lease.js';
-import {
-  resolveGitHubTokenForRepo,
-  resolveManagedGitLabToken,
-} from '../../services/git-token-service-client.js';
+import { registerNewSession, startNewSession } from '../../session/session-registration.js';
 import { getPgDb } from '../../db/pg.js';
-import { repoFullNameFromGitUrl } from '@kilocode/worker-utils/git-url';
-import {
-  destroySandboxAfterPreparationInfrastructureFailure,
-  getPreparationInfrastructureFailure,
-  isSandboxInternalServerError,
-} from '../../sandbox-recovery.js';
+import type { Env } from '../../types.js';
+import type { SessionProfileBundle } from '../../session-profile.js';
+import type { SessionCreateRequest } from '../../session/session-requests.js';
 
 type SessionPrepareHandlers = {
   prepareSession: typeof prepareSessionHandler;
   updateSession: typeof updateSessionHandler;
 };
 
-/**
- * Platform that always gets full profile resolution applied — the main
- * user-facing cloud-agent chat UI. Other callers must opt in via `profileId`.
- */
 const CLOUD_AGENT_WEB_PLATFORM = 'cloud-agent-web';
+
+export type ProfileResolutionPolicy = {
+  defaultProfileResolution: 'explicit-profile-only' | 'include-web-defaults';
+};
+
+export function profileResolutionPolicyForSessionCreateOrigin(
+  createdOnPlatform: string | undefined
+): ProfileResolutionPolicy {
+  return {
+    defaultProfileResolution:
+      createdOnPlatform === CLOUD_AGENT_WEB_PLATFORM
+        ? 'include-web-defaults'
+        : 'explicit-profile-only',
+  };
+}
 
 type PrepareInput = z.infer<typeof PrepareSessionInput>;
 
-/** Pick a stable `repoFullName` for repo-binding lookup across platforms. */
-function repoFullNameForBindingLookup(input: PrepareInput): string | undefined {
-  if (input.githubRepo) return input.githubRepo;
-  if (input.platform === 'gitlab' && input.gitUrl) {
-    return repoFullNameFromGitUrl(input.gitUrl);
+function repoFullNameForBindingLookup(input: SessionCreateRequest): string | undefined {
+  if (input.repository.type === 'github') return input.repository.repo;
+  if (input.repository.type === 'gitlab') {
+    return repoFullNameFromGitUrl(input.repository.url);
   }
   return undefined;
 }
 
-/**
- * Resolve the caller's profile stack in Postgres when we should — see the
- * "When cloud agent resolves a profile" section of the refactor plan for the rule.
- *
- * Returns `null` when no resolution runs so that the handler can keep passing
- * inline fields through verbatim.
- */
-async function resolveProfileForInput(
+async function resolveProfileForSessionCreateRequest(
   ctx: { env: Pick<Env, 'HYPERDRIVE'>; userId: string },
-  input: PrepareInput
+  input: SessionCreateRequest,
+  policy: ProfileResolutionPolicy,
+  db?: WorkerDb
 ): Promise<MergeProfileConfigurationResult | null> {
-  const shouldResolve = !!input.profileId || input.createdOnPlatform === CLOUD_AGENT_WEB_PLATFORM;
+  const shouldResolve =
+    input.profile?.id !== undefined || policy.defaultProfileResolution === 'include-web-defaults';
   if (!shouldResolve) return null;
 
-  const owner: ProfileOwner = input.kilocodeOrganizationId
-    ? { type: 'organization', id: input.kilocodeOrganizationId }
+  const owner: ProfileOwner = input.options?.kilocodeOrganizationId
+    ? { type: 'organization', id: input.options.kilocodeOrganizationId }
     : { type: 'user', id: ctx.userId };
-  // In org context we also allow the user's personal profile to apply.
-  const userId = input.kilocodeOrganizationId ? ctx.userId : undefined;
-
-  const db = getPgDb(ctx.env);
+  const userId = input.options?.kilocodeOrganizationId ? ctx.userId : undefined;
+  const overrides = input.profile?.overrides;
 
   try {
-    return await mergeProfileConfiguration(db, {
-      profileId: input.profileId,
+    return await mergeProfileConfiguration(db ?? getPgDb(ctx.env), {
+      profileId: input.profile?.id,
       owner,
       userId,
       repoFullName: repoFullNameForBindingLookup(input),
-      platform: input.platform,
-      envVars: input.envVars,
-      setupCommands: input.setupCommands,
-      encryptedSecrets: input.encryptedSecrets,
-      mcpServers: input.mcpServers as Record<string, ClientMcpServerValue> | undefined,
-      runtimeSkills: input.runtimeSkills,
-      // Cast: the runtime-agent schema permits looser color/permission shapes
-      // than db's AgentConfig, but configs are forwarded opaquely to the CLI.
-      runtimeAgents: input.runtimeAgents as InlineAgentInput[] | undefined,
+      platform:
+        input.repository.type === 'gitlab'
+          ? 'gitlab'
+          : input.repository.type === 'github'
+            ? 'github'
+            : undefined,
+      envVars: overrides?.envVars,
+      setupCommands: overrides?.setupCommands,
+      encryptedSecrets: overrides?.encryptedSecrets,
+      mcpServers: overrides?.mcpServers as Record<string, ClientMcpServerValue> | undefined,
+      runtimeSkills: overrides?.runtimeSkills,
+      runtimeAgents: overrides?.runtimeAgents as InlineAgentInput[] | undefined,
     });
   } catch (err) {
     if (err instanceof ProfileNotFoundError) {
@@ -125,45 +117,56 @@ async function resolveProfileForInput(
   }
 }
 
-/**
- * Project the resolved bundle (or the unresolved inline pass-through) into
- * the canonical `SessionProfileBundle` shape consumed by the session
- * service. When resolution ran, `mergeProfileConfiguration` has already
- * stacked the inline layer on top of the profile layers — this function
- * just reshapes mcpServers from the profile's array form to the worker's
- * record form.
- *
- * `ClientMcpServerValue` is structurally identical to the worker's
- * `MCPServerConfig`, so the record passes through without coercion.
- */
 function applyProfileResolution(
-  input: PrepareInput,
+  input: SessionCreateRequest,
   resolved: MergeProfileConfigurationResult | null
-): SessionProfileBundle {
+): SessionCreateRequest {
   if (!resolved) {
     return {
-      envVars: input.envVars,
-      encryptedSecrets: input.encryptedSecrets,
-      setupCommands: input.setupCommands,
-      mcpServers: input.mcpServers,
-      runtimeSkills: input.runtimeSkills,
-      runtimeAgents: input.runtimeAgents,
-      kiloCommands: input.kiloCommands,
+      ...input,
+      profile: {
+        ...input.profile,
+        resolved: {
+          ...input.profile?.resolved,
+          envVars: input.profile?.overrides?.envVars,
+          encryptedSecrets: input.profile?.overrides?.encryptedSecrets,
+          setupCommands: input.profile?.overrides?.setupCommands,
+          mcpServers: input.profile?.overrides?.mcpServers,
+          runtimeSkills: input.profile?.overrides?.runtimeSkills,
+          runtimeAgents: input.profile?.overrides?.runtimeAgents,
+        },
+      },
     };
   }
 
   return {
-    envVars: resolved.envVars,
-    setupCommands: resolved.setupCommands,
-    encryptedSecrets: resolved.encryptedSecrets,
-    mcpServers: profileMcpServersToClientRecord(resolved.mcpServers),
-    runtimeSkills: resolved.skills,
-    runtimeAgents: resolved.agents,
-    kiloCommands: resolved.kiloCommands,
+    ...input,
+    profile: {
+      ...input.profile,
+      resolved: {
+        envVars: resolved.envVars,
+        setupCommands: resolved.setupCommands,
+        encryptedSecrets: resolved.encryptedSecrets,
+        mcpServers: profileMcpServersToClientRecord(resolved.mcpServers),
+        runtimeSkills: resolved.skills,
+        runtimeAgents: resolved.agents,
+        kiloCommands: resolved.kiloCommands ?? input.profile?.resolved?.kiloCommands,
+      },
+    },
   };
 }
 
-function assertModeAvailableForProfile(mode: string, profile: SessionProfileBundle): void {
+export async function resolveEffectiveSessionConfiguration(
+  ctx: { env: Pick<Env, 'HYPERDRIVE'>; userId: string },
+  input: SessionCreateRequest,
+  policy: ProfileResolutionPolicy,
+  db?: WorkerDb
+): Promise<SessionCreateRequest> {
+  const resolved = await resolveProfileForSessionCreateRequest(ctx, input, policy, db);
+  return applyProfileResolution(input, resolved);
+}
+
+export function assertModeAvailableForProfile(mode: string, profile: SessionProfileBundle): void {
   if (isBuiltinMode(mode)) return;
   const slugs = new Set((profile.runtimeAgents ?? []).map(a => a.slug));
   if (slugs.has(mode)) return;
@@ -174,101 +177,95 @@ function assertModeAvailableForProfile(mode: string, profile: SessionProfileBund
   });
 }
 
-function setUpdateValue(updates: Record<string, unknown>, key: string, value: unknown): void {
-  if (value !== undefined) {
-    updates[key] = value;
+export function prepareInputToSessionCreateRequest(input: PrepareInput): SessionCreateRequest {
+  const gitUrl = input.gitUrl;
+  if (!input.githubRepo && !gitUrl) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'Must provide either githubRepo or gitUrl',
+    });
   }
+  let repository: SessionCreateRequest['repository'];
+  if (input.githubRepo) {
+    repository = {
+      type: 'github',
+      repo: input.githubRepo,
+      branch: input.upstreamBranch,
+    };
+  } else {
+    if (!gitUrl) {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: 'Must provide either githubRepo or gitUrl',
+      });
+    }
+    repository =
+      input.platform === 'gitlab'
+        ? {
+            type: 'gitlab',
+            url: gitUrl,
+            branch: input.upstreamBranch,
+          }
+        : {
+            type: 'git',
+            url: gitUrl,
+            token: input.gitToken,
+            branch: input.upstreamBranch,
+          };
+  }
+
+  const initialTurn: SessionCreateRequest['initialTurn'] =
+    input.initialPayload?.type === 'command'
+      ? {
+          type: 'command',
+          id: input.initialMessageId,
+          command: input.initialPayload.command,
+          arguments: input.initialPayload.arguments,
+          images: input.images,
+        }
+      : {
+          type: 'prompt',
+          prompt: input.prompt,
+          images: input.images,
+          id: input.initialMessageId,
+        };
+
+  return {
+    initialTurn,
+    agent: {
+      mode: input.mode,
+      model: input.model,
+      variant: input.variant,
+    },
+    repository,
+    runtime: input.devcontainer ? { devcontainer: true } : undefined,
+    profile: {
+      id: input.profileId,
+      overrides: {
+        envVars: input.envVars,
+        encryptedSecrets: input.encryptedSecrets,
+        setupCommands: input.setupCommands,
+        mcpServers: input.mcpServers,
+        runtimeSkills: input.runtimeSkills,
+        runtimeAgents: input.runtimeAgents,
+        appendSystemPrompt: input.appendSystemPrompt,
+      },
+      ...(input.kiloCommands ? { resolved: { kiloCommands: input.kiloCommands } } : {}),
+    },
+    finalization: {
+      autoCommit: input.autoCommit,
+      condenseOnComplete: input.condenseOnComplete,
+      gateThreshold: input.gateThreshold,
+    },
+    options: {
+      callbackTarget: input.callbackTarget,
+      kilocodeOrganizationId: input.kilocodeOrganizationId,
+      createdOnPlatform: input.createdOnPlatform,
+      shallow: input.shallow,
+    },
+  };
 }
 
-function setCollectionUpdate<T>(
-  updates: Record<string, unknown>,
-  key: string,
-  value: T | undefined,
-  isEmpty: (value: T) => boolean
-): void {
-  if (value === undefined) {
-    return;
-  }
-
-  updates[key] = isEmpty(value) ? null : value;
-}
-
-type PrepareSessionWorkspaceFailureCategory =
-  | 'sandbox_api_or_storage_failure'
-  | 'workspace_filesystem_preparation_failure'
-  | 'wrapper_wait_for_port_timeout'
-  | 'wrapper_kilo_server_start_timeout'
-  | 'configured_session_lookup_failure'
-  | 'repo_clone_or_checkout_failure'
-  | 'other_workspace_preparation_failure';
-
-function prepareSessionErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
-
-function classifyPrepareSessionWorkspaceFailure(
-  error: unknown,
-  sandboxInternalServerError: boolean,
-  workspaceFilesystemPreparationFailure = false
-): PrepareSessionWorkspaceFailureCategory {
-  const message = prepareSessionErrorMessage(error).toLowerCase();
-
-  if (workspaceFilesystemPreparationFailure) {
-    return 'workspace_filesystem_preparation_failure';
-  }
-
-  if (
-    message.includes('configured session') &&
-    message.includes('not found: session get returned no data')
-  ) {
-    return 'configured_session_lookup_failure';
-  }
-
-  if (message.includes('failed to start kilo server: timeout waiting for server to start')) {
-    return 'wrapper_kilo_server_start_timeout';
-  }
-
-  if (
-    message.includes('wrapper did not become ready on port') &&
-    message.includes('waitforport timed out')
-  ) {
-    return 'wrapper_wait_for_port_timeout';
-  }
-
-  if (
-    message.includes('git clone timed out') ||
-    message.includes('failed to checkout pull ref') ||
-    message.includes('git-lfs filter-process') ||
-    message.includes('object does not exist on the server')
-  ) {
-    return 'repo_clone_or_checkout_failure';
-  }
-
-  if (
-    sandboxInternalServerError ||
-    message.includes('internal error in durable object storage') ||
-    message.includes('durable object storage operation exceeded timeout')
-  ) {
-    return 'sandbox_api_or_storage_failure';
-  }
-
-  return 'other_workspace_preparation_failure';
-}
-
-function isRetryableWrapperReadinessFailure(
-  failureCategory: PrepareSessionWorkspaceFailureCategory
-): boolean {
-  return (
-    failureCategory === 'wrapper_wait_for_port_timeout' ||
-    failureCategory === 'wrapper_kilo_server_start_timeout'
-  );
-}
-
-/**
- * Creates session preparation handlers.
- * These handlers are protected by internal API authentication (backend-to-backend).
- * They support the prepare-then-initiate flow for AI Agents.
- */
 export function createSessionPrepareHandlers(): SessionPrepareHandlers {
   return {
     prepareSession: prepareSessionHandler,
@@ -279,34 +276,33 @@ export function createSessionPrepareHandlers(): SessionPrepareHandlers {
 /**
  * Prepare a new session for later initiation.
  *
- * This creates a fully prepared session with:
- * - Workspace directories created
- * - Git repository cloned
- * - Branch created/checked out
- * - Setup commands executed
- * - MCP settings configured
- * - Kilo server started
- * - Kilo CLI session created
- *
- * The session can then be updated via updateSession and initiated via startExecutionV2.
- *
- * Flow:
- * 1. Generate cloudAgentSessionId and sandboxId
- * 2. Get sandbox and setup workspace
- * 3. Clone repository and create branch
- * 4. Run setup commands and configure MCP
- * 5. Start kilo server and create CLI session
- * 6. Store all metadata in Durable Object
- * 7. Return { cloudAgentSessionId, kiloSessionId }
- *
- * Protected by internal API authentication (x-internal-api-key header).
+ * Registers session metadata in the DO for lazy preparation.
+ * Returns immediately; the caller is expected to follow up with
+ * `initiateFromKilocodeSessionV2` to queue the initial message - or switch
+ * to the unified `start` endpoint which does both in one call.
  */
 const prepareSessionHandler = internalApiProtectedProcedure
   .input(PrepareSessionInput)
   .output(PrepareSessionOutput)
   .mutation(async ({ input, ctx }) => {
     return withLogTags({ source: 'prepareSession' }, async () => {
-      const sessionService = new SessionService();
+      const request = prepareInputToSessionCreateRequest(input);
+      const policy = profileResolutionPolicyForSessionCreateOrigin(input.createdOnPlatform);
+      const requestWithProfile = await resolveEffectiveSessionConfiguration(ctx, request, policy);
+      assertModeAvailableForProfile(
+        requestWithProfile.agent.mode,
+        requestWithProfile.profile?.resolved ?? {}
+      );
+
+      if (
+        requestWithProfile.initialTurn.type === 'command' &&
+        requestWithProfile.initialTurn.images !== undefined
+      ) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Images cannot be attached to slash commands',
+        });
+      }
 
       if (input.devcontainer && !input.autoInitiate) {
         throw new TRPCError({
@@ -315,576 +311,35 @@ const prepareSessionHandler = internalApiProtectedProcedure
         });
       }
 
-      // 1. Generate new cloudAgentSessionId and sandboxId
-      const cloudAgentSessionId = generateSessionId();
-      const sandboxId = await generateSandboxId(
-        ctx.env.PER_SESSION_SANDBOX_ORG_IDS,
-        input.kilocodeOrganizationId,
-        ctx.userId,
-        cloudAgentSessionId,
-        ctx.botId,
-        input.devcontainer
-      );
-
-      logger.setTags({
-        cloudAgentSessionId,
-        userId: ctx.userId,
-        orgId: input.kilocodeOrganizationId ?? '(personal)',
-        sandboxId,
-        botId: ctx.botId,
-        sandboxKind: ctx.botId ? 'bot' : 'user',
-      });
-      logger.info('Preparing new session with workspace setup');
-
-      // Resolve profile (repo binding + default + explicit override) server-side.
-      // Runs only when the caller either set an explicit profileId, or this
-      // session comes from the main user-facing chat UI ('cloud-agent-web').
-      // Other callers (app-builder, security-agent, webhooks without profileId,
-      // etc.) keep getting their inline fields verbatim — same as before.
-      const resolved = await resolveProfileForInput(ctx, input);
-      const effective = applyProfileResolution(input, resolved);
-      assertModeAvailableForProfile(input.mode, effective);
-
-      // 2. Lookup GitHub installation + generate token via git-token-service RPC
-      let resolvedGithubToken = input.githubToken;
-      let resolvedInstallationId: string | undefined;
-      let resolvedGithubAppType: 'standard' | 'lite' | undefined;
-      if (input.githubRepo && !input.githubToken) {
-        const result = await resolveGitHubTokenForRepo(ctx.env, {
-          githubRepo: input.githubRepo,
-          userId: ctx.userId,
-          orgId: input.kilocodeOrganizationId,
-        });
-        if (result.success) {
-          resolvedGithubToken = result.value.token;
-          resolvedInstallationId = result.value.installationId;
-          resolvedGithubAppType = result.value.appType;
-        }
-      }
-
-      // Validate that we have auth for GitHub repo
-      if (input.githubRepo && !resolvedGithubToken) {
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: 'GitHub token or active app installation required for this repository',
-        });
-      }
-
-      // 2b. Lookup GitLab token via git-token-service RPC when no client token provided
-      let resolvedGitToken = input.gitToken;
-      let gitlabTokenManaged = false;
-      if (input.gitUrl && !input.gitToken && input.platform === 'gitlab') {
-        const result = await resolveManagedGitLabToken(ctx.env, {
-          userId: ctx.userId,
-          orgId: input.kilocodeOrganizationId,
-        });
-        if (result.success) {
-          resolvedGitToken = result.token;
-          gitlabTokenManaged = true;
-        }
-      }
-
-      // Validate that we have auth for GitLab repo
-      if (input.gitUrl && input.platform === 'gitlab' && !resolvedGitToken) {
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: 'No GitLab integration found. Please connect your GitLab account first.',
-        });
-      }
-
-      // --- Fast path: autoInitiate returns immediately, runs preparation asynchronously ---
-      if (input.autoInitiate) {
-        logger.info('autoInitiate=true: fast-path return, async preparation');
-
-        // Generate kiloSessionId upfront so the ID is stable from the start (no URL rewriting)
-        const kiloSessionId = generateKiloSessionId();
-        logger.setTags({ kiloSessionId });
-
-        // Create cli_sessions_v2 record immediately (stream-ticket route needs it for ownership)
-        const defaultTitle = 'New session - ' + new Date().toISOString();
-        await sessionService.createCliSessionViaSessionIngest(
-          kiloSessionId,
-          cloudAgentSessionId,
-          ctx.userId,
-          ctx.env,
-          input.kilocodeOrganizationId,
-          input.createdOnPlatform ?? 'cloud-agent',
-          defaultTitle
-        );
-
-        const rollbackCliSession = async () => {
-          await sessionService
-            .deleteCliSessionViaSessionIngest(kiloSessionId, ctx.userId, ctx.env, {
-              onlyIfEmpty: true,
+      const result =
+        input.autoInitiate === true
+          ? await startNewSession(requestWithProfile, {
+              env: ctx.env,
+              userId: ctx.userId,
+              authToken: ctx.authToken,
+              botId: ctx.botId,
             })
-            .catch((rollbackError: unknown) => {
-              logger
-                .withFields({
-                  error:
-                    rollbackError instanceof Error ? rollbackError.message : String(rollbackError),
-                })
-                .error('Failed to rollback cli_sessions_v2 record (fast path)');
+          : await registerNewSession(requestWithProfile, {
+              env: ctx.env,
+              userId: ctx.userId,
+              authToken: ctx.authToken,
+              botId: ctx.botId,
             });
-        };
 
-        // Register minimal metadata in DO (makes getSession return non-null runtimeState)
-        const doId = ctx.env.CLOUD_AGENT_SESSION.idFromName(`${ctx.userId}:${cloudAgentSessionId}`);
-        const stub = ctx.env.CLOUD_AGENT_SESSION.get(doId);
-
-        const registerResult = await stub.registerSession({
-          sessionId: cloudAgentSessionId,
-          userId: ctx.userId,
-          orgId: input.kilocodeOrganizationId,
-          botId: ctx.botId,
-          prompt: input.prompt,
-          mode: input.mode,
-          model: input.model,
-          variant: input.variant,
-          kiloSessionId,
-          githubRepo: input.githubRepo,
-          gitUrl: input.gitUrl,
-          platform: input.platform,
-          initialMessageId: input.initialMessageId,
-          initialPayload: input.initialPayload,
-          // Carry the resolved profile into the DO up-front so the chat page
-          // can render custom-mode options (runtimeAgents) immediately after
-          // navigation, before the async prepare() alarm fires.
-          profile: effective,
-        });
-
-        if (!registerResult.success) {
-          await rollbackCliSession();
-          logger
-            .withFields({ error: registerResult.error })
-            .error('Failed to register session in DO');
-          throw new TRPCError({
-            code: 'INTERNAL_SERVER_ERROR',
-            message: registerResult.error ?? 'Failed to register session',
-          });
-        }
-
-        // Schedule async preparation via DO alarm (returns immediately)
-        try {
-          await stub.startPreparationAsync({
-            sessionId: cloudAgentSessionId,
-            kiloSessionId,
-            userId: ctx.userId,
-            orgId: input.kilocodeOrganizationId,
-            botId: ctx.botId,
-            authToken: ctx.authToken,
-            githubRepo: input.githubRepo,
-            githubToken: input.githubToken,
-            gitUrl: input.gitUrl,
-            // Forward the already-resolved managed GitLab token so async
-            // prep does not re-resolve it (which would race with refresh-
-            // token rotation and fail with token_refresh_failed).
-            gitToken: resolvedGitToken,
-            platform: input.platform,
-            gitlabTokenManaged,
-            prompt: input.prompt,
-            mode: input.mode,
-            model: input.model,
-            variant: input.variant,
-            profile: effective,
-            upstreamBranch: input.upstreamBranch,
-            autoCommit: input.autoCommit,
-            condenseOnComplete: input.condenseOnComplete,
-            appendSystemPrompt: input.appendSystemPrompt,
-            callbackTarget: input.callbackTarget,
-            images: input.images,
-            createdOnPlatform: input.createdOnPlatform,
-            shallow: input.shallow,
-            gateThreshold: input.gateThreshold,
-            kilocodeOrganizationId: input.kilocodeOrganizationId,
-            autoInitiate: true,
-            devcontainer: input.devcontainer,
-            initialMessageId: input.initialMessageId,
-            initialPayload: input.initialPayload,
-          });
-        } catch (error) {
-          await rollbackCliSession();
-          throw error;
-        }
-
-        logger.info('Session registered, async preparation scheduled');
-        return { cloudAgentSessionId, kiloSessionId };
-      }
-
-      // 3. Get sandbox
-      logger.info('Getting sandbox');
-      const sandbox = getSandbox(getSandboxNamespace(ctx.env, sandboxId), sandboxId, {
-        sleepAfter: SANDBOX_SLEEP_AFTER_SECONDS,
-      });
-
-      const prepareWorkspace = async () => {
-        // 4. Check disk space before creating directories; clean stale workspaces if low
-        await checkDiskAndCleanBeforeSetup(
-          sandbox,
-          input.kilocodeOrganizationId,
-          ctx.userId,
-          cloudAgentSessionId
-        );
-
-        // 5. Setup workspace directories
-        logger.info('Setting up workspace directories');
-        const { workspacePath, sessionHome } = await setupWorkspace(
-          sandbox,
-          ctx.userId,
-          input.kilocodeOrganizationId,
-          cloudAgentSessionId
-        );
-
-        // 6. Build context and create execution session
-        const branchName = determineBranchName(cloudAgentSessionId, input.upstreamBranch);
-        const context = sessionService.buildContext({
-          sandboxId,
-          orgId: input.kilocodeOrganizationId,
-          userId: ctx.userId,
-          sessionId: cloudAgentSessionId,
-          workspacePath,
-          sessionHome,
-          githubRepo: input.githubRepo,
-          githubToken: resolvedGithubToken, // Use resolved token (from input or generated from installation)
-          gitUrl: input.gitUrl,
-          gitToken: resolvedGitToken,
-          platform: input.platform,
-          upstreamBranch: input.upstreamBranch,
-          botId: ctx.botId,
-        });
-
-        logger.info('Creating execution session');
-        const sessionOptions = {
-          sandbox,
-          context,
-          env: ctx.env,
-          originalToken: ctx.authToken,
-          kilocodeModel: input.model,
-          originalOrgId: input.kilocodeOrganizationId,
-          createdOnPlatform: input.createdOnPlatform,
-          appendSystemPrompt: input.appendSystemPrompt,
-          profile: effective,
-        };
-        const runtimeEnv = sessionService.buildRuntimeEnv(sessionOptions);
-        const session = await sessionService.getOrCreateSession(sessionOptions);
-
-        // 7. Clone repository
-        const cloneOptions = input.shallow ? { shallow: true } : undefined;
-        logger.info('Cloning repository');
-        try {
-          if (input.gitUrl) {
-            await cloneGitRepo(
-              session,
-              workspacePath,
-              input.gitUrl,
-              resolvedGitToken,
-              undefined,
-              cloneOptions
-            );
-          } else if (input.githubRepo) {
-            await cloneGitHubRepo(
-              session,
-              workspacePath,
-              input.githubRepo,
-              resolvedGithubToken,
-              {
-                GITHUB_APP_SLUG: ctx.env.GITHUB_APP_SLUG,
-                GITHUB_APP_BOT_USER_ID: ctx.env.GITHUB_APP_BOT_USER_ID,
-              },
-              cloneOptions
-            );
-          } else {
-            throw new TRPCError({
-              code: 'BAD_REQUEST',
-              message: 'Either githubRepo or gitUrl must be provided',
-            });
-          }
-        } catch (error) {
-          if (error instanceof GitRepositoryNotFoundError) {
-            throw new TRPCError({ code: 'BAD_REQUEST', message: error.message });
-          }
-          throw error;
-        }
-
-        // 8. Branch management
-        logger
-          .withFields({ branchName, upstreamBranch: input.upstreamBranch })
-          .info('Managing branch');
-        try {
-          if (input.upstreamBranch) {
-            // For upstream branches, use manageBranch (verifies exists remotely)
-            await manageBranch(session, workspacePath, branchName, true);
-          } else {
-            // For session branches, create directly (can't exist remotely with UUID-based name)
-            const result = await session.exec(
-              `cd ${workspacePath} && git checkout -b '${branchName}'`
-            );
-            if (result.exitCode !== 0) {
-              throw new TRPCError({
-                code: 'INTERNAL_SERVER_ERROR',
-                message: `Failed to create branch ${branchName}: ${result.stderr || result.stdout}`,
-              });
-            }
-          }
-        } catch (error) {
-          if (error instanceof BranchNotFoundError) {
-            throw new TRPCError({ code: 'BAD_REQUEST', message: error.message });
-          }
-          throw error;
-        }
-
-        // 9. Run setup commands
-        if (effective.setupCommands && effective.setupCommands.length > 0) {
-          logger
-            .withFields({ count: effective.setupCommands.length })
-            .info('Running setup commands');
-          try {
-            await runSetupCommands(session, context, effective.setupCommands, true); // fail-fast
-          } catch (error) {
-            if (error instanceof SetupCommandFailedError) {
-              throw new TRPCError({ code: 'BAD_REQUEST', message: error.message });
-            }
-            throw error;
-          }
-        }
-
-        // 10. Write auth file for session ingest, plus global rules.
-        // (runtime skills were written by getOrCreateSession above)
-        await writeAuthFile(sandbox, sessionHome, ctx.authToken);
-        await writeGlobalRules(sandbox, sessionHome, cloudAgentSessionId);
-
-        // 11. Pre-import a minimal session so the wrapper starts with --session-id.
-        // This avoids the race condition where Session.Event.Created fires before
-        // KiloSessions.init() has registered its Bus.subscribe handler.
-        const kiloSessionId = generateKiloSessionId();
-        logger.setTags({ kiloSessionId });
-        logger.info('Pre-importing kilo session');
-        const now = Date.now();
-        const minimalSessionJson = JSON.stringify({
-          info: {
-            id: kiloSessionId,
-            slug: '',
-            projectID: '',
-            directory: '',
-            title: 'New session - ' + new Date(now).toISOString(),
-            version: '2',
-            time: { created: now, updated: now },
-          },
-          messages: [],
-        });
-        const importFilePath = `/tmp/kilo-empty-session-${kiloSessionId}.json`;
-        await sandbox.writeFile(importFilePath, minimalSessionJson);
-        const escapedFile = importFilePath.replaceAll("'", "'\\''");
-        const escapedId = kiloSessionId.replaceAll("'", "'\\''");
-        const escapedWorkspace = workspacePath.replaceAll("'", "'\\''");
-        const restoreResult = await session.exec(
-          `bun /usr/local/bin/kilo-restore-session.js --file '${escapedFile}' '${escapedId}' '${escapedWorkspace}'`,
-          { cwd: dirname(workspacePath) }
-        );
-        if (restoreResult.exitCode !== 0) {
-          const stdout = restoreResult.stdout?.trim() ?? '';
-          const stderr = restoreResult.stderr?.trim() ?? '';
-          logger
-            .withFields({ exitCode: restoreResult.exitCode, stdout, stderr })
-            .error('Pre-import of kilo session failed');
-          throw new TRPCError({
-            code: 'INTERNAL_SERVER_ERROR',
-            message: `Failed to pre-import kilo session (exit ${restoreResult.exitCode})`,
-          });
-        }
-        logger.info('Kilo session pre-imported');
-
-        // 12. Start wrapper with --session-id so no new session is created (no race)
-        logger.info('Starting wrapper');
-        const { client: _wrapperClient } = await WrapperClient.ensureWrapper(sandbox, session, {
-          agentSessionId: cloudAgentSessionId,
-          userId: ctx.userId,
-          workspacePath,
-          sessionId: kiloSessionId,
-          runtimeEnv,
-        });
-
-        logger.info('Wrapper started');
-
-        return { workspacePath, sessionHome, branchName, kiloSessionId };
+      return {
+        cloudAgentSessionId: result.cloudAgentSessionId,
+        kiloSessionId: result.kiloSessionId,
       };
-
-      let preparedWorkspace: Awaited<ReturnType<typeof prepareWorkspace>>;
-      try {
-        preparedWorkspace = await prepareWorkspace();
-      } catch (error) {
-        const preparationFailure = getPreparationInfrastructureFailure(error);
-        const sandboxInternalServerError = isSandboxInternalServerError(error);
-        const workspaceFilesystemPreparationFailure =
-          preparationFailure?.type === 'workspace_filesystem_preparation_error';
-        const failureCategory = classifyPrepareSessionWorkspaceFailure(
-          error,
-          sandboxInternalServerError,
-          workspaceFilesystemPreparationFailure
-        );
-        logger
-          .withFields({
-            error: prepareSessionErrorMessage(error),
-            failureCategory,
-            retryableSandboxInternalServerError: sandboxInternalServerError,
-            retryablePreparationInfrastructureFailure: preparationFailure !== undefined,
-            retryableWrapperReadinessFailure: isRetryableWrapperReadinessFailure(failureCategory),
-            sandboxKind: ctx.botId ? 'bot' : 'user',
-            logTag: 'prepare_session_workspace_preparation_failed',
-          })
-          .error('prepareSession workspace preparation failed');
-        await destroySandboxAfterPreparationInfrastructureFailure(
-          {
-            sandbox,
-            sandboxId,
-            sessionId: cloudAgentSessionId,
-            phase: 'prepareSession',
-          },
-          error
-        );
-        if (preparationFailure) {
-          throw new TRPCError({
-            code: 'INTERNAL_SERVER_ERROR',
-            message: preparationFailure.message,
-            cause: { error: 'sandbox_internal_server_error', retryable: true },
-          });
-        }
-        throw error;
-      }
-
-      const { workspacePath, sessionHome, branchName, kiloSessionId } = preparedWorkspace;
-
-      // 13. Create cli_sessions_v2 record via session-ingest RPC (blocking)
-      logger.info('Creating cli_sessions_v2 record via session-ingest');
-      try {
-        await sessionService.createCliSessionViaSessionIngest(
-          kiloSessionId,
-          cloudAgentSessionId,
-          ctx.userId,
-          ctx.env,
-          input.kilocodeOrganizationId,
-          input.createdOnPlatform ?? 'cloud-agent'
-        );
-      } catch (error) {
-        logger
-          .withFields({ error: error instanceof Error ? error.message : String(error) })
-          .error('Failed to create cli_sessions_v2 record');
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: `Failed to create session record: ${
-            error instanceof Error ? error.message : String(error)
-          }`,
-        });
-      }
-
-      const rollbackCliSession = async () => {
-        await sessionService
-          .deleteCliSessionViaSessionIngest(kiloSessionId, ctx.userId, ctx.env)
-          .catch((rollbackError: unknown) => {
-            logger
-              .withFields({
-                error:
-                  rollbackError instanceof Error ? rollbackError.message : String(rollbackError),
-              })
-              .error('Failed to rollback cli_sessions_v2 record');
-          });
-      };
-
-      // 14. Get DO stub and store metadata
-      const doId = ctx.env.CLOUD_AGENT_SESSION.idFromName(`${ctx.userId}:${cloudAgentSessionId}`);
-      const stub = ctx.env.CLOUD_AGENT_SESSION.get(doId);
-
-      let prepareResult: Awaited<ReturnType<typeof stub.prepare>>;
-      try {
-        prepareResult = await stub.prepare({
-          sessionId: cloudAgentSessionId,
-          userId: ctx.userId,
-          orgId: input.kilocodeOrganizationId,
-          botId: ctx.botId,
-          kiloSessionId,
-          prompt: input.prompt,
-          mode: input.mode,
-          model: input.model,
-          variant: input.variant,
-          kilocodeToken: ctx.authToken,
-          githubRepo: input.githubRepo,
-          githubToken: input.githubToken,
-          githubInstallationId: resolvedInstallationId,
-          githubAppType: resolvedGithubAppType,
-          gitUrl: input.gitUrl,
-          gitToken: resolvedGitToken,
-          platform: input.platform,
-          gitlabTokenManaged,
-          envVars: effective.envVars,
-          encryptedSecrets: effective.encryptedSecrets,
-          setupCommands: effective.setupCommands,
-          mcpServers: effective.mcpServers,
-          runtimeSkills: effective.runtimeSkills,
-          runtimeAgents: effective.runtimeAgents,
-          kiloCommands: effective.kiloCommands,
-          upstreamBranch: input.upstreamBranch,
-          autoCommit: input.autoCommit,
-          condenseOnComplete: input.condenseOnComplete,
-          appendSystemPrompt: input.appendSystemPrompt,
-          callbackTarget: input.callbackTarget,
-          images: input.images,
-          createdOnPlatform: input.createdOnPlatform,
-          gateThreshold: input.gateThreshold,
-          initialMessageId: input.initialMessageId,
-          initialPayload: input.initialPayload,
-          // Workspace metadata
-          workspacePath,
-          sessionHome,
-          branchName,
-          sandboxId,
-        });
-      } catch (error) {
-        logger
-          .withFields({ error: error instanceof Error ? error.message : String(error) })
-          .error('DO prepare() threw, rolling back cli_sessions_v2 record');
-        await rollbackCliSession();
-        throw error;
-      }
-
-      if (!prepareResult.success) {
-        logger.withFields({ error: prepareResult.error }).error('Failed to prepare session in DO');
-        await rollbackCliSession();
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: prepareResult.error ?? 'Failed to prepare session',
-        });
-      }
-
-      // 15. Record kilo server activity for idle timeout tracking
-      try {
-        await withDORetry(
-          () => ctx.env.CLOUD_AGENT_SESSION.get(doId),
-          s => s.recordKiloServerActivity(),
-          'recordKiloServerActivity'
-        );
-      } catch (error) {
-        // Non-fatal - log but continue
-        logger
-          .withFields({ error: error instanceof Error ? error.message : String(error) })
-          .warn('Failed to record kilo server activity');
-      }
-
-      logger.info('Session prepared successfully');
-
-      // 16. Return both IDs
-      return { cloudAgentSessionId, kiloSessionId };
     });
   });
 
 /**
  * Update a prepared (but not yet initiated) session.
  *
- * This allows modifying session configuration before initiation.
- * - undefined: skip field (no change)
- * - null: clear field
- * - value: set field to value
- * - For collections, empty array/object clears them
+ * Retained for `services/code-review-infra` which rewrites `callbackTarget`
+ * on session continuation. Not used by any apps/web flow.
  *
- * Protected by internal API authentication (x-internal-api-key header).
+ * Protected by internal API authentication.
  */
 const updateSessionHandler = internalApiProtectedProcedure
   .input(UpdateSessionInput)
@@ -897,52 +352,12 @@ const updateSessionHandler = internalApiProtectedProcedure
       });
       logger.info('Updating session');
 
-      // 1. Get DO stub
       const doId = ctx.env.CLOUD_AGENT_SESSION.idFromName(
         `${ctx.userId}:${input.cloudAgentSessionId}`
       );
       const stub = ctx.env.CLOUD_AGENT_SESSION.get(doId);
 
-      // 2. Build update object
-      const updates: Record<string, unknown> = {};
-
-      // Scalar fields - pass through as-is (undefined skips, null clears, value sets)
-      setUpdateValue(updates, 'mode', input.mode);
-      setUpdateValue(updates, 'model', input.model);
-      setUpdateValue(updates, 'variant', input.variant);
-      setUpdateValue(updates, 'githubToken', input.githubToken);
-      setUpdateValue(updates, 'gitToken', input.gitToken);
-      setUpdateValue(updates, 'upstreamBranch', input.upstreamBranch);
-      setUpdateValue(updates, 'autoCommit', input.autoCommit);
-      setUpdateValue(updates, 'condenseOnComplete', input.condenseOnComplete);
-      setUpdateValue(updates, 'appendSystemPrompt', input.appendSystemPrompt);
-      setUpdateValue(updates, 'callbackTarget', input.callbackTarget);
-
-      // Collection fields - empty = clear (converted to null for DO)
-      setCollectionUpdate(updates, 'envVars', input.envVars, value => {
-        return Object.keys(value).length === 0;
-      });
-      setCollectionUpdate(updates, 'encryptedSecrets', input.encryptedSecrets, value => {
-        return Object.keys(value).length === 0;
-      });
-      setCollectionUpdate(updates, 'setupCommands', input.setupCommands, value => {
-        return value.length === 0;
-      });
-      setCollectionUpdate(updates, 'mcpServers', input.mcpServers, value => {
-        return Object.keys(value).length === 0;
-      });
-      setCollectionUpdate(updates, 'runtimeSkills', input.runtimeSkills, value => {
-        return value.length === 0;
-      });
-      setCollectionUpdate(updates, 'runtimeAgents', input.runtimeAgents, value => {
-        return value.length === 0;
-      });
-      setCollectionUpdate(updates, 'kiloCommands', input.kiloCommands, value => {
-        return value.length === 0;
-      });
-
-      // 3. Call tryUpdate() on DO
-      const result = await stub.tryUpdate(updates);
+      const result = await stub.tryUpdate({ callbackTarget: input.callbackTarget });
 
       if (!result.success) {
         logger.withFields({ error: result.error }).error('Failed to update session');

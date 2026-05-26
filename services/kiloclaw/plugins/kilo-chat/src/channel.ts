@@ -1,8 +1,9 @@
-import { Type } from '@sinclair/typebox';
+import { readStringParam } from 'openclaw/plugin-sdk/agent-runtime';
 import {
   buildChannelOutboundSessionRoute,
   createChannelPluginBase,
   createChatChannelPlugin,
+  optionalStringEnum,
 } from 'openclaw/plugin-sdk/core';
 import type { ChannelMessageActionContext, OpenClawConfig } from 'openclaw/plugin-sdk/core';
 import { createKiloChatClient } from './client';
@@ -18,9 +19,10 @@ import { handleKiloChatCreateConversationAction } from './create-conversation-ac
 import { createKiloChatApprovalCapability } from './approval';
 import { getExecApprovalReplyMetadata } from 'openclaw/plugin-sdk/approval-reply-runtime';
 import { CHANNEL_APPROVAL_NATIVE_RUNTIME_CONTEXT_CAPABILITY } from 'openclaw/plugin-sdk/approval-handler-adapter-runtime';
-import { stripPrefix } from './action-schemas';
+import { resolveConversationId, stripPrefix } from './action-schemas';
 import {
   loadOutboundMedia,
+  sendKiloChatLoadedMediaMessage,
   sendKiloChatMediaMessage,
   type LoadedOutboundMedia,
 } from './media-delivery';
@@ -82,6 +84,87 @@ function inspectAccount(
   return { enabled, configured: enabled };
 }
 
+function readSendMediaHint(params: Record<string, unknown>): string | undefined {
+  return (
+    readStringParam(params, 'media', { trim: false }) ??
+    readStringParam(params, 'mediaUrl', { trim: false }) ??
+    readStringParam(params, 'path', { trim: false }) ??
+    readStringParam(params, 'filePath', { trim: false }) ??
+    readStringParam(params, 'fileUrl', { trim: false })
+  );
+}
+
+function decodeBase64Buffer(raw: string): Buffer {
+  const dataUrlMatch = /^data:([^;,]+)?;base64,(.*)$/is.exec(raw.trim());
+  const encoded = (dataUrlMatch ? dataUrlMatch[2] : raw).replace(/\s+/g, '');
+  const normalized = encoded.replace(/-/g, '+').replace(/_/g, '/');
+  if (!normalized || normalized.length % 4 === 1 || !/^[A-Za-z0-9+/]*={0,2}$/.test(normalized)) {
+    throw new Error('kilo-chat: buffer must be base64 encoded');
+  }
+  return Buffer.from(normalized, 'base64');
+}
+
+async function handleKiloChatSendAction(ctx: ChannelMessageActionContext): Promise<{
+  content: Array<{ type: 'text'; text: string }>;
+}> {
+  const client = makeClient();
+  const conversationId = resolveConversationId(ctx.params, ctx.toolContext);
+  const message = readStringParam(ctx.params, 'message', { allowEmpty: true }) ?? '';
+  const bufferParam =
+    readStringParam(ctx.params, 'buffer', { trim: false }) ??
+    readStringParam(ctx.params, 'base64', { trim: false });
+  const mediaHint = readSendMediaHint(ctx.params);
+
+  if (bufferParam) {
+    const media: LoadedOutboundMedia = {
+      buffer: decodeBase64Buffer(bufferParam),
+      contentType:
+        readStringParam(ctx.params, 'contentType') ??
+        readStringParam(ctx.params, 'mimeType') ??
+        'application/octet-stream',
+      fileName: readStringParam(ctx.params, 'filename'),
+    };
+    const { messageId } = await sendKiloChatLoadedMediaMessage({
+      client,
+      conversationId,
+      media,
+      caption: message,
+      inReplyToMessageId: readStringParam(ctx.params, 'replyTo') ?? undefined,
+      fetchImpl: __pluginInternals.fetchImpl,
+    });
+    return { content: [{ type: 'text', text: `Sent message ${messageId}` }] };
+  }
+
+  if (mediaHint) {
+    const { messageId } = await sendKiloChatMediaMessage({
+      client,
+      conversationId,
+      mediaUrl: mediaHint,
+      caption: message,
+      inReplyToMessageId: readStringParam(ctx.params, 'replyTo') ?? undefined,
+      mediaAccess: ctx.mediaAccess,
+      mediaLocalRoots: ctx.mediaLocalRoots,
+      mediaReadFile: ctx.mediaReadFile,
+      fetchImpl: __pluginInternals.fetchImpl,
+      loadMediaImpl: __pluginInternals.loadMediaImpl
+        ? mediaUrl => __pluginInternals.loadMediaImpl!(mediaUrl)
+        : loadOutboundMedia,
+    });
+    return { content: [{ type: 'text', text: `Sent message ${messageId}` }] };
+  }
+
+  if (!message) {
+    throw new Error('kilo-chat: message or media is required for send action');
+  }
+
+  const { messageId } = await client.createMessage({
+    conversationId,
+    content: [{ type: 'text', text: message }],
+    inReplyToMessageId: readStringParam(ctx.params, 'replyTo') ?? undefined,
+  });
+  return { content: [{ type: 'text', text: `Sent message ${messageId}` }] };
+}
+
 const pluginBase = createChannelPluginBase({
   id: CHANNEL_ID,
   meta: {
@@ -97,7 +180,9 @@ const pluginBase = createChannelPluginBase({
   agentPrompt: {
     messageToolHints: () => [
       '- Kilo Chat uses the shared `message` tool. Prefer `target` for explicit conversation destinations; omit it to act in the current conversation when supported.',
-      '- `send`: pass `message` plus `target`; `conversationId` and `groupId` are accepted compatibility aliases for the target conversation.',
+      '- `send`: pass `message` plus `target`; `conversationId` and `groupId` are accepted compatibility aliases. To send any attachment, pass base64 `buffer`, `filename`, and `contentType`, or pass a local workspace path with `filePath`/`media` and a caption in `message`.',
+      '- For generated text files or arbitrary local file types, prefer `send` with `filePath`/`media`, or `upload-file` with base64 `buffer`. Do not use `upload-file` with a local `filePath` for plain text or unknown file types.',
+      '- `upload-file`: use for direct file uploads when you already have base64 `buffer`, `filename`, and `contentType`; local `media`/`path`/`filePath` is best for images, audio, video, PDF, and Office documents.',
       '- Kilo Chat actions: `channel-list` lists conversations with optional `limit`; `channel-create` creates a conversation with optional `name`.',
       '- `read`: omit `target` for the current conversation, or pass `target`/`conversationId`; use `limit` and `before` for pagination.',
       '- `react`: pass `messageId` and the actual emoji in `emoji`; set `remove=true` to remove that emoji. If `messageId` is omitted, the current inbound message is used when available.',
@@ -194,6 +279,8 @@ export const kiloChatPlugin = createChatChannelPlugin<ResolvedKiloChatAccount>({
     actions: {
       describeMessageTool: () => ({
         actions: [
+          'send',
+          'upload-file',
           'react',
           'read',
           'member-info',
@@ -205,67 +292,10 @@ export const kiloChatPlugin = createChatChannelPlugin<ResolvedKiloChatAccount>({
         ] as const,
         schema: {
           properties: {
-            conversationId: Type.Optional(
-              Type.String({
-                description:
-                  'Kilo Chat conversation id. Prefer `target` for OpenClaw-native sends, but this is accepted as a compatibility alias for `send`, `read`, `react`, `edit`, `delete`, and `renameGroup` when not acting on the current conversation.',
-              })
-            ),
-            groupId: Type.Optional(
-              Type.String({
-                description:
-                  'Alias for `conversationId`. Accepted for `send`, `read`, `react`, `edit`, `delete`, and `renameGroup`; required for `renameGroup` if `conversationId` is omitted.',
-              })
-            ),
-            messageId: Type.Optional(
-              Type.String({
-                description:
-                  'Target Kilo Chat message id for `react`, `edit`, and `delete`. Defaults to the current inbound message when available.',
-              })
-            ),
-            message: Type.Optional(
-              Type.String({
-                description: 'Message body for `send` and replacement text for `edit`.',
-              })
-            ),
-            emoji: Type.Optional(
-              Type.String({
-                description: 'Actual emoji for `react`, for example 👍.',
-              })
-            ),
-            remove: Type.Optional(
-              Type.Boolean({
-                description: 'For `react`, remove the given emoji reaction instead of adding it.',
-              })
-            ),
-            name: Type.Optional(
-              Type.String({
-                description: 'Conversation title for `channel-create` or `renameGroup`.',
-              })
-            ),
-            limit: Type.Optional(
-              Type.Number({
-                description:
-                  'Maximum conversations or messages to return for `channel-list` or `read`.',
-              })
-            ),
-            before: Type.Optional(
-              Type.String({
-                description:
-                  'Pagination cursor for `read`; use the `nextCursor` returned by a previous read.',
-              })
-            ),
-            memberId: Type.Optional(
-              Type.String({
-                description:
-                  'Member/user id to inspect with `member-info`. Omit to list all members.',
-              })
-            ),
-            userId: Type.Optional(
-              Type.String({
-                description: 'Alias for `memberId` for `member-info`.',
-              })
-            ),
+            conversationId: optionalStringEnum([], {
+              description:
+                'Kilo Chat conversation id. Prefer `target` for OpenClaw-native sends, but this is accepted as a compatibility alias for `send`, `read`, `react`, `edit`, `delete`, and `renameGroup` when not acting on the current conversation.',
+            }),
           },
           visibility: 'current-channel' as const,
         },
@@ -275,6 +305,7 @@ export const kiloChatPlugin = createChatChannelPlugin<ResolvedKiloChatAccount>({
       // overwritten by the current conversation during tool normalization.
       messageActionTargetAliases: {
         send: { aliases: CONVERSATION_TARGET_ALIASES },
+        'upload-file': { aliases: CONVERSATION_TARGET_ALIASES },
         read: { aliases: CONVERSATION_TARGET_ALIASES },
         react: { aliases: CONVERSATION_TARGET_ALIASES },
         edit: { aliases: CONVERSATION_TARGET_ALIASES },
@@ -282,6 +313,8 @@ export const kiloChatPlugin = createChatChannelPlugin<ResolvedKiloChatAccount>({
         renameGroup: { aliases: CONVERSATION_TARGET_ALIASES },
       },
       supportsAction: ({ action }: { action: string }) =>
+        action === 'send' ||
+        action === 'upload-file' ||
         action === 'react' ||
         action === 'read' ||
         action === 'member-info' ||
@@ -292,6 +325,9 @@ export const kiloChatPlugin = createChatChannelPlugin<ResolvedKiloChatAccount>({
         action === 'channel-create',
       resolveExecutionMode: () => 'local' as const,
       handleAction: async (ctx: ChannelMessageActionContext) => {
+        if (ctx.action === 'send' || ctx.action === 'upload-file') {
+          return handleKiloChatSendAction(ctx);
+        }
         const client = makeClient();
         if (ctx.action === 'read') {
           return handleKiloChatReadAction({

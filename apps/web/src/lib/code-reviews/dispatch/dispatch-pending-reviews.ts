@@ -43,12 +43,22 @@ import {
   MAX_CONCURRENT_CODE_REVIEWS_PER_ORG,
   staleQueuedCodeReviewCutoffSql,
   staleRunningCodeReviewCutoffSql,
+  type PendingCodeReviewCreatedAtWindow,
 } from './dispatch-constants';
 
 export type DispatchResult = {
   dispatched: number;
   notDispatched: number;
   activeCount: number;
+};
+
+export type TryDispatchPendingReviewsOptions = {
+  /**
+   * When provided, restricts pending work selection to reviews whose
+   * `created_at` is inside the cron recovery window. Direct dispatch paths
+   * leave this unset, and stale queued recovery remains unaffected.
+   */
+  pendingCreatedAtWindow?: PendingCodeReviewCreatedAtWindow;
 };
 
 type ReservedReview = {
@@ -93,7 +103,10 @@ function ownerReviewCondition(owner: Owner) {
     : eq(cloud_agent_code_reviews.owned_by_user_id, owner.id);
 }
 
-async function reservePendingReviewsForDispatch(owner: Owner): Promise<ReviewReservationBatch> {
+async function reservePendingReviewsForDispatch(
+  owner: Owner,
+  options: TryDispatchPendingReviewsOptions = {}
+): Promise<ReviewReservationBatch> {
   return await db.transaction(async tx => {
     await tx.execute(
       sql`SELECT pg_advisory_xact_lock(hashtext(${`code-review-dispatch:${owner.type}:${owner.id}`}))`
@@ -101,6 +114,7 @@ async function reservePendingReviewsForDispatch(owner: Owner): Promise<ReviewRes
 
     const staleQueuedCutoff = staleQueuedCodeReviewCutoffSql();
     const staleRunningCutoff = staleRunningCodeReviewCutoffSql();
+    const { pendingCreatedAtWindow } = options;
     const ownerCondition = ownerReviewCondition(owner);
 
     const activeCountResult = await tx
@@ -128,7 +142,12 @@ async function reservePendingReviewsForDispatch(owner: Owner): Promise<ReviewRes
     const candidates = await tx
       .select()
       .from(cloud_agent_code_reviews)
-      .where(and(ownerCondition, reconsiderableCodeReviewWorkCondition(staleQueuedCutoff)))
+      .where(
+        and(
+          ownerCondition,
+          reconsiderableCodeReviewWorkCondition(staleQueuedCutoff, pendingCreatedAtWindow)
+        )
+      )
       .orderBy(
         sql`CASE WHEN ${cloud_agent_code_reviews.status} = 'pending' THEN 0 ELSE 1 END`,
         cloud_agent_code_reviews.created_at
@@ -159,7 +178,7 @@ async function reservePendingReviewsForDispatch(owner: Owner): Promise<ReviewRes
             cloud_agent_code_reviews.id,
             candidates.map(candidate => candidate.id)
           ),
-          reconsiderableCodeReviewWorkCondition(staleQueuedCutoff)
+          reconsiderableCodeReviewWorkCondition(staleQueuedCutoff, pendingCreatedAtWindow)
         )
       )
       .returning();
@@ -177,12 +196,20 @@ async function reservePendingReviewsForDispatch(owner: Owner): Promise<ReviewRes
 /**
  * Try to dispatch pending reviews for an owner.
  * Checks available slots and dispatches up to available capacity.
+ *
+ * The default unbounded behavior is intended for direct dispatch paths
+ * (webhook, status callbacks, manual retrigger). The cron drain passes
+ * `pendingCreatedAtWindow` so it only scans pending rows created inside the
+ * cron recovery window; stale queued recovery still runs independently.
  */
-export async function tryDispatchPendingReviews(owner: Owner): Promise<DispatchResult> {
+export async function tryDispatchPendingReviews(
+  owner: Owner,
+  options: TryDispatchPendingReviewsOptions = {}
+): Promise<DispatchResult> {
   try {
     logExceptInTest('[tryDispatchPendingReviews] Starting dispatch check', { owner });
 
-    const { activeCount, reservations } = await reservePendingReviewsForDispatch(owner);
+    const { activeCount, reservations } = await reservePendingReviewsForDispatch(owner, options);
 
     if (reservations.length === 0) {
       logExceptInTest('[tryDispatchPendingReviews] No reviews reserved', { owner, activeCount });

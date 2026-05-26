@@ -18,7 +18,7 @@ import {
   createConnectionManager,
   type ConnectionCallbacks,
 } from '../../../wrapper/src/connection.js';
-import { WrapperState, type JobContext } from '../../../wrapper/src/state.js';
+import { WrapperState, type SessionContext } from '../../../wrapper/src/state.js';
 import type { WrapperKiloClient } from '../../../wrapper/src/kilo-api.js';
 import { logToFile } from '../../../wrapper/src/utils.js';
 
@@ -91,10 +91,7 @@ class MockWebSocket {
   }
 }
 
-const createJobContext = (): JobContext => ({
-  executionId: 'exec_test',
-  sessionId: 'session_abc',
-  userId: 'user_xyz',
+const createSessionContext = (): SessionContext => ({
   kiloSessionId: 'kilo_sess_456',
   ingestUrl: 'wss://ingest.example.com/ingest',
   ingestToken: 'token_secret',
@@ -160,13 +157,9 @@ function createMockKiloClient(overrides?: Partial<WrapperKiloClient>): WrapperKi
     getNetworkWaits: vi.fn().mockResolvedValue([]),
     resumeNetworkWait: vi.fn().mockResolvedValue(true),
     generateCommitMessage: vi.fn().mockResolvedValue({ message: 'test commit' }),
-    sdkClient: {
-      event: {
-        subscribe: vi.fn().mockResolvedValue({
-          stream: createEventStream([]),
-        }),
-      },
-    } as unknown as WrapperKiloClient['sdkClient'],
+    subscribeEvents: vi.fn().mockResolvedValue({
+      stream: createEventStream([]),
+    }),
     serverUrl: 'http://127.0.0.1:0',
     ...overrides,
   };
@@ -199,7 +192,7 @@ describe('network resume', () => {
     vi.stubGlobal('WebSocket', MockWebSocket);
 
     state = new WrapperState();
-    state.startJob(createJobContext());
+    state.bindSession(createSessionContext());
     callbacks = createCallbacks();
   });
 
@@ -212,18 +205,14 @@ describe('network resume', () => {
     const resumeNetworkWait = vi.fn().mockResolvedValue(true);
     const kiloClient = createMockKiloClient({
       resumeNetworkWait,
-      sdkClient: {
-        event: {
-          subscribe: vi.fn().mockResolvedValue({
-            stream: createEventStream([
-              {
-                type: 'session.network.restored',
-                properties: { sessionID: 'kilo_sess_456', requestID: 'net_req_123' },
-              },
-            ]),
-          }),
-        },
-      } as unknown as WrapperKiloClient['sdkClient'],
+      subscribeEvents: vi.fn().mockResolvedValue({
+        stream: createEventStream([
+          {
+            type: 'session.network.restored',
+            properties: { sessionID: 'kilo_sess_456', requestID: 'net_req_123' },
+          },
+        ]),
+      }),
     });
 
     const manager = createConnectionManager(state, { kiloClient }, callbacks);
@@ -244,18 +233,14 @@ describe('network resume', () => {
     const resumeNetworkWait = vi.fn().mockResolvedValue(true);
     const kiloClient = createMockKiloClient({
       resumeNetworkWait,
-      sdkClient: {
-        event: {
-          subscribe: vi.fn().mockResolvedValue({
-            stream: createEventStream([
-              {
-                type: 'session.network.restored',
-                properties: { sessionID: 'child_sess_789', requestID: 'net_req_123' },
-              },
-            ]),
-          }),
-        },
-      } as unknown as WrapperKiloClient['sdkClient'],
+      subscribeEvents: vi.fn().mockResolvedValue({
+        stream: createEventStream([
+          {
+            type: 'session.network.restored',
+            properties: { sessionID: 'child_sess_789', requestID: 'net_req_123' },
+          },
+        ]),
+      }),
     });
 
     const manager = createConnectionManager(state, { kiloClient }, callbacks);
@@ -270,18 +255,14 @@ describe('network resume', () => {
     const resumeNetworkWait = vi.fn().mockRejectedValue(new Error('network wait disappeared'));
     const kiloClient = createMockKiloClient({
       resumeNetworkWait,
-      sdkClient: {
-        event: {
-          subscribe: vi.fn().mockResolvedValue({
-            stream: createEventStream([
-              {
-                type: 'session.network.restored',
-                properties: { sessionID: 'kilo_sess_456', requestID: 'net_req_123' },
-              },
-            ]),
-          }),
-        },
-      } as unknown as WrapperKiloClient['sdkClient'],
+      subscribeEvents: vi.fn().mockResolvedValue({
+        stream: createEventStream([
+          {
+            type: 'session.network.restored',
+            properties: { sessionID: 'kilo_sess_456', requestID: 'net_req_123' },
+          },
+        ]),
+      }),
     });
 
     const manager = createConnectionManager(state, { kiloClient }, callbacks);
@@ -295,7 +276,7 @@ describe('network resume', () => {
     );
   });
 
-  it('resumes restored network waits after the event subscription receives server.connected', async () => {
+  it('resumes restored network waits after the event subscription handshake', async () => {
     const resumeNetworkWait = vi.fn().mockResolvedValue(true);
     const eventStream = createDeferredFirstEventStream();
     const subscribe = vi.fn().mockResolvedValue({
@@ -317,19 +298,16 @@ describe('network resume', () => {
           restored: true,
         },
       ]),
-      sdkClient: {
-        event: {
-          subscribe,
-        },
-      } as unknown as WrapperKiloClient['sdkClient'],
+      subscribeEvents: subscribe,
     });
 
     const manager = createConnectionManager(state, { kiloClient }, callbacks);
     await openConnection(manager);
     await vi.advanceTimersByTimeAsync(0);
 
-    expect(manager.isConnected()).toBe(false);
-    expect(resumeNetworkWait).not.toHaveBeenCalled();
+    expect(manager.isConnected()).toBe(true);
+    expect(resumeNetworkWait).toHaveBeenCalledTimes(1);
+    expect(resumeNetworkWait).toHaveBeenCalledWith('net_req_restored');
 
     eventStream.emitFirstEvent({ type: 'server.connected' });
     await vi.advanceTimersByTimeAsync(0);
@@ -365,11 +343,7 @@ describe('network resume', () => {
     const kiloClient = createMockKiloClient({
       resumeNetworkWait,
       getNetworkWaits,
-      sdkClient: {
-        event: {
-          subscribe,
-        },
-      } as unknown as WrapperKiloClient['sdkClient'],
+      subscribeEvents: subscribe,
     });
 
     const manager = createConnectionManager(state, { kiloClient }, callbacks);

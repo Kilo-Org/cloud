@@ -42,6 +42,7 @@ import { signStreamTicket } from '@/lib/cloud-agent/stream-ticket';
 import { db } from '@/lib/drizzle';
 import { verifyUserOwnsSessionV2ByCloudAgentId } from '@/lib/cloud-agent/session-ownership';
 import { TRPCError } from '@trpc/server';
+import { generateMessageId } from '@/lib/cloud-agent-sdk/message-id';
 
 function buildTerminalUrl(params: {
   cloudAgentSessionId: string;
@@ -208,7 +209,10 @@ export const cloudAgentNextRouter = createTRPCRouter({
       // Tokens are refreshed inside cloud-agent-next (GitHub App installation
       // for GitHub, GIT_TOKEN_SERVICE for managed GitLab).
       try {
-        return await client.sendMessage(input);
+        return await client.sendMessage({
+          ...input,
+          messageId: input.messageId ?? generateMessageId(),
+        });
       } catch (error) {
         rethrowAsPaymentRequired(error);
         throw error;

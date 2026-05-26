@@ -128,19 +128,26 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           hasIntegration: false,
           hasPermissions: false,
           reauthorizeUrl: null,
+          authInvalidAt: integration?.auth_invalid_at ?? null,
+          authInvalidReason: integration?.auth_invalid_reason ?? null,
         };
       }
 
       const hasPermissions = hasSecurityReviewPermissions(integration);
+      // UI reauthorization state is intentionally time-invariant: once GitHub returns
+      // auth-invalid, keep prompting until a sync or install-refresh path clears the flag.
+      const hasEffectivePermissions = hasPermissions && !integration.auth_invalid_at;
 
       return {
         hasIntegration: true,
-        hasPermissions,
-        reauthorizeUrl: hasPermissions
+        hasPermissions: hasEffectivePermissions,
+        reauthorizeUrl: hasEffectivePermissions
           ? null
           : integration.platform_installation_id
             ? getReauthorizeUrl(integration.platform_installation_id)
             : null,
+        authInvalidAt: integration.auth_invalid_at,
+        authInvalidReason: integration.auth_invalid_reason,
       };
     },
 
@@ -475,6 +482,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
                 syncResult: {
                   synced: syncResult.synced,
                   errors: syncResult.errors,
+                  reauthRequired: syncResult.reauthRequired,
                 },
               };
             }
@@ -736,6 +744,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
             success: true,
             synced: result.synced,
             errors: result.errors,
+            reauthRequired: result.reauthRequired,
           };
         }
 
@@ -800,6 +809,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           success: true,
           synced: result.synced,
           errors: result.errors,
+          reauthRequired: result.reauthRequired,
         };
       },
     },

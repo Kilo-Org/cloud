@@ -4,7 +4,7 @@ import { Suspense } from 'react';
 import { StytchClient } from '@/components/auth/StytchClient';
 import { AnimatedLogo } from '@/components/AnimatedLogo';
 import BigLoader from '@/components/BigLoader';
-import { getUserFromAuthOrRedirect } from '@/lib/user.server';
+import { getUserFromAuthOrRedirect } from '@/lib/user/server';
 import { getStytchStatus, handleSignupPromotion, type SignupSource } from '@/lib/stytch';
 import { PageContainer } from '@/components/layouts/PageContainer';
 import { isValidCallbackPath } from '@/lib/getSignInCallbackUrl';

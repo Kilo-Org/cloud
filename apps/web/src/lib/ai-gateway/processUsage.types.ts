@@ -151,6 +151,30 @@ export type MicrodollarUsageContext = {
    * do not need to know about it.
    */
   clientRequestId?: string | null;
+  /**
+   * The exact `model_experiment_variant_version` row that served this request.
+   * Set only when an experiment was applied.
+   */
+  modelExperimentVariantVersionId?: string;
+  /** 'user' | 'machine' | 'ip' — recorded for reporting filters when an experiment was applied. */
+  modelExperimentAllocationSubject?: 'user' | 'machine' | 'ip';
+  /**
+   * Bounded (size-capped) capture of the canonical post-`transformRequest`
+   * upstream request body. Set only for experimented requests. Consumed
+   * by `persistExperimentAttribution` after the microdollar write.
+   */
+  experimentPromptCapture?: ExperimentPromptCapture;
+};
+
+/**
+ * Bounded prompt capture used by the experiment attribution path. The
+ * full serialized body is stored as a single content-addressed blob.
+ * `requestKind` records which upstream API shape it was serialized for.
+ */
+export type ExperimentPromptCapture = {
+  requestKind: 'chat_completions' | 'messages' | 'responses';
+  requestBodyContent: string;
+  wasTruncated: boolean;
 };
 
 export type CoreUsageWithMetaData = {

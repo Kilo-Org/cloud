@@ -16,13 +16,11 @@ import { ulid } from 'ulid';
 export type ExecutionId = `exc_${string}`;
 
 /**
- * Unique identifier for a preparation request.
- * Format: prep_<string>
+ * Union of IDs that can be used as an event source.
+ * Lazy-prep collapsed the former `PreparationId` branch, so only execution IDs
+ * remain; the alias is kept for callers that still read `EventSourceId`.
  */
-export type PreparationId = `prep_${string}`;
-
-/** Union of IDs that can be used as an event source */
-export type EventSourceId = ExecutionId | PreparationId;
+export type EventSourceId = ExecutionId;
 
 /**
  * Session identifier - supports both:
@@ -56,9 +54,6 @@ export const createLeaseId = (): LeaseId => `lease_${crypto.randomUUID()}`;
 
 /** Check if a string is a valid ExecutionId (exc_<ulid> format) */
 export const isExecutionId = (s: string): s is ExecutionId => s.startsWith('exc_');
-
-/** Check if a string is a valid PreparationId */
-export const isPreparationId = (s: string): s is PreparationId => s.startsWith('prep_');
 
 /** Check if a string is a valid SessionId (supports both sess_ and agent_ prefixes) */
 export const isSessionId = (s: string): s is SessionId =>

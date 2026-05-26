@@ -36,6 +36,16 @@ const isBillingAttemptError = sql`(
   OR ${cloud_agent_code_review_attempts.error_message} ILIKE '%Credits Required%'
 )`;
 
+const isModelNotFound = sql`(
+  ${cloud_agent_code_reviews.terminal_reason} = 'model_not_found'
+  OR ${cloud_agent_code_reviews.error_message} ILIKE '%model not found%'
+)`;
+
+const isModelNotFoundAttempt = sql`(
+  ${cloud_agent_code_review_attempts.terminal_reason} = 'model_not_found'
+  OR ${cloud_agent_code_review_attempts.error_message} ILIKE '%model not found%'
+)`;
+
 /**
  * SQL condition to exclude billing errors from failure metrics.
  * Uses COALESCE to handle NULL error_message (NULL NOT LIKE returns NULL, not TRUE).
@@ -51,6 +61,12 @@ const excludeBillingAttemptErrors = sql`COALESCE(${cloud_agent_code_review_attem
   AND COALESCE(${cloud_agent_code_review_attempts.error_message}, '') NOT ILIKE '%paid model%'
   AND COALESCE(${cloud_agent_code_review_attempts.error_message}, '') NOT ILIKE '%add credits%'
   AND COALESCE(${cloud_agent_code_review_attempts.error_message}, '') NOT ILIKE '%Credits Required%'`;
+
+const excludeModelNotFound = sql`COALESCE(${cloud_agent_code_reviews.terminal_reason}, '') <> 'model_not_found'
+  AND COALESCE(${cloud_agent_code_reviews.error_message}, '') NOT ILIKE '%model not found%'`;
+
+const excludeModelNotFoundAttempt = sql`COALESCE(${cloud_agent_code_review_attempts.terminal_reason}, '') <> 'model_not_found'
+  AND COALESCE(${cloud_agent_code_review_attempts.error_message}, '') NOT ILIKE '%model not found%'`;
 
 /**
  * Categorize error messages into high-level buckets via SQL CASE WHEN.
@@ -280,6 +296,12 @@ export const adminCodeReviewsRouter = createTRPCRouter({
       input.retryAccountingMode === 'all_attempts'
         ? excludeBillingAttemptErrors
         : excludeBillingErrors;
+    const excludeModelUnavailable =
+      input.retryAccountingMode === 'all_attempts'
+        ? excludeModelNotFoundAttempt
+        : excludeModelNotFound;
+    const modelUnavailable =
+      input.retryAccountingMode === 'all_attempts' ? isModelNotFoundAttempt : isModelNotFound;
     const durationStartedAt =
       input.retryAccountingMode === 'all_attempts'
         ? cloud_agent_code_review_attempts.started_at
@@ -308,8 +330,8 @@ export const adminCodeReviewsRouter = createTRPCRouter({
         total_reviews: sql<number>`COUNT(*)`,
         completed_count: sql<number>`COUNT(*) FILTER (WHERE ${statusTable.status} = 'completed')`,
         // Exclude billing errors from system failure count — they get their own KPI
-        failed_count: sql<number>`COUNT(*) FILTER (WHERE ${statusTable.status} = 'failed' AND ${excludeBilling})`,
-        cancelled_count: sql<number>`COUNT(*) FILTER (WHERE ${statusTable.status} = 'cancelled')`,
+        failed_count: sql<number>`COUNT(*) FILTER (WHERE ${statusTable.status} = 'failed' AND ${excludeBilling} AND ${excludeModelUnavailable})`,
+        cancelled_count: sql<number>`COUNT(*) FILTER (WHERE ${statusTable.status} = 'cancelled' OR (${statusTable.status} = 'failed' AND ${modelUnavailable}))`,
         interrupted_count: sql<number>`COUNT(*) FILTER (WHERE ${statusTable.status} = 'interrupted')`,
         in_progress_count: sql<number>`COUNT(*) FILTER (WHERE ${statusTable.status} IN ('pending', 'queued', 'running'))`,
         avg_duration_seconds: sql<number>`AVG(EXTRACT(EPOCH FROM (${durationCompletedAt}::timestamp - ${durationStartedAt}::timestamp))) FILTER (WHERE ${durationCompletedAt} IS NOT NULL AND ${durationStartedAt} IS NOT NULL)`,
@@ -392,6 +414,12 @@ export const adminCodeReviewsRouter = createTRPCRouter({
       input.retryAccountingMode === 'all_attempts'
         ? excludeBillingAttemptErrors
         : excludeBillingErrors;
+    const excludeModelUnavailable =
+      input.retryAccountingMode === 'all_attempts'
+        ? excludeModelNotFoundAttempt
+        : excludeModelNotFound;
+    const modelUnavailable =
+      input.retryAccountingMode === 'all_attempts' ? isModelNotFoundAttempt : isModelNotFound;
 
     const query = db
       .select({
@@ -399,8 +427,8 @@ export const adminCodeReviewsRouter = createTRPCRouter({
         total: sql<number>`COUNT(*)`,
         completed: sql<number>`COUNT(*) FILTER (WHERE ${statusTable.status} = 'completed')`,
         // Exclude billing errors from system failure count
-        failed: sql<number>`COUNT(*) FILTER (WHERE ${statusTable.status} = 'failed' AND ${excludeBilling})`,
-        cancelled: sql<number>`COUNT(*) FILTER (WHERE ${statusTable.status} = 'cancelled')`,
+        failed: sql<number>`COUNT(*) FILTER (WHERE ${statusTable.status} = 'failed' AND ${excludeBilling} AND ${excludeModelUnavailable})`,
+        cancelled: sql<number>`COUNT(*) FILTER (WHERE ${statusTable.status} = 'cancelled' OR (${statusTable.status} = 'failed' AND ${modelUnavailable}))`,
         interrupted: sql<number>`COUNT(*) FILTER (WHERE ${statusTable.status} = 'interrupted')`,
         in_progress: sql<number>`COUNT(*) FILTER (WHERE ${statusTable.status} IN ('pending', 'queued', 'running'))`,
         billing_errors: sql<number>`COUNT(*) FILTER (WHERE ${statusTable.status} = 'failed' AND ${billingError})`,
@@ -442,12 +470,16 @@ export const adminCodeReviewsRouter = createTRPCRouter({
         ? cloud_agent_code_review_attempts
         : cloud_agent_code_reviews;
 
+    const modelUnavailable =
+      input.retryAccountingMode === 'all_attempts' ? isModelNotFoundAttempt : isModelNotFound;
+
     const conditions = [
-      eq(statusTable.status, 'cancelled'),
+      sql`(${statusTable.status} = 'cancelled' OR (${statusTable.status} = 'failed' AND ${modelUnavailable}))`,
       ...buildBaseConditions(input),
     ] as SQL[];
 
     const cancellationReasonExpr = sql<string>`CASE
+      WHEN ${statusTable.terminal_reason} = 'model_not_found' OR ${statusTable.error_message} ILIKE '%model not found%' THEN 'Model no longer available'
       WHEN ${statusTable.terminal_reason} = 'superseded' OR ${statusTable.error_message} ILIKE '%superseded%' THEN 'Superseded by new commit'
       WHEN ${statusTable.error_message} ILIKE '%stream timeout%' THEN 'Stream timeout'
       WHEN ${statusTable.terminal_reason} = 'user_cancelled' OR ${statusTable.error_message} ILIKE '%cancelled%' OR ${statusTable.error_message} ILIKE '%canceled%' THEN 'Explicitly cancelled'
@@ -506,10 +538,15 @@ export const adminCodeReviewsRouter = createTRPCRouter({
       input.retryAccountingMode === 'all_attempts'
         ? excludeBillingAttemptErrors
         : excludeBillingErrors;
+    const excludeModelUnavailable =
+      input.retryAccountingMode === 'all_attempts'
+        ? excludeModelNotFoundAttempt
+        : excludeModelNotFound;
 
     const conditions = [
       eq(statusTable.status, 'failed'),
       excludeBilling,
+      excludeModelUnavailable,
       ...buildBaseConditions(input),
     ] as SQL[];
 
@@ -598,10 +635,15 @@ export const adminCodeReviewsRouter = createTRPCRouter({
       input.retryAccountingMode === 'all_attempts'
         ? excludeBillingAttemptErrors
         : excludeBillingErrors;
+    const excludeModelUnavailable =
+      input.retryAccountingMode === 'all_attempts'
+        ? excludeModelNotFoundAttempt
+        : excludeModelNotFound;
 
     const conditions = [
       eq(statusTable.status, 'failed'),
       excludeBilling,
+      excludeModelUnavailable,
       eq(
         sql`COALESCE(SUBSTRING(${errorMessageColumn} FROM 1 FOR 200), 'Unknown Error')`,
         errorMessage
@@ -682,6 +724,10 @@ export const adminCodeReviewsRouter = createTRPCRouter({
       input.retryAccountingMode === 'all_attempts'
         ? excludeBillingAttemptErrors
         : excludeBillingErrors;
+    const excludeModelUnavailable =
+      input.retryAccountingMode === 'all_attempts'
+        ? excludeModelNotFoundAttempt
+        : excludeModelNotFound;
     const waitCondition =
       input.retryAccountingMode === 'all_attempts'
         ? validAttemptStartedWaitCondition
@@ -696,7 +742,7 @@ export const adminCodeReviewsRouter = createTRPCRouter({
         count: sql<number>`COUNT(*)`,
         completed: sql<number>`COUNT(*) FILTER (WHERE ${statusTable.status} = 'completed')`,
         // Exclude billing errors from failed count
-        failed: sql<number>`COUNT(*) FILTER (WHERE ${statusTable.status} = 'failed' AND ${excludeBilling})`,
+        failed: sql<number>`COUNT(*) FILTER (WHERE ${statusTable.status} = 'failed' AND ${excludeBilling} AND ${excludeModelUnavailable})`,
         wait_started_count: sql<number>`COUNT(*) FILTER (WHERE ${waitCondition})`,
         avg_wait_seconds: sql<number>`AVG(${waitSeconds}) FILTER (WHERE ${waitCondition})`,
         p95_wait_seconds: sql<number>`percentile_cont(0.95) WITHIN GROUP (ORDER BY ${waitSeconds}) FILTER (WHERE ${waitCondition})`,

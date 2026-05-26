@@ -43,6 +43,7 @@ const forbiddenFreeModelIds: ReadonlySet<string> = new Set([
   'xiaomi/mimo-v2-pro:free',
   'z-ai/glm-4.5-air:free',
   'z-ai/glm-4.7:free',
+  'stepfun/step-3.5-flash:free',
   'z-ai/glm-5:free',
   claude_sonnet_clawsetup_model.public_id, // only usable through kilo-auto
 ]);

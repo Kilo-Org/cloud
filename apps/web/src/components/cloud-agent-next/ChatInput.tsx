@@ -505,7 +505,7 @@ export function ChatInput({
               <Paperclip className="h-4 w-4" />
             </UIButton>
           )}
-          {isStreaming ? (
+          {isStreaming && (
             <UIButton
               type="button"
               variant="destructive"
@@ -516,23 +516,22 @@ export function ChatInput({
             >
               <Square className="h-4 w-4" />
             </UIButton>
-          ) : (
-            <UIButton
-              type="button"
-              variant="primary"
-              size="icon"
-              onClick={handleSend}
-              disabled={
-                disabled ||
-                !value.trim() ||
-                value.length > CLOUD_AGENT_PROMPT_MAX_LENGTH ||
-                imageUpload.hasUploadingImages
-              }
-              className="h-8 w-8 rounded-lg"
-            >
-              <Send className="h-4 w-4" />
-            </UIButton>
           )}
+          <UIButton
+            type="button"
+            variant="primary"
+            size="icon"
+            onClick={handleSend}
+            disabled={
+              disabled ||
+              !value.trim() ||
+              value.length > CLOUD_AGENT_PROMPT_MAX_LENGTH ||
+              imageUpload.hasUploadingImages
+            }
+            className="h-8 w-8 rounded-lg"
+          >
+            <Send className="h-4 w-4" />
+          </UIButton>
         </div>
       </div>
     </div>

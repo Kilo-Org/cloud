@@ -30,6 +30,8 @@ const UPSERT_ACTIONS: ReadonlySet<string> = new Set([
   GITHUB_ACTION.EDITED,
   GITHUB_ACTION.SYNCHRONIZE,
   GITHUB_ACTION.CLOSED,
+  GITHUB_ACTION.READY_FOR_REVIEW,
+  GITHUB_ACTION.CONVERTED_TO_DRAFT,
 ]);
 
 // Actions that can change the review decision (push auto-dismisses reviews,
@@ -40,13 +42,14 @@ const REVIEW_DECISION_PENDING_ACTIONS: ReadonlySet<string> = new Set([
   GITHUB_ACTION.SYNCHRONIZE,
 ]);
 
-type PrState = 'open' | 'closed' | 'merged';
+type PrState = 'open' | 'closed' | 'merged' | 'draft';
 
 function derivePrState(pr: PullRequestPayload['pull_request'], action: string): PrState {
   if (action === GITHUB_ACTION.CLOSED) {
     return pr.merged === true ? 'merged' : 'closed';
   }
-  return pr.state === 'closed' ? 'closed' : 'open';
+  if (pr.state === 'closed') return 'closed';
+  return pr.draft === true ? 'draft' : 'open';
 }
 
 /**
@@ -147,10 +150,10 @@ export async function upsertCliSessionPullRequestsFromWebhook(
         ? sql`excluded.pr_state`
         : sql`CASE
             WHEN ${github_branch_pull_requests.pr_state} = 'merged'
-              AND excluded.pr_state IN ('open', 'closed')
+              AND excluded.pr_state IN ('open', 'closed', 'draft')
             THEN ${github_branch_pull_requests.pr_state}
             WHEN ${github_branch_pull_requests.pr_state} = 'closed'
-              AND excluded.pr_state = 'open'
+              AND excluded.pr_state IN ('open', 'draft')
             THEN ${github_branch_pull_requests.pr_state}
             ELSE excluded.pr_state
           END`;

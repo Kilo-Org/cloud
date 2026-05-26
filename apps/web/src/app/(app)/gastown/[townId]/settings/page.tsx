@@ -1,4 +1,4 @@
-import { getUserFromAuthOrRedirect } from '@/lib/user.server';
+import { getUserFromAuthOrRedirect } from '@/lib/user/server';
 import { notFound } from 'next/navigation';
 import { isGastownEnabled } from '@/lib/gastown/feature-flags';
 import { TownSettingsPageClient } from './TownSettingsPageClient';

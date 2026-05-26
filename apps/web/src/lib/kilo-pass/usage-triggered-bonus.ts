@@ -235,6 +235,7 @@ async function maybeIssueBonusFromUsageThreshold(
       inArray(kilo_pass_issuance_items.kind, [
         KiloPassIssuanceItemKind.Bonus,
         KiloPassIssuanceItemKind.PromoFirstMonth50Pct,
+        KiloPassIssuanceItemKind.ReferralBonus,
       ])
     ),
   });

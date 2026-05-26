@@ -18,16 +18,19 @@ import type {
 } from '@/lib/ai-gateway/providers/openrouter/types';
 import { applyProviderSpecificLogic } from '@/lib/ai-gateway/providers/apply-provider-specific-logic';
 import { getProvider } from '@/lib/ai-gateway/providers/get-provider';
+import { buildExperimentPromptCapture } from '@/lib/ai-gateway/experiments/persist';
+import { isPublicIdExperimented } from '@/lib/ai-gateway/experiments/membership';
 import { upstreamRequest } from '@/lib/ai-gateway/providers/upstream-request';
 import { debugSaveProxyRequest } from '@/lib/debugUtils';
 import { setTag, startInactiveSpan } from '@sentry/nextjs';
-import { getUserFromAuth } from '@/lib/user.server';
+import { getUserFromAuth } from '@/lib/user/server';
 import { sentryRootSpan } from '@/lib/getRootSpan';
 import {
   isDeadFreeModel,
   isExcludedForFeature,
   isKiloExclusiveFreeModel,
   isKiloStealthModel,
+  requiresKiloDataCollection,
 } from '@/lib/ai-gateway/models';
 import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
 import {
@@ -42,6 +45,7 @@ import {
   malformedJsonResponse,
   makeErrorReadable,
   modelDoesNotExistResponse,
+  modelNotAllowedResponse,
   extractHeaderAndLimitLength,
   noFreeModelsAvailableResponse,
   temporarilyUnavailableResponse,
@@ -275,7 +279,9 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   // per user when the request comes from Cloudflare IPs (Kilo infrastructure).
   // All other products rate-limit per IP (fast pre-auth path).
   const isRateLimitedFreeModelRequest =
-    isKiloExclusiveFreeModel(originalModelIdLowerCased) || autoModel === KILO_AUTO_FREE_MODEL.id;
+    isKiloExclusiveFreeModel(originalModelIdLowerCased) ||
+    autoModel === KILO_AUTO_FREE_MODEL.id ||
+    (await isPublicIdExperimented(originalModelIdLowerCased));
   if (isRateLimitedFreeModelRequest) {
     const rateLimit = await resolveRateLimit(feature, ipAddress, authPromise);
     if (rateLimit instanceof NextResponse) return rateLimit;
@@ -385,14 +391,38 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     user,
     organizationId,
     taskId,
+    clientIp: ipAddress ?? null,
+    machineId: machineIdHeader,
   });
   if (providerResult.kind === 'not-found') {
+    // Paused experiment for this public id — return a local model-unavailable
+    // response instead of silently falling through to default routing.
     return modelDoesNotExistResponse();
   }
   if (providerResult.kind === 'unavailable') {
     return temporarilyUnavailableResponse();
   }
-  const { provider, userByok, bypassAccessCheck } = providerResult;
+  const {
+    provider,
+    userByok,
+    bypassAccessCheck,
+    skipProviderPin,
+    skipKiloExclusiveModelSettings,
+    experiment,
+  } = providerResult;
+
+  // Request-level data-collection opt-out: a caller can set
+  // `provider.data_collection: 'deny'` or `provider.zdr: true` on any
+  // request to opt that single request out of training/data-retention.
+  // Direct experiment upstreams ignore those OpenRouter/Vercel flags
+  // (we never reach OpenRouter), but we still capture the prompt to R2
+  // for partner evaluation — which violates the caller's stated
+  // intent. Refuse here regardless of org settings, anon/BYOK status,
+  // or the org-level check below.
+  if (experiment && !isFreePromptTrainingAllowed(requestBodyParsed.body.provider)) {
+    return dataCollectionRequiredResponse();
+  }
+
   if (!provider.supportedChatApis.includes(requestBodyParsed.kind)) {
     return apiKindNotSupportedResponse(
       requestBodyParsed.kind,
@@ -482,9 +512,36 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     });
     if (modelRestrictionError) return modelRestrictionError;
 
-    if (providerConfig) {
+    // Experiment traffic captures prompts to R2 for partner evaluation, which
+    // is a form of data collection that the gateway-pinned `data_collection`
+    // setting cannot enforce on a direct partner upstream. If the org has
+    // explicitly disabled data collection, refuse the experimented public id
+    // here rather than routing through and silently capturing prompts.
+    if (experiment && settings?.data_collection === 'deny') {
+      return dataCollectionRequiredResponse();
+    }
+
+    // Enterprise `provider_allow_list` is enforced via OpenRouter's
+    // `body.provider.only` field, which doesn't reach a direct partner
+    // upstream. Refuse the experimented public id rather than routing
+    // around the org's allow-list.
+    if (experiment && providerConfig?.only !== undefined) {
+      return modelNotAllowedResponse();
+    }
+
+    // Direct experiment upstreams must not have a Vercel/OpenRouter
+    // provider config pinned onto them — the partner endpoint is selected
+    // by the variant version.
+    if (providerConfig && !skipProviderPin) {
       requestBodyParsed.body.provider = providerConfig;
     }
+  }
+
+  if (experiment) {
+    usageContext.modelExperimentVariantVersionId = experiment.variantVersionId;
+    usageContext.modelExperimentAllocationSubject = experiment.allocationSubject;
+    // Cost zeroing for experiment traffic is handled by `isFreeModel`, which
+    // returns true for experimented public ids.
   }
 
   sentryRootSpan()?.setAttribute(
@@ -498,7 +555,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   });
 
   if (
-    isKiloExclusiveFreeModel(originalModelIdLowerCased) &&
+    requiresKiloDataCollection(originalModelIdLowerCased) &&
     !isFreePromptTrainingAllowed(requestBodyParsed.body.provider)
   ) {
     return dataCollectionRequiredResponse();
@@ -534,8 +591,17 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     requestBodyParsed,
     extraHeaders,
     userByok,
-    fraudHeaders
+    fraudHeaders,
+    { skipKiloExclusiveModelSettings: skipKiloExclusiveModelSettings === true }
   );
+
+  // Capture the bounded prompt for experimented requests AFTER provider
+  // transforms have produced the canonical upstream body. Stored on the
+  // usage context so the async `after()` hook can persist it without
+  // retaining a reference to the full uncapped body.
+  if (experiment) {
+    usageContext.experimentPromptCapture = buildExperimentPromptCapture(requestBodyParsed);
+  }
 
   const response = await upstreamRequest({
     path,

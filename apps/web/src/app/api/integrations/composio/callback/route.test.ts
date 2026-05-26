@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, test } from '@jest/globals';
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserFromAuth } from '@/lib/user.server';
+import { getUserFromAuth } from '@/lib/user/server';
 import { getActiveInstance, getActiveOrgInstance } from '@/lib/kiloclaw/instance-registry';
 import { completeManagedComposioGoogleCalendarConnection } from '@/lib/kiloclaw/composio-onboarding';
 import { withKiloclawProvisionContextLock } from '@/lib/kiloclaw/provision-lock';
 import { failureResult } from '@/lib/maybe-result';
 
-jest.mock('@/lib/user.server');
+jest.mock('@/lib/user/server');
 jest.mock('@/lib/kiloclaw/instance-registry');
 jest.mock('@/lib/kiloclaw/composio-onboarding');
 jest.mock('@/lib/kiloclaw/provision-lock', () => ({

@@ -38,11 +38,10 @@ export function inferSupportedChatApis(
  * Plain in-memory shape: an `ExperimentUpstream` (no key) merged with the
  * decrypted partner-issued api key.
  *
- * The cache loader (`getRoutingExperimentForPublicId`) decrypts
- * `model_experiment_variant_version.encrypted_api_key` once and stores the
- * resulting plaintext alongside the rest of the upstream blob in this shape
- * for hot-path use. The plaintext NEVER touches Postgres or any tRPC
- * response — only this in-memory record and the per-public-id Redis cache.
+ * `pickModelExperimentVariant` decrypts the chosen
+ * `model_experiment_variant_version.encrypted_api_key` and merges the
+ * plaintext with the upstream blob for the outbound provider request. The
+ * plaintext NEVER touches Postgres, Redis, or any tRPC response.
  */
 export type ResolvedExperimentUpstream = ExperimentUpstream & { api_key: string };
 

@@ -10,6 +10,12 @@ export type ImageDownloadResult = {
   errors: string[];
 };
 
+export type PresignedImageAttachment = {
+  filename: string;
+  signedUrl: string;
+  localPath: string;
+};
+
 const MESSAGE_UUID_REGEX =
   /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 const IMAGE_FILENAME_REGEX =
@@ -131,6 +137,34 @@ export async function downloadImagesToSandbox(
     .info('Image download complete');
 
   return { localPaths, errors };
+}
+
+export async function buildPresignedImageAttachments(
+  r2Client: R2Client,
+  bucketName: string,
+  sessionId: string,
+  userId: string,
+  service: AttachmentService,
+  images: NonNullable<Images>
+): Promise<PresignedImageAttachment[]> {
+  validateImages(images);
+
+  const { path: messageUuid, files } = images;
+  const r2Prefix = `${userId}/${service}/${messageUuid}`;
+  const sanitizedUserId = userId.replace(/[^a-zA-Z0-9-_]/g, '-');
+  const tmpDir = `/tmp/attachments/${shellQuoteSegment(sessionId)}/${sanitizedUserId}/${messageUuid}`;
+
+  const attachments: PresignedImageAttachment[] = [];
+  for (const filename of files) {
+    const r2Key = `${r2Prefix}/${filename}`;
+    attachments.push({
+      filename,
+      signedUrl: await r2Client.getSignedURL(bucketName, r2Key),
+      localPath: `${tmpDir}/${filename}`,
+    });
+  }
+
+  return attachments;
 }
 
 /**

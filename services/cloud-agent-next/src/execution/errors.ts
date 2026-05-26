@@ -2,7 +2,6 @@
  * Execution error types and error codes.
  *
  * These errors are surfaced to clients via HTTP status codes:
- * - 409 Conflict: EXECUTION_IN_PROGRESS
  * - 503 Service Unavailable: Retryable errors (sandbox, workspace, server, wrapper)
  * - 4xx/5xx: Non-retryable errors
  */
@@ -18,11 +17,6 @@ export type RetryableErrorCode =
   | 'WRAPPER_START_FAILED'; // Wrapper process starting
 
 /**
- * Error codes for conflict errors (409).
- */
-export type ConflictErrorCode = 'EXECUTION_IN_PROGRESS';
-
-/**
  * Error codes for non-retryable failures (4xx/5xx).
  */
 export type PermanentErrorCode =
@@ -33,7 +27,7 @@ export type PermanentErrorCode =
 /**
  * All possible execution error codes.
  */
-export type ExecutionErrorCode = RetryableErrorCode | ConflictErrorCode | PermanentErrorCode;
+export type ExecutionErrorCode = RetryableErrorCode | PermanentErrorCode;
 
 /**
  * Options for creating an ExecutionError.
@@ -41,8 +35,6 @@ export type ExecutionErrorCode = RetryableErrorCode | ConflictErrorCode | Perman
 export type ExecutionErrorOptions = {
   /** Whether the error is retryable (affects HTTP status code mapping) */
   retryable: boolean;
-  /** For EXECUTION_IN_PROGRESS, the ID of the active execution */
-  activeExecutionId?: string;
   /** Original error that caused this (for logging/debugging) */
   cause?: unknown;
 };
@@ -54,14 +46,12 @@ export type ExecutionErrorOptions = {
 export class ExecutionError extends Error {
   readonly code: ExecutionErrorCode;
   readonly retryable: boolean;
-  readonly activeExecutionId?: string;
 
   constructor(code: ExecutionErrorCode, message: string, options: ExecutionErrorOptions) {
     super(message, { cause: options.cause });
     this.name = 'ExecutionError';
     this.code = code;
     this.retryable = options.retryable;
-    this.activeExecutionId = options.activeExecutionId;
   }
 
   /**
@@ -90,17 +80,6 @@ export class ExecutionError extends Error {
    */
   static wrapperStartFailed(message: string, cause?: unknown): ExecutionError {
     return new ExecutionError('WRAPPER_START_FAILED', message, { retryable: true, cause });
-  }
-
-  /**
-   * Create a conflict error when execution is already in progress.
-   */
-  static executionInProgress(activeExecutionId: string): ExecutionError {
-    return new ExecutionError(
-      'EXECUTION_IN_PROGRESS',
-      `Execution ${activeExecutionId} is in progress`,
-      { retryable: false, activeExecutionId }
-    );
   }
 
   /**

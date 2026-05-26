@@ -7,11 +7,10 @@
 import { Octokit } from '@octokit/rest';
 import { generateGitHubInstallationToken } from '@/lib/integrations/platforms/github/adapter';
 import type { DependabotAlertRaw, DependabotAlertState } from '../core/types';
-import { sentryLogger } from '@/lib/utils.server';
+import { errorExceptInTest, sentryLogger, warnExceptInTest } from '@/lib/utils.server';
 
 const log = sentryLogger('security-agent:dependabot-api', 'info');
 const warn = sentryLogger('security-agent:dependabot-api', 'warning');
-const logError = sentryLogger('security-agent:dependabot-api', 'error');
 
 /**
  * Dependabot alert from GitHub API
@@ -109,9 +108,14 @@ export type FetchAlertsResult =
   | { status: 'success'; alerts: DependabotAlertRaw[] }
   | { status: 'repo_not_found' }
   | { status: 'alerts_disabled' }
-  | { status: 'access_blocked' };
+  | { status: 'access_blocked' }
+  | { status: 'auth_invalid' };
 
-type FetchAlertsSkipStatus = 'repo_not_found' | 'alerts_disabled' | 'access_blocked';
+type FetchAlertsSkipStatus =
+  | 'repo_not_found'
+  | 'alerts_disabled'
+  | 'access_blocked'
+  | 'auth_invalid';
 
 // Permanent repo-level settings — safe to skip without blocking freshness.
 const DEPENDABOT_DISABLED_HINTS = [
@@ -134,10 +138,14 @@ function matchesAnyHint(message: string | undefined, hints: readonly string[]): 
   return hints.some(hint => normalized.includes(hint));
 }
 
-function classifyFetchAlertsError(
+export function classifyFetchAlertsError(
   httpStatus?: number,
   message?: string
 ): FetchAlertsSkipStatus | null {
+  if (httpStatus === 401) {
+    return 'auth_invalid';
+  }
+
   if (httpStatus === 404) {
     return 'repo_not_found';
   }
@@ -217,6 +225,14 @@ export async function fetchAllDependabotAlerts(
     const message = (error as { message?: string }).message;
     const skipStatus = classifyFetchAlertsError(httpStatus, message);
 
+    if (skipStatus === 'auth_invalid') {
+      warnExceptInTest(`GitHub App installation auth invalid for ${owner}/${repo}, skipping`, {
+        status: httpStatus,
+        message,
+      });
+      return { status: 'auth_invalid' };
+    }
+
     if (skipStatus === 'alerts_disabled') {
       warn(`Dependabot alerts are disabled for ${owner}/${repo}, skipping`, {
         status: httpStatus,
@@ -240,7 +256,7 @@ export async function fetchAllDependabotAlerts(
       return { status: 'repo_not_found' };
     }
 
-    logError(`Error fetching alerts for ${owner}/${repo}`, {
+    errorExceptInTest(`Error fetching alerts for ${owner}/${repo}`, {
       status: httpStatus,
       message,
       durationMs: apiDurationMs,
@@ -258,19 +274,42 @@ export async function fetchOpenDependabotAlerts(
   installationId: string,
   owner: string,
   repo: string
-): Promise<DependabotAlertRaw[]> {
+): Promise<FetchAlertsResult> {
   const tokenData = await generateGitHubInstallationToken(installationId);
   const octokit = new Octokit({ auth: tokenData.token });
 
-  // Use Octokit's paginate helper which handles cursor-based pagination automatically
-  const data = await octokit.paginate(octokit.rest.dependabot.listAlertsForRepo, {
-    owner,
-    repo,
-    state: 'open',
-    per_page: 100,
-  });
+  try {
+    // Use Octokit's paginate helper which handles cursor-based pagination automatically
+    const data = await octokit.paginate(octokit.rest.dependabot.listAlertsForRepo, {
+      owner,
+      repo,
+      state: 'open',
+      per_page: 100,
+    });
 
-  return data.map(alert => toInternalAlert(alert as unknown as GitHubDependabotAlert));
+    return {
+      status: 'success',
+      alerts: data.map(alert => toInternalAlert(alert as unknown as GitHubDependabotAlert)),
+    };
+  } catch (error) {
+    const httpStatus = (error as { status?: number }).status;
+    const message = (error as { message?: string }).message;
+    const skipStatus = classifyFetchAlertsError(httpStatus, message);
+
+    if (skipStatus === 'auth_invalid') {
+      warnExceptInTest(`GitHub App installation auth invalid for ${owner}/${repo}, skipping`, {
+        status: httpStatus,
+        message,
+      });
+      return { status: 'auth_invalid' };
+    }
+
+    if (skipStatus) {
+      return { status: skipStatus };
+    }
+
+    throw error;
+  }
 }
 
 /**
@@ -294,8 +333,16 @@ export async function fetchDependabotAlert(
 
     return toInternalAlert(data as unknown as GitHubDependabotAlert);
   } catch (error) {
+    const status = (error as { status?: number }).status;
+    if (status === 401) {
+      warnExceptInTest(`GitHub App installation auth invalid for ${owner}/${repo}, skipping`, {
+        status,
+      });
+      return null;
+    }
+
     // Return null if alert not found
-    if ((error as { status?: number }).status === 404) {
+    if (status === 404) {
       return null;
     }
     throw error;
@@ -365,8 +412,15 @@ export async function isDependabotEnabled(
     });
     return true;
   } catch (error) {
-    // 403 or 404 typically means Dependabot is not enabled or no access
+    // 401 means the GitHub App installation needs reauthorization.
+    // 403 or 404 typically means Dependabot is not enabled or no access.
     const status = (error as { status?: number }).status;
+    if (status === 401) {
+      warnExceptInTest(`GitHub App installation auth invalid for ${owner}/${repo}, skipping`, {
+        status,
+      });
+      return false;
+    }
     if (status === 403 || status === 404) {
       return false;
     }

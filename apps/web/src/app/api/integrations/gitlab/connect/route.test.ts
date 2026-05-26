@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, test } from '@jest/globals';
 import { NextRequest } from 'next/server';
-import { getUserFromAuth } from '@/lib/user.server';
+import { getUserFromAuth } from '@/lib/user/server';
 import { buildGitLabOAuthUrl } from '@/lib/integrations/platforms/gitlab/adapter';
 import { createGitLabOAuthState } from '@/lib/integrations/platforms/gitlab/oauth-state';
 import { storeGitLabOAuthCredentials } from '@/lib/integrations/platforms/gitlab/oauth-credentials';
 
-jest.mock('@/lib/user.server');
+jest.mock('@/lib/user/server');
 jest.mock('@/routers/organizations/utils', () => ({
   ensureOrganizationAccess: jest.fn(),
 }));

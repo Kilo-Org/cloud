@@ -4,6 +4,7 @@ import { db, readDb } from '@/lib/drizzle';
 import { getKiloPassStateForUser, type KiloPassSubscriptionState } from '@/lib/kilo-pass/state';
 import { client as stripe } from '@/lib/stripe-client';
 import { getStripePriceIdForKiloPass } from '@/lib/kilo-pass/stripe-price-ids.server';
+import { getAffiliateAttribution } from '@/lib/affiliate-attribution';
 import { APP_URL } from '@/lib/constants';
 import { TRPCError } from '@trpc/server';
 import {
@@ -67,6 +68,7 @@ const KiloPassCreditHistoryEntrySchema = z.object({
     KiloPassIssuanceItemKind.Base,
     KiloPassIssuanceItemKind.Bonus,
     KiloPassIssuanceItemKind.PromoFirstMonth50Pct,
+    KiloPassIssuanceItemKind.ReferralBonus,
   ]),
   description: z.string(),
 });
@@ -387,6 +389,7 @@ async function getIsBonusUnlockedForSubscriptionId(subscriptionId: string): Prom
       inArray(kilo_pass_issuance_items.kind, [
         KiloPassIssuanceItemKind.Bonus,
         KiloPassIssuanceItemKind.PromoFirstMonth50Pct,
+        KiloPassIssuanceItemKind.ReferralBonus,
       ])
     ),
   });
@@ -1513,6 +1516,14 @@ export const kiloPassRouter = createTRPCRouter({
       }
 
       const priceId = getStripePriceIdForKiloPass({ tier, cadence });
+      const attribution = await getAffiliateAttribution(ctx.user.id, 'impact');
+      const sessionMetadata = {
+        type: 'kilo-pass',
+        kiloUserId: ctx.user.id,
+        tier,
+        cadence,
+        affiliateTrackingId: attribution?.tracking_id ?? '',
+      };
 
       const session = await stripe.checkout.sessions.create({
         mode: 'subscription',
@@ -1531,19 +1542,9 @@ export const kiloPassRouter = createTRPCRouter({
         success_url: `${APP_URL}/payments/kilo-pass/awarding?session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${APP_URL}/profile?kilo_pass_checkout=cancelled`,
         subscription_data: {
-          metadata: {
-            type: 'kilo-pass',
-            kiloUserId: ctx.user.id,
-            tier,
-            cadence,
-          },
+          metadata: sessionMetadata,
         },
-        metadata: {
-          type: 'kilo-pass',
-          kiloUserId: ctx.user.id,
-          tier,
-          cadence,
-        },
+        metadata: sessionMetadata,
       });
 
       return { url: typeof session.url === 'string' ? session.url : null };

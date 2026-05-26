@@ -1,5 +1,6 @@
 import type { WorkerDb } from '@kilocode/db/client';
 import { model_eval_ingestions, modelStats } from '@kilocode/db/schema';
+import { unprefixKiloGatewayModelId } from '@kilocode/worker-utils/kilo-model-id';
 import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import {
   PromotionRecordSchema,
@@ -44,6 +45,11 @@ export type PromotionStore = {
   writeKiloBenchBenchmarks(modelStatsId: string, benchmarks: KiloBenchBenchmarks): Promise<void>;
 };
 
+function modelStatsTargetCandidates(model: string): string[] {
+  const unprefixedModel = unprefixKiloGatewayModelId(model);
+  return unprefixedModel ? [model, unprefixedModel] : [model];
+}
+
 export function createPromotionStore(db: WorkerDb): PromotionStore {
   return {
     async getLatestPromotedAtMs(): Promise<number> {
@@ -57,14 +63,31 @@ export function createPromotionStore(db: WorkerDb): PromotionStore {
     },
 
     async findModelStatsTargets(models: string[]): Promise<Map<string, ModelStatsTarget>> {
-      if (models.length === 0) return new Map();
+      const promotionModels = [...new Set(models)];
+      if (promotionModels.length === 0) return new Map();
+
+      const lookupModels = new Set<string>();
+      for (const model of promotionModels) {
+        for (const candidate of modelStatsTargetCandidates(model)) lookupModels.add(candidate);
+      }
 
       const targets = await db
         .select({ id: modelStats.id, model: modelStats.openrouterId })
         .from(modelStats)
-        .where(inArray(modelStats.openrouterId, models));
+        .where(inArray(modelStats.openrouterId, [...lookupModels]));
+      const targetsByModel = new Map(targets.map(target => [target.model, target]));
+      const resolvedTargets = new Map<string, ModelStatsTarget>();
 
-      return new Map(targets.map(target => [target.model, target]));
+      for (const model of promotionModels) {
+        for (const candidate of modelStatsTargetCandidates(model)) {
+          const target = targetsByModel.get(candidate);
+          if (!target) continue;
+          resolvedTargets.set(model, target);
+          break;
+        }
+      }
+
+      return resolvedTargets;
     },
 
     async insertPromotions(promotions: PromotionInsert[]): Promise<Set<string>> {

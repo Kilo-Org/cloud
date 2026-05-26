@@ -8,7 +8,7 @@ import type {
 } from '@kilocode/db/schema';
 import type { describePaymentMethods } from '@/lib/admin-utils-serverside';
 import { OrganizationSchema } from '@/lib/organizations/organization-types';
-import { type BalanceForUser } from '@/lib/user.balance';
+import { type BalanceForUser } from '@/lib/user/balance';
 import type { PaginationMetadata } from '@/types/pagination';
 
 export type PaymentMethodStatus = Awaited<ReturnType<typeof describePaymentMethods>>;

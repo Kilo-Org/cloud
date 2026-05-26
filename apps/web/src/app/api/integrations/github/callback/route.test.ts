@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test } from '@jest/globals';
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserFromAuth } from '@/lib/user.server';
+import { getUserFromAuth } from '@/lib/user/server';
 import { verifyGitHubBotLinkState } from '@/lib/bot/github-link-state';
 import { exchangeGitHubOAuthCode } from '@/lib/integrations/platforms/github/adapter';
 import { linkKiloUser } from '@/lib/bot-identity';
@@ -13,7 +13,7 @@ import type { StateAdapter } from 'chat';
 const mockState = { kind: 'state' } as unknown as StateAdapter;
 const mockIsEnabledForBot = jest.fn();
 
-jest.mock('@/lib/user.server');
+jest.mock('@/lib/user/server');
 jest.mock('@/lib/bot/github-link-state');
 jest.mock('@/lib/bot-identity');
 jest.mock('@/lib/integrations/platforms/github/adapter');

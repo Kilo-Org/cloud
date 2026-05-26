@@ -18,6 +18,7 @@ import {
   getPreparationInfrastructureFailure,
   destroySandboxAfterInternalServerError,
   isSandboxInternalServerError,
+  SANDBOX_WORKSPACE_PROBE_TIMEOUT_MESSAGE,
   withPreparationInfrastructureRecovery,
 } from './sandbox-recovery.js';
 import { WrapperNotReadyError } from './kilo/wrapper-client.js';
@@ -166,6 +167,31 @@ describe('sandbox recovery', () => {
     expect(mockInfo).toHaveBeenCalledWith(
       'Destroyed sandbox after workspace filesystem preparation failure'
     );
+  });
+
+  it('destroys sandbox when a workspace Git probe times out before bootstrap', async () => {
+    const sandbox = { destroy: vi.fn().mockResolvedValue(undefined) };
+    const error = new Error(`${SANDBOX_WORKSPACE_PROBE_TIMEOUT_MESSAGE} after 30000ms`);
+
+    await expect(
+      withPreparationInfrastructureRecovery(
+        {
+          sandbox,
+          sandboxId: 'ses-test',
+          sessionId: 'agent_test',
+          phase: 'asyncPreparation',
+        },
+        async () => {
+          throw error;
+        }
+      )
+    ).rejects.toBe(error);
+
+    expect(sandbox.destroy).toHaveBeenCalledOnce();
+    expect(mockError).toHaveBeenCalledWith(
+      'Sandbox workspace Git probe timed out; destroying sandbox'
+    );
+    expect(mockInfo).toHaveBeenCalledWith('Destroyed sandbox after workspace Git probe timeout');
   });
 
   it('does not destroy sandbox for unrelated errors', async () => {

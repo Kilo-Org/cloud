@@ -146,6 +146,12 @@ export type SyncResult = {
   errors: number;
   /** Repos where Dependabot alerts are permanently disabled (safe to skip) */
   skipped: number;
+  /** Repos where the GitHub App installation auth is invalid and needs reauthorization */
+  authInvalid: number;
+  /** Names of repos skipped because the installation needs reauthorization */
+  authInvalidRepos: string[];
+  /** True when the GitHub App installation needs user reauthorization */
+  reauthRequired: boolean;
   /** Repos that returned 404 or are access-blocked (deleted/transferred/inaccessible) */
   staleRepos: string[];
 };

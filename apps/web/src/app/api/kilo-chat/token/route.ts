@@ -1,7 +1,7 @@
 import 'server-only';
 import { NextResponse } from 'next/server';
 import { createKiloChatTokenResponse } from '@/lib/kilo-chat/token';
-import { getUserFromAuth } from '@/lib/user.server';
+import { getUserFromAuth } from '@/lib/user/server';
 
 /**
  * POST /api/kilo-chat/token

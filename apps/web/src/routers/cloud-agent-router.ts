@@ -31,7 +31,7 @@ import {
   basePrepareLegacySessionOutputSchema,
   isPreparedSessionInput,
 } from './cloud-agent-schemas';
-import { getBalanceForUser } from '@/lib/user.balance';
+import { getBalanceForUser } from '@/lib/user/balance';
 import * as z from 'zod';
 import { db } from '@/lib/drizzle';
 import { cliSessions } from '@kilocode/db/schema';

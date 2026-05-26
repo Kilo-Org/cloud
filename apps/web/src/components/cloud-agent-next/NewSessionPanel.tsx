@@ -79,13 +79,17 @@ import {
   CLOUD_AGENT_PROMPT_MAX_LENGTH,
 } from '@/lib/cloud-agent/constants';
 import {
+  appendCloudAgentNextLocalTestModel,
   getDevcontainerEnabled,
   getLastUsedModel,
+  getLastUsedRepo,
   getLastUsedVariant,
   getPreferredInitialModel,
+  getPreferredInitialRepo,
   getPreferredInitialVariant,
   setDevcontainerEnabled,
   setLastUsedModel,
+  setLastUsedRepo,
   setLastUsedVariant,
 } from '@/components/cloud-agent-next/model-preferences';
 
@@ -147,11 +151,13 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
 
   const modelOptions = useMemo<ModelOption[]>(
     () =>
-      allModels.map(model => ({
-        id: model.id,
-        name: model.name,
-        variants: model.opencode?.variants ? Object.keys(model.opencode.variants) : undefined,
-      })),
+      appendCloudAgentNextLocalTestModel(
+        allModels.map(model => ({
+          id: model.id,
+          name: model.name,
+          variants: model.opencode?.variants ? Object.keys(model.opencode.variants) : undefined,
+        }))
+      ),
     [allModels]
   );
 
@@ -166,6 +172,7 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
   const [variant, setVariant] = useState<string | undefined>(undefined);
   const [isModelUserSelected, setIsModelUserSelected] = useState(false);
   const [isRepoUserSelected, setIsRepoUserSelected] = useState(false);
+  const [showRepositoryRequiredMessage, setShowRepositoryRequiredMessage] = useState(false);
   const [isPreparing, setIsPreparing] = useState(false);
   const [imageMessageUuid, setImageMessageUuid] = useState(() => crypto.randomUUID());
 
@@ -432,26 +439,56 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
   const hasMultiplePlatforms = githubRepositories.length > 0 && gitlabRepositories.length > 0;
 
   const handleRepoSelect = useCallback(
-    (repoFullName: string, userInitiated = true) => {
-      setSelectedRepo(repoFullName);
+    (repo: RepositoryOption, userInitiated = true) => {
+      setSelectedRepo(repo.fullName);
+      setShowRepositoryRequiredMessage(false);
       if (userInitiated) setIsRepoUserSelected(true);
-      const repo = unifiedRepositories.find(r => r.fullName === repoFullName);
-      if (repo?.platform) {
+      if (repo.platform) {
         setSelectedPlatform(repo.platform);
+        if (userInitiated) setLastUsedRepo(repo.fullName, repo.platform, organizationId);
       }
     },
-    [unifiedRepositories]
+    [organizationId]
   );
 
   // ---------------------------------------------------------------------------
-  // Auto-select repo from last session (most recently used)
+  // Auto-select repo from saved preference, recent session, or the only
+  // available repository, in that priority order.
   // ---------------------------------------------------------------------------
   useEffect(() => {
-    if (selectedRepo || isRepoUserSelected || recentRepos.length === 0) return;
-    const firstRecent = recentRepos[0];
-    if (!firstRecent) return;
-    handleRepoSelect(firstRecent.fullName, false);
-  }, [recentRepos, selectedRepo, isRepoUserSelected, handleRepoSelect]);
+    if (selectedRepo || isRepoUserSelected || unifiedRepositories.length === 0) return;
+
+    const onlyAvailableRepo =
+      !isLoadingGitHubRepos &&
+      !isLoadingGitLabRepos &&
+      !githubRepoError &&
+      !gitlabRepoError &&
+      unifiedRepositories.length === 1
+        ? unifiedRepositories[0]
+        : undefined;
+    const preferredRepo = getPreferredInitialRepo({
+      availableRepos: unifiedRepositories,
+      recentRepos,
+      onlyAvailableRepo,
+      lastUsedRepo: getLastUsedRepo(organizationId),
+      isLoadingGitHubRepos,
+      isLoadingGitLabRepos,
+    });
+    if (!preferredRepo) return;
+
+    handleRepoSelect(preferredRepo, false);
+  }, [
+    recentRepos,
+    selectedRepo,
+    isRepoUserSelected,
+    handleRepoSelect,
+    unifiedRepositories,
+    organizationId,
+    isLoadingGitHubRepos,
+    isLoadingGitLabRepos,
+    githubRepoError,
+    gitlabRepoError,
+  ]);
 
   // ---------------------------------------------------------------------------
   // Auto-select repo from pasted GitHub/GitLab URLs
@@ -469,6 +506,7 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
       if (!match) continue;
 
       setSelectedRepo(match.fullName);
+      setShowRepositoryRequiredMessage(false);
       const platform = detectGitPlatform(url);
       if (platform) {
         setSelectedPlatform(platform);
@@ -577,8 +615,8 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
   const filteredUnifiedRepos = unifiedRepositories.filter(r => !recentFullNames.has(r.fullName));
 
   const handleRepoPillSelect = useCallback(
-    (fullName: string) => {
-      handleRepoSelect(fullName);
+    (repo: RepositoryOption) => {
+      handleRepoSelect(repo);
       setRepoPopoverOpen(false);
     },
     [handleRepoSelect]
@@ -651,7 +689,7 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
   const handleStartSession = useCallback(async () => {
     if (!prompt.trim() || imageUpload.hasUploadingImages) return;
     if (!selectedRepo) {
-      toast.error('Please select a repository');
+      setShowRepositoryRequiredMessage(true);
       return;
     }
 
@@ -1107,9 +1145,20 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
               disabled={isPreparing}
               className="h-8 w-8 rounded-lg"
               title="Attach images"
+              aria-label="Attach images"
             >
               <Paperclip className="h-4 w-4" />
             </UIButton>
+            {showRepositoryRequiredMessage && (
+              <p
+                id="new-session-repository-required"
+                className="flex shrink-0 items-center gap-1 text-xs text-amber-400"
+                role="alert"
+              >
+                <AlertCircle className="h-3 w-3 shrink-0" />
+                Select a repository
+              </p>
+            )}
             <UIButton
               type="button"
               variant="primary"
@@ -1117,6 +1166,10 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
               onClick={() => void handleStartSession()}
               disabled={!isFormValid || isPreparing || imageUpload.hasUploadingImages}
               className="h-8 w-8 rounded-lg"
+              aria-describedby={
+                showRepositoryRequiredMessage ? 'new-session-repository-required' : undefined
+              }
+              aria-label="Start session"
             >
               <Send className="h-4 w-4" />
             </UIButton>
@@ -1179,7 +1232,9 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
                           <RepoCommandItem
                             key={`recent-${repo.id}`}
                             repo={repo}
-                            isSelected={repo.fullName === selectedRepo}
+                            isSelected={
+                              repo.fullName === selectedRepo && repo.platform === selectedPlatform
+                            }
                             onSelect={handleRepoPillSelect}
                           />
                         ))}
@@ -1193,7 +1248,10 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
                               <RepoCommandItem
                                 key={repo.id}
                                 repo={repo}
-                                isSelected={repo.fullName === selectedRepo}
+                                isSelected={
+                                  repo.fullName === selectedRepo &&
+                                  repo.platform === selectedPlatform
+                                }
                                 onSelect={handleRepoPillSelect}
                               />
                             ))}
@@ -1205,7 +1263,10 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
                               <RepoCommandItem
                                 key={repo.id}
                                 repo={repo}
-                                isSelected={repo.fullName === selectedRepo}
+                                isSelected={
+                                  repo.fullName === selectedRepo &&
+                                  repo.platform === selectedPlatform
+                                }
                                 onSelect={handleRepoPillSelect}
                               />
                             ))}
@@ -1217,7 +1278,10 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
                               <RepoCommandItem
                                 key={repo.id}
                                 repo={repo}
-                                isSelected={repo.fullName === selectedRepo}
+                                isSelected={
+                                  repo.fullName === selectedRepo &&
+                                  repo.platform === selectedPlatform
+                                }
                                 onSelect={handleRepoPillSelect}
                               />
                             ))}
@@ -1230,7 +1294,9 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
                           <RepoCommandItem
                             key={repo.id}
                             repo={repo}
-                            isSelected={repo.fullName === selectedRepo}
+                            isSelected={
+                              repo.fullName === selectedRepo && repo.platform === selectedPlatform
+                            }
                             onSelect={handleRepoPillSelect}
                           />
                         ))}
@@ -1282,10 +1348,14 @@ function RepoCommandItem({
 }: {
   repo: RepositoryOption;
   isSelected: boolean;
-  onSelect: (fullName: string) => void;
+  onSelect: (repo: RepositoryOption) => void;
 }) {
   return (
-    <CommandItem value={repo.fullName} onSelect={onSelect} className="flex items-center gap-2">
+    <CommandItem
+      value={repo.fullName}
+      onSelect={() => onSelect(repo)}
+      className="flex items-center gap-2"
+    >
       {repo.private ? (
         <Lock className="size-3.5 text-yellow-500" />
       ) : (

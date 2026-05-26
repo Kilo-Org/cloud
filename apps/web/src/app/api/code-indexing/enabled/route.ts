@@ -2,7 +2,7 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { createTRPCContext } from '@/lib/trpc/init';
 import { ensureOrganizationAccessAndFetchOrg } from '@/routers/organizations/utils';
-import { getUserFromAuth } from '@/lib/user.server';
+import { getUserFromAuth } from '@/lib/user/server';
 import { isEnabledForUser } from '@/lib/code-indexing/util';
 
 type EnabledResponse = { enabled: boolean };

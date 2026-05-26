@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
 import { APP_URL } from '@/lib/constants';
-import { getUserFromAuth } from '@/lib/user.server';
+import { getUserFromAuth } from '@/lib/user/server';
 import { isSafeGoogleOAuthReturnTo } from '@/lib/integrations/google/oauth-state';
 import { completeManagedComposioGoogleCalendarConnection } from '@/lib/kiloclaw/composio-onboarding';
 import { getActiveInstance, getActiveOrgInstance } from '@/lib/kiloclaw/instance-registry';

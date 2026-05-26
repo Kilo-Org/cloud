@@ -423,6 +423,55 @@ describe('session capabilities', () => {
   });
 });
 
+describe('delivery callback plumbing', () => {
+  it('forwards onMessageQueued / onMessageCompleted / onMessageFailed through to service state', async () => {
+    const onMessageQueued = jest.fn();
+    const onMessageCompleted = jest.fn();
+    const onMessageFailed = jest.fn();
+
+    const api = createMockApi();
+    const session = createCloudAgentSession({
+      kiloSessionId,
+      resolveSession: async () => ({
+        type: 'cloud-agent' as const,
+        kiloSessionId,
+        cloudAgentSessionId,
+      }),
+      transport: {
+        getTicket: () => 'ticket',
+        api,
+        fetchSnapshot: () => Promise.resolve(makeSnapshot({ id: 'ses_transport-tests' })),
+      },
+      websocketBaseUrl: 'ws://localhost:9999',
+      onMessageQueued,
+      onMessageCompleted,
+      onMessageFailed,
+    });
+
+    session.state.process({ type: 'cloud.message.queued', messageId: 'm1' });
+    expect(onMessageQueued).toHaveBeenCalledWith('m1');
+
+    session.state.process({ type: 'cloud.message.completed', messageId: 'm1' });
+    expect(onMessageCompleted).toHaveBeenCalledWith('m1');
+
+    session.state.process({
+      type: 'cloud.message.failed',
+      messageId: 'm2',
+      error: 'boom',
+      reason: 'exhausted',
+      attempts: 5,
+    });
+    expect(onMessageFailed).toHaveBeenCalledWith('m2', {
+      status: 'failed',
+      error: 'boom',
+      reason: 'exhausted',
+      attempts: 5,
+    });
+
+    session.destroy();
+  });
+});
+
 describe('disconnect during resolution', () => {
   it('disconnect() before resolveSession settles prevents transport from attaching', async () => {
     const api = createMockApi();

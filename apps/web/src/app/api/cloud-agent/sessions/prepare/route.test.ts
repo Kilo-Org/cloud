@@ -2,7 +2,7 @@ import { describe, test, expect, beforeEach } from '@jest/globals';
 import { NextResponse } from 'next/server';
 import { POST } from './route';
 import { failureResult } from '@/lib/maybe-result';
-import { getUserFromAuth } from '@/lib/user.server';
+import { getUserFromAuth } from '@/lib/user/server';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import {
   validateGitHubRepoAccessForUser,
@@ -14,7 +14,7 @@ import { createCloudAgentClient } from '@/lib/cloud-agent/cloud-agent-client';
 import { signStreamTicket } from '@/lib/cloud-agent/stream-ticket';
 import type { User } from '@kilocode/db/schema';
 
-jest.mock('@/lib/user.server');
+jest.mock('@/lib/user/server');
 jest.mock('@/routers/organizations/utils');
 jest.mock('@/lib/cloud-agent/github-integration-helpers');
 jest.mock('@/lib/cloud-agent/cloud-agent-client');

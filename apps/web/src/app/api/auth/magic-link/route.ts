@@ -6,7 +6,7 @@ import { verifyTurnstileJWT } from '@/lib/auth/verify-turnstile-jwt';
 import * as z from 'zod';
 import { findUserByEmail } from '@/lib/user';
 import { validateMagicLinkSignupEmail } from '@/lib/schemas/email';
-import { isEmailBlacklistedByDomainAsync, isBlockedTLD } from '@/lib/user.server';
+import { isEmailBlacklistedByDomainAsync, isBlockedTLD } from '@/lib/user/server';
 
 const requestSchema = z.object({
   email: z.string().email(),

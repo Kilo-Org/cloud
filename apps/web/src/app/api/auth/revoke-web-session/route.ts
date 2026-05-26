@@ -1,5 +1,5 @@
 import { successResult } from '@/lib/maybe-result';
-import { getUserFromAuth } from '@/lib/user.server';
+import { getUserFromAuth } from '@/lib/user/server';
 import { revokeWebSessions } from '@/lib/web-session-revocation';
 import { NextResponse } from 'next/server';
 

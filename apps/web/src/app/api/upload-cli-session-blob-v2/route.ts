@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import * as z from 'zod';
-import { getUserFromAuth } from '@/lib/user.server';
+import { getUserFromAuth } from '@/lib/user/server';
 import { db } from '@/lib/drizzle';
 import { eq, and } from 'drizzle-orm';
 import { cliSessions } from '@kilocode/db/schema';

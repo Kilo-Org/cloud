@@ -1,26 +1,27 @@
-import { getProfileRedirectPath, getUserFromAuth } from '@/lib/user.server';
+import { getProfileRedirectPath, getUserFromAuth } from '@/lib/user/server';
 import { isValidCallbackPath } from '@/lib/getSignInCallbackUrl';
 import { maybeInterceptWithSurvey } from '@/lib/survey-redirect';
 import PostHogClient from '@/lib/posthog';
 import { getAffiliateAttribution } from '@/lib/affiliate-attribution';
-import { recordAffiliateAttributionAndQueueParentEvent } from '@/lib/affiliate-events';
-import { logImpactReferralDebug } from '@/lib/impact-debug';
+import { recordAffiliateAttributionAndQueueParentEvent } from '@/lib/impact/affiliate-events';
+import { logImpactReferralDebug } from '@/lib/impact/debug';
 import {
   IMPACT_APP_TRACKED_CLICK_ID_COOKIE,
   IMPACT_CLICK_ID_COOKIE,
   resolveImpactAffiliateTrackingId,
-} from '@/lib/impact-affiliate-utils';
+} from '@/lib/impact/affiliate-utils';
 import {
   countryCodeFromHeaders,
   localeFromHeaders,
   queueImpactAdvocateParticipantRegistration,
   recordImpactAffiliateTouch,
   recordImpactReferralTouch,
-} from '@/lib/impact-referral';
+} from '@/lib/impact/referral';
 import {
   parseImpactAffiliateTouchFromUrl,
   parseImpactReferralTouchFromUrl,
-} from '@/lib/impact-referral-utils';
+  redactLandingPathForLogs,
+} from '@/lib/impact/referral-utils';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { APP_URL } from '@/lib/constants';
@@ -179,21 +180,21 @@ export async function GET(request: NextRequest) {
 
   logImpactReferralDebug('After sign-in resolved Impact tracking context', {
     userId: user?.id ?? null,
-    responsePath,
+    responsePath: redactLandingPathForLogs(responsePath),
     affiliateTrackingIdPresent: Boolean(affiliateTrackingId?.trim()),
     impactCookieValuePresent: Boolean(impactCookieValue?.trim()),
     affiliateTouchPresent: Boolean(affiliateTouch),
     referralTouchPresent: Boolean(referralTouch),
     referralCookieValuePresent: Boolean(referralTouch?.opaqueTrackingValue),
     ignoredUrlImRefForReferralTouch: ignoreUrlImRefForReferralTouch,
-    callbackPath: url.searchParams.get('callbackPath') ?? null,
+    callbackPath: redactLandingPathForLogs(url.searchParams.get('callbackPath')),
   });
 
   if (user && affiliateTouch) {
     try {
       logImpactReferralDebug('After sign-in recording Impact affiliate touch', {
         userId: user.id,
-        landingPath: affiliateTouch.landingPath,
+        landingPath: redactLandingPathForLogs(affiliateTouch.landingPath),
         trackingValueLength: affiliateTouch.trackingValueLength,
         isTrackingValueAccepted: affiliateTouch.isTrackingValueAccepted,
       });
@@ -213,7 +214,7 @@ export async function GET(request: NextRequest) {
     try {
       logImpactReferralDebug('After sign-in recording Impact Advocate referral touch', {
         userId: user.id,
-        landingPath: referralTouch.landingPath,
+        landingPath: redactLandingPathForLogs(referralTouch.landingPath),
         rsCodePresent: Boolean(referralTouch.rsCode?.trim()),
         trackingValueLength: referralTouch.trackingValueLength,
         isTrackingValueAccepted: referralTouch.isTrackingValueAccepted,
@@ -232,7 +233,7 @@ export async function GET(request: NextRequest) {
     try {
       logImpactReferralDebug('After sign-in queueing Impact Advocate participant registration', {
         userId: user.id,
-        landingPath: referralTouch.landingPath,
+        landingPath: redactLandingPathForLogs(referralTouch.landingPath),
         localePresent: Boolean(localeFromHeaders(request.headers)?.trim()),
         countryCode: countryCodeFromHeaders(request.headers),
       });
@@ -250,17 +251,18 @@ export async function GET(request: NextRequest) {
     }
   }
 
+  let impactAffiliateAttributionProcessed = false;
   if (user && affiliateTrackingId) {
-    const existingAttribution = await getAffiliateAttribution(user.id, 'impact');
+    try {
+      const existingAttribution = await getAffiliateAttribution(user.id, 'impact');
 
-    logImpactReferralDebug('After sign-in checked Impact affiliate attribution row', {
-      userId: user.id,
-      existingAttributionPresent: Boolean(existingAttribution),
-      trackingIdLength: affiliateTrackingId.length,
-    });
+      logImpactReferralDebug('After sign-in checked Impact affiliate attribution row', {
+        userId: user.id,
+        existingAttributionPresent: Boolean(existingAttribution),
+        trackingIdLength: affiliateTrackingId.length,
+      });
 
-    if (!existingAttribution) {
-      try {
+      if (!existingAttribution) {
         await recordAffiliateAttributionAndQueueParentEvent({
           userId: user.id,
           provider: 'impact',
@@ -268,12 +270,13 @@ export async function GET(request: NextRequest) {
           customerEmail: user.google_user_email,
           eventDate: new Date(),
         });
-      } catch (error) {
-        console.error('[after-sign-in] failed to persist affiliate attribution', {
-          userId: user.id,
-          error: error instanceof Error ? error.message : String(error),
-        });
       }
+      impactAffiliateAttributionProcessed = true;
+    } catch (error) {
+      console.error('[after-sign-in] failed to persist affiliate attribution', {
+        userId: user.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
   }
 
@@ -284,7 +287,7 @@ export async function GET(request: NextRequest) {
   // because one already existed). Without this guard, an unauthenticated
   // hit would burn the marker and suppress the fallback on the next real
   // sign-in.
-  if (user && impactCookieValue) {
+  if (user && impactCookieValue && impactAffiliateAttributionProcessed) {
     logImpactReferralDebug('After sign-in setting app-tracked Impact click cookie marker', {
       userId: user.id,
       impactCookieValueLength: impactCookieValue.length,

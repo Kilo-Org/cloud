@@ -5,9 +5,11 @@
  * instance and interact with it through methods. This makes state transitions
  * explicit, simplifies testing, and prevents scattered state bugs.
  *
- * State model:
- * - IDLE: _isActive == false
- * - ACTIVE: _isActive == true
+ * Session-level multi-message model:
+ * - Session context: shared connection parameters across messages
+ * - Message tracking: each message has state 'accepted' | 'active' | 'completed'
+ * - At most one 'active' message at a time; others are 'accepted' (queued)
+ * - Wrapper is idle only when no messages are pending
  */
 
 import type { IngestEvent } from '../../src/shared/protocol.js';
@@ -18,13 +20,27 @@ export type { LogUploader } from './log-uploader.js';
 // Types
 // ---------------------------------------------------------------------------
 
-export type JobContext = {
-  executionId: string;
+export type SessionContext = {
   kiloSessionId: string;
   ingestUrl: string;
-  ingestToken: string;
+  ingestToken?: string;
   workerAuthToken: string;
   platform?: string;
+  wrapperRunId?: string;
+  wrapperGeneration?: number;
+  wrapperConnectionId?: string;
+  agentSessionId?: string;
+};
+
+export type MessageState = 'accepted' | 'active' | 'completed';
+
+export type MessageInfo = {
+  messageId: string;
+  state: MessageState;
+  autoCommit: boolean;
+  condenseOnComplete: boolean;
+  model?: string;
+  upstreamBranch?: string;
 };
 
 export type LastError = {
@@ -36,8 +52,8 @@ export type LastError = {
 
 export type WrapperStatus = {
   state: 'idle' | 'active';
-  executionId?: string;
   sessionId?: string;
+  pendingMessages: string[];
   lastError?: LastError;
 };
 
@@ -46,11 +62,16 @@ export type WrapperStatus = {
 // ---------------------------------------------------------------------------
 
 export class WrapperState {
-  // Job context (set on the first turn-start request, cleared on reset or drain)
-  private job: JobContext | null = null;
-
-  // Whether the wrapper is actively processing a prompt
   private _isActive = false;
+
+  // Session-level context (set on first bind, updated on subsequent binds)
+  private session: SessionContext | null = null;
+
+  // Per-message tracking
+  private messages: Map<string, MessageInfo> = new Map();
+
+  // The currently active messageId (Kilo is processing it)
+  private _activeMessageId: string | null = null;
 
   // Connection state - managed externally, stored here for reference
   private _ingestWs: WebSocket | null = null;
@@ -62,6 +83,16 @@ export class WrapperState {
 
   // Last root-session assistant message ID (tracked from message.updated kilocode events)
   private _lastAssistantMessageId: string | null = null;
+
+  private _observedGateResult: 'pass' | 'fail' | null = null;
+
+  // Config of the most recently completed message, captured before active message advances
+  private _completedMessageConfig: {
+    autoCommit: boolean;
+    condenseOnComplete: boolean;
+    model?: string;
+    upstreamBranch?: string;
+  } | null = null;
 
   // Callbacks for sending events to ingest
   private _sendToIngestFn: ((event: IngestEvent) => void) | null = null;
@@ -79,48 +110,6 @@ export class WrapperState {
 
   get isActive(): boolean {
     return this._isActive;
-  }
-
-  get hasJob(): boolean {
-    return this.job !== null;
-  }
-
-  get currentJob(): JobContext | null {
-    return this.job;
-  }
-
-  // ---------------------------------------------------------------------------
-  // Job Lifecycle
-  // ---------------------------------------------------------------------------
-
-  /**
-   * Start a new job. Idempotent for same executionId.
-   * Throws if a different job is currently active (caller should return 409).
-   */
-  startJob(context: JobContext): void {
-    if (this.job && this.job.executionId === context.executionId) {
-      return;
-    }
-
-    if (this.job && this.job.executionId !== context.executionId && this.isActive) {
-      throw new Error(`Cannot start new job while active (current: ${this.job.executionId})`);
-    }
-
-    // Start new job
-    this.job = context;
-    this._lastError = null;
-    this.updateActivity();
-  }
-
-  /**
-   * Clear job context. Called on explicit reset or when draining.
-   */
-  clearJob(): void {
-    this._logUploader?.stop();
-    this._logUploader = null;
-    this.job = null;
-    this._isActive = false;
-    this._lastAssistantMessageId = null;
   }
 
   // ---------------------------------------------------------------------------
@@ -266,19 +255,274 @@ export class WrapperState {
     this._lastAssistantMessageId = messageId;
   }
 
+  get observedGateResult(): 'pass' | 'fail' | undefined {
+    return this._observedGateResult ?? undefined;
+  }
+
+  observeGateResult(gateResult: 'pass' | 'fail'): void {
+    this._observedGateResult = gateResult;
+  }
+
+  consumeObservedGateResult(): 'pass' | 'fail' | undefined {
+    const gateResult = this.observedGateResult;
+    this._observedGateResult = null;
+    return gateResult;
+  }
+
   // ---------------------------------------------------------------------------
   // Status for API Responses
   // ---------------------------------------------------------------------------
 
-  /**
-   * Get current wrapper status for /job/status endpoint.
-   */
   getStatus(): WrapperStatus {
     return {
       state: this.isActive ? 'active' : 'idle',
-      executionId: this.job?.executionId,
-      sessionId: this.job?.kiloSessionId,
+      sessionId: this.session?.kiloSessionId,
+      pendingMessages: this.pendingMessageIds,
       lastError: this._lastError ?? undefined,
     };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Session Context
+  // ---------------------------------------------------------------------------
+
+  get hasSession(): boolean {
+    return this.session !== null;
+  }
+
+  get currentSession(): SessionContext | null {
+    return this.session;
+  }
+
+  bindSession(context: SessionContext): { changed: boolean } {
+    if (!this.session) {
+      this.session = context;
+      this._lastError = null;
+      this.updateActivity();
+      return { changed: true };
+    }
+    const changed =
+      this.session.ingestUrl !== context.ingestUrl ||
+      this.session.ingestToken !== context.ingestToken ||
+      this.session.workerAuthToken !== context.workerAuthToken ||
+      this.session.platform !== context.platform ||
+      this.session.wrapperRunId !== context.wrapperRunId ||
+      this.session.wrapperGeneration !== context.wrapperGeneration ||
+      this.session.wrapperConnectionId !== context.wrapperConnectionId;
+    if (changed) {
+      this.session = context;
+      this.updateActivity();
+    }
+    return { changed };
+  }
+
+  clearSession(): void {
+    this._logUploader?.stop();
+    this._logUploader = null;
+    this.session = null;
+    this.messages.clear();
+    this._activeMessageId = null;
+    this._isActive = false;
+    this._lastAssistantMessageId = null;
+    this._observedGateResult = null;
+    this._completedMessageConfig = null;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Message Tracking
+  // ---------------------------------------------------------------------------
+
+  acceptMessage(
+    messageId: string,
+    config: {
+      autoCommit: boolean;
+      condenseOnComplete: boolean;
+      model?: string;
+      upstreamBranch?: string;
+    }
+  ): void {
+    const info: MessageInfo = {
+      messageId,
+      state: !this._activeMessageId ? 'active' : 'accepted',
+      ...config,
+    };
+    this.messages.set(messageId, info);
+    if (!this._activeMessageId) {
+      this._activeMessageId = messageId;
+      this._isActive = true;
+    }
+    this.updateActivity();
+  }
+
+  completeActiveMessage(): MessageInfo | null {
+    if (!this._activeMessageId) return null;
+    const info = this.messages.get(this._activeMessageId);
+    if (info) info.state = 'completed';
+    const completedInfo = info ?? null;
+
+    let nextActive: string | null = null;
+    for (const [id, msg] of this.messages) {
+      if (msg.state === 'accepted') {
+        nextActive = id;
+        break;
+      }
+    }
+
+    this._activeMessageId = nextActive;
+    if (nextActive) {
+      const nextInfo = this.messages.get(nextActive);
+      if (nextInfo) nextInfo.state = 'active';
+    } else {
+      this._isActive = false;
+    }
+
+    return completedInfo;
+  }
+
+  completeMessage(messageId: string): MessageInfo | null {
+    if (messageId !== this._activeMessageId) return null;
+    const info = this.messages.get(messageId);
+    if (!info) return null;
+
+    info.state = 'completed';
+
+    let nextActive: string | null = null;
+    for (const [id, msg] of this.messages) {
+      if (msg.state === 'accepted') {
+        nextActive = id;
+        break;
+      }
+    }
+
+    this._activeMessageId = nextActive;
+    if (nextActive) {
+      const nextInfo = this.messages.get(nextActive);
+      if (nextInfo) nextInfo.state = 'active';
+    } else {
+      this._isActive = false;
+    }
+
+    return info;
+  }
+
+  get activeMessageId(): string | null {
+    return this._activeMessageId;
+  }
+
+  get hasPendingMessages(): boolean {
+    for (const msg of this.messages.values()) {
+      if (msg.state !== 'completed') return true;
+    }
+    return false;
+  }
+
+  get pendingMessageIds(): string[] {
+    const ids: string[] = [];
+    for (const msg of this.messages.values()) {
+      if (msg.state !== 'completed') ids.push(msg.messageId);
+    }
+    return ids;
+  }
+
+  get activeMessageConfig(): {
+    autoCommit: boolean;
+    condenseOnComplete: boolean;
+    model?: string;
+    upstreamBranch?: string;
+  } | null {
+    if (!this._activeMessageId) return null;
+    const info = this.messages.get(this._activeMessageId);
+    if (!info) return null;
+    return {
+      autoCommit: info.autoCommit,
+      condenseOnComplete: info.condenseOnComplete,
+      model: info.model,
+      upstreamBranch: info.upstreamBranch,
+    };
+  }
+
+  get completedMessageConfig(): {
+    autoCommit: boolean;
+    condenseOnComplete: boolean;
+    model?: string;
+    upstreamBranch?: string;
+  } | null {
+    return this._completedMessageConfig;
+  }
+
+  setCompletedMessageConfig(config: {
+    autoCommit: boolean;
+    condenseOnComplete: boolean;
+    model?: string;
+    upstreamBranch?: string;
+  }): void {
+    this._completedMessageConfig = config;
+  }
+
+  clearCompletedMessageConfig(): void {
+    this._completedMessageConfig = null;
+  }
+
+  getMessageConfig(messageId: string): {
+    autoCommit: boolean;
+    condenseOnComplete: boolean;
+    model?: string;
+    upstreamBranch?: string;
+  } | null {
+    const info = this.messages.get(messageId);
+    if (!info) return null;
+    return {
+      autoCommit: info.autoCommit,
+      condenseOnComplete: info.condenseOnComplete,
+      model: info.model,
+      upstreamBranch: info.upstreamBranch,
+    };
+  }
+
+  updateMessageConfig(
+    messageId: string,
+    config: {
+      autoCommit?: boolean;
+      condenseOnComplete?: boolean;
+      model?: string;
+      upstreamBranch?: string;
+    }
+  ): void {
+    const info = this.messages.get(messageId);
+    if (!info) return;
+    if (config.autoCommit !== undefined) info.autoCommit = config.autoCommit;
+    if (config.condenseOnComplete !== undefined)
+      info.condenseOnComplete = config.condenseOnComplete;
+    if (config.model !== undefined) info.model = config.model;
+    if (config.upstreamBranch !== undefined) info.upstreamBranch = config.upstreamBranch;
+  }
+
+  removeMessage(messageId: string): void {
+    this.messages.delete(messageId);
+    if (this._activeMessageId === messageId) {
+      let nextActive: string | null = null;
+      for (const [id, msg] of this.messages) {
+        if (msg.state === 'accepted') {
+          nextActive = id;
+          break;
+        }
+      }
+      if (nextActive) {
+        this._activeMessageId = nextActive;
+        const nextInfo = this.messages.get(nextActive);
+        if (nextInfo) nextInfo.state = 'active';
+      } else {
+        this._activeMessageId = null;
+        this._isActive = false;
+      }
+    }
+  }
+
+  clearAllMessages(): void {
+    this.messages.clear();
+    this._activeMessageId = null;
+    this._isActive = false;
+    this._observedGateResult = null;
+    this._completedMessageConfig = null;
   }
 }

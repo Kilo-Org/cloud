@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from '@jest/globals';
 import { verifyTurnstileJWT } from './verify-turnstile-jwt';
 import jwt from 'jsonwebtoken';
-import type { TurnstileJwtPayload } from '@/lib/user.server';
+import type { TurnstileJwtPayload } from '@/lib/user/server';
 
 // Mock Next.js server functions - must be before imports that use them
 // Note: Next.js may show runtime warnings about calling cookies/headers outside request scope,

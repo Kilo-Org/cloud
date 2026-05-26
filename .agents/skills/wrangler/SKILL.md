@@ -11,11 +11,11 @@ Your knowledge of Wrangler CLI flags, config fields, and subcommands may be outd
 
 Fetch the **latest** information before writing or reviewing Wrangler commands and config. Do not rely on baked-in knowledge for CLI flags, config fields, or binding shapes.
 
-| Source                 | How to retrieve                                             | Use for                                       |
-| ---------------------- | ----------------------------------------------------------- | --------------------------------------------- |
-| Wrangler docs          | `https://developers.cloudflare.com/workers/wrangler/`       | CLI commands, flags, config reference         |
-| Wrangler config schema | `node_modules/wrangler/config-schema.json`                  | Config fields, binding shapes, allowed values |
-| Cloudflare docs        | Search tool or `https://developers.cloudflare.com/workers/` | API reference, compatibility dates/flags      |
+| Source | How to retrieve | Use for |
+|---|---|---|
+| Wrangler docs | `https://developers.cloudflare.com/workers/wrangler/` | CLI commands, flags, config reference |
+| Wrangler config schema | `node_modules/wrangler/config-schema.json` | Config fields, binding shapes, allowed values |
+| Cloudflare docs | Search tool or `https://developers.cloudflare.com/workers/` | API reference, compatibility dates/flags |
 
 ## FIRST: Verify Wrangler Installation
 
@@ -50,16 +50,16 @@ npx create-cloudflare@latest my-app
 
 ## Quick Reference: Core Commands
 
-| Task                        | Command                     |
-| --------------------------- | --------------------------- |
-| Start local dev server      | `wrangler dev`              |
-| Deploy to Cloudflare        | `wrangler deploy`           |
-| Deploy dry run              | `wrangler deploy --dry-run` |
-| Generate TypeScript types   | `wrangler types`            |
-| Profile Worker startup time | `wrangler check startup`    |
-| View live logs              | `wrangler tail`             |
-| Delete Worker               | `wrangler delete`           |
-| Auth status                 | `wrangler whoami`           |
+| Task | Command |
+|---|---|
+| Start local dev server | `wrangler dev` |
+| Deploy to Cloudflare | `wrangler deploy` |
+| Deploy dry run | `wrangler deploy --dry-run` |
+| Generate TypeScript types | `wrangler types` |
+| Profile Worker startup time | `wrangler check startup` |
+| View live logs | `wrangler tail` |
+| Delete Worker | `wrangler delete` |
+| Auth status | `wrangler whoami` |
 
 ---
 
@@ -835,14 +835,14 @@ curl http://localhost:8787/__scheduled
 
 ### Common Issues
 
-| Issue                           | Solution                                                                  |
-| ------------------------------- | ------------------------------------------------------------------------- |
-| `command not found: wrangler`   | Install: `npm install -D wrangler`                                        |
-| Auth errors                     | Run `wrangler login`                                                      |
-| Startup time limit exceeded     | Run `wrangler check startup` to profile startup and generate CPU profiles |
-| Type errors after config change | Run `wrangler types`                                                      |
-| Local storage not persisting    | Check `.wrangler/state` directory                                         |
-| Binding undefined in Worker     | Verify binding name matches config exactly                                |
+| Issue | Solution |
+|---|---|
+| `command not found: wrangler` | Install: `npm install -D wrangler` |
+| Auth errors | Run `wrangler login` |
+| Startup time limit exceeded | Run `wrangler check startup` to profile startup and generate CPU profiles |
+| Type errors after config change | Run `wrangler types` |
+| Local storage not persisting | Check `.wrangler/state` directory |
+| Binding undefined in Worker | Verify binding name matches config exactly |
 
 ### Debug Commands
 

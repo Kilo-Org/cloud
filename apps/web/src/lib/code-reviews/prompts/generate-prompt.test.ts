@@ -135,7 +135,6 @@ const baseConfig = {
   focus_areas: [],
   custom_instructions: '',
   model_slug: 'test-model',
-  max_review_time_minutes: 30,
 } satisfies CodeReviewAgentConfig;
 
 describe('generateReviewPrompt', () => {
@@ -355,6 +354,20 @@ describe('generateReviewPrompt (incremental review)', () => {
     expect(prompt).toContain('gh pr diff 42');
   });
 
+  it('allows GitHub agents to pull latest changes in standard mode', async () => {
+    const { prompt } = await generateReviewPrompt(baseConfig, 'owner/repo', 42, {
+      reviewId: 'review-123',
+      existingReviewState: existingReviewStateNoSummary,
+      previousHeadSha: null,
+    });
+
+    expect(prompt).toContain('Before reading files, always fetch from remote');
+    expect(prompt).toContain('git pull origin $(git branch --show-current)');
+    expect(prompt).toContain('gh pr diff 42');
+    expect(prompt).not.toContain('DO NOT fetch or pull');
+    expect(prompt).not.toContain('Do not run `git fetch`');
+  });
+
   it('uses standard workflow when previousHeadSha is provided but no summary comment', async () => {
     const { prompt } = await generateReviewPrompt(baseConfig, 'owner/repo', 42, {
       reviewId: 'review-123',
@@ -413,5 +426,32 @@ describe('generateReviewPrompt (incremental review)', () => {
     expect(prompt).toContain('INCREMENTAL REVIEW MODE');
     expect(prompt).toContain('prevsha456');
     expect(prompt).toContain('glab mr diff');
+    expect(prompt).toContain('git pull');
+    expect(prompt).toContain('git diff prevsha456..HEAD');
+    expect(prompt).not.toContain('DO NOT fetch or pull');
+    expect(prompt).not.toContain('Do not run `git fetch`');
+  });
+
+  it('allows GitLab agents to fetch and pull latest changes in standard mode', async () => {
+    const { prompt } = await generateReviewPrompt(baseConfig, 'group/project', 10, {
+      reviewId: 'review-456',
+      existingReviewState: existingReviewStateNoSummary,
+      platform: 'gitlab',
+      gitlabContext: { baseSha: 'base123', startSha: 'start123', headSha: 'head123' },
+      previousHeadSha: null,
+    });
+
+    expect(prompt).toContain('Before reading files, always fetch from remote');
+    expect(prompt).toContain('git fetch origin');
+    expect(prompt).toContain('git pull origin $(git branch --show-current)');
+    expect(prompt).toContain('glab mr diff 10');
+    expect(prompt).toContain(
+      'glab api --method POST "projects/group%2Fproject/merge_requests/10/notes"'
+    );
+    expect(prompt).toContain(
+      'glab api --method POST "projects/group%2Fproject/merge_requests/10/discussions"'
+    );
+    expect(prompt).not.toContain('DO NOT fetch or pull');
+    expect(prompt).not.toContain('Do not run `git fetch`');
   });
 });

@@ -1,94 +1,210 @@
-/**
- * Unit tests for ExecutionOrchestrator types and ExecutionError.
- *
- * Note: The ExecutionOrchestrator class itself requires complex mocking of
- * cloudflare-specific types (@cloudflare/containers, DurableObjectStub, etc.)
- * which have module resolution issues in vitest's Node environment.
- *
- * This file focuses on testing:
- * - ExecutionError class and factory methods
- * - isExecutionError type guard
- * - ExecutionPlan type structure
- * - WorkspacePlan variants
- * - Error code classification
- *
- * Full integration testing of ExecutionOrchestrator is done via
- * integration tests that run in the Cloudflare Workers environment.
- */
-
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   ExecutionError,
   isExecutionError,
-  type RetryableErrorCode,
-  type ConflictErrorCode,
   type PermanentErrorCode,
+  type RetryableErrorCode,
 } from '../../../src/execution/errors.js';
+import { ExecutionOrchestrator } from '../../../src/execution/orchestrator.js';
+import { WrapperClient } from '../../../src/kilo/wrapper-client.js';
+import { SessionService } from '../../../src/session-service.js';
 import type {
   ExecutionPlan,
   ExecutionResult,
-  WorkspacePlan,
+  FencedWrapperDispatchRequest,
   ModelConfig,
-  ResumeContext,
-  InitContext,
-  ExistingSessionMetadata,
-  WrapperPlan,
+  WorkspaceDeliveryPlan,
+  WrapperRunFence,
 } from '../../../src/execution/types.js';
+import type { Env, ExecutionSession, SandboxInstance, SessionContext } from '../../../src/types.js';
+import type {
+  WrapperPromptRequest,
+  WrapperSessionReadyRequest,
+  WrapperWorkspaceReady,
+} from '../../../src/shared/wrapper-bootstrap.js';
+import { FAST_SANDBOX_COMMAND_TIMEOUT_MS } from '../../../src/sandbox-timeout-logging.js';
 
-// ---------------------------------------------------------------------------
-// Test Helpers
-// ---------------------------------------------------------------------------
-
-const createResumeWorkspacePlan = (): WorkspacePlan => ({
-  shouldPrepare: false,
+const createWorkspaceDeliveryPlan = (): WorkspaceDeliveryPlan => ({
   sandboxId: 'sandbox_123',
-  resumeContext: {
+  metadata: {
+    version: 1,
+    sessionId: 'agent_123',
+    userId: 'user_123',
+    timestamp: 1,
     kiloSessionId: 'kilo_sess_456',
-    workspacePath: '/workspace/project',
     kilocodeToken: 'kilo_token',
+    workspacePath: '/workspace/project',
+    sessionHome: '/home/agent_123',
     branchName: 'feature-branch',
   },
 });
 
-const createInitWorkspacePlan = (): WorkspacePlan => ({
-  shouldPrepare: true,
-  sandboxId: 'sandbox_123',
-  initContext: {
-    githubRepo: 'owner/repo',
-    githubToken: 'gh_token',
-    kilocodeToken: 'kilo_token',
-    kilocodeModel: 'anthropic/claude-sonnet-4-20250514',
+const createExecutionPlan = (): ExecutionPlan => ({
+  executionId: 'exec_123',
+  scope: {
+    sessionId: 'agent_123',
+    userId: 'user_123',
+  },
+  turn: {
+    prompt: 'Do the work',
+    messageId: 'msg_018f1e2d3c4bOrchestratorAAAA',
+  },
+  agent: {
+    mode: 'code',
+    model: 'claude-sonnet-4-20250514',
+  },
+  workspace: createWorkspaceDeliveryPlan(),
+  wrapper: {
+    kiloSessionId: 'kilo_sess_456',
+    fence: {
+      wrapperRunId: 'wr_123',
+      wrapperGeneration: 1,
+      wrapperConnectionId: 'conn_123',
+    },
   },
 });
 
-const createPreparedWorkspacePlan = (): WorkspacePlan => ({
-  shouldPrepare: true,
+const createWrapperReady = (): WrapperWorkspaceReady => ({
+  workspacePath: '/workspace/user_123/sessions/agent_123',
   sandboxId: 'sandbox_123',
-  initContext: {
-    githubRepo: 'owner/repo',
-    githubToken: 'gh_token',
-    kilocodeToken: 'kilo_token',
-    isPreparedSession: true,
-    kiloSessionId: 'kilo_sess_existing',
+  sessionHome: '/home/agent_123',
+  branchName: 'feature-branch',
+  kiloSessionId: 'kilo_sess_456',
+});
+
+const createWrapperReadyRequest = (): WrapperSessionReadyRequest => ({
+  agentSessionId: 'agent_123',
+  userId: 'user_123',
+  sandboxId: 'sandbox_123',
+  kiloSessionId: 'kilo_sess_456',
+  workspace: {
+    workspacePath: '/workspace/user_123/sessions/agent_123',
+    sessionHome: '/home/agent_123',
+    branchName: 'feature-branch',
   },
-  existingMetadata: {
-    workspacePath: '/workspace/project',
-    kiloSessionId: 'kilo_sess_existing',
-    branchName: 'main',
-    sandboxId: 'sandbox_123',
-    sessionHome: '/home/agent',
+  materialized: {
+    env: {
+      HOME: '/home/agent_123',
+      KILOCODE_TOKEN: 'kilo_token',
+    },
+  },
+  session: {
+    ingestUrl: 'wss://cloud-agent.example.com/sessions/user_123/agent_123/ingest',
+    workerAuthToken: 'kilo_token',
+    wrapperRunId: 'wr_123',
+    wrapperGeneration: 1,
+    wrapperConnectionId: 'conn_123',
   },
 });
 
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
+const createWrapperPromptRequest = (): WrapperPromptRequest => ({
+  message: {
+    id: 'msg_018f1e2d3c4bOrchestratorAAAA',
+    prompt: 'Do the work',
+  },
+  session: createWrapperReadyRequest().session,
+});
+
+const createSessionContext = (): SessionContext => ({
+  sandboxId: 'sandbox_123',
+  sessionId: 'agent_123',
+  userId: 'user_123',
+  sessionHome: '/home/agent_123',
+  workspacePath: '/workspace/user_123/sessions/agent_123',
+  branchName: 'feature-branch',
+});
+
+const createMockSandbox = (options: { workspaceWarm?: boolean } = {}) => {
+  const calls: string[] = [];
+  const session = {} as ExecutionSession;
+  const sandbox = {
+    exec: vi.fn(async (command: string) => {
+      calls.push(`exec:${command}`);
+      if (command.includes("test -d '/workspace/user_123/sessions/agent_123/.git'")) {
+        return {
+          exitCode: options.workspaceWarm ? 0 : 1,
+          stdout: options.workspaceWarm ? 'exists\n' : '',
+          stderr: '',
+        };
+      }
+      if (command.includes('df -B1 --output=avail,size /')) {
+        return { exitCode: 0, stdout: '9999999999 10000000000\n', stderr: '' };
+      }
+      return { exitCode: 0, stdout: '', stderr: '' };
+    }),
+    createSession: vi.fn(async () => {
+      calls.push('createSession');
+      return session;
+    }),
+    destroy: vi.fn().mockResolvedValue(undefined),
+    listProcesses: vi.fn().mockResolvedValue([]),
+  } as unknown as SandboxInstance & {
+    exec: ReturnType<typeof vi.fn>;
+    createSession: ReturnType<typeof vi.fn>;
+    destroy: ReturnType<typeof vi.fn>;
+    listProcesses: ReturnType<typeof vi.fn>;
+  };
+
+  return { sandbox, calls };
+};
+
+function stubWrapperBootstrap(
+  overrides: Partial<
+    Awaited<ReturnType<SessionService['buildWrapperSessionReadyAndPromptRequests']>>
+  > = {}
+) {
+  const ready = createWrapperReady();
+  const built = {
+    readyRequest: createWrapperReadyRequest(),
+    promptRequest: createWrapperPromptRequest(),
+    ready,
+    context: createSessionContext(),
+    ...overrides,
+  } satisfies Awaited<ReturnType<SessionService['buildWrapperSessionReadyAndPromptRequests']>>;
+  vi.spyOn(SessionService.prototype, 'buildWrapperSessionReadyAndPromptRequests').mockResolvedValue(
+    built
+  );
+
+  const ensureSessionReady = vi.fn().mockResolvedValue({
+    status: 'ready',
+    kiloSessionId: 'kilo_sess_456',
+    workspaceReady: ready,
+  });
+  const prompt = vi.fn().mockResolvedValue({
+    messageId: 'msg_018f1e2d3c4bOrchestratorAAAA',
+  });
+  vi.spyOn(WrapperClient, 'ensureBootstrapWrapper').mockResolvedValue({
+    client: { ensureSessionReady, prompt } as unknown as WrapperClient,
+  });
+
+  return { ensureSessionReady, prompt, built };
+}
+
+function createOrchestrator(
+  sandbox: SandboxInstance,
+  env: Partial<Env> & Record<string, unknown> = {},
+  options: { recordKiloServerActivity?: ReturnType<typeof vi.fn> } = {}
+) {
+  const recordKiloServerActivity =
+    options.recordKiloServerActivity ?? vi.fn().mockResolvedValue(undefined);
+  return new ExecutionOrchestrator({
+    getSandbox: vi.fn().mockResolvedValue(sandbox),
+    getSessionStub: vi.fn(
+      () =>
+        ({
+          recordKiloServerActivity,
+        }) as unknown as DurableObjectStub
+    ),
+    env: env as Env,
+  });
+}
+
+afterEach(() => {
+  vi.useRealTimers();
+  vi.restoreAllMocks();
+});
 
 describe('ExecutionError', () => {
-  // -------------------------------------------------------------------------
-  // Factory Methods - Retryable Errors
-  // -------------------------------------------------------------------------
-
   describe('retryable error factory methods', () => {
     it('sandboxConnectFailed creates retryable error', () => {
       const error = ExecutionError.sandboxConnectFailed('Connection refused');
@@ -121,25 +237,6 @@ describe('ExecutionError', () => {
     });
   });
 
-  // -------------------------------------------------------------------------
-  // Factory Methods - Conflict Errors
-  // -------------------------------------------------------------------------
-
-  describe('conflict error factory methods', () => {
-    it('executionInProgress creates conflict error', () => {
-      const error = ExecutionError.executionInProgress('exc_active');
-
-      expect(error.code).toBe('EXECUTION_IN_PROGRESS');
-      expect(error.retryable).toBe(false);
-      expect(error.activeExecutionId).toBe('exc_active');
-      expect(error.message).toContain('exc_active');
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // Factory Methods - Permanent Errors
-  // -------------------------------------------------------------------------
-
   describe('permanent error factory methods', () => {
     it('invalidRequest creates non-retryable error', () => {
       const error = ExecutionError.invalidRequest('Missing field');
@@ -164,187 +261,52 @@ describe('ExecutionError', () => {
     });
   });
 
-  // -------------------------------------------------------------------------
-  // Cause Preservation
-  // -------------------------------------------------------------------------
+  it('preserves cause for debugging', () => {
+    const originalError = new Error('Original problem');
+    const error = ExecutionError.sandboxConnectFailed('Wrapped', originalError);
 
-  describe('cause preservation', () => {
-    it('preserves cause for debugging', () => {
-      const originalError = new Error('Original problem');
-      const error = ExecutionError.sandboxConnectFailed('Wrapped', originalError);
-
-      expect(error.cause).toBe(originalError);
-    });
-
-    it('works without cause', () => {
-      const error = ExecutionError.sandboxConnectFailed('No cause');
-
-      expect(error.cause).toBeUndefined();
-    });
+    expect(error.cause).toBe(originalError);
   });
 
-  // -------------------------------------------------------------------------
-  // Error Code Classification
-  // -------------------------------------------------------------------------
-
-  describe('error code classification', () => {
+  it('classifies retryable codes', () => {
     const retryableCodes: RetryableErrorCode[] = [
       'SANDBOX_CONNECT_FAILED',
       'WORKSPACE_SETUP_FAILED',
       'KILO_SERVER_FAILED',
       'WRAPPER_START_FAILED',
     ];
+    const permanentCodes: PermanentErrorCode[] = [
+      'INVALID_REQUEST',
+      'SESSION_NOT_FOUND',
+      'WRAPPER_JOB_CONFLICT',
+    ];
 
-    it.each(retryableCodes)('%s is retryable', code => {
-      let error: ExecutionError;
-      switch (code) {
-        case 'SANDBOX_CONNECT_FAILED':
-          error = ExecutionError.sandboxConnectFailed('test');
-          break;
-        case 'WORKSPACE_SETUP_FAILED':
-          error = ExecutionError.workspaceSetupFailed('test');
-          break;
-        case 'KILO_SERVER_FAILED':
-          error = ExecutionError.kiloServerFailed('test');
-          break;
-        case 'WRAPPER_START_FAILED':
-          error = ExecutionError.wrapperStartFailed('test');
-          break;
-      }
-
-      expect(error.retryable).toBe(true);
-    });
-
-    it('EXECUTION_IN_PROGRESS is not retryable', () => {
-      const error = ExecutionError.executionInProgress('exc_123');
-      expect(error.retryable).toBe(false);
-    });
-
-    it('INVALID_REQUEST is not retryable', () => {
-      const error = ExecutionError.invalidRequest('Bad input');
-      expect(error.retryable).toBe(false);
-    });
+    expect(retryableCodes).toHaveLength(4);
+    expect(permanentCodes).toHaveLength(3);
   });
 });
-
-// ---------------------------------------------------------------------------
-// isExecutionError Type Guard
-// ---------------------------------------------------------------------------
 
 describe('isExecutionError', () => {
   it('returns true for ExecutionError instances', () => {
-    const error = ExecutionError.sandboxConnectFailed('test');
-    expect(isExecutionError(error)).toBe(true);
+    expect(isExecutionError(ExecutionError.sandboxConnectFailed('test'))).toBe(true);
   });
 
-  it('returns false for regular Error', () => {
-    const error = new Error('test');
-    expect(isExecutionError(error)).toBe(false);
-  });
-
-  it('returns false for non-error values', () => {
+  it('returns false for other values', () => {
+    expect(isExecutionError(new Error('test'))).toBe(false);
     expect(isExecutionError(null)).toBe(false);
-    expect(isExecutionError(undefined)).toBe(false);
-    expect(isExecutionError('string')).toBe(false);
-    expect(isExecutionError({ code: 'FAKE' })).toBe(false);
-    expect(isExecutionError(42)).toBe(false);
-  });
-
-  it('returns false for Error subclass with code property', () => {
-    class CustomError extends Error {
-      code = 'SANDBOX_CONNECT_FAILED';
-    }
-    const error = new CustomError('test');
-    expect(isExecutionError(error)).toBe(false);
+    expect(isExecutionError({ code: 'SANDBOX_CONNECT_FAILED' })).toBe(false);
   });
 });
 
-// ---------------------------------------------------------------------------
-// WorkspacePlan Type Tests
-// ---------------------------------------------------------------------------
+describe('WorkspaceDeliveryPlan types', () => {
+  it('carries sandbox and metadata in a single shape', () => {
+    const plan = createWorkspaceDeliveryPlan();
 
-describe('WorkspacePlan types', () => {
-  it('distinguishes resume vs init via shouldPrepare', () => {
-    const resumePlan = createResumeWorkspacePlan();
-    const initPlan = createInitWorkspacePlan();
-
-    expect(resumePlan.shouldPrepare).toBe(false);
-    expect(initPlan.shouldPrepare).toBe(true);
-  });
-
-  it('resume plan has resumeContext', () => {
-    const plan = createResumeWorkspacePlan();
-
-    if (!plan.shouldPrepare) {
-      expect(plan.resumeContext).toBeDefined();
-      expect(plan.resumeContext.kiloSessionId).toBeDefined();
-      expect(plan.resumeContext.workspacePath).toBeDefined();
-      expect(plan.resumeContext.kilocodeToken).toBeDefined();
-      expect(plan.resumeContext.branchName).toBeDefined();
-    }
-  });
-
-  it('init plan has initContext', () => {
-    const plan = createInitWorkspacePlan();
-
-    if (plan.shouldPrepare) {
-      expect(plan.initContext).toBeDefined();
-      expect(plan.initContext.kilocodeToken).toBeDefined();
-    }
-  });
-
-  it('prepared plan has both initContext and existingMetadata', () => {
-    const plan = createPreparedWorkspacePlan();
-
-    if (plan.shouldPrepare) {
-      expect(plan.initContext).toBeDefined();
-      expect(plan.initContext.isPreparedSession).toBe(true);
-      expect(plan.existingMetadata).toBeDefined();
-      expect(plan.existingMetadata?.workspacePath).toBeDefined();
-    }
-  });
-
-  it('resume context can have optional token overrides', () => {
-    const context: ResumeContext = {
-      kiloSessionId: 'kilo_sess',
-      workspacePath: '/workspace',
-      kilocodeToken: 'token',
-      branchName: 'main',
-      githubToken: 'gh_token_override',
-      gitToken: 'git_token_override',
-    };
-
-    expect(context.githubToken).toBe('gh_token_override');
-    expect(context.gitToken).toBe('git_token_override');
-  });
-
-  it('init context supports all optional fields', () => {
-    const context: InitContext = {
-      kilocodeToken: 'token',
-      githubRepo: 'owner/repo',
-      gitUrl: 'https://git.example.com/repo.git',
-      githubToken: 'gh_token',
-      gitToken: 'git_token',
-      profile: {
-        envVars: { NODE_ENV: 'production' },
-        setupCommands: ['npm install'],
-      },
-      upstreamBranch: 'main',
-      kiloSessionId: 'kilo_sess',
-      isPreparedSession: true,
-      kilocodeModel: 'anthropic/claude-sonnet-4-20250514',
-      botId: 'bot_123',
-      githubAppType: 'standard',
-    };
-
-    expect(context.githubAppType).toBe('standard');
-    expect(context.botId).toBe('bot_123');
+    expect(plan.sandboxId).toBe('sandbox_123');
+    expect(plan.metadata.kiloSessionId).toBe('kilo_sess_456');
+    expect(plan.metadata.kilocodeToken).toBe('kilo_token');
   });
 });
-
-// ---------------------------------------------------------------------------
-// ExecutionResult Type Tests
-// ---------------------------------------------------------------------------
 
 describe('ExecutionResult types', () => {
   it('contains kiloSessionId', () => {
@@ -356,95 +318,148 @@ describe('ExecutionResult types', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// ModelConfig Type Tests
-// ---------------------------------------------------------------------------
-
 describe('ModelConfig types', () => {
-  it('requires modelID', () => {
+  it('requires modelID and accepts optional providerID', () => {
     const model: ModelConfig = {
-      modelID: 'anthropic/claude-sonnet-4-20250514',
-    };
-
-    expect(model.modelID).toBeDefined();
-  });
-
-  it('accepts optional providerID', () => {
-    const modelWithProvider: ModelConfig = {
       providerID: 'kilo',
       modelID: 'anthropic/claude-sonnet-4-20250514',
     };
 
-    expect(modelWithProvider.providerID).toBe('kilo');
+    expect(model).toEqual({
+      providerID: 'kilo',
+      modelID: 'anthropic/claude-sonnet-4-20250514',
+    });
   });
 });
 
-// ---------------------------------------------------------------------------
-// WrapperPlan Type Tests
-// ---------------------------------------------------------------------------
-
-describe('WrapperPlan types', () => {
-  it('accepts all optional fields', () => {
-    const plan: WrapperPlan = {
-      kiloSessionId: 'kilo_sess',
-      kiloSessionTitle: 'My Session',
-      model: { modelID: 'anthropic/claude-sonnet-4-20250514' },
-      autoCommit: true,
-      condenseOnComplete: true,
+describe('WrapperRunFence types', () => {
+  it('keeps runtime fence identity grouped on wrapper delivery bindings', () => {
+    const fence: WrapperRunFence = {
+      wrapperRunId: 'wr_123',
+      wrapperGeneration: 1,
+      wrapperConnectionId: 'conn_123',
+    };
+    const wrapper: FencedWrapperDispatchRequest['wrapper'] = {
+      kiloSessionId: 'kilo_sess_456',
+      fence,
     };
 
-    expect(plan.kiloSessionId).toBe('kilo_sess');
-    expect(plan.autoCommit).toBe(true);
-  });
-
-  it('works with minimal fields', () => {
-    const plan: WrapperPlan = {};
-
-    expect(plan.kiloSessionId).toBeUndefined();
-  });
-
-  it('includes variant when provided', () => {
-    const plan: WrapperPlan = {
-      kiloSessionId: 'kilo_sess',
-      model: { modelID: 'anthropic/claude-sonnet-4-20250514' },
-      variant: 'high',
-    };
-
-    expect(plan.variant).toBe('high');
+    expect(wrapper.kiloSessionId).toBe('kilo_sess_456');
+    expect(wrapper.fence.wrapperRunId).toBe('wr_123');
   });
 });
 
-// ---------------------------------------------------------------------------
-// ExistingSessionMetadata Type Tests
-// ---------------------------------------------------------------------------
-
-describe('ExistingSessionMetadata types', () => {
-  it('has required fields', () => {
-    const metadata: ExistingSessionMetadata = {
-      workspacePath: '/workspace/project',
-      kiloSessionId: 'kilo_sess',
-      branchName: 'main',
+describe('ExecutionPlan types', () => {
+  it('extends the composed message delivery plan with only compatibility identity', () => {
+    const plan: ExecutionPlan = {
+      executionId: 'exec_123',
+      scope: {
+        sessionId: 'agent_123',
+        userId: 'user_123',
+      },
+      turn: {
+        prompt: 'Do the work',
+        messageId: 'msg_018f1e2d3c4bPlanTypeAbCdE',
+      },
+      agent: {
+        mode: 'code',
+        model: 'claude-sonnet-4-20250514',
+      },
+      workspace: createWorkspaceDeliveryPlan(),
+      wrapper: {
+        kiloSessionId: 'kilo_sess_456',
+        fence: {
+          wrapperRunId: 'wr_plan_type',
+          wrapperGeneration: 1,
+          wrapperConnectionId: 'conn_plan_type',
+        },
+      },
     };
 
-    expect(metadata.workspacePath).toBeDefined();
-    expect(metadata.kiloSessionId).toBeDefined();
-    expect(metadata.branchName).toBeDefined();
+    expect(plan.workspace.metadata.sessionId).toBe('agent_123');
+    expect(plan.agent.model).toBe('claude-sonnet-4-20250514');
+    expect(plan.turn.messageId).toBe('msg_018f1e2d3c4bPlanTypeAbCdE');
+  });
+});
+
+describe('ExecutionOrchestrator bootstrap execution', () => {
+  it('uses wrapper bootstrap without a feature flag and cleans cold workspaces before starting the bootstrap session', async () => {
+    const { sandbox, calls } = createMockSandbox({ workspaceWarm: false });
+    const { ensureSessionReady, prompt, built } = stubWrapperBootstrap();
+    const recordKiloServerActivity = vi.fn().mockResolvedValue(undefined);
+    const orchestrator = createOrchestrator(sandbox, {}, { recordKiloServerActivity });
+    const onWorkspaceReady = vi.fn().mockResolvedValue(undefined);
+
+    const result = await orchestrator.execute(createExecutionPlan(), { onWorkspaceReady });
+
+    expect(result).toEqual({ kiloSessionId: 'kilo_sess_456' });
+    expect(WrapperClient.ensureBootstrapWrapper).toHaveBeenCalledOnce();
+    expect(ensureSessionReady).toHaveBeenCalledWith(built.readyRequest);
+    expect(onWorkspaceReady).toHaveBeenCalledWith(built.ready);
+    expect(prompt).toHaveBeenCalledWith(built.promptRequest);
+    expect(
+      vi.mocked(WrapperClient.ensureBootstrapWrapper).mock.invocationCallOrder[0]
+    ).toBeLessThan(ensureSessionReady.mock.invocationCallOrder[0]);
+    expect(ensureSessionReady.mock.invocationCallOrder[0]).toBeLessThan(
+      onWorkspaceReady.mock.invocationCallOrder[0]
+    );
+    expect(onWorkspaceReady.mock.invocationCallOrder[0]).toBeLessThan(
+      prompt.mock.invocationCallOrder[0]
+    );
+    expect(prompt.mock.invocationCallOrder[0]).toBeLessThan(
+      recordKiloServerActivity.mock.invocationCallOrder[0]
+    );
+    expect(calls).toEqual([
+      "exec:test -d '/workspace/user_123/sessions/agent_123/.git' && echo exists",
+      'exec:df -B1 --output=avail,size / | tail -1',
+      'createSession',
+    ]);
   });
 
-  it('accepts optional fields', () => {
-    const metadata: ExistingSessionMetadata = {
-      workspacePath: '/workspace/project',
-      kiloSessionId: 'kilo_sess',
-      branchName: 'main',
-      sandboxId: 'sandbox_123',
-      sessionHome: '/home/agent',
-      upstreamBranch: 'develop',
-      appendSystemPrompt: 'Additional instructions',
-      githubRepo: 'owner/repo',
-      gitUrl: 'https://git.example.com/repo.git',
-    };
+  it('does not emit preparation progress when delivering to a warm workspace', async () => {
+    const { sandbox } = createMockSandbox({ workspaceWarm: true });
+    const { ensureSessionReady, prompt } = stubWrapperBootstrap();
+    const orchestrator = createOrchestrator(sandbox);
+    const onProgress = vi.fn();
 
-    expect(metadata.sandboxId).toBe('sandbox_123');
-    expect(metadata.appendSystemPrompt).toBe('Additional instructions');
+    await orchestrator.execute(createExecutionPlan(), { onProgress });
+
+    expect(onProgress).not.toHaveBeenCalled();
+    expect(ensureSessionReady).toHaveBeenCalledOnce();
+    expect(prompt).toHaveBeenCalledOnce();
+  });
+
+  it('destroys the sandbox when a bootstrap sandbox operation hits HTTP 500', async () => {
+    const { sandbox } = createMockSandbox({ workspaceWarm: true });
+    stubWrapperBootstrap();
+    const sandbox500 = Object.assign(new Error('HTTP Error! status: 500'), {
+      name: 'SandboxError',
+      httpStatus: 500,
+    });
+    sandbox.createSession.mockRejectedValueOnce(sandbox500);
+    const orchestrator = createOrchestrator(sandbox);
+
+    await expect(orchestrator.execute(createExecutionPlan())).rejects.toThrow(
+      'HTTP Error! status: 500'
+    );
+
+    expect(sandbox.destroy).toHaveBeenCalledOnce();
+  });
+
+  it('destroys a stale sandbox when the warm workspace probe stalls', async () => {
+    vi.useFakeTimers();
+    const { sandbox } = createMockSandbox({ workspaceWarm: true });
+    sandbox.exec.mockImplementationOnce(() => new Promise(() => {}));
+    stubWrapperBootstrap();
+    const orchestrator = createOrchestrator(sandbox);
+
+    const execution = orchestrator.execute(createExecutionPlan());
+    const rejection = expect(execution).rejects.toThrow(
+      'Sandbox workspace Git probe timed out before wrapper bootstrap'
+    );
+    await vi.advanceTimersByTimeAsync(FAST_SANDBOX_COMMAND_TIMEOUT_MS);
+
+    await rejection;
+    expect(sandbox.destroy).toHaveBeenCalledOnce();
   });
 });

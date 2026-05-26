@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { KiloCardLayout } from '@/components/KiloCardLayout';
-import { getUserFromAuthOrRedirect } from '@/lib/user.server';
+import { getUserFromAuthOrRedirect } from '@/lib/user/server';
 import { ALL_PLATFORM_IDS, type PlatformId } from '../_components/platforms';
 import { AuthorizeFlow } from './_components/AuthorizeFlow';
 

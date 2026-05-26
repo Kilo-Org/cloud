@@ -38,11 +38,6 @@ export const ReviewConfigSchema = z.object({
     })
   ),
   customInstructions: z.string().nullable(),
-  maxReviewTimeMinutes: z
-    .number()
-    .int()
-    .min(1, 'maxReviewTimeMinutes must be at least 1')
-    .max(120, 'maxReviewTimeMinutes must be at most 120'),
   modelSlug: z
     .string()
     .regex(

@@ -1,4 +1,4 @@
-import { getUserFromAuthOrRedirect } from '@/lib/user.server';
+import { getUserFromAuthOrRedirect } from '@/lib/user/server';
 import { isNewSession } from '@/lib/cloud-agent/session-type';
 import { LegacySessionViewer } from '@/components/cloud-agent-next/LegacySessionViewer';
 import { CloudChatPageWrapperNext } from './CloudChatPageWrapperNext';

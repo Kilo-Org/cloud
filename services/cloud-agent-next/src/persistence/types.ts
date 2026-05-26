@@ -1,10 +1,10 @@
 import type { SandboxId, SessionId, SessionContext, ExecutionSession } from '../types.js';
 import type { Sandbox } from '@cloudflare/sandbox';
 import type { CloudAgentSession } from './CloudAgentSession.js';
-import type { EncryptedSecrets, MCPSecretValue } from '../router/schemas.js';
-import type { CallbackTarget } from '../callbacks/index.js';
-import type { Images, SessionProfileBundle, InitialExecutionPayload } from './schemas.js';
+import type { MCPSecretValue } from '../router/schemas.js';
+import type { SessionMetadata } from './session-metadata.js';
 import type { SessionIngestBinding } from '../session-ingest-binding.js';
+import type { GitTokenService } from '../types.js';
 
 /**
  * Local MCP server configuration (runs a command).
@@ -98,124 +98,7 @@ export type RuntimeKiloCommand = {
   subtask?: boolean;
 };
 
-export type CloudAgentSessionState = {
-  /** Current version timestamp (for cache invalidation) */
-  version: number;
-  /** Session identifier (e.g., agent_abc-123) */
-  sessionId: string;
-  /** Organization ID (optional for personal accounts) */
-  orgId?: string;
-  /** User ID */
-  userId: string;
-  /** Bot/service identifier (if token is for a bot) */
-  botId?: string;
-  /** Platform that created this session (e.g. slack, app-builder) */
-  createdOnPlatform?: string;
-  /** Kilocode authentication token for CLI (stored securely, never exposed in getSession) */
-  kilocodeToken?: string;
-  /** Last save timestamp */
-  timestamp: number;
-  /** GitHub repository (e.g., 'facebook/react') */
-  githubRepo?: string;
-  /** GitHub token for private repos */
-  githubToken?: string;
-  /** GitHub App installation ID for token generation */
-  githubInstallationId?: string;
-  /** GitHub App type: 'standard' for full KiloConnect, 'lite' for read-only KiloConnect-Lite */
-  githubAppType?: 'standard' | 'lite';
-  /** Generic git repository URL (full HTTPS URL, e.g., 'https://gitlab.com/org/repo.git') */
-  gitUrl?: string;
-  /** Git token for authentication (username is always 'x-access-token') */
-  gitToken?: string;
-  /** Git platform type for correct token/env var handling */
-  platform?: 'github' | 'gitlab';
-  /** Whether the GitLab token was auto-looked up via git-token-service (enables refresh on resume) */
-  gitlabTokenManaged?: boolean;
-  /**
-   * Profile-derived configuration (envVars, encryptedSecrets, setupCommands,
-   * mcpServers, runtimeSkills, runtimeAgents). Always written in this nested
-   * form; the legacy flat fields below are a read-only compatibility surface
-   * for sessions stored before nesting landed. Never access these fields
-   * directly — go through `readProfileBundle` to get a normalized bundle.
-   */
-  profile?: SessionProfileBundle;
-  /** @deprecated Legacy flat read-fallback. Use `readProfileBundle(state).envVars`. */
-  envVars?: Record<string, string>;
-  /** @deprecated Legacy flat read-fallback. Use `readProfileBundle(state).encryptedSecrets`. */
-  encryptedSecrets?: EncryptedSecrets;
-  /** @deprecated Legacy flat read-fallback. Use `readProfileBundle(state).setupCommands`. */
-  setupCommands?: string[];
-  /** @deprecated Legacy flat read-fallback. Use `readProfileBundle(state).mcpServers`. */
-  mcpServers?: Record<string, MCPServerConfig>;
-  /** @deprecated Legacy flat read-fallback. Use `readProfileBundle(state).runtimeSkills`. */
-  runtimeSkills?: readonly RuntimeSkill[];
-  /** @deprecated Legacy flat read-fallback. Use `readProfileBundle(state).runtimeAgents`. */
-  runtimeAgents?: readonly RuntimeAgent[];
-  /** @deprecated Legacy flat read-fallback. Use `readProfileBundle(state).kiloCommands`. */
-  kiloCommands?: readonly RuntimeKiloCommand[];
-  /** Upstream branch to checkout when cloning the repo */
-  upstreamBranch?: string;
-  /** Kilo CLI session ID for continuation (from session_created event) */
-  kiloSessionId?: string;
-
-  // Execution params (for prepareSession flow)
-  /** The prompt/task to execute */
-  prompt?: string;
-  /** The mode to use (e.g., 'code', 'architect') */
-  mode?: string;
-  /** The model to use */
-  model?: string;
-  variant?: string;
-  /** Whether to auto-commit changes */
-  autoCommit?: boolean;
-  /** Whether to condense context after execution */
-  condenseOnComplete?: boolean;
-  /** Custom text to append to the system prompt */
-  appendSystemPrompt?: string;
-  /** PR gate threshold — when not "off", the agent evaluates findings and reports gateResult */
-  gateThreshold?: 'off' | 'all' | 'warning' | 'critical';
-
-  // Lifecycle timestamps (for state machine)
-  /** Timestamp when session was prepared (state machine: prepared) */
-  preparedAt?: number;
-  /** Timestamp when session execution started (state machine: initiated) */
-  initiatedAt?: number;
-
-  // Callback configuration
-  /** Optional callback target for execution completion notifications */
-  callbackTarget?: CallbackTarget;
-
-  // Image attachments
-  /** Optional image attachments to download from R2 to the sandbox */
-  images?: Images;
-
-  // Kilo server lifecycle tracking
-  /** Timestamp of last kilo server activity (for idle timeout cleanup) */
-  kiloServerLastActivity?: number;
-
-  // Workspace metadata (set during prepareSession)
-  /** Workspace path where the repo was cloned */
-  workspacePath?: string;
-  /** Session home directory */
-  sessionHome?: string;
-  /** Git branch name created for the session */
-  branchName?: string;
-  /** Sandbox ID where the session runs */
-  sandboxId?: SandboxId;
-  /** Devcontainer metadata needed to re-enter the same runtime on follow-up executions. */
-  devcontainer?: {
-    workspacePath: string;
-    innerWorkspaceFolder: string;
-    wrapperPort: number;
-    configPath: string;
-  };
-
-  // Initial message ID for correlation
-  initialMessageId?: string;
-
-  // Discriminated payload for the first execution (prompt or command)
-  initialPayload?: InitialExecutionPayload;
-};
+export type CloudAgentSessionState = SessionMetadata;
 
 /**
  * Result type for atomic DO operations with success/error feedback.
@@ -263,6 +146,8 @@ export type PersistenceEnv = {
 
   /** URL for session ingest service, injected into sandbox session env vars */
   KILO_SESSION_INGEST_URL?: string;
+  /** Worker base URL for building wrapper ingest WebSocket endpoints */
+  WORKER_URL?: string;
 
   /** Shared secret for internal service-to-service authentication */
   INTERNAL_API_SECRET_PROD: SecretsStoreSecret;
@@ -273,6 +158,8 @@ export type PersistenceEnv = {
   R2_ATTACHMENTS_BUCKET?: string;
   /** Comma-separated org IDs that use per-session sandbox containers */
   PER_SESSION_SANDBOX_ORG_IDS?: string;
+  /** Service binding for centralized git token generation */
+  GIT_TOKEN_SERVICE?: GitTokenService;
 };
 
 // Re-export commonly used types for convenience

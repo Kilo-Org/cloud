@@ -103,6 +103,7 @@ export const InternalStatusResponseSchema = z.object({
   terminalReason: z
     .enum([
       'billing',
+      'model_not_found',
       'user_cancelled',
       'superseded',
       'interrupted',

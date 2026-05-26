@@ -86,29 +86,29 @@ Open <http://localhost:3000> to use the dashboard.
 
 Control how the three processes are displayed with `--display <mode>`:
 
-| Mode    | Description                                                           |
-| ------- | --------------------------------------------------------------------- |
-| `tabs`  | Separate terminal tabs (default; auto-detects iTerm2 vs Terminal.app) |
-| `split` | Single tab with split panes (requires iTerm2)                         |
-| `tmux`  | tmux session `kiloclaw` (attach with `tmux attach -t kiloclaw`)       |
+| Mode | Description |
+|---|---|
+| `tabs` | Separate terminal tabs (default; auto-detects iTerm2 vs Terminal.app) |
+| `split` | Single tab with split panes (requires iTerm2) |
+| `tmux` | tmux session `kiloclaw` (attach with `tmux attach -t kiloclaw`) |
 
 ### Other flags
 
-| Flag                          | Description                                                                    |
-| ----------------------------- | ------------------------------------------------------------------------------ |
-| `--has-controller-changes`    | Build and push a new Docker image before starting                              |
-| `--local-openclaw-image`      | Build and push with `Dockerfile.local` and one local OpenClaw tarball          |
+| Flag | Description |
+|---|---|
+| `--has-controller-changes` | Build and push a new Docker image before starting |
+| `--local-openclaw-image` | Build and push with `Dockerfile.local` and one local OpenClaw tarball |
 | `--production-openclaw-image` | Use the production `Dockerfile` even when `.dev.vars` records local image mode |
-| `--tunnel-name <name>`        | Use a named Cloudflare tunnel instead of a quick one                           |
+| `--tunnel-name <name>` | Use a named Cloudflare tunnel instead of a quick one |
 
 ### Script configuration
 
 Save defaults in a config file so you don't need to pass flags every time.
 The script checks two locations (project-local overrides user-global):
 
-| Location                            | Scope                       |
-| ----------------------------------- | --------------------------- |
-| `kiloclaw/scripts/.dev-start.conf`  | Per-worktree (gitignored)   |
+| Location | Scope |
+|---|---|
+| `kiloclaw/scripts/.dev-start.conf` | Per-worktree (gitignored) |
 | `~/.config/kiloclaw/dev-start.conf` | Shared across all worktrees |
 
 See `scripts/.dev-start.conf.example` for available options. CLI flags
@@ -222,11 +222,11 @@ are auto-managed and which require manual setup.
 
 ### Auth (required)
 
-| Variable               | Description                                                                                                                          | How to generate        | Source  | Auto-managed |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | ---------------------- | ------- | ------------ |
-| `NEXTAUTH_SECRET`      | JWT signing key (HS256). Must match the Next.js app's secret.                                                                        | `openssl rand -hex 32` | Vercel  | Yes          |
-| `INTERNAL_API_SECRET`  | Shared key for platform API routes (`x-internal-api-key` header). Must match Next.js internal API secrets.                           | `openssl rand -hex 32` | Vercel  | Yes          |
-| `GATEWAY_TOKEN_SECRET` | HMAC key for per-sandbox gateway tokens. Worker-only (Next.js reads derived tokens from the API). Can be any arbitrary value in dev. | `openssl rand -hex 32` | Example | No           |
+| Variable | Description | How to generate | Source | Auto-managed |
+|---|---|---|---|---|
+| `NEXTAUTH_SECRET` | JWT signing key (HS256). Must match the Next.js app's secret. | `openssl rand -hex 32` | Vercel | Yes |
+| `INTERNAL_API_SECRET` | Shared key for platform API routes (`x-internal-api-key` header). Must match Next.js internal API secrets. | `openssl rand -hex 32` | Vercel | Yes |
+| `GATEWAY_TOKEN_SECRET` | HMAC key for per-sandbox gateway tokens. Worker-only (Next.js reads derived tokens from the API). Can be any arbitrary value in dev. | `openssl rand -hex 32` | Example | No |
 
 For local dev, any placeholder values work (the example file has defaults).
 For production, generate real secrets and keep `NEXTAUTH_SECRET` and
@@ -236,23 +236,23 @@ For production, generate real secrets and keep `NEXTAUTH_SECRET` and
 
 KiloClaw uses the KiloCode provider only.
 
-| Variable           | Description                                                                |
-| ------------------ | -------------------------------------------------------------------------- |
+| Variable | Description |
+|---|---|
 | `KILOCODE_API_KEY` | Per-instance KiloCode API key (injected by Next.js during provision/patch) |
 
 ### Fly.io
 
-| Variable                 | Description                                                                             | Source       | Auto-managed |
-| ------------------------ | --------------------------------------------------------------------------------------- | ------------ | ------------ |
-| `FLY_API_TOKEN`          | Fly org token                                                                           | dev-start.sh | Yes          |
-| `FLY_ORG_SLUG`           | Fly org slug (read by script for token creation)                                        | Example      | No           |
-| `FLY_REGISTRY_APP`       | Shared Fly app that holds Docker images (e.g., `kiloclaw-dev`)                          | Example      | No           |
-| `FLY_APP_NAME`           | Legacy fallback app name for existing instances (may be removed in future)              | Example      | No           |
-| `FLY_REGION`             | Region priority list, e.g. `us,eu`. Tries US first, falls back to EU, then gives up.    | Example      | No           |
-| `FLY_IMAGE_TAG`          | Docker image tag. Set automatically by `scripts/push-dev.sh`, or use `latest` to start. | push-dev.sh  | Yes          |
-| `FLY_IMAGE_DIGEST`       | Docker image digest. Set automatically by `scripts/push-dev.sh`.                        | push-dev.sh  | Yes          |
-| `FLY_IMAGE_CONTENT_MODE` | Image hash mode, `production` or `local`. Set automatically by `scripts/push-dev.sh`.   | push-dev.sh  | Yes          |
-| `OPENCLAW_VERSION`       | OpenClaw version in the image. Set automatically by `scripts/push-dev.sh`.              | push-dev.sh  | Yes          |
+| Variable | Description | Source | Auto-managed |
+|---|---|---|---|
+| `FLY_API_TOKEN` | Fly org token | dev-start.sh | Yes |
+| `FLY_ORG_SLUG` | Fly org slug (read by script for token creation) | Example | No |
+| `FLY_REGISTRY_APP` | Shared Fly app that holds Docker images (e.g., `kiloclaw-dev`) | Example | No |
+| `FLY_APP_NAME` | Legacy fallback app name for existing instances (may be removed in future) | Example | No |
+| `FLY_REGION` | Region priority list, e.g. `us,eu`. Tries US first, falls back to EU, then gives up. | Example | No |
+| `FLY_IMAGE_TAG` | Docker image tag. Set automatically by `scripts/push-dev.sh`, or use `latest` to start. | push-dev.sh | Yes |
+| `FLY_IMAGE_DIGEST` | Docker image digest. Set automatically by `scripts/push-dev.sh`. | push-dev.sh | Yes |
+| `FLY_IMAGE_CONTENT_MODE` | Image hash mode, `production` or `local`. Set automatically by `scripts/push-dev.sh`. | push-dev.sh | Yes |
+| `OPENCLAW_VERSION` | OpenClaw version in the image. Set automatically by `scripts/push-dev.sh`. | push-dev.sh | Yes |
 
 `FLY_IMAGE_TAG`, `FLY_IMAGE_DIGEST`, and `OPENCLAW_VERSION` together control
 what version gets deployed by default for your dev instances. The build script
@@ -261,21 +261,21 @@ values or use `latest` (if a `latest` tag exists in the registry).
 
 ### Tunnel / API
 
-| Variable                | Description                                 | Source       | Auto-managed |
-| ----------------------- | ------------------------------------------- | ------------ | ------------ |
-| `KILOCODE_API_BASE_URL` | Your tunnel URL + `/api/gateway/`           | dev-start.sh | Yes          |
-| `KILOCLAW_CHECKIN_URL`  | Your tunnel URL + `/api/controller/checkin` | dev-start.sh | Yes          |
+| Variable | Description | Source | Auto-managed |
+|---|---|---|---|
+| `KILOCODE_API_BASE_URL` | Your tunnel URL + `/api/gateway/` | dev-start.sh | Yes |
+| `KILOCLAW_CHECKIN_URL` | Your tunnel URL + `/api/controller/checkin` | dev-start.sh | Yes |
 
 ### R2 Persistence
 
 Without these, container data is ephemeral (lost on restart). R2 mounting only
 works in production -- `wrangler dev` does not support s3fs mounts.
 
-| Variable               | Description                                 |
-| ---------------------- | ------------------------------------------- |
-| `R2_ACCESS_KEY_ID`     | R2 S3-compatible access key                 |
-| `R2_SECRET_ACCESS_KEY` | R2 S3-compatible secret key                 |
-| `CF_ACCOUNT_ID`        | Cloudflare account ID (for R2 endpoint URL) |
+| Variable | Description |
+|---|---|
+| `R2_ACCESS_KEY_ID` | R2 S3-compatible access key |
+| `R2_SECRET_ACCESS_KEY` | R2 S3-compatible secret key |
+| `CF_ACCOUNT_ID` | Cloudflare account ID (for R2 endpoint URL) |
 
 To create R2 API credentials:
 
@@ -288,9 +288,9 @@ To create R2 API credentials:
 
 Required for decrypting user-provided secrets (BYOK API keys, channel tokens).
 
-| Variable                     | Description                                                                                                                                                                                             | Source    | Auto-managed |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- | ------------ |
-| `AGENT_ENV_VARS_PRIVATE_KEY` | RSA private key (PEM). Get the **dev** version from 1Password (engineering vault). Quote the value in `.dev.vars`. The matching public key lives in the Next.js backend as `AGENT_ENV_VARS_PUBLIC_KEY`. | 1Password | No           |
+| Variable | Description | Source | Auto-managed |
+|---|---|---|---|
+| `AGENT_ENV_VARS_PRIVATE_KEY` | RSA private key (PEM). Get the **dev** version from 1Password (engineering vault). Quote the value in `.dev.vars`. The matching public key lives in the Next.js backend as `AGENT_ENV_VARS_PUBLIC_KEY`. | 1Password | No |
 
 The Next.js app encrypts user secrets with the public key before sending them to
 the worker. The worker decrypts them at container startup. Without this key,
@@ -298,20 +298,20 @@ user-provided encrypted secrets and channel tokens are silently skipped.
 
 ### Development Flags
 
-| Variable     | Description                                                                                                                                                                                                                                                                    |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Variable | Description |
+|---|---|
 | `WORKER_ENV` | Defaults to `"production"` in `wrangler.jsonc`. **Set to `"development"` in `.dev.vars` for local dev** so JWT `env` claims match and Fly app names use the `dev-` prefix instead of `acct-`. Leave it unset in production unless you intentionally need a different override. |
 
 ### Optional
 
-| Variable                        | Description                                                                   |
-| ------------------------------- | ----------------------------------------------------------------------------- |
-| `KILOCODE_API_BASE_URL`         | Override KiloCode API base URL (dev only)                                     |
-| `CDP_SECRET`                    | Shared secret for CDP browser automation endpoints                            |
-| `WORKER_URL`                    | Public URL of the worker (required for CDP)                                   |
-| `OPENCLAW_ALLOWED_ORIGINS`      | Comma-separated origins for WebSocket connections                             |
+| Variable | Description |
+|---|---|
+| `KILOCODE_API_BASE_URL` | Override KiloCode API base URL (dev only) |
+| `CDP_SECRET` | Shared secret for CDP browser automation endpoints |
+| `WORKER_URL` | Public URL of the worker (required for CDP) |
+| `OPENCLAW_ALLOWED_ORIGINS` | Comma-separated origins for WebSocket connections |
 | `KILOCLAW_INSTANCE_HOST_SUFFIX` | Per-instance host suffix. Prod: `.kiloclaw.ai`. Required (no silent default). |
-| `KILOCLAW_INSTANCE_URL_SCHEME`  | URL scheme paired with the suffix. Prod: `https`. Required.                   |
+| `KILOCLAW_INSTANCE_URL_SCHEME` | URL scheme paired with the suffix. Prod: `https`. Required. |
 
 ### Per-instance host routing (`*.kiloclaw.ai`)
 
@@ -339,21 +339,21 @@ The Next.js app also needs these two variables to talk to the KiloClaw worker.
 Both are included in `vercel env pull` (run automatically by the dev-start
 script):
 
-| Variable              | Description                                     |
-| --------------------- | ----------------------------------------------- |
-| `KILOCLAW_API_URL`    | Worker URL, e.g. `http://localhost:8795`        |
+| Variable | Description |
+|---|---|
+| `KILOCLAW_API_URL` | Worker URL, e.g. `http://localhost:8795` |
 | `INTERNAL_API_SECRET` | Must match `INTERNAL_API_SECRET` in `.dev.vars` |
 
 ## Wrangler Bindings
 
 These are configured in `wrangler.jsonc`, not as secrets:
 
-| Binding             | Type           | Description                                                   |
-| ------------------- | -------------- | ------------------------------------------------------------- |
-| `Sandbox`           | Durable Object | `KiloClawSandbox` -- container lifecycle management           |
+| Binding | Type | Description |
+|---|---|---|
+| `Sandbox` | Durable Object | `KiloClawSandbox` -- container lifecycle management |
 | `KILOCLAW_INSTANCE` | Durable Object | `KiloClawInstance` -- per-user instance state, config, alarms |
-| `KILOCLAW_BUCKET`   | R2 Bucket      | `kiloclaw-data` -- persistent storage                         |
-| `HYPERDRIVE`        | Hyperdrive     | Postgres connection for pepper validation + instance registry |
+| `KILOCLAW_BUCKET` | R2 Bucket | `kiloclaw-data` -- persistent storage |
+| `HYPERDRIVE` | Hyperdrive | Postgres connection for pepper validation + instance registry |
 
 ## Building and Pushing Images
 
@@ -700,11 +700,11 @@ scheduled.
 
 Reconciliation runs on all instance statuses:
 
-| Status                     | Alarm interval |
-| -------------------------- | -------------- |
-| Running                    | 5 min          |
-| Destroying                 | 1 min          |
-| Idle (provisioned/stopped) | 30 min         |
+| Status | Alarm interval |
+|---|---|
+| Running | 5 min |
+| Destroying | 1 min |
+| Idle (provisioned/stopped) | 30 min |
 
 ## Production Deployment
 
@@ -733,12 +733,12 @@ pnpm deploy
 
 **Secrets that must match the Next.js app:**
 
-| Worker Secret                | Next.js Env Var             | Notes                                                 |
-| ---------------------------- | --------------------------- | ----------------------------------------------------- |
-| `NEXTAUTH_SECRET`            | `NEXTAUTH_SECRET`           | Same HS256 signing key for JWT verification           |
-| `INTERNAL_API_SECRET`        | `INTERNAL_API_SECRET`       | Platform API authentication                           |
+| Worker Secret | Next.js Env Var | Notes |
+|---|---|---|
+| `NEXTAUTH_SECRET` | `NEXTAUTH_SECRET` | Same HS256 signing key for JWT verification |
+| `INTERNAL_API_SECRET` | `INTERNAL_API_SECRET` | Platform API authentication |
 | `AGENT_ENV_VARS_PRIVATE_KEY` | `AGENT_ENV_VARS_PUBLIC_KEY` | RSA key pair (worker has private, Next.js has public) |
-| `WORKER_ENV`                 | `NODE_ENV`                  | Defaults to `production` in `wrangler.jsonc`          |
+| `WORKER_ENV` | `NODE_ENV` | Defaults to `production` in `wrangler.jsonc` |
 
 ## Troubleshooting
 

@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, test } from '@jest/globals';
 import { NextRequest } from 'next/server';
-import { getUserFromAuth } from '@/lib/user.server';
+import { getUserFromAuth } from '@/lib/user/server';
 import { getLinearOAuthUrl } from '@/lib/integrations/linear-service';
 import { verifyOAuthState } from '@/lib/integrations/oauth-state';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import { requireActiveSubscriptionOrTrial } from '@/lib/organizations/trial-middleware';
 
-jest.mock('@/lib/user.server');
+jest.mock('@/lib/user/server');
 jest.mock('@/lib/integrations/linear-service', () => ({
   getLinearOAuthUrl: jest.fn(),
 }));

@@ -6,11 +6,11 @@ Add monthly Kilo Credits to the contributor champions feature, modeled after the
 
 ### Tier Credit Amounts
 
-| Tier        | Monthly Credits | Auto-upgrade threshold  |
-| ----------- | --------------- | ----------------------- |
-| Contributor | $0/month        | 1+ merged PR in 90 days |
-| Ambassador  | $50/month       | 5+ merged PRs all-time  |
-| Champion    | $150/month      | 15+ merged PRs all-time |
+| Tier | Monthly Credits | Auto-upgrade threshold |
+|---|---|---|
+| Contributor | $0/month | 1+ merged PR in 90 days |
+| Ambassador | $50/month | 5+ merged PRs all-time |
+| Champion | $150/month | 15+ merged PRs all-time |
 
 ---
 
@@ -246,10 +246,10 @@ If the contributor has no linked Kilo account, show a warning:
 
 Add columns to the Enrolled table:
 
-| Column       | Description                                                     |
-| ------------ | --------------------------------------------------------------- |
-| Credits/mo   | e.g. "$50" or "—" for contributor tier                          |
-| Last Grant   | e.g. "2025-02-15 12:00" or "Never"                              |
+| Column | Description |
+|---|---|
+| Credits/mo | e.g. "$50" or "—" for contributor tier |
+| Last Grant | e.g. "2025-02-15 12:00" or "Never" |
 | Kilo Account | Already effectively shown via the email link + AlertCircle icon |
 
 ### 6c. Tier selector credit preview in review queue

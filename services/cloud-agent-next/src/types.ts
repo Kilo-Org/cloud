@@ -73,6 +73,8 @@ export type SessionContext = {
   gitUrl?: string;
   /** Token for generic git authentication (e.g., GitLab token) */
   gitToken?: string;
+  /** Whether the GitLab token was resolved from a managed OAuth integration */
+  gitlabTokenManaged?: boolean;
   /** Git platform type for correct token/env var handling */
   platform?: 'github' | 'gitlab';
   envVars?: Record<string, string>;
@@ -159,10 +161,6 @@ export type Env = {
   CLI_TIMEOUT_SECONDS?: string;
   /** Reaper interval override (ms) */
   REAPER_INTERVAL_MS?: string;
-  /** Execution stale threshold override (ms) */
-  STALE_THRESHOLD_MS?: string;
-  /** Pending execution start timeout override (ms) */
-  PENDING_START_TIMEOUT_MS?: string;
   /** Kilo server idle timeout override (ms) - defaults to 15 minutes */
   KILO_SERVER_IDLE_TIMEOUT_MS?: string;
   /** Shared secret for backend-to-backend authentication (prepareSession/updateSession) */

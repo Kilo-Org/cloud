@@ -94,6 +94,7 @@ export type {
   SlashCommandInfo,
   SuggestionAction,
   SuggestionState,
+  MessageDeliveryState,
   ServiceStateSnapshot,
   SessionInfo,
   KiloSessionId,

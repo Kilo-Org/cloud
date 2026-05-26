@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { approveDeviceAuthRequest } from '@/lib/device-auth/device-auth';
-import { getUserFromAuth } from '@/lib/user.server';
+import { getUserFromAuth } from '@/lib/user/server';
 import * as z from 'zod';
 
 const TokensSchema = z.object({

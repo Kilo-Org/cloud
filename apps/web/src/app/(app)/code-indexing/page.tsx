@@ -1,4 +1,4 @@
-import { getUserFromAuthOrRedirect } from '@/lib/user.server';
+import { getUserFromAuthOrRedirect } from '@/lib/user/server';
 import { CodeIndexingView } from '@/components/code-indexing/CodeIndexingView';
 import { isEnabledForUser } from '@/lib/code-indexing/util';
 import { Badge } from '@/components/ui/badge';

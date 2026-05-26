@@ -51,7 +51,8 @@ const VOLUME_NAME = volumeNameFromSandboxId(SANDBOX_ID);
 
 /**
  * Instance row for INSTANCE_ID that passes the identity / destroyed /
- * grace gates: identity matches and destroyed long ago.
+ * grace gates: identity matches, destroyed long ago, and the sandbox's
+ * latest destruction (`latestSandboxDestroyedAt`) is also long ago.
  */
 const DEFAULT_DESTROY_ROW = {
   id: INSTANCE_ID,
@@ -59,16 +60,17 @@ const DEFAULT_DESTROY_ROW = {
   sandboxId: SANDBOX_ID,
   organizationId: null,
   destroyedAt: new Date(Date.now() - 30 * 86_400_000).toISOString(),
+  latestSandboxDestroyedAt: new Date(Date.now() - 30 * 86_400_000).toISOString(),
 };
 
 /**
  * Build a fake worker DB for the destroy endpoint. It runs two queries on
  * one DB handle — the instance lookup (terminated by `.limit(1)`) and the
- * access-granting-context subscription lookup inside
- * `getAccessGrantingOrphanVolumeContexts` (awaited directly, no `.limit`).
- * They resolve `instanceRows` and `contextRows` respectively.
+ * ownership-context protection lookup inside
+ * `getOrphanVolumeContextProtections` (awaited directly, no `.limit`).
+ * They resolve `instanceRows` and `subscriptionRows` respectively.
  */
-function makeWorkerDb(instanceRows: unknown[], contextRows: unknown[]) {
+function makeWorkerDb(instanceRows: unknown[], subscriptionRows: unknown[]) {
   return {
     select: () => {
       const chain: Record<string, unknown> = {
@@ -78,7 +80,7 @@ function makeWorkerDb(instanceRows: unknown[], contextRows: unknown[]) {
         where: () => chain,
         limit: () => Promise.resolve(instanceRows),
         then: (onFulfilled: (rows: unknown[]) => unknown) =>
-          Promise.resolve(contextRows).then(onFulfilled),
+          Promise.resolve(subscriptionRows).then(onFulfilled),
       };
       return chain;
     },
@@ -87,27 +89,30 @@ function makeWorkerDb(instanceRows: unknown[], contextRows: unknown[]) {
 
 /**
  * Drive the destroy endpoint's DB queries: `instanceRow` is what the
- * instance lookup resolves; `contextSubscriptions` are the current
- * (non-transferred) subscription rows the access-granting-context query
- * resolves for the ownership context.
+ * instance lookup resolves; `subscriptions` are the current
+ * (non-transferred) subscription rows the context protection query resolves
+ * for the owning user.
  */
 function mockDestroyLookup(
   instanceRow: Record<string, unknown> | null,
-  contextSubscriptions: Record<string, unknown>[] = []
+  subscriptions: Record<string, unknown>[] = []
 ): void {
   vi.mocked(getWorkerDb).mockReturnValue(
-    makeWorkerDb(instanceRow === null ? [] : [instanceRow], contextSubscriptions) as never
+    makeWorkerDb(instanceRow === null ? [] : [instanceRow], subscriptions) as never
   );
 }
 
-/** A current, access-granting subscription row for the default ownership context. */
-function accessGrantingContextRow(status: string): Record<string, unknown> {
+/** A current subscription row linked to the destroyed row's ownership context. */
+function accessGrantingSubscriptionRow(status: string): Record<string, unknown> {
   return {
     user_id: USER_ID,
+    instance_id: INSTANCE_ID,
+    instance_user_id: USER_ID,
     organization_id: null,
     status,
     suspended_at: null,
     trial_ends_at: null,
+    destruction_deadline: null,
   };
 }
 
@@ -390,6 +395,7 @@ describe('POST /admin/orphan-volume-destroy', () => {
       sandboxId: legacySandbox,
       organizationId: null,
       destroyedAt: new Date(Date.now() - 30 * 86_400_000).toISOString(),
+      latestSandboxDestroyedAt: new Date(Date.now() - 30 * 86_400_000).toISOString(),
     });
     vi.mocked(fly.listVolumes).mockResolvedValue([
       flyVolume({ id: legacyVolumeId, name: volumeNameFromSandboxId(legacySandbox) }),
@@ -532,6 +538,7 @@ describe('POST /admin/orphan-volume-destroy', () => {
     mockDestroyLookup({
       ...DEFAULT_DESTROY_ROW,
       destroyedAt: new Date(Date.now() - 2 * 86_400_000).toISOString(),
+      latestSandboxDestroyedAt: new Date(Date.now() - 2 * 86_400_000).toISOString(),
     });
 
     const response = await platform.request(
@@ -544,14 +551,17 @@ describe('POST /admin/orphan-volume-destroy', () => {
     expect(fly.deleteVolume).not.toHaveBeenCalled();
   });
 
-  it('refuses (409) when the ownership context has a current access-granting subscription', async () => {
-    // Models the reprovision case: the destroyed instance's own subscription
-    // was transferred away, but the user still has access via a current
-    // successor subscription in the same (user, org) context. The
-    // context-based gate — not the destroyed row's own subscription — must
-    // catch this and block the delete.
+  it('refuses (409) when a newer destruction of the same sandbox is within grace', async () => {
+    // The submitted instance was destroyed long ago, but the sandbox was
+    // reprovisioned and destroyed again recently. The grace period must run
+    // from that latest destruction, so an older submitted row cannot reap
+    // the still-shared volume early.
     const { env } = makeEnv();
-    mockDestroyLookup(DEFAULT_DESTROY_ROW, [accessGrantingContextRow('active')]);
+    mockDestroyLookup({
+      ...DEFAULT_DESTROY_ROW,
+      destroyedAt: new Date(Date.now() - 30 * 86_400_000).toISOString(),
+      latestSandboxDestroyedAt: new Date(Date.now() - 2 * 86_400_000).toISOString(),
+    });
 
     const response = await platform.request(
       '/admin/orphan-volume-destroy',
@@ -563,9 +573,104 @@ describe('POST /admin/orphan-volume-destroy', () => {
     expect(fly.deleteVolume).not.toHaveBeenCalled();
   });
 
-  it('allows destroy when the context has only a non-access-granting subscription', async () => {
+  it('refuses (409) when the user has a current access-granting subscription', async () => {
+    // Models the reprovision case: the destroyed instance's own subscription
+    // was transferred away, but the same ownership context still has access via
+    // a current successor subscription. The context gate must block the delete.
     const { env } = makeEnv();
-    mockDestroyLookup(DEFAULT_DESTROY_ROW, [accessGrantingContextRow('canceled')]);
+    mockDestroyLookup(DEFAULT_DESTROY_ROW, [accessGrantingSubscriptionRow('active')]);
+
+    const response = await platform.request(
+      '/admin/orphan-volume-destroy',
+      destroyInit(validDestroyBody),
+      env
+    );
+    expect(response.status).toBe(409);
+    expect(fly.listVolumes).not.toHaveBeenCalled();
+    expect(fly.deleteVolume).not.toHaveBeenCalled();
+  });
+
+  it('allows destroy when an access-granting subscription belongs to another context', async () => {
+    const { env } = makeEnv();
+    mockDestroyLookup(DEFAULT_DESTROY_ROW, [
+      {
+        ...accessGrantingSubscriptionRow('active'),
+        instance_id: '22222222-2222-4222-8222-222222222222',
+        organization_id: '33333333-3333-4333-8333-333333333333',
+      },
+    ]);
+    vi.mocked(fly.listVolumes).mockResolvedValue([flyVolume()]);
+    vi.mocked(fly.deleteVolume).mockResolvedValue(undefined);
+
+    const response = await platform.request(
+      '/admin/orphan-volume-destroy',
+      destroyInit(validDestroyBody),
+      env
+    );
+    expect(response.status).toBe(200);
+    expect(fly.deleteVolume).toHaveBeenCalledTimes(1);
+  });
+
+  it('refuses (409) when the user has a current live trial', async () => {
+    // The Odai case: the destroyed instance's own subscription is canceled,
+    // but the user has a detached trialing subscription whose trial has not
+    // ended. The context cannot be resolved safely, so it must fail closed.
+    const { env } = makeEnv();
+    mockDestroyLookup(DEFAULT_DESTROY_ROW, [
+      {
+        user_id: USER_ID,
+        instance_id: null,
+        instance_user_id: null,
+        organization_id: null,
+        status: 'trialing',
+        suspended_at: null,
+        trial_ends_at: new Date(Date.now() + 30 * 86_400_000).toISOString(),
+        destruction_deadline: null,
+      },
+    ]);
+
+    const response = await platform.request(
+      '/admin/orphan-volume-destroy',
+      destroyInit(validDestroyBody),
+      env
+    );
+    expect(response.status).toBe(409);
+    expect(fly.listVolumes).not.toHaveBeenCalled();
+    expect(fly.deleteVolume).not.toHaveBeenCalled();
+  });
+
+  it('refuses (409) when the user has a pending billing destruction deadline', async () => {
+    // The Stefan case: the subscription is canceled and not access-granting,
+    // but its billing destruction_deadline is still in the future — the
+    // kiloclaw-billing lifecycle reaper is already scheduled to destroy the
+    // instance and its volume, so the orphan reaper must not race it.
+    const { env } = makeEnv();
+    mockDestroyLookup(DEFAULT_DESTROY_ROW, [
+      {
+        user_id: USER_ID,
+        instance_id: INSTANCE_ID,
+        instance_user_id: USER_ID,
+        organization_id: null,
+        status: 'canceled',
+        suspended_at: new Date(Date.now() - 86_400_000).toISOString(),
+        trial_ends_at: null,
+        destruction_deadline: new Date(Date.now() + 2 * 86_400_000).toISOString(),
+      },
+    ]);
+
+    const response = await platform.request(
+      '/admin/orphan-volume-destroy',
+      destroyInit(validDestroyBody),
+      env
+    );
+    expect(response.status).toBe(409);
+    expect(fly.listVolumes).not.toHaveBeenCalled();
+    expect(fly.deleteVolume).not.toHaveBeenCalled();
+  });
+
+  it('allows destroy when the user has only a non-access-granting subscription', async () => {
+    const { env } = makeEnv();
+    mockDestroyLookup(DEFAULT_DESTROY_ROW, [accessGrantingSubscriptionRow('canceled')]);
     vi.mocked(fly.listVolumes).mockResolvedValue([flyVolume()]);
     vi.mocked(fly.deleteVolume).mockResolvedValue(undefined);
 

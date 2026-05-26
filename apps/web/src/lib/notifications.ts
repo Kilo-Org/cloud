@@ -1,5 +1,5 @@
 import { type User } from '@kilocode/db/schema';
-import { type BalanceForUser, getBalanceForUser } from './user.balance';
+import { type BalanceForUser, getBalanceForUser } from '@/lib/user/balance';
 import { FIRST_TOPUP_BONUS_AMOUNT, APP_URL } from '@/lib/constants';
 import { getUserOrganizationsWithSeats } from '@/lib/organizations/organizations';
 import type { UserOrganizationWithSeats } from '@/lib/organizations/organization-types';
@@ -36,6 +36,14 @@ export type KiloNotification = {
 const normalUnconditionalNotifications: KiloNotification[] = [
   //If you need to check or personalize the notification, see examples at the bottom of this file
   //if you just want a simple straightforward global message, add it here.
+  {
+    id: 'stealth-opus-discount-may-25',
+    title: 'Claude Opus 4.7 at 20% Off — Only in Kilo Code!',
+    message:
+      'A stealth provider is offering Claude Opus 4.7 at 20% off list price, exclusively in Kilo Code.',
+    suggestModelId: 'stealth/claude-opus-4.7',
+    expiresAt: '2026-06-08T08:00:00Z',
+  },
   {
     id: 'kilo-cli-jan-5',
     title: 'Kilo CLI',

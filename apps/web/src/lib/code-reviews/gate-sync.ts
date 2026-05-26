@@ -82,6 +82,7 @@ export type GateSyncBatchSummary = {
 
 const CLAIM_TIMEOUT_MS = 2 * 60 * 1000;
 const DEFAULT_BATCH_LIMIT = 25;
+const MAX_GATE_SYNC_ATTEMPTS = 12;
 const MODEL_NOT_FOUND_SUMMARY_URL = 'https://app.kilo.ai/code-reviews';
 const MODEL_NOT_FOUND_CHECK_TITLE = 'Selected model is no longer available';
 const MODEL_NOT_FOUND_STATUS_SUMMARY = `The review did not run because the selected model is no longer available. Choose another model in Kilo Code review settings: ${MODEL_NOT_FOUND_SUMMARY_URL}`;
@@ -519,6 +520,39 @@ async function markGateSyncFailure(
   const nowIso = now.toISOString();
   const nextRetryAt = new Date(now.getTime() + classification.retryDelayMs).toISOString();
   const terminalAmbiguity = classification.ambiguous && isTerminalStatus(sync.desired_status);
+
+  if (sync.attempt_count >= MAX_GATE_SYNC_ATTEMPTS) {
+    const [updated] = await db
+      .update(cloud_agent_code_review_gate_syncs)
+      .set({
+        sync_status: 'skipped',
+        claim_token: null,
+        claimed_at: null,
+        next_retry_at: null,
+        last_error_code: classification.code,
+        last_error_redacted: redactedError,
+        terminal_confirmation_required: terminalAmbiguity || sync.terminal_confirmation_required,
+        last_ambiguous_at: classification.ambiguous ? nowIso : sync.last_ambiguous_at,
+        updated_at: nowIso,
+      })
+      .where(
+        and(
+          eq(cloud_agent_code_review_gate_syncs.code_review_id, sync.code_review_id),
+          eq(cloud_agent_code_review_gate_syncs.claim_token, sync.claim_token),
+          eq(cloud_agent_code_review_gate_syncs.desired_revision, sync.desired_revision)
+        )
+      )
+      .returning();
+
+    if (!updated) return await markSupersededClaimPending(sync);
+
+    return {
+      outcome: 'skipped',
+      reviewId: sync.code_review_id,
+      revision: sync.desired_revision,
+      reason: `retry_exhausted:${classification.code}`,
+    };
+  }
 
   const [updated] = await db
     .update(cloud_agent_code_review_gate_syncs)

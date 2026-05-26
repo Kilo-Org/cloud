@@ -96,13 +96,16 @@ async function enhancedModelList(models: OpenRouterModel[]) {
           !isForbiddenFreeModel(model.id)
       )
       .map(model => {
-        const preferredProvider = normalizeInferenceProviderId(
-          getPreferredProviderOrder(model.id).at(0)
-        );
+        const preferredProvider = getPreferredProviderOrder(model.id).at(0);
         const endpoints = endpointsMetadata[model.id]?.endpoints ?? [];
-        const pricing = endpoints.find(
-          e => normalizeInferenceProviderId(e.tag) === preferredProvider
-        )?.pricing;
+        const pricing = preferredProvider
+          ? (endpoints.find(e => e.tag === preferredProvider)?.pricing ??
+            endpoints.find(
+              e =>
+                normalizeInferenceProviderId(e.tag) ===
+                normalizeInferenceProviderId(preferredProvider)
+            )?.pricing)
+          : undefined;
         return pricing ? { ...model, pricing } : model;
       })
       .concat(

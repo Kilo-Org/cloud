@@ -78,18 +78,20 @@ print("loaded")
 assert_kilo_chat_webhook_route() {
   local port="$1"
   local token="$2"
-  local body_file
+  local response
+  local body
   local code
   local body_check
 
-  body_file=$(mktemp)
-  code=$(curl -sS -o "$body_file" -w "%{http_code}" \
+  response=$(curl -sS -w "\n%{http_code}" \
     -X POST \
     -H "x-kiloclaw-proxy-token: $token" \
     -H "Authorization: Bearer $token" \
     -H "Content-Type: application/json" \
     --data '{"type":"smoke.probe"}' \
     "http://127.0.0.1:${port}/plugins/kilo-chat/webhook" 2>/dev/null || true)
+  code="${response##*$'\n'}"
+  body="${response%$'\n'*}"
 
   check "kilo-chat webhook unknown event -> 400" "400" "$code"
 
@@ -97,19 +99,17 @@ assert_kilo_chat_webhook_route() {
 import json
 import sys
 
-doc = json.load(open(sys.argv[1]))
+doc = json.loads(sys.stdin.read())
 if doc.get("error") != "Unknown webhook type":
     raise SystemExit(doc)
 print("Unknown webhook type")
-' "$body_file" 2>&1); then
+' <<< "$body" 2>&1); then
     check "kilo-chat webhook error body" "Unknown webhook type" "$body_check"
   else
     check "kilo-chat webhook error body" "Unknown webhook type" "failed"
     echo "  details: $body_check"
-    echo "  body: $(cat "$body_file")"
+    echo "  body: $body"
   fi
-
-  rm -f "$body_file"
 }
 
 assert_kilo_chat_smoke() {

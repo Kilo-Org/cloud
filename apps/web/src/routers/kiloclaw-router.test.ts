@@ -29,7 +29,10 @@ import {
   kiloclaw_subscriptions,
 } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
-import { LEGACY_KILOCLAW_PRICE_VERSION } from '@kilocode/db';
+import {
+  LEGACY_KILOCLAW_PRICE_VERSION,
+  PersonalSubscriptionCollapseUQConflictError,
+} from '@kilocode/db';
 
 (kiloclaw_subscriptions.kiloclaw_price_version as { defaultFn: () => string }).defaultFn = () =>
   LEGACY_KILOCLAW_PRICE_VERSION;
@@ -987,6 +990,88 @@ describe('kiloclawRouter destroy', () => {
         headers: { 'content-type': 'application/json' },
       })
     );
+  });
+
+  it('maps personal subscription collapse UQ conflicts to conflict errors', async () => {
+    const user = await insertTestUser({
+      google_user_email: `kiloclaw-destroy-conflict-${Math.random()}@example.com`,
+    });
+    const otherUser = await insertTestUser({
+      google_user_email: `kiloclaw-destroy-conflict-other-${Math.random()}@example.com`,
+    });
+    const instanceA = crypto.randomUUID();
+    const instanceB = crypto.randomUUID();
+    const otherUserInstance = crypto.randomUUID();
+    const subscriptionA = crypto.randomUUID();
+    const subscriptionB = crypto.randomUUID();
+    const conflictingSubscription = crypto.randomUUID();
+
+    await db.insert(kiloclaw_instances).values([
+      {
+        id: instanceA,
+        user_id: user.id,
+        sandbox_id: `ki_${instanceA.replace(/-/g, '')}`,
+        created_at: '2026-04-01T00:00:00.000Z',
+        destroyed_at: '2026-04-02T00:00:00.000Z',
+      },
+      {
+        id: instanceB,
+        user_id: user.id,
+        sandbox_id: `ki_${instanceB.replace(/-/g, '')}`,
+        created_at: '2026-04-03T00:00:00.000Z',
+      },
+      {
+        id: otherUserInstance,
+        user_id: otherUser.id,
+        sandbox_id: `ki_${otherUserInstance.replace(/-/g, '')}`,
+        created_at: '2026-04-04T00:00:00.000Z',
+      },
+    ]);
+    await db.insert(kiloclaw_subscriptions).values([
+      {
+        id: subscriptionA,
+        user_id: user.id,
+        instance_id: instanceA,
+        plan: 'trial',
+        status: 'canceled',
+        created_at: '2026-04-01T00:00:00.000Z',
+        updated_at: '2026-04-01T00:00:00.000Z',
+      },
+      {
+        id: subscriptionB,
+        user_id: user.id,
+        instance_id: instanceB,
+        plan: 'trial',
+        status: 'canceled',
+        created_at: '2026-04-03T00:00:00.000Z',
+        updated_at: '2026-04-03T00:00:00.000Z',
+      },
+      {
+        id: conflictingSubscription,
+        user_id: user.id,
+        instance_id: otherUserInstance,
+        plan: 'trial',
+        status: 'canceled',
+        transferred_to_subscription_id: subscriptionB,
+        created_at: '2026-04-04T00:00:00.000Z',
+        updated_at: '2026-04-04T00:00:00.000Z',
+      },
+    ]);
+
+    await expect(createCaller({ user }).destroy()).rejects.toMatchObject({
+      code: 'CONFLICT',
+      message:
+        'Your subscription state needs support review before this instance can be destroyed.',
+      cause: expect.any(PersonalSubscriptionCollapseUQConflictError),
+    });
+    expect(kiloclawClientMock.__destroyMock).not.toHaveBeenCalled();
+
+    const [instanceAfter] = await db
+      .select()
+      .from(kiloclaw_instances)
+      .where(eq(kiloclaw_instances.id, instanceB))
+      .limit(1);
+    expect(instanceAfter?.destroyed_at).toBeNull();
   });
 
   it('clears subscription destruction lifecycle and writes changelog', async () => {

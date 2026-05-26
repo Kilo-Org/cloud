@@ -19,6 +19,7 @@ export {
   FundedRowDemotionRefusedError,
   isAccessGrantingSubscription,
   markInstanceDestroyedWithPersonalSubscriptionCollapse,
+  PersonalSubscriptionCollapseUQConflictError,
   PersonalSubscriptionDestroyConflictError,
   type DestroyedInstanceRow,
 } from './kiloclaw-personal-subscription-collapse';

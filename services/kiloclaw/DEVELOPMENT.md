@@ -590,8 +590,14 @@ Then run one of:
   - Validates proxy enforcement semantics end-to-end:
     no token -> `401`, correct proxy token -> pass-through.
   - Use this when changing proxy token logic or route/auth ordering.
+- `bash scripts/controller-live-provider-smoke-test.sh`
+  - Runs the packaged image against the real Kilo Gateway with `kilocode/kilo-auto/free`, verifying Control UI proxying, packaged Kilo Chat loading, and one live agent turn.
+  - Reads `KILOCODE_API_KEY` from the environment, or falls back locally to the active `kilocodeToken` and matching organization scope in `~/.kilocode/cli/config.json`. The token value is not logged or mounted into the container.
+  - Uses a generated non-sensitive nonce prompt because Auto Free can route to upstream providers that log prompts.
+  - Add `--upgrade` with `IMAGE_BEFORE` and `IMAGE_AFTER` to repeat the live checks after restarting on the same temporary `/root` volume.
+  - This is an opt-in/manual live validation; it is not a deterministic CI smoke or an image-promotion gate.
 
-All scripts support overrides via env vars (`IMAGE`, `PORT`, `TOKEN`).
+All scripts support overrides via env vars (`IMAGE`, `PORT`, `TOKEN`). The live provider smoke also accepts `KILOCODE_API_KEY`, `KILOCODE_ORGANIZATION_ID`, `KILOCODE_CONFIG_PATH`, `KILOCODE_SMOKE_MODEL`, `IMAGE_BEFORE`, and `IMAGE_AFTER`.
 
 ## Admin Panel
 

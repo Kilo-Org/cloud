@@ -1,6 +1,7 @@
 import { db } from '@/lib/drizzle';
 import {
   cloud_agent_code_review_attempts,
+  cloud_agent_code_review_gate_syncs,
   cloud_agent_code_reviews,
   kilocode_users,
 } from '@kilocode/db/schema';
@@ -16,7 +17,10 @@ import {
   listCodeReviewAttempts,
   updateCodeReviewAttemptForCallback,
   findPreviousCompletedReview,
+  listStrandedTerminalAttemptReviews,
+  repairStrandedTerminalCodeReview,
   updateCodeReviewStatus,
+  updateCodeReviewStatusWithGateSyncIntent,
 } from './code-reviews';
 
 const REPO = `test-org/session-continuation-${Date.now()}`;
@@ -520,5 +524,190 @@ describe('findPreviousCompletedReview', () => {
         errorMessage: 'bad callback',
       })
     ).rejects.toThrow('not found');
+  });
+});
+
+describe('gate sync persistence helpers', () => {
+  let testUser: User;
+  const createdReviewIds: string[] = [];
+  const repo = `${REPO}-gate-sync`;
+
+  beforeAll(async () => {
+    testUser = await insertTestUser();
+  });
+
+  afterAll(async () => {
+    for (const id of createdReviewIds) {
+      await db.delete(cloud_agent_code_reviews).where(eq(cloud_agent_code_reviews.id, id));
+    }
+    await db.delete(kilocode_users).where(eq(kilocode_users.id, testUser.id));
+  });
+
+  async function createReview(headSha: string) {
+    const id = await createCodeReview({
+      owner: { type: 'user', id: testUser.id, userId: testUser.id },
+      repoFullName: repo,
+      prNumber: 77,
+      prUrl: `https://github.com/${repo}/pull/77`,
+      prTitle: 'gate sync PR',
+      prAuthor: 'octocat',
+      baseRef: 'main',
+      headRef: 'feature/gate-sync',
+      headSha,
+      platform: 'github',
+    });
+    createdReviewIds.push(id);
+    return id;
+  }
+
+  it('atomically persists terminal parent status and desired gate sync intent', async () => {
+    const reviewId = await createReview('sha-gate-terminal');
+    await updateCodeReviewStatus(reviewId, 'running', { sessionId: 'agent_gate_terminal' });
+
+    const result = await updateCodeReviewStatusWithGateSyncIntent(
+      reviewId,
+      'completed',
+      {
+        sessionId: 'agent_gate_terminal',
+        completedAt: new Date(),
+      },
+      {
+        status: 'completed',
+        gateResult: 'fail',
+        errorMessage: 'findings exceeded threshold',
+      },
+      { onlyIfNonTerminal: true }
+    );
+
+    expect(result.applied).toBe(true);
+
+    const [review] = await db
+      .select({ status: cloud_agent_code_reviews.status })
+      .from(cloud_agent_code_reviews)
+      .where(eq(cloud_agent_code_reviews.id, reviewId))
+      .limit(1);
+    const [sync] = await db
+      .select()
+      .from(cloud_agent_code_review_gate_syncs)
+      .where(eq(cloud_agent_code_review_gate_syncs.code_review_id, reviewId))
+      .limit(1);
+
+    expect(review?.status).toBe('completed');
+    expect(sync).toEqual(
+      expect.objectContaining({
+        desired_status: 'completed',
+        desired_gate_result: 'fail',
+        desired_error_message: 'findings exceeded threshold',
+        desired_revision: 1,
+        sync_status: 'pending',
+      })
+    );
+  });
+
+  it('does not enqueue a late running gate intent after a terminal parent state', async () => {
+    const reviewId = await createReview('sha-late-running');
+    await updateCodeReviewStatusWithGateSyncIntent(
+      reviewId,
+      'completed',
+      { completedAt: new Date() },
+      { status: 'completed', gateResult: 'pass' },
+      { onlyIfNonTerminal: true }
+    );
+
+    const lateRunning = await updateCodeReviewStatusWithGateSyncIntent(
+      reviewId,
+      'running',
+      { sessionId: 'agent_late_running' },
+      { status: 'running' },
+      { onlyIfNonTerminal: true }
+    );
+
+    const [sync] = await db
+      .select()
+      .from(cloud_agent_code_review_gate_syncs)
+      .where(eq(cloud_agent_code_review_gate_syncs.code_review_id, reviewId))
+      .limit(1);
+
+    expect(lateRunning.applied).toBe(false);
+    expect(sync?.desired_status).toBe('completed');
+    expect(sync?.desired_revision).toBe(1);
+  });
+
+  it('advances desired revision when a terminal intent supersedes running', async () => {
+    const reviewId = await createReview('sha-revision-advance');
+    await updateCodeReviewStatusWithGateSyncIntent(
+      reviewId,
+      'running',
+      { sessionId: 'agent_revision' },
+      { status: 'running' },
+      { onlyIfNonTerminal: true }
+    );
+    await updateCodeReviewStatusWithGateSyncIntent(
+      reviewId,
+      'failed',
+      {
+        sessionId: 'agent_revision',
+        terminalReason: 'sandbox_error',
+        errorMessage: 'worker failed',
+      },
+      {
+        status: 'failed',
+        terminalReason: 'sandbox_error',
+        errorMessage: 'worker failed',
+      },
+      { onlyIfNonTerminal: true }
+    );
+
+    const [sync] = await db
+      .select()
+      .from(cloud_agent_code_review_gate_syncs)
+      .where(eq(cloud_agent_code_review_gate_syncs.code_review_id, reviewId))
+      .limit(1);
+
+    expect(sync?.desired_status).toBe('failed');
+    expect(sync?.desired_revision).toBe(2);
+    expect(sync?.last_error_code).toBeNull();
+  });
+
+  it('repairs a stranded parent from a terminal latest attempt with explicit gate result', async () => {
+    const reviewId = await createReview('sha-stranded-repair');
+    await updateCodeReviewStatus(reviewId, 'running', { sessionId: 'agent_stranded' });
+    const attempt = await createCodeReviewAttempt({
+      codeReviewId: reviewId,
+      status: 'completed',
+      sessionId: 'agent_stranded',
+    });
+
+    const stranded = await listStrandedTerminalAttemptReviews(200);
+    expect(stranded).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          reviewId,
+          latestAttemptId: attempt.id,
+          latestAttemptStatus: 'completed',
+        }),
+      ])
+    );
+
+    const repair = await repairStrandedTerminalCodeReview({
+      reviewId,
+      expectedParentStatus: 'running',
+      expectedAttemptId: attempt.id,
+      expectedAttemptStatus: 'completed',
+      expectedAttemptTerminalReason: null,
+      expectedAttemptErrorMessage: null,
+      gateResult: 'pass',
+    });
+
+    const [sync] = await db
+      .select()
+      .from(cloud_agent_code_review_gate_syncs)
+      .where(eq(cloud_agent_code_review_gate_syncs.code_review_id, reviewId))
+      .limit(1);
+
+    expect(repair.applied).toBe(true);
+    expect(repair.review?.status).toBe('completed');
+    expect(sync?.desired_status).toBe('completed');
+    expect(sync?.desired_gate_result).toBe('pass');
   });
 });

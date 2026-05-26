@@ -17,6 +17,9 @@ const mockGetCodeReviewById = jest.fn() as jest.MockedFunction<
 const mockUpdateCodeReviewStatus = jest.fn() as jest.MockedFunction<
   typeof codeReviewsDbModule.updateCodeReviewStatus
 >;
+const mockUpdateCodeReviewStatusWithGateSyncIntent = jest.fn() as jest.MockedFunction<
+  typeof codeReviewsDbModule.updateCodeReviewStatusWithGateSyncIntent
+>;
 const mockUpdateCodeReviewStatusIfNonTerminal = jest.fn() as jest.MockedFunction<
   typeof codeReviewsDbModule.updateCodeReviewStatusIfNonTerminal
 >;
@@ -74,6 +77,12 @@ const mockCaptureMessage = jest.fn<any>();
 const mockAppendReviewSummaryFooter = jest.fn<any>();
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const mockRetryReviewFresh = jest.fn<any>();
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const mockProcessDueCodeReviewGateSync = jest.fn<any>();
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const mockResolveGitLabAccessToken = jest.fn<any>();
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const mockGetGitLabInstanceUrl = jest.fn<any>();
 
 // --- Module mocks ---
 
@@ -84,6 +93,7 @@ jest.mock('@/lib/config.server', () => ({
 jest.mock('@/lib/code-reviews/db/code-reviews', () => ({
   getCodeReviewById: mockGetCodeReviewById,
   updateCodeReviewStatus: mockUpdateCodeReviewStatus,
+  updateCodeReviewStatusWithGateSyncIntent: mockUpdateCodeReviewStatusWithGateSyncIntent,
   updateCodeReviewStatusIfNonTerminal: mockUpdateCodeReviewStatusIfNonTerminal,
   updateCodeReviewUsage: mockUpdateCodeReviewUsage,
   getSessionUsageFromBilling: mockGetSessionUsageFromBilling,
@@ -140,6 +150,12 @@ jest.mock('@sentry/nextjs', () => ({
 
 jest.mock('@/lib/code-reviews/summary/usage-footer', () => ({
   appendReviewSummaryFooter: (...args: unknown[]) => mockAppendReviewSummaryFooter(...args),
+}));
+
+jest.mock('@/lib/code-reviews/gate-sync', () => ({
+  processDueCodeReviewGateSync: mockProcessDueCodeReviewGateSync,
+  resolveGitLabAccessToken: mockResolveGitLabAccessToken,
+  getGitLabInstanceUrl: mockGetGitLabInstanceUrl,
 }));
 
 jest.mock('@/lib/constants', () => ({
@@ -286,9 +302,106 @@ function makeIntegration(overrides: Partial<PlatformIntegration> = {}): Platform
 import type { POST as POSTType } from './route';
 
 let POST: typeof POSTType;
+let lastGateIntent: {
+  status: 'running' | 'completed' | 'failed' | 'cancelled';
+  gateResult?: 'pass' | 'fail';
+  errorMessage?: string;
+  terminalReason?: string;
+} | null = null;
+
+function isBillingIntent(intent: NonNullable<typeof lastGateIntent>) {
+  if (intent.terminalReason === 'billing') return true;
+  const message = intent.errorMessage?.toLowerCase();
+  return (
+    !!message &&
+    ['insufficient credits', 'paid model', 'add credits', 'credits required'].some(pattern =>
+      message.includes(pattern)
+    )
+  );
+}
+
+function isModelNotFoundIntent(intent: NonNullable<typeof lastGateIntent>) {
+  return (
+    intent.terminalReason === 'model_not_found' ||
+    /\bmodel\s+not\s+found\b/i.test(intent.errorMessage ?? '')
+  );
+}
+
+function checkRunUpdateForIntent(intent: NonNullable<typeof lastGateIntent>) {
+  const reviewFailed = intent.status === 'completed' && intent.gateResult === 'fail';
+  const billingFailure = intent.status === 'failed' && isBillingIntent(intent);
+  const modelNotFoundCancellation = intent.status === 'cancelled' && isModelNotFoundIntent(intent);
+
+  return {
+    status: intent.status === 'running' ? 'in_progress' : 'completed',
+    conclusion:
+      intent.status === 'completed'
+        ? reviewFailed
+          ? 'failure'
+          : 'success'
+        : intent.status === 'failed'
+          ? billingFailure
+            ? 'action_required'
+            : 'failure'
+          : intent.status === 'cancelled'
+            ? 'cancelled'
+            : undefined,
+    output: {
+      title:
+        intent.status === 'running'
+          ? 'Kilo Code Review in progress'
+          : intent.status === 'completed'
+            ? reviewFailed
+              ? 'Kilo Code Review found issues'
+              : 'Kilo Code Review completed'
+            : intent.status === 'failed'
+              ? billingFailure
+                ? 'Insufficient credits to run review'
+                : 'Kilo Code Review failed'
+              : modelNotFoundCancellation
+                ? 'Selected model is no longer available'
+                : 'Kilo Code Review cancelled',
+      summary:
+        intent.status === 'running'
+          ? 'Review is running...'
+          : intent.status === 'completed'
+            ? reviewFailed
+              ? 'Code review completed with findings that require attention.'
+              : 'Code review completed successfully.'
+            : intent.status === 'failed'
+              ? billingFailure
+                ? 'Review could not start because the account has insufficient credits.'
+                : intent.errorMessage
+                  ? `Review failed: ${intent.errorMessage}`
+                  : 'Review failed.'
+              : modelNotFoundCancellation
+                ? 'The review did not run because the selected model is no longer available. Choose another model in Kilo Code review settings: https://app.kilo.ai/code-reviews'
+                : 'Review was cancelled.',
+    },
+  };
+}
+
+function gitLabDescriptionForIntent(intent: NonNullable<typeof lastGateIntent>) {
+  if (intent.status === 'running') return 'Kilo Code Review in progress';
+  if (intent.status === 'completed' && intent.gateResult === 'fail') {
+    return 'Kilo Code Review found issues that require attention';
+  }
+  if (intent.status === 'completed') return 'Kilo Code Review completed';
+  if (intent.status === 'cancelled' && isModelNotFoundIntent(intent)) {
+    return 'Selected model is no longer available. Choose another model: https://app.kilo.ai/code-reviews';
+  }
+  if (intent.status === 'cancelled') return 'Kilo Code Review cancelled';
+  if (intent.status === 'failed' && isBillingIntent(intent))
+    return 'Insufficient credits to run review';
+  if (intent.status === 'failed' && intent.errorMessage)
+    return `Review failed: ${intent.errorMessage}`;
+  if (intent.status === 'failed') return 'Kilo Code Review failed';
+  return undefined;
+}
 
 beforeEach(async () => {
   jest.clearAllMocks();
+  lastGateIntent = null;
   defaultCallbackToken = await deriveCallbackToken({
     secret: CALLBACK_SECRET,
     scope: 'code-review-status-callback',
@@ -332,6 +445,82 @@ beforeEach(async () => {
   mockGetSessionUsageFromBilling.mockResolvedValue(null);
   mockUpdateCodeReviewUsage.mockResolvedValue(undefined);
   mockUpdateCodeReviewStatusIfNonTerminal.mockResolvedValue(true);
+  mockUpdateCodeReviewStatusWithGateSyncIntent.mockImplementation(
+    async (reviewId, status, updates, gateIntent) => {
+      lastGateIntent =
+        gateIntent ??
+        (status === 'running' ||
+        status === 'completed' ||
+        status === 'failed' ||
+        status === 'cancelled'
+          ? { status }
+          : null);
+      if (gateIntent?.status === 'cancelled' && gateIntent.terminalReason === 'model_not_found') {
+        const applied = await mockUpdateCodeReviewStatusIfNonTerminal(reviewId, status, updates);
+        return {
+          applied,
+          review: applied ? makeReview({ id: reviewId, status }) : null,
+          gateSync: null,
+        };
+      }
+
+      await mockUpdateCodeReviewStatus(reviewId, status, updates);
+      return {
+        applied: true,
+        review: makeReview({ id: reviewId, status }),
+        gateSync: null,
+      };
+    }
+  );
+  mockProcessDueCodeReviewGateSync.mockImplementation(async () => {
+    if (!lastGateIntent) return { outcome: 'none-due' };
+    const reviewResult = [...mockGetCodeReviewById.mock.results]
+      .reverse()
+      .find(result => result.type === 'return');
+    const review = reviewResult ? await reviewResult.value : makeReview();
+    if (!review?.platform_integration_id) return { outcome: 'none-due' };
+    const integration = await mockGetIntegrationById(review.platform_integration_id);
+    if (!integration) return { outcome: 'none-due' };
+
+    if ((review.platform || 'github') === 'gitlab') {
+      const state =
+        lastGateIntent.status === 'completed'
+          ? lastGateIntent.gateResult === 'fail'
+            ? 'failed'
+            : 'success'
+          : lastGateIntent.status === 'failed'
+            ? 'failed'
+            : lastGateIntent.status === 'cancelled'
+              ? 'canceled'
+              : 'running';
+      await mockSetCommitStatus(
+        'mock-token',
+        review.platform_project_id ?? review.repo_full_name,
+        review.head_sha,
+        state,
+        {
+          description: gitLabDescriptionForIntent(lastGateIntent),
+        },
+        'https://gitlab.com'
+      );
+      return { outcome: 'synchronized', reviewId: review.id, revision: 1 };
+    }
+
+    if (!review.check_run_id || !integration.platform_installation_id)
+      return { outcome: 'none-due' };
+    const [repoOwner, repoName] = review.repo_full_name.split('/');
+    await mockUpdateCheckRun(
+      integration.platform_installation_id,
+      repoOwner,
+      repoName,
+      review.check_run_id,
+      checkRunUpdateForIntent(lastGateIntent),
+      integration.github_app_type ?? 'standard'
+    );
+    return { outcome: 'synchronized', reviewId: review.id, revision: 1 };
+  });
+  mockResolveGitLabAccessToken.mockResolvedValue('mock-token');
+  mockGetGitLabInstanceUrl.mockReturnValue('https://gitlab.com');
   mockAppendReviewSummaryFooter.mockReturnValue('body with footer');
   ({ POST } = await import('./route'));
 });
@@ -1043,6 +1232,29 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
   });
 
   describe('GitHub check run billing messaging', () => {
+    it('returns success when immediate gate sync records a provider failure', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+      mockProcessDueCodeReviewGateSync.mockResolvedValueOnce({
+        outcome: 'retried',
+        reviewId: REVIEW_ID,
+        revision: 1,
+        errorCode: 'permission',
+        permissionBlocked: true,
+        nextRetryAt: '2025-01-01T01:00:00Z',
+      });
+
+      const response = await POST(makeRequest({ status: 'completed' }), makeParams(REVIEW_ID));
+
+      expect(response.status).toBe(200);
+      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+        REVIEW_ID,
+        'completed',
+        expect.any(Object)
+      );
+      expect(mockProcessDueCodeReviewGateSync).toHaveBeenCalledWith(REVIEW_ID);
+      expect(mockTryDispatchPendingReviews).toHaveBeenCalled();
+    });
+
     it('uses action_required conclusion for billing failures', async () => {
       mockGetCodeReviewById.mockResolvedValue(makeReview());
 

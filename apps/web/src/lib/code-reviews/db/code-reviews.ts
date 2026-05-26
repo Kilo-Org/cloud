@@ -8,6 +8,7 @@
 import { db } from '@/lib/drizzle';
 import {
   cloud_agent_code_review_attempts,
+  cloud_agent_code_review_gate_syncs,
   cloud_agent_code_reviews,
   kilocode_users,
   microdollar_usage,
@@ -16,7 +17,11 @@ import {
 import { eq, and, asc, desc, count, ne, inArray, sql, sum, gte, isNull } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
 import type { CreateReviewParams, CodeReviewStatus, ListReviewsParams, Owner } from '../core';
-import type { CloudAgentCodeReview, CloudAgentCodeReviewAttempt } from '@kilocode/db/schema';
+import type {
+  CloudAgentCodeReview,
+  CloudAgentCodeReviewAttempt,
+  CloudAgentCodeReviewGateSync,
+} from '@kilocode/db/schema';
 import type { CodeReviewTerminalReason } from '@kilocode/db/schema-types';
 import {
   activeCodeReviewWorkCondition,
@@ -31,6 +36,50 @@ import {
 } from '../dispatch/dispatch-constants';
 
 type CodeReviewAttemptStatus = CodeReviewStatus;
+
+export type CodeReviewGateDesiredStatus = 'running' | 'completed' | 'failed' | 'cancelled';
+export type CodeReviewGateResult = 'pass' | 'fail';
+
+export type CodeReviewGateSyncIntent = {
+  status: CodeReviewGateDesiredStatus;
+  gateResult?: CodeReviewGateResult;
+  errorMessage?: string;
+  terminalReason?: CodeReviewTerminalReason;
+};
+
+type ReviewStatusUpdateFields = {
+  sessionId?: string;
+  cliSessionId?: string;
+  errorMessage?: string;
+  terminalReason?: CodeReviewTerminalReason;
+  startedAt?: Date;
+  completedAt?: Date;
+  agentVersion?: string;
+  model?: string;
+  totalTokensIn?: number;
+  totalTokensOut?: number;
+  totalCostMusd?: number;
+};
+
+export type CodeReviewStatusWithGateSyncResult = {
+  applied: boolean;
+  review: CloudAgentCodeReview | null;
+  gateSync: CloudAgentCodeReviewGateSync | null;
+};
+
+export type StrandedTerminalAttemptReview = {
+  reviewId: string;
+  parentStatus: 'queued' | 'running';
+  latestAttemptId: string;
+  latestAttemptStatus: CodeReviewGateDesiredStatus;
+  latestAttemptCompletedAt: string | null;
+  latestAttemptTerminalReason: string | null;
+  latestAttemptErrorMessage: string | null;
+  repoFullName: string;
+  prNumber: number;
+  headSha: string;
+  platform: 'github' | 'gitlab';
+};
 
 type InfraRetryAttemptResult =
   | {
@@ -75,6 +124,42 @@ export type DispatchableCodeReviewOwnerCandidatesResult = {
 
 function isTerminalCodeReviewStatus(status: string): boolean {
   return status === 'completed' || status === 'failed' || status === 'cancelled';
+}
+
+function isGateSyncStatus(status: string): status is CodeReviewGateDesiredStatus {
+  return status === 'running' || isTerminalCodeReviewStatus(status);
+}
+
+function buildReviewStatusUpdateData(
+  status: CodeReviewStatus,
+  updates: ReviewStatusUpdateFields = {}
+): Partial<typeof cloud_agent_code_reviews.$inferInsert> {
+  const updateData: Partial<typeof cloud_agent_code_reviews.$inferInsert> = {
+    status,
+    updated_at: new Date().toISOString(),
+  };
+
+  if (updates.sessionId !== undefined) updateData.session_id = updates.sessionId;
+  if (updates.cliSessionId !== undefined) updateData.cli_session_id = updates.cliSessionId;
+  if (updates.errorMessage !== undefined) updateData.error_message = updates.errorMessage;
+  if (updates.terminalReason !== undefined) updateData.terminal_reason = updates.terminalReason;
+  if (updates.startedAt !== undefined) updateData.started_at = updates.startedAt.toISOString();
+  if (updates.completedAt !== undefined)
+    updateData.completed_at = updates.completedAt.toISOString();
+  if (updates.agentVersion !== undefined) updateData.agent_version = updates.agentVersion;
+  if (updates.model !== undefined) updateData.model = updates.model;
+  if (updates.totalTokensIn !== undefined) updateData.total_tokens_in = updates.totalTokensIn;
+  if (updates.totalTokensOut !== undefined) updateData.total_tokens_out = updates.totalTokensOut;
+  if (updates.totalCostMusd !== undefined) updateData.total_cost_musd = updates.totalCostMusd;
+
+  if (status === 'running' && !updates.startedAt) {
+    updateData.started_at = new Date().toISOString();
+  }
+  if (isTerminalCodeReviewStatus(status) && !updates.completedAt) {
+    updateData.completed_at = new Date().toISOString();
+  }
+
+  return updateData;
 }
 
 function buildAttemptUpdateData(
@@ -768,75 +853,12 @@ export async function ensureCurrentCodeReviewAttemptFromReview(
 export async function updateCodeReviewStatus(
   reviewId: string,
   status: CodeReviewStatus,
-  updates: {
-    sessionId?: string;
-    cliSessionId?: string;
-    errorMessage?: string;
-    terminalReason?: CodeReviewTerminalReason;
-    startedAt?: Date;
-    completedAt?: Date;
-    agentVersion?: string;
-    model?: string;
-    totalTokensIn?: number;
-    totalTokensOut?: number;
-    totalCostMusd?: number;
-  } = {}
+  updates: ReviewStatusUpdateFields = {}
 ): Promise<void> {
   try {
-    const updateData: Partial<typeof cloud_agent_code_reviews.$inferInsert> = {
-      status,
-      updated_at: new Date().toISOString(),
-    };
-
-    // Add optional updates
-    if (updates.sessionId !== undefined) {
-      updateData.session_id = updates.sessionId;
-    }
-    if (updates.cliSessionId !== undefined) {
-      updateData.cli_session_id = updates.cliSessionId;
-    }
-    if (updates.errorMessage !== undefined) {
-      updateData.error_message = updates.errorMessage;
-    }
-    if (updates.terminalReason !== undefined) {
-      updateData.terminal_reason = updates.terminalReason;
-    }
-    if (updates.startedAt !== undefined) {
-      updateData.started_at = updates.startedAt.toISOString();
-    }
-    if (updates.completedAt !== undefined) {
-      updateData.completed_at = updates.completedAt.toISOString();
-    }
-    if (updates.agentVersion !== undefined) {
-      updateData.agent_version = updates.agentVersion;
-    }
-    if (updates.model !== undefined) {
-      updateData.model = updates.model;
-    }
-    if (updates.totalTokensIn !== undefined) {
-      updateData.total_tokens_in = updates.totalTokensIn;
-    }
-    if (updates.totalTokensOut !== undefined) {
-      updateData.total_tokens_out = updates.totalTokensOut;
-    }
-    if (updates.totalCostMusd !== undefined) {
-      updateData.total_cost_musd = updates.totalCostMusd;
-    }
-
-    // Auto-set timestamps based on status
-    if (status === 'running' && !updates.startedAt) {
-      updateData.started_at = new Date().toISOString();
-    }
-    if (
-      (status === 'completed' || status === 'failed' || status === 'cancelled') &&
-      !updates.completedAt
-    ) {
-      updateData.completed_at = new Date().toISOString();
-    }
-
     await db
       .update(cloud_agent_code_reviews)
-      .set(updateData)
+      .set(buildReviewStatusUpdateData(status, updates))
       .where(eq(cloud_agent_code_reviews.id, reviewId));
   } catch (error) {
     captureException(error, {
@@ -850,54 +872,13 @@ export async function updateCodeReviewStatus(
 export async function updateCodeReviewStatusIfNonTerminal(
   reviewId: string,
   status: CodeReviewStatus,
-  updates: {
-    sessionId?: string;
-    cliSessionId?: string;
-    errorMessage?: string;
-    terminalReason?: CodeReviewTerminalReason;
-    startedAt?: Date;
-    completedAt?: Date;
-    agentVersion?: string;
-    model?: string;
-    totalTokensIn?: number;
-    totalTokensOut?: number;
-    totalCostMusd?: number;
-  } = {},
+  updates: ReviewStatusUpdateFields = {},
   dispatchReservationId?: string
 ): Promise<boolean> {
   try {
-    const updateData: Partial<typeof cloud_agent_code_reviews.$inferInsert> = {
-      status,
-      updated_at: new Date().toISOString(),
-    };
-
-    if (updates.sessionId !== undefined) updateData.session_id = updates.sessionId;
-    if (updates.cliSessionId !== undefined) updateData.cli_session_id = updates.cliSessionId;
-    if (updates.errorMessage !== undefined) updateData.error_message = updates.errorMessage;
-    if (updates.terminalReason !== undefined) updateData.terminal_reason = updates.terminalReason;
-    if (updates.startedAt !== undefined) updateData.started_at = updates.startedAt.toISOString();
-    if (updates.completedAt !== undefined) {
-      updateData.completed_at = updates.completedAt.toISOString();
-    }
-    if (updates.agentVersion !== undefined) updateData.agent_version = updates.agentVersion;
-    if (updates.model !== undefined) updateData.model = updates.model;
-    if (updates.totalTokensIn !== undefined) updateData.total_tokens_in = updates.totalTokensIn;
-    if (updates.totalTokensOut !== undefined) updateData.total_tokens_out = updates.totalTokensOut;
-    if (updates.totalCostMusd !== undefined) updateData.total_cost_musd = updates.totalCostMusd;
-
-    if (status === 'running' && !updates.startedAt) {
-      updateData.started_at = new Date().toISOString();
-    }
-    if (
-      (status === 'completed' || status === 'failed' || status === 'cancelled') &&
-      !updates.completedAt
-    ) {
-      updateData.completed_at = new Date().toISOString();
-    }
-
     const updated = await db
       .update(cloud_agent_code_reviews)
-      .set(updateData)
+      .set(buildReviewStatusUpdateData(status, updates))
       .where(
         and(
           eq(cloud_agent_code_reviews.id, reviewId),
@@ -914,6 +895,307 @@ export async function updateCodeReviewStatusIfNonTerminal(
     captureException(error, {
       tags: { operation: 'updateCodeReviewStatusIfNonTerminal' },
       extra: { reviewId, status, updates },
+    });
+    throw error;
+  }
+}
+
+export async function updateCodeReviewStatusWithGateSyncIntent(
+  reviewId: string,
+  status: CodeReviewStatus,
+  updates: ReviewStatusUpdateFields = {},
+  gateIntent?: CodeReviewGateSyncIntent,
+  options: { onlyIfNonTerminal?: boolean; dispatchReservationId?: string } = {}
+): Promise<CodeReviewStatusWithGateSyncResult> {
+  try {
+    return await db.transaction(async tx => {
+      const [review] = await tx
+        .update(cloud_agent_code_reviews)
+        .set(buildReviewStatusUpdateData(status, updates))
+        .where(
+          and(
+            eq(cloud_agent_code_reviews.id, reviewId),
+            options.onlyIfNonTerminal
+              ? inArray(cloud_agent_code_reviews.status, ['pending', 'queued', 'running'])
+              : undefined,
+            options.dispatchReservationId
+              ? eq(cloud_agent_code_reviews.dispatch_reservation_id, options.dispatchReservationId)
+              : undefined
+          )
+        )
+        .returning();
+
+      if (!review) {
+        return { applied: false, review: null, gateSync: null };
+      }
+
+      const intent = gateIntent ?? (isGateSyncStatus(status) ? { status } : undefined);
+      if (!intent || !isGateSyncStatus(intent.status)) {
+        return { applied: true, review, gateSync: null };
+      }
+
+      const now = new Date().toISOString();
+      const [gateSync] = await tx
+        .insert(cloud_agent_code_review_gate_syncs)
+        .values({
+          code_review_id: reviewId,
+          desired_status: intent.status,
+          desired_gate_result: intent.gateResult ?? null,
+          desired_terminal_reason: intent.terminalReason ?? null,
+          desired_error_message: intent.errorMessage ?? null,
+          desired_revision: 1,
+          sync_status: 'pending',
+          claim_token: null,
+          claimed_at: null,
+          attempt_count: 0,
+          next_retry_at: now,
+          synced_at: null,
+          last_error_code: null,
+          last_error_redacted: null,
+          terminal_confirmation_required: false,
+          last_ambiguous_at: null,
+        })
+        .onConflictDoUpdate({
+          target: cloud_agent_code_review_gate_syncs.code_review_id,
+          set: {
+            desired_status: intent.status,
+            desired_gate_result: intent.gateResult ?? null,
+            desired_terminal_reason: intent.terminalReason ?? null,
+            desired_error_message: intent.errorMessage ?? null,
+            desired_revision: sql`${cloud_agent_code_review_gate_syncs.desired_revision} + 1`,
+            sync_status: 'pending',
+            claim_token: null,
+            claimed_at: null,
+            attempt_count: 0,
+            next_retry_at: now,
+            synced_at: null,
+            last_error_code: null,
+            last_error_redacted: null,
+            terminal_confirmation_required: false,
+            last_ambiguous_at: null,
+            updated_at: now,
+          },
+        })
+        .returning();
+
+      return { applied: true, review, gateSync: gateSync ?? null };
+    });
+  } catch (error) {
+    captureException(error, {
+      tags: { operation: 'updateCodeReviewStatusWithGateSyncIntent' },
+      extra: { reviewId, status, updates, gateIntent, options },
+    });
+    throw error;
+  }
+}
+
+export async function listStrandedTerminalAttemptReviews(
+  limit: number = 50
+): Promise<StrandedTerminalAttemptReview[]> {
+  const boundedLimit = Math.max(1, Math.min(limit, 200));
+  try {
+    const result = await db.execute<{
+      review_id: string;
+      parent_status: 'queued' | 'running';
+      latest_attempt_id: string;
+      latest_attempt_status: CodeReviewGateDesiredStatus;
+      latest_attempt_completed_at: string | null;
+      latest_attempt_terminal_reason: string | null;
+      latest_attempt_error_message: string | null;
+      repo_full_name: string;
+      pr_number: number;
+      head_sha: string;
+      platform: 'github' | 'gitlab';
+    }>(sql`
+      WITH latest_attempts AS (
+        SELECT DISTINCT ON (${cloud_agent_code_review_attempts.code_review_id})
+          ${cloud_agent_code_review_attempts.code_review_id},
+          ${cloud_agent_code_review_attempts.id},
+          ${cloud_agent_code_review_attempts.status},
+          ${cloud_agent_code_review_attempts.completed_at},
+          ${cloud_agent_code_review_attempts.terminal_reason},
+          ${cloud_agent_code_review_attempts.error_message}
+        FROM ${cloud_agent_code_review_attempts}
+        ORDER BY ${cloud_agent_code_review_attempts.code_review_id},
+          ${cloud_agent_code_review_attempts.attempt_number} DESC
+      )
+      SELECT
+        ${cloud_agent_code_reviews.id} AS review_id,
+        ${cloud_agent_code_reviews.status} AS parent_status,
+        latest_attempts.id AS latest_attempt_id,
+        latest_attempts.status AS latest_attempt_status,
+        latest_attempts.completed_at AS latest_attempt_completed_at,
+        latest_attempts.terminal_reason AS latest_attempt_terminal_reason,
+        latest_attempts.error_message AS latest_attempt_error_message,
+        ${cloud_agent_code_reviews.repo_full_name} AS repo_full_name,
+        ${cloud_agent_code_reviews.pr_number} AS pr_number,
+        ${cloud_agent_code_reviews.head_sha} AS head_sha,
+        ${cloud_agent_code_reviews.platform} AS platform
+      FROM ${cloud_agent_code_reviews}
+      INNER JOIN latest_attempts
+        ON latest_attempts.code_review_id = ${cloud_agent_code_reviews.id}
+      WHERE ${cloud_agent_code_reviews.status} IN ('queued', 'running')
+        AND latest_attempts.status IN ('completed', 'failed', 'cancelled')
+      ORDER BY latest_attempts.completed_at ASC NULLS LAST,
+        ${cloud_agent_code_reviews.updated_at} ASC
+      LIMIT ${boundedLimit}
+    `);
+
+    return result.rows.map(row => ({
+      reviewId: row.review_id,
+      parentStatus: row.parent_status,
+      latestAttemptId: row.latest_attempt_id,
+      latestAttemptStatus: row.latest_attempt_status,
+      latestAttemptCompletedAt: row.latest_attempt_completed_at,
+      latestAttemptTerminalReason: row.latest_attempt_terminal_reason,
+      latestAttemptErrorMessage: row.latest_attempt_error_message,
+      repoFullName: row.repo_full_name,
+      prNumber: row.pr_number,
+      headSha: row.head_sha,
+      platform: row.platform,
+    }));
+  } catch (error) {
+    captureException(error, {
+      tags: { operation: 'listStrandedTerminalAttemptReviews' },
+      extra: { limit },
+    });
+    throw error;
+  }
+}
+
+export async function repairStrandedTerminalCodeReview(params: {
+  reviewId: string;
+  expectedParentStatus: 'queued' | 'running';
+  expectedAttemptId: string;
+  expectedAttemptStatus: 'completed' | 'failed' | 'cancelled';
+  expectedAttemptTerminalReason: string | null;
+  expectedAttemptErrorMessage: string | null;
+  gateResult?: CodeReviewGateResult;
+}): Promise<CodeReviewStatusWithGateSyncResult> {
+  try {
+    return await db.transaction(async tx => {
+      const [review] = await tx
+        .select()
+        .from(cloud_agent_code_reviews)
+        .where(eq(cloud_agent_code_reviews.id, params.reviewId))
+        .for('update')
+        .limit(1);
+
+      if (!review) {
+        throw new Error(`Code review ${params.reviewId} not found`);
+      }
+      if (review.status !== params.expectedParentStatus) {
+        throw new Error(
+          `Code review ${params.reviewId} status changed from ${params.expectedParentStatus} to ${review.status}`
+        );
+      }
+
+      const [latestAttempt] = await tx
+        .select()
+        .from(cloud_agent_code_review_attempts)
+        .where(eq(cloud_agent_code_review_attempts.code_review_id, params.reviewId))
+        .orderBy(desc(cloud_agent_code_review_attempts.attempt_number))
+        .limit(1);
+
+      if (!latestAttempt) {
+        throw new Error(`Code review ${params.reviewId} has no attempts to repair from`);
+      }
+      if (latestAttempt.id !== params.expectedAttemptId) {
+        throw new Error(
+          `Latest attempt changed from ${params.expectedAttemptId} to ${latestAttempt.id}`
+        );
+      }
+      if (latestAttempt.status !== params.expectedAttemptStatus) {
+        throw new Error(
+          `Latest attempt ${latestAttempt.id} status changed from ${params.expectedAttemptStatus} to ${latestAttempt.status}`
+        );
+      }
+      if (latestAttempt.terminal_reason !== params.expectedAttemptTerminalReason) {
+        throw new Error(`Latest attempt ${latestAttempt.id} terminal reason changed`);
+      }
+      if (latestAttempt.error_message !== params.expectedAttemptErrorMessage) {
+        throw new Error(`Latest attempt ${latestAttempt.id} error message changed`);
+      }
+      if (latestAttempt.status === 'completed' && !params.gateResult) {
+        throw new Error('Completed review repair requires an explicit gateResult');
+      }
+
+      const completedAt = latestAttempt.completed_at
+        ? new Date(latestAttempt.completed_at)
+        : new Date();
+      const [updatedReview] = await tx
+        .update(cloud_agent_code_reviews)
+        .set(
+          buildReviewStatusUpdateData(latestAttempt.status, {
+            sessionId: latestAttempt.session_id ?? undefined,
+            cliSessionId: latestAttempt.cli_session_id ?? undefined,
+            errorMessage: latestAttempt.error_message ?? undefined,
+            terminalReason: latestAttempt.terminal_reason as CodeReviewTerminalReason | undefined,
+            completedAt,
+          })
+        )
+        .where(
+          and(
+            eq(cloud_agent_code_reviews.id, params.reviewId),
+            eq(cloud_agent_code_reviews.status, params.expectedParentStatus)
+          )
+        )
+        .returning();
+
+      if (!updatedReview) {
+        return { applied: false, review: null, gateSync: null };
+      }
+
+      const now = new Date().toISOString();
+      const [gateSync] = await tx
+        .insert(cloud_agent_code_review_gate_syncs)
+        .values({
+          code_review_id: params.reviewId,
+          desired_status: latestAttempt.status,
+          desired_gate_result: params.gateResult ?? null,
+          desired_terminal_reason: latestAttempt.terminal_reason,
+          desired_error_message: latestAttempt.error_message,
+          desired_revision: 1,
+          sync_status: 'pending',
+          claim_token: null,
+          claimed_at: null,
+          attempt_count: 0,
+          next_retry_at: now,
+          synced_at: null,
+          last_error_code: null,
+          last_error_redacted: null,
+          terminal_confirmation_required: false,
+          last_ambiguous_at: null,
+        })
+        .onConflictDoUpdate({
+          target: cloud_agent_code_review_gate_syncs.code_review_id,
+          set: {
+            desired_status: latestAttempt.status,
+            desired_gate_result: params.gateResult ?? null,
+            desired_terminal_reason: latestAttempt.terminal_reason,
+            desired_error_message: latestAttempt.error_message,
+            desired_revision: sql`${cloud_agent_code_review_gate_syncs.desired_revision} + 1`,
+            sync_status: 'pending',
+            claim_token: null,
+            claimed_at: null,
+            attempt_count: 0,
+            next_retry_at: now,
+            synced_at: null,
+            last_error_code: null,
+            last_error_redacted: null,
+            terminal_confirmation_required: false,
+            last_ambiguous_at: null,
+            updated_at: now,
+          },
+        })
+        .returning();
+
+      return { applied: true, review: updatedReview, gateSync: gateSync ?? null };
+    });
+  } catch (error) {
+    captureException(error, {
+      tags: { operation: 'repairStrandedTerminalCodeReview' },
+      extra: params,
     });
     throw error;
   }

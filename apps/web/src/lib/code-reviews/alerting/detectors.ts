@@ -1,10 +1,11 @@
 import type { db as defaultDb } from '@/lib/drizzle';
 import { sql } from '@/lib/drizzle';
-import { cloud_agent_code_reviews } from '@kilocode/db/schema';
+import { cloud_agent_code_review_gate_syncs, cloud_agent_code_reviews } from '@kilocode/db/schema';
 import { CODE_REVIEW_BENIGN_TERMINAL_REASONS } from '@kilocode/db/schema-types';
 import {
   ERROR_SPIKE_RATE_THRESHOLD,
   ERROR_SPIKE_WINDOW_MINUTES,
+  GATE_SYNC_BACKLOG_SLA_MINUTES,
   SLOW_REVIEW_DURATION_MINUTES,
   SLOW_REVIEW_RATE_THRESHOLD,
   SLOW_REVIEW_WINDOW_MINUTES,
@@ -32,7 +33,20 @@ export type ErrorSpikeAlertDetails = {
   topReasonCount?: number;
 };
 
-export type CodeReviewAlertDetails = SlowReviewsAlertDetails | ErrorSpikeAlertDetails;
+export type GateSyncBacklogAlertDetails = {
+  kind: 'gate_sync_backlog';
+  unsynchronizedCount: number;
+  permissionBlockedCount: number;
+  oldestUnsyncedAgeMinutes: number;
+  slaMinutes: number;
+  dominantFailureCode?: string;
+  dominantFailureCount?: number;
+};
+
+export type CodeReviewAlertDetails =
+  | SlowReviewsAlertDetails
+  | ErrorSpikeAlertDetails
+  | GateSyncBacklogAlertDetails;
 
 export type CodeReviewAlertEvaluation =
   | { tripped: false }
@@ -48,6 +62,14 @@ type ErrorSpikeRow = {
   error_count: CountValue;
   top_reason: string | null;
   top_reason_count: CountValue;
+};
+
+type GateSyncBacklogRow = {
+  unsynchronized_count: CountValue;
+  permission_blocked_count: CountValue;
+  oldest_unsynced_age_minutes: CountValue;
+  dominant_failure_code: string | null;
+  dominant_failure_count: CountValue;
 };
 
 const benignTerminalReasonsSql = sql`(${sql.join(
@@ -177,6 +199,72 @@ export async function evaluateErrorSpike(database: AlertingDb): Promise<CodeRevi
       ...(row?.top_reason ? { topReason: row.top_reason } : {}),
       ...(toNumber(row?.top_reason_count) > 0
         ? { topReasonCount: toNumber(row?.top_reason_count) }
+        : {}),
+    },
+  };
+}
+
+export async function evaluateGateSyncBacklog(
+  database: AlertingDb
+): Promise<CodeReviewAlertEvaluation> {
+  const result = await database.execute<GateSyncBacklogRow>(sql`
+    WITH unsynchronized AS (
+      SELECT
+        ${cloud_agent_code_review_gate_syncs.last_error_code},
+        EXTRACT(EPOCH FROM (
+          now() - COALESCE(
+            ${cloud_agent_code_review_gate_syncs.last_attempted_at},
+            ${cloud_agent_code_review_gate_syncs.updated_at},
+            ${cloud_agent_code_review_gate_syncs.created_at}
+          )
+        )) / 60 AS age_minutes
+      FROM ${cloud_agent_code_review_gate_syncs}
+      INNER JOIN ${cloud_agent_code_reviews}
+        ON ${cloud_agent_code_reviews.id} = ${cloud_agent_code_review_gate_syncs.code_review_id}
+      WHERE ${cloud_agent_code_reviews.status} IN ('completed', 'failed', 'cancelled')
+        AND ${cloud_agent_code_review_gate_syncs.desired_status} IN ('completed', 'failed', 'cancelled')
+        AND ${cloud_agent_code_review_gate_syncs.sync_status} IN ('pending', 'retry', 'processing')
+        AND (
+          COALESCE(
+            ${cloud_agent_code_review_gate_syncs.last_attempted_at},
+            ${cloud_agent_code_review_gate_syncs.updated_at},
+            ${cloud_agent_code_review_gate_syncs.created_at}
+          ) < now() - (${GATE_SYNC_BACKLOG_SLA_MINUTES} * INTERVAL '1 minute')
+          OR ${cloud_agent_code_review_gate_syncs.last_error_code} = 'permission'
+        )
+    ), top_failure AS (
+      SELECT COALESCE(last_error_code, 'pending') AS code, COUNT(*) AS count
+      FROM unsynchronized
+      GROUP BY 1
+      ORDER BY 2 DESC, 1 ASC
+      LIMIT 1
+    )
+    SELECT
+      COUNT(*) AS unsynchronized_count,
+      COUNT(*) FILTER (WHERE last_error_code = 'permission') AS permission_blocked_count,
+      COALESCE(MAX(age_minutes), 0) AS oldest_unsynced_age_minutes,
+      (SELECT code FROM top_failure) AS dominant_failure_code,
+      (SELECT count FROM top_failure) AS dominant_failure_count
+    FROM unsynchronized
+  `);
+
+  const row = result.rows[0];
+  const unsynchronizedCount = toNumber(row?.unsynchronized_count);
+  if (unsynchronizedCount === 0) {
+    return { tripped: false };
+  }
+
+  return {
+    tripped: true,
+    details: {
+      kind: 'gate_sync_backlog',
+      unsynchronizedCount,
+      permissionBlockedCount: toNumber(row?.permission_blocked_count),
+      oldestUnsyncedAgeMinutes: Math.round(toNumber(row?.oldest_unsynced_age_minutes)),
+      slaMinutes: GATE_SYNC_BACKLOG_SLA_MINUTES,
+      ...(row?.dominant_failure_code ? { dominantFailureCode: row.dominant_failure_code } : {}),
+      ...(toNumber(row?.dominant_failure_count) > 0
+        ? { dominantFailureCount: toNumber(row?.dominant_failure_count) }
         : {}),
     },
   };

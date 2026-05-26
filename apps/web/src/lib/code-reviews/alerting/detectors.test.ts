@@ -1,8 +1,13 @@
 import { db, sql } from '@/lib/drizzle';
 import { insertTestUser } from '@/tests/helpers/user.helper';
-import { cloud_agent_code_reviews, kilocode_users, type User } from '@kilocode/db/schema';
+import {
+  cloud_agent_code_review_gate_syncs,
+  cloud_agent_code_reviews,
+  kilocode_users,
+  type User,
+} from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
-import { evaluateErrorSpike, evaluateSlowReviews } from './detectors';
+import { evaluateErrorSpike, evaluateGateSyncBacklog, evaluateSlowReviews } from './detectors';
 
 const REPO = `test-org/code-review-alerts-${Date.now()}`;
 type CodeReviewInsert = typeof cloud_agent_code_reviews.$inferInsert;
@@ -353,5 +358,37 @@ describe('code review alert detectors', () => {
     ]);
 
     await expect(evaluateErrorSpike(db)).resolves.toEqual({ tripped: false });
+  });
+
+  it('trips gate-sync backlog alerts for stale terminal provider mismatches', async () => {
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(reviewValues({ status: 'completed', completed_at: minutesAgo(30) }))
+      .returning({ id: cloud_agent_code_reviews.id });
+
+    await db.insert(cloud_agent_code_review_gate_syncs).values({
+      code_review_id: review.id,
+      desired_status: 'completed',
+      desired_gate_result: 'pass',
+      desired_revision: 1,
+      sync_status: 'retry',
+      attempt_count: 2,
+      next_retry_at: minutesAgo(-30),
+      last_attempted_at: minutesAgo(20),
+      last_error_code: 'permission',
+      last_error_redacted: 'GitLab set commit status failed: 403 - Forbidden',
+      created_at: minutesAgo(25),
+      updated_at: minutesAgo(20),
+    });
+
+    await expect(evaluateGateSyncBacklog(db)).resolves.toMatchObject({
+      tripped: true,
+      details: {
+        kind: 'gate_sync_backlog',
+        unsynchronizedCount: 1,
+        permissionBlockedCount: 1,
+        dominantFailureCode: 'permission',
+      },
+    });
   });
 });

@@ -3501,6 +3501,70 @@ export const cloud_agent_code_review_attempts = pgTable(
 
 export type CloudAgentCodeReviewAttempt = typeof cloud_agent_code_review_attempts.$inferSelect;
 
+export const cloud_agent_code_review_gate_syncs = pgTable(
+  'cloud_agent_code_review_gate_syncs',
+  {
+    code_review_id: uuid()
+      .primaryKey()
+      .notNull()
+      .references(() => cloud_agent_code_reviews.id, { onDelete: 'cascade' }),
+    desired_status: text().notNull(),
+    desired_gate_result: text(),
+    desired_terminal_reason: text(),
+    desired_error_message: text(),
+    desired_revision: integer().notNull().default(1),
+    sync_status: text().notNull().default('pending'),
+    claim_token: text(),
+    claimed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    attempt_count: integer().notNull().default(0),
+    next_retry_at: timestamp({ withTimezone: true, mode: 'string' }),
+    last_attempted_at: timestamp({ withTimezone: true, mode: 'string' }),
+    synced_at: timestamp({ withTimezone: true, mode: 'string' }),
+    last_error_code: text(),
+    last_error_redacted: text(),
+    terminal_confirmation_required: boolean().notNull().default(false),
+    last_ambiguous_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    check(
+      'cloud_agent_code_review_gate_syncs_desired_status_check',
+      sql`${table.desired_status} IN ('running', 'completed', 'failed', 'cancelled')`
+    ),
+    check(
+      'cloud_agent_code_review_gate_syncs_desired_gate_result_check',
+      sql`${table.desired_gate_result} IS NULL OR ${table.desired_gate_result} IN ('pass', 'fail')`
+    ),
+    check(
+      'cloud_agent_code_review_gate_syncs_sync_status_check',
+      sql`${table.sync_status} IN ('pending', 'processing', 'retry', 'synced', 'skipped')`
+    ),
+    check(
+      'cloud_agent_code_review_gate_syncs_desired_revision_check',
+      sql`${table.desired_revision} >= 1`
+    ),
+    check(
+      'cloud_agent_code_review_gate_syncs_attempt_count_check',
+      sql`${table.attempt_count} >= 0`
+    ),
+    index('idx_cloud_agent_code_review_gate_syncs_due')
+      .on(table.sync_status, table.next_retry_at, table.updated_at)
+      .where(sql`${table.sync_status} IN ('pending', 'retry')`),
+    index('idx_cloud_agent_code_review_gate_syncs_claimed')
+      .on(table.claimed_at, table.code_review_id)
+      .where(sql`${table.sync_status} = 'processing'`),
+    index('idx_cloud_agent_code_review_gate_syncs_failures')
+      .on(table.last_error_code, table.updated_at)
+      .where(sql`${table.last_error_code} IS NOT NULL`),
+  ]
+);
+
+export type CloudAgentCodeReviewGateSync = typeof cloud_agent_code_review_gate_syncs.$inferSelect;
+
 export const cliSessions = pgTable(
   'cli_sessions',
   {

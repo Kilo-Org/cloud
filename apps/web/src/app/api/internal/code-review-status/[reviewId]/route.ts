@@ -483,12 +483,18 @@ export async function POST(
         currentStatus: review.status,
         requestedStatus: status,
       });
-      processDueCodeReviewGateSync(reviewId).catch(gateSyncError => {
+      try {
+        await processDueCodeReviewGateSync(reviewId);
+      } catch (gateSyncError) {
         logExceptInTest(
           '[code-review-status] Failed to process existing gate sync intent:',
           gateSyncError
         );
-      });
+        captureException(gateSyncError, {
+          tags: { source: 'code-review-status-existing-gate-sync' },
+          extra: { reviewId, status },
+        });
+      }
       return NextResponse.json({
         success: true,
         message: 'Review already in terminal state',

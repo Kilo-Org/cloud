@@ -9,12 +9,7 @@ jest.mock('@sentry/nextjs', () => ({
 import { db, sql } from '@/lib/drizzle';
 import { CODE_REVIEW_RUNBOOK_URL } from '@/lib/code-reviews/alerting/health-response';
 import { insertTestUser } from '@/tests/helpers/user.helper';
-import {
-  cloud_agent_code_review_gate_syncs,
-  cloud_agent_code_reviews,
-  kilocode_users,
-  type User,
-} from '@kilocode/db/schema';
+import { cloud_agent_code_reviews, kilocode_users, type User } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { GET } from './route';
 
@@ -121,8 +116,8 @@ describe('GET /api/code-reviews/up', () => {
       const response = await GET(makeRequest('kilo-code-reviews-health-check'));
 
       expect(response.status).toBe(200);
-      expect(transactionSpy).toHaveBeenCalledTimes(3);
-      expect(txExecuteCalls).toHaveLength(3);
+      expect(transactionSpy).toHaveBeenCalledTimes(2);
+      expect(txExecuteCalls).toHaveLength(2);
       for (const execute of txExecuteCalls) {
         expect(execute).toHaveBeenCalledTimes(2);
       }
@@ -290,44 +285,6 @@ describe('GET /api/code-reviews/up', () => {
     expect(kinds).toEqual(expect.arrayContaining(['slow_reviews', 'error_spike']));
   });
 
-  it('returns 503 with gate-sync backlog alert when terminal gates are unsynchronized', async () => {
-    const [review] = await db
-      .insert(cloud_agent_code_reviews)
-      .values(reviewValues({ status: 'completed', completed_at: minutesAgo(30) }))
-      .returning({ id: cloud_agent_code_reviews.id });
-
-    await db.insert(cloud_agent_code_review_gate_syncs).values({
-      code_review_id: review.id,
-      desired_status: 'completed',
-      desired_gate_result: 'pass',
-      desired_revision: 1,
-      sync_status: 'retry',
-      attempt_count: 3,
-      last_attempted_at: minutesAgo(20),
-      last_error_code: 'permission',
-      last_error_redacted: 'GitLab set commit status failed: 403 - Forbidden',
-      created_at: minutesAgo(25),
-      updated_at: minutesAgo(20),
-    });
-
-    const response = await GET(makeRequest('kilo-code-reviews-health-check'));
-
-    expect(response.status).toBe(503);
-    const body = await response.json();
-    expect(body).toMatchObject({
-      healthy: false,
-      alerts: [
-        expect.objectContaining({
-          kind: 'gate_sync_backlog',
-          label: 'Gate Sync Backlog',
-          unsynchronizedCount: 1,
-          permissionBlockedCount: 1,
-          dominantFailureCode: 'permission',
-        }),
-      ],
-    });
-  });
-
   it('fails open and captures every detector error to Sentry when the database is unreachable', async () => {
     const transactionSpy = jest
       .spyOn(db, 'transaction')
@@ -339,11 +296,11 @@ describe('GET /api/code-reviews/up', () => {
       expect(response.status).toBe(200);
       const body = await response.json();
       expect(body).toMatchObject({ healthy: true, alerts: [] });
-      expect(mockCaptureException).toHaveBeenCalledTimes(3);
+      expect(mockCaptureException).toHaveBeenCalledTimes(2);
       const detectorTags = mockCaptureException.mock.calls
         .map(call => call[1].tags.detector)
         .sort();
-      expect(detectorTags).toEqual(['error_spike', 'gate_sync_backlog', 'slow_reviews']);
+      expect(detectorTags).toEqual(['error_spike', 'slow_reviews']);
       expect(mockCaptureException.mock.calls[0][1]).toMatchObject({
         tags: { endpoint: 'code-reviews/up', source: 'code_review_health_check' },
       });

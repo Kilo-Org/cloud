@@ -19,7 +19,8 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import {
-  updateCodeReviewStatusWithGateSyncIntent,
+  updateCodeReviewStatus,
+  updateCodeReviewStatusIfNonTerminal,
   updateCodeReviewUsage,
   getCodeReviewById,
   getSessionUsageFromBilling,
@@ -37,27 +38,31 @@ import {
   hasPRCommentWithMarker,
   findKiloReviewComment,
   updateKiloReviewComment,
+  updateCheckRun,
 } from '@/lib/integrations/platforms/github/adapter';
+import type { CheckRunConclusion } from '@/lib/integrations/platforms/github/adapter';
 import {
   addReactionToMR,
   createMRNote,
   hasMRNoteWithMarker,
   findKiloReviewNote,
   updateKiloReviewNote,
+  setCommitStatus,
 } from '@/lib/integrations/platforms/gitlab/adapter';
+import type { GitLabCommitStatusState } from '@/lib/integrations/platforms/gitlab/adapter';
 import { getIntegrationById } from '@/lib/integrations/db/platform-integrations';
+import {
+  getValidGitLabToken,
+  getStoredProjectAccessToken,
+} from '@/lib/integrations/gitlab-service';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { CALLBACK_TOKEN_SECRET } from '@/lib/config.server';
 import { verifyCallbackToken } from '@kilocode/worker-utils/callback-token';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { appendReviewSummaryFooter } from '@/lib/code-reviews/summary/usage-footer';
+import { APP_URL } from '@/lib/constants';
 import type { CloudAgentCodeReview, PlatformIntegration } from '@kilocode/db/schema';
 import type { GitHubAppType } from '@/lib/integrations/platforms/github/app-selector';
-import {
-  getGitLabInstanceUrl,
-  processDueCodeReviewGateSync,
-  resolveGitLabAccessToken,
-} from '@/lib/code-reviews/gate-sync';
 import {
   CODE_REVIEW_TERMINAL_REASONS,
   type CodeReviewTerminalReason,
@@ -223,6 +228,9 @@ function isSupersededReview(review: CloudAgentCodeReview): boolean {
 
 const BILLING_NOTICE_MARKER = '<!-- kilo-billing-notice -->';
 const MODEL_NOT_FOUND_SUMMARY_URL = 'https://app.kilo.ai/code-reviews';
+const MODEL_NOT_FOUND_CHECK_TITLE = 'Selected model is no longer available';
+const MODEL_NOT_FOUND_STATUS_SUMMARY = `The review did not run because the selected model is no longer available. Choose another model in Kilo Code review settings: ${MODEL_NOT_FOUND_SUMMARY_URL}`;
+const MODEL_NOT_FOUND_GITLAB_DESCRIPTION = `Selected model is no longer available. Choose another model: ${MODEL_NOT_FOUND_SUMMARY_URL}`;
 
 const MODEL_NOT_FOUND_SUMMARY_BODY = `<!-- kilo-review -->
 ## Code Review Summary
@@ -303,6 +311,124 @@ function getReviewGuidanceFooterData(review: CloudAgentCodeReview) {
   };
 }
 
+/**
+ * Maps a review status to a GitHub Check Run update.
+ * Returns null for statuses that don't have a check run mapping (e.g. 'queued').
+ *
+ * When `gateResult` is `'fail'` and the review completed successfully (no system error),
+ * the conclusion is set to `'failure'` — the agent determined that the review found
+ * blocking issues (based on the `gate_threshold` setting in the agent config).
+ */
+function mapStatusToCheckRun(
+  reviewStatus: string,
+  errorMessage?: string,
+  terminalReason?: CodeReviewTerminalReason,
+  gateResult?: 'pass' | 'fail'
+) {
+  const statusMap: Record<string, 'in_progress' | 'completed'> = {
+    running: 'in_progress',
+    completed: 'completed',
+    failed: 'completed',
+    cancelled: 'completed',
+  };
+
+  const checkStatus = statusMap[reviewStatus];
+  if (!checkStatus) return null;
+
+  // When the review completed but the agent reported a gate failure
+  // (e.g. findings exceeding the gate_threshold), fail the check.
+  const reviewFailed = reviewStatus === 'completed' && gateResult === 'fail';
+  const billingFailure =
+    reviewStatus === 'failed' && isBillingCodeReviewTerminalReason(terminalReason, errorMessage);
+  const modelNotFoundCancellation =
+    reviewStatus === 'cancelled' &&
+    isModelNotFoundCodeReviewTerminalReason(terminalReason, errorMessage);
+
+  const conclusionMap: Record<string, CheckRunConclusion> = {
+    completed: reviewFailed ? 'failure' : 'success',
+    failed: billingFailure ? 'action_required' : 'failure',
+    cancelled: 'cancelled',
+  };
+
+  const titleMap: Record<string, string> = {
+    running: 'Kilo Code Review in progress',
+    completed: reviewFailed ? 'Kilo Code Review found issues' : 'Kilo Code Review completed',
+    failed: billingFailure ? 'Insufficient credits to run review' : 'Kilo Code Review failed',
+    cancelled: modelNotFoundCancellation
+      ? MODEL_NOT_FOUND_CHECK_TITLE
+      : 'Kilo Code Review cancelled',
+  };
+
+  const summaryMap: Record<string, string> = {
+    running: 'Review is running...',
+    completed: reviewFailed
+      ? 'Code review completed with findings that require attention.'
+      : 'Code review completed successfully.',
+    failed: billingFailure
+      ? 'Review could not start because the account has insufficient credits.'
+      : errorMessage
+        ? `Review failed: ${errorMessage}`
+        : 'Review failed.',
+    cancelled: modelNotFoundCancellation ? MODEL_NOT_FOUND_STATUS_SUMMARY : 'Review was cancelled.',
+  };
+
+  return {
+    status: checkStatus,
+    conclusion: conclusionMap[reviewStatus],
+    title: titleMap[reviewStatus] ?? 'Kilo Code Review',
+    summary: summaryMap[reviewStatus] ?? '',
+  };
+}
+
+/**
+ * Maps a review status to a GitLab commit status state.
+ */
+function mapStatusToGitLabState(
+  reviewStatus: string,
+  gateResult?: 'pass' | 'fail'
+): GitLabCommitStatusState {
+  if (reviewStatus === 'completed' && gateResult === 'fail') return 'failed';
+  const stateMap: Record<string, GitLabCommitStatusState> = {
+    running: 'running',
+    completed: 'success',
+    failed: 'failed',
+    cancelled: 'canceled',
+  };
+  return stateMap[reviewStatus] ?? 'pending';
+}
+
+function getGitLabStatusDescription(
+  reviewStatus: string,
+  errorMessage?: string,
+  terminalReason?: CodeReviewTerminalReason,
+  gateResult?: 'pass' | 'fail'
+): string | undefined {
+  if (reviewStatus === 'running') return 'Kilo Code Review in progress';
+  if (reviewStatus === 'completed' && gateResult === 'fail') {
+    return 'Kilo Code Review found issues that require attention';
+  }
+  if (reviewStatus === 'completed') return 'Kilo Code Review completed';
+  if (
+    reviewStatus === 'cancelled' &&
+    isModelNotFoundCodeReviewTerminalReason(terminalReason, errorMessage)
+  ) {
+    return MODEL_NOT_FOUND_GITLAB_DESCRIPTION;
+  }
+  if (reviewStatus === 'cancelled') return 'Kilo Code Review cancelled';
+  if (
+    reviewStatus === 'failed' &&
+    isBillingCodeReviewTerminalReason(terminalReason, errorMessage)
+  ) {
+    return 'Insufficient credits to run review';
+  }
+  if (reviewStatus === 'failed' && errorMessage) {
+    const desc = `Review failed: ${errorMessage}`;
+    return desc.length > 255 ? desc.slice(0, 252) + '...' : desc;
+  }
+  if (reviewStatus === 'failed') return 'Kilo Code Review failed';
+  return undefined;
+}
+
 async function upsertModelNotFoundSummary(
   review: CloudAgentCodeReview,
   integration: PlatformIntegration,
@@ -380,6 +506,115 @@ async function upsertModelNotFoundSummary(
 
     logExceptInTest(
       `[code-review-status] Upserted model unavailable summary on GitLab MR ${review.repo_full_name}!${review.pr_number}`
+    );
+  }
+}
+
+/**
+ * Resolves a GitLab access token for a review's project.
+ * Prefers a stored Project Access Token; falls back to the user's OAuth token.
+ */
+async function resolveGitLabAccessToken(
+  integration: PlatformIntegration,
+  projectId: number | null
+): Promise<string> {
+  const storedPrat = projectId ? getStoredProjectAccessToken(integration, projectId) : null;
+  return storedPrat ? storedPrat.token : await getValidGitLabToken(integration);
+}
+
+/**
+ * Extracts the GitLab instance URL from an integration's metadata.
+ */
+function getGitLabInstanceUrl(integration: PlatformIntegration): string {
+  const metadata = integration.metadata as {
+    gitlab_instance_url?: string;
+  } | null;
+  return metadata?.gitlab_instance_url || 'https://gitlab.com';
+}
+
+/**
+ * Update the GitHub Check Run or GitLab commit status for a review.
+ * Non-blocking — errors are logged but don't fail the callback.
+ */
+async function updatePRGateCheck(
+  review: CloudAgentCodeReview,
+  integration: PlatformIntegration,
+  reviewStatus: string,
+  errorMessage?: string,
+  terminalReason?: CodeReviewTerminalReason,
+  gitlabAccessToken?: string,
+  gateResult?: 'pass' | 'fail'
+) {
+  const platform = review.platform || 'github';
+  const detailsUrl = `${APP_URL}/code-reviews/${review.id}`;
+
+  const checkRunMapping = mapStatusToCheckRun(
+    reviewStatus,
+    errorMessage,
+    terminalReason,
+    gateResult
+  );
+  if (!checkRunMapping) return; // unsupported status (e.g. 'queued') — nothing to update
+
+  if (platform === 'github' && integration.platform_installation_id) {
+    // GitHub: update Check Run (only if we have a check_run_id)
+    if (!review.check_run_id) return;
+
+    const [repoOwner, repoName] = review.repo_full_name.split('/');
+
+    await updateCheckRun(
+      integration.platform_installation_id,
+      repoOwner,
+      repoName,
+      review.check_run_id,
+      {
+        status: checkRunMapping.status,
+        conclusion: checkRunMapping.conclusion,
+        detailsUrl,
+        output: {
+          title: checkRunMapping.title,
+          summary: checkRunMapping.summary,
+        },
+      },
+      integration.github_app_type ?? 'standard'
+    );
+
+    logExceptInTest(
+      `[code-review-status] Updated check run for ${review.repo_full_name}#${review.pr_number}`,
+      {
+        status: checkRunMapping.status,
+        conclusion: checkRunMapping.conclusion,
+      }
+    );
+  } else if (platform === PLATFORM.GITLAB) {
+    // GitLab: update commit status
+    const instanceUrl = getGitLabInstanceUrl(integration);
+    const projectId = review.platform_project_id;
+    const accessToken =
+      gitlabAccessToken ?? (await resolveGitLabAccessToken(integration, projectId));
+
+    const state = mapStatusToGitLabState(reviewStatus, gateResult);
+
+    await setCommitStatus(
+      accessToken,
+      projectId ?? review.repo_full_name,
+      review.head_sha,
+      state,
+      {
+        targetUrl: detailsUrl,
+        description: getGitLabStatusDescription(
+          reviewStatus,
+          errorMessage,
+          terminalReason,
+          gateResult
+        ),
+      },
+      instanceUrl
+    );
+
+    logExceptInTest(
+      `[code-review-status] Updated commit status for GitLab MR ${review.repo_full_name}!${review.pr_number}`,
+      { state }
     );
   }
 }
@@ -483,18 +718,6 @@ export async function POST(
         currentStatus: review.status,
         requestedStatus: status,
       });
-      try {
-        await processDueCodeReviewGateSync(reviewId);
-      } catch (gateSyncError) {
-        logExceptInTest(
-          '[code-review-status] Failed to process existing gate sync intent:',
-          gateSyncError
-        );
-        captureException(gateSyncError, {
-          tags: { source: 'code-review-status-existing-gate-sync' },
-          extra: { reviewId, status },
-        });
-      }
       return NextResponse.json({
         success: true,
         message: 'Review already in terminal state',
@@ -653,44 +876,36 @@ export async function POST(
           ? new Date()
           : undefined,
     };
+    const isModelNotFoundCancellation =
+      status === 'cancelled' &&
+      isModelNotFoundCodeReviewTerminalReason(terminalReason, errorMessage);
 
-    const persistenceResult = await updateCodeReviewStatusWithGateSyncIntent(
-      reviewId,
-      status,
-      parentStatusUpdates,
-      {
-        status,
-        gateResult: validGateResult,
-        errorMessage,
-        terminalReason,
-      },
-      { onlyIfNonTerminal: true }
-    );
-
-    if (!persistenceResult.applied) {
-      logExceptInTest('[code-review-status] Review state changed before persistence, skipping', {
+    if (isModelNotFoundCancellation) {
+      const claimedTerminalUpdate = await updateCodeReviewStatusIfNonTerminal(
         reviewId,
-        requestedStatus: status,
-      });
-      return NextResponse.json({
-        success: true,
-        message: 'Review already in terminal state',
-      });
+        status,
+        parentStatusUpdates
+      );
+      if (!claimedTerminalUpdate) {
+        logExceptInTest(
+          '[code-review-status] Model unavailable cancellation was already persisted, skipping summary upsert',
+          { reviewId }
+        );
+        return NextResponse.json({
+          success: true,
+          message: 'Review already in terminal state',
+        });
+      }
+    } else {
+      await updateCodeReviewStatus(reviewId, status, parentStatusUpdates);
     }
 
-    try {
-      await processDueCodeReviewGateSync(reviewId);
-    } catch (gateSyncError) {
-      logExceptInTest('[code-review-status] Failed to process gate sync intent:', gateSyncError);
-      captureException(gateSyncError, {
-        tags: { source: 'code-review-status-gate-sync' },
-        extra: { reviewId, status },
-      });
-    }
-
+    // Fetch integration once — used for gate check updates and post-completion actions
     const integration = review.platform_integration_id
       ? await getIntegrationById(review.platform_integration_id)
       : null;
+
+    // Resolve GitLab token once, shared between gate check and reaction/footer logic
     const isGitLab = (review.platform || 'github') === PLATFORM.GITLAB;
     const gitlabAccessToken =
       integration && isGitLab
@@ -699,11 +914,34 @@ export async function POST(
           )
         : undefined;
 
-    if (
-      integration &&
-      status === 'cancelled' &&
-      isModelNotFoundCodeReviewTerminalReason(terminalReason, errorMessage)
-    ) {
+    if (integration) {
+      try {
+        await updatePRGateCheck(
+          review,
+          integration,
+          status,
+          errorMessage,
+          terminalReason,
+          gitlabAccessToken,
+          validGateResult
+        );
+      } catch (gateCheckError) {
+        logExceptInTest('[code-review-status] Failed to update PR gate check:', gateCheckError);
+        const isTerminal = status === 'completed' || status === 'failed' || status === 'cancelled';
+        if (isTerminal) {
+          captureException(gateCheckError, {
+            tags: { source: 'code-review-status-gate-check' },
+            extra: {
+              reviewId,
+              status,
+              checkRunId: String(review.check_run_id ?? ''),
+            },
+          });
+        }
+      }
+    }
+
+    if (integration && isModelNotFoundCancellation) {
       try {
         await upsertModelNotFoundSummary(review, integration, gitlabAccessToken);
       } catch (summaryError) {

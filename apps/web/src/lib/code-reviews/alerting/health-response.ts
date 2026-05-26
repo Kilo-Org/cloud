@@ -9,7 +9,6 @@ type AlertKindLabel = Record<CodeReviewAlertDetails['kind'], string>;
 const ALERT_KIND_LABELS: AlertKindLabel = {
   slow_reviews: 'Slow Reviews',
   error_spike: 'Error Spike',
-  gate_sync_backlog: 'Gate Sync Backlog',
 };
 
 type CodeReviewHealthAlertCommon = {

@@ -1,6 +1,5 @@
 import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import { db } from '@/lib/drizzle';
-import { TRPCError } from '@trpc/server';
 import {
   cloud_agent_code_review_attempts,
   cloud_agent_code_reviews,
@@ -14,10 +13,6 @@ import {
   staleQueuedCodeReviewCutoffSql,
   staleRunningCodeReviewCutoffSql,
 } from '@/lib/code-reviews/dispatch/dispatch-constants';
-import {
-  listStrandedTerminalAttemptReviews,
-  repairStrandedTerminalCodeReview,
-} from '@/lib/code-reviews/db/code-reviews';
 
 /**
  * SQL condition that identifies billing/credits errors (402 Payment Required).
@@ -150,18 +145,6 @@ const ErrorSessionsFilterSchema = z
   .object({ ...FilterSchemaShape, errorMessage: z.string().min(1) })
   .refine(hasAscendingDateInterval, intervalOrderValidation)
   .refine(hasBoundedDateInterval, intervalLengthValidation);
-const StrandedReviewsInputSchema = z.object({
-  limit: z.number().int().min(1).max(200).default(50),
-});
-const RepairStrandedReviewInputSchema = z.object({
-  reviewId: z.string().uuid(),
-  expectedParentStatus: z.enum(['queued', 'running']),
-  expectedAttemptId: z.string().uuid(),
-  expectedAttemptStatus: z.enum(['completed', 'failed', 'cancelled']),
-  expectedAttemptTerminalReason: z.string().nullable(),
-  expectedAttemptErrorMessage: z.string().nullable(),
-  gateResult: z.enum(['pass', 'fail']).optional(),
-});
 
 type FilterInput = z.infer<typeof FilterSchema>;
 
@@ -230,30 +213,6 @@ function buildBaseConditions(input: FilterInput): SQL[] {
 }
 
 export const adminCodeReviewsRouter = createTRPCRouter({
-  listStrandedTerminalAttemptReviews: adminProcedure
-    .input(StrandedReviewsInputSchema)
-    .query(async ({ input }) => {
-      return await listStrandedTerminalAttemptReviews(input.limit);
-    }),
-
-  repairStrandedTerminalReview: adminProcedure
-    .input(RepairStrandedReviewInputSchema)
-    .mutation(async ({ input }) => {
-      try {
-        const result = await repairStrandedTerminalCodeReview(input);
-        return {
-          success: result.applied,
-          reviewId: result.review?.id ?? input.reviewId,
-          gateSyncRevision: result.gateSync?.desired_revision ?? null,
-        };
-      } catch (error) {
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: error instanceof Error ? error.message : String(error),
-        });
-      }
-    }),
-
   getQueueHealthStats: adminProcedure.input(FilterSchema).query(async ({ input }) => {
     const ownershipFilter = buildOwnershipFilter(
       input.userId,

@@ -4,7 +4,6 @@ import { APP_URL } from '@/lib/constants';
 import { db, sql } from '@/lib/drizzle';
 import {
   evaluateErrorSpike,
-  evaluateGateSyncBacklog,
   evaluateSlowReviews,
   type CodeReviewAlertEvaluation,
 } from '@/lib/code-reviews/alerting/detectors';
@@ -30,7 +29,6 @@ type Detector = {
 const DETECTORS: Detector[] = [
   { name: 'slow_reviews', evaluate: evaluateSlowReviews },
   { name: 'error_spike', evaluate: evaluateErrorSpike },
-  { name: 'gate_sync_backlog', evaluate: evaluateGateSyncBacklog },
 ];
 
 type UnauthorizedResponse = { healthy: false };

@@ -1,6 +1,7 @@
 import { execFile } from 'node:child_process';
 import path from 'node:path';
 import { z } from 'zod';
+import { normalizeAgentId } from './openclaw-agent-config';
 
 const AGENT_CLI_TIMEOUT_MS = 30_000;
 const AGENT_CLI_MAX_OUTPUT_BYTES = 1_048_576;
@@ -30,8 +31,10 @@ export const BasicAgentCreateBodySchema = z
 
 export type BasicAgentCreateBody = z.infer<typeof BasicAgentCreateBodySchema>;
 
+const NormalizedCliAgentIdSchema = z.string().trim().min(1).transform(normalizeAgentId);
+
 const CreateResultSchema = z.object({
-  agentId: z.string().min(1),
+  agentId: NormalizedCliAgentIdSchema,
   name: z.string().min(1),
   workspace: z.string().min(1),
   agentDir: z.string().min(1),
@@ -47,7 +50,7 @@ const CreateResultSchema = z.object({
 });
 
 const DeleteResultSchema = z.object({
-  agentId: z.string().min(1),
+  agentId: NormalizedCliAgentIdSchema,
   workspace: z.string().min(1),
   agentDir: z.string().min(1),
   sessionsDir: z.string().min(1),

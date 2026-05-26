@@ -10,7 +10,7 @@ describe('createAgentViaCli', () => {
   it('uses argv-only non-interactive JSON creation arguments', async () => {
     const run = vi.fn(async () => ({
       stdout: JSON.stringify({
-        agentId: 'research',
+        agentId: 'Research Agent',
         name: 'Research',
         workspace: '/root/.openclaw/workspace-research',
         agentDir: '/root/.openclaw/agents/research/agent',
@@ -29,7 +29,7 @@ describe('createAgentViaCli', () => {
 
     const result = await createAgentViaCli(body, { run });
 
-    expect(result.agentId).toBe('research');
+    expect(result.agentId).toBe('research-agent');
     expect(run).toHaveBeenCalledWith([
       'agents',
       'add',
@@ -61,7 +61,7 @@ describe('deleteAgentViaCli', () => {
   it('uses forced JSON deletion arguments and parses deletion summary', async () => {
     const run = vi.fn(async () => ({
       stdout: JSON.stringify({
-        agentId: 'research',
+        agentId: 'Research Agent',
         workspace: '/root/.openclaw/workspace-research',
         agentDir: '/root/.openclaw/agents/research/agent',
         sessionsDir: '/root/.openclaw/agents/research/sessions',
@@ -74,6 +74,7 @@ describe('deleteAgentViaCli', () => {
     const result = await deleteAgentViaCli('research', { run });
 
     expect(run).toHaveBeenCalledWith(['agents', 'delete', 'research', '--force', '--json']);
+    expect(result.agentId).toBe('research-agent');
     expect(result.removedBindings).toBe(2);
     expect(result.removedAllow).toBe(1);
   });

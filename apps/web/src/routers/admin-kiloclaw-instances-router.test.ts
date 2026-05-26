@@ -3269,6 +3269,55 @@ describe('admin.kiloclawInstances.destroyOrphanVolume', () => {
     expect(mockDestroyOrphanVolume).toHaveBeenCalledTimes(1);
   });
 
+  it('measures grace per (user, sandbox), not across the entire table', async () => {
+    // Regression: an earlier shape of the grace SQL used Drizzle's
+    // `${kiloclaw_instances.user_id}` interpolation inside a `sql` template,
+    // which Drizzle rendered as a BARE `"user_id"` (no table qualifier).
+    // Postgres then resolved that bare reference to the inner aliased table
+    // (most-local scope), collapsing the correlated subquery into a
+    // trivially-true predicate and computing `max(destroyed_at)` over EVERY
+    // destroyed row in the table. In production that maximum is almost
+    // always recent, so the grace gate would fail closed for every destroy
+    // regardless of the target's actual destruction time.
+    //
+    // This test seeds an unrelated user with a destroyed_at inside the last
+    // 7 days alongside a 30-day-old target row. With a properly scoped
+    // correlation the unrelated row is invisible to the target's grace
+    // check; with the bug present, the destroy throws PRECONDITION_FAILED.
+    const otherUser = await insertTestUser({
+      google_user_email: `unrelated-recent-${Math.random()}@example.com`,
+      is_admin: false,
+    });
+    await db.insert(kiloclaw_instances).values({
+      id: crypto.randomUUID(),
+      user_id: otherUser.id,
+      sandbox_id: `ki_${crypto.randomUUID().replace(/-/g, '')}`,
+      destroyed_at: daysAgo(1),
+    });
+    const targetInstanceId = await insertDestroyedInstance({ destroyedAt: daysAgo(30) });
+    mockDestroyOrphanVolume.mockResolvedValue({
+      ok: true,
+      flyApp: 'inst-scoped',
+      volumeId: VOLUME_ID,
+      volumeName: 'kiloclaw_scoped',
+      alreadyGone: false,
+    });
+    const caller = await createCallerForUser(adminUser.id);
+
+    const result = await caller.admin.kiloclawInstances.destroyOrphanVolume({
+      instanceId: targetInstanceId,
+      volumeId: VOLUME_ID,
+    });
+
+    expect(result).toMatchObject({ success: true });
+    expect(mockDestroyOrphanVolume).toHaveBeenCalledTimes(1);
+
+    // afterEach cleans by `regularUser` / `adminUser` / `cliRunUser`; this
+    // unrelated user's instance must be cleaned up explicitly.
+    await db.delete(kiloclaw_instances).where(eq(kiloclaw_instances.user_id, otherUser.id));
+    await db.delete(kilocode_users).where(eq(kilocode_users.id, otherUser.id));
+  });
+
   it('rejects when the user has an access-granting subscription', async () => {
     const instanceId = await insertDestroyedInstance({
       destroyedAt: daysAgo(30),

@@ -22,12 +22,16 @@ export function useOrgKiloClawConfig(organizationId: string) {
   return useQuery(trpc.organizations.kiloclaw.getConfig.queryOptions({ organizationId }));
 }
 
-export function useOrgKiloClawComposioOnboardingStatus(organizationId: string, enabled = true) {
+export function useOrgKiloClawComposioOnboardingStatus(
+  organizationId: string,
+  enabled = true,
+  pollingEnabled = enabled
+) {
   const trpc = useTRPC();
   return useQuery(
     trpc.organizations.kiloclaw.getComposioOnboardingStatus.queryOptions(
       { organizationId },
-      { enabled }
+      { enabled, refetchInterval: enabled && pollingEnabled ? 15_000 : false }
     )
   );
 }
@@ -324,14 +328,14 @@ export function useOrgKiloClawMutations(
   );
   const rawCreateComposioGoogleCalendarLink = useMutation(
     trpc.organizations.kiloclaw.createComposioGoogleCalendarLink.mutationOptions({
-      onSuccess: () => {
-        void invalidateStatus();
-        void queryClient.invalidateQueries({
+      onSuccess: async () => {
+        await invalidateStatus();
+        await queryClient.invalidateQueries({
           queryKey: trpc.organizations.kiloclaw.getComposioOnboardingStatus.queryKey({
             organizationId,
           }),
         });
-        void queryClient.invalidateQueries({
+        await queryClient.invalidateQueries({
           queryKey: trpc.organizations.kiloclaw.getConfig.queryKey({ organizationId }),
         });
       },

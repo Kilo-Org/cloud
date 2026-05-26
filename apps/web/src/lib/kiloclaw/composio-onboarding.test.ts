@@ -13,19 +13,6 @@ jest.mock('@/lib/kiloclaw/composio-identities', () => ({
 }));
 
 jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => ({
-  // Production code branches on `instanceof KiloClawApiError`; the mock must
-  // export a real class so retry/terminal paths exercise that boundary.
-  KiloClawApiError: class KiloClawApiError extends Error {
-    readonly statusCode: number;
-    readonly responseBody: string;
-
-    constructor(statusCode: number, responseBody = '') {
-      super(`KiloClaw API error (${statusCode})`);
-      this.name = 'KiloClawApiError';
-      this.statusCode = statusCode;
-      this.responseBody = responseBody;
-    }
-  },
   KiloClawInternalClient: jest.fn(),
 }));
 
@@ -66,7 +53,7 @@ jest.mock('@/lib/drizzle', () => ({
 
 import { listComposioConnectedAccounts } from '@/lib/kiloclaw/composio-client';
 import { getActiveManagedComposioIdentity } from '@/lib/kiloclaw/composio-identities';
-import { KiloClawApiError, KiloClawInternalClient } from '@/lib/kiloclaw/kiloclaw-internal-client';
+import { KiloClawInternalClient } from '@/lib/kiloclaw/kiloclaw-internal-client';
 import {
   buildComposioProvisionSecrets,
   completeManagedComposioGoogleCalendarConnection,
@@ -89,12 +76,12 @@ const instance = {
   composioConfigSource: null,
 };
 
-function mockManagedIdentity(connectedAccountId: string | null = 'ca_123') {
+function mockManagedIdentity() {
   mockedGetActiveManagedComposioIdentity.mockResolvedValue({
     row: {
       id: 'identity-1',
       composio_project_id: 'project-1',
-      google_calendar_connected_account_id: connectedAccountId,
+      google_calendar_connected_account_id: 'ca_123',
     },
     agentKey: 'agent-key',
     userApiKey: 'uak_123',
@@ -109,9 +96,6 @@ beforeEach(() => {
   selectedRows.length = 0;
   updateSets.length = 0;
   mockManagedIdentity();
-  mockedKiloClawInternalClient.mockImplementation(
-    () => ({ patchSecrets: jest.fn(async () => ({})) }) as unknown as KiloClawInternalClient
-  );
   mockedListComposioConnectedAccounts.mockResolvedValue([
     { id: 'ca_123', status: 'ACTIVE' },
   ] as never);
@@ -133,29 +117,9 @@ describe('getManagedComposioGoogleCalendarStatus', () => {
       connectedAccountId: null,
       sandboxConfigSource: 'managed',
     });
-    expect(mockedListComposioConnectedAccounts).not.toHaveBeenCalled();
   });
 
-  it('does not report connected when the current sandbox is not marked managed', async () => {
-    selectedRows.push([{ source: null }]);
-
-    const status = await getManagedComposioGoogleCalendarStatus({
-      scope,
-      instance,
-      sandboxHasComposioSecrets: true,
-    });
-
-    expect(status).toEqual({
-      enabled: true,
-      status: 'disconnected',
-      connectedAccountId: null,
-      sandboxConfigSource: null,
-    });
-    expect(mockedGetActiveManagedComposioIdentity).not.toHaveBeenCalled();
-    expect(mockedListComposioConnectedAccounts).not.toHaveBeenCalled();
-  });
-
-  it('reports connected when identity has a stored connected account id and the sandbox has managed secrets', async () => {
+  it('reports connected only when the account is active and the current sandbox has managed secrets', async () => {
     selectedRows.push([{ source: 'managed' }]);
 
     const status = await getManagedComposioGoogleCalendarStatus({
@@ -170,10 +134,9 @@ describe('getManagedComposioGoogleCalendarStatus', () => {
       connectedAccountId: 'ca_123',
       sandboxConfigSource: 'managed',
     });
-    expect(mockedListComposioConnectedAccounts).not.toHaveBeenCalled();
   });
 
-  it('reports connected before provision when the owner identity has a stored account id', async () => {
+  it('reports connected before provision when the owner identity has an active account', async () => {
     const status = await getManagedComposioGoogleCalendarStatus({
       scope,
       instance: null,
@@ -186,11 +149,21 @@ describe('getManagedComposioGoogleCalendarStatus', () => {
       connectedAccountId: 'ca_123',
       sandboxConfigSource: null,
     });
-    expect(mockedListComposioConnectedAccounts).not.toHaveBeenCalled();
   });
 
-  it('reports disconnected when identity has no stored connected account id', async () => {
-    mockManagedIdentity(null);
+  it('does not report pre-provision connected until the callback stores the durable account marker', async () => {
+    mockedGetActiveManagedComposioIdentity.mockResolvedValue({
+      row: {
+        id: 'identity-1',
+        composio_project_id: 'project-1',
+        google_calendar_connected_account_id: null,
+      },
+      agentKey: 'agent-key',
+      userApiKey: 'uak_123',
+      apiKey: 'api-key',
+      org: 'org-1',
+      consumerUserId: 'consumer-user-1',
+    } as never);
 
     const status = await getManagedComposioGoogleCalendarStatus({
       scope,
@@ -204,10 +177,9 @@ describe('getManagedComposioGoogleCalendarStatus', () => {
       connectedAccountId: null,
       sandboxConfigSource: null,
     });
-    expect(mockedListComposioConnectedAccounts).not.toHaveBeenCalled();
   });
 
-  it('reports disconnected when instance is manual, even with a stored connected account id', async () => {
+  it('keeps manual sandbox configuration separate from managed connected-account status', async () => {
     selectedRows.push([{ source: 'manual' }]);
 
     const status = await getManagedComposioGoogleCalendarStatus({
@@ -222,8 +194,6 @@ describe('getManagedComposioGoogleCalendarStatus', () => {
       connectedAccountId: null,
       sandboxConfigSource: 'manual',
     });
-    expect(mockedGetActiveManagedComposioIdentity).not.toHaveBeenCalled();
-    expect(mockedListComposioConnectedAccounts).not.toHaveBeenCalled();
   });
 });
 
@@ -242,28 +212,8 @@ describe('completeManagedComposioGoogleCalendarConnection', () => {
     expect(mockedKiloClawInternalClient).not.toHaveBeenCalled();
   });
 
-  it('returns false when the connected account is not in the caller account list', async () => {
-    mockedListComposioConnectedAccounts.mockResolvedValue([
-      { id: 'ca_other', status: 'ACTIVE' },
-    ] as never);
-
-    const result = await completeManagedComposioGoogleCalendarConnection({
-      userId: 'user-1',
-      instance,
-      scope,
-      connectedAccountId: 'ca_123',
-    });
-
-    expect(result).toBe(false);
-    expect(mockedKiloClawInternalClient).not.toHaveBeenCalled();
-    expect(updateSets).toEqual([]);
-  });
-
-  it('accepts any Composio account status and patches managed credentials through workerInstanceId routing', async () => {
+  it('patches managed credentials through workerInstanceId routing', async () => {
     selectedRows.push([{ source: 'managed' }]);
-    mockedListComposioConnectedAccounts.mockResolvedValue([
-      { id: 'ca_123', status: 'INITIATED' },
-    ] as never);
     const patchSecrets = jest.fn(async () => ({}));
     mockedKiloClawInternalClient.mockImplementation(
       () => ({ patchSecrets }) as unknown as KiloClawInternalClient
@@ -282,118 +232,6 @@ describe('completeManagedComposioGoogleCalendarConnection', () => {
       { secrets: expect.objectContaining({ composioUserApiKey: expect.any(String) }) },
       undefined
     );
-    expect(updateSets).toEqual([
-      { google_calendar_connected_account_id: 'ca_123' },
-      { composio_config_source: 'managed' },
-    ]);
-  });
-
-  it('retries worker patchSecrets on 5xx and succeeds within the retry budget', async () => {
-    selectedRows.push([{ source: 'managed' }]);
-    const backoffs: number[] = [];
-    const patchSecrets = jest
-      .fn()
-      .mockRejectedValueOnce(new KiloClawApiError(503, 'temporary outage'))
-      .mockResolvedValueOnce({});
-    mockedKiloClawInternalClient.mockImplementation(
-      () => ({ patchSecrets }) as unknown as KiloClawInternalClient
-    );
-
-    const result = await completeManagedComposioGoogleCalendarConnection({
-      userId: 'user-1',
-      instance,
-      scope,
-      connectedAccountId: 'ca_123',
-      patchSecretsBackoff: async ms => {
-        backoffs.push(ms);
-      },
-    });
-
-    expect(result).toBe(true);
-    expect(patchSecrets).toHaveBeenCalledTimes(2);
-    expect(backoffs).toEqual([250]);
-    expect(updateSets).toEqual([
-      { google_calendar_connected_account_id: 'ca_123' },
-      { composio_config_source: 'managed' },
-    ]);
-  });
-
-  it('returns false and writes nothing when worker patchSecrets exhausts retries', async () => {
-    selectedRows.push([{ source: 'managed' }]);
-    const backoffs: number[] = [];
-    const patchSecrets = jest.fn(async () => {
-      throw new KiloClawApiError(503, 'temporary outage');
-    });
-    mockedKiloClawInternalClient.mockImplementation(
-      () => ({ patchSecrets }) as unknown as KiloClawInternalClient
-    );
-    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
-
-    const result = await completeManagedComposioGoogleCalendarConnection({
-      userId: 'user-1',
-      instance,
-      scope,
-      connectedAccountId: 'ca_123',
-      patchSecretsBackoff: async ms => {
-        backoffs.push(ms);
-      },
-    });
-
-    expect(result).toBe(false);
-    expect(patchSecrets).toHaveBeenCalledTimes(3);
-    expect(backoffs).toEqual([250, 750]);
-    expect(updateSets).toEqual([]);
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
-      'Managed Composio patchSecrets failed',
-      expect.objectContaining({
-        operation: 'patchSecrets',
-        identityId: 'identity-1',
-        instanceId: instance.id,
-        status: 503,
-        responseExcerpt: 'temporary outage',
-        attempt: 3,
-      })
-    );
-    consoleErrorSpy.mockRestore();
-  });
-
-  it('returns false and logs when worker patchSecrets returns terminal 4xx', async () => {
-    selectedRows.push([{ source: 'managed' }]);
-    const backoffs: number[] = [];
-    const patchSecrets = jest.fn(async () => {
-      throw new KiloClawApiError(400, 'bad contract');
-    });
-    mockedKiloClawInternalClient.mockImplementation(
-      () => ({ patchSecrets }) as unknown as KiloClawInternalClient
-    );
-    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
-
-    const result = await completeManagedComposioGoogleCalendarConnection({
-      userId: 'user-1',
-      instance,
-      scope,
-      connectedAccountId: 'ca_123',
-      patchSecretsBackoff: async ms => {
-        backoffs.push(ms);
-      },
-    });
-
-    expect(result).toBe(false);
-    expect(patchSecrets).toHaveBeenCalledTimes(1);
-    expect(backoffs).toEqual([]);
-    expect(updateSets).toEqual([]);
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
-      'Managed Composio patchSecrets failed',
-      expect.objectContaining({
-        operation: 'patchSecrets',
-        identityId: 'identity-1',
-        instanceId: instance.id,
-        status: 400,
-        responseExcerpt: 'bad contract',
-        attempt: 1,
-      })
-    );
-    consoleErrorSpy.mockRestore();
   });
 
   it('records the connected account without patching secrets before an instance exists', async () => {

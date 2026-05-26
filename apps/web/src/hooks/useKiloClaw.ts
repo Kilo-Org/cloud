@@ -17,11 +17,12 @@ export function useKiloClawConfig() {
   return useQuery(trpc.kiloclaw.getConfig.queryOptions());
 }
 
-export function useKiloClawComposioOnboardingStatus(enabled = true) {
+export function useKiloClawComposioOnboardingStatus(enabled = true, pollingEnabled = enabled) {
   const trpc = useTRPC();
   return useQuery(
     trpc.kiloclaw.getComposioOnboardingStatus.queryOptions(undefined, {
       enabled,
+      refetchInterval: enabled && pollingEnabled ? 15_000 : false,
     })
   );
 }
@@ -240,12 +241,12 @@ export function useKiloClawMutations() {
     ),
     createComposioGoogleCalendarLink: useMutation(
       trpc.kiloclaw.createComposioGoogleCalendarLink.mutationOptions({
-        onSuccess: () => {
-          void invalidateStatus();
-          void queryClient.invalidateQueries({
+        onSuccess: async () => {
+          await invalidateStatus();
+          await queryClient.invalidateQueries({
             queryKey: trpc.kiloclaw.getComposioOnboardingStatus.queryKey(),
           });
-          void queryClient.invalidateQueries({ queryKey: trpc.kiloclaw.getConfig.queryKey() });
+          await queryClient.invalidateQueries({ queryKey: trpc.kiloclaw.getConfig.queryKey() });
         },
       })
     ),

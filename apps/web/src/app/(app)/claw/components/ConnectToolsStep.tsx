@@ -1,7 +1,7 @@
 'use client';
 
 import { useId, useState } from 'react';
-import { Calendar, Check, ChevronDown, Plug } from 'lucide-react';
+import { Calendar, Check, ChevronDown, Plug, TriangleAlert } from 'lucide-react';
 import { SECRET_CATALOG_MAP, validateFieldValue } from '@kilocode/kiloclaw-secret-catalog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,7 +12,7 @@ import { OnboardingStepView } from './OnboardingStepView';
 type ConnectToolsStepViewProps = {
   currentStep: number;
   totalSteps: number;
-  status: 'not_configured' | 'disconnected' | 'connected';
+  status: 'not_configured' | 'disconnected' | 'connected' | 'error';
   loading: boolean;
   connecting: boolean;
   savingManual: boolean;
@@ -31,6 +31,7 @@ type ConnectToolsStepViewProps = {
 
 function statusLabel(status: ConnectToolsStepViewProps['status']): string {
   if (status === 'connected') return 'Connected';
+  if (status === 'error') return "Couldn't verify";
   return 'Optional';
 }
 
@@ -112,7 +113,9 @@ export function ConnectToolsStepView({
               'w-fit rounded-full px-2.5 py-0.5 text-xs font-semibold tracking-wider uppercase ring-1',
               status === 'connected'
                 ? 'bg-emerald-500/10 text-emerald-400 ring-emerald-500/20'
-                : 'bg-zinc-500/10 text-zinc-400 ring-zinc-500/20'
+                : status === 'error'
+                  ? 'bg-destructive/10 text-destructive ring-destructive/30'
+                  : 'bg-zinc-500/10 text-zinc-400 ring-zinc-500/20'
             )}
           >
             {loading ? 'Checking' : statusLabel(status)}
@@ -149,6 +152,13 @@ export function ConnectToolsStepView({
             </div>
           </div>
         </div>
+
+        {status === 'error' ? (
+          <div className="text-muted-foreground flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-xs">
+            <TriangleAlert className="text-destructive mt-0.5 h-3.5 w-3.5 shrink-0" />
+            <span>We could not verify the Composio connection. Try again or skip for now.</span>
+          </div>
+        ) : null}
 
         {status === 'connected' ? (
           <div className="flex items-start gap-2 rounded-md border border-emerald-500/20 bg-emerald-500/10 p-3 text-xs text-emerald-300">

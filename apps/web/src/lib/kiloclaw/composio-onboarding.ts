@@ -5,7 +5,7 @@ import { eq } from 'drizzle-orm';
 import { FIELD_KEY_TO_ENTRY, validateFieldValue } from '@kilocode/kiloclaw-secret-catalog';
 import { APP_URL } from '@/lib/constants';
 import { encryptKiloClawSecret } from '@/lib/kiloclaw/encryption';
-import { KiloClawApiError, KiloClawInternalClient } from '@/lib/kiloclaw/kiloclaw-internal-client';
+import { KiloClawInternalClient } from '@/lib/kiloclaw/kiloclaw-internal-client';
 import {
   createComposioGoogleCalendarConnectLink,
   listComposioConnectedAccounts,
@@ -26,56 +26,11 @@ import {
 } from '@/lib/kiloclaw/composio-identities';
 import { workerInstanceId, type ActiveKiloClawInstance } from '@/lib/kiloclaw/instance-registry';
 
-export type ComposioConnectionStatus = 'not_configured' | 'disconnected' | 'connected';
+export type ComposioConnectionStatus = 'not_configured' | 'disconnected' | 'connected' | 'error';
 
 export type ComposioSandboxConfigSource = KiloClawComposioInstanceConfigSource | null;
 
 export type ProvisionComposioConfigToMark = { source: 'manual' | 'managed' } | null;
-
-const MANAGED_COMPOSIO_PATCH_SECRETS_BACKOFF_MS = [250, 750] as const;
-
-export type ManagedComposioPatchSecretsBackoff = (ms: number) => Promise<void>;
-
-function waitForManagedComposioPatchSecretsRetry(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-function responseExcerpt(body: string): string {
-  return body.slice(0, 500);
-}
-
-function isRetryablePatchSecretsError(error: unknown): boolean {
-  if (error instanceof KiloClawApiError) return error.statusCode >= 500;
-  return true;
-}
-
-function logTerminalManagedComposioPatchSecretsError(params: {
-  error: unknown;
-  identityId: string;
-  instanceId: string;
-  attempt: number;
-}): void {
-  if (params.error instanceof KiloClawApiError) {
-    console.error('Managed Composio patchSecrets failed', {
-      operation: 'patchSecrets',
-      identityId: params.identityId,
-      instanceId: params.instanceId,
-      status: params.error.statusCode,
-      responseExcerpt: responseExcerpt(params.error.responseBody),
-      attempt: params.attempt,
-    });
-    return;
-  }
-
-  console.error('Managed Composio patchSecrets failed', {
-    operation: 'patchSecrets',
-    identityId: params.identityId,
-    instanceId: params.instanceId,
-    status: 'transport_error',
-    attempt: params.attempt,
-    error: params.error instanceof Error ? params.error.message : String(params.error),
-  });
-}
 
 export function composioSecretsPatchSource(
   secrets: Record<string, string | null>
@@ -231,7 +186,6 @@ export async function completeManagedComposioGoogleCalendarConnection(params: {
   instance: ActiveKiloClawInstance | null;
   scope: ComposioOwnerScope;
   connectedAccountId: string;
-  patchSecretsBackoff?: ManagedComposioPatchSecretsBackoff;
 }): Promise<boolean> {
   const identity = await getActiveManagedComposioIdentity(params.scope);
   if (!identity) return false;
@@ -242,7 +196,9 @@ export async function completeManagedComposioGoogleCalendarConnection(params: {
     auth,
     userId: identity.consumerUserId,
   });
-  const connected = accounts.some(account => account.id === params.connectedAccountId);
+  const connected = accounts.some(
+    account => account.id === params.connectedAccountId && account.status === 'ACTIVE'
+  );
   if (!connected) return false;
 
   if (!params.instance) {
@@ -254,47 +210,22 @@ export async function completeManagedComposioGoogleCalendarConnection(params: {
   }
 
   // Blocks callbacks after manual mode is recorded. The worker secret write
-  // below is cross-service, so the persisted source marker remains the final
-  // arbiter for later status/provision decisions.
+  // below is cross-service, so a manual save starting concurrently still races
+  // until these writes share a common lock or transaction boundary.
   const sandboxConfigSource = await getComposioInstanceConfigSource(params.instance.id);
   if (sandboxConfigSource === 'manual') return false;
 
   const client = new KiloClawInternalClient();
-  const patchSecretsBackoff = params.patchSecretsBackoff ?? waitForManagedComposioPatchSecretsRetry;
-  for (
-    let attemptIndex = 0;
-    attemptIndex <= MANAGED_COMPOSIO_PATCH_SECRETS_BACKOFF_MS.length;
-    attemptIndex++
-  ) {
-    try {
-      await client.patchSecrets(
-        params.userId,
-        {
-          secrets: {
-            composioUserApiKey: encryptKiloClawSecret(identity.userApiKey),
-            composioOrg: encryptKiloClawSecret(identity.org),
-          },
-        },
-        workerInstanceId(params.instance)
-      );
-      break;
-    } catch (error) {
-      const attempt = attemptIndex + 1;
-      if (
-        !isRetryablePatchSecretsError(error) ||
-        attemptIndex === MANAGED_COMPOSIO_PATCH_SECRETS_BACKOFF_MS.length
-      ) {
-        logTerminalManagedComposioPatchSecretsError({
-          error,
-          identityId: identity.row.id,
-          instanceId: params.instance.id,
-          attempt,
-        });
-        return false;
-      }
-      await patchSecretsBackoff(MANAGED_COMPOSIO_PATCH_SECRETS_BACKOFF_MS[attemptIndex]);
-    }
-  }
+  await client.patchSecrets(
+    params.userId,
+    {
+      secrets: {
+        composioUserApiKey: encryptKiloClawSecret(identity.userApiKey),
+        composioOrg: encryptKiloClawSecret(identity.org),
+      },
+    },
+    workerInstanceId(params.instance)
+  );
   await db
     .update(kiloclaw_composio_identities)
     .set({ google_calendar_connected_account_id: params.connectedAccountId })
@@ -346,32 +277,39 @@ export async function getManagedComposioGoogleCalendarStatus(params: {
     ? await getComposioInstanceConfigSource(params.instance.id)
     : null;
 
-  if (sandboxConfigSource === 'manual') {
-    return { enabled: true, status: 'disconnected', connectedAccountId: null, sandboxConfigSource };
-  }
-
-  if (params.instance && sandboxConfigSource !== 'managed') {
-    return { enabled: true, status: 'disconnected', connectedAccountId: null, sandboxConfigSource };
-  }
-
   const identity = await getActiveManagedComposioIdentity(params.scope);
   if (!identity) {
     return { enabled: true, status: 'disconnected', connectedAccountId: null, sandboxConfigSource };
   }
+  const knownConnectedAccountId = identity.row.google_calendar_connected_account_id;
+  const auth = composioUserContextAuth(identity);
+  if (!auth)
+    return { enabled: true, status: 'error', connectedAccountId: null, sandboxConfigSource };
 
-  const connectedAccountId = identity.row.google_calendar_connected_account_id;
-  if (!connectedAccountId) {
+  try {
+    const accounts = await listComposioConnectedAccounts({
+      auth,
+      userId: identity.consumerUserId,
+    });
+    const active = accounts.find(
+      account =>
+        account.status === 'ACTIVE' &&
+        (!knownConnectedAccountId || account.id === knownConnectedAccountId)
+    );
+    if (
+      active &&
+      ((!params.instance && knownConnectedAccountId !== null) ||
+        (params.instance && params.sandboxHasComposioSecrets && sandboxConfigSource === 'managed'))
+    ) {
+      return {
+        enabled: true,
+        status: 'connected',
+        connectedAccountId: active.id,
+        sandboxConfigSource,
+      };
+    }
     return { enabled: true, status: 'disconnected', connectedAccountId: null, sandboxConfigSource };
+  } catch {
+    return { enabled: true, status: 'error', connectedAccountId: null, sandboxConfigSource };
   }
-
-  if (params.instance && !params.sandboxHasComposioSecrets) {
-    return { enabled: true, status: 'disconnected', connectedAccountId: null, sandboxConfigSource };
-  }
-
-  return {
-    enabled: true,
-    status: 'connected',
-    connectedAccountId,
-    sandboxConfigSource,
-  };
 }

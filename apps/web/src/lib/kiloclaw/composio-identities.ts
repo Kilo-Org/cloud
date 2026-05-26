@@ -1,9 +1,10 @@
 import 'server-only';
 
-import { and, eq, isNull, sql } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { db } from '@/lib/drizzle';
 import { decryptWithSymmetricKey, encryptWithSymmetricKey } from '@/lib/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
+import { withKiloclawProvisionContextLock } from '@/lib/kiloclaw/provision-lock';
 import {
   getComposioAgentIdentity,
   resolveComposioConsumerProject,
@@ -36,6 +37,11 @@ function requireComposioEncryptionKey(): string {
     throw new Error('BYOK_ENCRYPTION_KEY is not configured');
   }
   return BYOK_ENCRYPTION_KEY;
+}
+
+function ownerScopeLockKey(scope: ComposioOwnerScope): string {
+  if (scope.ownerType === 'user') return `kiloclaw-composio:user:${scope.userId}`;
+  return `kiloclaw-composio:organization-user:${scope.organizationId}:${scope.userId}`;
 }
 
 export function composioConsumerUserId(scope: ComposioOwnerScope): string {
@@ -187,42 +193,19 @@ function needsComposioIdentityRefresh(row: KiloClawComposioIdentity): boolean {
 async function createPendingComposioIdentityReservation(
   scope: ComposioOwnerScope
 ): Promise<KiloClawComposioIdentity> {
-  const insertValues = {
-    owner_type: scope.ownerType,
-    user_id: scope.userId,
-    organization_id: scope.ownerType === 'organization_user' ? scope.organizationId : null,
-    status: 'pending' satisfies KiloClawComposioIdentityStatus,
-  } satisfies NewKiloClawComposioIdentity;
-
-  const insertedRows =
-    scope.ownerType === 'user'
-      ? await db
-          .insert(kiloclaw_composio_identities)
-          .values(insertValues)
-          .onConflictDoNothing({
-            target: [kiloclaw_composio_identities.user_id],
-            where: sql`${kiloclaw_composio_identities.owner_type} = 'user' AND ${kiloclaw_composio_identities.revoked_at} IS NULL`,
-          })
-          .returning()
-      : await db
-          .insert(kiloclaw_composio_identities)
-          .values(insertValues)
-          .onConflictDoNothing({
-            target: [
-              kiloclaw_composio_identities.organization_id,
-              kiloclaw_composio_identities.user_id,
-            ],
-            where: sql`${kiloclaw_composio_identities.owner_type} = 'organization_user' AND ${kiloclaw_composio_identities.revoked_at} IS NULL`,
-          })
-          .returning();
-
-  const inserted = insertedRows[0];
-  if (inserted) return inserted;
-
-  const existing = await findCurrentComposioIdentity(scope);
-  if (existing) return existing;
-
-  throw new Error('Failed to reserve managed Composio identity');
+  const [inserted] = await db
+    .insert(kiloclaw_composio_identities)
+    .values({
+      owner_type: scope.ownerType,
+      user_id: scope.userId,
+      organization_id: scope.ownerType === 'organization_user' ? scope.organizationId : null,
+      status: 'pending',
+    })
+    .returning();
+  if (!inserted) {
+    throw new Error('Failed to reserve managed Composio identity');
+  }
+  return inserted;
 }
 
 export async function getActiveManagedComposioIdentity(
@@ -235,44 +218,46 @@ export async function getActiveManagedComposioIdentity(
 export async function ensureManagedComposioIdentity(
   scope: ComposioOwnerScope
 ): Promise<DecryptedComposioIdentity> {
-  const existing = await findCurrentComposioIdentity(scope);
-  if (existing?.status === 'active') {
-    const decrypted = decryptComposioIdentity(existing);
-    if (!needsComposioIdentityRefresh(existing)) return decrypted;
+  return await withKiloclawProvisionContextLock(ownerScopeLockKey(scope), async () => {
+    const existing = await findCurrentComposioIdentity(scope);
+    if (existing?.status === 'active') {
+      const decrypted = decryptComposioIdentity(existing);
+      if (!needsComposioIdentityRefresh(existing)) return decrypted;
 
-    const refreshed = await getComposioAgentIdentity(decrypted.agentKey);
-    const [updated] = await db
-      .update(kiloclaw_composio_identities)
-      .set(await encryptComposioIdentity(scope, refreshed))
-      .where(eq(kiloclaw_composio_identities.id, existing.id))
-      .returning();
-    if (!updated) {
-      throw new Error('Failed to refresh managed Composio identity context');
+      const refreshed = await getComposioAgentIdentity(decrypted.agentKey);
+      const [updated] = await db
+        .update(kiloclaw_composio_identities)
+        .set(await encryptComposioIdentity(scope, refreshed))
+        .where(eq(kiloclaw_composio_identities.id, existing.id))
+        .returning();
+      if (!updated) {
+        throw new Error('Failed to refresh managed Composio identity context');
+      }
+      return decryptComposioIdentity(updated);
     }
-    return decryptComposioIdentity(updated);
-  }
 
-  requireComposioEncryptionKey();
-  const pending = existing ?? (await createPendingComposioIdentityReservation(scope));
-  const identity = hasStoredComposioCredentials(pending)
-    ? await getComposioAgentIdentity(decryptComposioIdentity(pending).agentKey)
-    : await signupComposioAgentIdentity({ idempotencyKey: pending.id });
-  const [storedCredentials] = await db
-    .update(kiloclaw_composio_identities)
-    .set(encryptComposioIdentityCredentials(scope, identity))
-    .where(eq(kiloclaw_composio_identities.id, pending.id))
-    .returning();
-  if (!storedCredentials) {
-    throw new Error('Failed to store managed Composio identity credentials');
-  }
+    requireComposioEncryptionKey();
+    const pending = existing ?? (await createPendingComposioIdentityReservation(scope));
+    const identity = hasStoredComposioCredentials(pending)
+      ? await getComposioAgentIdentity(decryptComposioIdentity(pending).agentKey)
+      : await signupComposioAgentIdentity({ idempotencyKey: pending.id });
+    const [storedCredentials] = await db
+      .update(kiloclaw_composio_identities)
+      .set(encryptComposioIdentityCredentials(scope, identity))
+      .where(eq(kiloclaw_composio_identities.id, pending.id))
+      .returning();
+    if (!storedCredentials) {
+      throw new Error('Failed to store managed Composio identity credentials');
+    }
 
-  const [activated] = await db
-    .update(kiloclaw_composio_identities)
-    .set({ ...(await resolveComposioIdentityContext(identity)), status: 'active' })
-    .where(eq(kiloclaw_composio_identities.id, storedCredentials.id))
-    .returning();
-  if (!activated) {
-    throw new Error('Failed to resolve managed Composio identity context');
-  }
-  return decryptComposioIdentity(activated);
+    const [activated] = await db
+      .update(kiloclaw_composio_identities)
+      .set({ ...(await resolveComposioIdentityContext(identity)), status: 'active' })
+      .where(eq(kiloclaw_composio_identities.id, storedCredentials.id))
+      .returning();
+    if (!activated) {
+      throw new Error('Failed to resolve managed Composio identity context');
+    }
+    return decryptComposioIdentity(activated);
+  });
 }

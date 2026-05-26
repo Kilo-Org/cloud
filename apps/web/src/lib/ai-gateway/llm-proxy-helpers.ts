@@ -777,7 +777,14 @@ export function countAndStoreNextEditUsage(
     ? Promise.resolve(null)
     : clonedResponse
         .text()
-        .then(content => parseNextEditUsageFromString(content, usageContext.provider, statusCode));
+        .then(content => parseNextEditUsageFromString(content, usageContext.provider, statusCode))
+        .catch(error => {
+          captureException(error, {
+            tags: { source: 'nextedit_usage_processing' },
+            extra: { statusCode },
+          });
+          return null;
+        });
 
   after(
     usageStatsPromise.then(usageStats => {

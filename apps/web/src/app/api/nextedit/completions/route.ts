@@ -63,7 +63,7 @@ const NextEditMessage = z.object({
 const NextEditRequestBody = z.object({
   model: z.string(),
   messages: z.array(NextEditMessage).min(1),
-  max_tokens: z.number().optional(),
+  max_tokens: z.number().int().positive().optional(),
   stop: z.string().array().optional(),
   // Streaming is not supported by Inception's edit endpoint today; reject if requested.
   stream: z.literal(false).optional(),

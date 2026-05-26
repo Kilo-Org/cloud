@@ -15,7 +15,7 @@
  *   tsx test/e2e/run.ts --api=legacy hot echo:hi
  *
  * The stack must be running with `.dev.vars` pointing
- * `KILO_OPENROUTER_BASE` at `http://host.docker.internal:<8811 + portOffset>/api`
+ * `KILO_OPENROUTER_BASE` at `http://localhost:<8811 + portOffset>/api`
  * and the `fake-llm` dev service started (`pnpm dev:start cloud-agent fake-llm`).
  */
 

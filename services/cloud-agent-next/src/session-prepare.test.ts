@@ -1,4 +1,5 @@
 import type * as CloudAgentProfile from '@kilocode/cloud-agent-profile';
+import { TRPCError } from '@trpc/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as schemas from './router/schemas.js';
 
@@ -9,6 +10,7 @@ const {
   deleteCliSessionMock,
   mergeProfileConfigurationMock,
   organizationMembershipLimitMock,
+  assertKiloModelAvailableMock,
 } = vi.hoisted(() => ({
   generateSessionIdMock: vi.fn(() => 'agent_12345678-1234-1234-1234-123456789abc'),
   generateSandboxIdMock: vi.fn().mockResolvedValue('sb-test-123'),
@@ -16,6 +18,7 @@ const {
   deleteCliSessionMock: vi.fn().mockResolvedValue(undefined),
   mergeProfileConfigurationMock: vi.fn(),
   organizationMembershipLimitMock: vi.fn(),
+  assertKiloModelAvailableMock: vi.fn(),
 }));
 
 vi.mock('@kilocode/cloud-agent-profile', async importActual => {
@@ -49,6 +52,10 @@ vi.mock('./sandbox-id.js', () => ({
 vi.mock('@cloudflare/sandbox', () => ({
   getSandbox: vi.fn(),
   Sandbox: class Sandbox {},
+}));
+
+vi.mock('./model-validation.js', () => ({
+  assertKiloModelAvailable: assertKiloModelAvailableMock,
 }));
 
 vi.mock('./session-service.js', () => ({
@@ -201,6 +208,7 @@ describe('prepareSession endpoint', () => {
     createCliSessionMock.mockResolvedValue(undefined);
     deleteCliSessionMock.mockResolvedValue(undefined);
     mergeProfileConfigurationMock.mockResolvedValue({});
+    assertKiloModelAvailableMock.mockResolvedValue(undefined);
   });
 
   it('rejects request without internal API key header', async () => {
@@ -229,6 +237,28 @@ describe('prepareSession endpoint', () => {
         githubRepo: 'acme/repo',
       })
     ).rejects.toThrow('Invalid customer token');
+  });
+
+  it('rejects an unavailable model before registration or auto-initiation', async () => {
+    const doStub = createMockDOStub();
+    const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
+    assertKiloModelAvailableMock.mockRejectedValue(
+      new TRPCError({ code: 'BAD_REQUEST', message: 'Selected model is not available' })
+    );
+
+    await expect(
+      caller.prepareSession({
+        prompt: 'Test prompt',
+        mode: 'code',
+        model: 'missing/model',
+        githubRepo: 'acme/repo',
+        autoInitiate: true,
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+
+    expect(createCliSessionMock).not.toHaveBeenCalled();
+    expect(doStub.registerSession).not.toHaveBeenCalled();
+    expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
   });
 
   it('resolves web defaults when no explicit profile is selected', async () => {
@@ -585,6 +615,7 @@ describe('prepareSession endpoint', () => {
     );
     expect(doStub.registerSession).not.toHaveBeenCalled();
     expect(doStub.admitSubmittedMessage).not.toHaveBeenCalled();
+    expect(assertKiloModelAvailableMock).not.toHaveBeenCalled();
   });
 
   it('rejects command-valued initialPayload images before registration', async () => {
@@ -691,6 +722,7 @@ describe('start endpoint', () => {
     deleteCliSessionMock.mockResolvedValue(undefined);
     mergeProfileConfigurationMock.mockResolvedValue({});
     organizationMembershipLimitMock.mockResolvedValue([{ id: 'membership-123' }]);
+    assertKiloModelAvailableMock.mockResolvedValue(undefined);
   });
 
   it('rejects non-member organization profile resolution when balance validation is skipped', async () => {
@@ -714,6 +746,25 @@ describe('start endpoint', () => {
     ).rejects.toMatchObject({ code: 'FORBIDDEN' });
 
     expect(mergeProfileConfigurationMock).not.toHaveBeenCalled();
+    expect(createCliSessionMock).not.toHaveBeenCalled();
+    expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+  });
+
+  it('rejects an unavailable model before ownership or initial admission', async () => {
+    const doStub = createMockDOStub();
+    const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
+    assertKiloModelAvailableMock.mockRejectedValue(
+      new TRPCError({ code: 'BAD_REQUEST', message: 'Selected model is not available' })
+    );
+
+    await expect(
+      caller.start({
+        message: { prompt: 'Do not admit' },
+        agent: { mode: 'code', model: 'missing/model' },
+        repository: { type: 'github', repo: 'acme/repo' },
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+
     expect(createCliSessionMock).not.toHaveBeenCalled();
     expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
   });

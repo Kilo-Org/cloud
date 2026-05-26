@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeKilocodeModel } from './model-utils.js';
+import { dispatchedKilocodeModelId, normalizeKilocodeModel } from './model-utils.js';
 
 describe('normalizeKilocodeModel', () => {
   it('returns undefined for empty input', () => {
@@ -21,5 +21,22 @@ describe('normalizeKilocodeModel', () => {
     expect(normalizeKilocodeModel('kilo/anthropic/claude-sonnet-4')).toBe(
       'kilo/anthropic/claude-sonnet-4'
     );
+  });
+});
+
+describe('dispatchedKilocodeModelId', () => {
+  it('returns the model ID sent to the kilo provider', () => {
+    expect(dispatchedKilocodeModelId('anthropic/claude-sonnet-4')).toBe(
+      'anthropic/claude-sonnet-4'
+    );
+    expect(dispatchedKilocodeModelId('kilo/anthropic/claude-sonnet-4')).toBe(
+      'anthropic/claude-sonnet-4'
+    );
+    expect(dispatchedKilocodeModelId('kilo-auto/free')).toBe('kilo-auto/free');
+  });
+
+  it('returns undefined for empty input', () => {
+    expect(dispatchedKilocodeModelId(undefined)).toBeUndefined();
+    expect(dispatchedKilocodeModelId('   ')).toBeUndefined();
   });
 });

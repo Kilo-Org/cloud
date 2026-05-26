@@ -41,10 +41,6 @@ const normalUnconditionalNotifications: KiloNotification[] = [
     title: 'Claude Opus 4.7 at 20% Off — Only in Kilo Code!',
     message:
       'A stealth provider is offering Claude Opus 4.7 at 20% off list price, exclusively in Kilo Code.',
-    action: {
-      actionText: 'Try Now',
-      actionURL: 'https://app.kilo.ai/settings/models',
-    },
     suggestModelId: 'stealth/claude-opus-4.7',
     expiresAt: '2026-06-08T08:00:00Z',
   },

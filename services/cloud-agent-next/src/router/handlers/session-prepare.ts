@@ -41,6 +41,7 @@ import { getPgDb } from '../../db/pg.js';
 import type { Env } from '../../types.js';
 import type { SessionProfileBundle } from '../../session-profile.js';
 import type { SessionCreateRequest } from '../../session/session-requests.js';
+import { assertKiloModelAvailable } from '../../model-validation.js';
 
 type SessionPrepareHandlers = {
   prepareSession: typeof prepareSessionHandler;
@@ -308,6 +309,17 @@ const prepareSessionHandler = internalApiProtectedProcedure
         throw new TRPCError({
           code: 'BAD_REQUEST',
           message: 'devcontainer sessions must use autoInitiate',
+        });
+      }
+
+      if (requestWithProfile.initialTurn.type === 'prompt') {
+        await assertKiloModelAvailable({
+          env: ctx.env,
+          submittedModel: requestWithProfile.agent.model,
+          originalToken: ctx.authToken,
+          originalOrganizationId: requestWithProfile.options?.kilocodeOrganizationId,
+          createdOnPlatform: requestWithProfile.options?.createdOnPlatform,
+          procedure: 'prepareSession',
         });
       }
 

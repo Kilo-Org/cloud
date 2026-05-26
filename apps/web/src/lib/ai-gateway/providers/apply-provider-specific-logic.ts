@@ -19,7 +19,7 @@ import { isGlmModel } from '@/lib/ai-gateway/providers/zai';
 import { isMinimaxModel } from '@/lib/ai-gateway/providers/minimax';
 import type { BYOKResult, Provider } from '@/lib/ai-gateway/providers/types';
 import { isStepModel } from '@/lib/ai-gateway/providers/stepfun';
-import { isDeepseekModel, isDeepseekV4Model } from '@/lib/ai-gateway/providers/deepseek';
+import { isDeepseekModel } from '@/lib/ai-gateway/providers/deepseek';
 import type { FraudDetectionHeaders } from '@/lib/utils';
 
 function applyToolChoiceSetting(
@@ -66,15 +66,9 @@ function getPreferredProviderOrder(requestedModel: string): string[] {
   if (isStepModel(requestedModel)) {
     return [OpenRouterInferenceProviderIdSchema.enum.stepfun];
   }
-  if (isDeepseekV4Model(requestedModel)) {
-    return [
-      OpenRouterInferenceProviderIdSchema.enum.alibaba,
-      OpenRouterInferenceProviderIdSchema.enum.deepseek,
-      OpenRouterInferenceProviderIdSchema.enum.novita,
-    ];
-  }
   if (isDeepseekModel(requestedModel)) {
     return [
+      OpenRouterInferenceProviderIdSchema.enum.alibaba,
       OpenRouterInferenceProviderIdSchema.enum.deepseek,
       OpenRouterInferenceProviderIdSchema.enum.novita,
     ];

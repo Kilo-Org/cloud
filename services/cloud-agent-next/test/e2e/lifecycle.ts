@@ -6,6 +6,7 @@
  */
 
 import {
+  fetchFakeRequests,
   fetchFakeWaiters,
   interruptSession,
   openStream,
@@ -1402,65 +1403,50 @@ export async function lifecycleInterruptMidStream(args: LifecycleArgs): Promise<
 }
 
 /**
- * unknown-model: request a model the fake LLM's catalogue does not advertise
- * (`kilo/does-not-exist`). Assert the sandbox/wrapper surfaces a failure
- * rather than hanging.
+ * unknown-model: request a model the fake LLM validation route rejects
+ * (`kilo/does-not-exist`). The mutation must reject before a sandbox or a
+ * chat-completion dispatch is created.
  */
 export async function lifecycleUnknownModel(args: LifecycleArgs): Promise<LifecycleResult> {
   const start = Date.now();
-  const { config, conversation, timeoutMs = 90_000, api = 'unified' } = args;
+  const { config, conversation, api = 'unified' } = args;
   const overriddenConfig: DriverConfig = { ...config, model: 'kilo/does-not-exist' };
   try {
     const knownSandboxIds = await snapshotSandboxIds();
-    const session = await startSession(
-      overriddenConfig,
-      { prompt: fakeDirective('echo:ignored') },
-      api
-    );
-    const stream = openStream(overriddenConfig, session.cloudAgentSessionId, { replay: false });
-
-    const sandbox = await waitForNewSandboxPresent(knownSandboxIds, 60_000);
-    if (!sandbox) {
-      stream.close();
+    const requestsBefore = await fetchFakeRequests(config.fakeLlmUrl);
+    try {
+      await startSession(overriddenConfig, { prompt: fakeDirective('echo:ignored') }, api);
       return {
         name: 'unknown-model',
         conversation,
         ok: false,
-        message: 'sandbox did not appear',
+        message: 'invalid model mutation was accepted',
+        events: [],
+        durationMs: Date.now() - start,
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const sandbox = await waitForNewSandboxPresent(knownSandboxIds, 2_000);
+      const requestsAfter = await fetchFakeRequests(config.fakeLlmUrl);
+      const rejectedUnavailableModel = /Selected model is not available/i.test(message);
+      const noPromptDispatch = requestsAfter.chatCompletions === requestsBefore.chatCompletions;
+      const noSandbox = sandbox === null;
+      return {
+        name: 'unknown-model',
+        conversation,
+        ok: rejectedUnavailableModel && noPromptDispatch && noSandbox,
+        message: `rejected=${rejectedUnavailableModel} sandbox=${noSandbox ? 'none' : 'created'} prompts=${requestsAfter.chatCompletions - requestsBefore.chatCompletions}`,
         events: [],
         durationMs: Date.now() - start,
       };
     }
-
-    const terminal = await stream.waitForTerminal(timeoutMs);
-    const events = [...stream.events];
-    stream.close();
-
-    // Kilo surfaces the unknown model as a `session.error` kilocode event
-    // (UnknownError: Model not found: <id>), and the wrapper should now emit
-    // a terminal failure instead of waiting for idle reconciliation. String-match
-    // on the stringified payload so SDK error shape churn stays visible.
-    const sessionErrorSeen = events.some(
-      e => e.streamEventType === 'kilocode' && /Model not found/i.test(JSON.stringify(e.data))
-    );
-
-    return {
-      name: 'unknown-model',
-      conversation,
-      ok: terminal !== null && sessionErrorSeen,
-      message: terminal
-        ? `terminal=${terminal.streamEventType}, sessionError=${sessionErrorSeen ? 'seen' : 'missing'}`
-        : `no terminal within ${timeoutMs}ms`,
-      events,
-      durationMs: Date.now() - start,
-    };
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
     return {
       name: 'unknown-model',
       conversation,
       ok: false,
-      message: `threw: ${msg}`,
+      message: `threw: ${message}`,
       events: [],
       durationMs: Date.now() - start,
     };

@@ -13,6 +13,30 @@ export type LegacyPreparedInitialAdmissionInput = {
   cloudAgentSessionId: string;
 };
 
+export async function replayLegacyPreparedInitialMessageIfAlreadyAdmitted(
+  input: LegacyPreparedInitialAdmissionInput,
+  ctx: { env: Env; userId: string; botId?: string }
+): Promise<QueueAckResponse | undefined> {
+  const sessionId = input.cloudAgentSessionId as SessionId;
+  const doId = ctx.env.CLOUD_AGENT_SESSION.idFromName(`${ctx.userId}:${sessionId}`);
+  const request: LegacyRegisteredInitialAdmissionRequest = {
+    userId: ctx.userId as UserId,
+    botId: ctx.botId,
+  };
+  const result = await withDORetry<
+    DurableObjectStub<CloudAgentSession>,
+    SessionMessageAdmissionResult | undefined
+  >(
+    () => ctx.env.CLOUD_AGENT_SESSION.get(doId),
+    stub => stub.replayPreparedInitialMessage(request),
+    'replayPreparedInitialMessage'
+  );
+
+  if (!result) return undefined;
+  if (!result.success) throwAdmissionError(result);
+  return projectAdmissionToPublicAck(sessionId, result);
+}
+
 export async function admitLegacyPreparedInitialMessage(
   input: LegacyPreparedInitialAdmissionInput,
   ctx: { env: Env; userId: string; botId?: string }

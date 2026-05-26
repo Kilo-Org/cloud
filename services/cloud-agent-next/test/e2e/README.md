@@ -20,16 +20,17 @@ cloud-agent-next refactor.
 
    ```bash
    # Real LLM (default):
-   # KILO_OPENROUTER_BASE=http://<LAN_IP>:3000/api
+   # KILO_OPENROUTER_BASE=http://localhost:3000/api
 
    # Fake LLM (E2E harness):
-   KILO_OPENROUTER_BASE=http://host.docker.internal:<8811 + portOffset>/api
+   KILO_OPENROUTER_BASE=http://localhost:<8811 + portOffset>/api
    ```
 
    `<portOffset>` is the dev-session port offset reported by
-   `pnpm dev:status --json` (usually `0` for the first session). The
-   sandbox container reaches the host's fake-LLM process via
-   `host.docker.internal`.
+   `pnpm dev:status --json` (usually `0` for the first session). The Worker
+   calls the fake's `POST /api/openrouter/models/validate` route through this
+   host-reachable URL and translates it to `host.docker.internal` when injecting
+   sandbox provider configuration.
 
 4. Start the stack including the `fake-llm` dev service:
 
@@ -110,10 +111,20 @@ and `.env`, then falls back to `@kilocode/db` `computeDatabaseUrl()`, which
 uses `POSTGRES_URL` for local development.
 
 `FAKE_LLM_URL` is how the **driver** reaches the fake server (for
-`/test/release`, `/test/gate-status`, and `/test/waiters` side channels). It's separate from
-`KILO_OPENROUTER_BASE` in `.dev.vars`, which is how **kilo inside the
-sandbox** reaches it via `host.docker.internal`. If you changed the fake's
-port (e.g. non-zero `portOffset`), set `FAKE_LLM_URL` to match.
+`/test/release`, `/test/gate-status`, `/test/waiters`, and `/test/requests` side channels). It is separate from
+`KILO_OPENROUTER_BASE` in `.dev.vars`, which is the Worker-reachable gateway
+base used for lightweight model validation; runtime setup translates local
+hostnames for **kilo inside the sandbox** when necessary. If you changed the
+fake's port (e.g. non-zero `portOffset`), set both values to the matching
+reachable views.
+
+## Gateway contract
+
+The fake gateway serves the Kilo routes used in this harness:
+
+- `GET /api/openrouter/models` - runtime model discovery inside sandboxed kilo.
+- `POST /api/openrouter/models/validate` - Worker-side fail-fast model validation.
+- `POST /api/openrouter/chat/completions` - deterministic streamed completion scenarios.
 
 ## Conversation directives
 
@@ -136,7 +147,7 @@ Unknown or missing directives produce HTTP 402 with
 
 ### Side channels
 
-The fake LLM server exposes three helper endpoints for driver code (not used
+The fake LLM server exposes four helper endpoints for driver code (not used
 by kilo):
 
 - `POST /test/release?tag=<tag>` — release a parked `gate:<tag>` turn. 204
@@ -146,9 +157,11 @@ by kilo):
   dialed the fake and the turn is blocked).
 - `GET /test/waiters` — returns parked gate counts plus live hang/gate streams
   so scenarios can detect leaked fake-server waiters after a terminal turn.
+- `GET /test/requests` — returns chat completion request counts so model
+  preflight scenarios can prove that rejected models did not reach dispatch.
 
-These are wrapped by `releaseGate()`, `waitForGateEngaged()`, and
-`fetchFakeWaiters()` in `client.ts`.
+These are wrapped by `releaseGate()`, `waitForGateEngaged()`,
+`fetchFakeWaiters()`, and `fetchFakeRequests()` in `client.ts`.
 
 ## Lifecycle scenarios
 
@@ -168,7 +181,7 @@ These are wrapped by `releaseGate()`, `waitForGateEngaged()`, and
 | `chunked-streaming` | Stream delayed fake chunks and assert multiple downstream `message.part.delta` events survive. |
 | `empty-response` | Run `idle`, assert completion, and assert no downstream `message.part.delta` is emitted. |
 | `interrupt-mid-stream` | Interrupt an actively gated fake request and assert the active message is interrupted, not a queued message. |
-| `unknown-model` | Use a model absent from the fake catalogue and require both the model error event and a terminal event. |
+| `unknown-model` | Use a model rejected by the fake validation route and require synchronous rejection before sandbox creation or fake chat dispatch. |
 | `waiters-clean` | Complete a normal fake turn, then assert the fake server has no parked waiters or live responses. |
 | `callback-completion` | Stand up local HTTP sink, register `callbackTarget.url`, run `echo:done`, assert the sink received `status: 'completed'`. |
 | `callback-batch-followup` | Queue two turns behind a gated callback session, assert one callback for the final queued turn, then assert a later hot turn emits a fresh callback. |
@@ -193,13 +206,13 @@ the newer `start` / `send` procedures. `prepareSession` requires
   or export `DATABASE_URL` to override the database URL for this harness.
 - **Sandbox calls out to a real provider** — check `.dev.vars`
   `KILO_OPENROUTER_BASE` is pointing at
-  `http://host.docker.internal:<8811 + portOffset>/api` and that the
-  `fake-llm` service is running (`pnpm dev:status`). Tail the fake's log
-  (`tail -f dev/logs/fake-llm.log`) to confirm kilo is hitting it.
-- **`waitForGateEngaged` timed out** — kilo never reached the fake LLM.
-  Most common cause: `KILO_OPENROUTER_BASE` still points at a real provider
-  or uses `localhost` (which the sandbox can't resolve). Use
-  `host.docker.internal`.
+  `http://localhost:<8811 + portOffset>/api` and that the `fake-llm` service is
+  running (`pnpm dev:status`). Runtime configuration translates this URL for
+  sandbox access. Tail the fake's log (`tail -f dev/logs/fake-llm.log`) to
+  confirm kilo is hitting it.
+- **`waitForGateEngaged` timed out** — kilo never reached the fake LLM. Most
+  common cause: `KILO_OPENROUTER_BASE` still points at a real provider or the
+  fake service is not running.
 - **`releaseGate` returned 404** — the gate already went away, usually
   because the wrapper's request was aborted (e.g. by an `interruptSession`).
   Queue-interrupt-clears tolerates this; other scenarios treat it as an

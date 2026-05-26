@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 
-export type WorkspaceSelection = { type: 'org'; id: string; name: string } | { type: 'personal' };
+export type WorkspaceSelection = { type: 'org'; id: string } | { type: 'personal' };
 
 type WorkspaceSelectorProps = {
   value: WorkspaceSelection | null;
@@ -58,7 +58,6 @@ export function WorkspaceSelector({ value, onSelect }: WorkspaceSelectorProps) {
       onSelect({
         type: 'org',
         id: result.organization.id,
-        name: result.organization.name,
       });
     } catch (error) {
       setCreateError(
@@ -87,9 +86,7 @@ export function WorkspaceSelector({ value, onSelect }: WorkspaceSelectorProps) {
           <WorkspaceRow
             key={org.organizationId}
             selected={isSelected}
-            onClick={() =>
-              onSelect({ type: 'org', id: org.organizationId, name: org.organizationName })
-            }
+            onClick={() => onSelect({ type: 'org', id: org.organizationId })}
           >
             <div className="bg-primary/10 flex size-10 items-center justify-center rounded-full">
               <Building2 className="text-primary size-5" />

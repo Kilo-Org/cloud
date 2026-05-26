@@ -14,17 +14,11 @@ export type EmbeddingProxyRequest = {
 /**
  * Build the upstream request body for the target provider.
  * Strips the deprecated `user` field (replaced by `safety_identifier`) and
- * Mistral-specific fields that upstream providers (OpenRouter, Vercel) don't understand.
+ * native Mistral fields that upstream providers (OpenRouter, Vercel) don't understand.
  */
 export function buildUpstreamBody(
   body: EmbeddingProxyRequest & { user?: string }
 ): Record<string, unknown> {
-  const {
-    dimensions: _,
-    output_dtype: __,
-    output_dimension: ___,
-    user: ____,
-    ...upstreamBody
-  } = body;
+  const { output_dtype: _, output_dimension: __, user: ___, ...upstreamBody } = body;
   return upstreamBody;
 }

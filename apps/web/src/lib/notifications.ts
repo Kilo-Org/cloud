@@ -9,7 +9,6 @@ import { cachedPosthogQuery } from '@/lib/posthog-query';
 import * as z from 'zod';
 
 import { fromMicrodollars } from '@/lib/utils';
-import { KILO_AUTO_FREE_MODEL } from '@/lib/ai-gateway/auto-model';
 
 /** Pre-fetched data shared across notification generators to avoid duplicate DB queries. */
 type NotificationContext = {
@@ -295,14 +294,16 @@ async function generateByokProvidersNotification(
   }
 }
 
+const getGrokCodeFast1OptimizedDiscontinuedUsers = cachedPosthogQuery(
+  z.array(z.tuple([z.string()]).transform(([userId]) => userId))
+);
+
 async function generateGrokCodeFast1OptimizedDiscontinuedNotification(
   user: User,
   _ctx: NotificationContext
 ): Promise<KiloNotification[]> {
   try {
-    const users = await cachedPosthogQuery(
-      z.array(z.tuple([z.string()]).transform(([userId]) => userId))
-    )(
+    const users = await getGrokCodeFast1OptimizedDiscontinuedUsers(
       'grok-code-fast-1-optimized-discontinued-users',
       'select kilo_user_id from notification_grok_code_may_15 limit 5e5'
     );
@@ -322,8 +323,8 @@ async function generateGrokCodeFast1OptimizedDiscontinuedNotification(
         id: 'grok-code-fast-1-optimized-discontinued-may-15',
         title: 'Grok Code Fast 1 Optimized is discontinued',
         message:
-          'Grok Code Fast 1 Optimized has been discontinued. Please switch to Auto Free or another model.',
-        suggestModelId: KILO_AUTO_FREE_MODEL.id,
+          'Grok Code Fast 1 Optimized has been discontinued. Give Grok Build 0.1 a try as a replacement.',
+        suggestModelId: 'x-ai/grok-build-0.1',
         showIn: ['cli', 'extension'],
       },
     ];

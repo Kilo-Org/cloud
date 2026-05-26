@@ -64,7 +64,7 @@ const VERCEL_BYOK_PROVIDER_NAMES = {
   novita: 'Novita',
   perplexity: 'Perplexity',
   xai: 'xAI',
-  xiaomi: 'Xiaomi',
+  xiaomi: 'Xiaomi (pay as you go)',
   zai: 'Z.ai (pay as you go)',
 } satisfies Record<VercelUserByokInferenceProviderId, string>;
 

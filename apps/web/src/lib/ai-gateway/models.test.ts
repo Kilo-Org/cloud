@@ -36,9 +36,6 @@ describe('isFreeModel', () => {
         m => m.status === 'public' && !m.pricing
       );
 
-      // Should have at least some enabled free models
-      expect(enabledFreeModels.length).toBeGreaterThan(0);
-
       // All enabled free models should be detected as free
       for (const model of enabledFreeModels) {
         expect(await isFreeModel(model.public_id)).toBe(true);

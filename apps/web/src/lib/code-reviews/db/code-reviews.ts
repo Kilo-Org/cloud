@@ -5,7 +5,7 @@
  * Follows Drizzle ORM patterns used throughout the codebase.
  */
 
-import { db } from '@/lib/drizzle';
+import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import {
   cloud_agent_code_review_attempts,
   cloud_agent_code_review_gate_syncs,
@@ -128,6 +128,65 @@ function isTerminalCodeReviewStatus(status: string): boolean {
 
 function isGateSyncStatus(status: string): status is CodeReviewGateDesiredStatus {
   return status === 'running' || isTerminalCodeReviewStatus(status);
+}
+
+type GateSyncUpsertParams = {
+  reviewId: string;
+  status: CodeReviewGateDesiredStatus;
+  gateResult: CodeReviewGateResult | null;
+  terminalReason: string | null;
+  errorMessage: string | null;
+};
+
+async function upsertCodeReviewGateSyncIntent(
+  tx: DrizzleTransaction,
+  params: GateSyncUpsertParams
+): Promise<CloudAgentCodeReviewGateSync | null> {
+  const now = new Date().toISOString();
+  const [gateSync] = await tx
+    .insert(cloud_agent_code_review_gate_syncs)
+    .values({
+      code_review_id: params.reviewId,
+      desired_status: params.status,
+      desired_gate_result: params.gateResult,
+      desired_terminal_reason: params.terminalReason,
+      desired_error_message: params.errorMessage,
+      desired_revision: 1,
+      sync_status: 'pending',
+      claim_token: null,
+      claimed_at: null,
+      attempt_count: 0,
+      next_retry_at: now,
+      synced_at: null,
+      last_error_code: null,
+      last_error_redacted: null,
+      terminal_confirmation_required: false,
+      last_ambiguous_at: null,
+    })
+    .onConflictDoUpdate({
+      target: cloud_agent_code_review_gate_syncs.code_review_id,
+      set: {
+        desired_status: params.status,
+        desired_gate_result: params.gateResult,
+        desired_terminal_reason: params.terminalReason,
+        desired_error_message: params.errorMessage,
+        desired_revision: sql`${cloud_agent_code_review_gate_syncs.desired_revision} + 1`,
+        sync_status: 'pending',
+        claim_token: null,
+        claimed_at: null,
+        attempt_count: 0,
+        next_retry_at: now,
+        synced_at: null,
+        last_error_code: null,
+        last_error_redacted: null,
+        terminal_confirmation_required: false,
+        last_ambiguous_at: null,
+        updated_at: now,
+      },
+    })
+    .returning();
+
+  return gateSync ?? null;
 }
 
 function buildReviewStatusUpdateData(
@@ -934,51 +993,15 @@ export async function updateCodeReviewStatusWithGateSyncIntent(
         return { applied: true, review, gateSync: null };
       }
 
-      const now = new Date().toISOString();
-      const [gateSync] = await tx
-        .insert(cloud_agent_code_review_gate_syncs)
-        .values({
-          code_review_id: reviewId,
-          desired_status: intent.status,
-          desired_gate_result: intent.gateResult ?? null,
-          desired_terminal_reason: intent.terminalReason ?? null,
-          desired_error_message: intent.errorMessage ?? null,
-          desired_revision: 1,
-          sync_status: 'pending',
-          claim_token: null,
-          claimed_at: null,
-          attempt_count: 0,
-          next_retry_at: now,
-          synced_at: null,
-          last_error_code: null,
-          last_error_redacted: null,
-          terminal_confirmation_required: false,
-          last_ambiguous_at: null,
-        })
-        .onConflictDoUpdate({
-          target: cloud_agent_code_review_gate_syncs.code_review_id,
-          set: {
-            desired_status: intent.status,
-            desired_gate_result: intent.gateResult ?? null,
-            desired_terminal_reason: intent.terminalReason ?? null,
-            desired_error_message: intent.errorMessage ?? null,
-            desired_revision: sql`${cloud_agent_code_review_gate_syncs.desired_revision} + 1`,
-            sync_status: 'pending',
-            claim_token: null,
-            claimed_at: null,
-            attempt_count: 0,
-            next_retry_at: now,
-            synced_at: null,
-            last_error_code: null,
-            last_error_redacted: null,
-            terminal_confirmation_required: false,
-            last_ambiguous_at: null,
-            updated_at: now,
-          },
-        })
-        .returning();
+      const gateSync = await upsertCodeReviewGateSyncIntent(tx, {
+        reviewId,
+        status: intent.status,
+        gateResult: intent.gateResult ?? null,
+        terminalReason: intent.terminalReason ?? null,
+        errorMessage: intent.errorMessage ?? null,
+      });
 
-      return { applied: true, review, gateSync: gateSync ?? null };
+      return { applied: true, review, gateSync };
     });
   } catch (error) {
     captureException(error, {
@@ -1146,51 +1169,15 @@ export async function repairStrandedTerminalCodeReview(params: {
         return { applied: false, review: null, gateSync: null };
       }
 
-      const now = new Date().toISOString();
-      const [gateSync] = await tx
-        .insert(cloud_agent_code_review_gate_syncs)
-        .values({
-          code_review_id: params.reviewId,
-          desired_status: latestAttempt.status,
-          desired_gate_result: params.gateResult ?? null,
-          desired_terminal_reason: latestAttempt.terminal_reason,
-          desired_error_message: latestAttempt.error_message,
-          desired_revision: 1,
-          sync_status: 'pending',
-          claim_token: null,
-          claimed_at: null,
-          attempt_count: 0,
-          next_retry_at: now,
-          synced_at: null,
-          last_error_code: null,
-          last_error_redacted: null,
-          terminal_confirmation_required: false,
-          last_ambiguous_at: null,
-        })
-        .onConflictDoUpdate({
-          target: cloud_agent_code_review_gate_syncs.code_review_id,
-          set: {
-            desired_status: latestAttempt.status,
-            desired_gate_result: params.gateResult ?? null,
-            desired_terminal_reason: latestAttempt.terminal_reason,
-            desired_error_message: latestAttempt.error_message,
-            desired_revision: sql`${cloud_agent_code_review_gate_syncs.desired_revision} + 1`,
-            sync_status: 'pending',
-            claim_token: null,
-            claimed_at: null,
-            attempt_count: 0,
-            next_retry_at: now,
-            synced_at: null,
-            last_error_code: null,
-            last_error_redacted: null,
-            terminal_confirmation_required: false,
-            last_ambiguous_at: null,
-            updated_at: now,
-          },
-        })
-        .returning();
+      const gateSync = await upsertCodeReviewGateSyncIntent(tx, {
+        reviewId: params.reviewId,
+        status: latestAttempt.status,
+        gateResult: params.gateResult ?? null,
+        terminalReason: latestAttempt.terminal_reason,
+        errorMessage: latestAttempt.error_message,
+      });
 
-      return { applied: true, review: updatedReview, gateSync: gateSync ?? null };
+      return { applied: true, review: updatedReview, gateSync };
     });
   } catch (error) {
     captureException(error, {

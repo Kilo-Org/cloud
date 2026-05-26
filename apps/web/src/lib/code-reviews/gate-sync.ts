@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { captureException } from '@sentry/nextjs';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import { db } from '@/lib/drizzle';
 import {
   cloud_agent_code_review_gate_syncs,
@@ -450,7 +450,13 @@ async function markSupersededClaimPending(sync: ClaimedGateSync): Promise<GateSy
     .where(
       and(
         eq(cloud_agent_code_review_gate_syncs.code_review_id, sync.code_review_id),
-        eq(cloud_agent_code_review_gate_syncs.claim_token, sync.claim_token)
+        sql`${cloud_agent_code_review_gate_syncs.desired_revision} > ${sync.desired_revision}`,
+        inArray(cloud_agent_code_review_gate_syncs.sync_status, [
+          'pending',
+          'retry',
+          'synced',
+          'skipped',
+        ])
       )
     );
 

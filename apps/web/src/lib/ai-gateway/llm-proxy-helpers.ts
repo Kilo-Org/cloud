@@ -697,6 +697,112 @@ export function countAndStoreFimUsage(
 }
 
 // ============================================================================
+// NextEdit-Specific Code
+// ============================================================================
+
+type NextEditMessage = { role: string; content: string };
+
+export function extractNextEditPromptInfo(body: { messages: NextEditMessage[] }): PromptInfo {
+  const lastUser = [...body.messages].reverse().find(m => m.role === 'user');
+  const content = lastUser?.content ?? '';
+  const totalLength = body.messages.reduce((sum, m) => sum + (m.content?.length ?? 0), 0);
+  return {
+    system_prompt_prefix: '', // /v1/edit/completions bakes its system prompt in server-side
+    system_prompt_length: totalLength,
+    user_prompt_prefix: content.slice(0, 100),
+  };
+}
+
+type MercuryEditCompletionResponse = {
+  id?: string;
+  model?: string;
+  usage?: FimUsage;
+  choices?: Array<{
+    index?: number;
+    message?: { role?: string; content?: string };
+    finish_reason?: string | null;
+  }>;
+};
+
+function computeNextEditMicrodollarCost(usage: FimUsage, provider: ProviderId): number {
+  switch (provider) {
+    case 'inception':
+      // Same per-token pricing as Inception FIM (mercury edit family).
+      return computeInceptionFimMicrodollarCost(usage);
+    default:
+      console.error('Unknown provider for NextEdit cost calculation', provider);
+      return 0;
+  }
+}
+
+function parseNextEditUsageFromString(
+  response: string,
+  provider: ProviderId,
+  statusCode: number
+): MicrodollarUsageStats {
+  const json: MercuryEditCompletionResponse = JSON.parse(response);
+  const usage = json.usage;
+  return {
+    messageId: json.id ?? null,
+    model: json.model ?? null,
+    responseContent: json.choices?.[0]?.message?.content || '',
+    hasError: !json.model || statusCode >= 400,
+    inference_provider: provider,
+    inputTokens: usage?.prompt_tokens ?? 0,
+    outputTokens: usage?.completion_tokens ?? 0,
+    cacheHitTokens: 0,
+    cacheWriteTokens: 0,
+    cost_mUsd: usage ? computeNextEditMicrodollarCost(usage, provider) : 0,
+    is_byok: null,
+    upstream_id: null,
+    finish_reason: null,
+    latency: null,
+    moderation_latency: null,
+    generation_time: null,
+    streamed: null,
+    cancelled: null,
+    status_code: statusCode,
+  };
+}
+
+export function countAndStoreNextEditUsage(
+  clonedResponse: Response,
+  usageContext: MicrodollarUsageContext,
+  requestSpan: Span | undefined
+) {
+  debugSaveProxyResponseStream(clonedResponse, '.log.resp.json');
+
+  const statusCode = usageContext.status_code ?? 0;
+  const usageStatsPromise = !clonedResponse.body
+    ? Promise.resolve(null)
+    : clonedResponse
+        .text()
+        .then(content => parseNextEditUsageFromString(content, usageContext.provider, statusCode));
+
+  after(
+    usageStatsPromise.then(usageStats => {
+      requestSpan?.end();
+      if (!usageStats) {
+        captureMessage('SUSPICIOUS: No NextEdit usage information', {
+          level: 'error',
+          tags: { source: 'nextedit_usage_processing' },
+          extra: { usageContext },
+        });
+        return;
+      }
+
+      usageStats.market_cost = usageStats.cost_mUsd;
+
+      if (usageContext.user_byok) {
+        usageStats.cost_mUsd = 0;
+      }
+
+      return logMicrodollarUsage(usageStats, usageContext);
+    })
+  );
+}
+
+// ============================================================================
 // Embedding-Specific Code
 // ============================================================================
 

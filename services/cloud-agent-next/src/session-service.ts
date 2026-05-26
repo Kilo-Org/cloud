@@ -1116,6 +1116,9 @@ export class SessionService {
     // Set GITLAB_TOKEN for GitLab repos, respecting user overrides
     if (gitToken && effectivePlatform === 'gitlab' && !baseEnvVars.GITLAB_TOKEN) {
       envVars.GITLAB_TOKEN = gitToken;
+      if (baseEnvVars.GLAB_IS_OAUTH2 === undefined) {
+        envVars.GLAB_IS_OAUTH2 = 'true';
+      }
       if (!baseEnvVars.GITLAB_HOST) {
         if (gitUrl) {
           try {
@@ -1132,9 +1135,10 @@ export class SessionService {
         .withFields({
           gitUrl,
           gitlabHost: envVars.GITLAB_HOST,
+          glabOAuthMode: envVars.GLAB_IS_OAUTH2 === 'true',
           gitTokenLength: gitToken.length,
         })
-        .info('[GITLAB] Setting GITLAB_TOKEN and GITLAB_HOST for GitLab session');
+        .info('[GITLAB] Configured GitLab CLI environment for GitLab session');
     }
 
     // Only add KILOCODE_ORG_ID if we have an org (personal accounts don't have one)

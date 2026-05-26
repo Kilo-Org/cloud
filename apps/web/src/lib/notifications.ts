@@ -9,6 +9,7 @@ import { cachedPosthogQuery } from '@/lib/posthog-query';
 import * as z from 'zod';
 
 import { fromMicrodollars } from '@/lib/utils';
+import { KILO_AUTO_FREE_MODEL } from '@/lib/ai-gateway/auto-model';
 
 /** Pre-fetched data shared across notification generators to avoid duplicate DB queries. */
 type NotificationContext = {
@@ -115,6 +116,7 @@ export async function generateUserNotifications(user: User): Promise<KiloNotific
     generateAutoTopUpNotification,
     generateAutoTopUpOrgsNotification,
     generateByokProvidersNotification,
+    generateGrokCodeFast1OptimizedDiscontinuedNotification,
     generateKiloPassNotification,
   ];
 
@@ -289,6 +291,44 @@ async function generateByokProvidersNotification(
     ];
   } catch (e) {
     console.error('[generateByokProvidersNotification]', e);
+    return [];
+  }
+}
+
+async function generateGrokCodeFast1OptimizedDiscontinuedNotification(
+  user: User,
+  _ctx: NotificationContext
+): Promise<KiloNotification[]> {
+  try {
+    const users = await cachedPosthogQuery(
+      z.array(z.tuple([z.string()]).transform(([userId]) => userId))
+    )(
+      'grok-code-fast-1-optimized-discontinued-users',
+      'select kilo_user_id from notification_grok_code_may_15 limit 5e5'
+    );
+
+    if (!users.includes(user.id)) {
+      console.debug(
+        '[generateGrokCodeFast1OptimizedDiscontinuedNotification] not showing notification for user'
+      );
+      return [];
+    }
+
+    console.debug(
+      '[generateGrokCodeFast1OptimizedDiscontinuedNotification] showing notification for user'
+    );
+    return [
+      {
+        id: 'grok-code-fast-1-optimized-discontinued-may-15',
+        title: 'Grok Code Fast 1 Optimized is discontinued',
+        message:
+          'Grok Code Fast 1 Optimized has been discontinued. Please switch to Auto Free or another model.',
+        suggestModelId: KILO_AUTO_FREE_MODEL.id,
+        showIn: ['cli', 'extension'],
+      },
+    ];
+  } catch (e) {
+    console.error('[generateGrokCodeFast1OptimizedDiscontinuedNotification]', e);
     return [];
   }
 }

@@ -77,7 +77,13 @@ import {
 } from '@/lib/free-model-rate-limiter';
 import { PROMOTION_MAX_REQUESTS, PROMOTION_WINDOW_HOURS } from '@/lib/constants';
 import { handleRequestLogging } from '@/lib/ai-gateway/handleRequestLogging';
-import { classifyAbuse } from '@/lib/ai-gateway/abuse-service';
+import {
+  classifyAbuse,
+  awaitClassifyAbuse,
+  getQuarantineFreeModel,
+  getRulesEngineActionDecision,
+  sleepForRulesEngineAction,
+} from '@/lib/ai-gateway/abuse-service';
 import {
   emitApiMetricsForResponse,
   getToolsAvailable,
@@ -255,7 +261,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     }
   }
 
-  const originalModelIdLowerCased = requestBodyParsed.body.model.toLowerCase();
+  let originalModelIdLowerCased = requestBodyParsed.body.model.toLowerCase();
 
   // Reject early (before rate limiting) if the model is exclusive to other features.
   if (isExcludedForFeature(originalModelIdLowerCased, feature)) {
@@ -385,7 +391,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   // Use new shared helper for fraud & project headers
   const { fraudHeaders, projectId } = extractFraudAndProjectHeaders(request);
-  const providerResult = await getProvider({
+  let providerResult = await getProvider({
     requestedModel: originalModelIdLowerCased,
     request: requestBodyParsed,
     user,
@@ -402,14 +408,12 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   if (providerResult.kind === 'unavailable') {
     return temporarilyUnavailableResponse();
   }
-  const {
-    provider,
-    userByok,
-    bypassAccessCheck,
-    skipProviderPin,
-    skipKiloExclusiveModelSettings,
-    experiment,
-  } = providerResult;
+  let provider = providerResult.provider;
+  let userByok = providerResult.userByok;
+  let bypassAccessCheck = providerResult.bypassAccessCheck;
+  let skipProviderPin = providerResult.skipProviderPin;
+  let skipKiloExclusiveModelSettings = providerResult.skipKiloExclusiveModelSettings;
+  let experiment = providerResult.experiment;
 
   // Request-level data-collection opt-out: a caller can set
   // `provider.data_collection: 'deny'` or `provider.zdr: true` on any
@@ -433,7 +437,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   console.debug(`Routing request to ${provider.id}`);
 
-  // Start abuse classification early (non-blocking) - we'll await it before creating usage context
   const classifyPromise = classifyAbuse(request, requestBodyParsed, {
     kiloUserId: user.id,
     organizationId,
@@ -459,6 +462,66 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   ) {
     console.warn(`User requested forbidden free model ${originalModelIdLowerCased}; rejecting.`);
     return forbiddenFreeModelResponse(fraudHeaders);
+  }
+
+  const classifyResult = await awaitClassifyAbuse(classifyPromise);
+  const rulesEngineDecision = getRulesEngineActionDecision({
+    classifyResult,
+    userByok: !!userByok,
+    quarantineFreeModel:
+      classifyResult?.rules_engine?.resolved_action === 'quarantine-3' && !userByok
+        ? await getQuarantineFreeModel(requestBodyParsed.kind)
+        : null,
+  });
+  if (classifyResult) {
+    console.log('Abuse classification result:', {
+      rules_engine_resolved_action: classifyResult.rules_engine?.resolved_action ?? null,
+      rules_engine_sus_score: classifyResult.rules_engine?.sus_score ?? null,
+      rules_engine_matched_abuse_rule_ids:
+        classifyResult.rules_engine?.matched_abuse_rule_ids ?? [],
+      identity_key: classifyResult.context?.identity_key,
+      kilo_user_id: user.id,
+      requested_model: originalModelIdLowerCased,
+      rps: classifyResult.context?.requests_per_second,
+      request_id: classifyResult.request_id,
+    });
+  }
+  if (rulesEngineDecision.response) {
+    return rulesEngineDecision.response;
+  }
+  if (rulesEngineDecision.modelOverride) {
+    requestBodyParsed.body.model = rulesEngineDecision.modelOverride;
+    originalModelIdLowerCased = rulesEngineDecision.modelOverride;
+    providerResult = await getProvider({
+      requestedModel: originalModelIdLowerCased,
+      request: requestBodyParsed,
+      user,
+      organizationId,
+      taskId,
+      clientIp: ipAddress ?? null,
+      machineId: machineIdHeader,
+    });
+    if (providerResult.kind === 'not-found') {
+      return modelDoesNotExistResponse();
+    }
+    if (providerResult.kind === 'unavailable') {
+      return temporarilyUnavailableResponse();
+    }
+
+    provider = providerResult.provider;
+    userByok = providerResult.userByok;
+    bypassAccessCheck = providerResult.bypassAccessCheck;
+    skipProviderPin = providerResult.skipProviderPin;
+    skipKiloExclusiveModelSettings = providerResult.skipKiloExclusiveModelSettings;
+    experiment = providerResult.experiment;
+
+    if (!provider.supportedChatApis.includes(requestBodyParsed.kind)) {
+      return apiKindNotSupportedResponse(
+        requestBodyParsed.kind,
+        provider.supportedChatApis,
+        fraudHeaders
+      );
+    }
   }
 
   // Extract properties for usage context
@@ -603,6 +666,10 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     usageContext.experimentPromptCapture = buildExperimentPromptCapture(requestBodyParsed);
   }
 
+  if (rulesEngineDecision.delayMs > 0) {
+    await sleepForRulesEngineAction(rulesEngineDecision.delayMs);
+  }
+
   const response = await upstreamRequest({
     path,
     search: url.search,
@@ -667,25 +734,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   const clonedReponse = response.clone(); // reading from body is side-effectful
 
-  // Await abuse classification (with timeout) to get request_id for cost tracking correlation
-  let timeoutId: ReturnType<typeof setTimeout> | undefined;
-  const classifyResult = await Promise.race([
-    classifyPromise.finally(() => timeoutId && clearTimeout(timeoutId)),
-    new Promise<null>(resolve => {
-      timeoutId = setTimeout(() => resolve(null), 2000);
-    }),
-  ]);
   if (classifyResult) {
-    console.log('Abuse classification result:', {
-      verdict: classifyResult.verdict,
-      risk_score: classifyResult.risk_score,
-      signals: classifyResult.signals,
-      identity_key: classifyResult.context?.identity_key,
-      kilo_user_id: user.id,
-      requested_model: originalModelIdLowerCased,
-      rps: classifyResult.context?.requests_per_second,
-      request_id: classifyResult.request_id,
-    });
     usageContext.abuse_request_id = classifyResult.request_id;
   }
 

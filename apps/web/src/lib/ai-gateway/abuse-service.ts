@@ -2,7 +2,7 @@
  * Client module for communicating with the Kilo Abuse Detection Service
  */
 
-import { type NextRequest } from 'next/server';
+import { NextResponse, type NextRequest } from 'next/server';
 import {
   ABUSE_SERVICE_CF_ACCESS_CLIENT_ID,
   ABUSE_SERVICE_CF_ACCESS_CLIENT_SECRET,
@@ -24,6 +24,13 @@ import {
   getMaxTokens,
   hasMiddleOutTransform,
 } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
+import { ProxyErrorType } from '@/lib/proxy-error-types';
+import { getAutoFreeCandidates } from '@/lib/ai-gateway/auto-model/resolution';
+import { getOpenRouterModels } from '@/lib/ai-gateway/providers/gateway-models-cache';
+
+const CLASSIFY_ABUSE_TIMEOUT_MS = 2000;
+const QUARANTINE_1_LATENCY_MS = 2000;
+const QUARANTINE_2_LATENCY_MS = 6000;
 
 /**
  * Extract full prompts from a GatewayRequest (chat completions, responses, or messages API).
@@ -189,7 +196,107 @@ export type AbuseClassificationResponse = {
   context: ClassificationContext;
   /** Request ID for correlating with cost updates. 0 indicates an error during classification. */
   request_id: number;
+  /** Rules-engine result used by cloud for enforcement decisions. */
+  rules_engine?: RulesEngineClassificationResult;
 };
+
+export type AbuseRuleAction =
+  | 'nothing'
+  | 'log'
+  | 'rate-limit'
+  | 'quarantine-1'
+  | 'quarantine-2'
+  | 'quarantine-3'
+  | 'block';
+
+export type RulesEngineClassificationResult = {
+  matches: unknown[];
+  sus_score: number;
+  resolved_action: AbuseRuleAction | null;
+  matched_abuse_rule_ids: string[];
+};
+
+export type RulesEngineActionDecision = {
+  action: AbuseRuleAction | null;
+  delayMs: number;
+  modelOverride: string | null;
+  response: NextResponse<unknown> | null;
+};
+
+export function sleepForRulesEngineAction(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function rulesEngineBlockResponse() {
+  const error = 'Request blocked by abuse prevention rules.';
+  return NextResponse.json(
+    { error, error_type: ProxyErrorType.abuse_blocked, message: error },
+    { status: 403 }
+  );
+}
+
+function rulesEngineRateLimitResponse() {
+  const error = 'Rate limit exceeded. Please try again later.';
+  return NextResponse.json(
+    { error, error_type: ProxyErrorType.rate_limit_exceeded, message: error },
+    { status: 429 }
+  );
+}
+
+export async function awaitClassifyAbuse(
+  classifyPromise: Promise<AbuseClassificationResponse | null>
+): Promise<AbuseClassificationResponse | null> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  return await Promise.race([
+    classifyPromise.finally(() => timeoutId && clearTimeout(timeoutId)),
+    new Promise<null>(resolve => {
+      timeoutId = setTimeout(() => resolve(null), CLASSIFY_ABUSE_TIMEOUT_MS);
+    }),
+  ]);
+}
+
+export async function getQuarantineFreeModel(
+  apiKind: GatewayRequest['kind']
+): Promise<string | null> {
+  const candidates = getAutoFreeCandidates(await getOpenRouterModels(), apiKind);
+  const candidate = candidates[0] ?? null;
+  if (!candidate) {
+    console.warn('No quarantine free model candidate available', { apiKind });
+  }
+  return candidate;
+}
+
+export function getRulesEngineActionDecision(args: {
+  classifyResult: AbuseClassificationResponse | null;
+  userByok: boolean;
+  quarantineFreeModel: string | null;
+}): RulesEngineActionDecision {
+  const action = args.classifyResult?.rules_engine?.resolved_action ?? null;
+  switch (action) {
+    case null:
+    case 'nothing':
+    case 'log':
+      return { action, delayMs: 0, modelOverride: null, response: null };
+    case 'block':
+      return { action, delayMs: 0, modelOverride: null, response: rulesEngineBlockResponse() };
+    case 'rate-limit':
+      return { action, delayMs: 0, modelOverride: null, response: rulesEngineRateLimitResponse() };
+    case 'quarantine-1':
+      return { action, delayMs: QUARANTINE_1_LATENCY_MS, modelOverride: null, response: null };
+    case 'quarantine-2':
+      return { action, delayMs: QUARANTINE_2_LATENCY_MS, modelOverride: null, response: null };
+    case 'quarantine-3':
+      return {
+        action,
+        delayMs: QUARANTINE_2_LATENCY_MS,
+        modelOverride: args.userByok ? null : args.quarantineFreeModel,
+        response: null,
+      };
+    default:
+      console.warn('Ignoring unknown rules-engine action', { action });
+      return { action: null, delayMs: 0, modelOverride: null, response: null };
+  }
+}
 
 /**
  * Request payload matching the microdollar_usage_view schema

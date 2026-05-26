@@ -1560,25 +1560,52 @@ export async function cancelCodeReview(reviewId: string): Promise<void> {
  */
 export async function resetCodeReviewForRetry(reviewId: string): Promise<void> {
   try {
-    await db
-      .update(cloud_agent_code_reviews)
-      .set({
-        status: 'pending',
-        dispatch_reservation_id: null,
-        session_id: null,
-        cli_session_id: null,
-        error_message: null,
-        terminal_reason: null,
-        check_run_id: null,
-        started_at: null,
-        completed_at: null,
-        model: null,
-        total_tokens_in: null,
-        total_tokens_out: null,
-        total_cost_musd: null,
-        updated_at: new Date().toISOString(),
-      })
-      .where(eq(cloud_agent_code_reviews.id, reviewId));
+    await db.transaction(async tx => {
+      const now = new Date().toISOString();
+      await tx
+        .update(cloud_agent_code_reviews)
+        .set({
+          status: 'pending',
+          dispatch_reservation_id: null,
+          session_id: null,
+          cli_session_id: null,
+          error_message: null,
+          terminal_reason: null,
+          check_run_id: null,
+          started_at: null,
+          completed_at: null,
+          model: null,
+          total_tokens_in: null,
+          total_tokens_out: null,
+          total_cost_musd: null,
+          updated_at: now,
+        })
+        .where(eq(cloud_agent_code_reviews.id, reviewId));
+
+      await tx
+        .update(cloud_agent_code_review_gate_syncs)
+        .set({
+          sync_status: 'skipped',
+          claim_token: null,
+          claimed_at: null,
+          next_retry_at: null,
+          last_error_code: 'manual_retrigger',
+          last_error_redacted: null,
+          terminal_confirmation_required: false,
+          last_ambiguous_at: null,
+          updated_at: now,
+        })
+        .where(
+          and(
+            eq(cloud_agent_code_review_gate_syncs.code_review_id, reviewId),
+            inArray(cloud_agent_code_review_gate_syncs.sync_status, [
+              'pending',
+              'processing',
+              'retry',
+            ])
+          )
+        );
+    });
   } catch (error) {
     captureException(error, {
       tags: { operation: 'resetCodeReviewForRetry' },

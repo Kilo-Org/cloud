@@ -15,6 +15,7 @@ import {
   createInfraRetryAttemptIfMissing,
   getCodeReviewAttemptForReview,
   listCodeReviewAttempts,
+  resetCodeReviewForRetry,
   updateCodeReviewAttemptForCallback,
   findPreviousCompletedReview,
   listStrandedTerminalAttemptReviews,
@@ -667,6 +668,41 @@ describe('gate sync persistence helpers', () => {
     expect(sync?.desired_status).toBe('failed');
     expect(sync?.desired_revision).toBe(2);
     expect(sync?.last_error_code).toBeNull();
+  });
+
+  it('skips active gate sync intent when a review is reset for retry', async () => {
+    const reviewId = await createReview('sha-reset-gate-sync');
+    await updateCodeReviewStatusWithGateSyncIntent(
+      reviewId,
+      'failed',
+      {
+        terminalReason: 'sandbox_error',
+        errorMessage: 'worker failed',
+      },
+      {
+        status: 'failed',
+        terminalReason: 'sandbox_error',
+        errorMessage: 'worker failed',
+      },
+      { onlyIfNonTerminal: true }
+    );
+    await db
+      .update(cloud_agent_code_review_gate_syncs)
+      .set({ sync_status: 'retry', next_retry_at: new Date(0).toISOString() })
+      .where(eq(cloud_agent_code_review_gate_syncs.code_review_id, reviewId));
+
+    await resetCodeReviewForRetry(reviewId);
+
+    const [sync] = await db
+      .select()
+      .from(cloud_agent_code_review_gate_syncs)
+      .where(eq(cloud_agent_code_review_gate_syncs.code_review_id, reviewId))
+      .limit(1);
+
+    expect(sync?.sync_status).toBe('skipped');
+    expect(sync?.next_retry_at).toBeNull();
+    expect(sync?.claim_token).toBeNull();
+    expect(sync?.last_error_code).toBe('manual_retrigger');
   });
 
   it('repairs a stranded parent from a terminal latest attempt with explicit gate result', async () => {

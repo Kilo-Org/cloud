@@ -126,7 +126,7 @@ const REFERRAL_REWARD_ACTOR = {
 } as const;
 
 const SIGNUP_REFERRAL_TOUCH_CAPTURE_GRACE_MS = 10 * 60 * 1000;
-const IMPACT_ADVOCATE_REWARD_UNIT = 'free-months';
+const IMPACT_ADVOCATE_REWARD_UNIT = 'MONTH';
 
 function getDatabaseClient(database?: DatabaseClient): DatabaseClient {
   return database ?? db;

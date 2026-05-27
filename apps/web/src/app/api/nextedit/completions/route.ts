@@ -58,13 +58,13 @@ function getSystemApiKey(provider: NextEditProvider): string | null {
 }
 
 const NextEditMessage = z.object({
-  role: z.string(),
+  role: z.literal('user'),
   content: z.string(),
 });
 
 const NextEditRequestBody = z.object({
   model: z.string(),
-  messages: z.array(NextEditMessage).min(1),
+  messages: z.array(NextEditMessage).length(1),
   max_tokens: z.number().int().positive().optional(),
   stop: z.string().array().optional(),
   // Streaming is not supported by Inception's edit endpoint today; reject if requested.

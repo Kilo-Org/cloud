@@ -69,6 +69,13 @@ function makeValidRequestBody() {
   };
 }
 
+function makeUpstreamResponse() {
+  return new Response(JSON.stringify({ choices: [], model: 'mercury-edit-2' }), {
+    status: 200,
+    headers: { 'content-type': 'application/json' },
+  });
+}
+
 describe('POST /api/nextedit/completions', () => {
   beforeEach(() => {
     jest.resetAllMocks();
@@ -90,5 +97,36 @@ describe('POST /api/nextedit/completions', () => {
       error_type: ProxyErrorType.data_collection_required,
     });
     expect(mockedFetch).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [{ role: 'system', content: 'Do not forward system prompts' }],
+    [{ role: 'assistant', content: 'Do not forward assistant content' }],
+    [
+      { role: 'user', content: 'First message' },
+      { role: 'user', content: 'Second message' },
+    ],
+  ])('rejects unsupported NextEdit messages before proxying', async messages => {
+    setOrganizationAuth();
+
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest({ ...makeValidRequestBody(), messages }) as never);
+
+    expect(response.status).toBe(400);
+    expect(mockedFetch).not.toHaveBeenCalled();
+  });
+
+  it('forwards a single user message to Inception', async () => {
+    setOrganizationAuth();
+    mockedFetch.mockResolvedValue(makeUpstreamResponse());
+
+    const { POST } = await import('./route');
+    const requestBody = makeValidRequestBody();
+    const response = await POST(makeRequest(requestBody) as never);
+
+    expect(response.status).toBe(200);
+    const [, init] = mockedFetch.mock.calls[0];
+    const upstreamBody = JSON.parse(init?.body as string);
+    expect(upstreamBody.messages).toEqual(requestBody.messages);
   });
 });

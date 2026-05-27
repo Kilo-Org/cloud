@@ -62,6 +62,7 @@ type StripeMock = {
   checkout: {
     sessions: {
       create: ReturnType<typeof jest.fn>;
+      retrieve: ReturnType<typeof jest.fn>;
     };
   };
   billingPortal: {
@@ -140,7 +141,7 @@ type KiloPassCaller = {
     isEligibleForFirstMonthPromo: boolean;
   }>;
   getAverageMonthlyUsageLast3Months: () => Promise<{ averageMonthlyUsageUsd: number }>;
-  getCheckoutReturnState: () => Promise<{
+  getCheckoutReturnState: (input?: { sessionId?: string }) => Promise<{
     subscription: {
       stripeSubscriptionId: string | null;
       tier: KiloPassTier;
@@ -225,6 +226,7 @@ jest.mock('@/lib/stripe-client', () => {
     checkout: {
       sessions: {
         create: jest.fn(),
+        retrieve: jest.fn(),
       },
     },
     billingPortal: {
@@ -417,6 +419,7 @@ describe('kiloPassRouter', () => {
     stripeMock.subscriptionSchedules.update.mockReset();
     stripeMock.subscriptionSchedules.release.mockReset();
     stripeMock.checkout.sessions.create.mockReset();
+    stripeMock.checkout.sessions.retrieve.mockReset();
     stripeMock.billingPortal.sessions.create.mockReset();
     stripeMock.invoices.list.mockReset();
     getAppStoreVerifierMock().verifyAppleKiloPassTransactionJws.mockReset();
@@ -1680,9 +1683,15 @@ describe('kiloPassRouter', () => {
           KiloPassWelcomePromoEligibilityReason.FingerprintPreviouslyClaimed,
       });
 
-      const caller = await createCallerForUser(user.id);
-      const result = await caller.kiloPass.getCheckoutReturnState();
+      const stripeMock = getStripeMock();
+      stripeMock.checkout.sessions.retrieve.mockResolvedValue({
+        subscription: 'sub_test_return_reused_card',
+      });
 
+      const caller = await createCallerForUser(user.id);
+      const result = await caller.kiloPass.getCheckoutReturnState({ sessionId: 'cs_reused_card' });
+
+      expect(stripeMock.checkout.sessions.retrieve).toHaveBeenCalledWith('cs_reused_card');
       expect(result.creditsAwarded).toBe(true);
       expect(result.welcomePromoIneligibleDueToReusedCard).toBe(true);
     });

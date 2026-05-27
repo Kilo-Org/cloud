@@ -58,6 +58,7 @@ export function KiloPassAwardingCreditsClient() {
   const [didTimeout, setDidTimeout] = useState(false);
   const [redirectSecondsRemaining, setRedirectSecondsRemaining] = useState<number | null>(null);
 
+  const checkoutSessionId = searchParams.get('session_id') ?? undefined;
   const clawHostingPlan = searchParams.get('clawHostingPlan');
   const clawInstanceId = searchParams.get('clawInstanceId');
   const isClawAutoActivation = !!clawHostingPlan;
@@ -90,7 +91,7 @@ export function KiloPassAwardingCreditsClient() {
   }, []);
 
   const query = useQuery({
-    ...trpc.kiloPass.getCheckoutReturnState.queryOptions(),
+    ...trpc.kiloPass.getCheckoutReturnState.queryOptions({ sessionId: checkoutSessionId }),
     refetchInterval: query => {
       const data = query.state.data;
       if (didTimeout) return false;

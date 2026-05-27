@@ -332,6 +332,7 @@ function ClawOnboardingFlowInner({
     'oauth_error',
     'missing_code',
     'missing_instance',
+    'missing_permissions',
     'connection_failed',
     'invalid_state',
     'unauthorized',
@@ -371,7 +372,11 @@ function ClawOnboardingFlowInner({
       toast.success('Calendar connected');
     } else if (errorParamRaw) {
       posthog?.capture('claw_setup_calendar_oauth_failed', { reason: errorReason });
-      toast.error('Could not connect calendar. Try again or skip for now.');
+      toast.error(
+        errorReason === 'missing_permissions'
+          ? 'Calendar permission was not granted. Allow Calendar access to connect or skip for now.'
+          : 'Could not connect calendar. Try again or skip for now.'
+      );
     }
     cleanupResumeQueryParams();
   }, [searchParams, botIdentity, posthog, cleanupResumeQueryParams]);

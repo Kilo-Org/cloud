@@ -6,7 +6,10 @@ import { APP_URL } from '@/lib/constants';
 import { getUserFromAuth } from '@/lib/user/server';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import { getInstanceById } from '@/lib/kiloclaw/instance-registry';
-import { exchangeGoogleOAuthCode } from '@/lib/integrations/google-service';
+import {
+  exchangeGoogleOAuthCode,
+  GoogleOAuthCapabilityScopesNotGrantedError,
+} from '@/lib/integrations/google-service';
 import {
   type VerifiedGoogleOAuthState,
   verifyGoogleOAuthState,
@@ -204,7 +207,17 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(new URL('/claw/settings?error=unauthorized', APP_URL));
     }
 
-    const oauthData = await exchangeGoogleOAuthCode(oauthCode, verifiedState.capabilities);
+    let oauthData;
+    try {
+      oauthData = await exchangeGoogleOAuthCode(oauthCode, verifiedState.capabilities);
+    } catch (error) {
+      if (error instanceof GoogleOAuthCapabilityScopesNotGrantedError) {
+        return NextResponse.redirect(
+          new URL(buildGoogleRedirectPath(verifiedState, 'error=missing_permissions'), APP_URL)
+        );
+      }
+      throw error;
+    }
 
     const persisted = await upsertKiloClawGoogleOAuthConnection({
       instanceId: verifiedState.instanceId,

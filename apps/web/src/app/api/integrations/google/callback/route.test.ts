@@ -2,7 +2,10 @@ import { beforeEach, describe, expect, test } from '@jest/globals';
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserFromAuth } from '@/lib/user/server';
 import { getInstanceById } from '@/lib/kiloclaw/instance-registry';
-import { exchangeGoogleOAuthCode } from '@/lib/integrations/google-service';
+import {
+  exchangeGoogleOAuthCode,
+  GoogleOAuthCapabilityScopesNotGrantedError,
+} from '@/lib/integrations/google-service';
 import { upsertKiloClawGoogleOAuthConnection } from '@/lib/kiloclaw/google-oauth-connections';
 import { verifyGoogleOAuthState } from '@/lib/integrations/google/oauth-state';
 import { captureException, captureMessage } from '@sentry/nextjs';
@@ -150,6 +153,29 @@ describe('GET /api/integrations/google/callback', () => {
 
     expect(response.status).toBe(307);
     expectRedirectLocation(response, '/claw/new?step=calendar&error=access_denied');
+  });
+
+  test('redirects missing Calendar permission back to onboarding without capturing an exception', async () => {
+    mockedVerifyGoogleOAuthState.mockReturnValue({
+      owner: { type: 'user', id: USER_ID },
+      userId: USER_ID,
+      instanceId: INSTANCE_ID,
+      capabilities: ['calendar_read'],
+      returnTo: '/claw/new?step=calendar',
+    });
+    mockedExchangeGoogleOAuthCode.mockRejectedValue(
+      new GoogleOAuthCapabilityScopesNotGrantedError()
+    );
+
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest('/api/integrations/google/callback?code=abc&state=signed') as never
+    );
+
+    expect(response.status).toBe(307);
+    expectRedirectLocation(response, '/claw/new?step=calendar&error=missing_permissions');
+    expect(mockedCaptureException).not.toHaveBeenCalled();
+    expect(mockedUpsertKiloClawGoogleOAuthConnection).not.toHaveBeenCalled();
   });
 
   test('redirects personal success flow to personal claw settings', async () => {

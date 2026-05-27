@@ -1,20 +1,45 @@
 import { describe, it, expect, vi } from 'vitest';
 import { checkPRStatus, type SCMContext } from '../../src/dos/town/town-scm';
 import { parsePrUrlForRepoMatch, parseGitUrl } from '../../src/util/platform-pr.util';
+import { submitExternalPrToReviewQueue } from '../../src/dos/town/review-queue';
 import type { TownConfig } from '../../src/types';
 
 class MiniSql {
-  exec(_stmt: string): void {}
-  prepare(_stmt: string): {
-    bind(...params: unknown[]): { step(): boolean; getRow(): unknown[]; free(): void };
-  } {
+  private inserts: { table: string; params: unknown[] }[] = [];
+
+  exec(stmt: string, ...params: unknown[]): SqlStoragecursor {
+    this.captureInsert(stmt, params);
     return {
-      bind: (..._params: unknown[]) => ({
-        step: () => false,
-        getRow: () => [],
-        free: () => {},
-      }),
-    };
+      get rows(): unknown[][] { return []; },
+      get columns(): string[] { return []; },
+      cursor: {
+        next(): string | null { return null; },
+        get value(): unknown[] { return []; },
+      },
+    } as unknown as SqlStoragecursor;
+  }
+
+  private captureInsert(stmt: string, params: unknown[]): void {
+    const match = stmt.match(/INSERT\s+INTO\s+(\S+)/i);
+    if (match) {
+      this.inserts.push({ table: match[1], params });
+    }
+  }
+
+  getInserts(): { table: string; params: unknown[] }[] {
+    return this.inserts;
+  }
+
+  findBeadInsert(): { table: string; params: unknown[] } | undefined {
+    return this.inserts.find((i) => /beads$/i.test(i.table));
+  }
+
+  findReviewMetadataInsert(): { table: string; params: unknown[] } | undefined {
+    return this.inserts.find((i) => /review_metadata$/i.test(i.table));
+  }
+
+  findEventInsert(): { table: string; params: unknown[] } | undefined {
+    return this.inserts.find((i) => /bead_events$/i.test(i.table));
   }
 }
 
@@ -269,14 +294,90 @@ describe('slingExistingPr validation logic', () => {
   });
 });
 
-describe('forcePushAllowed default', () => {
-  it('defaults to false when not specified', () => {
-    const forcePushAllowed = undefined ?? false;
-    expect(forcePushAllowed).toBe(false);
+describe('submitExternalPrToReviewQueue force_push_allowed', () => {
+  it('defaults force_push_allowed to false when slingExistingPr omits it', () => {
+    const sql = new MiniSql() as unknown as SqlStorage;
+    const { beadId } = submitExternalPrToReviewQueue(sql, {
+      rigId: 'rig-1',
+      prUrl: 'https://github.com/Org/repo/pull/1',
+      branch: 'feature/x',
+      targetBranch: 'main',
+      headSha: 'abc1234',
+      title: 'Babysit: Test PR',
+      forcePushAllowed: false,
+      sourceAgentId: 'mayor',
+    });
+
+    expect(beadId).toBeTruthy();
+
+    const beadInsert = sql.findBeadInsert();
+    expect(beadInsert).toBeTruthy();
+    const metadata = JSON.parse(beadInsert!.params[10] as string);
+    expect(metadata.force_push_allowed).toBe(false);
+    expect(metadata.babysit).toBe(true);
+    expect(metadata.head_sha).toBe('abc1234');
   });
 
-  it('persists true when explicitly set', () => {
-    const forcePushAllowed = true;
-    expect(forcePushAllowed).toBe(true);
+  it('persists force_push_allowed: true when explicitly set', () => {
+    const sql = new MiniSql() as unknown as SqlStorage;
+    submitExternalPrToReviewQueue(sql, {
+      rigId: 'rig-1',
+      prUrl: 'https://github.com/Org/repo/pull/1',
+      branch: 'feature/x',
+      targetBranch: 'main',
+      headSha: 'def5678',
+      title: 'Babysit: Another PR',
+      forcePushAllowed: true,
+      sourceAgentId: 'system',
+    });
+
+    const beadInsert = sql.findBeadInsert();
+    expect(beadInsert).toBeTruthy();
+    const metadata = JSON.parse(beadInsert!.params[10] as string);
+    expect(metadata.force_push_allowed).toBe(true);
+  });
+
+  it('creates review_metadata row and babysit_started event', () => {
+    const sql = new MiniSql() as unknown as SqlStorage;
+    submitExternalPrToReviewQueue(sql, {
+      rigId: 'rig-1',
+      prUrl: 'https://github.com/Org/repo/pull/1',
+      branch: 'feature/x',
+      targetBranch: 'main',
+      headSha: 'abc1234',
+      title: 'Babysit: Test',
+      forcePushAllowed: false,
+      sourceAgentId: 'mayor',
+    });
+
+    const rmInsert = sql.findReviewMetadataInsert();
+    expect(rmInsert).toBeTruthy();
+    expect(rmInsert!.params[1]).toBe('feature/x');
+    expect(rmInsert!.params[2]).toBe('main');
+    expect(rmInsert!.params[4]).toBe('https://github.com/Org/repo/pull/1');
+
+    const eventInsert = sql.findEventInsert();
+    expect(eventInsert).toBeTruthy();
+    expect(eventInsert!.params[3]).toBe('babysit_started');
+  });
+
+  it('includes gt:babysit label alongside gt:merge-request', () => {
+    const sql = new MiniSql() as unknown as SqlStorage;
+    submitExternalPrToReviewQueue(sql, {
+      rigId: 'rig-1',
+      prUrl: 'https://github.com/Org/repo/pull/1',
+      branch: 'feature/x',
+      targetBranch: 'main',
+      headSha: 'abc1234',
+      title: 'Babysit: Test',
+      forcePushAllowed: false,
+      sourceAgentId: 'mayor',
+    });
+
+    const beadInsert = sql.findBeadInsert();
+    expect(beadInsert).toBeTruthy();
+    const labels = JSON.parse(beadInsert!.params[9] as string);
+    expect(labels).toContain('gt:merge-request');
+    expect(labels).toContain('gt:babysit');
   });
 });

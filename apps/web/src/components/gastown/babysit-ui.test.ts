@@ -1,5 +1,5 @@
 import { describe, it, expect } from '@jest/globals';
-import { eventDescription } from '@/components/gastown/ActivityFeed';
+import { eventDescription } from '@/components/gastown/event-description';
 
 describe('eventDescription — babysit event types', () => {
   it('formats babysit_started with branch and pr_url', () => {

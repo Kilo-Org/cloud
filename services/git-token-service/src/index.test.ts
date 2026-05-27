@@ -160,6 +160,49 @@ describe('resolveGitLabRuntimeToken', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
+  it('uses a matched project token when another matching integration token fails', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation(() => Promise.resolve(Response.json({ id: 42 })))
+    );
+    const failingIntegration: AuthorizedGitLabIntegration = {
+      ...integration,
+      integrationId: 'failing-integration',
+      metadata: {
+        ...integration.metadata,
+        project_tokens: { '42': { token: 'failing-project-token' } },
+      },
+    };
+    const dependencies = createDependencies({
+      integrations: [failingIntegration, integration],
+    });
+    dependencies.tokenService.getToken.mockImplementation(integrationId =>
+      integrationId === failingIntegration.integrationId
+        ? Promise.resolve({ success: false, reason: 'token_expired_no_refresh' })
+        : Promise.resolve({
+            success: true,
+            token: 'human-integration-token',
+            instanceUrl: 'https://gitlab.example.com/gitlab',
+          })
+    );
+
+    await expect(
+      resolveGitLabRuntimeToken(
+        {
+          userId: 'user_123',
+          repositoryUrl: 'https://gitlab.example.com/gitlab/team/repo.git',
+          createdOnPlatform: 'code-review',
+        },
+        dependencies
+      )
+    ).resolves.toEqual({
+      success: true,
+      token: 'project-bot-token',
+      instanceUrl: 'https://gitlab.example.com/gitlab',
+      glabIsOAuth2: false,
+    });
+  });
+
   it('skips project lookup for matching integrations without stored project tokens', async () => {
     const fetchMock = vi.fn().mockImplementation(() => Promise.resolve(Response.json({ id: 42 })));
     vi.stubGlobal('fetch', fetchMock);

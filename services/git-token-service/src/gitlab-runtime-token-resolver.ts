@@ -170,9 +170,11 @@ export async function resolveGitLabRuntimeToken(
     return { success: false, reason: 'ambiguous_integration' };
   }
 
-  const tokenFailure = evaluations.find(evaluation => evaluation.status === 'token_failed');
-  if (tokenFailure?.status === 'token_failed') {
-    return tokenFailure.failure;
+  if (qualifiedCandidates.length === 0) {
+    const tokenFailure = evaluations.find(evaluation => evaluation.status === 'token_failed');
+    if (tokenFailure?.status === 'token_failed') {
+      return tokenFailure.failure;
+    }
   }
 
   if (evaluations.some(evaluation => evaluation.status === 'lookup_failed')) {

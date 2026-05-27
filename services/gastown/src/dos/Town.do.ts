@@ -67,6 +67,7 @@ import { generateKiloApiToken } from '../util/kilo-token.util';
 import { resolveSecret } from '../util/secret.util';
 import { writeEvent, type GastownEventData } from '../util/analytics.util';
 import { logger, withLogTags } from '../util/log.util';
+import { parseGitUrl, parsePrUrlForRepoMatch } from '../util/platform-pr.util';
 import { BeadPriority } from '../types';
 import type {
   TownConfig,
@@ -2523,6 +2524,90 @@ export class TownDO extends DurableObject<Env> {
     );
     await this.escalateToActiveCadence();
     return { bead, agent: hookedAgent };
+  }
+
+  async slingExistingPr(args: {
+    rigId: string;
+    prUrl: string;
+    title?: string;
+    body?: string;
+    forcePushAllowed?: boolean;
+    sourceAgentId?: string;
+  }): Promise<{ beadId: string; warning?: string }> {
+    const rig = rigs.getRig(this.sql, args.rigId);
+    if (!rig) {
+      throw new Error(`Rig ${args.rigId} not found`);
+    }
+
+    const rigCoords = parseGitUrl(rig.git_url);
+    if (!rigCoords) {
+      throw new Error(`Cannot parse rig git_url: ${rig.git_url}`);
+    }
+    const prCoords = parsePrUrlForRepoMatch(args.prUrl);
+    if (!prCoords) {
+      throw new Error(`Cannot parse PR URL: ${args.prUrl}`);
+    }
+    if (
+      rigCoords.platform !== prCoords.platform ||
+      rigCoords.owner !== prCoords.owner ||
+      rigCoords.repo !== prCoords.repo
+    ) {
+      throw new Error(
+        'PR URL repo does not match rig repo. Cannot adopt PRs from other repositories.'
+      );
+    }
+
+    const scmCtx = {
+      env: this.env,
+      townId: this.townId,
+      getTownConfig: () => this.getTownConfig(),
+    };
+    const outcome = await scm.checkPRStatus(scmCtx, args.prUrl);
+    if (!outcome.ok) {
+      const err = outcome.error;
+      throw new Error(
+        `Failed to fetch PR status: ${err.kind}${err.kind === 'http_error' ? ` (HTTP ${err.status})` : ''}${err.kind === 'no_token' ? ` — tried: ${err.resolutionChain.join(', ')}` : ''}`
+      );
+    }
+
+    const { result } = outcome;
+    if (result.status === 'merged' || result.status === 'closed') {
+      throw new Error(`Cannot babysit a PR that is already ${result.status}.`);
+    }
+
+    const headBranch = result.head_branch ?? '';
+    const baseBranch = result.base_branch ?? '';
+    const headSha = result.head_sha ?? '';
+    const prTitle = result.title ?? '';
+
+    const resolvedTitle = args.title ?? `Babysit: ${prTitle}`;
+    const resolvedBody =
+      args.body ??
+      `Adopted external PR ${args.prUrl} at SHA ${headSha}. Town will poll and address review feedback, conflicts, and auto-merge.`;
+    const forcePushAllowed = args.forcePushAllowed ?? false;
+    const sourceAgentId = args.sourceAgentId ?? 'mayor';
+
+    const { beadId } = reviewQueue.submitExternalPrToReviewQueue(this.sql, {
+      rigId: args.rigId,
+      prUrl: args.prUrl,
+      branch: headBranch,
+      targetBranch: baseBranch,
+      headSha,
+      title: resolvedTitle,
+      body: resolvedBody,
+      forcePushAllowed,
+      sourceAgentId,
+    });
+
+    await this.escalateToActiveCadence();
+
+    const townConfig = await this.getTownConfig();
+    const codeReview = townConfig.refinery?.code_review;
+    const warning = codeReview
+      ? 'This rig has code_review enabled. Babysat PRs bypass refinery review (wired in chunk 1).'
+      : undefined;
+
+    return { beadId, warning };
   }
 
   /**

@@ -88,12 +88,28 @@ export const GitHubPRStatusSchema = z.object({
   state: z.string(),
   merged: z.boolean().optional(),
   mergeable: z.boolean().nullable().optional(),
-  mergeable_state: z.string().optional(), // 'clean', 'dirty', 'blocked', 'unknown', 'unstable'
+  mergeable_state: z.string().optional(),
+  head: z
+    .object({
+      ref: z.string().optional(),
+      sha: z.string().optional(),
+    })
+    .optional(),
+  base: z
+    .object({
+      ref: z.string().optional(),
+    })
+    .optional(),
+  title: z.string().optional(),
 });
 
 /** Schema for GitLab MR status responses (used by checkPRStatus). */
 export const GitLabMRStatusSchema = z.object({
   state: z.string(),
+  source_branch: z.string().optional(),
+  target_branch: z.string().optional(),
+  sha: z.string().optional(),
+  title: z.string().optional(),
 });
 
 // -- GitHub PR creation --
@@ -270,4 +286,26 @@ export async function createGitLabMR(params: {
   const data: unknown = await response.json();
   const parsed = GitLabMRResponse.parse(data);
   return { mr_url: parsed.web_url, mr_iid: parsed.iid };
+}
+
+export function parsePrUrlForRepoMatch(
+  prUrl: string
+): { platform: 'github' | 'gitlab'; owner: string; repo: string } | null {
+  const ghMatch = prUrl.match(/^https:\/\/github\.com\/([^/]+)\/([^/]+)\/pull\/\d+/);
+  if (ghMatch) {
+    return { platform: 'github', owner: ghMatch[1], repo: ghMatch[2] };
+  }
+  const glMatch = prUrl.match(/^https:\/\/([^/]+)\/(.+)\/-\/merge_requests\/\d+/);
+  if (glMatch) {
+    const fullPath = glMatch[2];
+    const lastSlash = fullPath.lastIndexOf('/');
+    if (lastSlash > 0) {
+      return {
+        platform: 'gitlab',
+        owner: fullPath.slice(0, lastSlash),
+        repo: fullPath.slice(lastSlash + 1),
+      };
+    }
+  }
+  return null;
 }

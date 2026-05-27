@@ -67,27 +67,68 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
     this.gitlabTokenService = new GitLabTokenService(env);
   }
 
+  private async refreshGitHubInstallationLogins(params: GetTokenForRepoParams): Promise<void> {
+    const candidates = await this.installationLookupService.findRefreshCandidates(params);
+    if (!candidates.success) {
+      return;
+    }
+
+    for (const candidate of candidates.candidates) {
+      const refreshedAccountLogin = await this.githubService.refreshInstallationAccountLoginIfDue(
+        candidate.installationId,
+        candidate.githubAppType
+      );
+      if (
+        !refreshedAccountLogin ||
+        refreshedAccountLogin.toLowerCase() === candidate.accountLogin?.toLowerCase()
+      ) {
+        continue;
+      }
+
+      await this.installationLookupService.updateAccountLogin(
+        candidate.integrationId,
+        refreshedAccountLogin
+      );
+    }
+  }
+
   /**
    * Get a GitHub token for a repository.
    *
    * This is the main entry point - it handles the full flow:
    * 1. Looks up the GitHub App installation for this repo/user
    * 2. Validates the user has access (via org membership if applicable)
-   * 3. Generates an installation access token
+   * 3. Generates an installation access token restricted to this repository
    *
    * @param params - The repo and user context
    * @returns Token and installation details, or a failure reason
    */
   async getTokenForRepo(params: GetTokenForRepoParams): Promise<GetTokenForRepoResult> {
-    // 1. Look up installation
-    const installation = await this.installationLookupService.findInstallationId(params);
+    let installation = await this.installationLookupService.findInstallationId(params);
+    if (!installation.success && installation.reason === 'no_installation_found') {
+      await this.refreshGitHubInstallationLogins(params);
+      installation = await this.installationLookupService.findInstallationId(params);
+    }
     if (!installation.success) {
-      return installation;
+      switch (installation.reason) {
+        case 'ambiguous_installation':
+          return { success: false, reason: 'no_installation_found' };
+        case 'database_not_configured':
+        case 'invalid_repo_format':
+        case 'no_installation_found':
+        case 'invalid_org_id':
+          return { success: false, reason: installation.reason };
+      }
     }
 
-    // 2. Generate token for the installation (not scoped to specific repo)
-    const token = await this.githubService.getToken(
+    const [, repoName] = params.githubRepo.split('/');
+    if (!repoName) {
+      return { success: false, reason: 'invalid_repo_format' };
+    }
+
+    const token = await this.githubService.getTokenForRepo(
       installation.installationId,
+      repoName,
       installation.githubAppType
     );
 

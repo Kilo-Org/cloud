@@ -23,6 +23,14 @@ const CACHE_TTL_MS = 30 * 60 * 1000;
 const CACHE_KEY_PREFIX = 'gh-token:';
 const MIN_TTL_SECONDS = 60;
 const EXPIRY_BUFFER_MS = 5 * 60 * 1000;
+const INSTALLATION_LOGIN_REFRESH_CACHE_KEY_PREFIX = 'gh-installation-login-refresh:v1:';
+const INSTALLATION_LOGIN_REFRESH_TTL_SECONDS = 10 * 60;
+
+const GitHubInstallationAccountSchema = z.object({
+  account: z.object({
+    login: z.string().min(1),
+  }),
+});
 
 export class GitHubTokenService {
   constructor(private env: CloudflareEnv) {}
@@ -59,6 +67,74 @@ export class GitHubTokenService {
     await this.cacheToken(cacheKey, token, expiresAt);
 
     return token;
+  }
+
+  async refreshInstallationAccountLoginIfDue(
+    installationId: string,
+    appType: GitHubAppType = 'standard'
+  ): Promise<string | null> {
+    const cooldownKey = `${INSTALLATION_LOGIN_REFRESH_CACHE_KEY_PREFIX}${appType}:${installationId}`;
+    if (this.env.TOKEN_CACHE) {
+      const cooldownMarker = await this.env.TOKEN_CACHE.get(cooldownKey);
+      if (cooldownMarker !== null) {
+        return null;
+      }
+      await this.env.TOKEN_CACHE.put(cooldownKey, new Date().toISOString(), {
+        expirationTtl: INSTALLATION_LOGIN_REFRESH_TTL_SECONDS,
+      });
+    }
+
+    try {
+      const numericId = this.validateInstallationId(installationId);
+      const credentials = this.getCredentials(appType);
+      const auth = createAppAuth({
+        appId: credentials.appId,
+        privateKey: credentials.privateKey,
+      });
+      const { token } = await auth({ type: 'app' });
+      const response = await fetch(`https://api.github.com/app/installations/${numericId}`, {
+        method: 'GET',
+        headers: {
+          Accept: 'application/vnd.github+json',
+          Authorization: `Bearer ${token}`,
+          'User-Agent': 'Kilo-Git-Token-Service',
+          'X-GitHub-Api-Version': '2022-11-28',
+        },
+      });
+
+      if (!response.ok) {
+        console.warn(
+          JSON.stringify({
+            message: 'Failed to refresh GitHub installation account login',
+            status: response.status,
+            appType,
+          })
+        );
+        return null;
+      }
+
+      const parsed = GitHubInstallationAccountSchema.safeParse(await response.json());
+      if (!parsed.success) {
+        console.warn(
+          JSON.stringify({
+            message: 'Invalid GitHub installation account metadata response',
+            appType,
+          })
+        );
+        return null;
+      }
+
+      return parsed.data.account.login;
+    } catch (error) {
+      console.warn(
+        JSON.stringify({
+          message: 'Failed to refresh GitHub installation account login',
+          errorType: error instanceof Error ? error.name : 'UnknownError',
+          appType,
+        })
+      );
+      return null;
+    }
   }
 
   /**
@@ -156,7 +232,12 @@ export class GitHubTokenService {
         expiresAt: new Date(result.expiresAt).getTime(),
       };
     } catch (error) {
-      console.error('Failed to generate GitHub token:', error);
+      console.error(
+        JSON.stringify({
+          message: 'Failed to generate GitHub installation token',
+          errorType: error instanceof Error ? error.name : 'UnknownError',
+        })
+      );
       const message = error instanceof Error ? error.message : 'Unknown error';
       throw new Error(`Failed to generate GitHub installation token: ${message}`);
     }

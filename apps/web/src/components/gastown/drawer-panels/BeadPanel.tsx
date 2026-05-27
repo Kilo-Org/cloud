@@ -37,6 +37,9 @@ import {
   Loader2,
   Play,
   MessageCircle,
+  Lock,
+  Unlock,
+  Eye,
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -249,6 +252,7 @@ export function BeadPanel({
 
   // Held bead detection
   const isHeld = bead.labels.includes('gt:held');
+  const isBabysit = bead.labels.includes('gt:babysit');
 
   // Mayor responses: message-type child beads
   const mayorResponses = allBeads.filter(
@@ -335,6 +339,12 @@ export function BeadPanel({
               <Flag className="size-2.5" />
               {bead.priority}
             </span>
+            {isBabysit && (
+              <span className="inline-flex items-center gap-1 rounded-md border border-sky-500/30 bg-sky-500/10 px-2 py-0.5 text-[10px] font-medium text-sky-300">
+                <Eye className="size-2.5" />
+                Babysat external PR
+              </span>
+            )}
             {isHeld && (
               <Button
                 size="sm"
@@ -463,6 +473,17 @@ export function BeadPanel({
             label="Labels"
             value={bead.labels.length ? bead.labels.join(', ') : 'None'}
           />
+
+          {isBabysit && typeof bead.metadata?.head_sha === 'string' && (
+            <MetaCell icon={Hash} label="Head SHA" value={bead.metadata.head_sha as string} mono />
+          )}
+          {isBabysit && (
+            <MetaCell
+              icon={bead.metadata?.force_push_allowed === true ? Unlock : Lock}
+              label="Force-push"
+              value={bead.metadata?.force_push_allowed === true ? 'Allowed' : 'Blocked'}
+            />
+          )}
 
           {/* Parent bead — clickable */}
           {bead.parent_bead_id && (

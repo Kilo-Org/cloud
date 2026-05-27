@@ -16,6 +16,11 @@ import {
   MessageSquare,
   ChevronRight,
   ShieldCheck,
+  Eye,
+  MessageCircle,
+  GitMergeIcon,
+  RefreshCw,
+  Zap,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -31,6 +36,11 @@ const EVENT_ICONS: Record<string, typeof Activity> = {
   mail_sent: Mail,
   agent_status: MessageSquare,
   triage_resolved: ShieldCheck,
+  babysit_started: Eye,
+  pr_feedback_detected: MessageCircle,
+  pr_conflict_detected: AlertTriangle,
+  pr_auto_merge: GitMergeIcon,
+  pr_status_changed: RefreshCw,
 };
 
 const EVENT_COLORS: Record<string, string> = {
@@ -45,6 +55,11 @@ const EVENT_COLORS: Record<string, string> = {
   mail_sent: 'text-sky-500',
   agent_status: 'text-white/50',
   triage_resolved: 'text-amber-500',
+  babysit_started: 'text-sky-500',
+  pr_feedback_detected: 'text-amber-500',
+  pr_conflict_detected: 'text-red-500',
+  pr_auto_merge: 'text-emerald-500',
+  pr_status_changed: 'text-purple-500',
 };
 
 type TownEvent = GastownOutputs['gastown']['getTownEvents'][number];
@@ -103,6 +118,25 @@ function eventDescription(event: {
       // never populated for bead_events rows).
       const prefix = rigName ? `[${rigName}] ` : rigPrefix;
       return agentName ? `${prefix}${agentName}: ${body}` : `${prefix}${body}`;
+    }
+    case 'babysit_started': {
+      const prUrl = event.metadata?.pr_url as string | undefined;
+      const branch = event.metadata?.branch as string | undefined;
+      const desc = `${rigPrefix}Babysit started`;
+      const parts: string[] = [];
+      if (branch) parts.push(branch);
+      if (prUrl) parts.push(prUrl);
+      return parts.length > 0 ? `${desc}: ${parts.join(' → ')}` : desc;
+    }
+    case 'pr_feedback_detected':
+      return `${rigPrefix}PR feedback detected: ${event.new_value ?? 'review comments'}`;
+    case 'pr_conflict_detected':
+      return `${rigPrefix}PR merge conflict detected`;
+    case 'pr_auto_merge':
+      return `${rigPrefix}PR auto-merge triggered`;
+    case 'pr_status_changed': {
+      const newState = event.metadata?.state as string | undefined;
+      return `${rigPrefix}PR status changed: ${newState ?? event.new_value ?? 'unknown'}`;
     }
     default:
       return `${rigPrefix}${event.event_type}`;

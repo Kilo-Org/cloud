@@ -19,13 +19,24 @@ import {
 } from '@/components/ui/alert-dialog';
 import Link from 'next/link';
 import { formatDistanceToNow, format } from 'date-fns';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Eye } from 'lucide-react';
 
 const STATUS_COLORS: Record<string, string> = {
   open: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
   in_progress: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
   closed: 'bg-green-500/10 text-green-400 border-green-500/20',
   failed: 'bg-red-500/10 text-red-400 border-red-500/20',
+};
+
+const EVENT_LABELS: Record<string, string> = {
+  babysit_started: 'Babysit Started',
+  pr_feedback_detected: 'PR Feedback',
+  pr_conflict_detected: 'PR Conflict',
+  pr_auto_merge: 'Auto-merge',
+  pr_status_changed: 'PR Status',
+  pr_created: 'PR Created',
+  pr_creation_failed: 'PR Creation Failed',
+  rework_requested: 'Rework Requested',
 };
 
 type ConfirmActionType = 'close' | 'fail' | 'reset_agent';
@@ -247,10 +258,36 @@ export function BeadInspectorDashboard({ townId, beadId }: { townId: string; bea
                     </dt>
                     <dd className="mt-1 flex flex-wrap gap-1">
                       {bead.labels.map(label => (
-                        <Badge key={label} variant="outline" className="font-mono text-xs">
+                        <Badge
+                          key={label}
+                          variant="outline"
+                          className={`font-mono text-xs ${label === 'gt:babysit' ? 'border-sky-500/30 bg-sky-500/10 text-sky-400' : ''}`}
+                        >
+                          {label === 'gt:babysit' && <Eye className="mr-1 size-3" />}
                           {label}
                         </Badge>
                       ))}
+                    </dd>
+                  </div>
+                )}
+                {bead.labels.includes('gt:babysit') &&
+                  typeof bead.metadata?.head_sha === 'string' && (
+                    <div>
+                      <dt className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+                        Head SHA
+                      </dt>
+                      <dd className="font-mono text-xs">
+                        {(bead.metadata.head_sha as string).slice(0, 12)}…
+                      </dd>
+                    </div>
+                  )}
+                {bead.labels.includes('gt:babysit') && (
+                  <div>
+                    <dt className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+                      Force-push
+                    </dt>
+                    <dd className="text-xs">
+                      {bead.metadata?.force_push_allowed === true ? 'Allowed' : 'Blocked'}
                     </dd>
                   </div>
                 )}
@@ -353,7 +390,7 @@ export function BeadInspectorDashboard({ townId, beadId }: { townId: string; bea
                     <div className="pb-4">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="rounded bg-gray-500/10 px-1.5 py-0.5 font-mono text-xs">
-                          {event.event_type}
+                          {EVENT_LABELS[event.event_type] ?? event.event_type}
                         </span>
                         {event.agent_id && (
                           <Link
@@ -431,7 +468,7 @@ export function BeadInspectorDashboard({ townId, beadId }: { townId: string; bea
                       </td>
                       <td className="py-2 pr-4">
                         <span className="rounded bg-gray-500/10 px-1.5 py-0.5 font-mono text-xs">
-                          {event.event_type}
+                          {EVENT_LABELS[event.event_type] ?? event.event_type}
                         </span>
                       </td>
                       <td

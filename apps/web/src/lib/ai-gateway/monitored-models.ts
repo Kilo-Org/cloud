@@ -2,6 +2,7 @@ import { AUTO_MODELS, isKiloAutoModel, KILO_AUTO_FREE_MODEL } from '@/lib/ai-gat
 import type { FeatureValue } from '@/lib/feature-detection';
 import { resolveAutoModel } from '@/lib/ai-gateway/auto-model/resolution';
 import { preferredModels } from '@/lib/ai-gateway/models';
+import { qwen37_max_model } from '@/lib/ai-gateway/providers/qwen';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 
 type AutoModelVariation = {
@@ -66,6 +67,9 @@ export async function getMonitoredModels() {
       set.add(model);
     }
   }
+
+  // Track stats for Qwen3.7 Max without elevating it in preferred UI placement.
+  set.add(qwen37_max_model.public_id);
 
   return [...set];
 }

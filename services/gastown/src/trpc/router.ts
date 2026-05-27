@@ -36,7 +36,11 @@ import {
   RpcAlarmStatusOutput,
   RpcOrgTownOutput,
   RpcMergeQueueDataOutput,
+  RpcBabysitPrResultOutput,
+  RpcPreviewPrResultOutput,
 } from './schemas';
+import { checkPRStatus } from '../dos/town/town-scm';
+import { parseGitUrl, parsePrUrl } from '../util/platform-pr.util';
 import type { TRPCContext } from './init';
 
 // rpcSafe wrapper for TownConfigSchema (imported from ../types, not ./schemas)
@@ -889,6 +893,98 @@ export const gastownRouter = router({
         labels: input.labels,
         metadata: { model: input.model, slung_by: user.id },
       });
+    }),
+
+  babysitPr: gastownProcedure
+    .input(
+      z.object({
+        rigId: z.string().uuid(),
+        prUrl: z.string().url(),
+        title: z.string().optional(),
+        body: z.string().optional(),
+        forcePushAllowed: z.boolean().optional(),
+      })
+    )
+    .output(RpcBabysitPrResultOutput)
+    .mutation(async ({ ctx, input }) => {
+      const rig = await verifyRigOwnership(ctx.env, ctx, input.rigId);
+      const townStub = getTownDOStub(ctx.env, rig.town_id);
+      return townStub.slingExistingPr({
+        rigId: rig.id,
+        prUrl: input.prUrl,
+        title: input.title,
+        body: input.body,
+        forcePushAllowed: input.forcePushAllowed,
+        sourceAgentId: 'system',
+      });
+    }),
+
+  previewPr: gastownProcedure
+    .input(
+      z.object({
+        rigId: z.string().uuid(),
+        prUrl: z.string().url(),
+      })
+    )
+    .output(RpcPreviewPrResultOutput)
+    .query(async ({ ctx, input }) => {
+      const rig = await verifyRigOwnership(ctx.env, ctx, input.rigId);
+      const townStub = getTownDOStub(ctx.env, rig.town_id);
+      const townConfig = await townStub.getTownConfig();
+
+      const rigCoords = parseGitUrl(rig.git_url, townConfig.git_auth?.gitlab_instance_url);
+      const prCoords = parsePrUrl(input.prUrl);
+
+      const effectiveRigHost = rigCoords
+        ? rigCoords.platform === 'github'
+          ? 'github.com'
+          : new URL(townConfig.git_auth?.gitlab_instance_url ?? 'https://gitlab.com').hostname
+        : null;
+
+      const repoMatches =
+        !!rigCoords &&
+        !!prCoords &&
+        effectiveRigHost === prCoords.host &&
+        rigCoords.owner === prCoords.owner &&
+        rigCoords.repo === prCoords.repo;
+
+      if (!repoMatches) {
+        return {
+          state: 'open',
+          head_branch: null,
+          base_branch: null,
+          head_sha: null,
+          title: null,
+          repo_matches: false,
+        };
+      }
+
+      const scmCtx = {
+        env: ctx.env,
+        townId: rig.town_id,
+        getTownConfig: () => townStub.getTownConfig(),
+      };
+      const outcome = await checkPRStatus(scmCtx, input.prUrl);
+      if (!outcome.ok) {
+        const err = outcome.error;
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message:
+            `Failed to fetch PR status: ${err.kind}` +
+            (err.kind === 'http_error' ? ` (HTTP ${err.status})` : '') +
+            (err.kind === 'no_token' ? ` — tried: ${err.resolutionChain.join(', ')}` : ''),
+        });
+      }
+
+      const pr = outcome.result;
+      return {
+        state: pr.status,
+        head_branch: pr.head_branch ?? null,
+        base_branch: pr.base_branch ?? null,
+        head_sha: pr.head_sha ?? null,
+        title: pr.title ?? null,
+        repo_matches: true,
+      };
     }),
 
   createBead: gastownProcedure

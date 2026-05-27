@@ -105,6 +105,7 @@ import {
 import {
   handleMayorSling,
   handleMayorSlingBatch,
+  handleMayorBabysitPr,
   handleMayorListRigs,
   handleMayorListBeads,
   handleMayorListAgents,
@@ -1202,6 +1203,11 @@ app.post('/api/mayor/:townId/tools/sling', c =>
 app.post('/api/mayor/:townId/tools/sling-batch', c =>
   instrumented(c, 'POST /api/mayor/:townId/tools/sling-batch', () =>
     handleMayorSlingBatch(c, c.req.param())
+  )
+);
+app.post('/api/mayor/:townId/tools/babysit-pr', c =>
+  instrumented(c, 'POST /api/mayor/:townId/tools/babysit-pr', () =>
+    handleMayorBabysitPr(c, c.req.param())
   )
 );
 app.get('/api/mayor/:townId/tools/rigs', c =>

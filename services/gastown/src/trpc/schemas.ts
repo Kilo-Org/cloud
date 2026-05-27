@@ -188,7 +188,23 @@ export const RpcStreamTicketOutput = rpcSafe(StreamTicketOutput);
 export const RpcPtySessionOutput = rpcSafe(PtySessionOutput);
 export const RpcConvoyOutput = rpcSafe(ConvoyOutput);
 export const RpcConvoyDetailOutput = rpcSafe(ConvoyDetailOutput);
+export const BabysitPrResultOutput = z.object({
+  beadId: z.string(),
+  warning: z.string().optional(),
+});
+
+export const PreviewPrResultOutput = z.object({
+  state: z.enum(['open', 'merged', 'closed']),
+  head_branch: z.string().nullable().optional(),
+  base_branch: z.string().nullable().optional(),
+  head_sha: z.string().nullable().optional(),
+  title: z.string().nullable().optional(),
+  repo_matches: z.boolean(),
+});
+
 export const RpcSlingResultOutput = rpcSafe(SlingResultOutput);
+export const RpcBabysitPrResultOutput = rpcSafe(BabysitPrResultOutput);
+export const RpcPreviewPrResultOutput = rpcSafe(PreviewPrResultOutput);
 
 // Alarm status
 const AlarmStatusOutput = z.object({

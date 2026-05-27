@@ -1507,6 +1507,40 @@ export function reconcileReviewQueue(
     }
   }
 
+  // Babysat external PRs fast-track: open MR beads with metadata.babysit=true
+  // always bypass refinery code review, regardless of the rig's code_review
+  // config. There's no source polecat to mail rework to and no source bead
+  // to reopen — the user adopted the PR to have it merged, not reviewed.
+  const babysitMrs = z
+    .object({ bead_id: z.string() })
+    .array()
+    .parse([
+      ...query(
+        sql,
+        /* sql */ `
+          SELECT b.${beads.columns.bead_id}
+          FROM ${beads} b
+          JOIN ${review_metadata} rm
+            ON rm.${review_metadata.columns.bead_id} = b.${beads.columns.bead_id}
+          WHERE b.${beads.columns.type} = 'merge_request'
+            AND b.${beads.columns.status} = 'open'
+            AND rm.${review_metadata.columns.pr_url} IS NOT NULL
+            AND json_extract(b.${beads.columns.metadata}, '$.babysit') = 1
+        `,
+        []
+      ),
+    ]);
+  for (const { bead_id } of babysitMrs) {
+    actions.push({
+      type: 'transition_bead',
+      bead_id,
+      from: 'open',
+      to: 'in_progress',
+      reason: 'babysit PR — bypass refinery, skip to poll_pr',
+      actor: 'system',
+    });
+  }
+
   // Per-rig: when refinery code review is disabled for a rig:
   //  - MR beads for that rig WITH pr_url → fast-track to in_progress for poll_pr
   //  - MR beads for that rig WITHOUT pr_url → fail them and reopen the source bead
@@ -1549,6 +1583,7 @@ export function reconcileReviewQueue(
               AND b.${beads.columns.status} = 'open'
               AND b.${beads.columns.rig_id} = ?
               AND rm.${review_metadata.columns.pr_url} IS NOT NULL
+              AND json_extract(b.${beads.columns.metadata}, '$.babysit') IS NULL
               AND NOT EXISTS (
                 SELECT 1
                 FROM ${beads} parent
@@ -1741,6 +1776,7 @@ export function reconcileReviewQueue(
           WHERE ${beads.type} = 'merge_request'
             AND ${beads.status} = 'open'
             AND ${beads.rig_id} = ?
+            AND json_extract(${beads.columns.metadata}, '$.babysit') IS NULL
             ${refineryNeededFilter}
           ORDER BY ${beads.created_at} ASC
           LIMIT 1

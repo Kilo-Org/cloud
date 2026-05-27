@@ -486,4 +486,46 @@ describe('Reconciler', () => {
       expect(statusAfter?.staged).toBe(false);
     });
   });
+
+  // ── Babysit PR: refinery bypass + fast-track ─────────────────────────
+
+  describe('babysit PR: refinery bypass and fast-track', () => {
+    it('should fast-track babysat MR bead to in_progress without refinery dispatch', async () => {
+      // Create a babysit MR bead directly via slingExistingPr
+      // (slingExistingPr is wired in chunk 0)
+      const result = await town.slingExistingPr({
+        rigId: 'rig-1',
+        prUrl: 'https://github.com/test/repo/pull/1',
+        title: 'Babysit: test PR',
+        body: 'Adopted external PR for testing',
+        forcePushAllowed: false,
+        sourceAgentId: 'mayor',
+      });
+
+      expect(result.beadId).toBeTruthy();
+
+      // Verify the bead exists and is open
+      const bead = await town.getBeadAsync(result.beadId);
+      expect(bead).toBeTruthy();
+      expect(bead!.type).toBe('merge_request');
+      expect(bead!.labels).toContain('gt:babysit');
+      expect(bead!.metadata?.babysit).toBe(true);
+
+      // Before alarm: bead is open
+      expect(bead!.status).toBe('open');
+
+      // Run alarm — reconciler should fast-track babysit bead to in_progress
+      // WITHOUT dispatching a refinery.
+      await runDurableObjectAlarm(town);
+
+      const afterAlarm = await town.getBeadAsync(result.beadId);
+      // Babysit bead should be in_progress (fast-tracked)
+      expect(afterAlarm!.status).toBe('in_progress');
+
+      // No refinery should have been created for this rig
+      const agents = await town.listAgents({ rig_id: 'rig-1' });
+      const refineries = agents.filter(a => a.role === 'refinery');
+      expect(refineries.length).toBe(0);
+    });
+  });
 });

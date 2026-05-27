@@ -2575,9 +2575,14 @@ export class TownDO extends DurableObject<Env> {
       throw new Error(`Cannot babysit a PR that is already ${result.status}.`);
     }
 
-    const headBranch = result.head_branch ?? '';
-    const baseBranch = result.base_branch ?? '';
-    const headSha = result.head_sha ?? '';
+    const headBranch = result.head_branch;
+    const baseBranch = result.base_branch;
+    const headSha = result.head_sha;
+    if (!headBranch || !baseBranch || !headSha) {
+      throw new Error(
+        `PR metadata missing required fields: head_branch=${headBranch ?? '(absent)'}, base_branch=${baseBranch ?? '(absent)'}, head_sha=${headSha ?? '(absent)'}. Cannot babysit.`
+      );
+    }
     const prTitle = result.title ?? '';
 
     const resolvedTitle = args.title ?? `Babysit: ${prTitle}`;

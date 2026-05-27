@@ -276,9 +276,7 @@ export function BeadInspectorDashboard({ townId, beadId }: { townId: string; bea
                       <dt className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
                         Head SHA
                       </dt>
-                      <dd className="font-mono text-xs">
-                        {(bead.metadata.head_sha as string).slice(0, 12)}…
-                      </dd>
+                      <dd className="font-mono text-xs">{bead.metadata.head_sha.slice(0, 12)}…</dd>
                     </div>
                   )}
                 {bead.labels.includes('gt:babysit') && (

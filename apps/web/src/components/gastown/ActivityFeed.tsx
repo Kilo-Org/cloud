@@ -20,7 +20,6 @@ import {
   MessageCircle,
   GitMergeIcon,
   RefreshCw,
-  Zap,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 

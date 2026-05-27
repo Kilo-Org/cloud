@@ -1,13 +1,9 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { checkPRStatus, type SCMContext, type PRStatusResult } from '../../src/dos/town/town-scm';
+import { describe, it, expect, vi } from 'vitest';
+import { checkPRStatus, type SCMContext } from '../../src/dos/town/town-scm';
 import { parsePrUrlForRepoMatch, parseGitUrl } from '../../src/util/platform-pr.util';
-import { submitExternalPrToReviewQueue } from '../../src/dos/town/review-queue';
-import { initBeadTables } from '../../src/dos/town/beads';
-import { initRigTables } from '../../src/dos/town/rigs';
 import type { TownConfig } from '../../src/types';
 
 class MiniSql {
-  private data: Map<string, unknown[]> = new Map();
   exec(_stmt: string): void {}
   prepare(_stmt: string): {
     bind(...params: unknown[]): { step(): boolean; getRow(): unknown[]; free(): void };

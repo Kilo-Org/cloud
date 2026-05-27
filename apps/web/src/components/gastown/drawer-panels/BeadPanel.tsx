@@ -475,7 +475,7 @@ export function BeadPanel({
           />
 
           {isBabysit && typeof bead.metadata?.head_sha === 'string' && (
-            <MetaCell icon={Hash} label="Head SHA" value={bead.metadata.head_sha as string} mono />
+            <MetaCell icon={Hash} label="Head SHA" value={bead.metadata.head_sha} mono />
           )}
           {isBabysit && (
             <MetaCell

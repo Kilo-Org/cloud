@@ -10,6 +10,7 @@
 
 import { DurableObject } from 'cloudflare:workers';
 import type { KiloClawEnv } from '../../types';
+import type { OpenclawFileWriteValidation } from '../gateway-controller-types';
 import type {
   InstanceConfig,
   PersistedState,
@@ -3763,6 +3764,15 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   async writeFile(filePath: string, content: string, etag?: string) {
     await this.loadState();
     return gateway.writeFile(this.s, this.env, filePath, content, etag);
+  }
+
+  async writeOpenclawConfigFile(
+    content: string,
+    etag: string | undefined,
+    mode: OpenclawFileWriteValidation
+  ) {
+    await this.loadState();
+    return gateway.writeOpenclawConfigFile(this.s, this.env, content, etag, mode);
   }
 
   async importOpenclawWorkspace(files: Array<{ path: string; content: string }>) {

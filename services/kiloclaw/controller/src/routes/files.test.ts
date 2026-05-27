@@ -24,9 +24,16 @@ vi.mock('../backup-file', () => ({
   backupFile: vi.fn(),
 }));
 
+vi.mock('../openclaw-config-validation', () => ({
+  isOpenclawValidationArtifactPath: (relativePath: string) =>
+    relativePath.startsWith('.openclaw.kiloclaw-validation-candidate.json'),
+  validateOpenclawConfigCandidate: vi.fn(),
+}));
+
 import fs from 'node:fs';
 import { atomicWrite } from '../atomic-write';
 import { backupFile } from '../backup-file';
+import { validateOpenclawConfigCandidate } from '../openclaw-config-validation';
 
 const TOKEN = 'test-token';
 const ROOT = '/root/.openclaw';
@@ -156,6 +163,7 @@ describe('file routes', () => {
             mockDirent('credentials', true),
             mockDirent('SOUL.md.bak.2026-03-01', false),
             mockDirent('debug.log', false),
+            mockDirent('.openclaw.kiloclaw-validation-candidate.json', false),
           ] as any;
         }
         if (dir === `${ROOT}/workspace`) {
@@ -180,6 +188,7 @@ describe('file routes', () => {
       expect(names).toContain('SOUL.md');
       expect(names).toContain('credentials');
       expect(names).toContain('token.txt');
+      expect(names).not.toContain('.openclaw.kiloclaw-validation-candidate.json');
     });
 
     it('skips symlinks', async () => {
@@ -336,6 +345,130 @@ describe('file routes', () => {
 
       const body = (await res.json()) as any;
       expect(body.etag).toBeDefined();
+    });
+
+    it('writes a validation-aware valid openclaw config with restricted mode', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.lstatSync).mockReturnValue({
+        isSymbolicLink: () => false,
+        isFile: () => true,
+      } as any);
+      vi.mocked(fs.readFileSync).mockReturnValue('old config');
+      vi.mocked(validateOpenclawConfigCandidate).mockResolvedValue({ valid: true });
+
+      const res = await app.request('/_kilo/files/write-openclaw-config', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({
+          content: '{"gateway":{"mode":"local"}}',
+          mode: 'warn-before-write',
+        }),
+      });
+
+      expect(res.status).toBe(200);
+      expect(validateOpenclawConfigCandidate).toHaveBeenCalledWith(
+        '{"gateway":{"mode":"local"}}',
+        `${ROOT}/openclaw.json`
+      );
+      expect(atomicWrite).toHaveBeenCalledWith(
+        `${ROOT}/openclaw.json`,
+        '{"gateway":{"mode":"local"}}',
+        undefined,
+        { mode: 0o600 }
+      );
+    });
+
+    it('returns a warning without writing an invalid openclaw config', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.lstatSync).mockReturnValue({
+        isSymbolicLink: () => false,
+        isFile: () => true,
+      } as any);
+      vi.mocked(validateOpenclawConfigCandidate).mockResolvedValue({
+        valid: false,
+        reason: 'invalid',
+        issues: [{ path: 'gateway.mode', message: 'Expected local' }],
+      });
+
+      const res = await app.request('/_kilo/files/write-openclaw-config', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({
+          content: '{"gateway":{"mode":"remote"}}',
+          mode: 'warn-before-write',
+        }),
+      });
+
+      expect(res.status).toBe(200);
+      await expect(res.json()).resolves.toEqual({
+        outcome: 'openclaw-validation-warning',
+        valid: false,
+        reason: 'invalid',
+        issues: [{ path: 'gateway.mode', message: 'Expected local' }],
+      });
+      expect(backupFile).not.toHaveBeenCalled();
+      expect(atomicWrite).not.toHaveBeenCalled();
+    });
+
+    it('allows an explicit invalid openclaw config override', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.lstatSync).mockReturnValue({
+        isSymbolicLink: () => false,
+        isFile: () => true,
+      } as any);
+
+      const res = await app.request('/_kilo/files/write-openclaw-config', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({
+          content: '{"gateway":{"mode":"remote"}}',
+          mode: 'allow-invalid',
+        }),
+      });
+
+      expect(res.status).toBe(200);
+      expect(validateOpenclawConfigCandidate).not.toHaveBeenCalled();
+      expect(atomicWrite).toHaveBeenCalledWith(
+        `${ROOT}/openclaw.json`,
+        '{"gateway":{"mode":"remote"}}',
+        undefined,
+        { mode: 0o600 }
+      );
+    });
+
+    it('hides internal validation artifacts and normalized aliases from generic writes', async () => {
+      for (const candidatePath of [
+        '.openclaw.kiloclaw-validation-candidate.json',
+        './.openclaw.kiloclaw-validation-candidate.json',
+        'workspace/../.openclaw.kiloclaw-validation-candidate.json',
+      ]) {
+        const res = await app.request('/_kilo/files/write', {
+          method: 'POST',
+          headers: authHeaders(),
+          body: JSON.stringify({ path: candidatePath, content: 'new content' }),
+        });
+        expect(res.status).toBe(404);
+      }
+      expect(validateOpenclawConfigCandidate).not.toHaveBeenCalled();
+    });
+
+    it('hides validation artifacts reached through a symlinked directory alias', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.realpathSync).mockImplementationOnce(
+        () => `${ROOT}/.openclaw.kiloclaw-validation-candidate.json`
+      );
+
+      const res = await app.request('/_kilo/files/write', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({
+          path: 'alias/.openclaw.kiloclaw-validation-candidate.json',
+          content: 'new content',
+        }),
+      });
+
+      expect(res.status).toBe(404);
+      expect(atomicWrite).not.toHaveBeenCalled();
     });
 
     it('path traversal still rejected', async () => {

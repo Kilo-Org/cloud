@@ -393,7 +393,8 @@ export function useOrgKiloClawMutations(
   );
   const rawWriteFile = useMutation(
     trpc.organizations.kiloclaw.writeFile.mutationOptions({
-      onSuccess: async () => {
+      onSuccess: async result => {
+        if ('outcome' in result) return;
         await queryClient.invalidateQueries({
           queryKey: trpc.organizations.kiloclaw.fileTree.queryKey(),
         });

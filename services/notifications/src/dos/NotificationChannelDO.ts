@@ -9,20 +9,29 @@ import { sendPushNotifications } from '../lib/expo-push';
 
 type ReceiptCheckMessage = { ticketTokenPairs: TicketTokenPair[] };
 
-// Idempotency record. `pending` means the badge was incremented for this
-// idempotency key but the Expo send did not (yet) succeed; on retry we must
-// skip the increment to avoid double-counting. `delivered`, `suppressed`,
-// `no_tokens`, and `failed` are terminal stages; further attempts are
-// duplicates.
-type IdemRecord = {
+// `pending` means badge mutation happened before an Expo attempt and must not
+// repeat. `accepted` means Expo accepted at least one push and only post-send
+// bookkeeping may be retried. Terminal stages make later attempts duplicates.
+type TerminalIdemRecord = {
   stage: 'pending' | 'delivered' | 'suppressed' | 'no_tokens' | 'failed';
   ts: number;
 };
+
+type AcceptedDeliveryIdemRecord = {
+  stage: 'accepted';
+  ts: number;
+  ticketTokenPairs: TicketTokenPair[];
+  staleTokens: string[];
+  finalStage: 'delivered' | 'failed';
+};
+
+type IdemRecord = TerminalIdemRecord | AcceptedDeliveryIdemRecord;
 
 const IDEM_PREFIX = 'idem:';
 const BUCKET_PREFIX = 'bucket:';
 const TOTAL_KEY = 'total';
 const IDEM_TTL_MS = 60 * 60 * 1000; // 1 hour
+const ACCEPTED_BOOKKEEPING_RETRY_DELAY_MS = 30_000;
 
 export class NotificationChannelDO extends DurableObject<Env> {
   async dispatchPush(input: DispatchPushInput): Promise<DispatchPushOutcome> {
@@ -32,6 +41,14 @@ export class NotificationChannelDO extends DurableObject<Env> {
     //    re-incrementing the badge.
     const idemKey = `${IDEM_PREFIX}${input.idempotencyKey}`;
     const existing = await this.ctx.storage.get<IdemRecord>(idemKey);
+    if (existing?.stage === 'accepted') {
+      const bookkeepingError = await this.completeAcceptedDelivery(idemKey, existing);
+      if (bookkeepingError) {
+        await this.requestAcceptedBookkeepingRepair();
+        return { kind: 'failed', error: bookkeepingError };
+      }
+      return { kind: 'duplicate' };
+    }
     if (
       existing?.stage === 'delivered' ||
       existing?.stage === 'suppressed' ||
@@ -43,21 +60,26 @@ export class NotificationChannelDO extends DurableObject<Env> {
     const isRetry = existing?.stage === 'pending';
 
     // 2. Presence
-    let inContext = false;
-    try {
-      inContext = await this.env.EVENT_SERVICE.isUserInContext(input.userId, input.presenceContext);
-    } catch (err) {
-      console.warn('Presence lookup failed while dispatching push; continuing delivery', {
-        presenceContext: input.presenceContext,
-        badgeBucket: input.badge?.badgeBucket,
-        error: err instanceof Error ? err.message : String(err),
-      });
-    }
-    if (inContext) {
-      const ts = Date.now();
-      await this.ctx.storage.put<IdemRecord>(idemKey, { stage: 'suppressed', ts });
-      await this.ensureCleanupAlarm(ts);
-      return { kind: 'suppressed_presence' };
+    if (input.presenceContext) {
+      let inContext = false;
+      try {
+        inContext = await this.env.EVENT_SERVICE.isUserInContext(
+          input.userId,
+          input.presenceContext
+        );
+      } catch (err) {
+        console.warn('Presence lookup failed while dispatching push; continuing delivery', {
+          presenceContext: input.presenceContext,
+          badgeBucket: input.badge?.badgeBucket,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+      if (inContext) {
+        const ts = Date.now();
+        await this.ctx.storage.put<IdemRecord>(idemKey, { stage: 'suppressed', ts });
+        await this.ensureCleanupAlarm(ts);
+        return { kind: 'suppressed_presence' };
+      }
     }
 
     const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
@@ -123,21 +145,47 @@ export class NotificationChannelDO extends DurableObject<Env> {
       };
     }
 
+    if (result.ticketTokenPairs.length > 0) {
+      const plural = result.ticketErrors.length === 1 ? '' : 's';
+      const deliveryOutcome: DispatchPushOutcome =
+        result.ticketErrors.length > 0
+          ? {
+              kind: 'failed',
+              error: `Expo rejected ${result.ticketErrors.length} push ticket${plural}`,
+            }
+          : { kind: 'delivered', tokenCount: result.ticketTokenPairs.length };
+      const acceptedDelivery = {
+        stage: 'accepted',
+        ts: Date.now(),
+        ticketTokenPairs: result.ticketTokenPairs,
+        staleTokens: result.staleTokens,
+        finalStage: result.ticketErrors.length > 0 ? 'failed' : 'delivered',
+      } satisfies AcceptedDeliveryIdemRecord;
+
+      // Persist acceptance before side effects that can fail independently. A
+      // replay then repairs bookkeeping rather than sending another OS push.
+      await this.ctx.storage.put<IdemRecord>(idemKey, acceptedDelivery);
+      try {
+        await this.ensureCleanupAlarm(acceptedDelivery.ts);
+      } catch (error) {
+        console.warn('Failed to schedule accepted push cleanup before bookkeeping; continuing', {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+      const bookkeepingError = await this.completeAcceptedDelivery(idemKey, acceptedDelivery, db);
+      if (bookkeepingError) {
+        await this.requestAcceptedBookkeepingRepair();
+        return { kind: 'failed', error: bookkeepingError };
+      }
+      return deliveryOutcome;
+    }
+
     if (result.staleTokens.length > 0) {
       await db.delete(user_push_tokens).where(inArray(user_push_tokens.token, result.staleTokens));
     }
 
-    if (result.ticketTokenPairs.length > 0) {
-      const receiptMsg = {
-        ticketTokenPairs: result.ticketTokenPairs,
-      } satisfies ReceiptCheckMessage;
-      await this.env.RECEIPTS_QUEUE.send(receiptMsg, { delaySeconds: 900 });
-    }
-
     if (result.ticketErrors.length > 0) {
-      const hasAcceptedTickets = result.ticketTokenPairs.length > 0;
-      const isTerminalFailure =
-        hasAcceptedTickets || result.ticketErrors.every(ticketError => !ticketError.retryable);
+      const isTerminalFailure = result.ticketErrors.every(ticketError => !ticketError.retryable);
       if (isTerminalFailure) {
         const ts = Date.now();
         await this.ctx.storage.put<IdemRecord>(idemKey, { stage: 'failed', ts });
@@ -151,19 +199,53 @@ export class NotificationChannelDO extends DurableObject<Env> {
       };
     }
 
-    if (result.ticketTokenPairs.length === 0 && result.staleTokens.length > 0) {
+    if (result.staleTokens.length > 0) {
       const ts = Date.now();
       await this.ctx.storage.put<IdemRecord>(idemKey, { stage: 'no_tokens', ts });
       await this.ensureCleanupAlarm(ts);
       return { kind: 'no_tokens' };
     }
 
-    // 6. Mark `delivered` so future retries short-circuit as duplicate.
-    const ts = Date.now();
-    await this.ctx.storage.put<IdemRecord>(idemKey, { stage: 'delivered', ts });
-    await this.ensureCleanupAlarm(ts);
+    console.warn('Expo returned no classified ticket outcomes for attempted push dispatch', {
+      tokenCount: tokens.length,
+      hasBadge: input.badge !== null,
+    });
+    return { kind: 'failed', error: 'Expo returned no classified push ticket outcomes' };
+  }
 
-    return { kind: 'delivered', tokenCount: result.ticketTokenPairs.length };
+  private async completeAcceptedDelivery(
+    idemKey: string,
+    record: AcceptedDeliveryIdemRecord,
+    db = getWorkerDb(this.env.HYPERDRIVE.connectionString)
+  ): Promise<string | null> {
+    try {
+      if (record.staleTokens.length > 0) {
+        await db
+          .delete(user_push_tokens)
+          .where(inArray(user_push_tokens.token, record.staleTokens));
+      }
+
+      const receiptMsg = {
+        ticketTokenPairs: record.ticketTokenPairs,
+      } satisfies ReceiptCheckMessage;
+      await this.env.RECEIPTS_QUEUE.send(receiptMsg, { delaySeconds: 900 });
+
+      const ts = Date.now();
+      await this.ctx.storage.put<IdemRecord>(idemKey, { stage: record.finalStage, ts });
+      await this.ensureCleanupAlarm(ts);
+      return null;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return `Accepted push bookkeeping failed: ${message}`;
+    }
+  }
+
+  private async requestAcceptedBookkeepingRepair(): Promise<void> {
+    const repairAt = Date.now() + ACCEPTED_BOOKKEEPING_RETRY_DELAY_MS;
+    const currentAlarm = await this.ctx.storage.getAlarm();
+    if (currentAlarm === null || currentAlarm > repairAt) {
+      await this.ctx.storage.setAlarm(repairAt);
+    }
   }
 
   /**
@@ -203,19 +285,34 @@ export class NotificationChannelDO extends DurableObject<Env> {
     const now = Date.now();
     const entries = await this.ctx.storage.list<IdemRecord>({ prefix: IDEM_PREFIX });
     const expired: string[] = [];
-    let earliestRemaining: number | undefined;
+    let nextAlarmAt: number | undefined;
+    const requestAlarmAtOrBefore = (deadline: number) => {
+      if (nextAlarmAt === undefined || deadline < nextAlarmAt) {
+        nextAlarmAt = deadline;
+      }
+    };
+
     for (const [key, rec] of entries) {
+      if (rec.stage === 'accepted') {
+        const bookkeepingError = await this.completeAcceptedDelivery(key, rec);
+        if (bookkeepingError) {
+          console.warn('Accepted push bookkeeping repair failed', { error: bookkeepingError });
+          requestAlarmAtOrBefore(now + ACCEPTED_BOOKKEEPING_RETRY_DELAY_MS);
+        } else {
+          requestAlarmAtOrBefore(Date.now() + IDEM_TTL_MS);
+        }
+        continue;
+      }
+
       if (now - rec.ts > IDEM_TTL_MS) {
         expired.push(key);
-      } else if (earliestRemaining === undefined || rec.ts < earliestRemaining) {
-        earliestRemaining = rec.ts;
+      } else {
+        requestAlarmAtOrBefore(rec.ts + IDEM_TTL_MS);
       }
     }
     if (expired.length > 0) await this.ctx.storage.delete(expired);
-    // Reschedule for the earliest remaining record so a quiet user still
-    // gets its leftover entries pruned exactly once their TTL elapses.
-    if (earliestRemaining !== undefined) {
-      await this.ctx.storage.setAlarm(earliestRemaining + IDEM_TTL_MS);
+    if (nextAlarmAt !== undefined) {
+      await this.ctx.storage.setAlarm(nextAlarmAt);
     }
   }
 

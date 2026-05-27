@@ -372,6 +372,7 @@ describe('terminalizeMessageOnce', () => {
     expect(result.state!.terminalEffects).toEqual({
       event: 'pending',
       callback: { disposition: 'not-required' },
+      push: { disposition: 'pending' },
     });
   });
 

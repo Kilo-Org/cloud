@@ -180,6 +180,7 @@ function createEnv(metadata?: CloudAgentSessionState | null): PersistenceEnv {
         instanceUrl: 'https://gitlab.com',
       }),
     },
+    NOTIFICATIONS: {} as unknown as PersistenceEnv['NOTIFICATIONS'],
   } satisfies PersistenceEnv;
 }
 

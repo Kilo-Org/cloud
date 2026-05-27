@@ -30,9 +30,14 @@ export type TerminalCallbackEffectAccounting =
   | { disposition: 'pending' | 'accounted'; allowWithoutObservedIdle: boolean }
   | { disposition: 'not-required' | 'suppressed' };
 
+export type TerminalPushEffectAccounting = {
+  disposition: 'pending' | 'accounted' | 'not-required' | 'suppressed';
+};
+
 export type TerminalEffectAccounting = {
   event: 'pending' | 'accounted';
   callback: TerminalCallbackEffectAccounting;
+  push?: TerminalPushEffectAccounting;
 };
 
 export type SessionMessageState = {
@@ -177,6 +182,9 @@ export const SessionMessageStateSchema = z
           }),
           z.object({ disposition: z.enum(['not-required', 'suppressed']) }),
         ]),
+        push: z
+          .object({ disposition: z.enum(['pending', 'accounted', 'not-required', 'suppressed']) })
+          .optional(),
       })
       .optional(),
     agent: z
@@ -467,7 +475,8 @@ export async function listTerminalMessagesWithPendingEffects(
             };
       if (!normalized.terminalEffects) return [];
       return normalized.terminalEffects.event !== 'accounted' ||
-        normalized.terminalEffects.callback.disposition === 'pending'
+        normalized.terminalEffects.callback.disposition === 'pending' ||
+        normalized.terminalEffects.push?.disposition === 'pending'
         ? [normalized]
         : [];
     })
@@ -492,6 +501,7 @@ async function listSessionMessageStates(
 
 export type TerminalizeEffectOptions = {
   suppressCallback?: boolean;
+  suppressPush?: boolean;
   allowIdleBatchWithoutObservedIdle?: boolean;
 };
 
@@ -534,6 +544,7 @@ export async function terminalizeMessageOnce(
             allowWithoutObservedIdle: effects.allowIdleBatchWithoutObservedIdle ?? false,
           }
         : { disposition: 'not-required' },
+    push: effects.suppressPush ? { disposition: 'suppressed' } : { disposition: 'pending' },
   };
   let updated: SessionMessageState;
   if (params.kind === 'completed') {

@@ -1500,6 +1500,9 @@ importers:
       '@kilocode/encryption':
         specifier: workspace:*
         version: link:../../packages/encryption
+      '@kilocode/notifications':
+        specifier: workspace:*
+        version: link:../../packages/notifications
       '@kilocode/worker-utils':
         specifier: workspace:*
         version: link:../../packages/worker-utils

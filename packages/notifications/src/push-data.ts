@@ -26,6 +26,10 @@ export const pushDataSchema = z.discriminatedUnion('type', [
     event: scheduledActionEventSchema,
     sandboxId: z.string().min(1),
   }),
+  z.object({
+    type: z.literal('cloud_agent_session'),
+    cliSessionId: nonEmptyStringSchema,
+  }),
 ]);
 
 export type PushData = z.infer<typeof pushDataSchema>;

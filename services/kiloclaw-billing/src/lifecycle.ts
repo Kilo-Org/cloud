@@ -727,7 +727,14 @@ async function insertLifecycleChangeLogBestEffort(
  *   - `instance_id IS NULL` — only clear rows that are still detached.
  *   - `destruction_deadline IS NOT NULL` — skip rows already cleared.
  * Rows that match neither guard are silently skipped (no changelog entry).
- * Changelog entries for all cleared rows are written in a single bulk INSERT.
+ *
+ * The SELECT + UPDATE + changelog INSERT run inside a single transaction so
+ * the audit record cannot be lost. If the changelog INSERT fails the UPDATE
+ * rolls back; the rows remain detached with their deadlines, and the next
+ * sweep re-discovers them and retries the whole pair atomically. Without
+ * this, a transient INSERT failure would erase the only signal
+ * (`destruction_deadline IS NOT NULL`) that the cleanup ever ran — there
+ * would be no future sweep to reconstruct the missing audit history.
  */
 async function clearDetachedSubscriptionDestructionDeadlineBestEffort(
   database: WorkerDb,
@@ -738,50 +745,58 @@ async function clearDetachedSubscriptionDestructionDeadlineBestEffort(
     return;
   }
 
-  // Bulk SELECT for before-snapshots (used in the audit changelog).
-  const befores = await database
-    .select()
-    .from(kiloclaw_subscriptions)
-    .where(inArray(kiloclaw_subscriptions.id, subscriptionIds));
-
-  // Single guarded UPDATE — rows already cleared or re-attached are skipped.
-  const cleared = await database
-    .update(kiloclaw_subscriptions)
-    .set({ destruction_deadline: null })
-    .where(
-      and(
-        inArray(kiloclaw_subscriptions.id, subscriptionIds),
-        isNull(kiloclaw_subscriptions.instance_id),
-        isNotNull(kiloclaw_subscriptions.destruction_deadline)
-      )
-    )
-    .returning();
-
-  if (cleared.length === 0) {
-    return;
-  }
-
-  // Bulk changelog INSERT — one round-trip for the entire batch.
-  const beforeMap = new Map(befores.map(s => [s.id, s]));
-  const changeLogEntries = cleared.map(after => ({
-    subscription_id: after.id,
-    actor_type: LIFECYCLE_ACTOR.actorType,
-    actor_id: LIFECYCLE_ACTOR.actorId,
-    action: 'status_changed' as KiloClawSubscriptionChangeAction,
-    reason,
-    before_state: serializeKiloClawSubscriptionSnapshot(beforeMap.get(after.id) ?? null),
-    after_state: serializeKiloClawSubscriptionSnapshot(after),
-  }));
-
   try {
-    await database.insert(kiloclaw_subscription_change_log).values(changeLogEntries);
+    await database.transaction(async tx => {
+      // Bulk SELECT for before-snapshots (used in the audit changelog).
+      const befores = await tx
+        .select()
+        .from(kiloclaw_subscriptions)
+        .where(inArray(kiloclaw_subscriptions.id, subscriptionIds));
+
+      // Single guarded UPDATE — rows already cleared or re-attached are skipped.
+      const cleared = await tx
+        .update(kiloclaw_subscriptions)
+        .set({ destruction_deadline: null })
+        .where(
+          and(
+            inArray(kiloclaw_subscriptions.id, subscriptionIds),
+            isNull(kiloclaw_subscriptions.instance_id),
+            isNotNull(kiloclaw_subscriptions.destruction_deadline)
+          )
+        )
+        .returning();
+
+      if (cleared.length === 0) {
+        return;
+      }
+
+      // Bulk changelog INSERT — one round-trip for the entire batch.
+      // A throw here aborts the surrounding transaction (above) so the
+      // UPDATE rolls back. The next sweep retries both atomically.
+      const beforeMap = new Map(befores.map(s => [s.id, s]));
+      const changeLogEntries = cleared.map(after => ({
+        subscription_id: after.id,
+        actor_type: LIFECYCLE_ACTOR.actorType,
+        actor_id: LIFECYCLE_ACTOR.actorId,
+        action: 'status_changed' as KiloClawSubscriptionChangeAction,
+        reason,
+        before_state: serializeKiloClawSubscriptionSnapshot(beforeMap.get(after.id) ?? null),
+        after_state: serializeKiloClawSubscriptionSnapshot(after),
+      }));
+      await tx.insert(kiloclaw_subscription_change_log).values(changeLogEntries);
+    });
   } catch (error) {
-    log('error', 'Failed to write lifecycle subscription change log for detached subscriptions', {
+    // The transaction was rolled back. The detached rows remain in the
+    // candidate set with their deadlines intact, so the next sweep will
+    // pick them up and retry both the UPDATE and the changelog INSERT
+    // atomically. We log but do not rethrow so a single bulk failure does
+    // not abort the outer sweep — every other row in this run still has
+    // its bookkeeping completed normally.
+    log('error', 'Bulk-clear of detached subscription destruction deadlines was rolled back', {
       event: 'subscription_change_log_failed',
       outcome: 'failed',
-      actor_id: LIFECYCLE_ACTOR.actorId,
-      action: 'status_changed' as KiloClawSubscriptionChangeAction,
       reason,
+      subscriptionIdCount: subscriptionIds.length,
       error: errorMessage(error),
     });
   }

@@ -3030,9 +3030,13 @@ describe('instance destruction sweep', () => {
     // overdue rows starve for 40 days behind ~50 detached rows.
     //
     // The fix collects all detached IDs during the loop, then after the
-    // loop issues a single bulk SELECT + guarded bulk UPDATE + single
-    // bulk changelog INSERT — 3 DB round-trips total regardless of how
-    // many detached rows are in the batch.
+    // loop issues a single bulk SELECT + guarded bulk UPDATE + bulk
+    // changelog INSERT inside one database transaction. The transaction
+    // is what keeps the audit record at-least-once: if the INSERT fails
+    // the UPDATE rolls back so the rows stay detached and the next sweep
+    // retries the whole pair atomically — otherwise a transient INSERT
+    // failure would erase the only signal (`destruction_deadline IS NOT
+    // NULL`) that the cleanup ever ran.
     const subscriptionId = 'sub-detached-1';
     const detachedBefore = {
       id: subscriptionId,
@@ -3041,9 +3045,9 @@ describe('instance destruction sweep', () => {
       destruction_deadline: '2026-04-17T18:41:17.736Z',
     };
     const detachedAfter = { ...detachedBefore, destruction_deadline: null };
-    const { db, updates, txUpdates, inserts, deletes } = createMockDb(
+    const { db, updates, txUpdates, inserts, txInserts, deletes } = createMockDb(
       [
-        // 1. Destruction candidates: a single detached row at the head.
+        // 1. Destruction candidates (db.select): a single detached row.
         [
           {
             id: subscriptionId,
@@ -3055,10 +3059,10 @@ describe('instance destruction sweep', () => {
             email: 'detached@example.com',
           },
         ],
-        // 2. Bulk SELECT for before-snapshots in the cleanup helper.
+        // 2. Bulk SELECT for before-snapshots inside the cleanup transaction.
         [detachedBefore],
       ],
-      { updateReturningRows: [[detachedAfter]] }
+      { txUpdateReturningRows: [[detachedAfter]] }
     );
     mockGetWorkerDb.mockReturnValue(db);
     const fetch = vi.fn();
@@ -3076,14 +3080,17 @@ describe('instance destruction sweep', () => {
     expect(summary.sweep3_instance_destruction).toBe(0);
     expect(fetch).not.toHaveBeenCalled();
     expect(globalThis.fetch).not.toHaveBeenCalled();
-    // The single guarded bulk UPDATE fired, clearing destruction_deadline.
-    expect(updates).toEqual([{ destruction_deadline: null }]);
-    expect(txUpdates).toHaveLength(0);
+    // The guarded UPDATE happens inside a transaction so it lives on
+    // `txUpdates`, not `updates`. The top-level handles see nothing.
+    expect(updates).toHaveLength(0);
+    expect(inserts).toHaveLength(0);
     expect(deletes).toHaveLength(0);
-    // The bulk INSERT wrote changelog entries as an array in a single call.
-    // inserts[0] is the values array passed to db.insert().values([...]).
-    expect(inserts).toHaveLength(1);
-    expect(inserts[0]).toEqual(
+    expect(txUpdates).toEqual([{ destruction_deadline: null }]);
+    // The bulk INSERT writes the changelog entries as an array in one
+    // call inside the same transaction. txInserts[0] is the values array
+    // passed to tx.insert().values([...]).
+    expect(txInserts).toHaveLength(1);
+    expect(txInserts[0]).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           subscription_id: subscriptionId,

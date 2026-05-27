@@ -390,4 +390,174 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     ]);
     expect(result.message.attachments).toBeUndefined();
   });
+
+  it('materializes PDF attachments as application/pdf file parts', async () => {
+    const pdfPath = path.join(tmpDir, 'spec.pdf');
+    const prompt: WrapperPromptRequest = {
+      message: {
+        id: 'msg_pdf',
+        prompt: 'Review this specification',
+        attachments: [
+          {
+            filename: 'spec.pdf',
+            mime: 'application/pdf',
+            signedUrl: 'https://r2.example.com/spec.pdf',
+            localPath: pdfPath,
+          },
+        ],
+      },
+      session: {
+        ingestUrl: 'wss://worker.example.com/sessions/user/agent/ingest',
+        workerAuthToken: 'token',
+        wrapperRunId: 'wr_test',
+        wrapperGeneration: 1,
+        wrapperConnectionId: 'conn_test',
+      },
+    };
+
+    const result = await materializePromptAttachments(prompt, {
+      fetch: asFetch(async () => new Response('pdf-bytes', { status: 200 })),
+      writeResponse: async (filePath, response) => {
+        const bytes = await response.text();
+        await fsp.writeFile(filePath, bytes);
+        return bytes.length;
+      },
+    });
+
+    expect(result.message.parts).toEqual([
+      { type: 'text', text: 'Review this specification' },
+      {
+        type: 'file',
+        mime: 'application/pdf',
+        url: `file://${pdfPath}`,
+        filename: 'spec.pdf',
+      },
+    ]);
+  });
+
+  it.each([
+    ['notes.md', '# Notes'],
+    ['records.csv', 'name,count\nalpha,1'],
+  ])('preserves %s materialized as a text/plain file part', async (filename, content) => {
+    const localPath = path.join(tmpDir, filename);
+    const prompt: WrapperPromptRequest = {
+      message: {
+        id: 'msg_text',
+        prompt: 'Read this document',
+        attachments: [
+          {
+            filename,
+            mime: 'text/plain',
+            signedUrl: `https://r2.example.com/${filename}`,
+            localPath,
+          },
+        ],
+      },
+      session: {
+        ingestUrl: 'wss://worker.example.com/sessions/user/agent/ingest',
+        workerAuthToken: 'token',
+        wrapperRunId: 'wr_test',
+        wrapperGeneration: 1,
+        wrapperConnectionId: 'conn_test',
+      },
+    };
+
+    const result = await materializePromptAttachments(prompt, {
+      fetch: asFetch(async () => new Response(content, { status: 200 })),
+      writeResponse: async (filePath, response) => {
+        const bytes = await response.text();
+        await fsp.writeFile(filePath, bytes);
+        return bytes.length;
+      },
+    });
+
+    expect(result.message.parts).toContainEqual({
+      type: 'file',
+      mime: 'text/plain',
+      url: `file://${localPath}`,
+      filename,
+    });
+  });
+
+  it('rejects attachments with an oversized content-length before writing', async () => {
+    const localPath = path.join(tmpDir, 'too-large.pdf');
+    const writeResponse = mock(async () => 0);
+    const prompt: WrapperPromptRequest = {
+      message: {
+        id: 'msg_header_limit',
+        prompt: 'Read this PDF',
+        attachments: [
+          {
+            filename: 'too-large.pdf',
+            mime: 'application/pdf',
+            signedUrl: 'https://r2.example.com/too-large.pdf',
+            localPath,
+          },
+        ],
+      },
+      session: {
+        ingestUrl: 'wss://worker.example.com/sessions/user/agent/ingest',
+        workerAuthToken: 'token',
+        wrapperRunId: 'wr_test',
+        wrapperGeneration: 1,
+        wrapperConnectionId: 'conn_test',
+      },
+    };
+
+    await expect(
+      materializePromptAttachments(prompt, {
+        fetch: asFetch(
+          async () =>
+            new Response('not-written', {
+              status: 200,
+              headers: { 'content-length': '5242881' },
+            })
+        ),
+        writeResponse,
+      })
+    ).rejects.toThrow('Attachment too large: too-large.pdf');
+
+    expect(writeResponse).not.toHaveBeenCalled();
+    expect(fs.existsSync(localPath)).toBe(false);
+  });
+
+  it('rejects and removes an attachment whose written bytes exceed a smaller reported length', async () => {
+    const localPath = path.join(tmpDir, 'oversized.md');
+    const prompt: WrapperPromptRequest = {
+      message: {
+        id: 'msg_written_limit',
+        prompt: 'Read these notes',
+        attachments: [
+          {
+            filename: 'oversized.md',
+            mime: 'text/plain',
+            signedUrl: 'https://r2.example.com/oversized.md',
+            localPath,
+          },
+        ],
+      },
+      session: {
+        ingestUrl: 'wss://worker.example.com/sessions/user/agent/ingest',
+        workerAuthToken: 'token',
+        wrapperRunId: 'wr_test',
+        wrapperGeneration: 1,
+        wrapperConnectionId: 'conn_test',
+      },
+    };
+
+    await expect(
+      materializePromptAttachments(prompt, {
+        fetch: asFetch(
+          async () =>
+            new Response('reported-small', { status: 200, headers: { 'content-length': '14' } })
+        ),
+        writeResponse: async filePath => {
+          await fsp.writeFile(filePath, 'oversized output');
+          return 5_242_881;
+        },
+      })
+    ).rejects.toThrow('Attachment too large: oversized.md');
+
+    expect(fs.existsSync(localPath)).toBe(false);
+  });
 });

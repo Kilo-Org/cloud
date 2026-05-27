@@ -6,7 +6,12 @@ import type {
 } from '../execution/types.js';
 import { renderExecutionTurnContent } from '../execution/types.js';
 import { logger } from '../logger.js';
-import { CallbackTargetSchema, ImagesSchema, type Images } from '../persistence/schemas.js';
+import {
+  AttachmentsSchema,
+  CallbackTargetSchema,
+  ImagesSchema,
+  type Images,
+} from '../persistence/schemas.js';
 import { Limits } from '../schema.js';
 import { MESSAGE_ID_FORMAT_DESCRIPTION, MESSAGE_ID_PATTERN } from './message-id.js';
 
@@ -28,21 +33,12 @@ const AgentSelectionSchema = z.object({
   model: z.string(),
   variant: z.string().optional(),
 });
-const SessionMessageIntentSchema = z.object({
-  turn: z.discriminatedUnion('type', [
-    z.object({
-      type: z.literal('prompt'),
-      messageId: z.string().regex(MESSAGE_ID_PATTERN, MESSAGE_ID_FORMAT_DESCRIPTION),
-      prompt: z.string(),
-      images: ImagesSchema.optional(),
-    }),
-    z.object({
-      type: z.literal('command'),
-      messageId: z.string().regex(MESSAGE_ID_PATTERN, MESSAGE_ID_FORMAT_DESCRIPTION),
-      command: z.string().min(1),
-      arguments: z.string(),
-    }),
-  ]),
+const PromptIntentTurnFields = {
+  type: z.literal('prompt'),
+  messageId: z.string().regex(MESSAGE_ID_PATTERN, MESSAGE_ID_FORMAT_DESCRIPTION),
+  prompt: z.string(),
+};
+const IntentEnvelopeFields = {
   agent: AgentSelectionSchema,
   finalization: z
     .object({
@@ -50,6 +46,40 @@ const SessionMessageIntentSchema = z.object({
       condenseOnComplete: z.boolean().optional(),
     })
     .optional(),
+};
+const SessionMessageIntentSchema = z.object({
+  turn: z.discriminatedUnion('type', [
+    z.object({ ...PromptIntentTurnFields, attachments: AttachmentsSchema.optional() }).strict(),
+    z
+      .object({
+        type: z.literal('command'),
+        messageId: z.string().regex(MESSAGE_ID_PATTERN, MESSAGE_ID_FORMAT_DESCRIPTION),
+        command: z.string().min(1),
+        arguments: z.string(),
+      })
+      .strict(),
+  ]),
+  ...IntentEnvelopeFields,
+});
+const StoredSessionMessageIntentSchema = z.object({
+  turn: z.discriminatedUnion('type', [
+    z
+      .object({
+        ...PromptIntentTurnFields,
+        attachments: AttachmentsSchema.optional(),
+        images: ImagesSchema.optional(),
+      })
+      .strict(),
+    z
+      .object({
+        type: z.literal('command'),
+        messageId: z.string().regex(MESSAGE_ID_PATTERN, MESSAGE_ID_FORMAT_DESCRIPTION),
+        command: z.string().min(1),
+        arguments: z.string(),
+      })
+      .strict(),
+  ]),
+  ...IntentEnvelopeFields,
 });
 const PendingSessionMessageCallbackSnapshotSchema = z
   .object({
@@ -70,6 +100,9 @@ export const PendingSessionMessageV2Schema = z.object({
   intent: SessionMessageIntentSchema,
   delivery: PendingDeliverySchema,
   callbackSnapshot: PendingSessionMessageCallbackSnapshotSchema.optional(),
+});
+const StoredPendingSessionMessageV2Schema = PendingSessionMessageV2Schema.extend({
+  intent: StoredSessionMessageIntentSchema,
 });
 export type PendingSessionMessageV2 = z.infer<typeof PendingSessionMessageV2Schema>;
 
@@ -206,7 +239,7 @@ function decodeLegacyPendingMessage(
                 type: 'prompt',
                 messageId: message.messageId,
                 prompt: message.content,
-                images: message.images,
+                attachments: message.images,
               },
         agent: { mode, model, variant },
         finalization:
@@ -235,19 +268,37 @@ function decodeLegacyPendingMessage(
     },
   };
 }
+function normalizeStoredIntent(
+  intent: z.infer<typeof StoredSessionMessageIntentSchema>
+): SessionMessageIntent {
+  return {
+    ...intent,
+    turn:
+      intent.turn.type === 'prompt'
+        ? {
+            type: 'prompt',
+            messageId: intent.turn.messageId,
+            prompt: intent.turn.prompt,
+            attachments: intent.turn.attachments ?? intent.turn.images,
+          }
+        : intent.turn,
+  };
+}
+
 function decodePendingMessage(
   raw: unknown,
   defaults?: PendingSessionExecutionDefaults
 ): PendingSessionMessage | undefined {
-  const current = PendingSessionMessageV2Schema.safeParse(raw);
+  const current = StoredPendingSessionMessageV2Schema.safeParse(raw);
   if (current.success) {
     const message = current.data;
+    const intent = normalizeStoredIntent(message.intent);
     return {
       version: 2,
-      messageId: message.intent.turn.messageId,
-      content: renderExecutionTurnContent(message.intent.turn),
+      messageId: intent.turn.messageId,
+      content: renderExecutionTurnContent(intent.turn),
       createdAt: message.delivery.queuedAt,
-      intent: message.intent,
+      intent,
       callbackSnapshot: message.callbackSnapshot,
       flushAttempts: message.delivery.flushAttempts,
       nextFlushAttemptAt: message.delivery.nextFlushAttemptAt,

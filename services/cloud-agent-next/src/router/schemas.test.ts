@@ -4,6 +4,7 @@ import {
   GetSessionOutput,
   InitiateFromPreparedSessionInput,
   LegacyExecutionResponse,
+  PrepareSessionInput,
   SendMessageInput,
   SendMessageV2Input,
   StartSessionOutput,
@@ -15,6 +16,10 @@ const validSessionId = 'agent_12345678-1234-1234-1234-123456789012';
 const validImages = {
   path: '123e4567-e89b-12d3-a456-426614174000',
   files: ['123e4567-e89b-12d3-a456-426614174001.png'],
+};
+const validAttachments = {
+  path: '123e4567-e89b-12d3-a456-426614174000',
+  files: ['123e4567-e89b-12d3-a456-426614174001.csv'],
 };
 const basePromptInput = {
   prompt: 'continue',
@@ -92,12 +97,48 @@ describe('grouped unified session input contracts', () => {
     expect(result.success).toBe(false);
   });
 
+  it('accepts document attachments on grouped start and send messages', () => {
+    expect(
+      StartSessionInput.parse({
+        ...baseStartInput,
+        message: { prompt: 'Summarize the CSV', attachments: validAttachments },
+      }).message.attachments
+    ).toEqual(validAttachments);
+    expect(
+      SendMessageInput.parse({
+        cloudAgentSessionId: validSessionId,
+        message: { prompt: 'Read this document', attachments: validAttachments },
+      }).message.attachments
+    ).toEqual(validAttachments);
+  });
+
+  it('continues accepting legacy images and rejects ambiguous grouped attachment payloads', () => {
+    expect(
+      SendMessageInput.safeParse({
+        cloudAgentSessionId: validSessionId,
+        message: { prompt: 'Read the image', images: validImages },
+      }).success
+    ).toBe(true);
+    expect(
+      StartSessionInput.safeParse({
+        ...baseStartInput,
+        message: { prompt: 'ambiguous', images: validImages, attachments: validAttachments },
+      }).success
+    ).toBe(false);
+    expect(
+      SendMessageInput.safeParse({
+        cloudAgentSessionId: validSessionId,
+        message: { prompt: 'ambiguous', images: validImages, attachments: validAttachments },
+      }).success
+    ).toBe(false);
+  });
+
   it('preserves the grouped send payload shape', () => {
     const input = {
       cloudAgentSessionId: validSessionId,
       message: {
         prompt: 'Continue with the queued turn',
-        images: validImages,
+        attachments: validAttachments,
         id: null,
       },
       agent: {
@@ -115,12 +156,38 @@ describe('grouped unified session input contracts', () => {
   });
 });
 
+describe('legacy live attachment input compatibility', () => {
+  it('accepts document attachments on prepareSession while retaining images', () => {
+    const basePrepareInput = {
+      prompt: 'Summarize this document',
+      mode: 'code',
+      model: 'claude-sonnet-4-5-20250929',
+      githubRepo: 'acme/repo',
+    };
+
+    expect(
+      PrepareSessionInput.safeParse({ ...basePrepareInput, attachments: validAttachments }).success
+    ).toBe(true);
+    expect(
+      PrepareSessionInput.safeParse({ ...basePrepareInput, images: validImages }).success
+    ).toBe(true);
+    expect(
+      PrepareSessionInput.safeParse({
+        ...basePrepareInput,
+        attachments: validAttachments,
+        images: validImages,
+      }).success
+    ).toBe(false);
+  });
+});
+
 describe('sendMessageV2 input compatibility', () => {
-  it('normalizes nested prompt payloads from web callers', () => {
+  it('normalizes nested prompt payloads with document attachments from web callers', () => {
     const result = SendMessageV2Input.safeParse({
       cloudAgentSessionId: validSessionId,
       messageId: validMessageId,
       payload: { type: 'prompt', ...basePromptInput },
+      attachments: validAttachments,
     });
 
     expect(result.success).toBe(true);
@@ -129,33 +196,43 @@ describe('sendMessageV2 input compatibility', () => {
     expect(result.data).toEqual({
       cloudAgentSessionId: validSessionId,
       messageId: validMessageId,
+      attachments: validAttachments,
       ...basePromptInput,
     });
   });
 
-  it('accepts nested command payloads emitted by CloudChatPage', () => {
-    const result = SendMessageV2Input.safeParse({
-      cloudAgentSessionId: validSessionId,
-      payload: {
-        type: 'command',
-        command: 'compact',
-        arguments: '--aggressive',
-      },
-      images: validImages,
-    });
+  it('continues accepting legacy images and rejects ambiguous prompt attachments', () => {
+    expect(
+      SendMessageV2Input.safeParse({
+        cloudAgentSessionId: validSessionId,
+        payload: { type: 'prompt', ...basePromptInput },
+        images: validImages,
+      }).success
+    ).toBe(true);
+    expect(
+      SendMessageV2Input.safeParse({
+        cloudAgentSessionId: validSessionId,
+        payload: { type: 'prompt', ...basePromptInput },
+        attachments: validAttachments,
+        images: validImages,
+      }).success
+    ).toBe(false);
+  });
 
-    expect(result.success).toBe(true);
-    if (!result.success) return;
-
-    expect(result.data).toEqual({
-      cloudAgentSessionId: validSessionId,
-      payload: {
-        type: 'command',
-        command: 'compact',
-        arguments: '--aggressive',
-      },
-      images: validImages,
-    });
+  it('rejects attachment descriptors on nested command payloads', () => {
+    for (const descriptor of [{ images: validImages }, { attachments: validAttachments }]) {
+      expect(
+        SendMessageV2Input.safeParse({
+          cloudAgentSessionId: validSessionId,
+          payload: {
+            type: 'command',
+            command: 'compact',
+            arguments: '--aggressive',
+          },
+          ...descriptor,
+        }).success
+      ).toBe(false);
+    }
   });
 });
 

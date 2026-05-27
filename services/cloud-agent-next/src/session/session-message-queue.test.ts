@@ -589,6 +589,73 @@ describe('SessionMessageQueue', () => {
     expect(result).toMatchObject({ success: false, code: 'BAD_REQUEST' });
   });
 
+  it('accepts a canonical attachment replay against legacy image state after normalization', async () => {
+    const harness = createQueueHarness();
+    const legacyImages = {
+      path: '123e4567-e89b-12d3-a456-426614174000',
+      files: ['123e4567-e89b-12d3-a456-426614174001.png'],
+    };
+    await harness.storage.put(`session_message:${FIRST_MESSAGE_ID}`, {
+      messageId: FIRST_MESSAGE_ID,
+      status: 'accepted',
+      prompt: 'original',
+      turn: {
+        type: 'prompt',
+        messageId: FIRST_MESSAGE_ID,
+        prompt: 'original',
+        images: legacyImages,
+      },
+      createdAt: 1,
+      acceptedAt: 2,
+      agent: { mode: 'code', model: 'default-model' },
+    });
+
+    const result = await harness.queue.admitSubmittedMessage({
+      userId: 'user_test' as UserId,
+      turn: { type: 'prompt', id: FIRST_MESSAGE_ID, prompt: 'original', attachments: legacyImages },
+      agent: { mode: 'code', model: 'default-model' },
+    });
+
+    expect(result).toMatchObject({ success: true, compatibilityDelivery: 'sent' });
+  });
+
+  it('accepts canonical replay against persisted legacy admission constraints with images', async () => {
+    const harness = createQueueHarness();
+    const legacyImages = {
+      path: '123e4567-e89b-12d3-a456-426614174000',
+      files: ['123e4567-e89b-12d3-a456-426614174001.png'],
+    };
+    await harness.storage.put(`session_message:${FIRST_MESSAGE_ID}`, {
+      messageId: FIRST_MESSAGE_ID,
+      status: 'accepted',
+      prompt: 'saved constraint',
+      legacyAdmissionConstraints: {
+        turn: {
+          type: 'prompt',
+          messageId: FIRST_MESSAGE_ID,
+          prompt: 'saved constraint',
+          images: legacyImages,
+        },
+        agent: { mode: 'code', model: 'default-model' },
+      },
+      createdAt: 1,
+      acceptedAt: 2,
+    });
+
+    const result = await harness.queue.admitSubmittedMessage({
+      userId: 'user_test' as UserId,
+      turn: {
+        type: 'prompt',
+        id: FIRST_MESSAGE_ID,
+        prompt: 'saved constraint',
+        attachments: legacyImages,
+      },
+      agent: { mode: 'code', model: 'default-model' },
+    });
+
+    expect(result).toMatchObject({ success: true, compatibilityDelivery: 'sent' });
+  });
+
   it('rejects replay changing a known legacy stored turn payload', async () => {
     const harness = createQueueHarness();
     await harness.storage.put(`session_message:${FIRST_MESSAGE_ID}`, {
@@ -718,7 +785,7 @@ describe('SessionMessageQueue', () => {
     expect(harness.queue).not.toHaveProperty('admitRegisteredInitial');
   });
 
-  it('rejects command turns with images instead of dropping attachments', async () => {
+  it('rejects command turns with generic attachments instead of dropping them', async () => {
     const harness = createQueueHarness();
 
     const result = await harness.queue.admitSubmittedMessage({
@@ -728,9 +795,9 @@ describe('SessionMessageQueue', () => {
         id: FIRST_MESSAGE_ID,
         command: 'compact',
         arguments: '--aggressive',
-        images: {
+        attachments: {
           path: '123e4567-e89b-12d3-a456-426614174000',
-          files: ['123e4567-e89b-12d3-a456-426614174001.png'],
+          files: ['123e4567-e89b-12d3-a456-426614174001.pdf'],
         },
       },
     });
@@ -738,10 +805,27 @@ describe('SessionMessageQueue', () => {
     expect(result).toEqual({
       success: false,
       code: 'BAD_REQUEST',
-      error: 'Images cannot be attached to slash commands',
+      error: 'Attachments cannot be attached to slash commands',
     });
     expect(await listPendingSessionMessages(harness.storage)).toHaveLength(0);
     expect(harness.events).toHaveLength(0);
+  });
+
+  it('admits prompt documents as canonical attachments in durable pending state', async () => {
+    const harness = createQueueHarness();
+    const attachments = {
+      path: '123e4567-e89b-12d3-a456-426614174000',
+      files: ['123e4567-e89b-12d3-a456-426614174001.pdf'],
+    };
+
+    const result = await harness.queue.admitSubmittedMessage({
+      userId: 'user_test' as UserId,
+      turn: { type: 'prompt', id: FIRST_MESSAGE_ID, prompt: 'read this PDF', attachments },
+    });
+    const [pending] = await listPendingSessionMessages(harness.storage);
+
+    expect(result).toMatchObject({ success: true, messageId: FIRST_MESSAGE_ID });
+    expect(pending?.intent?.turn).toMatchObject({ attachments });
   });
 
   it('rejects queue admission once durable pending capacity is exhausted', async () => {

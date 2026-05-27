@@ -687,8 +687,11 @@ export function createSessionMessageQueue(
       if (explicitTurn.type === 'prompt' && !explicitTurn.prompt) {
         return buildAdmissionError('BAD_REQUEST', 'No prompt provided');
       }
-      if (explicitTurn.type === 'command' && explicitTurn.images !== undefined) {
-        return buildAdmissionError('BAD_REQUEST', 'Images cannot be attached to slash commands');
+      if (explicitTurn.type === 'command' && explicitTurn.attachments !== undefined) {
+        return buildAdmissionError(
+          'BAD_REQUEST',
+          'Attachments cannot be attached to slash commands'
+        );
       }
 
       const requestedAgent = request.agent;
@@ -714,7 +717,7 @@ export function createSessionMessageQueue(
                 type: 'prompt',
                 messageId,
                 prompt: explicitTurn.prompt,
-                images: explicitTurn.images,
+                attachments: explicitTurn.attachments,
               }
             : {
                 type: 'command',

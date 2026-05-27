@@ -3,6 +3,7 @@ import * as z from 'zod';
 import { MESSAGE_ID_FORMAT_DESCRIPTION, MESSAGE_ID_PATTERN } from '../session/message-id.js';
 import type { SandboxId } from '../types.js';
 import {
+  AttachmentsSchema,
   branchNameSchema,
   CallbackTargetSchema,
   ImagesSchema,
@@ -72,11 +73,38 @@ const MetadataRepositorySchema = z.discriminatedUnion('type', [
     .strict(),
 ]);
 
-const MetadataInitialTurnSchema = z.discriminatedUnion('type', [
+const CurrentMetadataInitialTurnSchema = z.discriminatedUnion('type', [
   z
     .object({
       type: z.literal('prompt'),
       prompt: z.string(),
+      attachments: AttachmentsSchema.optional(),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal('command'),
+      command: z.string().min(1),
+      arguments: z.string(),
+    })
+    .strict(),
+]);
+
+const CurrentMetadataInitialMessageSchema = z
+  .object({
+    id: MessageIdSchema.optional(),
+    prompt: z.string().optional(),
+    attachments: AttachmentsSchema.optional(),
+    turn: CurrentMetadataInitialTurnSchema.optional(),
+  })
+  .strict();
+
+const StoredMetadataInitialTurnSchema = z.discriminatedUnion('type', [
+  z
+    .object({
+      type: z.literal('prompt'),
+      prompt: z.string(),
+      attachments: AttachmentsSchema.optional(),
       images: ImagesSchema.optional(),
     })
     .strict(),
@@ -89,12 +117,13 @@ const MetadataInitialTurnSchema = z.discriminatedUnion('type', [
     .strict(),
 ]);
 
-const MetadataInitialMessageSchema = z
+const StoredMetadataInitialMessageSchema = z
   .object({
     id: MessageIdSchema.optional(),
     prompt: z.string().optional(),
+    attachments: AttachmentsSchema.optional(),
     images: ImagesSchema.optional(),
-    turn: MetadataInitialTurnSchema.optional(),
+    turn: StoredMetadataInitialTurnSchema.optional(),
   })
   .strict();
 
@@ -161,7 +190,7 @@ export const CurrentSessionMetadataSchema = z
     identity: MetadataIdentitySchema,
     auth: MetadataAuthSchema,
     repository: MetadataRepositorySchema.optional(),
-    initialMessage: MetadataInitialMessageSchema.optional(),
+    initialMessage: CurrentMetadataInitialMessageSchema.optional(),
     agent: MetadataAgentSchema.optional(),
     finalization: MetadataFinalizationSchema.optional(),
     profile: SessionProfileBundleSchema.optional(),
@@ -175,6 +204,10 @@ export const CurrentSessionMetadataSchema = z
 export type SessionMetadata = z.infer<typeof CurrentSessionMetadataSchema>;
 
 type LegacySessionMetadata = z.output<typeof LegacySessionMetadataSchema>;
+
+const StoredCurrentSessionMetadataSchema = CurrentSessionMetadataSchema.extend({
+  initialMessage: StoredMetadataInitialMessageSchema.optional(),
+});
 
 function omitUndefined<T extends Record<string, unknown>>(value: T): Partial<T> {
   return Object.fromEntries(
@@ -212,6 +245,29 @@ function profileFromLegacy(metadata: LegacySessionMetadata): SessionMetadata['pr
       runtimeAgents: metadata.runtimeAgents,
     })
   ) as SessionMetadata['profile'];
+}
+
+function normalizeStoredInitialMessage(
+  message: z.infer<typeof StoredMetadataInitialMessageSchema> | undefined
+): SessionMetadata['initialMessage'] {
+  if (!message) return undefined;
+  const attachments = message.attachments ?? message.images;
+  const turn =
+    message.turn?.type === 'prompt'
+      ? {
+          type: 'prompt' as const,
+          prompt: message.turn.prompt,
+          attachments: message.turn.attachments ?? message.turn.images,
+        }
+      : message.turn;
+  return optionalObject(
+    omitUndefined({
+      id: message.id,
+      prompt: message.prompt,
+      attachments,
+      turn,
+    })
+  ) as SessionMetadata['initialMessage'];
 }
 
 function repositoryFromLegacy(
@@ -278,7 +334,7 @@ function legacyToCurrentSessionMetadata(metadata: LegacySessionMetadata): Sessio
       omitUndefined({
         id: metadata.initialMessageId,
         prompt: metadata.prompt,
-        images: metadata.images,
+        attachments: metadata.images,
       })
     ),
     agent: optionalObject(
@@ -329,6 +385,13 @@ export function parseSessionMetadata(raw: unknown): SessionMetadata {
   }
 
   if (looksLikeCurrentMetadata(raw)) {
+    const stored = StoredCurrentSessionMetadataSchema.safeParse(raw);
+    if (stored.success) {
+      return CurrentSessionMetadataSchema.parse({
+        ...stored.data,
+        initialMessage: normalizeStoredInitialMessage(stored.data.initialMessage),
+      });
+    }
     throw new Error(`Invalid current session metadata: ${JSON.stringify(current.error.format())}`);
   }
 

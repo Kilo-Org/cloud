@@ -368,13 +368,14 @@ Most workers require a `.dev.vars` file with secrets like `NEXTAUTH_SECRET` and 
 pnpm dev:env
 ```
 
-The script (`dev/local/env-sync/`) scans every `.dev.vars.example` in the repo, resolves each variable's value, and writes (or patches) the corresponding `.dev.vars` file. Before applying, it shows a diff of what will change and asks for confirmation.
+The script (`dev/local/env-sync/`) scans every `.dev.vars.example` in the repo and `apps/web/.env.development.local.example`, resolves each variable's value, and writes (or patches) the corresponding generated local env file. Before applying, it shows a diff of what will change and asks for confirmation.
 
-Values are resolved using annotations in `.dev.vars.example` comment lines:
+Values are resolved using annotations in example env file comment lines:
 
 | Annotation | What it does | Example |
 |---|---|---|
-| _(none)_ | Copies the value from `.env.local` if the key matches, otherwise keeps the default | `INTERNAL_API_SECRET=your-secret-here` |
+| _(none)_ | Copies the value from `.env.local` if the key matches, otherwise keeps the template literal | `INTERNAL_API_SECRET=your-secret-here` |
+| `# @override` | Always uses the template literal, even when `.env.local` contains the same key | `# @override` above a development-only bucket name |
 | `# @url <service>` | Builds `http://localhost:<port>` from the service's dev port in `wrangler.jsonc` | `# @url nextjs` → `http://localhost:3000` |
 | `# @from <KEY>` | Copies the value of a _different_ key from `.env.local` | `# @from CODE_REVIEW_WORKER_AUTH_TOKEN` |
 | `# @pkcs8` | Copies from `.env.local` and converts PKCS#1 PEM keys to PKCS#8 format | `# @pkcs8` above a private key var |

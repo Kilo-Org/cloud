@@ -225,7 +225,7 @@ function isSameAcceptedInitialTurn(
   return (
     stored.turn?.type === 'prompt' &&
     stored.turn.prompt === initialTurn.prompt &&
-    JSON.stringify(stored.turn.images) === JSON.stringify(initialTurn.images)
+    JSON.stringify(stored.turn.attachments) === JSON.stringify(initialTurn.attachments)
   );
 }
 
@@ -1365,13 +1365,14 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
             : input.message.turn.arguments.length > 0
               ? `/${input.message.turn.command} ${input.message.turn.arguments}`
               : `/${input.message.turn.command}`,
-        images: input.message.turn.type === 'prompt' ? input.message.turn.images : undefined,
+        attachments:
+          input.message.turn.type === 'prompt' ? input.message.turn.attachments : undefined,
         turn:
           input.message.turn.type === 'prompt'
             ? {
                 type: 'prompt',
                 prompt: input.message.turn.prompt,
-                images: input.message.turn.images,
+                attachments: input.message.turn.attachments,
               }
             : {
                 type: 'command',
@@ -1469,7 +1470,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
                 type: 'prompt',
                 id: initialTurn.messageId,
                 prompt: initialTurn.prompt,
-                images: initialTurn.images,
+                attachments: initialTurn.attachments,
               }
             : {
                 type: 'command',
@@ -2425,14 +2426,14 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
               type: 'prompt',
               messageId: initialMessage.id,
               prompt: initialMessage.turn.prompt,
-              images: initialMessage.turn.images,
+              attachments: initialMessage.turn.attachments,
             }
           : initialMessage.prompt
             ? {
                 type: 'prompt',
                 messageId: initialMessage.id,
                 prompt: initialMessage.prompt,
-                images: initialMessage.images,
+                attachments: initialMessage.attachments,
               }
             : undefined;
     if (!turn) return { success: false, code: 'BAD_REQUEST', error: 'No prompt provided' };

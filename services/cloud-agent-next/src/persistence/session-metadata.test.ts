@@ -24,7 +24,7 @@ const profile = {
 };
 
 describe('session metadata boundary', () => {
-  it('parses and serializes current grouped metadata', () => {
+  it('parses and serializes current grouped metadata with canonical attachments', () => {
     const current = {
       metadataSchemaVersion: 2 as const,
       identity: {
@@ -49,9 +49,9 @@ describe('session metadata boundary', () => {
       initialMessage: {
         id: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
         prompt: 'Build the thing',
-        images: {
+        attachments: {
           path: '123e4567-e89b-12d3-a456-426614174000',
-          files: ['123e4567-e89b-12d3-a456-426614174001.png'],
+          files: ['123e4567-e89b-12d3-a456-426614174001.pdf'],
         },
       },
       agent: {
@@ -202,7 +202,7 @@ describe('session metadata boundary', () => {
       initialMessage: {
         id: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
         prompt: 'Build the thing',
-        images: {
+        attachments: {
           path: '123e4567-e89b-12d3-a456-426614174000',
           files: ['123e4567-e89b-12d3-a456-426614174001.png'],
         },
@@ -235,6 +235,47 @@ describe('session metadata boundary', () => {
         kiloServerLastActivity: 1237,
       },
     });
+  });
+
+  it('normalizes grouped metadata retained with images into canonical attachments', () => {
+    const metadata = parseSessionMetadata({
+      metadataSchemaVersion: 2,
+      identity: { sessionId: 'agent_grouped_legacy', userId: 'user_123' },
+      auth: {},
+      initialMessage: {
+        id: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
+        prompt: 'old image turn',
+        images: {
+          path: '123e4567-e89b-12d3-a456-426614174000',
+          files: ['123e4567-e89b-12d3-a456-426614174001.png'],
+        },
+        turn: {
+          type: 'prompt',
+          prompt: 'old image turn',
+          images: {
+            path: '123e4567-e89b-12d3-a456-426614174000',
+            files: ['123e4567-e89b-12d3-a456-426614174001.png'],
+          },
+        },
+      },
+      lifecycle: { version: 1, timestamp: 1 },
+    });
+
+    expect(metadata.initialMessage).toMatchObject({
+      attachments: {
+        path: '123e4567-e89b-12d3-a456-426614174000',
+        files: ['123e4567-e89b-12d3-a456-426614174001.png'],
+      },
+      turn: {
+        type: 'prompt',
+        attachments: {
+          path: '123e4567-e89b-12d3-a456-426614174000',
+          files: ['123e4567-e89b-12d3-a456-426614174001.png'],
+        },
+      },
+    });
+    expect(metadata.initialMessage).not.toHaveProperty('images');
+    expect(metadata.initialMessage?.turn).not.toHaveProperty('images');
   });
 
   it('maps legacy DIND devcontainer metadata into grouped current metadata', () => {

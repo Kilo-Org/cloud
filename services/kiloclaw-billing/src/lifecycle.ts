@@ -85,7 +85,14 @@ const DESTRUCTION_WARNING_DAYS = 2;
 const EARLYBIRD_WARNING_DAYS = 14;
 const AUTO_RESUME_INITIAL_BACKOFF_MS = 2 * 60 * 60 * 1000;
 const AUTO_RESUME_MAX_BACKOFF_MS = 24 * 60 * 60 * 1000;
-const INSTANCE_DESTRUCTION_BATCH_SIZE = 50;
+// Per-cron-tick destruction batch size. Each row's destroy takes ~7-8s
+// (Fly API + DO finalize), and the Cloudflare queue consumer's wall-clock
+// budget per message is 15 minutes — so safe ceiling is roughly 100. We
+// run sequentially today and chose 75 to leave a generous margin for
+// slower rows while still meaningfully outpacing inflow. Crank higher
+// only after parallelizing the destroy loop, or batches will start
+// hitting the wall-clock limit and getting retried.
+const INSTANCE_DESTRUCTION_BATCH_SIZE = 75;
 const TRIAL_INACTIVITY_BATCH_SIZE = 50;
 const SOFT_DELETED_EMAIL_SUFFIX = '@deleted.invalid';
 const TRIAL_ENDING_SOON_MIN_DURATION_DAYS = 2;

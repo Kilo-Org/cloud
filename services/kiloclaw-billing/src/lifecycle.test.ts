@@ -3072,7 +3072,7 @@ describe('instance destruction sweep', () => {
 
     expect(summary.errors).toBe(0);
     expect(summary.sweep3_instance_destruction).toBe(1);
-    expect(selectBuilders[0]?.limit).toHaveBeenCalledWith(50);
+    expect(selectBuilders[0]?.limit).toHaveBeenCalledWith(75);
     expect(fetch).toHaveBeenCalledTimes(1);
     expect(globalThis.fetch).toHaveBeenCalledTimes(1);
     expect(inserts).toEqual(

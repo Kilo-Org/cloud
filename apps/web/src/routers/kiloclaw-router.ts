@@ -64,9 +64,11 @@ import {
   getInboundEmailAddressForInstance,
 } from '@/lib/kiloclaw/inbound-email-alias';
 import {
+  clearComposioInstanceConfigSource,
   getActiveInstance,
   listAllActiveInstances,
   markActiveInstanceDestroyed,
+  markComposioInstanceConfigManual,
   renameInstance,
   restoreDestroyedInstance,
   workerInstanceId,
@@ -76,7 +78,11 @@ import {
   getPersonalProvisionLockKey,
   withKiloclawProvisionContextLock,
 } from '@/lib/kiloclaw/provision-lock';
-import { encryptProvisionSecretsForWorker } from '@/lib/kiloclaw/provision-secrets';
+import {
+  encryptProvisionSecretsForWorker,
+  getComposioSecretsPatchSource,
+  hasComposioProvisionSecrets,
+} from '@/lib/kiloclaw/provision-secrets';
 import {
   clearSubscriptionLifecycleAfterInstanceDestroy,
   clearTrialInactivityStopAfterStart,
@@ -1132,6 +1138,10 @@ async function provisionInstance(
         }
       : undefined
   );
+
+  if (hasComposioProvisionSecrets(input.secrets)) {
+    await markComposioInstanceConfigManual(result.instanceId);
+  }
 
   return result;
 }
@@ -3453,11 +3463,18 @@ export const kiloclawRouter = createTRPCRouter({
       const instance = await getActiveInstance(ctx.user.id);
       const client = new KiloClawInternalClient();
       try {
-        return await client.patchSecrets(
+        const result = await client.patchSecrets(
           ctx.user.id,
           { secrets: encryptedPatch, meta: input.meta },
           workerInstanceId(instance)
         );
+        const composioSourceAction = getComposioSecretsPatchSource(secrets);
+        if (instance && composioSourceAction === 'upsert_manual') {
+          await markComposioInstanceConfigManual(instance.id);
+        } else if (instance && composioSourceAction === 'clear') {
+          await clearComposioInstanceConfigSource(instance.id);
+        }
+        return result;
       } catch (err) {
         if (err instanceof KiloClawApiError && err.statusCode >= 400 && err.statusCode < 500) {
           // Extract message from worker response body (JSON or plain text)

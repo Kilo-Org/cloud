@@ -55,15 +55,16 @@ Kilo previously shipped a managed Composio onboarding experiment that created Ki
 15. Retired managed Composio identities MUST NOT be reused for new instances or configuration updates.
 16. After managed creation paths are disabled, the system MUST verify whether an active instance associated with retired managed identity state retains managed Composio credentials, including a possible partial-write case where runtime injection succeeded before a tracking marker was persisted.
 17. Any confirmed managed credential material in a live instance MUST be cleared before obsolete stored managed identity state is deleted. Verification and clearing MUST NOT remove manually configured Composio credentials.
-18. If no live managed runtime credential remains, obsolete managed identity rows, encrypted credential residue, connected-account identifiers, and destroyed-instance tracking markers MAY be removed by dropping the retired managed-state schema.
-19. Obsolete managed-state database structures MUST NOT be dropped until managed creation is disabled and live runtime residue has been ruled out or cleared.
+18. Until obsolete managed-state schema is dropped, an instance that receives user-provided Composio credentials through provision or Settings MUST be recorded as manually configured, and an instance that clears both Composio fields MUST clear that provenance marker. This marker retention is cleanup safety metadata only and MUST NOT restore managed onboarding behavior.
+19. If no live managed runtime credential remains, obsolete managed identity rows, encrypted credential residue, connected-account identifiers, and destroyed-instance tracking markers MAY be removed by dropping the retired managed-state schema.
+20. Obsolete managed-state database structures MUST NOT be dropped until managed creation is disabled and live runtime residue has been ruled out or cleared.
 
 ### Credential Boundary and Data Protection
 
-20. Kilo central or retired managed Composio credentials MUST NOT be injected into a user or organization OpenClaw instance.
-21. Logs, analytics, audit records, Sentry events, command output, and user-facing errors MUST NOT include raw Composio credentials, OAuth tokens, Connect Links containing secret material, or decrypted stored identity data.
-22. User-provided Composio secrets MUST continue to follow the normal KiloClaw secret encryption, transport, and deletion rules.
-23. Retired managed rows containing encrypted credentials or user-linked provider identifiers MUST be deleted after the required live-runtime verification or otherwise scrubbed in accordance with account-deletion requirements.
+21. Kilo central or retired managed Composio credentials MUST NOT be injected into a user or organization OpenClaw instance.
+22. Logs, analytics, audit records, Sentry events, command output, and user-facing errors MUST NOT include raw Composio credentials, OAuth tokens, Connect Links containing secret material, or decrypted stored identity data.
+23. User-provided Composio secrets MUST continue to follow the normal KiloClaw secret encryption, transport, and deletion rules.
+24. Retired managed rows containing encrypted credentials or user-linked provider identifiers MUST be deleted after the required live-runtime verification or otherwise scrubbed in accordance with account-deletion requirements.
 
 ## Error Handling
 
@@ -78,7 +79,7 @@ Kilo previously shipped a managed Composio onboarding experiment that created Ki
 
 - Removed managed identity provisioning, managed Connect Link onboarding, and managed callback injection from supported product behavior.
 - Retained explicit user-provided Composio credentials through Settings and the encrypted secret pipeline.
-- Added post-deploy live-runtime verification and subsequent stored-state removal requirements for managed credentials created or injected while the experiment was shipped.
+- Added post-deploy live-runtime verification, temporary manual provenance tracking, and subsequent stored-state removal requirements for managed credentials created or injected while the experiment was shipped.
 
 ### 2026-05-20 -- Managed onboarding experiment
 

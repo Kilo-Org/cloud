@@ -129,6 +129,12 @@ This pattern blocks API endpoints from running for external contributors who don
 - Put Kilo/job behavior in `wrapper/` or Kilo SDK integration code when it does not require durable DO coordination.
 - Avoid growing `CloudAgentSession.ts` with product behavior that can live in the wrapper, Kilo SDK layer, or a small helper module.
 
+### Code Review Integration Boundary
+
+- `services/code-review-infra/src/code-review-orchestrator.ts` owns code-review product and workflow semantics: review IDs and attempt state, status reconciliation, retry or fresh-session selection, review callback construction, cancellation policy, and review-specific dispatch rules.
+- `CloudAgentSession` may provide reusable durable runtime operations used by code review, including the retained `prepareSession` / `updateSession` / `sendMessageV2` callback seam and runtime enforcement of the read-only code-review command guard. It must not acquire review IDs or attempt state, review status reconciliation, retry or fresh-session selection, review callback construction, or review-specific dispatch rules.
+- When code-review integration needs another generic session or runtime capability, expose a narrow reusable primitive here and leave the code-review decision and policy in `CodeReviewOrchestrator`.
+
 ### Runtime Guidelines
 
 - Durable Object calls should be retried using `withDORetry` in `src/utils/do-retry.ts`

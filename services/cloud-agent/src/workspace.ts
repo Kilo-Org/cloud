@@ -59,7 +59,8 @@ const DEFAULT_ALLOWED_COMMANDS = [
 
 const DEFAULT_DENIED_COMMAND_PATTERNS = ['rm -rf', 'sudo rm', 'mkfs', 'dd if='];
 
-// Keep in sync with: cloud-agent-next/src/session-service.ts, cloudflare-code-review-infra/src/code-review-orchestrator.ts
+// This service enforces legacy runtime permissions; keep them aligned with cloud-agent-next/src/session-service.ts.
+// `services/code-review-infra/src/code-review-orchestrator.ts` maintains only the review-side observability subset.
 // mkdir and touch are intentionally allowed for agent scratch space during analysis
 const CODE_REVIEW_ALLOWED_COMMANDS = [
   'ls',

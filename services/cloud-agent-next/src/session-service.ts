@@ -73,7 +73,8 @@ import { normalizeAgentMode } from './schema.js';
 const SETUP_COMMAND_TIMEOUT_SECONDS = 300; // 5 minutes
 const DEFAULT_DENIED_COMMAND_PATTERNS = ['rm -rf', 'sudo rm', 'mkfs', 'dd if='];
 
-// Keep in sync with: cloudflare-code-review-infra/src/code-review-orchestrator.ts
+// This service enforces runtime permissions for code-review sessions.
+// `services/code-review-infra/src/code-review-orchestrator.ts` maintains only the review-side observability subset.
 // mkdir and touch are intentionally allowed for agent scratch space during analysis
 const CODE_REVIEW_ALLOWED_COMMANDS = [
   'ls',

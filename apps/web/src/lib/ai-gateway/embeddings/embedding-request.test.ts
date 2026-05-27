@@ -1,5 +1,5 @@
 import { describe, it, expect } from '@jest/globals';
-import { buildUpstreamBody } from './embedding-request';
+import { buildUpstreamBody, validateEmbeddingDimensions } from './embedding-request';
 
 describe('buildUpstreamBody', () => {
   it('should forward supported fields and strip native Mistral fields', () => {
@@ -28,18 +28,43 @@ describe('buildUpstreamBody', () => {
     expect(result).not.toHaveProperty('output_dimension');
   });
 
-  it('should keep Codestral embedding dimensions for the upstream provider', () => {
+  it.each([
+    ['mistralai/codestral-embed-2505', 1536],
+    ['mistralai/mistral-embed-2312', 1024],
+    ['openai/text-embedding-ada-002', 1536],
+    ['baai/bge-large-en-v1.5', 1024],
+    ['baai/bge-base-en-v1.5', 768],
+  ])('should omit catalog dimensions for fixed model %s', (model, dimensions) => {
     const result = buildUpstreamBody({
-      model: 'mistralai/codestral-embed-2505',
+      model,
       input: ['function add(a, b) { return a + b; }'],
-      dimensions: 256,
+      dimensions,
     });
 
     expect(result).toEqual({
-      model: 'mistralai/codestral-embed-2505',
+      model,
       input: ['function add(a, b) { return a + b; }'],
-      dimensions: 256,
     });
+  });
+
+  it.each([
+    ['openai/text-embedding-3-small', 1536],
+    ['google/gemini-embedding-001', 3072],
+  ])('should keep catalog dimensions for model %s without a fixed policy', (model, dimensions) => {
+    expect(buildUpstreamBody({ model, input: 'hello', dimensions })).toEqual({
+      model,
+      input: 'hello',
+      dimensions,
+    });
+  });
+
+  it('should apply fixed model handling after an upstream model ID rewrite', () => {
+    expect(
+      buildUpstreamBody(
+        { model: 'mistral/codestral-embed', input: 'hello', dimensions: 1536 },
+        'mistralai/codestral-embed-2505'
+      )
+    ).toEqual({ model: 'mistral/codestral-embed', input: 'hello' });
   });
 
   it('should strip the deprecated user field', () => {
@@ -60,6 +85,33 @@ describe('buildUpstreamBody', () => {
     });
 
     expect(result).toEqual({ model: 'openai/text-embedding-3-small', input: 'hello' });
+  });
+
+  it('should reject a non-native dimension for a fixed model before proxying', () => {
+    expect(
+      validateEmbeddingDimensions({
+        model: 'codestral-embed-2505',
+        input: 'hello',
+        dimensions: 256,
+      })
+    ).toContain('fixed 1536-dimensional embeddings');
+    expect(
+      validateEmbeddingDimensions({
+        model: 'mistralai/codestral-embed-2505',
+        input: 'hello',
+        dimensions: 1536,
+      })
+    ).toBeUndefined();
+  });
+
+  it('should not reject a catalog dimension for a model without a fixed policy', () => {
+    expect(
+      validateEmbeddingDimensions({
+        model: 'google/gemini-embedding-001',
+        input: 'hello',
+        dimensions: 3072,
+      })
+    ).toBeUndefined();
   });
 
   it('should strip output_dtype and output_dimension even when other optional fields are absent', () => {

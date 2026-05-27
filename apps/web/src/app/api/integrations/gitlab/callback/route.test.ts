@@ -48,6 +48,11 @@ function expectRedirectLocation(response: Response, expectedPathWithQuery: strin
   expect(`${url.pathname}${url.search}`).toBe(expectedPathWithQuery);
 }
 
+async function callGitLabCallback(request: NextRequest) {
+  const { GET } = await import('../../[platform]/callback/route');
+  return GET(request, { params: Promise.resolve({ platform: 'gitlab' }) });
+}
+
 describe('GET /api/integrations/gitlab/callback', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -60,8 +65,7 @@ describe('GET /api/integrations/gitlab/callback', () => {
 
   test('rejects attacker-controlled raw state before exchanging an OAuth code', async () => {
     const forgedState = `user_${USER_ID}|https://attacker.example`;
-    const { GET } = await import('./route');
-    const response = await GET(
+    const response = await callGitLabCallback(
       makeRequest(
         `/api/integrations/gitlab/callback?code=anything&state=${encodeURIComponent(forgedState)}`
       )
@@ -78,8 +82,7 @@ describe('GET /api/integrations/gitlab/callback', () => {
       },
       OTHER_USER_ID
     );
-    const { GET } = await import('./route');
-    const response = await GET(
+    const response = await callGitLabCallback(
       makeRequest(
         `/api/integrations/gitlab/callback?code=anything&state=${encodeURIComponent(state)}`
       )
@@ -98,13 +101,46 @@ describe('GET /api/integrations/gitlab/callback', () => {
       },
       USER_ID
     );
-    const { GET } = await import('./route');
-    const response = await GET(
+    const response = await callGitLabCallback(
       makeRequest(`/api/integrations/gitlab/callback?state=${encodeURIComponent(state)}`)
     );
 
     expectRedirectLocation(response, '/integrations/gitlab?error=missing_code');
     expect(mockedGetGitLabOAuthCredentials).not.toHaveBeenCalled();
+    expect(mockedExchangeGitLabOAuthCode).not.toHaveBeenCalled();
+  });
+
+  test('redirects oauth errors to returnTo when signed state carries one', async () => {
+    const state = createGitLabOAuthState(
+      {
+        owner: { type: 'user', id: USER_ID },
+        returnTo: '/claw/new?step=gitlab',
+      },
+      USER_ID
+    );
+    const response = await callGitLabCallback(
+      makeRequest(
+        `/api/integrations/gitlab/callback?error=access_denied&state=${encodeURIComponent(state)}`
+      )
+    );
+
+    expectRedirectLocation(response, '/claw/new?step=gitlab&error=access_denied');
+    expect(mockedExchangeGitLabOAuthCode).not.toHaveBeenCalled();
+  });
+
+  test('uses returnTo for missing-code redirects when signed state carries one', async () => {
+    const state = createGitLabOAuthState(
+      {
+        owner: { type: 'user', id: USER_ID },
+        returnTo: '/claw/new?step=gitlab',
+      },
+      USER_ID
+    );
+    const response = await callGitLabCallback(
+      makeRequest(`/api/integrations/gitlab/callback?state=${encodeURIComponent(state)}`)
+    );
+
+    expectRedirectLocation(response, '/claw/new?step=gitlab&error=missing_code');
     expect(mockedExchangeGitLabOAuthCode).not.toHaveBeenCalled();
   });
 
@@ -117,8 +153,7 @@ describe('GET /api/integrations/gitlab/callback', () => {
       },
       USER_ID
     );
-    const { GET } = await import('./route');
-    const response = await GET(
+    const response = await callGitLabCallback(
       makeRequest(
         `/api/integrations/gitlab/callback?code=anything&state=${encodeURIComponent(state)}`
       )
@@ -144,8 +179,7 @@ describe('GET /api/integrations/gitlab/callback', () => {
       },
       USER_ID
     );
-    const { GET } = await import('./route');
-    await GET(
+    await callGitLabCallback(
       makeRequest(
         `/api/integrations/gitlab/callback?code=anything&state=${encodeURIComponent(state)}`
       )

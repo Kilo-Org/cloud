@@ -22,10 +22,14 @@ import { toast } from 'sonner';
 import { useEffect, useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
+import { PLATFORM } from '@/lib/integrations/core/constants';
+import {
+  getPlatformOAuthCallbackPath,
+  getPlatformOAuthConnectPath,
+} from '@/lib/integrations/oauth/paths';
 
 type GitLabIntegrationDetailsProps = {
   organizationId?: string;
-  organizationName?: string;
   success?: boolean;
   error?: string;
 };
@@ -72,6 +76,7 @@ export function GitLabIntegrationDetails({
   // OAuth-specific state
   const [clientId, setClientId] = useState('');
   const [clientSecret, setClientSecret] = useState('');
+  const [isStartingOAuthConnection, setIsStartingOAuthConnection] = useState(false);
 
   // PAT-specific state
   const [connectionMethod, setConnectionMethod] = useState<'oauth' | 'pat'>('oauth');
@@ -84,6 +89,7 @@ export function GitLabIntegrationDetails({
   const queryClient = useQueryClient();
   const validationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const patValidationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const gitLabOAuthCallbackPath = getPlatformOAuthCallbackPath(PLATFORM.GITLAB);
 
   const isSelfHostedInput = Boolean(
     showSelfHosted && instanceUrl && instanceUrl !== 'https://gitlab.com' && instanceUrl !== ''
@@ -273,11 +279,13 @@ export function GitLabIntegrationDetails({
     }
   }, [success, error]);
 
-  const handleConnect = () => {
+  const handleConnect = async () => {
     if (isSelfHostedInput && (!clientId || !clientSecret)) {
       toast.error('Please enter your GitLab Client ID and Secret');
       return;
     }
+
+    setIsStartingOAuthConnection(true);
 
     const params = new URLSearchParams();
     if (organizationId) {
@@ -286,12 +294,51 @@ export function GitLabIntegrationDetails({
     if (instanceUrl && instanceUrl !== 'https://gitlab.com') {
       params.set('instanceUrl', instanceUrl);
     }
+
+    const basePath = getPlatformOAuthConnectPath(PLATFORM.GITLAB);
+
     if (isSelfHostedInput && clientId && clientSecret) {
-      params.set('clientId', clientId);
-      params.set('clientSecret', clientSecret);
+      try {
+        const response = await fetch(basePath, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ...(organizationId ? { organizationId } : {}),
+            instanceUrl,
+            clientId,
+            clientSecret,
+          }),
+        });
+        const responseBody = (await response.json().catch(() => null)) as {
+          url?: string;
+          error?: string;
+        } | null;
+
+        if (response.status === 401) {
+          const callbackPath = organizationId
+            ? `/organizations/${organizationId}/integrations/gitlab`
+            : '/integrations/gitlab';
+          window.location.href = `/users/sign_in?${new URLSearchParams({ callbackPath }).toString()}`;
+          return;
+        }
+
+        if (!response.ok || !responseBody?.url) {
+          throw new Error(responseBody?.error ?? 'Failed to initiate GitLab OAuth');
+        }
+
+        window.location.href = responseBody.url;
+        return;
+      } catch (err) {
+        setIsStartingOAuthConnection(false);
+        toast.error('Failed to initiate GitLab OAuth', {
+          description: err instanceof Error ? err.message : undefined,
+        });
+        return;
+      }
     }
 
-    window.location.href = `/api/integrations/gitlab/connect?${params.toString()}`;
+    const queryString = params.toString();
+    window.location.href = queryString ? `${basePath}?${queryString}` : basePath;
   };
 
   const handleDisconnect = () => {
@@ -648,8 +695,8 @@ export function GitLabIntegrationDetails({
                                     Redirect URI:{' '}
                                     <code className="bg-muted rounded px-1">
                                       {typeof window !== 'undefined'
-                                        ? `${window.location.origin}/api/integrations/gitlab/callback`
-                                        : 'https://app.kilo.ai/api/integrations/gitlab/callback'}
+                                        ? `${window.location.origin}${gitLabOAuthCallbackPath}`
+                                        : `https://app.kilo.ai${gitLabOAuthCallbackPath}`}
                                     </code>
                                   </li>
                                   <li>
@@ -697,12 +744,19 @@ export function GitLabIntegrationDetails({
                       size="lg"
                       className="w-full"
                       disabled={
-                        isSelfHostedInput &&
-                        (!clientId || !clientSecret || instanceValidation.status !== 'valid')
+                        isStartingOAuthConnection ||
+                        (isSelfHostedInput &&
+                          (!clientId || !clientSecret || instanceValidation.status !== 'valid'))
                       }
                     >
-                      <GitBranch className="mr-2 h-4 w-4" />
-                      Connect {isSelfHostedInput ? 'Self-Hosted ' : ''}GitLab
+                      {isStartingOAuthConnection ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <GitBranch className="mr-2 h-4 w-4" />
+                      )}
+                      {isStartingOAuthConnection
+                        ? 'Connecting...'
+                        : `Connect ${isSelfHostedInput ? 'Self-Hosted ' : ''}GitLab`}
                     </Button>
                   </>
                 ) : (

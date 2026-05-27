@@ -53,6 +53,9 @@ jest.mock(
   }),
   { virtual: true }
 );
+jest.mock('@/lib/ai-gateway/abuse-service', () => ({
+  reportEvents: jest.fn(async () => undefined),
+}));
 import {
   type StripeTopupMetadata,
   ensurePaymentMethodStored,
@@ -91,6 +94,9 @@ import type * as kiloPassStripeHandlersModule from '@/lib/kilo-pass/stripe-handl
 import { cleanupDbForTest } from '@/lib/drizzle';
 import { processTopUp } from '@/lib/credits';
 import { processTopupForOrganization } from '@/lib/organizations/organization-billing';
+import { reportEvents } from '@/lib/ai-gateway/abuse-service';
+
+const reportEventsMock = jest.mocked(reportEvents);
 
 const sampleStripePaymentMethod = (): Stripe.PaymentMethod => ({
   id: `pm_test_${Math.random().toString(36).substring(7)}`,
@@ -263,6 +269,83 @@ const sampleStripeDispute = (
     ...rest,
   };
 };
+
+const sampleStripeCharge = (
+  overrides: Partial<Stripe.Charge> & Pick<Stripe.Charge, 'id'>
+): Stripe.Charge => {
+  const { id, ...rest } = overrides;
+
+  return {
+    id,
+    object: 'charge',
+    amount: 1000,
+    amount_captured: 0,
+    amount_refunded: 0,
+    application: null,
+    application_fee: null,
+    application_fee_amount: null,
+    balance_transaction: null,
+    billing_details: {
+      address: null,
+      email: null,
+      name: null,
+      phone: null,
+      tax_id: null,
+    },
+    calculated_statement_descriptor: null,
+    captured: false,
+    created: 1712743200,
+    currency: 'usd',
+    customer: null,
+    description: null,
+    disputed: false,
+    failure_balance_transaction: null,
+    failure_code: null,
+    failure_message: null,
+    fraud_details: {},
+    livemode: false,
+    metadata: {},
+    on_behalf_of: null,
+    outcome: null,
+    paid: false,
+    payment_intent: null,
+    payment_method: null,
+    payment_method_details: null,
+    receipt_email: null,
+    receipt_number: null,
+    receipt_url: null,
+    refunded: false,
+    refunds: { object: 'list', data: [], has_more: false, url: '' },
+    review: null,
+    shipping: null,
+    source: null,
+    source_transfer: null,
+    statement_descriptor: null,
+    statement_descriptor_suffix: null,
+    status: 'failed',
+    transfer_data: null,
+    transfer_group: null,
+    ...rest,
+  } as Stripe.Charge;
+};
+
+const sampleStripeChargeResponse = (
+  charge: Stripe.Charge,
+  overrides: Record<string, unknown> = {}
+): Stripe.Response<Stripe.Charge> =>
+  ({
+    ...charge,
+    ...overrides,
+    lastResponse: { headers: {}, requestId: 'req_test', statusCode: 200 },
+  }) as Stripe.Response<Stripe.Charge>;
+
+async function waitForReportEventsCall() {
+  for (let attempt = 0; attempt < 10; attempt++) {
+    if (reportEventsMock.mock.calls.length > 0) return;
+    await new Promise(resolve => setImmediate(resolve));
+  }
+  throw new Error('Timed out waiting for reportEvents to be called');
+}
 
 describe('ensurePaymentMethodStored', () => {
   let testUser: User;
@@ -528,6 +611,7 @@ describe('processStripePaymentEventHook', () => {
   let mockStripePaymentMethod: Stripe.PaymentMethod;
 
   beforeEach(async () => {
+    reportEventsMock.mockClear();
     testUser = await insertTestUser();
     mockStripePaymentMethod = sampleStripePaymentMethod();
     mockStripePaymentMethod.customer = testUser.stripe_customer_id!;
@@ -619,11 +703,17 @@ describe('processStripePaymentEventHook', () => {
     expect(storedPaymentMethod[0].deleted_at).not.toBeNull();
   });
 
-  test('should handle payment_intent.succeeded event by ignoring it', async () => {
+  test('payment_intent.succeeded reports customer and amount to abuse service', async () => {
+    const paymentIntent = sampleStripePaymentIntent();
+    paymentIntent.customer = testUser.stripe_customer_id;
+    paymentIntent.amount = 1500;
+    paymentIntent.amount_received = 1400;
+
     const event: Stripe.Event = {
       ...baseStripeEvent(),
+      id: 'evt_payment_intent_succeeded',
       data: {
-        object: sampleStripePaymentIntent(),
+        object: paymentIntent,
         previous_attributes: {},
       },
       type: 'payment_intent.succeeded',
@@ -636,6 +726,223 @@ describe('processStripePaymentEventHook', () => {
     });
 
     expect(paymentMethodExists).toBeUndefined();
+    expect(reportEventsMock).toHaveBeenCalledWith({
+      events: [
+        {
+          type: 'stripe.payment_intent.succeeded',
+          occurred_at: 1234567890000,
+          data: {
+            id: 'evt_payment_intent_succeeded',
+            type: 'payment_intent.succeeded',
+            payment_intent: 'pi_test_123',
+            customer: testUser.stripe_customer_id,
+            amount: 1400,
+          },
+        },
+      ],
+    });
+  });
+
+  test('charge.failed reports customer and decline code to abuse service', async () => {
+    const event: Stripe.Event = {
+      ...baseStripeEvent(),
+      id: 'evt_charge_failed',
+      data: {
+        object: sampleStripeCharge({
+          id: 'ch_failed_123',
+          customer: testUser.stripe_customer_id,
+          outcome: {
+            advice_code: null,
+            network_advice_code: null,
+            network_decline_code: null,
+            network_status: 'declined_by_network',
+            reason: 'insufficient_funds',
+            risk_level: 'normal',
+            risk_score: 12,
+            seller_message: 'The bank returned the decline code `insufficient_funds`.',
+            type: 'issuer_declined',
+          },
+        }),
+        previous_attributes: {},
+      },
+      type: 'charge.failed',
+    };
+
+    await processStripePaymentEventHook(event);
+
+    expect(reportEventsMock).toHaveBeenCalledWith({
+      events: [
+        {
+          type: 'stripe.charge.failed',
+          occurred_at: 1234567890000,
+          data: {
+            id: 'evt_charge_failed',
+            type: 'charge.failed',
+            charge: 'ch_failed_123',
+            customer: testUser.stripe_customer_id,
+            decline_code: 'insufficient_funds',
+          },
+        },
+      ],
+    });
+  });
+
+  test('radar.early_fraud_warning.created resolves charge customer for abuse service', async () => {
+    const { client } = await import('@/lib/stripe-client');
+    const retrieveSpy = jest.spyOn(client.charges, 'retrieve').mockResolvedValue(
+      sampleStripeChargeResponse(
+        sampleStripeCharge({
+          id: 'ch_radar_123',
+          customer: testUser.stripe_customer_id,
+          payment_intent: 'pi_radar_123',
+        })
+      )
+    );
+
+    const event = {
+      ...baseStripeEvent(),
+      id: 'evt_radar_warning',
+      data: {
+        object: {
+          id: 'issfr_123',
+          object: 'radar.early_fraud_warning',
+          charge: 'ch_radar_123',
+          payment_intent: null,
+        },
+        previous_attributes: {},
+      },
+      type: 'radar.early_fraud_warning.created',
+    } as unknown as Stripe.Event;
+
+    await processStripePaymentEventHook(event);
+    await waitForReportEventsCall();
+
+    expect(retrieveSpy).toHaveBeenCalledWith('ch_radar_123');
+    expect(reportEventsMock).toHaveBeenCalledWith({
+      events: [
+        {
+          type: 'stripe.radar.early_fraud_warning.created',
+          occurred_at: 1234567890000,
+          data: {
+            id: 'evt_radar_warning',
+            type: 'radar.early_fraud_warning.created',
+            charge: 'ch_radar_123',
+            customer: testUser.stripe_customer_id,
+            payment_intent: 'pi_radar_123',
+            early_fraud_warning: 'issfr_123',
+          },
+        },
+      ],
+    });
+
+    retrieveSpy.mockRestore();
+  });
+
+  test('charge.dispute.funds_withdrawn resolves charge customer for abuse service', async () => {
+    const { client } = await import('@/lib/stripe-client');
+    const retrieveSpy = jest.spyOn(client.charges, 'retrieve').mockResolvedValue(
+      sampleStripeChargeResponse(
+        sampleStripeCharge({
+          id: 'ch_dispute_withdrawn_123',
+          customer: testUser.stripe_customer_id,
+          payment_intent: 'pi_dispute_withdrawn_123',
+        })
+      )
+    );
+
+    const event: Stripe.Event = {
+      ...baseStripeEvent(),
+      id: 'evt_dispute_withdrawn',
+      data: {
+        object: sampleStripeDispute({
+          id: 'dp_withdrawn_123',
+          charge: 'ch_dispute_withdrawn_123',
+        }),
+        previous_attributes: {},
+      },
+      type: 'charge.dispute.funds_withdrawn',
+    };
+
+    await processStripePaymentEventHook(event);
+    await waitForReportEventsCall();
+
+    expect(retrieveSpy).toHaveBeenCalledWith('ch_dispute_withdrawn_123');
+    expect(reportEventsMock).toHaveBeenCalledWith({
+      events: [
+        {
+          type: 'stripe.charge.dispute.funds_withdrawn',
+          occurred_at: 1234567890000,
+          data: {
+            id: 'evt_dispute_withdrawn',
+            type: 'charge.dispute.funds_withdrawn',
+            charge: 'ch_dispute_withdrawn_123',
+            customer: testUser.stripe_customer_id,
+            payment_intent: 'pi_dispute_withdrawn_123',
+            dispute: 'dp_withdrawn_123',
+          },
+        },
+      ],
+    });
+
+    retrieveSpy.mockRestore();
+  });
+
+  test('charge.dispute.created resolves charge customer for abuse service', async () => {
+    await cleanupDbForTest();
+    testUser = await insertTestUser();
+
+    const { client } = await import('@/lib/stripe-client');
+    const kiloClawInvoice = {
+      object: 'invoice',
+      lines: {
+        data: [{ pricing: { price_details: { price: CURRENT_KILOCLAW_STANDARD_PRICE_ID } } }],
+      },
+    } as unknown as Stripe.Invoice;
+    const retrieveSpy = jest.spyOn(client.charges, 'retrieve').mockResolvedValue(
+      sampleStripeChargeResponse(
+        sampleStripeCharge({
+          id: 'ch_dispute_created_123',
+          customer: testUser.stripe_customer_id,
+          payment_intent: 'pi_dispute_created_123',
+        }),
+        { invoice: kiloClawInvoice }
+      )
+    );
+
+    const event: Stripe.Event = {
+      ...baseStripeEvent(),
+      id: 'evt_dispute_created_abuse',
+      data: {
+        object: sampleStripeDispute({
+          id: 'dp_created_123',
+          charge: 'ch_dispute_created_123',
+        }),
+        previous_attributes: {},
+      },
+      type: 'charge.dispute.created',
+    };
+
+    await processStripePaymentEventHook(event);
+    await waitForReportEventsCall();
+
+    expect(reportEventsMock).toHaveBeenCalledWith({
+      events: [
+        {
+          type: 'stripe.charge.dispute.created',
+          occurred_at: 1234567890000,
+          data: {
+            id: 'evt_dispute_created_abuse',
+            type: 'charge.dispute.created',
+            charge: 'ch_dispute_created_123',
+            customer: testUser.stripe_customer_id,
+            payment_intent: 'pi_dispute_created_123',
+            dispute: 'dp_created_123',
+          },
+        },
+      ],
+    });
+
+    retrieveSpy.mockRestore();
   });
 
   test('should handle missing user gracefully', async () => {

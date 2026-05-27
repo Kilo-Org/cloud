@@ -1,13 +1,13 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
-import { useTRPC } from '@/lib/trpc/utils';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { ArrowLeft, MessageSquare, CheckCircle2, Building2, User } from 'lucide-react';
 import type { WorkspaceSelection } from './types';
 import { useState } from 'react';
+import { PLATFORM } from '@/lib/integrations/core/constants';
+import { getPlatformOAuthConnectPath } from '@/lib/integrations/oauth/paths';
 
 type SlackConnectStepProps = {
   workspace: WorkspaceSelection;
@@ -15,25 +15,14 @@ type SlackConnectStepProps = {
 };
 
 export function SlackConnectStep({ workspace, onBack }: SlackConnectStepProps) {
-  const trpc = useTRPC();
   const [isStartingSlackConnection, setIsStartingSlackConnection] = useState(false);
 
-  // Get OAuth URL only when the user clicks Connect so the signed state is fresh.
-  const { refetch: refetchOAuthUrl, isFetching: isFetchingOAuthUrl } = useQuery(
-    trpc.slack.getOAuthUrl.queryOptions(
-      workspace.type === 'org' ? { organizationId: workspace.id } : undefined,
-      { enabled: false }
-    )
-  );
-
-  const handleConnectSlack = async () => {
+  const handleConnectSlack = () => {
     setIsStartingSlackConnection(true);
-    const result = await refetchOAuthUrl();
-    if (result.data?.url) {
-      window.location.href = result.data.url;
-    } else {
-      setIsStartingSlackConnection(false);
-    }
+    window.location.href = getPlatformOAuthConnectPath(
+      PLATFORM.SLACK,
+      workspace.type === 'org' ? workspace.id : undefined
+    );
   };
 
   const workspaceName = workspace.type === 'user' ? 'Personal Account' : workspace.name;
@@ -111,10 +100,10 @@ export function SlackConnectStep({ workspace, onBack }: SlackConnectStepProps) {
             onClick={handleConnectSlack}
             size="lg"
             className="w-full bg-[#4A154B] text-white hover:bg-[#3a1039]"
-            disabled={isStartingSlackConnection || isFetchingOAuthUrl}
+            disabled={isStartingSlackConnection}
           >
             <MessageSquare className="mr-2 h-5 w-5" />
-            {isStartingSlackConnection || isFetchingOAuthUrl ? 'Loading...' : 'Connect Slack'}
+            {isStartingSlackConnection ? 'Loading...' : 'Connect Slack'}
           </Button>
 
           <p className="text-muted-foreground text-center text-xs">

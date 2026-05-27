@@ -16,7 +16,6 @@ import { BotIdentityStep } from './BotIdentityStep';
 import { ClawConfigServiceBanner } from './ClawConfigServiceBanner';
 import { ClawHeader } from './ClawHeader';
 import { CalendarConnectStepView } from './CalendarConnectStep';
-import { ConnectToolsStepView } from './ConnectToolsStep';
 import { InboundEmailStepView } from './InboundEmailStep';
 import { InterestsStepView } from './InterestsStep';
 import { ClawSetupCompleteStep, ClawSetupErrorStep } from './ClawOnboardingFlow';
@@ -173,7 +172,7 @@ type RenderFakeStepInput = {
 };
 
 function getFakeStepProgress(step: ClawOnboardingRenderStep): StepProgress {
-  return getClawOnboardingStepProgress(getFakeOnboardingStep(step), true, true, step === 'tools');
+  return getClawOnboardingStepProgress(getFakeOnboardingStep(step), true, true, false);
 }
 
 function getFakeOnboardingStep(step: ClawOnboardingRenderStep): OnboardingStep {
@@ -194,27 +193,9 @@ function getFakeOnboardingStep(step: ClawOnboardingRenderStep): OnboardingStep {
 function renderFakeStep({ step, setStep, stepProgress, basePath }: RenderFakeStepInput) {
   switch (step) {
     case 'identity': {
-      return <BotIdentityStep {...stepProgress} onContinue={() => setStep('tools')} />;
+      return <BotIdentityStep {...stepProgress} onContinue={() => setStep('calendar')} />;
     }
-    case 'tools': {
-      return (
-        <ConnectToolsStepView
-          {...stepProgress}
-          status="disconnected"
-          loading={false}
-          connecting={false}
-          savingManual={false}
-          readyToConnect={true}
-          readyToSaveManualCredentials={true}
-          manualConfigured={false}
-          organizationContext={false}
-          onConnect={() => setStep('email')}
-          onSkip={() => setStep('email')}
-          onContinue={() => setStep('email')}
-          onSaveManualCredentials={() => setStep('email')}
-        />
-      );
-    }
+    case 'tools':
     case 'calendar': {
       return (
         <CalendarConnectStepView

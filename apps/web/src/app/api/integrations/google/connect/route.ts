@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { getUserFromAuth } from '@/lib/user/server';
 import { APP_URL } from '@/lib/constants';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
+import { requireOrganizationKiloClawComputeEntitlement } from '@/lib/organizations/trial-middleware';
 import { getActiveInstance, getActiveOrgInstance } from '@/lib/kiloclaw/instance-registry';
 import { buildGoogleOAuthUrl } from '@/lib/integrations/google-service';
 import {
@@ -52,6 +53,7 @@ export async function GET(request: NextRequest) {
       }
       organizationId = parsedOrgId.data;
       await ensureOrganizationAccess({ user }, organizationId);
+      await requireOrganizationKiloClawComputeEntitlement(organizationId);
     }
 
     const owner: Owner = organizationId

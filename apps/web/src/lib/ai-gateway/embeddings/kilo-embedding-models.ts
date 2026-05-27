@@ -4,6 +4,7 @@ export type KiloEmbeddingModel = {
   dimension: number;
   scoreThreshold: number;
   note?: string;
+  dimensionMode?: 'fixed';
 };
 
 export type KiloEmbeddingModelCatalog = {
@@ -18,15 +19,17 @@ export const KILO_EMBEDDING_MODELS = [
   {
     id: 'mistralai/codestral-embed-2505',
     name: 'Codestral Embed 2505',
-    dimension: 256,
+    dimension: 1536,
     scoreThreshold: 0.35,
     note: 'code',
+    dimensionMode: 'fixed',
   },
   {
     id: KILO_DEFAULT_EMBEDDING_MODEL,
     name: 'Mistral Embed 2312',
     dimension: 1024,
     scoreThreshold: 0.35,
+    dimensionMode: 'fixed',
   },
   {
     id: 'openai/text-embedding-3-small',
@@ -45,6 +48,7 @@ export const KILO_EMBEDDING_MODELS = [
     name: 'OpenAI Text Embedding Ada 002',
     dimension: 1536,
     scoreThreshold: 0.4,
+    dimensionMode: 'fixed',
   },
   {
     id: 'google/gemini-embedding-001',
@@ -82,12 +86,14 @@ export const KILO_EMBEDDING_MODELS = [
     name: 'BAAI bge-large-en-v1.5',
     dimension: 1024,
     scoreThreshold: 0.35,
+    dimensionMode: 'fixed',
   },
   {
     id: 'baai/bge-base-en-v1.5',
     name: 'BAAI bge-base-en-v1.5',
     dimension: 768,
     scoreThreshold: 0.35,
+    dimensionMode: 'fixed',
   },
   { id: 'thenlper/gte-large', name: 'GTE Large', dimension: 1024, scoreThreshold: 0.35 },
   { id: 'thenlper/gte-base', name: 'GTE Base', dimension: 768, scoreThreshold: 0.35 },

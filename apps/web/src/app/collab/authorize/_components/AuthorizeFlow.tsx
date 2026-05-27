@@ -4,12 +4,14 @@ import { useEffect, useState } from 'react';
 import { AlertCircle, Check, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useRouter } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import KiloLogo from '@/components/KiloLogo';
-import { useTRPC } from '@/lib/trpc/utils';
 import { useUser } from '@/hooks/useUser';
+import {
+  getPlatformOAuthConnectPath,
+  type StandardOAuthPlatform,
+} from '@/lib/integrations/oauth/paths';
 import { getPlatform, type PlatformId, type PlatformOption } from '../../_components/platforms';
 import { buildReturnToPath } from './authorize-path';
 
@@ -29,11 +31,11 @@ type AuthorizeFlowProps = {
 export function AuthorizeFlow(props: AuthorizeFlowProps) {
   const { serviceIds, connectedServiceIds, organizationId, initialIndex, initialError } = props;
   const router = useRouter();
-  const trpc = useTRPC();
   const { data: user } = useUser();
   const [index, setIndex] = useState(initialIndex);
   const [done, setDone] = useState(initialIndex >= serviceIds.length);
   const [connectionError, setConnectionError] = useState<string | null>(initialError ?? null);
+  const [isStartingOAuth, setIsStartingOAuth] = useState(false);
 
   const services = serviceIds.map(id => getPlatform(id)).filter(p => p !== undefined);
   const current = services[index];
@@ -45,24 +47,8 @@ export function AuthorizeFlow(props: AuthorizeFlowProps) {
       step,
     });
   const returnTo = getAuthorizePath(index);
-  const oauthInput = {
-    ...(organizationId ? { organizationId } : {}),
-    returnTo,
-  };
-
-  const { refetch: refetchSlackOAuthUrl, isFetching: isFetchingSlackOAuthUrl } = useQuery(
-    trpc.slack.getOAuthUrl.queryOptions(oauthInput, { enabled: false })
-  );
-  const { refetch: refetchDiscordOAuthUrl, isFetching: isFetchingDiscordOAuthUrl } = useQuery(
-    trpc.discord.getOAuthUrl.queryOptions(oauthInput, { enabled: false })
-  );
-  const { refetch: refetchLinearOAuthUrl, isFetching: isFetchingLinearOAuthUrl } = useQuery(
-    trpc.linear.getOAuthUrl.queryOptions(oauthInput, { enabled: false })
-  );
 
   const isLoadingGitHubUser = current?.id === 'github' && !organizationId && !user;
-  const isStartingOAuth =
-    isFetchingSlackOAuthUrl || isFetchingDiscordOAuthUrl || isFetchingLinearOAuthUrl;
 
   useEffect(() => {
     setIndex(initialIndex);
@@ -83,22 +69,22 @@ export function AuthorizeFlow(props: AuthorizeFlowProps) {
     setConnectionError(null);
 
     try {
+      setIsStartingOAuth(true);
       const oauthUrl = await getOAuthUrl(current.id, {
         organizationId,
         returnTo,
         userId: user?.id,
-        getSlackOAuthUrl: refetchSlackOAuthUrl,
-        getDiscordOAuthUrl: refetchDiscordOAuthUrl,
-        getLinearOAuthUrl: refetchLinearOAuthUrl,
       });
 
       if (!oauthUrl) {
         setConnectionError(`${current.name} setup is not available from this flow yet.`);
+        setIsStartingOAuth(false);
         return;
       }
 
       window.location.href = oauthUrl;
     } catch (error) {
+      setIsStartingOAuth(false);
       setConnectionError(
         error instanceof Error ? error.message : `Couldn't start ${current.name}.`
       );
@@ -186,24 +172,10 @@ async function getOAuthUrl(
     organizationId?: string;
     returnTo: string;
     userId?: string;
-    getSlackOAuthUrl: () => Promise<{ data?: { url: string } }>;
-    getDiscordOAuthUrl: () => Promise<{ data?: { url: string } }>;
-    getLinearOAuthUrl: () => Promise<{ data?: { url: string } }>;
   }
 ): Promise<string | null> {
-  if (platformId === 'slack') {
-    return (await options.getSlackOAuthUrl()).data?.url ?? null;
-  }
-  if (platformId === 'discord') {
-    return (await options.getDiscordOAuthUrl()).data?.url ?? null;
-  }
-  if (platformId === 'linear') {
-    return (await options.getLinearOAuthUrl()).data?.url ?? null;
-  }
-  if (platformId === 'gitlab') {
-    const params = new URLSearchParams({ returnTo: options.returnTo });
-    if (options.organizationId) params.set('organizationId', options.organizationId);
-    return `/api/integrations/gitlab/connect?${params.toString()}`;
+  if (isCollabOAuthConnectPlatform(platformId)) {
+    return getPlatformOAuthConnectPath(platformId, options.organizationId, options.returnTo);
   }
   if (platformId === 'github') {
     const ownerToken = options.organizationId
@@ -217,6 +189,19 @@ async function getOAuthUrl(
     return `https://github.com/apps/${githubAppName}/installations/new?state=${encodeURIComponent(state)}`;
   }
   return null;
+}
+
+const COLLAB_OAUTH_CONNECT_PLATFORM_IDS = new Set<PlatformId>([
+  'slack',
+  'discord',
+  'linear',
+  'gitlab',
+]);
+
+function isCollabOAuthConnectPlatform(
+  platformId: PlatformId
+): platformId is Extract<PlatformId, StandardOAuthPlatform> {
+  return COLLAB_OAUTH_CONNECT_PLATFORM_IDS.has(platformId);
 }
 
 function ConnectionBadge({ service }: { service: PlatformOption }) {

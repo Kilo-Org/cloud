@@ -19,6 +19,8 @@ import { useTRPC } from '@/lib/trpc/utils';
 import { IS_DEVELOPMENT } from '@/lib/constants';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import { useModelSelectorList } from '@/app/api/openrouter/hooks';
+import { PLATFORM } from '@/lib/integrations/core/constants';
+import { getPlatformOAuthConnectPath } from '@/lib/integrations/oauth/paths';
 
 type SlackIntegrationDetailsProps = {
   organizationId?: string;
@@ -60,11 +62,6 @@ export function SlackIntegrationDetails({
     isLoading,
     refetch,
   } = useQuery(trpc.slack.getInstallation.queryOptions(input));
-
-  // Get OAuth URL only when the user clicks Connect so the signed state is fresh.
-  const { refetch: refetchOAuthUrl, isFetching: isFetchingOAuthUrl } = useQuery(
-    trpc.slack.getOAuthUrl.queryOptions(input, { enabled: false })
-  );
 
   // Fetch models for the model selector
   const { data: openRouterModels, isLoading: isLoadingModels } =
@@ -150,19 +147,9 @@ export function SlackIntegrationDetails({
     }
   }, [success, error]);
 
-  const handleInstall = async () => {
+  const handleInstall = () => {
     setIsStartingSlackConnection(true);
-    const result = await refetchOAuthUrl();
-    if (result.data?.url) {
-      window.location.href = result.data.url;
-    } else if (result.error) {
-      setIsStartingSlackConnection(false);
-      toast.error('Failed to start Slack connection', {
-        description: result.error.message,
-      });
-    } else {
-      setIsStartingSlackConnection(false);
-    }
+    window.location.href = getPlatformOAuthConnectPath(PLATFORM.SLACK, organizationId);
   };
 
   const handleUninstall = () => {
@@ -282,11 +269,11 @@ export function SlackIntegrationDetails({
             </p>
             <Button
               onClick={handleInstall}
-              disabled={isStartingSlackConnection || isFetchingOAuthUrl}
+              disabled={isStartingSlackConnection}
               className="bg-yellow-400 text-yellow-950 hover:bg-yellow-300"
             >
               <RefreshCw className="mr-2 h-4 w-4" />
-              {isStartingSlackConnection || isFetchingOAuthUrl ? 'Loading...' : 'Re-install'}
+              {isStartingSlackConnection ? 'Loading...' : 'Re-install'}
             </Button>
           </AlertDescription>
         </Alert>
@@ -300,11 +287,11 @@ export function SlackIntegrationDetails({
             <p>{getSuspendedSlackIntegrationMessage(installation.suspendedBy)}</p>
             <Button
               onClick={handleInstall}
-              disabled={isStartingSlackConnection || isFetchingOAuthUrl}
+              disabled={isStartingSlackConnection}
               className="bg-yellow-400 text-yellow-950 hover:bg-yellow-300"
             >
               <RefreshCw className="mr-2 h-4 w-4" />
-              {isStartingSlackConnection || isFetchingOAuthUrl ? 'Loading...' : 'Re-install Slack'}
+              {isStartingSlackConnection ? 'Loading...' : 'Re-install Slack'}
             </Button>
           </AlertDescription>
         </Alert>
@@ -400,11 +387,11 @@ export function SlackIntegrationDetails({
                   <Button
                     variant="outline"
                     onClick={handleInstall}
-                    disabled={isStartingSlackConnection || isFetchingOAuthUrl}
+                    disabled={isStartingSlackConnection}
                     title="Re-run the Slack OAuth flow to refresh scopes and permissions"
                   >
                     <RefreshCw className="mr-2 h-4 w-4" />
-                    {isStartingSlackConnection || isFetchingOAuthUrl ? 'Loading...' : 'Re-install'}
+                    {isStartingSlackConnection ? 'Loading...' : 'Re-install'}
                   </Button>
                   {!isSuspended && (
                     <TestConnectionButton
@@ -471,10 +458,10 @@ export function SlackIntegrationDetails({
                 onClick={handleInstall}
                 size="lg"
                 className="w-full"
-                disabled={isStartingSlackConnection || isFetchingOAuthUrl}
+                disabled={isStartingSlackConnection}
               >
                 <MessageSquare className="mr-2 h-4 w-4" />
-                {isStartingSlackConnection || isFetchingOAuthUrl ? 'Loading...' : 'Connect Slack'}
+                {isStartingSlackConnection ? 'Loading...' : 'Connect Slack'}
               </Button>
             </>
           )}

@@ -13,6 +13,11 @@ const mockedEnsureOrganizationAccess = jest.fn();
 jest.mock('@/routers/organizations/utils', () => ({
   ensureOrganizationAccess: mockedEnsureOrganizationAccess,
 }));
+const mockedRequireOrganizationKiloClawComputeEntitlement = jest.fn();
+jest.mock('@/lib/organizations/trial-middleware', () => ({
+  requireOrganizationKiloClawComputeEntitlement:
+    mockedRequireOrganizationKiloClawComputeEntitlement,
+}));
 jest.mock('@/lib/kiloclaw/instance-registry');
 jest.mock('@/lib/integrations/google-service');
 // Partial-mock so GOOGLE_OAUTH_RETURN_TO_REGEX (and any other constants) keep
@@ -104,7 +109,7 @@ describe('GET /api/integrations/google/connect', () => {
     );
   });
 
-  test('redirects org flow to Google OAuth URL', async () => {
+  test('redirects entitled org flow to Google OAuth URL', async () => {
     const { GET } = await import('./route');
     const response = await GET(
       makeRequest(`/api/integrations/google/connect?organizationId=${ORG_ID}`) as never
@@ -115,6 +120,7 @@ describe('GET /api/integrations/google/connect', () => {
       'https://accounts.google.com/o/oauth2/v2/auth?x=1'
     );
     expect(mockedEnsureOrganizationAccess).toHaveBeenCalledWith({ user: { id: USER_ID } }, ORG_ID);
+    expect(mockedRequireOrganizationKiloClawComputeEntitlement).toHaveBeenCalledWith(ORG_ID);
     expect(mockedGetActiveOrgInstance).toHaveBeenCalledWith(USER_ID, ORG_ID);
     expect(mockedCreateGoogleOAuthState).toHaveBeenCalledWith(
       {

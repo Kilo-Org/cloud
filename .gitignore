@@ -67,6 +67,7 @@ yarn-error.log*
 /.plans/*
 !/.plans/experimental-models-1.md
 !/.plans/experimental-models-2.md
+!/.plans/kilo-pass-welcome-promo-card-fingerprint-guard.md
 /.plan/
 .kilo/plans
 .superpowers/

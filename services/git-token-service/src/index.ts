@@ -89,6 +89,14 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
         candidate.integrationId,
         refreshedAccountLogin
       );
+      console.log(
+        JSON.stringify({
+          message: 'Repaired GitHub installation account login after token lookup miss',
+          integrationId: candidate.integrationId,
+          installationId: candidate.installationId,
+          appType: candidate.githubAppType,
+        })
+      );
     }
   }
 

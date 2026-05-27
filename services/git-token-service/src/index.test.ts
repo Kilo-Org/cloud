@@ -70,6 +70,7 @@ describe('GitTokenRPCEntrypoint', () => {
     const updateAccountLogin = vi
       .spyOn(InstallationLookupService.prototype, 'updateAccountLogin')
       .mockResolvedValue();
+    const consoleLog = vi.spyOn(console, 'log').mockImplementation(() => {});
     vi.spyOn(
       GitHubTokenService.prototype,
       'refreshInstallationAccountLoginIfDue'
@@ -86,6 +87,16 @@ describe('GitTokenRPCEntrypoint', () => {
 
     expect(result).toMatchObject({ success: true, token: 'scoped-token' });
     expect(updateAccountLogin).toHaveBeenCalledWith('integration-1', 'renamed-owner');
+    expect(consoleLog).toHaveBeenCalledWith(
+      JSON.stringify({
+        message: 'Repaired GitHub installation account login after token lookup miss',
+        integrationId: 'integration-1',
+        installationId: '123',
+        appType: 'standard',
+      })
+    );
+    expect(JSON.stringify(consoleLog.mock.calls)).not.toContain('old-owner');
+    expect(JSON.stringify(consoleLog.mock.calls)).not.toContain('renamed-owner');
     expect(findInstallationId).toHaveBeenCalledTimes(2);
     expect(getTokenForRepo).toHaveBeenCalledWith('123', 'repository', 'standard');
   });
@@ -109,6 +120,7 @@ describe('GitTokenRPCEntrypoint', () => {
     const updateAccountLogin = vi
       .spyOn(InstallationLookupService.prototype, 'updateAccountLogin')
       .mockResolvedValue();
+    vi.spyOn(console, 'log').mockImplementation(() => {});
     vi.spyOn(
       GitHubTokenService.prototype,
       'refreshInstallationAccountLoginIfDue'

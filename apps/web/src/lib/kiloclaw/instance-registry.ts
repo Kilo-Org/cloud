@@ -196,22 +196,6 @@ export async function restoreDestroyedInstance(instanceId: string): Promise<void
     .where(eq(kiloclaw_instances.id, instanceId));
 }
 
-// Retained until retired managed Composio state is verified and its schema is dropped.
-// Manual provenance prevents follow-up cleanup from removing user-owned secrets.
-export async function markComposioInstanceConfigManual(instanceId: string): Promise<void> {
-  await db
-    .update(kiloclaw_instances)
-    .set({ composio_config_source: 'manual' })
-    .where(eq(kiloclaw_instances.id, instanceId));
-}
-
-export async function clearComposioInstanceConfigSource(instanceId: string): Promise<void> {
-  await db
-    .update(kiloclaw_instances)
-    .set({ composio_config_source: null })
-    .where(eq(kiloclaw_instances.id, instanceId));
-}
-
 /**
  * Fetch the user's active personal KiloClaw instance (read-only, no upsert).
  *

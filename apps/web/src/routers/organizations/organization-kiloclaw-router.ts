@@ -39,10 +39,8 @@ import {
   getInboundEmailAddressForInstance,
 } from '@/lib/kiloclaw/inbound-email-alias';
 import {
-  clearComposioInstanceConfigSource,
   getActiveOrgInstance,
   markActiveInstanceDestroyed,
-  markComposioInstanceConfigManual,
   renameOrgInstance,
   restoreDestroyedInstance,
   workerInstanceId,
@@ -52,11 +50,7 @@ import {
   getOrganizationProvisionLockKey,
   withKiloclawProvisionContextLock,
 } from '@/lib/kiloclaw/provision-lock';
-import {
-  encryptProvisionSecretsForWorker,
-  getComposioSecretsPatchSource,
-  hasComposioProvisionSecrets,
-} from '@/lib/kiloclaw/provision-secrets';
+import { encryptProvisionSecretsForWorker } from '@/lib/kiloclaw/provision-secrets';
 import {
   organizationMemberProcedure,
   organizationMemberMutationProcedure,
@@ -487,10 +481,6 @@ export const organizationKiloclawRouter = createTRPCRouter({
             { orgId: input.organizationId }
           );
 
-          if (hasComposioProvisionSecrets(input.secrets)) {
-            await markComposioInstanceConfigManual(result.instanceId);
-          }
-
           PostHogClient().capture({
             distinctId: ctx.user.google_user_email,
             event: 'claw_org_instance_provisioned',
@@ -543,10 +533,6 @@ export const organizationKiloclawRouter = createTRPCRouter({
         },
         { instanceId: instance.id, orgId: input.organizationId }
       );
-
-      if (hasComposioProvisionSecrets(input.secrets)) {
-        await markComposioInstanceConfigManual(result.instanceId);
-      }
 
       return result;
     }),
@@ -751,18 +737,11 @@ export const organizationKiloclawRouter = createTRPCRouter({
       const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
       const client = new KiloClawInternalClient();
       try {
-        const result = await client.patchSecrets(
+        return await client.patchSecrets(
           ctx.user.id,
           { secrets: encryptedPatch, meta: input.meta },
           workerInstanceId(instance)
         );
-        const composioSourceAction = getComposioSecretsPatchSource(input.secrets);
-        if (composioSourceAction === 'upsert_manual') {
-          await markComposioInstanceConfigManual(instance.id);
-        } else if (composioSourceAction === 'clear') {
-          await clearComposioInstanceConfigSource(instance.id);
-        }
-        return result;
       } catch (err) {
         if (err instanceof KiloClawApiError && err.statusCode >= 400 && err.statusCode < 500) {
           let message = `Secret patch failed (${err.statusCode})`;

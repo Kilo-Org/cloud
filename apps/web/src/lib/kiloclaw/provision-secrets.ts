@@ -8,19 +8,8 @@ import { encryptKiloClawSecret } from '@/lib/kiloclaw/encryption';
 
 const COMPOSIO_SECRET_FIELD_KEYS = ['composioUserApiKey', 'composioOrg'] as const;
 
-export function hasComposioProvisionSecrets(secrets: Record<string, string> | undefined): boolean {
-  return COMPOSIO_SECRET_FIELD_KEYS.some(key => secrets?.[key] !== undefined);
-}
-
-export function getComposioSecretsPatchSource(
-  secrets: Record<string, string | null>
-): 'upsert_manual' | 'clear' | 'none' {
-  const touchedValues = COMPOSIO_SECRET_FIELD_KEYS.filter(key => secrets[key] !== undefined).map(
-    key => secrets[key]
-  );
-  if (touchedValues.length === 0) return 'none';
-  if (touchedValues.every(value => value === null)) return 'clear';
-  return 'upsert_manual';
+function hasComposioProvisionSecrets(secrets: Record<string, string>): boolean {
+  return COMPOSIO_SECRET_FIELD_KEYS.some(key => secrets[key] !== undefined);
 }
 
 function validateComposioProvisionSecrets(secrets: Record<string, string>): void {

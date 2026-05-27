@@ -3112,6 +3112,85 @@ describe('instance destruction sweep', () => {
     );
   });
 
+  it('clears a soft-deleted detached subscription instead of leaving it to pin the queue', async () => {
+    // Regression for the review of this PR. The detached check fires
+    // BEFORE the soft-deleted check inside the loop, so a row that is
+    // BOTH soft-deleted AND detached (`instance_id IS NULL`) still gets
+    // its destruction_deadline cleared. Without that ordering, the
+    // soft-deleted `continue` would short-circuit the loop and the row
+    // would stay at the head of the bounded FIFO queue forever — the
+    // same starvation the PR fixes for the common case, just gated on
+    // a different attribute.
+    const subscriptionId = 'sub-detached-softdeleted';
+    const detachedBefore = {
+      id: subscriptionId,
+      user_id: 'user-softdeleted',
+      instance_id: null,
+      destruction_deadline: '2026-04-17T18:41:17.736Z',
+    };
+    const detachedAfter = { ...detachedBefore, destruction_deadline: null };
+    const { db, updates, txUpdates, inserts, txInserts, deletes } = createMockDb(
+      [
+        [
+          {
+            id: subscriptionId,
+            user_id: 'user-softdeleted',
+            instance_id: null,
+            sandbox_id: null,
+            organization_id: null,
+            status: 'canceled',
+            // Trailing @deleted.invalid identifies a soft-deleted account
+            // (see SOFT_DELETED_EMAIL_SUFFIX in lifecycle.ts).
+            email: 'user-softdeleted@deleted.invalid',
+          },
+        ],
+        [detachedBefore],
+      ],
+      { txUpdateReturningRows: [[detachedAfter]] }
+    );
+    mockGetWorkerDb.mockReturnValue(db);
+    const fetch = vi.fn();
+
+    const summary = await runSweep(
+      createEnv(fetch),
+      {
+        runId: 'cdcdcdcd-cdcd-4cdc-8cdc-cdcdcdcdcdcd',
+        sweep: 'instance_destruction',
+      },
+      1
+    );
+
+    expect(summary.errors).toBe(0);
+    expect(summary.sweep3_instance_destruction).toBe(0);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+    // Cleared inside a transaction even though the user is soft-deleted.
+    expect(updates).toHaveLength(0);
+    expect(inserts).toHaveLength(0);
+    expect(deletes).toHaveLength(0);
+    expect(txUpdates).toEqual([{ destruction_deadline: null }]);
+    expect(txInserts).toHaveLength(1);
+    expect(txInserts[0]).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          subscription_id: subscriptionId,
+          actor_id: 'billing-lifecycle-job',
+          action: 'status_changed',
+          reason: 'detached_subscription_no_instance',
+        }),
+      ])
+    );
+    expect(loggedValues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          message: 'Skipping instance destruction for detached subscription row',
+          reason: 'missing_instance_id',
+          subscriptionId,
+        }),
+      ])
+    );
+  });
+
   it('keeps DB/email cleanup unchanged when platform destroy succeeds', async () => {
     const instanceId = '11111111-1111-4111-8111-111111111111';
     const { db, updates, txUpdates, inserts, deletes, selectBuilders } = createMockDb([

@@ -3732,17 +3732,14 @@ async function runInstanceDestructionSweep(
 
   for (const row of destructionCandidates) {
     try {
-      if (isSoftDeletedUserEmail(row.email)) continue;
-      if (row.status === 'active') {
-        logSkippedSubscriptionRow(
-          'Skipping instance destruction for active subscription row',
-          row,
-          {
-            reason: 'active_subscription',
-          }
-        );
-        continue;
-      }
+      // Detached rows are checked FIRST, before any other skip path. A row
+      // with no instance has no live resource to destroy regardless of the
+      // owning user's other attributes (soft-deleted, active, etc), so the
+      // deadline is stale bookkeeping and the row must be cleared from the
+      // bounded candidate queue. Without this ordering, a soft-deleted
+      // detached row would hit the soft-deleted continue below and stay
+      // pinned at the head of the FIFO queue indefinitely, recreating the
+      // exact starvation this PR fixes for the common case.
       if (!row.instance_id) {
         logSkippedSubscriptionRow(
           'Skipping instance destruction for detached subscription row',
@@ -3753,6 +3750,17 @@ async function runInstanceDestructionSweep(
         );
         // Bulk-cleared after the loop — see detachedSubscriptionIds below.
         detachedSubscriptionIds.push(row.id);
+        continue;
+      }
+      if (isSoftDeletedUserEmail(row.email)) continue;
+      if (row.status === 'active') {
+        logSkippedSubscriptionRow(
+          'Skipping instance destruction for active subscription row',
+          row,
+          {
+            reason: 'active_subscription',
+          }
+        );
         continue;
       }
 

@@ -378,6 +378,35 @@ describe('file routes', () => {
       );
     });
 
+    it('returns a conflict if openclaw.json disappears during ETag validation', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.lstatSync).mockReturnValue({
+        isSymbolicLink: () => false,
+        isFile: () => true,
+      } as any);
+      vi.mocked(fs.readFileSync).mockImplementation(() => {
+        throw Object.assign(new Error('file removed'), { code: 'ENOENT' });
+      });
+
+      const res = await app.request('/_kilo/files/write-openclaw-config', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({
+          content: '{"gateway":{"mode":"local"}}',
+          etag: 'prior-etag',
+          mode: 'warn-before-write',
+        }),
+      });
+
+      expect(res.status).toBe(409);
+      await expect(res.json()).resolves.toEqual({
+        code: 'file_etag_conflict',
+        error: 'File was modified externally',
+      });
+      expect(validateOpenclawConfigCandidate).not.toHaveBeenCalled();
+      expect(atomicWrite).not.toHaveBeenCalled();
+    });
+
     it('returns a warning without writing an invalid openclaw config', async () => {
       vi.mocked(fs.existsSync).mockReturnValue(true);
       vi.mocked(fs.lstatSync).mockReturnValue({

@@ -769,8 +769,12 @@ export function registerFileRoutes(app: Hono, expectedToken: string, rootDir: st
 
     const hasEtagConflict = () => {
       if (!body.etag) return false;
-      const currentContent = fs.readFileSync(result, 'utf-8');
-      return body.etag !== computeEtag(currentContent);
+      try {
+        const currentContent = fs.readFileSync(result, 'utf-8');
+        return body.etag !== computeEtag(currentContent);
+      } catch {
+        return true;
+      }
     };
 
     return serializeAgentConfigMutation(

@@ -54,8 +54,20 @@ export type OpenclawConfigValidationDeps = {
   runValidation: (stagePath: string) => Promise<CommandResult>;
 };
 
+function errorCode(error: unknown): string {
+  if (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    typeof error.code === 'string'
+  ) {
+    return error.code;
+  }
+  return 'unknown';
+}
+
 function isMissingFileError(error: unknown): boolean {
-  return typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT';
+  return errorCode(error) === 'ENOENT';
 }
 
 function removeFileIfPresent(filePath: string): void {
@@ -217,14 +229,15 @@ export async function validateOpenclawConfigCandidate(
       };
     }
     return unavailableIssue('OpenClaw could not validate this configuration.');
-  } catch {
+  } catch (error) {
+    console.error('[openclaw-config-validation] Validation failed unexpectedly:', errorCode(error));
     return unavailableIssue('OpenClaw configuration validation could not be started.');
   } finally {
     try {
       deps.removeFile(stagePath);
       deps.removeFile(stageBackupPath);
-    } catch {
-      // Best-effort cleanup: never replace a validation outcome with cleanup failure.
+    } catch (error) {
+      console.warn('[openclaw-config-validation] Staging cleanup failed:', errorCode(error));
     }
   }
 }

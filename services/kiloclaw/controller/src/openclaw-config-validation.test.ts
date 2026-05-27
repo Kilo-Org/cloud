@@ -71,6 +71,27 @@ describe('validateOpenclawConfigCandidate', () => {
     });
   });
 
+  it('logs safe failure metadata when staging fails unexpectedly', async () => {
+    const deps = createDeps(JSON.stringify({ valid: true }));
+    const log = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    vi.mocked(deps.writeCandidate).mockImplementation(() => {
+      throw Object.assign(new Error('disk full at a sensitive path'), { code: 'ENOSPC' });
+    });
+
+    await expect(validateOpenclawConfigCandidate('{}', CONFIG_PATH, deps)).resolves.toEqual({
+      valid: false,
+      reason: 'validation-unavailable',
+      issues: [{ path: '', message: 'OpenClaw configuration validation could not be started.' }],
+    });
+    expect(log).toHaveBeenCalledWith(
+      '[openclaw-config-validation] Validation failed unexpectedly:',
+      'ENOSPC'
+    );
+    expect(log.mock.calls.flat().join(' ')).not.toContain('sensitive path');
+
+    log.mockRestore();
+  });
+
   it('redacts staging filenames from invalid diagnostics', async () => {
     const deps = createDeps(
       JSON.stringify({

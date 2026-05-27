@@ -196,6 +196,43 @@ export function dbSessionMatchesSearch(session: DbSessionV2, searchQuery: string
   );
 }
 
+/**
+ * Status events are patched locally and reconciled in batches so frequent
+ * activity transitions do not issue one authoritative refetch per event.
+ */
+export const SIDEBAR_RECONCILE_DELAY_MS = 30_000;
+
+type SidebarQueryReconciler = {
+  schedule: () => void;
+  reconcileNow: () => void;
+  dispose: () => void;
+};
+
+export function createSidebarQueryReconciler(reconcile: () => void): SidebarQueryReconciler {
+  let pendingReconciliation: ReturnType<typeof setTimeout> | null = null;
+
+  const clearPendingReconciliation = () => {
+    if (pendingReconciliation === null) return;
+    clearTimeout(pendingReconciliation);
+    pendingReconciliation = null;
+  };
+
+  return {
+    schedule: () => {
+      if (pendingReconciliation !== null) return;
+      pendingReconciliation = setTimeout(() => {
+        pendingReconciliation = null;
+        reconcile();
+      }, SIDEBAR_RECONCILE_DELAY_MS);
+    },
+    reconcileNow: () => {
+      clearPendingReconciliation();
+      reconcile();
+    },
+    dispose: clearPendingReconciliation,
+  };
+}
+
 type UseSidebarSessionsOptions = {
   organizationId?: string | null;
   searchQuery?: string;
@@ -215,6 +252,17 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const sharedConnection = useUserWebConnection();
+  const reconcileSidebarQueries = useCallback(() => {
+    void queryClient.invalidateQueries(trpc.cliSessionsV2.list.pathFilter());
+    void queryClient.invalidateQueries(trpc.cliSessionsV2.search.pathFilter());
+    void queryClient.invalidateQueries(trpc.cliSessionsV2.recentRepositories.pathFilter());
+  }, [queryClient, trpc]);
+  const queryReconciler = useMemo(
+    () => createSidebarQueryReconciler(reconcileSidebarQueries),
+    [reconcileSidebarQueries]
+  );
+
+  useEffect(() => () => queryReconciler.dispose(), [queryReconciler]);
 
   const recentSessions = useAtomValue(recentSessionsAtom);
   const setDbSessions = useSetAtom(dbSessionsAtom);
@@ -351,11 +399,6 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
     if (!sharedConnection) return;
 
     const filters = { organizationId, createdOnPlatform, gitUrl } satisfies SidebarSessionFilters;
-    const invalidateSessionQueries = () => {
-      void queryClient.invalidateQueries(trpc.cliSessionsV2.list.pathFilter());
-      void queryClient.invalidateQueries(trpc.cliSessionsV2.search.pathFilter());
-      void queryClient.invalidateQueries(trpc.cliSessionsV2.recentRepositories.pathFilter());
-    };
     const patchSearchCacheForRow = (session: DbSessionV2, filterResult: boolean | null) => {
       if (!isSearchActive) return;
       queryClient.setQueryData(searchQueryKey, (current: SearchData | undefined) => {
@@ -415,7 +458,10 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
         return { ...current, results: withoutSession, total: Math.max(0, current.total - 1) };
       });
     };
-    const patchRow = (payload: UserWebSessionEventData<'session.created'>) => {
+    const patchRow = (
+      payload: UserWebSessionEventData<'session.created'>,
+      reconciliation: 'immediate' | 'delayed'
+    ) => {
       if (payload.source !== 'v2') return;
       const next = eventRowToDbSession(payload.session);
       const filterResult = eventRowMatchesSidebarFilters(payload.session, filters);
@@ -425,16 +471,23 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
         setDbSessions(prev => removeSidebarDbSession(prev, next.session_id));
       }
       patchSearchCacheForRow(next, filterResult);
-      invalidateSessionQueries();
+      if (reconciliation === 'immediate' || filterResult === null) {
+        queryReconciler.reconcileNow();
+      } else {
+        queryReconciler.schedule();
+      }
     };
 
     const unsubs = [
-      sharedConnection.onSessionEvent('session.created', patchRow),
-      sharedConnection.onSessionEvent('session.updated', patchRow),
+      sharedConnection.onSessionEvent('session.created', payload => patchRow(payload, 'immediate')),
+      sharedConnection.onSessionEvent('session.updated', payload => patchRow(payload, 'immediate')),
       sharedConnection.onSessionEvent('session.status.updated', payload => {
         if (payload.source !== 'v2') return;
         if ('session' in payload) {
-          patchRow({ source: 'v2', session: payload.session, changedAt: payload.changedAt });
+          patchRow(
+            { source: 'v2', session: payload.session, changedAt: payload.changedAt },
+            'delayed'
+          );
           return;
         }
         setDbSessions(prev =>
@@ -454,14 +507,18 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
           )
         );
         patchSearchCacheForStatus(payload);
-        invalidateSessionQueries();
+        queryReconciler.schedule();
       }),
       sharedConnection.onSessionEvent('session.deleted', payload => {
         if (payload.source !== 'v2') return;
         setDbSessions(prev => removeSidebarDbSession(prev, payload.sessionId));
         removeFromSearchCache(payload.sessionId);
-        invalidateSessionQueries();
+        queryReconciler.reconcileNow();
       }),
+      // After a reconnect we may have missed events while the socket was down,
+      // and (unlike useActiveSessions) no authoritative snapshot is replayed for
+      // the sidebar, so reconcile immediately.
+      sharedConnection.onReconnect(queryReconciler.reconcileNow),
     ];
     return () => unsubs.forEach(unsub => unsub());
   }, [
@@ -474,7 +531,7 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
     searchQueryKey,
     setDbSessions,
     queryClient,
-    trpc,
+    queryReconciler,
   ]);
 
   const sessions = isSearchActive ? searchSessions : listSessions;

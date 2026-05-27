@@ -1,10 +1,12 @@
 import type { UserWebSessionEventData } from '@/lib/cloud-agent-sdk';
 import type { DbSessionV2 } from '../store/db-session-atoms';
 import {
+  createSidebarQueryReconciler,
   dbSessionToStoredSession,
   dbSessionMatchesSearch,
   eventRowMatchesSidebarFilters,
   removeSidebarDbSession,
+  SIDEBAR_RECONCILE_DELAY_MS,
   upsertSidebarDbSession,
 } from './useSidebarSessions';
 
@@ -162,6 +164,56 @@ describe('useSidebarSessions live update helpers', () => {
     it('returns false when neither session_id nor title matches', () => {
       const session = makeDbSession('ses-1', '2026-01-01T00:00:00.000Z');
       expect(dbSessionMatchesSearch(session, 'zzz')).toBe(false);
+    });
+  });
+
+  describe('createSidebarQueryReconciler', () => {
+    beforeEach(() => {
+      jest.useFakeTimers();
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('coalesces status event bursts into one delayed authoritative reconciliation', () => {
+      const reconcile = jest.fn();
+      const reconciler = createSidebarQueryReconciler(reconcile);
+
+      reconciler.schedule();
+      reconciler.schedule();
+      jest.advanceTimersByTime(SIDEBAR_RECONCILE_DELAY_MS - 1);
+      expect(reconcile).not.toHaveBeenCalled();
+
+      jest.advanceTimersByTime(1);
+      expect(reconcile).toHaveBeenCalledTimes(1);
+
+      reconciler.schedule();
+      jest.advanceTimersByTime(SIDEBAR_RECONCILE_DELAY_MS);
+      expect(reconcile).toHaveBeenCalledTimes(2);
+    });
+
+    it('reconciles immediately after reconnect without running a pending delayed refresh', () => {
+      const reconcile = jest.fn();
+      const reconciler = createSidebarQueryReconciler(reconcile);
+
+      reconciler.schedule();
+      reconciler.reconcileNow();
+      expect(reconcile).toHaveBeenCalledTimes(1);
+
+      jest.advanceTimersByTime(SIDEBAR_RECONCILE_DELAY_MS);
+      expect(reconcile).toHaveBeenCalledTimes(1);
+    });
+
+    it('cancels pending reconciliation when its listener owner is disposed', () => {
+      const reconcile = jest.fn();
+      const reconciler = createSidebarQueryReconciler(reconcile);
+
+      reconciler.schedule();
+      reconciler.dispose();
+      jest.advanceTimersByTime(SIDEBAR_RECONCILE_DELAY_MS);
+
+      expect(reconcile).not.toHaveBeenCalled();
     });
   });
 });

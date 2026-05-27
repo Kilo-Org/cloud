@@ -14,6 +14,7 @@ import {
   extractNextEditPromptInfo,
   extractFraudAndProjectHeaders,
   invalidRequestResponse,
+  dataCollectionRequiredResponse,
   temporarilyUnavailableResponse,
   wrapInSafeNextResponse,
   captureProxyError,
@@ -195,6 +196,10 @@ export async function POST(request: NextRequest) {
     organizationPlan: plan,
   });
   if (modelRestrictionError) return modelRestrictionError;
+
+  if (providerConfig?.data_collection === 'deny') {
+    return dataCollectionRequiredResponse();
+  }
 
   if (providerConfig?.only && !providerConfig.only.includes(nextEditProvider)) {
     return NextResponse.json(

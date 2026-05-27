@@ -5,7 +5,6 @@ import type { SandboxId } from '../types.js';
 import {
   branchNameSchema,
   CallbackTargetSchema,
-  GitLabCodeReviewTokenRefSchema,
   ImagesSchema,
   MetadataSchema as LegacySessionMetadataSchema,
   SessionProfileBundleSchema,
@@ -60,7 +59,6 @@ const MetadataRepositorySchema = z.discriminatedUnion('type', [
       url: z.string(),
       platform: z.literal('gitlab').optional(),
       gitlabTokenManaged: z.boolean().optional(),
-      gitlabCodeReviewTokenRef: GitLabCodeReviewTokenRefSchema.optional(),
       ...RepositoryCommonSchema,
     })
     .strict(),

@@ -17,11 +17,6 @@ export type CallbackTarget = {
   headers?: Record<string, string>;
 };
 
-export type GitLabCodeReviewTokenRef = {
-  integrationId: string;
-  projectId: number;
-};
-
 export type CloudAgentPrepareSessionInput = {
   prompt: string;
   mode: string;
@@ -31,7 +26,6 @@ export type CloudAgentPrepareSessionInput = {
   githubToken?: string;
   gitUrl?: string;
   gitToken?: string;
-  gitlabCodeReviewTokenRef?: GitLabCodeReviewTokenRef;
   platform?: 'github' | 'gitlab';
   kilocodeOrganizationId?: string;
   envVars?: Record<string, string>;
@@ -59,8 +53,6 @@ export type CloudAgentInitiateOutput = {
 export type CloudAgentUpdateSessionInput = {
   cloudAgentSessionId: string;
   callbackTarget?: CallbackTarget | null;
-  gitlabCodeReviewTokenRef?: GitLabCodeReviewTokenRef;
-  gitlabCodeReviewRepositoryUrl?: string;
   [key: string]: unknown;
 };
 

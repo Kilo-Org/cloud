@@ -8,7 +8,6 @@ import type {
 import type { AgentMode } from '../../src/schema.js';
 import type { Images } from '../../src/router/schemas.js';
 import type { SessionProfileBundle } from '../../src/session-profile.js';
-import type { GitLabCodeReviewTokenRef } from '../../src/persistence/schemas.js';
 
 type RegisterSessionInput = Parameters<CloudAgentSession['registerSession']>[0];
 type RecordSessionReadyInput = Parameters<CloudAgentSession['recordSessionReady']>[0];
@@ -40,7 +39,6 @@ type TestRegisterSessionInput = {
   githubToken?: string;
   gitUrl?: string;
   gitToken?: string;
-  gitlabCodeReviewTokenRef?: GitLabCodeReviewTokenRef;
   platform?: 'github' | 'gitlab';
   upstreamBranch?: string;
   autoCommit?: boolean;
@@ -101,7 +99,6 @@ export function groupedRegisterSessionInput(input: TestRegisterSessionInput): Re
       ? {
           type: 'gitlab',
           url: input.gitUrl,
-          gitlabCodeReviewTokenRef: input.gitlabCodeReviewTokenRef,
           branch: input.upstreamBranch,
         }
       : input.gitUrl

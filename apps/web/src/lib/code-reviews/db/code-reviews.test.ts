@@ -407,7 +407,7 @@ describe('findPreviousCompletedReview', () => {
     });
   });
 
-  it('does not continue GitLab sessions without an exact token-reference scope', async () => {
+  it('does not continue GitLab sessions without an exact continuation scope', async () => {
     const result = await findPreviousCompletedReview(
       gitLabRepo,
       42,

@@ -8,7 +8,6 @@ import {
   EncryptedSecretEnvelopeSchema,
   EncryptedSecretsSchema,
   CallbackTargetSchema,
-  GitLabCodeReviewTokenRefSchema,
   ImagesSchema,
   RuntimeSkillSchema,
   RuntimeSkillsSchema,
@@ -27,7 +26,6 @@ export {
   EncryptedSecretEnvelopeSchema,
   EncryptedSecretsSchema,
   CallbackTargetSchema,
-  GitLabCodeReviewTokenRefSchema,
   ImagesSchema,
   RuntimeSkillSchema,
   RuntimeSkillsSchema,
@@ -43,11 +41,7 @@ export type {
   EncryptedSecrets,
   MCPSecretValue,
 } from '../persistence/schemas.js';
-export type {
-  RuntimeSkillInput,
-  RuntimeAgentInput,
-  GitLabCodeReviewTokenRef,
-} from '../persistence/schemas.js';
+export type { RuntimeSkillInput, RuntimeAgentInput } from '../persistence/schemas.js';
 
 /**
  * Flexible mode slug — built-in agent enum value, `custom`, or any slug
@@ -356,9 +350,6 @@ export const PrepareSessionInput = z
       .describe(
         'Git token for generic git repositories. Ignored when platform selects a managed provider.'
       ),
-    gitlabCodeReviewTokenRef: GitLabCodeReviewTokenRefSchema.optional().describe(
-      'Internal reference for resolving a GitLab code-review project access token'
-    ),
     platform: z
       .enum(['github', 'gitlab'])
       .optional()
@@ -674,7 +665,7 @@ export const SendMessageInput = z
 
 /**
  * Input schema for updateSession endpoint.
- * Retained for callback updates and internal GitLab code-review credential-reference upgrades.
+ * Retained for internal callback target updates before continued executions.
  */
 export const UpdateSessionInput = z
   .object({
@@ -683,12 +674,6 @@ export const UpdateSessionInput = z
     callbackTarget: CallbackTargetSchema.nullable()
       .optional()
       .describe('Callback target (null to clear, value to set, undefined to skip)'),
-    gitlabCodeReviewTokenRef: GitLabCodeReviewTokenRefSchema.optional().describe(
-      'Internal GitLab code-review project token reference to attach to this session'
-    ),
-    gitlabCodeReviewRepositoryUrl: gitUrlSchema
-      .optional()
-      .describe('Expected GitLab repository URL when attaching a code-review token reference'),
   })
   .strict();
 

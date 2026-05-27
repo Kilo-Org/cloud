@@ -7,13 +7,11 @@ import {
 } from '@kilocode/db/schema';
 import { eq, and, isNull, isNotNull, sql } from 'drizzle-orm';
 
+const DEFAULT_GITLAB_INSTANCE_URL = 'https://gitlab.com';
+
 export type GitLabLookupParams = {
   userId: string;
   orgId?: string;
-};
-
-export type AuthorizedGitLabIntegrationLookupParams = GitLabLookupParams & {
-  integrationId?: string;
 };
 
 export type GitLabIntegrationMetadata = {
@@ -27,9 +25,9 @@ export type GitLabIntegrationMetadata = {
   project_tokens?: Record<string, { token: string }>;
 };
 
-export type GitLabCodeReviewTokenLookupParams = GitLabLookupParams & {
+export type AuthorizedGitLabIntegration = {
   integrationId: string;
-  projectId: number;
+  metadata: GitLabIntegrationMetadata;
 };
 
 type GitLabLookupSuccess = {
@@ -38,23 +36,21 @@ type GitLabLookupSuccess = {
   metadata: GitLabIntegrationMetadata;
 };
 
-type GitLabLookupFailure = {
+export type GitLabLookupFailure = {
   success: false;
   reason: 'database_not_configured' | 'no_integration_found' | 'invalid_org_id';
 };
 
 export type GitLabLookupResult = GitLabLookupSuccess | GitLabLookupFailure;
 
-export type GitLabCodeReviewTokenLookupResult =
-  | { success: true; token: string; instanceUrl: string }
-  | {
-      success: false;
-      reason:
-        | GitLabLookupFailure['reason']
-        | 'invalid_integration_id'
-        | 'invalid_project_id'
-        | 'no_project_token';
-    };
+export type AuthorizedGitLabIntegrationsResult =
+  | { success: true; integrations: AuthorizedGitLabIntegration[] }
+  | GitLabLookupFailure;
+
+export type GitLabRepositoryMatch = AuthorizedGitLabIntegration & {
+  instanceUrl: string;
+  projectPath: string;
+};
 
 const GitLabMetadataSchema = z
   .object({
@@ -71,10 +67,100 @@ const GitLabMetadataSchema = z
   })
   .passthrough();
 
-export function buildAuthorizedGitLabIntegrationQuery(
-  db: WorkerDb,
-  params: AuthorizedGitLabIntegrationLookupParams
-) {
+type ParsedGitLabInstanceUrl = {
+  origin: string;
+  basePath: string;
+  instanceUrl: string;
+};
+
+function parseSecureUrl(value: string): URL | null {
+  try {
+    const parsed = new URL(value);
+    if (
+      parsed.protocol !== 'https:' ||
+      parsed.username !== '' ||
+      parsed.password !== '' ||
+      parsed.search !== '' ||
+      parsed.hash !== ''
+    ) {
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function parseGitLabInstanceUrl(instanceUrl: string): ParsedGitLabInstanceUrl | null {
+  const parsed = parseSecureUrl(instanceUrl);
+  if (!parsed) {
+    return null;
+  }
+
+  const basePath = parsed.pathname.replace(/\/+$/, '');
+  return {
+    origin: parsed.origin,
+    basePath,
+    instanceUrl: `${parsed.origin}${basePath}`,
+  };
+}
+
+export function isValidGitLabRepositoryUrl(repositoryUrl: string): boolean {
+  const parsed = parseSecureUrl(repositoryUrl);
+  return parsed !== null && parsed.pathname !== '/' && !parsed.pathname.endsWith('/');
+}
+
+export function matchGitLabRepositoryToIntegration(
+  repositoryUrl: string,
+  integration: AuthorizedGitLabIntegration
+): GitLabRepositoryMatch | null {
+  const repository = parseSecureUrl(repositoryUrl);
+  const instance = parseGitLabInstanceUrl(
+    integration.metadata.gitlab_instance_url || DEFAULT_GITLAB_INSTANCE_URL
+  );
+
+  if (!repository || !instance || repository.origin !== instance.origin) {
+    return null;
+  }
+
+  if (repository.pathname === '/' || repository.pathname.endsWith('/')) {
+    return null;
+  }
+
+  const repositoryPrefix = instance.basePath === '' ? '/' : `${instance.basePath}/`;
+  if (!repository.pathname.startsWith(repositoryPrefix)) {
+    return null;
+  }
+
+  const encodedProjectPath = repository.pathname.slice(repositoryPrefix.length).replace(/^\/+/, '');
+  let projectPath: string;
+  try {
+    projectPath = decodeURIComponent(encodedProjectPath);
+  } catch {
+    return null;
+  }
+
+  if (projectPath.endsWith('.git')) {
+    projectPath = projectPath.slice(0, -4);
+  }
+
+  const pathSegments = projectPath.split('/');
+  if (
+    pathSegments.length < 2 ||
+    pathSegments.some(segment => segment === '') ||
+    pathSegments.includes('-')
+  ) {
+    return null;
+  }
+
+  return {
+    ...integration,
+    instanceUrl: instance.instanceUrl,
+    projectPath,
+  };
+}
+
+export function buildAuthorizedGitLabIntegrationQuery(db: WorkerDb, params: GitLabLookupParams) {
   return db
     .select({
       id: platform_integrations.id,
@@ -99,7 +185,6 @@ export function buildAuthorizedGitLabIntegrationQuery(
       and(
         eq(platform_integrations.platform, 'gitlab'),
         eq(platform_integrations.integration_status, 'active'),
-        params.integrationId ? eq(platform_integrations.id, params.integrationId) : undefined,
         params.orgId
           ? and(
               eq(platform_integrations.owned_by_organization_id, sql`${params.orgId}::uuid`),
@@ -110,8 +195,7 @@ export function buildAuthorizedGitLabIntegrationQuery(
               eq(platform_integrations.owned_by_user_id, params.userId)
             )
       )
-    )
-    .limit(1);
+    );
 }
 
 export class GitLabLookupService {
@@ -133,13 +217,7 @@ export class GitLabLookupService {
     return this.db;
   }
 
-  async findGitLabIntegration(params: GitLabLookupParams): Promise<GitLabLookupResult> {
-    return this.findAuthorizedGitLabIntegration(params);
-  }
-
-  private async findAuthorizedGitLabIntegration(
-    params: AuthorizedGitLabIntegrationLookupParams
-  ): Promise<GitLabLookupResult> {
+  private validateLookup(params: GitLabLookupParams): GitLabLookupFailure | undefined {
     if (!this.isConfigured()) {
       return { success: false, reason: 'database_not_configured' };
     }
@@ -147,47 +225,46 @@ export class GitLabLookupService {
     if (params.orgId !== undefined && !z.string().uuid().safeParse(params.orgId).success) {
       return { success: false, reason: 'invalid_org_id' };
     }
+  }
 
-    const rows = await buildAuthorizedGitLabIntegrationQuery(this.getDb(), params);
+  async findGitLabIntegration(params: GitLabLookupParams): Promise<GitLabLookupResult> {
+    const validationFailure = this.validateLookup(params);
+    if (validationFailure) {
+      return validationFailure;
+    }
 
+    const rows = await buildAuthorizedGitLabIntegrationQuery(this.getDb(), params).limit(1);
     if (rows.length === 0) {
       return { success: false, reason: 'no_integration_found' };
     }
 
     const row = rows[0];
-    const metadata = GitLabMetadataSchema.parse(row.metadata ?? {});
-
     return {
       success: true,
       integrationId: row.id,
-      metadata,
+      metadata: GitLabMetadataSchema.parse(row.metadata ?? {}),
     };
   }
 
-  async findGitLabCodeReviewToken(
-    params: GitLabCodeReviewTokenLookupParams
-  ): Promise<GitLabCodeReviewTokenLookupResult> {
-    if (!z.string().uuid().safeParse(params.integrationId).success) {
-      return { success: false, reason: 'invalid_integration_id' };
-    }
-    if (!Number.isSafeInteger(params.projectId) || params.projectId <= 0) {
-      return { success: false, reason: 'invalid_project_id' };
+  async findAuthorizedGitLabIntegrations(
+    params: GitLabLookupParams
+  ): Promise<AuthorizedGitLabIntegrationsResult> {
+    const validationFailure = this.validateLookup(params);
+    if (validationFailure) {
+      return validationFailure;
     }
 
-    const integration = await this.findAuthorizedGitLabIntegration(params);
-    if (!integration.success) {
-      return integration;
-    }
-
-    const projectToken = integration.metadata.project_tokens?.[String(params.projectId)];
-    if (!projectToken) {
-      return { success: false, reason: 'no_project_token' };
+    const rows = await buildAuthorizedGitLabIntegrationQuery(this.getDb(), params);
+    if (rows.length === 0) {
+      return { success: false, reason: 'no_integration_found' };
     }
 
     return {
       success: true,
-      token: projectToken.token,
-      instanceUrl: integration.metadata.gitlab_instance_url || 'https://gitlab.com',
+      integrations: rows.map(row => ({
+        integrationId: row.id,
+        metadata: GitLabMetadataSchema.parse(row.metadata ?? {}),
+      })),
     };
   }
 }

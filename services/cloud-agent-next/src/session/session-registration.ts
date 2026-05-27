@@ -11,9 +11,7 @@
  * Managed git-token resolution (GitHub App installation, managed GitLab) is
  * NOT performed here; it happens lazily in the flusher's workspace preparation
  * path. Provider credentials are intentionally not stored in registration
- * metadata; generic git repositories may still carry an explicit token. GitLab
- * code-review sessions may persist a non-secret project-token reference that is
- * resolved lazily through git-token-service during workspace preparation.
+ * metadata; generic git repositories may still carry an explicit token.
  */
 import { TRPCError } from '@trpc/server';
 

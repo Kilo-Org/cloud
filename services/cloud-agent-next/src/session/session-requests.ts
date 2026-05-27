@@ -5,7 +5,6 @@ import type {
   SessionFinalization,
 } from '../execution/types.js';
 import type { SessionProfileBundle } from '../session-profile.js';
-import type { GitLabCodeReviewTokenRef } from '../persistence/schemas.js';
 
 export type ProfileOverrides = {
   envVars?: Record<string, string>;
@@ -27,7 +26,6 @@ export type SessionRepositoryRequest =
       type: 'gitlab';
       url: string;
       branch?: string;
-      gitlabCodeReviewTokenRef?: GitLabCodeReviewTokenRef;
     }
   | {
       type: 'git';

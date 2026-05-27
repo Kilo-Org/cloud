@@ -56,8 +56,6 @@ export type SandboxId =
 /** Unique identifier for a session within a sandbox */
 export type SessionId = `agent_${string}`;
 
-export type GitLabCredentialSource = 'managed-integration' | 'code-review-project-access-token';
-
 export type SessionContext = {
   sandboxId: SandboxId;
   sessionId: SessionId;
@@ -75,10 +73,10 @@ export type SessionContext = {
   gitUrl?: string;
   /** Token for generic git authentication (e.g., GitLab token) */
   gitToken?: string;
-  /** Whether the GitLab token was resolved from a managed OAuth integration */
+  /** Whether the GitLab token was resolved server-side and its remote should be refreshed. */
   gitlabTokenManaged?: boolean;
-  /** Runtime source for a server-resolved GitLab credential. */
-  gitlabCredentialSource?: GitLabCredentialSource;
+  /** GitLab CLI bearer-mode instruction returned with a server-resolved credential. */
+  glabIsOAuth2?: boolean;
   /** Git platform type for correct token/env var handling */
   platform?: 'github' | 'gitlab';
   envVars?: Record<string, string>;
@@ -109,7 +107,7 @@ type GetTokenForRepoResult =
     };
 
 type GetGitLabTokenResult =
-  | { success: true; token: string; instanceUrl: string }
+  | { success: true; token: string; instanceUrl: string; glabIsOAuth2: boolean }
   | {
       success: false;
       reason:
@@ -118,19 +116,12 @@ type GetGitLabTokenResult =
         | 'invalid_org_id'
         | 'no_token'
         | 'token_refresh_failed'
-        | 'token_expired_no_refresh';
-    };
-
-type GetGitLabCodeReviewTokenResult =
-  | { success: true; token: string; instanceUrl: string }
-  | {
-      success: false;
-      reason:
-        | 'database_not_configured'
-        | 'no_integration_found'
-        | 'invalid_org_id'
-        | 'invalid_integration_id'
-        | 'invalid_project_id'
+        | 'token_expired_no_refresh'
+        | 'repository_url_required'
+        | 'invalid_repository_url'
+        | 'no_matching_integration'
+        | 'ambiguous_integration'
+        | 'project_lookup_failed'
         | 'no_project_token';
     };
 
@@ -141,13 +132,12 @@ export type GitTokenService = {
     orgId?: string;
   }): Promise<GetTokenForRepoResult>;
   getToken(installationId: string, appType?: 'standard' | 'lite'): Promise<string>;
-  getGitLabToken(params: { userId: string; orgId?: string }): Promise<GetGitLabTokenResult>;
-  getGitLabCodeReviewToken(params: {
+  getGitLabToken(params: {
     userId: string;
     orgId?: string;
-    integrationId: string;
-    projectId: number;
-  }): Promise<GetGitLabCodeReviewTokenResult>;
+    repositoryUrl?: string;
+    createdOnPlatform?: string;
+  }): Promise<GetGitLabTokenResult>;
 };
 
 export type Env = {

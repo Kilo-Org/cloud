@@ -26,11 +26,6 @@ export interface SessionInput {
   githubToken?: string;
   /** Generic git token for authentication (for GitLab and other platforms) */
   gitToken?: string;
-  /** Internal reference for resolving the GitLab code-review project access token. */
-  gitlabCodeReviewTokenRef?: {
-    integrationId: string;
-    projectId: number;
-  };
   /** Git platform type for correct token/env var handling */
   platform?: 'github' | 'gitlab';
   envVars?: Record<string, string>;

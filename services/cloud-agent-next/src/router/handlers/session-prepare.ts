@@ -9,8 +9,8 @@
  * canonical initial admission to the same grouped primitive used by `start`.
  *
  * `updateSession` is retained because `services/code-review-infra` still
- * uses it to rewrite `callbackTarget` and attach internal GitLab code-review
- * credential references before a session-continuation `sendMessageV2`.
+ * uses it to rewrite `callbackTarget` before a session-continuation
+ * `sendMessageV2`.
  */
 import { TRPCError } from '@trpc/server';
 import type { WorkerDb } from '@kilocode/db/client';
@@ -205,9 +205,6 @@ export function prepareInputToSessionCreateRequest(input: PrepareInput): Session
             type: 'gitlab',
             url: gitUrl,
             branch: input.upstreamBranch,
-            ...(input.createdOnPlatform === 'code-review' && input.gitlabCodeReviewTokenRef
-              ? { gitlabCodeReviewTokenRef: input.gitlabCodeReviewTokenRef }
-              : {}),
           }
         : {
             type: 'git',
@@ -351,8 +348,7 @@ const prepareSessionHandler = internalApiProtectedProcedure
  * Update a prepared (but not yet initiated) session.
  *
  * Retained for `services/code-review-infra` which rewrites `callbackTarget`
- * and can upgrade GitLab code-review credential references on continuation.
- * Not used by any apps/web flow.
+ * before a continued session execution. Not used by any apps/web flow.
  *
  * Protected by internal API authentication.
  */
@@ -374,12 +370,6 @@ const updateSessionHandler = internalApiProtectedProcedure
 
       const result = await stub.tryUpdate({
         callbackTarget: input.callbackTarget,
-        ...(input.gitlabCodeReviewTokenRef
-          ? {
-              gitlabCodeReviewTokenRef: input.gitlabCodeReviewTokenRef,
-              gitlabCodeReviewRepositoryUrl: input.gitlabCodeReviewRepositoryUrl,
-            }
-          : {}),
       });
 
       if (!result.success) {

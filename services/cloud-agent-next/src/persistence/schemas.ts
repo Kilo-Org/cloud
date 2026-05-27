@@ -12,15 +12,6 @@ export const CallbackTargetSchema = z.object({
   headers: z.record(z.string(), z.string()).optional(),
 });
 
-export const GitLabCodeReviewTokenRefSchema = z
-  .object({
-    integrationId: z.string().uuid(),
-    projectId: z.number().int().positive(),
-  })
-  .strict();
-
-export type GitLabCodeReviewTokenRef = z.infer<typeof GitLabCodeReviewTokenRefSchema>;
-
 /**
  * Schema for image attachments that will be downloaded from R2 to the sandbox.
  * Defined here to avoid circular dependency with router/schemas.ts.

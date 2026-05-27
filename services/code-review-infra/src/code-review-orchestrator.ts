@@ -1352,10 +1352,6 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       await client.updateSession(internalHeaders, {
         cloudAgentSessionId: previousSessionId,
         callbackTarget,
-        gitlabCodeReviewTokenRef: this.state.sessionInput.gitlabCodeReviewTokenRef,
-        gitlabCodeReviewRepositoryUrl: this.state.sessionInput.gitlabCodeReviewTokenRef
-          ? this.state.sessionInput.gitUrl
-          : undefined,
       });
 
       // Step 2: Send follow-up message (user-facing, no callbackTarget)

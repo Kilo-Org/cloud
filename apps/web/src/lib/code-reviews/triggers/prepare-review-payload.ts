@@ -83,11 +83,6 @@ export type SessionInput = {
   githubToken?: string;
   /** Generic git token for authentication (for GitLab and other platforms) */
   gitToken?: string;
-  /** Internal reference for resolving the GitLab code-review project access token. */
-  gitlabCodeReviewTokenRef?: {
-    integrationId: string;
-    projectId: number;
-  };
   /** Git platform type for correct token/env var handling */
   platform?: 'github' | 'gitlab';
   /** Gate threshold — when not 'off', the agent should report gateResult in its callback */
@@ -156,7 +151,7 @@ export async function prepareReviewPayload(
     // 3. Get platform token and build review state based on platform
     let githubToken: string | undefined;
     let gitlabToken: string | undefined;
-    let gitlabCodeReviewTokenRef: SessionInput['gitlabCodeReviewTokenRef'];
+    let gitlabContinuationScope: { integrationId: string; projectId: number } | undefined;
     let gitlabInstanceUrl: string | undefined;
     let existingReviewState: ExistingReviewState | null = null;
     let gitlabContext: GitLabDiffContext | undefined;
@@ -264,7 +259,7 @@ export async function prepareReviewPayload(
 
         try {
           gitlabToken = await getOrCreateProjectAccessToken(integration, projectId);
-          gitlabCodeReviewTokenRef = {
+          gitlabContinuationScope = {
             integrationId: integration.id,
             projectId,
           };
@@ -382,7 +377,7 @@ export async function prepareReviewPayload(
               review.pr_number,
               existingReviewState?.headCommitSha ?? review.head_sha,
               platform,
-              gitlabCodeReviewTokenRef
+              gitlabContinuationScope
             )
           : await findPreviousCompletedReview(
               review.repo_full_name,
@@ -480,9 +475,8 @@ export async function prepareReviewPayload(
       platform === 'gitlab'
         ? {
             // GitLab: use full git URL for cloning
-            gitUrl: `${gitlabInstanceUrl || 'https://gitlab.com'}/${review.repo_full_name}.git`,
+            gitUrl: `${(gitlabInstanceUrl || 'https://gitlab.com').replace(/\/+$/, '')}/${review.repo_full_name}.git`,
             gitToken: gitlabToken,
-            gitlabCodeReviewTokenRef,
             platform: 'gitlab',
             kilocodeOrganizationId: owner.type === 'org' ? owner.id : undefined,
             prompt,
@@ -511,7 +505,6 @@ export async function prepareReviewPayload(
       logExceptInTest('[prepareReviewPayload] GitLab session input prepared', {
         gitUrl: sessionInput.gitUrl,
         hasGitToken: !!sessionInput.gitToken,
-        hasGitlabCodeReviewTokenRef: sessionInput.gitlabCodeReviewTokenRef !== undefined,
         upstreamBranch: sessionInput.upstreamBranch,
         model: sessionInput.model,
       });
@@ -541,8 +534,6 @@ export async function prepareReviewPayload(
         ...sessionInput,
         githubToken: sessionInput.githubToken ? '***' : undefined, // Redact token
         gitToken: sessionInput.gitToken ? '***' : undefined, // Redact token
-        gitlabCodeReviewTokenRef: undefined,
-        hasGitlabCodeReviewTokenRef: sessionInput.gitlabCodeReviewTokenRef !== undefined,
         prompt: sessionInput.prompt.substring(0, 200) + '...', // Show first 200 chars
       },
     });

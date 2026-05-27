@@ -21,6 +21,19 @@ export type ExecutionCallbackPayload = {
    * Undefined when no assistant message has been recorded yet.
    */
   lastAssistantMessageText?: string;
+  completionData?: {
+    assistantMessageId?: string;
+    lastAssistantMessageText?: string;
+    gateResult?: 'pass' | 'fail';
+    lastSeenBranch?: string;
+    completedAt?: number;
+    source?:
+      | 'assistant_message_event'
+      | 'idle_reconciliation'
+      | 'wrapper_failure'
+      | 'interrupt'
+      | 'delivery_failure';
+  };
   /**
    * Deterministic idempotency key based on messageId.
    * Receivers can use this to safely deduplicate retried callbacks after a

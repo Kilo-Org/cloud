@@ -196,6 +196,7 @@ type GroupedRegisterSessionInput = {
       };
   profile?: SessionProfileBundle;
   finalization?: SessionFinalization;
+  executionPolicy?: SessionMetadata['executionPolicy'];
   callback?: SessionMetadata['callback'];
   workspace?: Pick<
     NonNullable<SessionMetadata['workspace']>,
@@ -238,7 +239,8 @@ function isSameInitialAdmissionConfiguration(
     metadata.agent.model === input.agent.model &&
     metadata.agent.variant === input.agent.variant &&
     metadata.finalization?.autoCommit === input.finalization?.autoCommit &&
-    metadata.finalization?.condenseOnComplete === input.finalization?.condenseOnComplete
+    metadata.finalization?.condenseOnComplete === input.finalization?.condenseOnComplete &&
+    JSON.stringify(metadata.executionPolicy) === JSON.stringify(input.executionPolicy)
   );
 }
 
@@ -306,6 +308,16 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       kiloSessionId: metadata.auth.kiloSessionId,
       gateResult,
       lastAssistantMessageText,
+      completionData:
+        status === 'completed'
+          ? {
+              ...(gateResult !== undefined ? { gateResult } : {}),
+              ...(lastAssistantMessageText !== undefined ? { lastAssistantMessageText } : {}),
+              ...(metadata.repository?.upstreamBranch !== undefined
+                ? { lastSeenBranch: metadata.repository.upstreamBranch }
+                : {}),
+            }
+          : undefined,
     };
 
     if (messageId) {
@@ -1386,6 +1398,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         appendSystemPrompt: input.agent.appendSystemPrompt,
       },
       finalization: input.finalization,
+      executionPolicy: input.executionPolicy,
       profile: input.profile,
       callback: input.callback,
       workspace: input.workspace,

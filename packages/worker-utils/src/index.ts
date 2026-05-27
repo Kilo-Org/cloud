@@ -48,6 +48,17 @@ export type {
 export { CloudAgentNextBillingError, CloudAgentNextError } from './cloud-agent-next-client.js';
 
 export {
+  CODE_REVIEW_RUNTIME_AGENT_SLUG,
+  buildCodeReviewManagedSessionPolicy,
+  buildCodeReviewRuntimeAgent,
+} from './managed-session-policy.js';
+export type {
+  CloudAgentRuntimeAgent,
+  ManagedSessionExecutionPolicy,
+  ManagedSessionInteractionPolicy,
+} from './managed-session-policy.js';
+
+export {
   signKiloToken,
   verifyKiloToken,
   kiloTokenPayload,

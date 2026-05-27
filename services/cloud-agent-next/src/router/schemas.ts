@@ -15,6 +15,7 @@ import {
   RuntimeAgentsSchema,
   RuntimeKiloCommandsSchema,
 } from '../persistence/schemas.js';
+import { ManagedSessionExecutionPolicySchema } from '../persistence/execution-policy.js';
 import { AgentModeSchema, BUILTIN_AGENT_MODES, Limits } from '../schema.js';
 import { MESSAGE_ID_FORMAT_DESCRIPTION, MESSAGE_ID_PATTERN } from '../session/message-id.js';
 
@@ -218,11 +219,29 @@ const SendMessageV2Options = z.object({
   messageId: MessageIdSchema.nullish().describe('Optional message ID for correlating the request'),
 });
 
+const MessageCompletionInputSchema = z
+  .object({
+    callbackTarget: CallbackTargetSchema.optional(),
+    gateThreshold: z.enum(['off', 'all', 'warning', 'critical']).optional(),
+  })
+  .strict();
+
+const TrustedSendMessageV2Options = SendMessageV2Options.extend({
+  completion: MessageCompletionInputSchema.optional(),
+});
+
 const SendMessageV2FlatInput = SendMessageV2Options.extend(PromptPayload.shape);
 const SendMessageV2PromptPayloadInput = SendMessageV2Options.extend({
   payload: PromptSendPayload,
 });
 const SendMessageV2CommandPayloadInput = SendMessageV2Options.extend({
+  payload: CommandSendPayload,
+});
+const TrustedSendMessageV2FlatInput = TrustedSendMessageV2Options.extend(PromptPayload.shape);
+const TrustedSendMessageV2PromptPayloadInput = TrustedSendMessageV2Options.extend({
+  payload: PromptSendPayload,
+});
+const TrustedSendMessageV2CommandPayloadInput = TrustedSendMessageV2Options.extend({
   payload: CommandSendPayload,
 });
 
@@ -231,6 +250,31 @@ export const SendMessageV2Input = z
     SendMessageV2FlatInput,
     SendMessageV2PromptPayloadInput,
     SendMessageV2CommandPayloadInput,
+  ])
+  .transform(input => {
+    if ('payload' in input && input.payload.type === 'prompt') {
+      const { payload, ...options } = input;
+      return {
+        ...options,
+        prompt: payload.prompt,
+        mode: payload.mode,
+        model: payload.model,
+        variant: payload.variant,
+      };
+    }
+
+    return input;
+  })
+  .refine(data => !('mode' in data) || data.mode !== 'custom', {
+    message: 'custom mode requires appendSystemPrompt (use prepareSession/updateSession)',
+    path: ['mode'],
+  });
+
+export const TrustedSendMessageV2Input = z
+  .union([
+    TrustedSendMessageV2FlatInput,
+    TrustedSendMessageV2PromptPayloadInput,
+    TrustedSendMessageV2CommandPayloadInput,
   ])
   .transform(input => {
     if ('payload' in input && input.payload.type === 'prompt') {
@@ -444,6 +488,13 @@ export const PrepareSessionInput = z
       .describe(
         'PR gate threshold — when not "off", the agent should evaluate findings and report gateResult in its callback'
       ),
+    managedSession: z
+      .object({
+        executionPolicy: ManagedSessionExecutionPolicySchema.optional(),
+      })
+      .strict()
+      .optional()
+      .describe('Trusted managed-session controls accepted only on internal prepareSession calls'),
     initialMessageId: MessageIdSchema.optional().describe(
       'Initial message ID for correlation with external systems'
     ),

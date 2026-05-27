@@ -3,6 +3,8 @@ import type { CloudAgentSessionState } from '../persistence/types.js';
 import { WRAPPER_VERSION } from '../shared/wrapper-version.js';
 import type { Env, SandboxInstance } from '../types.js';
 import { resolveTerminalWrapperClient, validateTerminalMetadata } from './access.js';
+import { buildCodeReviewManagedSessionPolicy } from '@kilocode/worker-utils/managed-session-policy';
+import { ManagedSessionExecutionPolicySchema } from '../persistence/execution-policy.js';
 
 vi.mock('@cloudflare/sandbox', () => ({
   getSandbox: vi.fn(),
@@ -54,7 +56,24 @@ describe('validateTerminalMetadata', () => {
 
     expect(result).toEqual({
       success: false,
-      error: 'Terminal is only available for interactive Cloud Agent sessions',
+      error: 'Terminal is disabled for this managed session',
+    });
+  });
+
+  it('rejects explicitly managed sessions even from interactive platforms', () => {
+    const result = validateTerminalMetadata(
+      {
+        ...baseMetadata,
+        executionPolicy: ManagedSessionExecutionPolicySchema.parse(
+          buildCodeReviewManagedSessionPolicy()
+        ),
+      },
+      baseMetadata.identity.sessionId
+    );
+
+    expect(result).toEqual({
+      success: false,
+      error: 'Terminal is disabled for this managed session',
     });
   });
 

@@ -13,6 +13,7 @@
  */
 
 import type { IngestEvent } from '../../src/shared/protocol.js';
+import type { ManagedSessionExecutionPolicy } from '../../src/shared/managed-session-policy.js';
 import type { LogUploader } from './log-uploader.js';
 export type { LogUploader } from './log-uploader.js';
 
@@ -26,6 +27,7 @@ export type SessionContext = {
   ingestToken?: string;
   workerAuthToken: string;
   platform?: string;
+  executionPolicy?: ManagedSessionExecutionPolicy;
   wrapperRunId?: string;
   wrapperGeneration?: number;
   wrapperConnectionId?: string;
@@ -42,6 +44,13 @@ export type MessageInfo = {
   model?: string;
   upstreamBranch?: string;
 };
+
+function sameExecutionPolicy(
+  left: ManagedSessionExecutionPolicy | undefined,
+  right: ManagedSessionExecutionPolicy | undefined
+): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
 
 export type LastError = {
   code: string;
@@ -306,6 +315,7 @@ export class WrapperState {
       this.session.ingestToken !== context.ingestToken ||
       this.session.workerAuthToken !== context.workerAuthToken ||
       this.session.platform !== context.platform ||
+      !sameExecutionPolicy(this.session.executionPolicy, context.executionPolicy) ||
       this.session.wrapperRunId !== context.wrapperRunId ||
       this.session.wrapperGeneration !== context.wrapperGeneration ||
       this.session.wrapperConnectionId !== context.wrapperConnectionId;

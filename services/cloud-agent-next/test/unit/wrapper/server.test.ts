@@ -19,6 +19,7 @@ import {
   type SessionBinding,
 } from '../../../wrapper/src/server.js';
 import type { WrapperKiloClient } from '../../../wrapper/src/kilo-api.js';
+import { buildCodeReviewManagedSessionPolicy } from '@kilocode/worker-utils/managed-session-policy';
 
 // ---------------------------------------------------------------------------
 // Test Helpers
@@ -103,6 +104,29 @@ describe('createAnswerPermissionHandler', () => {
     expect(data).toEqual({ status: 'answered', success: true });
     expect(deps.kiloClient.answerPermission).toHaveBeenCalledWith('perm_1', 'always');
   });
+
+  it('rejects permission approvals for managed sessions', async () => {
+    const state = new WrapperState();
+    state.bindSession({
+      kiloSessionId: 'kilo_sess_1',
+      ingestUrl: 'wss://ingest.example.com',
+      ingestToken: 'token',
+      workerAuthToken: 'auth',
+      executionPolicy: buildCodeReviewManagedSessionPolicy(),
+    });
+    const deps = createMockDeps(state);
+    const handler = createAnswerPermissionHandler(deps);
+
+    const response = await handler(jsonRequest({ permissionId: 'perm_1', response: 'always' }));
+    const data = await readJson(response);
+
+    expect(response.status).toBe(403);
+    expect(data).toEqual({
+      error: 'PERMISSION_DISABLED',
+      message: 'Permissions are auto-rejected for this managed session',
+    });
+    expect(deps.kiloClient.answerPermission).not.toHaveBeenCalled();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -140,6 +164,29 @@ describe('createAnswerQuestionHandler', () => {
     expect(data).toEqual({ status: 'answered', success: true });
     expect(deps.kiloClient.answerQuestion).toHaveBeenCalledWith('q_1', [['yes']]);
   });
+
+  it('rejects question answers for managed sessions', async () => {
+    const state = new WrapperState();
+    state.bindSession({
+      kiloSessionId: 'kilo_sess_1',
+      ingestUrl: 'wss://ingest.example.com',
+      ingestToken: 'token',
+      workerAuthToken: 'auth',
+      executionPolicy: buildCodeReviewManagedSessionPolicy(),
+    });
+    const deps = createMockDeps(state);
+    const handler = createAnswerQuestionHandler(deps);
+
+    const response = await handler(jsonRequest({ questionId: 'q_1', answers: [['yes']] }));
+    const data = await readJson(response);
+
+    expect(response.status).toBe(403);
+    expect(data).toEqual({
+      error: 'QUESTION_DISABLED',
+      message: 'Questions are disabled for this managed session',
+    });
+    expect(deps.kiloClient.answerQuestion).not.toHaveBeenCalled();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -176,6 +223,29 @@ describe('createRejectQuestionHandler', () => {
     expect(response.status).toBe(200);
     expect(data).toEqual({ status: 'rejected', success: true });
     expect(deps.kiloClient.rejectQuestion).toHaveBeenCalledWith('q_1');
+  });
+
+  it('rejects question rejection endpoint for managed sessions', async () => {
+    const state = new WrapperState();
+    state.bindSession({
+      kiloSessionId: 'kilo_sess_1',
+      ingestUrl: 'wss://ingest.example.com',
+      ingestToken: 'token',
+      workerAuthToken: 'auth',
+      executionPolicy: buildCodeReviewManagedSessionPolicy(),
+    });
+    const deps = createMockDeps(state);
+    const handler = createRejectQuestionHandler(deps);
+
+    const response = await handler(jsonRequest({ questionId: 'q_1' }));
+    const data = await readJson(response);
+
+    expect(response.status).toBe(403);
+    expect(data).toEqual({
+      error: 'QUESTION_DISABLED',
+      message: 'Questions are disabled for this managed session',
+    });
+    expect(deps.kiloClient.rejectQuestion).not.toHaveBeenCalled();
   });
 });
 

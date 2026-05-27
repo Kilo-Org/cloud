@@ -1,3 +1,5 @@
+import type { ManagedSessionExecutionPolicy } from './managed-session-policy.js';
+
 export type WrapperBootstrapRepoSource =
   | {
       kind: 'github';
@@ -64,6 +66,7 @@ export type WrapperSessionBinding = {
   ingestToken?: string;
   workerAuthToken: string;
   upstreamBranch?: string;
+  executionPolicy?: ManagedSessionExecutionPolicy;
   wrapperRunId: string;
   wrapperGeneration: number;
   wrapperConnectionId: string;

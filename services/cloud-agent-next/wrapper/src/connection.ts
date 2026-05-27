@@ -11,6 +11,10 @@
 
 import type { WrapperState } from './state.js';
 import type { IngestEvent, WrapperCommand } from '../../src/shared/protocol.js';
+import {
+  shouldAutoRejectPermissionInteraction,
+  shouldDenyQuestionInteraction,
+} from '../../src/shared/managed-session-policy.js';
 import { trimPayload } from '../../src/shared/trim-payload.js';
 import { logToFile } from './utils.js';
 import type { KiloEvent, WrapperKiloClient } from './kilo-api.js';
@@ -19,8 +23,29 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
-function isCodeReviewJob(state: WrapperState): boolean {
-  return state.currentSession?.platform === 'code-review';
+function shouldRejectPermission(state: WrapperState): boolean {
+  const session = state.currentSession;
+  return shouldAutoRejectPermissionInteraction({
+    executionPolicy: session?.executionPolicy,
+    platform: session?.platform,
+  });
+}
+
+function shouldRejectQuestion(state: WrapperState): boolean {
+  const session = state.currentSession;
+  return shouldDenyQuestionInteraction({
+    executionPolicy: session?.executionPolicy,
+    platform: session?.platform,
+  });
+}
+
+function shouldSuppressInteractiveStatus(
+  state: WrapperState,
+  statusType: string | undefined
+): boolean {
+  if (statusType === 'question') return shouldRejectQuestion(state);
+  if (statusType === 'permission') return shouldRejectPermission(state);
+  return false;
 }
 
 function gateResultFromProperties(
@@ -33,10 +58,6 @@ function gateResultFromProperties(
 function statusTypeFromProperties(properties: Record<string, unknown>): string | undefined {
   const status = properties.status;
   return isRecord(status) && typeof status.type === 'string' ? status.type : undefined;
-}
-
-function isInteractiveStatusType(statusType: string | undefined): boolean {
-  return statusType === 'question' || statusType === 'permission';
 }
 
 function permissionCategoryFromProperties(properties: Record<string, unknown>): string {
@@ -537,11 +558,12 @@ export function createConnectionManager(
       const pendingQuestion = questions.find(q => q.sessionID === kiloSessionId);
       const pendingPermission = permissions.find(p => p.sessionID === kiloSessionId);
       const pendingNetworkWaits = networkWaits.filter(wait => wait.sessionID === kiloSessionId);
-      const codeReviewJob = isCodeReviewJob(state);
-      const skipStatusForCodeReview = codeReviewJob && isInteractiveStatusType(sessionStatus.type);
+      const suppressQuestion = shouldRejectQuestion(state);
+      const suppressPermission = shouldRejectPermission(state);
+      const skipInteractiveStatus = shouldSuppressInteractiveStatus(state, sessionStatus.type);
 
       // Send session status as a regular kilocode event
-      if (!skipStatusForCodeReview) {
+      if (!skipInteractiveStatus) {
         const statusProperties = { sessionID: kiloSessionId, status: sessionStatus };
         sendToIngest({
           streamEventType: 'kilocode',
@@ -557,7 +579,7 @@ export function createConnectionManager(
 
       // Replay pending questions/permissions as regular events
       // (same format as real-time delivery - matches CLI behavior)
-      if (pendingQuestion && !codeReviewJob) {
+      if (pendingQuestion && !suppressQuestion) {
         sendToIngest({
           streamEventType: 'kilocode',
           data: {
@@ -568,7 +590,7 @@ export function createConnectionManager(
           timestamp: new Date().toISOString(),
         });
       }
-      if (pendingPermission && !codeReviewJob) {
+      if (pendingPermission && !suppressPermission) {
         sendToIngest({
           streamEventType: 'kilocode',
           data: {
@@ -593,7 +615,7 @@ export function createConnectionManager(
       }
 
       logToFile(
-        `kilo state sent: status=${sessionStatus.type}${skipStatusForCodeReview ? ' (suppressed)' : ''}, question=${pendingQuestion?.id ?? 'none'}${codeReviewJob && pendingQuestion ? ' (suppressed)' : ''}, permission=${pendingPermission?.id ?? 'none'}${codeReviewJob && pendingPermission ? ' (suppressed)' : ''}, networkWaits=${pendingNetworkWaits.length}`
+        `kilo state sent: status=${sessionStatus.type}${skipInteractiveStatus ? ' (suppressed)' : ''}, question=${pendingQuestion?.id ?? 'none'}${suppressQuestion && pendingQuestion ? ' (suppressed)' : ''}, permission=${pendingPermission?.id ?? 'none'}${suppressPermission && pendingPermission ? ' (suppressed)' : ''}, networkWaits=${pendingNetworkWaits.length}`
       );
     } catch (err) {
       logToFile(
@@ -962,7 +984,7 @@ export function createConnectionManager(
           // waiting for a human response that will never come.
           if (eventType === 'permission.asked') {
             const permId = typeof properties.id === 'string' ? properties.id : undefined;
-            if (isCodeReviewJob(state)) {
+            if (shouldRejectPermission(state)) {
               rejectCodeReviewPermission(permId, properties, state, config.kiloClient);
               callbacks.onSseEvent?.();
               continue;
@@ -980,21 +1002,19 @@ export function createConnectionManager(
             continue;
           }
 
-          if (isCodeReviewJob(state)) {
-            if (eventType === 'question.asked') {
-              const questionId = typeof properties.id === 'string' ? properties.id : undefined;
-              rejectCodeReviewQuestion(questionId, config.kiloClient);
-              callbacks.onSseEvent?.();
-              continue;
-            }
+          if (eventType === 'question.asked' && shouldRejectQuestion(state)) {
+            const questionId = typeof properties.id === 'string' ? properties.id : undefined;
+            rejectCodeReviewQuestion(questionId, config.kiloClient);
+            callbacks.onSseEvent?.();
+            continue;
+          }
 
-            if (
-              eventType === 'session.status' &&
-              isInteractiveStatusType(statusTypeFromProperties(properties))
-            ) {
-              callbacks.onSseEvent?.();
-              continue;
-            }
+          if (
+            eventType === 'session.status' &&
+            shouldSuppressInteractiveStatus(state, statusTypeFromProperties(properties))
+          ) {
+            callbacks.onSseEvent?.();
+            continue;
           }
 
           maybeResumeNetworkWait(eventType, properties);

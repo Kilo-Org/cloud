@@ -11,6 +11,7 @@ import type { AgentMode } from '../schema.js';
 import type { Images } from '../router/schemas.js';
 import type { SessionMetadata } from '../persistence/session-metadata.js';
 import type { CloudAgentSessionState } from '../persistence/types.js';
+import type { CallbackTarget } from '../callbacks/index.js';
 
 // ---------------------------------------------------------------------------
 // Execution Modes
@@ -105,6 +106,11 @@ export type TurnFinalization = {
   condenseOnComplete?: boolean;
 };
 
+export type MessageCompletionPolicy = {
+  callbackTarget?: CallbackTarget;
+  gateThreshold?: 'off' | 'all' | 'warning' | 'critical';
+};
+
 /** Session policy extends per-turn finalization with session-only gates. */
 export type SessionFinalization = TurnFinalization & {
   gateThreshold?: 'off' | 'all' | 'warning' | 'critical';
@@ -194,6 +200,7 @@ export type QueueExecutionTurnCommand = {
   turn: ExecutionTurnSubmission;
   agent?: AgentSelectionOverride;
   finalization?: TurnFinalization;
+  completion?: MessageCompletionPolicy;
 };
 
 /** Current-path submitted message before durable admission resolves identity/defaults. */

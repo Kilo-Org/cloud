@@ -34,15 +34,10 @@ import {
   withPreparationInfrastructureRecovery,
 } from '../sandbox-recovery.js';
 import { checkDiskAndCleanBeforeSetup } from '../workspace.js';
+import { resolveSessionExecutionPolicy } from '../persistence/execution-policy.js';
 
 /** Maximum time allowed for workspace preparation (resume, init, fast path). */
 const PREPARE_WORKSPACE_TIMEOUT_MS = 10 * 60 * 1000;
-
-const CODE_REVIEW_DISABLED_TOOLS = {
-  question: false,
-  plan_enter: false,
-  plan_exit: false,
-} satisfies Record<string, boolean>;
 
 function withWorkspacePreparationTimeout<T>(operation: Promise<T>, step: string): Promise<T> {
   return withTimeout(
@@ -400,17 +395,9 @@ export class ExecutionOrchestrator {
     }
   }
 
-  private getCreatedOnPlatform(
-    plan: FencedWrapperDispatchRequest | FencedLegacyExecutionRequest
-  ): string | undefined {
-    return plan.workspace.metadata?.identity?.createdOnPlatform;
-  }
-
   private getToolOverrides(
     plan: FencedWrapperDispatchRequest | FencedLegacyExecutionRequest
   ): Record<string, boolean> | undefined {
-    return this.getCreatedOnPlatform(plan) === 'code-review'
-      ? CODE_REVIEW_DISABLED_TOOLS
-      : undefined;
+    return resolveSessionExecutionPolicy(plan.workspace.metadata)?.tools;
   }
 }

@@ -58,6 +58,10 @@ import {
 import { shellQuote, validShellEnvEntries } from './kilo/utils.js';
 import { buildSignedImagePromptAttachments } from './execution/image-prompt-parts.js';
 import {
+  resolveSessionExecutionPolicy,
+  type ManagedSessionExecutionPolicy,
+} from './persistence/execution-policy.js';
+import {
   type WrapperBootstrapRepoSource,
   type WrapperCommandRequest,
   type WrapperPromptRequest,
@@ -909,6 +913,7 @@ export class SessionService {
       gitlabTokenManaged: context.gitlabTokenManaged,
       platform: context.platform,
       profile: effectiveProfile,
+      executionPolicy: opts.executionPolicy,
     });
   }
 
@@ -930,6 +935,7 @@ export class SessionService {
       gitlabTokenManaged,
       platform,
       profile,
+      executionPolicy: storedExecutionPolicy,
     } = opts;
     const userEnvVars = profile?.envVars;
     const encryptedSecrets = profile?.encryptedSecrets;
@@ -984,10 +990,15 @@ export class SessionService {
     if (env.KILO_OPENROUTER_BASE) {
       providerOptions.baseURL = backendUrlForSandbox(env.KILO_OPENROUTER_BASE);
     }
-    const isInteractive = createdOnPlatform == 'cloud-agent-web';
-    const commandGuardPolicy = getCommandGuardPolicy(createdOnPlatform);
+    const managedPolicy = resolveSessionExecutionPolicy({
+      executionPolicy: storedExecutionPolicy,
+      identity: { createdOnPlatform },
+    });
+    const isInteractive =
+      createdOnPlatform == 'cloud-agent-web' && managedPolicy?.runtime?.nonInteractive !== true;
+    const denyQuestions = !isInteractive || managedPolicy?.interaction?.question === 'deny';
 
-    if (commandGuardPolicy) {
+    if (managedPolicy?.runtime?.nonInteractive === true) {
       Object.assign(envVars, {
         CI: 'true',
         GIT_TERMINAL_PROMPT: '0',
@@ -1005,7 +1016,7 @@ export class SessionService {
         [`${workspacePath}/**`]: 'allow',
         [`${sessionHome}/.kilocode/skills/**`]: 'allow',
       },
-      ...(!isInteractive && { question: 'deny' }),
+      ...(denyQuestions && { question: 'deny' }),
       read: 'allow',
       edit: 'allow',
       glob: 'allow',
@@ -1023,33 +1034,15 @@ export class SessionService {
       suggest: 'deny',
     };
 
-    if (commandGuardPolicy) {
-      const bashPermissions = buildCommandGuardBashPermissions(commandGuardPolicy);
-
-      // Parity with old autoApproval config:
-      //   read: allow  (was read.enabled: true)
-      //   edit: deny   (was write.enabled: false)
-      //   webfetch/websearch/codesearch: deny  (was browser.enabled: false)
-      //   MCP: allowed by default (was mcp.enabled: true)
-      //   question: handled above (line 564) for non-interactive sessions
-      Object.assign(permission, {
-        read: 'allow',
-        edit: 'deny',
-        bash: bashPermissions,
-        webfetch: 'deny',
-        websearch: 'deny',
-        codesearch: 'deny',
-        todowrite: 'allow',
-        todoread: 'allow',
-      });
-
+    if (managedPolicy?.permissionOverrides) {
+      Object.assign(permission, managedPolicy.permissionOverrides);
       logger
         .withFields({
           createdOnPlatform,
-          commandPolicy: commandGuardPolicy.policyName,
-          deniedCommandPatterns: commandGuardPolicy.denied.length,
+          executionPolicy: managedPolicy.name,
+          permissionOverrideKeys: Object.keys(managedPolicy.permissionOverrides).length,
         })
-        .info('Enabled read-only command guard policy');
+        .info('Applied managed session execution policy');
     }
 
     const configContent: Record<string, unknown> = {
@@ -1182,6 +1175,7 @@ export class SessionService {
       createdOnPlatform,
       appendSystemPrompt,
       profile,
+      executionPolicy,
     } = opts;
     const { sessionId, sessionHome, workspacePath, envVars: contextEnvVars } = context;
 
@@ -1199,6 +1193,7 @@ export class SessionService {
       createdOnPlatform,
       appendSystemPrompt,
       profile: effectiveProfile,
+      executionPolicy,
     });
 
     const session = await sandbox.createSession({
@@ -1342,6 +1337,7 @@ export class SessionService {
       platform,
     });
 
+    const executionPolicy = resolveSessionExecutionPolicy(metadata);
     const materializedEnv = this.getSaferEnvVars({
       sessionHome,
       sessionId,
@@ -1359,6 +1355,7 @@ export class SessionService {
       gitlabTokenManaged: resolvedTokens.gitlabTokenManaged,
       platform,
       profile,
+      executionPolicy,
     });
 
     const ready = {
@@ -1382,6 +1379,7 @@ export class SessionService {
       sessionId,
       wrapper,
       upstreamBranch: metadata.repository?.upstreamBranch,
+      executionPolicy,
     });
 
     const attachments =
@@ -1583,6 +1581,7 @@ export class SessionService {
       createdOnPlatform: metadata.identity.createdOnPlatform,
       appendSystemPrompt: metadata.agent?.appendSystemPrompt,
       profile: readProfileBundle(metadata),
+      executionPolicy: resolveSessionExecutionPolicy(metadata),
     });
 
     // Warm fast path: probe for an existing .git before touching disk. The
@@ -1784,6 +1783,7 @@ export class SessionService {
       createdOnPlatform: metadata.identity.createdOnPlatform,
       appendSystemPrompt: metadata.agent?.appendSystemPrompt,
       profile: readProfileBundle(metadata),
+      executionPolicy: resolveSessionExecutionPolicy(metadata),
     });
   }
 
@@ -2390,6 +2390,7 @@ export type GetOrCreateSessionOptions = {
   createdOnPlatform?: string;
   appendSystemPrompt?: string;
   profile?: SessionProfileBundle;
+  executionPolicy?: ManagedSessionExecutionPolicy;
 };
 
 export type BuildRuntimeEnvOptions = Omit<GetOrCreateSessionOptions, 'sandbox'>;
@@ -2420,6 +2421,7 @@ type GetSaferEnvVarsOptions = {
   gitlabTokenManaged?: boolean;
   platform?: 'github' | 'gitlab';
   profile?: SessionProfileBundle;
+  executionPolicy?: ManagedSessionExecutionPolicy;
 };
 
 export type WorkspaceReadyMetadata = {
@@ -2463,8 +2465,10 @@ function buildWrapperSessionBinding(options: {
   sessionId: string;
   wrapper: FencedWrapperDispatchRequest['wrapper'];
   upstreamBranch?: string;
+  executionPolicy?: ManagedSessionExecutionPolicy;
 }): WrapperSessionReadyRequest['session'] {
-  const { workerUrl, kilocodeToken, userId, sessionId, wrapper, upstreamBranch } = options;
+  const { workerUrl, kilocodeToken, userId, sessionId, wrapper, upstreamBranch, executionPolicy } =
+    options;
   if (!workerUrl) {
     throw ExecutionError.invalidRequest('WORKER_URL is required for wrapper bootstrap');
   }
@@ -2480,5 +2484,6 @@ function buildWrapperSessionBinding(options: {
     wrapperGeneration: wrapper.fence.wrapperGeneration,
     wrapperConnectionId: wrapper.fence.wrapperConnectionId,
     ...(upstreamBranch ? { upstreamBranch } : {}),
+    ...(executionPolicy ? { executionPolicy } : {}),
   };
 }

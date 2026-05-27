@@ -27,6 +27,8 @@ import {
   putSessionMessageState,
   type TerminalizeParams,
 } from './session-message-state.js';
+import { buildCodeReviewManagedSessionPolicy } from '@kilocode/worker-utils/managed-session-policy';
+import { ManagedSessionExecutionPolicySchema } from '../persistence/execution-policy.js';
 
 type QueueEvent = {
   sessionId: string;
@@ -522,6 +524,30 @@ describe('SessionMessageQueue', () => {
     });
 
     expect(replay).toMatchObject({ success: false, code: 'BAD_REQUEST' });
+  });
+
+  it('rejects submitted agent overrides for managed sessions', async () => {
+    const harness = createQueueHarness({
+      metadata: createMetadata({
+        agent: { mode: 'code-review', model: 'default-model', variant: 'alpha' },
+        executionPolicy: ManagedSessionExecutionPolicySchema.parse(
+          buildCodeReviewManagedSessionPolicy()
+        ),
+      }),
+    });
+
+    const result = await harness.queue.admitSubmittedMessage({
+      userId: 'user_test' as UserId,
+      turn: { type: 'prompt', id: FIRST_MESSAGE_ID, prompt: 'try another mode' },
+      agent: { mode: 'code', model: 'default-model', variant: 'alpha' },
+    });
+
+    expect(result).toMatchObject({
+      success: false,
+      code: 'BAD_REQUEST',
+      error: 'Managed sessions cannot override agent mode',
+    });
+    await expect(listPendingSessionMessages(harness.storage)).resolves.toHaveLength(0);
   });
 
   it('accepts replay matching predecessor partial immutable constraints without a stored turn', async () => {

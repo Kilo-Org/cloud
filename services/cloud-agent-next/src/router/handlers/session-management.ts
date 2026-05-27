@@ -25,6 +25,7 @@ import {
 import { readProfileBundle } from '../../session-profile.js';
 import type { CloudAgentSession } from '../../persistence/CloudAgentSession.js';
 import type { CloudAgentSessionState } from '../../persistence/types.js';
+import { resolveSessionExecutionPolicy } from '../../persistence/execution-policy.js';
 
 function publicRepositoryFields(metadata: CloudAgentSessionState): {
   githubRepo?: string;
@@ -279,6 +280,7 @@ export function createSessionManagementHandlers() {
               createdOnPlatform: metadata.identity.createdOnPlatform,
               appendSystemPrompt: metadata.agent?.appendSystemPrompt,
               profile: readProfileBundle(metadata),
+              executionPolicy: resolveSessionExecutionPolicy(metadata),
             });
 
             // Kill all kilocode processes in this session
@@ -641,6 +643,7 @@ export function createSessionManagementHandlers() {
             profile: sessionService.metadata
               ? readProfileBundle(sessionService.metadata)
               : undefined,
+            executionPolicy: resolveSessionExecutionPolicy(sessionService.metadata),
           });
 
           // Discover all log files from the sandbox

@@ -8,6 +8,8 @@ import {
 } from '../kilo/wrapper-client.js';
 import { findWrapperForSession } from '../kilo/wrapper-manager.js';
 import { generateSandboxId, getSandboxNamespace } from '../sandbox-id.js';
+import { resolveSessionExecutionPolicy } from '../persistence/execution-policy.js';
+import { shouldDenyTerminalInteraction } from '../shared/managed-session-policy.js';
 import { WRAPPER_VERSION } from '../shared/wrapper-version.js';
 import type { Env, SandboxId, SandboxInstance } from '../types.js';
 
@@ -33,6 +35,19 @@ export function validateTerminalMetadata(
     return {
       success: false,
       error: 'Terminal is only available after the workspace is prepared',
+    };
+  }
+
+  const executionPolicy = resolveSessionExecutionPolicy(metadata);
+  if (
+    shouldDenyTerminalInteraction({
+      executionPolicy,
+      platform: metadata.identity.createdOnPlatform,
+    })
+  ) {
+    return {
+      success: false,
+      error: 'Terminal is disabled for this managed session',
     };
   }
 

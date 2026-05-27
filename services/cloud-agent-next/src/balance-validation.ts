@@ -139,6 +139,7 @@ export async function fetchOrgIdForSession(
 export const BALANCE_REQUIRED_MUTATIONS = new Set([
   'initiateFromKilocodeSessionV2',
   'sendMessageV2',
+  'sendMessageV2Internal',
   'start',
   'send',
 ]);

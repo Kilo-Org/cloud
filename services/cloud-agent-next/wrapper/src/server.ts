@@ -25,6 +25,11 @@ import {
   type WrapperSessionReadyRequest,
   type WrapperSessionReadyResponse,
 } from '../../src/shared/wrapper-bootstrap.js';
+import {
+  shouldAutoRejectPermissionInteraction,
+  shouldDenyQuestionInteraction,
+  type ManagedSessionExecutionPolicy,
+} from '../../src/shared/managed-session-policy.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -67,6 +72,7 @@ export type SessionBinding = {
   ingestToken?: string;
   workerAuthToken: string;
   upstreamBranch?: string;
+  executionPolicy?: ManagedSessionExecutionPolicy;
   wrapperRunId: string;
   wrapperGeneration: number;
   wrapperConnectionId: string;
@@ -239,6 +245,7 @@ export async function bindSessionContext(
       ingestToken: binding.ingestToken,
       workerAuthToken: binding.workerAuthToken,
       platform: config.platform,
+      executionPolicy: binding.executionPolicy,
       wrapperRunId: binding.wrapperRunId,
       wrapperGeneration: binding.wrapperGeneration,
       wrapperConnectionId: binding.wrapperConnectionId,
@@ -269,6 +276,7 @@ export async function bindSessionContext(
     ingestToken: binding.ingestToken,
     workerAuthToken: binding.workerAuthToken,
     platform: config.platform,
+    executionPolicy: binding.executionPolicy,
     wrapperRunId: binding.wrapperRunId,
     wrapperGeneration: binding.wrapperGeneration,
     wrapperConnectionId: binding.wrapperConnectionId,
@@ -479,6 +487,21 @@ export function createAnswerPermissionHandler(deps: ServerDependencies) {
       return errorResponse('INVALID_REQUEST', 'permissionId and response are required', 400);
     }
 
+    const session = state.currentSession;
+    if (
+      body.response !== 'reject' &&
+      shouldAutoRejectPermissionInteraction({
+        executionPolicy: session?.executionPolicy,
+        platform: session?.platform,
+      })
+    ) {
+      return errorResponse(
+        'PERMISSION_DISABLED',
+        'Permissions are auto-rejected for this managed session',
+        403
+      );
+    }
+
     try {
       const success =
         body.message === undefined
@@ -516,6 +539,20 @@ export function createAnswerQuestionHandler(deps: ServerDependencies) {
       return errorResponse('INVALID_REQUEST', 'questionId and answers are required', 400);
     }
 
+    const session = state.currentSession;
+    if (
+      shouldDenyQuestionInteraction({
+        executionPolicy: session?.executionPolicy,
+        platform: session?.platform,
+      })
+    ) {
+      return errorResponse(
+        'QUESTION_DISABLED',
+        'Questions are disabled for this managed session',
+        403
+      );
+    }
+
     try {
       const success = await kiloClient.answerQuestion(body.questionId, body.answers);
       state.updateActivity();
@@ -546,6 +583,20 @@ export function createRejectQuestionHandler(deps: ServerDependencies) {
 
     if (!body.questionId) {
       return errorResponse('INVALID_REQUEST', 'questionId is required', 400);
+    }
+
+    const session = state.currentSession;
+    if (
+      shouldDenyQuestionInteraction({
+        executionPolicy: session?.executionPolicy,
+        platform: session?.platform,
+      })
+    ) {
+      return errorResponse(
+        'QUESTION_DISABLED',
+        'Questions are disabled for this managed session',
+        403
+      );
     }
 
     try {

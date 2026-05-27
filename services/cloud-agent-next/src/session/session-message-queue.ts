@@ -2,6 +2,7 @@ import { TRPCError } from '@trpc/server';
 import type {
   ExecutionDeliveryContext,
   AdmitAcceptedSessionMessageRequest,
+  MessageCompletionPolicy,
   MessageDeliveryRequest,
   MessageDeliveryResult,
   SessionMessageAdmissionResult,
@@ -12,6 +13,7 @@ import { renderExecutionTurnContent } from '../execution/types.js';
 import { isExecutionError } from '../execution/errors.js';
 import { logger } from '../logger.js';
 import { dispatchedKilocodeModelId } from '../persistence/model-utils.js';
+import { resolveSessionExecutionPolicy } from '../persistence/execution-policy.js';
 import type { SessionMetadata } from '../persistence/session-metadata.js';
 import { isSandboxWorkspaceProbeTimeoutError } from '../sandbox-recovery.js';
 import {
@@ -41,6 +43,7 @@ import {
   listReconnectVisibleTerminalQueuedMessages,
   putSessionMessageState,
   type SessionMessageStorage,
+  type SessionMessageCompletionPolicy,
   type TerminalizeParams,
 } from './session-message-state.js';
 import type { QueuedMessageSnapshot } from '../websocket/stream.js';
@@ -209,6 +212,41 @@ function buildMessageDeliveryRequest(
   } satisfies MessageDeliveryRequest;
 }
 
+function completionPolicyFromRequest(
+  completion: MessageCompletionPolicy | undefined
+): SessionMessageCompletionPolicy | undefined {
+  return completion?.gateThreshold !== undefined
+    ? { gateThreshold: completion.gateThreshold }
+    : undefined;
+}
+
+function validateManagedSessionAgentOverride(
+  metadata: SessionMetadata,
+  requestedAgent: SubmittedSessionMessageRequest['agent']
+): string | null {
+  const executionPolicy = resolveSessionExecutionPolicy(metadata);
+  if (!executionPolicy || !requestedAgent) return null;
+
+  const expectedMode = metadata.agent?.mode ?? 'code';
+  if (requestedAgent.mode !== undefined && requestedAgent.mode !== expectedMode) {
+    return 'Managed sessions cannot override agent mode';
+  }
+
+  if (requestedAgent.model !== undefined) {
+    const expectedModel = dispatchedKilocodeModelId(metadata.agent?.model);
+    const requestedModel = dispatchedKilocodeModelId(requestedAgent.model);
+    if (requestedModel !== expectedModel) {
+      return 'Managed sessions cannot override agent model';
+    }
+  }
+
+  if (requestedAgent.variant !== undefined && requestedAgent.variant !== metadata.agent?.variant) {
+    return 'Managed sessions cannot override agent variant';
+  }
+
+  return null;
+}
+
 class MessageDeliveryRequestValidationError extends Error {
   readonly code = 'BAD_REQUEST' as const;
 
@@ -319,7 +357,12 @@ export async function flushNextPendingSessionMessage(params: {
         : undefined);
     await putSessionMessageState(
       params.storage,
-      createQueuedSessionMessageState(intent, callbackSnapshot, message.createdAt)
+      createQueuedSessionMessageState(
+        intent,
+        callbackSnapshot,
+        message.createdAt,
+        message.completionPolicy
+      )
     );
   }
   await params.repairQueuedMessageEffects?.(intent);
@@ -599,11 +642,19 @@ export function createSessionMessageQueue(
         : undefined);
     await putSessionMessageState(
       storage,
-      createQueuedSessionMessageState(intent, callbackSnapshot, message.createdAt)
+      createQueuedSessionMessageState(
+        intent,
+        callbackSnapshot,
+        message.createdAt,
+        message.completionPolicy
+      )
     );
   }
 
-  async function admitIntent(intent: SessionMessageIntent): Promise<SessionMessageAdmissionResult> {
+  async function admitIntent(
+    intent: SessionMessageIntent,
+    completion?: MessageCompletionPolicy
+  ): Promise<SessionMessageAdmissionResult> {
     const { turn } = intent;
     const idempotentResult = await getExistingAdmissionAckForMessageId(turn.messageId, intent);
     if (idempotentResult) return idempotentResult;
@@ -612,13 +663,25 @@ export function createSessionMessageQueue(
     if (capacityError) return capacityError;
 
     const metadata = await getMetadata();
-    const callbackTarget = metadata?.callback?.target;
+    const callbackTarget = completion?.callbackTarget ?? metadata?.callback?.target;
     const callbackSnapshot = callbackTarget
       ? { required: true, target: callbackTarget }
       : undefined;
+    const completionPolicy = completionPolicyFromRequest(completion);
 
-    await enqueuePendingSessionMessageIntent(storage, intent, Date.now(), callbackSnapshot);
-    const messageState = createQueuedSessionMessageState(intent, callbackSnapshot);
+    await enqueuePendingSessionMessageIntent(
+      storage,
+      intent,
+      Date.now(),
+      callbackSnapshot,
+      completionPolicy
+    );
+    const messageState = createQueuedSessionMessageState(
+      intent,
+      callbackSnapshot,
+      Date.now(),
+      completionPolicy
+    );
     await putSessionMessageState(storage, messageState);
     await completeQueuedAdmissionEffects(intent);
     return buildAdmissionAck(turn.messageId);
@@ -693,6 +756,13 @@ export function createSessionMessageQueue(
 
       const requestedAgent = request.agent;
       const requestedFinalization = request.finalization;
+      const managedAgentOverrideError = validateManagedSessionAgentOverride(
+        metadata,
+        requestedAgent
+      );
+      if (managedAgentOverrideError) {
+        return buildAdmissionError('BAD_REQUEST', managedAgentOverrideError);
+      }
       const modeInput = requestedAgent?.mode ?? metadata.agent?.mode ?? 'code';
       const modeCheck = validateModeAgainstRuntimeAgents(metadata, modeInput);
       if (modeCheck) {
@@ -737,7 +807,7 @@ export function createSessionMessageQueue(
       if (existingAdmission) return existingAdmission;
       const capacityError = await checkPendingQueueCapacity();
       if (capacityError) return capacityError;
-      return await admitIntent(intent);
+      return await admitIntent(intent, request.completion);
     } catch (error) {
       if (isExecutionError(error)) {
         if (error.retryable) {
@@ -976,9 +1046,15 @@ export async function enqueuePendingSessionMessageIntent(
   storage: SessionQueueStorage,
   intent: SessionMessageIntent,
   createdAt = Date.now(),
-  callbackSnapshot?: PendingSessionMessage['callbackSnapshot']
+  callbackSnapshot?: PendingSessionMessage['callbackSnapshot'],
+  completionPolicy?: PendingSessionMessage['completionPolicy']
 ): Promise<PendingSessionMessage> {
-  const message = createPendingSessionMessageFromIntent(intent, createdAt, callbackSnapshot);
+  const message = createPendingSessionMessageFromIntent(
+    intent,
+    createdAt,
+    callbackSnapshot,
+    completionPolicy
+  );
   await storePendingSessionMessage(storage, message);
   return message;
 }

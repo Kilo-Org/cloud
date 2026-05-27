@@ -57,6 +57,11 @@ const PendingSessionMessageCallbackSnapshotSchema = z
     target: CallbackTargetSchema.optional(),
   })
   .strict();
+const PendingSessionMessageCompletionPolicySchema = z
+  .object({
+    gateThreshold: z.enum(['off', 'all', 'warning', 'critical']).optional(),
+  })
+  .strict();
 const PendingDeliveryDispositionSchema = z.enum(['terminalization-pending']);
 const PendingDeliverySchema = z.object({
   queuedAt: z.number(),
@@ -70,6 +75,7 @@ export const PendingSessionMessageV2Schema = z.object({
   intent: SessionMessageIntentSchema,
   delivery: PendingDeliverySchema,
   callbackSnapshot: PendingSessionMessageCallbackSnapshotSchema.optional(),
+  completionPolicy: PendingSessionMessageCompletionPolicySchema.optional(),
 });
 export type PendingSessionMessageV2 = z.infer<typeof PendingSessionMessageV2Schema>;
 
@@ -124,6 +130,7 @@ export type PendingSessionMessage = {
   createdAt: number;
   intent?: SessionMessageIntent;
   callbackSnapshot?: z.infer<typeof PendingSessionMessageCallbackSnapshotSchema>;
+  completionPolicy?: z.infer<typeof PendingSessionMessageCompletionPolicySchema>;
   flushAttempts?: number;
   nextFlushAttemptAt?: number;
   lastFlushError?: string;
@@ -249,6 +256,7 @@ function decodePendingMessage(
       createdAt: message.delivery.queuedAt,
       intent: message.intent,
       callbackSnapshot: message.callbackSnapshot,
+      completionPolicy: message.completionPolicy,
       flushAttempts: message.delivery.flushAttempts,
       nextFlushAttemptAt: message.delivery.nextFlushAttemptAt,
       lastFlushError: message.delivery.lastFlushError,
@@ -297,7 +305,8 @@ export function createPendingSessionMessage(params: {
 export function createPendingSessionMessageFromIntent(
   intent: SessionMessageIntent,
   createdAt = Date.now(),
-  callbackSnapshot?: z.infer<typeof PendingSessionMessageCallbackSnapshotSchema>
+  callbackSnapshot?: z.infer<typeof PendingSessionMessageCallbackSnapshotSchema>,
+  completionPolicy?: z.infer<typeof PendingSessionMessageCompletionPolicySchema>
 ): PendingSessionMessage {
   return {
     version: 2,
@@ -306,6 +315,7 @@ export function createPendingSessionMessageFromIntent(
     createdAt,
     intent,
     callbackSnapshot,
+    completionPolicy,
   };
 }
 export function resolvePendingSessionMessageExecutionOptions(
@@ -353,6 +363,7 @@ function serializePendingSessionMessage(
           disposition: normalized.deliveryDisposition,
         },
         callbackSnapshot: normalized.callbackSnapshot,
+        completionPolicy: normalized.completionPolicy,
       })
     : LegacyPendingSessionMessageSchema.parse({
         ...normalized.legacy,

@@ -130,6 +130,7 @@ export async function queueMessage(
     },
     agent: input.agent,
     finalization: input.finalization,
+    completion: input.completion,
   };
 
   const result = await withDORetry<

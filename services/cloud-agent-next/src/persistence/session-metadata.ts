@@ -9,6 +9,7 @@ import {
   MetadataSchema as LegacySessionMetadataSchema,
   SessionProfileBundleSchema,
 } from './schemas.js';
+import { ManagedSessionExecutionPolicySchema } from './execution-policy.js';
 
 const SandboxIdSchema = z
   .string()
@@ -164,6 +165,7 @@ export const CurrentSessionMetadataSchema = z
     initialMessage: MetadataInitialMessageSchema.optional(),
     agent: MetadataAgentSchema.optional(),
     finalization: MetadataFinalizationSchema.optional(),
+    executionPolicy: ManagedSessionExecutionPolicySchema.optional(),
     profile: SessionProfileBundleSchema.optional(),
     callback: MetadataCallbackSchema.optional(),
     workspace: MetadataWorkspaceSchema.optional(),

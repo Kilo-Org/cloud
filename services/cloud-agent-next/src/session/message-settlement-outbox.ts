@@ -208,7 +208,14 @@ export function createMessageSettlementOutbox(
     if (representativeMessageId && gateResult !== undefined) {
       const representative = await getSessionMessageState(storage, representativeMessageId);
       if (representative?.callbackRequired && !representative.callbackEnqueuedAt) {
-        await putSessionMessageState(storage, { ...representative, gateResult });
+        await putSessionMessageState(storage, {
+          ...representative,
+          gateResult,
+          completionData: {
+            ...representative.completionData,
+            gateResult,
+          },
+        });
       }
     }
 
@@ -267,11 +274,18 @@ export function createMessageSettlementOutbox(
       accepted: true,
       completionSource: state.completionSource,
     };
+    const completionData = {
+      ...state.completionData,
+      ...(extra?.gateResult !== undefined ? { gateResult: extra.gateResult } : {}),
+    };
     if (state.assistantMessageId) {
       payload.assistantMessageId = state.assistantMessageId;
     }
     if (extra?.gateResult !== undefined) {
       payload.gateResult = extra.gateResult;
+    }
+    if (Object.keys(completionData).length > 0) {
+      payload.completionData = completionData;
     }
     ensureTerminalMessageEvent({
       entityId: `terminal-message/${state.messageId}`,
@@ -365,6 +379,23 @@ export function createMessageSettlementOutbox(
       }
     }
 
+    const completionData =
+      status === 'completed'
+        ? {
+            ...state.completionData,
+            ...(lastAssistantMessageText !== undefined ? { lastAssistantMessageText } : {}),
+            ...(metadata?.repository?.upstreamBranch !== undefined
+              ? { lastSeenBranch: metadata.repository.upstreamBranch }
+              : {}),
+            ...(state.gateResult !== undefined ? { gateResult: state.gateResult } : {}),
+          }
+        : state.completionData;
+
+    if (status === 'completed' && completionData !== state.completionData) {
+      state.completionData = completionData;
+      await putSessionMessageState(storage, state);
+    }
+
     const payload: CallbackJob['payload'] = {
       sessionId,
       cloudAgentSessionId: sessionId,
@@ -376,6 +407,7 @@ export function createMessageSettlementOutbox(
       kiloSessionId: metadata?.auth.kiloSessionId,
       gateResult: state.gateResult,
       lastAssistantMessageText,
+      completionData,
       idempotencyKey: state.messageId,
     };
 
@@ -427,7 +459,9 @@ export function createMessageSettlementOutbox(
       return false;
     }
 
-    const gateThreshold = (await getMetadata())?.finalization?.gateThreshold;
+    const gateThreshold =
+      representative.completionPolicy?.gateThreshold ??
+      (await getMetadata())?.finalization?.gateThreshold;
     return gateThreshold !== undefined && gateThreshold !== 'off';
   }
 

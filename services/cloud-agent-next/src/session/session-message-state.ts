@@ -35,6 +35,19 @@ export type TerminalEffectAccounting = {
   callback: TerminalCallbackEffectAccounting;
 };
 
+export type SessionMessageCompletionPolicy = {
+  gateThreshold?: 'off' | 'all' | 'warning' | 'critical';
+};
+
+export type SessionMessageCompletionData = {
+  assistantMessageId?: string;
+  lastAssistantMessageText?: string;
+  gateResult?: 'pass' | 'fail';
+  lastSeenBranch?: string;
+  completedAt?: number;
+  source?: SessionMessageCompletionSource;
+};
+
 export type SessionMessageState = {
   messageId: string;
   status: SessionMessageStatus;
@@ -53,6 +66,8 @@ export type SessionMessageState = {
   failureReason?: string;
   attempts?: number;
   gateResult?: 'pass' | 'fail';
+  completionPolicy?: SessionMessageCompletionPolicy;
+  completionData?: SessionMessageCompletionData;
   callbackRequired?: boolean;
   callbackTarget?: CallbackTarget;
   callbackEnqueuedAt?: number;
@@ -156,6 +171,31 @@ export const SessionMessageStateSchema = z
     failureReason: z.string().optional(),
     attempts: z.number().int().nonnegative().optional(),
     gateResult: z.enum(['pass', 'fail']).optional(),
+    completionPolicy: z
+      .object({
+        gateThreshold: z.enum(['off', 'all', 'warning', 'critical']).optional(),
+      })
+      .strict()
+      .optional(),
+    completionData: z
+      .object({
+        assistantMessageId: z.string().optional(),
+        lastAssistantMessageText: z.string().optional(),
+        gateResult: z.enum(['pass', 'fail']).optional(),
+        lastSeenBranch: z.string().optional(),
+        completedAt: z.number().optional(),
+        source: z
+          .enum([
+            'assistant_message_event',
+            'idle_reconciliation',
+            'wrapper_failure',
+            'interrupt',
+            'delivery_failure',
+          ])
+          .optional(),
+      })
+      .strict()
+      .optional(),
     callbackRequired: z.boolean().optional(),
     callbackTarget: z
       .object({
@@ -280,7 +320,8 @@ export async function putSessionMessageState(
 export function createQueuedSessionMessageState(
   intent: SessionMessageIntent,
   callbackSnapshot?: { required: boolean; target?: CallbackTarget },
-  now = Date.now()
+  now = Date.now(),
+  completionPolicy?: SessionMessageCompletionPolicy
 ): SessionMessageState {
   return {
     messageId: intent.turn.messageId,
@@ -291,6 +332,7 @@ export function createQueuedSessionMessageState(
     queuedAt: now,
     callbackRequired: callbackSnapshot?.required ?? false,
     callbackTarget: callbackSnapshot?.target,
+    completionPolicy,
   };
 }
 
@@ -317,6 +359,7 @@ export type MarkMessageCompletedParams = {
   assistantMessageId?: string;
   completionSource: SessionMessageCompletionSource;
   gateResult?: 'pass' | 'fail';
+  completionData?: SessionMessageCompletionData;
 };
 
 export async function markMessageCompleted(
@@ -328,13 +371,28 @@ export async function markMessageCompleted(
   const state = await getSessionMessageState(storage, messageId);
   if (!state) return null;
   if (isTerminalStatus(state.status)) return null;
+  const assistantMessageId =
+    params.assistantMessageId ??
+    params.completionData?.assistantMessageId ??
+    state.completionData?.assistantMessageId ??
+    state.assistantMessageId;
+  const gateResult =
+    params.gateResult ?? params.completionData?.gateResult ?? state.completionData?.gateResult;
   const updated: SessionMessageState = {
     ...state,
     status: 'completed',
     terminalAt: now,
-    assistantMessageId: params.assistantMessageId,
+    assistantMessageId,
     completionSource: params.completionSource,
-    gateResult: params.gateResult,
+    gateResult,
+    completionData: {
+      ...state.completionData,
+      ...params.completionData,
+      ...(assistantMessageId !== undefined ? { assistantMessageId } : {}),
+      ...(gateResult !== undefined ? { gateResult } : {}),
+      completedAt: now,
+      source: params.completionSource,
+    },
   };
   await putSessionMessageState(storage, updated);
   return updated;
@@ -501,6 +559,7 @@ export type TerminalizeParams =
       assistantMessageId?: string;
       completionSource: SessionMessageCompletionSource;
       gateResult?: 'pass' | 'fail';
+      completionData?: SessionMessageCompletionData;
     }
   | {
       kind: 'failed';
@@ -537,13 +596,29 @@ export async function terminalizeMessageOnce(
   };
   let updated: SessionMessageState;
   if (params.kind === 'completed') {
+    const assistantMessageId =
+      params.assistantMessageId ??
+      params.completionData?.assistantMessageId ??
+      state.completionData?.assistantMessageId ??
+      state.assistantMessageId;
+    const gateResult =
+      params.gateResult ?? params.completionData?.gateResult ?? state.completionData?.gateResult;
+    const completionData: SessionMessageCompletionData = {
+      ...state.completionData,
+      ...params.completionData,
+      ...(assistantMessageId !== undefined ? { assistantMessageId } : {}),
+      ...(gateResult !== undefined ? { gateResult } : {}),
+      completedAt: now,
+      source: params.completionSource,
+    };
     updated = {
       ...state,
       status: 'completed',
       terminalAt: now,
-      assistantMessageId: params.assistantMessageId,
+      assistantMessageId,
       completionSource: params.completionSource,
-      gateResult: params.gateResult,
+      gateResult,
+      completionData,
       terminalEffects,
     };
   } else if (params.kind === 'failed') {

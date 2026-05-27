@@ -1,4 +1,5 @@
 import type { CallbackTarget } from '../callbacks/index.js';
+import type { ManagedSessionExecutionPolicy } from '../persistence/execution-policy.js';
 import type {
   AgentSelection,
   ExecutionTurnSubmission,
@@ -49,6 +50,9 @@ export type SessionCreateRequest = {
     resolved?: SessionProfileBundle;
   };
   finalization?: SessionFinalization;
+  managedSession?: {
+    executionPolicy?: ManagedSessionExecutionPolicy;
+  };
   options?: {
     callbackTarget?: CallbackTarget;
     kilocodeOrganizationId?: string;

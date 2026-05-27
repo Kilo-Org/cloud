@@ -178,6 +178,7 @@ function buildSessionRegistrationCommand(
     repository: input.repository,
     profile: input.profile?.resolved,
     finalization: input.finalization,
+    executionPolicy: input.managedSession?.executionPolicy,
     callback: input.options?.callbackTarget ? { target: input.options.callbackTarget } : undefined,
     workspace: {
       sandboxId: allocation.sandboxId,

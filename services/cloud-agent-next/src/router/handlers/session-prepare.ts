@@ -258,6 +258,7 @@ export function prepareInputToSessionCreateRequest(input: PrepareInput): Session
       condenseOnComplete: input.condenseOnComplete,
       gateThreshold: input.gateThreshold,
     },
+    managedSession: input.managedSession,
     options: {
       callbackTarget: input.callbackTarget,
       kilocodeOrganizationId: input.kilocodeOrganizationId,

@@ -68,6 +68,7 @@ export const balanceMiddleware = createMiddleware<HonoContext>(
     // carries `kilocodeOrganizationId` in the body, so it is not included here.
     if (
       (procedureName === 'sendMessageV2' ||
+        procedureName === 'sendMessageV2Internal' ||
         procedureName === 'initiateFromKilocodeSessionV2' ||
         procedureName === 'send') &&
       !orgId &&

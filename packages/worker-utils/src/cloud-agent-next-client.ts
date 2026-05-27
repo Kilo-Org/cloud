@@ -17,6 +17,33 @@ export type CallbackTarget = {
   headers?: Record<string, string>;
 };
 
+export type CloudAgentRuntimeAgent = {
+  slug: string;
+  name: string;
+  config: Record<string, unknown>;
+};
+
+export type CloudAgentManagedSession = {
+  executionPolicy?: {
+    name: string;
+    permissionOverrides?: Record<string, unknown>;
+    tools?: Record<string, boolean>;
+    interaction?: {
+      question?: 'allow' | 'deny';
+      permission?: 'allow' | 'auto-approve' | 'auto-reject';
+      terminal?: 'allow' | 'deny';
+    };
+    runtime?: {
+      nonInteractive?: boolean;
+    };
+  };
+};
+
+export type CloudAgentMessageCompletion = {
+  callbackTarget?: CallbackTarget;
+  gateThreshold?: 'off' | 'all' | 'warning' | 'critical';
+};
+
 export type CloudAgentPrepareSessionInput = {
   prompt: string;
   mode: string;
@@ -30,10 +57,12 @@ export type CloudAgentPrepareSessionInput = {
   kilocodeOrganizationId?: string;
   envVars?: Record<string, string>;
   mcpServers?: Record<string, unknown>;
+  runtimeAgents?: CloudAgentRuntimeAgent[];
   upstreamBranch?: string;
   callbackTarget?: CallbackTarget;
   createdOnPlatform?: string;
   gateThreshold?: 'off' | 'all' | 'warning' | 'critical';
+  managedSession?: CloudAgentManagedSession;
 };
 
 export type CloudAgentPrepareSessionOutput = {
@@ -64,6 +93,10 @@ export type CloudAgentSendMessageInput = {
   variant?: string;
   githubToken?: string;
   gitToken?: string;
+};
+
+export type CloudAgentSendMessageInternalInput = CloudAgentSendMessageInput & {
+  completion?: CloudAgentMessageCompletion;
 };
 
 export type CloudAgentSendMessageOutput = {
@@ -239,6 +272,11 @@ export type CloudAgentNextFetchClient = {
     input: CloudAgentSendMessageInput
   ): Promise<CloudAgentSendMessageOutput>;
 
+  sendMessageV2Internal(
+    headers: Record<string, string>,
+    input: CloudAgentSendMessageInternalInput
+  ): Promise<CloudAgentSendMessageOutput>;
+
   getSessionHealth(
     headers: Record<string, string>,
     input: CloudAgentSessionHealthInput
@@ -305,6 +343,21 @@ export function createCloudAgentNextFetchClient(baseUrl: string): CloudAgentNext
       if (typeof data.executionId !== 'string') {
         throw new Error(
           `Unexpected sendMessageV2 response shape: ${JSON.stringify(data).slice(0, 500)}`
+        );
+      }
+      return data as unknown as CloudAgentSendMessageOutput;
+    },
+
+    async sendMessageV2Internal(headers, input) {
+      const data = await trpcPost<Record<string, unknown>>(
+        trpc('sendMessageV2Internal'),
+        headers,
+        input,
+        'sendMessageV2Internal'
+      );
+      if (typeof data.executionId !== 'string') {
+        throw new Error(
+          `Unexpected sendMessageV2Internal response shape: ${JSON.stringify(data).slice(0, 500)}`
         );
       }
       return data as unknown as CloudAgentSendMessageOutput;

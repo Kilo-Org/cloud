@@ -9,18 +9,48 @@ import { protectedProcedure } from '../auth.js';
 import { sessionIdSchema } from '../schemas.js';
 import { findWrapperForSession } from '../../kilo/wrapper-manager.js';
 import { WrapperClient } from '../../kilo/wrapper-client.js';
+import { resolveSessionExecutionPolicy } from '../../persistence/execution-policy.js';
+import {
+  shouldAutoRejectPermissionInteraction,
+  shouldDenyQuestionInteraction,
+} from '../../shared/managed-session-policy.js';
 
 async function resolveWrapperClient(opts: {
   sessionId: SessionId;
   userId: string;
   env: Env;
   authToken: string;
+  interaction?:
+    | { type: 'question' }
+    | { type: 'permission'; response: 'once' | 'always' | 'reject' };
 }): Promise<WrapperClient> {
   const { sessionId, userId, env, authToken } = opts;
 
   const metadata = await fetchSessionMetadata(env, userId, sessionId);
   if (!metadata) {
     throw new TRPCError({ code: 'NOT_FOUND', message: 'Session not found' });
+  }
+  const executionPolicy = resolveSessionExecutionPolicy(metadata);
+  const platform = metadata.identity.createdOnPlatform;
+
+  if (
+    opts.interaction?.type === 'question' &&
+    shouldDenyQuestionInteraction({ executionPolicy, platform })
+  ) {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'Questions are disabled for this managed session',
+    });
+  }
+  if (
+    opts.interaction?.type === 'permission' &&
+    opts.interaction.response !== 'reject' &&
+    shouldAutoRejectPermissionInteraction({ executionPolicy, platform })
+  ) {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'Permissions are auto-rejected for this managed session',
+    });
   }
 
   const sandboxId: SandboxId =
@@ -55,6 +85,9 @@ async function resolveWrapperClient(opts: {
     env,
     originalToken: authToken,
     originalOrgId: metadata.identity.orgId,
+    createdOnPlatform: metadata.identity.createdOnPlatform,
+    appendSystemPrompt: metadata.agent?.appendSystemPrompt,
+    executionPolicy,
   });
 
   return new WrapperClient({ session, port: wrapperInfo.port });
@@ -82,6 +115,7 @@ export function createSessionQuestionHandlers() {
               userId,
               env,
               authToken: ctx.authToken,
+              interaction: { type: 'question' },
             });
             const result = await wrapperClient.answerQuestion(input.questionId, input.answers);
             logger
@@ -119,6 +153,7 @@ export function createSessionQuestionHandlers() {
               userId,
               env,
               authToken: ctx.authToken,
+              interaction: { type: 'question' },
             });
             const result = await wrapperClient.rejectQuestion(input.questionId);
             logger
@@ -158,6 +193,7 @@ export function createSessionQuestionHandlers() {
               userId,
               env,
               authToken: ctx.authToken,
+              interaction: { type: 'permission', response: input.response },
             });
             const result = await wrapperClient.answerPermission(input.permissionId, input.response);
             logger

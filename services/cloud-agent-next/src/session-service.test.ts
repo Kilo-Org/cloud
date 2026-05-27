@@ -68,6 +68,8 @@ import type { CloudAgentSessionState, PersistenceEnv } from './persistence/types
 import { parseSessionMetadata } from './persistence/session-metadata.js';
 import type { ExecutionSession, SandboxInstance, SessionId } from './types.js';
 import type { FencedWrapperDispatchRequest } from './execution/types.js';
+import { buildCodeReviewManagedSessionPolicy } from '@kilocode/worker-utils/managed-session-policy';
+import { ManagedSessionExecutionPolicySchema } from './persistence/execution-policy.js';
 
 type MockExecutionSession = ExecutionSession & {
   exec: ReturnType<typeof vi.fn>;
@@ -945,6 +947,41 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     expect(result.promptRequest).not.toHaveProperty('prompt');
     expect(result.promptRequest).not.toHaveProperty('attachments');
     expect(result.promptRequest.session).toEqual(result.readyRequest.session);
+  });
+
+  it('materializes explicit managed session policy into runtime config and wrapper binding', async () => {
+    const executionPolicy = ManagedSessionExecutionPolicySchema.parse(
+      buildCodeReviewManagedSessionPolicy()
+    );
+    const metadata = {
+      ...createMetadata({ createdOnPlatform: 'cloud-agent' }),
+      executionPolicy,
+    } satisfies CloudAgentSessionState;
+
+    const result = await buildPromptWrapperRequests(metadata);
+
+    expect(result.readyRequest.materialized.env.CI).toBe('true');
+    expect(result.readyRequest.materialized.env.GIT_TERMINAL_PROMPT).toBe('0');
+    expect(result.readyRequest.session.executionPolicy).toEqual(executionPolicy);
+    expect(result.type).toBe('prompt');
+    if (result.type !== 'prompt') throw new Error('Expected prompt delivery request');
+    expect(result.promptRequest.session.executionPolicy).toEqual(executionPolicy);
+
+    const config = JSON.parse(result.readyRequest.materialized.env.KILO_CONFIG_CONTENT) as {
+      permission: Record<string, unknown>;
+    };
+    expect(config.permission).toMatchObject({
+      edit: 'deny',
+      webfetch: 'deny',
+      websearch: 'deny',
+      codesearch: 'deny',
+      question: 'deny',
+    });
+    expect(config.permission.bash).toMatchObject({
+      'git push': 'deny',
+      'git push *': 'deny',
+      'gh pr diff': 'allow',
+    });
   });
 
   it('materializes OAuth bearer mode with a self-managed GitLab host', async () => {

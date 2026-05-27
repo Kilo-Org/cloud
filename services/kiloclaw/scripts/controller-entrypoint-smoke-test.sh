@@ -133,6 +133,10 @@ CREATE_RESP=$(curl -sS -X POST \
 CREATE_ID=$(echo "$CREATE_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin).get('agent',{}).get('id',''))" 2>/dev/null || echo "")
 check "create configured agent" "crud-smoke" "$CREATE_ID"
 
+CONFIG_VALIDATE_RESP=$(docker exec "$CID" openclaw config validate --json 2>/dev/null || true)
+CONFIG_VALID=$(echo "$CONFIG_VALIDATE_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin).get('valid', False))" 2>/dev/null || echo "")
+check "created agent leaves OpenClaw config valid" "True" "$CONFIG_VALID"
+
 LIST_RESP=$(curl -sS \
   -H "Authorization: Bearer $TOKEN" \
   "http://127.0.0.1:${PORT}/_kilo/config/agents")

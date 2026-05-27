@@ -58,6 +58,7 @@ import {
   getIndexesAgentNudges,
 } from '../db/tables/agent-nudges.table';
 import { query } from '../util/query.util';
+import { parseGitUrl, parsePrUrl } from '../util/platform-pr.util';
 import { getAgentDOStub } from './Agent.do';
 import { getTownContainerStub } from './TownContainer.do';
 
@@ -2523,6 +2524,100 @@ export class TownDO extends DurableObject<Env> {
     );
     await this.escalateToActiveCadence();
     return { bead, agent: hookedAgent };
+  }
+
+  async slingExistingPr(input: {
+    rigId: string;
+    prUrl: string;
+    title?: string;
+    body?: string;
+    forcePushAllowed?: boolean;
+    sourceAgentId?: string;
+  }): Promise<{ beadId: string; warning?: string }> {
+    const sourceAgentId = input.sourceAgentId ?? 'mayor';
+    const forcePushAllowed = input.forcePushAllowed ?? false;
+
+    const rig = rigs.getRig(this.sql, input.rigId);
+    if (!rig) {
+      throw new Error(`Rig ${input.rigId} not found`);
+    }
+
+    const townConfig = await this.getTownConfig();
+    const rigCoords = parseGitUrl(rig.git_url, townConfig.git_auth?.gitlab_instance_url);
+    const prCoords = parsePrUrl(input.prUrl);
+    if (!rigCoords || !prCoords) {
+      throw new Error(
+        `Cannot parse repo coordinates from rig git_url="${rig.git_url}" or pr_url="${input.prUrl}"`
+      );
+    }
+
+    const effectiveRigHost =
+      rigCoords.platform === 'github'
+        ? 'github.com'
+        : new URL(townConfig.git_auth?.gitlab_instance_url ?? 'https://gitlab.com').hostname;
+
+    if (
+      effectiveRigHost !== prCoords.host ||
+      rigCoords.owner !== prCoords.owner ||
+      rigCoords.repo !== prCoords.repo
+    ) {
+      throw new Error(
+        'PR URL repo does not match rig repo. Cannot adopt PRs from other repositories.'
+      );
+    }
+
+    const scmCtx = {
+      env: this.env,
+      townId: this.townId,
+      getTownConfig: () => this.getTownConfig(),
+    };
+    const outcome = await scm.checkPRStatus(scmCtx, input.prUrl);
+    if (!outcome.ok) {
+      const err = outcome.error;
+      throw new Error(
+        `Failed to fetch PR status: ${err.kind}` +
+          (err.kind === 'http_error' ? ` (HTTP ${err.status})` : '') +
+          (err.kind === 'no_token' ? ` — tried: ${err.resolutionChain.join(', ')}` : '')
+      );
+    }
+
+    const pr = outcome.result;
+    if (pr.status === 'merged' || pr.status === 'closed') {
+      throw new Error(`Cannot babysit a PR that is already ${pr.status}.`);
+    }
+
+    if (!pr.head_branch || !pr.base_branch || !pr.head_sha) {
+      throw new Error(
+        'PR metadata is missing branch or SHA information. ' +
+          `head_branch=${pr.head_branch ?? '(missing)'}, base_branch=${pr.base_branch ?? '(missing)'}, head_sha=${pr.head_sha ?? '(missing)'}`
+      );
+    }
+
+    const title = input.title ?? `Babysit: ${pr.title ?? 'external PR'}`;
+    const body =
+      input.body ??
+      `Adopted external PR ${input.prUrl} at SHA ${pr.head_sha}. Town will poll and address review feedback, conflicts, and auto-merge.`;
+
+    const { beadId } = reviewQueue.submitExternalPrToReviewQueue(this.sql, {
+      rigId: input.rigId,
+      prUrl: input.prUrl,
+      branch: pr.head_branch,
+      targetBranch: pr.base_branch,
+      headSha: pr.head_sha,
+      title,
+      body,
+      forcePushAllowed,
+      sourceAgentId,
+    });
+
+    await this.escalateToActiveCadence();
+
+    const warning =
+      rig.config?.code_review === true
+        ? 'Rig has code_review enabled. Babysat PRs bypass refinery review (wired in chunk 1).'
+        : undefined;
+
+    return { beadId, warning };
   }
 
   /**

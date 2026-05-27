@@ -117,8 +117,8 @@ export class ExecutionOrchestrator {
         messageId: turn.messageId,
         hasLegacyExecutionId: executionId !== undefined,
         sandboxId: workspace.sandboxId,
-        hasImages: turn.type === 'prompt' && turn.images !== undefined,
-        imageCount: turn.type === 'prompt' ? (turn.images?.files.length ?? 0) : 0,
+        hasAttachments: turn.type === 'prompt' && turn.attachments !== undefined,
+        attachmentCount: turn.type === 'prompt' ? (turn.attachments?.files.length ?? 0) : 0,
         wrapperHasKiloSessionId: plan.wrapper.kiloSessionId !== undefined,
       })
       .info('ExecutionOrchestrator starting execution');

@@ -62,6 +62,45 @@ describe('CloudAgentSession message admission', () => {
     expect(result.pending[0]?.content).toBe('admit my first turn');
   });
 
+  it('persists and admits canonical document attachments during grouped session creation', async () => {
+    const userId = 'user_grouped_document_start' as const;
+    const sessionId = 'agent_grouped_document_start' as const;
+    const messageId = 'msg_018f1e2d3c4bDocInitAbCdEfG';
+    const attachments = {
+      path: '123e4567-e89b-12d3-a456-426614174000',
+      files: ['123e4567-e89b-12d3-a456-426614174001.pdf'],
+    };
+    const stub = env.CLOUD_AGENT_SESSION.get(
+      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
+    );
+
+    const result = await runInDurableObject(stub, async instance => {
+      const admitted = await instance.createSessionWithInitialAdmission({
+        ...groupedRegisterSessionInput({
+          sessionId,
+          userId,
+          prompt: 'summarize document',
+          mode: 'code',
+          model: 'test-model',
+          kiloSessionId: '21212121-2121-4121-9121-212121212121',
+          kilocodeToken: 'token-grouped-document-start',
+        }),
+        message: {
+          initialTurn: { type: 'prompt', messageId, prompt: 'summarize document', attachments },
+        },
+      });
+      return {
+        admitted,
+        metadata: await instance.getMetadata(),
+        pending: await listPendingSessionMessages(instance.ctx.storage),
+      };
+    });
+
+    expect(result.admitted).toMatchObject({ success: true, messageId });
+    expect(result.metadata?.initialMessage?.attachments).toEqual(attachments);
+    expect(result.pending[0]?.intent?.turn).toMatchObject({ attachments });
+  });
+
   it('surfaces initial admission failure after retaining registered DO metadata', async () => {
     const userId = 'user_grouped_start_failure' as const;
     const sessionId = 'agent_grouped_start_failure' as const;

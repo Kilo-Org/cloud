@@ -9,6 +9,7 @@ import {
 import { APP_URL } from '@/lib/constants';
 import type { GoogleCapability } from '@/lib/integrations/google/capabilities';
 import {
+  GOOGLE_IDENTITY_SCOPES,
   hasRequiredScopesForCapabilities,
   parseGoogleScopeString,
   resolveGoogleScopesForCapabilities,
@@ -31,6 +32,13 @@ type GoogleOAuthExchangeResult = {
   googleEmail: string;
   expiresAt: string | null;
 };
+
+export class GoogleOAuthCapabilityScopesNotGrantedError extends Error {
+  constructor() {
+    super('Required Google capability scopes were not granted');
+    this.name = 'GoogleOAuthCapabilityScopesNotGrantedError';
+  }
+}
 
 export function resolveGoogleOAuthRedirectURI(): string {
   if (!GOOGLE_WORKSPACE_OAUTH_REDIRECT_URI) {
@@ -109,8 +117,13 @@ export async function exchangeGoogleOAuthCode(
       ? grantedScopesFromToken
       : resolveGoogleScopesForCapabilities(requestedCapabilities);
 
+  const grantedScopeSet = new Set(grantedScopes);
+  if (!GOOGLE_IDENTITY_SCOPES.every(scope => grantedScopeSet.has(scope))) {
+    throw new Error('Required Google identity scopes were not granted');
+  }
+
   if (!hasRequiredScopesForCapabilities(grantedScopes, requestedCapabilities)) {
-    throw new Error('Required Google scopes were not granted');
+    throw new GoogleOAuthCapabilityScopesNotGrantedError();
   }
 
   const userInfo = await fetchGoogleUserInfo(tokens.access_token);

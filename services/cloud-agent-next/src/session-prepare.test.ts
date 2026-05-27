@@ -377,7 +377,7 @@ describe('prepareSession endpoint', () => {
             type: 'prompt',
             id: expect.stringMatching(/^msg_/) as unknown,
             prompt: 'Test prompt',
-            images: undefined,
+            attachments: undefined,
           },
         },
         agent: {
@@ -483,7 +483,7 @@ describe('prepareSession endpoint', () => {
     );
   });
 
-  it('auto-initiates through grouped creation with the canonical initial message', async () => {
+  it('auto-initiates through grouped creation with canonicalized legacy initial attachments', async () => {
     const initialMessageId = 'msg_018f1e2d3c4bAbCdEfGhIjKlMn';
     const images = {
       path: '123e4567-e89b-12d3-a456-426614174000',
@@ -515,7 +515,7 @@ describe('prepareSession endpoint', () => {
             type: 'prompt',
             messageId: initialMessageId,
             prompt: 'Inspect the screenshot',
-            images,
+            attachments: images,
           },
         },
       })
@@ -618,7 +618,7 @@ describe('prepareSession endpoint', () => {
     expect(assertKiloModelAvailableMock).not.toHaveBeenCalled();
   });
 
-  it('rejects command-valued initialPayload images before registration', async () => {
+  it('rejects command-valued initialPayload attachments before registration', async () => {
     const doStub = createMockDOStub();
     const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
 
@@ -629,9 +629,9 @@ describe('prepareSession endpoint', () => {
         model: 'claude-3',
         githubRepo: 'acme/repo',
         autoInitiate: true,
-        images: {
+        attachments: {
           path: '123e4567-e89b-12d3-a456-426614174000',
-          files: ['123e4567-e89b-12d3-a456-426614174001.png'],
+          files: ['123e4567-e89b-12d3-a456-426614174001.pdf'],
         },
         initialPayload: {
           type: 'command',
@@ -639,7 +639,7 @@ describe('prepareSession endpoint', () => {
           arguments: '--aggressive',
         },
       })
-    ).rejects.toThrow('Images cannot be attached to slash commands');
+    ).rejects.toThrow('Attachments cannot be attached to slash commands');
 
     expect(doStub.registerSession).not.toHaveBeenCalled();
     expect(doStub.admitSubmittedMessage).not.toHaveBeenCalled();
@@ -826,11 +826,11 @@ describe('start endpoint', () => {
     expect(mergeProfileConfigurationMock).not.toHaveBeenCalled();
   });
 
-  it('admits the canonical initial turn through one grouped creation operation', async () => {
+  it('admits canonical document attachments through one grouped creation operation', async () => {
     const initialMessageId = 'msg_018f1e2d3c4bAbCdEfGhIjKlMn';
-    const images = {
+    const attachments = {
       path: '123e4567-e89b-12d3-a456-426614174000',
-      files: ['123e4567-e89b-12d3-a456-426614174001.png'],
+      files: ['123e4567-e89b-12d3-a456-426614174001.pdf'],
     };
     const createSessionWithInitialAdmission = vi.fn().mockResolvedValue({
       success: true,
@@ -844,8 +844,8 @@ describe('start endpoint', () => {
     const result = await caller.start({
       message: {
         id: initialMessageId,
-        prompt: 'Describe the attached image',
-        images,
+        prompt: 'Describe the attached document',
+        attachments,
       },
       agent: {
         mode: 'code',
@@ -869,8 +869,8 @@ describe('start endpoint', () => {
           initialTurn: {
             type: 'prompt',
             messageId: initialMessageId,
-            prompt: 'Describe the attached image',
-            images,
+            prompt: 'Describe the attached document',
+            attachments,
           },
         },
       })

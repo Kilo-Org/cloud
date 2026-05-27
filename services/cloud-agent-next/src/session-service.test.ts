@@ -49,6 +49,9 @@ const devcontainerMocks = vi.hoisted(() => ({
 const portMocks = vi.hoisted(() => ({
   randomPort: vi.fn(() => 4173),
 }));
+const attachmentMocks = vi.hoisted(() => ({
+  buildSignedPromptAttachments: vi.fn().mockResolvedValue([]),
+}));
 
 vi.mock('./services/git-token-service-client.js', () => tokenMocks);
 vi.mock('./kilo/devcontainer.js', async importActual => ({
@@ -57,6 +60,7 @@ vi.mock('./kilo/devcontainer.js', async importActual => ({
   detectDevContainer: devcontainerMocks.detectDevContainer,
 }));
 vi.mock('./kilo/ports.js', () => portMocks);
+vi.mock('./execution/attachment-prompt-parts.js', () => attachmentMocks);
 
 import {
   SessionService,
@@ -750,6 +754,7 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     devcontainerMocks.detectDevContainer.mockResolvedValue(null);
     devcontainerMocks.bringUpDevContainer.mockReset();
     portMocks.randomPort.mockReturnValue(4173);
+    attachmentMocks.buildSignedPromptAttachments.mockResolvedValue([]);
   });
 
   async function buildPromptWrapperRequests(metadata: CloudAgentSessionState) {
@@ -945,6 +950,72 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     expect(result.promptRequest).not.toHaveProperty('prompt');
     expect(result.promptRequest).not.toHaveProperty('attachments');
     expect(result.promptRequest.session).toEqual(result.readyRequest.session);
+  });
+
+  it('allowlists only the active session attachment directory for Kilo file access', async () => {
+    const result = await buildPromptWrapperRequests(createMetadata());
+    const config: unknown = JSON.parse(result.readyRequest.materialized.env.KILO_CONFIG_CONTENT);
+
+    expect(config).toMatchObject({
+      permission: {
+        external_directory: {
+          '*': 'deny',
+          '/tmp/agent_test/**': 'allow',
+          '/tmp/attachments/agent_test/**': 'allow',
+        },
+      },
+    });
+    expect(config).not.toMatchObject({
+      permission: { external_directory: { '/tmp/attachments/**': 'allow' } },
+    });
+  });
+
+  it('passes canonical document attachments through signed wrapper prompt construction', async () => {
+    const service = new SessionService();
+    const env = createEnv();
+    env.WORKER_URL = 'https://cloud-agent.example.com';
+    const attachments = {
+      path: '123e4567-e89b-12d3-a456-426614174000',
+      files: ['123e4567-e89b-12d3-a456-426614174001.pdf'],
+    };
+    const signedAttachments = [
+      {
+        filename: attachments.files[0],
+        mime: 'application/pdf',
+        signedUrl: 'https://r2.example.com/document.pdf',
+        localPath: '/tmp/attachments/agent_test/document.pdf',
+      },
+    ];
+    attachmentMocks.buildSignedPromptAttachments.mockResolvedValueOnce(signedAttachments);
+
+    const result = await service.buildWrapperSessionReadyAndPromptRequests({
+      env,
+      plan: {
+        scope: { sessionId: 'agent_test', userId: 'user_test' },
+        turn: {
+          type: 'prompt',
+          messageId: 'msg_018f1e2d3c4bDocumentPayload',
+          prompt: 'Read the document',
+          attachments,
+        },
+        agent: { mode: 'code', model: 'test-model' },
+        workspace: { sandboxId: 'usr-abcdef', metadata: createMetadata() },
+        wrapper: {
+          fence: {
+            wrapperRunId: 'wr_attachment',
+            wrapperGeneration: 1,
+            wrapperConnectionId: 'conn_attachment',
+          },
+        },
+      } satisfies FencedWrapperDispatchRequest,
+    });
+
+    expect(attachmentMocks.buildSignedPromptAttachments).toHaveBeenCalledWith(
+      expect.objectContaining({ env, userId: 'user_test', sessionId: 'agent_test', attachments })
+    );
+    expect(result.type).toBe('prompt');
+    if (result.type !== 'prompt') throw new Error('Expected prompt delivery request');
+    expect(result.promptRequest.message.attachments).toEqual(signedAttachments);
   });
 
   it('materializes OAuth bearer mode with a self-managed GitLab host', async () => {

@@ -6,7 +6,7 @@ import type {
   SubmittedSessionMessageRequest,
 } from '../../src/execution/types.js';
 import type { AgentMode } from '../../src/schema.js';
-import type { Images } from '../../src/router/schemas.js';
+import type { Attachments, Images } from '../../src/router/schemas.js';
 import type { SessionProfileBundle } from '../../src/session-profile.js';
 
 type RegisterSessionInput = Parameters<CloudAgentSession['registerSession']>[0];
@@ -21,6 +21,7 @@ type QueueSessionUserMessageInput = {
   variant?: string;
   autoCommit?: boolean;
   condenseOnComplete?: boolean;
+  attachments?: Attachments;
   images?: Images;
 };
 
@@ -45,6 +46,7 @@ type TestRegisterSessionInput = {
   condenseOnComplete?: boolean;
   appendSystemPrompt?: string;
   callbackTarget?: CallbackTarget;
+  attachments?: Attachments;
   images?: Images;
   createdOnPlatform?: string;
   shallow?: boolean;
@@ -54,6 +56,7 @@ type TestRegisterSessionInput = {
     | {
         type: 'prompt';
         prompt: string;
+        attachments?: Attachments;
         images?: Images;
       }
     | {
@@ -127,12 +130,19 @@ export function groupedRegisterSessionInput(input: TestRegisterSessionInput): Re
     message: {
       initialMessageId: input.initialMessageId,
       turn: input.initialTurn
-        ? { ...input.initialTurn, id: input.initialMessageId }
+        ? input.initialTurn.type === 'prompt'
+          ? {
+              type: 'prompt',
+              id: input.initialMessageId,
+              prompt: input.initialTurn.prompt,
+              attachments: input.initialTurn.attachments ?? input.initialTurn.images,
+            }
+          : { ...input.initialTurn, id: input.initialMessageId }
         : {
             type: 'prompt',
             id: input.initialMessageId,
             prompt: input.prompt,
-            images: input.images,
+            attachments: input.attachments ?? input.images,
           },
     },
     agent: {
@@ -163,7 +173,7 @@ export function queueUserMessageInput(
       type: 'prompt',
       id: input.messageId,
       prompt: input.prompt,
-      images: input.images,
+      attachments: input.attachments ?? input.images,
     },
     agent: {
       mode: input.mode,

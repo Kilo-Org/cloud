@@ -56,7 +56,7 @@ import {
   resolveDockerSocketPath,
 } from './kilo/sandbox-runtime.js';
 import { shellQuote, validShellEnvEntries } from './kilo/utils.js';
-import { buildSignedImagePromptAttachments } from './execution/image-prompt-parts.js';
+import { buildSignedPromptAttachments } from './execution/attachment-prompt-parts.js';
 import {
   type WrapperBootstrapRepoSource,
   type WrapperCommandRequest,
@@ -1001,6 +1001,7 @@ export class SessionService {
       external_directory: {
         '*': 'deny',
         [`/tmp/${sessionId}/**`]: 'allow',
+        [`/tmp/attachments/${sessionId}/**`]: 'allow',
         [`${workspacePath}/**`]: 'allow',
         [`${sessionHome}/.kilocode/skills/**`]: 'allow',
       },
@@ -1385,11 +1386,11 @@ export class SessionService {
 
     const attachments =
       turn.type === 'prompt'
-        ? await buildSignedImagePromptAttachments({
+        ? await buildSignedPromptAttachments({
             env,
             userId,
             sessionId,
-            images: turn.images,
+            attachments: turn.attachments,
             createdOnPlatform: metadata.identity.createdOnPlatform,
           })
         : [];

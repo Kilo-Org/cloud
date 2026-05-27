@@ -408,6 +408,28 @@ describe('CloudAgentTransport command delegation', () => {
     transport.destroy();
   });
 
+  it('send() delegates canonical document attachments to api.send', () => {
+    const api = createMockApi();
+    const { transport } = createTransportWithSinks(undefined, undefined, api);
+    const attachments = {
+      path: '12345678-1234-4234-9234-123456789abc',
+      files: ['87654321-4321-4321-8321-cba987654321.pdf'],
+    };
+
+    void transport.send!({
+      payload: { type: 'prompt', prompt: 'read it', mode: 'code', model: 'gpt-4' },
+      attachments,
+    });
+
+    expect(api.send).toHaveBeenCalledWith({
+      sessionId: 'ses-1',
+      payload: { type: 'prompt', prompt: 'read it', mode: 'code', model: 'gpt-4' },
+      attachments,
+    });
+
+    transport.destroy();
+  });
+
   it('interrupt() delegates to api.interrupt with bound sessionId', () => {
     const api = createMockApi();
     const { transport } = createTransportWithSinks(undefined, undefined, api);

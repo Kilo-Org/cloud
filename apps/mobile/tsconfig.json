@@ -6,6 +6,7 @@
     "paths": {
       "@/types/*": ["../../apps/web/src/types/*"],
       "@/lib/cloud-agent-next/*": ["../../apps/web/src/lib/cloud-agent-next/*"],
+      "@/lib/cloud-agent/constants": ["../../apps/web/src/lib/cloud-agent/constants.ts"],
       "@/lib/images-schema": ["../../apps/web/src/lib/images-schema.ts"],
       "@/*": ["./src/*"],
       "@/assets/*": ["./assets/*"],

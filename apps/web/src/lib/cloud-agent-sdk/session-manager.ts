@@ -797,8 +797,8 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
 
     try {
       if (!currentSession) throw new Error('No active session');
-      if (sessionType === 'remote' && input.attachments) {
-        throw new Error('Remote sessions do not support attachments');
+      if (input.attachments && sessionType !== 'cloud-agent') {
+        throw new Error('Only Cloud Agent sessions support attachments');
       }
       await currentSession.send({
         payload: input.payload,

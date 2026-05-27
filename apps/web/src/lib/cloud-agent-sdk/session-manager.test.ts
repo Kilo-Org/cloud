@@ -844,6 +844,32 @@ describe('createSessionManager', () => {
       );
     });
 
+    it('rejects canonical attachments for resolved read-only sessions before transport send', async () => {
+      const onSendFailed = jest.fn();
+      const config = createMockConfig({ onSendFailed });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'read-only', kiloSessionId: kiloId('ses-1') });
+
+      const accepted = await mgr.send({
+        payload: { type: 'prompt', prompt: 'Hello', mode: 'code', model: 'claude-3-5-sonnet' },
+        attachments: {
+          path: '12345678-1234-4234-9234-123456789abc',
+          files: ['87654321-4321-4321-8321-cba987654321.md'],
+        },
+      });
+
+      expect(accepted).toBe(false);
+      expect(mockSession.send).not.toHaveBeenCalled();
+      expect(atomValue<string | null>(config.store, mgr.atoms.failedPrompt)).toBe('Hello');
+      expect(onSendFailed).toHaveBeenCalledWith(
+        'Hello',
+        'Connection failed. Please retry in a moment.',
+        expect.any(Error)
+      );
+    });
+
     it('omits variant when not provided (backward compat)', async () => {
       const config = createMockConfig();
       const mgr = createSessionManager(config);

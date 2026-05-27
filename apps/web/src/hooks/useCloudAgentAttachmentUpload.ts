@@ -77,9 +77,6 @@ export type UseCloudAgentAttachmentUploadReturn = {
   };
 };
 
-const activeUploads = new Map<string, XMLHttpRequest>();
-const uploadingIds = new Set<string>();
-
 export function classifyCloudAgentAttachmentType(
   file: File
 ): CloudAgentAttachmentAllowedType | null {
@@ -184,6 +181,8 @@ export function useCloudAgentAttachmentUpload(
   const attachmentsRef = useRef(attachments);
   const isMountedRef = useRef(true);
   const cancelledAttachmentIdsRef = useRef(new Set<string>());
+  const activeUploadsRef = useRef(new Map<string, XMLHttpRequest>());
+  const uploadingIdsRef = useRef(new Set<string>());
   const dragCounterRef = useRef(0);
   attachmentsRef.current = attachments;
 
@@ -217,10 +216,10 @@ export function useCloudAgentAttachmentUpload(
         if (shouldCancelCloudAgentAttachmentUpload(attachment.status)) {
           cancelledAttachmentIdsRef.current.add(attachment.id);
         }
-        const xhr = activeUploads.get(attachment.id);
+        const xhr = activeUploadsRef.current.get(attachment.id);
         if (xhr) {
           xhr.abort();
-          activeUploads.delete(attachment.id);
+          activeUploadsRef.current.delete(attachment.id);
         }
         if (attachment.previewUrl) URL.revokeObjectURL(attachment.previewUrl);
       });
@@ -229,8 +228,8 @@ export function useCloudAgentAttachmentUpload(
 
   const uploadAttachment = useCallback(
     async (attachment: CloudAgentAttachmentFile) => {
-      if (uploadingIds.has(attachment.id)) return;
-      uploadingIds.add(attachment.id);
+      if (uploadingIdsRef.current.has(attachment.id)) return;
+      uploadingIdsRef.current.add(attachment.id);
       const canContinue = () =>
         shouldContinueCloudAgentAttachmentUpload(
           isMountedRef.current,
@@ -256,23 +255,23 @@ export function useCloudAgentAttachmentUpload(
 
         await new Promise<void>((resolve, reject) => {
           const xhr = new XMLHttpRequest();
-          activeUploads.set(attachment.id, xhr);
+          activeUploadsRef.current.set(attachment.id, xhr);
           xhr.upload.onprogress = event => {
             if (event.lengthComputable) {
               updateAttachment({ progress: Math.round((event.loaded / event.total) * 100) });
             }
           };
           xhr.onload = () => {
-            activeUploads.delete(attachment.id);
+            activeUploadsRef.current.delete(attachment.id);
             if (xhr.status >= 200 && xhr.status < 300) resolve();
             else reject(new Error(`Upload failed with status ${xhr.status}`));
           };
           xhr.onerror = () => {
-            activeUploads.delete(attachment.id);
+            activeUploadsRef.current.delete(attachment.id);
             reject(new Error('Network error during upload'));
           };
           xhr.onabort = () => {
-            activeUploads.delete(attachment.id);
+            activeUploadsRef.current.delete(attachment.id);
             reject(new Error('Upload cancelled'));
           };
           xhr.open('PUT', result.signedUrl);
@@ -289,7 +288,7 @@ export function useCloudAgentAttachmentUpload(
         }
         updateAttachment({ status: 'error', error: errorMessage });
       } finally {
-        uploadingIds.delete(attachment.id);
+        uploadingIdsRef.current.delete(attachment.id);
         cancelledAttachmentIdsRef.current.delete(attachment.id);
       }
     },
@@ -393,10 +392,10 @@ export function useCloudAgentAttachmentUpload(
     if (shouldCancelCloudAgentAttachmentUpload(attachment.status)) {
       cancelledAttachmentIdsRef.current.add(attachmentId);
     }
-    const xhr = activeUploads.get(attachmentId);
+    const xhr = activeUploadsRef.current.get(attachmentId);
     if (xhr) {
       xhr.abort();
-      activeUploads.delete(attachmentId);
+      activeUploadsRef.current.delete(attachmentId);
     }
     if (attachment.previewUrl) URL.revokeObjectURL(attachment.previewUrl);
     setAttachments(current => current.filter(item => item.id !== attachmentId));
@@ -407,10 +406,10 @@ export function useCloudAgentAttachmentUpload(
       if (shouldCancelCloudAgentAttachmentUpload(attachment.status)) {
         cancelledAttachmentIdsRef.current.add(attachment.id);
       }
-      const xhr = activeUploads.get(attachment.id);
+      const xhr = activeUploadsRef.current.get(attachment.id);
       if (xhr) {
         xhr.abort();
-        activeUploads.delete(attachment.id);
+        activeUploadsRef.current.delete(attachment.id);
       }
       if (attachment.previewUrl) URL.revokeObjectURL(attachment.previewUrl);
     });

@@ -240,7 +240,28 @@ export function submitExternalPrToReviewQueue(
     forcePushAllowed: boolean;
     sourceAgentId: string;
   }
-): { beadId: string } {
+): { beadId: string; warning?: string } {
+  const existingRows = [
+    ...query(
+      sql,
+      /* sql */ `
+        SELECT ${beads.bead_id}
+        FROM ${beads}
+        INNER JOIN ${review_metadata} ON ${beads.bead_id} = ${review_metadata.bead_id}
+        WHERE ${review_metadata.pr_url} = ?
+          AND ${beads.status} NOT IN ('closed', 'failed')
+      `,
+      [args.prUrl]
+    ),
+  ];
+  if (existingRows.length > 0) {
+    const existingId = z.object({ bead_id: z.string() }).parse(existingRows[0]).bead_id;
+    return {
+      beadId: existingId,
+      warning: `An active babysit bead already exists for this PR (bead ${existingId.slice(0, 8)}). No duplicate created.`,
+    };
+  }
+
   const metadata: Record<string, unknown> = {
     source_agent_id: args.sourceAgentId,
     babysit: true,

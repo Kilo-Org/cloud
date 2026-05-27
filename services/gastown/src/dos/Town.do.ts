@@ -2592,7 +2592,7 @@ export class TownDO extends DurableObject<Env> {
     const forcePushAllowed = args.forcePushAllowed ?? false;
     const sourceAgentId = args.sourceAgentId ?? 'mayor';
 
-    const { beadId } = reviewQueue.submitExternalPrToReviewQueue(this.sql, {
+    const { beadId, warning: dedupWarning } = reviewQueue.submitExternalPrToReviewQueue(this.sql, {
       rigId: args.rigId,
       prUrl: args.prUrl,
       branch: headBranch,
@@ -2608,11 +2608,15 @@ export class TownDO extends DurableObject<Env> {
 
     const townConfig = await this.getTownConfig();
     const codeReview = townConfig.refinery?.code_review;
-    const warning = codeReview
-      ? 'This rig has code_review enabled. Babysat PRs bypass refinery review (wired in chunk 1).'
-      : undefined;
+    const warnings: string[] = [];
+    if (codeReview) {
+      warnings.push('This rig has code_review enabled. Babysat PRs bypass refinery code review.');
+    }
+    if (dedupWarning) {
+      warnings.push(dedupWarning);
+    }
 
-    return { beadId, warning };
+    return { beadId, warning: warnings.length > 0 ? warnings.join(' ') : undefined };
   }
 
   /**

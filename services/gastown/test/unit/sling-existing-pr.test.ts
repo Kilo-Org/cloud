@@ -6,17 +6,15 @@ import type { TownConfig } from '../../src/types';
 
 class MiniSql {
   private inserts: { table: string; params: unknown[] }[] = [];
+  private selectResults: Map<string, Record<string, unknown>[]> = new Map();
 
   exec(stmt: string, ...params: unknown[]): SqlStoragecursor {
     this.captureInsert(stmt, params);
-    return {
-      get rows(): unknown[][] { return []; },
-      get columns(): string[] { return []; },
-      cursor: {
-        next(): string | null { return null; },
-        get value(): unknown[] { return []; },
-      },
-    } as unknown as SqlStoragecursor;
+    const selectRows = this.matchSelect(stmt, params);
+    if (selectRows !== undefined) {
+      return this.cursorFromRows(selectRows);
+    }
+    return this.cursorFromRows([]);
   }
 
   private captureInsert(stmt: string, params: unknown[]): void {
@@ -26,20 +24,55 @@ class MiniSql {
     }
   }
 
+  private matchSelect(stmt: string, _params: unknown[]): Record<string, unknown>[] | undefined {
+    for (const [key, rows] of this.selectResults) {
+      if (stmt.includes(key)) {
+        return rows;
+      }
+    }
+    return undefined;
+  }
+
+  private cursorFromRows(rows: Record<string, unknown>[]): SqlStoragecursor {
+    return {
+      get rows(): unknown[][] {
+        return rows as unknown as unknown[][];
+      },
+      get columns(): string[] {
+        return rows.length > 0 ? Object.keys(rows[0]) : [];
+      },
+      cursor: {
+        next(): string | null {
+          return null;
+        },
+        get value(): unknown[] {
+          return [];
+        },
+      },
+      [Symbol.iterator]() {
+        return (rows as unknown as unknown[][])[Symbol.iterator]();
+      },
+    } as unknown as SqlStoragecursor;
+  }
+
+  addSelectResult(key: string, rows: Record<string, unknown>[]): void {
+    this.selectResults.set(key, rows);
+  }
+
   getInserts(): { table: string; params: unknown[] }[] {
     return this.inserts;
   }
 
   findBeadInsert(): { table: string; params: unknown[] } | undefined {
-    return this.inserts.find((i) => /beads$/i.test(i.table));
+    return this.inserts.find(i => /beads$/i.test(i.table));
   }
 
   findReviewMetadataInsert(): { table: string; params: unknown[] } | undefined {
-    return this.inserts.find((i) => /review_metadata$/i.test(i.table));
+    return this.inserts.find(i => /review_metadata$/i.test(i.table));
   }
 
   findEventInsert(): { table: string; params: unknown[] } | undefined {
-    return this.inserts.find((i) => /bead_events$/i.test(i.table));
+    return this.inserts.find(i => /bead_events$/i.test(i.table));
   }
 }
 
@@ -72,6 +105,11 @@ describe('parsePrUrlForRepoMatch', () => {
       'https://gitlab.example.com/org/team/project/-/merge_requests/99'
     );
     expect(result).toEqual({ platform: 'gitlab', owner: 'org/team', repo: 'project' });
+  });
+
+  it('parses GitLab MR URL for root-level project (no group)', () => {
+    const result = parsePrUrlForRepoMatch('https://gitlab.com/myproject/-/merge_requests/1');
+    expect(result).toEqual({ platform: 'gitlab', owner: '', repo: 'myproject' });
   });
 
   it('returns null for unrecognized URLs', () => {
@@ -379,5 +417,25 @@ describe('submitExternalPrToReviewQueue force_push_allowed', () => {
     const labels = JSON.parse(beadInsert!.params[9] as string);
     expect(labels).toContain('gt:merge-request');
     expect(labels).toContain('gt:babysit');
+  });
+
+  it('returns existing beadId with warning when duplicate prUrl exists', () => {
+    const sql = new MiniSql() as unknown as SqlStorage;
+    (sql as MiniSql).addSelectResult('pr_url', [{ bead_id: 'existing-bead-id' }]);
+
+    const result = submitExternalPrToReviewQueue(sql, {
+      rigId: 'rig-1',
+      prUrl: 'https://github.com/Org/repo/pull/1',
+      branch: 'feature/x',
+      targetBranch: 'main',
+      headSha: 'abc1234',
+      title: 'Babysit: Test',
+      forcePushAllowed: false,
+      sourceAgentId: 'mayor',
+    });
+
+    expect(result.beadId).toBe('existing-bead-id');
+    expect(result.warning).toContain('already exists');
+    expect(sql.findBeadInsert()).toBeUndefined();
   });
 });

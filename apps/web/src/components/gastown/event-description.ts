@@ -37,22 +37,32 @@ export function eventDescription(event: {
     case 'mail_sent':
       return `${rigPrefix}Mail sent`;
     case 'triage_resolved': {
-      const action = event.new_value ?? (event.metadata?.action as string | undefined) ?? 'unknown';
-      const notes = event.metadata?.resolution_notes as string | undefined;
+      const action =
+        event.new_value ??
+        (typeof event.metadata?.action === 'string' ? event.metadata.action : undefined) ??
+        'unknown';
+      const notes =
+        typeof event.metadata?.resolution_notes === 'string'
+          ? event.metadata.resolution_notes
+          : undefined;
       const desc = `${rigPrefix}Triage: ${action}`;
       return notes ? `${desc} — ${notes}` : desc;
     }
     case 'agent_status': {
-      const msg = event.new_value ?? (event.metadata?.message as string | undefined);
-      const agentName = event.metadata?.agent_name as string | undefined;
-      const rigName = event.metadata?.rig_name as string | undefined;
+      const msg =
+        event.new_value ??
+        (typeof event.metadata?.message === 'string' ? event.metadata.message : undefined);
+      const agentName =
+        typeof event.metadata?.agent_name === 'string' ? event.metadata.agent_name : undefined;
+      const rigName =
+        typeof event.metadata?.rig_name === 'string' ? event.metadata.rig_name : undefined;
       const body = msg ?? 'Agent status update';
       const prefix = rigName ? `[${rigName}] ` : rigPrefix;
       return agentName ? `${prefix}${agentName}: ${body}` : `${prefix}${body}`;
     }
     case 'babysit_started': {
-      const prUrl = event.metadata?.pr_url as string | undefined;
-      const branch = event.metadata?.branch as string | undefined;
+      const prUrl = typeof event.metadata?.pr_url === 'string' ? event.metadata.pr_url : undefined;
+      const branch = typeof event.metadata?.branch === 'string' ? event.metadata.branch : undefined;
       const desc = `${rigPrefix}Babysit started`;
       const parts: string[] = [];
       if (branch) parts.push(branch);
@@ -66,7 +76,7 @@ export function eventDescription(event: {
     case 'pr_auto_merge':
       return `${rigPrefix}PR auto-merge triggered`;
     case 'pr_status_changed': {
-      const newState = event.metadata?.state as string | undefined;
+      const newState = typeof event.metadata?.state === 'string' ? event.metadata.state : undefined;
       return `${rigPrefix}PR status changed: ${newState ?? event.new_value ?? 'unknown'}`;
     }
     default:

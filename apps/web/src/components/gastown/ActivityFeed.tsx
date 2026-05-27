@@ -22,7 +22,6 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-export { eventDescription } from './event-description';
 import { eventDescription } from './event-description';
 
 const EVENT_ICONS: Record<string, typeof Activity> = {

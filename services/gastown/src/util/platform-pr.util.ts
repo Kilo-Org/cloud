@@ -299,13 +299,14 @@ export function parsePrUrlForRepoMatch(
   if (glMatch) {
     const fullPath = glMatch[2];
     const lastSlash = fullPath.lastIndexOf('/');
-    if (lastSlash > 0) {
+    if (lastSlash >= 0) {
       return {
         platform: 'gitlab',
         owner: fullPath.slice(0, lastSlash),
         repo: fullPath.slice(lastSlash + 1),
       };
     }
+    return { platform: 'gitlab', owner: '', repo: fullPath };
   }
   return null;
 }

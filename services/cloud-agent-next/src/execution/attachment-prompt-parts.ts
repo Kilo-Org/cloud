@@ -41,6 +41,12 @@ export function assertR2AttachmentDownloadConfigured<T extends R2AttachmentDownl
     !env.R2_ENDPOINT ||
     !env.R2_ATTACHMENTS_BUCKET
   ) {
+    logger.warn('Attachments requested but R2 download config is incomplete', {
+      hasAccessKeyId: Boolean(env.R2_ATTACHMENTS_READONLY_ACCESS_KEY_ID),
+      hasSecretAccessKey: Boolean(env.R2_ATTACHMENTS_READONLY_SECRET_ACCESS_KEY),
+      hasEndpoint: Boolean(env.R2_ENDPOINT),
+      hasBucket: Boolean(env.R2_ATTACHMENTS_BUCKET),
+    });
     throw ExecutionError.workspaceSetupFailed(
       'Attachments were requested, but R2 attachment download is not configured'
     );
@@ -61,20 +67,6 @@ export async function buildSignedPromptAttachments({
   createdOnPlatform?: string;
 }): Promise<WrapperBootstrapAttachment[]> {
   if (!attachments) return [];
-
-  if (
-    !env.R2_ATTACHMENTS_READONLY_ACCESS_KEY_ID ||
-    !env.R2_ATTACHMENTS_READONLY_SECRET_ACCESS_KEY ||
-    !env.R2_ENDPOINT ||
-    !env.R2_ATTACHMENTS_BUCKET
-  ) {
-    logger.warn('Attachments requested but R2 download config is incomplete', {
-      hasAccessKeyId: Boolean(env.R2_ATTACHMENTS_READONLY_ACCESS_KEY_ID),
-      hasSecretAccessKey: Boolean(env.R2_ATTACHMENTS_READONLY_SECRET_ACCESS_KEY),
-      hasEndpoint: Boolean(env.R2_ENDPOINT),
-      hasBucket: Boolean(env.R2_ATTACHMENTS_BUCKET),
-    });
-  }
 
   assertR2AttachmentDownloadConfigured(env);
 

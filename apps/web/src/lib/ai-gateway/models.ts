@@ -33,10 +33,7 @@ import {
 } from '@/lib/ai-gateway/providers/google';
 import { alibabaDirectModels, qwen36_plus_model } from '@/lib/ai-gateway/providers/qwen';
 import { stepfun_35_flash_free_model } from '@/lib/ai-gateway/providers/stepfun';
-import {
-  grok_code_fast_1_optimized_free_model,
-  isGrok4Model,
-} from '@/lib/ai-gateway/providers/xai';
+import { isGrokModel } from '@/lib/ai-gateway/providers/xai';
 import { isClaudeModel } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { GPT_CURRENT_MODEL_ID, isOpenAiModel } from '@/lib/ai-gateway/providers/openai';
 import { GLM_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/zai';
@@ -68,7 +65,7 @@ export const preferredModels = [
 ];
 
 export function isPdfSupportingModel(model: string): boolean {
-  return isClaudeModel(model) || isOpenAiModel(model) || isGrok4Model(model);
+  return isClaudeModel(model) || isOpenAiModel(model) || isGrokModel(model);
 }
 
 export function isKiloExclusiveFreeModel(model: string): boolean {
@@ -85,7 +82,6 @@ export const kiloExclusiveModels = [
   gemma_4_26b_a4b_it_free_model,
   minimax_m25_free_model,
   morph_warp_grep_free_model,
-  grok_code_fast_1_optimized_free_model,
   seed_20_code_free_model,
   ...alibabaDirectModels,
   claude_sonnet_clawsetup_model,

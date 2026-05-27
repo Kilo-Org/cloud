@@ -85,10 +85,22 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
         continue;
       }
 
-      await this.installationLookupService.updateAccountLogin(
+      const wasUpdated = await this.installationLookupService.updateAccountLogin(
         candidate.integrationId,
         refreshedAccountLogin
       );
+      if (!wasUpdated) {
+        console.warn(
+          JSON.stringify({
+            message: 'GitHub installation login repair found no integration row to update',
+            integrationId: candidate.integrationId,
+            installationId: candidate.installationId,
+            appType: candidate.githubAppType,
+          })
+        );
+        continue;
+      }
+
       console.log(
         JSON.stringify({
           message: 'Repaired GitHub installation account login after token lookup miss',

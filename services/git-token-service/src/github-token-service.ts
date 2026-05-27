@@ -1,4 +1,5 @@
 import { createAppAuth } from '@octokit/auth-app';
+import { Octokit } from '@octokit/rest';
 import * as z from 'zod';
 
 type Token = z.infer<typeof Token>;
@@ -93,28 +94,9 @@ export class GitHubTokenService {
         privateKey: credentials.privateKey,
       });
       const { token } = await auth({ type: 'app' });
-      const response = await fetch(`https://api.github.com/app/installations/${numericId}`, {
-        method: 'GET',
-        headers: {
-          Accept: 'application/vnd.github+json',
-          Authorization: `Bearer ${token}`,
-          'User-Agent': 'Kilo-Git-Token-Service',
-          'X-GitHub-Api-Version': '2022-11-28',
-        },
-      });
-
-      if (!response.ok) {
-        console.warn(
-          JSON.stringify({
-            message: 'Failed to refresh GitHub installation account login',
-            status: response.status,
-            appType,
-          })
-        );
-        return null;
-      }
-
-      const parsed = GitHubInstallationAccountSchema.safeParse(await response.json());
+      const octokit = new Octokit({ auth: token });
+      const { data } = await octokit.apps.getInstallation({ installation_id: numericId });
+      const parsed = GitHubInstallationAccountSchema.safeParse(data);
       if (!parsed.success) {
         console.warn(
           JSON.stringify({

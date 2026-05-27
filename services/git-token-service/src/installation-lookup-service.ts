@@ -231,13 +231,16 @@ export class InstallationLookupService {
     };
   }
 
-  async updateAccountLogin(integrationId: string, accountLogin: string): Promise<void> {
-    await this.getDb()
+  async updateAccountLogin(integrationId: string, accountLogin: string): Promise<boolean> {
+    const updatedRows = await this.getDb()
       .update(platform_integrations)
       .set({
         platform_account_login: accountLogin,
         updated_at: new Date().toISOString(),
       })
-      .where(eq(platform_integrations.id, integrationId));
+      .where(eq(platform_integrations.id, integrationId))
+      .returning({ id: platform_integrations.id });
+
+    return updatedRows.length > 0;
   }
 }

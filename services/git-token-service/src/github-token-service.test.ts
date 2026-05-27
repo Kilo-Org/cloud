@@ -1,10 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createAppAuth } from '@octokit/auth-app';
+import { Octokit } from '@octokit/rest';
 import { GitHubTokenService } from './github-token-service.js';
 
 vi.mock('@octokit/auth-app', () => ({
   createAppAuth: vi.fn(),
 }));
+vi.mock('@octokit/rest', () => ({
+  Octokit: vi.fn(),
+}));
+
+const mockGetInstallation = vi.fn();
 
 type RefreshableGitHubTokenService = {
   refreshInstallationAccountLoginIfDue(
@@ -24,6 +30,11 @@ describe('GitHubTokenService', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     vi.mocked(createAppAuth).mockReset();
+    vi.mocked(Octokit).mockReset();
+    mockGetInstallation.mockReset();
+    vi.mocked(Octokit).mockImplementation(function MockOctokit() {
+      return { apps: { getInstallation: mockGetInstallation } } as unknown as Octokit;
+    });
   });
 
   it('refreshes installation account login and stores a fifteen minute cooldown marker', async () => {
@@ -31,11 +42,7 @@ describe('GitHubTokenService', () => {
     vi.mocked(createAppAuth).mockReturnValue(
       vi.fn().mockResolvedValue({ token: 'app-jwt' }) as unknown as ReturnType<typeof createAppAuth>
     );
-    const fetchSpy = vi
-      .spyOn(globalThis, 'fetch')
-      .mockResolvedValue(
-        new Response(JSON.stringify({ account: { login: 'renamed-owner' } }), { status: 200 })
-      );
+    mockGetInstallation.mockResolvedValue({ data: { account: { login: 'renamed-owner' } } });
     const service = new GitHubTokenService({
       GITHUB_APP_ID: 'app-id',
       GITHUB_APP_PRIVATE_KEY: 'private-key',
@@ -50,15 +57,12 @@ describe('GitHubTokenService', () => {
       expect.any(String),
       { expirationTtl: 15 * 60 }
     );
-    expect(fetchSpy).toHaveBeenCalledWith(
-      'https://api.github.com/app/installations/123',
-      expect.objectContaining({ method: 'GET' })
-    );
+    expect(Octokit).toHaveBeenCalledWith({ auth: 'app-jwt' });
+    expect(mockGetInstallation).toHaveBeenCalledWith({ installation_id: 123 });
   });
 
   it('suppresses installation login refresh during the cooldown window', async () => {
     const tokenCache = createTokenCache('attempted');
-    const fetchSpy = vi.spyOn(globalThis, 'fetch');
     const service = new GitHubTokenService({
       GITHUB_APP_ID: 'app-id',
       GITHUB_APP_PRIVATE_KEY: 'private-key',
@@ -69,7 +73,7 @@ describe('GitHubTokenService', () => {
 
     expect(result).toBeNull();
     expect(tokenCache.put).not.toHaveBeenCalled();
-    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(Octokit).not.toHaveBeenCalled();
     expect(createAppAuth).not.toHaveBeenCalled();
   });
 
@@ -84,7 +88,7 @@ describe('GitHubTokenService', () => {
     vi.mocked(createAppAuth).mockReturnValue(
       vi.fn().mockResolvedValue({ token: 'app-jwt' }) as unknown as ReturnType<typeof createAppAuth>
     );
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('unavailable'));
+    mockGetInstallation.mockRejectedValue(new Error('unavailable'));
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     const service = new GitHubTokenService({
       GITHUB_APP_ID: 'app-id',
@@ -96,7 +100,7 @@ describe('GitHubTokenService', () => {
     expect(await service.refreshInstallationAccountLoginIfDue('123')).toBeNull();
 
     expect(tokenCache.put).toHaveBeenCalledTimes(1);
-    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(mockGetInstallation).toHaveBeenCalledTimes(1);
   });
 
   it('does not log authenticated response data when installation login refresh fails', async () => {
@@ -106,7 +110,7 @@ describe('GitHubTokenService', () => {
     vi.mocked(createAppAuth).mockReturnValue(
       vi.fn().mockResolvedValue({ token: 'app-jwt' }) as unknown as ReturnType<typeof createAppAuth>
     );
-    vi.spyOn(globalThis, 'fetch').mockRejectedValue(upstreamError);
+    mockGetInstallation.mockRejectedValue(upstreamError);
     const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const service = new GitHubTokenService({
       GITHUB_APP_ID: 'app-id',

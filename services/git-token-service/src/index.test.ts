@@ -69,7 +69,7 @@ describe('GitTokenRPCEntrypoint', () => {
     });
     const updateAccountLogin = vi
       .spyOn(InstallationLookupService.prototype, 'updateAccountLogin')
-      .mockResolvedValue();
+      .mockResolvedValue(true);
     const consoleLog = vi.spyOn(console, 'log').mockImplementation(() => {});
     vi.spyOn(
       GitHubTokenService.prototype,
@@ -101,6 +101,50 @@ describe('GitTokenRPCEntrypoint', () => {
     expect(getTokenForRepo).toHaveBeenCalledWith('123', 'repository', 'standard');
   });
 
+  it('warns instead of reporting success when a repaired integration no longer exists', async () => {
+    vi.spyOn(InstallationLookupService.prototype, 'findInstallationId').mockResolvedValue({
+      success: false,
+      reason: 'no_installation_found',
+    });
+    vi.spyOn(InstallationLookupService.prototype, 'findRefreshCandidates').mockResolvedValue({
+      success: true,
+      candidates: [
+        {
+          integrationId: 'integration-1',
+          installationId: '123',
+          accountLogin: 'old-owner',
+          githubAppType: 'standard',
+        },
+      ],
+    });
+    vi.spyOn(InstallationLookupService.prototype, 'updateAccountLogin').mockResolvedValue(false);
+    vi.spyOn(
+      GitHubTokenService.prototype,
+      'refreshInstallationAccountLoginIfDue'
+    ).mockResolvedValue('renamed-owner');
+    const consoleLog = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const rpc = new GitTokenRPCEntrypoint({} as ExecutionContext, {} as CloudflareEnv);
+
+    const result = await rpc.getTokenForRepo({
+      githubRepo: 'renamed-owner/repository',
+      userId: 'user-1',
+    });
+
+    expect(result).toEqual({ success: false, reason: 'no_installation_found' });
+    expect(consoleLog).not.toHaveBeenCalled();
+    expect(consoleWarn).toHaveBeenCalledWith(
+      JSON.stringify({
+        message: 'GitHub installation login repair found no integration row to update',
+        integrationId: 'integration-1',
+        installationId: '123',
+        appType: 'standard',
+      })
+    );
+    expect(JSON.stringify(consoleWarn.mock.calls)).not.toContain('old-owner');
+    expect(JSON.stringify(consoleWarn.mock.calls)).not.toContain('renamed-owner');
+  });
+
   it('does not mint when refreshed metadata identifies a different repository owner', async () => {
     vi.spyOn(InstallationLookupService.prototype, 'findInstallationId').mockResolvedValue({
       success: false,
@@ -119,7 +163,7 @@ describe('GitTokenRPCEntrypoint', () => {
     });
     const updateAccountLogin = vi
       .spyOn(InstallationLookupService.prototype, 'updateAccountLogin')
-      .mockResolvedValue();
+      .mockResolvedValue(true);
     vi.spyOn(console, 'log').mockImplementation(() => {});
     vi.spyOn(
       GitHubTokenService.prototype,

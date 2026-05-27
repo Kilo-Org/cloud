@@ -14,7 +14,7 @@ type InstallationRow = {
   owned_by_organization_id: string | null;
 };
 
-function createDb(rows: InstallationRow[]) {
+function createDb(rows: InstallationRow[], updatedRows = [{ id: 'integration-1' }]) {
   const query = {
     from: vi.fn(() => query),
     leftJoin: vi.fn(() => query),
@@ -26,7 +26,8 @@ function createDb(rows: InstallationRow[]) {
   };
   const updateQuery = {
     set: vi.fn(() => updateQuery),
-    where: vi.fn(async () => undefined),
+    where: vi.fn(() => updateQuery),
+    returning: vi.fn(async () => updatedRows),
   };
 
   return {
@@ -104,21 +105,33 @@ describe('InstallationLookupService', () => {
     });
   });
 
-  it('persists refreshed account login metadata', async () => {
+  it('reports when refreshed account login metadata is persisted', async () => {
     const db = createDb([]);
     vi.mocked(getWorkerDb).mockReturnValue(db as never);
     const service = new InstallationLookupService({
       HYPERDRIVE: { connectionString: 'postgres://test' },
-    } as CloudflareEnv) as unknown as {
-      updateAccountLogin(integrationId: string, accountLogin: string): Promise<void>;
-    };
+    } as CloudflareEnv);
 
-    await service.updateAccountLogin('integration-1', 'renamed-owner');
+    const wasUpdated = await service.updateAccountLogin('integration-1', 'renamed-owner');
 
+    expect(wasUpdated).toBe(true);
     expect(db.updateQuery.set).toHaveBeenCalledWith(
       expect.objectContaining({ platform_account_login: 'renamed-owner' })
     );
     expect(db.updateQuery.where).toHaveBeenCalled();
+  });
+
+  it('reports when refreshed account login metadata no longer has a target row', async () => {
+    const db = createDb([], []);
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+    const service = new InstallationLookupService({
+      HYPERDRIVE: { connectionString: 'postgres://test' },
+    } as CloudflareEnv);
+
+    const wasUpdated = await service.updateAccountLogin('integration-1', 'renamed-owner');
+
+    expect(wasUpdated).toBe(false);
+    expect(db.updateQuery.returning).toHaveBeenCalled();
   });
 
   it('resolves an exact-login integration using the legacy standard app type', async () => {

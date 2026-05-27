@@ -88,4 +88,23 @@ describe('githubAppsRouter.refreshInstallation', () => {
       expect.objectContaining({ platformAccountLogin: 'renamed-owner' })
     );
   });
+
+  it('does not clear stored identity when GitHub returns no current account login', async () => {
+    mockFetchGitHubInstallationDetails.mockResolvedValue({
+      account: { id: 0, login: '' },
+      permissions: {},
+      events: [],
+      repository_selection: 'all',
+      created_at: '2026-01-01T00:00:00.000Z',
+    });
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+
+    await expect(caller.refreshInstallation()).rejects.toThrow(
+      'GitHub installation account identity unavailable'
+    );
+
+    expect(mockUpsertPlatformIntegrationForOwner).not.toHaveBeenCalled();
+    expect(mockFetchGitHubRepositories).not.toHaveBeenCalled();
+    expect(mockUpdateRepositoriesForIntegration).not.toHaveBeenCalled();
+  });
 });

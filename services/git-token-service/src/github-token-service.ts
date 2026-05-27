@@ -24,7 +24,7 @@ const CACHE_KEY_PREFIX = 'gh-token:';
 const MIN_TTL_SECONDS = 60;
 const EXPIRY_BUFFER_MS = 5 * 60 * 1000;
 const INSTALLATION_LOGIN_REFRESH_CACHE_KEY_PREFIX = 'gh-installation-login-refresh:v1:';
-const INSTALLATION_LOGIN_REFRESH_TTL_SECONDS = 10 * 60;
+const INSTALLATION_LOGIN_REFRESH_TTL_SECONDS = 15 * 60;
 
 const GitHubInstallationAccountSchema = z.object({
   account: z.object({

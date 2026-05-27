@@ -26,7 +26,7 @@ describe('GitHubTokenService', () => {
     vi.mocked(createAppAuth).mockReset();
   });
 
-  it('refreshes installation account login and stores a ten minute cooldown marker', async () => {
+  it('refreshes installation account login and stores a fifteen minute cooldown marker', async () => {
     const tokenCache = createTokenCache();
     vi.mocked(createAppAuth).mockReturnValue(
       vi.fn().mockResolvedValue({ token: 'app-jwt' }) as unknown as ReturnType<typeof createAppAuth>
@@ -48,7 +48,7 @@ describe('GitHubTokenService', () => {
     expect(tokenCache.put).toHaveBeenCalledWith(
       'gh-installation-login-refresh:v1:standard:123',
       expect.any(String),
-      { expirationTtl: 10 * 60 }
+      { expirationTtl: 15 * 60 }
     );
     expect(fetchSpy).toHaveBeenCalledWith(
       'https://api.github.com/app/installations/123',

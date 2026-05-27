@@ -199,6 +199,12 @@ export const githubAppsRouter = createTRPCRouter({
     const appType = integration.github_app_type || 'standard';
 
     const installationDetails = await fetchGitHubInstallationDetails(installationId, appType);
+    if (!installationDetails.account.id || !installationDetails.account.login) {
+      throw new TRPCError({
+        code: 'BAD_GATEWAY',
+        message: 'GitHub installation account identity unavailable',
+      });
+    }
 
     await upsertPlatformIntegrationForOwner(owner, {
       platform: 'github',

@@ -35,6 +35,7 @@ import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 import {
   buildUpstreamBody,
   type EmbeddingProxyRequest,
+  validateEmbeddingDimensions,
 } from '@/lib/ai-gateway/embeddings/embedding-request';
 import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import { getVercelInferenceProviderConfigForUserByok } from '@/lib/ai-gateway/providers/vercel';
@@ -220,6 +221,21 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     performance.now() - requestStartedAt
   );
 
+  const dimensionError = validateEmbeddingDimensions(requestBodyParsed, requestedModelLowerCased);
+  if (dimensionError) {
+    return NextResponse.json(
+      {
+        error: {
+          message: dimensionError,
+          type: 'invalid_request_error',
+          param: 'dimensions',
+          code: null,
+        },
+      },
+      { status: 400 }
+    );
+  }
+
   const embeddingRequestSpan = startInactiveSpan({
     name: 'embedding-request-start',
     op: 'http.client',
@@ -235,7 +251,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     requestBodyParsed.model = mapModelIdToVercel(requestBodyParsed.model, false);
   }
 
-  const upstreamBody = buildUpstreamBody(requestBodyParsed);
+  const upstreamBody = buildUpstreamBody(requestBodyParsed, requestedModelLowerCased);
 
   if (userByok && userByok.length > 0 && provider.id === 'vercel') {
     const byokProviders: Record<string, unknown[]> = {};

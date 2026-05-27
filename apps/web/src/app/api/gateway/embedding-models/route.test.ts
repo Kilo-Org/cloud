@@ -21,11 +21,21 @@ describe('GET /api/gateway/embedding-models', () => {
       id: KILO_DEFAULT_EMBEDDING_MODEL,
       dimension: 1024,
       scoreThreshold: 0.35,
+      dimensionMode: 'fixed',
     });
     expect(getKiloEmbeddingModel('codestral-embed-2505')).toMatchObject({
       id: 'mistralai/codestral-embed-2505',
-      dimension: 256,
+      dimension: 1536,
       scoreThreshold: 0.35,
+      dimensionMode: 'fixed',
+    });
+    expect(getKiloEmbeddingModel('openai/text-embedding-3-small')).toMatchObject({
+      dimensionMode: 'selectable',
+      verifiedDimensions: [256, 1536],
+    });
+    expect(getKiloEmbeddingModel('google/gemini-embedding-001')).toMatchObject({
+      dimensionMode: 'selectable',
+      verifiedDimensions: [768, 3072],
     });
     expect(normalizeKiloEmbeddingModelId('text-embedding-3-small')).toBe(
       'openai/text-embedding-3-small'

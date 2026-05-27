@@ -51,7 +51,7 @@ describe('provider predicates match substrings, regardless of prefix', () => {
     expect(isGrokModel('grok-4.1-fast')).toBe(true);
     expect(isGrokModel('x-ai/grok-4')).toBe(true);
     expect(isGrokModel('grok-4.1-fast')).toBe(true);
-    expect(isGrokModel('x-ai/grok-code-fast-1')).toBe(false);
+    expect(isGrokModel('x-ai/grok-code-fast-1')).toBe(true);
   });
 
   test('isGlmModel', () => {

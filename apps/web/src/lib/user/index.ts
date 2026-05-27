@@ -47,7 +47,6 @@ import {
   bot_requests,
   cloud_agent_code_reviews,
   kiloclaw_instances,
-  kiloclaw_composio_identities,
   kiloclaw_google_oauth_connections,
   kiloclaw_inbound_email_aliases,
   kiloclaw_access_codes,
@@ -1045,9 +1044,6 @@ export async function softDeleteUser(userId: string) {
       .set({ initiated_by_admin_id: null })
       .where(eq(kiloclaw_cli_runs.initiated_by_admin_id, userId));
     await tx.delete(kiloclaw_cli_runs).where(eq(kiloclaw_cli_runs.user_id, userId));
-    await tx
-      .delete(kiloclaw_composio_identities)
-      .where(eq(kiloclaw_composio_identities.user_id, userId));
     // Remove stored Google OAuth credentials for all instances owned by this user.
     await tx
       .delete(kiloclaw_google_oauth_connections)

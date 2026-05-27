@@ -65,7 +65,7 @@ const EVENT_COLORS: Record<string, string> = {
 type TownEvent = GastownOutputs['gastown']['getTownEvents'][number];
 type BeadEvent = GastownOutputs['gastown']['getBeadEvents'][number];
 
-function eventDescription(event: {
+export function eventDescription(event: {
   event_type: string;
   old_value: string | null;
   new_value: string | null;

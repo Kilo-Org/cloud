@@ -48,9 +48,9 @@ describe('buildUpstreamBody', () => {
   });
 
   it.each([
-    ['openai/text-embedding-3-small', 256],
-    ['google/gemini-embedding-001', 768],
-  ])('should keep selectable dimensions for model %s', (model, dimensions) => {
+    ['openai/text-embedding-3-small', 1536],
+    ['google/gemini-embedding-001', 3072],
+  ])('should keep catalog dimensions for model %s without a fixed policy', (model, dimensions) => {
     expect(buildUpstreamBody({ model, input: 'hello', dimensions })).toEqual({
       model,
       input: 'hello',
@@ -104,12 +104,12 @@ describe('buildUpstreamBody', () => {
     ).toBeUndefined();
   });
 
-  it('should not reject configured dimensions for selectable models', () => {
+  it('should not reject a catalog dimension for a model without a fixed policy', () => {
     expect(
       validateEmbeddingDimensions({
         model: 'google/gemini-embedding-001',
         input: 'hello',
-        dimensions: 768,
+        dimensions: 3072,
       })
     ).toBeUndefined();
   });

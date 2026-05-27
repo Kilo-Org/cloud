@@ -29,14 +29,6 @@ describe('GET /api/gateway/embedding-models', () => {
       scoreThreshold: 0.35,
       dimensionMode: 'fixed',
     });
-    expect(getKiloEmbeddingModel('openai/text-embedding-3-small')).toMatchObject({
-      dimensionMode: 'selectable',
-      verifiedDimensions: [256, 1536],
-    });
-    expect(getKiloEmbeddingModel('google/gemini-embedding-001')).toMatchObject({
-      dimensionMode: 'selectable',
-      verifiedDimensions: [768, 3072],
-    });
     expect(normalizeKiloEmbeddingModelId('text-embedding-3-small')).toBe(
       'openai/text-embedding-3-small'
     );

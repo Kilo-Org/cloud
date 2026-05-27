@@ -4,8 +4,7 @@ export type KiloEmbeddingModel = {
   dimension: number;
   scoreThreshold: number;
   note?: string;
-  dimensionMode?: 'fixed' | 'selectable';
-  verifiedDimensions?: number[];
+  dimensionMode?: 'fixed';
 };
 
 export type KiloEmbeddingModelCatalog = {
@@ -37,8 +36,6 @@ export const KILO_EMBEDDING_MODELS = [
     name: 'OpenAI Text Embedding 3 Small',
     dimension: 1536,
     scoreThreshold: 0.4,
-    dimensionMode: 'selectable',
-    verifiedDimensions: [256, 1536],
   },
   {
     id: 'openai/text-embedding-3-large',
@@ -58,8 +55,6 @@ export const KILO_EMBEDDING_MODELS = [
     name: 'Gemini Embedding 001',
     dimension: 3072,
     scoreThreshold: 0.35,
-    dimensionMode: 'selectable',
-    verifiedDimensions: [768, 3072],
   },
   {
     id: 'qwen/qwen3-embedding-8b',

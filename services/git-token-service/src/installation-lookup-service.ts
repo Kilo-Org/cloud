@@ -24,6 +24,8 @@ const InstallationRefreshCandidateSchema = InstallationLookupResultSchema.extend
   id: z.string(),
 });
 
+const MAX_INSTALLATION_LOGIN_REFRESH_CANDIDATES = 10;
+
 export type InstallationLookupSuccess = {
   success: true;
   installationId: string;
@@ -121,7 +123,9 @@ export function buildInstallationRefreshCandidatesQuery(
   db: WorkerDb,
   params: FindInstallationParams
 ) {
-  return buildAuthorizedInstallationsQuery(db, params);
+  return buildAuthorizedInstallationsQuery(db, params).limit(
+    MAX_INSTALLATION_LOGIN_REFRESH_CANDIDATES
+  );
 }
 
 export class InstallationLookupService {

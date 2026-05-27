@@ -79,6 +79,7 @@ export class GitHubTokenService {
       if (cooldownMarker !== null) {
         return null;
       }
+      // Cool down failed attempts too, so repeated lookup misses cannot hammer GitHub.
       await this.env.TOKEN_CACHE.put(cooldownKey, new Date().toISOString(), {
         expirationTtl: INSTALLATION_LOGIN_REFRESH_TTL_SECONDS,
       });

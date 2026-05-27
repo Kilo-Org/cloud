@@ -73,6 +73,32 @@ describe('GitHubTokenService', () => {
     expect(createAppAuth).not.toHaveBeenCalled();
   });
 
+  it('cools down failed login refresh attempts to avoid repeated upstream requests', async () => {
+    let cooldownValue: string | null = null;
+    const tokenCache = {
+      get: vi.fn(async () => cooldownValue),
+      put: vi.fn(async (_key: string, value: string) => {
+        cooldownValue = value;
+      }),
+    };
+    vi.mocked(createAppAuth).mockReturnValue(
+      vi.fn().mockResolvedValue({ token: 'app-jwt' }) as unknown as ReturnType<typeof createAppAuth>
+    );
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('unavailable'));
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const service = new GitHubTokenService({
+      GITHUB_APP_ID: 'app-id',
+      GITHUB_APP_PRIVATE_KEY: 'private-key',
+      TOKEN_CACHE: tokenCache,
+    } as unknown as CloudflareEnv) as unknown as RefreshableGitHubTokenService;
+
+    expect(await service.refreshInstallationAccountLoginIfDue('123')).toBeNull();
+    expect(await service.refreshInstallationAccountLoginIfDue('123')).toBeNull();
+
+    expect(tokenCache.put).toHaveBeenCalledTimes(1);
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
   it('does not log authenticated response data when installation login refresh fails', async () => {
     const upstreamError = Object.assign(new Error('metadata lookup unavailable'), {
       response: { data: { token: 'sensitive-metadata-response' } },

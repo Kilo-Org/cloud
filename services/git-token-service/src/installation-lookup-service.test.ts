@@ -38,12 +38,13 @@ describe('buildInstallationLookupQuery', () => {
     expect(query.params).toContain(2);
   });
 
-  it('loads authorized repair candidates without relying on stale account login metadata', () => {
+  it('loads up to ten authorized repair candidates without relying on stale account login metadata', () => {
     const db = getWorkerDb('postgres://unused:unused@localhost:0/unused');
     const query = buildInstallationRefreshCandidatesQuery(db, params).toSQL();
 
     expect(query.params).not.toContain('renamed-owner');
     expect(query.sql).toContain('"kilocode_users"."blocked_reason" is null');
     expect(query.sql).toContain('"organization_memberships"."id" is not null');
+    expect(query.params).toContain(10);
   });
 });

@@ -9,40 +9,16 @@ import { applyXaiModelSettings, isGrokModel } from '@/lib/ai-gateway/providers/x
 import { kiloExclusiveModels } from '@/lib/ai-gateway/models';
 import { applyKiloExclusiveModelSettings } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 import { applyAnthropicModelSettings } from '@/lib/ai-gateway/providers/anthropic';
-import { isClaudeModel, isHaikuModel } from '@/lib/ai-gateway/providers/anthropic.constants';
+import { isClaudeModel } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { OpenRouterInferenceProviderIdSchema } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
-import { hasAttemptCompletionTool } from '@/lib/ai-gateway/tool-calling';
 import { applyGoogleModelSettings, isGeminiModel } from '@/lib/ai-gateway/providers/google';
 import { applyMoonshotModelSettings, isKimiModel } from '@/lib/ai-gateway/providers/moonshotai';
-import { isOpenAiModel } from '@/lib/ai-gateway/providers/openai';
 import { isGlmModel } from '@/lib/ai-gateway/providers/zai';
 import { isMinimaxModel } from '@/lib/ai-gateway/providers/minimax';
 import type { BYOKResult, Provider } from '@/lib/ai-gateway/providers/types';
 import { isStepModel } from '@/lib/ai-gateway/providers/stepfun';
 import { isDeepseekModel } from '@/lib/ai-gateway/providers/deepseek';
 import type { FraudDetectionHeaders } from '@/lib/utils';
-
-function applyToolChoiceSetting(
-  requestedModel: string,
-  requestToMutate: OpenRouterChatCompletionRequest
-) {
-  if (!hasAttemptCompletionTool(requestToMutate)) {
-    return;
-  }
-  const isReasoningEnabled =
-    (requestToMutate.reasoning?.enabled ?? false) === true ||
-    (requestToMutate.reasoning?.effort ?? 'none') !== 'none' ||
-    (requestToMutate.reasoning?.max_tokens ?? 0) > 0;
-  if (
-    isGrokModel(requestedModel) ||
-    isOpenAiModel(requestedModel) ||
-    isGeminiModel(requestedModel) ||
-    (isHaikuModel(requestedModel) && !isReasoningEnabled)
-  ) {
-    console.debug('[applyToolChoiceSetting] setting tool_choice required');
-    requestToMutate.tool_choice = 'required';
-  }
-}
 
 export function getPreferredProviderOrder(requestedModel: string): string[] {
   if (isClaudeModel(requestedModel)) {
@@ -132,10 +108,6 @@ export function applyProviderSpecificLogic(
 
   if (isClaudeModel(requestedModel)) {
     applyAnthropicModelSettings(requestToMutate, extraHeaders);
-  }
-
-  if (requestToMutate.kind === 'chat_completions') {
-    applyToolChoiceSetting(requestedModel, requestToMutate.body);
   }
 
   if (provider.id === 'openrouter' || provider.id === 'vercel') {

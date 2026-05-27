@@ -141,7 +141,7 @@ export const qwen36_plus_stealth_model: KiloExclusiveModel = {
   status: 'public',
   flags: ['reasoning', 'vision', 'stealth', 'requires-data-collection'],
   gateway: 'martian',
-  internal_id: 'qwen3.6-plus',
+  internal_id: 'qwen/qwen3.6-plus',
   pricing: makeTieredPricing(
     [
       {

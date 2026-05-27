@@ -799,7 +799,7 @@ async function fetchWttr(location: string, query: string): Promise<WttrFetchResu
   }
 }
 
-async function fetchWeatherLocationData(location: string): Promise<unknown | null> {
+async function fetchWeatherLocationData(location: string): Promise<unknown> {
   try {
     const result = await fetchWttr(location, 'format=j1');
     if (!result.ok || !result.response.ok) return null;

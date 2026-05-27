@@ -4,6 +4,7 @@ import {
   extractEmbeddingPromptInfo,
   makeErrorReadable,
   parseEmbeddingUsageFromResponse,
+  parseNextEditUsageFromResponse,
   parseTranscriptionUsageFromResponse,
 } from './llm-proxy-helpers';
 
@@ -269,6 +270,31 @@ describe('extractEmbeddingPromptInfo', () => {
 
     expect(result.system_prompt_prefix).toBe('');
     expect(result.system_prompt_length).toBe(0);
+  });
+});
+
+describe('parseNextEditUsageFromResponse', () => {
+  it('prices cached Inception input tokens at the discounted rate', () => {
+    const result = parseNextEditUsageFromResponse(
+      JSON.stringify({
+        id: 'edit-123',
+        model: 'mercury-edit-2',
+        usage: {
+          prompt_tokens: 100_000,
+          cached_input_tokens: 90_000,
+          completion_tokens: 0,
+          total_tokens: 100_000,
+        },
+        choices: [],
+      }),
+      'inception',
+      200
+    );
+
+    expect(result.inputTokens).toBe(100_000);
+    expect(result.cacheHitTokens).toBe(90_000);
+    expect(result.cost_mUsd).toBe(4_750);
+    expect(result.cacheDiscount_mUsd).toBe(20_250);
   });
 });
 

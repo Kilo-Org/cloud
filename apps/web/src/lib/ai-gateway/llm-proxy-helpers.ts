@@ -713,10 +713,14 @@ export function extractNextEditPromptInfo(body: { messages: NextEditMessage[] })
   };
 }
 
+type NextEditUsage = FimUsage & {
+  cached_input_tokens?: number;
+};
+
 type MercuryEditCompletionResponse = {
   id?: string;
   model?: string;
-  usage?: FimUsage;
+  usage?: NextEditUsage;
   choices?: Array<{
     index?: number;
     message?: { role?: string; content?: string };
@@ -724,24 +728,33 @@ type MercuryEditCompletionResponse = {
   }>;
 };
 
-function computeNextEditMicrodollarCost(usage: FimUsage, provider: ProviderId): number {
+function getNextEditCacheHitTokens(usage: NextEditUsage): number {
+  return Math.min(usage.prompt_tokens, Math.max(usage.cached_input_tokens ?? 0, 0));
+}
+
+function computeNextEditMicrodollarCost(usage: NextEditUsage, provider: ProviderId): number {
   switch (provider) {
-    case 'inception':
-      // Same per-token pricing as Inception FIM (mercury edit family).
-      return computeInceptionFimMicrodollarCost(usage);
+    case 'inception': {
+      const cacheHitTokens = getNextEditCacheHitTokens(usage);
+      const uncachedInputTokens = usage.prompt_tokens - cacheHitTokens;
+      return Math.round(
+        uncachedInputTokens * 0.25 + cacheHitTokens * 0.025 + usage.completion_tokens * 0.75
+      );
+    }
     default:
       console.error('Unknown provider for NextEdit cost calculation', provider);
       return 0;
   }
 }
 
-function parseNextEditUsageFromString(
+export function parseNextEditUsageFromResponse(
   response: string,
   provider: ProviderId,
   statusCode: number
 ): MicrodollarUsageStats {
   const json: MercuryEditCompletionResponse = JSON.parse(response);
   const usage = json.usage;
+  const cacheHitTokens = usage ? getNextEditCacheHitTokens(usage) : 0;
   return {
     messageId: json.id ?? null,
     model: json.model ?? null,
@@ -750,9 +763,11 @@ function parseNextEditUsageFromString(
     inference_provider: provider,
     inputTokens: usage?.prompt_tokens ?? 0,
     outputTokens: usage?.completion_tokens ?? 0,
-    cacheHitTokens: 0,
+    cacheHitTokens,
     cacheWriteTokens: 0,
     cost_mUsd: usage ? computeNextEditMicrodollarCost(usage, provider) : 0,
+    cacheDiscount_mUsd:
+      usage && provider === 'inception' ? Math.round(cacheHitTokens * (0.25 - 0.025)) : undefined,
     is_byok: null,
     upstream_id: null,
     finish_reason: null,
@@ -777,7 +792,7 @@ export function countAndStoreNextEditUsage(
     ? Promise.resolve(null)
     : clonedResponse
         .text()
-        .then(content => parseNextEditUsageFromString(content, usageContext.provider, statusCode))
+        .then(content => parseNextEditUsageFromResponse(content, usageContext.provider, statusCode))
         .catch(error => {
           captureException(error, {
             tags: { source: 'nextedit_usage_processing' },

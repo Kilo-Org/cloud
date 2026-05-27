@@ -11,7 +11,10 @@ import {
   createCloudAgentNextFetchClient,
   CloudAgentNextBillingError,
   CloudAgentNextError,
+  CODE_REVIEW_RUNTIME_AGENT_SLUG,
   deriveCallbackToken,
+  buildCodeReviewManagedSessionPolicy,
+  buildCodeReviewRuntimeAgent,
   type CloudAgentNextFetchClient,
   type CloudAgentSessionHealthOutput,
   type CloudAgentTerminalReason,
@@ -1139,10 +1142,22 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
         this.env.CALLBACK_TOKEN_SECRET
       );
 
+      const executionPolicy = buildCodeReviewManagedSessionPolicy();
+      const runtimeAgent = buildCodeReviewRuntimeAgent({
+        model: this.state.sessionInput.model,
+        ...(this.state.sessionInput.variant ? { variant: this.state.sessionInput.variant } : {}),
+        ...(executionPolicy.permissionOverrides
+          ? { permission: executionPolicy.permissionOverrides }
+          : {}),
+      });
+
       const prepareInput = {
         ...this.state.sessionInput,
+        mode: CODE_REVIEW_RUNTIME_AGENT_SLUG,
         createdOnPlatform: 'code-review' as const,
         callbackTarget,
+        runtimeAgents: [runtimeAgent],
+        managedSession: { executionPolicy },
       };
 
       console.log('[CodeReviewOrchestrator] Calling prepareSession', {
@@ -1266,13 +1281,13 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
 
   // ---------------------------------------------------------------------------
   // cloud-agent-next follow-up flow (session continuation)
-  // Uses sendMessageV2 to reuse an existing session from a previous review.
+  // Uses sendMessageV2Internal to reuse an existing session from a previous review.
   // Falls back to fresh session (prepareSession + initiate) on failure.
   // ---------------------------------------------------------------------------
 
   /**
    * Orchestration via cloud-agent-next with session continuation.
-   * Calls sendMessageV2 on an existing session from a previous review.
+   * Calls sendMessageV2Internal on an existing session from a previous review.
    * On failure (404, 409, etc.), falls back to runWithCloudAgentNext() for a fresh session.
    */
   private async runWithCloudAgentNextFollowup(): Promise<void> {
@@ -1282,10 +1297,13 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
     }
     const client = this.getCloudAgentNextClient();
 
-    console.log('[CodeReviewOrchestrator] Attempting session continuation via sendMessageV2', {
-      reviewId: this.state.reviewId,
-      previousCloudAgentSessionId: previousSessionId,
-    });
+    console.log(
+      '[CodeReviewOrchestrator] Attempting session continuation via sendMessageV2Internal',
+      {
+        reviewId: this.state.reviewId,
+        previousCloudAgentSessionId: previousSessionId,
+      }
+    );
 
     try {
       const statusUpdateResult = await this.updateStatus('running');
@@ -1339,9 +1357,6 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
         internalHeaders['x-skip-balance-check'] = 'true';
       }
 
-      // Step 1: Update callback target via updateSession (internal-only endpoint).
-      // callbackTarget must be set through an internal procedure, not the
-      // user-facing sendMessageV2, to prevent SSRF via arbitrary callback URLs.
       const callbackTarget = await callbackTargetForAttempt(
         this.env.API_URL,
         this.state.reviewId,
@@ -1349,26 +1364,26 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
         this.env.CALLBACK_TOKEN_SECRET
       );
 
-      await client.updateSession(internalHeaders, {
-        cloudAgentSessionId: previousSessionId,
-        callbackTarget,
-      });
-
-      // Step 2: Send follow-up message (user-facing, no callbackTarget)
-      console.log('[CodeReviewOrchestrator] Calling sendMessageV2', {
+      console.log('[CodeReviewOrchestrator] Calling sendMessageV2Internal', {
         reviewId: this.state.reviewId,
         cloudAgentSessionId: previousSessionId,
         callbackUrl: callbackTarget.url,
       });
 
-      const sendResult = await client.sendMessageV2(userHeaders, {
+      const sendResult = await client.sendMessageV2Internal(internalHeaders, {
         cloudAgentSessionId: previousSessionId,
         prompt: this.state.sessionInput.prompt,
-        mode: this.state.sessionInput.mode,
+        mode: CODE_REVIEW_RUNTIME_AGENT_SLUG,
         model: this.state.sessionInput.model,
         variant: this.state.sessionInput.variant,
         githubToken: this.state.sessionInput.githubToken,
         gitToken: this.state.sessionInput.gitToken,
+        completion: {
+          callbackTarget,
+          ...(this.state.sessionInput.gateThreshold !== undefined
+            ? { gateThreshold: this.state.sessionInput.gateThreshold }
+            : {}),
+        },
       });
 
       // Store session ID (reusing the previous one) and execution ID
@@ -1376,12 +1391,15 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
         sessionId: previousSessionId,
       });
 
-      console.log('[CodeReviewOrchestrator] Follow-up execution started via sendMessageV2', {
-        reviewId: this.state.reviewId,
-        cloudAgentSessionId: previousSessionId,
-        executionId: sendResult.executionId,
-        status: sendResult.status,
-      });
+      console.log(
+        '[CodeReviewOrchestrator] Follow-up execution started via sendMessageV2Internal',
+        {
+          reviewId: this.state.reviewId,
+          cloudAgentSessionId: previousSessionId,
+          executionId: sendResult.executionId,
+          status: sendResult.status,
+        }
+      );
 
       // Done — cloud-agent-next callback will deliver terminal status
     } catch (error) {

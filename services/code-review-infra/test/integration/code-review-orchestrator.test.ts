@@ -87,8 +87,18 @@ function mockSuccessfulCloudAgentNextRun() {
   return fetchMock;
 }
 
+function requestUrl(request: RequestInfo | URL): string {
+  return request instanceof Request ? request.url : String(request);
+}
+
 function fetchCalls(fetchMock: ReturnType<typeof vi.fn>, path: string) {
-  return fetchMock.mock.calls.filter(([request]) => String(request).includes(path));
+  return fetchMock.mock.calls.filter(([request]) => {
+    const url = requestUrl(request);
+    if (path.startsWith('/trpc/')) {
+      return new URL(url).pathname === path;
+    }
+    return url.includes(path);
+  });
 }
 
 function hasFetchCall(fetchMock: ReturnType<typeof vi.fn>, path: string): boolean {
@@ -221,6 +231,36 @@ describe('CodeReviewOrchestrator recovery', () => {
       headers: { 'X-Callback-Token': expectedCallbackToken },
     });
     expect(prepareBody.callbackTarget.headers).not.toHaveProperty('X-Internal-Secret');
+    expect(prepareBody).toMatchObject({
+      mode: 'code-review',
+      managedSession: {
+        executionPolicy: {
+          name: 'code-review-read-only',
+          runtime: { nonInteractive: true },
+          interaction: {
+            question: 'deny',
+            permission: 'auto-reject',
+            terminal: 'deny',
+          },
+          tools: {
+            question: false,
+            plan_enter: false,
+            plan_exit: false,
+          },
+        },
+      },
+      runtimeAgents: [
+        {
+          slug: 'code-review',
+          name: 'Code Review',
+          config: {
+            mode: 'primary',
+            model: 'test-model',
+            permission: expect.objectContaining({ edit: 'deny', question: 'deny' }),
+          },
+        },
+      ],
+    });
   });
 
   it('fresh attempt dispatch does not reuse failed state from an earlier attempt', async () => {
@@ -337,7 +377,7 @@ describe('CodeReviewOrchestrator recovery', () => {
     expect(fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toHaveLength(0);
     expect(fetchCalls(fetchMock, '/trpc/getSessionHealth')).toHaveLength(0);
     expect(fetchCalls(fetchMock, '/trpc/updateSession')).toHaveLength(0);
-    expect(fetchCalls(fetchMock, '/trpc/sendMessageV2')).toHaveLength(0);
+    expect(fetchCalls(fetchMock, '/trpc/sendMessageV2Internal')).toHaveLength(0);
   });
 
   it('retry-fresh starts a new retry attempt durable object instead of resetting the failed attempt', async () => {
@@ -932,10 +972,7 @@ describe('CodeReviewOrchestrator recovery', () => {
           executionHealth: 'none',
         });
       }
-      if (url.includes('/trpc/updateSession')) {
-        return trpcSuccess({ success: true });
-      }
-      if (url.includes('/trpc/sendMessageV2')) {
+      if (url.includes('/trpc/sendMessageV2Internal')) {
         return trpcSuccess({ executionId: 'exec-followup', status: 'running' });
       }
       return new Response('unexpected fetch', { status: 500 });
@@ -947,6 +984,7 @@ describe('CodeReviewOrchestrator recovery', () => {
         'state',
         codeReview({
           previousCloudAgentSessionId: previousSessionId,
+          sessionInput: { ...sessionInput(), gateThreshold: 'warning' },
         })
       );
       await state.storage.setAlarm(Date.now() + 30_000);
@@ -962,10 +1000,26 @@ describe('CodeReviewOrchestrator recovery', () => {
     });
     expect(status.cliSessionId).toBeUndefined();
     expect(hasFetchCall(fetchMock, '/trpc/getSessionHealth')).toBe(true);
-    expect(hasFetchCall(fetchMock, '/trpc/updateSession')).toBe(true);
-    expect(hasFetchCall(fetchMock, '/trpc/sendMessageV2')).toBe(true);
+    expect(hasFetchCall(fetchMock, '/trpc/updateSession')).toBe(false);
+    expect(hasFetchCall(fetchMock, '/trpc/sendMessageV2Internal')).toBe(true);
+    expect(hasFetchCall(fetchMock, '/trpc/sendMessageV2')).toBe(false);
     expect(hasFetchCall(fetchMock, '/trpc/prepareSession')).toBe(false);
     expect(hasFetchCall(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toBe(false);
+
+    const sendCall = getFetchCall(fetchMock, '/trpc/sendMessageV2Internal');
+    const sendBody = JSON.parse(String(sendCall?.[1]?.body));
+    expect(sendBody).toMatchObject({
+      cloudAgentSessionId: previousSessionId,
+      mode: 'code-review',
+      completion: {
+        callbackTarget: {
+          url: expect.stringContaining('/api/internal/code-review-status/'),
+          headers: { 'X-Callback-Token': expect.stringMatching(/^[0-9a-f]{64}$/) },
+        },
+        gateThreshold: 'warning',
+      },
+    });
+    expect(sendBody.completion.callbackTarget.headers).not.toHaveProperty('X-Internal-Secret');
   });
 
   it('skips continuation and prepares a fresh session when previous sandbox is unreachable', async () => {
@@ -1036,8 +1090,7 @@ describe('CodeReviewOrchestrator recovery', () => {
           executionHealth: 'none',
         });
       }
-      if (url.includes('/trpc/updateSession')) return trpcSuccess({ success: true });
-      if (url.includes('/trpc/sendMessageV2')) {
+      if (url.includes('/trpc/sendMessageV2Internal')) {
         return trpcSuccess({
           executionId: 'msg_followup',
           status: 'started',
@@ -1058,7 +1111,8 @@ describe('CodeReviewOrchestrator recovery', () => {
 
     await runDurableObjectAlarm(stub);
 
-    expect(hasFetchCall(fetchMock, '/trpc/sendMessageV2')).toBe(true);
+    expect(hasFetchCall(fetchMock, '/trpc/sendMessageV2Internal')).toBe(true);
+    expect(hasFetchCall(fetchMock, '/trpc/sendMessageV2')).toBe(false);
     expect(hasFetchCall(fetchMock, '/trpc/prepareSession')).toBe(false);
   });
 
@@ -1111,7 +1165,7 @@ describe('CodeReviewOrchestrator recovery', () => {
       cliSessionId: 'ses_fresh_stale',
     });
     expect(hasFetchCall(fetchMock, '/trpc/updateSession')).toBe(false);
-    expect(hasFetchCall(fetchMock, '/trpc/sendMessageV2')).toBe(false);
+    expect(hasFetchCall(fetchMock, '/trpc/sendMessageV2Internal')).toBe(false);
     expect(hasFetchCall(fetchMock, '/trpc/prepareSession')).toBe(true);
   });
 
@@ -1165,7 +1219,7 @@ describe('CodeReviewOrchestrator recovery', () => {
       cliSessionId: 'ses_fresh_active',
     });
     expect(hasFetchCall(fetchMock, '/trpc/updateSession')).toBe(false);
-    expect(hasFetchCall(fetchMock, '/trpc/sendMessageV2')).toBe(false);
+    expect(hasFetchCall(fetchMock, '/trpc/sendMessageV2Internal')).toBe(false);
     expect(hasFetchCall(fetchMock, '/trpc/prepareSession')).toBe(true);
   });
 
@@ -1214,11 +1268,11 @@ describe('CodeReviewOrchestrator recovery', () => {
     });
     expect(hasFetchCall(fetchMock, '/trpc/getSessionHealth')).toBe(true);
     expect(hasFetchCall(fetchMock, '/trpc/updateSession')).toBe(false);
-    expect(hasFetchCall(fetchMock, '/trpc/sendMessageV2')).toBe(false);
+    expect(hasFetchCall(fetchMock, '/trpc/sendMessageV2Internal')).toBe(false);
     expect(hasFetchCall(fetchMock, '/trpc/prepareSession')).toBe(true);
   });
 
-  it('falls back to a fresh session when sendMessageV2 fails after healthy preflight', async () => {
+  it('falls back to a fresh session when sendMessageV2Internal fails after healthy preflight', async () => {
     const stub = getReviewStub();
     const previousSessionId = 'agent_previous_send_failure';
     const fetchMock = vi.fn(async (request: RequestInfo | URL) => {
@@ -1233,10 +1287,7 @@ describe('CodeReviewOrchestrator recovery', () => {
           executionHealth: 'none',
         });
       }
-      if (url.includes('/trpc/updateSession')) {
-        return trpcSuccess({ success: true });
-      }
-      if (url.includes('/trpc/sendMessageV2')) {
+      if (url.includes('/trpc/sendMessageV2Internal')) {
         return new Response('Session not found', { status: 404 });
       }
       if (url.includes('/trpc/prepareSession')) {
@@ -1272,23 +1323,26 @@ describe('CodeReviewOrchestrator recovery', () => {
       cliSessionId: 'ses_fresh_after_send_failure',
     });
     expect(hasFetchCall(fetchMock, '/trpc/getSessionHealth')).toBe(true);
-    expect(hasFetchCall(fetchMock, '/trpc/updateSession')).toBe(true);
-    expect(hasFetchCall(fetchMock, '/trpc/sendMessageV2')).toBe(true);
+    expect(hasFetchCall(fetchMock, '/trpc/updateSession')).toBe(false);
+    expect(hasFetchCall(fetchMock, '/trpc/sendMessageV2Internal')).toBe(true);
+    expect(hasFetchCall(fetchMock, '/trpc/sendMessageV2')).toBe(false);
     expect(hasFetchCall(fetchMock, '/trpc/prepareSession')).toBe(true);
 
-    const updateCall = getFetchCall(fetchMock, '/trpc/updateSession');
-    const updateBody = JSON.parse(String(updateCall?.[1]?.body));
-    expect(updateBody).toMatchObject({
+    const sendCall = getFetchCall(fetchMock, '/trpc/sendMessageV2Internal');
+    const sendBody = JSON.parse(String(sendCall?.[1]?.body));
+    expect(sendBody).toMatchObject({
       cloudAgentSessionId: previousSessionId,
-      callbackTarget: {
-        url: expect.stringContaining('/api/internal/code-review-status/'),
-        headers: { 'X-Callback-Token': expect.stringMatching(/^[0-9a-f]{64}$/) },
+      completion: {
+        callbackTarget: {
+          url: expect.stringContaining('/api/internal/code-review-status/'),
+          headers: { 'X-Callback-Token': expect.stringMatching(/^[0-9a-f]{64}$/) },
+        },
       },
     });
-    expect(updateBody.callbackTarget.headers).not.toHaveProperty('X-Internal-Secret');
+    expect(sendBody.completion.callbackTarget.headers).not.toHaveProperty('X-Internal-Secret');
   });
 
-  it('retries with a fresh session when sendMessageV2 fails with a sandbox 500', async () => {
+  it('retries with a fresh session when sendMessageV2Internal fails with a sandbox 500', async () => {
     const stub = getReviewStub();
     const previousSessionId = 'agent_previous_sandbox_500';
     const fetchMock = vi.fn(async (request: RequestInfo | URL) => {
@@ -1303,10 +1357,7 @@ describe('CodeReviewOrchestrator recovery', () => {
           executionHealth: 'none',
         });
       }
-      if (url.includes('/trpc/updateSession')) {
-        return trpcSuccess({ success: true });
-      }
-      if (url.includes('/trpc/sendMessageV2')) {
+      if (url.includes('/trpc/sendMessageV2Internal')) {
         return trpcError(500, 'Container failed with internal server error status: 500');
       }
       if (url.includes('/trpc/prepareSession')) {
@@ -1343,8 +1394,9 @@ describe('CodeReviewOrchestrator recovery', () => {
       cliSessionId: 'ses_fresh_after_sandbox_500',
     });
     expect(fetchCalls(fetchMock, '/trpc/getSessionHealth')).toHaveLength(1);
-    expect(fetchCalls(fetchMock, '/trpc/updateSession')).toHaveLength(1);
-    expect(fetchCalls(fetchMock, '/trpc/sendMessageV2')).toHaveLength(1);
+    expect(fetchCalls(fetchMock, '/trpc/updateSession')).toHaveLength(0);
+    expect(fetchCalls(fetchMock, '/trpc/sendMessageV2Internal')).toHaveLength(1);
+    expect(fetchCalls(fetchMock, '/trpc/sendMessageV2')).toHaveLength(0);
     expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(1);
     expect(fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toHaveLength(1);
 
@@ -1357,7 +1409,7 @@ describe('CodeReviewOrchestrator recovery', () => {
     });
   });
 
-  it('fails with sandbox_error when sendMessageV2 retry also hits a sandbox 500', async () => {
+  it('fails with sandbox_error when sendMessageV2Internal retry also hits a sandbox 500', async () => {
     const stub = getReviewStub();
     const previousSessionId = 'agent_previous_sandbox_repeat';
     const fetchMock = vi.fn(async (request: RequestInfo | URL) => {
@@ -1372,10 +1424,7 @@ describe('CodeReviewOrchestrator recovery', () => {
           executionHealth: 'none',
         });
       }
-      if (url.includes('/trpc/updateSession')) {
-        return trpcSuccess({ success: true });
-      }
-      if (url.includes('/trpc/sendMessageV2')) {
+      if (url.includes('/trpc/sendMessageV2Internal')) {
         return trpcError(500, 'SandboxError: HTTP error! status: 500 during resume');
       }
       if (url.includes('/trpc/prepareSession')) {
@@ -1402,7 +1451,8 @@ describe('CodeReviewOrchestrator recovery', () => {
       status: 'failed',
       terminalReason: 'sandbox_error',
     });
-    expect(fetchCalls(fetchMock, '/trpc/sendMessageV2')).toHaveLength(1);
+    expect(fetchCalls(fetchMock, '/trpc/sendMessageV2Internal')).toHaveLength(1);
+    expect(fetchCalls(fetchMock, '/trpc/sendMessageV2')).toHaveLength(0);
     expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(1);
     expect(fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toHaveLength(0);
   });

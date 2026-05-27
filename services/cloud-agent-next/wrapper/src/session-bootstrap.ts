@@ -399,11 +399,7 @@ async function downloadAttachment(
   if (contentLength && Number(contentLength) > MAX_ATTACHMENT_BYTES) {
     throw new Error(`Attachment too large: ${attachment.filename}`);
   }
-  const bytesWritten = await writeResponse(attachment.localPath, response);
-  if (bytesWritten > MAX_ATTACHMENT_BYTES) {
-    await fs.rm(attachment.localPath, { force: true });
-    throw new Error(`Attachment too large: ${attachment.filename}`);
-  }
+  await writeResponse(attachment.localPath, response);
   return {
     type: 'file',
     mime: attachment.mime,

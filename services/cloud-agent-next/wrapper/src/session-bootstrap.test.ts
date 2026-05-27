@@ -524,48 +524,4 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     expect(writeResponse).not.toHaveBeenCalled();
     expect(fs.existsSync(localPath)).toBe(false);
   });
-
-  it('rejects and removes an attachment whose written bytes exceed a smaller reported length', async () => {
-    const localPath = path.join(tmpDir, 'oversized.md');
-    const prompt: WrapperPromptRequest = {
-      message: {
-        id: 'msg_written_limit',
-        prompt: 'Read these notes',
-        attachments: [
-          {
-            filename: 'oversized.md',
-            mime: 'text/plain',
-            signedUrl: 'https://r2.example.com/oversized.md',
-            localPath,
-          },
-        ],
-      },
-      session: {
-        ingestUrl: 'wss://worker.example.com/sessions/user/agent/ingest',
-        workerAuthToken: 'token',
-        wrapperRunId: 'wr_test',
-        wrapperGeneration: 1,
-        wrapperConnectionId: 'conn_test',
-      },
-    };
-
-    let error: Error | undefined;
-    try {
-      await materializePromptAttachments(prompt, {
-        fetch: asFetch(
-          async () =>
-            new Response('reported-small', { status: 200, headers: { 'content-length': '14' } })
-        ),
-        writeResponse: async filePath => {
-          await fsp.writeFile(filePath, 'oversized output');
-          return 5_242_881;
-        },
-      });
-    } catch (caught) {
-      error = caught instanceof Error ? caught : new Error(String(caught));
-    }
-
-    expect(error?.message).toBe('Attachment too large: oversized.md');
-    expect(fs.existsSync(localPath)).toBe(false);
-  });
 });

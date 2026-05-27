@@ -5,11 +5,7 @@
  * reject-question, abort) work when `currentSession` is set.
  */
 
-import fs from 'node:fs/promises';
-import os from 'node:os';
-import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
-import { materializePromptAttachments } from '../../../wrapper/src/session-bootstrap.js';
 import { WrapperState } from '../../../wrapper/src/state.js';
 import {
   createAnswerPermissionHandler,
@@ -462,55 +458,6 @@ describe('createPromptHandler', () => {
         ],
       })
     );
-  });
-
-  it('does not submit a prompt after oversized materialization output is cleaned up', async () => {
-    const tempDirectory = await fs.mkdtemp(path.join(os.tmpdir(), 'wrapper-prompt-'));
-    const localPath = path.join(tempDirectory, 'notes.md');
-    const state = new WrapperState();
-    const deps = createMockDeps(state);
-    deps.materializePromptAttachments.mockImplementation(prompt =>
-      materializePromptAttachments(prompt, {
-        fetch: async () => new Response('reported-small', { status: 200 }),
-        writeResponse: async filePath => {
-          await fs.writeFile(filePath, 'oversized output');
-          return 5_242_881;
-        },
-      })
-    );
-    const handler = createPromptHandler(defaultServerConfig, deps);
-
-    try {
-      const response = await handler(
-        jsonRequest({
-          message: {
-            id: 'msg_oversized_attachment',
-            prompt: 'Read this document',
-            attachments: [
-              {
-                filename: 'notes.md',
-                mime: 'text/plain',
-                signedUrl: 'https://r2.example.com/notes.md',
-                localPath,
-              },
-            ],
-          },
-          session: completeBinding,
-        })
-      );
-      const data = await readJson(response);
-
-      expect(response.status).toBe(500);
-      expect(data).toEqual({
-        error: 'SEND_ERROR',
-        message: 'Failed to materialize attachments: Attachment too large: notes.md',
-      });
-      await expect(fs.stat(localPath)).rejects.toThrow();
-      expect(deps.openConnection).not.toHaveBeenCalled();
-      expect(deps.kiloClient.sendPromptAsync).not.toHaveBeenCalled();
-    } finally {
-      await fs.rm(tempDirectory, { recursive: true, force: true });
-    }
   });
 
   it('maps grouped agent and finalization fields into Kilo prompt and message config', async () => {

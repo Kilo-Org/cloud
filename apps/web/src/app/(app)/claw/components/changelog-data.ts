@@ -13,7 +13,7 @@ export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: '2026-05-27',
     description:
-      'Saving openclaw.json from Edit Files now checks the installed OpenClaw configuration rules first. If validation fails, your edits are preserved and you can review the warning before choosing to save anyway.',
+      'Saving openclaw.json from the file explorer in Settings now runs OpenClaw config validation first. If validation fails, your edits are preserved so you can review the warning before choosing Save anyway.',
     category: 'feature',
     deployHint: 'upgrade_required',
   },

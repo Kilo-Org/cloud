@@ -205,7 +205,7 @@ export const githubAppsRouter = createTRPCRouter({
       integrationType: 'app',
       platformInstallationId: installationId,
       platformAccountId: installationDetails.account.id.toString(),
-      platformAccountLogin: integration.platform_account_login ?? undefined,
+      platformAccountLogin: installationDetails.account.login,
       permissions: installationDetails.permissions,
       scopes: installationDetails.events,
       repositoryAccess: installationDetails.repository_selection,

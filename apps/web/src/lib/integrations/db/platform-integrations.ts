@@ -178,6 +178,21 @@ export async function updateRepositoriesForIntegration(
     .where(eq(platform_integrations.id, integrationId));
 }
 
+export async function updateIntegrationAccountIdentity(
+  integrationId: string,
+  platformAccountId: string,
+  platformAccountLogin: string
+) {
+  await db
+    .update(platform_integrations)
+    .set({
+      platform_account_id: platformAccountId,
+      platform_account_login: platformAccountLogin,
+      updated_at: new Date().toISOString(),
+    })
+    .where(eq(platform_integrations.id, integrationId));
+}
+
 /**
  * Suspends a platform integration
  */

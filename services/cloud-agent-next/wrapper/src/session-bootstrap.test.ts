@@ -504,8 +504,9 @@ describe('prepareWrapperBootstrapWorkspace', () => {
       },
     };
 
-    await expect(
-      materializePromptAttachments(prompt, {
+    let error: Error | undefined;
+    try {
+      await materializePromptAttachments(prompt, {
         fetch: asFetch(
           async () =>
             new Response('not-written', {
@@ -514,9 +515,12 @@ describe('prepareWrapperBootstrapWorkspace', () => {
             })
         ),
         writeResponse,
-      })
-    ).rejects.toThrow('Attachment too large: too-large.pdf');
+      });
+    } catch (caught) {
+      error = caught instanceof Error ? caught : new Error(String(caught));
+    }
 
+    expect(error?.message).toBe('Attachment too large: too-large.pdf');
     expect(writeResponse).not.toHaveBeenCalled();
     expect(fs.existsSync(localPath)).toBe(false);
   });
@@ -545,8 +549,9 @@ describe('prepareWrapperBootstrapWorkspace', () => {
       },
     };
 
-    await expect(
-      materializePromptAttachments(prompt, {
+    let error: Error | undefined;
+    try {
+      await materializePromptAttachments(prompt, {
         fetch: asFetch(
           async () =>
             new Response('reported-small', { status: 200, headers: { 'content-length': '14' } })
@@ -555,9 +560,12 @@ describe('prepareWrapperBootstrapWorkspace', () => {
           await fsp.writeFile(filePath, 'oversized output');
           return 5_242_881;
         },
-      })
-    ).rejects.toThrow('Attachment too large: oversized.md');
+      });
+    } catch (caught) {
+      error = caught instanceof Error ? caught : new Error(String(caught));
+    }
 
+    expect(error?.message).toBe('Attachment too large: oversized.md');
     expect(fs.existsSync(localPath)).toBe(false);
   });
 });

@@ -1,9 +1,5 @@
 import * as z from 'zod';
-import {
-  CustomLlmExtraBodySchema,
-  OpenCodeSettingsSchema,
-  OpenClawModelSettingsSchema,
-} from '@kilocode/db/schema-types';
+import { CustomLlmExtraBodySchema, OpenCodeSettingsSchema } from '@kilocode/db/schema-types';
 
 /**
  * Strict subset of `CustomLlmDefinitionSchema` for experiment variant versions.
@@ -28,12 +24,6 @@ export const ExperimentUpstreamSchema = z
     opencode_settings: z
       .object({
         ai_sdk_provider: OpenCodeSettingsSchema.shape.ai_sdk_provider,
-      })
-      .strict()
-      .optional(),
-    openclaw_settings: z
-      .object({
-        api_adapter: OpenClawModelSettingsSchema.shape.api_adapter,
       })
       .strict()
       .optional(),

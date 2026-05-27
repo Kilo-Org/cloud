@@ -12,6 +12,7 @@ import {
   kilo_pass_subscriptions,
   kilo_pass_issuances,
   kilo_pass_issuance_items,
+  kilo_pass_welcome_promo_card_claims,
   enrichment_data,
   referral_codes,
   referral_code_usages,
@@ -1695,6 +1696,24 @@ describe('User', () => {
       expect(pms[0].address_city).toBeNull();
       // stripe_fingerprint preserved for fraud detection
       expect(pms[0].stripe_fingerprint).toBe(pm.stripe_fingerprint);
+    });
+
+    it('should retain minimal Kilo Pass card-claim evidence for repeat-offer enforcement', async () => {
+      const user = await insertTestUser();
+      const stripeFingerprint = `fp_deleted_user_${randomUUID()}`;
+      const sourceStripeInvoiceId = `in_deleted_user_${randomUUID()}`;
+      await db.insert(kilo_pass_welcome_promo_card_claims).values({
+        stripe_fingerprint: stripeFingerprint,
+        source_stripe_invoice_id: sourceStripeInvoiceId,
+      });
+
+      await softDeleteUser(user.id);
+
+      const claim = await db.query.kilo_pass_welcome_promo_card_claims.findFirst({
+        where: eq(kilo_pass_welcome_promo_card_claims.stripe_fingerprint, stripeFingerprint),
+      });
+      expect(claim?.stripe_fingerprint).toBe(stripeFingerprint);
+      expect(claim?.source_stripe_invoice_id).toBe(sourceStripeInvoiceId);
     });
 
     it('should cascade-delete agent environment profile MCPs and skills', async () => {

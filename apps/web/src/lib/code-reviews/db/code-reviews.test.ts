@@ -393,13 +393,11 @@ describe('findPreviousCompletedReview', () => {
       sessionId: 'agent_other_project',
     });
 
-    const result = await findPreviousCompletedReview(
-      gitLabRepo,
-      42,
-      'current-gitlab-sha',
-      'gitlab',
-      { integrationId: gitLabIntegrationAId, projectId: 501 }
-    );
+    const result = await findPreviousCompletedReview(gitLabRepo, 42, 'current-gitlab-sha', {
+      platform: 'gitlab',
+      integrationId: gitLabIntegrationAId,
+      projectId: 501,
+    });
 
     expect(result).toEqual({
       head_sha: 'gitlab-matching-sha',
@@ -407,13 +405,8 @@ describe('findPreviousCompletedReview', () => {
     });
   });
 
-  it('does not continue GitLab sessions without an exact continuation scope', async () => {
-    const result = await findPreviousCompletedReview(
-      gitLabRepo,
-      42,
-      'current-gitlab-sha',
-      'gitlab'
-    );
+  it('uses the default GitHub continuation scope when options are omitted', async () => {
+    const result = await findPreviousCompletedReview(gitLabRepo, 42, 'current-gitlab-sha');
     expect(result).toBeNull();
   });
 

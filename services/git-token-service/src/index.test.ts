@@ -104,7 +104,7 @@ describe('resolveGitLabRuntimeToken', () => {
     expect(dependencies.tokenService.getToken).not.toHaveBeenCalled();
   });
 
-  it('fails closed for unmatched and ambiguous authorized instance candidates', async () => {
+  it('fails closed for unmatched authorized instance candidates', async () => {
     const unmatched = createDependencies({
       integrations: [
         {
@@ -124,9 +124,93 @@ describe('resolveGitLabRuntimeToken', () => {
       )
     ).resolves.toEqual({ success: false, reason: 'no_matching_integration' });
     expect(unmatched.tokenService.getToken).not.toHaveBeenCalled();
+  });
 
+  it('returns the unique project token when multiple integrations match but only one owns the project', async () => {
+    const fetchMock = vi.fn().mockImplementation(() => Promise.resolve(Response.json({ id: 42 })));
+    vi.stubGlobal('fetch', fetchMock);
+    const integrationWithoutProjectToken: AuthorizedGitLabIntegration = {
+      ...integration,
+      integrationId: 'another-integration',
+      metadata: {
+        ...integration.metadata,
+        project_tokens: { '99': { token: 'other-project-token' } },
+      },
+    };
+    const dependencies = createDependencies({
+      integrations: [integrationWithoutProjectToken, integration],
+    });
+
+    await expect(
+      resolveGitLabRuntimeToken(
+        {
+          userId: 'user_123',
+          repositoryUrl: 'https://gitlab.example.com/gitlab/team/repo.git',
+          createdOnPlatform: 'code-review',
+        },
+        dependencies
+      )
+    ).resolves.toEqual({
+      success: true,
+      token: 'project-bot-token',
+      instanceUrl: 'https://gitlab.example.com/gitlab',
+      glabIsOAuth2: false,
+    });
+    expect(dependencies.tokenService.getToken).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('skips project lookup for matching integrations without stored project tokens', async () => {
+    const fetchMock = vi.fn().mockImplementation(() => Promise.resolve(Response.json({ id: 42 })));
+    vi.stubGlobal('fetch', fetchMock);
+    const integrationWithoutProjectTokens: AuthorizedGitLabIntegration = {
+      ...integration,
+      integrationId: 'another-integration',
+      metadata: {
+        access_token: integration.metadata.access_token,
+        gitlab_instance_url: integration.metadata.gitlab_instance_url,
+      },
+    };
+    const dependencies = createDependencies({
+      integrations: [integrationWithoutProjectTokens, integration],
+    });
+
+    await expect(
+      resolveGitLabRuntimeToken(
+        {
+          userId: 'user_123',
+          repositoryUrl: 'https://gitlab.example.com/gitlab/team/repo.git',
+          createdOnPlatform: 'code-review',
+        },
+        dependencies
+      )
+    ).resolves.toEqual({
+      success: true,
+      token: 'project-bot-token',
+      instanceUrl: 'https://gitlab.example.com/gitlab',
+      glabIsOAuth2: false,
+    });
+    expect(dependencies.tokenService.getToken).toHaveBeenCalledOnce();
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it('fails closed when multiple matching integrations own the resolved project token', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation(() => Promise.resolve(Response.json({ id: 42 })))
+    );
     const ambiguous = createDependencies({
-      integrations: [integration, { ...integration, integrationId: 'another-integration' }],
+      integrations: [
+        integration,
+        {
+          ...integration,
+          integrationId: 'another-integration',
+          metadata: {
+            ...integration.metadata,
+            project_tokens: { '42': { token: 'duplicate-project-bot-token' } },
+          },
+        },
+      ],
     });
     await expect(
       resolveGitLabRuntimeToken(
@@ -138,7 +222,7 @@ describe('resolveGitLabRuntimeToken', () => {
         ambiguous
       )
     ).resolves.toEqual({ success: false, reason: 'ambiguous_integration' });
-    expect(ambiguous.tokenService.getToken).not.toHaveBeenCalled();
+    expect(ambiguous.tokenService.getToken).toHaveBeenCalledTimes(2);
   });
 
   it('does not fall back to the integration token when project resolution or storage fails', async () => {

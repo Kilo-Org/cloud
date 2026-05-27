@@ -1099,14 +1099,58 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     expect(result.readyRequest.materialized.env.GITLAB_HOST).toBe('gitlab.com');
   });
 
-  it('fails review-origin GitLab token lookup without using a human-token fallback', async () => {
+  it.each([
+    [
+      'no_project_token',
+      'GitLab token lookup failed (no_project_token). No GitLab project access token is configured for this repository. Reconfigure or reinstall the GitLab code-review bot for the project.',
+    ],
+    [
+      'ambiguous_integration',
+      'GitLab token lookup failed (ambiguous_integration). Multiple GitLab integrations or project tokens match this repository. Remove duplicate GitLab integrations or reconfigure the GitLab code-review integration.',
+    ],
+    [
+      'no_matching_integration',
+      'GitLab token lookup failed (no_matching_integration). No authorized GitLab integration matches this repository. Connect the GitLab account or organization that has access to the repository.',
+    ],
+    [
+      'project_lookup_failed',
+      'GitLab token lookup failed (project_lookup_failed). The connected GitLab integration cannot read this project. Grant repository access, then reconnect GitLab if required.',
+    ],
+  ])(
+    'reports actionable review-origin GitLab token lookup failure for %s without using a human-token fallback',
+    async (reason, expectedMessage) => {
+      const metadata = createGitLabCodeReviewMetadata();
+      if (!metadata.repository || metadata.repository.type !== 'gitlab') {
+        throw new Error('Expected GitLab code-review metadata');
+      }
+      const metadataWithFallbackToken = {
+        ...metadata,
+        repository: {
+          ...metadata.repository,
+          token: 'configured-human-token',
+        },
+      } satisfies CloudAgentSessionState;
+
+      tokenMocks.resolveManagedGitLabToken.mockResolvedValueOnce({
+        success: false,
+        reason,
+      });
+
+      await expect(buildPromptWrapperRequests(metadataWithFallbackToken)).rejects.toThrow(
+        expectedMessage
+      );
+      expect(tokenMocks.resolveManagedGitLabToken).toHaveBeenCalledOnce();
+    }
+  );
+
+  it('keeps reconnect guidance for GitLab OAuth-token lifecycle failures', async () => {
     tokenMocks.resolveManagedGitLabToken.mockResolvedValueOnce({
       success: false,
-      reason: 'no_project_token',
+      reason: 'token_refresh_failed',
     });
 
     await expect(buildPromptWrapperRequests(createGitLabCodeReviewMetadata())).rejects.toThrow(
-      'GitLab token lookup failed (no_project_token)'
+      'GitLab token lookup failed (token_refresh_failed). Please reconnect your GitLab account.'
     );
     expect(tokenMocks.resolveManagedGitLabToken).toHaveBeenCalledOnce();
   });

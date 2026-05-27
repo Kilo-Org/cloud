@@ -231,7 +231,9 @@ describe('prepareReviewPayload', () => {
         repositoryReviewInstructions: '# Review policy\n\nFlag only regressions.',
       })
     );
-    expect(mockFindPreviousCompletedReview).toHaveBeenCalledWith(REPO, 123, 'headsha123', 'github');
+    expect(mockFindPreviousCompletedReview).toHaveBeenCalledWith(REPO, 123, 'headsha123', {
+      platform: 'github',
+    });
     expect(mockUpdateRepositoryReviewInstructionsMetadata).toHaveBeenCalledWith(review.id, {
       used: true,
       ref: 'main',
@@ -267,16 +269,11 @@ describe('prepareReviewPayload', () => {
       platform: 'gitlab',
     });
     expect(payload.sessionInput).not.toHaveProperty('gitlabCodeReviewTokenRef');
-    expect(mockFindPreviousCompletedReview).toHaveBeenCalledWith(
-      REPO,
-      123,
-      'headsha123',
-      'gitlab',
-      {
-        integrationId: gitlabIntegration.id,
-        projectId: 456,
-      }
-    );
+    expect(mockFindPreviousCompletedReview).toHaveBeenCalledWith(REPO, 123, 'headsha123', {
+      platform: 'gitlab',
+      integrationId: gitlabIntegration.id,
+      projectId: 456,
+    });
     expect(mockFetchGitLabRootTextFileAtRef).toHaveBeenCalledWith(
       'gitlab-project-token',
       REPO,
@@ -298,6 +295,29 @@ describe('prepareReviewPayload', () => {
       ref: 'main',
       truncated: false,
     });
+  });
+
+  it('skips GitLab continuation lookup when exact scope is unavailable', async () => {
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        defineReview(testUser.id, null, {
+          platform: 'gitlab',
+          pr_url: `https://gitlab.example.com/${REPO}/-/merge_requests/123`,
+        })
+      )
+      .returning();
+
+    const payload = await prepareReviewPayload({
+      reviewId: review.id,
+      owner: { type: 'user', id: testUser.id, userId: testUser.id },
+      agentConfig: { config: baseAgentConfig },
+      platform: 'gitlab',
+    });
+
+    expect(mockGetOrCreateProjectAccessToken).not.toHaveBeenCalled();
+    expect(mockFindPreviousCompletedReview).not.toHaveBeenCalled();
+    expect(payload.previousCloudAgentSessionId).toBeUndefined();
   });
 
   it('normalizes trailing slashes in self-hosted GitLab review repository URLs', async () => {

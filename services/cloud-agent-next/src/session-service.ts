@@ -73,6 +73,35 @@ import { normalizeAgentMode } from './schema.js';
 const SETUP_COMMAND_TIMEOUT_SECONDS = 300; // 5 minutes
 const DEFAULT_DENIED_COMMAND_PATTERNS = ['rm -rf', 'sudo rm', 'mkfs', 'dd if='];
 
+function gitLabTokenLookupFailureMessage(reason: string): string {
+  switch (reason) {
+    case 'no_integration_found':
+    case 'invalid_org_id':
+      return `No GitLab integration found (${reason}). Please connect your GitLab account first.`;
+    case 'no_token':
+    case 'token_refresh_failed':
+    case 'token_expired_no_refresh':
+      return `GitLab token lookup failed (${reason}). Please reconnect your GitLab account.`;
+    case 'repository_url_required':
+    case 'invalid_repository_url':
+      return `GitLab token lookup failed (${reason}). Repository metadata is missing or invalid for this GitLab code-review session.`;
+    case 'no_matching_integration':
+      return `GitLab token lookup failed (${reason}). No authorized GitLab integration matches this repository. Connect the GitLab account or organization that has access to the repository.`;
+    case 'ambiguous_integration':
+      return `GitLab token lookup failed (${reason}). Multiple GitLab integrations or project tokens match this repository. Remove duplicate GitLab integrations or reconfigure the GitLab code-review integration.`;
+    case 'project_lookup_failed':
+      return `GitLab token lookup failed (${reason}). The connected GitLab integration cannot read this project. Grant repository access, then reconnect GitLab if required.`;
+    case 'no_project_token':
+      return `GitLab token lookup failed (${reason}). No GitLab project access token is configured for this repository. Reconfigure or reinstall the GitLab code-review bot for the project.`;
+    case 'database_not_configured':
+    case 'service_not_configured':
+    case 'rpc_error':
+      return `GitLab token lookup failed (${reason}). Git token service is unavailable; contact support.`;
+    default:
+      return `GitLab token lookup failed (${reason}). Please reconnect your GitLab account.`;
+  }
+}
+
 // Keep in sync with: cloudflare-code-review-infra/src/code-review-orchestrator.ts
 // mkdir and touch are intentionally allowed for agent scratch space during analysis
 const CODE_REVIEW_ALLOWED_COMMANDS = [
@@ -1281,14 +1310,8 @@ export class SessionService {
         gitToken = result.token;
         gitlabTokenManaged = true;
         glabIsOAuth2 = result.glabIsOAuth2;
-      } else if (result.reason === 'no_integration_found' || result.reason === 'invalid_org_id') {
-        throw ExecutionError.invalidRequest(
-          'No GitLab integration found. Please connect your GitLab account first.'
-        );
       } else {
-        throw ExecutionError.invalidRequest(
-          `GitLab token lookup failed (${result.reason}). Please reconnect your GitLab account.`
-        );
+        throw ExecutionError.invalidRequest(gitLabTokenLookupFailureMessage(result.reason));
       }
     }
 

@@ -18,6 +18,8 @@ import { MessageErrorBoundary } from './MessageErrorBoundary';
 import type { ChildSessionDrawerEntry, OpenChildSession } from './ChildSessionSection';
 
 const IDLE_HYDRATION_STATE: ChildSessionHydrationState = { status: 'idle' };
+const AUTO_SCROLL_PAUSE_DISTANCE_PX = 20;
+const AUTO_SCROLL_RESUME_DISTANCE_PX = 100;
 
 type ChildSessionDrawerProps = {
   stack: ChildSessionDrawerEntry[];
@@ -52,10 +54,12 @@ export function ChildSessionDrawer({
   const messagesContentRef = useRef<HTMLDivElement>(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
+  const shouldAutoScrollRef = useRef(true);
   const isAutoScrollingRef = useRef(false);
   const autoScrollRunRef = useRef(0);
   const lastScrollTopRef = useRef(0);
   const autoScrollFrameRef = useRef(0);
+  const followUpAutoScrollFrameRef = useRef(0);
   const delayedAutoScrollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const scrollToBottomNow = useCallback(() => {
@@ -76,31 +80,34 @@ export function ChildSessionDrawer({
     });
   }, []);
 
-  const scheduleScrollToBottom = useCallback(() => {
+  const cancelScheduledAutoScroll = useCallback(() => {
     cancelAnimationFrame(autoScrollFrameRef.current);
+    cancelAnimationFrame(followUpAutoScrollFrameRef.current);
     if (delayedAutoScrollRef.current !== null) {
       clearTimeout(delayedAutoScrollRef.current);
       delayedAutoScrollRef.current = null;
     }
+  }, []);
 
+  const scheduleScrollToBottom = useCallback(() => {
+    if (!shouldAutoScrollRef.current) return;
+
+    cancelScheduledAutoScroll();
     autoScrollFrameRef.current = requestAnimationFrame(() => {
+      if (!shouldAutoScrollRef.current) return;
+
       scrollToBottomNow();
-      requestAnimationFrame(scrollToBottomNow);
+      followUpAutoScrollFrameRef.current = requestAnimationFrame(() => {
+        if (shouldAutoScrollRef.current) scrollToBottomNow();
+      });
       delayedAutoScrollRef.current = setTimeout(() => {
         delayedAutoScrollRef.current = null;
-        scrollToBottomNow();
+        if (shouldAutoScrollRef.current) scrollToBottomNow();
       }, 100);
     });
-  }, [scrollToBottomNow]);
+  }, [cancelScheduledAutoScroll, scrollToBottomNow]);
 
-  useEffect(() => {
-    return () => {
-      cancelAnimationFrame(autoScrollFrameRef.current);
-      if (delayedAutoScrollRef.current !== null) {
-        clearTimeout(delayedAutoScrollRef.current);
-      }
-    };
-  }, []);
+  useEffect(() => cancelScheduledAutoScroll, [cancelScheduledAutoScroll]);
 
   useEffect(() => {
     if (!selectedSessionId) return;
@@ -128,6 +135,7 @@ export function ChildSessionDrawer({
   useEffect(() => {
     if (!selectedSessionId) return;
 
+    shouldAutoScrollRef.current = true;
     setShouldAutoScroll(true);
     lastScrollTopRef.current = 0;
     setShowScrollButton(false);
@@ -138,7 +146,8 @@ export function ChildSessionDrawer({
     const el = scrollContainerRef.current;
     if (!el) return;
     const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-    setShowScrollButton(distanceFromBottom > 20);
+    const isAwayFromBottom = distanceFromBottom > AUTO_SCROLL_PAUSE_DISTANCE_PX;
+    setShowScrollButton(isAwayFromBottom);
 
     if (isAutoScrollingRef.current) {
       lastScrollTopRef.current = el.scrollTop;
@@ -148,14 +157,18 @@ export function ChildSessionDrawer({
     const scrolledUp = el.scrollTop < lastScrollTopRef.current;
     lastScrollTopRef.current = el.scrollTop;
 
-    if (scrolledUp) {
+    if (scrolledUp && isAwayFromBottom) {
+      shouldAutoScrollRef.current = false;
+      cancelScheduledAutoScroll();
       setShouldAutoScroll(false);
-    } else if (distanceFromBottom < 100) {
+    } else if (distanceFromBottom < AUTO_SCROLL_RESUME_DISTANCE_PX) {
+      shouldAutoScrollRef.current = true;
       setShouldAutoScroll(true);
     }
-  }, []);
+  }, [cancelScheduledAutoScroll]);
 
   const scrollToBottom = useCallback(() => {
+    shouldAutoScrollRef.current = true;
     setShouldAutoScroll(true);
     scheduleScrollToBottom();
   }, [scheduleScrollToBottom]);
@@ -279,7 +292,8 @@ export function ChildSessionDrawer({
                     </MessageErrorBoundary>
                   ))}
                 </div>
-              ) : hydrationState.status === 'loading' || hydrationState.status === 'error' ? null : (
+              ) : hydrationState.status === 'loading' ||
+                hydrationState.status === 'error' ? null : (
                 <div className="border-border bg-muted/20 text-muted-foreground rounded-lg border px-4 py-6 text-sm">
                   No sub-agent messages yet.
                 </div>

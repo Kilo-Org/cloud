@@ -25,6 +25,7 @@ import { readDb } from '@/lib/drizzle';
 import { debugSaveProxyRequest } from '@/lib/debugUtils';
 import { sentryLogger } from '@/lib/utils.server';
 import { getBYOKforOrganization, getBYOKforUser } from '@/lib/ai-gateway/byok';
+import type { UserByokProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 
 // Inception's "next edit" endpoint mirrors a chat completion shape but is hosted at
 // a separate path. It accepts a single `role: "user"` message; the system prompt
@@ -92,6 +93,15 @@ export async function POST(request: NextRequest) {
   try {
     const { success, data, error } = NextEditRequestBody.safeParse(JSON.parse(requestBodyText));
     if (!success) {
+      if (error.issues.some(issue => issue.path[0] === 'stream')) {
+        return NextResponse.json(
+          {
+            error: 'Streaming is not supported for next-edit completions',
+            error_type: ProxyErrorType.unsupported_field,
+          },
+          { status: 400 }
+        );
+      }
       sentryLogger('nextedit-proxy')('request failed to parse', {
         extra: { kiloUserId: user.id, error, organizationId },
         tags: { source: 'nextedit-proxy' },
@@ -133,7 +143,7 @@ export async function POST(request: NextRequest) {
 
   const promptInfo = extractNextEditPromptInfo(requestBody);
 
-  const byokProviderKey = 'inception' as const;
+  const byokProviderKey: UserByokProviderId = 'inception';
 
   const userByok = organizationId
     ? await getBYOKforOrganization(readDb, organizationId, [byokProviderKey])

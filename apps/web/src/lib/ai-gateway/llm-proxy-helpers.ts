@@ -708,7 +708,7 @@ export function extractNextEditPromptInfo(body: { messages: NextEditMessage[] })
   const totalLength = body.messages.reduce((sum, m) => sum + (m.content?.length ?? 0), 0);
   return {
     system_prompt_prefix: '', // /v1/edit/completions bakes its system prompt in server-side
-    system_prompt_length: totalLength,
+    system_prompt_length: totalLength, // total message content length; there is no explicit system prompt
     user_prompt_prefix: content.slice(0, 100),
   };
 }

@@ -44,7 +44,7 @@ function applyToolChoiceSetting(
   }
 }
 
-function getPreferredProviderOrder(requestedModel: string): string[] {
+export function getPreferredProviderOrder(requestedModel: string): string[] {
   if (isClaudeModel(requestedModel)) {
     return [
       OpenRouterInferenceProviderIdSchema.enum['amazon-bedrock'],

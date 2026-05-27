@@ -27,6 +27,10 @@ function microdollarsToUsd(value: number | null): number | null {
   return value === null ? null : value / MICRODOLLARS_PER_DOLLAR;
 }
 
+function averagePerAttempt(total: number | null, nAttempts: number | null): number | null {
+  return total === null || nAttempts === null || nAttempts <= 0 ? null : total / nAttempts;
+}
+
 type BenchDashboard = {
   listPromotions(opts?: { sinceMs?: number; limit?: number }): Promise<PromotionRecord[]>;
   getPromotion(name: string): Promise<PromotionRecord | null>;
@@ -37,10 +41,39 @@ type PromotionInsert = {
   modelStatsId: string | null;
 };
 
+function storedPromotionValues({ promotion, modelStatsId }: PromotionInsert) {
+  return {
+    bench_eval_url: promotion.bench_eval_url,
+    provider: promotion.provider,
+    model: promotion.model,
+    model_stats_id: modelStatsId,
+    variant: promotion.variant,
+    task_source: promotion.task_source,
+    n_total_trials: promotion.n_total_trials,
+    n_attempts: promotion.n_attempts ?? null,
+    total_score: promotion.total_score,
+    overall_score: promotion.overall_score,
+    n_errored: promotion.n_errored,
+    avg_cost_microdollars: usdToMicrodollars(promotion.avg_cost_usd),
+    total_cost_microdollars: usdToMicrodollars(promotion.total_cost_usd ?? null),
+    avg_input_tokens: roundAverage(promotion.avg_input_tokens),
+    total_input_tokens: roundAverage(promotion.total_input_tokens ?? null),
+    avg_output_tokens: roundAverage(promotion.avg_output_tokens),
+    total_output_tokens: roundAverage(promotion.total_output_tokens ?? null),
+    avg_cache_read_tokens: roundAverage(promotion.avg_cache_read_tokens),
+    total_cache_read_tokens: roundAverage(promotion.total_cache_read_tokens ?? null),
+    avg_execution_ms: roundAverage(promotion.avg_execution_ms),
+    promoted_at: new Date(promotion.promoted_at).toISOString(),
+    promoted_by_email: promotion.promoted_by_email,
+    promotion_note: promotion.promotion_note,
+  };
+}
+
 export type PromotionStore = {
   getLatestPromotedAtMs(): Promise<number>;
   findModelStatsTargets(models: string[]): Promise<Map<string, ModelStatsTarget>>;
   insertPromotions(promotions: PromotionInsert[]): Promise<Set<string>>;
+  refreshPromotion(promotion: PromotionInsert): Promise<void>;
   listLatestPromotions(tuple: Omit<PromotionTuple, 'modelStatsId'>): Promise<LatestPromotion[]>;
   writeKiloBenchBenchmarks(modelStatsId: string, benchmarks: KiloBenchBenchmarks): Promise<void>;
 };
@@ -96,32 +129,22 @@ export function createPromotionStore(db: WorkerDb): PromotionStore {
       const inserted = await db
         .insert(model_eval_ingestions)
         .values(
-          promotions.map(({ promotion, modelStatsId }) => ({
-            bench_eval_name: promotion.bench_eval_name,
-            bench_eval_url: promotion.bench_eval_url,
-            provider: promotion.provider,
-            model: promotion.model,
-            model_stats_id: modelStatsId,
-            variant: promotion.variant,
-            task_source: promotion.task_source,
-            n_total_trials: promotion.n_total_trials,
-            total_score: promotion.total_score,
-            overall_score: promotion.overall_score,
-            n_errored: promotion.n_errored,
-            avg_cost_microdollars: usdToMicrodollars(promotion.avg_cost_usd),
-            avg_input_tokens: roundAverage(promotion.avg_input_tokens),
-            avg_output_tokens: roundAverage(promotion.avg_output_tokens),
-            avg_cache_read_tokens: roundAverage(promotion.avg_cache_read_tokens),
-            avg_execution_ms: roundAverage(promotion.avg_execution_ms),
-            promoted_at: new Date(promotion.promoted_at).toISOString(),
-            promoted_by_email: promotion.promoted_by_email,
-            promotion_note: promotion.promotion_note,
+          promotions.map(promotion => ({
+            bench_eval_name: promotion.promotion.bench_eval_name,
+            ...storedPromotionValues(promotion),
           }))
         )
         .onConflictDoNothing({ target: model_eval_ingestions.bench_eval_name })
         .returning({ benchEvalName: model_eval_ingestions.bench_eval_name });
 
       return new Set(inserted.map(row => row.benchEvalName));
+    },
+
+    async refreshPromotion(promotion: PromotionInsert): Promise<void> {
+      await db
+        .update(model_eval_ingestions)
+        .set(storedPromotionValues(promotion))
+        .where(eq(model_eval_ingestions.bench_eval_name, promotion.promotion.bench_eval_name));
     },
 
     async listLatestPromotions(
@@ -142,6 +165,11 @@ export function createPromotionStore(db: WorkerDb): PromotionStore {
           avgCacheReadTokens: model_eval_ingestions.avg_cache_read_tokens,
           avgExecutionMs: model_eval_ingestions.avg_execution_ms,
           nTotalTrials: model_eval_ingestions.n_total_trials,
+          nAttempts: model_eval_ingestions.n_attempts,
+          totalCostMicrodollars: model_eval_ingestions.total_cost_microdollars,
+          totalInputTokens: model_eval_ingestions.total_input_tokens,
+          totalOutputTokens: model_eval_ingestions.total_output_tokens,
+          totalCacheReadTokens: model_eval_ingestions.total_cache_read_tokens,
           nErrored: model_eval_ingestions.n_errored,
           promotedAt: model_eval_ingestions.promoted_at,
         })
@@ -203,6 +231,13 @@ export function buildKiloBenchBenchmarks(rows: LatestPromotion[]): KiloBenchBenc
       avgCacheReadTokens: row.avgCacheReadTokens,
       avgExecutionMs: row.avgExecutionMs,
       nTotalTrials: row.nTotalTrials,
+      nAttempts: row.nAttempts,
+      avgAttemptCostUsd: microdollarsToUsd(
+        averagePerAttempt(row.totalCostMicrodollars, row.nAttempts)
+      ),
+      avgAttemptInputTokens: averagePerAttempt(row.totalInputTokens, row.nAttempts),
+      avgAttemptOutputTokens: averagePerAttempt(row.totalOutputTokens, row.nAttempts),
+      avgAttemptCacheReadTokens: averagePerAttempt(row.totalCacheReadTokens, row.nAttempts),
       nErrored: row.nErrored,
       lastPromotedAt: new Date(row.promotedAt).toISOString(),
     };
@@ -250,6 +285,14 @@ export async function syncPromotionsFromBench(
     } satisfies PromotionInsert;
   });
   const insertedPromotionNames = await store.insertPromotions(promotionsToInsert);
+  if (opts.promotionName != null) {
+    const promotionToRefresh = promotionsToInsert.find(
+      ({ promotion }) => !insertedPromotionNames.has(promotion.bench_eval_name)
+    );
+    if (promotionToRefresh) {
+      await store.refreshPromotion(promotionToRefresh);
+    }
+  }
 
   for (const promotion of promotions) {
     const modelStatsTarget = modelStatsTargets.get(promotion.model);

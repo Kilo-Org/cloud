@@ -59,6 +59,17 @@ class MemoryPromotionStore implements PromotionStore {
     return inserted;
   }
 
+  async refreshPromotion({
+    promotion,
+    modelStatsId,
+  }: {
+    promotion: PromotionRecord;
+    modelStatsId: string | null;
+  }): Promise<void> {
+    if (!this.rows.has(promotion.bench_eval_name)) return;
+    this.rows.set(promotion.bench_eval_name, { promotion, modelStatsId });
+  }
+
   async listLatestPromotions(
     tuple: Omit<PromotionTuple, 'modelStatsId'>
   ): Promise<LatestPromotion[]> {
@@ -85,6 +96,11 @@ class MemoryPromotionStore implements PromotionStore {
         avgCacheReadTokens: roundAverage(promotion.avg_cache_read_tokens),
         avgExecutionMs: roundAverage(promotion.avg_execution_ms),
         nTotalTrials: promotion.n_total_trials,
+        nAttempts: promotion.n_attempts ?? null,
+        totalCostMicrodollars: usdToMicrodollars(promotion.total_cost_usd ?? null),
+        totalInputTokens: roundAverage(promotion.total_input_tokens ?? null),
+        totalOutputTokens: roundAverage(promotion.total_output_tokens ?? null),
+        totalCacheReadTokens: roundAverage(promotion.total_cache_read_tokens ?? null),
         nErrored: promotion.n_errored,
         promotedAt: new Date(promotion.promoted_at).toISOString(),
       });
@@ -153,6 +169,11 @@ describe('syncPromotionsFromBench', () => {
       avgCacheReadTokens: 10,
       avgExecutionMs: 251,
       nTotalTrials: 4,
+      nAttempts: 2,
+      avgAttemptCostUsd: 0.5,
+      avgAttemptInputTokens: 202,
+      avgAttemptOutputTokens: 100,
+      avgAttemptCacheReadTokens: 20,
     });
     expect(cache?.overallScore).toBe(0.5625);
   });
@@ -216,18 +237,33 @@ describe('syncPromotionsFromBench', () => {
     expect(rerun.cacheRecomputes).toBe(0);
   });
 
-  it('recomputes cache on an explicit admin re-pull of an existing promotion', async () => {
+  it('refreshes attempt metrics on an explicit admin re-pull of an existing promotion', async () => {
     const store = createStore();
-    const bench = new MemoryBenchDashboard([promotion({ bench_eval_name: 'repull-row' })]);
+    const initialBench = new MemoryBenchDashboard([
+      promotion({
+        bench_eval_name: 'repull-row',
+        n_attempts: undefined,
+        total_cost_usd: undefined,
+        total_input_tokens: undefined,
+        total_output_tokens: undefined,
+        total_cache_read_tokens: undefined,
+      }),
+    ]);
 
-    await syncPromotionsFromBench(bench, store);
-    const repull = await syncPromotionsFromBench(bench, store, {
+    await syncPromotionsFromBench(initialBench, store);
+    expect(store.cache.get('model-stats-1')?.evals['terminal-bench'].avgAttemptCostUsd).toBeNull();
+
+    const enrichedBench = new MemoryBenchDashboard([
+      promotion({ bench_eval_name: 'repull-row', n_attempts: 5, total_cost_usd: 500 }),
+    ]);
+    const repull = await syncPromotionsFromBench(enrichedBench, store, {
       promotionName: 'repull-row',
     });
 
     expect(repull.inserted).toBe(0);
     expect(repull.alreadyHad).toBe(1);
     expect(repull.cacheRecomputes).toBe(1);
+    expect(store.cache.get('model-stats-1')?.evals['terminal-bench'].avgAttemptCostUsd).toBe(100);
   });
 
   it('uses the latest promoted task row and excludes audit-only promotion details from cache', async () => {
@@ -276,13 +312,18 @@ function promotion(overrides: Partial<PromotionRecord>): PromotionRecord {
     variant: null,
     task_source: 'terminal-bench',
     n_total_trials: 4,
+    n_attempts: 2,
     total_score: 2,
     overall_score: 0.5,
     n_errored: 0,
     avg_cost_usd: 0.25,
+    total_cost_usd: 1,
     avg_input_tokens: 100.5,
+    total_input_tokens: 404,
     avg_output_tokens: 50.25,
+    total_output_tokens: 200,
     avg_cache_read_tokens: 10.125,
+    total_cache_read_tokens: 40,
     avg_execution_ms: 250.75,
     promoted_at: Date.parse('2026-05-14T10:00:00.000Z'),
     promoted_by_email: 'promoter@example.com',

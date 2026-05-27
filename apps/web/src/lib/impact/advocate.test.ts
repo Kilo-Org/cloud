@@ -190,7 +190,7 @@ describe('impact advocate', () => {
     const result = await sendImpactAdvocateRewardRedemptionPayload({
       rewardId: 'reward-123',
       amount: 1,
-      unit: 'free-months',
+      unit: 'MONTH',
     });
 
     expect(result).toEqual({ ok: true, statusCode: 200, responseBody: '{"ok":true}' });
@@ -205,7 +205,7 @@ describe('impact advocate', () => {
         Accept: 'application/json',
         'Content-Type': 'application/json',
       }),
-      body: '{"amount":1,"unit":"free-months"}',
+      body: '{"amount":1,"unit":"MONTH"}',
     });
   });
 

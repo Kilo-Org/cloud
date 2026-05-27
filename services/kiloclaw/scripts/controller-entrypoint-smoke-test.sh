@@ -9,6 +9,9 @@ IMAGE="${IMAGE:-kiloclaw:controller}"
 TOKEN="${TOKEN:-smoke-token}"
 PORT="${PORT:-18790}"
 KILOCODE_API_KEY="${KILOCODE_API_KEY:-smoke-kilocode-key}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+source "$SCRIPT_DIR/controller-smoke-helpers.sh"
 
 if ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
   echo "Image '$IMAGE' is not available locally."
@@ -115,6 +118,8 @@ CODE=$(curl -s -o /dev/null -w "%{http_code}" \
   -H "Authorization: Bearer $TOKEN" \
   "http://127.0.0.1:${PORT}/_kilo/gateway/status")
 check "gateway status (bearer auth) -> 200" "200" "$CODE"
+
+assert_kilo_chat_smoke "$CID" "$PORT" "$TOKEN"
 
 echo
 echo "--- proxy token ---"

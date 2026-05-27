@@ -36,6 +36,10 @@ const agentConfig = {
 
 export const kiloExtras = {
   top: {
+    auto_expand_history: {
+      description: 'Automatically expand command history when searching',
+      type: 'boolean',
+    },
     model: {
       description: 'Model to use in the format of provider/model, eg anthropic/claude-2',
       ...nullableModel,

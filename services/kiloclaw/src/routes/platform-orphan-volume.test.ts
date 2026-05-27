@@ -51,8 +51,9 @@ const VOLUME_NAME = volumeNameFromSandboxId(SANDBOX_ID);
 
 /**
  * Instance row for INSTANCE_ID that passes the identity / destroyed /
- * grace gates: identity matches, destroyed long ago, and the sandbox's
- * latest destruction (`latestSandboxDestroyedAt`) is also long ago.
+ * grace gates: identity matches, destroyed long ago, and the grace period
+ * (`gracePeriodElapsed`, computed in SQL by the endpoint's instance query)
+ * has elapsed.
  */
 const DEFAULT_DESTROY_ROW = {
   id: INSTANCE_ID,
@@ -60,7 +61,7 @@ const DEFAULT_DESTROY_ROW = {
   sandboxId: SANDBOX_ID,
   organizationId: null,
   destroyedAt: new Date(Date.now() - 30 * 86_400_000).toISOString(),
-  latestSandboxDestroyedAt: new Date(Date.now() - 30 * 86_400_000).toISOString(),
+  gracePeriodElapsed: true,
 };
 
 /**
@@ -395,7 +396,7 @@ describe('POST /admin/orphan-volume-destroy', () => {
       sandboxId: legacySandbox,
       organizationId: null,
       destroyedAt: new Date(Date.now() - 30 * 86_400_000).toISOString(),
-      latestSandboxDestroyedAt: new Date(Date.now() - 30 * 86_400_000).toISOString(),
+      gracePeriodElapsed: true,
     });
     vi.mocked(fly.listVolumes).mockResolvedValue([
       flyVolume({ id: legacyVolumeId, name: volumeNameFromSandboxId(legacySandbox) }),
@@ -534,33 +535,16 @@ describe('POST /admin/orphan-volume-destroy', () => {
   });
 
   it('refuses (409) while the instance is within the grace period', async () => {
+    // `gracePeriodElapsed` is computed by the endpoint's instance query in
+    // SQL — `max(destroyed_at)` of the (user, sandbox) versus the grace
+    // window — so an older submitted row of a sandbox reprovisioned and
+    // destroyed again recently is still blocked. That SQL is exercised
+    // end-to-end against Postgres by the web router's `destroyOrphanVolume`
+    // test; here the worker just honors the precomputed flag.
     const { env } = makeEnv();
     mockDestroyLookup({
       ...DEFAULT_DESTROY_ROW,
-      destroyedAt: new Date(Date.now() - 2 * 86_400_000).toISOString(),
-      latestSandboxDestroyedAt: new Date(Date.now() - 2 * 86_400_000).toISOString(),
-    });
-
-    const response = await platform.request(
-      '/admin/orphan-volume-destroy',
-      destroyInit(validDestroyBody),
-      env
-    );
-    expect(response.status).toBe(409);
-    expect(fly.listVolumes).not.toHaveBeenCalled();
-    expect(fly.deleteVolume).not.toHaveBeenCalled();
-  });
-
-  it('refuses (409) when a newer destruction of the same sandbox is within grace', async () => {
-    // The submitted instance was destroyed long ago, but the sandbox was
-    // reprovisioned and destroyed again recently. The grace period must run
-    // from that latest destruction, so an older submitted row cannot reap
-    // the still-shared volume early.
-    const { env } = makeEnv();
-    mockDestroyLookup({
-      ...DEFAULT_DESTROY_ROW,
-      destroyedAt: new Date(Date.now() - 30 * 86_400_000).toISOString(),
-      latestSandboxDestroyedAt: new Date(Date.now() - 2 * 86_400_000).toISOString(),
+      gracePeriodElapsed: false,
     });
 
     const response = await platform.request(

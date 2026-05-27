@@ -270,7 +270,7 @@ describe('kiloclaw referrals', () => {
             userId: user.google_user_email,
             rewardTypeFilter: 'CREDIT',
           },
-          redemption: { amount: 1, unit: 'free-months' },
+          redemption: { amount: 1, unit: 'MONTH' },
         },
       });
       mockSendImpactAdvocateRewardRedemptionPayload.mockResolvedValueOnce({
@@ -311,7 +311,7 @@ describe('kiloclaw referrals', () => {
             userId: user.google_user_email,
             rewardTypeFilter: 'CREDIT',
           },
-          redemption: { amount: 1, unit: 'free-months' },
+          redemption: { amount: 1, unit: 'MONTH' },
         },
       });
       mockSendImpactAdvocateRewardRedemptionPayload.mockResolvedValueOnce({
@@ -331,6 +331,66 @@ describe('kiloclaw referrals', () => {
           impact_reward_id: 'impact-reward-123',
           response_status_code: 400,
           redeem_response_payload: expect.objectContaining({ alreadyRedeemed: true }),
+        })
+      );
+    });
+
+    it('redeems month credits returned by Impact', async () => {
+      const user = await insertTestUser({
+        google_user_email: 'month-credit@example.com',
+        normalized_email: 'month-credit@example.com',
+      });
+      const rewardId = await insertAppliedReferralRewardForUser(user.id);
+      await db.insert(impact_advocate_reward_redemptions).values({
+        reward_id: rewardId,
+        dedupe_key: `month-credit:${rewardId}`,
+        beneficiary_user_id: user.id,
+        state: 'queued',
+        request_payload: {
+          lookup: {
+            accountId: user.google_user_email,
+            userId: user.google_user_email,
+            rewardTypeFilter: 'CREDIT',
+          },
+          redemption: { amount: 1, unit: 'MONTH' },
+        },
+      });
+      mockSendImpactAdvocateRewardLookupPayload.mockResolvedValueOnce({
+        ok: true,
+        statusCode: 200,
+        responseBody: JSON.stringify([
+          {
+            id: 'impact-month-reward',
+            type: 'CREDIT',
+            unit: 'MONTH',
+            assignedCredit: 1,
+            redeemedCredit: 0,
+          },
+        ]),
+        rewards: [
+          {
+            id: 'impact-month-reward',
+            type: 'CREDIT',
+            unit: 'MONTH',
+            assignedCredit: 1,
+            redeemedCredit: 0,
+          },
+        ],
+      });
+
+      const summary = await dispatchQueuedImpactAdvocateRewardRedemptions();
+
+      expect(summary).toEqual({ claimed: 1, redeemed: 1, retried: 0, failed: 0 });
+      expect(mockSendImpactAdvocateRewardRedemptionPayload).toHaveBeenCalledWith({
+        rewardId: 'impact-month-reward',
+        amount: 1,
+        unit: 'MONTH',
+      });
+      const [redemption] = await db.select().from(impact_advocate_reward_redemptions);
+      expect(redemption).toEqual(
+        expect.objectContaining({
+          state: 'redeemed',
+          impact_reward_id: 'impact-month-reward',
         })
       );
     });
@@ -1439,7 +1499,7 @@ describe('kiloclaw referrals', () => {
       expect(mockSendImpactAdvocateRewardRedemptionPayload).toHaveBeenCalledWith({
         rewardId: 'impact-reward-123',
         amount: 1,
-        unit: 'free-months',
+        unit: 'MONTH',
       });
 
       const redeemedRedemptions = await db.select().from(impact_advocate_reward_redemptions);

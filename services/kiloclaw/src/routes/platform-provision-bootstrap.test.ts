@@ -62,6 +62,7 @@ import { BootstrapProvisionFallbackError } from './provision-bootstrap';
 type SelectBuilder<T> = Promise<T[]> & {
   from: ReturnType<typeof vi.fn>;
   innerJoin: ReturnType<typeof vi.fn>;
+  leftJoin: ReturnType<typeof vi.fn>;
   where: ReturnType<typeof vi.fn>;
   orderBy: ReturnType<typeof vi.fn>;
   limit: ReturnType<typeof vi.fn>;
@@ -71,12 +72,14 @@ function createSelectBuilder<T>(rows: T[]): SelectBuilder<T> {
   const builder = Object.assign(Promise.resolve(rows), {
     from: vi.fn(),
     innerJoin: vi.fn(),
+    leftJoin: vi.fn(),
     where: vi.fn(),
     orderBy: vi.fn(),
     limit: vi.fn(),
   }) as SelectBuilder<T>;
   builder.from.mockReturnValue(builder);
   builder.innerJoin.mockReturnValue(builder);
+  builder.leftJoin.mockReturnValue(builder);
   builder.where.mockReturnValue(builder);
   builder.orderBy.mockReturnValue(builder);
   builder.limit.mockReturnValue(builder);

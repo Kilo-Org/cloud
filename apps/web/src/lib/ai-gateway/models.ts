@@ -11,7 +11,11 @@ import {
 import {
   CLAUDE_OPUS_CURRENT_MODEL_ID,
   CLAUDE_OPUS_STEALTH_MODEL_ID,
+  CLAUDE_SONNET_STEALTH_MODEL_ID,
+  CLAUDE_OPUS_4_6_STEALTH_MODEL_ID,
   claude_opus_4_7_stealth_model,
+  claude_sonnet_4_6_stealth_model,
+  claude_opus_4_6_stealth_model,
   claude_sonnet_clawsetup_model,
   CLAUDE_SONNET_CURRENT_MODEL_ID,
 } from '@/lib/ai-gateway/providers/anthropic.constants';
@@ -52,6 +56,8 @@ export const preferredModels = [
   ...autoFreeModels,
   CLAUDE_OPUS_CURRENT_MODEL_ID,
   CLAUDE_OPUS_STEALTH_MODEL_ID,
+  CLAUDE_SONNET_STEALTH_MODEL_ID,
+  CLAUDE_OPUS_4_6_STEALTH_MODEL_ID,
   KIMI_CURRENT_MODEL_ID,
   CLAUDE_SONNET_CURRENT_MODEL_ID,
   GPT_CURRENT_MODEL_ID,
@@ -84,6 +90,8 @@ export const kiloExclusiveModels = [
   ...alibabaDirectModels,
   claude_sonnet_clawsetup_model,
   claude_opus_4_7_stealth_model,
+  claude_sonnet_4_6_stealth_model,
+  claude_opus_4_6_stealth_model,
   stepfun_35_flash_free_model,
 ] as KiloExclusiveModel[];
 

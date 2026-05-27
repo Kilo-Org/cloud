@@ -101,6 +101,8 @@ export const DirectUserByokInferenceProviderIdSchema = z.enum([
   'kimi-coding',
   'neuralwatt',
   'ollama-cloud',
+  'xiaomi-token-plan-ams',
+  'xiaomi-token-plan-sgp',
   'zai-coding',
 ]);
 
@@ -136,6 +138,8 @@ export const UserByokTestModels = {
   [DirectUserByokInferenceProviderIdSchema.enum['kimi-coding']]: 'kimi-for-coding',
   [DirectUserByokInferenceProviderIdSchema.enum.neuralwatt]: 'Qwen/Qwen3.5-35B-A3B',
   [DirectUserByokInferenceProviderIdSchema.enum['ollama-cloud']]: 'kimi-k2.6:cloud',
+  [DirectUserByokInferenceProviderIdSchema.enum['xiaomi-token-plan-ams']]: 'mimo-v2-flash',
+  [DirectUserByokInferenceProviderIdSchema.enum['xiaomi-token-plan-sgp']]: 'mimo-v2-flash',
   [DirectUserByokInferenceProviderIdSchema.enum['zai-coding']]: 'glm-4.7',
 } satisfies Record<UserByokProviderId, string>;
 
@@ -190,11 +194,16 @@ const openRouterToVercelInferenceProviderMapping = {
     VercelNonUserByokInferenceProviderIdSchema.enum.togetherai,
 } as Record<string, VercelInferenceProviderId | undefined>;
 
-export function openRouterToVercelInferenceProviderId(providerId: string) {
+export function normalizeInferenceProviderId(providerId: string): string;
+export function normalizeInferenceProviderId(providerId: string | undefined): string | undefined;
+export function normalizeInferenceProviderId(providerId: string | undefined) {
+  if (!providerId) return providerId;
   const slashIndex = providerId.indexOf('/');
-  const normalizedProviderId = (
-    slashIndex >= 0 ? providerId.slice(0, slashIndex) : providerId
-  ).toLowerCase();
+  return (slashIndex >= 0 ? providerId.slice(0, slashIndex) : providerId).toLowerCase();
+}
+
+export function openRouterToVercelInferenceProviderId(providerId: string) {
+  const normalizedProviderId = normalizeInferenceProviderId(providerId);
   return openRouterToVercelInferenceProviderMapping[normalizedProviderId] ?? normalizedProviderId;
 }
 

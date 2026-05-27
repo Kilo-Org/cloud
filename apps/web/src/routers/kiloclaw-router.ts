@@ -29,6 +29,7 @@ import {
   getKiloClawPlanCostMicrodollars,
   getKiloClawPricingCatalogEntry,
   insertKiloClawSubscriptionChangeLog,
+  PersonalSubscriptionCollapseUQConflictError,
 } from '@kilocode/db';
 import {
   kiloclaw_version_pins,
@@ -3186,7 +3187,26 @@ export const kiloclawRouter = createTRPCRouter({
   }),
 
   destroy: baseProcedure.mutation(async ({ ctx }) => {
-    const destroyedRow = await markActiveInstanceDestroyed(ctx.user.id);
+    let destroyedRow: Awaited<ReturnType<typeof markActiveInstanceDestroyed>>;
+    try {
+      destroyedRow = await markActiveInstanceDestroyed(ctx.user.id);
+    } catch (error) {
+      if (error instanceof PersonalSubscriptionCollapseUQConflictError) {
+        logBillingError('personal subscription collapse UQ conflict', {
+          userId: error.userId,
+          selfSubscriptionId: error.selfSubscriptionId,
+          targetSubscriptionId: error.targetSubscriptionId,
+          conflictingOccupantId: error.conflictingOccupantId,
+        });
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message:
+            'Your subscription state needs support review before this instance can be destroyed.',
+          cause: error,
+        });
+      }
+      throw error;
+    }
     const client = new KiloClawInternalClient();
     let result: Awaited<ReturnType<KiloClawInternalClient['destroy']>>;
     try {

@@ -729,7 +729,7 @@ describe('User', () => {
             userId: user.google_user_email,
             rewardTypeFilter: 'CREDIT',
           },
-          redemption: { amount: 1, unit: 'free-months' },
+          redemption: { amount: 1, unit: 'MONTH' },
         },
       });
       await db.insert(impact_conversion_reports).values({

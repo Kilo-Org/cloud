@@ -8,7 +8,7 @@ export const grok_code_fast_1_optimized_free_model: KiloExclusiveModel = {
     'An optimized variant of Grok Code Fast 1, provided free of charge for a limited time. Going away May 15, 2026. **Note:** All prompts and completions for this model are logged by the provider and may be used to improve their services.',
   context_length: 256_000,
   max_completion_tokens: 10_000,
-  status: 'public',
+  status: 'disabled',
   flags: ['reasoning', 'stealth'],
   gateway: 'martian',
   internal_id: 'x-ai/grok-code-fast-1:optimized',

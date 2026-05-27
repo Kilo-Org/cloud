@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { AlertCircle, FileText, Loader2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';

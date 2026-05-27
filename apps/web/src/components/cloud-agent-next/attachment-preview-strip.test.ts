@@ -1,53 +1,89 @@
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import React from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import type { CloudAgentAttachmentFile } from '@/hooks/useCloudAgentAttachmentUpload';
+import { AttachmentPreviewStrip } from './AttachmentPreviewStrip';
 
-const attachmentPreviewStripSource = readFileSync(
-  join(__dirname, 'AttachmentPreviewStrip.tsx'),
-  'utf8'
-);
+function createFile(name: string, type: string) {
+  return new File(['attachment'], name, { type });
+}
+
+function renderStrip(attachments: CloudAgentAttachmentFile[]) {
+  return renderToStaticMarkup(
+    React.createElement(AttachmentPreviewStrip, {
+      attachments,
+      onRemove: () => undefined,
+    })
+  );
+}
 
 describe('attachment preview strip accessibility', () => {
-  it('announces upload errors without making progress updates live', () => {
-    const errorStatusStart = attachmentPreviewStripSource.indexOf(
-      "if (attachment.status === 'error')"
-    );
-    const uploadingStatusStart = attachmentPreviewStripSource.indexOf(
-      "if (attachment.status === 'uploading')"
-    );
-    const uploadingStatusEnd = attachmentPreviewStripSource.indexOf(
-      'return null;',
-      uploadingStatusStart
-    );
-    const errorStatusSource = attachmentPreviewStripSource.slice(
-      errorStatusStart,
-      uploadingStatusStart
-    );
-    const uploadingStatusSource = attachmentPreviewStripSource.slice(
-      uploadingStatusStart,
-      uploadingStatusEnd
-    );
+  it('renders a labelled document preview with a focusable filename and named remove control', () => {
+    const html = renderStrip([
+      {
+        id: 'notes',
+        file: createFile('meeting-notes-for-launch.md', 'text/markdown'),
+        contentType: 'text/markdown',
+        kind: 'document',
+        status: 'complete',
+        progress: 100,
+      },
+    ]);
 
-    expect(attachmentPreviewStripSource).not.toContain('aria-live=');
-    expect(uploadingStatusSource).not.toContain('role="status"');
-    expect(errorStatusSource).toContain('role="status"');
-    expect(errorStatusSource).toContain("Upload failed: {attachment.error ?? 'Try again.'}");
+    expect(html).toContain('aria-label="Attached files"');
+    expect(html).toContain('tabindex="0"');
+    expect(html).toContain('meeting-notes-for-launch.md');
+    expect(html).toContain('aria-label="Remove meeting-notes-for-launch.md"');
   });
 
-  it('renders documents as thumbnail-sized tiles with full-name tooltips', () => {
-    expect(attachmentPreviewStripSource).toContain(
-      "'border-border bg-muted/30 relative flex h-16 w-16 shrink-0 flex-col items-center justify-center gap-1 overflow-hidden rounded-lg border p-1'"
-    );
-    expect(attachmentPreviewStripSource).toContain(
-      '<TooltipContent side="top" className="max-w-xs break-all text-xs">'
-    );
-    expect(attachmentPreviewStripSource).toContain('tabIndex={0}');
+  it('renders an image preview with filename alternative text and a named remove control', () => {
+    const html = renderStrip([
+      {
+        id: 'diagram',
+        file: createFile('architecture-diagram.png', 'image/png'),
+        contentType: 'image/png',
+        kind: 'image',
+        previewUrl: 'blob:architecture-diagram',
+        status: 'complete',
+        progress: 100,
+      },
+    ]);
+
+    expect(html).toContain('alt="architecture-diagram.png"');
+    expect(html).toContain('aria-label="Remove architecture-diagram.png"');
   });
 
-  it('extends both compact remove controls hit targets', () => {
-    expect(
-      attachmentPreviewStripSource.match(
-        /className="absolute top-1 right-1 h-7 w-7 rounded-md before:absolute before:-inset-2"/g
-      )
-    ).toHaveLength(2);
+  it('presents upload errors as status announcements', () => {
+    const html = renderStrip([
+      {
+        id: 'failed',
+        file: createFile('failed-report.pdf', 'application/pdf'),
+        contentType: 'application/pdf',
+        kind: 'document',
+        status: 'error',
+        progress: 0,
+        error: 'Upload interrupted.',
+      },
+    ]);
+
+    expect(html).toContain('role="status"');
+    expect(html).toContain('Upload failed: Upload interrupted.');
+  });
+
+  it('labels upload progress without announcing each progress update as status', () => {
+    const html = renderStrip([
+      {
+        id: 'uploading',
+        file: createFile('uploading-report.pdf', 'application/pdf'),
+        contentType: 'application/pdf',
+        kind: 'document',
+        status: 'uploading',
+        progress: 42,
+      },
+    ]);
+
+    expect(html).toContain('Uploading 42%');
+    expect(html).toContain('role="progressbar"');
+    expect(html).toContain('aria-label="Uploading uploading-report.pdf"');
+    expect(html).not.toContain('role="status"');
   });
 });

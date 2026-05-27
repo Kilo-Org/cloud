@@ -220,10 +220,15 @@ export function normalizeAgentId(value: string): string {
 }
 
 export function requireAgentId(value: string): string {
-  if (!value.trim()) {
+  const trimmed = value.trim();
+  if (!trimmed) {
     throw new AgentConfigError(400, 'invalid_agent_id', 'Agent id is required');
   }
-  return normalizeAgentId(value);
+  const normalized = normalizeAgentId(trimmed);
+  if (normalized === DEFAULT_AGENT_ID && trimmed.toLowerCase() !== DEFAULT_AGENT_ID) {
+    throw new AgentConfigError(400, 'invalid_agent_id', 'Agent id normalizes to a reserved id');
+  }
+  return normalized;
 }
 
 function normalizeModel(model: ModelValue | undefined): NormalizedModel | null {
@@ -290,11 +295,8 @@ export function readAgentConfigSnapshot(options: AgentConfigOptions = {}): Agent
     raw = fs.readFileSync(configPath, 'utf8');
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    throw new AgentConfigError(
-      500,
-      'agent_config_read_failed',
-      `Failed to read config: ${message}`
-    );
+    console.error('[controller] Failed to read OpenClaw agent config:', message);
+    throw new AgentConfigError(500, 'agent_config_read_failed', 'Failed to read agent config');
   }
 
   let value: unknown;

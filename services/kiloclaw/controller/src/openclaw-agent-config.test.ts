@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import fsPromises from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   AgentConfigError,
   AgentDefaultsPatchBodySchema,
@@ -64,6 +64,36 @@ describe('agent config summaries', () => {
 
     expect(readAgentSummary('main', { configPath }).agent.configured).toBe(false);
     expect(() => readAgentSummary('research', { configPath })).toThrowError(AgentConfigError);
+  });
+
+  it('rejects resource IDs that collapse to the implicit main agent', async () => {
+    const configPath = await configFixture({ agents: { defaults: {} } });
+
+    for (const agentId of ['@@@', '!!!', '----']) {
+      expect(() => readAgentSummary(agentId, { configPath })).toThrowError(
+        expect.objectContaining({ code: 'invalid_agent_id', status: 400 })
+      );
+    }
+    expect(readAgentSummary('MAIN', { configPath }).agent.id).toBe('main');
+  });
+
+  it('does not expose filesystem details when reading config fails', () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    expect(() =>
+      readAgentConfigSnapshot({ configPath: '/missing/private/config.json' })
+    ).toThrowError(
+      expect.objectContaining({
+        code: 'agent_config_read_failed',
+        status: 500,
+        message: 'Failed to read agent config',
+      })
+    );
+    expect(log).toHaveBeenCalledWith(
+      '[controller] Failed to read OpenClaw agent config:',
+      expect.stringContaining('/missing/private/config.json')
+    );
+    log.mockRestore();
   });
 });
 

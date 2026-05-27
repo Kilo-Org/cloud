@@ -47,6 +47,16 @@ describe('createAgentViaCli', () => {
     ]);
   });
 
+  it('rejects option-like create values before constructing CLI arguments', () => {
+    for (const body of [
+      { name: '--help', workspace: '/tmp/research' },
+      { name: 'Research', workspace: '/tmp/research', model: '--config=/tmp/other.json' },
+      { name: 'Research', workspace: '/tmp/research', bindings: ['--debug'] },
+    ]) {
+      expect(BasicAgentCreateBodySchema.safeParse(body).success).toBe(false);
+    }
+  });
+
   it('rejects malformed CLI JSON output', async () => {
     await expect(
       createAgentViaCli(

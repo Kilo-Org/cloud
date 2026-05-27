@@ -670,13 +670,16 @@ Other values MUST return 400.
 4. `PATCH /_kilo/config/agents/:agentId` and `PATCH /_kilo/config/agent-defaults` MUST expose only controller-approved model/settings fields and MUST reject unknown patch fields.
 5. Agent/default native updates MUST use guarded read-modify-write behavior that preserves unrelated configuration and sibling agent entries.
 6. `POST /_kilo/config/agents` MUST delegate basic creation to non-interactive OpenClaw CLI behavior and MUST return the normalized created agent identifier.
-7. `POST /_kilo/config/agents` MAY accept arbitrary absolute workspace paths. Clients MUST NOT assume every configured workspace is exposed by `/_kilo/files/*`.
-8. `DELETE /_kilo/config/agents/:agentId` MUST delegate deletion to non-interactive OpenClaw CLI behavior and MUST reject deletion of `main`.
-9. The delete response MUST NOT claim verified filesystem deletion or verified file retention. Filesystem disposition is controlled by the installed OpenClaw CLI/runtime behavior and is not represented by the controller response.
-10. The following capability hints MUST be advertised when the corresponding CRUD routes are registered: `config.agents.read`, `config.agents.create.basic.cli`, `config.agents.update`, `config.agents.delete.cli`, and `config.agent-defaults.update`.
-11. Native updates MUST report stale config etags or config changes observed before commit as `409 config_etag_conflict`.
-12. Controller-originated agent create, update, defaults-update, and delete mutations MUST be serialized per config path so a lifecycle CLI mutation cannot be overwritten by a concurrent native controller update.
-13. CLI lifecycle operations MUST report known reserved/not-found/conflict validation failures using stable HTTP error codes, and MUST report timeout or malformed/process failures without exposing secret environment values.
+7. Controller-accepted CLI creation values MUST NOT be interpreted as additional OpenClaw command options beyond the defined basic-create surface.
+8. `POST /_kilo/config/agents` MAY accept arbitrary absolute workspace paths. Clients MUST NOT assume every configured workspace is exposed by `/_kilo/files/*`.
+9. Native agent resource lookup and update requests MUST reject non-empty IDs that collapse to the reserved implicit `main` identifier rather than silently targeting `main`.
+10. `DELETE /_kilo/config/agents/:agentId` MUST delegate deletion to non-interactive OpenClaw CLI behavior and MUST reject deletion of `main`.
+11. The delete response MUST NOT claim verified filesystem deletion or verified file retention. Filesystem disposition is controlled by the installed OpenClaw CLI/runtime behavior and is not represented by the controller response.
+12. The following capability hints MUST be advertised when the corresponding CRUD routes are registered: `config.agents.read`, `config.agents.create.basic.cli`, `config.agents.update`, `config.agents.delete.cli`, and `config.agent-defaults.update`.
+13. Native updates MUST report stale config etags or config changes observed before commit as `409 config_etag_conflict`.
+14. Controller-originated agent create, update, defaults-update, and delete mutations MUST be serialized per config path so a lifecycle CLI mutation cannot be overwritten by a concurrent native controller update.
+15. CLI lifecycle operations MUST report known reserved/not-found/conflict validation failures using stable HTTP error codes, and MUST report timeout or malformed/process failures without exposing secret environment values.
+16. Controller server errors from agent-config reads MUST NOT expose filesystem error details in HTTP responses.
 
 #### Environment (bearer token)
 

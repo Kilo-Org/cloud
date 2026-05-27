@@ -6,9 +6,17 @@ import { normalizeAgentId } from './openclaw-agent-config';
 const AGENT_CLI_TIMEOUT_MS = 30_000;
 const AGENT_CLI_MAX_OUTPUT_BYTES = 1_048_576;
 
+const CliValueSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .refine(value => !value.startsWith('-'), {
+    message: 'CLI value must not begin with a dash',
+  });
+
 export const BasicAgentCreateBodySchema = z
   .object({
-    name: z.string().trim().min(1),
+    name: CliValueSchema,
     workspace: z
       .string()
       .trim()
@@ -24,8 +32,8 @@ export const BasicAgentCreateBodySchema = z
         message: 'Agent directory must be an absolute path',
       })
       .optional(),
-    model: z.string().trim().min(1).optional(),
-    bindings: z.array(z.string().trim().min(1)).optional(),
+    model: CliValueSchema.optional(),
+    bindings: z.array(CliValueSchema).optional(),
   })
   .strict();
 

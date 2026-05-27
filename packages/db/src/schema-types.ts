@@ -37,6 +37,18 @@ export enum KiloPassIssuanceItemKind {
   ReferralBonus = 'referral_bonus',
 }
 
+export enum KiloPassWelcomePromoEligibility {
+  Eligible = 'eligible',
+  Ineligible = 'ineligible',
+}
+
+export enum KiloPassWelcomePromoEligibilityReason {
+  FirstCardClaim = 'first_card_claim',
+  FingerprintPreviouslyClaimed = 'fingerprint_previously_claimed',
+  MissingFingerprint = 'missing_fingerprint',
+  NonCardPaymentMethod = 'non_card_payment_method',
+}
+
 export enum KiloPassAuditLogAction {
   StripeWebhookReceived = 'stripe_webhook_received',
   KiloPassInvoicePaidHandled = 'kilo_pass_invoice_paid_handled',

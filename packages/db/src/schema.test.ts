@@ -170,6 +170,13 @@ describe('database schema', () => {
         'cron',
       ],
       KiloPassIssuanceItemKind: ['base', 'bonus', 'promo_first_month_50pct', 'referral_bonus'],
+      KiloPassWelcomePromoEligibility: ['eligible', 'ineligible'],
+      KiloPassWelcomePromoEligibilityReason: [
+        'first_card_claim',
+        'fingerprint_previously_claimed',
+        'missing_fingerprint',
+        'non_card_payment_method',
+      ],
       KiloPassAuditLogAction: [
         'stripe_webhook_received',
         'kilo_pass_invoice_paid_handled',

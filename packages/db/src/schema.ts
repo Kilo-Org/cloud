@@ -31,6 +31,8 @@ import {
   KiloPassPaymentProvider,
   KiloPassIssuanceSource,
   KiloPassIssuanceItemKind,
+  KiloPassWelcomePromoEligibility,
+  KiloPassWelcomePromoEligibilityReason,
   KiloPassAuditLogAction,
   KiloPassAuditLogResult,
   KiloPassScheduledChangeStatus,
@@ -137,6 +139,8 @@ export const SCHEMA_CHECK_ENUMS = {
   KiloPassPaymentProvider,
   KiloPassIssuanceSource,
   KiloPassIssuanceItemKind,
+  KiloPassWelcomePromoEligibility,
+  KiloPassWelcomePromoEligibilityReason,
   KiloPassAuditLogAction,
   KiloPassAuditLogResult,
   KiloPassScheduledChangeStatus,
@@ -1293,6 +1297,8 @@ export const kilo_pass_issuances = pgTable(
     issue_month: date().notNull(),
     source: text().notNull().$type<KiloPassIssuanceSource>(),
     stripe_invoice_id: text(),
+    initial_welcome_promo_eligibility: text().$type<KiloPassWelcomePromoEligibility>(),
+    initial_welcome_promo_eligibility_reason: text().$type<KiloPassWelcomePromoEligibilityReason>(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()
@@ -1314,11 +1320,43 @@ export const kilo_pass_issuances = pgTable(
       sql`EXTRACT(DAY FROM ${table.issue_month}) = 1`
     ),
     enumCheck('kilo_pass_issuances_source_check', table.source, KiloPassIssuanceSource),
+    enumCheck(
+      'kilo_pass_issuances_initial_welcome_promo_eligibility_check',
+      table.initial_welcome_promo_eligibility,
+      KiloPassWelcomePromoEligibility
+    ),
+    enumCheck(
+      'kilo_pass_issuances_initial_welcome_promo_reason_check',
+      table.initial_welcome_promo_eligibility_reason,
+      KiloPassWelcomePromoEligibilityReason
+    ),
+    check(
+      'kilo_pass_issuances_initial_welcome_promo_decision_consistency_check',
+      sql`(${table.initial_welcome_promo_eligibility} IS NULL AND ${table.initial_welcome_promo_eligibility_reason} IS NULL) OR (${table.initial_welcome_promo_eligibility} IS NOT NULL AND ${table.initial_welcome_promo_eligibility_reason} IS NOT NULL)`
+    ),
   ]
 );
 
 export type KiloPassIssuance = typeof kilo_pass_issuances.$inferSelect;
 export type NewKiloPassIssuance = typeof kilo_pass_issuances.$inferInsert;
+
+export const kilo_pass_welcome_promo_card_claims = pgTable(
+  'kilo_pass_welcome_promo_card_claims',
+  {
+    stripe_fingerprint: text().primaryKey().notNull(),
+    source_stripe_invoice_id: text().notNull(),
+    claimed_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    unique('UQ_kilo_pass_welcome_promo_card_claims_source_invoice_id').on(
+      table.source_stripe_invoice_id
+    ),
+  ]
+);
+
+export type KiloPassWelcomePromoCardClaim = typeof kilo_pass_welcome_promo_card_claims.$inferSelect;
+export type NewKiloPassWelcomePromoCardClaim =
+  typeof kilo_pass_welcome_promo_card_claims.$inferInsert;
 
 export const kilo_pass_pause_events = pgTable(
   'kilo_pass_pause_events',

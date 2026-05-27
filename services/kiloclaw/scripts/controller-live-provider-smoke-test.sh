@@ -211,6 +211,27 @@ assert_openclaw_version() {
   check "OpenClaw version" "$expected" "$actual"
 }
 
+assert_openclaw_config_valid() {
+  local output
+  local result="invalid"
+
+  if output=$(docker exec "$CID" openclaw config validate --json 2>/dev/null); then
+    result=$(python3 -c '
+import json
+import sys
+
+try:
+    doc = json.load(sys.stdin)
+except json.JSONDecodeError:
+    print("invalid")
+    raise SystemExit(0)
+print("valid" if doc.get("valid") is True else "invalid")
+' <<< "$output")
+  fi
+
+  check "OpenClaw config validate" "valid" "$result"
+}
+
 assert_gateway_status() {
   local code
   code=$(curl -s -o /dev/null -w "%{http_code}" \
@@ -303,6 +324,7 @@ run_phase() {
   start_container "$image"
   wait_for_ready "$label"
   assert_openclaw_version "$expected_version"
+  assert_openclaw_config_valid
   assert_gateway_status
   assert_control_ui_proxy
   assert_configured_model

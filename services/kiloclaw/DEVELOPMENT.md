@@ -591,14 +591,14 @@ Then run one of:
     no token -> `401`, correct proxy token -> pass-through.
   - Use this when changing proxy token logic or route/auth ordering.
 - `bash scripts/controller-live-provider-smoke-test.sh`
-  - Runs the packaged image against the real Kilo Gateway with `kilocode/kilo-auto/free`, verifying Control UI proxying, packaged Kilo Chat loading, and one live agent turn.
+  - Runs the packaged image against the real Kilo Gateway with `kilocode/kilo-auto/free`, verifying `openclaw config validate --json`, Control UI proxying, packaged Kilo Chat loading, and one live agent turn.
   - Reads `KILOCODE_API_KEY` from the environment, or falls back locally to the active `kilocodeToken` and matching organization scope in `~/.kilocode/cli/config.json`. The credential is passed to the temporary container as an environment variable; the script does not print it or dump potentially sensitive controller logs on startup failure.
   - Publishes the temporary controller only on loopback and generates a random controller/proxy token unless `TOKEN` is explicitly set.
   - Uses a generated non-sensitive nonce prompt because Auto Free can route to upstream providers that log prompts.
   - Add `--upgrade` with `IMAGE_BEFORE` and `IMAGE_AFTER` to repeat the live checks after restarting on the same temporary `/root` volume. Set `EXPECTED_VERSION_BEFORE` and `EXPECTED_VERSION_AFTER` to assert the images contain the intended OpenClaw versions.
   - This is an opt-in/manual live validation; it is not a deterministic CI smoke or an image-promotion gate.
 - `bash scripts/controller-openclaw-upgrade-smoke-test.sh`
-  - One-command workflow for an OpenClaw version-bump branch: refreshes and builds the baseline image from `origin/main`, builds the candidate image from a detached worktree at `HEAD`, then runs the persisted-root live smoke with version assertions.
+  - One-command workflow for an OpenClaw version-bump branch: refreshes and builds the baseline image from `origin/main`, builds the candidate image from a detached worktree at `HEAD`, then runs the persisted-root live smoke with installed-version assertions, `openclaw doctor` on candidate startup, and explicit config validation in both phases.
   - The wrapper fails if the checked-in Dockerfile pin has not changed or the current checkout has uncommitted files. Use `ALLOW_SAME_OPENCLAW_VERSION=true` or `ALLOW_DIRTY_CHECKOUT=true` only to test wrapper mechanics locally; candidate image contents still come from committed `HEAD`.
   - Set `BASE_REF` when the upgrade baseline is not `origin/main`; set `IMAGE_BEFORE` and `IMAGE_AFTER` to choose local image tags. Built images remain in Docker for inspection or build-cache reuse until explicitly removed.
 

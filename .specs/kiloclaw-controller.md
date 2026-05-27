@@ -738,7 +738,7 @@ running. When forwarding, it MUST authenticate to gog with
 2. For a normal validation-aware save, the controller MUST evaluate the submitted candidate using the installed OpenClaw config-validation behavior before committing it.
 3. When the candidate is invalid or validation cannot complete, the controller MUST leave `openclaw.json` unchanged and MUST return a bounded structured warning result suitable for an authenticated client to display.
 4. The controller MAY accept an explicit invalid-write override after a warning. An override MUST remain subject to normal safe-path and ETag concurrency checks and MUST NOT be inferred from an ordinary save request.
-5. Validation-warning and override writes MUST NOT expose config contents, secrets, environment values, staging paths, or unrestricted subprocess output in responses or logs.
+5. Validation-warning responses MAY return bounded diagnostics derived while validating the authenticated instance's configuration, including substituted values; those diagnostics MUST be returned only to authenticated config-management clients and MUST NOT be logged. Responses and logs MUST NOT expose staging paths or unrestricted subprocess output.
 6. Validation-aware writes MUST remain usable when the gateway process is unavailable after controller routes are registered.
 7. Controllers implementing this behavior MUST advertise `files.write-openclaw-config`; clients MUST NOT infer this behavior solely from controller CalVer.
 8. This validation reports OpenClaw configuration validity. It MUST NOT be represented as proof that runtime SecretRefs or optional environment substitutions resolve successfully.

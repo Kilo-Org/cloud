@@ -176,6 +176,7 @@ export function FileEditorPane({
           },
           onError: err => {
             if (err.data?.code === 'CONFLICT' && err.data?.upstreamCode === 'file_etag_conflict') {
+              setPendingValidationWarning(null);
               refetch();
               setShowDiff(true);
               toast.error(
@@ -257,7 +258,7 @@ export function FileEditorPane({
               value={currentValue}
               onChange={handleEditorChange}
               theme="vs-dark"
-              options={EDITOR_OPTIONS}
+              options={{ ...EDITOR_OPTIONS, readOnly: isSaving }}
               keepCurrentModel
             />
           )}
@@ -331,6 +332,11 @@ export function FileEditorPane({
                   <li key={`${issue.path}:${index}`} className="space-y-0.5">
                     {issue.path && <div className="font-mono text-destructive">{issue.path}</div>}
                     <div className="text-muted-foreground">{issue.message}</div>
+                    {issue.allowedValues && issue.allowedValues.length > 0 && (
+                      <div className="text-muted-foreground font-mono">
+                        Allowed values: {issue.allowedValues.join(', ')}
+                      </div>
+                    )}
                   </li>
                 ))}
               </ul>

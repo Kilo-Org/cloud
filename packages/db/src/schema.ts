@@ -3878,6 +3878,44 @@ export const byok_api_keys = pgTable(
 
 export type BYOKApiKey = typeof byok_api_keys.$inferSelect;
 
+export const gateway_custom_upstreams = pgTable(
+  'gateway_custom_upstreams',
+  {
+    id: idPrimaryKeyColumn,
+    organization_id: uuid().references(() => organizations.id, { onDelete: 'cascade' }),
+    kilo_user_id: text().references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    provider_id: text().notNull(),
+    display_name: text().notNull(),
+    base_url: text().notNull(),
+    encrypted_api_key: jsonb().$type<EncryptedData>().notNull(),
+    encrypted_extra_headers: jsonb().$type<EncryptedData>(),
+    model_metadata: jsonb()
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default(sql`'{}'::jsonb`),
+    is_enabled: boolean().default(true).notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+    created_by: text().notNull(),
+  },
+  table => [
+    unique('UQ_gateway_custom_upstreams_org_provider').on(table.organization_id, table.provider_id),
+    unique('UQ_gateway_custom_upstreams_user_provider').on(table.kilo_user_id, table.provider_id),
+    index('IDX_gateway_custom_upstreams_organization_id').on(table.organization_id),
+    index('IDX_gateway_custom_upstreams_kilo_user_id').on(table.kilo_user_id),
+    index('IDX_gateway_custom_upstreams_provider_id').on(table.provider_id),
+    check(
+      'gateway_custom_upstreams_owner_check',
+      sql`(( ${table.kilo_user_id} IS NOT NULL AND ${table.organization_id} IS NULL) OR ( ${table.kilo_user_id} IS NULL AND ${table.organization_id} IS NOT NULL))`
+    ),
+  ]
+);
+
+export type GatewayCustomUpstream = typeof gateway_custom_upstreams.$inferSelect;
+
 // Security Reviews - Phase 1
 export const security_findings = pgTable(
   'security_findings',

@@ -180,11 +180,6 @@ export type GetProviderInput = {
 export async function getProvider(input: GetProviderInput): Promise<GetProviderResult> {
   const { requestedModel, request, user, organizationId, taskId, clientIp, machineId } = input;
 
-  const directByokByok = await checkDirectBYOK(user, requestedModel, organizationId);
-  if (directByokByok) {
-    return directByokByok;
-  }
-
   if (!isAnonymousContext(user)) {
     const customUpstream = await getCustomUpstreamForModel(
       db,
@@ -209,6 +204,11 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
         isByok: true,
       };
     }
+  }
+
+  const directByokByok = await checkDirectBYOK(user, requestedModel, organizationId);
+  if (directByokByok) {
+    return directByokByok;
   }
 
   const vercelByok = await checkVercelBYOK(user, requestedModel, organizationId);

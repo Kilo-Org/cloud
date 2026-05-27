@@ -2,6 +2,7 @@ import { and, eq } from 'drizzle-orm';
 import { gateway_custom_upstreams } from '@kilocode/db/schema';
 import { decryptApiKey } from '@/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
+import type { db as drizzleDb } from '@/lib/drizzle';
 
 export type CustomUpstreamResolved = {
   providerId: string;
@@ -12,7 +13,7 @@ export type CustomUpstreamResolved = {
 };
 
 export async function getCustomUpstreamForModel(
-  db: typeof import('@/lib/drizzle').db,
+  db: typeof drizzleDb,
   owner: { organizationId?: string; userId: string },
   requestedModel: string
 ): Promise<CustomUpstreamResolved | null> {
@@ -33,12 +34,21 @@ export async function getCustomUpstreamForModel(
       )
     );
   if (!row) return null;
-  const apiKey = decryptApiKey(row.encrypted_api_key, BYOK_ENCRYPTION_KEY);
-  const extraHeaders = row.encrypted_extra_headers
-    ? (JSON.parse(decryptApiKey(row.encrypted_extra_headers, BYOK_ENCRYPTION_KEY)) as Record<
-        string,
-        string
-      >)
-    : {};
-  return { providerId, upstreamModelId, apiKey, baseUrl: row.base_url, extraHeaders };
+  try {
+    const apiKey = decryptApiKey(row.encrypted_api_key, BYOK_ENCRYPTION_KEY);
+    const extraHeaders = row.encrypted_extra_headers
+      ? (JSON.parse(decryptApiKey(row.encrypted_extra_headers, BYOK_ENCRYPTION_KEY)) as Record<
+          string,
+          string
+        >)
+      : {};
+    return { providerId, upstreamModelId, apiKey, baseUrl: row.base_url, extraHeaders };
+  } catch (error) {
+    console.error('[getCustomUpstreamForModel] failed to decrypt custom upstream', {
+      providerId,
+      upstreamModelId,
+      error,
+    });
+    return null;
+  }
 }

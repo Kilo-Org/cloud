@@ -1,7 +1,8 @@
 import {
+  applyActiveSessionsHeartbeat,
   getRootSessionsFromHeartbeatPayload,
   getRootSessionsFromListPayload,
-  mergeActiveSessionsWithPollingFallback,
+  removeActiveSessionsForConnection,
 } from './useActiveSessions';
 
 describe('useActiveSessions live payload helpers', () => {
@@ -45,18 +46,35 @@ describe('useActiveSessions live payload helpers', () => {
     expect(payload).toEqual({ connectionId: 'conn-1', sessions: [] });
   });
 
-  it('keeps polling results as a fallback after live sessions are initialized', () => {
-    const sessions = mergeActiveSessionsWithPollingFallback(
-      [{ id: 'root-1', status: 'busy', title: 'Live', connectionId: 'conn-1' }],
+  it('replaces all cached rows owned by a connection on heartbeat', () => {
+    const sessions = applyActiveSessionsHeartbeat(
       [
-        { id: 'root-1', status: 'idle', title: 'Polled stale', connectionId: 'conn-1' },
-        { id: 'root-2', status: 'busy', title: 'Polled new', connectionId: 'conn-1' },
-      ]
+        { id: 'root-1', status: 'idle', title: 'Stale', connectionId: 'conn-1' },
+        { id: 'root-2', status: 'busy', title: 'Other CLI', connectionId: 'conn-2' },
+      ],
+      {
+        connectionId: 'conn-1',
+        sessions: [{ id: 'root-3', status: 'busy', title: 'New', connectionId: 'conn-1' }],
+      }
     );
 
     expect(sessions).toEqual([
-      { id: 'root-1', status: 'busy', title: 'Live', connectionId: 'conn-1' },
-      { id: 'root-2', status: 'busy', title: 'Polled new', connectionId: 'conn-1' },
+      { id: 'root-3', status: 'busy', title: 'New', connectionId: 'conn-1' },
+      { id: 'root-2', status: 'busy', title: 'Other CLI', connectionId: 'conn-2' },
+    ]);
+  });
+
+  it('removes all cached rows for a disconnected connection', () => {
+    const sessions = removeActiveSessionsForConnection(
+      [
+        { id: 'root-1', status: 'busy', title: 'Disconnected', connectionId: 'conn-1' },
+        { id: 'root-2', status: 'busy', title: 'Connected', connectionId: 'conn-2' },
+      ],
+      'conn-1'
+    );
+
+    expect(sessions).toEqual([
+      { id: 'root-2', status: 'busy', title: 'Connected', connectionId: 'conn-2' },
     ]);
   });
 });

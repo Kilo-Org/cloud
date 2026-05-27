@@ -747,7 +747,7 @@ describe('api routes', () => {
     expect(forwardedUrl.pathname).toBe('/cli');
   });
 
-  it('GET /user/web forwards to DO fetch with /web path', async () => {
+  it('GET /user/web forwards to DO fetch with /web path and viewer identity query', async () => {
     const stubFetch = vi.fn(async (_req: Request) => new Response(null, { status: 101 }));
     const connectionStub = { fetch: stubFetch };
     vi.mocked(getUserConnectionDO).mockReturnValue(
@@ -756,7 +756,7 @@ describe('api routes', () => {
 
     const app = makeApiApp();
     await app.fetch(
-      new Request('http://local/user/web', {
+      new Request('http://local/user/web?connectionId=viewer-1', {
         method: 'GET',
         headers: { Upgrade: 'websocket' },
       }),
@@ -768,5 +768,6 @@ describe('api routes', () => {
     const forwardedReq = stubFetch.mock.calls[0][0];
     const forwardedUrl = new URL(forwardedReq.url);
     expect(forwardedUrl.pathname).toBe('/web');
+    expect(forwardedUrl.searchParams.get('connectionId')).toBe('viewer-1');
   });
 });

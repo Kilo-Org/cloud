@@ -212,6 +212,16 @@ describe('WebOutboundMessageSchema', () => {
     expect(result.success).toBe(true);
   });
 
+  it('parses viewer ping with a nonce', () => {
+    const result = WebOutboundMessageSchema.safeParse({ type: 'ping', nonce: 'ping-1' });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects viewer ping without a nonce', () => {
+    const result = WebOutboundMessageSchema.safeParse({ type: 'ping' });
+    expect(result.success).toBe(false);
+  });
+
   it('rejects command without id', () => {
     const msg = { type: 'command', command: 'test', data: {} };
     const result = WebOutboundMessageSchema.safeParse(msg);
@@ -245,6 +255,16 @@ describe('WebInboundMessageSchema', () => {
     const msg = { type: 'response', id: 'req_abc', result: { success: true } };
     const result = WebInboundMessageSchema.safeParse(msg);
     expect(result.success).toBe(true);
+  });
+
+  it('parses viewer pong with a nonce', () => {
+    const result = WebInboundMessageSchema.safeParse({ type: 'pong', nonce: 'ping-1' });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects viewer pong without a nonce', () => {
+    const result = WebInboundMessageSchema.safeParse({ type: 'pong' });
+    expect(result.success).toBe(false);
   });
 
   it('parses event with parentSessionId', () => {

@@ -2,8 +2,8 @@
  * Hook for polling active CLI sessions from the session-ingest worker.
  */
 
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useEffect, useMemo } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import {
   cliConnectionDataSchema,
@@ -51,90 +51,95 @@ function getCliConnectionPayload(value: unknown): CliConnectionPayload | null {
   return parsed.data;
 }
 
-export function mergeActiveSessionsWithPollingFallback(
-  liveSessions: ActiveSession[] | null,
-  polledSessions: ActiveSession[]
+export function applyActiveSessionsHeartbeat(
+  currentSessions: ActiveSession[],
+  payload: RootHeartbeatPayload
 ): ActiveSession[] {
-  if (liveSessions === null) return polledSessions;
-
-  const merged = new Map<string, ActiveSession>();
-  for (const session of liveSessions) {
-    merged.set(session.id, session);
-  }
-  for (const session of polledSessions) {
-    if (!merged.has(session.id)) {
-      merged.set(session.id, session);
-    }
-  }
-  return Array.from(merged.values());
+  return [
+    ...payload.sessions,
+    ...currentSessions.filter(session => session.connectionId !== payload.connectionId),
+  ];
 }
+
+export function removeActiveSessionsForConnection(
+  currentSessions: ActiveSession[],
+  connectionId: string
+): ActiveSession[] {
+  return currentSessions.filter(session => session.connectionId !== connectionId);
+}
+
+type ActiveSessionsQueryData = {
+  sessions: ActiveSession[];
+};
 
 export function useActiveSessions(): {
   activeSessions: ActiveSession[];
   isLoading: boolean;
 } {
   const trpc = useTRPC();
+  const queryClient = useQueryClient();
   const sharedConnection = useUserWebConnection();
-  const [liveSessions, setLiveSessions] = useState<ActiveSession[] | null>(null);
-  const latestPolledSessionsRef = useRef<ActiveSession[]>([]);
   const activeSessionsQueryOptions = trpc.activeSessions.list.queryOptions();
+  const activeSessionsQueryKey = useMemo(() => trpc.activeSessions.list.queryKey(), [trpc]);
   const { data, isLoading, refetch } = useQuery({
     ...activeSessionsQueryOptions,
     refetchInterval: 10_000,
     staleTime: 5_000,
   });
-  const polledRootSessions = useMemo(
+  const activeSessions = useMemo(
     () => (data?.sessions ?? []).filter(isRootSession),
     [data?.sessions]
   );
 
   useEffect(() => {
-    latestPolledSessionsRef.current = polledRootSessions;
-  }, [polledRootSessions]);
-
-  useEffect(() => {
     if (!sharedConnection) return;
-    const refreshActiveSessions = () => {
-      void refetch().then(result => {
-        if (result.data?.sessions) setLiveSessions(result.data.sessions.filter(isRootSession));
+    let pendingLiveUpdate = Promise.resolve();
+    const updateCachedSessions = (
+      update: (sessions: ActiveSession[]) => ActiveSession[],
+      refetchAfterUpdate = false
+    ) => {
+      pendingLiveUpdate = pendingLiveUpdate.then(async () => {
+        await queryClient.cancelQueries({ queryKey: activeSessionsQueryKey });
+        queryClient.setQueryData<ActiveSessionsQueryData>(activeSessionsQueryKey, current => ({
+          sessions: update((current?.sessions ?? []).filter(isRootSession)),
+        }));
+        if (refetchAfterUpdate) void refetch();
       });
     };
-    sharedConnection.connect();
+    const refreshActiveSessions = () => {
+      pendingLiveUpdate = pendingLiveUpdate.then(async () => {
+        await queryClient.cancelQueries({ queryKey: activeSessionsQueryKey });
+        void refetch();
+      });
+    };
     return sharedConnection.onSystemEvent(event => {
       if (event.event === 'sessions.list') {
         const sessions = getRootSessionsFromListPayload(event.data);
-        if (sessions) setLiveSessions(sessions);
+        if (sessions) updateCachedSessions(() => sessions);
       }
       if (event.event === 'sessions.heartbeat') {
-        const data = getRootSessionsFromHeartbeatPayload(event.data);
-        if (data) {
-          setLiveSessions(prev => {
-            const baseSessions = prev ?? latestPolledSessionsRef.current;
-            const sessionsFromOtherConnections = baseSessions.filter(
-              s => s.connectionId !== data.connectionId
-            );
-            return [...data.sessions, ...sessionsFromOtherConnections];
-          });
+        const payload = getRootSessionsFromHeartbeatPayload(event.data);
+        if (payload) {
+          updateCachedSessions(sessions => applyActiveSessionsHeartbeat(sessions, payload));
         }
       }
       if (event.event === 'cli.disconnected') {
-        const data = getCliConnectionPayload(event.data);
-        if (data) {
-          setLiveSessions(prev => {
-            const baseSessions = prev ?? latestPolledSessionsRef.current;
-            return baseSessions.filter(s => s.connectionId !== data.connectionId);
-          });
-          refreshActiveSessions();
+        const payload = getCliConnectionPayload(event.data);
+        if (payload) {
+          updateCachedSessions(
+            sessions => removeActiveSessionsForConnection(sessions, payload.connectionId),
+            true
+          );
         }
       }
       if (event.event === 'cli.connected') {
         refreshActiveSessions();
       }
     });
-  }, [refetch, sharedConnection]);
+  }, [activeSessionsQueryKey, queryClient, refetch, sharedConnection]);
 
   return {
-    activeSessions: mergeActiveSessionsWithPollingFallback(liveSessions, polledRootSessions),
-    isLoading: liveSessions === null && isLoading,
+    activeSessions,
+    isLoading,
   };
 }

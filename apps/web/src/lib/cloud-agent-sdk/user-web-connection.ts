@@ -3,6 +3,7 @@ import {
   type Connection,
   type ConnectionLifecycleHooks,
 } from './base-connection';
+import { cloudAgentSdkRuntime } from './runtime';
 import {
   sessionEventPayloadSchema,
   webInboundMessageSchema,
@@ -11,6 +12,11 @@ import {
 } from './schemas';
 
 const COMMAND_TIMEOUT_MS = 30_000;
+const INITIAL_AUTH_RETRY_BASE_MS = 1_000;
+const INITIAL_AUTH_RETRY_CAP_MS = 30_000;
+export const VIEWER_PING_INTERVAL_MS = 20_000;
+export const VIEWER_PONG_TIMEOUT_MS = 10_000;
+
 type UserWebSessionEventName = SessionEventPayload['type'];
 type UserWebSessionEventData<T extends UserWebSessionEventName> = Extract<
   SessionEventPayload,
@@ -28,7 +34,11 @@ type UserWebConnectionConfig = {
 };
 
 type UserWebConnection = {
+  /** New connection owners use this lease; optional on injected legacy clients until they migrate. */
+  retain?: () => () => void;
+  /** @deprecated Retain the connection explicitly with retain() instead. */
   connect: () => void;
+  /** @deprecated Release the function returned by retain() instead. */
   disconnect: () => void;
   destroy: () => void;
   subscribeToCliSession: (sessionId: string) => () => void;
@@ -42,7 +52,10 @@ type UserWebConnection = {
   ) => () => void;
 };
 
-function createUserWebConnection(config: UserWebConnectionConfig): UserWebConnection {
+function createUserWebConnection(
+  config: UserWebConnectionConfig
+): UserWebConnection & { retain: () => () => void } {
+  const connectionId = cloudAgentSdkRuntime.randomUUID();
   let token = '';
   let baseConnection: Connection | null = null;
   let currentWs: WebSocket | null = null;
@@ -50,6 +63,16 @@ function createUserWebConnection(config: UserWebConnectionConfig): UserWebConnec
   let started = false;
   let generation = 0;
   let connectPromise: Promise<void> | null = null;
+  let retainCount = 0;
+  let commandRetainCount = 0;
+  let legacyRetained = false;
+  let pingInterval: ReturnType<typeof setInterval> | null = null;
+  let pongTimeout: ReturnType<typeof setTimeout> | null = null;
+  let initialAuthRetryTimeout: ReturnType<typeof setTimeout> | null = null;
+  let initialAuthRetryAttempt = 0;
+  let outstandingPingNonce: string | null = null;
+  const preSocketLifecycleCleanupFns: Array<() => void> = [];
+  let preSocketLifecycleRegistered = false;
   const subscriptionCounts = new Map<string, number>();
   const cliListeners = new Map<string, Set<(event: CliEvent) => void>>();
   const systemListeners = new Set<(event: SystemEvent) => void>();
@@ -69,6 +92,10 @@ function createUserWebConnection(config: UserWebConnectionConfig): UserWebConnec
     timer: ReturnType<typeof setTimeout>;
   }>();
 
+  function hasLifetime(): boolean {
+    return retainCount > 0;
+  }
+
   function sendWire(value: unknown): void {
     if (!currentWs || currentWs.readyState !== WebSocket.OPEN) return;
     currentWs.send(JSON.stringify(value));
@@ -82,6 +109,104 @@ function createUserWebConnection(config: UserWebConnectionConfig): UserWebConnec
     sendWire({ type: 'unsubscribe', sessionId });
   }
 
+  function clearPongTimeout(): void {
+    if (pongTimeout !== null) {
+      clearTimeout(pongTimeout);
+      pongTimeout = null;
+    }
+    outstandingPingNonce = null;
+  }
+
+  function clearLiveness(): void {
+    if (pingInterval !== null) {
+      clearInterval(pingInterval);
+      pingInterval = null;
+    }
+    clearPongTimeout();
+  }
+
+  function clearInitialAuthRetry(): void {
+    if (initialAuthRetryTimeout !== null) {
+      clearTimeout(initialAuthRetryTimeout);
+      initialAuthRetryTimeout = null;
+    }
+    initialAuthRetryAttempt = 0;
+  }
+
+  function scheduleInitialAuthRetry(expectedGeneration: number): void {
+    if (destroyed || !hasLifetime() || expectedGeneration !== generation) return;
+
+    const exponentialDelay = Math.min(
+      INITIAL_AUTH_RETRY_CAP_MS,
+      INITIAL_AUTH_RETRY_BASE_MS * Math.pow(2, initialAuthRetryAttempt)
+    );
+    const delay = Math.floor(exponentialDelay * (0.5 + Math.random()));
+    initialAuthRetryAttempt += 1;
+    initialAuthRetryTimeout = setTimeout(() => {
+      initialAuthRetryTimeout = null;
+      if (destroyed || !hasLifetime() || expectedGeneration !== generation) return;
+      startConnection(false);
+    }, delay);
+  }
+
+  function requestPreSocketRecovery(): void {
+    if (destroyed || !hasLifetime() || baseConnection || started || connectPromise) return;
+    if (initialAuthRetryTimeout !== null) {
+      clearTimeout(initialAuthRetryTimeout);
+      initialAuthRetryTimeout = null;
+    }
+    startConnection(false);
+  }
+
+  function addPreSocketLifecycleListeners(): void {
+    if (!config.lifecycleHooks || preSocketLifecycleRegistered || baseConnection) return;
+    preSocketLifecycleRegistered = true;
+    if (config.lifecycleHooks.onVisibilityChange) {
+      preSocketLifecycleCleanupFns.push(
+        config.lifecycleHooks.onVisibilityChange(requestPreSocketRecovery, () => {})
+      );
+    }
+    if (config.lifecycleHooks.onPageshow) {
+      preSocketLifecycleCleanupFns.push(
+        config.lifecycleHooks.onPageshow(event => {
+          if (event.persisted) requestPreSocketRecovery();
+        })
+      );
+    }
+    if (config.lifecycleHooks.onOnline) {
+      preSocketLifecycleCleanupFns.push(config.lifecycleHooks.onOnline(requestPreSocketRecovery));
+    }
+  }
+
+  function removePreSocketLifecycleListeners(): void {
+    for (const cleanup of preSocketLifecycleCleanupFns) cleanup();
+    preSocketLifecycleCleanupFns.length = 0;
+    preSocketLifecycleRegistered = false;
+  }
+
+  function replaceUnresponsiveSocket(): void {
+    if (destroyed || !hasLifetime()) return;
+    clearPongTimeout();
+    currentWs = null;
+    baseConnection?.reconnectWithRefreshedAuth?.();
+  }
+
+  function sendPing(): void {
+    if (destroyed || !hasLifetime() || outstandingPingNonce !== null) return;
+    if (!currentWs || currentWs.readyState !== WebSocket.OPEN) return;
+
+    const nonce = cloudAgentSdkRuntime.randomUUID();
+    outstandingPingNonce = nonce;
+    sendWire({ type: 'ping', nonce });
+    pongTimeout = setTimeout(replaceUnresponsiveSocket, VIEWER_PONG_TIMEOUT_MS);
+  }
+
+  function startLiveness(): void {
+    clearLiveness();
+    if (!hasLifetime()) return;
+    pingInterval = setInterval(sendPing, VIEWER_PING_INTERVAL_MS);
+  }
+
   function rejectPending(message: string): void {
     for (const waiter of pendingOpenWaiters) {
       clearTimeout(waiter.timer);
@@ -90,8 +215,8 @@ function createUserWebConnection(config: UserWebConnectionConfig): UserWebConnec
     }
     for (const [id, pending] of pendingCommands) {
       clearTimeout(pending.timer);
-      pending.reject(new Error(message));
       pendingCommands.delete(id);
+      pending.reject(new Error(message));
     }
   }
 
@@ -103,9 +228,25 @@ function createUserWebConnection(config: UserWebConnectionConfig): UserWebConnec
     }
   }
 
+  function retainConnection(): () => void {
+    if (destroyed) return () => {};
+    retainCount += 1;
+    if (retainCount === 1) {
+      addPreSocketLifecycleListeners();
+      startConnection();
+    }
+
+    let released = false;
+    return () => {
+      if (released || destroyed) return;
+      released = true;
+      retainCount -= 1;
+      if (retainCount === 0) stopConnection('Connection disconnected');
+    };
+  }
+
   function waitForOpen(): Promise<WebSocket> {
     if (destroyed) return Promise.reject(new Error('Connection destroyed'));
-    connect();
     if (currentWs && currentWs.readyState === WebSocket.OPEN) return Promise.resolve(currentWs);
     if (!started && !connectPromise) return Promise.reject(new Error('Failed to get auth token'));
     return new Promise((resolve, reject) => {
@@ -122,6 +263,11 @@ function createUserWebConnection(config: UserWebConnectionConfig): UserWebConnec
   }
 
   function handleInboundMessage(msg: WebInboundMessage): void {
+    if (msg.type === 'pong') {
+      if (msg.nonce === outstandingPingNonce) clearPongTimeout();
+      return;
+    }
+
     if (msg.type === 'event') {
       for (const key of [msg.sessionId, msg.parentSessionId]) {
         if (!key) continue;
@@ -150,11 +296,41 @@ function createUserWebConnection(config: UserWebConnectionConfig): UserWebConnec
     else pending.resolve(msg.result);
   }
 
+  function createLifecycleHooks(): ConnectionLifecycleHooks | undefined {
+    const lifecycleHooks = config.lifecycleHooks;
+    if (!lifecycleHooks) return undefined;
+    return {
+      onVisibilityChange: lifecycleHooks.onVisibilityChange
+        ? (onResume, onHidden) =>
+            lifecycleHooks.onVisibilityChange?.(() => {
+              onResume();
+              sendPing();
+            }, onHidden) ?? (() => {})
+        : undefined,
+      onPageshow: lifecycleHooks.onPageshow,
+      onOnline: lifecycleHooks.onOnline
+        ? handler =>
+            lifecycleHooks.onOnline?.(() => {
+              handler();
+              sendPing();
+            }) ?? (() => {})
+        : undefined,
+    };
+  }
+
+  function buildUrl(): string {
+    const url = new URL(config.websocketUrl);
+    url.searchParams.set('token', token);
+    url.searchParams.set('connectionId', connectionId);
+    return url.toString();
+  }
+
   function ensureBaseConnection(): void {
     if (baseConnection) return;
+    removePreSocketLifecycleListeners();
     baseConnection = createBaseConnection({
-      lifecycleHooks: config.lifecycleHooks,
-      buildUrl: () => `${config.websocketUrl}?token=${token}`,
+      lifecycleHooks: createLifecycleHooks(),
+      buildUrl,
       parseMessage: (data: unknown) => {
         if (typeof data !== 'string') return null;
         try {
@@ -168,17 +344,26 @@ function createUserWebConnection(config: UserWebConnectionConfig): UserWebConnec
       },
       onEvent: handleInboundMessage,
       onOpen: ws => {
+        if (!hasLifetime()) return;
         currentWs = ws;
         resolveOpenWaiters(ws);
         for (const sessionId of subscriptionCounts.keys()) sendSubscribe(sessionId);
+        startLiveness();
       },
       onConnected: () => {},
       onReconnected: () => {
         config.onReconnect?.();
         for (const listener of reconnectListeners) listener();
       },
+      onReplacingConnection: () => {
+        rejectPending('Connection lost during reconnect');
+      },
       onDisconnected: () => {
         currentWs = null;
+        clearLiveness();
+      },
+      onUnexpectedDisconnect: () => {
+        rejectPending('Connection lost during reconnect');
       },
       onError: config.onError,
       isAuthFailure: event => event.code === 4001 || event.code === 1008,
@@ -188,17 +373,19 @@ function createUserWebConnection(config: UserWebConnectionConfig): UserWebConnec
     });
   }
 
-  function connect(): void {
-    if (destroyed) return;
-    if (started || connectPromise) return;
+  function startConnection(newLifetime = true): void {
+    if (destroyed || started || connectPromise) return;
 
-    destroyed = false;
     started = true;
-    generation += 1;
+    if (newLifetime) {
+      generation += 1;
+      clearInitialAuthRetry();
+    }
     const expectedGeneration = generation;
 
     const openWithToken = (value: string): void => {
-      if (!started || destroyed || expectedGeneration !== generation) return;
+      if (!started || destroyed || !hasLifetime() || expectedGeneration !== generation) return;
+      clearInitialAuthRetry();
       token = value;
       ensureBaseConnection();
       baseConnection?.connect();
@@ -208,6 +395,7 @@ function createUserWebConnection(config: UserWebConnectionConfig): UserWebConnec
       started = false;
       rejectPending('Failed to get auth token');
       config.onError?.('Failed to get auth token');
+      scheduleInitialAuthRetry(expectedGeneration);
     };
 
     try {
@@ -217,43 +405,49 @@ function createUserWebConnection(config: UserWebConnectionConfig): UserWebConnec
         return;
       }
 
-      connectPromise = tokenResult
-        .then(
-          value => {
-            openWithToken(value);
-          },
-          () => {
-            rejectAuthFailure();
-          }
-        )
-        .finally(() => {
-          if (expectedGeneration === generation) connectPromise = null;
-        });
+      connectPromise = tokenResult.then(openWithToken, rejectAuthFailure).finally(() => {
+        if (expectedGeneration === generation) connectPromise = null;
+      });
     } catch {
       rejectAuthFailure();
     }
   }
 
+  function stopConnection(message: string): void {
+    generation += 1;
+    connectPromise = null;
+    started = false;
+    currentWs = null;
+    clearLiveness();
+    clearInitialAuthRetry();
+    removePreSocketLifecycleListeners();
+    rejectPending(message);
+    baseConnection?.destroy();
+    baseConnection = null;
+  }
+
+  function connect(): void {
+    if (destroyed || legacyRetained) return;
+    legacyRetained = true;
+    retainConnection();
+  }
+
   return {
+    retain: retainConnection,
     connect,
     disconnect() {
-      generation += 1;
-      connectPromise = null;
-      started = false;
-      currentWs = null;
-      rejectPending('Connection disconnected');
-      baseConnection?.destroy();
-      baseConnection = null;
+      if (!legacyRetained || destroyed) return;
+      legacyRetained = false;
+      retainCount -= 1;
+      if (retainCount === 0) stopConnection('Connection disconnected');
     },
     destroy() {
-      generation += 1;
-      connectPromise = null;
+      if (destroyed) return;
       destroyed = true;
-      started = false;
-      currentWs = null;
-      rejectPending('Connection destroyed');
-      baseConnection?.destroy();
-      baseConnection = null;
+      legacyRetained = false;
+      retainCount = 0;
+      commandRetainCount = 0;
+      stopConnection('Connection destroyed');
       subscriptionCounts.clear();
       cliListeners.clear();
       systemListeners.clear();
@@ -261,13 +455,14 @@ function createUserWebConnection(config: UserWebConnectionConfig): UserWebConnec
       sessionListeners.clear();
     },
     subscribeToCliSession(sessionId) {
+      if (destroyed) return () => {};
+      const releaseConnection = retainConnection();
       const current = subscriptionCounts.get(sessionId) ?? 0;
       subscriptionCounts.set(sessionId, current + 1);
-      connect();
       if (current === 0) sendSubscribe(sessionId);
       let released = false;
       return () => {
-        if (released) return;
+        if (released || destroyed) return;
         released = true;
         const count = subscriptionCounts.get(sessionId) ?? 0;
         if (count <= 1) {
@@ -276,27 +471,53 @@ function createUserWebConnection(config: UserWebConnectionConfig): UserWebConnec
         } else {
           subscriptionCounts.set(sessionId, count - 1);
         }
+        releaseConnection();
       };
     },
     sendCommand(sessionId, command, data) {
+      const hasOwnerLifetime = retainCount > commandRetainCount;
+      const releaseCommandLifetime = hasOwnerLifetime ? null : retainConnection();
+      if (releaseCommandLifetime) commandRetainCount += 1;
+      let commandLifetimeReleased = false;
+      const releaseLifetime = () => {
+        if (commandLifetimeReleased) return;
+        commandLifetimeReleased = true;
+        if (releaseCommandLifetime) {
+          commandRetainCount -= 1;
+          releaseCommandLifetime();
+        }
+      };
+
       return new Promise((resolve, reject) => {
+        const resolveCommand = (value: unknown) => {
+          releaseLifetime();
+          resolve(value);
+        };
+        const rejectCommand = (reason: Error) => {
+          releaseLifetime();
+          reject(reason);
+        };
         void waitForOpen().then(
           ws => {
-            if (destroyed || !started || ws.readyState !== WebSocket.OPEN) {
-              reject(new Error(destroyed ? 'Connection destroyed' : 'Connection disconnected'));
+            if (destroyed || !hasLifetime() || ws.readyState !== WebSocket.OPEN) {
+              rejectCommand(
+                new Error(destroyed ? 'Connection destroyed' : 'Connection disconnected')
+              );
               return;
             }
 
-            const id = crypto.randomUUID();
+            const id = cloudAgentSdkRuntime.randomUUID();
             const timer = setTimeout(() => {
               pendingCommands.delete(id);
-              reject(new Error('Command timed out'));
+              rejectCommand(new Error('Command timed out'));
             }, COMMAND_TIMEOUT_MS);
-            pendingCommands.set(id, { resolve, reject, timer });
+            pendingCommands.set(id, { resolve: resolveCommand, reject: rejectCommand, timer });
             ws.send(JSON.stringify({ type: 'command', id, command, sessionId, data }));
           },
           reason => {
-            reject(reason instanceof Error ? reason : new Error('WebSocket is not connected'));
+            rejectCommand(
+              reason instanceof Error ? reason : new Error('WebSocket is not connected')
+            );
           }
         );
       });

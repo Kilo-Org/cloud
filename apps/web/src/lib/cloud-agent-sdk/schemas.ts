@@ -98,6 +98,7 @@ export const webInboundMessageSchema = z.discriminatedUnion('type', [
     data: z.unknown(),
   }),
   z.object({ type: z.literal('system'), event: z.string(), data: z.unknown() }),
+  z.object({ type: z.literal('pong'), nonce: z.string() }),
   z.object({
     type: z.literal('response'),
     id: z.string(),

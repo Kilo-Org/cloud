@@ -428,7 +428,6 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
       invalidateSessionQueries();
     };
 
-    sharedConnection.connect();
     const unsubs = [
       sharedConnection.onSessionEvent('session.created', patchRow),
       sharedConnection.onSessionEvent('session.updated', patchRow),

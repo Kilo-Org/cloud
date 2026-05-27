@@ -10,6 +10,7 @@ import {
   type SessionManager,
   type SessionSnapshot,
   type TransportSendPayload,
+  type UserWebConnection,
 } from 'cloud-agent-sdk';
 import { normalizeAgentMode } from '@/components/agents/mode-options';
 import {
@@ -17,17 +18,13 @@ import {
   withCloudAgentDiagnostics,
 } from '@/components/agents/mobile-session-diagnostics';
 import { trpcClient } from '@/lib/trpc';
-import {
-  API_BASE_URL,
-  CLOUD_AGENT_WS_URL,
-  SESSION_INGEST_WS_URL,
-  WEB_BASE_URL,
-} from '@/lib/config';
+import { API_BASE_URL, CLOUD_AGENT_WS_URL, WEB_BASE_URL } from '@/lib/config';
 import { AUTH_TOKEN_KEY } from '@/lib/storage-keys';
 import { type SendMessagePayload } from '@/lib/cloud-agent-next/types';
 
 type CreateMobileAgentSessionManagerOptions = {
   store: JotaiStore;
+  userWebConnection: UserWebConnection;
   organizationId?: string;
 };
 
@@ -59,13 +56,14 @@ function normalizeTransportPayload(payload: TransportSendPayload): SendMessagePa
 
 export function createMobileAgentSessionManager({
   store,
+  userWebConnection,
   organizationId,
 }: Readonly<CreateMobileAgentSessionManagerOptions>): SessionManager {
   return createSessionManager({
     store,
     websocketBaseUrl: CLOUD_AGENT_WS_URL,
     websocketHeaders: { Origin: WEB_BASE_URL },
-    cliWebsocketUrl: `${SESSION_INGEST_WS_URL}/api/user/web`,
+    userWebConnection,
     resolveSession: async (kiloSessionId: KiloSessionId): Promise<ResolvedSession> => {
       try {
         const session = await trpcClient.cliSessionsV2.get.query({ session_id: kiloSessionId });
@@ -132,10 +130,6 @@ export function createMobileAgentSessionManager({
         },
         messages: messagesResult.messages as SessionSnapshot['messages'],
       };
-    },
-    getAuthToken: async () => {
-      const result = await trpcClient.activeSessions.getToken.query();
-      return result.token;
     },
     api: {
       send: async input => {

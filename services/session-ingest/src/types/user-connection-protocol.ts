@@ -82,6 +82,10 @@ export const WebOutboundMessageSchema = z.discriminatedUnion('type', [
     command: z.string(),
     data: z.unknown().optional(),
   }),
+  z.object({
+    type: z.literal('ping'),
+    nonce: z.string(),
+  }),
 ]);
 
 // -- V2 session system events -------------------------------------------------
@@ -168,6 +172,10 @@ export const WebInboundMessageSchema = z.discriminatedUnion('type', [
     id: z.string(),
     result: z.unknown().optional(),
     error: z.unknown().optional(),
+  }),
+  z.object({
+    type: z.literal('pong'),
+    nonce: z.string(),
   }),
 ]);
 

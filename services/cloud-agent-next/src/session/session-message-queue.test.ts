@@ -589,41 +589,11 @@ describe('SessionMessageQueue', () => {
     expect(result).toMatchObject({ success: false, code: 'BAD_REQUEST' });
   });
 
-  it('accepts a canonical attachment replay against legacy image state after normalization', async () => {
+  it('accepts canonical replay against predecessor constraints with attachments', async () => {
     const harness = createQueueHarness();
-    const legacyImages = {
+    const attachments = {
       path: '123e4567-e89b-12d3-a456-426614174000',
-      files: ['123e4567-e89b-12d3-a456-426614174001.png'],
-    };
-    await harness.storage.put(`session_message:${FIRST_MESSAGE_ID}`, {
-      messageId: FIRST_MESSAGE_ID,
-      status: 'accepted',
-      prompt: 'original',
-      turn: {
-        type: 'prompt',
-        messageId: FIRST_MESSAGE_ID,
-        prompt: 'original',
-        images: legacyImages,
-      },
-      createdAt: 1,
-      acceptedAt: 2,
-      agent: { mode: 'code', model: 'default-model' },
-    });
-
-    const result = await harness.queue.admitSubmittedMessage({
-      userId: 'user_test' as UserId,
-      turn: { type: 'prompt', id: FIRST_MESSAGE_ID, prompt: 'original', attachments: legacyImages },
-      agent: { mode: 'code', model: 'default-model' },
-    });
-
-    expect(result).toMatchObject({ success: true, compatibilityDelivery: 'sent' });
-  });
-
-  it('accepts canonical replay against persisted legacy admission constraints with images', async () => {
-    const harness = createQueueHarness();
-    const legacyImages = {
-      path: '123e4567-e89b-12d3-a456-426614174000',
-      files: ['123e4567-e89b-12d3-a456-426614174001.png'],
+      files: ['123e4567-e89b-12d3-a456-426614174001.pdf'],
     };
     await harness.storage.put(`session_message:${FIRST_MESSAGE_ID}`, {
       messageId: FIRST_MESSAGE_ID,
@@ -634,7 +604,7 @@ describe('SessionMessageQueue', () => {
           type: 'prompt',
           messageId: FIRST_MESSAGE_ID,
           prompt: 'saved constraint',
-          images: legacyImages,
+          attachments,
         },
         agent: { mode: 'code', model: 'default-model' },
       },
@@ -644,12 +614,7 @@ describe('SessionMessageQueue', () => {
 
     const result = await harness.queue.admitSubmittedMessage({
       userId: 'user_test' as UserId,
-      turn: {
-        type: 'prompt',
-        id: FIRST_MESSAGE_ID,
-        prompt: 'saved constraint',
-        attachments: legacyImages,
-      },
+      turn: { type: 'prompt', id: FIRST_MESSAGE_ID, prompt: 'saved constraint', attachments },
       agent: { mode: 'code', model: 'default-model' },
     });
 

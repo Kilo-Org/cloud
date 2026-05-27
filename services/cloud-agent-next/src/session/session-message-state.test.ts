@@ -136,50 +136,34 @@ describe('getSessionMessageState / putSessionMessageState', () => {
     expect(loaded).not.toHaveProperty('finalization');
   });
 
-  it('normalizes a legacy image stored turn as canonical attachment replay constraints', async () => {
+  it('round-trips canonical attachments in an admission snapshot', async () => {
     const storage = createFakeStorage();
-    await storage.put(`session_message:${VALID_MESSAGE_ID}`, {
-      messageId: VALID_MESSAGE_ID,
-      status: 'accepted',
-      prompt: 'legacy prompt',
-      turn: {
-        type: 'prompt',
-        messageId: VALID_MESSAGE_ID,
-        prompt: 'legacy prompt',
-        images: {
-          path: '123e4567-e89b-12d3-a456-426614174000',
-          files: ['123e4567-e89b-12d3-a456-426614174001.png'],
-        },
-      },
-      createdAt: 1000,
-      acceptedAt: 2000,
-      agent: { mode: 'plan', model: 'legacy-model' },
+    const attachments = {
+      path: '123e4567-e89b-12d3-a456-426614174000',
+      files: ['123e4567-e89b-12d3-a456-426614174001.pdf'],
+    };
+    const state = createQueuedSessionMessageState({
+      turn: { type: 'prompt', messageId: VALID_MESSAGE_ID, prompt: 'document', attachments },
+      agent: { mode: 'code', model: 'default-model' },
     });
+    await putSessionMessageState(storage, state);
 
     const loaded = await getSessionMessageState(storage, VALID_MESSAGE_ID);
 
-    expect(loaded?.legacyAdmissionConstraints?.turn).toEqual({
-      type: 'prompt',
-      messageId: VALID_MESSAGE_ID,
-      prompt: 'legacy prompt',
-      attachments: {
-        path: '123e4567-e89b-12d3-a456-426614174000',
-        files: ['123e4567-e89b-12d3-a456-426614174001.png'],
-      },
-    });
+    expect(loaded?.admissionSnapshot?.turn).toMatchObject({ attachments });
   });
 
-  it('normalizes legacy image admission snapshots when listing accepted messages', async () => {
+  it('rejects stored admission snapshots containing legacy images', async () => {
     const storage = createFakeStorage();
     await storage.put(`session_message:${VALID_MESSAGE_ID}`, {
       messageId: VALID_MESSAGE_ID,
       status: 'accepted',
-      prompt: 'legacy snapshot',
+      prompt: 'old image snapshot',
       admissionSnapshot: {
         turn: {
           type: 'prompt',
           messageId: VALID_MESSAGE_ID,
-          prompt: 'legacy snapshot',
+          prompt: 'old image snapshot',
           images: {
             path: '123e4567-e89b-12d3-a456-426614174000',
             files: ['123e4567-e89b-12d3-a456-426614174001.png'],
@@ -191,37 +175,28 @@ describe('getSessionMessageState / putSessionMessageState', () => {
       acceptedAt: 2000,
     });
 
-    const [listed] = await listNonTerminalAcceptedMessages(storage);
-
-    expect(listed?.admissionSnapshot?.turn).toMatchObject({
-      attachments: {
-        path: '123e4567-e89b-12d3-a456-426614174000',
-        files: ['123e4567-e89b-12d3-a456-426614174001.png'],
-      },
-    });
+    expect(await getSessionMessageState(storage, VALID_MESSAGE_ID)).toBeUndefined();
   });
 
-  it('normalizes persisted legacy admission constraints and rewrites them canonically', async () => {
+  it('normalizes canonical predecessor turn attachments into replay constraints', async () => {
     const storage = createFakeStorage();
-    const images = {
+    const attachments = {
       path: '123e4567-e89b-12d3-a456-426614174000',
-      files: ['123e4567-e89b-12d3-a456-426614174001.png'],
+      files: ['123e4567-e89b-12d3-a456-426614174001.pdf'],
     };
     await storage.put(`session_message:${VALID_MESSAGE_ID}`, {
       messageId: VALID_MESSAGE_ID,
       status: 'accepted',
-      prompt: 'legacy constraint',
-      legacyAdmissionConstraints: {
-        turn: {
-          type: 'prompt',
-          messageId: VALID_MESSAGE_ID,
-          prompt: 'legacy constraint',
-          images,
-        },
-        agent: { mode: 'code', model: 'default-model' },
+      prompt: 'stored document',
+      turn: {
+        type: 'prompt',
+        messageId: VALID_MESSAGE_ID,
+        prompt: 'stored document',
+        attachments,
       },
       createdAt: 1000,
       acceptedAt: 2000,
+      agent: { mode: 'plan', model: 'legacy-model' },
     });
 
     const loaded = await getSessionMessageState(storage, VALID_MESSAGE_ID);
@@ -229,14 +204,9 @@ describe('getSessionMessageState / putSessionMessageState', () => {
     expect(loaded?.legacyAdmissionConstraints?.turn).toEqual({
       type: 'prompt',
       messageId: VALID_MESSAGE_ID,
-      prompt: 'legacy constraint',
-      attachments: images,
+      prompt: 'stored document',
+      attachments,
     });
-    if (!loaded) throw new Error('Expected stored state to load');
-    await putSessionMessageState(storage, loaded);
-    expect(storage.store.get(`session_message:${VALID_MESSAGE_ID}`)).not.toHaveProperty(
-      'legacyAdmissionConstraints.turn.images'
-    );
   });
 
   it('prefers a current admission snapshot over conflicting legacy copied fields', async () => {

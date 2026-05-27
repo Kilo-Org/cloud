@@ -146,6 +146,32 @@ describe('createPendingSessionMessageFromIntent', () => {
       intent,
     });
   });
+
+  it('does not decode stored V2 intents containing legacy images', async () => {
+    const storage = createMemoryStorage([
+      [
+        `pending_message:0000000000000001:${BASE_MSG_ID}`,
+        {
+          version: 2,
+          intent: {
+            turn: {
+              type: 'prompt',
+              messageId: BASE_MSG_ID,
+              prompt: 'old image record',
+              images: {
+                path: '123e4567-e89b-12d3-a456-426614174000',
+                files: ['123e4567-e89b-12d3-a456-426614174001.png'],
+              },
+            },
+            agent: { mode: 'code', model: 'claude' },
+          },
+          delivery: { queuedAt: 1 },
+        },
+      ],
+    ]);
+
+    expect(await listPendingSessionMessages(storage)).toEqual([]);
+  });
 });
 
 describe('resolvePendingSessionMessageExecutionOptions', () => {
@@ -180,10 +206,6 @@ describe('resolvePendingSessionMessageExecutionOptions', () => {
 describe('resolvePendingSessionMessageIntent', () => {
   it('restores an accepted turn plus resolved delivery semantics from flat pending storage', () => {
     const message = makeMessage({
-      images: {
-        path: '123e4567-e89b-12d3-a456-426614174000',
-        files: ['123e4567-e89b-12d3-a456-426614174001.png'],
-      },
       executionOptions: {
         mode: 'plan',
         model: 'queued-model',
@@ -205,10 +227,6 @@ describe('resolvePendingSessionMessageIntent', () => {
         type: 'prompt',
         messageId: BASE_MSG_ID,
         prompt: 'hello',
-        attachments: {
-          path: '123e4567-e89b-12d3-a456-426614174000',
-          files: ['123e4567-e89b-12d3-a456-426614174001.png'],
-        },
       },
       agent: { mode: 'plan', model: 'queued-model', variant: 'thinking' },
       finalization: { autoCommit: true, condenseOnComplete: false },

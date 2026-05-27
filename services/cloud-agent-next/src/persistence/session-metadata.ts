@@ -6,7 +6,6 @@ import {
   AttachmentsSchema,
   branchNameSchema,
   CallbackTargetSchema,
-  ImagesSchema,
   MetadataSchema as LegacySessionMetadataSchema,
   SessionProfileBundleSchema,
 } from './schemas.js';
@@ -99,34 +98,6 @@ const CurrentMetadataInitialMessageSchema = z
   })
   .strict();
 
-const StoredMetadataInitialTurnSchema = z.discriminatedUnion('type', [
-  z
-    .object({
-      type: z.literal('prompt'),
-      prompt: z.string(),
-      attachments: AttachmentsSchema.optional(),
-      images: ImagesSchema.optional(),
-    })
-    .strict(),
-  z
-    .object({
-      type: z.literal('command'),
-      command: z.string().min(1),
-      arguments: z.string(),
-    })
-    .strict(),
-]);
-
-const StoredMetadataInitialMessageSchema = z
-  .object({
-    id: MessageIdSchema.optional(),
-    prompt: z.string().optional(),
-    attachments: AttachmentsSchema.optional(),
-    images: ImagesSchema.optional(),
-    turn: StoredMetadataInitialTurnSchema.optional(),
-  })
-  .strict();
-
 const MetadataAgentSchema = z
   .object({
     mode: z.string().optional(),
@@ -205,10 +176,6 @@ export type SessionMetadata = z.infer<typeof CurrentSessionMetadataSchema>;
 
 type LegacySessionMetadata = z.output<typeof LegacySessionMetadataSchema>;
 
-const StoredCurrentSessionMetadataSchema = CurrentSessionMetadataSchema.extend({
-  initialMessage: StoredMetadataInitialMessageSchema.optional(),
-});
-
 function omitUndefined<T extends Record<string, unknown>>(value: T): Partial<T> {
   return Object.fromEntries(
     Object.entries(value).filter(([, item]) => item !== undefined)
@@ -245,29 +212,6 @@ function profileFromLegacy(metadata: LegacySessionMetadata): SessionMetadata['pr
       runtimeAgents: metadata.runtimeAgents,
     })
   ) as SessionMetadata['profile'];
-}
-
-function normalizeStoredInitialMessage(
-  message: z.infer<typeof StoredMetadataInitialMessageSchema> | undefined
-): SessionMetadata['initialMessage'] {
-  if (!message) return undefined;
-  const attachments = message.attachments ?? message.images;
-  const turn =
-    message.turn?.type === 'prompt'
-      ? {
-          type: 'prompt' as const,
-          prompt: message.turn.prompt,
-          attachments: message.turn.attachments ?? message.turn.images,
-        }
-      : message.turn;
-  return optionalObject(
-    omitUndefined({
-      id: message.id,
-      prompt: message.prompt,
-      attachments,
-      turn,
-    })
-  ) as SessionMetadata['initialMessage'];
 }
 
 function repositoryFromLegacy(
@@ -334,7 +278,6 @@ function legacyToCurrentSessionMetadata(metadata: LegacySessionMetadata): Sessio
       omitUndefined({
         id: metadata.initialMessageId,
         prompt: metadata.prompt,
-        attachments: metadata.images,
       })
     ),
     agent: optionalObject(
@@ -385,13 +328,6 @@ export function parseSessionMetadata(raw: unknown): SessionMetadata {
   }
 
   if (looksLikeCurrentMetadata(raw)) {
-    const stored = StoredCurrentSessionMetadataSchema.safeParse(raw);
-    if (stored.success) {
-      return CurrentSessionMetadataSchema.parse({
-        ...stored.data,
-        initialMessage: normalizeStoredInitialMessage(stored.data.initialMessage),
-      });
-    }
     throw new Error(`Invalid current session metadata: ${JSON.stringify(current.error.format())}`);
   }
 

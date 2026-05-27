@@ -2,7 +2,7 @@ import { z } from 'zod';
 import type { CallbackTarget } from '../callbacks/index.js';
 import type { ExecutionMode, SessionMessageIntent } from '../execution/types.js';
 import { renderExecutionTurnContent } from '../execution/types.js';
-import { AttachmentsSchema, ImagesSchema } from '../persistence/schemas.js';
+import { AttachmentsSchema } from '../persistence/schemas.js';
 import { MESSAGE_ID_FORMAT_DESCRIPTION, MESSAGE_ID_PATTERN } from './message-id.js';
 
 const SESSION_MESSAGE_STATE_PREFIX = 'session_message:';
@@ -79,13 +79,14 @@ export const SessionMessageStateSchema = z
     admissionSnapshot: z
       .object({
         turn: z.discriminatedUnion('type', [
-          z.object({
-            type: z.literal('prompt'),
-            messageId: z.string(),
-            prompt: z.string(),
-            attachments: AttachmentsSchema.optional(),
-            images: ImagesSchema.optional(),
-          }),
+          z
+            .object({
+              type: z.literal('prompt'),
+              messageId: z.string(),
+              prompt: z.string(),
+              attachments: AttachmentsSchema.optional(),
+            })
+            .strict(),
           z.object({
             type: z.literal('command'),
             messageId: z.string(),
@@ -106,13 +107,14 @@ export const SessionMessageStateSchema = z
       .object({
         turn: z
           .discriminatedUnion('type', [
-            z.object({
-              type: z.literal('prompt'),
-              messageId: z.string(),
-              prompt: z.string(),
-              attachments: AttachmentsSchema.optional(),
-              images: ImagesSchema.optional(),
-            }),
+            z
+              .object({
+                type: z.literal('prompt'),
+                messageId: z.string(),
+                prompt: z.string(),
+                attachments: AttachmentsSchema.optional(),
+              })
+              .strict(),
             z.object({
               type: z.literal('command'),
               messageId: z.string(),
@@ -137,7 +139,6 @@ export const SessionMessageStateSchema = z
       })
       .optional(),
     turn: z.unknown().optional(),
-    images: ImagesSchema.optional(),
     createdAt: z.number(),
     queuedAt: z.number().optional(),
     acceptedAt: z.number().optional(),
@@ -219,7 +220,7 @@ function normalizeLegacyAdmissionConstraints(
             type: 'prompt',
             messageId: constraints.turn.messageId,
             prompt: constraints.turn.prompt,
-            attachments: constraints.turn.attachments ?? constraints.turn.images,
+            attachments: constraints.turn.attachments,
           }
         : constraints.turn,
   };
@@ -249,7 +250,7 @@ function normalizeParsedSessionMessageState(
                 type: 'prompt',
                 messageId: admissionSnapshot.turn.messageId,
                 prompt: admissionSnapshot.turn.prompt,
-                attachments: admissionSnapshot.turn.attachments ?? admissionSnapshot.turn.images,
+                attachments: admissionSnapshot.turn.attachments,
               }
             : admissionSnapshot.turn,
       },
@@ -257,13 +258,14 @@ function normalizeParsedSessionMessageState(
   }
   const parsedTurn = z
     .discriminatedUnion('type', [
-      z.object({
-        type: z.literal('prompt'),
-        messageId: z.string(),
-        prompt: z.string(),
-        attachments: AttachmentsSchema.optional(),
-        images: ImagesSchema.optional(),
-      }),
+      z
+        .object({
+          type: z.literal('prompt'),
+          messageId: z.string(),
+          prompt: z.string(),
+          attachments: AttachmentsSchema.optional(),
+        })
+        .strict(),
       z.object({
         type: z.literal('command'),
         messageId: z.string(),
@@ -279,7 +281,7 @@ function normalizeParsedSessionMessageState(
             type: 'prompt',
             messageId: parsedTurn.data.messageId,
             prompt: parsedTurn.data.prompt,
-            attachments: parsedTurn.data.attachments ?? parsedTurn.data.images,
+            attachments: parsedTurn.data.attachments,
           }
         : parsedTurn.data
       : undefined,

@@ -49,7 +49,7 @@ const imageFilenameSchema = z
     'Image filename must be a UUID with extension png, jpg, jpeg, webp, or gif'
   );
 
-/** Legacy/public image decoder retained while callers and durable records migrate. */
+/** Legacy public image decoder retained only for API request compatibility. */
 export const ImagesSchema = z.object({
   path: attachmentMessageUuidSchema,
   files: z
@@ -426,9 +426,6 @@ export const MetadataSchema = z.object({
 
   // Callback configuration
   callbackTarget: CallbackTargetSchema.optional(),
-
-  // Image attachments
-  images: ImagesSchema.optional(),
 
   // Kilo server lifecycle tracking
   kiloServerLastActivity: z.number().optional(),

@@ -215,8 +215,7 @@ describe('api routes', () => {
   it('POST /session emits created only for newly inserted rows', async () => {
     const { db, fns } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db);
-    fns.insertResult.mockResolvedValueOnce([{ session_id: 'ses_12345678901234567890123456' }]);
-    fns.selectResult.mockResolvedValueOnce([
+    fns.insertResult.mockResolvedValueOnce([
       {
         session_id: 'ses_12345678901234567890123456',
         created_at: '2026-01-01T00:00:00.000Z',
@@ -252,6 +251,7 @@ describe('api routes', () => {
     );
 
     expect(res.status).toBe(200);
+    expect(fns.select).not.toHaveBeenCalled();
     expect(notifyUserSessionEvent).toHaveBeenCalledWith(
       expect.anything(),
       'usr_test',
@@ -263,21 +263,6 @@ describe('api routes', () => {
     const { db, fns } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db);
     fns.insertResult.mockResolvedValueOnce([]);
-    fns.selectResult.mockResolvedValueOnce([
-      {
-        session_id: 'ses_12345678901234567890123456',
-        created_at: '2026-01-01T00:00:00.000Z',
-        updated_at: '2026-01-01T00:00:00.000Z',
-        title: null,
-        created_on_platform: null,
-        organization_id: null,
-        git_url: null,
-        git_branch: null,
-        parent_session_id: null,
-        status: null,
-        status_updated_at: null,
-      },
-    ]);
 
     const sessionCache = {
       add: vi.fn(async () => undefined),
@@ -299,6 +284,7 @@ describe('api routes', () => {
     );
 
     expect(res.status).toBe(200);
+    expect(fns.select).not.toHaveBeenCalled();
     expect(notifyUserSessionEvent).not.toHaveBeenCalled();
   });
 

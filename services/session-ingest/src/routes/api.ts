@@ -67,7 +67,7 @@ api.post('/session', zodJsonValidator(createSessionSchema), async c => {
   const db = getWorkerDb(c.env.HYPERDRIVE.connectionString);
   const kiloUserId = c.get('user_id');
 
-  const insertedRows = await db
+  const [createdRow] = await db
     .insert(cli_sessions_v2)
     .values({
       session_id: body.sessionId,
@@ -76,20 +76,9 @@ api.post('/session', zodJsonValidator(createSessionSchema), async c => {
     .onConflictDoNothing({
       target: [cli_sessions_v2.session_id, cli_sessions_v2.kilo_user_id],
     })
-    .returning({ session_id: cli_sessions_v2.session_id });
+    .returning();
 
-  const createdRows = await db
-    .select()
-    .from(cli_sessions_v2)
-    .where(
-      and(
-        eq(cli_sessions_v2.session_id, body.sessionId),
-        eq(cli_sessions_v2.kilo_user_id, kiloUserId)
-      )
-    )
-    .limit(1);
-  const createdRow = createdRows[0];
-  if (insertedRows.length > 0 && createdRow) {
+  if (createdRow) {
     const session = mapSessionEventRow(createdRow);
     notifyUserSessionEventFromContext(c, kiloUserId, {
       type: 'session.created',

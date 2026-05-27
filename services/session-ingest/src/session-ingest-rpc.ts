@@ -66,7 +66,7 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> {
           existingRow.organization_id !== parsed.organizationId)
       : true;
 
-    await db
+    const [persistedRow] = await db
       .insert(cli_sessions_v2)
       .values({
         session_id: parsed.sessionId,
@@ -85,21 +85,11 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> {
             ? { organization_id: parsed.organizationId }
             : {}),
         },
-      });
+      })
+      .returning();
 
-    const createdRows = await db
-      .select()
-      .from(cli_sessions_v2)
-      .where(
-        and(
-          eq(cli_sessions_v2.session_id, parsed.sessionId),
-          eq(cli_sessions_v2.kilo_user_id, parsed.kiloUserId)
-        )
-      )
-      .limit(1);
-    const createdRow = createdRows[0];
-    if (hasMeaningfulChange && createdRow) {
-      const session = mapSessionEventRow(createdRow);
+    if (hasMeaningfulChange && persistedRow) {
+      const session = mapSessionEventRow(persistedRow);
       notifyUserSessionEvent(
         this.env,
         parsed.kiloUserId,

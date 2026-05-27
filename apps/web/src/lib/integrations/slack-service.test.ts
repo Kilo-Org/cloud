@@ -43,6 +43,7 @@ jest.mock('@slack/web-api', () => ({
 
 import type { Owner } from '@/lib/integrations/core/types';
 import type { SlackInstallation } from '@chat-adapter/slack';
+import { DEFAULT_BOT_MODEL } from '@/lib/bot/constants';
 import {
   deleteInstallationByTeamId,
   getMissingSlackScopes,
@@ -297,6 +298,28 @@ describe('upsertSlackInstallation', () => {
           model_slug: 'anthropic/claude-sonnet-4.5',
         }),
         platform_installation_id: 'T123',
+      })
+    );
+  });
+
+  it('uses the bot default model for new personal installations', async () => {
+    mockLimit.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+
+    const installation = {
+      botToken: 'xoxb-new-token',
+      botUserId: 'U_NEW_BOT',
+      teamName: 'Kilo Team',
+    } satisfies SlackInstallation;
+
+    await upsertSlackInstallation({ owner, teamId: 'T123', installation });
+
+    expect(mockInsertValues).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadata: expect.objectContaining({
+          access_token: 'xoxb-new-token',
+          bot_user_id: 'U_NEW_BOT',
+          model_slug: DEFAULT_BOT_MODEL,
+        }),
       })
     );
   });

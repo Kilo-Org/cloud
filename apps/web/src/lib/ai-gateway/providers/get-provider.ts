@@ -88,7 +88,7 @@ async function checkDirectBYOK(
       id: 'direct-byok',
       apiUrl: directByok.base_url,
       apiKey: userByok[0].decryptedAPIKey,
-      supportedChatApis: inferSupportedChatApis(directByok.ai_sdk_provider, undefined),
+      supportedChatApis: inferSupportedChatApis(directByok.ai_sdk_provider),
       transformRequest(context) {
         context.request.body.model = directByokModel.id;
         directByok.transformRequest(context);
@@ -123,9 +123,6 @@ async function checkCustomLlm(
       api_key: customLlm.api_key,
       opencode_settings: customLlm.opencode_settings
         ? { ai_sdk_provider: customLlm.opencode_settings.ai_sdk_provider }
-        : undefined,
-      openclaw_settings: customLlm.openclaw_settings
-        ? { api_adapter: customLlm.openclaw_settings.api_adapter }
         : undefined,
       extra_body: customLlm.extra_body,
       extra_headers: customLlm.extra_headers,

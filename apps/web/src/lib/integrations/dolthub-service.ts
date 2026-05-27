@@ -7,8 +7,8 @@ import { platform_integrations } from '@kilocode/db/schema';
 import { eq, and, isNull, sql } from 'drizzle-orm';
 import type { Owner } from '@/lib/integrations/core/types';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
+import { getPlatformOAuthCallbackUrl } from '@/lib/integrations/oauth/urls';
 import { DOLTHUB_APP_CLIENT_ID, DOLTHUB_APP_CLIENT_SECRET } from '@/lib/config.server';
-import { APP_URL } from '@/lib/constants';
 
 const DOLTHUB_TOKEN_URL = 'https://www.dolthub.com/api/oauth/access_token';
 const DOLTHUB_AUTHORIZE_URL = 'https://www.dolthub.com/oauth/authorize';
@@ -37,7 +37,7 @@ export const DOLTHUB_SCOPES = ['api_read_write'];
  * available. If a developer sets `APP_URL_OVERRIDE` (ngrok, etc.) they will
  * need DoltHub admins to register the additional URI.
  */
-export const DOLTHUB_REDIRECT_URI = `${APP_URL}/api/integrations/dolthub/callback`;
+export const DOLTHUB_REDIRECT_URI = getPlatformOAuthCallbackUrl(PLATFORM.DOLTHUB);
 
 export function getDoltHubOAuthUrl(state: string): string {
   const params = new URLSearchParams({

@@ -10,8 +10,9 @@
 import { protectedProcedure } from '../auth.js';
 import { logger, withLogTags } from '../../logger.js';
 import { SendMessageInput, ExecutionResponse } from '../schemas.js';
-import { queueMessage } from '../../session/queue-message.js';
+import { queueMessage, replayMessageIfAlreadyAdmitted } from '../../session/queue-message.js';
 import type { SessionId } from '../../types/ids.js';
+import { preflightExistingPromptModel } from '../../session/model-preflight.js';
 
 type SessionSendHandlers = {
   send: typeof sendMessageHandler;
@@ -29,21 +30,30 @@ const sendMessageHandler = protectedProcedure
       const sessionId = input.cloudAgentSessionId as SessionId;
       logger.setTags({ userId: ctx.userId, sessionId });
       logger.info('Sending message via unified send endpoint');
-
-      const ack = await queueMessage(
-        {
-          cloudAgentSessionId: input.cloudAgentSessionId,
-          turn: {
-            type: 'prompt',
-            id: input.message.id ?? undefined,
-            prompt: input.message.prompt,
-            images: input.message.images,
-          },
-          agent: input.agent,
-          finalization: input.finalization,
+      const queuedMessage = {
+        cloudAgentSessionId: input.cloudAgentSessionId,
+        turn: {
+          type: 'prompt' as const,
+          id: input.message.id ?? undefined,
+          prompt: input.message.prompt,
+          images: input.message.images,
         },
-        { env: ctx.env, userId: ctx.userId, botId: ctx.botId }
-      );
+        agent: input.agent,
+        finalization: input.finalization,
+      };
+      const admissionContext = { env: ctx.env, userId: ctx.userId, botId: ctx.botId };
+      const replay = await replayMessageIfAlreadyAdmitted(queuedMessage, admissionContext);
+      if (replay) return replay;
+
+      await preflightExistingPromptModel({
+        env: ctx.env,
+        userId: ctx.userId,
+        cloudAgentSessionId: input.cloudAgentSessionId,
+        requestedModel: input.agent?.model,
+        procedure: 'send',
+      });
+
+      const ack = await queueMessage(queuedMessage, admissionContext);
       return ack;
     });
   });

@@ -1,4 +1,5 @@
 import { PLATFORM } from '@/lib/integrations/core/constants';
+import type { PlatformIntegrationSetupStatus } from '@/lib/integrations/platform-integration-setup-status';
 
 export type PlatformType =
   | 'github'
@@ -92,14 +93,15 @@ export const PLATFORM_DEFINITIONS: PlatformDefinition[] = [
   },
 ];
 
-type InstallationStatus = {
-  github?: { installed: boolean };
-  slack?: { installed: boolean };
-  gitlab?: { installed: boolean };
-  discord?: { installed: boolean };
-  linear?: { installed: boolean };
-  dolthub?: { installed: boolean };
-};
+type InstallationStatus = Partial<Record<PlatformType, { installed: boolean }>>;
+
+function buildInstallationStatusMap(
+  installationStatuses: readonly PlatformIntegrationSetupStatus[]
+): InstallationStatus {
+  return Object.fromEntries(
+    installationStatuses.map(status => [status.platform, { installed: status.installed }])
+  );
+}
 
 function getStatus(id: PlatformType, installations: InstallationStatus): PlatformStatus {
   const def = PLATFORM_DEFINITIONS.find(p => p.id === id);
@@ -108,9 +110,11 @@ function getStatus(id: PlatformType, installations: InstallationStatus): Platfor
 }
 
 export function buildPlatforms(
-  installations: InstallationStatus,
+  installationStatuses: readonly PlatformIntegrationSetupStatus[],
   organizationId?: string
 ): Platform[] {
+  const installations = buildInstallationStatusMap(installationStatuses);
+
   return PLATFORM_DEFINITIONS.filter(def => {
     if (def.hiddenUnlessInstalled) {
       return installations[def.id as keyof InstallationStatus]?.installed === true;

@@ -431,6 +431,18 @@ describe('flushNextPendingSessionMessage', () => {
 });
 
 describe('SessionMessageQueue', () => {
+  it('reports whether a message identity already has durable admission state', async () => {
+    const harness = createQueueHarness();
+
+    await expect(harness.queue.hasMessageAdmission(FIRST_MESSAGE_ID)).resolves.toBe(false);
+    await harness.queue.admitSubmittedMessage({
+      userId: 'user_test' as UserId,
+      turn: { type: 'prompt', id: FIRST_MESSAGE_ID, prompt: 'queue this prompt' },
+    });
+
+    await expect(harness.queue.hasMessageAdmission(FIRST_MESSAGE_ID)).resolves.toBe(true);
+  });
+
   it('admits a durable queued message once and replays the original acknowledgement', async () => {
     const harness = createQueueHarness();
     const request = {

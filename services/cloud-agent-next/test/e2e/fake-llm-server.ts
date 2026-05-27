@@ -1,10 +1,11 @@
 /**
  * Fake LLM gateway for cloud-agent E2E harness.
  *
- * Masquerades as the OpenRouter-compatible endpoint that real kilo hits via
- * `@openrouter/ai-sdk-provider`. When `.dev.vars` sets
- * `KILO_OPENROUTER_BASE=http://host.docker.internal:<port>/api`, kilo dials
- * this server for `GET /api/openrouter/models` and
+ * Masquerades as the OpenRouter-compatible endpoint used by model preflight
+ * and real kilo through `@openrouter/ai-sdk-provider`. When `.dev.vars` sets
+ * `KILO_OPENROUTER_BASE=http://localhost:<port>/api`, the Worker calls
+ * `POST /api/openrouter/models/validate` and translates the URL for sandboxed
+ * kilo requests to `GET /api/openrouter/models` and
  * `POST /api/openrouter/chat/completions`.
  *
  * Directives in the last user message's content drive scenarios:
@@ -58,6 +59,8 @@ type ServerState = {
   liveResponses: Set<ServerResponse>;
   /** Monotonic id for log correlation. Not visible to callers. */
   nextRequestId: number;
+  /** Count of dispatched completions, exposed for fail-fast scenario assertions. */
+  chatCompletionRequests: number;
 };
 
 type LogFields = Record<string, string | number | boolean | undefined>;
@@ -481,6 +484,7 @@ async function handleChatCompletions(
   res: ServerResponse,
   state: ServerState
 ): Promise<void> {
+  state.chatCompletionRequests += 1;
   const reqLogId = ++state.nextRequestId;
   const startedAt = Date.now();
 
@@ -618,6 +622,35 @@ function handleModels(res: ServerResponse): void {
   res.end(JSON.stringify(modelsCatalogue()));
 }
 
+async function handleModelValidation(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  const raw = await readBody(req);
+  let body: unknown;
+  try {
+    body = JSON.parse(raw);
+  } catch {
+    writeJsonError(res, 400, 'invalid JSON body', 'invalid_request');
+    return;
+  }
+
+  if (typeof body !== 'object' || body === null || !('modelId' in body)) {
+    writeJsonError(res, 400, 'modelId is required', 'invalid_request');
+    return;
+  }
+  if (typeof body.modelId !== 'string') {
+    writeJsonError(res, 400, 'modelId is required', 'invalid_request');
+    return;
+  }
+
+  const valid = body.modelId === FAKE_MODEL.id;
+  res.writeHead(200, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify(valid ? { valid: true } : { valid: false, reason: 'unavailable' }));
+}
+
+function handleRequestCounts(res: ServerResponse, state: ServerState): void {
+  res.writeHead(200, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify({ chatCompletions: state.chatCompletionRequests }));
+}
+
 /**
  * Snapshot of all currently parked gate waiters, grouped by tag. Tests use
  * this after expected completions to assert the fake server has no stale
@@ -648,6 +681,7 @@ export async function startFakeLlmServer(opts?: {
     releasedGateFollowups: new Map(),
     liveResponses: new Set(),
     nextRequestId: 0,
+    chatCompletionRequests: 0,
   };
 
   const sockets = new Set<Socket>();
@@ -658,6 +692,21 @@ export async function startFakeLlmServer(opts?: {
 
     if (route === 'GET /api/openrouter/models') {
       handleModels(res);
+      return;
+    }
+    if (
+      route === 'POST /api/openrouter/models/validate' ||
+      (req.method === 'POST' &&
+        /^\/api\/organizations\/[^/]+\/models\/validate$/.test(url.pathname))
+    ) {
+      handleModelValidation(req, res).catch(err => {
+        console.error('fake-llm models/validate error:', err);
+        if (!res.headersSent) {
+          writeJsonError(res, 500, 'internal error', 'server_error');
+        } else {
+          res.end();
+        }
+      });
       return;
     }
     if (route === 'POST /api/openrouter/chat/completions') {
@@ -681,6 +730,10 @@ export async function startFakeLlmServer(opts?: {
     }
     if (route === 'GET /test/waiters') {
       handleWaiters(res, state);
+      return;
+    }
+    if (route === 'GET /test/requests') {
+      handleRequestCounts(res, state);
       return;
     }
 

@@ -45,7 +45,6 @@ export const FAKE_ONBOARDING_STEP_PARAM = 'fakeOnboardingStep';
 
 export const CLAW_ONBOARDING_FAKE_STEPS = [
   'identity',
-  'tools',
   'calendar',
   'email',
   'interests',

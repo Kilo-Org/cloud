@@ -6,19 +6,16 @@ import { eq, and, isNull } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import type { Owner } from '@/lib/integrations/core/types';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
+import { getPlatformOAuthCallbackUrl } from '@/lib/integrations/oauth/urls';
 import { DISCORD_CLIENT_ID, DISCORD_CLIENT_SECRET, DISCORD_BOT_TOKEN } from '@/lib/config.server';
-import { APP_URL } from '@/lib/constants';
 import { getOrganizationById } from '@/lib/organizations/organizations';
 import { getDefaultAllowedModel } from '@/lib/slack-bot/model-allow-list';
 import {
   createAllowPredicateFromRestrictions,
   hasActiveModelRestrictions,
 } from '@/lib/model-allow.server';
-import { KILO_AUTO_FREE_MODEL } from '@/lib/ai-gateway/auto-model';
+import { DEFAULT_BOT_MODEL } from '@/lib/bot/constants';
 import { getEffectiveModelRestrictions } from '@/lib/organizations/model-restrictions';
-
-// Default model for Discord integrations - mirrors the Slack default
-const DISCORD_DEFAULT_MODEL = KILO_AUTO_FREE_MODEL.id;
 
 // Discord OAuth2 scopes for the bot integration
 // 'bot' scope is needed for the bot to join servers
@@ -29,7 +26,7 @@ const DISCORD_SCOPES = ['bot', 'guilds', 'applications.commands'];
 // Includes: Send Messages, Read Message History, Add Reactions, Use Slash Commands, Embed Links, Attach Files
 const DISCORD_BOT_PERMISSIONS = '277025770560';
 
-const DISCORD_REDIRECT_URI = `${APP_URL}/api/integrations/discord/callback`;
+const DISCORD_REDIRECT_URI = getPlatformOAuthCallbackUrl(PLATFORM.DISCORD);
 
 /**
  * Discord OAuth2 token response shape
@@ -212,11 +209,11 @@ export async function upsertDiscordInstallation(
   }
 
   // For org integrations, get a model that respects org access policy.
-  // For user integrations, use the Discord-specific default model
+  // For user integrations, use the shared bot default model.
   const defaultModel =
     owner.type === 'org'
-      ? await getDefaultAllowedModel(owner.id, DISCORD_DEFAULT_MODEL)
-      : DISCORD_DEFAULT_MODEL;
+      ? await getDefaultAllowedModel(owner.id, DEFAULT_BOT_MODEL)
+      : DEFAULT_BOT_MODEL;
 
   const metadata = {
     guild_icon: oauthResponse.guild.icon,
@@ -346,8 +343,8 @@ export async function getModel(owner: Owner): Promise<string | null> {
 
   // Pre-existing installation without a stored model — resolve a default
   return owner.type === 'org'
-    ? getDefaultAllowedModel(owner.id, DISCORD_DEFAULT_MODEL)
-    : DISCORD_DEFAULT_MODEL;
+    ? getDefaultAllowedModel(owner.id, DEFAULT_BOT_MODEL)
+    : DEFAULT_BOT_MODEL;
 }
 
 /**

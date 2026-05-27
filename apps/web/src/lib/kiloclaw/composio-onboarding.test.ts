@@ -265,7 +265,6 @@ describe('composioSecretsPatchSource', () => {
 describe('buildComposioProvisionSecrets', () => {
   it('preserves manual Composio credentials instead of injecting managed credentials', async () => {
     const result = await buildComposioProvisionSecrets({
-      scope,
       secrets: {
         composioUserApiKey: 'uak_manual_credential_123',
         composioOrg: 'manual-org',
@@ -287,7 +286,6 @@ describe('buildComposioProvisionSecrets', () => {
   it('rejects invalid pre-provision manual Composio credentials', async () => {
     await expect(
       buildComposioProvisionSecrets({
-        scope,
         secrets: {
           composioUserApiKey: 'uak_short',
           composioOrg: 'manual-org',
@@ -296,87 +294,15 @@ describe('buildComposioProvisionSecrets', () => {
     ).rejects.toThrow('Composio user API keys start with uak_');
   });
 
-  it('rehydrates previously applied managed credentials for a recreated sandbox', async () => {
-    selectedRows.push([{ instanceId: 'old-instance-id' }]);
-
+  it('does not inject stored managed credentials when no manual credentials are submitted', async () => {
     const result = await buildComposioProvisionSecrets({
-      scope,
       secrets: { otherSecret: 'kept' },
     });
 
     expect(result).toEqual({
-      secrets: {
-        otherSecret: 'kept',
-        composioUserApiKey: 'uak_123',
-        composioOrg: 'org-1',
-      },
-      configToMark: { source: 'managed' },
+      secrets: { otherSecret: 'kept' },
+      configToMark: null,
     });
-  });
-
-  it('blocks first provision while a managed Composio connect attempt has no durable marker', async () => {
-    mockedGetActiveManagedComposioIdentity.mockResolvedValue({
-      row: {
-        id: 'identity-1',
-        composio_project_id: 'project-1',
-        google_calendar_connected_account_id: null,
-      },
-      agentKey: 'agent-key',
-      userApiKey: 'uak_123',
-      apiKey: 'api-key',
-      org: 'org-1',
-      consumerUserId: 'consumer-user-1',
-    } as never);
-
-    await expect(buildComposioProvisionSecrets({ scope })).rejects.toThrow(
-      'Managed Composio connection is still completing'
-    );
-  });
-
-  it('allows an explicit Tools skip to provision while a managed connect attempt is incomplete', async () => {
-    mockedGetActiveManagedComposioIdentity.mockResolvedValue({
-      row: {
-        id: 'identity-1',
-        composio_project_id: 'project-1',
-        google_calendar_connected_account_id: null,
-      },
-      agentKey: 'agent-key',
-      userApiKey: 'uak_123',
-      apiKey: 'api-key',
-      org: 'org-1',
-      consumerUserId: 'consumer-user-1',
-    } as never);
-
-    await expect(
-      buildComposioProvisionSecrets({ scope, skipIncompleteManagedConnection: true })
-    ).resolves.toEqual({ secrets: undefined, configToMark: null });
-  });
-
-  it('does not inject managed credentials into a current manual sandbox', async () => {
-    selectedRows.push([{ source: 'manual' }]);
-
-    const result = await buildComposioProvisionSecrets({
-      scope,
-      instanceId: instance.id,
-    });
-
-    expect(result).toEqual({ secrets: undefined, configToMark: null });
-  });
-
-  it('rehydrates managed credentials when reprovisioning an already managed sandbox', async () => {
-    selectedRows.push([{ source: 'managed' }]);
-
-    const result = await buildComposioProvisionSecrets({
-      scope,
-      instanceId: instance.id,
-    });
-
-    expect(result).toEqual({
-      secrets: {
-        composioUserApiKey: 'uak_123',
-        composioOrg: 'org-1',
-      },
-      configToMark: { source: 'managed' },
-    });
+    expect(mockedGetActiveManagedComposioIdentity).not.toHaveBeenCalled();
   });
 });

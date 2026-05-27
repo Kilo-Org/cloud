@@ -12,6 +12,7 @@ type CalendarConnectStepViewProps = {
   connectUrl: string;
   isConnected: boolean;
   connectedAccountEmail?: string | null;
+  interactionDisabled?: boolean;
   /**
    * Whether it's safe to start the OAuth round trip. Two prerequisites:
    * (1) the kiloclaw instance row exists — `/api/integrations/google/connect`
@@ -51,6 +52,7 @@ export function CalendarConnectStepView({
   connectUrl,
   isConnected,
   connectedAccountEmail,
+  interactionDisabled = false,
   readyToConnect,
   onSkip,
   onContinue,
@@ -124,12 +126,13 @@ export function CalendarConnectStepView({
           <button
             type="button"
             onClick={() => onSkip()}
-            className="text-muted-foreground hover:text-foreground text-sm font-medium transition-colors"
+            disabled={interactionDisabled}
+            className="text-muted-foreground hover:text-foreground text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60"
           >
             Skip for now
           </button>
           {isConnected ? (
-            <Button variant="primary" onClick={() => onContinue()}>
+            <Button variant="primary" onClick={() => onContinue()} disabled={interactionDisabled}>
               Continue
             </Button>
           ) : readyToConnect ? (

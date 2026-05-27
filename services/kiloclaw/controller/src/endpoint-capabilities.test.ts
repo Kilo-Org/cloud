@@ -16,6 +16,18 @@ describe('getControllerEndpointCapabilities', () => {
     expect(capabilities).toEqual([...new Set(CONTROLLER_ENDPOINT_CAPABILITIES)].sort());
   });
 
+  it('advertises operation-specific agent CRUD capabilities', () => {
+    expect(getControllerEndpointCapabilities()).toEqual(
+      expect.arrayContaining([
+        'config.agents.read',
+        'config.agents.create.basic.cli',
+        'config.agents.update',
+        'config.agents.delete.cli',
+        'config.agent-defaults.update',
+      ])
+    );
+  });
+
   it('includes conditional Kilo Chat capabilities only when requested', () => {
     const defaultCapabilities = getControllerEndpointCapabilities();
     const kiloChatCapabilities = getControllerEndpointCapabilities({

@@ -15,7 +15,6 @@ import { useOrganizationWithMembers } from '@/app/api/organizations/hooks';
 
 type GitHubIntegrationDetailsProps = {
   organizationId?: string;
-  organizationName?: string;
   success?: boolean;
   error?: string;
   pendingApproval?: boolean;

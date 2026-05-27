@@ -2,254 +2,84 @@
 
 ## Role of This Document
 
-This spec defines the business rules and invariants for integrating
-Composio with KiloClaw. It is the source of truth for what the system
-must guarantee about Composio credential ownership, OpenClaw instance
-injection, manual configuration, managed provisioning, organization
-sharing, and connection onboarding.
+This spec defines the business rules and invariants for user-provided Composio CLI credentials in KiloClaw settings and the retirement of the removed managed Composio onboarding experiment. It is the source of truth for what the system must guarantee about credential ownership, encrypted instance injection, cleanup of managed credentials previously created by Kilo, and logging boundaries.
 
-It deliberately does not prescribe how to implement those guarantees:
-column layouts, endpoint names, controller helper names, and UI component
-structure belong in plan documents and code, not here.
+It deliberately does not prescribe implementation details such as endpoint names, column layouts, cleanup command names, or controller helper structure.
 
 ## Status
 
-Draft -- proposed for PR #3348. Not yet shipped.
+Draft -- created for managed Composio onboarding in PR #3348 on 2026-05-20.
+Updated 2026-05-27 -- retired managed onboarding; retained user-provided Settings configuration only.
 
 ## Conventions
 
-The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT",
-"SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED", "MAY", and
-"OPTIONAL" in this document are to be interpreted as described in
-BCP 14 [RFC 2119] [RFC 8174] when, and only when, they appear in all
-capitals, as shown here.
+The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED", "MAY", and "OPTIONAL" in this document are to be interpreted as described in BCP 14 [RFC 2119] [RFC 8174] when, and only when, they appear in all capitals, as shown here.
 
 ## Definitions
 
-- **Composio CLI credentials**: The Composio user API key and
-  organization identifier required to sign the `composio` CLI into a
-  Composio account or organization.
-- **Manual Composio configuration**: User-provided Composio CLI
-  credentials entered through KiloClaw and injected into an OpenClaw
-  instance.
-- **Managed Composio identity**: A Composio identity provisioned by Kilo
-  on behalf of a Kilo user or a Kilo user's organization context, with
-  credentials stored by Kilo and reused across KiloClaw instance
-  lifecycles.
-- **Owner scope**: The Kilo ownership boundary for a Composio identity.
-  The supported scopes are a personal Kilo user and a Kilo organization
-  user context: one specific Kilo user acting inside one specific Kilo
-  organization.
-- **Connected account**: A Composio record representing a user's
-  authorization to an external toolkit such as Google Calendar, Gmail,
-  GitHub, or Slack within a personal or organization context.
-- **Connect Link**: A Composio-hosted authentication URL used to connect
-  an external toolkit account to a Composio user/context.
-- **OpenClaw instance**: The Fly Machine-backed KiloClaw environment
-  where OpenClaw and the `composio` CLI run.
-- **Kilo central Composio credential**: Any Composio credential owned by
-  Kilo as an operator/developer rather than by a specific Kilo user or
-  Kilo organization-user owner scope.
+- **Composio CLI credentials**: The Composio user API key and organization identifier required to sign the `composio` CLI into a Composio account or organization.
+- **Manual Composio configuration**: User-provided Composio CLI credentials saved through KiloClaw Settings and injected into an OpenClaw instance.
+- **Retired managed Composio identity**: A Kilo-created Composio identity or connected-account record created during the removed managed onboarding experiment.
+- **OpenClaw instance**: The provider-backed KiloClaw environment where OpenClaw and the `composio` CLI run.
 
 ## Overview
 
-KiloClaw can expose Composio to OpenClaw instances in two ways. First,
-users may manually provide Composio CLI credentials; KiloClaw injects
-those credentials into the instance and signs the local `composio` CLI in
-during controller bootstrap. This makes Composio available without Kilo
-provisioning or owning a Composio identity.
+KiloClaw supports Composio only as an explicitly user-configured Settings secret. A user can enter their Composio CLI credentials, which are validated, encrypted, delivered through the existing instance secret pipeline, and used by the controller to make Composio available inside their instance.
 
-Kilo may also provision managed Composio identities during onboarding.
-Managed personal identities are reused across new personal KiloClaw
-instances created after a prior instance is destroyed. Managed
-organization-context identities are scoped per organization user, not
-shared across the whole organization: the same Kilo user receives a
-distinct Composio identity for each organization context where they use
-KiloClaw. Kilo may create Connect Links during onboarding so external
-toolkit connections can be completed before the OpenClaw instance is fully
-provisioned.
+Kilo previously shipped a managed Composio onboarding experiment that created Kilo-owned identities and Connect Links. That behavior is retired. Kilo must not create or inject new managed Composio credentials. After new creation is disabled, Kilo must verify whether any active instance retains managed credentials, clear any confirmed runtime residue, and remove obsolete stored managed identity state.
 
 ## Rules
 
 ### Manual Configuration
 
-1. Manual Composio configuration MUST be opt-in. An OpenClaw instance
-   without both a Composio user API key and Composio organization value
-   MUST continue to boot without Composio CLI sign-in.
-2. Manual Composio credentials MUST be treated as user-provided secrets.
-   The Composio user API key MUST be encrypted at rest before it reaches
-   the KiloClaw worker and MUST be delivered to the machine through the
-   existing encrypted environment variable pipeline.
-3. The Composio organization value MAY be less sensitive than the user
-   API key, but when collected with the Composio integration it SHOULD be
-   stored and transported through the same secret path to avoid exposing
-   account metadata unnecessarily.
-4. The controller MUST NOT log Composio user API keys, generated login
-   commands containing those keys, Connect Links containing secret
-   material, OAuth tokens, or raw Composio credentials.
-5. When manual Composio credentials are removed from KiloClaw settings,
-   the next OpenClaw instance bootstrap SHOULD leave the CLI unsigned-in
-   or clean up prior Composio CLI auth state so stale credentials are not
-   reused.
-6. Kilo MUST NOT rotate, revoke, claim, or otherwise manage manually
-   entered Composio credentials unless the user explicitly requests that
-   action through a supported product flow.
+1. Manual Composio configuration MUST be opt-in. An OpenClaw instance without both required Composio fields MUST continue to boot without Composio CLI sign-in.
+2. Manual Composio credentials MUST be treated as user-provided secrets. The user API key and organization value MUST be encrypted before reaching the KiloClaw Worker and MUST be delivered through the existing encrypted environment variable pipeline.
+3. Manual Composio fields MUST remain configurable from Settings through the secret catalog unless a future spec explicitly removes Composio support.
+4. The system MUST validate manually entered Composio credential fields according to the catalog validation contract before saving or provisioning them.
+5. When a user clears manual Composio settings, subsequent instance configuration MUST remove the corresponding injected secret values through the normal secret update path.
+6. Kilo MUST NOT rotate, revoke, claim, or otherwise manage manually entered Composio credentials unless the user explicitly requests that action through a future supported flow.
 
 ### Instance CLI Sign-In
 
-7. The OpenClaw instance MAY contain the Composio CLI even when no Composio
-   credentials are configured.
-8. When valid Composio CLI credentials are available, the controller
-   SHOULD sign the CLI in during bootstrap so `composio` commands work
-   without an interactive browser login.
-9. Composio CLI sign-in MUST be best-effort and MUST NOT prevent the
-   controller from starting OpenClaw unless the user or product has
-   explicitly configured Composio as a required startup dependency.
-10. If sign-in uses a subprocess invocation, the implementation MUST use
-    a direct executable call rather than a shell and MUST suppress logs
-    that would include credentials.
-11. If sign-in writes Composio CLI state files directly, those files MUST
-    be written with owner-only permissions and MUST be placed in the
-    OpenClaw instance user's Composio config directory.
-12. Composio credentials injected for CLI sign-in MUST NOT be left in the
-    gateway child process environment when they are no longer needed by
-    the running gateway.
-13. Configuring Composio through KiloClaw settings or managed
-    provisioning is an explicit request for Kilo to manage the OpenClaw
-    instance's Composio CLI sign-in. When valid Kilo-provided Composio
-    credentials are available, the controller MAY overwrite existing
-    on-disk Composio CLI configuration during bootstrap.
-14. If a user signs into Composio manually inside the OpenClaw instance
-    after configuring Composio through KiloClaw, a later controller
-    bootstrap MAY overwrite that manual sign-in with the Kilo-provided
-    credentials. This is accepted behavior; users who want to preserve a
-    fully custom Composio CLI configuration SHOULD not configure Composio
-    through KiloClaw for that OpenClaw instance.
-15. When Composio credentials are removed from Kilo settings or managed
-    provisioning, the controller MAY leave any existing on-disk Composio
-    CLI configuration untouched. Kilo is not required to determine
-    whether that configuration was written by Kilo or by a user.
+7. The OpenClaw instance MAY contain the Composio CLI even when no Composio credentials are configured.
+8. When valid manual Composio credentials are present, the controller SHOULD sign the CLI in during bootstrap so `composio` commands work without interactive browser login.
+9. Composio CLI sign-in MUST be best-effort and MUST NOT prevent the controller from starting OpenClaw unless a future product contract makes Composio a required dependency.
+10. If sign-in uses a subprocess, the implementation MUST invoke a direct executable rather than a shell and MUST suppress logs containing credentials.
+11. Any Composio CLI state files written by the controller MUST use owner-only permissions and remain inside the instance user's Composio configuration directory.
+12. Credentials used only for CLI sign-in MUST NOT remain unnecessarily available to unrelated child processes.
 
-### Credential Boundary
+### Removed Managed Onboarding
 
-16. Kilo central Composio credentials MUST NOT be injected into a user or
-    organization OpenClaw instance.
-17. An OpenClaw instance MUST receive only credentials for its own owner
-    scope: the user's manual credentials, the user's managed personal
-    Composio identity, or the user's managed Composio identity for the
-    active Kilo organization context.
-18. The system MUST NOT fall back from a missing owner-scoped Composio
-    identity to any shared global Composio identity.
-19. Manual personal Composio credentials MUST NOT be reused for an
-    organization OpenClaw instance unless the user explicitly configures
-    those credentials in that organization context.
-20. Managed personal Composio credentials MUST NOT be reused for a Kilo
-    organization context. Managed organization-context credentials MUST
-    NOT be reused for a different user, a different organization, or a
-    personal context.
+13. Kilo MUST NOT create new managed Composio identities, Connect Links, connected-account onboarding flows, or managed credential injection for KiloClaw onboarding.
+14. Direct Google Calendar onboarding, when offered, is independent of Composio and MUST NOT depend on retired managed Composio state.
+15. Retired managed Composio identities MUST NOT be reused for new instances or configuration updates.
+16. After managed creation paths are disabled, the system MUST verify whether an active instance associated with retired managed identity state retains managed Composio credentials, including a possible partial-write case where runtime injection succeeded before a tracking marker was persisted.
+17. Any confirmed managed credential material in a live instance MUST be cleared before obsolete stored managed identity state is deleted. Verification and clearing MUST NOT remove manually configured Composio credentials.
+18. If no live managed runtime credential remains, obsolete managed identity rows, encrypted credential residue, connected-account identifiers, and destroyed-instance tracking markers MAY be removed by dropping the retired managed-state schema.
+19. Obsolete managed-state database structures MUST NOT be dropped until managed creation is disabled and live runtime residue has been ruled out or cleared.
 
-### Managed Identity Ownership
+### Credential Boundary and Data Protection
 
-21. A managed personal Composio identity MUST be scoped to exactly one
-    Kilo user.
-22. A managed organization-context Composio identity MUST be scoped to
-    exactly one Kilo user and exactly one Kilo organization.
-23. Managed Composio identities MUST survive KiloClaw instance destroy
-    and reprovision operations unless the owner explicitly revokes the
-    identity or account deletion/org deletion policy requires revocation
-    or anonymization.
-24. Kilo SHOULD store managed Composio identities in owner-scoped
-    persistent storage rather than instance-scoped Durable Object state.
-    That storage SHOULD distinguish pending provisioning from active
-    identities.
-25. Managed Composio identity credentials MUST be encrypted at rest.
-26. The KiloClaw worker MUST NOT be the primary creator of persistent
-    managed Composio identity records. Persistent identity writes SHOULD
-    be owned by the Next.js web app or another explicitly designated
-    control-plane service.
-27. At most one non-revoked managed Composio identity SHOULD exist per
-    owner scope unless a future spec explicitly supports multiple active
-    identities.
-
-### Organization Contexts
-
-28. In a Kilo organization context, each eligible organization user MUST
-    receive their own managed Composio identity for that organization
-    context. Managed Composio identities MUST NOT be shared across all
-    members of an organization unless a future spec explicitly introduces
-    shared organization-level identities.
-29. A managed organization-context identity MAY be reused by the same
-    Kilo user across new KiloClaw instances created after prior instances
-    are destroyed in the same Kilo organization.
-30. Connected accounts associated with a managed organization-context
-    identity are scoped to that Kilo user in that Kilo organization
-    context. They MUST NOT become implicitly usable by other organization
-    members through a shared Composio workspace.
-31. When a user loses access to a Kilo organization, the system MUST
-    prevent that user from receiving that organization-context Composio
-    identity's credentials in any future OpenClaw instance config.
-32. Organization member removal SHOULD NOT delete other members'
-    organization-context Composio identities or connected accounts.
-33. Organization deletion MUST define whether organization-context
-    Composio identities are revoked, anonymized, or retained for
-    audit/compliance before deletion support ships.
-
-### Connect Link Onboarding
-
-34. Kilo MAY create Composio Connect Links during onboarding before the
-    OpenClaw instance machine exists.
-35. A Connect Link created by Kilo MUST be scoped to the correct managed
-    owner identity and to the intended Composio user/context for that
-    owner.
-36. Connect Link callback handling MUST verify the authenticated Kilo
-    user still has access to the owner scope before recording a
-    connection as active or surfacing it in UI.
-37. Kilo MUST NOT receive or persist raw OAuth access tokens from external
-    toolkits connected through Composio unless a separate spec explicitly
-    permits that behavior.
-38. Connection status displayed in Kilo SHOULD be derived from Composio
-    connected-account state or from a Kilo cache that is refreshed from
-    Composio. Kilo MUST NOT treat creation of a Connect Link as proof
-    that the external account is connected.
-39. For organization-context onboarding, Kilo MUST make clear that the
-    connection is for the current user inside the organization context,
-    not for a shared organization-wide Composio workspace.
-40. Managed Connect Link onboarding UI MUST disclose that Composio powers
-    the toolkit connection. When manual Composio configuration is
-    available for the OpenClaw instance, the onboarding UI MUST provide a
-    path for the user to use their own Composio credentials instead of
-    the managed Composio identity.
-
-### Data Protection and Logging
-
-41. Composio user API keys, project API keys, agent keys, OAuth tokens,
-    and any equivalent credential material MUST be treated as secrets.
-42. Logs, analytics, audit records, Sentry events, and user-facing errors
-    MUST NOT include raw Composio credentials or OAuth tokens.
-43. Generated Composio emails or identifiers that can be linked to a Kilo
-    user SHOULD be treated as user-linked data for GDPR/anonymization
-    purposes.
-44. When Kilo stores user-linked managed Composio data in Postgres, the
-    GDPR soft-delete flow MUST anonymize, revoke, or detach that data in
-    a way that complies with the product's account deletion policy.
+20. Kilo central or retired managed Composio credentials MUST NOT be injected into a user or organization OpenClaw instance.
+21. Logs, analytics, audit records, Sentry events, command output, and user-facing errors MUST NOT include raw Composio credentials, OAuth tokens, Connect Links containing secret material, or decrypted stored identity data.
+22. User-provided Composio secrets MUST continue to follow the normal KiloClaw secret encryption, transport, and deletion rules.
+23. Retired managed rows containing encrypted credentials or user-linked provider identifiers MUST be deleted after the required live-runtime verification or otherwise scrubbed in accordance with account-deletion requirements.
 
 ## Error Handling
 
-1. If manual Composio credentials are missing or incomplete, the
-   controller MUST skip Composio CLI sign-in and continue startup.
-2. If Composio CLI sign-in fails, the controller MUST log a sanitized
-   failure and SHOULD continue startup in a usable state.
-3. If managed Composio identity provisioning fails during onboarding,
-   the onboarding flow MUST surface a retryable error and MUST NOT store
-   a partially usable identity as active.
-4. If a Connect Link callback reports failure or the connected account is
-   not active, Kilo MUST keep the connection status non-active and allow
-   the user to retry.
-5. If an organization user is no longer authorized for an organization
-   before a Connect Link callback completes, Kilo MUST reject the
-   callback result for that user's session.
+1. If manual Composio credentials are missing or incomplete, the controller MUST skip Composio CLI sign-in and continue startup.
+2. If manual Composio credential validation fails, the save or provision request MUST fail before transporting invalid credentials to the Worker.
+3. If Composio CLI sign-in fails, the controller MUST log a sanitized failure and SHOULD continue startup in a usable state.
+4. If clearing confirmed managed runtime credentials from an active instance fails, obsolete managed stored state MUST be retained until that cleanup can be retried successfully.
 
-## Implementation Status
+## Changelog
 
-This spec describes the intended first shipped behavior for PR #3348.
-None of the managed Composio onboarding behavior has reached production.
+### 2026-05-27 -- Retired managed Composio onboarding
+
+- Removed managed identity provisioning, managed Connect Link onboarding, and managed callback injection from supported product behavior.
+- Retained explicit user-provided Composio credentials through Settings and the encrypted secret pipeline.
+- Added post-deploy live-runtime verification and subsequent stored-state removal requirements for managed credentials created or injected while the experiment was shipped.
+
+### 2026-05-20 -- Managed onboarding experiment
+
+- Introduced the managed Composio onboarding behavior later retired by the 2026-05-27 revision.

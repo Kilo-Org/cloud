@@ -153,10 +153,8 @@ function ClawOnboardingFlowInner({
   const [onboardingStep, setOnboardingStep] = useState<OnboardingStep>(() => {
     if (typeof window === 'undefined') return 'identity';
     const initialStep = new URLSearchParams(window.location.search).get('step');
-    if (initialStep === 'tools') return 'tools';
     return initialStep === 'calendar' ? 'calendar' : 'identity';
   });
-  const hasToolsStep = false;
 
   const gatewayUrl = useGatewayUrl(status);
 
@@ -186,7 +184,6 @@ function ClawOnboardingFlowInner({
     setupFailed,
     onboardingStep,
     hasBotIdentity: botIdentity !== null,
-    hasToolsStep,
     hasCalendarStep,
     hasInterestsStep,
   };
@@ -316,8 +313,8 @@ function ClawOnboardingFlowInner({
   }, [flowState.instanceStatus, botIdentity]);
 
   // Resume the calendar step after the full-page Google OAuth round trip.
-  // Stale Composio callback URLs are cleaned up without showing connection
-  // feedback because Composio is no longer part of onboarding.
+  // Remove stale `tools` URLs from the retired integration flow without
+  // displaying obsolete connection feedback.
   const hasResumedFromQuery = useRef(false);
 
   // Allowlist of known OAuth error codes that the callback route can emit.
@@ -688,7 +685,6 @@ function ClawOnboardingFlowInner({
     switch (renderStep) {
       case 'identity':
         return renderIdentityStep();
-      case 'tools':
       case 'calendar':
         return renderCalendarStep();
       case 'email':

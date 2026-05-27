@@ -10,7 +10,7 @@ IMAGE="${IMAGE:-kiloclaw:controller}"
 IMAGE_BEFORE="${IMAGE_BEFORE:-$IMAGE}"
 IMAGE_AFTER="${IMAGE_AFTER:-$IMAGE}"
 PORT="${PORT:-18791}"
-TOKEN="${TOKEN:-live-smoke-token}"
+TOKEN="${TOKEN:-$(python3 -c 'import secrets; print(secrets.token_hex(32))')}"
 KILOCODE_CONFIG_PATH="${KILOCODE_CONFIG_PATH:-$HOME/.kilocode/cli/config.json}"
 KILOCODE_SMOKE_MODEL="${KILOCODE_SMOKE_MODEL:-kilocode/kilo-auto/free}"
 EXPECTED_VERSION_BEFORE="${EXPECTED_VERSION_BEFORE:-}"
@@ -145,7 +145,7 @@ start_container() {
     docker_env+=(-e KILOCODE_ORGANIZATION_ID)
   fi
   CID=$(docker run -d --rm \
-    -p "$PORT:18789" \
+    -p "127.0.0.1:${PORT}:18789" \
     "${docker_env[@]}" \
     -v "$ROOTDIR:/root" \
     "$image")
@@ -180,7 +180,8 @@ wait_for_ready() {
   done
 
   echo "FAIL: $label controller did not reach ready state"
-  docker logs --tail 80 "$CID" || true
+  echo "  Container logs suppressed because startup errors can contain live credentials."
+  echo "  Reproduce with disposable credentials before inspecting raw container logs."
   return 1
 }
 
@@ -242,7 +243,6 @@ assert_live_agent_turn() {
   local params
   local output
   local parsed
-  local safe_output
 
   nonce="KILOCLAW_SMOKE_$(python3 -c 'import secrets; print(secrets.token_hex(8).upper())')"
   session_id="kiloclaw-live-smoke-$(date +%s)"
@@ -268,8 +268,7 @@ PY
     --timeout 240000 \
     --json 2>&1); then
     check "live Auto Free agent turn" "nonce returned" "command failed"
-    safe_output="${output//"$KILOCODE_API_KEY"/<redacted-token>}"
-    echo "  output: $safe_output"
+    echo "  Gateway output suppressed because provider errors can contain live credentials."
     return
   fi
 
@@ -289,9 +288,8 @@ print("nonce returned")
     check "live Auto Free agent turn" "nonce returned" "$parsed"
   else
     check "live Auto Free agent turn" "nonce returned" "unexpected response"
-    safe_output="${output//"$KILOCODE_API_KEY"/<redacted-token>}"
     echo "  details: $parsed"
-    echo "  output: $safe_output"
+    echo "  Gateway output suppressed because provider responses can contain sensitive data."
   fi
 }
 

@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { getUserFromAuth } from '@/lib/user/server';
 import { APP_URL } from '@/lib/constants';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
+import { requireKiloClawAccess } from '@/lib/kiloclaw/access-gate';
 import { requireOrganizationKiloClawComputeEntitlement } from '@/lib/organizations/trial-middleware';
 import { getActiveInstance, getActiveOrgInstance } from '@/lib/kiloclaw/instance-registry';
 import { buildGoogleOAuthUrl } from '@/lib/integrations/google-service';
@@ -38,7 +39,7 @@ export async function GET(request: NextRequest) {
   let organizationId: string | undefined;
 
   try {
-    const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: true });
+    const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
     if (authFailedResponse) {
       return NextResponse.redirect(new URL('/users/sign_in', APP_URL));
     }
@@ -54,6 +55,8 @@ export async function GET(request: NextRequest) {
       organizationId = parsedOrgId.data;
       await ensureOrganizationAccess({ user }, organizationId);
       await requireOrganizationKiloClawComputeEntitlement(organizationId);
+    } else {
+      await requireKiloClawAccess(user.id);
     }
 
     const owner: Owner = organizationId

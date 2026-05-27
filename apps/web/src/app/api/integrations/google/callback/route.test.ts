@@ -16,6 +16,15 @@ const mockedEnsureOrganizationAccess = jest.fn();
 jest.mock('@/routers/organizations/utils', () => ({
   ensureOrganizationAccess: mockedEnsureOrganizationAccess,
 }));
+const mockedRequireKiloClawAccess = jest.fn();
+jest.mock('@/lib/kiloclaw/access-gate', () => ({
+  requireKiloClawAccess: mockedRequireKiloClawAccess,
+}));
+const mockedRequireOrganizationKiloClawComputeEntitlement = jest.fn();
+jest.mock('@/lib/organizations/trial-middleware', () => ({
+  requireOrganizationKiloClawComputeEntitlement:
+    mockedRequireOrganizationKiloClawComputeEntitlement,
+}));
 jest.mock('@/lib/kiloclaw/instance-registry');
 jest.mock('@/lib/integrations/google-service');
 jest.mock('@/lib/kiloclaw/google-oauth-connections');
@@ -186,6 +195,8 @@ describe('GET /api/integrations/google/callback', () => {
 
     expect(response.status).toBe(307);
     expectRedirectLocation(response, '/claw/settings?success=google_connected');
+    expect(mockedRequireKiloClawAccess).toHaveBeenCalledWith(USER_ID);
+    expect(mockedRequireOrganizationKiloClawComputeEntitlement).not.toHaveBeenCalled();
     expect(mockedExchangeGoogleOAuthCode).toHaveBeenCalledWith('abc', ['calendar_read']);
     expect(mockedUpsertKiloClawGoogleOAuthConnection).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -202,6 +213,21 @@ describe('GET /api/integrations/google/callback', () => {
       }),
       INSTANCE_ID
     );
+  });
+
+  test('does not persist personal OAuth callback after KiloClaw access expires', async () => {
+    mockedRequireKiloClawAccess.mockRejectedValue(new Error('access denied'));
+
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest('/api/integrations/google/callback?code=abc&state=signed') as never
+    );
+
+    expect(response.status).toBe(307);
+    expectRedirectLocation(response, '/claw/settings?error=connection_failed');
+    expect(mockedExchangeGoogleOAuthCode).not.toHaveBeenCalled();
+    expect(mockedUpsertKiloClawGoogleOAuthConnection).not.toHaveBeenCalled();
+    expect(mockedCaptureException).toHaveBeenCalledWith(expect.any(Error), expect.any(Object));
   });
 
   test('redirects org success flow to org claw settings', async () => {
@@ -229,6 +255,8 @@ describe('GET /api/integrations/google/callback', () => {
       `/organizations/${ORG_ID}/claw/settings?success=google_connected`
     );
     expect(mockedEnsureOrganizationAccess).toHaveBeenCalledWith({ user: { id: USER_ID } }, ORG_ID);
+    expect(mockedRequireOrganizationKiloClawComputeEntitlement).toHaveBeenCalledWith(ORG_ID);
+    expect(mockedRequireKiloClawAccess).not.toHaveBeenCalled();
   });
 
   test('allows different org admin than instance creator to complete callback', async () => {

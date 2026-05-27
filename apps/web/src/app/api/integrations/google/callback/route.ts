@@ -5,6 +5,8 @@ import { captureException, captureMessage } from '@sentry/nextjs';
 import { APP_URL } from '@/lib/constants';
 import { getUserFromAuth } from '@/lib/user/server';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
+import { requireKiloClawAccess } from '@/lib/kiloclaw/access-gate';
+import { requireOrganizationKiloClawComputeEntitlement } from '@/lib/organizations/trial-middleware';
 import { getInstanceById } from '@/lib/kiloclaw/instance-registry';
 import {
   exchangeGoogleOAuthCode,
@@ -205,6 +207,12 @@ export async function GET(request: NextRequest) {
       });
 
       return NextResponse.redirect(new URL('/claw/settings?error=unauthorized', APP_URL));
+    }
+
+    if (verifiedState.owner.type === 'org') {
+      await requireOrganizationKiloClawComputeEntitlement(verifiedState.owner.id);
+    } else {
+      await requireKiloClawAccess(user.id);
     }
 
     let oauthData;

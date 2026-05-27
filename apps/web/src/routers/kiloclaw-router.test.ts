@@ -249,19 +249,19 @@ describe('kiloclawRouter validateWeatherLocation', () => {
     fetchSpy.mockRestore();
   });
 
-  it('returns the format=3 preview with a readable nearest-area location', async () => {
+  it('requests metric weather for a non-US resolved location', async () => {
     const user = await insertTestUser({
       google_user_email: `kiloclaw-weather-test-${Math.random()}@example.com`,
     });
     fetchSpy
-      .mockResolvedValueOnce(wttrFormat3Response('Amsterdam: ☁️   +7°C'))
       .mockResolvedValueOnce(
         wttrLocationResponse({
           areaName: 'Binnenstad',
           region: 'North Holland',
           country: 'Netherlands',
         })
-      );
+      )
+      .mockResolvedValueOnce(wttrFormat3Response('Amsterdam: ☁️   +7°C'));
     const caller = createCaller({ user });
 
     const result = await caller.validateWeatherLocation({ location: ' Amsterdam ' });
@@ -269,7 +269,7 @@ describe('kiloclawRouter validateWeatherLocation', () => {
     expect(fetchSpy).toHaveBeenCalledTimes(2);
     expect(fetchSpy).toHaveBeenNthCalledWith(
       1,
-      'https://wttr.in/Amsterdam?format=3',
+      'https://wttr.in/Amsterdam?format=j1',
       expect.objectContaining({
         headers: expect.objectContaining({ 'User-Agent': 'curl/8.7.1' }),
         signal: expect.any(AbortSignal),
@@ -277,7 +277,7 @@ describe('kiloclawRouter validateWeatherLocation', () => {
     );
     expect(fetchSpy).toHaveBeenNthCalledWith(
       2,
-      'https://wttr.in/Amsterdam?format=j1',
+      'https://wttr.in/Amsterdam?format=3&m',
       expect.objectContaining({
         headers: expect.objectContaining({ 'User-Agent': 'curl/8.7.1' }),
         signal: expect.any(AbortSignal),
@@ -290,26 +290,58 @@ describe('kiloclawRouter validateWeatherLocation', () => {
     });
   });
 
+  it('requests USCS weather for a US resolved location', async () => {
+    const user = await insertTestUser({
+      google_user_email: `kiloclaw-weather-us-test-${Math.random()}@example.com`,
+    });
+    fetchSpy
+      .mockResolvedValueOnce(
+        wttrLocationResponse({
+          areaName: 'Austin',
+          region: 'Texas',
+          country: 'United States of America',
+        })
+      )
+      .mockResolvedValueOnce(wttrFormat3Response('Austin: ☀️   +78°F'));
+    const caller = createCaller({ user });
+
+    const result = await caller.validateWeatherLocation({ location: 'Austin, Texas' });
+
+    expect(fetchSpy).toHaveBeenNthCalledWith(
+      2,
+      'https://wttr.in/Austin%2C%20Texas?format=3&u',
+      expect.objectContaining({
+        headers: expect.objectContaining({ 'User-Agent': 'curl/8.7.1' }),
+        signal: expect.any(AbortSignal),
+      })
+    );
+    expect(result).toEqual({
+      location: 'Austin, United States of America',
+      currentWeatherText: '☀️   +78°F',
+      status: 'validated',
+    });
+  });
+
   it('resolves coordinate locations to a readable display location', async () => {
     const user = await insertTestUser({
       google_user_email: `kiloclaw-weather-format-test-${Math.random()}@example.com`,
     });
     fetchSpy
-      .mockResolvedValueOnce(wttrFormat3Response('53.2167,6.5667: ☀️   +9°C\n'))
       .mockResolvedValueOnce(
         wttrLocationResponse({
           areaName: 'Groningen',
           region: 'Groningen',
           country: 'Netherlands',
         })
-      );
+      )
+      .mockResolvedValueOnce(wttrFormat3Response('53.2167,6.5667: ☀️   +9°C\n'));
     const caller = createCaller({ user });
 
     const result = await caller.validateWeatherLocation({ location: '53.2167,6.5667' });
 
     expect(fetchSpy).toHaveBeenNthCalledWith(
       2,
-      'https://wttr.in/53.2167%2C6.5667?format=j1',
+      'https://wttr.in/53.2167%2C6.5667?format=3&m',
       expect.objectContaining({
         headers: expect.objectContaining({ 'User-Agent': 'curl/8.7.1' }),
         signal: expect.any(AbortSignal),
@@ -322,11 +354,52 @@ describe('kiloclawRouter validateWeatherLocation', () => {
     });
   });
 
+  it('defaults to metric weather when the resolved country is unavailable', async () => {
+    const user = await insertTestUser({
+      google_user_email: `kiloclaw-weather-default-units-test-${Math.random()}@example.com`,
+    });
+    fetchSpy
+      .mockResolvedValueOnce(wttrFormat3Response('malformed location response'))
+      .mockResolvedValueOnce(wttrFormat3Response('Somewhere: ☁️   +7°C'));
+    const caller = createCaller({ user });
+
+    await caller.validateWeatherLocation({ location: 'Somewhere' });
+
+    expect(fetchSpy).toHaveBeenNthCalledWith(
+      2,
+      'https://wttr.in/Somewhere?format=3&m',
+      expect.anything()
+    );
+  });
+
+  it('uses metric weather when country lookup is temporarily unavailable', async () => {
+    const user = await insertTestUser({
+      google_user_email: `kiloclaw-weather-country-outage-test-${Math.random()}@example.com`,
+    });
+    fetchSpy
+      .mockResolvedValueOnce(wttrFormat3Response('Bad Gateway', 502))
+      .mockResolvedValueOnce(wttrFormat3Response('Amsterdam: ☁️   +7°C'));
+    const caller = createCaller({ user });
+
+    await expect(caller.validateWeatherLocation({ location: 'Amsterdam' })).resolves.toEqual({
+      location: 'Amsterdam',
+      currentWeatherText: '☁️   +7°C',
+      status: 'validated',
+    });
+    expect(fetchSpy).toHaveBeenNthCalledWith(
+      2,
+      'https://wttr.in/Amsterdam?format=3&m',
+      expect.anything()
+    );
+  });
+
   it('rejects unknown locations without returning raw input', async () => {
     const user = await insertTestUser({
       google_user_email: `kiloclaw-weather-invalid-test-${Math.random()}@example.com`,
     });
-    fetchSpy.mockResolvedValue(wttrFormat3Response('Unknown location; please try again.'));
+    fetchSpy.mockImplementation(async () =>
+      wttrFormat3Response('Unknown location; please try again.')
+    );
     const caller = createCaller({ user });
 
     await expect(caller.validateWeatherLocation({ location: 'not-a-real-place' })).rejects.toThrow(
@@ -338,7 +411,7 @@ describe('kiloclawRouter validateWeatherLocation', () => {
     const user = await insertTestUser({
       google_user_email: `kiloclaw-weather-malformed-test-${Math.random()}@example.com`,
     });
-    fetchSpy.mockResolvedValue(wttrFormat3Response('☁️   +7°C'));
+    fetchSpy.mockImplementation(async () => wttrFormat3Response('☁️   +7°C'));
     const caller = createCaller({ user });
 
     await expect(caller.validateWeatherLocation({ location: ' Amsterdam ' })).resolves.toEqual({
@@ -381,7 +454,7 @@ describe('kiloclawRouter validateWeatherLocation', () => {
     const user = await insertTestUser({
       google_user_email: `kiloclaw-weather-service-error-test-${Math.random()}@example.com`,
     });
-    fetchSpy.mockResolvedValue(wttrFormat3Response('Bad Gateway', 502));
+    fetchSpy.mockImplementation(async () => wttrFormat3Response('Bad Gateway', 502));
     const caller = createCaller({ user });
 
     await expect(caller.validateWeatherLocation({ location: 'Amsterdam' })).resolves.toEqual({
@@ -395,7 +468,7 @@ describe('kiloclawRouter validateWeatherLocation', () => {
     const user = await insertTestUser({
       google_user_email: `kiloclaw-weather-not-found-status-test-${Math.random()}@example.com`,
     });
-    fetchSpy.mockResolvedValue(wttrFormat3Response('Not Found', 404));
+    fetchSpy.mockImplementation(async () => wttrFormat3Response('Not Found', 404));
     const caller = createCaller({ user });
 
     await expect(caller.validateWeatherLocation({ location: 'not-a-real-place' })).rejects.toThrow(

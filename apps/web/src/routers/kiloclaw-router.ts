@@ -646,6 +646,9 @@ const WTTR_LOCATION_TIMEOUT_MS = 4_000;
 const WTTR_SERVICE_UNAVAILABLE_MESSAGE =
   "wttr.in is down right now. We'll store your location as entered.";
 const COORDINATE_LOCATION_PATTERN = /^-?\d+(?:\.\d+)?\s*,\s*-?\d+(?:\.\d+)?$/;
+const US_WEATHER_COUNTRIES = new Set(['united states', 'united states of america']);
+
+type WeatherUnits = 'm' | 'u';
 
 type WeatherLocationValidationResult = {
   location: string;
@@ -684,6 +687,17 @@ function wttrValue(values: WttrValue[] | undefined): string | null {
 
 function formatCountryName(country: string): string {
   return country.toLowerCase() === 'netherlands' ? 'The Netherlands' : country;
+}
+
+function weatherUnitsForCountry(country: string | null): WeatherUnits {
+  return country && US_WEATHER_COUNTRIES.has(country.toLowerCase()) ? 'u' : 'm';
+}
+
+function weatherUnitsForLocation(data: unknown): WeatherUnits {
+  const parsed = wttrLocationResponseSchema.safeParse(data);
+  if (!parsed.success) return 'm';
+
+  return weatherUnitsForCountry(wttrValue(parsed.data.nearest_area?.[0]?.country));
 }
 
 function isCoordinateLocation(location: string): boolean {
@@ -785,21 +799,20 @@ async function fetchWttr(location: string, query: string): Promise<WttrFetchResu
   }
 }
 
-async function fetchReadableLocationName(
-  location: string,
-  preferredAreaName: string
-): Promise<string | null> {
+async function fetchWeatherLocationData(location: string): Promise<unknown | null> {
   try {
     const result = await fetchWttr(location, 'format=j1');
     if (!result.ok || !result.response.ok) return null;
-    return normalizeWeatherLocation(await result.response.json(), preferredAreaName);
+    return await result.response.json();
   } catch {
     return null;
   }
 }
 
 async function validateWeatherLocation(location: string): Promise<WeatherLocationValidationResult> {
-  const result = await fetchWttr(location, 'format=3');
+  const locationData = await fetchWeatherLocationData(location);
+  const units = weatherUnitsForLocation(locationData);
+  const result = await fetchWttr(location, `format=3&${units}`);
   if (!result.ok) return wttrServiceUnavailableResult(location);
 
   const response = result.response;
@@ -823,7 +836,7 @@ async function validateWeatherLocation(location: string): Promise<WeatherLocatio
     return wttrServiceUnavailableResult(location);
   }
 
-  const resolvedLocation = await fetchReadableLocationName(location, parsed.location);
+  const resolvedLocation = normalizeWeatherLocation(locationData, parsed.location);
   return {
     ...parsed,
     status: 'validated',

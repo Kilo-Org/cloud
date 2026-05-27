@@ -681,40 +681,44 @@ conversion, local referral rewards are authoritative and affiliate SALE reportin
 175. Before launch, the existing internal referral system MUST be scoped away from KiloClaw and Kilo Pass, disabled for
      those products, or migrated into this program's rules to prevent double rewards.
 
-### Kilo Pass Payment Card Welcome-Promo Guard
+### Kilo Pass Reusable Payment-Fingerprint Welcome-Promo Guard
 
-176. The Kilo Pass introductory welcome promo MUST be claimable at most once per Stripe card fingerprint. The claim applies
-     only to the first confirmed paid personal monthly Kilo Pass Stripe payment that exposes a usable settled card
-     fingerprint; annual subscriptions are excluded.
+176. The Kilo Pass introductory welcome promo MUST be claimable at most once per reusable Stripe payment-instrument
+     fingerprint that the system supports. Initial supported instrument types are `card`, `sepa_debit`,
+     `us_bank_account`, `bacs_debit`, and `au_becs_debit`. Annual subscriptions are excluded.
 
-177. The card fingerprint opportunity MUST be claimed when the qualifying monthly payment settles, not when the card is
-     merely attached, when usage crosses the bonus threshold, or when the welcome-promo credits are later issued.
+177. An instrument fingerprint opportunity MUST be claimed only when a personal monthly Kilo Pass Stripe payment with
+     `amount_paid > 0` settles using that instrument, not when the instrument is merely attached, when a zero-value
+     invoice is finalized, when usage crosses the bonus threshold, or when welcome-promo credits are later issued.
 
-178. A first-time account whose paid monthly Kilo Pass payment uses a previously claimed Stripe card fingerprint MUST NOT
-     receive the introductory `50%` welcome promo. It MAY receive the ordinary monthly-ramp bonus using the same behavior
-     as an existing or previously canceled Kilo Pass subscriber.
+178. A first-time account whose positively paid monthly Kilo Pass settlement uses a previously claimed reusable instrument
+     fingerprint MUST NOT receive the introductory `50%` welcome promo. It MAY receive the ordinary monthly-ramp bonus
+     using the same behavior as an existing or previously canceled Kilo Pass subscriber.
 
-179. A paid monthly Kilo Pass payment using a previously claimed Stripe card fingerprint MUST NOT be an eligible Kilo Pass
-     referral conversion and MUST NOT grant a Kilo Pass referral reward to either beneficiary role.
+179. A positively paid monthly Kilo Pass settlement using a previously claimed reusable instrument fingerprint MUST NOT be
+     an eligible Kilo Pass referral conversion and MUST NOT grant a Kilo Pass referral reward to either beneficiary role.
 
-180. A monthly payment without a usable settled Stripe card fingerprint MUST NOT be disqualified solely because the system
-     cannot apply the card-level guard. Existing account-history eligibility rules remain authoritative for that payment.
+180. A positively paid monthly settlement whose payment method is confirmed not to provide a supported reusable
+     fingerprint MUST NOT be disqualified solely because no cross-account instrument signal exists. A supported reusable
+     method with an absent fingerprint MAY follow that fallback. An unresolvable settlement MUST NOT be treated as a
+     confirmed eligible fallback.
 
-181. Shared household, business, or other jointly used cards are governed by the same one-claim rule; the system MUST NOT
-     provide additional welcome-promo or Kilo Pass referral-conversion eligibility solely because a later buyer is a
-     different person.
+181. Shared household, business, or other jointly used payment instruments are governed by the same one-claim rule; the
+     system MUST NOT provide additional welcome-promo or Kilo Pass referral-conversion eligibility solely because a later
+     buyer is a different person.
 
-182. A claimed card fingerprint MUST remain claimed after refund, dispute, fraud marking, cancellation, failure to redeem
-     welcome-promo credits, or account deletion. Credit or reward handling for adverse payments is separate from card
-     claim retention.
+182. A claimed reusable instrument fingerprint MUST remain claimed after refund, dispute, fraud marking, cancellation,
+     failure to redeem welcome-promo credits, or account deletion. Credit or reward handling for adverse payments is
+     separate from instrument-claim retention.
 
-183. When a paid monthly purchase is welcome-promo ineligible because its card fingerprint was previously claimed, the
-     post-payment Kilo Pass confirmation flow MUST inform the customer that the introductory bonus does not apply. The
-     message MUST NOT expose the fingerprint or the existence or identity of another account.
+183. When a paid monthly purchase is welcome-promo ineligible because its reusable payment fingerprint was previously
+     claimed, the post-payment Kilo Pass confirmation flow MUST inform the customer that the introductory bonus does not
+     apply. The message MUST NOT expose the fingerprint or the existence or identity of another account.
 
-184. Durable card-claim records MAY retain the minimum card fingerprint and payment identity data needed to enforce these
-     anti-abuse rules after account deletion. Customer-facing surfaces MUST NOT expose that retained evidence, and any
-     direct user identity references stored with such records MUST be deleted or anonymized under GDPR deletion flows.
+184. Durable instrument-claim records MAY retain the minimum Stripe fingerprint and payment identity data needed to
+     enforce these anti-abuse rules after account deletion. Customer-facing surfaces MUST NOT expose that retained
+     evidence, and any direct user identity references stored with such records MUST be deleted or anonymized under GDPR
+     deletion flows.
 
 ## Error Handling
 
@@ -750,12 +754,12 @@ conversion, local referral rewards are authoritative and affiliate SALE reportin
 
 ## Changelog
 
-### 2026-05-27 -- Prevent repeated Kilo Pass welcome claims by card
+### 2026-05-27 -- Prevent repeated Kilo Pass welcome claims by payment fingerprint
 
-Added the Kilo Pass Stripe card-fingerprint guard for monthly introductory welcome promos and referral conversions. The
-first settled qualifying card payment permanently claims the card opportunity; reused cards retain ordinary monthly-ramp
-bonus behavior but do not receive the introductory promo or create Kilo Pass referral rewards. Annual and non-card
-behavior remain outside the card-level restriction.
+Added the Kilo Pass reusable Stripe payment-fingerprint guard for monthly introductory welcome promos and referral
+conversions. The first positively paid settlement using a supported fingerprintable instrument permanently claims that
+instrument opportunity; reused instruments retain ordinary monthly-ramp bonus behavior but do not receive the
+introductory promo or create Kilo Pass referral rewards. Annual behavior remains outside this restriction.
 
 ### 2026-05-22 -- Rename and expand to Kilo Pass
 

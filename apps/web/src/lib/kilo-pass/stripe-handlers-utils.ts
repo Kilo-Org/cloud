@@ -79,6 +79,76 @@ export async function getInvoiceSubscription(params: {
   return await stripe.subscriptions.retrieve(subscriptionId);
 }
 
+export type SettledInvoicePaymentMethod =
+  | { kind: 'card'; fingerprint: string | null }
+  | { kind: 'non_card' }
+  | { kind: 'unknown' };
+
+async function getExpandedPaymentMethod(params: {
+  stripe: Stripe;
+  paymentMethod: string | Stripe.PaymentMethod | null;
+}): Promise<Stripe.PaymentMethod | null> {
+  if (params.paymentMethod === null) return null;
+  if (typeof params.paymentMethod !== 'string') return params.paymentMethod;
+  if (!params.stripe.paymentMethods?.retrieve) return null;
+  return await params.stripe.paymentMethods.retrieve(params.paymentMethod);
+}
+
+/**
+ * Resolves the payment method that settled an invoice. This deliberately uses the paid invoice
+ * payment rather than a customer's attached or default payment method.
+ */
+export async function getSettledInvoicePaymentMethod(params: {
+  invoice: Stripe.Invoice;
+  stripe: Stripe;
+}): Promise<SettledInvoicePaymentMethod> {
+  const embeddedPaidPayments = (params.invoice.payments?.data ?? []).filter(
+    payment => payment.status === 'paid'
+  );
+  const paidPayments =
+    embeddedPaidPayments.length > 0
+      ? embeddedPaidPayments
+      : params.stripe.invoicePayments?.list
+        ? (
+            await params.stripe.invoicePayments.list({
+              invoice: params.invoice.id,
+              status: 'paid',
+              limit: 1,
+            })
+          ).data
+        : [];
+
+  for (const invoicePayment of paidPayments) {
+    const rawPaymentIntent =
+      invoicePayment.payment.type === 'payment_intent'
+        ? invoicePayment.payment.payment_intent
+        : null;
+    if (!rawPaymentIntent) continue;
+
+    const paymentIntent =
+      typeof rawPaymentIntent === 'string'
+        ? params.stripe.paymentIntents?.retrieve
+          ? await params.stripe.paymentIntents.retrieve(rawPaymentIntent, {
+              expand: ['payment_method'],
+            })
+          : null
+        : rawPaymentIntent;
+    if (!paymentIntent) continue;
+
+    const paymentMethod = await getExpandedPaymentMethod({
+      stripe: params.stripe,
+      paymentMethod: paymentIntent.payment_method,
+    });
+    if (!paymentMethod) continue;
+    if (paymentMethod.type !== 'card') return { kind: 'non_card' };
+
+    const fingerprint = paymentMethod.card?.fingerprint?.trim() ?? '';
+    return { kind: 'card', fingerprint: fingerprint || null };
+  }
+
+  return { kind: 'unknown' };
+}
+
 /**
  * Gets the ended_at timestamp from a Stripe subscription as an ISO string.
  * Falls back to current time if no ended_at or canceled_at is available.

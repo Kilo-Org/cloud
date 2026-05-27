@@ -2,14 +2,16 @@ import 'server-only';
 
 import {
   credit_transactions,
+  kilo_pass_issuances,
   kilo_pass_scheduled_changes,
   kilo_pass_subscriptions,
+  kilo_pass_welcome_promo_card_claims,
   kilocode_users,
 } from '@kilocode/db/schema';
 
 import type { DrizzleTransaction } from '@/lib/drizzle';
 import { db } from '@/lib/drizzle';
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, asc, eq, isNull } from 'drizzle-orm';
 
 import { KILO_PASS_TIER_CONFIG } from '@/lib/kilo-pass/constants';
 import { KiloPassError } from '@/lib/kilo-pass/errors';
@@ -28,6 +30,7 @@ import { invoiceLooksLikeKiloPassByPriceId } from '@/lib/kilo-pass/stripe-invoic
 import {
   getInvoiceIssueMonth,
   getInvoiceSubscription,
+  getSettledInvoicePaymentMethod,
   getStripeEndedAtIso,
 } from '@/lib/kilo-pass/stripe-handlers-utils';
 import type Stripe from 'stripe';
@@ -38,6 +41,8 @@ import {
   KiloPassCadence,
   KiloPassIssuanceSource,
   KiloPassPaymentProvider,
+  KiloPassWelcomePromoEligibility,
+  KiloPassWelcomePromoEligibilityReason,
 } from '@/lib/kilo-pass/enums';
 import { isStripeSubscriptionEnded } from '@/lib/kilo-pass/stripe-subscription-status';
 import { processTopUp } from '@/lib/credits';
@@ -51,6 +56,104 @@ import {
   enqueueKiloPassAffiliateSaleForInvoice,
   type KiloPassAffiliateSaleContext,
 } from '@/lib/kilo-pass/affiliate-sale';
+
+type InitialWelcomePromoDecision = {
+  eligibility: KiloPassWelcomePromoEligibility;
+  reason: KiloPassWelcomePromoEligibilityReason;
+};
+
+async function getOrCreateInitialMonthlyWelcomePromoDecision(params: {
+  tx: DrizzleTransaction;
+  stripe: Stripe;
+  invoice: Stripe.Invoice;
+  subscriptionId: string;
+  issuanceId: string;
+}): Promise<InitialWelcomePromoDecision | null> {
+  const firstIssuance = await params.tx.query.kilo_pass_issuances.findFirst({
+    columns: {
+      id: true,
+      initial_welcome_promo_eligibility: true,
+      initial_welcome_promo_eligibility_reason: true,
+    },
+    where: eq(kilo_pass_issuances.kilo_pass_subscription_id, params.subscriptionId),
+    orderBy: asc(kilo_pass_issuances.issue_month),
+  });
+  if (!firstIssuance || firstIssuance.id !== params.issuanceId) return null;
+
+  if (
+    firstIssuance.initial_welcome_promo_eligibility !== null &&
+    firstIssuance.initial_welcome_promo_eligibility_reason !== null
+  ) {
+    return {
+      eligibility: firstIssuance.initial_welcome_promo_eligibility,
+      reason: firstIssuance.initial_welcome_promo_eligibility_reason,
+    };
+  }
+
+  const settledPaymentMethod = await getSettledInvoicePaymentMethod({
+    invoice: params.invoice,
+    stripe: params.stripe,
+  });
+  let decision: InitialWelcomePromoDecision;
+
+  if (settledPaymentMethod.kind === 'non_card') {
+    decision = {
+      eligibility: KiloPassWelcomePromoEligibility.Eligible,
+      reason: KiloPassWelcomePromoEligibilityReason.NonCardPaymentMethod,
+    };
+  } else if (settledPaymentMethod.kind !== 'card' || settledPaymentMethod.fingerprint === null) {
+    decision = {
+      eligibility: KiloPassWelcomePromoEligibility.Eligible,
+      reason: KiloPassWelcomePromoEligibilityReason.MissingFingerprint,
+    };
+  } else {
+    const insertedClaim = await params.tx
+      .insert(kilo_pass_welcome_promo_card_claims)
+      .values({
+        stripe_fingerprint: settledPaymentMethod.fingerprint,
+        source_stripe_invoice_id: params.invoice.id,
+      })
+      .onConflictDoNothing({ target: kilo_pass_welcome_promo_card_claims.stripe_fingerprint })
+      .returning({
+        source_stripe_invoice_id: kilo_pass_welcome_promo_card_claims.source_stripe_invoice_id,
+      });
+    const existingClaim =
+      insertedClaim[0] ??
+      (await params.tx.query.kilo_pass_welcome_promo_card_claims.findFirst({
+        columns: { source_stripe_invoice_id: true },
+        where: eq(
+          kilo_pass_welcome_promo_card_claims.stripe_fingerprint,
+          settledPaymentMethod.fingerprint
+        ),
+      }));
+    const isFirstClaim = existingClaim?.source_stripe_invoice_id === params.invoice.id;
+
+    decision = isFirstClaim
+      ? {
+          eligibility: KiloPassWelcomePromoEligibility.Eligible,
+          reason: KiloPassWelcomePromoEligibilityReason.FirstCardClaim,
+        }
+      : {
+          eligibility: KiloPassWelcomePromoEligibility.Ineligible,
+          reason: KiloPassWelcomePromoEligibilityReason.FingerprintPreviouslyClaimed,
+        };
+  }
+
+  await params.tx
+    .update(kilo_pass_issuances)
+    .set({
+      initial_welcome_promo_eligibility: decision.eligibility,
+      initial_welcome_promo_eligibility_reason: decision.reason,
+    })
+    .where(
+      and(
+        eq(kilo_pass_issuances.id, params.issuanceId),
+        isNull(kilo_pass_issuances.initial_welcome_promo_eligibility)
+      )
+    );
+
+  return decision;
+}
 
 async function maybeIssueYearlyRemainingCredits(params: {
   tx: DrizzleTransaction;
@@ -364,6 +467,16 @@ export async function handleKiloPassInvoicePaid(params: {
         source: KiloPassIssuanceSource.StripeInvoice,
         stripeInvoiceId: invoice.id,
       });
+      const initialWelcomePromoDecision =
+        cadence === KiloPassCadence.Monthly
+          ? await getOrCreateInitialMonthlyWelcomePromoDecision({
+              tx,
+              stripe,
+              invoice,
+              subscriptionId: kiloPassSubscriptionId,
+              issuanceId: issuanceHeader.issuanceId,
+            })
+          : null;
 
       await appendKiloPassAuditLog(tx, {
         action: KiloPassAuditLogAction.KiloPassInvoicePaidHandled,
@@ -380,6 +493,12 @@ export async function handleKiloPassInvoicePaid(params: {
           cadence,
           ...(priceMetadata ? { priceId: priceMetadata.priceId } : {}),
           issuanceHeaderWasCreated: issuanceHeader.wasCreated,
+          ...(initialWelcomePromoDecision
+            ? {
+                initialWelcomePromoEligibility: initialWelcomePromoDecision.eligibility,
+                initialWelcomePromoEligibilityReason: initialWelcomePromoDecision.reason,
+              }
+            : {}),
         },
       });
 

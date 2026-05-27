@@ -1,6 +1,10 @@
 import { describe, expect, test } from '@jest/globals';
 
-import { KiloPassTier } from '@/lib/kilo-pass/enums';
+import {
+  KiloPassTier,
+  KiloPassWelcomePromoEligibility,
+  KiloPassWelcomePromoEligibilityReason,
+} from '@/lib/kilo-pass/enums';
 import {
   computeUsageTriggeredMonthlyBonusDecision,
   computeUsageTriggeredYearlyIssueMonth,
@@ -53,6 +57,23 @@ describe('usage-triggered-bonus (unit)', () => {
           }),
         })
       );
+    });
+
+    test('reused card eligibility uses ramp instead of first-month promo', () => {
+      const d = computeUsageTriggeredMonthlyBonusDecision({
+        tier: KiloPassTier.Tier19,
+        startedAtIso: '2026-05-20T00:00:00.000Z',
+        currentStreakMonths: 1,
+        isFirstTimeSubscriberEver: true,
+        welcomePromoEligibility: KiloPassWelcomePromoEligibility.Ineligible,
+        welcomePromoEligibilityReason:
+          KiloPassWelcomePromoEligibilityReason.FingerprintPreviouslyClaimed,
+        issueMonth: '2026-05-01',
+      });
+
+      expect(d.shouldIssueFirstMonthPromo).toBe(false);
+      expect(d.bonusPercentApplied).toBeCloseTo(0.05);
+      expect(d.auditPayload).toEqual(expect.objectContaining({ bonusKind: 'monthly-ramp' }));
     });
 
     test('ineligible at promo cutoff => uses ramp (not 50%) and bonusKind=monthly-ramp', () => {

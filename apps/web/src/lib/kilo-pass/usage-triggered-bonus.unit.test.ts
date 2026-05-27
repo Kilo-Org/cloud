@@ -1,10 +1,6 @@
 import { describe, expect, test } from '@jest/globals';
 
-import {
-  KiloPassTier,
-  KiloPassWelcomePromoEligibility,
-  KiloPassWelcomePromoEligibilityReason,
-} from '@/lib/kilo-pass/enums';
+import { KiloPassTier, KiloPassWelcomePromoEligibilityReason } from '@/lib/kilo-pass/enums';
 import {
   computeUsageTriggeredMonthlyBonusDecision,
   computeUsageTriggeredYearlyIssueMonth,
@@ -65,7 +61,6 @@ describe('usage-triggered-bonus (unit)', () => {
         startedAtIso: '2026-05-20T00:00:00.000Z',
         currentStreakMonths: 1,
         isFirstTimeSubscriberEver: true,
-        welcomePromoEligibility: KiloPassWelcomePromoEligibility.Ineligible,
         welcomePromoEligibilityReason:
           KiloPassWelcomePromoEligibilityReason.FingerprintPreviouslyClaimed,
         issueMonth: '2026-05-01',

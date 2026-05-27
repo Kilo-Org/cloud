@@ -16,7 +16,6 @@ import {
   KiloPassIssuanceItemKind,
   KiloPassIssuanceSource,
   KiloPassTier,
-  KiloPassWelcomePromoEligibility,
   KiloPassWelcomePromoEligibilityReason,
 } from '@/lib/kilo-pass/enums';
 import { computeMonthlyCadenceBonusPercent, getMonthlyPriceUsd } from '@/lib/kilo-pass/bonus';
@@ -37,7 +36,6 @@ async function seedBaseIssuance(params: {
   currentStreakMonths: number;
   nextYearlyIssueAt: string | null;
   startedAtIso?: string | null;
-  welcomePromoEligibility?: KiloPassWelcomePromoEligibility;
   welcomePromoEligibilityReason?: KiloPassWelcomePromoEligibilityReason;
 }) {
   const {
@@ -49,7 +47,6 @@ async function seedBaseIssuance(params: {
     currentStreakMonths,
     nextYearlyIssueAt,
     startedAtIso,
-    welcomePromoEligibility,
     welcomePromoEligibilityReason,
   } = params;
 
@@ -81,7 +78,6 @@ async function seedBaseIssuance(params: {
       issue_month: issueMonth,
       source: KiloPassIssuanceSource.StripeInvoice,
       stripe_invoice_id: stripeInvoiceId,
-      initial_welcome_promo_eligibility: welcomePromoEligibility,
       initial_welcome_promo_eligibility_reason: welcomePromoEligibilityReason,
     })
     .returning({ id: kilo_pass_issuances.id });
@@ -453,7 +449,6 @@ describe('maybeIssueKiloPassBonusFromUsageThreshold', () => {
       stripeInvoiceId: 'inv_test_reused_card',
       currentStreakMonths: 1,
       nextYearlyIssueAt: null,
-      welcomePromoEligibility: KiloPassWelcomePromoEligibility.Ineligible,
       welcomePromoEligibilityReason:
         KiloPassWelcomePromoEligibilityReason.FingerprintPreviouslyClaimed,
     });

@@ -11,8 +11,7 @@ import {
   KiloPassCadence,
   KiloPassIssuanceItemKind,
   KiloPassIssuanceSource,
-  KiloPassWelcomePromoEligibility,
-  type KiloPassWelcomePromoEligibilityReason,
+  KiloPassWelcomePromoEligibilityReason,
 } from '@/lib/kilo-pass/enums';
 import {
   computeIssueMonth,
@@ -44,14 +43,14 @@ export function computeUsageTriggeredMonthlyBonusDecision(params: {
   startedAtIso: string | null;
   currentStreakMonths: number;
   isFirstTimeSubscriberEver: boolean;
-  welcomePromoEligibility?: KiloPassWelcomePromoEligibility | null;
   welcomePromoEligibilityReason?: KiloPassWelcomePromoEligibilityReason | null;
   issueMonth: string;
 }): UsageTriggeredMonthlyBonusDecision {
   const streakMonths = Math.max(1, params.currentStreakMonths);
   const isEligibleForFirstMonthPromo =
     params.isFirstTimeSubscriberEver &&
-    params.welcomePromoEligibility !== KiloPassWelcomePromoEligibility.Ineligible;
+    params.welcomePromoEligibilityReason !==
+      KiloPassWelcomePromoEligibilityReason.FingerprintPreviouslyClaimed;
   const bonusPercentApplied = computeMonthlyCadenceBonusPercent({
     tier: params.tier,
     streakMonths,
@@ -67,7 +66,6 @@ export function computeUsageTriggeredMonthlyBonusDecision(params: {
       startedAt: params.startedAtIso,
       issueMonth: params.issueMonth,
       bonusPercentApplied,
-      welcomePromoEligibility: params.welcomePromoEligibility ?? null,
       welcomePromoEligibilityReason: params.welcomePromoEligibilityReason ?? null,
     },
   } satisfies Record<string, unknown>;
@@ -147,7 +145,6 @@ async function getLatestIssuanceForMonthlyCadence(
   issuanceId: string;
   issueMonth: string;
   stripeInvoiceId: string | null;
-  welcomePromoEligibility: KiloPassWelcomePromoEligibility | null;
   welcomePromoEligibilityReason: KiloPassWelcomePromoEligibilityReason | null;
 } | null> {
   const issuanceRows = await tx
@@ -155,7 +152,6 @@ async function getLatestIssuanceForMonthlyCadence(
       issuanceId: kilo_pass_issuances.id,
       issueMonth: kilo_pass_issuances.issue_month,
       stripeInvoiceId: kilo_pass_issuances.stripe_invoice_id,
-      welcomePromoEligibility: kilo_pass_issuances.initial_welcome_promo_eligibility,
       welcomePromoEligibilityReason: kilo_pass_issuances.initial_welcome_promo_eligibility_reason,
     })
     .from(kilo_pass_issuances)
@@ -170,7 +166,6 @@ async function getLatestIssuanceForMonthlyCadence(
     issuanceId: latestIssuance.issuanceId,
     issueMonth: latestIssuance.issueMonth,
     stripeInvoiceId: latestIssuance.stripeInvoiceId,
-    welcomePromoEligibility: latestIssuance.welcomePromoEligibility,
     welcomePromoEligibilityReason: latestIssuance.welcomePromoEligibilityReason,
   };
 }
@@ -186,7 +181,6 @@ async function getOrCreateIssuanceForYearlyCadence(
   issuanceId: string;
   issueMonth: string;
   stripeInvoiceId: string | null;
-  welcomePromoEligibility: KiloPassWelcomePromoEligibility | null;
   welcomePromoEligibilityReason: KiloPassWelcomePromoEligibilityReason | null;
 } | null> {
   const { issueMonth } = computeUsageTriggeredYearlyIssueMonth({
@@ -212,7 +206,6 @@ async function getOrCreateIssuanceForYearlyCadence(
     issuanceId: issuanceHeader.issuanceId,
     issueMonth,
     stripeInvoiceId: issuanceRow?.stripe_invoice_id ?? null,
-    welcomePromoEligibility: null,
     welcomePromoEligibilityReason: null,
   };
 }
@@ -296,7 +289,6 @@ async function maybeIssueBonusFromUsageThreshold(
       startedAtIso: subscription.startedAt,
       currentStreakMonths: subscription.currentStreakMonths,
       isFirstTimeSubscriberEver,
-      welcomePromoEligibility: issuance.welcomePromoEligibility,
       welcomePromoEligibilityReason: issuance.welcomePromoEligibilityReason,
       issueMonth: issuance.issueMonth,
     });

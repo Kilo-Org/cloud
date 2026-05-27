@@ -20,7 +20,6 @@ import {
   KiloPassPaymentProvider,
   KiloPassScheduledChangeStatus,
   KiloPassTier,
-  KiloPassWelcomePromoEligibility,
   KiloPassWelcomePromoEligibilityReason,
 } from '@/lib/kilo-pass/enums';
 import { and, eq, isNull } from 'drizzle-orm';
@@ -351,7 +350,6 @@ function expectNoStripeManagementCalls(stripeMock: StripeMock): void {
 async function insertBaseCreditsIssuance(params: {
   subscriptionId: string;
   kiloUserId: string;
-  welcomePromoEligibility?: KiloPassWelcomePromoEligibility;
   welcomePromoEligibilityReason?: KiloPassWelcomePromoEligibilityReason;
 }): Promise<void> {
   const issuedMonth = new Date().toISOString().slice(0, 7);
@@ -364,7 +362,6 @@ async function insertBaseCreditsIssuance(params: {
       issue_month: issueMonth,
       source: KiloPassIssuanceSource.StripeInvoice,
       stripe_invoice_id: `in_test_${Date.now()}`,
-      initial_welcome_promo_eligibility: params.welcomePromoEligibility,
       initial_welcome_promo_eligibility_reason: params.welcomePromoEligibilityReason,
     })
     .returning({ id: kilo_pass_issuances.id });
@@ -1678,7 +1675,6 @@ describe('kiloPassRouter', () => {
       await insertBaseCreditsIssuance({
         subscriptionId,
         kiloUserId: user.id,
-        welcomePromoEligibility: KiloPassWelcomePromoEligibility.Ineligible,
         welcomePromoEligibilityReason:
           KiloPassWelcomePromoEligibilityReason.FingerprintPreviouslyClaimed,
       });

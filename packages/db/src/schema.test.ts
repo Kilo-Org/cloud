@@ -170,7 +170,6 @@ describe('database schema', () => {
         'cron',
       ],
       KiloPassIssuanceItemKind: ['base', 'bonus', 'promo_first_month_50pct', 'referral_bonus'],
-      KiloPassWelcomePromoEligibility: ['eligible', 'ineligible'],
       KiloPassWelcomePromoEligibilityReason: [
         'first_card_claim',
         'fingerprint_previously_claimed',

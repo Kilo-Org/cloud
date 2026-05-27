@@ -31,7 +31,6 @@ import {
   KiloPassPaymentProvider,
   KiloPassIssuanceSource,
   KiloPassIssuanceItemKind,
-  KiloPassWelcomePromoEligibility,
   KiloPassWelcomePromoEligibilityReason,
   KiloPassAuditLogAction,
   KiloPassAuditLogResult,
@@ -139,7 +138,6 @@ export const SCHEMA_CHECK_ENUMS = {
   KiloPassPaymentProvider,
   KiloPassIssuanceSource,
   KiloPassIssuanceItemKind,
-  KiloPassWelcomePromoEligibility,
   KiloPassWelcomePromoEligibilityReason,
   KiloPassAuditLogAction,
   KiloPassAuditLogResult,
@@ -1297,7 +1295,6 @@ export const kilo_pass_issuances = pgTable(
     issue_month: date().notNull(),
     source: text().notNull().$type<KiloPassIssuanceSource>(),
     stripe_invoice_id: text(),
-    initial_welcome_promo_eligibility: text().$type<KiloPassWelcomePromoEligibility>(),
     initial_welcome_promo_eligibility_reason: text().$type<KiloPassWelcomePromoEligibilityReason>(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
@@ -1321,18 +1318,9 @@ export const kilo_pass_issuances = pgTable(
     ),
     enumCheck('kilo_pass_issuances_source_check', table.source, KiloPassIssuanceSource),
     enumCheck(
-      'kilo_pass_issuances_initial_welcome_promo_eligibility_check',
-      table.initial_welcome_promo_eligibility,
-      KiloPassWelcomePromoEligibility
-    ),
-    enumCheck(
       'kilo_pass_issuances_initial_welcome_promo_reason_check',
       table.initial_welcome_promo_eligibility_reason,
       KiloPassWelcomePromoEligibilityReason
-    ),
-    check(
-      'kilo_pass_issuances_initial_welcome_promo_decision_consistency_check',
-      sql`(${table.initial_welcome_promo_eligibility} IS NULL AND ${table.initial_welcome_promo_eligibility_reason} IS NULL) OR (${table.initial_welcome_promo_eligibility} IS NOT NULL AND ${table.initial_welcome_promo_eligibility_reason} IS NOT NULL)`
     ),
   ]
 );

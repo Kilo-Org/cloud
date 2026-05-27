@@ -19,11 +19,7 @@ import { KiloPassIssuanceItemKind } from './enums';
 import { KiloPassIssuanceSource } from './enums';
 import { KiloPassCadence } from './enums';
 import { KiloPassScheduledChangeStatus } from './enums';
-import {
-  KiloPassTier,
-  KiloPassWelcomePromoEligibility,
-  KiloPassWelcomePromoEligibilityReason,
-} from '@/lib/kilo-pass/enums';
+import { KiloPassTier, KiloPassWelcomePromoEligibilityReason } from '@/lib/kilo-pass/enums';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { and, eq } from 'drizzle-orm';
 import type Stripe from 'stripe';
@@ -1100,9 +1096,6 @@ describe('handleKiloPassInvoicePaid', () => {
       ),
     });
     expect(issuance).toBeTruthy();
-    expect(issuance?.initial_welcome_promo_eligibility).toBe(
-      KiloPassWelcomePromoEligibility.Eligible
-    );
     expect(issuance?.initial_welcome_promo_eligibility_reason).toBe(
       KiloPassWelcomePromoEligibilityReason.MissingFingerprint
     );
@@ -1223,9 +1216,6 @@ describe('handleKiloPassInvoicePaid', () => {
     const firstIssuance = await db.query.kilo_pass_issuances.findFirst({
       where: eq(kilo_pass_issuances.stripe_invoice_id, firstInvoiceId),
     });
-    expect(firstIssuance?.initial_welcome_promo_eligibility).toBe(
-      KiloPassWelcomePromoEligibility.Eligible
-    );
     expect(firstIssuance?.initial_welcome_promo_eligibility_reason).toBe(
       KiloPassWelcomePromoEligibilityReason.FirstCardClaim
     );
@@ -1233,9 +1223,6 @@ describe('handleKiloPassInvoicePaid', () => {
     const secondIssuance = await db.query.kilo_pass_issuances.findFirst({
       where: eq(kilo_pass_issuances.stripe_invoice_id, secondInvoiceId),
     });
-    expect(secondIssuance?.initial_welcome_promo_eligibility).toBe(
-      KiloPassWelcomePromoEligibility.Ineligible
-    );
     expect(secondIssuance?.initial_welcome_promo_eligibility_reason).toBe(
       KiloPassWelcomePromoEligibilityReason.FingerprintPreviouslyClaimed
     );

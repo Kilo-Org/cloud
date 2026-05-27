@@ -37,11 +37,6 @@ export enum KiloPassIssuanceItemKind {
   ReferralBonus = 'referral_bonus',
 }
 
-export enum KiloPassWelcomePromoEligibility {
-  Eligible = 'eligible',
-  Ineligible = 'ineligible',
-}
-
 export enum KiloPassWelcomePromoEligibilityReason {
   FirstCardClaim = 'first_card_claim',
   FingerprintPreviouslyClaimed = 'fingerprint_previously_claimed',

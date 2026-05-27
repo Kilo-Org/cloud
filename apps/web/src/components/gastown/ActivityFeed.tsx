@@ -16,6 +16,10 @@ import {
   MessageSquare,
   ChevronRight,
   ShieldCheck,
+  Eye,
+  MessageSquareWarning,
+  Rocket,
+  RefreshCw,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -31,6 +35,11 @@ const EVENT_ICONS: Record<string, typeof Activity> = {
   mail_sent: Mail,
   agent_status: MessageSquare,
   triage_resolved: ShieldCheck,
+  babysit_started: Eye,
+  pr_feedback_detected: MessageSquareWarning,
+  pr_conflict_detected: AlertTriangle,
+  pr_auto_merge: Rocket,
+  pr_status_changed: RefreshCw,
 };
 
 const EVENT_COLORS: Record<string, string> = {
@@ -45,12 +54,17 @@ const EVENT_COLORS: Record<string, string> = {
   mail_sent: 'text-sky-500',
   agent_status: 'text-white/50',
   triage_resolved: 'text-amber-500',
+  babysit_started: 'text-cyan-500',
+  pr_feedback_detected: 'text-orange-500',
+  pr_conflict_detected: 'text-red-400',
+  pr_auto_merge: 'text-emerald-500',
+  pr_status_changed: 'text-blue-400',
 };
 
 type TownEvent = GastownOutputs['gastown']['getTownEvents'][number];
 type BeadEvent = GastownOutputs['gastown']['getBeadEvents'][number];
 
-function eventDescription(event: {
+export function eventDescription(event: {
   event_type: string;
   old_value: string | null;
   new_value: string | null;
@@ -99,10 +113,23 @@ function eventDescription(event: {
       const agentName = event.metadata?.agent_name as string | undefined;
       const rigName = event.metadata?.rig_name as string | undefined;
       const body = msg ?? 'Agent status update';
-      // Prefer metadata rig_name over the top-level rig_name (which is
-      // never populated for bead_events rows).
       const prefix = rigName ? `[${rigName}] ` : rigPrefix;
       return agentName ? `${prefix}${agentName}: ${body}` : `${prefix}${body}`;
+    }
+    case 'babysit_started':
+      return `${rigPrefix}Babysit started for external PR`;
+    case 'pr_feedback_detected': {
+      const kind = event.metadata?.kind as string | undefined;
+      return `${rigPrefix}PR feedback detected${kind ? `: ${kind}` : ''}`;
+    }
+    case 'pr_conflict_detected':
+      return `${rigPrefix}PR merge conflict detected`;
+    case 'pr_auto_merge':
+      return `${rigPrefix}PR auto-merge initiated`;
+    case 'pr_status_changed': {
+      const oldState = event.old_value ?? '?';
+      const newState = event.new_value ?? '?';
+      return `${rigPrefix}PR state: ${oldState} → ${newState}`;
     }
     default:
       return `${rigPrefix}${event.event_type}`;

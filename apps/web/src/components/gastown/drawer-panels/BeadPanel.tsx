@@ -1,5 +1,6 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import { useState, useCallback } from 'react';
 import { usePathname } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -16,6 +17,7 @@ import { format, formatDistanceToNow } from 'date-fns';
 import {
   Clock,
   ExternalLink,
+  Eye,
   Flag,
   Hash,
   Tags,
@@ -37,6 +39,8 @@ import {
   Loader2,
   Play,
   MessageCircle,
+  Lock,
+  Unlock,
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -250,6 +254,9 @@ export function BeadPanel({
   // Held bead detection
   const isHeld = bead.labels.includes('gt:held');
 
+  // Babysit bead detection
+  const isBabysit = bead.labels.includes('gt:babysit');
+
   // Mayor responses: message-type child beads
   const mayorResponses = allBeads.filter(
     b => b.type === 'message' && b.parent_bead_id === bead.bead_id
@@ -329,6 +336,12 @@ export function BeadPanel({
             <Badge variant="outline" className="text-[10px]">
               {bead.type}
             </Badge>
+            {isBabysit && (
+              <span className="inline-flex items-center gap-1 rounded-md border border-cyan-500/30 bg-cyan-500/10 px-2 py-0.5 text-[10px] font-medium text-cyan-300">
+                <Eye className="size-2.5" />
+                Babysat external PR
+              </span>
+            )}
             <span
               className={`inline-flex items-center gap-0.5 text-[10px] font-medium ${PRIORITY_STYLES[bead.priority] ?? 'text-white/50'}`}
             >
@@ -517,6 +530,46 @@ export function BeadPanel({
         </div>
       )}
 
+      {/* Babysit metadata */}
+      {isBabysit && (
+        <div className="grid grid-cols-2 border-b border-white/[0.06]">
+          {typeof bead.metadata?.head_sha === 'string' && (
+            <MetaCell
+              icon={Hash}
+              label="Head SHA"
+              value={
+                prUrl ? (
+                  <a
+                    href={`${prUrl}/commits/${bead.metadata.head_sha}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-mono text-xs text-[color:oklch(95%_0.15_108)] hover:underline"
+                  >
+                    {bead.metadata.head_sha.slice(0, 7)}
+                  </a>
+                ) : (
+                  <span className="font-mono text-xs">{bead.metadata.head_sha.slice(0, 7)}</span>
+                )
+              }
+            />
+          )}
+          <MetaCell
+            icon={bead.metadata?.force_push_allowed === true ? Unlock : Lock}
+            label="Force-push"
+            value={bead.metadata?.force_push_allowed === true ? 'Allowed' : 'Blocked'}
+          />
+          {typeof bead.metadata?.babysit_started_at === 'string' && (
+            <MetaCell
+              icon={Clock}
+              label="Babysit started"
+              value={formatDistanceToNow(new Date(bead.metadata.babysit_started_at), {
+                addSuffix: true,
+              })}
+            />
+          )}
+        </div>
+      )}
+
       {/* Wasteland origin link — present when this bead was created in
           response to a wasteland event (e.g. a wanted-item claim). */}
       <WastelandOriginLink metadata={bead.metadata} pathname={pathname} />
@@ -668,7 +721,7 @@ function MetaCell({
 }: {
   icon: typeof Clock;
   label: string;
-  value: string;
+  value: ReactNode;
   mono?: boolean;
 }) {
   return (
@@ -686,17 +739,18 @@ function MetaCell({
 
 // ── Related beads DAG ─────────────────────────────────────────────────
 
-type BeadLike = {
+export type BeadLike = {
   bead_id: string;
   type: string;
   status: string;
   title: string;
   parent_bead_id: string | null;
   rig_id?: string | null;
+  labels?: string[];
   metadata: Record<string, unknown>;
 };
 
-type RelatedBead = {
+export type RelatedBead = {
   relation: string;
   label: string;
   icon: typeof Clock;
@@ -715,7 +769,7 @@ type ConvoyLike = {
  * Compute the DAG neighborhood of a bead from the flat list and convoy data.
  * Includes: children, source/review links, blockers, and dependents from convoy DAG.
  */
-function buildRelatedBeads(
+export function buildRelatedBeads(
   bead: BeadLike,
   allBeads: BeadLike[],
   convoys: ConvoyLike[]
@@ -804,8 +858,12 @@ function buildRelatedBeads(
     }
   }
 
-  // For merge_request beads: link back to the source bead
-  if (bead.type === 'merge_request' && typeof bead.metadata?.source_bead_id === 'string') {
+  // For merge_request beads: link back to the source bead (skip for babysit beads)
+  if (
+    bead.type === 'merge_request' &&
+    !(bead.labels ?? []).includes('gt:babysit') &&
+    typeof bead.metadata?.source_bead_id === 'string'
+  ) {
     const source = allBeads.find(b => b.bead_id === bead.metadata.source_bead_id);
     if (source) {
       related.push({ relation: 'source', label: 'Source Work', icon: CircleDot, bead: source });

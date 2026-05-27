@@ -19,7 +19,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import Link from 'next/link';
 import { formatDistanceToNow, format } from 'date-fns';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Eye, Hash, Lock, Unlock } from 'lucide-react';
 
 const STATUS_COLORS: Record<string, string> = {
   open: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
@@ -251,8 +251,59 @@ export function BeadInspectorDashboard({ townId, beadId }: { townId: string; bea
                           {label}
                         </Badge>
                       ))}
+                      {bead.labels.includes('gt:babysit') && (
+                        <Badge
+                          variant="outline"
+                          className="border-cyan-500/30 bg-cyan-500/10 text-xs text-cyan-300"
+                        >
+                          <Eye className="mr-1 size-3" />
+                          Babysat external PR
+                        </Badge>
+                      )}
                     </dd>
                   </div>
+                )}
+                {bead.labels.includes('gt:babysit') && (
+                  <>
+                    {typeof bead.metadata?.head_sha === 'string' && (
+                      <div>
+                        <dt className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+                          Head SHA
+                        </dt>
+                        <dd className="font-mono text-xs">{bead.metadata.head_sha.slice(0, 7)}</dd>
+                      </div>
+                    )}
+                    <div>
+                      <dt className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+                        Force-push
+                      </dt>
+                      <dd className="flex items-center gap-1 text-xs">
+                        {bead.metadata?.force_push_allowed === true ? (
+                          <>
+                            <Unlock className="size-3 text-amber-400" />
+                            <span className="text-amber-400">Allowed</span>
+                          </>
+                        ) : (
+                          <>
+                            <Lock className="size-3 text-white/50" />
+                            <span className="text-white/50">Blocked</span>
+                          </>
+                        )}
+                      </dd>
+                    </div>
+                    {typeof bead.metadata?.babysit_started_at === 'string' && (
+                      <div>
+                        <dt className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+                          Babysit started
+                        </dt>
+                        <dd title={format(new Date(bead.metadata.babysit_started_at), 'PPpp')}>
+                          {formatDistanceToNow(new Date(bead.metadata.babysit_started_at), {
+                            addSuffix: true,
+                          })}
+                        </dd>
+                      </div>
+                    )}
+                  </>
                 )}
                 {bead.title && (
                   <div className="col-span-2 md:col-span-3">

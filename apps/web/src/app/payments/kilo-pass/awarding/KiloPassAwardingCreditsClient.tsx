@@ -7,6 +7,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 
 import BigLoader from '@/components/BigLoader';
 import { PageContainer } from '@/components/layouts/PageContainer';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useTRPC } from '@/lib/trpc/utils';
@@ -35,6 +36,19 @@ function stepStatus(step: ActivationStep, current: ActivationStep): 'done' | 'ac
   if (stepIndex < currentIndex) return 'done';
   if (stepIndex === currentIndex) return 'active';
   return 'pending';
+}
+
+function WelcomePromoIneligibleNotice() {
+  return (
+    <Alert variant="warning">
+      <AlertTriangle />
+      <AlertTitle>Introductory bonus not available</AlertTitle>
+      <AlertDescription>
+        This payment method has already been used for the introductory Kilo Pass bonus. Your
+        subscription remains active and standard monthly bonus terms apply.
+      </AlertDescription>
+    </Alert>
+  );
 }
 
 export function KiloPassAwardingCreditsClient() {
@@ -89,6 +103,8 @@ export function KiloPassAwardingCreditsClient() {
 
   const isReady = query.data?.creditsAwarded === true;
   const hasSubscription = query.data?.subscription != null;
+  const showWelcomePromoIneligibleNotice =
+    query.data?.welcomePromoIneligibleDueToReusedCard === true;
 
   // For KiloClaw auto-activation: advance step when credits are awarded, then enroll
   useEffect(() => {
@@ -276,6 +292,7 @@ export function KiloPassAwardingCreditsClient() {
                 <div className="text-muted-foreground text-sm">
                   You can activate hosting manually from the KiloClaw dashboard.
                 </div>
+                {showWelcomePromoIneligibleNotice ? <WelcomePromoIneligibleNotice /> : null}
                 <div className="flex flex-wrap gap-2">
                   <Button type="button" onClick={() => router.replace('/claw')}>
                     Go to KiloClaw
@@ -303,6 +320,7 @@ export function KiloPassAwardingCreditsClient() {
               </CardHeader>
               <CardContent className="grid gap-4">
                 <ActivationSteps current="done" />
+                {showWelcomePromoIneligibleNotice ? <WelcomePromoIneligibleNotice /> : null}
                 <div className="flex flex-wrap items-center gap-3">
                   <Button type="button" onClick={() => router.replace('/claw')}>
                     Continue to KiloClaw
@@ -356,6 +374,8 @@ export function KiloPassAwardingCreditsClient() {
               <div className="text-muted-foreground text-sm">
                 Your Kilo Pass is active and your credits are ready.
               </div>
+
+              {showWelcomePromoIneligibleNotice ? <WelcomePromoIneligibleNotice /> : null}
 
               <div className="flex flex-wrap items-center gap-3">
                 <Button type="button" onClick={() => router.replace('/profile')}>

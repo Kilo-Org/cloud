@@ -24,9 +24,10 @@ import {
   KiloPassScheduledChangeStatus,
   KiloPassTier,
   KiloPassPaymentProvider,
+  KiloPassWelcomePromoEligibilityReason,
 } from '@/lib/kilo-pass/enums';
 import { KiloPassIssuanceItemKind } from '@/lib/kilo-pass/enums';
-import { and, desc, eq, inArray, isNull, ne, sql, sum } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNull, ne, sql, sum } from 'drizzle-orm';
 import * as z from 'zod';
 import {
   computeMonthlyCadenceBonusPercent,
@@ -721,6 +722,7 @@ async function buildEndedKiloPassSubscriptionState(params: {
 const GetCheckoutReturnStateOutputSchema = z.object({
   subscription: KiloPassSubscriptionStateBaseSchema.nullable(),
   creditsAwarded: z.boolean(),
+  welcomePromoIneligibleDueToReusedCard: z.boolean(),
 });
 
 const CreateCheckoutSessionInputSchema = z.object({
@@ -940,11 +942,19 @@ export const kiloPassRouter = createTRPCRouter({
     .query(async ({ ctx }) => {
       const subscription = await getKiloPassStateForUser(db, ctx.user.id);
       if (!subscription) {
-        return { subscription: null, creditsAwarded: false };
+        return {
+          subscription: null,
+          creditsAwarded: false,
+          welcomePromoIneligibleDueToReusedCard: false,
+        };
       }
 
       const issuedBaseCredits = await db
-        .select({ id: kilo_pass_issuance_items.id })
+        .select({
+          id: kilo_pass_issuance_items.id,
+          welcomePromoEligibilityReason:
+            kilo_pass_issuances.initial_welcome_promo_eligibility_reason,
+        })
         .from(kilo_pass_issuance_items)
         .innerJoin(
           kilo_pass_issuances,
@@ -956,11 +966,15 @@ export const kiloPassRouter = createTRPCRouter({
             eq(kilo_pass_issuance_items.kind, KiloPassIssuanceItemKind.Base)
           )
         )
+        .orderBy(asc(kilo_pass_issuances.issue_month))
         .limit(1);
 
       return {
         subscription,
         creditsAwarded: issuedBaseCredits.length > 0,
+        welcomePromoIneligibleDueToReusedCard:
+          issuedBaseCredits[0]?.welcomePromoEligibilityReason ===
+          KiloPassWelcomePromoEligibilityReason.FingerprintPreviouslyClaimed,
       };
     }),
 

@@ -20,6 +20,8 @@ import {
   KiloPassPaymentProvider,
   KiloPassScheduledChangeStatus,
   KiloPassTier,
+  KiloPassWelcomePromoEligibility,
+  KiloPassWelcomePromoEligibilityReason,
 } from '@/lib/kilo-pass/enums';
 import { and, eq, isNull } from 'drizzle-orm';
 import crypto from 'crypto';
@@ -149,6 +151,7 @@ type KiloPassCaller = {
       nextYearlyIssueAt: string | null;
     } | null;
     creditsAwarded: boolean;
+    welcomePromoIneligibleDueToReusedCard: boolean;
   }>;
   getCustomerPortalUrl: (input: { returnUrl?: string }) => Promise<{ url: string }>;
   getChurnkeyAuthHash: () => Promise<{ hash: string; customerId: string }>;
@@ -346,6 +349,8 @@ function expectNoStripeManagementCalls(stripeMock: StripeMock): void {
 async function insertBaseCreditsIssuance(params: {
   subscriptionId: string;
   kiloUserId: string;
+  welcomePromoEligibility?: KiloPassWelcomePromoEligibility;
+  welcomePromoEligibilityReason?: KiloPassWelcomePromoEligibilityReason;
 }): Promise<void> {
   const issuedMonth = new Date().toISOString().slice(0, 7);
   const issueMonth = `${issuedMonth}-01`;
@@ -357,6 +362,8 @@ async function insertBaseCreditsIssuance(params: {
       issue_month: issueMonth,
       source: KiloPassIssuanceSource.StripeInvoice,
       stripe_invoice_id: `in_test_${Date.now()}`,
+      initial_welcome_promo_eligibility: params.welcomePromoEligibility,
+      initial_welcome_promo_eligibility_reason: params.welcomePromoEligibilityReason,
     })
     .returning({ id: kilo_pass_issuances.id });
 
@@ -1602,7 +1609,11 @@ describe('kiloPassRouter', () => {
       const caller = await createCallerForUser(user.id);
       const result = await caller.kiloPass.getCheckoutReturnState();
 
-      expect(result).toEqual({ subscription: null, creditsAwarded: false });
+      expect(result).toEqual({
+        subscription: null,
+        creditsAwarded: false,
+        welcomePromoIneligibleDueToReusedCard: false,
+      });
     });
 
     it('returns creditsAwarded=false when subscription exists but no issuance items exist yet', async () => {
@@ -1622,6 +1633,7 @@ describe('kiloPassRouter', () => {
       const result = await caller.kiloPass.getCheckoutReturnState();
 
       expect(result.creditsAwarded).toBe(false);
+      expect(result.welcomePromoIneligibleDueToReusedCard).toBe(false);
       expect(result.subscription?.stripeSubscriptionId).toBe('sub_test_return_no_credits');
     });
 
@@ -1644,7 +1656,35 @@ describe('kiloPassRouter', () => {
       const result = await caller.kiloPass.getCheckoutReturnState();
 
       expect(result.creditsAwarded).toBe(true);
+      expect(result.welcomePromoIneligibleDueToReusedCard).toBe(false);
       expect(result.subscription?.stripeSubscriptionId).toBe('sub_test_return_credits');
+    });
+
+    it('returns the reused-card introductory-offer warning state after base issuance', async () => {
+      const user = await insertTestUser({
+        google_user_email: 'kilo-pass-checkout-return-reused-card@example.com',
+      });
+      const { id: subscriptionId } = await insertSubscription({
+        kiloUserId: user.id,
+        stripeSubscriptionId: 'sub_test_return_reused_card',
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+        status: 'active',
+      });
+
+      await insertBaseCreditsIssuance({
+        subscriptionId,
+        kiloUserId: user.id,
+        welcomePromoEligibility: KiloPassWelcomePromoEligibility.Ineligible,
+        welcomePromoEligibilityReason:
+          KiloPassWelcomePromoEligibilityReason.FingerprintPreviouslyClaimed,
+      });
+
+      const caller = await createCallerForUser(user.id);
+      const result = await caller.kiloPass.getCheckoutReturnState();
+
+      expect(result.creditsAwarded).toBe(true);
+      expect(result.welcomePromoIneligibleDueToReusedCard).toBe(true);
     });
   });
 

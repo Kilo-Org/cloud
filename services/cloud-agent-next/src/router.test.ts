@@ -1752,6 +1752,28 @@ describe('legacy V2 execution response compatibility', () => {
     expect(admitSubmittedMessage).toHaveBeenCalledTimes(1);
   });
 
+  it('sendMessageV2 normalizes legacy image descriptors before queueing', async () => {
+    const { caller, admitSubmittedMessage } = createLegacyExecutionCaller();
+    const images = {
+      path: '123e4567-e89b-12d3-a456-426614174000',
+      files: ['123e4567-e89b-12d3-a456-426614174001.png'],
+    };
+
+    await caller.sendMessageV2({
+      cloudAgentSessionId: validSessionId,
+      prompt: 'follow up with old client image',
+      mode: 'code',
+      model: 'test-model',
+      images,
+    });
+
+    expect(admitSubmittedMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        turn: expect.objectContaining({ attachments: images }),
+      })
+    );
+  });
+
   it('sendMessageV2 accepts deprecated token fields without queueing token overrides', async () => {
     const { caller, admitSubmittedMessage } = createLegacyExecutionCaller();
 
@@ -1770,7 +1792,7 @@ describe('legacy V2 execution response compatibility', () => {
         type: 'prompt',
         id: undefined,
         prompt: 'follow up',
-        images: undefined,
+        attachments: undefined,
       },
     });
     expect(request).not.toHaveProperty('tokenOverrides');

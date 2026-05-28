@@ -2,6 +2,7 @@ import { getWorkerDb, type WorkerDb } from '@kilocode/db/client';
 import { platform_integrations } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import * as z from 'zod';
+import { DEFAULT_GITLAB_INSTANCE_URL } from './gitlab-constants.js';
 import type { GitLabIntegrationMetadata } from './gitlab-lookup-service.js';
 
 const GitLabOAuthTokenResponseSchema = z.object({
@@ -49,7 +50,7 @@ export class GitLabTokenService {
     integrationId: string,
     metadata: GitLabIntegrationMetadata
   ): Promise<GitLabTokenResult> {
-    const instanceUrl = metadata.gitlab_instance_url || 'https://gitlab.com';
+    const instanceUrl = metadata.gitlab_instance_url || DEFAULT_GITLAB_INSTANCE_URL;
 
     if (!metadata.access_token) {
       return { success: false, reason: 'no_token' };

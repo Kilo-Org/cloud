@@ -73,8 +73,10 @@ export type SessionContext = {
   gitUrl?: string;
   /** Token for generic git authentication (e.g., GitLab token) */
   gitToken?: string;
-  /** Whether the GitLab token was resolved from a managed OAuth integration */
+  /** Whether the GitLab token was resolved server-side and its remote should be refreshed. */
   gitlabTokenManaged?: boolean;
+  /** GitLab CLI bearer-mode instruction returned with a server-resolved credential. */
+  glabIsOAuth2?: boolean;
   /** Git platform type for correct token/env var handling */
   platform?: 'github' | 'gitlab';
   envVars?: Record<string, string>;
@@ -105,7 +107,7 @@ type GetTokenForRepoResult =
     };
 
 type GetGitLabTokenResult =
-  | { success: true; token: string; instanceUrl: string }
+  | { success: true; token: string; instanceUrl: string; glabIsOAuth2: boolean }
   | {
       success: false;
       reason:
@@ -114,7 +116,13 @@ type GetGitLabTokenResult =
         | 'invalid_org_id'
         | 'no_token'
         | 'token_refresh_failed'
-        | 'token_expired_no_refresh';
+        | 'token_expired_no_refresh'
+        | 'repository_url_required'
+        | 'invalid_repository_url'
+        | 'no_matching_integration'
+        | 'ambiguous_integration'
+        | 'project_lookup_failed'
+        | 'no_project_token';
     };
 
 export type GitTokenService = {
@@ -124,7 +132,12 @@ export type GitTokenService = {
     orgId?: string;
   }): Promise<GetTokenForRepoResult>;
   getToken(installationId: string, appType?: 'standard' | 'lite'): Promise<string>;
-  getGitLabToken(params: { userId: string; orgId?: string }): Promise<GetGitLabTokenResult>;
+  getGitLabToken(params: {
+    userId: string;
+    orgId?: string;
+    repositoryUrl?: string;
+    createdOnPlatform?: string;
+  }): Promise<GetGitLabTokenResult>;
 };
 
 export type Env = {

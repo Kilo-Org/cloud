@@ -45,7 +45,9 @@ function startInputToSessionCreateRequest(
   return {
     initialTurn: {
       type: 'prompt',
-      ...input.message,
+      id: input.message.id,
+      prompt: input.message.prompt,
+      attachments: input.message.attachments ?? input.message.images,
     },
     agent: input.agent,
     repository:

@@ -19,6 +19,7 @@ Active.
 - Updated 2026-03-28 to document billing cycle change hardening.
 - Updated 2026-03-28/29 with spec audit fixes, definitions, and billing compliance implementation.
 - Updated 2026-05-18 to define organization KiloClaw hard-expiry lifecycle coupling.
+- Updated 2026-05-28 to classify organization-owned Stripe EFWs as review-only.
 
 ## Conventions
 
@@ -511,6 +512,12 @@ grants billing access without consuming a seat.
 4. The system MUST store the organization ID in the payment
    processor customer's metadata.
 
+### Early Fraud Warning Review Boundary
+
+1. A Stripe Early Fraud Warning whose warned payment resolves to an organization customer MUST be persisted for operational review in the initial enforcement release.
+2. An organization-owned Early Fraud Warning MUST NOT automatically block an individual member, refund organization billing, cancel organization subscriptions, reduce seat access, or suspend organization-managed KiloClaw instances.
+3. Any organization financial or access remediation based on an Early Fraud Warning MUST require an authorized manual review decision.
+
 ### Invoices
 
 1. The system MUST classify organization invoices as "seats" when
@@ -584,6 +591,10 @@ in the current codebase:
    purchase records. (Currently records gross only.)
 
 ## Changelog
+
+### 2026-05-28 -- Organization EFW review boundary
+
+- Defined organization-owned Stripe Early Fraud Warnings as review-only in the initial enforcement release, with no automatic refunds, subscription cancellation, seat restriction, member block, or organization-managed KiloClaw suspension.
 
 ### 2026-05-18 -- Organization KiloClaw hard-expiry coupling
 

@@ -7,6 +7,7 @@ import {
   countPendingSessionMessages,
   deletePendingSessionMessageByMessageId,
   findPendingSessionMessageByClientRequestId,
+  createPendingSessionMessageFromIntent,
   listPendingSessionMessages,
   storePendingSessionMessage,
   type PendingSessionMessage,
@@ -292,22 +293,22 @@ describe('pending session messages', () => {
     expect(result.acceptedMessages[0]?.messageId).toBe('msg_018f1e2d3c4bFlushMsgAbCdEf');
   });
 
-  it('rebuilds queued image descriptors into the flush delivery plan', async () => {
-    const userId = 'user_pending_flush_images';
-    const sessionId = 'agent_pending_flush_images';
+  it('flushes canonical document attachment descriptors through the durable queue plan', async () => {
+    const userId = 'user_pending_flush_attachments';
+    const sessionId = 'agent_pending_flush_attachments';
     const stub = env.CLOUD_AGENT_SESSION.get(
       env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
     );
-    const images = {
+    const attachments = {
       path: '123e4567-e89b-12d3-a456-426614174000',
-      files: ['123e4567-e89b-12d3-a456-426614174001.png'],
+      files: ['123e4567-e89b-12d3-a456-426614174001.pdf'],
     };
 
     const result = await runInDurableObject(stub, async instance => {
-      let deliveredImages: unknown;
+      let deliveredAttachments: unknown;
       (instance as any).orchestrator = {
         execute: async (plan: any) => {
-          deliveredImages = plan.turn.images;
+          deliveredAttachments = plan.turn.attachments;
           return { messageId: plan.turn.messageId, kiloSessionId: 'kilo_test' };
         },
       };
@@ -318,26 +319,32 @@ describe('pending session messages', () => {
         prompt: 'prepared prompt',
         mode: 'code',
         model: 'test-model',
-        kilocodeToken: 'token-followup-images',
+        kilocodeToken: 'token-followup-attachments',
         gitUrl: 'https://example.com/repo.git',
         gitToken: 'old-token',
       });
       await storePendingSessionMessage(
         instance.ctx.storage,
-        createMessage({
-          messageId: 'msg_018f1e2d3c4bImgFlushAbCdEf',
-          content: 'flush image prompt',
-          createdAt: 1,
-          images,
-        })
+        createPendingSessionMessageFromIntent(
+          {
+            turn: {
+              type: 'prompt',
+              messageId: 'msg_018f1e2d3c4bDocFlushAbCdEf',
+              prompt: 'flush document prompt',
+              attachments,
+            },
+            agent: { mode: 'code', model: 'test-model' },
+          },
+          1
+        )
       );
 
       await instance.alarm();
       const pending = await listPendingSessionMessages(instance.ctx.storage);
-      return { deliveredImages, pending };
+      return { deliveredAttachments, pending };
     });
 
-    expect(result.deliveredImages).toEqual(images);
+    expect(result.deliveredAttachments).toEqual(attachments);
     expect(result.pending).toHaveLength(0);
   });
 

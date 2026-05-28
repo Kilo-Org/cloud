@@ -103,14 +103,14 @@ export function createSessionExecutionV2Handlers() {
               id: input.messageId ?? undefined,
               command: commandPayload.command,
               arguments: commandPayload.arguments,
-              images: input.images,
+              attachments: input.attachments ?? input.images,
             };
           } else if (promptPayload) {
             turn = {
               type: 'prompt',
               id: input.messageId ?? undefined,
               prompt: promptPayload.prompt,
-              images: input.images,
+              attachments: input.attachments ?? input.images,
             };
             agent = {
               mode: promptPayload.mode,

@@ -109,6 +109,29 @@ describe('session transport delegation (cloud agent)', () => {
     session.destroy();
   });
 
+  it('session.send() delegates canonical attachment references', async () => {
+    const api = createMockApi();
+    const session = createCloudAgentResolvedSession(api);
+    const attachments = {
+      path: '12345678-1234-4234-9234-123456789abc',
+      files: ['87654321-4321-4321-8321-cba987654321.txt'],
+    };
+
+    await connectSession(session);
+    await session.send({
+      payload: { type: 'prompt', prompt: 'hello', mode: 'auto' },
+      attachments,
+    });
+
+    expect(api.send).toHaveBeenCalledWith({
+      sessionId: cloudAgentSessionId,
+      payload: { type: 'prompt', prompt: 'hello', mode: 'auto' },
+      attachments,
+    });
+
+    session.destroy();
+  });
+
   it('session.interrupt() delegates to api.interrupt with resolved cloudAgentSessionId', async () => {
     const api = createMockApi();
     const session = createCloudAgentResolvedSession(api);

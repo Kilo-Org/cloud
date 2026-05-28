@@ -33,9 +33,13 @@ import {
   baseResizeTerminalNextOutputSchema,
   baseCloseTerminalNextSchema,
   baseCloseTerminalNextOutputSchema,
+  cloudAgentGetAttachmentUploadUrlSchema,
   cloudAgentGetImageUploadUrlSchema,
 } from './cloud-agent-next-schemas';
-import { generateImageUploadUrl } from '@/lib/r2/cloud-agent-attachments';
+import {
+  generateCloudAgentAttachmentUploadUrl,
+  generateImageUploadUrl,
+} from '@/lib/r2/cloud-agent-attachments';
 import * as z from 'zod';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { signStreamTicket } from '@/lib/cloud-agent/stream-ticket';
@@ -134,7 +138,7 @@ export const cloudAgentNextRouter = createTRPCRouter({
       const authToken = generateCloudAgentToken(ctx.user);
       const client = createCloudAgentNextClient(authToken);
 
-      const { gitlabProject, githubRepo, ...restInput } = input;
+      const { gitlabProject, githubRepo, attachments, images, ...restInput } = input;
 
       // Determine git source: GitLab uses gitUrl, GitHub uses githubRepo.
       // Tokens are resolved inside cloud-agent-next via GIT_TOKEN_SERVICE.
@@ -159,6 +163,7 @@ export const cloudAgentNextRouter = createTRPCRouter({
         return await client.prepareSession({
           ...restInput,
           ...gitParams,
+          attachments: attachments ?? images,
           createdOnPlatform: 'cloud-agent-web',
         });
       } catch (error) {
@@ -209,8 +214,10 @@ export const cloudAgentNextRouter = createTRPCRouter({
       // Tokens are refreshed inside cloud-agent-next (GitHub App installation
       // for GitHub, GIT_TOKEN_SERVICE for managed GitLab).
       try {
+        const { attachments, images, ...restInput } = input;
         return await client.sendMessage({
-          ...input,
+          ...restInput,
+          attachments: attachments ?? images,
           messageId: input.messageId ?? generateMessageId(),
         });
       } catch (error) {
@@ -299,6 +306,21 @@ export const cloudAgentNextRouter = createTRPCRouter({
         userId: ctx.user.id,
         messageUuid: input.messageUuid,
         imageId: input.imageId,
+        contentType: input.contentType,
+        contentLength: input.contentLength,
+      });
+    }),
+
+  /**
+   * Generate a presigned URL for uploading a canonical Cloud Agent attachment.
+   */
+  getAttachmentUploadUrl: baseProcedure
+    .input(cloudAgentGetAttachmentUploadUrlSchema)
+    .mutation(async ({ ctx, input }) => {
+      return generateCloudAgentAttachmentUploadUrl({
+        userId: ctx.user.id,
+        messageUuid: input.messageUuid,
+        attachmentId: input.attachmentId,
         contentType: input.contentType,
         contentLength: input.contentLength,
       });

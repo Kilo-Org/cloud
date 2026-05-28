@@ -3020,6 +3020,177 @@ describe('instance destruction sweep', () => {
     );
   });
 
+  it('clears destruction_deadline on a detached subscription row instead of starving the queue', async () => {
+    // Regression: a subscription with `destruction_deadline < now()` but
+    // `instance_id IS NULL` (its instance was already destroyed via some
+    // other path) has nothing left for this sweep to destroy. Before this
+    // fix the loop logged "missing_instance_id" and `continue`d without
+    // clearing the deadline, so the same detached row stayed at the head
+    // of the FIFO candidate query forever — production saw 25k+ real
+    // overdue rows starve for 40 days behind ~50 detached rows.
+    //
+    // The fix collects all detached IDs during the loop, then after the
+    // loop issues a single bulk SELECT + guarded bulk UPDATE + bulk
+    // changelog INSERT inside one database transaction. The transaction
+    // is what keeps the audit record at-least-once: if the INSERT fails
+    // the UPDATE rolls back so the rows stay detached and the next sweep
+    // retries the whole pair atomically — otherwise a transient INSERT
+    // failure would erase the only signal (`destruction_deadline IS NOT
+    // NULL`) that the cleanup ever ran.
+    const subscriptionId = 'sub-detached-1';
+    const detachedBefore = {
+      id: subscriptionId,
+      user_id: 'user-detached',
+      instance_id: null,
+      destruction_deadline: '2026-04-17T18:41:17.736Z',
+    };
+    const detachedAfter = { ...detachedBefore, destruction_deadline: null };
+    const { db, updates, txUpdates, inserts, txInserts, deletes } = createMockDb(
+      [
+        // 1. Destruction candidates (db.select): a single detached row.
+        [
+          {
+            id: subscriptionId,
+            user_id: 'user-detached',
+            instance_id: null,
+            sandbox_id: null,
+            organization_id: null,
+            status: 'canceled',
+            email: 'detached@example.com',
+          },
+        ],
+        // 2. Bulk SELECT for before-snapshots inside the cleanup transaction.
+        [detachedBefore],
+      ],
+      { txUpdateReturningRows: [[detachedAfter]] }
+    );
+    mockGetWorkerDb.mockReturnValue(db);
+    const fetch = vi.fn();
+
+    const summary = await runSweep(
+      createEnv(fetch),
+      {
+        runId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+        sweep: 'instance_destruction',
+      },
+      1
+    );
+
+    expect(summary.errors).toBe(0);
+    expect(summary.sweep3_instance_destruction).toBe(0);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+    // The guarded UPDATE happens inside a transaction so it lives on
+    // `txUpdates`, not `updates`. The top-level handles see nothing.
+    expect(updates).toHaveLength(0);
+    expect(inserts).toHaveLength(0);
+    expect(deletes).toHaveLength(0);
+    expect(txUpdates).toEqual([{ destruction_deadline: null }]);
+    // The bulk INSERT writes the changelog entries as an array in one
+    // call inside the same transaction. txInserts[0] is the values array
+    // passed to tx.insert().values([...]).
+    expect(txInserts).toHaveLength(1);
+    expect(txInserts[0]).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          subscription_id: subscriptionId,
+          actor_id: 'billing-lifecycle-job',
+          action: 'status_changed',
+          reason: 'detached_subscription_no_instance',
+        }),
+      ])
+    );
+    // The pre-existing skip log is still emitted for operator visibility.
+    expect(loggedValues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          message: 'Skipping instance destruction for detached subscription row',
+          reason: 'missing_instance_id',
+          subscriptionId,
+        }),
+      ])
+    );
+  });
+
+  it('clears a soft-deleted detached subscription instead of leaving it to pin the queue', async () => {
+    // Regression for the review of this PR. The detached check fires
+    // BEFORE the soft-deleted check inside the loop, so a row that is
+    // BOTH soft-deleted AND detached (`instance_id IS NULL`) still gets
+    // its destruction_deadline cleared. Without that ordering, the
+    // soft-deleted `continue` would short-circuit the loop and the row
+    // would stay at the head of the bounded FIFO queue forever — the
+    // same starvation the PR fixes for the common case, just gated on
+    // a different attribute.
+    const subscriptionId = 'sub-detached-softdeleted';
+    const detachedBefore = {
+      id: subscriptionId,
+      user_id: 'user-softdeleted',
+      instance_id: null,
+      destruction_deadline: '2026-04-17T18:41:17.736Z',
+    };
+    const detachedAfter = { ...detachedBefore, destruction_deadline: null };
+    const { db, updates, txUpdates, inserts, txInserts, deletes } = createMockDb(
+      [
+        [
+          {
+            id: subscriptionId,
+            user_id: 'user-softdeleted',
+            instance_id: null,
+            sandbox_id: null,
+            organization_id: null,
+            status: 'canceled',
+            // Trailing @deleted.invalid identifies a soft-deleted account
+            // (see SOFT_DELETED_EMAIL_SUFFIX in lifecycle.ts).
+            email: 'user-softdeleted@deleted.invalid',
+          },
+        ],
+        [detachedBefore],
+      ],
+      { txUpdateReturningRows: [[detachedAfter]] }
+    );
+    mockGetWorkerDb.mockReturnValue(db);
+    const fetch = vi.fn();
+
+    const summary = await runSweep(
+      createEnv(fetch),
+      {
+        runId: 'cdcdcdcd-cdcd-4cdc-8cdc-cdcdcdcdcdcd',
+        sweep: 'instance_destruction',
+      },
+      1
+    );
+
+    expect(summary.errors).toBe(0);
+    expect(summary.sweep3_instance_destruction).toBe(0);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+    // Cleared inside a transaction even though the user is soft-deleted.
+    expect(updates).toHaveLength(0);
+    expect(inserts).toHaveLength(0);
+    expect(deletes).toHaveLength(0);
+    expect(txUpdates).toEqual([{ destruction_deadline: null }]);
+    expect(txInserts).toHaveLength(1);
+    expect(txInserts[0]).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          subscription_id: subscriptionId,
+          actor_id: 'billing-lifecycle-job',
+          action: 'status_changed',
+          reason: 'detached_subscription_no_instance',
+        }),
+      ])
+    );
+    expect(loggedValues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          message: 'Skipping instance destruction for detached subscription row',
+          reason: 'missing_instance_id',
+          subscriptionId,
+        }),
+      ])
+    );
+  });
+
   it('keeps DB/email cleanup unchanged when platform destroy succeeds', async () => {
     const instanceId = '11111111-1111-4111-8111-111111111111';
     const { db, updates, txUpdates, inserts, deletes, selectBuilders } = createMockDb([
@@ -3072,7 +3243,7 @@ describe('instance destruction sweep', () => {
 
     expect(summary.errors).toBe(0);
     expect(summary.sweep3_instance_destruction).toBe(1);
-    expect(selectBuilders[0]?.limit).toHaveBeenCalledWith(50);
+    expect(selectBuilders[0]?.limit).toHaveBeenCalledWith(75);
     expect(fetch).toHaveBeenCalledTimes(1);
     expect(globalThis.fetch).toHaveBeenCalledTimes(1);
     expect(inserts).toEqual(

@@ -59,25 +59,26 @@ describe('mapModelIdToVercel', () => {
     });
   });
 
-  describe('grok reasoning/non-reasoning toggle', () => {
-    it.each([
-      ['x-ai/grok-4-fast', 'xai/grok-4-fast-reasoning'],
-      ['x-ai/grok-4.1-fast', 'xai/grok-4.1-fast-reasoning'],
-      ['x-ai/grok-4.20-beta', 'xai/grok-4.20-reasoning'],
-    ])('maps %s to %s when reasoning is not explicitly disabled', (input, expected) => {
-      expect(mapModelIdToVercel(input, false)).toBe(expected);
+  describe('grok 4.20 reasoning/non-reasoning toggle', () => {
+    it('maps x-ai/grok-4.20 to the reasoning variant when reasoning is not explicitly disabled', () => {
+      expect(mapModelIdToVercel('x-ai/grok-4.20', false)).toBe('xai/grok-4.20-reasoning');
     });
 
-    it.each([
-      ['x-ai/grok-4-fast', 'xai/grok-4-fast-non-reasoning'],
-      ['x-ai/grok-4.1-fast', 'xai/grok-4.1-fast-non-reasoning'],
-      ['x-ai/grok-4.20-beta', 'xai/grok-4.20-non-reasoning'],
-    ])('maps %s to %s when reasoning is explicitly disabled', (input, expected) => {
-      expect(mapModelIdToVercel(input, true)).toBe(expected);
+    it('maps x-ai/grok-4.20 to the non-reasoning variant when reasoning is explicitly disabled', () => {
+      expect(mapModelIdToVercel('x-ai/grok-4.20', true)).toBe('xai/grok-4.20-non-reasoning');
     });
 
-    it('does not rewrite a mapped target that does not end with -reasoning', () => {
+    it('does not rewrite other hardcoded mapping targets when reasoning is disabled', () => {
+      // Only grok-4.20 has a reasoning/non-reasoning split; other hardcoded
+      // mappings must pass through unchanged regardless of the flag.
       expect(mapModelIdToVercel('mistralai/codestral-2508', true)).toBe('mistral/codestral');
+      expect(mapModelIdToVercel('qwen/qwen3-32b', true)).toBe('alibaba/qwen-3-32b');
+    });
+
+    it('does not apply the reasoning toggle to grok models outside the hardcoded mapping', () => {
+      // A grok id that is not in vercelModelIdMapping should fall through to
+      // the generic prefix rewrite even when reasoning is explicitly disabled.
+      expect(mapModelIdToVercel('x-ai/grok-4.20-reasoning', true)).toBe('xai/grok-4.20-reasoning');
     });
   });
 
@@ -123,19 +124,29 @@ describe('mapModelIdToVercel', () => {
   });
 
   describe('kilo-exclusive models', () => {
-    it('maps a hidden openrouter-gateway exclusive to its internal id', () => {
+    it('maps an exclusive flagged with vercel-routing to its internal id', () => {
       // google/gemma-4-26b-a4b-it:free is registered in kiloExclusiveModels
-      // with gateway 'openrouter' and internal_id 'google/gemma-4-26b-a4b-it'.
+      // with the 'vercel-routing' flag and internal_id 'google/gemma-4-26b-a4b-it'.
       expect(mapModelIdToVercel('google/gemma-4-26b-a4b-it:free', false)).toBe(
         'google/gemma-4-26b-a4b-it'
       );
     });
 
-    it('does not use internal_id for exclusives that are not routed via openrouter', () => {
-      // x-ai/grok-code-fast-1:optimized:free has gateway 'martian',
-      // so the mapping should pass the public id through the prefix rewrite.
-      expect(mapModelIdToVercel('x-ai/grok-code-fast-1:optimized:free', false)).toBe(
-        'xai/grok-code-fast-1:optimized:free'
+    it('does not use internal_id for exclusives that are not vercel-routed', () => {
+      // claude_sonnet_clawsetup_model has gateway 'openrouter' and no
+      // 'vercel-routing' flag, so the mapping must pass the public id through
+      // the generic prefix rewrite instead of substituting internal_id.
+      expect(mapModelIdToVercel('anthropic/claude-sonnet-4.6:clawsetup', false)).toBe(
+        'anthropic/claude-sonnet-4.6:clawsetup'
+      );
+    });
+
+    it('does not use internal_id for disabled exclusives even when vercel-routed', () => {
+      // minimax_m25_free_model has the 'vercel-routing' flag but status
+      // 'disabled', so it must not be substituted by internal_id and instead
+      // pass the public id through the generic prefix rewrite.
+      expect(mapModelIdToVercel('minimax/minimax-m2.5:free', false)).toBe(
+        'minimax/minimax-m2.5:free'
       );
     });
   });

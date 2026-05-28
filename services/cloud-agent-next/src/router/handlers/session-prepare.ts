@@ -10,7 +10,8 @@
  *
  * `updateSession` is retained because `services/code-review-infra` still
  * uses it to rewrite `callbackTarget` before a session-continuation
- * `sendMessageV2`.
+ * `sendMessageV2`. It will be removed once that flow migrates to an
+ * execution-scoped callback target override on `send`.
  */
 import { TRPCError } from '@trpc/server';
 import type { WorkerDb } from '@kilocode/db/client';
@@ -348,7 +349,7 @@ const prepareSessionHandler = internalApiProtectedProcedure
  * Update a prepared (but not yet initiated) session.
  *
  * Retained for `services/code-review-infra` which rewrites `callbackTarget`
- * before a continued session execution. Not used by any apps/web flow.
+ * on session continuation. Not used by any apps/web flow.
  *
  * Protected by internal API authentication.
  */
@@ -368,9 +369,7 @@ const updateSessionHandler = internalApiProtectedProcedure
       );
       const stub = ctx.env.CLOUD_AGENT_SESSION.get(doId);
 
-      const result = await stub.tryUpdate({
-        callbackTarget: input.callbackTarget,
-      });
+      const result = await stub.tryUpdate({ callbackTarget: input.callbackTarget });
 
       if (!result.success) {
         logger.withFields({ error: result.error }).error('Failed to update session');

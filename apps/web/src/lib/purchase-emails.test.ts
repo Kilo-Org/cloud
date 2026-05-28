@@ -130,6 +130,23 @@ describe('subjects map', () => {
   test('includes transactional purchase templates', () => {
     expect(subjects.creditsTopUp).toBeTruthy();
     expect(subjects.kiloClawSubscriptionStarted).toBeTruthy();
+    expect(subjects.codeReviewDisabled).toBe('Action Required: Code Reviewer Disabled');
+  });
+});
+
+describe('codeReviewDisabled template', () => {
+  test('renders reason and recovery link', () => {
+    const html = renderTemplate('codeReviewDisabled', {
+      reason: 'The selected BYOK API key is invalid or has been revoked.',
+      recovery_url: 'https://app.kilocode.ai/byok',
+      recovery_label: 'Update BYOK settings',
+      year: '2026',
+    });
+
+    expect(html).toContain('Code Reviewer Disabled');
+    expect(html).toContain('The selected BYOK API key is invalid or has been revoked.');
+    expect(html).toContain('https://app.kilocode.ai/byok');
+    expect(html).toContain('Update BYOK settings');
   });
 });
 

@@ -27,6 +27,7 @@ import { codeReviewWorkerClient } from '@/lib/code-reviews/client/code-review-wo
 import { updateCheckRunId } from '@/lib/code-reviews/db/code-reviews';
 import { resolvePullRequestCheckoutRef } from './pull-request-checkout-ref';
 import { APP_URL } from '@/lib/constants';
+import { getCodeReviewActionRequiredState } from '@/lib/code-reviews/action-required';
 
 /**
  * GitHub Pull Request Event Handler
@@ -114,7 +115,7 @@ export async function handlePullRequestCodeReview(
     // 2. Check if code review agent is enabled for this owner
     const agentConfig = await getAgentConfigForOwner(owner, 'code_review', 'github');
 
-    if (!agentConfig || !agentConfig.is_enabled) {
+    if (!agentConfig || !agentConfig.is_enabled || getCodeReviewActionRequiredState(agentConfig)) {
       logExceptInTest(
         `Code review agent not enabled for ${owner.type} ${owner.id} (repo: ${repository.full_name})`
       );

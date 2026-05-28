@@ -18,6 +18,7 @@ import { captureException } from '@sentry/nextjs';
 import type { CreateReviewParams, CodeReviewStatus, ListReviewsParams, Owner } from '../core';
 import type { CloudAgentCodeReview, CloudAgentCodeReviewAttempt } from '@kilocode/db/schema';
 import type { CodeReviewTerminalReason } from '@kilocode/db/schema-types';
+import { isCodeReviewActionRequiredReason } from '../action-required-shared';
 import {
   activeCodeReviewWorkCondition,
   reconsiderableCodeReviewWorkCondition,
@@ -119,6 +120,7 @@ const RETRYABLE_PARENT_REVIEW_STATUSES = ['queued', 'running'];
 function canCreateInfraRetryAttempt(review: { status: string; terminal_reason: string | null }) {
   return (
     review.terminal_reason !== 'superseded' &&
+    !isCodeReviewActionRequiredReason(review.terminal_reason) &&
     RETRYABLE_PARENT_REVIEW_STATUSES.includes(review.status)
   );
 }
@@ -954,17 +956,24 @@ export async function releaseQueuedReviewClaim(
 export async function failReservedQueuedReview(
   reviewId: string,
   dispatchReservationId: string,
-  errorMessage: string
+  errorMessage: string,
+  terminalReason?: CodeReviewTerminalReason
 ): Promise<boolean> {
   try {
+    const updateData: Partial<typeof cloud_agent_code_reviews.$inferInsert> = {
+      status: 'failed',
+      error_message: errorMessage,
+      dispatch_reservation_id: null,
+      completed_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    if (terminalReason !== undefined) {
+      updateData.terminal_reason = terminalReason;
+    }
+
     const failed = await db
       .update(cloud_agent_code_reviews)
-      .set({
-        status: 'failed',
-        error_message: errorMessage,
-        completed_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
+      .set(updateData)
       .where(
         and(
           eq(cloud_agent_code_reviews.id, reviewId),

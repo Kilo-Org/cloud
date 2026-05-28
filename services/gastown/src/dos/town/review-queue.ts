@@ -108,41 +108,23 @@ function toReviewQueueEntry(row: MergeRequestBeadRecord): ReviewQueueEntry {
   };
 }
 
-export function submitToReviewQueue(sql: SqlStorage, input: ReviewQueueInput): void {
+function createMergeRequestBeadCore(
+  sql: SqlStorage,
+  args: {
+    rigId: string;
+    title: string;
+    body: string | null;
+    metadata: Record<string, unknown>;
+    labels: string[];
+    createdBy: string | null;
+    branch: string;
+    targetBranch: string;
+    prUrl?: string;
+  }
+): { beadId: string } {
   const id = generateId();
   const timestamp = now();
 
-  // Build metadata — include pr_url if the agent already created a PR so
-  // the link is visible via the standard bead list endpoint.
-  const metadata: Record<string, unknown> = {
-    source_bead_id: input.bead_id,
-    source_agent_id: input.agent_id,
-  };
-  if (input.pr_url) {
-    metadata.pr_url = input.pr_url;
-  }
-
-  // Resolve the target branch for this MR:
-  // - For review-then-land convoy beads → convoy's feature branch
-  // - For review-and-merge convoy beads → rig's default branch (land independently)
-  // - For standalone beads → rig's default branch
-  // We pass defaultBranch from the caller so we don't hardcode 'main'.
-  const convoyId = getConvoyForBead(sql, input.bead_id);
-  const convoyFeatureBranch = convoyId ? getConvoyFeatureBranch(sql, convoyId) : null;
-  const convoyMergeMode = convoyId ? getConvoyMergeMode(sql, convoyId) : null;
-  const targetBranch =
-    convoyMergeMode === 'review-then-land' && convoyFeatureBranch
-      ? convoyFeatureBranch
-      : (input.default_branch ?? 'main');
-
-  if (convoyId) {
-    metadata.convoy_id = convoyId;
-    if (convoyFeatureBranch) {
-      metadata.convoy_feature_branch = convoyFeatureBranch;
-    }
-  }
-
-  // Create the merge_request bead
   query(
     sql,
     /* sql */ `
@@ -159,35 +141,21 @@ export function submitToReviewQueue(sql: SqlStorage, input: ReviewQueueInput): v
       id,
       'merge_request',
       'open',
-      `Review: ${input.branch}`,
-      input.summary ?? null,
-      input.rig_id,
+      args.title,
+      args.body,
+      args.rigId,
       null,
-      null, // assignee left null — refinery claims it via hookBead
+      null,
       'medium',
-      JSON.stringify(['gt:merge-request']),
-      JSON.stringify(metadata),
-      input.agent_id, // created_by records who submitted
+      JSON.stringify(args.labels),
+      JSON.stringify(args.metadata),
+      args.createdBy,
       timestamp,
       timestamp,
       null,
     ]
   );
 
-  // Link MR bead → source bead via bead_dependencies so the DAG is queryable
-  query(
-    sql,
-    /* sql */ `
-      INSERT INTO ${bead_dependencies} (
-        ${bead_dependencies.columns.bead_id},
-        ${bead_dependencies.columns.depends_on_bead_id},
-        ${bead_dependencies.columns.dependency_type}
-      ) VALUES (?, ?, 'tracks')
-    `,
-    [id, input.bead_id]
-  );
-
-  // Create the review_metadata satellite
   query(
     sql,
     /* sql */ `
@@ -197,7 +165,58 @@ export function submitToReviewQueue(sql: SqlStorage, input: ReviewQueueInput): v
         ${review_metadata.columns.pr_url}, ${review_metadata.columns.retry_count}
       ) VALUES (?, ?, ?, ?, ?, ?)
     `,
-    [id, input.branch, targetBranch, null, input.pr_url ?? null, 0]
+    [id, args.branch, args.targetBranch, null, args.prUrl ?? null, 0]
+  );
+
+  return { beadId: id };
+}
+
+export function submitToReviewQueue(sql: SqlStorage, input: ReviewQueueInput): void {
+  const metadata: Record<string, unknown> = {
+    source_bead_id: input.bead_id,
+    source_agent_id: input.agent_id,
+  };
+  if (input.pr_url) {
+    metadata.pr_url = input.pr_url;
+  }
+
+  const convoyId = getConvoyForBead(sql, input.bead_id);
+  const convoyFeatureBranch = convoyId ? getConvoyFeatureBranch(sql, convoyId) : null;
+  const convoyMergeMode = convoyId ? getConvoyMergeMode(sql, convoyId) : null;
+  const targetBranch =
+    convoyMergeMode === 'review-then-land' && convoyFeatureBranch
+      ? convoyFeatureBranch
+      : (input.default_branch ?? 'main');
+
+  if (convoyId) {
+    metadata.convoy_id = convoyId;
+    if (convoyFeatureBranch) {
+      metadata.convoy_feature_branch = convoyFeatureBranch;
+    }
+  }
+
+  const { beadId } = createMergeRequestBeadCore(sql, {
+    rigId: input.rig_id,
+    title: `Review: ${input.branch}`,
+    body: input.summary ?? null,
+    metadata,
+    labels: ['gt:merge-request'],
+    createdBy: input.agent_id,
+    branch: input.branch,
+    targetBranch,
+    prUrl: input.pr_url,
+  });
+
+  query(
+    sql,
+    /* sql */ `
+      INSERT INTO ${bead_dependencies} (
+        ${bead_dependencies.columns.bead_id},
+        ${bead_dependencies.columns.depends_on_bead_id},
+        ${bead_dependencies.columns.dependency_type}
+      ) VALUES (?, ?, 'tracks')
+    `,
+    [beadId, input.bead_id]
   );
 
   logBeadEvent(sql, {
@@ -207,6 +226,55 @@ export function submitToReviewQueue(sql: SqlStorage, input: ReviewQueueInput): v
     newValue: input.branch,
     metadata: { branch: input.branch, target_branch: targetBranch },
   });
+}
+
+export function submitExternalPrToReviewQueue(
+  sql: SqlStorage,
+  args: {
+    rigId: string;
+    prUrl: string;
+    branch: string;
+    targetBranch: string;
+    headSha: string;
+    title: string;
+    body?: string;
+    forcePushAllowed: boolean;
+    sourceAgentId: string;
+  }
+): { beadId: string } {
+  const metadata: Record<string, unknown> = {
+    source_agent_id: args.sourceAgentId,
+    babysit: true,
+    head_sha: args.headSha,
+    force_push_allowed: args.forcePushAllowed,
+  };
+
+  const { beadId } = createMergeRequestBeadCore(sql, {
+    rigId: args.rigId,
+    title: args.title,
+    body: args.body ?? null,
+    metadata,
+    labels: ['gt:merge-request', 'gt:babysit'],
+    createdBy: args.sourceAgentId,
+    branch: args.branch,
+    targetBranch: args.targetBranch,
+    prUrl: args.prUrl,
+  });
+
+  logBeadEvent(sql, {
+    beadId,
+    agentId: args.sourceAgentId,
+    eventType: 'babysit_started',
+    newValue: args.prUrl,
+    metadata: {
+      branch: args.branch,
+      target_branch: args.targetBranch,
+      head_sha: args.headSha,
+      pr_url: args.prUrl,
+    },
+  });
+
+  return { beadId };
 }
 
 export function completeReview(
@@ -1185,7 +1253,8 @@ export function getMergeQueueData(sql: SqlStorage, params: MergeQueueParams): Me
           ON rig.id = b.${beads.columns.rig_id}
         WHERE ${bead_events.event_type} IN (
           'review_submitted', 'review_completed', 'pr_created',
-          'pr_creation_failed', 'rework_requested', 'status_changed'
+          'pr_creation_failed', 'rework_requested', 'status_changed',
+          'babysit_started'
         )
           AND (? IS NULL OR b.${beads.columns.rig_id} = ?)
           AND (? IS NULL OR ${bead_events.created_at} > ?)

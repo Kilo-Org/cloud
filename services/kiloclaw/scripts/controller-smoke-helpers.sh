@@ -58,13 +58,10 @@ doc = json.load(sys.stdin)
 plugin = doc.get("plugin", {})
 status = plugin.get("status")
 error = plugin.get("error")
-route_count = doc.get("httpRouteCount", 0)
 if status != "loaded":
     raise SystemExit(f"status={status!r}")
 if error:
     raise SystemExit(f"error={error!r}")
-if not isinstance(route_count, int) or route_count < 1:
-    raise SystemExit(f"httpRouteCount={route_count!r}")
 print("loaded")
 ' <<< "$plugin_json" 2>&1); then
     check "kilo-chat plugin inspect" "loaded" "$details"

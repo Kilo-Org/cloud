@@ -9,6 +9,7 @@ import { logger, withLogTags } from './util/logger';
 import { formatError } from '@kilocode/worker-utils';
 import { authMiddleware } from './auth';
 import { botAuthMiddleware } from './auth-bot';
+import { internalApiMiddleware } from './auth-internal';
 import type { AuthContext } from './auth';
 import { decodeConversationCursor, type ConversationCursor } from '@kilocode/kilo-chat';
 import { registerConversationRoutes } from './routes/conversations';
@@ -26,6 +27,7 @@ import {
   handleStopTyping,
 } from './routes/handler';
 import { registerBotRoutes } from './routes/bot-messages';
+import { registerInternalRoutes } from './routes/internal';
 import { registerSandboxReadRoutes } from './routes/sandbox-reads';
 import {
   postMessageAsUser,
@@ -104,6 +106,11 @@ app.get('/v1/attachments/:id/url', handleAttachmentGetUrl);
 // Bot HTTP routes — gateway-token auth, called directly by Fly controllers.
 app.use('/bot/v1/sandboxes/:sandboxId/*', botAuthMiddleware);
 registerBotRoutes(app);
+
+// Internal HTTP routes — `x-internal-api-key` shared-secret auth, called
+// server-to-server by trusted callers (e.g. the Next.js cloud web app).
+app.use('/internal/*', internalApiMiddleware);
+registerInternalRoutes(app);
 
 export class KiloChatService extends WorkerEntrypoint<Env> {
   async fetch(request: Request): Promise<Response> {

@@ -29,6 +29,7 @@ import {
   ImpactAdvocateRegistrationState,
   ImpactAttributionTouchProvider,
   ImpactAttributionTouchType,
+  ImpactReferralProduct,
 } from '@kilocode/db/schema-types';
 import { and, asc, eq, lte, ne, or, sql } from 'drizzle-orm';
 
@@ -50,6 +51,28 @@ const IMPACT_ADVOCATE_REGISTRATION_CLAIM_STALE_MS = 15 * 60 * 1000;
 
 function getDatabaseClient(database?: DatabaseClient): DatabaseClient {
   return database ?? db;
+}
+
+function productForProgramKey(programKey: ImpactAdvocateProgramKey): ImpactReferralProduct {
+  return programKey === ImpactAdvocateProgramKey.KiloPass
+    ? ImpactReferralProduct.KiloPass
+    : ImpactReferralProduct.KiloClaw;
+}
+
+function resolveReferralProgramKey(params: {
+  product?: ImpactReferralProduct | null;
+  programKey?: ImpactAdvocateProgramKey | null;
+}): ImpactAdvocateProgramKey {
+  if (params.programKey) return params.programKey;
+  if (params.product === ImpactReferralProduct.KiloPass) return ImpactAdvocateProgramKey.KiloPass;
+  return ImpactAdvocateProgramKey.KiloClaw;
+}
+
+function resolveReferralProduct(params: {
+  product?: ImpactReferralProduct | null;
+  programKey?: ImpactAdvocateProgramKey | null;
+}): ImpactReferralProduct {
+  return params.product ?? productForProgramKey(resolveReferralProgramKey(params));
 }
 
 function buildHashedDedupeKey(parts: Array<string | null | undefined>): string {
@@ -93,12 +116,15 @@ export function hashNormalizedEmailForDeletionTombstone(normalizedEmail: string)
 
 export async function recordImpactAffiliateTouch(params: {
   database?: DatabaseClient;
+  product?: ImpactReferralProduct | null;
   userId?: string | null;
   anonymousId?: string | null;
   touch: ParsedImpactAffiliateTouch;
 }): Promise<void> {
   const database = getDatabaseClient(params.database);
+  const product = resolveReferralProduct({ product: params.product ?? params.touch.product });
   const dedupeKey = buildHashedDedupeKey([
+    product,
     touchIdentity(params),
     ImpactAttributionTouchType.Affiliate,
     ImpactAttributionTouchProvider.ImpactPerformance,
@@ -111,6 +137,8 @@ export async function recordImpactAffiliateTouch(params: {
     .insert(impact_attribution_touches)
     .values({
       dedupe_key: dedupeKey,
+      product,
+      program_key: null,
       anonymous_id: params.anonymousId ?? null,
       user_id: params.userId ?? null,
       touch_type: ImpactAttributionTouchType.Affiliate,
@@ -148,12 +176,24 @@ export async function recordImpactAffiliateTouch(params: {
 
 export async function recordImpactReferralTouch(params: {
   database?: DatabaseClient;
+  product?: ImpactReferralProduct | null;
+  programKey?: ImpactAdvocateProgramKey | null;
   userId?: string | null;
   anonymousId?: string | null;
   touch: ParsedImpactReferralTouch;
 }): Promise<void> {
   const database = getDatabaseClient(params.database);
+  const programKey = resolveReferralProgramKey({
+    product: params.product ?? params.touch.product ?? null,
+    programKey: params.programKey ?? params.touch.programKey ?? null,
+  });
+  const product = resolveReferralProduct({
+    product: params.product ?? params.touch.product ?? null,
+    programKey,
+  });
   const dedupeKey = buildHashedDedupeKey([
+    product,
+    programKey,
     touchIdentity(params),
     ImpactAttributionTouchType.Referral,
     ImpactAttributionTouchProvider.ImpactAdvocate,
@@ -167,6 +207,8 @@ export async function recordImpactReferralTouch(params: {
     .insert(impact_attribution_touches)
     .values({
       dedupe_key: dedupeKey,
+      product,
+      program_key: programKey,
       anonymous_id: params.anonymousId ?? null,
       user_id: params.userId ?? null,
       touch_type: ImpactAttributionTouchType.Referral,
@@ -207,18 +249,21 @@ export async function recordImpactReferralTouch(params: {
 
 export async function ensureImpactAdvocateParticipantProfile(params: {
   database?: DatabaseClient;
+  programKey?: ImpactAdvocateProgramKey | null;
   user: Pick<User, 'id' | 'google_user_email'>;
   locale?: string | null;
   countryCode?: string | null;
   opaqueReferralIdentifier?: string | null;
 }): Promise<{ id: string }> {
   const database = getDatabaseClient(params.database);
+  const programKey = params.programKey ?? ImpactAdvocateProgramKey.KiloClaw;
 
-  const isConfigured = isImpactAdvocateConfigured();
+  const isConfigured = isImpactAdvocateConfigured({ programKey });
 
   const [insertedParticipant] = await database
     .insert(impact_advocate_participants)
     .values({
+      program_key: programKey,
       user_id: params.user.id,
       advocate_id: params.user.google_user_email,
       advocate_account_id: params.user.google_user_email,
@@ -241,7 +286,7 @@ export async function ensureImpactAdvocateParticipantProfile(params: {
     insertedParticipant ??
     (await database.query.impact_advocate_participants.findFirst({
       where: and(
-        eq(impact_advocate_participants.program_key, ImpactAdvocateProgramKey.KiloClaw),
+        eq(impact_advocate_participants.program_key, programKey),
         eq(impact_advocate_participants.user_id, params.user.id)
       ),
       columns: { id: true },
@@ -270,6 +315,8 @@ export async function ensureImpactAdvocateParticipantProfile(params: {
 
 export async function queueImpactAdvocateParticipantRegistration(params: {
   database?: DatabaseClient;
+  product?: ImpactReferralProduct | null;
+  programKey?: ImpactAdvocateProgramKey | null;
   user: Pick<User, 'id' | 'google_user_email'>;
   referralTouch: ParsedImpactReferralTouch;
   locale?: string | null;
@@ -287,6 +334,10 @@ export async function queueImpactAdvocateParticipantRegistration(params: {
   }
 
   const database = getDatabaseClient(params.database);
+  const programKey = resolveReferralProgramKey({
+    product: params.product ?? params.referralTouch.product ?? null,
+    programKey: params.programKey ?? params.referralTouch.programKey ?? null,
+  });
   const payload = buildImpactAdvocateRegisterParticipantPayload({
     user: params.user,
     referralCookieValue: params.referralTouch.opaqueTrackingValue,
@@ -294,9 +345,10 @@ export async function queueImpactAdvocateParticipantRegistration(params: {
     countryCode: params.countryCode,
   });
   const nowIso = new Date().toISOString();
-  const isConfigured = isImpactAdvocateConfigured();
+  const isConfigured = isImpactAdvocateConfigured({ programKey });
   const participant = await ensureImpactAdvocateParticipantProfile({
     database,
+    programKey,
     user: params.user,
     locale: params.locale,
     countryCode: params.countryCode,
@@ -304,6 +356,7 @@ export async function queueImpactAdvocateParticipantRegistration(params: {
 
   const attemptDedupeKey = buildHashedDedupeKey([
     'impact-advocate-registration',
+    programKey,
     params.user.id,
     params.referralTouch.opaqueTrackingValue,
   ]);
@@ -311,6 +364,7 @@ export async function queueImpactAdvocateParticipantRegistration(params: {
   const [insertedAttempt] = await database
     .insert(impact_advocate_registration_attempts)
     .values({
+      program_key: programKey,
       participant_id: participant.id,
       dedupe_key: attemptDedupeKey,
       opaque_cookie_value: params.referralTouch.opaqueTrackingValue,
@@ -335,6 +389,7 @@ export async function queueImpactAdvocateParticipantRegistration(params: {
       userId: params.user.id,
       participantId: participant.id,
       attemptId: insertedAttempt?.id ?? null,
+      programKey,
       impactAdvocateConfigured: isConfigured,
       trackingValueLength: params.referralTouch.trackingValueLength,
       localePresent: Boolean(params.locale?.trim()),
@@ -380,12 +435,18 @@ export async function queueImpactAdvocateParticipantRegistration(params: {
  */
 export async function queueImpactAdvocateSelfRegistration(params: {
   database?: DatabaseClient;
+  product?: ImpactReferralProduct | null;
+  programKey?: ImpactAdvocateProgramKey | null;
   user: Pick<User, 'id' | 'google_user_email'>;
   locale?: string | null;
   countryCode?: string | null;
 }): Promise<void> {
   const database = getDatabaseClient(params.database);
-  const isConfigured = isImpactAdvocateConfigured();
+  const programKey = resolveReferralProgramKey({
+    product: params.product ?? null,
+    programKey: params.programKey ?? null,
+  });
+  const isConfigured = isImpactAdvocateConfigured({ programKey });
   const nowIso = new Date().toISOString();
 
   // Empty cookie envelope — advocate-only users have no inbound attribution.
@@ -401,6 +462,7 @@ export async function queueImpactAdvocateSelfRegistration(params: {
 
   const participant = await ensureImpactAdvocateParticipantProfile({
     database,
+    programKey,
     user: params.user,
     locale: params.locale,
     countryCode: params.countryCode,
@@ -426,12 +488,14 @@ export async function queueImpactAdvocateSelfRegistration(params: {
 
   const attemptDedupeKey = buildHashedDedupeKey([
     'impact-advocate-self-registration',
+    programKey,
     params.user.id,
   ]);
 
   const [insertedAttempt] = await database
     .insert(impact_advocate_registration_attempts)
     .values({
+      program_key: programKey,
       participant_id: participant.id,
       dedupe_key: attemptDedupeKey,
       opaque_cookie_value: null,
@@ -456,6 +520,7 @@ export async function queueImpactAdvocateSelfRegistration(params: {
       userId: params.user.id,
       participantId: participant.id,
       attemptId: insertedAttempt?.id ?? null,
+      programKey,
       impactAdvocateConfigured: isConfigured,
       localePresent: Boolean(params.locale?.trim()),
       countryCode: params.countryCode ?? null,
@@ -580,7 +645,9 @@ async function dispatchImpactAdvocateRegistrationAttemptById(
     attemptCount: attempt.attempt_count,
   });
 
-  const result = await sendImpactAdvocateRegisterParticipantPayload(payload);
+  const result = await sendImpactAdvocateRegisterParticipantPayload(payload, {
+    programKey: participant.program_key,
+  });
   const attemptCount = attempt.attempt_count + 1;
   const completedAt = new Date().toISOString();
 
@@ -603,16 +670,16 @@ async function dispatchImpactAdvocateRegistrationAttemptById(
     // (vanishingly unlikely — SaaSquatch issues unique codes per tenant — but
     // a violation here would otherwise roll back the whole success transaction
     // and put us in a retry loop).
-    const programId = getImpactAdvocateProgramId();
-    const advocateCode = extractAdvocateReferralCodeFromUpsertResponse(
-      result.responseBody,
-      programId
-    );
+    const programId = getImpactAdvocateProgramId({ programKey: participant.program_key });
+    const advocateCode = programId
+      ? extractAdvocateReferralCodeFromUpsertResponse(result.responseBody, programId)
+      : null;
 
     let advocateCodeToPersist: string | null = null;
     if (advocateCode) {
       const conflicting = await db.query.impact_advocate_participants.findFirst({
         where: and(
+          eq(impact_advocate_participants.program_key, participant.program_key),
           eq(impact_advocate_participants.opaque_referral_identifier, advocateCode),
           ne(impact_advocate_participants.id, participant.id)
         ),

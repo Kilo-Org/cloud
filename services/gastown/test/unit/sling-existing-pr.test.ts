@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { checkPRStatus, type SCMContext } from '../../src/dos/town/town-scm';
+import { checkPRStatus, type SCMContext, type PRStatusResult } from '../../src/dos/town/town-scm';
 import { parseGitUrl } from '../../src/util/platform-pr.util';
 import type { TownConfig } from '../../src/types';
 

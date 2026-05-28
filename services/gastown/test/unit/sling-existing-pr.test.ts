@@ -306,27 +306,76 @@ describe('slingExistingPr repo validation', () => {
     expect(ghMatch).toBeNull();
     expect(glMatch).toBeNull();
   });
+
+  it('rejects non-GitLab host with /-/merge_requests/ pattern (e.g. Bitbucket)', () => {
+    const prUrl = 'https://bitbucket.org/group/project/-/merge_requests/1';
+    const ghMatch = prUrl.match(/^https:\/\/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/);
+    expect(ghMatch).toBeNull();
+    const glMatch = prUrl.match(/^(https:\/\/[^/]+)\/(.+)\/-\/merge_requests\/(\d+)/);
+    expect(glMatch).not.toBeNull();
+    const glHost = new URL(glMatch![1]).hostname;
+    expect(glHost).toBe('bitbucket.org');
+    expect(glHost !== 'gitlab.com' && glHost !== null).toBe(true);
+  });
 });
 
-describe('slingExistingPr state validation', () => {
-  it('refuses merged PR', () => {
-    const prStatus: PRStatusResult = { status: 'merged' };
-    expect(prStatus.status === 'merged' || prStatus.status === 'closed').toBe(true);
+describe('slingExistingPr state validation via checkPRStatus', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
   });
 
-  it('refuses closed PR', () => {
-    const prStatus: PRStatusResult = { status: 'closed' };
-    expect(prStatus.status === 'merged' || prStatus.status === 'closed').toBe(true);
+  it('checkPRStatus returns merged → slingExistingPr would refuse', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify(GITHUB_MERGED_PR), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+    const ctx = mockSCMContext({
+      getTownConfig: async () => ({ git_auth: { github_token: 'ghp_test' } }) as TownConfig,
+    });
+    const outcome = await checkPRStatus(ctx, 'https://github.com/owner/repo/pull/1');
+    expect(outcome.ok).toBe(true);
+    if (outcome.ok) {
+      expect(outcome.result.status).toBe('merged');
+    }
   });
 
-  it('allows open PR', () => {
-    const prStatus: PRStatusResult = {
-      status: 'open',
-      head_branch: 'feat',
-      base_branch: 'main',
-      head_sha: 'abc',
-    };
-    expect(prStatus.status === 'merged' || prStatus.status === 'closed').toBe(false);
+  it('checkPRStatus returns closed → slingExistingPr would refuse', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify(GITHUB_CLOSED_PR), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+    const ctx = mockSCMContext({
+      getTownConfig: async () => ({ git_auth: { github_token: 'ghp_test' } }) as TownConfig,
+    });
+    const outcome = await checkPRStatus(ctx, 'https://github.com/owner/repo/pull/1');
+    expect(outcome.ok).toBe(true);
+    if (outcome.ok) {
+      expect(outcome.result.status).toBe('closed');
+    }
+  });
+
+  it('checkPRStatus returns open with full metadata → slingExistingPr would proceed', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify(GITHUB_OPEN_PR), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+    const ctx = mockSCMContext({
+      getTownConfig: async () => ({ git_auth: { github_token: 'ghp_test' } }) as TownConfig,
+    });
+    const outcome = await checkPRStatus(ctx, 'https://github.com/owner/repo/pull/1');
+    expect(outcome.ok).toBe(true);
+    if (outcome.ok) {
+      expect(outcome.result.status).toBe('open');
+      expect(outcome.result.head_branch).toBe('feature/babysit');
+      expect(outcome.result.base_branch).toBe('main');
+      expect(outcome.result.head_sha).toBe('abc1234def5678');
+    }
   });
 });
 

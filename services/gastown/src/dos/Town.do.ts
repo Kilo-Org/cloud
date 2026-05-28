@@ -2557,11 +2557,17 @@ export class TownDO extends DurableObject<Env> {
       prOwner = prUrlMatch[1];
       prRepo = prUrlMatch[2];
     } else if (glUrlMatch) {
-      prPlatform = 'gitlab';
-      const fullPath = glUrlMatch[2];
-      const lastSlash = fullPath.lastIndexOf('/');
-      prOwner = lastSlash > 0 ? fullPath.slice(0, lastSlash) : fullPath;
-      prRepo = lastSlash > 0 ? fullPath.slice(lastSlash + 1) : '';
+      const glHost = new URL(glUrlMatch[1]).hostname;
+      const configuredGlHost = townConfig.git_auth?.gitlab_instance_url
+        ? new URL(townConfig.git_auth.gitlab_instance_url).hostname
+        : null;
+      if (glHost === 'gitlab.com' || glHost === configuredGlHost) {
+        prPlatform = 'gitlab';
+        const fullPath = glUrlMatch[2];
+        const lastSlash = fullPath.lastIndexOf('/');
+        prOwner = lastSlash > 0 ? fullPath.slice(0, lastSlash) : fullPath;
+        prRepo = lastSlash > 0 ? fullPath.slice(lastSlash + 1) : '';
+      }
     }
 
     if (!prPlatform || !prOwner || !prRepo) {
@@ -2618,7 +2624,7 @@ export class TownDO extends DurableObject<Env> {
       input.body ??
       `Adopted external PR ${input.prUrl} at SHA ${headSha}. Town will poll and address review feedback, conflicts, and auto-merge.`;
 
-    const { beadId } = await reviewQueue.submitExternalPrToReviewQueue(this.sql, {
+    const { beadId } = reviewQueue.submitExternalPrToReviewQueue(this.sql, {
       rigId: input.rigId,
       prUrl: input.prUrl,
       branch: headBranch,

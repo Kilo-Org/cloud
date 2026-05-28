@@ -227,7 +227,7 @@ export function submitToReviewQueue(sql: SqlStorage, input: ReviewQueueInput): v
   });
 }
 
-export async function submitExternalPrToReviewQueue(
+export function submitExternalPrToReviewQueue(
   sql: SqlStorage,
   args: {
     rigId: string;
@@ -240,7 +240,7 @@ export async function submitExternalPrToReviewQueue(
     forcePushAllowed: boolean;
     sourceAgentId: string;
   }
-): Promise<{ beadId: string }> {
+): { beadId: string } {
   const metadata: Record<string, unknown> = {
     source_agent_id: args.sourceAgentId,
     babysit: true,

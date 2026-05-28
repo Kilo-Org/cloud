@@ -3,21 +3,6 @@ import { getAnthropicProviderOptionsForVercel } from '@/lib/ai-gateway/providers
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 
 describe('getAnthropicProviderOptionsForVercel', () => {
-  it('enables summarized thinking for Opus 4.7 when reasoning is explicitly enabled', () => {
-    const request: GatewayRequest = {
-      kind: 'chat_completions',
-      body: {
-        model: 'anthropic/claude-opus-4.7',
-        messages: [{ role: 'user', content: 'hello' }],
-        reasoning: { enabled: true },
-      },
-    };
-
-    expect(getAnthropicProviderOptionsForVercel('anthropic/claude-opus-4.7', request)).toEqual({
-      thinking: { type: 'adaptive', display: 'summarized' },
-    });
-  });
-
   it('maps chat completion verbosity to Anthropic effort', () => {
     const request: GatewayRequest = {
       kind: 'chat_completions',
@@ -28,7 +13,7 @@ describe('getAnthropicProviderOptionsForVercel', () => {
       },
     };
 
-    expect(getAnthropicProviderOptionsForVercel('anthropic/claude-sonnet-4.5', request)).toEqual({
+    expect(getAnthropicProviderOptionsForVercel(request)).toEqual({
       effort: 'high',
     });
   });
@@ -43,7 +28,7 @@ describe('getAnthropicProviderOptionsForVercel', () => {
       },
     };
 
-    expect(getAnthropicProviderOptionsForVercel('anthropic/claude-sonnet-4.5', request)).toEqual({
+    expect(getAnthropicProviderOptionsForVercel(request)).toEqual({
       effort: 'low',
     });
   });
@@ -57,8 +42,6 @@ describe('getAnthropicProviderOptionsForVercel', () => {
       },
     };
 
-    expect(getAnthropicProviderOptionsForVercel('anthropic/claude-sonnet-4.5', request)).toBe(
-      undefined
-    );
+    expect(getAnthropicProviderOptionsForVercel(request)).toBe(undefined);
   });
 });

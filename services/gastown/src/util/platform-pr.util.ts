@@ -88,12 +88,28 @@ export const GitHubPRStatusSchema = z.object({
   state: z.string(),
   merged: z.boolean().optional(),
   mergeable: z.boolean().nullable().optional(),
-  mergeable_state: z.string().optional(), // 'clean', 'dirty', 'blocked', 'unknown', 'unstable'
+  mergeable_state: z.string().optional(),
+  head: z
+    .object({
+      ref: z.string().optional(),
+      sha: z.string().optional(),
+    })
+    .optional(),
+  base: z
+    .object({
+      ref: z.string().optional(),
+    })
+    .optional(),
+  title: z.string().optional(),
 });
 
 /** Schema for GitLab MR status responses (used by checkPRStatus). */
 export const GitLabMRStatusSchema = z.object({
   state: z.string(),
+  source_branch: z.string().optional(),
+  target_branch: z.string().optional(),
+  sha: z.string().optional(),
+  title: z.string().optional(),
 });
 
 // -- GitHub PR creation --

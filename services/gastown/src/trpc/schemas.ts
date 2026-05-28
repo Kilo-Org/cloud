@@ -155,6 +155,22 @@ export const SlingResultOutput = z.object({
   agent: AgentOutput,
 });
 
+// BabysitPrResult
+export const BabysitPrResultOutput = z.object({
+  beadId: z.string(),
+  warning: z.string().optional(),
+});
+
+// PreviewPrResult
+export const PreviewPrResultOutput = z.object({
+  state: z.string(),
+  head_branch: z.string().optional(),
+  base_branch: z.string().optional(),
+  head_sha: z.string().optional(),
+  title: z.string().optional(),
+  repo_matches: z.boolean(),
+});
+
 // getRig enriched result
 export const RigDetailOutput = z.object({
   id: z.string(),
@@ -189,6 +205,8 @@ export const RpcPtySessionOutput = rpcSafe(PtySessionOutput);
 export const RpcConvoyOutput = rpcSafe(ConvoyOutput);
 export const RpcConvoyDetailOutput = rpcSafe(ConvoyDetailOutput);
 export const RpcSlingResultOutput = rpcSafe(SlingResultOutput);
+export const RpcBabysitPrResultOutput = rpcSafe(BabysitPrResultOutput);
+export const RpcPreviewPrResultOutput = rpcSafe(PreviewPrResultOutput);
 
 // Alarm status
 const AlarmStatusOutput = z.object({

@@ -790,9 +790,18 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
       const rigId = action.rig_id;
 
       if (!agentId) {
+        // Babysat external PRs bypass refinery code review — there's no source
+        // polecat to mail rework to and no source bead to reopen. The user
+        // adopted the PR explicitly to have it merged, not reviewed. The
+        // reconciler will fast-track these to in_progress via transition_bead
+        // instead of dispatching a refinery.
+        const targetBead = beadOps.getBead(sql, beadId);
+        if (targetBead?.type === 'merge_request' && targetBead.metadata?.babysit === true) {
+          return null;
+        }
+
         // Need to get-or-create an agent for this bead.
         // Infer role from bead type: MR beads need refineries, issue beads need polecats.
-        const targetBead = beadOps.getBead(sql, beadId);
         const role = targetBead?.type === 'merge_request' ? 'refinery' : 'polecat';
         try {
           const agent = agentOps.getOrCreateAgent(sql, role, rigId, townId);

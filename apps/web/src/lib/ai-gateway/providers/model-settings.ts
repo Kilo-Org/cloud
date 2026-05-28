@@ -35,7 +35,7 @@ export const REASONING_VARIANTS_NONE_LOW_MEDIUM_HIGH = {
 } as const;
 
 export function getModelVariants(model: string): OpenCodeSettings['variants'] {
-  if (isOpusModel(model) && model.includes('4.7')) {
+  if (isOpusModel(model) && (model.includes('4.7') || model.includes('4.8'))) {
     return {
       none: { reasoning: { enabled: false, effort: 'none' } },
       low: { reasoning: { enabled: true, effort: 'low' }, verbosity: 'low' },

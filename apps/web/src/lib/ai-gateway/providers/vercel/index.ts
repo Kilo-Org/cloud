@@ -107,9 +107,10 @@ export function getAnthropicProviderOptionsForVercel(
   const anthropicOptions: AnthropicProviderOptions = {};
 
   // Workaround for Vercel not displaying thinking by default, unlike OpenRouter.
-  const isOpus47Thinking =
-    requestedModel.includes('opus-4.7') && isReasoningExplicitlyEnabled(request);
-  if (isOpus47Thinking) {
+  const isOpusThinking =
+    (requestedModel.includes('opus-4.7') || requestedModel.includes('opus-4.8')) &&
+    isReasoningExplicitlyEnabled(request);
+  if (isOpusThinking) {
     anthropicOptions.thinking = { type: 'adaptive', display: 'summarized' };
   }
 

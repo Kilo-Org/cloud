@@ -702,7 +702,7 @@ export const SendMessageInput = z
 
 /**
  * Input schema for updateSession endpoint.
- * Retained for internal callback target updates before continued executions.
+ * Retained only for rewriting callbackTarget on session continuations.
  */
 export const UpdateSessionInput = z
   .object({

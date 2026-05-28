@@ -1,6 +1,6 @@
 import { createBotRequest, updateBotRequest } from '@/lib/bot/request-logging';
 import { runBotAgent } from '@/lib/bot/agent-runner';
-import { extractAndUploadImages } from '@/lib/bot/images';
+import { extractAndUploadAttachments } from '@/lib/bot/attachments';
 import type { PlatformIntegration, User } from '@kilocode/db';
 import type { Message, Thread } from 'chat';
 import { captureException } from '@sentry/nextjs';
@@ -66,16 +66,18 @@ async function processMessage({
 }) {
   const startedAt = Date.now();
 
-  // Extract and upload any image attachments from the chat message to R2.
-  // This runs before the agent loop so the images are ready when a Cloud Agent
-  // session is spawned. Failures are non-fatal — we log and continue without images.
-  let images: Awaited<ReturnType<typeof extractAndUploadImages>>;
+  // Upload all supported files through the canonical attachments contract so
+  // mixed image/document messages share one path and one five-file limit.
+  let attachments: Awaited<ReturnType<typeof extractAndUploadAttachments>>;
   try {
-    images = await extractAndUploadImages(message, user.id);
+    attachments = await extractAndUploadAttachments(message, user.id);
   } catch (error) {
-    console.error('[KiloBot] Failed to extract/upload images, continuing without them:', error);
+    console.error(
+      '[KiloBot] Failed to extract/upload attachments, continuing without them:',
+      error
+    );
     captureException(error, {
-      tags: { component: 'kilo-bot', op: 'extract-upload-images' },
+      tags: { component: 'kilo-bot', op: 'extract-upload-attachments' },
     });
   }
 
@@ -88,7 +90,7 @@ async function processMessage({
       user,
       botRequestId,
       prompt: message.text,
-      images,
+      attachments,
     });
 
     updateBotRequest(botRequestId, {

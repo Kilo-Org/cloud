@@ -183,6 +183,27 @@ describe('CloudAgentNextFetchClient billing error detection', () => {
   });
 });
 
+describe('CloudAgentNextFetchClient internal session updates', () => {
+  it('posts only callback routing data for a continued session', async () => {
+    const fetchMock = mockFetch(200, { result: { data: { success: true } } });
+    vi.stubGlobal('fetch', fetchMock);
+    const client = createCloudAgentNextFetchClient(BASE_URL);
+    const callbackTarget = { url: 'https://example.test/callback' };
+
+    await client.updateSession(
+      { Authorization: 'Bearer token' },
+      { cloudAgentSessionId: 'agent_123', callbackTarget }
+    );
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      `${BASE_URL}/trpc/updateSession`,
+      expect.objectContaining({
+        body: JSON.stringify({ cloudAgentSessionId: 'agent_123', callbackTarget }),
+      })
+    );
+  });
+});
+
 describe('CloudAgentNextFetchClient getSessionHealth', () => {
   it('posts to getSessionHealth and parses a healthy response', async () => {
     const fetchMock = mockFetch(200, {

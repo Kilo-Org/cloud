@@ -20,6 +20,14 @@ function sessionInput(): SessionInput {
   };
 }
 
+function gitlabSessionInput(): SessionInput {
+  return {
+    ...sessionInput(),
+    gitUrl: 'https://gitlab.example.test/acme/repo.git',
+    platform: 'gitlab',
+  };
+}
+
 function codeReview(overrides: Partial<CodeReview> = {}): CodeReview {
   return {
     reviewId: `review-${crypto.randomUUID()}`,
@@ -221,6 +229,34 @@ describe('CodeReviewOrchestrator recovery', () => {
       headers: { 'X-Callback-Token': expectedCallbackToken },
     });
     expect(prepareBody.callbackTarget.headers).not.toHaveProperty('X-Internal-Secret');
+  });
+
+  it('prepares fresh GitLab code-review sessions without selector transport', async () => {
+    const fetchMock = mockSuccessfulCloudAgentNextRun();
+    const reviewId = crypto.randomUUID();
+    const attemptId = crypto.randomUUID();
+
+    const response = await SELF.fetch('https://worker.test/review', {
+      method: 'POST',
+      headers: { ...workerAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        reviewId,
+        attemptId,
+        authToken: 'test-auth-token',
+        sessionInput: gitlabSessionInput(),
+        owner: { type: 'user', id: 'user-id', userId: 'user-id' },
+        agentVersion: 'v2',
+      }),
+    });
+
+    expect(response.status).toBe(202);
+    await SELF.fetch(`https://worker.test/reviews/${reviewId}/status?attemptId=${attemptId}`, {
+      headers: workerAuthHeaders(),
+    });
+    const prepareCall = getFetchCall(fetchMock, '/trpc/prepareSession');
+    const prepareBody = JSON.parse(String(prepareCall?.[1]?.body));
+    expect(prepareBody).toMatchObject({ platform: 'gitlab' });
+    expect(prepareBody).not.toHaveProperty('gitlabCodeReviewTokenRef');
   });
 
   it('fresh attempt dispatch does not reuse failed state from an earlier attempt', async () => {
@@ -947,6 +983,7 @@ describe('CodeReviewOrchestrator recovery', () => {
         'state',
         codeReview({
           previousCloudAgentSessionId: previousSessionId,
+          sessionInput: gitlabSessionInput(),
         })
       );
       await state.storage.setAlarm(Date.now() + 30_000);
@@ -966,6 +1003,10 @@ describe('CodeReviewOrchestrator recovery', () => {
     expect(hasFetchCall(fetchMock, '/trpc/sendMessageV2')).toBe(true);
     expect(hasFetchCall(fetchMock, '/trpc/prepareSession')).toBe(false);
     expect(hasFetchCall(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toBe(false);
+    const updateCall = getFetchCall(fetchMock, '/trpc/updateSession');
+    const updateBody = JSON.parse(String(updateCall?.[1]?.body));
+    expect(updateBody).not.toHaveProperty('gitlabCodeReviewTokenRef');
+    expect(updateBody).not.toHaveProperty('gitlabCodeReviewRepositoryUrl');
   });
 
   it('skips continuation and prepares a fresh session when previous sandbox is unreachable', async () => {

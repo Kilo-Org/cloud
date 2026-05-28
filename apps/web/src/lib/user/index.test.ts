@@ -72,6 +72,8 @@ import {
   model_experiment_variant,
   model_experiment_variant_version,
   model_experiment_request,
+  stripe_early_fraud_warning_cases,
+  stripe_early_fraud_warning_actions,
 } from '@kilocode/db/schema';
 import { eq, count, sql } from 'drizzle-orm';
 import {
@@ -128,6 +130,8 @@ describe('User', () => {
     await db.delete(impact_referral_conversions);
     await db.delete(impact_referrals);
     await db.delete(deleted_user_email_tombstones);
+    await db.delete(stripe_early_fraud_warning_actions);
+    await db.delete(stripe_early_fraud_warning_cases);
     await db.delete(payment_methods);
     await db.delete(kilo_pass_store_events);
     await db.delete(kilo_pass_store_purchases);
@@ -1785,6 +1789,74 @@ describe('User', () => {
       expect(feedback).toHaveLength(1);
       expect(feedback[0].kilo_user_id).toBeNull();
       expect(feedback[0].feedback_text).toBe('Cloud agent is great!');
+    });
+
+    it('should nullify Stripe EFW case owner links while retaining enforcement audit history', async () => {
+      const user = await insertTestUser();
+      const unaffectedUser = await insertTestUser();
+      const [fraudCase] = await db
+        .insert(stripe_early_fraud_warning_cases)
+        .values({
+          stripe_early_fraud_warning_id: 'issfr_deleted_user',
+          stripe_event_id: 'evt_deleted_user',
+          stripe_charge_id: 'ch_deleted_user',
+          stripe_payment_intent_id: 'pi_deleted_user',
+          stripe_customer_id: user.stripe_customer_id,
+          amount_minor_units: 1900,
+          currency: 'usd',
+          owner_classification: 'personal',
+          kilo_user_id: user.id,
+          status: 'completed',
+          reason: 'automatic_personal_enforcement',
+        })
+        .returning({ id: stripe_early_fraud_warning_cases.id });
+      const [unaffectedCase] = await db
+        .insert(stripe_early_fraud_warning_cases)
+        .values({
+          stripe_early_fraud_warning_id: 'issfr_unaffected_user',
+          stripe_event_id: 'evt_unaffected_user',
+          stripe_charge_id: 'ch_unaffected_user',
+          stripe_customer_id: unaffectedUser.stripe_customer_id,
+          amount_minor_units: 4900,
+          currency: 'usd',
+          owner_classification: 'personal',
+          kilo_user_id: unaffectedUser.id,
+          status: 'completed',
+        })
+        .returning({ id: stripe_early_fraud_warning_cases.id });
+
+      await db.insert(stripe_early_fraud_warning_actions).values({
+        case_id: fraudCase.id,
+        action_type: 'refund',
+        target_key: 'charge:ch_deleted_user',
+        status: 'completed',
+        result_code: 'refunded',
+        result_reference_id: 're_deleted_user',
+      });
+
+      await softDeleteUser(user.id);
+
+      const retainedCase = await db
+        .select()
+        .from(stripe_early_fraud_warning_cases)
+        .where(eq(stripe_early_fraud_warning_cases.id, fraudCase.id));
+      expect(retainedCase).toHaveLength(1);
+      expect(retainedCase[0].kilo_user_id).toBeNull();
+      expect(retainedCase[0].stripe_early_fraud_warning_id).toBe('issfr_deleted_user');
+      expect(retainedCase[0].stripe_charge_id).toBe('ch_deleted_user');
+
+      const retainedActions = await db
+        .select()
+        .from(stripe_early_fraud_warning_actions)
+        .where(eq(stripe_early_fraud_warning_actions.case_id, fraudCase.id));
+      expect(retainedActions).toHaveLength(1);
+      expect(retainedActions[0].result_reference_id).toBe('re_deleted_user');
+
+      const unaffectedCaseRows = await db
+        .select()
+        .from(stripe_early_fraud_warning_cases)
+        .where(eq(stripe_early_fraud_warning_cases.id, unaffectedCase.id));
+      expect(unaffectedCaseRows[0].kilo_user_id).toBe(unaffectedUser.id);
     });
 
     it('should delete user_push_tokens', async () => {

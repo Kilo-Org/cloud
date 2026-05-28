@@ -73,6 +73,35 @@ import { normalizeAgentMode } from './schema.js';
 const SETUP_COMMAND_TIMEOUT_SECONDS = 300; // 5 minutes
 const DEFAULT_DENIED_COMMAND_PATTERNS = ['rm -rf', 'sudo rm', 'mkfs', 'dd if='];
 
+function gitLabTokenLookupFailureMessage(reason: string): string {
+  switch (reason) {
+    case 'no_integration_found':
+    case 'invalid_org_id':
+      return `No GitLab integration found (${reason}). Please connect your GitLab account first.`;
+    case 'no_token':
+    case 'token_refresh_failed':
+    case 'token_expired_no_refresh':
+      return `GitLab token lookup failed (${reason}). Please reconnect your GitLab account.`;
+    case 'repository_url_required':
+    case 'invalid_repository_url':
+      return `GitLab token lookup failed (${reason}). Repository metadata is missing or invalid for this GitLab code-review session.`;
+    case 'no_matching_integration':
+      return `GitLab token lookup failed (${reason}). No authorized GitLab integration matches this repository. Connect the GitLab account or organization that has access to the repository.`;
+    case 'ambiguous_integration':
+      return `GitLab token lookup failed (${reason}). Multiple GitLab integrations or project tokens match this repository. Remove duplicate GitLab integrations or reconfigure the GitLab code-review integration.`;
+    case 'project_lookup_failed':
+      return `GitLab token lookup failed (${reason}). The connected GitLab integration cannot read this project. Grant repository access, then reconnect GitLab if required.`;
+    case 'no_project_token':
+      return `GitLab token lookup failed (${reason}). No GitLab project access token is configured for this repository. Reconfigure or reinstall the GitLab code-review bot for the project.`;
+    case 'database_not_configured':
+    case 'service_not_configured':
+    case 'rpc_error':
+      return `GitLab token lookup failed (${reason}). Git token service is unavailable; contact support.`;
+    default:
+      return `GitLab token lookup failed (${reason}). Please reconnect your GitLab account.`;
+  }
+}
+
 // Keep in sync with: cloudflare-code-review-infra/src/code-review-orchestrator.ts
 // mkdir and touch are intentionally allowed for agent scratch space during analysis
 const CODE_REVIEW_ALLOWED_COMMANDS = [
@@ -302,6 +331,7 @@ export type ResolvedWorkspaceTokens = {
   githubAppType?: 'standard' | 'lite';
   gitToken?: string;
   gitlabTokenManaged?: boolean;
+  glabIsOAuth2?: boolean;
 };
 
 function parseRestoreScriptOutput(stdout: string | undefined): {
@@ -848,6 +878,7 @@ export class SessionService {
     gitUrl?: string;
     gitToken?: string;
     gitlabTokenManaged?: boolean;
+    glabIsOAuth2?: boolean;
     upstreamBranch?: string;
     branchName?: string;
     envVars?: Record<string, string>;
@@ -877,6 +908,7 @@ export class SessionService {
       gitUrl: options.gitUrl,
       gitToken: options.gitToken,
       gitlabTokenManaged: options.gitlabTokenManaged,
+      glabIsOAuth2: options.glabIsOAuth2,
       platform: options.platform,
       envVars: options.envVars,
     };
@@ -905,7 +937,7 @@ export class SessionService {
       appendSystemPrompt: opts.appendSystemPrompt,
       gitUrl: context.gitUrl,
       gitToken: context.gitToken,
-      gitlabTokenManaged: context.gitlabTokenManaged,
+      glabIsOAuth2: context.glabIsOAuth2,
       platform: context.platform,
       profile: effectiveProfile,
     });
@@ -926,7 +958,7 @@ export class SessionService {
       appendSystemPrompt,
       gitUrl,
       gitToken,
-      gitlabTokenManaged,
+      glabIsOAuth2,
       platform,
       profile,
     } = opts;
@@ -1118,13 +1150,21 @@ export class SessionService {
     // Determine effective platform: use explicit platform param, or infer from gitUrl as fallback
     const effectivePlatform = platform ?? (gitUrl?.includes('gitlab') ? 'gitlab' : undefined);
 
-    // Set GITLAB_TOKEN for GitLab repos, respecting user overrides
-    if (gitToken && effectivePlatform === 'gitlab' && !baseEnvVars.GITLAB_TOKEN) {
+    const requiresResolvedGitLabTokenMode = glabIsOAuth2 === false;
+    // A token-mode credential must be materialized consistently with its resolver instruction.
+    if (
+      gitToken &&
+      effectivePlatform === 'gitlab' &&
+      (!baseEnvVars.GITLAB_TOKEN || requiresResolvedGitLabTokenMode)
+    ) {
       envVars.GITLAB_TOKEN = gitToken;
-      if (gitlabTokenManaged === true && baseEnvVars.GLAB_IS_OAUTH2 === undefined) {
-        envVars.GLAB_IS_OAUTH2 = 'true';
+      if (
+        glabIsOAuth2 !== undefined &&
+        (baseEnvVars.GLAB_IS_OAUTH2 === undefined || requiresResolvedGitLabTokenMode)
+      ) {
+        envVars.GLAB_IS_OAUTH2 = glabIsOAuth2 ? 'true' : 'false';
       }
-      if (!baseEnvVars.GITLAB_HOST) {
+      if (!baseEnvVars.GITLAB_HOST || requiresResolvedGitLabTokenMode) {
         if (gitUrl) {
           try {
             const url = new URL(gitUrl);
@@ -1141,7 +1181,6 @@ export class SessionService {
           gitUrl,
           gitlabHost: envVars.GITLAB_HOST,
           glabOAuthMode: envVars.GLAB_IS_OAUTH2 === 'true',
-          gitTokenLength: gitToken.length,
         })
         .info('[GITLAB] Configured GitLab CLI environment for GitLab session');
     }
@@ -1256,25 +1295,24 @@ export class SessionService {
 
     let gitToken = repositoryPlatform(metadata) === 'gitlab' ? undefined : git?.token;
     let gitlabTokenManaged = git?.type === 'gitlab' ? git.gitlabTokenManaged : undefined;
+    let glabIsOAuth2: boolean | undefined;
     if (git?.url && repositoryPlatform(metadata) === 'gitlab') {
       if (!env.GIT_TOKEN_SERVICE) {
         throw ExecutionError.invalidRequest('Git token service is not configured');
       }
+
       const result = await resolveManagedGitLabToken(env, {
         userId: metadata.identity.userId,
         orgId: metadata.identity.orgId,
+        repositoryUrl: git.url,
+        createdOnPlatform: metadata.identity.createdOnPlatform,
       });
       if (result.success) {
         gitToken = result.token;
         gitlabTokenManaged = true;
-      } else if (result.reason === 'no_integration_found' || result.reason === 'invalid_org_id') {
-        throw ExecutionError.invalidRequest(
-          'No GitLab integration found. Please connect your GitLab account first.'
-        );
+        glabIsOAuth2 = result.glabIsOAuth2;
       } else {
-        throw ExecutionError.invalidRequest(
-          `GitLab token lookup failed (${result.reason}). Please reconnect your GitLab account.`
-        );
+        throw ExecutionError.invalidRequest(gitLabTokenLookupFailureMessage(result.reason));
       }
     }
 
@@ -1284,7 +1322,14 @@ export class SessionService {
       );
     }
 
-    return { githubToken, githubInstallationId, githubAppType, gitToken, gitlabTokenManaged };
+    return {
+      githubToken,
+      githubInstallationId,
+      githubAppType,
+      gitToken,
+      gitlabTokenManaged,
+      glabIsOAuth2,
+    };
   }
 
   async buildWrapperSessionReadyAndPromptRequests(
@@ -1335,6 +1380,7 @@ export class SessionService {
       gitUrl: git?.url,
       gitToken: resolvedTokens.gitToken,
       gitlabTokenManaged: resolvedTokens.gitlabTokenManaged,
+      glabIsOAuth2: resolvedTokens.glabIsOAuth2,
       upstreamBranch: metadata.repository?.upstreamBranch,
       branchName,
       envVars: profile.envVars,
@@ -1356,7 +1402,7 @@ export class SessionService {
       appendSystemPrompt: metadata.agent?.appendSystemPrompt,
       gitUrl: git?.url,
       gitToken: resolvedTokens.gitToken,
-      gitlabTokenManaged: resolvedTokens.gitlabTokenManaged,
+      glabIsOAuth2: resolvedTokens.glabIsOAuth2,
       platform,
       profile,
     });
@@ -1555,6 +1601,7 @@ export class SessionService {
       gitUrl: git?.url,
       gitToken: resolvedTokens.gitToken,
       gitlabTokenManaged: resolvedTokens.gitlabTokenManaged,
+      glabIsOAuth2: resolvedTokens.glabIsOAuth2,
       upstreamBranch: metadata.repository?.upstreamBranch,
       branchName,
       envVars: readProfileBundle(metadata).envVars,
@@ -1872,12 +1919,12 @@ export class SessionService {
    * Refresh the embedded credentials in the workspace's git remote URL on the
    * warm fast path.
    *
-   * GitHub App installation tokens expire after ~1h, and managed GitLab tokens
-   * rotate on a similar cadence; the URL-embedded credentials from the original
-   * clone go stale quickly. `GH_TOKEN` / `GITLAB_TOKEN` env vars don't rescue
-   * `git` itself (they only affect the `gh` CLI / GitLab HTTP integrations), so
-   * we rewrite `origin` with the freshly-resolved token whenever the token is
-   * managed by us.
+   * GitHub App installation tokens expire after ~1h, and server-resolved GitLab
+   * credentials can rotate independently of a warm workspace. The URL-embedded
+   * credentials from the original clone go stale quickly. `GH_TOKEN` /
+   * `GITLAB_TOKEN` env vars don't rescue `git` itself (they only affect the
+   * provider CLIs / GitLab HTTP integrations), so we rewrite `origin` whenever
+   * the token is resolved by us.
    */
   private async refreshGitRemoteToken(
     session: ExecutionSession,
@@ -2417,7 +2464,7 @@ type GetSaferEnvVarsOptions = {
   appendSystemPrompt?: string;
   gitUrl?: string;
   gitToken?: string;
-  gitlabTokenManaged?: boolean;
+  glabIsOAuth2?: boolean;
   platform?: 'github' | 'gitlab';
   profile?: SessionProfileBundle;
 };

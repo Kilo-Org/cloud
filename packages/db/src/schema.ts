@@ -50,6 +50,10 @@ import {
   KiloClawTerminalRenewalFailureStatus,
   KiloClawTerminalRenewalFailureCode,
   KiloClawTerminalRenewalFailureResolutionActorType,
+  StripeEarlyFraudWarningOwnerClassification,
+  StripeEarlyFraudWarningCaseStatus,
+  StripeEarlyFraudWarningActionType,
+  StripeEarlyFraudWarningActionStatus,
   AffiliateProvider,
   AffiliateEventType,
   AffiliateEventDeliveryState,
@@ -152,6 +156,10 @@ export const SCHEMA_CHECK_ENUMS = {
   KiloClawTerminalRenewalFailureStatus,
   KiloClawTerminalRenewalFailureCode,
   KiloClawTerminalRenewalFailureResolutionActorType,
+  StripeEarlyFraudWarningOwnerClassification,
+  StripeEarlyFraudWarningCaseStatus,
+  StripeEarlyFraudWarningActionType,
+  StripeEarlyFraudWarningActionStatus,
   AffiliateProvider,
   AffiliateEventType,
   AffiliateEventDeliveryState,
@@ -473,6 +481,156 @@ export const pending_impact_sale_reversals = pgTable(
 );
 
 export type PendingImpactSaleReversal = typeof pending_impact_sale_reversals.$inferSelect;
+
+export const stripe_early_fraud_warning_cases = pgTable(
+  'stripe_early_fraud_warning_cases',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    stripe_early_fraud_warning_id: text().notNull(),
+    stripe_event_id: text().notNull(),
+    stripe_charge_id: text(),
+    stripe_payment_intent_id: text(),
+    stripe_customer_id: text(),
+    amount_minor_units: integer(),
+    currency: text(),
+    owner_classification: text().notNull().$type<StripeEarlyFraudWarningOwnerClassification>(),
+    kilo_user_id: text().references(() => kilocode_users.id, {
+      onDelete: 'set null',
+      onUpdate: 'cascade',
+    }),
+    organization_id: uuid().references(() => organizations.id, {
+      onDelete: 'set null',
+      onUpdate: 'cascade',
+    }),
+    status: text()
+      .notNull()
+      .$type<StripeEarlyFraudWarningCaseStatus>()
+      .default(StripeEarlyFraudWarningCaseStatus.Queued),
+    reason: text(),
+    failure_context: text(),
+    warning_created_at: timestamp({ withTimezone: true, mode: 'string' }),
+    contained_at: timestamp({ withTimezone: true, mode: 'string' }),
+    processing_started_at: timestamp({ withTimezone: true, mode: 'string' }),
+    completed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    review_required_at: timestamp({ withTimezone: true, mode: 'string' }),
+    remediated_at: timestamp({ withTimezone: true, mode: 'string' }),
+    dismissed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    unique('UQ_stripe_early_fraud_warning_cases_warning_id').on(
+      table.stripe_early_fraud_warning_id
+    ),
+    index('IDX_stripe_early_fraud_warning_cases_event_id').on(table.stripe_event_id),
+    index('IDX_stripe_early_fraud_warning_cases_charge_id').on(table.stripe_charge_id),
+    index('IDX_stripe_early_fraud_warning_cases_payment_intent_id').on(
+      table.stripe_payment_intent_id
+    ),
+    index('IDX_stripe_early_fraud_warning_cases_customer_id').on(table.stripe_customer_id),
+    index('IDX_stripe_early_fraud_warning_cases_kilo_user_id').on(table.kilo_user_id),
+    index('IDX_stripe_early_fraud_warning_cases_organization_id').on(table.organization_id),
+    index('IDX_stripe_early_fraud_warning_cases_status_created_at').on(
+      table.status,
+      table.created_at
+    ),
+    enumCheck(
+      'stripe_early_fraud_warning_cases_owner_classification_check',
+      table.owner_classification,
+      StripeEarlyFraudWarningOwnerClassification
+    ),
+    enumCheck(
+      'stripe_early_fraud_warning_cases_status_check',
+      table.status,
+      StripeEarlyFraudWarningCaseStatus
+    ),
+    check(
+      'stripe_early_fraud_warning_cases_amount_minor_units_non_negative_check',
+      sql`${table.amount_minor_units} IS NULL OR ${table.amount_minor_units} >= 0`
+    ),
+  ]
+);
+
+export type StripeEarlyFraudWarningCase = typeof stripe_early_fraud_warning_cases.$inferSelect;
+export type NewStripeEarlyFraudWarningCase = typeof stripe_early_fraud_warning_cases.$inferInsert;
+
+export const stripe_early_fraud_warning_actions = pgTable(
+  'stripe_early_fraud_warning_actions',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    case_id: uuid()
+      .notNull()
+      .references(() => stripe_early_fraud_warning_cases.id, {
+        onDelete: 'restrict',
+        onUpdate: 'cascade',
+      }),
+    action_type: text().notNull().$type<StripeEarlyFraudWarningActionType>(),
+    target_key: text().notNull(),
+    status: text()
+      .notNull()
+      .$type<StripeEarlyFraudWarningActionStatus>()
+      .default(StripeEarlyFraudWarningActionStatus.Queued),
+    attempt_count: integer().notNull().default(0),
+    next_retry_at: timestamp({ withTimezone: true, mode: 'string' }),
+    claimed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    last_attempt_at: timestamp({ withTimezone: true, mode: 'string' }),
+    completed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    terminal_at: timestamp({ withTimezone: true, mode: 'string' }),
+    result_code: text(),
+    result_reference_id: text(),
+    failure_context: text(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    unique('UQ_stripe_early_fraud_warning_actions_case_type_target').on(
+      table.case_id,
+      table.action_type,
+      table.target_key
+    ),
+    index('IDX_stripe_early_fraud_warning_actions_case_id').on(table.case_id),
+    index('IDX_stripe_early_fraud_warning_actions_claim_path').on(
+      table.status,
+      sql`coalesce(${table.next_retry_at}, '-infinity'::timestamptz)`,
+      table.created_at,
+      table.id
+    ),
+    enumCheck(
+      'stripe_early_fraud_warning_actions_action_type_check',
+      table.action_type,
+      StripeEarlyFraudWarningActionType
+    ),
+    enumCheck(
+      'stripe_early_fraud_warning_actions_status_check',
+      table.status,
+      StripeEarlyFraudWarningActionStatus
+    ),
+    check(
+      'stripe_early_fraud_warning_actions_attempt_count_non_negative_check',
+      sql`${table.attempt_count} >= 0`
+    ),
+    check(
+      'stripe_early_fraud_warning_actions_target_key_not_empty_check',
+      sql`length(${table.target_key}) > 0`
+    ),
+  ]
+);
+
+export type StripeEarlyFraudWarningAction = typeof stripe_early_fraud_warning_actions.$inferSelect;
+export type NewStripeEarlyFraudWarningAction =
+  typeof stripe_early_fraud_warning_actions.$inferInsert;
 
 export const deleted_user_email_tombstones = pgTable('deleted_user_email_tombstones', {
   normalized_email_hash: text().primaryKey().notNull(),

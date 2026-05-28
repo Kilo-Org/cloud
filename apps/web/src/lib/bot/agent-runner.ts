@@ -20,7 +20,7 @@ import { buildSessionUrl } from '@/lib/cloud-agent-next/session-url';
 import { APP_URL } from '@/lib/constants';
 import { FEATURE_HEADER } from '@/lib/feature-detection';
 import { ownerFromIntegration } from '@/lib/integrations/core/owner';
-import type { Images } from '@/lib/images-schema';
+import type { CloudAgentAttachments } from '@/lib/cloud-agent/constants';
 import {
   formatGitHubRepositoriesForPrompt,
   getGitHubRepositoryContext,
@@ -57,8 +57,8 @@ type RunBotAgentParams = {
   user: User;
   botRequestId: string;
   prompt: string;
-  /** Pre-uploaded image attachments from the user's message (already in R2). */
-  images?: Images;
+  /** Pre-uploaded supported attachments from the user's message (already in R2). */
+  attachments?: CloudAgentAttachments;
   completedStepCount?: number;
   initialSteps?: BotRequestStep[];
   onSessionReady?: (params: {
@@ -125,7 +125,7 @@ ${formatGitLabRepositoriesForPrompt(gitlabContext)}
 Treat this context as authoritative. Prefer selecting a repo from the provided repository list. If the user requests work on a repo that isn't in the list, ask them to confirm the exact owner/repo (or group/project for GitLab) and ensure it's accessible to the integration. Never invent repository names.
 
 ## Cloud Agent tool
-If the user asks you to analyze or act on an attached image, you must use the spawnCloudAgentSession tool to start a Cloud Agent session that will analyze the image.
+If the user asks you to analyze or act on an attached image or file (PDF, Markdown, text, CSV), you must use the spawnCloudAgentSession tool to start a Cloud Agent session that will process the attachment.
 
 ## Accuracy & safety
 - Don't claim you ran tools, changed code, or created a PR/MR unless the tool results confirm it.
@@ -266,7 +266,7 @@ export async function runBotAgent(params: RunBotAgentParams): Promise<BotAgentCo
       spawnCloudAgentSession: tool({
         description: `Spawn a Cloud Agent session to perform coding tasks on a GitHub repository or GitLab project. The agent can make code changes, fix bugs, implement features, review/analyze code, run tests, or open PRs/MRs. Do NOT use it for questions you can answer directly.
 
-If the user attached images to their message, those images are automatically forwarded to the Cloud Agent session — you do not need to describe or re-upload them. Reference them in the prompt if relevant (e.g. "implement the design shown in the attached screenshot").
+If the user attached images or files (PDF, Markdown, text, CSV) to their message, those attachments are automatically forwarded to the Cloud Agent session — you do not need to describe or re-upload them. Reference them in the prompt if relevant (e.g. "implement the design shown in the attached screenshot" or "use the requirements in the attached document").
 
 This tool returns an acknowledgement immediately. The final Cloud Agent result will be posted later in the same thread after the async session completes.`,
         inputSchema: spawnCloudAgentInputSchema,
@@ -307,7 +307,7 @@ This tool returns an acknowledgement immediately. The final Cloud Agent result w
               prSignature,
               chatPlatform,
               currentStep,
-              images: params.images,
+              attachments: params.attachments,
             }
           );
 
@@ -338,13 +338,13 @@ This tool returns an acknowledgement immediately. The final Cloud Agent result w
     },
   });
 
-  const imageCount = params.images?.files.length ?? 0;
-  const promptWithImageContext =
-    imageCount > 0
-      ? `${params.prompt}\n\n[The user attached ${imageCount} image${imageCount > 1 ? 's' : ''} to this message. The image${imageCount > 1 ? 's are' : ' is'} automatically forwarded to any Cloud Agent session you spawn.]`
+  const attachmentCount = params.attachments?.files.length ?? 0;
+  const promptWithAttachmentContext =
+    attachmentCount > 0
+      ? `${params.prompt}\n\n[The user attached ${attachmentCount} supported attachment${attachmentCount > 1 ? 's' : ''} (images, PDFs, text, Markdown, or CSV) to this message. The attachment${attachmentCount > 1 ? 's are' : ' is'} automatically forwarded to any Cloud Agent session you spawn.]`
       : params.prompt;
 
-  const result = await agent.generate({ prompt: promptWithImageContext });
+  const result = await agent.generate({ prompt: promptWithAttachmentContext });
 
   return {
     finalText: result.text,

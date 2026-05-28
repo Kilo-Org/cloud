@@ -1,6 +1,11 @@
 import { WorkerEntrypoint } from 'cloudflare:workers';
 import { GitHubTokenService, type GitHubAppType } from './github-token-service.js';
 import { GitLabLookupService } from './gitlab-lookup-service.js';
+import {
+  resolveGitLabRuntimeToken,
+  type GetGitLabTokenParams,
+  type GetGitLabTokenResult,
+} from './gitlab-runtime-token-resolver.js';
 import { GitLabTokenService } from './gitlab-token-service.js';
 import { InstallationLookupService } from './installation-lookup-service.js';
 
@@ -28,30 +33,12 @@ export type GetTokenForRepoFailure = {
 };
 
 export type GetTokenForRepoResult = GetTokenForRepoSuccess | GetTokenForRepoFailure;
-
-export type GetGitLabTokenParams = {
-  userId: string;
-  orgId?: string;
-};
-
-export type GetGitLabTokenSuccess = {
-  success: true;
-  token: string;
-  instanceUrl: string;
-};
-
-export type GetGitLabTokenFailure = {
-  success: false;
-  reason:
-    | 'database_not_configured'
-    | 'no_integration_found'
-    | 'invalid_org_id'
-    | 'no_token'
-    | 'token_refresh_failed'
-    | 'token_expired_no_refresh';
-};
-
-export type GetGitLabTokenResult = GetGitLabTokenSuccess | GetGitLabTokenFailure;
+export type {
+  GetGitLabTokenParams,
+  GetGitLabTokenSuccess,
+  GetGitLabTokenFailure,
+  GetGitLabTokenResult,
+} from './gitlab-runtime-token-resolver.js';
 
 export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
   private githubService: GitHubTokenService;
@@ -176,21 +163,15 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
   }
 
   /**
-   * Get a GitLab token for the user/org.
-   *
-   * Looks up the GitLab integration and returns a valid access token,
-   * refreshing OAuth tokens if needed.
-   *
-   * @param params - The user and optional org context
-   * @returns Token and instance URL, or a failure reason
+   * Get the runtime GitLab credential for the user/org and generic session context.
+   * Review-origin repository sessions resolve their exact stored project token;
+   * ordinary sessions preserve the existing integration-token path.
    */
   async getGitLabToken(params: GetGitLabTokenParams): Promise<GetGitLabTokenResult> {
-    const integration = await this.gitlabLookupService.findGitLabIntegration(params);
-    if (!integration.success) {
-      return integration;
-    }
-
-    return this.gitlabTokenService.getToken(integration.integrationId, integration.metadata);
+    return resolveGitLabRuntimeToken(params, {
+      lookupService: this.gitlabLookupService,
+      tokenService: this.gitlabTokenService,
+    });
   }
 }
 

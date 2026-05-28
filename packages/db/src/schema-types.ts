@@ -248,6 +248,57 @@ export const KiloClawSubscriptionChangeAction = {
 export type KiloClawSubscriptionChangeAction =
   (typeof KiloClawSubscriptionChangeAction)[keyof typeof KiloClawSubscriptionChangeAction];
 
+export const StripeEarlyFraudWarningOwnerClassification = {
+  Personal: 'personal',
+  Organization: 'organization',
+  Ambiguous: 'ambiguous',
+  Unmatched: 'unmatched',
+} as const;
+
+export type StripeEarlyFraudWarningOwnerClassification =
+  (typeof StripeEarlyFraudWarningOwnerClassification)[keyof typeof StripeEarlyFraudWarningOwnerClassification];
+
+export const StripeEarlyFraudWarningCaseStatus = {
+  Queued: 'queued',
+  Contained: 'contained',
+  Processing: 'processing',
+  Completed: 'completed',
+  ReviewRequired: 'review_required',
+  Failed: 'failed',
+  Remediated: 'remediated',
+  Dismissed: 'dismissed',
+} as const;
+
+export type StripeEarlyFraudWarningCaseStatus =
+  (typeof StripeEarlyFraudWarningCaseStatus)[keyof typeof StripeEarlyFraudWarningCaseStatus];
+
+export const StripeEarlyFraudWarningActionType = {
+  Containment: 'containment',
+  Refund: 'refund',
+  PaymentValueClawback: 'payment_value_clawback',
+  SubscriptionTermination: 'subscription_termination',
+  AccessTermination: 'access_termination',
+  KiloClawSuspension: 'kiloclaw_suspension',
+  AffiliatePayoutReversal: 'affiliate_payout_reversal',
+  ReferralRewardReversal: 'referral_reward_reversal',
+  UserNotice: 'user_notice',
+} as const;
+
+export type StripeEarlyFraudWarningActionType =
+  (typeof StripeEarlyFraudWarningActionType)[keyof typeof StripeEarlyFraudWarningActionType];
+
+export const StripeEarlyFraudWarningActionStatus = {
+  Queued: 'queued',
+  Processing: 'processing',
+  Completed: 'completed',
+  Failed: 'failed',
+  ReviewRequired: 'review_required',
+  Dismissed: 'dismissed',
+} as const;
+
+export type StripeEarlyFraudWarningActionStatus =
+  (typeof StripeEarlyFraudWarningActionStatus)[keyof typeof StripeEarlyFraudWarningActionStatus];
+
 export const AffiliateProvider = {
   Impact: 'impact',
 } as const;

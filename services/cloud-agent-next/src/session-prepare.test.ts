@@ -458,6 +458,34 @@ describe('prepareSession endpoint', () => {
     );
   });
 
+  it('persists generic GitLab review origin and repository context without a caller token', async () => {
+    const doStub = createMockDOStub();
+    const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
+
+    await caller.prepareSession({
+      prompt: 'Test GitLab review prompt',
+      mode: 'code',
+      model: 'claude-3',
+      gitUrl: 'https://gitlab.com/acme/repo.git',
+      gitToken: 'caller-gitlab-token',
+      platform: 'gitlab',
+      createdOnPlatform: 'code-review',
+      upstreamBranch: 'feature/gitlab',
+    });
+
+    expect(doStub.registerSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        identity: expect.objectContaining({ createdOnPlatform: 'code-review' }),
+        repository: {
+          type: 'gitlab',
+          url: 'https://gitlab.com/acme/repo.git',
+          branch: 'feature/gitlab',
+        },
+      })
+    );
+    expect(doStub.registerSession.mock.calls[0]?.[0].repository).not.toHaveProperty('token');
+  });
+
   it('preserves caller gitToken for generic git repositories', async () => {
     const doStub = createMockDOStub();
     const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
@@ -1025,7 +1053,7 @@ describe('schema validation', () => {
     ).toBe(false);
   });
 
-  it('restricts updateSession to callbackTarget', () => {
+  it('restricts updateSession to supported internal updates', () => {
     expect(
       schemas.UpdateSessionInput.safeParse({
         cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc',

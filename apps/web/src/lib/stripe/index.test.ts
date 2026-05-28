@@ -920,6 +920,54 @@ describe('processStripePaymentEventHook', () => {
     retrieveSpy.mockRestore();
   });
 
+  test('radar.early_fraud_warning.created does not link a case during concurrent soft deletion', async () => {
+    await cleanupDbForTest();
+    testUser = await insertTestUser();
+    const { client } = await import('@/lib/stripe-client');
+    const retrieveSpy = jest.spyOn(client.charges, 'retrieve').mockResolvedValue(
+      sampleStripeChargeResponse(
+        sampleStripeCharge({
+          id: 'ch_deleting_customer',
+          customer: testUser.stripe_customer_id,
+        })
+      )
+    );
+    let observationPromise: Promise<void> | null = null;
+
+    await db.transaction(async tx => {
+      await tx
+        .update(kilocode_users)
+        .set({ blocked_reason: 'soft-deleted at 2026-05-28T12:00:00.000Z' })
+        .where(eq(kilocode_users.id, testUser.id));
+      observationPromise = processStripePaymentEventHook(
+        sampleEarlyFraudWarningEvent({
+          eventId: 'evt_deleting_customer',
+          warningId: 'issfr_deleting_customer',
+          charge: 'ch_deleting_customer',
+        })
+      );
+      await new Promise(resolve => setImmediate(resolve));
+    });
+
+    if (!observationPromise) {
+      throw new Error('Observation did not start during deletion transaction');
+    }
+    await observationPromise;
+
+    const [fraudCase] = await db.select().from(stripe_early_fraud_warning_cases);
+    expect(fraudCase).toEqual(
+      expect.objectContaining({
+        stripe_customer_id: testUser.stripe_customer_id,
+        owner_classification: 'unmatched',
+        kilo_user_id: null,
+        status: 'review_required',
+      })
+    );
+    expect(await db.select().from(stripe_early_fraud_warning_actions)).toHaveLength(0);
+
+    retrieveSpy.mockRestore();
+  });
+
   test('radar.early_fraud_warning.created deduplicates repeated delivery without creating actions', async () => {
     await cleanupDbForTest();
     testUser = await insertTestUser();

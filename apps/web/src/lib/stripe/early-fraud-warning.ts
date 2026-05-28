@@ -14,7 +14,7 @@ import {
 import { and, eq, isNull, like, not, or } from 'drizzle-orm';
 import type Stripe from 'stripe';
 
-import { db } from '@/lib/drizzle';
+import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import { client } from '@/lib/stripe-client';
 
 type StripeReference = string | { id: string } | null | undefined;
@@ -60,7 +60,10 @@ function stripeReferenceId(reference: StripeReference): string | null {
   return reference?.id || null;
 }
 
-async function resolveOwner(customerId: string | null): Promise<OwnerResolution> {
+async function resolveOwner(
+  database: DrizzleTransaction,
+  customerId: string | null
+): Promise<OwnerResolution> {
   if (!customerId) {
     return {
       classification: StripeEarlyFraudWarningOwnerClassification.Unmatched,
@@ -70,28 +73,26 @@ async function resolveOwner(customerId: string | null): Promise<OwnerResolution>
     };
   }
 
-  const [personalOwners, organizationOwners] = await Promise.all([
-    db
-      .select({ id: kilocode_users.id })
-      .from(kilocode_users)
-      .where(
-        and(
-          eq(kilocode_users.stripe_customer_id, customerId),
-          or(
-            isNull(kilocode_users.blocked_reason),
-            not(like(kilocode_users.blocked_reason, 'soft-deleted at %'))
-          )
+  // Keep the case insert ordered with softDeleteUser's link scrubbing for matched user rows.
+  const personalOwners = await database
+    .select({ id: kilocode_users.id })
+    .from(kilocode_users)
+    .where(
+      and(
+        eq(kilocode_users.stripe_customer_id, customerId),
+        or(
+          isNull(kilocode_users.blocked_reason),
+          not(like(kilocode_users.blocked_reason, 'soft-deleted at %'))
         )
       )
-      .limit(2),
-    db
-      .select({ id: organizations.id })
-      .from(organizations)
-      .where(
-        and(eq(organizations.stripe_customer_id, customerId), isNull(organizations.deleted_at))
-      )
-      .limit(2),
-  ]);
+    )
+    .limit(2)
+    .for('update');
+  const organizationOwners = await database
+    .select({ id: organizations.id })
+    .from(organizations)
+    .where(and(eq(organizations.stripe_customer_id, customerId), isNull(organizations.deleted_at)))
+    .limit(2);
 
   if (personalOwners.length === 1 && organizationOwners.length === 0) {
     return {
@@ -128,8 +129,11 @@ async function resolveOwner(customerId: string | null): Promise<OwnerResolution>
   };
 }
 
-async function persistReviewCase(values: ReviewCaseValues): Promise<void> {
-  await db
+async function persistReviewCase(
+  database: typeof db | DrizzleTransaction,
+  values: ReviewCaseValues
+): Promise<void> {
+  await database
     .insert(stripe_early_fraud_warning_cases)
     .values({
       stripe_early_fraud_warning_id: values.earlyFraudWarningId,
@@ -165,7 +169,7 @@ export async function observeStripeEarlyFraudWarningCreated({
   const paymentIntentId = stripeReferenceId(earlyFraudWarning.payment_intent);
 
   if (!chargeId) {
-    await persistReviewCase({
+    await persistReviewCase(db, {
       eventId,
       earlyFraudWarningId: earlyFraudWarning.id,
       chargeId: null,
@@ -196,7 +200,7 @@ export async function observeStripeEarlyFraudWarningCreated({
         stripe_charge_id: chargeId,
       },
     });
-    await persistReviewCase({
+    await persistReviewCase(db, {
       eventId,
       earlyFraudWarningId: earlyFraudWarning.id,
       chargeId,
@@ -216,22 +220,24 @@ export async function observeStripeEarlyFraudWarningCreated({
     return null;
   }
 
-  const owner = await resolveOwner(stripeReferenceId(charge.customer));
-  await persistReviewCase({
-    eventId,
-    earlyFraudWarningId: earlyFraudWarning.id,
-    chargeId,
-    paymentIntentId: paymentIntentId ?? stripeReferenceId(charge.payment_intent),
-    customerId: stripeReferenceId(charge.customer),
-    amountMinorUnits: charge.amount,
-    currency: charge.currency,
-    owner: charge.disputed
-      ? {
-          ...owner,
-          reason: 'Warned charge is already disputed; manual review required',
-        }
-      : owner,
-    warningCreatedAt,
+  await db.transaction(async tx => {
+    const owner = await resolveOwner(tx, stripeReferenceId(charge.customer));
+    await persistReviewCase(tx, {
+      eventId,
+      earlyFraudWarningId: earlyFraudWarning.id,
+      chargeId,
+      paymentIntentId: paymentIntentId ?? stripeReferenceId(charge.payment_intent),
+      customerId: stripeReferenceId(charge.customer),
+      amountMinorUnits: charge.amount,
+      currency: charge.currency,
+      owner: charge.disputed
+        ? {
+            ...owner,
+            reason: 'Warned charge is already disputed; manual review required',
+          }
+        : owner,
+      warningCreatedAt,
+    });
   });
 
   return charge;

@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, jest, test } from '@jest/globals';
 import { db, cleanupDbForTest } from '@/lib/drizzle';
 import {
   credit_transactions,
+  kilocode_users,
   kilo_pass_audit_log,
   kilo_pass_subscriptions,
   payment_methods,
@@ -285,6 +286,13 @@ describe('card fingerprint gate', () => {
       .from(credit_transactions)
       .where(eq(credit_transactions.kilo_user_id, newUser.id));
     expect(creditRows).toHaveLength(0);
+
+    const blockedUser = await db.query.kilocode_users.findFirst({
+      columns: { blocked_reason: true, blocked_at: true },
+      where: eq(kilocode_users.id, newUser.id),
+    });
+    expect(blockedUser?.blocked_reason).toBe('kilo_pass_duplicate_card');
+    expect(blockedUser?.blocked_at).not.toBeNull();
   });
 
   test('does not block same user re-subscribing with the same card', async () => {
@@ -389,6 +397,103 @@ describe('card fingerprint gate', () => {
         )
       );
     expect(creditRows.length).toBeGreaterThanOrEqual(1);
+
+    const userRow = await db.query.kilocode_users.findFirst({
+      columns: { blocked_reason: true },
+      where: eq(kilocode_users.id, user.id),
+    });
+    expect(userRow?.blocked_reason).toBeNull();
+  });
+
+  test('does not overwrite existing blocked_reason when user is already blocked', async () => {
+    const { handleKiloPassInvoicePaid } =
+      await import('@/lib/kilo-pass/stripe-handlers-invoice-paid');
+
+    const existingUser = await insertTestUser({
+      total_microdollars_acquired: 0,
+      microdollars_used: 0,
+    });
+    const newUser = await insertTestUser({
+      total_microdollars_acquired: 0,
+      microdollars_used: 0,
+      blocked_reason: 'preexisting_block',
+      blocked_at: new Date().toISOString(),
+    });
+
+    const fingerprint = `fp_already_blocked_${Math.random()}`;
+    const existingPmId = `pm_already_blocked_existing_${Math.random()}`;
+    const newPmId = `pm_already_blocked_new_${Math.random()}`;
+
+    await insertPaymentMethod({ userId: existingUser.id, stripeId: existingPmId, fingerprint });
+    await insertPaymentMethod({ userId: newUser.id, stripeId: newPmId, fingerprint });
+
+    const existingSubId = `sub_already_blocked_existing_${Math.random()}`;
+    await insertKiloPassSubscription({
+      kiloUserId: existingUser.id,
+      stripeSubscriptionId: existingSubId,
+      tier: KiloPassTier.Tier19,
+      cadence: KiloPassCadence.Monthly,
+    });
+
+    const newSubId = `sub_already_blocked_new_${Math.random()}`;
+    const meta = kiloPassMetadata({
+      kiloUserId: newUser.id,
+      tier: KiloPassTier.Tier19,
+      cadence: KiloPassCadence.Monthly,
+    });
+    const subscription = makeStripeSubscription({
+      id: newSubId,
+      start_date_seconds: 1_735_689_600,
+      metadata: meta,
+    });
+
+    const priceId = await getKiloPassPriceId({
+      tier: KiloPassTier.Tier19,
+      cadence: KiloPassCadence.Monthly,
+    });
+
+    const paymentIntentId = `pi_already_blocked_${Math.random()}`;
+    const invoice = makeStripeInvoice({
+      id: `inv_already_blocked_${Math.random()}`,
+      amount_paid_cents: 1900,
+      created_seconds: 1_735_689_600,
+      priceId,
+      subscriptionIdOrExpanded: newSubId,
+      metadata: meta,
+      paymentIntentId,
+    });
+
+    const mockCancel = jest.fn(async () => ({
+      id: newSubId,
+      status: 'canceled',
+    }));
+    const mockRefund = jest.fn(async () => ({ id: `re_${Math.random()}` }));
+    const mockRetrievePm = jest.fn(async () => ({
+      id: newPmId,
+      card: { fingerprint },
+    }));
+    const mockRetrieveSub = jest.fn(async () => subscription);
+
+    const stripe = {
+      subscriptions: { retrieve: mockRetrieveSub, cancel: mockCancel },
+      refunds: { create: mockRefund },
+      paymentMethods: { retrieve: mockRetrievePm },
+      paymentIntents: {
+        retrieve: jest.fn(async () => ({ id: paymentIntentId, payment_method: newPmId })),
+      },
+    };
+
+    await handleKiloPassInvoicePaid({
+      eventId: 'evt_already_blocked_test',
+      invoice,
+      stripe: stripe as unknown as Stripe,
+    });
+
+    const blockedUser = await db.query.kilocode_users.findFirst({
+      columns: { blocked_reason: true },
+      where: eq(kilocode_users.id, newUser.id),
+    });
+    expect(blockedUser?.blocked_reason).toBe('preexisting_block');
   });
 
   test('does not block when other user has ended Kilo Pass with same fingerprint', async () => {

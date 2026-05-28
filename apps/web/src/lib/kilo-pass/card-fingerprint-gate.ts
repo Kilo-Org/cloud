@@ -138,7 +138,9 @@ async function resolveCardFingerprint(params: {
 
 // Card fingerprint gate for Kilo Pass subscriptions. Ensures a single card
 // fingerprint can be attached to at most one active (non-canceled, non-ended)
-// Kilo Pass subscription across all Kilo users at any time.
+// Kilo Pass subscription across all Kilo users at any time. When a duplicate
+// is detected, the new subscription is canceled, the invoice refunded, and
+// the offending user's account is blocked (if not already blocked).
 //
 // This gate is only applied to Stripe subscriptions (invoice.paid webhook path).
 // App Store and Google Play purchases are not gated here because:
@@ -236,6 +238,19 @@ export async function checkDuplicateCardFingerprintGate(params: {
       otherStripeSubscriptionId: existingActiveKiloPass.stripeSubscriptionId,
     },
   });
+
+  await dbOrTx
+    .update(kilocode_users)
+    .set({
+      blocked_reason: 'kilo_pass_duplicate_card',
+      blocked_at: new Date().toISOString(),
+    })
+    .where(
+      and(
+        eq(kilocode_users.id, kiloUserId),
+        isNull(kilocode_users.blocked_reason),
+      )
+    );
 
   return {
     blocked: true,

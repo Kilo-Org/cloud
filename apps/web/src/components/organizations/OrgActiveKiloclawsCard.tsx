@@ -19,7 +19,7 @@ type Props = {
 
 export function OrgActiveKiloclawsCard({ organizationId }: Props) {
   const trpc = useTRPC();
-  const { data, isLoading } = useQuery(
+  const { data, isLoading, isError } = useQuery(
     trpc.organizations.kiloclaw.listActiveInstances.queryOptions({ organizationId })
   );
 

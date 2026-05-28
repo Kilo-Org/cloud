@@ -264,6 +264,27 @@ describe('admin.blacklistDomains.suspicious', () => {
     expect(names).not.toContain('under-threshold.com');
   });
 
+  it('includes domains below the blocked-percent threshold when provider filtering is disabled', async () => {
+    for (let i = 0; i < 9; i++) {
+      await insertTestUser({
+        google_user_email: `u${i}@hotmail.com`,
+        email_domain: 'hotmail.com',
+      });
+    }
+    await insertTestUser({
+      google_user_email: 'blocked@hotmail.com',
+      email_domain: 'hotmail.com',
+      blocked_reason: 'abuse',
+    });
+
+    const caller = await createCallerForUser(admin.id);
+    const { domains } = await caller.admin.blacklistDomains.suspicious({
+      hideLegitimateProviders: false,
+    });
+
+    expect(domains.map(d => d.domain)).toContain('hotmail.com');
+  });
+
   it('excludes users whose email_domain is NULL', async () => {
     await insertTestUser({
       google_user_email: 'a@example.com',

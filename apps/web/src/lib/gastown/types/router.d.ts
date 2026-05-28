@@ -1616,6 +1616,35 @@ export declare const gastownRouter: import('@trpc/server').TRPCBuiltRouter<
       } | null;
       meta: object;
     }>;
+    babysitPr: import('@trpc/server').TRPCMutationProcedure<{
+      input: {
+        rigId: string;
+        prUrl: string;
+        title?: string | undefined;
+        body?: string | undefined;
+        forcePushAllowed?: boolean | undefined;
+      };
+      output: {
+        beadId: string;
+        warning?: string | undefined;
+      };
+      meta: object;
+    }>;
+    previewPr: import('@trpc/server').TRPCQueryProcedure<{
+      input: {
+        rigId: string;
+        prUrl: string;
+      };
+      output: {
+        state: string;
+        head_branch?: string | undefined;
+        base_branch?: string | undefined;
+        head_sha?: string | undefined;
+        title?: string | undefined;
+        repo_matches: boolean;
+      };
+      meta: object;
+    }>;
   }>
 >;
 export type GastownRouter = typeof gastownRouter;
@@ -3248,6 +3277,35 @@ export declare const wrappedGastownRouter: import('@trpc/server').TRPCBuiltRoute
             title: string;
             labels: string[];
           } | null;
+          meta: object;
+        }>;
+        babysitPr: import('@trpc/server').TRPCMutationProcedure<{
+          input: {
+            rigId: string;
+            prUrl: string;
+            title?: string | undefined;
+            body?: string | undefined;
+            forcePushAllowed?: boolean | undefined;
+          };
+          output: {
+            beadId: string;
+            warning?: string | undefined;
+          };
+          meta: object;
+        }>;
+        previewPr: import('@trpc/server').TRPCQueryProcedure<{
+          input: {
+            rigId: string;
+            prUrl: string;
+          };
+          output: {
+            state: string;
+            head_branch?: string | undefined;
+            base_branch?: string | undefined;
+            head_sha?: string | undefined;
+            title?: string | undefined;
+            repo_matches: boolean;
+          };
           meta: object;
         }>;
       }>

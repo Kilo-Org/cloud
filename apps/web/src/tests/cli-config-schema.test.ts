@@ -38,9 +38,7 @@ describe('kilo config.json schema merge', () => {
   });
 
   test('auto_collapse_reasoning is a boolean', () => {
-    expect(props.auto_collapse_reasoning).toEqual(
-      expect.objectContaining({ type: 'boolean' }),
-    );
+    expect(props.auto_collapse_reasoning).toEqual(expect.objectContaining({ type: 'boolean' }));
   });
 
   test('terminal_command_display is an enum of expanded/collapsed', () => {

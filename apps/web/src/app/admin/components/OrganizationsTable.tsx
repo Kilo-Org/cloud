@@ -22,19 +22,28 @@ type OrganizationSortConfig = {
   direction: 'asc' | 'desc';
 };
 
-export function OrganizationsTable() {
+type OrganizationsTableProps = {
+  mode?: 'paying' | 'trial' | 'all';
+  showMetrics?: boolean;
+  showStripeStatus?: boolean;
+};
+
+export function OrganizationsTable({
+  mode = 'paying',
+  showMetrics = true,
+  showStripeStatus = true,
+}: OrganizationsTableProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
 
   const currentPage = parseInt(searchParams.get('page') || '1');
   const currentPageSize = parseInt(searchParams.get('limit') || '25') as PageSize;
-  const currentSortBy = (searchParams.get('sortBy') || 'created_at') as OrganizationSortableField;
+  const currentSortBy = (searchParams.get('sortBy') || 'name') as OrganizationSortableField;
   const currentSortOrder = searchParams.get('sortOrder') || 'desc';
   const currentSearch = searchParams.get('search') || '';
-  const currentSeatsRequired = searchParams.get('seatsRequired') || '';
-  const currentHasBalance = searchParams.get('hasBalance') || '';
-  const currentStatus = searchParams.get('status') || 'all';
+  const currentIncludeDeleted = searchParams.get('include_deleted') === 'true';
+  const currentStripeStatus = searchParams.get('stripe_status') || '';
   const currentPlan = searchParams.get('plan') || '';
 
   const sortConfig: OrganizationSortConfig = useMemo(
@@ -51,9 +60,9 @@ export function OrganizationsTable() {
     sortBy: currentSortBy,
     sortOrder: currentSortOrder as 'asc' | 'desc',
     search: currentSearch,
-    seatsRequired: currentSeatsRequired,
-    hasBalance: currentHasBalance,
-    status: currentStatus,
+    mode,
+    include_deleted: currentIncludeDeleted,
+    stripe_status: currentStripeStatus,
     plan: currentPlan,
   });
 
@@ -69,255 +78,113 @@ export function OrganizationsTable() {
         }
       });
 
-      router.push(`/admin/organizations?${newSearchParams.toString()}`);
+      router.push(`?${newSearchParams.toString()}`);
     },
     [router, searchParams]
   );
 
+  const sharedParams = useCallback(
+    () => ({
+      limit: currentPageSize.toString(),
+      sortBy: currentSortBy,
+      sortOrder: currentSortOrder,
+      include_deleted: currentIncludeDeleted ? 'true' : '',
+      stripe_status: currentStripeStatus,
+      plan: currentPlan === 'all' ? '' : currentPlan,
+    }),
+    [
+      currentPageSize,
+      currentSortBy,
+      currentSortOrder,
+      currentIncludeDeleted,
+      currentStripeStatus,
+      currentPlan,
+    ]
+  );
+
   const handleSearchChange = useCallback(
     (searchTerm: string) => {
-      const params = {
-        search: searchTerm,
-        page: '1', // Reset to first page when searching
-        limit: currentPageSize.toString(),
-        sortBy: currentSortBy,
-        sortOrder: currentSortOrder,
-        seatsRequired: currentSeatsRequired,
-        hasBalance: currentHasBalance,
-        status: currentStatus === 'all' ? '' : currentStatus,
-        plan: currentPlan === 'all' ? '' : currentPlan,
-      };
-
-      updateUrl(params);
+      updateUrl({ ...sharedParams(), search: searchTerm, page: '1' });
     },
-    [
-      currentPageSize,
-      currentSortBy,
-      currentSortOrder,
-      currentSeatsRequired,
-      currentHasBalance,
-      currentStatus,
-      currentPlan,
-      updateUrl,
-    ]
+    [sharedParams, updateUrl]
   );
 
-  const handleSeatsRequiredChange = useCallback(
-    (value: string) => {
-      const params = {
+  const handleIncludeDeletedChange = useCallback(
+    (value: boolean) => {
+      updateUrl({
+        ...sharedParams(),
+        include_deleted: value ? 'true' : '',
         search: currentSearch,
-        page: '1', // Reset to first page when filtering
-        limit: currentPageSize.toString(),
-        sortBy: currentSortBy,
-        sortOrder: currentSortOrder,
-        seatsRequired: value,
-        hasBalance: currentHasBalance,
-        status: currentStatus === 'all' ? '' : currentStatus,
-        plan: currentPlan === 'all' ? '' : currentPlan,
-      };
-
-      updateUrl(params);
+        page: '1',
+      });
     },
-    [
-      currentSearch,
-      currentPageSize,
-      currentSortBy,
-      currentSortOrder,
-      currentHasBalance,
-      currentStatus,
-      currentPlan,
-      updateUrl,
-    ]
+    [sharedParams, currentSearch, updateUrl]
   );
 
-  const handleHasBalanceChange = useCallback(
+  const handleStripeStatusChange = useCallback(
     (value: string) => {
-      const params = {
-        search: currentSearch,
-        page: '1', // Reset to first page when filtering
-        limit: currentPageSize.toString(),
-        sortBy: currentSortBy,
-        sortOrder: currentSortOrder,
-        seatsRequired: currentSeatsRequired,
-        hasBalance: value,
-        status: currentStatus === 'all' ? '' : currentStatus,
-        plan: currentPlan === 'all' ? '' : currentPlan,
-      };
-
-      updateUrl(params);
+      updateUrl({ ...sharedParams(), stripe_status: value, search: currentSearch, page: '1' });
     },
-    [
-      currentSearch,
-      currentPageSize,
-      currentSortBy,
-      currentSortOrder,
-      currentSeatsRequired,
-      currentStatus,
-      currentPlan,
-      updateUrl,
-    ]
-  );
-
-  const handleStatusChange = useCallback(
-    (value: string) => {
-      const params = {
-        search: currentSearch,
-        page: '1', // Reset to first page when filtering
-        limit: currentPageSize.toString(),
-        sortBy: currentSortBy,
-        sortOrder: currentSortOrder,
-        seatsRequired: currentSeatsRequired,
-        hasBalance: currentHasBalance,
-        status: value === 'all' ? '' : value,
-        plan: currentPlan === 'all' ? '' : currentPlan,
-      };
-
-      updateUrl(params);
-    },
-    [
-      currentSearch,
-      currentPageSize,
-      currentSortBy,
-      currentSortOrder,
-      currentSeatsRequired,
-      currentHasBalance,
-      currentPlan,
-      updateUrl,
-    ]
+    [sharedParams, currentSearch, updateUrl]
   );
 
   const handlePlanChange = useCallback(
     (value: string) => {
-      const params = {
-        search: currentSearch,
-        page: '1', // Reset to first page when filtering
-        limit: currentPageSize.toString(),
-        sortBy: currentSortBy,
-        sortOrder: currentSortOrder,
-        seatsRequired: currentSeatsRequired,
-        hasBalance: currentHasBalance,
-        status: currentStatus === 'all' ? '' : currentStatus,
+      updateUrl({
+        ...sharedParams(),
         plan: value === 'all' ? '' : value,
-      };
-
-      updateUrl(params);
+        search: currentSearch,
+        page: '1',
+      });
     },
-    [
-      currentSearch,
-      currentPageSize,
-      currentSortBy,
-      currentSortOrder,
-      currentSeatsRequired,
-      currentHasBalance,
-      currentStatus,
-      updateUrl,
-    ]
+    [sharedParams, currentSearch, updateUrl]
   );
 
   const handleResetFilters = useCallback(() => {
-    const params = {
+    updateUrl({
       search: currentSearch,
       page: '1',
       limit: currentPageSize.toString(),
       sortBy: currentSortBy,
       sortOrder: currentSortOrder,
-      seatsRequired: '',
-      hasBalance: '',
-      status: '',
+      include_deleted: '',
+      stripe_status: '',
       plan: '',
-    };
-
-    updateUrl(params);
+    });
   }, [currentSearch, currentPageSize, currentSortBy, currentSortOrder, updateUrl]);
 
-  // Handle sorting
   const handleSort = useCallback(
     (field: OrganizationSortableField) => {
       const newDirection =
         sortConfig.field === field && sortConfig.direction === 'asc' ? 'desc' : 'asc';
-
-      const params = {
+      updateUrl({
+        ...sharedParams(),
         search: currentSearch,
-        page: '1', // Reset to first page when sorting
-        limit: currentPageSize.toString(),
+        page: '1',
         sortBy: field,
         sortOrder: newDirection,
-        seatsRequired: currentSeatsRequired,
-        hasBalance: currentHasBalance,
-        status: currentStatus === 'all' ? '' : currentStatus,
-        plan: currentPlan === 'all' ? '' : currentPlan,
-      };
-
-      updateUrl(params);
+      });
     },
-    [
-      sortConfig,
-      currentPageSize,
-      currentSearch,
-      currentSeatsRequired,
-      currentHasBalance,
-      currentStatus,
-      currentPlan,
-      updateUrl,
-    ]
+    [sortConfig, sharedParams, currentSearch, updateUrl]
   );
 
-  // Handle page change
   const handlePageChange = useCallback(
     (page: number) => {
-      const params = {
-        search: currentSearch,
-        page: page.toString(),
-        limit: currentPageSize.toString(),
-        sortBy: currentSortBy,
-        sortOrder: currentSortOrder,
-        seatsRequired: currentSeatsRequired,
-        hasBalance: currentHasBalance,
-        status: currentStatus === 'all' ? '' : currentStatus,
-        plan: currentPlan === 'all' ? '' : currentPlan,
-      };
-
-      updateUrl(params);
+      updateUrl({ ...sharedParams(), search: currentSearch, page: page.toString() });
     },
-    [
-      currentPageSize,
-      currentSortBy,
-      currentSortOrder,
-      currentSearch,
-      currentSeatsRequired,
-      currentHasBalance,
-      currentStatus,
-      currentPlan,
-      updateUrl,
-    ]
+    [sharedParams, currentSearch, updateUrl]
   );
 
   const handlePageSizeChange = useCallback(
     (pageSize: PageSize) => {
-      const params = {
+      updateUrl({
+        ...sharedParams(),
         search: currentSearch,
-        page: '1', // Reset to first page when changing page size
+        page: '1',
         limit: pageSize.toString(),
-        sortBy: currentSortBy,
-        sortOrder: currentSortOrder,
-        seatsRequired: currentSeatsRequired,
-        hasBalance: currentHasBalance,
-        status: currentStatus === 'all' ? '' : currentStatus,
-        plan: currentPlan === 'all' ? '' : currentPlan,
-      };
-
-      updateUrl(params);
+      });
     },
-    [
-      currentSortBy,
-      currentSortOrder,
-      currentSearch,
-      currentSeatsRequired,
-      currentHasBalance,
-      currentStatus,
-      currentPlan,
-      updateUrl,
-    ]
+    [sharedParams, currentSearch, updateUrl]
   );
 
   const buttons = (
@@ -341,21 +208,19 @@ export function OrganizationsTable() {
   return (
     <AdminPage breadcrumbs={breadcrumbs} buttons={buttons}>
       <div className="flex max-w-max flex-col gap-y-4">
-        {/* Organization Metrics */}
-        <OrganizationMetricCards />
+        {showMetrics && <OrganizationMetricCards />}
 
         <div className="flex items-center justify-between">
           <OrganizationFilters
             search={currentSearch}
             onSearchChange={handleSearchChange}
             isLoading={isFetching}
-            seatsRequired={currentSeatsRequired}
-            hasBalance={currentHasBalance}
-            status={currentStatus}
+            includeDeleted={currentIncludeDeleted}
+            stripeStatus={currentStripeStatus}
             plan={currentPlan}
-            onSeatsRequiredChange={handleSeatsRequiredChange}
-            onHasBalanceChange={handleHasBalanceChange}
-            onStatusChange={handleStatusChange}
+            showStripeStatus={showStripeStatus}
+            onIncludeDeletedChange={handleIncludeDeletedChange}
+            onStripeStatusChange={handleStripeStatusChange}
             onPlanChange={handlePlanChange}
             onResetFilters={handleResetFilters}
             totalCount={data?.pagination.total}
@@ -368,13 +233,13 @@ export function OrganizationsTable() {
             <OrganizationTableHeader
               sortConfig={sortConfig}
               onSort={handleSort}
-              showDeleted={currentStatus === 'deleted' || currentStatus === 'all'}
+              showDeleted={currentIncludeDeleted}
             />
             <OrganizationTableBody
               organizations={data?.organizations || []}
               isLoading={isLoading}
               searchTerm={currentSearch}
-              showDeleted={currentStatus === 'deleted' || currentStatus === 'all'}
+              showDeleted={currentIncludeDeleted}
             />
           </Table>
         </div>

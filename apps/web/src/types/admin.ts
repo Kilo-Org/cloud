@@ -47,9 +47,10 @@ export type UsersApiResponse = {
 
 export const AdminOrganizationSchema = OrganizationSchema.extend({
   member_count: z.number(),
-  created_by_user_email: z.string().nullable(),
-  created_by_user_name: z.string().nullable(),
   subscription_amount_usd: z.number().nullable(),
+  latest_stripe_status: z.string().nullable(),
+  kilo_pass_tier: z.string().nullable(),
+  kiloclaw_count: z.number(),
 });
 
 export const OrganizationsApiGetResponseSchema = z.object({
@@ -96,7 +97,6 @@ export const ascendingFirstFields: SortableField[] = ['google_user_email'];
 
 export type OrganizationSortableField =
   | 'name'
-  | 'created_at'
   | 'microdollars_used'
   | 'balance'
   | 'member_count';

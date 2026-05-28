@@ -29,11 +29,6 @@ export function OrganizationTableHeader({
           </SortableButton>
         </TableHead>
         <TableHead>
-          <SortableButton field="created_at" sortConfig={sortConfig} onSort={onSort}>
-            Created
-          </SortableButton>
-        </TableHead>
-        <TableHead>
           <SortableButton field="microdollars_used" sortConfig={sortConfig} onSort={onSort}>
             Usage
           </SortableButton>
@@ -45,13 +40,15 @@ export function OrganizationTableHeader({
         </TableHead>
         <TableHead>
           <SortableButton field="member_count" sortConfig={sortConfig} onSort={onSort}>
-            Members
+            Users / Seats
           </SortableButton>
         </TableHead>
-        <TableHead>Seats Required</TableHead>
         <TableHead>Plan</TableHead>
-        <TableHead>Subscription Amount</TableHead>
-        <TableHead>Created By</TableHead>
+        <TableHead>Stripe Status</TableHead>
+        <TableHead>Subscription</TableHead>
+        <TableHead>Kilo Pass</TableHead>
+        <TableHead>KiloClaw</TableHead>
+        <TableHead>Links</TableHead>
         {showDeleted && <TableHead>Deleted</TableHead>}
         <TableHead>Actions</TableHead>
       </TableRow>

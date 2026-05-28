@@ -69,9 +69,9 @@ type UseOrganizationsListParams = {
   sortBy: OrganizationSortableField;
   sortOrder: 'asc' | 'desc';
   search: string;
-  seatsRequired?: string;
-  hasBalance?: string;
-  status?: string;
+  mode?: 'paying' | 'trial' | 'all';
+  include_deleted?: boolean;
+  stripe_status?: string;
   plan?: string;
 };
 
@@ -84,9 +84,9 @@ export function useOrganizationsList(params: UseOrganizationsListParams) {
       sortBy: params.sortBy,
       sortOrder: params.sortOrder,
       search: params.search,
-      seatsRequired: params.seatsRequired as '' | 'true' | 'false' | undefined,
-      hasBalance: params.hasBalance as '' | 'true' | 'false' | undefined,
-      status: params.status as 'active' | 'all' | 'incomplete' | 'deleted' | undefined,
+      mode: params.mode,
+      include_deleted: params.include_deleted ?? false,
+      stripe_status: params.stripe_status,
       plan: params.plan as '' | OrganizationPlan | undefined,
     })
   );

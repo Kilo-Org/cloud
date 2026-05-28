@@ -7,7 +7,7 @@ import {
   organization_seats_purchases,
   credit_transactions,
 } from '@kilocode/db/schema';
-import { ilike, or, asc, desc, count, eq, and, gt, isNull, isNotNull, sql } from 'drizzle-orm';
+import { ilike, or, asc, desc, count, eq, and, isNull, sql } from 'drizzle-orm';
 import * as z from 'zod';
 import { OrganizationsApiGetResponseSchema } from '@/types/admin';
 import { isValidUUID, toMicrodollars } from '@/lib/utils';
@@ -29,13 +29,17 @@ const OrganizationListInputSchema = z.object({
   page: z.number().int().min(1).default(1),
   limit: z.number().int().min(1).max(100_000).default(25),
   sortBy: z
-    .enum(['name', 'created_at', 'microdollars_used', 'balance', 'member_count'])
-    .default('created_at'),
+    .enum(['name', 'microdollars_used', 'balance', 'member_count'])
+    .default('name'),
   sortOrder: z.enum(['asc', 'desc']).default('desc'),
   search: z.string().optional().default(''),
-  seatsRequired: z.enum(['true', 'false', '']).optional(),
-  hasBalance: z.enum(['true', 'false', '']).optional(),
-  status: z.enum(['active', 'deleted', 'incomplete', 'all']).default('active'),
+  // mode controls which broad set of orgs to show (page-level, not user-facing)
+  // paying = has ever had a seats purchase (active or churned customers)
+  // trial  = has never had a seats purchase
+  mode: z.enum(['paying', 'trial', 'all']).default('paying'),
+  // User-facing filters
+  include_deleted: z.boolean().default(false),
+  stripe_status: z.string().optional(), // filter by latest subscription_status value
   plan: z.enum(['enterprise', 'teams', '']).optional(),
 });
 
@@ -118,14 +122,10 @@ const NullifyCreditsOutputSchema = z.object({
 });
 
 const OrganizationMetricsSchema = z.object({
-  teamCount: z.number(),
-  teamMemberCount: z.number(),
+  activeOrgCount: z.number(),
+  teamsCount: z.number(),
   enterpriseCount: z.number(),
-  enterpriseMemberCount: z.number(),
-  trialingTeamCount: z.number(),
-  trialingTeamMemberCount: z.number(),
-  trialingEnterpriseCount: z.number(),
-  trialingEnterpriseMemberCount: z.number(),
+  totalSeats: z.number(),
 });
 
 const AddMemberInputSchema = z.object({
@@ -411,97 +411,40 @@ export const organizationAdminRouter = createTRPCRouter({
     }),
 
   getMetrics: adminProcedure.output(OrganizationMetricsSchema).query(async () => {
-    // Get team metrics (organizations with plan = team AND active subscription)
-    const teamMetrics = await db
-      .select({
-        orgCount: count(sql`DISTINCT ${organizations.id}`),
-        memberCount: count(organization_memberships.id),
-      })
-      .from(organizations)
-      .leftJoin(
-        organization_memberships,
-        eq(organizations.id, organization_memberships.organization_id)
-      )
-      .where(
-        and(
-          eq(organizations.plan, 'teams'),
-          isNull(organizations.deleted_at),
-          sql`EXISTS (
-            SELECT 1 FROM ${organization_seats_purchases}
-            WHERE ${organization_seats_purchases.organization_id} = ${organizations.id}
-            AND ${organization_seats_purchases.subscription_status} = 'active'
-          )`
-        )
-      );
+    // "Paying" = has at least one seats purchase record, not deleted
+    const payingCondition = and(
+      isNull(organizations.deleted_at),
+      sql`EXISTS (
+        SELECT 1 FROM ${organization_seats_purchases}
+        WHERE ${organization_seats_purchases.organization_id} = ${organizations.id}
+      )`
+    );
 
-    // Get enterprise metrics (organizations with require_seats = false)
-    const enterpriseMetrics = await db
-      .select({
-        orgCount: count(sql`DISTINCT ${organizations.id}`),
-        memberCount: count(organization_memberships.id),
-      })
+    const [activeResult] = await db
+      .select({ orgCount: count() })
       .from(organizations)
-      .leftJoin(
-        organization_memberships,
-        eq(organizations.id, organization_memberships.organization_id)
-      )
-      .where(and(eq(organizations.plan, 'enterprise'), isNull(organizations.deleted_at)));
+      .where(payingCondition);
 
-    // Get trialing team metrics
-    // (plan = 'teams', created within 30 days, has members, no seats purchase)
-    const trialingTeamMetrics = await db
-      .select({
-        orgCount: count(sql`DISTINCT ${organizations.id}`),
-        memberCount: count(organization_memberships.id),
-      })
+    const [teamsResult] = await db
+      .select({ orgCount: count() })
       .from(organizations)
-      .innerJoin(
-        organization_memberships,
-        eq(organizations.id, organization_memberships.organization_id)
-      )
-      .where(
-        and(
-          eq(organizations.plan, 'teams'),
-          isNull(organizations.deleted_at),
-          sql`NOT EXISTS (
-            SELECT 1 FROM ${organization_seats_purchases}
-            WHERE ${organization_seats_purchases.organization_id} = ${organizations.id}
-          )`
-        )
-      );
+      .where(and(payingCondition, eq(organizations.plan, 'teams')));
 
-    // Get trialing enterprise metrics
-    // (plan = 'enterprise', created within 30 days, has members, no seats purchase)
-    const trialingEnterpriseMetrics = await db
-      .select({
-        orgCount: count(sql`DISTINCT ${organizations.id}`),
-        memberCount: count(organization_memberships.id),
-      })
+    const [enterpriseResult] = await db
+      .select({ orgCount: count() })
       .from(organizations)
-      .innerJoin(
-        organization_memberships,
-        eq(organizations.id, organization_memberships.organization_id)
-      )
-      .where(
-        and(
-          eq(organizations.plan, 'enterprise'),
-          isNull(organizations.deleted_at),
-          sql`NOT EXISTS (
-            SELECT 1 FROM ${organization_seats_purchases}
-            WHERE ${organization_seats_purchases.organization_id} = ${organizations.id}
-          )`
-        )
-      );
+      .where(and(payingCondition, eq(organizations.plan, 'enterprise')));
+
+    const [seatsResult] = await db
+      .select({ totalSeats: sql<number>`COALESCE(SUM(${organizations.seat_count}), 0)::int` })
+      .from(organizations)
+      .where(payingCondition);
 
     return {
-      teamCount: teamMetrics[0]?.orgCount ?? 0,
-      teamMemberCount: teamMetrics[0]?.memberCount ?? 0,
-      enterpriseCount: enterpriseMetrics[0]?.orgCount ?? 0,
-      enterpriseMemberCount: enterpriseMetrics[0]?.memberCount ?? 0,
-      trialingTeamCount: trialingTeamMetrics[0]?.orgCount ?? 0,
-      trialingTeamMemberCount: trialingTeamMetrics[0]?.memberCount ?? 0,
-      trialingEnterpriseCount: trialingEnterpriseMetrics[0]?.orgCount ?? 0,
-      trialingEnterpriseMemberCount: trialingEnterpriseMetrics[0]?.memberCount ?? 0,
+      activeOrgCount: activeResult?.orgCount ?? 0,
+      teamsCount: teamsResult?.orgCount ?? 0,
+      enterpriseCount: enterpriseResult?.orgCount ?? 0,
+      totalSeats: seatsResult?.totalSeats ?? 0,
     };
   }),
 
@@ -587,7 +530,7 @@ export const organizationAdminRouter = createTRPCRouter({
     .input(OrganizationListInputSchema)
     .output(OrganizationsApiGetResponseSchema)
     .query(async ({ input }) => {
-      const { page, limit, sortBy, sortOrder, search, seatsRequired, hasBalance, status, plan } =
+      const { page, limit, sortBy, sortOrder, search, mode, include_deleted, stripe_status, plan } =
         input;
 
       const searchTerm = search.trim();
@@ -608,43 +551,14 @@ export const organizationAdminRouter = createTRPCRouter({
         conditions.push(or(...searchConditions));
       }
 
-      if (seatsRequired === 'true') {
-        conditions.push(eq(organizations.require_seats, true));
-      } else if (seatsRequired === 'false') {
-        conditions.push(eq(organizations.require_seats, false));
-      }
-
-      if (hasBalance === 'true') {
-        conditions.push(
-          gt(organizations.total_microdollars_acquired, organizations.microdollars_used)
-        );
-      } else if (hasBalance === 'false') {
-        conditions.push(
-          eq(organizations.total_microdollars_acquired, organizations.microdollars_used)
-        );
-      }
-
       if (plan === 'enterprise') {
         conditions.push(eq(organizations.plan, 'enterprise'));
       } else if (plan === 'teams') {
         conditions.push(eq(organizations.plan, 'teams'));
       }
 
-      // Handle status-based filtering
-      if (status === 'deleted') {
-        conditions.push(isNotNull(organizations.deleted_at));
-      } else if (status === 'incomplete') {
-        // For incomplete: require_seats = true, not deleted (subscription check done later)
-        conditions.push(eq(organizations.require_seats, true));
-        conditions.push(isNull(organizations.deleted_at));
-      } else if (status === 'active') {
-        // For active: not deleted (subscription check done later)
-        conditions.push(isNull(organizations.deleted_at));
-      } else if (status === 'all') {
-        // For all: no deleted_at filter - show both active and deleted
-        // Don't add any deleted_at condition
-      } else {
-        // Default to active if no status specified
+      // Deleted filter: unless include_deleted is true, hide soft-deleted orgs
+      if (!include_deleted) {
         conditions.push(isNull(organizations.deleted_at));
       }
 
@@ -662,18 +576,18 @@ export const organizationAdminRouter = createTRPCRouter({
         orderCondition = orderFunction(organizations[sortField]);
       }
 
-      // Subquery to get the latest active subscription per organization
+      // Subquery to get the latest subscription per organization (any status)
       const latestSubscriptions = db
         .select({
           organization_id: organization_seats_purchases.organization_id,
           amount_usd: organization_seats_purchases.amount_usd,
+          subscription_status: organization_seats_purchases.subscription_status,
           row_num:
             sql<number>`ROW_NUMBER() OVER (PARTITION BY ${organization_seats_purchases.organization_id} ORDER BY ${organization_seats_purchases.created_at} DESC)`.as(
               'row_num'
             ),
         })
         .from(organization_seats_purchases)
-        .where(eq(organization_seats_purchases.subscription_status, 'active'))
         .as('latest_subscriptions');
 
       const organizationFields = {
@@ -691,14 +605,23 @@ export const organizationAdminRouter = createTRPCRouter({
         seat_count: organizations.seat_count,
         require_seats: organizations.require_seats,
         created_by_kilo_user_id: organizations.created_by_kilo_user_id,
-        created_by_user_email: kilocode_users.google_user_email,
-        created_by_user_name: kilocode_users.google_user_name,
         deleted_at: organizations.deleted_at,
         sso_domain: organizations.sso_domain,
         plan: organizations.plan,
         free_trial_end_at: organizations.free_trial_end_at,
         company_domain: organizations.company_domain,
         subscription_amount_usd: latestSubscriptions.amount_usd,
+        latest_stripe_status: latestSubscriptions.subscription_status,
+        kilo_pass_tier: sql<
+          string | null
+        >`(SELECT kps.tier FROM organization_memberships om2 JOIN kilo_pass_subscriptions kps ON kps.kilo_user_id = om2.kilo_user_id WHERE om2.organization_id = ${organizations.id} AND kps.status = 'active' LIMIT 1)`.as(
+          'kilo_pass_tier'
+        ),
+        kiloclaw_count: sql<
+          number
+        >`(SELECT COUNT(*) FROM kiloclaw_instances ki WHERE ki.organization_id = ${organizations.id} AND ki.destroyed_at IS NULL)::int`.as(
+          'kiloclaw_count'
+        ),
       };
 
       // Build base query without status-specific joins
@@ -709,7 +632,6 @@ export const organizationAdminRouter = createTRPCRouter({
           organization_memberships,
           eq(organizations.id, organization_memberships.organization_id)
         )
-        .leftJoin(kilocode_users, eq(organizations.created_by_kilo_user_id, kilocode_users.id))
         .leftJoin(
           latestSubscriptions,
           and(
@@ -718,34 +640,31 @@ export const organizationAdminRouter = createTRPCRouter({
           )
         );
 
-      // Add status-specific conditions using subqueries
+      // Add mode-based and stripe_status conditions
       const statusConditions = whereCondition ? [whereCondition] : [];
 
-      if (status === 'incomplete') {
-        // Incomplete: require_seats = true AND no active subscription
-        statusConditions.push(eq(organizations.require_seats, true));
+      if (mode === 'paying') {
+        // Paying: has at least one seats purchase record (active or churned customers)
+        statusConditions.push(
+          sql`EXISTS (
+            SELECT 1 FROM ${organization_seats_purchases}
+            WHERE ${organization_seats_purchases.organization_id} = ${organizations.id}
+          )`
+        );
+      } else if (mode === 'trial') {
+        // Trial: has never had a seats purchase
         statusConditions.push(
           sql`NOT EXISTS (
             SELECT 1 FROM ${organization_seats_purchases}
             WHERE ${organization_seats_purchases.organization_id} = ${organizations.id}
-            AND ${organization_seats_purchases.subscription_status} = 'active'
           )`
         );
-      } else if (status === 'active' || !status) {
-        // Active: require_seats = false OR has active subscription
-        statusConditions.push(
-          sql`(
-            ${organizations.require_seats} = false OR
-            EXISTS (
-              SELECT 1 FROM ${organization_seats_purchases}
-              WHERE ${organization_seats_purchases.organization_id} = ${organizations.id}
-              AND ${organization_seats_purchases.subscription_status} = 'active'
-            )
-          )`
-        );
-      } else if (status === 'all') {
-        // All: no additional subscription-based filtering
-        // Don't add any subscription conditions
+      }
+      // mode === 'all': no subscription filter
+
+      // Filter by Stripe subscription status (latest subscription for this org)
+      if (stripe_status) {
+        statusConditions.push(sql`${latestSubscriptions.subscription_status} = ${stripe_status}`);
       }
 
       const finalWhereCondition =
@@ -754,7 +673,11 @@ export const organizationAdminRouter = createTRPCRouter({
       // Execute main query with pagination
       const filteredOrganizations = await baseQuery
         .where(finalWhereCondition)
-        .groupBy(organizations.id, kilocode_users.id, latestSubscriptions.amount_usd)
+        .groupBy(
+          organizations.id,
+          latestSubscriptions.amount_usd,
+          latestSubscriptions.subscription_status
+        )
         .orderBy(orderCondition)
         .limit(limit)
         .offset((page - 1) * limit);

@@ -1,5 +1,5 @@
 'use client';
-import { Users } from 'lucide-react';
+import { AlertTriangle, Users } from 'lucide-react';
 import { useTRPC } from '@/lib/trpc/utils';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -45,6 +45,13 @@ export function OrgActiveKiloclawsCard({ organizationId }: Props) {
             <Skeleton className="h-8 w-full" />
             <Skeleton className="h-8 w-full" />
             <Skeleton className="h-8 w-4/5" />
+          </div>
+        ) : isError ? (
+          <div className="flex items-start gap-3 px-4 pb-4 pt-2 text-sm">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-red-400" />
+            <p className="text-muted-foreground">
+              Unable to load active KiloClaw instances. Please try again later.
+            </p>
           </div>
         ) : activeEmails.length === 0 ? (
           <p className="text-muted-foreground px-4 pb-4 pt-2 text-sm">

@@ -14,6 +14,7 @@ import {
   listProposalEvidence,
   markProposalOpeningChangeRequest,
   recordFeedbackEvent,
+  updateReviewMemoryProposal,
   upsertFeedbackSubject,
   upsertReviewMemoryProposal,
 } from './db';
@@ -209,5 +210,47 @@ describe('review memory db helpers', () => {
 
     expect(opening?.status).toBe('opening_change_request');
     expect(duplicateOpening).toBeNull();
+  });
+
+  it('does not edit proposals in non-actionable states', async () => {
+    const user = await insertTestUser();
+    const owner = { type: 'user' as const, id: user.id };
+    const proposal = await upsertReviewMemoryProposal({
+      owner,
+      platform: 'github',
+      repoFullName: 'owner/repo',
+      proposalType: 'clarify',
+      scopeKind: 'repository',
+      title: 'Clarify noisy guidance',
+      rationale: 'Maintainers corrected the same guidance.',
+      proposedMarkdown: '### Review guidance: Clarify noisy guidance',
+      dedupeKey: 'clarify-noisy-guidance-edit-blocked',
+    });
+    const opening = await markProposalOpeningChangeRequest({
+      owner,
+      proposalId: proposal.id,
+      approvedByUserId: user.id,
+      changeRequestType: 'github_pr',
+      branchName: 'kilo/review-memory/test',
+    });
+
+    const edited = await updateReviewMemoryProposal({
+      owner,
+      proposalId: proposal.id,
+      editedByUserId: user.id,
+      title: 'Edited title',
+      rationale: 'Edited rationale',
+      proposedMarkdown: '### Edited guidance',
+      scopeKind: 'repository',
+    });
+    const [stored] = await db
+      .select()
+      .from(code_review_memory_proposals)
+      .where(eq(code_review_memory_proposals.id, proposal.id));
+
+    expect(opening?.status).toBe('opening_change_request');
+    expect(edited).toBeNull();
+    expect(stored.title).toBe('Clarify noisy guidance');
+    expect(stored.status).toBe('opening_change_request');
   });
 });

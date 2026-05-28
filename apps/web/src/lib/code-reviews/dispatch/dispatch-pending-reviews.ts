@@ -342,10 +342,47 @@ export async function tryDispatchPendingReviews(
               `Dispatch failed: ${getCodeReviewActionRequiredCopy(actionRequiredReason).description}`,
               actionRequiredReason
             );
-            await finalizeActionRequiredGateCheck(reservation.review, actionRequiredReason);
           } catch (updateError) {
             errorExceptInTest(
               '[tryDispatchPendingReviews] Failed to mark review as action-required',
+              {
+                reviewId: reservation.review.id,
+                updateError,
+              }
+            );
+            try {
+              const released = await releaseQueuedReviewClaim(
+                reservation.review.id,
+                reservation.dispatchReservationId
+              );
+              logExceptInTest(
+                '[tryDispatchPendingReviews] Released action-required review reservation',
+                {
+                  reviewId: reservation.review.id,
+                  released,
+                }
+              );
+            } catch (releaseError) {
+              errorExceptInTest(
+                '[tryDispatchPendingReviews] Failed to release action-required review reservation',
+                {
+                  reviewId: reservation.review.id,
+                  releaseError,
+                }
+              );
+              captureException(releaseError, {
+                tags: { operation: 'release-action-required-review-reservation' },
+                extra: { reviewId: reservation.review.id, owner },
+              });
+            }
+            continue;
+          }
+
+          try {
+            await finalizeActionRequiredGateCheck(reservation.review, actionRequiredReason);
+          } catch (updateError) {
+            errorExceptInTest(
+              '[tryDispatchPendingReviews] Failed to finalize action-required check run',
               {
                 reviewId: reservation.review.id,
                 updateError,

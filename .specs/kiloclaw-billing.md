@@ -30,6 +30,7 @@ Updated 2026-04-16 -- successor subscription rows on personal reprovision.
 Updated 2026-05-10 -- price-versioned legacy and current pricing.
 Updated 2026-05-12 -- retired current Standard first-month discount.
 Updated 2026-05-18 -- organization hard-expiry suspension and recovery contract.
+Updated 2026-05-28 -- exceptional personal Stripe EFW cancellation and suspension contract.
 
 ## Conventions
 
@@ -91,6 +92,10 @@ capitals, as shown here.
   the pre-increase KiloClaw prices.
 - **Current pricing**: The default price version for fresh subscription
   rows created after the price-increase rollout.
+- **Fraud-enforcement cancellation**: Exceptional immediate personal
+  subscription cancellation and suspension required when a personal
+  Stripe payment is enforced under `.specs/stripe-early-fraud-warnings.md`.
+  It is not a user cancellation or ordinary payment-dunning transition.
 
 ## Overview
 
@@ -831,6 +836,15 @@ rows renew.
     price version. Re-enrollment after final cancellation MUST follow
     Pricing Versions and Legacy Lineages rule 9.
 
+### Fraud-Enforcement Cancellation Exception
+
+1. The ordinary period-end continuation rule in Cancellation and Reactivation rule 4 MUST NOT apply when a canonical personal Stripe payment is enforced under `.specs/stripe-early-fraud-warnings.md`.
+2. Fraud enforcement MUST immediately cancel renewal for every current personal KiloClaw subscription belonging to the contained user, including Stripe-funded, hybrid, and pure-credit renewal state. Any Stripe-backed cancellation MUST leave local billing state reconciled with the provider outcome.
+3. Fraud enforcement MUST stop or suspend affected personal compute promptly, transition the affected subscription into non-access-granting canceled/suspended state, and assign a fresh destruction deadline 7 days after suspension.
+4. Fraud enforcement MUST preserve the seven-day destruction grace and MUST NOT destroy instance data immediately. Remediation during that interval is an audited admin/support path, not automatic payment recovery.
+5. Every fraud-enforcement mutation MUST be captured in append-only subscription change history with a non-sensitive fraud-enforcement reason and a system actor.
+6. This exception MUST NOT apply to organization-managed KiloClaw subscriptions or instances based solely on an organization-owned EFW; organization warnings remain review-only under the EFW spec.
+
 ### Billing Lifecycle Background Job
 
 1. The background job MUST be protected by an authorization secret;
@@ -1324,6 +1338,11 @@ rows renew.
    requirements on credit transaction records.
 
 ### Changelog
+
+#### 2026-05-28 -- Personal Stripe EFW fraud-enforcement exception
+
+- Defined fraud enforcement as an exceptional immediate cancellation/suspension path for personal KiloClaw subscriptions rather than ordinary period-end cancellation.
+- Preserved append-only change history and the fresh seven-day destruction grace while excluding organization-owned EFWs from automatic KiloClaw action.
 
 #### 2026-05-18 -- Organization hard-expiry suspension contract
 

@@ -17,6 +17,7 @@ Draft -- created 2026-04-21 as `.specs/kiloclaw-referrals.md` for KiloClaw refer
 Updated 2026-05-06 -- require Impact Advocate reward redemption after local KiloClaw reward application.
 Updated 2026-05-12 -- note price-versioned KiloClaw billing preserves referral semantics.
 Updated 2026-05-22 -- renamed to `.specs/impact-referrals.md` and expanded to Kilo Pass referrals.
+Updated 2026-05-28 -- classify enforced Stripe EFW refunds as adverse payments.
 
 ## Conventions
 
@@ -73,6 +74,9 @@ BCP 14 [RFC 2119] [RFC 8174] keywords apply only when they appear in all capital
 - **Chargeback**: Stripe dispute event for the qualifying Stripe payment.
 - **Fraud-marked payment**: Qualifying payment marked fraudulent by Stripe, an internal fraud process, or an authorized
   operator.
+- **Enforced EFW refund**: Refund of a qualifying personal Stripe payment performed under
+  `.specs/stripe-early-fraud-warnings.md` after a new Stripe Early Fraud Warning; it is an adverse payment even when no
+  later chargeback is created.
 - **Support review**: Durable `review_required` reward state with triggering reason, affected billing period, and source
   payment or dispute recorded. Kilo team review is required before an already-applied reward can be canceled, clawed
   back, or otherwise adjusted.
@@ -625,18 +629,22 @@ conversion, local referral rewards are authoritative and affiliate SALE reportin
 
 ### Refunds, Reversals, and Fraud
 
-159. Rewards from a qualifying Stripe payment MUST be canceled if Stripe reports a chargeback for that payment.
+159. Rewards from a qualifying Stripe payment MUST be treated as adverse when Stripe reports a chargeback or when
+     Kilo enforces an EFW refund for that payment.
 
 160. Pending or earned-but-unapplied rewards MUST be canceled when the qualifying Stripe payment is charged back,
-     refunded, or fraud-marked.
+     refunded, fraud-marked, or refunded as part of enforced EFW handling. This rule applies to both KiloClaw and Kilo
+     Pass qualifying payments.
 
-161. Already-applied rewards from a charged-back, refunded, or fraud-marked payment MUST be marked for support review
-     and MUST NOT be automatically canceled or clawed back.
+161. Already-applied rewards from a charged-back, refunded, fraud-marked, or EFW-refunded payment MUST be marked for
+     support review and MUST NOT be automatically canceled or clawed back.
 
-162. If a qualifying Impact action must be reversed, the system SHOULD use Impact's reverse-action mechanism instead of
-     creating an unrelated negative conversion.
+162. If a qualifying Impact action must be reversed, including after an enforced EFW refund that prevents a later
+     chargeback event, the system SHOULD use Impact's reverse-action mechanism instead of creating an unrelated negative
+     conversion.
 
-163. Reversal and reward-cancellation handling MUST be idempotent.
+163. Reversal and reward-cancellation handling MUST be idempotent across EFW refund, ordinary refund, fraud marking, and
+     later chargeback delivery for the same qualifying payment.
 
 ### GDPR and PII
 
@@ -714,6 +722,10 @@ conversion, local referral rewards are authoritative and affiliate SALE reportin
     retry unchanged payloads, except an already-redeemed response MAY be treated as idempotent success.
 
 ## Changelog
+
+### 2026-05-28 -- Enforced EFW refunds are adverse payments
+
+Classified an enforced Stripe Early Fraud Warning refund as an adverse qualifying payment for both covered products. Pending or earned-but-unapplied rewards cancel, already-applied rewards require support review, and later refund or chargeback delivery must remain idempotent.
 
 ### 2026-05-22 -- Rename and expand to Kilo Pass
 

@@ -78,6 +78,7 @@ import {
   impact_conversion_reports,
   github_branch_pull_requests,
   model_eval_ingestions,
+  stripe_early_fraud_warning_cases,
 } from '@kilocode/db/schema';
 import { eq, and, inArray, isNotNull, isNull, sql, or, gte, count } from 'drizzle-orm';
 import { allow_fake_login, IS_DEVELOPMENT } from '@/lib/constants';
@@ -789,7 +790,9 @@ export class SoftDeletePreconditionError extends Error {
  * - kiloclaw_scheduled_action_targets (retained operational records;
  * - transactional_email_log (retained outbox marker, financial record;
  *   user_id FK references the anonymized kilocode_users row and optional
- *   organization_id references the organization — no direct PII)
+ *   organization_id references the organization -- no direct PII)
+ * - stripe_early_fraud_warning_cases/actions (retained enforcement and
+ *   financial audit history; case user ownership link is nulled)
  *
  * What is scrubbed/deleted:
  * - PII on the user row (email, name, avatar, urls)
@@ -809,6 +812,7 @@ export class SoftDeletePreconditionError extends Error {
  * - payment_methods (soft-deleted, address/name/IP fields nulled)
  * - App Store account token and retained Kilo Pass store purchase/event token fields
  * - user_feedback / app_builder_feedback / free_model_usage (FK nulled)
+ * - stripe_early_fraud_warning_cases direct user ownership link (FK nulled)
  * - Various user-owned resources (platform_integrations, byok_api_keys,
  *   agent_configs, webhook_events, code_indexing_*, source_embeddings,
  *   cloud_agent_webhook_triggers, agent_environment_profiles,
@@ -1256,6 +1260,10 @@ export async function softDeleteUser(userId: string) {
       .update(free_model_usage)
       .set({ kilo_user_id: null })
       .where(eq(free_model_usage.kilo_user_id, userId));
+    await tx
+      .update(stripe_early_fraud_warning_cases)
+      .set({ kilo_user_id: null })
+      .where(eq(stripe_early_fraud_warning_cases.kilo_user_id, userId));
     await tx
       .update(security_advisor_scans)
       .set({ kilo_user_id: 'deleted', public_ip: null })

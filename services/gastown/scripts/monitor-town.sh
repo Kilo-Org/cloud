@@ -2,7 +2,9 @@
 # Continuously monitor a town's state via the debug endpoint.
 # Usage: ./scripts/monitor-town.sh [townId] [interval_seconds]
 #
-# Requires Cloudflare Access service token credentials:
+# Requires Cloudflare Access credentials. Prefer an interactive JWT:
+#   export CF_ACCESS_TOKEN="$(cloudflared access login --no-verbose https://gastown.kiloapps.io/debug/login)"
+# Or use service token credentials:
 #   export CF_ACCESS_CLIENT_ID="<service-token-client-id>"
 #   export CF_ACCESS_CLIENT_SECRET="<service-token-client-secret>"
 
@@ -11,9 +13,9 @@ INTERVAL="${2:-15}"
 BASE_URL="${GASTOWN_URL:-https://gastown.kiloapps.io}"
 URL="${BASE_URL}/debug/towns/${TOWN_ID}/status"
 
-if [ -z "$CF_ACCESS_CLIENT_ID" ] || [ -z "$CF_ACCESS_CLIENT_SECRET" ]; then
-  echo "Error: CF_ACCESS_CLIENT_ID and CF_ACCESS_CLIENT_SECRET must be set"
-  echo "These are the Cloudflare Access service token credentials."
+if [ -z "${CF_ACCESS_TOKEN:-}" ] && { [ -z "${CF_ACCESS_CLIENT_ID:-}" ] || [ -z "${CF_ACCESS_CLIENT_SECRET:-}" ]; }; then
+  echo "Error: CF_ACCESS_TOKEN or CF_ACCESS_CLIENT_ID/CF_ACCESS_CLIENT_SECRET must be set"
+  echo "Run: export CF_ACCESS_TOKEN=\"\$(cloudflared access login --no-verbose https://gastown.kiloapps.io/debug/login)\""
   exit 1
 fi
 
@@ -23,10 +25,16 @@ echo "Press Ctrl+C to stop"
 echo "=========================================="
 
 while true; do
-  RESP=$(curl -s --max-time 10 \
-    -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
-    -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
-    "${URL}" 2>/dev/null)
+  if [ -n "${CF_ACCESS_TOKEN:-}" ]; then
+    RESP=$(curl -s --max-time 10 \
+      -H "cf-access-token: $CF_ACCESS_TOKEN" \
+      "${URL}" 2>/dev/null)
+  else
+    RESP=$(curl -s --max-time 10 \
+      -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
+      -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
+      "${URL}" 2>/dev/null)
+  fi
   if [ -z "$RESP" ]; then
     echo "$(date -u +%H:%M:%S)  [ERROR] No response from ${URL}"
     sleep "$INTERVAL"

@@ -1613,6 +1613,10 @@ export class TownDO extends DurableObject<Env> {
   // ── Agent Events (delegated to AgentDO) ───────────────────────────
 
   async appendAgentEvent(agentId: string, eventType: string, data: unknown): Promise<number> {
+    agents.touchAgent(this.sql, agentId, {
+      lastEventType: eventType,
+      lastEventAt: new Date().toISOString(),
+    });
     const agentDO = getAgentDOStub(this.env, agentId);
     return agentDO.appendEvent(eventType, data);
   }
@@ -1735,6 +1739,10 @@ export class TownDO extends DurableObject<Env> {
   }
 
   async updateAgentStatusMessage(agentId: string, message: string): Promise<void> {
+    agents.touchAgent(this.sql, agentId, {
+      lastEventType: 'agent_status',
+      lastEventAt: new Date().toISOString(),
+    });
     agents.updateAgentStatusMessage(this.sql, agentId, message);
     const agent = agents.getAgent(this.sql, agentId);
     if (agent?.current_hook_bead_id) {

@@ -23,6 +23,10 @@ const CONTAINER_INSTANCE_ID = crypto.randomUUID();
  * which forwards them to the Rig DO to update `last_activity_at`.
  */
 export function startHeartbeat(apiUrl: string, token: string): void {
+  if (heartbeatTimer && gastownApiUrl === apiUrl && sessionToken === token) {
+    return;
+  }
+
   gastownApiUrl = apiUrl;
   sessionToken = token;
 

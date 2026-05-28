@@ -139,14 +139,17 @@ describe('spawnCloudAgentSession', () => {
 
   it('adds separate PR strategy guidance when preparing a requested GitHub session', async () => {
     await spawnCloudAgentSession(
-      { githubRepo: 'owner/repo', prompt: 'Update REVIEW.md', mode: 'code' },
+      {
+        githubRepo: 'owner/repo',
+        githubPullRequestStrategy: 'separate_pull_request',
+        prompt: 'Update REVIEW.md',
+        mode: 'code',
+      },
       'model',
       platformIntegration,
       'auth-token',
       'ticket-user',
-      'request-3',
-      undefined,
-      { useSeparatePullRequestStrategy: true }
+      'request-3'
     );
 
     const prepareInput = mockPrepareSession.mock.calls[0]?.[0];
@@ -162,6 +165,34 @@ describe('spawnCloudAgentSession', () => {
     );
   });
 
+  it('adds current PR branch guidance when preparing a current-branch GitHub session', async () => {
+    await spawnCloudAgentSession(
+      {
+        githubRepo: 'owner/repo',
+        githubPullRequestStrategy: 'current_pr_branch',
+        prompt: 'Update REVIEW.md',
+        mode: 'code',
+      },
+      'model',
+      platformIntegration,
+      'auth-token',
+      'ticket-user',
+      'request-4'
+    );
+
+    const prepareInput = mockPrepareSession.mock.calls[0]?.[0];
+    expect(prepareInput).toEqual(
+      expect.objectContaining({
+        prompt: expect.stringContaining('Work on the current PR head branch'),
+      })
+    );
+    expect(prepareInput).toEqual(
+      expect.objectContaining({
+        prompt: expect.not.stringContaining('create a fresh branch'),
+      })
+    );
+  });
+
   it('leaves the prompt unchanged when separate PR strategy is not requested', async () => {
     await spawnCloudAgentSession(
       { githubRepo: 'owner/repo', prompt: 'Update REVIEW.md', mode: 'code' },
@@ -169,7 +200,7 @@ describe('spawnCloudAgentSession', () => {
       platformIntegration,
       'auth-token',
       'ticket-user',
-      'request-4'
+      'request-5'
     );
 
     const prepareInput = mockPrepareSession.mock.calls[0]?.[0];

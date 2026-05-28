@@ -37,6 +37,12 @@ const SEPARATE_PULL_REQUEST_STRATEGY_INSTRUCTION = `
 **Required GitHub PR strategy:**
 The user explicitly requested a separate new PR. You must create a fresh branch from the original PR's base branch, open a separate new GitHub PR targeting that same base branch, and must not push to or modify the current PR's head branch.`;
 
+const CURRENT_PULL_REQUEST_BRANCH_STRATEGY_INSTRUCTION = `
+
+---
+**Required GitHub PR strategy:**
+Work on the current PR head branch for this task and do not open a separate GitHub PR.`;
+
 /**
  * Derive a per-request callback token so the dedicated callback HMAC secret
  * is never stored in session metadata (which is visible via getSession).
@@ -70,6 +76,12 @@ export const spawnCloudAgentInputSchema = z.object({
     .regex(/^[-a-zA-Z0-9_.]+\/[-a-zA-Z0-9_.]+$/)
     .describe('The GitHub repository in owner/repo format (e.g., "facebook/react")')
     .optional(),
+  githubPullRequestStrategy: z
+    .enum(['current_pr_branch', 'separate_pull_request'])
+    .describe(
+      'For GitHub PR or review-thread work only. Select "separate_pull_request" when the user asks for a new, fresh, separate, or different PR. Select "current_pr_branch" when the user wants the current PR updated or does not ask for a separate PR.'
+    )
+    .optional(),
   gitlabProject: z
     .string()
     .regex(/^[-a-zA-Z0-9_.]+(?:\/[-a-zA-Z0-9_.]+)+$/)
@@ -80,7 +92,7 @@ export const spawnCloudAgentInputSchema = z.object({
   prompt: z
     .string()
     .describe(
-      'The task description for the Cloud Agent. Be specific about what changes or analysis you want.'
+      'The task description for the Cloud Agent. Be specific about what changes or analysis you want. Cloud Agent does not see bot-only GitHub PR/review-thread context unless you include it here. For GitHub PR or review-thread work, include the PR URL or number, relevant review-thread/comment details, and the chosen current-PR or separate-PR strategy.'
     ),
   mode: z
     .enum(['code', 'ask'])
@@ -109,7 +121,6 @@ export default async function spawnCloudAgentSession(
     chatPlatform?: string;
     currentStep?: number;
     attachments?: CloudAgentAttachments;
-    useSeparatePullRequestStrategy?: boolean;
   }
 ): Promise<SpawnCloudAgentResult> {
   console.log('[KiloBot] spawnCloudAgentSession called with args:', JSON.stringify(args, null, 2));
@@ -140,8 +151,10 @@ export default async function spawnCloudAgentSession(
 
   let prompt = args.prompt;
 
-  if (options?.useSeparatePullRequestStrategy && args.githubRepo) {
+  if (args.githubPullRequestStrategy === 'separate_pull_request' && args.githubRepo) {
     prompt += SEPARATE_PULL_REQUEST_STRATEGY_INSTRUCTION;
+  } else if (args.githubPullRequestStrategy === 'current_pr_branch' && args.githubRepo) {
+    prompt += CURRENT_PULL_REQUEST_BRANCH_STRATEGY_INSTRUCTION;
   }
 
   // Append PR/MR signature to the prompt if available

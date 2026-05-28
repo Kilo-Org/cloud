@@ -59,7 +59,6 @@ type RunBotAgentParams = {
   prompt: string;
   /** Pre-uploaded supported attachments from the user's message (already in R2). */
   attachments?: CloudAgentAttachments;
-  useSeparatePullRequestStrategy?: boolean;
   completedStepCount?: number;
   initialSteps?: BotRequestStep[];
   onSessionReady?: (params: {
@@ -269,6 +268,8 @@ export async function runBotAgent(params: RunBotAgentParams): Promise<BotAgentCo
 
 If the user attached images or files (PDF, Markdown, text, CSV) to their message, those attachments are automatically forwarded to the Cloud Agent session — you do not need to describe or re-upload them. Reference them in the prompt if relevant (e.g. "implement the design shown in the attached screenshot" or "use the requirements in the attached document").
 
+For GitHub PR or review-thread work, Cloud Agent only sees the prompt you pass to this tool. Include the PR URL or number, relevant review-thread/comment details, and whether Cloud Agent should update the current PR branch or create a separate new PR.
+
 This tool returns an acknowledgement immediately. The final Cloud Agent result will be posted later in the same thread after the async session completes.`,
         inputSchema: spawnCloudAgentInputSchema,
         execute: async args => {
@@ -309,7 +310,6 @@ This tool returns an acknowledgement immediately. The final Cloud Agent result w
               chatPlatform,
               currentStep,
               attachments: params.attachments,
-              useSeparatePullRequestStrategy: params.useSeparatePullRequestStrategy,
             }
           );
 

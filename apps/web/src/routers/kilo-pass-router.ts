@@ -722,7 +722,7 @@ async function buildEndedKiloPassSubscriptionState(params: {
 const GetCheckoutReturnStateOutputSchema = z.object({
   subscription: KiloPassSubscriptionStateBaseSchema.nullable(),
   creditsAwarded: z.boolean(),
-  welcomePromoIneligibleDueToReusedCard: z.boolean(),
+  welcomePromoIneligibleDueToReusedFingerprint: z.boolean(),
 });
 
 const CreateCheckoutSessionInputSchema = z.object({
@@ -938,7 +938,7 @@ export const kiloPassRouter = createTRPCRouter({
    * we've issued the initial base credits for that subscription.
    */
   getCheckoutReturnState: baseProcedure
-    .input(z.object({ sessionId: z.string().min(1).optional() }).optional())
+    .input(z.object({ sessionId: z.string().min(1) }))
     .output(GetCheckoutReturnStateOutputSchema)
     .query(async ({ ctx, input }) => {
       const subscription = await getKiloPassStateForUser(db, ctx.user.id);
@@ -946,39 +946,35 @@ export const kiloPassRouter = createTRPCRouter({
         return {
           subscription: null,
           creditsAwarded: false,
-          welcomePromoIneligibleDueToReusedCard: false,
+          welcomePromoIneligibleDueToReusedFingerprint: false,
         };
       }
 
-      let targetSubscriptionId = subscription.subscriptionId;
-      if (input?.sessionId) {
-        const checkoutSession = await stripe.checkout.sessions.retrieve(input.sessionId);
-        const stripeSubscription = checkoutSession.subscription;
-        const stripeSubscriptionId =
-          typeof stripeSubscription === 'string' ? stripeSubscription : stripeSubscription?.id;
-        if (!stripeSubscriptionId) {
-          return {
-            subscription: null,
-            creditsAwarded: false,
-            welcomePromoIneligibleDueToReusedCard: false,
-          };
-        }
+      const checkoutSession = await stripe.checkout.sessions.retrieve(input.sessionId);
+      const stripeSubscription = checkoutSession.subscription;
+      const stripeSubscriptionId =
+        typeof stripeSubscription === 'string' ? stripeSubscription : stripeSubscription?.id;
+      if (!stripeSubscriptionId) {
+        return {
+          subscription: null,
+          creditsAwarded: false,
+          welcomePromoIneligibleDueToReusedFingerprint: false,
+        };
+      }
 
-        const settledSubscription = await db.query.kilo_pass_subscriptions.findFirst({
-          columns: { id: true },
-          where: and(
-            eq(kilo_pass_subscriptions.kilo_user_id, ctx.user.id),
-            eq(kilo_pass_subscriptions.stripe_subscription_id, stripeSubscriptionId)
-          ),
-        });
-        if (!settledSubscription) {
-          return {
-            subscription: null,
-            creditsAwarded: false,
-            welcomePromoIneligibleDueToReusedCard: false,
-          };
-        }
-        targetSubscriptionId = settledSubscription.id;
+      const settledSubscription = await db.query.kilo_pass_subscriptions.findFirst({
+        columns: { id: true },
+        where: and(
+          eq(kilo_pass_subscriptions.kilo_user_id, ctx.user.id),
+          eq(kilo_pass_subscriptions.stripe_subscription_id, stripeSubscriptionId)
+        ),
+      });
+      if (!settledSubscription) {
+        return {
+          subscription: null,
+          creditsAwarded: false,
+          welcomePromoIneligibleDueToReusedFingerprint: false,
+        };
       }
 
       const issuedBaseCredits = await db
@@ -994,7 +990,7 @@ export const kiloPassRouter = createTRPCRouter({
         )
         .where(
           and(
-            eq(kilo_pass_issuances.kilo_pass_subscription_id, targetSubscriptionId),
+            eq(kilo_pass_issuances.kilo_pass_subscription_id, settledSubscription.id),
             eq(kilo_pass_issuance_items.kind, KiloPassIssuanceItemKind.Base)
           )
         )
@@ -1004,7 +1000,7 @@ export const kiloPassRouter = createTRPCRouter({
       return {
         subscription,
         creditsAwarded: issuedBaseCredits.length > 0,
-        welcomePromoIneligibleDueToReusedCard:
+        welcomePromoIneligibleDueToReusedFingerprint:
           issuedBaseCredits[0]?.welcomePromoEligibilityReason ===
           KiloPassWelcomePromoEligibilityReason.FingerprintPreviouslyClaimed,
       };

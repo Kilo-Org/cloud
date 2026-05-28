@@ -58,7 +58,7 @@ export function KiloPassAwardingCreditsClient() {
   const [didTimeout, setDidTimeout] = useState(false);
   const [redirectSecondsRemaining, setRedirectSecondsRemaining] = useState<number | null>(null);
 
-  const checkoutSessionId = searchParams.get('session_id') ?? undefined;
+  const checkoutSessionId = searchParams.get('session_id') ?? '';
   const clawHostingPlan = searchParams.get('clawHostingPlan');
   const clawInstanceId = searchParams.get('clawInstanceId');
   const isClawAutoActivation = !!clawHostingPlan;
@@ -92,6 +92,7 @@ export function KiloPassAwardingCreditsClient() {
 
   const query = useQuery({
     ...trpc.kiloPass.getCheckoutReturnState.queryOptions({ sessionId: checkoutSessionId }),
+    enabled: checkoutSessionId.length > 0,
     refetchInterval: query => {
       const data = query.state.data;
       if (didTimeout) return false;
@@ -105,7 +106,7 @@ export function KiloPassAwardingCreditsClient() {
   const isReady = query.data?.creditsAwarded === true;
   const hasSubscription = query.data?.subscription != null;
   const showWelcomePromoIneligibleNotice =
-    query.data?.welcomePromoIneligibleDueToReusedCard === true;
+    query.data?.welcomePromoIneligibleDueToReusedFingerprint === true;
 
   // For KiloClaw auto-activation: advance step when credits are awarded, then enroll
   useEffect(() => {

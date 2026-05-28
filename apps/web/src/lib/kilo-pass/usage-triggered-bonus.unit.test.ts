@@ -61,6 +61,7 @@ describe('usage-triggered-bonus (unit)', () => {
         startedAtIso: '2026-05-20T00:00:00.000Z',
         currentStreakMonths: 1,
         isFirstTimeSubscriberEver: true,
+        requiresSettledPaymentDecision: true,
         welcomePromoEligibilityReason:
           KiloPassWelcomePromoEligibilityReason.FingerprintPreviouslyClaimed,
         issueMonth: '2026-05-01',
@@ -72,22 +73,46 @@ describe('usage-triggered-bonus (unit)', () => {
     });
 
     test.each([
+      null,
       KiloPassWelcomePromoEligibilityReason.NoPositiveSettlement,
       KiloPassWelcomePromoEligibilityReason.SettlementUnresolved,
     ])(
-      'settlement decision %s does not unlock first-month promo',
+      'Stripe settlement decision %s does not unlock first-month promo',
       welcomePromoEligibilityReason => {
         const d = computeUsageTriggeredMonthlyBonusDecision({
           tier: KiloPassTier.Tier19,
           startedAtIso: '2026-05-20T00:00:00.000Z',
           currentStreakMonths: 1,
           isFirstTimeSubscriberEver: true,
+          requiresSettledPaymentDecision: true,
           welcomePromoEligibilityReason,
           issueMonth: '2026-05-01',
         });
 
         expect(d.shouldIssueFirstMonthPromo).toBe(false);
         expect(d.bonusPercentApplied).toBeCloseTo(0.05);
+      }
+    );
+
+    test.each([
+      KiloPassWelcomePromoEligibilityReason.FirstPaymentFingerprintClaim,
+      KiloPassWelcomePromoEligibilityReason.MissingFingerprint,
+      KiloPassWelcomePromoEligibilityReason.NoSupportedFingerprint,
+    ])(
+      'allowed Stripe settlement decision %s retains first-month promo',
+      welcomePromoEligibilityReason => {
+        const d = computeUsageTriggeredMonthlyBonusDecision({
+          tier: KiloPassTier.Tier19,
+          startedAtIso: '2026-05-20T00:00:00.000Z',
+          currentStreakMonths: 1,
+          isFirstTimeSubscriberEver: true,
+          requiresSettledPaymentDecision: true,
+          welcomePromoEligibilityReason,
+          issueMonth: '2026-05-01',
+        });
+
+        expect(d.shouldIssueFirstMonthPromo).toBe(true);
+        expect(d.bonusPercentApplied).toBeCloseTo(0.5);
       }
     );
 

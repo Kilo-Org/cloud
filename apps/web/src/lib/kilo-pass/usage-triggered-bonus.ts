@@ -11,6 +11,7 @@ import {
   KiloPassCadence,
   KiloPassIssuanceItemKind,
   KiloPassIssuanceSource,
+  KiloPassPaymentProvider,
   KiloPassWelcomePromoEligibilityReason,
 } from '@/lib/kilo-pass/enums';
 import {
@@ -43,18 +44,21 @@ export function computeUsageTriggeredMonthlyBonusDecision(params: {
   startedAtIso: string | null;
   currentStreakMonths: number;
   isFirstTimeSubscriberEver: boolean;
+  requiresSettledPaymentDecision?: boolean;
   welcomePromoEligibilityReason?: KiloPassWelcomePromoEligibilityReason | null;
   issueMonth: string;
 }): UsageTriggeredMonthlyBonusDecision {
   const streakMonths = Math.max(1, params.currentStreakMonths);
+  const isAllowedStripeWelcomePromoReason =
+    params.welcomePromoEligibilityReason ===
+      KiloPassWelcomePromoEligibilityReason.FirstPaymentFingerprintClaim ||
+    params.welcomePromoEligibilityReason ===
+      KiloPassWelcomePromoEligibilityReason.MissingFingerprint ||
+    params.welcomePromoEligibilityReason ===
+      KiloPassWelcomePromoEligibilityReason.NoSupportedFingerprint;
   const isEligibleForFirstMonthPromo =
     params.isFirstTimeSubscriberEver &&
-    params.welcomePromoEligibilityReason !==
-      KiloPassWelcomePromoEligibilityReason.FingerprintPreviouslyClaimed &&
-    params.welcomePromoEligibilityReason !==
-      KiloPassWelcomePromoEligibilityReason.NoPositiveSettlement &&
-    params.welcomePromoEligibilityReason !==
-      KiloPassWelcomePromoEligibilityReason.SettlementUnresolved;
+    (params.requiresSettledPaymentDecision ? isAllowedStripeWelcomePromoReason : true);
 
   const bonusPercentApplied = computeMonthlyCadenceBonusPercent({
     tier: params.tier,
@@ -294,6 +298,8 @@ async function maybeIssueBonusFromUsageThreshold(
       startedAtIso: subscription.startedAt,
       currentStreakMonths: subscription.currentStreakMonths,
       isFirstTimeSubscriberEver,
+      requiresSettledPaymentDecision:
+        subscription.paymentProvider === KiloPassPaymentProvider.Stripe,
       welcomePromoEligibilityReason: issuance.welcomePromoEligibilityReason,
       issueMonth: issuance.issueMonth,
     });

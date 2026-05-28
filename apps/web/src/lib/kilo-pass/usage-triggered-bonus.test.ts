@@ -78,7 +78,11 @@ async function seedBaseIssuance(params: {
       issue_month: issueMonth,
       source: KiloPassIssuanceSource.StripeInvoice,
       stripe_invoice_id: stripeInvoiceId,
-      initial_welcome_promo_eligibility_reason: welcomePromoEligibilityReason,
+      initial_welcome_promo_eligibility_reason:
+        welcomePromoEligibilityReason ??
+        (cadence === KiloPassCadence.Monthly
+          ? KiloPassWelcomePromoEligibilityReason.FirstPaymentFingerprintClaim
+          : undefined),
     })
     .returning({ id: kilo_pass_issuances.id });
 

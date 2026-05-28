@@ -575,7 +575,6 @@ describe('reconciler babysit fast-track', () => {
   });
 });
 
-
 describe('polecat prime context force_push_allowed gate', () => {
   it('babysat bead with force_push_allowed: false → resolveForcePushAllowed returns false', () => {
     const meta: Record<string, unknown> = {

@@ -323,7 +323,8 @@ export function useKiloClawMutations() {
     ),
     writeFile: useMutation(
       trpc.kiloclaw.writeFile.mutationOptions({
-        onSuccess: async () => {
+        onSuccess: async result => {
+          if ('outcome' in result) return;
           await queryClient.invalidateQueries({
             queryKey: trpc.kiloclaw.fileTree.queryKey(),
           });

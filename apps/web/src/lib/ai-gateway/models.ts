@@ -37,6 +37,7 @@ import { isGrokModel } from '@/lib/ai-gateway/providers/xai';
 import { isClaudeModel } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { GPT_CURRENT_MODEL_ID, isOpenAiModel } from '@/lib/ai-gateway/providers/openai';
 import { GLM_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/zai';
+import { deepseekDiscountedModels } from '@/lib/ai-gateway/providers/deepseek';
 
 export const PRIMARY_DEFAULT_MODEL = CLAUDE_SONNET_CURRENT_MODEL_ID;
 
@@ -84,6 +85,7 @@ export const kiloExclusiveModels = [
   morph_warp_grep_free_model,
   seed_20_code_free_model,
   ...alibabaDirectModels,
+  ...deepseekDiscountedModels,
   claude_sonnet_clawsetup_model,
   claude_opus_4_7_stealth_model,
   claude_sonnet_4_6_stealth_model,

@@ -11,6 +11,13 @@ export type ChangelogEntry = {
 // Newest entries first. Developers add new entries to the top of this array.
 export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: '2026-05-27',
+    description:
+      'Saving openclaw.json from the file explorer in Settings now runs OpenClaw config validation first. If validation fails, your edits are preserved so you can review the warning before choosing Save anyway.',
+    category: 'feature',
+    deployHint: 'upgrade_required',
+  },
+  {
     date: '2026-05-20',
     description:
       'Morning Briefing is now generally available to all KiloClaw users. Enable it in Settings → Morning Briefing for a daily briefing covering your calendar, open GitHub and Linear issues, news on the topics you choose, local news, and a summary of your recent KiloClaw chat activity. It is delivered each morning, or on demand with Run Now.',

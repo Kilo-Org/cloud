@@ -2,7 +2,7 @@
 
 ## Role of This Document
 
-This spec defines the security and product rules for user-provided Composio CLI credentials configured in KiloClaw Settings. Managed Composio identity provisioning and managed connection onboarding are retired and are not supported behavior.
+This spec defines the security and product rules for user-provided Composio CLI credentials configured in KiloClaw Settings. Managed Composio identity provisioning and managed connection onboarding are retired and are not supported behavior. Removing retired managed persistence does not alter this manual Settings contract.
 
 It deliberately does not prescribe implementation details such as endpoint names, column layouts, or controller helper structure.
 

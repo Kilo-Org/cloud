@@ -1,5 +1,7 @@
 # Code Review Instructions
 
+Use at most sub-agents when performing reviews.
+
 # WHAT TO REVIEW
 
 **Flag these (high confidence only):**

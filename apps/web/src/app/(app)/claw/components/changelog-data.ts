@@ -14,7 +14,7 @@ export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
     date: '2026-05-28',
     description: 'Updated OpenClaw to 2026.5.22.',
     category: 'feature',
-    deployHint: 'redeploy_suggested',
+    deployHint: 'upgrade_required',
   },
   {
     date: '2026-05-27',

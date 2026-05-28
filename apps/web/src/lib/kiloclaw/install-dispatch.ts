@@ -1,0 +1,145 @@
+import 'server-only';
+import { TRPCError } from '@trpc/server';
+import { fetchInstallPayload } from './install';
+import type { InstallSource } from './install-sources';
+import { getActiveInstance } from './instance-registry';
+import { postMessageAsUser } from './kilo-chat-internal-client';
+
+/**
+ * Server-side dispatch for the `installFromSource` tRPC mutation, extracted
+ * here so the decision logic is unit-testable without a full tRPC + DB
+ * setup. The mutation is a thin wrapper that supplies `userId` from
+ * `ctx.user.id`.
+ *
+ * Outcomes:
+ * - `{ ok: true, ... }` — payload verified, message dispatched to the user's
+ *   kiloclaw chat as their own user-turn. Client redirects to `/claw/chat`.
+ * - `{ ok: false, code: 'no_instance' }` — caller has no active kiloclaw
+ *   instance yet. Client should drop a `pending_install` cookie and
+ *   redirect to `/claw/new`; the chat page consumes the cookie after
+ *   provisioning completes.
+ *
+ * Other failure modes throw a `TRPCError`:
+ * - `NOT_FOUND` — byte missing upstream, signature failed, slug mismatch,
+ *   or verification config broken. Already logged in detail by
+ *   `fetchInstallPayload`; the throw is a one-liner for the client.
+ * - `INTERNAL_SERVER_ERROR` — kilo-chat returned `forbidden` (internal-auth
+ *   misconfigured) or `internal` (network/timeout/unknown). These should
+ *   page on-call; client gets a generic error.
+ */
+
+export type DispatchInstallFromSourceArgs = {
+  userId: string;
+  source: InstallSource;
+  slug: string;
+};
+
+export type DispatchInstallFromSourceResult =
+  | {
+      ok: true;
+      conversationId: string;
+      messageId: string;
+      conversationCreated: boolean;
+    }
+  | { ok: false; code: 'no_instance' };
+
+// Dependency injection points kept narrow for testing. Real callers always
+// use the production implementations.
+export type DispatchInstallFromSourceDeps = {
+  fetchInstallPayload: typeof fetchInstallPayload;
+  getActiveInstance: typeof getActiveInstance;
+  postMessageAsUser: typeof postMessageAsUser;
+};
+
+const defaultDeps: DispatchInstallFromSourceDeps = {
+  fetchInstallPayload,
+  getActiveInstance,
+  postMessageAsUser,
+};
+
+export async function dispatchInstallFromSource(
+  args: DispatchInstallFromSourceArgs,
+  deps: DispatchInstallFromSourceDeps = defaultDeps
+): Promise<DispatchInstallFromSourceResult> {
+  const { userId, source, slug } = args;
+
+  const payload = await deps.fetchInstallPayload(source, slug);
+  if (!payload) {
+    throw new TRPCError({
+      code: 'NOT_FOUND',
+      message: 'This install link is not available.',
+    });
+  }
+
+  const instance = await deps.getActiveInstance(userId);
+  if (!instance) {
+    // Don't dispatch yet — the user has no instance to deliver into. The
+    // client surfaces this as the "drop pending_install cookie + redirect
+    // to /claw/new" flow. Provisioning happens off the cookie; on chat-
+    // page load, the cookie triggers a re-call of this mutation.
+    return { ok: false, code: 'no_instance' };
+  }
+
+  const dispatchedAt = new Date().toISOString();
+  const result = await deps.postMessageAsUser({
+    userId,
+    sandboxId: instance.sandboxId,
+    message: payload.prompt,
+    source: 'install',
+    autoCreateConversation: true,
+    correlation: { reason: `clawbyte:${slug}` },
+  });
+
+  if (result.ok) {
+    // Audit log — durable storage is a separate open question; log-only
+    // for v1 so on-call can grep by these fields. The shape is intentionally
+    // flat-keyed JSON-stringified so it survives structured-log shipping.
+    console.info(
+      JSON.stringify({
+        event: 'install_dispatched',
+        userId,
+        source,
+        slug,
+        signatureKeyId: payload.signatureKeyId,
+        signedAt: payload.signedAt,
+        dispatchedAt,
+        conversationId: result.conversationId,
+        messageId: result.messageId,
+        conversationCreated: result.conversationCreated,
+      })
+    );
+    return {
+      ok: true,
+      conversationId: result.conversationId,
+      messageId: result.messageId,
+      conversationCreated: result.conversationCreated,
+    };
+  }
+
+  // result.ok === false: log loudly and throw. Each code is operationally
+  // distinct (auth bug vs. transient infra) so the log line carries enough
+  // to grep on.
+  console.error(
+    JSON.stringify({
+      event: 'install_dispatch_failed',
+      userId,
+      source,
+      slug,
+      signatureKeyId: payload.signatureKeyId,
+      kilochatCode: result.code,
+      kilochatError: result.error,
+    })
+  );
+
+  // `no_conversation` from kilo-chat would mean the instance exists but
+  // its chat hasn't been provisioned yet — same UX class as the
+  // no_instance case above, so map it to the typed result for consistency.
+  if (result.code === 'no_conversation') {
+    return { ok: false, code: 'no_instance' };
+  }
+
+  throw new TRPCError({
+    code: 'INTERNAL_SERVER_ERROR',
+    message: 'Could not install this byte. Please try again.',
+  });
+}

@@ -1,9 +1,10 @@
 /* eslint-disable drizzle/enforce-delete-with-where */
-const mockDispatchReviewMemoryAggregationCron = jest.fn();
+const mockDispatchManualReviewMemoryAggregation = jest.fn();
 const mockApproveAndOpenReviewMemoryChangeRequest = jest.fn();
 
 jest.mock('@/lib/code-reviews/review-memory/aggregation', () => ({
-  dispatchReviewMemoryAggregationCron: () => mockDispatchReviewMemoryAggregationCron(),
+  dispatchManualReviewMemoryAggregation: (...args: unknown[]) =>
+    mockDispatchManualReviewMemoryAggregation(...args),
 }));
 
 jest.mock('@/lib/code-reviews/review-memory/change-request', () => {
@@ -54,7 +55,7 @@ describe('reviewMemoryRouter', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    mockDispatchReviewMemoryAggregationCron.mockResolvedValue({
+    mockDispatchManualReviewMemoryAggregation.mockResolvedValue({
       claimed: 1,
       completed: 1,
       skipped: 0,
@@ -175,7 +176,10 @@ describe('reviewMemoryRouter', () => {
         summary: expect.objectContaining({ claimed: 1 }),
       })
     );
-    expect(mockDispatchReviewMemoryAggregationCron).toHaveBeenCalledTimes(1);
+    expect(mockDispatchManualReviewMemoryAggregation).toHaveBeenCalledWith({
+      limit: 1,
+      stateId: expect.any(String),
+    });
   });
 
   it('approves proposals through the change-request workflow', async () => {

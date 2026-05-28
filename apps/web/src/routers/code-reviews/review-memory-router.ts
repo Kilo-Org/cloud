@@ -1,7 +1,7 @@
 import { createTRPCRouter, baseProcedure, type TRPCContext } from '@/lib/trpc/init';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import type { OrganizationRole } from '@/lib/organizations/organization-types';
-import { dispatchReviewMemoryAggregationCron } from '@/lib/code-reviews/review-memory/aggregation';
+import { dispatchManualReviewMemoryAggregation } from '@/lib/code-reviews/review-memory/aggregation';
 import {
   approveAndOpenReviewMemoryChangeRequest,
   ReviewMemoryChangeRequestError,
@@ -205,7 +205,7 @@ export const reviewMemoryRouter = createTRPCRouter({
         repoFullName: input.repoFullName,
         platformProjectId: input.platformProjectId,
       });
-      const summary = await dispatchReviewMemoryAggregationCron({ limit: 1, stateId: state.id });
+      const summary = await dispatchManualReviewMemoryAggregation({ limit: 1, stateId: state.id });
       return { state, summary };
     }),
 });

@@ -1379,7 +1379,7 @@ export const REVIEW_MEMORY_AGGREGATION_SCOPE_STATUSES = [
 export type ReviewMemoryAggregationScopeStatus =
   (typeof REVIEW_MEMORY_AGGREGATION_SCOPE_STATUSES)[number];
 
-export const REVIEW_MEMORY_AGGREGATION_RUN_TRIGGERS = ['cron', 'manual', 'backfill'] as const;
+export const REVIEW_MEMORY_AGGREGATION_RUN_TRIGGERS = ['manual', 'backfill'] as const;
 export type ReviewMemoryAggregationRunTrigger =
   (typeof REVIEW_MEMORY_AGGREGATION_RUN_TRIGGERS)[number];
 

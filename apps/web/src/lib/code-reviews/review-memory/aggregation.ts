@@ -393,7 +393,7 @@ async function processClaimedAggregationScope(
     repoFullName: state.repo_full_name,
     platformProjectId: state.platform_project_id,
     modelSlug,
-    trigger: 'cron',
+    trigger: 'manual',
     inputEventCount: events.length,
     inputSubjectCount: new Set(
       events.flatMap(event => (event.subject_id ? [event.subject_id] : []))
@@ -546,7 +546,7 @@ async function processClaimedAggregationScope(
   }
 }
 
-export async function dispatchReviewMemoryAggregationCron(
+export async function dispatchManualReviewMemoryAggregation(
   options: DispatchReviewMemoryAggregationOptions = {}
 ): Promise<DispatchReviewMemoryAggregationSummary> {
   const now = options.now ?? new Date();

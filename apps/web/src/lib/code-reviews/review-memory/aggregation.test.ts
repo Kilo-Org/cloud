@@ -11,7 +11,7 @@ import {
   kilocode_users,
 } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
-import { dispatchReviewMemoryAggregationCron } from './aggregation';
+import { dispatchManualReviewMemoryAggregation } from './aggregation';
 import {
   listProposalEvidence,
   recordFeedbackEvent,
@@ -98,7 +98,7 @@ describe('review memory aggregation', () => {
     });
 
     const generateOpportunities = jest.fn();
-    const summary = await dispatchReviewMemoryAggregationCron({ generateOpportunities });
+    const summary = await dispatchManualReviewMemoryAggregation({ generateOpportunities });
 
     expect(summary).toEqual({ claimed: 0, completed: 0, skipped: 0, failed: 0, proposals: 0 });
     expect(generateOpportunities).not.toHaveBeenCalled();
@@ -128,7 +128,7 @@ describe('review memory aggregation', () => {
       tokensOut: 50,
     }));
 
-    const summary = await dispatchReviewMemoryAggregationCron({
+    const summary = await dispatchManualReviewMemoryAggregation({
       now: new Date('2026-06-01T00:00:00.000Z'),
       generateOpportunities,
     });
@@ -158,7 +158,9 @@ describe('review memory aggregation', () => {
     expect(includedEvents.every(event => event.aggregation_state === 'included')).toBe(true);
 
     const [run] = await db.select().from(code_review_memory_aggregation_runs);
-    expect(run).toEqual(expect.objectContaining({ status: 'completed', tokens_in: 100 }));
+    expect(run).toEqual(
+      expect.objectContaining({ status: 'completed', tokens_in: 100, trigger: 'manual' })
+    );
   });
 
   it('claims only the requested aggregation state', async () => {
@@ -175,7 +177,7 @@ describe('review memory aggregation', () => {
       .where(eq(code_review_memory_aggregation_state.repo_full_name, 'acme/target'));
     const generateOpportunities = jest.fn(async () => ({ opportunities: [] }));
 
-    const summary = await dispatchReviewMemoryAggregationCron({
+    const summary = await dispatchManualReviewMemoryAggregation({
       stateId: targetState.id,
       limit: 1,
       generateOpportunities,
@@ -212,7 +214,7 @@ describe('review memory aggregation', () => {
     }
 
     const generateOpportunities = jest.fn();
-    const summary = await dispatchReviewMemoryAggregationCron({ generateOpportunities });
+    const summary = await dispatchManualReviewMemoryAggregation({ generateOpportunities });
 
     expect(summary).toEqual({ claimed: 1, completed: 0, skipped: 1, failed: 0, proposals: 0 });
     expect(generateOpportunities).not.toHaveBeenCalled();
@@ -222,6 +224,7 @@ describe('review memory aggregation', () => {
 
     const [run] = await db.select().from(code_review_memory_aggregation_runs);
     expect(run.status).toBe('skipped');
+    expect(run.trigger).toBe('manual');
 
     const [state] = await db
       .select()

@@ -71,6 +71,26 @@ describe('usage-triggered-bonus (unit)', () => {
       expect(d.auditPayload).toEqual(expect.objectContaining({ bonusKind: 'monthly-ramp' }));
     });
 
+    test.each([
+      KiloPassWelcomePromoEligibilityReason.NoPositiveSettlement,
+      KiloPassWelcomePromoEligibilityReason.SettlementUnresolved,
+    ])(
+      'settlement decision %s does not unlock first-month promo',
+      welcomePromoEligibilityReason => {
+        const d = computeUsageTriggeredMonthlyBonusDecision({
+          tier: KiloPassTier.Tier19,
+          startedAtIso: '2026-05-20T00:00:00.000Z',
+          currentStreakMonths: 1,
+          isFirstTimeSubscriberEver: true,
+          welcomePromoEligibilityReason,
+          issueMonth: '2026-05-01',
+        });
+
+        expect(d.shouldIssueFirstMonthPromo).toBe(false);
+        expect(d.bonusPercentApplied).toBeCloseTo(0.05);
+      }
+    );
+
     test('ineligible at promo cutoff => uses ramp (not 50%) and bonusKind=monthly-ramp', () => {
       const d = computeUsageTriggeredMonthlyBonusDecision({
         tier: KiloPassTier.Tier49,

@@ -79,10 +79,105 @@ export async function getInvoiceSubscription(params: {
   return await stripe.subscriptions.retrieve(subscriptionId);
 }
 
+export type SupportedReusablePaymentMethodType =
+  | 'card'
+  | 'sepa_debit'
+  | 'us_bank_account'
+  | 'bacs_debit'
+  | 'au_becs_debit';
+
 export type SettledInvoicePaymentMethod =
-  | { kind: 'card'; fingerprint: string | null }
-  | { kind: 'non_card' }
+  | {
+      kind: 'reusable';
+      paymentMethodType: SupportedReusablePaymentMethodType;
+      fingerprint: string | null;
+    }
+  | { kind: 'without_supported_fingerprint' }
   | { kind: 'unknown' };
+
+function normalizedFingerprint(value: string | null | undefined): string | null {
+  const fingerprint = value?.trim() ?? '';
+  return fingerprint || null;
+}
+
+function getReusablePaymentMethodResult(
+  paymentMethod: Stripe.PaymentMethod
+): SettledInvoicePaymentMethod {
+  switch (paymentMethod.type) {
+    case 'card':
+      return {
+        kind: 'reusable',
+        paymentMethodType: 'card',
+        fingerprint: normalizedFingerprint(paymentMethod.card?.fingerprint),
+      };
+    case 'sepa_debit':
+      return {
+        kind: 'reusable',
+        paymentMethodType: 'sepa_debit',
+        fingerprint: normalizedFingerprint(paymentMethod.sepa_debit?.fingerprint),
+      };
+    case 'us_bank_account':
+      return {
+        kind: 'reusable',
+        paymentMethodType: 'us_bank_account',
+        fingerprint: normalizedFingerprint(paymentMethod.us_bank_account?.fingerprint),
+      };
+    case 'bacs_debit':
+      return {
+        kind: 'reusable',
+        paymentMethodType: 'bacs_debit',
+        fingerprint: normalizedFingerprint(paymentMethod.bacs_debit?.fingerprint),
+      };
+    case 'au_becs_debit':
+      return {
+        kind: 'reusable',
+        paymentMethodType: 'au_becs_debit',
+        fingerprint: normalizedFingerprint(paymentMethod.au_becs_debit?.fingerprint),
+      };
+    default:
+      return { kind: 'without_supported_fingerprint' };
+  }
+}
+
+function getReusableChargeResult(charge: Stripe.Charge): SettledInvoicePaymentMethod {
+  const details = charge.payment_method_details;
+  if (!details) return { kind: 'unknown' };
+
+  switch (details.type) {
+    case 'card':
+      return {
+        kind: 'reusable',
+        paymentMethodType: 'card',
+        fingerprint: normalizedFingerprint(details.card?.fingerprint),
+      };
+    case 'sepa_debit':
+      return {
+        kind: 'reusable',
+        paymentMethodType: 'sepa_debit',
+        fingerprint: normalizedFingerprint(details.sepa_debit?.fingerprint),
+      };
+    case 'us_bank_account':
+      return {
+        kind: 'reusable',
+        paymentMethodType: 'us_bank_account',
+        fingerprint: normalizedFingerprint(details.us_bank_account?.fingerprint),
+      };
+    case 'bacs_debit':
+      return {
+        kind: 'reusable',
+        paymentMethodType: 'bacs_debit',
+        fingerprint: normalizedFingerprint(details.bacs_debit?.fingerprint),
+      };
+    case 'au_becs_debit':
+      return {
+        kind: 'reusable',
+        paymentMethodType: 'au_becs_debit',
+        fingerprint: normalizedFingerprint(details.au_becs_debit?.fingerprint),
+      };
+    default:
+      return { kind: 'without_supported_fingerprint' };
+  }
+}
 
 async function getExpandedPaymentMethod(params: {
   stripe: Stripe;
@@ -94,9 +189,19 @@ async function getExpandedPaymentMethod(params: {
   return await params.stripe.paymentMethods.retrieve(params.paymentMethod);
 }
 
+async function getExpandedCharge(params: {
+  stripe: Stripe;
+  charge: string | Stripe.Charge | undefined;
+}): Promise<Stripe.Charge | null> {
+  if (!params.charge) return null;
+  if (typeof params.charge !== 'string') return params.charge;
+  if (!params.stripe.charges?.retrieve) return null;
+  return await params.stripe.charges.retrieve(params.charge);
+}
+
 /**
- * Resolves the payment method that settled an invoice. This deliberately uses the paid invoice
- * payment rather than a customer's attached or default payment method.
+ * Resolves the payment instrument that settled an invoice. This deliberately uses the paid
+ * invoice payment rather than a customer's attached or default payment method.
  */
 export async function getSettledInvoicePaymentMethod(params: {
   invoice: Stripe.Invoice;
@@ -119,31 +224,29 @@ export async function getSettledInvoicePaymentMethod(params: {
         : [];
 
   for (const invoicePayment of paidPayments) {
-    const rawPaymentIntent =
-      invoicePayment.payment.type === 'payment_intent'
-        ? invoicePayment.payment.payment_intent
-        : null;
-    if (!rawPaymentIntent) continue;
+    const payment = invoicePayment.payment;
+    if (payment.type === 'charge') {
+      const charge = await getExpandedCharge({ stripe: params.stripe, charge: payment.charge });
+      if (charge) return getReusableChargeResult(charge);
+      continue;
+    }
+    if (payment.type !== 'payment_intent' || !payment.payment_intent) continue;
 
     const paymentIntent =
-      typeof rawPaymentIntent === 'string'
+      typeof payment.payment_intent === 'string'
         ? params.stripe.paymentIntents?.retrieve
-          ? await params.stripe.paymentIntents.retrieve(rawPaymentIntent, {
+          ? await params.stripe.paymentIntents.retrieve(payment.payment_intent, {
               expand: ['payment_method'],
             })
           : null
-        : rawPaymentIntent;
+        : payment.payment_intent;
     if (!paymentIntent) continue;
 
     const paymentMethod = await getExpandedPaymentMethod({
       stripe: params.stripe,
       paymentMethod: paymentIntent.payment_method,
     });
-    if (!paymentMethod) continue;
-    if (paymentMethod.type !== 'card') return { kind: 'non_card' };
-
-    const fingerprint = paymentMethod.card?.fingerprint?.trim() ?? '';
-    return { kind: 'card', fingerprint: fingerprint || null };
+    if (paymentMethod) return getReusablePaymentMethodResult(paymentMethod);
   }
 
   return { kind: 'unknown' };

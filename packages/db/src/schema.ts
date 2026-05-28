@@ -31,6 +31,7 @@ import {
   KiloPassPaymentProvider,
   KiloPassIssuanceSource,
   KiloPassIssuanceItemKind,
+  KiloPassWelcomePromoPaymentFingerprintType,
   KiloPassWelcomePromoEligibilityReason,
   KiloPassAuditLogAction,
   KiloPassAuditLogResult,
@@ -138,6 +139,7 @@ export const SCHEMA_CHECK_ENUMS = {
   KiloPassPaymentProvider,
   KiloPassIssuanceSource,
   KiloPassIssuanceItemKind,
+  KiloPassWelcomePromoPaymentFingerprintType,
   KiloPassWelcomePromoEligibilityReason,
   KiloPassAuditLogAction,
   KiloPassAuditLogResult,
@@ -1328,23 +1330,33 @@ export const kilo_pass_issuances = pgTable(
 export type KiloPassIssuance = typeof kilo_pass_issuances.$inferSelect;
 export type NewKiloPassIssuance = typeof kilo_pass_issuances.$inferInsert;
 
-export const kilo_pass_welcome_promo_card_claims = pgTable(
-  'kilo_pass_welcome_promo_card_claims',
+export const kilo_pass_welcome_promo_payment_fingerprint_claims = pgTable(
+  'kilo_pass_welcome_promo_payment_fingerprint_claims',
   {
-    stripe_fingerprint: text().primaryKey().notNull(),
+    stripe_payment_method_type: text()
+      .notNull()
+      .$type<KiloPassWelcomePromoPaymentFingerprintType>(),
+    stripe_fingerprint: text().notNull(),
     source_stripe_invoice_id: text().notNull(),
     claimed_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
   },
   table => [
-    unique('UQ_kilo_pass_welcome_promo_card_claims_source_invoice_id').on(
+    primaryKey({ columns: [table.stripe_payment_method_type, table.stripe_fingerprint] }),
+    enumCheck(
+      'kilo_pass_welcome_promo_payment_fingerprint_claims_type_check',
+      table.stripe_payment_method_type,
+      KiloPassWelcomePromoPaymentFingerprintType
+    ),
+    unique('UQ_kilo_pass_welcome_promo_payment_fingerprint_claims_source_invoice_id').on(
       table.source_stripe_invoice_id
     ),
   ]
 );
 
-export type KiloPassWelcomePromoCardClaim = typeof kilo_pass_welcome_promo_card_claims.$inferSelect;
-export type NewKiloPassWelcomePromoCardClaim =
-  typeof kilo_pass_welcome_promo_card_claims.$inferInsert;
+export type KiloPassWelcomePromoPaymentFingerprintClaim =
+  typeof kilo_pass_welcome_promo_payment_fingerprint_claims.$inferSelect;
+export type NewKiloPassWelcomePromoPaymentFingerprintClaim =
+  typeof kilo_pass_welcome_promo_payment_fingerprint_claims.$inferInsert;
 
 export const kilo_pass_pause_events = pgTable(
   'kilo_pass_pause_events',

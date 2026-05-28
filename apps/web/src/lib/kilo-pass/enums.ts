@@ -4,6 +4,7 @@ export {
   KiloPassPaymentProvider,
   KiloPassIssuanceSource,
   KiloPassIssuanceItemKind,
+  KiloPassWelcomePromoPaymentFingerprintType,
   KiloPassWelcomePromoEligibilityReason,
   KiloPassAuditLogAction,
   KiloPassAuditLogResult,

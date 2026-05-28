@@ -12,7 +12,7 @@ import {
   kilo_pass_subscriptions,
   kilo_pass_issuances,
   kilo_pass_issuance_items,
-  kilo_pass_welcome_promo_card_claims,
+  kilo_pass_welcome_promo_payment_fingerprint_claims,
   enrichment_data,
   referral_codes,
   referral_code_usages,
@@ -93,6 +93,7 @@ import {
   KiloPassIssuanceSource,
   KiloPassPaymentProvider,
   KiloPassTier,
+  KiloPassWelcomePromoPaymentFingerprintType,
 } from '@/lib/kilo-pass/enums';
 import { SecurityAuditLogAction } from '@/lib/security-agent/core/enums';
 import { recordAffiliateAttributionAndQueueParentEvent } from '@/lib/impact/affiliate-events';
@@ -1698,19 +1699,23 @@ describe('User', () => {
       expect(pms[0].stripe_fingerprint).toBe(pm.stripe_fingerprint);
     });
 
-    it('should retain minimal Kilo Pass card-claim evidence for repeat-offer enforcement', async () => {
+    it('should retain minimal Kilo Pass payment-fingerprint evidence for repeat-offer enforcement', async () => {
       const user = await insertTestUser();
       const stripeFingerprint = `fp_deleted_user_${randomUUID()}`;
       const sourceStripeInvoiceId = `in_deleted_user_${randomUUID()}`;
-      await db.insert(kilo_pass_welcome_promo_card_claims).values({
+      await db.insert(kilo_pass_welcome_promo_payment_fingerprint_claims).values({
+        stripe_payment_method_type: KiloPassWelcomePromoPaymentFingerprintType.Card,
         stripe_fingerprint: stripeFingerprint,
         source_stripe_invoice_id: sourceStripeInvoiceId,
       });
 
       await softDeleteUser(user.id);
 
-      const claim = await db.query.kilo_pass_welcome_promo_card_claims.findFirst({
-        where: eq(kilo_pass_welcome_promo_card_claims.stripe_fingerprint, stripeFingerprint),
+      const claim = await db.query.kilo_pass_welcome_promo_payment_fingerprint_claims.findFirst({
+        where: eq(
+          kilo_pass_welcome_promo_payment_fingerprint_claims.stripe_fingerprint,
+          stripeFingerprint
+        ),
       });
       expect(claim?.stripe_fingerprint).toBe(stripeFingerprint);
       expect(claim?.source_stripe_invoice_id).toBe(sourceStripeInvoiceId);

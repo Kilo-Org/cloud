@@ -5,7 +5,7 @@ import {
   kilo_pass_issuances,
   kilo_pass_scheduled_changes,
   kilo_pass_subscriptions,
-  kilo_pass_welcome_promo_card_claims,
+  kilo_pass_welcome_promo_payment_fingerprint_claims,
   kilocode_users,
 } from '@kilocode/db/schema';
 
@@ -41,6 +41,7 @@ import {
   KiloPassCadence,
   KiloPassIssuanceSource,
   KiloPassPaymentProvider,
+  KiloPassWelcomePromoPaymentFingerprintType,
   KiloPassWelcomePromoEligibilityReason,
 } from '@/lib/kilo-pass/enums';
 import { isStripeSubscriptionEnded } from '@/lib/kilo-pass/stripe-subscription-status';
@@ -55,13 +56,91 @@ import {
   enqueueKiloPassAffiliateSaleForInvoice,
   type KiloPassAffiliateSaleContext,
 } from '@/lib/kilo-pass/affiliate-sale';
+import type { SupportedReusablePaymentMethodType } from '@/lib/kilo-pass/stripe-handlers-utils';
 
-async function getOrCreateInitialMonthlyWelcomePromoReason(params: {
+function getPaymentFingerprintType(
+  type: SupportedReusablePaymentMethodType
+): KiloPassWelcomePromoPaymentFingerprintType {
+  switch (type) {
+    case 'card':
+      return KiloPassWelcomePromoPaymentFingerprintType.Card;
+    case 'sepa_debit':
+      return KiloPassWelcomePromoPaymentFingerprintType.SepaDebit;
+    case 'us_bank_account':
+      return KiloPassWelcomePromoPaymentFingerprintType.UsBankAccount;
+    case 'bacs_debit':
+      return KiloPassWelcomePromoPaymentFingerprintType.BacsDebit;
+    case 'au_becs_debit':
+      return KiloPassWelcomePromoPaymentFingerprintType.AuBecsDebit;
+  }
+}
+
+async function claimMonthlyPaymentFingerprint(params: {
   tx: DrizzleTransaction;
   stripe: Stripe;
   invoice: Stripe.Invoice;
+}): Promise<KiloPassWelcomePromoEligibilityReason> {
+  const settledPaymentMethod = await getSettledInvoicePaymentMethod({
+    invoice: params.invoice,
+    stripe: params.stripe,
+  });
+
+  if (settledPaymentMethod.kind === 'unknown') {
+    return KiloPassWelcomePromoEligibilityReason.SettlementUnresolved;
+  }
+  if (settledPaymentMethod.kind === 'without_supported_fingerprint') {
+    return KiloPassWelcomePromoEligibilityReason.NoSupportedFingerprint;
+  }
+  if (settledPaymentMethod.fingerprint === null) {
+    return KiloPassWelcomePromoEligibilityReason.MissingFingerprint;
+  }
+
+  const paymentFingerprintType = getPaymentFingerprintType(settledPaymentMethod.paymentMethodType);
+  const insertedClaim = await params.tx
+    .insert(kilo_pass_welcome_promo_payment_fingerprint_claims)
+    .values({
+      stripe_payment_method_type: paymentFingerprintType,
+      stripe_fingerprint: settledPaymentMethod.fingerprint,
+      source_stripe_invoice_id: params.invoice.id,
+    })
+    .onConflictDoNothing({
+      target: [
+        kilo_pass_welcome_promo_payment_fingerprint_claims.stripe_payment_method_type,
+        kilo_pass_welcome_promo_payment_fingerprint_claims.stripe_fingerprint,
+      ],
+    })
+    .returning({
+      source_stripe_invoice_id:
+        kilo_pass_welcome_promo_payment_fingerprint_claims.source_stripe_invoice_id,
+    });
+  const existingClaim =
+    insertedClaim[0] ??
+    (await params.tx.query.kilo_pass_welcome_promo_payment_fingerprint_claims.findFirst({
+      columns: { source_stripe_invoice_id: true },
+      where: and(
+        eq(
+          kilo_pass_welcome_promo_payment_fingerprint_claims.stripe_payment_method_type,
+          paymentFingerprintType
+        ),
+        eq(
+          kilo_pass_welcome_promo_payment_fingerprint_claims.stripe_fingerprint,
+          settledPaymentMethod.fingerprint
+        )
+      ),
+    }));
+
+  return existingClaim?.source_stripe_invoice_id === params.invoice.id
+    ? KiloPassWelcomePromoEligibilityReason.FirstPaymentFingerprintClaim
+    : KiloPassWelcomePromoEligibilityReason.FingerprintPreviouslyClaimed;
+}
+
+async function getOrCreateInitialMonthlyWelcomePromoReason(params: {
+  tx: DrizzleTransaction;
   subscriptionId: string;
   issuanceId: string;
+  stripeInvoiceId: string;
+  hasPositiveSettlement: boolean;
+  positiveSettlementReason: KiloPassWelcomePromoEligibilityReason | null;
 }): Promise<KiloPassWelcomePromoEligibilityReason | null> {
   const firstIssuance = await params.tx.query.kilo_pass_issuances.findFirst({
     columns: {
@@ -73,56 +152,30 @@ async function getOrCreateInitialMonthlyWelcomePromoReason(params: {
   });
   if (!firstIssuance || firstIssuance.id !== params.issuanceId) return null;
 
-  if (firstIssuance.initial_welcome_promo_eligibility_reason !== null) {
+  if (
+    firstIssuance.initial_welcome_promo_eligibility_reason !== null &&
+    firstIssuance.initial_welcome_promo_eligibility_reason !==
+      KiloPassWelcomePromoEligibilityReason.SettlementUnresolved
+  ) {
     return firstIssuance.initial_welcome_promo_eligibility_reason;
   }
 
-  const settledPaymentMethod = await getSettledInvoicePaymentMethod({
-    invoice: params.invoice,
-    stripe: params.stripe,
-  });
-  let reason: KiloPassWelcomePromoEligibilityReason;
-
-  if (settledPaymentMethod.kind === 'non_card') {
-    reason = KiloPassWelcomePromoEligibilityReason.NonCardPaymentMethod;
-  } else if (settledPaymentMethod.kind !== 'card' || settledPaymentMethod.fingerprint === null) {
-    reason = KiloPassWelcomePromoEligibilityReason.MissingFingerprint;
-  } else {
-    const insertedClaim = await params.tx
-      .insert(kilo_pass_welcome_promo_card_claims)
-      .values({
-        stripe_fingerprint: settledPaymentMethod.fingerprint,
-        source_stripe_invoice_id: params.invoice.id,
-      })
-      .onConflictDoNothing({ target: kilo_pass_welcome_promo_card_claims.stripe_fingerprint })
-      .returning({
-        source_stripe_invoice_id: kilo_pass_welcome_promo_card_claims.source_stripe_invoice_id,
-      });
-    const existingClaim =
-      insertedClaim[0] ??
-      (await params.tx.query.kilo_pass_welcome_promo_card_claims.findFirst({
-        columns: { source_stripe_invoice_id: true },
-        where: eq(
-          kilo_pass_welcome_promo_card_claims.stripe_fingerprint,
-          settledPaymentMethod.fingerprint
-        ),
-      }));
-    const isFirstClaim = existingClaim?.source_stripe_invoice_id === params.invoice.id;
-
-    reason = isFirstClaim
-      ? KiloPassWelcomePromoEligibilityReason.FirstCardClaim
-      : KiloPassWelcomePromoEligibilityReason.FingerprintPreviouslyClaimed;
+  const reason = params.hasPositiveSettlement
+    ? params.positiveSettlementReason
+    : KiloPassWelcomePromoEligibilityReason.NoPositiveSettlement;
+  if (reason === null) {
+    throw new KiloPassError(
+      'Positive monthly Kilo Pass settlement did not produce promo decision',
+      {
+        stripe_invoice_id: params.stripeInvoiceId,
+      }
+    );
   }
 
   await params.tx
     .update(kilo_pass_issuances)
     .set({ initial_welcome_promo_eligibility_reason: reason })
-    .where(
-      and(
-        eq(kilo_pass_issuances.id, params.issuanceId),
-        isNull(kilo_pass_issuances.initial_welcome_promo_eligibility_reason)
-      )
-    );
+    .where(eq(kilo_pass_issuances.id, params.issuanceId));
 
   return reason;
 }
@@ -439,14 +492,20 @@ export async function handleKiloPassInvoicePaid(params: {
         source: KiloPassIssuanceSource.StripeInvoice,
         stripeInvoiceId: invoice.id,
       });
+      const hasPositiveSettlement = invoice.amount_paid > 0;
+      const positiveSettlementReason =
+        cadence === KiloPassCadence.Monthly && hasPositiveSettlement
+          ? await claimMonthlyPaymentFingerprint({ tx, stripe, invoice })
+          : null;
       const initialWelcomePromoEligibilityReason =
         cadence === KiloPassCadence.Monthly
           ? await getOrCreateInitialMonthlyWelcomePromoReason({
               tx,
-              stripe,
-              invoice,
               subscriptionId: kiloPassSubscriptionId,
               issuanceId: issuanceHeader.issuanceId,
+              stripeInvoiceId: invoice.id,
+              hasPositiveSettlement,
+              positiveSettlementReason,
             })
           : null;
 
@@ -465,6 +524,7 @@ export async function handleKiloPassInvoicePaid(params: {
           cadence,
           ...(priceMetadata ? { priceId: priceMetadata.priceId } : {}),
           issuanceHeaderWasCreated: issuanceHeader.wasCreated,
+          ...(positiveSettlementReason ? { positiveSettlementReason } : {}),
           ...(initialWelcomePromoEligibilityReason ? { initialWelcomePromoEligibilityReason } : {}),
         },
       });

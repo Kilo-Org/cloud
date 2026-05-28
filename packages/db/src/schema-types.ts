@@ -37,11 +37,21 @@ export enum KiloPassIssuanceItemKind {
   ReferralBonus = 'referral_bonus',
 }
 
+export enum KiloPassWelcomePromoPaymentFingerprintType {
+  Card = 'card',
+  SepaDebit = 'sepa_debit',
+  UsBankAccount = 'us_bank_account',
+  BacsDebit = 'bacs_debit',
+  AuBecsDebit = 'au_becs_debit',
+}
+
 export enum KiloPassWelcomePromoEligibilityReason {
-  FirstCardClaim = 'first_card_claim',
+  FirstPaymentFingerprintClaim = 'first_payment_fingerprint_claim',
   FingerprintPreviouslyClaimed = 'fingerprint_previously_claimed',
   MissingFingerprint = 'missing_fingerprint',
-  NonCardPaymentMethod = 'non_card_payment_method',
+  NoSupportedFingerprint = 'no_supported_fingerprint',
+  NoPositiveSettlement = 'no_positive_settlement',
+  SettlementUnresolved = 'settlement_unresolved',
 }
 
 export enum KiloPassAuditLogAction {

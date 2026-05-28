@@ -50,7 +50,12 @@ export function computeUsageTriggeredMonthlyBonusDecision(params: {
   const isEligibleForFirstMonthPromo =
     params.isFirstTimeSubscriberEver &&
     params.welcomePromoEligibilityReason !==
-      KiloPassWelcomePromoEligibilityReason.FingerprintPreviouslyClaimed;
+      KiloPassWelcomePromoEligibilityReason.FingerprintPreviouslyClaimed &&
+    params.welcomePromoEligibilityReason !==
+      KiloPassWelcomePromoEligibilityReason.NoPositiveSettlement &&
+    params.welcomePromoEligibilityReason !==
+      KiloPassWelcomePromoEligibilityReason.SettlementUnresolved;
+
   const bonusPercentApplied = computeMonthlyCadenceBonusPercent({
     tier: params.tier,
     streakMonths,

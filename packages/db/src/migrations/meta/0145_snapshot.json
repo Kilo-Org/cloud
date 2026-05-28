@@ -1,5 +1,5 @@
 {
-  "id": "ea55aada-5011-46c0-bffb-09679a3d9657",
+  "id": "76b63bd4-92f3-415a-802f-b56ec2e2b327",
   "prevId": "ad0c69fc-419c-440e-9fa8-8f246897a3d8",
   "version": "7",
   "dialect": "postgresql",
@@ -10762,12 +10762,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "initial_welcome_promo_eligibility": {
-          "name": "initial_welcome_promo_eligibility",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "initial_welcome_promo_eligibility_reason": {
           "name": "initial_welcome_promo_eligibility_reason",
           "type": "text",
@@ -10873,17 +10867,9 @@
           "name": "kilo_pass_issuances_source_check",
           "value": "\"kilo_pass_issuances\".\"source\" IN ('stripe_invoice', 'app_store_transaction', 'google_play_transaction', 'cron')"
         },
-        "kilo_pass_issuances_initial_welcome_promo_eligibility_check": {
-          "name": "kilo_pass_issuances_initial_welcome_promo_eligibility_check",
-          "value": "\"kilo_pass_issuances\".\"initial_welcome_promo_eligibility\" IN ('eligible', 'ineligible')"
-        },
         "kilo_pass_issuances_initial_welcome_promo_reason_check": {
           "name": "kilo_pass_issuances_initial_welcome_promo_reason_check",
-          "value": "\"kilo_pass_issuances\".\"initial_welcome_promo_eligibility_reason\" IN ('first_card_claim', 'fingerprint_previously_claimed', 'missing_fingerprint', 'non_card_payment_method')"
-        },
-        "kilo_pass_issuances_initial_welcome_promo_decision_consistency_check": {
-          "name": "kilo_pass_issuances_initial_welcome_promo_decision_consistency_check",
-          "value": "(\"kilo_pass_issuances\".\"initial_welcome_promo_eligibility\" IS NULL AND \"kilo_pass_issuances\".\"initial_welcome_promo_eligibility_reason\" IS NULL) OR (\"kilo_pass_issuances\".\"initial_welcome_promo_eligibility\" IS NOT NULL AND \"kilo_pass_issuances\".\"initial_welcome_promo_eligibility_reason\" IS NOT NULL)"
+          "value": "\"kilo_pass_issuances\".\"initial_welcome_promo_eligibility_reason\" IN ('first_payment_fingerprint_claim', 'fingerprint_previously_claimed', 'missing_fingerprint', 'no_supported_fingerprint', 'no_positive_settlement', 'settlement_unresolved')"
         }
       },
       "isRLSEnabled": false
@@ -11912,14 +11898,20 @@
       },
       "isRLSEnabled": false
     },
-    "public.kilo_pass_welcome_promo_card_claims": {
-      "name": "kilo_pass_welcome_promo_card_claims",
+    "public.kilo_pass_welcome_promo_payment_fingerprint_claims": {
+      "name": "kilo_pass_welcome_promo_payment_fingerprint_claims",
       "schema": "",
       "columns": {
+        "stripe_payment_method_type": {
+          "name": "stripe_payment_method_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
         "stripe_fingerprint": {
           "name": "stripe_fingerprint",
           "type": "text",
-          "primaryKey": true,
+          "primaryKey": false,
           "notNull": true
         },
         "source_stripe_invoice_id": {
@@ -11938,10 +11930,18 @@
       },
       "indexes": {},
       "foreignKeys": {},
-      "compositePrimaryKeys": {},
+      "compositePrimaryKeys": {
+        "kilo_pass_welcome_promo_payment_fingerprint_claims_stripe_payment_method_type_stripe_fingerprint_pk": {
+          "name": "kilo_pass_welcome_promo_payment_fingerprint_claims_stripe_payment_method_type_stripe_fingerprint_pk",
+          "columns": [
+            "stripe_payment_method_type",
+            "stripe_fingerprint"
+          ]
+        }
+      },
       "uniqueConstraints": {
-        "UQ_kilo_pass_welcome_promo_card_claims_source_invoice_id": {
-          "name": "UQ_kilo_pass_welcome_promo_card_claims_source_invoice_id",
+        "UQ_kilo_pass_welcome_promo_payment_fingerprint_claims_source_invoice_id": {
+          "name": "UQ_kilo_pass_welcome_promo_payment_fingerprint_claims_source_invoice_id",
           "nullsNotDistinct": false,
           "columns": [
             "source_stripe_invoice_id"
@@ -11949,7 +11949,12 @@
         }
       },
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "kilo_pass_welcome_promo_payment_fingerprint_claims_type_check": {
+          "name": "kilo_pass_welcome_promo_payment_fingerprint_claims_type_check",
+          "value": "\"kilo_pass_welcome_promo_payment_fingerprint_claims\".\"stripe_payment_method_type\" IN ('card', 'sepa_debit', 'us_bank_account', 'bacs_debit', 'au_becs_debit')"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.kiloclaw_access_codes": {

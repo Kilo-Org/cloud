@@ -67,7 +67,8 @@ Candidate record: `kilo_pass_welcome_promo_payment_fingerprint_claims`
 
 | Field | Purpose |
 |---|---|
-| `stripe_fingerprint` | Supported reusable Stripe instrument identifier; uniquely claims one welcome opportunity. |
+| `stripe_payment_method_type` | Supported Stripe instrument type; paired with the fingerprint to avoid cross-type collisions. |
+| `stripe_fingerprint` | Supported reusable Stripe instrument identifier; uniquely claims one welcome opportunity within its instrument type. |
 | `first_stripe_invoice_id` | Idempotent source paid invoice that made the claim. |
 | `first_kilo_pass_subscription_id` | Subscription responsible for the claim, retained or nulled according to deletion policy. |
 | `first_kilo_user_id` | Optional audit reference, retained or nulled according to deletion policy. |
@@ -75,7 +76,7 @@ Candidate record: `kilo_pass_welcome_promo_payment_fingerprint_claims`
 
 Required properties:
 
-- Unique constraint on `stripe_fingerprint` so concurrent positively paid purchases cannot both receive first-instrument eligibility.
+- Unique constraint on (`stripe_payment_method_type`, `stripe_fingerprint`) so concurrent positively paid purchases using the same instrument cannot both receive first-instrument eligibility without falsely colliding unrelated instrument types.
 - Unique constraint on the source invoice ID so webhook retries are idempotent.
 - Retain the fingerprint and source invoice identity after account deletion as anti-abuse evidence, consistent with the existing preservation of `payment_methods.stripe_fingerprint` for fraud detection.
 - If the claim stores direct `first_kilo_user_id` or identifying user-linked references, null or anonymize those in `softDeleteUser` and add the required GDPR regression test while preserving enforceability by fingerprint.

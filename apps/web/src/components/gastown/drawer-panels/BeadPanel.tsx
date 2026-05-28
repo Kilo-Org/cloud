@@ -255,6 +255,9 @@ export function BeadPanel({
   // Held bead detection
   const isHeld = bead.labels.includes('gt:held');
 
+  // Babysit bead detection
+  const isBabysit = bead.labels.includes('gt:babysit');
+
   // Mayor responses: message-type child beads
   const mayorResponses = allBeads.filter(
     b => b.type === 'message' && b.parent_bead_id === bead.bead_id

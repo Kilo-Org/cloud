@@ -33,7 +33,7 @@ export function AuthMarketingAside() {
   const reduceMotion = useReducedMotion();
 
   return (
-    <aside className="relative isolate hidden min-h-screen w-1/2 shrink-0 flex-col items-center justify-center overflow-hidden px-16 xl:flex">
+    <aside className="relative isolate hidden min-h-screen w-2/5 shrink-0 flex-col items-center justify-center overflow-hidden px-16 xl:flex">
       {/* Dithered shader background — the one visual effect on this column */}
       <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
         <Dithering

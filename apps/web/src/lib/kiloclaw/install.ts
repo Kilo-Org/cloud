@@ -18,6 +18,14 @@ const SUPPORTED_SIGNATURE_VERSION = 1;
 // the byte catalog churns frequently.
 const MAX_SIGNATURE_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 
+// Bound the upstream response so a malicious or misbehaving source can't
+// force us to buffer and parse arbitrarily large JSON before Zod's per-
+// field caps fire. 256 KiB is well above any realistic signed byte
+// payload (`prompt` is capped at 32k, `description` at 2k, body etc. are
+// dropped by Zod) and well below memory-pressure thresholds for a Vercel
+// serverless render.
+const MAX_RESPONSE_BYTES = 256 * 1024;
+
 const installPayloadSchema = z.object({
   slug: z.string().min(1).max(200),
   title: z.string().max(500),
@@ -36,15 +44,15 @@ const installPayloadSchema = z.object({
 
 export type InstallPayload = z.infer<typeof installPayloadSchema>;
 
-function getPublicKey(): crypto.KeyObject {
+function getPublicKey(): crypto.KeyObject | null {
   const raw = process.env.CLAWBYTE_SIGNING_PUBLIC_KEY;
-  if (!raw) {
-    throw new Error(
-      'CLAWBYTE_SIGNING_PUBLIC_KEY is not configured — install payloads cannot be verified'
-    );
-  }
+  if (!raw) return null;
   const pem = raw.replace(/\\n/g, '\n').trim();
-  return crypto.createPublicKey({ key: pem, format: 'pem' });
+  try {
+    return crypto.createPublicKey({ key: pem, format: 'pem' });
+  } catch {
+    return null;
+  }
 }
 
 function deriveKeyId(publicKey: crypto.KeyObject): string {
@@ -91,6 +99,13 @@ function verifySignedPayload(payload: InstallPayload): VerifyOk | VerifyErr {
   }
 
   const publicKey = getPublicKey();
+  if (!publicKey) {
+    return {
+      ok: false,
+      reason:
+        'CLAWBYTE_SIGNING_PUBLIC_KEY is not configured or unparseable — verification unavailable',
+    };
+  }
   const expectedKid = deriveKeyId(publicKey);
   if (payload.signatureKeyId !== expectedKid) {
     return {
@@ -109,6 +124,43 @@ function verifySignedPayload(payload: InstallPayload): VerifyOk | VerifyErr {
   return { ok: true };
 }
 
+/**
+ * Read a response body as text, but bail out if it exceeds `maxBytes`.
+ * Returns null on overflow (caller logs and rejects).
+ */
+async function readBoundedText(res: Response, maxBytes: number): Promise<string | null> {
+  if (!res.body) return await res.text();
+  const reader = res.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    if (value) {
+      total += value.byteLength;
+      if (total > maxBytes) {
+        // Free the buffer; we're throwing this body away.
+        chunks.length = 0;
+        try {
+          await reader.cancel();
+        } catch {
+          // Cancel may reject if the stream is already terminating; safe to ignore.
+        }
+        return null;
+      }
+      chunks.push(value);
+    }
+  }
+  // Concatenate and decode as UTF-8.
+  const merged = new Uint8Array(total);
+  let offset = 0;
+  for (const c of chunks) {
+    merged.set(c, offset);
+    offset += c.byteLength;
+  }
+  return new TextDecoder('utf-8').decode(merged);
+}
+
 export async function fetchInstallPayload(
   source: InstallSource,
   slug: string
@@ -121,7 +173,35 @@ export async function fetchInstallPayload(
     throw new Error(`fetchInstallPayload(${source}, ${slug}): ${res.status} ${res.statusText}`);
   }
 
-  const json = await res.json();
+  // Fast-path reject when the server tells us the body is too big. Not all
+  // upstreams send a reliable Content-Length, so we still bound the body
+  // read below.
+  const declaredLength = Number(res.headers.get('content-length') ?? '');
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_RESPONSE_BYTES) {
+    console.error(
+      `[install] upstream Content-Length ${declaredLength} exceeds limit ${MAX_RESPONSE_BYTES} for ${source}/${slug}`
+    );
+    return null;
+  }
+
+  // Read as text with an explicit size cap so we never buffer a runaway
+  // body. (`res.text()` would buffer the whole stream first.) Parse JSON
+  // ourselves only after the size check passes.
+  const text = await readBoundedText(res, MAX_RESPONSE_BYTES);
+  if (text === null) {
+    console.error(
+      `[install] upstream response exceeded ${MAX_RESPONSE_BYTES} bytes for ${source}/${slug}`
+    );
+    return null;
+  }
+  let json: unknown;
+  try {
+    json = JSON.parse(text);
+  } catch (err) {
+    throw new Error(
+      `fetchInstallPayload(${source}, ${slug}): upstream returned invalid JSON: ${err instanceof Error ? err.message : String(err)}`
+    );
+  }
   const payload = installPayloadSchema.parse(json);
 
   const verify = verifySignedPayload(payload);

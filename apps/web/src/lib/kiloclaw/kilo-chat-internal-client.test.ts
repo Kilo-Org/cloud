@@ -124,4 +124,33 @@ describe('postMessageAsUser (cloud → kilo-chat internal HTTP)', () => {
       process.env.NEXT_PUBLIC_KILO_CHAT_URL = saved;
     }
   });
+
+  it('returns a typed internal error when the request times out', async () => {
+    // Simulate AbortSignal.timeout firing by having fetch reject with a
+    // TimeoutError-named exception (which is what the browser/node fetch
+    // surface when AbortSignal.timeout aborts a request).
+    const timeoutErr = new Error('The operation was aborted due to timeout');
+    timeoutErr.name = 'TimeoutError';
+    jest.spyOn(global, 'fetch').mockRejectedValue(timeoutErr);
+
+    const result = await postMessageAsUser(VALID_PARAMS);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe('internal');
+      expect(result.error).toMatch(/timed out/);
+    }
+  });
+
+  it('returns a typed internal error on a generic network failure', async () => {
+    jest.spyOn(global, 'fetch').mockRejectedValue(new Error('network down'));
+
+    const result = await postMessageAsUser(VALID_PARAMS);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe('internal');
+      expect(result.error).toMatch(/network down|fetch failed/);
+    }
+  });
 });

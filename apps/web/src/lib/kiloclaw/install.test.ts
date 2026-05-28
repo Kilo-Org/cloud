@@ -191,21 +191,40 @@ describe('fetchInstallPayload', () => {
     expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('slug mismatch'));
   });
 
-  it('throws when CLAWBYTE_SIGNING_PUBLIC_KEY is unset', async () => {
+  it('returns null and logs when CLAWBYTE_SIGNING_PUBLIC_KEY is unset', async () => {
+    // Treat missing/unparseable verifier config as a verification failure
+    // rather than a thrown 500, so the install page returns a controlled
+    // "not available" (the route surfaces null as notFound()) and ops can
+    // distinguish it from "byte deleted upstream" via the log line.
     const saved = process.env.CLAWBYTE_SIGNING_PUBLIC_KEY;
     delete process.env.CLAWBYTE_SIGNING_PUBLIC_KEY;
     try {
       const signed = signPayload(VALID_BASE);
       jest.spyOn(global, 'fetch').mockResolvedValue(jsonResponse(signed));
-      jest.spyOn(console, 'error').mockImplementation(() => {});
+      const errSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 
-      // getPublicKey throws inside verifySignedPayload; the throw propagates
-      // out of fetchInstallPayload since we don't catch it there.
-      await expect(fetchInstallPayload('byte', 'deep-research')).rejects.toThrow(
-        /CLAWBYTE_SIGNING_PUBLIC_KEY is not configured/
+      const result = await fetchInstallPayload('byte', 'deep-research');
+
+      expect(result).toBeNull();
+      expect(errSpy).toHaveBeenCalledWith(
+        expect.stringContaining('CLAWBYTE_SIGNING_PUBLIC_KEY is not configured')
       );
     } finally {
       process.env.CLAWBYTE_SIGNING_PUBLIC_KEY = saved;
     }
+  });
+
+  it('rejects an oversize upstream response', async () => {
+    // Build a JSON body that exceeds MAX_RESPONSE_BYTES (256 KiB) so the
+    // bounded reader bails out before Zod parsing even runs.
+    const huge = 'x'.repeat(300 * 1024);
+    const signed = signPayload({ ...VALID_BASE, description: huge });
+    jest.spyOn(global, 'fetch').mockResolvedValue(jsonResponse(signed));
+    const errSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    const result = await fetchInstallPayload('byte', 'deep-research');
+
+    expect(result).toBeNull();
+    expect(errSpy).toHaveBeenCalledWith(expect.stringMatching(/exceeded \d+ bytes|exceeds limit/));
   });
 });

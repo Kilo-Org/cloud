@@ -1,3 +1,5 @@
+import { z } from 'zod';
+
 // Cross-service RPC contracts exposed by the kilo-chat WorkerEntrypoint.
 //
 // Producer:  services/kilo-chat/src/index.ts (KiloChatService)
@@ -49,3 +51,25 @@ export type PostMessageAsUserErr = {
 };
 
 export type PostMessageAsUserResult = PostMessageAsUserOk | PostMessageAsUserErr;
+
+// Runtime schemas for the same shapes, so HTTP callers (e.g. cloud's
+// Next.js app) can Zod-validate responses against one source of truth
+// shared with the producer. Keep `z.infer` aligned with the types above —
+// if you add a field or error code here, mirror it in the type union.
+export const postMessageAsUserOkSchema = z.object({
+  ok: z.literal(true),
+  conversationId: z.string(),
+  messageId: z.string(),
+  conversationCreated: z.boolean(),
+});
+
+export const postMessageAsUserErrSchema = z.object({
+  ok: z.literal(false),
+  code: z.enum(['invalid_request', 'no_conversation', 'forbidden', 'internal']),
+  error: z.string(),
+});
+
+export const postMessageAsUserResultSchema = z.discriminatedUnion('ok', [
+  postMessageAsUserOkSchema,
+  postMessageAsUserErrSchema,
+]);

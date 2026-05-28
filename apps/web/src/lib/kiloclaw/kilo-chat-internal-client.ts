@@ -1,7 +1,16 @@
 import 'server-only';
-import { z } from 'zod';
-import type { PostMessageAsUserParams, PostMessageAsUserResult } from '@kilocode/kilo-chat';
+import {
+  postMessageAsUserResultSchema,
+  type PostMessageAsUserParams,
+  type PostMessageAsUserResult,
+} from '@kilocode/kilo-chat';
 import { INTERNAL_API_SECRET } from '@/lib/config.server';
+
+// 5s is well above kilo-chat's expected p99 for postMessageAsUser
+// (~ a single DO RPC + a sendMessage) and well below Vercel's outer
+// serverless function timeout, so a stuck request fails fast with a
+// typed `internal` result instead of cascading into the wider request.
+const POST_MESSAGE_AS_USER_TIMEOUT_MS = 5_000;
 
 /**
  * Server-side HTTP client for kilo-chat's `/internal/v1/*` routes.
@@ -18,21 +27,6 @@ import { INTERNAL_API_SECRET } from '@/lib/config.server';
  * - `INTERNAL_API_SECRET` — shared secret with kilo-chat's Secrets Store
  *   binding. Already used by other cloud → service integrations.
  */
-
-const okSchema = z.object({
-  ok: z.literal(true),
-  conversationId: z.string(),
-  messageId: z.string(),
-  conversationCreated: z.boolean(),
-});
-
-const errSchema = z.object({
-  ok: z.literal(false),
-  code: z.enum(['invalid_request', 'no_conversation', 'forbidden', 'internal']),
-  error: z.string(),
-});
-
-const responseSchema = z.discriminatedUnion('ok', [okSchema, errSchema]);
 
 function getKiloChatBaseUrl(): string {
   // We deliberately read process.env directly here rather than importing
@@ -59,16 +53,32 @@ export async function postMessageAsUser(
   }
 
   const url = `${getKiloChatBaseUrl()}/internal/v1/post-message-as-user`;
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      'x-internal-api-key': INTERNAL_API_SECRET,
-    },
-    body: JSON.stringify(params),
-    // Internal-only call between services; no caching.
-    cache: 'no-store',
-  });
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-internal-api-key': INTERNAL_API_SECRET,
+      },
+      body: JSON.stringify(params),
+      // Internal-only call between services; no caching.
+      cache: 'no-store',
+      signal: AbortSignal.timeout(POST_MESSAGE_AS_USER_TIMEOUT_MS),
+    });
+  } catch (err) {
+    // AbortSignal.timeout fires with a TimeoutError DOMException. Map to a
+    // typed `internal` result so callers don't have to know about fetch's
+    // abort/network failure modes; same shape regardless of cause.
+    const isTimeout = err instanceof Error && err.name === 'TimeoutError';
+    return {
+      ok: false,
+      code: 'internal',
+      error: isTimeout
+        ? `kilo-chat /internal/v1/post-message-as-user timed out after ${POST_MESSAGE_AS_USER_TIMEOUT_MS}ms`
+        : `kilo-chat /internal/v1/post-message-as-user fetch failed: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
 
   // kilo-chat's internal route always returns a JSON body whether the
   // outcome is ok:true (200) or ok:false (400/403/404/500). Parse first,
@@ -83,7 +93,7 @@ export async function postMessageAsUser(
     );
   }
 
-  const parsed = responseSchema.safeParse(body);
+  const parsed = postMessageAsUserResultSchema.safeParse(body);
   if (!parsed.success) {
     // Most likely: 403 from `internalApiMiddleware` before reaching the
     // route handler, which returns `{ error: 'Forbidden' }`. Surface that

@@ -245,12 +245,7 @@ export async function checkDuplicateCardFingerprintGate(params: {
       blocked_reason: 'kilo_pass_duplicate_card',
       blocked_at: new Date().toISOString(),
     })
-    .where(
-      and(
-        eq(kilocode_users.id, kiloUserId),
-        isNull(kilocode_users.blocked_reason),
-      )
-    );
+    .where(and(eq(kilocode_users.id, kiloUserId), isNull(kilocode_users.blocked_reason)));
 
   return {
     blocked: true,

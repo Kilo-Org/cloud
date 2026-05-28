@@ -3,10 +3,10 @@ import { randomUUID } from 'node:crypto';
 import { insertKiloClawSubscriptionChangeLog } from '@kilocode/db';
 import { CURRENT_KILOCLAW_PRICE_VERSION } from '@kilocode/db/kiloclaw-pricing-catalog';
 import {
-  credit_transactions,
   kilocode_users,
   kiloclaw_instances,
   kiloclaw_subscriptions,
+  organizations,
 } from '@kilocode/db/schema';
 import {
   KiloClawPaymentSource,
@@ -16,28 +16,28 @@ import {
   KiloClawSubscriptionChangeActorType,
   KiloClawSubscriptionStatus,
 } from '@kilocode/db/schema-types';
-import { and, eq, inArray, isNull, like, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNull, like } from 'drizzle-orm';
 
 import { getSeedDb } from '../lib/db';
 import type { SeedResult } from '../index';
 
-const FAKE_SANDBOX_PREFIX = 'ki_fake_';
-const DEFAULT_INSTANCE_NAME = 'Fake local KiloClaw';
+const FAKE_SANDBOX_PREFIX = 'ki_fake_org_';
+const DEFAULT_INSTANCE_NAME = 'Fake local org KiloClaw';
 
-export const usage = '<user-id> [options]';
+export const usage = '<user-id> <org-id> [options]';
 
 function printUsage(): void {
-  console.log('Usage: pnpm dev:seed kiloclaw:fake-instance <user-id> [options]');
+  console.log('Usage: pnpm dev:seed kiloclaw:fake-org-instance <user-id> <org-id> [options]');
   console.log('');
   console.log('Options:');
   console.log('  --plan=standard|trial|commit   Subscription plan to create (default: standard)');
   console.log('  --days=<number>                Days until period/trial end');
-  console.log('  --name=<name>                  Instance name (default: Fake local KiloClaw)');
+  console.log('  --name=<name>                  Instance name');
   console.log('');
   console.log(
-    'The script retires prior fake instances for the same user (sandbox_id starts with ki_fake_)'
+    'Retires prior fake org instances (sandbox_id starts with ki_fake_org_) for the same user+org.'
   );
-  console.log('and refuses to run if the user already has a non-fake active personal instance.');
+  console.log('Creates a DB-only kiloclaw_instances row with organization_id set.');
 }
 
 function parsePlan(value: string): KiloClawPlan {
@@ -74,6 +74,7 @@ function parsePositiveInteger(value: string, flagName: string): number {
 
 function parseArgs(args: string[]): {
   userId: string;
+  organizationId: string;
   plan: KiloClawPlan;
   days: number;
   name: string;
@@ -84,11 +85,17 @@ function parseArgs(args: string[]): {
     throw new Error('user-id is required');
   }
 
+  const organizationId = args[1]?.trim();
+  if (!organizationId || organizationId.startsWith('--')) {
+    printUsage();
+    throw new Error('org-id is required');
+  }
+
   let plan = KiloClawPlan.Standard;
   let days: number | null = null;
   let name = DEFAULT_INSTANCE_NAME;
 
-  for (const arg of args.slice(1)) {
+  for (const arg of args.slice(2)) {
     if (arg === '--help' || arg === '-h') {
       printUsage();
       throw new Error('help requested');
@@ -118,6 +125,7 @@ function parseArgs(args: string[]): {
 
   return {
     userId,
+    organizationId,
     plan,
     days: days ?? defaultDaysForPlan(plan),
     name,
@@ -144,42 +152,6 @@ function paymentSourceForPlan(plan: KiloClawPlan): KiloClawPaymentSource | null 
   return plan === KiloClawPlan.Trial ? null : KiloClawPaymentSource.Credits;
 }
 
-function costMicrodollarsForPlan(plan: KiloClawPlan): number | null {
-  switch (plan) {
-    case KiloClawPlan.Trial:
-      return null;
-    case KiloClawPlan.Standard:
-      return 9_000_000;
-    case KiloClawPlan.Commit:
-      return 48_000_000;
-  }
-}
-
-function periodKey(date: Date): string {
-  const year = date.getUTCFullYear();
-  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
-  return `${year}-${month}`;
-}
-
-function deductionCategoryForPlan(plan: KiloClawPlan, instanceId: string, date: Date): string {
-  const prefix =
-    plan === KiloClawPlan.Commit ? 'kiloclaw-subscription-commit' : 'kiloclaw-subscription';
-  return `${prefix}:${instanceId}:${periodKey(date)}`;
-}
-
-async function assertUserExists(userId: string): Promise<void> {
-  const db = getSeedDb();
-  const [user] = await db
-    .select({ id: kilocode_users.id, email: kilocode_users.google_user_email })
-    .from(kilocode_users)
-    .where(eq(kilocode_users.id, userId))
-    .limit(1);
-
-  if (!user) {
-    throw new Error(`User ${userId} was not found. Sign in locally first or seed/create the user.`);
-  }
-}
-
 export async function run(...args: string[]): Promise<SeedResult | void> {
   if (args.includes('--help') || args.includes('-h')) {
     printUsage();
@@ -189,7 +161,27 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   const options = parseArgs(args);
   const db = getSeedDb();
 
-  await assertUserExists(options.userId);
+  const [user] = await db
+    .select({ id: kilocode_users.id, email: kilocode_users.google_user_email })
+    .from(kilocode_users)
+    .where(eq(kilocode_users.id, options.userId))
+    .limit(1);
+
+  if (!user) {
+    throw new Error(
+      `User ${options.userId} not found. Sign in locally first or seed/create the user.`
+    );
+  }
+
+  const [org] = await db
+    .select({ id: organizations.id, name: organizations.name })
+    .from(organizations)
+    .where(eq(organizations.id, options.organizationId))
+    .limit(1);
+
+  if (!org) {
+    throw new Error(`Organization ${options.organizationId} not found.`);
+  }
 
   const now = new Date();
   const nowIso = now.toISOString();
@@ -198,25 +190,26 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   const sandboxId = sandboxIdForInstance(instanceId);
 
   const result = await db.transaction(async tx => {
+    // Retire prior fake org instances for this user+org.
     const priorFakeInstances = await tx
       .select({ id: kiloclaw_instances.id })
       .from(kiloclaw_instances)
       .where(
         and(
           eq(kiloclaw_instances.user_id, options.userId),
-          isNull(kiloclaw_instances.organization_id),
+          eq(kiloclaw_instances.organization_id, options.organizationId),
           isNull(kiloclaw_instances.destroyed_at),
           like(kiloclaw_instances.sandbox_id, `${FAKE_SANDBOX_PREFIX}%`)
         )
       );
-    const priorFakeInstanceIds = priorFakeInstances.map(instance => instance.id);
+    const priorFakeInstanceIds = priorFakeInstances.map(i => i.id);
 
     if (priorFakeInstanceIds.length > 0) {
       const priorFakeSubscriptions = await tx
         .select()
         .from(kiloclaw_subscriptions)
         .where(inArray(kiloclaw_subscriptions.instance_id, priorFakeInstanceIds));
-      const priorFakeSubscriptionIds = priorFakeSubscriptions.map(subscription => subscription.id);
+      const priorFakeSubscriptionIds = priorFakeSubscriptions.map(s => s.id);
 
       if (priorFakeSubscriptionIds.length > 0) {
         const retiredSubscriptions = await tx
@@ -231,16 +224,16 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
 
         for (const retiredSubscription of retiredSubscriptions) {
           const priorSubscription = priorFakeSubscriptions.find(
-            subscription => subscription.id === retiredSubscription.id
+            s => s.id === retiredSubscription.id
           );
           await insertKiloClawSubscriptionChangeLog(tx, {
             subscriptionId: retiredSubscription.id,
             actor: {
               actorType: KiloClawSubscriptionChangeActorType.System,
-              actorId: 'dev-seed:kiloclaw/fake-instance',
+              actorId: 'dev-seed:kiloclaw/fake-org-instance',
             },
             action: KiloClawSubscriptionChangeAction.Canceled,
-            reason: 'dev_seed:replace_fake_instance',
+            reason: 'dev_seed:replace_fake_org_instance',
             before: priorSubscription ?? null,
             after: retiredSubscription,
           });
@@ -258,26 +251,6 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
         );
     }
 
-    const activePersonalInstances = await tx
-      .select({ id: kiloclaw_instances.id, sandboxId: kiloclaw_instances.sandbox_id })
-      .from(kiloclaw_instances)
-      .where(
-        and(
-          eq(kiloclaw_instances.user_id, options.userId),
-          isNull(kiloclaw_instances.organization_id),
-          isNull(kiloclaw_instances.destroyed_at)
-        )
-      );
-
-    if (activePersonalInstances.length > 0) {
-      const instanceList = activePersonalInstances
-        .map(instance => `${instance.id} (${instance.sandboxId})`)
-        .join(', ');
-      throw new Error(
-        `User ${options.userId} already has active personal KiloClaw instance(s): ${instanceList}`
-      );
-    }
-
     const [instance] = await tx
       .insert(kiloclaw_instances)
       .values({
@@ -285,7 +258,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
         user_id: options.userId,
         sandbox_id: sandboxId,
         provider: KiloClawProvider.DockerLocal,
-        organization_id: null,
+        organization_id: options.organizationId,
         name: options.name,
         inbound_email_enabled: true,
         inactive_trial_stopped_at: null,
@@ -294,65 +267,6 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
         tracked_image_tag: 'fake-local-instance',
       })
       .returning();
-
-    const costMicrodollars = costMicrodollarsForPlan(options.plan);
-    if (costMicrodollars !== null) {
-      const [user] = await tx
-        .select({
-          microdollarsUsed: kilocode_users.microdollars_used,
-          totalMicrodollarsAcquired: kilocode_users.total_microdollars_acquired,
-        })
-        .from(kilocode_users)
-        .where(eq(kilocode_users.id, options.userId))
-        .limit(1);
-
-      if (!user) {
-        throw new Error(`User ${options.userId} was not found. Sign in locally first.`);
-      }
-
-      const balanceMicrodollars = user.totalMicrodollarsAcquired - user.microdollarsUsed;
-      const creditGrantMicrodollars = Math.max(costMicrodollars - balanceMicrodollars, 0);
-
-      if (creditGrantMicrodollars > 0) {
-        await tx.insert(credit_transactions).values({
-          id: randomUUID(),
-          kilo_user_id: options.userId,
-          amount_microdollars: creditGrantMicrodollars,
-          is_free: true,
-          description: `Dev seed credits for KiloClaw ${options.plan} enrollment`,
-          credit_category: `dev-seed:kiloclaw-fake-instance-credit:${instance.id}`,
-          check_category_uniqueness: true,
-          original_baseline_microdollars_used: user.microdollarsUsed,
-          created_at: nowIso,
-        });
-
-        await tx
-          .update(kilocode_users)
-          .set({
-            total_microdollars_acquired: sql`${kilocode_users.total_microdollars_acquired} + ${creditGrantMicrodollars}`,
-          })
-          .where(eq(kilocode_users.id, options.userId));
-      }
-
-      await tx.insert(credit_transactions).values({
-        id: randomUUID(),
-        kilo_user_id: options.userId,
-        amount_microdollars: -costMicrodollars,
-        is_free: false,
-        description: `Dev seed KiloClaw ${options.plan} enrollment`,
-        credit_category: deductionCategoryForPlan(options.plan, instance.id, now),
-        check_category_uniqueness: true,
-        original_baseline_microdollars_used: user.microdollarsUsed,
-        created_at: nowIso,
-      });
-
-      await tx
-        .update(kilocode_users)
-        .set({
-          microdollars_used: sql`${kilocode_users.microdollars_used} + ${costMicrodollars}`,
-        })
-        .where(eq(kilocode_users.id, options.userId));
-    }
 
     const [subscription] = await tx
       .insert(kiloclaw_subscriptions)
@@ -378,10 +292,10 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
       subscriptionId: subscription.id,
       actor: {
         actorType: KiloClawSubscriptionChangeActorType.System,
-        actorId: 'dev-seed:kiloclaw/fake-instance',
+        actorId: 'dev-seed:kiloclaw/fake-org-instance',
       },
       action: KiloClawSubscriptionChangeAction.Created,
-      reason: 'dev_seed:fake_instance',
+      reason: 'dev_seed:fake_org_instance',
       before: null,
       after: subscription,
     });
@@ -390,10 +304,13 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   });
 
   console.log('');
-  console.log('Note: this is DB-only. No Durable Object, container, or provider resource exists.');
+  console.log(`Organization:  ${org.name} (${org.id})`);
+  console.log(`User email:    ${user.email}`);
+  console.log('Note: DB-only. No Durable Object, container, or provider resource exists.');
 
   return {
     userId: options.userId,
+    organizationId: options.organizationId,
     instanceId: result.instance.id,
     sandboxId: result.instance.sandbox_id,
     subscriptionId: result.subscription.id,

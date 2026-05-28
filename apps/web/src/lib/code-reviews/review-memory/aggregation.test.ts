@@ -10,7 +10,7 @@ import {
   code_review_memory_proposals,
   kilocode_users,
 } from '@kilocode/db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import { dispatchManualReviewMemoryAggregation } from './aggregation';
 import {
   listProposalEvidence,
@@ -193,6 +193,33 @@ describe('review memory aggregation', () => {
       .from(code_review_memory_aggregation_state)
       .where(eq(code_review_memory_aggregation_state.repo_full_name, 'acme/other'));
     expect(otherState.status).toBe('eligible');
+  });
+
+  it('does not aggregate feedback outside the retention window', async () => {
+    const user = await insertTestUser();
+    const owner = { type: 'user' as const, id: user.id };
+    const events = await seedActionableFeedback(owner, 'acme/expired');
+    const expiredCreatedAt = '2026-05-01T00:00:00.000Z';
+    await db
+      .update(code_review_feedback_events)
+      .set({ created_at: expiredCreatedAt, occurred_at: expiredCreatedAt })
+      .where(
+        inArray(
+          code_review_feedback_events.id,
+          events.map(event => event.id)
+        )
+      );
+    const generateOpportunities = jest.fn();
+
+    const summary = await dispatchManualReviewMemoryAggregation({
+      now: new Date('2026-06-01T00:00:00.000Z'),
+      generateOpportunities,
+    });
+
+    expect(summary).toEqual({ claimed: 0, completed: 0, skipped: 0, failed: 0, proposals: 0 });
+    expect(generateOpportunities).not.toHaveBeenCalled();
+    await expect(db.select().from(code_review_feedback_events)).resolves.toHaveLength(0);
+    await expect(db.select().from(code_review_memory_aggregation_state)).resolves.toHaveLength(0);
   });
 
   it('skips weak MR-level-only feedback without calling the model', async () => {

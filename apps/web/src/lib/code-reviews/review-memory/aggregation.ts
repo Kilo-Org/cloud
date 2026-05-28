@@ -32,6 +32,7 @@ import {
   listReviewMemoryProposals,
   markFeedbackEventsAggregationState,
   markFeedbackEventsIncluded,
+  pruneExpiredReviewMemoryData,
   refreshAggregationStateForScope,
   updateAggregationRunStatus,
   upsertReviewMemoryProposal,
@@ -427,6 +428,7 @@ async function processClaimedAggregationScope(
         platform: state.platform,
         repoFullName: state.repo_full_name,
         platformProjectId: state.platform_project_id,
+        now: options.now,
       });
       return { status: 'skipped', proposals: 0, reason: 'no_actionable_comment_evidence' };
     }
@@ -521,6 +523,7 @@ async function processClaimedAggregationScope(
       platform: state.platform,
       repoFullName: state.repo_full_name,
       platformProjectId: state.platform_project_id,
+      now: options.now,
     });
 
     return { status: 'completed', proposals: proposalCount };
@@ -552,6 +555,7 @@ export async function dispatchManualReviewMemoryAggregation(
   const now = options.now ?? new Date();
   const generateOpportunities =
     options.generateOpportunities ?? generateReviewMemoryOpportunitiesWithGateway;
+  await pruneExpiredReviewMemoryData({ now });
   const claimed = await claimEligibleAggregationStates({
     limit: options.limit ?? 10,
     stateId: options.stateId,

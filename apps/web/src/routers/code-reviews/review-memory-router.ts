@@ -13,6 +13,7 @@ import {
   listProposalEvidence,
   listReviewMemoryProposals,
   listReviewMemoryRepositories,
+  pruneExpiredReviewMemoryData,
   refreshAggregationStateForScope,
   rejectReviewMemoryProposal,
   updateReviewMemoryProposal,
@@ -199,6 +200,7 @@ export const reviewMemoryRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       const owner = await ownerFromInput(ctx, input);
+      await pruneExpiredReviewMemoryData();
       const state = await refreshAggregationStateForScope({
         owner,
         platform: input.platform,
@@ -206,6 +208,12 @@ export const reviewMemoryRouter = createTRPCRouter({
         platformProjectId: input.platformProjectId,
       });
       const summary = await dispatchManualReviewMemoryAggregation({ limit: 1, stateId: state.id });
-      return { state, summary };
+      const refreshedState = await refreshAggregationStateForScope({
+        owner,
+        platform: input.platform,
+        repoFullName: input.repoFullName,
+        platformProjectId: input.platformProjectId,
+      });
+      return { state: refreshedState, summary };
     }),
 });

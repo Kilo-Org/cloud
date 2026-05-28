@@ -32,7 +32,19 @@ import type {
   ReviewMemorySubjectState,
   ReviewMemorySubjectType,
 } from '@kilocode/db/schema-types';
-import { and, desc, eq, inArray, sql, type SQL } from 'drizzle-orm';
+import {
+  and,
+  desc,
+  eq,
+  getTableColumns,
+  gte,
+  inArray,
+  lt,
+  notExists,
+  sql,
+  type SQL,
+} from 'drizzle-orm';
+import { reviewMemoryRetentionCutoff } from './retention';
 
 export type ReviewMemoryDatabase = typeof db | DrizzleTransaction;
 
@@ -82,6 +94,92 @@ function proposalOwnerWhere(owner: ReviewMemoryOwner): SQL {
   return owner.type === 'org'
     ? eq(code_review_memory_proposals.owned_by_organization_id, owner.id)
     : eq(code_review_memory_proposals.owned_by_user_id, owner.id);
+}
+
+function retainedProposalWhere(now?: Date): SQL {
+  return gte(code_review_memory_proposals.created_at, reviewMemoryRetentionCutoff(now));
+}
+
+function retainedFreshEventWhere(now?: Date): SQL {
+  return sql`${code_review_feedback_events.aggregation_state} = 'fresh' AND ${
+    code_review_feedback_events.created_at
+  } >= ${reviewMemoryRetentionCutoff(now)}`;
+}
+
+function aggregationStateFreshEventScopeWhere(cutoff: string): SQL {
+  return sql`
+    ${code_review_feedback_events.owned_by_organization_id} IS NOT DISTINCT FROM ${code_review_memory_aggregation_state.owned_by_organization_id}
+    AND ${code_review_feedback_events.owned_by_user_id} IS NOT DISTINCT FROM ${code_review_memory_aggregation_state.owned_by_user_id}
+    AND ${code_review_feedback_events.platform} = ${code_review_memory_aggregation_state.platform}
+    AND ${code_review_feedback_events.repo_full_name} = ${code_review_memory_aggregation_state.repo_full_name}
+    AND ${code_review_feedback_events.aggregation_state} = 'fresh'
+    AND ${code_review_feedback_events.created_at} >= ${cutoff}
+  `;
+}
+
+function aggregationStateProposalScopeWhere(cutoff: string): SQL {
+  return sql`
+    ${code_review_memory_proposals.owned_by_organization_id} IS NOT DISTINCT FROM ${code_review_memory_aggregation_state.owned_by_organization_id}
+    AND ${code_review_memory_proposals.owned_by_user_id} IS NOT DISTINCT FROM ${code_review_memory_aggregation_state.owned_by_user_id}
+    AND ${code_review_memory_proposals.platform} = ${code_review_memory_aggregation_state.platform}
+    AND ${code_review_memory_proposals.repo_full_name} = ${code_review_memory_aggregation_state.repo_full_name}
+    AND ${code_review_memory_proposals.created_at} >= ${cutoff}
+  `;
+}
+
+function aggregationStateHasRetainedDataWhere(cutoff: string): SQL {
+  return sql`(
+    EXISTS (
+      SELECT 1
+      FROM ${code_review_feedback_events}
+      WHERE ${aggregationStateFreshEventScopeWhere(cutoff)}
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM ${code_review_memory_proposals}
+      WHERE ${aggregationStateProposalScopeWhere(cutoff)}
+    )
+  )`;
+}
+
+function retainedFreshEventCountForAggregationState(cutoff: string): SQL<number> {
+  return sql<number>`(
+    SELECT COUNT(*)::int
+    FROM ${code_review_feedback_events}
+    WHERE ${aggregationStateFreshEventScopeWhere(cutoff)}
+  )`;
+}
+
+function retainedFreshEventWeightForAggregationState(cutoff: string): SQL<number> {
+  return sql<number>`(
+    SELECT COALESCE(SUM(${code_review_feedback_events.strength}), 0)::int
+    FROM ${code_review_feedback_events}
+    WHERE ${aggregationStateFreshEventScopeWhere(cutoff)}
+  )`;
+}
+
+function retainedFreshEventSubjectCountForAggregationState(cutoff: string): SQL<number> {
+  return sql<number>`(
+    SELECT COUNT(DISTINCT ${code_review_feedback_events.subject_id}) FILTER (WHERE ${code_review_feedback_events.subject_id} IS NOT NULL)::int
+    FROM ${code_review_feedback_events}
+    WHERE ${aggregationStateFreshEventScopeWhere(cutoff)}
+  )`;
+}
+
+function retainedFreshEventPrCountForAggregationState(cutoff: string): SQL<number> {
+  return sql<number>`(
+    SELECT COUNT(DISTINCT ${code_review_feedback_events.pr_number}) FILTER (WHERE ${code_review_feedback_events.pr_number} IS NOT NULL)::int
+    FROM ${code_review_feedback_events}
+    WHERE ${aggregationStateFreshEventScopeWhere(cutoff)}
+  )`;
+}
+
+function retainedLastFreshEventCreatedAtForAggregationState(cutoff: string): SQL<string | null> {
+  return sql<string | null>`(
+    SELECT MAX(${code_review_feedback_events.created_at})
+    FROM ${code_review_feedback_events}
+    WHERE ${aggregationStateFreshEventScopeWhere(cutoff)}
+  )`;
 }
 
 function compactText(
@@ -408,6 +506,7 @@ export type RefreshAggregationStateInput = {
   platform: ReviewMemoryPlatform;
   repoFullName: string;
   platformProjectId?: number | null;
+  now?: Date;
   database?: ReviewMemoryDatabase;
 };
 
@@ -415,11 +514,13 @@ export async function refreshAggregationStateForScope(
   input: RefreshAggregationStateInput
 ): Promise<CodeReviewMemoryAggregationState> {
   const database = databaseOrDefault(input.database);
+  const cutoff = reviewMemoryRetentionCutoff(input.now);
   const conditions = [
     eventOwnerWhere(input.owner),
     eq(code_review_feedback_events.platform, input.platform),
     eq(code_review_feedback_events.repo_full_name, input.repoFullName),
     eq(code_review_feedback_events.aggregation_state, 'fresh'),
+    gte(code_review_feedback_events.created_at, cutoff),
   ] satisfies SQL[];
 
   const [rollup] = await database
@@ -484,6 +585,121 @@ export async function refreshAggregationStateForScope(
 
   if (!inserted) throw new Error('Failed to insert review memory aggregation state');
   return inserted;
+}
+
+export type PruneExpiredReviewMemoryDataSummary = {
+  cutoff: string;
+  proposalsDeleted: number;
+  aggregationRunsDeleted: number;
+  feedbackEventsDeleted: number;
+  subjectsDeleted: number;
+  aggregationStatesDeleted: number;
+};
+
+type ReviewMemoryScopeRow = {
+  ownedByOrganizationId: string | null;
+  ownedByUserId: string | null;
+  platform: ReviewMemoryPlatform;
+  repoFullName: string;
+  platformProjectId: number | null;
+};
+
+function ownerFromScopeRow(row: ReviewMemoryScopeRow): ReviewMemoryOwner | null {
+  if (row.ownedByOrganizationId) return { type: 'org', id: row.ownedByOrganizationId };
+  if (row.ownedByUserId) return { type: 'user', id: row.ownedByUserId };
+  return null;
+}
+
+async function refreshAggregationScopes(input: {
+  scopes: ReviewMemoryScopeRow[];
+  now: Date;
+  database: ReviewMemoryDatabase;
+}): Promise<void> {
+  const seen = new Set<string>();
+  for (const scope of input.scopes) {
+    const owner = ownerFromScopeRow(scope);
+    if (!owner) continue;
+
+    const key = [owner.type, owner.id, scope.platform, scope.repoFullName].join(':');
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    await refreshAggregationStateForScope({
+      owner,
+      platform: scope.platform,
+      repoFullName: scope.repoFullName,
+      platformProjectId: scope.platformProjectId,
+      now: input.now,
+      database: input.database,
+    });
+  }
+}
+
+export async function pruneExpiredReviewMemoryData(
+  input: {
+    now?: Date;
+    database?: ReviewMemoryDatabase;
+  } = {}
+): Promise<PruneExpiredReviewMemoryDataSummary> {
+  const database = databaseOrDefault(input.database);
+  const now = input.now ?? new Date();
+  const cutoff = reviewMemoryRetentionCutoff(now);
+  const expiredEventScopes = await database
+    .selectDistinct({
+      ownedByOrganizationId: code_review_feedback_events.owned_by_organization_id,
+      ownedByUserId: code_review_feedback_events.owned_by_user_id,
+      platform: code_review_feedback_events.platform,
+      repoFullName: code_review_feedback_events.repo_full_name,
+      platformProjectId: code_review_feedback_events.platform_project_id,
+    })
+    .from(code_review_feedback_events)
+    .where(lt(code_review_feedback_events.created_at, cutoff));
+
+  const deletedProposals = await database
+    .delete(code_review_memory_proposals)
+    .where(lt(code_review_memory_proposals.created_at, cutoff))
+    .returning({ id: code_review_memory_proposals.id });
+
+  const deletedAggregationRuns = await database
+    .delete(code_review_memory_aggregation_runs)
+    .where(lt(code_review_memory_aggregation_runs.created_at, cutoff))
+    .returning({ id: code_review_memory_aggregation_runs.id });
+
+  const deletedFeedbackEvents = await database
+    .delete(code_review_feedback_events)
+    .where(lt(code_review_feedback_events.created_at, cutoff))
+    .returning({ id: code_review_feedback_events.id });
+
+  await refreshAggregationScopes({ scopes: expiredEventScopes, now, database });
+
+  const deletedSubjects = await database
+    .delete(code_review_feedback_subjects)
+    .where(
+      and(
+        lt(code_review_feedback_subjects.last_seen_at, cutoff),
+        notExists(
+          database
+            .select({ one: sql`1` })
+            .from(code_review_feedback_events)
+            .where(eq(code_review_feedback_events.subject_id, code_review_feedback_subjects.id))
+        )
+      )
+    )
+    .returning({ id: code_review_feedback_subjects.id });
+
+  const deletedAggregationStates = await database
+    .delete(code_review_memory_aggregation_state)
+    .where(sql`NOT ${aggregationStateHasRetainedDataWhere(cutoff)}`)
+    .returning({ id: code_review_memory_aggregation_state.id });
+
+  return {
+    cutoff,
+    proposalsDeleted: deletedProposals.length,
+    aggregationRunsDeleted: deletedAggregationRuns.length,
+    feedbackEventsDeleted: deletedFeedbackEvents.length,
+    subjectsDeleted: deletedSubjects.length,
+    aggregationStatesDeleted: deletedAggregationStates.length,
+  };
 }
 
 export type CreateAggregationRunInput = {
@@ -707,6 +923,7 @@ export async function upsertReviewMemoryProposal(
         eq(code_review_memory_proposals.platform, input.platform),
         eq(code_review_memory_proposals.repo_full_name, input.repoFullName),
         eq(code_review_memory_proposals.dedupe_key, input.dedupeKey),
+        retainedProposalWhere(),
         inArray(code_review_memory_proposals.status, activeStatuses)
       )
     )
@@ -829,7 +1046,7 @@ export async function listFeedbackEventsForAggregation(input: {
         eventOwnerWhere(input.owner),
         eq(code_review_feedback_events.platform, input.platform),
         eq(code_review_feedback_events.repo_full_name, input.repoFullName),
-        eq(code_review_feedback_events.aggregation_state, 'fresh')
+        retainedFreshEventWhere()
       )
     )
     .orderBy(desc(code_review_feedback_events.created_at))
@@ -870,16 +1087,26 @@ export async function listAggregationStates(input: {
   database?: ReviewMemoryDatabase;
 }): Promise<CodeReviewMemoryAggregationState[]> {
   const database = databaseOrDefault(input.database);
+  const cutoff = reviewMemoryRetentionCutoff();
   const conditions: SQL[] = [
     aggregationStateOwnerWhere(input.owner),
     eq(code_review_memory_aggregation_state.platform, input.platform),
+    aggregationStateHasRetainedDataWhere(cutoff),
   ];
   if (input.repoFullName) {
     conditions.push(eq(code_review_memory_aggregation_state.repo_full_name, input.repoFullName));
   }
+  const stateColumns = getTableColumns(code_review_memory_aggregation_state);
 
   return await database
-    .select()
+    .select({
+      ...stateColumns,
+      fresh_event_count: retainedFreshEventCountForAggregationState(cutoff),
+      fresh_weight: retainedFreshEventWeightForAggregationState(cutoff),
+      fresh_distinct_subject_count: retainedFreshEventSubjectCountForAggregationState(cutoff),
+      fresh_distinct_pr_count: retainedFreshEventPrCountForAggregationState(cutoff),
+      last_included_event_created_at: retainedLastFreshEventCreatedAtForAggregationState(cutoff),
+    })
     .from(code_review_memory_aggregation_state)
     .where(and(...conditions))
     .orderBy(desc(code_review_memory_aggregation_state.updated_at));
@@ -891,17 +1118,19 @@ export async function listReviewMemoryRepositories(input: {
   database?: ReviewMemoryDatabase;
 }): Promise<{ repoFullName: string; platformProjectId: number | null; freshEventCount: number }[]> {
   const database = databaseOrDefault(input.database);
+  const cutoff = reviewMemoryRetentionCutoff();
   const rows = await database
     .select({
       repoFullName: code_review_memory_aggregation_state.repo_full_name,
       platformProjectId: code_review_memory_aggregation_state.platform_project_id,
-      freshEventCount: code_review_memory_aggregation_state.fresh_event_count,
+      freshEventCount: retainedFreshEventCountForAggregationState(cutoff),
     })
     .from(code_review_memory_aggregation_state)
     .where(
       and(
         aggregationStateOwnerWhere(input.owner),
-        eq(code_review_memory_aggregation_state.platform, input.platform)
+        eq(code_review_memory_aggregation_state.platform, input.platform),
+        aggregationStateHasRetainedDataWhere(cutoff)
       )
     )
     .orderBy(desc(code_review_memory_aggregation_state.updated_at));
@@ -919,6 +1148,7 @@ export async function countActionableProposals(input: {
   const conditions: SQL[] = [
     proposalOwnerWhere(input.owner),
     eq(code_review_memory_proposals.platform, input.platform),
+    retainedProposalWhere(),
     inArray(code_review_memory_proposals.status, ACTIONABLE_REVIEW_MEMORY_PROPOSAL_STATUSES),
   ];
   if (input.repoFullName) {
@@ -947,6 +1177,7 @@ export async function listReviewMemoryProposals(input: {
   const conditions: SQL[] = [
     proposalOwnerWhere(input.owner),
     eq(code_review_memory_proposals.platform, input.platform),
+    retainedProposalWhere(),
   ];
   if (input.repoFullName)
     conditions.push(eq(code_review_memory_proposals.repo_full_name, input.repoFullName));
@@ -974,7 +1205,11 @@ export async function getReviewMemoryProposal(input: {
     .select()
     .from(code_review_memory_proposals)
     .where(
-      and(proposalOwnerWhere(input.owner), eq(code_review_memory_proposals.id, input.proposalId))
+      and(
+        proposalOwnerWhere(input.owner),
+        eq(code_review_memory_proposals.id, input.proposalId),
+        retainedProposalWhere()
+      )
     )
     .limit(1);
 
@@ -1007,7 +1242,12 @@ export async function listProposalEvidence(input: {
       code_review_feedback_subjects,
       eq(code_review_feedback_events.subject_id, code_review_feedback_subjects.id)
     )
-    .where(eq(code_review_memory_proposal_evidence.proposal_id, input.proposalId))
+    .where(
+      and(
+        eq(code_review_memory_proposal_evidence.proposal_id, input.proposalId),
+        gte(code_review_feedback_events.created_at, reviewMemoryRetentionCutoff())
+      )
+    )
     .orderBy(desc(code_review_feedback_events.created_at));
 
   return rows.map(row => ({
@@ -1045,6 +1285,7 @@ export async function updateReviewMemoryProposal(input: {
       and(
         proposalOwnerWhere(input.owner),
         eq(code_review_memory_proposals.id, input.proposalId),
+        retainedProposalWhere(),
         inArray(code_review_memory_proposals.status, ACTIONABLE_REVIEW_MEMORY_PROPOSAL_STATUSES)
       )
     )
@@ -1069,7 +1310,11 @@ export async function rejectReviewMemoryProposal(input: {
       updated_at: new Date().toISOString(),
     })
     .where(
-      and(proposalOwnerWhere(input.owner), eq(code_review_memory_proposals.id, input.proposalId))
+      and(
+        proposalOwnerWhere(input.owner),
+        eq(code_review_memory_proposals.id, input.proposalId),
+        retainedProposalWhere()
+      )
     )
     .returning();
 
@@ -1100,6 +1345,7 @@ export async function markProposalOpeningChangeRequest(input: {
       and(
         proposalOwnerWhere(input.owner),
         eq(code_review_memory_proposals.id, input.proposalId),
+        retainedProposalWhere(),
         inArray(code_review_memory_proposals.status, ACTIONABLE_REVIEW_MEMORY_PROPOSAL_STATUSES)
       )
     )

@@ -8,6 +8,11 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
+import {
+  REVIEW_MEMORY_RETENTION_COPY,
+  REVIEW_MEMORY_RETENTION_DAYS,
+  REVIEW_MEMORY_RETENTION_LABEL,
+} from '@/lib/code-reviews/review-memory/retention';
 import { useTRPC } from '@/lib/trpc/utils';
 import { cn } from '@/lib/utils';
 import type { ReviewMemoryProposalStatus } from '@kilocode/db/schema-types';
@@ -120,12 +125,18 @@ export function ReviewMemoryPanel({ organizationId, platform }: ReviewMemoryPane
       <Card>
         <CardHeader className="gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="space-y-1.5">
-            <CardTitle className="flex items-center gap-2">
-              <Brain className="size-4" />
-              Review memory
+            <CardTitle className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-2">
+                <Brain className="size-4" />
+                Review memory
+              </span>
+              <Badge variant="outline" className="text-muted-foreground">
+                {REVIEW_MEMORY_RETENTION_LABEL}
+              </Badge>
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="max-w-2xl">
               Turn recurring reviewer feedback into proposed REVIEW.md guidance.
+              {` ${REVIEW_MEMORY_RETENTION_COPY}`}
             </CardDescription>
           </div>
           <Button
@@ -148,7 +159,7 @@ export function ReviewMemoryPanel({ organizationId, platform }: ReviewMemoryPane
             value={summaryQuery.data?.repositories.length ?? 0}
           />
           <Metric
-            label="Fresh signals"
+            label={`Fresh signals from the last ${REVIEW_MEMORY_RETENTION_DAYS} days`}
             value={
               summaryQuery.data?.states.reduce((sum, state) => sum + state.fresh_event_count, 0) ??
               0
@@ -172,8 +183,8 @@ export function ReviewMemoryPanel({ organizationId, platform }: ReviewMemoryPane
               </div>
             ) : proposals.length === 0 ? (
               <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
-                No proposals yet. Kilo waits for repeated, high-signal feedback before suggesting
-                memory changes.
+                No proposals from retained feedback yet. Kilo waits for repeated, high-signal
+                feedback before suggesting memory changes.
               </div>
             ) : (
               proposals.map(proposal => (

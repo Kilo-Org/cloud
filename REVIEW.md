@@ -154,3 +154,5 @@ One concise sentence describing the reviewed scope and confidence level.
 
 </details>
 ```
+
+Start a new sub-agent looking for BYOK issues.

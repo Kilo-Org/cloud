@@ -63,6 +63,7 @@ export const GITHUB_ACTION = {
   DELETED: 'deleted',
   SUSPEND: 'suspend',
   UNSUSPEND: 'unsuspend',
+  RENAMED: 'renamed',
 
   // Repository actions
   ADDED: 'added',

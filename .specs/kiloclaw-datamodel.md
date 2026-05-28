@@ -19,8 +19,9 @@ background jobs). All consumers MUST comply with the rules below.
 
 ## Status
 
-Draft — created 2026-04-15.
+Draft -- created 2026-04-15.
 Updated 2026-05-12 -- required KiloClaw price-version lineage invariants.
+Updated 2026-05-28 -- fraud-enforcement subscription mutation invariants.
 
 ## Conventions
 
@@ -57,11 +58,14 @@ capitals, as shown here.
 - **Actor**: The entity responsible for a subscription mutation.
   An actor is either a user (identified by user ID) or the system
   (identified by a service or process name).
-- **Context**: The ownership scope of an instance — either
+- **Context**: The ownership scope of an instance -- either
   _personal_ (not associated with any organization) or
   _organizational_ (associated with a specific organization). A user
   has one personal context and one organizational context per
   organization they belong to.
+- **Fraud-enforcement mutation**: Exceptional personal subscription
+  cancellation or suspension required by an enforced Stripe Early
+  Fraud Warning under `.specs/stripe-early-fraud-warnings.md`.
 - **Active instance**: An instance record that has not been marked
   as destroyed.
 - **Mutation**: Any database write (INSERT or UPDATE) to a
@@ -269,6 +273,13 @@ and serves as the authoritative audit trail for subscription state.
     identifiers (e.g., Stripe subscription ID, invoice ID) MAY be
     included as context.
 
+### Fraud-Enforcement Mutations
+
+- An enforced personal Stripe Early Fraud Warning is an exceptional immediate mutation path. It MUST cancel or suspend affected personal subscription state without relying on ordinary paid-period continuation.
+- A fraud-enforcement cancellation or suspension MUST write subscription change log entries with a system actor, consistent action labels, and a non-sensitive fraud-enforcement reason.
+- A fraud-enforcement suspension MUST retain the associated instance and subscription records and MUST assign the seven-day destruction grace defined by KiloClaw billing rather than destroying data immediately.
+- Organization-managed subscription and instance rows MUST NOT be mutated automatically for an organization-owned Early Fraud Warning in the initial rollout.
+
 ### Record Creation Order
 
 The creation order below reflects the target lifecycle. This order
@@ -341,6 +352,11 @@ not yet enforced in the current codebase:
    complete cross-service coverage remains the intended invariant.
 
 ## Changelog
+
+### 2026-05-28 -- Fraud-enforcement subscription mutations
+
+- Defined enforced personal Stripe Early Fraud Warnings as exceptional immediate cancellation/suspension mutations that retain instance history, write system-attributed change logs, and preserve the seven-day destruction grace.
+- Excluded organization-owned warnings from automatic organization-managed instance or subscription mutation.
 
 ### 2026-05-12 -- Required KiloClaw price-version lineage invariants
 

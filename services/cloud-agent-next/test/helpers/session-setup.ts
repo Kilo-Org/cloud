@@ -102,7 +102,6 @@ export function groupedRegisterSessionInput(input: TestRegisterSessionInput): Re
       ? {
           type: 'gitlab',
           url: input.gitUrl,
-          token: input.gitToken,
           branch: input.upstreamBranch,
         }
       : input.gitUrl

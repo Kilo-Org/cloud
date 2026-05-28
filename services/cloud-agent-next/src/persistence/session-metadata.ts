@@ -28,14 +28,14 @@ const MetadataIdentitySchema = z
     botId: z.string().optional(),
     createdOnPlatform: z.string().max(100).optional(),
   })
-  .strict();
+  .strip();
 
 const MetadataAuthSchema = z
   .object({
     kiloSessionId: z.string().optional(),
     kilocodeToken: z.string().optional(),
   })
-  .strict();
+  .strip();
 
 const RepositoryCommonSchema = {
   token: z.string().optional(),
@@ -52,7 +52,7 @@ const MetadataRepositorySchema = z.discriminatedUnion('type', [
       githubAppType: z.enum(['standard', 'lite']).optional(),
       ...RepositoryCommonSchema,
     })
-    .strict(),
+    .strip(),
   z
     .object({
       type: z.literal('gitlab'),
@@ -61,7 +61,7 @@ const MetadataRepositorySchema = z.discriminatedUnion('type', [
       gitlabTokenManaged: z.boolean().optional(),
       ...RepositoryCommonSchema,
     })
-    .strict(),
+    .strip(),
   z
     .object({
       type: z.literal('git'),
@@ -69,7 +69,7 @@ const MetadataRepositorySchema = z.discriminatedUnion('type', [
       platform: z.enum(['github', 'gitlab']).optional(),
       ...RepositoryCommonSchema,
     })
-    .strict(),
+    .strip(),
 ]);
 
 const CurrentMetadataInitialTurnSchema = z.discriminatedUnion('type', [
@@ -79,14 +79,14 @@ const CurrentMetadataInitialTurnSchema = z.discriminatedUnion('type', [
       prompt: z.string(),
       attachments: AttachmentsSchema.optional(),
     })
-    .strict(),
+    .strip(),
   z
     .object({
       type: z.literal('command'),
       command: z.string().min(1),
       arguments: z.string(),
     })
-    .strict(),
+    .strip(),
 ]);
 
 const CurrentMetadataInitialMessageSchema = z
@@ -96,7 +96,7 @@ const CurrentMetadataInitialMessageSchema = z
     attachments: AttachmentsSchema.optional(),
     turn: CurrentMetadataInitialTurnSchema.optional(),
   })
-  .strict();
+  .strip();
 
 const MetadataAgentSchema = z
   .object({
@@ -109,7 +109,7 @@ const MetadataAgentSchema = z
       .optional(),
     appendSystemPrompt: z.string().max(10000).optional(),
   })
-  .strict();
+  .strip();
 
 const MetadataFinalizationSchema = z
   .object({
@@ -117,13 +117,13 @@ const MetadataFinalizationSchema = z
     condenseOnComplete: z.boolean().optional(),
     gateThreshold: z.enum(['off', 'all', 'warning', 'critical']).optional(),
   })
-  .strict();
+  .strip();
 
 const MetadataCallbackSchema = z
   .object({
     target: CallbackTargetSchema.optional(),
   })
-  .strict();
+  .strip();
 
 const MetadataWorkspaceSchema = z
   .object({
@@ -134,7 +134,7 @@ const MetadataWorkspaceSchema = z
     shallow: z.boolean().optional(),
     devcontainerRequested: z.boolean().optional(),
   })
-  .strict();
+  .strip();
 
 const MetadataDevContainerSchema = z
   .object({
@@ -143,7 +143,7 @@ const MetadataDevContainerSchema = z
     wrapperPort: z.number().int().min(1).max(65535),
     configPath: z.string(),
   })
-  .strict();
+  .strip();
 
 const MetadataLifecycleSchema = z
   .object({
@@ -153,7 +153,7 @@ const MetadataLifecycleSchema = z
     initiatedAt: z.number().optional(),
     kiloServerLastActivity: z.number().optional(),
   })
-  .strict();
+  .strip();
 
 export const CurrentSessionMetadataSchema = z
   .object({
@@ -170,7 +170,7 @@ export const CurrentSessionMetadataSchema = z
     devcontainer: MetadataDevContainerSchema.optional(),
     lifecycle: MetadataLifecycleSchema,
   })
-  .strict();
+  .strip();
 
 export type SessionMetadata = z.infer<typeof CurrentSessionMetadataSchema>;
 

@@ -28,9 +28,7 @@ const vercelModelIdMapping: Record<string, string | undefined> = {
   'mistralai/devstral-2512': 'mistral/devstral-2',
   'mistralai/mistral-embed-2312': 'mistral/mistral-embed',
   'mistralai/codestral-embed-2505': 'mistral/codestral-embed',
-  'x-ai/grok-4-fast': 'xai/grok-4-fast-reasoning',
-  'x-ai/grok-4.1-fast': 'xai/grok-4.1-fast-reasoning',
-  'x-ai/grok-4.20-beta': 'xai/grok-4.20-reasoning',
+  'x-ai/grok-4.20': 'xai/grok-4.20-reasoning',
   'mistralai/ministral-14b-2512': 'mistral/ministral-14b',
   'mistralai/ministral-3b-2512': 'mistral/ministral-3b',
   'mistralai/ministral-8b-2512': 'mistral/ministral-8b',
@@ -47,15 +45,17 @@ const vercelModelIdMapping: Record<string, string | undefined> = {
 export function mapModelIdToVercel(modelId: string, reasoningExplicitlyDisabled: boolean) {
   const hardcodedVercelId = vercelModelIdMapping[modelId];
   if (hardcodedVercelId) {
-    if (reasoningExplicitlyDisabled && hardcodedVercelId.endsWith('-reasoning')) {
-      return hardcodedVercelId.replace(/-reasoning$/, '-non-reasoning');
-    }
-    return hardcodedVercelId;
+    return hardcodedVercelId === 'xai/grok-4.20-reasoning' && reasoningExplicitlyDisabled
+      ? 'xai/grok-4.20-non-reasoning'
+      : hardcodedVercelId;
   }
 
   const internalId =
     kiloExclusiveModels.find(
-      m => m.public_id === modelId && m.status !== 'disabled' && m.gateway === 'openrouter'
+      m =>
+        m.public_id === modelId &&
+        m.status !== 'disabled' &&
+        (m.gateway === 'vercel' || m.flags.includes('vercel-routing'))
     )?.internal_id ?? modelId;
 
   const slashIndex = internalId.indexOf('/');

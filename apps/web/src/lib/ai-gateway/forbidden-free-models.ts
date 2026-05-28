@@ -40,6 +40,7 @@ const forbiddenFreeModelIds: ReadonlySet<string> = new Set([
   'qwen/qwen3.6-plus-preview:free',
   'qwen/qwen3.6-plus:free',
   'upstage/solar-pro-3:free',
+  'x-ai/grok-code-fast-1:optimized:free',
   'xiaomi/mimo-v2-omni:free',
   'xiaomi/mimo-v2-pro:free',
   'z-ai/glm-4.5-air:free',

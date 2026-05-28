@@ -21,12 +21,13 @@ const groups: ServiceGroup[] = [
     alwaysOn: false,
     sectionBreakBefore: true,
   },
-  { id: 'kiloclaw', label: 'KiloClaw', alwaysOn: false },
+  { id: 'notifications', label: 'Notifications', alwaysOn: false },
+  { id: 'kiloclaw', label: 'KiloClaw', alwaysOn: false, groupDependsOn: ['notifications'] },
   {
     id: 'cloud-agent',
     label: 'Cloud Agent',
     alwaysOn: false,
-    groupDependsOn: ['git-token-service'],
+    groupDependsOn: ['git-token-service', 'notifications'],
   },
   { id: 'code-review', label: 'Code Review', alwaysOn: false, groupDependsOn: ['cloud-agent'] },
   { id: 'app-builder', label: 'App Builder', alwaysOn: false, groupDependsOn: ['cloud-agent'] },
@@ -72,7 +73,13 @@ const serviceMeta: Record<string, ServiceMeta> = {
   // cloud-agent
   'cloud-agent-next': {
     group: 'cloud-agent',
-    dependsOn: ['postgres', 'nextjs', 'cloudflare-session-ingest', 'cloudflare-git-token-service'],
+    dependsOn: [
+      'postgres',
+      'nextjs',
+      'cloudflare-session-ingest',
+      'cloudflare-git-token-service',
+      'notifications',
+    ],
     dir: 'services/cloud-agent-next',
     useLanIp: true,
   },
@@ -143,7 +150,7 @@ const serviceMeta: Record<string, ServiceMeta> = {
   'kiloclaw-tunnel': { group: 'kiloclaw', dependsOn: [] },
   'kiloclaw-docker-tcp': { group: 'kiloclaw', dependsOn: [] },
   notifications: {
-    group: 'kiloclaw',
+    group: 'notifications',
     dependsOn: ['postgres'],
     dir: 'services/notifications',
   },

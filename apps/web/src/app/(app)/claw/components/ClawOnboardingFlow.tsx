@@ -11,7 +11,6 @@ import type { KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
 import { controllerVersionOk, gatewayStatusOk } from '@/lib/kiloclaw/types';
 import { useKiloClawGatewayStatus, useKiloClawMutations } from '@/hooks/useKiloClaw';
 import { useOrgKiloClawGatewayStatus, useOrgKiloClawMutations } from '@/hooks/useOrgKiloClaw';
-import { useUser } from '@/hooks/useUser';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -119,12 +118,9 @@ function ClawOnboardingFlowInner({
   const personalMutations = useKiloClawMutations();
   const orgMutations = useOrgKiloClawMutations(organizationId ?? '');
   const mutations = organizationId ? orgMutations : personalMutations;
-  const { data: currentUser, isPending: userIsPending } = useUser();
   const searchParams = useSearchParams();
-  const isCalendarResume = searchParams?.get('step') === 'calendar';
-  const calendarEligibilityPending = userIsPending && isCalendarResume;
 
-  const hasCalendarStep = currentUser?.is_admin === true || calendarEligibilityPending;
+  const hasCalendarStep = true;
   // Morning briefing is generally available — the Interests step shows for
   // all users (it still gates on controller version below).
   // Gate on controller version. The plugin route that backs
@@ -157,10 +153,8 @@ function ClawOnboardingFlowInner({
   const [onboardingStep, setOnboardingStep] = useState<OnboardingStep>(() => {
     if (typeof window === 'undefined') return 'identity';
     const initialStep = new URLSearchParams(window.location.search).get('step');
-    if (initialStep === 'tools') return 'tools';
     return initialStep === 'calendar' ? 'calendar' : 'identity';
   });
-  const hasToolsStep = false;
 
   const gatewayUrl = useGatewayUrl(status);
 
@@ -190,7 +184,6 @@ function ClawOnboardingFlowInner({
     setupFailed,
     onboardingStep,
     hasBotIdentity: botIdentity !== null,
-    hasToolsStep,
     hasCalendarStep,
     hasInterestsStep,
   };
@@ -320,8 +313,8 @@ function ClawOnboardingFlowInner({
   }, [flowState.instanceStatus, botIdentity]);
 
   // Resume the calendar step after the full-page Google OAuth round trip.
-  // Stale Composio callback URLs are cleaned up without showing connection
-  // feedback because Composio is no longer part of onboarding.
+  // Remove stale `tools` URLs from the retired integration flow without
+  // displaying obsolete connection feedback.
   const hasResumedFromQuery = useRef(false);
 
   // Allowlist of known OAuth error codes that the callback route can emit.
@@ -332,6 +325,7 @@ function ClawOnboardingFlowInner({
     'oauth_error',
     'missing_code',
     'missing_instance',
+    'missing_permissions',
     'connection_failed',
     'invalid_state',
     'unauthorized',
@@ -371,7 +365,11 @@ function ClawOnboardingFlowInner({
       toast.success('Calendar connected');
     } else if (errorParamRaw) {
       posthog?.capture('claw_setup_calendar_oauth_failed', { reason: errorReason });
-      toast.error('Could not connect calendar. Try again or skip for now.');
+      toast.error(
+        errorReason === 'missing_permissions'
+          ? 'Calendar permission was not granted. Allow Calendar access to connect or skip for now.'
+          : 'Could not connect calendar. Try again or skip for now.'
+      );
     }
     cleanupResumeQueryParams();
   }, [searchParams, botIdentity, posthog, cleanupResumeQueryParams]);
@@ -522,10 +520,7 @@ function ClawOnboardingFlowInner({
         connectUrl={connectUrl}
         isConnected={isConnected}
         connectedAccountEmail={connectedEmail}
-        interactionDisabled={calendarEligibilityPending}
-        readyToConnect={
-          !calendarEligibilityPending && flowState.instanceStatus !== null && onboardingSaves.ready
-        }
+        readyToConnect={flowState.instanceStatus !== null && onboardingSaves.ready}
         onConnectClick={() => {
           posthog?.capture('claw_setup_calendar_connect_clicked', { skipped: false });
         }}
@@ -690,7 +685,6 @@ function ClawOnboardingFlowInner({
     switch (renderStep) {
       case 'identity':
         return renderIdentityStep();
-      case 'tools':
       case 'calendar':
         return renderCalendarStep();
       case 'email':

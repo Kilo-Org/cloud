@@ -3,6 +3,7 @@ import {
   cloud_agent_code_review_attempts,
   cloud_agent_code_reviews,
   kilocode_users,
+  platform_integrations,
 } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
@@ -213,16 +214,55 @@ describe('cancelSupersededReviewsForPR', () => {
 
 describe('findPreviousCompletedReview', () => {
   let testUser: User;
+  let gitLabIntegrationAId: string;
+  let gitLabIntegrationBId: string;
   const createdReviewIds: string[] = [];
+  const gitLabRepo = `${REPO}-gitlab-scope`;
 
   beforeAll(async () => {
     testUser = await insertTestUser();
+    const [gitLabIntegrationA, gitLabIntegrationB] = await db
+      .insert(platform_integrations)
+      .values([
+        {
+          owned_by_user_id: testUser.id,
+          platform: 'gitlab',
+          integration_type: 'oauth',
+          platform_installation_id: `gitlab-a-${Date.now()}-${Math.random()}`,
+          platform_account_id: 'gitlab-a',
+          platform_account_login: 'gitlab-a',
+          repository_access: 'all',
+          integration_status: 'active',
+        },
+        {
+          owned_by_user_id: testUser.id,
+          platform: 'gitlab',
+          integration_type: 'oauth',
+          platform_installation_id: `gitlab-b-${Date.now()}-${Math.random()}`,
+          platform_account_id: 'gitlab-b',
+          platform_account_login: 'gitlab-b',
+          repository_access: 'all',
+          integration_status: 'active',
+        },
+      ])
+      .returning({ id: platform_integrations.id });
+    if (!gitLabIntegrationA || !gitLabIntegrationB) {
+      throw new Error('Expected GitLab integrations');
+    }
+    gitLabIntegrationAId = gitLabIntegrationA.id;
+    gitLabIntegrationBId = gitLabIntegrationB.id;
   });
 
   afterAll(async () => {
     for (const id of createdReviewIds) {
       await db.delete(cloud_agent_code_reviews).where(eq(cloud_agent_code_reviews.id, id));
     }
+    await db
+      .delete(platform_integrations)
+      .where(eq(platform_integrations.id, gitLabIntegrationAId));
+    await db
+      .delete(platform_integrations)
+      .where(eq(platform_integrations.id, gitLabIntegrationBId));
     await db.delete(kilocode_users).where(eq(kilocode_users.id, testUser.id));
   });
 
@@ -238,6 +278,25 @@ describe('findPreviousCompletedReview', () => {
       headRef: 'feature/test',
       headSha,
       platform: 'github',
+    });
+    createdReviewIds.push(id);
+    return id;
+  }
+
+  async function createGitLabReview(headSha: string, integrationId: string, projectId: number) {
+    const id = await createCodeReview({
+      owner: { type: 'user', id: testUser.id, userId: testUser.id },
+      repoFullName: gitLabRepo,
+      prNumber: 42,
+      prUrl: `https://gitlab.example.com/${gitLabRepo}/-/merge_requests/42`,
+      prTitle: 'test GitLab MR',
+      prAuthor: 'gitlab-user',
+      baseRef: 'main',
+      headRef: 'feature/test',
+      headSha,
+      platform: 'gitlab',
+      platformIntegrationId: integrationId,
+      platformProjectId: projectId,
     });
     createdReviewIds.push(id);
     return id;
@@ -312,6 +371,43 @@ describe('findPreviousCompletedReview', () => {
     // The newest completed review has no session — both fields from same row
     expect(result!.head_sha).toBe('sha-legacy-newest');
     expect(result!.session_id).toBeNull();
+  });
+
+  it('scopes GitLab session continuation to the exact integration and project', async () => {
+    const matchingId = await createGitLabReview('gitlab-matching-sha', gitLabIntegrationAId, 501);
+    const differentIntegrationId = await createGitLabReview(
+      'gitlab-other-integration-sha',
+      gitLabIntegrationBId,
+      501
+    );
+    const differentProjectId = await createGitLabReview(
+      'gitlab-other-project-sha',
+      gitLabIntegrationAId,
+      502
+    );
+    await updateCodeReviewStatus(matchingId, 'completed', { sessionId: 'agent_matching_gitlab' });
+    await updateCodeReviewStatus(differentIntegrationId, 'completed', {
+      sessionId: 'agent_other_integration',
+    });
+    await updateCodeReviewStatus(differentProjectId, 'completed', {
+      sessionId: 'agent_other_project',
+    });
+
+    const result = await findPreviousCompletedReview(gitLabRepo, 42, 'current-gitlab-sha', {
+      platform: 'gitlab',
+      integrationId: gitLabIntegrationAId,
+      projectId: 501,
+    });
+
+    expect(result).toEqual({
+      head_sha: 'gitlab-matching-sha',
+      session_id: 'agent_matching_gitlab',
+    });
+  });
+
+  it('uses the default GitHub continuation scope when options are omitted', async () => {
+    const result = await findPreviousCompletedReview(gitLabRepo, 42, 'current-gitlab-sha');
+    expect(result).toBeNull();
   });
 
   it('persists terminal_reason for failed reviews', async () => {

@@ -1,3 +1,4 @@
+import type { CloudAgentAttachments } from '@/lib/cloud-agent/constants';
 import type { Images } from '@/lib/images-schema';
 import { errorShapeSchema } from './schemas';
 import type { TransportSendPayload } from './transport';
@@ -51,7 +52,7 @@ type SessionConfig = {
   /** Custom modes exposed by this session's profile stack (slug + name, plus optional model and thinking-effort overrides). */
   runtimeAgents?: Array<{ slug: string; name: string; model?: string; variant?: string }>;
 };
-type ActiveSessionType = 'cloud-agent' | 'remote';
+type ActiveSessionType = ResolvedSession['type'];
 type StandaloneQuestion = { requestId: string; questions: QuestionInfo[] };
 type StandalonePermission = {
   requestId: string;
@@ -158,6 +159,8 @@ type SessionManagerAtoms = {
   isLoading: W<boolean>;
   /** Session structurally cannot accept input (no transport send). */
   isReadOnly: W<boolean>;
+  /** Active resolved transport can deliver canonical Cloud Agent attachments. */
+  supportsAttachments: W<boolean>;
   canSend: W<boolean>;
   canInterrupt: W<boolean>;
   statusIndicator: W<SessionStatusIndicator | null>;
@@ -191,7 +194,11 @@ type SessionManagerAtoms = {
 type SessionManager = {
   switchSession(kiloSessionId: KiloSessionId): Promise<void>;
   hydrateChildSession(childSessionId: KiloSessionId): Promise<void>;
-  send(input: { payload: TransportSendPayload; images?: Images }): Promise<boolean>;
+  send(input: {
+    payload: TransportSendPayload;
+    attachments?: CloudAgentAttachments;
+    images?: Images;
+  }): Promise<boolean>;
   interrupt(): Promise<void>;
   answerQuestion(requestId: string, answers: string[][]): Promise<void>;
   rejectQuestion(requestId: string): Promise<void>;
@@ -302,6 +309,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   const isStreamingAtom = atom(false);
   const isLoadingAtom = atom(false);
   const isReadOnlyAtom = atom(false);
+  const supportsAttachmentsAtom = atom(false);
   const canSendAtom = atom(false);
   const canInterruptAtom = atom(false);
   const statusIndicatorAtom = atom<SessionStatusIndicator | null>(null);
@@ -410,6 +418,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     store.set(isStreamingAtom, false);
     store.set(isLoadingAtom, false);
     store.set(isReadOnlyAtom, false);
+    store.set(supportsAttachmentsAtom, false);
     store.set(canSendAtom, false);
     store.set(canInterruptAtom, false);
     store.set(statusIndicatorAtom, null);
@@ -696,8 +705,8 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         if (as?.requestId === requestId) store.set(activeSuggestionAtom, null);
       },
       onResolved: resolved => {
-        if (resolved.type === 'cloud-agent') activeSessionType = 'cloud-agent';
-        else if (resolved.type === 'remote') activeSessionType = 'remote';
+        activeSessionType = resolved.type;
+        store.set(supportsAttachmentsAtom, resolved.type === 'cloud-agent');
       },
       onBranchChanged: branch => {
         const currentFetched = store.get(fetchedSessionDataAtom);
@@ -765,7 +774,11 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     session.connect();
   }
 
-  async function send(input: { payload: TransportSendPayload; images?: Images }): Promise<boolean> {
+  async function send(input: {
+    payload: TransportSendPayload;
+    attachments?: CloudAgentAttachments;
+    images?: Images;
+  }): Promise<boolean> {
     store.set(errorAtom, null);
     if (store.get(agentStatusAtom).type !== 'disconnected') {
       setIndicator(null);
@@ -784,9 +797,13 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
 
     try {
       if (!currentSession) throw new Error('No active session');
+      if (input.attachments && sessionType !== 'cloud-agent') {
+        throw new Error('Only Cloud Agent sessions support attachments');
+      }
       await currentSession.send({
         payload: input.payload,
         messageId,
+        ...(input.attachments ? { attachments: input.attachments } : {}),
         images: input.images,
       });
       if (sessionType === 'remote' && kiloSessionId) {
@@ -907,6 +924,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       isStreaming: isStreamingAtom,
       isLoading: isLoadingAtom,
       isReadOnly: isReadOnlyAtom,
+      supportsAttachments: supportsAttachmentsAtom,
       canSend: canSendAtom,
       canInterrupt: canInterruptAtom,
       statusIndicator: statusIndicatorAtom,

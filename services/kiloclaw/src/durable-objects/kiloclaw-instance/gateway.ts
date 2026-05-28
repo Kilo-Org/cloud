@@ -13,6 +13,9 @@ import {
   EnvPatchResponseSchema,
   ToolsMdSectionSyncResponseSchema,
   OpenclawConfigResponseSchema,
+  FileWriteResponseSchema as ValidationAwareFileWriteResponseSchema,
+  type FileWriteResponse,
+  type OpenclawFileWriteValidation,
   MorningBriefingStatusResponseSchema,
   MorningBriefingActionResponseSchema,
   MorningBriefingInterestsResponseSchema,
@@ -454,9 +457,7 @@ export async function readFile(
   }
 }
 
-const FileWriteResponseSchema = z.object({
-  etag: z.string(),
-});
+const LegacyFileWriteResponseSchema = z.object({ etag: z.string() });
 
 export async function writeFile(
   state: InstanceMutableState,
@@ -471,8 +472,30 @@ export async function writeFile(
       env,
       '/_kilo/files/write',
       'POST',
-      FileWriteResponseSchema,
+      LegacyFileWriteResponseSchema,
       { path: filePath, content, etag }
+    );
+  } catch (error) {
+    if (isErrorUnknownRoute(error)) return null;
+    throw error;
+  }
+}
+
+export async function writeOpenclawConfigFile(
+  state: InstanceMutableState,
+  env: KiloClawEnv,
+  content: string,
+  etag: string | undefined,
+  mode: OpenclawFileWriteValidation
+): Promise<FileWriteResponse | null> {
+  try {
+    return await callGatewayController(
+      state,
+      env,
+      '/_kilo/files/write-openclaw-config',
+      'POST',
+      ValidationAwareFileWriteResponseSchema,
+      { content, etag, mode }
     );
   } catch (error) {
     if (isErrorUnknownRoute(error)) return null;

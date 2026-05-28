@@ -39,19 +39,12 @@ import { isMessageStreaming } from './types';
 import { useOrganizationModels } from './hooks/useOrganizationModels';
 import { useSlashCommandSets } from '@/hooks/useSlashCommandSets';
 import { useCelebrationSound } from '@/hooks/useCelebrationSound';
-import {
-  CLOUD_AGENT_IMAGE_ALLOWED_TYPES,
-  CLOUD_AGENT_IMAGE_MAX_COUNT,
-  CLOUD_AGENT_IMAGE_MAX_DIMENSION_PX,
-  CLOUD_AGENT_IMAGE_MAX_ORIGINAL_SIZE_BYTES,
-  CLOUD_AGENT_IMAGE_MAX_SIZE_BYTES,
-} from '@/lib/cloud-agent/constants';
+import type { CloudAgentAttachments } from '@/lib/cloud-agent/constants';
 
 import { SetPageTitle } from '@/components/SetPageTitle';
 import { formatShortModelDisplayName } from '@/lib/format-model-name';
 import type { AgentMode } from './types';
 import type { MessageDeliveryState, StoredMessage } from '@/lib/cloud-agent-sdk';
-import type { Images } from '@/lib/images-schema';
 import type { WorkspaceTabId } from './terminal-tabs';
 import type { TerminalStatus } from './useCloudAgentTerminal';
 
@@ -87,38 +80,55 @@ const StaticMessages = memo(
 StaticMessages.displayName = 'StaticMessages';
 
 // ---------------------------------------------------------------------------
-// Dynamic messages — re-renders as streaming progresses
+// Dynamic messages — re-renders as streaming progresses while chat is visible
 // ---------------------------------------------------------------------------
-function DynamicMessages({
-  messages,
-  pendingMessages,
-  getChildMessages,
-  onOpenChildSession,
-}: {
+type DynamicMessagesProps = {
+  active: boolean;
   messages: StoredMessage[];
   pendingMessages: ReadonlyMap<string, MessageDeliveryState>;
   getChildMessages?: (sessionId: string) => StoredMessage[];
   onOpenChildSession?: OpenChildSession;
-}) {
-  return (
-    <>
-      {messages.map(msg => {
-        const streaming = isMessageStreaming(msg);
-        return (
-          <MessageErrorBoundary key={msg.info.id}>
-            <MessageBubble
-              message={msg}
-              isStreaming={streaming}
-              deliveryState={pendingMessages.get(msg.info.id)}
-              getChildMessages={getChildMessages}
-              onOpenChildSession={onOpenChildSession}
-            />
-          </MessageErrorBoundary>
-        );
-      })}
-    </>
-  );
-}
+};
+
+const DynamicMessages = memo(
+  function DynamicMessages({
+    messages,
+    pendingMessages,
+    getChildMessages,
+    onOpenChildSession,
+  }: DynamicMessagesProps) {
+    return (
+      <>
+        {messages.map(msg => {
+          const streaming = isMessageStreaming(msg);
+          return (
+            <MessageErrorBoundary key={msg.info.id}>
+              <MessageBubble
+                message={msg}
+                isStreaming={streaming}
+                deliveryState={pendingMessages.get(msg.info.id)}
+                getChildMessages={getChildMessages}
+                onOpenChildSession={onOpenChildSession}
+              />
+            </MessageErrorBoundary>
+          );
+        })}
+      </>
+    );
+  },
+  (previous, next) => {
+    if (!previous.active && !next.active) return true;
+
+    return (
+      previous.active === next.active &&
+      previous.messages === next.messages &&
+      previous.pendingMessages === next.pendingMessages &&
+      previous.getChildMessages === next.getChildMessages &&
+      previous.onOpenChildSession === next.onOpenChildSession
+    );
+  }
+);
+DynamicMessages.displayName = 'DynamicMessages';
 
 // ---------------------------------------------------------------------------
 // CloudChatPage
@@ -148,7 +158,7 @@ function TerminalPaneSlot({
   );
 
   return (
-    <div className={active ? 'h-full min-h-0' : 'hidden'} aria-hidden={!active}>
+    <div className={active ? 'h-full min-h-0' : 'hidden'}>
       {sessionId && (
         <CloudAgentTerminalPane
           cloudAgentSessionId={sessionId}
@@ -167,10 +177,10 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
   const queryClient = useQueryClient();
   const trpc = useTRPC();
   const { mutateAsync: personalUploadUrl } = useMutation(
-    trpc.cloudAgentNext.getImageUploadUrl.mutationOptions()
+    trpc.cloudAgentNext.getAttachmentUploadUrl.mutationOptions()
   );
   const { mutateAsync: orgUploadUrl } = useMutation(
-    trpc.organizations.cloudAgentNext.getImageUploadUrl.mutationOptions()
+    trpc.organizations.cloudAgentNext.getAttachmentUploadUrl.mutationOptions()
   );
   const [childSessionStack, setChildSessionStack] = useState<ChildSessionDrawerEntry[]>([]);
   const [childSessionDrawerContainer, setChildSessionDrawerContainer] =
@@ -191,6 +201,7 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
   const isStreaming = useAtomValue(manager.atoms.isStreaming);
   const isLoading = useAtomValue(manager.atoms.isLoading);
   const isReadOnly = useAtomValue(manager.atoms.isReadOnly);
+  const supportsAttachments = useAtomValue(manager.atoms.supportsAttachments);
   const canSend = useAtomValue(manager.atoms.canSend);
   const statusIndicator = useAtomValue(manager.atoms.statusIndicator);
   const sessionConfig = useAtomValue(manager.atoms.sessionConfig);
@@ -210,11 +221,12 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
 
   const setSessionConfig = useSetAtom(manager.atoms.sessionConfig);
 
-  const [imageMessageUuid, setImageMessageUuid] = useState(() => crypto.randomUUID());
+  const [attachmentMessageUuid] = useState(() => crypto.randomUUID());
   const [workspaceTabs, setWorkspaceTabs] = useState(createWorkspaceTabsState);
   const [terminalStatuses, setTerminalStatuses] = useState<
     Record<string, TerminalStatusSummary | undefined>
   >({});
+  const chatTabActive = workspaceTabs.activeTabId === CHAT_TAB_ID;
 
   useEffect(() => {
     setWorkspaceTabs(resetWorkspaceTabs);
@@ -253,11 +265,23 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
   const lastScrollTopRef = useRef(0);
 
   const autoScrollFrameRef = useRef(0);
+  const followUpAutoScrollFrameRef = useRef(0);
   const delayedAutoScrollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const cancelScheduledAutoScroll = useCallback(() => {
+    cancelAnimationFrame(autoScrollFrameRef.current);
+    cancelAnimationFrame(followUpAutoScrollFrameRef.current);
+    autoScrollFrameRef.current = 0;
+    followUpAutoScrollFrameRef.current = 0;
+    if (delayedAutoScrollRef.current !== null) {
+      clearTimeout(delayedAutoScrollRef.current);
+      delayedAutoScrollRef.current = null;
+    }
+  }, []);
 
   const scrollToBottomNow = useCallback(() => {
     const el = scrollContainerRef.current;
-    if (!el) return;
+    if (!el || el.hidden) return;
 
     const scrollRun = autoScrollRunRef.current + 1;
     autoScrollRunRef.current = scrollRun;
@@ -274,38 +298,41 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
   }, []);
 
   const scheduleScrollToBottom = useCallback(() => {
-    cancelAnimationFrame(autoScrollFrameRef.current);
-    if (delayedAutoScrollRef.current !== null) {
-      clearTimeout(delayedAutoScrollRef.current);
-      delayedAutoScrollRef.current = null;
-    }
+    cancelScheduledAutoScroll();
 
     autoScrollFrameRef.current = requestAnimationFrame(() => {
+      autoScrollFrameRef.current = 0;
       scrollToBottomNow();
-      requestAnimationFrame(scrollToBottomNow);
+      followUpAutoScrollFrameRef.current = requestAnimationFrame(() => {
+        followUpAutoScrollFrameRef.current = 0;
+        scrollToBottomNow();
+      });
       delayedAutoScrollRef.current = setTimeout(() => {
         delayedAutoScrollRef.current = null;
         scrollToBottomNow();
       }, 100);
     });
-  }, [scrollToBottomNow]);
+  }, [cancelScheduledAutoScroll, scrollToBottomNow]);
+
+  useEffect(() => cancelScheduledAutoScroll, [cancelScheduledAutoScroll]);
 
   useEffect(() => {
-    return () => {
-      cancelAnimationFrame(autoScrollFrameRef.current);
-      if (delayedAutoScrollRef.current !== null) {
-        clearTimeout(delayedAutoScrollRef.current);
-      }
-    };
-  }, []);
+    if (!chatTabActive) cancelScheduledAutoScroll();
+  }, [cancelScheduledAutoScroll, chatTabActive]);
 
   useEffect(() => {
-    if (!chatUI.shouldAutoScroll) return;
+    if (!chatTabActive || !chatUI.shouldAutoScroll) return;
     scheduleScrollToBottom();
-  }, [staticMessages, dynamicMessages, chatUI.shouldAutoScroll, scheduleScrollToBottom]);
+  }, [
+    staticMessages,
+    dynamicMessages,
+    chatTabActive,
+    chatUI.shouldAutoScroll,
+    scheduleScrollToBottom,
+  ]);
 
   useEffect(() => {
-    if (!chatUI.shouldAutoScroll) return;
+    if (!chatTabActive || !chatUI.shouldAutoScroll) return;
     if (typeof ResizeObserver === 'undefined') return;
 
     const content = messagesContentRef.current;
@@ -316,7 +343,7 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
     });
     observer.observe(content);
     return () => observer.disconnect();
-  }, [chatUI.shouldAutoScroll, scheduleScrollToBottom]);
+  }, [chatTabActive, chatUI.shouldAutoScroll, scheduleScrollToBottom]);
 
   useEffect(() => {
     if (!sessionIdFromParams) return;
@@ -355,7 +382,7 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
 
   // -- Handlers -------------------------------------------------------------
   const handleSendMessage = useCallback(
-    async (prompt: string, images?: Images) => {
+    async (prompt: string, attachments?: CloudAgentAttachments) => {
       setChatUI({ shouldAutoScroll: true });
       const selectedRuntimeAgentForSend = sessionConfig?.runtimeAgents?.find(
         a => a.slug === sessionConfig?.mode
@@ -378,36 +405,34 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
             ? agentVariantOverrideForSend
             : (sessionConfig?.variant ?? undefined),
         },
-        images,
+        attachments: supportsAttachments ? attachments : undefined,
       });
       scheduleScrollToBottom();
 
       const accepted = await acceptedPromise;
       if (accepted) {
-        setImageMessageUuid(crypto.randomUUID());
         scheduleScrollToBottom();
       }
       return accepted;
     },
-    [manager, scheduleScrollToBottom, sessionConfig, setChatUI]
+    [manager, scheduleScrollToBottom, sessionConfig, setChatUI, supportsAttachments]
   );
 
   const handleSendSlashCommand = useCallback(
-    async (command: string, args: string, images?: Images) => {
+    async (command: string, args: string, attachments?: CloudAgentAttachments) => {
       setChatUI({ shouldAutoScroll: true });
       const acceptedPromise = manager.send({
         payload: { type: 'command', command, arguments: args },
-        images,
+        attachments: supportsAttachments ? attachments : undefined,
       });
       scheduleScrollToBottom();
       const accepted = await acceptedPromise;
       if (accepted) {
-        setImageMessageUuid(crypto.randomUUID());
         scheduleScrollToBottom();
       }
       return accepted;
     },
-    [manager, scheduleScrollToBottom, setChatUI]
+    [manager, scheduleScrollToBottom, setChatUI, supportsAttachments]
   );
 
   const handleStopExecution = useCallback(() => {
@@ -678,54 +703,56 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
                     className="flex min-h-0 flex-1 flex-col"
                   >
                     <div className="relative min-h-0 flex-1">
-                      {workspaceTabs.activeTabId === CHAT_TAB_ID && (
-                        <>
-                          <div
-                            ref={scrollContainerRef}
-                            className={`absolute inset-0 overflow-y-auto px-[max(1rem,calc(50%_-_27rem))] pb-2 pt-4 transition-opacity duration-150 ${showLoadingIndicator ? 'pointer-events-none opacity-40' : 'opacity-100'}`}
-                            onScroll={handleScroll}
-                          >
-                            <div ref={messagesContentRef}>
-                              <StaticMessages
-                                messages={staticMessages}
-                                pendingMessages={pendingMessages}
-                                getChildMessages={getChildMessages}
-                                onOpenChildSession={handleOpenTopLevelChildSession}
-                              />
-                              <DynamicMessages
-                                messages={dynamicMessages}
-                                pendingMessages={pendingMessages}
-                                getChildMessages={getChildMessages}
-                                onOpenChildSession={handleOpenTopLevelChildSession}
-                              />
+                      <>
+                        <div
+                          ref={scrollContainerRef}
+                          hidden={!chatTabActive}
+                          className={`absolute inset-0 overflow-y-auto px-[max(1rem,calc(50%_-_27rem))] pb-2 pt-4 transition-opacity duration-150 ${showLoadingIndicator ? 'pointer-events-none opacity-40' : 'opacity-100'}`}
+                          onScroll={handleScroll}
+                        >
+                          <div ref={messagesContentRef}>
+                            <StaticMessages
+                              messages={staticMessages}
+                              pendingMessages={pendingMessages}
+                              getChildMessages={getChildMessages}
+                              onOpenChildSession={handleOpenTopLevelChildSession}
+                            />
+                            <DynamicMessages
+                              active={chatTabActive}
+                              messages={dynamicMessages}
+                              pendingMessages={pendingMessages}
+                              getChildMessages={getChildMessages}
+                              onOpenChildSession={handleOpenTopLevelChildSession}
+                            />
 
+                            {chatTabActive && (
                               <WorkingIndicator
                                 messages={dynamicMessages}
                                 isStreaming={isStreaming}
                               />
-                              {statusIndicator && (
-                                <SessionStatusIndicator indicator={statusIndicator} />
-                              )}
+                            )}
+                            {statusIndicator && (
+                              <SessionStatusIndicator indicator={statusIndicator} />
+                            )}
 
-                              <div ref={messagesEndRef} />
-                            </div>
+                            <div ref={messagesEndRef} />
                           </div>
+                        </div>
 
-                          {showScrollButton && (
-                            <button
-                              type="button"
-                              onClick={scrollToBottom}
-                              className="border-border bg-background absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full border p-2 shadow-md"
-                            >
-                              <ArrowDown className="h-4 w-4" />
-                            </button>
-                          )}
-                        </>
-                      )}
+                        {chatTabActive && showScrollButton && (
+                          <button
+                            type="button"
+                            onClick={scrollToBottom}
+                            className="border-border bg-background absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full border p-2 shadow-md"
+                          >
+                            <ArrowDown className="h-4 w-4" />
+                          </button>
+                        )}
+                      </>
 
                       <div
                         className={
-                          workspaceTabs.activeTabId === CHAT_TAB_ID
+                          chatTabActive
                             ? 'hidden'
                             : 'h-full min-h-0 px-[max(1rem,calc(50%_-_27rem))] py-2'
                         }
@@ -734,7 +761,7 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
                       </div>
                     </div>
 
-                    {workspaceTabs.activeTabId === CHAT_TAB_ID && (
+                    {chatTabActive && (
                       <>
                         {isReadOnly ? (
                           !isLoading && sessionIdFromParams && fetchedSessionData ? (
@@ -789,17 +816,10 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
                                 modelPickerTooltip={lockTooltip}
                                 variantPickerDisabled={modelPickerLocked}
                                 variantPickerTooltip={lockTooltip}
-                                imageUploadOptions={{
-                                  messageUuid: imageMessageUuid,
+                                attachmentsEnabled={supportsAttachments}
+                                attachmentUploadOptions={{
+                                  messageUuid: attachmentMessageUuid,
                                   organizationId,
-                                  maxImages: CLOUD_AGENT_IMAGE_MAX_COUNT,
-                                  maxOriginalFileSizeBytes:
-                                    CLOUD_AGENT_IMAGE_MAX_ORIGINAL_SIZE_BYTES,
-                                  maxFileSizeBytes: CLOUD_AGENT_IMAGE_MAX_SIZE_BYTES,
-                                  allowedTypes: CLOUD_AGENT_IMAGE_ALLOWED_TYPES,
-                                  resizeImages: {
-                                    maxDimensionPx: CLOUD_AGENT_IMAGE_MAX_DIMENSION_PX,
-                                  },
                                   getUploadUrl: {
                                     personal: personalUploadUrl,
                                     organization: orgUploadUrl,

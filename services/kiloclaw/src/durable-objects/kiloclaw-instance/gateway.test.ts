@@ -6,6 +6,7 @@ import {
   getMorningBriefingStatus,
   runMorningBriefing,
   waitForHealthy,
+  writeOpenclawConfigFile,
 } from './gateway';
 import { GatewayControllerError } from '../gateway-controller-types';
 
@@ -218,6 +219,47 @@ describe('gateway controller routing', () => {
       ],
     });
     expect(timeoutSpy).toHaveBeenCalledWith(120_000);
+  });
+
+  it('forwards validation-aware file writes and parses warnings', async () => {
+    const state = createMutableState();
+    state.provider = 'fly';
+    state.status = 'running';
+    state.sandboxId = 'sandbox-1';
+    state.flyAppName = 'test-app';
+    state.flyMachineId = 'machine-1';
+
+    const fetchMock: FetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          outcome: 'openclaw-validation-warning',
+          valid: false,
+          reason: 'invalid',
+          issues: [{ path: 'gateway.mode', message: 'Expected local' }],
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } }
+      )
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await writeOpenclawConfigFile(
+      state,
+      { GATEWAY_TOKEN_SECRET: 'gateway-secret', FLY_APP_NAME: 'fallback-app' } as never,
+      '{"gateway":{"mode":"remote"}}',
+      'etag-1',
+      'warn-before-write'
+    );
+
+    expect(result).toMatchObject({ outcome: 'openclaw-validation-warning', reason: 'invalid' });
+    const { init } = getFetchCall(fetchMock);
+    if (typeof init?.body !== 'string') {
+      throw new Error('Expected JSON string request body');
+    }
+    expect(JSON.parse(init.body)).toEqual({
+      content: '{"gateway":{"mode":"remote"}}',
+      etag: 'etag-1',
+      mode: 'warn-before-write',
+    });
   });
 
   it('fails controller RPCs before fetching when instance state is not running', async () => {

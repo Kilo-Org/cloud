@@ -20,6 +20,7 @@ Updated 2026-05-12 -- note price-versioned billing preserves affiliate semantics
 Updated 2026-05-20 -- broaden tracking to Kilo Pass SALE conversions and rename the affiliate spec.
 Updated 2026-05-20 -- tighten attribution boundaries, SALE uniqueness, Kilo Pass eligibility, reversal scope, and
 provider-contract ownership after audit.
+Updated 2026-05-28 -- allow full SALE reversal for enforced Stripe EFW refunds.
 
 ## Conventions
 
@@ -57,9 +58,9 @@ BCP 14 [RFC 2119] [RFC 8174] keywords apply only when they appear in all capital
 - **Kilo Pass cadence**: Eligible billing cadence `monthly` or `yearly`.
 - **Promo code**: Provider- or checkout-applied purchase code that is available as a discrete reportable value for an
   eligible SALE.
-- **Disputed eligible sale**: Eligible payment-provider-backed SALE whose underlying payment later receives a provider
-  dispute notification.
-- **Commission reversal**: Provider-facing rejection of an affiliate SALE commission for a disputed eligible sale.
+- **Adverse eligible sale**: Eligible payment-provider-backed SALE whose underlying payment later receives a provider
+  dispute notification or is refunded under enforced Stripe Early Fraud Warning handling.
+- **Commission reversal**: Provider-facing rejection of an affiliate SALE commission for an adverse eligible sale.
 - **Reversal identity**: Provider-retained reference needed to reverse a prior SALE without guessing which reported
   action to reject.
 - **Primary operation**: User creation, authentication, subscription settlement, billing progression, or another
@@ -193,26 +194,28 @@ after the winning attribution is established.
 27. Admin-only subscription interventions, such as admin trial resets, admin cancellations, or manual trial-date edits,
     MUST NOT emit affiliate conversion events.
 
-### Dispute Reversals
+### Adverse Payment Reversals
 
-28. When the payment provider reports creation of a dispute for a disputed eligible sale, the system MUST submit a full
-    commission reversal. This covers payment-provider-backed personal KiloClaw SALE events and eligible Kilo Pass SALE
-    events.
+28. When the payment provider reports creation of a dispute for an adverse eligible sale, or Kilo refunds that sale under
+    enforced Stripe Early Fraud Warning handling, the system MUST submit a full commission reversal. This covers
+    payment-provider-backed personal KiloClaw SALE events and eligible Kilo Pass SALE events.
 
-29. Partial payment disputes MUST still reverse the full associated affiliate commission.
+29. Partial payment disputes and an enforced EFW refund of only the remaining refundable amount MUST still reverse the
+    full associated affiliate commission.
 
-30. The system MUST NOT automatically restore reversed commission if the dispute is later resolved in the brand's favor.
+30. The system MUST NOT automatically restore reversed commission if the dispute is later resolved in the brand's favor
+    or an EFW-enforced account later receives legitimate-user remediation.
 
-31. Reversal handling MUST preserve intent when a dispute arrives before the corresponding SALE is reversal-ready. Once
-    the relevant SALE and reversal identity become resolvable, the pending dispute MUST be eligible for reversal
-    submission.
+31. Reversal handling MUST preserve intent when a dispute or enforced EFW refund arrives before the corresponding SALE is
+    reversal-ready. Once the relevant SALE and reversal identity become resolvable, the pending adverse payment MUST be
+    eligible for reversal submission.
 
 32. Automatic reversal is REQUIRED only when a reversal identity exists or can be recovered without guessing. If an
     earlier eligible sale lacks recoverable reversal identity, the system MUST make that gap operationally observable for
     non-automated follow-up.
 
-33. Reversal processing MUST be idempotent. Duplicate dispute notifications for the same disputed eligible sale MUST NOT
-    produce multiple commission reversals.
+33. Reversal processing MUST be idempotent. Duplicate dispute notifications, duplicate EFW processing, or a later
+    dispute for an already EFW-reversed eligible sale MUST NOT produce multiple commission reversals.
 
 ### Client-Side Identity Bridging
 
@@ -248,6 +251,10 @@ after the winning attribution is established.
     commission behavior governed by this spec.
 
 ## Changelog
+
+### 2026-05-28 -- Enforced EFW refund reversals
+
+Expanded adverse SALE reversal to enforced Stripe Early Fraud Warning refunds so proactive refunds can reverse a full eligible affiliate commission without waiting for a dispute, while preserving reversal identity and deduplication requirements.
 
 ### 2026-05-20 -- Audit clarifications after Kilo Pass expansion
 

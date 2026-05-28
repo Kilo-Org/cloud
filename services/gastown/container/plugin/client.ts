@@ -1,6 +1,7 @@
 import type {
   Agent,
   ApiResponse,
+  BabysitPrResult,
   Bead,
   BeadPriority,
   BeadStatus,
@@ -375,6 +376,19 @@ export class MayorGastownClient {
     labels?: string[];
   }): Promise<SlingResult> {
     return this.request<SlingResult>(this.mayorPath('/sling'), {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
+  }
+
+  async babysitPr(input: {
+    rig_id: string;
+    pr_url: string;
+    title?: string;
+    body?: string;
+    force_push_allowed?: boolean;
+  }): Promise<BabysitPrResult> {
+    return this.request<BabysitPrResult>(this.mayorPath('/babysit-pr'), {
       method: 'POST',
       body: JSON.stringify(input),
     });

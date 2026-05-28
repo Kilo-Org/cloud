@@ -176,6 +176,8 @@ export type PrimeContext = {
     pr_url: string | null;
     branch: string | null;
     target_branch: string | null;
+    /** Whether force-push is allowed on this PR branch. Absent on pre-babysit beads = true (backwards compat). */
+    force_push_allowed: boolean;
   } | null;
   /** Present when the hooked bead is a PR conflict resolution (gt:pr-conflict label). */
   pr_conflict_context: {
@@ -184,6 +186,8 @@ export type PrimeContext = {
     target_branch: string | null;
     /** When true, the bead also has pending review feedback to address after resolving conflicts. */
     has_feedback: boolean;
+    /** Whether force-push is allowed on this PR branch. Absent on pre-babysit beads = true (backwards compat). */
+    force_push_allowed: boolean;
   } | null;
 };
 

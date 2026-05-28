@@ -82,6 +82,19 @@ After all gates pass and your work is complete, create a pull request before cal
 `
       : ''
   }
+## Force-push policy
+
+When handling a gt:pr-fixup, gt:pr-feedback, or gt:pr-conflict bead, check \`force_push_allowed\` in your prime context (it comes from \`bead.metadata.force_push_allowed\`):
+
+- If \`force_push_allowed === true\` **or absent** (backwards compat for beads created before this gate landed), use \`git push --force-with-lease\` for rebase-style fixes. Cleaner history.
+
+- If \`force_push_allowed === false\` (set on babysat PRs where the user has not authorized force-push), DO NOT force-push. Instead:
+  - For conflicts: \`git merge origin/<target_branch>\` (creates a merge commit; preserves history)
+  - For fixups/feedback: regular \`git commit && git push\`
+  - Push only fast-forwarding commits — never rewrite history.
+
+This field is surfaced in the prime context as \`pr_fixup_context.force_push_allowed\` or \`pr_conflict_context.force_push_allowed\`. When absent (non-babysat beads), treat it as \`true\`.
+
 ## PR Conflict Resolution Workflow
 
 When your hooked bead has the \`gt:pr-conflict\` label, **or** when it has the \`gt:pr-feedback\` label and \`pr_conflict_context\` is present in your context, you are resolving merge conflicts on an existing PR branch. **This is an exception to the "do not switch branches" rule.** You MUST check out the PR branch from your bead metadata (\`pr_conflict_context.branch\`).
@@ -96,14 +109,13 @@ When your hooked bead has the \`gt:pr-conflict\` label, **or** when it has the \
    - Stage the resolved files: \`git add <file>\`
    - Continue the rebase: \`git rebase --continue\`
    - Repeat until the rebase completes
-4. Push the rebased branch:
-   \`\`\`
-   git push --force-with-lease origin <branch>
-   \`\`\`
+4. Push the rebased branch following the **Force-push policy** above:
+   - If force-push allowed (or absent): \`git push --force-with-lease origin <branch>\`
+   - If force-push NOT allowed: abort the rebase (\`git rebase --abort\`), then \`git merge origin/<target_branch>\` and \`git push origin <branch>\`
 5. If the bead metadata has \`has_feedback: true\`, also address the PR review feedback (see PR Fixup Workflow below) before calling gt_done.
  6. Call \`gt_done\` with both required arguments once all conflicts are resolved (and feedback addressed if applicable):
-    - \`pr_url\`: the PR URL from \`pr_conflict_context.pr_url\`
-    - \`branch\`: the branch name from \`pr_conflict_context.branch\`
+     - \`pr_url\`: the PR URL from \`pr_conflict_context.pr_url\`
+     - \`branch\`: the branch name from \`pr_conflict_context.branch\`
 
 Do NOT create a new PR. Push to the existing branch.
 
@@ -117,7 +129,7 @@ When your hooked bead has the \`gt:pr-fixup\` label, you are fixing an existing 
    - If the comment is actionable: fix the issue, push the fix, reply explaining how you fixed it, and resolve the thread.
    - If the comment is not relevant or is incorrect: reply explaining why, and resolve the thread.
 4. **Important**: Resolve the entire thread, not just the individual comment. Use \`gh api\` to resolve review threads.
-5. After addressing all comments, push your changes and call gt_done.
+5. After addressing all comments, push your changes following the **Force-push policy** above and call gt_done.
 
 Do NOT create a new PR. Push to the existing branch.
 

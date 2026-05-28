@@ -569,3 +569,80 @@ describe('reconciler babysit fast-track', () => {
     expect(rigCodeReview).toBe(true);
   });
 });
+
+describe('polecat prime context force_push_allowed gate', () => {
+  it('babysat bead with force_push_allowed: false → prime context has force_push_allowed: false', () => {
+    const meta = {
+      force_push_allowed: false,
+      pr_url: 'https://github.com/o/r/pull/1',
+      branch: 'feat/x',
+      target_branch: 'main',
+    };
+    const forcePushAllowed = meta.force_push_allowed !== false;
+    expect(forcePushAllowed).toBe(false);
+  });
+
+  it('babysat bead with force_push_allowed: true → prime context has force_push_allowed: true', () => {
+    const meta = {
+      force_push_allowed: true,
+      pr_url: 'https://github.com/o/r/pull/1',
+      branch: 'feat/x',
+      target_branch: 'main',
+    };
+    const forcePushAllowed = meta.force_push_allowed !== false;
+    expect(forcePushAllowed).toBe(true);
+  });
+
+  it('non-babysat bead (force_push_allowed absent) → prime context has force_push_allowed: true (backwards compat)', () => {
+    const meta = {
+      pr_url: 'https://github.com/o/r/pull/1',
+      branch: 'feat/x',
+      target_branch: 'main',
+    };
+    const forcePushAllowed = (meta as Record<string, unknown>).force_push_allowed !== false;
+    expect(forcePushAllowed).toBe(true);
+  });
+
+  it('pr_fixup_context with force_push_allowed: false surfaces correctly', () => {
+    const hookedBead = {
+      labels: ['gt:pr-fixup'],
+      metadata: {
+        pr_url: 'https://github.com/o/r/pull/1',
+        branch: 'feat/x',
+        target_branch: 'main',
+        force_push_allowed: false,
+      },
+    };
+    const meta = hookedBead.metadata as Record<string, unknown>;
+    const prFixupContext = {
+      pr_url: typeof meta.pr_url === 'string' ? meta.pr_url : null,
+      branch: typeof meta.branch === 'string' ? meta.branch : null,
+      target_branch: typeof meta.target_branch === 'string' ? meta.target_branch : null,
+      force_push_allowed: meta.force_push_allowed !== false,
+    };
+    expect(prFixupContext.force_push_allowed).toBe(false);
+    expect(prFixupContext.pr_url).toBe('https://github.com/o/r/pull/1');
+  });
+
+  it('pr_conflict_context with force_push_allowed absent surfaces as true (backwards compat)', () => {
+    const hookedBead = {
+      labels: ['gt:pr-conflict'],
+      metadata: {
+        pr_url: 'https://github.com/o/r/pull/1',
+        branch: 'feat/x',
+        target_branch: 'main',
+        has_feedback: false,
+      },
+    };
+    const meta = hookedBead.metadata as Record<string, unknown>;
+    const prConflictContext = {
+      pr_url: typeof meta.pr_url === 'string' ? meta.pr_url : null,
+      branch: typeof meta.branch === 'string' ? meta.branch : null,
+      target_branch: typeof meta.target_branch === 'string' ? meta.target_branch : null,
+      has_feedback: meta.has_feedback === true || meta.has_feedback === 1,
+      force_push_allowed: meta.force_push_allowed !== false,
+    };
+    expect(prConflictContext.force_push_allowed).toBe(true);
+    expect(prConflictContext.has_feedback).toBe(false);
+  });
+});

@@ -32,7 +32,7 @@ export function OrgActiveKiloclawsCard({ organizationId }: Props) {
           <Users className="h-4 w-4" />
           <CardTitle>Active KiloClaws</CardTitle>
         </div>
-        {!isLoading && (
+        {!isLoading && !isError && (
           <CardDescription className="text-xs">
             You have {activeEmails.length} active KiloClaw
             {activeEmails.length !== 1 ? 's' : ''} in this organization

@@ -1373,9 +1373,6 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       const sendResult = await client.sendMessageV2Internal(internalHeaders, {
         cloudAgentSessionId: previousSessionId,
         prompt: this.state.sessionInput.prompt,
-        mode: CODE_REVIEW_RUNTIME_AGENT_SLUG,
-        model: this.state.sessionInput.model,
-        variant: this.state.sessionInput.variant,
         githubToken: this.state.sessionInput.githubToken,
         gitToken: this.state.sessionInput.gitToken,
         completion: {

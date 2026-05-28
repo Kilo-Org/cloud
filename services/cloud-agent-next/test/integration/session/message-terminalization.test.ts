@@ -783,6 +783,7 @@ describe('message terminalization and stream events', () => {
     expect(job.payload.status).toBe('completed');
     expect(job.payload.messageId).toBe('msg_018f1e2d3c4btermcorrabcd01');
     expect(job.payload.lastAssistantMessageText).toBe('Correct answer');
+    expect(job.payload.completionData).not.toHaveProperty('lastAssistantMessageText');
   });
 
   it('completed callback omits assistant text when no matching parentID reply exists', async () => {

@@ -550,6 +550,30 @@ describe('SessionMessageQueue', () => {
     await expect(listPendingSessionMessages(harness.storage)).resolves.toHaveLength(0);
   });
 
+  it('uses stored agent selection for managed submissions without overrides', async () => {
+    const harness = createQueueHarness({
+      metadata: createMetadata({
+        agent: { mode: 'code-review', model: 'default-model', variant: 'alpha' },
+        executionPolicy: ManagedSessionExecutionPolicySchema.parse(
+          buildCodeReviewManagedSessionPolicy()
+        ),
+      }),
+    });
+
+    const result = await harness.queue.admitSubmittedMessage({
+      userId: 'user_test' as UserId,
+      turn: { type: 'prompt', id: FIRST_MESSAGE_ID, prompt: 'continue review' },
+    });
+    const state = await getSessionMessageState(harness.storage, FIRST_MESSAGE_ID);
+
+    expect(result).toMatchObject({ success: true, messageId: FIRST_MESSAGE_ID });
+    expect(state?.admissionSnapshot?.agent).toEqual({
+      mode: 'code-review',
+      model: 'default-model',
+      variant: 'alpha',
+    });
+  });
+
   it('accepts replay matching predecessor partial immutable constraints without a stored turn', async () => {
     const harness = createQueueHarness();
     await harness.storage.put(`session_message:${FIRST_MESSAGE_ID}`, {

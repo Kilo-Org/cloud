@@ -6,6 +6,7 @@ import {
   LegacyExecutionResponse,
   SendMessageInput,
   SendMessageV2Input,
+  TrustedSendMessageV2Input,
   StartSessionOutput,
   StartSessionInput,
 } from './schemas.js';
@@ -156,6 +157,26 @@ describe('sendMessageV2 input compatibility', () => {
       },
       images: validImages,
     });
+  });
+
+  it('allows trusted continuations to reuse the stored agent selection', () => {
+    const result = TrustedSendMessageV2Input.safeParse({
+      cloudAgentSessionId: validSessionId,
+      prompt: 'continue managed review',
+      completion: { gateThreshold: 'warning' },
+    });
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+
+    expect(result.data).toMatchObject({
+      cloudAgentSessionId: validSessionId,
+      prompt: 'continue managed review',
+      completion: { gateThreshold: 'warning' },
+    });
+    expect(result.data).not.toHaveProperty('mode');
+    expect(result.data).not.toHaveProperty('model');
+    expect(result.data).not.toHaveProperty('variant');
   });
 });
 

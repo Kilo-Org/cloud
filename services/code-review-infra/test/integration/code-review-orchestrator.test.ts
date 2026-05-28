@@ -1010,7 +1010,6 @@ describe('CodeReviewOrchestrator recovery', () => {
     const sendBody = JSON.parse(String(sendCall?.[1]?.body));
     expect(sendBody).toMatchObject({
       cloudAgentSessionId: previousSessionId,
-      mode: 'code-review',
       completion: {
         callbackTarget: {
           url: expect.stringContaining('/api/internal/code-review-status/'),
@@ -1019,6 +1018,9 @@ describe('CodeReviewOrchestrator recovery', () => {
         gateThreshold: 'warning',
       },
     });
+    expect(sendBody).not.toHaveProperty('mode');
+    expect(sendBody).not.toHaveProperty('model');
+    expect(sendBody).not.toHaveProperty('variant');
     expect(sendBody.completion.callbackTarget.headers).not.toHaveProperty('X-Internal-Secret');
   });
 
@@ -1339,6 +1341,9 @@ describe('CodeReviewOrchestrator recovery', () => {
         },
       },
     });
+    expect(sendBody).not.toHaveProperty('mode');
+    expect(sendBody).not.toHaveProperty('model');
+    expect(sendBody).not.toHaveProperty('variant');
     expect(sendBody.completion.callbackTarget.headers).not.toHaveProperty('X-Internal-Secret');
   });
 

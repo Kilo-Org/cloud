@@ -140,6 +140,7 @@ describe('Callback notification with latest assistant message', () => {
     const [job] = queue.captured;
     expect(job.payload.status).toBe('completed');
     expect(job.payload.lastAssistantMessageText).toBe('Hello world');
+    expect(job.payload.completionData).not.toHaveProperty('lastAssistantMessageText');
     expect(job.target.url).toBe('https://example.com/callback');
   });
 

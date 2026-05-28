@@ -104,6 +104,15 @@ function extractAssistantTextFromParts(parts: AssistantMessagePart[]): string {
   return pieces.join('').trim();
 }
 
+function withoutDuplicatedAssistantText(
+  completionData: SessionMessageState['completionData']
+): SessionMessageState['completionData'] {
+  if (completionData?.lastAssistantMessageText === undefined) return completionData;
+  const sanitized = { ...completionData };
+  delete sanitized.lastAssistantMessageText;
+  return sanitized;
+}
+
 function redactCallbackTargetUrl(callbackUrl: string): string {
   try {
     const url = new URL(callbackUrl);
@@ -275,7 +284,7 @@ export function createMessageSettlementOutbox(
       completionSource: state.completionSource,
     };
     const completionData = {
-      ...state.completionData,
+      ...withoutDuplicatedAssistantText(state.completionData),
       ...(extra?.gateResult !== undefined ? { gateResult: extra.gateResult } : {}),
     };
     if (state.assistantMessageId) {
@@ -382,14 +391,13 @@ export function createMessageSettlementOutbox(
     const completionData =
       status === 'completed'
         ? {
-            ...state.completionData,
-            ...(lastAssistantMessageText !== undefined ? { lastAssistantMessageText } : {}),
+            ...withoutDuplicatedAssistantText(state.completionData),
             ...(metadata?.repository?.upstreamBranch !== undefined
               ? { lastSeenBranch: metadata.repository.upstreamBranch }
               : {}),
             ...(state.gateResult !== undefined ? { gateResult: state.gateResult } : {}),
           }
-        : state.completionData;
+        : withoutDuplicatedAssistantText(state.completionData);
 
     if (status === 'completed' && completionData !== state.completionData) {
       state.completionData = completionData;

@@ -95,7 +95,13 @@ export type CloudAgentSendMessageInput = {
   gitToken?: string;
 };
 
-export type CloudAgentSendMessageInternalInput = CloudAgentSendMessageInput & {
+export type CloudAgentSendMessageInternalInput = Omit<
+  CloudAgentSendMessageInput,
+  'mode' | 'model' | 'variant'
+> & {
+  mode?: string;
+  model?: string;
+  variant?: string;
   completion?: CloudAgentMessageCompletion;
 };
 

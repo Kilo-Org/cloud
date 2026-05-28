@@ -312,7 +312,6 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         status === 'completed'
           ? {
               ...(gateResult !== undefined ? { gateResult } : {}),
-              ...(lastAssistantMessageText !== undefined ? { lastAssistantMessageText } : {}),
               ...(metadata.repository?.upstreamBranch !== undefined
                 ? { lastSeenBranch: metadata.repository.upstreamBranch }
                 : {}),

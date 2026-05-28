@@ -237,9 +237,18 @@ const SendMessageV2PromptPayloadInput = SendMessageV2Options.extend({
 const SendMessageV2CommandPayloadInput = SendMessageV2Options.extend({
   payload: CommandSendPayload,
 });
-const TrustedSendMessageV2FlatInput = TrustedSendMessageV2Options.extend(PromptPayload.shape);
+const TrustedSendMessageV2FlatInput = TrustedSendMessageV2Options.extend({
+  prompt: PromptPayload.shape.prompt,
+  mode: ModeSlugSchema.optional(),
+  model: modelIdSchema.optional(),
+  variant: PromptPayload.shape.variant,
+});
+const TrustedPromptSendPayload = PromptSendPayload.extend({
+  mode: ModeSlugSchema.optional(),
+  model: modelIdSchema.optional(),
+});
 const TrustedSendMessageV2PromptPayloadInput = TrustedSendMessageV2Options.extend({
-  payload: PromptSendPayload,
+  payload: TrustedPromptSendPayload,
 });
 const TrustedSendMessageV2CommandPayloadInput = TrustedSendMessageV2Options.extend({
   payload: CommandSendPayload,

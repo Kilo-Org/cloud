@@ -23,7 +23,6 @@ export type ExecutionCallbackPayload = {
   lastAssistantMessageText?: string;
   completionData?: {
     assistantMessageId?: string;
-    lastAssistantMessageText?: string;
     gateResult?: 'pass' | 'fail';
     lastSeenBranch?: string;
     completedAt?: number;

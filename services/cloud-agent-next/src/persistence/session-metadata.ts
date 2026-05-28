@@ -3,9 +3,9 @@ import * as z from 'zod';
 import { MESSAGE_ID_FORMAT_DESCRIPTION, MESSAGE_ID_PATTERN } from '../session/message-id.js';
 import type { SandboxId } from '../types.js';
 import {
+  AttachmentsSchema,
   branchNameSchema,
   CallbackTargetSchema,
-  ImagesSchema,
   MetadataSchema as LegacySessionMetadataSchema,
   SessionProfileBundleSchema,
 } from './schemas.js';
@@ -72,12 +72,12 @@ const MetadataRepositorySchema = z.discriminatedUnion('type', [
     .strict(),
 ]);
 
-const MetadataInitialTurnSchema = z.discriminatedUnion('type', [
+const CurrentMetadataInitialTurnSchema = z.discriminatedUnion('type', [
   z
     .object({
       type: z.literal('prompt'),
       prompt: z.string(),
-      images: ImagesSchema.optional(),
+      attachments: AttachmentsSchema.optional(),
     })
     .strict(),
   z
@@ -89,12 +89,12 @@ const MetadataInitialTurnSchema = z.discriminatedUnion('type', [
     .strict(),
 ]);
 
-const MetadataInitialMessageSchema = z
+const CurrentMetadataInitialMessageSchema = z
   .object({
     id: MessageIdSchema.optional(),
     prompt: z.string().optional(),
-    images: ImagesSchema.optional(),
-    turn: MetadataInitialTurnSchema.optional(),
+    attachments: AttachmentsSchema.optional(),
+    turn: CurrentMetadataInitialTurnSchema.optional(),
   })
   .strict();
 
@@ -161,7 +161,7 @@ export const CurrentSessionMetadataSchema = z
     identity: MetadataIdentitySchema,
     auth: MetadataAuthSchema,
     repository: MetadataRepositorySchema.optional(),
-    initialMessage: MetadataInitialMessageSchema.optional(),
+    initialMessage: CurrentMetadataInitialMessageSchema.optional(),
     agent: MetadataAgentSchema.optional(),
     finalization: MetadataFinalizationSchema.optional(),
     profile: SessionProfileBundleSchema.optional(),
@@ -278,7 +278,6 @@ function legacyToCurrentSessionMetadata(metadata: LegacySessionMetadata): Sessio
       omitUndefined({
         id: metadata.initialMessageId,
         prompt: metadata.prompt,
-        images: metadata.images,
       })
     ),
     agent: optionalObject(

@@ -24,7 +24,7 @@ const profile = {
 };
 
 describe('session metadata boundary', () => {
-  it('parses and serializes current grouped metadata', () => {
+  it('parses and serializes current grouped metadata with canonical attachments', () => {
     const current = {
       metadataSchemaVersion: 2 as const,
       identity: {
@@ -49,9 +49,9 @@ describe('session metadata boundary', () => {
       initialMessage: {
         id: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
         prompt: 'Build the thing',
-        images: {
+        attachments: {
           path: '123e4567-e89b-12d3-a456-426614174000',
-          files: ['123e4567-e89b-12d3-a456-426614174001.png'],
+          files: ['123e4567-e89b-12d3-a456-426614174001.pdf'],
         },
       },
       agent: {
@@ -156,10 +156,6 @@ describe('session metadata boundary', () => {
       upstreamBranch: 'main',
       prompt: 'Build the thing',
       initialMessageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
-      images: {
-        path: '123e4567-e89b-12d3-a456-426614174000',
-        files: ['123e4567-e89b-12d3-a456-426614174001.png'],
-      },
       mode: 'reviewer',
       model: 'kilo/gpt-5',
       variant: 'thinking',
@@ -202,10 +198,6 @@ describe('session metadata boundary', () => {
       initialMessage: {
         id: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
         prompt: 'Build the thing',
-        images: {
-          path: '123e4567-e89b-12d3-a456-426614174000',
-          files: ['123e4567-e89b-12d3-a456-426614174001.png'],
-        },
       },
       agent: {
         mode: 'reviewer',
@@ -235,6 +227,25 @@ describe('session metadata boundary', () => {
         kiloServerLastActivity: 1237,
       },
     });
+  });
+
+  it('rejects current grouped metadata containing legacy images', () => {
+    expect(() =>
+      parseSessionMetadata({
+        metadataSchemaVersion: 2,
+        identity: { sessionId: 'agent_grouped_legacy', userId: 'user_123' },
+        auth: {},
+        initialMessage: {
+          id: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
+          prompt: 'old image turn',
+          images: {
+            path: '123e4567-e89b-12d3-a456-426614174000',
+            files: ['123e4567-e89b-12d3-a456-426614174001.png'],
+          },
+        },
+        lifecycle: { version: 1, timestamp: 1 },
+      })
+    ).toThrow('Invalid current session metadata');
   });
 
   it('maps legacy DIND devcontainer metadata into grouped current metadata', () => {

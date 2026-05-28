@@ -7,6 +7,7 @@ import {
   InstallationDeletedPayloadSchema,
   InstallationSuspendPayloadSchema,
   InstallationUnsuspendPayloadSchema,
+  InstallationTargetRenamedPayloadSchema,
   InstallationRepositoriesPayloadSchema,
   PushEventPayloadSchema,
   PullRequestPayloadSchema,
@@ -20,6 +21,7 @@ import {
   handleInstallationDeleted,
   handleInstallationSuspend,
   handleInstallationUnsuspend,
+  handleInstallationTargetRenamed,
   handleInstallationRepositories,
   handlePushEvent,
   handlePullRequest,
@@ -286,6 +288,65 @@ export async function handleGitHubWebhook(
       }
 
       return NextResponse.json({ message: 'Event received' }, { status: 200 });
+    }
+
+    if (eventType === GITHUB_EVENT.INSTALLATION_TARGET) {
+      const action = (payload as { action?: string }).action || '';
+      if (action !== GITHUB_ACTION.RENAMED) {
+        return NextResponse.json({ message: 'Event received' }, { status: 200 });
+      }
+
+      const parseResult = InstallationTargetRenamedPayloadSchema.safeParse(payload);
+      if (!parseResult.success) {
+        logExceptInTest(
+          `Invalid installation_target.renamed payload${logSuffix}:`,
+          parseResult.error
+        );
+        captureMessage('Invalid GitHub webhook payload structure', {
+          level: 'error',
+          tags: {
+            source: `${sentryPrefix}webhook_validation`,
+            event: 'installation_target.renamed',
+          },
+          extra: { errors: parseResult.error.issues },
+        });
+        return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
+      }
+
+      const installationId = parseResult.data.installation.id.toString();
+      const integration = await findIntegrationByInstallationId(PLATFORM.GITHUB, installationId);
+      if (!integration) {
+        console.warn(`Integration not found${logSuffix}:`, installationId);
+        return NextResponse.json({ message: 'Integration not found' }, { status: 404 });
+      }
+
+      // Identity synchronization is idempotent and must finish before delivery deduplication;
+      // otherwise GitHub redelivery after a transient API or database failure cannot repair metadata.
+      const result = await handleInstallationTargetRenamed(
+        parseResult.data,
+        integration.id,
+        appType
+      );
+
+      const logResult = await logWebhook(integration, action);
+      if (logResult.isDuplicate) {
+        return NextResponse.json({ message: 'Duplicate event' }, { status: 200 });
+      }
+
+      if (logResult.webhookEventId) {
+        try {
+          await updateWebhookEvent(logResult.webhookEventId, {
+            processed: true,
+            processed_at: new Date().toISOString(),
+            handlers_triggered: ['installation_target_renamed'],
+            errors: null,
+          });
+        } catch (error) {
+          logExceptInTest(`Error updating webhook event${logSuffix}:`, error);
+        }
+      }
+
+      return result;
     }
 
     // Handle installation_repositories events

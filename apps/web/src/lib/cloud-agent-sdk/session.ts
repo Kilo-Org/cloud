@@ -6,6 +6,7 @@
  * CLI live, or CLI historical transport.
  */
 import type { QuestionInfo } from '@/types/opencode.gen';
+import type { CloudAgentAttachments } from '@/lib/cloud-agent/constants';
 import type { Images } from '@/lib/images-schema';
 import type { NormalizedEvent } from './normalizer';
 import type { SuggestionAction } from './types';
@@ -75,6 +76,7 @@ type CloudAgentSessionConfig = {
 type CloudAgentSessionSendInput = {
   payload: TransportSendPayload;
   messageId?: string;
+  attachments?: CloudAgentAttachments;
   images?: Images;
 };
 

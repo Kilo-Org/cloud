@@ -6,8 +6,7 @@ import {
   kilocode_users,
 } from '@kilocode/db/schema';
 import { eq, and, isNull, isNotNull, sql } from 'drizzle-orm';
-
-const DEFAULT_GITLAB_INSTANCE_URL = 'https://gitlab.com';
+import { DEFAULT_GITLAB_INSTANCE_URL } from './gitlab-constants.js';
 
 export type GitLabLookupParams = {
   userId: string;

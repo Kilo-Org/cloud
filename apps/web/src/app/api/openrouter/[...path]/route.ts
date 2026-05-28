@@ -542,6 +542,9 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     experiment = providerResult.experiment;
 
     if (!provider.supportedChatApis.includes(requestBodyParsed.kind)) {
+      if (rulesEngineDecision.delayMs > 0) {
+        await sleepForRulesEngineAction(rulesEngineDecision.delayMs);
+      }
       return apiKindNotSupportedResponse(
         requestBodyParsed.kind,
         provider.supportedChatApis,

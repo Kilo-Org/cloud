@@ -30,11 +30,29 @@ import { getOpenRouterModels } from '@/lib/ai-gateway/providers/gateway-models-c
 import { redisGet, redisSet } from '@/lib/redis';
 import { abuseRulesClassificationRedisKey } from '@/lib/redis-keys';
 import type { FraudDetectionHeaders } from '@/lib/utils';
+import { z } from 'zod';
 
 const CLASSIFY_ABUSE_TIMEOUT_MS = 2000;
 const QUARANTINE_1_LATENCY_MS = 2000;
 const QUARANTINE_2_LATENCY_MS = 6000;
 const ABUSE_RULES_CLASSIFICATION_CACHE_TTL_SECONDS = 60;
+
+const AbuseRuleActionSchema = z.enum([
+  'nothing',
+  'log',
+  'rate-limit',
+  'quarantine-1',
+  'quarantine-2',
+  'quarantine-3',
+  'block',
+]);
+
+const RulesEngineClassificationResultSchema = z.object({
+  matches: z.array(z.unknown()),
+  sus_score: z.number(),
+  resolved_action: AbuseRuleActionSchema.nullable(),
+  matched_abuse_rule_ids: z.array(z.string()),
+});
 
 /**
  * Extract full prompts from a GatewayRequest (chat completions, responses, or messages API).
@@ -204,21 +222,9 @@ export type AbuseClassificationResponse = {
   rules_engine?: RulesEngineClassificationResult;
 };
 
-export type AbuseRuleAction =
-  | 'nothing'
-  | 'log'
-  | 'rate-limit'
-  | 'quarantine-1'
-  | 'quarantine-2'
-  | 'quarantine-3'
-  | 'block';
+export type AbuseRuleAction = z.infer<typeof AbuseRuleActionSchema>;
 
-export type RulesEngineClassificationResult = {
-  matches: unknown[];
-  sus_score: number;
-  resolved_action: AbuseRuleAction | null;
-  matched_abuse_rule_ids: string[];
-};
+export type RulesEngineClassificationResult = z.infer<typeof RulesEngineClassificationResultSchema>;
 
 export type CachedRulesEngineClassification = {
   identityKey: string;
@@ -294,36 +300,9 @@ export async function resolveAbuseClassificationCacheIdentityKey(args: {
   return `fingerprint:${await sha256(compositeParams)}`;
 }
 
-function isAbuseRuleAction(value: unknown): value is AbuseRuleAction {
-  return (
-    value === 'nothing' ||
-    value === 'log' ||
-    value === 'rate-limit' ||
-    value === 'quarantine-1' ||
-    value === 'quarantine-2' ||
-    value === 'quarantine-3' ||
-    value === 'block'
-  );
-}
-
 function parseCachedRulesEngineResult(raw: string): RulesEngineClassificationResult | null {
   try {
-    const parsed = JSON.parse(raw) as unknown;
-    if (typeof parsed !== 'object' || parsed === null) return null;
-    const candidate = parsed as Record<string, unknown>;
-    const resolvedAction = candidate.resolved_action;
-    if (resolvedAction !== null && !isAbuseRuleAction(resolvedAction)) return null;
-    if (typeof candidate.sus_score !== 'number') return null;
-    if (!Array.isArray(candidate.matches)) return null;
-    if (!Array.isArray(candidate.matched_abuse_rule_ids)) return null;
-    if (!candidate.matched_abuse_rule_ids.every(id => typeof id === 'string')) return null;
-
-    return {
-      matches: candidate.matches,
-      sus_score: candidate.sus_score,
-      resolved_action: resolvedAction,
-      matched_abuse_rule_ids: candidate.matched_abuse_rule_ids,
-    };
+    return RulesEngineClassificationResultSchema.parse(JSON.parse(raw));
   } catch (error) {
     console.warn('Failed to parse cached rules-engine classification', { error });
     return null;

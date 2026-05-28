@@ -322,6 +322,38 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
 
+  it('applies delay before returning error when quarantine-3 override API kind is unsupported', async () => {
+    jest.useFakeTimers();
+    mockedRedisGet.mockResolvedValue(cachedRulesEngine('quarantine-3'));
+    mockedClassifyAbuse.mockResolvedValue(classifyResult('quarantine-3'));
+    mockedGetProvider
+      .mockResolvedValueOnce({
+        kind: 'provider',
+        provider,
+        userByok: null,
+        bypassAccessCheck: false,
+      })
+      .mockResolvedValueOnce({
+        kind: 'provider',
+        provider: { ...provider, supportedChatApis: ['responses'] },
+        userByok: null,
+        bypassAccessCheck: false,
+      });
+
+    const { POST } = await import('./route');
+    const responsePromise = POST(makeRequest(makeBody()) as never);
+
+    await jest.advanceTimersByTimeAsync(5999);
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+
+    await jest.advanceTimersByTimeAsync(1);
+    const response = await responsePromise;
+
+    expect(response.status).toBe(400);
+    expect(mockedGetProvider).toHaveBeenCalledTimes(2);
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
   it('adds latency without rewriting quarantine-3 BYOK requests', async () => {
     jest.useFakeTimers();
     mockedRedisGet.mockResolvedValue(cachedRulesEngine('quarantine-3'));

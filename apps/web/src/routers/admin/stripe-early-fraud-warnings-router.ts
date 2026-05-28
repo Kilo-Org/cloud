@@ -17,7 +17,7 @@ const EarlyFraudWarningListInputSchema = z.object({
 function normalizeTimestamp(value: string | null): string | null {
   if (!value) return null;
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toISOString();
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
 export const adminStripeEarlyFraudWarningsRouter = createTRPCRouter({
@@ -57,7 +57,7 @@ export const adminStripeEarlyFraudWarningsRouter = createTRPCRouter({
         eq(organizations.id, stripe_early_fraud_warning_cases.organization_id)
       )
       .orderBy(
-        desc(stripe_early_fraud_warning_cases.warning_created_at),
+        sql`${stripe_early_fraud_warning_cases.warning_created_at} DESC NULLS LAST`,
         desc(stripe_early_fraud_warning_cases.created_at),
         desc(stripe_early_fraud_warning_cases.id)
       )

@@ -105,7 +105,7 @@ describe('admin early fraud warnings list', () => {
     );
   });
 
-  it('paginates warning cases deterministically', async () => {
+  it('paginates dated warning cases before rows without warning timestamps', async () => {
     await db.insert(stripe_early_fraud_warning_cases).values([
       {
         stripe_early_fraud_warning_id: 'issfr_older',
@@ -123,14 +123,25 @@ describe('admin early fraud warnings list', () => {
         reason: 'No canonical customer owner matched; manual review required',
         warning_created_at: '2026-05-27T00:00:00.000Z',
       },
+      {
+        stripe_early_fraud_warning_id: 'issfr_missing_warning_time',
+        stripe_event_id: 'evt_missing_warning_time',
+        owner_classification: StripeEarlyFraudWarningOwnerClassification.Unmatched,
+        status: StripeEarlyFraudWarningCaseStatus.ReviewRequired,
+        reason: 'Warning timestamp missing; manual review required',
+        warning_created_at: null,
+      },
     ]);
 
     const caller = await createCallerForUser(admin.id);
     const firstPage = await caller.admin.earlyFraudWarnings.list({ page: 1, limit: 1 });
     const secondPage = await caller.admin.earlyFraudWarnings.list({ page: 2, limit: 1 });
+    const thirdPage = await caller.admin.earlyFraudWarnings.list({ page: 3, limit: 1 });
 
-    expect(firstPage.pagination).toEqual({ page: 1, limit: 1, total: 2, totalPages: 2 });
+    expect(firstPage.pagination).toEqual({ page: 1, limit: 1, total: 3, totalPages: 3 });
     expect(firstPage.rows[0]?.stripeEarlyFraudWarningId).toBe('issfr_newer');
     expect(secondPage.rows[0]?.stripeEarlyFraudWarningId).toBe('issfr_older');
+    expect(thirdPage.rows[0]?.stripeEarlyFraudWarningId).toBe('issfr_missing_warning_time');
+    expect(thirdPage.rows[0]?.warningCreatedAt).toBeNull();
   });
 });

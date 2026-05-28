@@ -28,8 +28,8 @@ const deepseek_v4_pro_discounted_model: KiloExclusiveModel = {
   status: 'public',
   context_length: 1048576,
   max_completion_tokens: 384000,
-  gateway: 'openrouter',
-  flags: ['reasoning', 'vision', 'requires-data-collection', 'vercel-routing'],
+  gateway: 'vercel', // openrouter seems to be affected by: https://kilo-code.slack.com/archives/C08P0HYC9S4/p1779874852296019
+  flags: ['reasoning', 'vision', 'requires-data-collection'],
   pricing: {
     prompt_per_million: 0.435,
     completion_per_million: 0.87,
@@ -50,8 +50,8 @@ const deepseek_v4_flash_discounted_model: KiloExclusiveModel = {
   status: 'public',
   context_length: 1048576,
   max_completion_tokens: 384000,
-  gateway: 'openrouter',
-  flags: ['reasoning', 'vision', 'requires-data-collection', 'vercel-routing'],
+  gateway: 'vercel',
+  flags: ['reasoning', 'vision', 'requires-data-collection'],
   pricing: {
     prompt_per_million: 0.14,
     completion_per_million: 0.28,

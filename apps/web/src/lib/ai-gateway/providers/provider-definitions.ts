@@ -2,9 +2,11 @@ import { getEnvVariable } from '@/lib/dotenvx';
 import {
   addCacheBreakpoints,
   isReasoningExplicitlyDisabled,
+  scrubOpenCodeSpecificProperties,
 } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
 import type { Provider } from '@/lib/ai-gateway/providers/types';
 import { applyVercelSettings } from '@/lib/ai-gateway/providers/vercel';
+import { qwen36_plus_stealth_model } from '@/lib/ai-gateway/providers/qwen';
 
 export default {
   OPENROUTER: {
@@ -55,6 +57,12 @@ export default {
     supportedChatApis: ['chat_completions', 'responses', 'messages'],
     transformRequest(context) {
       delete context.request.body.provider;
+      if (context.request.kind === 'chat_completions') {
+        scrubOpenCodeSpecificProperties(context.request.body);
+      }
+      if (context.model === qwen36_plus_stealth_model.public_id) {
+        addCacheBreakpoints(context.request);
+      }
     },
   },
   MISTRAL: {

@@ -242,7 +242,9 @@ export async function disableCodeReviewForActionRequiredFailure(
         reason: args.reason,
         reviewId: args.reviewId,
       });
-      return;
+      throw new Error(
+        `Code Review agent config not found for owner ${args.owner.type}:${args.owner.id} on ${args.platform}`
+      );
     }
 
     const now = new Date().toISOString();

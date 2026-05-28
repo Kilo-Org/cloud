@@ -101,6 +101,29 @@ describe('disableCodeReviewForActionRequiredFailure', () => {
     return config;
   }
 
+  it('throws when the agent config is missing', async () => {
+    await db
+      .delete(agent_configs)
+      .where(
+        and(
+          eq(agent_configs.owned_by_user_id, testUser.id),
+          eq(agent_configs.agent_type, 'code_review')
+        )
+      );
+
+    await expect(
+      disableCodeReviewForActionRequiredFailure({
+        owner: { type: 'user', id: testUser.id, userId: testUser.id },
+        platform: 'github',
+        reason: 'github_installation_required',
+        errorMessage:
+          'GitHub token or active app installation required for this repository (no_installation_found)',
+      })
+    ).rejects.toThrow('Code Review agent config not found');
+
+    expect(mockSendCodeReviewDisabledEmail).not.toHaveBeenCalled();
+  });
+
   it('stores runtime state without recipient PII and sends one email for a repeated reason', async () => {
     const owner = { type: 'user' as const, id: testUser.id, userId: testUser.id };
 

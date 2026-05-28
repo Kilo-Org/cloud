@@ -45,6 +45,7 @@ import {
   isAlreadyReported,
   type ReporterBead,
 } from './wasteland-reporter';
+import { HEARTBEAT_STALE_MS, staleMs } from './staleness';
 
 const LOG = '[reconciler]';
 
@@ -130,13 +131,6 @@ const STALE_IN_PROGRESS_TIMEOUT_MS = 5 * 60_000; // 5 min
  * running/unknown, the stalled row persists indefinitely. This time-based
  * cleanup closes the loop. */
 const STALLED_AUTO_IDLE_MS = 2.5 * 60 * 60_000; // 2h 30min
-
-// ── Helper: staleness check ─────────────────────────────────────────
-
-function staleMs(timestamp: string | null, thresholdMs: number): boolean {
-  if (!timestamp) return true;
-  return Date.now() - new Date(timestamp).getTime() > thresholdMs;
-}
 
 /**
  * Compute the dispatch cooldown for a bead based on its attempt count.
@@ -728,7 +722,7 @@ export function reconcileAgents(sql: SqlStorage, opts?: { draining?: boolean }):
         to: 'idle',
         reason: 'no heartbeat received since dispatch',
       });
-    } else if (staleMs(agent.last_activity_at, 90_000)) {
+    } else if (staleMs(agent.last_activity_at, HEARTBEAT_STALE_MS)) {
       actions.push({
         type: 'transition_agent',
         agent_id: agent.bead_id,
@@ -907,7 +901,7 @@ export function reconcileAgents(sql: SqlStorage, opts?: { draining?: boolean }):
       // alive and leave the hook in place. The 90s window matches
       // reconcileAgents' stale-heartbeat threshold, so a truly dead
       // agent still gets reaped by the heartbeat path on a later tick.
-      if (!staleMs(agent.last_activity_at, 90_000)) continue;
+      if (!staleMs(agent.last_activity_at, HEARTBEAT_STALE_MS)) continue;
 
       actions.push({
         type: 'unhook_agent',

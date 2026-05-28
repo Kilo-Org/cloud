@@ -156,6 +156,37 @@ describe('disableCodeReviewForActionRequiredFailure', () => {
     expect(mockSendCodeReviewDisabledEmail).toHaveBeenCalledTimes(1);
   });
 
+  it('retries email when notification delivery fails', async () => {
+    const owner = { type: 'user' as const, id: testUser.id, userId: testUser.id };
+    mockSendCodeReviewDisabledEmail.mockResolvedValueOnce({ sent: false });
+
+    await disableCodeReviewForActionRequiredFailure({
+      owner,
+      platform: 'github',
+      reviewId: 'review-1',
+      reason: 'github_installation_required',
+      errorMessage:
+        'GitHub token or active app installation required for this repository (no_installation_found)',
+    });
+
+    let state = getCodeReviewActionRequiredState(await getStoredConfig());
+    expect(state?.emailSentAt).toBeUndefined();
+
+    mockSendCodeReviewDisabledEmail.mockResolvedValueOnce({ sent: true });
+    await disableCodeReviewForActionRequiredFailure({
+      owner,
+      platform: 'github',
+      reviewId: 'review-2',
+      reason: 'github_installation_required',
+      errorMessage:
+        'Dispatch failed: GitHub token or active app installation required for this repository (no_installation_found)',
+    });
+
+    state = getCodeReviewActionRequiredState(await getStoredConfig());
+    expect(state?.emailSentAt).toBeTruthy();
+    expect(mockSendCodeReviewDisabledEmail).toHaveBeenCalledTimes(2);
+  });
+
   it('sends a new email when the action-required reason changes', async () => {
     const owner = { type: 'user' as const, id: testUser.id, userId: testUser.id };
 

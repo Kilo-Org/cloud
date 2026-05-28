@@ -53,6 +53,13 @@ type ClearCodeReviewActionRequiredStateArgs = {
   platform: CodeReviewPlatform;
 };
 
+type MarkActionRequiredEmailSentArgs = {
+  owner: Owner;
+  platform: CodeReviewPlatform;
+  reason: CodeReviewActionRequiredReason;
+  sentAt: string;
+};
+
 function stripKnownErrorPrefixes(errorMessage: string): string {
   let message = errorMessage.trim();
   let next = message.replace(/^dispatch failed:\s*/i, '').trim();
@@ -161,7 +168,7 @@ async function sendActionRequiredEmailNotifications(
   owner: Owner,
   platform: CodeReviewPlatform,
   reason: CodeReviewActionRequiredReason
-): Promise<void> {
+): Promise<boolean> {
   const recipients = await getRecipientEmails(owner);
   if (recipients.length === 0) {
     logExceptInTest('[code-review-action-required] No notification recipients found', {
@@ -170,7 +177,7 @@ async function sendActionRequiredEmailNotifications(
       platform,
       reason,
     });
-    return;
+    return false;
   }
 
   const copy = getCodeReviewActionRequiredCopy(reason);
@@ -212,7 +219,40 @@ async function sendActionRequiredEmailNotifications(
         recipientCount: recipients.length,
       },
     });
+    return false;
   }
+
+  return true;
+}
+
+async function markActionRequiredEmailSent(args: MarkActionRequiredEmailSentArgs): Promise<void> {
+  await db.transaction(async tx => {
+    await tx.execute(
+      sql`SELECT pg_advisory_xact_lock(hashtext(${`code-review-action-required:${args.owner.type}:${args.owner.id}:${args.platform}`}))`
+    );
+
+    const conditions = ownerConditions(args.owner, args.platform);
+    const [config] = await tx
+      .select()
+      .from(agent_configs)
+      .where(and(...conditions))
+      .for('update')
+      .limit(1);
+
+    if (!config) {
+      throw new Error(
+        `Code Review agent config not found for owner ${args.owner.type}:${args.owner.id} on ${args.platform}`
+      );
+    }
+
+    const existingState = getCodeReviewActionRequiredState(config);
+    if (!existingState || existingState.reason !== args.reason || existingState.emailSentAt) return;
+
+    await updateActionRequiredRuntimeState(tx, conditions, {
+      ...existingState,
+      emailSentAt: args.sentAt,
+    });
+  });
 }
 
 export async function disableCodeReviewForActionRequiredFailure(
@@ -260,7 +300,6 @@ export async function disableCodeReviewForActionRequiredFailure(
       lastSeenAt: now,
       ...(args.reviewId ? { triggeringReviewId: args.reviewId } : {}),
       lastErrorMessage: copy.description,
-      ...(shouldSendEmail ? { emailSentAt: now } : {}),
       ...(!shouldSendEmail && existingState?.emailSentAt
         ? { emailSentAt: existingState.emailSentAt }
         : {}),
@@ -274,7 +313,15 @@ export async function disableCodeReviewForActionRequiredFailure(
   if (!shouldSendEmail) return;
 
   try {
-    await sendActionRequiredEmailNotifications(args.owner, args.platform, args.reason);
+    const sent = await sendActionRequiredEmailNotifications(args.owner, args.platform, args.reason);
+    if (sent) {
+      await markActionRequiredEmailSent({
+        owner: args.owner,
+        platform: args.platform,
+        reason: args.reason,
+        sentAt: new Date().toISOString(),
+      });
+    }
   } catch (error) {
     logExceptInTest('[code-review-action-required] Failed to send notification email', {
       ownerType: args.owner.type,

@@ -2,7 +2,12 @@ import 'server-only';
 import { TRPCError } from '@trpc/server';
 import { fetchInstallPayload } from './install';
 import type { InstallSource } from './install-sources';
-import { getActiveInstance } from './instance-registry';
+import {
+  getActiveInstance,
+  workerInstanceId,
+  type ActiveKiloClawInstance,
+} from './instance-registry';
+import { KiloClawInternalClient } from './kiloclaw-internal-client';
 import { postMessageAsUser } from './kilo-chat-internal-client';
 
 /**
@@ -48,12 +53,37 @@ export type DispatchInstallFromSourceResult =
 export type DispatchInstallFromSourceDeps = {
   fetchInstallPayload: typeof fetchInstallPayload;
   getActiveInstance: typeof getActiveInstance;
+  resolveRuntimeSandboxId: (
+    userId: string,
+    instance: ActiveKiloClawInstance
+  ) => Promise<string | null>;
   postMessageAsUser: typeof postMessageAsUser;
 };
+
+/**
+ * Resolve the *runtime* sandbox id the chat is currently keyed on, not the
+ * Postgres registry row's `sandbox_id`. Matches the dashboard/status path
+ * (`client.getStatus(userId, workerInstanceId(instance)).sandboxId`).
+ *
+ * Why this matters: during half-migrated states the registry row may still
+ * carry a legacy sandbox id while the active worker / chat are on
+ * `ki_<instanceId>`. Dispatching against the registry value in that state
+ * would write the install message into a stale conversation that the user
+ * never sees.
+ */
+async function defaultResolveRuntimeSandboxId(
+  userId: string,
+  instance: ActiveKiloClawInstance
+): Promise<string | null> {
+  const client = new KiloClawInternalClient();
+  const status = await client.getStatus(userId, workerInstanceId(instance));
+  return status.sandboxId ?? null;
+}
 
 const defaultDeps: DispatchInstallFromSourceDeps = {
   fetchInstallPayload,
   getActiveInstance,
+  resolveRuntimeSandboxId: defaultResolveRuntimeSandboxId,
   postMessageAsUser,
 };
 
@@ -80,10 +110,21 @@ export async function dispatchInstallFromSource(
     return { ok: false, code: 'no_instance' };
   }
 
+  // Use the runtime sandbox id (not the registry row's `sandboxId`) so
+  // half-migrated rows don't dispatch into a stale conversation. See
+  // `defaultResolveRuntimeSandboxId` for the why.
+  const runtimeSandboxId = await deps.resolveRuntimeSandboxId(userId, instance);
+  if (!runtimeSandboxId) {
+    // Instance row exists but the runtime isn't reporting a sandbox yet —
+    // provisioning still in flight. Same UX class as no-instance, so the
+    // client lands on /claw/new and re-tries once chat is ready.
+    return { ok: false, code: 'no_instance' };
+  }
+
   const dispatchedAt = new Date().toISOString();
   const result = await deps.postMessageAsUser({
     userId,
-    sandboxId: instance.sandboxId,
+    sandboxId: runtimeSandboxId,
     message: payload.prompt,
     source: 'install',
     autoCreateConversation: true,

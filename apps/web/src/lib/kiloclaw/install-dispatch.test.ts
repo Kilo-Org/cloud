@@ -21,16 +21,15 @@ const ACTIVE_INSTANCE = {
   sandboxId: 'sb-1',
 } as unknown as Awaited<ReturnType<DispatchInstallFromSourceDeps['getActiveInstance']>>;
 
+const RUNTIME_SANDBOX_ID = 'ki_runtime_sandbox';
+
 function makeDeps(
-  overrides: Partial<{
-    fetchInstallPayload: DispatchInstallFromSourceDeps['fetchInstallPayload'];
-    getActiveInstance: DispatchInstallFromSourceDeps['getActiveInstance'];
-    postMessageAsUser: DispatchInstallFromSourceDeps['postMessageAsUser'];
-  }> = {}
+  overrides: Partial<DispatchInstallFromSourceDeps> = {}
 ): DispatchInstallFromSourceDeps {
   return {
     fetchInstallPayload: overrides.fetchInstallPayload ?? (async () => VALID_PAYLOAD),
     getActiveInstance: overrides.getActiveInstance ?? (async () => ACTIVE_INSTANCE),
+    resolveRuntimeSandboxId: overrides.resolveRuntimeSandboxId ?? (async () => RUNTIME_SANDBOX_ID),
     postMessageAsUser:
       overrides.postMessageAsUser ??
       (async () =>
@@ -84,7 +83,7 @@ describe('dispatchInstallFromSource', () => {
     expect(instanceSpy).toHaveBeenCalledWith('user-1');
     expect(dispatchSpy).toHaveBeenCalledWith({
       userId: 'user-1',
-      sandboxId: 'sb-1',
+      sandboxId: RUNTIME_SANDBOX_ID, // NOT the registry row's sandboxId
       message: 'Research [topic] for me.',
       source: 'install',
       autoCreateConversation: true,
@@ -120,6 +119,61 @@ describe('dispatchInstallFromSource', () => {
       ARGS,
       makeDeps({
         getActiveInstance: async () => null,
+        postMessageAsUser: dispatchSpy as never,
+      })
+    );
+
+    expect(result).toEqual({ ok: false, code: 'no_instance' });
+    expect(dispatchSpy).not.toHaveBeenCalled();
+  });
+
+  it('uses the runtime sandbox id, not the registry row, to dispatch', async () => {
+    jest.spyOn(console, 'info').mockImplementation(() => {});
+
+    // Make the registry row carry a legacy sandbox id; the resolver returns
+    // the modern ki_<instanceId> value the active worker/chat are keyed on.
+    const LEGACY_REGISTRY_SANDBOX = 'legacy_userbase64_sandbox';
+    const MODERN_RUNTIME_SANDBOX = 'ki_active_runtime_sandbox';
+    const halfMigratedInstance = {
+      ...ACTIVE_INSTANCE!,
+      sandboxId: LEGACY_REGISTRY_SANDBOX,
+    } as typeof ACTIVE_INSTANCE;
+
+    let dispatchedWith: Parameters<DispatchInstallFromSourceDeps['postMessageAsUser']>[0] | null =
+      null;
+    const dispatchSpy: DispatchInstallFromSourceDeps['postMessageAsUser'] = async params => {
+      dispatchedWith = params;
+      return {
+        ok: true,
+        conversationId: 'conv-x',
+        messageId: 'msg-x',
+        conversationCreated: false,
+      } satisfies PostMessageAsUserResult;
+    };
+
+    await dispatchInstallFromSource(
+      ARGS,
+      makeDeps({
+        getActiveInstance: async () => halfMigratedInstance,
+        resolveRuntimeSandboxId: async () => MODERN_RUNTIME_SANDBOX,
+        postMessageAsUser: dispatchSpy,
+      })
+    );
+
+    expect(dispatchedWith).not.toBeNull();
+    expect(dispatchedWith!.sandboxId).toBe(MODERN_RUNTIME_SANDBOX);
+    expect(dispatchedWith!.sandboxId).not.toBe(LEGACY_REGISTRY_SANDBOX);
+  });
+
+  it('returns no_instance when runtime sandbox id resolves to null', async () => {
+    // Instance row exists but the runtime status reports no sandbox yet
+    // (e.g. provisioning still warming up). Surface this as the same UX
+    // class as no-instance so the client lands on /claw/new and re-tries.
+    const dispatchSpy = jest.fn();
+    const result = await dispatchInstallFromSource(
+      ARGS,
+      makeDeps({
+        resolveRuntimeSandboxId: async () => null,
         postMessageAsUser: dispatchSpy as never,
       })
     );

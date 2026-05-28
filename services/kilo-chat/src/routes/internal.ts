@@ -1,24 +1,9 @@
 import type { Hono } from 'hono';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
-import { z } from 'zod';
+import { postMessageAsUserParamsSchema } from '@kilocode/kilo-chat';
 import type { AuthContext } from '../auth';
 import { logger } from '../util/logger';
 import { postMessageAsUser } from '../services/post-message-as-user';
-
-const postMessageAsUserBodySchema = z.object({
-  userId: z.string().min(1),
-  sandboxId: z.string().min(1),
-  message: z.string().min(1),
-  source: z.string().min(1).max(64),
-  autoCreateConversation: z.boolean().optional(),
-  correlation: z
-    .object({
-      triggerId: z.string().optional(),
-      webhookRequestId: z.string().optional(),
-      reason: z.string().optional(),
-    })
-    .optional(),
-});
 
 /**
  * HTTP wrapper around the `postMessageAsUser` RPC primitive, for callers
@@ -28,7 +13,7 @@ const postMessageAsUserBodySchema = z.object({
 export function registerInternalRoutes(app: Hono<{ Bindings: Env; Variables: AuthContext }>) {
   app.post('/internal/v1/post-message-as-user', async c => {
     const raw = await c.req.json().catch(() => null);
-    const parsed = postMessageAsUserBodySchema.safeParse(raw);
+    const parsed = postMessageAsUserParamsSchema.safeParse(raw);
     if (!parsed.success) {
       return c.json({ ok: false, code: 'invalid_request', error: parsed.error.message }, 400);
     }

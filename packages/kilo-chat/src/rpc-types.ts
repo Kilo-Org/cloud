@@ -52,6 +52,25 @@ export type PostMessageAsUserErr = {
 
 export type PostMessageAsUserResult = PostMessageAsUserOk | PostMessageAsUserErr;
 
+// Runtime schema for `PostMessageAsUserParams` so HTTP callers and the
+// HTTP route share one source of truth (Worker RPC callers rely on the
+// declared types). The bounds (`min(1)`, `max(64)` on source, etc.) are
+// HTTP-boundary safety and apply uniformly to both call paths.
+export const postMessageAsUserCorrelationSchema = z.object({
+  triggerId: z.string().max(200).optional(),
+  webhookRequestId: z.string().max(200).optional(),
+  reason: z.string().max(200).optional(),
+});
+
+export const postMessageAsUserParamsSchema = z.object({
+  userId: z.string().min(1).max(200),
+  sandboxId: z.string().min(1).max(200),
+  message: z.string().min(1),
+  source: z.string().min(1).max(64),
+  autoCreateConversation: z.boolean().optional(),
+  correlation: postMessageAsUserCorrelationSchema.optional(),
+});
+
 // Runtime schemas for the same shapes, so HTTP callers (e.g. cloud's
 // Next.js app) can Zod-validate responses against one source of truth
 // shared with the producer. Keep `z.infer` aligned with the types above —

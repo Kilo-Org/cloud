@@ -11,7 +11,7 @@ import {
   StripeEarlyFraudWarningOwnerClassification,
   type StripeEarlyFraudWarningOwnerClassification as OwnerClassification,
 } from '@kilocode/db/schema-types';
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, isNull, like, not, or } from 'drizzle-orm';
 import type Stripe from 'stripe';
 
 import { db } from '@/lib/drizzle';
@@ -74,7 +74,15 @@ async function resolveOwner(customerId: string | null): Promise<OwnerResolution>
     db
       .select({ id: kilocode_users.id })
       .from(kilocode_users)
-      .where(eq(kilocode_users.stripe_customer_id, customerId))
+      .where(
+        and(
+          eq(kilocode_users.stripe_customer_id, customerId),
+          or(
+            isNull(kilocode_users.blocked_reason),
+            not(like(kilocode_users.blocked_reason, 'soft-deleted at %'))
+          )
+        )
+      )
       .limit(2),
     db
       .select({ id: organizations.id })

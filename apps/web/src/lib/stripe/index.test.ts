@@ -81,6 +81,7 @@ import {
 } from '@kilocode/db/schema';
 import { db, auto_deleted_at } from '@/lib/drizzle';
 import { insertTestUser } from '@/tests/helpers/user.helper';
+import { softDeleteUser } from '@/lib/user';
 import { createTestPaymentMethod } from '@/tests/helpers/payment-method.helper';
 import { eq, and, count } from 'drizzle-orm';
 import type Stripe from 'stripe';
@@ -878,6 +879,43 @@ describe('processStripePaymentEventHook', () => {
         },
       ],
     });
+
+    retrieveSpy.mockRestore();
+  });
+
+  test('radar.early_fraud_warning.created does not link a new case to a soft-deleted user', async () => {
+    await cleanupDbForTest();
+    testUser = await insertTestUser();
+    await softDeleteUser(testUser.id);
+    const { client } = await import('@/lib/stripe-client');
+    const retrieveSpy = jest.spyOn(client.charges, 'retrieve').mockResolvedValue(
+      sampleStripeChargeResponse(
+        sampleStripeCharge({
+          id: 'ch_deleted_customer',
+          customer: testUser.stripe_customer_id,
+        })
+      )
+    );
+
+    await processStripePaymentEventHook(
+      sampleEarlyFraudWarningEvent({
+        eventId: 'evt_deleted_customer',
+        warningId: 'issfr_deleted_customer',
+        charge: 'ch_deleted_customer',
+      })
+    );
+
+    const [fraudCase] = await db.select().from(stripe_early_fraud_warning_cases);
+    expect(fraudCase).toEqual(
+      expect.objectContaining({
+        stripe_customer_id: testUser.stripe_customer_id,
+        owner_classification: 'unmatched',
+        kilo_user_id: null,
+        status: 'review_required',
+        reason: 'No canonical customer owner matched; manual review required',
+      })
+    );
+    expect(await db.select().from(stripe_early_fraud_warning_actions)).toHaveLength(0);
 
     retrieveSpy.mockRestore();
   });

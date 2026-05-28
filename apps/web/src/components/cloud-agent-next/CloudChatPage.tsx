@@ -80,38 +80,55 @@ const StaticMessages = memo(
 StaticMessages.displayName = 'StaticMessages';
 
 // ---------------------------------------------------------------------------
-// Dynamic messages — re-renders as streaming progresses
+// Dynamic messages — re-renders as streaming progresses while chat is visible
 // ---------------------------------------------------------------------------
-function DynamicMessages({
-  messages,
-  pendingMessages,
-  getChildMessages,
-  onOpenChildSession,
-}: {
+type DynamicMessagesProps = {
+  active: boolean;
   messages: StoredMessage[];
   pendingMessages: ReadonlyMap<string, MessageDeliveryState>;
   getChildMessages?: (sessionId: string) => StoredMessage[];
   onOpenChildSession?: OpenChildSession;
-}) {
-  return (
-    <>
-      {messages.map(msg => {
-        const streaming = isMessageStreaming(msg);
-        return (
-          <MessageErrorBoundary key={msg.info.id}>
-            <MessageBubble
-              message={msg}
-              isStreaming={streaming}
-              deliveryState={pendingMessages.get(msg.info.id)}
-              getChildMessages={getChildMessages}
-              onOpenChildSession={onOpenChildSession}
-            />
-          </MessageErrorBoundary>
-        );
-      })}
-    </>
-  );
-}
+};
+
+const DynamicMessages = memo(
+  function DynamicMessages({
+    messages,
+    pendingMessages,
+    getChildMessages,
+    onOpenChildSession,
+  }: DynamicMessagesProps) {
+    return (
+      <>
+        {messages.map(msg => {
+          const streaming = isMessageStreaming(msg);
+          return (
+            <MessageErrorBoundary key={msg.info.id}>
+              <MessageBubble
+                message={msg}
+                isStreaming={streaming}
+                deliveryState={pendingMessages.get(msg.info.id)}
+                getChildMessages={getChildMessages}
+                onOpenChildSession={onOpenChildSession}
+              />
+            </MessageErrorBoundary>
+          );
+        })}
+      </>
+    );
+  },
+  (previous, next) => {
+    if (!previous.active && !next.active) return true;
+
+    return (
+      previous.active === next.active &&
+      previous.messages === next.messages &&
+      previous.pendingMessages === next.pendingMessages &&
+      previous.getChildMessages === next.getChildMessages &&
+      previous.onOpenChildSession === next.onOpenChildSession
+    );
+  }
+);
+DynamicMessages.displayName = 'DynamicMessages';
 
 // ---------------------------------------------------------------------------
 // CloudChatPage
@@ -141,7 +158,7 @@ function TerminalPaneSlot({
   );
 
   return (
-    <div className={active ? 'h-full min-h-0' : 'hidden'} aria-hidden={!active}>
+    <div className={active ? 'h-full min-h-0' : 'hidden'}>
       {sessionId && (
         <CloudAgentTerminalPane
           cloudAgentSessionId={sessionId}
@@ -248,11 +265,23 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
   const lastScrollTopRef = useRef(0);
 
   const autoScrollFrameRef = useRef(0);
+  const followUpAutoScrollFrameRef = useRef(0);
   const delayedAutoScrollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const cancelScheduledAutoScroll = useCallback(() => {
+    cancelAnimationFrame(autoScrollFrameRef.current);
+    cancelAnimationFrame(followUpAutoScrollFrameRef.current);
+    autoScrollFrameRef.current = 0;
+    followUpAutoScrollFrameRef.current = 0;
+    if (delayedAutoScrollRef.current !== null) {
+      clearTimeout(delayedAutoScrollRef.current);
+      delayedAutoScrollRef.current = null;
+    }
+  }, []);
 
   const scrollToBottomNow = useCallback(() => {
     const el = scrollContainerRef.current;
-    if (!el) return;
+    if (!el || el.hidden) return;
 
     const scrollRun = autoScrollRunRef.current + 1;
     autoScrollRunRef.current = scrollRun;
@@ -269,30 +298,27 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
   }, []);
 
   const scheduleScrollToBottom = useCallback(() => {
-    cancelAnimationFrame(autoScrollFrameRef.current);
-    if (delayedAutoScrollRef.current !== null) {
-      clearTimeout(delayedAutoScrollRef.current);
-      delayedAutoScrollRef.current = null;
-    }
+    cancelScheduledAutoScroll();
 
     autoScrollFrameRef.current = requestAnimationFrame(() => {
+      autoScrollFrameRef.current = 0;
       scrollToBottomNow();
-      requestAnimationFrame(scrollToBottomNow);
+      followUpAutoScrollFrameRef.current = requestAnimationFrame(() => {
+        followUpAutoScrollFrameRef.current = 0;
+        scrollToBottomNow();
+      });
       delayedAutoScrollRef.current = setTimeout(() => {
         delayedAutoScrollRef.current = null;
         scrollToBottomNow();
       }, 100);
     });
-  }, [scrollToBottomNow]);
+  }, [cancelScheduledAutoScroll, scrollToBottomNow]);
+
+  useEffect(() => cancelScheduledAutoScroll, [cancelScheduledAutoScroll]);
 
   useEffect(() => {
-    return () => {
-      cancelAnimationFrame(autoScrollFrameRef.current);
-      if (delayedAutoScrollRef.current !== null) {
-        clearTimeout(delayedAutoScrollRef.current);
-      }
-    };
-  }, []);
+    if (!chatTabActive) cancelScheduledAutoScroll();
+  }, [cancelScheduledAutoScroll, chatTabActive]);
 
   useEffect(() => {
     if (!chatTabActive || !chatUI.shouldAutoScroll) return;
@@ -680,8 +706,8 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
                       <>
                         <div
                           ref={scrollContainerRef}
-                          aria-hidden={!chatTabActive}
-                          className={`absolute inset-0 overflow-y-auto px-[max(1rem,calc(50%_-_27rem))] pb-2 pt-4 transition-opacity duration-150 ${showLoadingIndicator ? 'pointer-events-none opacity-40' : 'opacity-100'} ${chatTabActive ? '' : 'hidden'}`}
+                          hidden={!chatTabActive}
+                          className={`absolute inset-0 overflow-y-auto px-[max(1rem,calc(50%_-_27rem))] pb-2 pt-4 transition-opacity duration-150 ${showLoadingIndicator ? 'pointer-events-none opacity-40' : 'opacity-100'}`}
                           onScroll={handleScroll}
                         >
                           <div ref={messagesContentRef}>
@@ -692,16 +718,19 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
                               onOpenChildSession={handleOpenTopLevelChildSession}
                             />
                             <DynamicMessages
+                              active={chatTabActive}
                               messages={dynamicMessages}
                               pendingMessages={pendingMessages}
                               getChildMessages={getChildMessages}
                               onOpenChildSession={handleOpenTopLevelChildSession}
                             />
 
-                            <WorkingIndicator
-                              messages={dynamicMessages}
-                              isStreaming={isStreaming}
-                            />
+                            {chatTabActive && (
+                              <WorkingIndicator
+                                messages={dynamicMessages}
+                                isStreaming={isStreaming}
+                              />
+                            )}
                             {statusIndicator && (
                               <SessionStatusIndicator indicator={statusIndicator} />
                             )}

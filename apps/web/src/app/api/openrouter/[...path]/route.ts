@@ -395,6 +395,8 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   // Use new shared helper for fraud & project headers
   const { fraudHeaders, projectId } = extractFraudAndProjectHeaders(request);
+  // Resolve the initial provider before abuse enforcement because abuse needs
+  // provider/BYOK context, and quarantine-3 may later rewrite these values.
   let providerResult = await getProvider({
     requestedModel: originalModelIdLowerCased,
     request: requestBodyParsed,
@@ -441,6 +443,8 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   console.debug(`Routing request to ${provider.id}`);
 
+  // Start classification early, but do not await it unless the last cached
+  // rules-engine result says this identity is already under enforcement.
   const classifyPromise = classifyAbuse(request, requestBodyParsed, {
     kiloUserId: user.id,
     organizationId,
@@ -455,6 +459,8 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   });
   const cachedClassification = await getCachedRulesEngineClassification(abuseCacheIdentityKey);
   const cachedRulesEngineAction = cachedClassification?.rulesEngine.resolved_action ?? null;
+  // Cache-gating keeps normal traffic on the fast path: only identities with a
+  // recent blocking/quarantine decision wait for a fresh abuse-service result.
   const shouldBlockOnClassify = isRulesEngineBlockingAction(cachedRulesEngineAction);
 
   // Large responses may run longer than the 800s serverless function timeout.
@@ -482,6 +488,9 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       rulesEngine: classifyResult.rules_engine,
     });
   }
+  // When a blocking refresh fails or times out, fall back to the cached
+  // enforcement decision. Missing/nonblocking cache entries never enforce the
+  // fresh result on this request; they only update Redis for the next request.
   const rulesEngineForDecision =
     (shouldBlockOnClassify ? classifyResult?.rules_engine : null) ??
     (shouldBlockOnClassify ? cachedClassification?.rulesEngine : null);
@@ -510,6 +519,8 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     return rulesEngineDecision.response;
   }
   if (rulesEngineDecision.modelOverride) {
+    // Quarantine-3 rewrites non-BYOK requests to an auto-free candidate, so the
+    // provider and derived policy flags must be resolved again for that model.
     requestBodyParsed.body.model = rulesEngineDecision.modelOverride;
     originalModelIdLowerCased = rulesEngineDecision.modelOverride;
     providerResult = await getProvider({

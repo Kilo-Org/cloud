@@ -28,6 +28,7 @@ import {
 import { getAgent, unhookBead, updateAgentStatus } from './agents';
 import { getRig } from './rigs';
 import type { ReviewQueueInput, ReviewQueueEntry, AgentDoneInput, Molecule } from '../../types';
+import { heartbeatStale } from './staleness';
 
 function generateId(): string {
   return crypto.randomUUID();
@@ -735,23 +736,30 @@ export function agentCompleted(
         });
       } else if (hookedBead && hookedBead.status === 'in_progress') {
         if (input.reason === 'container eviction') {
-          // Container eviction: WIP was force-pushed and eviction context
-          // was written on the bead body. Reset to open and clear the
-          // stale assignee so the reconciler can re-dispatch immediately.
-          console.log(
-            `[review-queue] agentCompleted: polecat ${agentId} evicted — ` +
-              `resetting bead ${agent.current_hook_bead_id} to open`
-          );
-          updateBeadStatus(sql, agent.current_hook_bead_id, 'open', agentId);
-          query(
-            sql,
-            /* sql */ `
-              UPDATE ${beads}
-              SET ${beads.columns.assignee_agent_bead_id} = NULL
-              WHERE ${beads.bead_id} = ?
-            `,
-            [agent.current_hook_bead_id]
-          );
+          if (!heartbeatStale(agent.last_activity_at)) {
+            console.log(
+              `[review-queue] agentCompleted: polecat ${agentId} eviction event ignored — ` +
+                `heartbeat fresh; bead ${agent.current_hook_bead_id} stays in_progress`
+            );
+          } else {
+            // Container eviction with a stale heartbeat: WIP was force-pushed and eviction
+            // context was written on the bead body. Reset to open and clear the stale
+            // assignee so the reconciler can re-dispatch immediately.
+            console.log(
+              `[review-queue] agentCompleted: polecat ${agentId} evicted (heartbeat stale) — ` +
+                `resetting bead ${agent.current_hook_bead_id} to open`
+            );
+            updateBeadStatus(sql, agent.current_hook_bead_id, 'open', agentId);
+            query(
+              sql,
+              /* sql */ `
+                UPDATE ${beads}
+                SET ${beads.columns.assignee_agent_bead_id} = NULL
+                WHERE ${beads.bead_id} = ?
+              `,
+              [agent.current_hook_bead_id]
+            );
+          }
         } else {
           // Agent exited 'completed' but bead is still in_progress — gt_done was never called.
           // Don't close the bead. Rule 3 will handle rework.

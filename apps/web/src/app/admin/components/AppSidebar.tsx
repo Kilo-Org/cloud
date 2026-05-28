@@ -191,6 +191,11 @@ const analyticsObservabilityItems: MenuItem[] = [
     icon: () => <FileSearch />,
   },
   {
+    title: () => 'Cloud Agent health',
+    url: '/admin/cloud-agent-next',
+    icon: () => <BarChart />,
+  },
+  {
     title: () => 'Session Traces',
     url: '/admin/session-traces',
     icon: () => <FileSearch />,

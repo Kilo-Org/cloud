@@ -3836,6 +3836,176 @@ export const cli_sessions_v2 = pgTable(
 export type CliSessionV2 = typeof cli_sessions_v2.$inferSelect;
 export type NewCliSessionV2 = typeof cli_sessions_v2.$inferInsert;
 
+export type CloudAgentSessionFailureStage =
+  | 'sandbox_identity'
+  | 'registration'
+  | 'initial_admission'
+  | 'transport';
+export type CloudAgentSessionFailureCode =
+  | 'sandbox_id_derivation_failed'
+  | 'do_registration_rejected'
+  | 'initial_admission_rejected'
+  | 'initial_queue_full'
+  | 'invalid_initial_intent'
+  | 'do_rpc_outcome_unknown';
+
+export const cloud_agent_sessions = pgTable(
+  'cloud_agent_sessions',
+  {
+    cloud_agent_session_id: text().primaryKey().notNull(),
+    kilo_session_id: text().notNull(),
+    initial_message_id: text().notNull(),
+    sandbox_id: text(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    failure_at: timestamp({ withTimezone: true, mode: 'string' }),
+    failure_stage: text().$type<CloudAgentSessionFailureStage>(),
+    failure_code: text().$type<CloudAgentSessionFailureCode>(),
+    error_message_redacted: text(),
+    error_expires_at: timestamp({ withTimezone: true, mode: 'string' }),
+  },
+  table => [
+    uniqueIndex('UQ_cloud_agent_sessions_kilo_session_id').on(table.kilo_session_id),
+    uniqueIndex('UQ_cloud_agent_sessions_initial_message_id').on(table.initial_message_id),
+    index('IDX_cloud_agent_sessions_sandbox_id')
+      .on(table.sandbox_id)
+      .where(isNotNull(table.sandbox_id)),
+    index('IDX_cloud_agent_sessions_created_at').on(table.created_at),
+    index('IDX_cloud_agent_sessions_failure_created').on(
+      table.failure_stage,
+      table.failure_code,
+      table.created_at
+    ),
+    index('IDX_cloud_agent_sessions_failure_at')
+      .on(table.failure_at)
+      .where(isNotNull(table.failure_at)),
+    index('IDX_cloud_agent_sessions_failure_classification_at')
+      .on(table.failure_stage, table.failure_code, table.failure_at)
+      .where(isNotNull(table.failure_at)),
+    index('IDX_cloud_agent_sessions_error_expires_at')
+      .on(table.error_expires_at)
+      .where(isNotNull(table.error_expires_at)),
+    check(
+      'cloud_agent_sessions_failure_classification_check',
+      sql`(${table.failure_at} IS NULL AND ${table.failure_stage} IS NULL AND ${table.failure_code} IS NULL) OR
+        (${table.failure_at} IS NOT NULL AND ${table.failure_stage} = 'sandbox_identity' AND ${table.failure_code} = 'sandbox_id_derivation_failed') OR
+        (${table.failure_at} IS NOT NULL AND ${table.failure_stage} = 'registration' AND ${table.failure_code} = 'do_registration_rejected') OR
+        (${table.failure_at} IS NOT NULL AND ${table.failure_stage} = 'initial_admission' AND ${table.failure_code} IN ('initial_admission_rejected', 'initial_queue_full', 'invalid_initial_intent')) OR
+        (${table.failure_at} IS NOT NULL AND ${table.failure_stage} = 'transport' AND ${table.failure_code} = 'do_rpc_outcome_unknown')`
+    ),
+    check(
+      'cloud_agent_sessions_error_message_bounded_check',
+      sql`${table.error_message_redacted} IS NULL OR char_length(${table.error_message_redacted}) <= 4096`
+    ),
+    check(
+      'cloud_agent_sessions_error_expiry_check',
+      sql`(${table.error_message_redacted} IS NULL AND ${table.error_expires_at} IS NULL) OR
+        (${table.error_message_redacted} IS NOT NULL AND ${table.error_expires_at} IS NOT NULL)`
+    ),
+  ]
+);
+
+export type CloudAgentSession = typeof cloud_agent_sessions.$inferSelect;
+export type NewCloudAgentSession = typeof cloud_agent_sessions.$inferInsert;
+
+export type CloudAgentSessionRunStatus =
+  | 'queued'
+  | 'accepted'
+  | 'completed'
+  | 'failed'
+  | 'interrupted';
+export type CloudAgentSessionRunFailureStage =
+  | 'pre_dispatch'
+  | 'post_dispatch_no_activity'
+  | 'agent_activity'
+  | 'interruption'
+  | 'unknown';
+export type CloudAgentSessionRunFailureCode =
+  | 'sandbox_connect_failed'
+  | 'workspace_setup_failed'
+  | 'kilo_server_failed'
+  | 'wrapper_start_failed'
+  | 'invalid_delivery_request'
+  | 'session_metadata_missing'
+  | 'model_missing'
+  | 'delivery_failure_unknown'
+  | 'wrapper_disconnected'
+  | 'wrapper_no_output'
+  | 'wrapper_ping_timeout'
+  | 'wrapper_error_before_activity'
+  | 'assistant_error'
+  | 'wrapper_error_after_activity'
+  | 'missing_assistant_reply'
+  | 'user_interrupt'
+  | 'container_shutdown'
+  | 'system_interrupt'
+  | 'unclassified';
+
+export const cloud_agent_session_runs = pgTable(
+  'cloud_agent_session_runs',
+  {
+    cloud_agent_session_id: text()
+      .notNull()
+      .references(() => cloud_agent_sessions.cloud_agent_session_id, { onDelete: 'cascade' }),
+    message_id: text().notNull(),
+    wrapper_run_id: text(),
+    status: text().notNull().$type<CloudAgentSessionRunStatus>(),
+    queued_at: timestamp({ withTimezone: true, mode: 'string' }),
+    dispatch_accepted_at: timestamp({ withTimezone: true, mode: 'string' }),
+    agent_activity_observed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    terminal_at: timestamp({ withTimezone: true, mode: 'string' }),
+    failure_stage: text().$type<CloudAgentSessionRunFailureStage>(),
+    failure_code: text().$type<CloudAgentSessionRunFailureCode>(),
+    error_message_redacted: text(),
+    error_expires_at: timestamp({ withTimezone: true, mode: 'string' }),
+  },
+  table => [
+    primaryKey({ columns: [table.cloud_agent_session_id, table.message_id] }),
+    index('IDX_cloud_agent_session_runs_wrapper_run_id')
+      .on(table.wrapper_run_id)
+      .where(isNotNull(table.wrapper_run_id)),
+    index('IDX_cloud_agent_session_runs_session_queued').on(
+      table.cloud_agent_session_id,
+      table.queued_at
+    ),
+    index('IDX_cloud_agent_session_runs_queued_at').on(table.queued_at),
+    index('IDX_cloud_agent_session_runs_terminal_at').on(table.terminal_at),
+    index('IDX_cloud_agent_session_runs_status_terminal').on(table.status, table.terminal_at),
+    index('IDX_cloud_agent_session_runs_failure_terminal').on(
+      table.failure_stage,
+      table.failure_code,
+      table.terminal_at
+    ),
+    index('IDX_cloud_agent_session_runs_error_expires_at')
+      .on(table.error_expires_at)
+      .where(isNotNull(table.error_expires_at)),
+    check(
+      'cloud_agent_session_runs_status_check',
+      sql`${table.status} IN ('queued', 'accepted', 'completed', 'failed', 'interrupted')`
+    ),
+    check(
+      'cloud_agent_session_runs_failure_classification_check',
+      sql`(${table.failure_stage} IS NULL AND ${table.failure_code} IS NULL) OR
+        (${table.failure_stage} = 'pre_dispatch' AND ${table.failure_code} IN ('sandbox_connect_failed', 'workspace_setup_failed', 'kilo_server_failed', 'wrapper_start_failed', 'invalid_delivery_request', 'session_metadata_missing', 'model_missing', 'delivery_failure_unknown')) OR
+        (${table.failure_stage} = 'post_dispatch_no_activity' AND ${table.failure_code} IN ('wrapper_disconnected', 'wrapper_no_output', 'wrapper_ping_timeout', 'wrapper_error_before_activity', 'missing_assistant_reply')) OR
+        (${table.failure_stage} = 'agent_activity' AND ${table.failure_code} IN ('assistant_error', 'wrapper_error_after_activity')) OR
+        (${table.failure_stage} = 'interruption' AND ${table.failure_code} IN ('user_interrupt', 'container_shutdown', 'system_interrupt')) OR
+        (${table.failure_stage} = 'unknown' AND ${table.failure_code} = 'unclassified')`
+    ),
+    check(
+      'cloud_agent_session_runs_error_message_bounded_check',
+      sql`${table.error_message_redacted} IS NULL OR char_length(${table.error_message_redacted}) <= 4096`
+    ),
+    check(
+      'cloud_agent_session_runs_error_expiry_check',
+      sql`(${table.error_message_redacted} IS NULL AND ${table.error_expires_at} IS NULL) OR
+        (${table.error_message_redacted} IS NOT NULL AND ${table.error_expires_at} IS NOT NULL)`
+    ),
+  ]
+);
+
+export type CloudAgentSessionRun = typeof cloud_agent_session_runs.$inferSelect;
+export type NewCloudAgentSessionRun = typeof cloud_agent_session_runs.$inferInsert;
+
 /**
  * Per-tenant cache of the latest GitHub pull request observed for a
  * `(repo, branch)` pair. Written by the `pull_request` webhook handler

@@ -850,11 +850,12 @@ describe('createIngestHandler', () => {
     function createNewPathDOContext() {
       return {
         ...createFakeDOContext(),
+        observeCorrelatedAgentActivity: vi.fn().mockResolvedValue(undefined),
         terminalizeSessionMessageOnce: vi.fn().mockResolvedValue(undefined),
       };
     }
 
-    it('does NOT terminalize on partial assistant message.updated (no time.completed)', async () => {
+    it('observes activity without terminalizing on partial assistant message.updated', async () => {
       const state = createFakeState();
       const doContext = createNewPathDOContext();
       const handler = createIngestHandler(
@@ -885,6 +886,7 @@ describe('createIngestHandler', () => {
 
       await handler.handleIngestMessage(ws, message);
 
+      expect(doContext.observeCorrelatedAgentActivity).toHaveBeenCalledWith('msg_user_111');
       expect(doContext.terminalizeSessionMessageOnce).not.toHaveBeenCalled();
     });
 

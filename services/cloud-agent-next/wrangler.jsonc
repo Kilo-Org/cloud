@@ -33,6 +33,9 @@
     },
   },
   "logpush": true,
+  "triggers": {
+    "crons": ["17 2 * * *"],
+  },
   "routes": [
     {
       "pattern": "cloud-agent-next.kilosessions.ai",
@@ -229,6 +232,10 @@
         "binding": "CALLBACK_QUEUE",
         "queue": "cloud-agent-next-callback-queue",
       },
+      {
+        "binding": "CLOUD_AGENT_REPORT_QUEUE",
+        "queue": "cloud-agent-next-report-queue",
+      },
     ],
     "consumers": [
       {
@@ -236,6 +243,11 @@
         "max_batch_size": 5,
         // Keep aligned with CALLBACK_DELIVERY_MAX_ATTEMPTS = initial attempt + 4 redeliveries.
         "max_retries": 4,
+      },
+      {
+        "queue": "cloud-agent-next-report-queue",
+        "max_retries": 3,
+        "dead_letter_queue": "cloud-agent-next-report-queue-dlq",
       },
     ],
   },
@@ -246,6 +258,9 @@
   "env": {
     "dev": {
       "name": "cloud-agent-next-dev",
+      "triggers": {
+        "crons": ["17 2 * * *"],
+      },
       "hyperdrive": [
         {
           "binding": "HYPERDRIVE",
@@ -356,6 +371,10 @@
             "binding": "CALLBACK_QUEUE",
             "queue": "cloud-agent-next-callback-queue-dev",
           },
+          {
+            "binding": "CLOUD_AGENT_REPORT_QUEUE",
+            "queue": "cloud-agent-next-report-queue-dev",
+          },
         ],
         "consumers": [
           {
@@ -363,6 +382,11 @@
             "max_batch_size": 5,
             // Keep aligned with CALLBACK_DELIVERY_MAX_ATTEMPTS = initial attempt + 4 redeliveries.
             "max_retries": 4,
+          },
+          {
+            "queue": "cloud-agent-next-report-queue-dev",
+            "max_retries": 3,
+            "dead_letter_queue": "cloud-agent-next-report-queue-dlq-dev",
           },
         ],
       },

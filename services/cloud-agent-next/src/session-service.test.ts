@@ -1253,6 +1253,27 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
   });
 });
 
+describe('SessionService session-ingest compatibility', () => {
+  it('creates a visible session without projecting reporting milestones', async () => {
+    const env = createEnv();
+    const service = new SessionService();
+
+    await service.createCliSessionViaSessionIngest(
+      'ses_12345678901234567890123456',
+      'agent_12345678-1234-1234-1234-123456789abc',
+      'user_test',
+      env,
+      undefined,
+      'cloud-agent'
+    );
+
+    // eslint-disable-next-line @typescript-eslint/unbound-method
+    expect(env.SESSION_INGEST.createSessionForCloudAgent).toHaveBeenCalledWith(
+      expect.not.objectContaining({ requireFullSessionReport: expect.anything() })
+    );
+  });
+});
+
 describe('fetchSessionMetadata', () => {
   it('returns parsed metadata from the session DO', async () => {
     const metadata = createMetadata();

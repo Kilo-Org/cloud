@@ -8,14 +8,28 @@ const {
   generateSandboxIdMock,
   createCliSessionMock,
   deleteCliSessionMock,
+  createSessionReportMock,
+  recordSandboxIdentityMock,
+  recordSessionFailureMock,
+  recordVisibleSessionOutcomeMock,
+  recordMetadataRegisteredMock,
+  recordInitialAdmissionMock,
+  recordInternalCompensationMock,
   mergeProfileConfigurationMock,
   organizationMembershipLimitMock,
   assertKiloModelAvailableMock,
 } = vi.hoisted(() => ({
   generateSessionIdMock: vi.fn(() => 'agent_12345678-1234-1234-1234-123456789abc'),
   generateSandboxIdMock: vi.fn().mockResolvedValue('sb-test-123'),
-  createCliSessionMock: vi.fn().mockResolvedValue(undefined),
-  deleteCliSessionMock: vi.fn().mockResolvedValue(undefined),
+  createCliSessionMock: vi.fn().mockResolvedValue({ created: true }),
+  deleteCliSessionMock: vi.fn().mockResolvedValue({ deleted: true }),
+  createSessionReportMock: vi.fn().mockResolvedValue(undefined),
+  recordSandboxIdentityMock: vi.fn().mockResolvedValue(undefined),
+  recordSessionFailureMock: vi.fn().mockResolvedValue(undefined),
+  recordVisibleSessionOutcomeMock: vi.fn().mockResolvedValue(undefined),
+  recordMetadataRegisteredMock: vi.fn().mockResolvedValue(undefined),
+  recordInitialAdmissionMock: vi.fn().mockResolvedValue(undefined),
+  recordInternalCompensationMock: vi.fn().mockResolvedValue(undefined),
   mergeProfileConfigurationMock: vi.fn(),
   organizationMembershipLimitMock: vi.fn(),
   assertKiloModelAvailableMock: vi.fn(),
@@ -49,6 +63,12 @@ vi.mock('./sandbox-id.js', () => ({
   getSandboxNamespace: vi.fn(),
 }));
 
+vi.mock('./telemetry/session-reports.js', () => ({
+  createCloudAgentSessionReport: createSessionReportMock,
+  recordCloudAgentSandboxIdentity: recordSandboxIdentityMock,
+  recordCloudAgentSessionFailure: recordSessionFailureMock,
+}));
+
 vi.mock('@cloudflare/sandbox', () => ({
   getSandbox: vi.fn(),
   Sandbox: class Sandbox {},
@@ -79,6 +99,10 @@ vi.mock('./session-service.js', () => ({
   SessionService: class SessionService {
     createCliSessionViaSessionIngest = createCliSessionMock;
     deleteCliSessionViaSessionIngest = deleteCliSessionMock;
+    recordCloudAgentVisibleSessionOutcome = recordVisibleSessionOutcomeMock;
+    recordCloudAgentMetadataRegistered = recordMetadataRegisteredMock;
+    recordCloudAgentInitialAdmission = recordInitialAdmissionMock;
+    recordCloudAgentInternalCompensation = recordInternalCompensationMock;
   },
 }));
 
@@ -175,12 +199,13 @@ function createInternalApiContext(options: {
       } as unknown as TRPCContext['env']['CLOUD_AGENT_SESSION'],
       SESSION_INGEST: {
         fetch: vi.fn(),
-        createSessionForCloudAgent: vi.fn().mockResolvedValue(undefined),
-        deleteSessionForCloudAgent: vi.fn().mockResolvedValue(undefined),
+        createSessionForCloudAgent: vi.fn().mockResolvedValue({ created: true }),
+        deleteSessionForCloudAgent: vi.fn().mockResolvedValue({ deleted: true }),
       } as unknown as TRPCContext['env']['SESSION_INGEST'],
       INTERNAL_API_SECRET: effectiveInternalApiSecret,
       NEXTAUTH_SECRET: 'test-secret',
       R2_BUCKET: {} as TRPCContext['env']['R2_BUCKET'],
+      CLOUD_AGENT_REPORT_QUEUE: {} as TRPCContext['env']['CLOUD_AGENT_REPORT_QUEUE'],
       GIT_TOKEN_SERVICE: {} as TRPCContext['env']['GIT_TOKEN_SERVICE'],
       HYPERDRIVE: {
         connectionString: 'postgres://profile-test',
@@ -205,8 +230,15 @@ describe('prepareSession endpoint', () => {
     vi.clearAllMocks();
     generateSessionIdMock.mockReturnValue('agent_12345678-1234-1234-1234-123456789abc');
     generateSandboxIdMock.mockResolvedValue('sb-test-123');
-    createCliSessionMock.mockResolvedValue(undefined);
-    deleteCliSessionMock.mockResolvedValue(undefined);
+    createCliSessionMock.mockResolvedValue({ created: true });
+    deleteCliSessionMock.mockResolvedValue({ deleted: true });
+    createSessionReportMock.mockResolvedValue(undefined);
+    recordSandboxIdentityMock.mockResolvedValue(undefined);
+    recordSessionFailureMock.mockResolvedValue(undefined);
+    recordVisibleSessionOutcomeMock.mockResolvedValue(undefined);
+    recordMetadataRegisteredMock.mockResolvedValue(undefined);
+    recordInitialAdmissionMock.mockResolvedValue(undefined);
+    recordInternalCompensationMock.mockResolvedValue(undefined);
     mergeProfileConfigurationMock.mockResolvedValue({});
     assertKiloModelAvailableMock.mockResolvedValue(undefined);
   });
@@ -214,6 +246,21 @@ describe('prepareSession endpoint', () => {
   it('rejects request without internal API key header', async () => {
     const caller = appRouter.createCaller(
       createInternalApiContext({ requestInternalApiKey: null })
+    );
+
+    await expect(
+      caller.prepareSession({
+        prompt: 'Test prompt',
+        mode: 'code',
+        model: 'claude-3',
+        githubRepo: 'acme/repo',
+      })
+    ).rejects.toThrow('Invalid or missing internal API key');
+  });
+
+  it('rejects an incorrect internal API key of a different length', async () => {
+    const caller = appRouter.createCaller(
+      createInternalApiContext({ requestInternalApiKey: 'wrong' })
     );
 
     await expect(
@@ -673,6 +720,60 @@ describe('prepareSession endpoint', () => {
     expect(doStub.admitSubmittedMessage).not.toHaveBeenCalled();
   });
 
+  it('returns a prepared session when post-registration fact persistence fails', async () => {
+    recordMetadataRegisteredMock.mockRejectedValueOnce(new Error('reporting unavailable'));
+    recordInitialAdmissionMock.mockRejectedValueOnce(new Error('reporting unavailable'));
+    const caller = appRouter.createCaller(createInternalApiContext({}));
+
+    const result = await caller.prepareSession({
+      prompt: 'Prepare even if reporting is unavailable',
+      mode: 'code',
+      model: 'claude-3',
+      githubRepo: 'acme/repo',
+    });
+
+    expect(result).toMatchObject({
+      cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc',
+      kiloSessionId: 'cli-session-abc123',
+    });
+  });
+
+  it('preserves a legacy registration rejection when fact persistence fails', async () => {
+    recordSessionFailureMock.mockRejectedValueOnce(new Error('reporting unavailable'));
+    const doStub = createMockDOStub({
+      registerSession: vi
+        .fn()
+        .mockResolvedValue({ success: false, error: 'Registration rejected' }),
+    });
+    const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
+
+    await expect(
+      caller.prepareSession({
+        prompt: 'Reject even if reporting is unavailable',
+        mode: 'code',
+        model: 'claude-3',
+        githubRepo: 'acme/repo',
+      })
+    ).rejects.toThrow('Registration rejected');
+  });
+
+  it('preserves a legacy registration unknown outcome when fact persistence fails', async () => {
+    recordSessionFailureMock.mockRejectedValueOnce(new Error('reporting unavailable'));
+    const doStub = createMockDOStub({
+      registerSession: vi.fn().mockRejectedValue(new Error('unknown registration outcome')),
+    });
+    const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
+
+    await expect(
+      caller.prepareSession({
+        prompt: 'Unknown even if reporting is unavailable',
+        mode: 'code',
+        model: 'claude-3',
+        githubRepo: 'acme/repo',
+      })
+    ).rejects.toThrow('unknown registration outcome');
+  });
+
   it('attempts best-effort ownership-row compensation on explicit registration rejection', async () => {
     const doStub = createMockDOStub({
       registerSession: vi
@@ -697,6 +798,41 @@ describe('prepareSession endpoint', () => {
       { onlyIfEmpty: true }
     );
     expect(doStub.registerSession).toHaveBeenCalledTimes(1);
+    expect(recordSessionFailureMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        failure: { stage: 'registration', code: 'do_registration_rejected' },
+      }),
+      expect.any(Object)
+    );
+    expect(recordInternalCompensationMock).not.toHaveBeenCalled();
+  });
+
+  it('does not record compensation when empty-only ownership deletion declines deletion', async () => {
+    deleteCliSessionMock.mockResolvedValueOnce({ deleted: false });
+    const doStub = createMockDOStub({
+      registerSession: vi
+        .fn()
+        .mockResolvedValue({ success: false, error: 'Registration rejected' }),
+    });
+    const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
+
+    await expect(
+      caller.prepareSession({
+        prompt: 'Do not erase non-empty ownership',
+        mode: 'code',
+        model: 'claude-3',
+        githubRepo: 'acme/repo',
+      })
+    ).rejects.toThrow('Registration rejected');
+
+    expect(deleteCliSessionMock).toHaveBeenCalled();
+    expect(recordSessionFailureMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        failure: { stage: 'registration', code: 'do_registration_rejected' },
+      }),
+      expect.any(Object)
+    );
+    expect(recordInternalCompensationMock).not.toHaveBeenCalled();
   });
 
   it('does not replay or compensate a committed registration with lost retryable response', async () => {
@@ -738,6 +874,12 @@ describe('prepareSession endpoint', () => {
 
     expect(registerSession).toHaveBeenCalledTimes(1);
     expect(deleteCliSessionMock).not.toHaveBeenCalled();
+    expect(recordSessionFailureMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        failure: { stage: 'transport', code: 'do_rpc_outcome_unknown' },
+      }),
+      expect.any(Object)
+    );
   });
 });
 
@@ -746,8 +888,15 @@ describe('start endpoint', () => {
     vi.clearAllMocks();
     generateSessionIdMock.mockReturnValue('agent_12345678-1234-1234-1234-123456789abc');
     generateSandboxIdMock.mockResolvedValue('sb-test-123');
-    createCliSessionMock.mockResolvedValue(undefined);
-    deleteCliSessionMock.mockResolvedValue(undefined);
+    createCliSessionMock.mockResolvedValue({ created: true });
+    deleteCliSessionMock.mockResolvedValue({ deleted: true });
+    createSessionReportMock.mockResolvedValue(undefined);
+    recordSandboxIdentityMock.mockResolvedValue(undefined);
+    recordSessionFailureMock.mockResolvedValue(undefined);
+    recordVisibleSessionOutcomeMock.mockResolvedValue(undefined);
+    recordMetadataRegisteredMock.mockResolvedValue(undefined);
+    recordInitialAdmissionMock.mockResolvedValue(undefined);
+    recordInternalCompensationMock.mockResolvedValue(undefined);
     mergeProfileConfigurationMock.mockResolvedValue({});
     organizationMembershipLimitMock.mockResolvedValue([{ id: 'membership-123' }]);
     assertKiloModelAvailableMock.mockResolvedValue(undefined);
@@ -817,6 +966,53 @@ describe('start endpoint', () => {
     );
   });
 
+  it('returns an admitted session without persisting setup success milestones', async () => {
+    const caller = appRouter.createCaller(createInternalApiContext({}));
+
+    const result = await caller.start({
+      message: { prompt: 'Run even if reporting is unavailable' },
+      agent: { mode: 'code', model: 'anthropic/claude-sonnet-4-20250514' },
+      repository: { type: 'github', repo: 'acme/repo' },
+    });
+
+    expect(result.delivery).toBe('queued');
+    expect(recordSessionFailureMock).not.toHaveBeenCalled();
+  });
+
+  it('preserves a rejected Durable Object outcome when failure fact persistence fails', async () => {
+    recordSessionFailureMock.mockRejectedValueOnce(new Error('reporting unavailable'));
+    const doStub = createMockDOStub({
+      createSessionWithInitialAdmission: vi
+        .fn()
+        .mockResolvedValue({ success: false, code: 'INTERNAL', error: 'admission failed' }),
+    });
+    const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
+
+    await expect(
+      caller.start({
+        message: { prompt: 'Reject with reporting unavailable' },
+        agent: { mode: 'code', model: 'anthropic/claude-sonnet-4-20250514' },
+        repository: { type: 'github', repo: 'acme/repo' },
+      })
+    ).rejects.toThrow('admission failed');
+  });
+
+  it('preserves an unknown Durable Object outcome when failure fact persistence fails', async () => {
+    recordSessionFailureMock.mockRejectedValueOnce(new Error('reporting unavailable'));
+    const doStub = createMockDOStub({
+      createSessionWithInitialAdmission: vi.fn().mockRejectedValue(new Error('rpc unavailable')),
+    });
+    const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
+
+    await expect(
+      caller.start({
+        message: { prompt: 'Unknown with reporting unavailable' },
+        agent: { mode: 'code', model: 'anthropic/claude-sonnet-4-20250514' },
+        repository: { type: 'github', repo: 'acme/repo' },
+      })
+    ).rejects.toThrow('rpc unavailable');
+  });
+
   it('resolves organization profile defaults for an authorized member', async () => {
     const caller = appRouter.createCaller(createInternalApiContext({}));
     const organizationId = 'f47ac10b-58cc-4372-a567-0e02b2c3d479';
@@ -852,6 +1048,124 @@ describe('start endpoint', () => {
     });
 
     expect(mergeProfileConfigurationMock).not.toHaveBeenCalled();
+  });
+
+  it('fails without later outcome facts when creating the session report fails', async () => {
+    createSessionReportMock.mockRejectedValueOnce(new Error('session report unavailable'));
+    const doStub = createMockDOStub();
+    const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
+
+    await expect(
+      caller.start({
+        message: { prompt: 'Do not allocate without a session report' },
+        agent: { mode: 'code', model: 'anthropic/claude-sonnet-4-20250514' },
+        repository: { type: 'github', repo: 'acme/repo' },
+      })
+    ).rejects.toThrow('session report unavailable');
+
+    expect(generateSandboxIdMock).not.toHaveBeenCalled();
+    expect(createCliSessionMock).not.toHaveBeenCalled();
+    expect(recordVisibleSessionOutcomeMock).not.toHaveBeenCalled();
+    expect(recordInitialAdmissionMock).not.toHaveBeenCalled();
+    expect(recordInternalCompensationMock).not.toHaveBeenCalled();
+    expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+  });
+
+  it('records sandbox identity failure without claiming visible-row compensation', async () => {
+    generateSandboxIdMock.mockRejectedValueOnce(new Error('sandbox identity unavailable'));
+    const caller = appRouter.createCaller(createInternalApiContext({}));
+
+    await expect(
+      caller.start({
+        message: { prompt: 'Cannot allocate sandbox' },
+        agent: { mode: 'code', model: 'anthropic/claude-sonnet-4-20250514' },
+        repository: { type: 'github', repo: 'acme/repo' },
+      })
+    ).rejects.toThrow('sandbox identity unavailable');
+
+    expect(createCliSessionMock).not.toHaveBeenCalled();
+    expect(recordSessionFailureMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        failure: { stage: 'sandbox_identity', code: 'sandbox_id_derivation_failed' },
+      }),
+      expect.any(Object)
+    );
+    expect(recordInternalCompensationMock).not.toHaveBeenCalled();
+  });
+
+  it('records ambiguous visible ownership creation without compensating it', async () => {
+    createCliSessionMock.mockRejectedValueOnce(new Error('visible create response unavailable'));
+    const caller = appRouter.createCaller(createInternalApiContext({}));
+
+    await expect(
+      caller.start({
+        message: { prompt: 'Create ownership' },
+        agent: { mode: 'code', model: 'anthropic/claude-sonnet-4-20250514' },
+        repository: { type: 'github', repo: 'acme/repo' },
+      })
+    ).rejects.toThrow('visible create response unavailable');
+
+    expect(recordSessionFailureMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        failure: { stage: 'transport', code: 'do_rpc_outcome_unknown' },
+      }),
+      expect.any(Object)
+    );
+    expect(recordInternalCompensationMock).not.toHaveBeenCalled();
+  });
+
+  it('creates the session report before deriving sandbox identity, creating ownership, or admitting work', async () => {
+    const steps: string[] = [];
+    createSessionReportMock.mockImplementationOnce(async () => {
+      steps.push('session-report');
+    });
+    generateSandboxIdMock.mockImplementationOnce(async () => {
+      steps.push('sandbox');
+      return 'sb-test-123';
+    });
+    recordSandboxIdentityMock.mockImplementationOnce(async () => {
+      steps.push('sandbox-report');
+    });
+    createCliSessionMock.mockImplementationOnce(async () => {
+      steps.push('visible');
+      return { created: true };
+    });
+    const createSessionWithInitialAdmission = vi.fn().mockImplementationOnce(async () => {
+      steps.push('admission');
+      return {
+        success: true,
+        outcome: 'queued',
+        compatibilityDelivery: 'queued',
+        messageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
+      };
+    });
+    const caller = appRouter.createCaller(
+      createInternalApiContext({ doStub: createMockDOStub({ createSessionWithInitialAdmission }) })
+    );
+
+    await caller.start({
+      message: { id: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn', prompt: 'Trace allocation' },
+      agent: { mode: 'code', model: 'anthropic/claude-sonnet-4-20250514' },
+      repository: { type: 'github', repo: 'acme/repo' },
+    });
+
+    expect(steps).toEqual(['session-report', 'sandbox', 'sandbox-report', 'visible', 'admission']);
+    expect(createSessionReportMock).toHaveBeenCalledWith(
+      {
+        cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc',
+        kiloSessionId: 'cli-session-abc123',
+        initialMessageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
+      },
+      expect.any(Object)
+    );
+    expect(recordSandboxIdentityMock).toHaveBeenCalledWith(
+      {
+        cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc',
+        sandboxId: 'sb-test-123',
+      },
+      expect.any(Object)
+    );
+    expect(recordSessionFailureMock).not.toHaveBeenCalled();
   });
 
   it('admits canonical document attachments through one grouped creation operation', async () => {
@@ -907,6 +1221,33 @@ describe('start endpoint', () => {
     expect(doStub.admitSubmittedMessage).not.toHaveBeenCalled();
   });
 
+  it('classifies grouped metadata registration rejection separately from initial admission', async () => {
+    const doStub = createMockDOStub({
+      createSessionWithInitialAdmission: vi.fn().mockResolvedValue({
+        success: false,
+        code: 'INTERNAL',
+        error: 'metadata invalid',
+        failureBoundary: 'registration',
+      }),
+    });
+    const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
+
+    await expect(
+      caller.start({
+        message: { prompt: 'Register the initial turn' },
+        agent: { mode: 'code', model: 'anthropic/claude-sonnet-4-20250514' },
+        repository: { type: 'github', repo: 'acme/repo' },
+      })
+    ).rejects.toThrow('metadata invalid');
+
+    expect(recordSessionFailureMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        failure: { stage: 'registration', code: 'do_registration_rejected' },
+      }),
+      expect.any(Object)
+    );
+  });
+
   it('compensates the ownership row when grouped Durable Object admission fails', async () => {
     const doStub = createMockDOStub({
       createSessionWithInitialAdmission: vi
@@ -931,6 +1272,39 @@ describe('start endpoint', () => {
     );
     expect(doStub.registerSession).not.toHaveBeenCalled();
     expect(doStub.admitSubmittedMessage).not.toHaveBeenCalled();
+    expect(recordSessionFailureMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        failure: { stage: 'initial_admission', code: 'initial_admission_rejected' },
+      }),
+      expect.any(Object)
+    );
+    expect(recordInternalCompensationMock).not.toHaveBeenCalled();
+  });
+
+  it('preserves failed admission evidence when empty-only deletion cannot compensate the visible row', async () => {
+    deleteCliSessionMock.mockResolvedValueOnce({ deleted: false });
+    const doStub = createMockDOStub({
+      createSessionWithInitialAdmission: vi
+        .fn()
+        .mockResolvedValue({ success: false, code: 'INTERNAL', error: 'admission failed' }),
+    });
+    const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
+
+    await expect(
+      caller.start({
+        message: { prompt: 'Already has visible activity' },
+        agent: { mode: 'code', model: 'anthropic/claude-sonnet-4-20250514' },
+        repository: { type: 'github', repo: 'acme/repo' },
+      })
+    ).rejects.toThrow('admission failed');
+
+    expect(recordSessionFailureMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        failure: { stage: 'initial_admission', code: 'initial_admission_rejected' },
+      }),
+      expect.any(Object)
+    );
+    expect(recordInternalCompensationMock).not.toHaveBeenCalled();
   });
 
   it('retains the ownership row when grouped Durable Object RPC outcome is unknown', async () => {
@@ -948,6 +1322,13 @@ describe('start endpoint', () => {
     ).rejects.toThrow('rpc unavailable');
 
     expect(deleteCliSessionMock).not.toHaveBeenCalled();
+    expect(recordSessionFailureMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        failure: { stage: 'transport', code: 'do_rpc_outcome_unknown' },
+      }),
+      expect.any(Object)
+    );
+    expect(recordInternalCompensationMock).not.toHaveBeenCalled();
   });
 
   it('rejects callbackTarget options before session registration or queueing', async () => {

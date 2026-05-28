@@ -15,7 +15,8 @@
     "./kilo-pass-bonus-projection": "./src/kilo-pass-bonus-projection.ts",
     "./git-url": "./src/git-url.ts",
     "./callback-token": "./src/callback-token.ts",
-    "./kilo-model-id": "./src/kilo-model-id.ts"
+    "./kilo-model-id": "./src/kilo-model-id.ts",
+    "./cloud-agent-queue-report": "./src/cloud-agent-queue-report.ts"
   },
   "scripts": {
     "test": "vitest run",

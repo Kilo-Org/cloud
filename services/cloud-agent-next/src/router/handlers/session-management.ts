@@ -3,7 +3,7 @@ import * as z from 'zod';
 import { getSandbox } from '@cloudflare/sandbox';
 import { logger, withLogTags } from '../../logger.js';
 import { generateSandboxId, getSandboxNamespace } from '../../sandbox-id.js';
-import type { SessionId, InterruptResult } from '../../types.js';
+import type { SessionId, InterruptResult, TRPCContext } from '../../types.js';
 import type { SandboxId } from '../../types.js';
 import {
   InvalidSessionMetadataError,
@@ -42,6 +42,85 @@ function publicRepositoryFields(metadata: CloudAgentSessionState): {
   };
 }
 
+async function deleteSessionResources(
+  sessionId: SessionId,
+  userId: string,
+  env: TRPCContext['env']
+): Promise<{ success: true; message?: string }> {
+  logger.setTags({ userId, sessionId });
+  logger.info('Starting session deletion');
+
+  try {
+    const metadata = await fetchSessionMetadata(env, userId, sessionId);
+    if (!metadata) {
+      logger.info('Session not found or already deleted');
+      return { success: true, message: 'Session not found or already deleted' };
+    }
+
+    const sandboxId: SandboxId =
+      metadata.workspace?.sandboxId ??
+      (await generateSandboxId(
+        env.PER_SESSION_SANDBOX_ORG_IDS,
+        metadata.identity.orgId,
+        userId,
+        metadata.identity.sessionId,
+        metadata.identity.botId
+      ));
+    logger.setTags({ sandboxId, orgId: metadata.identity.orgId ?? '(personal)' });
+    const sandbox = getSandbox(getSandboxNamespace(env, sandboxId), sandboxId);
+    const workspacePath = getSessionWorkspacePath(metadata.identity.orgId, userId, sessionId);
+    const sessionHome = getSessionHomePath(sessionId);
+
+    try {
+      const session = await sandbox.getSession(sessionId);
+      await cleanupWorkspace(session, workspacePath, sessionHome);
+      logger.info('Workspace directories cleaned up');
+    } catch (error) {
+      logger
+        .withFields({ error: error instanceof Error ? error.message : String(error) })
+        .warn('Failed to clean up workspace directories, continuing with deletion');
+    }
+
+    await sandbox
+      .deleteSession(sessionId)
+      .then(() => logger.info('Cloudflare sandbox session deleted'))
+      .catch(error => {
+        logger
+          .withFields({ error: error instanceof Error ? error.message : String(error) })
+          .warn('Failed to delete Cloudflare sandbox session, continuing with cleanup');
+      });
+
+    try {
+      const doKey = `${userId}:${sessionId}`;
+      await withDORetry(
+        () => env.CLOUD_AGENT_SESSION.get(env.CLOUD_AGENT_SESSION.idFromName(doKey)),
+        stub => stub.deleteSession(),
+        'deleteSession'
+      );
+      logger.info('Session metadata destroyed');
+    } catch (error) {
+      logger
+        .withFields({ error: error instanceof Error ? error.message : String(error) })
+        .error('Failed to destroy session metadata');
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Failed to clean up session metadata',
+      });
+    }
+
+    logger.info('Session deletion completed successfully');
+    return { success: true };
+  } catch (error) {
+    if (error instanceof TRPCError) throw error;
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    logger.withFields({ error: errorMsg }).error('Session deletion failed');
+    throw new TRPCError({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: `Failed to delete session: ${errorMsg}`,
+    });
+  }
+}
+
 /**
  * Creates session management handlers.
  * These handlers manage session lifecycle (delete, interrupt, logs) and health checks.
@@ -63,113 +142,21 @@ export function createSessionManagementHandlers() {
         })
       )
       .mutation(async ({ input, ctx }) => {
-        return withLogTags({ source: 'deleteSession' }, async () => {
-          const sessionId = input.sessionId as SessionId;
-          const { userId, env } = ctx;
+        return withLogTags({ source: 'deleteSession' }, () =>
+          deleteSessionResources(input.sessionId as SessionId, ctx.userId, ctx.env)
+        );
+      }),
 
-          logger.setTags({ userId, sessionId });
-          logger.info('Starting session deletion');
-
-          /* - Sandbox deletion is best-effort because the sandbox may already be evicted or unreachable.
-           *   Failing here shouldn't block metadata cleanup since the sandbox is ephemeral.
-           * - DO/R2 cleanup is not technically critical either because we have life cycle rules,
-           *   so the metadata is really semi-persistent state (metadata, CLI state).
-           */
-          try {
-            const metadata = await fetchSessionMetadata(env, userId, sessionId);
-
-            if (!metadata) {
-              logger.info('Session not found or already deleted');
-              return {
-                success: true,
-                message: 'Session not found or already deleted',
-              };
-            }
-
-            const sandboxId: SandboxId =
-              metadata.workspace?.sandboxId ??
-              (await generateSandboxId(
-                env.PER_SESSION_SANDBOX_ORG_IDS,
-                metadata.identity.orgId,
-                userId,
-                metadata.identity.sessionId,
-                metadata.identity.botId
-              ));
-
-            logger.setTags({ sandboxId, orgId: metadata.identity.orgId ?? '(personal)' });
-
-            const sandbox = getSandbox(getSandboxNamespace(env, sandboxId), sandboxId);
-
-            // Clean up workspace directories before deleting sandbox session
-            // This prevents disk accumulation from abandoned sessions
-            const workspacePath = getSessionWorkspacePath(
-              metadata.identity.orgId,
-              userId,
-              sessionId
-            );
-            const sessionHome = getSessionHomePath(sessionId);
-
-            try {
-              const session = await sandbox.getSession(sessionId);
-              await cleanupWorkspace(session, workspacePath, sessionHome);
-              logger.info('Workspace directories cleaned up');
-            } catch (error) {
-              // Log but don't fail - workspace cleanup is best-effort
-              logger
-                .withFields({
-                  error: error instanceof Error ? error.message : String(error),
-                })
-                .warn('Failed to clean up workspace directories, continuing with deletion');
-            }
-
-            await sandbox
-              .deleteSession(sessionId)
-              .then(() => logger.info('Cloudflare sandbox session deleted'))
-              .catch(error => {
-                // Log but don't fail - sandbox cleanup is best-effort
-                logger
-                  .withFields({
-                    error: error instanceof Error ? error.message : String(error),
-                  })
-                  .warn('Failed to delete Cloudflare sandbox session, continuing with cleanup');
-              });
-
-            try {
-              const doKey = `${userId}:${sessionId}`;
-              await withDORetry(
-                () => env.CLOUD_AGENT_SESSION.get(env.CLOUD_AGENT_SESSION.idFromName(doKey)),
-                stub => stub.deleteSession(),
-                'deleteSession'
-              );
-              logger.info('Session metadata destroyed');
-            } catch (error) {
-              const errorMsg = error instanceof Error ? error.message : String(error);
-              logger.withFields({ error: errorMsg }).error('Failed to destroy session metadata');
-
-              throw new TRPCError({
-                code: 'INTERNAL_SERVER_ERROR',
-                message: `Failed to clean up session metadata`,
-              });
-            }
-
-            logger.info('Session deletion completed successfully');
-            return {
-              success: true,
-            };
-          } catch (error) {
-            if (error instanceof TRPCError) {
-              throw error;
-            }
-
-            const errorMsg = error instanceof Error ? error.message : String(error);
-            logger.withFields({ error: errorMsg }).error('Session deletion failed');
-
-            throw new TRPCError({
-              code: 'INTERNAL_SERVER_ERROR',
-              message: `Failed to delete session: ${errorMsg}`,
-            });
-          }
-        });
+    cleanupSession: internalApiProtectedProcedure
+      .input(
+        z.object({
+          sessionId: sessionIdSchema.describe('Session ID requiring trusted runtime cleanup'),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        return withLogTags({ source: 'cleanupSession' }, () =>
+          deleteSessionResources(input.sessionId as SessionId, ctx.userId, ctx.env)
+        );
       }),
 
     /**

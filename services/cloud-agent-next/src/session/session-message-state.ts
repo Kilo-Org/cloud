@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { CloudAgentRunStateReport } from '@kilocode/worker-utils/cloud-agent-queue-report';
 import type { CallbackTarget } from '../callbacks/index.js';
 import type { ExecutionMode, SessionMessageIntent } from '../execution/types.js';
 import { renderExecutionTurnContent } from '../execution/types.js';
@@ -15,6 +16,12 @@ export type SessionMessageCompletionSource =
   | 'wrapper_failure'
   | 'interrupt'
   | 'delivery_failure';
+
+export type SessionMessageFailureStage = NonNullable<
+  CloudAgentRunStateReport['run']['failureStage']
+>;
+export type SessionMessageFailureCode = NonNullable<CloudAgentRunStateReport['run']['failureCode']>;
+export type SessionMessageDispatchAcceptanceKind = 'observed' | 'inferred_from_terminal';
 
 export type LegacyAdmissionConstraints = {
   turn?: SessionMessageIntent['turn'];
@@ -49,11 +56,15 @@ export type SessionMessageState = {
   createdAt: number;
   queuedAt?: number;
   acceptedAt?: number;
+  dispatchAcceptanceKind?: SessionMessageDispatchAcceptanceKind;
+  agentActivityObservedAt?: number;
   terminalAt?: number;
   wrapperRunId?: string;
   assistantMessageId?: string;
   assistantCompletedAt?: number;
   completionSource?: SessionMessageCompletionSource;
+  failureStage?: SessionMessageFailureStage;
+  failureCode?: SessionMessageFailureCode;
   error?: string;
   failureReason?: string;
   attempts?: number;
@@ -147,6 +158,8 @@ export const SessionMessageStateSchema = z
     createdAt: z.number(),
     queuedAt: z.number().optional(),
     acceptedAt: z.number().optional(),
+    dispatchAcceptanceKind: z.enum(['observed', 'inferred_from_terminal']).optional(),
+    agentActivityObservedAt: z.number().optional(),
     terminalAt: z.number().optional(),
     wrapperRunId: z.string().optional(),
     assistantMessageId: z.string().optional(),
@@ -158,6 +171,38 @@ export const SessionMessageStateSchema = z
         'wrapper_failure',
         'interrupt',
         'delivery_failure',
+      ])
+      .optional(),
+    failureStage: z
+      .enum([
+        'pre_dispatch',
+        'post_dispatch_no_activity',
+        'agent_activity',
+        'interruption',
+        'unknown',
+      ])
+      .optional(),
+    failureCode: z
+      .enum([
+        'sandbox_connect_failed',
+        'workspace_setup_failed',
+        'kilo_server_failed',
+        'wrapper_start_failed',
+        'invalid_delivery_request',
+        'session_metadata_missing',
+        'model_missing',
+        'delivery_failure_unknown',
+        'wrapper_disconnected',
+        'wrapper_no_output',
+        'wrapper_ping_timeout',
+        'wrapper_error_before_activity',
+        'assistant_error',
+        'wrapper_error_after_activity',
+        'missing_assistant_reply',
+        'user_interrupt',
+        'container_shutdown',
+        'system_interrupt',
+        'unclassified',
       ])
       .optional(),
     error: z.string().optional(),
@@ -358,7 +403,8 @@ export async function markMessageAccepted(
   storage: SessionMessageStorage,
   messageId: string,
   wrapperRunId: string,
-  now = Date.now()
+  now = Date.now(),
+  dispatchAcceptanceKind: SessionMessageDispatchAcceptanceKind = 'observed'
 ): Promise<SessionMessageState | null> {
   const state = await getSessionMessageState(storage, messageId);
   if (!state) return null;
@@ -367,8 +413,23 @@ export async function markMessageAccepted(
     ...state,
     status: 'accepted',
     acceptedAt: now,
+    dispatchAcceptanceKind,
     wrapperRunId,
   };
+  await putSessionMessageState(storage, updated);
+  return updated;
+}
+
+export async function markAgentActivityObserved(
+  storage: SessionMessageStorage,
+  messageId: string,
+  now = Date.now()
+): Promise<SessionMessageState | null> {
+  const state = await getSessionMessageState(storage, messageId);
+  if (!state || state.agentActivityObservedAt !== undefined || state.acceptedAt === undefined) {
+    return null;
+  }
+  const updated: SessionMessageState = { ...state, agentActivityObservedAt: now };
   await putSessionMessageState(storage, updated);
   return updated;
 }
@@ -404,6 +465,8 @@ export type MarkMessageFailedParams = {
   reason: string;
   error?: string;
   completionSource: SessionMessageCompletionSource;
+  failureStage?: SessionMessageFailureStage;
+  failureCode?: SessionMessageFailureCode;
   attempts?: number;
 };
 
@@ -423,6 +486,8 @@ export async function markMessageFailed(
     failureReason: params.reason,
     error: params.error,
     completionSource: params.completionSource,
+    failureStage: params.failureStage,
+    failureCode: params.failureCode,
     attempts: params.attempts,
   };
   await putSessionMessageState(storage, updated);
@@ -432,6 +497,8 @@ export async function markMessageFailed(
 export type MarkMessageInterruptedParams = {
   error?: string;
   completionSource?: SessionMessageCompletionSource;
+  failureStage?: 'interruption';
+  failureCode?: 'user_interrupt' | 'container_shutdown' | 'system_interrupt';
 };
 
 export async function markMessageInterrupted(
@@ -450,6 +517,8 @@ export async function markMessageInterrupted(
     failureReason: 'interrupted',
     error: params.error,
     completionSource: params.completionSource ?? 'interrupt',
+    failureStage: params.failureStage,
+    failureCode: params.failureCode,
   };
   await putSessionMessageState(storage, updated);
   return updated;
@@ -569,9 +638,17 @@ export type TerminalizeParams =
       reason: string;
       error?: string;
       completionSource: SessionMessageCompletionSource;
+      failureStage?: SessionMessageFailureStage;
+      failureCode?: SessionMessageFailureCode;
       attempts?: number;
     }
-  | { kind: 'interrupted'; error?: string; completionSource?: SessionMessageCompletionSource };
+  | {
+      kind: 'interrupted';
+      error?: string;
+      completionSource?: SessionMessageCompletionSource;
+      failureStage?: 'interruption';
+      failureCode?: 'user_interrupt' | 'container_shutdown' | 'system_interrupt';
+    };
 
 export async function terminalizeMessageOnce(
   storage: SessionMessageStorage,
@@ -598,10 +675,14 @@ export async function terminalizeMessageOnce(
         : { disposition: 'not-required' },
     push: effects.suppressPush ? { disposition: 'suppressed' } : { disposition: 'pending' },
   };
+  const stateForTerminal: SessionMessageState =
+    state.acceptedAt !== undefined && state.dispatchAcceptanceKind === undefined
+      ? { ...state, dispatchAcceptanceKind: 'inferred_from_terminal' }
+      : state;
   let updated: SessionMessageState;
   if (params.kind === 'completed') {
     updated = {
-      ...state,
+      ...stateForTerminal,
       status: 'completed',
       terminalAt: now,
       assistantMessageId: params.assistantMessageId,
@@ -611,23 +692,27 @@ export async function terminalizeMessageOnce(
     };
   } else if (params.kind === 'failed') {
     updated = {
-      ...state,
+      ...stateForTerminal,
       status: 'failed',
       terminalAt: now,
       failureReason: params.reason,
       error: params.error,
       completionSource: params.completionSource,
+      failureStage: params.failureStage,
+      failureCode: params.failureCode,
       attempts: params.attempts,
       terminalEffects,
     };
   } else {
     updated = {
-      ...state,
+      ...stateForTerminal,
       status: 'interrupted',
       terminalAt: now,
       failureReason: 'interrupted',
       error: params.error,
       completionSource: params.completionSource ?? 'interrupt',
+      failureStage: params.failureStage,
+      failureCode: params.failureCode,
       terminalEffects,
     };
   }

@@ -5,6 +5,7 @@
  */
 
 import { DurableObject } from 'cloudflare:workers';
+import type { CloudAgentQueueReport } from '@kilocode/worker-utils/cloud-agent-queue-report';
 import type { OperationResult } from './types.js';
 import {
   parseSessionMetadata,
@@ -95,8 +96,10 @@ import {
 import {
   getSessionMessageState,
   listNonTerminalAcceptedMessages,
+  markAgentActivityObserved,
   markMessageAccepted,
   putSessionMessageState,
+  type SessionMessageState,
   type TerminalizeParams,
 } from '../session/session-message-state.js';
 import {
@@ -111,6 +114,7 @@ import {
   type AgentRuntimeStopReason,
 } from '../session/agent-runtime.js';
 import { createWrapperSupervisor, type WrapperSupervisor } from '../session/wrapper-supervisor.js';
+import { emitRunStateReport } from '../telemetry/queue-reports.js';
 
 // ---------------------------------------------------------------------------
 // Alarm Constants
@@ -407,6 +411,26 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     return sessionId;
   }
 
+  private sendRunStateReport(report: CloudAgentQueueReport): Promise<unknown> {
+    return this.env.CLOUD_AGENT_REPORT_QUEUE.send(report);
+  }
+
+  private async reportRunState(state: SessionMessageState): Promise<void> {
+    try {
+      const sessionId = await this.resolveSessionId();
+      if (!sessionId) return;
+      await emitRunStateReport({
+        queue: { send: report => this.sendRunStateReport(report) },
+        cloudAgentSessionId: sessionId,
+        state,
+      });
+    } catch {
+      logger
+        .withFields({ sessionId: this.sessionId, messageId: state.messageId, status: state.status })
+        .warn('Cloud Agent report preparation skipped');
+    }
+  }
+
   private getMessageSettlementOutbox(): MessageSettlementOutbox {
     if (!this.messageSettlementOutbox) {
       this.messageSettlementOutbox = createMessageSettlementOutbox({
@@ -423,6 +447,9 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         sendPushNotification: params =>
           this.env.NOTIFICATIONS.sendCloudAgentSessionNotification(params),
         hasConnectedStreamClients: () => getConnectedStreamClientCount(this.ctx) > 0,
+        reportTerminalState: state => {
+          this.ctx.waitUntil(this.reportRunState(state));
+        },
         getAssistantMessageForUserMessage: (sessionId, kiloSessionId, parentMessageId) =>
           this.eventQueries.getAssistantMessageForUserMessage(
             sessionId,
@@ -480,6 +507,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
             kiloSessionId,
             parentMessageId
           ),
+        observeCorrelatedAgentActivity: messageId => this.recordCorrelatedAgentActivity(messageId),
         hasActiveIngestConnection: async params =>
           (await this.getIngestHandler()).hasActiveConnection(params),
         clearInterruptRequest: () => this.executionQueries.clearInterrupt(),
@@ -529,6 +557,9 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
             ...event,
           });
         },
+        reportQueuedState: state => {
+          this.ctx.waitUntil(this.reportRunState(state));
+        },
         ensureAcceptedMessageEffects: messageId => this.ensureAcceptedMessageEffects(messageId),
         persistTerminalTransition: (messageId, params, options) =>
           this.getMessageSettlementOutbox().persistTerminalTransition(messageId, params, options),
@@ -569,9 +600,16 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         keepContainerAlive: () => {
           void this.keepContainerAlive();
         },
+        observeCorrelatedAgentActivity: messageId => this.recordCorrelatedAgentActivity(messageId),
         terminalizeSessionMessageOnce: async (messageId, params, wrapperRunId) => {
           await this.ensureAcceptedMessageBeforeTerminal(messageId, wrapperRunId);
-          await this.terminalizeSessionMessageOnce(messageId, params as TerminalizeParams);
+          await this.recordCorrelatedAgentActivity(messageId);
+          await this.terminalizeSessionMessageOnce(messageId, {
+            ...params,
+            ...(params.kind === 'failed'
+              ? { failureStage: 'agent_activity', failureCode: 'assistant_error' }
+              : {}),
+          } as TerminalizeParams);
         },
       };
 
@@ -1143,6 +1181,8 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
           kind: 'interrupted',
           error: 'Message interrupted by user',
           completionSource: 'interrupt',
+          failureStage: 'interruption',
+          failureCode: 'user_interrupt',
         },
         { allowIdleBatchWithoutObservedIdle: true }
       );
@@ -1489,6 +1529,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         success: false,
         code: 'INTERNAL',
         error: registration.error ?? 'Failed to register session',
+        failureBoundary: 'registration',
       };
     }
 
@@ -2015,6 +2056,11 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     return this.getMessageSettlementOutbox().terminalizeSessionMessageOnce(messageId, params, opts);
   }
 
+  private async recordCorrelatedAgentActivity(messageId: string): Promise<void> {
+    const updated = await markAgentActivityObserved(this.ctx.storage, messageId);
+    if (updated) this.ctx.waitUntil(this.reportRunState(updated));
+  }
+
   private async ensureAcceptedMessageBeforeTerminal(
     messageId: string,
     wrapperRunId: string
@@ -2032,6 +2078,14 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     }
     if (state?.status === 'accepted') {
       if (state.wrapperRunId !== wrapperRunId) return;
+      if (state.dispatchAcceptanceKind === undefined) {
+        const inferredState = {
+          ...state,
+          dispatchAcceptanceKind: 'inferred_from_terminal' as const,
+        };
+        await putSessionMessageState(this.ctx.storage, inferredState);
+        void this.reportRunState(inferredState).catch(() => undefined);
+      }
       await this.ensureAcceptedMessageEffects(messageId, state.acceptedAt ?? Date.now());
       return;
     }
@@ -2040,8 +2094,15 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     if (!state && !pending) return;
 
     const acceptedAt = Date.now();
+    let acceptedState: SessionMessageState | null = null;
     if (state?.status === 'queued') {
-      await markMessageAccepted(this.ctx.storage, messageId, wrapperRunId, acceptedAt);
+      acceptedState = await markMessageAccepted(
+        this.ctx.storage,
+        messageId,
+        wrapperRunId,
+        acceptedAt,
+        'inferred_from_terminal'
+      );
     } else if (pending) {
       const context = await this.getPendingMessageDeliveryContext();
       const intent = resolvePendingSessionMessageIntent(pending, {
@@ -2051,19 +2112,22 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         autoCommit: context?.metadata.finalization?.autoCommit,
         condenseOnComplete: context?.metadata.finalization?.condenseOnComplete,
       });
-      await putSessionMessageState(this.ctx.storage, {
+      acceptedState = {
         messageId,
         status: 'accepted',
         prompt: pending.content,
         createdAt: pending.createdAt,
         queuedAt: pending.createdAt,
         acceptedAt,
+        dispatchAcceptanceKind: 'inferred_from_terminal',
         wrapperRunId,
         callbackRequired: pending.callbackSnapshot?.required,
         callbackTarget: pending.callbackSnapshot?.target,
         admissionSnapshot: intent,
-      });
+      };
+      await putSessionMessageState(this.ctx.storage, acceptedState);
     }
+    if (acceptedState) void this.reportRunState(acceptedState).catch(() => undefined);
     try {
       await this.ensureAcceptedMessageEffects(messageId, acceptedAt);
     } catch (error) {
@@ -2481,8 +2545,14 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     const { acceptedAt, wrapperRunId } = delivery;
 
     const existingState = await getSessionMessageState(this.ctx.storage, turn.messageId);
+    let acceptedState: SessionMessageState | null = null;
     if (existingState && existingState.status === 'queued') {
-      await markMessageAccepted(this.ctx.storage, turn.messageId, wrapperRunId, acceptedAt);
+      acceptedState = await markMessageAccepted(
+        this.ctx.storage,
+        turn.messageId,
+        wrapperRunId,
+        acceptedAt
+      );
       logger
         .withFields({ sessionId, messageId: turn.messageId, wrapperRunId })
         .info('Session message transitioned from queued to accepted');
@@ -2497,23 +2567,26 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
             condenseOnComplete: plan.finalization?.condenseOnComplete,
           })
         : undefined;
-      await putSessionMessageState(this.ctx.storage, {
+      acceptedState = {
         messageId: turn.messageId,
         status: 'accepted',
         prompt: pending?.content ?? renderExecutionTurnContent(turn),
         createdAt: pending?.createdAt ?? acceptedAt,
         queuedAt: pending?.createdAt ?? acceptedAt,
         acceptedAt,
+        dispatchAcceptanceKind: 'observed',
         wrapperRunId,
         callbackRequired: pending?.callbackSnapshot?.required,
         callbackTarget: pending?.callbackSnapshot?.target,
         admissionSnapshot: intent,
-      });
+      };
+      await putSessionMessageState(this.ctx.storage, acceptedState);
       logger
         .withFields({ sessionId, messageId: turn.messageId, wrapperRunId })
         .warn('Accepted session message state was missing and has been reconstructed');
     }
 
+    if (acceptedState) void this.reportRunState(acceptedState).catch(() => undefined);
     await this.ensureAcceptedMessageEffects(turn.messageId, acceptedAt);
   }
 

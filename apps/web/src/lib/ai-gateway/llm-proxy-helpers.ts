@@ -697,12 +697,12 @@ export function countAndStoreFimUsage(
 }
 
 // ============================================================================
-// NextEdit-Specific Code
+// Edit-Specific Code
 // ============================================================================
 
-type NextEditMessage = { role: string; content: string };
+type EditMessage = { role: string; content: string };
 
-export function extractNextEditPromptInfo(body: { messages: NextEditMessage[] }): PromptInfo {
+export function extractEditPromptInfo(body: { messages: EditMessage[] }): PromptInfo {
   const lastUser = [...body.messages].reverse().find(m => m.role === 'user');
   const content = lastUser?.content ?? '';
   const totalLength = body.messages.reduce((sum, m) => sum + (m.content?.length ?? 0), 0);
@@ -713,14 +713,14 @@ export function extractNextEditPromptInfo(body: { messages: NextEditMessage[] })
   };
 }
 
-type NextEditUsage = FimUsage & {
+type EditUsage = FimUsage & {
   cached_input_tokens?: number;
 };
 
 type MercuryEditCompletionResponse = {
   id?: string;
   model?: string;
-  usage?: NextEditUsage;
+  usage?: EditUsage;
   choices?: Array<{
     index?: number;
     message?: { role?: string; content?: string };
@@ -728,33 +728,33 @@ type MercuryEditCompletionResponse = {
   }>;
 };
 
-function getNextEditCacheHitTokens(usage: NextEditUsage): number {
+function getEditCacheHitTokens(usage: EditUsage): number {
   return Math.min(usage.prompt_tokens, Math.max(usage.cached_input_tokens ?? 0, 0));
 }
 
-function computeNextEditMicrodollarCost(usage: NextEditUsage, provider: ProviderId): number {
+function computeEditMicrodollarCost(usage: EditUsage, provider: ProviderId): number {
   switch (provider) {
     case 'inception': {
-      const cacheHitTokens = getNextEditCacheHitTokens(usage);
+      const cacheHitTokens = getEditCacheHitTokens(usage);
       const uncachedInputTokens = usage.prompt_tokens - cacheHitTokens;
       return Math.round(
         uncachedInputTokens * 0.25 + cacheHitTokens * 0.025 + usage.completion_tokens * 0.75
       );
     }
     default:
-      console.error('Unknown provider for NextEdit cost calculation', provider);
+      console.error('Unknown provider for edit cost calculation', provider);
       return 0;
   }
 }
 
-export function parseNextEditUsageFromResponse(
+export function parseEditUsageFromResponse(
   response: string,
   provider: ProviderId,
   statusCode: number
 ): MicrodollarUsageStats {
   const json: MercuryEditCompletionResponse = JSON.parse(response);
   const usage = json.usage;
-  const cacheHitTokens = usage ? getNextEditCacheHitTokens(usage) : 0;
+  const cacheHitTokens = usage ? getEditCacheHitTokens(usage) : 0;
   return {
     messageId: json.id ?? null,
     model: json.model ?? null,
@@ -765,7 +765,7 @@ export function parseNextEditUsageFromResponse(
     outputTokens: usage?.completion_tokens ?? 0,
     cacheHitTokens,
     cacheWriteTokens: 0,
-    cost_mUsd: usage ? computeNextEditMicrodollarCost(usage, provider) : 0,
+    cost_mUsd: usage ? computeEditMicrodollarCost(usage, provider) : 0,
     cacheDiscount_mUsd:
       usage && provider === 'inception' ? Math.round(cacheHitTokens * (0.25 - 0.025)) : undefined,
     is_byok: null,
@@ -780,7 +780,7 @@ export function parseNextEditUsageFromResponse(
   };
 }
 
-export function countAndStoreNextEditUsage(
+export function countAndStoreEditUsage(
   clonedResponse: Response,
   usageContext: MicrodollarUsageContext,
   requestSpan: Span | undefined
@@ -792,10 +792,10 @@ export function countAndStoreNextEditUsage(
     ? Promise.resolve(null)
     : clonedResponse
         .text()
-        .then(content => parseNextEditUsageFromResponse(content, usageContext.provider, statusCode))
+        .then(content => parseEditUsageFromResponse(content, usageContext.provider, statusCode))
         .catch(error => {
           captureException(error, {
-            tags: { source: 'nextedit_usage_processing' },
+            tags: { source: 'edit_usage_processing' },
             extra: { statusCode },
           });
           return null;
@@ -805,9 +805,9 @@ export function countAndStoreNextEditUsage(
     usageStatsPromise.then(usageStats => {
       requestSpan?.end();
       if (!usageStats) {
-        captureMessage('SUSPICIOUS: No NextEdit usage information', {
+        captureMessage('SUSPICIOUS: No edit usage information', {
           level: 'error',
-          tags: { source: 'nextedit_usage_processing' },
+          tags: { source: 'edit_usage_processing' },
           extra: { usageContext },
         });
         return;

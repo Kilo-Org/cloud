@@ -20,7 +20,7 @@ jest.mock('@/lib/ai-gateway/llm-proxy-helpers', () => {
   const actual = jest.requireActual('@/lib/ai-gateway/llm-proxy-helpers');
   return {
     ...actual,
-    countAndStoreNextEditUsage: jest.fn(),
+    countAndStoreEditUsage: jest.fn(),
   };
 });
 
@@ -32,7 +32,7 @@ const mockedFetch = jest.fn() as jest.MockedFunction<typeof globalThis.fetch>;
 const originalFetch = globalThis.fetch;
 
 function makeRequest(body: unknown) {
-  return new Request('http://localhost:3000/api/nextedit/completions', {
+  return new Request('http://localhost:3000/api/edit/completions', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -76,7 +76,7 @@ function makeUpstreamResponse() {
   });
 }
 
-describe('POST /api/nextedit/completions', () => {
+describe('POST /api/edit/completions', () => {
   beforeEach(() => {
     jest.resetAllMocks();
     globalThis.fetch = mockedFetch;
@@ -106,7 +106,7 @@ describe('POST /api/nextedit/completions', () => {
       { role: 'user', content: 'First message' },
       { role: 'user', content: 'Second message' },
     ],
-  ])('rejects unsupported NextEdit messages before proxying', async messages => {
+  ])('rejects unsupported edit messages before proxying', async messages => {
     setOrganizationAuth();
 
     const { POST } = await import('./route');

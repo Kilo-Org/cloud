@@ -10,8 +10,8 @@ import { sentryRootSpan } from '@/lib/getRootSpan';
 import { getUserFromAuth } from '@/lib/user/server';
 import {
   checkOrganizationModelRestrictions,
-  countAndStoreNextEditUsage,
-  extractNextEditPromptInfo,
+  countAndStoreEditUsage,
+  extractEditPromptInfo,
   extractFraudAndProjectHeaders,
   invalidRequestResponse,
   dataCollectionRequiredResponse,
@@ -28,17 +28,17 @@ import { sentryLogger } from '@/lib/utils.server';
 import { getBYOKforOrganization, getBYOKforUser } from '@/lib/ai-gateway/byok';
 import type { UserByokProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 
-// Inception's "next edit" endpoint mirrors a chat completion shape but is hosted at
+// Inception's edit endpoint mirrors a chat completion shape but is hosted at
 // a separate path. It accepts a single `role: "user"` message; the system prompt
 // is baked in server-side and the endpoint returns 400 for any `role: "system"`
 // message. See https://docs.inceptionlabs.ai/api-reference/edit/create-a-code-edit-completion
-const INCEPTION_NEXTEDIT_URL = 'https://api.inceptionlabs.ai/v1/edit/completions';
-const NEXTEDIT_MAX_TOKENS_LIMIT = 1000;
+const INCEPTION_EDIT_URL = 'https://api.inceptionlabs.ai/v1/edit/completions';
+const EDIT_MAX_TOKENS_LIMIT = 1000;
 
-type NextEditProvider = 'inception';
+type EditProvider = 'inception';
 
-function resolveNextEditProvider(model: string): {
-  provider: NextEditProvider;
+function resolveEditProvider(model: string): {
+  provider: EditProvider;
   upstreamModel: string;
 } | null {
   if (model.startsWith('inception/')) {
@@ -50,28 +50,28 @@ function resolveNextEditProvider(model: string): {
   return null;
 }
 
-function getSystemApiKey(provider: NextEditProvider): string | null {
+function getSystemApiKey(provider: EditProvider): string | null {
   switch (provider) {
     case 'inception':
       return INCEPTION_API_KEY || null;
   }
 }
 
-const NextEditMessage = z.object({
+const EditMessage = z.object({
   role: z.literal('user'),
   content: z.string(),
 });
 
-const NextEditRequestBody = z.object({
+const EditRequestBody = z.object({
   model: z.string(),
-  messages: z.array(NextEditMessage).length(1),
+  messages: z.array(EditMessage).length(1),
   max_tokens: z.number().int().positive().optional(),
   stop: z.string().array().optional(),
   // Streaming is not supported by Inception's edit endpoint today; reject if requested.
   stream: z.literal(false).optional(),
 });
 
-type NextEditRequestBody = z.infer<typeof NextEditRequestBody>;
+type EditRequestBody = z.infer<typeof EditRequestBody>;
 
 export async function POST(request: NextRequest) {
   const requestStartedAt = performance.now();
@@ -90,22 +90,22 @@ export async function POST(request: NextRequest) {
   const requestBodyText = await requestBodyTextPromise;
   debugSaveProxyRequest(requestBodyText);
 
-  let requestBody: NextEditRequestBody;
+  let requestBody: EditRequestBody;
   try {
-    const { success, data, error } = NextEditRequestBody.safeParse(JSON.parse(requestBodyText));
+    const { success, data, error } = EditRequestBody.safeParse(JSON.parse(requestBodyText));
     if (!success) {
       if (error.issues.some(issue => issue.path[0] === 'stream')) {
         return NextResponse.json(
           {
-            error: 'Streaming is not supported for next-edit completions',
+            error: 'Streaming is not supported for edit completions',
             error_type: ProxyErrorType.unsupported_field,
           },
           { status: 400 }
         );
       }
-      sentryLogger('nextedit-proxy')('request failed to parse', {
+      sentryLogger('edit-proxy')('request failed to parse', {
         extra: { kiloUserId: user.id, error, organizationId },
-        tags: { source: 'nextedit-proxy' },
+        tags: { source: 'edit-proxy' },
         user: { id: user.id },
       });
       return invalidRequestResponse();
@@ -114,26 +114,26 @@ export async function POST(request: NextRequest) {
   } catch (e) {
     captureException(e, {
       extra: { kiloUserId: user.id },
-      tags: { source: 'nextedit-proxy' },
+      tags: { source: 'edit-proxy' },
       user: { id: user.id },
     });
     return invalidRequestResponse();
   }
 
-  const resolved = resolveNextEditProvider(requestBody.model);
+  const resolved = resolveEditProvider(requestBody.model);
   if (!resolved) {
     return NextResponse.json(
       {
-        error: requestBody.model + ' is not a supported next-edit model',
-        error_type: ProxyErrorType.unsupported_nextedit_model,
+        error: requestBody.model + ' is not a supported edit model',
+        error_type: ProxyErrorType.unsupported_edit_model,
       },
       { status: 400 }
     );
   }
-  const { provider: nextEditProvider, upstreamModel } = resolved;
+  const { provider: editProvider, upstreamModel } = resolved;
 
-  if (!requestBody.max_tokens || requestBody.max_tokens > NEXTEDIT_MAX_TOKENS_LIMIT) {
-    console.warn(`SECURITY: NextEdit max tokens limit exceeded or missing: ${user.id}`, {
+  if (!requestBody.max_tokens || requestBody.max_tokens > EDIT_MAX_TOKENS_LIMIT) {
+    console.warn(`SECURITY: Edit max tokens limit exceeded or missing: ${user.id}`, {
       maxTokens: requestBody.max_tokens,
     });
     return temporarilyUnavailableResponse();
@@ -142,7 +142,7 @@ export async function POST(request: NextRequest) {
   const { fraudHeaders, projectId } = extractFraudAndProjectHeaders(request);
   const taskId = extractHeaderAndLimitLength(request, 'x-kilocode-taskid') ?? undefined;
 
-  const promptInfo = extractNextEditPromptInfo(requestBody);
+  const promptInfo = extractEditPromptInfo(requestBody);
 
   const byokProviderKey: UserByokProviderId = 'inception';
 
@@ -151,9 +151,9 @@ export async function POST(request: NextRequest) {
     : await getBYOKforUser(readDb, user.id, [byokProviderKey]);
 
   const usageContext: MicrodollarUsageContext = {
-    api_kind: 'nextedit_completions',
+    api_kind: 'edit_completions',
     kiloUserId: user.id,
-    provider: nextEditProvider,
+    provider: editProvider,
     requested_model: requestBody.model,
     promptInfo,
     max_tokens: requestBody.max_tokens ?? null,
@@ -201,29 +201,29 @@ export async function POST(request: NextRequest) {
     return dataCollectionRequiredResponse();
   }
 
-  if (providerConfig?.only && !providerConfig.only.includes(nextEditProvider)) {
+  if (providerConfig?.only && !providerConfig.only.includes(editProvider)) {
     return NextResponse.json(
       {
         error: 'Provider not allowed for your team.',
         error_type: ProxyErrorType.provider_not_allowed,
-        message: `The provider "${nextEditProvider}" is not allowed for your team.`,
+        message: `The provider "${editProvider}" is not allowed for your team.`,
       },
       { status: 403 }
     );
   }
 
-  if (providerConfig?.ignore?.includes(nextEditProvider)) {
+  if (providerConfig?.ignore?.includes(editProvider)) {
     return NextResponse.json(
       {
         error: 'Provider not allowed for your team.',
         error_type: ProxyErrorType.provider_not_allowed,
-        message: `The provider "${nextEditProvider}" is not allowed for your team.`,
+        message: `The provider "${editProvider}" is not allowed for your team.`,
       },
       { status: 403 }
     );
   }
 
-  const systemKey = getSystemApiKey(nextEditProvider);
+  const systemKey = getSystemApiKey(editProvider);
   const userByokEntry = userByok?.at(0);
   const apiKey = userByokEntry?.decryptedAPIKey ?? systemKey;
 
@@ -238,18 +238,18 @@ export async function POST(request: NextRequest) {
   }
 
   sentryRootSpan()?.setAttribute(
-    'nextedit.time_to_request_start_ms',
+    'edit.time_to_request_start_ms',
     performance.now() - requestStartedAt
   );
 
   const requestSpan = startInactiveSpan({
-    name: 'nextedit-request-start',
+    name: 'edit-request-start',
     op: 'http.client',
   });
 
   const bodyForUpstream = { ...requestBody, model: upstreamModel };
 
-  const proxyRes = await fetch(INCEPTION_NEXTEDIT_URL, {
+  const proxyRes = await fetch(INCEPTION_EDIT_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -277,14 +277,14 @@ export async function POST(request: NextRequest) {
       response: proxyRes,
       organizationId,
       model: requestBody.model,
-      errorMessage: `NextEdit provider returned error ${proxyRes.status}`,
+      errorMessage: `Edit provider returned error ${proxyRes.status}`,
       trackInSentry: proxyRes.status >= 500,
     });
   }
 
   const clonedResponse = proxyRes.clone();
 
-  countAndStoreNextEditUsage(clonedResponse, usageContext, requestSpan);
+  countAndStoreEditUsage(clonedResponse, usageContext, requestSpan);
 
   return wrapInSafeNextResponse(proxyRes);
 }

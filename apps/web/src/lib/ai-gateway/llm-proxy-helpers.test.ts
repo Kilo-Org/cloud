@@ -4,7 +4,7 @@ import {
   extractEmbeddingPromptInfo,
   makeErrorReadable,
   parseEmbeddingUsageFromResponse,
-  parseNextEditUsageFromResponse,
+  parseEditUsageFromResponse,
   parseTranscriptionUsageFromResponse,
 } from './llm-proxy-helpers';
 
@@ -273,9 +273,9 @@ describe('extractEmbeddingPromptInfo', () => {
   });
 });
 
-describe('parseNextEditUsageFromResponse', () => {
+describe('parseEditUsageFromResponse', () => {
   it('prices cached Inception input tokens at the discounted rate', () => {
-    const result = parseNextEditUsageFromResponse(
+    const result = parseEditUsageFromResponse(
       JSON.stringify({
         id: 'edit-123',
         model: 'mercury-edit-2',

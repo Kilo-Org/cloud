@@ -37,9 +37,13 @@ import {
   baseResizeTerminalNextOutputSchema,
   baseCloseTerminalNextSchema,
   baseCloseTerminalNextOutputSchema,
+  cloudAgentGetAttachmentUploadUrlSchema,
   cloudAgentGetImageUploadUrlSchema,
 } from '../cloud-agent-next-schemas';
-import { generateImageUploadUrl } from '@/lib/r2/cloud-agent-attachments';
+import {
+  generateCloudAgentAttachmentUploadUrl,
+  generateImageUploadUrl,
+} from '@/lib/r2/cloud-agent-attachments';
 import * as z from 'zod';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { signStreamTicket } from '@/lib/cloud-agent/stream-ticket';
@@ -129,6 +133,10 @@ const ImageUploadUrlInput = cloudAgentGetImageUploadUrlSchema.extend({
   organizationId: z.uuid(),
 });
 
+const AttachmentUploadUrlInput = cloudAgentGetAttachmentUploadUrlSchema.extend({
+  organizationId: z.uuid(),
+});
+
 const GetSessionInput = baseGetSessionNextSchema.extend({
   organizationId: z.uuid(),
 });
@@ -207,7 +215,8 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
       const authToken = generateCloudAgentToken(ctx.user);
       const client = createCloudAgentNextClient(authToken);
 
-      const { gitlabProject, githubRepo, organizationId, ...restInput } = input;
+      const { gitlabProject, githubRepo, organizationId, attachments, images, ...restInput } =
+        input;
 
       // Profile resolution happens inside cloud-agent-next. Tokens are resolved
       // there as well via GIT_TOKEN_SERVICE. We forward profileId + inline
@@ -230,6 +239,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         return await client.prepareSession({
           ...restInput,
           ...gitParams,
+          attachments: attachments ?? images,
           createdOnPlatform: 'cloud-agent-web',
           kilocodeOrganizationId: organizationId,
         });
@@ -287,7 +297,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
           payload: input.payload,
           autoCommit: input.autoCommit,
           messageId: input.messageId ?? generateMessageId(),
-          images: input.images,
+          attachments: input.attachments ?? input.images,
         });
       } catch (error) {
         rethrowAsPaymentRequired(error);
@@ -405,6 +415,21 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         userId: ctx.user.id,
         messageUuid: input.messageUuid,
         imageId: input.imageId,
+        contentType: input.contentType,
+        contentLength: input.contentLength,
+      });
+    }),
+
+  /**
+   * Generate a presigned URL for uploading a canonical Cloud Agent attachment.
+   */
+  getAttachmentUploadUrl: organizationMemberMutationProcedure
+    .input(AttachmentUploadUrlInput)
+    .mutation(async ({ ctx, input }) => {
+      return generateCloudAgentAttachmentUploadUrl({
+        userId: ctx.user.id,
+        messageUuid: input.messageUuid,
+        attachmentId: input.attachmentId,
         contentType: input.contentType,
         contentLength: input.contentLength,
       });

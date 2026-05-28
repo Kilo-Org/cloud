@@ -9,6 +9,7 @@ export {
   handleInstallationSuspend,
   handleInstallationUnsuspend,
 } from './installation-handler';
+export { handleInstallationTargetRenamed } from './installation-target-handler';
 export { handleInstallationRepositories } from './installation-repositories-handler';
 export { handlePushEvent } from './push-handler';
 export { handlePullRequest } from './pull-request-handler';

@@ -391,7 +391,7 @@ describe('createPromptHandler', () => {
     expect(deps.openConnection).toHaveBeenCalled();
   });
 
-  it('materializes attachments before opening ingest and sending the prompt', async () => {
+  it('materializes a PDF before opening ingest and sends its local file part to Kilo', async () => {
     const state = new WrapperState();
     const deps = createMockDeps(state);
     const callOrder: string[] = [];
@@ -407,9 +407,9 @@ describe('createPromptHandler', () => {
             { type: 'text', text: 'Hello' },
             {
               type: 'file',
-              mime: 'image/png',
-              url: 'file:///tmp/image.png',
-              filename: 'image.png',
+              mime: 'application/pdf',
+              url: 'file:///tmp/brief.pdf',
+              filename: 'brief.pdf',
             },
           ],
         },
@@ -430,10 +430,10 @@ describe('createPromptHandler', () => {
           prompt: 'Hello',
           attachments: [
             {
-              filename: 'image.png',
-              mime: 'image/png',
-              signedUrl: 'https://r2.example.com/image.png',
-              localPath: '/tmp/image.png',
+              filename: 'brief.pdf',
+              mime: 'application/pdf',
+              signedUrl: 'https://r2.example.com/brief.pdf',
+              localPath: '/tmp/brief.pdf',
             },
           ],
         },
@@ -451,9 +451,9 @@ describe('createPromptHandler', () => {
           { type: 'text', text: 'Hello' },
           {
             type: 'file',
-            mime: 'image/png',
-            url: 'file:///tmp/image.png',
-            filename: 'image.png',
+            mime: 'application/pdf',
+            url: 'file:///tmp/brief.pdf',
+            filename: 'brief.pdf',
           },
         ],
       })

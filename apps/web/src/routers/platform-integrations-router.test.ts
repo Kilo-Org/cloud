@@ -77,6 +77,11 @@ describe('platformIntegrationsRouter', () => {
         installed: false,
         installation: { accountLogin: 'kilocode' },
       },
+      {
+        platform: PLATFORM.DOLTHUB,
+        installed: true,
+        installation: { accountLogin: 'kilocode' },
+      },
     ]);
   });
 

@@ -54,6 +54,16 @@ export const kiloExtras = {
         'Enable remote control of sessions via Kilo Cloud. Equivalent to running /remote on startup.',
       type: 'boolean',
     },
+    auto_collapse_reasoning: {
+      description: 'Automatically collapse reasoning blocks after the agent finishes writing them',
+      type: 'boolean',
+    },
+    terminal_command_display: {
+      description:
+        'Controls whether terminal command blocks are expanded or collapsed by default in the VS Code chat UI',
+      type: 'string',
+      enum: ['expanded', 'collapsed'],
+    },
     commit_message: {
       description: 'Configuration for AI-generated commit messages',
       type: 'object',

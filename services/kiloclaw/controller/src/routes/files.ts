@@ -16,6 +16,11 @@ import { timingSafeTokenEqual } from '../auth';
 import { resolveSafePath, verifyCanonicalized, SafePathError } from '../safe-path';
 import { atomicWrite } from '../atomic-write';
 import { backupFile } from '../backup-file';
+import { serializeAgentConfigMutation } from '../openclaw-agent-config';
+import {
+  isOpenclawValidationArtifactPath,
+  validateOpenclawConfigCandidate,
+} from '../openclaw-config-validation';
 import {
   ensureWeatherSkillInstalled,
   formatBotIdentityMarkdown,
@@ -62,6 +67,28 @@ type OpenclawWorkspacePreparedFile = {
 };
 
 type OpenclawImportFailure = z.infer<typeof OpenclawWorkspaceImportFailureSchema>;
+
+function errorCode(error: unknown): string {
+  if (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    typeof error.code === 'string'
+  ) {
+    return error.code;
+  }
+  return 'unknown';
+}
+
+function resolvesToOpenclawConfig(resolvedPath: string, rootDir: string): boolean {
+  const configPath = path.resolve(rootDir, 'openclaw.json');
+  if (resolvedPath === configPath) return true;
+  try {
+    return fs.realpathSync(resolvedPath) === fs.realpathSync(configPath);
+  } catch {
+    return false;
+  }
+}
 
 type OpenclawWorkspaceImportValidation =
   | {
@@ -317,6 +344,7 @@ function buildTree(dir: string, rootDir: string): FileNode[] {
     if (entry.isSymbolicLink()) continue;
 
     const relativePath = path.relative(rootDir, path.join(dir, entry.name));
+    if (isOpenclawValidationArtifactPath(relativePath)) continue;
 
     if (entry.isDirectory()) {
       nodes.push({
@@ -358,18 +386,27 @@ function resolveAndValidateFile(
     throw e;
   }
 
+  if (isOpenclawValidationArtifactPath(path.relative(rootDir, resolved))) {
+    return { code: 'file_not_found', error: 'File does not exist', status: 404 };
+  }
+
   if (!fs.existsSync(resolved)) {
     return { code: 'file_not_found', error: 'File does not exist', status: 404 };
   }
 
-  // Canonicalize to catch symlinked ancestors escaping the root
+  // Canonicalize to catch symlinked ancestors escaping the root or aliasing internal artifacts.
+  let canonicalPath: string;
   try {
-    verifyCanonicalized(fs.realpathSync(resolved), rootDir);
+    canonicalPath = fs.realpathSync(resolved);
+    verifyCanonicalized(canonicalPath, rootDir);
   } catch (e) {
     if (e instanceof SafePathError) {
       return { error: e.message, status: 400 };
     }
     throw e;
+  }
+  if (isOpenclawValidationArtifactPath(path.relative(rootDir, canonicalPath))) {
+    return { code: 'file_not_found', error: 'File does not exist', status: 404 };
   }
 
   const stat = fs.lstatSync(resolved);
@@ -697,7 +734,6 @@ export function registerFileRoutes(app: Hono, expectedToken: string, rootDir: st
       return c.json({ error: 'Missing or invalid path/content' }, 400);
     }
     const body = parsed.data;
-
     const result = resolveAndValidateFile(body.path, rootDir);
     if (typeof result !== 'string') {
       return c.json(
@@ -706,27 +742,111 @@ export function registerFileRoutes(app: Hono, expectedToken: string, rootDir: st
       );
     }
 
-    if (body.etag) {
-      const currentContent = fs.readFileSync(result, 'utf-8');
-      const currentEtag = computeEtag(currentContent);
-      if (body.etag !== currentEtag) {
-        return c.json({ code: 'file_etag_conflict', error: 'File was modified externally' }, 409);
+    const writeFile = () => {
+      if (body.etag) {
+        try {
+          const currentContent = fs.readFileSync(result, 'utf-8');
+          if (body.etag !== computeEtag(currentContent)) {
+            return c.json(
+              { code: 'file_etag_conflict', error: 'File was modified externally' },
+              409
+            );
+          }
+        } catch {
+          return c.json({ code: 'file_etag_conflict', error: 'File was modified externally' }, 409);
+        }
       }
+
+      try {
+        backupFile(result, rootDir);
+      } catch (error) {
+        console.warn('[files] Failed to create backup, proceeding with write:', errorCode(error));
+      }
+      try {
+        atomicWrite(result, body.content);
+      } catch (err) {
+        console.error('[files] atomicWrite failed:', err);
+        return c.json({ error: 'Failed to write file' }, 500);
+      }
+      return c.json({ etag: computeEtag(body.content) });
+    };
+
+    if (resolvesToOpenclawConfig(result, rootDir)) {
+      return serializeAgentConfigMutation(async () => writeFile(), {
+        configPath: path.resolve(rootDir, 'openclaw.json'),
+      });
+    }
+    return writeFile();
+  });
+
+  const WriteOpenclawConfigBodySchema = z.object({
+    content: z.string(),
+    etag: z.string().optional(),
+    mode: z.enum(['warn-before-write', 'allow-invalid']),
+  });
+
+  app.post('/_kilo/files/write-openclaw-config', async c => {
+    let rawBody: unknown;
+    try {
+      rawBody = await c.req.json();
+    } catch {
+      return c.json({ error: 'Invalid JSON body' }, 400);
+    }
+    const parsed = WriteOpenclawConfigBodySchema.safeParse(rawBody);
+    if (!parsed.success) {
+      return c.json({ error: 'Missing or invalid content/mode' }, 400);
+    }
+    const body = parsed.data;
+    const result = resolveAndValidateFile('openclaw.json', rootDir);
+    if (typeof result !== 'string') {
+      return c.json(
+        { error: result.error, ...(result.code && { code: result.code }) },
+        result.status
+      );
     }
 
-    try {
-      backupFile(result, rootDir);
-    } catch (err) {
-      console.warn('[files] Failed to create backup, proceeding with write:', err);
-    }
-    try {
-      atomicWrite(result, body.content);
-    } catch (err) {
-      console.error('[files] atomicWrite failed:', err);
-      return c.json({ error: 'Failed to write file' }, 500);
-    }
+    const hasEtagConflict = () => {
+      if (!body.etag) return false;
+      try {
+        const currentContent = fs.readFileSync(result, 'utf-8');
+        return body.etag !== computeEtag(currentContent);
+      } catch {
+        return true;
+      }
+    };
 
-    const newEtag = computeEtag(body.content);
-    return c.json({ etag: newEtag });
+    return serializeAgentConfigMutation(
+      async () => {
+        if (hasEtagConflict()) {
+          return c.json({ code: 'file_etag_conflict', error: 'File was modified externally' }, 409);
+        }
+        if (body.mode === 'warn-before-write') {
+          const validation = await validateOpenclawConfigCandidate(body.content, result);
+          if (!validation.valid) {
+            return c.json({ outcome: 'openclaw-validation-warning', ...validation });
+          }
+          if (hasEtagConflict()) {
+            return c.json(
+              { code: 'file_etag_conflict', error: 'File was modified externally' },
+              409
+            );
+          }
+        }
+
+        try {
+          backupFile(result, rootDir);
+        } catch (error) {
+          console.warn('[files] Failed to create backup, proceeding with write:', errorCode(error));
+        }
+        try {
+          atomicWrite(result, body.content, undefined, { mode: 0o600 });
+        } catch (err) {
+          console.error('[files] atomicWrite failed:', err);
+          return c.json({ error: 'Failed to write file' }, 500);
+        }
+        return c.json({ etag: computeEtag(body.content) });
+      },
+      { configPath: result }
+    );
   });
 }

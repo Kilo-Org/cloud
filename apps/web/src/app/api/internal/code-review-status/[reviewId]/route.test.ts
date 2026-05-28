@@ -320,6 +320,7 @@ beforeEach(async () => {
   mockGetBotUserId.mockResolvedValue(null);
   mockGetIntegrationById.mockResolvedValue(makeIntegration());
   mockUpdateCheckRun.mockResolvedValue(undefined);
+  mockSetCommitStatus.mockResolvedValue(undefined);
   mockAddReactionToPR.mockResolvedValue(undefined);
   mockCreatePRComment.mockResolvedValue(undefined);
   mockHasPRCommentWithMarker.mockResolvedValue(false);
@@ -1042,6 +1043,91 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
     });
   });
 
+  describe('best-effort terminal gate publication', () => {
+    it('persists GitLab terminal status before failed publication and continues dispatch', async () => {
+      const callOrder: string[] = [];
+      mockGetCodeReviewById.mockResolvedValue(
+        makeReview({ platform: 'gitlab', platform_project_id: 42, check_run_id: null })
+      );
+      mockUpdateCodeReviewStatus.mockImplementation(async () => {
+        callOrder.push('persist');
+      });
+      mockSetCommitStatus.mockImplementation(async () => {
+        callOrder.push('publish');
+        throw new Error('GitLab unavailable');
+      });
+
+      const response = await POST(
+        makeRequest({ status: 'completed', gateResult: 'fail' }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      expect(callOrder.slice(0, 2)).toEqual(['persist', 'publish']);
+      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+        REVIEW_ID,
+        'completed',
+        expect.any(Object)
+      );
+      expect(mockSetCommitStatus).toHaveBeenCalledWith(
+        'mock-token',
+        42,
+        'abc123',
+        'failed',
+        expect.objectContaining({
+          description: 'Kilo Code Review found issues that require attention',
+        }),
+        'https://gitlab.com'
+      );
+      expect(mockCaptureException).toHaveBeenCalledWith(
+        expect.any(Error),
+        expect.objectContaining({ tags: { source: 'code-review-status-gate-check' } })
+      );
+      expect(mockTryDispatchPendingReviews).toHaveBeenCalled();
+    });
+
+    it('persists GitHub terminal status when check run publication fails', async () => {
+      const callOrder: string[] = [];
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+      mockUpdateCodeReviewStatus.mockImplementation(async () => {
+        callOrder.push('persist');
+      });
+      mockUpdateCheckRun.mockImplementation(async () => {
+        callOrder.push('publish');
+        throw new Error('GitHub unavailable');
+      });
+
+      const response = await POST(
+        makeRequest({ status: 'completed', gateResult: 'fail' }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      expect(callOrder.slice(0, 2)).toEqual(['persist', 'publish']);
+      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+        REVIEW_ID,
+        'completed',
+        expect.any(Object)
+      );
+      expect(mockUpdateCheckRun).toHaveBeenCalledWith(
+        'inst-1',
+        'owner',
+        'repo',
+        12345,
+        expect.objectContaining({
+          status: 'completed',
+          conclusion: 'failure',
+          output: expect.objectContaining({ title: 'Kilo Code Review found issues' }),
+        }),
+        'standard'
+      );
+      expect(mockCaptureException).toHaveBeenCalledWith(
+        expect.any(Error),
+        expect.objectContaining({ tags: { source: 'code-review-status-gate-check' } })
+      );
+    });
+  });
+
   describe('GitHub check run billing messaging', () => {
     it('uses action_required conclusion for billing failures', async () => {
       mockGetCodeReviewById.mockResolvedValue(makeReview());
@@ -1412,6 +1498,43 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       expect(mockCreatePRComment).not.toHaveBeenCalled();
     });
 
+    it('continues model-unavailable summary publication after gate publication fails', async () => {
+      const callOrder: string[] = [];
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+      mockUpdateCodeReviewStatusIfNonTerminal.mockImplementation(async () => {
+        callOrder.push('persist');
+        return true;
+      });
+      mockUpdateCheckRun.mockImplementation(async () => {
+        callOrder.push('publish-gate');
+        throw new Error('GitHub unavailable');
+      });
+      mockFindKiloReviewComment.mockImplementation(async () => {
+        callOrder.push('find-summary');
+        return null;
+      });
+      mockCreatePRComment.mockImplementation(async () => {
+        callOrder.push('create-summary');
+      });
+
+      const response = await POST(
+        makeRequest({ status: 'failed', errorMessage: 'Model not found: kilo/retired-model' }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      expect(callOrder).toEqual(['persist', 'publish-gate', 'find-summary', 'create-summary']);
+      expect(mockUpdateCodeReviewStatusIfNonTerminal).toHaveBeenCalledWith(
+        REVIEW_ID,
+        'cancelled',
+        expect.objectContaining({ terminalReason: 'model_not_found' })
+      );
+      expect(mockCaptureException).toHaveBeenCalledWith(
+        expect.any(Error),
+        expect.objectContaining({ tags: { source: 'code-review-status-gate-check' } })
+      );
+    });
+
     it('persists the cancellation if the model-unavailable summary fails to publish', async () => {
       mockGetCodeReviewById.mockResolvedValue(makeReview());
       mockFindKiloReviewComment.mockResolvedValue(null);
@@ -1513,6 +1636,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       );
 
       expect(response.status).toBe(200);
+      expect(mockUpdateCheckRun).not.toHaveBeenCalled();
       expect(mockFindKiloReviewComment).not.toHaveBeenCalled();
       expect(mockCreatePRComment).not.toHaveBeenCalled();
       expect(mockUpdateCodeReviewStatus).not.toHaveBeenCalled();

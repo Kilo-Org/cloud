@@ -1,7 +1,9 @@
 import type { PlatformId } from './platforms';
 
+type SetupStatusPlatformId = Exclude<PlatformId, 'microsoft-teams' | 'google-chat'> | 'dolthub';
+
 export type PlatformInstallation = {
-  platform: Exclude<PlatformId, 'microsoft-teams' | 'google-chat'>;
+  platform: SetupStatusPlatformId;
   installed: boolean;
   installation: {
     accountLogin?: string | null;

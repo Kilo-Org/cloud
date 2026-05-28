@@ -29,7 +29,6 @@ import { morningBriefingStatusOk } from '@/lib/kiloclaw/types';
 import { calverAtLeast, cleanVersion, controllerCalverSupports } from '@/lib/kiloclaw/version';
 import type { useKiloClawMutations } from '@/hooks/useKiloClaw';
 import {
-  useClawComposioOnboardingStatus,
   useClawConfig,
   useClawMyPin,
   useClawGoogleSetupCommand,
@@ -1891,7 +1890,6 @@ export function SettingsTab({
 }) {
   const posthog = usePostHog();
   const { data: config } = useClawConfig();
-  const { data: composioOnboardingStatus } = useClawComposioOnboardingStatus();
   const { organizationId } = useClawContext();
   const { data: modelsData, isLoading: isLoadingModels } = useModelSelectorList(organizationId);
   const isRunning = status.status === 'running';
@@ -2005,6 +2003,8 @@ export function SettingsTab({
     cleanVersion(controllerVersion?.version),
     OPENCLAW_IMPORT_UI_MIN_CONTROLLER_VERSION
   );
+  const supportsOpenclawSaveValidation =
+    controllerVersion?.capabilities?.includes('files.write-openclaw-config') === true;
   // Fail OPEN: hide the interests editor only when the controller
   // version is positively parsed as too old, OR the worker reports an
   // explicit `version: null` (its positive old-controller signal for a
@@ -2020,14 +2020,6 @@ export function SettingsTab({
   );
 
   const configuredSecrets = config?.configuredSecrets ?? {};
-  const composioManagedConfigured = composioOnboardingStatus?.sandboxConfigSource === 'managed';
-  const composioManagedConnected =
-    composioManagedConfigured && composioOnboardingStatus?.status === 'connected';
-  const composioManualConfigured = composioOnboardingStatus?.sandboxConfigSource === 'manual';
-  const composioConfigured =
-    (configuredSecrets['composio'] ?? false) ||
-    composioManagedConfigured ||
-    composioManualConfigured;
   const kiloExaSearchMode = config?.kiloExaSearchMode ?? null;
   const braveSearchConfigured = configuredSecrets['brave-search'] ?? false;
   // Reflects which provider is actually active. Mirrors controller arbitration
@@ -2421,39 +2413,11 @@ export function SettingsTab({
                 <SecretEntrySection
                   key={entry.id}
                   entry={entry}
-                  configured={composioConfigured}
+                  configured={configuredSecrets[entry.id] ?? false}
                   mutations={mutations}
                   onSecretsChanged={onSecretsChanged}
                   isDirty={dirtySecrets.has(entry.id)}
                   onRedeploy={onRedeploy}
-                  statusInlineExtra={
-                    composioManagedConfigured ? (
-                      <Badge
-                        variant="secondary"
-                        className="gap-1 px-1.5 py-0 text-[10px] leading-4"
-                      >
-                        <ShieldCheck className="h-3 w-3" />
-                        Kilo-managed
-                      </Badge>
-                    ) : undefined
-                  }
-                  actionRowExtra={
-                    composioManagedConnected ? (
-                      <p className="text-muted-foreground flex items-start gap-2 text-xs">
-                        <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                        Google Calendar is connected through Kilo-managed Composio for this OpenClaw
-                        instance. Saving your own Composio credentials here will switch this
-                        instance to manual setup.
-                      </p>
-                    ) : composioManagedConfigured ? (
-                      <p className="text-muted-foreground flex items-start gap-2 text-xs">
-                        <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                        Kilo-managed Composio is configured for this OpenClaw instance. Reconnect
-                        Google Calendar from onboarding, or save your own Composio credentials here
-                        to switch this instance to manual setup.
-                      </p>
-                    ) : undefined
-                  }
                 />
               ))}
           </div>
@@ -2643,6 +2607,7 @@ export function SettingsTab({
                   enabled={isRunning}
                   mutations={mutations}
                   onOpenChange={setEditConfigOpen}
+                  enableOpenclawValidation={supportsOpenclawSaveValidation}
                 />
               </div>
             )}

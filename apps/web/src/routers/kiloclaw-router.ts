@@ -78,15 +78,6 @@ import {
 } from '@/lib/kiloclaw/provision-lock';
 import { encryptProvisionSecretsForWorker } from '@/lib/kiloclaw/provision-secrets';
 import {
-  buildComposioProvisionSecrets,
-  composioSecretsPatchSource,
-  createManagedComposioGoogleCalendarLink,
-  clearComposioInstanceConfig,
-  getManagedComposioGoogleCalendarStatus,
-  getComposioInstanceConfigSource,
-  markComposioInstanceConfig,
-} from '@/lib/kiloclaw/composio-onboarding';
-import {
   clearSubscriptionLifecycleAfterInstanceDestroy,
   clearTrialInactivityStopAfterStart,
 } from '@/lib/kiloclaw/instance-lifecycle';
@@ -851,7 +842,6 @@ const updateConfigSchema = z.object({
   kilocodeDefaultModel: kilocodeDefaultModelSchema.nullable().optional(),
   userTimezone: userTimezoneSchema.nullable().optional(),
   userLocation: userLocationSchema.nullable().optional(),
-  skipIncompleteManagedComposioConnection: z.boolean().optional(),
 });
 
 const updateKiloCodeConfigSchema = z.object({
@@ -877,18 +867,6 @@ const patchBotIdentitySchema = z.object({
   botNature: z.string().trim().min(1).max(120).nullable().optional(),
   botVibe: z.string().trim().min(1).max(120).nullable().optional(),
   botEmoji: z.string().trim().min(1).max(16).nullable().optional(),
-});
-
-const composioConnectLinkSchema = z.object({
-  returnTo: z
-    .string()
-    .min(1)
-    .max(500)
-    .refine(value => value.startsWith('/'), {
-      message: 'returnTo must be a relative path',
-    }),
-  popup: z.boolean().optional(),
-  attemptId: z.string().min(1).max(100).optional(),
 });
 
 /**
@@ -1115,14 +1093,7 @@ async function provisionInstance(
   params: { instanceId: string | null; bootstrapSubscription: boolean },
   executor: typeof db | DrizzleTransaction = db
 ) {
-  const composioProvision = await buildComposioProvisionSecrets({
-    scope: { ownerType: 'user', userId: user.id },
-    instanceId: params.instanceId,
-    secrets: input.secrets,
-    skipIncompleteManagedConnection: input.skipIncompleteManagedComposioConnection,
-  });
-
-  const encryptedSecrets = encryptProvisionSecretsForWorker(composioProvision.secrets);
+  const encryptedSecrets = encryptProvisionSecretsForWorker(input.secrets);
 
   const expiresInSeconds = TOKEN_EXPIRY.thirtyDays;
   const kilocodeApiKey = generateApiToken(user, undefined, {
@@ -1161,15 +1132,6 @@ async function provisionInstance(
         }
       : undefined
   );
-
-  if (composioProvision.configToMark?.source === 'manual') {
-    await markComposioInstanceConfig({ instanceId: result.instanceId, source: 'manual' });
-  } else if (composioProvision.configToMark?.source === 'managed') {
-    await markComposioInstanceConfig({
-      instanceId: result.instanceId,
-      source: 'managed',
-    });
-  }
 
   return result;
 }
@@ -3491,18 +3453,11 @@ export const kiloclawRouter = createTRPCRouter({
       const instance = await getActiveInstance(ctx.user.id);
       const client = new KiloClawInternalClient();
       try {
-        const result = await client.patchSecrets(
+        return await client.patchSecrets(
           ctx.user.id,
           { secrets: encryptedPatch, meta: input.meta },
           workerInstanceId(instance)
         );
-        const sourceAction = instance ? composioSecretsPatchSource(secrets) : 'none';
-        if (instance && sourceAction === 'upsert_manual') {
-          await markComposioInstanceConfig({ instanceId: instance.id, source: 'manual' });
-        } else if (instance && sourceAction === 'clear') {
-          await clearComposioInstanceConfig(instance.id);
-        }
-        return result;
       } catch (err) {
         if (err instanceof KiloClawApiError && err.statusCode >= 400 && err.statusCode < 500) {
           // Extract message from worker response body (JSON or plain text)
@@ -3528,58 +3483,6 @@ export const kiloclawRouter = createTRPCRouter({
     );
     return client.getConfig({ userId: ctx.user.id, instanceId: workerInstanceId(instance) });
   }),
-
-  getComposioOnboardingStatus: baseProcedure.query(async ({ ctx }) => {
-    const instance = await getActiveInstance(ctx.user.id);
-    let sandboxHasComposioSecrets = false;
-    if (instance) {
-      const client = new KiloClawUserClient(
-        generateApiToken(ctx.user, undefined, { expiresIn: TOKEN_EXPIRY.fiveMinutes })
-      );
-      const config = await client.getConfig({
-        userId: ctx.user.id,
-        instanceId: workerInstanceId(instance),
-      });
-      sandboxHasComposioSecrets = config.configuredSecrets.composio === true;
-    }
-    return await getManagedComposioGoogleCalendarStatus({
-      scope: {
-        ownerType: 'user',
-        userId: ctx.user.id,
-      },
-      instance,
-      sandboxHasComposioSecrets,
-    });
-  }),
-
-  createComposioGoogleCalendarLink: baseProcedure
-    .input(composioConnectLinkSchema)
-    .mutation(async ({ ctx, input }) => {
-      return await withKiloclawProvisionContextLock(
-        getPersonalProvisionLockKey(ctx.user.id),
-        async () => {
-          await ensureProvisionAccess(ctx.user.id, ctx.user.google_user_email);
-          const instance = await getActiveInstance(ctx.user.id);
-          const sandboxConfigSource = instance
-            ? await getComposioInstanceConfigSource(instance.id)
-            : null;
-          if (sandboxConfigSource === 'manual') {
-            throw new TRPCError({
-              code: 'CONFLICT',
-              message: 'This sandbox already uses your own Composio credentials.',
-            });
-          }
-
-          return await createManagedComposioGoogleCalendarLink({
-            userId: ctx.user.id,
-            scope: { ownerType: 'user', userId: ctx.user.id },
-            returnTo: input.returnTo,
-            popup: input.popup,
-            attemptId: input.attemptId,
-          });
-        }
-      );
-    }),
 
   getChannelCatalog: baseProcedure.query(async ({ ctx }) => {
     const instance = await getActiveInstance(ctx.user.id);
@@ -4302,6 +4205,7 @@ export const kiloclawRouter = createTRPCRouter({
         path: z.string().min(1),
         content: z.string(),
         etag: z.string().min(1),
+        openclawValidation: z.enum(['warn-before-write', 'allow-invalid']).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -4329,6 +4233,21 @@ export const kiloclawRouter = createTRPCRouter({
           content = JSON.stringify(userConfig, null, 2);
         }
 
+        if (input.openclawValidation) {
+          if (input.path !== 'openclaw.json') {
+            throw new TRPCError({
+              code: 'BAD_REQUEST',
+              message: 'OpenClaw validation is only available for openclaw.json',
+            });
+          }
+          return await client.writeOpenclawConfigFile(
+            ctx.user.id,
+            content,
+            input.etag,
+            workerInstanceId(instance),
+            input.openclawValidation
+          );
+        }
         return await client.writeFile(
           ctx.user.id,
           input.path,

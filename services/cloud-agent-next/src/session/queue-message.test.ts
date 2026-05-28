@@ -107,7 +107,42 @@ describe('queueMessage', () => {
     expect(request?.turn.id).toBe('msg_018f1e2d3c4bAbCdEfGhIjKlMn');
   });
 
-  it('forwards the composed user-message payload to the Durable Object', async () => {
+  it('forwards canonical document attachments to the Durable Object', async () => {
+    const { stub, admitSubmittedMessage } = makeDoStub({
+      success: true,
+      outcome: 'queued',
+      compatibilityDelivery: 'queued',
+      messageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
+    });
+
+    await queueMessage(
+      {
+        cloudAgentSessionId: 'agent_document' as SessionId,
+        turn: {
+          type: 'prompt',
+          prompt: 'inspect the PDF',
+          attachments: {
+            path: '123e4567-e89b-12d3-a456-426614174000',
+            files: ['123e4567-e89b-12d3-a456-426614174001.pdf'],
+          },
+        },
+      },
+      { env: makeEnv(stub) as Env, userId: 'user_document' }
+    );
+
+    expect(admitSubmittedMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        turn: expect.objectContaining({
+          attachments: {
+            path: '123e4567-e89b-12d3-a456-426614174000',
+            files: ['123e4567-e89b-12d3-a456-426614174001.pdf'],
+          },
+        }),
+      })
+    );
+  });
+
+  it('forwards the composed canonical message payload to the Durable Object', async () => {
     const { stub, admitSubmittedMessage } = makeDoStub({
       success: true,
       outcome: 'queued',
@@ -121,7 +156,7 @@ describe('queueMessage', () => {
         turn: {
           type: 'prompt',
           prompt: 'inspect the screenshot',
-          images: {
+          attachments: {
             path: '123e4567-e89b-12d3-a456-426614174000',
             files: ['123e4567-e89b-12d3-a456-426614174001.png'],
           },
@@ -139,7 +174,7 @@ describe('queueMessage', () => {
         type: 'prompt',
         id: undefined,
         prompt: 'inspect the screenshot',
-        images: {
+        attachments: {
           path: '123e4567-e89b-12d3-a456-426614174000',
           files: ['123e4567-e89b-12d3-a456-426614174001.png'],
         },

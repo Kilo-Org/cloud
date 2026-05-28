@@ -121,15 +121,15 @@ describe('createPendingSessionMessageFromIntent', () => {
     expect(stored).not.toHaveProperty('callbackUrl');
   });
 
-  it('creates a message from a session message intent', () => {
+  it('creates a canonical document message from a session message intent', () => {
     const intent: SessionMessageIntent = {
       turn: {
         type: 'prompt',
         messageId: 'msg_018f1e2d3c4bIntentAbCdEfGh',
         prompt: 'write tests',
-        images: {
+        attachments: {
           path: '123e4567-e89b-12d3-a456-426614174000',
-          files: ['123e4567-e89b-12d3-a456-426614174001.png'],
+          files: ['123e4567-e89b-12d3-a456-426614174001.pdf'],
         },
       },
       agent: { mode: 'plan', model: 'claude', variant: 'thinking' },
@@ -145,6 +145,32 @@ describe('createPendingSessionMessageFromIntent', () => {
       createdAt: 42,
       intent,
     });
+  });
+
+  it('does not decode stored V2 intents containing legacy images', async () => {
+    const storage = createMemoryStorage([
+      [
+        `pending_message:0000000000000001:${BASE_MSG_ID}`,
+        {
+          version: 2,
+          intent: {
+            turn: {
+              type: 'prompt',
+              messageId: BASE_MSG_ID,
+              prompt: 'old image record',
+              images: {
+                path: '123e4567-e89b-12d3-a456-426614174000',
+                files: ['123e4567-e89b-12d3-a456-426614174001.png'],
+              },
+            },
+            agent: { mode: 'code', model: 'claude' },
+          },
+          delivery: { queuedAt: 1 },
+        },
+      ],
+    ]);
+
+    expect(await listPendingSessionMessages(storage)).toEqual([]);
   });
 });
 
@@ -180,10 +206,6 @@ describe('resolvePendingSessionMessageExecutionOptions', () => {
 describe('resolvePendingSessionMessageIntent', () => {
   it('restores an accepted turn plus resolved delivery semantics from flat pending storage', () => {
     const message = makeMessage({
-      images: {
-        path: '123e4567-e89b-12d3-a456-426614174000',
-        files: ['123e4567-e89b-12d3-a456-426614174001.png'],
-      },
       executionOptions: {
         mode: 'plan',
         model: 'queued-model',
@@ -205,10 +227,6 @@ describe('resolvePendingSessionMessageIntent', () => {
         type: 'prompt',
         messageId: BASE_MSG_ID,
         prompt: 'hello',
-        images: {
-          path: '123e4567-e89b-12d3-a456-426614174000',
-          files: ['123e4567-e89b-12d3-a456-426614174001.png'],
-        },
       },
       agent: { mode: 'plan', model: 'queued-model', variant: 'thinking' },
       finalization: { autoCommit: true, condenseOnComplete: false },
@@ -445,13 +463,16 @@ describe('recordPendingFlushFailure', () => {
     expect(listed[0].lastFlushError).toBe('transient');
   });
 
-  it('retains images when re-storing a retryable pending message', async () => {
+  it('retains canonical attachments when re-storing a retryable current pending message', async () => {
     const storage = createMemoryStorage();
-    const images = {
+    const attachments = {
       path: '123e4567-e89b-12d3-a456-426614174000',
-      files: ['123e4567-e89b-12d3-a456-426614174001.png'],
+      files: ['123e4567-e89b-12d3-a456-426614174001.md'],
     };
-    const message = makeMessage({ images });
+    const message = createPendingSessionMessageFromIntent({
+      turn: { type: 'prompt', messageId: BASE_MSG_ID, prompt: 'read markdown', attachments },
+      agent: { mode: 'code', model: 'test-model' },
+    });
     await storePendingSessionMessage(storage, message);
 
     await recordPendingFlushFailure(storage, message, 'transient', 100_000, {
@@ -460,8 +481,9 @@ describe('recordPendingFlushFailure', () => {
     });
 
     const listed = await listPendingSessionMessages(storage);
-    expect(listed).toHaveLength(1);
-    expect(listed[0]?.legacy?.images).toEqual(images);
+    expect(listed[0]?.intent?.turn).toMatchObject({ attachments });
+    const [stored] = storage.store.values();
+    expect(stored).not.toHaveProperty('images');
   });
 
   it('preserves the original pending intent when retry replacement write fails', async () => {

@@ -7,6 +7,7 @@ export const SETUP_STATUS_PLATFORMS = [
   PLATFORM.GITHUB,
   PLATFORM.GITLAB,
   PLATFORM.LINEAR,
+  PLATFORM.DOLTHUB,
 ] as const;
 
 export type SetupStatusPlatform = (typeof SETUP_STATUS_PLATFORMS)[number];
@@ -38,7 +39,11 @@ function buildInstallationSummary(
   if (integration.platform === PLATFORM.LINEAR) {
     return { workspaceName: integration.platform_account_login };
   }
-  if (integration.platform === PLATFORM.GITHUB || integration.platform === PLATFORM.GITLAB) {
+  if (
+    integration.platform === PLATFORM.GITHUB ||
+    integration.platform === PLATFORM.GITLAB ||
+    integration.platform === PLATFORM.DOLTHUB
+  ) {
     return { accountLogin: integration.platform_account_login };
   }
 

@@ -2,7 +2,7 @@ import {
   addCacheBreakpoints,
   injectReasoningIntoContent,
 } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
-import type { CustomLlmProvider, OpenClawApiAdapter } from '@kilocode/db';
+import type { CustomLlmProvider } from '@kilocode/db';
 import type { GatewayChatApiKind, Provider } from '@/lib/ai-gateway/providers/types';
 import type { ExperimentUpstream } from '@/lib/ai-gateway/experiments/upstream-schema';
 
@@ -12,26 +12,23 @@ import type { ExperimentUpstream } from '@/lib/ai-gateway/experiments/upstream-s
  * `apps/web/src/lib/ai-gateway/providers/get-provider.ts`.
  */
 export function inferSupportedChatApis(
-  aiSdkProvider: CustomLlmProvider | undefined,
-  openClawApiAdapter: OpenClawApiAdapter | undefined
+  aiSdkProvider: CustomLlmProvider | undefined
 ): ReadonlyArray<GatewayChatApiKind> {
-  const result = new Array<GatewayChatApiKind>();
-  if (aiSdkProvider === 'openai' || openClawApiAdapter === 'openai-responses') {
-    result.push('responses');
+  if (aiSdkProvider === 'openai') {
+    return ['responses'];
   }
-  if (aiSdkProvider === 'anthropic' || openClawApiAdapter === 'anthropic-messages') {
-    result.push('messages');
+  if (aiSdkProvider === 'anthropic') {
+    return ['messages'];
   }
   if (
     aiSdkProvider === 'openai-compatible' ||
     aiSdkProvider === 'alibaba' ||
     aiSdkProvider === 'openrouter' ||
-    openClawApiAdapter === 'openai-completions' ||
-    result.length === 0
+    aiSdkProvider === undefined
   ) {
-    result.push('chat_completions');
+    return ['chat_completions'];
   }
-  return result;
+  return [];
 }
 
 /**
@@ -73,10 +70,7 @@ export function buildDirectProvider(upstream: DirectProviderInput): Provider {
     id: 'custom',
     apiUrl: upstream.base_url,
     apiKey: upstream.api_key,
-    supportedChatApis: inferSupportedChatApis(
-      upstream.opencode_settings?.ai_sdk_provider,
-      upstream.openclaw_settings?.api_adapter
-    ),
+    supportedChatApis: inferSupportedChatApis(upstream.opencode_settings?.ai_sdk_provider),
     transformRequest(context) {
       if (upstream.remove_from_body) {
         const body = context.request.body as Record<string, unknown>;

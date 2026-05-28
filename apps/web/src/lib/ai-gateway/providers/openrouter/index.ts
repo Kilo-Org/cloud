@@ -14,10 +14,7 @@ import { errorExceptInTest } from '@/lib/utils.server';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { convertFromKiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 import { isForbiddenFreeModel } from '@/lib/ai-gateway/forbidden-free-models';
-import {
-  getOpenClawSettings,
-  getOpenCodeSettings,
-} from '@/lib/ai-gateway/providers/model-settings';
+import { getOpenCodeSettings } from '@/lib/ai-gateway/providers/model-settings';
 import { AUTO_MODELS } from '@/lib/ai-gateway/auto-model';
 import { ATTRIBUTION_HEADERS } from '@/lib/ai-gateway/providers/openrouter/attribution-headers';
 import { getOpenRouterModelsMetadata } from '@/lib/ai-gateway/providers/gateway-models-cache';
@@ -124,7 +121,6 @@ async function enhancedModelList(models: OpenRouterModel[]) {
           preferredIndex: preferredIndex >= 0 ? preferredIndex : undefined,
           isFree: await isFreeModel(model.id),
           opencode: model.opencode ?? getOpenCodeSettings(model.id),
-          openclaw: model.openclaw ?? getOpenClawSettings(model.id),
           architecture: addPdf
             ? {
                 ...model.architecture,

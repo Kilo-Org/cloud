@@ -651,10 +651,35 @@ Version capability hint rules:
 | POST | `/_kilo/config/restore/base` | Regenerate config from env vars, signal gateway reload |
 | POST | `/_kilo/config/replace` | Atomically replace openclaw.json (etag concurrency) |
 | POST | `/_kilo/config/patch` | Deep-merge a JSON patch into openclaw.json |
+| GET | `/_kilo/config/agents` | List normalized configured-agent summaries and effective defaults |
+| GET | `/_kilo/config/agents/:agentId` | Read one normalized configured-agent summary |
+| POST | `/_kilo/config/agents` | Create a basic agent through non-interactive OpenClaw CLI behavior |
+| PATCH | `/_kilo/config/agents/:agentId` | Update approved agent model/settings fields |
+| DELETE | `/_kilo/config/agents/:agentId` | Delete a configured agent through non-interactive OpenClaw CLI behavior |
+| PATCH | `/_kilo/config/agent-defaults` | Update approved inherited agent-default fields |
 | POST | `/_kilo/config/tools-md/google-workspace` | Enable/disable managed Google Workspace `TOOLS.md` section |
 
 The restore endpoint only accepts `base` as the version parameter.
 Other values MUST return 400.
+
+##### Agent configuration CRUD
+
+1. All agent configuration endpoints MUST require bearer-token authentication.
+2. `GET /_kilo/config/agents` MUST return configured agent summaries, effective defaults, and an etag representing the read config snapshot.
+3. Agent reads MAY represent the implicit default `main` agent as `configured: false` when no explicit list entry exists for it.
+4. `PATCH /_kilo/config/agents/:agentId` and `PATCH /_kilo/config/agent-defaults` MUST expose only controller-approved model/settings fields and MUST reject unknown patch fields.
+5. Agent/default native updates MUST use guarded read-modify-write behavior that preserves unrelated configuration and sibling agent entries.
+6. `POST /_kilo/config/agents` MUST delegate basic creation to non-interactive OpenClaw CLI behavior and MUST return the normalized created agent identifier.
+7. Controller-accepted CLI creation values MUST NOT be interpreted as additional OpenClaw command options beyond the defined basic-create surface.
+8. `POST /_kilo/config/agents` MAY accept arbitrary absolute workspace paths. Clients MUST NOT assume every configured workspace is exposed by `/_kilo/files/*`.
+9. Native agent resource lookup and update requests MUST reject non-empty IDs that collapse to the reserved implicit `main` identifier rather than silently targeting `main`.
+10. `DELETE /_kilo/config/agents/:agentId` MUST delegate deletion to non-interactive OpenClaw CLI behavior and MUST reject deletion of `main`.
+11. The delete response MUST NOT claim verified filesystem deletion or verified file retention. Filesystem disposition is controlled by the installed OpenClaw CLI/runtime behavior and is not represented by the controller response.
+12. The following capability hints MUST be advertised when the corresponding CRUD routes are registered: `config.agents.read`, `config.agents.create.basic.cli`, `config.agents.update`, `config.agents.delete.cli`, and `config.agent-defaults.update`.
+13. Native updates MUST report stale config etags or config changes observed before commit as `409 config_etag_conflict`.
+14. Controller-originated agent create, update, defaults-update, and delete mutations MUST be serialized per config path so a lifecycle CLI mutation cannot be overwritten by a concurrent native controller update.
+15. CLI lifecycle operations MUST report known reserved/not-found/conflict validation failures using stable HTTP error codes, and MUST report timeout or malformed/process failures without exposing secret environment values.
+16. Controller server errors from agent-config reads MUST NOT expose filesystem error details in HTTP responses.
 
 #### Environment (bearer token)
 
@@ -705,6 +730,19 @@ running. When forwarding, it MUST authenticate to gog with
 | GET | `/_kilo/files/read` | Read a safe file path |
 | POST | `/_kilo/files/import-openclaw-workspace` | Import OpenClaw workspace files |
 | POST | `/_kilo/files/write` | Write a safe file path |
+| POST | `/_kilo/files/write-openclaw-config` | Validate and write `openclaw.json`, with explicit invalid override support |
+
+##### Validation-aware `openclaw.json` file writes
+
+1. `POST /_kilo/files/write-openclaw-config` MUST provide the validation-aware save flow for `openclaw.json`; clients MUST NOT use optional fields on generic `/_kilo/files/write` to infer validation behavior.
+2. For a normal validation-aware save, the controller MUST evaluate the submitted candidate using the installed OpenClaw config-validation behavior before committing it.
+3. When the candidate is invalid or validation cannot complete, the controller MUST leave `openclaw.json` unchanged and MUST return a bounded structured warning result suitable for an authenticated client to display.
+4. The controller MAY accept an explicit invalid-write override after a warning. An override MUST remain subject to normal safe-path and ETag concurrency checks and MUST NOT be inferred from an ordinary save request.
+5. Validation-warning responses MAY return bounded diagnostics derived while validating the authenticated instance's configuration, including substituted values; those diagnostics MUST be returned only to authenticated config-management clients and MUST NOT be logged. Responses and logs MUST NOT expose staging paths or unrestricted subprocess output.
+6. Validation-aware writes MUST remain usable when the gateway process is unavailable after controller routes are registered.
+7. Controllers implementing this behavior MUST advertise `files.write-openclaw-config`; clients MUST NOT infer this behavior solely from controller CalVer.
+8. Controllers implementing this behavior MUST serialize any remaining generic `POST /_kilo/files/write` mutation of `openclaw.json` with validation-aware writes and other controller-owned config mutations so legacy clients cannot interleave config commits.
+9. This validation reports OpenClaw configuration validity. It MUST NOT be represented as proof that runtime SecretRefs or optional environment substitutions resolve successfully.
 
 #### Doctor (bearer token)
 

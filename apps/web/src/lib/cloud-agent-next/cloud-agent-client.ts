@@ -3,6 +3,7 @@ import { createTRPCClient, httpLink, TRPCClientError } from '@trpc/client';
 import { TRPCError } from '@trpc/server';
 import type { AgentConfig } from '@kilocode/db/schema-types';
 import type { EncryptedEnvelope } from '@/lib/encryption';
+import type { CloudAgentAttachments } from '@/lib/cloud-agent/constants';
 import type { Images } from '@/lib/images-schema';
 import { getEnvVariable } from '@/lib/dotenvx';
 import { captureException } from '@sentry/nextjs';
@@ -126,7 +127,9 @@ export type PrepareSessionInput = {
   condenseOnComplete?: boolean;
   /** Custom text to append to the system prompt (required when mode is 'custom') */
   appendSystemPrompt?: string;
-  /** Image attachments for the prompt */
+  /** Canonical Cloud Agent attachments for the prompt */
+  attachments?: CloudAgentAttachments;
+  /** Legacy image attachments accepted during client migration */
   images?: Images;
   /** Callback configuration for execution completion events */
   callbackTarget?: CallbackTarget;
@@ -160,7 +163,9 @@ export type SendMessageInput = {
   autoCommit?: boolean;
   githubToken?: string;
   gitToken?: string;
-  /** Image attachments for the message */
+  /** Canonical Cloud Agent attachments for the message */
+  attachments?: CloudAgentAttachments;
+  /** Legacy image attachments accepted during client migration */
   images?: Images;
   condenseOnComplete?: boolean;
   /** Custom text to append to the system prompt */

@@ -475,6 +475,30 @@ describe('createSessionManager', () => {
         atomValue<{ type: string; message: string } | null>(config.store, mgr.atoms.statusIndicator)
       ).toBeNull();
     });
+
+    it('allows attachments only for a resolved Cloud Agent session', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      expect(atomValue<boolean>(config.store, mgr.atoms.supportsAttachments)).toBe(false);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      expect(atomValue<boolean>(config.store, mgr.atoms.supportsAttachments)).toBe(true);
+
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+      expect(atomValue<boolean>(config.store, mgr.atoms.supportsAttachments)).toBe(false);
+
+      mockSessionCallbacks.onResolved?.({ type: 'read-only', kiloSessionId: kiloId('ses-1') });
+      expect(atomValue<boolean>(config.store, mgr.atoms.supportsAttachments)).toBe(false);
+
+      const switching = mgr.switchSession(kiloId('ses-2'));
+      expect(atomValue<boolean>(config.store, mgr.atoms.supportsAttachments)).toBe(false);
+      await switching;
+      expect(atomValue<boolean>(config.store, mgr.atoms.supportsAttachments)).toBe(true);
+
+      mgr.destroy();
+      expect(atomValue<boolean>(config.store, mgr.atoms.supportsAttachments)).toBe(false);
+    });
   });
 
   // -------------------------------------------------------------------------
@@ -748,7 +772,7 @@ describe('createSessionManager', () => {
       });
     });
 
-    it('passes images through to session.send', async () => {
+    it('passes images through to session.send for legacy Cloud Agent callers', async () => {
       const config = createMockConfig();
       const mgr = createSessionManager(config);
       const images = { path: 'cloud-agent/message-1', files: ['image.png'] };
@@ -767,6 +791,83 @@ describe('createSessionManager', () => {
         payload: { type: 'prompt', prompt: 'Hello', mode: 'code', model: 'claude-3-5-sonnet' },
         images,
       });
+    });
+
+    it('passes canonical document attachments through to session.send', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      const attachments = {
+        path: '12345678-1234-4234-9234-123456789abc',
+        files: ['87654321-4321-4321-8321-cba987654321.md'],
+      };
+
+      await mgr.switchSession(kiloId('ses-1'));
+
+      mockSession.send.mockResolvedValue(undefined);
+      const accepted = await mgr.send({
+        payload: { type: 'prompt', prompt: 'Hello', mode: 'code', model: 'claude-3-5-sonnet' },
+        attachments,
+      });
+
+      expect(accepted).toBe(true);
+      expect(mockSession.send).toHaveBeenCalledWith({
+        messageId: expect.stringMatching(/^msg_/),
+        payload: { type: 'prompt', prompt: 'Hello', mode: 'code', model: 'claude-3-5-sonnet' },
+        attachments,
+        images: undefined,
+      });
+    });
+
+    it('rejects canonical attachments for resolved remote sessions before transport send', async () => {
+      const onSendFailed = jest.fn();
+      const config = createMockConfig({ onSendFailed });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+
+      const accepted = await mgr.send({
+        payload: { type: 'prompt', prompt: 'Hello', mode: 'code', model: 'claude-3-5-sonnet' },
+        attachments: {
+          path: '12345678-1234-4234-9234-123456789abc',
+          files: ['87654321-4321-4321-8321-cba987654321.md'],
+        },
+      });
+
+      expect(accepted).toBe(false);
+      expect(mockSession.send).not.toHaveBeenCalled();
+      expect(atomValue<string | null>(config.store, mgr.atoms.failedPrompt)).toBe('Hello');
+      expect(onSendFailed).toHaveBeenCalledWith(
+        'Hello',
+        'Connection failed. Please retry in a moment.',
+        expect.any(Error)
+      );
+    });
+
+    it('rejects canonical attachments for resolved read-only sessions before transport send', async () => {
+      const onSendFailed = jest.fn();
+      const config = createMockConfig({ onSendFailed });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'read-only', kiloSessionId: kiloId('ses-1') });
+
+      const accepted = await mgr.send({
+        payload: { type: 'prompt', prompt: 'Hello', mode: 'code', model: 'claude-3-5-sonnet' },
+        attachments: {
+          path: '12345678-1234-4234-9234-123456789abc',
+          files: ['87654321-4321-4321-8321-cba987654321.md'],
+        },
+      });
+
+      expect(accepted).toBe(false);
+      expect(mockSession.send).not.toHaveBeenCalled();
+      expect(atomValue<string | null>(config.store, mgr.atoms.failedPrompt)).toBe('Hello');
+      expect(onSendFailed).toHaveBeenCalledWith(
+        'Hello',
+        'Connection failed. Please retry in a moment.',
+        expect.any(Error)
+      );
     });
 
     it('omits variant when not provided (backward compat)', async () => {

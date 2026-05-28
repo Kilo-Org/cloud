@@ -88,6 +88,8 @@ Existing targeted coverage includes:
 
 Experiment routing rewrites outbound requests to the selected variant `upstream.internal_id`, but direct partner responses can still echo that id. Implement response rewriting so clients receive the requested public model id in every response shape.
 
+Optional consideration: evaluate whether experiment responses should also be retained for analysis or partner evaluation. This is not required by the current spec and should be designed separately from response rewriting, including explicit policy decisions for sensitive data handling, retention, wipe behavior, storage location, truncation, and admin/provider access.
+
 Implementation target:
 
 - Reuse or generalize existing free-model response rewriters in `apps/web/src/lib/ai-gateway/providers/openrouter/responses.ts` and sibling response helpers.
@@ -107,6 +109,17 @@ Only add these when a concrete consumer exists:
 - `admin.modelExperiments.getLiveStats(id)`.
 - `model_experiment_request_stats` reporting view.
 - Analytics Engine dimensions for experiment, variant, or variant version.
+
+### Experiment Model Properties
+
+Add admin support for defining model properties for the experimented public model id, such as context window, supported request/response capabilities, pricing/display metadata, and any other fields needed by clients or routing logic. These properties are not currently configurable through the experiment workflow, so preview ids cannot fully describe model behavior independently of their upstream variants.
+
+Implementation target:
+
+- Decide whether model properties belong on the experiment, the public model id, or a separate model-metadata record referenced by the experiment.
+- Ensure clients can discover the experimented model's effective context window and capabilities before sending requests.
+- Keep variant upstream configuration separate from client-facing model properties unless a field is intentionally variant-specific.
+- Validate that configured properties match the request kinds and provider APIs supported by all active variants.
 
 ### Prompt Retention Operations
 

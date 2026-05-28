@@ -29,7 +29,7 @@ export type UploadUrlResult = {
 
 type ImageAllowedType = (typeof APP_BUILDER_IMAGE_ALLOWED_TYPES)[number];
 
-type ImageResizeOptions = {
+export type ImageResizeOptions = {
   maxDimensionPx: number;
   quality?: number;
 };
@@ -203,7 +203,7 @@ async function resizeImageFile(file: File, resizeImages?: ImageResizeOptions): P
   }
 }
 
-async function preprocessImageFile(
+export async function preprocessImageFile(
   file: File,
   options: {
     allowedTypes: readonly string[];

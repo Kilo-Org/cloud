@@ -137,12 +137,6 @@ export function repairTools(requestToMutate: OpenRouterChatCompletionRequest) {
   );
 }
 
-export function hasAttemptCompletionTool(request: OpenRouterChatCompletionRequest) {
-  return (request.tools ?? []).some(
-    tool => tool.type === 'function' && tool.function?.name === 'attempt_completion'
-  );
-}
-
 function containsNul(value: string): boolean {
   return value.includes('\0');
 }

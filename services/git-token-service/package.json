@@ -6,6 +6,7 @@
     "dev": "wrangler dev --env dev",
     "dev:test": "wrangler dev --config wrangler.test.jsonc",
     "deploy": "wrangler deploy",
+    "test": "vitest run",
     "typecheck": "tsgo --noEmit",
     "lint": "pnpm -w exec oxlint --config .oxlintrc.json services/git-token-service/src",
     "types": "wrangler types --env-interface CloudflareEnv worker-configuration.d.ts"
@@ -13,12 +14,14 @@
   "dependencies": {
     "@kilocode/db": "workspace:*",
     "@octokit/auth-app": "catalog:",
+    "@octokit/rest": "22.0.1",
     "drizzle-orm": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
     "@typescript/native-preview": "catalog:",
     "typescript": "catalog:",
+    "vitest": "catalog:",
     "wrangler": "catalog:"
   }
 }

@@ -2,7 +2,6 @@ import 'server-only';
 import { z } from 'zod';
 import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import * as discordService from '@/lib/integrations/discord-service';
-import { createOAuthState } from '@/lib/integrations/oauth-state';
 import { TRPCError } from '@trpc/server';
 import {
   resolveOwner,
@@ -11,11 +10,6 @@ import {
 } from '@/lib/integrations/resolve-owner';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
-import { validateReturnPath } from '@/lib/integrations/validate-return-path';
-
-const oauthUrlInput = z
-  .object({ organizationId: z.string().uuid().optional(), returnTo: z.string().optional() })
-  .optional();
 
 export const discordRouter = createTRPCRouter({
   // Get Discord installation status
@@ -45,21 +39,6 @@ export const discordRouter = createTRPCRouter({
         installedAt: integration.installed_at,
         modelSlug: metadata?.model_slug || null,
       },
-    };
-  }),
-
-  // Get OAuth URL for initiating Discord OAuth flow
-  getOAuthUrl: baseProcedure.input(oauthUrlInput).query(async ({ ctx, input }) => {
-    if (input?.organizationId) {
-      await ensureOrganizationAccess(ctx, input.organizationId);
-    }
-    const statePrefix = input?.organizationId
-      ? `org_${input.organizationId}`
-      : `user_${ctx.user.id}`;
-    const returnTo = input?.returnTo ? validateReturnPath(input.returnTo) : undefined;
-    const state = createOAuthState(statePrefix, ctx.user.id, returnTo ?? undefined);
-    return {
-      url: discordService.getDiscordOAuthUrl(state),
     };
   }),
 

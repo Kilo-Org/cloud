@@ -6,7 +6,7 @@ import type {
 } from '../execution/types.js';
 import { renderExecutionTurnContent } from '../execution/types.js';
 import { logger } from '../logger.js';
-import { CallbackTargetSchema, ImagesSchema, type Images } from '../persistence/schemas.js';
+import { AttachmentsSchema, CallbackTargetSchema } from '../persistence/schemas.js';
 import { Limits } from '../schema.js';
 import { MESSAGE_ID_FORMAT_DESCRIPTION, MESSAGE_ID_PATTERN } from './message-id.js';
 
@@ -28,21 +28,12 @@ const AgentSelectionSchema = z.object({
   model: z.string(),
   variant: z.string().optional(),
 });
-const SessionMessageIntentSchema = z.object({
-  turn: z.discriminatedUnion('type', [
-    z.object({
-      type: z.literal('prompt'),
-      messageId: z.string().regex(MESSAGE_ID_PATTERN, MESSAGE_ID_FORMAT_DESCRIPTION),
-      prompt: z.string(),
-      images: ImagesSchema.optional(),
-    }),
-    z.object({
-      type: z.literal('command'),
-      messageId: z.string().regex(MESSAGE_ID_PATTERN, MESSAGE_ID_FORMAT_DESCRIPTION),
-      command: z.string().min(1),
-      arguments: z.string(),
-    }),
-  ]),
+const PromptIntentTurnFields = {
+  type: z.literal('prompt'),
+  messageId: z.string().regex(MESSAGE_ID_PATTERN, MESSAGE_ID_FORMAT_DESCRIPTION),
+  prompt: z.string(),
+};
+const IntentEnvelopeFields = {
   agent: AgentSelectionSchema,
   finalization: z
     .object({
@@ -50,6 +41,20 @@ const SessionMessageIntentSchema = z.object({
       condenseOnComplete: z.boolean().optional(),
     })
     .optional(),
+};
+const SessionMessageIntentSchema = z.object({
+  turn: z.discriminatedUnion('type', [
+    z.object({ ...PromptIntentTurnFields, attachments: AttachmentsSchema.optional() }).strict(),
+    z
+      .object({
+        type: z.literal('command'),
+        messageId: z.string().regex(MESSAGE_ID_PATTERN, MESSAGE_ID_FORMAT_DESCRIPTION),
+        command: z.string().min(1),
+        arguments: z.string(),
+      })
+      .strict(),
+  ]),
+  ...IntentEnvelopeFields,
 });
 const PendingSessionMessageCallbackSnapshotSchema = z
   .object({
@@ -100,7 +105,6 @@ const LegacyPendingSessionMessageSchema = z
     role: z.literal('user'),
     content: z.string(),
     turn: LegacyPendingSessionMessageTurnSchema.optional(),
-    images: ImagesSchema.optional(),
     createdAt: z.number(),
     callbackUrl: z.string().optional(),
     callbackMetadata: z.unknown().optional(),
@@ -206,7 +210,6 @@ function decodeLegacyPendingMessage(
                 type: 'prompt',
                 messageId: message.messageId,
                 prompt: message.content,
-                images: message.images,
               },
         agent: { mode, model, variant },
         finalization:
@@ -280,7 +283,6 @@ export function createPendingSessionMessage(params: {
   role: 'user';
   content: string;
   turn?: z.infer<typeof LegacyPendingSessionMessageTurnSchema>;
-  images?: Images;
   createdAt: number;
   callbackUrl?: string;
   callbackMetadata?: unknown;

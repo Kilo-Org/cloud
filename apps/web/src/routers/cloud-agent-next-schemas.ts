@@ -1,5 +1,8 @@
 import * as z from 'zod';
 import {
+  CLOUD_AGENT_ATTACHMENT_ALLOWED_TYPES,
+  CLOUD_AGENT_ATTACHMENT_MAX_COUNT,
+  CLOUD_AGENT_ATTACHMENT_MAX_SIZE_BYTES,
   CLOUD_AGENT_IMAGE_ALLOWED_TYPES,
   CLOUD_AGENT_IMAGE_MAX_COUNT,
   CLOUD_AGENT_IMAGE_MAX_SIZE_BYTES,
@@ -30,6 +33,28 @@ export const cloudAgentGetImageUploadUrlSchema = z.object({
   contentType: z.enum(CLOUD_AGENT_IMAGE_ALLOWED_TYPES),
   contentLength: z.number().int().positive().max(CLOUD_AGENT_IMAGE_MAX_SIZE_BYTES),
 });
+
+const cloudAgentAttachmentFilenameSchema = z
+  .string()
+  .regex(
+    /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\.(?:png|jpg|jpeg|webp|gif|pdf|txt|md|csv)$/
+  );
+
+export const cloudAgentAttachmentsSchema = z.object({
+  path: z.uuid(),
+  files: z.array(cloudAgentAttachmentFilenameSchema).min(1).max(CLOUD_AGENT_ATTACHMENT_MAX_COUNT),
+});
+
+export const cloudAgentGetAttachmentUploadUrlSchema = z.object({
+  messageUuid: z.uuid(),
+  attachmentId: z.uuid(),
+  contentType: z.enum(CLOUD_AGENT_ATTACHMENT_ALLOWED_TYPES),
+  contentLength: z.number().int().positive().max(CLOUD_AGENT_ATTACHMENT_MAX_SIZE_BYTES),
+});
+
+function hasOnlyOneAttachmentField(data: { images?: unknown; attachments?: unknown }): boolean {
+  return data.images === undefined || data.attachments === undefined;
+}
 
 /**
  * Agent mode enum - all supported modes.
@@ -243,6 +268,7 @@ export const basePrepareSessionNextSchema = z
     autoInitiate: z.boolean().optional(),
     initialMessageId: messageIdNextSchema.optional(),
     initialPayload: sendMessageNextPayloadSchema.optional(),
+    attachments: cloudAgentAttachmentsSchema.optional(),
     images: cloudAgentImagesSchema,
     devcontainer: z.boolean().optional(),
   })
@@ -252,7 +278,11 @@ export const basePrepareSessionNextSchema = z
       message: 'Must provide either githubRepo or gitlabProject, but not both',
       path: ['githubRepo'],
     }
-  );
+  )
+  .refine(hasOnlyOneAttachmentField, {
+    message: 'Must not provide both attachments and images',
+    path: ['attachments'],
+  });
 
 // Output schema for prepareSession
 export const basePrepareSessionNextOutputSchema = z.object({
@@ -268,13 +298,19 @@ export const baseInitiateFromPreparedSessionNextSchema = z
   .strict();
 
 // Schema for sending a message (V2 - uses cloudAgentSessionId)
-export const baseSendMessageNextSchema = z.object({
-  cloudAgentSessionId: z.string(),
-  payload: sendMessageNextPayloadSchema,
-  autoCommit: z.boolean().optional(),
-  messageId: messageIdNextSchema.nullish(),
-  images: cloudAgentImagesSchema,
-});
+export const baseSendMessageNextSchema = z
+  .object({
+    cloudAgentSessionId: z.string(),
+    payload: sendMessageNextPayloadSchema,
+    autoCommit: z.boolean().optional(),
+    messageId: messageIdNextSchema.nullish(),
+    attachments: cloudAgentAttachmentsSchema.optional(),
+    images: cloudAgentImagesSchema,
+  })
+  .refine(hasOnlyOneAttachmentField, {
+    message: 'Must not provide both attachments and images',
+    path: ['attachments'],
+  });
 
 // Schema for interrupting a session
 export const baseInterruptSessionNextSchema = z.object({

@@ -31,6 +31,8 @@ import {
   KiloPassPaymentProvider,
   KiloPassIssuanceSource,
   KiloPassIssuanceItemKind,
+  KiloPassWelcomePromoPaymentFingerprintType,
+  KiloPassWelcomePromoEligibilityReason,
   KiloPassAuditLogAction,
   KiloPassAuditLogResult,
   KiloPassScheduledChangeStatus,
@@ -50,6 +52,10 @@ import {
   KiloClawTerminalRenewalFailureStatus,
   KiloClawTerminalRenewalFailureCode,
   KiloClawTerminalRenewalFailureResolutionActorType,
+  StripeEarlyFraudWarningOwnerClassification,
+  StripeEarlyFraudWarningCaseStatus,
+  StripeEarlyFraudWarningActionType,
+  StripeEarlyFraudWarningActionStatus,
   AffiliateProvider,
   AffiliateEventType,
   AffiliateEventDeliveryState,
@@ -137,6 +143,8 @@ export const SCHEMA_CHECK_ENUMS = {
   KiloPassPaymentProvider,
   KiloPassIssuanceSource,
   KiloPassIssuanceItemKind,
+  KiloPassWelcomePromoPaymentFingerprintType,
+  KiloPassWelcomePromoEligibilityReason,
   KiloPassAuditLogAction,
   KiloPassAuditLogResult,
   KiloPassScheduledChangeStatus,
@@ -152,6 +160,10 @@ export const SCHEMA_CHECK_ENUMS = {
   KiloClawTerminalRenewalFailureStatus,
   KiloClawTerminalRenewalFailureCode,
   KiloClawTerminalRenewalFailureResolutionActorType,
+  StripeEarlyFraudWarningOwnerClassification,
+  StripeEarlyFraudWarningCaseStatus,
+  StripeEarlyFraudWarningActionType,
+  StripeEarlyFraudWarningActionStatus,
   AffiliateProvider,
   AffiliateEventType,
   AffiliateEventDeliveryState,
@@ -473,6 +485,156 @@ export const pending_impact_sale_reversals = pgTable(
 );
 
 export type PendingImpactSaleReversal = typeof pending_impact_sale_reversals.$inferSelect;
+
+export const stripe_early_fraud_warning_cases = pgTable(
+  'stripe_early_fraud_warning_cases',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    stripe_early_fraud_warning_id: text().notNull(),
+    stripe_event_id: text().notNull(),
+    stripe_charge_id: text(),
+    stripe_payment_intent_id: text(),
+    stripe_customer_id: text(),
+    amount_minor_units: integer(),
+    currency: text(),
+    owner_classification: text().notNull().$type<StripeEarlyFraudWarningOwnerClassification>(),
+    kilo_user_id: text().references(() => kilocode_users.id, {
+      onDelete: 'set null',
+      onUpdate: 'cascade',
+    }),
+    organization_id: uuid().references(() => organizations.id, {
+      onDelete: 'set null',
+      onUpdate: 'cascade',
+    }),
+    status: text()
+      .notNull()
+      .$type<StripeEarlyFraudWarningCaseStatus>()
+      .default(StripeEarlyFraudWarningCaseStatus.Queued),
+    reason: text(),
+    failure_context: text(),
+    warning_created_at: timestamp({ withTimezone: true, mode: 'string' }),
+    contained_at: timestamp({ withTimezone: true, mode: 'string' }),
+    processing_started_at: timestamp({ withTimezone: true, mode: 'string' }),
+    completed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    review_required_at: timestamp({ withTimezone: true, mode: 'string' }),
+    remediated_at: timestamp({ withTimezone: true, mode: 'string' }),
+    dismissed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    unique('UQ_stripe_early_fraud_warning_cases_warning_id').on(
+      table.stripe_early_fraud_warning_id
+    ),
+    index('IDX_stripe_early_fraud_warning_cases_event_id').on(table.stripe_event_id),
+    index('IDX_stripe_early_fraud_warning_cases_charge_id').on(table.stripe_charge_id),
+    index('IDX_stripe_early_fraud_warning_cases_payment_intent_id').on(
+      table.stripe_payment_intent_id
+    ),
+    index('IDX_stripe_early_fraud_warning_cases_customer_id').on(table.stripe_customer_id),
+    index('IDX_stripe_early_fraud_warning_cases_kilo_user_id').on(table.kilo_user_id),
+    index('IDX_stripe_early_fraud_warning_cases_organization_id').on(table.organization_id),
+    index('IDX_stripe_early_fraud_warning_cases_status_created_at').on(
+      table.status,
+      table.created_at
+    ),
+    enumCheck(
+      'stripe_early_fraud_warning_cases_owner_classification_check',
+      table.owner_classification,
+      StripeEarlyFraudWarningOwnerClassification
+    ),
+    enumCheck(
+      'stripe_early_fraud_warning_cases_status_check',
+      table.status,
+      StripeEarlyFraudWarningCaseStatus
+    ),
+    check(
+      'stripe_early_fraud_warning_cases_amount_minor_units_non_negative_check',
+      sql`${table.amount_minor_units} IS NULL OR ${table.amount_minor_units} >= 0`
+    ),
+  ]
+);
+
+export type StripeEarlyFraudWarningCase = typeof stripe_early_fraud_warning_cases.$inferSelect;
+export type NewStripeEarlyFraudWarningCase = typeof stripe_early_fraud_warning_cases.$inferInsert;
+
+export const stripe_early_fraud_warning_actions = pgTable(
+  'stripe_early_fraud_warning_actions',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    case_id: uuid()
+      .notNull()
+      .references(() => stripe_early_fraud_warning_cases.id, {
+        onDelete: 'restrict',
+        onUpdate: 'cascade',
+      }),
+    action_type: text().notNull().$type<StripeEarlyFraudWarningActionType>(),
+    target_key: text().notNull(),
+    status: text()
+      .notNull()
+      .$type<StripeEarlyFraudWarningActionStatus>()
+      .default(StripeEarlyFraudWarningActionStatus.Queued),
+    attempt_count: integer().notNull().default(0),
+    next_retry_at: timestamp({ withTimezone: true, mode: 'string' }),
+    claimed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    last_attempt_at: timestamp({ withTimezone: true, mode: 'string' }),
+    completed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    terminal_at: timestamp({ withTimezone: true, mode: 'string' }),
+    result_code: text(),
+    result_reference_id: text(),
+    failure_context: text(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    unique('UQ_stripe_early_fraud_warning_actions_case_type_target').on(
+      table.case_id,
+      table.action_type,
+      table.target_key
+    ),
+    index('IDX_stripe_early_fraud_warning_actions_case_id').on(table.case_id),
+    index('IDX_stripe_early_fraud_warning_actions_claim_path').on(
+      table.status,
+      sql`coalesce(${table.next_retry_at}, '-infinity'::timestamptz)`,
+      table.created_at,
+      table.id
+    ),
+    enumCheck(
+      'stripe_early_fraud_warning_actions_action_type_check',
+      table.action_type,
+      StripeEarlyFraudWarningActionType
+    ),
+    enumCheck(
+      'stripe_early_fraud_warning_actions_status_check',
+      table.status,
+      StripeEarlyFraudWarningActionStatus
+    ),
+    check(
+      'stripe_early_fraud_warning_actions_attempt_count_non_negative_check',
+      sql`${table.attempt_count} >= 0`
+    ),
+    check(
+      'stripe_early_fraud_warning_actions_target_key_not_empty_check',
+      sql`length(${table.target_key}) > 0`
+    ),
+  ]
+);
+
+export type StripeEarlyFraudWarningAction = typeof stripe_early_fraud_warning_actions.$inferSelect;
+export type NewStripeEarlyFraudWarningAction =
+  typeof stripe_early_fraud_warning_actions.$inferInsert;
 
 export const deleted_user_email_tombstones = pgTable('deleted_user_email_tombstones', {
   normalized_email_hash: text().primaryKey().notNull(),
@@ -1293,6 +1455,7 @@ export const kilo_pass_issuances = pgTable(
     issue_month: date().notNull(),
     source: text().notNull().$type<KiloPassIssuanceSource>(),
     stripe_invoice_id: text(),
+    initial_welcome_promo_eligibility_reason: text().$type<KiloPassWelcomePromoEligibilityReason>(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()
@@ -1314,11 +1477,44 @@ export const kilo_pass_issuances = pgTable(
       sql`EXTRACT(DAY FROM ${table.issue_month}) = 1`
     ),
     enumCheck('kilo_pass_issuances_source_check', table.source, KiloPassIssuanceSource),
+    enumCheck(
+      'kilo_pass_issuances_initial_welcome_promo_reason_check',
+      table.initial_welcome_promo_eligibility_reason,
+      KiloPassWelcomePromoEligibilityReason
+    ),
   ]
 );
 
 export type KiloPassIssuance = typeof kilo_pass_issuances.$inferSelect;
 export type NewKiloPassIssuance = typeof kilo_pass_issuances.$inferInsert;
+
+export const kilo_pass_welcome_promo_payment_fingerprint_claims = pgTable(
+  'kilo_pass_welcome_promo_payment_fingerprint_claims',
+  {
+    stripe_payment_method_type: text()
+      .notNull()
+      .$type<KiloPassWelcomePromoPaymentFingerprintType>(),
+    stripe_fingerprint: text().notNull(),
+    source_stripe_invoice_id: text().notNull(),
+    claimed_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    primaryKey({ columns: [table.stripe_payment_method_type, table.stripe_fingerprint] }),
+    enumCheck(
+      'kilo_pass_welcome_promo_payment_fingerprint_claims_type_check',
+      table.stripe_payment_method_type,
+      KiloPassWelcomePromoPaymentFingerprintType
+    ),
+    unique('UQ_kilo_pass_welcome_promo_payment_fingerprint_claims_source_invoice_id').on(
+      table.source_stripe_invoice_id
+    ),
+  ]
+);
+
+export type KiloPassWelcomePromoPaymentFingerprintClaim =
+  typeof kilo_pass_welcome_promo_payment_fingerprint_claims.$inferSelect;
+export type NewKiloPassWelcomePromoPaymentFingerprintClaim =
+  typeof kilo_pass_welcome_promo_payment_fingerprint_claims.$inferInsert;
 
 export const kilo_pass_pause_events = pgTable(
   'kilo_pass_pause_events',
@@ -3072,6 +3268,11 @@ export const ModelStatsBenchmarksSchema = z
             avgCacheReadTokens: z.number().nullable(),
             avgExecutionMs: z.number().nullable(),
             nTotalTrials: z.number(),
+            nAttempts: z.number().nullable().optional(),
+            avgAttemptCostUsd: z.number().nullable().optional(),
+            avgAttemptInputTokens: z.number().nullable().optional(),
+            avgAttemptOutputTokens: z.number().nullable().optional(),
+            avgAttemptCacheReadTokens: z.number().nullable().optional(),
             nErrored: z.number(),
             lastPromotedAt: z.string(),
           })
@@ -3191,13 +3392,18 @@ export const model_eval_ingestions = pgTable(
     variant: text('variant'),
     task_source: text('task_source').notNull(),
     n_total_trials: integer('n_total_trials').notNull(),
+    n_attempts: integer('n_attempts'),
     total_score: decimal('total_score', { precision: 14, scale: 6, mode: 'number' }).notNull(),
     overall_score: decimal('overall_score', { precision: 12, scale: 8, mode: 'number' }).notNull(),
     n_errored: integer('n_errored').notNull(),
     avg_cost_microdollars: bigint('avg_cost_microdollars', { mode: 'number' }),
+    total_cost_microdollars: bigint('total_cost_microdollars', { mode: 'number' }),
     avg_input_tokens: integer('avg_input_tokens'),
+    total_input_tokens: bigint('total_input_tokens', { mode: 'number' }),
     avg_output_tokens: integer('avg_output_tokens'),
+    total_output_tokens: bigint('total_output_tokens', { mode: 'number' }),
     avg_cache_read_tokens: integer('avg_cache_read_tokens'),
+    total_cache_read_tokens: bigint('total_cache_read_tokens', { mode: 'number' }),
     avg_execution_ms: integer('avg_execution_ms'),
     promoted_at: timestamp('promoted_at', { withTimezone: true, mode: 'string' }).notNull(),
     promoted_by_email: text('promoted_by_email').notNull(),
@@ -4955,8 +5161,6 @@ export type NewCloudAgentFeedback = typeof cloud_agent_feedback.$inferInsert;
 
 // ─── KiloClaw (multi-tenant sandbox instances) ──────────────────────
 
-export type KiloClawComposioInstanceConfigSource = 'managed' | 'manual';
-
 export const kiloclaw_instances = pgTable(
   'kiloclaw_instances',
   {
@@ -4991,7 +5195,6 @@ export const kiloclaw_instances = pgTable(
     // set/clear, plus auto-cleared as part of a tier resize.
     // Shape: { size: { cpus, memory_mb, cpu_kind? }, reason, actorId, actorEmail, setAt }.
     admin_size_override: jsonb(),
-    composio_config_source: text().$type<KiloClawComposioInstanceConfigSource>(),
   },
   table => [
     // One active instance per user+sandbox combination.
@@ -5030,10 +5233,6 @@ export const kiloclaw_instances = pgTable(
     index('IDX_kiloclaw_instances_admin_size_override')
       .on(table.id)
       .where(sql`${table.admin_size_override} IS NOT NULL AND ${table.destroyed_at} IS NULL`),
-    check(
-      'kiloclaw_instances_composio_config_source_check',
-      sql`${table.composio_config_source} IS NULL OR ${table.composio_config_source} IN ('managed', 'manual')`
-    ),
   ]
 );
 
@@ -5106,69 +5305,6 @@ export const kiloclaw_google_oauth_connections = pgTable(
 export type KiloClawGoogleOAuthConnection = typeof kiloclaw_google_oauth_connections.$inferSelect;
 export type NewKiloClawGoogleOAuthConnection =
   typeof kiloclaw_google_oauth_connections.$inferInsert;
-
-export type KiloClawComposioIdentityOwnerType = 'user' | 'organization_user';
-export type KiloClawComposioIdentityStatus = 'pending' | 'active' | 'revoked';
-
-export const kiloclaw_composio_identities = pgTable(
-  'kiloclaw_composio_identities',
-  {
-    id: uuid()
-      .default(sql`gen_random_uuid()`)
-      .primaryKey()
-      .notNull(),
-    owner_type: text().$type<KiloClawComposioIdentityOwnerType>().notNull(),
-    user_id: text()
-      .notNull()
-      .references(() => kilocode_users.id),
-    organization_id: uuid().references(() => organizations.id),
-    status: text().$type<KiloClawComposioIdentityStatus>().default('pending').notNull(),
-    composio_agent_key_encrypted: text(),
-    composio_user_api_key_encrypted: text(),
-    composio_api_key_encrypted: text(),
-    composio_org_id: text(),
-    composio_org_name: text(),
-    composio_project_id: text(),
-    composio_consumer_user_id: text(),
-    google_calendar_connected_account_id: text(),
-    composio_agent_email: text(),
-    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-    updated_at: timestamp({ withTimezone: true, mode: 'string' })
-      .defaultNow()
-      .notNull()
-      .$onUpdateFn(() => sql`now()`),
-    revoked_at: timestamp({ withTimezone: true, mode: 'string' }),
-  },
-  table => [
-    uniqueIndex('UQ_kiloclaw_composio_identities_current_user')
-      .on(table.user_id)
-      .where(sql`${table.owner_type} = 'user' AND ${table.revoked_at} IS NULL`),
-    uniqueIndex('UQ_kiloclaw_composio_identities_current_org_user')
-      .on(table.organization_id, table.user_id)
-      .where(sql`${table.owner_type} = 'organization_user' AND ${table.revoked_at} IS NULL`),
-    index('IDX_kiloclaw_composio_identities_user').on(table.user_id),
-    index('IDX_kiloclaw_composio_identities_organization').on(table.organization_id),
-    check(
-      'kiloclaw_composio_identities_owner_type_check',
-      sql`${table.owner_type} IN ('user', 'organization_user')`
-    ),
-    check(
-      'kiloclaw_composio_identities_status_check',
-      sql`${table.status} IN ('pending', 'active', 'revoked')`
-    ),
-    check(
-      'kiloclaw_composio_identities_owner_scope_check',
-      sql`(${table.owner_type} = 'user' AND ${table.organization_id} IS NULL) OR (${table.owner_type} = 'organization_user' AND ${table.organization_id} IS NOT NULL)`
-    ),
-    check(
-      'kiloclaw_composio_identities_active_complete_check',
-      sql`${table.status} <> 'active' OR (${table.composio_agent_key_encrypted} IS NOT NULL AND ${table.composio_user_api_key_encrypted} IS NOT NULL AND ${table.composio_org_id} IS NOT NULL AND ${table.composio_project_id} IS NOT NULL AND ${table.composio_consumer_user_id} IS NOT NULL AND ${table.revoked_at} IS NULL)`
-    ),
-  ]
-);
-
-export type KiloClawComposioIdentity = typeof kiloclaw_composio_identities.$inferSelect;
-export type NewKiloClawComposioIdentity = typeof kiloclaw_composio_identities.$inferInsert;
 
 export const kiloclaw_inbound_email_reserved_aliases = pgTable(
   'kiloclaw_inbound_email_reserved_aliases',

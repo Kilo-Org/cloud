@@ -27,6 +27,7 @@ type KiloClawClientMock = {
   __restartGatewayProcessMock: AnyMock;
   __startMock: AnyMock;
   __stopMock: AnyMock;
+  __writeOpenclawConfigFileMock: AnyMock;
 };
 
 type KiloClawUserClientMock = {
@@ -73,6 +74,7 @@ jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => {
   const restartGatewayProcessMock = jest.fn();
   const startMock = jest.fn();
   const stopMock = jest.fn();
+  const writeOpenclawConfigFileMock = jest.fn();
   return {
     KiloClawInternalClient: jest.fn().mockImplementation(() => ({
       destroy: destroyMock,
@@ -81,6 +83,7 @@ jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => {
       restartGatewayProcess: restartGatewayProcessMock,
       start: startMock,
       stop: stopMock,
+      writeOpenclawConfigFile: writeOpenclawConfigFileMock,
     })),
     KiloClawApiError: class KiloClawApiError extends Error {
       statusCode: number;
@@ -97,6 +100,7 @@ jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => {
     __restartGatewayProcessMock: restartGatewayProcessMock,
     __startMock: startMock,
     __stopMock: stopMock,
+    __writeOpenclawConfigFileMock: writeOpenclawConfigFileMock,
   };
 });
 
@@ -458,6 +462,46 @@ describe('organizations.kiloclaw.patchWebSearchConfig', () => {
     });
 
     expect(kiloclawClientMock.__patchWebSearchConfigMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('organizations.kiloclaw.writeFile validation mode', () => {
+  beforeEach(async () => {
+    await cleanupDbForTest();
+    kiloclawClientMock.__writeOpenclawConfigFileMock.mockReset();
+  });
+
+  it('normalizes openclaw.json and forwards validation-aware saves', async () => {
+    const user = await insertTestUser({
+      google_user_email: `org-kiloclaw-write-file-${crypto.randomUUID()}@example.com`,
+    });
+    const organization = await createOrganization('Org KiloClaw File Write Test', user.id);
+    const instanceId = await createActiveOrgInstance(user.id, organization.id);
+    kiloclawClientMock.__writeOpenclawConfigFileMock.mockResolvedValue({
+      outcome: 'openclaw-validation-warning',
+      valid: false,
+      reason: 'invalid',
+      issues: [{ path: 'gateway.mode', message: 'Expected local' }],
+    });
+
+    const caller = await createCallerForUser(user.id);
+    await expect(
+      caller.organizations.kiloclaw.writeFile({
+        organizationId: organization.id,
+        path: 'openclaw.json',
+        content: '{"gateway":{"mode":"remote"}}',
+        etag: 'etag-1',
+        openclawValidation: 'warn-before-write',
+      })
+    ).resolves.toMatchObject({ outcome: 'openclaw-validation-warning', reason: 'invalid' });
+
+    expect(kiloclawClientMock.__writeOpenclawConfigFileMock).toHaveBeenCalledWith(
+      user.id,
+      '{\n  "gateway": {\n    "mode": "remote"\n  }\n}',
+      'etag-1',
+      instanceId,
+      'warn-before-write'
+    );
   });
 });
 

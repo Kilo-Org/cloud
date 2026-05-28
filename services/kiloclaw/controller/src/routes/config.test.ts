@@ -472,6 +472,15 @@ describe('/_kilo/config/read routes', () => {
     vi.resetAllMocks();
   });
 
+  it('rejects agent CRUD requests without auth through config middleware', async () => {
+    await test({
+      route: '/_kilo/config/agents',
+      expect: {
+        status: 401,
+      },
+    });
+  });
+
   it('rejects requests without auth', async () => {
     await test({
       route: '/_kilo/config/read',

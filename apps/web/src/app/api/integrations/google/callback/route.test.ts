@@ -2,7 +2,10 @@ import { beforeEach, describe, expect, test } from '@jest/globals';
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserFromAuth } from '@/lib/user/server';
 import { getInstanceById } from '@/lib/kiloclaw/instance-registry';
-import { exchangeGoogleOAuthCode } from '@/lib/integrations/google-service';
+import {
+  exchangeGoogleOAuthCode,
+  GoogleOAuthCapabilityScopesNotGrantedError,
+} from '@/lib/integrations/google-service';
 import { upsertKiloClawGoogleOAuthConnection } from '@/lib/kiloclaw/google-oauth-connections';
 import { verifyGoogleOAuthState } from '@/lib/integrations/google/oauth-state';
 import { captureException, captureMessage } from '@sentry/nextjs';
@@ -12,6 +15,15 @@ jest.mock('@/lib/user/server');
 const mockedEnsureOrganizationAccess = jest.fn();
 jest.mock('@/routers/organizations/utils', () => ({
   ensureOrganizationAccess: mockedEnsureOrganizationAccess,
+}));
+const mockedRequireKiloClawAccess = jest.fn();
+jest.mock('@/lib/kiloclaw/access-gate', () => ({
+  requireKiloClawAccess: mockedRequireKiloClawAccess,
+}));
+const mockedRequireOrganizationKiloClawComputeEntitlement = jest.fn();
+jest.mock('@/lib/organizations/trial-middleware', () => ({
+  requireOrganizationKiloClawComputeEntitlement:
+    mockedRequireOrganizationKiloClawComputeEntitlement,
 }));
 jest.mock('@/lib/kiloclaw/instance-registry');
 jest.mock('@/lib/integrations/google-service');
@@ -152,6 +164,29 @@ describe('GET /api/integrations/google/callback', () => {
     expectRedirectLocation(response, '/claw/new?step=calendar&error=access_denied');
   });
 
+  test('redirects missing Calendar permission back to onboarding without capturing an exception', async () => {
+    mockedVerifyGoogleOAuthState.mockReturnValue({
+      owner: { type: 'user', id: USER_ID },
+      userId: USER_ID,
+      instanceId: INSTANCE_ID,
+      capabilities: ['calendar_read'],
+      returnTo: '/claw/new?step=calendar',
+    });
+    mockedExchangeGoogleOAuthCode.mockRejectedValue(
+      new GoogleOAuthCapabilityScopesNotGrantedError()
+    );
+
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest('/api/integrations/google/callback?code=abc&state=signed') as never
+    );
+
+    expect(response.status).toBe(307);
+    expectRedirectLocation(response, '/claw/new?step=calendar&error=missing_permissions');
+    expect(mockedCaptureException).not.toHaveBeenCalled();
+    expect(mockedUpsertKiloClawGoogleOAuthConnection).not.toHaveBeenCalled();
+  });
+
   test('redirects personal success flow to personal claw settings', async () => {
     const { GET } = await import('./route');
     const response = await GET(
@@ -160,6 +195,8 @@ describe('GET /api/integrations/google/callback', () => {
 
     expect(response.status).toBe(307);
     expectRedirectLocation(response, '/claw/settings?success=google_connected');
+    expect(mockedRequireKiloClawAccess).toHaveBeenCalledWith(USER_ID);
+    expect(mockedRequireOrganizationKiloClawComputeEntitlement).not.toHaveBeenCalled();
     expect(mockedExchangeGoogleOAuthCode).toHaveBeenCalledWith('abc', ['calendar_read']);
     expect(mockedUpsertKiloClawGoogleOAuthConnection).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -176,6 +213,21 @@ describe('GET /api/integrations/google/callback', () => {
       }),
       INSTANCE_ID
     );
+  });
+
+  test('does not persist personal OAuth callback after KiloClaw access expires', async () => {
+    mockedRequireKiloClawAccess.mockRejectedValue(new Error('access denied'));
+
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest('/api/integrations/google/callback?code=abc&state=signed') as never
+    );
+
+    expect(response.status).toBe(307);
+    expectRedirectLocation(response, '/claw/settings?error=connection_failed');
+    expect(mockedExchangeGoogleOAuthCode).not.toHaveBeenCalled();
+    expect(mockedUpsertKiloClawGoogleOAuthConnection).not.toHaveBeenCalled();
+    expect(mockedCaptureException).toHaveBeenCalledWith(expect.any(Error), expect.any(Object));
   });
 
   test('redirects org success flow to org claw settings', async () => {
@@ -203,6 +255,8 @@ describe('GET /api/integrations/google/callback', () => {
       `/organizations/${ORG_ID}/claw/settings?success=google_connected`
     );
     expect(mockedEnsureOrganizationAccess).toHaveBeenCalledWith({ user: { id: USER_ID } }, ORG_ID);
+    expect(mockedRequireOrganizationKiloClawComputeEntitlement).toHaveBeenCalledWith(ORG_ID);
+    expect(mockedRequireKiloClawAccess).not.toHaveBeenCalled();
   });
 
   test('allows different org admin than instance creator to complete callback', async () => {

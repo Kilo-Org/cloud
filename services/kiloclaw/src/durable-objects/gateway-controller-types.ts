@@ -234,6 +234,26 @@ export const OpenclawConfigResponseSchema = z.object({
   etag: z.string(),
 });
 
+export const OpenclawFileWriteValidationSchema = z.enum(['warn-before-write', 'allow-invalid']);
+export type OpenclawFileWriteValidation = z.infer<typeof OpenclawFileWriteValidationSchema>;
+
+const OpenclawValidationIssueSchema = z.object({
+  path: z.string(),
+  message: z.string(),
+  allowedValues: z.array(z.string()).optional(),
+});
+
+export const FileWriteResponseSchema = z.union([
+  z.object({ etag: z.string() }),
+  z.object({
+    outcome: z.literal('openclaw-validation-warning'),
+    valid: z.literal(false),
+    reason: z.enum(['invalid', 'validation-unavailable']),
+    issues: z.array(OpenclawValidationIssueSchema),
+  }),
+]);
+export type FileWriteResponse = z.infer<typeof FileWriteResponseSchema>;
+
 // ──────────────────────────────────────────────────────────────────────
 // Controller pairing responses
 //

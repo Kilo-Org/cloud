@@ -38,7 +38,36 @@ describe('gitlab oauth state', () => {
     });
   });
 
-  test('round-trips a safe return path', () => {
+  test('round-trips a validated return path', () => {
+    const state = createGitLabOAuthState(
+      {
+        owner: { type: 'user', id: 'user_123' },
+        returnTo: '/claw/new?step=gitlab',
+      },
+      'user_123'
+    );
+
+    expect(verifyGitLabOAuthState(state)).toEqual({
+      owner: { type: 'user', id: 'user_123' },
+      instanceUrl: DEFAULT_GITLAB_OAUTH_INSTANCE_URL,
+      returnTo: '/claw/new?step=gitlab',
+      userId: 'user_123',
+    });
+  });
+
+  test('rejects invalid return paths', () => {
+    const state = createGitLabOAuthState(
+      {
+        owner: { type: 'user', id: 'user_123' },
+        returnTo: 'https://evil.example.com/path',
+      },
+      'user_123'
+    );
+
+    expect(verifyGitLabOAuthState(state)).toBeNull();
+  });
+
+  test('round-trips a collab return path', () => {
     const state = createGitLabOAuthState(
       {
         owner: { type: 'user', id: 'user_123' },

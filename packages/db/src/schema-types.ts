@@ -37,6 +37,23 @@ export enum KiloPassIssuanceItemKind {
   ReferralBonus = 'referral_bonus',
 }
 
+export enum KiloPassWelcomePromoPaymentFingerprintType {
+  Card = 'card',
+  SepaDebit = 'sepa_debit',
+  UsBankAccount = 'us_bank_account',
+  BacsDebit = 'bacs_debit',
+  AuBecsDebit = 'au_becs_debit',
+}
+
+export enum KiloPassWelcomePromoEligibilityReason {
+  FirstPaymentFingerprintClaim = 'first_payment_fingerprint_claim',
+  FingerprintPreviouslyClaimed = 'fingerprint_previously_claimed',
+  MissingFingerprint = 'missing_fingerprint',
+  NoSupportedFingerprint = 'no_supported_fingerprint',
+  NoPositiveSettlement = 'no_positive_settlement',
+  SettlementUnresolved = 'settlement_unresolved',
+}
+
 export enum KiloPassAuditLogAction {
   StripeWebhookReceived = 'stripe_webhook_received',
   KiloPassInvoicePaidHandled = 'kilo_pass_invoice_paid_handled',
@@ -247,6 +264,57 @@ export const KiloClawSubscriptionChangeAction = {
 
 export type KiloClawSubscriptionChangeAction =
   (typeof KiloClawSubscriptionChangeAction)[keyof typeof KiloClawSubscriptionChangeAction];
+
+export const StripeEarlyFraudWarningOwnerClassification = {
+  Personal: 'personal',
+  Organization: 'organization',
+  Ambiguous: 'ambiguous',
+  Unmatched: 'unmatched',
+} as const;
+
+export type StripeEarlyFraudWarningOwnerClassification =
+  (typeof StripeEarlyFraudWarningOwnerClassification)[keyof typeof StripeEarlyFraudWarningOwnerClassification];
+
+export const StripeEarlyFraudWarningCaseStatus = {
+  Queued: 'queued',
+  Contained: 'contained',
+  Processing: 'processing',
+  Completed: 'completed',
+  ReviewRequired: 'review_required',
+  Failed: 'failed',
+  Remediated: 'remediated',
+  Dismissed: 'dismissed',
+} as const;
+
+export type StripeEarlyFraudWarningCaseStatus =
+  (typeof StripeEarlyFraudWarningCaseStatus)[keyof typeof StripeEarlyFraudWarningCaseStatus];
+
+export const StripeEarlyFraudWarningActionType = {
+  Containment: 'containment',
+  Refund: 'refund',
+  PaymentValueClawback: 'payment_value_clawback',
+  SubscriptionTermination: 'subscription_termination',
+  AccessTermination: 'access_termination',
+  KiloClawSuspension: 'kiloclaw_suspension',
+  AffiliatePayoutReversal: 'affiliate_payout_reversal',
+  ReferralRewardReversal: 'referral_reward_reversal',
+  UserNotice: 'user_notice',
+} as const;
+
+export type StripeEarlyFraudWarningActionType =
+  (typeof StripeEarlyFraudWarningActionType)[keyof typeof StripeEarlyFraudWarningActionType];
+
+export const StripeEarlyFraudWarningActionStatus = {
+  Queued: 'queued',
+  Processing: 'processing',
+  Completed: 'completed',
+  Failed: 'failed',
+  ReviewRequired: 'review_required',
+  Dismissed: 'dismissed',
+} as const;
+
+export type StripeEarlyFraudWarningActionStatus =
+  (typeof StripeEarlyFraudWarningActionStatus)[keyof typeof StripeEarlyFraudWarningActionStatus];
 
 export const AffiliateProvider = {
   Impact: 'impact',
@@ -775,6 +843,7 @@ export const GatewayApiKindSchema = z.enum([
   'chat_completions',
   'embeddings',
   'fim_completions',
+  'edit_completions',
   'messages',
   'responses',
   'audio_transcriptions',
@@ -1111,24 +1180,6 @@ export const OpenCodeSettingsSchema = z.object({
 
 export type OpenCodeSettings = z.infer<typeof OpenCodeSettingsSchema>;
 
-export const OpenClawApiAdapterSchema = z.enum([
-  'openai-completions',
-  'openai-responses',
-  'anthropic-messages',
-]);
-
-export type OpenClawApiAdapter = z.infer<typeof OpenClawApiAdapterSchema>;
-
-export const OpenClawModelSettingsSchema = z.object({
-  api_adapter: OpenClawApiAdapterSchema.optional(),
-});
-
-export type OpenClawModelSettings = z.infer<typeof OpenClawModelSettingsSchema>;
-
-export const InterleavedFormatSchema = z.enum(['reasoning_content', 'think']);
-
-export type InterleavedFormat = z.infer<typeof InterleavedFormatSchema>;
-
 export const CustomLlmExtraBodySchema = z.record(z.string(), z.any());
 
 export type CustomLlmExtraBody = z.infer<typeof CustomLlmExtraBodySchema>;
@@ -1163,7 +1214,6 @@ export const CustomLlmDefinitionSchema = z.object({
   extra_body: CustomLlmExtraBodySchema.optional(),
   remove_from_body: z.array(z.string()).optional(),
   opencode_settings: OpenCodeSettingsSchema.optional(),
-  openclaw_settings: OpenClawModelSettingsSchema.optional(),
   pricing: CustomLlmPricingSchema.optional(),
 });
 

@@ -53,6 +53,9 @@ jest.mock(
   }),
   { virtual: true }
 );
+jest.mock('@/lib/ai-gateway/abuse-service', () => ({
+  reportEvents: jest.fn(async () => undefined),
+}));
 import {
   type StripeTopupMetadata,
   ensurePaymentMethodStored,
@@ -71,11 +74,14 @@ import {
   kilocode_users,
   auto_top_up_configs,
   pending_impact_sale_reversals,
+  stripe_early_fraud_warning_actions,
+  stripe_early_fraud_warning_cases,
   user_affiliate_attributions,
   user_affiliate_events,
 } from '@kilocode/db/schema';
 import { db, auto_deleted_at } from '@/lib/drizzle';
 import { insertTestUser } from '@/tests/helpers/user.helper';
+import { softDeleteUser } from '@/lib/user';
 import { createTestPaymentMethod } from '@/tests/helpers/payment-method.helper';
 import { eq, and, count } from 'drizzle-orm';
 import type Stripe from 'stripe';
@@ -91,6 +97,9 @@ import type * as kiloPassStripeHandlersModule from '@/lib/kilo-pass/stripe-handl
 import { cleanupDbForTest } from '@/lib/drizzle';
 import { processTopUp } from '@/lib/credits';
 import { processTopupForOrganization } from '@/lib/organizations/organization-billing';
+import { reportEvents } from '@/lib/ai-gateway/abuse-service';
+
+const reportEventsMock = jest.mocked(reportEvents);
 
 const sampleStripePaymentMethod = (): Stripe.PaymentMethod => ({
   id: `pm_test_${Math.random().toString(36).substring(7)}`,
@@ -263,6 +272,109 @@ const sampleStripeDispute = (
     ...rest,
   };
 };
+
+const sampleStripeCharge = (
+  overrides: Partial<Stripe.Charge> & Pick<Stripe.Charge, 'id'>
+): Stripe.Charge => {
+  const { id, ...rest } = overrides;
+
+  return {
+    id,
+    object: 'charge',
+    amount: 1000,
+    amount_captured: 0,
+    amount_refunded: 0,
+    application: null,
+    application_fee: null,
+    application_fee_amount: null,
+    balance_transaction: null,
+    billing_details: {
+      address: null,
+      email: null,
+      name: null,
+      phone: null,
+      tax_id: null,
+    },
+    calculated_statement_descriptor: null,
+    captured: false,
+    created: 1712743200,
+    currency: 'usd',
+    customer: null,
+    description: null,
+    disputed: false,
+    failure_balance_transaction: null,
+    failure_code: null,
+    failure_message: null,
+    fraud_details: {},
+    livemode: false,
+    metadata: {},
+    on_behalf_of: null,
+    outcome: null,
+    paid: false,
+    payment_intent: null,
+    payment_method: null,
+    payment_method_details: null,
+    receipt_email: null,
+    receipt_number: null,
+    receipt_url: null,
+    refunded: false,
+    refunds: { object: 'list', data: [], has_more: false, url: '' },
+    review: null,
+    shipping: null,
+    source: null,
+    source_transfer: null,
+    statement_descriptor: null,
+    statement_descriptor_suffix: null,
+    status: 'failed',
+    transfer_data: null,
+    transfer_group: null,
+    ...rest,
+  } as Stripe.Charge;
+};
+
+const sampleStripeChargeResponse = (
+  charge: Stripe.Charge,
+  overrides: Record<string, unknown> = {}
+): Stripe.Response<Stripe.Charge> =>
+  ({
+    ...charge,
+    ...overrides,
+    lastResponse: { headers: {}, requestId: 'req_test', statusCode: 200 },
+  }) as Stripe.Response<Stripe.Charge>;
+
+function sampleEarlyFraudWarningEvent(params: {
+  eventId: string;
+  warningId: string;
+  charge: string | null;
+  paymentIntent?: string | null;
+}): Stripe.Event {
+  return {
+    ...baseStripeEvent(),
+    id: params.eventId,
+    data: {
+      object: {
+        id: params.warningId,
+        object: 'radar.early_fraud_warning',
+        actionable: true,
+        charge: params.charge,
+        created: 1234567890,
+        fraud_type: 'stolen_card',
+        livemode: false,
+        payment_intent: params.paymentIntent ?? null,
+      },
+      previous_attributes: {},
+    },
+    type: 'radar.early_fraud_warning.created',
+  } as unknown as Stripe.Event;
+}
+
+async function waitForReportEventsCall() {
+  for (let attempt = 0; attempt < 10; attempt++) {
+    if (reportEventsMock.mock.calls.length > 0) return;
+    await new Promise(resolve => setImmediate(resolve));
+  }
+  throw new Error('Timed out waiting for reportEvents to be called');
+}
 
 describe('ensurePaymentMethodStored', () => {
   let testUser: User;
@@ -528,6 +640,7 @@ describe('processStripePaymentEventHook', () => {
   let mockStripePaymentMethod: Stripe.PaymentMethod;
 
   beforeEach(async () => {
+    reportEventsMock.mockClear();
     testUser = await insertTestUser();
     mockStripePaymentMethod = sampleStripePaymentMethod();
     mockStripePaymentMethod.customer = testUser.stripe_customer_id!;
@@ -619,11 +732,17 @@ describe('processStripePaymentEventHook', () => {
     expect(storedPaymentMethod[0].deleted_at).not.toBeNull();
   });
 
-  test('should handle payment_intent.succeeded event by ignoring it', async () => {
+  test('payment_intent.succeeded reports customer and amount to abuse service', async () => {
+    const paymentIntent = sampleStripePaymentIntent();
+    paymentIntent.customer = testUser.stripe_customer_id;
+    paymentIntent.amount = 1500;
+    paymentIntent.amount_received = 1400;
+
     const event: Stripe.Event = {
       ...baseStripeEvent(),
+      id: 'evt_payment_intent_succeeded',
       data: {
-        object: sampleStripePaymentIntent(),
+        object: paymentIntent,
         previous_attributes: {},
       },
       type: 'payment_intent.succeeded',
@@ -636,6 +755,581 @@ describe('processStripePaymentEventHook', () => {
     });
 
     expect(paymentMethodExists).toBeUndefined();
+    expect(reportEventsMock).toHaveBeenCalledWith({
+      events: [
+        {
+          type: 'stripe.payment_intent.succeeded',
+          occurred_at: 1234567890000,
+          data: {
+            id: 'evt_payment_intent_succeeded',
+            type: 'payment_intent.succeeded',
+            payment_intent: 'pi_test_123',
+            customer: testUser.stripe_customer_id,
+            amount: 1400,
+          },
+        },
+      ],
+    });
+  });
+
+  test('charge.failed reports customer and decline code to abuse service', async () => {
+    const event: Stripe.Event = {
+      ...baseStripeEvent(),
+      id: 'evt_charge_failed',
+      data: {
+        object: sampleStripeCharge({
+          id: 'ch_failed_123',
+          customer: testUser.stripe_customer_id,
+          outcome: {
+            advice_code: null,
+            network_advice_code: null,
+            network_decline_code: null,
+            network_status: 'declined_by_network',
+            reason: 'insufficient_funds',
+            risk_level: 'normal',
+            risk_score: 12,
+            seller_message: 'The bank returned the decline code `insufficient_funds`.',
+            type: 'issuer_declined',
+          },
+        }),
+        previous_attributes: {},
+      },
+      type: 'charge.failed',
+    };
+
+    await processStripePaymentEventHook(event);
+
+    expect(reportEventsMock).toHaveBeenCalledWith({
+      events: [
+        {
+          type: 'stripe.charge.failed',
+          occurred_at: 1234567890000,
+          data: {
+            id: 'evt_charge_failed',
+            type: 'charge.failed',
+            charge: 'ch_failed_123',
+            customer: testUser.stripe_customer_id,
+            decline_code: 'insufficient_funds',
+          },
+        },
+      ],
+    });
+  });
+
+  test('radar.early_fraud_warning.created persists a personal observation and preserves abuse telemetry', async () => {
+    await cleanupDbForTest();
+    testUser = await insertTestUser();
+    const { client } = await import('@/lib/stripe-client');
+    const retrieveSpy = jest.spyOn(client.charges, 'retrieve').mockResolvedValue(
+      sampleStripeChargeResponse(
+        sampleStripeCharge({
+          id: 'ch_radar_123',
+          amount: 1900,
+          currency: 'usd',
+          customer: testUser.stripe_customer_id,
+          payment_intent: 'pi_radar_123',
+        })
+      )
+    );
+
+    await processStripePaymentEventHook(
+      sampleEarlyFraudWarningEvent({
+        eventId: 'evt_radar_warning',
+        warningId: 'issfr_123',
+        charge: 'ch_radar_123',
+      })
+    );
+    await waitForReportEventsCall();
+
+    const [fraudCase] = await db.select().from(stripe_early_fraud_warning_cases);
+    const actions = await db.select().from(stripe_early_fraud_warning_actions);
+    expect(fraudCase).toEqual(
+      expect.objectContaining({
+        stripe_early_fraud_warning_id: 'issfr_123',
+        stripe_event_id: 'evt_radar_warning',
+        stripe_charge_id: 'ch_radar_123',
+        stripe_payment_intent_id: 'pi_radar_123',
+        stripe_customer_id: testUser.stripe_customer_id,
+        amount_minor_units: 1900,
+        currency: 'usd',
+        owner_classification: 'personal',
+        kilo_user_id: testUser.id,
+        organization_id: null,
+        status: 'review_required',
+        reason: 'Observation only: canonical personal owner matched; manual review required',
+      })
+    );
+    expect(fraudCase.review_required_at).not.toBeNull();
+    expect(actions).toHaveLength(0);
+    expect(retrieveSpy).toHaveBeenCalledTimes(1);
+    expect(retrieveSpy).toHaveBeenCalledWith('ch_radar_123');
+    expect(reportEventsMock).toHaveBeenCalledWith({
+      events: [
+        {
+          type: 'stripe.radar.early_fraud_warning.created',
+          occurred_at: 1234567890000,
+          data: {
+            id: 'evt_radar_warning',
+            type: 'radar.early_fraud_warning.created',
+            charge: 'ch_radar_123',
+            customer: testUser.stripe_customer_id,
+            payment_intent: 'pi_radar_123',
+            early_fraud_warning: 'issfr_123',
+          },
+        },
+      ],
+    });
+
+    retrieveSpy.mockRestore();
+  });
+
+  test('radar.early_fraud_warning.created does not link a new case to a soft-deleted user', async () => {
+    await cleanupDbForTest();
+    testUser = await insertTestUser();
+    await softDeleteUser(testUser.id);
+    const { client } = await import('@/lib/stripe-client');
+    const retrieveSpy = jest.spyOn(client.charges, 'retrieve').mockResolvedValue(
+      sampleStripeChargeResponse(
+        sampleStripeCharge({
+          id: 'ch_deleted_customer',
+          customer: testUser.stripe_customer_id,
+        })
+      )
+    );
+
+    await processStripePaymentEventHook(
+      sampleEarlyFraudWarningEvent({
+        eventId: 'evt_deleted_customer',
+        warningId: 'issfr_deleted_customer',
+        charge: 'ch_deleted_customer',
+      })
+    );
+
+    const [fraudCase] = await db.select().from(stripe_early_fraud_warning_cases);
+    expect(fraudCase).toEqual(
+      expect.objectContaining({
+        stripe_customer_id: testUser.stripe_customer_id,
+        owner_classification: 'unmatched',
+        kilo_user_id: null,
+        status: 'review_required',
+        reason: 'No canonical customer owner matched; manual review required',
+      })
+    );
+    expect(await db.select().from(stripe_early_fraud_warning_actions)).toHaveLength(0);
+
+    retrieveSpy.mockRestore();
+  });
+
+  test('radar.early_fraud_warning.created does not link a case during concurrent soft deletion', async () => {
+    await cleanupDbForTest();
+    testUser = await insertTestUser();
+    const { client } = await import('@/lib/stripe-client');
+    const retrieveSpy = jest.spyOn(client.charges, 'retrieve').mockResolvedValue(
+      sampleStripeChargeResponse(
+        sampleStripeCharge({
+          id: 'ch_deleting_customer',
+          customer: testUser.stripe_customer_id,
+        })
+      )
+    );
+    let observationPromise: Promise<void> | null = null;
+
+    await db.transaction(async tx => {
+      await tx
+        .update(kilocode_users)
+        .set({ blocked_reason: 'soft-deleted at 2026-05-28T12:00:00.000Z' })
+        .where(eq(kilocode_users.id, testUser.id));
+      observationPromise = processStripePaymentEventHook(
+        sampleEarlyFraudWarningEvent({
+          eventId: 'evt_deleting_customer',
+          warningId: 'issfr_deleting_customer',
+          charge: 'ch_deleting_customer',
+        })
+      );
+      await new Promise(resolve => setImmediate(resolve));
+    });
+
+    if (!observationPromise) {
+      throw new Error('Observation did not start during deletion transaction');
+    }
+    await observationPromise;
+
+    const [fraudCase] = await db.select().from(stripe_early_fraud_warning_cases);
+    expect(fraudCase).toEqual(
+      expect.objectContaining({
+        stripe_customer_id: testUser.stripe_customer_id,
+        owner_classification: 'unmatched',
+        kilo_user_id: null,
+        status: 'review_required',
+      })
+    );
+    expect(await db.select().from(stripe_early_fraud_warning_actions)).toHaveLength(0);
+
+    retrieveSpy.mockRestore();
+  });
+
+  test('radar.early_fraud_warning.created deduplicates repeated delivery without creating actions', async () => {
+    await cleanupDbForTest();
+    testUser = await insertTestUser();
+    const { client } = await import('@/lib/stripe-client');
+    const retrieveSpy = jest
+      .spyOn(client.charges, 'retrieve')
+      .mockResolvedValue(
+        sampleStripeChargeResponse(
+          sampleStripeCharge({ id: 'ch_duplicate', customer: testUser.stripe_customer_id })
+        )
+      );
+
+    await processStripePaymentEventHook(
+      sampleEarlyFraudWarningEvent({
+        eventId: 'evt_duplicate_first',
+        warningId: 'issfr_duplicate',
+        charge: 'ch_duplicate',
+      })
+    );
+    await processStripePaymentEventHook(
+      sampleEarlyFraudWarningEvent({
+        eventId: 'evt_duplicate_second',
+        warningId: 'issfr_duplicate',
+        charge: 'ch_duplicate',
+      })
+    );
+
+    const fraudCases = await db.select().from(stripe_early_fraud_warning_cases);
+    const actions = await db.select().from(stripe_early_fraud_warning_actions);
+    expect(fraudCases).toHaveLength(1);
+    expect(fraudCases[0]).toEqual(
+      expect.objectContaining({
+        stripe_event_id: 'evt_duplicate_first',
+        stripe_early_fraud_warning_id: 'issfr_duplicate',
+        status: 'review_required',
+      })
+    );
+    expect(actions).toHaveLength(0);
+    expect(retrieveSpy).toHaveBeenCalledTimes(2);
+
+    retrieveSpy.mockRestore();
+  });
+
+  test('radar.early_fraud_warning.created classifies organization ownership for review only', async () => {
+    await cleanupDbForTest();
+    const [organization] = await db
+      .insert(organizations)
+      .values({ name: 'Warning Review Organization', stripe_customer_id: 'cus_efw_organization' })
+      .returning();
+    const { client } = await import('@/lib/stripe-client');
+    const retrieveSpy = jest
+      .spyOn(client.charges, 'retrieve')
+      .mockResolvedValue(
+        sampleStripeChargeResponse(
+          sampleStripeCharge({ id: 'ch_organization', customer: 'cus_efw_organization' })
+        )
+      );
+
+    await processStripePaymentEventHook(
+      sampleEarlyFraudWarningEvent({
+        eventId: 'evt_organization',
+        warningId: 'issfr_organization',
+        charge: 'ch_organization',
+      })
+    );
+
+    const [fraudCase] = await db.select().from(stripe_early_fraud_warning_cases);
+    expect(fraudCase).toEqual(
+      expect.objectContaining({
+        owner_classification: 'organization',
+        kilo_user_id: null,
+        organization_id: organization.id,
+        status: 'review_required',
+        reason: 'Organization-owned warning; manual review required',
+      })
+    );
+    expect(await db.select().from(stripe_early_fraud_warning_actions)).toHaveLength(0);
+
+    retrieveSpy.mockRestore();
+  });
+
+  test('radar.early_fraud_warning.created retains ambiguous customer ownership without owner links', async () => {
+    await cleanupDbForTest();
+    testUser = await insertTestUser({ stripe_customer_id: 'cus_efw_shared' });
+    await db
+      .insert(organizations)
+      .values({ name: 'Shared Customer Organization', stripe_customer_id: 'cus_efw_shared' });
+    const { client } = await import('@/lib/stripe-client');
+    const retrieveSpy = jest
+      .spyOn(client.charges, 'retrieve')
+      .mockResolvedValue(
+        sampleStripeChargeResponse(
+          sampleStripeCharge({ id: 'ch_shared', customer: 'cus_efw_shared' })
+        )
+      );
+
+    await processStripePaymentEventHook(
+      sampleEarlyFraudWarningEvent({
+        eventId: 'evt_ambiguous',
+        warningId: 'issfr_ambiguous',
+        charge: 'ch_shared',
+      })
+    );
+
+    const [fraudCase] = await db.select().from(stripe_early_fraud_warning_cases);
+    expect(fraudCase).toEqual(
+      expect.objectContaining({
+        owner_classification: 'ambiguous',
+        kilo_user_id: null,
+        organization_id: null,
+        status: 'review_required',
+        reason: 'Canonical customer ownership is ambiguous; manual review required',
+      })
+    );
+    expect(await db.select().from(stripe_early_fraud_warning_actions)).toHaveLength(0);
+
+    retrieveSpy.mockRestore();
+  });
+
+  test('radar.early_fraud_warning.created retains an already disputed charge for manual review', async () => {
+    await cleanupDbForTest();
+    testUser = await insertTestUser();
+    const { client } = await import('@/lib/stripe-client');
+    const retrieveSpy = jest.spyOn(client.charges, 'retrieve').mockResolvedValue(
+      sampleStripeChargeResponse(
+        sampleStripeCharge({
+          id: 'ch_disputed_warning',
+          customer: testUser.stripe_customer_id,
+          disputed: true,
+        })
+      )
+    );
+
+    await processStripePaymentEventHook(
+      sampleEarlyFraudWarningEvent({
+        eventId: 'evt_disputed_warning',
+        warningId: 'issfr_disputed_warning',
+        charge: 'ch_disputed_warning',
+      })
+    );
+
+    const [fraudCase] = await db.select().from(stripe_early_fraud_warning_cases);
+    expect(fraudCase).toEqual(
+      expect.objectContaining({
+        owner_classification: 'personal',
+        kilo_user_id: testUser.id,
+        status: 'review_required',
+        reason: 'Warned charge is already disputed; manual review required',
+      })
+    );
+    expect(await db.select().from(stripe_early_fraud_warning_actions)).toHaveLength(0);
+
+    retrieveSpy.mockRestore();
+  });
+
+  test('radar.early_fraud_warning.created retains unmatched and malformed warnings for review', async () => {
+    await cleanupDbForTest();
+    const { client } = await import('@/lib/stripe-client');
+    const retrieveSpy = jest
+      .spyOn(client.charges, 'retrieve')
+      .mockResolvedValue(
+        sampleStripeChargeResponse(
+          sampleStripeCharge({ id: 'ch_unmatched', customer: 'cus_unknown' })
+        )
+      );
+
+    await processStripePaymentEventHook(
+      sampleEarlyFraudWarningEvent({
+        eventId: 'evt_unmatched',
+        warningId: 'issfr_unmatched',
+        charge: 'ch_unmatched',
+      })
+    );
+    await processStripePaymentEventHook(
+      sampleEarlyFraudWarningEvent({
+        eventId: 'evt_malformed',
+        warningId: 'issfr_malformed',
+        charge: null,
+      })
+    );
+
+    const fraudCases = await db
+      .select()
+      .from(stripe_early_fraud_warning_cases)
+      .orderBy(stripe_early_fraud_warning_cases.stripe_early_fraud_warning_id);
+    expect(fraudCases).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          stripe_early_fraud_warning_id: 'issfr_unmatched',
+          owner_classification: 'unmatched',
+          reason: 'No canonical customer owner matched; manual review required',
+        }),
+        expect.objectContaining({
+          stripe_early_fraud_warning_id: 'issfr_malformed',
+          stripe_charge_id: null,
+          owner_classification: 'unmatched',
+          reason: 'Warning does not identify a charge; manual review required',
+        }),
+      ])
+    );
+    expect(fraudCases.every(fraudCase => fraudCase.status === 'review_required')).toBe(true);
+    expect(await db.select().from(stripe_early_fraud_warning_actions)).toHaveLength(0);
+    expect(retrieveSpy).toHaveBeenCalledTimes(1);
+
+    retrieveSpy.mockRestore();
+  });
+
+  test('radar.early_fraud_warning.created records retrieval failures as safe review cases', async () => {
+    await cleanupDbForTest();
+    const { client } = await import('@/lib/stripe-client');
+    const retrieveSpy = jest
+      .spyOn(client.charges, 'retrieve')
+      .mockRejectedValue(new Error('Temporary Stripe retrieval failure'));
+
+    await processStripePaymentEventHook(
+      sampleEarlyFraudWarningEvent({
+        eventId: 'evt_retrieval_failed',
+        warningId: 'issfr_retrieval_failed',
+        charge: 'ch_retrieval_failed',
+        paymentIntent: 'pi_retrieval_failed',
+      })
+    );
+    await waitForReportEventsCall();
+
+    const [fraudCase] = await db.select().from(stripe_early_fraud_warning_cases);
+    expect(fraudCase).toEqual(
+      expect.objectContaining({
+        stripe_charge_id: 'ch_retrieval_failed',
+        stripe_payment_intent_id: 'pi_retrieval_failed',
+        stripe_customer_id: null,
+        owner_classification: 'unmatched',
+        status: 'review_required',
+        reason: 'Charge context retrieval failed; manual review required',
+        failure_context: 'Stripe charge retrieval failed during warning observation',
+      })
+    );
+    expect(await db.select().from(stripe_early_fraud_warning_actions)).toHaveLength(0);
+    expect(retrieveSpy).toHaveBeenCalledTimes(1);
+    expect(reportEventsMock).toHaveBeenCalledWith({
+      events: [
+        {
+          type: 'stripe.radar.early_fraud_warning.created',
+          occurred_at: 1234567890000,
+          data: {
+            id: 'evt_retrieval_failed',
+            type: 'radar.early_fraud_warning.created',
+            charge: 'ch_retrieval_failed',
+            payment_intent: 'pi_retrieval_failed',
+            early_fraud_warning: 'issfr_retrieval_failed',
+          },
+        },
+      ],
+    });
+
+    retrieveSpy.mockRestore();
+  });
+
+  test('charge.dispute.funds_withdrawn resolves charge customer for abuse service', async () => {
+    const { client } = await import('@/lib/stripe-client');
+    const retrieveSpy = jest.spyOn(client.charges, 'retrieve').mockResolvedValue(
+      sampleStripeChargeResponse(
+        sampleStripeCharge({
+          id: 'ch_dispute_withdrawn_123',
+          customer: testUser.stripe_customer_id,
+          payment_intent: 'pi_dispute_withdrawn_123',
+        })
+      )
+    );
+
+    const event: Stripe.Event = {
+      ...baseStripeEvent(),
+      id: 'evt_dispute_withdrawn',
+      data: {
+        object: sampleStripeDispute({
+          id: 'dp_withdrawn_123',
+          charge: 'ch_dispute_withdrawn_123',
+        }),
+        previous_attributes: {},
+      },
+      type: 'charge.dispute.funds_withdrawn',
+    };
+
+    await processStripePaymentEventHook(event);
+    await waitForReportEventsCall();
+
+    expect(retrieveSpy).toHaveBeenCalledWith('ch_dispute_withdrawn_123');
+    expect(reportEventsMock).toHaveBeenCalledWith({
+      events: [
+        {
+          type: 'stripe.charge.dispute.funds_withdrawn',
+          occurred_at: 1234567890000,
+          data: {
+            id: 'evt_dispute_withdrawn',
+            type: 'charge.dispute.funds_withdrawn',
+            charge: 'ch_dispute_withdrawn_123',
+            customer: testUser.stripe_customer_id,
+            payment_intent: 'pi_dispute_withdrawn_123',
+            dispute: 'dp_withdrawn_123',
+          },
+        },
+      ],
+    });
+
+    retrieveSpy.mockRestore();
+  });
+
+  test('charge.dispute.created resolves charge customer for abuse service', async () => {
+    await cleanupDbForTest();
+    testUser = await insertTestUser();
+
+    const { client } = await import('@/lib/stripe-client');
+    const kiloClawInvoice = {
+      object: 'invoice',
+      lines: {
+        data: [{ pricing: { price_details: { price: CURRENT_KILOCLAW_STANDARD_PRICE_ID } } }],
+      },
+    } as unknown as Stripe.Invoice;
+    const retrieveSpy = jest.spyOn(client.charges, 'retrieve').mockResolvedValue(
+      sampleStripeChargeResponse(
+        sampleStripeCharge({
+          id: 'ch_dispute_created_123',
+          customer: testUser.stripe_customer_id,
+          payment_intent: 'pi_dispute_created_123',
+        }),
+        { invoice: kiloClawInvoice }
+      )
+    );
+
+    const event: Stripe.Event = {
+      ...baseStripeEvent(),
+      id: 'evt_dispute_created_abuse',
+      data: {
+        object: sampleStripeDispute({
+          id: 'dp_created_123',
+          charge: 'ch_dispute_created_123',
+        }),
+        previous_attributes: {},
+      },
+      type: 'charge.dispute.created',
+    };
+
+    await processStripePaymentEventHook(event);
+    await waitForReportEventsCall();
+
+    expect(reportEventsMock).toHaveBeenCalledWith({
+      events: [
+        {
+          type: 'stripe.charge.dispute.created',
+          occurred_at: 1234567890000,
+          data: {
+            id: 'evt_dispute_created_abuse',
+            type: 'charge.dispute.created',
+            charge: 'ch_dispute_created_123',
+            customer: testUser.stripe_customer_id,
+            payment_intent: 'pi_dispute_created_123',
+            dispute: 'dp_created_123',
+          },
+        },
+      ],
+    });
+
+    retrieveSpy.mockRestore();
   });
 
   test('should handle missing user gracefully', async () => {

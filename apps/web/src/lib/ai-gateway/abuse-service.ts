@@ -35,7 +35,6 @@ import { z } from 'zod';
 const CLASSIFY_ABUSE_TIMEOUT_MS = 2000;
 const QUARANTINE_1_LATENCY_MS = 2000;
 const QUARANTINE_2_LATENCY_MS = 6000;
-const ABUSE_RULES_CLASSIFICATION_CACHE_TTL_SECONDS = 60;
 
 const AbuseRuleActionSchema = z.enum([
   'nothing',
@@ -53,6 +52,8 @@ const RulesEngineClassificationResultSchema = z.object({
   resolved_action: AbuseRuleActionSchema.nullable(),
   matched_abuse_rule_ids: z.array(z.string()),
 });
+
+const CachedRulesEngineActionSchema = z.union([AbuseRuleActionSchema, z.literal('none')]);
 
 /**
  * Extract full prompts from a GatewayRequest (chat completions, responses, or messages API).
@@ -226,9 +227,9 @@ export type AbuseRuleAction = z.infer<typeof AbuseRuleActionSchema>;
 
 export type RulesEngineClassificationResult = z.infer<typeof RulesEngineClassificationResultSchema>;
 
-export type CachedRulesEngineClassification = {
+export type CachedRulesEngineAction = {
   identityKey: string;
-  rulesEngine: RulesEngineClassificationResult;
+  action: AbuseRuleAction | null;
 };
 
 export type RulesEngineActionDecision = {
@@ -300,30 +301,31 @@ export async function resolveAbuseClassificationCacheIdentityKey(args: {
   return `fingerprint:${await sha256(compositeParams)}`;
 }
 
-function parseCachedRulesEngineResult(raw: string): RulesEngineClassificationResult | null {
+function parseCachedRulesEngineAction(raw: string): AbuseRuleAction | null | undefined {
   try {
-    return RulesEngineClassificationResultSchema.parse(JSON.parse(raw));
+    const action = CachedRulesEngineActionSchema.parse(raw);
+    return action === 'none' ? null : action;
   } catch (error) {
-    console.warn('Failed to parse cached rules-engine classification', { error });
-    return null;
+    console.warn('Failed to parse cached rules-engine action', { error });
+    return undefined;
   }
 }
 
-export async function getCachedRulesEngineClassification(
+export async function getCachedRulesEngineAction(
   identityKey: string
-): Promise<CachedRulesEngineClassification | null> {
+): Promise<CachedRulesEngineAction | null> {
   try {
     const raw = await redisGet(abuseRulesClassificationRedisKey(identityKey));
     if (!raw) return null;
-    const rulesEngine = parseCachedRulesEngineResult(raw);
-    return rulesEngine ? { identityKey, rulesEngine } : null;
+    const action = parseCachedRulesEngineAction(raw);
+    return action !== undefined ? { identityKey, action } : null;
   } catch (error) {
-    console.warn('Failed to read cached rules-engine classification', { identityKey, error });
+    console.warn('Failed to read cached rules-engine action', { identityKey, error });
     return null;
   }
 }
 
-export async function cacheRulesEngineClassification(args: {
+export async function cacheRulesEngineAction(args: {
   identityKey: string;
   rulesEngine: RulesEngineClassificationResult | undefined;
 }): Promise<void> {
@@ -331,11 +333,10 @@ export async function cacheRulesEngineClassification(args: {
   try {
     await redisSet(
       abuseRulesClassificationRedisKey(args.identityKey),
-      JSON.stringify(args.rulesEngine),
-      ABUSE_RULES_CLASSIFICATION_CACHE_TTL_SECONDS
+      args.rulesEngine.resolved_action ?? 'none'
     );
   } catch (error) {
-    console.warn('Failed to write cached rules-engine classification', {
+    console.warn('Failed to write cached rules-engine action', {
       identityKey: args.identityKey,
       error,
     });
@@ -368,11 +369,11 @@ export async function getQuarantineFreeModel(
 }
 
 export function getRulesEngineActionDecision(args: {
-  rulesEngine: RulesEngineClassificationResult | null | undefined;
+  action: AbuseRuleAction | null | undefined;
   userByok: boolean;
   quarantineFreeModel: string | null;
 }): RulesEngineActionDecision {
-  const action = args.rulesEngine?.resolved_action ?? null;
+  const action = args.action ?? null;
   switch (action) {
     case null:
     case 'nothing':

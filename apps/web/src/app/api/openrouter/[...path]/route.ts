@@ -80,8 +80,8 @@ import { handleRequestLogging } from '@/lib/ai-gateway/handleRequestLogging';
 import {
   classifyAbuse,
   awaitClassifyAbuse,
-  cacheRulesEngineClassification,
-  getCachedRulesEngineClassification,
+  cacheRulesEngineAction,
+  getCachedRulesEngineAction,
   getQuarantineFreeModel,
   getRulesEngineActionDecision,
   isRulesEngineBlockingAction,
@@ -457,10 +457,10 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     kiloUserId: user.id,
     fraudHeaders,
   });
-  const cachedClassification = await getCachedRulesEngineClassification(abuseCacheIdentityKey);
-  const cachedRulesEngineAction = cachedClassification?.rulesEngine.resolved_action ?? null;
+  const cachedAction = await getCachedRulesEngineAction(abuseCacheIdentityKey);
+  const cachedRulesEngineAction = cachedAction?.action ?? null;
   // Cache-gating keeps normal traffic on the fast path: only identities with a
-  // recent blocking/quarantine decision wait for a fresh abuse-service result.
+  // previously blocking/quarantine decision wait for a fresh abuse-service result.
   const shouldBlockOnClassify = isRulesEngineBlockingAction(cachedRulesEngineAction);
 
   // Large responses may run longer than the 800s serverless function timeout.
@@ -483,7 +483,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   let classifyResult = shouldBlockOnClassify ? await awaitClassifyAbuse(classifyPromise) : null;
   if (classifyResult?.rules_engine) {
-    await cacheRulesEngineClassification({
+    await cacheRulesEngineAction({
       identityKey: classifyResult.context?.identity_key ?? abuseCacheIdentityKey,
       rulesEngine: classifyResult.rules_engine,
     });
@@ -491,14 +491,14 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   // When a blocking refresh fails or times out, fall back to the cached
   // enforcement decision. Missing/nonblocking cache entries never enforce the
   // fresh result on this request; they only update Redis for the next request.
-  const rulesEngineForDecision =
-    (shouldBlockOnClassify ? classifyResult?.rules_engine : null) ??
-    (shouldBlockOnClassify ? cachedClassification?.rulesEngine : null);
+  const rulesEngineActionForDecision =
+    (shouldBlockOnClassify ? classifyResult?.rules_engine?.resolved_action : null) ??
+    (shouldBlockOnClassify ? cachedAction?.action : null);
   const rulesEngineDecision = getRulesEngineActionDecision({
-    rulesEngine: rulesEngineForDecision,
+    action: rulesEngineActionForDecision,
     userByok: !!userByok,
     quarantineFreeModel:
-      rulesEngineForDecision?.resolved_action === 'quarantine-3' && !userByok
+      rulesEngineActionForDecision === 'quarantine-3' && !userByok
         ? await getQuarantineFreeModel(requestBodyParsed.kind)
         : null,
   });
@@ -777,7 +777,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   if (!shouldBlockOnClassify) {
     classifyResult = await awaitClassifyAbuse(classifyPromise);
     if (classifyResult?.rules_engine) {
-      await cacheRulesEngineClassification({
+      await cacheRulesEngineAction({
         identityKey: classifyResult.context?.identity_key ?? abuseCacheIdentityKey,
         rulesEngine: classifyResult.rules_engine,
       });

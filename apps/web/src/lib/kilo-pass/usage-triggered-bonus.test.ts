@@ -174,6 +174,62 @@ describe('maybeIssueKiloPassBonusFromUsageThreshold', () => {
     expect(userRow?.kilo_pass_threshold).toBeNull();
   });
 
+  test('monthly: skips usage-triggered bonus when referral_bonus item already exists and clears threshold', async () => {
+    const user = await insertTestUser({
+      microdollars_used: 55_000_000,
+      kilo_pass_threshold: 49_000_000,
+    });
+
+    const { issuanceId } = await seedBaseIssuance({
+      kiloUserId: user.id,
+      cadence: KiloPassCadence.Monthly,
+      tier: KiloPassTier.Tier49,
+      issueMonth: '2026-01-01',
+      stripeInvoiceId: 'inv_test_monthly_referral_bonus_blocks_usage_bonus',
+      currentStreakMonths: 1,
+      nextYearlyIssueAt: null,
+    });
+
+    const [referralCredit] = await db
+      .insert(credit_transactions)
+      .values({
+        kilo_user_id: user.id,
+        amount_microdollars: 24_500_000,
+        is_free: true,
+        description: 'seed referral bonus credits',
+        credit_category: `test-kilo-pass-referral-bonus-${crypto.randomUUID()}`,
+      })
+      .returning({ id: credit_transactions.id });
+    if (!referralCredit) throw new Error('Failed to insert referral credit transaction');
+
+    await db.insert(kilo_pass_issuance_items).values({
+      kilo_pass_issuance_id: issuanceId,
+      kind: KiloPassIssuanceItemKind.ReferralBonus,
+      credit_transaction_id: referralCredit.id,
+      amount_usd: 24.5,
+      bonus_percent_applied: 0.5,
+    });
+
+    await maybeIssueKiloPassBonusFromUsageThreshold({
+      kiloUserId: user.id,
+      nowIso: new Date('2026-01-15T00:00:00.000Z').toISOString(),
+      db,
+    });
+
+    const bonusItem = await db.query.kilo_pass_issuance_items.findFirst({
+      where: and(
+        eq(kilo_pass_issuance_items.kilo_pass_issuance_id, issuanceId),
+        eq(kilo_pass_issuance_items.kind, KiloPassIssuanceItemKind.Bonus)
+      ),
+    });
+    expect(bonusItem).toBeFalsy();
+
+    const userRow = await db.query.kilocode_users.findFirst({
+      where: eq(kilocode_users.id, user.id),
+    });
+    expect(userRow?.kilo_pass_threshold).toBeNull();
+  });
+
   test('monthly: first-2-months promo eligible => 50% bonus (tier_49, streak=2)', async () => {
     const user = await insertTestUser({
       microdollars_used: 55_000_000,

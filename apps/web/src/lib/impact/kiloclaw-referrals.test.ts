@@ -486,7 +486,8 @@ describe('kiloclaw referrals', () => {
         id: 'affiliate-touch',
         touch_type: 'affiliate',
         im_ref: 'im-ref',
-        expires_at: '2026-04-05T00:00:00.000Z',
+        touched_at: '2026-03-01T00:00:00.000Z',
+        expires_at: '2026-03-31T00:00:00.000Z',
       });
       const invalidReferralTouch = makeTouch({
         id: 'referral-touch',
@@ -500,6 +501,63 @@ describe('kiloclaw referrals', () => {
         resolveWinningAttributionTouch({
           touches: [expiredAffiliateTouch, invalidReferralTouch],
           convertedAt,
+        })
+      ).toEqual({
+        winner: 'none',
+        affiliateTouch: null,
+        referralTouch: null,
+      });
+    });
+
+    it('filters touches by product for mirrored Kilo Pass attribution', () => {
+      const kiloClawReferralTouch = makeTouch({
+        id: 'kiloclaw-referral-touch',
+        product: 'kiloclaw',
+        touch_type: 'referral',
+        touched_at: '2026-04-01T00:00:00.000Z',
+        rs_code: 'claw-ref-code',
+      });
+      const kiloPassAffiliateTouch = makeTouch({
+        id: 'kilo-pass-affiliate-touch',
+        product: 'kilo_pass',
+        program_key: null,
+        touch_type: 'affiliate',
+        touched_at: '2026-04-02T00:00:00.000Z',
+        im_ref: 'pass-im-ref',
+      });
+
+      expect(
+        resolveWinningAttributionTouch({
+          product: 'kilo_pass',
+          touches: [kiloClawReferralTouch, kiloPassAffiliateTouch],
+          convertedAt,
+        })
+      ).toMatchObject({
+        winner: 'affiliate',
+        affiliateTouch: { id: 'kilo-pass-affiliate-touch' },
+        referralTouch: null,
+      });
+    });
+
+    it('uses the exact 30-day UTC expiration boundary', () => {
+      const referralTouch = makeTouch({
+        id: 'boundary-referral-touch',
+        touch_type: 'referral',
+        touched_at: '2026-04-01T00:00:00.000Z',
+        expires_at: '2026-06-01T00:00:00.000Z',
+        rs_code: 'ref-code',
+      });
+
+      expect(
+        resolveWinningAttributionTouch({
+          touches: [referralTouch],
+          convertedAt: new Date('2026-04-30T23:59:59.999Z'),
+        })
+      ).toMatchObject({ winner: 'referral' });
+      expect(
+        resolveWinningAttributionTouch({
+          touches: [referralTouch],
+          convertedAt: new Date('2026-05-01T00:00:00.000Z'),
         })
       ).toEqual({
         winner: 'none',

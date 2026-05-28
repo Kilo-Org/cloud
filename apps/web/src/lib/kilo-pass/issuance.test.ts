@@ -5,6 +5,10 @@ import { insertTestUser } from '@/tests/helpers/user.helper';
 import { dayjs } from '@/lib/kilo-pass/dayjs';
 import {
   credit_transactions,
+  impact_referral_conversions,
+  impact_referral_reward_applications,
+  impact_referral_reward_decisions,
+  impact_referral_rewards,
   kilo_pass_audit_log,
   kilo_pass_issuance_items,
   kilo_pass_subscriptions,
@@ -16,10 +20,20 @@ import { KiloPassIssuanceItemKind } from './enums';
 import { KiloPassIssuanceSource } from './enums';
 import { KiloPassCadence } from './enums';
 import { KiloPassTier } from '@/lib/kilo-pass/enums';
-import { and, eq } from 'drizzle-orm';
+import {
+  ImpactReferralBeneficiaryRole,
+  ImpactReferralDecisionOutcome,
+  ImpactReferralPaymentProvider,
+  ImpactReferralProduct,
+  ImpactReferralRewardKind,
+  ImpactReferralRewardStatus,
+  ImpactReferralWinningTouchType,
+} from '@kilocode/db/schema-types';
+import { and, eq, inArray } from 'drizzle-orm';
 import { forceImmediateExpirationRecomputation } from '@/lib/balanceCache';
 
 import {
+  applyPendingKiloPassReferralBonusForIssuance,
   computeIssueMonth,
   createOrGetIssuanceHeader,
   issueBaseCreditsForIssuance,
@@ -59,6 +73,75 @@ async function createTestSubscription(params: {
   const row = inserted[0];
   if (!row) throw new Error('Failed to create test kilo_pass_subscription');
   return row;
+}
+
+async function createPendingKiloPassReferralReward(params: {
+  beneficiaryUserId: string;
+  beneficiaryRole?: ImpactReferralBeneficiaryRole;
+  earnedAt: string;
+  expiresAt?: string | null;
+  rewardAmountUsd?: number;
+  sourcePaymentId?: string;
+}): Promise<{ rewardId: string; conversionId: string }> {
+  const referee = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
+  const sourcePaymentId = params.sourcePaymentId ?? `inv-referral-source-${crypto.randomUUID()}`;
+  const beneficiaryRole = params.beneficiaryRole ?? ImpactReferralBeneficiaryRole.Referrer;
+
+  const [conversion] = await db
+    .insert(impact_referral_conversions)
+    .values({
+      product: ImpactReferralProduct.KiloPass,
+      referee_user_id: referee.id,
+      referrer_user_id:
+        beneficiaryRole === ImpactReferralBeneficiaryRole.Referrer
+          ? params.beneficiaryUserId
+          : null,
+      winning_touch_type: ImpactReferralWinningTouchType.Referral,
+      payment_provider: ImpactReferralPaymentProvider.Stripe,
+      source_payment_id: sourcePaymentId,
+      qualified: true,
+      converted_at: params.earnedAt,
+    })
+    .returning({ id: impact_referral_conversions.id });
+  if (!conversion) throw new Error('Failed to create impact_referral_conversion');
+
+  const [decision] = await db
+    .insert(impact_referral_reward_decisions)
+    .values({
+      product: ImpactReferralProduct.KiloPass,
+      conversion_id: conversion.id,
+      beneficiary_user_id: params.beneficiaryUserId,
+      beneficiary_role: beneficiaryRole,
+      outcome: ImpactReferralDecisionOutcome.Granted,
+      reward_kind: ImpactReferralRewardKind.KiloPassBonus,
+      reward_percent: 0.5,
+      source_tier: KiloPassTier.Tier49,
+      reward_amount_usd: params.rewardAmountUsd ?? 24.5,
+    })
+    .returning({ id: impact_referral_reward_decisions.id });
+  if (!decision) throw new Error('Failed to create impact_referral_reward_decision');
+
+  const [reward] = await db
+    .insert(impact_referral_rewards)
+    .values({
+      product: ImpactReferralProduct.KiloPass,
+      conversion_id: conversion.id,
+      decision_id: decision.id,
+      beneficiary_user_id: params.beneficiaryUserId,
+      beneficiary_role: beneficiaryRole,
+      reward_kind: ImpactReferralRewardKind.KiloPassBonus,
+      months_granted: 0,
+      reward_percent: 0.5,
+      source_tier: KiloPassTier.Tier49,
+      reward_amount_usd: params.rewardAmountUsd ?? 24.5,
+      status: ImpactReferralRewardStatus.Pending,
+      earned_at: params.earnedAt,
+      expires_at: params.expiresAt ?? '2027-01-01T00:00:00.000Z',
+    })
+    .returning({ id: impact_referral_rewards.id });
+  if (!reward) throw new Error('Failed to create impact_referral_reward');
+
+  return { rewardId: reward.id, conversionId: conversion.id };
 }
 
 test('base issuance is idempotent: calling twice only creates one credit_transaction', async () => {
@@ -389,6 +472,274 @@ test('bonus issuance skips when a referral bonus item already exists', async () 
       reason: 'existing_referral_bonus_item',
     })
   );
+});
+
+test('monthly issuance consumes the oldest pending Kilo Pass referral reward and blocks normal bonus', async () => {
+  const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 123 });
+  const { subscriptionId } = await createTestSubscription({
+    kiloUserId: user.id,
+    tier: KiloPassTier.Tier49,
+    cadence: KiloPassCadence.Monthly,
+    startedAt: '2026-02-01T00:00:00.000Z',
+  });
+
+  const newerReward = await createPendingKiloPassReferralReward({
+    beneficiaryUserId: user.id,
+    earnedAt: '2026-01-15T00:00:00.000Z',
+    rewardAmountUsd: 10,
+  });
+  const olderReward = await createPendingKiloPassReferralReward({
+    beneficiaryUserId: user.id,
+    earnedAt: '2026-01-10T00:00:00.000Z',
+    rewardAmountUsd: 24.5,
+  });
+
+  const { issuanceId } = await db.transaction(async tx => {
+    return await createOrGetIssuanceHeader(tx, {
+      subscriptionId,
+      issueMonth: '2026-02-01',
+      source: KiloPassIssuanceSource.StripeInvoice,
+      stripeInvoiceId: `inv-referral-application-${crypto.randomUUID()}`,
+    });
+  });
+
+  const result = await db.transaction(async tx => {
+    return await applyPendingKiloPassReferralBonusForIssuance(tx, {
+      issuanceId,
+      subscriptionId,
+      kiloUserId: user.id,
+    });
+  });
+  await forceImmediateExpirationRecomputation(user.id);
+
+  expect(result).toEqual(
+    expect.objectContaining({
+      wasIssued: true,
+      rewardId: olderReward.rewardId,
+      amountUsd: 24.5,
+      amountMicrodollars: 24_500_000,
+    })
+  );
+
+  const [referralItem] = await db
+    .select({
+      id: kilo_pass_issuance_items.id,
+      creditTransactionId: kilo_pass_issuance_items.credit_transaction_id,
+      amountUsd: kilo_pass_issuance_items.amount_usd,
+      bonusPercentApplied: kilo_pass_issuance_items.bonus_percent_applied,
+    })
+    .from(kilo_pass_issuance_items)
+    .where(
+      and(
+        eq(kilo_pass_issuance_items.kilo_pass_issuance_id, issuanceId),
+        eq(kilo_pass_issuance_items.kind, KiloPassIssuanceItemKind.ReferralBonus)
+      )
+    );
+  expect(referralItem).toEqual(
+    expect.objectContaining({
+      creditTransactionId: result.creditTransactionId,
+      amountUsd: 24.5,
+      bonusPercentApplied: 0.5,
+    })
+  );
+
+  const credit = await db.query.credit_transactions.findFirst({
+    where: eq(credit_transactions.id, result.creditTransactionId ?? ''),
+  });
+  expect(credit).toEqual(
+    expect.objectContaining({
+      is_free: true,
+      amount_microdollars: 24_500_000,
+      expiration_baseline_microdollars_used: 123,
+      original_baseline_microdollars_used: 123,
+    })
+  );
+  expect(new Date(credit?.expiry_date ?? '').toISOString()).toBe('2026-03-01T00:00:00.000Z');
+
+  const appliedReward = await db.query.impact_referral_rewards.findFirst({
+    where: eq(impact_referral_rewards.id, olderReward.rewardId),
+  });
+  expect(appliedReward).toEqual(
+    expect.objectContaining({
+      status: ImpactReferralRewardStatus.Applied,
+      applies_to_kilo_pass_subscription_id: subscriptionId,
+      consumed_kilo_pass_issuance_id: issuanceId,
+      consumed_kilo_pass_issuance_item_id: referralItem?.id,
+    })
+  );
+  expect(appliedReward?.applied_at).toBeTruthy();
+
+  const application = await db.query.impact_referral_reward_applications.findFirst({
+    where: eq(impact_referral_reward_applications.reward_id, olderReward.rewardId),
+  });
+  expect(application).toEqual(
+    expect.objectContaining({
+      product: ImpactReferralProduct.KiloPass,
+      beneficiary_user_id: user.id,
+      subscription_id: subscriptionId,
+      local_operation_id: result.creditTransactionId,
+    })
+  );
+
+  const pendingNewerReward = await db.query.impact_referral_rewards.findFirst({
+    where: eq(impact_referral_rewards.id, newerReward.rewardId),
+  });
+  expect(pendingNewerReward?.status).toBe(ImpactReferralRewardStatus.Pending);
+
+  const normalBonusResult = await db.transaction(async tx => {
+    return await issueBonusCreditsForIssuance(tx, {
+      issuanceId,
+      subscriptionId,
+      kiloUserId: user.id,
+      baseAmountUsd: KILO_PASS_TIER_CONFIG.tier_49.monthlyPriceUsd,
+      bonusPercentApplied: 0.1,
+      description: `kilo-pass-normal-bonus-after-referral-${crypto.randomUUID()}`,
+    });
+  });
+  expect(normalBonusResult.wasIssued).toBe(false);
+});
+
+test('monthly issuance expires stale rewards, consumes one unexpired reward per issuance, and retries idempotently', async () => {
+  const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
+  const { subscriptionId } = await createTestSubscription({
+    kiloUserId: user.id,
+    tier: KiloPassTier.Tier49,
+    cadence: KiloPassCadence.Monthly,
+    startedAt: '2026-02-01T00:00:00.000Z',
+  });
+
+  const expiredReward = await createPendingKiloPassReferralReward({
+    beneficiaryUserId: user.id,
+    earnedAt: '2026-01-01T00:00:00.000Z',
+    expiresAt: '2026-01-31T00:00:00.000Z',
+  });
+  const firstReward = await createPendingKiloPassReferralReward({
+    beneficiaryUserId: user.id,
+    earnedAt: '2026-01-02T00:00:00.000Z',
+    rewardAmountUsd: 7,
+  });
+  const secondReward = await createPendingKiloPassReferralReward({
+    beneficiaryUserId: user.id,
+    earnedAt: '2026-01-03T00:00:00.000Z',
+    rewardAmountUsd: 8,
+  });
+
+  const { issuanceId: issuanceId1 } = await db.transaction(async tx => {
+    return await createOrGetIssuanceHeader(tx, {
+      subscriptionId,
+      issueMonth: '2026-02-01',
+      source: KiloPassIssuanceSource.StripeInvoice,
+      stripeInvoiceId: `inv-referral-stack-1-${crypto.randomUUID()}`,
+    });
+  });
+
+  const firstApply = await db.transaction(async tx => {
+    return await applyPendingKiloPassReferralBonusForIssuance(tx, {
+      issuanceId: issuanceId1,
+      subscriptionId,
+      kiloUserId: user.id,
+    });
+  });
+  expect(firstApply.wasIssued).toBe(true);
+  expect(firstApply.rewardId).toBe(firstReward.rewardId);
+  expect(firstApply.expiredRewardIds).toContain(expiredReward.rewardId);
+
+  const retry = await db.transaction(async tx => {
+    return await applyPendingKiloPassReferralBonusForIssuance(tx, {
+      issuanceId: issuanceId1,
+      subscriptionId,
+      kiloUserId: user.id,
+    });
+  });
+  expect(retry.wasIssued).toBe(false);
+
+  const { issuanceId: issuanceId2 } = await db.transaction(async tx => {
+    return await createOrGetIssuanceHeader(tx, {
+      subscriptionId,
+      issueMonth: '2026-03-01',
+      source: KiloPassIssuanceSource.StripeInvoice,
+      stripeInvoiceId: `inv-referral-stack-2-${crypto.randomUUID()}`,
+    });
+  });
+
+  const secondApply = await db.transaction(async tx => {
+    return await applyPendingKiloPassReferralBonusForIssuance(tx, {
+      issuanceId: issuanceId2,
+      subscriptionId,
+      kiloUserId: user.id,
+    });
+  });
+  expect(secondApply.wasIssued).toBe(true);
+  expect(secondApply.rewardId).toBe(secondReward.rewardId);
+
+  const rewards = await db
+    .select({ id: impact_referral_rewards.id, status: impact_referral_rewards.status })
+    .from(impact_referral_rewards)
+    .where(
+      inArray(impact_referral_rewards.id, [
+        expiredReward.rewardId,
+        firstReward.rewardId,
+        secondReward.rewardId,
+      ])
+    );
+  expect(rewards).toEqual(
+    expect.arrayContaining([
+      { id: expiredReward.rewardId, status: ImpactReferralRewardStatus.Expired },
+      { id: firstReward.rewardId, status: ImpactReferralRewardStatus.Applied },
+      { id: secondReward.rewardId, status: ImpactReferralRewardStatus.Applied },
+    ])
+  );
+
+  const items1 = await db
+    .select({ id: kilo_pass_issuance_items.id })
+    .from(kilo_pass_issuance_items)
+    .where(
+      and(
+        eq(kilo_pass_issuance_items.kilo_pass_issuance_id, issuanceId1),
+        eq(kilo_pass_issuance_items.kind, KiloPassIssuanceItemKind.ReferralBonus)
+      )
+    );
+  expect(items1).toHaveLength(1);
+});
+
+test('monthly issuance does not apply a referral reward to its source conversion issuance', async () => {
+  const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
+  const { subscriptionId } = await createTestSubscription({
+    kiloUserId: user.id,
+    tier: KiloPassTier.Tier49,
+    cadence: KiloPassCadence.Monthly,
+    startedAt: '2026-02-01T00:00:00.000Z',
+  });
+  const sourceInvoiceId = `inv-referral-source-${crypto.randomUUID()}`;
+  const reward = await createPendingKiloPassReferralReward({
+    beneficiaryUserId: user.id,
+    earnedAt: '2026-01-01T00:00:00.000Z',
+    sourcePaymentId: sourceInvoiceId,
+  });
+
+  const { issuanceId } = await db.transaction(async tx => {
+    return await createOrGetIssuanceHeader(tx, {
+      subscriptionId,
+      issueMonth: '2026-02-01',
+      source: KiloPassIssuanceSource.StripeInvoice,
+      stripeInvoiceId: sourceInvoiceId,
+    });
+  });
+
+  const result = await db.transaction(async tx => {
+    return await applyPendingKiloPassReferralBonusForIssuance(tx, {
+      issuanceId,
+      subscriptionId,
+      kiloUserId: user.id,
+      stripeInvoiceId: sourceInvoiceId,
+    });
+  });
+
+  expect(result.wasIssued).toBe(false);
+  const rewardAfter = await db.query.impact_referral_rewards.findFirst({
+    where: eq(impact_referral_rewards.id, reward.rewardId),
+  });
+  expect(rewardAfter?.status).toBe(ImpactReferralRewardStatus.Pending);
 });
 
 test('monthly cadence: bonus expiry is end of the subscription month (period end), not month end', async () => {

@@ -6,9 +6,12 @@ import { client as stripe } from '@/lib/stripe-client';
 import { getStripePriceIdForKiloPass } from '@/lib/kilo-pass/stripe-price-ids.server';
 import { getAffiliateAttribution } from '@/lib/affiliate-attribution';
 import { APP_URL } from '@/lib/constants';
+import { KILO_PASS_REFERRER_REWARD_CAP } from '@/lib/impact/kilo-pass-referrals';
 import { TRPCError } from '@trpc/server';
 import {
   credit_transactions,
+  impact_referral_reward_decisions,
+  impact_referral_rewards,
   kilo_pass_issuance_items,
   kilo_pass_issuances,
   kilo_pass_scheduled_changes,
@@ -26,6 +29,13 @@ import {
   KiloPassPaymentProvider,
   KiloPassWelcomePromoEligibilityReason,
 } from '@/lib/kilo-pass/enums';
+import {
+  ImpactReferralBeneficiaryRole,
+  ImpactReferralDecisionOutcome,
+  ImpactReferralProduct,
+  ImpactReferralRewardKind,
+  ImpactReferralRewardStatus,
+} from '@kilocode/db/schema-types';
 import { KiloPassIssuanceItemKind } from '@/lib/kilo-pass/enums';
 import { and, asc, desc, eq, inArray, isNull, ne, sql, sum } from 'drizzle-orm';
 import * as z from 'zod';
@@ -141,6 +151,35 @@ const GetAverageMonthlyUsageLast3MonthsOutputSchema = z.object({
   averageMonthlyUsageUsd: z.number(),
 });
 
+const KiloPassReferralRewardSummaryOutputSchema = z.object({
+  totals: z.object({
+    totalRewards: z.number(),
+    pendingRewards: z.number(),
+    appliedRewards: z.number(),
+    totalRewardAmountUsd: z.number(),
+    pendingRewardAmountUsd: z.number(),
+    appliedRewardAmountUsd: z.number(),
+  }),
+  referrerCap: z.object({
+    grantedRewards: z.number(),
+    limit: z.number(),
+    reached: z.boolean(),
+  }),
+  rewards: z.array(
+    z.object({
+      id: z.string(),
+      role: z.enum(ImpactReferralBeneficiaryRole),
+      status: z.enum(ImpactReferralRewardStatus),
+      rewardAmountUsd: z.number(),
+      earnedAt: z.string(),
+      appliedAt: z.string().nullable(),
+      expiresAt: z.string().nullable(),
+      sourceTier: z.string().nullable(),
+      reviewReason: z.string().nullable(),
+    })
+  ),
+});
+
 const CompleteStorePurchaseOutputSchema = z.object({
   subscriptionId: z.string(),
   tier: KiloPassTierSchema,
@@ -162,6 +201,11 @@ type StripeManagedKiloPassSubscription = KiloPassSubscriptionState & {
   paymentProvider: typeof KiloPassPaymentProvider.Stripe;
   stripeSubscriptionId: string;
 };
+
+const KILO_PASS_PENDING_REFERRAL_REWARD_STATUSES = new Set<string>([
+  ImpactReferralRewardStatus.Pending,
+  ImpactReferralRewardStatus.Earned,
+]);
 
 const APP_STORE_ACCOUNT_TOKEN_MISMATCH_MESSAGE =
   'App Store purchase account token does not match the signed-in user.';
@@ -809,6 +853,97 @@ export const kiloPassRouter = createTRPCRouter({
 
       const averageMonthlyUsageUsd = roundToCents(fromMicrodollars(totalCost_mUsd) / 3);
       return { averageMonthlyUsageUsd };
+    }),
+
+  getReferralRewardSummary: baseProcedure
+    .output(KiloPassReferralRewardSummaryOutputSchema)
+    .query(async ({ ctx }) => {
+      const [rewardRows, capRows] = await Promise.all([
+        db
+          .select({
+            id: impact_referral_rewards.id,
+            role: impact_referral_rewards.beneficiary_role,
+            status: impact_referral_rewards.status,
+            rewardAmountUsd: impact_referral_rewards.reward_amount_usd,
+            earnedAt: impact_referral_rewards.earned_at,
+            appliedAt: impact_referral_rewards.applied_at,
+            expiresAt: impact_referral_rewards.expires_at,
+            sourceTier: impact_referral_rewards.source_tier,
+            reviewReason: impact_referral_rewards.review_reason,
+          })
+          .from(impact_referral_rewards)
+          .where(
+            and(
+              eq(impact_referral_rewards.product, ImpactReferralProduct.KiloPass),
+              eq(impact_referral_rewards.reward_kind, ImpactReferralRewardKind.KiloPassBonus),
+              eq(impact_referral_rewards.beneficiary_user_id, ctx.user.id)
+            )
+          )
+          .orderBy(
+            desc(impact_referral_rewards.earned_at),
+            desc(impact_referral_rewards.created_at)
+          ),
+        db
+          .select({ grantedRewards: sql<number>`COUNT(*)::int` })
+          .from(impact_referral_reward_decisions)
+          .where(
+            and(
+              eq(impact_referral_reward_decisions.product, ImpactReferralProduct.KiloPass),
+              eq(
+                impact_referral_reward_decisions.reward_kind,
+                ImpactReferralRewardKind.KiloPassBonus
+              ),
+              eq(impact_referral_reward_decisions.beneficiary_user_id, ctx.user.id),
+              eq(
+                impact_referral_reward_decisions.beneficiary_role,
+                ImpactReferralBeneficiaryRole.Referrer
+              ),
+              eq(impact_referral_reward_decisions.outcome, ImpactReferralDecisionOutcome.Granted)
+            )
+          ),
+      ]);
+
+      const rewards = rewardRows.map(row => ({
+        id: row.id,
+        role: row.role,
+        status: row.status,
+        rewardAmountUsd: row.rewardAmountUsd ?? 0,
+        earnedAt: normalizeTimestampToIso(row.earnedAt) ?? row.earnedAt,
+        appliedAt: normalizeTimestampToIso(row.appliedAt),
+        expiresAt: normalizeTimestampToIso(row.expiresAt),
+        sourceTier: row.sourceTier,
+        reviewReason: row.reviewReason,
+      }));
+
+      const nowMs = Date.now();
+      const pendingRewards = rewards.filter(reward => {
+        if (!KILO_PASS_PENDING_REFERRAL_REWARD_STATUSES.has(reward.status)) return false;
+        if (!reward.expiresAt) return true;
+        return new Date(reward.expiresAt).getTime() > nowMs;
+      });
+      const appliedRewards = rewards.filter(
+        reward => reward.status === ImpactReferralRewardStatus.Applied
+      );
+      const sumRewardAmounts = (items: typeof rewards) =>
+        roundToCents(items.reduce((total, reward) => total + reward.rewardAmountUsd, 0));
+      const grantedRewards = capRows[0]?.grantedRewards ?? 0;
+
+      return {
+        totals: {
+          totalRewards: rewards.length,
+          pendingRewards: pendingRewards.length,
+          appliedRewards: appliedRewards.length,
+          totalRewardAmountUsd: sumRewardAmounts(rewards),
+          pendingRewardAmountUsd: sumRewardAmounts(pendingRewards),
+          appliedRewardAmountUsd: sumRewardAmounts(appliedRewards),
+        },
+        referrerCap: {
+          grantedRewards,
+          limit: KILO_PASS_REFERRER_REWARD_CAP,
+          reached: grantedRewards >= KILO_PASS_REFERRER_REWARD_CAP,
+        },
+        rewards,
+      };
     }),
 
   getState: baseProcedure.output(GetStateOutputSchema).query(async ({ ctx }) => {

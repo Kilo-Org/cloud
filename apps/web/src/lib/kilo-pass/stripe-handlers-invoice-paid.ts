@@ -17,6 +17,7 @@ import { KILO_PASS_TIER_CONFIG } from '@/lib/kilo-pass/constants';
 import { KiloPassError } from '@/lib/kilo-pass/errors';
 import {
   appendKiloPassAuditLog,
+  applyPendingKiloPassReferralBonusForIssuance,
   createOrGetIssuanceHeader,
   issueBaseCreditsForIssuance,
 } from '@/lib/kilo-pass/issuance';
@@ -59,8 +60,10 @@ import {
 } from '@/lib/kilo-pass/subscription-accounting';
 import {
   enqueueKiloPassAffiliateSaleForInvoice,
+  getKiloPassAffiliateSaleReportingFields,
   type KiloPassAffiliateSaleContext,
 } from '@/lib/kilo-pass/affiliate-sale';
+import { processPersonalKiloPassStripePaidConversion } from '@/lib/impact/kilo-pass-referrals';
 import type { SupportedReusablePaymentMethodType } from '@/lib/kilo-pass/stripe-handlers-utils';
 
 function getPaymentFingerprintType(
@@ -360,8 +363,25 @@ export async function handleKiloPassInvoicePaid(params: {
 
   let didMutateBalance = false;
   let kiloUserIdForCache: string | null = null;
-  const affiliateSaleState: { context: KiloPassAffiliateSaleContext | null } = {
+  const affiliateSaleState: {
+    context: KiloPassAffiliateSaleContext | null;
+    shouldEnqueueAffiliateSale: boolean;
+  } = {
     context: null,
+    shouldEnqueueAffiliateSale: true,
+  };
+  const referralConversionState: {
+    kiloPassSubscriptionId: string | null;
+    userId: string | null;
+    tier: KiloPassAffiliateSaleContext['tier'] | null;
+    cadence: KiloPassAffiliateSaleContext['cadence'] | null;
+    welcomePromoEligibilityReason: KiloPassWelcomePromoEligibilityReason | null;
+  } = {
+    kiloPassSubscriptionId: null,
+    userId: null,
+    tier: null,
+    cadence: null,
+    welcomePromoEligibilityReason: null,
   };
 
   // Track context for failure audit logging
@@ -540,6 +560,11 @@ export async function handleKiloPassInvoicePaid(params: {
         return { kiloUserId, stripeInvoiceId: invoice.id };
       }
 
+      referralConversionState.kiloPassSubscriptionId = kiloPassSubscriptionId;
+      referralConversionState.userId = kiloUserId;
+      referralConversionState.tier = tier;
+      referralConversionState.cadence = cadence;
+
       const issuanceHeader = await createOrGetIssuanceHeader(tx, {
         subscriptionId: kiloPassSubscriptionId,
         issueMonth,
@@ -551,6 +576,7 @@ export async function handleKiloPassInvoicePaid(params: {
         cadence === KiloPassCadence.Monthly && hasPositiveSettlement
           ? await claimMonthlyPaymentFingerprint({ tx, stripe, invoice })
           : null;
+      referralConversionState.welcomePromoEligibilityReason = positiveSettlementReason;
       const initialWelcomePromoEligibilityReason =
         cadence === KiloPassCadence.Monthly
           ? await getOrCreateInitialMonthlyWelcomePromoReason({
@@ -600,7 +626,20 @@ export async function handleKiloPassInvoicePaid(params: {
       });
       didMutateBalance ||= baseCreditsResult.wasIssued;
 
-      if (baseCreditsResult.wasIssued) {
+      let referralBonusBlocksNormalBonus = false;
+      if (cadence === KiloPassCadence.Monthly) {
+        const referralBonusResult = await applyPendingKiloPassReferralBonusForIssuance(tx, {
+          issuanceId: issuanceHeader.issuanceId,
+          subscriptionId: kiloPassSubscriptionId,
+          kiloUserId,
+          stripeInvoiceId: invoice.id,
+        });
+        referralBonusBlocksNormalBonus =
+          referralBonusResult.wasIssued || referralBonusResult.issuanceItemId !== null;
+        didMutateBalance ||= referralBonusResult.wasIssued;
+      }
+
+      if (baseCreditsResult.wasIssued && !referralBonusBlocksNormalBonus) {
         await updateKiloPassThresholdAfterBaseCredits(tx, {
           kiloUserId,
           baseAmountUsd: tierConfig.monthlyPriceUsd,
@@ -677,12 +716,50 @@ export async function handleKiloPassInvoicePaid(params: {
     throw error;
   }
 
-  await enqueueKiloPassAffiliateSaleForInvoice({
-    eventId,
-    invoice,
-    stripe,
-    context: affiliateSaleState.context,
-  });
+  if (
+    affiliateSaleState.context &&
+    referralConversionState.kiloPassSubscriptionId &&
+    referralConversionState.userId &&
+    referralConversionState.tier &&
+    referralConversionState.cadence
+  ) {
+    const convertedAt =
+      invoice.status_transitions?.paid_at != null
+        ? new Date(invoice.status_transitions.paid_at * 1000)
+        : invoice.created != null
+          ? new Date(invoice.created * 1000)
+          : invoice.period_start != null
+            ? new Date(invoice.period_start * 1000)
+            : new Date();
+    const reportingFields = getKiloPassAffiliateSaleReportingFields(affiliateSaleState.context);
+    const referralDisposition = await processPersonalKiloPassStripePaidConversion({
+      userId: referralConversionState.userId,
+      kiloPassSubscriptionId: referralConversionState.kiloPassSubscriptionId,
+      sourcePaymentId: invoice.id,
+      orderId: invoice.id,
+      amount: invoice.amount_paid / 100,
+      currencyCode: invoice.currency ?? 'usd',
+      itemCategory: reportingFields.itemCategory,
+      itemName: reportingFields.itemName,
+      ...('itemSku' in reportingFields && reportingFields.itemSku
+        ? { itemSku: reportingFields.itemSku }
+        : {}),
+      sourceTier: referralConversionState.tier,
+      cadence: referralConversionState.cadence,
+      welcomePromoEligibilityReason: referralConversionState.welcomePromoEligibilityReason,
+      convertedAt,
+    });
+    affiliateSaleState.shouldEnqueueAffiliateSale = referralDisposition.shouldEnqueueAffiliateSale;
+  }
+
+  if (affiliateSaleState.shouldEnqueueAffiliateSale) {
+    await enqueueKiloPassAffiliateSaleForInvoice({
+      eventId,
+      invoice,
+      stripe,
+      context: affiliateSaleState.context,
+    });
+  }
 
   if (blockedEmailParams) {
     await maybeSendDuplicateCardCanceledEmail({

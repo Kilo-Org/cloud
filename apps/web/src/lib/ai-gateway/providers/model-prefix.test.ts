@@ -2,7 +2,7 @@ import { isClaudeModel, isHaikuModel, isOpusModel } from './anthropic.constants'
 import { isOpenAiModel, isGptOssModel } from './openai';
 import { isGeminiModel, isGemmaModel, isGemini3Model } from './google';
 import { isKimiModel } from './moonshotai';
-import { isGrokModel, isGrok4Model } from './xai';
+import { isGrokModel } from './xai';
 import { isGlmModel } from './zai';
 import { isMinimaxModel } from './minimax';
 import { isStepModel } from './stepfun';
@@ -46,12 +46,12 @@ describe('provider predicates match substrings, regardless of prefix', () => {
     expect(isKimiModel('kimi-k2.6')).toBe(true);
   });
 
-  test('isGrokModel / isGrok4Model', () => {
+  test('isGrokModel', () => {
     expect(isGrokModel('x-ai/grok-code-fast-1')).toBe(true);
     expect(isGrokModel('grok-4.1-fast')).toBe(true);
-    expect(isGrok4Model('x-ai/grok-4')).toBe(true);
-    expect(isGrok4Model('grok-4.1-fast')).toBe(true);
-    expect(isGrok4Model('x-ai/grok-code-fast-1')).toBe(false);
+    expect(isGrokModel('x-ai/grok-4')).toBe(true);
+    expect(isGrokModel('grok-4.1-fast')).toBe(true);
+    expect(isGrokModel('x-ai/grok-code-fast-1')).toBe(true);
   });
 
   test('isGlmModel', () => {

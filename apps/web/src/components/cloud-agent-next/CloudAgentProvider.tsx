@@ -145,7 +145,7 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
                 autoCommit: true,
                 organizationId,
                 messageId: input.messageId,
-                images: input.images,
+                attachments: input.attachments ?? input.images,
               },
               { context: { skipBatch: true } }
             );
@@ -156,7 +156,7 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
               payload: normalizedPayload,
               autoCommit: true,
               messageId: input.messageId,
-              images: input.images,
+              attachments: input.attachments ?? input.images,
             },
             { context: { skipBatch: true } }
           );

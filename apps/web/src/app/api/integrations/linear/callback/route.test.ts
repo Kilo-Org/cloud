@@ -103,6 +103,11 @@ function expectRedirectLocation(response: Response, expectedPathWithQuery: strin
   expect(`${url.pathname}${url.search}`).toBe(expectedPathWithQuery);
 }
 
+async function callLinearCallback(request: NextRequest) {
+  const { GET } = await import('../../[platform]/callback/route');
+  return GET(request, { params: Promise.resolve({ platform: 'linear' }) });
+}
+
 describe('GET /api/integrations/linear/callback', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -139,33 +144,56 @@ describe('GET /api/integrations/linear/callback', () => {
       authFailedResponse: new Response(null, { status: 401 }),
     } as never);
 
-    const { GET } = await import('./route');
-    const response = await GET(makeRequest('/api/integrations/linear/callback'));
+    const response = await callLinearCallback(makeRequest('/api/integrations/linear/callback'));
 
     expect(response.headers.get('location')).toContain('/users/sign_in');
   });
 
   test('redirects with the oauth error when Linear returns one', async () => {
     const state = createOAuthState(`user_${USER_ID}`, USER_ID);
-    const { GET } = await import('./route');
-    const response = await GET(
+    const response = await callLinearCallback(
       makeRequest(`/api/integrations/linear/callback?error=access_denied&state=${state}`)
     );
 
     expectRedirectLocation(response, '/integrations/linear?error=access_denied');
   });
 
+  test('redirects oauth errors to returnTo when signed state carries one', async () => {
+    const state = createOAuthState(`user_${USER_ID}`, USER_ID, '/claw/new?step=linear');
+    const response = await callLinearCallback(
+      makeRequest(`/api/integrations/linear/callback?error=access_denied&state=${state}`)
+    );
+
+    expectRedirectLocation(response, '/claw/new?step=linear&error=access_denied');
+  });
+
+  test('encodes oauth error values before redirecting', async () => {
+    const state = createOAuthState(`user_${USER_ID}`, USER_ID);
+    const response = await callLinearCallback(
+      makeRequest(
+        `/api/integrations/linear/callback?error=${encodeURIComponent(
+          'access_denied&success=installed'
+        )}&state=${state}`
+      )
+    );
+
+    expectRedirectLocation(
+      response,
+      '/integrations/linear?error=access_denied%26success%3Dinstalled'
+    );
+  });
+
   test('redirects with missing_code when no code is present', async () => {
     const state = createOAuthState(`user_${USER_ID}`, USER_ID);
-    const { GET } = await import('./route');
-    const response = await GET(makeRequest(`/api/integrations/linear/callback?state=${state}`));
+    const response = await callLinearCallback(
+      makeRequest(`/api/integrations/linear/callback?state=${state}`)
+    );
 
     expectRedirectLocation(response, '/integrations/linear?error=missing_code');
   });
 
   test('rejects an invalid state signature', async () => {
-    const { GET } = await import('./route');
-    const response = await GET(
+    const response = await callLinearCallback(
       makeRequest('/api/integrations/linear/callback?code=abc&state=forged.sig')
     );
 
@@ -174,8 +202,7 @@ describe('GET /api/integrations/linear/callback', () => {
 
   test('rejects when the state was signed for a different user', async () => {
     const state = createOAuthState(`user_${OTHER_USER_ID}`, OTHER_USER_ID);
-    const { GET } = await import('./route');
-    const response = await GET(
+    const response = await callLinearCallback(
       makeRequest(`/api/integrations/linear/callback?code=abc&state=${state}`)
     );
 
@@ -185,8 +212,7 @@ describe('GET /api/integrations/linear/callback', () => {
   test('invokes upsertLinearInstallation with the workspace name from Linear GraphQL', async () => {
     mockedUpsertLinearInstallation.mockResolvedValue({} as never);
     const state = createOAuthState(`user_${USER_ID}`, USER_ID);
-    const { GET } = await import('./route');
-    const response = await GET(
+    const response = await callLinearCallback(
       makeRequest(`/api/integrations/linear/callback?code=abc&state=${state}`)
     );
 
@@ -205,12 +231,38 @@ describe('GET /api/integrations/linear/callback', () => {
     expectRedirectLocation(response, '/integrations/linear?success=installed');
   });
 
+  test('redirects successful installs to returnTo when signed state carries one', async () => {
+    mockedUpsertLinearInstallation.mockResolvedValue({} as never);
+    const state = createOAuthState(`user_${USER_ID}`, USER_ID, '/claw/new?step=linear');
+    const response = await callLinearCallback(
+      makeRequest(`/api/integrations/linear/callback?code=abc&state=${state}`)
+    );
+
+    expectRedirectLocation(response, '/claw/new?step=linear&success=linear_installed');
+  });
+
+  test('inserts returnTo success query before a fragment', async () => {
+    mockedUpsertLinearInstallation.mockResolvedValue({} as never);
+    const state = createOAuthState(`user_${USER_ID}`, USER_ID, '/claw/new#calendar');
+    const response = await callLinearCallback(
+      makeRequest(`/api/integrations/linear/callback?code=abc&state=${state}`)
+    );
+
+    const location = response.headers.get('location');
+    expect(location).toBeTruthy();
+    const url = new URL(location ?? '');
+    expect(`${url.pathname}${url.search}${url.hash}`).toBe(
+      '/claw/new?success=linear_installed#calendar'
+    );
+  });
+
   test('falls back to organizationId when the Linear GraphQL query fails', async () => {
     mockLinearOrganization.mockRejectedValue(new Error('Unauthorized'));
     mockedUpsertLinearInstallation.mockResolvedValue({} as never);
     const state = createOAuthState(`user_${USER_ID}`, USER_ID);
-    const { GET } = await import('./route');
-    await GET(makeRequest(`/api/integrations/linear/callback?code=abc&state=${state}`));
+    await callLinearCallback(
+      makeRequest(`/api/integrations/linear/callback?code=abc&state=${state}`)
+    );
 
     expect(mockedUpsertLinearInstallation).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -242,8 +294,7 @@ describe('GET /api/integrations/linear/callback', () => {
     mockedBotGetAdapter.mockReturnValue(adapter as never);
 
     const state = createOAuthState(`user_${USER_ID}`, USER_ID);
-    const { GET } = await import('./route');
-    const response = await GET(
+    const response = await callLinearCallback(
       makeRequest(`/api/integrations/linear/callback?code=abc&state=${state}`)
     );
 
@@ -336,8 +387,7 @@ describe('GET /api/integrations/linear/callback bot-link flow', () => {
       callbackPath: '/linear/link',
     });
 
-    const { GET } = await import('./route');
-    const response = await GET(
+    const response = await callLinearCallback(
       makeRequest('/api/integrations/linear/callback?code=abc&state=signed-bot-link')
     );
 
@@ -354,8 +404,7 @@ describe('GET /api/integrations/linear/callback bot-link flow', () => {
       organizationName: 'Another Workspace',
     });
 
-    const { GET } = await import('./route');
-    const response = await GET(
+    const response = await callLinearCallback(
       makeRequest('/api/integrations/linear/callback?code=abc&state=signed-bot-link')
     );
 
@@ -367,8 +416,7 @@ describe('GET /api/integrations/linear/callback bot-link flow', () => {
   test('returns 403 when the Kilo user cannot access the integration owner', async () => {
     mockedCanKiloUserAccessPlatformIntegration.mockResolvedValue(false);
 
-    const { GET } = await import('./route');
-    const response = await GET(
+    const response = await callLinearCallback(
       makeRequest('/api/integrations/linear/callback?code=abc&state=signed-bot-link')
     );
 
@@ -380,8 +428,7 @@ describe('GET /api/integrations/linear/callback bot-link flow', () => {
   test('returns 404 when the integration cannot be found', async () => {
     mockedGetPlatformIntegrationById.mockRejectedValue(new Error('not found'));
 
-    const { GET } = await import('./route');
-    const response = await GET(
+    const response = await callLinearCallback(
       makeRequest('/api/integrations/linear/callback?code=abc&state=signed-bot-link')
     );
 
@@ -400,8 +447,7 @@ describe('GET /api/integrations/linear/callback bot-link flow', () => {
       metadata: { bot_enabled: true },
     } as never);
 
-    const { GET } = await import('./route');
-    const response = await GET(
+    const response = await callLinearCallback(
       makeRequest('/api/integrations/linear/callback?code=abc&state=signed-bot-link')
     );
 
@@ -413,8 +459,7 @@ describe('GET /api/integrations/linear/callback bot-link flow', () => {
   test('returns 404 when bot is not enabled for the integration', async () => {
     mockIsEnabledForBot.mockReturnValue(false);
 
-    const { GET } = await import('./route');
-    const response = await GET(
+    const response = await callLinearCallback(
       makeRequest('/api/integrations/linear/callback?code=abc&state=signed-bot-link')
     );
 
@@ -424,8 +469,7 @@ describe('GET /api/integrations/linear/callback bot-link flow', () => {
   });
 
   test('renders an error page when Linear returns an OAuth error', async () => {
-    const { GET } = await import('./route');
-    const response = await GET(
+    const response = await callLinearCallback(
       makeRequest('/api/integrations/linear/callback?error=access_denied&state=signed-bot-link')
     );
 
@@ -435,8 +479,7 @@ describe('GET /api/integrations/linear/callback bot-link flow', () => {
   });
 
   test('happy path: links the OAuth-verified Linear viewer id, NOT the comment author id', async () => {
-    const { GET } = await import('./route');
-    const response = await GET(
+    const response = await callLinearCallback(
       makeRequest('/api/integrations/linear/callback?code=abc&state=signed-bot-link')
     );
 
@@ -475,8 +518,9 @@ describe('GET /api/integrations/linear/callback bot-link flow', () => {
       scope: 'read',
     });
 
-    const { GET } = await import('./route');
-    await GET(makeRequest('/api/integrations/linear/callback?code=abc&state=signed-bot-link'));
+    await callLinearCallback(
+      makeRequest('/api/integrations/linear/callback?code=abc&state=signed-bot-link')
+    );
 
     expect(mockedRevokeLinearToken).toHaveBeenCalledWith('lin_user_tok', 'access_token');
     expect(mockedRevokeLinearToken).toHaveBeenCalledWith('lin_refresh_tok', 'refresh_token');
@@ -491,11 +535,12 @@ describe('GET /api/integrations/linear/callback bot-link flow', () => {
     });
     mockedLinkKiloUser.mockRejectedValueOnce(new Error('db down'));
 
-    const { GET } = await import('./route');
     // The outer GET handler catches thrown errors and turns them into a
     // redirect, so we don't observe the throw here — we only care that the
     // `finally` in the bot-link handler dropped the proof tokens.
-    await GET(makeRequest('/api/integrations/linear/callback?code=abc&state=signed-bot-link'));
+    await callLinearCallback(
+      makeRequest('/api/integrations/linear/callback?code=abc&state=signed-bot-link')
+    );
 
     expect(mockedLinkKiloUser).toHaveBeenCalledTimes(1);
     expect(mockedRevokeLinearToken).toHaveBeenCalledWith('lin_user_tok', 'access_token');
@@ -517,8 +562,9 @@ describe('GET /api/integrations/linear/callback bot-link flow', () => {
       deleteInstallation: jest.fn(async () => undefined),
     } as never);
 
-    const { GET } = await import('./route');
-    await GET(makeRequest('/api/integrations/linear/callback?code=abc&state=signed-bot-link'));
+    await callLinearCallback(
+      makeRequest('/api/integrations/linear/callback?code=abc&state=signed-bot-link')
+    );
 
     expect(handleOAuthCallback).not.toHaveBeenCalled();
   });

@@ -8,6 +8,7 @@ import type { Supervisor } from '../supervisor';
 import { backupConfigFile, writeBaseConfig } from '../config-writer';
 import { GOG_SECTION_CONFIG, seedExecApprovalsDefaults, updateToolsMdSection } from '../bootstrap';
 import { getBearerToken } from './gateway';
+import { registerAgentConfigRoutes } from './config-agents';
 
 const ReplaceConfigBodySchema = z.object({
   config: z.record(z.string(), z.unknown()),
@@ -71,6 +72,8 @@ export function registerConfigRoutes(
     }
     await next();
   });
+
+  registerAgentConfigRoutes(app);
 
   // Read the current openclaw.json config from disk.
   app.get('/_kilo/config/read', c => {

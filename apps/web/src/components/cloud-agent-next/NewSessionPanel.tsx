@@ -68,14 +68,10 @@ import {
 } from '@/components/cloud-agent-next/utils/git-utils';
 import type { AgentMode } from './types';
 import { generateMessageId } from '@/lib/cloud-agent-sdk/message-id';
-import { useImageUpload } from '@/hooks/useImageUpload';
-import { ImagePreviewStrip } from '@/components/shared/ImagePreviewStrip';
+import { useCloudAgentAttachmentUpload } from '@/hooks/useCloudAgentAttachmentUpload';
+import { AttachmentPreviewStrip } from './AttachmentPreviewStrip';
 import {
-  CLOUD_AGENT_IMAGE_ALLOWED_TYPES,
-  CLOUD_AGENT_IMAGE_MAX_COUNT,
-  CLOUD_AGENT_IMAGE_MAX_DIMENSION_PX,
-  CLOUD_AGENT_IMAGE_MAX_ORIGINAL_SIZE_BYTES,
-  CLOUD_AGENT_IMAGE_MAX_SIZE_BYTES,
+  CLOUD_AGENT_ATTACHMENT_MAX_COUNT,
   CLOUD_AGENT_PROMPT_MAX_LENGTH,
 } from '@/lib/cloud-agent/constants';
 import {
@@ -115,10 +111,10 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
   const commandListRef = useRef<HTMLDivElement>(null);
   const [devcontainer, setDevcontainer] = useState(false);
   const { mutateAsync: personalUploadUrl } = useMutation(
-    trpc.cloudAgentNext.getImageUploadUrl.mutationOptions()
+    trpc.cloudAgentNext.getAttachmentUploadUrl.mutationOptions()
   );
   const { mutateAsync: orgUploadUrl } = useMutation(
-    trpc.organizations.cloudAgentNext.getImageUploadUrl.mutationOptions()
+    trpc.organizations.cloudAgentNext.getAttachmentUploadUrl.mutationOptions()
   );
 
   // ---------------------------------------------------------------------------
@@ -174,22 +170,18 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
   const [isRepoUserSelected, setIsRepoUserSelected] = useState(false);
   const [showRepositoryRequiredMessage, setShowRepositoryRequiredMessage] = useState(false);
   const [isPreparing, setIsPreparing] = useState(false);
-  const [imageMessageUuid, setImageMessageUuid] = useState(() => crypto.randomUUID());
+  const [attachmentMessageUuid, setAttachmentMessageUuid] = useState(() => crypto.randomUUID());
 
-  const imageUpload = useImageUpload({
-    messageUuid: imageMessageUuid,
+  const attachmentUpload = useCloudAgentAttachmentUpload({
+    messageUuid: attachmentMessageUuid,
     organizationId,
-    maxImages: CLOUD_AGENT_IMAGE_MAX_COUNT,
-    maxOriginalFileSizeBytes: CLOUD_AGENT_IMAGE_MAX_ORIGINAL_SIZE_BYTES,
-    maxFileSizeBytes: CLOUD_AGENT_IMAGE_MAX_SIZE_BYTES,
-    allowedTypes: CLOUD_AGENT_IMAGE_ALLOWED_TYPES,
-    resizeImages: { maxDimensionPx: CLOUD_AGENT_IMAGE_MAX_DIMENSION_PX },
     getUploadUrl: {
       personal: personalUploadUrl,
       organization: orgUploadUrl,
     },
   });
-  const isImageLimitReached = imageUpload.images.length >= CLOUD_AGENT_IMAGE_MAX_COUNT;
+  const isAttachmentLimitReached =
+    attachmentUpload.attachments.length >= CLOUD_AGENT_ATTACHMENT_MAX_COUNT;
 
   // ---------------------------------------------------------------------------
   // Session form atoms (profile override)
@@ -684,10 +676,10 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
     model.length > 0 &&
     !isPreparing &&
     !hasInsufficientBalance &&
-    !imageUpload.hasUploadingImages;
+    !attachmentUpload.hasUploadingAttachments;
 
   const handleStartSession = useCallback(async () => {
-    if (!prompt.trim() || imageUpload.hasUploadingImages) return;
+    if (!prompt.trim() || attachmentUpload.hasUploadingAttachments) return;
     if (!selectedRepo) {
       setShowRepositoryRequiredMessage(true);
       return;
@@ -708,9 +700,9 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
           ? { command: slashMatch[1], args: slashMatch[2]?.trim() ?? '' }
           : null;
 
-      if (slashCommand && imageUpload.images.length > 0) {
-        toast.error('Images cannot be attached to slash commands', {
-          description: 'Remove the images or type a plain prompt instead.',
+      if (slashCommand && attachmentUpload.attachments.length > 0) {
+        toast.error('Files cannot be attached to slash commands', {
+          description: 'Remove the files or type a plain prompt instead.',
         });
         setIsPreparing(false);
         return;
@@ -725,7 +717,7 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
         autoCommit: true,
         autoInitiate: true,
         initialMessageId,
-        images: imageUpload.getImagesData(),
+        attachments: attachmentUpload.getAttachmentsData(),
         ...(slashCommand
           ? {
               initialPayload: {
@@ -783,8 +775,8 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
         }),
       });
 
-      imageUpload.clearImages();
-      setImageMessageUuid(crypto.randomUUID());
+      attachmentUpload.clearAttachments();
+      setAttachmentMessageUuid(crypto.randomUUID());
 
       const basePath = organizationId ? `/organizations/${organizationId}/cloud` : '/cloud';
       router.push(`${basePath}/chat?sessionId=${result.kiloSessionId}`);
@@ -796,7 +788,7 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
     }
   }, [
     effectiveDevcontainer,
-    imageUpload,
+    attachmentUpload,
     displayModel,
     // `displayVariant` is what we actually submit; raw `variant` is only read
     // inside the `!hasAgentModelOverride` branch for last-used persistence, so
@@ -848,10 +840,10 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
         .map(item => item.getAsFile())
         .filter((file): file is File => file !== null);
       if (files.length > 0) {
-        imageUpload.addFiles(files);
+        attachmentUpload.addFiles(files);
       }
     },
-    [imageUpload]
+    [attachmentUpload]
   );
 
   const handleKeyDown = useCallback(
@@ -931,15 +923,15 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
           className={cn(
             'relative overflow-hidden bg-muted/30 focus-within:ring-ring rounded-lg border focus-within:ring-2',
             isPreparing && 'pointer-events-none opacity-60',
-            imageUpload.isDragging && 'border-transparent focus-within:ring-0'
+            attachmentUpload.isDragging && 'border-transparent focus-within:ring-0'
           )}
-          {...imageUpload.dragHandlers}
+          {...attachmentUpload.dragHandlers}
         >
-          {imageUpload.isDragging && (
+          {attachmentUpload.isDragging && (
             <div
               className={cn(
                 'absolute inset-0 z-10 flex items-center justify-center rounded-lg border-2 border-dashed backdrop-blur-[2px]',
-                isImageLimitReached
+                isAttachmentLimitReached
                   ? 'border-amber-500/60 bg-amber-500/10'
                   : 'border-primary/60 bg-primary/5'
               )}
@@ -947,25 +939,25 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
               <div
                 className={cn(
                   'flex items-center gap-2 text-sm font-medium',
-                  isImageLimitReached ? 'text-amber-400' : 'text-primary'
+                  isAttachmentLimitReached ? 'text-amber-400' : 'text-primary'
                 )}
               >
                 <Upload className="h-4 w-4" />
-                {isImageLimitReached
-                  ? `Maximum ${CLOUD_AGENT_IMAGE_MAX_COUNT} images attached`
-                  : 'Drop images here'}
+                {isAttachmentLimitReached
+                  ? `Maximum ${CLOUD_AGENT_ATTACHMENT_MAX_COUNT} files attached`
+                  : 'Drop files here'}
               </div>
             </div>
           )}
           <input
             ref={fileInputRef}
             type="file"
-            accept="image/png,image/jpeg,image/webp,image/gif"
+            accept="image/png,image/jpeg,image/webp,image/gif,application/pdf,.txt,.md,.csv"
             multiple
             className="hidden"
             onChange={e => {
               if (e.target.files) {
-                imageUpload.addFiles(e.target.files);
+                attachmentUpload.addFiles(e.target.files);
                 e.target.value = '';
               }
             }}
@@ -1035,12 +1027,11 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
               characters
             </p>
           )}
-          {imageUpload.images.length > 0 && (
+          {attachmentUpload.attachments.length > 0 && (
             <div className="px-4 pb-1">
-              <ImagePreviewStrip
-                images={imageUpload.images}
-                onRemove={imageUpload.removeImage}
-                size="compact"
+              <AttachmentPreviewStrip
+                attachments={attachmentUpload.attachments}
+                onRemove={attachmentUpload.removeAttachment}
               />
             </div>
           )}
@@ -1143,9 +1134,9 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
               size="icon"
               onClick={() => fileInputRef.current?.click()}
               disabled={isPreparing}
-              className="h-8 w-8 rounded-lg"
-              title="Attach images"
-              aria-label="Attach images"
+              className="relative h-8 w-8 rounded-lg before:absolute before:-inset-1.5"
+              title="Attach files"
+              aria-label="Attach files"
             >
               <Paperclip className="h-4 w-4" />
             </UIButton>
@@ -1164,8 +1155,8 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
               variant="primary"
               size="icon"
               onClick={() => void handleStartSession()}
-              disabled={!isFormValid || isPreparing || imageUpload.hasUploadingImages}
-              className="h-8 w-8 rounded-lg"
+              disabled={!isFormValid || isPreparing || attachmentUpload.hasUploadingAttachments}
+              className="relative h-8 w-8 rounded-lg before:absolute before:-inset-1.5"
               aria-describedby={
                 showRepositoryRequiredMessage ? 'new-session-repository-required' : undefined
               }

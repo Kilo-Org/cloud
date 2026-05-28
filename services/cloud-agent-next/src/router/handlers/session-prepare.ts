@@ -222,12 +222,12 @@ export function prepareInputToSessionCreateRequest(input: PrepareInput): Session
           id: input.initialMessageId,
           command: input.initialPayload.command,
           arguments: input.initialPayload.arguments,
-          images: input.images,
+          attachments: input.attachments ?? input.images,
         }
       : {
           type: 'prompt',
           prompt: input.prompt,
-          images: input.images,
+          attachments: input.attachments ?? input.images,
           id: input.initialMessageId,
         };
 
@@ -297,11 +297,11 @@ const prepareSessionHandler = internalApiProtectedProcedure
 
       if (
         requestWithProfile.initialTurn.type === 'command' &&
-        requestWithProfile.initialTurn.images !== undefined
+        requestWithProfile.initialTurn.attachments !== undefined
       ) {
         throw new TRPCError({
           code: 'BAD_REQUEST',
-          message: 'Images cannot be attached to slash commands',
+          message: 'Attachments cannot be attached to slash commands',
         });
       }
 

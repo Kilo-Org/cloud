@@ -860,6 +860,46 @@ export async function POST(
     // - running -> completed/failed (callback)
     // - queued -> completed/failed (edge case: immediate failure)
 
+    const parentStatusUpdates = {
+      sessionId,
+      cliSessionId,
+      errorMessage,
+      terminalReason,
+      startedAt:
+        status === 'running'
+          ? review.started_at
+            ? new Date(review.started_at)
+            : new Date()
+          : undefined,
+      completedAt:
+        status === 'completed' || status === 'failed' || status === 'cancelled'
+          ? new Date()
+          : undefined,
+    };
+    const isModelNotFoundCancellation =
+      status === 'cancelled' &&
+      isModelNotFoundCodeReviewTerminalReason(terminalReason, errorMessage);
+
+    if (isModelNotFoundCancellation) {
+      const claimedTerminalUpdate = await updateCodeReviewStatusIfNonTerminal(
+        reviewId,
+        status,
+        parentStatusUpdates
+      );
+      if (!claimedTerminalUpdate) {
+        logExceptInTest(
+          '[code-review-status] Model unavailable cancellation was already persisted, skipping summary upsert',
+          { reviewId }
+        );
+        return NextResponse.json({
+          success: true,
+          message: 'Review already in terminal state',
+        });
+      }
+    } else {
+      await updateCodeReviewStatus(reviewId, status, parentStatusUpdates);
+    }
+
     // Fetch integration once — used for gate check updates and post-completion actions
     const integration = review.platform_integration_id
       ? await getIntegrationById(review.platform_integration_id)
@@ -874,9 +914,6 @@ export async function POST(
           )
         : undefined;
 
-    // Update PR gate check BEFORE writing terminal DB state.
-    // Once the DB moves to a terminal status, subsequent callbacks hit the early-return
-    // above, so a flaky gate update would be unrecoverable.
     if (integration) {
       try {
         await updatePRGateCheck(
@@ -900,51 +937,11 @@ export async function POST(
               checkRunId: String(review.check_run_id ?? ''),
             },
           });
-          // Abort so the caller retries — once the DB moves to a terminal status
-          // the early-return above prevents any later attempt to update the gate.
-          throw gateCheckError;
         }
       }
     }
 
-    const parentStatusUpdates = {
-      sessionId,
-      cliSessionId,
-      errorMessage,
-      terminalReason,
-      startedAt:
-        status === 'running'
-          ? review.started_at
-            ? new Date(review.started_at)
-            : new Date()
-          : undefined,
-      completedAt:
-        status === 'completed' || status === 'failed' || status === 'cancelled'
-          ? new Date()
-          : undefined,
-    };
-
-    if (
-      integration &&
-      status === 'cancelled' &&
-      isModelNotFoundCodeReviewTerminalReason(terminalReason, errorMessage)
-    ) {
-      const claimedTerminalUpdate = await updateCodeReviewStatusIfNonTerminal(
-        reviewId,
-        status,
-        parentStatusUpdates
-      );
-      if (!claimedTerminalUpdate) {
-        logExceptInTest(
-          '[code-review-status] Model unavailable cancellation was already persisted, skipping summary upsert',
-          { reviewId }
-        );
-        return NextResponse.json({
-          success: true,
-          message: 'Review already in terminal state',
-        });
-      }
-
+    if (integration && isModelNotFoundCancellation) {
       try {
         await upsertModelNotFoundSummary(review, integration, gitlabAccessToken);
       } catch (summaryError) {
@@ -957,8 +954,6 @@ export async function POST(
           extra: { reviewId, platform: review.platform || 'github' },
         });
       }
-    } else {
-      await updateCodeReviewStatus(reviewId, status, parentStatusUpdates);
     }
 
     logExceptInTest('[code-review-status] Updated review status', {

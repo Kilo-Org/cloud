@@ -110,6 +110,11 @@ const financialItems: MenuItem[] = [
     icon: () => <Coins />,
   },
   {
+    title: () => 'Early Fraud Warnings',
+    url: '/admin/early-fraud-warnings',
+    icon: () => <Shield />,
+  },
+  {
     title: () => 'Revenue KPI',
     url: '/admin/revenue',
     icon: () => <DollarSign />,

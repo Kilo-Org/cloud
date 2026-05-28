@@ -16,35 +16,9 @@ export function IntegrationsHub({ organizationId }: IntegrationsHubProps) {
   const trpc = useTRPC();
   const input = organizationId ? { organizationId } : undefined;
 
-  // Fetch all installation statuses via tRPC.
-  // These individual useQuery calls are automatically batched into a single HTTP request
-  // by tRPC's built-in batching (httpBatchLink), so no manual parallelization is needed.
-  const { data: githubInstallation, isLoading: githubLoading } = useQuery(
-    trpc.githubApps.getInstallation.queryOptions(input)
+  const { data: installationStatuses, isLoading } = useQuery(
+    trpc.platformIntegrations.listSetupStatus.queryOptions(input)
   );
-  const { data: slackInstallation, isLoading: slackLoading } = useQuery(
-    trpc.slack.getInstallation.queryOptions(input)
-  );
-  const { data: discordInstallation, isLoading: discordLoading } = useQuery(
-    trpc.discord.getInstallation.queryOptions(input)
-  );
-  const { data: gitlabInstallation, isLoading: gitlabLoading } = useQuery(
-    trpc.gitlab.getInstallation.queryOptions(input)
-  );
-  const { data: linearInstallation, isLoading: linearLoading } = useQuery(
-    trpc.linear.getInstallation.queryOptions(input)
-  );
-  const { data: dolthubInstallation, isLoading: dolthubLoading } = useQuery(
-    trpc.dolthub.getInstallation.queryOptions(input)
-  );
-
-  const isLoading =
-    githubLoading ||
-    slackLoading ||
-    discordLoading ||
-    gitlabLoading ||
-    linearLoading ||
-    dolthubLoading;
 
   if (isLoading) {
     return (
@@ -63,17 +37,7 @@ export function IntegrationsHub({ organizationId }: IntegrationsHubProps) {
     );
   }
 
-  const platforms = buildPlatforms(
-    {
-      github: githubInstallation,
-      slack: slackInstallation,
-      discord: discordInstallation,
-      gitlab: gitlabInstallation,
-      linear: linearInstallation,
-      dolthub: dolthubInstallation,
-    },
-    organizationId
-  );
+  const platforms = buildPlatforms(installationStatuses ?? [], organizationId);
 
   const handleNavigate = (platformId: string) => {
     const platform = platforms.find(p => p.id === platformId);

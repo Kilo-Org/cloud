@@ -2,7 +2,7 @@ import { z } from 'zod';
 import type { CallbackTarget } from '../callbacks/index.js';
 import type { ExecutionMode, SessionMessageIntent } from '../execution/types.js';
 import { renderExecutionTurnContent } from '../execution/types.js';
-import { ImagesSchema } from '../persistence/schemas.js';
+import { AttachmentsSchema } from '../persistence/schemas.js';
 import { MESSAGE_ID_FORMAT_DESCRIPTION, MESSAGE_ID_PATTERN } from './message-id.js';
 
 const SESSION_MESSAGE_STATE_PREFIX = 'session_message:';
@@ -79,12 +79,14 @@ export const SessionMessageStateSchema = z
     admissionSnapshot: z
       .object({
         turn: z.discriminatedUnion('type', [
-          z.object({
-            type: z.literal('prompt'),
-            messageId: z.string(),
-            prompt: z.string(),
-            images: ImagesSchema.optional(),
-          }),
+          z
+            .object({
+              type: z.literal('prompt'),
+              messageId: z.string(),
+              prompt: z.string(),
+              attachments: AttachmentsSchema.optional(),
+            })
+            .strict(),
           z.object({
             type: z.literal('command'),
             messageId: z.string(),
@@ -105,12 +107,14 @@ export const SessionMessageStateSchema = z
       .object({
         turn: z
           .discriminatedUnion('type', [
-            z.object({
-              type: z.literal('prompt'),
-              messageId: z.string(),
-              prompt: z.string(),
-              images: ImagesSchema.optional(),
-            }),
+            z
+              .object({
+                type: z.literal('prompt'),
+                messageId: z.string(),
+                prompt: z.string(),
+                attachments: AttachmentsSchema.optional(),
+              })
+              .strict(),
             z.object({
               type: z.literal('command'),
               messageId: z.string(),
@@ -135,7 +139,6 @@ export const SessionMessageStateSchema = z
       })
       .optional(),
     turn: z.unknown().optional(),
-    images: ImagesSchema.optional(),
     createdAt: z.number(),
     queuedAt: z.number().optional(),
     acceptedAt: z.number().optional(),
@@ -205,6 +208,100 @@ function sessionMessageStateKey(messageId: string): string {
   return `${SESSION_MESSAGE_STATE_PREFIX}${messageId}`;
 }
 
+function normalizeLegacyAdmissionConstraints(
+  constraints: z.infer<typeof SessionMessageStateSchema>['legacyAdmissionConstraints']
+): LegacyAdmissionConstraints | undefined {
+  if (!constraints) return undefined;
+  return {
+    ...constraints,
+    turn:
+      constraints.turn?.type === 'prompt'
+        ? {
+            type: 'prompt',
+            messageId: constraints.turn.messageId,
+            prompt: constraints.turn.prompt,
+            attachments: constraints.turn.attachments,
+          }
+        : constraints.turn,
+  };
+}
+
+function normalizeParsedSessionMessageState(
+  state: z.infer<typeof SessionMessageStateSchema>
+): SessionMessageState {
+  const currentState = { ...state };
+
+  delete currentState.turn;
+  delete currentState.images;
+  delete currentState.agent;
+  delete currentState.finalization;
+  currentState.legacyAdmissionConstraints = normalizeLegacyAdmissionConstraints(
+    state.legacyAdmissionConstraints
+  );
+  if (state.admissionSnapshot) {
+    const admissionSnapshot = state.admissionSnapshot;
+    return {
+      ...currentState,
+      admissionSnapshot: {
+        ...admissionSnapshot,
+        turn:
+          admissionSnapshot.turn.type === 'prompt'
+            ? {
+                type: 'prompt',
+                messageId: admissionSnapshot.turn.messageId,
+                prompt: admissionSnapshot.turn.prompt,
+                attachments: admissionSnapshot.turn.attachments,
+              }
+            : admissionSnapshot.turn,
+      },
+    };
+  }
+  const parsedTurn = z
+    .discriminatedUnion('type', [
+      z
+        .object({
+          type: z.literal('prompt'),
+          messageId: z.string(),
+          prompt: z.string(),
+          attachments: AttachmentsSchema.optional(),
+        })
+        .strict(),
+      z.object({
+        type: z.literal('command'),
+        messageId: z.string(),
+        command: z.string(),
+        arguments: z.string(),
+      }),
+    ])
+    .safeParse(state.turn);
+  const constraints: LegacyAdmissionConstraints = {
+    turn: parsedTurn.success
+      ? parsedTurn.data.type === 'prompt'
+        ? {
+            type: 'prompt',
+            messageId: parsedTurn.data.messageId,
+            prompt: parsedTurn.data.prompt,
+            attachments: parsedTurn.data.attachments,
+          }
+        : parsedTurn.data
+      : undefined,
+    agent:
+      state.agent &&
+      (state.agent.mode !== undefined ||
+        state.agent.model !== undefined ||
+        state.agent.variant !== undefined)
+        ? {
+            mode: state.agent.mode,
+            model: state.agent.model,
+            variant: state.agent.variant,
+          }
+        : undefined,
+    finalization: state.finalization,
+  };
+  if (!constraints.turn && !constraints.agent && !constraints.finalization) return currentState;
+  return { ...currentState, legacyAdmissionConstraints: constraints };
+}
+
 export async function getSessionMessageState(
   storage: SessionMessageStorage,
   messageId: string
@@ -219,52 +316,7 @@ export async function getSessionMessageState(
     });
     return undefined;
   }
-  const state = result.data;
-  const currentState = { ...state };
-
-  delete currentState.turn;
-  delete currentState.images;
-  delete currentState.agent;
-  delete currentState.finalization;
-  if (state.admissionSnapshot) return currentState;
-  const legacy = raw as {
-    turn?: unknown;
-    agent?: { mode?: string; model?: string; variant?: string };
-    finalization?: SessionMessageIntent['finalization'];
-  };
-  const parsedTurn = z
-    .discriminatedUnion('type', [
-      z.object({
-        type: z.literal('prompt'),
-        messageId: z.string(),
-        prompt: z.string(),
-        images: ImagesSchema.optional(),
-      }),
-      z.object({
-        type: z.literal('command'),
-        messageId: z.string(),
-        command: z.string(),
-        arguments: z.string(),
-      }),
-    ])
-    .safeParse(legacy.turn);
-  const constraints: LegacyAdmissionConstraints = {
-    turn: parsedTurn.success ? parsedTurn.data : undefined,
-    agent:
-      legacy.agent &&
-      (legacy.agent.mode !== undefined ||
-        legacy.agent.model !== undefined ||
-        legacy.agent.variant !== undefined)
-        ? {
-            mode: legacy.agent.mode,
-            model: legacy.agent.model,
-            variant: legacy.agent.variant,
-          }
-        : undefined,
-    finalization: legacy.finalization,
-  };
-  if (!constraints.turn && !constraints.agent && !constraints.finalization) return currentState;
-  return { ...currentState, legacyAdmissionConstraints: constraints };
+  return normalizeParsedSessionMessageState(result.data);
 }
 
 export async function putSessionMessageState(
@@ -486,7 +538,7 @@ async function listSessionMessageStates(
       console.warn('Skipping invalid session message state', { issues: result.error.issues });
       return [];
     }
-    return [result.data];
+    return [normalizeParsedSessionMessageState(result.data)];
   });
 }
 

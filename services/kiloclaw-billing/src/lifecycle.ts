@@ -14,6 +14,7 @@ import {
   getWorkerDb,
   insertKiloClawSubscriptionChangeLog,
   recordTerminalRenewalFailure,
+  serializeKiloClawSubscriptionSnapshot,
   supersedeTerminalRenewalFailuresForBoundary,
   type KiloClawSubscription,
   type Organization,
@@ -40,6 +41,7 @@ import {
   kilo_pass_subscriptions,
   kiloclaw_email_log,
   kiloclaw_instances,
+  kiloclaw_subscription_change_log,
   kiloclaw_subscriptions,
   kilocode_users,
   organization_memberships,
@@ -85,7 +87,14 @@ const DESTRUCTION_WARNING_DAYS = 2;
 const EARLYBIRD_WARNING_DAYS = 14;
 const AUTO_RESUME_INITIAL_BACKOFF_MS = 2 * 60 * 60 * 1000;
 const AUTO_RESUME_MAX_BACKOFF_MS = 24 * 60 * 60 * 1000;
-const INSTANCE_DESTRUCTION_BATCH_SIZE = 50;
+// Per-cron-tick destruction batch size. Each row's destroy takes ~7-8s
+// (Fly API + DO finalize), and the Cloudflare queue consumer's wall-clock
+// budget per message is 15 minutes — so safe ceiling for the current
+// sequential loop is roughly 100. We chose 75 to leave a generous margin
+// for slower rows while still meaningfully outpacing inflow. Crank higher
+// only after parallelizing the destroy loop, or batches will start
+// hitting the wall-clock limit and getting retried.
+const INSTANCE_DESTRUCTION_BATCH_SIZE = 75;
 const TRIAL_INACTIVITY_BATCH_SIZE = 50;
 const SOFT_DELETED_EMAIL_SUFFIX = '@deleted.invalid';
 const TRIAL_ENDING_SOON_MIN_DURATION_DAYS = 2;
@@ -702,6 +711,99 @@ async function insertLifecycleChangeLogBestEffort(
       instanceId: params.after.instance_id ?? undefined,
       action: params.action,
       reason: params.reason,
+      error: errorMessage(error),
+    });
+  }
+}
+
+/**
+ * Clear `destruction_deadline` on a batch of subscriptions whose instances
+ * have already been cleaned up via some other path (`instance_id IS NULL`),
+ * so the destruction sweep stops re-selecting them on every cron.
+ *
+ * The destruction sweep selects candidates ordered by `destruction_deadline
+ * ASC, id ASC` with `LIMIT INSTANCE_DESTRUCTION_BATCH_SIZE`, then per-row
+ * checks `!row.instance_id` and `continue`s. Without this cleanup, the same
+ * detached rows stay at the head of the queue forever and every row behind
+ * them is starved — production saw 25k+ overdue real rows stuck behind a
+ * head of ~50 detached rows for 40 days. Clearing the deadline is the same
+ * final step the happy-path destroy does once the underlying resources are
+ * gone.
+ *
+ * The UPDATE is guarded so a concurrent re-attach or re-clear cannot race:
+ *   - `instance_id IS NULL` — only clear rows that are still detached.
+ *   - `destruction_deadline IS NOT NULL` — skip rows already cleared.
+ * Rows that match neither guard are silently skipped (no changelog entry).
+ *
+ * The SELECT + UPDATE + changelog INSERT run inside a single transaction so
+ * the audit record cannot be lost. If the changelog INSERT fails the UPDATE
+ * rolls back; the rows remain detached with their deadlines, and the next
+ * sweep re-discovers them and retries the whole pair atomically. Without
+ * this, a transient INSERT failure would erase the only signal
+ * (`destruction_deadline IS NOT NULL`) that the cleanup ever ran — there
+ * would be no future sweep to reconstruct the missing audit history.
+ */
+async function clearDetachedSubscriptionDestructionDeadlineBestEffort(
+  database: WorkerDb,
+  subscriptionIds: string[],
+  reason: string
+): Promise<void> {
+  if (subscriptionIds.length === 0) {
+    return;
+  }
+
+  try {
+    await database.transaction(async tx => {
+      // Bulk SELECT for before-snapshots (used in the audit changelog).
+      const befores = await tx
+        .select()
+        .from(kiloclaw_subscriptions)
+        .where(inArray(kiloclaw_subscriptions.id, subscriptionIds));
+
+      // Single guarded UPDATE — rows already cleared or re-attached are skipped.
+      const cleared = await tx
+        .update(kiloclaw_subscriptions)
+        .set({ destruction_deadline: null })
+        .where(
+          and(
+            inArray(kiloclaw_subscriptions.id, subscriptionIds),
+            isNull(kiloclaw_subscriptions.instance_id),
+            isNotNull(kiloclaw_subscriptions.destruction_deadline)
+          )
+        )
+        .returning();
+
+      if (cleared.length === 0) {
+        return;
+      }
+
+      // Bulk changelog INSERT — one round-trip for the entire batch.
+      // A throw here aborts the surrounding transaction (above) so the
+      // UPDATE rolls back. The next sweep retries both atomically.
+      const beforeMap = new Map(befores.map(s => [s.id, s]));
+      const changeLogEntries = cleared.map(after => ({
+        subscription_id: after.id,
+        actor_type: LIFECYCLE_ACTOR.actorType,
+        actor_id: LIFECYCLE_ACTOR.actorId,
+        action: 'status_changed' as KiloClawSubscriptionChangeAction,
+        reason,
+        before_state: serializeKiloClawSubscriptionSnapshot(beforeMap.get(after.id) ?? null),
+        after_state: serializeKiloClawSubscriptionSnapshot(after),
+      }));
+      await tx.insert(kiloclaw_subscription_change_log).values(changeLogEntries);
+    });
+  } catch (error) {
+    // The transaction was rolled back. The detached rows remain in the
+    // candidate set with their deadlines intact, so the next sweep will
+    // pick them up and retry both the UPDATE and the changelog INSERT
+    // atomically. We log but do not rethrow so a single bulk failure does
+    // not abort the outer sweep — every other row in this run still has
+    // its bookkeeping completed normally.
+    log('error', 'Bulk-clear of detached subscription destruction deadlines was rolled back', {
+      event: 'subscription_change_log_failed',
+      outcome: 'failed',
+      reason,
+      subscriptionIdCount: subscriptionIds.length,
       error: errorMessage(error),
     });
   }
@@ -3623,8 +3725,33 @@ async function runInstanceDestructionSweep(
     .orderBy(asc(kiloclaw_subscriptions.destruction_deadline), asc(kiloclaw_subscriptions.id))
     .limit(INSTANCE_DESTRUCTION_BATCH_SIZE);
 
+  // Collect detached row IDs for a single bulk clear after the loop,
+  // avoiding O(n) DB round-trips per row. See
+  // `clearDetachedSubscriptionDestructionDeadlineBestEffort`.
+  const detachedSubscriptionIds: string[] = [];
+
   for (const row of destructionCandidates) {
     try {
+      // Detached rows are checked FIRST, before any other skip path. A row
+      // with no instance has no live resource to destroy regardless of the
+      // owning user's other attributes (soft-deleted, active, etc), so the
+      // deadline is stale bookkeeping and the row must be cleared from the
+      // bounded candidate queue. Without this ordering, a soft-deleted
+      // detached row would hit the soft-deleted continue below and stay
+      // pinned at the head of the FIFO queue indefinitely, recreating the
+      // exact starvation this PR fixes for the common case.
+      if (!row.instance_id) {
+        logSkippedSubscriptionRow(
+          'Skipping instance destruction for detached subscription row',
+          row,
+          {
+            reason: 'missing_instance_id',
+          }
+        );
+        // Bulk-cleared after the loop — see detachedSubscriptionIds below.
+        detachedSubscriptionIds.push(row.id);
+        continue;
+      }
       if (isSoftDeletedUserEmail(row.email)) continue;
       if (row.status === 'active') {
         logSkippedSubscriptionRow(
@@ -3632,16 +3759,6 @@ async function runInstanceDestructionSweep(
           row,
           {
             reason: 'active_subscription',
-          }
-        );
-        continue;
-      }
-      if (!row.instance_id) {
-        logSkippedSubscriptionRow(
-          'Skipping instance destruction for detached subscription row',
-          row,
-          {
-            reason: 'missing_instance_id',
           }
         );
         continue;
@@ -3762,16 +3879,27 @@ async function runInstanceDestructionSweep(
       const [updated] = await database
         .update(kiloclaw_subscriptions)
         .set({ destruction_deadline: null })
-        .where(eq(kiloclaw_subscriptions.id, destructionRow.id))
+        .where(
+          and(
+            eq(kiloclaw_subscriptions.id, destructionRow.id),
+            isNotNull(kiloclaw_subscriptions.destruction_deadline)
+          )
+        )
         .returning();
 
-      await insertLifecycleChangeLogBestEffort(database, {
-        subscriptionId: destructionRow.id,
-        action: 'status_changed',
-        reason: 'instance_destroyed',
-        before,
-        after: updated ?? null,
-      });
+      // Only write changelog when the UPDATE actually changed a row.
+      // A concurrent clear (e.g. clearDetachedSubscriptionDestructionDeadlineBestEffort)
+      // can race here; without this guard the log would record a phantom
+      // `instance_destroyed` event with identical before/after states.
+      if (updated) {
+        await insertLifecycleChangeLogBestEffort(database, {
+          subscriptionId: destructionRow.id,
+          action: 'status_changed',
+          reason: 'instance_destroyed',
+          before,
+          after: updated,
+        });
+      }
 
       let organizationNotificationSentCount = 0;
       if (destructionRow.organization_id && destructionRow.organization_name) {
@@ -3867,6 +3995,14 @@ async function runInstanceDestructionSweep(
       });
     }
   }
+
+  // Bulk-clear destruction_deadline for all detached rows collected above.
+  // A single SELECT + UPDATE + INSERT replaces O(n) per-row round-trips.
+  await clearDetachedSubscriptionDestructionDeadlineBestEffort(
+    database,
+    detachedSubscriptionIds,
+    'detached_subscription_no_instance'
+  );
 }
 
 async function runPastDueCleanupSweep(

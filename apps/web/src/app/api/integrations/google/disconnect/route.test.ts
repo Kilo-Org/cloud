@@ -96,7 +96,7 @@ describe('POST /api/integrations/google/disconnect', () => {
 
     expect(response.status).toBe(303);
     expectRedirectLocation(response, '/claw/settings?success=google_disconnected');
-    expect(mockedGetUserFromAuth).toHaveBeenCalledWith({ adminOnly: true });
+    expect(mockedGetUserFromAuth).toHaveBeenCalledWith({ adminOnly: false });
     expect(mockedGetActiveInstance).toHaveBeenCalledWith(USER_ID);
     expect(mockedGetKiloClawGoogleOAuthConnection).toHaveBeenCalledWith(INSTANCE_ID);
     expect(mockedClearKiloClawGoogleOAuthConnection).toHaveBeenCalledWith(INSTANCE_ID);

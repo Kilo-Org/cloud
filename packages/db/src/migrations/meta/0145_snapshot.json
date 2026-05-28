@@ -1,5 +1,5 @@
 {
-  "id": "76b63bd4-92f3-415a-802f-b56ec2e2b327",
+  "id": "4ded19f6-d687-4f20-bbcf-26e7f6f2e975",
   "prevId": "ad0c69fc-419c-440e-9fa8-8f246897a3d8",
   "version": "7",
   "dialect": "postgresql",
@@ -10762,12 +10762,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "initial_welcome_promo_eligibility_reason": {
-          "name": "initial_welcome_promo_eligibility_reason",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -10866,10 +10860,6 @@
         "kilo_pass_issuances_source_check": {
           "name": "kilo_pass_issuances_source_check",
           "value": "\"kilo_pass_issuances\".\"source\" IN ('stripe_invoice', 'app_store_transaction', 'google_play_transaction', 'cron')"
-        },
-        "kilo_pass_issuances_initial_welcome_promo_reason_check": {
-          "name": "kilo_pass_issuances_initial_welcome_promo_reason_check",
-          "value": "\"kilo_pass_issuances\".\"initial_welcome_promo_eligibility_reason\" IN ('first_payment_fingerprint_claim', 'fingerprint_previously_claimed', 'missing_fingerprint', 'no_supported_fingerprint', 'no_positive_settlement', 'settlement_unresolved')"
         }
       },
       "isRLSEnabled": false
@@ -11894,65 +11884,6 @@
         "kilo_pass_subscriptions_cadence_check": {
           "name": "kilo_pass_subscriptions_cadence_check",
           "value": "\"kilo_pass_subscriptions\".\"cadence\" IN ('monthly', 'yearly')"
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "public.kilo_pass_welcome_promo_payment_fingerprint_claims": {
-      "name": "kilo_pass_welcome_promo_payment_fingerprint_claims",
-      "schema": "",
-      "columns": {
-        "stripe_payment_method_type": {
-          "name": "stripe_payment_method_type",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "stripe_fingerprint": {
-          "name": "stripe_fingerprint",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "source_stripe_invoice_id": {
-          "name": "source_stripe_invoice_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "claimed_at": {
-          "name": "claimed_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {},
-      "compositePrimaryKeys": {
-        "kilo_pass_welcome_promo_payment_fingerprint_claims_stripe_payment_method_type_stripe_fingerprint_pk": {
-          "name": "kilo_pass_welcome_promo_payment_fingerprint_claims_stripe_payment_method_type_stripe_fingerprint_pk",
-          "columns": [
-            "stripe_payment_method_type",
-            "stripe_fingerprint"
-          ]
-        }
-      },
-      "uniqueConstraints": {
-        "UQ_kilo_pass_welcome_promo_payment_fingerprint_claims_source_invoice_id": {
-          "name": "UQ_kilo_pass_welcome_promo_payment_fingerprint_claims_source_invoice_id",
-          "nullsNotDistinct": false,
-          "columns": [
-            "source_stripe_invoice_id"
-          ]
-        }
-      },
-      "policies": {},
-      "checkConstraints": {
-        "kilo_pass_welcome_promo_payment_fingerprint_claims_type_check": {
-          "name": "kilo_pass_welcome_promo_payment_fingerprint_claims_type_check",
-          "value": "\"kilo_pass_welcome_promo_payment_fingerprint_claims\".\"stripe_payment_method_type\" IN ('card', 'sepa_debit', 'us_bank_account', 'bacs_debit', 'au_becs_debit')"
         }
       },
       "isRLSEnabled": false
@@ -21859,6 +21790,525 @@
       },
       "policies": {},
       "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.stripe_early_fraud_warning_actions": {
+      "name": "stripe_early_fraud_warning_actions",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "case_id": {
+          "name": "case_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "action_type": {
+          "name": "action_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "target_key": {
+          "name": "target_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'queued'"
+        },
+        "attempt_count": {
+          "name": "attempt_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "next_retry_at": {
+          "name": "next_retry_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "claimed_at": {
+          "name": "claimed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_attempt_at": {
+          "name": "last_attempt_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "completed_at": {
+          "name": "completed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "terminal_at": {
+          "name": "terminal_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "result_code": {
+          "name": "result_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "result_reference_id": {
+          "name": "result_reference_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "failure_context": {
+          "name": "failure_context",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "IDX_stripe_early_fraud_warning_actions_case_id": {
+          "name": "IDX_stripe_early_fraud_warning_actions_case_id",
+          "columns": [
+            {
+              "expression": "case_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_stripe_early_fraud_warning_actions_claim_path": {
+          "name": "IDX_stripe_early_fraud_warning_actions_claim_path",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "coalesce(\"next_retry_at\", '-infinity'::timestamptz)",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "stripe_early_fraud_warning_actions_case_id_stripe_early_fraud_warning_cases_id_fk": {
+          "name": "stripe_early_fraud_warning_actions_case_id_stripe_early_fraud_warning_cases_id_fk",
+          "tableFrom": "stripe_early_fraud_warning_actions",
+          "tableTo": "stripe_early_fraud_warning_cases",
+          "columnsFrom": [
+            "case_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "UQ_stripe_early_fraud_warning_actions_case_type_target": {
+          "name": "UQ_stripe_early_fraud_warning_actions_case_type_target",
+          "nullsNotDistinct": false,
+          "columns": [
+            "case_id",
+            "action_type",
+            "target_key"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "stripe_early_fraud_warning_actions_action_type_check": {
+          "name": "stripe_early_fraud_warning_actions_action_type_check",
+          "value": "\"stripe_early_fraud_warning_actions\".\"action_type\" IN ('containment', 'refund', 'payment_value_clawback', 'subscription_termination', 'access_termination', 'kiloclaw_suspension', 'affiliate_payout_reversal', 'referral_reward_reversal', 'user_notice')"
+        },
+        "stripe_early_fraud_warning_actions_status_check": {
+          "name": "stripe_early_fraud_warning_actions_status_check",
+          "value": "\"stripe_early_fraud_warning_actions\".\"status\" IN ('queued', 'processing', 'completed', 'failed', 'review_required', 'dismissed')"
+        },
+        "stripe_early_fraud_warning_actions_attempt_count_non_negative_check": {
+          "name": "stripe_early_fraud_warning_actions_attempt_count_non_negative_check",
+          "value": "\"stripe_early_fraud_warning_actions\".\"attempt_count\" >= 0"
+        },
+        "stripe_early_fraud_warning_actions_target_key_not_empty_check": {
+          "name": "stripe_early_fraud_warning_actions_target_key_not_empty_check",
+          "value": "length(\"stripe_early_fraud_warning_actions\".\"target_key\") > 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.stripe_early_fraud_warning_cases": {
+      "name": "stripe_early_fraud_warning_cases",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "stripe_early_fraud_warning_id": {
+          "name": "stripe_early_fraud_warning_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "stripe_event_id": {
+          "name": "stripe_event_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "stripe_charge_id": {
+          "name": "stripe_charge_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "stripe_payment_intent_id": {
+          "name": "stripe_payment_intent_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "stripe_customer_id": {
+          "name": "stripe_customer_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "amount_minor_units": {
+          "name": "amount_minor_units",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "currency": {
+          "name": "currency",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "owner_classification": {
+          "name": "owner_classification",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "kilo_user_id": {
+          "name": "kilo_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "organization_id": {
+          "name": "organization_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'queued'"
+        },
+        "reason": {
+          "name": "reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "failure_context": {
+          "name": "failure_context",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "warning_created_at": {
+          "name": "warning_created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "contained_at": {
+          "name": "contained_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "processing_started_at": {
+          "name": "processing_started_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "completed_at": {
+          "name": "completed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "review_required_at": {
+          "name": "review_required_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "remediated_at": {
+          "name": "remediated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "dismissed_at": {
+          "name": "dismissed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "IDX_stripe_early_fraud_warning_cases_event_id": {
+          "name": "IDX_stripe_early_fraud_warning_cases_event_id",
+          "columns": [
+            {
+              "expression": "stripe_event_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_stripe_early_fraud_warning_cases_charge_id": {
+          "name": "IDX_stripe_early_fraud_warning_cases_charge_id",
+          "columns": [
+            {
+              "expression": "stripe_charge_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_stripe_early_fraud_warning_cases_payment_intent_id": {
+          "name": "IDX_stripe_early_fraud_warning_cases_payment_intent_id",
+          "columns": [
+            {
+              "expression": "stripe_payment_intent_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_stripe_early_fraud_warning_cases_customer_id": {
+          "name": "IDX_stripe_early_fraud_warning_cases_customer_id",
+          "columns": [
+            {
+              "expression": "stripe_customer_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_stripe_early_fraud_warning_cases_kilo_user_id": {
+          "name": "IDX_stripe_early_fraud_warning_cases_kilo_user_id",
+          "columns": [
+            {
+              "expression": "kilo_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_stripe_early_fraud_warning_cases_organization_id": {
+          "name": "IDX_stripe_early_fraud_warning_cases_organization_id",
+          "columns": [
+            {
+              "expression": "organization_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_stripe_early_fraud_warning_cases_status_created_at": {
+          "name": "IDX_stripe_early_fraud_warning_cases_status_created_at",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "stripe_early_fraud_warning_cases_kilo_user_id_kilocode_users_id_fk": {
+          "name": "stripe_early_fraud_warning_cases_kilo_user_id_kilocode_users_id_fk",
+          "tableFrom": "stripe_early_fraud_warning_cases",
+          "tableTo": "kilocode_users",
+          "columnsFrom": [
+            "kilo_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "cascade"
+        },
+        "stripe_early_fraud_warning_cases_organization_id_organizations_id_fk": {
+          "name": "stripe_early_fraud_warning_cases_organization_id_organizations_id_fk",
+          "tableFrom": "stripe_early_fraud_warning_cases",
+          "tableTo": "organizations",
+          "columnsFrom": [
+            "organization_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "UQ_stripe_early_fraud_warning_cases_warning_id": {
+          "name": "UQ_stripe_early_fraud_warning_cases_warning_id",
+          "nullsNotDistinct": false,
+          "columns": [
+            "stripe_early_fraud_warning_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "stripe_early_fraud_warning_cases_owner_classification_check": {
+          "name": "stripe_early_fraud_warning_cases_owner_classification_check",
+          "value": "\"stripe_early_fraud_warning_cases\".\"owner_classification\" IN ('personal', 'organization', 'ambiguous', 'unmatched')"
+        },
+        "stripe_early_fraud_warning_cases_status_check": {
+          "name": "stripe_early_fraud_warning_cases_status_check",
+          "value": "\"stripe_early_fraud_warning_cases\".\"status\" IN ('queued', 'contained', 'processing', 'completed', 'review_required', 'failed', 'remediated', 'dismissed')"
+        },
+        "stripe_early_fraud_warning_cases_amount_minor_units_non_negative_check": {
+          "name": "stripe_early_fraud_warning_cases_amount_minor_units_non_negative_check",
+          "value": "\"stripe_early_fraud_warning_cases\".\"amount_minor_units\" IS NULL OR \"stripe_early_fraud_warning_cases\".\"amount_minor_units\" >= 0"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.stytch_fingerprints": {

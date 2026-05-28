@@ -37,6 +37,23 @@ export enum KiloPassIssuanceItemKind {
   ReferralBonus = 'referral_bonus',
 }
 
+export enum KiloPassWelcomePromoPaymentFingerprintType {
+  Card = 'card',
+  SepaDebit = 'sepa_debit',
+  UsBankAccount = 'us_bank_account',
+  BacsDebit = 'bacs_debit',
+  AuBecsDebit = 'au_becs_debit',
+}
+
+export enum KiloPassWelcomePromoEligibilityReason {
+  FirstPaymentFingerprintClaim = 'first_payment_fingerprint_claim',
+  FingerprintPreviouslyClaimed = 'fingerprint_previously_claimed',
+  MissingFingerprint = 'missing_fingerprint',
+  NoSupportedFingerprint = 'no_supported_fingerprint',
+  NoPositiveSettlement = 'no_positive_settlement',
+  SettlementUnresolved = 'settlement_unresolved',
+}
+
 export enum KiloPassAuditLogAction {
   StripeWebhookReceived = 'stripe_webhook_received',
   KiloPassInvoicePaidHandled = 'kilo_pass_invoice_paid_handled',
@@ -827,6 +844,7 @@ export const GatewayApiKindSchema = z.enum([
   'chat_completions',
   'embeddings',
   'fim_completions',
+  'edit_completions',
   'messages',
   'responses',
   'audio_transcriptions',

@@ -209,6 +209,7 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
   const [terminalStatuses, setTerminalStatuses] = useState<
     Record<string, TerminalStatusSummary | undefined>
   >({});
+  const chatTabActive = workspaceTabs.activeTabId === CHAT_TAB_ID;
 
   useEffect(() => {
     setWorkspaceTabs(resetWorkspaceTabs);
@@ -294,12 +295,18 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
   }, []);
 
   useEffect(() => {
-    if (!chatUI.shouldAutoScroll) return;
+    if (!chatTabActive || !chatUI.shouldAutoScroll) return;
     scheduleScrollToBottom();
-  }, [staticMessages, dynamicMessages, chatUI.shouldAutoScroll, scheduleScrollToBottom]);
+  }, [
+    staticMessages,
+    dynamicMessages,
+    chatTabActive,
+    chatUI.shouldAutoScroll,
+    scheduleScrollToBottom,
+  ]);
 
   useEffect(() => {
-    if (!chatUI.shouldAutoScroll) return;
+    if (!chatTabActive || !chatUI.shouldAutoScroll) return;
     if (typeof ResizeObserver === 'undefined') return;
 
     const content = messagesContentRef.current;
@@ -310,7 +317,7 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
     });
     observer.observe(content);
     return () => observer.disconnect();
-  }, [chatUI.shouldAutoScroll, scheduleScrollToBottom]);
+  }, [chatTabActive, chatUI.shouldAutoScroll, scheduleScrollToBottom]);
 
   useEffect(() => {
     if (!sessionIdFromParams) return;
@@ -670,54 +677,53 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
                     className="flex min-h-0 flex-1 flex-col"
                   >
                     <div className="relative min-h-0 flex-1">
-                      {workspaceTabs.activeTabId === CHAT_TAB_ID && (
-                        <>
-                          <div
-                            ref={scrollContainerRef}
-                            className={`absolute inset-0 overflow-y-auto px-[max(1rem,calc(50%_-_27rem))] pb-2 pt-4 transition-opacity duration-150 ${showLoadingIndicator ? 'pointer-events-none opacity-40' : 'opacity-100'}`}
-                            onScroll={handleScroll}
-                          >
-                            <div ref={messagesContentRef}>
-                              <StaticMessages
-                                messages={staticMessages}
-                                pendingMessages={pendingMessages}
-                                getChildMessages={getChildMessages}
-                                onOpenChildSession={handleOpenTopLevelChildSession}
-                              />
-                              <DynamicMessages
-                                messages={dynamicMessages}
-                                pendingMessages={pendingMessages}
-                                getChildMessages={getChildMessages}
-                                onOpenChildSession={handleOpenTopLevelChildSession}
-                              />
+                      <>
+                        <div
+                          ref={scrollContainerRef}
+                          aria-hidden={!chatTabActive}
+                          className={`absolute inset-0 overflow-y-auto px-[max(1rem,calc(50%_-_27rem))] pb-2 pt-4 transition-opacity duration-150 ${showLoadingIndicator ? 'pointer-events-none opacity-40' : 'opacity-100'} ${chatTabActive ? '' : 'hidden'}`}
+                          onScroll={handleScroll}
+                        >
+                          <div ref={messagesContentRef}>
+                            <StaticMessages
+                              messages={staticMessages}
+                              pendingMessages={pendingMessages}
+                              getChildMessages={getChildMessages}
+                              onOpenChildSession={handleOpenTopLevelChildSession}
+                            />
+                            <DynamicMessages
+                              messages={dynamicMessages}
+                              pendingMessages={pendingMessages}
+                              getChildMessages={getChildMessages}
+                              onOpenChildSession={handleOpenTopLevelChildSession}
+                            />
 
-                              <WorkingIndicator
-                                messages={dynamicMessages}
-                                isStreaming={isStreaming}
-                              />
-                              {statusIndicator && (
-                                <SessionStatusIndicator indicator={statusIndicator} />
-                              )}
+                            <WorkingIndicator
+                              messages={dynamicMessages}
+                              isStreaming={isStreaming}
+                            />
+                            {statusIndicator && (
+                              <SessionStatusIndicator indicator={statusIndicator} />
+                            )}
 
-                              <div ref={messagesEndRef} />
-                            </div>
+                            <div ref={messagesEndRef} />
                           </div>
+                        </div>
 
-                          {showScrollButton && (
-                            <button
-                              type="button"
-                              onClick={scrollToBottom}
-                              className="border-border bg-background absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full border p-2 shadow-md"
-                            >
-                              <ArrowDown className="h-4 w-4" />
-                            </button>
-                          )}
-                        </>
-                      )}
+                        {chatTabActive && showScrollButton && (
+                          <button
+                            type="button"
+                            onClick={scrollToBottom}
+                            className="border-border bg-background absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full border p-2 shadow-md"
+                          >
+                            <ArrowDown className="h-4 w-4" />
+                          </button>
+                        )}
+                      </>
 
                       <div
                         className={
-                          workspaceTabs.activeTabId === CHAT_TAB_ID
+                          chatTabActive
                             ? 'hidden'
                             : 'h-full min-h-0 px-[max(1rem,calc(50%_-_27rem))] py-2'
                         }
@@ -726,7 +732,7 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
                       </div>
                     </div>
 
-                    {workspaceTabs.activeTabId === CHAT_TAB_ID && (
+                    {chatTabActive && (
                       <>
                         {isReadOnly ? (
                           !isLoading && sessionIdFromParams && fetchedSessionData ? (

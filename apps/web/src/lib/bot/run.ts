@@ -1,5 +1,6 @@
 import { createBotRequest, updateBotRequest } from '@/lib/bot/request-logging';
 import { runBotAgent } from '@/lib/bot/agent-runner';
+import { extractAndUploadFileAttachments } from '@/lib/bot/file-attachments';
 import { extractAndUploadImages } from '@/lib/bot/images';
 import type { PlatformIntegration, User } from '@kilocode/db';
 import type { Message, Thread } from 'chat';
@@ -79,6 +80,21 @@ async function processMessage({
     });
   }
 
+  // Extract and upload non-image file attachments (PDF, text, Markdown, CSV).
+  // Failures are non-fatal — we log and continue without the file attachments.
+  let fileAttachments: Awaited<ReturnType<typeof extractAndUploadFileAttachments>>;
+  try {
+    fileAttachments = await extractAndUploadFileAttachments(message, user.id);
+  } catch (error) {
+    console.error(
+      '[KiloBot] Failed to extract/upload file attachments, continuing without them:',
+      error
+    );
+    captureException(error, {
+      tags: { component: 'kilo-bot', op: 'extract-upload-file-attachments' },
+    });
+  }
+
   try {
     const result = await runBotAgent({
       thread,
@@ -89,6 +105,7 @@ async function processMessage({
       botRequestId,
       prompt: message.text,
       images,
+      fileAttachments,
     });
 
     updateBotRequest(botRequestId, {

@@ -342,6 +342,10 @@ export async function cacheRulesEngineClassification(args: {
   }
 }
 
+/**
+ * Returns true when a cached action is severe enough that the gateway should
+ * wait for a fresh abuse classification before contacting the upstream model.
+ */
 export function isRulesEngineBlockingAction(action: AbuseRuleAction | null | undefined): boolean {
   return (
     action === 'block' ||

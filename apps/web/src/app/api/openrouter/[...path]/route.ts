@@ -80,8 +80,12 @@ import { handleRequestLogging } from '@/lib/ai-gateway/handleRequestLogging';
 import {
   classifyAbuse,
   awaitClassifyAbuse,
+  cacheRulesEngineClassification,
+  getCachedRulesEngineClassification,
   getQuarantineFreeModel,
   getRulesEngineActionDecision,
+  isRulesEngineBlockingAction,
+  resolveAbuseClassificationCacheIdentityKey,
   sleepForRulesEngineAction,
 } from '@/lib/ai-gateway/abuse-service';
 import {
@@ -445,6 +449,13 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     isByok: !!userByok,
     feature,
   });
+  const abuseCacheIdentityKey = await resolveAbuseClassificationCacheIdentityKey({
+    kiloUserId: user.id,
+    fraudHeaders,
+  });
+  const cachedClassification = await getCachedRulesEngineClassification(abuseCacheIdentityKey);
+  const cachedRulesEngineAction = cachedClassification?.rulesEngine.resolved_action ?? null;
+  const shouldBlockOnClassify = isRulesEngineBlockingAction(cachedRulesEngineAction);
 
   // Large responses may run longer than the 800s serverless function timeout.
   const requestMaxTokens = getMaxTokens(requestBodyParsed);
@@ -464,12 +475,21 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     return forbiddenFreeModelResponse(fraudHeaders);
   }
 
-  const classifyResult = await awaitClassifyAbuse(classifyPromise);
+  let classifyResult = shouldBlockOnClassify ? await awaitClassifyAbuse(classifyPromise) : null;
+  if (classifyResult?.rules_engine) {
+    await cacheRulesEngineClassification({
+      identityKey: classifyResult.context?.identity_key ?? abuseCacheIdentityKey,
+      rulesEngine: classifyResult.rules_engine,
+    });
+  }
+  const rulesEngineForDecision =
+    (shouldBlockOnClassify ? classifyResult?.rules_engine : null) ??
+    (shouldBlockOnClassify ? cachedClassification?.rulesEngine : null);
   const rulesEngineDecision = getRulesEngineActionDecision({
-    classifyResult,
+    rulesEngine: rulesEngineForDecision,
     userByok: !!userByok,
     quarantineFreeModel:
-      classifyResult?.rules_engine?.resolved_action === 'quarantine-3' && !userByok
+      rulesEngineForDecision?.resolved_action === 'quarantine-3' && !userByok
         ? await getQuarantineFreeModel(requestBodyParsed.kind)
         : null,
   });
@@ -739,6 +759,16 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   }
 
   const clonedReponse = response.clone(); // reading from body is side-effectful
+
+  if (!shouldBlockOnClassify) {
+    classifyResult = await awaitClassifyAbuse(classifyPromise);
+    if (classifyResult?.rules_engine) {
+      await cacheRulesEngineClassification({
+        identityKey: classifyResult.context?.identity_key ?? abuseCacheIdentityKey,
+        rulesEngine: classifyResult.rules_engine,
+      });
+    }
+  }
 
   if (classifyResult) {
     usageContext.abuse_request_id = classifyResult.request_id;

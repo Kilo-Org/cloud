@@ -27,10 +27,14 @@ import {
 import { ProxyErrorType } from '@/lib/proxy-error-types';
 import { getAutoFreeCandidates } from '@/lib/ai-gateway/auto-model/resolution';
 import { getOpenRouterModels } from '@/lib/ai-gateway/providers/gateway-models-cache';
+import { redisGet, redisSet } from '@/lib/redis';
+import { abuseRulesClassificationRedisKey } from '@/lib/redis-keys';
+import type { FraudDetectionHeaders } from '@/lib/utils';
 
 const CLASSIFY_ABUSE_TIMEOUT_MS = 2000;
 const QUARANTINE_1_LATENCY_MS = 2000;
 const QUARANTINE_2_LATENCY_MS = 6000;
+const ABUSE_RULES_CLASSIFICATION_CACHE_TTL_SECONDS = 60;
 
 /**
  * Extract full prompts from a GatewayRequest (chat completions, responses, or messages API).
@@ -216,6 +220,11 @@ export type RulesEngineClassificationResult = {
   matched_abuse_rule_ids: string[];
 };
 
+export type CachedRulesEngineClassification = {
+  identityKey: string;
+  rulesEngine: RulesEngineClassificationResult;
+};
+
 export type RulesEngineActionDecision = {
   action: AbuseRuleAction | null;
   delayMs: number;
@@ -255,6 +264,115 @@ export async function awaitClassifyAbuse(
   ]);
 }
 
+function isAnonymousUserId(kiloUserId: string | null | undefined): boolean {
+  return kiloUserId?.startsWith('anon:') === true;
+}
+
+async function sha256(value: string): Promise<string> {
+  const data = new TextEncoder().encode(value);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(hashBuffer))
+    .map(byte => byte.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+export async function resolveAbuseClassificationCacheIdentityKey(args: {
+  kiloUserId: string | null | undefined;
+  fraudHeaders: FraudDetectionHeaders;
+}): Promise<string> {
+  const kiloUserId = args.kiloUserId?.trim();
+  if (kiloUserId && !isAnonymousUserId(kiloUserId)) {
+    return `user:${kiloUserId}`;
+  }
+
+  const compositeParams = [
+    args.fraudHeaders.http_x_forwarded_for || 'unknown_ip',
+    args.fraudHeaders.http_x_vercel_ja4_digest || 'no_ja4',
+    args.fraudHeaders.http_user_agent || 'no_ua',
+  ].join('|');
+
+  return `fingerprint:${await sha256(compositeParams)}`;
+}
+
+function isAbuseRuleAction(value: unknown): value is AbuseRuleAction {
+  return (
+    value === 'nothing' ||
+    value === 'log' ||
+    value === 'rate-limit' ||
+    value === 'quarantine-1' ||
+    value === 'quarantine-2' ||
+    value === 'quarantine-3' ||
+    value === 'block'
+  );
+}
+
+function parseCachedRulesEngineResult(raw: string): RulesEngineClassificationResult | null {
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (typeof parsed !== 'object' || parsed === null) return null;
+    const candidate = parsed as Record<string, unknown>;
+    const resolvedAction = candidate.resolved_action;
+    if (resolvedAction !== null && !isAbuseRuleAction(resolvedAction)) return null;
+    if (typeof candidate.sus_score !== 'number') return null;
+    if (!Array.isArray(candidate.matches)) return null;
+    if (!Array.isArray(candidate.matched_abuse_rule_ids)) return null;
+    if (!candidate.matched_abuse_rule_ids.every(id => typeof id === 'string')) return null;
+
+    return {
+      matches: candidate.matches,
+      sus_score: candidate.sus_score,
+      resolved_action: resolvedAction,
+      matched_abuse_rule_ids: candidate.matched_abuse_rule_ids,
+    };
+  } catch (error) {
+    console.warn('Failed to parse cached rules-engine classification', { error });
+    return null;
+  }
+}
+
+export async function getCachedRulesEngineClassification(
+  identityKey: string
+): Promise<CachedRulesEngineClassification | null> {
+  try {
+    const raw = await redisGet(abuseRulesClassificationRedisKey(identityKey));
+    if (!raw) return null;
+    const rulesEngine = parseCachedRulesEngineResult(raw);
+    return rulesEngine ? { identityKey, rulesEngine } : null;
+  } catch (error) {
+    console.warn('Failed to read cached rules-engine classification', { identityKey, error });
+    return null;
+  }
+}
+
+export async function cacheRulesEngineClassification(args: {
+  identityKey: string;
+  rulesEngine: RulesEngineClassificationResult | undefined;
+}): Promise<void> {
+  if (!args.rulesEngine) return;
+  try {
+    await redisSet(
+      abuseRulesClassificationRedisKey(args.identityKey),
+      JSON.stringify(args.rulesEngine),
+      ABUSE_RULES_CLASSIFICATION_CACHE_TTL_SECONDS
+    );
+  } catch (error) {
+    console.warn('Failed to write cached rules-engine classification', {
+      identityKey: args.identityKey,
+      error,
+    });
+  }
+}
+
+export function isRulesEngineBlockingAction(action: AbuseRuleAction | null | undefined): boolean {
+  return (
+    action === 'block' ||
+    action === 'rate-limit' ||
+    action === 'quarantine-1' ||
+    action === 'quarantine-2' ||
+    action === 'quarantine-3'
+  );
+}
+
 export async function getQuarantineFreeModel(
   apiKind: GatewayRequest['kind']
 ): Promise<string | null> {
@@ -267,11 +385,11 @@ export async function getQuarantineFreeModel(
 }
 
 export function getRulesEngineActionDecision(args: {
-  classifyResult: AbuseClassificationResponse | null;
+  rulesEngine: RulesEngineClassificationResult | null | undefined;
   userByok: boolean;
   quarantineFreeModel: string | null;
 }): RulesEngineActionDecision {
-  const action = args.classifyResult?.rules_engine?.resolved_action ?? null;
+  const action = args.rulesEngine?.resolved_action ?? null;
   switch (action) {
     case null:
     case 'nothing':

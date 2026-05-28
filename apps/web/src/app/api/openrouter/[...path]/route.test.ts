@@ -8,6 +8,7 @@ import { upstreamRequest } from '@/lib/ai-gateway/providers/upstream-request';
 import { getOpenRouterModels } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import { emitApiMetricsForResponse } from '@/lib/ai-gateway/o11y/api-metrics.server';
 import { accountForMicrodollarUsage } from '@/lib/ai-gateway/llm-proxy-helpers';
+import { redisGet, redisSet } from '@/lib/redis';
 import type { Provider } from '@/lib/ai-gateway/providers/types';
 
 jest.mock('next/server', () => {
@@ -38,6 +39,7 @@ jest.mock('@/lib/ai-gateway/abuse-service', () => {
 jest.mock('@/lib/ai-gateway/providers/get-provider');
 jest.mock('@/lib/ai-gateway/providers/upstream-request');
 jest.mock('@/lib/ai-gateway/providers/gateway-models-cache');
+jest.mock('@/lib/redis');
 jest.mock('@/lib/ai-gateway/o11y/api-metrics.server', () => ({
   emitApiMetricsForResponse: jest.fn(),
   getToolsAvailable: jest.fn(() => false),
@@ -63,6 +65,8 @@ const mockedUpstreamRequest = jest.mocked(upstreamRequest);
 const mockedGetOpenRouterModels = jest.mocked(getOpenRouterModels);
 const mockedEmitApiMetricsForResponse = jest.mocked(emitApiMetricsForResponse);
 const mockedAccountForMicrodollarUsage = jest.mocked(accountForMicrodollarUsage);
+const mockedRedisGet = jest.mocked(redisGet);
+const mockedRedisSet = jest.mocked(redisSet);
 
 const provider = {
   id: 'openrouter',
@@ -107,7 +111,9 @@ function setUserAuth() {
   });
 }
 
-function classifyResult(action: 'block' | 'rate-limit' | 'quarantine-1' | 'quarantine-2' | 'quarantine-3' | null) {
+function classifyResult(
+  action: 'block' | 'rate-limit' | 'quarantine-1' | 'quarantine-2' | 'quarantine-3' | 'log' | null
+) {
   return {
     verdict: 'ALLOW' as const,
     risk_score: 0,
@@ -129,6 +135,12 @@ function classifyResult(action: 'block' | 'rate-limit' | 'quarantine-1' | 'quara
   };
 }
 
+function cachedRulesEngine(
+  action: NonNullable<ReturnType<typeof classifyResult>['rules_engine']['resolved_action']>
+) {
+  return JSON.stringify(classifyResult(action).rules_engine);
+}
+
 function upstreamJsonResponse(body: unknown) {
   return new Response(JSON.stringify(body), {
     status: 200,
@@ -147,6 +159,8 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
       bypassAccessCheck: false,
     });
     mockedClassifyAbuse.mockResolvedValue(classifyResult(null));
+    mockedRedisGet.mockResolvedValue(null);
+    mockedRedisSet.mockResolvedValue(true);
     mockedGetOpenRouterModels.mockResolvedValue(
       new Set(['nvidia/nemotron-3-super-120b-a12b:free'])
     );
@@ -162,6 +176,7 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
   });
 
   it('blocks request-local rules-engine block actions before upstream', async () => {
+    mockedRedisGet.mockResolvedValue(cachedRulesEngine('block'));
     mockedClassifyAbuse.mockResolvedValue(classifyResult('block'));
 
     const { POST } = await import('./route');
@@ -175,7 +190,36 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
 
+  it('uses cached blocking action when blocking abuse refresh fails', async () => {
+    mockedRedisGet.mockResolvedValue(cachedRulesEngine('block'));
+    mockedClassifyAbuse.mockResolvedValue(null);
+
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest(makeBody()) as never);
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({ error_type: 'abuse_blocked' });
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
+  it('does not block upstream on fresh blocking classifications when cache is nonblocking', async () => {
+    mockedRedisGet.mockResolvedValue(cachedRulesEngine('log'));
+    mockedClassifyAbuse.mockResolvedValue(classifyResult('block'));
+
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest(makeBody()) as never);
+
+    expect(response.status).toBe(200);
+    expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
+    expect(mockedRedisSet).toHaveBeenCalledWith(
+      expect.stringContaining('ai-gateway.abuse-rules:last-classification:user:user-123'),
+      JSON.stringify(classifyResult('block').rules_engine),
+      60
+    );
+  });
+
   it('rate limits rules-engine rate-limit actions before upstream', async () => {
+    mockedRedisGet.mockResolvedValue(cachedRulesEngine('rate-limit'));
     mockedClassifyAbuse.mockResolvedValue(classifyResult('rate-limit'));
 
     const { POST } = await import('./route');
@@ -191,6 +235,7 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
 
   it('adds latency and rewrites quarantine-3 non-BYOK requests to a free model', async () => {
     jest.useFakeTimers();
+    mockedRedisGet.mockResolvedValue(cachedRulesEngine('quarantine-3'));
     mockedClassifyAbuse.mockResolvedValue(classifyResult('quarantine-3'));
 
     const { POST } = await import('./route');
@@ -214,6 +259,7 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
 
   it('applies quarantine-1 latency without model rewrite', async () => {
     jest.useFakeTimers();
+    mockedRedisGet.mockResolvedValue(cachedRulesEngine('quarantine-1'));
     mockedClassifyAbuse.mockResolvedValue(classifyResult('quarantine-1'));
 
     const { POST } = await import('./route');
@@ -232,6 +278,7 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
 
   it('applies quarantine-2 latency without model rewrite', async () => {
     jest.useFakeTimers();
+    mockedRedisGet.mockResolvedValue(cachedRulesEngine('quarantine-2'));
     mockedClassifyAbuse.mockResolvedValue(classifyResult('quarantine-2'));
 
     const { POST } = await import('./route');
@@ -250,6 +297,7 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
 
   it('applies delay before returning error when quarantine-3 model-override provider fails', async () => {
     jest.useFakeTimers();
+    mockedRedisGet.mockResolvedValue(cachedRulesEngine('quarantine-3'));
     mockedClassifyAbuse.mockResolvedValue(classifyResult('quarantine-3'));
     mockedGetProvider
       .mockResolvedValueOnce({
@@ -276,6 +324,7 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
 
   it('adds latency without rewriting quarantine-3 BYOK requests', async () => {
     jest.useFakeTimers();
+    mockedRedisGet.mockResolvedValue(cachedRulesEngine('quarantine-3'));
     mockedGetProvider.mockResolvedValue({
       kind: 'provider',
       provider,

@@ -21,7 +21,6 @@ import { APP_URL } from '@/lib/constants';
 import { FEATURE_HEADER } from '@/lib/feature-detection';
 import { ownerFromIntegration } from '@/lib/integrations/core/owner';
 import type { CloudAgentAttachments } from '@/lib/cloud-agent/constants';
-import type { Images } from '@/lib/images-schema';
 import {
   formatGitHubRepositoriesForPrompt,
   getGitHubRepositoryContext,
@@ -58,10 +57,8 @@ type RunBotAgentParams = {
   user: User;
   botRequestId: string;
   prompt: string;
-  /** Pre-uploaded image attachments from the user's message (already in R2). */
-  images?: Images;
-  /** Pre-uploaded non-image file attachments from the user's message (already in R2). */
-  fileAttachments?: CloudAgentAttachments;
+  /** Pre-uploaded supported attachments from the user's message (already in R2). */
+  attachments?: CloudAgentAttachments;
   completedStepCount?: number;
   initialSteps?: BotRequestStep[];
   onSessionReady?: (params: {
@@ -310,8 +307,7 @@ This tool returns an acknowledgement immediately. The final Cloud Agent result w
               prSignature,
               chatPlatform,
               currentStep,
-              images: params.images,
-              fileAttachments: params.fileAttachments,
+              attachments: params.attachments,
             }
           );
 
@@ -342,21 +338,13 @@ This tool returns an acknowledgement immediately. The final Cloud Agent result w
     },
   });
 
-  const imageCount = params.images?.files.length ?? 0;
-  const fileCount = params.fileAttachments?.files.length ?? 0;
-  const attachmentParts: string[] = [];
-  if (imageCount > 0) {
-    attachmentParts.push(`${imageCount} image${imageCount > 1 ? 's' : ''}`);
-  }
-  if (fileCount > 0) {
-    attachmentParts.push(`${fileCount} file${fileCount > 1 ? 's' : ''} (PDF/text/Markdown/CSV)`);
-  }
-  const promptWithImageContext =
-    attachmentParts.length > 0
-      ? `${params.prompt}\n\n[The user attached ${attachmentParts.join(' and ')} to this message. The attachment${attachmentParts.length > 1 || imageCount + fileCount > 1 ? 's are' : ' is'} automatically forwarded to any Cloud Agent session you spawn.]`
+  const attachmentCount = params.attachments?.files.length ?? 0;
+  const promptWithAttachmentContext =
+    attachmentCount > 0
+      ? `${params.prompt}\n\n[The user attached ${attachmentCount} supported attachment${attachmentCount > 1 ? 's' : ''} (images, PDFs, text, Markdown, or CSV) to this message. The attachment${attachmentCount > 1 ? 's are' : ' is'} automatically forwarded to any Cloud Agent session you spawn.]`
       : params.prompt;
 
-  const result = await agent.generate({ prompt: promptWithImageContext });
+  const result = await agent.generate({ prompt: promptWithAttachmentContext });
 
   return {
     finalText: result.text,

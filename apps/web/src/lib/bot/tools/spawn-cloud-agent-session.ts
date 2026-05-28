@@ -16,7 +16,6 @@ import {
   buildGitLabCloneUrl,
 } from '@/lib/cloud-agent/gitlab-integration-helpers';
 import type { CloudAgentAttachments } from '@/lib/cloud-agent/constants';
-import type { Images } from '@/lib/images-schema';
 import { APP_URL } from '@/lib/constants';
 import { CALLBACK_TOKEN_SECRET } from '@/lib/config.server';
 import { parseBotCallbackStep } from '@/lib/bot/step-budget';
@@ -103,8 +102,7 @@ export default async function spawnCloudAgentSession(
     prSignature?: string;
     chatPlatform?: string;
     currentStep?: number;
-    images?: Images;
-    fileAttachments?: CloudAgentAttachments;
+    attachments?: CloudAgentAttachments;
   }
 ): Promise<SpawnCloudAgentResult> {
   console.log('[KiloBot] spawnCloudAgentSession called with args:', JSON.stringify(args, null, 2));
@@ -190,8 +188,7 @@ export default async function spawnCloudAgentSession(
       kilocodeOrganizationId,
       createdOnPlatform: chatPlatform,
       callbackTarget,
-      images: options?.images,
-      attachments: options?.fileAttachments,
+      attachments: options?.attachments,
       envVars: profileConfig.envVars,
       encryptedSecrets: profileConfig.encryptedSecrets,
       setupCommands: profileConfig.setupCommands,
@@ -222,8 +219,7 @@ export default async function spawnCloudAgentSession(
       kilocodeOrganizationId,
       createdOnPlatform: chatPlatform,
       callbackTarget,
-      images: options?.images,
-      attachments: options?.fileAttachments,
+      attachments: options?.attachments,
       envVars: profileConfig.envVars,
       encryptedSecrets: profileConfig.encryptedSecrets,
       setupCommands: profileConfig.setupCommands,

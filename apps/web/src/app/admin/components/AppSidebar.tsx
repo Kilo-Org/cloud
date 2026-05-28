@@ -177,6 +177,11 @@ const productEngineeringItems: MenuItem[] = [
     url: '/admin/gateway',
     icon: () => <Network />,
   },
+  {
+    title: () => 'Coding plans',
+    url: '/admin/coding-plans',
+    icon: () => <KeyRound />,
+  },
 ];
 
 const analyticsObservabilityItems: MenuItem[] = [

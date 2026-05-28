@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { AlertTriangle, Calendar, Coins, Crown, ExternalLink, Loader2 } from 'lucide-react';
@@ -82,20 +82,16 @@ export function KiloPassDetail() {
 
   const subscriptionId = subscription?.stripeSubscriptionId ?? null;
 
-  const fetchMoreBilling = useCallback(
-    (cursor: string) => trpcClient.kiloPass.getBillingHistory.query({ cursor }),
-    [trpcClient]
-  );
+  const fetchMoreBilling = (cursor: string) =>
+    trpcClient.kiloPass.getBillingHistory.query({ cursor });
   const billing = useCursorPagination({
     initialData: billingQuery.data,
     fetchMore: fetchMoreBilling,
     resetKey: subscriptionId,
   });
 
-  const fetchMoreCredits = useCallback(
-    (cursor: string) => trpcClient.kiloPass.getCreditHistory.query({ cursor }),
-    [trpcClient]
-  );
+  const fetchMoreCredits = (cursor: string) =>
+    trpcClient.kiloPass.getCreditHistory.query({ cursor });
   const credits = useCursorPagination({
     initialData: creditHistoryQuery.data,
     fetchMore: fetchMoreCredits,
@@ -104,28 +100,24 @@ export function KiloPassDetail() {
 
   const scheduledChange = scheduledChangeQuery.data?.scheduledChange ?? null;
 
-  const showFirstMonthPromoInDialog = useMemo(() => {
-    if (!subscription || subscription.cadence !== 'monthly') return false;
-    const promoPercent = computeMonthlyCadenceBonusPercent({
+  const showFirstMonthPromoInDialog =
+    subscription?.cadence === 'monthly' &&
+    computeMonthlyCadenceBonusPercent({
       tier: subscription.tier,
       streakMonths: Math.max(1, subscription.currentStreakMonths),
       isFirstTimeSubscriberEver: subscription.isFirstTimeSubscriberEver,
       subscriptionStartedAtIso: subscription.startedAt,
-    });
-    return promoPercent === KILO_PASS_FIRST_MONTH_PROMO_BONUS_PERCENT;
-  }, [subscription]);
+    }) === KILO_PASS_FIRST_MONTH_PROMO_BONUS_PERCENT;
 
-  const showSecondMonthPromoInDialog = useMemo(() => {
-    if (!subscription || subscription.cadence !== 'monthly') return false;
-    if (subscription.currentStreakMonths > 2) return false;
-    const month2Percent = computeMonthlyCadenceBonusPercent({
+  const showSecondMonthPromoInDialog =
+    subscription?.cadence === 'monthly' &&
+    subscription.currentStreakMonths <= 2 &&
+    computeMonthlyCadenceBonusPercent({
       tier: subscription.tier,
       streakMonths: 2,
       isFirstTimeSubscriberEver: subscription.isFirstTimeSubscriberEver,
       subscriptionStartedAtIso: subscription.startedAt,
-    });
-    return month2Percent === KILO_PASS_FIRST_MONTH_PROMO_BONUS_PERCENT;
-  }, [subscription]);
+    }) === KILO_PASS_FIRST_MONTH_PROMO_BONUS_PERCENT;
 
   async function refreshData() {
     await Promise.all([
@@ -185,7 +177,7 @@ export function KiloPassDetail() {
     <KiloPassSubscriptionInfoProvider subscription={subscription}>
       <div className="space-y-6">
         <DetailPageHeader
-          backHref="/subscriptions"
+          backHref="/subscriptions#kilo-pass"
           backLabel="Back to subscriptions"
           title="Kilo Pass"
           status={subscriptionDisplay.status}

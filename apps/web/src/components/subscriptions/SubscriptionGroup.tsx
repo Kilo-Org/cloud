@@ -16,6 +16,8 @@ export function SubscriptionGroup({
   error,
   onRetry,
   accordionValue,
+  hideHeader = false,
+  unframed = false,
 }: {
   title: string;
   description?: string;
@@ -26,11 +28,13 @@ export function SubscriptionGroup({
   error?: unknown;
   onRetry?: () => void;
   accordionValue?: string;
+  hideHeader?: boolean;
+  unframed?: boolean;
 }) {
   const header = (
     <div className="flex min-w-0 items-center gap-4">
       {headerIcon ? (
-        <div className="bg-muted flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border">
+        <div className="bg-muted flex size-12 shrink-0 items-center justify-center rounded-2xl border">
           {headerIcon}
         </div>
       ) : null}
@@ -47,7 +51,7 @@ export function SubscriptionGroup({
         <Card key={key}>
           <CardContent className="space-y-4 p-5">
             <div className="flex items-center gap-3">
-              <Skeleton className="h-11 w-11 rounded-xl" />
+              <Skeleton className="size-11 rounded-xl" />
               <div className="space-y-2">
                 <Skeleton className="h-4 w-36" />
                 <Skeleton className="h-4 w-24" />
@@ -63,7 +67,7 @@ export function SubscriptionGroup({
     <Card className="border-red-500/40 bg-red-500/5">
       <CardContent className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-start gap-3">
-          <AlertTriangle className="mt-0.5 h-5 w-5 text-red-300" />
+          <AlertTriangle className="mt-0.5 size-5 text-red-300" />
           <div>
             <p className="font-medium">Unable to load {title.toLowerCase()}</p>
             <p className="text-muted-foreground text-sm">
@@ -75,7 +79,7 @@ export function SubscriptionGroup({
         </div>
         {onRetry ? (
           <Button variant="outline" onClick={onRetry} className="self-start sm:self-auto">
-            <RefreshCw className="h-4 w-4" />
+            <RefreshCw className="size-4" />
             Retry
           </Button>
         ) : null}
@@ -84,6 +88,10 @@ export function SubscriptionGroup({
   ) : (
     children
   );
+
+  if (unframed) {
+    return body;
+  }
 
   if (accordionValue) {
     return (
@@ -104,11 +112,15 @@ export function SubscriptionGroup({
 
   return (
     <section className="rounded-3xl border bg-card/30 p-5 shadow-sm md:p-6">
-      <div className="space-y-5">
-        {header}
-        <Separator />
-        {body}
-      </div>
+      {hideHeader ? (
+        body
+      ) : (
+        <div className="space-y-5">
+          {header}
+          <Separator />
+          {body}
+        </div>
+      )}
     </section>
   );
 }

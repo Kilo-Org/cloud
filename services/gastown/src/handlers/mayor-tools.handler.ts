@@ -27,6 +27,14 @@ const MayorSlingBody = z.object({
   labels: z.array(z.string()).optional(),
 });
 
+const MayorBabysitPrBody = z.object({
+  rig_id: z.string().min(1),
+  pr_url: z.string().url(),
+  title: z.string().optional(),
+  body: z.string().optional(),
+  force_push_allowed: z.boolean().optional(),
+});
+
 const MayorSlingBatchBody = z
   .object({
     rig_id: z.string().min(1),
@@ -161,6 +169,45 @@ export async function handleMayorSling(c: Context<GastownEnv>, params: { townId:
   console.log(
     `${HANDLER_LOG} handleMayorSling: completed, result=${JSON.stringify(result).slice(0, 300)}`
   );
+
+  return c.json(resSuccess(result), 201);
+}
+
+/**
+ * POST /api/mayor/:townId/tools/babysit-pr
+ * Adopt an existing PR for the town to babysit. Creates a merge_request
+ * bead with babysit metadata, bypasses refinery code review, and starts
+ * polling the PR for feedback/conflicts/auto-merge.
+ */
+export async function handleMayorBabysitPr(c: Context<GastownEnv>, params: { townId: string }) {
+  const parsed = MayorBabysitPrBody.safeParse(await parseJsonBody(c));
+  if (!parsed.success) {
+    return c.json(
+      { success: false, error: 'Invalid request body', issues: parsed.error.issues },
+      400
+    );
+  }
+
+  const rigOwned = await verifyRigBelongsToTown(c, params.townId, parsed.data.rig_id);
+  if (!rigOwned) {
+    return c.json(resError('Rig not found in this town'), 403);
+  }
+
+  console.log(
+    `${HANDLER_LOG} handleMayorBabysitPr: townId=${params.townId} rigId=${parsed.data.rig_id} prUrl=${parsed.data.pr_url}`
+  );
+
+  const town = getTownDOStub(c.env, params.townId);
+  const result = await town.slingExistingPr({
+    rigId: parsed.data.rig_id,
+    prUrl: parsed.data.pr_url,
+    title: parsed.data.title,
+    body: parsed.data.body,
+    forcePushAllowed: parsed.data.force_push_allowed,
+    sourceAgentId: 'mayor',
+  });
+
+  console.log(`${HANDLER_LOG} handleMayorBabysitPr: completed, beadId=${result.beadId}`);
 
   return c.json(resSuccess(result), 201);
 }

@@ -24,6 +24,7 @@ export const BeadEventType = z.enum([
   'escalation_rate_spike',
   'agent_restart_loop',
   'rework_requested',
+  'babysit_started',
 ]);
 
 export type BeadEventType = z.infer<typeof BeadEventType>;

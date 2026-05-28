@@ -71,6 +71,7 @@ import { kiloTokenPayload } from '@kilocode/worker-utils';
 import { jwtVerify } from 'jose';
 import { generateKiloApiToken } from '../util/kilo-token.util';
 import { resolveSecret } from '../util/secret.util';
+import { parseGitUrl } from '../util/platform-pr.util';
 import { writeEvent, type GastownEventData } from '../util/analytics.util';
 import { logger, withLogTags } from '../util/log.util';
 import { BeadPriority } from '../types';
@@ -2537,6 +2538,217 @@ export class TownDO extends DurableObject<Env> {
     );
     await this.escalateToActiveCadence();
     return { bead, agent: hookedAgent };
+  }
+
+  async slingExistingPr(input: {
+    rigId: string;
+    prUrl: string;
+    title?: string;
+    body?: string;
+    forcePushAllowed?: boolean;
+    sourceAgentId?: string;
+  }): Promise<{ beadId: string; warning?: string }> {
+    const rig = rigs.getRig(this.sql, input.rigId);
+    if (!rig) {
+      throw new Error(`Rig not found: ${input.rigId}`);
+    }
+
+    const townConfig = await this.getTownConfig();
+    const rigCoords = parseGitUrl(rig.git_url, townConfig.git_auth?.gitlab_instance_url);
+    if (!rigCoords) {
+      throw new Error(`Cannot parse rig git URL: ${rig.git_url}`);
+    }
+
+    const prUrlMatch = input.prUrl.match(/^https:\/\/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/);
+    const glUrlMatch = input.prUrl.match(/^(https:\/\/[^/]+)\/(.+)\/-\/merge_requests\/(\d+)/);
+
+    let prOwner: string | undefined;
+    let prRepo: string | undefined;
+    let prPlatform: 'github' | 'gitlab' | undefined;
+
+    if (prUrlMatch) {
+      prPlatform = 'github';
+      prOwner = prUrlMatch[1];
+      prRepo = prUrlMatch[2];
+    } else if (glUrlMatch) {
+      const glHost = new URL(glUrlMatch[1]).hostname;
+      const configuredGlHost = townConfig.git_auth?.gitlab_instance_url
+        ? new URL(townConfig.git_auth.gitlab_instance_url).hostname
+        : null;
+      if (glHost === 'gitlab.com' || glHost === configuredGlHost) {
+        prPlatform = 'gitlab';
+        const fullPath = glUrlMatch[2];
+        const lastSlash = fullPath.lastIndexOf('/');
+        prOwner = lastSlash > 0 ? fullPath.slice(0, lastSlash) : fullPath;
+        prRepo = lastSlash > 0 ? fullPath.slice(lastSlash + 1) : '';
+      }
+    }
+
+    if (!prPlatform || !prOwner || !prRepo) {
+      throw new Error(`Cannot parse PR URL: ${input.prUrl}`);
+    }
+
+    if (
+      prPlatform !== rigCoords.platform ||
+      prOwner !== rigCoords.owner ||
+      prRepo !== rigCoords.repo
+    ) {
+      throw new Error(
+        'PR URL repo does not match rig repo. Cannot adopt PRs from other repositories.'
+      );
+    }
+
+    const rigConfig = await this.getRigConfig(input.rigId);
+    const scmCtx: scm.SCMContext = {
+      env: this.env,
+      townId: this.townId,
+      getTownConfig: () => this.getTownConfig(),
+      platformIntegrationId: rigConfig?.platformIntegrationId,
+    };
+
+    const outcome = await scm.checkPRStatus(scmCtx, input.prUrl);
+    if (!outcome.ok) {
+      const err = outcome.error;
+      throw new Error(
+        `Failed to fetch PR status: ${err.kind}` +
+          (err.kind === 'http_error' ? ` (${err.status} ${err.statusText})` : '') +
+          (err.kind === 'no_token' ? ` — tried: ${err.resolutionChain.join(', ')}` : '')
+      );
+    }
+
+    const prResult = outcome.result;
+    if (prResult.status === 'merged' || prResult.status === 'closed') {
+      throw new Error(`Cannot babysit a PR that is already ${prResult.status}.`);
+    }
+
+    const headBranch = prResult.head_branch;
+    const baseBranch = prResult.base_branch;
+    const headSha = prResult.head_sha;
+    const prTitle = prResult.title;
+
+    if (!headBranch || !baseBranch || !headSha) {
+      throw new Error(
+        `PR metadata incomplete — missing head_branch, base_branch, or head_sha. ` +
+          `head_branch=${headBranch ?? 'missing'}, base_branch=${baseBranch ?? 'missing'}, head_sha=${headSha ?? 'missing'}`
+      );
+    }
+
+    const title = input.title ?? `Babysit: ${prTitle ?? input.prUrl}`;
+    const body =
+      input.body ??
+      `Adopted external PR ${input.prUrl} at SHA ${headSha}. Town will poll and address review feedback, conflicts, and auto-merge.`;
+
+    const { beadId } = reviewQueue.submitExternalPrToReviewQueue(this.sql, {
+      rigId: input.rigId,
+      prUrl: input.prUrl,
+      branch: headBranch,
+      targetBranch: baseBranch,
+      headSha,
+      title,
+      body,
+      forcePushAllowed: input.forcePushAllowed ?? false,
+      sourceAgentId: input.sourceAgentId ?? 'mayor',
+    });
+
+    events.insertEvent(this.sql, 'bead_created', {
+      bead_id: beadId,
+      payload: { bead_type: 'merge_request', rig_id: input.rigId, babysit: true },
+    });
+
+    await this.escalateToActiveCadence();
+
+    let warning: string | undefined;
+    const effectiveConfig = config.resolveRigConfig(townConfig, rig.config ?? null);
+    if (effectiveConfig.code_review) {
+      warning =
+        'This rig has code review enabled. Babysat PRs bypass refinery code review — the town will poll and auto-merge instead of dispatching a refinery.';
+    }
+
+    return { beadId, warning };
+  }
+
+  async previewPr(input: { rigId: string; prUrl: string }): Promise<{
+    state: string;
+    head_branch?: string;
+    base_branch?: string;
+    head_sha?: string;
+    title?: string;
+    repo_matches: boolean;
+  }> {
+    const rig = rigs.getRig(this.sql, input.rigId);
+    if (!rig) {
+      throw new Error(`Rig not found: ${input.rigId}`);
+    }
+
+    const townConfig = await this.getTownConfig();
+    const rigCoords = parseGitUrl(rig.git_url, townConfig.git_auth?.gitlab_instance_url);
+    if (!rigCoords) {
+      throw new Error(`Cannot parse rig git URL: ${rig.git_url}`);
+    }
+
+    const prUrlMatch = input.prUrl.match(/^https:\/\/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/);
+    const glUrlMatch = input.prUrl.match(/^(https:\/\/[^/]+)\/(.+)\/-\/merge_requests\/(\d+)/);
+
+    let prOwner: string | undefined;
+    let prRepo: string | undefined;
+    let prPlatform: 'github' | 'gitlab' | undefined;
+
+    if (prUrlMatch) {
+      prPlatform = 'github';
+      prOwner = prUrlMatch[1];
+      prRepo = prUrlMatch[2];
+    } else if (glUrlMatch) {
+      const glHost = new URL(glUrlMatch[1]).hostname;
+      const configuredGlHost = townConfig.git_auth?.gitlab_instance_url
+        ? new URL(townConfig.git_auth.gitlab_instance_url).hostname
+        : null;
+      if (glHost === 'gitlab.com' || glHost === configuredGlHost) {
+        prPlatform = 'gitlab';
+        const fullPath = glUrlMatch[2];
+        const lastSlash = fullPath.lastIndexOf('/');
+        prOwner = lastSlash > 0 ? fullPath.slice(0, lastSlash) : fullPath;
+        prRepo = lastSlash > 0 ? fullPath.slice(lastSlash + 1) : '';
+      }
+    }
+
+    if (!prPlatform || !prOwner || !prRepo) {
+      throw new Error(`Cannot parse PR URL: ${input.prUrl}`);
+    }
+
+    const repoMatches =
+      prPlatform === rigCoords.platform && prOwner === rigCoords.owner && prRepo === rigCoords.repo;
+
+    if (!repoMatches) {
+      return { state: 'unknown', repo_matches: false };
+    }
+
+    const rigConfig = await this.getRigConfig(input.rigId);
+    const scmCtx: scm.SCMContext = {
+      env: this.env,
+      townId: this.townId,
+      getTownConfig: () => this.getTownConfig(),
+      platformIntegrationId: rigConfig?.platformIntegrationId,
+    };
+
+    const outcome = await scm.checkPRStatus(scmCtx, input.prUrl);
+    if (!outcome.ok) {
+      const err = outcome.error;
+      throw new Error(
+        `Failed to fetch PR status: ${err.kind}` +
+          (err.kind === 'http_error' ? ` (${err.status} ${err.statusText})` : '') +
+          (err.kind === 'no_token' ? ` — tried: ${err.resolutionChain.join(', ')}` : '')
+      );
+    }
+
+    const prResult = outcome.result;
+    return {
+      state: prResult.status,
+      head_branch: prResult.head_branch,
+      base_branch: prResult.base_branch,
+      head_sha: prResult.head_sha,
+      title: prResult.title,
+      repo_matches: true,
+    };
   }
 
   /**

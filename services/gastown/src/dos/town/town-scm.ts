@@ -108,6 +108,10 @@ export async function resolveGitHubTokenString(ctx: SCMContext): Promise<string 
 export type PRStatusResult = {
   status: 'open' | 'merged' | 'closed';
   mergeable_state?: string;
+  head_branch?: string;
+  base_branch?: string;
+  head_sha?: string;
+  title?: string;
 };
 
 export type PRStatusError =
@@ -203,9 +207,39 @@ export async function checkPRStatus(ctx: SCMContext, prUrl: string): Promise<PRS
       };
     }
 
-    if (data.data.merged) return { ok: true, result: { status: 'merged' } };
-    if (data.data.state === 'closed') return { ok: true, result: { status: 'closed' } };
-    return { ok: true, result: { status: 'open', mergeable_state: data.data.mergeable_state } };
+    if (data.data.merged)
+      return {
+        ok: true,
+        result: {
+          status: 'merged',
+          head_branch: data.data.head?.ref,
+          base_branch: data.data.base?.ref,
+          head_sha: data.data.head?.sha,
+          title: data.data.title,
+        },
+      };
+    if (data.data.state === 'closed')
+      return {
+        ok: true,
+        result: {
+          status: 'closed',
+          head_branch: data.data.head?.ref,
+          base_branch: data.data.base?.ref,
+          head_sha: data.data.head?.sha,
+          title: data.data.title,
+        },
+      };
+    return {
+      ok: true,
+      result: {
+        status: 'open',
+        mergeable_state: data.data.mergeable_state,
+        head_branch: data.data.head?.ref,
+        base_branch: data.data.base?.ref,
+        head_sha: data.data.head?.sha,
+        title: data.data.title,
+      },
+    };
   }
 
   // GitLab MR URL format: https://{host}/{path}/-/merge_requests/{iid}
@@ -288,9 +322,38 @@ export async function checkPRStatus(ctx: SCMContext, prUrl: string): Promise<PRS
       };
     }
 
-    if (data.data.state === 'merged') return { ok: true, result: { status: 'merged' } };
-    if (data.data.state === 'closed') return { ok: true, result: { status: 'closed' } };
-    return { ok: true, result: { status: 'open' } };
+    if (data.data.state === 'merged')
+      return {
+        ok: true,
+        result: {
+          status: 'merged',
+          head_branch: data.data.source_branch,
+          base_branch: data.data.target_branch,
+          head_sha: data.data.sha,
+          title: data.data.title,
+        },
+      };
+    if (data.data.state === 'closed')
+      return {
+        ok: true,
+        result: {
+          status: 'closed',
+          head_branch: data.data.source_branch,
+          base_branch: data.data.target_branch,
+          head_sha: data.data.sha,
+          title: data.data.title,
+        },
+      };
+    return {
+      ok: true,
+      result: {
+        status: 'open',
+        head_branch: data.data.source_branch,
+        base_branch: data.data.target_branch,
+        head_sha: data.data.sha,
+        title: data.data.title,
+      },
+    };
   }
 
   console.warn(`${TOWN_LOG} checkPRStatus: unrecognized PR URL format: ${prUrl}`);

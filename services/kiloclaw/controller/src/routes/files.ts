@@ -68,6 +68,28 @@ type OpenclawWorkspacePreparedFile = {
 
 type OpenclawImportFailure = z.infer<typeof OpenclawWorkspaceImportFailureSchema>;
 
+function errorCode(error: unknown): string {
+  if (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    typeof error.code === 'string'
+  ) {
+    return error.code;
+  }
+  return 'unknown';
+}
+
+function resolvesToOpenclawConfig(resolvedPath: string, rootDir: string): boolean {
+  const configPath = path.resolve(rootDir, 'openclaw.json');
+  if (resolvedPath === configPath) return true;
+  try {
+    return fs.realpathSync(resolvedPath) === fs.realpathSync(configPath);
+  } catch {
+    return false;
+  }
+}
+
 type OpenclawWorkspaceImportValidation =
   | {
       ok: true;
@@ -720,25 +742,41 @@ export function registerFileRoutes(app: Hono, expectedToken: string, rootDir: st
       );
     }
 
-    if (body.etag) {
-      const currentContent = fs.readFileSync(result, 'utf-8');
-      if (body.etag !== computeEtag(currentContent)) {
-        return c.json({ code: 'file_etag_conflict', error: 'File was modified externally' }, 409);
+    const writeFile = () => {
+      if (body.etag) {
+        try {
+          const currentContent = fs.readFileSync(result, 'utf-8');
+          if (body.etag !== computeEtag(currentContent)) {
+            return c.json(
+              { code: 'file_etag_conflict', error: 'File was modified externally' },
+              409
+            );
+          }
+        } catch {
+          return c.json({ code: 'file_etag_conflict', error: 'File was modified externally' }, 409);
+        }
       }
-    }
 
-    try {
-      backupFile(result, rootDir);
-    } catch (err) {
-      console.warn('[files] Failed to create backup, proceeding with write:', err);
+      try {
+        backupFile(result, rootDir);
+      } catch (error) {
+        console.warn('[files] Failed to create backup, proceeding with write:', errorCode(error));
+      }
+      try {
+        atomicWrite(result, body.content);
+      } catch (err) {
+        console.error('[files] atomicWrite failed:', err);
+        return c.json({ error: 'Failed to write file' }, 500);
+      }
+      return c.json({ etag: computeEtag(body.content) });
+    };
+
+    if (resolvesToOpenclawConfig(result, rootDir)) {
+      return serializeAgentConfigMutation(async () => writeFile(), {
+        configPath: path.resolve(rootDir, 'openclaw.json'),
+      });
     }
-    try {
-      atomicWrite(result, body.content);
-    } catch (err) {
-      console.error('[files] atomicWrite failed:', err);
-      return c.json({ error: 'Failed to write file' }, 500);
-    }
-    return c.json({ etag: computeEtag(body.content) });
+    return writeFile();
   });
 
   const WriteOpenclawConfigBodySchema = z.object({
@@ -797,8 +835,8 @@ export function registerFileRoutes(app: Hono, expectedToken: string, rootDir: st
 
         try {
           backupFile(result, rootDir);
-        } catch (err) {
-          console.warn('[files] Failed to create backup, proceeding with write:', err);
+        } catch (error) {
+          console.warn('[files] Failed to create backup, proceeding with write:', errorCode(error));
         }
         try {
           atomicWrite(result, body.content, undefined, { mode: 0o600 });

@@ -378,6 +378,56 @@ describe('file routes', () => {
       );
     });
 
+    it('serializes legacy openclaw writes through in-root aliases behind validation-aware writes', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.lstatSync).mockReturnValue({
+        isSymbolicLink: () => false,
+        isFile: () => true,
+      } as any);
+      vi.mocked(fs.realpathSync).mockImplementation(filePath => {
+        const resolvedPath = String(filePath);
+        return resolvedPath.includes('/alias/') ? `${ROOT}/openclaw.json` : resolvedPath;
+      });
+      let resolveValidation: ((result: { valid: true }) => void) | undefined;
+      vi.mocked(validateOpenclawConfigCandidate).mockReturnValue(
+        new Promise(resolve => {
+          resolveValidation = resolve;
+        })
+      );
+
+      const validatedWrite = app.request('/_kilo/files/write-openclaw-config', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ content: '{"validated":true}', mode: 'warn-before-write' }),
+      });
+      await vi.waitFor(() => expect(validateOpenclawConfigCandidate).toHaveBeenCalledOnce());
+
+      const legacyWrite = app.request('/_kilo/files/write', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ path: 'alias/openclaw.json', content: '{"legacy":true}' }),
+      });
+      await Promise.resolve();
+      expect(atomicWrite).not.toHaveBeenCalled();
+
+      if (!resolveValidation) throw new Error('Validation request did not start');
+      resolveValidation({ valid: true });
+      await Promise.all([validatedWrite, legacyWrite]);
+
+      expect(atomicWrite).toHaveBeenNthCalledWith(
+        1,
+        `${ROOT}/openclaw.json`,
+        '{"validated":true}',
+        undefined,
+        { mode: 0o600 }
+      );
+      expect(atomicWrite).toHaveBeenNthCalledWith(
+        2,
+        `${ROOT}/alias/openclaw.json`,
+        '{"legacy":true}'
+      );
+    });
+
     it('returns a conflict if openclaw.json disappears during ETag validation', async () => {
       vi.mocked(fs.existsSync).mockReturnValue(true);
       vi.mocked(fs.lstatSync).mockReturnValue({
@@ -437,6 +487,34 @@ describe('file routes', () => {
       });
       expect(backupFile).not.toHaveBeenCalled();
       expect(atomicWrite).not.toHaveBeenCalled();
+    });
+
+    it('logs only safe error metadata when a config backup fails', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.lstatSync).mockReturnValue({
+        isSymbolicLink: () => false,
+        isFile: () => true,
+      } as any);
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+      vi.mocked(backupFile).mockImplementation(() => {
+        throw Object.assign(new Error('backup failed at /root/.openclaw/openclaw.json'), {
+          code: 'EACCES',
+        });
+      });
+
+      const res = await app.request('/_kilo/files/write-openclaw-config', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ content: '{"gateway":{}}', mode: 'allow-invalid' }),
+      });
+
+      expect(res.status).toBe(200);
+      expect(warn).toHaveBeenCalledWith(
+        '[files] Failed to create backup, proceeding with write:',
+        'EACCES'
+      );
+      expect(warn.mock.calls.flat().join(' ')).not.toContain('/root/.openclaw/openclaw.json');
+      warn.mockRestore();
     });
 
     it('allows an explicit invalid openclaw config override', async () => {

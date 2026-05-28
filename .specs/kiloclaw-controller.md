@@ -741,7 +741,8 @@ running. When forwarding, it MUST authenticate to gog with
 5. Validation-warning responses MAY return bounded diagnostics derived while validating the authenticated instance's configuration, including substituted values; those diagnostics MUST be returned only to authenticated config-management clients and MUST NOT be logged. Responses and logs MUST NOT expose staging paths or unrestricted subprocess output.
 6. Validation-aware writes MUST remain usable when the gateway process is unavailable after controller routes are registered.
 7. Controllers implementing this behavior MUST advertise `files.write-openclaw-config`; clients MUST NOT infer this behavior solely from controller CalVer.
-8. This validation reports OpenClaw configuration validity. It MUST NOT be represented as proof that runtime SecretRefs or optional environment substitutions resolve successfully.
+8. Controllers implementing this behavior MUST serialize any remaining generic `POST /_kilo/files/write` mutation of `openclaw.json` with validation-aware writes and other controller-owned config mutations so legacy clients cannot interleave config commits.
+9. This validation reports OpenClaw configuration validity. It MUST NOT be represented as proof that runtime SecretRefs or optional environment substitutions resolve successfully.
 
 #### Doctor (bearer token)
 

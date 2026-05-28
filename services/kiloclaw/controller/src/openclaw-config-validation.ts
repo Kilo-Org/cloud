@@ -143,29 +143,46 @@ function unavailableIssue(message: string): OpenclawConfigValidationResult {
   };
 }
 
-function referencesTargetConfig(value: unknown, configPath: string): boolean {
-  if (Array.isArray(value)) {
-    return value.some(entry => referencesTargetConfig(entry, configPath));
+function unexpectedValidationFailure(error: unknown): OpenclawConfigValidationResult {
+  switch (errorCode(error)) {
+    case 'ENOSPC':
+      return unavailableIssue('There is not enough disk space to validate this configuration.');
+    case 'EACCES':
+    case 'EPERM':
+      return unavailableIssue('OpenClaw cannot access the temporary validation file.');
+    case 'EEXIST':
+      return unavailableIssue('Configuration validation is already in progress. Try saving again.');
+    default:
+      return unavailableIssue('OpenClaw configuration validation could not be started.');
   }
-  if (typeof value !== 'object' || value === null) {
-    return false;
-  }
+}
 
-  for (const [key, nestedValue] of Object.entries(value)) {
-    if (key === '$include') {
-      const includes = Array.isArray(nestedValue) ? nestedValue : [nestedValue];
-      if (
-        includes.some(
-          include =>
-            typeof include === 'string' &&
-            path.resolve(path.dirname(configPath), include) === path.resolve(configPath)
-        )
-      ) {
-        return true;
-      }
+function referencesTargetConfig(value: unknown, configPath: string): boolean {
+  const pending: unknown[] = [value];
+  while (pending.length > 0) {
+    const current = pending.pop();
+    if (Array.isArray(current)) {
+      for (const entry of current) pending.push(entry);
+      continue;
     }
-    if (referencesTargetConfig(nestedValue, configPath)) {
-      return true;
+    if (typeof current !== 'object' || current === null) {
+      continue;
+    }
+
+    for (const [key, nestedValue] of Object.entries(current)) {
+      if (key === '$include') {
+        const includes = Array.isArray(nestedValue) ? nestedValue : [nestedValue];
+        if (
+          includes.some(
+            include =>
+              typeof include === 'string' &&
+              path.resolve(path.dirname(configPath), include) === path.resolve(configPath)
+          )
+        ) {
+          return true;
+        }
+      }
+      pending.push(nestedValue);
     }
   }
   return false;
@@ -231,7 +248,7 @@ export async function validateOpenclawConfigCandidate(
     return unavailableIssue('OpenClaw could not validate this configuration.');
   } catch (error) {
     console.error('[openclaw-config-validation] Validation failed unexpectedly:', errorCode(error));
-    return unavailableIssue('OpenClaw configuration validation could not be started.');
+    return unexpectedValidationFailure(error);
   } finally {
     try {
       deps.removeFile(stagePath);

@@ -81,7 +81,9 @@ describe('validateOpenclawConfigCandidate', () => {
     await expect(validateOpenclawConfigCandidate('{}', CONFIG_PATH, deps)).resolves.toEqual({
       valid: false,
       reason: 'validation-unavailable',
-      issues: [{ path: '', message: 'OpenClaw configuration validation could not be started.' }],
+      issues: [
+        { path: '', message: 'There is not enough disk space to validate this configuration.' },
+      ],
     });
     expect(log).toHaveBeenCalledWith(
       '[openclaw-config-validation] Validation failed unexpectedly:',
@@ -89,6 +91,25 @@ describe('validateOpenclawConfigCandidate', () => {
     );
     expect(log.mock.calls.flat().join(' ')).not.toContain('sensitive path');
 
+    log.mockRestore();
+  });
+
+  it.each([
+    ['EACCES', 'OpenClaw cannot access the temporary validation file.'],
+    ['EPERM', 'OpenClaw cannot access the temporary validation file.'],
+    ['EEXIST', 'Configuration validation is already in progress. Try saving again.'],
+  ])('returns actionable messages for staging error %s', async (code, message) => {
+    const deps = createDeps(JSON.stringify({ valid: true }));
+    const log = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    vi.mocked(deps.writeCandidate).mockImplementation(() => {
+      throw Object.assign(new Error('staging failed'), { code });
+    });
+
+    await expect(validateOpenclawConfigCandidate('{}', CONFIG_PATH, deps)).resolves.toEqual({
+      valid: false,
+      reason: 'validation-unavailable',
+      issues: [{ path: '', message }],
+    });
     log.mockRestore();
   });
 
@@ -137,6 +158,20 @@ describe('validateOpenclawConfigCandidate', () => {
     });
     expect(deps.writeCandidate).not.toHaveBeenCalled();
     expect(deps.runValidation).not.toHaveBeenCalled();
+  });
+
+  it('inspects deeply nested candidates without recursive traversal', async () => {
+    const deps = createDeps(JSON.stringify({ valid: true }));
+    const depth = 10_000;
+    const candidate = `${'{"nested":'.repeat(depth)}{"$include":"./openclaw.json"}${'}'.repeat(depth)}`;
+
+    await expect(
+      validateOpenclawConfigCandidate(candidate, CONFIG_PATH, deps)
+    ).resolves.toMatchObject({
+      valid: false,
+      reason: 'validation-unavailable',
+    });
+    expect(deps.writeCandidate).not.toHaveBeenCalled();
   });
 
   it('warns without staging JSON5 candidates, including escaped self-targeting includes', async () => {

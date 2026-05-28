@@ -219,9 +219,8 @@ export async function disableCodeReviewForActionRequiredFailure(
   args: DisableCodeReviewForActionRequiredFailureArgs
 ): Promise<void> {
   const copy = getCodeReviewActionRequiredCopy(args.reason);
-  let shouldSendEmail = false;
 
-  await db.transaction(async tx => {
+  const shouldSendEmail = await db.transaction(async tx => {
     await tx.execute(
       sql`SELECT pg_advisory_xact_lock(hashtext(${`code-review-action-required:${args.owner.type}:${args.owner.id}:${args.platform}`}))`
     );
@@ -249,7 +248,7 @@ export async function disableCodeReviewForActionRequiredFailure(
 
     const now = new Date().toISOString();
     const existingState = getCodeReviewActionRequiredState(config);
-    shouldSendEmail =
+    const shouldSendEmail =
       !existingState || existingState.reason !== args.reason || !existingState.emailSentAt;
 
     const nextState: CodeReviewActionRequiredState = {
@@ -268,6 +267,8 @@ export async function disableCodeReviewForActionRequiredFailure(
     };
 
     await updateActionRequiredRuntimeState(tx, conditions, nextState);
+
+    return shouldSendEmail;
   });
 
   if (!shouldSendEmail) return;

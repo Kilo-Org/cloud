@@ -1629,6 +1629,40 @@ export function reconcileReviewQueue(
     }
   }
 
+  // Babysat PR fast-track: open MR beads with metadata.babysit=true
+  // bypass refinery code review regardless of the rig's code_review config.
+  // These beads already have pr_url set at creation (from slingExistingPr),
+  // so they transition directly to in_progress for poll_pr.
+  const babysatOpenMrs = z
+    .object({ bead_id: z.string() })
+    .array()
+    .parse([
+      ...query(
+        sql,
+        /* sql */ `
+          SELECT b.${beads.columns.bead_id}
+          FROM ${beads} b
+          JOIN ${review_metadata} rm
+            ON rm.${review_metadata.columns.bead_id} = b.${beads.columns.bead_id}
+          WHERE b.${beads.columns.type} = 'merge_request'
+            AND b.${beads.columns.status} = 'open'
+            AND rm.${review_metadata.columns.pr_url} IS NOT NULL
+            AND json_extract(COALESCE(b.${beads.columns.metadata}, '{}'), '$.babysit') = 1
+        `,
+        []
+      ),
+    ]);
+  for (const { bead_id } of babysatOpenMrs) {
+    actions.push({
+      type: 'transition_bead',
+      bead_id,
+      from: 'open',
+      to: 'in_progress',
+      reason: 'babysat PR — skip refinery, fast-track to poll_pr',
+      actor: 'system',
+    });
+  }
+
   // Rules 5-6: Refinery dispatch for open MR beads.
   // When code_review=true for a rig: dispatches for all open MR beads in that rig.
   // When code_review=false for a rig: only dispatches for convoy review-and-merge
@@ -1735,6 +1769,7 @@ export function reconcileReviewQueue(
           WHERE ${beads.type} = 'merge_request'
             AND ${beads.status} = 'open'
             AND ${beads.rig_id} = ?
+            AND json_extract(COALESCE(${beads.metadata}, '{}'), '$.babysit') IS NOT 1
             ${refineryNeededFilter}
           ORDER BY ${beads.created_at} ASC
           LIMIT 1

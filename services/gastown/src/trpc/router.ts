@@ -31,6 +31,8 @@ import {
   RpcStreamTicketOutput,
   RpcPtySessionOutput,
   RpcSlingResultOutput,
+  RpcBabysitPrResultOutput,
+  RpcPreviewPrResultOutput,
   RpcRigDetailOutput,
   RpcConvoyDetailOutput,
   RpcAlarmStatusOutput,
@@ -888,6 +890,47 @@ export const gastownRouter = router({
         body: input.body,
         labels: input.labels,
         metadata: { model: input.model, slung_by: user.id },
+      });
+    }),
+
+  babysitPr: gastownProcedure
+    .input(
+      z.object({
+        rigId: z.string().uuid(),
+        prUrl: z.string().url(),
+        title: z.string().optional(),
+        body: z.string().optional(),
+        forcePushAllowed: z.boolean().optional(),
+      })
+    )
+    .output(RpcBabysitPrResultOutput)
+    .mutation(async ({ ctx, input }) => {
+      const rig = await verifyRigOwnership(ctx.env, ctx, input.rigId);
+      const townStub = getTownDOStub(ctx.env, rig.town_id);
+      return townStub.slingExistingPr({
+        rigId: rig.id,
+        prUrl: input.prUrl,
+        title: input.title,
+        body: input.body,
+        forcePushAllowed: input.forcePushAllowed,
+        sourceAgentId: 'system',
+      });
+    }),
+
+  previewPr: gastownProcedure
+    .input(
+      z.object({
+        rigId: z.string().uuid(),
+        prUrl: z.string().url(),
+      })
+    )
+    .output(RpcPreviewPrResultOutput)
+    .query(async ({ ctx, input }) => {
+      const rig = await verifyRigOwnership(ctx.env, ctx, input.rigId);
+      const townStub = getTownDOStub(ctx.env, rig.town_id);
+      return townStub.previewPr({
+        rigId: rig.id,
+        prUrl: input.prUrl,
       });
     }),
 

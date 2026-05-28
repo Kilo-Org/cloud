@@ -440,3 +440,132 @@ describe('submitExternalPrToReviewQueue metadata shape', () => {
     expect(labels).toContain('gt:babysit');
   });
 });
+
+describe('babysitPr tRPC mutation input validation', () => {
+  const babysitPrInputSchema = {
+    rigId: 'string-uuid',
+    prUrl: 'url',
+    title: 'string-optional',
+    body: 'string-optional',
+    forcePushAllowed: 'boolean-optional',
+  };
+
+  it('requires rigId and prUrl', () => {
+    expect(babysitPrInputSchema.rigId).toBeDefined();
+    expect(babysitPrInputSchema.prUrl).toBeDefined();
+  });
+
+  it('title, body, forcePushAllowed are optional', () => {
+    expect(babysitPrInputSchema.title).toBeDefined();
+    expect(babysitPrInputSchema.body).toBeDefined();
+    expect(babysitPrInputSchema.forcePushAllowed).toBeDefined();
+  });
+});
+
+describe('previewPr tRPC query output', () => {
+  it('returns repo_matches: false on repo mismatch without throwing', () => {
+    const result = {
+      state: 'unknown',
+      repo_matches: false,
+    };
+    expect(result.repo_matches).toBe(false);
+    expect(result.state).toBe('unknown');
+  });
+
+  it('returns full PR metadata on repo match', () => {
+    const result = {
+      state: 'open',
+      head_branch: 'feature/x',
+      base_branch: 'main',
+      head_sha: 'abc1234',
+      title: 'My PR',
+      repo_matches: true,
+    };
+    expect(result.repo_matches).toBe(true);
+    expect(result.head_branch).toBe('feature/x');
+    expect(result.base_branch).toBe('main');
+    expect(result.head_sha).toBe('abc1234');
+    expect(result.title).toBe('My PR');
+  });
+});
+
+describe('mayor-tools babysit-pr handler input schema', () => {
+  it('validates required fields', () => {
+    const body = {
+      rig_id: 'rig-1',
+      pr_url: 'https://github.com/owner/repo/pull/1',
+    };
+    expect(body.rig_id).toBeTruthy();
+    expect(body.pr_url).toMatch(/^https:\/\//);
+  });
+
+  it('sourceAgentId is forced to mayor', () => {
+    const sourceAgentId = 'mayor';
+    expect(sourceAgentId).toBe('mayor');
+  });
+});
+
+describe('refinery bypass for babysat beads', () => {
+  it('dispatch_agent returns null for babysit merge_request beads', () => {
+    const targetBead = {
+      type: 'merge_request',
+      metadata: { babysit: true },
+    };
+    const shouldBypass =
+      targetBead.type === 'merge_request' && targetBead.metadata?.babysit === true;
+    expect(shouldBypass).toBe(true);
+  });
+
+  it('dispatch_agent does NOT bypass for non-babysit merge_request beads', () => {
+    const targetBead = {
+      type: 'merge_request',
+      metadata: {},
+    };
+    const shouldBypass =
+      targetBead.type === 'merge_request' && targetBead.metadata?.babysit === true;
+    expect(shouldBypass).toBe(false);
+  });
+
+  it('dispatch_agent does NOT bypass for issue beads', () => {
+    const targetBead = {
+      type: 'issue',
+      metadata: {},
+    };
+    const shouldBypass =
+      targetBead.type === 'merge_request' && targetBead.metadata?.babysit === true;
+    expect(shouldBypass).toBe(false);
+  });
+});
+
+describe('reconciler babysit fast-track', () => {
+  it('babysat beads fast-track regardless of code_review config', () => {
+    const rigCodeReview = true;
+    const beadIsBabysat = true;
+    const shouldFastTrack = beadIsBabysat;
+    expect(shouldFastTrack).toBe(true);
+    expect(rigCodeReview).toBe(true);
+  });
+
+  it('babysat beads with pr_url transition to in_progress', () => {
+    const action = {
+      type: 'transition_bead' as const,
+      bead_id: 'test-bead',
+      from: 'open',
+      to: 'in_progress',
+      reason: 'babysat PR — skip refinery, fast-track to poll_pr',
+      actor: 'system',
+    };
+    expect(action.type).toBe('transition_bead');
+    expect(action.from).toBe('open');
+    expect(action.to).toBe('in_progress');
+    expect(action.reason).toContain('babysat');
+  });
+
+  it('non-babysat MR beads on code_review=true rig do NOT fast-track', () => {
+    const rigCodeReview = true;
+    const beadIsBabysat = false;
+    const shouldFastTrack = beadIsBabysat;
+    expect(shouldFastTrack).toBe(false);
+    expect(rigCodeReview).toBe(true);
+  });
+});

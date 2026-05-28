@@ -2661,6 +2661,90 @@ export class TownDO extends DurableObject<Env> {
     return { beadId, warning };
   }
 
+  async previewPr(input: { rigId: string; prUrl: string }): Promise<{
+    state: string;
+    head_branch?: string;
+    base_branch?: string;
+    head_sha?: string;
+    title?: string;
+    repo_matches: boolean;
+  }> {
+    const rig = rigs.getRig(this.sql, input.rigId);
+    if (!rig) {
+      throw new Error(`Rig not found: ${input.rigId}`);
+    }
+
+    const townConfig = await this.getTownConfig();
+    const rigCoords = parseGitUrl(rig.git_url, townConfig.git_auth?.gitlab_instance_url);
+    if (!rigCoords) {
+      throw new Error(`Cannot parse rig git URL: ${rig.git_url}`);
+    }
+
+    const prUrlMatch = input.prUrl.match(/^https:\/\/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/);
+    const glUrlMatch = input.prUrl.match(/^(https:\/\/[^/]+)\/(.+)\/-\/merge_requests\/(\d+)/);
+
+    let prOwner: string | undefined;
+    let prRepo: string | undefined;
+    let prPlatform: 'github' | 'gitlab' | undefined;
+
+    if (prUrlMatch) {
+      prPlatform = 'github';
+      prOwner = prUrlMatch[1];
+      prRepo = prUrlMatch[2];
+    } else if (glUrlMatch) {
+      const glHost = new URL(glUrlMatch[1]).hostname;
+      const configuredGlHost = townConfig.git_auth?.gitlab_instance_url
+        ? new URL(townConfig.git_auth.gitlab_instance_url).hostname
+        : null;
+      if (glHost === 'gitlab.com' || glHost === configuredGlHost) {
+        prPlatform = 'gitlab';
+        const fullPath = glUrlMatch[2];
+        const lastSlash = fullPath.lastIndexOf('/');
+        prOwner = lastSlash > 0 ? fullPath.slice(0, lastSlash) : fullPath;
+        prRepo = lastSlash > 0 ? fullPath.slice(lastSlash + 1) : '';
+      }
+    }
+
+    if (!prPlatform || !prOwner || !prRepo) {
+      throw new Error(`Cannot parse PR URL: ${input.prUrl}`);
+    }
+
+    const repoMatches =
+      prPlatform === rigCoords.platform && prOwner === rigCoords.owner && prRepo === rigCoords.repo;
+
+    if (!repoMatches) {
+      return { state: 'unknown', repo_matches: false };
+    }
+
+    const rigConfig = await this.getRigConfig(input.rigId);
+    const scmCtx: scm.SCMContext = {
+      env: this.env,
+      townId: this.townId,
+      getTownConfig: () => this.getTownConfig(),
+      platformIntegrationId: rigConfig?.platformIntegrationId,
+    };
+
+    const outcome = await scm.checkPRStatus(scmCtx, input.prUrl);
+    if (!outcome.ok) {
+      const err = outcome.error;
+      throw new Error(
+        `Failed to fetch PR status: ${err.kind}` +
+          (err.kind === 'http_error' ? ` (${err.status} ${err.statusText})` : '') +
+          (err.kind === 'no_token' ? ` — tried: ${err.resolutionChain.join(', ')}` : '')
+      );
+    }
+
+    const prResult = outcome.result;
+    return {
+      state: prResult.status,
+      head_branch: prResult.head_branch,
+      base_branch: prResult.base_branch,
+      head_sha: prResult.head_sha,
+      title: prResult.title,
+      repo_matches: true,
+    };
+  }
+
   /**
    * Create an open bead with the given labels, without arming the reconciler alarm.
    * The caller is responsible for including `gt:held` in the labels if the bead

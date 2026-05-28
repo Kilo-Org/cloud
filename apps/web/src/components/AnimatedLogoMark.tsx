@@ -57,7 +57,8 @@ export function AnimatedLogoMark({ size = 48, className }: AnimatedLogoMarkProps
       onMouseLeave={() => setIsHovered(false)}
     >
       <span className="relative inline-block" style={{ width: size, height: size }} aria-hidden>
-        <Image src="/kilo-v1.svg" alt="" width={size} height={size} priority />
+        {/* `kilo-v1.svg` ships with a dark `#231f20` fill; invert it for dark surfaces. */}
+        <Image src="/kilo-v1.svg" alt="" width={size} height={size} priority className="invert" />
         <video
           ref={videoRef}
           src="/kilo-anim.mp4"

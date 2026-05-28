@@ -197,6 +197,20 @@ export async function POST(request: NextRequest) {
   });
   if (modelRestrictionError) return modelRestrictionError;
 
+  // Org-level "do not collect my data" opt-out. The OpenRouter/Vercel paths
+  // honor this by setting `provider.data_collection = 'deny'` on the upstream
+  // request body, which causes the gateway to route to a sub-provider with a
+  // no-training/no-retention contract. This route bypasses both gateways and
+  // POSTs straight to Inception, and Inception's edit endpoint exposes no
+  // per-request opt-out flag. Their public privacy policy
+  // (https://www.inceptionlabs.ai/docs/privacy-policy) lists "Personal Data
+  // contained in prompts, inputs and uploaded content processed by our models"
+  // among the data they collect for purposes including "training and refining
+  // our models"; "no training / no retention" is only offered as an enterprise
+  // feature (https://www.inceptionlabs.ai/enterprise), not as the default for
+  // the standard API tier we call here. Until we sign an enterprise agreement
+  // or Inception adds a per-request flag, refusing is the only way to honor
+  // the org's stated intent.
   if (providerConfig?.data_collection === 'deny') {
     return dataCollectionRequiredResponse();
   }

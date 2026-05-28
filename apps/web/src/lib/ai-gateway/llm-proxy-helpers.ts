@@ -735,6 +735,14 @@ function getEditCacheHitTokens(usage: EditUsage): number {
 function computeEditMicrodollarCost(usage: EditUsage, provider: ProviderId): number {
   switch (provider) {
     case 'inception': {
+      // Inception Mercury Edit 2 published rates (per 1M tokens):
+      //   $0.25 input  →  0.25 mUSD/token
+      //   $0.025 cached input  →  0.025 mUSD/token
+      //   $0.75 output  →  0.75 mUSD/token
+      // Sources:
+      //   https://www.inceptionlabs.ai/models
+      //   https://www.inceptionlabs.ai/blog/introducing-mercury-edit-2
+      // Mercury 2 (chat) shares the same per-token rates.
       const cacheHitTokens = getEditCacheHitTokens(usage);
       const uncachedInputTokens = usage.prompt_tokens - cacheHitTokens;
       return Math.round(

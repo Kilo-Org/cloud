@@ -1,9 +1,9 @@
-"use client";
-import { useTRPC } from "@/lib/trpc/utils";
-import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
+'use client';
+import { useTRPC } from '@/lib/trpc/utils';
+import { useQuery } from '@tanstack/react-query';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
   TableBody,
@@ -11,22 +11,20 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
-import { formatIsoDateString_UsaDateOnlyFormat } from "@/lib/utils";
-import { AlertTriangle } from "lucide-react";
+} from '@/components/ui/table';
+import { formatIsoDateString_UsaDateOnlyFormat } from '@/lib/utils';
+import { AlertTriangle } from 'lucide-react';
 
 type ActiveKiloclawsTableProps = {
   organizationId: string;
 };
 
-export function ActiveKiloclawsTable({
-  organizationId,
-}: ActiveKiloclawsTableProps) {
+export function ActiveKiloclawsTable({ organizationId }: ActiveKiloclawsTableProps) {
   const trpc = useTRPC();
   const { data, isLoading, isError } = useQuery(
     trpc.organizations.kiloclaw.listActiveInstances.queryOptions({
       organizationId,
-    }),
+    })
   );
 
   const instanceCount = data?.length ?? 0;
@@ -38,7 +36,7 @@ export function ActiveKiloclawsTable({
           Active KiloClaws
           {!isLoading && !isError && (
             <span className="text-muted-foreground ml-2 text-sm font-normal">
-              {instanceCount} {instanceCount === 1 ? "instance" : "instances"}
+              {instanceCount} {instanceCount === 1 ? 'instance' : 'instances'}
             </span>
           )}
         </CardTitle>
@@ -72,15 +70,11 @@ export function ActiveKiloclawsTable({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {data?.map((instance) => (
+              {data?.map(instance => (
                 <TableRow key={instance.id}>
+                  <TableCell className="text-sm">{instance.userEmail}</TableCell>
                   <TableCell className="text-sm">
-                    {instance.userEmail}
-                  </TableCell>
-                  <TableCell className="text-sm">
-                    {instance.name ?? (
-                      <span className="text-muted-foreground">—</span>
-                    )}
+                    {instance.name ?? <span className="text-muted-foreground">—</span>}
                   </TableCell>
                   <TableCell className="text-sm">
                     {formatIsoDateString_UsaDateOnlyFormat(instance.createdAt)}

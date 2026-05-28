@@ -1,8 +1,8 @@
 'use client';
+import { Users } from 'lucide-react';
 import { useTRPC } from '@/lib/trpc/utils';
 import { useQuery } from '@tanstack/react-query';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
@@ -27,17 +27,19 @@ export function OrgActiveKiloclawsCard({ organizationId }: Props) {
 
   return (
     <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="flex items-center gap-2 text-base">
-          Active KiloClaws
-          {!isLoading && (
-            <Badge variant="secondary" className="text-xs font-normal">
-              {activeEmails.length} {activeEmails.length === 1 ? 'KiloClaw' : 'KiloClaws'}
-            </Badge>
-          )}
-        </CardTitle>
+      <CardHeader className="pb-3">
+        <div className="flex items-center gap-2">
+          <Users className="h-4 w-4" />
+          <CardTitle>Active KiloClaws</CardTitle>
+        </div>
+        {!isLoading && (
+          <CardDescription className="text-xs">
+            You have {activeEmails.length} active KiloClaw
+            {activeEmails.length !== 1 ? 's' : ''} in this organization
+          </CardDescription>
+        )}
       </CardHeader>
-      <CardContent className="p-0">
+      <CardContent className="pt-0">
         {isLoading ? (
           <div className="space-y-2 p-4">
             <Skeleton className="h-8 w-full" />
@@ -52,7 +54,9 @@ export function OrgActiveKiloclawsCard({ organizationId }: Props) {
           <Table className="table-fixed">
             <TableHeader>
               <TableRow>
-                <TableHead className="w-full px-6">Owner</TableHead>
+                <TableHead className="w-full px-6 text-muted-foreground text-xs font-normal">
+                  Owner
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>

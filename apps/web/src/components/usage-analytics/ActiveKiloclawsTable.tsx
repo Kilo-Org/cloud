@@ -1,0 +1,91 @@
+'use client';
+import { useTRPC } from '@/lib/trpc/utils';
+import { useQuery } from '@tanstack/react-query';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { formatIsoDateString_UsaDateOnlyFormat } from '@/lib/utils';
+
+type ActiveKiloclawsTableProps = {
+  organizationId: string;
+};
+
+export function ActiveKiloclawsTable({ organizationId }: ActiveKiloclawsTableProps) {
+  const trpc = useTRPC();
+  const { data, isLoading } = useQuery(
+    trpc.organizations.kiloclaw.listActiveInstances.queryOptions({ organizationId })
+  );
+
+  const instanceCount = data?.length ?? 0;
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base">
+          Active KiloClaws
+          {!isLoading && (
+            <span className="text-muted-foreground ml-2 text-sm font-normal">
+              {instanceCount} {instanceCount === 1 ? 'instance' : 'instances'}
+            </span>
+          )}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="p-0">
+        {isLoading ? (
+          <div className="space-y-2 p-4">
+            <Skeleton className="h-8 w-full" />
+            <Skeleton className="h-8 w-full" />
+            <Skeleton className="h-8 w-4/5" />
+          </div>
+        ) : instanceCount === 0 ? (
+          <p className="text-muted-foreground px-4 pb-4 pt-2 text-sm">
+            No active KiloClaw instances in this organization.
+          </p>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>User</TableHead>
+                <TableHead>Instance Name</TableHead>
+                <TableHead>Created</TableHead>
+                <TableHead>Status</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {data?.map(instance => (
+                <TableRow key={instance.id}>
+                  <TableCell className="text-sm">{instance.userEmail}</TableCell>
+                  <TableCell className="text-sm">
+                    {instance.name ?? <span className="text-muted-foreground">—</span>}
+                  </TableCell>
+                  <TableCell className="text-sm">
+                    {formatIsoDateString_UsaDateOnlyFormat(instance.createdAt)}
+                  </TableCell>
+                  <TableCell>
+                    {instance.isSuspended ? (
+                      <Badge variant="destructive" className="text-xs">
+                        Suspended
+                      </Badge>
+                    ) : (
+                      <Badge variant="secondary" className="text-xs">
+                        Active
+                      </Badge>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent>
+    </Card>
+  );
+}

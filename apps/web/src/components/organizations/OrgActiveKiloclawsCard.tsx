@@ -28,7 +28,7 @@ export function OrgActiveKiloclawsCard({ organizationId }: Props) {
   return (
     <Card>
       <CardHeader className="pb-3">
-        <div className="flex items-center gap-2">
+        <div className="flex min-h-8 items-center gap-2">
           <Users className="h-4 w-4" />
           <CardTitle>Active KiloClaws</CardTitle>
         </div>

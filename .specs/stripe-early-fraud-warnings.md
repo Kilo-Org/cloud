@@ -38,6 +38,12 @@ BCP 14 [RFC 2119] [RFC 8174] keywords apply only when they appear in all capital
 3. Existing dispute, refund, and fraud-mark handling MUST continue to operate independently, subject to idempotency rules that prevent duplicated EFW side effects.
 4. The persistence-only foundation MAY exist before processing is enabled; until ingestion is deployed, it MUST remain unwritten by EFW automation.
 
+### Observation-Only Rollout Interval
+
+- Before automatic enforcement is deployed and enabled, newly delivered EFWs MUST be persisted as `review_required` cases for operator visibility only, including warnings that resolve to a canonical personal owner.
+- A case captured during the observation-only interval MUST remain manual-review work and MUST NOT later be promoted into automatic enforcement merely because enforcement is enabled for newly arriving warnings.
+- Observation-only ingestion MUST NOT create action-ledger work, block users, disable automatic top-up, refund payments, reverse value, modify subscriptions or compute, reverse payouts or rewards, or send enforcement notices.
+
 ### Ownership Resolution and Review Boundary
 
 5. Automatic enforcement MUST occur only when the warned payment resolves to one canonical personal owner and does not resolve to an organization.

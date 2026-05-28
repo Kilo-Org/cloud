@@ -63,6 +63,33 @@ export type PrimeContext = {
   hooked_bead: Bead | null;
   undelivered_mail: Mail[];
   open_beads: Bead[];
+  /** Present when the hooked bead is a rework request (gt:rework label). */
+  rework_context: {
+    feedback: string;
+    branch: string | null;
+    target_branch: string | null;
+    files: string[];
+    original_bead_title: string | null;
+    mr_bead_id: string | null;
+  } | null;
+  /** Present when the hooked bead is a PR fixup (gt:pr-fixup label). */
+  pr_fixup_context: {
+    pr_url: string | null;
+    branch: string | null;
+    target_branch: string | null;
+    /** Whether force-push is allowed on this PR branch. Absent = true (backwards compat). */
+    force_push_allowed: boolean;
+  } | null;
+  /** Present when the hooked bead is a PR conflict resolution (gt:pr-conflict label). */
+  pr_conflict_context: {
+    pr_url: string | null;
+    branch: string | null;
+    target_branch: string | null;
+    /** When true, the bead also has pending review feedback to address after resolving conflicts. */
+    has_feedback: boolean;
+    /** Whether force-push is allowed on this PR branch. Absent = true (backwards compat). */
+    force_push_allowed: boolean;
+  } | null;
 };
 
 // API response envelope
@@ -79,6 +106,13 @@ export type Rig = {
   default_branch: string;
   created_at: string;
   updated_at: string;
+};
+
+// Result of POST /babysit-pr — the babysit adoption creates a bead and
+// optionally returns a warning (e.g. PR already merged, but adoption proceeds).
+export type BabysitPrResult = {
+  beadId: string;
+  warning?: string;
 };
 
 // Sling result (bead + assigned agent)

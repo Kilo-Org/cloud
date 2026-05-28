@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { MayorGastownClient } from './client';
 import type {
   Agent,
+  BabysitPrResult,
   Bead,
   Convoy,
   ConvoyDetail,
@@ -86,6 +87,9 @@ function makeFakeMayorClient(overrides: Partial<MayorGastownClient> = {}): Mayor
     sling: vi.fn<() => Promise<SlingResult>>().mockResolvedValue({
       bead: FAKE_BEAD,
       agent: FAKE_AGENT,
+    }),
+    babysitPr: vi.fn<() => Promise<BabysitPrResult>>().mockResolvedValue({
+      beadId: 'babysit-bead-1',
     }),
     listRigs: vi.fn<() => Promise<Rig[]>>().mockResolvedValue([]),
     listBeads: vi.fn<() => Promise<Bead[]>>().mockResolvedValue([]),
@@ -586,6 +590,64 @@ describe('mayor tools', () => {
         message: 'Urgent!',
         mode: 'immediate',
       });
+    });
+  });
+
+  describe('gt_babysit_pr', () => {
+    it('delegates to client.babysitPr and returns result summary', async () => {
+      const result = await tools.gt_babysit_pr.execute(
+        {
+          rig_id: 'rig-1',
+          pr_url: 'https://github.com/owner/repo/pull/42',
+        },
+        CTX
+      );
+      expect(result).toContain('Babysit started');
+      expect(result).toContain('https://github.com/owner/repo/pull/42');
+      expect(result).toContain('babysit-bead-1');
+      expect(client.babysitPr).toHaveBeenCalledWith({
+        rig_id: 'rig-1',
+        pr_url: 'https://github.com/owner/repo/pull/42',
+        title: undefined,
+        body: undefined,
+        force_push_allowed: undefined,
+      });
+    });
+
+    it('passes all optional fields to the client', async () => {
+      await tools.gt_babysit_pr.execute(
+        {
+          rig_id: 'rig-1',
+          pr_url: 'https://github.com/owner/repo/pull/99',
+          title: 'Babysit: Fix auth',
+          body: 'Please merge this PR',
+          force_push_allowed: true,
+        },
+        CTX
+      );
+      expect(client.babysitPr).toHaveBeenCalledWith({
+        rig_id: 'rig-1',
+        pr_url: 'https://github.com/owner/repo/pull/99',
+        title: 'Babysit: Fix auth',
+        body: 'Please merge this PR',
+        force_push_allowed: true,
+      });
+    });
+
+    it('includes warning in result when present', async () => {
+      client = makeFakeMayorClient({
+        babysitPr: vi.fn<() => Promise<BabysitPrResult>>().mockResolvedValue({
+          beadId: 'babysit-bead-2',
+          warning: 'PR is from a fork — limited permissions',
+        }),
+      });
+      tools = createMayorTools(client);
+
+      const result = await tools.gt_babysit_pr.execute(
+        { rig_id: 'rig-1', pr_url: 'https://github.com/owner/repo/pull/55' },
+        CTX
+      );
+      expect(result).toContain('Warning: PR is from a fork — limited permissions');
     });
   });
 });

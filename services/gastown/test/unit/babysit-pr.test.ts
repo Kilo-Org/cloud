@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { checkPRStatus, type SCMContext } from '../../src/dos/town/town-scm';
+import { resolveForcePushAllowed } from '../../src/dos/town/agents';
 import { parseGitUrl } from '../../src/util/platform-pr.util';
 import type { TownConfig } from '../../src/types';
 
@@ -567,5 +568,64 @@ describe('reconciler babysit fast-track', () => {
     const shouldFastTrack = beadIsBabysat;
     expect(shouldFastTrack).toBe(false);
     expect(rigCodeReview).toBe(true);
+  });
+});
+
+describe('polecat prime context force_push_allowed gate', () => {
+  it('babysat bead with force_push_allowed: false → resolveForcePushAllowed returns false', () => {
+    const meta: Record<string, unknown> = {
+      force_push_allowed: false,
+      pr_url: 'https://github.com/o/r/pull/1',
+      branch: 'feat/x',
+      target_branch: 'main',
+    };
+    expect(resolveForcePushAllowed(meta)).toBe(false);
+  });
+
+  it('babysat bead with force_push_allowed: true → resolveForcePushAllowed returns true', () => {
+    const meta: Record<string, unknown> = {
+      force_push_allowed: true,
+      pr_url: 'https://github.com/o/r/pull/1',
+      branch: 'feat/x',
+      target_branch: 'main',
+    };
+    expect(resolveForcePushAllowed(meta)).toBe(true);
+  });
+
+  it('non-babysat bead (force_push_allowed absent) → resolveForcePushAllowed returns true (backwards compat)', () => {
+    const meta: Record<string, unknown> = {
+      pr_url: 'https://github.com/o/r/pull/1',
+      branch: 'feat/x',
+      target_branch: 'main',
+    };
+    expect(resolveForcePushAllowed(meta)).toBe(true);
+  });
+
+  it('pr_fixup_context with force_push_allowed: false surfaces correctly via resolveForcePushAllowed', () => {
+    const hookedBead: { labels: string[]; metadata: Record<string, unknown> } = {
+      labels: ['gt:pr-fixup'],
+      metadata: {
+        pr_url: 'https://github.com/o/r/pull/1',
+        branch: 'feat/x',
+        target_branch: 'main',
+        force_push_allowed: false,
+      },
+    };
+    const forcePushAllowed = resolveForcePushAllowed(hookedBead.metadata);
+    expect(forcePushAllowed).toBe(false);
+  });
+
+  it('pr_conflict_context with force_push_allowed absent surfaces as true (backwards compat)', () => {
+    const hookedBead: { labels: string[]; metadata: Record<string, unknown> } = {
+      labels: ['gt:pr-conflict'],
+      metadata: {
+        pr_url: 'https://github.com/o/r/pull/1',
+        branch: 'feat/x',
+        target_branch: 'main',
+        has_feedback: false,
+      },
+    };
+    const forcePushAllowed = resolveForcePushAllowed(hookedBead.metadata);
+    expect(forcePushAllowed).toBe(true);
   });
 });

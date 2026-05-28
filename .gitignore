@@ -116,3 +116,4 @@ run-milvus-test.sh
 .beads/
 .env*.local
 .tests/
+.env*

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { toast } from 'sonner';
@@ -8,6 +9,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Table,
@@ -194,8 +197,11 @@ function StatsTab() {
 
 function SuspiciousTab() {
   const trpc = useTRPC();
+  const [hideLegitimateProviders, setHideLegitimateProviders] = useState(true);
 
-  const { data, isLoading } = useQuery(trpc.admin.blacklistDomains.suspicious.queryOptions());
+  const { data, isLoading } = useQuery(
+    trpc.admin.blacklistDomains.suspicious.queryOptions({ hideLegitimateProviders })
+  );
 
   const domains = data?.domains ?? [];
   const blacklistedCount = domains.filter(d => d.isBlacklisted).length;
@@ -203,14 +209,14 @@ function SuspiciousTab() {
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between">
+        <div className="flex items-start justify-between gap-4">
           <div>
             <CardTitle>Suspicious Domains</CardTitle>
             <CardDescription>
               Top 100 registrable domains by blocked account count, then total account count. Only
-              shows domains where at least 30% of accounts have been blocked, to filter out
-              legitimate high-volume providers. Use this to spot domains that are accumulating abuse
-              but aren&apos;t yet blacklisted.
+              shows domains where at least 30% of accounts have been blocked when the provider-noise
+              filter is on. Use this to spot domains that are accumulating abuse but aren&apos;t yet
+              blacklisted.
             </CardDescription>
           </div>
           {data && (
@@ -226,7 +232,17 @@ function SuspiciousTab() {
           )}
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="flex flex-col gap-4">
+        <div className="flex items-center gap-2">
+          <Checkbox
+            id="hide-legitimate-providers"
+            checked={hideLegitimateProviders}
+            onCheckedChange={checked => setHideLegitimateProviders(checked === true)}
+          />
+          <Label htmlFor="hide-legitimate-providers" className="text-sm font-normal">
+            Hide legitimate high-volume providers
+          </Label>
+        </div>
         {isLoading ? (
           <div className="text-muted-foreground py-8 text-center text-sm">Loading…</div>
         ) : domains.length === 0 ? (
@@ -311,11 +327,36 @@ function formatTimestamp(value: string | null): string {
 const tabTriggerClass =
   'text-muted-foreground hover:text-foreground data-[state=active]:border-foreground data-[state=active]:text-foreground rounded-none border-b-2 border-transparent px-0 py-3 text-sm font-medium transition-colors data-[state=active]:border-0 data-[state=active]:border-b-2 data-[state=active]:bg-transparent data-[state=active]:shadow-none';
 
+const blacklistedDomainsTabs = ['edit', 'stats', 'suspicious'] as const;
+type BlacklistedDomainsTab = (typeof blacklistedDomainsTabs)[number];
+
+function isBlacklistedDomainsTab(value: string): value is BlacklistedDomainsTab {
+  return blacklistedDomainsTabs.some(tab => tab === value);
+}
+
+function getTabFromSearchParam(value: string | null): BlacklistedDomainsTab {
+  if (value && isBlacklistedDomainsTab(value)) {
+    return value;
+  }
+
+  return 'edit';
+}
+
 export function BlacklistedDomains() {
-  const [activeTab, setActiveTab] = useState('edit');
+  const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const activeTab = getTabFromSearchParam(searchParams.get('tab'));
+
+  function handleTabChange(tab: string) {
+    const nextTab = getTabFromSearchParam(tab);
+    const params = new URLSearchParams(searchParams);
+    params.set('tab', nextTab);
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+  }
 
   return (
-    <Tabs value={activeTab} onValueChange={setActiveTab}>
+    <Tabs value={activeTab} onValueChange={handleTabChange}>
       <TabsList className="h-auto w-full justify-start gap-6 rounded-none border-b bg-transparent p-0">
         <TabsTrigger value="edit" className={tabTriggerClass}>
           Edit

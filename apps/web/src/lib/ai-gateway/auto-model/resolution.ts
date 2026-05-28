@@ -15,7 +15,8 @@ import {
   KILO_AUTO_BALANCED_MODEL,
   modeSchema,
   BALANCED_CLAW_SETUP_MODEL,
-  BALANCED_QWEN_MODEL,
+  BALANCED_MODE_TO_MODEL,
+  BALANCED_CODE_MODEL,
   BALANCED_RESPONSES_FALLBACK_MODEL,
   FRONTIER_MODE_TO_MODEL,
   FRONTIER_CODE_MODEL,
@@ -136,7 +137,10 @@ export async function resolveAutoModel(
     } else if (apiKind === 'messages') {
       return { kind: 'ok', resolved: BALANCED_MESSAGES_FALLBACK_MODEL };
     } else {
-      return { kind: 'ok', resolved: BALANCED_QWEN_MODEL };
+      return {
+        kind: 'ok',
+        resolved: (mode !== null ? BALANCED_MODE_TO_MODEL[mode] : null) ?? BALANCED_CODE_MODEL,
+      };
     }
   }
   return {

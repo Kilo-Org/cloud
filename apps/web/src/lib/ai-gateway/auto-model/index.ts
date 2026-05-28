@@ -6,7 +6,7 @@ import {
 } from '@/lib/ai-gateway/providers/anthropic.constants';
 import type { OpenRouterReasoningConfig } from '@/lib/ai-gateway/providers/openrouter/types';
 import type { OpenCodeSettings, Verbosity } from '@kilocode/db/schema-types';
-import { qwen36_plus_model } from '@/lib/ai-gateway/providers/qwen';
+import { qwen36_plus_model, qwen37_max_model } from '@/lib/ai-gateway/providers/qwen';
 
 type AutoModel = {
   id: string;
@@ -92,9 +92,29 @@ export const BALANCED_CLAW_SETUP_MODEL: ResolvedAutoModel = {
   verbosity: 'high',
 };
 
-export const BALANCED_QWEN_MODEL: ResolvedAutoModel = {
+const QWEN_MAX_BALANCED: ResolvedAutoModel = {
+  model: qwen37_max_model.public_id,
+  reasoning: { enabled: true },
+};
+
+const QWEN_PLUS_BALANCED: ResolvedAutoModel = {
   model: qwen36_plus_model.public_id,
   reasoning: { enabled: true },
+};
+
+export const BALANCED_CODE_MODEL: ResolvedAutoModel = QWEN_PLUS_BALANCED;
+
+export const BALANCED_MODE_TO_MODEL: Record<Mode, ResolvedAutoModel> = {
+  claw: QWEN_MAX_BALANCED,
+  plan: QWEN_MAX_BALANCED,
+  general: QWEN_MAX_BALANCED,
+  architect: QWEN_MAX_BALANCED,
+  orchestrator: QWEN_MAX_BALANCED,
+  ask: QWEN_MAX_BALANCED,
+  debug: QWEN_MAX_BALANCED,
+  build: QWEN_PLUS_BALANCED,
+  explore: QWEN_PLUS_BALANCED,
+  code: QWEN_PLUS_BALANCED,
 };
 
 export const KILO_AUTO_FRONTIER_MODEL: AutoModel = {

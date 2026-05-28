@@ -100,13 +100,15 @@ describe('POST /api/edit/completions', () => {
   });
 
   it.each([
-    [{ role: 'system', content: 'Do not forward system prompts' }],
-    [{ role: 'assistant', content: 'Do not forward assistant content' }],
-    [
-      { role: 'user', content: 'First message' },
-      { role: 'user', content: 'Second message' },
-    ],
-  ])('rejects unsupported edit messages before proxying', async messages => {
+    { messages: [{ role: 'system', content: 'Do not forward system prompts' }] },
+    { messages: [{ role: 'assistant', content: 'Do not forward assistant content' }] },
+    {
+      messages: [
+        { role: 'user', content: 'First message' },
+        { role: 'user', content: 'Second message' },
+      ],
+    },
+  ])('rejects unsupported edit messages before proxying', async ({ messages }) => {
     setOrganizationAuth();
 
     const { POST } = await import('./route');

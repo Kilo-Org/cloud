@@ -270,7 +270,17 @@ export async function maybeSendDuplicateCardCanceledEmail(params: {
       where: eq(kilocode_users.id, kiloUserId),
     });
 
-    if (!user?.google_user_email) return;
+    if (!user?.google_user_email) {
+      await db
+        .delete(transactional_email_log)
+        .where(
+          and(
+            eq(transactional_email_log.email_type, KILO_PASS_DUPLICATE_CARD_EMAIL_TYPE),
+            eq(transactional_email_log.idempotency_key, stripeInvoiceId)
+          )
+        );
+      return;
+    }
 
     const sendResult = await sendKiloPassDuplicateCardCanceledEmail(user.google_user_email, {});
 

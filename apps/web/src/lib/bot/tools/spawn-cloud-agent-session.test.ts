@@ -68,7 +68,7 @@ let mockGetGitLabInstanceUrlForUser: jest.MockedFunction<typeof GetGitLabInstanc
 let mockBuildGitLabCloneUrl: jest.MockedFunction<typeof BuildGitLabCloneUrl>;
 let mockResolveBotSessionProfile: jest.MockedFunction<typeof ResolveBotSessionProfile>;
 
-describe('spawnCloudAgentSession attachment forwarding', () => {
+describe('spawnCloudAgentSession', () => {
   beforeAll(async () => {
     const client = await import('@/lib/cloud-agent-next/cloud-agent-client');
     const github = await import('@/lib/cloud-agent/github-integration-helpers');
@@ -135,5 +135,44 @@ describe('spawnCloudAgentSession attachment forwarding', () => {
     const prepareInput = mockPrepareSession.mock.calls[0]?.[0];
     expect(prepareInput).toEqual(expect.objectContaining({ attachments }));
     expect(prepareInput).not.toHaveProperty('images');
+  });
+
+  it('adds separate PR strategy guidance when preparing a requested GitHub session', async () => {
+    await spawnCloudAgentSession(
+      { githubRepo: 'owner/repo', prompt: 'Update REVIEW.md', mode: 'code' },
+      'model',
+      platformIntegration,
+      'auth-token',
+      'ticket-user',
+      'request-3',
+      undefined,
+      { useSeparatePullRequestStrategy: true }
+    );
+
+    const prepareInput = mockPrepareSession.mock.calls[0]?.[0];
+    expect(prepareInput).toEqual(
+      expect.objectContaining({
+        prompt: expect.stringContaining('create a fresh branch'),
+      })
+    );
+    expect(prepareInput).toEqual(
+      expect.objectContaining({
+        prompt: expect.stringContaining("must not push to or modify the current PR's head branch"),
+      })
+    );
+  });
+
+  it('leaves the prompt unchanged when separate PR strategy is not requested', async () => {
+    await spawnCloudAgentSession(
+      { githubRepo: 'owner/repo', prompt: 'Update REVIEW.md', mode: 'code' },
+      'model',
+      platformIntegration,
+      'auth-token',
+      'ticket-user',
+      'request-4'
+    );
+
+    const prepareInput = mockPrepareSession.mock.calls[0]?.[0];
+    expect(prepareInput).toEqual(expect.objectContaining({ prompt: 'Update REVIEW.md' }));
   });
 });

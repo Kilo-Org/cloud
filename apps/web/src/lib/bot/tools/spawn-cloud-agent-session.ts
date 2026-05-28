@@ -31,6 +31,12 @@ import { captureException } from '@sentry/nextjs';
 import type { PlatformIntegration } from '@kilocode/db';
 import z from 'zod';
 
+const SEPARATE_PULL_REQUEST_STRATEGY_INSTRUCTION = `
+
+---
+**Required GitHub PR strategy:**
+The user explicitly requested a separate new PR. You must create a fresh branch from the original PR's base branch, open a separate new GitHub PR targeting that same base branch, and must not push to or modify the current PR's head branch.`;
+
 /**
  * Derive a per-request callback token so the dedicated callback HMAC secret
  * is never stored in session metadata (which is visible via getSession).
@@ -103,6 +109,7 @@ export default async function spawnCloudAgentSession(
     chatPlatform?: string;
     currentStep?: number;
     attachments?: CloudAgentAttachments;
+    useSeparatePullRequestStrategy?: boolean;
   }
 ): Promise<SpawnCloudAgentResult> {
   console.log('[KiloBot] spawnCloudAgentSession called with args:', JSON.stringify(args, null, 2));
@@ -132,6 +139,10 @@ export default async function spawnCloudAgentSession(
   }
 
   let prompt = args.prompt;
+
+  if (options?.useSeparatePullRequestStrategy && args.githubRepo) {
+    prompt += SEPARATE_PULL_REQUEST_STRATEGY_INSTRUCTION;
+  }
 
   // Append PR/MR signature to the prompt if available
   if (options?.prSignature) {

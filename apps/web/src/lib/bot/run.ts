@@ -1,6 +1,7 @@
 import { createBotRequest, updateBotRequest } from '@/lib/bot/request-logging';
 import { runBotAgent } from '@/lib/bot/agent-runner';
 import { extractAndUploadAttachments } from '@/lib/bot/attachments';
+import { shouldUseSeparatePullRequestStrategy } from '@/lib/bot/pr-creation-strategy';
 import type { PlatformIntegration, User } from '@kilocode/db';
 import type { Message, Thread } from 'chat';
 import { captureException } from '@sentry/nextjs';
@@ -91,6 +92,7 @@ async function processMessage({
       botRequestId,
       prompt: message.text,
       attachments,
+      useSeparatePullRequestStrategy: shouldUseSeparatePullRequestStrategy({ thread, message }),
     });
 
     updateBotRequest(botRequestId, {

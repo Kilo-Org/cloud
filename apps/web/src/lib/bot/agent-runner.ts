@@ -59,6 +59,7 @@ type RunBotAgentParams = {
   prompt: string;
   /** Pre-uploaded supported attachments from the user's message (already in R2). */
   attachments?: CloudAgentAttachments;
+  useSeparatePullRequestStrategy?: boolean;
   completedStepCount?: number;
   initialSteps?: BotRequestStep[];
   onSessionReady?: (params: {
@@ -308,6 +309,7 @@ This tool returns an acknowledgement immediately. The final Cloud Agent result w
               chatPlatform,
               currentStep,
               attachments: params.attachments,
+              useSeparatePullRequestStrategy: params.useSeparatePullRequestStrategy,
             }
           );
 

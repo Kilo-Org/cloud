@@ -344,7 +344,7 @@ describe('parseEditUsageFromResponse', () => {
     expect(result.hasError).toBe(false);
   });
 
-  it('returns zero cost and flags an error when usage is absent', () => {
+  it('returns zero cost when usage is absent', () => {
     const result = parseEditUsageFromResponse(
       JSON.stringify({
         id: 'edit-789',

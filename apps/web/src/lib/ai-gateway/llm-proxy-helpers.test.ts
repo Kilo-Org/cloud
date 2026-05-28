@@ -26,6 +26,7 @@ jest.mock('./processUsage', () => ({
 import {
   checkOrganizationModelRestrictions,
   countAndStoreEditUsage,
+  extractEditPromptInfo,
   extractEmbeddingPromptInfo,
   makeErrorReadable,
   parseEmbeddingUsageFromResponse,
@@ -295,6 +296,18 @@ describe('extractEmbeddingPromptInfo', () => {
 
     expect(result.system_prompt_prefix).toBe('');
     expect(result.system_prompt_length).toBe(0);
+  });
+});
+
+describe('extractEditPromptInfo', () => {
+  it('uses zero system prompt length because edit has no explicit system prompt', () => {
+    const result = extractEditPromptInfo({
+      messages: [{ role: 'user', content: '<|code_to_edit|>const a = 1<|/code_to_edit|>' }],
+    });
+
+    expect(result.system_prompt_prefix).toBe('');
+    expect(result.system_prompt_length).toBe(0);
+    expect(result.user_prompt_prefix).toBe('<|code_to_edit|>const a = 1<|/code_to_edit|>');
   });
 });
 

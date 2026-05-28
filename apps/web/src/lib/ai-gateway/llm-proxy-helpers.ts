@@ -705,10 +705,9 @@ type EditMessage = { role: string; content: string };
 export function extractEditPromptInfo(body: { messages: EditMessage[] }): PromptInfo {
   const lastUser = [...body.messages].reverse().find(m => m.role === 'user');
   const content = lastUser?.content ?? '';
-  const totalLength = body.messages.reduce((sum, m) => sum + (m.content?.length ?? 0), 0);
   return {
     system_prompt_prefix: '', // /v1/edit/completions bakes its system prompt in server-side
-    system_prompt_length: totalLength, // total message content length; there is no explicit system prompt
+    system_prompt_length: 0,
     user_prompt_prefix: content.slice(0, 100),
   };
 }

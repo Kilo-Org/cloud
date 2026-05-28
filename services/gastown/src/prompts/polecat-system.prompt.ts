@@ -99,23 +99,27 @@ This field is surfaced in the prime context as \`pr_fixup_context.force_push_all
 
 When your hooked bead has the \`gt:pr-conflict\` label, **or** when it has the \`gt:pr-feedback\` label and \`pr_conflict_context\` is present in your context, you are resolving merge conflicts on an existing PR branch. **This is an exception to the "do not switch branches" rule.** You MUST check out the PR branch from your bead metadata (\`pr_conflict_context.branch\`).
 
-1. Check out the PR branch: \`git fetch origin && git checkout <branch>\`
-2. Rebase onto the target branch to incorporate its latest changes:
-   \`\`\`
-   git rebase origin/<target_branch>
-   \`\`\`
-3. If there are conflicts during rebase, resolve them:
-   - Edit conflicting files to resolve conflict markers (\`<<<<<<<\`, \`=======\`, \`>>>>>>>\`)
-   - Stage the resolved files: \`git add <file>\`
-   - Continue the rebase: \`git rebase --continue\`
-   - Repeat until the rebase completes
-4. Push the rebased branch following the **Force-push policy** above:
-   - If force-push allowed (or absent): \`git push --force-with-lease origin <branch>\`
-   - If force-push NOT allowed: abort the rebase (\`git rebase --abort\`), then \`git merge origin/<target_branch>\` and \`git push origin <branch>\`
-5. If the bead metadata has \`has_feedback: true\`, also address the PR review feedback (see PR Fixup Workflow below) before calling gt_done.
- 6. Call \`gt_done\` with both required arguments once all conflicts are resolved (and feedback addressed if applicable):
-     - \`pr_url\`: the PR URL from \`pr_conflict_context.pr_url\`
-     - \`branch\`: the branch name from \`pr_conflict_context.branch\`
+**Before starting any conflict resolution**, check \`force_push_allowed\` in your prime context to decide the strategy:
+
+- **If \`force_push_allowed === true\` or absent** → use **rebase** (rewrites history, cleaner):
+  1. Check out the PR branch: \`git fetch origin && git checkout <branch>\`
+  2. Rebase onto the target branch: \`git rebase origin/<target_branch>\`
+  3. Resolve any conflicts: edit files, \`git add\`, \`git rebase --continue\`
+  4. Push: \`git push --force-with-lease origin <branch>\`
+
+- **If \`force_push_allowed === false\`** → use **merge** (preserves history, no force-push):
+  1. Check out the PR branch: \`git fetch origin && git checkout <branch>\`
+  2. Merge the target branch: \`git merge origin/<target_branch>\`
+  3. Resolve any conflicts: edit files, \`git add\`, \`git commit\`
+  4. Push: \`git push origin <branch>\`
+
+Do NOT start a rebase and then abort it — choose the right strategy first.
+
+If the bead metadata has \`has_feedback: true\`, also address the PR review feedback (see PR Fixup Workflow below) before calling gt_done.
+
+Call \`gt_done\` with both required arguments once all conflicts are resolved (and feedback addressed if applicable):
+  - \`pr_url\`: the PR URL from \`pr_conflict_context.pr_url\`
+  - \`branch\`: the branch name from \`pr_conflict_context.branch\`
 
 Do NOT create a new PR. Push to the existing branch.
 

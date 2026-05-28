@@ -475,6 +475,15 @@ export function getOrCreateAgent(
 
 // ── Prime Context ───────────────────────────────────────────────────
 
+/**
+ * Resolve force_push_allowed from bead metadata.
+ * Absent = true (backwards compat for pre-babysit beads).
+ * Only explicit false disables force-push.
+ */
+export function resolveForcePushAllowed(meta: Record<string, unknown>): boolean {
+  return meta.force_push_allowed !== false;
+}
+
 export function prime(sql: SqlStorage, agentId: string): PrimeContext {
   const agent = getAgent(sql, agentId);
   if (!agent) throw new Error(`Agent ${agentId} not found`);
@@ -521,9 +530,7 @@ export function prime(sql: SqlStorage, agentId: string): PrimeContext {
   let pr_fixup_context: PrimeContext['pr_fixup_context'] = null;
   if (hookedBead?.labels.includes('gt:pr-fixup') && hookedBead.metadata) {
     const meta = hookedBead.metadata as Record<string, unknown>;
-    // force_push_allowed: absent = true (backwards compat for pre-babysit beads).
-    // Only explicit false disables force-push.
-    const forcePushAllowed = meta.force_push_allowed !== false;
+    const forcePushAllowed = resolveForcePushAllowed(meta);
     pr_fixup_context = {
       pr_url: typeof meta.pr_url === 'string' ? meta.pr_url : null,
       branch: typeof meta.branch === 'string' ? meta.branch : null,
@@ -537,9 +544,7 @@ export function prime(sql: SqlStorage, agentId: string): PrimeContext {
   let pr_conflict_context: PrimeContext['pr_conflict_context'] = null;
   if (hookedBead?.labels.includes('gt:pr-conflict') && hookedBead.metadata) {
     const meta = hookedBead.metadata as Record<string, unknown>;
-    // force_push_allowed: absent = true (backwards compat for pre-babysit beads).
-    // Only explicit false disables force-push.
-    const forcePushAllowed = meta.force_push_allowed !== false;
+    const forcePushAllowed = resolveForcePushAllowed(meta);
     pr_conflict_context = {
       pr_url: typeof meta.pr_url === 'string' ? meta.pr_url : null,
       branch: typeof meta.branch === 'string' ? meta.branch : null,
@@ -553,7 +558,7 @@ export function prime(sql: SqlStorage, agentId: string): PrimeContext {
     // agent resolves conflicts first, then addresses review feedback.
     const meta = hookedBead.metadata as Record<string, unknown>;
     if (meta.has_conflicts === true || meta.has_conflicts === 1) {
-      const forcePushAllowed = meta.force_push_allowed !== false;
+      const forcePushAllowed = resolveForcePushAllowed(meta);
       pr_conflict_context = {
         pr_url: typeof meta.pr_url === 'string' ? meta.pr_url : null,
         branch: typeof meta.branch === 'string' ? meta.branch : null,

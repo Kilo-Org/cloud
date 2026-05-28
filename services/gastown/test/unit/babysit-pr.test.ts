@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { checkPRStatus, type SCMContext } from '../../src/dos/town/town-scm';
+import { resolveForcePushAllowed } from '../../src/dos/town/agents';
 import { parseGitUrl } from '../../src/util/platform-pr.util';
 import type { TownConfig } from '../../src/types';
 
@@ -571,40 +572,37 @@ describe('reconciler babysit fast-track', () => {
 });
 
 describe('polecat prime context force_push_allowed gate', () => {
-  it('babysat bead with force_push_allowed: false → prime context has force_push_allowed: false', () => {
-    const meta = {
+  it('babysat bead with force_push_allowed: false → resolveForcePushAllowed returns false', () => {
+    const meta: Record<string, unknown> = {
       force_push_allowed: false,
       pr_url: 'https://github.com/o/r/pull/1',
       branch: 'feat/x',
       target_branch: 'main',
     };
-    const forcePushAllowed = meta.force_push_allowed !== false;
-    expect(forcePushAllowed).toBe(false);
+    expect(resolveForcePushAllowed(meta)).toBe(false);
   });
 
-  it('babysat bead with force_push_allowed: true → prime context has force_push_allowed: true', () => {
-    const meta = {
+  it('babysat bead with force_push_allowed: true → resolveForcePushAllowed returns true', () => {
+    const meta: Record<string, unknown> = {
       force_push_allowed: true,
       pr_url: 'https://github.com/o/r/pull/1',
       branch: 'feat/x',
       target_branch: 'main',
     };
-    const forcePushAllowed = meta.force_push_allowed !== false;
-    expect(forcePushAllowed).toBe(true);
+    expect(resolveForcePushAllowed(meta)).toBe(true);
   });
 
-  it('non-babysat bead (force_push_allowed absent) → prime context has force_push_allowed: true (backwards compat)', () => {
-    const meta = {
+  it('non-babysat bead (force_push_allowed absent) → resolveForcePushAllowed returns true (backwards compat)', () => {
+    const meta: Record<string, unknown> = {
       pr_url: 'https://github.com/o/r/pull/1',
       branch: 'feat/x',
       target_branch: 'main',
     };
-    const forcePushAllowed = (meta as Record<string, unknown>).force_push_allowed !== false;
-    expect(forcePushAllowed).toBe(true);
+    expect(resolveForcePushAllowed(meta)).toBe(true);
   });
 
-  it('pr_fixup_context with force_push_allowed: false surfaces correctly', () => {
-    const hookedBead = {
+  it('pr_fixup_context with force_push_allowed: false surfaces correctly via resolveForcePushAllowed', () => {
+    const hookedBead: { labels: string[]; metadata: Record<string, unknown> } = {
       labels: ['gt:pr-fixup'],
       metadata: {
         pr_url: 'https://github.com/o/r/pull/1',
@@ -613,19 +611,12 @@ describe('polecat prime context force_push_allowed gate', () => {
         force_push_allowed: false,
       },
     };
-    const meta = hookedBead.metadata as Record<string, unknown>;
-    const prFixupContext = {
-      pr_url: typeof meta.pr_url === 'string' ? meta.pr_url : null,
-      branch: typeof meta.branch === 'string' ? meta.branch : null,
-      target_branch: typeof meta.target_branch === 'string' ? meta.target_branch : null,
-      force_push_allowed: meta.force_push_allowed !== false,
-    };
-    expect(prFixupContext.force_push_allowed).toBe(false);
-    expect(prFixupContext.pr_url).toBe('https://github.com/o/r/pull/1');
+    const forcePushAllowed = resolveForcePushAllowed(hookedBead.metadata);
+    expect(forcePushAllowed).toBe(false);
   });
 
   it('pr_conflict_context with force_push_allowed absent surfaces as true (backwards compat)', () => {
-    const hookedBead = {
+    const hookedBead: { labels: string[]; metadata: Record<string, unknown> } = {
       labels: ['gt:pr-conflict'],
       metadata: {
         pr_url: 'https://github.com/o/r/pull/1',
@@ -634,15 +625,7 @@ describe('polecat prime context force_push_allowed gate', () => {
         has_feedback: false,
       },
     };
-    const meta = hookedBead.metadata as Record<string, unknown>;
-    const prConflictContext = {
-      pr_url: typeof meta.pr_url === 'string' ? meta.pr_url : null,
-      branch: typeof meta.branch === 'string' ? meta.branch : null,
-      target_branch: typeof meta.target_branch === 'string' ? meta.target_branch : null,
-      has_feedback: meta.has_feedback === true || meta.has_feedback === 1,
-      force_push_allowed: meta.force_push_allowed !== false,
-    };
-    expect(prConflictContext.force_push_allowed).toBe(true);
-    expect(prConflictContext.has_feedback).toBe(false);
+    const forcePushAllowed = resolveForcePushAllowed(hookedBead.metadata);
+    expect(forcePushAllowed).toBe(true);
   });
 });

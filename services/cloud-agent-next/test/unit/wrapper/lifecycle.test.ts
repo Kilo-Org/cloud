@@ -13,18 +13,28 @@ import {
   type LifecycleConfig,
   type LifecycleDependencies,
   type LifecycleManager,
-  type PerTurnConfig,
 } from '../../../wrapper/src/lifecycle.js';
-import { WrapperState, type JobContext } from '../../../wrapper/src/state.js';
+import { WrapperState, type SessionContext } from '../../../wrapper/src/state.js';
 import type { WrapperKiloClient } from '../../../wrapper/src/kilo-api.js';
 
 vi.mock('../../../wrapper/src/auto-commit.js', () => ({
   runAutoCommit: vi.fn(),
 }));
 
+vi.mock('../../../wrapper/src/condense-on-complete.js', () => ({
+  runCondenseOnComplete: vi.fn(),
+}));
+
+vi.mock('../../../wrapper/src/utils.js', () => ({
+  getCurrentBranch: vi.fn().mockResolvedValue('main'),
+  logToFile: vi.fn(),
+}));
+
 import { runAutoCommit } from '../../../wrapper/src/auto-commit.js';
+import { runCondenseOnComplete } from '../../../wrapper/src/condense-on-complete.js';
 
 const mockRunAutoCommit = vi.mocked(runAutoCommit);
+const mockRunCondenseOnComplete = vi.mocked(runCondenseOnComplete);
 // ---------------------------------------------------------------------------
 // Test Helpers
 // ---------------------------------------------------------------------------
@@ -44,7 +54,10 @@ const createMockKiloClient = (): WrapperKiloClient => ({
   getNetworkWaits: vi.fn().mockResolvedValue([]),
   resumeNetworkWait: vi.fn().mockResolvedValue(true),
   generateCommitMessage: vi.fn().mockResolvedValue({ message: 'test commit' }),
-  sdkClient: {} as WrapperKiloClient['sdkClient'],
+  getSessionStatuses: vi.fn().mockResolvedValue({}),
+  getQuestions: vi.fn().mockResolvedValue([]),
+  getPermissions: vi.fn().mockResolvedValue([]),
+  subscribeEvents: vi.fn().mockResolvedValue({ stream: undefined }),
   serverUrl: 'http://127.0.0.1:0',
 });
 
@@ -65,20 +78,21 @@ const createDefaultConfig = (overrides: Partial<LifecycleConfig> = {}): Lifecycl
   ...overrides,
 });
 
-const createDefaultPerTurnConfig = (overrides: Partial<PerTurnConfig> = {}): PerTurnConfig => ({
-  autoCommit: false,
-  condenseOnComplete: false,
-  ...overrides,
-});
-
-const createJobContext = (overrides: Partial<JobContext> = {}): JobContext => ({
-  executionId: 'exec_test',
+const createSessionContext = (overrides: Partial<SessionContext> = {}): SessionContext => ({
   kiloSessionId: 'kilo_sess_456',
   ingestUrl: 'wss://ingest.example.com',
   ingestToken: 'token_secret',
   workerAuthToken: 'kilo_token_789',
   ...overrides,
 });
+
+const createDeferred = <T>() => {
+  let resolve: (value: T) => void = () => {};
+  const promise = new Promise<T>(res => {
+    resolve = res;
+  });
+  return { promise, resolve };
+};
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -98,6 +112,7 @@ describe('createLifecycleManager', () => {
     connectionFns = createMockConnectionFns();
     config = createDefaultConfig();
     mockRunAutoCommit.mockResolvedValue({ success: true });
+    mockRunCondenseOnComplete.mockResolvedValue({ wasAborted: false, success: true });
   });
 
   afterEach(() => {
@@ -108,10 +123,7 @@ describe('createLifecycleManager', () => {
     vi.clearAllMocks();
   });
 
-  const createManager = (
-    overrides: Partial<LifecycleConfig> = {},
-    perTurnOverrides: Partial<PerTurnConfig> = {}
-  ): LifecycleManager => {
+  const createManager = (overrides: Partial<LifecycleConfig> = {}): LifecycleManager => {
     manager = createLifecycleManager(
       { ...config, ...overrides },
       {
@@ -122,10 +134,6 @@ describe('createLifecycleManager', () => {
         reconnectEventSubscription: connectionFns.reconnectEventSubscription,
       }
     );
-    // Apply per-turn config if overrides provided
-    if (Object.keys(perTurnOverrides).length > 0) {
-      manager.setPerTurnConfig(createDefaultPerTurnConfig(perTurnOverrides));
-    }
     return manager;
   };
 
@@ -140,6 +148,7 @@ describe('createLifecycleManager', () => {
       expect(mgr).toHaveProperty('start');
       expect(mgr).toHaveProperty('stop');
       expect(mgr).toHaveProperty('onMessageComplete');
+      expect(mgr).toHaveProperty('onRootSessionActivity');
       expect(mgr).toHaveProperty('triggerDrainAndClose');
       expect(mgr).toHaveProperty('onSseEvent');
       expect(mgr).toHaveProperty('signalCompletion');
@@ -157,31 +166,168 @@ describe('createLifecycleManager', () => {
   // -------------------------------------------------------------------------
 
   describe('onMessageComplete', () => {
-    it('sets state to inactive', () => {
+    it('sets state to idle after completing last message', () => {
       const mgr = createManager();
-      state.startJob(createJobContext());
-      state.setActive(true);
+      state.bindSession(createSessionContext());
+      state.acceptMessage('msg_1', { autoCommit: false, condenseOnComplete: false });
       mgr.onMessageComplete('msg_1');
       expect(state.isIdle).toBe(true);
     });
 
-    it('triggers drain when message completes', async () => {
+    it('triggers drain after the final message and root session idle', async () => {
       const mgr = createManager();
       (connectionFns.isConnected as ReturnType<typeof vi.fn>).mockReturnValue(true);
-      state.startJob(createJobContext());
-      state.setActive(true);
+      state.bindSession(createSessionContext());
+      state.acceptMessage('msg_1', { autoCommit: false, condenseOnComplete: false });
       mgr.onMessageComplete('msg_1');
+      mgr.onSessionIdle();
       await vi.advanceTimersByTimeAsync(500);
       expect(connectionFns.closeConnections).toHaveBeenCalled();
     });
 
+    it('does not trigger drain when pending messages remain', async () => {
+      const mgr = createManager();
+      (connectionFns.isConnected as ReturnType<typeof vi.fn>).mockReturnValue(true);
+      state.bindSession(createSessionContext());
+      state.acceptMessage('msg_1', { autoCommit: false, condenseOnComplete: false });
+      state.acceptMessage('msg_2', { autoCommit: false, condenseOnComplete: false });
+      mgr.onMessageComplete('msg_1');
+      await vi.advanceTimersByTimeAsync(500);
+      expect(connectionFns.closeConnections).not.toHaveBeenCalled();
+      expect(state.isActive).toBe(true);
+      expect(state.activeMessageId).toBe('msg_2');
+    });
+
     it('handles unknown messageId gracefully', () => {
       const mgr = createManager();
-      state.startJob(createJobContext());
-
-      // Should not throw
+      state.bindSession(createSessionContext());
       expect(() => mgr.onMessageComplete('unknown_msg')).not.toThrow();
     });
+  });
+
+  // -------------------------------------------------------------------------
+  // Root idle freshness barrier
+  // -------------------------------------------------------------------------
+
+  describe('root idle freshness barrier', () => {
+    it('waits for a fresh root idle after post-idle activity before finalizing', async () => {
+      const mgr = createManager();
+      const sendToIngestSpy = vi.fn();
+      (connectionFns.isConnected as ReturnType<typeof vi.fn>).mockReturnValue(true);
+      state.setSendToIngestFn(sendToIngestSpy);
+      state.bindSession(createSessionContext());
+      state.acceptMessage('msg_1', { autoCommit: false, condenseOnComplete: false });
+
+      mgr.onSessionIdle();
+      mgr.onRootSessionActivity();
+      mgr.onMessageComplete('msg_1');
+
+      await vi.advanceTimersByTimeAsync(1000);
+
+      expect(sendToIngestSpy).not.toHaveBeenCalledWith(
+        expect.objectContaining({ streamEventType: 'complete' })
+      );
+      expect(connectionFns.closeConnections).not.toHaveBeenCalled();
+
+      mgr.onSessionIdle();
+      await vi.advanceTimersByTimeAsync(1000);
+
+      expect(sendToIngestSpy).toHaveBeenCalledTimes(1);
+      expect(sendToIngestSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ streamEventType: 'complete' })
+      );
+      expect(connectionFns.closeConnections).toHaveBeenCalledTimes(1);
+    });
+
+    it('finalizes once after repeated stale idle and root activity cycles', async () => {
+      const mgr = createManager();
+      const sendToIngestSpy = vi.fn();
+      (connectionFns.isConnected as ReturnType<typeof vi.fn>).mockReturnValue(true);
+      state.setSendToIngestFn(sendToIngestSpy);
+      state.bindSession(createSessionContext());
+      state.acceptMessage('msg_cycle', { autoCommit: false, condenseOnComplete: false });
+
+      mgr.onSessionIdle();
+      mgr.onRootSessionActivity();
+      mgr.onSessionIdle();
+      mgr.onRootSessionActivity();
+      mgr.onMessageComplete('msg_cycle');
+
+      await vi.advanceTimersByTimeAsync(1000);
+
+      expect(sendToIngestSpy).not.toHaveBeenCalledWith(
+        expect.objectContaining({ streamEventType: 'complete' })
+      );
+      expect(connectionFns.closeConnections).not.toHaveBeenCalled();
+
+      mgr.onSessionIdle();
+      mgr.onSessionIdle();
+      await vi.advanceTimersByTimeAsync(1000);
+
+      expect(sendToIngestSpy).toHaveBeenCalledTimes(1);
+      expect(sendToIngestSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ streamEventType: 'complete' })
+      );
+      expect(connectionFns.closeConnections).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it('includes the observed gate result in the final complete event', async () => {
+    const mgr = createManager();
+    const sendToIngestSpy = vi.fn();
+    (connectionFns.isConnected as ReturnType<typeof vi.fn>).mockReturnValue(true);
+    state.setSendToIngestFn(sendToIngestSpy);
+    state.bindSession(createSessionContext());
+    state.acceptMessage('msg_gate_result', { autoCommit: false, condenseOnComplete: false });
+    state.observeGateResult('pass');
+
+    mgr.onMessageComplete('msg_gate_result');
+    mgr.onSessionIdle();
+    await vi.advanceTimersByTimeAsync(1000);
+
+    expect(sendToIngestSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        streamEventType: 'complete',
+        data: expect.objectContaining({ gateResult: 'pass' }),
+      })
+    );
+  });
+
+  it('does not carry an observed gate result into a follow-up message accepted during drain', async () => {
+    const mgr = createManager();
+    const sendToIngestSpy = vi.fn();
+    (connectionFns.isConnected as ReturnType<typeof vi.fn>).mockReturnValue(true);
+    state.setSendToIngestFn(sendToIngestSpy);
+    state.bindSession(createSessionContext());
+    state.acceptMessage('msg_first', { autoCommit: false, condenseOnComplete: false });
+    state.observeGateResult('fail');
+
+    mgr.onMessageComplete('msg_first');
+    mgr.onSessionIdle();
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(sendToIngestSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        streamEventType: 'complete',
+        data: expect.objectContaining({ gateResult: 'fail' }),
+      })
+    );
+
+    state.acceptMessage('msg_followup', { autoCommit: false, condenseOnComplete: false });
+    await vi.advanceTimersByTimeAsync(300);
+
+    expect(connectionFns.closeConnections).not.toHaveBeenCalled();
+
+    mgr.onMessageComplete('msg_followup');
+    mgr.onSessionIdle();
+    await vi.advanceTimersByTimeAsync(1000);
+
+    const completeEvents = sendToIngestSpy.mock.calls
+      .map(([event]) => event)
+      .filter(event => event.streamEventType === 'complete');
+
+    expect(completeEvents).toHaveLength(2);
+    expect(completeEvents[1].data).not.toHaveProperty('gateResult');
   });
 
   // -------------------------------------------------------------------------
@@ -191,7 +337,7 @@ describe('createLifecycleManager', () => {
   describe('triggerDrainAndClose', () => {
     it('closes connection after drain delay', async () => {
       const mgr = createManager();
-      state.startJob(createJobContext());
+      state.bindSession(createSessionContext());
 
       mgr.triggerDrainAndClose();
 
@@ -206,7 +352,7 @@ describe('createLifecycleManager', () => {
 
     it('is idempotent - multiple calls do not queue multiple drains', async () => {
       const mgr = createManager();
-      state.startJob(createJobContext());
+      state.bindSession(createSessionContext());
 
       mgr.triggerDrainAndClose();
       mgr.triggerDrainAndClose();
@@ -226,23 +372,21 @@ describe('createLifecycleManager', () => {
   describe('stop', () => {
     it('clears all timers', async () => {
       const mgr = createManager();
-      state.startJob(createJobContext());
+      state.bindSession(createSessionContext());
 
       mgr.start();
 
       await vi.advanceTimersByTimeAsync(3000);
       mgr.stop();
 
-      // Advance well past any timer interval
       await vi.advanceTimersByTimeAsync(20000);
 
-      // Job should still exist (timers stopped)
-      expect(state.hasJob).toBe(true);
+      expect(state.hasSession).toBe(true);
     });
 
     it('cancels pending drain', async () => {
       const mgr = createManager();
-      state.startJob(createJobContext());
+      state.bindSession(createSessionContext());
 
       mgr.triggerDrainAndClose();
 
@@ -274,17 +418,14 @@ describe('createLifecycleManager', () => {
   describe('setAborted', () => {
     it('prevents post-completion tasks from running', async () => {
       const mgr = createManager({}, { autoCommit: true });
-      state.startJob(createJobContext());
-      state.setActive(true);
+      state.bindSession(createSessionContext());
+      state.acceptMessage('msg_1', { autoCommit: true, condenseOnComplete: false });
 
-      // Set aborted before completion
       mgr.setAborted();
 
-      // Complete the message (would trigger post-completion tasks)
       (connectionFns.isConnected as ReturnType<typeof vi.fn>).mockReturnValue(true);
       mgr.onMessageComplete('msg_1');
 
-      // Wait for any async tasks
       await vi.advanceTimersByTimeAsync(1000);
     });
   });
@@ -296,8 +437,8 @@ describe('createLifecycleManager', () => {
   describe('reset', () => {
     it('reset clears aborted flag - allows complete event after reset', async () => {
       const mgr = createManager();
-      state.startJob(createJobContext());
-      state.setActive(true);
+      state.bindSession(createSessionContext());
+      state.acceptMessage('msg_1', { autoCommit: false, condenseOnComplete: false });
 
       mgr.setAborted();
       mgr.reset();
@@ -306,11 +447,10 @@ describe('createLifecycleManager', () => {
       const sendToIngestSpy = vi.fn();
       state.setSendToIngestFn(sendToIngestSpy);
 
-      // Completing the last active message triggers drain
       mgr.onMessageComplete('msg_1');
+      mgr.onSessionIdle();
       await vi.advanceTimersByTimeAsync(1000);
 
-      // complete event should be sent because isAborted was reset
       expect(sendToIngestSpy).toHaveBeenCalledWith(
         expect.objectContaining({
           streamEventType: 'complete',
@@ -320,11 +460,13 @@ describe('createLifecycleManager', () => {
 
     it('reset clears draining flag - allows new drain after reset', async () => {
       const mgr = createManager();
-      state.startJob(createJobContext());
+      state.bindSession(createSessionContext());
+      state.acceptMessage('msg_1', { autoCommit: false, condenseOnComplete: false });
       (connectionFns.isConnected as ReturnType<typeof vi.fn>).mockReturnValue(true);
 
-      // First drain
-      mgr.triggerDrainAndClose();
+      // First drain — complete the message to simulate realistic flow
+      mgr.onMessageComplete('msg_1');
+      mgr.onSessionIdle();
       await vi.advanceTimersByTimeAsync(500);
 
       expect(connectionFns.closeConnections).toHaveBeenCalledTimes(1);
@@ -332,13 +474,14 @@ describe('createLifecycleManager', () => {
       // Reset clears isDraining so a second drain can happen
       mgr.reset();
 
-      // Start a fresh job
-      state.clearJob();
-      state.startJob(createJobContext({ executionId: 'exc_second' }));
-      state.setActive(true);
+      // Start a fresh session
+      state.clearSession();
+      state.bindSession(createSessionContext({ kiloSessionId: 'kilo_sess_second' }));
+      state.acceptMessage('msg_2', { autoCommit: false, condenseOnComplete: false });
 
       // Completing last active message triggers a new drain
       mgr.onMessageComplete('msg_2');
+      mgr.onSessionIdle();
       await vi.advanceTimersByTimeAsync(1000);
 
       expect(connectionFns.closeConnections).toHaveBeenCalledTimes(2);
@@ -346,8 +489,8 @@ describe('createLifecycleManager', () => {
 
     it('reset enables post-completion flow after previous abort', async () => {
       const mgr = createManager({}, { autoCommit: false });
-      state.startJob(createJobContext());
-      state.setActive(true);
+      state.bindSession(createSessionContext());
+      state.acceptMessage('msg_1', { autoCommit: false, condenseOnComplete: false });
 
       mgr.setAborted();
       mgr.reset();
@@ -358,9 +501,9 @@ describe('createLifecycleManager', () => {
 
       mgr.onMessageComplete('msg_1');
       mgr.signalCompletion();
+      mgr.onSessionIdle();
       await vi.advanceTimersByTimeAsync(1000);
 
-      // complete event should be sent (not skipped due to stale aborted flag)
       expect(sendToIngestSpy).toHaveBeenCalledWith(
         expect.objectContaining({
           streamEventType: 'complete',
@@ -394,17 +537,15 @@ describe('createLifecycleManager', () => {
       const mgr = createManager({}, { autoCommit: true });
       (connectionFns.isConnected as ReturnType<typeof vi.fn>).mockReturnValue(true);
 
-      state.startJob(createJobContext());
-      state.setActive(true);
+      state.bindSession(createSessionContext());
+      state.acceptMessage('msg_1', { autoCommit: true, condenseOnComplete: false });
 
       mgr.start();
       mgr.onMessageComplete('msg_1');
+      mgr.onSessionIdle();
 
-      // Signal completion to unblock auto-commit waiter
       mgr.signalCompletion();
 
-      // Post-completion tasks run before drain
-      // This is an integration point - actual auto-commit behavior tested elsewhere
       await vi.advanceTimersByTimeAsync(1000);
     });
 
@@ -412,11 +553,12 @@ describe('createLifecycleManager', () => {
       const mgr = createManager({}, { condenseOnComplete: true });
       (connectionFns.isConnected as ReturnType<typeof vi.fn>).mockReturnValue(true);
 
-      state.startJob(createJobContext());
-      state.setActive(true);
+      state.bindSession(createSessionContext());
+      state.acceptMessage('msg_1', { autoCommit: false, condenseOnComplete: true });
 
       mgr.start();
       mgr.onMessageComplete('msg_1');
+      mgr.onSessionIdle();
 
       mgr.signalCompletion();
 
@@ -438,11 +580,14 @@ describe('createLifecycleManager', () => {
             );
           })
       );
+      (connectionFns.isConnected as ReturnType<typeof vi.fn>).mockReturnValue(true);
 
-      const mgr = createManager({}, { autoCommit: true });
-      state.startJob(createJobContext());
+      const mgr = createManager();
+      state.bindSession(createSessionContext());
+      state.acceptMessage('msg_1', { autoCommit: true, condenseOnComplete: false });
 
-      mgr.triggerDrainAndClose();
+      mgr.onMessageComplete('msg_1');
+      mgr.onSessionIdle();
       await vi.advanceTimersByTimeAsync(120_000);
       await vi.advanceTimersByTimeAsync(300);
 
@@ -470,11 +615,14 @@ describe('createLifecycleManager', () => {
             });
           })
       );
+      (connectionFns.isConnected as ReturnType<typeof vi.fn>).mockReturnValue(true);
 
-      const mgr = createManager({}, { autoCommit: true });
-      state.startJob(createJobContext());
+      const mgr = createManager();
+      state.bindSession(createSessionContext());
+      state.acceptMessage('msg_1', { autoCommit: true, condenseOnComplete: false });
 
-      mgr.triggerDrainAndClose();
+      mgr.onMessageComplete('msg_1');
+      mgr.onSessionIdle();
       await vi.advanceTimersByTimeAsync(120_000);
       await vi.advanceTimersByTimeAsync(300);
 
@@ -488,6 +636,54 @@ describe('createLifecycleManager', () => {
         expect.objectContaining({ streamEventType: 'complete' })
       );
     });
+
+    it('awaits final message auto-commit before log upload, complete event, and close', async () => {
+      const order: string[] = [];
+      const autoCommit = createDeferred<{ success: true }>();
+      mockRunAutoCommit.mockImplementation(async () => {
+        order.push('auto-commit:start');
+        const result = await autoCommit.promise;
+        order.push('auto-commit:finish');
+        return result;
+      });
+      (connectionFns.isConnected as ReturnType<typeof vi.fn>).mockReturnValue(true);
+      connectionFns.closeConnections.mockImplementation(async () => {
+        order.push('close');
+      });
+      state.setLogUploader({
+        start: vi.fn(),
+        uploadNow: vi.fn(async () => {
+          order.push('upload');
+        }),
+        stop: vi.fn(),
+      });
+      state.setSendToIngestFn(event => {
+        if (event.streamEventType === 'complete') {
+          order.push('complete');
+        }
+      });
+
+      const mgr = createManager();
+      state.bindSession(createSessionContext());
+      state.acceptMessage('msg_1', { autoCommit: true, condenseOnComplete: false });
+
+      mgr.onMessageComplete('msg_1');
+      mgr.onSessionIdle();
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(order).toEqual(['auto-commit:start']);
+
+      autoCommit.resolve({ success: true });
+      await vi.advanceTimersByTimeAsync(300);
+
+      expect(order).toEqual([
+        'auto-commit:start',
+        'auto-commit:finish',
+        'upload',
+        'complete',
+        'close',
+      ]);
+    });
   });
 
   // -------------------------------------------------------------------------
@@ -499,14 +695,12 @@ describe('createLifecycleManager', () => {
       const mgr = createManager();
       (connectionFns.isConnected as ReturnType<typeof vi.fn>).mockReturnValue(false);
 
-      state.startJob(createJobContext());
+      state.bindSession(createSessionContext());
 
-      // Even without connection, triggerDrainAndClose should work
       mgr.triggerDrainAndClose();
 
       await vi.advanceTimersByTimeAsync(500);
 
-      // close() should still be called (to ensure cleanup)
       expect(connectionFns.closeConnections).toHaveBeenCalled();
     });
   });
@@ -518,12 +712,10 @@ describe('createLifecycleManager', () => {
   describe('onSseEvent / transport timer', () => {
     it('fires reconnectEventSubscription after 15s of no events', async () => {
       const mgr = createManager();
-      state.startJob(createJobContext());
+      state.bindSession(createSessionContext());
 
-      // First call starts the timer
       mgr.onSseEvent();
 
-      // Advance 15 seconds — timer should fire
       await vi.advanceTimersByTimeAsync(15_000);
 
       expect(connectionFns.reconnectEventSubscription).toHaveBeenCalledTimes(1);
@@ -531,29 +723,24 @@ describe('createLifecycleManager', () => {
 
     it('resets timer on each onSseEvent call', async () => {
       const mgr = createManager();
-      state.startJob(createJobContext());
+      state.bindSession(createSessionContext());
 
       mgr.onSseEvent();
 
-      // Advance 10s (not yet expired)
       await vi.advanceTimersByTimeAsync(10_000);
       expect(connectionFns.reconnectEventSubscription).not.toHaveBeenCalled();
 
-      // Reset timer
       mgr.onSseEvent();
 
-      // Advance another 10s (timer was reset, so 10s since last reset)
       await vi.advanceTimersByTimeAsync(10_000);
       expect(connectionFns.reconnectEventSubscription).not.toHaveBeenCalled();
 
-      // Advance 5 more seconds (15s since last reset)
       await vi.advanceTimersByTimeAsync(5_000);
       expect(connectionFns.reconnectEventSubscription).toHaveBeenCalledTimes(1);
     });
 
-    it('does not fire timer when no job context', async () => {
+    it('does not fire timer when no session context', async () => {
       const mgr = createManager();
-      // No job started
 
       mgr.onSseEvent();
 
@@ -563,7 +750,7 @@ describe('createLifecycleManager', () => {
 
     it('transport timer is cleared on stop', async () => {
       const mgr = createManager();
-      state.startJob(createJobContext());
+      state.bindSession(createSessionContext());
 
       mgr.onSseEvent();
       mgr.stop();
@@ -574,7 +761,7 @@ describe('createLifecycleManager', () => {
 
     it('transport timer is cleared on reset', async () => {
       const mgr = createManager();
-      state.startJob(createJobContext());
+      state.bindSession(createSessionContext());
 
       mgr.onSseEvent();
       mgr.reset();
@@ -585,15 +772,296 @@ describe('createLifecycleManager', () => {
 
     it('initial arming triggers reconnect when stream never yields', async () => {
       const mgr = createManager();
-      state.startJob(createJobContext());
+      state.bindSession(createSessionContext());
 
-      // Simulate the initial arming added in startEventSubscription()
-      // before the for-await loop — no stream events follow.
       mgr.onSseEvent();
 
-      // After 15s with no further onSseEvent calls, the timer should fire.
       await vi.advanceTimersByTimeAsync(15_000);
       expect(connectionFns.reconnectEventSubscription).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Post-completion exactly-once
+  // -------------------------------------------------------------------------
+
+  describe('post-completion exactly-once', () => {
+    it('final message auto-commit runs exactly once, not twice', async () => {
+      mockRunAutoCommit.mockResolvedValue({ success: true });
+      (connectionFns.isConnected as ReturnType<typeof vi.fn>).mockReturnValue(true);
+
+      const mgr = createManager();
+      state.bindSession(createSessionContext());
+      state.acceptMessage('msg_final', { autoCommit: true, condenseOnComplete: false });
+
+      mgr.onMessageComplete('msg_final');
+      mgr.signalCompletion();
+      mgr.onSessionIdle();
+
+      await vi.advanceTimersByTimeAsync(1000);
+
+      expect(mockRunAutoCommit).toHaveBeenCalledTimes(1);
+    });
+
+    it('defers non-final message auto-commit while wrapper remains active', async () => {
+      mockRunAutoCommit.mockResolvedValue({ success: true });
+      (connectionFns.isConnected as ReturnType<typeof vi.fn>).mockReturnValue(true);
+
+      const mgr = createManager();
+      state.bindSession(createSessionContext());
+      state.acceptMessage('msg_a', { autoCommit: true, condenseOnComplete: false });
+      state.acceptMessage('msg_b', { autoCommit: false, condenseOnComplete: false });
+
+      mgr.onMessageComplete('msg_a');
+      mgr.signalCompletion();
+
+      await vi.advanceTimersByTimeAsync(1000);
+
+      expect(mockRunAutoCommit).not.toHaveBeenCalled();
+      expect(state.activeMessageId).toBe('msg_b');
+      expect(connectionFns.closeConnections).not.toHaveBeenCalled();
+    });
+
+    it('finalizes a multi-message sequence once after the batch reaches idle', async () => {
+      mockRunAutoCommit.mockResolvedValue({ success: true });
+      (connectionFns.isConnected as ReturnType<typeof vi.fn>).mockReturnValue(true);
+
+      const mgr = createManager();
+      state.bindSession(createSessionContext());
+      state.acceptMessage('msg_a', { autoCommit: true, condenseOnComplete: false });
+      state.acceptMessage('msg_b', { autoCommit: true, condenseOnComplete: false });
+
+      mgr.onMessageComplete('msg_a');
+      mgr.signalCompletion();
+      await vi.advanceTimersByTimeAsync(100);
+
+      expect(mockRunAutoCommit).not.toHaveBeenCalled();
+
+      mgr.onMessageComplete('msg_b');
+      mgr.signalCompletion();
+      mgr.onSessionIdle();
+      await vi.advanceTimersByTimeAsync(1000);
+
+      expect(mockRunAutoCommit).toHaveBeenCalledTimes(1);
+    });
+
+    it('abort path does not run auto-commit', async () => {
+      mockRunAutoCommit.mockResolvedValue({ success: true });
+
+      const mgr = createManager();
+      state.bindSession(createSessionContext());
+      state.acceptMessage('msg_1', { autoCommit: true, condenseOnComplete: false });
+
+      mgr.setAborted();
+      mgr.triggerDrainAndClose();
+
+      await vi.advanceTimersByTimeAsync(1000);
+
+      expect(mockRunAutoCommit).not.toHaveBeenCalled();
+    });
+
+    it('final message condense runs exactly once', async () => {
+      (connectionFns.isConnected as ReturnType<typeof vi.fn>).mockReturnValue(true);
+
+      const mgr = createManager();
+      state.bindSession(createSessionContext());
+      state.acceptMessage('msg_final', { autoCommit: false, condenseOnComplete: true });
+
+      mgr.onMessageComplete('msg_final');
+      mgr.signalCompletion();
+      mgr.onSessionIdle();
+
+      await vi.advanceTimersByTimeAsync(1000);
+
+      expect(mockRunCondenseOnComplete).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Idle-batch post-completion tasks
+  // -------------------------------------------------------------------------
+
+  describe('onMessageComplete — idle-batch post-completion', () => {
+    it('runs auto-commit after the final message reaches drain', async () => {
+      mockRunAutoCommit.mockResolvedValue({ success: true });
+      (connectionFns.isConnected as ReturnType<typeof vi.fn>).mockReturnValue(true);
+
+      const mgr = createManager();
+      state.bindSession(createSessionContext());
+      state.acceptMessage('msg_comp_1', { autoCommit: true, condenseOnComplete: false });
+
+      mgr.onMessageComplete('msg_comp_1');
+      mgr.onSessionIdle();
+
+      // Auto-commit runs asynchronously after completion
+      await vi.advanceTimersByTimeAsync(100);
+
+      expect(mockRunAutoCommit).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not trigger drain when onMessageComplete and more messages are pending', async () => {
+      (connectionFns.isConnected as ReturnType<typeof vi.fn>).mockReturnValue(true);
+
+      const mgr = createManager();
+      state.bindSession(createSessionContext());
+      state.acceptMessage('msg_first', { autoCommit: false, condenseOnComplete: false });
+      state.acceptMessage('msg_second', { autoCommit: false, condenseOnComplete: false });
+
+      // Complete first message — should NOT drain because second is still pending
+      mgr.onMessageComplete('msg_first');
+
+      await vi.advanceTimersByTimeAsync(100);
+
+      expect(connectionFns.closeConnections).not.toHaveBeenCalled();
+      expect(state.activeMessageId).toBe('msg_second');
+    });
+
+    it('promotes next accepted message after completing active', async () => {
+      const mgr = createManager();
+      state.bindSession(createSessionContext());
+      state.acceptMessage('msg_a', { autoCommit: false, condenseOnComplete: false });
+      state.acceptMessage('msg_b', { autoCommit: false, condenseOnComplete: false });
+      state.acceptMessage('msg_c', { autoCommit: false, condenseOnComplete: false });
+
+      expect(state.activeMessageId).toBe('msg_a');
+
+      mgr.onMessageComplete('msg_a');
+      expect(state.activeMessageId).toBe('msg_b');
+
+      mgr.onMessageComplete('msg_b');
+      expect(state.activeMessageId).toBe('msg_c');
+
+      mgr.onMessageComplete('msg_c');
+      expect(state.activeMessageId).toBeNull();
+      expect(state.isIdle).toBe(true);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Message-ID-gated completion (stale/duplicate protection)
+  // -------------------------------------------------------------------------
+
+  describe('onMessageComplete — stale and duplicate protection', () => {
+    it('duplicate completion for already-completed message does not affect the new active message', async () => {
+      (connectionFns.isConnected as ReturnType<typeof vi.fn>).mockReturnValue(true);
+      mockRunAutoCommit.mockResolvedValue({ success: true });
+
+      const mgr = createManager();
+      state.bindSession(createSessionContext());
+      state.acceptMessage('msg_a', { autoCommit: false, condenseOnComplete: false });
+      state.acceptMessage('msg_b', { autoCommit: false, condenseOnComplete: false });
+
+      mgr.onMessageComplete('msg_a');
+      expect(state.activeMessageId).toBe('msg_b');
+
+      mgr.onMessageComplete('msg_a');
+      expect(state.activeMessageId).toBe('msg_b');
+      expect(state.isActive).toBe(true);
+
+      await vi.advanceTimersByTimeAsync(500);
+      expect(connectionFns.closeConnections).not.toHaveBeenCalled();
+    });
+
+    it('completion for accepted-but-not-active message is ignored', async () => {
+      (connectionFns.isConnected as ReturnType<typeof vi.fn>).mockReturnValue(true);
+
+      const mgr = createManager();
+      state.bindSession(createSessionContext());
+      state.acceptMessage('msg_a', { autoCommit: false, condenseOnComplete: false });
+      state.acceptMessage('msg_b', { autoCommit: false, condenseOnComplete: false });
+
+      mgr.onMessageComplete('msg_b');
+
+      expect(state.activeMessageId).toBe('msg_a');
+      expect(state.isActive).toBe(true);
+
+      await vi.advanceTimersByTimeAsync(500);
+      expect(connectionFns.closeConnections).not.toHaveBeenCalled();
+    });
+
+    it('completion for unknown message ID is ignored', async () => {
+      (connectionFns.isConnected as ReturnType<typeof vi.fn>).mockReturnValue(true);
+
+      const mgr = createManager();
+      state.bindSession(createSessionContext());
+      state.acceptMessage('msg_a', { autoCommit: false, condenseOnComplete: false });
+
+      mgr.onMessageComplete('msg_nonexistent');
+
+      expect(state.activeMessageId).toBe('msg_a');
+      expect(state.isActive).toBe(true);
+
+      await vi.advanceTimersByTimeAsync(500);
+      expect(connectionFns.closeConnections).not.toHaveBeenCalled();
+    });
+
+    it('stale completion does not run post-completion tasks for the wrong message', async () => {
+      (connectionFns.isConnected as ReturnType<typeof vi.fn>).mockReturnValue(true);
+      mockRunAutoCommit.mockResolvedValue({ success: true });
+
+      const mgr = createManager();
+      state.bindSession(createSessionContext());
+      state.acceptMessage('msg_a', { autoCommit: true, condenseOnComplete: false });
+      state.acceptMessage('msg_b', { autoCommit: false, condenseOnComplete: false });
+
+      mgr.onMessageComplete('msg_a');
+      await vi.advanceTimersByTimeAsync(100);
+
+      const autoCommitCallsAfterFirst = mockRunAutoCommit.mock.calls.length;
+
+      mgr.onMessageComplete('msg_a');
+      await vi.advanceTimersByTimeAsync(100);
+
+      expect(mockRunAutoCommit.mock.calls.length).toBe(autoCommitCallsAfterFirst);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Drain guard — drain does not close over newly accepted prompts
+  // -------------------------------------------------------------------------
+
+  describe('drain guard', () => {
+    it('drain does not close connections when a new message is accepted during drain', async () => {
+      (connectionFns.isConnected as ReturnType<typeof vi.fn>).mockReturnValue(true);
+
+      const mgr = createManager();
+      state.bindSession(createSessionContext());
+      state.acceptMessage('msg_last', { autoCommit: false, condenseOnComplete: false });
+
+      // Complete last message and observe root idle — triggers drain
+      mgr.onMessageComplete('msg_last');
+      mgr.onSessionIdle();
+
+      // Before drain delay expires, accept a new message
+      state.acceptMessage('msg_new', { autoCommit: false, condenseOnComplete: false });
+
+      // Advance past drain delay
+      await vi.advanceTimersByTimeAsync(1000);
+
+      // Drain should NOT have closed connections because a new message is active
+      expect(connectionFns.closeConnections).not.toHaveBeenCalled();
+
+      // The session should still be active
+      expect(state.activeMessageId).toBe('msg_new');
+      expect(state.isIdle).toBe(false);
+    });
+
+    it('drain still closes after delay when no new messages arrive', async () => {
+      (connectionFns.isConnected as ReturnType<typeof vi.fn>).mockReturnValue(true);
+
+      const mgr = createManager();
+      state.bindSession(createSessionContext());
+      state.acceptMessage('msg_only', { autoCommit: false, condenseOnComplete: false });
+
+      // Complete the only message and observe root idle — triggers drain
+      mgr.onMessageComplete('msg_only');
+      mgr.onSessionIdle();
+
+      // Advance past drain delay
+      await vi.advanceTimersByTimeAsync(1000);
+
+      // Drain should close connections
+      expect(connectionFns.closeConnections).toHaveBeenCalledTimes(1);
     });
   });
 });

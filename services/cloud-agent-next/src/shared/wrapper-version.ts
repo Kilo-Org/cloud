@@ -1,1 +1,1 @@
-export const WRAPPER_VERSION = '2.1.0';
+export const WRAPPER_VERSION = '2.2.0';

@@ -6,11 +6,11 @@ This runbook walks you through the full cycle: making a change to the Docker ima
 
 ### Files you'll typically change
 
-| File                                   | Purpose                                                                 |
-| -------------------------------------- | ----------------------------------------------------------------------- |
-| `kiloclaw/Dockerfile`                  | Base image, dependencies, OpenClaw version                              |
+| File | Purpose |
+|---|---|
+| `kiloclaw/Dockerfile` | Base image, dependencies, OpenClaw version |
 | `kiloclaw/controller/src/bootstrap.ts` | Controller bootstrap (config generation, env decryption, feature flags) |
-| `kiloclaw/scripts/push-dev.sh`         | Dev image build and push script                                         |
+| `kiloclaw/scripts/push-dev.sh` | Dev image build and push script |
 
 ### Workflow at a glance
 

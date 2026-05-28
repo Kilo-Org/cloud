@@ -81,7 +81,7 @@ export async function updateCheckRun(
 export type AssociatedPullRequest = {
   number: number;
   htmlUrl: string;
-  state: 'open' | 'closed' | 'merged';
+  state: 'open' | 'closed' | 'merged' | 'draft';
   title: string;
   headSha: string;
   updatedAt: string;

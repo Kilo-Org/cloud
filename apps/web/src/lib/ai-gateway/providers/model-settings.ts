@@ -8,7 +8,6 @@ import { isGrokModel, isGrokToggleableReasoningModel } from '@/lib/ai-gateway/pr
 import { isGlmModel } from '@/lib/ai-gateway/providers/zai';
 import type {
   CustomLlmProvider,
-  OpenClawModelSettings,
   OpenCodePrompt,
   OpenCodeSettings,
 } from '@kilocode/db/schema-types';
@@ -131,15 +130,4 @@ export function getOpenCodeSettings(model: string): OpenCodeSettings | undefined
   const variants = getModelVariants(model);
   const prompt = getOpenCodePrompt(model);
   return { ai_sdk_provider, variants, prompt };
-}
-
-export function getOpenClawSettings(model: string): OpenClawModelSettings | undefined {
-  // 2026-04-28: this is aspirational, the OpenClaw Kilo provider does not respect this
-  if (isClaudeModel(model)) {
-    return { api_adapter: 'anthropic-messages' };
-  }
-  if (isOpenAiModel(model) || isGrokModel(model)) {
-    return { api_adapter: 'openai-responses' };
-  }
-  return undefined;
 }

@@ -82,10 +82,10 @@ Price-versioned KiloClaw billing does not change affiliate eligibility, attribut
 triggers. SALE amounts continue to use the monetized amount reported by KiloClaw billing. Product reporting values must
 stay stable enough to distinguish KiloClaw plan family and Kilo Pass tier/cadence without relying on invoice display text.
 
-For KiloClaw conversions also governed by `.specs/kiloclaw-referrals.md`, that referral spec's conversion-time
-referral-priority rules override this document's default first-touch affiliate behavior for the initial paid conversion
-decision. This document remains authoritative for affiliate event eligibility, delivery sequencing, and affiliate
-renewal reporting after the winning attribution is established.
+For conversions also governed by `.specs/impact-referrals.md`, that referral spec's conversion-time referral-priority
+rules override this document's default first-touch affiliate behavior for the initial paid conversion decision. This
+document remains authoritative for affiliate event eligibility, delivery sequencing, and affiliate renewal reporting
+after the winning attribution is established.
 
 ## Rules
 
@@ -126,12 +126,12 @@ renewal reporting after the winning attribution is established.
 
 12. The system MUST report only these conversion event types under this spec:
 
-    | Event       | Trigger                                                                 |
-    | ----------- | ----------------------------------------------------------------------- |
-    | SIGNUP      | User's first attributed association for a provider                      |
-    | TRIAL_START | Attributed personal KiloClaw trial subscription becomes active          |
-    | TRIAL_END   | Attributed personal KiloClaw trial subscription ends by product flow    |
-    | SALE        | Affiliate-eligible KiloClaw payment period or Kilo Pass invoice settles |
+    | Event | Trigger |
+    |---|---|
+    | SIGNUP | User's first attributed association for a provider |
+    | TRIAL_START | Attributed personal KiloClaw trial subscription becomes active |
+    | TRIAL_END | Attributed personal KiloClaw trial subscription ends by product flow |
+    | SALE | Affiliate-eligible KiloClaw payment period or Kilo Pass invoice settles |
 
 13. Every conversion event MUST carry its conversion occurrence time as a UTC instant.
 
@@ -160,14 +160,14 @@ renewal reporting after the winning attribution is established.
 20. Kilo Pass SALE reporting MUST use this tier/cadence classification and MUST NOT derive classification from invoice
     display text:
 
-    | Tier | Cadence | Reporting category           | Reporting name               |
-    | ---- | ------- | ---------------------------- | ---------------------------- |
-    | 19   | monthly | `kilo-pass-tier-19-monthly`  | `Kilo Pass Tier 19 Monthly`  |
-    | 19   | yearly  | `kilo-pass-tier-19-yearly`   | `Kilo Pass Tier 19 Yearly`   |
-    | 49   | monthly | `kilo-pass-tier-49-monthly`  | `Kilo Pass Tier 49 Monthly`  |
-    | 49   | yearly  | `kilo-pass-tier-49-yearly`   | `Kilo Pass Tier 49 Yearly`   |
-    | 199  | monthly | `kilo-pass-tier-199-monthly` | `Kilo Pass Tier 199 Monthly` |
-    | 199  | yearly  | `kilo-pass-tier-199-yearly`  | `Kilo Pass Tier 199 Yearly`  |
+    | Tier | Cadence | Reporting category | Reporting name |
+    |---|---|---|---|
+    | 19 | monthly | `kilo-pass-tier-19-monthly` | `Kilo Pass Tier 19 Monthly` |
+    | 19 | yearly | `kilo-pass-tier-19-yearly` | `Kilo Pass Tier 19 Yearly` |
+    | 49 | monthly | `kilo-pass-tier-49-monthly` | `Kilo Pass Tier 49 Monthly` |
+    | 49 | yearly | `kilo-pass-tier-49-yearly` | `Kilo Pass Tier 49 Yearly` |
+    | 199 | monthly | `kilo-pass-tier-199-monthly` | `Kilo Pass Tier 199 Monthly` |
+    | 199 | yearly | `kilo-pass-tier-199-yearly` | `Kilo Pass Tier 199 Yearly` |
 
 21. Kilo Pass SALE reporting SHOULD include the resolved Stripe price identifier as the provider SKU when it is
     available. If tier and cadence are resolved but the SKU is unavailable, the SALE MUST still be reported without a

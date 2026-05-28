@@ -22,12 +22,106 @@ import {
   type SyncResult,
 } from '../core/types';
 import type { Owner } from '@/lib/code-reviews/core';
-import { sentryLogger } from '@/lib/utils.server';
+import { errorExceptInTest, sentryLogger, warnExceptInTest } from '@/lib/utils.server';
 import { logSecurityAuditAndWait, SecurityAuditLogAction } from './audit-log-service';
 
 const log = sentryLogger('security-agent:sync', 'info');
 const warn = sentryLogger('security-agent:sync', 'warning');
 const logError = sentryLogger('security-agent:sync', 'error');
+
+const AUTH_INVALID_SHORT_CIRCUIT_MS = 60 * 60 * 1000;
+const AUTH_INVALID_WRITE_THROTTLE_MS = AUTH_INVALID_SHORT_CIRCUIT_MS;
+
+function createEmptySyncResult(): SyncResult {
+  return {
+    synced: 0,
+    created: 0,
+    updated: 0,
+    errors: 0,
+    skipped: 0,
+    authInvalid: 0,
+    authInvalidRepos: [],
+    reauthRequired: false,
+    staleRepos: [],
+  };
+}
+
+function isRecentTimestamp(value: string | null | undefined, windowMs: number): boolean {
+  if (!value) return false;
+  const timestamp = new Date(value).getTime();
+  return Number.isFinite(timestamp) && Date.now() - timestamp < windowMs;
+}
+
+function createAuthInvalidSyncResult(repositories: string[]): SyncResult {
+  return {
+    ...createEmptySyncResult(),
+    authInvalid: repositories.length,
+    authInvalidRepos: [...repositories],
+    reauthRequired: true,
+  };
+}
+
+async function getIntegrationAuthInvalidAt(platformIntegrationId: string): Promise<string | null> {
+  const [integration] = await db
+    .select({ authInvalidAt: platform_integrations.auth_invalid_at })
+    .from(platform_integrations)
+    .where(eq(platform_integrations.id, platformIntegrationId))
+    .limit(1);
+
+  return integration?.authInvalidAt ?? null;
+}
+
+async function markIntegrationAuthInvalid(
+  platformIntegrationId: string,
+  reason: string
+): Promise<void> {
+  try {
+    const now = new Date().toISOString();
+    await db
+      .update(platform_integrations)
+      .set({
+        auth_invalid_at: now,
+        auth_invalid_reason: reason,
+        updated_at: now,
+      })
+      .where(
+        and(
+          eq(platform_integrations.id, platformIntegrationId),
+          sql`(${platform_integrations.auth_invalid_at} IS NULL OR ${platform_integrations.auth_invalid_at} < now() - ${AUTH_INVALID_WRITE_THROTTLE_MS} * interval '1 millisecond')`
+        )
+      );
+  } catch (error) {
+    logError('Failed to mark GitHub integration auth invalid', { error, platformIntegrationId });
+  }
+}
+
+async function clearIntegrationAuthInvalid(platformIntegrationId: string): Promise<void> {
+  try {
+    const now = new Date().toISOString();
+    await db
+      .update(platform_integrations)
+      .set({
+        auth_invalid_at: null,
+        auth_invalid_reason: null,
+        updated_at: now,
+      })
+      .where(
+        and(
+          eq(platform_integrations.id, platformIntegrationId),
+          isNotNull(platform_integrations.auth_invalid_at)
+        )
+      );
+  } catch (error) {
+    logError('Failed to clear GitHub integration auth invalid state', {
+      error,
+      platformIntegrationId,
+    });
+    captureException(error, {
+      tags: { operation: 'clearIntegrationAuthInvalid' },
+      extra: { platformIntegrationId },
+    });
+  }
+}
 
 export async function updateLastSyncedAt(owner: SecurityReviewOwner): Promise<void> {
   try {
@@ -82,14 +176,7 @@ export async function syncDependabotAlertsForRepo(params: {
 
   log(`Starting sync for ${repoFullName}`, { installationId });
 
-  const result: SyncResult = {
-    synced: 0,
-    created: 0,
-    updated: 0,
-    errors: 0,
-    skipped: 0,
-    staleRepos: [],
-  };
+  const result = createEmptySyncResult();
   const queueSyncTotals: AutoAnalysisQueueSyncResult = {
     enqueueCount: 0,
     eligibleCount: 0,
@@ -98,6 +185,16 @@ export async function syncDependabotAlertsForRepo(params: {
   };
 
   try {
+    const authInvalidAt = await getIntegrationAuthInvalidAt(platformIntegrationId);
+    if (isRecentTimestamp(authInvalidAt, AUTH_INVALID_SHORT_CIRCUIT_MS)) {
+      warnExceptInTest('Skipping security sync because GitHub installation needs reauthorization', {
+        platformIntegrationId,
+        repoFullName,
+        authInvalidAt,
+      });
+      return createAuthInvalidSyncResult([repoFullName]);
+    }
+
     const [repoOwner, repoName] = repoFullName.split('/');
     if (!repoOwner || !repoName) {
       throw new Error(`Invalid repo full name: ${repoFullName}`);
@@ -122,6 +219,21 @@ export async function syncDependabotAlertsForRepo(params: {
       result.staleRepos.push(repoFullName);
       return result;
     }
+
+    if (fetchResult.status === 'auth_invalid') {
+      warnExceptInTest('GitHub installation needs reauthorization; skipping repo sync', {
+        platformIntegrationId,
+        installationId,
+        repoFullName,
+      });
+      await markIntegrationAuthInvalid(platformIntegrationId, 'github_dependabot_401');
+      result.authInvalid = 1;
+      result.authInvalidRepos.push(repoFullName);
+      result.reauthRequired = true;
+      return result;
+    }
+
+    await clearIntegrationAuthInvalid(platformIntegrationId);
 
     const alerts = fetchResult.alerts;
     log(`Fetched ${alerts.length} alerts from GitHub for ${repoFullName}`);
@@ -234,7 +346,7 @@ export async function syncDependabotAlertsForRepo(params: {
     return result;
   } catch (error) {
     const repoDurationMs = Math.round(performance.now() - repoStartTime);
-    logError(`Error syncing ${repoFullName}`, { durationMs: repoDurationMs, error });
+    errorExceptInTest(`Error syncing ${repoFullName}`, { durationMs: repoDurationMs, error });
     captureException(error, {
       tags: { operation: 'syncDependabotAlertsForRepo' },
       extra: { repoFullName },
@@ -263,14 +375,17 @@ export async function syncAllReposForOwner(params: {
   } = params;
   const syncStartTime = performance.now();
 
-  const totalResult: SyncResult = {
-    synced: 0,
-    created: 0,
-    updated: 0,
-    errors: 0,
-    skipped: 0,
-    staleRepos: [],
-  };
+  const totalResult = createEmptySyncResult();
+
+  const authInvalidAt = await getIntegrationAuthInvalidAt(platformIntegrationId);
+  if (isRecentTimestamp(authInvalidAt, AUTH_INVALID_SHORT_CIRCUIT_MS)) {
+    warnExceptInTest('Skipping security sync because GitHub installation needs reauthorization', {
+      platformIntegrationId,
+      repositoryCount: repositories.length,
+      authInvalidAt,
+    });
+    return createAuthInvalidSyncResult(repositories);
+  }
 
   let firstError: Error | null = null;
   let successfulRepos = 0;
@@ -289,11 +404,18 @@ export async function syncAllReposForOwner(params: {
       totalResult.updated += result.updated;
       totalResult.errors += result.errors;
       totalResult.skipped += result.skipped;
+      totalResult.authInvalid += result.authInvalid;
+      totalResult.authInvalidRepos.push(...result.authInvalidRepos);
+      totalResult.reauthRequired = totalResult.reauthRequired || result.reauthRequired;
       totalResult.staleRepos.push(...result.staleRepos);
       successfulRepos++;
+
+      if (result.reauthRequired) {
+        break;
+      }
     } catch (error) {
       totalResult.errors++;
-      logError(`Failed to sync ${repoFullName}`, { error });
+      errorExceptInTest(`Failed to sync ${repoFullName}`, { error });
       if (!firstError && error instanceof Error) {
         firstError = error;
       }
@@ -313,6 +435,7 @@ export async function syncAllReposForOwner(params: {
   // was configured but silently dropped from the accessible list.
   if (
     totalResult.errors === 0 &&
+    totalResult.authInvalid === 0 &&
     totalResult.staleRepos.length === 0 &&
     missingSelectedRepoCount === 0
   ) {
@@ -320,7 +443,12 @@ export async function syncAllReposForOwner(params: {
   }
 
   const totalDurationMs = Math.round(performance.now() - syncStartTime);
-  if (totalResult.synced === 0 && totalResult.errors === 0 && totalResult.skipped === 0) {
+  if (
+    totalResult.synced === 0 &&
+    totalResult.errors === 0 &&
+    totalResult.skipped === 0 &&
+    totalResult.authInvalid === 0
+  ) {
     warn('Sync completed with zero findings processed across all repos', {
       reposScanned: repositories.length,
       missingSelectedRepos: missingSelectedRepoCount,
@@ -334,6 +462,8 @@ export async function syncAllReposForOwner(params: {
       findingsUpdated: totalResult.updated,
       errors: totalResult.errors,
       skippedRepos: totalResult.skipped,
+      authInvalidRepos: totalResult.authInvalid,
+      reauthRequired: totalResult.reauthRequired,
       missingSelectedRepos: missingSelectedRepoCount,
       durationMs: totalDurationMs,
     });

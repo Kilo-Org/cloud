@@ -43,6 +43,7 @@ import { detectContextOverflow } from '@/lib/ai-gateway/context-overflow';
 import { KILO_AUTO_BALANCED_MODEL, KILO_AUTO_FREE_MODEL } from '@/lib/ai-gateway/auto-model';
 import type { GatewayChatApiKind, ProviderId } from '@/lib/ai-gateway/providers/types';
 import { computeOpenRouterCostFields } from '@/lib/ai-gateway/processUsage.shared';
+import { persistExperimentAttribution } from '@/lib/ai-gateway/experiments/persist';
 export { proxyErrorTypeSchema, ProxyErrorType } from '@/lib/proxy-error-types';
 import { ProxyErrorType } from '@/lib/proxy-error-types';
 
@@ -308,7 +309,31 @@ export function accountForMicrodollarUsage(
 ) {
   const logFileExtension = usageContext.isStreaming ? '.log.resp.sse' : '.log.resp.json';
   debugSaveProxyResponseStream(clonedReponse, logFileExtension);
-  after(countAndStoreUsage(clonedReponse, usageContext, openrouterRequestSpan));
+  after(
+    countAndStoreUsage(clonedReponse, usageContext, openrouterRequestSpan).then(
+      async usageIdentity => {
+        // Chain the experiment-attribution write after the microdollar
+        // write. This is best-effort analytics: failures here MUST NOT
+        // roll back the billing write, which has already succeeded by
+        // the time we reach here. `persistExperimentAttribution`
+        // swallows errors internally.
+        if (
+          usageIdentity &&
+          usageContext.modelExperimentVariantVersionId &&
+          usageContext.modelExperimentAllocationSubject
+        ) {
+          await persistExperimentAttribution({
+            usageId: usageIdentity.usageId,
+            createdAt: usageIdentity.createdAt,
+            variantVersionId: usageContext.modelExperimentVariantVersionId,
+            allocationSubject: usageContext.modelExperimentAllocationSubject,
+            clientRequestId: usageContext.clientRequestId ?? null,
+            capture: usageContext.experimentPromptCapture ?? null,
+          });
+        }
+      }
+    )
+  );
 }
 
 export async function captureProxyError(params: {

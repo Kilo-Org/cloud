@@ -6,8 +6,8 @@ import { eq, and, isNull } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import type { Owner } from '@/lib/integrations/core/types';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
+import { getPlatformOAuthCallbackUrl } from '@/lib/integrations/oauth/urls';
 import { SLACK_CLIENT_ID } from '@/lib/config.server';
-import { APP_URL } from '@/lib/constants';
 import { WebClient } from '@slack/web-api';
 import type { SlackInstallation } from '@chat-adapter/slack';
 import { getOrganizationById } from '@/lib/organizations/organizations';
@@ -16,11 +16,8 @@ import {
   createAllowPredicateFromRestrictions,
   hasActiveModelRestrictions,
 } from '@/lib/model-allow.server';
-import { KILO_AUTO_FREE_MODEL } from '@/lib/ai-gateway/auto-model';
+import { DEFAULT_BOT_MODEL } from '@/lib/bot/constants';
 import { getEffectiveModelRestrictions } from '@/lib/organizations/model-restrictions';
-
-// Default model for Slack integrations - separate from the global platform default
-const SLACK_DEFAULT_MODEL = KILO_AUTO_FREE_MODEL.id;
 
 export class SlackWorkspaceAlreadyConnectedError extends Error {
   constructor(teamName: string) {
@@ -57,7 +54,7 @@ export function getMissingSlackScopes(installedScopes: string[] | null): string[
   return SLACK_SCOPES.filter(scope => !installedScopeSet.has(scope));
 }
 
-const SLACK_REDIRECT_URI = `${APP_URL}/api/integrations/slack/callback`;
+const SLACK_REDIRECT_URI = getPlatformOAuthCallbackUrl(PLATFORM.SLACK);
 
 type SlackUninstallOptions = {
   deleteChatSdkInstallation?: (teamId: string) => Promise<void>;
@@ -220,11 +217,11 @@ export async function upsertSlackInstallation({
   }
 
   // For org integrations, get a model that respects org access policy.
-  // For user integrations, use the Slack-specific default model
+  // For user integrations, use the shared bot default model.
   const defaultModel =
     owner.type === 'org'
-      ? await getDefaultAllowedModel(owner.id, SLACK_DEFAULT_MODEL)
-      : SLACK_DEFAULT_MODEL;
+      ? await getDefaultAllowedModel(owner.id, DEFAULT_BOT_MODEL)
+      : DEFAULT_BOT_MODEL;
 
   const metadata = {
     ...(existing?.metadata && typeof existing.metadata === 'object' ? existing.metadata : {}),

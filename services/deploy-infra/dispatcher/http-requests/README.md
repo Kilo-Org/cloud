@@ -21,8 +21,8 @@ The `.env` file is gitignored so your credentials won't be committed.
 
 ## Files
 
-| File              | Purpose                              |
-| ----------------- | ------------------------------------ |
+| File | Purpose |
+|---|---|
 | `dispatcher.http` | All API requests (management + auth) |
-| `.env.example`    | Template for credentials             |
-| `.env`            | Your credentials (gitignored)        |
+| `.env.example` | Template for credentials |
+| `.env` | Your credentials (gitignored) |

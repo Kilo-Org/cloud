@@ -2,11 +2,13 @@ import { test, describe, expect } from '@jest/globals';
 import { calculateKiloExclusiveCost_mUsd } from './processUsage';
 import type { JustTheCostsUsageStats } from './processUsage.types';
 import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
+import { claude_opus_4_7_stealth_model } from '@/lib/ai-gateway/providers/anthropic.constants';
 import {
   qwen36_27b_model,
   qwen36_flash_model,
   qwen36_max_preview_model,
   qwen36_plus_model,
+  qwen37_max_model,
 } from '@/lib/ai-gateway/providers/qwen';
 
 const makeUsage = (overrides: Partial<JustTheCostsUsageStats> = {}): JustTheCostsUsageStats => ({
@@ -17,6 +19,26 @@ const makeUsage = (overrides: Partial<JustTheCostsUsageStats> = {}): JustTheCost
   cacheHitTokens: 0,
   is_byok: false,
   ...overrides,
+});
+
+describe('calculatKiloExclusiveCost_mUsd with qwen3.7-max', () => {
+  test('uses direct Alibaba pricing with the Kilo discount', () => {
+    const result = calculateKiloExclusiveCost_mUsd(
+      qwen37_max_model,
+      makeUsage({ inputTokens: 100_000, outputTokens: 10_000 })
+    );
+
+    expect(result).toBe(Math.round(100_000 * 1.625 + 10_000 * 4.875));
+  });
+
+  test('charges explicit cache reads and writes at discounted rates', () => {
+    const result = calculateKiloExclusiveCost_mUsd(
+      qwen37_max_model,
+      makeUsage({ inputTokens: 100_000, cacheHitTokens: 20_000, cacheWriteTokens: 30_000 })
+    );
+
+    expect(result).toBe(Math.round(50_000 * 1.625 + 20_000 * 0.1625 + 30_000 * 2.03125));
+  });
 });
 
 describe('calculatKiloExclusiveCost_mUsd with qwen3.6-plus', () => {
@@ -398,6 +420,29 @@ describe('calculatKiloExclusiveCost_mUsd with qwen3.6-max-preview', () => {
       makeUsage({ inputTokens: 256 * 1024 })
     );
     expect(result).toBe(Math.round(256 * 1024 * 1.3));
+  });
+});
+
+describe('calculatKiloExclusiveCost_mUsd with stealth Claude Opus 4.7', () => {
+  test('uses the 20% lower flat price for uncached tokens', () => {
+    const result = calculateKiloExclusiveCost_mUsd(
+      claude_opus_4_7_stealth_model,
+      makeUsage({ inputTokens: 100_000, outputTokens: 10_000 })
+    );
+    expect(result).toBe(600_000);
+  });
+
+  test('uses the discounted Anthropic-compatible cache prices', () => {
+    const result = calculateKiloExclusiveCost_mUsd(
+      claude_opus_4_7_stealth_model,
+      makeUsage({
+        inputTokens: 150_000,
+        outputTokens: 10_000,
+        cacheHitTokens: 25_000,
+        cacheWriteTokens: 25_000,
+      })
+    );
+    expect(result).toBe(735_000);
   });
 });
 

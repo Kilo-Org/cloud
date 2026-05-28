@@ -7,12 +7,23 @@
 
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import {
+  allocateWrapperRuntimeState,
+  clearAllocatedWrapperRuntimeState,
+  clearWrapperRuntimeIdentity,
+  getWrapperRuntimeState,
+  READY_ONLY_IDLE_MS,
+  recordWrapperAcceptedMessage,
+  recordWrapperPong,
+  recordWrapperReadyLease,
+} from '../../../src/session/wrapper-runtime-state.js';
+import {
   CODE_REVIEW_PERMISSION_REJECTION_MESSAGE,
   createConnectionManager,
+  openIngestProgressChannel,
   type ConnectionCallbacks,
 } from '../../../wrapper/src/connection.js';
-import { WrapperState, type JobContext } from '../../../wrapper/src/state.js';
-import type { WrapperKiloClient } from '../../../wrapper/src/kilo-api.js';
+import { WrapperState, type SessionContext } from '../../../wrapper/src/state.js';
+import type { KiloEvent, WrapperKiloClient } from '../../../wrapper/src/kilo-api.js';
 import type { IngestEvent } from '../../../src/shared/protocol.js';
 
 // ---------------------------------------------------------------------------
@@ -108,26 +119,26 @@ class MockWebSocket {
 // Test helpers
 // ---------------------------------------------------------------------------
 
-const createJobContext = (): JobContext => ({
-  executionId: 'exec_test',
-  sessionId: 'session_abc',
-  userId: 'user_xyz',
+const createSessionContext = (overrides: Partial<SessionContext> = {}): SessionContext => ({
   kiloSessionId: 'kilo_sess_456',
   ingestUrl: 'wss://ingest.example.com/ingest',
   ingestToken: 'token_secret',
   workerAuthToken: 'kilo_token_789',
+  wrapperRunId: 'run_test',
+  wrapperGeneration: 7,
+  wrapperConnectionId: 'conn_test',
+  ...overrides,
 });
 
-const createCodeReviewJobContext = (): JobContext => ({
-  ...createJobContext(),
-  platform: 'code-review',
-});
+const createCodeReviewSessionContext = (): SessionContext =>
+  createSessionContext({ platform: 'code-review' });
 
 const createCallbacks = (): ConnectionCallbacks & {
   onReconnecting: ReturnType<typeof vi.fn>;
   onReconnected: ReturnType<typeof vi.fn>;
   onDisconnect: ReturnType<typeof vi.fn>;
   onTerminalError: ReturnType<typeof vi.fn>;
+  onRootSessionActivity: ReturnType<typeof vi.fn>;
   onSseEvent: ReturnType<typeof vi.fn>;
 } => ({
   onMessageComplete: vi.fn(),
@@ -135,23 +146,13 @@ const createCallbacks = (): ConnectionCallbacks & {
   onCommand: vi.fn(),
   onDisconnect: vi.fn(),
   onCompletionSignal: vi.fn(),
-  onSseEvent: vi.fn(),
+  onRootSessionActivity: vi.fn(),
   onReconnecting: vi.fn(),
   onReconnected: vi.fn(),
+  onSseEvent: vi.fn(),
 });
 
-type KiloEvent = { type: string; properties?: Record<string, unknown> };
-
-function createEventStream(events: KiloEvent[]): AsyncIterable<KiloEvent> {
-  return (async function* () {
-    for (const event of events) {
-      yield event;
-    }
-    await new Promise(() => {});
-  })();
-}
-
-const createMockKiloClient = (overrides?: Partial<WrapperKiloClient>): WrapperKiloClient => ({
+const createMockKiloClient = (overrides: Partial<WrapperKiloClient> = {}): WrapperKiloClient => ({
   createSession: vi.fn().mockResolvedValue({ id: 'kilo_sess' }),
   getSession: vi.fn().mockResolvedValue({ id: 'kilo_sess' }),
   sendPromptAsync: vi.fn().mockResolvedValue(undefined),
@@ -166,17 +167,33 @@ const createMockKiloClient = (overrides?: Partial<WrapperKiloClient>): WrapperKi
   getPermissions: vi.fn().mockResolvedValue([]),
   getNetworkWaits: vi.fn().mockResolvedValue([]),
   resumeNetworkWait: vi.fn().mockResolvedValue(true),
-  sdkClient: {
-    event: {
-      // Return a stream that connects, then never yields again.
-      subscribe: vi.fn().mockResolvedValue({
-        stream: createEventStream([{ type: 'server.connected' }]),
-      }),
-    },
-  } as unknown as WrapperKiloClient['sdkClient'],
+  // Return a stream that never yields — keeps event subscription alive
+  subscribeEvents: vi.fn().mockResolvedValue({
+    stream: (async function* () {
+      await new Promise(() => {});
+    })(),
+  }),
   serverUrl: 'http://127.0.0.1:0',
   ...overrides,
 });
+
+function createEventStream(events: KiloEvent[]): AsyncIterable<KiloEvent> {
+  return (async function* () {
+    for (const event of events) {
+      yield event;
+    }
+    await new Promise(() => {});
+  })();
+}
+
+function parseSentMessages(
+  ws: MockWebSocket
+): Array<{ streamEventType?: string; data: Record<string, unknown> }> {
+  return ws.sent.map(msg => {
+    const parsed = JSON.parse(msg) as { streamEventType?: string; data?: Record<string, unknown> };
+    return { streamEventType: parsed.streamEventType, data: parsed.data ?? {} };
+  });
+}
 
 /**
  * Mock fetch to simulate a never-ending SSE stream.
@@ -221,6 +238,251 @@ async function openConnection(
 // Tests
 // ---------------------------------------------------------------------------
 
+describe('wrapper runtime state', () => {
+  const createStorage = () => {
+    const storage = new Map<string, unknown>();
+    return {
+      get: async (key: string) => storage.get(key),
+      put: async (key: string, value: unknown) => {
+        storage.set(key, value);
+      },
+      delete: async (key: string) => storage.delete(key),
+    } as unknown as DurableObjectStorage;
+  };
+
+  it('preserves active liveness state when reusing the same wrapper allocation', async () => {
+    const durableStorage = createStorage();
+
+    const { state: allocated } = await allocateWrapperRuntimeState(durableStorage, 1_000);
+    await recordWrapperAcceptedMessage(durableStorage, allocated, 10_000, 61_000);
+    if (!allocated.wrapperConnectionId) throw new Error('expected wrapper connection ID');
+    await recordWrapperPong(
+      durableStorage,
+      allocated.wrapperGeneration,
+      allocated.wrapperConnectionId,
+      2_000,
+      62_000
+    );
+
+    const { state: reused } = await allocateWrapperRuntimeState(durableStorage, 3_000);
+    const stored = await getWrapperRuntimeState(durableStorage);
+
+    expect(reused.wrapperGeneration).toBe(allocated.wrapperGeneration);
+    expect(reused.wrapperConnectionId).toBe(allocated.wrapperConnectionId);
+    expect(stored.noOutputDeadlineAt).toBe(10_000);
+    expect(stored.pingDeadlineAt).toBeUndefined();
+    expect(stored.nextPingAt).toBe(62_000);
+  });
+
+  it('does not let stale terminal cleanup clear a newer wrapper runtime state', async () => {
+    const durableStorage = createStorage();
+
+    const { state: stale } = await allocateWrapperRuntimeState(durableStorage, 1_000);
+    if (!stale.wrapperConnectionId) throw new Error('expected stale wrapper connection ID');
+    await clearAllocatedWrapperRuntimeState(durableStorage, stale);
+
+    const { state: current } = await allocateWrapperRuntimeState(durableStorage, 2_000);
+    if (!current.wrapperConnectionId) throw new Error('expected current wrapper connection ID');
+    await recordWrapperAcceptedMessage(durableStorage, current, 10_000, 61_000);
+
+    const cleared = await clearWrapperRuntimeIdentity(
+      durableStorage,
+      {
+        wrapperGeneration: stale.wrapperGeneration,
+        wrapperConnectionId: stale.wrapperConnectionId,
+      },
+      { incrementGeneration: true }
+    );
+    const stored = await getWrapperRuntimeState(durableStorage);
+
+    expect(cleared).toBeNull();
+    expect(stored).toMatchObject({
+      wrapperGeneration: current.wrapperGeneration,
+      wrapperConnectionId: current.wrapperConnectionId,
+      wrapperRunId: current.wrapperRunId,
+      lastWrapperConnectedAt: 2_000,
+      noOutputDeadlineAt: 10_000,
+      nextPingAt: 61_000,
+    });
+    expect(stored.wrapperIdleDeadlineAt).toBeUndefined();
+  });
+
+  it('allocates a fresh fenced identity instead of reusing an obsolete execution-era record', async () => {
+    const durableStorage = createStorage();
+    await durableStorage.put('wrapper_runtime_state', {
+      wrapperGeneration: 7,
+      wrapperConnectionId: 'conn_legacy',
+      acceptedExecutionId: 'exc_legacy',
+    });
+
+    const allocated = await allocateWrapperRuntimeState(durableStorage, 4_000);
+    const stored = await getWrapperRuntimeState(durableStorage);
+
+    expect(allocated.allocatedNewIdentity).toBe(true);
+    expect(allocated.state.wrapperGeneration).toBe(8);
+    expect(allocated.state.wrapperConnectionId).not.toBe('conn_legacy');
+    expect(allocated.state.wrapperRunId).toMatch(/^wr_/);
+    expect(stored).toEqual(allocated.state);
+  });
+
+  it('allocates fresh current identity even when obsolete grace cleanup fails', async () => {
+    const durableStorage = createStorage();
+    await durableStorage.put('wrapper_runtime_state', {
+      wrapperGeneration: 5,
+      wrapperConnectionId: 'conn_legacy',
+      acceptedExecutionId: 'exc_legacy',
+    });
+    durableStorage.delete = async () => {
+      throw new Error('cleanup unavailable');
+    };
+
+    const allocated = await allocateWrapperRuntimeState(durableStorage, 4_000);
+
+    expect(allocated.allocatedNewIdentity).toBe(true);
+    expect(allocated.state.wrapperGeneration).toBe(6);
+    expect(allocated.state.wrapperRunId).toMatch(/^wr_/);
+  });
+
+  it('reports allocatedNewIdentity=true for cold allocation and false for hot reuse', async () => {
+    const durableStorage = createStorage();
+
+    const cold = await allocateWrapperRuntimeState(durableStorage, 1_000);
+    expect(cold.allocatedNewIdentity).toBe(true);
+
+    const hot = await allocateWrapperRuntimeState(durableStorage, 2_000);
+    expect(hot.allocatedNewIdentity).toBe(false);
+    expect(hot.state.wrapperConnectionId).toBe(cold.state.wrapperConnectionId);
+
+    await clearAllocatedWrapperRuntimeState(durableStorage, hot.state);
+
+    const nextCold = await allocateWrapperRuntimeState(durableStorage, 3_000);
+    expect(nextCold.allocatedNewIdentity).toBe(true);
+  });
+
+  it('records a short ready-only idle lease for prepared wrappers', async () => {
+    const durableStorage = createStorage();
+    const { state: allocated } = await allocateWrapperRuntimeState(durableStorage, 1_000);
+
+    await recordWrapperReadyLease(durableStorage, allocated, 2_000);
+
+    const stored = await getWrapperRuntimeState(durableStorage);
+    expect(stored.wrapperIdleDeadlineAt).toBe(2_000 + READY_ONLY_IDLE_MS);
+    expect(stored.wrapperConnectionId).toBe(allocated.wrapperConnectionId);
+  });
+
+  it('clears ready-only idle lease when a message is accepted', async () => {
+    const durableStorage = createStorage();
+    const { state: allocated } = await allocateWrapperRuntimeState(durableStorage, 1_000);
+
+    await recordWrapperReadyLease(durableStorage, allocated, 2_000);
+    await recordWrapperAcceptedMessage(durableStorage, allocated, 10_000, 61_000);
+
+    const stored = await getWrapperRuntimeState(durableStorage);
+    expect(stored.wrapperIdleDeadlineAt).toBeUndefined();
+    expect(stored.noOutputDeadlineAt).toBe(10_000);
+    expect(stored.nextPingAt).toBe(61_000);
+  });
+});
+
+describe('session binding fence values', () => {
+  it('uses refreshed fence values in the next ingest URL and pong source state', async () => {
+    const state = new WrapperState();
+    state.bindSession(
+      createSessionContext({
+        ingestUrl: 'wss://ingest.example.com/ingest-refreshed',
+        ingestToken: 'token_secret_refreshed',
+        workerAuthToken: 'kilo_token_refreshed',
+        wrapperGeneration: 8,
+        wrapperConnectionId: 'conn_refreshed',
+      })
+    );
+    const callbacks = createCallbacks();
+    vi.useFakeTimers();
+    vi.stubGlobal('WebSocket', MockWebSocket);
+    stubFetch();
+
+    try {
+      const manager = createConnectionManager(
+        state,
+        { kiloClient: createMockKiloClient() },
+        callbacks
+      );
+      const ws = await openConnection(manager);
+
+      expect(ws.url).toContain('wrapperGeneration=8');
+      expect(ws.url).toContain('wrapperConnectionId=conn_refreshed');
+      state.sendToIngest({
+        streamEventType: 'pong',
+        data: {
+          wrapperRunId: state.currentSession?.wrapperRunId,
+          wrapperGeneration: state.currentSession?.wrapperGeneration,
+          wrapperConnectionId: state.currentSession?.wrapperConnectionId,
+        },
+        timestamp: new Date().toISOString(),
+      });
+      const pong = ws.sent
+        .map(message => JSON.parse(message))
+        .find(event => event.streamEventType === 'pong');
+      expect(pong.data).toMatchObject({
+        wrapperRunId: 'run_test',
+        wrapperGeneration: 8,
+        wrapperConnectionId: 'conn_refreshed',
+      });
+    } finally {
+      vi.useRealTimers();
+      vi.unstubAllGlobals();
+    }
+  });
+});
+
+describe('bootstrap progress channel', () => {
+  beforeEach(() => {
+    MockWebSocket.reset();
+    vi.stubGlobal('WebSocket', MockWebSocket);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('sends preparing events before the full Kilo connection is available', async () => {
+    const state = new WrapperState();
+    state.bindSession(createSessionContext());
+
+    const openPromise = openIngestProgressChannel(state);
+    const ws = MockWebSocket.latest!;
+    ws.simulateOpen();
+    const channel = await openPromise;
+
+    expect(state.isConnected).toBe(false);
+    expect(ws.url).toContain('wrapperRunId=run_test');
+    expect(ws.url).toContain('wrapperGeneration=7');
+    expect(ws.url).toContain('wrapperConnectionId=conn_test');
+
+    state.sendToIngest({
+      streamEventType: 'preparing',
+      data: { step: 'cloning', message: 'Cloning repository...' },
+      timestamp: '2026-05-17T00:00:00.000Z',
+    });
+
+    expect(parseSentMessages(ws)).toEqual([
+      {
+        streamEventType: 'preparing',
+        data: { step: 'cloning', message: 'Cloning repository...' },
+      },
+    ]);
+
+    channel.close();
+    state.sendToIngest({
+      streamEventType: 'preparing',
+      data: { step: 'branch', message: 'Setting up branch...' },
+      timestamp: '2026-05-17T00:00:01.000Z',
+    });
+
+    expect(ws.sent).toHaveLength(1);
+  });
+});
+
 describe('ingest WS reconnection', () => {
   let state: WrapperState;
   let callbacks: ReturnType<typeof createCallbacks>;
@@ -232,7 +494,7 @@ describe('ingest WS reconnection', () => {
     stubFetch();
 
     state = new WrapperState();
-    state.startJob(createJobContext());
+    state.bindSession(createSessionContext());
     callbacks = createCallbacks();
   });
 
@@ -241,19 +503,41 @@ describe('ingest WS reconnection', () => {
     vi.unstubAllGlobals();
   });
 
+  it('opens ingest WebSocket with wrapper fencing query params', async () => {
+    const manager = createManager();
+
+    const ws = await openConnection(manager);
+
+    expect(ws.url).toContain('wrapperRunId=run_test');
+    expect(ws.url).toContain('wrapperGeneration=7');
+    expect(ws.url).toContain('wrapperConnectionId=conn_test');
+  });
+
+  it('openIngestWs does not fall back to executionId when wrapperRunId is absent', async () => {
+    const stateNoWr = new WrapperState();
+    stateNoWr.bindSession(
+      createSessionContext({
+        wrapperGeneration: undefined,
+        wrapperConnectionId: undefined,
+      })
+    );
+    const mgr = createConnectionManager(
+      stateNoWr,
+      { kiloClient: createMockKiloClient() },
+      createCallbacks()
+    );
+    const ws = await openConnection(mgr);
+    expect(ws.url).not.toContain('executionId=');
+    expect(ws.url).toContain('kiloSessionId=kilo_sess_456');
+    expect(ws.url).toContain('sessionId=');
+  });
+
   function createManager() {
     return createConnectionManager(state, { kiloClient: createMockKiloClient() }, callbacks);
   }
 
   function createManagerWithClient(kiloClient: WrapperKiloClient) {
     return createConnectionManager(state, { kiloClient }, callbacks);
-  }
-
-  function parseSentMessages(ws: MockWebSocket): Array<{
-    streamEventType: string;
-    data: Record<string, unknown>;
-  }> {
-    return ws.sent.map(msg => JSON.parse(msg));
   }
 
   // -------------------------------------------------------------------------
@@ -370,12 +654,20 @@ describe('ingest WS reconnection', () => {
     state.sendToIngest(event2);
 
     // Events should NOT have been sent to the old WS
-    // (old WS is closed, so nothing is sent — events are buffered internally)
+    // (old WS is closed, so nothing is sent — events are buffered internally).
+    // Filter to just our test events: the open-time kilo snapshot legitimately
+    // sends a session.status kilocode event through the old WS *before* close,
+    // so ignore that.
     const oldWsSentAfterClose = ws.sent.filter(msg => {
       const parsed = JSON.parse(msg);
-      return parsed.data.event === 'test_event_1' || parsed.data.text === 'some output';
+      if (parsed.streamEventType === 'output' && parsed.data?.text === 'some output') {
+        return true;
+      }
+      if (parsed.streamEventType === 'kilocode' && parsed.data?.event === 'test_event_1') {
+        return true;
+      }
+      return false;
     });
-    // The old WS may have sent a heartbeat before close; filter to our test events
     expect(oldWsSentAfterClose).toHaveLength(0);
 
     // Advance past first backoff (1s) and reconnect
@@ -395,13 +687,16 @@ describe('ingest WS reconnection', () => {
     expect(parsedResume.data.bufferedEvents).toBe(2);
     expect(parsedResume.data.eventsLost).toBe(false);
 
-    // Verify buffered events were flushed to new WS
+    // Verify buffered events were flushed to new WS. Filter to the specific
+    // test events — the reconnect-time kilo snapshot will add its own
+    // session.status kilocode event, which we ignore.
     const flushedEvents = newWs.sent
       .map(msg => JSON.parse(msg))
-      .filter(
-        (e: { streamEventType: string; data: Record<string, unknown> }) =>
-          e.streamEventType === 'output' || e.data.event === 'test_event_1'
-      );
+      .filter((e: { streamEventType: string; data?: { event?: string; text?: string } }) => {
+        if (e.streamEventType === 'kilocode' && e.data?.event === 'test_event_1') return true;
+        if (e.streamEventType === 'output' && e.data?.text === 'some output') return true;
+        return false;
+      });
     expect(flushedEvents).toHaveLength(2);
     expect(flushedEvents[0].data.event).toBe('test_event_1');
     expect(flushedEvents[1].data.text).toBe('some output');
@@ -749,8 +1044,8 @@ describe('ingest WS reconnection', () => {
     // Old WS fires onclose (stale socket — ignored by guard)
     ws.simulateClose(1000, 'normal close');
 
-    // Simulate starting a new execution with a fresh manager on the same state
-    // (In production, state.startJob() is called for the new job. Here we
+    // Simulate starting a new session with a fresh manager on the same state
+    // (In production, state.bindSession() is called for the new session. Here we
     // just create a new manager to ensure closedByUs doesn't carry over.)
     const callbacks2 = createCallbacks();
     const manager2 = createConnectionManager(
@@ -769,26 +1064,118 @@ describe('ingest WS reconnection', () => {
     expect(callbacks2.onReconnecting).toHaveBeenCalledWith(1);
   });
 
-  it('rejects real-time code-review questions without disconnecting', async () => {
-    state = new WrapperState();
-    state.startJob(createCodeReviewJobContext());
-    const rejectQuestion = vi.fn().mockResolvedValue(true);
+  it('surfaces model-not-found session errors as terminal wrapper errors', async () => {
     const kiloClient = createMockKiloClient({
-      rejectQuestion,
-      sdkClient: {
-        event: {
-          subscribe: vi.fn().mockResolvedValue({
-            stream: createEventStream([
-              { type: 'question.asked', properties: { id: 'q_123', sessionID: 'kilo_sess_456' } },
-            ]),
-          }),
-        },
-      } as unknown as WrapperKiloClient['sdkClient'],
+      subscribeEvents: vi.fn().mockResolvedValue({
+        stream: createEventStream([
+          {
+            type: 'session.error',
+            properties: {
+              sessionID: 'kilo_sess_456',
+              error: {
+                name: 'UnknownError',
+                data: { message: 'Model not found: kilo/does-not-exist.' },
+              },
+            },
+          },
+        ]),
+      }),
     });
 
     const manager = createManagerWithClient(kiloClient);
     const ws = await openConnection(manager);
-    callbacks.onSseEvent.mockClear();
+    await vi.advanceTimersByTimeAsync(0);
+
+    const sessionErrors = parseSentMessages(ws).filter(
+      event => event.streamEventType === 'kilocode' && event.data.event === 'session.error'
+    );
+    expect(sessionErrors).toHaveLength(1);
+    expect(callbacks.onTerminalError).toHaveBeenCalledWith('Model not found: kilo/does-not-exist.');
+  });
+
+  it('records explicit Kilo gate results from event properties', async () => {
+    const kiloClient = createMockKiloClient({
+      subscribeEvents: vi.fn().mockResolvedValue({
+        stream: createEventStream([
+          {
+            type: 'session.updated',
+            properties: {
+              sessionID: 'kilo_sess_456',
+              gateResult: 'fail',
+            },
+          },
+        ]),
+      }),
+    });
+
+    const manager = createManagerWithClient(kiloClient);
+    await openConnection(manager);
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(state.observedGateResult).toBe('fail');
+  });
+
+  it('reports root activity before a terminal root message completion after idle', async () => {
+    const callbackOrder: string[] = [];
+    callbacks.onSessionIdle = vi.fn(() => {
+      callbackOrder.push('idle');
+    });
+    callbacks.onRootSessionActivity.mockImplementation(() => {
+      callbackOrder.push('activity');
+    });
+    callbacks.onMessageComplete = vi.fn((messageId: string) => {
+      callbackOrder.push(`complete:${messageId}`);
+    });
+
+    const kiloClient = createMockKiloClient({
+      subscribeEvents: vi.fn().mockResolvedValue({
+        stream: createEventStream([
+          {
+            type: 'session.idle',
+            properties: { sessionID: 'kilo_sess_456' },
+          },
+          {
+            type: 'message.updated',
+            properties: {
+              info: {
+                id: 'assistant_msg_root_123',
+                parentID: 'msg_root_user_123',
+                role: 'assistant',
+                sessionID: 'kilo_sess_456',
+                time: { completed: 1_716_200_000_000 },
+              },
+            },
+          },
+        ]),
+      }),
+    });
+
+    const manager = createManagerWithClient(kiloClient);
+    await openConnection(manager);
+    await vi.advanceTimersByTimeAsync(0);
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(callbacks.onSessionIdle).toHaveBeenCalledTimes(1);
+    expect(callbacks.onRootSessionActivity).toHaveBeenCalledTimes(1);
+    expect(callbacks.onMessageComplete).toHaveBeenCalledWith('msg_root_user_123');
+    expect(callbackOrder).toEqual(['idle', 'activity', 'complete:msg_root_user_123']);
+  });
+
+  it('rejects real-time code-review questions without disconnecting', async () => {
+    state = new WrapperState();
+    state.bindSession(createCodeReviewSessionContext());
+    const rejectQuestion = vi.fn().mockResolvedValue(true);
+    const kiloClient = createMockKiloClient({
+      rejectQuestion,
+      subscribeEvents: vi.fn().mockResolvedValue({
+        stream: createEventStream([
+          { type: 'question.asked', properties: { id: 'q_123', sessionID: 'kilo_sess_456' } },
+        ]),
+      }),
+    });
+
+    const manager = createManagerWithClient(kiloClient);
+    const ws = await openConnection(manager);
     await vi.advanceTimersByTimeAsync(0);
 
     const questionEvents = parseSentMessages(ws).filter(
@@ -798,32 +1185,26 @@ describe('ingest WS reconnection', () => {
     expect(rejectQuestion).toHaveBeenCalledWith('q_123');
     expect(callbacks.onDisconnect).not.toHaveBeenCalled();
     expect(callbacks.onMessageComplete).not.toHaveBeenCalled();
-    expect(callbacks.onSseEvent).toHaveBeenCalledTimes(1);
   });
 
   it('rejects real-time code-review permissions without disconnecting', async () => {
     state = new WrapperState();
-    state.startJob(createCodeReviewJobContext());
+    state.bindSession(createCodeReviewSessionContext());
     const answerPermission = vi.fn().mockResolvedValue(true);
     const kiloClient = createMockKiloClient({
       answerPermission,
-      sdkClient: {
-        event: {
-          subscribe: vi.fn().mockResolvedValue({
-            stream: createEventStream([
-              {
-                type: 'permission.asked',
-                properties: { id: 'p_456', sessionID: 'kilo_sess_456', permission: 'file_write' },
-              },
-            ]),
-          }),
-        },
-      } as unknown as WrapperKiloClient['sdkClient'],
+      subscribeEvents: vi.fn().mockResolvedValue({
+        stream: createEventStream([
+          {
+            type: 'permission.asked',
+            properties: { id: 'p_456', sessionID: 'kilo_sess_456', permission: 'file_write' },
+          },
+        ]),
+      }),
     });
 
     const manager = createManagerWithClient(kiloClient);
     const ws = await openConnection(manager);
-    callbacks.onSseEvent.mockClear();
     await vi.advanceTimersByTimeAsync(0);
 
     const permissionEvents = parseSentMessages(ws).filter(
@@ -837,32 +1218,26 @@ describe('ingest WS reconnection', () => {
     );
     expect(callbacks.onDisconnect).not.toHaveBeenCalled();
     expect(callbacks.onMessageComplete).not.toHaveBeenCalled();
-    expect(callbacks.onSseEvent).toHaveBeenCalledTimes(1);
   });
 
   it.each(['question', 'permission'])(
     'ignores real-time code-review %s session status without disconnecting',
     async statusType => {
       state = new WrapperState();
-      state.startJob(createCodeReviewJobContext());
+      state.bindSession(createCodeReviewSessionContext());
       const kiloClient = createMockKiloClient({
-        sdkClient: {
-          event: {
-            subscribe: vi.fn().mockResolvedValue({
-              stream: createEventStream([
-                {
-                  type: 'session.status',
-                  properties: { sessionID: 'kilo_sess_456', status: { type: statusType } },
-                },
-              ]),
-            }),
-          },
-        } as unknown as WrapperKiloClient['sdkClient'],
+        subscribeEvents: vi.fn().mockResolvedValue({
+          stream: createEventStream([
+            {
+              type: 'session.status',
+              properties: { sessionID: 'kilo_sess_456', status: { type: statusType } },
+            },
+          ]),
+        }),
       });
 
       const manager = createManagerWithClient(kiloClient);
       const ws = await openConnection(manager);
-      callbacks.onSseEvent.mockClear();
       await vi.advanceTimersByTimeAsync(0);
 
       const statusEvents = parseSentMessages(ws).filter(event => {
@@ -879,26 +1254,20 @@ describe('ingest WS reconnection', () => {
       expect(statusEvents).toHaveLength(0);
       expect(callbacks.onDisconnect).not.toHaveBeenCalled();
       expect(callbacks.onMessageComplete).not.toHaveBeenCalled();
-      expect(callbacks.onSseEvent).toHaveBeenCalledTimes(1);
     }
   );
 
   it('forwards real-time interactive questions for non-code-review jobs', async () => {
     const kiloClient = createMockKiloClient({
-      sdkClient: {
-        event: {
-          subscribe: vi.fn().mockResolvedValue({
-            stream: createEventStream([
-              { type: 'question.asked', properties: { id: 'q_123', sessionID: 'kilo_sess_456' } },
-            ]),
-          }),
-        },
-      } as unknown as WrapperKiloClient['sdkClient'],
+      subscribeEvents: vi.fn().mockResolvedValue({
+        stream: createEventStream([
+          { type: 'question.asked', properties: { id: 'q_123', sessionID: 'kilo_sess_456' } },
+        ]),
+      }),
     });
 
     const manager = createManagerWithClient(kiloClient);
     const ws = await openConnection(manager);
-    callbacks.onSseEvent.mockClear();
     await vi.advanceTimersByTimeAsync(0);
 
     const questionEvents = parseSentMessages(ws).filter(
@@ -906,23 +1275,18 @@ describe('ingest WS reconnection', () => {
     );
     expect(questionEvents).toHaveLength(1);
     expect(kiloClient.rejectQuestion).not.toHaveBeenCalled();
-    expect(callbacks.onSseEvent).toHaveBeenCalledTimes(1);
   });
 
   it('forwards payment-style events and reports terminal errors', async () => {
     const kiloClient = createMockKiloClient({
-      sdkClient: {
-        event: {
-          subscribe: vi.fn().mockResolvedValue({
-            stream: createEventStream([
-              {
-                type: 'payment_required',
-                properties: { error: 'Insufficient credits', sessionID: 'kilo_sess_456' },
-              },
-            ]),
-          }),
-        },
-      } as unknown as WrapperKiloClient['sdkClient'],
+      subscribeEvents: vi.fn().mockResolvedValue({
+        stream: createEventStream([
+          {
+            type: 'payment_required',
+            properties: { error: 'Insufficient credits', sessionID: 'kilo_sess_456' },
+          },
+        ]),
+      }),
     });
 
     const manager = createManagerWithClient(kiloClient);
@@ -940,5 +1304,317 @@ describe('ingest WS reconnection', () => {
     expect(callbacks.onTerminalError).toHaveBeenCalledWith('Insufficient credits');
     expect(callbacks.onDisconnect).not.toHaveBeenCalled();
     expect(callbacks.onMessageComplete).not.toHaveBeenCalled();
+  });
+
+  // -------------------------------------------------------------------------
+  // Test: close() clears event buffer to prevent stale events leaking
+  // -------------------------------------------------------------------------
+
+  it('clears event buffer on close() so stale events do not leak into the next open', async () => {
+    const manager = createManager();
+    const ws = await openConnection(manager);
+
+    // Simulate unexpected close — events will be buffered while disconnected
+    ws.simulateClose(1006);
+    expect(manager.isReconnecting()).toBe(true);
+
+    // Buffer events while disconnected
+    state.sendToIngest({
+      streamEventType: 'output',
+      timestamp: new Date().toISOString(),
+      data: { text: 'stale event from previous run' },
+    });
+
+    // Intentional close (drain boundary) — should clear the buffer
+    await manager.close();
+    expect(manager.isReconnecting()).toBe(false);
+
+    // Reopen on the same manager — simulates a new session starting
+    const openPromise = manager.open();
+    const newWs = MockWebSocket.latest!;
+    expect(newWs).not.toBe(ws);
+    newWs.simulateOpen();
+    await openPromise;
+
+    // The stale buffered event should NOT be sent through the new connection
+    const staleEventSent = newWs.sent.some(msg => {
+      const parsed = JSON.parse(msg);
+      return (
+        parsed.streamEventType === 'output' && parsed.data?.text === 'stale event from previous run'
+      );
+    });
+    expect(staleEventSent).toBe(false);
+
+    // wrapper_resumed should NOT be sent since the buffer was cleared on close
+    const resumedMsg = newWs.sent.find(
+      msg => JSON.parse(msg).streamEventType === 'wrapper_resumed'
+    );
+    expect(resumedMsg).toBeUndefined();
+  });
+
+  // -------------------------------------------------------------------------
+  // Test: event buffer survives same-run reconnect
+  // -------------------------------------------------------------------------
+
+  it('preserves event buffer across unexpected disconnect and reconnect within the same run', async () => {
+    const manager = createManager();
+    const ws = await openConnection(manager);
+
+    // Simulate unexpected close
+    ws.simulateClose(1006);
+
+    // Buffer events while disconnected
+    state.sendToIngest({
+      streamEventType: 'output',
+      timestamp: new Date().toISOString(),
+      data: { text: 'event during reconnect' },
+    });
+
+    // Reconnect (not close!) — events should still be flushed
+    await vi.advanceTimersByTimeAsync(1_000);
+    const newWs = MockWebSocket.latest!;
+    newWs.simulateOpen();
+    await vi.advanceTimersByTimeAsync(0);
+
+    // The buffered event should be sent through the reconnected WS
+    const bufferedEvent = newWs.sent.some(msg => {
+      const parsed = JSON.parse(msg);
+      return parsed.streamEventType === 'output' && parsed.data?.text === 'event during reconnect';
+    });
+    expect(bufferedEvent).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Subscribe handshake ordering — regression guard for the queue-while-busy
+// hang caused by open() returning before the SSE subscription was live.
+// See .plans/cloud-agent-queue-while-busy-findings.md.
+// ---------------------------------------------------------------------------
+
+type DeferredSubscribe = {
+  promise: Promise<{ stream?: AsyncIterable<unknown> }>;
+  resolve: (stream: AsyncIterable<unknown>) => void;
+  reject: (err: Error) => void;
+};
+
+function createDeferredSubscribe(): DeferredSubscribe {
+  let resolveFn!: (stream: AsyncIterable<unknown>) => void;
+  let rejectFn!: (err: Error) => void;
+  const promise = new Promise<{ stream?: AsyncIterable<unknown> }>((resolve, reject) => {
+    resolveFn = (stream: AsyncIterable<unknown>) => resolve({ stream });
+    rejectFn = reject;
+  });
+  return { promise, resolve: resolveFn, reject: rejectFn };
+}
+
+function neverYieldingStream(): AsyncIterable<unknown> {
+  return (async function* () {
+    await new Promise(() => {});
+  })();
+}
+
+describe('subscribe-handshake ordering', () => {
+  let state: WrapperState;
+  let callbacks: ReturnType<typeof createCallbacks>;
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    MockWebSocket.reset();
+    vi.stubGlobal('WebSocket', MockWebSocket);
+    stubFetch();
+
+    state = new WrapperState();
+    state.bindSession(createSessionContext());
+    callbacks = createCallbacks();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it('open() does not resolve until subscribeEvents has returned', async () => {
+    const deferred = createDeferredSubscribe();
+    const kiloClient: WrapperKiloClient = {
+      ...createMockKiloClient(),
+      subscribeEvents: vi.fn().mockReturnValue(deferred.promise),
+    };
+    const manager = createConnectionManager(state, { kiloClient }, callbacks);
+
+    const openPromise = manager.open();
+    // Let openIngestWs's WS creation happen and resolve onopen
+    MockWebSocket.latest!.simulateOpen();
+    // Flush microtasks so open() can reach the attachEventSubscription await
+    await vi.advanceTimersByTimeAsync(0);
+
+    // While subscribe is pending, open() must not be settled and the manager
+    // must not advertise as connected.
+    expect(manager.isConnected()).toBe(false);
+    let settled = false;
+    void openPromise.then(() => {
+      settled = true;
+    });
+    await vi.advanceTimersByTimeAsync(10);
+    expect(settled).toBe(false);
+
+    // Resolve the subscribe handshake → open() resolves and isConnected flips.
+    deferred.resolve(neverYieldingStream());
+    await openPromise;
+    expect(manager.isConnected()).toBe(true);
+  });
+
+  it('open() rejects when subscribeEvents rejects and leaves isConnected false', async () => {
+    const deferred = createDeferredSubscribe();
+    const kiloClient: WrapperKiloClient = {
+      ...createMockKiloClient(),
+      subscribeEvents: vi.fn().mockReturnValue(deferred.promise),
+    };
+    const manager = createConnectionManager(state, { kiloClient }, callbacks);
+
+    const openPromise = manager.open();
+    // Attach rejection handler synchronously so the rejection never becomes
+    // unhandled while timers advance.
+    const rejection = expect(openPromise).rejects.toThrow(/SSE handshake failed/);
+    MockWebSocket.latest!.simulateOpen();
+    await vi.advanceTimersByTimeAsync(0);
+
+    deferred.reject(new Error('SSE handshake failed'));
+    await rejection;
+
+    expect(manager.isConnected()).toBe(false);
+    expect(state.isConnected).toBe(false);
+    expect(state.sseAbortController).toBeNull();
+  });
+
+  it('does not arm the SSE watchdog before the stream is live', async () => {
+    const deferred = createDeferredSubscribe();
+    const kiloClient: WrapperKiloClient = {
+      ...createMockKiloClient(),
+      subscribeEvents: vi.fn().mockReturnValue(deferred.promise),
+    };
+    const manager = createConnectionManager(state, { kiloClient }, callbacks);
+
+    const openPromise = manager.open();
+    MockWebSocket.latest!.simulateOpen();
+    await vi.advanceTimersByTimeAsync(0);
+
+    // Before the subscribe handshake resolves, onSseEvent must NOT have been
+    // called — the watchdog should arm on the first real kilo event, not on
+    // "we are about to subscribe".
+    expect(callbacks.onSseEvent).not.toHaveBeenCalled();
+
+    deferred.resolve(neverYieldingStream());
+    await openPromise;
+
+    // Still no onSseEvent — the stream hasn't yielded anything yet.
+    expect(callbacks.onSseEvent).not.toHaveBeenCalled();
+  });
+
+  it('events emitted immediately after open() resolves reach the consumer', async () => {
+    let emit: ((event: { type: string; properties?: Record<string, unknown> }) => void) | null =
+      null;
+    const liveStream: AsyncIterable<unknown> = {
+      [Symbol.asyncIterator]() {
+        const queue: unknown[] = [];
+        const waiters: Array<(v: IteratorResult<unknown>) => void> = [];
+        emit = event => {
+          if (waiters.length > 0) {
+            waiters.shift()!({ value: event, done: false });
+          } else {
+            queue.push(event);
+          }
+        };
+        return {
+          next(): Promise<IteratorResult<unknown>> {
+            if (queue.length > 0) {
+              return Promise.resolve({ value: queue.shift(), done: false });
+            }
+            return new Promise(resolve => {
+              waiters.push(resolve);
+            });
+          },
+        };
+      },
+    };
+    const kiloClient: WrapperKiloClient = {
+      ...createMockKiloClient(),
+      subscribeEvents: vi.fn().mockResolvedValue({ stream: liveStream }),
+    };
+    const manager = createConnectionManager(state, { kiloClient }, callbacks);
+
+    const openPromise = manager.open();
+    MockWebSocket.latest!.simulateOpen();
+    await openPromise;
+
+    expect(emit).not.toBeNull();
+    // Simulate kilo emitting session.idle immediately after the handshake —
+    // the consumer should pick it up and fire onCompletionSignal.
+    emit!({
+      type: 'session.idle',
+      properties: { sessionID: state.currentSession!.kiloSessionId },
+    });
+    await vi.advanceTimersByTimeAsync(0);
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(callbacks.onCompletionSignal).toHaveBeenCalled();
+  });
+
+  it('open() rejects and cleans up if subscribeEvents returns no stream', async () => {
+    const kiloClient: WrapperKiloClient = {
+      ...createMockKiloClient(),
+      subscribeEvents: vi.fn().mockResolvedValue({ stream: undefined }),
+    };
+    const manager = createConnectionManager(state, { kiloClient }, callbacks);
+
+    const openPromise = manager.open();
+    // Attach rejection handler synchronously so the rejection never becomes
+    // unhandled, then drive the WS open and timers.
+    const rejection = expect(openPromise).rejects.toThrow(/No event stream from SDK/);
+    MockWebSocket.latest!.simulateOpen();
+    await vi.advanceTimersByTimeAsync(0);
+    await rejection;
+
+    expect(manager.isConnected()).toBe(false);
+    expect(state.isConnected).toBe(false);
+    expect(callbacks.onDisconnect).toHaveBeenCalledWith('No event stream from SDK');
+  });
+
+  it('open() rejects with a handshake timeout error if subscribeEvents hangs', async () => {
+    // subscribeEvents never resolves on its own — only the abort signal can
+    // end it, mirroring a kilo server that accepts the SSE connection but
+    // never writes a response.
+    const kiloClient: WrapperKiloClient = {
+      ...createMockKiloClient(),
+      subscribeEvents: vi.fn().mockImplementation(
+        ({ signal }: { signal?: AbortSignal }) =>
+          new Promise((_, reject) => {
+            signal?.addEventListener('abort', () => {
+              reject(signal.reason instanceof Error ? signal.reason : new Error('aborted'));
+            });
+          })
+      ),
+    };
+    const manager = createConnectionManager(state, { kiloClient }, callbacks);
+
+    const openPromise = manager.open();
+    const rejection = expect(openPromise).rejects.toThrow(/handshake timed out after 5000ms/);
+    MockWebSocket.latest!.simulateOpen();
+
+    // Advance just under the handshake timeout — open() is still pending.
+    await vi.advanceTimersByTimeAsync(4_999);
+    let settled = false;
+    void openPromise.catch(() => {
+      settled = true;
+    });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(settled).toBe(false);
+
+    // Cross the threshold — open() rejects with the handshake timeout error.
+    await vi.advanceTimersByTimeAsync(1);
+    await rejection;
+
+    expect(manager.isConnected()).toBe(false);
+    expect(state.isConnected).toBe(false);
+    expect(state.sseAbortController).toBeNull();
   });
 });

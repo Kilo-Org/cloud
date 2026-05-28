@@ -31,11 +31,11 @@ This gives us:
 
 State that lives outside the DO:
 
-| Location         | Role                              | Authority                                                       |
-| ---------------- | --------------------------------- | --------------------------------------------------------------- |
-| **Postgres**     | Registry + config backup          | Next.js is sole writer; worker reads only for restore           |
-| **Fly metadata** | Recovery index                    | Written at machine creation; queried only when DO state is lost |
-| **Fly itself**   | Actual compute + volume resources | Ground truth for machine/volume existence and state             |
+| Location | Role | Authority |
+|---|---|---|
+| **Postgres** | Registry + config backup | Next.js is sole writer; worker reads only for restore |
+| **Fly metadata** | Recovery index | Written at machine creation; queried only when DO state is lost |
+| **Fly itself** | Actual compute + volume resources | Ground truth for machine/volume existence and state |
 
 All three are fallback/recovery paths. The DO is the atom.
 

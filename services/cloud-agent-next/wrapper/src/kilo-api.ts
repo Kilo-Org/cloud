@@ -6,6 +6,9 @@
  * main.ts, which uses createKilo() from the root @kilocode/sdk). Methods only
  * available in the v2 API (permission reply, question reply/reject, commit
  * message) use a v2 client created internally from the same server URL.
+ *
+ * The raw SDK client is not exposed on the returned interface — all access
+ * goes through named methods.
  */
 
 import type { KiloClient as SDKClient } from '@kilocode/sdk';
@@ -80,6 +83,17 @@ export type WrapperPtySize = {
 };
 
 /**
+ * Shape of an event yielded by `subscribeEvents().stream`. Both the real SDK's
+ * `event.subscribe()` generator and the fake kilo's in-memory channel produce
+ * values that structurally match this — `connection.ts` only reads `type`
+ * and `properties`.
+ */
+export type KiloEvent = {
+  type?: string;
+  properties?: Record<string, unknown>;
+};
+
+/**
  * The wrapper's unified kilo client interface.
  * All wrapper modules depend on this type rather than the raw SDK client.
  */
@@ -88,7 +102,7 @@ export type WrapperKiloClient = {
   getSession: (sessionId: string) => Promise<{ id: string }>;
   sendPromptAsync: (opts: {
     sessionId: string;
-    messageId?: string;
+    messageId: string;
     parts?: Array<
       | { type: 'text'; text: string }
       | { type: 'file'; mime: string; url: string; filename?: string }
@@ -142,8 +156,13 @@ export type WrapperKiloClient = {
   resizePty: (ptyId: string, size: WrapperPtySize) => Promise<WrapperPty>;
   deletePty: (ptyId: string) => Promise<boolean>;
 
-  /** The underlying SDK client — used directly by connection.ts for event subscription */
-  readonly sdkClient: SDKClient;
+  /**
+   * Subscribe to kilo events. The stream yields typed events until the abort
+   * signal fires or the server closes the stream. Used by connection.ts.
+   */
+  subscribeEvents: (opts: { signal?: AbortSignal }) => Promise<{
+    stream?: AsyncIterable<KiloEvent>;
+  }>;
   /** The in-process server URL — for diagnostics */
   readonly serverUrl: string;
 };
@@ -167,8 +186,12 @@ export function createWrapperKiloClient(
   const v2Client = createV2Client({ baseUrl: serverUrl });
 
   return {
-    sdkClient,
     serverUrl,
+
+    subscribeEvents: async opts => {
+      const result = await sdkClient.event.subscribe({ signal: opts.signal });
+      return { stream: result.stream };
+    },
 
     createSession: async opts => {
       const result = await sdkClient.session.create({
@@ -204,7 +227,7 @@ export function createWrapperKiloClient(
           : { type: 'text' as const, text: p.text }
       );
       // Use v2 client — it supports `variant` (thinking effort); v1 SDK omits it.
-      await v2Client.session.promptAsync({
+      const result = await v2Client.session.promptAsync({
         sessionID: opts.sessionId,
         ...(opts.messageId !== undefined ? { messageID: opts.messageId } : {}),
         parts,
@@ -221,6 +244,11 @@ export function createWrapperKiloClient(
         ...(opts.tools ? { tools: opts.tools } : {}),
         ...(opts.agent ? { agent: opts.agent } : {}),
       });
+      if (result.error !== undefined) {
+        throw new Error(
+          `Async prompt for session ${opts.sessionId} failed: ${formatSdkError(result.error)}`
+        );
+      }
     },
 
     abortSession: async opts => {
@@ -237,6 +265,11 @@ export function createWrapperKiloClient(
           ...(opts.messageId !== undefined ? { messageID: opts.messageId } : {}),
         },
       });
+      if (result.error !== undefined) {
+        throw new Error(
+          `Command for session ${opts.sessionId} failed: ${formatSdkError(result.error)}`
+        );
+      }
       return result.data;
     },
 

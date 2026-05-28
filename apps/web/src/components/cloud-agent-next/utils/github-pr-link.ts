@@ -18,19 +18,36 @@ export type AssociatedPr = {
   reviewDecisionPending: boolean;
 };
 
-export type PrBadgeState = 'open' | 'closed' | 'merged';
+export type PrBadgeState = 'open' | 'closed' | 'merged' | 'draft';
 
 /**
- * Interpret the raw PR state string (as GitHub returns it + our "merged" flag
- * from the webhook) into one of three UI buckets.
+ * Interpret the raw PR state string (as GitHub returns it + our "merged" /
+ * "draft" flags from the backend) into one of four UI buckets.
  *
  * GitHub state is 'open' or 'closed'; closed-and-merged PRs are surfaced as
- * state 'merged' by the backend refresh endpoint.
+ * 'merged' and open-but-draft PRs as 'draft' by the backend refresh endpoint.
  */
 export function normalizePrBadgeState(state: string): PrBadgeState {
   if (state === 'merged') return 'merged';
+  if (state === 'draft') return 'draft';
   if (state === 'open') return 'open';
   return 'closed';
+}
+
+/**
+ * Returns the CSS accent color for a PR badge, matching the Agent Manager
+ * visual conventions in the kilocode repo.
+ *
+ * The returned string is a CSS `var(--color-*)` reference from the Tailwind 4
+ * palette, suitable for use with `color-mix()` inline styles.
+ */
+export function prAccentColor(state: PrBadgeState, reviewDecision: ReviewDecision | null): string {
+  if (state === 'merged') return 'var(--color-violet-400)';
+  if (state === 'closed') return 'var(--color-red-400)';
+  if (state === 'draft') return 'var(--color-zinc-400)';
+  // Agent Manager uses amber for requested changes and emerald for other open PRs.
+  if (reviewDecision === 'changes_requested') return 'var(--color-amber-400)';
+  return 'var(--color-emerald-400)';
 }
 
 /**

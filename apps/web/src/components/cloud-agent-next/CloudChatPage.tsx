@@ -39,19 +39,12 @@ import { isMessageStreaming } from './types';
 import { useOrganizationModels } from './hooks/useOrganizationModels';
 import { useSlashCommandSets } from '@/hooks/useSlashCommandSets';
 import { useCelebrationSound } from '@/hooks/useCelebrationSound';
-import {
-  CLOUD_AGENT_IMAGE_ALLOWED_TYPES,
-  CLOUD_AGENT_IMAGE_MAX_COUNT,
-  CLOUD_AGENT_IMAGE_MAX_DIMENSION_PX,
-  CLOUD_AGENT_IMAGE_MAX_ORIGINAL_SIZE_BYTES,
-  CLOUD_AGENT_IMAGE_MAX_SIZE_BYTES,
-} from '@/lib/cloud-agent/constants';
+import type { CloudAgentAttachments } from '@/lib/cloud-agent/constants';
 
 import { SetPageTitle } from '@/components/SetPageTitle';
 import { formatShortModelDisplayName } from '@/lib/format-model-name';
 import type { AgentMode } from './types';
-import type { StoredMessage } from '@/lib/cloud-agent-sdk';
-import type { Images } from '@/lib/images-schema';
+import type { MessageDeliveryState, StoredMessage } from '@/lib/cloud-agent-sdk';
 import type { WorkspaceTabId } from './terminal-tabs';
 import type { TerminalStatus } from './useCloudAgentTerminal';
 
@@ -61,10 +54,12 @@ import type { TerminalStatus } from './useCloudAgentTerminal';
 const StaticMessages = memo(
   ({
     messages,
+    pendingMessages,
     getChildMessages,
     onOpenChildSession,
   }: {
     messages: StoredMessage[];
+    pendingMessages: ReadonlyMap<string, MessageDeliveryState>;
     getChildMessages?: (sessionId: string) => StoredMessage[];
     onOpenChildSession?: OpenChildSession;
   }) => (
@@ -73,6 +68,7 @@ const StaticMessages = memo(
         <MessageErrorBoundary key={msg.info.id}>
           <MessageBubble
             message={msg}
+            deliveryState={pendingMessages.get(msg.info.id)}
             getChildMessages={getChildMessages}
             onOpenChildSession={onOpenChildSession}
           />
@@ -88,10 +84,12 @@ StaticMessages.displayName = 'StaticMessages';
 // ---------------------------------------------------------------------------
 function DynamicMessages({
   messages,
+  pendingMessages,
   getChildMessages,
   onOpenChildSession,
 }: {
   messages: StoredMessage[];
+  pendingMessages: ReadonlyMap<string, MessageDeliveryState>;
   getChildMessages?: (sessionId: string) => StoredMessage[];
   onOpenChildSession?: OpenChildSession;
 }) {
@@ -104,6 +102,7 @@ function DynamicMessages({
             <MessageBubble
               message={msg}
               isStreaming={streaming}
+              deliveryState={pendingMessages.get(msg.info.id)}
               getChildMessages={getChildMessages}
               onOpenChildSession={onOpenChildSession}
             />
@@ -161,10 +160,10 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
   const queryClient = useQueryClient();
   const trpc = useTRPC();
   const { mutateAsync: personalUploadUrl } = useMutation(
-    trpc.cloudAgentNext.getImageUploadUrl.mutationOptions()
+    trpc.cloudAgentNext.getAttachmentUploadUrl.mutationOptions()
   );
   const { mutateAsync: orgUploadUrl } = useMutation(
-    trpc.organizations.cloudAgentNext.getImageUploadUrl.mutationOptions()
+    trpc.organizations.cloudAgentNext.getAttachmentUploadUrl.mutationOptions()
   );
   const [childSessionStack, setChildSessionStack] = useState<ChildSessionDrawerEntry[]>([]);
   const [childSessionDrawerContainer, setChildSessionDrawerContainer] =
@@ -185,6 +184,7 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
   const isStreaming = useAtomValue(manager.atoms.isStreaming);
   const isLoading = useAtomValue(manager.atoms.isLoading);
   const isReadOnly = useAtomValue(manager.atoms.isReadOnly);
+  const supportsAttachments = useAtomValue(manager.atoms.supportsAttachments);
   const canSend = useAtomValue(manager.atoms.canSend);
   const statusIndicator = useAtomValue(manager.atoms.statusIndicator);
   const sessionConfig = useAtomValue(manager.atoms.sessionConfig);
@@ -197,13 +197,14 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
   const failedPrompt = useAtomValue(manager.atoms.failedPrompt);
   const staticMessages = useAtomValue(manager.atoms.staticMessages);
   const dynamicMessages = useAtomValue(manager.atoms.dynamicMessages);
+  const pendingMessages = useAtomValue(manager.atoms.pendingMessages);
   const totalCost = useAtomValue(manager.atoms.totalCost);
   const getChildMessages = useAtomValue(manager.atoms.childMessages);
   const fetchedSessionData = useAtomValue(manager.atoms.fetchedSessionData);
 
   const setSessionConfig = useSetAtom(manager.atoms.sessionConfig);
 
-  const [imageMessageUuid, setImageMessageUuid] = useState(() => crypto.randomUUID());
+  const [attachmentMessageUuid] = useState(() => crypto.randomUUID());
   const [workspaceTabs, setWorkspaceTabs] = useState(createWorkspaceTabsState);
   const [terminalStatuses, setTerminalStatuses] = useState<
     Record<string, TerminalStatusSummary | undefined>
@@ -348,7 +349,7 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
 
   // -- Handlers -------------------------------------------------------------
   const handleSendMessage = useCallback(
-    async (prompt: string, images?: Images) => {
+    async (prompt: string, attachments?: CloudAgentAttachments) => {
       setChatUI({ shouldAutoScroll: true });
       const selectedRuntimeAgentForSend = sessionConfig?.runtimeAgents?.find(
         a => a.slug === sessionConfig?.mode
@@ -371,36 +372,34 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
             ? agentVariantOverrideForSend
             : (sessionConfig?.variant ?? undefined),
         },
-        images,
+        attachments: supportsAttachments ? attachments : undefined,
       });
       scheduleScrollToBottom();
 
       const accepted = await acceptedPromise;
       if (accepted) {
-        setImageMessageUuid(crypto.randomUUID());
         scheduleScrollToBottom();
       }
       return accepted;
     },
-    [manager, scheduleScrollToBottom, sessionConfig, setChatUI]
+    [manager, scheduleScrollToBottom, sessionConfig, setChatUI, supportsAttachments]
   );
 
   const handleSendSlashCommand = useCallback(
-    async (command: string, args: string, images?: Images) => {
+    async (command: string, args: string, attachments?: CloudAgentAttachments) => {
       setChatUI({ shouldAutoScroll: true });
       const acceptedPromise = manager.send({
         payload: { type: 'command', command, arguments: args },
-        images,
+        attachments: supportsAttachments ? attachments : undefined,
       });
       scheduleScrollToBottom();
       const accepted = await acceptedPromise;
       if (accepted) {
-        setImageMessageUuid(crypto.randomUUID());
         scheduleScrollToBottom();
       }
       return accepted;
     },
-    [manager, scheduleScrollToBottom, setChatUI]
+    [manager, scheduleScrollToBottom, setChatUI, supportsAttachments]
   );
 
   const handleStopExecution = useCallback(() => {
@@ -435,8 +434,6 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
     },
     []
   );
-
-  const chatNeedsAttention = Boolean(activeQuestion || activePermission || statusIndicator);
 
   const terminalPaneMap = workspaceTabs.terminals.map(tab => {
     const active = terminalTabId(tab.id) === workspaceTabs.activeTabId;
@@ -654,9 +651,6 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
                         activeTabId={workspaceTabs.activeTabId}
                         terminals={workspaceTabs.terminals}
                         terminalStatuses={terminalStatuses}
-                        chatNeedsAttention={
-                          chatNeedsAttention && workspaceTabs.activeTabId !== CHAT_TAB_ID
-                        }
                         canCreateTerminal={canOpenTerminal}
                         onSelectTab={handleSelectWorkspaceTab}
                         onCreateTerminal={handleCreateTerminalTab}
@@ -686,11 +680,13 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
                             <div ref={messagesContentRef}>
                               <StaticMessages
                                 messages={staticMessages}
+                                pendingMessages={pendingMessages}
                                 getChildMessages={getChildMessages}
                                 onOpenChildSession={handleOpenTopLevelChildSession}
                               />
                               <DynamicMessages
                                 messages={dynamicMessages}
+                                pendingMessages={pendingMessages}
                                 getChildMessages={getChildMessages}
                                 onOpenChildSession={handleOpenTopLevelChildSession}
                               />
@@ -765,7 +761,7 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
                                 onSend={handleSendMessage}
                                 onSendCommand={handleSendSlashCommand}
                                 onStop={handleStopExecution}
-                                disabled={(isStreaming && !activeSuggestion) || !canSend}
+                                disabled={!canSend}
                                 isStreaming={isStreaming && !activeSuggestion}
                                 placeholder={placeholder}
                                 slashCommands={availableCommands}
@@ -785,17 +781,10 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
                                 modelPickerTooltip={lockTooltip}
                                 variantPickerDisabled={modelPickerLocked}
                                 variantPickerTooltip={lockTooltip}
-                                imageUploadOptions={{
-                                  messageUuid: imageMessageUuid,
+                                attachmentsEnabled={supportsAttachments}
+                                attachmentUploadOptions={{
+                                  messageUuid: attachmentMessageUuid,
                                   organizationId,
-                                  maxImages: CLOUD_AGENT_IMAGE_MAX_COUNT,
-                                  maxOriginalFileSizeBytes:
-                                    CLOUD_AGENT_IMAGE_MAX_ORIGINAL_SIZE_BYTES,
-                                  maxFileSizeBytes: CLOUD_AGENT_IMAGE_MAX_SIZE_BYTES,
-                                  allowedTypes: CLOUD_AGENT_IMAGE_ALLOWED_TYPES,
-                                  resizeImages: {
-                                    maxDimensionPx: CLOUD_AGENT_IMAGE_MAX_DIMENSION_PX,
-                                  },
                                   getUploadUrl: {
                                     personal: personalUploadUrl,
                                     organization: orgUploadUrl,

@@ -87,6 +87,8 @@ describe('adminCodeReviewsRouter', () => {
     updatedAt = createdAt,
     startedAt = null,
     completedAt = null,
+    errorMessage = null,
+    terminalReason = null,
   }: {
     owner: ReviewOwner;
     status: string;
@@ -94,6 +96,8 @@ describe('adminCodeReviewsRouter', () => {
     updatedAt?: string;
     startedAt?: string | null;
     completedAt?: string | null;
+    errorMessage?: string | null;
+    terminalReason?: string | null;
   }): CodeReviewInsert {
     const sequence = reviewSequence++;
 
@@ -112,6 +116,8 @@ describe('adminCodeReviewsRouter', () => {
       agent_version: 'v2',
       started_at: startedAt,
       completed_at: completedAt,
+      error_message: errorMessage,
+      terminal_reason: terminalReason,
       created_at: createdAt,
       updated_at: updatedAt,
     };
@@ -333,6 +339,148 @@ describe('adminCodeReviewsRouter', () => {
     });
     expect(exportRows[0]).toHaveProperty('attempt_id');
     expect(exportRows[0]).toHaveProperty('attempt_status');
+  });
+
+  it('classifies final model-not-found outcomes as cancellations instead of failures', async () => {
+    const owner = { type: 'user', id: adminUser.id } satisfies ReviewOwner;
+
+    await db.insert(cloud_agent_code_reviews).values([
+      reviewValues({
+        owner,
+        status: 'failed',
+        createdAt: timestamp(700),
+        errorMessage: 'Model not found: kilo/retired-model',
+      }),
+      reviewValues({
+        owner,
+        status: 'cancelled',
+        createdAt: timestamp(710),
+        terminalReason: 'model_not_found',
+        errorMessage: 'Model not found: kilo/retired-model',
+      }),
+      reviewValues({
+        owner,
+        status: 'failed',
+        createdAt: timestamp(720),
+        terminalReason: 'timeout',
+        errorMessage: 'Execution timed out',
+      }),
+      reviewValues({ owner, status: 'completed', createdAt: timestamp(730) }),
+    ]);
+
+    const caller = await createCallerForUser(adminUser.id);
+    const overview = await caller.admin.codeReviews.getOverviewStats(filterInput());
+    const daily = await caller.admin.codeReviews.getDailyStats(filterInput());
+    const cancellations = await caller.admin.codeReviews.getCancellationAnalysis(filterInput());
+    const errors = await caller.admin.codeReviews.getErrorAnalysis(filterInput());
+    const modelSessions = await caller.admin.codeReviews.getErrorSessions({
+      ...filterInput(),
+      errorMessage: 'Model not found: kilo/retired-model',
+    });
+    const segmentation = await caller.admin.codeReviews.getUserSegmentation(filterInput());
+
+    expect(overview).toMatchObject({
+      totalReviews: 4,
+      completedCount: 1,
+      failedCount: 1,
+      cancelledCount: 2,
+    });
+    expect(daily[0]).toMatchObject({ completed: 1, failed: 1, cancelled: 2 });
+    expect(cancellations).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ reason: 'Model no longer available', count: 2 }),
+      ])
+    );
+    expect(errors.details).toEqual([
+      expect.objectContaining({ errorType: 'Execution timed out', count: 1 }),
+    ]);
+    expect(modelSessions).toEqual([]);
+    expect(segmentation.ownershipBreakdown[0]).toMatchObject({ failed: 1 });
+  });
+
+  it('classifies all-attempt model-not-found outcomes as cancellations instead of failures', async () => {
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        reviewValues({
+          owner: { type: 'user', id: adminUser.id },
+          status: 'completed',
+          createdAt: timestamp(700),
+          startedAt: timestamp(701),
+          completedAt: timestamp(740),
+        })
+      )
+      .returning({ id: cloud_agent_code_reviews.id });
+
+    await db.insert(cloud_agent_code_review_attempts).values([
+      {
+        code_review_id: review.id,
+        attempt_number: 1,
+        status: 'failed',
+        error_message: 'Model not found: kilo/retired-model',
+        created_at: timestamp(701),
+        started_at: timestamp(702),
+        completed_at: timestamp(703),
+      },
+      {
+        code_review_id: review.id,
+        attempt_number: 2,
+        status: 'cancelled',
+        terminal_reason: 'model_not_found',
+        error_message: 'Model not found: kilo/retired-model',
+        created_at: timestamp(704),
+        started_at: timestamp(705),
+        completed_at: timestamp(706),
+      },
+      {
+        code_review_id: review.id,
+        attempt_number: 3,
+        status: 'failed',
+        terminal_reason: 'timeout',
+        error_message: 'Execution timed out',
+        created_at: timestamp(707),
+        started_at: timestamp(708),
+        completed_at: timestamp(709),
+      },
+      {
+        code_review_id: review.id,
+        attempt_number: 4,
+        status: 'completed',
+        created_at: timestamp(710),
+        started_at: timestamp(711),
+        completed_at: timestamp(740),
+      },
+    ]);
+
+    const input = filterInput({ retryAccountingMode: 'all_attempts' });
+    const caller = await createCallerForUser(adminUser.id);
+    const overview = await caller.admin.codeReviews.getOverviewStats(input);
+    const daily = await caller.admin.codeReviews.getDailyStats(input);
+    const cancellations = await caller.admin.codeReviews.getCancellationAnalysis(input);
+    const errors = await caller.admin.codeReviews.getErrorAnalysis(input);
+    const modelSessions = await caller.admin.codeReviews.getErrorSessions({
+      ...input,
+      errorMessage: 'Model not found: kilo/retired-model',
+    });
+    const segmentation = await caller.admin.codeReviews.getUserSegmentation(input);
+
+    expect(overview).toMatchObject({
+      totalReviews: 4,
+      completedCount: 1,
+      failedCount: 1,
+      cancelledCount: 2,
+    });
+    expect(daily[0]).toMatchObject({ completed: 1, failed: 1, cancelled: 2 });
+    expect(cancellations).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ reason: 'Model no longer available', count: 2 }),
+      ])
+    );
+    expect(errors.details).toEqual([
+      expect.objectContaining({ errorType: 'Execution timed out', count: 1 }),
+    ]);
+    expect(modelSessions).toEqual([]);
+    expect(segmentation.ownershipBreakdown[0]).toMatchObject({ failed: 1 });
   });
 
   it('returns ownership wait breakdown and daily trend series', async () => {

@@ -6,6 +6,7 @@ import {
   collapseOrphanPersonalSubscriptionsOnDestroy,
   FundedRowDemotionRefusedError,
   markInstanceDestroyedWithPersonalSubscriptionCollapse,
+  PersonalSubscriptionCollapseUQConflictError,
   PersonalSubscriptionDestroyConflictError,
 } from '@kilocode/db';
 import {
@@ -66,7 +67,7 @@ async function insertPersonalInstance(params: {
 async function insertPersonalSubscription(params: {
   createdAt: string;
   id: string;
-  instanceId: string;
+  instanceId: string | null;
   plan: PersonalPlan;
   paymentSource?: 'credits' | 'stripe' | null;
   status: PersonalStatus;
@@ -1512,6 +1513,437 @@ describe('personal subscription destroy collapse', () => {
       headPlan: 'trial',
       headStatus: 'canceled',
       headStripeSubscriptionId: null,
+      updateCount: 3,
+    });
+  });
+
+  it('includes detached personal predecessors in collapse planning', async () => {
+    const user = await insertTestUser({
+      google_user_email: 'destroy-collapse-detached-predecessor@example.com',
+    });
+
+    const instanceB = crypto.randomUUID();
+    const instanceC = crypto.randomUUID();
+    const subscriptionA = crypto.randomUUID();
+    const subscriptionB = crypto.randomUUID();
+    const subscriptionC = crypto.randomUUID();
+
+    await insertPersonalInstance({
+      id: instanceB,
+      userId: user.id,
+      createdAt: '2026-04-02T00:00:00.000Z',
+      destroyedAt: '2026-04-03T00:00:00.000Z',
+    });
+    await insertPersonalInstance({
+      id: instanceC,
+      userId: user.id,
+      createdAt: '2026-04-04T00:00:00.000Z',
+    });
+
+    await insertPersonalSubscription({
+      id: subscriptionB,
+      userId: user.id,
+      instanceId: instanceB,
+      createdAt: '2026-04-02T00:00:00.000Z',
+      plan: 'trial',
+      status: 'canceled',
+    });
+    await insertPersonalSubscription({
+      id: subscriptionA,
+      userId: user.id,
+      instanceId: null,
+      createdAt: '2026-04-01T00:00:00.000Z',
+      plan: 'trial',
+      status: 'canceled',
+      transferredToSubscriptionId: subscriptionB,
+    });
+    await insertPersonalSubscription({
+      id: subscriptionC,
+      userId: user.id,
+      instanceId: instanceC,
+      createdAt: '2026-04-04T00:00:00.000Z',
+      plan: 'trial',
+      status: 'canceled',
+    });
+
+    await db.transaction(async tx => {
+      await markInstanceDestroyedWithPersonalSubscriptionCollapse({
+        actor: TEST_ACTOR,
+        executor: tx,
+        instanceId: instanceC,
+        reason: DESTROY_REASON,
+        userId: user.id,
+      });
+    });
+
+    await expectCurrentHead({ subscriptionId: subscriptionC, userId: user.id });
+
+    const subscriptions = await listUserSubscriptions(user.id);
+    expectTransferredToTargets(subscriptions, {
+      [subscriptionA]: subscriptionB,
+      [subscriptionB]: subscriptionC,
+      [subscriptionC]: null,
+    });
+
+    await expectChangeLogsForSubscriptions([
+      {
+        subscriptionId: subscriptionB,
+        action: 'reassigned',
+        reason: DESTROY_REASON,
+        beforeTransferredTo: null,
+        afterTransferredTo: subscriptionC,
+        beforePlan: 'trial',
+        beforeStatus: 'canceled',
+      },
+    ]);
+
+    expectCollapseStructuredLog({
+      userId: user.id,
+      destroyedInstanceId: instanceC,
+      rowCountTotal: 3,
+      rowCountAlive: 0,
+      headSubscriptionId: subscriptionC,
+      headPlan: 'trial',
+      headStatus: 'canceled',
+      headStripeSubscriptionId: null,
+      updateCount: 1,
+    });
+  });
+
+  it('does not select detached access-granting rows as the collapse head', async () => {
+    const user = await insertTestUser({
+      google_user_email: 'destroy-collapse-detached-not-head@example.com',
+    });
+
+    const instanceB = crypto.randomUUID();
+    const instanceC = crypto.randomUUID();
+    const subscriptionA = crypto.randomUUID();
+    const subscriptionB = crypto.randomUUID();
+    const subscriptionC = crypto.randomUUID();
+
+    await insertPersonalInstance({
+      id: instanceB,
+      userId: user.id,
+      createdAt: '2026-04-01T00:00:00.000Z',
+      destroyedAt: '2026-04-02T00:00:00.000Z',
+    });
+    await insertPersonalInstance({
+      id: instanceC,
+      userId: user.id,
+      createdAt: '2026-04-02T00:00:00.000Z',
+    });
+
+    await insertPersonalSubscription({
+      id: subscriptionB,
+      userId: user.id,
+      instanceId: instanceB,
+      createdAt: '2026-04-01T00:00:00.000Z',
+      plan: 'trial',
+      status: 'canceled',
+    });
+    await insertPersonalSubscription({
+      id: subscriptionC,
+      userId: user.id,
+      instanceId: instanceC,
+      createdAt: '2026-04-02T00:00:00.000Z',
+      plan: 'trial',
+      status: 'canceled',
+    });
+    await insertPersonalSubscription({
+      id: subscriptionA,
+      userId: user.id,
+      instanceId: null,
+      createdAt: '2026-04-03T00:00:00.000Z',
+      plan: 'standard',
+      status: 'active',
+    });
+
+    await db.transaction(async tx => {
+      await markInstanceDestroyedWithPersonalSubscriptionCollapse({
+        actor: TEST_ACTOR,
+        executor: tx,
+        instanceId: instanceC,
+        reason: DESTROY_REASON,
+        userId: user.id,
+      });
+    });
+
+    await expectCurrentHead({ subscriptionId: subscriptionC, userId: user.id });
+
+    const subscriptions = await listUserSubscriptions(user.id);
+    expectTransferredToTargets(subscriptions, {
+      [subscriptionB]: subscriptionA,
+      [subscriptionC]: null,
+      [subscriptionA]: subscriptionC,
+    });
+
+    await expectChangeLogsForSubscriptions([
+      {
+        subscriptionId: subscriptionB,
+        action: 'reassigned',
+        reason: DESTROY_REASON,
+        beforeTransferredTo: null,
+        afterTransferredTo: subscriptionA,
+        beforePlan: 'trial',
+        beforeStatus: 'canceled',
+      },
+      {
+        subscriptionId: subscriptionA,
+        action: 'reassigned',
+        reason: DESTROY_REASON,
+        beforeTransferredTo: null,
+        afterTransferredTo: subscriptionC,
+        beforePlan: 'standard',
+        beforeStatus: 'active',
+      },
+    ]);
+
+    expectCollapseStructuredLog({
+      userId: user.id,
+      destroyedInstanceId: instanceC,
+      rowCountTotal: 3,
+      rowCountAlive: 0,
+      headSubscriptionId: subscriptionC,
+      headPlan: 'trial',
+      headStatus: 'canceled',
+      headStripeSubscriptionId: null,
+      updateCount: 2,
+    });
+  });
+
+  it('throws a typed UQ conflict for invisible target occupants outside the personal planner', async () => {
+    const user = await insertTestUser({
+      google_user_email: 'destroy-collapse-uq-conflict@example.com',
+    });
+    const otherUser = await insertTestUser({
+      google_user_email: 'destroy-collapse-uq-conflict-other@example.com',
+    });
+
+    const instanceA = crypto.randomUUID();
+    const instanceB = crypto.randomUUID();
+    const otherUserInstance = crypto.randomUUID();
+    const subscriptionA = crypto.randomUUID();
+    const subscriptionB = crypto.randomUUID();
+    const conflictingSubscription = crypto.randomUUID();
+
+    await insertPersonalInstance({
+      id: instanceA,
+      userId: user.id,
+      createdAt: '2026-04-01T00:00:00.000Z',
+      destroyedAt: '2026-04-02T00:00:00.000Z',
+    });
+    await insertPersonalInstance({
+      id: instanceB,
+      userId: user.id,
+      createdAt: '2026-04-03T00:00:00.000Z',
+    });
+    await insertPersonalInstance({
+      id: otherUserInstance,
+      userId: otherUser.id,
+      createdAt: '2026-04-04T00:00:00.000Z',
+    });
+
+    await insertPersonalSubscription({
+      id: subscriptionA,
+      userId: user.id,
+      instanceId: instanceA,
+      createdAt: '2026-04-01T00:00:00.000Z',
+      plan: 'trial',
+      status: 'canceled',
+    });
+    await insertPersonalSubscription({
+      id: subscriptionB,
+      userId: user.id,
+      instanceId: instanceB,
+      createdAt: '2026-04-03T00:00:00.000Z',
+      plan: 'trial',
+      status: 'canceled',
+    });
+    await insertPersonalSubscription({
+      id: conflictingSubscription,
+      userId: user.id,
+      instanceId: otherUserInstance,
+      createdAt: '2026-04-04T00:00:00.000Z',
+      plan: 'trial',
+      status: 'canceled',
+      transferredToSubscriptionId: subscriptionB,
+    });
+
+    const destroyPromise = db.transaction(async tx => {
+      await markInstanceDestroyedWithPersonalSubscriptionCollapse({
+        actor: TEST_ACTOR,
+        executor: tx,
+        instanceId: instanceB,
+        reason: DESTROY_REASON,
+        userId: user.id,
+      });
+    });
+
+    await expect(destroyPromise).rejects.toBeInstanceOf(
+      PersonalSubscriptionCollapseUQConflictError
+    );
+    await expect(destroyPromise).rejects.toMatchObject({
+      userId: user.id,
+      selfSubscriptionId: subscriptionA,
+      targetSubscriptionId: subscriptionB,
+      conflictingOccupantId: conflictingSubscription,
+    });
+
+    const [destroyedInstance] = await db
+      .select()
+      .from(kiloclaw_instances)
+      .where(eq(kiloclaw_instances.id, instanceB));
+    expect(destroyedInstance?.destroyed_at).toBeNull();
+
+    const subscriptions = await listUserSubscriptions(user.id);
+    expectTransferredToTargets(subscriptions, {
+      [subscriptionA]: null,
+      [subscriptionB]: null,
+      [conflictingSubscription]: subscriptionB,
+    });
+
+    await expectNoChangeLogsForSubscriptions([
+      subscriptionA,
+      subscriptionB,
+      conflictingSubscription,
+    ]);
+    expect(console.log).not.toHaveBeenCalled();
+  });
+
+  it('clears a detached occupant before chaining to the paid head', async () => {
+    const user = await insertTestUser({
+      google_user_email: 'destroy-collapse-detached-reporter-shape@example.com',
+    });
+
+    const trialInstance1 = crypto.randomUUID();
+    const paidInstance = crypto.randomUUID();
+    const trialInstance2 = crypto.randomUUID();
+    const trialSubscription1 = crypto.randomUUID();
+    const detachedSubscription = crypto.randomUUID();
+    const paidSubscription = crypto.randomUUID();
+    const trialSubscription2 = crypto.randomUUID();
+
+    await insertPersonalInstance({
+      id: trialInstance1,
+      userId: user.id,
+      createdAt: '2026-04-01T00:00:00.000Z',
+      destroyedAt: '2026-04-02T00:00:00.000Z',
+    });
+    await insertPersonalInstance({
+      id: paidInstance,
+      userId: user.id,
+      createdAt: '2026-04-03T00:00:00.000Z',
+      destroyedAt: '2026-04-04T00:00:00.000Z',
+    });
+    await insertPersonalInstance({
+      id: trialInstance2,
+      userId: user.id,
+      createdAt: '2026-04-05T00:00:00.000Z',
+    });
+
+    await insertPersonalSubscription({
+      id: trialSubscription1,
+      userId: user.id,
+      instanceId: trialInstance1,
+      createdAt: '2026-04-01T00:00:00.000Z',
+      plan: 'trial',
+      status: 'canceled',
+    });
+    await insertPersonalSubscription({
+      id: paidSubscription,
+      userId: user.id,
+      instanceId: paidInstance,
+      createdAt: '2026-04-03T00:00:00.000Z',
+      plan: 'standard',
+      status: 'active',
+      stripeSubscriptionId: 'sub_destroy_collapse_reporter_shape',
+    });
+    await insertPersonalSubscription({
+      id: detachedSubscription,
+      userId: user.id,
+      instanceId: null,
+      createdAt: '2026-04-02T00:00:00.000Z',
+      plan: 'trial',
+      status: 'canceled',
+      transferredToSubscriptionId: paidSubscription,
+    });
+    await insertPersonalSubscription({
+      id: trialSubscription2,
+      userId: user.id,
+      instanceId: trialInstance2,
+      createdAt: '2026-04-05T00:00:00.000Z',
+      plan: 'trial',
+      status: 'canceled',
+    });
+
+    await db.transaction(async tx => {
+      await markInstanceDestroyedWithPersonalSubscriptionCollapse({
+        actor: TEST_ACTOR,
+        executor: tx,
+        instanceId: trialInstance2,
+        reason: DESTROY_REASON,
+        userId: user.id,
+      });
+    });
+
+    await expectCurrentHead({ subscriptionId: paidSubscription, userId: user.id });
+
+    const subscriptions = await listUserSubscriptions(user.id);
+    expectTransferredToTargets(subscriptions, {
+      [trialSubscription1]: detachedSubscription,
+      [detachedSubscription]: trialSubscription2,
+      [paidSubscription]: null,
+      [trialSubscription2]: paidSubscription,
+    });
+
+    const paidRow = subscriptions.find(subscription => subscription.id === paidSubscription);
+    expect(paidRow).toEqual(
+      expect.objectContaining({
+        plan: 'standard',
+        status: 'active',
+        transferred_to_subscription_id: null,
+      })
+    );
+
+    await expectChangeLogsForSubscriptions([
+      {
+        subscriptionId: trialSubscription1,
+        action: 'reassigned',
+        reason: DESTROY_REASON,
+        beforeTransferredTo: null,
+        afterTransferredTo: detachedSubscription,
+        beforePlan: 'trial',
+        beforeStatus: 'canceled',
+      },
+      {
+        subscriptionId: detachedSubscription,
+        action: 'reassigned',
+        reason: DESTROY_REASON,
+        beforeTransferredTo: paidSubscription,
+        afterTransferredTo: trialSubscription2,
+        beforePlan: 'trial',
+        beforeStatus: 'canceled',
+      },
+      {
+        subscriptionId: trialSubscription2,
+        action: 'reassigned',
+        reason: DESTROY_REASON,
+        beforeTransferredTo: null,
+        afterTransferredTo: paidSubscription,
+        beforePlan: 'trial',
+        beforeStatus: 'canceled',
+      },
+    ]);
+
+    expectCollapseStructuredLog({
+      userId: user.id,
+      destroyedInstanceId: trialInstance2,
+      rowCountTotal: 4,
+      rowCountAlive: 0,
+      headSubscriptionId: paidSubscription,
+      headPlan: 'standard',
+      headStatus: 'active',
+      headStripeSubscriptionId: 'sub_destroy_collapse_reporter_shape',
       updateCount: 3,
     });
   });

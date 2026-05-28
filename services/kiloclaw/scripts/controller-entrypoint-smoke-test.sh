@@ -9,6 +9,9 @@ IMAGE="${IMAGE:-kiloclaw:controller}"
 TOKEN="${TOKEN:-smoke-token}"
 PORT="${PORT:-18790}"
 KILOCODE_API_KEY="${KILOCODE_API_KEY:-smoke-kilocode-key}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+source "$SCRIPT_DIR/controller-smoke-helpers.sh"
 
 if ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
   echo "Image '$IMAGE' is not available locally."
@@ -115,6 +118,58 @@ CODE=$(curl -s -o /dev/null -w "%{http_code}" \
   -H "Authorization: Bearer $TOKEN" \
   "http://127.0.0.1:${PORT}/_kilo/gateway/status")
 check "gateway status (bearer auth) -> 200" "200" "$CODE"
+
+echo
+echo "--- agent config CRUD endpoints ---"
+
+TRASH_BIN=$(docker exec "$CID" sh -c 'command -v trash 2>/dev/null || true')
+check "trash command omitted from packaged image" "" "$TRASH_BIN"
+
+CREATE_RESP=$(curl -sS -X POST \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"crud-smoke","workspace":"/root/.openclaw/workspace-crud-smoke"}' \
+  "http://127.0.0.1:${PORT}/_kilo/config/agents")
+CREATE_ID=$(echo "$CREATE_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin).get('agent',{}).get('id',''))" 2>/dev/null || echo "")
+check "create configured agent" "crud-smoke" "$CREATE_ID"
+
+CONFIG_VALIDATE_RESP=$(docker exec "$CID" openclaw config validate --json 2>/dev/null || true)
+CONFIG_VALID=$(echo "$CONFIG_VALIDATE_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin).get('valid', False))" 2>/dev/null || echo "")
+check "created agent leaves OpenClaw config valid" "True" "$CONFIG_VALID"
+
+LIST_RESP=$(curl -sS \
+  -H "Authorization: Bearer $TOKEN" \
+  "http://127.0.0.1:${PORT}/_kilo/config/agents")
+LIST_HAS_AGENT=$(echo "$LIST_RESP" | python3 -c "import sys,json; print(any(a.get('id') == 'crud-smoke' and a.get('configured') for a in json.load(sys.stdin).get('agents', [])))" 2>/dev/null || echo "")
+check "list includes created agent" "True" "$LIST_HAS_AGENT"
+
+PATCH_RESP=$(curl -sS -X PATCH \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"set":{"model":{"primary":"kilocode/kilo-auto/balanced"}}}' \
+  "http://127.0.0.1:${PORT}/_kilo/config/agents/crud-smoke")
+PATCH_MODEL=$(echo "$PATCH_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin).get('agent',{}).get('model',{}).get('primary',''))" 2>/dev/null || echo "")
+check "patch updates created agent model" "kilocode/kilo-auto/balanced" "$PATCH_MODEL"
+
+DELETE_RESP=$(curl -sS -X DELETE \
+  -H "Authorization: Bearer $TOKEN" \
+  "http://127.0.0.1:${PORT}/_kilo/config/agents/crud-smoke")
+DELETE_DISPOSITION=$(echo "$DELETE_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin).get('filesystemDisposition',''))" 2>/dev/null || echo "")
+check "delete reports unverified filesystem disposition" "unverified" "$DELETE_DISPOSITION"
+
+LIST_AFTER_DELETE=$(curl -sS \
+  -H "Authorization: Bearer $TOKEN" \
+  "http://127.0.0.1:${PORT}/_kilo/config/agents")
+LIST_STILL_HAS_AGENT=$(echo "$LIST_AFTER_DELETE" | python3 -c "import sys,json; print(any(a.get('id') == 'crud-smoke' and a.get('configured') for a in json.load(sys.stdin).get('agents', [])))" 2>/dev/null || echo "")
+check "deleted agent is no longer configured" "False" "$LIST_STILL_HAS_AGENT"
+
+if [ -d "$ROOTDIR/.openclaw/workspace-crud-smoke" ]; then
+  check "packaged no-trash baseline retains deleted workspace" "1" "1"
+else
+  check "packaged no-trash baseline retains deleted workspace" "1" "0"
+fi
+
+assert_kilo_chat_smoke "$CID" "$PORT" "$TOKEN"
 
 echo
 echo "--- proxy token ---"

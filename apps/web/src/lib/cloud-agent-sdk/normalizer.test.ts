@@ -41,6 +41,25 @@ describe('normalize', () => {
       } as unknown as CloudAgentEvent;
       expect(normalize(invalid)).toBeNull();
     });
+
+    it('normalizes events without executionId', () => {
+      const { executionId, ...rawWithoutExecId } = createRaw('session.idle', {
+        sessionID: 'sid-1',
+      });
+      void executionId;
+      expect(normalize(rawWithoutExecId as CloudAgentEvent)).toEqual({
+        type: 'session.idle',
+        sessionId: 'sid-1',
+      });
+    });
+
+    it('normalizes events with executionId null', () => {
+      const raw = { ...createRaw('session.idle', { sessionID: 'sid-1' }), executionId: null };
+      expect(normalize(raw as CloudAgentEvent)).toEqual({
+        type: 'session.idle',
+        sessionId: 'sid-1',
+      });
+    });
   });
 
   describe('message.updated', () => {
@@ -1189,6 +1208,18 @@ describe('normalize', () => {
       });
     });
 
+    it('normalizes bare preparing cloudStatus without sessionStatus', () => {
+      const result = normalize(
+        createRaw('connected', {
+          cloudStatus: { type: 'preparing' },
+        })
+      );
+      expect(result).toEqual({
+        type: 'connected',
+        cloudStatus: { type: 'preparing' },
+      });
+    });
+
     it('normalizes with sessionStatus and cloudStatus', () => {
       const result = normalize(
         createRaw('connected', {
@@ -1304,6 +1335,258 @@ describe('normalize', () => {
 
     it('is not a chat event', () => {
       const result = normalize(createRaw('commands.available', { commands: [] }));
+      expect(result).not.toBeNull();
+      expect(isChatEvent(result!)).toBe(false);
+    });
+  });
+
+  describe('cloud.message.queued', () => {
+    it('normalizes with messageId, executionId, delivery', () => {
+      const result = normalize(
+        createRaw('cloud.message.queued', {
+          messageId: 'msg_1',
+          executionId: 'exe_1',
+          content: 'hi',
+          delivery: 'queued',
+        })
+      );
+      expect(result).toEqual({
+        type: 'cloud.message.queued',
+        messageId: 'msg_1',
+        executionId: 'exe_1',
+        content: 'hi',
+      });
+    });
+
+    it('normalizes with only messageId', () => {
+      const result = normalize(createRaw('cloud.message.queued', { messageId: 'msg_2' }));
+      expect(result).toEqual({
+        type: 'cloud.message.queued',
+        messageId: 'msg_2',
+        executionId: undefined,
+        content: undefined,
+      });
+    });
+
+    it('returns null when messageId is missing', () => {
+      expect(normalize(createRaw('cloud.message.queued', { executionId: 'exe_1' }))).toBeNull();
+    });
+
+    it('returns null when messageId is not a string', () => {
+      expect(normalize(createRaw('cloud.message.queued', { messageId: 42 }))).toBeNull();
+    });
+
+    it('is classified as a ServiceEvent, not a ChatEvent', () => {
+      const result = normalize(createRaw('cloud.message.queued', { messageId: 'msg_1' }));
+      expect(result).not.toBeNull();
+      expect(isChatEvent(result!)).toBe(false);
+    });
+  });
+
+  describe('cloud.message.sent', () => {
+    it('normalizes with messageId and executionId', () => {
+      const result = normalize(
+        createRaw('cloud.message.sent', {
+          messageId: 'msg_1',
+          executionId: 'exe_1',
+          delivery: 'sent',
+        })
+      );
+      expect(result).toEqual({
+        type: 'cloud.message.sent',
+        messageId: 'msg_1',
+        executionId: 'exe_1',
+      });
+    });
+
+    it('normalizes with only messageId', () => {
+      const result = normalize(createRaw('cloud.message.sent', { messageId: 'msg_2' }));
+      expect(result).toEqual({
+        type: 'cloud.message.sent',
+        messageId: 'msg_2',
+        executionId: undefined,
+      });
+    });
+
+    it('returns null when messageId is missing', () => {
+      expect(normalize(createRaw('cloud.message.sent', { executionId: 'exe_1' }))).toBeNull();
+    });
+
+    it('returns null when messageId is not a string', () => {
+      expect(normalize(createRaw('cloud.message.sent', { messageId: 42 }))).toBeNull();
+    });
+
+    it('is classified as a ServiceEvent, not a ChatEvent', () => {
+      const result = normalize(createRaw('cloud.message.sent', { messageId: 'msg_1' }));
+      expect(result).not.toBeNull();
+      expect(isChatEvent(result!)).toBe(false);
+    });
+  });
+
+  describe('cloud.message.completed', () => {
+    it('normalizes with messageId and executionId', () => {
+      const result = normalize(
+        createRaw('cloud.message.completed', {
+          messageId: 'msg_1',
+          executionId: 'exe_1',
+          status: 'completed',
+          delivery: 'sent',
+          accepted: true,
+        })
+      );
+      expect(result).toEqual({
+        type: 'cloud.message.completed',
+        messageId: 'msg_1',
+        executionId: 'exe_1',
+      });
+    });
+
+    it('normalizes with only messageId', () => {
+      const result = normalize(createRaw('cloud.message.completed', { messageId: 'msg_2' }));
+      expect(result).toEqual({
+        type: 'cloud.message.completed',
+        messageId: 'msg_2',
+        executionId: undefined,
+      });
+    });
+
+    it('returns null when messageId is missing', () => {
+      expect(normalize(createRaw('cloud.message.completed', { executionId: 'exe_1' }))).toBeNull();
+    });
+
+    it('is classified as a ServiceEvent, not a ChatEvent', () => {
+      const result = normalize(createRaw('cloud.message.completed', { messageId: 'msg_1' }));
+      expect(result).not.toBeNull();
+      expect(isChatEvent(result!)).toBe(false);
+    });
+  });
+
+  describe('cloud.message.failed', () => {
+    it('maps queued interrupted payload to reason=interrupted', () => {
+      const result = normalize(
+        createRaw('cloud.message.failed', {
+          messageId: 'msg',
+          executionId: 'exe',
+          delivery: 'queued',
+          reason: 'interrupted',
+          error: 'Pending queued message interrupted by user',
+        })
+      );
+      expect(result).toEqual({
+        type: 'cloud.message.failed',
+        messageId: 'msg',
+        executionId: 'exe',
+        error: 'Pending queued message interrupted by user',
+        reason: 'interrupted',
+        attempts: undefined,
+      });
+    });
+
+    it('maps exhausted-retries payload to reason=exhausted with attempts', () => {
+      const result = normalize(
+        createRaw('cloud.message.failed', {
+          messageId: 'msg',
+          executionId: 'exe',
+          delivery: 'queued',
+          attempts: 5,
+          error: 'flush failed',
+        })
+      );
+      expect(result).toEqual({
+        type: 'cloud.message.failed',
+        messageId: 'msg',
+        executionId: 'exe',
+        error: 'flush failed',
+        reason: 'exhausted',
+        attempts: 5,
+      });
+    });
+
+    it('maps execution failure to reason=execution', () => {
+      const result = normalize(
+        createRaw('cloud.message.failed', {
+          messageId: 'msg',
+          executionId: 'exe',
+          delivery: 'sent',
+          status: 'failed',
+          accepted: true,
+          error: 'boom',
+        })
+      );
+      expect(result).toEqual({
+        type: 'cloud.message.failed',
+        messageId: 'msg',
+        executionId: 'exe',
+        error: 'boom',
+        reason: 'execution',
+        attempts: undefined,
+      });
+    });
+
+    it('maps accepted-interrupted payload to reason=interrupted', () => {
+      const result = normalize(
+        createRaw('cloud.message.failed', {
+          messageId: 'msg',
+          executionId: 'exe',
+          delivery: 'sent',
+          status: 'interrupted',
+          accepted: true,
+          reason: 'interrupted',
+          error: 'Execution was interrupted',
+        })
+      );
+      expect(result).toEqual({
+        type: 'cloud.message.failed',
+        messageId: 'msg',
+        executionId: 'exe',
+        error: 'Execution was interrupted',
+        reason: 'interrupted',
+        attempts: undefined,
+      });
+    });
+
+    it('defaults error when missing', () => {
+      const result = normalize(
+        createRaw('cloud.message.failed', { messageId: 'msg', delivery: 'sent' })
+      );
+      expect(result).toEqual({
+        type: 'cloud.message.failed',
+        messageId: 'msg',
+        executionId: undefined,
+        error: 'Message delivery failed',
+        reason: 'execution',
+        attempts: undefined,
+      });
+    });
+
+    it('extracts error string from structured error object', () => {
+      const result = normalize(
+        createRaw('cloud.message.failed', {
+          messageId: 'msg',
+          delivery: 'queued',
+          attempts: 5,
+          error: { message: 'Underlying failure' },
+        })
+      );
+      expect(result).toEqual({
+        type: 'cloud.message.failed',
+        messageId: 'msg',
+        executionId: undefined,
+        error: 'Underlying failure',
+        reason: 'exhausted',
+        attempts: 5,
+      });
+    });
+
+    it('returns null when messageId is missing', () => {
+      expect(
+        normalize(createRaw('cloud.message.failed', { executionId: 'exe', error: 'boom' }))
+      ).toBeNull();
+    });
+
+    it('is classified as a ServiceEvent, not a ChatEvent', () => {
+      const result = normalize(createRaw('cloud.message.failed', { messageId: 'msg', error: 'x' }));
+      expect(result).not.toBeNull();
       expect(isChatEvent(result!)).toBe(false);
     });
   });

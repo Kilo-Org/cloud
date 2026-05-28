@@ -48,36 +48,36 @@ git diff <OLD_BASE>...HEAD --name-status
 Save this file list — these are the only files you need to migrate. The status
 codes you may see:
 
-| Status | Meaning  | How to handle                                                                                |
-| ------ | -------- | -------------------------------------------------------------------------------------------- |
-| `M`    | Modified | Apply the diff to the file at its new path                                                   |
-| `A`    | Added    | Create at the mapped new path (see safety rule below)                                        |
-| `D`    | Deleted  | Delete at the mapped new path                                                                |
-| `R###` | Renamed  | Treat as a delete of the old path + add of the new path, both mapped through the table below |
-| `C###` | Copied   | Treat as an add of the destination path, mapped through the table below                      |
+| Status | Meaning | How to handle |
+|---|---|---|
+| `M` | Modified | Apply the diff to the file at its new path |
+| `A` | Added | Create at the mapped new path (see safety rule below) |
+| `D` | Deleted | Delete at the mapped new path |
+| `R###` | Renamed | Treat as a delete of the old path + add of the new path, both mapped through the table below |
+| `C###` | Copied | Treat as an add of the destination path, mapped through the table below |
 
 ## 2. Path mapping
 
 The restructure renamed paths as follows. For `cloudflare-*` workers, the
 `cloudflare-` prefix was stripped:
 
-| Old path (this branch)              | New path (main)                     |
-| ----------------------------------- | ----------------------------------- |
-| `src/`                              | `apps/web/src/`                     |
-| `public/`                           | `apps/web/public/`                  |
-| `dev/`                              | `apps/web/dev/`                     |
-| `tests/`                            | `apps/web/tests/`                   |
-| `storybook/`                        | `apps/storybook/`                   |
-| `kilo-app/`                         | `apps/mobile/`                      |
-| `cloud-agent/`                      | `services/cloud-agent/`             |
-| `cloud-agent-next/`                 | `services/cloud-agent-next/`        |
-| `cloudflare-gastown/`               | `services/gastown/`                 |
-| `cloudflare-deploy-infra/`          | `services/deploy-infra/`            |
-| `cloudflare-o11y/`                  | `services/o11y/`                    |
-| `cloudflare-<name>/`                | `services/<name>/`                  |
-| `kiloclaw/`                         | `services/kiloclaw/`                |
+| Old path (this branch) | New path (main) |
+|---|---|
+| `src/` | `apps/web/src/` |
+| `public/` | `apps/web/public/` |
+| `dev/` | `apps/web/dev/` |
+| `tests/` | `apps/web/tests/` |
+| `storybook/` | `apps/storybook/` |
+| `kilo-app/` | `apps/mobile/` |
+| `cloud-agent/` | `services/cloud-agent/` |
+| `cloud-agent-next/` | `services/cloud-agent-next/` |
+| `cloudflare-gastown/` | `services/gastown/` |
+| `cloudflare-deploy-infra/` | `services/deploy-infra/` |
+| `cloudflare-o11y/` | `services/o11y/` |
+| `cloudflare-<name>/` | `services/<name>/` |
+| `kiloclaw/` | `services/kiloclaw/` |
 | `kiloclaw/packages/secret-catalog/` | `packages/kiloclaw-secret-catalog/` |
-| `packages/*`                        | `packages/*` (unchanged)            |
+| `packages/*` | `packages/*` (unchanged) |
 
 Many root-level Next.js config files (`next.config.mjs`, `tsconfig.json`,
 `jest.config.ts`, `playwright.config.ts`, `vercel.json`, etc.) moved into
@@ -94,13 +94,13 @@ The root `package.json` was split: it is now a lean workspace root
 names. When running `pnpm --filter`, always use the name from the workspace's
 `package.json`, not the directory name. Known divergences:
 
-| Directory           | `package.json` name   |
-| ------------------- | --------------------- |
-| `apps/web/`         | `web`                 |
-| `apps/mobile/`      | `kilo-app`            |
-| `apps/storybook/`   | `@kilocode/storybook` |
-| `services/o11y/`    | `cloudflare-o11y`     |
-| `services/gastown/` | `cloudflare-gastown`  |
+| Directory | `package.json` name |
+|---|---|
+| `apps/web/` | `web` |
+| `apps/mobile/` | `kilo-app` |
+| `apps/storybook/` | `@kilocode/storybook` |
+| `services/o11y/` | `cloudflare-o11y` |
+| `services/gastown/` | `cloudflare-gastown` |
 
 ## 3. Create migration branch
 

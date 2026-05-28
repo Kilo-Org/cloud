@@ -363,8 +363,9 @@ await client.updateSession.mutate({
 
 ### V2 Endpoints
 
-V2 endpoints execute directly and return an immediate ack. Output is delivered via the
-read-only `/stream` WebSocket for live updates and replay.
+V2 endpoints accept requests by storing pending delivery first, then flush messages
+through one wrapper delivery path. Output is delivered via the read-only `/stream`
+WebSocket for live updates and replay.
 
 **Ack shape (all V2 mutations):**
 
@@ -373,13 +374,16 @@ read-only `/stream` WebSocket for live updates and replay.
   cloudAgentSessionId,
   executionId,
   status: 'started',
-  streamUrl: `/stream?cloudAgentSessionId=${cloudAgentSessionId}`
+  streamUrl: `/stream?cloudAgentSessionId=${cloudAgentSessionId}`,
+  messageId,
+  delivery: 'sent' | 'queued'
 }
 ```
 
+`delivery: 'queued'` means the Durable Object accepted and stored the message for asynchronous delivery. `delivery: 'sent'` is preserved for idempotent replays or lower-level flows where the wrapper has already accepted the same durable `messageId`; it is not a separate current execution identity.
+
 **Error responses:**
 
-- `409 Conflict`: Another execution is already in progress (includes `activeExecutionId`)
 - `503 Service Unavailable`: Transient error (sandbox connect, workspace setup, etc.) - client should retry
 
 **Endpoints:**
@@ -820,7 +824,7 @@ This enables:
 
 ### GitHub Integration
 
-- Repository cloning happens during `SessionService.initiate` using the session service clone helpers
+- Repository preparation/cloning occurs during wrapper readiness or `SessionService.prepareWorkspace` for prepared devcontainer flows, using the session service/workspace helpers.
 - Branch handling:
   - **Default**: Creates isolated `session/<sessionId>` branches for each session
   - **Upstream branches**: Use `upstreamBranch` to work on existing branches (e.g., `main`, `develop`)
@@ -837,7 +841,7 @@ For V2 routes (`sendMessageV2`, `initiateFromKilocodeSessionV2`), the cloud-agen
 **How it works:**
 
 1. **Delegated resolution**: The worker calls `git-token-service` RPC (see `src/services/git-token-service-client.ts`) to look up the installation ID for the repo and mint an installation access token. Token caching and GitHub App credentials live in `git-token-service`.
-2. **Managed GitLab tokens**: The same client resolves and refreshes managed GitLab tokens; `gitlabTokenManaged` is persisted in session metadata so the session DO can refresh it on `startExecutionV2`.
+2. **Managed GitLab tokens**: The same client resolves and refreshes managed GitLab tokens; `gitlabTokenManaged` is persisted in session metadata so wrapper readiness/delivery preparation can refresh it on current admissions.
 
 **Configuration:**
 

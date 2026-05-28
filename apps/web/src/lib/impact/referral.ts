@@ -20,14 +20,15 @@ import {
   deleted_user_email_tombstones,
   impact_advocate_participants,
   impact_advocate_registration_attempts,
-  kiloclaw_attribution_touches,
+  impact_attribution_touches,
   type User,
 } from '@kilocode/db/schema';
 import {
   ImpactAdvocateAttemptDeliveryState,
+  ImpactAdvocateProgramKey,
   ImpactAdvocateRegistrationState,
-  KiloClawAttributionTouchProvider,
-  KiloClawAttributionTouchType,
+  ImpactAttributionTouchProvider,
+  ImpactAttributionTouchType,
 } from '@kilocode/db/schema-types';
 import { and, asc, eq, lte, ne, or, sql } from 'drizzle-orm';
 
@@ -99,21 +100,21 @@ export async function recordImpactAffiliateTouch(params: {
   const database = getDatabaseClient(params.database);
   const dedupeKey = buildHashedDedupeKey([
     touchIdentity(params),
-    KiloClawAttributionTouchType.Affiliate,
-    KiloClawAttributionTouchProvider.ImpactPerformance,
+    ImpactAttributionTouchType.Affiliate,
+    ImpactAttributionTouchProvider.ImpactPerformance,
     params.touch.trackingId,
     params.touch.landingPath,
     touchMinuteBucket(params.touch.touchedAt),
   ]);
 
   const [insertedTouch] = await database
-    .insert(kiloclaw_attribution_touches)
+    .insert(impact_attribution_touches)
     .values({
       dedupe_key: dedupeKey,
       anonymous_id: params.anonymousId ?? null,
       user_id: params.userId ?? null,
-      touch_type: KiloClawAttributionTouchType.Affiliate,
-      provider: KiloClawAttributionTouchProvider.ImpactPerformance,
+      touch_type: ImpactAttributionTouchType.Affiliate,
+      provider: ImpactAttributionTouchProvider.ImpactPerformance,
       opaque_tracking_value: params.touch.trackingId,
       tracking_value_length: params.touch.trackingValueLength,
       is_tracking_value_accepted: params.touch.isTrackingValueAccepted,
@@ -127,8 +128,8 @@ export async function recordImpactAffiliateTouch(params: {
       touched_at: params.touch.touchedAt.toISOString(),
       expires_at: params.touch.expiresAt.toISOString(),
     })
-    .onConflictDoNothing({ target: [kiloclaw_attribution_touches.dedupe_key] })
-    .returning({ id: kiloclaw_attribution_touches.id });
+    .onConflictDoNothing({ target: [impact_attribution_touches.dedupe_key] })
+    .returning({ id: impact_attribution_touches.id });
 
   logImpactReferralDebug(
     insertedTouch
@@ -154,8 +155,8 @@ export async function recordImpactReferralTouch(params: {
   const database = getDatabaseClient(params.database);
   const dedupeKey = buildHashedDedupeKey([
     touchIdentity(params),
-    KiloClawAttributionTouchType.Referral,
-    KiloClawAttributionTouchProvider.ImpactAdvocate,
+    ImpactAttributionTouchType.Referral,
+    ImpactAttributionTouchProvider.ImpactAdvocate,
     params.touch.opaqueTrackingValue,
     params.touch.rsCode,
     params.touch.landingPath,
@@ -163,13 +164,13 @@ export async function recordImpactReferralTouch(params: {
   ]);
 
   const [insertedTouch] = await database
-    .insert(kiloclaw_attribution_touches)
+    .insert(impact_attribution_touches)
     .values({
       dedupe_key: dedupeKey,
       anonymous_id: params.anonymousId ?? null,
       user_id: params.userId ?? null,
-      touch_type: KiloClawAttributionTouchType.Referral,
-      provider: KiloClawAttributionTouchProvider.ImpactAdvocate,
+      touch_type: ImpactAttributionTouchType.Referral,
+      provider: ImpactAttributionTouchProvider.ImpactAdvocate,
       opaque_tracking_value: params.touch.opaqueTrackingValue,
       tracking_value_length: params.touch.trackingValueLength,
       is_tracking_value_accepted: params.touch.isTrackingValueAccepted,
@@ -185,8 +186,8 @@ export async function recordImpactReferralTouch(params: {
       touched_at: params.touch.touchedAt.toISOString(),
       expires_at: params.touch.expiresAt.toISOString(),
     })
-    .onConflictDoNothing({ target: [kiloclaw_attribution_touches.dedupe_key] })
-    .returning({ id: kiloclaw_attribution_touches.id });
+    .onConflictDoNothing({ target: [impact_attribution_touches.dedupe_key] })
+    .returning({ id: impact_attribution_touches.id });
 
   logImpactReferralDebug(
     insertedTouch
@@ -231,13 +232,18 @@ export async function ensureImpactAdvocateParticipantProfile(params: {
       last_error_code: isConfigured ? null : 'missing_configuration',
       last_error_message: isConfigured ? null : 'Impact Advocate configuration is incomplete',
     })
-    .onConflictDoNothing({ target: [impact_advocate_participants.user_id] })
+    .onConflictDoNothing({
+      target: [impact_advocate_participants.program_key, impact_advocate_participants.user_id],
+    })
     .returning({ id: impact_advocate_participants.id });
 
   const participant =
     insertedParticipant ??
     (await database.query.impact_advocate_participants.findFirst({
-      where: eq(impact_advocate_participants.user_id, params.user.id),
+      where: and(
+        eq(impact_advocate_participants.program_key, ImpactAdvocateProgramKey.KiloClaw),
+        eq(impact_advocate_participants.user_id, params.user.id)
+      ),
       columns: { id: true },
     }));
 

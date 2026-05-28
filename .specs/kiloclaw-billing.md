@@ -11,12 +11,12 @@ layouts, conflict-resolution strategies, null-safety patterns, and
 other implementation choices belong in plan documents and code, not
 here.
 
-When `.specs/kiloclaw-referrals.md` grants a KiloClaw free-month
-reward, billing fulfillment is still governed by this document's core
-subscription invariants. Referral rewards delay the beneficiary's next
-unpaid KiloClaw renewal boundary by one calendar month and MUST NOT
-break Stripe-funded, hybrid, pure-credit, commit-plan, cancellation,
-or reactivation guarantees defined here.
+When `.specs/impact-referrals.md` grants a KiloClaw free-month reward,
+billing fulfillment is still governed by this document's core subscription
+invariants. Referral rewards delay the beneficiary's next unpaid KiloClaw
+renewal boundary by one calendar month and MUST NOT break Stripe-funded,
+hybrid, pure-credit, commit-plan, cancellation, or reactivation guarantees
+defined here.
 
 ## Status
 
@@ -187,10 +187,10 @@ lapses, with email notifications at each stage.
    price version.
 3. The catalog MUST include these self-service price versions:
 
-   | Price version | Effective timestamp      | Standard first paid month                                         | Standard recurring                  | Commit                                               | Trial  | Default/max self-service instance |
-   | ------------- | ------------------------ | ----------------------------------------------------------------- | ----------------------------------- | ---------------------------------------------------- | ------ | --------------------------------- |
-   | `2026-03-19`  | 2026-03-19T00:00:00.000Z | $4 (4,000,000 microdollars) when eligible for pre-rollout lineage | $9/month (9,000,000 microdollars)   | $48 upfront for 6 months (48,000,000 microdollars)   | 7 days | `perf-1-3`                        |
-   | `2026-05-10`  | 2026-05-10T00:00:00.000Z | $55/month; no first-month discount                                | $55/month (55,000,000 microdollars) | $306 upfront for 6 months (306,000,000 microdollars) | 1 day  | `perf-1-3`                        |
+   | Price version | Effective timestamp | Standard first paid month | Standard recurring | Commit | Trial | Default/max self-service instance |
+   |---|---|---|---|---|---|---|
+   | `2026-03-19` | 2026-03-19T00:00:00.000Z | $4 (4,000,000 microdollars) when eligible for pre-rollout lineage | $9/month (9,000,000 microdollars) | $48 upfront for 6 months (48,000,000 microdollars) | 7 days | `perf-1-3` |
+   | `2026-05-10` | 2026-05-10T00:00:00.000Z | $55/month; no first-month discount | $55/month (55,000,000 microdollars) | $306 upfront for 6 months (306,000,000 microdollars) | 1 day | `perf-1-3` |
 
 4. The current commit plan MAY be described as $51/month, but billing
    MUST charge $306 upfront for each six-month commit period.
@@ -271,11 +271,11 @@ requirements defined below.
    valid combinations of payment source and payment provider
    subscription ID:
 
-   | State         | payment_source | provider subscription ID |
-   | ------------- | -------------- | ------------------------ |
-   | Legacy Stripe | `stripe`       | non-null                 |
-   | Hybrid        | `credits`      | non-null                 |
-   | Pure credit   | `credits`      | null                     |
+   | State | payment_source | provider subscription ID |
+   |---|---|---|
+   | Legacy Stripe | `stripe` | non-null |
+   | Hybrid | `credits` | non-null |
+   | Pure credit | `credits` | null |
 
    A subscription with payment source `stripe` MUST have a non-null
    payment provider subscription ID. A subscription with payment source

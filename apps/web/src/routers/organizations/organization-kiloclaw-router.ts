@@ -194,7 +194,6 @@ const updateConfigSchema = z.object({
   kilocodeDefaultModel: kilocodeDefaultModelSchema.nullable().optional(),
   userTimezone: userTimezoneSchema.nullable().optional(),
   userLocation: userLocationSchema.nullable().optional(),
-  skipIncompleteManagedComposioConnection: z.boolean().optional(),
 });
 
 const updateKiloCodeConfigSchema = z.object({
@@ -479,13 +478,7 @@ export const organizationKiloclawRouter = createTRPCRouter({
           }
 
           const composioProvision = await buildComposioProvisionSecrets({
-            scope: {
-              ownerType: 'organization_user',
-              userId: ctx.user.id,
-              organizationId: input.organizationId,
-            },
             secrets: input.secrets,
-            skipIncompleteManagedConnection: input.skipIncompleteManagedComposioConnection,
           });
 
           const encryptedSecrets = encryptProvisionSecretsForWorker(composioProvision.secrets);
@@ -516,11 +509,6 @@ export const organizationKiloclawRouter = createTRPCRouter({
 
           if (composioProvision.configToMark?.source === 'manual') {
             await markComposioInstanceConfig({ instanceId: result.instanceId, source: 'manual' });
-          } else if (composioProvision.configToMark?.source === 'managed') {
-            await markComposioInstanceConfig({
-              instanceId: result.instanceId,
-              source: 'managed',
-            });
           }
 
           PostHogClient().capture({
@@ -546,14 +534,7 @@ export const organizationKiloclawRouter = createTRPCRouter({
       const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
 
       const composioProvision = await buildComposioProvisionSecrets({
-        scope: {
-          ownerType: 'organization_user',
-          userId: ctx.user.id,
-          organizationId: input.organizationId,
-        },
-        instanceId: instance.id,
         secrets: input.secrets,
-        skipIncompleteManagedConnection: input.skipIncompleteManagedComposioConnection,
       });
 
       const encryptedSecrets = encryptProvisionSecretsForWorker(composioProvision.secrets);
@@ -589,11 +570,6 @@ export const organizationKiloclawRouter = createTRPCRouter({
 
       if (composioProvision.configToMark?.source === 'manual') {
         await markComposioInstanceConfig({ instanceId: result.instanceId, source: 'manual' });
-      } else if (composioProvision.configToMark?.source === 'managed') {
-        await markComposioInstanceConfig({
-          instanceId: result.instanceId,
-          source: 'managed',
-        });
       }
 
       return result;

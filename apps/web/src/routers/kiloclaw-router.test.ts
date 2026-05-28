@@ -19,17 +19,20 @@ import {
   kiloclaw_inbound_email_aliases,
   kiloclaw_inbound_email_reserved_aliases,
   kiloclaw_instances,
-  kiloclaw_attribution_touches,
-  kiloclaw_referrals,
-  kiloclaw_referral_conversions,
-  kiloclaw_referral_reward_applications,
-  kiloclaw_referral_reward_decisions,
-  kiloclaw_referral_rewards,
+  impact_attribution_touches,
+  impact_referrals,
+  impact_referral_conversions,
+  impact_referral_reward_applications,
+  impact_referral_reward_decisions,
+  impact_referral_rewards,
   kiloclaw_subscription_change_log,
   kiloclaw_subscriptions,
 } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
-import { LEGACY_KILOCLAW_PRICE_VERSION } from '@kilocode/db';
+import {
+  LEGACY_KILOCLAW_PRICE_VERSION,
+  PersonalSubscriptionCollapseUQConflictError,
+} from '@kilocode/db';
 
 (kiloclaw_subscriptions.kiloclaw_price_version as { defaultFn: () => string }).defaultFn = () =>
   LEGACY_KILOCLAW_PRICE_VERSION;
@@ -630,7 +633,7 @@ describe('kiloclawRouter getActivePersonalBillingStatus referral rewards', () =>
       google_user_email: `kiloclaw-reward-referee-${Math.random()}@example.com`,
     });
     const [conversion] = await db
-      .insert(kiloclaw_referral_conversions)
+      .insert(impact_referral_conversions)
       .values({
         referee_user_id: referee.id,
         referrer_user_id: params.role === 'referrer' ? params.beneficiaryUserId : null,
@@ -639,9 +642,9 @@ describe('kiloclawRouter getActivePersonalBillingStatus referral rewards', () =>
         qualified: true,
         converted_at: '2026-04-10T00:00:00.000Z',
       })
-      .returning({ id: kiloclaw_referral_conversions.id });
+      .returning({ id: impact_referral_conversions.id });
     const [decision] = await db
-      .insert(kiloclaw_referral_reward_decisions)
+      .insert(impact_referral_reward_decisions)
       .values({
         conversion_id: conversion.id,
         beneficiary_user_id: params.beneficiaryUserId,
@@ -649,9 +652,9 @@ describe('kiloclawRouter getActivePersonalBillingStatus referral rewards', () =>
         outcome: 'granted',
         months_granted: 1,
       })
-      .returning({ id: kiloclaw_referral_reward_decisions.id });
+      .returning({ id: impact_referral_reward_decisions.id });
     const [reward] = await db
-      .insert(kiloclaw_referral_rewards)
+      .insert(impact_referral_rewards)
       .values({
         conversion_id: conversion.id,
         decision_id: decision.id,
@@ -663,8 +666,8 @@ describe('kiloclawRouter getActivePersonalBillingStatus referral rewards', () =>
         earned_at: '2026-04-10T00:00:00.000Z',
         applied_at: '2026-04-10T00:05:00.000Z',
       })
-      .returning({ id: kiloclaw_referral_rewards.id });
-    await db.insert(kiloclaw_referral_reward_applications).values({
+      .returning({ id: impact_referral_rewards.id });
+    await db.insert(impact_referral_reward_applications).values({
       reward_id: reward.id,
       beneficiary_user_id: params.beneficiaryUserId,
       subscription_id: params.subscriptionId,
@@ -769,7 +772,7 @@ describe('kiloclawRouter getReferralRewardSummary', () => {
       google_user_email: `kiloclaw-summary-other-${Math.random()}@example.com`,
     });
     const [conversion] = await db
-      .insert(kiloclaw_referral_conversions)
+      .insert(impact_referral_conversions)
       .values({
         referee_user_id: params.role === 'referee' ? params.userId : otherUser.id,
         referrer_user_id: params.role === 'referrer' ? params.userId : otherUser.id,
@@ -778,9 +781,9 @@ describe('kiloclawRouter getReferralRewardSummary', () => {
         qualified: true,
         converted_at: '2026-04-10T00:00:00.000Z',
       })
-      .returning({ id: kiloclaw_referral_conversions.id });
+      .returning({ id: impact_referral_conversions.id });
     const [decision] = await db
-      .insert(kiloclaw_referral_reward_decisions)
+      .insert(impact_referral_reward_decisions)
       .values({
         conversion_id: conversion.id,
         beneficiary_user_id: params.userId,
@@ -788,9 +791,9 @@ describe('kiloclawRouter getReferralRewardSummary', () => {
         outcome: 'granted',
         months_granted: 1,
       })
-      .returning({ id: kiloclaw_referral_reward_decisions.id });
+      .returning({ id: impact_referral_reward_decisions.id });
     const [reward] = await db
-      .insert(kiloclaw_referral_rewards)
+      .insert(impact_referral_rewards)
       .values({
         conversion_id: conversion.id,
         decision_id: decision.id,
@@ -801,10 +804,10 @@ describe('kiloclawRouter getReferralRewardSummary', () => {
         earned_at: '2026-04-10T00:00:00.000Z',
         applied_at: params.status === 'applied' ? '2026-04-10T00:05:00.000Z' : null,
       })
-      .returning({ id: kiloclaw_referral_rewards.id });
+      .returning({ id: impact_referral_rewards.id });
 
     if (params.status === 'applied') {
-      await db.insert(kiloclaw_referral_reward_applications).values({
+      await db.insert(impact_referral_reward_applications).values({
         reward_id: reward.id,
         beneficiary_user_id: params.userId,
         subscription_id: crypto.randomUUID(),
@@ -827,7 +830,7 @@ describe('kiloclawRouter getReferralRewardSummary', () => {
       normalized_email: params.refereeEmail,
     });
     const [touch] = await db
-      .insert(kiloclaw_attribution_touches)
+      .insert(impact_attribution_touches)
       .values({
         dedupe_key: `summary-relationship-touch-${params.refereeEmail}`,
         user_id: referee.id,
@@ -841,8 +844,8 @@ describe('kiloclawRouter getReferralRewardSummary', () => {
         touched_at: '2026-04-01T00:00:00.000Z',
         expires_at: '2026-05-01T00:00:00.000Z',
       })
-      .returning({ id: kiloclaw_attribution_touches.id });
-    await db.insert(kiloclaw_referrals).values({
+      .returning({ id: impact_attribution_touches.id });
+    await db.insert(impact_referrals).values({
       referee_user_id: referee.id,
       referrer_user_id: params.referrerId,
       source_touch_id: touch.id,
@@ -850,7 +853,7 @@ describe('kiloclawRouter getReferralRewardSummary', () => {
     });
 
     if (params.sourcePaymentId) {
-      await db.insert(kiloclaw_referral_conversions).values({
+      await db.insert(impact_referral_conversions).values({
         referee_user_id: referee.id,
         referrer_user_id: params.referrerId,
         source_touch_id: touch.id,
@@ -987,6 +990,88 @@ describe('kiloclawRouter destroy', () => {
         headers: { 'content-type': 'application/json' },
       })
     );
+  });
+
+  it('maps personal subscription collapse UQ conflicts to conflict errors', async () => {
+    const user = await insertTestUser({
+      google_user_email: `kiloclaw-destroy-conflict-${Math.random()}@example.com`,
+    });
+    const otherUser = await insertTestUser({
+      google_user_email: `kiloclaw-destroy-conflict-other-${Math.random()}@example.com`,
+    });
+    const instanceA = crypto.randomUUID();
+    const instanceB = crypto.randomUUID();
+    const otherUserInstance = crypto.randomUUID();
+    const subscriptionA = crypto.randomUUID();
+    const subscriptionB = crypto.randomUUID();
+    const conflictingSubscription = crypto.randomUUID();
+
+    await db.insert(kiloclaw_instances).values([
+      {
+        id: instanceA,
+        user_id: user.id,
+        sandbox_id: `ki_${instanceA.replace(/-/g, '')}`,
+        created_at: '2026-04-01T00:00:00.000Z',
+        destroyed_at: '2026-04-02T00:00:00.000Z',
+      },
+      {
+        id: instanceB,
+        user_id: user.id,
+        sandbox_id: `ki_${instanceB.replace(/-/g, '')}`,
+        created_at: '2026-04-03T00:00:00.000Z',
+      },
+      {
+        id: otherUserInstance,
+        user_id: otherUser.id,
+        sandbox_id: `ki_${otherUserInstance.replace(/-/g, '')}`,
+        created_at: '2026-04-04T00:00:00.000Z',
+      },
+    ]);
+    await db.insert(kiloclaw_subscriptions).values([
+      {
+        id: subscriptionA,
+        user_id: user.id,
+        instance_id: instanceA,
+        plan: 'trial',
+        status: 'canceled',
+        created_at: '2026-04-01T00:00:00.000Z',
+        updated_at: '2026-04-01T00:00:00.000Z',
+      },
+      {
+        id: subscriptionB,
+        user_id: user.id,
+        instance_id: instanceB,
+        plan: 'trial',
+        status: 'canceled',
+        created_at: '2026-04-03T00:00:00.000Z',
+        updated_at: '2026-04-03T00:00:00.000Z',
+      },
+      {
+        id: conflictingSubscription,
+        user_id: user.id,
+        instance_id: otherUserInstance,
+        plan: 'trial',
+        status: 'canceled',
+        transferred_to_subscription_id: subscriptionB,
+        created_at: '2026-04-04T00:00:00.000Z',
+        updated_at: '2026-04-04T00:00:00.000Z',
+      },
+    ]);
+
+    await expect(createCaller({ user }).destroy()).rejects.toMatchObject({
+      code: 'CONFLICT',
+      message:
+        'Your subscription state needs support review before this instance can be destroyed.',
+      cause: expect.any(PersonalSubscriptionCollapseUQConflictError),
+    });
+    expect(kiloclawClientMock.__destroyMock).not.toHaveBeenCalled();
+
+    const [instanceAfter] = await db
+      .select()
+      .from(kiloclaw_instances)
+      .where(eq(kiloclaw_instances.id, instanceB))
+      .limit(1);
+    expect(instanceAfter?.destroyed_at).toBeNull();
   });
 
   it('clears subscription destruction lifecycle and writes changelog', async () => {

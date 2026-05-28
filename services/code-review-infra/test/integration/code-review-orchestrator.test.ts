@@ -1022,6 +1022,46 @@ describe('CodeReviewOrchestrator recovery', () => {
     expect(hasFetchCall(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toBe(true);
   });
 
+  it('continues a session when abandoned legacy execution rows are omitted from current health', async () => {
+    const stub = getReviewStub();
+    const previousSessionId = 'agent_previous_stranded_legacy';
+    const fetchMock = vi.fn(async (request: RequestInfo | URL) => {
+      const url = String(request);
+      if (url.includes('/api/internal/code-review-status/'))
+        return Response.json({ success: true });
+      if (url.includes('/trpc/getSessionHealth')) {
+        return trpcSuccess({
+          cloudAgentSessionId: previousSessionId,
+          sandboxStatus: 'healthy',
+          executionHealth: 'none',
+        });
+      }
+      if (url.includes('/trpc/updateSession')) return trpcSuccess({ success: true });
+      if (url.includes('/trpc/sendMessageV2')) {
+        return trpcSuccess({
+          executionId: 'msg_followup',
+          status: 'started',
+          messageId: 'msg_followup',
+          delivery: 'queued',
+        });
+      }
+      return new Response('unexpected fetch', { status: 500 });
+    });
+    globalThis.fetch = fetchMock;
+    await runInDurableObject(stub, async (_instance: CodeReviewOrchestrator, state) => {
+      await state.storage.put(
+        'state',
+        codeReview({ previousCloudAgentSessionId: previousSessionId })
+      );
+      await state.storage.setAlarm(Date.now() + 30_000);
+    });
+
+    await runDurableObjectAlarm(stub);
+
+    expect(hasFetchCall(fetchMock, '/trpc/sendMessageV2')).toBe(true);
+    expect(hasFetchCall(fetchMock, '/trpc/prepareSession')).toBe(false);
+  });
+
   it('skips continuation and prepares a fresh session when previous execution is stale', async () => {
     const stub = getReviewStub();
     const previousSessionId = 'agent_previous_stale';

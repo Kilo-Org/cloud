@@ -2,6 +2,9 @@
   "name": "kiloclaw-controller",
   "private": true,
   "type": "module",
+  "scripts": {
+    "typecheck": "tsgo --noEmit"
+  },
   "dependencies": {
     "hono": "catalog:",
     "zod": "catalog:"

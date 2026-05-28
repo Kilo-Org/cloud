@@ -13,15 +13,15 @@ generic AI-flavored "modern SaaS."
 Before changing tokens, colors, type, radius, or animation, consult these
 files directly:
 
-| Concern                  | File                                                       |
-| ------------------------ | ---------------------------------------------------------- |
-| Web tokens & base theme  | `apps/web/src/app/globals.css`                             |
-| Font loading & variables | `apps/web/src/app/layout.tsx`                              |
-| shadcn config            | `apps/web/components.json`                                 |
-| Core UI primitives       | `apps/web/src/components/ui/*.tsx`                         |
-| Brand lockup             | `apps/web/src/components/HeaderLogo.tsx`                   |
-| Storybook canvas         | `apps/storybook/.storybook/preview.ts` and `storybook.css` |
-| Mobile tokens            | `apps/mobile/src/global.css`                               |
+| Concern | File |
+|---|---|
+| Web tokens & base theme | `apps/web/src/app/globals.css` |
+| Font loading & variables | `apps/web/src/app/layout.tsx` |
+| shadcn config | `apps/web/components.json` |
+| Core UI primitives | `apps/web/src/components/ui/*.tsx` |
+| Brand lockup | `apps/web/src/components/HeaderLogo.tsx` |
+| Storybook canvas | `apps/storybook/.storybook/preview.ts` and `storybook.css` |
+| Mobile tokens | `apps/mobile/src/global.css` |
 
 If a token or component already exists, **use it**. Do not reintroduce a
 parallel system.
@@ -31,10 +31,10 @@ parallel system.
 Kilo has two surfaces with slightly different design rules. Identify which
 one you are designing for before picking colors, type scale, or motion.
 
-| Register              | Scope                                                                                   |
-| --------------------- | --------------------------------------------------------------------------------------- |
-| **Product UI**        | Web app, dashboards, settings, billing, admin, Storybook components, mobile app screens |
-| **Brand / Marketing** | Landing pages, docs, pricing, hero surfaces, on-brand campaign moments                  |
+| Register | Scope |
+|---|---|
+| **Product UI** | Web app, dashboards, settings, billing, admin, Storybook components, mobile app screens |
+| **Brand / Marketing** | Landing pages, docs, pricing, hero surfaces, on-brand campaign moments |
 
 Both use the same tokens and fonts. Brand permits more visual expression
 (hero type, animation, committed color, imagery). Product UI stays calm,
@@ -60,40 +60,40 @@ These are declared as CSS variables in `globals.css` and surfaced to
 Tailwind via `@theme inline`. Prefer the Tailwind utility that maps to the
 token (e.g. `bg-background`, `text-foreground`, `border-border`) over hex.
 
-| Token                          | Role                                                    |
-| ------------------------------ | ------------------------------------------------------- |
-| `background`                   | Page/body surface. Near-black `oklch(0.145 0 0)`.       |
-| `foreground`                   | Default text. Near-white `oklch(0.985 0 0)`.            |
-| `card`, `popover`              | Elevated dark surface `oklch(0.205 0 0)`.               |
-| `card-foreground`              | Text on card.                                           |
-| `primary`                      | Brand yellow-green primary CTA token.                   |
-| `primary-foreground`           | Near-black text on primary yellow-green.                |
+| Token | Role |
+|---|---|
+| `background` | Page/body surface. Near-black `oklch(0.145 0 0)`. |
+| `foreground` | Default text. Near-white `oklch(0.985 0 0)`. |
+| `card`, `popover` | Elevated dark surface `oklch(0.205 0 0)`. |
+| `card-foreground` | Text on card. |
+| `primary` | Brand yellow-green primary CTA token. |
+| `primary-foreground` | Near-black text on primary yellow-green. |
 | `secondary`, `muted`, `accent` | Mid-dark surfaces `oklch(0.269 0 0)` for chips, hovers. |
-| `muted-foreground`             | Secondary text `oklch(0.708 0 0)`.                      |
-| `border`, `input`, `ring`      | Hairline borders and focus rings.                       |
-| `destructive`                  | Red error/danger state.                                 |
-| `sidebar-*`                    | Sidebar app-shell tokens.                               |
-| `chart-1`..`chart-5`           | Data viz palette.                                       |
+| `muted-foreground` | Secondary text `oklch(0.708 0 0)`. |
+| `border`, `input`, `ring` | Hairline borders and focus rings. |
+| `destructive` | Red error/danger state. |
+| `sidebar-*` | Sidebar app-shell tokens. |
+| `chart-1`..`chart-5` | Data viz palette. |
 
 ### Kilo-specific primitives
 
-| Token                               | Value                                           | Use                              |
-| ----------------------------------- | ----------------------------------------------- | -------------------------------- |
-| `--brand-primary` / `brand-primary` | `oklch(95% 0.15 108)` (electric yellow-green)   | Alias of primary for brand roles |
-| `--color-kilo-gray`                 | `oklch(0.24 0.007 1)`                           | Kilo-branded neutral surface     |
-| `--color-kilo-gray-lighter`         | Derived via `oklch(from ... calc(l + 0.1) c h)` | Paired with `kilo-gray`          |
-| `--ease-out-strong`                 | `cubic-bezier(0.23, 1, 0.32, 1)`                | Preferred easing for transitions |
+| Token | Value | Use |
+|---|---|---|
+| `--brand-primary` / `brand-primary` | `oklch(95% 0.15 108)` (electric yellow-green) | Alias of primary for brand roles |
+| `--color-kilo-gray` | `oklch(0.24 0.007 1)` | Kilo-branded neutral surface |
+| `--color-kilo-gray-lighter` | Derived via `oklch(from ... calc(l + 0.1) c h)` | Paired with `kilo-gray` |
+| `--ease-out-strong` | `cubic-bezier(0.23, 1, 0.32, 1)` | Preferred easing for transitions |
 
 ### Primary action color
 
 The product primary CTA is the Kilo brand yellow-green, exposed through the
 semantic `primary` token and `--brand-primary` alias:
 
-| Role       | Value                                    |
-| ---------- | ---------------------------------------- |
-| Background | `oklch(95% 0.15 108)` (`#EDFF00`-ish)    |
-| Hover      | Slightly darker yellow-green             |
-| Text       | Near-black via `primary-foreground`      |
+| Role | Value |
+|---|---|
+| Background | `oklch(95% 0.15 108)` (`#EDFF00`-ish) |
+| Hover | Slightly darker yellow-green |
+| Text | Near-black via `primary-foreground` |
 | Focus ring | Low-alpha yellow-green / semantic `ring` |
 
 Use it for the main action on a surface, exactly once. Blue is no longer a
@@ -124,10 +124,10 @@ Avoid:
 
 Font loading is in `apps/web/src/app/layout.tsx`:
 
-| Family         | CSS variable       | Use                                                        |
-| -------------- | ------------------ | ---------------------------------------------------------- |
-| Inter          | `--font-sans`      | Default UI text                                            |
-| Roboto Mono    | `--font-mono`      | Code, identifiers, metadata                                |
+| Family | CSS variable | Use |
+|---|---|---|
+| Inter | `--font-sans` | Default UI text |
+| Roboto Mono | `--font-mono` | Code, identifiers, metadata |
 | JetBrains Mono | `--font-jetbrains` | Terminal-like and code-editor surfaces (`.font-jetbrains`) |
 
 Known issue to be aware of (do not fix casually): `globals.css` currently
@@ -152,13 +152,13 @@ Type scale rules for product UI:
 
 Base radius: `--radius: 0.625rem` in `globals.css`. Derived tokens:
 
-| Token         | Value                       | Typical use                   |
-| ------------- | --------------------------- | ----------------------------- |
-| `--radius-sm` | `calc(var(--radius) - 4px)` | Tight inline chips            |
-| `--radius-md` | `calc(var(--radius) - 2px)` | Buttons, inputs               |
-| `--radius-lg` | `var(--radius)`             | Popovers, medium containers   |
-| `--radius-xl` | `calc(var(--radius) + 4px)` | Cards, dialogs                |
-| (pill)        | `rounded-full`              | Badges, avatars, status pills |
+| Token | Value | Typical use |
+|---|---|---|
+| `--radius-sm` | `calc(var(--radius) - 4px)` | Tight inline chips |
+| `--radius-md` | `calc(var(--radius) - 2px)` | Buttons, inputs |
+| `--radius-lg` | `var(--radius)` | Popovers, medium containers |
+| `--radius-xl` | `calc(var(--radius) + 4px)` | Cards, dialogs |
+| (pill) | `rounded-full` | Badges, avatars, status pills |
 
 Follow existing shadcn primitives. Buttons/inputs `rounded-md`, cards
 `rounded-xl`, badges full-pill. Do not introduce new radius values.

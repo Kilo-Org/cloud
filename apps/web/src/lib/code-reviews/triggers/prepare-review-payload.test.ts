@@ -75,7 +75,6 @@ const baseAgentConfig = {
   focus_areas: [],
   custom_instructions: '',
   model_slug: 'test-model',
-  max_review_time_minutes: 30,
   repository_selection_mode: 'all',
   gate_threshold: 'off',
   disable_review_md: false,

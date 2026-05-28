@@ -1,20 +1,21 @@
 import * as z from 'zod';
 import { TRPCError } from '@trpc/server';
-import { desc, eq, inArray, or } from 'drizzle-orm';
+import { and, desc, eq, inArray, or } from 'drizzle-orm';
 
 import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import { db } from '@/lib/drizzle';
 import {
   impact_advocate_reward_redemptions,
   impact_conversion_reports,
-  kiloclaw_attribution_touches,
-  kiloclaw_referral_conversions,
-  kiloclaw_referral_reward_applications,
-  kiloclaw_referral_reward_decisions,
-  kiloclaw_referral_rewards,
-  kiloclaw_referrals,
+  impact_attribution_touches,
+  impact_referral_conversions,
+  impact_referral_reward_applications,
+  impact_referral_reward_decisions,
+  impact_referral_rewards,
+  impact_referrals,
   kilocode_users,
 } from '@kilocode/db/schema';
+import { ImpactReferralProduct, ImpactReferralRewardKind } from '@kilocode/db/schema-types';
 
 const ReferralInvestigationInputSchema = z.object({
   search: z.string().trim().min(1),
@@ -168,97 +169,129 @@ async function investigateReferrer(search: string): Promise<ReferralInvestigatio
 
   const referralRows = await db
     .select({
-      referralId: kiloclaw_referrals.id,
-      impactReferralId: kiloclaw_referrals.impact_referral_id,
-      referralCreatedAt: kiloclaw_referrals.created_at,
+      referralId: impact_referrals.id,
+      impactReferralId: impact_referrals.impact_referral_id,
+      referralCreatedAt: impact_referrals.created_at,
       refereeId: kilocode_users.id,
       refereeEmail: kilocode_users.google_user_email,
       refereeName: kilocode_users.google_user_name,
-      touchId: kiloclaw_attribution_touches.id,
-      touchProvider: kiloclaw_attribution_touches.provider,
-      touchType: kiloclaw_attribution_touches.touch_type,
-      landingPath: kiloclaw_attribution_touches.landing_path,
-      rsCode: kiloclaw_attribution_touches.rs_code,
-      imRef: kiloclaw_attribution_touches.im_ref,
-      touchedAt: kiloclaw_attribution_touches.touched_at,
-      expiresAt: kiloclaw_attribution_touches.expires_at,
+      touchId: impact_attribution_touches.id,
+      touchProvider: impact_attribution_touches.provider,
+      touchType: impact_attribution_touches.touch_type,
+      landingPath: impact_attribution_touches.landing_path,
+      rsCode: impact_attribution_touches.rs_code,
+      imRef: impact_attribution_touches.im_ref,
+      touchedAt: impact_attribution_touches.touched_at,
+      expiresAt: impact_attribution_touches.expires_at,
     })
-    .from(kiloclaw_referrals)
-    .innerJoin(kilocode_users, eq(kilocode_users.id, kiloclaw_referrals.referee_user_id))
+    .from(impact_referrals)
+    .innerJoin(kilocode_users, eq(kilocode_users.id, impact_referrals.referee_user_id))
     .leftJoin(
-      kiloclaw_attribution_touches,
-      eq(kiloclaw_attribution_touches.id, kiloclaw_referrals.source_touch_id)
+      impact_attribution_touches,
+      eq(impact_attribution_touches.id, impact_referrals.source_touch_id)
     )
-    .where(eq(kiloclaw_referrals.referrer_user_id, referrer.id))
-    .orderBy(desc(kiloclaw_referrals.created_at));
+    .where(
+      and(
+        eq(impact_referrals.product, ImpactReferralProduct.KiloClaw),
+        eq(impact_referrals.referrer_user_id, referrer.id)
+      )
+    )
+    .orderBy(desc(impact_referrals.created_at));
 
   const conversions = await db
     .select({
-      id: kiloclaw_referral_conversions.id,
-      refereeUserId: kiloclaw_referral_conversions.referee_user_id,
-      winningTouchType: kiloclaw_referral_conversions.winning_touch_type,
-      sourcePaymentId: kiloclaw_referral_conversions.source_payment_id,
-      qualified: kiloclaw_referral_conversions.qualified,
-      disqualificationReason: kiloclaw_referral_conversions.disqualification_reason,
-      convertedAt: kiloclaw_referral_conversions.converted_at,
+      id: impact_referral_conversions.id,
+      refereeUserId: impact_referral_conversions.referee_user_id,
+      winningTouchType: impact_referral_conversions.winning_touch_type,
+      sourcePaymentId: impact_referral_conversions.source_payment_id,
+      qualified: impact_referral_conversions.qualified,
+      disqualificationReason: impact_referral_conversions.disqualification_reason,
+      convertedAt: impact_referral_conversions.converted_at,
     })
-    .from(kiloclaw_referral_conversions)
-    .where(eq(kiloclaw_referral_conversions.referrer_user_id, referrer.id))
-    .orderBy(desc(kiloclaw_referral_conversions.converted_at));
+    .from(impact_referral_conversions)
+    .where(
+      and(
+        eq(impact_referral_conversions.product, ImpactReferralProduct.KiloClaw),
+        eq(impact_referral_conversions.referrer_user_id, referrer.id)
+      )
+    )
+    .orderBy(desc(impact_referral_conversions.converted_at));
 
   const conversionIds = conversions.map(conversion => conversion.id);
   const rewardDecisions = conversionIds.length
     ? await db
         .select({
-          conversionId: kiloclaw_referral_reward_decisions.conversion_id,
-          id: kiloclaw_referral_reward_decisions.id,
-          beneficiaryUserId: kiloclaw_referral_reward_decisions.beneficiary_user_id,
-          beneficiaryRole: kiloclaw_referral_reward_decisions.beneficiary_role,
-          outcome: kiloclaw_referral_reward_decisions.outcome,
-          reason: kiloclaw_referral_reward_decisions.reason,
-          monthsGranted: kiloclaw_referral_reward_decisions.months_granted,
-          createdAt: kiloclaw_referral_reward_decisions.created_at,
+          conversionId: impact_referral_reward_decisions.conversion_id,
+          id: impact_referral_reward_decisions.id,
+          beneficiaryUserId: impact_referral_reward_decisions.beneficiary_user_id,
+          beneficiaryRole: impact_referral_reward_decisions.beneficiary_role,
+          outcome: impact_referral_reward_decisions.outcome,
+          reason: impact_referral_reward_decisions.reason,
+          monthsGranted: impact_referral_reward_decisions.months_granted,
+          createdAt: impact_referral_reward_decisions.created_at,
         })
-        .from(kiloclaw_referral_reward_decisions)
-        .where(inArray(kiloclaw_referral_reward_decisions.conversion_id, conversionIds))
-        .orderBy(desc(kiloclaw_referral_reward_decisions.created_at))
+        .from(impact_referral_reward_decisions)
+        .where(
+          and(
+            eq(impact_referral_reward_decisions.product, ImpactReferralProduct.KiloClaw),
+            eq(
+              impact_referral_reward_decisions.reward_kind,
+              ImpactReferralRewardKind.KiloClawFreeMonth
+            ),
+            inArray(impact_referral_reward_decisions.conversion_id, conversionIds)
+          )
+        )
+        .orderBy(desc(impact_referral_reward_decisions.created_at))
     : [];
   const rewards = conversionIds.length
     ? await db
         .select({
-          conversionId: kiloclaw_referral_rewards.conversion_id,
-          id: kiloclaw_referral_rewards.id,
-          beneficiaryUserId: kiloclaw_referral_rewards.beneficiary_user_id,
-          beneficiaryRole: kiloclaw_referral_rewards.beneficiary_role,
-          status: kiloclaw_referral_rewards.status,
-          monthsGranted: kiloclaw_referral_rewards.months_granted,
-          earnedAt: kiloclaw_referral_rewards.earned_at,
-          appliedAt: kiloclaw_referral_rewards.applied_at,
-          expiresAt: kiloclaw_referral_rewards.expires_at,
-          reviewReason: kiloclaw_referral_rewards.review_reason,
+          conversionId: impact_referral_rewards.conversion_id,
+          id: impact_referral_rewards.id,
+          beneficiaryUserId: impact_referral_rewards.beneficiary_user_id,
+          beneficiaryRole: impact_referral_rewards.beneficiary_role,
+          status: impact_referral_rewards.status,
+          monthsGranted: impact_referral_rewards.months_granted,
+          earnedAt: impact_referral_rewards.earned_at,
+          appliedAt: impact_referral_rewards.applied_at,
+          expiresAt: impact_referral_rewards.expires_at,
+          reviewReason: impact_referral_rewards.review_reason,
         })
-        .from(kiloclaw_referral_rewards)
-        .where(inArray(kiloclaw_referral_rewards.conversion_id, conversionIds))
-        .orderBy(desc(kiloclaw_referral_rewards.created_at))
+        .from(impact_referral_rewards)
+        .where(
+          and(
+            eq(impact_referral_rewards.product, ImpactReferralProduct.KiloClaw),
+            eq(impact_referral_rewards.reward_kind, ImpactReferralRewardKind.KiloClawFreeMonth),
+            inArray(impact_referral_rewards.conversion_id, conversionIds)
+          )
+        )
+        .orderBy(desc(impact_referral_rewards.created_at))
     : [];
   const rewardApplications = conversionIds.length
     ? await db
         .select({
-          conversionId: kiloclaw_referral_rewards.conversion_id,
-          id: kiloclaw_referral_reward_applications.id,
-          beneficiaryUserId: kiloclaw_referral_reward_applications.beneficiary_user_id,
-          subscriptionId: kiloclaw_referral_reward_applications.subscription_id,
-          previousRenewalBoundary: kiloclaw_referral_reward_applications.previous_renewal_boundary,
-          newRenewalBoundary: kiloclaw_referral_reward_applications.new_renewal_boundary,
-          appliedAt: kiloclaw_referral_reward_applications.applied_at,
+          conversionId: impact_referral_rewards.conversion_id,
+          id: impact_referral_reward_applications.id,
+          beneficiaryUserId: impact_referral_reward_applications.beneficiary_user_id,
+          subscriptionId: impact_referral_reward_applications.subscription_id,
+          previousRenewalBoundary: impact_referral_reward_applications.previous_renewal_boundary,
+          newRenewalBoundary: impact_referral_reward_applications.new_renewal_boundary,
+          appliedAt: impact_referral_reward_applications.applied_at,
         })
-        .from(kiloclaw_referral_reward_applications)
+        .from(impact_referral_reward_applications)
         .innerJoin(
-          kiloclaw_referral_rewards,
-          eq(kiloclaw_referral_rewards.id, kiloclaw_referral_reward_applications.reward_id)
+          impact_referral_rewards,
+          eq(impact_referral_rewards.id, impact_referral_reward_applications.reward_id)
         )
-        .where(inArray(kiloclaw_referral_rewards.conversion_id, conversionIds))
-        .orderBy(desc(kiloclaw_referral_reward_applications.applied_at))
+        .where(
+          and(
+            eq(impact_referral_rewards.product, ImpactReferralProduct.KiloClaw),
+            eq(impact_referral_rewards.reward_kind, ImpactReferralRewardKind.KiloClawFreeMonth),
+            eq(impact_referral_reward_applications.product, ImpactReferralProduct.KiloClaw),
+            inArray(impact_referral_rewards.conversion_id, conversionIds)
+          )
+        )
+        .orderBy(desc(impact_referral_reward_applications.applied_at))
     : [];
   const impactReports = conversionIds.length
     ? await db
@@ -279,7 +312,7 @@ async function investigateReferrer(search: string): Promise<ReferralInvestigatio
   const impactRewardRedemptions = conversionIds.length
     ? await db
         .select({
-          conversionId: kiloclaw_referral_rewards.conversion_id,
+          conversionId: impact_referral_rewards.conversion_id,
           id: impact_advocate_reward_redemptions.id,
           rewardId: impact_advocate_reward_redemptions.reward_id,
           beneficiaryUserId: impact_advocate_reward_redemptions.beneficiary_user_id,
@@ -291,10 +324,16 @@ async function investigateReferrer(search: string): Promise<ReferralInvestigatio
         })
         .from(impact_advocate_reward_redemptions)
         .innerJoin(
-          kiloclaw_referral_rewards,
-          eq(kiloclaw_referral_rewards.id, impact_advocate_reward_redemptions.reward_id)
+          impact_referral_rewards,
+          eq(impact_referral_rewards.id, impact_advocate_reward_redemptions.reward_id)
         )
-        .where(inArray(kiloclaw_referral_rewards.conversion_id, conversionIds))
+        .where(
+          and(
+            eq(impact_referral_rewards.product, ImpactReferralProduct.KiloClaw),
+            eq(impact_referral_rewards.reward_kind, ImpactReferralRewardKind.KiloClawFreeMonth),
+            inArray(impact_referral_rewards.conversion_id, conversionIds)
+          )
+        )
         .orderBy(desc(impact_advocate_reward_redemptions.created_at))
     : [];
 

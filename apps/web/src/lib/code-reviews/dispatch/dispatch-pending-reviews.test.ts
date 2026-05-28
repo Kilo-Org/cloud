@@ -33,6 +33,7 @@ import {
 } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { tryDispatchPendingReviews } from './dispatch-pending-reviews';
+import { cronPendingCodeReviewCreatedAtWindowSql } from './dispatch-constants';
 import {
   cancelSupersededReviewsForPR,
   updateRepositoryReviewInstructionsMetadata,
@@ -446,6 +447,179 @@ describe('tryDispatchPendingReviews', () => {
     expect(mockDispatchReview).toHaveBeenCalledTimes(1);
     expect(storedReview?.status).toBe('queued');
     expect(storedReview?.updated_at).not.toBe(staleQueuedTimestamp);
+  });
+
+  it('claims the oldest pending review regardless of age', async () => {
+    const oldPendingTimestamp = minutesAgo(150);
+    const recentPendingTimestamp = minutesAgo(30);
+    const owner = { type: 'user', id: testUser.id } satisfies ReviewOwner;
+    await setTestUserBalance(DEFAULT_TIER_BALANCE_MICRODOLLARS);
+
+    const [oldPendingReview, recentPendingReview] = await db
+      .insert(cloud_agent_code_reviews)
+      .values([
+        reviewValues({
+          owner,
+          status: 'pending',
+          createdAt: oldPendingTimestamp,
+          updatedAt: oldPendingTimestamp,
+        }),
+        reviewValues({
+          owner,
+          status: 'pending',
+          createdAt: recentPendingTimestamp,
+          updatedAt: recentPendingTimestamp,
+        }),
+      ])
+      .returning({ id: cloud_agent_code_reviews.id });
+
+    if (!oldPendingReview || !recentPendingReview) {
+      throw new Error('Expected old and recent pending reviews to be inserted');
+    }
+
+    const result = await tryDispatchPendingReviews({
+      type: 'user',
+      id: testUser.id,
+      userId: testUser.id,
+    });
+
+    const storedOldPendingReview = await db.query.cloud_agent_code_reviews.findFirst({
+      where: eq(cloud_agent_code_reviews.id, oldPendingReview.id),
+    });
+    const storedRecentPendingReview = await db.query.cloud_agent_code_reviews.findFirst({
+      where: eq(cloud_agent_code_reviews.id, recentPendingReview.id),
+    });
+
+    expect(result).toEqual({ dispatched: 1, notDispatched: 0, activeCount: 1 });
+    expect(storedOldPendingReview?.status).toBe('queued');
+    expect(storedRecentPendingReview?.status).toBe('pending');
+    expect(mockPrepareReviewPayload).toHaveBeenCalledWith({
+      reviewId: oldPendingReview.id,
+      owner: { type: 'user', id: testUser.id, userId: testUser.id },
+      agentConfig: { id: 'test-agent-config', config: {} },
+      platform: 'github',
+    });
+    expect(mockPrepareReviewPayload).not.toHaveBeenCalledWith(
+      expect.objectContaining({ reviewId: recentPendingReview.id })
+    );
+  });
+
+  it('claims only pending rows created inside the cron window', async () => {
+    const tooRecentTimestamp = minutesAgo(30);
+    const eligibleTimestamp = minutesAgo(65);
+    const tooOldTimestamp = minutesAgo(90);
+    const recentlyUpdatedAt = minutesAgo(5);
+    const owner = { type: 'user', id: testUser.id } satisfies ReviewOwner;
+    await setTestUserBalance(DEFAULT_TIER_BALANCE_MICRODOLLARS);
+
+    const [tooRecentReview, eligibleReview, tooOldReview] = await db
+      .insert(cloud_agent_code_reviews)
+      .values([
+        reviewValues({
+          owner,
+          status: 'pending',
+          createdAt: tooRecentTimestamp,
+          updatedAt: tooRecentTimestamp,
+        }),
+        reviewValues({
+          owner,
+          status: 'pending',
+          createdAt: eligibleTimestamp,
+          updatedAt: recentlyUpdatedAt,
+        }),
+        reviewValues({
+          owner,
+          status: 'pending',
+          createdAt: tooOldTimestamp,
+          updatedAt: recentlyUpdatedAt,
+        }),
+      ])
+      .returning({ id: cloud_agent_code_reviews.id });
+
+    if (!tooRecentReview || !eligibleReview || !tooOldReview) {
+      throw new Error('Expected pending reviews to be inserted');
+    }
+
+    const result = await tryDispatchPendingReviews(
+      {
+        type: 'user',
+        id: testUser.id,
+        userId: testUser.id,
+      },
+      { pendingCreatedAtWindow: cronPendingCodeReviewCreatedAtWindowSql() }
+    );
+
+    const storedTooRecentReview = await db.query.cloud_agent_code_reviews.findFirst({
+      where: eq(cloud_agent_code_reviews.id, tooRecentReview.id),
+    });
+    const storedEligibleReview = await db.query.cloud_agent_code_reviews.findFirst({
+      where: eq(cloud_agent_code_reviews.id, eligibleReview.id),
+    });
+    const storedTooOldReview = await db.query.cloud_agent_code_reviews.findFirst({
+      where: eq(cloud_agent_code_reviews.id, tooOldReview.id),
+    });
+
+    expect(result).toEqual({ dispatched: 1, notDispatched: 0, activeCount: 1 });
+    expect(storedTooRecentReview?.status).toBe('pending');
+    expect(storedEligibleReview?.status).toBe('queued');
+    expect(storedTooOldReview?.status).toBe('pending');
+    expect(mockPrepareReviewPayload).toHaveBeenCalledWith({
+      reviewId: eligibleReview.id,
+      owner: { type: 'user', id: testUser.id, userId: testUser.id },
+      agentConfig: { id: 'test-agent-config', config: {} },
+      platform: 'github',
+    });
+    expect(mockPrepareReviewPayload).not.toHaveBeenCalledWith(
+      expect.objectContaining({ reviewId: tooRecentReview.id })
+    );
+    expect(mockPrepareReviewPayload).not.toHaveBeenCalledWith(
+      expect.objectContaining({ reviewId: tooOldReview.id })
+    );
+  });
+
+  it('recovers stale queued reviews regardless of age under the cron window', async () => {
+    const oldQueuedCreatedAt = minutesAgo(180);
+    const staleQueuedUpdatedAt = minutesAgo(10);
+    const owner = { type: 'user', id: testUser.id } satisfies ReviewOwner;
+    await setTestUserBalance(DEFAULT_TIER_BALANCE_MICRODOLLARS);
+
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        reviewValues({
+          owner,
+          status: 'queued',
+          createdAt: oldQueuedCreatedAt,
+          updatedAt: staleQueuedUpdatedAt,
+        })
+      )
+      .returning({ id: cloud_agent_code_reviews.id });
+
+    if (!review) {
+      throw new Error('Expected stale queued review to be inserted');
+    }
+
+    const result = await tryDispatchPendingReviews(
+      {
+        type: 'user',
+        id: testUser.id,
+        userId: testUser.id,
+      },
+      { pendingCreatedAtWindow: cronPendingCodeReviewCreatedAtWindowSql() }
+    );
+
+    const storedReview = await db.query.cloud_agent_code_reviews.findFirst({
+      where: eq(cloud_agent_code_reviews.id, review.id),
+    });
+
+    expect(result).toEqual({ dispatched: 1, notDispatched: 0, activeCount: 1 });
+    expect(storedReview?.status).toBe('queued');
+    expect(mockPrepareReviewPayload).toHaveBeenCalledWith({
+      reviewId: review.id,
+      owner: { type: 'user', id: testUser.id, userId: testUser.id },
+      agentConfig: { id: 'test-agent-config', config: {} },
+      platform: 'github',
+    });
   });
 
   it('does not overwrite a review that becomes terminal after reservation', async () => {

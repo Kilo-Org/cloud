@@ -44,18 +44,18 @@ import {
   impact_advocate_participants,
   impact_advocate_reward_redemptions,
   impact_conversion_reports,
-  kiloclaw_attribution_touches,
+  impact_attribution_touches,
   kiloclaw_instances,
-  kiloclaw_referral_conversions,
-  kiloclaw_referral_reward_applications,
-  kiloclaw_referral_reward_decisions,
-  kiloclaw_referral_rewards,
+  impact_referral_conversions,
+  impact_referral_reward_applications,
+  impact_referral_reward_decisions,
+  impact_referral_rewards,
   kiloclaw_subscription_change_log,
   kiloclaw_subscriptions,
   kilocode_users,
   referral_codes,
   user_affiliate_attributions,
-  type KiloClawAttributionTouch,
+  type ImpactAttributionTouch,
 } from '@kilocode/db/schema';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import {
@@ -72,6 +72,7 @@ import {
   sendImpactAdvocateRewardRedemptionPayload,
 } from '@/lib/impact/advocate';
 import { client as stripeClient } from '@/lib/stripe-client';
+import { ImpactReferralPaymentProvider } from '@kilocode/db/schema-types';
 
 const mockIsImpactConfigured = jest.mocked(isImpactConfigured);
 const mockIsImpactAdvocateConfigured = jest.mocked(isImpactAdvocateConfigured);
@@ -86,11 +87,13 @@ const mockReverseImpactAction = jest.mocked(reverseImpactAction);
 const mockStripeSubscriptionUpdate = jest.mocked(stripeClient.subscriptions.update);
 
 function makeTouch(
-  overrides: Partial<KiloClawAttributionTouch> & Pick<KiloClawAttributionTouch, 'touch_type'>
-): KiloClawAttributionTouch {
+  overrides: Partial<ImpactAttributionTouch> & Pick<ImpactAttributionTouch, 'touch_type'>
+): ImpactAttributionTouch {
   const touchedAt = overrides.touched_at ?? '2026-04-01T00:00:00.000Z';
   return {
     id: overrides.id ?? randomUUID(),
+    product: overrides.product ?? 'kiloclaw',
+    program_key: overrides.program_key ?? 'kiloclaw',
     dedupe_key: overrides.dedupe_key ?? randomUUID(),
     anonymous_id: overrides.anonymous_id ?? null,
     user_id: overrides.user_id ?? 'user_123',
@@ -171,7 +174,7 @@ async function insertImpactAdvocateParticipant(userId: string, opaqueReferralIde
 
 async function insertAppliedReferralRewardForUser(userId: string): Promise<string> {
   const [conversion] = await db
-    .insert(kiloclaw_referral_conversions)
+    .insert(impact_referral_conversions)
     .values({
       referee_user_id: userId,
       referrer_user_id: null,
@@ -180,12 +183,12 @@ async function insertAppliedReferralRewardForUser(userId: string): Promise<strin
       qualified: true,
       converted_at: '2026-04-10T00:00:00.000Z',
     })
-    .returning({ id: kiloclaw_referral_conversions.id });
+    .returning({ id: impact_referral_conversions.id });
 
   if (!conversion) throw new Error('Failed to insert referral conversion');
 
   const [decision] = await db
-    .insert(kiloclaw_referral_reward_decisions)
+    .insert(impact_referral_reward_decisions)
     .values({
       conversion_id: conversion.id,
       beneficiary_user_id: userId,
@@ -193,12 +196,12 @@ async function insertAppliedReferralRewardForUser(userId: string): Promise<strin
       outcome: 'granted',
       months_granted: 1,
     })
-    .returning({ id: kiloclaw_referral_reward_decisions.id });
+    .returning({ id: impact_referral_reward_decisions.id });
 
   if (!decision) throw new Error('Failed to insert referral reward decision');
 
   const [reward] = await db
-    .insert(kiloclaw_referral_rewards)
+    .insert(impact_referral_rewards)
     .values({
       conversion_id: conversion.id,
       decision_id: decision.id,
@@ -209,7 +212,7 @@ async function insertAppliedReferralRewardForUser(userId: string): Promise<strin
       earned_at: '2026-04-10T00:00:00.000Z',
       applied_at: '2026-04-10T00:05:00.000Z',
     })
-    .returning({ id: kiloclaw_referral_rewards.id });
+    .returning({ id: impact_referral_rewards.id });
 
   if (!reward) throw new Error('Failed to insert referral reward');
 
@@ -234,12 +237,12 @@ describe('kiloclaw referrals', () => {
     });
     await db.delete(impact_conversion_reports).where(sql`true`);
     await db.delete(impact_advocate_reward_redemptions).where(sql`true`);
-    await db.delete(kiloclaw_referral_reward_applications).where(sql`true`);
-    await db.delete(kiloclaw_referral_rewards).where(sql`true`);
-    await db.delete(kiloclaw_referral_reward_decisions).where(sql`true`);
-    await db.delete(kiloclaw_referral_conversions).where(sql`true`);
+    await db.delete(impact_referral_reward_applications).where(sql`true`);
+    await db.delete(impact_referral_rewards).where(sql`true`);
+    await db.delete(impact_referral_reward_decisions).where(sql`true`);
+    await db.delete(impact_referral_conversions).where(sql`true`);
     await db.delete(user_affiliate_attributions).where(sql`true`);
-    await db.delete(kiloclaw_attribution_touches).where(sql`true`);
+    await db.delete(impact_attribution_touches).where(sql`true`);
     await db.delete(credit_transactions).where(sql`true`);
     await db.delete(kiloclaw_subscription_change_log).where(sql`true`);
     await db.delete(kiloclaw_subscriptions).where(sql`true`);
@@ -267,7 +270,7 @@ describe('kiloclaw referrals', () => {
             userId: user.google_user_email,
             rewardTypeFilter: 'CREDIT',
           },
-          redemption: { amount: 1, unit: 'free-months' },
+          redemption: { amount: 1, unit: 'MONTH' },
         },
       });
       mockSendImpactAdvocateRewardRedemptionPayload.mockResolvedValueOnce({
@@ -308,7 +311,7 @@ describe('kiloclaw referrals', () => {
             userId: user.google_user_email,
             rewardTypeFilter: 'CREDIT',
           },
-          redemption: { amount: 1, unit: 'free-months' },
+          redemption: { amount: 1, unit: 'MONTH' },
         },
       });
       mockSendImpactAdvocateRewardRedemptionPayload.mockResolvedValueOnce({
@@ -328,6 +331,66 @@ describe('kiloclaw referrals', () => {
           impact_reward_id: 'impact-reward-123',
           response_status_code: 400,
           redeem_response_payload: expect.objectContaining({ alreadyRedeemed: true }),
+        })
+      );
+    });
+
+    it('redeems month credits returned by Impact', async () => {
+      const user = await insertTestUser({
+        google_user_email: 'month-credit@example.com',
+        normalized_email: 'month-credit@example.com',
+      });
+      const rewardId = await insertAppliedReferralRewardForUser(user.id);
+      await db.insert(impact_advocate_reward_redemptions).values({
+        reward_id: rewardId,
+        dedupe_key: `month-credit:${rewardId}`,
+        beneficiary_user_id: user.id,
+        state: 'queued',
+        request_payload: {
+          lookup: {
+            accountId: user.google_user_email,
+            userId: user.google_user_email,
+            rewardTypeFilter: 'CREDIT',
+          },
+          redemption: { amount: 1, unit: 'MONTH' },
+        },
+      });
+      mockSendImpactAdvocateRewardLookupPayload.mockResolvedValueOnce({
+        ok: true,
+        statusCode: 200,
+        responseBody: JSON.stringify([
+          {
+            id: 'impact-month-reward',
+            type: 'CREDIT',
+            unit: 'MONTH',
+            assignedCredit: 1,
+            redeemedCredit: 0,
+          },
+        ]),
+        rewards: [
+          {
+            id: 'impact-month-reward',
+            type: 'CREDIT',
+            unit: 'MONTH',
+            assignedCredit: 1,
+            redeemedCredit: 0,
+          },
+        ],
+      });
+
+      const summary = await dispatchQueuedImpactAdvocateRewardRedemptions();
+
+      expect(summary).toEqual({ claimed: 1, redeemed: 1, retried: 0, failed: 0 });
+      expect(mockSendImpactAdvocateRewardRedemptionPayload).toHaveBeenCalledWith({
+        rewardId: 'impact-month-reward',
+        amount: 1,
+        unit: 'MONTH',
+      });
+      const [redemption] = await db.select().from(impact_advocate_reward_redemptions);
+      expect(redemption).toEqual(
+        expect.objectContaining({
+          state: 'redeemed',
+          impact_reward_id: 'impact-month-reward',
         })
       );
     });
@@ -463,7 +526,7 @@ describe('kiloclaw referrals', () => {
         credit_category: sourcePaymentId,
       });
       const affiliateTouchId = '11111111-1111-4111-8111-111111111111';
-      await db.insert(kiloclaw_attribution_touches).values({
+      await db.insert(impact_attribution_touches).values({
         id: affiliateTouchId,
         dedupe_key: 'affiliate-touch',
         user_id: user.id,
@@ -498,8 +561,8 @@ describe('kiloclaw referrals', () => {
 
       const [touch] = await db
         .select()
-        .from(kiloclaw_attribution_touches)
-        .where(eq(kiloclaw_attribution_touches.id, affiliateTouchId));
+        .from(impact_attribution_touches)
+        .where(eq(impact_attribution_touches.id, affiliateTouchId));
       expect(touch.sale_attributed_at).toBeTruthy();
       expect(mockSendImpactConversionPayload).not.toHaveBeenCalled();
     });
@@ -525,7 +588,7 @@ describe('kiloclaw referrals', () => {
         description: 'KiloClaw standard enrollment',
         credit_category: sourcePaymentId,
       });
-      await db.insert(kiloclaw_attribution_touches).values({
+      await db.insert(impact_attribution_touches).values({
         id: '22222222-2222-4222-8222-222222222222',
         dedupe_key: 'referral-touch',
         user_id: referee.id,
@@ -557,21 +620,19 @@ describe('kiloclaw referrals', () => {
 
       const decisions = await db
         .select()
-        .from(kiloclaw_referral_reward_decisions)
-        .where(
-          eq(kiloclaw_referral_reward_decisions.conversion_id, disposition.conversionId ?? '')
-        );
+        .from(impact_referral_reward_decisions)
+        .where(eq(impact_referral_reward_decisions.conversion_id, disposition.conversionId ?? ''));
       expect(decisions).toHaveLength(2);
       expect(decisions.map(decision => decision.outcome).sort()).toEqual(['granted', 'granted']);
 
       const rewards = await db
         .select()
-        .from(kiloclaw_referral_rewards)
-        .where(eq(kiloclaw_referral_rewards.conversion_id, disposition.conversionId ?? ''));
+        .from(impact_referral_rewards)
+        .where(eq(impact_referral_rewards.conversion_id, disposition.conversionId ?? ''));
       expect(rewards).toHaveLength(2);
       expect(rewards.map(reward => reward.status).sort()).toEqual(['applied', 'applied']);
 
-      const applications = await db.select().from(kiloclaw_referral_reward_applications);
+      const applications = await db.select().from(impact_referral_reward_applications);
       expect(applications).toHaveLength(2);
       expect(
         applications.map(application => String(application.new_renewal_boundary)).sort()
@@ -606,6 +667,98 @@ describe('kiloclaw referrals', () => {
       expect(mockSendImpactConversionPayload).toHaveBeenCalledTimes(1);
     });
 
+    it('scopes conversion identity and report dedupe by payment provider', async () => {
+      const referrer = await insertTestUser({
+        google_user_email: 'provider-scope-referrer@example.com',
+        normalized_email: 'provider-scope-referrer@example.com',
+      });
+      const referee = await insertTestUser({
+        google_user_email: 'provider-scope-referee@example.com',
+        normalized_email: 'provider-scope-referee@example.com',
+      });
+      const opaqueReferralIdentifier = await insertImpactAdvocateParticipant(referrer.id);
+      const sourcePaymentId = 'shared-source-payment-id';
+
+      await insertActivePersonalSubscription(referrer.id);
+      await insertActivePersonalSubscription(referee.id);
+      await db.insert(impact_attribution_touches).values({
+        id: '33333333-3333-4333-8333-333333333333',
+        dedupe_key: 'provider-scope-referral-touch',
+        user_id: referee.id,
+        touch_type: 'referral',
+        provider: 'impact_advocate',
+        opaque_tracking_value: 'sq-cookie',
+        tracking_value_length: 9,
+        is_tracking_value_accepted: true,
+        rs_code: opaqueReferralIdentifier,
+        touched_at: '2026-03-31T00:00:00.000Z',
+        expires_at: '2026-04-30T00:00:00.000Z',
+      });
+
+      const creditsDisposition = await processPersonalKiloClawPaidConversion({
+        userId: referee.id,
+        sourcePaymentId,
+        orderId: sourcePaymentId,
+        paymentProvider: ImpactReferralPaymentProvider.Credits,
+        amount: 9,
+        currencyCode: 'usd',
+        itemCategory: 'kiloclaw-standard',
+        itemName: 'KiloClaw Standard Plan',
+        itemSku: 'price_standard',
+        convertedAt: new Date('2026-04-09T00:00:00.000Z'),
+      });
+      const stripeDisposition = await processPersonalKiloClawPaidConversion({
+        userId: referee.id,
+        sourcePaymentId,
+        orderId: sourcePaymentId,
+        paymentProvider: ImpactReferralPaymentProvider.Stripe,
+        amount: 9,
+        currencyCode: 'usd',
+        itemCategory: 'kiloclaw-standard',
+        itemName: 'KiloClaw Standard Plan',
+        itemSku: 'price_standard',
+        convertedAt: new Date('2026-04-09T00:00:00.000Z'),
+      });
+      const repeatCreditsDisposition = await processPersonalKiloClawPaidConversion({
+        userId: referee.id,
+        sourcePaymentId,
+        orderId: sourcePaymentId,
+        paymentProvider: ImpactReferralPaymentProvider.Credits,
+        amount: 9,
+        currencyCode: 'usd',
+        itemCategory: 'kiloclaw-standard',
+        itemName: 'KiloClaw Standard Plan',
+        itemSku: 'price_standard',
+        convertedAt: new Date('2026-04-09T00:00:00.000Z'),
+      });
+
+      expect(creditsDisposition.conversionId).toEqual(expect.any(String));
+      expect(stripeDisposition.conversionId).toEqual(expect.any(String));
+      expect(stripeDisposition.conversionId).not.toBe(creditsDisposition.conversionId);
+      expect(repeatCreditsDisposition.conversionId).toBe(creditsDisposition.conversionId);
+
+      const conversions = await db
+        .select({
+          id: impact_referral_conversions.id,
+          paymentProvider: impact_referral_conversions.payment_provider,
+        })
+        .from(impact_referral_conversions)
+        .where(eq(impact_referral_conversions.source_payment_id, sourcePaymentId));
+      expect(conversions).toHaveLength(2);
+      expect(conversions.map(conversion => conversion.paymentProvider).sort()).toEqual([
+        ImpactReferralPaymentProvider.Credits,
+        ImpactReferralPaymentProvider.Stripe,
+      ]);
+
+      const reports = await db
+        .select({ dedupeKey: impact_conversion_reports.dedupe_key })
+        .from(impact_conversion_reports);
+      expect(reports.map(report => report.dedupeKey).sort()).toEqual([
+        `impact-referral-sale:kiloclaw:${ImpactReferralPaymentProvider.Credits}:${sourcePaymentId}`,
+        `impact-referral-sale:kiloclaw:${ImpactReferralPaymentProvider.Stripe}:${sourcePaymentId}`,
+      ]);
+    });
+
     it('resolves referrers through referral_codes when no participant mapping exists', async () => {
       const referrer = await insertTestUser({
         google_user_email: 'referral-code-referrer@example.com',
@@ -631,7 +784,7 @@ describe('kiloclaw referrals', () => {
         description: 'KiloClaw standard enrollment',
         credit_category: sourcePaymentId,
       });
-      await db.insert(kiloclaw_attribution_touches).values({
+      await db.insert(impact_attribution_touches).values({
         id: 'abababab-abab-4bab-8bab-abababababab',
         dedupe_key: 'referral-code-touch',
         user_id: referee.id,
@@ -663,7 +816,7 @@ describe('kiloclaw referrals', () => {
         disqualificationReason: null,
       });
 
-      const [conversion] = await db.select().from(kiloclaw_referral_conversions);
+      const [conversion] = await db.select().from(impact_referral_conversions);
       expect(conversion.referrer_user_id).toBe(referrer.id);
       expect(conversion.qualified).toBe(true);
     });
@@ -691,7 +844,7 @@ describe('kiloclaw referrals', () => {
         description: 'KiloClaw standard enrollment',
         credit_category: sourcePaymentId,
       });
-      await db.insert(kiloclaw_attribution_touches).values({
+      await db.insert(impact_attribution_touches).values({
         id: 'cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd',
         dedupe_key: 'signup-race-referral-touch',
         user_id: referee.id,
@@ -754,7 +907,7 @@ describe('kiloclaw referrals', () => {
         description: 'KiloClaw standard enrollment',
         credit_category: sourcePaymentId,
       });
-      await db.insert(kiloclaw_attribution_touches).values({
+      await db.insert(impact_attribution_touches).values({
         id: '12121212-1212-4212-8212-121212121212',
         dedupe_key: 'terminal-report-referral-touch',
         user_id: referee.id,
@@ -826,7 +979,7 @@ describe('kiloclaw referrals', () => {
           description: 'KiloClaw standard enrollment',
           credit_category: sourcePaymentId,
         });
-        await db.insert(kiloclaw_attribution_touches).values({
+        await db.insert(impact_attribution_touches).values({
           id: '77777777-7777-4777-8777-777777777777',
           dedupe_key: 'missing-config-referral-touch',
           user_id: referee.id,
@@ -861,13 +1014,13 @@ describe('kiloclaw referrals', () => {
 
         const decisions = await db
           .select({
-            beneficiaryRole: kiloclaw_referral_reward_decisions.beneficiary_role,
-            outcome: kiloclaw_referral_reward_decisions.outcome,
-            reason: kiloclaw_referral_reward_decisions.reason,
+            beneficiaryRole: impact_referral_reward_decisions.beneficiary_role,
+            outcome: impact_referral_reward_decisions.outcome,
+            reason: impact_referral_reward_decisions.reason,
           })
-          .from(kiloclaw_referral_reward_decisions)
+          .from(impact_referral_reward_decisions)
           .where(
-            eq(kiloclaw_referral_reward_decisions.conversion_id, disposition.conversionId ?? '')
+            eq(impact_referral_reward_decisions.conversion_id, disposition.conversionId ?? '')
           );
         expect(decisions).toHaveLength(2);
         expect(decisions).toEqual(
@@ -885,7 +1038,7 @@ describe('kiloclaw referrals', () => {
           ])
         );
 
-        const rewards = await db.select().from(kiloclaw_referral_rewards);
+        const rewards = await db.select().from(impact_referral_rewards);
         expect(rewards).toHaveLength(0);
 
         const reports = await db.select().from(impact_conversion_reports);
@@ -929,7 +1082,7 @@ describe('kiloclaw referrals', () => {
         description: 'KiloClaw standard enrollment',
         credit_category: sourcePaymentId,
       });
-      await db.insert(kiloclaw_attribution_touches).values({
+      await db.insert(impact_attribution_touches).values({
         id: '33333333-3333-4333-8333-333333333333',
         dedupe_key: 'late-referral-touch',
         user_id: referee.id,
@@ -962,7 +1115,7 @@ describe('kiloclaw referrals', () => {
         disqualificationReason: 'referral_existing_user_before_touch',
       });
 
-      const rewards = await db.select().from(kiloclaw_referral_rewards);
+      const rewards = await db.select().from(impact_referral_rewards);
       expect(rewards).toHaveLength(0);
       expect(mockSendImpactConversionPayload).not.toHaveBeenCalled();
     });
@@ -995,7 +1148,7 @@ describe('kiloclaw referrals', () => {
         provider: 'impact',
         tracking_id: 'impact-click-123',
       });
-      await db.insert(kiloclaw_attribution_touches).values({
+      await db.insert(impact_attribution_touches).values({
         id: '88888888-8888-4888-8888-888888888888',
         dedupe_key: 'affiliate-touch-without-sale',
         user_id: referee.id,
@@ -1057,7 +1210,7 @@ describe('kiloclaw referrals', () => {
         provider: 'impact',
         tracking_id: 'impact-click-456',
       });
-      await db.insert(kiloclaw_attribution_touches).values({
+      await db.insert(impact_attribution_touches).values({
         id: '99999999-9999-4999-8999-999999999999',
         dedupe_key: 'affiliate-touch-with-sale',
         user_id: referee.id,
@@ -1197,7 +1350,7 @@ describe('kiloclaw referrals', () => {
         description: 'KiloClaw standard enrollment',
         credit_category: 'kiloclaw-subscription:instance-override-eligible:2026-04',
       });
-      await db.insert(kiloclaw_attribution_touches).values({
+      await db.insert(impact_attribution_touches).values({
         id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
         dedupe_key: 'override-eligible-affiliate-touch',
         user_id: referee.id,
@@ -1255,7 +1408,7 @@ describe('kiloclaw referrals', () => {
         description: 'KiloClaw standard enrollment',
         credit_category: sourcePaymentId,
       });
-      await db.insert(kiloclaw_attribution_touches).values({
+      await db.insert(impact_attribution_touches).values({
         id: '44444444-4444-4444-8444-444444444444',
         dedupe_key: 'pending-referral-touch',
         user_id: referee.id,
@@ -1283,11 +1436,11 @@ describe('kiloclaw referrals', () => {
 
       const rewardsBefore = await db
         .select({
-          beneficiaryUserId: kiloclaw_referral_rewards.beneficiary_user_id,
-          status: kiloclaw_referral_rewards.status,
+          beneficiaryUserId: impact_referral_rewards.beneficiary_user_id,
+          status: impact_referral_rewards.status,
         })
-        .from(kiloclaw_referral_rewards)
-        .where(eq(kiloclaw_referral_rewards.conversion_id, disposition.conversionId ?? ''));
+        .from(impact_referral_rewards)
+        .where(eq(impact_referral_rewards.conversion_id, disposition.conversionId ?? ''));
       expect(rewardsBefore).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
@@ -1316,8 +1469,8 @@ describe('kiloclaw referrals', () => {
 
       const [referrerReward] = await db
         .select()
-        .from(kiloclaw_referral_rewards)
-        .where(eq(kiloclaw_referral_rewards.beneficiary_user_id, referrer.id));
+        .from(impact_referral_rewards)
+        .where(eq(impact_referral_rewards.beneficiary_user_id, referrer.id));
       expect(referrerReward.status).toBe('applied');
 
       const queuedRedemptions = await db.select().from(impact_advocate_reward_redemptions);
@@ -1346,7 +1499,7 @@ describe('kiloclaw referrals', () => {
       expect(mockSendImpactAdvocateRewardRedemptionPayload).toHaveBeenCalledWith({
         rewardId: 'impact-reward-123',
         amount: 1,
-        unit: 'free-months',
+        unit: 'MONTH',
       });
 
       const redeemedRedemptions = await db.select().from(impact_advocate_reward_redemptions);
@@ -1390,7 +1543,7 @@ describe('kiloclaw referrals', () => {
         description: 'KiloClaw standard enrollment',
         credit_category: sourcePaymentId,
       });
-      await db.insert(kiloclaw_attribution_touches).values({
+      await db.insert(impact_attribution_touches).values({
         id: '54545454-5454-4545-8545-545454545454',
         dedupe_key: 'stripe-failure-referral-touch',
         user_id: referee.id,
@@ -1424,11 +1577,11 @@ describe('kiloclaw referrals', () => {
 
       const refereeRewards = await db
         .select({
-          status: kiloclaw_referral_rewards.status,
-          appliedAt: kiloclaw_referral_rewards.applied_at,
+          status: impact_referral_rewards.status,
+          appliedAt: impact_referral_rewards.applied_at,
         })
-        .from(kiloclaw_referral_rewards)
-        .where(eq(kiloclaw_referral_rewards.beneficiary_user_id, referee.id));
+        .from(impact_referral_rewards)
+        .where(eq(impact_referral_rewards.beneficiary_user_id, referee.id));
       expect(refereeRewards).toEqual([
         {
           status: 'earned',
@@ -1436,7 +1589,7 @@ describe('kiloclaw referrals', () => {
         },
       ]);
 
-      const applications = await db.select().from(kiloclaw_referral_reward_applications);
+      const applications = await db.select().from(impact_referral_reward_applications);
       expect(applications).toHaveLength(0);
     });
 
@@ -1463,7 +1616,7 @@ describe('kiloclaw referrals', () => {
         description: 'KiloClaw standard enrollment',
         credit_category: sourcePaymentId,
       });
-      await db.insert(kiloclaw_attribution_touches).values({
+      await db.insert(impact_attribution_touches).values({
         id: '55555555-5555-4555-8555-555555555555',
         dedupe_key: 'stripe-referral-touch',
         user_id: referee.id,
@@ -1528,7 +1681,7 @@ describe('kiloclaw referrals', () => {
         description: 'KiloClaw standard enrollment',
         credit_category: sourcePaymentId,
       });
-      await db.insert(kiloclaw_attribution_touches).values({
+      await db.insert(impact_attribution_touches).values({
         id: '66666666-6666-4666-8666-666666666666',
         dedupe_key: 'reversal-referral-touch',
         user_id: referee.id,
@@ -1568,11 +1721,11 @@ describe('kiloclaw referrals', () => {
 
       const rewards = await db
         .select({
-          beneficiaryUserId: kiloclaw_referral_rewards.beneficiary_user_id,
-          status: kiloclaw_referral_rewards.status,
-          reviewReason: kiloclaw_referral_rewards.review_reason,
+          beneficiaryUserId: impact_referral_rewards.beneficiary_user_id,
+          status: impact_referral_rewards.status,
+          reviewReason: impact_referral_rewards.review_reason,
         })
-        .from(kiloclaw_referral_rewards);
+        .from(impact_referral_rewards);
       expect(rewards).toEqual(
         expect.arrayContaining([
           expect.objectContaining({

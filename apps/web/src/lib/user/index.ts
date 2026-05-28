@@ -72,13 +72,13 @@ import {
   contributor_champion_memberships,
   contributor_champion_contributors,
   credit_campaigns,
-  kiloclaw_attribution_touches,
+  impact_attribution_touches,
   impact_advocate_participants,
-  kiloclaw_referrals,
-  kiloclaw_referral_conversions,
-  kiloclaw_referral_reward_decisions,
-  kiloclaw_referral_rewards,
-  kiloclaw_referral_reward_applications,
+  impact_referrals,
+  impact_referral_conversions,
+  impact_referral_reward_decisions,
+  impact_referral_rewards,
+  impact_referral_reward_applications,
   impact_advocate_reward_redemptions,
   impact_conversion_reports,
   github_branch_pull_requests,
@@ -789,6 +789,8 @@ export class SoftDeletePreconditionError extends Error {
  * - stytch_fingerprints (abuse detection)
  * - referral_code_usages (financial, references anonymized user)
  * - kiloclaw_subscriptions, kiloclaw_earlybird_purchases, kiloclaw_email_log (retained records)
+ * - model_experiment_request (experiment attribution and prompt hashes retained
+ *   under the dedicated experiment retention policy)
  * - kiloclaw_scheduled_action_targets (retained operational records;
  * - transactional_email_log (retained outbox marker, financial record;
  *   user_id FK references the anonymized kilocode_users row and optional
@@ -933,43 +935,43 @@ export async function softDeleteUser(userId: string) {
       .where(eq(user_affiliate_attributions.user_id, userId));
     await tx.delete(user_affiliate_events).where(eq(user_affiliate_events.user_id, userId));
     await tx
-      .delete(kiloclaw_attribution_touches)
-      .where(eq(kiloclaw_attribution_touches.user_id, userId));
+      .delete(impact_attribution_touches)
+      .where(eq(impact_attribution_touches.user_id, userId));
     await tx
       .delete(impact_advocate_participants)
       .where(eq(impact_advocate_participants.user_id, userId));
     await tx
-      .delete(kiloclaw_referral_reward_applications)
-      .where(eq(kiloclaw_referral_reward_applications.beneficiary_user_id, userId));
+      .delete(impact_referral_reward_applications)
+      .where(eq(impact_referral_reward_applications.beneficiary_user_id, userId));
     await tx
       .delete(impact_advocate_reward_redemptions)
       .where(eq(impact_advocate_reward_redemptions.beneficiary_user_id, userId));
     await tx
-      .delete(kiloclaw_referral_rewards)
-      .where(eq(kiloclaw_referral_rewards.beneficiary_user_id, userId));
+      .delete(impact_referral_rewards)
+      .where(eq(impact_referral_rewards.beneficiary_user_id, userId));
     await tx
-      .delete(kiloclaw_referral_reward_decisions)
-      .where(eq(kiloclaw_referral_reward_decisions.beneficiary_user_id, userId));
+      .delete(impact_referral_reward_decisions)
+      .where(eq(impact_referral_reward_decisions.beneficiary_user_id, userId));
     await tx.delete(impact_conversion_reports).where(
       sql`${impact_conversion_reports.conversion_id} IN (
-          SELECT c.id FROM ${kiloclaw_referral_conversions} c
+          SELECT c.id FROM ${impact_referral_conversions} c
           WHERE c.referee_user_id = ${userId} OR c.referrer_user_id = ${userId}
         )`
     );
     await tx
-      .delete(kiloclaw_referral_conversions)
+      .delete(impact_referral_conversions)
       .where(
         or(
-          eq(kiloclaw_referral_conversions.referee_user_id, userId),
-          eq(kiloclaw_referral_conversions.referrer_user_id, userId)
+          eq(impact_referral_conversions.referee_user_id, userId),
+          eq(impact_referral_conversions.referrer_user_id, userId)
         )
       );
     await tx
-      .delete(kiloclaw_referrals)
+      .delete(impact_referrals)
       .where(
         or(
-          eq(kiloclaw_referrals.referee_user_id, userId),
-          eq(kiloclaw_referrals.referrer_user_id, userId)
+          eq(impact_referrals.referee_user_id, userId),
+          eq(impact_referrals.referrer_user_id, userId)
         )
       );
     await tx.delete(referral_codes).where(eq(referral_codes.kilo_user_id, userId));

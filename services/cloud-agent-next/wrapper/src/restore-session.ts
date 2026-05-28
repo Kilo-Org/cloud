@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { logToFile } from './utils.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -25,7 +26,9 @@ type SnapshotDiff = {
 // ---------------------------------------------------------------------------
 
 function log(msg: string): void {
-  console.error(`restore-session: ${msg}`);
+  const message = `restore-session: ${msg}`;
+  console.error(message);
+  logToFile(message);
 }
 
 function fail(
@@ -59,6 +62,10 @@ function resolveKilocodeToken(): string | undefined {
 }
 
 type SnapshotInfoValidation = 'valid' | 'missing' | 'invalid';
+type SnapshotInfoValidationResult = {
+  validation: SnapshotInfoValidation;
+  infoId?: string;
+};
 
 type JsonCharReader = {
   next: () => Promise<string | null>;
@@ -234,13 +241,13 @@ async function skipJsonValue(reader: JsonCharReader): Promise<boolean> {
   return skipJsonScalar(reader, firstChar);
 }
 
-type InfoObjectValidation = { ok: true; infoId: SnapshotInfoValidation } | { ok: false };
+type InfoObjectValidation = { ok: true; infoId?: string } | { ok: false };
 
 async function validateInfoObject(reader: JsonCharReader): Promise<InfoObjectValidation> {
-  let infoId: SnapshotInfoValidation = 'missing';
+  let infoId: string | undefined;
   const firstChar = await nextNonWhitespace(reader);
   if (firstChar === null) return { ok: false };
-  if (firstChar === '}') return { ok: true, infoId };
+  if (firstChar === '}') return { ok: true };
   reader.unread(firstChar);
 
   while (true) {
@@ -252,19 +259,20 @@ async function validateInfoObject(reader: JsonCharReader): Promise<InfoObjectVal
       const idValueStart = await nextNonWhitespace(reader);
       if (idValueStart === null) return { ok: false };
       if (idValueStart === '"') {
-        if ((await readJsonString(reader, { collect: false })) === null) return { ok: false };
-        infoId = 'valid';
+        const nextInfoId = await readJsonString(reader, { collect: true });
+        if (nextInfoId === null) return { ok: false };
+        infoId = nextInfoId;
       } else {
         reader.unread(idValueStart);
         if (!(await skipJsonValue(reader))) return { ok: false };
-        infoId = 'missing';
+        infoId = undefined;
       }
     } else if (!(await skipJsonValue(reader))) {
       return { ok: false };
     }
 
     const separator = await nextNonWhitespace(reader);
-    if (separator === '}') return { ok: true, infoId };
+    if (separator === '}') return infoId === undefined ? { ok: true } : { ok: true, infoId };
     if (separator !== ',') return { ok: false };
 
     const nextMember = await nextNonWhitespace(reader);
@@ -273,49 +281,52 @@ async function validateInfoObject(reader: JsonCharReader): Promise<InfoObjectVal
   }
 }
 
-async function validateSnapshotInfoId(snapshotPath: string): Promise<SnapshotInfoValidation> {
+async function validateSnapshotInfoId(snapshotPath: string): Promise<SnapshotInfoValidationResult> {
   const reader = createJsonCharReader(snapshotPath);
   try {
-    if ((await nextNonWhitespace(reader)) !== '{') return 'invalid';
+    if ((await nextNonWhitespace(reader)) !== '{') return { validation: 'invalid' };
 
-    let infoId: SnapshotInfoValidation = 'missing';
+    let infoId: string | undefined;
     const firstChar = await nextNonWhitespace(reader);
-    if (firstChar === null) return 'invalid';
+    if (firstChar === null) return { validation: 'invalid' };
     if (firstChar !== '}') {
       reader.unread(firstChar);
 
       while (true) {
-        if ((await nextNonWhitespace(reader)) !== '"') return 'invalid';
+        if ((await nextNonWhitespace(reader)) !== '"') return { validation: 'invalid' };
         const key = await readJsonString(reader, { collect: true });
-        if (key === null || (await nextNonWhitespace(reader)) !== ':') return 'invalid';
+        if (key === null || (await nextNonWhitespace(reader)) !== ':') {
+          return { validation: 'invalid' };
+        }
 
         if (key === 'info') {
           const infoStart = await nextNonWhitespace(reader);
-          if (infoStart === null) return 'invalid';
+          if (infoStart === null) return { validation: 'invalid' };
           if (infoStart === '{') {
             const infoValidation = await validateInfoObject(reader);
-            if (!infoValidation.ok) return 'invalid';
+            if (!infoValidation.ok) return { validation: 'invalid' };
             infoId = infoValidation.infoId;
           } else {
             reader.unread(infoStart);
-            if (!(await skipJsonValue(reader))) return 'invalid';
-            infoId = 'missing';
+            if (!(await skipJsonValue(reader))) return { validation: 'invalid' };
+            infoId = undefined;
           }
         } else if (!(await skipJsonValue(reader))) {
-          return 'invalid';
+          return { validation: 'invalid' };
         }
 
         const separator = await nextNonWhitespace(reader);
         if (separator === '}') break;
-        if (separator !== ',') return 'invalid';
+        if (separator !== ',') return { validation: 'invalid' };
 
         const nextMember = await nextNonWhitespace(reader);
-        if (nextMember === null || nextMember === '}') return 'invalid';
+        if (nextMember === null || nextMember === '}') return { validation: 'invalid' };
         reader.unread(nextMember);
       }
     }
 
-    return (await nextNonWhitespace(reader)) === null ? infoId : 'invalid';
+    if ((await nextNonWhitespace(reader)) !== null) return { validation: 'invalid' };
+    return infoId === undefined ? { validation: 'missing' } : { validation: 'valid', infoId };
   } finally {
     reader.close();
   }
@@ -405,7 +416,9 @@ export async function restoreSession(
   const tmpPath = filePath ?? `/tmp/kilo-session-export-${kiloSessionId}.json`;
   const downloaded = !filePath;
 
-  log(`starting kiloSessionId=${kiloSessionId} workspace=${workspacePath}`);
+  log(
+    `starting kiloSessionId=${kiloSessionId} workspace=${workspacePath} input=${downloaded ? 'downloaded' : 'provided'} tmpPath=${tmpPath} home=${process.env.HOME ?? '(unset)'}`
+  );
 
   if (!filePath) {
     const ingestUrl = process.env.KILO_SESSION_INGEST_URL;
@@ -453,11 +466,14 @@ export async function restoreSession(
       // and exit 1. Stream only the top-level metadata guardrail instead of
       // materializing the full export in the wrapper heap.
       const snapshotInfoValidation = await validateSnapshotInfoId(tmpPath);
-      if (snapshotInfoValidation === 'invalid') {
+      log(
+        `snapshot metadata validated status=${snapshotInfoValidation.validation} expectedKiloSessionId=${kiloSessionId} snapshotInfoId=${snapshotInfoValidation.infoId ?? '(missing)'} idMatchesExpected=${snapshotInfoValidation.infoId === kiloSessionId} bytes=${bytesWritten}`
+      );
+      if (snapshotInfoValidation.validation === 'invalid') {
         log('snapshot is not valid JSON before info.id metadata');
         return fail(`snapshot is not valid JSON (${bytesWritten} bytes)`, null, 'download');
       }
-      if (snapshotInfoValidation === 'missing') {
+      if (snapshotInfoValidation.validation === 'missing') {
         log('snapshot missing info.id — likely an error response');
         return fail(
           `snapshot missing info.id (${bytesWritten} bytes); session-ingest may have returned an error body`,
@@ -472,11 +488,24 @@ export async function restoreSession(
     }
   } else {
     log(`using provided file=${filePath}`);
+    try {
+      const providedInfoValidation = await validateSnapshotInfoId(tmpPath);
+      log(
+        `provided snapshot metadata inspected status=${providedInfoValidation.validation} expectedKiloSessionId=${kiloSessionId} snapshotInfoId=${providedInfoValidation.infoId ?? '(missing)'} idMatchesExpected=${providedInfoValidation.infoId === kiloSessionId}`
+      );
+    } catch (err) {
+      log(
+        `provided snapshot metadata inspection failed expectedKiloSessionId=${kiloSessionId} error=${err instanceof Error ? err.message : String(err)}`
+      );
+    }
   }
 
   try {
     // ---- Step 2: Run kilo import ----
-    log('running kilo import');
+    const importStartedAt = Date.now();
+    log(
+      `running kilo import kiloSessionId=${kiloSessionId} input=${downloaded ? 'downloaded' : 'provided'} cwd=${workspacePath} home=${process.env.HOME ?? '(unset)'} tmpPath=${tmpPath}`
+    );
     const importProc = Bun.spawn(['kilo', 'import', tmpPath], {
       stdout: 'pipe',
       stderr: 'pipe',
@@ -484,12 +513,17 @@ export async function restoreSession(
       env: process.env,
     });
     const exitCode = await importProc.exited;
+    const importElapsedMs = Date.now() - importStartedAt;
 
     if (exitCode !== 0) {
-      log(`kilo import failed exitCode=${exitCode}`);
+      log(
+        `kilo import finished outcome=error exitCode=${exitCode} kiloSessionId=${kiloSessionId} input=${downloaded ? 'downloaded' : 'provided'} cwd=${workspacePath} home=${process.env.HOME ?? '(unset)'} elapsedMs=${importElapsedMs}`
+      );
       return fail(`kilo import failed exitCode=${exitCode}`, null, 'import');
     }
-    log('kilo import succeeded');
+    log(
+      `kilo import finished outcome=ok exitCode=${exitCode} kiloSessionId=${kiloSessionId} input=${downloaded ? 'downloaded' : 'provided'} cwd=${workspacePath} home=${process.env.HOME ?? '(unset)'} elapsedMs=${importElapsedMs}`
+    );
 
     // ---- Step 3: Apply diffs ----
     // Extract diffs in a subprocess so the full snapshot JSON is never loaded

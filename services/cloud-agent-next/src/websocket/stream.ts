@@ -24,6 +24,7 @@ import type {
   CommandsAvailableData,
 } from '../shared/protocol.js';
 import type { SlashCommandInfo } from '../shared/slash-commands.js';
+import { logger } from '../logger.js';
 
 /**
  * Approximate byte budget per replay round.
@@ -53,7 +54,9 @@ const REPLAY_BATCH_BYTES = 1_048_576; // 1 MiB
 export function formatStreamEvent(event: StoredEvent, sessionId: SessionId): StreamEvent {
   return {
     eventId: event.id,
-    executionId: event.execution_id as StreamEvent['executionId'],
+    ...(event.execution_id
+      ? { executionId: event.execution_id as StreamEvent['executionId'] }
+      : {}),
     sessionId,
     streamEventType: event.stream_event_type as StreamEvent['streamEventType'],
     timestamp: new Date(event.timestamp).toISOString(),
@@ -76,6 +79,25 @@ export function createErrorMessage(code: StreamErrorCode, message: string): Stre
 // Stream Handler Factory
 // ---------------------------------------------------------------------------
 
+/**
+ * A currently-queued user message that should be resurfaced on WebSocket
+ * connect so the client can render the user bubble without waiting for
+ * async preparation (or a page reload) to surface it via another event.
+ */
+export type QueuedMessageSnapshot = {
+  messageId: string;
+  content: string;
+  timestamp: number;
+  terminalFailure?: {
+    status: 'failed' | 'interrupted';
+    completionSource?: string;
+    reason?: string;
+    error?: string;
+    attempts?: number;
+    timestamp: number;
+  };
+};
+
 /** Options for deriving current session state in the `connected` event. */
 export type StreamHandlerOptions = {
   deriveCloudStatus?: () => Promise<CloudStatusData['cloudStatus'] | null>;
@@ -84,6 +106,7 @@ export type StreamHandlerOptions = {
    * connect — it never calls back to the wrapper at this point.
    */
   getAvailableCommands?: () => Promise<SlashCommandInfo[]>;
+  deriveQueuedMessages?: () => Promise<QueuedMessageSnapshot[]>;
 };
 
 /**
@@ -131,7 +154,6 @@ export function createStreamHandler(
       const url = new URL(request.url);
       const filters = parseStreamFilters(url, sessionId);
       const skipReplay = url.searchParams.get('replay') === 'false';
-
       // Create WebSocket pair
       const pair = new WebSocketPair();
       const client = pair[0];
@@ -147,6 +169,9 @@ export function createStreamHandler(
       // Use a single 'stream' tag since tags are capped at 10
       state.acceptWebSocket(server, ['stream']);
       server.serializeAttachment(attachment);
+      logger
+        .withFields({ sessionId, connectedClientCount: state.getWebSockets('stream').length })
+        .info('Client stream WebSocket registered');
 
       // Replay historical events unless client opted out
       if (!skipReplay) {
@@ -160,14 +185,12 @@ export function createStreamHandler(
         const connectedData: ConnectedEventData = {};
         const cloudStatus = await options?.deriveCloudStatus?.();
         if (cloudStatus) connectedData.cloudStatus = cloudStatus;
-
         // eventId: 0 is the sentinel for non-persisted synthetic events.
         // Real SQLite-backed events carry their actual row ID; downstream
         // clients that track a replay cursor should skip eventId 0.
         server.send(
           JSON.stringify({
             eventId: 0,
-            executionId: null,
             sessionId,
             streamEventType: 'connected' as const,
             timestamp: new Date().toISOString(),
@@ -203,6 +226,67 @@ export function createStreamHandler(
         }
       }
 
+      // Resurface currently-queued user messages so the client can render
+      // them immediately. This covers two gaps: (1) on the initial-session
+      // path, registerSession persists the prompt in metadata before any WS
+      // is connected and before queueExecutionPlan's synchronous broadcast
+      // runs, so no cloud.message.queued reaches the page otherwise; (2) on
+      // page reload while messages are still pending, replay=false on the
+      // client means past queued events aren't replayed from the event log.
+      // These are volatile — the client's synthesizeQueuedUserMessage is
+      // idempotent, so a later authoritative message.updated from the
+      // wrapper overwrites the synthetic bubble cleanly.
+      const queued = (await options?.deriveQueuedMessages?.()) ?? [];
+      for (const msg of queued) {
+        const matches = matchesFilters(
+          {
+            id: 0 as EventId,
+            execution_id: '',
+            session_id: sessionId,
+            stream_event_type: 'cloud.message.queued',
+            payload: '',
+            timestamp: msg.timestamp,
+          },
+          filters
+        );
+        if (!matches) continue;
+
+        server.send(
+          JSON.stringify({
+            eventId: 0,
+            sessionId,
+            streamEventType: 'cloud.message.queued' as const,
+            timestamp: new Date(msg.timestamp).toISOString(),
+            data: {
+              messageId: msg.messageId,
+              content: msg.content,
+              delivery: 'queued',
+            },
+          })
+        );
+
+        if (msg.terminalFailure) {
+          server.send(
+            JSON.stringify({
+              eventId: 0,
+              sessionId,
+              streamEventType: 'cloud.message.failed' as const,
+              timestamp: new Date(msg.terminalFailure.timestamp).toISOString(),
+              data: {
+                messageId: msg.messageId,
+                status: msg.terminalFailure.status,
+                delivery: 'queued',
+                accepted: false,
+                completionSource: msg.terminalFailure.completionSource,
+                reason: msg.terminalFailure.reason,
+                attempts: msg.terminalFailure.attempts,
+                error: msg.terminalFailure.error,
+              },
+            })
+          );
+        }
+      }
+
       return new Response(null, { status: 101, webSocket: client });
     },
 
@@ -221,6 +305,10 @@ export function createStreamHandler(
      * @param filters - The client's filter preferences
      */
     async replayEvents(ws: WebSocket, filters: StreamFilters): Promise<void> {
+      const startedAt = Date.now();
+      let totalBytesSent = 0;
+      let totalEventsSent = 0;
+      let replayRounds = 0;
       try {
         let cursor: EventId | undefined = filters.fromId;
 
@@ -229,6 +317,7 @@ export function createStreamHandler(
 
           let bytesSent = 0;
           let eventsSent = 0;
+          replayRounds++;
 
           for (const event of eventQueries.iterateByFilters({
             fromId: cursor,
@@ -240,8 +329,10 @@ export function createStreamHandler(
             const message = JSON.stringify(formatStreamEvent(event, sessionId));
             ws.send(message);
             bytesSent += message.length;
+            totalBytesSent += message.length;
             cursor = event.id;
             eventsSent++;
+            totalEventsSent++;
 
             if (bytesSent >= REPLAY_BATCH_BYTES) break;
           }
@@ -249,8 +340,27 @@ export function createStreamHandler(
           // No events yielded — replay is complete
           if (eventsSent === 0) break;
         }
+        logger
+          .withFields({
+            sessionId,
+            totalEventsSent,
+            totalBytesSent,
+            replayRounds,
+            elapsedMs: Date.now() - startedAt,
+            socketOpen: ws.readyState === WebSocket.OPEN,
+          })
+          .info('Client stream replay completed');
       } catch (error) {
-        console.error('Error replaying events:', error);
+        logger
+          .withFields({
+            sessionId,
+            totalEventsSent,
+            totalBytesSent,
+            replayRounds,
+            elapsedMs: Date.now() - startedAt,
+            error: error instanceof Error ? error.message : String(error),
+          })
+          .error('Error replaying client stream events');
         ws.send(
           JSON.stringify(
             createErrorMessage('WS_INTERNAL_ERROR', 'Failed to replay historical events')
@@ -288,7 +398,14 @@ export function createStreamHandler(
           const formatted = formatStreamEvent(event, sessionId);
           ws.send(JSON.stringify(formatted));
         } catch (error) {
-          console.error('Error broadcasting to WebSocket:', error);
+          logger
+            .withFields({
+              sessionId,
+              eventId: event.id,
+              streamEventType: event.stream_event_type,
+              error: error instanceof Error ? error.message : String(error),
+            })
+            .error('Error broadcasting event to client stream WebSocket');
           // Don't close the WebSocket on broadcast error - let the client handle reconnection
         }
       }

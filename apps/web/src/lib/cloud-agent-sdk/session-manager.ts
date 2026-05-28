@@ -1,3 +1,4 @@
+import type { CloudAgentAttachments } from '@/lib/cloud-agent/constants';
 import type { Images } from '@/lib/images-schema';
 import { errorShapeSchema } from './schemas';
 import type { TransportSendPayload } from './transport';
@@ -24,9 +25,9 @@ import type {
   SlashCommandInfo,
   SuggestionAction,
   SuggestionState,
+  MessageDeliveryState,
   MessageInfo,
   Part,
-  TextPart,
 } from './types';
 import type { QuestionInfo } from '@/types/opencode.gen';
 import { splitByContiguousPrefix } from './array-utils';
@@ -51,7 +52,7 @@ type SessionConfig = {
   /** Custom modes exposed by this session's profile stack (slug + name, plus optional model and thinking-effort overrides). */
   runtimeAgents?: Array<{ slug: string; name: string; model?: string; variant?: string }>;
 };
-type ActiveSessionType = 'cloud-agent' | 'remote';
+type ActiveSessionType = ResolvedSession['type'];
 type StandaloneQuestion = { requestId: string; questions: QuestionInfo[] };
 type StandalonePermission = {
   requestId: string;
@@ -121,6 +122,7 @@ type PrepareInput = {
   profileId?: string;
   /** Optional structured payload for the first execution (command variant allows slash-command starts). */
   initialPayload?: TransportSendPayload;
+  initialMessageId?: string;
 };
 
 type SessionManagerConfig = {
@@ -157,6 +159,8 @@ type SessionManagerAtoms = {
   isLoading: W<boolean>;
   /** Session structurally cannot accept input (no transport send). */
   isReadOnly: W<boolean>;
+  /** Active resolved transport can deliver canonical Cloud Agent attachments. */
+  supportsAttachments: W<boolean>;
   canSend: W<boolean>;
   canInterrupt: W<boolean>;
   statusIndicator: W<SessionStatusIndicator | null>;
@@ -174,6 +178,7 @@ type SessionManagerAtoms = {
   chatUI: W<{ shouldAutoScroll: boolean }>;
   permission: W<PermissionState | null>;
   suggestion: W<SuggestionState | null>;
+  pendingMessages: W<ReadonlyMap<string, MessageDeliveryState>>;
   failedPrompt: W<string | null>;
   fetchedSessionData: W<FetchedSessionData | null>;
   /** Slash command catalog reported by the wrapper for the current session. */
@@ -189,7 +194,11 @@ type SessionManagerAtoms = {
 type SessionManager = {
   switchSession(kiloSessionId: KiloSessionId): Promise<void>;
   hydrateChildSession(childSessionId: KiloSessionId): Promise<void>;
-  send(input: { payload: TransportSendPayload; images?: Images }): Promise<boolean>;
+  send(input: {
+    payload: TransportSendPayload;
+    attachments?: CloudAgentAttachments;
+    images?: Images;
+  }): Promise<boolean>;
   interrupt(): Promise<void>;
   answerQuestion(requestId: string, answers: string[][]): Promise<void>;
   rejectQuestion(requestId: string): Promise<void>;
@@ -300,6 +309,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   const isStreamingAtom = atom(false);
   const isLoadingAtom = atom(false);
   const isReadOnlyAtom = atom(false);
+  const supportsAttachmentsAtom = atom(false);
   const canSendAtom = atom(false);
   const canInterruptAtom = atom(false);
   const statusIndicatorAtom = atom<SessionStatusIndicator | null>(null);
@@ -317,6 +327,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   const activePermissionAtom = atom<StandalonePermission | null>(null);
   const suggestionAtom = atom<SuggestionState | null>(null);
   const activeSuggestionAtom = atom<StandaloneSuggestion | null>(null);
+  const pendingMessagesAtom = atom<ReadonlyMap<string, MessageDeliveryState>>(new Map());
   const failedPromptAtom = atom<string | null>(null);
   const fetchedSessionDataAtom = atom<FetchedSessionData | null>(null);
   /**
@@ -380,6 +391,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
 
   // Private mutable state
   let activeSessionId: KiloSessionId | null = null;
+  let switchGeneration = 0;
   let currentSession: CloudAgentSession | null = null;
   let activeSessionType: ActiveSessionType | null = null;
   let stateUnsub: (() => void) | null = null;
@@ -406,6 +418,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     store.set(isStreamingAtom, false);
     store.set(isLoadingAtom, false);
     store.set(isReadOnlyAtom, false);
+    store.set(supportsAttachmentsAtom, false);
     store.set(canSendAtom, false);
     store.set(canInterruptAtom, false);
     store.set(statusIndicatorAtom, null);
@@ -422,36 +435,12 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     store.set(activePermissionAtom, null);
     store.set(suggestionAtom, null);
     store.set(activeSuggestionAtom, null);
+    store.set(pendingMessagesAtom, new Map());
     store.set(failedPromptAtom, null);
     store.set(fetchedSessionDataAtom, null);
     store.set(childSessionHydrationStatesAtom, new Map());
     store.set(chatUIAtom, { shouldAutoScroll: true });
     store.set(availableCommandsAtom, []);
-  }
-
-  function upsertInitialMessageFromFetchedMetadata(
-    storage: JotaiSessionStorage,
-    kiloSessionId: KiloSessionId,
-    data: FetchedSessionData
-  ): void {
-    if (!data.prompt || !data.initialMessageId) return;
-
-    storage.upsertMessage({
-      id: data.initialMessageId,
-      sessionID: kiloSessionId,
-      role: 'user',
-      time: { created: Date.now() },
-      agent: '',
-      model: { providerID: '', modelID: '' },
-    } satisfies MessageInfo);
-    storage.upsertPart(data.initialMessageId, {
-      id: `${data.initialMessageId}-text`,
-      sessionID: kiloSessionId,
-      messageID: data.initialMessageId,
-      type: 'text',
-      text: data.prompt,
-      synthetic: true,
-    } satisfies TextPart);
   }
 
   function setChildSessionHydrationState(
@@ -558,6 +547,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       store.set(permissionAtom, session.state.getPermission());
       store.set(suggestionAtom, session.state.getSuggestion());
       store.set(sessionInfoAtom, session.state.getSessionInfo());
+      store.set(pendingMessagesAtom, new Map(session.state.getPendingMessages()));
 
       // canSend factors in cloud status: preparing/finalizing blocks input
       const cloudReady = cs === null || cs.type === 'ready';
@@ -614,6 +604,8 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   async function switchSession(kiloSessionId: KiloSessionId): Promise<void> {
     childSessionHydrationGeneration += 1;
     childSessionHydrationRequests.clear();
+    switchGeneration += 1;
+    const expectedGeneration = switchGeneration;
     activeSessionId = kiloSessionId;
     activeSessionType = null;
     stateUnsub?.();
@@ -632,12 +624,12 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     try {
       data = await config.fetchSession(kiloSessionId);
     } catch (err) {
-      if (kiloSessionId !== activeSessionId) return;
+      if (expectedGeneration !== switchGeneration) return;
       store.set(isLoadingAtom, false);
       setIndicator({ type: 'error', message: formatError(err), timestamp: Date.now() });
       return;
     }
-    if (kiloSessionId !== activeSessionId) return;
+    if (expectedGeneration !== switchGeneration) return;
     store.set(fetchedSessionDataAtom, data);
 
     const jotaiStorage = createJotaiStorage(store);
@@ -655,8 +647,6 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       runtimeAgents: data.runtimeAgents,
     });
     store.set(sessionIdAtom, data.cloudAgentSessionId);
-
-    upsertInitialMessageFromFetchedMetadata(jotaiStorage, kiloSessionId, data);
 
     config.onKiloSessionCreated?.(kiloSessionId);
 
@@ -715,8 +705,8 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         if (as?.requestId === requestId) store.set(activeSuggestionAtom, null);
       },
       onResolved: resolved => {
-        if (resolved.type === 'cloud-agent') activeSessionType = 'cloud-agent';
-        else if (resolved.type === 'remote') activeSessionType = 'remote';
+        activeSessionType = resolved.type;
+        store.set(supportsAttachmentsAtom, resolved.type === 'cloud-agent');
       },
       onBranchChanged: branch => {
         const currentFetched = store.get(fetchedSessionDataAtom);
@@ -726,6 +716,14 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         config.onBranchChanged?.(branch);
       },
       onError: message => store.set(errorAtom, message),
+      onMessageFailed: (_messageId, deliveryState) => {
+        if (deliveryState.reason === 'execution') return;
+        const message =
+          deliveryState.reason === 'interrupted'
+            ? 'Queued message interrupted'
+            : 'Message failed to deliver';
+        setIndicator({ type: 'error', message, timestamp: Date.now() });
+      },
       onEvent: event => {
         if (event.type === 'commands.available') {
           // Replace the catalog wholesale. The DO sends the full list on
@@ -734,6 +732,9 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
           return;
         }
         if (event.type === 'message.updated' && event.info.role === 'assistant') {
+          const rootSessionId = store.get(rootSessionIdAtom);
+          if (rootSessionId !== null && event.info.sessionID !== rootSessionId) return;
+
           // `info.agent` is the agent slug (e.g. 'code', 'e-code'); `info.mode`
           // is the visibility ('primary'|'subagent'|'all') and must not be used
           // as the picker's selected mode.
@@ -755,7 +756,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       },
     });
 
-    if (kiloSessionId !== activeSessionId) {
+    if (expectedGeneration !== switchGeneration) {
       session.destroy();
       return;
     }
@@ -773,53 +774,36 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     session.connect();
   }
 
-  async function send(input: { payload: TransportSendPayload; images?: Images }): Promise<boolean> {
+  async function send(input: {
+    payload: TransportSendPayload;
+    attachments?: CloudAgentAttachments;
+    images?: Images;
+  }): Promise<boolean> {
     store.set(errorAtom, null);
     if (store.get(agentStatusAtom).type !== 'disconnected') {
       setIndicator(null);
     }
 
-    const storage = store.get(sessionStorageAtom);
+    // Snapshot before any await — switchSession() can retarget activeSessionId
+    // and activeSessionType while send is in flight; we need the values that
+    // were current when the user pressed send, not the post-switch ones.
     const kiloSessionId = activeSessionId;
+    const sessionType = activeSessionType;
     const messageId = generateMessageId();
-    const shouldStoreOptimisticMessage = activeSessionType === 'cloud-agent';
-    const optimisticCreatedAt = Date.now();
-
-    // For commands, render the optimistic user message as `/command args` so
-    // the chat shows what the user did. The agent's structured response then
-    // arrives via the same kilocode event stream as a normal prompt.
-    const optimisticText =
+    const messageText =
       input.payload.type === 'command'
         ? `/${input.payload.command}${input.payload.arguments ? ` ${input.payload.arguments}` : ''}`
         : input.payload.prompt;
-    const optimisticModel = input.payload.type === 'prompt' ? (input.payload.model ?? '') : '';
-
-    if (storage && kiloSessionId && shouldStoreOptimisticMessage) {
-      storage.upsertMessage({
-        id: messageId,
-        sessionID: kiloSessionId,
-        role: 'user',
-        time: { created: optimisticCreatedAt },
-        agent: '',
-        model: { providerID: '', modelID: optimisticModel },
-      });
-      storage.upsertPart(messageId, {
-        id: `${messageId}-text`,
-        sessionID: kiloSessionId,
-        messageID: messageId,
-        type: 'text',
-        text: optimisticText,
-        synthetic: true,
-      });
-    }
 
     try {
       if (!currentSession) throw new Error('No active session');
-      // Snapshot before await — switchSession() can overwrite these while send is in flight.
-      const sessionType = activeSessionType;
+      if (input.attachments && sessionType !== 'cloud-agent') {
+        throw new Error('Only Cloud Agent sessions support attachments');
+      }
       await currentSession.send({
         payload: input.payload,
         messageId,
+        ...(input.attachments ? { attachments: input.attachments } : {}),
         images: input.images,
       });
       if (sessionType === 'remote' && kiloSessionId) {
@@ -827,12 +811,9 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       }
       return true;
     } catch (err) {
-      if (storage && shouldStoreOptimisticMessage) {
-        storage.deleteMessage(messageId);
-      }
-      store.set(failedPromptAtom, optimisticText);
+      store.set(failedPromptAtom, messageText);
       const message = formatError(err);
-      config.onSendFailed?.(optimisticText, message, err);
+      config.onSendFailed?.(messageText, message, err);
       if (store.get(agentStatusAtom).type !== 'disconnected') {
         setIndicator({ type: 'error', message, timestamp: Date.now() });
       }
@@ -893,7 +874,11 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
 
   async function createAndStart(input: PrepareInput): Promise<void> {
     try {
-      const { cloudAgentSessionId, kiloSessionId } = await config.prepare(input);
+      const initialMessageId = input.initialMessageId ?? generateMessageId();
+      const { cloudAgentSessionId, kiloSessionId } = await config.prepare({
+        ...input,
+        initialMessageId,
+      });
       await config.initiate({ cloudAgentSessionId });
       store.set(sessionIdAtom, cloudAgentSessionId);
       await switchSession(kiloSessionId);
@@ -905,6 +890,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   function destroy(): void {
     childSessionHydrationGeneration += 1;
     childSessionHydrationRequests.clear();
+    switchGeneration += 1;
     stateUnsub?.();
     stateUnsub = null;
     currentSession?.destroy();
@@ -938,6 +924,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       isStreaming: isStreamingAtom,
       isLoading: isLoadingAtom,
       isReadOnly: isReadOnlyAtom,
+      supportsAttachments: supportsAttachmentsAtom,
       canSend: canSendAtom,
       canInterrupt: canInterruptAtom,
       statusIndicator: statusIndicatorAtom,
@@ -955,6 +942,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       activePermission: activePermissionAtom,
       suggestion: suggestionAtom,
       activeSuggestion: activeSuggestionAtom,
+      pendingMessages: pendingMessagesAtom,
       failedPrompt: failedPromptAtom,
       fetchedSessionData: fetchedSessionDataAtom,
       availableCommands: availableCommandsAtom,

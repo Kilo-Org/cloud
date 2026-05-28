@@ -3,20 +3,28 @@
  *
  * Exposes the wrapper's HTTP API for the Worker to interact with:
  * - GET /health - Health check (includes sessionId)
- * - GET /job/status - Current job status
- * - POST /job/prompt - Send a prompt (includes execution binding)
- * - POST /job/command - Send a command (includes execution binding)
+ * - GET /job/status - Current status
+ * - POST /job/prompt - Send a prompt (includes session binding)
+ * - POST /session/ready - Prepare workspace and Kilo runtime
+ * - POST /job/command - Send a command (includes session binding)
  * - POST /job/answer-permission - Answer a permission request
  * - POST /job/answer-question - Answer a question
  * - POST /job/reject-question - Reject a question
- * - POST /job/abort - Abort the current job
+ * - POST /job/abort - Abort the current session
  */
 
-import type { WrapperState, JobContext } from './state.js';
+import type { WrapperState, SessionContext } from './state.js';
 import type { WrapperKiloClient, WrapperPtySize } from './kilo-api.js';
 import type { PerTurnConfig } from './lifecycle.js';
 import { createLogUploader } from './log-uploader.js';
 import { logToFile } from './utils.js';
+import { materializePromptAttachments as defaultMaterializePromptAttachments } from './session-bootstrap.js';
+import {
+  isWrapperSessionReadyRequest,
+  type WrapperPromptRequest,
+  type WrapperSessionReadyRequest,
+  type WrapperSessionReadyResponse,
+} from '../../src/shared/wrapper-bootstrap.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -46,40 +54,25 @@ export type ServerDependencies = {
   setAborted: () => void;
   /** Reset lifecycle state for a new execution */
   resetLifecycle: () => void;
-  /** Set per-turn config on the lifecycle manager */
-  setPerTurnConfig: (config: PerTurnConfig) => void;
+  /** Compatibility hook for callers that still construct wrapper server test deps. */
+  setPerTurnConfig?: (config: PerTurnConfig) => void;
+  /** Workspace/Kilo readiness path */
+  readySession?: (request: WrapperSessionReadyRequest) => Promise<WrapperSessionReadyResponse>;
+  /** Materialize signed prompt attachments into local file parts. */
+  materializePromptAttachments?: (prompt: WrapperPromptRequest) => Promise<WrapperPromptRequest>;
 };
 
-/**
- * Per-execution config, included in prompt/command bodies.
- * A new executionId triggers setup (log uploader, state reset).
- * Same executionId is idempotent. Omitted means use existing context.
- */
-type ExecutionBinding = {
-  executionId: string;
+export type SessionBinding = {
   ingestUrl: string;
-  ingestToken: string;
+  ingestToken?: string;
   workerAuthToken: string;
   upstreamBranch?: string;
+  wrapperRunId: string;
+  wrapperGeneration: number;
+  wrapperConnectionId: string;
 };
 
-type PromptBody = {
-  prompt?: string;
-  /** Message parts - text or file (with local file:// URL) */
-  parts?: Array<
-    { type: 'text'; text: string } | { type: 'file'; mime: string; url: string; filename?: string }
-  >;
-  model?: { providerID?: string; modelID: string };
-  variant?: string;
-  agent?: string;
-  messageId?: string;
-  system?: string;
-  tools?: Record<string, boolean>;
-  autoCommit?: boolean;
-  condenseOnComplete?: boolean;
-  /** Per-execution config — new executionId triggers setup */
-  execution?: ExecutionBinding;
-};
+type PromptBody = WrapperPromptRequest;
 
 type CommandBody = {
   command: string;
@@ -87,8 +80,8 @@ type CommandBody = {
   messageId?: string;
   autoCommit?: boolean;
   condenseOnComplete?: boolean;
-  /** Per-execution config — new executionId triggers setup */
-  execution?: ExecutionBinding;
+  session?: SessionBinding;
+  execution?: SessionBinding;
 };
 
 type AnswerPermissionBody = {
@@ -194,54 +187,37 @@ function parsePtyPath(path: string): { ptyId: string; action?: 'connect' } | nul
   };
 }
 
-/**
- * Bind execution context from a prompt/command body.
- *
- * - If `execution` present with a new `executionId`: run setup (store context,
- *   create log uploader, reset lifecycle).
- * - If same `executionId`: no-op (idempotent).
- * - If `execution` omitted: use existing job context (for follow-up calls
- *   like answer-question).
- *
- * Returns an error Response if binding fails, or null on success.
- */
-async function bindExecutionContext(
-  execution: ExecutionBinding | undefined,
+export async function bindSessionContext(
+  binding: SessionBinding | undefined,
   config: ServerConfig,
   deps: ServerDependencies
 ): Promise<Response | null> {
   const { state } = deps;
 
-  if (!execution) {
-    // No execution binding — use existing context
-    if (!state.hasJob) {
-      return errorResponse('NO_JOB', 'No execution context and no execution binding provided', 400);
+  if (!binding) {
+    if (!state.hasSession) {
+      return errorResponse('NO_SESSION', 'No session context and no binding provided', 400);
     }
     return null;
   }
 
-  // Idempotent: same executionId
-  const currentJob = state.currentJob;
-  if (currentJob && currentJob.executionId === execution.executionId) {
-    return null;
+  const missingFields: string[] = [];
+  if (!binding.wrapperRunId) missingFields.push('wrapperRunId');
+  if (binding.wrapperGeneration === undefined || binding.wrapperGeneration === null) {
+    missingFields.push('wrapperGeneration');
   }
-
-  // Conflict: different executionId while active
-  if (currentJob && state.isActive) {
-    logToFile(
-      `execution binding conflict: active=${currentJob.executionId} requested=${execution.executionId}`
-    );
+  if (!binding.wrapperConnectionId) missingFields.push('wrapperConnectionId');
+  if (missingFields.length > 0) {
     return errorResponse(
-      'JOB_CONFLICT',
-      `Cannot bind new execution while execution ${currentJob.executionId} is active`,
-      409
+      'INVALID_REQUEST',
+      `Session binding missing required fields: ${missingFields.join(', ')}`,
+      400
     );
   }
 
-  // Parse ingest URL to derive worker base URL for log uploads
   let workerBaseUrl: string;
   try {
-    const ingestOrigin = new URL(execution.ingestUrl);
+    const ingestOrigin = new URL(binding.ingestUrl);
     ingestOrigin.protocol =
       ingestOrigin.protocol === 'wss:' || ingestOrigin.protocol === 'https:' ? 'https:' : 'http:';
     workerBaseUrl = ingestOrigin.origin;
@@ -249,53 +225,65 @@ async function bindExecutionContext(
     return errorResponse('INVALID_REQUEST', 'Invalid ingestUrl', 400);
   }
 
-  // Build job context
-  const jobContext: JobContext = {
-    executionId: execution.executionId,
+  const existingSession = state.currentSession;
+
+  if (!existingSession) {
+    if (state.isConnected) {
+      await deps.closeConnection();
+    }
+    deps.resetLifecycle();
+
+    const sessionContext: SessionContext = {
+      kiloSessionId: config.sessionId,
+      ingestUrl: binding.ingestUrl,
+      ingestToken: binding.ingestToken,
+      workerAuthToken: binding.workerAuthToken,
+      platform: config.platform,
+      wrapperRunId: binding.wrapperRunId,
+      wrapperGeneration: binding.wrapperGeneration,
+      wrapperConnectionId: binding.wrapperConnectionId,
+      agentSessionId: config.agentSessionId,
+    };
+    state.bindSession(sessionContext);
+
+    const cliLogDir = `/home/${config.agentSessionId}/.local/share/kilo/log`;
+    const wrapperLogPath = process.env.WRAPPER_LOG_PATH ?? '/tmp/kilocode-wrapper.log';
+    const logUploader = createLogUploader({
+      workerBaseUrl,
+      sessionId: config.agentSessionId,
+      executionId: 'session',
+      userId: config.userId,
+      workerAuthToken: binding.workerAuthToken,
+      cliLogDir,
+      wrapperLogPath,
+    });
+    state.setLogUploader(logUploader);
+    logUploader.start();
+    logToFile(`session bound: sessionId=${config.sessionId}`);
+    return null;
+  }
+
+  const sessionContext: SessionContext = {
     kiloSessionId: config.sessionId,
-    ingestUrl: execution.ingestUrl,
-    ingestToken: execution.ingestToken,
-    workerAuthToken: execution.workerAuthToken,
+    ingestUrl: binding.ingestUrl,
+    ingestToken: binding.ingestToken,
+    workerAuthToken: binding.workerAuthToken,
     platform: config.platform,
+    wrapperRunId: binding.wrapperRunId,
+    wrapperGeneration: binding.wrapperGeneration,
+    wrapperConnectionId: binding.wrapperConnectionId,
+    agentSessionId: config.agentSessionId,
   };
-
-  // Close stale ingest connection from the prior execution. The prior execution's
-  // 'complete' event was already delivered before the DO allowed this new execution
-  // to start, so all A-side events have been flushed — closing now is safe.
-  // Await the close to ensure the old event subscription is fully torn down
-  // before starting the new job context.
-  if (state.isConnected) {
-    await deps.closeConnection();
+  const result = state.bindSession(sessionContext);
+  if (result.changed) {
+    logToFile(
+      `session binding refreshed: generation=${binding.wrapperGeneration ?? 'none'} connectionId=${binding.wrapperConnectionId ?? 'none'}`
+    );
+    if (state.isConnected) {
+      await deps.closeConnection();
+    }
+    deps.resetLifecycle();
   }
-
-  // Reset lifecycle state from previous execution
-  deps.resetLifecycle();
-
-  // Start the job
-  try {
-    state.startJob(jobContext);
-  } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error);
-    logToFile(`execution binding failed: ${msg}`);
-    return errorResponse('JOB_CONFLICT', msg, 409);
-  }
-
-  // Create and start log uploader for this execution
-  const cliLogDir = `/home/${config.agentSessionId}/.local/share/kilo/log`;
-  const wrapperLogPath = process.env.WRAPPER_LOG_PATH ?? '/tmp/kilocode-wrapper.log';
-  const logUploader = createLogUploader({
-    workerBaseUrl,
-    sessionId: config.agentSessionId,
-    executionId: execution.executionId,
-    userId: config.userId,
-    workerAuthToken: execution.workerAuthToken,
-    cliLogDir,
-    wrapperLogPath,
-  });
-  state.setLogUploader(logUploader);
-  logUploader.start();
-  logToFile(`execution bound: executionId=${execution.executionId} sessionId=${config.sessionId}`);
-
   return null;
 }
 
@@ -310,6 +298,7 @@ function createHealthHandler(config: ServerConfig, state: WrapperState) {
       state: state.isActive ? 'active' : 'idle',
       version: config.version,
       sessionId: config.sessionId,
+      pendingMessages: state.pendingMessageIds.length,
     });
   };
 }
@@ -320,7 +309,7 @@ function createStatusHandler(state: WrapperState) {
   };
 }
 
-function createPromptHandler(config: ServerConfig, deps: ServerDependencies) {
+export function createPromptHandler(config: ServerConfig, deps: ServerDependencies) {
   return async (req: Request): Promise<Response> => {
     const { state, kiloClient, openConnection } = deps;
 
@@ -331,34 +320,44 @@ function createPromptHandler(config: ServerConfig, deps: ServerDependencies) {
       return errorResponse('INVALID_REQUEST', 'Invalid JSON body', 400);
     }
 
-    // Bind execution context if provided
-    const bindError = await bindExecutionContext(body.execution, config, deps);
+    if (!body.message?.id) {
+      return errorResponse('INVALID_REQUEST', 'message.id is required', 400);
+    }
+    if (!body.message.prompt && !body.message.parts) {
+      return errorResponse(
+        'INVALID_REQUEST',
+        'Either message.prompt or message.parts is required',
+        400
+      );
+    }
+
+    const binding = body.session;
+    const bindError = await bindSessionContext(binding, config, deps);
     if (bindError) return bindError;
 
-    const job = state.currentJob;
-    if (!job) {
-      return errorResponse('NO_JOB', 'No execution context available', 400);
+    const session = state.currentSession;
+    if (!session) {
+      return errorResponse('NO_SESSION', 'No session context available', 400);
+    }
+    const messageId = body.message.id;
+
+    let prompt = body;
+    if (body.message.attachments?.length) {
+      try {
+        prompt = await (deps.materializePromptAttachments ?? defaultMaterializePromptAttachments)(
+          body
+        );
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error);
+        logToFile(`job/prompt: failed to materialize attachments: ${msg}`);
+        return errorResponse('SEND_ERROR', `Failed to materialize attachments: ${msg}`, 500);
+      }
     }
 
-    // Validate prompt content
-    if (!body.prompt && !body.parts) {
-      return errorResponse('INVALID_REQUEST', 'Either prompt or parts is required', 400);
-    }
-    const messageId = body.messageId;
-
-    // Set per-turn config on the lifecycle manager
-    deps.setPerTurnConfig({
-      autoCommit: body.autoCommit ?? false,
-      condenseOnComplete: body.condenseOnComplete ?? false,
-      model: body.model?.modelID,
-      upstreamBranch: body.execution?.upstreamBranch,
-    });
-
-    // Open connection if idle
-    if (state.isIdle && !state.isConnected) {
+    if (!state.isConnected) {
       try {
         await openConnection();
-        logToFile('job/prompt: connection opened');
+        logToFile('job/prompt: subscription confirmed, connection opened');
       } catch (error) {
         const msg = error instanceof Error ? error.message : String(error);
         logToFile(`job/prompt: failed to open connection: ${msg}`);
@@ -366,35 +365,34 @@ function createPromptHandler(config: ServerConfig, deps: ServerDependencies) {
       }
     }
 
-    // Mark active
-    state.setActive(true);
+    state.acceptMessage(messageId, {
+      autoCommit: prompt.finalization?.autoCommit ?? false,
+      condenseOnComplete: prompt.finalization?.condenseOnComplete ?? false,
+      model: prompt.agent?.model?.modelID,
+      upstreamBranch: binding?.upstreamBranch,
+    });
 
-    // Send to kilo server
     try {
       await kiloClient.sendPromptAsync({
-        sessionId: job.kiloSessionId,
+        sessionId: session.kiloSessionId,
         messageId,
-        parts: body.parts,
-        prompt: body.prompt,
-        variant: body.variant,
-        agent: body.agent,
-        model: body.model,
-        system: body.system,
-        tools: body.tools,
+        parts: prompt.message.parts,
+        prompt: prompt.message.prompt,
+        variant: prompt.agent?.variant,
+        agent: prompt.agent?.mode,
+        model: prompt.agent?.model,
+        system: prompt.agent?.system,
+        tools: prompt.agent?.tools,
       });
-      logToFile(
-        messageId !== undefined ? `job/prompt: sent messageId=${messageId}` : 'job/prompt: sent'
-      );
+      logToFile(`job/prompt: sent messageId=${messageId}`);
     } catch (error) {
-      state.setActive(false);
+      state.removeMessage(messageId);
       const msg = error instanceof Error ? error.message : String(error);
       logToFile(`job/prompt: failed to send: ${msg}`);
       return errorResponse('SEND_ERROR', `Failed to send prompt: ${msg}`, 500);
     }
 
-    return jsonResponse(
-      messageId !== undefined ? { status: 'sent', messageId } : { status: 'sent' }
-    );
+    return jsonResponse({ status: 'sent', messageId });
   };
 }
 
@@ -409,54 +407,52 @@ function createCommandHandler(config: ServerConfig, deps: ServerDependencies) {
       return errorResponse('INVALID_REQUEST', 'Invalid JSON body', 400);
     }
 
-    // Bind execution context if provided
-    const bindError = await bindExecutionContext(body.execution, config, deps);
+    const bindError = await bindSessionContext(body.session ?? body.execution, config, deps);
     if (bindError) return bindError;
 
-    const job = state.currentJob;
-    if (!job) {
-      return errorResponse('NO_JOB', 'No execution context available', 400);
+    const session = state.currentSession;
+    if (!session) {
+      return errorResponse('NO_SESSION', 'No session context available', 400);
     }
 
     if (!body.command) {
       return errorResponse('INVALID_REQUEST', 'command is required', 400);
     }
 
-    // Slash commands now enter through the same execution lifecycle as prompts
-    // (sendMessageV2 with payload.type === 'command'), so they may be the first
-    // wrapper interaction for a fresh execution. Mirror /job/prompt's
-    // connection + active-state setup so kilo's events flow back via /ingest.
-    deps.setPerTurnConfig({
-      autoCommit: body.autoCommit ?? false,
-      condenseOnComplete: body.condenseOnComplete ?? false,
-      upstreamBranch: body.execution?.upstreamBranch,
-    });
+    const binding = body.session ?? body.execution;
+    const messageId = body.messageId;
+    if (messageId) {
+      state.acceptMessage(messageId, {
+        autoCommit: body.autoCommit ?? false,
+        condenseOnComplete: body.condenseOnComplete ?? false,
+        upstreamBranch: binding?.upstreamBranch,
+      });
+    }
 
-    if (state.isIdle && !state.isConnected) {
+    if (!state.isConnected) {
       try {
         await openConnection();
-        logToFile('job/command: connection opened');
+        logToFile('job/command: subscription confirmed, connection opened');
       } catch (error) {
         const msg = error instanceof Error ? error.message : String(error);
         logToFile(`job/command: failed to open connection: ${msg}`);
+        if (messageId) state.removeMessage(messageId);
         return errorResponse('CONNECTION_ERROR', `Failed to open connection: ${msg}`, 500);
       }
     }
 
-    state.setActive(true);
-
     try {
       const result = await kiloClient.sendCommand({
-        sessionId: job.kiloSessionId,
+        sessionId: session.kiloSessionId,
         command: body.command,
         args: body.args,
-        messageId: body.messageId,
+        messageId,
       });
+      state.updateActivity();
       logToFile(`job/command: sent command=${body.command}`);
-      state.setActive(false);
       return jsonResponse({ status: 'sent', result });
     } catch (error) {
-      state.setActive(false);
+      if (messageId) state.removeMessage(messageId);
       const msg = error instanceof Error ? error.message : String(error);
       logToFile(`job/command: failed: ${msg}`);
       return errorResponse('COMMAND_ERROR', `Failed to send command: ${msg}`, 500);
@@ -464,12 +460,12 @@ function createCommandHandler(config: ServerConfig, deps: ServerDependencies) {
   };
 }
 
-function createAnswerPermissionHandler(deps: ServerDependencies) {
+export function createAnswerPermissionHandler(deps: ServerDependencies) {
   return async (req: Request): Promise<Response> => {
     const { state, kiloClient } = deps;
 
-    if (!state.hasJob) {
-      return errorResponse('NO_JOB', 'No execution context', 400);
+    if (!state.hasSession) {
+      return errorResponse('NO_SESSION', 'No session context', 400);
     }
 
     let body: AnswerPermissionBody;
@@ -484,11 +480,10 @@ function createAnswerPermissionHandler(deps: ServerDependencies) {
     }
 
     try {
-      const success = await kiloClient.answerPermission(
-        body.permissionId,
-        body.response,
-        body.message
-      );
+      const success =
+        body.message === undefined
+          ? await kiloClient.answerPermission(body.permissionId, body.response)
+          : await kiloClient.answerPermission(body.permissionId, body.response, body.message);
       state.updateActivity();
       logToFile(
         `job/answer-permission: permissionId=${body.permissionId} response=${body.response}`
@@ -502,12 +497,12 @@ function createAnswerPermissionHandler(deps: ServerDependencies) {
   };
 }
 
-function createAnswerQuestionHandler(deps: ServerDependencies) {
+export function createAnswerQuestionHandler(deps: ServerDependencies) {
   return async (req: Request): Promise<Response> => {
     const { state, kiloClient } = deps;
 
-    if (!state.hasJob) {
-      return errorResponse('NO_JOB', 'No execution context', 400);
+    if (!state.hasSession) {
+      return errorResponse('NO_SESSION', 'No session context', 400);
     }
 
     let body: AnswerQuestionBody;
@@ -534,12 +529,12 @@ function createAnswerQuestionHandler(deps: ServerDependencies) {
   };
 }
 
-function createRejectQuestionHandler(deps: ServerDependencies) {
+export function createRejectQuestionHandler(deps: ServerDependencies) {
   return async (req: Request): Promise<Response> => {
     const { state, kiloClient } = deps;
 
-    if (!state.hasJob) {
-      return errorResponse('NO_JOB', 'No execution context', 400);
+    if (!state.hasSession) {
+      return errorResponse('NO_SESSION', 'No session context', 400);
     }
 
     let body: RejectQuestionBody;
@@ -566,36 +561,32 @@ function createRejectQuestionHandler(deps: ServerDependencies) {
   };
 }
 
-function createAbortHandler(deps: ServerDependencies, triggerDrainAndClose: () => void) {
+export function createAbortHandler(deps: ServerDependencies, triggerDrainAndClose: () => void) {
   return async (_req: Request): Promise<Response> => {
     const { state, kiloClient, setAborted } = deps;
 
-    const job = state.currentJob;
-    if (!job) {
-      return errorResponse('NO_JOB', 'No active job to abort', 400);
+    const session = state.currentSession;
+    if (!session) {
+      return errorResponse('NO_SESSION', 'No active session to abort', 400);
     }
 
-    // Set aborted flag FIRST to prevent post-completion tasks from running
     setAborted();
 
-    // Abort the kilo session
     try {
-      await kiloClient.abortSession({ sessionId: job.kiloSessionId });
-      logToFile(`job/abort: aborted kilo session ${job.kiloSessionId}`);
+      await kiloClient.abortSession({ sessionId: session.kiloSessionId });
+      logToFile(`job/abort: aborted kilo session ${session.kiloSessionId}`);
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       logToFile(`job/abort: abort request failed (continuing): ${msg}`);
     }
 
-    // Send abort event to ingest
     state.sendToIngest({
       streamEventType: 'interrupted',
       data: { reason: 'aborted via API' },
       timestamp: new Date().toISOString(),
     });
 
-    // Deactivate and trigger close
-    state.setActive(false);
+    state.clearAllMessages();
     triggerDrainAndClose();
 
     return jsonResponse({ status: 'aborted' });
@@ -811,6 +802,40 @@ function createWebSocketHandlers(config: ServerConfig, deps: ServerDependencies)
   };
 }
 
+export function createSessionReadyHandler(deps: ServerDependencies) {
+  return async (req: Request): Promise<Response> => {
+    if (!deps.readySession) {
+      return errorResponse('NOT_READY', 'Wrapper readiness executor is not configured', 503);
+    }
+
+    let body: unknown;
+    try {
+      body = await req.json();
+    } catch {
+      return errorResponse('INVALID_REQUEST', 'Invalid JSON body', 400);
+    }
+
+    if (!isWrapperSessionReadyRequest(body)) {
+      return errorResponse('INVALID_REQUEST', 'Invalid session ready request', 400);
+    }
+
+    const result = await deps.readySession(body);
+    if (result.status === 'error') {
+      const status = result.error.code === 'INVALID_REQUEST' ? 400 : 503;
+      return jsonResponse(
+        {
+          error: result.error.code,
+          message: result.error.message,
+          ...(result.error.retryable !== undefined ? { retryable: result.error.retryable } : {}),
+        },
+        status
+      );
+    }
+
+    return jsonResponse(result);
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Server Creation
 // ---------------------------------------------------------------------------
@@ -837,6 +862,7 @@ export function createFetchHandler(
   const rejectQuestionHandler = createRejectQuestionHandler(deps);
   const abortHandler = createAbortHandler(deps, triggerDrainAndClose);
   const ptyCreateHandler = createPtyCreateHandler(config, deps);
+  const sessionReadyHandler = createSessionReadyHandler(deps);
 
   // Route table
   type RouteHandler = (req: Request) => Response | Promise<Response>;
@@ -853,6 +879,7 @@ export function createFetchHandler(
       '/job/reject-question': rejectQuestionHandler,
       '/job/abort': abortHandler,
       '/pty': ptyCreateHandler,
+      '/session/ready': sessionReadyHandler,
     },
   };
 

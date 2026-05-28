@@ -14,7 +14,7 @@ const messageTimeSchema = messageUpdatedDataSchema.extend({
 
 describe.each(allFixtures)('fixture: $name', ({ description, events, expected }) => {
   it(description, () => {
-    const { storage, feedEvent } = createTestSession();
+    const { storage, serviceState, feedEvent } = createTestSession();
 
     for (const event of events) {
       feedEvent(event);
@@ -27,6 +27,14 @@ describe.each(allFixtures)('fixture: $name', ({ description, events, expected })
       expect(actual).toHaveLength(expectedParts.length);
       for (let i = 0; i < expectedParts.length; i++) {
         expect(actual[i]).toEqual(expect.objectContaining(expectedParts[i]));
+      }
+    }
+
+    if (expected.pendingMessages) {
+      const pending = serviceState.getPendingMessages();
+      expect(pending.size).toBe(Object.keys(expected.pendingMessages).length);
+      for (const [messageId, expectedState] of Object.entries(expected.pendingMessages)) {
+        expect(pending.get(messageId)).toEqual(expectedState);
       }
     }
   });

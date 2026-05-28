@@ -227,6 +227,29 @@ describe('stream handler handleStreamRequest', () => {
     });
   }
 
+  it('sends bare preparing cloud status in the synthetic connected event', async () => {
+    const serverWs = makeFakeWebSocket();
+    mockWebSocketPair(serverWs);
+
+    const eq = makeFakeEventQueries([]);
+    const handler = createStreamHandler(makeFakeState(), eq, SESSION_ID, {
+      deriveCloudStatus: async () => ({ type: 'preparing' }),
+    });
+
+    const request = new Request('https://example.com/stream', {
+      headers: { Upgrade: 'websocket' },
+    });
+    await handler.handleStreamRequest(request);
+
+    const connectedMessage = serverWs.sentMessages.find(m => {
+      const parsed = JSON.parse(m) as Record<string, unknown>;
+      return parsed.streamEventType === 'connected';
+    });
+    expect(connectedMessage).toBeDefined();
+    const parsed = JSON.parse(connectedMessage!) as Record<string, unknown>;
+    expect(parsed.data).toEqual({ cloudStatus: { type: 'preparing' } });
+  });
+
   it('sends cached commands.available on connect when no eventTypes filter is set', async () => {
     const serverWs = makeFakeWebSocket();
     mockWebSocketPair(serverWs);

@@ -9,6 +9,8 @@ import { toast } from 'sonner';
 import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
+import { PLATFORM } from '@/lib/integrations/core/constants';
+import { getPlatformOAuthConnectPath } from '@/lib/integrations/oauth/paths';
 
 type DoltHubIntegrationDetailsProps = {
   organizationId?: string;
@@ -54,15 +56,7 @@ export function DoltHubIntegrationDetails({
 
   const handleConnect = () => {
     setIsStartingConnection(true);
-    try {
-      const url = new URL('/api/integrations/dolthub/connect', window.location.origin);
-      if (organizationId) {
-        url.searchParams.set('organizationId', organizationId);
-      }
-      window.location.href = url.toString();
-    } catch {
-      setIsStartingConnection(false);
-    }
+    window.location.href = getPlatformOAuthConnectPath(PLATFORM.DOLTHUB, organizationId);
   };
 
   const handleDisconnect = () => {

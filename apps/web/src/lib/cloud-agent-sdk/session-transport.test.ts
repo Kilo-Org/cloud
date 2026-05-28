@@ -109,6 +109,29 @@ describe('session transport delegation (cloud agent)', () => {
     session.destroy();
   });
 
+  it('session.send() delegates canonical attachment references', async () => {
+    const api = createMockApi();
+    const session = createCloudAgentResolvedSession(api);
+    const attachments = {
+      path: '12345678-1234-4234-9234-123456789abc',
+      files: ['87654321-4321-4321-8321-cba987654321.txt'],
+    };
+
+    await connectSession(session);
+    await session.send({
+      payload: { type: 'prompt', prompt: 'hello', mode: 'auto' },
+      attachments,
+    });
+
+    expect(api.send).toHaveBeenCalledWith({
+      sessionId: cloudAgentSessionId,
+      payload: { type: 'prompt', prompt: 'hello', mode: 'auto' },
+      attachments,
+    });
+
+    session.destroy();
+  });
+
   it('session.interrupt() delegates to api.interrupt with resolved cloudAgentSessionId', async () => {
     const api = createMockApi();
     const session = createCloudAgentResolvedSession(api);
@@ -419,6 +442,55 @@ describe('session capabilities', () => {
     await new Promise(r => setTimeout(r, 0));
 
     expect(session.canInterrupt).toBe(false);
+    session.destroy();
+  });
+});
+
+describe('delivery callback plumbing', () => {
+  it('forwards onMessageQueued / onMessageCompleted / onMessageFailed through to service state', async () => {
+    const onMessageQueued = jest.fn();
+    const onMessageCompleted = jest.fn();
+    const onMessageFailed = jest.fn();
+
+    const api = createMockApi();
+    const session = createCloudAgentSession({
+      kiloSessionId,
+      resolveSession: async () => ({
+        type: 'cloud-agent' as const,
+        kiloSessionId,
+        cloudAgentSessionId,
+      }),
+      transport: {
+        getTicket: () => 'ticket',
+        api,
+        fetchSnapshot: () => Promise.resolve(makeSnapshot({ id: 'ses_transport-tests' })),
+      },
+      websocketBaseUrl: 'ws://localhost:9999',
+      onMessageQueued,
+      onMessageCompleted,
+      onMessageFailed,
+    });
+
+    session.state.process({ type: 'cloud.message.queued', messageId: 'm1' });
+    expect(onMessageQueued).toHaveBeenCalledWith('m1');
+
+    session.state.process({ type: 'cloud.message.completed', messageId: 'm1' });
+    expect(onMessageCompleted).toHaveBeenCalledWith('m1');
+
+    session.state.process({
+      type: 'cloud.message.failed',
+      messageId: 'm2',
+      error: 'boom',
+      reason: 'exhausted',
+      attempts: 5,
+    });
+    expect(onMessageFailed).toHaveBeenCalledWith('m2', {
+      status: 'failed',
+      error: 'boom',
+      reason: 'exhausted',
+      attempts: 5,
+    });
+
     session.destroy();
   });
 });

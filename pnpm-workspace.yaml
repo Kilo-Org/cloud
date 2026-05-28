@@ -62,7 +62,7 @@ minimumReleaseAgeExclude:
 overrides:
   '@sentry/cli': 3.4.2
   mdast-util-to-hast: 13.2.1
-  storybook: 9.1.17
+  storybook: 9.1.20
   next: 16.2.6
   preact: 10.28.4
   glob: '>=13.0.1'

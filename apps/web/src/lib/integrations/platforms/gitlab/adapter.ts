@@ -5,15 +5,16 @@
  * Supports both GitLab.com and self-hosted GitLab instances.
  */
 
-import { APP_URL } from '@/lib/constants';
 import { getEnvVariable } from '@/lib/dotenvx';
+import { PLATFORM } from '@/lib/integrations/core/constants';
 import type { PlatformRepository } from '@/lib/integrations/core/types';
+import { getPlatformOAuthCallbackUrl } from '@/lib/integrations/oauth/urls';
 import { logExceptInTest } from '@/lib/utils.server';
 import crypto from 'crypto';
 
 const GITLAB_CLIENT_ID = process.env.GITLAB_CLIENT_ID;
 const GITLAB_CLIENT_SECRET = getEnvVariable('GITLAB_CLIENT_SECRET');
-const GITLAB_REDIRECT_URI = `${APP_URL}/api/integrations/gitlab/callback`;
+const GITLAB_REDIRECT_URI = getPlatformOAuthCallbackUrl(PLATFORM.GITLAB);
 
 const DEFAULT_GITLAB_URL = 'https://gitlab.com';
 

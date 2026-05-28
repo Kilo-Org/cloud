@@ -24,6 +24,7 @@ function isAllowedWebSocketOrigin(env: Env, origin: string | undefined): boolean
   return allowedOrigins.length === 0 || !isRealOrigin || allowedOrigins.includes(origin);
 }
 
+// TODO: the name is not very clear. I thought it is a termination of a websocket, not that websocket is for PTY
 async function handleTerminalWebSocket(request: Request, env: Env): Promise<Response> {
   const upgradeHeader = request.headers.get('Upgrade');
   if (upgradeHeader?.toLowerCase() !== 'websocket') {
@@ -120,6 +121,7 @@ app.get('/health', (c: Context<HonoContext>) => {
   });
 });
 
+// TODO: I think this and /terminal share a bit of code. Could be worth extracting to middleware or just a common method?
 app.get('/stream', async (c: Context<HonoContext>) => {
   const upgradeHeader = c.req.header('Upgrade');
   if (upgradeHeader?.toLowerCase() !== 'websocket') {

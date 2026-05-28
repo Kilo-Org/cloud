@@ -123,6 +123,16 @@ export type SlashCommandInfo = {
   subtask?: boolean;
 };
 
+/** Per-user-message delivery state, tracked via server-emitted cloud.message.* events. */
+export type MessageDeliveryState =
+  | { status: 'queued' }
+  | {
+      status: 'failed';
+      error: string;
+      reason: 'interrupted' | 'exhausted' | 'execution';
+      attempts?: number;
+    };
+
 /** Full service state — all non-chat state in one place. */
 export type ServiceStateSnapshot = {
   activity: SessionActivity;
@@ -132,6 +142,7 @@ export type ServiceStateSnapshot = {
   question: QuestionState | null;
   permission: PermissionState | null;
   suggestion: SuggestionState | null;
+  pendingMessages: ReadonlyMap<string, MessageDeliveryState>;
 };
 
 // ---------------------------------------------------------------------------

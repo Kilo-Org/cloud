@@ -16,6 +16,7 @@ import { createEventQueries } from '../../../src/session/queries/events.js';
 import type { CloudAgentSession } from '../../../src/persistence/CloudAgentSession.js';
 import type { CallbackJob } from '../../../src/callbacks/types.js';
 import type { ExecutionId } from '../../../src/types/ids.js';
+import { groupedRegisterSessionInput } from '../../helpers/session-setup.js';
 
 type CapturedQueue = {
   send: (job: CallbackJob) => Promise<void>;
@@ -85,18 +86,20 @@ async function prepareSessionWithCallback(
   sessionId: string,
   userId: string
 ): Promise<void> {
-  const prepareResult = await instance.prepare({
-    sessionId,
-    userId,
-    kiloSessionId,
-    prompt: 'test prompt',
-    mode: 'code',
-    model: 'test-model',
-    kilocodeToken: 'token',
-    gitUrl: 'https://example.com/repo.git',
-    gitToken: 'git-token',
-    callbackTarget: { url: 'https://example.com/callback' },
-  });
+  const prepareResult = await instance.registerSession(
+    groupedRegisterSessionInput({
+      sessionId,
+      userId,
+      kiloSessionId,
+      prompt: 'test prompt',
+      mode: 'code',
+      model: 'test-model',
+      kilocodeToken: 'token',
+      gitUrl: 'https://example.com/repo.git',
+      gitToken: 'git-token',
+      callbackTarget: { url: 'https://example.com/callback' },
+    })
+  );
   expect(prepareResult.success).toBe(true);
 }
 

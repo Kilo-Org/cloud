@@ -37,6 +37,14 @@ const normalUnconditionalNotifications: KiloNotification[] = [
   //If you need to check or personalize the notification, see examples at the bottom of this file
   //if you just want a simple straightforward global message, add it here.
   {
+    id: 'stealth-opus-discount-may-25',
+    title: 'Claude Opus 4.7 at 20% Off — Only in Kilo Code!',
+    message:
+      'A stealth provider is offering Claude Opus 4.7 at 20% off list price, exclusively in Kilo Code.',
+    suggestModelId: 'stealth/claude-opus-4.7',
+    expiresAt: '2026-06-08T08:00:00Z',
+  },
+  {
     id: 'kilo-cli-jan-5',
     title: 'Kilo CLI',
     message: 'Prefer the terminal? Install the Kilo CLI with npm install -g @kilocode/cli',
@@ -107,6 +115,7 @@ export async function generateUserNotifications(user: User): Promise<KiloNotific
     generateAutoTopUpNotification,
     generateAutoTopUpOrgsNotification,
     generateByokProvidersNotification,
+    generateGrokCodeFast1OptimizedDiscontinuedNotification,
     generateKiloPassNotification,
   ];
 
@@ -281,6 +290,46 @@ async function generateByokProvidersNotification(
     ];
   } catch (e) {
     console.error('[generateByokProvidersNotification]', e);
+    return [];
+  }
+}
+
+const getGrokCodeFast1OptimizedDiscontinuedUsers = cachedPosthogQuery(
+  z.array(z.tuple([z.string()]).transform(([userId]) => userId))
+);
+
+async function generateGrokCodeFast1OptimizedDiscontinuedNotification(
+  user: User,
+  _ctx: NotificationContext
+): Promise<KiloNotification[]> {
+  try {
+    const users = await getGrokCodeFast1OptimizedDiscontinuedUsers(
+      'grok-code-fast-1-optimized-discontinued-users',
+      'select kilo_user_id from notification_grok_code_may_15 limit 5e5'
+    );
+
+    if (!users.includes(user.id)) {
+      console.debug(
+        '[generateGrokCodeFast1OptimizedDiscontinuedNotification] not showing notification for user'
+      );
+      return [];
+    }
+
+    console.debug(
+      '[generateGrokCodeFast1OptimizedDiscontinuedNotification] showing notification for user'
+    );
+    return [
+      {
+        id: 'grok-code-fast-1-optimized-discontinued-may-15',
+        title: 'Grok Code Fast 1 Optimized is discontinued',
+        message:
+          'Grok Code Fast 1 Optimized has been discontinued. Give Grok Build 0.1 a try as a replacement.',
+        suggestModelId: 'x-ai/grok-build-0.1',
+        showIn: ['cli', 'extension'],
+      },
+    ];
+  } catch (e) {
+    console.error('[generateGrokCodeFast1OptimizedDiscontinuedNotification]', e);
     return [];
   }
 }

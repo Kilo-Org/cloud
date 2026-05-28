@@ -24,6 +24,13 @@ type MaybeHasVercelProviderMetadata = {
   provider_metadata?: VercelProviderMetaData;
 };
 
+// OpenRouter augments the Anthropic Messages envelope with a top-level `provider`
+// field (e.g. "Anthropic", "Bedrock") indicating the upstream inference provider
+// that served the request. The Anthropic SDK type does not model it.
+type MaybeHasOpenRouterProvider = {
+  provider?: string | null;
+};
+
 // Anthropic usage combined with OpenRouter cost fields
 // ref: https://docs.anthropic.com/en/api/messages
 // ref: https://openrouter.ai/docs/use-cases/usage-accounting#response-format
@@ -133,6 +140,10 @@ export async function parseMessagesMicrodollarUsageFromStream(
       if (json.type === 'message_start') {
         messageId = json.message.id;
         model = json.message.model;
+        const openRouterProvider = (json.message as MaybeHasOpenRouterProvider).provider;
+        if (openRouterProvider) {
+          inference_provider = openRouterProvider;
+        }
       }
 
       if (
@@ -194,12 +205,13 @@ export function parseMessagesMicrodollarUsageFromString(
   statusCode: number
 ): MicrodollarUsageStats {
   const responseJson = JSON.parse(fullResponse) as
-    | (Anthropic.Messages.Message & MaybeHasVercelProviderMetadata)
+    | (Anthropic.Messages.Message & MaybeHasVercelProviderMetadata & MaybeHasOpenRouterProvider)
     | null;
 
   const usage = responseJson?.usage;
   const providerMetadata = responseJson?.provider_metadata ?? null;
-  const inference_provider = providerMetadata?.gateway?.routing?.finalProvider ?? null;
+  const inference_provider =
+    providerMetadata?.gateway?.routing?.finalProvider ?? responseJson?.provider ?? null;
 
   const responseContent = (responseJson?.content ?? [])
     .filter((c): c is Anthropic.Messages.TextBlock => c != null && c.type === 'text')

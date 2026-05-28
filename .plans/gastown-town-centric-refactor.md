@@ -102,23 +102,23 @@ Everything currently in the Rig DO's SQLite moves to Town DO's SQLite, scoped by
 
 #### From Rig DO → Town DO
 
-| Table              | Key Change                                                     |
-| ------------------ | -------------------------------------------------------------- |
-| `rig_beads`        | Add `rig_id TEXT NOT NULL` column, index on `(rig_id, status)` |
-| `rig_agents`       | Add `rig_id TEXT NOT NULL` column, index on `(rig_id, role)`   |
-| `rig_mail`         | Already scoped via agent FKs — no change needed                |
-| `rig_review_queue` | Add `rig_id TEXT NOT NULL` for queries                         |
-| `rig_molecules`    | Already scoped via bead FK — no change needed                  |
-| `rig_bead_events`  | Already scoped via bead FK — no change needed                  |
-| `rig_agent_events` | **Moves to AgentDO** (see below) — not in Town DO              |
+| Table | Key Change |
+|---|---|
+| `rig_beads` | Add `rig_id TEXT NOT NULL` column, index on `(rig_id, status)` |
+| `rig_agents` | Add `rig_id TEXT NOT NULL` column, index on `(rig_id, role)` |
+| `rig_mail` | Already scoped via agent FKs — no change needed |
+| `rig_review_queue` | Add `rig_id TEXT NOT NULL` for queries |
+| `rig_molecules` | Already scoped via bead FK — no change needed |
+| `rig_bead_events` | Already scoped via bead FK — no change needed |
+| `rig_agent_events` | **Moves to AgentDO** (see below) — not in Town DO |
 
 The Town DO already has `town_convoys`, `town_convoy_beads`, `town_escalations`. These stay.
 
 #### From Mayor DO → Town DO
 
-| Data              | Migration                                                                                                       |
-| ----------------- | --------------------------------------------------------------------------------------------------------------- |
-| `mayorConfig` KV  | Merged into town config KV (it's mostly redundant — townId, gitUrl, etc.)                                       |
+| Data | Migration |
+|---|---|
+| `mayorConfig` KV | Merged into town config KV (it's mostly redundant — townId, gitUrl, etc.) |
 | `mayorSession` KV | New `mayor_session` KV key in Town DO, or just tracked as a special agent in `rig_agents` with `role = 'mayor'` |
 
 The Mayor becomes just another agent row in `rig_agents` with `role = 'mayor'` and a synthetic `rig_id` (e.g., `mayor-{townId}`). Its session state (agentId, sessionId, status, lastActivityAt) maps directly to the agent table's existing columns.
@@ -331,28 +331,28 @@ No buffering needed. Late-joining clients get a backfill from the AgentDO (which
 
 ### Files to Delete
 
-| File                            | Reason                              |
-| ------------------------------- | ----------------------------------- |
-| `container/src/kilo-server.ts`  | Replaced by SDK `createOpencode()`  |
-| `container/src/kilo-client.ts`  | Replaced by SDK client              |
+| File | Reason |
+|---|---|
+| `container/src/kilo-server.ts` | Replaced by SDK `createOpencode()` |
+| `container/src/kilo-client.ts` | Replaced by SDK client |
 | `container/src/sse-consumer.ts` | Replaced by SDK `event.subscribe()` |
 
 ### Files to Heavily Refactor
 
-| File                               | Changes                                                                                                               |
-| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| `container/src/process-manager.ts` | Remove ring buffers, SSE consumers, event buffering. Becomes a thin map of agentId → { client, server, session }      |
-| `container/src/agent-runner.ts`    | Use `createOpencode()` instead of `ensureServer()`. Simplify `buildAgentEnv()` since config is passed to SDK directly |
-| `container/src/control-server.ts`  | Remove `/agents/:id/events` polling endpoint, stream-ticket endpoints. Add WebSocket endpoint                         |
-| `container/src/types.ts`           | Remove SSE event Zod schemas (`SSESessionEvent`, `SSEMessageEvent`, etc.), `KiloServerInstance`, `BufferedEvent`      |
+| File | Changes |
+|---|---|
+| `container/src/process-manager.ts` | Remove ring buffers, SSE consumers, event buffering. Becomes a thin map of agentId → { client, server, session } |
+| `container/src/agent-runner.ts` | Use `createOpencode()` instead of `ensureServer()`. Simplify `buildAgentEnv()` since config is passed to SDK directly |
+| `container/src/control-server.ts` | Remove `/agents/:id/events` polling endpoint, stream-ticket endpoints. Add WebSocket endpoint |
+| `container/src/types.ts` | Remove SSE event Zod schemas (`SSESessionEvent`, `SSEMessageEvent`, etc.), `KiloServerInstance`, `BufferedEvent` |
 
 ### Files to Keep (mostly unchanged)
 
-| File                           | Notes                                                               |
-| ------------------------------ | ------------------------------------------------------------------- |
-| `container/src/git-manager.ts` | Git operations don't change                                         |
-| `container/src/heartbeat.ts`   | Simplify — may not need per-agent heartbeats if events flow over WS |
-| `container/src/main.ts`        | Still starts control server                                         |
+| File | Notes |
+|---|---|
+| `container/src/git-manager.ts` | Git operations don't change |
+| `container/src/heartbeat.ts` | Simplify — may not need per-agent heartbeats if events flow over WS |
+| `container/src/main.ts` | Still starts control server |
 
 ---
 
@@ -486,16 +486,16 @@ export class TownContainerDO extends Container<Env> {
 
 ### What Gets Eliminated
 
-| Component                                                                                              | Status                                          |
-| ------------------------------------------------------------------------------------------------------ | ----------------------------------------------- |
-| Stream ticket system (`streamTickets` map, `consumeStreamTicket()`, `POST /stream-ticket`)             | **Deleted**                                     |
-| `GET /agents/:id/events?after=N` polling endpoint                                                      | **Deleted**                                     |
-| Ring buffer in `process-manager.ts` (`agentEventBuffers`, `MAX_BUFFERED_EVENTS`, `bufferAgentEvent()`) | **Deleted**                                     |
-| `TownContainerDO.pollEvents()` (500ms setInterval)                                                     | **Deleted**                                     |
-| `TownContainerDO.backfillEvents()` via HTTP                                                            | **Replaced** with historical query from AgentDO |
-| `gastown-router.ts` `getAgentStreamUrl` (ticket fetching)                                              | **Replaced** with direct WS URL                 |
-| `gastown-client.ts` `getStreamTicket()`                                                                | **Deleted**                                     |
-| `town-container.handler.ts` `handleContainerStreamTicket()`                                            | **Deleted**                                     |
+| Component | Status |
+|---|---|
+| Stream ticket system (`streamTickets` map, `consumeStreamTicket()`, `POST /stream-ticket`) | **Deleted** |
+| `GET /agents/:id/events?after=N` polling endpoint | **Deleted** |
+| Ring buffer in `process-manager.ts` (`agentEventBuffers`, `MAX_BUFFERED_EVENTS`, `bufferAgentEvent()`) | **Deleted** |
+| `TownContainerDO.pollEvents()` (500ms setInterval) | **Deleted** |
+| `TownContainerDO.backfillEvents()` via HTTP | **Replaced** with historical query from AgentDO |
+| `gastown-router.ts` `getAgentStreamUrl` (ticket fetching) | **Replaced** with direct WS URL |
+| `gastown-client.ts` `getStreamTicket()` | **Deleted** |
+| `town-container.handler.ts` `handleContainerStreamTicket()` | **Deleted** |
 
 ### Browser Connection
 

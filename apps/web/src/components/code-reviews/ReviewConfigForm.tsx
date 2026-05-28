@@ -6,7 +6,6 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import {
   Settings,
@@ -205,7 +204,6 @@ export function ReviewConfigForm({
   );
   const [focusAreas, setFocusAreas] = useState<string[]>([]);
   const [customInstructions, setCustomInstructions] = useState('');
-  const [maxReviewTime, setMaxReviewTime] = useState([10]);
   const [selectedModel, setSelectedModel] = useState(PRIMARY_DEFAULT_MODEL);
   const [thinkingEffort, setThinkingEffort] = useState<string | null>(null);
   const [gateThreshold, setGateThreshold] = useState<'off' | 'all' | 'warning' | 'critical'>('off');
@@ -305,7 +303,6 @@ export function ReviewConfigForm({
       setReviewStyle(configData.reviewStyle);
       setFocusAreas(configData.focusAreas);
       setCustomInstructions(configData.customInstructions || '');
-      setMaxReviewTime([configData.maxReviewTimeMinutes]);
       setSelectedModel(configData.modelSlug);
       setThinkingEffort(configData.thinkingEffort ?? null);
       setGateThreshold(configData.gateThreshold ?? 'off');
@@ -457,7 +454,6 @@ export function ReviewConfigForm({
         reviewStyle,
         focusAreas,
         customInstructions: customInstructions.trim() || undefined,
-        maxReviewTimeMinutes: maxReviewTime[0],
         modelSlug: selectedModel,
         thinkingEffort,
         gateThreshold,
@@ -474,7 +470,6 @@ export function ReviewConfigForm({
         reviewStyle,
         focusAreas,
         customInstructions: customInstructions.trim() || undefined,
-        maxReviewTimeMinutes: maxReviewTime[0],
         modelSlug: selectedModel,
         thinkingEffort,
         gateThreshold,
@@ -1039,22 +1034,6 @@ export function ReviewConfigForm({
                   </div>
                 ))}
               </div>
-            </div>
-
-            {/* Max Review Time */}
-            <div className="space-y-3">
-              <Label>Maximum Review Time: {maxReviewTime[0]} minutes</Label>
-              <Slider
-                value={maxReviewTime}
-                onValueChange={setMaxReviewTime}
-                min={5}
-                max={30}
-                step={1}
-                className="w-full"
-              />
-              <p className="text-muted-foreground text-sm">
-                Timeout for the code review workflow (5-30 minutes)
-              </p>
             </div>
 
             {/* Custom Instructions */}

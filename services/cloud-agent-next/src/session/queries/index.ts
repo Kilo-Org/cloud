@@ -19,5 +19,4 @@ export {
   type ExecutionQueries,
   type AddExecutionError,
   type UpdateStatusError,
-  type SetActiveError,
 } from './executions.js';

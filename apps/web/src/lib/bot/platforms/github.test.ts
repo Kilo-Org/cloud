@@ -116,6 +116,8 @@ function createIntegration(overrides: Partial<PlatformIntegration> = {}): Platfo
     repository_access: 'all',
     repositories: null,
     repositories_synced_at: null,
+    auth_invalid_at: null,
+    auth_invalid_reason: null,
     metadata: null,
     kilo_requester_user_id: null,
     platform_requester_account_id: null,

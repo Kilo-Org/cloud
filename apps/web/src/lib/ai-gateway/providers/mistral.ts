@@ -1,9 +1,5 @@
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
-import {
-  dropToolStrictProperties,
-  hasAttemptCompletionTool,
-  normalizeToolCallIds,
-} from '@/lib/ai-gateway/tool-calling';
+import { dropToolStrictProperties, normalizeToolCallIds } from '@/lib/ai-gateway/tool-calling';
 
 export function isMistralModel(model: string) {
   return model.includes('mistral');
@@ -28,8 +24,4 @@ export function applyMistralModelSettings(requestToMutate: GatewayRequest) {
 
   // mistral doesn't support strict for our schema
   dropToolStrictProperties(requestToMutate.body);
-
-  if (hasAttemptCompletionTool(requestToMutate.body)) {
-    requestToMutate.body.tool_choice = 'required';
-  }
 }

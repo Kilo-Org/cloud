@@ -55,19 +55,19 @@ mode-aware mutation orchestration, branch management, and action computation.
 
 The **backend** layer provides a `DB` interface with two implementations:
 
-| Backend    | How it works             | Used when                      |
-| ---------- | ------------------------ | ------------------------------ |
-| `LocalDB`  | Shells out to `dolt` CLI | Self-hosted, local development |
-| `RemoteDB` | DoltHub REST API         | Hosted mode (our container)    |
+| Backend | How it works | Used when |
+|---|---|---|
+| `LocalDB` | Shells out to `dolt` CLI | Self-hosted, local development |
+| `RemoteDB` | DoltHub REST API | Hosted mode (our container) |
 
 The **remote** layer provides a `Provider` interface for fork/PR operations:
 
-| Provider          | Description                              |
-| ----------------- | ---------------------------------------- |
-| `DoltHubProvider` | Production — REST + GraphQL APIs         |
-| `GitHubProvider`  | Uses `gh` CLI for forks and PRs          |
-| `FileProvider`    | `file://` dolt remotes (offline testing) |
-| `GitProvider`     | Bare git repos (LAN/SSH)                 |
+| Provider | Description |
+|---|---|
+| `DoltHubProvider` | Production — REST + GraphQL APIs |
+| `GitHubProvider` | Uses `gh` CLI for forks and PRs |
+| `FileProvider` | `file://` dolt remotes (offline testing) |
+| `GitProvider` | Bare git repos (LAN/SSH) |
 
 ## Database Schema
 
@@ -116,11 +116,11 @@ for reputation, identity, and federation.
 
 ### ID Generation
 
-| Entity     | Format       | Derivation                                  |
-| ---------- | ------------ | ------------------------------------------- |
-| Wanted     | `w-<10-hex>` | SHA-256 of `title:timestamp:random`         |
+| Entity | Format | Derivation |
+|---|---|---|
+| Wanted | `w-<10-hex>` | SHA-256 of `title:timestamp:random` |
 | Completion | `c-<16-hex>` | SHA-256 of `wantedID\|rigHandle\|timestamp` |
-| Stamp      | `s-<16-hex>` | SHA-256 of `wantedID\|rigHandle\|timestamp` |
+| Stamp | `s-<16-hex>` | SHA-256 of `wantedID\|rigHandle\|timestamp` |
 
 ### Item Lifecycle
 
@@ -140,64 +140,64 @@ Transitions are validated by `internal/commons/lifecycle.go`.
 
 ### Federation
 
-| Command               | Description                    |
-| --------------------- | ------------------------------ |
-| `wl create <org/db>`  | Create a new wasteland commons |
-| `wl join [upstream]`  | Fork commons, register rig     |
-| `wl leave [upstream]` | Leave a wasteland              |
-| `wl list`             | List joined wastelands         |
+| Command | Description |
+|---|---|
+| `wl create <org/db>` | Create a new wasteland commons |
+| `wl join [upstream]` | Fork commons, register rig |
+| `wl leave [upstream]` | Leave a wasteland |
+| `wl list` | List joined wastelands |
 
 ### Wanted Board CRUD
 
-| Command          | Description                                                                                |
-| ---------------- | ------------------------------------------------------------------------------------------ |
-| `wl post`        | Post a new wanted item (`--title` required)                                                |
-| `wl browse`      | Browse with filters (`--project`, `--type`, `--status`, `--priority`, `--limit`, `--json`) |
-| `wl status <id>` | Show full item details                                                                     |
-| `wl update <id>` | Update an open item                                                                        |
+| Command | Description |
+|---|---|
+| `wl post` | Post a new wanted item (`--title` required) |
+| `wl browse` | Browse with filters (`--project`, `--type`, `--status`, `--priority`, `--limit`, `--json`) |
+| `wl status <id>` | Show full item details |
+| `wl update <id>` | Update an open item |
 
 ### Lifecycle Transitions
 
-| Command           | Description                                   |
-| ----------------- | --------------------------------------------- |
-| `wl claim <id>`   | Claim an open item                            |
-| `wl unclaim <id>` | Release back to open                          |
-| `wl done <id>`    | Submit evidence (`--evidence` required)       |
-| `wl accept <id>`  | Accept and issue stamp (`--quality` required) |
-| `wl reject <id>`  | Reject back to claimed                        |
-| `wl close <id>`   | Close without stamp                           |
-| `wl delete <id>`  | Withdraw (soft-delete)                        |
+| Command | Description |
+|---|---|
+| `wl claim <id>` | Claim an open item |
+| `wl unclaim <id>` | Release back to open |
+| `wl done <id>` | Submit evidence (`--evidence` required) |
+| `wl accept <id>` | Accept and issue stamp (`--quality` required) |
+| `wl reject <id>` | Reject back to claimed |
+| `wl close <id>` | Close without stamp |
+| `wl delete <id>` | Withdraw (soft-delete) |
 
 ### PR/Review Workflow
 
-| Command               | Description                            |
-| --------------------- | -------------------------------------- |
-| `wl review [branch]`  | List or diff PR-mode branches          |
-| `wl approve <branch>` | Approve a branch                       |
-| `wl request-changes`  | Request changes (`--comment` required) |
-| `wl merge <branch>`   | Merge reviewed branch                  |
-| `wl pending`          | List pending upstream PRs              |
+| Command | Description |
+|---|---|
+| `wl review [branch]` | List or diff PR-mode branches |
+| `wl approve <branch>` | Approve a branch |
+| `wl request-changes` | Request changes (`--comment` required) |
+| `wl merge <branch>` | Merge reviewed branch |
+| `wl pending` | List pending upstream PRs |
 
 ### Upstream Approval (Hosted Maintainer Flow)
 
-| Command                         | Description                         |
-| ------------------------------- | ----------------------------------- |
-| `wl accept-upstream <id> <rig>` | Accept a fork submission            |
+| Command | Description |
+|---|---|
+| `wl accept-upstream <id> <rig>` | Accept a fork submission |
 | `wl reject-upstream <id> <rig>` | Reject (close PR) a fork submission |
-| `wl close-upstream <id> <rig>`  | Close without stamp                 |
+| `wl close-upstream <id> <rig>` | Close without stamp |
 
 ### Utility
 
-| Command               | Description                                         |
-| --------------------- | --------------------------------------------------- |
-| `wl sync`             | Pull upstream into fork                             |
-| `wl config get\|set`  | Read/write config                                   |
-| `wl doctor`           | Check setup health                                  |
-| `wl serve`            | Start web UI server (`--hosted` for container mode) |
-| `wl tui`              | Launch terminal UI                                  |
-| `wl profile [handle]` | Profile lookup                                      |
-| `wl me`               | Personal dashboard                                  |
-| `wl leaderboard`      | Rig rankings                                        |
+| Command | Description |
+|---|---|
+| `wl sync` | Pull upstream into fork |
+| `wl config get\|set` | Read/write config |
+| `wl doctor` | Check setup health |
+| `wl serve` | Start web UI server (`--hosted` for container mode) |
+| `wl tui` | Launch terminal UI |
+| `wl profile [handle]` | Profile lookup |
+| `wl me` | Personal dashboard |
+| `wl leaderboard` | Rig rankings |
 
 ## Web API (Served by `wl serve`)
 
@@ -205,51 +205,51 @@ Default port: 8999. The container runs `wl serve --hosted`.
 
 ### Read Endpoints
 
-| Route                       | Description                    |
-| --------------------------- | ------------------------------ |
-| `GET /api/bootstrap`        | Auth state + joined wastelands |
-| `GET /api/wanted`           | Browse with query filters      |
-| `GET /api/wanted/{id}`      | Item detail                    |
-| `GET /api/dashboard`        | Personal dashboard             |
-| `GET /api/config`           | Rig/mode config                |
-| `GET /api/leaderboard`      | Rig rankings                   |
-| `GET /api/scoreboard`       | Public scoreboard              |
-| `GET /api/profile/{handle}` | Profile lookup                 |
+| Route | Description |
+|---|---|
+| `GET /api/bootstrap` | Auth state + joined wastelands |
+| `GET /api/wanted` | Browse with query filters |
+| `GET /api/wanted/{id}` | Item detail |
+| `GET /api/dashboard` | Personal dashboard |
+| `GET /api/config` | Rig/mode config |
+| `GET /api/leaderboard` | Rig rankings |
+| `GET /api/scoreboard` | Public scoreboard |
+| `GET /api/profile/{handle}` | Profile lookup |
 
 ### Mutation Endpoints
 
-| Route                                   | Description            |
-| --------------------------------------- | ---------------------- |
-| `POST /api/wanted`                      | Create item            |
-| `PATCH /api/wanted/{id}`                | Update item            |
-| `DELETE /api/wanted/{id}`               | Delete item            |
-| `POST /api/wanted/{id}/claim`           | Claim                  |
-| `POST /api/wanted/{id}/unclaim`         | Unclaim                |
-| `POST /api/wanted/{id}/done`            | Submit evidence        |
-| `POST /api/wanted/{id}/accept`          | Accept + stamp         |
-| `POST /api/wanted/{id}/reject`          | Reject                 |
-| `POST /api/wanted/{id}/close`           | Close without stamp    |
+| Route | Description |
+|---|---|
+| `POST /api/wanted` | Create item |
+| `PATCH /api/wanted/{id}` | Update item |
+| `DELETE /api/wanted/{id}` | Delete item |
+| `POST /api/wanted/{id}/claim` | Claim |
+| `POST /api/wanted/{id}/unclaim` | Unclaim |
+| `POST /api/wanted/{id}/done` | Submit evidence |
+| `POST /api/wanted/{id}/accept` | Accept + stamp |
+| `POST /api/wanted/{id}/reject` | Reject |
+| `POST /api/wanted/{id}/close` | Close without stamp |
 | `POST /api/wanted/{id}/accept-upstream` | Accept fork submission |
 | `POST /api/wanted/{id}/reject-upstream` | Reject fork submission |
 
 ### Branch Endpoints
 
-| Route                               | Description    |
-| ----------------------------------- | -------------- |
-| `GET /api/branches/diff/{branch}`   | Branch diff    |
-| `POST /api/branches/apply/{branch}` | Merge branch   |
-| `DELETE /api/branches/{branch}`     | Discard branch |
-| `POST /api/branches/pr/{branch}`    | Create PR      |
+| Route | Description |
+|---|---|
+| `GET /api/branches/diff/{branch}` | Branch diff |
+| `POST /api/branches/apply/{branch}` | Merge branch |
+| `DELETE /api/branches/{branch}` | Discard branch |
+| `POST /api/branches/pr/{branch}` | Create PR |
 
 ### Hosted Auth Endpoints
 
-| Route                                    | Description              |
-| ---------------------------------------- | ------------------------ |
-| `POST /api/auth/connect`                 | Begin DoltHub connection |
-| `POST /api/auth/connect-session`         | Establish session        |
-| `GET /api/auth/status`                   | Check auth state         |
-| `POST /api/auth/join`                    | Join a wasteland         |
-| `DELETE /api/auth/wastelands/{upstream}` | Leave                    |
+| Route | Description |
+|---|---|
+| `POST /api/auth/connect` | Begin DoltHub connection |
+| `POST /api/auth/connect-session` | Establish session |
+| `GET /api/auth/status` | Check auth state |
+| `POST /api/auth/join` | Join a wasteland |
+| `DELETE /api/auth/wastelands/{upstream}` | Leave |
 
 ### Caching & Rate Limiting
 
@@ -329,12 +329,12 @@ Settings: `wl config set mode pr|wild-west`, `wl config set signing true|false`.
 
 ## Environment Variables
 
-| Variable                              | Description                              |
-| ------------------------------------- | ---------------------------------------- |
-| `DOLTHUB_TOKEN`                       | DoltHub API token                        |
-| `DOLTHUB_ORG`                         | DoltHub org/username                     |
-| `DOLTHUB_SESSION_TOKEN`               | Browser session for GraphQL fork         |
-| `PORT`                                | Override listen port for `wl serve`      |
-| `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`  | OTLP traces endpoint                     |
-| `OTEL_EXPORTER_OTLP_METRICS_ENDPOINT` | OTLP metrics endpoint                    |
-| `WL_ENVIRONMENT`                      | Staging env (shows impersonation banner) |
+| Variable | Description |
+|---|---|
+| `DOLTHUB_TOKEN` | DoltHub API token |
+| `DOLTHUB_ORG` | DoltHub org/username |
+| `DOLTHUB_SESSION_TOKEN` | Browser session for GraphQL fork |
+| `PORT` | Override listen port for `wl serve` |
+| `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` | OTLP traces endpoint |
+| `OTEL_EXPORTER_OTLP_METRICS_ENDPOINT` | OTLP metrics endpoint |
+| `WL_ENVIRONMENT` | Staging env (shows impersonation banner) |

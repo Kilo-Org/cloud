@@ -76,10 +76,13 @@ type EnvSyncPlan = {
 
 type Annotation =
   | { type: 'passthrough' }
+  | { type: 'override' }
   | { type: 'from'; envLocalKey: string }
   | { type: 'url'; services: { name: string; path?: string }[] }
   | { type: 'pkcs8' }
   | { type: 'exec'; command: string; args: string[] };
+
+type ResolvedValueSource = 'env-local' | 'override' | 'generated' | 'exec' | 'default' | 'missing';
 
 type ExampleEntry = {
   key: string;
@@ -116,6 +119,7 @@ export type {
   ExecWarning,
   EnvSyncPlan,
   Annotation,
+  ResolvedValueSource,
   ExampleEntry,
   SyncResult,
   CheckResult,

@@ -16,6 +16,7 @@ import type {
   SecretStoreAutoCreate,
   ConsistencyWarning,
   EnvLocalAutoCreate,
+  ResolvedValueSource,
 } from './types';
 import {
   parseEnvFile,
@@ -69,11 +70,14 @@ function getEnvLocalSourceKey(key: string, annotation: Annotation): string | und
     case 'from':
       return annotation.envLocalKey;
     case 'url':
+    case 'override':
       return undefined;
     case 'pkcs8':
       return key;
     case 'passthrough':
       return key;
+    case 'exec':
+      return undefined;
   }
 }
 
@@ -407,10 +411,7 @@ function computePlan(repoRoot: string, serviceFilter?: Set<string>): EnvSyncPlan
       existingContent !== null ? parseEnvFile(existingContent) : new Map<string, string>();
 
     const resolvedVars = new Map<string, string>();
-    const resolvedSources = new Map<
-      string,
-      'env-local' | 'generated' | 'exec' | 'default' | 'missing'
-    >();
+    const resolvedSources = new Map<string, ResolvedValueSource>();
     const unresolvedKeys: string[] = [];
     let shouldCreateFlyToken = false;
 

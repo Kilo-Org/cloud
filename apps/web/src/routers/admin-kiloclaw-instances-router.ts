@@ -79,7 +79,6 @@ import {
   sql,
   gte,
   lte,
-  lt,
   type SQL,
 } from 'drizzle-orm';
 
@@ -3843,85 +3842,85 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
     const MAX_SCAN = 500;
     const CONCURRENCY = 10;
 
-    // 1. The latest destroyed row per (user, sandbox), restricted to the
-    //    requested window.
-    //
-    //    `UQ_kiloclaw_instances_active` is a PARTIAL unique index — it only
-    //    covers live rows (`WHERE destroyed_at IS NULL`) — so a sandbox that
-    //    has been reprovisioned accumulates many destroyed `kiloclaw_instances`
-    //    rows that all share one `sandbox_id`, hence one Fly volume name.
-    //    Scanning each separately would surface the same volume once per row.
-    //
-    //    `selectDistinctOn` collapses them to the single most-recent destroyed
-    //    row per sandbox. It runs over ALL destroyed rows, NOT just the window,
-    //    so the row it keeps is the genuine latest destruction — the correct
-    //    `destroyed_at` to measure the grace period against. The window filter
-    //    is then applied to that latest row in the outer query, so a sandbox
-    //    whose latest destruction falls outside the window is omitted entirely
-    //    rather than represented by a stale older row (which would compute the
-    //    grace period from the wrong, earlier timestamp).
-    //
-    //    leftJoin on subscriptions: a missing subscription row is fine (no
-    //    access to preserve); `UQ_kiloclaw_subscriptions_instance` guarantees
-    //    at most one subscription per instance, so the join stays 1:1.
-    // Every projected column must emit a UNIQUE name: this select becomes a
-    // derived table, and Drizzle does not alias subquery columns, so two
-    // `*.id` projections (`kiloclaw_instances.id` and `kiloclaw_subscriptions.id`)
-    // would both surface as `id` and make the outer SELECT ambiguous. Only
-    // `subscription_status` is consumed downstream, so the other subscription
-    // columns are not projected.
-    const destroyedInstancesByLatest = db
-      .selectDistinctOn([kiloclaw_instances.user_id, kiloclaw_instances.sandbox_id], {
-        id: kiloclaw_instances.id,
-        user_id: kiloclaw_instances.user_id,
-        sandbox_id: kiloclaw_instances.sandbox_id,
-        organization_id: kiloclaw_instances.organization_id,
-        destroyed_at: kiloclaw_instances.destroyed_at,
-        user_email: kilocode_users.google_user_email,
-        subscription_status: kiloclaw_subscriptions.status,
-      })
-      .from(kiloclaw_instances)
-      .leftJoin(kilocode_users, eq(kiloclaw_instances.user_id, kilocode_users.id))
-      .leftJoin(
-        kiloclaw_subscriptions,
-        eq(kiloclaw_instances.id, kiloclaw_subscriptions.instance_id)
-      )
-      .where(isNotNull(kiloclaw_instances.destroyed_at))
-      .orderBy(
-        kiloclaw_instances.user_id,
-        kiloclaw_instances.sandbox_id,
-        desc(kiloclaw_instances.destroyed_at)
-      )
-      .as('destroyed_instances_by_latest');
+    type DestroyedInstanceScanRow = {
+      id: string;
+      user_id: string;
+      sandbox_id: string;
+      organization_id: string | null;
+      destroyed_at: string;
+      latest_sandbox_destroyed_at: string | null;
+      user_email: string | null;
+      subscription_status: string | null;
+    };
 
-    // Apply the requested window to the deduplicated latest row, then order
-    // by recency and cap. Filtering here (not inside the subquery) is what
-    // guarantees the window is matched against each sandbox's genuine latest
-    // destruction. The optional cursor continues older rows from the last
-    // scanned `(destroyed_at, id)` tuple, preserving a deterministic 500-row
-    // batch limit without forcing admins to manually bisect date windows.
+    // 1. The latest destroyed row per (user, sandbox) inside the requested
+    //    window.
+    //
+    // This is intentionally written as raw SQL matching the production query
+    // we used to diagnose the scanner. The previous Drizzle `selectDistinctOn`
+    // derived table returned `scanned: 0` in production for a narrow same-day
+    // ISO window even though this SQL shape returned the matching rows.
+    //
+    // `DISTINCT ON` collapses reprovisioned sandboxes to the latest destroyed
+    // row inside the admin-selected scan window, restoring the pre-#3407 scan
+    // semantics. `latest_sandbox_destroyed_at` still tracks the latest
+    // destruction across all time so grace-period safety is measured from the
+    // most recent volume use, not just from the selected row.
+    // Timestamps are cast explicitly so ISO inputs and Postgres timestamp text
+    // are compared as timestamptz values in every runtime. The outer SELECT
+    // formats timestamps as strict ISO 8601 (to_char with AT TIME ZONE 'UTC')
+    // so downstream code never has to parse Postgres's space-separated text
+    // representation (e.g. "2026-05-15 10:06:30.976+00").
     const cursorPredicate = input.cursor
-      ? or(
-          lt(destroyedInstancesByLatest.destroyed_at, input.cursor.destroyedAt),
-          and(
-            eq(destroyedInstancesByLatest.destroyed_at, input.cursor.destroyedAt),
-            lt(destroyedInstancesByLatest.id, input.cursor.id)
+      ? sql`
+          and (
+            ranked.destroyed_at < ${input.cursor.destroyedAt}::timestamptz
+            or (
+              ranked.destroyed_at = ${input.cursor.destroyedAt}::timestamptz
+              and ranked.id < ${input.cursor.id}::uuid
+            )
           )
-        )
-      : undefined;
+        `
+      : sql``;
 
-    const instances = await db
-      .select()
-      .from(destroyedInstancesByLatest)
-      .where(
-        and(
-          gte(destroyedInstancesByLatest.destroyed_at, input.destroyedAfter),
-          lte(destroyedInstancesByLatest.destroyed_at, input.destroyedBefore),
-          cursorPredicate
-        )
-      )
-      .orderBy(desc(destroyedInstancesByLatest.destroyed_at), desc(destroyedInstancesByLatest.id))
-      .limit(MAX_SCAN + 1);
+    const { rows: instances } = await db.execute<DestroyedInstanceScanRow>(sql`
+      select
+        ranked.id::text as id,
+        ranked.user_id,
+        ranked.sandbox_id,
+        ranked.organization_id,
+        to_char(ranked.destroyed_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as destroyed_at,
+        to_char(ranked.latest_sandbox_destroyed_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as latest_sandbox_destroyed_at,
+        ranked.user_email,
+        ranked.subscription_status
+      from (
+        select distinct on (i.user_id, i.sandbox_id)
+          i.id,
+          i.user_id,
+          i.sandbox_id,
+          i.organization_id,
+          i.destroyed_at,
+          (
+            select max(latest.destroyed_at)
+            from kiloclaw_instances latest
+            where latest.user_id = i.user_id
+              and latest.sandbox_id = i.sandbox_id
+              and latest.destroyed_at is not null
+          ) as latest_sandbox_destroyed_at,
+          u.google_user_email as user_email,
+          s.status as subscription_status
+        from kiloclaw_instances i
+        left join kilocode_users u on i.user_id = u.id
+        left join kiloclaw_subscriptions s on i.id = s.instance_id
+        where i.destroyed_at >= ${input.destroyedAfter}::timestamptz
+          and i.destroyed_at <= ${input.destroyedBefore}::timestamptz
+        order by i.user_id, i.sandbox_id, i.destroyed_at desc, i.id desc
+      ) ranked
+      where true
+        ${cursorPredicate}
+      order by ranked.destroyed_at desc, ranked.id desc
+      limit ${MAX_SCAN + 1}
+    `);
 
     const capped = instances.length > MAX_SCAN;
     const toScan = capped ? instances.slice(0, MAX_SCAN) : instances;
@@ -3929,7 +3928,9 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
     const nextCursor =
       capped && lastScanned?.destroyed_at
         ? {
-            destroyedAt: new Date(lastScanned.destroyed_at).toISOString(),
+            // destroyed_at is already ISO 8601 (formatted by to_char in the
+            // query above) so no Date round-trip is needed here.
+            destroyedAt: lastScanned.destroyed_at,
             id: lastScanned.id,
           }
         : null;
@@ -4026,7 +4027,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         // The DO state could not be read, so a volume cannot be confirmed as
         // an orphan. Surface it as an unscanned instance rather than silently
         // dropping it from a results table that only shows confirmed orphans.
-        if (scan.doStatusError) {
+        if (scan.doStatusError !== null) {
           errors.push({
             instance_id: instance.id,
             user_id: instance.user_id,
@@ -4039,8 +4040,9 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
 
         // destroyed_at is non-null here (the WHERE clause guarantees it).
         const destroyedAt = instance.destroyed_at as string;
+        const graceDestroyedAt = instance.latest_sandbox_destroyed_at ?? destroyedAt;
         const graceElapsed =
-          now.getTime() - new Date(destroyedAt).getTime() > ORPHAN_VOLUME_GRACE_PERIOD_MS;
+          now.getTime() - new Date(graceDestroyedAt).getTime() > ORPHAN_VOLUME_GRACE_PERIOD_MS;
         const contextKey = orphanVolumeSubscriptionContextKey({
           user_id: instance.user_id,
           organization_id: instance.organization_id,
@@ -4112,27 +4114,45 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
     .mutation(async ({ input, ctx }) => {
       // 1. Re-fetch the instance. Every DB-side guard is re-evaluated here —
       //    the scan result the admin saw may be stale.
+      // Aliased outer table so the correlated subquery below can refer to
+      // it as `target_inst.*`. Drizzle interpolates `${kiloclaw_instances.X}`
+      // inside a raw `sql` template as a BARE `"X"` column reference (no
+      // table qualifier). Postgres then resolves that bare reference to the
+      // most-local scope — the inner `sandbox_destroys` alias — which
+      // collapses the correlation to a trivially-true
+      // `sandbox_destroys.user_id = sandbox_destroys.user_id` and turns the
+      // subquery into a table-wide `max(destroyed_at)`. With many users in
+      // production that max is always recent, so the grace gate would fail
+      // closed for every destroy regardless of the target. Aliasing the
+      // outer table and writing the correlation columns as literal SQL
+      // keeps every reference explicitly qualified.
+      const targetInstance = alias(kiloclaw_instances, 'target_inst');
       const [row] = await db
         .select({
-          id: kiloclaw_instances.id,
-          user_id: kiloclaw_instances.user_id,
-          sandbox_id: kiloclaw_instances.sandbox_id,
-          organization_id: kiloclaw_instances.organization_id,
-          destroyed_at: kiloclaw_instances.destroyed_at,
-          // The latest `destroyed_at` across every destroyed row of this
-          // (user, sandbox). A reprovisioned sandbox has several destroyed
-          // rows sharing one Fly volume; the grace period runs from the most
-          // recent destruction, not whichever row the admin selected.
-          latest_sandbox_destroyed_at: sql<string | null>`(
-            select max(latest.destroyed_at)
-            from ${kiloclaw_instances} as latest
-            where latest.user_id = ${kiloclaw_instances.user_id}
-              and latest.sandbox_id = ${kiloclaw_instances.sandbox_id}
-              and latest.destroyed_at is not null
-          )`,
+          id: targetInstance.id,
+          user_id: targetInstance.user_id,
+          sandbox_id: targetInstance.sandbox_id,
+          organization_id: targetInstance.organization_id,
+          destroyed_at: targetInstance.destroyed_at,
+          // Whether the orphan-volume grace period has elapsed, evaluated
+          // entirely in Postgres. Grace runs from the LATEST destruction of
+          // this (user, sandbox): a reprovisioned sandbox has several
+          // destroyed rows sharing one Fly volume, so the clock follows the
+          // most recent destruction, not whichever row the admin selected.
+          // Computing this in SQL avoids parsing a database timestamp with
+          // the JS `Date` constructor, whose handling of Postgres timestamp
+          // text differs across the Vercel and Cloudflare runtimes.
+          grace_period_elapsed: sql<boolean>`
+            extract(epoch from (now() - (
+              select max(sandbox_destroys.destroyed_at)
+              from ${kiloclaw_instances} as sandbox_destroys
+              where sandbox_destroys.user_id = target_inst.user_id
+                and sandbox_destroys.sandbox_id = target_inst.sandbox_id
+                and sandbox_destroys.destroyed_at is not null
+            ))) * 1000 > ${ORPHAN_VOLUME_GRACE_PERIOD_MS}`,
         })
-        .from(kiloclaw_instances)
-        .where(eq(kiloclaw_instances.id, input.instanceId))
+        .from(targetInstance)
+        .where(eq(targetInstance.id, input.instanceId))
         .limit(1);
 
       if (!row) {
@@ -4150,10 +4170,10 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
 
       // 3. Grace period, measured from the latest destruction of this
       //    sandbox — give Fly + the DO sweep time to self-heal first.
-      const now = new Date();
-      const latestDestroyedAt = row.latest_sandbox_destroyed_at ?? row.destroyed_at;
-      const destroyedMsAgo = now.getTime() - new Date(latestDestroyedAt).getTime();
-      if (destroyedMsAgo <= ORPHAN_VOLUME_GRACE_PERIOD_MS) {
+      //    `grace_period_elapsed` is computed by Postgres in the query above;
+      //    `false` or `null` (no destroyed row, already ruled out by gate 2)
+      //    both fail closed.
+      if (row.grace_period_elapsed !== true) {
         throw new TRPCError({
           code: 'PRECONDITION_FAILED',
           message: 'Instance was destroyed too recently — wait out the 7-day grace period',
@@ -4171,7 +4191,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         organization_id: row.organization_id,
       };
       const { accessGrantingContextKeys, pendingDestructionContextKeys } =
-        await getOrphanVolumeContextProtections(db, [context], now);
+        await getOrphanVolumeContextProtections(db, [context], new Date());
       const contextKey = orphanVolumeSubscriptionContextKey(context);
       if (accessGrantingContextKeys.has(contextKey)) {
         throw new TRPCError({

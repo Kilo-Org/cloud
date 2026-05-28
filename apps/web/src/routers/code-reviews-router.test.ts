@@ -320,7 +320,6 @@ describe('review agent config REVIEW.md setting', () => {
       platform: 'github',
       reviewStyle: 'balanced',
       focusAreas: [],
-      maxReviewTimeMinutes: 10,
       modelSlug: 'test-model',
       disableReviewMd: true,
     });
@@ -334,9 +333,11 @@ describe('review agent config REVIEW.md setting', () => {
     });
 
     expect(config?.config).toEqual(expect.objectContaining({ disable_review_md: true }));
+    expect(config?.config).not.toHaveProperty('max_review_time_minutes');
 
     const refetched = await caller.personalReviewAgent.getReviewConfig({ platform: 'github' });
     expect(refetched.disableReviewMd).toBe(true);
+    expect(refetched).not.toHaveProperty('maxReviewTimeMinutes');
   });
 
   it('persists organization disableReviewMd true as disable_review_md true', async () => {
@@ -347,7 +348,6 @@ describe('review agent config REVIEW.md setting', () => {
       platform: 'github',
       reviewStyle: 'balanced',
       focusAreas: [],
-      maxReviewTimeMinutes: 10,
       modelSlug: 'test-model',
       disableReviewMd: true,
     });
@@ -361,12 +361,14 @@ describe('review agent config REVIEW.md setting', () => {
     });
 
     expect(config?.config).toEqual(expect.objectContaining({ disable_review_md: true }));
+    expect(config?.config).not.toHaveProperty('max_review_time_minutes');
 
     const refetched = await caller.organizations.reviewAgent.getReviewConfig({
       organizationId: organization.id,
       platform: 'github',
     });
     expect(refetched.disableReviewMd).toBe(true);
+    expect(refetched).not.toHaveProperty('maxReviewTimeMinutes');
   });
 
   it('persists omitted personal disableReviewMd as true by default', async () => {
@@ -376,7 +378,6 @@ describe('review agent config REVIEW.md setting', () => {
       platform: 'github',
       reviewStyle: 'balanced',
       focusAreas: [],
-      maxReviewTimeMinutes: 10,
       modelSlug: 'test-model',
     });
 
@@ -389,6 +390,7 @@ describe('review agent config REVIEW.md setting', () => {
     });
 
     expect(config?.config).toEqual(expect.objectContaining({ disable_review_md: true }));
+    expect(config?.config).not.toHaveProperty('max_review_time_minutes');
   });
 
   it('persists omitted organization disableReviewMd as true by default', async () => {
@@ -399,7 +401,6 @@ describe('review agent config REVIEW.md setting', () => {
       platform: 'github',
       reviewStyle: 'balanced',
       focusAreas: [],
-      maxReviewTimeMinutes: 10,
       modelSlug: 'test-model',
     });
 
@@ -412,6 +413,7 @@ describe('review agent config REVIEW.md setting', () => {
     });
 
     expect(config?.config).toEqual(expect.objectContaining({ disable_review_md: true }));
+    expect(config?.config).not.toHaveProperty('max_review_time_minutes');
   });
 });
 

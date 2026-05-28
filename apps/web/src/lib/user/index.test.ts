@@ -55,14 +55,14 @@ import {
   agent_environment_profile_mcp_servers,
   agent_environment_profile_skills,
   deleted_user_email_tombstones,
-  kiloclaw_attribution_touches,
+  impact_attribution_touches,
   impact_advocate_participants,
   impact_advocate_registration_attempts,
-  kiloclaw_referrals,
-  kiloclaw_referral_conversions,
-  kiloclaw_referral_reward_decisions,
-  kiloclaw_referral_rewards,
-  kiloclaw_referral_reward_applications,
+  impact_referrals,
+  impact_referral_conversions,
+  impact_referral_reward_decisions,
+  impact_referral_rewards,
+  impact_referral_reward_applications,
   impact_advocate_reward_redemptions,
   impact_conversion_reports,
   github_branch_pull_requests,
@@ -73,6 +73,11 @@ import {
   code_review_memory_aggregation_runs,
   code_review_memory_proposals,
   code_review_memory_proposal_evidence,
+  microdollar_usage,
+  model_experiment,
+  model_experiment_variant,
+  model_experiment_variant_version,
+  model_experiment_request,
 } from '@kilocode/db/schema';
 import { eq, count, sql } from 'drizzle-orm';
 import {
@@ -118,16 +123,16 @@ describe('User', () => {
     await db.delete(user_auth_provider);
     await db.delete(user_affiliate_attributions);
     await db.delete(user_affiliate_events);
-    await db.delete(kiloclaw_attribution_touches);
+    await db.delete(impact_attribution_touches);
     await db.delete(impact_advocate_registration_attempts);
     await db.delete(impact_advocate_participants);
     await db.delete(impact_conversion_reports);
     await db.delete(impact_advocate_reward_redemptions);
-    await db.delete(kiloclaw_referral_reward_applications);
-    await db.delete(kiloclaw_referral_rewards);
-    await db.delete(kiloclaw_referral_reward_decisions);
-    await db.delete(kiloclaw_referral_conversions);
-    await db.delete(kiloclaw_referrals);
+    await db.delete(impact_referral_reward_applications);
+    await db.delete(impact_referral_rewards);
+    await db.delete(impact_referral_reward_decisions);
+    await db.delete(impact_referral_conversions);
+    await db.delete(impact_referrals);
     await db.delete(deleted_user_email_tombstones);
     await db.delete(payment_methods);
     await db.delete(kilo_pass_store_events);
@@ -163,6 +168,11 @@ describe('User', () => {
     await db.delete(organization_user_limits);
     await db.delete(organization_memberships);
     await db.delete(free_model_usage);
+    await db.delete(model_experiment_request);
+    await db.delete(model_experiment_variant_version);
+    await db.delete(model_experiment_variant);
+    await db.delete(model_experiment);
+    await db.delete(microdollar_usage);
     await db.delete(user_feedback);
     await db.delete(cloud_agent_feedback);
     await db.delete(user_admin_notes);
@@ -791,7 +801,7 @@ describe('User', () => {
       const decisionId = randomUUID();
       const rewardId = randomUUID();
 
-      await db.insert(kiloclaw_attribution_touches).values({
+      await db.insert(impact_attribution_touches).values({
         id: touchId,
         dedupe_key: 'touch-dedupe',
         user_id: user.id,
@@ -818,12 +828,12 @@ describe('User', () => {
         cookie_value_length: 9,
         delivery_state: 'queued',
       });
-      await db.insert(kiloclaw_referrals).values({
+      await db.insert(impact_referrals).values({
         referee_user_id: user.id,
         referrer_user_id: referrer.id,
         source_touch_id: touchId,
       });
-      await db.insert(kiloclaw_referral_conversions).values({
+      await db.insert(impact_referral_conversions).values({
         id: conversionId,
         referee_user_id: user.id,
         referrer_user_id: referrer.id,
@@ -833,7 +843,7 @@ describe('User', () => {
         qualified: true,
         converted_at: '2026-04-23T00:00:00.000Z',
       });
-      await db.insert(kiloclaw_referral_reward_decisions).values({
+      await db.insert(impact_referral_reward_decisions).values({
         id: decisionId,
         conversion_id: conversionId,
         beneficiary_user_id: user.id,
@@ -841,7 +851,7 @@ describe('User', () => {
         outcome: 'granted',
         months_granted: 1,
       });
-      await db.insert(kiloclaw_referral_rewards).values({
+      await db.insert(impact_referral_rewards).values({
         id: rewardId,
         conversion_id: conversionId,
         decision_id: decisionId,
@@ -851,7 +861,7 @@ describe('User', () => {
         status: 'pending',
         earned_at: '2026-04-23T00:00:00.000Z',
       });
-      await db.insert(kiloclaw_referral_reward_applications).values({
+      await db.insert(impact_referral_reward_applications).values({
         reward_id: rewardId,
         beneficiary_user_id: user.id,
         previous_renewal_boundary: '2026-05-01T00:00:00.000Z',
@@ -869,7 +879,7 @@ describe('User', () => {
             userId: user.google_user_email,
             rewardTypeFilter: 'CREDIT',
           },
-          redemption: { amount: 1, unit: 'free-months' },
+          redemption: { amount: 1, unit: 'MONTH' },
         },
       });
       await db.insert(impact_conversion_reports).values({
@@ -895,8 +905,8 @@ describe('User', () => {
 
       const [touchCount] = await db
         .select({ count: count() })
-        .from(kiloclaw_attribution_touches)
-        .where(eq(kiloclaw_attribution_touches.user_id, user.id));
+        .from(impact_attribution_touches)
+        .where(eq(impact_attribution_touches.user_id, user.id));
       expect(touchCount.count).toBe(0);
 
       const [participantCount] = await db
@@ -913,8 +923,8 @@ describe('User', () => {
 
       const [conversionCount] = await db
         .select({ count: count() })
-        .from(kiloclaw_referral_conversions)
-        .where(eq(kiloclaw_referral_conversions.referee_user_id, user.id));
+        .from(impact_referral_conversions)
+        .where(eq(impact_referral_conversions.referee_user_id, user.id));
       expect(conversionCount.count).toBe(0);
     });
 
@@ -2020,6 +2030,91 @@ describe('User', () => {
           .where(eq(credit_transactions.kilo_user_id, user.id))
           .then(r => r[0].count)
       ).toBe(1);
+    });
+
+    it('should preserve model experiment attribution and prompt hashes', async () => {
+      const user = await insertTestUser();
+      const usageId = randomUUID();
+      const createdAt = '2026-05-25T12:00:00.000Z';
+      const requestBodySha256 = 'a'.repeat(64);
+
+      await db.insert(microdollar_usage).values({
+        id: usageId,
+        kilo_user_id: user.id,
+        cost: 0,
+        input_tokens: 100,
+        output_tokens: 50,
+        cache_write_tokens: 0,
+        cache_hit_tokens: 0,
+        created_at: createdAt,
+        provider: 'custom',
+        model: 'partner/checkpoint-rc1',
+        requested_model: 'kilo/preview-experiment-test',
+        has_error: false,
+      });
+
+      const [experiment] = await db
+        .insert(model_experiment)
+        .values({
+          public_model_id: 'kilo/preview-experiment-test',
+          name: 'Soft-delete retention test',
+          status: 'active',
+          created_by_user_id: user.id,
+        })
+        .returning({ id: model_experiment.id });
+      if (!experiment) throw new Error('Failed to insert model experiment');
+
+      const [variant] = await db
+        .insert(model_experiment_variant)
+        .values({
+          experiment_id: experiment.id,
+          label: 'A',
+          weight: 1,
+        })
+        .returning({ id: model_experiment_variant.id });
+      if (!variant) throw new Error('Failed to insert model experiment variant');
+
+      const [variantVersion] = await db
+        .insert(model_experiment_variant_version)
+        .values({
+          variant_id: variant.id,
+          upstream: {
+            internal_id: 'partner/checkpoint-rc1',
+            base_url: 'https://partner.example.com/v1',
+          },
+          encrypted_api_key: { iv: 'iv', data: 'data', authTag: 'authTag' },
+          created_by: user.id,
+        })
+        .returning({ id: model_experiment_variant_version.id });
+      if (!variantVersion) throw new Error('Failed to insert model experiment variant version');
+
+      await db.insert(model_experiment_request).values({
+        usage_id: usageId,
+        variant_version_id: variantVersion.id,
+        allocation_subject: 'user',
+        client_request_id: 'client-message-id',
+        request_kind: 'chat_completions',
+        request_body_sha256: requestBodySha256,
+        was_truncated: false,
+        created_at: createdAt,
+      });
+
+      await softDeleteUser(user.id);
+
+      const [usage] = await db
+        .select()
+        .from(microdollar_usage)
+        .where(eq(microdollar_usage.id, usageId));
+      expect(usage?.kilo_user_id).toBe(user.id);
+
+      const [attribution] = await db
+        .select()
+        .from(model_experiment_request)
+        .where(eq(model_experiment_request.usage_id, usageId));
+      if (!attribution) throw new Error('Expected model experiment attribution to be retained');
+      expect(attribution.request_body_sha256).toBe(requestBodySha256);
+      expect(attribution.client_request_id).toBe('client-message-id');
+      expect(new Date(attribution.created_at).toISOString()).toBe(createdAt);
     });
 
     it('should preserve Kilo Pass subscriptions and issuance chain', async () => {

@@ -20,7 +20,6 @@ import { Ok, Err, type Result } from '../../lib/result.js';
 // ---------------------------------------------------------------------------
 
 const EXECUTIONS_KEY = 'executions';
-const ACTIVE_EXECUTION_KEY = 'active_execution_id';
 const INTERRUPT_KEY = 'interrupt_requested';
 
 /** Storage interface for key-value operations */
@@ -35,8 +34,6 @@ export type AddExecutionError = { code: 'ALREADY_EXISTS' };
 export type UpdateStatusError =
   | { code: 'NOT_FOUND' }
   | { code: 'INVALID_TRANSITION'; from: ExecutionStatus; to: ExecutionStatus };
-
-export type SetActiveError = { code: 'ALREADY_ACTIVE'; currentExecutionId: ExecutionId };
 
 // ---------------------------------------------------------------------------
 // Query Factory
@@ -83,6 +80,7 @@ export function createExecutionQueries(storage: KVStorage) {
         mode: params.mode,
         streamingMode: params.streamingMode,
         ingestToken: params.ingestToken,
+        messageId: params.messageId,
       };
 
       executions.push(execution);
@@ -91,9 +89,22 @@ export function createExecutionQueries(storage: KVStorage) {
       return Ok(execution);
     },
 
+    async delete(executionId: ExecutionId): Promise<boolean> {
+      const executions = await this.getAll();
+      const remainingExecutions = executions.filter(
+        execution => execution.executionId !== executionId
+      );
+
+      if (remainingExecutions.length === executions.length) {
+        return false;
+      }
+
+      await storage.put(EXECUTIONS_KEY, remainingExecutions);
+      return true;
+    },
+
     /**
      * Update execution status with state machine validation.
-     * Automatically clears active execution when transitioning to terminal state.
      */
     async updateStatus(
       params: UpdateExecutionStatusParams
@@ -129,14 +140,6 @@ export function createExecutionQueries(storage: KVStorage) {
 
       executions[index] = execution;
       await storage.put(EXECUTIONS_KEY, executions);
-
-      // Clear active execution if terminal
-      if (isTerminal(params.status)) {
-        const activeId = await storage.get<ExecutionId>(ACTIVE_EXECUTION_KEY);
-        if (activeId === params.executionId) {
-          await storage.delete(ACTIVE_EXECUTION_KEY);
-        }
-      }
 
       return Ok(execution);
     },
@@ -187,43 +190,6 @@ export function createExecutionQueries(storage: KVStorage) {
       await storage.put(EXECUTIONS_KEY, executions);
 
       return true;
-    },
-
-    /**
-     * Get the currently active execution ID, if any.
-     */
-    async getActiveExecutionId(): Promise<ExecutionId | null> {
-      return (await storage.get<ExecutionId>(ACTIVE_EXECUTION_KEY)) ?? null;
-    },
-
-    /**
-     * Set the active execution for this session.
-     * Enforces single active execution per session.
-     *
-     * SAFETY NOTE: This check-then-set pattern is safe because Durable Objects
-     * serialize all incoming requests within a single instance. There is no
-     * concurrent execution of RPC methods within a DO, so no race condition
-     * can occur between the read and write operations.
-     */
-    async setActiveExecution(executionId: ExecutionId): Promise<Result<void, SetActiveError>> {
-      const currentActive = await this.getActiveExecutionId();
-
-      if (currentActive !== null && currentActive !== executionId) {
-        return Err({
-          code: 'ALREADY_ACTIVE',
-          currentExecutionId: currentActive,
-        });
-      }
-
-      await storage.put(ACTIVE_EXECUTION_KEY, executionId);
-      return Ok(undefined);
-    },
-
-    /**
-     * Clear the active execution.
-     */
-    async clearActiveExecution(): Promise<void> {
-      await storage.delete(ACTIVE_EXECUTION_KEY);
     },
 
     /**

@@ -9,6 +9,7 @@ const forbiddenFreeModelIds: ReadonlySet<string> = new Set([
   'bytedance-seed/dola-seed-2.0-pro:free',
   'cognitivecomputations/dolphin-mistral-24b-venice-edition:free',
   'deepseek/deepseek-r1-0528:free',
+  'deepseek/deepseek-v4-flash:free',
   'giga-potato',
   'giga-potato-thinking',
   'google/gemma-3-12b-it:free',
@@ -43,6 +44,7 @@ const forbiddenFreeModelIds: ReadonlySet<string> = new Set([
   'xiaomi/mimo-v2-pro:free',
   'z-ai/glm-4.5-air:free',
   'z-ai/glm-4.7:free',
+  'stepfun/step-3.5-flash:free',
   'z-ai/glm-5:free',
   claude_sonnet_clawsetup_model.public_id, // only usable through kilo-auto
 ]);

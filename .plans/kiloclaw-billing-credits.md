@@ -6,12 +6,12 @@ Every KiloClaw instance is funded by credits. A KiloClaw subscription is
 a recurring credit deduction tied to a specific instance. Credits reach
 the user's balance through one of three funding sources:
 
-| Funding source          | Mechanism                                              | Kilo Pass bonuses?              |
-| ----------------------- | ------------------------------------------------------ | ------------------------------- |
-| **Kilo Pass** (primary) | Kilo Pass subscription adds credits via Stripe         | Yes                             |
-| **Standalone hosting**  | Stripe subscription ($9/mo or $48/6mo), routed through | Only if user also has Kilo Pass |
-|                         | credits internally (deposit + deduct, balance neutral) |                                 |
-| **Manual top-up**       | User buys credits ad hoc                               | Only if user also has Kilo Pass |
+| Funding source | Mechanism | Kilo Pass bonuses? |
+|---|---|---|
+| **Kilo Pass** (primary) | Kilo Pass subscription adds credits via Stripe | Yes |
+| **Standalone hosting** | Stripe subscription ($9/mo or $48/6mo), routed through | Only if user also has Kilo Pass |
+|  | credits internally (deposit + deduct, balance neutral) |  |
+| **Manual top-up** | User buys credits ad hoc | Only if user also has Kilo Pass |
 
 The KiloClaw subscription itself does not know or care where credits
 came from. It deducts from the balance on each renewal.

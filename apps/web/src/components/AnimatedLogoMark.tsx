@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useMemo } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
+import { useReducedMotion } from 'motion/react';
 import { cn } from '@/lib/utils';
 
 type AnimatedLogoMarkProps = {
@@ -14,22 +15,29 @@ type AnimatedLogoMarkProps = {
 /**
  * Just the Kilo animated mark, without the "Kilo" wordmark.
  * Use when the wordmark would duplicate adjacent text (e.g., a page title).
+ *
+ * - Plays the animation on hover only on devices that haven't opted out
+ *   of motion via `prefers-reduced-motion`.
+ * - Uses `preload="none"` so the video file isn't fetched until a user
+ *   actually triggers playback. The mark is mounted in several auth
+ *   flow states; eager preload would hammer the network on every mount.
  */
 export function AnimatedLogoMark({ size = 48, className }: AnimatedLogoMarkProps) {
   const [isHovered, setIsHovered] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const { status } = useSession();
+  const reduceMotion = useReducedMotion();
+  const animationsAllowed = reduceMotion !== true;
 
   useEffect(() => {
-    if (videoRef.current) {
-      if (isHovered) {
-        void videoRef.current.play();
-      } else {
-        videoRef.current.pause();
-        videoRef.current.currentTime = 0;
-      }
+    if (!videoRef.current) return;
+    if (isHovered && animationsAllowed) {
+      void videoRef.current.play();
+    } else {
+      videoRef.current.pause();
+      videoRef.current.currentTime = 0;
     }
-  }, [isHovered]);
+  }, [isHovered, animationsAllowed]);
 
   const href = useMemo(() => {
     if (status === 'authenticated') {
@@ -56,7 +64,7 @@ export function AnimatedLogoMark({ size = 48, className }: AnimatedLogoMarkProps
         height={size}
         muted
         loop
-        preload="auto"
+        preload="none"
         playsInline
         aria-hidden
       >

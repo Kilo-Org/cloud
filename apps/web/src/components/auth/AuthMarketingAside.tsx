@@ -44,7 +44,7 @@ export function AuthMarketingAside() {
           shape="warp"
           type="4x4"
           size={2.5}
-          speed={reduceMotion ? 0 : 0.12}
+          speed={reduceMotion === true ? 0 : 0.12}
         />
       </div>
 

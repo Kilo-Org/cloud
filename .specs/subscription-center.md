@@ -14,6 +14,16 @@ choices belong in plan documents and code, not here.
 
 Draft -- created 2026-03-31.
 Updated 2026-05-12 -- KiloClaw price-version display behavior.
+Updated 2026-05-26 -- Coding Plans managed-credential and catalog behavior.
+Updated 2026-05-27 -- Coding Plans ordinary MiniMax BYOK setup and billing separation.
+Updated 2026-05-27 -- Coding Plans manual MiniMax revocation handling.
+Updated 2026-05-27 -- Token Plan Plus pilot operations and UI behavior.
+Updated 2026-05-28 -- Personal product navigation and return context.
+Updated 2026-05-28 -- USD price display independent of payment source.
+Updated 2026-05-28 -- Coding Plans sold-out availability notification intent.
+Updated 2026-05-28 -- Credit-funded payment source label.
+Updated 2026-05-28 -- Coding Plans API key configuration summary.
+Updated 2026-05-28 -- Coding Plans billing history USD amount display.
 
 ## Conventions
 
@@ -28,9 +38,9 @@ capitals, as shown here.
 - **Subscription Center**: A unified page where users view and manage
   all of their subscriptions in one place. It exists at both a personal
   and organizational level.
-- **Subscription Group**: A category of subscriptions displayed as a
-  visual section on the page. Current groups are Kilo Pass, KiloClaw,
-  Coding Plans, and Teams/Enterprise Seats.
+- **Subscription Group**: A product category within the Subscription
+  Center. Current groups are Kilo Pass, KiloClaw, Coding Plans, and
+  Teams/Enterprise Seats.
 - **Subscription Card**: A summary element within a group that
   represents a single subscription instance and its current state.
 - **Available Product Card**: A card shown within a subscription group
@@ -56,18 +66,21 @@ capitals, as shown here.
   current period; (c) it is trialing and the trial end date is
   approaching. The exact threshold for "approaching" is an
   implementation choice that MAY vary by subscription type.
-- **Price**: All prices are denominated in USD and MUST be displayed
-  with a dollar sign and two decimal places (e.g. "$9.99/mo").
+- **Price**: Prices MUST be displayed in USD regardless of payment
+  source. Price labels MUST use a dollar sign and billing cadence (e.g.
+  "$20 /month"). Credit-funded products MUST display "Credits" as their
+  payment source separately from their USD price.
 
 ## Overview
 
-The Subscription Center is a centralized page where users can see
-every subscription they hold, grouped by product type: Kilo Pass,
-KiloClaw, Coding Plans, and Teams/Enterprise Seats. Each group contains individual
-subscription cards showing status, plan, pricing, and billing date at
-a glance. Clicking a subscription card navigates to a detail page with
-full management capabilities including plan changes, cancellation,
-usage history, and invoice viewing.
+The Subscription Center is a centralized page where users manage
+subscriptions by product type: Kilo Pass, KiloClaw, Coding Plans, and
+Teams/Enterprise Seats. The personal route provides access to each
+personal product while preserving product context when users return from
+its detail page. Each visible group contains subscription cards showing
+status, plan, pricing, and billing date at a glance. Clicking a
+subscription card navigates to a detail page with management capabilities
+including plan changes, cancellation, usage history, and invoice viewing.
 
 The personal Subscription Center lives at `/subscriptions` and is
 accessible from the sidebar. Organization subscriptions live at
@@ -79,8 +92,8 @@ only org-owned subscriptions.
 Subscription management UI may continue to appear in other parts of
 the app (e.g. Kilo Pass cards on the profile page, billing controls
 within the KiloClaw dashboard). The Subscription Center does not
-replace those surfaces but serves as the canonical hub where all
-subscriptions are consolidated.
+replace those surfaces but is the canonical hub for moving between and
+managing each subscription product.
 
 These routes form a stable URL contract. If any path changes in the
 future, the system MUST redirect from the old path to the new one.
@@ -109,34 +122,36 @@ future, the system MUST redirect from the old path to the new one.
 
 ### Subscription Groups
 
-6. The page MUST display subscriptions organized into groups by product
-   type. The initial groups are:
+6. The page MUST organize subscriptions into groups by product type. The
+   initial groups are:
    - **Kilo Pass** (personal route only)
    - **KiloClaw** (personal route only)
    - **Coding Plans** (personal route only)
    - **Teams/Enterprise Seats** (org route only)
 
-7. A group MUST always appear on its respective route regardless of
-   whether the user has a subscription of that type.
+7. The personal route MUST provide access to each personal Subscription
+   Group regardless of whether the user has a subscription of that type.
+   The route MAY show only one group's content at a time. Returning from a
+   personal subscription detail page MUST restore the user's product
+   context.
 
-8. When a group contains no subscriptions in a non-terminal state, the
-   system MUST display an Available Product Card with a call-to-action
-   to subscribe.
+8. When a user views a group with no subscriptions in a non-terminal
+   state, the system MUST display an Available Product Card with a
+   call-to-action to subscribe.
 
-9. When a group contains one or more subscriptions in a non-terminal
-   state, the system MUST display a Subscription Card for each
-   non-terminal subscription.
+9. When a user views a group with one or more subscriptions in a
+   non-terminal state, the system MUST display a Subscription Card for
+   each non-terminal subscription.
 
 10. Subscriptions in a terminal state (Kilo Pass: `canceled`,
     `incomplete_expired`; KiloClaw: `canceled`; Coding Plans:
     `canceled`; Teams/Enterprise: `ended`) MUST be hidden by default.
-    The page MUST provide a single page-level toggle that reveals or
-    hides all terminal subscriptions across all groups simultaneously.
+    Users MUST be able to reveal terminal subscriptions for each
+    applicable product.
 
-11. When revealed, terminal subscription cards MUST use a visually
-    muted treatment — reduced opacity or desaturated color — and MUST
-    display a status label indicating the terminal state (e.g.
-    "Cancelled", "Ended").
+11. When revealed, terminal subscriptions MUST be clearly distinguished
+    from non-terminal subscriptions and MUST display their terminal
+    status (e.g. "Cancelled", "Ended").
 
 ### Subscription Cards
 
@@ -147,20 +162,17 @@ future, the system MUST redirect from the old path to the new one.
     - Price per billing period
     - Payment method summary (e.g. "Visa ending 4242" or "Credits")
 
-13. Cards for subscriptions in a warning state MUST use a colored left
-    border or background tint that differs from the default card style,
-    using the application's existing warning/destructive color tokens.
-    The system MUST NOT use badges or notification indicators in the
-    navigation.
+13. Cards for subscriptions in a warning state MUST communicate
+    prominently and accessibly that the subscription requires attention.
 
 14. Each Subscription Card MUST be clickable and navigate to that
     subscription's detail page, regardless of subscription status.
 
 15. Each subscription group MUST load independently. A failure or delay
-    in loading one group MUST NOT prevent other groups from rendering.
+    in one group MUST NOT prevent the user from viewing another group.
 
-16. While a group's data is loading, the system MUST display a
-    placeholder skeleton for that group's cards.
+16. While the requested group's data is loading, the system MUST provide
+    visible loading feedback for that group.
 
 ### Kilo Pass Subscriptions (Personal Route)
 
@@ -231,57 +243,70 @@ future, the system MUST redirect from the old path to the new one.
     - Link to the Stripe customer portal for payment method management
       (if Stripe-funded)
 
-KiloClaw Subscription Card price display MUST use the subscription
-row's price version and renewal amount, when available, so live legacy
-lineages show legacy pricing and current lineages show current pricing.
-KiloClaw detail price and plan-switch displays MUST use the
-subscription row's price version for both the current plan and any
-scheduled or requested target plan.
+KiloClaw summary and detail views MUST display the pricing applicable
+to the subscription, including subscriptions enrolled under earlier
+pricing. Scheduled or requested plan changes MUST display pricing that
+will apply if the change completes.
 
-The KiloClaw Available Product Card MUST use the fresh current-price
-enrollment preview when the group has no non-terminal KiloClaw
-subscription. Canceled KiloClaw history MUST NOT cause legacy pricing
-or legacy entitlement to appear on subscribe surfaces. Stripe-funded
-KiloClaw checkout pending invoice settlement MUST be displayed as
-pending settlement rather than fully active.
+When the user has no non-terminal KiloClaw subscription, the enrollment
+view MUST display the currently available offer and price. Canceled
+KiloClaw history MUST NOT cause an earlier price or entitlement to
+appear as the available offer. Stripe-funded enrollment awaiting invoice
+settlement MUST be presented as pending rather than active.
 
 ### Coding Plans Subscriptions (Personal Route)
 
 27. A user MAY have multiple Coding Plans subscriptions — one per
-    upstream provider. The Coding Plans group MUST display one
-    Subscription Card for each active coding plan subscription.
+    configured Plan ID. The Coding Plans group MUST display one
+    Subscription Card for each non-terminal coding plan subscription,
+    including a `past_due` subscription in its warning state.
 
 28. The Coding Plans detail page MUST be served at
     `/subscriptions/coding-plans/[subscriptionId]`.
 
 29. Each Coding Plans detail page MUST support the following management
     actions:
-    - View subscription status (active, cancelled)
-    - Cancel subscription
+    - View subscription status (`active`, `past_due`, or `canceled`)
+    - Cancel an active subscription at the end of its paid period
 
 30. Each Coding Plans detail page MUST display:
-    - Provider name and status
-    - Billing period and next renewal date
-    - Cost in Kilo Credits per billing period
-    - Payment source (Kilo Credits)
-    - Traffic routing information (Kilo Gateway or direct)
-    - The user's assigned API key with view and copy controls (see
-      Coding Plans spec, rule 4.2.1)
-    - Inline billing history showing credit transactions (see Billing
-      History rules)
+    - Provider name, plan name, and status
+    - Billing period and next renewal date, paid-through date, or grace
+      deadline as appropriate for its status; a grace deadline MUST include
+      local date and time
+    - Price in USD per billing period
+    - Payment source (Credits)
+    - API Key Configuration summary identifying configuration in BYOK and
+      linking to `/byok` when a managed key is installed
+    - Traffic routing information (Kilo Gateway through the ordinary
+      MiniMax BYOK provider setup)
+    - Inline billing history showing credit transactions with amounts in USD
+      (see Billing History rules)
 
-31. When a coding plan is cancelled or the user's credit balance is
-    insufficient to renew, the system MUST remove the API key from the
-    user's BYOK configuration within Kilo. The system MUST NOT revoke
-    the key with the upstream provider — the key belongs to the user
-    (see Coding Plans spec, rule 5.1). The cancel confirmation dialog
-    MUST communicate this to the user.
+    Before update, disable, or delete, `/byok` MUST warn that routing changes
+    do not cancel or pause Token Plan Plus billing and cancellation is managed
+    in Subscription Center; customer surfaces MUST NOT include saved raw-key
+    view or copy controls.
 
-32. When a group contains no active coding plans, the system MUST
-    display the available provider catalog inline as Available Product
-    Cards — one per upstream provider — showing the provider name,
-    recurring cost in Kilo Credits, and billing period. Each card MUST
-    have a subscribe action that initiates subscription creation.
+31. Coding Plan cancellation, installed MiniMax configuration cleanup,
+    and issued-credential revocation MUST follow `.specs/coding-plans.md`.
+    Cancellation messaging MUST communicate the paid-through date, that
+    only Kilo's unchanged installed configuration is removed, and that
+    Kilo revokes its issued credential when plan access ends.
+
+32. When the user views Coding Plans with no non-terminal subscription,
+    the system MUST show each configured offering with provider name,
+    plan name, recurring USD price, billing period, and payment source.
+    An offering with assignable credential capacity MUST show a subscribe
+    action. For MiniMax Token Plan Plus, purchase messaging MUST explain
+    automatic MiniMax BYOK setup and purchase MUST be blocked when any
+    personal MiniMax BYOK key exists, including a disabled key. In that
+    state, the system MUST direct the user to delete the existing key in
+    `/byok` first. An offering without assignable credential capacity MUST
+    display a sold-out state and a `Notify me when available` action. The
+    action MUST persist one notification intent per user and Plan ID without
+    charging credits or reserving inventory, and the surface MUST indicate
+    once that intent has been saved.
 
 ### Teams/Enterprise Seats Subscriptions (Org Route)
 
@@ -341,9 +366,9 @@ pending settlement rather than fully active.
     group's displayed state MUST NOT change. An abandoned or failed
     checkout MUST NOT alter what the page displays.
 
-45. When the user has no subscriptions of any type, the personal
-    Subscription Center MUST display Available Product Cards for every
-    group — it MUST NOT show an empty page.
+45. When the user has no subscriptions of any type, each personal
+    product MUST remain accessible and MUST present its subscribe
+    opportunity when viewed; the visible product view MUST NOT be empty.
 
 ### Billing History
 
@@ -356,16 +381,16 @@ pending settlement rather than fully active.
 
 48. For subscriptions funded entirely by credits (no Stripe billing),
     the billing history MUST display credit transaction history in
-    place of invoices — showing date, amount, and description for each
-    credit deduction.
+    place of invoices, showing date, USD-denominated amount, and description
+    for each credit deduction.
 
 49. The billing history MUST be scoped to the individual subscription
     being viewed — the system MUST NOT display entries from other
     subscriptions.
 
 50. The billing history MUST be ordered by date descending (newest
-    first). When there are more than 25 entries, the system MUST
-    paginate or provide a "show more" mechanism.
+    first). Users MUST be able to access additional entries when the
+    complete history is not shown initially.
 
 ### Payment Method Management
 
@@ -379,8 +404,8 @@ pending settlement rather than fully active.
 ### Responsiveness
 
 53. The Subscription Center MUST be fully functional on mobile
-    viewports. Subscription Cards MUST stack vertically on narrow
-    screens.
+    viewports without hiding subscription information or management
+    actions required by this spec.
 
 54. All management actions on detail pages MUST be accessible and
     usable on mobile viewports.
@@ -412,8 +437,7 @@ The following rules use SHOULD and reflect intended behavior that is
 not yet enforced in the current codebase:
 
 1. The system SHOULD support additional subscription types beyond the
-   initial four. The group-based layout SHOULD accommodate new product
-   types without structural changes to the page.
+   initial four without disrupting access to existing products.
 
 2. The system SHOULD surface upcoming renewals or billing events on
    the landing page (e.g. "renews in 3 days") to help users
@@ -424,6 +448,27 @@ not yet enforced in the current codebase:
    the current plan and seat count without management actions.
 
 ## Changelog
+
+### 2026-05-28 -- Personal product navigation and return context
+
+- Defined access to each personal product and restoration of product context after detail-page navigation.
+- Kept independent loading, terminal history, and available-product behavior within each product view.
+
+### 2026-05-27 -- Token Plan Plus pilot operations and UI behavior
+
+- Accepted billing-sweep local cleanup timing for the pilot and defined admin-console manual credential revocation.
+- Added admin-only explicit key reveal, validate-on-upload inventory, mutation-time BYOK warnings, no prepaid extensions, and local-time grace display.
+- Dropped Coding Plans admin-action audit history for the initial pilot while retaining secret-handling restrictions and inventory disposition state.
+
+### 2026-05-27 -- Coding Plans manual MiniMax revocation handling
+
+- Recorded manual provider revocation as the initial MiniMax operational workflow.
+- Kept local cleanup separate from upstream revocation processing by authorized support.
+
+### 2026-05-27 -- Coding Plans ordinary MiniMax BYOK setup
+
+- Replaced read-only managed-key behavior with automatic ordinary MiniMax BYOK setup and normal key management.
+- Defined occupied-MiniMax purchase blocking, billing separation, and conditional installed-key cleanup.
 
 ### 2026-05-12 -- KiloClaw price-version display behavior
 

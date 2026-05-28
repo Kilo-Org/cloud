@@ -303,36 +303,40 @@ export async function tryDispatchPendingReviews(
         const error = result.reason;
         const errorMessage = getErrorMessage(error);
         const actionRequiredReason = getActionRequiredReasonFromError(error);
+        const actionRequiredStateAlreadyPresent =
+          error instanceof CodeReviewActionRequiredDispatchError;
 
         if (actionRequiredReason) {
-          logExceptInTest(
-            '[tryDispatchPendingReviews] Disabling Code Reviewer after action-required failure',
-            {
-              reviewId: reservation.review.id,
-              owner,
-              reason: actionRequiredReason,
-            }
-          );
+          if (!actionRequiredStateAlreadyPresent) {
+            logExceptInTest(
+              '[tryDispatchPendingReviews] Disabling Code Reviewer after action-required failure',
+              {
+                reviewId: reservation.review.id,
+                owner,
+                reason: actionRequiredReason,
+              }
+            );
 
-          try {
-            await disableCodeReviewForActionRequiredFailure({
-              owner,
-              platform: reservation.review.platform === 'gitlab' ? 'gitlab' : 'github',
-              reviewId: reservation.review.id,
-              reason: actionRequiredReason,
-              errorMessage,
-            });
-          } catch (disableError) {
-            errorExceptInTest('[tryDispatchPendingReviews] Failed to disable Code Reviewer', {
-              reviewId: reservation.review.id,
-              owner,
-              reason: actionRequiredReason,
-              disableError,
-            });
-            captureException(disableError, {
-              tags: { operation: 'disable-code-review-action-required' },
-              extra: { reviewId: reservation.review.id, owner, reason: actionRequiredReason },
-            });
+            try {
+              await disableCodeReviewForActionRequiredFailure({
+                owner,
+                platform: reservation.review.platform === 'gitlab' ? 'gitlab' : 'github',
+                reviewId: reservation.review.id,
+                reason: actionRequiredReason,
+                errorMessage,
+              });
+            } catch (disableError) {
+              errorExceptInTest('[tryDispatchPendingReviews] Failed to disable Code Reviewer', {
+                reviewId: reservation.review.id,
+                owner,
+                reason: actionRequiredReason,
+                disableError,
+              });
+              captureException(disableError, {
+                tags: { operation: 'disable-code-review-action-required' },
+                extra: { reviewId: reservation.review.id, owner, reason: actionRequiredReason },
+              });
+            }
           }
 
           try {

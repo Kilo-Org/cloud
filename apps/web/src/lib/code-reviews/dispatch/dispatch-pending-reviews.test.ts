@@ -372,20 +372,17 @@ describe('tryDispatchPendingReviews', () => {
   it('refuses to prepare pending work while action-required state is present', async () => {
     const recentTimestamp = minutesAgo(1);
     const owner = { type: 'user', id: testUser.id } satisfies ReviewOwner;
-    mockGetAgentConfigForOwner.mockResolvedValue({
-      id: 'test-agent-config',
-      config: {},
-      is_enabled: true,
-      runtime_state: {
-        code_review_action_required: {
-          reason: 'byok_invalid_key',
-          detectedAt: new Date().toISOString(),
-          lastSeenAt: new Date().toISOString(),
-          lastErrorMessage:
-            'Code Reviewer was disabled because the selected BYOK API key is invalid or has been revoked. Update the key or choose another model, then enable Code Reviewer again.',
-        },
+    const actionRequiredState = {
+      code_review_action_required: {
+        reason: 'byok_invalid_key',
+        detectedAt: minutesAgo(10),
+        lastSeenAt: minutesAgo(9),
+        lastErrorMessage:
+          'Code Reviewer was disabled because the selected BYOK API key is invalid or has been revoked. Update the key or choose another model, then enable Code Reviewer again.',
       },
-    });
+    };
+    const agentConfig = await insertAgentConfigForUser(actionRequiredState);
+    mockGetAgentConfigForOwner.mockResolvedValue(agentConfig);
 
     const [review] = await db
       .insert(cloud_agent_code_reviews)
@@ -406,9 +403,14 @@ describe('tryDispatchPendingReviews', () => {
     });
 
     const storedReview = await getStoredReview(review.id);
+    const storedConfig = await db.query.agent_configs.findFirst({
+      where: eq(agent_configs.id, agentConfig.id),
+    });
 
     expect(mockPrepareReviewPayload).not.toHaveBeenCalled();
     expect(mockDispatchReview).not.toHaveBeenCalled();
+    expect(mockSendCodeReviewDisabledEmail).not.toHaveBeenCalled();
+    expect(storedConfig?.runtime_state).toEqual(actionRequiredState);
     expect(storedReview).toEqual(
       expect.objectContaining({
         status: 'failed',

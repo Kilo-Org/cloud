@@ -5,7 +5,7 @@ import type {
 } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 
 export const CLAUDE_SONNET_CURRENT_MODEL_ID = 'anthropic/claude-sonnet-4.6';
-export const CLAUDE_OPUS_CURRENT_MODEL_ID = 'anthropic/claude-opus-4.7';
+export const CLAUDE_OPUS_CURRENT_MODEL_ID = 'anthropic/claude-opus-4.8';
 export const CLAUDE_HAIKU_CURRENT_MODEL_ID = 'anthropic/claude-haiku-4.5';
 export const CLAUDE_OPUS_STEALTH_MODEL_ID = 'stealth/claude-opus-4.7';
 export const CLAUDE_SONNET_STEALTH_MODEL_ID = 'stealth/claude-sonnet-4.6';

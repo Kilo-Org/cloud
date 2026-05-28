@@ -9,8 +9,8 @@ export const INSTALL_SOURCES = {
 
 export type InstallSource = keyof typeof INSTALL_SOURCES;
 
-export const INSTALL_SOURCE_KEYS = Object.keys(INSTALL_SOURCES) as InstallSource[];
-
 export function isInstallSource(value: string): value is InstallSource {
-  return value in INSTALL_SOURCES;
+  // Own-property check (not `value in`) so inherited names like `toString`
+  // or `hasOwnProperty` can't pass the guard and then crash the lookup.
+  return Object.hasOwn(INSTALL_SOURCES, value);
 }

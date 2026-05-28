@@ -178,6 +178,19 @@ describe('fetchInstallPayload', () => {
     await expect(fetchInstallPayload('byte', 'deep-research')).rejects.toThrow();
   });
 
+  it('rejects when signed payload.slug does not match the requested slug', async () => {
+    // A validly-signed byte for a different slug — protects against CDN /
+    // upstream swapping byte A's payload for a request targeting byte B.
+    const signed = signPayload({ ...VALID_BASE, slug: 'different-byte' });
+    jest.spyOn(global, 'fetch').mockResolvedValue(jsonResponse(signed));
+    const errSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    const result = await fetchInstallPayload('byte', 'deep-research');
+
+    expect(result).toBeNull();
+    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('slug mismatch'));
+  });
+
   it('throws when CLAWBYTE_SIGNING_PUBLIC_KEY is unset', async () => {
     const saved = process.env.CLAWBYTE_SIGNING_PUBLIC_KEY;
     delete process.env.CLAWBYTE_SIGNING_PUBLIC_KEY;

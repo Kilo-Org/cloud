@@ -16,6 +16,11 @@ export const internalApiMiddleware = createMiddleware<{
   Bindings: Env;
   Variables: AuthContext;
 }>(async (c, next) => {
+  // Reject missing-header probes immediately, before hitting Secrets Store.
+  // Unauthenticated traffic shouldn't generate backend secret reads.
+  const apiKey = c.req.header('x-internal-api-key');
+  if (!apiKey) return c.json({ error: 'Forbidden' }, 403);
+
   let secret: string;
   try {
     secret = await c.env.INTERNAL_API_SECRET.get();
@@ -28,8 +33,6 @@ export const internalApiMiddleware = createMiddleware<{
     return c.json({ error: 'Server configuration error' }, 500);
   }
 
-  const apiKey = c.req.header('x-internal-api-key');
-  if (!apiKey) return c.json({ error: 'Forbidden' }, 403);
   if (!timingSafeEqual(apiKey, secret)) return c.json({ error: 'Forbidden' }, 403);
 
   logger.setTags({ source: 'internal-api' });

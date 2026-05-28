@@ -136,5 +136,17 @@ export async function fetchInstallPayload(
     return null;
   }
 
+  // The signature covers `payload.slug`, but we also need to bind that slug
+  // to the slug the user actually requested. Otherwise a CDN/cache/object-
+  // path swap (or a malicious intermediary serving a different validly-
+  // signed byte for the requested URL) would let one byte's install
+  // dispatch under another byte's name.
+  if (payload.slug !== slug) {
+    console.error(
+      `[install] slug mismatch for ${source}/${slug}: signed payload is for "${payload.slug}"`
+    );
+    return null;
+  }
+
   return payload;
 }

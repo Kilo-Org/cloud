@@ -241,7 +241,10 @@ export async function prepareReviewPayload(
         // Unlike GitHub, we cannot fall back to no-token for GitLab private repos,
         // so auth errors here are hard failures that must propagate.
         const metadata = integration.metadata as GitLabIntegrationMetadata | null;
-        gitlabInstanceUrl = metadata?.gitlab_instance_url || 'https://gitlab.com';
+        gitlabInstanceUrl = (metadata?.gitlab_instance_url || 'https://gitlab.com').replace(
+          /\/+$/,
+          ''
+        );
         const instanceUrl = gitlabInstanceUrl;
 
         logExceptInTest('[prepareReviewPayload] GitLab integration found', {
@@ -471,7 +474,7 @@ export async function prepareReviewPayload(
       platform === 'gitlab'
         ? {
             // GitLab: use full git URL for cloning
-            gitUrl: `${(gitlabInstanceUrl || 'https://gitlab.com').replace(/\/+$/, '')}/${review.repo_full_name}.git`,
+            gitUrl: `${gitlabInstanceUrl || 'https://gitlab.com'}/${review.repo_full_name}.git`,
             gitToken: gitlabToken,
             platform: 'gitlab',
             kilocodeOrganizationId: owner.type === 'org' ? owner.id : undefined,

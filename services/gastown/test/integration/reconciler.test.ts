@@ -126,7 +126,7 @@ describe('Reconciler', () => {
     });
   });
 
-  // ── #1358: Heartbeat restores working status ────────────────────────
+  // ── #1358: Container activity restores working status ───────────────
 
   describe('#1358: dispatch timeout race recovery', () => {
     it('should restore idle agent to working on heartbeat', async () => {
@@ -194,6 +194,52 @@ describe('Reconciler', () => {
 
       const after = await town.getAgentAsync(agent.id);
       expect(after?.status).toBe('exited');
+    });
+
+    it('should restore idle agent to working on agent event activity', async () => {
+      const agent = await town.registerAgent({
+        role: 'polecat',
+        name: 'P4',
+        identity: `agent-event-restore-${townName}`,
+        rig_id: 'rig-1',
+      });
+      const bead = await town.createBead({
+        type: 'issue',
+        title: 'Agent event activity test',
+        rig_id: 'rig-1',
+      });
+
+      await town.hookBead(agent.id, bead.bead_id);
+      await town.updateAgentStatus(agent.id, 'idle');
+
+      await town.appendAgentEvent(agent.id, 'message', { text: 'working' });
+
+      const after = await town.getAgentAsync(agent.id);
+      expect(after?.status).toBe('working');
+      expect(after?.last_activity_at).toBeTruthy();
+    });
+
+    it('should restore idle agent to working on status message activity', async () => {
+      const agent = await town.registerAgent({
+        role: 'polecat',
+        name: 'P5',
+        identity: `status-message-restore-${townName}`,
+        rig_id: 'rig-1',
+      });
+      const bead = await town.createBead({
+        type: 'issue',
+        title: 'Status message activity test',
+        rig_id: 'rig-1',
+      });
+
+      await town.hookBead(agent.id, bead.bead_id);
+      await town.updateAgentStatus(agent.id, 'idle');
+
+      await town.updateAgentStatusMessage(agent.id, 'Still working');
+
+      const after = await town.getAgentAsync(agent.id);
+      expect(after?.status).toBe('working');
+      expect(after?.last_activity_at).toBeTruthy();
     });
   });
 

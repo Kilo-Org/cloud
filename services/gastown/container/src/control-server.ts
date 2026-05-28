@@ -169,6 +169,12 @@ function syncTownConfigToProcessEnv(): void {
     process.env[key] = String(value);
   }
   lastAppliedEnvVarKeys = newCustomKeys;
+
+  const apiUrl = process.env.GASTOWN_API_URL;
+  const authToken = process.env.GASTOWN_CONTAINER_TOKEN ?? process.env.GASTOWN_SESSION_TOKEN;
+  if (apiUrl && authToken) {
+    startHeartbeat(apiUrl, authToken);
+  }
 }
 
 export const app = new Hono();
@@ -353,6 +359,10 @@ app.post('/agents/start', async c => {
   process.env.GASTOWN_TOWN_ID = parsed.data.townId;
   if (parsed.data.envVars?.GASTOWN_CONTAINER_TOKEN) {
     process.env.GASTOWN_CONTAINER_TOKEN = parsed.data.envVars.GASTOWN_CONTAINER_TOKEN;
+  }
+  const heartbeatToken = process.env.GASTOWN_CONTAINER_TOKEN ?? process.env.GASTOWN_SESSION_TOKEN;
+  if (process.env.GASTOWN_API_URL && heartbeatToken) {
+    startHeartbeat(process.env.GASTOWN_API_URL, heartbeatToken);
   }
 
   console.log(

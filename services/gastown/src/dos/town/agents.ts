@@ -601,7 +601,7 @@ export function updateAgentStatusMessage(sql: SqlStorage, agentId: string, messa
   );
 }
 
-// ── Touch (heartbeat helper) ────────────────────────────────────────
+// ── Touch (container activity helper) ────────────────────────────────
 
 export function touchAgent(
   sql: SqlStorage,
@@ -612,7 +612,7 @@ export function touchAgent(
     activeTools?: string[];
   }
 ): void {
-  // A heartbeat is proof the agent is alive in the container.
+  // A heartbeat, agent event, or status update is proof the agent is alive in the container.
   // If the agent's status is 'idle' (e.g. due to a dispatch timeout
   // race — see #1358), restore it to 'working'. This prevents the
   // reconciler from treating the agent as lost while it's actively

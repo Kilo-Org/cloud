@@ -5,13 +5,19 @@ Guide for an AI agent to verify town health after a production deploy.
 ## Prerequisites
 
 - The debug endpoint is deployed: `GET /debug/towns/:townId/status`
-- The debug endpoint is protected by Cloudflare Access. Requests must include service token headers.
+- The debug endpoint is protected by Cloudflare Access. Requests must include a Cloudflare Access JWT.
 - Base URL: `https://gastown.kiloapps.io`
 - Town ID: obtain from `GET /trpc/gastown.listOrgTowns` (requires auth) or from the user
 
 ### Authentication
 
-The debug endpoint requires Cloudflare Access service token headers. These are the same credentials the Next.js app uses to communicate with gastown:
+The debug endpoint requires a Cloudflare Access token. For interactive debugging, obtain one with `cloudflared`:
+
+```bash
+export CF_ACCESS_TOKEN="$(cloudflared access login --no-verbose https://gastown.kiloapps.io/debug/login)"
+```
+
+Service token headers also work when using the same credentials the Next.js app uses to communicate with gastown:
 
 ```bash
 # Set these from your Cloudflare Access service token
@@ -28,14 +34,18 @@ export GASTOWN_CF_ANALYTICS_API_KEY="<api-token>"
 export CF_ACCOUNT_ID="<account-id>"
 ```
 
-All `curl` commands in this document use a helper function that includes these headers:
+All `curl` commands in this document use a helper function. Prefer the interactive token when available; fall back to service token headers if set:
 
 ```bash
 debug_curl() {
-  curl -s \
-    -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
-    -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
-    "$@"
+  if [ -n "${CF_ACCESS_TOKEN:-}" ]; then
+    curl -s -H "cf-access-token: $CF_ACCESS_TOKEN" "$@"
+  else
+    curl -s \
+      -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
+      -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
+      "$@"
+  fi
 }
 ```
 
@@ -44,8 +54,7 @@ debug_curl() {
 The monitoring script at `scripts/monitor-town.sh` polls the debug endpoint:
 
 ```bash
-export CF_ACCESS_CLIENT_ID="<client-id>"
-export CF_ACCESS_CLIENT_SECRET="<client-secret>"
+export CF_ACCESS_TOKEN="$(cloudflared access login --no-verbose https://gastown.kiloapps.io/debug/login)"
 ./scripts/monitor-town.sh <townId> [interval_seconds]
 ```
 

@@ -237,6 +237,38 @@ describe('Reconciler', () => {
     });
   });
 
+  describe('event-driven agentCompleted container eviction', () => {
+    it('keeps an in-progress bead assigned when the agent heartbeat is fresh', async () => {
+      const agent = await town.registerAgent({
+        role: 'polecat',
+        name: 'P1',
+        identity: `eviction-fresh-${townName}`,
+        rig_id: 'rig-1',
+      });
+      const bead = await town.createBead({
+        type: 'issue',
+        title: 'Fresh eviction bead',
+        rig_id: 'rig-1',
+      });
+
+      await town.hookBead(agent.id, bead.bead_id);
+      await town.updateBeadStatus(bead.bead_id, 'in_progress', agent.id);
+      await town.updateAgentStatus(agent.id, 'working');
+      await town.touchAgentHeartbeat(agent.id);
+
+      await town.agentCompleted(agent.id, { status: 'completed', reason: 'container eviction' });
+      await runDurableObjectAlarm(town);
+
+      const beadAfter = await town.getBeadAsync(bead.bead_id);
+      expect(beadAfter?.status).toBe('in_progress');
+      expect(beadAfter?.assignee_agent_bead_id).toBe(agent.id);
+
+      const agentAfter = await town.getAgentAsync(agent.id);
+      expect(agentAfter?.status).toBe('idle');
+      expect(agentAfter?.current_hook_bead_id).toBeNull();
+    });
+  });
+
   // ── reconcileReviewQueue Rule 5: Refinery dispatch ──────────────────
 
   describe('reconcileReviewQueue Rule 5: refinery dispatch', () => {

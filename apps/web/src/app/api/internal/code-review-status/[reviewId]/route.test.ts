@@ -589,6 +589,47 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       expect(mockFindKiloReviewComment).not.toHaveBeenCalled();
     });
 
+    it('infers model-not-allowed callbacks as action-required failures', async () => {
+      const errorMessage =
+        'prepareSession failed (400): {"error":{"message":"Not Found: The requested model is not allowed for your team.","code":-32600,"data":{"code":"BAD_REQUEST","httpStatus":400,"path":"prepareSession"}}}';
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+
+      const response = await POST(
+        makeRequest({
+          status: 'failed',
+          errorMessage,
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+        REVIEW_ID,
+        'failed',
+        expect.objectContaining({
+          errorMessage,
+          terminalReason: 'selected_model_unavailable',
+        })
+      );
+      expect(mockDisableCodeReviewForActionRequiredFailure).toHaveBeenCalledWith(
+        expect.objectContaining({
+          reason: 'selected_model_unavailable',
+          errorMessage,
+        })
+      );
+      expect(mockUpdateCheckRun).toHaveBeenCalledWith(
+        'inst-1',
+        'owner',
+        'repo',
+        12345,
+        expect.objectContaining({
+          conclusion: 'action_required',
+          output: expect.objectContaining({ title: 'Selected model unavailable' }),
+        }),
+        'standard'
+      );
+    });
+
     it('infers GitHub installation and IP allow-list callback failures', async () => {
       mockGetCodeReviewById.mockResolvedValue(makeReview());
 

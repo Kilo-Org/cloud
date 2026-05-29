@@ -52,6 +52,18 @@ describe('classifyCodeReviewActionRequiredFailure', () => {
         'prepareSession failed (400): {"error":{"message":"Selected model is not available for this cloud agent session","code":-32600,"data":{"code":"BAD_REQUEST","httpStatus":400,"path":"prepareSession"}}}'
       )
     ).toBe('selected_model_unavailable');
+
+    expect(
+      classifyCodeReviewActionRequiredFailure(
+        'Not Found: The requested model is not allowed for your team.'
+      )
+    ).toBe('selected_model_unavailable');
+
+    expect(
+      classifyCodeReviewActionRequiredFailure(
+        'prepareSession failed (400): {"error":{"message":"Not Found: The requested model is not allowed for your team.","code":-32600,"data":{"code":"BAD_REQUEST","httpStatus":400,"path":"prepareSession"}}}'
+      )
+    ).toBe('selected_model_unavailable');
   });
 
   it('does not classify unrelated auth, rate-limit, or BYOK quota failures', () => {

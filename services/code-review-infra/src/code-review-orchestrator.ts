@@ -100,6 +100,8 @@ const RISKY_COMMAND_PATTERNS = [
 
 const SELECTED_MODEL_UNAVAILABLE_MESSAGE =
   'selected model is not available for this cloud agent session';
+const REQUESTED_MODEL_NOT_ALLOWED_FOR_TEAM_MESSAGE =
+  'the requested model is not allowed for your team';
 
 function findRiskyPattern(command: string): string | null {
   const normalized = command.toLowerCase();
@@ -735,7 +737,10 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
 
     const message = error.message.toLowerCase();
 
-    if (message.includes(SELECTED_MODEL_UNAVAILABLE_MESSAGE)) {
+    if (
+      message.includes(SELECTED_MODEL_UNAVAILABLE_MESSAGE) ||
+      message.includes(REQUESTED_MODEL_NOT_ALLOWED_FOR_TEAM_MESSAGE)
+    ) {
       return 'selected_model_unavailable';
     }
 

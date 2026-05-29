@@ -73,7 +73,7 @@ function buildAutoModels(): OpenRouterModel[] {
 
 function formatName(model: OpenRouterModel, preferredIndex: number) {
   const promptPrice = Number.parseFloat(model.pricing.prompt);
-  const isExpensive = Number.isFinite(promptPrice) && promptPrice >= 0.00003; // Opus Fast / GPT Pro price
+  const isExpensive = Number.isFinite(promptPrice) && promptPrice >= 0.00001; // Opus 4.8 Fast price
   if (isExpensive) return model.name + ' ($$$$)';
   if (model.name.endsWith(')')) return model.name;
   const ageDays = (Date.now() / 1_000 - model.created) / (24 * 3600);

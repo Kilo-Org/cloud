@@ -231,7 +231,9 @@ describe('prepareReviewPayload', () => {
         repositoryReviewInstructions: '# Review policy\n\nFlag only regressions.',
       })
     );
-    expect(mockFindPreviousCompletedReview).toHaveBeenCalledWith(REPO, 123, 'headsha123', 'github');
+    expect(mockFindPreviousCompletedReview).toHaveBeenCalledWith(REPO, 123, 'headsha123', {
+      platform: 'github',
+    });
     expect(mockUpdateRepositoryReviewInstructionsMetadata).toHaveBeenCalledWith(review.id, {
       used: true,
       ref: 'main',
@@ -254,13 +256,24 @@ describe('prepareReviewPayload', () => {
       )
       .returning();
 
-    await prepareReviewPayload({
+    const payload = await prepareReviewPayload({
       reviewId: review.id,
       owner: { type: 'user', id: testUser.id, userId: testUser.id },
       agentConfig: { config: baseAgentConfig },
       platform: 'gitlab',
     });
 
+    expect(payload.sessionInput).toMatchObject({
+      gitUrl: `https://gitlab.example.com/${REPO}.git`,
+      gitToken: 'gitlab-project-token',
+      platform: 'gitlab',
+    });
+    expect(payload.sessionInput).not.toHaveProperty('gitlabCodeReviewTokenRef');
+    expect(mockFindPreviousCompletedReview).toHaveBeenCalledWith(REPO, 123, 'headsha123', {
+      platform: 'gitlab',
+      integrationId: gitlabIntegration.id,
+      projectId: 456,
+    });
     expect(mockFetchGitLabRootTextFileAtRef).toHaveBeenCalledWith(
       'gitlab-project-token',
       REPO,
@@ -282,6 +295,71 @@ describe('prepareReviewPayload', () => {
       ref: 'main',
       truncated: false,
     });
+  });
+
+  it('skips GitLab continuation lookup when exact scope is unavailable', async () => {
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        defineReview(testUser.id, null, {
+          platform: 'gitlab',
+          pr_url: `https://gitlab.example.com/${REPO}/-/merge_requests/123`,
+        })
+      )
+      .returning();
+
+    const payload = await prepareReviewPayload({
+      reviewId: review.id,
+      owner: { type: 'user', id: testUser.id, userId: testUser.id },
+      agentConfig: { config: baseAgentConfig },
+      platform: 'gitlab',
+    });
+
+    expect(mockGetOrCreateProjectAccessToken).not.toHaveBeenCalled();
+    expect(mockFindPreviousCompletedReview).not.toHaveBeenCalled();
+    expect(payload.previousCloudAgentSessionId).toBeUndefined();
+  });
+
+  it('normalizes trailing slashes in self-hosted GitLab review repository URLs', async () => {
+    const [trailingSlashIntegration] = await db
+      .insert(platform_integrations)
+      .values(
+        defineIntegration(testUser.id, {
+          platform: 'gitlab',
+          integration_type: 'oauth',
+          platform_installation_id: `gitlab-trailing-${Date.now()}-${Math.random()}`,
+          metadata: {
+            access_token: 'gitlab-oauth-token',
+            gitlab_instance_url: 'https://gitlab.example.com/gitlab/',
+          },
+        })
+      )
+      .returning();
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        defineReview(testUser.id, trailingSlashIntegration.id, {
+          platform: 'gitlab',
+          platform_project_id: 456,
+          pr_url: `https://gitlab.example.com/gitlab/${REPO}/-/merge_requests/123`,
+        })
+      )
+      .returning();
+
+    try {
+      const payload = await prepareReviewPayload({
+        reviewId: review.id,
+        owner: { type: 'user', id: testUser.id, userId: testUser.id },
+        agentConfig: { config: baseAgentConfig },
+        platform: 'gitlab',
+      });
+
+      expect(payload.sessionInput.gitUrl).toBe(`https://gitlab.example.com/gitlab/${REPO}.git`);
+    } finally {
+      await db
+        .delete(platform_integrations)
+        .where(eq(platform_integrations.id, trailingSlashIntegration.id));
+    }
   });
 
   it('falls back to built-in guidance when REVIEW.md is missing', async () => {
@@ -495,6 +573,7 @@ describe('prepareReviewPayload', () => {
       platform: 'github',
       upstreamBranch: 'refs/pull/1234/head',
     });
+    expect(payload.sessionInput).not.toHaveProperty('gitlabCodeReviewTokenRef');
   });
 
   it('does not continue previous cloud-agent sessions for GitHub pull-ref reviews', async () => {

@@ -8,6 +8,10 @@ import { Button } from '@/components/ui/button';
 import { FileEditorShell } from '@/app/(app)/claw/components/FileEditorShell';
 import { FileEditorPane, type FileSaveError } from '@/app/(app)/claw/components/FileEditorPane';
 import { validateOpenclawJsonForSave } from '@/app/(app)/claw/components/validateOpenclawJson';
+import type {
+  FileWriteResponse,
+  OpenclawFileWriteValidation,
+} from '@/lib/kiloclaw/kiloclaw-internal-client';
 
 function AdminFileEditorPaneInner({
   userId,
@@ -15,12 +19,14 @@ function AdminFileEditorPaneInner({
   filePath,
   writeFileMutation,
   onDirtyChange,
+  enableOpenclawValidation,
 }: {
   userId: string;
   instanceId: string;
   filePath: string;
-  writeFileMutation: ReturnType<typeof useMutation<{ etag: string }, any, any>>; // eslint-disable-line @typescript-eslint/no-explicit-any
+  writeFileMutation: ReturnType<typeof useMutation<FileWriteResponse, any, any>>; // eslint-disable-line @typescript-eslint/no-explicit-any
   onDirtyChange: (dirty: boolean) => void;
+  enableOpenclawValidation: boolean;
 }) {
   const trpc = useTRPC();
   const { data, isLoading, error, refetch } = useQuery(
@@ -32,14 +38,26 @@ function AdminFileEditorPaneInner({
 
   const handleSave = useCallback(
     (
-      args: { path: string; content: string; etag?: string },
+      args: {
+        path: string;
+        content: string;
+        etag?: string;
+        openclawValidation?: OpenclawFileWriteValidation;
+      },
       callbacks: {
-        onSuccess: (result: { etag: string }) => void;
+        onSuccess: (result: FileWriteResponse) => void;
         onError: (err: FileSaveError) => void;
       }
     ) => {
       writeFileMutation.mutate(
-        { userId, instanceId, path: args.path, content: args.content, etag: args.etag },
+        {
+          userId,
+          instanceId,
+          path: args.path,
+          content: args.content,
+          etag: args.etag,
+          openclawValidation: args.openclawValidation,
+        },
         callbacks
       );
     },
@@ -59,11 +77,20 @@ function AdminFileEditorPaneInner({
       isSaving={writeFileMutation.isPending}
       onDirtyChange={onDirtyChange}
       validateBeforeSave={validateBeforeSave}
+      enableOpenclawValidation={enableOpenclawValidation}
     />
   );
 }
 
-export function AdminFileEditor({ userId, instanceId }: { userId: string; instanceId: string }) {
+export function AdminFileEditor({
+  userId,
+  instanceId,
+  enableOpenclawValidation,
+}: {
+  userId: string;
+  instanceId: string;
+  enableOpenclawValidation: boolean;
+}) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const [enabled, setEnabled] = useState(false);
@@ -82,7 +109,8 @@ export function AdminFileEditor({ userId, instanceId }: { userId: string; instan
 
   const writeFileMutation = useMutation(
     trpc.admin.kiloclawInstances.writeFile.mutationOptions({
-      onSuccess: async () => {
+      onSuccess: async result => {
+        if ('outcome' in result) return;
         await queryClient.invalidateQueries({
           queryKey: trpc.admin.kiloclawInstances.fileTree.queryKey({ userId, instanceId }),
         });
@@ -117,6 +145,7 @@ export function AdminFileEditor({ userId, instanceId }: { userId: string; instan
           filePath={selectedPath}
           writeFileMutation={writeFileMutation}
           onDirtyChange={onDirtyChange}
+          enableOpenclawValidation={enableOpenclawValidation}
         />
       )}
     />

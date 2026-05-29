@@ -46,6 +46,7 @@ import type { Result } from '../lib/result.js';
 import type { AddExecutionError, UpdateStatusError } from '../session/queries/executions.js';
 import {
   createStreamHandler,
+  getConnectedStreamClientCount,
   type StreamHandler,
   type QueuedMessageSnapshot,
 } from '../websocket/stream.js';
@@ -419,6 +420,9 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
           return resolvedSessionId ?? metadata?.identity.sessionId ?? '';
         },
         getCallbackQueue: () => this.env.CALLBACK_QUEUE,
+        sendPushNotification: params =>
+          this.env.NOTIFICATIONS.sendCloudAgentSessionNotification(params),
+        hasConnectedStreamClients: () => getConnectedStreamClientCount(this.ctx) > 0,
         getAssistantMessageForUserMessage: (sessionId, kiloSessionId, parentMessageId) =>
           this.eventQueries.getAssistantMessageForUserMessage(
             sessionId,
@@ -883,7 +887,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
    * @returns Number of active WebSocket connections
    */
   getConnectedClientCount(): number {
-    return this.streamHandler?.getConnectedClientCount() ?? 0;
+    return getConnectedStreamClientCount(this.ctx);
   }
 
   // ---------------------------------------------------------------------------
@@ -2004,6 +2008,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     opts?: {
       gateResult?: 'pass' | 'fail';
       suppressCallback?: boolean;
+      suppressPush?: boolean;
       allowIdleBatchWithoutObservedIdle?: boolean;
     }
   ) {

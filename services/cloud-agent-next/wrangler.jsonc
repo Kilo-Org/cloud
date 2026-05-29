@@ -88,6 +88,11 @@
       "service": "git-token-service",
       "entrypoint": "GitTokenRPCEntrypoint",
     },
+    {
+      "binding": "NOTIFICATIONS",
+      "service": "notifications",
+      "entrypoint": "NotificationsService",
+    },
   ],
   "secrets_store_secrets": [
     {
@@ -273,6 +278,11 @@
           "binding": "GIT_TOKEN_SERVICE",
           "service": "git-token-service-dev",
           "entrypoint": "GitTokenRPCEntrypoint",
+        },
+        {
+          "binding": "NOTIFICATIONS",
+          "service": "notifications",
+          "entrypoint": "NotificationsService",
         },
       ],
       "secrets_store_secrets": [

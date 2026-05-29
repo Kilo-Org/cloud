@@ -5,7 +5,7 @@ import {
   markInstanceDestroyedWithPersonalSubscriptionCollapse,
   type KiloClawSubscriptionChangeActor,
 } from '@kilocode/db';
-import { kiloclaw_instances, type KiloClawComposioInstanceConfigSource } from '@kilocode/db/schema';
+import { kiloclaw_instances } from '@kilocode/db/schema';
 import { db, type DrizzleTransaction } from '@/lib/drizzle';
 
 export type ActiveKiloClawInstance = {
@@ -15,7 +15,6 @@ export type ActiveKiloClawInstance = {
   organizationId: string | null;
   name: string | null;
   inboundEmailEnabled: boolean;
-  composioConfigSource?: KiloClawComposioInstanceConfigSource | null;
 };
 
 export type EnsureActiveInstanceResult = {
@@ -217,7 +216,6 @@ export async function getActiveInstance(
       organizationId: kiloclaw_instances.organization_id,
       name: kiloclaw_instances.name,
       inboundEmailEnabled: kiloclaw_instances.inbound_email_enabled,
-      composioConfigSource: kiloclaw_instances.composio_config_source,
     })
     .from(kiloclaw_instances)
     .where(
@@ -247,7 +245,6 @@ export async function getInstanceById(instanceId: string): Promise<ActiveKiloCla
       organizationId: kiloclaw_instances.organization_id,
       name: kiloclaw_instances.name,
       inboundEmailEnabled: kiloclaw_instances.inbound_email_enabled,
-      composioConfigSource: kiloclaw_instances.composio_config_source,
     })
     .from(kiloclaw_instances)
     .where(and(eq(kiloclaw_instances.id, instanceId), isNull(kiloclaw_instances.destroyed_at)))
@@ -273,7 +270,6 @@ export async function getActiveOrgInstance(
       organizationId: kiloclaw_instances.organization_id,
       name: kiloclaw_instances.name,
       inboundEmailEnabled: kiloclaw_instances.inbound_email_enabled,
-      composioConfigSource: kiloclaw_instances.composio_config_source,
     })
     .from(kiloclaw_instances)
     .where(
@@ -307,7 +303,6 @@ export async function listAllActiveInstances(userId: string): Promise<ActiveKilo
       organizationId: kiloclaw_instances.organization_id,
       name: kiloclaw_instances.name,
       inboundEmailEnabled: kiloclaw_instances.inbound_email_enabled,
-      composioConfigSource: kiloclaw_instances.composio_config_source,
     })
     .from(kiloclaw_instances)
     .where(and(eq(kiloclaw_instances.user_id, userId), isNull(kiloclaw_instances.destroyed_at)))
@@ -337,7 +332,6 @@ export async function listActiveOrgInstances(orgId: string): Promise<ActiveKiloC
       organizationId: kiloclaw_instances.organization_id,
       name: kiloclaw_instances.name,
       inboundEmailEnabled: kiloclaw_instances.inbound_email_enabled,
-      composioConfigSource: kiloclaw_instances.composio_config_source,
     })
     .from(kiloclaw_instances)
     .where(

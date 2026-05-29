@@ -1,21 +1,20 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, KeyboardAvoidingView, Platform, View } from 'react-native';
-import { useAtomValue } from 'jotai';
 import { type CloudStatus, type KiloSessionId, type StoredMessage } from 'cloud-agent-sdk';
-import { toast } from 'sonner-native';
+import { useAtomValue } from 'jotai';
+import { useCallback, useEffect, useMemo } from 'react';
+import { ActivityIndicator, FlatList, KeyboardAvoidingView, Platform, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { toast } from 'sonner-native';
 
 import { ChatComposer } from '@/components/agents/chat-composer';
 import { ConnectivityBanner } from '@/components/agents/connectivity-banner';
 import { MessageBubble } from '@/components/agents/message-bubble';
-import { normalizeAgentMode } from '@/components/agents/mode-options';
-import { type AgentMode } from '@/components/agents/mode-selector';
 import { PermissionCard } from '@/components/agents/permission-card';
 import { QuestionCard } from '@/components/agents/question-card';
 import { useSessionManager } from '@/components/agents/session-provider';
 import { SessionStatusIndicator } from '@/components/agents/session-status-indicator';
 import { useInteractionHandlers } from '@/components/agents/use-interaction-handlers';
 import { useSessionAutoScroll } from '@/components/agents/use-session-auto-scroll';
+import { useSessionConfigSync } from '@/components/agents/use-session-config-sync';
 import { WorkingIndicator } from '@/components/agents/working-indicator';
 import { ScreenHeader } from '@/components/screen-header';
 import { Text } from '@/components/ui/text';
@@ -71,51 +70,14 @@ export function SessionDetailContent({ sessionId }: Readonly<SessionDetailConten
 
   const { models: modelOptions } = useAvailableModels(organizationId);
 
-  const [currentMode, setCurrentMode] = useState<AgentMode>(() =>
-    normalizeAgentMode(fetchedData?.mode)
-  );
-
-  const [currentModel, setCurrentModel] = useState<string>(fetchedData?.model ?? '');
-  const [currentVariant, setCurrentVariant] = useState<string>(fetchedData?.variant ?? '');
-
-  // Sync mode/model/variant from session data and SDK session config.
-  // The SDK's sessionConfig is updated from assistant messages during snapshot
-  // replay, so it captures the model actually used in the conversation.
-  useEffect(() => {
-    const mode = sessionConfig?.mode ?? fetchedData?.mode;
-    if (mode) {
-      setCurrentMode(normalizeAgentMode(mode));
-    }
-
-    const model = sessionConfig?.model ?? fetchedData?.model;
-    if (model) {
-      setCurrentModel(model);
-    }
-
-    const variant = sessionConfig?.variant ?? fetchedData?.variant;
-    if (variant) {
-      setCurrentVariant(variant);
-    }
-  }, [
-    sessionConfig?.mode,
-    sessionConfig?.model,
-    sessionConfig?.variant,
-    fetchedData?.mode,
-    fetchedData?.model,
-    fetchedData?.variant,
-  ]);
-
-  // Auto-select first available model when session has no model (e.g. remote CLI sessions)
-  useEffect(() => {
-    if (currentModel || modelOptions.length === 0 || fetchedData === null) {
-      return;
-    }
-    const firstModel = modelOptions[0];
-    if (firstModel) {
-      setCurrentModel(firstModel.id);
-      setCurrentVariant(firstModel.variants[0] ?? '');
-    }
-  }, [currentModel, modelOptions, fetchedData]);
+  const {
+    currentMode,
+    currentModel,
+    currentVariant,
+    setCurrentMode,
+    setCurrentModel,
+    setCurrentVariant,
+  } = useSessionConfigSync({ fetchedData, sessionConfig, modelOptions });
 
   const {
     flatListRef,

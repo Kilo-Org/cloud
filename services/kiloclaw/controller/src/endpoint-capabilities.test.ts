@@ -28,6 +28,10 @@ describe('getControllerEndpointCapabilities', () => {
     );
   });
 
+  it('advertises validation-aware OpenClaw file writes', () => {
+    expect(getControllerEndpointCapabilities()).toContain('files.write-openclaw-config');
+  });
+
   it('includes conditional Kilo Chat capabilities only when requested', () => {
     const defaultCapabilities = getControllerEndpointCapabilities();
     const kiloChatCapabilities = getControllerEndpointCapabilities({

@@ -3759,12 +3759,24 @@ export const code_review_feedback_subjects = pgTable(
       .$onUpdateFn(() => sql`now()`),
   },
   table => [
-    uniqueIndex('UQ_code_review_feedback_subjects_platform_external').on(
-      table.platform,
-      table.repo_full_name,
-      table.subject_type,
-      table.external_id
-    ),
+    uniqueIndex('UQ_code_review_feedback_subjects_org_platform_external')
+      .on(
+        table.owned_by_organization_id,
+        table.platform,
+        table.repo_full_name,
+        table.subject_type,
+        table.external_id
+      )
+      .where(isNotNull(table.owned_by_organization_id)),
+    uniqueIndex('UQ_code_review_feedback_subjects_user_platform_external')
+      .on(
+        table.owned_by_user_id,
+        table.platform,
+        table.repo_full_name,
+        table.subject_type,
+        table.external_id
+      )
+      .where(isNotNull(table.owned_by_user_id)),
     index('idx_code_review_feedback_subjects_owned_by_org_id').on(table.owned_by_organization_id),
     index('idx_code_review_feedback_subjects_owned_by_user_id').on(table.owned_by_user_id),
     index('idx_code_review_feedback_subjects_platform_repo').on(

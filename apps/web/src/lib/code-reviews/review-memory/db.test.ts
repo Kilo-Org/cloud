@@ -77,6 +77,56 @@ describe('review memory db helpers', () => {
     expect(rows[0].count).toBe(1);
   });
 
+  it('keeps feedback subjects scoped to their owner', async () => {
+    const user = await insertTestUser();
+    const otherUser = await insertTestUser();
+    const owner = { type: 'user' as const, id: user.id };
+    const otherOwner = { type: 'user' as const, id: otherUser.id };
+
+    const first = await upsertFeedbackSubject({
+      owner,
+      platform: 'github',
+      repoFullName: 'owner/repo',
+      subjectType: 'inline_comment',
+      externalId: 'shared-comment-id',
+      bodyExcerpt: 'First owner finding body',
+      state: 'active',
+    });
+    const second = await upsertFeedbackSubject({
+      owner: otherOwner,
+      platform: 'github',
+      repoFullName: 'owner/repo',
+      subjectType: 'inline_comment',
+      externalId: 'shared-comment-id',
+      bodyExcerpt: 'Second owner finding body',
+      state: 'resolved',
+    });
+
+    expect(second.id).not.toBe(first.id);
+
+    const rows = await db
+      .select()
+      .from(code_review_feedback_subjects)
+      .where(eq(code_review_feedback_subjects.external_id, 'shared-comment-id'));
+    expect(rows).toHaveLength(2);
+    expect(rows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: first.id,
+          owned_by_user_id: user.id,
+          body_excerpt: 'First owner finding body',
+          state: 'active',
+        }),
+        expect.objectContaining({
+          id: second.id,
+          owned_by_user_id: otherUser.id,
+          body_excerpt: 'Second owner finding body',
+          state: 'resolved',
+        }),
+      ])
+    );
+  });
+
   it('dedupes feedback events and refreshes aggregation state', async () => {
     const user = await insertTestUser();
     const owner = { type: 'user' as const, id: user.id };

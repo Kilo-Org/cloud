@@ -235,6 +235,26 @@ export async function upsertFeedbackSubject(
 ): Promise<CodeReviewFeedbackSubject> {
   const database = databaseOrDefault(input.database);
   const now = new Date().toISOString();
+  const conflictTarget =
+    input.owner.type === 'org'
+      ? [
+          code_review_feedback_subjects.owned_by_organization_id,
+          code_review_feedback_subjects.platform,
+          code_review_feedback_subjects.repo_full_name,
+          code_review_feedback_subjects.subject_type,
+          code_review_feedback_subjects.external_id,
+        ]
+      : [
+          code_review_feedback_subjects.owned_by_user_id,
+          code_review_feedback_subjects.platform,
+          code_review_feedback_subjects.repo_full_name,
+          code_review_feedback_subjects.subject_type,
+          code_review_feedback_subjects.external_id,
+        ];
+  const conflictTargetWhere =
+    input.owner.type === 'org'
+      ? sql`${code_review_feedback_subjects.owned_by_organization_id} IS NOT NULL`
+      : sql`${code_review_feedback_subjects.owned_by_user_id} IS NOT NULL`;
   const [subject] = await database
     .insert(code_review_feedback_subjects)
     .values({
@@ -264,15 +284,9 @@ export async function upsertFeedbackSubject(
       updated_at: now,
     })
     .onConflictDoUpdate({
-      target: [
-        code_review_feedback_subjects.platform,
-        code_review_feedback_subjects.repo_full_name,
-        code_review_feedback_subjects.subject_type,
-        code_review_feedback_subjects.external_id,
-      ],
+      target: conflictTarget,
+      targetWhere: conflictTargetWhere,
       set: {
-        owned_by_organization_id: ownerColumns(input.owner).owned_by_organization_id,
-        owned_by_user_id: ownerColumns(input.owner).owned_by_user_id,
         platform_integration_id: input.platformIntegrationId ?? null,
         code_review_id: input.codeReviewId ?? null,
         external_thread_id: input.externalThreadId ?? null,

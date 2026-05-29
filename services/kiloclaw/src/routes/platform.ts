@@ -37,7 +37,7 @@ import {
   markImageAsLatest,
   disableImageAndClearRollout,
 } from '../lib/version-rollout';
-import { setKiloclawEarlyAccess, lookupKiloclawEarlyAccess } from '../lib/user-flags';
+import { setKiloclawEarlyAccess, lookupKiloclawEarlyAccessByInstanceId } from '../lib/user-flags';
 import { upsertCatalogVersion } from '../lib/catalog-registration';
 import { runScheduledActionNoticesSweep } from '../scheduled/scheduled-action-notices';
 import { flattenError, z } from 'zod';
@@ -4440,12 +4440,12 @@ platform.get('/versions', async c => {
 //
 // Without rolloutSubject, returns the current :latest pointer for anonymous
 // callers. With rolloutSubject, runs the same rollout selector used by
-// restartMachine({ imageTag: 'latest' }). userId is used only to resolve Early
-// Access server-side.
+// restartMachine({ imageTag: 'latest' }). instanceId is the authoritative DB
+// row used to resolve Early Access server-side.
 platform.get('/versions/latest', async c => {
   try {
     const rolloutSubject = c.req.query('rolloutSubject');
-    const userId = c.req.query('userId');
+    const instanceId = c.req.query('instanceId');
     const currentImageTag = c.req.query('currentImageTag') ?? null;
 
     if (!rolloutSubject) {
@@ -4454,13 +4454,11 @@ platform.get('/versions/latest', async c => {
       return c.json(latest);
     }
 
-    // Resolve Early Access the same way restartMachine does inside the DO:
-    // from the owning userId, not from caller-provided eligibility state.
     let autoEnroll = false;
     const connectionString = c.env.HYPERDRIVE?.connectionString;
-    if (userId && connectionString) {
+    if (instanceId && connectionString) {
       try {
-        autoEnroll = await lookupKiloclawEarlyAccess(connectionString, userId);
+        autoEnroll = await lookupKiloclawEarlyAccessByInstanceId(connectionString, instanceId);
       } catch (err) {
         console.warn(
           '[platform] Early Access lookup failed; treating as false:',

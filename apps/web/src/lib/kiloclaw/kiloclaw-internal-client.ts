@@ -158,13 +158,14 @@ export class KiloClawInternalClient {
   }
 
   async getLatestVersionForInstance(opts: {
+    instanceId: string;
     sandboxId: string | null | undefined;
     userId: string;
     currentImageTag?: string | null;
   }): Promise<ImageVersionEntry | null> {
     const params = new URLSearchParams({
+      instanceId: opts.instanceId,
       rolloutSubject: imageRolloutSubjectFromSandboxId(opts.sandboxId, opts.userId),
-      userId: opts.userId,
     });
     if (opts.currentImageTag) params.set('currentImageTag', opts.currentImageTag);
     return this.requestLatestVersion(`/api/platform/versions/latest?${params.toString()}`);

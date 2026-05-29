@@ -548,4 +548,46 @@ describe('review memory db helpers', () => {
       })
     );
   });
+
+  it('bounds review memory pruning by batch size', async () => {
+    const user = await insertTestUser();
+    const owner = { type: 'user' as const, id: user.id };
+    const expiredCreatedAt = '2026-05-01T00:00:00.000Z';
+    const now = new Date('2026-06-01T00:00:00.000Z');
+    const first = await recordFeedbackEvent({
+      owner,
+      platform: 'github',
+      repoFullName: 'owner/repo',
+      prNumber: 1,
+      eventSource: 'github_webhook',
+      signalKind: 'corrective_reply',
+      sentiment: 'negative',
+      strength: 3,
+      externalEventId: 'retention-batch-prune-one',
+    });
+    const second = await recordFeedbackEvent({
+      owner,
+      platform: 'github',
+      repoFullName: 'owner/repo',
+      prNumber: 2,
+      eventSource: 'github_webhook',
+      signalKind: 'corrective_reply',
+      sentiment: 'negative',
+      strength: 3,
+      externalEventId: 'retention-batch-prune-two',
+    });
+    await db
+      .update(code_review_feedback_events)
+      .set({ created_at: expiredCreatedAt, occurred_at: expiredCreatedAt })
+      .where(eq(code_review_feedback_events.id, first.event.id));
+    await db
+      .update(code_review_feedback_events)
+      .set({ created_at: expiredCreatedAt, occurred_at: expiredCreatedAt })
+      .where(eq(code_review_feedback_events.id, second.event.id));
+
+    const summary = await pruneExpiredReviewMemoryData({ now, batchSize: 1 });
+
+    expect(summary.feedbackEventsDeleted).toBe(1);
+    await expect(db.select().from(code_review_feedback_events)).resolves.toHaveLength(1);
+  });
 });

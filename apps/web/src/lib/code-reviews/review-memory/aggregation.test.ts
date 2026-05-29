@@ -218,8 +218,8 @@ describe('review memory aggregation', () => {
 
     expect(summary).toEqual({ claimed: 0, completed: 0, skipped: 0, failed: 0, proposals: 0 });
     expect(generateOpportunities).not.toHaveBeenCalled();
-    await expect(db.select().from(code_review_feedback_events)).resolves.toHaveLength(0);
-    await expect(db.select().from(code_review_memory_aggregation_state)).resolves.toHaveLength(0);
+    await expect(db.select().from(code_review_feedback_events)).resolves.toHaveLength(5);
+    await expect(db.select().from(code_review_memory_aggregation_state)).resolves.toHaveLength(1);
   });
 
   it('skips weak MR-level-only feedback without calling the model', async () => {

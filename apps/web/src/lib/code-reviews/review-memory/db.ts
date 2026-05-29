@@ -34,6 +34,7 @@ import type {
 } from '@kilocode/db/schema-types';
 import {
   and,
+  asc,
   desc,
   eq,
   getTableColumns,
@@ -610,6 +611,9 @@ export type PruneExpiredReviewMemoryDataSummary = {
   aggregationStatesDeleted: number;
 };
 
+const DEFAULT_REVIEW_MEMORY_PRUNE_BATCH_SIZE = 500;
+const MAX_REVIEW_MEMORY_PRUNE_BATCH_SIZE = 5_000;
+
 type ReviewMemoryScopeRow = {
   ownedByOrganizationId: string | null;
   ownedByUserId: string | null;
@@ -652,14 +656,23 @@ async function refreshAggregationScopes(input: {
 export async function pruneExpiredReviewMemoryData(
   input: {
     now?: Date;
+    batchSize?: number;
     database?: ReviewMemoryDatabase;
   } = {}
 ): Promise<PruneExpiredReviewMemoryDataSummary> {
   const database = databaseOrDefault(input.database);
   const now = input.now ?? new Date();
   const cutoff = reviewMemoryRetentionCutoff(now);
-  const expiredEventScopes = await database
-    .selectDistinct({
+  const batchSize = Math.max(
+    1,
+    Math.min(
+      input.batchSize ?? DEFAULT_REVIEW_MEMORY_PRUNE_BATCH_SIZE,
+      MAX_REVIEW_MEMORY_PRUNE_BATCH_SIZE
+    )
+  );
+  const expiredEventRows = await database
+    .select({
+      id: code_review_feedback_events.id,
       ownedByOrganizationId: code_review_feedback_events.owned_by_organization_id,
       ownedByUserId: code_review_feedback_events.owned_by_user_id,
       platform: code_review_feedback_events.platform,
@@ -667,27 +680,64 @@ export async function pruneExpiredReviewMemoryData(
       platformProjectId: code_review_feedback_events.platform_project_id,
     })
     .from(code_review_feedback_events)
-    .where(lt(code_review_feedback_events.created_at, cutoff));
-
-  const deletedProposals = await database
-    .delete(code_review_memory_proposals)
-    .where(lt(code_review_memory_proposals.created_at, cutoff))
-    .returning({ id: code_review_memory_proposals.id });
-
-  const deletedAggregationRuns = await database
-    .delete(code_review_memory_aggregation_runs)
-    .where(lt(code_review_memory_aggregation_runs.created_at, cutoff))
-    .returning({ id: code_review_memory_aggregation_runs.id });
-
-  const deletedFeedbackEvents = await database
-    .delete(code_review_feedback_events)
     .where(lt(code_review_feedback_events.created_at, cutoff))
-    .returning({ id: code_review_feedback_events.id });
+    .orderBy(asc(code_review_feedback_events.created_at), asc(code_review_feedback_events.id))
+    .limit(batchSize);
+  const expiredEventIds = expiredEventRows.map(row => row.id);
 
-  await refreshAggregationScopes({ scopes: expiredEventScopes, now, database });
+  const expiredProposalIds = await database
+    .select({ id: code_review_memory_proposals.id })
+    .from(code_review_memory_proposals)
+    .where(lt(code_review_memory_proposals.created_at, cutoff))
+    .orderBy(asc(code_review_memory_proposals.created_at), asc(code_review_memory_proposals.id))
+    .limit(batchSize);
 
-  const deletedSubjects = await database
-    .delete(code_review_feedback_subjects)
+  const deletedProposals = expiredProposalIds.length
+    ? await database
+        .delete(code_review_memory_proposals)
+        .where(
+          inArray(
+            code_review_memory_proposals.id,
+            expiredProposalIds.map(row => row.id)
+          )
+        )
+        .returning({ id: code_review_memory_proposals.id })
+    : [];
+
+  const expiredAggregationRunIds = await database
+    .select({ id: code_review_memory_aggregation_runs.id })
+    .from(code_review_memory_aggregation_runs)
+    .where(lt(code_review_memory_aggregation_runs.created_at, cutoff))
+    .orderBy(
+      asc(code_review_memory_aggregation_runs.created_at),
+      asc(code_review_memory_aggregation_runs.id)
+    )
+    .limit(batchSize);
+
+  const deletedAggregationRuns = expiredAggregationRunIds.length
+    ? await database
+        .delete(code_review_memory_aggregation_runs)
+        .where(
+          inArray(
+            code_review_memory_aggregation_runs.id,
+            expiredAggregationRunIds.map(row => row.id)
+          )
+        )
+        .returning({ id: code_review_memory_aggregation_runs.id })
+    : [];
+
+  const deletedFeedbackEvents = expiredEventIds.length
+    ? await database
+        .delete(code_review_feedback_events)
+        .where(inArray(code_review_feedback_events.id, expiredEventIds))
+        .returning({ id: code_review_feedback_events.id })
+    : [];
+
+  await refreshAggregationScopes({ scopes: expiredEventRows, now, database });
+
+  const expiredSubjectIds = await database
+    .select({ id: code_review_feedback_subjects.id })
+    .from(code_review_feedback_subjects)
     .where(
       and(
         lt(code_review_feedback_subjects.last_seen_at, cutoff),
@@ -699,12 +749,42 @@ export async function pruneExpiredReviewMemoryData(
         )
       )
     )
-    .returning({ id: code_review_feedback_subjects.id });
+    .orderBy(asc(code_review_feedback_subjects.last_seen_at), asc(code_review_feedback_subjects.id))
+    .limit(batchSize);
 
-  const deletedAggregationStates = await database
-    .delete(code_review_memory_aggregation_state)
+  const deletedSubjects = expiredSubjectIds.length
+    ? await database
+        .delete(code_review_feedback_subjects)
+        .where(
+          inArray(
+            code_review_feedback_subjects.id,
+            expiredSubjectIds.map(row => row.id)
+          )
+        )
+        .returning({ id: code_review_feedback_subjects.id })
+    : [];
+
+  const expiredAggregationStateIds = await database
+    .select({ id: code_review_memory_aggregation_state.id })
+    .from(code_review_memory_aggregation_state)
     .where(sql`NOT ${aggregationStateHasRetainedDataWhere(cutoff)}`)
-    .returning({ id: code_review_memory_aggregation_state.id });
+    .orderBy(
+      asc(code_review_memory_aggregation_state.updated_at),
+      asc(code_review_memory_aggregation_state.id)
+    )
+    .limit(batchSize);
+
+  const deletedAggregationStates = expiredAggregationStateIds.length
+    ? await database
+        .delete(code_review_memory_aggregation_state)
+        .where(
+          inArray(
+            code_review_memory_aggregation_state.id,
+            expiredAggregationStateIds.map(row => row.id)
+          )
+        )
+        .returning({ id: code_review_memory_aggregation_state.id })
+    : [];
 
   return {
     cutoff,
@@ -803,6 +883,7 @@ export async function claimEligibleAggregationStates(
   input: ClaimEligibleAggregationStatesInput
 ): Promise<CodeReviewMemoryAggregationState[]> {
   const now = input.now ?? new Date();
+  const cutoff = reviewMemoryRetentionCutoff(now);
   const staleBefore = new Date(now.getTime() - input.staleAfterMs).toISOString();
   const limit = Math.max(1, Math.min(input.limit ?? 10, 50));
   const stateIdFilter = input.stateId ? sql`AND id = ${input.stateId}::uuid` : sql``;
@@ -817,6 +898,11 @@ export async function claimEligibleAggregationStates(
           (
             status IN ('eligible', 'failed')
             AND next_eligible_at <= ${now.toISOString()}
+            AND EXISTS (
+              SELECT 1
+              FROM ${code_review_feedback_events}
+              WHERE ${aggregationStateFreshEventScopeWhere(cutoff)}
+            )
             AND (fresh_event_count >= ${input.minFreshEvents} OR fresh_weight >= ${input.minFreshWeight})
             AND (
               fresh_distinct_subject_count >= ${input.minDistinctSubjects}

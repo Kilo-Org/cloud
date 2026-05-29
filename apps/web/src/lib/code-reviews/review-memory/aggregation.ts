@@ -32,7 +32,6 @@ import {
   listReviewMemoryProposals,
   markFeedbackEventsAggregationState,
   markFeedbackEventsIncluded,
-  pruneExpiredReviewMemoryData,
   refreshAggregationStateForScope,
   updateAggregationRunStatus,
   upsertReviewMemoryProposal,
@@ -555,7 +554,6 @@ export async function dispatchManualReviewMemoryAggregation(
   const now = options.now ?? new Date();
   const generateOpportunities =
     options.generateOpportunities ?? generateReviewMemoryOpportunitiesWithGateway;
-  await pruneExpiredReviewMemoryData({ now });
   const claimed = await claimEligibleAggregationStates({
     limit: options.limit ?? 10,
     stateId: options.stateId,

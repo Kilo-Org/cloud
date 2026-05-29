@@ -3,6 +3,7 @@ import 'server-only';
 import { createHash, createHmac } from 'node:crypto';
 import { addDays } from 'date-fns';
 import { and, eq, inArray, sql } from 'drizzle-orm';
+import pLimit from 'p-limit';
 
 import { decryptApiKey, encryptApiKey } from '@/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
@@ -22,6 +23,11 @@ import {
 
 const logInfo = sentryLogger('coding-plans', 'info');
 const logError = sentryLogger('coding-plans', 'error');
+
+// Credential validation calls the live MiniMax API per key. Bound the fan-out so
+// large inventory uploads finish within the request budget without overwhelming
+// the upstream provider with one unbounded burst of requests.
+const INVENTORY_VALIDATION_CONCURRENCY = 10;
 
 type CancellationReason =
   | 'user_canceled'
@@ -383,12 +389,14 @@ export async function uploadKeysToInventory(
 
   const entries = rawEntries.map(parseInventoryCredentialEntry);
   const validateCredential = options.validateCredential ?? validateTokenPlanPlusCredential;
-  for (const entry of entries) {
-    if (!(await validateCredential(entry.apiKey))) {
-      throw new Error(
-        'One or more MiniMax credentials failed validation. Confirm plan access and supported model behavior, then try again.'
-      );
-    }
+  const limit = pLimit(INVENTORY_VALIDATION_CONCURRENCY);
+  const validationResults = await Promise.all(
+    entries.map(entry => limit(() => validateCredential(entry.apiKey)))
+  );
+  if (validationResults.some(isValid => !isValid)) {
+    throw new Error(
+      'One or more MiniMax credentials failed validation. Confirm plan access and supported model behavior, then try again.'
+    );
   }
 
   const inserted = await db.transaction(async tx => {

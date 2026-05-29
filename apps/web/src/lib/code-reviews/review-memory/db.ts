@@ -32,19 +32,7 @@ import type {
   ReviewMemorySubjectState,
   ReviewMemorySubjectType,
 } from '@kilocode/db/schema-types';
-import {
-  and,
-  asc,
-  desc,
-  eq,
-  getTableColumns,
-  gte,
-  inArray,
-  lt,
-  notExists,
-  sql,
-  type SQL,
-} from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray, lt, notExists, sql, type SQL } from 'drizzle-orm';
 import { reviewMemoryRetentionCutoff } from './retention';
 
 export type ReviewMemoryDatabase = typeof db | DrizzleTransaction;
@@ -146,38 +134,6 @@ function aggregationStateHasRetainedDataWhere(cutoff: string): SQL {
 function retainedFreshEventCountForAggregationState(cutoff: string): SQL<number> {
   return sql<number>`(
     SELECT COUNT(*)::int
-    FROM ${code_review_feedback_events}
-    WHERE ${aggregationStateFreshEventScopeWhere(cutoff)}
-  )`;
-}
-
-function retainedFreshEventWeightForAggregationState(cutoff: string): SQL<number> {
-  return sql<number>`(
-    SELECT COALESCE(SUM(${code_review_feedback_events.strength}), 0)::int
-    FROM ${code_review_feedback_events}
-    WHERE ${aggregationStateFreshEventScopeWhere(cutoff)}
-  )`;
-}
-
-function retainedFreshEventSubjectCountForAggregationState(cutoff: string): SQL<number> {
-  return sql<number>`(
-    SELECT COUNT(DISTINCT ${code_review_feedback_events.subject_id}) FILTER (WHERE ${code_review_feedback_events.subject_id} IS NOT NULL)::int
-    FROM ${code_review_feedback_events}
-    WHERE ${aggregationStateFreshEventScopeWhere(cutoff)}
-  )`;
-}
-
-function retainedFreshEventPrCountForAggregationState(cutoff: string): SQL<number> {
-  return sql<number>`(
-    SELECT COUNT(DISTINCT ${code_review_feedback_events.pr_number}) FILTER (WHERE ${code_review_feedback_events.pr_number} IS NOT NULL)::int
-    FROM ${code_review_feedback_events}
-    WHERE ${aggregationStateFreshEventScopeWhere(cutoff)}
-  )`;
-}
-
-function retainedLastFreshEventCreatedAtForAggregationState(cutoff: string): SQL<string | null> {
-  return sql<string | null>`(
-    SELECT MAX(${code_review_feedback_events.created_at})
     FROM ${code_review_feedback_events}
     WHERE ${aggregationStateFreshEventScopeWhere(cutoff)}
   )`;
@@ -1196,17 +1152,8 @@ export async function listAggregationStates(input: {
   if (input.repoFullName) {
     conditions.push(eq(code_review_memory_aggregation_state.repo_full_name, input.repoFullName));
   }
-  const stateColumns = getTableColumns(code_review_memory_aggregation_state);
-
   return await database
-    .select({
-      ...stateColumns,
-      fresh_event_count: retainedFreshEventCountForAggregationState(cutoff),
-      fresh_weight: retainedFreshEventWeightForAggregationState(cutoff),
-      fresh_distinct_subject_count: retainedFreshEventSubjectCountForAggregationState(cutoff),
-      fresh_distinct_pr_count: retainedFreshEventPrCountForAggregationState(cutoff),
-      last_included_event_created_at: retainedLastFreshEventCreatedAtForAggregationState(cutoff),
-    })
+    .select()
     .from(code_review_memory_aggregation_state)
     .where(and(...conditions))
     .orderBy(desc(code_review_memory_aggregation_state.updated_at));

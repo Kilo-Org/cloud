@@ -529,6 +529,22 @@ describe('kiloclawRouter latestVersion', () => {
     });
     expect(kiloclawClientMock.__getLatestVersionMock).not.toHaveBeenCalled();
   });
+
+  it('uses anonymous latest version lookup when the user has no active instance', async () => {
+    kiloclawClientMock.__getLatestVersionMock.mockResolvedValue({
+      imageTag: 'anonymous-tag',
+    });
+    const user = await insertTestUser({
+      google_user_email: `kiloclaw-latest-version-${crypto.randomUUID()}@example.com`,
+    });
+
+    const caller = createCaller({ user });
+    const result = await caller.latestVersion({ currentImageTag: 'current-tag' });
+
+    expect(result).toEqual({ imageTag: 'anonymous-tag' });
+    expect(kiloclawClientMock.__getLatestVersionMock).toHaveBeenCalledWith();
+    expect(kiloclawClientMock.__getLatestVersionForInstanceMock).not.toHaveBeenCalled();
+  });
 });
 
 describe('kiloclawRouter start', () => {

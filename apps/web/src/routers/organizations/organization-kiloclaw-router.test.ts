@@ -184,7 +184,7 @@ describe('organizations.kiloclaw.latestVersion', () => {
     kiloclawClientMock.__getLatestVersionForInstanceMock.mockReset();
   });
 
-  it('passes the active org instance row and sandbox-derived rollout subject inputs', async () => {
+  it('passes the active org instance row for server-derived rollout lookup', async () => {
     kiloclawClientMock.__getLatestVersionForInstanceMock.mockResolvedValue({
       imageTag: 'candidate-tag',
     });
@@ -193,7 +193,6 @@ describe('organizations.kiloclaw.latestVersion', () => {
     });
     const organization = await createOrganization('Org Latest Version Test', user.id);
     const instanceId = await createActiveOrgInstance(user.id, organization.id);
-    const sandboxId = `ki_${instanceId.replace(/-/g, '')}`;
 
     const caller = await createCallerForUser(user.id);
     await caller.organizations.kiloclaw.latestVersion({
@@ -203,8 +202,6 @@ describe('organizations.kiloclaw.latestVersion', () => {
 
     expect(kiloclawClientMock.__getLatestVersionForInstanceMock).toHaveBeenCalledWith({
       instanceId,
-      sandboxId,
-      userId: user.id,
       currentImageTag: 'current-tag',
     });
     expect(kiloclawClientMock.__getLatestVersionMock).not.toHaveBeenCalled();

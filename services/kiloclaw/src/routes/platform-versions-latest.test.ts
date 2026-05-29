@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { platform } from './platform';
-import { lookupKiloclawEarlyAccessByInstanceId } from '../lib/user-flags';
+import { lookupKiloclawRolloutContextByInstanceId } from '../lib/user-flags';
 import { resolveLatestVersion } from '../lib/image-version';
 import { selectImageVersionForInstance } from '../lib/version-rollout';
 import type { ImageVersionEntry } from '../schemas/image-version';
@@ -18,7 +18,7 @@ vi.mock('../lib/image-version', () => ({
 
 vi.mock('../lib/user-flags', () => ({
   setKiloclawEarlyAccess: vi.fn(),
-  lookupKiloclawEarlyAccessByInstanceId: vi.fn(),
+  lookupKiloclawRolloutContextByInstanceId: vi.fn(),
 }));
 
 vi.mock('../lib/version-rollout', () => ({
@@ -49,46 +49,61 @@ describe('platform /versions/latest', () => {
   beforeEach(() => {
     vi.mocked(resolveLatestVersion).mockReset();
     vi.mocked(selectImageVersionForInstance).mockReset();
-    vi.mocked(lookupKiloclawEarlyAccessByInstanceId).mockReset();
+    vi.mocked(lookupKiloclawRolloutContextByInstanceId).mockReset();
   });
 
-  it('uses rolloutSubject for bucket math and instanceId for Early Access lookup', async () => {
-    vi.mocked(lookupKiloclawEarlyAccessByInstanceId).mockResolvedValue(true);
+  it('uses instanceId-only callers for rollout selection, current tag suppression, and Early Access lookup', async () => {
+    vi.mocked(lookupKiloclawRolloutContextByInstanceId).mockResolvedValue({
+      rolloutSubject: 'instance-row-id',
+      earlyAccess: true,
+    });
     vi.mocked(selectImageVersionForInstance).mockResolvedValue(selectedVersion);
 
     const response = await platform.request(
-      '/versions/latest?rolloutSubject=bucket-subject&instanceId=instance-row-id&userId=forged-user&currentImageTag=current-tag',
+      '/versions/latest?instanceId=instance-row-id&currentImageTag=current-tag',
       undefined,
       makeEnv()
     );
 
     expect(response.status).toBe(200);
-    expect(lookupKiloclawEarlyAccessByInstanceId).toHaveBeenCalledWith(
+    expect(resolveLatestVersion).not.toHaveBeenCalled();
+    expect(lookupKiloclawRolloutContextByInstanceId).toHaveBeenCalledWith(
       'postgres://test',
       'instance-row-id'
     );
     expect(selectImageVersionForInstance).toHaveBeenCalledWith({
       kv: {},
       variant: 'default',
-      instanceId: 'bucket-subject',
+      instanceId: 'instance-row-id',
       currentImageTag: 'current-tag',
       autoEnroll: true,
     });
   });
 
-  it('does not grant Early Access when rolloutSubject has no authoritative instanceId', async () => {
+  it('does not let caller-supplied rolloutSubject borrow Early Access from an unrelated instance', async () => {
+    vi.mocked(lookupKiloclawRolloutContextByInstanceId).mockResolvedValue({
+      rolloutSubject: 'authoritative-row-subject',
+      earlyAccess: true,
+    });
     vi.mocked(selectImageVersionForInstance).mockResolvedValue(selectedVersion);
 
     const response = await platform.request(
-      '/versions/latest?rolloutSubject=bucket-subject&userId=early-access-user',
+      '/versions/latest?rolloutSubject=caller-controlled-subject&instanceId=authoritative-early-access-instance',
       undefined,
       makeEnv()
     );
 
     expect(response.status).toBe(200);
-    expect(lookupKiloclawEarlyAccessByInstanceId).not.toHaveBeenCalled();
-    expect(selectImageVersionForInstance).toHaveBeenCalledWith(
-      expect.objectContaining({ autoEnroll: false })
+    expect(lookupKiloclawRolloutContextByInstanceId).toHaveBeenCalledWith(
+      'postgres://test',
+      'authoritative-early-access-instance'
     );
+    expect(selectImageVersionForInstance).toHaveBeenCalledWith({
+      kv: {},
+      variant: 'default',
+      instanceId: 'authoritative-row-subject',
+      currentImageTag: null,
+      autoEnroll: true,
+    });
   });
 });

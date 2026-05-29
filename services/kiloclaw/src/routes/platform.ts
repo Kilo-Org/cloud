@@ -37,7 +37,10 @@ import {
   markImageAsLatest,
   disableImageAndClearRollout,
 } from '../lib/version-rollout';
-import { setKiloclawEarlyAccess, lookupKiloclawEarlyAccessByInstanceId } from '../lib/user-flags';
+import {
+  setKiloclawEarlyAccess,
+  lookupKiloclawRolloutContextByInstanceId,
+} from '../lib/user-flags';
 import { upsertCatalogVersion } from '../lib/catalog-registration';
 import { runScheduledActionNoticesSweep } from '../scheduled/scheduled-action-notices';
 import { flattenError, z } from 'zod';
@@ -4438,16 +4441,17 @@ platform.get('/versions', async c => {
 // GET /api/platform/versions/latest
 // Resolves the image version this caller should be on next.
 //
-// Without rolloutSubject, returns the current :latest pointer for anonymous
-// callers. With rolloutSubject, runs the same rollout selector used by
-// restartMachine({ imageTag: 'latest' }). instanceId is the authoritative DB
-// row used to resolve Early Access server-side.
+// Without rolloutSubject or instanceId, returns the current :latest pointer for
+// anonymous callers. With a rollout subject, runs the same rollout selector used
+// by restartMachine({ imageTag: 'latest' }). instanceId is the authoritative DB
+// row used to resolve Early Access and the rollout subject server-side.
 platform.get('/versions/latest', async c => {
   try {
-    const rolloutSubject = c.req.query('rolloutSubject');
+    const requestedRolloutSubject = c.req.query('rolloutSubject');
     const instanceId = c.req.query('instanceId');
     const currentImageTag = c.req.query('currentImageTag') ?? null;
 
+    let rolloutSubject = instanceId ?? requestedRolloutSubject;
     if (!rolloutSubject) {
       const latest = await resolveLatestVersion(c.env.KV_CLAW_CACHE, 'default');
       if (!latest) return c.json({ error: 'No latest version registered' }, 404);
@@ -4458,12 +4462,22 @@ platform.get('/versions/latest', async c => {
     const connectionString = c.env.HYPERDRIVE?.connectionString;
     if (instanceId && connectionString) {
       try {
-        autoEnroll = await lookupKiloclawEarlyAccessByInstanceId(connectionString, instanceId);
+        const rolloutContext = await lookupKiloclawRolloutContextByInstanceId(
+          connectionString,
+          instanceId
+        );
+        if (rolloutContext) {
+          rolloutSubject = rolloutContext.rolloutSubject;
+          autoEnroll = rolloutContext.earlyAccess;
+        } else {
+          rolloutSubject = instanceId;
+        }
       } catch (err) {
         console.warn(
-          '[platform] Early Access lookup failed; treating as false:',
+          '[platform] Instance rollout context lookup failed; treating as false:',
           err instanceof Error ? err.message : err
         );
+        rolloutSubject = instanceId;
       }
     }
 

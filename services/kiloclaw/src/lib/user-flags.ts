@@ -9,6 +9,12 @@
 import { getWorkerDb } from '@kilocode/db/client';
 import { kilocode_users, kiloclaw_instances } from '@kilocode/db';
 import { eq } from 'drizzle-orm';
+import { imageRolloutSubjectFromSandboxId } from '@kilocode/worker-utils/instance-id';
+
+export type KiloclawRolloutContext = {
+  rolloutSubject: string;
+  earlyAccess: boolean;
+};
 
 export async function lookupKiloclawEarlyAccess(
   hyperdriveConnectionString: string,
@@ -38,21 +44,29 @@ export async function setKiloclawEarlyAccess(
 }
 
 /**
- * Resolve the Early Access flag for the user who owns the given instance.
+ * Resolve the rollout subject and Early Access flag from the authoritative
+ * instance row.
  *
- * Returns false when the instance row doesn't exist (e.g. provisioning
- * race) or the user has the flag disabled.
+ * Returns null when the instance row doesn't exist (e.g. provisioning race).
  */
-export async function lookupKiloclawEarlyAccessByInstanceId(
+export async function lookupKiloclawRolloutContextByInstanceId(
   hyperdriveConnectionString: string,
   instanceId: string
-): Promise<boolean> {
+): Promise<KiloclawRolloutContext | null> {
   const db = getWorkerDb(hyperdriveConnectionString);
   const [row] = await db
-    .select({ early_access: kilocode_users.kiloclaw_early_access })
+    .select({
+      early_access: kilocode_users.kiloclaw_early_access,
+      sandbox_id: kiloclaw_instances.sandbox_id,
+      user_id: kiloclaw_instances.user_id,
+    })
     .from(kiloclaw_instances)
     .innerJoin(kilocode_users, eq(kiloclaw_instances.user_id, kilocode_users.id))
     .where(eq(kiloclaw_instances.id, instanceId))
     .limit(1);
-  return row?.early_access ?? false;
+  if (!row) return null;
+  return {
+    rolloutSubject: imageRolloutSubjectFromSandboxId(row.sandbox_id, row.user_id),
+    earlyAccess: row.early_access ?? false,
+  };
 }

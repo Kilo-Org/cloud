@@ -5,7 +5,6 @@ import type {
   KiloclawStartReason,
   KiloclawStopReason,
 } from '@kilocode/worker-utils';
-import { imageRolloutSubjectFromSandboxId } from '@kilocode/worker-utils/instance-id';
 import { INTERNAL_API_SECRET, KILOCLAW_API_URL } from '@/lib/config.server';
 import type {
   ImageVersionEntry,
@@ -159,13 +158,10 @@ export class KiloClawInternalClient {
 
   async getLatestVersionForInstance(opts: {
     instanceId: string;
-    sandboxId: string | null | undefined;
-    userId: string;
     currentImageTag?: string | null;
   }): Promise<ImageVersionEntry | null> {
     const params = new URLSearchParams({
       instanceId: opts.instanceId,
-      rolloutSubject: imageRolloutSubjectFromSandboxId(opts.sandboxId, opts.userId),
     });
     if (opts.currentImageTag) params.set('currentImageTag', opts.currentImageTag);
     return this.requestLatestVersion(`/api/platform/versions/latest?${params.toString()}`);

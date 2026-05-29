@@ -310,8 +310,6 @@ export const organizationKiloclawRouter = createTRPCRouter({
       if (!instance) return client.getLatestVersion();
       return client.getLatestVersionForInstance({
         instanceId: instance.id,
-        sandboxId: instance.sandboxId,
-        userId: ctx.user.id,
         currentImageTag: input.currentImageTag ?? null,
       });
     }),

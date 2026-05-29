@@ -506,7 +506,7 @@ describe('kiloclawRouter latestVersion', () => {
     kiloclawClientMock.__getLatestVersionForInstanceMock.mockReset();
   });
 
-  it('passes the active instance row and sandbox-derived rollout subject inputs', async () => {
+  it('passes the active instance row for server-derived rollout lookup', async () => {
     kiloclawClientMock.__getLatestVersionForInstanceMock.mockResolvedValue({
       imageTag: 'candidate-tag',
     });
@@ -525,8 +525,6 @@ describe('kiloclawRouter latestVersion', () => {
 
     expect(kiloclawClientMock.__getLatestVersionForInstanceMock).toHaveBeenCalledWith({
       instanceId,
-      sandboxId: `ki_${instanceId.replace(/-/g, '')}`,
-      userId: user.id,
       currentImageTag: 'current-tag',
     });
     expect(kiloclawClientMock.__getLatestVersionMock).not.toHaveBeenCalled();

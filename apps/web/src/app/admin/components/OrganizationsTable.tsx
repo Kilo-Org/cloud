@@ -24,13 +24,19 @@ type OrganizationSortConfig = {
   direction: 'asc' | 'desc';
 };
 
+// `create` is required only when the page wants the create button rendered;
+// callers that omit `create` get no button. This avoids a never-rendered default
+// label and keeps the create-button-label and click-target wired together.
+type CreateButtonConfig = {
+  label: string;
+};
+
 type OrganizationsTableProps = {
   mode?: 'paying' | 'trial' | 'all';
   showMetrics?: boolean;
   showStripeStatus?: boolean;
   pageTitle?: string;
-  showCreateButton?: boolean;
-  createButtonLabel?: string;
+  create?: CreateButtonConfig;
   defaultTab?: TableVariant;
 };
 
@@ -39,8 +45,7 @@ export function OrganizationsTable({
   showMetrics = true,
   showStripeStatus = true,
   pageTitle = 'Organizations',
-  showCreateButton = true,
-  createButtonLabel = 'Create Organization',
+  create,
   defaultTab = 'entitlements',
 }: OrganizationsTableProps) {
   const router = useRouter();
@@ -208,10 +213,10 @@ export function OrganizationsTable({
     [sharedParams, updateUrl]
   );
 
-  const buttons = showCreateButton ? (
+  const buttons = create ? (
     <Button variant="outline" onClick={() => setIsCreateDialogOpen(true)}>
       <Plus className="h-4 w-4" />
-      {createButtonLabel}
+      {create.label}
     </Button>
   ) : null;
 
@@ -230,6 +235,7 @@ export function OrganizationsTable({
             sortConfig={sortConfig}
             onSort={handleSort}
             showDeleted={currentIncludeDeleted}
+            showStripeStatus={showStripeStatus}
           />
           <OrganizationTableBody
             variant={variant}
@@ -237,6 +243,7 @@ export function OrganizationsTable({
             isLoading={isLoading}
             searchTerm={currentSearch}
             showDeleted={currentIncludeDeleted}
+            showStripeStatus={showStripeStatus}
           />
         </Table>
       </div>

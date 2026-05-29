@@ -8,9 +8,11 @@ import {
   credit_transactions,
   platform_integrations,
 } from '@kilocode/db/schema';
-import { ilike, or, asc, desc, count, eq, and, isNull, sql } from 'drizzle-orm';
+import { ilike, or, asc, desc, count, eq, and, isNull, sql, type SQL } from 'drizzle-orm';
+import type { PgColumn } from 'drizzle-orm/pg-core';
 import * as z from 'zod';
 import { OrganizationsApiGetResponseSchema } from '@/types/admin';
+import { STRIPE_SUBSCRIPTION_STATUS_VALUES } from '@/lib/admin/stripe-subscription-statuses';
 import { isValidUUID, toMicrodollars } from '@/lib/utils';
 import { millisecondsInHour } from 'date-fns/constants';
 import {
@@ -38,7 +40,9 @@ const OrganizationListInputSchema = z.object({
   mode: z.enum(['paying', 'trial', 'all']).default('paying'),
   // User-facing filters
   include_deleted: z.boolean().default(false),
-  stripe_status: z.string().optional(), // filter by latest subscription_status value
+  // Filter by latest subscription_status value. Values match the canonical
+  // Stripe status registry; '' clears the filter.
+  stripe_status: z.union([z.enum(STRIPE_SUBSCRIPTION_STATUS_VALUES), z.literal('')]).optional(),
   plan: z.enum(['enterprise', 'teams', '']).optional(),
 });
 
@@ -529,6 +533,15 @@ export const organizationAdminRouter = createTRPCRouter({
     .input(OrganizationListInputSchema)
     .output(OrganizationsApiGetResponseSchema)
     .query(async ({ input }) => {
+      // Single-source-of-truth for "has platform X integration" — keeps the
+      // active/pending status set defined in one place across github, gitlab,
+      // slack so future status rule changes can't drift between platforms.
+      const hasPlatformIntegrationSql = (
+        platform: 'github' | 'gitlab' | 'slack',
+        orgIdColumn: PgColumn
+      ): SQL<boolean> =>
+        sql<boolean>`EXISTS (SELECT 1 FROM ${platform_integrations} pi WHERE pi.owned_by_organization_id = ${orgIdColumn} AND pi.platform = ${platform} AND pi.integration_status IN ('active', 'pending'))`;
+
       const { page, limit, sortBy, sortOrder, search, mode, include_deleted, stripe_status, plan } =
         input;
 
@@ -609,7 +622,16 @@ export const organizationAdminRouter = createTRPCRouter({
         plan: organizations.plan,
         free_trial_end_at: organizations.free_trial_end_at,
         company_domain: organizations.company_domain,
-        subscription_amount_usd: latestSubscriptions.amount_usd,
+        // Null out subscription_amount_usd for non-billable statuses so the
+        // "Subscription" column doesn't display the dollar amount of a churned
+        // plan as if it were current MRR. Reading "latest_stripe_status" tells
+        // admins the lifecycle state separately. Cast to float8 so the JSON
+        // payload matches the column's `mode: 'number'` declaration.
+        subscription_amount_usd: sql<
+          number | null
+        >`CASE WHEN ${latestSubscriptions.subscription_status} IN ('active','trialing','past_due') THEN ${latestSubscriptions.amount_usd}::float8 ELSE NULL END`.as(
+          'subscription_amount_usd'
+        ),
         latest_stripe_status: latestSubscriptions.subscription_status,
         kilo_pass_tier: sql<
           string | null
@@ -620,18 +642,15 @@ export const organizationAdminRouter = createTRPCRouter({
           sql<number>`(SELECT COUNT(*) FROM kiloclaw_instances ki WHERE ki.organization_id = ${organizations.id} AND ki.destroyed_at IS NULL)::int`.as(
             'kiloclaw_count'
           ),
-        has_github_integration:
-          sql<boolean>`EXISTS (SELECT 1 FROM ${platform_integrations} pi WHERE pi.owned_by_organization_id = ${organizations.id} AND pi.platform = 'github' AND pi.integration_status IN ('active', 'pending'))`.as(
-            'has_github_integration'
-          ),
-        has_gitlab_integration:
-          sql<boolean>`EXISTS (SELECT 1 FROM ${platform_integrations} pi WHERE pi.owned_by_organization_id = ${organizations.id} AND pi.platform = 'gitlab' AND pi.integration_status IN ('active', 'pending'))`.as(
-            'has_gitlab_integration'
-          ),
-        has_slack_integration:
-          sql<boolean>`EXISTS (SELECT 1 FROM ${platform_integrations} pi WHERE pi.owned_by_organization_id = ${organizations.id} AND pi.platform = 'slack' AND pi.integration_status IN ('active', 'pending'))`.as(
-            'has_slack_integration'
-          ),
+        has_github_integration: hasPlatformIntegrationSql('github', organizations.id).as(
+          'has_github_integration'
+        ),
+        has_gitlab_integration: hasPlatformIntegrationSql('gitlab', organizations.id).as(
+          'has_gitlab_integration'
+        ),
+        has_slack_integration: hasPlatformIntegrationSql('slack', organizations.id).as(
+          'has_slack_integration'
+        ),
         has_sso_configured: sql<boolean>`${organizations.sso_domain} IS NOT NULL`.as(
           'has_sso_configured'
         ),
@@ -703,13 +722,22 @@ export const organizationAdminRouter = createTRPCRouter({
         .limit(limit)
         .offset((page - 1) * limit);
 
-      // Get total count using the same filtering logic
+      // Get total count using the same filtering logic. Must mirror baseQuery's
+      // joins so finalWhereCondition references (e.g. latestSubscriptions for the
+      // stripe_status filter) resolve.
       const countQuery = db
         .select({ count: count() })
         .from(organizations)
         .leftJoin(
           organization_memberships,
           eq(organizations.id, organization_memberships.organization_id)
+        )
+        .leftJoin(
+          latestSubscriptions,
+          and(
+            eq(organizations.id, latestSubscriptions.organization_id),
+            eq(latestSubscriptions.row_num, 1)
+          )
         )
         .where(finalWhereCondition)
         .groupBy(organizations.id);

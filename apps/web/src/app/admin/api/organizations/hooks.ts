@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useInvalidateAllOrganizationData } from '@/app/api/organizations/hooks';
 import { useTRPC } from '@/lib/trpc/utils';
 import type { OrganizationPlan } from '@/lib/organizations/organization-types';
+import type { StripeSubscriptionStatusValue } from '@/lib/admin/stripe-subscription-statuses';
 
 export function useDeleteOrganization() {
   const queryClient = useQueryClient();
@@ -86,7 +87,7 @@ export function useOrganizationsList(params: UseOrganizationsListParams) {
       search: params.search,
       mode: params.mode,
       include_deleted: params.include_deleted ?? false,
-      stripe_status: params.stripe_status,
+      stripe_status: params.stripe_status as StripeSubscriptionStatusValue | '' | undefined,
       plan: params.plan as '' | OrganizationPlan | undefined,
     })
   );

@@ -9,7 +9,7 @@ export default async function TrialOrganizationsPage() {
         showMetrics={false}
         showStripeStatus={false}
         pageTitle="Trial Organizations"
-        createButtonLabel="Create Org Trial"
+        create={{ label: 'Create Org Trial' }}
         defaultTab="usage"
       />
     </Suspense>

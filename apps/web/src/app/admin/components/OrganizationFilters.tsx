@@ -14,18 +14,10 @@ import {
 import { UserSearchInput } from './UserSearchInput';
 import { X, Filter } from 'lucide-react';
 
-// Known Stripe subscription status values
-const STRIPE_STATUSES = [
-  { value: 'active', label: 'Active' },
-  { value: 'past_due', label: 'Past due' },
-  { value: 'canceled', label: 'Canceled' },
-  { value: 'ended', label: 'Ended' },
-  { value: 'incomplete', label: 'Incomplete' },
-  { value: 'incomplete_expired', label: 'Incomplete expired' },
-  { value: 'trialing', label: 'Trialing' },
-  { value: 'unpaid', label: 'Unpaid' },
-  { value: 'paused', label: 'Paused' },
-];
+import {
+  STRIPE_SUBSCRIPTION_STATUSES,
+  getStripeStatusLabel,
+} from '@/lib/admin/stripe-subscription-statuses';
 
 interface OrganizationFiltersProps {
   search: string;
@@ -60,7 +52,7 @@ export function OrganizationFilters({
 }: OrganizationFiltersProps) {
   const hasActiveFilters = includeDeleted || !!stripeStatus || (!!plan && plan !== 'all');
 
-  const stripeStatusLabel = STRIPE_STATUSES.find(s => s.value === stripeStatus)?.label;
+  const stripeStatusLabel = stripeStatus ? getStripeStatusLabel(stripeStatus) : undefined;
 
   return (
     <div className="space-y-4">
@@ -92,7 +84,7 @@ export function OrganizationFilters({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Any</SelectItem>
-                {STRIPE_STATUSES.map(s => (
+                {STRIPE_SUBSCRIPTION_STATUSES.map(s => (
                   <SelectItem key={s.value} value={s.value}>
                     {s.label}
                   </SelectItem>

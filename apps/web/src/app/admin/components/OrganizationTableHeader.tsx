@@ -16,6 +16,7 @@ interface OrganizationTableHeaderProps {
   sortConfig: OrganizationSortConfig | null;
   onSort: (field: OrganizationSortableField) => void;
   showDeleted?: boolean;
+  showStripeStatus?: boolean;
 }
 
 export function OrganizationTableHeader({
@@ -23,6 +24,7 @@ export function OrganizationTableHeader({
   sortConfig,
   onSort,
   showDeleted,
+  showStripeStatus = true,
 }: OrganizationTableHeaderProps) {
   if (variant === 'entitlements') {
     return (
@@ -35,7 +37,7 @@ export function OrganizationTableHeader({
           </TableHead>
           <TableHead>Plan</TableHead>
           <TableHead>Kilo Pass</TableHead>
-          <TableHead>Stripe Status</TableHead>
+          {showStripeStatus && <TableHead>Stripe Status</TableHead>}
           <TableHead>Subscription</TableHead>
           <TableHead>Links</TableHead>
           {showDeleted && <TableHead>Deleted</TableHead>}

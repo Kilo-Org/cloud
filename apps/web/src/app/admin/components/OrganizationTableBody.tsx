@@ -9,29 +9,19 @@ import type { AdminOrganizationSchema } from '@/types/admin';
 import type { z } from 'zod';
 import { ExternalLink } from 'lucide-react';
 import type { TableVariant } from './OrganizationTableHeader';
+import {
+  getStripeStatusLabel,
+  getStripeStatusStyle,
+} from '@/lib/admin/stripe-subscription-statuses';
 
 type AdminOrganization = z.infer<typeof AdminOrganizationSchema>;
 
-const STRIPE_STATUS_STYLES: Record<string, string> = {
-  active: 'bg-green-100 text-green-800',
-  past_due: 'bg-yellow-100 text-yellow-800',
-  canceled: 'bg-red-100 text-red-800',
-  ended: 'bg-gray-100 text-gray-700',
-  incomplete: 'bg-orange-100 text-orange-800',
-  incomplete_expired: 'bg-red-100 text-red-700',
-  trialing: 'bg-blue-100 text-blue-800',
-  unpaid: 'bg-red-100 text-red-800',
-  paused: 'bg-purple-100 text-purple-800',
-};
-
 function StripeStatusBadge({ status }: { status: string }) {
-  const style = STRIPE_STATUS_STYLES[status] ?? 'bg-gray-100 text-gray-700';
-  const label = status.replace(/_/g, ' ');
   return (
     <span
-      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium capitalize ${style}`}
+      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium capitalize ${getStripeStatusStyle(status)}`}
     >
-      {label}
+      {getStripeStatusLabel(status)}
     </span>
   );
 }
@@ -105,19 +95,22 @@ type OrganizationTableBodyProps = {
   isLoading: boolean;
   searchTerm?: string;
   showDeleted?: boolean;
+  showStripeStatus?: boolean;
 };
 
-function getColumnCount(variant: TableVariant, showDeleted?: boolean) {
-  const base = variant === 'entitlements' ? 6 : 9;
+function getColumnCount(variant: TableVariant, showDeleted?: boolean, showStripeStatus?: boolean) {
+  const base = variant === 'entitlements' ? (showStripeStatus ? 6 : 5) : 9;
   return showDeleted ? base + 1 : base;
 }
 
 function EntitlementsRow({
   organization,
   showDeleted,
+  showStripeStatus = true,
 }: {
   organization: AdminOrganization;
   showDeleted?: boolean;
+  showStripeStatus?: boolean;
 }) {
   return (
     <>
@@ -142,13 +135,15 @@ function EntitlementsRow({
           <span className="text-muted-foreground text-sm">—</span>
         )}
       </TableCell>
-      <TableCell>
-        {organization.latest_stripe_status ? (
-          <StripeStatusBadge status={organization.latest_stripe_status} />
-        ) : (
-          <span className="text-muted-foreground text-sm">—</span>
-        )}
-      </TableCell>
+      {showStripeStatus && (
+        <TableCell>
+          {organization.latest_stripe_status ? (
+            <StripeStatusBadge status={organization.latest_stripe_status} />
+          ) : (
+            <span className="text-muted-foreground text-sm">—</span>
+          )}
+        </TableCell>
+      )}
       <TableCell className="min-w-28">
         {organization.subscription_amount_usd ? (
           <span className="font-mono text-sm">
@@ -264,9 +259,10 @@ export function OrganizationTableBody({
   isLoading,
   searchTerm,
   showDeleted,
+  showStripeStatus = true,
 }: OrganizationTableBodyProps) {
   const router = useRouter();
-  const colSpan = getColumnCount(variant, showDeleted);
+  const colSpan = getColumnCount(variant, showDeleted, showStripeStatus);
 
   const handleRowClick = (organizationId: string) => {
     router.push(`/admin/organizations/${encodeURIComponent(organizationId)}`);
@@ -320,7 +316,11 @@ export function OrganizationTableBody({
           onClick={() => handleRowClick(organization.id)}
         >
           {variant === 'entitlements' ? (
-            <EntitlementsRow organization={organization} showDeleted={showDeleted} />
+            <EntitlementsRow
+              organization={organization}
+              showDeleted={showDeleted}
+              showStripeStatus={showStripeStatus}
+            />
           ) : (
             <UsageRow organization={organization} showDeleted={showDeleted} />
           )}

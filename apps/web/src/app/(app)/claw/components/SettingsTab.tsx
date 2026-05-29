@@ -2003,6 +2003,8 @@ export function SettingsTab({
     cleanVersion(controllerVersion?.version),
     OPENCLAW_IMPORT_UI_MIN_CONTROLLER_VERSION
   );
+  const supportsOpenclawSaveValidation =
+    controllerVersion?.capabilities?.includes('files.write-openclaw-config') === true;
   // Fail OPEN: hide the interests editor only when the controller
   // version is positively parsed as too old, OR the worker reports an
   // explicit `version: null` (its positive old-controller signal for a
@@ -2605,6 +2607,7 @@ export function SettingsTab({
                   enabled={isRunning}
                   mutations={mutations}
                   onOpenChange={setEditConfigOpen}
+                  enableOpenclawValidation={supportsOpenclawSaveValidation}
                 />
               </div>
             )}

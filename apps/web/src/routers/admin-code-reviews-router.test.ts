@@ -398,6 +398,52 @@ describe('adminCodeReviewsRouter', () => {
     expect(segmentation.ownershipBreakdown[0]).toMatchObject({ failed: 1 });
   });
 
+  it('buckets selected-model-unavailable terminal reasons as action required', async () => {
+    const owner = { type: 'user', id: adminUser.id } satisfies ReviewOwner;
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        reviewValues({
+          owner,
+          status: 'failed',
+          createdAt: timestamp(760),
+          terminalReason: 'selected_model_unavailable',
+          errorMessage: 'Selected model is not available for this cloud agent session',
+        })
+      )
+      .returning({ id: cloud_agent_code_reviews.id });
+
+    await db.insert(cloud_agent_code_review_attempts).values({
+      code_review_id: review.id,
+      attempt_number: 1,
+      status: 'failed',
+      terminal_reason: 'selected_model_unavailable',
+      error_message: 'Selected model is not available for this cloud agent session',
+      created_at: timestamp(761),
+      started_at: timestamp(762),
+      completed_at: timestamp(763),
+    });
+
+    const caller = await createCallerForUser(adminUser.id);
+    const finalErrors = await caller.admin.codeReviews.getErrorAnalysis(filterInput());
+    const attemptErrors = await caller.admin.codeReviews.getErrorAnalysis(
+      filterInput({ retryAccountingMode: 'all_attempts' })
+    );
+
+    expect(finalErrors.categories).toEqual([
+      expect.objectContaining({ category: 'Action Required', count: 1 }),
+    ]);
+    expect(finalErrors.details).toEqual([
+      expect.objectContaining({ category: 'Action Required', count: 1 }),
+    ]);
+    expect(attemptErrors.categories).toEqual([
+      expect.objectContaining({ category: 'Action Required', count: 1 }),
+    ]);
+    expect(attemptErrors.details).toEqual([
+      expect.objectContaining({ category: 'Action Required', count: 1 }),
+    ]);
+  });
+
   it('classifies all-attempt model-not-found outcomes as cancellations instead of failures', async () => {
     const [review] = await db
       .insert(cloud_agent_code_reviews)

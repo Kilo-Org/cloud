@@ -123,6 +123,16 @@ export type StreamHandlerOptions = {
  * @param options - Optional derivation functions for the `connected` event
  * @returns Stream handler object with methods for WebSocket operations
  */
+/**
+ * Number of active /stream WebSocket connections.
+ *
+ * Stateless so callers can check the count without instantiating a
+ * StreamHandler (and without knowing the internal 'stream' tag).
+ */
+export function getConnectedStreamClientCount(state: DurableObjectState): number {
+  return state.getWebSockets('stream').length;
+}
+
 export function createStreamHandler(
   state: DurableObjectState,
   eventQueries: EventQueries,
@@ -409,15 +419,6 @@ export function createStreamHandler(
           // Don't close the WebSocket on broadcast error - let the client handle reconnection
         }
       }
-    },
-
-    /**
-     * Get count of connected stream clients.
-     *
-     * @returns Number of active WebSocket connections with 'stream' tag
-     */
-    getConnectedClientCount(): number {
-      return state.getWebSockets('stream').length;
     },
   };
 }

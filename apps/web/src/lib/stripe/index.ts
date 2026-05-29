@@ -69,6 +69,7 @@ import {
 import type { OrganizationPlan, BillingCycle } from '@/lib/organizations/organization-types';
 import { isSeatLineItem } from '@/lib/organizations/stripe-seat-line-items';
 import { successResult } from '@/lib/maybe-result';
+import { observeStripeEarlyFraudWarningCreated } from '@/lib/stripe/early-fraud-warning';
 
 type KiloClawChargeContext = {
   chargeId: string;
@@ -165,7 +166,7 @@ async function reportChargeBackedStripeAbuseEvent(params: {
   const chargeId = stripeReferenceId(params.charge);
   let charge: Stripe.Charge | null = params.preFetchedCharge ?? null;
 
-  if (!charge && chargeId) {
+  if (params.preFetchedCharge === undefined && chargeId) {
     try {
       charge = await client.charges.retrieve(chargeId);
     } catch (error) {
@@ -1242,6 +1243,11 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
 
     case 'radar.early_fraud_warning.created': {
       const earlyFraudWarning = event.data.object;
+      const observedCharge = await observeStripeEarlyFraudWarningCreated({
+        eventId: event.id,
+        eventCreated: event.created,
+        earlyFraudWarning,
+      });
       void reportChargeBackedStripeAbuseEvent({
         abuseEventType: 'stripe.radar.early_fraud_warning.created',
         eventId: event.id,
@@ -1250,6 +1256,7 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
         charge: earlyFraudWarning.charge,
         paymentIntent: earlyFraudWarning.payment_intent,
         data: { early_fraud_warning: earlyFraudWarning.id },
+        preFetchedCharge: observedCharge,
       });
       break;
     }

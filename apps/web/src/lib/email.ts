@@ -17,6 +17,7 @@ export const subjects = {
   magicLink: 'Sign in to Kilo Code',
   balanceAlert: 'Kilo: Low Balance Alert',
   autoTopUpFailed: 'Kilo: Auto Top-Up Failed',
+  codeReviewDisabled: 'Action Required: Code Reviewer Disabled',
   ossInviteNewUser: 'Kilo: OSS Sponsorship Offer',
   ossInviteExistingUser: 'Kilo: OSS Sponsorship Offer',
   ossExistingOrgProvisioned: 'Kilo: OSS Sponsorship Offer',
@@ -225,6 +226,21 @@ export async function sendAutoTopUpFailedEmail(
     to,
     templateName: 'autoTopUpFailed',
     templateVars: { reason: props.reason, credits_url },
+  });
+}
+
+export async function sendCodeReviewDisabledEmail(
+  to: string,
+  props: { reason: string; recoveryUrl: string; recoveryLabel: string }
+): Promise<SendResult> {
+  return send({
+    to,
+    templateName: 'codeReviewDisabled',
+    templateVars: {
+      reason: props.reason,
+      recovery_url: props.recoveryUrl,
+      recovery_label: props.recoveryLabel,
+    },
   });
 }
 

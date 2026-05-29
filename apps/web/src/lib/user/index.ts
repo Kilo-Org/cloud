@@ -47,7 +47,6 @@ import {
   bot_requests,
   cloud_agent_code_reviews,
   kiloclaw_instances,
-  kiloclaw_composio_identities,
   kiloclaw_google_oauth_connections,
   kiloclaw_inbound_email_aliases,
   kiloclaw_access_codes,
@@ -78,6 +77,7 @@ import {
   impact_conversion_reports,
   github_branch_pull_requests,
   model_eval_ingestions,
+  stripe_early_fraud_warning_cases,
 } from '@kilocode/db/schema';
 import { eq, and, inArray, isNotNull, isNull, sql, or, gte, count } from 'drizzle-orm';
 import { allow_fake_login, IS_DEVELOPMENT } from '@/lib/constants';
@@ -779,6 +779,7 @@ export class SoftDeletePreconditionError extends Error {
  * - Stripe link (stripe_customer_id unchanged)
  * - credit_transactions, microdollar_usage (billing records)
  * - kilo_pass_subscriptions/issuances/issuance_items (financial)
+ * - kilo_pass_welcome_promo_payment_fingerprint_claims (minimal retained payment anti-abuse evidence)
  * - cli_sessions, shared_cli_sessions, cli_sessions_v2 (session history)
  * - deployments, app_builder_projects (user assets)
  * - stytch_fingerprints (abuse detection)
@@ -789,7 +790,9 @@ export class SoftDeletePreconditionError extends Error {
  * - kiloclaw_scheduled_action_targets (retained operational records;
  * - transactional_email_log (retained outbox marker, financial record;
  *   user_id FK references the anonymized kilocode_users row and optional
- *   organization_id references the organization — no direct PII)
+ *   organization_id references the organization -- no direct PII)
+ * - stripe_early_fraud_warning_cases/actions (retained enforcement and
+ *   financial audit history; case user ownership link is nulled)
  *
  * What is scrubbed/deleted:
  * - PII on the user row (email, name, avatar, urls)
@@ -809,6 +812,7 @@ export class SoftDeletePreconditionError extends Error {
  * - payment_methods (soft-deleted, address/name/IP fields nulled)
  * - App Store account token and retained Kilo Pass store purchase/event token fields
  * - user_feedback / app_builder_feedback / free_model_usage (FK nulled)
+ * - stripe_early_fraud_warning_cases direct user ownership link (FK nulled)
  * - Various user-owned resources (platform_integrations, byok_api_keys,
  *   agent_configs, webhook_events, code_indexing_*, source_embeddings,
  *   cloud_agent_webhook_triggers, agent_environment_profiles,
@@ -1040,9 +1044,6 @@ export async function softDeleteUser(userId: string) {
       .set({ initiated_by_admin_id: null })
       .where(eq(kiloclaw_cli_runs.initiated_by_admin_id, userId));
     await tx.delete(kiloclaw_cli_runs).where(eq(kiloclaw_cli_runs.user_id, userId));
-    await tx
-      .delete(kiloclaw_composio_identities)
-      .where(eq(kiloclaw_composio_identities.user_id, userId));
     // Remove stored Google OAuth credentials for all instances owned by this user.
     await tx
       .delete(kiloclaw_google_oauth_connections)
@@ -1256,6 +1257,10 @@ export async function softDeleteUser(userId: string) {
       .update(free_model_usage)
       .set({ kilo_user_id: null })
       .where(eq(free_model_usage.kilo_user_id, userId));
+    await tx
+      .update(stripe_early_fraud_warning_cases)
+      .set({ kilo_user_id: null })
+      .where(eq(stripe_early_fraud_warning_cases.kilo_user_id, userId));
     await tx
       .update(security_advisor_scans)
       .set({ kilo_user_id: 'deleted', public_ip: null })

@@ -24,6 +24,10 @@ import {
 } from '@/lib/integrations/platforms/gitlab/webhook-sync';
 import { getValidGitLabToken } from '@/lib/integrations/gitlab-service';
 import { logExceptInTest } from '@/lib/utils.server';
+import {
+  clearCodeReviewActionRequiredState,
+  getCodeReviewActionRequiredState,
+} from '@/lib/code-reviews/action-required';
 
 const PlatformSchema = z.enum(['github', 'gitlab']).default('github');
 
@@ -164,6 +168,7 @@ export const personalReviewAgentRouter = createTRPCRouter({
           selectedRepositoryIds: [],
           manuallyAddedRepositories: [],
           disableReviewMd: true,
+          actionRequired: null,
         };
       }
 
@@ -180,6 +185,7 @@ export const personalReviewAgentRouter = createTRPCRouter({
         selectedRepositoryIds: cfg.selected_repository_ids || [],
         manuallyAddedRepositories: cfg.manually_added_repositories || [],
         disableReviewMd: cfg.disable_review_md ?? true,
+        actionRequired: getCodeReviewActionRequiredState(config),
       };
     }),
 
@@ -315,6 +321,7 @@ export const personalReviewAgentRouter = createTRPCRouter({
         const platform = input.platform ?? 'github';
 
         await setAgentEnabledForOwner(owner, 'code_review', platform, input.isEnabled);
+        await clearCodeReviewActionRequiredState({ owner, platform });
 
         return { success: true, isEnabled: input.isEnabled };
       } catch (error) {

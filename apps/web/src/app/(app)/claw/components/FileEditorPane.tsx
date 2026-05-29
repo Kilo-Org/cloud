@@ -6,6 +6,20 @@ import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import type {
+  FileWriteResponse,
+  OpenclawFileWriteValidation,
+} from '@/lib/kiloclaw/kiloclaw-internal-client';
 
 const Editor = lazy<React.ComponentType<EditorProps>>(() => import('@monaco-editor/react'));
 const DiffEditor = lazy<React.ComponentType<DiffEditorProps>>(() =>
@@ -61,15 +75,21 @@ export interface FileEditorPaneProps {
   error: { message: string } | null;
   refetch: () => void;
   onSave: (
-    args: { path: string; content: string; etag?: string },
+    args: {
+      path: string;
+      content: string;
+      etag?: string;
+      openclawValidation?: OpenclawFileWriteValidation;
+    },
     callbacks: {
-      onSuccess: (result: { etag: string }) => void;
+      onSuccess: (result: FileWriteResponse) => void;
       onError: (err: FileSaveError) => void;
     }
   ) => void;
   isSaving: boolean;
   onDirtyChange?: (dirty: boolean) => void;
   validateBeforeSave?: (filePath: string, content: string) => boolean;
+  enableOpenclawValidation?: boolean;
 }
 
 export function FileEditorPane({
@@ -82,8 +102,13 @@ export function FileEditorPane({
   isSaving,
   onDirtyChange,
   validateBeforeSave,
+  enableOpenclawValidation = false,
 }: FileEditorPaneProps) {
   const [showDiff, setShowDiff] = useState(false);
+  const [pendingValidationWarning, setPendingValidationWarning] = useState<
+    | (Extract<FileWriteResponse, { outcome: 'openclaw-validation-warning' }> & { content: string })
+    | null
+  >(null);
 
   // savedContentRef holds the last successfully saved content, used as fallback
   // until the query refetches to avoid flashing stale content after save.
@@ -98,6 +123,7 @@ export function FileEditorPane({
     prevFilePathRef.current = filePath;
     setEditedContent(null);
     setShowDiff(false);
+    setPendingValidationWarning(null);
     etagRef.current = undefined;
     savedContentRef.current = null;
   }
@@ -130,6 +156,40 @@ export function FileEditorPane({
       }
     },
     [serverContent]
+  );
+
+  const submitSave = useCallback(
+    (content: string, openclawValidation?: OpenclawFileWriteValidation) => {
+      onSave(
+        { path: filePath, content, etag: etagRef.current, openclawValidation },
+        {
+          onSuccess: result => {
+            if ('outcome' in result) {
+              setPendingValidationWarning({ ...result, content });
+              return;
+            }
+            etagRef.current = result.etag;
+            savedContentRef.current = content;
+            setEditedContent(null);
+            setPendingValidationWarning(null);
+            toast.success(`Saved ${filePath}`);
+          },
+          onError: err => {
+            if (err.data?.code === 'CONFLICT' && err.data?.upstreamCode === 'file_etag_conflict') {
+              setPendingValidationWarning(null);
+              refetch();
+              setShowDiff(true);
+              toast.error(
+                'File was modified externally — your edits are preserved, review the diff'
+              );
+            } else {
+              toast.error(err.message);
+            }
+          },
+        }
+      );
+    },
+    [filePath, onSave, refetch]
   );
 
   if (isLoading) {
@@ -198,7 +258,7 @@ export function FileEditorPane({
               value={currentValue}
               onChange={handleEditorChange}
               theme="vs-dark"
-              options={EDITOR_OPTIONS}
+              options={{ ...EDITOR_OPTIONS, readOnly: isSaving }}
               keepCurrentModel
             />
           )}
@@ -226,34 +286,11 @@ export function FileEditorPane({
               if (validateBeforeSave && !validateBeforeSave(filePath, currentValue)) {
                 return;
               }
-              onSave(
-                { path: filePath, content: currentValue, etag: etagRef.current },
-                {
-                  onSuccess: result => {
-                    etagRef.current = result.etag;
-                    // Optimistically update serverContent so we don't flash stale content
-                    // while the invalidated readFile query refetches.
-                    savedContentRef.current = currentValue;
-                    setEditedContent(null);
-                    toast.success(`Saved ${filePath}`);
-                  },
-                  onError: err => {
-                    if (
-                      err.data?.code === 'CONFLICT' &&
-                      err.data?.upstreamCode === 'file_etag_conflict'
-                    ) {
-                      // Preserve the user's edits and show diff so they can compare
-                      // their version against the server's updated content.
-                      refetch();
-                      setShowDiff(true);
-                      toast.error(
-                        'File was modified externally — your edits are preserved, review the diff'
-                      );
-                    } else {
-                      toast.error(err.message);
-                    }
-                  },
-                }
+              submitSave(
+                currentValue,
+                enableOpenclawValidation && filePath === 'openclaw.json'
+                  ? 'warn-before-write'
+                  : undefined
               );
             }}
           >
@@ -268,6 +305,59 @@ export function FileEditorPane({
           </Button>
         </div>
       </div>
+
+      <AlertDialog
+        open={pendingValidationWarning !== null}
+        onOpenChange={open => {
+          if (!open && !isSaving) setPendingValidationWarning(null);
+        }}
+      >
+        <AlertDialogContent className="sm:max-w-xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {pendingValidationWarning?.reason === 'invalid'
+                ? 'OpenClaw configuration is invalid'
+                : 'Configuration validation could not run'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingValidationWarning?.reason === 'invalid'
+                ? 'OpenClaw may reject this file or restore the previous configuration during reload or startup.'
+                : 'Save without validation only if you understand that OpenClaw may reject or restore this file.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {pendingValidationWarning && (
+            <div className="bg-muted max-h-48 overflow-y-auto rounded-md border p-3 text-xs">
+              <ul className="space-y-2">
+                {pendingValidationWarning.issues.map((issue, index) => (
+                  <li key={`${issue.path}:${index}`} className="space-y-0.5">
+                    {issue.path && <div className="font-mono text-destructive">{issue.path}</div>}
+                    <div className="text-muted-foreground">{issue.message}</div>
+                    {issue.allowedValues && issue.allowedValues.length > 0 && (
+                      <div className="text-muted-foreground font-mono">
+                        Allowed values: {issue.allowedValues.join(', ')}
+                      </div>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isSaving}>Keep editing</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              disabled={isSaving || !pendingValidationWarning}
+              onClick={() => {
+                if (pendingValidationWarning) {
+                  submitSave(pendingValidationWarning.content, 'allow-invalid');
+                }
+              }}
+            >
+              {isSaving ? 'Saving...' : 'Save anyway'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

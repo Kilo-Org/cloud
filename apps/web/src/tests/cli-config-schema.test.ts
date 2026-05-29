@@ -33,6 +33,18 @@ describe('kilo config.json schema merge', () => {
     expect(props.commit_message).toBeDefined();
     expect(props.remote_control).toBeDefined();
     expect(props.auto_expand_history).toBeDefined();
+    expect(props.auto_collapse_reasoning).toBeDefined();
+    expect(props.terminal_command_display).toBeDefined();
+  });
+
+  test('auto_collapse_reasoning is a boolean', () => {
+    expect(props.auto_collapse_reasoning).toEqual(expect.objectContaining({ type: 'boolean' }));
+  });
+
+  test('terminal_command_display is an enum of expanded/collapsed', () => {
+    const tcd = props.terminal_command_display as { type: string; enum: string[] };
+    expect(tcd.type).toBe('string');
+    expect(tcd.enum).toEqual(['expanded', 'collapsed']);
   });
 
   test('commit_message has a prompt string property', () => {

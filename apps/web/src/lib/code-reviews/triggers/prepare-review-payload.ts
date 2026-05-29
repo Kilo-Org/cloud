@@ -42,6 +42,7 @@ import {
   getCodeReviewById,
   findPreviousCompletedReview,
   updateRepositoryReviewInstructionsMetadata,
+  type ReviewContinuationScope,
 } from '../db/code-reviews';
 import { DEFAULT_CODE_REVIEW_MODEL, DEFAULT_CODE_REVIEW_MODE } from '../core/constants';
 import type { Owner } from '../core';
@@ -151,6 +152,8 @@ export async function prepareReviewPayload(
     // 3. Get platform token and build review state based on platform
     let githubToken: string | undefined;
     let gitlabToken: string | undefined;
+    let reviewContinuationScope: ReviewContinuationScope | null =
+      platform === PLATFORM.GITLAB ? null : { platform: 'github' };
     let gitlabInstanceUrl: string | undefined;
     let existingReviewState: ExistingReviewState | null = null;
     let gitlabContext: GitLabDiffContext | undefined;
@@ -238,7 +241,10 @@ export async function prepareReviewPayload(
         // Unlike GitHub, we cannot fall back to no-token for GitLab private repos,
         // so auth errors here are hard failures that must propagate.
         const metadata = integration.metadata as GitLabIntegrationMetadata | null;
-        gitlabInstanceUrl = metadata?.gitlab_instance_url || 'https://gitlab.com';
+        gitlabInstanceUrl = (metadata?.gitlab_instance_url || 'https://gitlab.com').replace(
+          /\/+$/,
+          ''
+        );
         const instanceUrl = gitlabInstanceUrl;
 
         logExceptInTest('[prepareReviewPayload] GitLab integration found', {
@@ -258,6 +264,11 @@ export async function prepareReviewPayload(
 
         try {
           gitlabToken = await getOrCreateProjectAccessToken(integration, projectId);
+          reviewContinuationScope = {
+            platform: 'gitlab',
+            integrationId: integration.id,
+            projectId,
+          };
           logExceptInTest('[prepareReviewPayload] Using PrAT for code review', {
             reviewId,
             repoFullName: review.repo_full_name,
@@ -365,12 +376,14 @@ export async function prepareReviewPayload(
     let previousHeadSha: string | null = null;
     let previousCloudAgentSessionId: string | undefined;
     try {
-      const previousReview = await findPreviousCompletedReview(
-        review.repo_full_name,
-        review.pr_number,
-        existingReviewState?.headCommitSha ?? review.head_sha,
-        platform
-      );
+      const previousReview = reviewContinuationScope
+        ? await findPreviousCompletedReview(
+            review.repo_full_name,
+            review.pr_number,
+            existingReviewState?.headCommitSha ?? review.head_sha,
+            reviewContinuationScope
+          )
+        : null;
       previousHeadSha = previousReview?.head_sha ?? null;
 
       if (previousReview?.session_id) {

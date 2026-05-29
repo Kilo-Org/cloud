@@ -76,6 +76,17 @@ export interface FileNode {
   children?: FileNode[];
 }
 
+export type OpenclawFileWriteValidation = 'warn-before-write' | 'allow-invalid';
+
+export type FileWriteResponse =
+  | { etag: string }
+  | {
+      outcome: 'openclaw-validation-warning';
+      valid: false;
+      reason: 'invalid' | 'validation-unavailable';
+      issues: Array<{ path: string; message: string; allowedValues?: string[] }>;
+    };
+
 /**
  * Error thrown when the KiloClaw API returns a non-OK response.
  * Preserves the HTTP status code and response body for structured
@@ -911,6 +922,20 @@ export class KiloClawInternalClient {
     return this.request(`/api/platform/files/write${params}`, {
       method: 'POST',
       body: JSON.stringify({ userId, path: filePath, content, etag }),
+    });
+  }
+
+  async writeOpenclawConfigFile(
+    userId: string,
+    content: string,
+    etag: string | undefined,
+    instanceId: string | undefined,
+    mode: OpenclawFileWriteValidation
+  ): Promise<FileWriteResponse> {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
+    return this.request(`/api/platform/files/write-openclaw-config${params}`, {
+      method: 'POST',
+      body: JSON.stringify({ userId, content, etag, mode }),
     });
   }
 

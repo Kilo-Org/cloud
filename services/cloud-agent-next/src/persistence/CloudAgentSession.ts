@@ -46,6 +46,7 @@ import type { Result } from '../lib/result.js';
 import type { AddExecutionError, UpdateStatusError } from '../session/queries/executions.js';
 import {
   createStreamHandler,
+  getConnectedStreamClientCount,
   type StreamHandler,
   type QueuedMessageSnapshot,
 } from '../websocket/stream.js';
@@ -225,7 +226,7 @@ function isSameAcceptedInitialTurn(
   return (
     stored.turn?.type === 'prompt' &&
     stored.turn.prompt === initialTurn.prompt &&
-    JSON.stringify(stored.turn.images) === JSON.stringify(initialTurn.images)
+    JSON.stringify(stored.turn.attachments) === JSON.stringify(initialTurn.attachments)
   );
 }
 
@@ -419,6 +420,9 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
           return resolvedSessionId ?? metadata?.identity.sessionId ?? '';
         },
         getCallbackQueue: () => this.env.CALLBACK_QUEUE,
+        sendPushNotification: params =>
+          this.env.NOTIFICATIONS.sendCloudAgentSessionNotification(params),
+        hasConnectedStreamClients: () => getConnectedStreamClientCount(this.ctx) > 0,
         getAssistantMessageForUserMessage: (sessionId, kiloSessionId, parentMessageId) =>
           this.eventQueries.getAssistantMessageForUserMessage(
             sessionId,
@@ -883,7 +887,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
    * @returns Number of active WebSocket connections
    */
   getConnectedClientCount(): number {
-    return this.streamHandler?.getConnectedClientCount() ?? 0;
+    return getConnectedStreamClientCount(this.ctx);
   }
 
   // ---------------------------------------------------------------------------
@@ -1365,13 +1369,14 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
             : input.message.turn.arguments.length > 0
               ? `/${input.message.turn.command} ${input.message.turn.arguments}`
               : `/${input.message.turn.command}`,
-        images: input.message.turn.type === 'prompt' ? input.message.turn.images : undefined,
+        attachments:
+          input.message.turn.type === 'prompt' ? input.message.turn.attachments : undefined,
         turn:
           input.message.turn.type === 'prompt'
             ? {
                 type: 'prompt',
                 prompt: input.message.turn.prompt,
-                images: input.message.turn.images,
+                attachments: input.message.turn.attachments,
               }
             : {
                 type: 'command',
@@ -1469,7 +1474,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
                 type: 'prompt',
                 id: initialTurn.messageId,
                 prompt: initialTurn.prompt,
-                images: initialTurn.images,
+                attachments: initialTurn.attachments,
               }
             : {
                 type: 'command',
@@ -2003,6 +2008,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     opts?: {
       gateResult?: 'pass' | 'fail';
       suppressCallback?: boolean;
+      suppressPush?: boolean;
       allowIdleBatchWithoutObservedIdle?: boolean;
     }
   ) {
@@ -2425,14 +2431,14 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
               type: 'prompt',
               messageId: initialMessage.id,
               prompt: initialMessage.turn.prompt,
-              images: initialMessage.turn.images,
+              attachments: initialMessage.turn.attachments,
             }
           : initialMessage.prompt
             ? {
                 type: 'prompt',
                 messageId: initialMessage.id,
                 prompt: initialMessage.prompt,
-                images: initialMessage.images,
+                attachments: initialMessage.attachments,
               }
             : undefined;
     if (!turn) return { success: false, code: 'BAD_REQUEST', error: 'No prompt provided' };

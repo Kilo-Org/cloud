@@ -28,6 +28,7 @@ const forbiddenFreeModelIds: ReadonlySet<string> = new Set([
   'minimax/minimax-m2.1:free',
   'minimax/minimax-m2.5:free', // usable through kilo-auto
   'moonshotai/kimi-k2.5:free',
+  'moonshotai/kimi-k2.6:free',
   'nousresearch/hermes-3-llama-3.1-405b:free',
   'nvidia/nemotron-3-nano-30b-a3b:free',
   'nvidia/nemotron-nano-12b-v2-vl:free',
@@ -40,6 +41,7 @@ const forbiddenFreeModelIds: ReadonlySet<string> = new Set([
   'qwen/qwen3.6-plus-preview:free',
   'qwen/qwen3.6-plus:free',
   'upstage/solar-pro-3:free',
+  'x-ai/grok-code-fast-1:optimized:free',
   'xiaomi/mimo-v2-omni:free',
   'xiaomi/mimo-v2-pro:free',
   'z-ai/glm-4.5-air:free',

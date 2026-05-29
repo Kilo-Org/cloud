@@ -183,12 +183,13 @@ describe('createIngestHandler', () => {
       const eventQueries = createFakeEventQueries();
       (eventQueries as unknown as Record<string, unknown>).upsert = vi.fn().mockReturnValue(42);
       const broadcastFn = vi.fn();
+      const doContext = createFakeDOContext();
       const handler = createIngestHandler(
         createFakeState(),
         eventQueries,
         SESSION_ID,
         broadcastFn,
-        createFakeDOContext()
+        doContext
       );
       const ws = createFakeWebSocket(makeAttachment());
 
@@ -217,12 +218,13 @@ describe('createIngestHandler', () => {
     ])('kilocode %s is plain-inserted', async eventName => {
       const eventQueries = createFakeEventQueries();
       const broadcastFn = vi.fn();
+      const doContext = createFakeDOContext();
       const handler = createIngestHandler(
         createFakeState(),
         eventQueries,
         SESSION_ID,
         broadcastFn,
-        createFakeDOContext()
+        doContext
       );
       const ws = createFakeWebSocket(makeAttachment());
 
@@ -245,12 +247,13 @@ describe('createIngestHandler', () => {
     ])('kilocode %s is broadcast-only', async eventName => {
       const eventQueries = createFakeEventQueries();
       const broadcastFn = vi.fn();
+      const doContext = createFakeDOContext();
       const handler = createIngestHandler(
         createFakeState(),
         eventQueries,
         SESSION_ID,
         broadcastFn,
-        createFakeDOContext()
+        doContext
       );
       const ws = createFakeWebSocket(makeAttachment());
 

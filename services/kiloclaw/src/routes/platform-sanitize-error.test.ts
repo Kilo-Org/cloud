@@ -757,6 +757,87 @@ describe('sanitizeError: explicit provider support errors', () => {
   });
 });
 
+describe('validation-aware config write platform route', () => {
+  function envWithWriteOpenclawConfigFile(
+    writeOpenclawConfigFile: (...args: unknown[]) => Promise<unknown>
+  ) {
+    return {
+      KILOCLAW_INSTANCE: {
+        idFromName: (id: string) => id,
+        get: () => ({ writeOpenclawConfigFile }),
+      },
+      KILOCLAW_AE: { writeDataPoint: vi.fn() },
+      KV_CLAW_CACHE: {
+        get: vi.fn().mockResolvedValue(null),
+        put: vi.fn().mockResolvedValue(undefined),
+        delete: vi.fn().mockResolvedValue(undefined),
+        list: vi.fn().mockResolvedValue({ keys: [], list_complete: true }),
+        getWithMetadata: vi.fn().mockResolvedValue({ value: null, metadata: null }),
+      },
+    } as never;
+  }
+
+  it('forwards opt-in validation mode and warning responses', async () => {
+    const writeOpenclawConfigFile = vi.fn().mockResolvedValue({
+      outcome: 'openclaw-validation-warning',
+      valid: false,
+      reason: 'invalid',
+      issues: [{ path: 'gateway.mode', message: 'Expected local' }],
+    });
+    const env = envWithWriteOpenclawConfigFile(writeOpenclawConfigFile);
+
+    const resp = await platform.request(
+      '/files/write-openclaw-config?instanceId=11111111-1111-4111-8111-111111111111',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          userId: 'user-1',
+          content: '{"gateway":{"mode":"remote"}}',
+          etag: 'etag-1',
+          mode: 'warn-before-write',
+        }),
+      },
+      env
+    );
+
+    expect(resp.status).toBe(200);
+    await expect(jsonBody(resp)).resolves.toMatchObject({
+      outcome: 'openclaw-validation-warning',
+      reason: 'invalid',
+    });
+    expect(writeOpenclawConfigFile).toHaveBeenCalledWith(
+      '{"gateway":{"mode":"remote"}}',
+      'etag-1',
+      'warn-before-write'
+    );
+  });
+
+  it('fails closed when the running controller lacks the dedicated route', async () => {
+    const env = envWithWriteOpenclawConfigFile(async () => null);
+    const resp = await platform.request(
+      '/files/write-openclaw-config',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          userId: 'user-1',
+          content: '{"gateway":{"mode":"remote"}}',
+          etag: 'etag-1',
+          mode: 'warn-before-write',
+        }),
+      },
+      env
+    );
+
+    expect(resp.status).toBe(404);
+    await expect(jsonBody(resp)).resolves.toEqual({
+      error: 'OpenClaw validation-aware writing not available (controller too old)',
+      code: 'controller_route_unavailable',
+    });
+  });
+});
+
 describe('openclaw import platform route', () => {
   function envWithImportOpenclawWorkspace(
     importOpenclawWorkspace: (files: Array<{ path: string; content: string }>) => Promise<unknown>,

@@ -23,7 +23,6 @@ import { ProvisioningStepView } from './ProvisioningStep';
 
 const FAKE_STEP_LABELS: Record<ClawOnboardingRenderStep, string> = {
   identity: 'Identity',
-  tools: 'Tools',
   calendar: 'Calendar',
   email: 'Inbound Email',
   interests: 'Interests',
@@ -172,13 +171,12 @@ type RenderFakeStepInput = {
 };
 
 function getFakeStepProgress(step: ClawOnboardingRenderStep): StepProgress {
-  return getClawOnboardingStepProgress(getFakeOnboardingStep(step), true, true, false);
+  return getClawOnboardingStepProgress(getFakeOnboardingStep(step), true, true);
 }
 
 function getFakeOnboardingStep(step: ClawOnboardingRenderStep): OnboardingStep {
   switch (step) {
     case 'identity':
-    case 'tools':
     case 'calendar':
     case 'email':
     case 'interests':
@@ -195,7 +193,6 @@ function renderFakeStep({ step, setStep, stepProgress, basePath }: RenderFakeSte
     case 'identity': {
       return <BotIdentityStep {...stepProgress} onContinue={() => setStep('calendar')} />;
     }
-    case 'tools':
     case 'calendar': {
       return (
         <CalendarConnectStepView

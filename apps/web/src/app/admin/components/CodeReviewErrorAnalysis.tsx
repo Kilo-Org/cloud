@@ -49,6 +49,7 @@ type Props = {
 };
 
 const CATEGORY_COLORS: Record<string, string> = {
+  'Action Required': 'bg-yellow-500',
   'Rate Limited': 'bg-amber-500',
   Timeout: 'bg-orange-500',
   'Context Window Exceeded': 'bg-purple-500',

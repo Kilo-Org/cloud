@@ -1,5 +1,22 @@
 import { describe, expect, it } from 'vitest';
-import { ControllerVersionResponseSchema } from './gateway-controller-types';
+import {
+  ControllerVersionResponseSchema,
+  FileWriteResponseSchema,
+} from './gateway-controller-types';
+
+describe('FileWriteResponseSchema', () => {
+  it('accepts written and validation-warning results', () => {
+    expect(FileWriteResponseSchema.parse({ etag: 'etag-1' })).toEqual({ etag: 'etag-1' });
+    expect(
+      FileWriteResponseSchema.parse({
+        outcome: 'openclaw-validation-warning',
+        valid: false,
+        reason: 'invalid',
+        issues: [{ path: 'gateway.mode', message: 'Expected local', allowedValues: ['local'] }],
+      })
+    ).toMatchObject({ outcome: 'openclaw-validation-warning', reason: 'invalid' });
+  });
+});
 
 describe('ControllerVersionResponseSchema', () => {
   it('accepts legacy version responses without capability hints', () => {

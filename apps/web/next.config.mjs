@@ -61,6 +61,10 @@ const nextConfig = {
               destination: 'https://global-api.kilo.ai/api/fim/completions',
             },
             {
+              source: '/api/edit/completions',
+              destination: 'https://global-api.kilo.ai/api/edit/completions',
+            },
+            {
               source: '/api/exa/:path*',
               destination: 'https://global-api.kilo.ai/api/exa/:path*',
             },

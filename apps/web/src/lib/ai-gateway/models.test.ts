@@ -3,7 +3,7 @@ import {
   autoFreeModels,
   findKiloExclusiveModel,
   kiloExclusiveModels,
-  requiresKiloDataCollection,
+  isKiloExclusiveModelRequiringDataCollection,
 } from './models';
 import { isFreeModel } from './is-free-model';
 import { getInferenceProvider } from './providers/kilo-exclusive-model';
@@ -80,10 +80,16 @@ describe('isFreeModel', () => {
     });
 
     test('requires data collection for paid training-enabled offerings', () => {
-      expect(requiresKiloDataCollection(claude_opus_4_7_stealth_model.public_id)).toBe(true);
-      expect(requiresKiloDataCollection(claude_sonnet_4_6_stealth_model.public_id)).toBe(true);
-      expect(requiresKiloDataCollection(claude_opus_4_6_stealth_model.public_id)).toBe(true);
-      expect(requiresKiloDataCollection(qwen36_plus_model.public_id)).toBe(false);
+      expect(
+        isKiloExclusiveModelRequiringDataCollection(claude_opus_4_7_stealth_model.public_id)
+      ).toBe(true);
+      expect(
+        isKiloExclusiveModelRequiringDataCollection(claude_sonnet_4_6_stealth_model.public_id)
+      ).toBe(true);
+      expect(
+        isKiloExclusiveModelRequiringDataCollection(claude_opus_4_6_stealth_model.public_id)
+      ).toBe(true);
+      expect(isKiloExclusiveModelRequiringDataCollection(qwen36_plus_model.public_id)).toBe(false);
     });
 
     test('all Kilo exclusive models should have either no pricing or valid pricing', () => {

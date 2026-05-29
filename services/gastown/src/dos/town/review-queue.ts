@@ -247,6 +247,7 @@ export function submitExternalPrToReviewQueue(
     babysit: true,
     head_sha: args.headSha,
     force_push_allowed: args.forcePushAllowed,
+    babysit_started_at: new Date().toISOString(),
   };
 
   const { beadId } = createMergeRequestBeadCore(sql, {

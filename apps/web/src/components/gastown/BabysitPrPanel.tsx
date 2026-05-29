@@ -39,6 +39,17 @@ export function BabysitPrPanel({ rigId, onClose }: BabysitPrPanelProps) {
   const [userEditedBody, setUserEditedBody] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const defaultTitle = preview?.title ? `Babysit: ${preview.title}` : '';
+  const defaultBody = preview ? `Monitoring PR: ${prUrl.trim()}` : '';
+
+  useEffect(() => {
+    if (!userEditedTitle) setTitleOverride(defaultTitle);
+  }, [defaultTitle, userEditedTitle]);
+
+  useEffect(() => {
+    if (!userEditedBody) setBodyOverride(defaultBody);
+  }, [defaultBody, userEditedBody]);
+
   useEffect(() => {
     if (debounceRef.current) {
       clearTimeout(debounceRef.current);
@@ -107,9 +118,6 @@ export function BabysitPrPanel({ rigId, onClose }: BabysitPrPanelProps) {
     },
     [isPreviewReady, babysitPr, rigId, prUrl, titleOverride, bodyOverride, forcePushAllowed]
   );
-
-  const defaultTitle = preview?.title ? `Babysit: ${preview.title}` : '';
-  const defaultBody = preview ? `Monitoring PR: ${prUrl.trim()}` : '';
 
   return (
     <form onSubmit={handleSubmit}>

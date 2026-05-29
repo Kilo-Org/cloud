@@ -411,12 +411,14 @@ describe('submitExternalPrToReviewQueue metadata shape', () => {
       babysit: true,
       head_sha: args.headSha,
       force_push_allowed: args.forcePushAllowed,
+      babysit_started_at: new Date().toISOString(),
     };
     expect(metadata.babysit).toBe(true);
     expect(metadata.head_sha).toBe('abc1234');
     expect(metadata.force_push_allowed).toBe(false);
     expect(metadata.source_agent_id).toBe('mayor');
     expect(metadata).not.toHaveProperty('source_bead_id');
+    expect(typeof metadata.babysit_started_at).toBe('string');
   });
 
   it('includes force_push_allowed: true when authorized', () => {
@@ -430,6 +432,7 @@ describe('submitExternalPrToReviewQueue metadata shape', () => {
       babysit: true,
       head_sha: args.headSha,
       force_push_allowed: args.forcePushAllowed,
+      babysit_started_at: new Date().toISOString(),
     };
     expect(metadata.force_push_allowed).toBe(true);
   });

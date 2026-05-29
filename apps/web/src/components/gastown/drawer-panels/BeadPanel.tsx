@@ -235,6 +235,9 @@ export function BeadPanel({
   // Only allow https:// URLs to prevent XSS via javascript: protocol injection.
   const prUrl = extractPrUrl(bead.metadata);
 
+  // Babysit bead detection (must be before relatedBeads to avoid TDZ)
+  const isBabysit = bead.labels.includes('gt:babysit');
+
   // Build related beads from the flat list and convoy DAG data
   const allBeads = beadsQuery.data ?? [];
   const convoys = convoysQuery.data ?? [];
@@ -251,9 +254,6 @@ export function BeadPanel({
 
   // Held bead detection
   const isHeld = bead.labels.includes('gt:held');
-
-  // Babysit bead detection
-  const isBabysit = bead.labels.includes('gt:babysit');
 
   // Mayor responses: message-type child beads
   const mayorResponses = allBeads.filter(

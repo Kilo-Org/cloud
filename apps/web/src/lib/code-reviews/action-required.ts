@@ -36,6 +36,9 @@ const CodeReviewActionRequiredStateSchema = z.object({
   emailSentAt: z.string().optional(),
 });
 
+const SELECTED_MODEL_UNAVAILABLE_MESSAGE =
+  'selected model is not available for this cloud agent session';
+
 type AgentConfigWithRuntimeState = {
   runtime_state?: Record<string, unknown> | null;
 };
@@ -100,6 +103,10 @@ export function classifyCodeReviewActionRequiredFailure(
     normalized.includes('organization has an ip allow list enabled')
   ) {
     return 'github_ip_allow_list';
+  }
+
+  if (normalized.includes(SELECTED_MODEL_UNAVAILABLE_MESSAGE)) {
+    return 'selected_model_unavailable';
   }
 
   return null;

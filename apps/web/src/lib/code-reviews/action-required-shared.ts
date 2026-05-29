@@ -4,6 +4,7 @@ export const CODE_REVIEW_ACTION_REQUIRED_REASONS = [
   'github_installation_required',
   'github_ip_allow_list',
   'byok_invalid_key',
+  'selected_model_unavailable',
 ] as const;
 
 export type CodeReviewActionRequiredReason = (typeof CODE_REVIEW_ACTION_REQUIRED_REASONS)[number];
@@ -61,6 +62,17 @@ const COPY_BY_REASON = {
       'Code Reviewer was disabled because the selected BYOK API key is invalid or has been revoked. Update the key or choose another model, then enable Code Reviewer again.',
     gitlabDescription: 'BYOK API key needs attention for Code Reviewer',
   },
+  selected_model_unavailable: {
+    title: 'Code Reviewer needs attention',
+    description:
+      'Code Reviewer was disabled because the selected model is not available for cloud agent sessions. Choose an available model, then enable Code Reviewer again.',
+    recoveryLabel: 'Update Code Reviewer settings',
+    emailReason: 'The selected model is not available for cloud agent sessions.',
+    checkTitle: 'Selected model unavailable',
+    checkSummary:
+      'Code Reviewer was disabled because the selected model is not available for cloud agent sessions. Choose an available model, then enable Code Reviewer again.',
+    gitlabDescription: 'Selected model unavailable for Code Reviewer',
+  },
 } satisfies Record<CodeReviewActionRequiredReason, CodeReviewActionRequiredCopy>;
 
 const ACTION_REQUIRED_REASON_SET = new Set<string>(CODE_REVIEW_ACTION_REQUIRED_REASONS);
@@ -89,6 +101,10 @@ export function getCodeReviewActionRequiredRecoveryHref(
 
   if (reason === 'github_ip_allow_list') {
     return 'mailto:hi@kilocode.ai?subject=GitHub%20IP%20allow%20list%20for%20Code%20Reviewer';
+  }
+
+  if (reason === 'selected_model_unavailable') {
+    return organizationId ? `/organizations/${organizationId}/code-reviews` : '/code-reviews';
   }
 
   return organizationId ? `/organizations/${organizationId}/byok` : '/byok';

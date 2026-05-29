@@ -236,7 +236,17 @@ describe('code review alert detectors', () => {
       reviewValues({ status: 'failed', terminal_reason: 'github_installation_required' }),
       reviewValues({ status: 'failed', terminal_reason: 'github_ip_allow_list' }),
       reviewValues({ status: 'failed', terminal_reason: 'byok_invalid_key' }),
+      reviewValues({ status: 'failed', terminal_reason: 'selected_model_unavailable' }),
       ...Array.from({ length: 13 }, () => reviewValues()),
+    ]);
+
+    await expect(evaluateErrorSpike(db)).resolves.toEqual({ tripped: false });
+  });
+
+  it('excludes selected model unavailable from error-spike counts', async () => {
+    await insertReviews([
+      reviewValues({ status: 'failed', terminal_reason: 'selected_model_unavailable' }),
+      ...Array.from({ length: 3 }, () => reviewValues()),
     ]);
 
     await expect(evaluateErrorSpike(db)).resolves.toEqual({ tripped: false });

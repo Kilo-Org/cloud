@@ -98,6 +98,9 @@ const RISKY_COMMAND_PATTERNS = [
   'vitest',
 ];
 
+const SELECTED_MODEL_UNAVAILABLE_MESSAGE =
+  'selected model is not available for this cloud agent session';
+
 function findRiskyPattern(command: string): string | null {
   const normalized = command.toLowerCase();
   const match = RISKY_COMMAND_PATTERNS.find(pattern => normalized.includes(pattern));
@@ -731,6 +734,11 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
     }
 
     const message = error.message.toLowerCase();
+
+    if (message.includes(SELECTED_MODEL_UNAVAILABLE_MESSAGE)) {
+      return 'selected_model_unavailable';
+    }
+
     if (
       message.includes('timeout') ||
       message.includes('timed out') ||

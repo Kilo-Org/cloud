@@ -369,6 +369,58 @@ describe('tryDispatchPendingReviews', () => {
     expect(mockSendCodeReviewDisabledEmail).toHaveBeenCalledTimes(1);
   });
 
+  it('disables Code Reviewer for selected-model worker status failures', async () => {
+    const recentTimestamp = minutesAgo(1);
+    const owner = { type: 'user', id: testUser.id } satisfies ReviewOwner;
+    const errorMessage =
+      'prepareSession failed (400): {"error":{"message":"Selected model is not available for this cloud agent session"}}';
+    const agentConfig = await insertAgentConfigForUser();
+    mockGetAgentConfigForOwner.mockResolvedValue(agentConfig);
+    mockDispatchReview.mockRejectedValue(
+      new Error("Dispatch returned terminal status 'failed' for review selected-model-review")
+    );
+    mockGetReviewStatus.mockResolvedValue({
+      reviewId: 'unused',
+      status: 'failed',
+      errorMessage,
+      terminalReason: 'selected_model_unavailable',
+    });
+
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        reviewValues({
+          owner,
+          status: 'pending',
+          createdAt: recentTimestamp,
+          updatedAt: recentTimestamp,
+        })
+      )
+      .returning({ id: cloud_agent_code_reviews.id });
+
+    const result = await tryDispatchPendingReviews({
+      type: 'user',
+      id: testUser.id,
+      userId: testUser.id,
+    });
+
+    const storedReview = await getStoredReview(review.id);
+    const storedConfig = await db.query.agent_configs.findFirst({
+      where: eq(agent_configs.id, agentConfig.id),
+    });
+
+    expect(result).toEqual({ dispatched: 1, notDispatched: 0, activeCount: 1 });
+    expect(storedReview).toEqual(
+      expect.objectContaining({
+        status: 'failed',
+        terminalReason: 'selected_model_unavailable',
+        errorMessage,
+      })
+    );
+    expect(storedConfig?.is_enabled).toBe(false);
+    expect(mockSendCodeReviewDisabledEmail).toHaveBeenCalledTimes(1);
+  });
+
   it('refuses to prepare pending work while action-required state is present', async () => {
     const recentTimestamp = minutesAgo(1);
     const owner = { type: 'user', id: testUser.id } satisfies ReviewOwner;

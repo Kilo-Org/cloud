@@ -1217,6 +1217,7 @@ export const CODE_REVIEW_TERMINAL_REASONS = [
   'github_installation_required',
   'github_ip_allow_list',
   'byok_invalid_key',
+  'selected_model_unavailable',
   'user_cancelled',
   'superseded',
   'interrupted',
@@ -1243,6 +1244,7 @@ export const CODE_REVIEW_BENIGN_TERMINAL_REASONS = [
   'github_installation_required',
   'github_ip_allow_list',
   'byok_invalid_key',
+  'selected_model_unavailable',
   'user_cancelled',
   'superseded',
 ] as const satisfies readonly CodeReviewTerminalReason[];

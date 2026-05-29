@@ -296,7 +296,7 @@ async function generateByokProvidersNotification(
       moonshot: 'Moonshot AI API Key',
       moonshotai: 'Moonshot AI API Key',
       kimi: 'Moonshot AI API Key',
-      'kimi-for-coding': 'Moonshot AI API Key',
+      'kimi-for-coding': 'Kimi Code Plan',
 
       // MiniMax
       minimax: 'MiniMax Coding Plan',

@@ -157,13 +157,7 @@ export async function checkDuplicateCardFingerprintGate(params: {
   stripeSubscriptionId: string;
   stripeInvoiceId: string;
 }): Promise<DuplicateCardGateResult> {
-  const {
-    invoice,
-    stripe,
-    kiloUserId,
-    stripeSubscriptionId,
-    stripeInvoiceId,
-  } = params;
+  const { invoice, stripe, kiloUserId, stripeSubscriptionId, stripeInvoiceId } = params;
 
   const invoiceWithPi = invoice as InvoiceWithPaymentIntent;
 

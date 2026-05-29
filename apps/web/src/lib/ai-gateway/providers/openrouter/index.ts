@@ -71,7 +71,7 @@ function buildAutoModels(): OpenRouterModel[] {
   });
 }
 
-function formatName(model: OpenRouterModel, preferredIndex: number) {
+export function formatName(model: OpenRouterModel, preferredIndex: number) {
   const promptPrice = Number.parseFloat(model.pricing.prompt);
   const isExpensive = Number.isFinite(promptPrice) && promptPrice >= 0.00001; // Opus 4.8 Fast price
   if (isExpensive) return model.name + ' ($$$$)';

@@ -3,6 +3,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Table } from '@/components/ui/table';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { OrganizationTableHeader } from './OrganizationTableHeader';
 import { OrganizationTableBody } from './OrganizationTableBody';
 import { OrganizationTablePagination } from './OrganizationTablePagination';
@@ -12,6 +13,7 @@ import { OrganizationMetricCards } from './OrganizationMetricCards';
 import { useOrganizationsList } from '@/app/admin/api/organizations/hooks';
 import type { OrganizationSortableField } from '@/types/admin';
 import type { PageSize } from '@/types/pagination';
+import type { TableVariant } from './OrganizationTableHeader';
 import AdminPage from '@/app/admin/components/AdminPage';
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
@@ -26,12 +28,20 @@ type OrganizationsTableProps = {
   mode?: 'paying' | 'trial' | 'all';
   showMetrics?: boolean;
   showStripeStatus?: boolean;
+  pageTitle?: string;
+  showCreateButton?: boolean;
+  createButtonLabel?: string;
+  defaultTab?: TableVariant;
 };
 
 export function OrganizationsTable({
   mode = 'paying',
   showMetrics = true,
   showStripeStatus = true,
+  pageTitle = 'Organizations',
+  showCreateButton = true,
+  createButtonLabel = 'Create Organization',
+  defaultTab = 'entitlements',
 }: OrganizationsTableProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -45,6 +55,7 @@ export function OrganizationsTable({
   const currentIncludeDeleted = searchParams.get('include_deleted') === 'true';
   const currentStripeStatus = searchParams.get('stripe_status') || '';
   const currentPlan = searchParams.get('plan') || '';
+  const currentTab = (searchParams.get('tab') || defaultTab) as TableVariant;
 
   const sortConfig: OrganizationSortConfig = useMemo(
     () => ({
@@ -91,6 +102,7 @@ export function OrganizationsTable({
       include_deleted: currentIncludeDeleted ? 'true' : '',
       stripe_status: currentStripeStatus,
       plan: currentPlan === 'all' ? '' : currentPlan,
+      tab: currentTab,
     }),
     [
       currentPageSize,
@@ -99,6 +111,7 @@ export function OrganizationsTable({
       currentIncludeDeleted,
       currentStripeStatus,
       currentPlan,
+      currentTab,
     ]
   );
 
@@ -150,8 +163,9 @@ export function OrganizationsTable({
       include_deleted: '',
       stripe_status: '',
       plan: '',
+      tab: currentTab,
     });
-  }, [currentSearch, currentPageSize, currentSortBy, currentSortOrder, updateUrl]);
+  }, [currentSearch, currentPageSize, currentSortBy, currentSortOrder, currentTab, updateUrl]);
 
   const handleSort = useCallback(
     (field: OrganizationSortableField) => {
@@ -187,21 +201,62 @@ export function OrganizationsTable({
     [sharedParams, currentSearch, updateUrl]
   );
 
-  const buttons = (
-    <>
-      <Button variant="outline" onClick={() => setIsCreateDialogOpen(true)}>
-        {' '}
-        <Plus className="h-4 w-4" />
-        Create Organization
-      </Button>{' '}
-    </>
+  const handleTabChange = useCallback(
+    (tab: TableVariant) => {
+      updateUrl({ ...sharedParams(), tab, page: '1' });
+    },
+    [sharedParams, updateUrl]
   );
 
+  const buttons = showCreateButton ? (
+    <Button variant="outline" onClick={() => setIsCreateDialogOpen(true)}>
+      <Plus className="h-4 w-4" />
+      {createButtonLabel}
+    </Button>
+  ) : null;
+
   const breadcrumbs = (
+    <BreadcrumbItem>
+      <BreadcrumbPage>{pageTitle}</BreadcrumbPage>
+    </BreadcrumbItem>
+  );
+
+  const tableContent = (variant: TableVariant) => (
     <>
-      <BreadcrumbItem>
-        <BreadcrumbPage>Organizations</BreadcrumbPage>
-      </BreadcrumbItem>
+      <div className="rounded-lg border">
+        <Table>
+          <OrganizationTableHeader
+            variant={variant}
+            sortConfig={sortConfig}
+            onSort={handleSort}
+            showDeleted={currentIncludeDeleted}
+          />
+          <OrganizationTableBody
+            variant={variant}
+            organizations={data?.organizations || []}
+            isLoading={isLoading}
+            searchTerm={currentSearch}
+            showDeleted={currentIncludeDeleted}
+          />
+        </Table>
+      </div>
+
+      <div className="mt-4">
+        <OrganizationTablePagination
+          pagination={
+            data?.pagination || {
+              page: 1,
+              total: 0,
+              totalPages: 1,
+              limit: currentPageSize,
+            }
+          }
+          pageSize={currentPageSize}
+          onPageChange={handlePageChange}
+          onPageSizeChange={handlePageSizeChange}
+          isLoading={isLoading}
+        />
+      </div>
     </>
   );
 
@@ -228,38 +283,14 @@ export function OrganizationsTable({
           />
         </div>
 
-        <div className="rounded-lg border">
-          <Table>
-            <OrganizationTableHeader
-              sortConfig={sortConfig}
-              onSort={handleSort}
-              showDeleted={currentIncludeDeleted}
-            />
-            <OrganizationTableBody
-              organizations={data?.organizations || []}
-              isLoading={isLoading}
-              searchTerm={currentSearch}
-              showDeleted={currentIncludeDeleted}
-            />
-          </Table>
-        </div>
-
-        <div className="mt-4">
-          <OrganizationTablePagination
-            pagination={
-              data?.pagination || {
-                page: 1,
-                total: 0,
-                totalPages: 1,
-                limit: currentPageSize,
-              }
-            }
-            pageSize={currentPageSize}
-            onPageChange={handlePageChange}
-            onPageSizeChange={handlePageSizeChange}
-            isLoading={isLoading}
-          />
-        </div>
+        <Tabs value={currentTab} onValueChange={v => handleTabChange(v as TableVariant)}>
+          <TabsList>
+            <TabsTrigger value="entitlements">Entitlements</TabsTrigger>
+            <TabsTrigger value="usage">Usage</TabsTrigger>
+          </TabsList>
+          <TabsContent value="entitlements">{tableContent('entitlements')}</TabsContent>
+          <TabsContent value="usage">{tableContent('usage')}</TabsContent>
+        </Tabs>
 
         <CreateOrganizationDialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen} />
       </div>

@@ -6,6 +6,7 @@ import {
   kilocode_users,
   organization_seats_purchases,
   credit_transactions,
+  platform_integrations,
 } from '@kilocode/db/schema';
 import { ilike, or, asc, desc, count, eq, and, isNull, sql } from 'drizzle-orm';
 import * as z from 'zod';
@@ -28,9 +29,7 @@ import { getMostRecentSeatPurchase } from '@/lib/organizations/organization-seat
 const OrganizationListInputSchema = z.object({
   page: z.number().int().min(1).default(1),
   limit: z.number().int().min(1).max(100_000).default(25),
-  sortBy: z
-    .enum(['name', 'microdollars_used', 'balance', 'member_count'])
-    .default('name'),
+  sortBy: z.enum(['name', 'microdollars_used', 'balance', 'member_count']).default('name'),
   sortOrder: z.enum(['asc', 'desc']).default('desc'),
   search: z.string().optional().default(''),
   // mode controls which broad set of orgs to show (page-level, not user-facing)
@@ -617,11 +616,33 @@ export const organizationAdminRouter = createTRPCRouter({
         >`(SELECT kps.tier FROM organization_memberships om2 JOIN kilo_pass_subscriptions kps ON kps.kilo_user_id = om2.kilo_user_id WHERE om2.organization_id = ${organizations.id} AND kps.status = 'active' LIMIT 1)`.as(
           'kilo_pass_tier'
         ),
-        kiloclaw_count: sql<
-          number
-        >`(SELECT COUNT(*) FROM kiloclaw_instances ki WHERE ki.organization_id = ${organizations.id} AND ki.destroyed_at IS NULL)::int`.as(
-          'kiloclaw_count'
+        kiloclaw_count:
+          sql<number>`(SELECT COUNT(*) FROM kiloclaw_instances ki WHERE ki.organization_id = ${organizations.id} AND ki.destroyed_at IS NULL)::int`.as(
+            'kiloclaw_count'
+          ),
+        has_github_integration:
+          sql<boolean>`EXISTS (SELECT 1 FROM ${platform_integrations} pi WHERE pi.owned_by_organization_id = ${organizations.id} AND pi.platform = 'github' AND pi.integration_status IN ('active', 'pending'))`.as(
+            'has_github_integration'
+          ),
+        has_gitlab_integration:
+          sql<boolean>`EXISTS (SELECT 1 FROM ${platform_integrations} pi WHERE pi.owned_by_organization_id = ${organizations.id} AND pi.platform = 'gitlab' AND pi.integration_status IN ('active', 'pending'))`.as(
+            'has_gitlab_integration'
+          ),
+        has_slack_integration:
+          sql<boolean>`EXISTS (SELECT 1 FROM ${platform_integrations} pi WHERE pi.owned_by_organization_id = ${organizations.id} AND pi.platform = 'slack' AND pi.integration_status IN ('active', 'pending'))`.as(
+            'has_slack_integration'
+          ),
+        has_sso_configured: sql<boolean>`${organizations.sso_domain} IS NOT NULL`.as(
+          'has_sso_configured'
         ),
+        has_provider_controls:
+          sql<boolean>`(${organizations.settings} -> 'provider_allow_list' IS NOT NULL OR ${organizations.settings} -> 'model_deny_list' IS NOT NULL)`.as(
+            'has_provider_controls'
+          ),
+        has_data_privacy:
+          sql<boolean>`${organizations.settings} -> 'data_collection' IS NOT NULL`.as(
+            'has_data_privacy'
+          ),
       };
 
       // Build base query without status-specific joins

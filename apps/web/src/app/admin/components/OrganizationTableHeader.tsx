@@ -4,22 +4,46 @@ import { TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import type { OrganizationSortableField } from '@/types/admin';
 import { SortableButton } from './SortableButton';
 
+export type TableVariant = 'entitlements' | 'usage';
+
 type OrganizationSortConfig = {
   field: OrganizationSortableField;
   direction: 'asc' | 'desc';
 };
 
 interface OrganizationTableHeaderProps {
+  variant: TableVariant;
   sortConfig: OrganizationSortConfig | null;
   onSort: (field: OrganizationSortableField) => void;
   showDeleted?: boolean;
 }
 
 export function OrganizationTableHeader({
+  variant,
   sortConfig,
   onSort,
   showDeleted,
 }: OrganizationTableHeaderProps) {
+  if (variant === 'entitlements') {
+    return (
+      <TableHeader className="bg-muted">
+        <TableRow>
+          <TableHead>
+            <SortableButton field="name" sortConfig={sortConfig} onSort={onSort}>
+              Name
+            </SortableButton>
+          </TableHead>
+          <TableHead>Plan</TableHead>
+          <TableHead>Kilo Pass</TableHead>
+          <TableHead>Stripe Status</TableHead>
+          <TableHead>Subscription</TableHead>
+          <TableHead>Links</TableHead>
+          {showDeleted && <TableHead>Deleted</TableHead>}
+        </TableRow>
+      </TableHeader>
+    );
+  }
+
   return (
     <TableHeader className="bg-muted">
       <TableRow>
@@ -43,14 +67,12 @@ export function OrganizationTableHeader({
             Users / Seats
           </SortableButton>
         </TableHead>
-        <TableHead>Plan</TableHead>
-        <TableHead>Stripe Status</TableHead>
-        <TableHead>Subscription</TableHead>
-        <TableHead>Kilo Pass</TableHead>
+        <TableHead>Tier Features</TableHead>
+        <TableHead>Integrations</TableHead>
         <TableHead>KiloClaw</TableHead>
+        <TableHead>Auto Top-Up</TableHead>
         <TableHead>Links</TableHead>
         {showDeleted && <TableHead>Deleted</TableHead>}
-        <TableHead>Actions</TableHead>
       </TableRow>
     </TableHeader>
   );

@@ -19,6 +19,10 @@ import {
 const PLAN_ID = 'minimax-token-plan-plus';
 const COST_MICRODOLLARS = 20_000_000;
 
+function inventoryEntry(key: string) {
+  return `${key}::minimax-plan-${crypto.randomUUID()}`;
+}
+
 afterEach(async () => {
   await db.delete(coding_plan_availability_intents);
   await db.delete(coding_plan_terms);
@@ -51,9 +55,13 @@ describe('coding plans router', () => {
   it('reports available capacity without exposing inventory and rejects notify requests while in stock', async () => {
     const user = await insertTestUser();
     const caller = await createCallerForUser(user.id);
-    await uploadKeysToInventory(PLAN_ID, [`catalog-available-${crypto.randomUUID()}`], {
-      validateCredential: async () => true,
-    });
+    await uploadKeysToInventory(
+      PLAN_ID,
+      [inventoryEntry(`catalog-available-${crypto.randomUUID()}`)],
+      {
+        validateCredential: async () => true,
+      }
+    );
 
     await expect(caller.codingPlans.catalog()).resolves.toEqual([
       expect.objectContaining({
@@ -97,9 +105,13 @@ describe('coding plans router', () => {
     });
     const caller = await createCallerForUser(user.id);
     await caller.codingPlans.requestAvailabilityNotification({ planId: PLAN_ID });
-    await uploadKeysToInventory(PLAN_ID, [`notify-activation-${crypto.randomUUID()}`], {
-      validateCredential: async () => true,
-    });
+    await uploadKeysToInventory(
+      PLAN_ID,
+      [inventoryEntry(`notify-activation-${crypto.randomUUID()}`)],
+      {
+        validateCredential: async () => true,
+      }
+    );
 
     await caller.codingPlans.subscribe({ planId: PLAN_ID, idempotencyKey: 'notify-activation' });
 
@@ -114,9 +126,13 @@ describe('coding plans router', () => {
     const caller = await createCallerForUser(user.id);
     const key = await caller.byok.create({ provider_id: 'minimax', api_key: 'existing-key' });
     await caller.byok.setEnabled({ id: key.id, is_enabled: false });
-    await uploadKeysToInventory(PLAN_ID, [`unused-router-key-${crypto.randomUUID()}`], {
-      validateCredential: async () => true,
-    });
+    await uploadKeysToInventory(
+      PLAN_ID,
+      [inventoryEntry(`unused-router-key-${crypto.randomUUID()}`)],
+      {
+        validateCredential: async () => true,
+      }
+    );
 
     await expect(
       caller.codingPlans.subscribe({ planId: PLAN_ID, idempotencyKey: 'blocked-slot' })
@@ -136,9 +152,13 @@ describe('coding plans router', () => {
       microdollars_used: 0,
     });
     const otherUser = await insertTestUser();
-    await uploadKeysToInventory(PLAN_ID, [`router-managed-key-${crypto.randomUUID()}`], {
-      validateCredential: async () => true,
-    });
+    await uploadKeysToInventory(
+      PLAN_ID,
+      [inventoryEntry(`router-managed-key-${crypto.randomUUID()}`)],
+      {
+        validateCredential: async () => true,
+      }
+    );
     const ownerCaller = await createCallerForUser(owner.id);
     const otherCaller = await createCallerForUser(otherUser.id);
 
@@ -209,9 +229,13 @@ describe('coding plans router', () => {
       total_microdollars_acquired: COST_MICRODOLLARS * 2,
       microdollars_used: 0,
     });
-    await uploadKeysToInventory(PLAN_ID, [`second-purchase-key-${crypto.randomUUID()}`], {
-      validateCredential: async () => true,
-    });
+    await uploadKeysToInventory(
+      PLAN_ID,
+      [inventoryEntry(`second-purchase-key-${crypto.randomUUID()}`)],
+      {
+        validateCredential: async () => true,
+      }
+    );
     const caller = await createCallerForUser(owner.id);
     await caller.codingPlans.subscribe({ planId: PLAN_ID, idempotencyKey: 'first-purchase' });
 
@@ -221,7 +245,19 @@ describe('coding plans router', () => {
     expect(await db.select().from(coding_plan_terms)).toHaveLength(1);
   });
 
-  it('restricts manual remediation and returns raw material only from explicit admin reveal', async () => {
+  it('reports malformed admin inventory entries as a request error', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const caller = await createCallerForUser(admin.id);
+
+    await expect(
+      caller.codingPlans.adminUploadKeys({ planId: PLAN_ID, entries: ['missing-plan-id'] })
+    ).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: expect.stringContaining('<api key>::<plan id>'),
+    });
+  });
+
+  it('restricts manual remediation and returns only the MiniMax plan ID needed to deprovision', async () => {
     const admin = await insertTestUser({ is_admin: true });
     const user = await insertTestUser();
     const [workItem] = await db
@@ -229,7 +265,8 @@ describe('coding plans router', () => {
       .values({
         plan_id: PLAN_ID,
         provider_id: 'minimax',
-        encrypted_api_key: encryptApiKey('manual-reveal-value', BYOK_ENCRYPTION_KEY),
+        upstream_plan_id: 'minimax-deprovision-plan',
+        encrypted_api_key: encryptApiKey('unreturned-secret', BYOK_ENCRYPTION_KEY),
         credential_fingerprint: crypto.randomUUID(),
         status: 'revocation_pending',
         revocation_requested_at: new Date().toISOString(),
@@ -241,10 +278,13 @@ describe('coding plans router', () => {
     await expect(userCaller.codingPlans.adminRevocationQueue({})).rejects.toThrow();
     const queue = await adminCaller.codingPlans.adminRevocationQueue({});
     expect(queue).toHaveLength(1);
+    expect(queue[0]).toMatchObject({
+      inventoryKeyId: workItem.id,
+      planId: PLAN_ID,
+      upstreamPlanId: 'minimax-deprovision-plan',
+    });
     expect(queue[0]).not.toHaveProperty('encrypted_api_key');
-    await expect(
-      adminCaller.codingPlans.adminRevealRevocationCredential({ inventoryKeyId: workItem.id })
-    ).resolves.toEqual({ apiKey: 'manual-reveal-value' });
+    expect(queue[0]).not.toHaveProperty('apiKey');
 
     await adminCaller.codingPlans.adminMarkRevocationFailed({
       inventoryKeyId: workItem.id,
@@ -255,6 +295,7 @@ describe('coding plans router', () => {
       .from(coding_plan_key_inventory)
       .where(eq(coding_plan_key_inventory.id, workItem.id));
     expect(failed.status).toBe('revocation_failed');
+    expect(failed.encrypted_api_key).toBeNull();
     expect(failed.last_revocation_error).toContain('bearer [redacted]');
 
     await adminCaller.codingPlans.adminRequeueRevocation({ inventoryKeyId: workItem.id });
@@ -264,6 +305,7 @@ describe('coding plans router', () => {
       .from(coding_plan_key_inventory)
       .where(eq(coding_plan_key_inventory.id, workItem.id));
     expect(revoked.status).toBe('revoked');
+    expect(revoked.upstream_plan_id).toBe('minimax-deprovision-plan');
     expect(revoked.encrypted_api_key).toBeNull();
   });
 });

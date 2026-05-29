@@ -2,8 +2,6 @@ import 'server-only';
 
 import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 
-import { decryptApiKey } from '@/lib/ai-gateway/byok/encryption';
-import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
 import type { CodingPlanId } from '@/lib/coding-plans/pricing';
 import { db } from '@/lib/drizzle';
 import { coding_plan_key_inventory } from '@kilocode/db/schema';
@@ -18,6 +16,7 @@ export async function listManualCredentialRevocations(input: {
     inventoryKeyId: string;
     planId: string;
     providerId: string;
+    upstreamPlanId: string;
     status: ManualRevocationStatus;
     revocationRequestedAt: string | null;
     revokedAt: string | null;
@@ -31,6 +30,7 @@ export async function listManualCredentialRevocations(input: {
       inventoryKeyId: coding_plan_key_inventory.id,
       planId: coding_plan_key_inventory.plan_id,
       providerId: coding_plan_key_inventory.provider_id,
+      upstreamPlanId: coding_plan_key_inventory.upstream_plan_id,
       status: coding_plan_key_inventory.status,
       revocationRequestedAt: coding_plan_key_inventory.revocation_requested_at,
       revokedAt: coding_plan_key_inventory.revoked_at,
@@ -53,29 +53,6 @@ export async function listManualCredentialRevocations(input: {
     ...row,
     status: row.status === 'revocation_failed' ? 'revocation_failed' : 'revocation_pending',
   }));
-}
-
-export async function revealCredentialForManualRevocation(
-  inventoryKeyId: string
-): Promise<{ apiKey: string }> {
-  const [inventoryKey] = await db
-    .select({ encryptedApiKey: coding_plan_key_inventory.encrypted_api_key })
-    .from(coding_plan_key_inventory)
-    .where(
-      and(
-        eq(coding_plan_key_inventory.id, inventoryKeyId),
-        inArray(coding_plan_key_inventory.status, ['revocation_pending', 'revocation_failed'])
-      )
-    )
-    .limit(1);
-
-  if (!inventoryKey?.encryptedApiKey) {
-    throw new Error('Credential is not eligible for manual revocation reveal.');
-  }
-
-  return {
-    apiKey: decryptApiKey(inventoryKey.encryptedApiKey, BYOK_ENCRYPTION_KEY),
-  };
 }
 
 export async function markCredentialManuallyRevoked(inventoryKeyId: string): Promise<void> {
@@ -109,6 +86,7 @@ export async function markCredentialManualRevocationFailed(
     .update(coding_plan_key_inventory)
     .set({
       status: 'revocation_failed',
+      encrypted_api_key: null,
       revocation_attempt_count: sql`${coding_plan_key_inventory.revocation_attempt_count} + 1`,
       last_revocation_error: sanitizedReason,
     })
@@ -129,6 +107,7 @@ export async function requeueManualCredentialRevocation(inventoryKeyId: string):
     .update(coding_plan_key_inventory)
     .set({
       status: 'revocation_pending',
+      encrypted_api_key: null,
       revocation_requested_at: sql`now()`,
       last_revocation_error: null,
     })

@@ -137,9 +137,10 @@ Rework the branch-local inventory table around a terminal credential lifecycle.
 ```text
 coding_plan_key_inventory
 ├── id                         uuid PK
-├── plan_id                    text NOT NULL
-├── managed_provider_id        text NOT NULL
-├── encrypted_api_key          jsonb NULL      (cleared after successful revocation when no retry needs it)
+├── plan_id                    text NOT NULL  (Kilo catalog identity)
+├── provider_id                text NOT NULL
+├── upstream_plan_id           text NOT NULL  (MiniMax deprovision identifier)
+├── encrypted_api_key          jsonb NULL      (cleared when manual revocation work starts)
 ├── credential_fingerprint     text NOT NULL UNIQUE
 ├── status                     text NOT NULL  ('available' | 'assigned' | 'revocation_pending' | 'revoked' | 'revocation_failed')
 ├── assigned_to_user_id        text NULL FK->kilocode_users.id ON DELETE SET NULL
@@ -728,9 +729,9 @@ This addendum records the implementation work still required for the initial Tok
 | Local end-of-access enforcement | Billing lifecycle cron removes unchanged Kilo-installed BYOK configuration when it processes an expired or canceled subscription; pilot accepts delay until the next scheduled sweep and does not add request-time entitlement enforcement |
 | Upstream revocation | MiniMax credential revocation is manual; terminal lifecycle processing immediately moves the originally issued inventory credential to `revocation_pending` |
 | Admin operations | Build an in-app admin console for validated inventory upload and manual revocation remediation |
-| Credential identification | Support may reveal one raw issued credential for a pending or failed work item because MiniMax manual revocation requires the raw key |
-| Reveal safeguards | Raw credential reveal is an explicit admin-only action behind a sensitive-data warning; the pilot does not require Coding Plans reveal/remediation audit-log history |
-| Revocation persistence | Inventory row status and disposition fields record `revocation_pending`, `revocation_failed`, or `revoked`; confirmed revocation clears encrypted credential material |
+| Credential identification | Each uploaded credential stores its MiniMax plan ID; support uses that identifier for pending or failed deprovision work |
+| Secret handling | Admin APIs never reveal issued credentials; terminal lifecycle processing clears encrypted credential material when remediation starts |
+| Revocation persistence | Inventory row stores its MiniMax plan ID and disposition fields for `revocation_pending`, `revocation_failed`, or `revoked` work |
 | Operational instructions | Admin console links to an externally maintained controlled support playbook |
 | Inventory eligibility | A MiniMax credential must pass approved ordinary MiniMax route/model validation before it becomes `available` inventory |
 | Paid extensions | Initial release supports activation and recurring renewal only; it rejects new purchase requests for a live subscription |
@@ -756,16 +757,15 @@ Add an admin-only Coding Plans operations surface, preferably under `apps/web/sr
 | Operation | Behavior |
 |---|---|
 | Inventory summary | Display non-secret counts grouped by `plan_id` and lifecycle status |
-| Revocation queue | List individual `revocation_pending` and `revocation_failed` credentials with inventory ID, plan, status, revocation request time, attempt count, and sanitized latest failure; do not return raw or encrypted key material |
-| Reveal credential | For one selected pending/failed inventory row only, show a sensitive-data warning, then explicitly retrieve its raw key for authorized support to use in MiniMax admin console |
-| Mark revoked | After external confirmation, transition inventory to `revoked`, set `revoked_at`, increment the operation/attempt count as appropriate, clear `last_revocation_error`, and clear `encrypted_api_key` in the same transaction |
-| Mark failed | Keep the credential terminal, transition to `revocation_failed`, retain encrypted material needed for later manual retry, increment attempt count, and store a sanitized failure explanation |
+| Revocation queue | List individual `revocation_pending` and `revocation_failed` credentials with inventory ID, MiniMax plan ID, status, revocation request time, attempt count, and sanitized latest failure; do not return raw or encrypted key material |
+| Mark revoked | After external confirmation, transition inventory to `revoked`, set `revoked_at`, increment the operation/attempt count as appropriate, and clear `last_revocation_error` |
+| Mark failed | Keep the credential terminal, transition to `revocation_failed`, retain the MiniMax plan ID for later retry, increment attempt count, and store a sanitized failure explanation |
 | Requeue | Move a failed item back to `revocation_pending` for another manual attempt without restoring local access or availability |
-| Upload inventory | Accept new MiniMax credentials, validate them before availability, encrypt accepted keys, fingerprint for duplicate detection, and insert `available` inventory rows |
+| Upload inventory | Accept `<api key>::<plan id>` MiniMax entries, validate keys before availability, encrypt accepted keys, fingerprint for duplicate detection, and store plan IDs for later deprovisioning |
 
 Required implementation changes:
 
-- Replace automated-provider assumptions in `apps/web/src/lib/coding-plans/revocation.ts`; production code must model manual reveal, completion, failure, and requeue transitions rather than calling an injected MiniMax revoker.
+- Replace automated-provider assumptions in `apps/web/src/lib/coding-plans/revocation.ts`; production code must expose MiniMax plan IDs and model manual completion, failure, and requeue transitions rather than calling an injected MiniMax revoker.
 - Replace or redefine `adminRetryRevocation`, which currently only resets status, with the manual-remediation operations above.
 - Link the admin console to the controlled external support playbook for MiniMax revocation and inventory replenishment.
 - Do not add a Coding Plans audit-log table or extend generic audit storage for pilot operations.
@@ -777,7 +777,7 @@ Update inventory admission so subscribers cannot receive untested MiniMax keys.
 - Validate every candidate key through the approved ordinary MiniMax BYOK route and supported Token Plan Plus model behavior before it can be stored with `status = 'available'`.
 - Reuse existing encryption handling and keyed fingerprint duplicate protection after validation succeeds.
 - Reject invalid, incompatible, or duplicate keys without exposing their value in responses, logs, analytics, or monitoring.
-- Keep raw values out of admin list and summary APIs. Raw disclosure is permitted only through the explicit pending/failed remediation reveal operation.
+- Keep raw values out of all admin APIs. Pending and failed remediation work exposes only the stored MiniMax plan ID required for deprovisioning.
 - Preserve terminal inventory rules: an issued credential never returns to `available`, including after manual revocation failure.
 
 Primary files:
@@ -874,20 +874,19 @@ Revise Coding Plans admin API to support manual operations. Final endpoint names
 
 | Endpoint behavior | Input | Output/side effects |
 |---|---|---|
-| List remediation work | Optional `planId`, status/page filters | Non-secret pending/failed inventory rows only |
-| Reveal selected credential | `{ inventoryKeyId }` | Admin-only raw key response for an eligible pending/failed row after explicit UI confirmation |
-| Mark manually revoked | `{ inventoryKeyId }` | Set `revoked`, timestamp completion, clear encrypted secret material |
-| Mark manual failure | `{ inventoryKeyId, reason }` | Set `revocation_failed` with sanitized reason and retained retry material |
+| List remediation work | Optional `planId`, status/page filters | Non-secret pending/failed inventory rows including stored MiniMax plan IDs only |
+| Mark manually revoked | `{ inventoryKeyId }` | Set `revoked` and timestamp completion after provider deprovisioning succeeds |
+| Mark manual failure | `{ inventoryKeyId, reason }` | Set `revocation_failed` with sanitized reason and retained MiniMax plan ID |
 | Requeue manual revocation | `{ inventoryKeyId }` | Set `revocation_pending` for a failed/pending item without re-enabling access |
-| Upload validated inventory | `{ planId, keys }` | Validate keys, then encrypt/dedupe/store accepted available inventory without returning raw material |
+| Upload validated inventory | `{ planId, entries }` | Parse `<api key>::<plan id>` entries, validate keys, then encrypt/dedupe/store accepted inventory without returning raw material |
 
 Security rules:
 
 - Every remediation procedure uses `adminProcedure`.
 - Queue, count, and status responses never contain raw or encrypted credential values.
-- Explicit reveal returns one raw value only for an eligible terminal remediation state.
-- Logs and monitoring never contain issued keys, reveal responses, authorization headers, or unfiltered provider errors.
-- Pilot does not require an audit event log for reveal or manual transitions; inventory disposition fields remain required.
+- Queue responses expose MiniMax plan IDs only when support needs them for terminal remediation.
+- Logs and monitoring never contain issued keys, authorization headers, or unfiltered provider errors.
+- Pilot does not require an audit event log for manual transitions; inventory disposition fields remain required.
 
 ### Work 8: tests and validation
 
@@ -897,13 +896,13 @@ Replace obsolete automated-revoker and prepaid-extension expectations and add co
 |---|---|
 | Activation | Occupied MiniMax slot, including disabled key, rejects without charge or assignment; validated available credential installs ordinary `minimax` BYOK; idempotency retry returns original result |
 | No extension | A new purchase request for an already live subscription is rejected and creates no debit or term; recurring renewal still advances period exactly once |
-| Inventory upload | Validation occurs before `available`; invalid/incompatible and duplicate credentials never become assignable; admin responses omit raw/encrypted values |
-| Manual revocation admin | Pending/failed list is non-secret; explicit reveal is admin-only and eligibility-checked; mark revoked clears encrypted key; failure/requeue transitions remain terminal |
-| Lifecycle cron | User cancellation, unfunded renewal, and expired grace delete only unchanged installed row, preserve replacement/recreated keys, and set original inventory to `revocation_pending` |
-| Account deletion | Removes local BYOK access, terminalizes subscription, anonymizes inventory linkage, and creates pending manual revocation work |
+| Inventory upload | `<api key>::<plan id>` parsing persists MiniMax plan IDs; validation occurs before `available`; invalid/incompatible and duplicate credentials never become assignable; admin responses omit raw/encrypted values |
+| Manual revocation admin | Pending/failed list exposes stored MiniMax plan IDs without raw credentials; failure/requeue transitions remain terminal |
+| Lifecycle cron | User cancellation, unfunded renewal, and expired grace delete only unchanged installed row, preserve replacement/recreated keys, clear issued key material, and set original inventory to `revocation_pending` |
+| Account deletion | Removes local BYOK access, terminalizes subscription, anonymizes inventory linkage, clears issued key material, and creates pending manual revocation work |
 | BYOK UX/API | Installed key remains testable/manageable; update/disable/delete warnings render; update transfers ownership; delete/disable do not cancel billing; failed test errors are generic and sanitized |
 | Subscription UI | Configured offering, statuses, billing history, revocation messaging, local-time grace deadline, conditional cleanup copy, and absence of customer raw-key controls |
-| Accessibility | Icon-only BYOK actions and terminal-history toggle have accessible names; warning/reveal dialogs remain keyboard operable |
+| Accessibility | Icon-only BYOK actions and terminal-history toggle have accessible names; warning dialogs remain keyboard operable |
 
 ### Implementation order
 
@@ -923,11 +922,11 @@ Replace obsolete automated-revoker and prepaid-extension expectations and add co
 - Full pilot implementation is complete before deployment; no temporary purchase feature flag is required.
 - Initial available MiniMax credential inventory has been validated and loaded through admin tooling.
 - Ordinary MiniMax routing/model behavior for Token Plan Plus credentials has been operationally confirmed.
-- Support can use admin console plus external playbook to reveal one pending/failed issued key, revoke it in MiniMax, and record disposition in Kilo.
-- Customer and ordinary admin responses do not expose issued credentials; explicit admin remediation reveal is the only permitted raw issued-key disclosure.
+- Support can use the admin console plus external playbook to retrieve a pending or failed MiniMax plan ID, deprovision it in MiniMax, and record disposition in Kilo.
+- No customer or admin API exposes issued raw credentials.
 - Issued credentials remain terminal after assignment and never return to available inventory.
 
 ### Explicitly accepted pilot limitations
 
 - Access through an unchanged Kilo-installed MiniMax BYOK key may continue between its paid-period or grace deadline and the next billing lifecycle cron execution. This is accepted for the pilot; manual upstream revocation does not determine local cutoff.
-- Admin credential reveal and manual remediation actions are restricted to admin users and protected from ordinary exposure, but the pilot does not require dedicated or generic audit-log history for those actions.
+- Admin manual remediation actions and MiniMax plan IDs are restricted to admin users, but the pilot does not require dedicated or generic audit-log history for those actions.

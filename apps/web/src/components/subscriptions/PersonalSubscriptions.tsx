@@ -59,17 +59,23 @@ function scrollSelectedTabIntoView(element: HTMLButtonElement | null) {
   element?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
 }
 
-export function PersonalSubscriptions() {
+export function PersonalSubscriptions({ codingPlansEnabled }: { codingPlansEnabled: boolean }) {
   const [showTerminal, setShowTerminal] = useState(false);
   const selectedTab = useSyncExternalStore(
     subscribeToSubscriptionTabChange,
     getSubscriptionTabSnapshot,
     getSubscriptionTabServerSnapshot
   );
+  // Fall back to the Kilo Pass tab when Coding Plans is hidden so a stale
+  // #coding-plans hash never selects a tab that isn't rendered.
+  const activeTab =
+    selectedTab === 'coding-plans' && !codingPlansEnabled ? 'kilo-pass' : selectedTab;
   const trpc = useTRPC();
   const kiloPassQuery = useQuery(trpc.kiloPass.getState.queryOptions());
   const kiloClawQuery = useQuery(trpc.kiloclaw.listPersonalSubscriptions.queryOptions());
-  const codingPlansQuery = useQuery(trpc.codingPlans.listSubscriptions.queryOptions());
+  const codingPlansQuery = useQuery(
+    trpc.codingPlans.listSubscriptions.queryOptions(undefined, { enabled: codingPlansEnabled })
+  );
 
   const hasTerminalSubscriptions =
     (kiloPassQuery.data?.subscription != null &&
@@ -96,13 +102,13 @@ export function PersonalSubscriptions() {
       }
     >
       <Tabs
-        value={selectedTab}
+        value={activeTab}
         onValueChange={value => replaceSubscriptionTabHash(getSubscriptionTabFromHash(`#${value}`))}
         className="space-y-6"
       >
         <TabsList className="h-auto w-full justify-start gap-1 overflow-x-auto rounded-xl p-1">
           <TabsTrigger
-            ref={selectedTab === 'kilo-pass' ? scrollSelectedTabIntoView : undefined}
+            ref={activeTab === 'kilo-pass' ? scrollSelectedTabIntoView : undefined}
             value="kilo-pass"
             className={subscriptionTabClassName}
           >
@@ -110,21 +116,23 @@ export function PersonalSubscriptions() {
             Kilo Pass
           </TabsTrigger>
           <TabsTrigger
-            ref={selectedTab === 'kiloclaw' ? scrollSelectedTabIntoView : undefined}
+            ref={activeTab === 'kiloclaw' ? scrollSelectedTabIntoView : undefined}
             value="kiloclaw"
             className={subscriptionTabClassName}
           >
             <KiloCrabIcon className="size-4" />
             KiloClaw
           </TabsTrigger>
-          <TabsTrigger
-            ref={selectedTab === 'coding-plans' ? scrollSelectedTabIntoView : undefined}
-            value="coding-plans"
-            className={subscriptionTabClassName}
-          >
-            <Code2 className="size-4" />
-            Coding Plans
-          </TabsTrigger>
+          {codingPlansEnabled ? (
+            <TabsTrigger
+              ref={activeTab === 'coding-plans' ? scrollSelectedTabIntoView : undefined}
+              value="coding-plans"
+              className={subscriptionTabClassName}
+            >
+              <Code2 className="size-4" />
+              Coding Plans
+            </TabsTrigger>
+          ) : null}
         </TabsList>
         <TabsContent value="kilo-pass" className="mt-0">
           <KiloPassGroup showTerminal={showTerminal} hideHeader />
@@ -132,9 +140,11 @@ export function PersonalSubscriptions() {
         <TabsContent value="kiloclaw" className="mt-0">
           <KiloClawGroup showTerminal={showTerminal} hideHeader />
         </TabsContent>
-        <TabsContent value="coding-plans" className="mt-0">
-          <CodingPlansGroup showTerminal={showTerminal} hideHeader />
-        </TabsContent>
+        {codingPlansEnabled ? (
+          <TabsContent value="coding-plans" className="mt-0">
+            <CodingPlansGroup showTerminal={showTerminal} hideHeader />
+          </TabsContent>
+        ) : null}
       </Tabs>
     </PageLayout>
   );

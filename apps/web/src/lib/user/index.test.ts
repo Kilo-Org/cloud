@@ -2659,6 +2659,7 @@ describe('User', () => {
         .values({
           plan_id: 'minimax-token-plan-plus',
           provider_id: 'minimax',
+          upstream_plan_id: 'minimax-gdpr-plan',
           encrypted_api_key: encrypted,
           credential_fingerprint: `gdpr-${randomUUID()}`,
           status: 'assigned',
@@ -2707,6 +2708,8 @@ describe('User', () => {
         .from(coding_plan_key_inventory)
         .where(eq(coding_plan_key_inventory.id, inventoryKey.id));
       expect(retainedInventory.status).toBe('revocation_pending');
+      expect(retainedInventory.upstream_plan_id).toBe('minimax-gdpr-plan');
+      expect(retainedInventory.encrypted_api_key).toBeNull();
       expect(retainedInventory.assigned_to_user_id).toBeNull();
       expect(retainedInventory.revocation_requested_at).not.toBeNull();
 

@@ -34,18 +34,14 @@ import { useTRPC } from '@/lib/trpc/utils';
 const PLAN_ID = 'minimax-token-plan-plus';
 
 type OperationsState = {
-  keysText: string;
-  revealInventoryId: string | null;
-  revealedCredential: string | null;
+  entriesText: string;
   completeInventoryId: string | null;
   failureInventoryId: string | null;
   failureReason: string;
 };
 
 const INITIAL_OPERATIONS_STATE: OperationsState = {
-  keysText: '',
-  revealInventoryId: null,
-  revealedCredential: null,
+  entriesText: '',
   completeInventoryId: null,
   failureInventoryId: null,
   failureReason: '',
@@ -58,19 +54,8 @@ function updateOperationsState(state: OperationsState, update: Partial<Operation
 export function CodingPlansOperationsContent() {
   const trpc = useTRPC();
   const [state, updateState] = useReducer(updateOperationsState, INITIAL_OPERATIONS_STATE);
-  const {
-    keysText,
-    revealInventoryId,
-    revealedCredential,
-    completeInventoryId,
-    failureInventoryId,
-    failureReason,
-  } = state;
-  const setKeysText = (keysText: string) => updateState({ keysText });
-  const setRevealInventoryId = (revealInventoryId: string | null) =>
-    updateState({ revealInventoryId });
-  const setRevealedCredential = (revealedCredential: string | null) =>
-    updateState({ revealedCredential });
+  const { entriesText, completeInventoryId, failureInventoryId, failureReason } = state;
+  const setEntriesText = (entriesText: string) => updateState({ entriesText });
   const setCompleteInventoryId = (completeInventoryId: string | null) =>
     updateState({ completeInventoryId });
   const setFailureInventoryId = (failureInventoryId: string | null) =>
@@ -87,7 +72,7 @@ export function CodingPlansOperationsContent() {
   const uploadMutation = useMutation(
     trpc.codingPlans.adminUploadKeys.mutationOptions({
       onSuccess: async result => {
-        setKeysText('');
+        setEntriesText('');
         toast.success(
           `${result.inserted} validated credential${result.inserted === 1 ? '' : 's'} added to inventory.`
         );
@@ -96,18 +81,11 @@ export function CodingPlansOperationsContent() {
       onError: error => toast.error(error.message || 'Credential validation or upload failed.'),
     })
   );
-  const revealMutation = useMutation(
-    trpc.codingPlans.adminRevealRevocationCredential.mutationOptions({
-      onSuccess: result => setRevealedCredential(result.apiKey),
-      onError: error => toast.error(error.message || 'Credential reveal failed.'),
-    })
-  );
   const completeMutation = useMutation(
     trpc.codingPlans.adminMarkRevocationComplete.mutationOptions({
       onSuccess: async () => {
-        closeRevealDialog();
         setCompleteInventoryId(null);
-        toast.success('Credential marked revoked. Stored secret material cleared.');
+        toast.success('MiniMax plan marked revoked.');
         await refreshOperations();
       },
       onError: error => toast.error(error.message || 'Unable to mark credential revoked.'),
@@ -116,7 +94,6 @@ export function CodingPlansOperationsContent() {
   const failureMutation = useMutation(
     trpc.codingPlans.adminMarkRevocationFailed.mutationOptions({
       onSuccess: async () => {
-        closeRevealDialog();
         setFailureInventoryId(null);
         setFailureReason('');
         toast.success('Revocation failure recorded for retry.');
@@ -135,10 +112,10 @@ export function CodingPlansOperationsContent() {
     })
   );
 
-  const submittedKeys = keysText
+  const submittedEntries = entriesText
     .split('\n')
-    .map(key => key.trim())
-    .filter(key => key.length > 0);
+    .map(entry => entry.trim())
+    .filter(entry => entry.length > 0);
   const workItems = queueQuery.data ?? [];
   const inventoryCounts = countsQuery.data ?? [];
   const totalCredentialCount = inventoryCounts.reduce((total, item) => total + item.count, 0);
@@ -166,12 +143,6 @@ export function CodingPlansOperationsContent() {
       detail: 'Awaiting manual action',
     },
   ];
-
-  function closeRevealDialog() {
-    setRevealInventoryId(null);
-    setRevealedCredential(null);
-    revealMutation.reset();
-  }
 
   return (
     <div className="flex w-full flex-col gap-6">
@@ -204,30 +175,24 @@ export function CodingPlansOperationsContent() {
         workItems={workItems}
         queueLoading={queueQuery.isLoading}
         queueError={queueQuery.isError}
-        keysText={keysText}
-        submittedKeys={submittedKeys}
+        entriesText={entriesText}
+        submittedEntries={submittedEntries}
         uploadPending={uploadMutation.isPending}
         requeuePending={requeueMutation.isPending}
         onRefresh={() => void refreshOperations()}
-        onReveal={setRevealInventoryId}
         onComplete={setCompleteInventoryId}
         onFailure={setFailureInventoryId}
         onRequeue={inventoryKeyId => requeueMutation.mutate({ inventoryKeyId })}
-        onKeysTextChange={setKeysText}
-        onUpload={() => uploadMutation.mutate({ planId: PLAN_ID, keys: submittedKeys })}
+        onEntriesTextChange={setEntriesText}
+        onUpload={() => uploadMutation.mutate({ planId: PLAN_ID, entries: submittedEntries })}
       />
 
       <OperationsDialogs
-        revealInventoryId={revealInventoryId}
-        revealedCredential={revealedCredential}
-        revealPending={revealMutation.isPending}
         completeInventoryId={completeInventoryId}
         completePending={completeMutation.isPending}
         failureInventoryId={failureInventoryId}
         failureReason={failureReason}
         failurePending={failureMutation.isPending}
-        onCloseReveal={closeRevealDialog}
-        onReveal={inventoryKeyId => revealMutation.mutate({ inventoryKeyId })}
         onCloseComplete={() => setCompleteInventoryId(null)}
         onComplete={inventoryKeyId => completeMutation.mutate({ inventoryKeyId })}
         onCloseFailure={() => setFailureInventoryId(null)}
@@ -247,6 +212,7 @@ type InventorySummaryItem = {
 type RevocationWorkItem = {
   inventoryKeyId: string;
   planId: string;
+  upstreamPlanId: string;
   status: string;
   revocationRequestedAt: string | null;
   revocationAttemptCount: number;
@@ -287,31 +253,29 @@ function OperationsTabs({
   workItems,
   queueLoading,
   queueError,
-  keysText,
-  submittedKeys,
+  entriesText,
+  submittedEntries,
   uploadPending,
   requeuePending,
   onRefresh,
-  onReveal,
   onComplete,
   onFailure,
   onRequeue,
-  onKeysTextChange,
+  onEntriesTextChange,
   onUpload,
 }: {
   workItems: RevocationWorkItem[];
   queueLoading: boolean;
   queueError: boolean;
-  keysText: string;
-  submittedKeys: string[];
+  entriesText: string;
+  submittedEntries: string[];
   uploadPending: boolean;
   requeuePending: boolean;
   onRefresh: () => void;
-  onReveal: (inventoryKeyId: string) => void;
   onComplete: (inventoryKeyId: string) => void;
   onFailure: (inventoryKeyId: string) => void;
   onRequeue: (inventoryKeyId: string) => void;
-  onKeysTextChange: (keysText: string) => void;
+  onEntriesTextChange: (entriesText: string) => void;
   onUpload: () => void;
 }) {
   return (
@@ -341,6 +305,7 @@ function OperationsTabs({
                 <TableHeader>
                   <TableRow>
                     <TableHead>Inventory item</TableHead>
+                    <TableHead>MiniMax plan ID</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Requested</TableHead>
                     <TableHead className="text-right">Attempts</TableHead>
@@ -351,13 +316,13 @@ function OperationsTabs({
                 <TableBody>
                   {queueError ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="h-24 text-center text-red-300">
+                      <TableCell colSpan={7} className="h-24 text-center text-red-300">
                         Unable to load manual revocation work. Refresh to retry.
                       </TableCell>
                     </TableRow>
                   ) : workItems.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-muted-foreground h-24 text-center">
+                      <TableCell colSpan={7} className="text-muted-foreground h-24 text-center">
                         {queueLoading ? 'Loading manual work...' : 'No revocation work pending.'}
                       </TableCell>
                     </TableRow>
@@ -367,6 +332,9 @@ function OperationsTabs({
                         <TableCell className="min-w-56 font-mono text-xs">
                           <div>{item.inventoryKeyId}</div>
                           <div className="text-muted-foreground mt-1">{item.planId}</div>
+                        </TableCell>
+                        <TableCell className="min-w-44 font-mono text-xs">
+                          {item.upstreamPlanId}
                         </TableCell>
                         <TableCell>
                           <Badge
@@ -391,13 +359,6 @@ function OperationsTabs({
                         </TableCell>
                         <TableCell>
                           <div className="flex justify-end gap-2">
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              onClick={() => onReveal(item.inventoryKeyId)}
-                            >
-                              Reveal
-                            </Button>
                             <Button
                               variant="secondary"
                               size="sm"
@@ -439,18 +400,18 @@ function OperationsTabs({
           <CardHeader>
             <CardTitle>Upload validated inventory</CardTitle>
             <CardDescription>
-              Enter one MiniMax credential per line. Each credential is tested through ordinary
-              MiniMax routing before encrypted storage as available inventory.
+              Enter one MiniMax credential and plan ID pair per line. Each credential is tested
+              through ordinary MiniMax routing before encrypted storage as available inventory.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="coding-plan-keys">MiniMax credentials</Label>
+              <Label htmlFor="coding-plan-entries">MiniMax credentials and plan IDs</Label>
               <Textarea
-                id="coding-plan-keys"
-                value={keysText}
-                onChange={event => onKeysTextChange(event.target.value)}
-                placeholder="Enter one credential per line"
+                id="coding-plan-entries"
+                value={entriesText}
+                onChange={event => onEntriesTextChange(event.target.value)}
+                placeholder="<api key>::<plan id>"
                 className="min-h-28 font-mono"
                 autoComplete="off"
               />
@@ -458,12 +419,13 @@ function OperationsTabs({
             <Alert>
               <ShieldAlert className="size-4" />
               <AlertDescription>
-                Values are encrypted after validation and never returned by inventory or queue APIs.
+                API keys are encrypted after validation and never returned. MiniMax plan IDs are
+                stored for deprovisioning and shown in the manual revocation queue.
               </AlertDescription>
             </Alert>
             <Button
               onClick={onUpload}
-              disabled={submittedKeys.length === 0 || uploadPending}
+              disabled={submittedEntries.length === 0 || uploadPending}
               aria-busy={uploadPending}
             >
               <Upload className="size-4" />
@@ -477,32 +439,22 @@ function OperationsTabs({
 }
 
 function OperationsDialogs({
-  revealInventoryId,
-  revealedCredential,
-  revealPending,
   completeInventoryId,
   completePending,
   failureInventoryId,
   failureReason,
   failurePending,
-  onCloseReveal,
-  onReveal,
   onCloseComplete,
   onComplete,
   onCloseFailure,
   onFailureReasonChange,
   onFailure,
 }: {
-  revealInventoryId: string | null;
-  revealedCredential: string | null;
-  revealPending: boolean;
   completeInventoryId: string | null;
   completePending: boolean;
   failureInventoryId: string | null;
   failureReason: string;
   failurePending: boolean;
-  onCloseReveal: () => void;
-  onReveal: (inventoryKeyId: string) => void;
   onCloseComplete: () => void;
   onComplete: (inventoryKeyId: string) => void;
   onCloseFailure: () => void;
@@ -511,47 +463,13 @@ function OperationsDialogs({
 }) {
   return (
     <>
-      <Dialog open={revealInventoryId !== null} onOpenChange={open => !open && onCloseReveal()}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Reveal issued credential?</DialogTitle>
-            <DialogDescription>
-              Sensitive data: reveal only while actively revoking this issued credential in MiniMax.
-              Do not paste it into tickets, chat, logs, or failure notes.
-            </DialogDescription>
-          </DialogHeader>
-          {revealedCredential ? (
-            <div className="space-y-2">
-              <Label>Issued MiniMax credential</Label>
-              <pre className="bg-background overflow-x-auto rounded-md border p-3 font-mono text-sm">
-                {revealedCredential}
-              </pre>
-            </div>
-          ) : null}
-          <DialogFooter>
-            <Button variant="secondary" onClick={onCloseReveal}>
-              Close
-            </Button>
-            {revealedCredential ? null : (
-              <Button
-                variant="destructive"
-                onClick={() => revealInventoryId && onReveal(revealInventoryId)}
-                disabled={revealPending}
-              >
-                {revealPending ? 'Revealing...' : 'Reveal credential'}
-              </Button>
-            )}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
       <Dialog open={completeInventoryId !== null} onOpenChange={open => !open && onCloseComplete()}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Record confirmed revocation?</DialogTitle>
             <DialogDescription>
-              Confirm only after MiniMax revocation succeeds. Kilo marks this credential revoked and
-              permanently clears retained encrypted material.
+              Confirm only after MiniMax deprovisioning succeeds. Kilo records this plan ID as
+              revoked and keeps issued credentials unavailable for reuse.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

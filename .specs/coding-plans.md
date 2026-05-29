@@ -12,13 +12,15 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 
 **Plan ID** - A stable identifier for a purchasable Coding Plan offering. A Plan ID is distinct from the upstream provider or routing identifier used to execute API traffic.
 
-**Managed Plan Credential** - An upstream API key acquired or provisioned by Kilo for a Coding Plan. Kilo manages its assignment and revocation. It is not exposed to the subscriber after it is installed in BYOK.
+**Upstream Plan ID** - The MiniMax-issued identifier paired with a Managed Plan Credential and used by support to deprovision that provider plan. It is operational metadata, not the Kilo Plan ID.
+
+**Managed Plan Credential** - An upstream API key acquired or provisioned by Kilo for a Coding Plan. Kilo manages its assignment and revocation. It is paired with an Upstream Plan ID and is not exposed to the subscriber after it is installed in BYOK.
 
 **Installed BYOK Configuration** - A normal personal BYOK entry that Kilo initially populates with a Managed Plan Credential. While unchanged, it identifies Token Plan Plus as its origin and Kilo may delete it at Effective Cancellation. A subscriber may test, enable, disable, update, or delete it using normal BYOK operations. Replacing its credential transfers cleanup ownership to the subscriber.
 
 **Availability Notification Intent** - A user's plan-scoped request to be notified when a sold-out Coding Plan has capacity again. It is not a reservation, purchase, subscription, or entitlement.
 
-**Manual Revocation Work Item** - Durable inventory remediation state requiring authorized support staff to revoke an issued MiniMax credential through the provider admin process and record its outcome in Kilo. The initial pilot represents this work on the inventory row and does not require a separate remediation audit-event history. MiniMax does not provide an automated revocation integration for the initial release.
+**Manual Revocation Work Item** - Durable inventory remediation state requiring authorized support staff to deprovision an issued MiniMax plan using its stored Upstream Plan ID through the provider admin process and record its outcome in Kilo. The initial pilot represents this work on the inventory row and does not require a separate remediation audit-event history. MiniMax does not provide an automated revocation integration for the initial release.
 
 **Kilo Credits** - The unit of account used for Coding Plan billing. The pricing layer manages conversion to internal microdollar accounting; user-facing surfaces display `Credits` as the payment source and charged amounts in USD.
 
@@ -76,7 +78,7 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 
 4.1. Kilo **MUST** acquire or provision Managed Plan Credentials before accepting a purchase that depends on them. For an offering initially provisioned by operator upload, only authorized administrative tooling **MAY** insert credentials into inventory.
 
-4.2. Available and assigned credentials **MUST** be encrypted at rest. Raw credentials **MUST NOT** appear in logs, analytics, error messages, customer responses, ordinary BYOK responses, or administrative inventory list responses. For the initial manual-revocation pilot, an authorized admin **MAY** reveal one raw issued credential through an explicit sensitive-data action for an inventory item in `revocation_pending` or `revocation_failed` state so support can revoke it in MiniMax.
+4.2. Available and assigned credentials **MUST** be encrypted at rest. Raw credentials **MUST NOT** appear in logs, analytics, error messages, customer responses, ordinary BYOK responses, or administrative inventory and remediation responses. Authorized administrative remediation surfaces **MAY** display the stored Upstream Plan ID needed to revoke issued MiniMax access.
 
 4.3. Inventory **MUST** distinguish at least these credential lifecycle states: available, assigned, revocation pending, revoked, and revocation failed.
 
@@ -86,11 +88,13 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 
 4.6. When no available credential exists for the requested plan, activation **MUST** fail without debiting credits or creating a subscription.
 
-4.7. Kilo **MUST** retain non-secret assignment and revocation disposition evidence on inventory records for the required operational and compliance retention period. Encrypted credential material **MAY** remain available through the admin-only manual-remediation workflow while revocation requires it. Once support confirms revocation and no further remediation requires the credential value, Kilo **MUST** remove retained encrypted credential material from the terminal inventory record. After the applicable retention period, terminal credential records **MAY** be deleted without deleting billing history.
+4.7. Kilo **MUST** retain the Upstream Plan ID and non-secret assignment and revocation disposition evidence on inventory records for the required operational and compliance retention period. When an issued credential enters manual revocation remediation, Kilo **MUST** remove retained encrypted credential material because support deprovisions it using the Upstream Plan ID. After the applicable retention period, terminal credential records **MAY** be deleted without deleting billing history.
 
-4.8. Administrative upload tooling **MUST** prevent accidental duplicate credential assignment without exposing raw credential values in list responses, for example through a secure, non-reversible fingerprint comparison.
+4.8. Administrative upload tooling **MUST** accept each MiniMax issued credential with its Upstream Plan ID, using the `<api key>::<upstream plan id>` input format or an equivalent structured input, and **MUST** persist the identifier on the inventory record without treating it as the Kilo Plan ID.
 
-4.9. Before a MiniMax credential becomes `available` inventory, administrative upload tooling **MUST** validate that it can use the approved ordinary MiniMax routing and model behavior for Token Plan Plus. An invalid or incompatible credential **MUST NOT** become assignable inventory.
+4.9. Administrative upload tooling **MUST** prevent accidental duplicate credential assignment without exposing raw credential values in list responses, for example through a secure, non-reversible fingerprint comparison.
+
+4.10. Before a MiniMax credential becomes `available` inventory, administrative upload tooling **MUST** validate that it can use the approved ordinary MiniMax routing and model behavior for Token Plan Plus. An invalid or incompatible credential **MUST NOT** become assignable inventory.
 
 ## 5. Subscription lifecycle
 
@@ -110,7 +114,7 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 
 5.8. When a user account is deleted, Kilo **MUST** immediately terminate any Coding Plan subscription, delete the user's BYOK configurations and Availability Notification Intents under the general deletion policy, create a Manual Revocation Work Item for each issued credential, and anonymize subscriber linkage in retained credential disposition records. Account deletion **MUST NOT** wait until the end of a prepaid period. Subscription and charged-term history **MAY** remain associated with the platform's anonymized user record when required for financial or compliance retention.
 
-5.9. Manual upstream revocation **MUST** be completed by authorized support through the MiniMax admin process and its outcome **MUST** be recorded on the inventory item in Kilo. Pending and failed work **MUST** remain visible in the admin console for remediation. Kilo **MUST** keep the Coding Plan terminated while revocation is pending or failed. An issued credential awaiting or failing revocation **MUST NOT** be reassigned; a separate user-managed provider key **MUST NOT** be removed because of revocation work.
+5.9. Manual upstream revocation **MUST** be completed by authorized support through the MiniMax admin process using the stored Upstream Plan ID, and its outcome **MUST** be recorded on the inventory item in Kilo. Pending and failed work **MUST** remain visible in the admin console for remediation. Kilo **MUST** keep the Coding Plan terminated while revocation is pending or failed. An issued credential awaiting or failing revocation **MUST NOT** be reassigned; a separate user-managed provider key **MUST NOT** be removed because of revocation work.
 
 5.10. The initial pilot **MAY** leave an unchanged Kilo-installed BYOK configuration routable between its paid-period or grace deadline and the next scheduled billing lifecycle sweep. Once that sweep processes termination, local Kilo-installed access **MUST** be deleted regardless of whether manual upstream revocation is complete.
 
@@ -140,6 +144,6 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 
 8.1. Logs and monitoring **MUST NOT** contain raw Managed Plan Credentials, credential-bearing authorization headers, provider-management secrets, or unfiltered provider/SDK key-test error content.
 
-8.2. General administrative credential inventory responses **MUST** return non-secret status and remediation metadata only. For a `revocation_pending` or `revocation_failed` item, the manual-revocation admin console **MAY** provide an explicit admin-only raw credential reveal action after a sensitive-data warning. Raw values **MUST NOT** appear in queue/list responses or customer surfaces.
+8.2. General administrative credential inventory responses **MUST** return non-secret status and remediation metadata only. For a `revocation_pending` or `revocation_failed` item, the manual-revocation admin console **MAY** display its Upstream Plan ID to authorized staff. Raw credential values **MUST NOT** be returned by queue, list, or remediation APIs or appear on customer surfaces.
 
-8.3. The initial pilot does not require a Coding Plans audit-log history for admin inventory upload, credential reveal, or manual revocation actions. Inventory lifecycle state, request/completion timestamps, attempt count, and sanitized failure information **MUST** record current disposition without retaining raw credentials after confirmed revocation.
+8.3. The initial pilot does not require a Coding Plans audit-log history for admin inventory upload or manual revocation actions. Inventory lifecycle state, Upstream Plan ID, request/completion timestamps, attempt count, and sanitized failure information **MUST** record current disposition without retaining raw credentials after remediation starts.

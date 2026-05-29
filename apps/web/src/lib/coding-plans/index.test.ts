@@ -15,7 +15,6 @@ import {
   markCredentialManuallyRevoked,
   markCredentialManualRevocationFailed,
   requeueManualCredentialRevocation,
-  revealCredentialForManualRevocation,
 } from '@/lib/coding-plans/revocation';
 import { db } from '@/lib/drizzle';
 import { insertTestUser } from '@/tests/helpers/user.helper';
@@ -34,8 +33,12 @@ const COST_MICRODOLLARS = 20_000_000;
 
 const validatedInventoryUpload = { validateCredential: async () => true };
 
+function inventoryEntry(key: string, upstreamPlanId = `minimax-plan-${crypto.randomUUID()}`) {
+  return `${key}::${upstreamPlanId}`;
+}
+
 async function seedInventoryKey(key = `managed-test-key-${crypto.randomUUID()}`) {
-  await uploadKeysToInventory(PLAN_ID, [key], validatedInventoryUpload);
+  await uploadKeysToInventory(PLAN_ID, [inventoryEntry(key)], validatedInventoryUpload);
 }
 
 async function createUserWithBalance(microdollars: number) {
@@ -306,28 +309,57 @@ describe('coding plans', () => {
     expect(managedKeys).toHaveLength(1);
   });
 
-  it('rejects unvalidated inventory credentials before they become available', async () => {
+  it('stores upstream plan IDs separately from validated inventory credentials', async () => {
+    const validateCredential = jest.fn(async () => true);
+
+    await uploadKeysToInventory(PLAN_ID, ['test-api-key::minimax-upstream-plan-123'], {
+      validateCredential,
+    });
+    const [inventory] = await db.select().from(coding_plan_key_inventory);
+
+    expect(validateCredential).toHaveBeenCalledWith('test-api-key');
+    expect(inventory.plan_id).toBe(PLAN_ID);
+    expect(inventory.upstream_plan_id).toBe('minimax-upstream-plan-123');
+  });
+
+  it('rejects malformed or unvalidated inventory entries before they become available', async () => {
     const validateCredential = jest.fn(async () => false);
 
     await expect(
-      uploadKeysToInventory(PLAN_ID, ['invalid-key'], { validateCredential })
+      uploadKeysToInventory(PLAN_ID, ['missing-plan-id'], { validateCredential })
+    ).rejects.toThrow('<api key>::<plan id>');
+    expect(validateCredential).not.toHaveBeenCalled();
+    await expect(
+      uploadKeysToInventory(PLAN_ID, ['invalid-key::minimax-plan-id'], { validateCredential })
     ).rejects.toThrow('failed validation');
     expect(validateCredential).toHaveBeenCalledWith('invalid-key');
     expect(await db.select().from(coding_plan_key_inventory)).toHaveLength(0);
   });
 
   it('rejects duplicate uploaded credentials using a secret keyed fingerprint', async () => {
-    await uploadKeysToInventory(PLAN_ID, ['duplicate-key'], validatedInventoryUpload);
+    await uploadKeysToInventory(
+      PLAN_ID,
+      [inventoryEntry('duplicate-key', 'minimax-plan-one')],
+      validatedInventoryUpload
+    );
     await expect(
-      uploadKeysToInventory(PLAN_ID, ['duplicate-key'], validatedInventoryUpload)
+      uploadKeysToInventory(
+        PLAN_ID,
+        [inventoryEntry('duplicate-key', 'minimax-plan-two')],
+        validatedInventoryUpload
+      )
     ).rejects.toThrow('already present');
     const counts = await getKeyInventoryCounts(PLAN_ID);
     expect(counts).toEqual([{ planId: PLAN_ID, status: 'available', count: 1 }]);
   });
 
-  it('reveals only queued credentials and clears material after manual revocation succeeds', async () => {
+  it('clears credential material once revocation work starts and records completion by plan ID', async () => {
     const user = await createUserWithBalance(COST_MICRODOLLARS);
-    await seedInventoryKey('revoke-success-key');
+    await uploadKeysToInventory(
+      PLAN_ID,
+      [inventoryEntry('revoke-success-key', 'minimax-revoke-plan')],
+      validatedInventoryUpload
+    );
     const activation = await subscribeToCodingPlan(user.id, PLAN_ID, 'revoke-success');
     const [subscription] = await db
       .select()
@@ -335,23 +367,24 @@ describe('coding plans', () => {
       .where(eq(coding_plan_subscriptions.id, activation.subscriptionId));
     await terminateCodingPlanImmediately(activation.subscriptionId);
 
-    await expect(
-      revealCredentialForManualRevocation(subscription.key_inventory_id!)
-    ).resolves.toEqual({
-      apiKey: 'revoke-success-key',
-    });
+    let [credential] = await db
+      .select()
+      .from(coding_plan_key_inventory)
+      .where(eq(coding_plan_key_inventory.id, subscription.key_inventory_id!));
+    expect(credential.status).toBe('revocation_pending');
+    expect(credential.upstream_plan_id).toBe('minimax-revoke-plan');
+    expect(credential.encrypted_api_key).toBeNull();
+
     await markCredentialManuallyRevoked(subscription.key_inventory_id!);
-    const [credential] = await db
+    [credential] = await db
       .select()
       .from(coding_plan_key_inventory)
       .where(eq(coding_plan_key_inventory.id, subscription.key_inventory_id!));
 
     expect(credential.status).toBe('revoked');
+    expect(credential.upstream_plan_id).toBe('minimax-revoke-plan');
     expect(credential.encrypted_api_key).toBeNull();
     expect(credential.revocation_attempt_count).toBe(1);
-    await expect(
-      revealCredentialForManualRevocation(subscription.key_inventory_id!)
-    ).rejects.toThrow('not eligible');
   });
 
   it('keeps failed manual revocation terminal and retryable', async () => {
@@ -374,7 +407,8 @@ describe('coding plans', () => {
       .where(eq(coding_plan_key_inventory.id, subscription.key_inventory_id!));
 
     expect(credential.status).toBe('revocation_failed');
-    expect(credential.encrypted_api_key).not.toBeNull();
+    expect(credential.upstream_plan_id).toEqual(expect.any(String));
+    expect(credential.encrypted_api_key).toBeNull();
     expect(credential.revocation_attempt_count).toBe(1);
     expect(credential.last_revocation_error).toContain('api_key=[redacted]');
 

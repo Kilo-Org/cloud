@@ -101,6 +101,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   const credentials = Array.from({ length: count }, (_, index) => {
     const plaintext = `${KEY_PREFIX}:${scenario}:${index + 1}`;
     return {
+      upstreamPlanId: `${KEY_PREFIX}:minimax-plan:${scenario}:${index + 1}`,
       fingerprint: credentialFingerprint(plaintext, key),
       encrypted: encryptCredential(plaintext, key),
     };
@@ -133,6 +134,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
             ({
               plan_id: PLAN_ID,
               provider_id: PROVIDER_ID,
+              upstream_plan_id: credential.upstreamPlanId,
               encrypted_api_key: credential.encrypted,
               credential_fingerprint: credential.fingerprint,
               status: 'available',

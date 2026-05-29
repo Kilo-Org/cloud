@@ -144,7 +144,11 @@ async function sweepCancelAtPeriodEnd(
         if (row.key_inventory_id) {
           await tx
             .update(coding_plan_key_inventory)
-            .set({ status: 'revocation_pending', revocation_requested_at: nowIso })
+            .set({
+              status: 'revocation_pending',
+              encrypted_api_key: null,
+              revocation_requested_at: nowIso,
+            })
             .where(eq(coding_plan_key_inventory.id, row.key_inventory_id));
         }
       });
@@ -398,7 +402,11 @@ async function processRenewal(
     if (row.key_inventory_id) {
       await tx
         .update(coding_plan_key_inventory)
-        .set({ status: 'revocation_pending', revocation_requested_at: nowIso })
+        .set({
+          status: 'revocation_pending',
+          encrypted_api_key: null,
+          revocation_requested_at: nowIso,
+        })
         .where(eq(coding_plan_key_inventory.id, row.key_inventory_id));
     }
     return 'terminated';

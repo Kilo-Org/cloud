@@ -327,6 +327,7 @@ export async function terminateCodingPlanImmediately(
         .update(coding_plan_key_inventory)
         .set({
           status: 'revocation_pending',
+          encrypted_api_key: null,
           revocation_requested_at: sql`now()`,
           last_revocation_error: null,
         })
@@ -346,9 +347,30 @@ type InventoryUploadOptions = {
   validateCredential?: InventoryCredentialValidator;
 };
 
+type InventoryCredentialEntry = {
+  apiKey: string;
+  upstreamPlanId: string;
+};
+
+function parseInventoryCredentialEntry(entry: string): InventoryCredentialEntry {
+  const segments = entry.split('::');
+  if (segments.length !== 2) {
+    throw new Error('Each MiniMax inventory entry must use the format <api key>::<plan id>.');
+  }
+
+  const [rawApiKey, rawUpstreamPlanId] = segments;
+  const apiKey = rawApiKey?.trim();
+  const upstreamPlanId = rawUpstreamPlanId?.trim();
+  if (!apiKey || !upstreamPlanId) {
+    throw new Error('Each MiniMax inventory entry must use the format <api key>::<plan id>.');
+  }
+
+  return { apiKey, upstreamPlanId };
+}
+
 export async function uploadKeysToInventory(
   planId: CodingPlanId,
-  plaintextKeys: string[],
+  rawEntries: string[],
   options: InventoryUploadOptions = {}
 ): Promise<{ inserted: number }> {
   const plan = getCodingPlanPrice(planId);
@@ -359,9 +381,10 @@ export async function uploadKeysToInventory(
     throw new Error('BYOK encryption is not configured');
   }
 
+  const entries = rawEntries.map(parseInventoryCredentialEntry);
   const validateCredential = options.validateCredential ?? validateTokenPlanPlusCredential;
-  for (const plaintextKey of plaintextKeys) {
-    if (!(await validateCredential(plaintextKey))) {
+  for (const entry of entries) {
+    if (!(await validateCredential(entry.apiKey))) {
       throw new Error(
         'One or more MiniMax credentials failed validation. Confirm plan access and supported model behavior, then try again.'
       );
@@ -372,17 +395,18 @@ export async function uploadKeysToInventory(
     const result = await tx
       .insert(coding_plan_key_inventory)
       .values(
-        plaintextKeys.map(key => ({
+        entries.map(entry => ({
           plan_id: plan.planId,
           provider_id: plan.providerId,
-          encrypted_api_key: encryptApiKey(key, BYOK_ENCRYPTION_KEY),
-          credential_fingerprint: credentialFingerprint(key),
+          upstream_plan_id: entry.upstreamPlanId,
+          encrypted_api_key: encryptApiKey(entry.apiKey, BYOK_ENCRYPTION_KEY),
+          credential_fingerprint: credentialFingerprint(entry.apiKey),
           status: 'available' as const,
         }))
       )
       .onConflictDoNothing({ target: coding_plan_key_inventory.credential_fingerprint });
     const insertedCount = result.rowCount ?? 0;
-    if (insertedCount !== plaintextKeys.length) {
+    if (insertedCount !== entries.length) {
       throw new Error('One or more managed credentials are already present in inventory.');
     }
     return insertedCount;

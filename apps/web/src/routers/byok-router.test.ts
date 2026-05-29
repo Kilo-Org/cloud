@@ -517,6 +517,7 @@ describe('BYOK Router', () => {
         .values({
           plan_id: 'minimax-token-plan-plus',
           provider_id: 'minimax',
+          upstream_plan_id: 'minimax-installed-plan',
           encrypted_api_key: encrypted,
           credential_fingerprint: crypto.randomUUID(),
           status: 'assigned',

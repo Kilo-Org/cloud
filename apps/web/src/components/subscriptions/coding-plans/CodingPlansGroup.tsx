@@ -75,9 +75,14 @@ export function CodingPlansGroup({
       onSuccess: async () => {
         toast.success('Coding Plan subscription activated');
         setSubscriptionRequest(null);
-        await queryClient.invalidateQueries({
-          queryKey: trpc.codingPlans.listSubscriptions.queryKey(),
-        });
+        await Promise.all([
+          queryClient.invalidateQueries({
+            queryKey: trpc.codingPlans.listSubscriptions.queryKey(),
+          }),
+          queryClient.invalidateQueries({
+            queryKey: trpc.byok.list.queryKey({}),
+          }),
+        ]);
       },
       onError: async error => {
         if (error.message.includes('No managed credential')) {

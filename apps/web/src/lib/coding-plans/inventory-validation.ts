@@ -32,7 +32,7 @@ export async function validateTokenPlanPlusCredential(apiKey: string): Promise<b
       },
     });
 
-    return output.finishReason === 'stop';
+    return output.finishReason === 'stop' || output.finishReason === 'length';
   } catch {
     logWarning('MiniMax inventory credential validation failed', {
       providerId: MINIMAX_PROVIDER_ID,

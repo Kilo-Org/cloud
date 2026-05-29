@@ -6584,6 +6584,7 @@ export const coding_plan_key_inventory = pgTable(
       .notNull(),
     plan_id: text().notNull(),
     provider_id: text().notNull(),
+    upstream_plan_id: text().notNull(),
     encrypted_api_key: jsonb().$type<EncryptedData>(),
     credential_fingerprint: text().notNull(),
     status: text().$type<CodingPlanCredentialStatus>().notNull().default('available'),

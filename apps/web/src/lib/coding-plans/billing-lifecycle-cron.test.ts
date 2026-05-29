@@ -29,9 +29,13 @@ async function createSubscription(balance = COST_MICRODOLLARS, autoTopUpEnabled 
     microdollars_used: 0,
     auto_top_up_enabled: autoTopUpEnabled,
   });
-  await uploadKeysToInventory(PLAN_ID, [`cron-key-${crypto.randomUUID()}`], {
-    validateCredential: async () => true,
-  });
+  await uploadKeysToInventory(
+    PLAN_ID,
+    [`cron-key-${crypto.randomUUID()}::minimax-plan-${crypto.randomUUID()}`],
+    {
+      validateCredential: async () => true,
+    }
+  );
   const created = await subscribeToCodingPlan(user.id, PLAN_ID, `activate-${crypto.randomUUID()}`);
   await db
     .update(coding_plan_subscriptions)
@@ -122,6 +126,8 @@ describe('Coding Plan billing lifecycle cron', () => {
     expect(subscription.cancellation_reason).toBe('user_canceled');
     expect(subscription.installed_byok_key_id).toBeNull();
     expect(credential.status).toBe('revocation_pending');
+    expect(credential.upstream_plan_id).toEqual(expect.any(String));
+    expect(credential.encrypted_api_key).toBeNull();
     expect(maybePerformAutoTopUp).not.toHaveBeenCalled();
   });
 
@@ -142,6 +148,7 @@ describe('Coding Plan billing lifecycle cron', () => {
     expect(subscription.status).toBe('canceled');
     expect(subscription.cancellation_reason).toBe('insufficient_credits');
     expect(credential.status).toBe('revocation_pending');
+    expect(credential.encrypted_api_key).toBeNull();
   });
 
   it('allows one past-due grace period and one auto-top-up attempt', async () => {
@@ -199,6 +206,7 @@ describe('Coding Plan billing lifecycle cron', () => {
     expect(subscription.status).toBe('canceled');
     expect(subscription.cancellation_reason).toBe('insufficient_credits');
     expect(credential.status).toBe('revocation_pending');
+    expect(credential.encrypted_api_key).toBeNull();
   });
 
   it('preserves a replacement MiniMax key when scheduled cancellation is processed', async () => {

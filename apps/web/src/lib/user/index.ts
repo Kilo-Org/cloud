@@ -1031,10 +1031,11 @@ export async function softDeleteUser(userId: string) {
       .delete(platform_integrations)
       .where(eq(platform_integrations.owned_by_user_id, userId));
     await tx.execute(sql`
-      UPDATE coding_plan_key_inventory
-      SET status = 'revocation_pending',
-          assigned_to_user_id = NULL,
-          revocation_requested_at = now(),
+       UPDATE coding_plan_key_inventory
+       SET status = 'revocation_pending',
+           encrypted_api_key = NULL,
+           assigned_to_user_id = NULL,
+           revocation_requested_at = now(),
           last_revocation_error = NULL,
           updated_at = now()
       WHERE id IN (

@@ -17,7 +17,6 @@ import {
   markCredentialManuallyRevoked,
   markCredentialManualRevocationFailed,
   requeueManualCredentialRevocation,
-  revealCredentialForManualRevocation,
 } from '@/lib/coding-plans/revocation';
 import {
   CODING_PLAN_IDS,
@@ -273,10 +272,24 @@ export const codingPlansRouter = createTRPCRouter({
     .input(
       z.object({
         planId: CodingPlanIdSchema,
-        keys: z.array(z.string().min(1)).min(1).max(1000),
+        entries: z.array(z.string().min(1)).min(1).max(1000),
       })
     )
-    .mutation(({ input }) => uploadKeysToInventory(input.planId, input.keys)),
+    .mutation(async ({ input }) => {
+      try {
+        return await uploadKeysToInventory(input.planId, input.entries);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (
+          message.includes('<api key>::<plan id>') ||
+          message.includes('failed validation') ||
+          message.includes('already present in inventory')
+        ) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message });
+        }
+        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message });
+      }
+    }),
 
   adminTerminateSubscription: adminProcedure
     .input(z.object({ subscriptionId: SubscriptionIdSchema }))
@@ -307,17 +320,6 @@ export const codingPlansRouter = createTRPCRouter({
         revokedAt: toNullableIsoTimestamp(item.revokedAt),
         updatedAt: toIsoTimestamp(item.updatedAt),
       }));
-    }),
-
-  adminRevealRevocationCredential: adminProcedure
-    .input(z.object({ inventoryKeyId: z.string().uuid() }))
-    .mutation(async ({ input }) => {
-      try {
-        return await revealCredentialForManualRevocation(input.inventoryKeyId);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        throw new TRPCError({ code: 'PRECONDITION_FAILED', message });
-      }
     }),
 
   adminMarkRevocationComplete: adminProcedure

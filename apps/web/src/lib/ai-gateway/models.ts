@@ -36,7 +36,7 @@ import {
   qwen36_plus_model,
   qwen36_plus_stealth_model,
 } from '@/lib/ai-gateway/providers/qwen';
-import { stepfun_35_flash_free_model } from '@/lib/ai-gateway/providers/stepfun';
+import { stepfun_37_flash_free_model } from '@/lib/ai-gateway/providers/stepfun';
 import { isGrokModel } from '@/lib/ai-gateway/providers/xai';
 import { isClaudeModel } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { GPT_CURRENT_MODEL_ID, isOpenAiModel } from '@/lib/ai-gateway/providers/openai';
@@ -48,7 +48,7 @@ export const PRIMARY_DEFAULT_MODEL = CLAUDE_SONNET_CURRENT_MODEL_ID;
 export const autoFreeModels = [
   'nvidia/nemotron-3-super-120b-a12b:free',
   'poolside/laguna-m.1:free',
-  stepfun_35_flash_free_model.status === 'public' ? stepfun_35_flash_free_model.public_id : null,
+  stepfun_37_flash_free_model.status === 'public' ? stepfun_37_flash_free_model.public_id : null,
 ].filter(m => m !== null);
 
 export const preferredModels = [
@@ -96,7 +96,7 @@ export const kiloExclusiveModels = [
   claude_opus_4_7_stealth_model,
   claude_sonnet_4_6_stealth_model,
   claude_opus_4_6_stealth_model,
-  stepfun_35_flash_free_model,
+  stepfun_37_flash_free_model,
 ] as KiloExclusiveModel[];
 
 export function requiresKiloDataCollection(model: string): boolean {

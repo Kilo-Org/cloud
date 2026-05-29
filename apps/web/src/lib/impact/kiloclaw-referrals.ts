@@ -129,7 +129,7 @@ const REFERRAL_REWARD_ACTOR = {
 
 const SIGNUP_REFERRAL_TOUCH_CAPTURE_GRACE_MS = 10 * 60 * 1000;
 const IMPACT_ADVOCATE_KILOCLAW_REWARD_UNIT = 'MONTH';
-const IMPACT_ADVOCATE_KILO_PASS_REWARD_UNIT = 'USD';
+const IMPACT_ADVOCATE_KILO_PASS_REWARD_UNIT = 'Kilo Pass Bonus Credits';
 
 function getDatabaseClient(database?: DatabaseClient): DatabaseClient {
   return database ?? db;

@@ -18,9 +18,16 @@ jest.mock('@/lib/impact/advocate', () => {
     sendImpactAdvocateRewardLookupPayload: jest.fn(async () => ({
       ok: true,
       statusCode: 200,
-      rewards: [{ id: 'impact-kilo-pass-reward', type: 'CREDIT', amount: 24.5, unit: 'USD' }],
+      rewards: [
+        {
+          id: 'impact-kilo-pass-reward',
+          type: 'CREDIT',
+          amount: 24.5,
+          unit: 'Kilo Pass Bonus Credits',
+        },
+      ],
       responseBody:
-        '{"rewards":[{"id":"impact-kilo-pass-reward","type":"CREDIT","amount":24.5,"unit":"USD"}]}',
+        '{"rewards":[{"id":"impact-kilo-pass-reward","type":"CREDIT","amount":24.5,"unit":"Kilo Pass Bonus Credits"}]}',
     })),
     sendImpactAdvocateRewardRedemptionPayload: jest.fn(async () => ({
       ok: true,
@@ -114,9 +121,16 @@ beforeEach(async () => {
   mockSendImpactAdvocateRewardLookupPayload.mockResolvedValue({
     ok: true,
     statusCode: 200,
-    rewards: [{ id: 'impact-kilo-pass-reward', type: 'CREDIT', amount: 24.5, unit: 'USD' }],
+    rewards: [
+      {
+        id: 'impact-kilo-pass-reward',
+        type: 'CREDIT',
+        amount: 24.5,
+        unit: 'Kilo Pass Bonus Credits',
+      },
+    ],
     responseBody:
-      '{"rewards":[{"id":"impact-kilo-pass-reward","type":"CREDIT","amount":24.5,"unit":"USD"}]}',
+      '{"rewards":[{"id":"impact-kilo-pass-reward","type":"CREDIT","amount":24.5,"unit":"Kilo Pass Bonus Credits"}]}',
   });
   mockSendImpactAdvocateRewardRedemptionPayload.mockResolvedValue({
     ok: true,
@@ -383,7 +397,7 @@ describe('Kilo Pass Impact referral conversions', () => {
               userId: 'referee@example.com',
               rewardTypeFilter: 'CREDIT',
             }),
-            redemption: { amount: 24.5, unit: 'USD' },
+            redemption: { amount: 24.5, unit: 'Kilo Pass Bonus Credits' },
           }),
         }),
         expect.objectContaining({
@@ -396,7 +410,7 @@ describe('Kilo Pass Impact referral conversions', () => {
               userId: 'referrer@example.com',
               rewardTypeFilter: 'CREDIT',
             }),
-            redemption: { amount: 24.5, unit: 'USD' },
+            redemption: { amount: 24.5, unit: 'Kilo Pass Bonus Credits' },
           }),
         }),
       ])
@@ -413,7 +427,7 @@ describe('Kilo Pass Impact referral conversions', () => {
       { programKey: ImpactAdvocateProgramKey.KiloPass }
     );
     expect(mockSendImpactAdvocateRewardRedemptionPayload).toHaveBeenCalledWith(
-      { rewardId: 'impact-kilo-pass-reward', amount: 24.5, unit: 'USD' },
+      { rewardId: 'impact-kilo-pass-reward', amount: 24.5, unit: 'Kilo Pass Bonus Credits' },
       { programKey: ImpactAdvocateProgramKey.KiloPass }
     );
 
@@ -837,7 +851,7 @@ describe('Kilo Pass Impact referral conversions', () => {
             state: 'redeemed',
             request_payload: expect.objectContaining({
               programKey: ImpactAdvocateProgramKey.KiloPass,
-              redemption: { amount: 24.5, unit: 'USD' },
+              redemption: { amount: 24.5, unit: 'Kilo Pass Bonus Credits' },
             }),
           })
         )

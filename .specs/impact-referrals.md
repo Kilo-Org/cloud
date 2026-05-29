@@ -18,6 +18,7 @@ Updated 2026-05-06 -- require Impact Advocate reward redemption after local Kilo
 Updated 2026-05-12 -- note price-versioned KiloClaw billing preserves referral semantics.
 Updated 2026-05-22 -- renamed to `.specs/impact-referrals.md` and expanded to Kilo Pass referrals.
 Updated 2026-05-28 -- classify enforced Stripe EFW refunds as adverse payments.
+Updated 2026-05-29 -- name the Impact-facing Kilo Pass reward unit `Kilo Pass Bonus Credits`.
 
 ## Conventions
 
@@ -631,8 +632,8 @@ application, and Kilo Pass redeems after local referral bonus allocation.
      local reward eligibility, application, cancellation, or reversal.
 
 158a. For Kilo Pass, when a local referral bonus reward is allocated/granted, the system MUST queue asynchronous Impact
-      Advocate reward lookup and single-reward redemption using the reward amount and USD unit so Impact reporting
-      matches Kilo allocation state.
+      Advocate reward lookup and single-reward redemption using the USD-denominated reward amount and the
+      `Kilo Pass Bonus Credits` unit so Impact reporting matches Kilo allocation state.
 
 158b. Kilo Pass Impact Advocate reward redemption MUST be idempotently queued per local reward and MUST NOT block paid
       conversion processing, reward ledger creation, reward application, billing settlement, or user access.
@@ -774,6 +775,10 @@ application, and Kilo Pass redeems after local referral bonus allocation.
     retry unchanged payloads, except an already-redeemed response MAY be treated as idempotent success.
 
 ## Changelog
+
+### 2026-05-29 -- Name the Kilo Pass Impact reward unit
+
+Kilo Pass reward synchronization sends the `Kilo Pass Bonus Credits` unit to Impact Advocate while retaining the USD-denominated local reward amount.
 
 ### 2026-05-28 -- Enforced EFW refunds are adverse payments
 

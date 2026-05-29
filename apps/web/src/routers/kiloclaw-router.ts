@@ -54,10 +54,7 @@ import {
 } from '@kilocode/db/schema';
 import { and, asc, eq, ne, desc, isNull, inArray, sql, like, or } from 'drizzle-orm';
 import { ImpactReferralProduct, ImpactReferralRewardKind } from '@kilocode/db/schema-types';
-import {
-  instanceIdFromSandboxId,
-  isInstanceKeyedSandboxId,
-} from '@kilocode/worker-utils/instance-id';
+import { imageRolloutSubjectFromSandboxId } from '@kilocode/worker-utils/instance-id';
 import { alias } from 'drizzle-orm/pg-core';
 import { deleteWorkerTrigger } from '@/lib/webhook-agent/webhook-agent-client';
 import { sentryLogger } from '@/lib/utils.server';
@@ -2866,9 +2863,7 @@ export const kiloclawRouter = createTRPCRouter({
       if (!instance) return client.getLatestVersion();
 
       return client.getLatestVersion({
-        instanceId: isInstanceKeyedSandboxId(instance.sandboxId)
-          ? instanceIdFromSandboxId(instance.sandboxId)
-          : ctx.user.id,
+        instanceId: imageRolloutSubjectFromSandboxId(instance.sandboxId, ctx.user.id),
         userId: ctx.user.id,
         currentImageTag: input?.currentImageTag ?? null,
       });

@@ -80,6 +80,52 @@ export function createMayorTools(client: MayorGastownClient) {
       },
     }),
 
+    gt_babysit_pr: tool({
+      description:
+        'Adopt an existing pull request for the town to babysit. The town will poll the PR for review feedback, fix CI failures, resolve merge conflicts, and auto-merge when ready — exactly as it would for a PR the town created itself. Use this when the user wants the town to take over an existing PR (e.g. one they created manually, one created by another tool, or one from a third party they have rights to). For new feature work that should produce a PR, use gt_sling instead.',
+      args: {
+        rig_id: tool.schema.string().describe('The UUID of the rig the PR belongs to'),
+        pr_url: tool.schema
+          .string()
+          .describe(
+            'The full URL of the pull request to babysit (e.g. https://github.com/owner/repo/pull/123)'
+          ),
+        title: tool.schema
+          .string()
+          .describe(
+            'Optional title override for the babysit bead. Defaults to "Babysit: <PR title>".'
+          )
+          .optional(),
+        body: tool.schema
+          .string()
+          .describe('Optional body override for the babysit bead.')
+          .optional(),
+        force_push_allowed: tool.schema
+          .boolean()
+          .describe(
+            'Whether polecats may force-push to the PR branch when fixing conflicts or ' +
+              'addressing review comments. Default false. Only set true if the user owns the ' +
+              'branch or the PR author has explicitly consented. When false, polecats use ' +
+              'merge commits and regular pushes only.'
+          )
+          .optional(),
+      },
+      async execute(args) {
+        const result = await client.babysitPr({
+          rig_id: args.rig_id,
+          pr_url: args.pr_url,
+          title: args.title,
+          body: args.body,
+          force_push_allowed: args.force_push_allowed,
+        });
+        const lines = [`Babysit started for PR: ${args.pr_url}`, `Bead: ${result.beadId}`];
+        if (result.warning) {
+          lines.push(`Warning: ${result.warning}`);
+        }
+        return lines.join('\n');
+      },
+    }),
+
     gt_list_rigs: tool({
       description:
         'List all rigs (repositories) in your town. ' +

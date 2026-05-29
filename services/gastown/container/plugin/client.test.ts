@@ -371,4 +371,50 @@ describe('MayorGastownClient', () => {
     const [url] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0] as [string];
     expect(url).toBe('https://gastown.example.com/api/mayor/town-1/tools/convoys/convoy-1');
   });
+
+  it('babysitPr() posts to babysit-pr endpoint', async () => {
+    const responseData = { beadId: 'babysit-bead-1' };
+    const fetchMock = mockFetch(responseData);
+    globalThis.fetch = fetchMock;
+
+    const result = await client.babysitPr({
+      rig_id: 'rig-1',
+      pr_url: 'https://github.com/owner/repo/pull/42',
+      title: 'Babysit: Fix auth',
+      force_push_allowed: false,
+    });
+
+    expect(result).toEqual(responseData);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('https://gastown.example.com/api/mayor/town-1/tools/babysit-pr');
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(init.body as string)).toEqual({
+      rig_id: 'rig-1',
+      pr_url: 'https://github.com/owner/repo/pull/42',
+      title: 'Babysit: Fix auth',
+      body: undefined,
+      force_push_allowed: false,
+    });
+  });
+
+  it('babysitPr() omits optional fields when not provided', async () => {
+    const responseData = { beadId: 'babysit-bead-2', warning: 'PR from fork' };
+    const fetchMock = mockFetch(responseData);
+    globalThis.fetch = fetchMock;
+
+    const result = await client.babysitPr({
+      rig_id: 'rig-2',
+      pr_url: 'https://github.com/other/repo/pull/7',
+    });
+
+    expect(result).toEqual(responseData);
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(init.body as string)).toEqual({
+      rig_id: 'rig-2',
+      pr_url: 'https://github.com/other/repo/pull/7',
+      title: undefined,
+      body: undefined,
+      force_push_allowed: undefined,
+    });
+  });
 });

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, type ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useGastownTRPC } from '@/lib/gastown/trpc';
@@ -11,6 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { BeadEventTimeline, extractPrUrl } from '@/components/gastown/ActivityFeed';
 import type { ResourceRef } from '@/components/gastown/DrawerStack';
 import { WastelandOriginLink } from './WastelandOriginLink';
+import { buildRelatedBeads, type BeadLike } from './buildRelatedBeads';
 
 import { format, formatDistanceToNow } from 'date-fns';
 import {
@@ -26,10 +27,6 @@ import {
   ChevronRight,
   Bot,
   Network,
-  ArrowDownRight,
-  ArrowUpRight,
-  GitPullRequest,
-  CircleDot,
   Layers,
   Pencil,
   X,
@@ -37,6 +34,9 @@ import {
   Loader2,
   Play,
   MessageCircle,
+  Lock,
+  Unlock,
+  Eye,
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -244,10 +244,15 @@ export function BeadPanel({
   // Only allow https:// URLs to prevent XSS via javascript: protocol injection.
   const prUrl = extractPrUrl(bead.metadata);
 
+  // Babysit bead detection (must be before relatedBeads to avoid TDZ)
+  const isBabysit = bead.labels.includes('gt:babysit');
+
   // Build related beads from the flat list and convoy DAG data
   const allBeads = beadsQuery.data ?? [];
   const convoys = convoysQuery.data ?? [];
-  const relatedBeads = buildRelatedBeads(bead, allBeads, convoys);
+  const relatedBeads = buildRelatedBeads(bead, allBeads, convoys).filter(
+    r => !(r.relation === 'source' && isBabysit)
+  );
 
   // Find parent convoy for metadata display
   const beadConvoyId =
@@ -338,6 +343,12 @@ export function BeadPanel({
             <Badge variant="outline" className="text-[10px]">
               {bead.type}
             </Badge>
+            {isBabysit && (
+              <span className="inline-flex items-center gap-1 rounded-md border border-cyan-500/30 bg-cyan-500/10 px-2 py-0.5 text-[10px] font-medium text-cyan-300">
+                <Eye className="size-2.5" />
+                Babysat external PR
+              </span>
+            )}
             <span
               className={`inline-flex items-center gap-0.5 text-[10px] font-medium ${PRIORITY_STYLES[bead.priority] ?? 'text-white/50'}`}
             >
@@ -526,6 +537,47 @@ export function BeadPanel({
         </div>
       )}
 
+      {/* Babysit metadata */}
+      {isBabysit && (
+        <div className="grid grid-cols-2 border-b border-white/[0.06]">
+          {typeof bead.metadata?.head_sha === 'string' && (
+            <MetaCell
+              icon={Hash}
+              label="Head SHA"
+              value={
+                prUrl && bead.metadata.head_sha.length >= 7 ? (
+                  <a
+                    href={`${prUrl.replace(/\/pull\/\d+.*$/, '/commit/')}${bead.metadata.head_sha}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-mono text-xs text-[color:oklch(95%_0.15_108)] hover:underline"
+                  >
+                    {bead.metadata.head_sha.slice(0, 7)}
+                  </a>
+                ) : (
+                  <span className="font-mono text-xs">{bead.metadata.head_sha.slice(0, 7)}</span>
+                )
+              }
+              mono
+            />
+          )}
+          <MetaCell
+            icon={bead.metadata?.force_push_allowed === true ? Unlock : Lock}
+            label="Force-push"
+            value={bead.metadata?.force_push_allowed === true ? 'Allowed' : 'Blocked'}
+          />
+          {typeof bead.metadata?.babysit_started_at === 'string' && (
+            <MetaCell
+              icon={Clock}
+              label="Babysit started"
+              value={formatDistanceToNow(new Date(bead.metadata.babysit_started_at), {
+                addSuffix: true,
+              })}
+            />
+          )}
+        </div>
+      )}
+
       {/* Wasteland origin link — present when this bead was created in
           response to a wasteland event (e.g. a wanted-item claim). */}
       <WastelandOriginLink metadata={bead.metadata} pathname={pathname} />
@@ -677,7 +729,7 @@ function MetaCell({
 }: {
   icon: typeof Clock;
   label: string;
-  value: string;
+  value: ReactNode;
   mono?: boolean;
 }) {
   return (
@@ -691,144 +743,4 @@ function MetaCell({
       </div>
     </div>
   );
-}
-
-// ── Related beads DAG ─────────────────────────────────────────────────
-
-type BeadLike = {
-  bead_id: string;
-  type: string;
-  status: string;
-  title: string;
-  parent_bead_id: string | null;
-  rig_id?: string | null;
-  metadata: Record<string, unknown>;
-};
-
-type RelatedBead = {
-  relation: string;
-  label: string;
-  icon: typeof Clock;
-  bead: BeadLike;
-};
-
-type ConvoyLike = {
-  id: string;
-  title: string;
-  feature_branch?: string | null;
-  beads: Array<{ bead_id: string; title: string; status: string; rig_id: string | null }>;
-  dependency_edges?: Array<{ bead_id: string; depends_on_bead_id: string }>;
-};
-
-/**
- * Compute the DAG neighborhood of a bead from the flat list and convoy data.
- * Includes: children, source/review links, blockers, and dependents from convoy DAG.
- */
-function buildRelatedBeads(
-  bead: BeadLike,
-  allBeads: BeadLike[],
-  convoys: ConvoyLike[]
-): RelatedBead[] {
-  const related: RelatedBead[] = [];
-
-  // Find which convoy this bead belongs to (if any) via metadata or convoy beads list
-  const convoyId = typeof bead.metadata?.convoy_id === 'string' ? bead.metadata.convoy_id : null;
-  const parentConvoy = convoys.find(
-    c => c.id === convoyId || c.beads.some(b => b.bead_id === bead.bead_id)
-  );
-
-  // Show convoy membership
-  if (parentConvoy) {
-    // Find blockers (beads that this bead depends on / is blocked by)
-    const edges = parentConvoy.dependency_edges ?? [];
-    const blockerIds = new Set(
-      edges.filter(e => e.bead_id === bead.bead_id).map(e => e.depends_on_bead_id)
-    );
-    for (const blockerId of blockerIds) {
-      const blockerBead = allBeads.find(b => b.bead_id === blockerId);
-      const convoyBead = parentConvoy.beads.find(b => b.bead_id === blockerId);
-      if (blockerBead) {
-        related.push({
-          relation: 'blocker',
-          label: 'Blocked by',
-          icon: ArrowUpRight,
-          bead: blockerBead,
-        });
-      } else if (convoyBead) {
-        // Bead is in convoy but not in the rig's bead list — use convoy data
-        related.push({
-          relation: 'blocker',
-          label: 'Blocked by',
-          icon: ArrowUpRight,
-          bead: {
-            bead_id: convoyBead.bead_id,
-            type: 'issue',
-            status: convoyBead.status,
-            title: convoyBead.title,
-            parent_bead_id: null,
-            rig_id: convoyBead.rig_id,
-            metadata: {},
-          },
-        });
-      }
-    }
-
-    // Find dependents (beads that depend on / are blocked by this bead)
-    const dependentIds = new Set(
-      edges.filter(e => e.depends_on_bead_id === bead.bead_id).map(e => e.bead_id)
-    );
-    for (const depId of dependentIds) {
-      const depBead = allBeads.find(b => b.bead_id === depId);
-      const convoyBead = parentConvoy.beads.find(b => b.bead_id === depId);
-      if (depBead) {
-        related.push({
-          relation: 'dependent',
-          label: 'Blocks',
-          icon: ArrowDownRight,
-          bead: depBead,
-        });
-      } else if (convoyBead) {
-        related.push({
-          relation: 'dependent',
-          label: 'Blocks',
-          icon: ArrowDownRight,
-          bead: {
-            bead_id: convoyBead.bead_id,
-            type: 'issue',
-            status: convoyBead.status,
-            title: convoyBead.title,
-            parent_bead_id: null,
-            rig_id: convoyBead.rig_id,
-            metadata: {},
-          },
-        });
-      }
-    }
-  }
-
-  // Child beads (beads whose parent_bead_id = this bead)
-  for (const b of allBeads) {
-    if (b.parent_bead_id === bead.bead_id) {
-      related.push({ relation: 'child', label: 'Child', icon: ArrowDownRight, bead: b });
-    }
-  }
-
-  // For merge_request beads: link back to the source bead
-  if (bead.type === 'merge_request' && typeof bead.metadata?.source_bead_id === 'string') {
-    const source = allBeads.find(b => b.bead_id === bead.metadata.source_bead_id);
-    if (source) {
-      related.push({ relation: 'source', label: 'Source Work', icon: CircleDot, bead: source });
-    }
-  }
-
-  // For non-MR beads: find any MR beads that track this bead
-  if (bead.type !== 'merge_request') {
-    for (const b of allBeads) {
-      if (b.type === 'merge_request' && b.metadata?.source_bead_id === bead.bead_id) {
-        related.push({ relation: 'review', label: 'Review', icon: GitPullRequest, bead: b });
-      }
-    }
-  }
-
-  return related;
 }

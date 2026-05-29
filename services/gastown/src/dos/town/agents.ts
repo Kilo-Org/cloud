@@ -475,6 +475,15 @@ export function getOrCreateAgent(
 
 // ── Prime Context ───────────────────────────────────────────────────
 
+/**
+ * Resolve force_push_allowed from bead metadata.
+ * Absent = true (backwards compat for pre-babysit beads).
+ * Only explicit false disables force-push.
+ */
+export function resolveForcePushAllowed(meta: Record<string, unknown>): boolean {
+  return meta.force_push_allowed !== false;
+}
+
 export function prime(sql: SqlStorage, agentId: string): PrimeContext {
   const agent = getAgent(sql, agentId);
   if (!agent) throw new Error(`Agent ${agentId} not found`);
@@ -521,10 +530,12 @@ export function prime(sql: SqlStorage, agentId: string): PrimeContext {
   let pr_fixup_context: PrimeContext['pr_fixup_context'] = null;
   if (hookedBead?.labels.includes('gt:pr-fixup') && hookedBead.metadata) {
     const meta = hookedBead.metadata as Record<string, unknown>;
+    const forcePushAllowed = resolveForcePushAllowed(meta);
     pr_fixup_context = {
       pr_url: typeof meta.pr_url === 'string' ? meta.pr_url : null,
       branch: typeof meta.branch === 'string' ? meta.branch : null,
       target_branch: typeof meta.target_branch === 'string' ? meta.target_branch : null,
+      force_push_allowed: forcePushAllowed,
     };
   }
 
@@ -533,11 +544,13 @@ export function prime(sql: SqlStorage, agentId: string): PrimeContext {
   let pr_conflict_context: PrimeContext['pr_conflict_context'] = null;
   if (hookedBead?.labels.includes('gt:pr-conflict') && hookedBead.metadata) {
     const meta = hookedBead.metadata as Record<string, unknown>;
+    const forcePushAllowed = resolveForcePushAllowed(meta);
     pr_conflict_context = {
       pr_url: typeof meta.pr_url === 'string' ? meta.pr_url : null,
       branch: typeof meta.branch === 'string' ? meta.branch : null,
       target_branch: typeof meta.target_branch === 'string' ? meta.target_branch : null,
       has_feedback: meta.has_feedback === true || meta.has_feedback === 1,
+      force_push_allowed: forcePushAllowed,
     };
   } else if (hookedBead?.labels.includes('gt:pr-feedback') && hookedBead.metadata) {
     // A feedback bead can also have has_conflicts: true when a conflict was detected
@@ -545,12 +558,14 @@ export function prime(sql: SqlStorage, agentId: string): PrimeContext {
     // agent resolves conflicts first, then addresses review feedback.
     const meta = hookedBead.metadata as Record<string, unknown>;
     if (meta.has_conflicts === true || meta.has_conflicts === 1) {
+      const forcePushAllowed = resolveForcePushAllowed(meta);
       pr_conflict_context = {
         pr_url: typeof meta.pr_url === 'string' ? meta.pr_url : null,
         branch: typeof meta.branch === 'string' ? meta.branch : null,
         target_branch:
           typeof meta.conflict_target_branch === 'string' ? meta.conflict_target_branch : null,
         has_feedback: true,
+        force_push_allowed: forcePushAllowed,
       };
     }
   }

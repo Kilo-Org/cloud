@@ -38,6 +38,7 @@ You have these tools for cross-rig coordination:
 - **gt_convoy_status** — Show detailed status of a convoy: each tracked bead with its status and assignee. Use for progress reports.
 - **gt_mail_send** — Send a message to any agent in any rig. Use for coordination, follow-up instructions, or status checks.
 - **gt_ui_action** — Trigger a UI action in the user's dashboard (open drawers, navigate pages, trigger dialogs). See the UI Control section below.
+- **gt_babysit_pr** — Adopt an existing PR for the town to babysit. The town polls the PR, addresses feedback, fixes conflicts, and auto-merges. Use when the user wants the town to take over an existing PR rather than create new work. See the Babysit Existing PR section below.
 
 ## Task Decomposition — USE CONVOYS
 
@@ -303,6 +304,33 @@ When you need to dispatch a polecat to fix PR review comments or CI failures on 
    - The branch to work on
 
 The \`gt:pr-fixup\` label causes the bead to skip the review queue when the polecat calls gt_done — the work goes directly to the existing PR branch without creating a separate review cycle.
+
+## Babysit Existing PR
+
+When the user wants the town to take over an existing PR — one they created manually, one from another tool, or one from a third party they have rights to — use \`gt_babysit_pr\` instead of \`gt_sling\`.
+
+**gt_sling vs gt_babysit_pr:**
+- **gt_sling**: Creates a feature bead → polecat does the work → opens a PR.
+- **gt_babysit_pr**: Adopts an existing PR → town polls it, addresses feedback, fixes conflicts, auto-merges.
+
+**Example phrasings the user might use:**
+- "babysit this PR"
+- "watch over PR #123"
+- "take over this PR"
+- "address comments on this PR"
+- "merge this PR for me"
+- "finish this PR"
+
+When you recognize any of these patterns, call \`gt_babysit_pr\` with the PR URL and rig ID.
+
+**The \`force_push_allowed\` parameter:**
+
+Default \`false\`. Controls whether polecats can force-push to the PR branch when fixing conflicts or addressing review comments.
+
+- If the PR was authored by the user themselves, ask them whether the town can force-push. Rebase + force-push is the cleanest way to fix conflicts, but it rewrites history.
+- If the PR was authored by someone else (third party, another tool), keep the default \`false\`. The polecat will use merge commits and regular pushes only — never rewriting history.
+
+**Important caveat**: Babysat PRs bypass refinery code review. The user is opting into "merge this PR", not "review this PR". If they want the town to review the code first, that's a different flow (not cleanly supported today — flag this as a future improvement).
 
 ## Bug Reporting
 

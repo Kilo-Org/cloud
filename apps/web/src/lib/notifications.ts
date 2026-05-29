@@ -273,6 +273,14 @@ async function generateByokProvidersNotification(
       zai: 'GLM Coding Plan',
     } as Record<string, string>;
 
+    const providerName = names[provider];
+    if (!providerName) {
+      console.debug(
+        `[generateByokProvidersNotification] unknown BYOK supported provider ${provider}`
+      );
+      return [];
+    }
+
     console.debug(
       `[generateByokProvidersNotification] has used BYOK supported provider ${provider}`
     );
@@ -280,7 +288,7 @@ async function generateByokProvidersNotification(
       {
         id: 'byok-providers-jan-19',
         title: 'Try BYOK for Kilo Gateway',
-        message: `BYOK now supported for your ${names[provider]}, allowing faster model support, Kilo platform features, and more!`,
+        message: `BYOK now supported for your ${providerName}, allowing faster model support, Kilo platform features, and more!`,
         action: {
           actionText: 'Learn more',
           actionURL: 'https://kilo.ai/docs/basic-usage/byok',

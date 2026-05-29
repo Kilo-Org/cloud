@@ -132,11 +132,35 @@ export const sendScheduledActionNoticeOutputSchema = z.object({
 });
 export type SendScheduledActionNoticeResult = z.infer<typeof sendScheduledActionNoticeOutputSchema>;
 
+// ── sendCloudAgentSessionNotification ───────────────────────────────
+
+export const cloudAgentSessionPushStatusSchema = z.enum(['completed', 'failed', 'interrupted']);
+export type CloudAgentSessionPushStatus = z.infer<typeof cloudAgentSessionPushStatusSchema>;
+
+export const sendCloudAgentSessionNotificationInputSchema = z.object({
+  userId: z.string().min(1),
+  cliSessionId: z.string().min(1),
+  executionId: z.string().min(1),
+  status: cloudAgentSessionPushStatusSchema,
+  body: z.string(),
+});
+export type SendCloudAgentSessionNotificationParams = z.infer<
+  typeof sendCloudAgentSessionNotificationInputSchema
+>;
+
+export const sendCloudAgentSessionNotificationOutputSchema = z.object({
+  dispatched: z.boolean(),
+  reason: z.enum(['missing_session', 'dispatch_failed']).optional(),
+});
+export type SendCloudAgentSessionNotificationResult = z.infer<
+  typeof sendCloudAgentSessionNotificationOutputSchema
+>;
+
 // ── dispatchPush (internal DO RPC) ──────────────────────────────────
 
 export const dispatchPushInputSchema = z.object({
   userId: z.string().min(1),
-  presenceContext: z.string().min(1),
+  presenceContext: z.string().min(1).nullable(),
   idempotencyKey: z.string().min(1),
   badge: z
     .object({

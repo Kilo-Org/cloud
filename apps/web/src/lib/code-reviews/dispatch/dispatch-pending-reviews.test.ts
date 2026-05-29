@@ -2,6 +2,9 @@ const mockDispatchReview = jest.fn();
 const mockGetReviewStatus = jest.fn();
 const mockGetAgentConfigForOwner = jest.fn();
 const mockPrepareReviewPayload = jest.fn();
+const mockSendCodeReviewDisabledEmail = jest.fn();
+const mockGetIntegrationById = jest.fn();
+const mockUpdateCheckRun = jest.fn();
 
 jest.mock('@/lib/code-reviews/client/code-review-worker-client', () => ({
   codeReviewWorkerClient: {
@@ -18,6 +21,22 @@ jest.mock('@/lib/code-reviews/triggers/prepare-review-payload', () => ({
   prepareReviewPayload: (...args: unknown[]) => mockPrepareReviewPayload(...args),
 }));
 
+jest.mock('@/lib/email', () => ({
+  sendCodeReviewDisabledEmail: (...args: unknown[]) => mockSendCodeReviewDisabledEmail(...args),
+}));
+
+jest.mock('@/lib/integrations/db/platform-integrations', () => ({
+  getIntegrationById: (...args: unknown[]) => mockGetIntegrationById(...args),
+}));
+
+jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
+  updateCheckRun: (...args: unknown[]) => mockUpdateCheckRun(...args),
+}));
+
+jest.mock('@/lib/constants', () => ({
+  APP_URL: 'https://test.kilo.ai',
+}));
+
 jest.mock('@sentry/nextjs', () => ({
   captureException: jest.fn(),
 }));
@@ -25,6 +44,7 @@ jest.mock('@sentry/nextjs', () => ({
 import { db } from '@/lib/drizzle';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import {
+  agent_configs,
   cloud_agent_code_review_attempts,
   cloud_agent_code_reviews,
   kilocode_users,
@@ -32,6 +52,7 @@ import {
   type User,
 } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
+import { or } from 'drizzle-orm';
 import { tryDispatchPendingReviews } from './dispatch-pending-reviews';
 import { cronPendingCodeReviewCreatedAtWindowSql } from './dispatch-constants';
 import {
@@ -78,20 +99,39 @@ describe('tryDispatchPendingReviews', () => {
   beforeEach(() => {
     mockDispatchReview.mockResolvedValue(undefined);
     mockGetReviewStatus.mockResolvedValue(null);
-    mockGetAgentConfigForOwner.mockResolvedValue({ id: 'test-agent-config', config: {} });
+    mockGetAgentConfigForOwner.mockResolvedValue({
+      id: 'test-agent-config',
+      config: {},
+      is_enabled: true,
+      runtime_state: {},
+    });
     mockPrepareReviewPayload.mockImplementation((params: { reviewId: string }) => ({
       reviewId: params.reviewId,
     }));
+    mockSendCodeReviewDisabledEmail.mockResolvedValue({ sent: true });
+    mockGetIntegrationById.mockResolvedValue(null);
+    mockUpdateCheckRun.mockResolvedValue(undefined);
   });
 
   afterEach(async () => {
     await db
       .delete(cloud_agent_code_reviews)
       .where(eq(cloud_agent_code_reviews.repo_full_name, REPO));
+    await db
+      .delete(agent_configs)
+      .where(
+        or(
+          eq(agent_configs.owned_by_user_id, testUser.id),
+          eq(agent_configs.owned_by_organization_id, testOrganizationId)
+        )
+      );
     mockDispatchReview.mockReset();
     mockGetReviewStatus.mockReset();
     mockGetAgentConfigForOwner.mockReset();
     mockPrepareReviewPayload.mockReset();
+    mockSendCodeReviewDisabledEmail.mockReset();
+    mockGetIntegrationById.mockReset();
+    mockUpdateCheckRun.mockReset();
   });
 
   afterAll(async () => {
@@ -140,6 +180,38 @@ describe('tryDispatchPendingReviews', () => {
       created_at: createdAt,
       updated_at: updatedAt,
     };
+  }
+
+  async function insertAgentConfigForUser(runtimeState: Record<string, unknown> = {}) {
+    const [config] = await db
+      .insert(agent_configs)
+      .values({
+        owned_by_user_id: testUser.id,
+        agent_type: 'code_review',
+        platform: 'github',
+        config: {},
+        is_enabled: true,
+        runtime_state: runtimeState,
+        created_by: testUser.id,
+      })
+      .returning();
+
+    return config;
+  }
+
+  async function getStoredReview(reviewId: string) {
+    const [review] = await db
+      .select({
+        status: cloud_agent_code_reviews.status,
+        terminalReason: cloud_agent_code_reviews.terminal_reason,
+        dispatchReservationId: cloud_agent_code_reviews.dispatch_reservation_id,
+        errorMessage: cloud_agent_code_reviews.error_message,
+      })
+      .from(cloud_agent_code_reviews)
+      .where(eq(cloud_agent_code_reviews.id, reviewId))
+      .limit(1);
+
+    return review;
   }
 
   it('keeps organization concurrency at 20 reviews', async () => {
@@ -248,6 +320,104 @@ describe('tryDispatchPendingReviews', () => {
       activeCount: 3,
     });
     expect(mockDispatchReview).toHaveBeenCalledTimes(1);
+  });
+
+  it('disables Code Reviewer for pre-worker GitHub installation failures', async () => {
+    const recentTimestamp = minutesAgo(1);
+    const owner = { type: 'user', id: testUser.id } satisfies ReviewOwner;
+    const agentConfig = await insertAgentConfigForUser();
+    mockGetAgentConfigForOwner.mockResolvedValue(agentConfig);
+    mockPrepareReviewPayload.mockRejectedValue(
+      new Error(
+        'GitHub token or active app installation required for this repository (no_installation_found)'
+      )
+    );
+
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        reviewValues({
+          owner,
+          status: 'pending',
+          createdAt: recentTimestamp,
+          updatedAt: recentTimestamp,
+        })
+      )
+      .returning({ id: cloud_agent_code_reviews.id });
+
+    const result = await tryDispatchPendingReviews({
+      type: 'user',
+      id: testUser.id,
+      userId: testUser.id,
+    });
+
+    const storedReview = await getStoredReview(review.id);
+    const storedConfig = await db.query.agent_configs.findFirst({
+      where: eq(agent_configs.id, agentConfig.id),
+    });
+
+    expect(result.dispatched).toBe(0);
+    expect(mockDispatchReview).not.toHaveBeenCalled();
+    expect(storedReview).toEqual(
+      expect.objectContaining({
+        status: 'failed',
+        terminalReason: 'github_installation_required',
+        dispatchReservationId: null,
+      })
+    );
+    expect(storedConfig?.is_enabled).toBe(false);
+    expect(mockSendCodeReviewDisabledEmail).toHaveBeenCalledTimes(1);
+  });
+
+  it('refuses to prepare pending work while action-required state is present', async () => {
+    const recentTimestamp = minutesAgo(1);
+    const owner = { type: 'user', id: testUser.id } satisfies ReviewOwner;
+    const actionRequiredState = {
+      code_review_action_required: {
+        reason: 'byok_invalid_key',
+        detectedAt: minutesAgo(10),
+        lastSeenAt: minutesAgo(9),
+        lastErrorMessage:
+          'Code Reviewer was disabled because the selected BYOK API key is invalid or has been revoked. Update the key or choose another model, then enable Code Reviewer again.',
+      },
+    };
+    const agentConfig = await insertAgentConfigForUser(actionRequiredState);
+    mockGetAgentConfigForOwner.mockResolvedValue(agentConfig);
+
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        reviewValues({
+          owner,
+          status: 'pending',
+          createdAt: recentTimestamp,
+          updatedAt: recentTimestamp,
+        })
+      )
+      .returning({ id: cloud_agent_code_reviews.id });
+
+    await tryDispatchPendingReviews({
+      type: 'user',
+      id: testUser.id,
+      userId: testUser.id,
+    });
+
+    const storedReview = await getStoredReview(review.id);
+    const storedConfig = await db.query.agent_configs.findFirst({
+      where: eq(agent_configs.id, agentConfig.id),
+    });
+
+    expect(mockPrepareReviewPayload).not.toHaveBeenCalled();
+    expect(mockDispatchReview).not.toHaveBeenCalled();
+    expect(mockSendCodeReviewDisabledEmail).not.toHaveBeenCalled();
+    expect(storedConfig?.runtime_state).toEqual(actionRequiredState);
+    expect(storedReview).toEqual(
+      expect.objectContaining({
+        status: 'failed',
+        terminalReason: 'byok_invalid_key',
+        dispatchReservationId: null,
+      })
+    );
   });
 
   it('does not dispatch funded personal reviews when three are already active', async () => {
@@ -496,7 +666,7 @@ describe('tryDispatchPendingReviews', () => {
     expect(mockPrepareReviewPayload).toHaveBeenCalledWith({
       reviewId: oldPendingReview.id,
       owner: { type: 'user', id: testUser.id, userId: testUser.id },
-      agentConfig: { id: 'test-agent-config', config: {} },
+      agentConfig: { id: 'test-agent-config', config: {}, is_enabled: true, runtime_state: {} },
       platform: 'github',
     });
     expect(mockPrepareReviewPayload).not.toHaveBeenCalledWith(
@@ -566,7 +736,7 @@ describe('tryDispatchPendingReviews', () => {
     expect(mockPrepareReviewPayload).toHaveBeenCalledWith({
       reviewId: eligibleReview.id,
       owner: { type: 'user', id: testUser.id, userId: testUser.id },
-      agentConfig: { id: 'test-agent-config', config: {} },
+      agentConfig: { id: 'test-agent-config', config: {}, is_enabled: true, runtime_state: {} },
       platform: 'github',
     });
     expect(mockPrepareReviewPayload).not.toHaveBeenCalledWith(
@@ -617,7 +787,7 @@ describe('tryDispatchPendingReviews', () => {
     expect(mockPrepareReviewPayload).toHaveBeenCalledWith({
       reviewId: review.id,
       owner: { type: 'user', id: testUser.id, userId: testUser.id },
-      agentConfig: { id: 'test-agent-config', config: {} },
+      agentConfig: { id: 'test-agent-config', config: {}, is_enabled: true, runtime_state: {} },
       platform: 'github',
     });
   });
@@ -933,7 +1103,7 @@ describe('tryDispatchPendingReviews', () => {
     expect(mockPrepareReviewPayload).toHaveBeenCalledWith({
       reviewId: pendingReview.id,
       owner: { type: 'user', id: testUser.id, userId: testUser.id },
-      agentConfig: { id: 'test-agent-config', config: {} },
+      agentConfig: { id: 'test-agent-config', config: {}, is_enabled: true, runtime_state: {} },
       platform: 'github',
     });
     expect(mockPrepareReviewPayload).not.toHaveBeenCalledWith(

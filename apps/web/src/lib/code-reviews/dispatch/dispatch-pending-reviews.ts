@@ -34,6 +34,21 @@ import { captureException } from '@sentry/nextjs';
 import { errorExceptInTest, logExceptInTest } from '@/lib/utils.server';
 import { codeReviewWorkerClient } from '../client/code-review-worker-client';
 import type { CodeReviewPlatform } from '../core/schemas';
+import { getIntegrationById } from '@/lib/integrations/db/platform-integrations';
+import { updateCheckRun } from '@/lib/integrations/platforms/github/adapter';
+import { APP_URL } from '@/lib/constants';
+import {
+  CODE_REVIEW_TERMINAL_REASONS,
+  type CodeReviewTerminalReason,
+} from '@kilocode/db/schema-types';
+import {
+  classifyCodeReviewActionRequiredFailure,
+  disableCodeReviewForActionRequiredFailure,
+  getCodeReviewActionRequiredCopy,
+  getCodeReviewActionRequiredState,
+  isCodeReviewActionRequiredReason,
+  type CodeReviewActionRequiredReason,
+} from '../action-required';
 import {
   activeCodeReviewWorkCondition,
   reconsiderableCodeReviewWorkCondition,
@@ -70,6 +85,62 @@ type ReviewReservationBatch = {
   activeCount: number;
   reservations: ReservedReview[];
 };
+
+class CodeReviewActionRequiredDispatchError extends Error {
+  readonly reason: CodeReviewActionRequiredReason;
+
+  constructor(reason: CodeReviewActionRequiredReason) {
+    super(getCodeReviewActionRequiredCopy(reason).description);
+    this.name = 'CodeReviewActionRequiredDispatchError';
+    this.reason = reason;
+  }
+}
+
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function getActionRequiredReasonFromError(error: unknown): CodeReviewActionRequiredReason | null {
+  if (error instanceof CodeReviewActionRequiredDispatchError) {
+    return error.reason;
+  }
+
+  return classifyCodeReviewActionRequiredFailure(getErrorMessage(error));
+}
+
+function parseTerminalReason(reason?: string): CodeReviewTerminalReason | undefined {
+  return CODE_REVIEW_TERMINAL_REASONS.find(candidate => candidate === reason);
+}
+
+async function finalizeActionRequiredGateCheck(
+  review: CloudAgentCodeReview,
+  reason: CodeReviewActionRequiredReason
+): Promise<void> {
+  const platform: CodeReviewPlatform = review.platform === 'gitlab' ? 'gitlab' : 'github';
+  if (platform !== 'github' || !review.check_run_id || !review.platform_integration_id) return;
+
+  const integration = await getIntegrationById(review.platform_integration_id);
+  if (!integration?.platform_installation_id) return;
+
+  const [repoOwner, repoName] = review.repo_full_name.split('/');
+  const copy = getCodeReviewActionRequiredCopy(reason);
+  await updateCheckRun(
+    integration.platform_installation_id,
+    repoOwner,
+    repoName,
+    review.check_run_id,
+    {
+      status: 'completed',
+      conclusion: 'action_required',
+      detailsUrl: `${APP_URL}/code-reviews/${review.id}`,
+      output: {
+        title: copy.checkTitle,
+        summary: copy.checkSummary,
+      },
+    },
+    integration.github_app_type ?? 'standard'
+  );
+}
 
 async function getMaxConcurrentReviewsForOwner(
   tx: DrizzleTransaction,
@@ -230,6 +301,102 @@ export async function tryDispatchPendingReviews(
       } else {
         const reservation = reservations[i];
         const error = result.reason;
+        const errorMessage = getErrorMessage(error);
+        const actionRequiredReason = getActionRequiredReasonFromError(error);
+        const actionRequiredStateAlreadyPresent =
+          error instanceof CodeReviewActionRequiredDispatchError;
+
+        if (actionRequiredReason) {
+          if (!actionRequiredStateAlreadyPresent) {
+            logExceptInTest(
+              '[tryDispatchPendingReviews] Disabling Code Reviewer after action-required failure',
+              {
+                reviewId: reservation.review.id,
+                owner,
+                reason: actionRequiredReason,
+              }
+            );
+
+            try {
+              await disableCodeReviewForActionRequiredFailure({
+                owner,
+                platform: reservation.review.platform === 'gitlab' ? 'gitlab' : 'github',
+                reviewId: reservation.review.id,
+                reason: actionRequiredReason,
+                errorMessage,
+              });
+            } catch (disableError) {
+              errorExceptInTest('[tryDispatchPendingReviews] Failed to disable Code Reviewer', {
+                reviewId: reservation.review.id,
+                owner,
+                reason: actionRequiredReason,
+                disableError,
+              });
+              captureException(disableError, {
+                tags: { operation: 'disable-code-review-action-required' },
+                extra: { reviewId: reservation.review.id, owner, reason: actionRequiredReason },
+              });
+            }
+          }
+
+          try {
+            await failReservedQueuedReview(
+              reservation.review.id,
+              reservation.dispatchReservationId,
+              `Dispatch failed: ${getCodeReviewActionRequiredCopy(actionRequiredReason).description}`,
+              actionRequiredReason
+            );
+          } catch (updateError) {
+            errorExceptInTest(
+              '[tryDispatchPendingReviews] Failed to mark review as action-required',
+              {
+                reviewId: reservation.review.id,
+                updateError,
+              }
+            );
+            try {
+              const released = await releaseQueuedReviewClaim(
+                reservation.review.id,
+                reservation.dispatchReservationId
+              );
+              logExceptInTest(
+                '[tryDispatchPendingReviews] Released action-required review reservation',
+                {
+                  reviewId: reservation.review.id,
+                  released,
+                }
+              );
+            } catch (releaseError) {
+              errorExceptInTest(
+                '[tryDispatchPendingReviews] Failed to release action-required review reservation',
+                {
+                  reviewId: reservation.review.id,
+                  releaseError,
+                }
+              );
+              captureException(releaseError, {
+                tags: { operation: 'release-action-required-review-reservation' },
+                extra: { reviewId: reservation.review.id, owner },
+              });
+            }
+            continue;
+          }
+
+          try {
+            await finalizeActionRequiredGateCheck(reservation.review, actionRequiredReason);
+          } catch (updateError) {
+            errorExceptInTest(
+              '[tryDispatchPendingReviews] Failed to finalize action-required check run',
+              {
+                reviewId: reservation.review.id,
+                updateError,
+              }
+            );
+          }
+
+          continue;
+        }
+
         errorExceptInTest('[tryDispatchPendingReviews] Failed to dispatch review', {
           reviewId: reservation.review.id,
           error,
@@ -243,7 +410,7 @@ export async function tryDispatchPendingReviews(
           await failReservedQueuedReview(
             reservation.review.id,
             reservation.dispatchReservationId,
-            `Dispatch failed: ${error instanceof Error ? error.message : String(error)}`
+            `Dispatch failed: ${errorMessage}`
           );
         } catch (updateError) {
           errorExceptInTest('[tryDispatchPendingReviews] Failed to mark review as failed', {
@@ -298,6 +465,15 @@ async function dispatchReservedReview(reservation: ReservedReview, owner: Owner)
     throw new Error(
       `Agent config not found for owner ${owner.type}:${owner.id} on platform ${platform}`
     );
+  }
+
+  const actionRequiredState = getCodeReviewActionRequiredState(agentConfig);
+  if (actionRequiredState) {
+    throw new CodeReviewActionRequiredDispatchError(actionRequiredState.reason);
+  }
+
+  if (!agentConfig.is_enabled) {
+    throw new Error(`Code Reviewer is disabled for owner ${owner.type}:${owner.id} on ${platform}`);
   }
 
   const payload = await prepareReviewPayload({
@@ -412,6 +588,36 @@ async function handleAmbiguousDispatchFailure(
     }
 
     const completedAt = workerStatus.completedAt ? new Date(workerStatus.completedAt) : undefined;
+    const workerTerminalReason = parseTerminalReason(workerStatus.terminalReason);
+    const classifiedReason = classifyCodeReviewActionRequiredFailure(workerStatus.errorMessage);
+    const terminalReason = workerTerminalReason ?? classifiedReason ?? undefined;
+    const actionRequiredReason = isCodeReviewActionRequiredReason(workerTerminalReason)
+      ? workerTerminalReason
+      : classifiedReason;
+
+    if (actionRequiredReason) {
+      try {
+        await disableCodeReviewForActionRequiredFailure({
+          owner,
+          platform: review.platform === 'gitlab' ? 'gitlab' : 'github',
+          reviewId: review.id,
+          reason: actionRequiredReason,
+          errorMessage: workerStatus.errorMessage ?? actionRequiredReason,
+        });
+        await finalizeActionRequiredGateCheck(review, actionRequiredReason);
+      } catch (disableError) {
+        errorExceptInTest('[dispatchReview] Failed to disable Code Reviewer', {
+          reviewId: review.id,
+          reason: actionRequiredReason,
+          disableError,
+        });
+        captureException(disableError, {
+          tags: { operation: 'dispatch-review-action-required-disable' },
+          extra: { reviewId: review.id, owner, reason: actionRequiredReason },
+        });
+      }
+    }
+
     await updateCodeReviewAttemptForCallback({
       codeReviewId: review.id,
       attemptId,
@@ -419,6 +625,7 @@ async function handleAmbiguousDispatchFailure(
       sessionId: workerStatus.sessionId,
       cliSessionId: workerStatus.cliSessionId,
       errorMessage: workerStatus.errorMessage,
+      terminalReason,
       completedAt,
     });
     const parentUpdated = await updateCodeReviewStatusIfNonTerminal(
@@ -428,6 +635,7 @@ async function handleAmbiguousDispatchFailure(
         sessionId: workerStatus.sessionId,
         cliSessionId: workerStatus.cliSessionId,
         errorMessage: workerStatus.errorMessage,
+        terminalReason,
         completedAt,
       },
       dispatchReservationId

@@ -1,5 +1,10 @@
 import type { CallbackJob } from '../callbacks/types.js';
 import { logger } from '../logger.js';
+import type {
+  SendCloudAgentSessionNotificationParams,
+  SendCloudAgentSessionNotificationResult,
+} from '../notifications-binding.js';
+import { buildCloudAgentPushBody } from '../notifications/producer.js';
 import type { SessionMetadata } from '../persistence/session-metadata.js';
 import { countPendingSessionMessages, type SessionQueueStorage } from './pending-messages.js';
 import {
@@ -17,6 +22,7 @@ import type { AssistantMessagePart, LatestAssistantMessage } from './types.js';
 const CURRENT_IDLE_BATCH_CALLBACK_KEY = 'idle_batch_callback_current';
 const IDLE_BATCH_CALLBACK_PREFIX = 'idle_batch_callback:';
 const CALLBACK_ENQUEUE_RETRY_DELAY_MS = 30_000;
+const PUSH_DISPATCH_RETRY_DELAY_MS = 30_000;
 
 type IdleBatchCallbackState = {
   batchId: string;
@@ -50,6 +56,7 @@ export type FinalizeIdleBatchCallbackOptions = {
 export type TerminalizeSessionMessageOptions = {
   gateResult?: 'pass' | 'fail';
   suppressCallback?: boolean;
+  suppressPush?: boolean;
   allowIdleBatchWithoutObservedIdle?: boolean;
 };
 
@@ -81,6 +88,10 @@ export type MessageSettlementOutboxDependencies = {
   requireSessionId: () => Promise<string>;
   resolveCallbackSessionId: (metadata: SessionMetadata | null) => Promise<string>;
   getCallbackQueue: () => CallbackQueue | undefined;
+  sendPushNotification: (
+    params: SendCloudAgentSessionNotificationParams
+  ) => Promise<SendCloudAgentSessionNotificationResult>;
+  hasConnectedStreamClients: () => boolean;
   getAssistantMessageForUserMessage: (
     sessionId: string,
     kiloSessionId: string,
@@ -126,6 +137,8 @@ export function createMessageSettlementOutbox(
     requireSessionId,
     resolveCallbackSessionId,
     getCallbackQueue,
+    sendPushNotification,
+    hasConnectedStreamClients,
     getAssistantMessageForUserMessage,
     ensureTerminalMessageEvent,
     hasObservedWrapperIdle,
@@ -413,6 +426,87 @@ export function createMessageSettlementOutbox(
     }
   }
 
+  async function settlePushNotificationEffect(
+    state: SessionMessageState
+  ): Promise<'accounted' | 'not-required' | 'suppressed' | null> {
+    if (
+      state.status !== 'completed' &&
+      state.status !== 'failed' &&
+      state.status !== 'interrupted'
+    ) {
+      return 'not-required';
+    }
+
+    const metadata = await getMetadata();
+    if (!metadata || metadata.identity.createdOnPlatform !== 'cloud-agent-web') {
+      return 'suppressed';
+    }
+    if (hasConnectedStreamClients()) {
+      return 'suppressed';
+    }
+
+    const cliSessionId = metadata.auth.kiloSessionId;
+    if (!cliSessionId) {
+      return 'not-required';
+    }
+
+    let lastAssistantMessageText: string | undefined;
+    if (state.status === 'completed') {
+      const assistantMessage = getAssistantMessageForUserMessage(
+        metadata.identity.sessionId,
+        cliSessionId,
+        state.messageId
+      );
+      if (assistantMessage) {
+        lastAssistantMessageText = extractAssistantTextFromParts(assistantMessage.parts);
+      }
+    }
+
+    try {
+      const result = await sendPushNotification({
+        userId: metadata.identity.userId,
+        cliSessionId,
+        executionId: state.messageId,
+        status: state.status,
+        body: buildCloudAgentPushBody(state.status, lastAssistantMessageText, state.error),
+      });
+      if (result.dispatched) {
+        return 'accounted';
+      }
+      if (result.reason !== 'dispatch_failed') {
+        logger
+          .withFields({
+            sessionId: metadata.identity.sessionId,
+            messageId: state.messageId,
+            status: state.status,
+            reason: result.reason,
+          })
+          .warn('Cloud-agent push notification skipped by notifications service');
+        return 'not-required';
+      }
+      logger
+        .withFields({
+          sessionId: metadata.identity.sessionId,
+          messageId: state.messageId,
+          status: state.status,
+          reason: result.reason,
+        })
+        .error('Cloud-agent push notification dispatch failed');
+    } catch (error) {
+      logger
+        .withFields({
+          sessionId: metadata.identity.sessionId,
+          messageId: state.messageId,
+          status: state.status,
+          error: error instanceof Error ? error.message : String(error),
+        })
+        .error('Failed to dispatch cloud-agent push notification');
+    }
+
+    await requestAlarmAtOrBefore(Date.now() + PUSH_DISPATCH_RETRY_DELAY_MS);
+    return null;
+  }
+
   async function shouldWaitForWrapperGateResult(batch: IdleBatchCallbackState): Promise<boolean> {
     if (
       batch.wrapperTerminalObservedAt !== undefined ||
@@ -508,6 +602,7 @@ export function createMessageSettlementOutbox(
                     state.completionSource === 'delivery_failure',
                 }
               : { disposition: 'not-required' }),
+          push: state.terminalEffects?.push ?? { disposition: 'not-required' },
         },
       });
       state = (await getSessionMessageState(storage, state.messageId)) ?? state;
@@ -521,13 +616,27 @@ export function createMessageSettlementOutbox(
       await putSessionMessageState(storage, {
         ...state,
         terminalEffects: {
-          event: 'accounted',
+          ...state.terminalEffects,
           callback: {
             ...state.terminalEffects.callback,
             disposition: 'accounted',
           },
         },
       });
+      state = (await getSessionMessageState(storage, state.messageId)) ?? state;
+    }
+
+    if (state.terminalEffects?.push?.disposition === 'pending') {
+      const disposition = await settlePushNotificationEffect(state);
+      if (disposition) {
+        await putSessionMessageState(storage, {
+          ...state,
+          terminalEffects: {
+            ...state.terminalEffects,
+            push: { disposition },
+          },
+        });
+      }
     }
   }
 
@@ -557,6 +666,7 @@ export function createMessageSettlementOutbox(
   ): Promise<{ changed: boolean; state: SessionMessageState | null }> {
     return persistTerminalStateTransition(storage, messageId, params, {
       suppressCallback: opts?.suppressCallback,
+      suppressPush: opts?.suppressPush,
       allowIdleBatchWithoutObservedIdle: opts?.allowIdleBatchWithoutObservedIdle,
     });
   }
@@ -584,6 +694,7 @@ export function createMessageSettlementOutbox(
         completionSource: state.completionSource,
         callbackRequired: state.callbackRequired,
         suppressCallback: opts?.suppressCallback ?? false,
+        suppressPush: opts?.suppressPush ?? false,
         hasAssistantMessageId: state.assistantMessageId !== undefined,
       })
       .info('Session message terminalized');

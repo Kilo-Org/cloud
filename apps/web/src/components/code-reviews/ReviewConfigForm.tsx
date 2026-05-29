@@ -30,6 +30,7 @@ import { useOrganizationModels } from '@/components/cloud-agent/hooks/useOrganiz
 import { ModelCombobox } from '@/components/shared/ModelCombobox';
 import { cn } from '@/lib/utils';
 import { RepositoryMultiSelect, type Repository } from './RepositoryMultiSelect';
+import { CodeReviewActionRequiredAlert } from './CodeReviewActionRequiredAlert';
 import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
 import {
   getAvailableThinkingEfforts,
@@ -522,6 +523,14 @@ export function ReviewConfigForm({
       </CardHeader>
       <CardContent>
         <div className="space-y-8">
+          {configData?.actionRequired && (
+            <CodeReviewActionRequiredAlert
+              actionRequired={configData.actionRequired}
+              organizationId={organizationId}
+              compact
+            />
+          )}
+
           {/* Enable/Disable Toggle */}
           <div className="flex items-center justify-between rounded-lg border p-4">
             <div className="space-y-0.5">

@@ -113,6 +113,8 @@ function createHarness(
         callbackJobs.push(job);
       },
     }),
+    sendPushNotification: async () => ({ dispatched: true }),
+    hasConnectedStreamClients: () => false,
     getAssistantMessageForUserMessage: () => null,
     ensureTerminalMessageEvent: event => {
       if (!events.some(existing => existing.entityId === event.entityId)) events.push(event);

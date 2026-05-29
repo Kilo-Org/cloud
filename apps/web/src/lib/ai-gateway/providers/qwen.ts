@@ -5,21 +5,25 @@ import type {
 } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 
 const KILO_DISCOUNT_FACTOR = 0.65;
+const KILO_STEALTH_DISCOUNT_FACTOR = 0.5;
 
 type PricePerMillion = Omit<Pricing, 'calculate_mUsd'>;
 
-function applyKiloDiscount(price: PricePerMillion): PricePerMillion {
+function applyKiloDiscount(
+  price: PricePerMillion,
+  discountFactor: number = KILO_DISCOUNT_FACTOR
+): PricePerMillion {
   return {
-    prompt_per_million: price.prompt_per_million * KILO_DISCOUNT_FACTOR,
-    completion_per_million: price.completion_per_million * KILO_DISCOUNT_FACTOR,
+    prompt_per_million: price.prompt_per_million * discountFactor,
+    completion_per_million: price.completion_per_million * discountFactor,
     input_cache_read_per_million:
       price.input_cache_read_per_million === null
         ? null
-        : price.input_cache_read_per_million * KILO_DISCOUNT_FACTOR,
+        : price.input_cache_read_per_million * discountFactor,
     input_cache_write_per_million:
       price.input_cache_write_per_million === null
         ? null
-        : price.input_cache_write_per_million * KILO_DISCOUNT_FACTOR,
+        : price.input_cache_write_per_million * discountFactor,
   };
 }
 
@@ -40,11 +44,12 @@ function costForTier(usage: Usage, tier: PricePerMillion): number {
  * here. Inputs that exceed every declared bracket fall through to the last tier.
  */
 function makeTieredPricing(
-  tiers: ReadonlyArray<{ maxInputTokens: number; undiscounted: PricePerMillion }>
+  tiers: ReadonlyArray<{ maxInputTokens: number; undiscounted: PricePerMillion }>,
+  discountFactor: number = KILO_DISCOUNT_FACTOR
 ): Pricing {
   const discounted = tiers.map(t => ({
     maxInputTokens: t.maxInputTokens,
-    price: applyKiloDiscount(t.undiscounted),
+    price: applyKiloDiscount(t.undiscounted, discountFactor),
   }));
   const firstTier = discounted[0].price;
   const lastTier = discounted[discounted.length - 1].price;
@@ -122,6 +127,44 @@ export const qwen36_plus_model: KiloExclusiveModel = {
       },
     },
   ]),
+  exclusive_to: [],
+  inference_provider_restriction: [],
+};
+
+export const qwen36_plus_stealth_model: KiloExclusiveModel = {
+  public_id: 'stealth/qwen3.6-plus',
+  display_name: 'Stealth: Qwen3.6 Plus (50% off)',
+  description:
+    "Your prompts and completions may be retained and used to train or improve the provider's services. This third-party-served variant of Qwen3.6 Plus is offered at 50% lower cost than standard Qwen3.6 Plus pricing and is not served by Alibaba or Kilo Code. Note: a surcharge applies to long-context workloads exceeding 256K input tokens.",
+  context_length: 1_000_000,
+  max_completion_tokens: 65_536,
+  status: 'public',
+  flags: ['reasoning', 'vision', 'stealth', 'requires-data-collection'],
+  gateway: 'martian',
+  internal_id: 'qwen/qwen3.6-plus',
+  pricing: makeTieredPricing(
+    [
+      {
+        maxInputTokens: TOKENS_256K,
+        undiscounted: {
+          prompt_per_million: 0.5,
+          completion_per_million: 3,
+          input_cache_read_per_million: 0.05,
+          input_cache_write_per_million: 0.625,
+        },
+      },
+      {
+        maxInputTokens: TOKENS_1M,
+        undiscounted: {
+          prompt_per_million: 2,
+          completion_per_million: 6,
+          input_cache_read_per_million: 0.2,
+          input_cache_write_per_million: 2.5,
+        },
+      },
+    ],
+    KILO_STEALTH_DISCOUNT_FACTOR
+  ),
   exclusive_to: [],
   inference_provider_restriction: [],
 };

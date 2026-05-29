@@ -45,6 +45,15 @@ describe('notificationPathForData', () => {
       })
     ).toBe('/(app)/(tabs)/(1_kiloclaw)/chat/ki_deadbeef');
   });
+
+  it('routes cloud agent notifications to the matching agent session', () => {
+    expect(
+      notificationPathForData({
+        type: 'cloud_agent_session',
+        cliSessionId: 'ses_1',
+      })
+    ).toBe('/(app)/agent-chat/ses_1');
+  });
 });
 
 describe('pushDataSchema', () => {
@@ -75,7 +84,7 @@ describe('pushDataSchema', () => {
     ).toBe(false);
   });
 
-  it('accepts valid chat and lifecycle notification data', () => {
+  it('accepts valid chat, lifecycle, and cloud agent notification data', () => {
     expect(
       pushDataSchema.safeParse({
         type: 'chat.message',
@@ -91,5 +100,20 @@ describe('pushDataSchema', () => {
         sandboxId: 'sandbox-1',
       }).success
     ).toBe(true);
+    expect(
+      pushDataSchema.safeParse({
+        type: 'cloud_agent_session',
+        cliSessionId: 'ses_1',
+      }).success
+    ).toBe(true);
+  });
+
+  it('rejects empty cloud agent session IDs', () => {
+    expect(
+      pushDataSchema.safeParse({
+        type: 'cloud_agent_session',
+        cliSessionId: '',
+      }).success
+    ).toBe(false);
   });
 });

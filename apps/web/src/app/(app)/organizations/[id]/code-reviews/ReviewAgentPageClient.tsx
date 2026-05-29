@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { toast } from 'sonner';
 import { ReviewConfigForm } from '@/components/code-reviews/ReviewConfigForm';
+import { CodeReviewActionRequiredAlert } from '@/components/code-reviews/CodeReviewActionRequiredAlert';
 import { CodeReviewJobsCard } from '@/components/code-reviews/CodeReviewJobsCard';
 import { ReviewMemoryPanel } from '@/components/code-reviews/ReviewMemoryPanel';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -66,6 +67,14 @@ export function ReviewAgentPageClient({
       organizationId,
     })
   );
+
+  const { data: selectedConfigData } = useQuery(
+    trpc.organizations.reviewAgent.getReviewConfig.queryOptions({
+      organizationId,
+      platform: selectedPlatform,
+    })
+  );
+  const selectedActionRequired = selectedConfigData?.actionRequired ?? null;
 
   const isGitHubAppInstalled =
     githubStatusData?.connected && githubStatusData?.integration?.isValid;
@@ -162,6 +171,13 @@ export function ReviewAgentPageClient({
             </Alert>
           )}
 
+          {selectedPlatform === 'github' && selectedActionRequired && (
+            <CodeReviewActionRequiredAlert
+              actionRequired={selectedActionRequired}
+              organizationId={organizationId}
+            />
+          )}
+
           {/* GitHub Configuration Tabs */}
           <Tabs defaultValue={initialTab} className="w-full">
             <TabsList className="grid w-full max-w-3xl grid-cols-3">
@@ -232,6 +248,13 @@ export function ReviewAgentPageClient({
                 </Link>
               </AlertDescription>
             </Alert>
+          )}
+
+          {selectedPlatform === 'gitlab' && selectedActionRequired && (
+            <CodeReviewActionRequiredAlert
+              actionRequired={selectedActionRequired}
+              organizationId={organizationId}
+            />
           )}
 
           {/* GitLab Configuration Tabs */}

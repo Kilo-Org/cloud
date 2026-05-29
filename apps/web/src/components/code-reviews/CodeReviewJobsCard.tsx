@@ -25,6 +25,11 @@ import { useTRPC } from '@/lib/trpc/utils';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { formatDistanceToNow } from 'date-fns';
 import { CodeReviewStreamView } from './CodeReviewStreamView';
+import {
+  getCodeReviewActionRequiredCopy,
+  getCodeReviewActionRequiredRecoveryHref,
+  isCodeReviewActionRequiredReason,
+} from '@/lib/code-reviews/action-required-shared';
 
 type Platform = 'github' | 'gitlab';
 
@@ -223,6 +228,15 @@ export function CodeReviewJobsCard({
             const StatusIcon = statusInfo.icon;
             const isExpanded = expandedReviewId === review.id;
             const canShowStream = ['running', 'queued'].includes(review.status);
+            const actionRequiredReason = isCodeReviewActionRequiredReason(review.terminal_reason)
+              ? review.terminal_reason
+              : null;
+            const actionRequiredCopy = actionRequiredReason
+              ? getCodeReviewActionRequiredCopy(actionRequiredReason)
+              : null;
+            const actionRequiredRecoveryHref = actionRequiredReason
+              ? getCodeReviewActionRequiredRecoveryHref(actionRequiredReason, organizationId)
+              : null;
 
             return (
               <div key={review.id} className="space-y-2">
@@ -364,25 +378,45 @@ export function CodeReviewJobsCard({
                       )}
 
                       {/* Retry Button for failed/cancelled/interrupted reviews */}
-                      {['failed', 'cancelled', 'interrupted'].includes(review.status) && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setActionInProgressId(review.id);
-                            retriggerMutation.mutate({ reviewId: review.id });
-                          }}
-                          disabled={actionInProgressId === review.id && retriggerMutation.isPending}
-                          className="gap-2"
-                        >
-                          <RotateCcw
-                            className={`h-3 w-3 ${actionInProgressId === review.id && retriggerMutation.isPending ? 'animate-spin' : ''}`}
-                          />
-                          {actionInProgressId === review.id && retriggerMutation.isPending
-                            ? 'Retrying...'
-                            : 'Retry'}
-                        </Button>
-                      )}
+                      {['failed', 'cancelled', 'interrupted'].includes(review.status) &&
+                        actionRequiredCopy &&
+                        actionRequiredRecoveryHref && (
+                          <Button variant="outline" size="sm" asChild className="gap-2">
+                            {actionRequiredRecoveryHref.startsWith('mailto:') ? (
+                              <a href={actionRequiredRecoveryHref}>
+                                {actionRequiredCopy.recoveryLabel}
+                                <ExternalLink className="h-3 w-3" />
+                              </a>
+                            ) : (
+                              <Link href={actionRequiredRecoveryHref}>
+                                {actionRequiredCopy.recoveryLabel}
+                                <ExternalLink className="h-3 w-3" />
+                              </Link>
+                            )}
+                          </Button>
+                        )}
+                      {['failed', 'cancelled', 'interrupted'].includes(review.status) &&
+                        !actionRequiredReason && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setActionInProgressId(review.id);
+                              retriggerMutation.mutate({ reviewId: review.id });
+                            }}
+                            disabled={
+                              actionInProgressId === review.id && retriggerMutation.isPending
+                            }
+                            className="gap-2"
+                          >
+                            <RotateCcw
+                              className={`h-3 w-3 ${actionInProgressId === review.id && retriggerMutation.isPending ? 'animate-spin' : ''}`}
+                            />
+                            {actionInProgressId === review.id && retriggerMutation.isPending
+                              ? 'Retrying...'
+                              : 'Retry'}
+                          </Button>
+                        )}
                     </div>
                   </div>
                 </div>

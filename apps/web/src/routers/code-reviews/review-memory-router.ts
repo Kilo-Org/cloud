@@ -171,7 +171,7 @@ export const reviewMemoryRouter = createTRPCRouter({
   approveAndOpenChangeRequest: baseProcedure
     .input(OwnerInputSchema.extend({ proposalId: z.uuid() }))
     .mutation(async ({ ctx, input }) => {
-      const owner = await ownerFromInput(ctx, input, ['owner', 'billing_manager']);
+      const owner = await ownerFromInput(ctx, input, ['owner']);
       try {
         return await approveAndOpenReviewMemoryChangeRequest({
           owner,

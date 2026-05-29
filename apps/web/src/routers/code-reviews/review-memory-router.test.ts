@@ -25,7 +25,9 @@ jest.mock('@/lib/code-reviews/review-memory/change-request', () => {
 });
 
 import { db } from '@/lib/drizzle';
+import { addUserToOrganization } from '@/lib/organizations/organizations';
 import { createCallerForUser } from '@/routers/test-utils';
+import { createTestOrganization } from '@/tests/helpers/organization.helper';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import {
   code_review_feedback_events,
@@ -35,6 +37,8 @@ import {
   code_review_memory_proposal_evidence,
   code_review_memory_proposals,
   kilocode_users,
+  organization_memberships,
+  organizations,
 } from '@kilocode/db/schema';
 import {
   recordFeedbackEvent,
@@ -50,6 +54,8 @@ describe('reviewMemoryRouter', () => {
     await db.delete(code_review_feedback_events);
     await db.delete(code_review_feedback_subjects);
     await db.delete(code_review_memory_aggregation_state);
+    await db.delete(organization_memberships);
+    await db.delete(organizations);
     await db.delete(kilocode_users);
   });
 
@@ -206,5 +212,22 @@ describe('reviewMemoryRouter', () => {
         name: user.google_user_name,
       },
     });
+  });
+
+  it('prevents billing managers from opening organization change requests', async () => {
+    const ownerUser = await insertTestUser();
+    const billingManager = await insertTestUser();
+    const organization = await createTestOrganization('Review Memory Org', ownerUser.id, 0);
+    await addUserToOrganization(organization.id, billingManager.id, 'billing_manager');
+    const proposal = await seedProposal({ type: 'org', id: organization.id });
+    const caller = await createCallerForUser(billingManager.id);
+
+    await expect(
+      caller.reviewMemory.approveAndOpenChangeRequest({
+        organizationId: organization.id,
+        proposalId: proposal.id,
+      })
+    ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+    expect(mockApproveAndOpenReviewMemoryChangeRequest).not.toHaveBeenCalled();
   });
 });

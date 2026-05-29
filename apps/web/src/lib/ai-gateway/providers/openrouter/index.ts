@@ -79,6 +79,13 @@ function formatName(model: OpenRouterModel, preferredIndex: number) {
   const ageDays = (Date.now() / 1_000 - model.created) / (24 * 3600);
   const isNew = preferredIndex >= 0 && ageDays >= 0 && ageDays < 7;
   if (isNew) return model.name + ' (new)';
+  if (model.expiration_date) {
+    const suffix = new Date(model.expiration_date).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+    });
+    return model.name + ' (retires ' + suffix + ')';
+  }
   return model.name;
 }
 

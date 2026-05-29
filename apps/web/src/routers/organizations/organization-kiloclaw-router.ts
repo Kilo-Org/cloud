@@ -25,7 +25,6 @@ import { KILOCLAW_API_URL, KILOCLAW_INSTANCE_URL_TEMPLATE } from '@/lib/config.s
 import { workerUrlForInstance } from '@/lib/kiloclaw/instance-url';
 import { sentryLogger } from '@/lib/utils.server';
 import { db } from '@/lib/drizzle';
-import { imageRolloutSubjectFromSandboxId } from '@kilocode/worker-utils/instance-id';
 import {
   kiloclaw_version_pins,
   kiloclaw_image_catalog,
@@ -309,8 +308,8 @@ export const organizationKiloclawRouter = createTRPCRouter({
       const client = new KiloClawInternalClient();
       const instance = await getActiveOrgInstance(ctx.user.id, input.organizationId);
       if (!instance) return client.getLatestVersion();
-      return client.getLatestVersion({
-        instanceId: imageRolloutSubjectFromSandboxId(instance.sandboxId, ctx.user.id),
+      return client.getLatestVersionForInstance({
+        sandboxId: instance.sandboxId,
         userId: ctx.user.id,
         currentImageTag: input.currentImageTag ?? null,
       });

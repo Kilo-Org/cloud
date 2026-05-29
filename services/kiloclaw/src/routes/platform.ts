@@ -4438,28 +4438,17 @@ platform.get('/versions', async c => {
 // GET /api/platform/versions/latest
 // Resolves the image version this caller should be on next.
 //
-// Query params (all optional):
-//   instanceId       — rollout subject used for candidate selection
-//   userId           — owning user; used only for Early Access lookup
-//   currentImageTag  — caller's current image; used to suppress self-upgrades
-//
-// Without instanceId, returns the current :latest pointer (back-compat for
-// anonymous callers — public version banner, CI, etc.). With instanceId, runs
-// the rollout-aware selector and returns the candidate when the instance falls
-// in cohort, the :latest baseline when not, or 404 when the caller is already
-// on the newest applicable image (banner: "no upgrade").
-//
-// The caller is responsible for passing the same rollout subject that the
-// restart path would use: userId for legacy user-keyed instances and instanceId
-// for instance-keyed instances. Early Access is still resolved server-side from
-// the owning userId, matching the DO upgrade path.
+// Without rolloutSubject, returns the current :latest pointer for anonymous
+// callers. With rolloutSubject, runs the same rollout selector used by
+// restartMachine({ imageTag: 'latest' }). userId is used only to resolve Early
+// Access server-side.
 platform.get('/versions/latest', async c => {
   try {
-    const instanceId = c.req.query('instanceId');
+    const rolloutSubject = c.req.query('rolloutSubject');
     const userId = c.req.query('userId');
     const currentImageTag = c.req.query('currentImageTag') ?? null;
 
-    if (!instanceId) {
+    if (!rolloutSubject) {
       const latest = await resolveLatestVersion(c.env.KV_CLAW_CACHE, 'default');
       if (!latest) return c.json({ error: 'No latest version registered' }, 404);
       return c.json(latest);
@@ -4483,7 +4472,7 @@ platform.get('/versions/latest', async c => {
     const selected = await selectImageVersionForInstance({
       kv: c.env.KV_CLAW_CACHE,
       variant: 'default',
-      instanceId,
+      instanceId: rolloutSubject,
       currentImageTag,
       autoEnroll,
     });

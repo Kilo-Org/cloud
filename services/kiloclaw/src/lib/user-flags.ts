@@ -39,8 +39,6 @@ export async function setKiloclawEarlyAccess(
 
 /**
  * Resolve the Early Access flag for the user who owns the given instance.
- * The platform `/versions/latest` endpoint uses this so callers cannot
- * forge Early Access by passing it as a query param.
  *
  * Returns false when the instance row doesn't exist (e.g. provisioning
  * race) or the user has the flag disabled.

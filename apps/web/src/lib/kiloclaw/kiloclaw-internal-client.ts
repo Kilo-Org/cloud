@@ -5,6 +5,7 @@ import type {
   KiloclawStartReason,
   KiloclawStopReason,
 } from '@kilocode/worker-utils';
+import { imageRolloutSubjectFromSandboxId } from '@kilocode/worker-utils/instance-id';
 import { INTERNAL_API_SECRET, KILOCLAW_API_URL } from '@/lib/config.server';
 import type {
   ImageVersionEntry,
@@ -152,18 +153,24 @@ export class KiloClawInternalClient {
     return this.request('/api/platform/versions');
   }
 
-  async getLatestVersion(opts?: {
-    instanceId?: string;
-    userId?: string;
+  async getLatestVersion(): Promise<ImageVersionEntry | null> {
+    return this.requestLatestVersion('/api/platform/versions/latest');
+  }
+
+  async getLatestVersionForInstance(opts: {
+    sandboxId: string | null | undefined;
+    userId: string;
     currentImageTag?: string | null;
   }): Promise<ImageVersionEntry | null> {
-    let path = '/api/platform/versions/latest';
-    if (opts?.instanceId) {
-      const params = new URLSearchParams({ instanceId: opts.instanceId });
-      if (opts.userId) params.set('userId', opts.userId);
-      if (opts.currentImageTag) params.set('currentImageTag', opts.currentImageTag);
-      path += `?${params.toString()}`;
-    }
+    const params = new URLSearchParams({
+      rolloutSubject: imageRolloutSubjectFromSandboxId(opts.sandboxId, opts.userId),
+      userId: opts.userId,
+    });
+    if (opts.currentImageTag) params.set('currentImageTag', opts.currentImageTag);
+    return this.requestLatestVersion(`/api/platform/versions/latest?${params.toString()}`);
+  }
+
+  private async requestLatestVersion(path: string): Promise<ImageVersionEntry | null> {
     try {
       return await this.request(path);
     } catch (err) {

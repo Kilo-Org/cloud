@@ -37,7 +37,7 @@ import {
   markImageAsLatest,
   disableImageAndClearRollout,
 } from '../lib/version-rollout';
-import { setKiloclawEarlyAccess, lookupKiloclawEarlyAccessByInstanceId } from '../lib/user-flags';
+import { setKiloclawEarlyAccess, lookupKiloclawEarlyAccess } from '../lib/user-flags';
 import { upsertCatalogVersion } from '../lib/catalog-registration';
 import { runScheduledActionNoticesSweep } from '../scheduled/scheduled-action-notices';
 import { flattenError, z } from 'zod';
@@ -4439,7 +4439,8 @@ platform.get('/versions', async c => {
 // Resolves the image version this caller should be on next.
 //
 // Query params (all optional):
-//   instanceId       — bucket subject for rollout candidate selection
+//   instanceId       — rollout subject used for candidate selection
+//   userId           — owning user; used only for Early Access lookup
 //   currentImageTag  — caller's current image; used to suppress self-upgrades
 //
 // Without instanceId, returns the current :latest pointer (back-compat for
@@ -4448,13 +4449,14 @@ platform.get('/versions', async c => {
 // in cohort, the :latest baseline when not, or 404 when the caller is already
 // on the newest applicable image (banner: "no upgrade").
 //
-// The Early Access flag is looked up server-side from the instance's owning
-// user — callers cannot pass it as a query param. This keeps the service as
-// the single authoritative source: even an internal-key-holding caller can't
-// claim Early Access for an arbitrary instance.
+// The caller is responsible for passing the same rollout subject that the
+// restart path would use: userId for legacy user-keyed instances and instanceId
+// for instance-keyed instances. Early Access is still resolved server-side from
+// the owning userId, matching the DO upgrade path.
 platform.get('/versions/latest', async c => {
   try {
     const instanceId = c.req.query('instanceId');
+    const userId = c.req.query('userId');
     const currentImageTag = c.req.query('currentImageTag') ?? null;
 
     if (!instanceId) {
@@ -4463,14 +4465,13 @@ platform.get('/versions/latest', async c => {
       return c.json(latest);
     }
 
-    // Resolve Early Access from the instance's owner. This requires Hyperdrive;
-    // without it we degrade gracefully to autoEnroll=false (the bucket math
-    // still works correctly — only the staff/beta-tester override is missing).
+    // Resolve Early Access the same way restartMachine does inside the DO:
+    // from the owning userId, not from caller-provided eligibility state.
     let autoEnroll = false;
     const connectionString = c.env.HYPERDRIVE?.connectionString;
-    if (connectionString) {
+    if (userId && connectionString) {
       try {
-        autoEnroll = await lookupKiloclawEarlyAccessByInstanceId(connectionString, instanceId);
+        autoEnroll = await lookupKiloclawEarlyAccess(connectionString, userId);
       } catch (err) {
         console.warn(
           '[platform] Early Access lookup failed; treating as false:',

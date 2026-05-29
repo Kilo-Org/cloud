@@ -26,6 +26,10 @@ import { workerUrlForInstance } from '@/lib/kiloclaw/instance-url';
 import { sentryLogger } from '@/lib/utils.server';
 import { db } from '@/lib/drizzle';
 import {
+  instanceIdFromSandboxId,
+  isInstanceKeyedSandboxId,
+} from '@kilocode/worker-utils/instance-id';
+import {
   kiloclaw_version_pins,
   kiloclaw_image_catalog,
   kiloclaw_cli_runs,
@@ -308,10 +312,11 @@ export const organizationKiloclawRouter = createTRPCRouter({
       const client = new KiloClawInternalClient();
       const instance = await getActiveOrgInstance(ctx.user.id, input.organizationId);
       if (!instance) return client.getLatestVersion();
-      // Early Access is resolved server-side via the platform endpoint
-      // (instance → owner → kiloclaw_early_access lookup), not passed by us.
       return client.getLatestVersion({
-        instanceId: instance.id,
+        instanceId: isInstanceKeyedSandboxId(instance.sandboxId)
+          ? instanceIdFromSandboxId(instance.sandboxId)
+          : ctx.user.id,
+        userId: ctx.user.id,
         currentImageTag: input.currentImageTag ?? null,
       });
     }),

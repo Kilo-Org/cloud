@@ -154,14 +154,13 @@ export class KiloClawInternalClient {
 
   async getLatestVersion(opts?: {
     instanceId?: string;
+    userId?: string;
     currentImageTag?: string | null;
   }): Promise<ImageVersionEntry | null> {
-    // Note: Early Access is resolved server-side from the instance's owning
-    // user — callers do NOT pass it as a param. Trying to set it here would
-    // be ignored.
     let path = '/api/platform/versions/latest';
     if (opts?.instanceId) {
       const params = new URLSearchParams({ instanceId: opts.instanceId });
+      if (opts.userId) params.set('userId', opts.userId);
       if (opts.currentImageTag) params.set('currentImageTag', opts.currentImageTag);
       path += `?${params.toString()}`;
     }

@@ -46,7 +46,7 @@ async function readPointer(kv: KVNamespace, key: string): Promise<ImageVersionEn
 export interface SelectImageVersionOptions {
   kv: KVNamespace;
   variant: ImageVariant;
-  /** Instance whose bucket determines candidate eligibility. */
+  /** Instance/DO subject whose bucket determines candidate eligibility. */
   instanceId: string;
   /** Tag the instance is currently running, if any. Used to skip self-upgrades. */
   currentImageTag?: string | null;

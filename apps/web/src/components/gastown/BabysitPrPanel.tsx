@@ -39,17 +39,6 @@ export function BabysitPrPanel({ rigId, onClose }: BabysitPrPanelProps) {
   const [userEditedBody, setUserEditedBody] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const defaultTitle = preview?.title ? `Babysit: ${preview.title}` : '';
-  const defaultBody = preview ? `Monitoring PR: ${prUrl.trim()}` : '';
-
-  useEffect(() => {
-    if (!userEditedTitle) setTitleOverride(defaultTitle);
-  }, [defaultTitle, userEditedTitle]);
-
-  useEffect(() => {
-    if (!userEditedBody) setBodyOverride(defaultBody);
-  }, [defaultBody, userEditedBody]);
-
   useEffect(() => {
     if (debounceRef.current) {
       clearTimeout(debounceRef.current);
@@ -80,6 +69,17 @@ export function BabysitPrPanel({ rigId, onClose }: BabysitPrPanelProps) {
 
   const preview = previewQuery.data as PreviewPrResult | undefined;
   const previewError = previewQuery.error;
+  const defaultTitle = preview?.title ? `Babysit: ${preview.title}` : '';
+  const defaultBody = preview ? `Monitoring PR: ${prUrl.trim()}` : '';
+
+  useEffect(() => {
+    if (!userEditedTitle) setTitleOverride(defaultTitle);
+  }, [defaultTitle, userEditedTitle]);
+
+  useEffect(() => {
+    if (!userEditedBody) setBodyOverride(defaultBody);
+  }, [defaultBody, userEditedBody]);
+
   const isValidUrl = HTTPS_URL_RE.test(prUrl.trim());
   const isPreviewReady = !!preview && preview.repo_matches && preview.state === 'open';
   const isRepoMismatch = !!preview && !preview.repo_matches;

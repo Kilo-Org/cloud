@@ -1051,6 +1051,13 @@
       "when": 1780080850427,
       "tag": "0149_pink_tag",
       "breakpoints": true
+    },
+    {
+      "idx": 150,
+      "version": "7",
+      "when": 1780085204443,
+      "tag": "0150_typical_scorpion",
+      "breakpoints": true
     }
   ]
 }

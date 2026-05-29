@@ -265,14 +265,14 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     }
   }
 
-  let originalModelIdLowerCased = requestBodyParsed.body.model.toLowerCase();
+  let effectiveModelIdLowerCased = requestBodyParsed.body.model.toLowerCase();
 
   // Reject early (before rate limiting) if the model is exclusive to other features.
-  if (isExcludedForFeature(originalModelIdLowerCased, feature)) {
+  if (isExcludedForFeature(effectiveModelIdLowerCased, feature)) {
     console.warn(
-      `Model ${originalModelIdLowerCased} is not available for feature ${feature}; rejecting.`
+      `Model ${effectiveModelIdLowerCased} is not available for feature ${feature}; rejecting.`
     );
-    return featureExclusiveModelResponse(originalModelIdLowerCased);
+    return featureExclusiveModelResponse(effectiveModelIdLowerCased);
   }
   if (!ipAddress) {
     return NextResponse.json(
@@ -289,16 +289,16 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   // per user when the request comes from Cloudflare IPs (Kilo infrastructure).
   // All other products rate-limit per IP (fast pre-auth path).
   const isRateLimitedFreeModelRequest =
-    isKiloExclusiveFreeModel(originalModelIdLowerCased) ||
+    isKiloExclusiveFreeModel(effectiveModelIdLowerCased) ||
     autoModel === KILO_AUTO_FREE_MODEL.id ||
-    (await isPublicIdExperimented(originalModelIdLowerCased));
+    (await isPublicIdExperimented(effectiveModelIdLowerCased));
   if (isRateLimitedFreeModelRequest) {
     const rateLimit = await resolveRateLimit(feature, ipAddress, authPromise);
     if (rateLimit instanceof NextResponse) return rateLimit;
 
     if (!rateLimit.result.allowed) {
       console.warn(
-        `Free model rate limit exceeded, ${rateLimit.subject}, model: ${originalModelIdLowerCased}, request count: ${rateLimit.result.requestCount}`
+        `Free model rate limit exceeded, ${rateLimit.subject}, model: ${effectiveModelIdLowerCased}, request count: ${rateLimit.result.requestCount}`
       );
       return NextResponse.json(
         {
@@ -330,7 +330,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   if (authFailedResponse) {
     // No valid auth
-    if (!(await isFreeModel(originalModelIdLowerCased))) {
+    if (!(await isFreeModel(effectiveModelIdLowerCased))) {
       // Paid model requires authentication
       return NextResponse.json(
         {
@@ -349,7 +349,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     if (!promotionLimit.allowed) {
       console.warn(
         `Promotion model limit exceeded, ip: ${ipAddress}, ` +
-          `model: ${originalModelIdLowerCased}, ` +
+          `model: ${effectiveModelIdLowerCased}, ` +
           `requests: ${promotionLimit.requestCount}/${PROMOTION_MAX_REQUESTS} ` +
           `in ${PROMOTION_WINDOW_HOURS}h window`
       );
@@ -388,7 +388,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   if (isRateLimitedFreeModelRequest) {
     await logFreeModelRequest(
       ipAddress,
-      originalModelIdLowerCased,
+      effectiveModelIdLowerCased,
       isAnonymousContext(user) ? undefined : user.id
     );
   }
@@ -397,8 +397,8 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   const { fraudHeaders, projectId } = extractFraudAndProjectHeaders(request);
   // Resolve the initial provider before abuse enforcement because abuse needs
   // provider/BYOK context, and quarantine-3 may later rewrite these values.
-  let providerResult = await getProvider({
-    requestedModel: originalModelIdLowerCased,
+  const initialProviderResultForAbuseService = await getProvider({
+    requestedModel: effectiveModelIdLowerCased,
     request: requestBodyParsed,
     user,
     organizationId,
@@ -406,20 +406,15 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     clientIp: ipAddress ?? null,
     machineId: machineIdHeader,
   });
-  if (providerResult.kind === 'not-found') {
+  if (initialProviderResultForAbuseService.kind === 'not-found') {
     // Paused experiment for this public id — return a local model-unavailable
     // response instead of silently falling through to default routing.
     return modelDoesNotExistResponse();
   }
-  if (providerResult.kind === 'unavailable') {
+  if (initialProviderResultForAbuseService.kind === 'unavailable') {
     return temporarilyUnavailableResponse();
   }
-  let provider = providerResult.provider;
-  let userByok = providerResult.userByok;
-  let bypassAccessCheck = providerResult.bypassAccessCheck;
-  let skipProviderPin = providerResult.skipProviderPin;
-  let skipKiloExclusiveModelSettings = providerResult.skipKiloExclusiveModelSettings;
-  let experiment = providerResult.experiment;
+  let effectiveProviderContext = initialProviderResultForAbuseService;
 
   // Request-level data-collection opt-out: a caller can set
   // `provider.data_collection: 'deny'` or `provider.zdr: true` on any
@@ -429,19 +424,22 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   // for partner evaluation — which violates the caller's stated
   // intent. Refuse here regardless of org settings, anon/BYOK status,
   // or the org-level check below.
-  if (experiment && !isFreePromptTrainingAllowed(requestBodyParsed.body.provider)) {
+  if (
+    effectiveProviderContext.experiment &&
+    !isFreePromptTrainingAllowed(requestBodyParsed.body.provider)
+  ) {
     return dataCollectionRequiredResponse();
   }
 
-  if (!provider.supportedChatApis.includes(requestBodyParsed.kind)) {
+  if (!effectiveProviderContext.provider.supportedChatApis.includes(requestBodyParsed.kind)) {
     return apiKindNotSupportedResponse(
       requestBodyParsed.kind,
-      provider.supportedChatApis,
+      effectiveProviderContext.provider.supportedChatApis,
       fraudHeaders
     );
   }
 
-  console.debug(`Routing request to ${provider.id}`);
+  console.debug(`Routing request to ${effectiveProviderContext.provider.id}`);
 
   // Start classification early, but do not await it unless the last cached
   // rules-engine result says this identity is already under enforcement.
@@ -449,8 +447,8 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     kiloUserId: user.id,
     organizationId,
     projectId,
-    provider: provider.id,
-    isByok: !!userByok,
+    provider: effectiveProviderContext.provider.id,
+    isByok: !!effectiveProviderContext.userByok,
     feature,
   });
   const abuseCacheIdentityKey = await resolveAbuseClassificationCacheIdentityKey({
@@ -474,10 +472,10 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   }
 
   if (
-    isDeadFreeModel(originalModelIdLowerCased) ||
-    (!autoModel && isForbiddenFreeModel(originalModelIdLowerCased))
+    isDeadFreeModel(effectiveModelIdLowerCased) ||
+    (!autoModel && isForbiddenFreeModel(effectiveModelIdLowerCased))
   ) {
-    console.warn(`User requested forbidden free model ${originalModelIdLowerCased}; rejecting.`);
+    console.warn(`User requested forbidden free model ${effectiveModelIdLowerCased}; rejecting.`);
     return forbiddenFreeModelResponse(fraudHeaders);
   }
 
@@ -496,9 +494,9 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     (shouldBlockOnClassify ? cachedAction?.action : null);
   const rulesEngineDecision = getRulesEngineActionDecision({
     action: rulesEngineActionForDecision,
-    userByok: !!userByok,
+    userByok: !!effectiveProviderContext.userByok,
     quarantineFreeModel:
-      rulesEngineActionForDecision === 'quarantine-3' && !userByok
+      rulesEngineActionForDecision === 'quarantine-3' && !effectiveProviderContext.userByok
         ? await getQuarantineFreeModel(requestBodyParsed.kind)
         : null,
   });
@@ -510,7 +508,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
         classifyResult.rules_engine?.matched_abuse_rule_ids ?? [],
       identity_key: classifyResult.context?.identity_key,
       kilo_user_id: user.id,
-      requested_model: originalModelIdLowerCased,
+      requested_model: effectiveModelIdLowerCased,
       rps: classifyResult.context?.requests_per_second,
       request_id: classifyResult.request_id,
     });
@@ -521,10 +519,11 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   if (rulesEngineDecision.modelOverride) {
     // Quarantine-3 rewrites non-BYOK requests to an auto-free candidate, so the
     // provider and derived policy flags must be resolved again for that model.
+    const modelBeforeQuarantineOverride = effectiveModelIdLowerCased;
     requestBodyParsed.body.model = rulesEngineDecision.modelOverride;
-    originalModelIdLowerCased = rulesEngineDecision.modelOverride;
-    providerResult = await getProvider({
-      requestedModel: originalModelIdLowerCased,
+    effectiveModelIdLowerCased = rulesEngineDecision.modelOverride;
+    const quarantineProviderResult = await getProvider({
+      requestedModel: effectiveModelIdLowerCased,
       request: requestBodyParsed,
       user,
       organizationId,
@@ -532,33 +531,44 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       clientIp: ipAddress ?? null,
       machineId: machineIdHeader,
     });
-    if (providerResult.kind === 'not-found') {
+    if (quarantineProviderResult.kind === 'not-found') {
       if (rulesEngineDecision.delayMs > 0) {
         await sleepForRulesEngineAction(rulesEngineDecision.delayMs);
       }
       return modelDoesNotExistResponse();
     }
-    if (providerResult.kind === 'unavailable') {
+    if (quarantineProviderResult.kind === 'unavailable') {
       if (rulesEngineDecision.delayMs > 0) {
         await sleepForRulesEngineAction(rulesEngineDecision.delayMs);
       }
       return temporarilyUnavailableResponse();
     }
 
-    provider = providerResult.provider;
-    userByok = providerResult.userByok;
-    bypassAccessCheck = providerResult.bypassAccessCheck;
-    skipProviderPin = providerResult.skipProviderPin;
-    skipKiloExclusiveModelSettings = providerResult.skipKiloExclusiveModelSettings;
-    experiment = providerResult.experiment;
+    effectiveProviderContext = quarantineProviderResult;
 
-    if (!provider.supportedChatApis.includes(requestBodyParsed.kind)) {
+    console.warn('SECURITY: Abuse quarantine-3 model override applied', {
+      kilo_user_id: user.id,
+      identity_key: classifyResult?.context?.identity_key ?? abuseCacheIdentityKey,
+      abuse_request_id: classifyResult?.request_id ?? null,
+      rules_engine_action: rulesEngineDecision.action,
+      rules_engine_matched_abuse_rule_ids:
+        classifyResult?.rules_engine?.matched_abuse_rule_ids ?? [],
+      original_model: modelBeforeQuarantineOverride,
+      overridden_model: effectiveModelIdLowerCased,
+      original_provider: initialProviderResultForAbuseService.provider.id,
+      overridden_provider: effectiveProviderContext.provider.id,
+      user_byok: !!effectiveProviderContext.userByok,
+      feature,
+      project_id: projectId,
+    });
+
+    if (!effectiveProviderContext.provider.supportedChatApis.includes(requestBodyParsed.kind)) {
       if (rulesEngineDecision.delayMs > 0) {
         await sleepForRulesEngineAction(rulesEngineDecision.delayMs);
       }
       return apiKindNotSupportedResponse(
         requestBodyParsed.kind,
-        provider.supportedChatApis,
+        effectiveProviderContext.provider.supportedChatApis,
         fraudHeaders
       );
     }
@@ -570,8 +580,8 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   const usageContext: MicrodollarUsageContext = {
     api_kind: requestBodyParsed.kind,
     kiloUserId: user.id,
-    provider: provider.id,
-    requested_model: originalModelIdLowerCased,
+    provider: effectiveProviderContext.provider.id,
+    requested_model: effectiveModelIdLowerCased,
     promptInfo,
     max_tokens: getMaxTokens(requestBodyParsed),
     has_middle_out_transform: hasMiddleOutTransform(requestBodyParsed),
@@ -584,7 +594,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     status_code: null,
     editor_name: extractHeaderAndLimitLength(request, 'x-kilocode-editorname'),
     machine_id: machineIdHeader,
-    user_byok: !!userByok,
+    user_byok: !!effectiveProviderContext.userByok,
     has_tools: (requestBodyParsed.body.tools?.length ?? 0) > 0,
     botId,
     tokenSource,
@@ -599,17 +609,21 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   setTag('ui.ai_model', requestBodyParsed.body.model);
 
   // Skip balance/org checks for anonymous users - they can only use free models
-  if (!isAnonymousContext(user) && !bypassAccessCheck) {
+  if (!isAnonymousContext(user) && !effectiveProviderContext.bypassAccessCheck) {
     const { balance, settings, plan } = await balanceAndSettingsPromise;
 
-    if (balance <= 0 && !(await isFreeModel(originalModelIdLowerCased)) && !userByok) {
+    if (
+      balance <= 0 &&
+      !(await isFreeModel(effectiveModelIdLowerCased)) &&
+      !effectiveProviderContext.userByok
+    ) {
       return await usageLimitExceededResponse(user, balance);
     }
 
     // Organization model/provider restrictions check
     // Provider/model access policy applies to Enterprise plans; data collection applies to all plans.
     const { error: modelRestrictionError, providerConfig } = checkOrganizationModelRestrictions({
-      modelId: originalModelIdLowerCased,
+      modelId: effectiveModelIdLowerCased,
       settings,
       organizationPlan: plan,
     });
@@ -620,7 +634,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     // setting cannot enforce on a direct partner upstream. If the org has
     // explicitly disabled data collection, refuse the experimented public id
     // here rather than routing through and silently capturing prompts.
-    if (experiment && settings?.data_collection === 'deny') {
+    if (effectiveProviderContext.experiment && settings?.data_collection === 'deny') {
       return dataCollectionRequiredResponse();
     }
 
@@ -628,21 +642,23 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     // `body.provider.only` field, which doesn't reach a direct partner
     // upstream. Refuse the experimented public id rather than routing
     // around the org's allow-list.
-    if (experiment && providerConfig?.only !== undefined) {
+    if (effectiveProviderContext.experiment && providerConfig?.only !== undefined) {
       return modelNotAllowedResponse();
     }
 
     // Direct experiment upstreams must not have a Vercel/OpenRouter
     // provider config pinned onto them — the partner endpoint is selected
     // by the variant version.
-    if (providerConfig && !skipProviderPin) {
+    if (providerConfig && !effectiveProviderContext.skipProviderPin) {
       requestBodyParsed.body.provider = providerConfig;
     }
   }
 
-  if (experiment) {
-    usageContext.modelExperimentVariantVersionId = experiment.variantVersionId;
-    usageContext.modelExperimentAllocationSubject = experiment.allocationSubject;
+  if (effectiveProviderContext.experiment) {
+    usageContext.modelExperimentVariantVersionId =
+      effectiveProviderContext.experiment.variantVersionId;
+    usageContext.modelExperimentAllocationSubject =
+      effectiveProviderContext.experiment.allocationSubject;
     // Cost zeroing for experiment traffic is handled by `isFreeModel`, which
     // returns true for experimented public ids.
   }
@@ -658,13 +674,13 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   });
 
   if (
-    requiresKiloDataCollection(originalModelIdLowerCased) &&
+    requiresKiloDataCollection(effectiveModelIdLowerCased) &&
     !isFreePromptTrainingAllowed(requestBodyParsed.body.provider)
   ) {
     return dataCollectionRequiredResponse();
   }
 
-  applyTrackingIds(requestBodyParsed, provider, user.id, taskId ?? null);
+  applyTrackingIds(requestBodyParsed, effectiveProviderContext.provider, user.id, taskId ?? null);
 
   sanitizeBinaryToolResults(requestBodyParsed);
 
@@ -674,7 +690,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
     if (isOpenCodeBasedClient(fraudHeaders)) {
       // Workaround for bugs in the chat completions client.
-      fixOpenCodeDuplicateReasoning(originalModelIdLowerCased, requestBodyParsed.body, taskId);
+      fixOpenCodeDuplicateReasoning(effectiveModelIdLowerCased, requestBodyParsed.body, taskId);
     }
   }
 
@@ -689,20 +705,23 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   const extraHeaders: Record<string, string> = {};
   applyProviderSpecificLogic(
-    provider,
-    originalModelIdLowerCased,
+    effectiveProviderContext.provider,
+    effectiveModelIdLowerCased,
     requestBodyParsed,
     extraHeaders,
-    userByok,
+    effectiveProviderContext.userByok,
     fraudHeaders,
-    { skipKiloExclusiveModelSettings: skipKiloExclusiveModelSettings === true }
+    {
+      skipKiloExclusiveModelSettings:
+        effectiveProviderContext.skipKiloExclusiveModelSettings === true,
+    }
   );
 
   // Capture the bounded prompt for experimented requests AFTER provider
   // transforms have produced the canonical upstream body. Stored on the
   // usage context so the async `after()` hook can persist it without
   // retaining a reference to the full uncapped body.
-  if (experiment) {
+  if (effectiveProviderContext.experiment) {
     usageContext.experimentPromptCapture = buildExperimentPromptCapture(requestBodyParsed);
   }
 
@@ -716,7 +735,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     method: request.method,
     body: requestBodyParsed.body,
     extraHeaders,
-    provider,
+    provider: effectiveProviderContext.provider,
     signal: request.signal,
   });
   const ttfbMs = Math.max(0, Math.round(performance.now() - requestStartedAt));
@@ -728,11 +747,11 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       organizationId,
       isAnonymous: isAnonymousContext(user),
       isStreaming: requestBodyParsed.body.stream === true,
-      userByok: !!userByok,
+      userByok: !!effectiveProviderContext.userByok,
       mode: modeHeader || undefined,
-      provider: provider.id,
+      provider: effectiveProviderContext.provider.id,
       requestedModel: requestedModelLowerCased,
-      resolvedModel: normalizeModelId(originalModelIdLowerCased),
+      resolvedModel: normalizeModelId(effectiveModelIdLowerCased),
       toolsAvailable,
       toolsUsed,
       ttfbMs,
@@ -745,14 +764,14 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   // Handle OpenRouter 402 errors - don't pass them through to the client. We need to pay, not them.
   // Skip this conversion when user BYOK is used - the 402 is about their account, not ours.
-  if (response.status === 402 && !userByok) {
+  if (response.status === 402 && !effectiveProviderContext.userByok) {
     await captureProxyError({
       user,
       request: requestBodyParsed.body,
       response,
       organizationId,
       model: requestBodyParsed.body.model,
-      errorMessage: `${provider.id} returned 402 Payment Required`,
+      errorMessage: `${effectiveProviderContext.provider.id} returned 402 Payment Required`,
       trackInSentry: true,
     });
 
@@ -767,7 +786,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       response,
       organizationId,
       model: requestBodyParsed.body.model,
-      errorMessage: `${provider.id} returned error ${response.status}`,
+      errorMessage: `${effectiveProviderContext.provider.id} returned error ${response.status}`,
       trackInSentry: response.status >= 500,
     });
   }
@@ -794,17 +813,17 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     clonedResponse: response.clone(),
     user: maybeUser,
     organization_id: organizationId || null,
-    provider: provider.id,
-    model: originalModelIdLowerCased,
+    provider: effectiveProviderContext.provider.id,
+    model: effectiveModelIdLowerCased,
     request: requestBodyParsed,
   });
 
   {
     const errorResponse = await makeErrorReadable({
-      requestedModel: originalModelIdLowerCased,
+      requestedModel: effectiveModelIdLowerCased,
       request: requestBodyParsed,
       response,
-      isUserByok: !!userByok,
+      isUserByok: !!effectiveProviderContext.userByok,
     });
     if (errorResponse) {
       return errorResponse;
@@ -812,20 +831,22 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   }
 
   const isFreeModelRequiringCostRemoval =
-    (provider.id === 'openrouter' || provider.id === 'vercel') &&
-    isKiloExclusiveFreeModel(originalModelIdLowerCased);
+    (effectiveProviderContext.provider.id === 'openrouter' ||
+      effectiveProviderContext.provider.id === 'vercel') &&
+    isKiloExclusiveFreeModel(effectiveModelIdLowerCased);
   const isStealthModelRequiringNameRemoval =
-    provider.id !== 'martian' && isKiloStealthModel(originalModelIdLowerCased);
+    effectiveProviderContext.provider.id !== 'martian' &&
+    isKiloStealthModel(effectiveModelIdLowerCased);
 
   if (isFreeModelRequiringCostRemoval || isStealthModelRequiringNameRemoval) {
     if (requestBodyParsed.kind === 'chat_completions') {
-      return rewriteFreeModelResponse_ChatCompletions(response, originalModelIdLowerCased);
+      return rewriteFreeModelResponse_ChatCompletions(response, effectiveModelIdLowerCased);
     }
     if (requestBodyParsed.kind === 'responses') {
-      return rewriteFreeModelResponse_Responses(response, originalModelIdLowerCased);
+      return rewriteFreeModelResponse_Responses(response, effectiveModelIdLowerCased);
     }
     if (requestBodyParsed.kind === 'messages') {
-      return rewriteFreeModelResponse_Messages(response, originalModelIdLowerCased);
+      return rewriteFreeModelResponse_Messages(response, effectiveModelIdLowerCased);
     }
   }
 

@@ -83,6 +83,10 @@ function formatName(model: OpenRouterModel, preferredIndex: number) {
     const suffix = new Date(model.expiration_date).toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
+      timeZone: 'UTC',
+    });
+      month: 'short',
+      day: 'numeric',
     });
     return model.name + ' (retires ' + suffix + ')';
   }

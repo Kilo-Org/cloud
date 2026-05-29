@@ -45,6 +45,7 @@ import {
   KiloPassWelcomePromoEligibilityReason,
 } from '@/lib/kilo-pass/enums';
 import { isStripeSubscriptionEnded } from '@/lib/kilo-pass/stripe-subscription-status';
+import { captureException } from '@sentry/nextjs';
 import {
   checkDuplicateCardFingerprintGate,
   maybeSendDuplicateCardCanceledEmail,
@@ -365,7 +366,6 @@ export async function handleKiloPassInvoicePaid(params: {
 
   // Track context for failure audit logging
   let kiloUserIdForAudit: string | null = null;
-  let kiloPassSubscriptionIdForAudit: string | null = null;
   let stripeSubscriptionIdForAudit: string | null = null;
 
   let blockedEmailParams: { kiloUserId: string; stripeInvoiceId: string } | null = null;
@@ -489,7 +489,6 @@ export async function handleKiloPassInvoicePaid(params: {
       }
 
       const kiloPassSubscriptionId = row.id;
-      kiloPassSubscriptionIdForAudit = kiloPassSubscriptionId;
       const priorStatus = existingSubscription?.status ?? null;
 
       // Card fingerprint gate: block if another user already has an active
@@ -503,17 +502,38 @@ export async function handleKiloPassInvoicePaid(params: {
         stripe,
         kiloUserId,
         stripeSubscriptionId: subscription.id,
-        stripeEventId: eventId,
         stripeInvoiceId: invoice.id,
-        kiloPassSubscriptionId,
-        dbOrTx: tx,
       });
 
       if (gateResult.blocked) {
+        await appendKiloPassAuditLog(tx, {
+          action: KiloPassAuditLogAction.DuplicateCardSubscriptionCanceled,
+          result: KiloPassAuditLogResult.Success,
+          kiloUserId,
+          kiloPassSubscriptionId,
+          stripeEventId: eventId,
+          stripeInvoiceId: invoice.id,
+          stripeSubscriptionId: subscription.id,
+          payload: {
+            fingerprint: gateResult.fingerprint,
+            otherKiloUserId: gateResult.otherKiloUserId,
+            otherSubscriptionId: gateResult.otherSubscriptionId,
+            otherStripeSubscriptionId: gateResult.otherStripeSubscriptionId,
+          },
+        });
+
         await tx
           .update(kilo_pass_subscriptions)
           .set({ status: 'canceled', ended_at: dayjs().utc().toISOString() })
           .where(eq(kilo_pass_subscriptions.id, kiloPassSubscriptionId));
+
+        await tx
+          .update(kilocode_users)
+          .set({
+            blocked_reason: 'kilo_pass_duplicate_card',
+            blocked_at: new Date().toISOString(),
+          })
+          .where(and(eq(kilocode_users.id, kiloUserId), isNull(kilocode_users.blocked_reason)));
 
         affiliateSaleState.context = null;
         kiloUserIdForCache = null;
@@ -633,19 +653,26 @@ export async function handleKiloPassInvoicePaid(params: {
     });
   } catch (error) {
     // Write failure audit log outside the transaction (non-transactional)
-    // so it persists even when the transaction rolls back.
-    await appendKiloPassAuditLog(db, {
-      action: KiloPassAuditLogAction.KiloPassInvoicePaidHandled,
-      result: KiloPassAuditLogResult.Failed,
-      kiloUserId: kiloUserIdForAudit,
-      kiloPassSubscriptionId: kiloPassSubscriptionIdForAudit,
-      stripeEventId: eventId,
-      stripeInvoiceId: invoice.id,
-      stripeSubscriptionId: stripeSubscriptionIdForAudit,
-      payload: {
-        error: error instanceof Error ? error.message : String(error),
-      },
-    });
+    // so it persists even when the transaction rolls back. Omit
+    // kiloPassSubscriptionId because the row may not exist after rollback.
+    try {
+      await appendKiloPassAuditLog(db, {
+        action: KiloPassAuditLogAction.KiloPassInvoicePaidHandled,
+        result: KiloPassAuditLogResult.Failed,
+        kiloUserId: kiloUserIdForAudit,
+        stripeEventId: eventId,
+        stripeInvoiceId: invoice.id,
+        stripeSubscriptionId: stripeSubscriptionIdForAudit,
+        payload: {
+          error: error instanceof Error ? error.message : String(error),
+        },
+      });
+    } catch (auditError) {
+      captureException(auditError, {
+        tags: { source: 'kilo_pass_invoice_paid_failure_audit' },
+        extra: { stripeEventId: eventId, stripeInvoiceId: invoice.id },
+      });
+    }
 
     throw error;
   }

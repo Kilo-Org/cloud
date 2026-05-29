@@ -6,11 +6,9 @@ import {
   payment_methods,
   transactional_email_log,
 } from '@kilocode/db/schema';
-import { db, type DrizzleTransaction } from '@/lib/drizzle';
+import { db } from '@/lib/drizzle';
 import { and, eq, inArray, isNotNull, isNull, ne, notInArray } from 'drizzle-orm';
 import type Stripe from 'stripe';
-import { appendKiloPassAuditLog } from '@/lib/kilo-pass/issuance';
-import { KiloPassAuditLogAction, KiloPassAuditLogResult } from '@/lib/kilo-pass/enums';
 import { captureException } from '@sentry/nextjs';
 import { sendKiloPassDuplicateCardCanceledEmail } from '@/lib/email';
 
@@ -79,6 +77,8 @@ export type DuplicateCardGateResult =
       blocked: true;
       otherKiloUserId: string;
       otherSubscriptionId: string;
+      otherStripeSubscriptionId: string | null;
+      fingerprint: string;
       stripeInvoiceId: string;
     };
 
@@ -155,20 +155,14 @@ export async function checkDuplicateCardFingerprintGate(params: {
   stripe: Stripe;
   kiloUserId: string;
   stripeSubscriptionId: string;
-  stripeEventId: string;
   stripeInvoiceId: string;
-  kiloPassSubscriptionId: string;
-  dbOrTx: typeof db | DrizzleTransaction;
 }): Promise<DuplicateCardGateResult> {
   const {
     invoice,
     stripe,
     kiloUserId,
     stripeSubscriptionId,
-    stripeEventId,
     stripeInvoiceId,
-    kiloPassSubscriptionId,
-    dbOrTx,
   } = params;
 
   const invoiceWithPi = invoice as InvoiceWithPaymentIntent;
@@ -223,34 +217,12 @@ export async function checkDuplicateCardFingerprintGate(params: {
     }
   }
 
-  await appendKiloPassAuditLog(dbOrTx, {
-    action: KiloPassAuditLogAction.DuplicateCardSubscriptionCanceled,
-    result: KiloPassAuditLogResult.Success,
-    kiloUserId,
-    kiloPassSubscriptionId,
-    stripeEventId,
-    stripeInvoiceId,
-    stripeSubscriptionId,
-    payload: {
-      fingerprint,
-      otherKiloUserId: existingActiveKiloPass.kiloUserId,
-      otherSubscriptionId: existingActiveKiloPass.subscriptionId,
-      otherStripeSubscriptionId: existingActiveKiloPass.stripeSubscriptionId,
-    },
-  });
-
-  await dbOrTx
-    .update(kilocode_users)
-    .set({
-      blocked_reason: 'kilo_pass_duplicate_card',
-      blocked_at: new Date().toISOString(),
-    })
-    .where(and(eq(kilocode_users.id, kiloUserId), isNull(kilocode_users.blocked_reason)));
-
   return {
     blocked: true,
     otherKiloUserId: existingActiveKiloPass.kiloUserId,
     otherSubscriptionId: existingActiveKiloPass.subscriptionId,
+    otherStripeSubscriptionId: existingActiveKiloPass.stripeSubscriptionId,
+    fingerprint,
     stripeInvoiceId,
   };
 }

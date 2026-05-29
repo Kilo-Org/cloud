@@ -11,6 +11,7 @@ import type {
   OpenCodePrompt,
   OpenCodeSettings,
 } from '@kilocode/db/schema-types';
+import { isStepModel } from '@/lib/ai-gateway/providers/stepfun';
 import { ReasoningEffortSchema } from '@kilocode/db/schema-types';
 
 export const REASONING_VARIANTS_BINARY = {

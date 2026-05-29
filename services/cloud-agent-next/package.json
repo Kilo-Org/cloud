@@ -35,6 +35,7 @@
     "@kilocode/cloud-agent-profile": "workspace:*",
     "@kilocode/db": "workspace:*",
     "@kilocode/encryption": "workspace:*",
+    "@kilocode/notifications": "workspace:*",
     "@kilocode/worker-utils": "workspace:*",
     "@trpc/server": "catalog:",
     "drizzle-orm": "catalog:",

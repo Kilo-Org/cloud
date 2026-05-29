@@ -60,21 +60,23 @@ RUN git config --system url."https://github.com/".insteadOf "ssh://git@github.co
 # Install global CLI tools in a single invocation, then patch openclaw and clean cache once.
 # Packages: pnpm (package manager), openclaw (pinned for reproducible builds; patched below),
 #   clawhub, mcporter, @steipete/summarize, @kilocode/cli (runtime tooling).
-# Patch: bump model discovery timeout from 5s to 60s — shared-cpu machines
+# Patch: bump KiloCode model discovery timeout from 5s to 60s — shared-cpu machines
 # under boot load routinely need 27-35s for the first TLS+fetch to complete.
-# Remove this sed patch once openclaw exposes a configurable timeout.
-RUN npm install -g pnpm openclaw@2026.4.23 clawhub mcporter@0.7.3 @steipete/summarize@0.12.0 @kilocode/cli@7.2.31 \
+# Match the KiloCode chunk explicitly because OpenClaw also ships other provider
+# discovery timeout constants. Remove this patch once the timeout is configurable.
+RUN npm install -g pnpm openclaw@2026.5.22 clawhub mcporter@0.7.3 @steipete/summarize@0.12.0 @kilocode/cli@7.2.31 \
     && OC_DIST=/usr/local/lib/node_modules/openclaw/dist \
-    && FOUND_FILES=$(find "$OC_DIST" -name 'provider-models-*.js' | wc -l | tr -d ' ') \
-    && if [ "$FOUND_FILES" -eq 0 ]; then echo "ERROR: provider-models-*.js not found in openclaw dist" >&2; exit 1; fi \
-    && BEFORE=$(grep -h 'DISCOVERY_TIMEOUT_MS = 5e3' "$OC_DIST"/provider-models-*.js 2>/dev/null | wc -l | tr -d ' ') \
-    && if [ "$BEFORE" -ne 1 ]; then echo "ERROR: expected exactly 1 occurrence of DISCOVERY_TIMEOUT_MS = 5e3, found $BEFORE - openclaw may have changed" >&2; exit 1; fi \
-    && PM_FILE=$(grep -l 'DISCOVERY_TIMEOUT_MS = 5e3' "$OC_DIST"/provider-models-*.js 2>/dev/null | head -1) \
+    && PM_FILES=$(grep -l 'KILOCODE_MODELS_URL' "$OC_DIST"/provider-models-*.js 2>/dev/null || true) \
+    && PM_FILE_COUNT=$(printf '%s\n' "$PM_FILES" | grep -c .) \
+    && if [ "$PM_FILE_COUNT" -ne 1 ]; then echo "ERROR: expected exactly 1 KiloCode provider-models chunk, found $PM_FILE_COUNT - openclaw may have changed" >&2; exit 1; fi \
+    && PM_FILE="$PM_FILES" \
+    && BEFORE=$(grep -c 'DISCOVERY_TIMEOUT_MS = 5e3' "$PM_FILE" 2>/dev/null || true) \
+    && if [ "$BEFORE" -ne 1 ]; then echo "ERROR: expected exactly 1 KiloCode DISCOVERY_TIMEOUT_MS = 5e3 occurrence, found $BEFORE - openclaw may have changed" >&2; exit 1; fi \
     && sed -i 's/DISCOVERY_TIMEOUT_MS = 5e3/DISCOVERY_TIMEOUT_MS = 60e3/' "$PM_FILE" \
-    && AFTER=$(grep -h 'DISCOVERY_TIMEOUT_MS = 60e3' "$OC_DIST"/provider-models-*.js 2>/dev/null | wc -l | tr -d ' ') \
-    && if [ "$AFTER" -ne 1 ]; then echo "ERROR: sed patch failed - expected 1 occurrence of 60e3, found $AFTER" >&2; exit 1; fi \
-    && if grep -q 'DISCOVERY_TIMEOUT_MS = 5e3' "$OC_DIST"/provider-models-*.js 2>/dev/null; then echo "ERROR: old 5e3 value still present after patch" >&2; exit 1; fi \
-    && echo "OK: patched DISCOVERY_TIMEOUT_MS 5e3 -> 60e3 in $(basename "$PM_FILE")" \
+    && AFTER=$(grep -c 'DISCOVERY_TIMEOUT_MS = 60e3' "$PM_FILE" 2>/dev/null || true) \
+    && if [ "$AFTER" -ne 1 ]; then echo "ERROR: KiloCode sed patch failed - expected 1 occurrence of 60e3, found $AFTER" >&2; exit 1; fi \
+    && if grep -q 'DISCOVERY_TIMEOUT_MS = 5e3' "$PM_FILE" 2>/dev/null; then echo "ERROR: old KiloCode 5e3 value still present after patch" >&2; exit 1; fi \
+    && echo "OK: patched KiloCode DISCOVERY_TIMEOUT_MS 5e3 -> 60e3 in $(basename "$PM_FILE")" \
     && CT_FILE=$(find "$OC_DIST" -name 'channel-target-*.js' | head -1) \
     && if [ -z "$CT_FILE" ]; then echo "ERROR: channel-target-*.js not found in openclaw dist" >&2; exit 1; fi \
     && sed -i 's/MESSAGE_ACTION_TARGET_MODE\[action\] !== "none"/\(MESSAGE_ACTION_TARGET_MODE[action] ?? "none"\) !== "none"/' "$CT_FILE" \
@@ -96,7 +98,7 @@ RUN COMPOSIO_INSTALL_TAG="%40composio%2Fcli%40${COMPOSIO_CLI_VERSION}" \
 # Bake bundled plugin runtime deps into OpenClaw's external stage dir so first
 # boot is pure startup — no npm install from `openclaw doctor` or gateway plugin
 # load on shared-cpu Fly machines. The stage-root naming mirrors OpenClaw
-# 2026.4.23's resolveExternalBundledRuntimeDepsInstallRoot().
+# 2026.5.22's resolveExternalBundledRuntimeDepsInstallRoot().
 RUN cd /usr/local/lib/node_modules/openclaw \
     && OPENCLAW_PACKAGE_ROOT="$(pwd -P)" \
     && OPENCLAW_PACKAGE_VERSION="$(node -p "require('./package.json').version")" \
@@ -255,7 +257,7 @@ RUN mkdir -p /root/.openclaw \
     && mkdir -p /root/clawd/skills
 
 # Copy helper scripts (used at runtime by the controller/gateway)
-# Build cache bust: 2026-05-01-v67-openclaw-2026.4.23
+# Build cache bust: 2026-05-28-v68-openclaw-2026.5.22
 RUN echo "13"
 COPY openclaw-pairing-list.js /usr/local/bin/openclaw-pairing-list.js
 COPY openclaw-device-pairing-list.js /usr/local/bin/openclaw-device-pairing-list.js

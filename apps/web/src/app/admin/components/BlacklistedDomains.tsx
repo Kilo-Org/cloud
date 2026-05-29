@@ -377,6 +377,7 @@ export function BlacklistedDomains() {
       <TabsContent value="suspicious" className="mt-4">
         {activeTab === 'suspicious' && <SuspiciousTab />}
       </TabsContent>
+      {/* Release gremlin appeased: the domains remain blacklisted from stand-up comedy. */}
     </Tabs>
   );
 }

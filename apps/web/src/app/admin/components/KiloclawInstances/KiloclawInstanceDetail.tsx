@@ -1505,6 +1505,8 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
     cleanVersion(controllerVersionResolved?.version),
     '2026.5.8.1900'
   );
+  const supportsOpenclawSaveValidation =
+    controllerVersionResolved?.capabilities?.includes('files.write-openclaw-config') === true;
 
   // After a restart/upgrade, poll the machine status until it returns to "running",
   // then invalidate controllerVersion so supportsConfigRestore reflects the new build.
@@ -4536,7 +4538,11 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <AdminFileEditor userId={data.user_id} instanceId={data.id} />
+              <AdminFileEditor
+                userId={data.user_id}
+                instanceId={data.id}
+                enableOpenclawValidation={supportsOpenclawSaveValidation}
+              />
             </CardContent>
           </Card>
         )}

@@ -74,6 +74,8 @@ const mockCaptureMessage = jest.fn<any>();
 const mockAppendReviewSummaryFooter = jest.fn<any>();
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const mockRetryReviewFresh = jest.fn<any>();
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const mockDisableCodeReviewForActionRequiredFailure = jest.fn<any>();
 
 // --- Module mocks ---
 
@@ -141,6 +143,15 @@ jest.mock('@sentry/nextjs', () => ({
 jest.mock('@/lib/code-reviews/summary/usage-footer', () => ({
   appendReviewSummaryFooter: (...args: unknown[]) => mockAppendReviewSummaryFooter(...args),
 }));
+
+jest.mock('@/lib/code-reviews/action-required', () => {
+  const actual = jest.requireActual<Record<string, unknown>>('@/lib/code-reviews/action-required');
+  return {
+    ...actual,
+    disableCodeReviewForActionRequiredFailure: (...args: unknown[]) =>
+      mockDisableCodeReviewForActionRequiredFailure(...args),
+  };
+});
 
 jest.mock('@/lib/constants', () => ({
   APP_URL: 'https://test.kilo.ai',
@@ -334,6 +345,7 @@ beforeEach(async () => {
   mockUpdateCodeReviewUsage.mockResolvedValue(undefined);
   mockUpdateCodeReviewStatusIfNonTerminal.mockResolvedValue(true);
   mockAppendReviewSummaryFooter.mockReturnValue('body with footer');
+  mockDisableCodeReviewForActionRequiredFailure.mockResolvedValue(undefined);
   ({ POST } = await import('./route'));
 });
 
@@ -476,6 +488,96 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
           errorMessage: 'Add credits to continue, or switch to a free model',
           terminalReason: 'billing',
         })
+      );
+    });
+
+    it('infers BYOK invalid-key callbacks as action-required failures', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+
+      const response = await POST(
+        makeRequest({
+          status: 'failed',
+          errorMessage:
+            '[BYOK] Your API key is invalid or has been revoked. Please check your API key configuration.',
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+        REVIEW_ID,
+        'failed',
+        expect.objectContaining({
+          terminalReason: 'byok_invalid_key',
+        })
+      );
+      expect(mockCreateInfraRetryAttemptIfMissing).not.toHaveBeenCalled();
+      expect(mockRetryReviewFresh).not.toHaveBeenCalled();
+      expect(mockDisableCodeReviewForActionRequiredFailure).toHaveBeenCalledWith(
+        expect.objectContaining({
+          owner: { type: 'user', id: 'user-1', userId: 'user-1' },
+          platform: 'github',
+          reviewId: REVIEW_ID,
+          reason: 'byok_invalid_key',
+        })
+      );
+      expect(mockUpdateCheckRun).toHaveBeenCalledWith(
+        'inst-1',
+        'owner',
+        'repo',
+        12345,
+        expect.objectContaining({
+          conclusion: 'action_required',
+          output: expect.objectContaining({ title: 'BYOK API key needs attention' }),
+        }),
+        'standard'
+      );
+    });
+
+    it('infers GitHub installation and IP allow-list callback failures', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+
+      await POST(
+        makeRequest({
+          status: 'failed',
+          errorMessage:
+            'Dispatch failed: GitHub token or active app installation required for this repository (no_installation_found)',
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(mockUpdateCodeReviewStatus).toHaveBeenLastCalledWith(
+        REVIEW_ID,
+        'failed',
+        expect.objectContaining({ terminalReason: 'github_installation_required' })
+      );
+
+      jest.clearAllMocks();
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+      mockUpdateCodeReviewAttemptForCallback.mockImplementation(async params =>
+        makeAttempt({
+          status: params.status,
+          error_message: params.errorMessage ?? null,
+          terminal_reason: params.terminalReason ?? null,
+        })
+      );
+      mockGetLatestCodeReviewAttempt.mockResolvedValue(makeAttempt());
+      mockGetIntegrationById.mockResolvedValue(makeIntegration());
+      mockDisableCodeReviewForActionRequiredFailure.mockResolvedValue(undefined);
+
+      await POST(
+        makeRequest({
+          status: 'failed',
+          errorMessage:
+            'Although you appear to have the correct authorization credentials, the `acme` organization has an IP allow list enabled, and 192.0.2.1 is not permitted.',
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(mockUpdateCodeReviewStatus).toHaveBeenLastCalledWith(
+        REVIEW_ID,
+        'failed',
+        expect.objectContaining({ terminalReason: 'github_ip_allow_list' })
       );
     });
 

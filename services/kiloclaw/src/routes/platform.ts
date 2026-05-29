@@ -9,6 +9,7 @@ import { Hono } from 'hono';
 import type { Context } from 'hono';
 import * as fly from '../fly/client';
 import type { InstanceStatus } from '../durable-objects/kiloclaw-instance/types';
+import type { FileWriteResponse } from '../durable-objects/gateway-controller-types';
 import type { AppEnv } from '../types';
 import {
   ProvisionRequestSchema,
@@ -2717,6 +2718,13 @@ const WriteFileSchema = z.object({
   etag: z.string().optional(),
 });
 
+const WriteOpenclawConfigFileSchema = z.object({
+  userId: z.string().min(1),
+  content: z.string(),
+  etag: z.string().optional(),
+  mode: z.enum(['warn-before-write', 'allow-invalid']),
+});
+
 const OpenclawWorkspaceImportSchema = z.object({
   userId: z.string().min(1),
   files: z
@@ -2757,6 +2765,40 @@ platform.post('/files/write', async c => {
     return c.json(response, 200);
   } catch (err) {
     const { message, status, code } = sanitizeOpenclawConfigError(err, 'files/write');
+    return jsonError(message, status, code);
+  }
+});
+
+// POST /api/platform/files/write-openclaw-config
+platform.post('/files/write-openclaw-config', async c => {
+  const result = await parseBody(c, WriteOpenclawConfigFileSchema);
+  if ('error' in result) return result.error;
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
+  const { userId, content, etag, mode } = result.data;
+  try {
+    const response = await withResolvedDORetry<FileWriteResponse | null>(
+      c.env,
+      userId,
+      iidResult.instanceId,
+      stub => stub.writeOpenclawConfigFile(content, etag, mode),
+      'writeOpenclawConfigFile'
+    );
+    if (!response) {
+      return jsonError(
+        'OpenClaw validation-aware writing not available (controller too old)',
+        404,
+        'controller_route_unavailable'
+      );
+    }
+    return c.json(response, 200);
+  } catch (err) {
+    const { message, status, code } = sanitizeOpenclawConfigError(
+      err,
+      'files/write-openclaw-config'
+    );
     return jsonError(message, status, code);
   }
 });

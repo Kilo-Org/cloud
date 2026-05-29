@@ -1030,6 +1030,13 @@
       "when": 1779968635182,
       "tag": "0146_deep_tattoo",
       "breakpoints": true
+    },
+    {
+      "idx": 147,
+      "version": "7",
+      "when": 1779979914171,
+      "tag": "0147_curvy_millenium_guard",
+      "breakpoints": true
     }
   ]
 }

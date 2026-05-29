@@ -233,7 +233,10 @@ describe('code review alert detectors', () => {
       reviewValues({ status: 'cancelled', terminal_reason: 'model_not_found' }),
       reviewValues({ status: 'cancelled', terminal_reason: 'user_cancelled' }),
       reviewValues({ status: 'cancelled', terminal_reason: 'superseded' }),
-      ...Array.from({ length: 16 }, () => reviewValues()),
+      reviewValues({ status: 'failed', terminal_reason: 'github_installation_required' }),
+      reviewValues({ status: 'failed', terminal_reason: 'github_ip_allow_list' }),
+      reviewValues({ status: 'failed', terminal_reason: 'byok_invalid_key' }),
+      ...Array.from({ length: 13 }, () => reviewValues()),
     ]);
 
     await expect(evaluateErrorSpike(db)).resolves.toEqual({ tripped: false });

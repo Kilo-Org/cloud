@@ -1283,6 +1283,9 @@ export type StripeSubscriptionStatus =
 export const CODE_REVIEW_TERMINAL_REASONS = [
   'billing',
   'model_not_found',
+  'github_installation_required',
+  'github_ip_allow_list',
+  'byok_invalid_key',
   'user_cancelled',
   'superseded',
   'interrupted',
@@ -1306,6 +1309,9 @@ export type CodeReviewTerminalReason = (typeof CODE_REVIEW_TERMINAL_REASONS)[num
 export const CODE_REVIEW_BENIGN_TERMINAL_REASONS = [
   'billing',
   'model_not_found',
+  'github_installation_required',
+  'github_ip_allow_list',
+  'byok_invalid_key',
   'user_cancelled',
   'superseded',
 ] as const satisfies readonly CodeReviewTerminalReason[];

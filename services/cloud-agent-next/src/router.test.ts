@@ -336,7 +336,8 @@ describe('router sessionId validation', () => {
               } as unknown as TRPCContext['env']['INTERNAL_API_SECRET_PROD'],
               HYPERDRIVE: {
                 connectionString: 'postgresql://test',
-              } as unknown as TRPCContext['env']['HYPERDRIVE'],
+              } as TRPCContext['env']['HYPERDRIVE'],
+              NOTIFICATIONS: {} as TRPCContext['env']['NOTIFICATIONS'],
             },
           };
           cloudAgentSession = mockContext.env.CLOUD_AGENT_SESSION as unknown as MockCAS;
@@ -744,6 +745,7 @@ describe('router sessionId validation', () => {
             HYPERDRIVE: {
               connectionString: 'postgresql://test',
             } as unknown as TRPCContext['env']['HYPERDRIVE'],
+            NOTIFICATIONS: {} as TRPCContext['env']['NOTIFICATIONS'],
           },
         };
         cloudAgentSession = mockContext.env.CLOUD_AGENT_SESSION as unknown as MockCAS;
@@ -835,6 +837,7 @@ describe('router sessionId validation', () => {
             HYPERDRIVE: {
               connectionString: 'postgresql://test',
             } as unknown as TRPCContext['env']['HYPERDRIVE'],
+            NOTIFICATIONS: {} as TRPCContext['env']['NOTIFICATIONS'],
           },
         };
         cloudAgentSession = mockContext.env.CLOUD_AGENT_SESSION as unknown as MockCAS;
@@ -1134,6 +1137,7 @@ describe('router sessionId validation', () => {
             HYPERDRIVE: {
               connectionString: 'postgresql://test',
             } as unknown as TRPCContext['env']['HYPERDRIVE'],
+            NOTIFICATIONS: {} as TRPCContext['env']['NOTIFICATIONS'],
           },
         };
         cloudAgentSession = mockContext.env.CLOUD_AGENT_SESSION as unknown as MockCAS;
@@ -1381,6 +1385,7 @@ describe('router sessionId validation', () => {
             HYPERDRIVE: {
               connectionString: 'postgresql://test',
             } as unknown as TRPCContext['env']['HYPERDRIVE'],
+            NOTIFICATIONS: {} as TRPCContext['env']['NOTIFICATIONS'],
           },
         };
         cloudAgentSession = mockContext.env.CLOUD_AGENT_SESSION as unknown as MockCAS;

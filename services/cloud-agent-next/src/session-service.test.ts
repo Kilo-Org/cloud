@@ -185,6 +185,7 @@ function createEnv(metadata?: CloudAgentSessionState | null): PersistenceEnv {
         glabIsOAuth2: true,
       }),
     },
+    NOTIFICATIONS: {} as unknown as PersistenceEnv['NOTIFICATIONS'],
   } satisfies PersistenceEnv;
 }
 

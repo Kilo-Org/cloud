@@ -37,6 +37,14 @@ export async function upsertAgentConfig(data: {
   isEnabled?: boolean;
   createdBy: string;
 }) {
+  const updateSet: Partial<typeof agent_configs.$inferInsert> = {
+    config: data.config,
+    updated_at: new Date().toISOString(),
+  };
+  if (data.isEnabled !== undefined) {
+    updateSet.is_enabled = data.isEnabled;
+  }
+
   await db
     .insert(agent_configs)
     .values({
@@ -53,11 +61,7 @@ export async function upsertAgentConfig(data: {
         agent_configs.agent_type,
         agent_configs.platform,
       ],
-      set: {
-        config: data.config,
-        is_enabled: data.isEnabled ?? true,
-        updated_at: new Date().toISOString(),
-      },
+      set: updateSet,
     });
 
   // Create bot user for code review agents
@@ -156,6 +160,14 @@ export async function upsertAgentConfigForOwner(data: {
   isEnabled?: boolean;
   createdBy: string;
 }) {
+  const updateSet: Partial<typeof agent_configs.$inferInsert> = {
+    config: data.config,
+    updated_at: new Date().toISOString(),
+  };
+  if (data.isEnabled !== undefined) {
+    updateSet.is_enabled = data.isEnabled;
+  }
+
   const values =
     data.owner.type === 'org'
       ? {
@@ -182,17 +194,10 @@ export async function upsertAgentConfigForOwner(data: {
       ? [agent_configs.owned_by_organization_id, agent_configs.agent_type, agent_configs.platform]
       : [agent_configs.owned_by_user_id, agent_configs.agent_type, agent_configs.platform];
 
-  await db
-    .insert(agent_configs)
-    .values(values)
-    .onConflictDoUpdate({
-      target: targetColumns,
-      set: {
-        config: data.config,
-        is_enabled: data.isEnabled ?? true,
-        updated_at: new Date().toISOString(),
-      },
-    });
+  await db.insert(agent_configs).values(values).onConflictDoUpdate({
+    target: targetColumns,
+    set: updateSet,
+  });
 
   // Create bot user for code review agents (only for organizations)
   if (data.agentType === 'code_review' && data.owner.type === 'org') {

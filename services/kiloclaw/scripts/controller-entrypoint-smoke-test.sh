@@ -169,6 +169,20 @@ else
   check "packaged no-trash baseline retains deleted workspace" "1" "0"
 fi
 
+echo
+echo "--- validation-aware openclaw.json write ---"
+
+CONFIG_SHA_BEFORE=$(python3 -c "import hashlib; print(hashlib.sha256(open('$ROOTDIR/.openclaw/openclaw.json','rb').read()).hexdigest())")
+INVALID_WRITE_RESP=$(curl -sS -X POST \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"content":"{\"unexpected_root_key\":true}","mode":"warn-before-write"}' \
+  "http://127.0.0.1:${PORT}/_kilo/files/write-openclaw-config")
+INVALID_WRITE_OUTCOME=$(echo "$INVALID_WRITE_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin).get('outcome',''))" 2>/dev/null || echo "")
+CONFIG_SHA_AFTER=$(python3 -c "import hashlib; print(hashlib.sha256(open('$ROOTDIR/.openclaw/openclaw.json','rb').read()).hexdigest())")
+check "invalid openclaw write returns validation warning" "openclaw-validation-warning" "$INVALID_WRITE_OUTCOME"
+check "invalid openclaw warning leaves config unchanged" "$CONFIG_SHA_BEFORE" "$CONFIG_SHA_AFTER"
+
 assert_kilo_chat_smoke "$CID" "$PORT" "$TOKEN"
 
 echo

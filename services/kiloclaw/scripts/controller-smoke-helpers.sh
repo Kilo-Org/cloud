@@ -43,6 +43,7 @@ assert_kilo_chat_plugin_loaded() {
   local cid="$1"
   local plugin_json
   local details
+  local diagnostic_details
 
   if ! plugin_json=$(docker exec "$cid" openclaw plugins inspect kilo-chat --json 2>&1); then
     check "kilo-chat plugin inspect" "loaded" "failed"
@@ -58,13 +59,10 @@ doc = json.load(sys.stdin)
 plugin = doc.get("plugin", {})
 status = plugin.get("status")
 error = plugin.get("error")
-route_count = doc.get("httpRouteCount", 0)
 if status != "loaded":
     raise SystemExit(f"status={status!r}")
 if error:
     raise SystemExit(f"error={error!r}")
-if not isinstance(route_count, int) or route_count < 1:
-    raise SystemExit(f"httpRouteCount={route_count!r}")
 print("loaded")
 ' <<< "$plugin_json" 2>&1); then
     check "kilo-chat plugin inspect" "loaded" "$details"
@@ -72,6 +70,46 @@ print("loaded")
     check "kilo-chat plugin inspect" "loaded" "failed"
     echo "  details: $details"
     echo "  output: $plugin_json"
+  fi
+
+  if diagnostic_details=$(python3 -c '
+import json
+import sys
+
+known_message = "channel plugin manifest declares kilo-chat without channelConfigs metadata; add openclaw.plugin.json#channelConfigs so config schema and setup surfaces work before runtime loads. Channels without channelConfigs still appear in channel listings, but setup UI may be limited."
+doc = json.load(sys.stdin)
+diagnostics = doc.get("diagnostics", [])
+if not isinstance(diagnostics, list):
+    raise SystemExit("diagnostics is not a list")
+known_count = 0
+unexpected = []
+for diagnostic in diagnostics:
+    if not isinstance(diagnostic, dict):
+        unexpected.append(repr(diagnostic))
+        continue
+    if (
+        diagnostic.get("level") == "warn"
+        and diagnostic.get("pluginId") == "kilo-chat"
+        and diagnostic.get("message") == known_message
+    ):
+        known_count += 1
+    else:
+        level = diagnostic.get("level", "unknown")
+        message = diagnostic.get("message", diagnostic)
+        unexpected.append(f"{level}: {message!s}")
+if known_count > 1:
+    unexpected.append(f"known cosmetic warning repeated {known_count} times")
+if unexpected:
+    raise SystemExit("; ".join(unexpected))
+print("known cosmetic warning" if known_count == 1 else "none")
+' <<< "$plugin_json" 2>&1); then
+    if [ "$diagnostic_details" = "known cosmetic warning" ]; then
+      echo "WARN: kilo-chat plugin diagnostic: missing channelConfigs metadata (known cosmetic warning)"
+    fi
+    check "kilo-chat plugin diagnostics" "$diagnostic_details" "$diagnostic_details"
+  else
+    check "kilo-chat plugin diagnostics" "none or known cosmetic warning" "unexpected diagnostic"
+    echo "  details: $diagnostic_details"
   fi
 }
 

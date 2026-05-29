@@ -117,6 +117,20 @@ describe('NotificationChannelDO.dispatchPush', () => {
     expect(stored.alarm).not.toBeNull();
   });
 
+  it('skips presence lookup when presence suppression is explicitly disabled', async () => {
+    installDbMock({ tokens: [] });
+    const presenceSpy = vi.spyOn(env.EVENT_SERVICE, 'isUserInContext').mockResolvedValueOnce(false);
+    const result = await getDO('user-no-presence-context').dispatchPush(
+      baseInput({
+        userId: 'user-no-presence-context',
+        presenceContext: null,
+        idempotencyKey: 'k-no-presence-context',
+      })
+    );
+    expect(result.kind).toBe('no_tokens');
+    expect(presenceSpy).not.toHaveBeenCalled();
+  });
+
   it('returns no_tokens when the user has no push tokens', async () => {
     installDbMock({ tokens: [] });
     vi.spyOn(env.EVENT_SERVICE, 'isUserInContext').mockResolvedValueOnce(false);
@@ -321,6 +335,33 @@ describe('NotificationChannelDO.dispatchPush', () => {
     expect(stored).toMatchObject({ stage: 'no_tokens' });
   });
 
+  it('keeps an unclassified empty Expo result retryable when push tokens exist', async () => {
+    installDbMock({ tokens: [{ user_id: 'user-empty-expo-result', token: 'tok1' }] });
+    vi.spyOn(env.EVENT_SERVICE, 'isUserInContext').mockResolvedValue(false);
+    vi.mocked(sendPushNotifications).mockResolvedValueOnce({
+      ticketTokenPairs: [],
+      staleTokens: [],
+      ticketErrors: [],
+    });
+    const stub = getDO('user-empty-expo-result');
+    const input = baseInput({
+      userId: 'user-empty-expo-result',
+      badge: null,
+      idempotencyKey: 'k-empty-expo-result',
+    });
+
+    const first = await stub.dispatchPush(input);
+    const storedAfterFirst = await runInDurableObject(stub, (_instance, state) =>
+      state.storage.get<{ stage: string; ts: number }>('idem:k-empty-expo-result')
+    );
+    const second = await stub.dispatchPush(input);
+
+    expect(first.kind).toBe('failed');
+    expect(storedAfterFirst).toBeUndefined();
+    expect(second).toEqual({ kind: 'delivered', tokenCount: 1 });
+    expect(sendPushNotifications).toHaveBeenCalledTimes(2);
+  });
+
   it('reports delivered tokenCount from accepted Expo tickets after stale cleanup', async () => {
     const dbState: DbState = {
       tokens: [
@@ -500,6 +541,94 @@ describe('NotificationChannelDO.dispatchPush', () => {
       return Array.from(entries.keys());
     });
     expect(buckets).toEqual([]);
+  });
+
+  it('retries receipt bookkeeping without resending an accepted badge-less push', async () => {
+    installDbMock({ tokens: [{ user_id: 'user-receipt-retry', token: 'tok1' }] });
+    const receiptSpy = vi
+      .spyOn(env.RECEIPTS_QUEUE, 'send')
+      .mockRejectedValueOnce(new Error('receipt queue unavailable'))
+      .mockResolvedValueOnce(undefined);
+    const stub = getDO('user-receipt-retry');
+    const input = baseInput({
+      userId: 'user-receipt-retry',
+      badge: null,
+      idempotencyKey: 'k-receipt-retry',
+    });
+
+    const firstResult = await stub.dispatchPush(input);
+    const retryResult = await stub.dispatchPush(input);
+
+    expect(firstResult).toEqual({
+      kind: 'failed',
+      error: 'Accepted push bookkeeping failed: receipt queue unavailable',
+    });
+    expect(retryResult).toEqual({ kind: 'duplicate' });
+    expect(sendPushNotifications).toHaveBeenCalledOnce();
+    expect(receiptSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it('repairs accepted push bookkeeping from the cleanup alarm without resending', async () => {
+    installDbMock({ tokens: [{ user_id: 'user-alarm-repair', token: 'tok1' }] });
+    const receiptSpy = vi
+      .spyOn(env.RECEIPTS_QUEUE, 'send')
+      .mockRejectedValueOnce(new Error('receipt queue unavailable'))
+      .mockResolvedValueOnce(undefined);
+    const stub = getDO('user-alarm-repair');
+
+    const firstResult = await stub.dispatchPush(
+      baseInput({
+        userId: 'user-alarm-repair',
+        badge: null,
+        idempotencyKey: 'k-alarm-repair',
+      })
+    );
+    const scheduledAlarm = await runInDurableObject(stub, (_instance, state) =>
+      state.storage.getAlarm()
+    );
+    expect(scheduledAlarm).not.toBeNull();
+    expect(scheduledAlarm ?? Infinity).toBeLessThan(Date.now() + 60_000);
+
+    await runInDurableObject(stub, async instance => {
+      await (instance as unknown as { alarm: () => Promise<void> }).alarm();
+    });
+
+    expect(firstResult.kind).toBe('failed');
+    expect(sendPushNotifications).toHaveBeenCalledOnce();
+    expect(receiptSpy).toHaveBeenCalledTimes(2);
+    const stored = await runInDurableObject(stub, (_instance, state) =>
+      state.storage.get<{ stage: string; ts: number }>('idem:k-alarm-repair')
+    );
+    expect(stored).toMatchObject({ stage: 'delivered' });
+  });
+
+  it('continues accepted push bookkeeping when initial alarm scheduling fails', async () => {
+    installDbMock({ tokens: [{ user_id: 'user-alarm-setup-fail', token: 'tok1' }] });
+    const receiptSpy = vi.spyOn(env.RECEIPTS_QUEUE, 'send');
+    const stub = getDO('user-alarm-setup-fail');
+
+    const result = await runInDurableObject(stub, async (instance, state) => {
+      const originalSetAlarm = state.storage.setAlarm.bind(state.storage);
+      vi.spyOn(state.storage, 'setAlarm')
+        .mockRejectedValueOnce(new Error('alarm unavailable'))
+        .mockImplementation(originalSetAlarm);
+
+      return instance.dispatchPush(
+        baseInput({
+          userId: 'user-alarm-setup-fail',
+          badge: null,
+          idempotencyKey: 'k-alarm-setup-fail',
+        })
+      );
+    });
+
+    expect(result).toEqual({ kind: 'delivered', tokenCount: 1 });
+    expect(sendPushNotifications).toHaveBeenCalledOnce();
+    expect(receiptSpy).toHaveBeenCalledOnce();
+    const stored = await runInDurableObject(stub, (_instance, state) =>
+      state.storage.get<{ stage: string; ts: number }>('idem:k-alarm-setup-fail')
+    );
+    expect(stored).toMatchObject({ stage: 'delivered' });
   });
 
   it('does not write idempotency key on Expo failure', async () => {

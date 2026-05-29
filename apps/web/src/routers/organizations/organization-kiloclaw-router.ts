@@ -404,6 +404,14 @@ export const organizationKiloclawRouter = createTRPCRouter({
     } satisfies KiloClawDashboardStatus;
   }),
 
+  getNavState: organizationMemberProcedure.query(async ({ ctx, input }) => {
+    const instance = await getActiveOrgInstance(ctx.user.id, input.organizationId);
+    return {
+      hasActiveInstance: instance !== null,
+      instanceId: instance?.id ?? null,
+    };
+  }),
+
   getDiskUsage: organizationMemberProcedure.query(async ({ ctx, input }) => {
     const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
     try {

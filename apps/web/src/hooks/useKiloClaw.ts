@@ -12,6 +12,15 @@ export function useKiloClawStatus() {
   );
 }
 
+export function useKiloClawNavState() {
+  const trpc = useTRPC();
+  return useQuery(
+    trpc.kiloclaw.getNavState.queryOptions(undefined, {
+      staleTime: 60_000,
+    })
+  );
+}
+
 export function useKiloClawConfig() {
   const trpc = useTRPC();
   return useQuery(trpc.kiloclaw.getConfig.queryOptions());
@@ -129,10 +138,13 @@ export function useKiloClawMutations() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const invalidateStatus = async () => {
-    await queryClient.invalidateQueries({ queryKey: trpc.kiloclaw.getStatus.queryKey() });
-    await queryClient.invalidateQueries({
-      queryKey: trpc.kiloclaw.controllerVersion.queryKey(),
-    });
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: trpc.kiloclaw.getStatus.queryKey() }),
+      queryClient.invalidateQueries({ queryKey: trpc.kiloclaw.getNavState.queryKey() }),
+      queryClient.invalidateQueries({
+        queryKey: trpc.kiloclaw.controllerVersion.queryKey(),
+      }),
+    ]);
   };
 
   const invalidateStatusAndBilling = async () => {

@@ -2,7 +2,7 @@
 
 import { Sidebar, SidebarContent, SidebarHeader } from '@/components/ui/sidebar';
 import { useUser } from '@/hooks/useUser';
-import { useKiloClawStatus } from '@/hooks/useKiloClaw';
+import { useKiloClawNavState } from '@/hooks/useKiloClaw';
 import { useEffect, useMemo, useState } from 'react';
 import {
   Code,
@@ -45,7 +45,7 @@ import { usePathname } from 'next/navigation';
 
 export default function PersonalAppSidebar(props: React.ComponentProps<typeof Sidebar>) {
   const { data: user, isLoading } = useUser();
-  const kiloClawStatusQuery = useKiloClawStatus();
+  const kiloClawNavStateQuery = useKiloClawNavState();
   const pathname = usePathname();
 
   // Feature flags
@@ -255,10 +255,10 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
   ];
 
   const kiloClawBaseUrl = '/claw';
-  const kiloClawInstanceState = kiloClawStatusQuery.isSuccess
-    ? kiloClawStatusQuery.data.status === null
-      ? 'absent'
-      : 'present'
+  const kiloClawInstanceState = kiloClawNavStateQuery.isSuccess
+    ? kiloClawNavStateQuery.data.hasActiveInstance
+      ? 'present'
+      : 'absent'
     : 'unknown';
   const hasKiloClawInstance = kiloClawInstanceState === 'present';
   const isKiloClawPath = pathname === kiloClawBaseUrl || pathname.startsWith(kiloClawBaseUrl + '/');

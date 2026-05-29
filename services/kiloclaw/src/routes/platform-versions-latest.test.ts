@@ -35,6 +35,12 @@ function makeEnv() {
   } as never;
 }
 
+function makeEnvWithoutHyperdrive() {
+  return {
+    KV_CLAW_CACHE: {},
+  } as never;
+}
+
 const selectedVersion: ImageVersionEntry = {
   openclawVersion: '2.0.0',
   variant: 'default',
@@ -105,5 +111,38 @@ describe('platform /versions/latest', () => {
       currentImageTag: null,
       autoEnroll: true,
     });
+  });
+
+  it('uses instanceId directly with autoEnroll disabled when Hyperdrive is unavailable', async () => {
+    vi.mocked(selectImageVersionForInstance).mockResolvedValue(selectedVersion);
+
+    const response = await platform.request(
+      '/versions/latest?instanceId=instance-row-id&currentImageTag=current-tag',
+      undefined,
+      makeEnvWithoutHyperdrive()
+    );
+
+    expect(response.status).toBe(200);
+    expect(resolveLatestVersion).not.toHaveBeenCalled();
+    expect(lookupKiloclawRolloutContextByInstanceId).not.toHaveBeenCalled();
+    expect(selectImageVersionForInstance).toHaveBeenCalledWith({
+      kv: {},
+      variant: 'default',
+      instanceId: 'instance-row-id',
+      currentImageTag: 'current-tag',
+      autoEnroll: false,
+    });
+  });
+
+  it('returns :latest for anonymous callers without rollout parameters', async () => {
+    vi.mocked(resolveLatestVersion).mockResolvedValue(selectedVersion);
+
+    const response = await platform.request('/versions/latest', undefined, makeEnv());
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual(selectedVersion);
+    expect(resolveLatestVersion).toHaveBeenCalledWith({}, 'default');
+    expect(lookupKiloclawRolloutContextByInstanceId).not.toHaveBeenCalled();
+    expect(selectImageVersionForInstance).not.toHaveBeenCalled();
   });
 });

@@ -60,40 +60,52 @@ export function ActiveKiloclawsTable({ organizationId }: ActiveKiloclawsTablePro
             No active KiloClaw instances in this organization.
           </p>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>User</TableHead>
-                <TableHead>Instance Name</TableHead>
-                <TableHead>Created</TableHead>
-                <TableHead>Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {data?.map(instance => (
-                <TableRow key={instance.id}>
-                  <TableCell className="text-sm">{instance.userEmail}</TableCell>
-                  <TableCell className="text-sm">
-                    {instance.name ?? <span className="text-muted-foreground">—</span>}
-                  </TableCell>
-                  <TableCell className="text-sm">
-                    {formatIsoDateString_UsaDateOnlyFormat(instance.createdAt)}
-                  </TableCell>
-                  <TableCell>
-                    {instance.isSuspended ? (
-                      <Badge variant="destructive" className="text-xs">
-                        Suspended
-                      </Badge>
-                    ) : (
-                      <Badge variant="secondary" className="text-xs">
-                        Active
-                      </Badge>
-                    )}
-                  </TableCell>
+          <div className="overflow-x-auto">
+            <Table className="min-w-[680px] table-fixed">
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[40%]">User</TableHead>
+                  <TableHead className="w-[30%]">Instance Name</TableHead>
+                  <TableHead className="w-[18%]">Created</TableHead>
+                  <TableHead className="w-[12%]">Status</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {data?.map(instance => (
+                  <TableRow key={instance.id}>
+                    <TableCell className="max-w-0 text-sm">
+                      <span className="block truncate" title={instance.userEmail}>
+                        {instance.userEmail}
+                      </span>
+                    </TableCell>
+                    <TableCell className="max-w-0 text-sm">
+                      {instance.name ? (
+                        <span className="block truncate" title={instance.name}>
+                          {instance.name}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      {formatIsoDateString_UsaDateOnlyFormat(instance.createdAt)}
+                    </TableCell>
+                    <TableCell>
+                      {instance.isSuspended ? (
+                        <Badge variant="destructive" className="text-xs">
+                          Suspended
+                        </Badge>
+                      ) : (
+                        <Badge variant="secondary" className="text-xs">
+                          Active
+                        </Badge>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         )}
       </CardContent>
     </Card>

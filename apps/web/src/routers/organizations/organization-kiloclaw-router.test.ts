@@ -6,6 +6,7 @@ import { cleanupDbForTest, db } from '@/lib/drizzle';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createOrganization } from '@/lib/organizations/organizations';
 import type { createCallerForUser as TestUtilsCallerFactory } from '@/routers/test-utils';
+import { LEGACY_KILOCLAW_PRICE_VERSION } from '@kilocode/db';
 import {
   kiloclaw_image_catalog,
   kiloclaw_instances,
@@ -16,6 +17,9 @@ import {
   organizations,
 } from '@kilocode/db/schema';
 import { and, eq } from 'drizzle-orm';
+
+(kiloclaw_subscriptions.kiloclaw_price_version as { defaultFn: () => string }).defaultFn = () =>
+  LEGACY_KILOCLAW_PRICE_VERSION;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyMock = jest.Mock<(...args: any[]) => any>;
@@ -164,6 +168,76 @@ async function addOrganizationSeatEntitlement(organizationId: string): Promise<v
     subscription_status: 'past_due',
   });
 }
+
+describe('organizations.kiloclaw.listActiveInstances', () => {
+  beforeEach(async () => {
+    await cleanupDbForTest();
+  });
+
+  it('excludes orphan and destroyed organization instances', async () => {
+    const user = await insertTestUser({
+      google_user_email: `org-kiloclaw-list-${crypto.randomUUID()}@example.com`,
+    });
+    const organization = await createOrganization('Org KiloClaw List Test', user.id);
+    await createActiveOrgInstance(user.id, organization.id);
+    const activeInstanceId = await createActiveOrgInstance(user.id, organization.id);
+    const suspendedInstanceId = await createActiveOrgInstance(user.id, organization.id);
+    const destroyedInstanceId = await createActiveOrgInstance(user.id, organization.id);
+
+    await db.insert(kiloclaw_subscriptions).values([
+      {
+        user_id: user.id,
+        instance_id: activeInstanceId,
+        plan: 'standard',
+        status: 'active',
+        payment_source: 'credits',
+        cancel_at_period_end: false,
+      },
+      {
+        user_id: user.id,
+        instance_id: suspendedInstanceId,
+        plan: 'standard',
+        status: 'canceled',
+        payment_source: 'credits',
+        cancel_at_period_end: false,
+        suspended_at: '2026-05-28T00:00:00.000Z',
+      },
+      {
+        user_id: user.id,
+        instance_id: destroyedInstanceId,
+        plan: 'standard',
+        status: 'active',
+        payment_source: 'credits',
+        cancel_at_period_end: false,
+      },
+    ]);
+    await db
+      .update(kiloclaw_instances)
+      .set({ destroyed_at: '2026-05-28T00:00:00.000Z' })
+      .where(eq(kiloclaw_instances.id, destroyedInstanceId));
+
+    const caller = await createCallerForUser(user.id);
+    const result = await caller.organizations.kiloclaw.listActiveInstances({
+      organizationId: organization.id,
+    });
+
+    expect(result).toHaveLength(2);
+    expect(result).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: activeInstanceId,
+          userEmail: user.google_user_email,
+          isSuspended: false,
+        }),
+        expect.objectContaining({
+          id: suspendedInstanceId,
+          userEmail: user.google_user_email,
+          isSuspended: true,
+        }),
+      ])
+    );
+  });
+});
 
 describe('organization kiloclaw destroy', () => {
   beforeEach(async () => {

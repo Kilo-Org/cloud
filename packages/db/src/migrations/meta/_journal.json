@@ -1037,6 +1037,13 @@
       "when": 1779979914171,
       "tag": "0147_curvy_millenium_guard",
       "breakpoints": true
+    },
+    {
+      "idx": 148,
+      "version": "7",
+      "when": 1780051885348,
+      "tag": "0148_cuddly_stryfe",
+      "breakpoints": true
     }
   ]
 }

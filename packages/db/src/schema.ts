@@ -5207,6 +5207,9 @@ export const kiloclaw_instances = pgTable(
     index('IDX_kiloclaw_instances_active_org_by_user_org')
       .on(table.user_id, table.organization_id)
       .where(sql`${table.organization_id} IS NOT NULL AND ${table.destroyed_at} IS NULL`),
+    index('IDX_kiloclaw_instances_active_org_by_org_created')
+      .on(table.organization_id, table.created_at)
+      .where(sql`${table.organization_id} IS NOT NULL AND ${table.destroyed_at} IS NULL`),
     // Non-partial index over all rows (including destroyed) so we can answer
     // "what is this user's earliest instance" without a sequential scan. Used
     // by `userIsWithinFirstKiloClawInstanceWindow` on the AI gateway hot path;

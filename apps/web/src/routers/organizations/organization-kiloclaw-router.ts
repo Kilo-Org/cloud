@@ -1591,7 +1591,7 @@ export const organizationKiloclawRouter = createTRPCRouter({
       })
       .from(kiloclaw_instances)
       .innerJoin(kilocode_users, eq(kiloclaw_instances.user_id, kilocode_users.id))
-      .leftJoin(
+      .innerJoin(
         kiloclaw_subscriptions,
         eq(kiloclaw_subscriptions.instance_id, kiloclaw_instances.id)
       )

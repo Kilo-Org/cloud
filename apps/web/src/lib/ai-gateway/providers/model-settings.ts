@@ -94,6 +94,9 @@ export function getModelVariants(model: string): OpenCodeSettings['variants'] {
       high: { reasoning: { enabled: true, effort: 'high' } },
     };
   }
+  if (isStepModel(model)) {
+    return REASONING_VARIANTS_LOW_MEDIUM_HIGH;
+  }
   return undefined;
 }
 

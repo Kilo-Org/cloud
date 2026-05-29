@@ -1413,7 +1413,8 @@ export async function rejectReviewMemoryProposal(input: {
       and(
         proposalOwnerWhere(input.owner),
         eq(code_review_memory_proposals.id, input.proposalId),
-        retainedProposalWhere()
+        retainedProposalWhere(),
+        inArray(code_review_memory_proposals.status, ACTIONABLE_REVIEW_MEMORY_PROPOSAL_STATUSES)
       )
     )
     .returning();

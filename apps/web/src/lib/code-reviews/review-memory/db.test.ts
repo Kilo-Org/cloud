@@ -22,6 +22,7 @@ import {
   pruneExpiredReviewMemoryData,
   recordFeedbackEvent,
   refreshAggregationStateForScope,
+  rejectReviewMemoryProposal,
   updateReviewMemoryProposal,
   upsertFeedbackSubject,
   upsertReviewMemoryProposal,
@@ -311,6 +312,43 @@ describe('review memory db helpers', () => {
     expect(edited).toBeNull();
     expect(stored.title).toBe('Clarify noisy guidance');
     expect(stored.status).toBe('opening_change_request');
+  });
+
+  it('does not reject proposals in non-actionable states', async () => {
+    const user = await insertTestUser();
+    const owner = { type: 'user' as const, id: user.id };
+    const proposal = await upsertReviewMemoryProposal({
+      owner,
+      platform: 'github',
+      repoFullName: 'owner/repo',
+      proposalType: 'clarify',
+      scopeKind: 'repository',
+      title: 'Clarify noisy guidance',
+      rationale: 'Maintainers corrected the same guidance.',
+      proposedMarkdown: '### Review guidance: Clarify noisy guidance',
+      dedupeKey: 'clarify-noisy-guidance-reject-blocked',
+    });
+    await markProposalOpeningChangeRequest({
+      owner,
+      proposalId: proposal.id,
+      approvedByUserId: user.id,
+      changeRequestType: 'github_pr',
+      branchName: 'kilo/review-memory/test',
+    });
+
+    const rejected = await rejectReviewMemoryProposal({
+      owner,
+      proposalId: proposal.id,
+      rejectedByUserId: user.id,
+    });
+    const [stored] = await db
+      .select()
+      .from(code_review_memory_proposals)
+      .where(eq(code_review_memory_proposals.id, proposal.id));
+
+    expect(rejected).toBeNull();
+    expect(stored.status).toBe('opening_change_request');
+    expect(stored.rejected_by_user_id).toBeNull();
   });
 
   it('refreshes aggregation state from retained fresh events only', async () => {

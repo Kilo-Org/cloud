@@ -257,20 +257,84 @@ async function generateByokProvidersNotification(
       return [];
     }
 
+    // Maps an extension `apiProvider` id to a user-facing label. Multiple ids can
+    // refer to the same underlying service (regional/plan/legacy variants), and we
+    // only list ids for services we actually support BYOK for via Kilo Gateway
+    // (see UserByokProviderIdSchema).
     const names = {
+      // Anthropic / Claude
       anthropic: 'Claude API Key',
+      claude: 'Claude API Key',
+      'claude-code': 'Claude API Key',
+
+      // Amazon Bedrock
       bedrock: 'Amazon Bedrock API Key',
+      'amazon-bedrock': 'Amazon Bedrock API Key',
+
+      // Chutes
       chutes: 'Chutes API Key',
+
+      // DeepSeek
       deepseek: 'DeepSeek API Key',
+      deepseek1: 'DeepSeek API Key',
+      'deepseek-v4': 'DeepSeek API Key',
+      'deepseek-v4-pro': 'DeepSeek API Key',
+
+      // Fireworks
       fireworks: 'Fireworks API Key',
+      'fireworks-ai': 'Fireworks API Key',
+
+      // Google AI (Gemini)
       gemini: 'Google AI API Key',
+      google: 'Google AI API Key',
+
+      // OpenAI
       'openai-native': 'OpenAI API Key',
+      openai: 'OpenAI API Key',
+      'openai-codex': 'OpenAI API Key',
+      'openai-responses': 'OpenAI API Key',
+
+      // Moonshot AI / Kimi
       moonshot: 'Moonshot AI API Key',
+      moonshotai: 'Moonshot AI API Key',
+      'moonshotai-cn': 'Moonshot AI API Key',
+      kimi: 'Moonshot AI API Key',
+      'kimi-for-coding': 'Moonshot AI API Key',
+
+      // MiniMax
       minimax: 'MiniMax Coding Plan',
+      'minimax-cn': 'MiniMax Coding Plan',
+      'minimax-coding-plan': 'MiniMax Coding Plan',
+      'minimax-cn-coding-plan': 'MiniMax Coding Plan',
+
+      // Mistral
       mistral: 'Mistral AI API Key',
+
+      // Novita
       novita: 'Novita AI API Key',
+
+      // xAI
       xai: 'xAI API Key',
+
+      // Z.ai / Zhipu (GLM)
       zai: 'GLM Coding Plan',
+      'z-ai': 'GLM Coding Plan',
+      'zai-coding-plan': 'GLM Coding Plan',
+      glm: 'GLM Coding Plan',
+      zhipuai: 'GLM Coding Plan',
+      'zhipuai-coding-plan': 'GLM Coding Plan',
+
+      // Xiaomi MiMo
+      xiaomi: 'Xiaomi MiMo API Key',
+      'xiaomi-mimo': 'Xiaomi MiMo API Key',
+      xiaomimimo: 'Xiaomi MiMo API Key',
+      mimo: 'Xiaomi MiMo API Key',
+      'xiaomi-token-plan-cn': 'Xiaomi Token Plan',
+      'xiaomi-token-plan-sgp': 'Xiaomi Token Plan',
+      'xiaomi-token-plan-ams': 'Xiaomi Token Plan',
+
+      // Ollama Cloud
+      'ollama-cloud': 'Ollama Cloud API Key',
     } as Record<string, string>;
 
     const providerName = names[provider];

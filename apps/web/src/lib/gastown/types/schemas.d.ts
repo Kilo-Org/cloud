@@ -1599,3 +1599,45 @@ export declare const RpcOrgTownOutput: z.ZodPipe<
     z.core.$strip
   >
 >;
+export declare const BabysitPrResultOutput: z.ZodObject<
+  {
+    beadId: z.ZodString;
+    warning: z.ZodOptional<z.ZodString>;
+  },
+  z.core.$strip
+>;
+export declare const PreviewPrResultOutput: z.ZodObject<
+  {
+    state: z.ZodString;
+    head_branch: z.ZodOptional<z.ZodString>;
+    base_branch: z.ZodOptional<z.ZodString>;
+    head_sha: z.ZodOptional<z.ZodString>;
+    title: z.ZodOptional<z.ZodString>;
+    repo_matches: z.ZodBoolean;
+  },
+  z.core.$strip
+>;
+export declare const RpcBabysitPrResultOutput: z.ZodPipe<
+  z.ZodAny,
+  z.ZodObject<
+    {
+      beadId: z.ZodString;
+      warning: z.ZodOptional<z.ZodString>;
+    },
+    z.core.$strip
+  >
+>;
+export declare const RpcPreviewPrResultOutput: z.ZodPipe<
+  z.ZodAny,
+  z.ZodObject<
+    {
+      state: z.ZodString;
+      head_branch: z.ZodOptional<z.ZodString>;
+      base_branch: z.ZodOptional<z.ZodString>;
+      head_sha: z.ZodOptional<z.ZodString>;
+      title: z.ZodOptional<z.ZodString>;
+      repo_matches: z.ZodBoolean;
+    },
+    z.core.$strip
+  >
+>;

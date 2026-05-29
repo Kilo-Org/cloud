@@ -1,15 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useGastownTRPC } from '@/lib/gastown/trpc';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import {
@@ -20,6 +15,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Button } from '@/components/Button';
+import { BabysitPrPanel } from '@/components/gastown/BabysitPrPanel';
 import { toast } from 'sonner';
 
 type SlingDialogProps = {
@@ -36,12 +32,41 @@ const MODEL_OPTIONS = [
   { value: 'kilo/gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
 ];
 
+const TAB_STORAGE_KEY = 'sling-dialog-last-tab';
+
+function getStoredTab(): string {
+  if (typeof window === 'undefined') return 'sling';
+  try {
+    return localStorage.getItem(TAB_STORAGE_KEY) ?? 'sling';
+  } catch {
+    return 'sling';
+  }
+}
+
+function storeTab(tab: string) {
+  try {
+    localStorage.setItem(TAB_STORAGE_KEY, tab);
+  } catch {}
+}
+
 export function SlingDialog({ rigId, isOpen, onClose }: SlingDialogProps) {
+  const [activeTab, setActiveTab] = useState(getStoredTab);
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [model, setModel] = useState(MODEL_OPTIONS[0].value);
   const trpc = useGastownTRPC();
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (isOpen) {
+      setActiveTab(getStoredTab());
+    }
+  }, [isOpen]);
+
+  const handleTabChange = (tab: string) => {
+    setActiveTab(tab);
+    storeTab(tab);
+  };
 
   const sling = useMutation(
     trpc.gastown.sling.mutationOptions({
@@ -78,61 +103,76 @@ export function SlingDialog({ rigId, isOpen, onClose }: SlingDialogProps) {
         <DialogHeader>
           <DialogTitle>Sling Work</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit}>
-          <div className="space-y-4 py-4">
-            <div>
-              <label className="mb-2 block text-sm font-medium text-white/70">Title</label>
-              <Input
-                value={title}
-                onChange={e => setTitle(e.target.value)}
-                placeholder="What needs to be done?"
-                autoFocus
-                className="border-white/10 bg-black/25"
-              />
-            </div>
-            <div>
-              <label className="mb-2 block text-sm font-medium text-white/70">
-                Description (optional)
-              </label>
-              <Textarea
-                value={body}
-                onChange={e => setBody(e.target.value)}
-                placeholder="Additional context or requirements..."
-                rows={4}
-                className="border-white/10 bg-black/25"
-              />
-            </div>
-            <div>
-              <label className="mb-2 block text-sm font-medium text-white/70">Model</label>
-              <Select value={model} onValueChange={setModel}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {MODEL_OPTIONS.map(opt => (
-                    <SelectItem key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="secondary" size="md" type="button" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button
-              variant="primary"
-              size="md"
-              type="submit"
-              disabled={!title.trim() || sling.isPending}
-              className="bg-[color:oklch(95%_0.15_108_/_0.90)] text-black hover:bg-[color:oklch(95%_0.15_108_/_0.95)]"
-            >
-              {sling.isPending ? 'Slinging...' : 'Sling'}
-            </Button>
-          </DialogFooter>
-        </form>
+        <Tabs value={activeTab} onValueChange={handleTabChange}>
+          <TabsList className="mb-2 w-full">
+            <TabsTrigger value="sling" className="flex-1">
+              Sling work
+            </TabsTrigger>
+            <TabsTrigger value="babysit" className="flex-1">
+              Babysit existing PR
+            </TabsTrigger>
+          </TabsList>
+          <TabsContent value="sling">
+            <form onSubmit={handleSubmit}>
+              <div className="space-y-4 py-4">
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-white/70">Title</label>
+                  <Input
+                    value={title}
+                    onChange={e => setTitle(e.target.value)}
+                    placeholder="What needs to be done?"
+                    autoFocus={activeTab === 'sling'}
+                    className="border-white/10 bg-black/25"
+                  />
+                </div>
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-white/70">
+                    Description (optional)
+                  </label>
+                  <Textarea
+                    value={body}
+                    onChange={e => setBody(e.target.value)}
+                    placeholder="Additional context or requirements..."
+                    rows={4}
+                    className="border-white/10 bg-black/25"
+                  />
+                </div>
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-white/70">Model</label>
+                  <Select value={model} onValueChange={setModel}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {MODEL_OPTIONS.map(opt => (
+                        <SelectItem key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="secondary" size="md" type="button" onClick={onClose}>
+                  Cancel
+                </Button>
+                <Button
+                  variant="primary"
+                  size="md"
+                  type="submit"
+                  disabled={!title.trim() || sling.isPending}
+                  className="bg-[color:oklch(95%_0.15_108_/_0.90)] text-black hover:bg-[color:oklch(95%_0.15_108_/_0.95)]"
+                >
+                  {sling.isPending ? 'Slinging...' : 'Sling'}
+                </Button>
+              </div>
+            </form>
+          </TabsContent>
+          <TabsContent value="babysit">
+            <BabysitPrPanel rigId={rigId} onClose={onClose} />
+          </TabsContent>
+        </Tabs>
       </DialogContent>
     </Dialog>
   );

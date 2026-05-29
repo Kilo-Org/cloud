@@ -11,9 +11,11 @@ import { BeadBoard } from '@/components/gastown/BeadBoard';
 import { AgentCard } from '@/components/gastown/AgentCard';
 import { ConvoyTimeline } from '@/components/gastown/ConvoyTimeline';
 import { CreateBeadDrawer } from '@/components/gastown/CreateBeadDrawer';
+import { SlingDialog } from '@/components/gastown/SlingDialog';
 import { useDrawerStack } from '@/components/gastown/DrawerStack';
 import {
   Plus,
+  Zap,
   GitBranch,
   Hexagon,
   Bot,
@@ -40,6 +42,7 @@ export function RigDetailPageClient({
   const townBasePath = basePathOverride ?? `/gastown/${townId}`;
   const trpc = useGastownTRPC();
   const [isCreateBeadOpen, setIsCreateBeadOpen] = useState(false);
+  const [isSlingOpen, setIsSlingOpen] = useState(false);
   const [convoysCollapsed, setConvoysCollapsed] = useState(false);
   const { open: openDrawer } = useDrawerStack();
 
@@ -163,6 +166,15 @@ export function RigDetailPageClient({
           >
             <Settings className="size-4" />
           </Link>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setIsSlingOpen(true)}
+            className="gap-1.5"
+          >
+            <Zap className="size-3.5" />
+            Sling
+          </Button>
           <Button
             variant="primary"
             size="sm"
@@ -302,6 +314,7 @@ export function RigDetailPageClient({
         isOpen={isCreateBeadOpen}
         onClose={() => setIsCreateBeadOpen(false)}
       />
+      <SlingDialog rigId={rigId} isOpen={isSlingOpen} onClose={() => setIsSlingOpen(false)} />
     </div>
   );
 }

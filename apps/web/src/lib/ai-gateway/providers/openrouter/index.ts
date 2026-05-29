@@ -85,9 +85,6 @@ function formatName(model: OpenRouterModel, preferredIndex: number) {
       day: 'numeric',
       timeZone: 'UTC',
     });
-      month: 'short',
-      day: 'numeric',
-    });
     return model.name + ' (retires ' + suffix + ')';
   }
   return model.name;

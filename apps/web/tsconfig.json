@@ -49,8 +49,7 @@
     "sentry.edge.config.ts",
     "sentry.server.config.ts",
     ".next/dev/types/**/*.ts",
-    "dev/discord-gateway-cron.ts",
-    ".next/dev/dev/types/**/*.ts"
+    "dev/discord-gateway-cron.ts"
   ],
   "exclude": ["node_modules", ".next"]
 }

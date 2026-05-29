@@ -246,7 +246,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   private async resolveImageStateForPin(
     pinnedImageTag: string | null,
     userId: string,
-    instanceId: string,
+    rolloutSubject: string,
     opts: { isNew: boolean; ignoreCurrentImageTag?: boolean }
   ): Promise<void> {
     if (pinnedImageTag) {
@@ -333,7 +333,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     const selected = await selectImageVersionForInstance({
       kv: this.env.KV_CLAW_CACHE,
       variant,
-      instanceId,
+      rolloutSubject,
       currentImageTag: selectorCurrentImageTag,
       autoEnroll,
     });
@@ -1934,8 +1934,8 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       throw Object.assign(new Error('Cannot apply pin: instance has no userId'), { status: 404 });
     }
 
-    const resolvedInstanceId = instanceId ?? this.s.userId;
-    await this.resolveImageStateForPin(imageTag, this.s.userId, resolvedInstanceId, {
+    const rolloutSubject = instanceId ?? this.s.userId;
+    await this.resolveImageStateForPin(imageTag, this.s.userId, rolloutSubject, {
       isNew: false,
       // When clearing a pin (imageTag === null), force a fresh rollout
       // decision instead of preserving the currently-tracked tag. Without
@@ -4067,7 +4067,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       if (options?.imageTag) {
         if (options.imageTag === 'latest') {
           const variant: ImageVariant = 'default';
-          const instanceIdForBucket = imageRolloutSubjectFromSandboxId(
+          const rolloutSubject = imageRolloutSubjectFromSandboxId(
             this.s.sandboxId,
             this.s.userId ?? ''
           );
@@ -4087,7 +4087,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
           const latest = await selectImageVersionForInstance({
             kv: this.env.KV_CLAW_CACHE,
             variant,
-            instanceId: instanceIdForBucket,
+            rolloutSubject,
             currentImageTag: this.s.trackedImageTag,
             autoEnroll,
           });

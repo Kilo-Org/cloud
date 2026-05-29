@@ -80,7 +80,7 @@ describe('platform /versions/latest', () => {
     expect(selectImageVersionForInstance).toHaveBeenCalledWith({
       kv: {},
       variant: 'default',
-      instanceId: 'instance-row-id',
+      rolloutSubject: 'instance-row-id',
       currentImageTag: 'current-tag',
       autoEnroll: true,
     });
@@ -107,7 +107,7 @@ describe('platform /versions/latest', () => {
     expect(selectImageVersionForInstance).toHaveBeenCalledWith({
       kv: {},
       variant: 'default',
-      instanceId: 'authoritative-row-subject',
+      rolloutSubject: 'authoritative-row-subject',
       currentImageTag: null,
       autoEnroll: true,
     });
@@ -128,7 +128,7 @@ describe('platform /versions/latest', () => {
     expect(selectImageVersionForInstance).toHaveBeenCalledWith({
       kv: {},
       variant: 'default',
-      instanceId: 'instance-row-id',
+      rolloutSubject: 'instance-row-id',
       currentImageTag: 'current-tag',
       autoEnroll: false,
     });

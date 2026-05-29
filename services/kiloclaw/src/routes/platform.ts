@@ -4484,7 +4484,7 @@ platform.get('/versions/latest', async c => {
     const selected = await selectImageVersionForInstance({
       kv: c.env.KV_CLAW_CACHE,
       variant: 'default',
-      instanceId: rolloutSubject,
+      rolloutSubject,
       currentImageTag,
       autoEnroll,
     });

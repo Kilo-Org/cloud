@@ -7822,7 +7822,7 @@ describe('restartMachine image tag override', () => {
 
     expect(result.success).toBe(true);
     expect(selectImageVersionForInstance).toHaveBeenCalledWith(
-      expect.objectContaining({ instanceId: 'user-1' })
+      expect.objectContaining({ rolloutSubject: 'user-1' })
     );
     expect(storage._store.get('trackedImageTag')).toBe('new-tag-from-kv');
     expect(storage._store.get('openclawVersion')).toBe('2.0.0');
@@ -7853,7 +7853,7 @@ describe('restartMachine image tag override', () => {
 
     expect(result.success).toBe(true);
     expect(selectImageVersionForInstance).toHaveBeenCalledWith(
-      expect.objectContaining({ instanceId })
+      expect.objectContaining({ rolloutSubject: instanceId })
     );
   });
 

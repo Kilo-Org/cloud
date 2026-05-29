@@ -30,7 +30,7 @@ import {
   isExcludedForFeature,
   isKiloExclusiveFreeModel,
   isKiloStealthModel,
-  requiresKiloDataCollection,
+  isKiloExclusiveModelRequiringDataCollection,
 } from '@/lib/ai-gateway/models';
 import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
 import {
@@ -58,7 +58,7 @@ import {
 import { ProxyErrorType } from '@/lib/proxy-error-types';
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
 import { repairTools, sanitizeBinaryToolResults } from '@/lib/ai-gateway/tool-calling';
-import { isFreePromptTrainingAllowed } from '@/lib/ai-gateway/providers/openrouter/types';
+import { isDataCollectionExplicitlyDisallowed } from '@/lib/ai-gateway/providers/openrouter/types';
 import {
   rewriteFreeModelResponse_ChatCompletions,
   rewriteFreeModelResponse_Messages,
@@ -419,7 +419,10 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   // for partner evaluation — which violates the caller's stated
   // intent. Refuse here regardless of org settings, anon/BYOK status,
   // or the org-level check below.
-  if (experiment && !isFreePromptTrainingAllowed(requestBodyParsed.body.provider)) {
+  if (
+    (experiment || isKiloExclusiveModelRequiringDataCollection(originalModelIdLowerCased)) &&
+    isDataCollectionExplicitlyDisallowed(requestBodyParsed.body.provider)
+  ) {
     return dataCollectionRequiredResponse();
   }
 
@@ -553,13 +556,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     name: 'upstream-request-start',
     op: 'http.client',
   });
-
-  if (
-    requiresKiloDataCollection(originalModelIdLowerCased) &&
-    !isFreePromptTrainingAllowed(requestBodyParsed.body.provider)
-  ) {
-    return dataCollectionRequiredResponse();
-  }
 
   applyTrackingIds(requestBodyParsed, provider, user.id, taskId ?? null);
 

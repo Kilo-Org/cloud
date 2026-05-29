@@ -29,8 +29,11 @@ import {
   kiloclaw_version_pins,
   kiloclaw_image_catalog,
   kiloclaw_cli_runs,
+  kiloclaw_instances,
+  kiloclaw_subscriptions,
+  kilocode_users,
 } from '@kilocode/db/schema';
-import { and, eq, desc, sql } from 'drizzle-orm';
+import { and, eq, desc, sql, isNull } from 'drizzle-orm';
 import type { KiloClawDashboardStatus, KiloCodeConfigResponse } from '@/lib/kiloclaw/types';
 import { cancelCliRun, createCliRun, getCliRunStatus } from '@/lib/kiloclaw/cli-runs';
 import { queryDiskUsage } from '@/lib/kiloclaw/disk-usage';
@@ -54,6 +57,7 @@ import { encryptProvisionSecretsForWorker } from '@/lib/kiloclaw/provision-secre
 import {
   organizationMemberProcedure,
   organizationMemberMutationProcedure,
+  organizationBillingProcedure,
 } from '@/routers/organizations/utils';
 import { requireOrganizationKiloClawComputeEntitlement } from '@/lib/organizations/trial-middleware';
 
@@ -1573,4 +1577,38 @@ export const organizationKiloclawRouter = createTRPCRouter({
         handleFileOperationError(err, 'patch openclaw config');
       }
     }),
+
+  // ── Org-wide instance list (owner / billing_manager only) ─────
+
+  listActiveInstances: organizationBillingProcedure.query(async ({ input }) => {
+    const rows = await db
+      .select({
+        id: kiloclaw_instances.id,
+        name: kiloclaw_instances.name,
+        createdAt: kiloclaw_instances.created_at,
+        userEmail: kilocode_users.google_user_email,
+        suspendedAt: kiloclaw_subscriptions.suspended_at,
+      })
+      .from(kiloclaw_instances)
+      .innerJoin(kilocode_users, eq(kiloclaw_instances.user_id, kilocode_users.id))
+      .innerJoin(
+        kiloclaw_subscriptions,
+        eq(kiloclaw_subscriptions.instance_id, kiloclaw_instances.id)
+      )
+      .where(
+        and(
+          eq(kiloclaw_instances.organization_id, input.organizationId),
+          isNull(kiloclaw_instances.destroyed_at)
+        )
+      )
+      .orderBy(kiloclaw_instances.created_at);
+
+    return rows.map(row => ({
+      id: row.id,
+      name: row.name,
+      createdAt: new Date(row.createdAt).toISOString(),
+      userEmail: row.userEmail,
+      isSuspended: row.suspendedAt !== null,
+    }));
+  }),
 });

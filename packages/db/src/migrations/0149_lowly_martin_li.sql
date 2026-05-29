@@ -203,7 +203,8 @@ CREATE INDEX "idx_code_review_feedback_events_sentiment" ON "code_review_feedbac
 CREATE INDEX "idx_code_review_feedback_events_signal_kind" ON "code_review_feedback_events" USING btree ("signal_kind");--> statement-breakpoint
 CREATE INDEX "idx_code_review_feedback_events_aggregation_state" ON "code_review_feedback_events" USING btree ("aggregation_state");--> statement-breakpoint
 CREATE INDEX "idx_code_review_feedback_events_created_at" ON "code_review_feedback_events" USING btree ("created_at");--> statement-breakpoint
-CREATE UNIQUE INDEX "UQ_code_review_feedback_subjects_platform_external" ON "code_review_feedback_subjects" USING btree ("platform","repo_full_name","subject_type","external_id");--> statement-breakpoint
+CREATE UNIQUE INDEX "UQ_code_review_feedback_subjects_org_platform_external" ON "code_review_feedback_subjects" USING btree ("owned_by_organization_id","platform","repo_full_name","subject_type","external_id") WHERE "code_review_feedback_subjects"."owned_by_organization_id" is not null;--> statement-breakpoint
+CREATE UNIQUE INDEX "UQ_code_review_feedback_subjects_user_platform_external" ON "code_review_feedback_subjects" USING btree ("owned_by_user_id","platform","repo_full_name","subject_type","external_id") WHERE "code_review_feedback_subjects"."owned_by_user_id" is not null;--> statement-breakpoint
 CREATE INDEX "idx_code_review_feedback_subjects_owned_by_org_id" ON "code_review_feedback_subjects" USING btree ("owned_by_organization_id");--> statement-breakpoint
 CREATE INDEX "idx_code_review_feedback_subjects_owned_by_user_id" ON "code_review_feedback_subjects" USING btree ("owned_by_user_id");--> statement-breakpoint
 CREATE INDEX "idx_code_review_feedback_subjects_platform_repo" ON "code_review_feedback_subjects" USING btree ("platform","repo_full_name");--> statement-breakpoint

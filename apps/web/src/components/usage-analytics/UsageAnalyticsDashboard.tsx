@@ -21,6 +21,7 @@ import { PrimaryChart } from './PrimaryChart';
 import { BreakdownPieChart } from './BreakdownPieChart';
 import { BreakdownBarChart } from './BreakdownBarChart';
 import { AIAdoptionScoreCard } from './AIAdoptionScoreCard';
+import { ActiveKiloclawsTable } from './ActiveKiloclawsTable';
 import {
   PERSONAL_VIEW_ALL_USAGE,
   PERSONAL_VIEW_PERSONAL_ONLY,
@@ -606,6 +607,12 @@ export function UsageAnalyticsDashboard({
                 </Button>
               }
             />
+
+            {isOrgContext &&
+              organizationId &&
+              (callerRole === 'owner' || callerRole === 'billing_manager') && (
+                <ActiveKiloclawsTable organizationId={organizationId} />
+              )}
           </div>
         </div>
       </div>

@@ -71,7 +71,7 @@ function buildAutoModels(): OpenRouterModel[] {
   });
 }
 
-function formatName(model: OpenRouterModel, preferredIndex: number) {
+export function formatName(model: OpenRouterModel, preferredIndex: number) {
   const promptPrice = Number.parseFloat(model.pricing.prompt);
   const isExpensive = Number.isFinite(promptPrice) && promptPrice >= 0.00001; // Opus 4.8 Fast price
   if (isExpensive) return model.name + ' ($$$$)';
@@ -79,6 +79,14 @@ function formatName(model: OpenRouterModel, preferredIndex: number) {
   const ageDays = (Date.now() / 1_000 - model.created) / (24 * 3600);
   const isNew = preferredIndex >= 0 && ageDays >= 0 && ageDays < 7;
   if (isNew) return model.name + ' (new)';
+  if (model.expiration_date) {
+    const suffix = new Date(model.expiration_date).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      timeZone: 'UTC',
+    });
+    return model.name + ' (retires ' + suffix + ')';
+  }
   return model.name;
 }
 

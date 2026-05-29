@@ -1,3 +1,0 @@
-DROP INDEX "UQ_code_review_feedback_subjects_platform_external";--> statement-breakpoint
-CREATE UNIQUE INDEX "UQ_code_review_feedback_subjects_org_platform_external" ON "code_review_feedback_subjects" USING btree ("owned_by_organization_id","platform","repo_full_name","subject_type","external_id") WHERE "code_review_feedback_subjects"."owned_by_organization_id" is not null;--> statement-breakpoint
-CREATE UNIQUE INDEX "UQ_code_review_feedback_subjects_user_platform_external" ON "code_review_feedback_subjects" USING btree ("owned_by_user_id","platform","repo_full_name","subject_type","external_id") WHERE "code_review_feedback_subjects"."owned_by_user_id" is not null;

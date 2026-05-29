@@ -122,6 +122,7 @@ export type CloudAgentTerminalReason =
   | 'github_installation_required'
   | 'github_ip_allow_list'
   | 'byok_invalid_key'
+  | 'selected_model_unavailable'
   | 'user_cancelled'
   | 'superseded'
   | 'interrupted'

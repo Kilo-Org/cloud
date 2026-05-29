@@ -1,8 +1,94 @@
 import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals';
-import { getOpenRouterTranscriptionModels } from '@/lib/ai-gateway/providers/openrouter';
+import {
+  formatName,
+  getOpenRouterTranscriptionModels,
+} from '@/lib/ai-gateway/providers/openrouter';
 import { createMockResponse, mockOpenRouterModels } from '@/tests/helpers/openrouter-models.helper';
+import type { OpenRouterModel } from '@/lib/organizations/organization-types';
 
 const originalFetch = global.fetch;
+
+function buildModel(overrides: Partial<OpenRouterModel> = {}): OpenRouterModel {
+  return {
+    id: 'vendor/model',
+    name: 'Test Model',
+    created: 1714000000,
+    description: 'A test model',
+    architecture: {
+      input_modalities: ['text'],
+      output_modalities: ['text'],
+      tokenizer: 'other',
+    },
+    top_provider: {
+      is_moderated: false,
+    },
+    pricing: {
+      prompt: '0.000001',
+      completion: '0.000005',
+    },
+    context_length: 32000,
+    ...overrides,
+  };
+}
+
+describe('formatName', () => {
+  const NOT_PREFERRED = -1;
+
+  it('appends ($$$$) for expensive models', () => {
+    const model = buildModel({ pricing: { prompt: '0.00001', completion: '0' } });
+    expect(formatName(model, NOT_PREFERRED)).toBe('Test Model ($$$$)');
+  });
+
+  it('prioritizes the expensive marker over the expiration marker', () => {
+    const model = buildModel({
+      pricing: { prompt: '0.00002', completion: '0' },
+      expiration_date: '2099-01-15',
+    });
+    expect(formatName(model, NOT_PREFERRED)).toBe('Test Model ($$$$)');
+  });
+
+  it('leaves names that already end with a parenthesis untouched', () => {
+    const model = buildModel({
+      name: 'Test Model (free)',
+      expiration_date: '2099-01-15',
+    });
+    expect(formatName(model, NOT_PREFERRED)).toBe('Test Model (free)');
+  });
+
+  it('appends (new) for recently created preferred models', () => {
+    const recentlyCreated = Math.floor(Date.now() / 1000) - 24 * 3600;
+    const model = buildModel({ created: recentlyCreated });
+    expect(formatName(model, 0)).toBe('Test Model (new)');
+  });
+
+  it('does not mark recent models as new when they are not preferred', () => {
+    const recentlyCreated = Math.floor(Date.now() / 1000) - 24 * 3600;
+    const model = buildModel({ created: recentlyCreated });
+    expect(formatName(model, NOT_PREFERRED)).toBe('Test Model');
+  });
+
+  it('does not mark older preferred models as new', () => {
+    const createdLongAgo = Math.floor(Date.now() / 1000) - 30 * 24 * 3600;
+    const model = buildModel({ created: createdLongAgo });
+    expect(formatName(model, 0)).toBe('Test Model');
+  });
+
+  it('appends the retirement date in UTC when an expiration date is set', () => {
+    const model = buildModel({ expiration_date: '2026-12-01' });
+    expect(formatName(model, NOT_PREFERRED)).toBe('Test Model (retires Dec 1)');
+  });
+
+  it('prefers the (new) marker over the retirement marker', () => {
+    const recentlyCreated = Math.floor(Date.now() / 1000) - 24 * 3600;
+    const model = buildModel({ created: recentlyCreated, expiration_date: '2026-12-01' });
+    expect(formatName(model, 0)).toBe('Test Model (new)');
+  });
+
+  it('returns the name unchanged when no markers apply', () => {
+    const model = buildModel({ created: 0 });
+    expect(formatName(model, NOT_PREFERRED)).toBe('Test Model');
+  });
+});
 
 describe('OpenRouter transcription model fetcher', () => {
   beforeEach(() => {

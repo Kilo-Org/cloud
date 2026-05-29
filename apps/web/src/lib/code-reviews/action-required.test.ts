@@ -11,11 +11,12 @@ import { and, eq } from 'drizzle-orm';
 import {
   classifyCodeReviewActionRequiredFailure,
   disableCodeReviewForActionRequiredFailure,
+  getCodeReviewActionRequiredRecoveryHref,
   getCodeReviewActionRequiredState,
 } from './action-required';
 
 describe('classifyCodeReviewActionRequiredFailure', () => {
-  it('classifies GitHub installation, GitHub IP allow-list, and BYOK invalid key failures', () => {
+  it('classifies GitHub installation, GitHub IP allow-list, BYOK invalid key, and selected model failures', () => {
     expect(
       classifyCodeReviewActionRequiredFailure(
         'GitHub token or active app installation required for this repository (no_installation_found)'
@@ -39,6 +40,30 @@ describe('classifyCodeReviewActionRequiredFailure', () => {
         'Although you appear to have the correct authorization credentials, the `acme` organization has an IP allow list enabled, and 192.0.2.1 is not permitted.'
       )
     ).toBe('github_ip_allow_list');
+
+    expect(
+      classifyCodeReviewActionRequiredFailure(
+        'Selected model is not available for this cloud agent session'
+      )
+    ).toBe('selected_model_unavailable');
+
+    expect(
+      classifyCodeReviewActionRequiredFailure(
+        'prepareSession failed (400): {"error":{"message":"Selected model is not available for this cloud agent session","code":-32600,"data":{"code":"BAD_REQUEST","httpStatus":400,"path":"prepareSession"}}}'
+      )
+    ).toBe('selected_model_unavailable');
+
+    expect(
+      classifyCodeReviewActionRequiredFailure(
+        'Not Found: The requested model is not allowed for your team.'
+      )
+    ).toBe('selected_model_unavailable');
+
+    expect(
+      classifyCodeReviewActionRequiredFailure(
+        'prepareSession failed (400): {"error":{"message":"Not Found: The requested model is not allowed for your team.","code":-32600,"data":{"code":"BAD_REQUEST","httpStatus":400,"path":"prepareSession"}}}'
+      )
+    ).toBe('selected_model_unavailable');
   });
 
   it('does not classify unrelated auth, rate-limit, or BYOK quota failures', () => {
@@ -48,6 +73,15 @@ describe('classifyCodeReviewActionRequiredFailure', () => {
     expect(
       classifyCodeReviewActionRequiredFailure('[BYOK] Your account quota is exhausted.')
     ).toBeNull();
+  });
+
+  it('routes selected model recovery to Code Reviewer settings', () => {
+    expect(getCodeReviewActionRequiredRecoveryHref('selected_model_unavailable')).toBe(
+      '/code-reviews'
+    );
+    expect(getCodeReviewActionRequiredRecoveryHref('selected_model_unavailable', 'org-1')).toBe(
+      '/organizations/org-1/code-reviews'
+    );
   });
 });
 

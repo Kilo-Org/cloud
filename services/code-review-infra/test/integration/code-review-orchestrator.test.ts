@@ -886,6 +886,86 @@ describe('CodeReviewOrchestrator recovery', () => {
     expect(stored?.sandboxRetryAttempted).toBeUndefined();
   });
 
+  it('maps selected-model prepareSession 400 failures to action-required terminal reason', async () => {
+    const stub = getReviewStub();
+    const fetchMock = vi.fn(async (request: RequestInfo | URL) => {
+      const url = String(request);
+      if (url.includes('/api/internal/code-review-status/')) {
+        return Response.json({ success: true });
+      }
+      if (url.includes('/trpc/prepareSession')) {
+        return trpcError(
+          400,
+          'Selected model is not available for this cloud agent session',
+          'BAD_REQUEST'
+        );
+      }
+      return new Response('unexpected fetch', { status: 500 });
+    });
+    globalThis.fetch = fetchMock;
+
+    await runInDurableObject(stub, async (_instance: CodeReviewOrchestrator, state) => {
+      await state.storage.put('state', codeReview());
+      await state.storage.setAlarm(Date.now() + 30_000);
+    });
+
+    const ran = await runDurableObjectAlarm(stub);
+
+    expect(ran).toBe(true);
+    await expect(stub.status()).resolves.toMatchObject({
+      status: 'failed',
+      terminalReason: 'selected_model_unavailable',
+    });
+    expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(1);
+    expect(fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toHaveLength(0);
+    expect(lastStatusUpdateBody(fetchMock)).toMatchObject({
+      status: 'failed',
+      terminalReason: 'selected_model_unavailable',
+    });
+    await expect(storedReview(stub)).resolves.toMatchObject({
+      status: 'failed',
+      terminalReason: 'selected_model_unavailable',
+    });
+  });
+
+  it('maps model-not-allowed prepareSession 400 failures to action-required terminal reason', async () => {
+    const stub = getReviewStub();
+    const fetchMock = vi.fn(async (request: RequestInfo | URL) => {
+      const url = String(request);
+      if (url.includes('/api/internal/code-review-status/')) {
+        return Response.json({ success: true });
+      }
+      if (url.includes('/trpc/prepareSession')) {
+        return trpcError(
+          400,
+          'Not Found: The requested model is not allowed for your team.',
+          'BAD_REQUEST'
+        );
+      }
+      return new Response('unexpected fetch', { status: 500 });
+    });
+    globalThis.fetch = fetchMock;
+
+    await runInDurableObject(stub, async (_instance: CodeReviewOrchestrator, state) => {
+      await state.storage.put('state', codeReview());
+      await state.storage.setAlarm(Date.now() + 30_000);
+    });
+
+    const ran = await runDurableObjectAlarm(stub);
+
+    expect(ran).toBe(true);
+    await expect(stub.status()).resolves.toMatchObject({
+      status: 'failed',
+      terminalReason: 'selected_model_unavailable',
+    });
+    expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(1);
+    expect(fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toHaveLength(0);
+    expect(lastStatusUpdateBody(fetchMock)).toMatchObject({
+      status: 'failed',
+      terminalReason: 'selected_model_unavailable',
+    });
+  });
+
   it('does not retry configured-session lookup failures nested in wrapper readiness output', async () => {
     const stub = getReviewStub();
     const fetchMock = vi.fn(async (request: RequestInfo | URL) => {

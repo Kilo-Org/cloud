@@ -1,6 +1,6 @@
 {
-  "id": "6a9b9bc9-e4b5-49fd-b372-5bcf6ee73c0c",
-  "prevId": "06df9017-c149-45ad-9c6b-cca5b656d8c9",
+  "id": "803b3b62-0422-4cf6-a2da-967ead344a62",
+  "prevId": "ccec681e-772d-4e6d-9df2-e60870cf76ce",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -15258,6 +15258,28 @@
             },
             {
               "expression": "organization_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"kiloclaw_instances\".\"organization_id\" IS NOT NULL AND \"kiloclaw_instances\".\"destroyed_at\" IS NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_kiloclaw_instances_active_org_by_org_created": {
+          "name": "IDX_kiloclaw_instances_active_org_by_org_created",
+          "columns": [
+            {
+              "expression": "organization_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
               "isExpression": false,
               "asc": true,
               "nulls": "last"

@@ -99,7 +99,7 @@ export const kiloExclusiveModels = [
   stepfun_37_flash_free_model,
 ] as KiloExclusiveModel[];
 
-export function requiresKiloDataCollection(model: string): boolean {
+export function isKiloExclusiveModelRequiringDataCollection(model: string): boolean {
   return kiloExclusiveModels.some(
     m =>
       m.public_id === model &&

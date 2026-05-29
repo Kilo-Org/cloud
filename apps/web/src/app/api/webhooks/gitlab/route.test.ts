@@ -210,6 +210,21 @@ describe('GitLab webhook route', () => {
     );
   });
 
+  it('does not persist ignored note events', async () => {
+    mockHandleGitLabNoteFeedback.mockResolvedValueOnce({
+      recorded: false,
+      eventIds: [],
+      reason: 'not-kilo-subject',
+    });
+
+    const response = await POST(gitLabRequest('Note Hook', notePayload()));
+
+    expect(response.status).toBe(200);
+    expect(mockHandleGitLabNoteFeedback).toHaveBeenCalled();
+    expect(mockLogWebhookEvent).not.toHaveBeenCalled();
+    expect(mockUpdateWebhookEvent).not.toHaveBeenCalled();
+  });
+
   it('routes emoji events to review memory feedback', async () => {
     const response = await POST(gitLabRequest('Emoji Hook', emojiPayload()));
 
@@ -224,5 +239,20 @@ describe('GitLab webhook route', () => {
       'we_1',
       expect.objectContaining({ handlers_triggered: ['review_memory_feedback'] })
     );
+  });
+
+  it('does not persist ignored emoji events', async () => {
+    mockHandleGitLabEmojiFeedback.mockResolvedValueOnce({
+      recorded: false,
+      eventIds: [],
+      reason: 'unsupported-emoji',
+    });
+
+    const response = await POST(gitLabRequest('Emoji Hook', emojiPayload()));
+
+    expect(response.status).toBe(200);
+    expect(mockHandleGitLabEmojiFeedback).toHaveBeenCalled();
+    expect(mockLogWebhookEvent).not.toHaveBeenCalled();
+    expect(mockUpdateWebhookEvent).not.toHaveBeenCalled();
   });
 });

@@ -33,10 +33,7 @@ export function getPreferredProviderOrder(requestedModel: string): string[] {
     return [OpenRouterInferenceProviderIdSchema.enum.mistral];
   }
   if (isKimiModel(requestedModel)) {
-    return [
-      OpenRouterInferenceProviderIdSchema.enum.moonshotai,
-      OpenRouterInferenceProviderIdSchema.enum.novita,
-    ];
+    return [OpenRouterInferenceProviderIdSchema.enum.novita];
   }
   if (isStepModel(requestedModel)) {
     return [OpenRouterInferenceProviderIdSchema.enum.stepfun];

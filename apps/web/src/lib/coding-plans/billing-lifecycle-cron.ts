@@ -237,6 +237,10 @@ async function sweepRenewals(
             error: error instanceof Error ? error.message : String(error),
           });
         }
+        // Counts auto-top-up attempts that were triggered, not successful charges.
+        // maybePerformAutoTopUp is best-effort, so the attempt still counts when it
+        // throws (the failure is logged above). This matches spec rule 5.5: at most
+        // one auto-top-up attempt is triggered per due term, regardless of outcome.
         summary.auto_top_up_triggered++;
       } else if (result === 'terminated') {
         summary.canceled_insufficient_balance++;

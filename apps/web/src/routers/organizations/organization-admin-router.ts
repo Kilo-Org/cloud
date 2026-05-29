@@ -635,7 +635,7 @@ export const organizationAdminRouter = createTRPCRouter({
         latest_stripe_status: latestSubscriptions.subscription_status,
         kilo_pass_tier: sql<
           string | null
-        >`(SELECT kps.tier FROM organization_memberships om2 JOIN kilo_pass_subscriptions kps ON kps.kilo_user_id = om2.kilo_user_id WHERE om2.organization_id = ${organizations.id} AND kps.status = 'active' LIMIT 1)`.as(
+        >`(SELECT kps.tier FROM organization_memberships om2 JOIN kilo_pass_subscriptions kps ON kps.kilo_user_id = om2.kilo_user_id WHERE om2.organization_id = ${organizations.id} AND kps.status = 'active' ORDER BY kps.tier LIMIT 1)`.as(
           'kilo_pass_tier'
         ),
         kiloclaw_count:

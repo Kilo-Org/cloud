@@ -68,7 +68,13 @@ export function SlackIntegrationDetails({
     useModelSelectorList(organizationId);
 
   const modelOptions = useMemo<ModelOption[]>(() => {
-    return openRouterModels?.data.map(model => ({ id: model.id, name: model.name })) ?? [];
+    return (
+      openRouterModels?.data.map(model => ({
+        id: model.id,
+        name: model.name,
+        isFree: model.isFree,
+      })) ?? []
+    );
   }, [openRouterModels]);
 
   // Track selected model

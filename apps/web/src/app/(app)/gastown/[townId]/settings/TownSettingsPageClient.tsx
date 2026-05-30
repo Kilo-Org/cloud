@@ -141,7 +141,12 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
   } = useModelSelectorList(organizationId);
 
   const modelOptions = useMemo<ModelOption[]>(
-    () => modelsData?.data.map(model => ({ id: model.id, name: model.name })) ?? [],
+    () =>
+      modelsData?.data.map(model => ({
+        id: model.id,
+        name: model.name,
+        isFree: model.isFree,
+      })) ?? [],
     [modelsData]
   );
 

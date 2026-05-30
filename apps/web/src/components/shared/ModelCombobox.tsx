@@ -13,16 +13,22 @@ import {
   CommandItem,
   CommandList,
 } from '@/components/ui/command';
-import { ChevronsUpDown, Check, Image } from 'lucide-react';
+import { ChevronsUpDown, Check, Image, Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { preferredModels } from '@/lib/ai-gateway/models';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { formatShortModelDisplayName } from '@/lib/format-model-name';
+import {
+  FREE_MODEL_DATA_LABEL,
+  getFreeModelDataTooltip,
+  isFreeModelOption,
+} from '@/components/shared/free-model-data-disclosure';
 
 export type ModelOption = {
   id: string; // e.g., "anthropic/claude-sonnet-4.5"
   name: string; // e.g., "Claude Sonnet 4.5"
   supportsVision?: boolean;
+  isFree?: boolean;
   /** Ordered list of variant key names (e.g., ["none","low","medium","high","max"]) */
   variants?: string[];
 };
@@ -111,6 +117,7 @@ export function ModelCombobox({
   const selectedModel = models.find(model => model.id === value);
   const isCompact = variant === 'compact';
   const showLabel = !isCompact && label;
+  const selectedIsFree = isFreeModelOption(selectedModel);
 
   if (isLoading) {
     if (isCompact) {
@@ -209,9 +216,10 @@ export function ModelCombobox({
             className={cn('h-9 justify-between gap-1.5', className)}
             ref={triggerRef}
           >
-            <span className="truncate">
+            <span className="min-w-0 truncate">
               {selectedModel ? formatShortModelDisplayName(selectedModel.name) : placeholder}
             </span>
+            {selectedIsFree && <FreeModelDataIcon />}
             <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 opacity-50" />
           </Button>
         </PopoverTrigger>
@@ -244,6 +252,7 @@ export function ModelCombobox({
                               <TooltipContent>Supports vision</TooltipContent>
                             </Tooltip>
                           )}
+                          {isFreeModelOption(model) && <FreeModelDataBadge />}
                         </div>
                         <span className="text-muted-foreground truncate text-xs">{model.id}</span>
                       </div>
@@ -281,6 +290,7 @@ export function ModelCombobox({
                               <TooltipContent>Supports vision</TooltipContent>
                             </Tooltip>
                           )}
+                          {isFreeModelOption(model) && <FreeModelDataBadge />}
                         </div>
                         <span className="text-muted-foreground truncate text-xs">{model.id}</span>
                       </div>
@@ -324,7 +334,10 @@ export function ModelCombobox({
             className={cn('w-full justify-between', className)}
             ref={triggerRef}
           >
-            <span className="truncate">{selectedModel ? selectedModel.name : placeholder}</span>
+            <span className="min-w-0 truncate">
+              {selectedModel ? selectedModel.name : placeholder}
+            </span>
+            {selectedIsFree && <FreeModelDataIcon />}
             <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
           </Button>
         </PopoverTrigger>
@@ -361,6 +374,7 @@ export function ModelCombobox({
                               <TooltipContent>Supports vision</TooltipContent>
                             </Tooltip>
                           )}
+                          {isFreeModelOption(model) && <FreeModelDataBadge />}
                         </div>
                         <span className="text-muted-foreground truncate text-xs">{model.id}</span>
                       </div>
@@ -398,6 +412,7 @@ export function ModelCombobox({
                               <TooltipContent>Supports vision</TooltipContent>
                             </Tooltip>
                           )}
+                          {isFreeModelOption(model) && <FreeModelDataBadge />}
                         </div>
                         <span className="text-muted-foreground truncate text-xs">{model.id}</span>
                       </div>
@@ -417,5 +432,30 @@ export function ModelCombobox({
       </Popover>
       {!isCompact && helperText && <p className="text-muted-foreground text-xs">{helperText}</p>}
     </div>
+  );
+}
+
+function FreeModelDataIcon() {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Info className="h-3.5 w-3.5 shrink-0 text-yellow-500" />
+      </TooltipTrigger>
+      <TooltipContent>{getFreeModelDataTooltip()}</TooltipContent>
+    </Tooltip>
+  );
+}
+
+function FreeModelDataBadge() {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="inline-flex max-w-36 shrink-0 items-center gap-1 rounded-full border border-yellow-500/30 bg-yellow-500/10 px-1.5 py-0.5 text-[10px] font-medium text-yellow-600 dark:text-yellow-300">
+          <Info className="h-3 w-3 shrink-0" />
+          <span className="truncate">{FREE_MODEL_DATA_LABEL}</span>
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>{getFreeModelDataTooltip()}</TooltipContent>
+    </Tooltip>
   );
 }

@@ -1956,7 +1956,11 @@ export function SettingsTab({
   const modelOptions = useMemo<ModelOption[]>(
     () =>
       getSettingsModelOptions({
-        models: (modelsData?.data || []).map(model => ({ id: model.id, name: model.name })),
+        models: (modelsData?.data || []).map(model => ({
+          id: model.id,
+          name: model.name,
+          isFree: model.isFree,
+        })),
         trackedOpenClawVersion: trackedVersion,
         runningOpenClawVersion: runningVersion,
         isRunning,

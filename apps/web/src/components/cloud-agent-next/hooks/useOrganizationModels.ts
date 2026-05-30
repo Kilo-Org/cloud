@@ -39,6 +39,7 @@ export function useOrganizationModels(organizationId?: string): UseOrganizationM
       openRouterModels?.data.map(model => ({
         id: model.id,
         name: model.name,
+        isFree: model.isFree,
         variants: model.opencode?.variants ? Object.keys(model.opencode.variants) : undefined,
       })) ?? []
     );

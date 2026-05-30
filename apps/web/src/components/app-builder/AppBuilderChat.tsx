@@ -532,7 +532,7 @@ export function AppBuilderChat({ organizationId }: AppBuilderChatProps) {
         const inputModalities = m.architecture?.input_modalities || [];
         const supportsVision =
           inputModalities.includes('image') || inputModalities.includes('image_url');
-        return { id: m.id, name: m.name, supportsVision };
+        return { id: m.id, name: m.name, supportsVision, isFree: m.isFree };
       }),
     [availableModels]
   );

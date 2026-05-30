@@ -188,6 +188,7 @@ function KiloCommandForm(props: KiloCommandFormProps) {
       (modelsData?.data ?? []).map(m => ({
         id: m.id,
         name: m.name,
+        isFree: m.isFree,
         variants: m.opencode?.variants ? Object.keys(m.opencode.variants) : undefined,
       })),
     [modelsData]

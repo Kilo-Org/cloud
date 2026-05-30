@@ -1,8 +1,12 @@
 import { Pressable, View } from 'react-native';
 import { type Href, useRouter } from 'expo-router';
-import { Brain, ChevronDown } from 'lucide-react-native';
+import { Brain, ChevronDown, Info } from 'lucide-react-native';
 
 import { Text } from '@/components/ui/text';
+import {
+  getFreeModelDataAccessibilityLabel,
+  isFreeModelOption,
+} from '@/lib/free-model-data-disclosure';
 import { type ModelOption, thinkingEffortLabel } from '@/lib/hooks/use-available-models';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { setModelPickerBridge } from '@/lib/picker-bridge';
@@ -39,9 +43,13 @@ export function ModelSelector({
 
   const selectedModel = options.find(m => m.id === value);
   const label = selectedModel?.name ?? (value || 'Model');
+  const collectsData = isFreeModelOption(selectedModel);
   const hasVariants = selectedModel ? selectedModel.variants.length > 1 : false;
   const variantLabel = variant ? thinkingEffortLabel(variant) : '';
   const compactVariantLabel = variant ? compactThinkingEffortLabel(variant) : '';
+  const dataLabel = collectsData ? getFreeModelDataAccessibilityLabel(label) : label;
+  const accessibilityLabel =
+    hasVariants && variantLabel ? `${dataLabel}, ${variantLabel} thinking effort` : dataLabel;
 
   function handlePress() {
     if (effectivelyDisabled) {
@@ -61,9 +69,7 @@ export function ModelSelector({
       onPress={handlePress}
       disabled={effectivelyDisabled}
       accessibilityRole="button"
-      accessibilityLabel={
-        hasVariants && variantLabel ? `${label}, ${variantLabel} thinking effort` : label
-      }
+      accessibilityLabel={accessibilityLabel}
       className={cn(
         'max-w-[240px] shrink flex-row items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5 active:opacity-70',
         effectivelyDisabled && 'opacity-50'
@@ -76,6 +82,7 @@ export function ModelSelector({
         >
           {label}
         </Text>
+        {collectsData ? <Info size={12} color={colors.warn} /> : null}
         {hasVariants && compactVariantLabel ? (
           <View className="flex-row items-center gap-1 rounded-full bg-neutral-200 px-1.5 py-0.5 dark:bg-neutral-800">
             <Brain size={12} color={colors.mutedForeground} />

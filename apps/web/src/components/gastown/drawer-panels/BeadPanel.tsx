@@ -547,7 +547,7 @@ export function BeadPanel({
               value={
                 prUrl && bead.metadata.head_sha.length >= 7 ? (
                   <a
-                    href={`${prUrl.replace(/\/pull\/\d+.*$/, '/commit/')}${bead.metadata.head_sha}`}
+                    href={`${prUrl.replace(/\/pull\/\d+.*$/, '/commit/').replace(/\/-\/merge_requests\/\d+.*$/, '/-/commit/')}${bead.metadata.head_sha}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="font-mono text-xs text-[color:oklch(95%_0.15_108)] hover:underline"

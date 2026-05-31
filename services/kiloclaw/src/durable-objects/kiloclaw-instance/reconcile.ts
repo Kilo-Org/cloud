@@ -48,6 +48,11 @@ import * as gateway from './gateway';
 import { writeEvent, eventContextFromState } from '../../utils/analytics';
 import { maybeDispatchStartFailurePush } from './lifecycle-push';
 
+export type FinalizeDestroyRetention = {
+  entries: Record<string, unknown>;
+  retryAlarmAt: number;
+};
+
 export type ReconcileWithFlyResult = {
   beginUnexpectedStopRecovery?: {
     flyState: 'stopped';
@@ -177,12 +182,20 @@ export async function reconcileWithFly(
   /** Callback to trigger a full destroy (calls back into the DO). */
   triggerDestroy: () => Promise<void>,
   /** Callback for marking Postgres row destroyed during finalization. */
-  markDestroyedInPostgres?: (userId: string, sandboxId: string) => Promise<boolean>
+  markDestroyedInPostgres?: (userId: string, sandboxId: string) => Promise<boolean>,
+  finalizeRetention?: FinalizeDestroyRetention
 ): Promise<ReconcileWithFlyResult> {
   const rctx = createReconcileContext(state, env, reason);
 
   if (state.status === 'destroying') {
-    await retryPendingDestroy(flyConfig, ctx, state, rctx, markDestroyedInPostgres);
+    await retryPendingDestroy(
+      flyConfig,
+      ctx,
+      state,
+      rctx,
+      markDestroyedInPostgres,
+      finalizeRetention
+    );
     return {};
   }
 
@@ -1393,7 +1406,8 @@ async function retryPendingDestroy(
   ctx: DurableObjectState,
   state: InstanceMutableState,
   rctx: ReconcileContext,
-  markDestroyedInPostgres?: (userId: string, sandboxId: string) => Promise<boolean>
+  markDestroyedInPostgres?: (userId: string, sandboxId: string) => Promise<boolean>,
+  finalizeRetention?: FinalizeDestroyRetention
 ): Promise<void> {
   await recoverBoundMachineForDestroy(flyConfig, ctx, state, rctx);
   await tryDeleteMachine(flyConfig, ctx, state, rctx);
@@ -1404,7 +1418,13 @@ async function retryPendingDestroy(
   // primary destroy path is unaffected. May also promote an attached orphan
   // into the pending pointers, which then defers finalize to the next alarm.
   await tryDeleteOrphanVolumes(flyConfig, ctx, state, rctx);
-  const result = await finalizeDestroyIfComplete(ctx, state, rctx, markDestroyedInPostgres);
+  const result = await finalizeDestroyIfComplete(
+    ctx,
+    state,
+    rctx,
+    markDestroyedInPostgres,
+    finalizeRetention
+  );
   if (!result.finalized) {
     await maybeEmitDestroyStuckTelemetry(ctx, state, rctx);
   }
@@ -1787,7 +1807,8 @@ export async function finalizeDestroyIfComplete(
   ctx: DurableObjectState,
   state: InstanceMutableState,
   rctx: ReconcileContext,
-  markDestroyedInPostgres?: (userId: string, sandboxId: string) => Promise<boolean>
+  markDestroyedInPostgres?: (userId: string, sandboxId: string) => Promise<boolean>,
+  finalizeRetention?: FinalizeDestroyRetention
 ): Promise<DestroyResult> {
   if (state.pendingDestroyMachineId || state.pendingDestroyVolumeId) {
     return destroyResultFromState(state, {
@@ -1825,8 +1846,18 @@ export async function finalizeDestroyIfComplete(
     sandbox_id: destroyedSandboxId,
   });
 
-  await ctx.storage.deleteAlarm();
-  await ctx.storage.deleteAll();
+  if (finalizeRetention) {
+    const keys = [...(await ctx.storage.list()).keys()];
+    await ctx.storage.transaction(async txn => {
+      await txn.deleteAlarm();
+      if (keys.length > 0) await txn.delete(keys);
+      await txn.put(finalizeRetention.entries);
+      await txn.setAlarm(finalizeRetention.retryAlarmAt);
+    });
+  } else {
+    await ctx.storage.deleteAlarm();
+    await ctx.storage.deleteAll();
+  }
   resetMutableState(state);
 
   return destroyResultFromState(state, { finalized: true, destroyedUserId, destroyedSandboxId });

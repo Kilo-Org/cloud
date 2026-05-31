@@ -1,10 +1,10 @@
 import { DurableObject } from 'cloudflare:workers';
 import { drizzle, type DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
-import { eq, isNull, and } from 'drizzle-orm';
+import { eq, isNull, and, inArray } from 'drizzle-orm';
 import migrations from '../../drizzle/migrations';
-import { registryInstances } from '../db/sqlite-schema';
-import { getWorkerDb, getActivePersonalInstance } from '../db';
+import { registryInstances, registryProvisionReservations } from '../db/sqlite-schema';
+import { getWorkerDb, getActivePersonalInstance, hasSubscriptionForInstance } from '../db';
 import type { KiloClawEnv } from '../types';
 import { doKeyFromActiveInstance } from '../lib/instance-routing';
 
@@ -16,6 +16,27 @@ export type RegistryEntry = {
   destroyedAt: string | null;
 };
 
+export type ProvisionReservationStatus =
+  | 'in_progress'
+  | 'completed'
+  | 'failed_requires_reconciliation'
+  | 'released';
+
+export type ProvisionReservationEntry = {
+  instanceId: string;
+  doKey: string;
+  assignedUserId: string;
+  status: ProvisionReservationStatus;
+  startedAt: string;
+  updatedAt: string;
+  completedAt: string | null;
+  failureCode: string | null;
+};
+
+export type BeginFreshProvisionResult =
+  | { outcome: 'admitted'; reservation: ProvisionReservationEntry }
+  | { outcome: 'conflict'; reservation: ProvisionReservationEntry };
+
 function rowToEntry(row: typeof registryInstances.$inferSelect): RegistryEntry {
   return {
     instanceId: row.instance_id,
@@ -23,6 +44,21 @@ function rowToEntry(row: typeof registryInstances.$inferSelect): RegistryEntry {
     assignedUserId: row.assigned_user_id,
     createdAt: row.created_at,
     destroyedAt: row.destroyed_at,
+  };
+}
+
+function rowToReservation(
+  row: typeof registryProvisionReservations.$inferSelect
+): ProvisionReservationEntry {
+  return {
+    instanceId: row.instance_id,
+    doKey: row.do_key,
+    assignedUserId: row.assigned_user_id,
+    status: row.status,
+    startedAt: row.started_at,
+    updatedAt: row.updated_at,
+    completedAt: row.completed_at,
+    failureCode: row.failure_code,
   };
 }
 
@@ -95,10 +131,12 @@ export class KiloClawRegistry extends DurableObject<KiloClawEnv> {
       .map(rowToEntry);
   }
 
-  /** List all registry entries including destroyed ones, plus migration status (admin). */
-  async listAllInstances(
-    ownerKey: string
-  ): Promise<{ entries: RegistryEntry[]; migrated: boolean }> {
+  /** List all registry entries and fresh-provision admission state for admin inspection. */
+  async listAllInstances(ownerKey: string): Promise<{
+    entries: RegistryEntry[];
+    reservations: ProvisionReservationEntry[];
+    migrated: boolean;
+  }> {
     await this.ensureOwnerKey(ownerKey);
 
     if (!this.migrated) {
@@ -110,7 +148,194 @@ export class KiloClawRegistry extends DurableObject<KiloClawEnv> {
     }
 
     const entries = this.db.select().from(registryInstances).all().map(rowToEntry);
-    return { entries, migrated: this.migrated };
+    const reservations = this.db
+      .select()
+      .from(registryProvisionReservations)
+      .all()
+      .map(rowToReservation);
+    return { entries, reservations, migrated: this.migrated };
+  }
+
+  async beginFreshProvision(
+    ownerKey: string,
+    assignedUserId: string,
+    instanceId: string,
+    doKey: string
+  ): Promise<BeginFreshProvisionResult> {
+    await this.ensureOwnerKey(ownerKey);
+    const now = new Date().toISOString();
+
+    try {
+      const reservation = this.ctx.storage.transactionSync(() => {
+        this.db
+          .insert(registryProvisionReservations)
+          .values({
+            instance_id: instanceId,
+            do_key: doKey,
+            assigned_user_id: assignedUserId,
+            status: 'in_progress',
+            started_at: now,
+            updated_at: now,
+          })
+          .run();
+        const row = this.db
+          .select()
+          .from(registryProvisionReservations)
+          .where(eq(registryProvisionReservations.instance_id, instanceId))
+          .get();
+        if (!row) throw new Error('Provision reservation missing after insertion');
+        return rowToReservation(row);
+      });
+      return { outcome: 'admitted', reservation };
+    } catch (error) {
+      const unresolved = this.db
+        .select()
+        .from(registryProvisionReservations)
+        .where(
+          and(
+            eq(registryProvisionReservations.assigned_user_id, assignedUserId),
+            inArray(registryProvisionReservations.status, [
+              'in_progress',
+              'failed_requires_reconciliation',
+            ])
+          )
+        )
+        .get();
+      if (unresolved) return { outcome: 'conflict', reservation: rowToReservation(unresolved) };
+      throw error;
+    }
+  }
+
+  async completeFreshProvision(
+    ownerKey: string,
+    assignedUserId: string,
+    instanceId: string,
+    doKey: string
+  ): Promise<void> {
+    await this.ensureOwnerKey(ownerKey);
+    this.finalizeFreshProvision(assignedUserId, instanceId, doKey, true);
+  }
+
+  async repairCompletedProvision(
+    ownerKey: string,
+    assignedUserId: string,
+    instanceId: string,
+    doKey: string
+  ): Promise<boolean> {
+    await this.ensureOwnerKey(ownerKey);
+    return this.finalizeFreshProvision(assignedUserId, instanceId, doKey, false);
+  }
+
+  async failFreshProvision(
+    ownerKey: string,
+    assignedUserId: string,
+    instanceId: string,
+    failureCode: string
+  ): Promise<void> {
+    await this.ensureOwnerKey(ownerKey);
+    const now = new Date().toISOString();
+    this.db
+      .update(registryProvisionReservations)
+      .set({
+        status: 'failed_requires_reconciliation',
+        updated_at: now,
+        failure_code: failureCode,
+      })
+      .where(
+        and(
+          eq(registryProvisionReservations.instance_id, instanceId),
+          eq(registryProvisionReservations.assigned_user_id, assignedUserId),
+          eq(registryProvisionReservations.status, 'in_progress')
+        )
+      )
+      .run();
+  }
+
+  async releaseFreshProvision(
+    ownerKey: string,
+    assignedUserId: string,
+    instanceId: string,
+    reason: string
+  ): Promise<void> {
+    await this.ensureOwnerKey(ownerKey);
+    const now = new Date().toISOString();
+    this.db
+      .update(registryProvisionReservations)
+      .set({ status: 'released', updated_at: now, failure_code: reason })
+      .where(
+        and(
+          eq(registryProvisionReservations.instance_id, instanceId),
+          eq(registryProvisionReservations.assigned_user_id, assignedUserId),
+          inArray(registryProvisionReservations.status, [
+            'in_progress',
+            'completed',
+            'failed_requires_reconciliation',
+          ])
+        )
+      )
+      .run();
+  }
+
+  async listProvisionReservations(ownerKey: string): Promise<ProvisionReservationEntry[]> {
+    await this.ensureOwnerKey(ownerKey);
+    return this.db.select().from(registryProvisionReservations).all().map(rowToReservation);
+  }
+
+  private finalizeFreshProvision(
+    assignedUserId: string,
+    instanceId: string,
+    doKey: string,
+    reservationRequired: boolean
+  ): boolean {
+    const now = new Date().toISOString();
+    return this.ctx.storage.transactionSync(() => {
+      const reservation = this.db
+        .select()
+        .from(registryProvisionReservations)
+        .where(
+          and(
+            eq(registryProvisionReservations.instance_id, instanceId),
+            eq(registryProvisionReservations.assigned_user_id, assignedUserId)
+          )
+        )
+        .get();
+      if (!reservation) {
+        if (reservationRequired)
+          throw new Error('Provision reservation not found during completion');
+        return false;
+      }
+      if (reservation.status === 'released') {
+        throw new Error('Cannot complete a released provision reservation');
+      }
+      if (
+        reservationRequired &&
+        reservation.status !== 'in_progress' &&
+        reservation.status !== 'completed'
+      ) {
+        throw new Error(`Cannot complete provision reservation from ${reservation.status}`);
+      }
+
+      this.db
+        .update(registryProvisionReservations)
+        .set({ status: 'completed', updated_at: now, completed_at: now, failure_code: null })
+        .where(eq(registryProvisionReservations.instance_id, instanceId))
+        .run();
+      this.db
+        .insert(registryInstances)
+        .values({
+          instance_id: instanceId,
+          do_key: doKey,
+          assigned_user_id: assignedUserId,
+          created_at: now,
+          destroyed_at: null,
+        })
+        .onConflictDoUpdate({
+          target: registryInstances.instance_id,
+          set: { do_key: doKey, assigned_user_id: assignedUserId, destroyed_at: null },
+        })
+        .run();
+      return true;
+    });
   }
 
   async createInstance(
@@ -128,9 +353,40 @@ export class KiloClawRegistry extends DurableObject<KiloClawEnv> {
         do_key: doKey,
         assigned_user_id: assignedUserId,
         created_at: new Date().toISOString(),
+        destroyed_at: null,
       })
       .onConflictDoNothing()
       .run();
+  }
+
+  async publishRecoveredInstance(
+    ownerKey: string,
+    assignedUserId: string,
+    instanceId: string,
+    doKey: string
+  ): Promise<boolean> {
+    await this.ensureOwnerKey(ownerKey);
+    return this.ctx.storage.transactionSync(() => {
+      const existing = this.db
+        .select()
+        .from(registryInstances)
+        .where(eq(registryInstances.instance_id, instanceId))
+        .get();
+      if (existing?.destroyed_at) return false;
+      if (!existing) {
+        this.db
+          .insert(registryInstances)
+          .values({
+            instance_id: instanceId,
+            do_key: doKey,
+            assigned_user_id: assignedUserId,
+            created_at: new Date().toISOString(),
+            destroyed_at: null,
+          })
+          .run();
+      }
+      return true;
+    });
   }
 
   async destroyInstance(ownerKey: string, instanceId: string): Promise<void> {
@@ -143,6 +399,48 @@ export class KiloClawRegistry extends DurableObject<KiloClawEnv> {
         and(eq(registryInstances.instance_id, instanceId), isNull(registryInstances.destroyed_at))
       )
       .run();
+  }
+
+  async finalizeDestroyedInstance(
+    ownerKey: string,
+    assignedUserId: string,
+    instanceId: string,
+    doKey: string,
+    reason: string
+  ): Promise<void> {
+    await this.ensureOwnerKey(ownerKey);
+    const now = new Date().toISOString();
+    this.ctx.storage.transactionSync(() => {
+      this.db
+        .insert(registryInstances)
+        .values({
+          instance_id: instanceId,
+          do_key: doKey,
+          assigned_user_id: assignedUserId,
+          created_at: now,
+          destroyed_at: now,
+        })
+        .onConflictDoUpdate({
+          target: registryInstances.instance_id,
+          set: { destroyed_at: now },
+        })
+        .run();
+      this.db
+        .update(registryProvisionReservations)
+        .set({ status: 'released', updated_at: now, failure_code: reason })
+        .where(
+          and(
+            eq(registryProvisionReservations.instance_id, instanceId),
+            eq(registryProvisionReservations.assigned_user_id, assignedUserId),
+            inArray(registryProvisionReservations.status, [
+              'in_progress',
+              'completed',
+              'failed_requires_reconciliation',
+            ])
+          )
+        )
+        .run();
+    });
   }
 
   async resolveDoKey(ownerKey: string, instanceId: string): Promise<string | null> {
@@ -206,6 +504,9 @@ export class KiloClawRegistry extends DurableObject<KiloClawEnv> {
       const instance = await getActivePersonalInstance(db, userId);
 
       if (instance) {
+        if (!(await hasSubscriptionForInstance(db, instance.id))) {
+          return;
+        }
         const doKey = doKeyFromActiveInstance(instance);
         this.db
           .insert(registryInstances)

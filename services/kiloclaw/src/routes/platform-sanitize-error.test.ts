@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { KiloClawEnv } from '../types';
+import * as DbModule from '../db';
 import type { InstanceMutableState } from '../durable-objects/kiloclaw-instance/types';
 import {
   cancelDoctorViaController,
@@ -35,6 +36,11 @@ function envWithDOError(error: Error, writeDataPoint = vi.fn()) {
         ),
     },
     KILOCLAW_AE: { writeDataPoint },
+    HYPERDRIVE: { connectionString: 'postgresql://fake' },
+    KILOCLAW_REGISTRY: {
+      idFromName: (id: string) => id,
+      get: () => ({ repairCompletedProvision: vi.fn().mockResolvedValue(false) }),
+    },
     KILOCLAW_BILLING: {
       resolveProvisionEntitlement: vi.fn().mockResolvedValue({
         priceVersion: '2026-05-10',
@@ -162,6 +168,25 @@ describe('sanitizeError: Instance-not-* status correction', () => {
     const err = new Error('Fly API allocateIP failed (500): <!DOCTYPE html><html>upstream</html>');
     const writeDataPoint = vi.fn();
     const env = envWithDOError(err, writeDataPoint);
+    vi.spyOn(DbModule, 'getWorkerDb').mockReturnValue({
+      select: () => ({
+        from: () => ({
+          where: () => ({
+            orderBy: () => ({
+              limit: () =>
+                Promise.resolve([
+                  {
+                    id: '11111111-1111-4111-8111-111111111111',
+                    sandbox_id: 'ki_11111111111141118111111111111111',
+                    organization_id: null,
+                  },
+                ]),
+            }),
+            limit: () => Promise.resolve([{ id: 'subscription-1' }]),
+          }),
+        }),
+      }),
+    } as never);
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     const resp = await platform.request(
@@ -169,7 +194,10 @@ describe('sanitizeError: Instance-not-* status correction', () => {
       {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ userId: 'user-1' }),
+        body: JSON.stringify({
+          userId: 'user-1',
+          instanceId: '11111111-1111-4111-8111-111111111111',
+        }),
       },
       env
     );

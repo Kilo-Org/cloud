@@ -77,7 +77,14 @@ import {
 } from '../providers/rollout';
 import type { ProviderId } from '../schemas/instance-config';
 import { doKeyFromActiveInstance, resolveDoKeyForUser } from '../lib/instance-routing';
-import { getInstanceById, getInstanceByIdIncludingDestroyed, getWorkerDb } from '../db';
+import {
+  getActiveOrganizationInstance,
+  getActivePersonalInstance,
+  getInstanceById,
+  getInstanceByIdIncludingDestroyed,
+  getWorkerDb,
+  hasSubscriptionForInstance,
+} from '../db';
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { volumeNameFromSandboxId } from '../durable-objects/machine-config';
@@ -115,6 +122,12 @@ const KiloCodeConfigPatchSchema = z.object({
 const WebSearchConfigPatchSchema = z.object({
   userId: z.string().min(1),
   exaMode: z.enum(['kilo-proxy', 'disabled']).nullable().optional(),
+});
+
+const ProvisionReservationRepairSchema = z.object({
+  userId: z.string().min(1),
+  instanceId: z.uuid(),
+  orgId: z.uuid().nullable().optional(),
 });
 
 const KILOCLAW_WORKER_DESTROY_ACTOR = {
@@ -413,6 +426,44 @@ type ProvisionedInstanceRecord = {
 
 function buildDefaultInboundEmailAlias(instanceId: string): string {
   return `claw-${instanceId.replaceAll('-', '')}`;
+}
+
+function provisionRegistryKey(userId: string, orgId: string | null | undefined): string {
+  return orgId ? `org:${orgId}` : `user:${userId}`;
+}
+
+function getProvisionRegistryStub(
+  env: AppEnv['Bindings'],
+  userId: string,
+  orgId: string | null | undefined
+) {
+  const registryKey = provisionRegistryKey(userId, orgId);
+  return {
+    registryKey,
+    stub: env.KILOCLAW_REGISTRY.get(env.KILOCLAW_REGISTRY.idFromName(registryKey)),
+  };
+}
+
+async function getActiveProvisionContextInstance(
+  env: AppEnv['Bindings'],
+  userId: string,
+  orgId: string | null | undefined
+) {
+  const connectionString = env.HYPERDRIVE?.connectionString;
+  if (!connectionString) throw new Error('HYPERDRIVE is not configured');
+  const db = getWorkerDb(connectionString);
+  return orgId
+    ? await getActiveOrganizationInstance(db, userId, orgId)
+    : await getActivePersonalInstance(db, userId);
+}
+
+async function hasCanonicalProvisionSubscription(
+  env: AppEnv['Bindings'],
+  instanceId: string
+): Promise<boolean> {
+  const connectionString = env.HYPERDRIVE?.connectionString;
+  if (!connectionString) throw new Error('HYPERDRIVE is not configured');
+  return await hasSubscriptionForInstance(getWorkerDb(connectionString), instanceId);
 }
 
 function isWithinSelfServiceEntitlement(
@@ -1112,6 +1163,10 @@ platform.post('/provision', async c => {
   const provisionRoute = '/api/platform/provision';
   const provisionDoKey = await resolveInstanceDoKey(c.env, userId, provisionedInstanceId);
   const provisionStartedAt = performance.now();
+  let provisionRegistry: ReturnType<typeof getProvisionRegistryStub> | null = null;
+  let freshReservationAdmitted = false;
+  let freshProviderWorkStarted = false;
+  let explicitInstanceRequiresSubscriptionBootstrap = false;
 
   let selectedProvider = provider;
   if (!selectedProvider && shouldInsertInstanceRecord) {
@@ -1131,6 +1186,41 @@ platform.post('/provision', async c => {
   let instanceType: InstanceTierKey | undefined;
   let provision: Awaited<ReturnType<KiloClawInstanceStub['provision']>>;
   try {
+    if (instanceId) {
+      const activeInstance = await getActiveProvisionContextInstance(c.env, userId, orgId);
+      if (activeInstance?.id !== instanceId) {
+        return jsonError('Active instance not found', 404, 'instance_not_found');
+      }
+      if (await hasCanonicalProvisionSubscription(c.env, instanceId)) {
+        const { registryKey, stub } = getProvisionRegistryStub(c.env, userId, orgId);
+        try {
+          await stub.repairCompletedProvision(
+            registryKey,
+            userId,
+            instanceId,
+            doKeyFromActiveInstance(activeInstance)
+          );
+        } catch (repairError) {
+          console.error(
+            '[platform] Failed to repair existing provision before update:',
+            repairError
+          );
+          return jsonError(
+            'Provisioning completed but finalization is pending',
+            503,
+            'provision_completion_pending'
+          );
+        }
+      } else if (bootstrapSubscription === true) {
+        explicitInstanceRequiresSubscriptionBootstrap = true;
+      } else {
+        return jsonError(
+          'Provisioning completed but subscription finalization is pending',
+          503,
+          'provision_completion_pending'
+        );
+      }
+    }
     if (selectedProvider) {
       assertAvailableProvider(c.env, selectedProvider);
     }
@@ -1164,6 +1254,99 @@ platform.post('/provision', async c => {
       ) {
         return c.json({ error: 'instanceType exceeds self-service entitlement' }, 400);
       }
+
+      provisionRegistry = getProvisionRegistryStub(c.env, userId, orgId);
+      const admission = await provisionRegistry.stub.beginFreshProvision(
+        provisionRegistry.registryKey,
+        userId,
+        provisionedInstanceId,
+        provisionDoKey
+      );
+      if (admission.outcome === 'conflict') {
+        writeEvent(c.env, {
+          event: 'instance.provision_reservation_conflict',
+          delivery: 'http',
+          route: provisionRoute,
+          userId,
+          instanceId: admission.reservation.instanceId,
+          orgId: orgId ?? undefined,
+          label: admission.reservation.status,
+        });
+        const activeInstance = await getActiveProvisionContextInstance(c.env, userId, orgId);
+        if (
+          activeInstance?.id === admission.reservation.instanceId &&
+          (await hasCanonicalProvisionSubscription(c.env, activeInstance.id))
+        ) {
+          try {
+            await provisionRegistry.stub.repairCompletedProvision(
+              provisionRegistry.registryKey,
+              userId,
+              activeInstance.id,
+              doKeyFromActiveInstance(activeInstance)
+            );
+            writeEvent(c.env, {
+              event: 'instance.provision_reservation_repaired',
+              delivery: 'http',
+              route: provisionRoute,
+              userId,
+              instanceId: activeInstance.id,
+              orgId: orgId ?? undefined,
+            });
+            return jsonError('User already has an active instance', 409, 'instance_already_active');
+          } catch (repairError) {
+            console.error(
+              '[platform] Failed to repair completed provision reservation:',
+              repairError
+            );
+            return jsonError(
+              'Provisioning completed but finalization is pending',
+              503,
+              'provision_completion_pending'
+            );
+          }
+        }
+        return jsonError(
+          'An instance is already being created. Wait for setup to finish, then try again.',
+          409,
+          'provision_in_progress'
+        );
+      }
+      freshReservationAdmitted = true;
+      writeEvent(c.env, {
+        event: 'instance.provision_reservation_started',
+        delivery: 'http',
+        route: provisionRoute,
+        userId,
+        instanceId: provisionedInstanceId,
+        orgId: orgId ?? undefined,
+      });
+
+      const activeInstance = await getActiveProvisionContextInstance(c.env, userId, orgId);
+      if (activeInstance) {
+        if (await hasCanonicalProvisionSubscription(c.env, activeInstance.id)) {
+          const repaired = await provisionRegistry.stub.repairCompletedProvision(
+            provisionRegistry.registryKey,
+            userId,
+            activeInstance.id,
+            doKeyFromActiveInstance(activeInstance)
+          );
+          if (!repaired) {
+            await provisionRegistry.stub.createInstance(
+              provisionRegistry.registryKey,
+              userId,
+              activeInstance.id,
+              doKeyFromActiveInstance(activeInstance)
+            );
+          }
+        }
+        await provisionRegistry.stub.releaseFreshProvision(
+          provisionRegistry.registryKey,
+          userId,
+          provisionedInstanceId,
+          'active_instance_exists'
+        );
+        return jsonError('User already has an active instance', 409, 'instance_already_active');
+      }
     }
     // Only default to the billing entitlement tier on FRESH inserts. On
     // re-provision (config updates with an existing instanceId), pass
@@ -1175,6 +1358,7 @@ platform.post('/provision', async c => {
     instanceType =
       requestedInstanceType ??
       (shouldInsertInstanceRecord ? provisionEntitlement?.selfServiceInstanceType : undefined);
+    freshProviderWorkStarted = shouldInsertInstanceRecord;
     provision = await withResolvedDORetry(
       c.env,
       userId,
@@ -1195,11 +1379,47 @@ platform.post('/provision', async c => {
             region,
             pinnedImageTag,
           },
-          { instanceId: provisionedInstanceId, orgId, provider: selectedProvider }
+          {
+            instanceId: provisionedInstanceId,
+            orgId,
+            provider: selectedProvider,
+            freshProvision: shouldInsertInstanceRecord,
+          }
         ),
       'provision'
     );
+    if (instanceId) {
+      const activeAfterProvision = await getActiveProvisionContextInstance(c.env, userId, orgId);
+      if (activeAfterProvision?.id !== instanceId) {
+        return jsonError('Instance was destroyed during update', 409, 'instance_destroyed');
+      }
+    }
   } catch (err) {
+    if (freshReservationAdmitted && provisionRegistry) {
+      try {
+        if (freshProviderWorkStarted) {
+          await provisionRegistry.stub.failFreshProvision(
+            provisionRegistry.registryKey,
+            userId,
+            provisionedInstanceId,
+            'provider_provision_failed'
+          );
+        } else {
+          await provisionRegistry.stub.releaseFreshProvision(
+            provisionRegistry.registryKey,
+            userId,
+            provisionedInstanceId,
+            'failed_before_provider_work'
+          );
+        }
+      } catch (reservationError) {
+        console.error('[platform] Failed to update fresh provision reservation after error:', {
+          instanceId: provisionedInstanceId,
+          error:
+            reservationError instanceof Error ? reservationError.message : String(reservationError),
+        });
+      }
+    }
     const raw = err instanceof Error ? err.message : 'Unknown error';
     if (raw.includes('duplicate key') || raw.includes('unique constraint')) {
       console.error('[platform] provision failed: duplicate instance');
@@ -1275,16 +1495,49 @@ platform.post('/provision', async c => {
           '[platform] Failed to destroy provisioned instance after bootstrap error:',
           destroyErr
         );
+        return null;
       });
+      let instanceMarkedDestroyed = true;
       await markProvisionedInstanceDestroyed({
         env: c.env,
         instanceId: provisionedInstanceId,
       }).catch(markErr => {
+        instanceMarkedDestroyed = false;
         console.error(
           '[platform] Failed to mark instance destroyed after bootstrap error:',
           markErr
         );
       });
+      if (instanceMarkedDestroyed) {
+        await withResolvedDORetry(
+          c.env,
+          userId,
+          provisionedInstanceId,
+          stub => stub.allowProvisionReservationReleaseOnFinalize(),
+          'allowProvisionReservationReleaseOnFinalize'
+        ).catch(releaseSignalError => {
+          instanceMarkedDestroyed = false;
+          console.error(
+            '[platform] Failed to confirm reservation cleanup release:',
+            releaseSignalError
+          );
+        });
+      }
+      if (provisionRegistry && !instanceMarkedDestroyed) {
+        await provisionRegistry.stub
+          .failFreshProvision(
+            provisionRegistry.registryKey,
+            userId,
+            provisionedInstanceId,
+            'instance_record_insert_failed'
+          )
+          .catch(reservationError => {
+            console.error(
+              '[platform] Failed to finalize failed provision reservation:',
+              reservationError
+            );
+          });
+      }
       return jsonError(message, status);
     }
   }
@@ -1385,16 +1638,49 @@ platform.post('/provision', async c => {
             '[platform] Failed to destroy provisioned instance after subscription bootstrap error:',
             destroyErr
           );
+          return null;
         });
+        let instanceMarkedDestroyed = true;
         await markProvisionedInstanceDestroyed({
           env: c.env,
           instanceId: provisionedInstanceId,
         }).catch(markErr => {
+          instanceMarkedDestroyed = false;
           console.error(
             '[platform] Failed to mark bootstrap-quarantined instance destroyed for retry:',
             markErr
           );
         });
+        if (instanceMarkedDestroyed) {
+          await withResolvedDORetry(
+            c.env,
+            userId,
+            provisionedInstanceId,
+            stub => stub.allowProvisionReservationReleaseOnFinalize(),
+            'allowProvisionReservationReleaseOnFinalize'
+          ).catch(releaseSignalError => {
+            instanceMarkedDestroyed = false;
+            console.error(
+              '[platform] Failed to confirm reservation cleanup release:',
+              releaseSignalError
+            );
+          });
+        }
+        if (provisionRegistry && !instanceMarkedDestroyed) {
+          await provisionRegistry.stub
+            .failFreshProvision(
+              provisionRegistry.registryKey,
+              userId,
+              provisionedInstanceId,
+              'subscription_bootstrap_failed'
+            )
+            .catch(reservationError => {
+              console.error(
+                '[platform] Failed to finalize failed provision reservation:',
+                reservationError
+              );
+            });
+        }
       }
       console.error(
         '[platform] Subscription bootstrap failed after local fallback; instance quarantined for remediation',
@@ -1411,19 +1697,91 @@ platform.post('/provision', async c => {
     }
   }
 
-  try {
-    const registryKey = orgId ? `org:${orgId}` : `user:${userId}`;
-    const registryStub = c.env.KILOCLAW_REGISTRY.get(
-      c.env.KILOCLAW_REGISTRY.idFromName(registryKey)
-    );
-    await registryStub.createInstance(registryKey, userId, provisionedInstanceId, provisionDoKey);
-    console.log('[platform] Registry entry created:', {
-      registryKey,
-      instanceId: provisionedInstanceId,
-      doKey: provisionDoKey,
-    });
-  } catch (registryErr) {
-    console.error('[platform] Registry create failed (non-fatal):', registryErr);
+  if (shouldInsertInstanceRecord && provisionRegistry) {
+    try {
+      await provisionRegistry.stub.completeFreshProvision(
+        provisionRegistry.registryKey,
+        userId,
+        provisionedInstanceId,
+        provisionDoKey
+      );
+      writeEvent(c.env, {
+        event: 'instance.provision_reservation_completed',
+        delivery: 'http',
+        route: provisionRoute,
+        userId,
+        instanceId: provisionedInstanceId,
+        orgId: orgId ?? undefined,
+      });
+    } catch (registryErr) {
+      console.error('[platform] Registry completion failed; attempting repair:', registryErr);
+      writeEvent(c.env, {
+        event: 'instance.provision_reservation_repair_required',
+        delivery: 'http',
+        route: provisionRoute,
+        userId,
+        instanceId: provisionedInstanceId,
+        orgId: orgId ?? undefined,
+      });
+      try {
+        const repaired = await provisionRegistry.stub.repairCompletedProvision(
+          provisionRegistry.registryKey,
+          userId,
+          provisionedInstanceId,
+          provisionDoKey
+        );
+        if (!repaired) throw new Error('Provision reservation missing during completion repair');
+        writeEvent(c.env, {
+          event: 'instance.provision_reservation_repaired',
+          delivery: 'http',
+          route: provisionRoute,
+          userId,
+          instanceId: provisionedInstanceId,
+          orgId: orgId ?? undefined,
+        });
+      } catch (repairError) {
+        console.error('[platform] Registry completion repair failed:', repairError);
+        return jsonError(
+          'Provisioning completed but finalization is pending',
+          503,
+          'provision_completion_pending'
+        );
+      }
+    }
+  } else if (explicitInstanceRequiresSubscriptionBootstrap) {
+    try {
+      const registryKey = provisionRegistryKey(userId, orgId);
+      const registryStub = c.env.KILOCLAW_REGISTRY.get(
+        c.env.KILOCLAW_REGISTRY.idFromName(registryKey)
+      );
+      const repaired = await registryStub.repairCompletedProvision(
+        registryKey,
+        userId,
+        provisionedInstanceId,
+        provisionDoKey
+      );
+      if (!repaired) {
+        const published = await registryStub.publishRecoveredInstance(
+          registryKey,
+          userId,
+          provisionedInstanceId,
+          provisionDoKey
+        );
+        if (!published) {
+          return jsonError('Instance was destroyed during update', 409, 'instance_destroyed');
+        }
+      }
+    } catch (registryErr) {
+      console.error(
+        '[platform] Registry completion failed after subscription recovery:',
+        registryErr
+      );
+      return jsonError(
+        'Provisioning completed but finalization is pending',
+        503,
+        'provision_completion_pending'
+      );
+    }
   }
 
   return c.json(
@@ -1435,7 +1793,54 @@ platform.post('/provision', async c => {
   );
 });
 
+platform.post('/provision/repair-reservation', async c => {
+  const result = await parseBody(c, ProvisionReservationRepairSchema);
+  if ('error' in result) return result.error;
+  const { userId, instanceId, orgId } = result.data;
+
+  try {
+    const activeInstance = await getActiveProvisionContextInstance(c.env, userId, orgId);
+    if (
+      activeInstance?.id !== instanceId ||
+      !(await hasCanonicalProvisionSubscription(c.env, instanceId))
+    ) {
+      return jsonError(
+        'No completed active provision exists for repair',
+        409,
+        'provision_repair_unavailable'
+      );
+    }
+    const { registryKey, stub } = getProvisionRegistryStub(c.env, userId, orgId);
+    const repaired = await stub.repairCompletedProvision(
+      registryKey,
+      userId,
+      instanceId,
+      doKeyFromActiveInstance(activeInstance)
+    );
+    if (!repaired) {
+      return jsonError(
+        'No provision reservation exists for repair',
+        409,
+        'provision_repair_unavailable'
+      );
+    }
+    writeEvent(c.env, {
+      event: 'instance.provision_reservation_repaired',
+      delivery: 'http',
+      route: '/api/platform/provision/repair-reservation',
+      userId,
+      instanceId,
+      orgId: orgId ?? undefined,
+    });
+    return c.json({ ok: true });
+  } catch (error) {
+    const { message, status } = sanitizeError(error, 'provision reservation repair');
+    return jsonError(message, status);
+  }
+});
+
 // PATCH /api/platform/kilocode-config
+
 platform.patch('/kilocode-config', async c => {
   const result = await parseBody(c, KiloCodeConfigPatchSchema);
   if ('error' in result) return result.error;
@@ -3707,6 +4112,16 @@ platform.get('/registry-entries', async c => {
       assignedUserId: string;
       createdAt: string;
       destroyedAt: string | null;
+    }>;
+    reservations: Array<{
+      instanceId: string;
+      doKey: string;
+      assignedUserId: string;
+      status: string;
+      startedAt: string;
+      updatedAt: string;
+      completedAt: string | null;
+      failureCode: string | null;
     }>;
     migrated: boolean;
   }> = [];

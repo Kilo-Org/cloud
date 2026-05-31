@@ -111,6 +111,7 @@ import {
   markRestartSuccessful,
   emitDestroyPendingTelemetry,
   maybeEmitDestroyStuckTelemetry,
+  type FinalizeDestroyRetention,
 } from './reconcile';
 import {
   restoreFromPostgres,
@@ -194,6 +195,17 @@ function resolveInstanceTypeFromState(
   }
   return state.instanceType ?? tryInstanceTypeLabel(state.machineSize, state.volumeSizeGb);
 }
+
+type PendingRegistryCleanup = {
+  userId: string;
+  orgId: string | null;
+  sandboxId: string;
+  releaseProvisionReservation: boolean;
+};
+
+const PENDING_REGISTRY_CLEANUP_KEY = 'pendingRegistryCleanup';
+const SKIP_PROVISION_RESERVATION_RELEASE_KEY = 'skipProvisionReservationRelease';
+const REGISTRY_CLEANUP_RETRY_MS = 60_000;
 
 export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   private s: InstanceMutableState = createMutableState();
@@ -802,7 +814,12 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   async provision(
     userId: string,
     config: InstanceConfig,
-    opts?: { orgId?: string | null; instanceId?: string; provider?: ProviderId }
+    opts?: {
+      orgId?: string | null;
+      instanceId?: string;
+      provider?: ProviderId;
+      freshProvision?: boolean;
+    }
   ): Promise<{ sandboxId: string }> {
     const provisionStart = performance.now();
     await this.loadState();
@@ -823,6 +840,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       ? sandboxIdFromInstanceId(opts.instanceId)
       : sandboxIdFromUserId(userId);
     const isNew = !this.s.status;
+    if (opts?.instanceId && !opts.freshProvision && isNew) {
+      throw Object.assign(new Error('Instance not provisioned'), { status: 404 });
+    }
     if (!isNew && opts?.provider && opts.provider !== this.s.provider) {
       throw Object.assign(
         new Error(`Cannot change provider from ${this.s.provider} to ${opts.provider}`),
@@ -2511,6 +2531,113 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     };
   }
 
+  private registryCleanupRetention(
+    userId: string,
+    orgId: string | null,
+    sandboxId: string,
+    releaseProvisionReservation: boolean
+  ): FinalizeDestroyRetention {
+    const pendingCleanup = {
+      userId,
+      orgId,
+      sandboxId,
+      releaseProvisionReservation,
+    } satisfies PendingRegistryCleanup;
+    return {
+      entries: { [PENDING_REGISTRY_CLEANUP_KEY]: pendingCleanup },
+      retryAlarmAt: Date.now() + REGISTRY_CLEANUP_RETRY_MS,
+    };
+  }
+
+  private async cleanupRegistryAfterFinalizedDestroy(
+    userId: string,
+    orgId: string | null,
+    sandboxId: string,
+    releaseProvisionReservation: boolean
+  ): Promise<void> {
+    try {
+      const registryInstanceId = isInstanceKeyedSandboxId(sandboxId)
+        ? instanceIdFromSandboxId(sandboxId)
+        : null;
+      const registryKeys = [`user:${userId}`];
+      if (orgId) registryKeys.push(`org:${orgId}`);
+
+      for (const registryKey of registryKeys) {
+        const registryStub = this.env.KILOCLAW_REGISTRY.get(
+          this.env.KILOCLAW_REGISTRY.idFromName(registryKey)
+        );
+        if (registryInstanceId) {
+          if (releaseProvisionReservation) {
+            await registryStub.finalizeDestroyedInstance(
+              registryKey,
+              userId,
+              registryInstanceId,
+              registryInstanceId,
+              'instance_destroyed'
+            );
+          } else {
+            await registryStub.destroyInstance(registryKey, registryInstanceId);
+          }
+          console.log('[DO] Registry entry destroyed on finalization:', {
+            registryKey,
+            instanceId: registryInstanceId,
+          });
+        } else {
+          const legacyDoKeys = legacyDoKeysForIdentity(userId, sandboxId);
+          const entries = await registryStub.listInstances(registryKey);
+          const legacyEntry = entries.find(e => legacyDoKeys.includes(e.doKey));
+          if (legacyEntry) {
+            await registryStub.destroyInstance(registryKey, legacyEntry.instanceId);
+            console.log('[DO] Registry entry destroyed on finalization (legacy):', {
+              registryKey,
+              instanceId: legacyEntry.instanceId,
+              doKeysTried: legacyDoKeys,
+              matchedDoKey: legacyEntry.doKey,
+            });
+          } else {
+            console.log(
+              '[DO] Registry cleanup: no active entry found (already cleaned or never existed):',
+              {
+                registryKey,
+                doKeysTried: legacyDoKeys,
+                activeEntryCount: entries.length,
+              }
+            );
+          }
+        }
+      }
+      if (!releaseProvisionReservation) {
+        await this.ctx.storage.setAlarm(Date.now() + REGISTRY_CLEANUP_RETRY_MS);
+        return;
+      }
+      await this.ctx.storage.delete(PENDING_REGISTRY_CLEANUP_KEY);
+      await this.ctx.storage.deleteAlarm();
+    } catch (registryErr) {
+      console.error('[DO] Registry cleanup on finalization failed; will retry:', registryErr);
+      await this.ctx.storage.setAlarm(Date.now() + REGISTRY_CLEANUP_RETRY_MS);
+    }
+  }
+
+  async allowProvisionReservationReleaseOnFinalize(): Promise<void> {
+    await this.ctx.storage.delete(SKIP_PROVISION_RESERVATION_RELEASE_KEY);
+    const pendingCleanup = await this.ctx.storage.get<PendingRegistryCleanup>(
+      PENDING_REGISTRY_CLEANUP_KEY
+    );
+    if (pendingCleanup) {
+      const permittedCleanup = {
+        ...pendingCleanup,
+        releaseProvisionReservation: true,
+      } satisfies PendingRegistryCleanup;
+      await this.ctx.storage.put({ [PENDING_REGISTRY_CLEANUP_KEY]: permittedCleanup });
+      await this.cleanupRegistryAfterFinalizedDestroy(
+        permittedCleanup.userId,
+        permittedCleanup.orgId,
+        permittedCleanup.sandboxId,
+        true
+      );
+    }
+  }
+
   async destroy(options?: { reason?: KiloclawDestroyReason }): Promise<DestroyResult> {
     await this.loadState();
 
@@ -2525,6 +2652,12 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     }
 
     const machineUptimeMs = this.s.lastStartedAt ? Date.now() - this.s.lastStartedAt : 0;
+    const releaseProvisionReservation = options?.reason !== 'bootstrap_cleanup_failure';
+    if (releaseProvisionReservation) {
+      await this.ctx.storage.delete(SKIP_PROVISION_RESERVATION_RELEASE_KEY);
+    } else {
+      await this.ctx.storage.put(SKIP_PROVISION_RESERVATION_RELEASE_KEY, true);
+    }
     const runtimeId = getRuntimeId(this.s);
     const storageId = getStorageId(this.s);
     const destroyStartedAt = this.s.destroyStartedAt ?? Date.now();
@@ -2591,58 +2724,22 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       this.s,
       destroyRctx,
       (userId, sandboxId) =>
-        markDestroyedInPostgresHelper(this.env, this.ctx, this.s, userId, sandboxId)
+        markDestroyedInPostgresHelper(this.env, this.ctx, this.s, userId, sandboxId),
+      this.registryCleanupRetention(
+        preDestroyUserId,
+        preDestroyOrgId,
+        preDestroySandboxId,
+        releaseProvisionReservation
+      )
     );
 
-    // Clean up registry entry on finalization. This covers both platform-initiated
-    // and alarm-initiated destroys. The platform route's registry cleanup is
-    // redundant but harmless (destroyInstance is idempotent on already-destroyed entries).
     if (finalized.finalized && preDestroyUserId && preDestroySandboxId) {
-      try {
-        const registryInstanceId = isInstanceKeyedSandboxId(preDestroySandboxId)
-          ? instanceIdFromSandboxId(preDestroySandboxId)
-          : null;
-
-        const registryKeys = [`user:${preDestroyUserId}`];
-        if (preDestroyOrgId) registryKeys.push(`org:${preDestroyOrgId}`);
-
-        for (const registryKey of registryKeys) {
-          const registryStub = this.env.KILOCLAW_REGISTRY.get(
-            this.env.KILOCLAW_REGISTRY.idFromName(registryKey)
-          );
-          if (registryInstanceId) {
-            await registryStub.destroyInstance(registryKey, registryInstanceId);
-            console.log('[DO] Registry entry destroyed on finalization:', {
-              registryKey,
-              instanceId: registryInstanceId,
-            });
-          } else {
-            const legacyDoKeys = legacyDoKeysForIdentity(preDestroyUserId, preDestroySandboxId);
-            const entries = await registryStub.listInstances(registryKey);
-            const legacyEntry = entries.find(e => legacyDoKeys.includes(e.doKey));
-            if (legacyEntry) {
-              await registryStub.destroyInstance(registryKey, legacyEntry.instanceId);
-              console.log('[DO] Registry entry destroyed on finalization (legacy):', {
-                registryKey,
-                instanceId: legacyEntry.instanceId,
-                doKeysTried: legacyDoKeys,
-                matchedDoKey: legacyEntry.doKey,
-              });
-            } else {
-              console.log(
-                '[DO] Registry cleanup: no active entry found (already cleaned or never existed):',
-                {
-                  registryKey,
-                  doKeysTried: legacyDoKeys,
-                  activeEntryCount: entries.length,
-                }
-              );
-            }
-          }
-        }
-      } catch (registryErr) {
-        console.error('[DO] Registry cleanup on finalization failed (non-fatal):', registryErr);
-      }
+      await this.cleanupRegistryAfterFinalizedDestroy(
+        preDestroyUserId,
+        preDestroyOrgId,
+        preDestroySandboxId,
+        releaseProvisionReservation
+      );
     }
 
     if (!finalized.finalized) {
@@ -4317,6 +4414,19 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   // ========================================================================
 
   override async alarm(): Promise<void> {
+    const pendingRegistryCleanup = await this.ctx.storage.get<PendingRegistryCleanup>(
+      PENDING_REGISTRY_CLEANUP_KEY
+    );
+    if (pendingRegistryCleanup) {
+      await this.cleanupRegistryAfterFinalizedDestroy(
+        pendingRegistryCleanup.userId,
+        pendingRegistryCleanup.orgId,
+        pendingRegistryCleanup.sandboxId,
+        pendingRegistryCleanup.releaseProvisionReservation
+      );
+      return;
+    }
+
     await this.loadState();
 
     if (!this.s.userId || !this.s.status) return;
@@ -4419,6 +4529,18 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       'alarm_retained_recovery_cleanup'
     );
 
+    const skipProvisionReservationRelease =
+      (await this.ctx.storage.get<boolean>(SKIP_PROVISION_RESERVATION_RELEASE_KEY)) === true;
+    const pendingDestroyIdentity =
+      this.s.status === 'destroying' && this.s.userId && this.s.sandboxId
+        ? {
+            userId: this.s.userId,
+            orgId: this.s.orgId,
+            sandboxId: this.s.sandboxId,
+            releaseProvisionReservation: !skipProvisionReservationRelease,
+          }
+        : null;
+
     try {
       if (this.s.provider !== 'fly') {
         if (this.s.status === 'destroying') {
@@ -4429,9 +4551,24 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
             this.s,
             destroyRctx,
             (userId, sandboxId) =>
-              markDestroyedInPostgresHelper(this.env, this.ctx, this.s, userId, sandboxId)
+              markDestroyedInPostgresHelper(this.env, this.ctx, this.s, userId, sandboxId),
+            pendingDestroyIdentity
+              ? this.registryCleanupRetention(
+                  pendingDestroyIdentity.userId,
+                  pendingDestroyIdentity.orgId,
+                  pendingDestroyIdentity.sandboxId,
+                  pendingDestroyIdentity.releaseProvisionReservation
+                )
+              : undefined
           );
-          if (!result.finalized) {
+          if (result.finalized && pendingDestroyIdentity) {
+            await this.cleanupRegistryAfterFinalizedDestroy(
+              pendingDestroyIdentity.userId,
+              pendingDestroyIdentity.orgId,
+              pendingDestroyIdentity.sandboxId,
+              pendingDestroyIdentity.releaseProvisionReservation
+            );
+          } else if (!result.finalized) {
             await maybeEmitDestroyStuckTelemetry(this.ctx, this.s, destroyRctx);
           }
         } else {
@@ -4452,8 +4589,25 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
         'alarm',
         () => this.destroy({ reason: 'stale_provision_cleanup' }).then(() => undefined),
         (userId, sandboxId) =>
-          markDestroyedInPostgresHelper(this.env, this.ctx, this.s, userId, sandboxId)
+          markDestroyedInPostgresHelper(this.env, this.ctx, this.s, userId, sandboxId),
+        pendingDestroyIdentity
+          ? this.registryCleanupRetention(
+              pendingDestroyIdentity.userId,
+              pendingDestroyIdentity.orgId,
+              pendingDestroyIdentity.sandboxId,
+              pendingDestroyIdentity.releaseProvisionReservation
+            )
+          : undefined
       );
+
+      if (pendingDestroyIdentity && this.s.status === null) {
+        await this.cleanupRegistryAfterFinalizedDestroy(
+          pendingDestroyIdentity.userId,
+          pendingDestroyIdentity.orgId,
+          pendingDestroyIdentity.sandboxId,
+          pendingDestroyIdentity.releaseProvisionReservation
+        );
+      }
 
       if (reconcileResult.beginUnexpectedStopRecovery && this.s.status === 'running') {
         await beginUnexpectedStopRecovery(

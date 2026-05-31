@@ -49,10 +49,6 @@ import {
   workerInstanceId,
 } from '@/lib/kiloclaw/instance-registry';
 import { clearSubscriptionLifecycleAfterInstanceDestroy } from '@/lib/kiloclaw/instance-lifecycle';
-import {
-  getOrganizationProvisionLockKey,
-  withKiloclawProvisionContextLock,
-} from '@/lib/kiloclaw/provision-lock';
 import { encryptProvisionSecretsForWorker } from '@/lib/kiloclaw/provision-secrets';
 import {
   organizationMemberProcedure,
@@ -90,6 +86,27 @@ function getKiloClawApiErrorPayload(err: KiloClawApiError): { message?: string; 
   } catch {
     return {};
   }
+}
+
+function handleProvisionError(err: unknown): never {
+  if (err instanceof KiloClawApiError && (err.statusCode === 409 || err.statusCode === 503)) {
+    const { message, code } = getKiloClawApiErrorPayload(err);
+    if (
+      code === 'provision_in_progress' ||
+      code === 'provision_completion_pending' ||
+      code === 'instance_already_active' ||
+      code === 'instance_destroyed'
+    ) {
+      throw new TRPCError({
+        code: 'CONFLICT',
+        message:
+          message ??
+          'An instance is already being created. Wait for setup to finish, then try again.',
+        cause: new UpstreamApiError(code),
+      });
+    }
+  }
+  throw err;
 }
 
 function handleFileOperationError(err: unknown, operation: string): never {
@@ -448,56 +465,64 @@ export const organizationKiloclawRouter = createTRPCRouter({
     .input(updateConfigSchema)
     .mutation(async ({ ctx, input }) => {
       await requireOrganizationKiloClawComputeEntitlement(input.organizationId);
-      return await withKiloclawProvisionContextLock(
-        getOrganizationProvisionLockKey(ctx.user.id, input.organizationId),
-        async () => {
-          const existing = await getActiveOrgInstance(ctx.user.id, input.organizationId);
-          if (existing) {
-            throw new TRPCError({
-              code: 'CONFLICT',
-              message: 'You already have an active KiloClaw instance in this organization',
-            });
+      const existing = await getActiveOrgInstance(ctx.user.id, input.organizationId);
+      if (existing) {
+        const client = new KiloClawInternalClient();
+        try {
+          await client.repairProvisionReservation(ctx.user.id, existing.id, input.organizationId);
+        } catch (error) {
+          if (error instanceof KiloClawApiError) {
+            const { code } = getKiloClawApiErrorPayload(error);
+            if (code !== 'provision_repair_unavailable') handleProvisionError(error);
+          } else {
+            throw error;
           }
-
-          const encryptedSecrets = encryptProvisionSecretsForWorker(input.secrets);
-
-          const expiresInSeconds = TOKEN_EXPIRY.thirtyDays;
-          const kilocodeApiKey = generateApiToken(ctx.user, undefined, {
-            expiresIn: expiresInSeconds,
-          });
-          const kilocodeApiKeyExpiresAt = new Date(
-            Date.now() + expiresInSeconds * 1000
-          ).toISOString();
-
-          const client = new KiloClawInternalClient();
-          const result = await client.provision(
-            ctx.user.id,
-            {
-              envVars: input.envVars,
-              encryptedSecrets,
-              channels: buildWorkerChannels(input.channels),
-              kilocodeApiKey,
-              kilocodeApiKeyExpiresAt,
-              kilocodeDefaultModel: input.kilocodeDefaultModel ?? undefined,
-              userTimezone: input.userTimezone === undefined ? undefined : input.userTimezone,
-              userLocation: input.userLocation === undefined ? undefined : input.userLocation,
-            },
-            { orgId: input.organizationId }
-          );
-
-          PostHogClient().capture({
-            distinctId: ctx.user.google_user_email,
-            event: 'claw_org_instance_provisioned',
-            properties: {
-              user_id: ctx.user.id,
-              organization_id: input.organizationId,
-              instance_id: result.instanceId,
-            },
-          });
-
-          return result;
         }
-      );
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message: 'You already have an active KiloClaw instance in this organization',
+        });
+      }
+
+      const encryptedSecrets = encryptProvisionSecretsForWorker(input.secrets);
+      const expiresInSeconds = TOKEN_EXPIRY.thirtyDays;
+      const kilocodeApiKey = generateApiToken(ctx.user, undefined, {
+        expiresIn: expiresInSeconds,
+      });
+      const kilocodeApiKeyExpiresAt = new Date(Date.now() + expiresInSeconds * 1000).toISOString();
+
+      const client = new KiloClawInternalClient();
+      let result: Awaited<ReturnType<typeof client.provision>>;
+      try {
+        result = await client.provision(
+          ctx.user.id,
+          {
+            envVars: input.envVars,
+            encryptedSecrets,
+            channels: buildWorkerChannels(input.channels),
+            kilocodeApiKey,
+            kilocodeApiKeyExpiresAt,
+            kilocodeDefaultModel: input.kilocodeDefaultModel ?? undefined,
+            userTimezone: input.userTimezone === undefined ? undefined : input.userTimezone,
+            userLocation: input.userLocation === undefined ? undefined : input.userLocation,
+          },
+          { orgId: input.organizationId }
+        );
+      } catch (error) {
+        handleProvisionError(error);
+      }
+
+      PostHogClient().capture({
+        distinctId: ctx.user.google_user_email,
+        event: 'claw_org_instance_provisioned',
+        properties: {
+          user_id: ctx.user.id,
+          organization_id: input.organizationId,
+          instance_id: result.instanceId,
+        },
+      });
+
+      return result;
     }),
 
   updateConfig: organizationMemberProcedure
@@ -522,23 +547,25 @@ export const organizationKiloclawRouter = createTRPCRouter({
         .limit(1);
 
       const client = new KiloClawInternalClient();
-      const result = await client.provision(
-        ctx.user.id,
-        {
-          envVars: input.envVars,
-          encryptedSecrets,
-          channels: buildWorkerChannels(input.channels),
-          kilocodeApiKey,
-          kilocodeApiKeyExpiresAt,
-          kilocodeDefaultModel: input.kilocodeDefaultModel ?? undefined,
-          userTimezone: input.userTimezone === undefined ? undefined : input.userTimezone,
-          userLocation: input.userLocation === undefined ? undefined : input.userLocation,
-          pinnedImageTag: pin?.image_tag,
-        },
-        { instanceId: instance.id, orgId: input.organizationId }
-      );
-
-      return result;
+      try {
+        return await client.provision(
+          ctx.user.id,
+          {
+            envVars: input.envVars,
+            encryptedSecrets,
+            channels: buildWorkerChannels(input.channels),
+            kilocodeApiKey,
+            kilocodeApiKeyExpiresAt,
+            kilocodeDefaultModel: input.kilocodeDefaultModel ?? undefined,
+            userTimezone: input.userTimezone === undefined ? undefined : input.userTimezone,
+            userLocation: input.userLocation === undefined ? undefined : input.userLocation,
+            pinnedImageTag: pin?.image_tag,
+          },
+          { instanceId: instance.id, orgId: input.organizationId }
+        );
+      } catch (error) {
+        handleProvisionError(error);
+      }
     }),
 
   start: organizationMemberProcedure.mutation(async ({ ctx, input }) => {

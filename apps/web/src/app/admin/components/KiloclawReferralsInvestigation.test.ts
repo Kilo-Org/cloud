@@ -46,8 +46,8 @@ function referralRow(params: {
             id: `${params.referralId}-application`,
             beneficiaryUserId: 'referrer-1',
             subscriptionId: '55555555-5555-4555-8555-555555555555',
-            previousRenewalBoundary: '2026-05-01T00:00:00.000Z',
-            newRenewalBoundary: '2026-06-01T00:00:00.000Z',
+            previousRenewalBoundary: '2026-05-01T12:00:00.000Z',
+            newRenewalBoundary: '2026-06-01T12:00:00.000Z',
             appliedAt: '2026-04-10T00:05:00.000Z',
           },
         ]

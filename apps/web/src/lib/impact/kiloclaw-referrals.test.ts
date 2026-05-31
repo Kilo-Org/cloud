@@ -145,8 +145,8 @@ async function insertActivePersonalSubscription(
       plan: 'standard',
       status: 'active',
       current_period_start: '2026-04-01T00:00:00.000Z',
-      current_period_end: '2026-05-01T00:00:00.000Z',
-      credit_renewal_at: '2026-05-01T00:00:00.000Z',
+      current_period_end: '2026-05-01T12:00:00.000Z',
+      credit_renewal_at: '2026-05-01T12:00:00.000Z',
       cancel_at_period_end: false,
       ...overrides,
     })
@@ -636,7 +636,7 @@ describe('kiloclaw referrals', () => {
       expect(applications).toHaveLength(2);
       expect(
         applications.map(application => String(application.new_renewal_boundary)).sort()
-      ).toEqual(['2026-06-01 00:00:00+00', '2026-06-01 00:00:00+00']);
+      ).toEqual(['2026-06-01 12:00:00+00', '2026-06-01 12:00:00+00']);
 
       const subscriptions = await db
         .select({
@@ -650,13 +650,13 @@ describe('kiloclaw referrals', () => {
         expect.arrayContaining([
           expect.objectContaining({
             userId: referrer.id,
-            currentPeriodEnd: '2026-06-01 00:00:00+00',
-            creditRenewalAt: '2026-06-01 00:00:00+00',
+            currentPeriodEnd: '2026-06-01 12:00:00+00',
+            creditRenewalAt: '2026-06-01 12:00:00+00',
           }),
           expect.objectContaining({
             userId: referee.id,
-            currentPeriodEnd: '2026-06-01 00:00:00+00',
-            creditRenewalAt: '2026-06-01 00:00:00+00',
+            currentPeriodEnd: '2026-06-01 12:00:00+00',
+            creditRenewalAt: '2026-06-01 12:00:00+00',
           }),
         ])
       );
@@ -1573,7 +1573,7 @@ describe('kiloclaw referrals', () => {
         .select()
         .from(kiloclaw_subscriptions)
         .where(eq(kiloclaw_subscriptions.user_id, referee.id));
-      expect(subscription.current_period_end).toBe('2026-05-01 00:00:00+00');
+      expect(subscription.current_period_end).toBe('2026-05-01 12:00:00+00');
 
       const refereeRewards = await db
         .select({
@@ -1646,7 +1646,7 @@ describe('kiloclaw referrals', () => {
         'sub_referee_123',
         expect.objectContaining({
           proration_behavior: 'none',
-          trial_end: Math.floor(new Date('2026-06-01T00:00:00.000Z').getTime() / 1000),
+          trial_end: Math.floor(new Date('2026-06-01T12:00:00.000Z').getTime() / 1000),
         }),
         expect.objectContaining({
           idempotencyKey: expect.stringContaining('stripe-apply'),

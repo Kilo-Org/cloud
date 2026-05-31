@@ -73,6 +73,7 @@ import {
   type ActiveKiloClawInstance,
 } from '@/lib/kiloclaw/instance-registry';
 import { encryptProvisionSecretsForWorker } from '@/lib/kiloclaw/provision-secrets';
+import { handleProvisionError } from '@/lib/kiloclaw/provision-error-handler';
 import {
   clearSubscriptionLifecycleAfterInstanceDestroy,
   clearTrialInactivityStopAfterStart,
@@ -569,27 +570,6 @@ function getKiloClawApiErrorPayload(err: KiloClawApiError): { message?: string; 
   } catch {
     return {};
   }
-}
-
-function handleProvisionError(err: unknown): never {
-  if (err instanceof KiloClawApiError && (err.statusCode === 409 || err.statusCode === 503)) {
-    const { message, code } = getKiloClawApiErrorPayload(err);
-    if (
-      code === 'provision_in_progress' ||
-      code === 'provision_completion_pending' ||
-      code === 'instance_already_active' ||
-      code === 'instance_destroyed'
-    ) {
-      throw new TRPCError({
-        code: 'CONFLICT',
-        message:
-          message ??
-          'An instance is already being created. Wait for setup to finish, then try again.',
-        cause: new UpstreamApiError(code),
-      });
-    }
-  }
-  throw err;
 }
 
 function handleRestartMachineError(err: unknown): never {
@@ -1151,7 +1131,7 @@ async function provisionInstance(
         : undefined
     );
   } catch (error) {
-    handleProvisionError(error);
+    handleProvisionError(error, getKiloClawApiErrorPayload);
   }
 }
 

@@ -95,6 +95,8 @@ vi.mock('../lib/user-flags', () => ({
 vi.mock('../db', () => ({
   getWorkerDb: vi.fn(() => ({})),
   getActivePersonalInstance: vi.fn().mockResolvedValue(null),
+  getInstanceById: vi.fn().mockResolvedValue(null),
+  getInstanceByIdIncludingDestroyed: vi.fn().mockResolvedValue(null),
   findPepperByUserId: vi.fn().mockResolvedValue({
     id: 'user-1',
     api_token_pepper: 'pepper-1',
@@ -784,6 +786,39 @@ describe('two-phase destroy', () => {
       '11111111-1111-4111-8111-111111111111',
       'instance_destroyed'
     );
+  });
+
+  it('releases a pending reservation after alarm sees canonical Postgres destroy confirmation', async () => {
+    const env = createFakeEnv();
+    const registryStub = (env.KILOCLAW_REGISTRY as unknown as { get: Mock }).get('user:user-1') as {
+      finalizeDestroyedInstance: Mock;
+    };
+    const { instance, storage } = createInstance(createFakeStorage(), env);
+    storage._store.set('pendingRegistryCleanup', {
+      userId: 'user-1',
+      orgId: null,
+      sandboxId: 'ki_11111111111141118111111111111111',
+      releaseProvisionReservation: false,
+    });
+    const getWorkerDbSpy = vi.spyOn(db, 'getWorkerDb').mockReturnValue({} as never);
+    const getInstanceByIdSpy = vi.spyOn(db, 'getInstanceById').mockResolvedValue(null as never);
+    const getInstanceByIdIncludingDestroyedSpy = vi
+      .spyOn(db, 'getInstanceByIdIncludingDestroyed')
+      .mockResolvedValue({ id: '11111111-1111-4111-8111-111111111111' } as never);
+
+    await instance.alarm();
+
+    expect(registryStub.finalizeDestroyedInstance).toHaveBeenCalledWith(
+      'user:user-1',
+      'user-1',
+      '11111111-1111-4111-8111-111111111111',
+      '11111111-1111-4111-8111-111111111111',
+      'instance_destroyed'
+    );
+    expect(storage._store.has('pendingRegistryCleanup')).toBe(false);
+    getWorkerDbSpy.mockRestore();
+    getInstanceByIdSpy.mockRestore();
+    getInstanceByIdIncludingDestroyedSpy.mockRestore();
   });
 
   it('retries reservation release after alarm-completed destruction if Registry is unavailable', async () => {

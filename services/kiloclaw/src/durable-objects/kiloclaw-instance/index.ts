@@ -10,6 +10,7 @@
 
 import { DurableObject } from 'cloudflare:workers';
 import type { KiloClawEnv } from '../../types';
+import { getInstanceById, getInstanceByIdIncludingDestroyed, getWorkerDb } from '../../db';
 import type { OpenclawFileWriteValidation } from '../gateway-controller-types';
 import type {
   InstanceConfig,
@@ -2559,6 +2560,19 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       const registryInstanceId = isInstanceKeyedSandboxId(sandboxId)
         ? instanceIdFromSandboxId(sandboxId)
         : null;
+      let releaseAllowed = releaseProvisionReservation;
+      if (!releaseAllowed && registryInstanceId) {
+        const connectionString = this.env.HYPERDRIVE?.connectionString;
+        if (!connectionString) throw new Error('HYPERDRIVE is not configured');
+        const db = getWorkerDb(connectionString);
+        const active = await getInstanceById(db, registryInstanceId);
+        if (!active) {
+          const destroyed = await getInstanceByIdIncludingDestroyed(db, registryInstanceId, {
+            includeDestroyed: true,
+          });
+          releaseAllowed = destroyed !== null;
+        }
+      }
       const registryKeys = [`user:${userId}`];
       if (orgId) registryKeys.push(`org:${orgId}`);
 
@@ -2567,7 +2581,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
           this.env.KILOCLAW_REGISTRY.idFromName(registryKey)
         );
         if (registryInstanceId) {
-          if (releaseProvisionReservation) {
+          if (releaseAllowed) {
             await registryStub.finalizeDestroyedInstance(
               registryKey,
               userId,
@@ -2606,7 +2620,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
           }
         }
       }
-      if (!releaseProvisionReservation) {
+      if (!releaseAllowed) {
         await this.ctx.storage.setAlarm(Date.now() + REGISTRY_CLEANUP_RETRY_MS);
         return;
       }

@@ -50,6 +50,7 @@ import {
 } from '@/lib/kiloclaw/instance-registry';
 import { clearSubscriptionLifecycleAfterInstanceDestroy } from '@/lib/kiloclaw/instance-lifecycle';
 import { encryptProvisionSecretsForWorker } from '@/lib/kiloclaw/provision-secrets';
+import { handleProvisionError } from '@/lib/kiloclaw/provision-error-handler';
 import {
   organizationMemberProcedure,
   organizationMemberMutationProcedure,
@@ -86,27 +87,6 @@ function getKiloClawApiErrorPayload(err: KiloClawApiError): { message?: string; 
   } catch {
     return {};
   }
-}
-
-function handleProvisionError(err: unknown): never {
-  if (err instanceof KiloClawApiError && (err.statusCode === 409 || err.statusCode === 503)) {
-    const { message, code } = getKiloClawApiErrorPayload(err);
-    if (
-      code === 'provision_in_progress' ||
-      code === 'provision_completion_pending' ||
-      code === 'instance_already_active' ||
-      code === 'instance_destroyed'
-    ) {
-      throw new TRPCError({
-        code: 'CONFLICT',
-        message:
-          message ??
-          'An instance is already being created. Wait for setup to finish, then try again.',
-        cause: new UpstreamApiError(code),
-      });
-    }
-  }
-  throw err;
 }
 
 function handleFileOperationError(err: unknown, operation: string): never {
@@ -473,7 +453,8 @@ export const organizationKiloclawRouter = createTRPCRouter({
         } catch (error) {
           if (error instanceof KiloClawApiError) {
             const { code } = getKiloClawApiErrorPayload(error);
-            if (code !== 'provision_repair_unavailable') handleProvisionError(error);
+            if (code !== 'provision_repair_unavailable')
+              handleProvisionError(error, getKiloClawApiErrorPayload);
           } else {
             throw error;
           }
@@ -509,7 +490,7 @@ export const organizationKiloclawRouter = createTRPCRouter({
           { orgId: input.organizationId }
         );
       } catch (error) {
-        handleProvisionError(error);
+        handleProvisionError(error, getKiloClawApiErrorPayload);
       }
 
       PostHogClient().capture({
@@ -564,7 +545,7 @@ export const organizationKiloclawRouter = createTRPCRouter({
           { instanceId: instance.id, orgId: input.organizationId }
         );
       } catch (error) {
-        handleProvisionError(error);
+        handleProvisionError(error, getKiloClawApiErrorPayload);
       }
     }),
 

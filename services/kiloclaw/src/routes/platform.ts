@@ -1516,9 +1516,8 @@ platform.post('/provision', async c => {
           stub => stub.allowProvisionReservationReleaseOnFinalize(),
           'allowProvisionReservationReleaseOnFinalize'
         ).catch(releaseSignalError => {
-          instanceMarkedDestroyed = false;
           console.error(
-            '[platform] Failed to confirm reservation cleanup release:',
+            '[platform] Failed to confirm reservation cleanup release; DO will retry after Postgres confirmation:',
             releaseSignalError
           );
         });
@@ -1659,9 +1658,8 @@ platform.post('/provision', async c => {
             stub => stub.allowProvisionReservationReleaseOnFinalize(),
             'allowProvisionReservationReleaseOnFinalize'
           ).catch(releaseSignalError => {
-            instanceMarkedDestroyed = false;
             console.error(
-              '[platform] Failed to confirm reservation cleanup release:',
+              '[platform] Failed to confirm reservation cleanup release; DO will retry after Postgres confirmation:',
               releaseSignalError
             );
           });

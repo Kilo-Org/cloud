@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as DrizzleOrm from 'drizzle-orm';
 import { registryInstances, registryProvisionReservations } from '../db/sqlite-schema';
+import { sandboxIdFromUserId } from '../auth/sandbox-id';
 
 type Predicate = (row: Record<string, unknown>) => boolean;
 type Row = Record<string, unknown>;
@@ -139,6 +140,22 @@ describe('KiloClawRegistry fresh provision reservations', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  it('keeps legacy user-keyed rows routable before early-bird backfill completes', async () => {
+    mockGetActivePersonalInstance.mockResolvedValue({
+      id: 'instance-legacy',
+      sandboxId: sandboxIdFromUserId('user-1'),
+      orgId: null,
+    });
+    const registry = new KiloClawRegistry(
+      createState() as never,
+      { HYPERDRIVE: { connectionString: 'postgresql://fake' } } as never
+    );
+
+    expect(await registry.listInstances('user:user-1')).toEqual([
+      expect.objectContaining({ instanceId: 'instance-legacy', assignedUserId: 'user-1' }),
+    ]);
   });
 
   it('does not lazily publish an active personal row until canonical subscription exists', async () => {

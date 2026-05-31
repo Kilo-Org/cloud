@@ -106,6 +106,9 @@ export async function getActivePersonalInstance(db: WorkerDb, userId: string) {
   return { id: row.id, sandboxId: row.sandbox_id, orgId: row.organization_id };
 }
 
+// Admission assumes one active organization instance per assigned user. If
+// legacy drift leaves multiple rows, the oldest row is the deterministic
+// representative until reconciliation collapses the duplicate state.
 export async function getActiveOrganizationInstance(
   db: WorkerDb,
   userId: string,

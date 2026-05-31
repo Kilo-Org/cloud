@@ -7,6 +7,7 @@ import { registryInstances, registryProvisionReservations } from '../db/sqlite-s
 import { getWorkerDb, getActivePersonalInstance, hasSubscriptionForInstance } from '../db';
 import type { KiloClawEnv } from '../types';
 import { doKeyFromActiveInstance } from '../lib/instance-routing';
+import { isInstanceKeyedSandboxId } from '@kilocode/worker-utils/instance-id';
 
 export type RegistryEntry = {
   instanceId: string;
@@ -31,6 +32,7 @@ export type ProvisionReservationEntry = {
   updatedAt: string;
   completedAt: string | null;
   failureCode: string | null;
+  resolutionReason: string | null;
 };
 
 export type BeginFreshProvisionResult =
@@ -59,6 +61,7 @@ function rowToReservation(
     updatedAt: row.updated_at,
     completedAt: row.completed_at,
     failureCode: row.failure_code,
+    resolutionReason: row.resolution_reason,
   };
 }
 
@@ -261,7 +264,7 @@ export class KiloClawRegistry extends DurableObject<KiloClawEnv> {
     const now = new Date().toISOString();
     this.db
       .update(registryProvisionReservations)
-      .set({ status: 'released', updated_at: now, failure_code: reason })
+      .set({ status: 'released', updated_at: now, resolution_reason: reason })
       .where(
         and(
           eq(registryProvisionReservations.instance_id, instanceId),
@@ -317,7 +320,13 @@ export class KiloClawRegistry extends DurableObject<KiloClawEnv> {
 
       this.db
         .update(registryProvisionReservations)
-        .set({ status: 'completed', updated_at: now, completed_at: now, failure_code: null })
+        .set({
+          status: 'completed',
+          updated_at: now,
+          completed_at: now,
+          failure_code: null,
+          resolution_reason: null,
+        })
         .where(eq(registryProvisionReservations.instance_id, instanceId))
         .run();
       this.db
@@ -427,7 +436,7 @@ export class KiloClawRegistry extends DurableObject<KiloClawEnv> {
         .run();
       this.db
         .update(registryProvisionReservations)
-        .set({ status: 'released', updated_at: now, failure_code: reason })
+        .set({ status: 'released', updated_at: now, resolution_reason: reason })
         .where(
           and(
             eq(registryProvisionReservations.instance_id, instanceId),
@@ -504,7 +513,8 @@ export class KiloClawRegistry extends DurableObject<KiloClawEnv> {
       const instance = await getActivePersonalInstance(db, userId);
 
       if (instance) {
-        if (!(await hasSubscriptionForInstance(db, instance.id))) {
+        const hasSubscription = await hasSubscriptionForInstance(db, instance.id);
+        if (!hasSubscription && isInstanceKeyedSandboxId(instance.sandboxId)) {
           return;
         }
         const doKey = doKeyFromActiveInstance(instance);
@@ -519,6 +529,9 @@ export class KiloClawRegistry extends DurableObject<KiloClawEnv> {
           .onConflictDoNothing()
           .run();
       }
+      // Legacy user-keyed rows can remain subscription-less until early-bird backfill
+      // completes, so they stay routable. New instance-keyed rows without a
+      // subscription are quarantine state and must not be published.
       // No Postgres row means no legacy instance — Postgres is the source of truth.
       // Orphaned DOs (state but no Postgres row) only occur via manual DB deletion
       // and are handled by the resolveRegistryEntry fallback in index.ts.

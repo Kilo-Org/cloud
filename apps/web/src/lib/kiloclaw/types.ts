@@ -272,6 +272,7 @@ export type RegistryResult = {
     updatedAt: string;
     completedAt: string | null;
     failureCode: string | null;
+    resolutionReason: string | null;
   }>;
   migrated: boolean;
 };

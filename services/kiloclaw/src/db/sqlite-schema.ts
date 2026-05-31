@@ -23,6 +23,7 @@ export const registryProvisionReservations = sqliteTable(
     updated_at: text('updated_at').notNull(),
     completed_at: text('completed_at'),
     failure_code: text('failure_code'),
+    resolution_reason: text('resolution_reason'),
   },
   table => [
     uniqueIndex('uq_provision_reservations_unresolved_user')

@@ -6,7 +6,8 @@ CREATE TABLE `provision_reservations` (
 	`started_at` text NOT NULL,
 	`updated_at` text NOT NULL,
 	`completed_at` text,
-	`failure_code` text
+	`failure_code` text,
+	`resolution_reason` text
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `uq_provision_reservations_unresolved_user` ON `provision_reservations` (`assigned_user_id`) WHERE "provision_reservations"."status" IN ('in_progress', 'failed_requires_reconciliation');

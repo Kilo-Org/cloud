@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "43ed2a74-7037-4bf2-8897-685fe20f257e",
+  "id": "e5703007-d9d0-4131-ac92-983840277e5d",
   "prevId": "f488eead-1986-472a-8973-f487dc7599bf",
   "tables": {
     "instances": {
@@ -103,6 +103,13 @@
         },
         "failure_code": {
           "name": "failure_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "resolution_reason": {
+          "name": "resolution_reason",
           "type": "text",
           "primaryKey": false,
           "notNull": false,

@@ -265,6 +265,7 @@ function makeEnv() {
       updatedAt: '2026-05-31T00:00:00.000Z',
       completedAt: null,
       failureCode: null,
+      resolutionReason: null,
     },
   }));
   const completeFreshProvision = vi.fn().mockResolvedValue(undefined);
@@ -394,6 +395,7 @@ describe('platform provision bootstrap quarantine', () => {
         updatedAt: '2026-05-31T00:00:00.000Z',
         completedAt: null,
         failureCode: null,
+        resolutionReason: null,
       },
     });
 

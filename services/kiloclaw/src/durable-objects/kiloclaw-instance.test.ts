@@ -2495,6 +2495,14 @@ describe('status guards', () => {
     );
   });
 
+  it('provision() rejects a wiped explicit instance without fresh admission', async () => {
+    const { instance } = createInstance();
+
+    await expect(
+      instance.provision('user-1', {}, { instanceId: '11111111-1111-4111-8111-111111111111' })
+    ).rejects.toThrow('Instance not provisioned');
+  });
+
   it('stop() is a no-op when destroying', async () => {
     const { instance, storage } = createInstance();
     await seedRunning(storage, { status: 'destroying' });

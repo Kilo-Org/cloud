@@ -4120,6 +4120,7 @@ platform.get('/registry-entries', async c => {
       updatedAt: string;
       completedAt: string | null;
       failureCode: string | null;
+      resolutionReason: string | null;
     }>;
     migrated: boolean;
   }> = [];

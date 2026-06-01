@@ -300,6 +300,10 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
     expect(response.status).toBe(200);
     expect(mockedGetProvider).toHaveBeenCalledTimes(1);
     expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.model).toBe('openai/gpt-4o');
+    expect(mockedAccountForMicrodollarUsage.mock.calls[0]?.[1]).toMatchObject({
+      abuse_delay: 6000,
+      abuse_downgraded_from: null,
+    });
   });
 
   it('applies delay before returning error when quarantine-3 model-override provider fails', async () => {

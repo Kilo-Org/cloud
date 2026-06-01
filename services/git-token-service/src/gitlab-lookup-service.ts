@@ -26,13 +26,14 @@ export type GitLabIntegrationMetadata = {
 
 export type AuthorizedGitLabIntegration = {
   integrationId: string;
+  integrationType: string;
+  accountId: string | null;
+  accountLogin: string | null;
   metadata: GitLabIntegrationMetadata;
 };
 
-type GitLabLookupSuccess = {
+export type GitLabLookupSuccess = AuthorizedGitLabIntegration & {
   success: true;
-  integrationId: string;
-  metadata: GitLabIntegrationMetadata;
 };
 
 export type GitLabLookupFailure = {
@@ -104,6 +105,10 @@ function parseGitLabInstanceUrl(instanceUrl: string): ParsedGitLabInstanceUrl | 
   };
 }
 
+export function normalizeGitLabInstanceUrl(instanceUrl: string): string | null {
+  return parseGitLabInstanceUrl(instanceUrl)?.instanceUrl ?? null;
+}
+
 export function isValidGitLabRepositoryUrl(repositoryUrl: string): boolean {
   const parsed = parseSecureUrl(repositoryUrl);
   return parsed !== null && parsed.pathname !== '/' && !parsed.pathname.endsWith('/');
@@ -159,10 +164,17 @@ export function matchGitLabRepositoryToIntegration(
   };
 }
 
-export function buildAuthorizedGitLabIntegrationQuery(db: WorkerDb, params: GitLabLookupParams) {
+export function buildAuthorizedGitLabIntegrationQuery(
+  db: WorkerDb,
+  params: GitLabLookupParams,
+  integrationId?: string
+) {
   return db
     .select({
       id: platform_integrations.id,
+      integration_type: platform_integrations.integration_type,
+      platform_account_id: platform_integrations.platform_account_id,
+      platform_account_login: platform_integrations.platform_account_login,
       metadata: platform_integrations.metadata,
     })
     .from(platform_integrations)
@@ -184,6 +196,7 @@ export function buildAuthorizedGitLabIntegrationQuery(db: WorkerDb, params: GitL
       and(
         eq(platform_integrations.platform, 'gitlab'),
         eq(platform_integrations.integration_status, 'active'),
+        ...(integrationId !== undefined ? [eq(platform_integrations.id, integrationId)] : []),
         params.orgId
           ? and(
               eq(platform_integrations.owned_by_organization_id, sql`${params.orgId}::uuid`),
@@ -197,9 +210,23 @@ export function buildAuthorizedGitLabIntegrationQuery(db: WorkerDb, params: GitL
     );
 }
 
-export class GitLabLookupService {
-  private db: WorkerDb | null = null;
+function parseAuthorizedGitLabIntegration(row: {
+  id: string;
+  integration_type: string;
+  platform_account_id: string | null;
+  platform_account_login: string | null;
+  metadata: unknown;
+}): AuthorizedGitLabIntegration {
+  return {
+    integrationId: row.id,
+    integrationType: row.integration_type,
+    accountId: row.platform_account_id,
+    accountLogin: row.platform_account_login,
+    metadata: GitLabMetadataSchema.parse(row.metadata ?? {}),
+  };
+}
 
+export class GitLabLookupService {
   constructor(private env: CloudflareEnv) {}
 
   isConfigured(): boolean {
@@ -207,13 +234,10 @@ export class GitLabLookupService {
   }
 
   private getDb(): WorkerDb {
-    if (!this.db) {
-      if (!this.env.HYPERDRIVE) {
-        throw new Error('Hyperdrive not configured');
-      }
-      this.db = getWorkerDb(this.env.HYPERDRIVE.connectionString, { statement_timeout: 10_000 });
+    if (!this.env.HYPERDRIVE) {
+      throw new Error('Hyperdrive not configured');
     }
-    return this.db;
+    return getWorkerDb(this.env.HYPERDRIVE.connectionString, { statement_timeout: 10_000 });
   }
 
   private validateLookup(params: GitLabLookupParams): GitLabLookupFailure | undefined {
@@ -226,22 +250,27 @@ export class GitLabLookupService {
     }
   }
 
-  async findGitLabIntegration(params: GitLabLookupParams): Promise<GitLabLookupResult> {
+  async findGitLabIntegration(
+    params: GitLabLookupParams,
+    integrationId?: string
+  ): Promise<GitLabLookupResult> {
     const validationFailure = this.validateLookup(params);
     if (validationFailure) {
       return validationFailure;
     }
 
-    const rows = await buildAuthorizedGitLabIntegrationQuery(this.getDb(), params).limit(1);
+    const rows = await buildAuthorizedGitLabIntegrationQuery(
+      this.getDb(),
+      params,
+      integrationId
+    ).limit(1);
     if (rows.length === 0) {
       return { success: false, reason: 'no_integration_found' };
     }
 
-    const row = rows[0];
     return {
       success: true,
-      integrationId: row.id,
-      metadata: GitLabMetadataSchema.parse(row.metadata ?? {}),
+      ...parseAuthorizedGitLabIntegration(rows[0]),
     };
   }
 
@@ -260,10 +289,7 @@ export class GitLabLookupService {
 
     return {
       success: true,
-      integrations: rows.map(row => ({
-        integrationId: row.id,
-        metadata: GitLabMetadataSchema.parse(row.metadata ?? {}),
-      })),
+      integrations: rows.map(parseAuthorizedGitLabIntegration),
     };
   }
 }

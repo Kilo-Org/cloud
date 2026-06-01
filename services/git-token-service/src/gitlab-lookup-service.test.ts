@@ -15,6 +15,9 @@ function integration(
 ): AuthorizedGitLabIntegration {
   return {
     integrationId,
+    integrationType: 'oauth',
+    accountId: '42',
+    accountLogin: 'octocat',
     metadata: { gitlab_instance_url: instanceUrl },
   };
 }

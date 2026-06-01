@@ -1,14 +1,35 @@
+import { timingSafeEqual } from '@kilocode/encryption';
 import { extractBearerToken, verifyKiloToken } from '@kilocode/worker-utils';
 import { WorkerEntrypoint } from 'cloudflare:workers';
 import { GitHubTokenService, type GitHubAppType } from './github-token-service.js';
-import { GitLabLookupService } from './gitlab-lookup-service.js';
+import { GitLabLookupService, type GitLabLookupSuccess } from './gitlab-lookup-service.js';
 import {
   resolveGitLabRuntimeToken,
   type GetGitLabTokenParams,
+  type GetGitLabTokenFailure,
   type GetGitLabTokenResult,
 } from './gitlab-runtime-token-resolver.js';
+import {
+  GitLabSessionCapabilityCodec,
+  GitLabSessionCapabilityError,
+  normalizeGitLabInstanceOrigin,
+  parseGitLabCloneUrl,
+  sha256Digest,
+  type GitLabAuthType,
+  type GitLabCapabilityCredentialSource,
+  type GitLabCloneUrlFailureReason,
+  type GitLabSessionCapabilityFailureReason,
+  type GitLabSessionIdentity,
+} from './gitlab-session-capability.js';
 import { GitLabTokenService } from './gitlab-token-service.js';
 import { InstallationLookupService } from './installation-lookup-service.js';
+import {
+  GitHubSessionCapabilityCodec,
+  GitHubSessionCapabilityError,
+  normalizeGitHubRepository,
+  type GitHubSessionCapabilityFailureReason,
+  type GitHubSessionIdentity,
+} from './github-session-capability.js';
 import {
   GitHubUserAuthorizationService,
   type GitAuthorConfig,
@@ -69,14 +90,201 @@ export type GetCloudAgentAuthForRepoResult =
   | GetCloudAgentAuthForRepoSuccess
   | GetTokenForRepoFailure;
 
+export type IssueGitHubSessionCapabilityParams = GetCloudAgentAuthForRepoParams;
+export type IssueGitHubSessionCapabilitySuccess = Omit<
+  GetCloudAgentAuthForRepoSuccess,
+  'githubToken'
+> & {
+  capability: string;
+};
+export type IssueGitHubSessionCapabilityResult =
+  | IssueGitHubSessionCapabilitySuccess
+  | GetTokenForRepoFailure
+  | { success: false; reason: 'capability_configuration_error' };
+
+export type RedeemGitHubSessionCapabilityParams = {
+  capability: string;
+  requestMethod: string;
+  requestUrl: string;
+};
+export type RedeemGitHubSessionCapabilitySuccess = {
+  success: true;
+  authorization: string;
+};
+export type RedeemGitHubSessionCapabilityFailureReason =
+  | GitHubSessionCapabilityFailureReason
+  | 'invalid_upstream_url'
+  | 'upstream_host_not_allowed'
+  | 'repository_mismatch'
+  | 'invalid_upstream_request'
+  | 'source_unavailable'
+  | 'identity_mismatch';
+export type RedeemGitHubSessionCapabilityResult =
+  | RedeemGitHubSessionCapabilitySuccess
+  | { success: false; reason: RedeemGitHubSessionCapabilityFailureReason };
+
+export type IssueGitLabSessionCapabilityParams = GetGitLabTokenParams & {
+  gitUrl: string;
+};
+export type IssueGitLabSessionCapabilitySuccess = {
+  success: true;
+  capability: string;
+  instanceOrigin: string;
+  instanceHost: string;
+  projectPath: string;
+  integrationId: string;
+  authType: GitLabAuthType;
+  identity: GitLabSessionIdentity;
+  source: GitLabCapabilityCredentialSource;
+  glabIsOAuth2: boolean;
+};
+export type IssueGitLabSessionCapabilityResult =
+  | IssueGitLabSessionCapabilitySuccess
+  | GetGitLabTokenFailure
+  | { success: false; reason: GitLabCloneUrlFailureReason | 'capability_configuration_error' };
+export type RedeemGitLabSessionCapabilityParams = {
+  capability: string;
+  requestMethod: string;
+  requestUrl: string;
+};
+export type RedeemGitLabSessionCapabilityFailureReason =
+  | GitLabSessionCapabilityFailureReason
+  | 'invalid_upstream_url'
+  | 'upstream_origin_not_allowed'
+  | 'repository_mismatch'
+  | 'invalid_upstream_request'
+  | 'source_unavailable'
+  | 'identity_mismatch';
+export type RedeemGitLabSessionCapabilityResult =
+  | {
+      success: true;
+      headers:
+        | { authorization: string; 'PRIVATE-TOKEN'?: never }
+        | { authorization?: never; 'PRIVATE-TOKEN': string };
+    }
+  | { success: false; reason: RedeemGitLabSessionCapabilityFailureReason };
+
 const DISCONNECT_PATH = '/internal/github-user-authorizations/disconnect';
 
 type DisconnectEnv = CloudflareEnv & {
   NEXTAUTH_SECRET: SecretsStoreSecret | string;
 };
 
-async function resolveJwtSecret(secret: SecretsStoreSecret | string): Promise<string> {
+async function resolveSecret(secret: SecretsStoreSecret | string): Promise<string> {
   return typeof secret === 'string' ? secret : secret.get();
+}
+
+function validateGitHubCapabilityUpstream(
+  requestMethod: string,
+  requestUrl: string,
+  repository: { owner: string; repo: string }
+): RedeemGitHubSessionCapabilityFailureReason | null {
+  let url: URL;
+  try {
+    url = new URL(requestUrl);
+  } catch {
+    return 'invalid_upstream_url';
+  }
+  if (url.protocol !== 'https:') return 'invalid_upstream_url';
+  if (url.username || url.password) return 'invalid_upstream_url';
+  const method = requestMethod.toUpperCase();
+  if (url.hostname === 'api.github.com' && url.port === '') {
+    return ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD'].includes(method)
+      ? null
+      : 'invalid_upstream_request';
+  }
+  if (url.hostname !== 'github.com' || url.port !== '') return 'upstream_host_not_allowed';
+
+  const repositoryPath = `/${repository.owner}/${repository.repo}.git`;
+  const path = url.pathname.toLowerCase();
+  if (!path.startsWith(`/${repository.owner}/${repository.repo}`)) return 'repository_mismatch';
+
+  if (method === 'GET' && path === `${repositoryPath}/info/refs`) {
+    const entries = [...url.searchParams.entries()];
+    const service = url.searchParams.get('service');
+    if (entries.length === 1 && (service === 'git-upload-pack' || service === 'git-receive-pack')) {
+      return null;
+    }
+  }
+  if (
+    method === 'POST' &&
+    url.search === '' &&
+    (path === `${repositoryPath}/git-upload-pack` ||
+      path === `${repositoryPath}/git-receive-pack` ||
+      path === `${repositoryPath}/info/lfs/objects/batch` ||
+      path === `${repositoryPath}/info/lfs/locks/verify`)
+  ) {
+    return null;
+  }
+  return 'invalid_upstream_request';
+}
+
+function validateGitLabCapabilityUpstream(
+  requestMethod: string,
+  requestUrl: string,
+  session: { instanceOrigin: string; projectPath: string }
+): { failure: RedeemGitLabSessionCapabilityFailureReason | null; authSurface: 'git' | 'api' } {
+  if (/%2f|%5c/i.test(requestUrl) || /\/(?:(?:\.|%2e){1,2})(?:\/|$)/i.test(requestUrl)) {
+    return { failure: 'invalid_upstream_url', authSurface: 'git' };
+  }
+  let url: URL;
+  try {
+    url = new URL(requestUrl);
+  } catch {
+    return { failure: 'invalid_upstream_url', authSurface: 'git' };
+  }
+  if (
+    url.protocol !== 'https:' ||
+    url.username ||
+    url.password ||
+    url.port !== '' ||
+    url.hash ||
+    url.origin !== session.instanceOrigin
+  ) {
+    return {
+      failure:
+        url.origin !== session.instanceOrigin
+          ? 'upstream_origin_not_allowed'
+          : 'invalid_upstream_url',
+      authSurface: 'git',
+    };
+  }
+  const method = requestMethod.toUpperCase();
+  if (url.pathname === '/api/graphql' || url.pathname.startsWith('/api/v4/')) {
+    return {
+      failure: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD'].includes(method)
+        ? null
+        : 'invalid_upstream_request',
+      authSurface: 'api',
+    };
+  }
+
+  const repositoryPath = `/${session.projectPath}.git`;
+  if (method === 'GET' && url.pathname === `${repositoryPath}/info/refs`) {
+    const entries = [...url.searchParams.entries()];
+    const service = url.searchParams.get('service');
+    if (entries.length === 1 && (service === 'git-upload-pack' || service === 'git-receive-pack')) {
+      return { failure: null, authSurface: 'git' };
+    }
+  }
+  if (
+    method === 'POST' &&
+    url.search === '' &&
+    (url.pathname === `${repositoryPath}/git-upload-pack` ||
+      url.pathname === `${repositoryPath}/git-receive-pack` ||
+      url.pathname === `${repositoryPath}/info/lfs/objects/batch` ||
+      url.pathname === `${repositoryPath}/info/lfs/locks/verify`)
+  ) {
+    return { failure: null, authSurface: 'git' };
+  }
+  const repositoryPrefix = `/${session.projectPath}`;
+  return {
+    failure:
+      url.pathname.startsWith(repositoryPrefix) || !url.pathname.includes('.git/')
+        ? 'invalid_upstream_request'
+        : 'repository_mismatch',
+    authSurface: 'git',
+  };
 }
 
 export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
@@ -252,6 +460,141 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
     };
   }
 
+  async issueGitHubSessionCapability(
+    params: IssueGitHubSessionCapabilityParams
+  ): Promise<IssueGitHubSessionCapabilityResult> {
+    const repository = normalizeGitHubRepository(params.githubRepo);
+    if (!repository) return { success: false, reason: 'invalid_repo_format' };
+
+    const auth = await this.getCloudAgentAuthForRepo({
+      ...params,
+      githubRepo: `${repository.owner}/${repository.repo}`,
+    });
+    if (!auth.success) return auth;
+
+    let capability: string;
+    try {
+      const encryptionKey = await resolveSecret(this.env.SCM_SESSION_CAPABILITY_ENCRYPTION_KEY);
+      capability = new GitHubSessionCapabilityCodec(encryptionKey).issue({
+        userId: params.userId,
+        ...(params.orgId !== undefined ? { orgId: params.orgId } : {}),
+        ...repository,
+        source: auth.source,
+        identity: this.getSessionIdentity(auth),
+      });
+    } catch {
+      return { success: false, reason: 'capability_configuration_error' };
+    }
+    return {
+      success: true,
+      capability,
+      installationId: auth.installationId,
+      accountLogin: auth.accountLogin,
+      appType: auth.appType,
+      source: auth.source,
+      gitAuthor: auth.gitAuthor,
+      ...(auth.commitCoAuthor !== undefined ? { commitCoAuthor: auth.commitCoAuthor } : {}),
+      ...(auth.fallbackReason !== undefined ? { fallbackReason: auth.fallbackReason } : {}),
+    };
+  }
+
+  async redeemGitHubSessionCapability(
+    params: RedeemGitHubSessionCapabilityParams
+  ): Promise<RedeemGitHubSessionCapabilityResult> {
+    let claims;
+    try {
+      const encryptionKey = await resolveSecret(this.env.SCM_SESSION_CAPABILITY_ENCRYPTION_KEY);
+      claims = new GitHubSessionCapabilityCodec(encryptionKey).decode(params.capability);
+    } catch (error) {
+      if (error instanceof GitHubSessionCapabilityError) {
+        return { success: false, reason: error.reason };
+      }
+      return { success: false, reason: 'capability_configuration_error' };
+    }
+
+    const upstreamFailure = validateGitHubCapabilityUpstream(
+      params.requestMethod,
+      params.requestUrl,
+      claims
+    );
+    if (upstreamFailure) return { success: false, reason: upstreamFailure };
+
+    const authParams = {
+      userId: claims.userId,
+      ...(claims.orgId !== undefined ? { orgId: claims.orgId } : {}),
+      githubRepo: `${claims.owner}/${claims.repo}`,
+    };
+    let auth: GetCloudAgentAuthForRepoResult | null;
+    if (claims.source === 'user') {
+      auth = await this.redeemPinnedUserAuthorization(authParams);
+    } else {
+      try {
+        auth = await this.getCloudAgentAuthForRepo(authParams);
+      } catch {
+        return { success: false, reason: 'source_unavailable' };
+      }
+    }
+    if (!auth || !auth.success || auth.source !== claims.source) {
+      return { success: false, reason: 'source_unavailable' };
+    }
+    if (!this.matchesSessionIdentity(claims.identity, auth)) {
+      return { success: false, reason: 'identity_mismatch' };
+    }
+    return {
+      success: true,
+      authorization: this.formatUpstreamAuthorization(params.requestUrl, auth.githubToken),
+    };
+  }
+
+  private getSessionIdentity(auth: GetCloudAgentAuthForRepoSuccess): GitHubSessionIdentity {
+    return {
+      installationId: auth.installationId,
+      accountLogin: auth.accountLogin,
+      appType: auth.appType,
+      gitAuthor: auth.gitAuthor,
+      ...(auth.commitCoAuthor !== undefined ? { commitCoAuthor: auth.commitCoAuthor } : {}),
+    };
+  }
+
+  private matchesSessionIdentity(
+    issuedIdentity: GitHubSessionIdentity,
+    auth: GetCloudAgentAuthForRepoSuccess
+  ): boolean {
+    return JSON.stringify(issuedIdentity) === JSON.stringify(this.getSessionIdentity(auth));
+  }
+
+  private formatUpstreamAuthorization(requestUrl: string, token: string): string {
+    return new URL(requestUrl).hostname === 'github.com'
+      ? `Basic ${Buffer.from(`x-access-token:${token}`).toString('base64')}`
+      : `Bearer ${token}`;
+  }
+
+  private async redeemPinnedUserAuthorization(
+    params: GetTokenForRepoParams
+  ): Promise<GetCloudAgentAuthForRepoSuccess | null> {
+    const installation =
+      await this.installationLookupService.findManagedInstallationForRepo(params);
+    if (!installation.success || installation.githubAppType === 'lite') return null;
+    if (
+      installation.permissions?.contents !== 'write' ||
+      installation.permissions?.pull_requests !== 'write'
+    ) {
+      return null;
+    }
+    const selection = await this.githubUserAuthorizationService.selectUserAuthorization(params);
+    if (!selection.selected) return null;
+    return {
+      success: true,
+      githubToken: selection.token,
+      installationId: installation.installationId,
+      accountLogin: installation.accountLogin,
+      appType: installation.githubAppType,
+      source: 'user',
+      gitAuthor: selection.gitAuthor,
+      commitCoAuthor: this.getInstallationAuthor(installation.githubAppType),
+    };
+  }
+
   private getInstallationAuthor(appType: GitHubAppType): GitAuthorConfig {
     const slug =
       appType === 'lite'
@@ -295,6 +638,150 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
       tokenService: this.gitlabTokenService,
     });
   }
+
+  async issueGitLabSessionCapability(
+    params: IssueGitLabSessionCapabilityParams
+  ): Promise<IssueGitLabSessionCapabilityResult> {
+    const runtimeToken = await resolveGitLabRuntimeToken(
+      { ...params, repositoryUrl: params.gitUrl },
+      {
+        lookupService: this.gitlabLookupService,
+        tokenService: this.gitlabTokenService,
+      }
+    );
+    if (!runtimeToken.success) return runtimeToken;
+
+    const integration = await this.gitlabLookupService.findGitLabIntegration(
+      params,
+      runtimeToken.integrationId
+    );
+    if (!integration.success) return integration;
+    const authType = this.getGitLabAuthType(integration);
+    if (!authType) return { success: false, reason: 'no_token' };
+    const instanceOrigin = normalizeGitLabInstanceOrigin(runtimeToken.instanceUrl);
+    if (!instanceOrigin) return { success: false, reason: 'unsupported_gitlab_instance' };
+    const repository = parseGitLabCloneUrl(params.gitUrl, instanceOrigin);
+    if (!repository.success) return repository;
+    const identity = this.getGitLabSessionIdentity(integration);
+    if (!identity) return { success: false, reason: 'no_token' };
+
+    let capability: string;
+    try {
+      const encryptionKey = await resolveSecret(this.env.SCM_SESSION_CAPABILITY_ENCRYPTION_KEY);
+      capability = new GitLabSessionCapabilityCodec(encryptionKey).issue({
+        userId: params.userId,
+        ...(params.orgId !== undefined ? { orgId: params.orgId } : {}),
+        integrationId: integration.integrationId,
+        instanceOrigin: repository.instanceOrigin,
+        projectPath: repository.projectPath,
+        authType,
+        identity,
+        source: runtimeToken.source,
+      });
+    } catch {
+      return { success: false, reason: 'capability_configuration_error' };
+    }
+    return {
+      success: true,
+      capability,
+      instanceOrigin: repository.instanceOrigin,
+      instanceHost: repository.instanceHost,
+      projectPath: repository.projectPath,
+      integrationId: integration.integrationId,
+      authType,
+      identity,
+      source: runtimeToken.source,
+      glabIsOAuth2: runtimeToken.glabIsOAuth2,
+    };
+  }
+
+  async redeemGitLabSessionCapability(
+    params: RedeemGitLabSessionCapabilityParams
+  ): Promise<RedeemGitLabSessionCapabilityResult> {
+    let claims;
+    try {
+      const encryptionKey = await resolveSecret(this.env.SCM_SESSION_CAPABILITY_ENCRYPTION_KEY);
+      claims = new GitLabSessionCapabilityCodec(encryptionKey).decode(params.capability);
+    } catch (error) {
+      if (error instanceof GitLabSessionCapabilityError) {
+        return { success: false, reason: error.reason };
+      }
+      return { success: false, reason: 'capability_configuration_error' };
+    }
+
+    const upstream = validateGitLabCapabilityUpstream(
+      params.requestMethod,
+      params.requestUrl,
+      claims
+    );
+    if (upstream.failure) return { success: false, reason: upstream.failure };
+    const context = {
+      userId: claims.userId,
+      ...(claims.orgId !== undefined ? { orgId: claims.orgId } : {}),
+    };
+    const integration = await this.gitlabLookupService.findGitLabIntegration(
+      context,
+      claims.integrationId
+    );
+    if (!integration.success) return { success: false, reason: 'source_unavailable' };
+    const authType = this.getGitLabAuthType(integration);
+    const identity = this.getGitLabSessionIdentity(integration);
+    if (
+      authType !== claims.authType ||
+      !identity ||
+      JSON.stringify(identity) !== JSON.stringify(claims.identity)
+    ) {
+      return { success: false, reason: 'identity_mismatch' };
+    }
+    const currentInstanceOrigin = normalizeGitLabInstanceOrigin(
+      integration.metadata.gitlab_instance_url ?? 'https://gitlab.com'
+    );
+    if (currentInstanceOrigin !== claims.instanceOrigin) {
+      return { success: false, reason: 'identity_mismatch' };
+    }
+
+    let token: string;
+    if (claims.source.type === 'integration') {
+      const integrationToken = await this.gitlabTokenService.getToken(
+        integration.integrationId,
+        integration.metadata
+      );
+      if (!integrationToken.success) return { success: false, reason: 'source_unavailable' };
+      token = integrationToken.token;
+    } else {
+      const projectToken = integration.metadata.project_tokens?.[String(claims.source.projectId)];
+      if (!projectToken) return { success: false, reason: 'source_unavailable' };
+      const currentTokenDigest = await sha256Digest(projectToken.token);
+      if (!timingSafeEqual(currentTokenDigest, claims.source.tokenDigest)) {
+        return { success: false, reason: 'source_unavailable' };
+      }
+      token = projectToken.token;
+    }
+
+    if (upstream.authSurface === 'git') {
+      return {
+        success: true,
+        headers: { authorization: `Basic ${Buffer.from(`oauth2:${token}`).toString('base64')}` },
+      };
+    }
+    if (claims.source.type === 'project') {
+      return { success: true, headers: { 'PRIVATE-TOKEN': token } };
+    }
+    return { success: true, headers: { authorization: `Bearer ${token}` } };
+  }
+
+  private getGitLabAuthType(integration: GitLabLookupSuccess): GitLabAuthType | null {
+    if (integration.metadata.auth_type) return integration.metadata.auth_type;
+    if (integration.integrationType === 'oauth' || integration.integrationType === 'pat') {
+      return integration.integrationType;
+    }
+    return null;
+  }
+
+  private getGitLabSessionIdentity(integration: GitLabLookupSuccess): GitLabSessionIdentity | null {
+    if (integration.accountId === null && integration.accountLogin === null) return null;
+    return { accountId: integration.accountId, accountLogin: integration.accountLogin };
+  }
 }
 
 export default {
@@ -308,7 +795,7 @@ export default {
 
     let secret: string;
     try {
-      secret = await resolveJwtSecret(env.NEXTAUTH_SECRET);
+      secret = await resolveSecret(env.NEXTAUTH_SECRET);
     } catch {
       return Response.json({ error: 'authentication_unavailable' }, { status: 503 });
     }

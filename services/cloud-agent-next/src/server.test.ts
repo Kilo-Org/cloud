@@ -1,16 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import jwt from 'jsonwebtoken';
 import type { Env } from './types.js';
-import { WRAPPER_VERSION } from './shared/wrapper-version.js';
 
 const {
-  getSandboxMock,
-  findWrapperForSessionMock,
+  getRunningTerminalClientMock,
   consumeCloudAgentReportBatchMock,
   removeExpiredCloudAgentReportDataMock,
 } = vi.hoisted(() => ({
-  getSandboxMock: vi.fn(),
-  findWrapperForSessionMock: vi.fn(),
+  getRunningTerminalClientMock: vi.fn(),
   consumeCloudAgentReportBatchMock: vi.fn().mockResolvedValue(undefined),
   removeExpiredCloudAgentReportDataMock: vi.fn().mockResolvedValue(undefined),
 }));
@@ -33,11 +30,13 @@ vi.mock('./logger.js', () => {
 
 vi.mock('@cloudflare/sandbox', () => ({
   Sandbox: class Sandbox {},
-  getSandbox: getSandboxMock,
+  getSandbox: vi.fn(),
 }));
 
-vi.mock('./kilo/wrapper-manager.js', () => ({
-  findWrapperForSession: findWrapperForSessionMock,
+vi.mock('./agent-sandbox/factory.js', () => ({
+  createAgentSandbox: vi.fn(() => ({
+    getRunningTerminalClient: getRunningTerminalClientMock,
+  })),
 }));
 
 vi.mock('./router.js', () => ({
@@ -102,8 +101,7 @@ function fetchWorker(request: Request, env: MockEnv): Promise<Response> | Respon
 }
 
 beforeEach(() => {
-  getSandboxMock.mockReset();
-  findWrapperForSessionMock.mockReset();
+  getRunningTerminalClientMock.mockReset();
   consumeCloudAgentReportBatchMock.mockClear();
   removeExpiredCloudAgentReportDataMock.mockClear();
 });
@@ -216,18 +214,11 @@ describe('server /terminal', () => {
       },
     };
     const terminalResponse = new Response('proxied', { status: 200 });
-    const wsConnect = vi.fn().mockResolvedValueOnce(terminalResponse);
-    const containerFetch = vi.fn().mockResolvedValueOnce(
-      Response.json({
-        healthy: true,
-        state: 'idle',
-        version: WRAPPER_VERSION,
-        sessionId: 'session-1',
-      })
-    );
-    const sandbox = { containerFetch, wsConnect };
-    getSandboxMock.mockReturnValue(sandbox);
-    findWrapperForSessionMock.mockResolvedValue({ port: 59954 });
+    const connectTerminal = vi.fn().mockResolvedValueOnce(terminalResponse);
+    getRunningTerminalClientMock.mockResolvedValue({
+      status: 'ready',
+      client: { connectTerminal },
+    });
     const getMetadata = vi.fn().mockResolvedValue(metadata);
     const fetch = vi.fn();
     env.CLOUD_AGENT_SESSION.idFromName.mockReturnValue('do-id');
@@ -246,19 +237,8 @@ describe('server /terminal', () => {
     expect(env.CLOUD_AGENT_SESSION.idFromName).toHaveBeenCalledWith('user-1:session-1');
     expect(getMetadata).toHaveBeenCalledTimes(1);
     expect(fetch).not.toHaveBeenCalled();
-    expect(getSandboxMock).toHaveBeenCalledWith(env.Sandbox, sandboxId, expect.any(Object));
-    expect(findWrapperForSessionMock).toHaveBeenCalledWith(sandbox, 'session-1');
-    expect(containerFetch).toHaveBeenCalledTimes(1);
-    expect(containerFetch.mock.calls[0]).toEqual([
-      'http://container/health',
-      { method: 'GET', headers: { 'Content-Type': 'application/json' } },
-      59954,
-    ]);
-    expect(wsConnect).toHaveBeenCalledTimes(1);
-    const connectRequest = wsConnect.mock.calls[0]?.[0];
-    expect(connectRequest).toBeInstanceOf(Request);
-    expect(new URL((connectRequest as Request).url).pathname).toBe('/pty/pty_123/connect');
-    expect(wsConnect.mock.calls[0]?.[1]).toBe(59954);
+    expect(getRunningTerminalClientMock).toHaveBeenCalledOnce();
+    expect(connectTerminal).toHaveBeenCalledWith('pty_123', request);
   });
 
   it('rejects stream-purpose tickets', async () => {

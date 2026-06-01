@@ -106,7 +106,13 @@ async function seedAssistantMessageWithParent(
 describe('message terminalization and stream events', () => {
   beforeEach(async () => {
     const ids = await listDurableObjectIds(env.CLOUD_AGENT_SESSION);
-    await Promise.all(ids.map(id => env.CLOUD_AGENT_SESSION.get(id).deleteSession()));
+    await Promise.all(
+      ids.map(id =>
+        runInDurableObject(env.CLOUD_AGENT_SESSION.get(id), instance =>
+          instance.ctx.storage.deleteAll()
+        )
+      )
+    );
   });
 
   it('alarm repairs terminal effects without duplicating a durable terminal event', async () => {

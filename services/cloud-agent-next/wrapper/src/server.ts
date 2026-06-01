@@ -40,6 +40,9 @@ export type ServerConfig = {
   agentSessionId: string;
   /** Stable Cloud Agent user ID, passed at wrapper startup */
   userId: string;
+  /** Stable physical wrapper identity, present after leased startup. */
+  wrapperInstanceId?: string;
+  wrapperInstanceGeneration?: number;
   /** Product surface that created the session, e.g. code-review. */
   platform?: string;
 };
@@ -298,6 +301,10 @@ function createHealthHandler(config: ServerConfig, state: WrapperState) {
       state: state.isActive ? 'active' : 'idle',
       version: config.version,
       sessionId: config.sessionId,
+      ...(config.wrapperInstanceId ? { wrapperInstanceId: config.wrapperInstanceId } : {}),
+      ...(config.wrapperInstanceGeneration !== undefined
+        ? { wrapperInstanceGeneration: config.wrapperInstanceGeneration }
+        : {}),
       pendingMessages: state.pendingMessageIds.length,
     });
   };

@@ -21,19 +21,32 @@ export type AutoAnalysisEligibilityDecision = {
 
 const LOW_SEVERITY_RANK = 3;
 
+const SEVERITY_RANKS = {
+  critical: 0,
+  high: 1,
+  medium: 2,
+  low: LOW_SEVERITY_RANK,
+} as const satisfies Record<string, AutoAnalysisSeverityRank>;
+
+type KnownSeverity = keyof typeof SEVERITY_RANKS;
+
+const MIN_SEVERITY_MAX_RANKS = {
+  critical: SEVERITY_RANKS.critical,
+  high: SEVERITY_RANKS.high,
+  medium: SEVERITY_RANKS.medium,
+  all: LOW_SEVERITY_RANK,
+} as const satisfies Record<AutoAnalysisMinSeverity, AutoAnalysisSeverityRank>;
+
+function isKnownSeverity(severity: string): severity is KnownSeverity {
+  return severity in SEVERITY_RANKS;
+}
+
 function getSeverityRank(severity: string | null): AutoAnalysisSeverityRank | null {
-  if (severity === 'critical') return 0;
-  if (severity === 'high') return 1;
-  if (severity === 'medium') return 2;
-  if (severity === 'low') return LOW_SEVERITY_RANK;
-  return null;
+  return severity && isKnownSeverity(severity) ? SEVERITY_RANKS[severity] : null;
 }
 
 function getMaxSeverityRank(minSeverity: AutoAnalysisMinSeverity): AutoAnalysisSeverityRank {
-  if (minSeverity === 'critical') return 0;
-  if (minSeverity === 'high') return 1;
-  if (minSeverity === 'medium') return 2;
-  return LOW_SEVERITY_RANK;
+  return MIN_SEVERITY_MAX_RANKS[minSeverity];
 }
 
 export function decideAutoAnalysisEligibility(

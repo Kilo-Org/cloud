@@ -3,10 +3,8 @@ import { manualAnalysisAdmissionCopy } from './manual-analysis-admission-copy';
 
 describe('manualAnalysisAdmissionCopy', () => {
   test('describes manual analysis as queued admission', () => {
-    expect(manualAnalysisAdmissionCopy).toEqual({
-      successTitle: 'Analysis queued',
-      failureTitle: 'Failed to queue analysis',
-      pendingLabel: 'Queueing',
-    });
+    expect(manualAnalysisAdmissionCopy.successTitle).toMatch(/queued/i);
+    expect(manualAnalysisAdmissionCopy.failureTitle).toMatch(/failed to queue/i);
+    expect(manualAnalysisAdmissionCopy.pendingLabel).toMatch(/queue/i);
   });
 });

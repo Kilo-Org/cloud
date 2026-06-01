@@ -135,10 +135,6 @@ function jsonResponse(body: unknown, status = 200): Response {
   });
 }
 
-function workerRouteEnabled(value: string | undefined): boolean {
-  return value !== 'false';
-}
-
 const QUEUE_SEND_BATCH_LIMIT = 100;
 
 function createOwnerKey(owner: SecuritySyncMessage['owner']): string {
@@ -343,7 +339,7 @@ export default {
     }
 
     if (request.method === 'POST' && url.pathname === '/internal/manual-sync') {
-      if (!workerRouteEnabled(env.MANUAL_SYNC_COMMAND_ROUTING_ENABLED)) {
+      if (env.MANUAL_SYNC_COMMAND_ROUTING_ENABLED === 'false') {
         return jsonResponse(
           { success: false, error: 'Manual sync Worker routing is disabled' },
           503
@@ -378,7 +374,7 @@ export default {
     }
 
     if (request.method === 'POST' && url.pathname === '/internal/dismiss-finding') {
-      if (!workerRouteEnabled(env.DISMISS_FINDING_COMMAND_ROUTING_ENABLED)) {
+      if (env.DISMISS_FINDING_COMMAND_ROUTING_ENABLED === 'false') {
         return jsonResponse(
           { success: false, error: 'Finding dismissal Worker routing is disabled' },
           503

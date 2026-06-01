@@ -34,10 +34,6 @@ async function timingSafeEqual(a: string, b: string): Promise<boolean> {
   return nodeTSE(new Uint8Array(digestA), new Uint8Array(digestB));
 }
 
-function workerRouteEnabled(value: string | undefined): boolean {
-  return value !== 'false';
-}
-
 async function handleFetch(request: Request, env: CloudflareEnv): Promise<Response> {
   const url = new URL(request.url);
 
@@ -65,7 +61,7 @@ async function handleFetch(request: Request, env: CloudflareEnv): Promise<Respon
   }
 
   if (request.method === 'POST' && url.pathname === '/internal/manual-analysis-start') {
-    if (!workerRouteEnabled(env.MANUAL_ANALYSIS_COMMAND_ROUTING_ENABLED)) {
+    if (env.MANUAL_ANALYSIS_COMMAND_ROUTING_ENABLED === 'false') {
       return Response.json(
         { error: 'Manual analysis Worker routing is disabled' },
         { status: 503 }
@@ -98,7 +94,7 @@ async function handleFetch(request: Request, env: CloudflareEnv): Promise<Respon
     /^\/internal\/security-analysis-callback\/([0-9a-fA-F-]+)$/
   );
   if (request.method === 'POST' && callbackMatch) {
-    if (!workerRouteEnabled(env.SECURITY_ANALYSIS_CALLBACK_WORKER_INGRESS_ENABLED)) {
+    if (env.SECURITY_ANALYSIS_CALLBACK_WORKER_INGRESS_ENABLED === 'false') {
       return Response.json(
         { error: 'Security analysis Worker callback ingress is disabled' },
         { status: 503 }

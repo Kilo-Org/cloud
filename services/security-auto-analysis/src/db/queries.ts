@@ -59,6 +59,7 @@ export function parseSecurityConfig(config: unknown): SecurityAgentConfig {
     ...parsed.data,
   };
 
+  // Preserve legacy unified model fallback instead of masking it with split model defaults.
   if (parsed.data.model_slug !== undefined) {
     if (parsed.data.triage_model_slug === undefined) {
       resolvedConfig.triage_model_slug = undefined;

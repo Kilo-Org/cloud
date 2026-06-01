@@ -12,7 +12,7 @@ import { postMessageAsUser } from '../services/post-message-as-user';
  */
 export function registerInternalRoutes(app: Hono<{ Bindings: Env; Variables: AuthContext }>) {
   app.post('/internal/v1/post-message-as-user', async c => {
-    const raw = await c.req.json().catch(() => null);
+    const raw: unknown = await c.req.json().catch(() => null);
     const parsed = postMessageAsUserParamsSchema.safeParse(raw);
     if (!parsed.success) {
       return c.json({ ok: false, code: 'invalid_request', error: parsed.error.message }, 400);

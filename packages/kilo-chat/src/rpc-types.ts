@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { messageTextSchema } from './schemas';
 
 // Cross-service RPC contracts exposed by the kilo-chat WorkerEntrypoint.
 //
@@ -34,7 +35,9 @@ export const postMessageAsUserCorrelationSchema = z.object({
 export const postMessageAsUserParamsSchema = z.object({
   userId: z.string().min(1).max(200),
   sandboxId: z.string().min(1).max(200),
-  message: z.string().min(1),
+  // Shared with `textBlockSchema` (the message-creation boundary) so the HTTP
+  // boundary and the service can't drift: trimmed, non-empty, ≤ 8000 chars.
+  message: messageTextSchema,
   // Origin identifier for diagnostics (e.g. "webhook", "onboarding-warmup").
   // Logged so structured-log queries can attribute new conversations to a
   // specific source.

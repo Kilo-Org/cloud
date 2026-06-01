@@ -229,7 +229,10 @@ describe('rewriteFreeModelResponse_Messages', () => {
     const sse = await readOutputStream(result);
     const events = dataObjects(sse) as Array<{
       type: string;
-      message?: { model: string; usage: { cost?: number; is_byok?: boolean; input_tokens: number } };
+      message?: {
+        model: string;
+        usage: { cost?: number; is_byok?: boolean; input_tokens: number };
+      };
       usage?: { cost?: number; is_byok?: boolean; output_tokens: number };
     }>;
 
@@ -284,7 +287,11 @@ describe('rewriteFreeModelResponse_Responses', () => {
       type: string;
       response: {
         model: string;
-        usage: { cost?: number; is_byok?: boolean; prompt_tokens_details: { cached_tokens: number } };
+        usage: {
+          cost?: number;
+          is_byok?: boolean;
+          prompt_tokens_details: { cached_tokens: number };
+        };
       };
     }>;
 

@@ -1,6 +1,6 @@
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 import { shouldRouteToVercel } from '@/lib/ai-gateway/providers/vercel';
-import { isKiloExclusiveModel, kiloExclusiveModels } from '@/lib/ai-gateway/models';
+import { findKiloExclusiveModel, isKiloExclusiveModel } from '@/lib/ai-gateway/models';
 import {
   getBYOKforOrganization,
   getBYOKforUser,
@@ -45,14 +45,6 @@ export type GetProviderProviderResult = {
    *  by direct-byok and custom_llm2 because both already require explicit
    *  admin opt-in. */
   bypassAccessCheck: boolean;
-  /** Skip pinning `body.provider` from the organization-determined config.
-   *  Set for direct experiment upstreams where the partner endpoint is
-   *  selected by the variant, not by gateway routing. */
-  skipProviderPin?: boolean;
-  /** Skip the kilo-exclusive `internal_id` rewrite + provider pin in
-   *  `applyProviderSpecificLogic`. Generic provider-specific request fixes
-   *  and `provider.transformRequest` still run. */
-  skipKiloExclusiveModelSettings?: boolean;
   /** Present when this provider was resolved through a model experiment. */
   experiment?: ExperimentRouting;
 };
@@ -188,11 +180,18 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
     };
   }
 
+  const kiloExclusiveModel = findKiloExclusiveModel(requestedModel);
+
   // Model experiment routing for dedicated preview public ids. Runs before
   // `kilo-internal/...` and the `kiloExclusiveModels` lookup so an
   // experimented public id never falls through to OpenRouter/Vercel.
   const experimented = await isPublicIdExperimented(requestedModel);
   if (experimented === true) {
+    if (kiloExclusiveModel) {
+      throw new Error(
+        `Configuration error: ${requestedModel} cannot be both an experiment and a Kilo-exclusive model`
+      );
+    }
     const userId = isAnonymousContext(user) ? null : user.id;
     const selection = await pickModelExperimentVariant({
       publicModelId: requestedModel,
@@ -212,8 +211,6 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
         provider: buildDirectProvider(selection.upstream),
         userByok: null,
         bypassAccessCheck: false,
-        skipProviderPin: true,
-        skipKiloExclusiveModelSettings: true,
         experiment: {
           experimentId: selection.experimentId,
           variantId: selection.variantId,
@@ -233,7 +230,6 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
     }
   }
 
-  const kiloExclusiveModel = kiloExclusiveModels.find(m => m.public_id === requestedModel);
   const eligibleForVercelRouting =
     !kiloExclusiveModel || kiloExclusiveModel.flags.includes('vercel-routing');
 

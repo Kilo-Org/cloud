@@ -52,6 +52,8 @@ const SyncConfigRequest = z.object({
   envVars: z.record(z.string(), z.string()).optional(),
 });
 
+const CONFIG_SYNC_ENV_KEYS_PRESERVE_WHEN_ABSENT = new Set(['GASTOWN_API_URL']);
+
 // Last-known-good town config. Updated on every request that carries the header.
 // Used as a fallback by code that runs outside a request context (e.g. background tasks).
 let lastKnownTownConfig: Record<string, unknown> | null = null;
@@ -77,6 +79,7 @@ export function getLastAppliedEnvVarKeys(): Set<string> {
 function syncTownConfigToProcessEnv(envVars?: Record<string, string>): void {
   if (envVars) {
     for (const key of CONFIG_SYNC_ENV_KEYS) {
+      if (CONFIG_SYNC_ENV_KEYS_PRESERVE_WHEN_ABSENT.has(key)) continue;
       if (!(key in envVars)) delete process.env[key];
     }
     for (const [key, value] of Object.entries(envVars)) {

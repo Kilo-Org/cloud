@@ -25,9 +25,6 @@ type RawPayload = {
   title: string;
   description: string;
   prompt: string;
-  tagline?: string;
-  category?: string;
-  tags?: string[];
   signature?: string;
   signatureKeyId?: string;
   signedAt?: string;

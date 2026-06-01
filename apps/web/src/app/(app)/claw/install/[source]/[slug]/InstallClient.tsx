@@ -65,9 +65,6 @@ export function InstallClient({ source, sourceLabel, payload }: InstallClientPro
     <div className="mx-auto flex min-h-[60vh] max-w-xl flex-col items-center justify-center gap-4 px-6 py-12 text-center">
       <p className="text-muted-foreground text-sm tracking-wide uppercase">{sourceLabel}</p>
       <h1 className="text-2xl font-semibold">{payload.title}</h1>
-      {payload.tagline ? (
-        <p className="text-muted-foreground text-base">{payload.tagline}</p>
-      ) : null}
       <p className="text-muted-foreground text-sm">{payload.description}</p>
       <Button type="button" onClick={onInstall} disabled={busy} className="mt-2">
         {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}

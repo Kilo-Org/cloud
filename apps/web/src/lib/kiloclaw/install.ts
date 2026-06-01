@@ -27,6 +27,14 @@ const MAX_SIGNATURE_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 // serverless render.
 const MAX_RESPONSE_BYTES = 256 * 1024;
 
+// IMPORTANT: this schema intentionally contains ONLY fields that are covered
+// by the Ed25519 signature (slug/title/description/prompt — see
+// `canonicalEnvelopeString`) plus the signature metadata itself. Marketing-
+// only fields the signer leaves unsigned (tagline, category, tags, body,
+// ratings, …) are deliberately NOT modelled here: Zod strips them on parse,
+// so it is impossible to render unsigned, tamperable content in the install
+// preview. Do not add an unsigned field here without also adding it to the
+// signed envelope on both the signer (kilocode-landing) and the verifier.
 const installPayloadSchema = z.object({
   slug: z.string().min(1).max(200),
   title: z.string().max(500),
@@ -35,9 +43,6 @@ const installPayloadSchema = z.object({
   // signed payload can't pass install verification only to fail downstream
   // as `invalid_request` when kilo-chat enforces its per-text-block limit.
   prompt: z.string().min(1).max(MESSAGE_TEXT_MAX_CHARS),
-  tagline: z.string().max(500).optional(),
-  category: z.string().max(100).optional(),
-  tags: z.array(z.string().max(100)).max(50).optional(),
   // Signature fields. All four are required — an unsigned payload fails
   // Zod parsing before reaching the crypto verify step.
   signature: z.string().min(1).max(200), // base64 Ed25519 sig (~88 chars)

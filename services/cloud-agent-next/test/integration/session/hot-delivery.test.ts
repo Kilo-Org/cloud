@@ -21,7 +21,10 @@ import {
   putSessionMessageState,
   type SessionMessageState,
 } from '../../../src/session/session-message-state.js';
-import { allocateWrapperRuntimeState } from '../../../src/session/wrapper-runtime-state.js';
+import {
+  allocateWrapperRuntimeState,
+  recordMeaningfulWrapperOutput,
+} from '../../../src/session/wrapper-runtime-state.js';
 import type { FencedWrapperDispatchRequest } from '../../../src/execution/types.js';
 import { registerReadySession } from '../../helpers/session-setup.js';
 
@@ -47,6 +50,18 @@ describe('hot delivery — DO integration', () => {
           return { messageId: plan.turn.messageId, kiloSessionId: 'kilo_hot_test' };
         },
       };
+      (instance as any).physicalWrapperObserver = async () => ({
+        status: 'present',
+        observed: [
+          {
+            representation: 'process',
+            id: 'wrapper-hot',
+            port: 4_173,
+            instanceId: 'instance_hot',
+            instanceGeneration: 1,
+          },
+        ],
+      });
 
       await registerReadySession(instance, {
         sessionId,
@@ -61,8 +76,19 @@ describe('hot delivery — DO integration', () => {
         gitToken: 'git-token',
       });
 
-      // Simulate a warm wrapper: allocate runtime state with connection
+      // Simulate a warm, physically owned wrapper with recent output.
       const { state: wrapperState } = await allocateWrapperRuntimeState(instance.ctx.storage);
+      await instance.ctx.storage.put('wrapper_lease', {
+        state: 'owns_wrapper',
+        nextInstanceGeneration: 2,
+        instance: { instanceId: 'instance_hot', instanceGeneration: 1 },
+      });
+      await recordMeaningfulWrapperOutput(
+        instance.ctx.storage,
+        wrapperState.wrapperGeneration,
+        wrapperState.wrapperConnectionId!,
+        Date.now()
+      );
 
       // Add an accepted message so hasCurrentWrapper is true
       const acceptedMsg: SessionMessageState = {

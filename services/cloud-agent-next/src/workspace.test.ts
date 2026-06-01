@@ -41,7 +41,12 @@ import {
   LOW_DISK_THRESHOLD_MB,
   STALE_DIR_MIN_AGE_SECONDS,
 } from './workspace';
-import { WorkspaceFilesystemPreparationError } from './workspace-errors';
+import {
+  SandboxCapacityInspectionError,
+  WorkspaceCapacityAdmissionRejectedError,
+  WorkspaceCapacityInspectionUnavailableError,
+  WorkspaceFilesystemPreparationError,
+} from './workspace-errors';
 import type { ExecutionSession, SandboxInstance } from './types';
 
 describe('setupWorkspace', () => {
@@ -789,7 +794,7 @@ describe('disk space checking', () => {
       } as unknown as SandboxInstance;
     });
 
-    it('cleans up sessions with no running wrapper', async () => {
+    it('cleans up sessions with no running wrapper and reports reclamation', async () => {
       const oldMtime = String(Math.floor(Date.now() / 1000) - STALE_DIR_MIN_AGE_SECONDS - 60);
       mockSandboxExec
         .mockResolvedValueOnce({
@@ -805,9 +810,10 @@ describe('disk space checking', () => {
 
       mockListProcesses.mockResolvedValue([]);
 
-      await cleanupStaleWorkspaces(fakeSandbox, '/workspace/org/user', 'agent_current-aaaa');
+      await expect(
+        cleanupStaleWorkspaces(fakeSandbox, '/workspace/org/user', 'agent_current-aaaa')
+      ).resolves.toEqual({ cleaned: 1, skipped: 1 });
 
-      // listProcesses is called exactly once (not per session)
       expect(mockListProcesses).toHaveBeenCalledTimes(1);
 
       const execCalls = mockSandboxExec.mock.calls.map((c: string[]) => c[0]);
@@ -884,6 +890,22 @@ describe('disk space checking', () => {
       expect(mockListProcesses).not.toHaveBeenCalled();
     });
 
+    it('does not count failed removal as reclaimed workspace', async () => {
+      const oldMtime = String(Math.floor(Date.now() / 1000) - STALE_DIR_MIN_AGE_SECONDS - 60);
+      mockSandboxExec
+        .mockResolvedValueOnce({ exitCode: 0, stdout: 'agent_stale-aaaa\n', stderr: '' })
+        .mockResolvedValueOnce(dockerSocketPath)
+        .mockResolvedValueOnce(dockerPsEmpty)
+        .mockResolvedValueOnce({ exitCode: 0, stdout: `${oldMtime}\n`, stderr: '' })
+        .mockResolvedValueOnce({ exitCode: 1, stdout: '', stderr: 'rm failed' })
+        .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' });
+      mockListProcesses.mockResolvedValue([]);
+
+      await expect(
+        cleanupStaleWorkspaces(fakeSandbox, '/workspace/org/user', 'agent_current-aaaa')
+      ).resolves.toEqual({ cleaned: 0, skipped: 1 });
+    });
+
     it('continues cleaning remaining sessions when one throws', async () => {
       const oldMtime = String(Math.floor(Date.now() / 1000) - STALE_DIR_MIN_AGE_SECONDS - 60);
       mockSandboxExec
@@ -901,10 +923,9 @@ describe('disk space checking', () => {
 
       mockListProcesses.mockResolvedValue([]);
 
-      // Should not throw
       await expect(
         cleanupStaleWorkspaces(fakeSandbox, '/workspace/org/user', 'agent_current-aaaa')
-      ).resolves.toBeUndefined();
+      ).resolves.toEqual({ cleaned: 1, skipped: 1 });
 
       // listProcesses is called exactly once (not per session)
       expect(mockListProcesses).toHaveBeenCalledTimes(1);
@@ -922,10 +943,9 @@ describe('disk space checking', () => {
       });
       mockListProcesses.mockRejectedValue(new Error('sandbox unavailable'));
 
-      // Should not throw — returns early without cleaning any sessions
       await expect(
         cleanupStaleWorkspaces(fakeSandbox, '/workspace/org/user', 'agent_current-aaaa')
-      ).resolves.toBeUndefined();
+      ).resolves.toEqual({ cleaned: 0, skipped: 1 });
 
       // Only the ls call — no rm calls since listProcesses failed
       expect(mockSandboxExec).toHaveBeenCalledTimes(1);
@@ -936,7 +956,7 @@ describe('disk space checking', () => {
 
       await expect(
         cleanupStaleWorkspaces(fakeSandbox, '/workspace/org/user', 'agent_current-aaaa')
-      ).resolves.toBeUndefined();
+      ).resolves.toEqual({ cleaned: 0, skipped: 0 });
     });
 
     it('skips directory entries that do not match the agent_ session ID format', async () => {
@@ -1057,6 +1077,19 @@ describe('disk space checking', () => {
       expect(mockSandboxExec).toHaveBeenCalledTimes(4);
     });
 
+    it('skips all cleanup when devcontainer wrapper inspection fails', async () => {
+      mockSandboxExec
+        .mockResolvedValueOnce({ exitCode: 0, stdout: 'agent_unknown-cccc\n', stderr: '' })
+        .mockResolvedValueOnce(dockerSocketPath)
+        .mockResolvedValueOnce({ exitCode: 1, stdout: '', stderr: 'docker unavailable' });
+      mockListProcesses.mockResolvedValue([]);
+
+      await expect(
+        cleanupStaleWorkspaces(fakeSandbox, '/workspace/org/user', 'agent_current-aaaa')
+      ).resolves.toEqual({ cleaned: 0, skipped: 1 });
+      expect(mockSandboxExec.mock.calls.every(call => !call[0].includes('rm -rf'))).toBe(true);
+    });
+
     it('skips sessions with a wrapper running inside a dev container', async () => {
       const oldMtime = String(Math.floor(Date.now() / 1000) - STALE_DIR_MIN_AGE_SECONDS - 60);
       mockSandboxExec
@@ -1098,91 +1131,219 @@ describe('disk space checking', () => {
       } as unknown as SandboxInstance;
     });
 
-    it('runs cleanup when disk space is low', async () => {
-      const oldMtime = String(Math.floor(Date.now() / 1000) - STALE_DIR_MIN_AGE_SECONDS - 60);
-      // df returns low disk (1024 MB avail, 10000 MB total)
-      mockSandboxExec
-        .mockResolvedValueOnce({
-          exitCode: 0,
-          stdout: '1073741824  10485760000\n',
-          stderr: '',
-        }) // df (checkDiskSpace)
-        .mockResolvedValueOnce({
-          exitCode: 0,
-          stdout: 'agent_stale-1111\nagent_current-aaaa\n',
-          stderr: '',
-        }) // ls sessions/ (cleanupStaleWorkspaces)
-        .mockResolvedValueOnce({
-          exitCode: 0,
-          stdout: '/run/user/1000/docker.sock',
-          stderr: '',
-        }) // resolve Docker socket
-        .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' }) // docker ps (listWrapperContainers)
-        .mockResolvedValueOnce({ exitCode: 0, stdout: `${oldMtime}\n`, stderr: '' }) // stat agent_stale-1111
-        .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' }) // rm workspace
-        .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' }); // rm home
-
-      mockListProcesses.mockResolvedValue([]);
-
-      await checkDiskAndCleanBeforeSetup(fakeSandbox, 'org-1', 'user-1', 'agent_current-aaaa');
-
-      // df was called
-      expect(mockSandboxExec.mock.calls[0][0]).toContain('df -B1');
-      // ls was called to find sessions
-      expect(mockSandboxExec.mock.calls[1][0]).toContain('ls -1');
-      // Docker socket was resolved before docker ps.
-      expect(mockSandboxExec.mock.calls[2][0]).toContain('/run/user/1000/docker.sock');
-      // docker ps was called to find devcontainer-launched wrappers
-      expect(mockSandboxExec.mock.calls[3][0]).toContain('docker ps');
-      // stat was called for the stale session
-      expect(mockSandboxExec.mock.calls[4][0]).toContain('stat');
-      // stale session was cleaned
-      expect(mockSandboxExec.mock.calls[5][0]).toContain('agent_stale-1111');
-    });
-
-    it('skips cleanup when disk space is adequate', async () => {
-      // df returns adequate disk (5000 MB avail, 10000 MB total)
+    it('admits setup without cleanup when capacity is adequate', async () => {
       mockSandboxExec.mockResolvedValueOnce({
         exitCode: 0,
         stdout: '5242880000  10485760000\n',
         stderr: '',
       });
 
-      await checkDiskAndCleanBeforeSetup(fakeSandbox, 'org-1', 'user-1', 'agent_current-aaaa');
+      await expect(
+        checkDiskAndCleanBeforeSetup(fakeSandbox, 'org-1', 'user-1', 'agent_current-aaaa')
+      ).resolves.toEqual({
+        availableMB: 5000,
+        thresholdMB: LOW_DISK_THRESHOLD_MB,
+        cleanup: { cleaned: 0, skipped: 0 },
+      });
 
-      // Only the df call — no cleanup
       expect(mockSandboxExec).toHaveBeenCalledTimes(1);
       expect(mockListProcesses).not.toHaveBeenCalled();
     });
 
-    it('does not throw when disk check fails', async () => {
-      mockSandboxExec.mockResolvedValueOnce({
-        exitCode: 1,
-        stdout: '',
-        stderr: 'df: command not found',
-      });
-
-      // Should not throw — logs and continues
-      await expect(
-        checkDiskAndCleanBeforeSetup(fakeSandbox, 'org-1', 'user-1', 'agent_current-aaaa')
-      ).resolves.toBeUndefined();
-    });
-
-    it('does not throw when cleanup fails', async () => {
-      // df returns low disk
+    it('cleans low capacity and admits after a successful recheck', async () => {
+      const oldMtime = String(Math.floor(Date.now() / 1000) - STALE_DIR_MIN_AGE_SECONDS - 60);
       mockSandboxExec
         .mockResolvedValueOnce({
           exitCode: 0,
           stdout: '1073741824  10485760000\n',
           stderr: '',
         })
-        // ls throws
-        .mockRejectedValueOnce(new Error('exec error'));
+        .mockResolvedValueOnce({
+          exitCode: 0,
+          stdout: 'agent_stale-1111\nagent_current-aaaa\n',
+          stderr: '',
+        })
+        .mockResolvedValueOnce({ exitCode: 0, stdout: '/run/user/1000/docker.sock', stderr: '' })
+        .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' })
+        .mockResolvedValueOnce({ exitCode: 0, stdout: `${oldMtime}\n`, stderr: '' })
+        .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' })
+        .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' })
+        .mockResolvedValueOnce({
+          exitCode: 0,
+          stdout: '3145728000  10485760000\n',
+          stderr: '',
+        });
+      mockListProcesses.mockResolvedValue([]);
 
-      // Should not throw — cleanupStaleWorkspaces catches internally
       await expect(
         checkDiskAndCleanBeforeSetup(fakeSandbox, 'org-1', 'user-1', 'agent_current-aaaa')
-      ).resolves.toBeUndefined();
+      ).resolves.toEqual({
+        availableMB: 3000,
+        thresholdMB: LOW_DISK_THRESHOLD_MB,
+        cleanup: { cleaned: 1, skipped: 1 },
+      });
+
+      expect(mockSandboxExec.mock.calls[7][0]).toContain('df -B1');
+    });
+
+    it('types ENOSPC during stale cleanup as sandbox unusable instead of rechecking capacity', async () => {
+      mockSandboxExec
+        .mockResolvedValueOnce({
+          exitCode: 0,
+          stdout: '1073741824  10485760000\n',
+          stderr: '',
+        })
+        .mockRejectedValueOnce(new Error('ENOSPC: no space left on device'));
+
+      await expect(
+        checkDiskAndCleanBeforeSetup(fakeSandbox, 'org-1', 'user-1', 'agent_current-aaaa')
+      ).rejects.toBeInstanceOf(SandboxCapacityInspectionError);
+      expect(mockSandboxExec).toHaveBeenCalledTimes(2);
+    });
+
+    it('types ENOSPC returned by stale removal as sandbox unusable', async () => {
+      const oldMtime = String(Math.floor(Date.now() / 1000) - STALE_DIR_MIN_AGE_SECONDS - 60);
+      mockSandboxExec
+        .mockResolvedValueOnce({ exitCode: 0, stdout: '1073741824  10485760000\n', stderr: '' })
+        .mockResolvedValueOnce({ exitCode: 0, stdout: 'agent_stale-aaaa\n', stderr: '' })
+        .mockResolvedValueOnce({ exitCode: 0, stdout: '/run/user/1000/docker.sock', stderr: '' })
+        .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' })
+        .mockResolvedValueOnce({ exitCode: 0, stdout: `${oldMtime}\n`, stderr: '' })
+        .mockResolvedValueOnce({ exitCode: 1, stdout: '', stderr: 'No space left on device' })
+        .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' });
+      mockListProcesses.mockResolvedValue([]);
+
+      await expect(
+        checkDiskAndCleanBeforeSetup(fakeSandbox, 'org-1', 'user-1', 'agent_current-aaaa')
+      ).rejects.toBeInstanceOf(SandboxCapacityInspectionError);
+    });
+
+    it('allows ordinary cleanup inspection failure only after a safe recheck', async () => {
+      mockSandboxExec
+        .mockResolvedValueOnce({
+          exitCode: 0,
+          stdout: '1073741824  10485760000\n',
+          stderr: '',
+        })
+        .mockRejectedValueOnce(new Error('transient list sessions failure'))
+        .mockResolvedValueOnce({
+          exitCode: 0,
+          stdout: '3145728000  10485760000\n',
+          stderr: '',
+        });
+
+      await expect(
+        checkDiskAndCleanBeforeSetup(fakeSandbox, 'org-1', 'user-1', 'agent_current-aaaa')
+      ).resolves.toEqual({
+        availableMB: 3000,
+        thresholdMB: LOW_DISK_THRESHOLD_MB,
+        cleanup: { cleaned: 0, skipped: 0 },
+      });
+    });
+
+    it('rejects admission when low capacity remains after cleanup', async () => {
+      mockSandboxExec
+        .mockResolvedValueOnce({
+          exitCode: 0,
+          stdout: '1073741824  10485760000\n',
+          stderr: '',
+        })
+        .mockResolvedValueOnce({ exitCode: 1, stdout: '', stderr: 'no sessions' })
+        .mockResolvedValueOnce({
+          exitCode: 0,
+          stdout: '1572864000  10485760000\n',
+          stderr: '',
+        });
+
+      const result = checkDiskAndCleanBeforeSetup(
+        fakeSandbox,
+        'org-1',
+        'user-1',
+        'agent_current-aaaa'
+      );
+
+      await expect(result).rejects.toBeInstanceOf(WorkspaceCapacityAdmissionRejectedError);
+      await expect(result).rejects.toMatchObject({
+        availableMB: 1500,
+        thresholdMB: LOW_DISK_THRESHOLD_MB,
+        cleaned: 0,
+        skipped: 0,
+      });
+    });
+
+    it('continues to protect live sibling wrappers while rejecting unsafe admission', async () => {
+      const oldMtime = String(Math.floor(Date.now() / 1000) - STALE_DIR_MIN_AGE_SECONDS - 60);
+      mockSandboxExec
+        .mockResolvedValueOnce({ exitCode: 0, stdout: '1073741824  10485760000\n', stderr: '' })
+        .mockResolvedValueOnce({ exitCode: 0, stdout: 'agent_active-bbbb\n', stderr: '' })
+        .mockResolvedValueOnce({ exitCode: 0, stdout: '/run/user/1000/docker.sock', stderr: '' })
+        .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' })
+        .mockResolvedValueOnce({ exitCode: 0, stdout: `${oldMtime}\n`, stderr: '' })
+        .mockResolvedValueOnce({ exitCode: 0, stdout: '1073741824  10485760000\n', stderr: '' });
+      mockListProcesses.mockResolvedValue([
+        {
+          id: '1',
+          command: 'kilocode-wrapper --agent-session agent_active-bbbb WRAPPER_PORT=5001',
+          status: 'running',
+        },
+      ]);
+
+      await expect(
+        checkDiskAndCleanBeforeSetup(fakeSandbox, 'org-1', 'user-1', 'agent_current-aaaa')
+      ).rejects.toMatchObject({ skipped: 1 });
+      expect(mockSandboxExec.mock.calls.every(call => !call[0].includes('rm -rf'))).toBe(true);
+    });
+
+    it('classifies ENOSPC disk inspection failures as sandbox unusable', async () => {
+      mockSandboxExec.mockResolvedValueOnce({
+        exitCode: 1,
+        stdout: '',
+        stderr: 'cannot create temporary file: No space left on device',
+      });
+
+      await expect(
+        checkDiskAndCleanBeforeSetup(fakeSandbox, 'org-1', 'user-1', 'agent_current-aaaa')
+      ).rejects.toBeInstanceOf(SandboxCapacityInspectionError);
+    });
+
+    it('does not classify temporary-file permission failures as destructive capacity evidence', async () => {
+      mockSandboxExec.mockResolvedValueOnce({
+        exitCode: 1,
+        stdout: '',
+        stderr: 'cannot create temporary file: Permission denied',
+      });
+
+      await expect(
+        checkDiskAndCleanBeforeSetup(fakeSandbox, 'org-1', 'user-1', 'agent_current-aaaa')
+      ).rejects.toBeInstanceOf(WorkspaceCapacityInspectionUnavailableError);
+    });
+
+    it('rejects admission without destroying a shared sandbox when disk execution is transiently unavailable', async () => {
+      mockSandboxExec.mockRejectedValueOnce(new Error('execution session unavailable'));
+
+      await expect(
+        checkDiskAndCleanBeforeSetup(fakeSandbox, 'org-1', 'user-1', 'agent_current-aaaa')
+      ).rejects.toBeInstanceOf(WorkspaceCapacityInspectionUnavailableError);
+    });
+
+    it('classifies a thrown ENOSPC disk execution failure as sandbox unusable', async () => {
+      mockSandboxExec.mockRejectedValueOnce(new Error('ENOSPC: no space left on device'));
+
+      await expect(
+        checkDiskAndCleanBeforeSetup(fakeSandbox, 'org-1', 'user-1', 'agent_current-aaaa')
+      ).rejects.toBeInstanceOf(SandboxCapacityInspectionError);
+    });
+
+    it('rejects admission without infrastructure recovery when a non-ENOSPC disk check returns failure', async () => {
+      mockSandboxExec.mockResolvedValueOnce({
+        exitCode: 1,
+        stdout: '',
+        stderr: 'df: command not found',
+      });
+
+      await expect(
+        checkDiskAndCleanBeforeSetup(fakeSandbox, 'org-1', 'user-1', 'agent_current-aaaa')
+      ).rejects.toBeInstanceOf(WorkspaceCapacityInspectionUnavailableError);
     });
   });
 });

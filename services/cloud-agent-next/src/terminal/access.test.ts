@@ -1,12 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { AgentSandbox } from '../agent-sandbox/protocol.js';
 import type { CloudAgentSessionState } from '../persistence/types.js';
-import { WRAPPER_VERSION } from '../shared/wrapper-version.js';
-import type { Env, SandboxInstance } from '../types.js';
+import type { Env } from '../types.js';
 import { resolveTerminalWrapperClient, validateTerminalMetadata } from './access.js';
 
-vi.mock('@cloudflare/sandbox', () => ({
-  getSandbox: vi.fn(),
-}));
+vi.mock('@cloudflare/sandbox', () => ({ getSandbox: vi.fn() }));
 
 const baseMetadata = {
   metadataSchemaVersion: 2,
@@ -97,58 +95,61 @@ describe('validateTerminalMetadata', () => {
   });
 });
 
+function sandboxWithTerminalResult(
+  getRunningTerminalClient: AgentSandbox['getRunningTerminalClient']
+): AgentSandbox {
+  return {
+    ensureWrapper: vi.fn(),
+    discoverSessionWrappers: vi.fn(),
+    stopWrappers: vi.fn(),
+    probeHealth: vi.fn(),
+    getRunningWrapper: vi.fn(),
+    getRunningTerminalClient,
+    readWrapperLogs: vi.fn(),
+    keepAlive: vi.fn(),
+    delete: vi.fn(),
+  };
+}
+
 describe('resolveTerminalWrapperClient', () => {
-  it('returns a healthy existing wrapper client', async () => {
-    const sandbox = {} as SandboxInstance;
+  it('returns the ready terminal client from AgentSandbox', async () => {
     const client = {
-      health: vi.fn().mockResolvedValue({
-        healthy: true,
-        state: 'idle',
-        version: WRAPPER_VERSION,
-        sessionId: 'kilo-session-1',
-      }),
+      health: vi.fn(),
       createTerminal: vi.fn(),
       resizeTerminal: vi.fn(),
       closeTerminal: vi.fn(),
       connectTerminal: vi.fn(),
     };
+    const getRunningTerminalClient = vi.fn().mockResolvedValue({ status: 'ready', client });
 
     const result = await resolveTerminalWrapperClient(
       {
-        env: { PER_SESSION_SANDBOX_ORG_IDS: '' } as Env,
+        env: {} as Env,
         metadata: baseMetadata,
         sessionId: baseMetadata.identity.sessionId,
       },
       {
-        getSandboxInstance: vi.fn().mockReturnValue(sandbox),
-        findWrapperForSession: vi.fn().mockResolvedValue({ port: 5050 }),
-        createClient: vi.fn().mockReturnValue(client),
+        createSandbox: vi.fn().mockReturnValue(sandboxWithTerminalResult(getRunningTerminalClient)),
       }
     );
 
-    expect(result.success).toBe(true);
-    expect(result.data).toMatchObject({
-      client,
-      sandbox,
-      port: 5050,
-    });
-    expect(client.health).toHaveBeenCalledTimes(1);
+    expect(result).toEqual({ success: true, data: { client } });
+    expect(getRunningTerminalClient).toHaveBeenCalledOnce();
   });
 
-  it('returns unavailable when no existing wrapper process is running', async () => {
-    const findWrapperForSession = vi.fn().mockResolvedValue(null);
-    const health = vi.fn();
-
+  it('returns unavailable when no wrapper process is running', async () => {
     const result = await resolveTerminalWrapperClient(
       {
-        env: { PER_SESSION_SANDBOX_ORG_IDS: '' } as Env,
+        env: {} as Env,
         metadata: baseMetadata,
         sessionId: baseMetadata.identity.sessionId,
       },
       {
-        getSandboxInstance: vi.fn().mockReturnValue({} as SandboxInstance),
-        findWrapperForSession,
-        createClient: vi.fn().mockReturnValue({ health }),
+        createSandbox: vi
+          .fn()
+          .mockReturnValue(
+            sandboxWithTerminalResult(vi.fn().mockResolvedValue({ status: 'not-running' }))
+          ),
       }
     );
 
@@ -156,7 +157,27 @@ describe('resolveTerminalWrapperClient', () => {
       success: false,
       error: 'Terminal is unavailable because the session wrapper is not running',
     });
-    expect(findWrapperForSession).toHaveBeenCalledTimes(1);
-    expect(health).not.toHaveBeenCalled();
+  });
+
+  it('preserves the unhealthy-wrapper terminal diagnostic', async () => {
+    const result = await resolveTerminalWrapperClient(
+      {
+        env: {} as Env,
+        metadata: baseMetadata,
+        sessionId: baseMetadata.identity.sessionId,
+      },
+      {
+        createSandbox: vi
+          .fn()
+          .mockReturnValue(
+            sandboxWithTerminalResult(vi.fn().mockResolvedValue({ status: 'unhealthy' }))
+          ),
+      }
+    );
+
+    expect(result).toEqual({
+      success: false,
+      error: 'Terminal is unavailable because the session wrapper is not healthy',
+    });
   });
 });

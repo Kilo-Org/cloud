@@ -408,7 +408,6 @@ export const organizationKiloclawRouter = createTRPCRouter({
     const instance = await getActiveOrgInstance(ctx.user.id, input.organizationId);
     return {
       hasActiveInstance: instance !== null,
-      instanceId: instance?.id ?? null,
     };
   }),
 

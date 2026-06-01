@@ -2989,7 +2989,6 @@ export const kiloclawRouter = createTRPCRouter({
     const instance = await getActiveInstance(ctx.user.id);
     return {
       hasActiveInstance: instance !== null,
-      instanceId: instance?.id ?? null,
     };
   }),
 

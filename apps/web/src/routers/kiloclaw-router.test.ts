@@ -134,7 +134,7 @@ jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => {
 
 let createCaller: (ctx: { user: Awaited<ReturnType<typeof insertTestUser>> }) => {
   getStatus: () => Promise<unknown>;
-  getNavState: () => Promise<{ hasActiveInstance: boolean; instanceId: string | null }>;
+  getNavState: () => Promise<{ hasActiveInstance: boolean }>;
   validateWeatherLocation: (input: { location: string }) => Promise<{
     location: string;
     currentWeatherText: string;
@@ -505,12 +505,12 @@ describe('kiloclawRouter getNavState', () => {
 
     const result = await caller.getNavState();
 
-    expect(result).toEqual({ hasActiveInstance: false, instanceId: null });
+    expect(result).toEqual({ hasActiveInstance: false });
     expect(kiloclawClientMock.KiloClawInternalClient).not.toHaveBeenCalled();
     expect(kiloclawClientMock.__getStatusMock).not.toHaveBeenCalled();
   });
 
-  it('returns the active personal instance id without requiring subscription access', async () => {
+  it('returns active personal instance presence without requiring subscription access', async () => {
     const user = await insertTestUser({
       google_user_email: `kiloclaw-nav-present-${Math.random()}@example.com`,
     });
@@ -524,7 +524,7 @@ describe('kiloclawRouter getNavState', () => {
 
     const result = await caller.getNavState();
 
-    expect(result).toEqual({ hasActiveInstance: true, instanceId });
+    expect(result).toEqual({ hasActiveInstance: true });
     expect(kiloclawClientMock.KiloClawInternalClient).not.toHaveBeenCalled();
     expect(kiloclawClientMock.__getStatusMock).not.toHaveBeenCalled();
   });
@@ -544,7 +544,7 @@ describe('kiloclawRouter getNavState', () => {
 
     const result = await caller.getNavState();
 
-    expect(result).toEqual({ hasActiveInstance: false, instanceId: null });
+    expect(result).toEqual({ hasActiveInstance: false });
   });
 });
 

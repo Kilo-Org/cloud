@@ -255,22 +255,22 @@ describe('organizations.kiloclaw.getNavState', () => {
       organizationId: organization.id,
     });
 
-    expect(result).toEqual({ hasActiveInstance: false, instanceId: null });
+    expect(result).toEqual({ hasActiveInstance: false });
   });
 
-  it('returns the active organization instance id', async () => {
+  it('returns active organization instance presence', async () => {
     const user = await insertTestUser({
       google_user_email: `org-kiloclaw-nav-present-${Math.random()}@example.com`,
     });
     const organization = await createOrganization('Org KiloClaw Nav Present Test', user.id);
-    const instanceId = await createActiveOrgInstance(user.id, organization.id);
+    await createActiveOrgInstance(user.id, organization.id);
     const caller = await createCallerForUser(user.id);
 
     const result = await caller.organizations.kiloclaw.getNavState({
       organizationId: organization.id,
     });
 
-    expect(result).toEqual({ hasActiveInstance: true, instanceId });
+    expect(result).toEqual({ hasActiveInstance: true });
   });
 
   it('does not leak a personal instance into organization nav state', async () => {
@@ -290,7 +290,7 @@ describe('organizations.kiloclaw.getNavState', () => {
       organizationId: organization.id,
     });
 
-    expect(result).toEqual({ hasActiveInstance: false, instanceId: null });
+    expect(result).toEqual({ hasActiveInstance: false });
   });
 
   it('ignores destroyed organization instances', async () => {
@@ -309,7 +309,7 @@ describe('organizations.kiloclaw.getNavState', () => {
       organizationId: organization.id,
     });
 
-    expect(result).toEqual({ hasActiveInstance: false, instanceId: null });
+    expect(result).toEqual({ hasActiveInstance: false });
   });
 });
 

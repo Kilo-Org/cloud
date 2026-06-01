@@ -65,12 +65,16 @@ type StartupArgs = {
   agentSessionId: string;
   userId: string;
   sessionId?: string;
+  wrapperInstanceId?: string;
+  wrapperInstanceGeneration?: number;
 };
 
 function parseStartupArgs(argv: string[]): StartupArgs {
   let agentSessionId: string | undefined;
   let userId: string | undefined;
   let sessionId: string | undefined;
+  let wrapperInstanceId: string | undefined;
+  let wrapperInstanceGeneration: number | undefined;
 
   for (let index = 0; index < argv.length; index++) {
     const arg = argv[index];
@@ -103,6 +107,28 @@ function parseStartupArgs(argv: string[]): StartupArgs {
       continue;
     }
 
+    if (arg === '--wrapper-instance-id') {
+      if (!value) {
+        failStartup('Missing value for --wrapper-instance-id');
+      }
+      wrapperInstanceId = value;
+      index++;
+      continue;
+    }
+
+    if (arg === '--wrapper-instance-generation') {
+      if (!value) {
+        failStartup('Missing value for --wrapper-instance-generation');
+      }
+      const generation = Number.parseInt(value, 10);
+      if (!Number.isInteger(generation) || generation < 0) {
+        failStartup('Invalid value for --wrapper-instance-generation');
+      }
+      wrapperInstanceGeneration = generation;
+      index++;
+      continue;
+    }
+
     failStartup(`Unknown argument: ${arg}`);
   }
 
@@ -114,7 +140,11 @@ function parseStartupArgs(argv: string[]): StartupArgs {
     failStartup('Missing required --user-id argument');
   }
 
-  return { agentSessionId, userId, sessionId };
+  if ((wrapperInstanceId === undefined) !== (wrapperInstanceGeneration === undefined)) {
+    failStartup('Wrapper instance identity requires both id and generation');
+  }
+
+  return { agentSessionId, userId, sessionId, wrapperInstanceId, wrapperInstanceGeneration };
 }
 
 // ---------------------------------------------------------------------------
@@ -129,11 +159,41 @@ async function main() {
   // is now passed in the POST /job/prompt body.
   const wrapperPort = getOptionalEnvInt('WRAPPER_PORT', 5000);
   const initialWorkspacePath = process.env.WORKSPACE_PATH;
-  const {
-    agentSessionId,
-    userId,
-    sessionId: configuredSessionId,
-  } = parseStartupArgs(process.argv.slice(2));
+  const startupArgs = parseStartupArgs(process.argv.slice(2));
+  // New bundles report env-based identity; old bundles safely ignore these rolling-deploy markers.
+  const envWrapperInstanceId = process.env.WRAPPER_INSTANCE_ID;
+  const envWrapperInstanceGenerationValue = process.env.WRAPPER_INSTANCE_GENERATION;
+  let envWrapperInstanceGeneration: number | undefined;
+  if (envWrapperInstanceGenerationValue !== undefined) {
+    const parsedGeneration = Number.parseInt(envWrapperInstanceGenerationValue, 10);
+    if (!Number.isInteger(parsedGeneration) || parsedGeneration < 0) {
+      failStartup('Invalid value for WRAPPER_INSTANCE_GENERATION');
+    }
+    envWrapperInstanceGeneration = parsedGeneration;
+  }
+  if (
+    startupArgs.wrapperInstanceId !== undefined &&
+    envWrapperInstanceId !== undefined &&
+    startupArgs.wrapperInstanceId !== envWrapperInstanceId
+  ) {
+    failStartup('Conflicting wrapper instance id configuration');
+  }
+  if (
+    startupArgs.wrapperInstanceGeneration !== undefined &&
+    envWrapperInstanceGeneration !== undefined &&
+    startupArgs.wrapperInstanceGeneration !== envWrapperInstanceGeneration
+  ) {
+    failStartup('Conflicting wrapper instance generation configuration');
+  }
+  const agentSessionId = startupArgs.agentSessionId;
+  const userId = startupArgs.userId;
+  const configuredSessionId = startupArgs.sessionId;
+  const wrapperInstanceId = startupArgs.wrapperInstanceId ?? envWrapperInstanceId;
+  const wrapperInstanceGeneration =
+    startupArgs.wrapperInstanceGeneration ?? envWrapperInstanceGeneration;
+  if ((wrapperInstanceId === undefined) !== (wrapperInstanceGeneration === undefined)) {
+    failStartup('Wrapper instance identity requires both id and generation');
+  }
 
   if (!SESSION_ID_RE.test(agentSessionId)) {
     failStartup(`Invalid agent session ID: ${agentSessionId}`);
@@ -149,6 +209,11 @@ async function main() {
   );
   if (configuredSessionId) {
     logToFile(`config: sessionId=${configuredSessionId}`);
+  }
+  if (wrapperInstanceId !== undefined && wrapperInstanceGeneration !== undefined) {
+    logToFile(
+      `config: wrapperInstanceId=${wrapperInstanceId} wrapperInstanceGeneration=${wrapperInstanceGeneration}`
+    );
   }
 
   // ---------------------------------------------------------------------------
@@ -178,6 +243,8 @@ async function main() {
     sessionId: kiloSessionId,
     agentSessionId,
     userId,
+    wrapperInstanceId,
+    wrapperInstanceGeneration,
     platform: process.env.KILO_PLATFORM,
   };
 

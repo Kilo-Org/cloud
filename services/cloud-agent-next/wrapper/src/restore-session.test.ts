@@ -50,14 +50,34 @@ function mockFetchStatus(status: number, body = ''): void {
   globalThis.fetch = asFetch(() => Promise.resolve(new Response(body, { status })));
 }
 
-function writeMockKilo(binDir: string, exitCode: number): void {
-  const script = `#!/bin/sh\nexit ${exitCode}\n`;
+type MockKiloOptions = {
+  exitCode: number;
+  stdout?: string;
+  stderr?: string;
+  sleepSeconds?: number;
+};
+
+function shellQuote(value: string): string {
+  return `'${value.replaceAll("'", `'"'"'`)}'`;
+}
+
+function writeMockKilo(binDir: string, options: MockKiloOptions): void {
+  const script = [
+    '#!/bin/sh',
+    options.stdout === undefined ? undefined : `printf '%s' ${shellQuote(options.stdout)}`,
+    options.stderr === undefined ? undefined : `printf '%s' ${shellQuote(options.stderr)} >&2`,
+    options.sleepSeconds === undefined ? undefined : `exec sleep ${options.sleepSeconds}`,
+    `exit ${options.exitCode}`,
+    '',
+  ]
+    .filter(line => line !== undefined)
+    .join('\n');
   const kiloPath = path.join(binDir, 'kilo');
   fs.writeFileSync(kiloPath, script, { mode: 0o755 });
 }
 
 function writeSlowMockKilo(binDir: string): void {
-  const script = '#!/bin/sh\nsleep 1\nexit 0\n';
+  const script = "#!/bin/sh\nprintf '%s' 'recognizable timeout diagnostic' >&2\nsleep 1\nexit 0\n";
   const kiloPath = path.join(binDir, 'kilo');
   fs.writeFileSync(kiloPath, script, { mode: 0o755 });
 }
@@ -83,6 +103,7 @@ describe('restoreSession', () => {
   let tmpDir: string;
   let workspace: string;
   let binDir: string;
+  let wrapperLogPath: string;
   let savedEnv: Record<string, string | undefined>;
   let originalFetch: typeof globalThis.fetch;
 
@@ -93,22 +114,27 @@ describe('restoreSession', () => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'restore-test-'));
     workspace = path.join(tmpDir, 'workspace');
     binDir = path.join(tmpDir, 'bin');
+    wrapperLogPath = path.join(tmpDir, 'wrapper.log');
     fs.mkdirSync(workspace, { recursive: true });
     fs.mkdirSync(binDir, { recursive: true });
 
-    writeMockKilo(binDir, 0);
+    writeMockKilo(binDir, { exitCode: 0 });
 
     savedEnv = {
+      IMPORT_API_KEY: process.env.IMPORT_API_KEY,
+      IMPORT_SECRET: process.env.IMPORT_SECRET,
       KILO_SESSION_INGEST_URL: process.env.KILO_SESSION_INGEST_URL,
       KILOCODE_TOKEN: process.env.KILOCODE_TOKEN,
       KILOCODE_TOKEN_FILE: process.env.KILOCODE_TOKEN_FILE,
       PATH: process.env.PATH,
+      WRAPPER_LOG_PATH: process.env.WRAPPER_LOG_PATH,
     };
 
     process.env.KILO_SESSION_INGEST_URL = 'http://localhost:9999';
     process.env.KILOCODE_TOKEN = 'test-token';
     delete process.env.KILOCODE_TOKEN_FILE;
     process.env.PATH = `${binDir}:${process.env.PATH}`;
+    process.env.WRAPPER_LOG_PATH = wrapperLogPath;
 
     originalFetch = globalThis.fetch;
   });
@@ -312,25 +338,319 @@ describe('restoreSession', () => {
 
   // ---- Import failures ----
 
-  it('returns import error when kilo import fails', async () => {
+  it('logs failed import stderr diagnostics while preserving the generic result', async () => {
     const snapshot = makeSnapshot([{ file: 'src/index.ts', after: 'content', status: 'modified' }]);
     mockFetchOk(snapshot);
-    writeMockKilo(binDir, 1);
+    writeMockKilo(binDir, { exitCode: 1, stderr: 'recognizable stderr diagnostic' });
+
+    const result = await restoreSession(SESSION_ID, workspace);
+
+    expect(result).toEqual({
+      ok: false,
+      error: 'kilo import failed exitCode=1',
+      code: null,
+      step: 'import',
+    });
+    const wrapperLog = fs.readFileSync(wrapperLogPath, 'utf8');
+    expect(wrapperLog).toContain('kilo import finished outcome=error exitCode=1');
+    expect(wrapperLog).toContain(
+      'kilo import diagnostics stream=stderr totalBytes=30 retainedBytes=30 truncated=false preview="recognizable stderr diagnostic"'
+    );
+  });
+
+  it('logs failed import stdout diagnostics', async () => {
+    mockFetchOk(makeSnapshot([]));
+    writeMockKilo(binDir, { exitCode: 1, stdout: 'recognizable stdout diagnostic' });
+
+    await restoreSession(SESSION_ID, workspace);
+
+    const wrapperLog = fs.readFileSync(wrapperLogPath, 'utf8');
+    expect(wrapperLog).toContain(
+      'kilo import diagnostics stream=stdout totalBytes=30 retainedBytes=30 truncated=false preview="recognizable stdout diagnostic"'
+    );
+  });
+
+  it('logs byte counts when a failed import has no diagnostic output', async () => {
+    mockFetchOk(makeSnapshot([]));
+    writeMockKilo(binDir, { exitCode: 1 });
+
+    await restoreSession(SESSION_ID, workspace);
+
+    const wrapperLog = fs.readFileSync(wrapperLogPath, 'utf8');
+    expect(wrapperLog).toContain('kilo import diagnostics stdoutBytes=0 stderrBytes=0');
+  });
+
+  it('redacts secrets and ANSI escapes from failed import diagnostics', async () => {
+    const kilocodeToken = 'configured-kilocode-token';
+    const bearerToken = 'bearer-token-not-env';
+    const basicToken = 'basic-token-not-env';
+    const gitToken = 'git-token-not-env';
+    const urlPassword = 'url-password-not-env';
+    const tokenOnlyUrlSecret = 'token-only-url-secret-not-env';
+    const signedUrlSecret = 'signed-url-secret-not-env';
+    const abbreviatedSignedUrlSecret = 'azure-sas-secret-not-env';
+    const assignmentSecret = 'correct horse; battery & staple@example.com';
+    const privateKeyMaterial = 'private-key-material-not-env';
+    const unfinishedPrivateKeyMaterial = 'unfinished-private-key-material-not-env';
+    const jsonApiKey = 'json-api-key-not-env';
+    const flagToken = 'flag-token-not-env';
+    const envSecret = 'environment-secret';
+    process.env.KILOCODE_TOKEN = kilocodeToken;
+    process.env.IMPORT_API_KEY = envSecret;
+    mockFetchOk(makeSnapshot([]));
+    writeMockKilo(binDir, {
+      exitCode: 1,
+      stderr: [
+        '\u001b[31mvisible diagnostic\u001b[0m',
+        `token=${kilocodeToken}`,
+        `authorization=Bearer ${bearerToken}`,
+        `basic=Basic ${basicToken}`,
+        `git=https://x-access-token:${gitToken}@github.com/org/repo.git`,
+        `url=https://user:${urlPassword}@example.com/path`,
+        `tokenOnlyUrl=https://${tokenOnlyUrlSecret}@github.com/org/repo.git`,
+        `signedUrl=https://example.com/export?X-Amz-Signature=${signedUrlSecret}`,
+        `abbreviatedSignedUrl=https://example.blob.core.windows.net/file?sv=1&sig=${abbreviatedSignedUrlSecret}`,
+        `password="${assignmentSecret}"`,
+        `SSH_PRIVATE_KEY=-----BEGIN OPENSSH PRIVATE KEY-----\n${privateKeyMaterial}\n-----END OPENSSH PRIVATE KEY-----`,
+        `{"apiKey":"${jsonApiKey}"}`,
+        `--token ${flagToken}`,
+        `\u009d0;terminal-title\u009cvisible after c1 controls`,
+        `env=${envSecret}`,
+        `UNFINISHED_PRIVATE_KEY=-----BEGIN PRIVATE KEY-----\n${unfinishedPrivateKeyMaterial}`,
+      ].join('\n'),
+    });
+
+    const result = await restoreSession(SESSION_ID, workspace);
+
+    expect(result).toEqual({
+      ok: false,
+      error: 'kilo import failed exitCode=1',
+      code: null,
+      step: 'import',
+    });
+    const wrapperLog = fs.readFileSync(wrapperLogPath, 'utf8');
+    expect(wrapperLog).toContain('[REDACTED]');
+    expect(wrapperLog).toContain('visible diagnostic');
+    expect(wrapperLog).toContain(
+      'abbreviatedSignedUrl=https://example.blob.core.windows.net/file?[REDACTED]'
+    );
+    for (const secret of [
+      kilocodeToken,
+      bearerToken,
+      basicToken,
+      gitToken,
+      urlPassword,
+      tokenOnlyUrlSecret,
+      signedUrlSecret,
+      abbreviatedSignedUrlSecret,
+      assignmentSecret,
+      privateKeyMaterial,
+      unfinishedPrivateKeyMaterial,
+      jsonApiKey,
+      flagToken,
+      envSecret,
+    ]) {
+      expect(wrapperLog).not.toContain(secret);
+    }
+    expect(wrapperLog).not.toContain('horse');
+    expect(wrapperLog).not.toContain('battery');
+    expect(wrapperLog).not.toContain('staple@example.com');
+    expect(wrapperLog).not.toContain('\\u001b');
+    expect(wrapperLog).not.toContain('\u009d');
+    expect(wrapperLog).not.toContain('\u009c');
+  });
+
+  it('redacts longer environment secrets before overlapping shorter values', async () => {
+    const shortSecret = 'overlap-secret';
+    const longSecret = `${shortSecret}-suffix`;
+    process.env.IMPORT_SECRET = shortSecret;
+    process.env.IMPORT_API_KEY = longSecret;
+    mockFetchOk(makeSnapshot([]));
+    writeMockKilo(binDir, { exitCode: 1, stderr: `secret=${longSecret}` });
+
+    await restoreSession(SESSION_ID, workspace);
+
+    const wrapperLog = fs.readFileSync(wrapperLogPath, 'utf8');
+    expect(wrapperLog).toContain('secret=[REDACTED]');
+    expect(wrapperLog).not.toContain('-suffix');
+  });
+
+  it('bounds diagnostics after secret redaction expands output', async () => {
+    process.env.IMPORT_SECRET = 'x';
+    mockFetchOk(makeSnapshot([]));
+    writeMockKilo(binDir, { exitCode: 1, stderr: 'x'.repeat(4_096) });
+
+    await restoreSession(SESSION_ID, workspace);
+
+    const wrapperLog = fs.readFileSync(wrapperLogPath, 'utf8');
+    const diagnosticLine = wrapperLog
+      .split('\n')
+      .find(line => line.includes('kilo import diagnostics stream=stderr'));
+    if (!diagnosticLine) throw new Error('missing stderr diagnostic line');
+    expect(diagnosticLine).toContain('[REDACTED]');
+    expect(diagnosticLine.length).toBeLessThan(5_000);
+  });
+
+  it('does not replace secrets inside redaction markers', async () => {
+    process.env.IMPORT_API_KEY = 'x';
+    process.env.IMPORT_SECRET = 'A';
+    mockFetchOk(makeSnapshot([]));
+    writeMockKilo(binDir, { exitCode: 1, stderr: 'x' });
+
+    await restoreSession(SESSION_ID, workspace);
+
+    const wrapperLog = fs.readFileSync(wrapperLogPath, 'utf8');
+    expect(wrapperLog).toContain('preview="[REDACTED]"');
+  });
+
+  it('redacts token-file credentials from failed import diagnostics', async () => {
+    const tokenPath = path.join(tmpDir, 'restore-token');
+    const fileToken = 'token-file-secret';
+    fs.writeFileSync(tokenPath, `${fileToken}\n`);
+    delete process.env.KILOCODE_TOKEN;
+    process.env.KILOCODE_TOKEN_FILE = tokenPath;
+    mockFetchOk(makeSnapshot([]));
+    writeMockKilo(binDir, { exitCode: 1, stderr: `token=${fileToken}` });
+
+    await restoreSession(SESSION_ID, workspace);
+
+    const wrapperLog = fs.readFileSync(wrapperLogPath, 'utf8');
+    expect(wrapperLog).toContain('token=[REDACTED]');
+    expect(wrapperLog).not.toContain(fileToken);
+  });
+
+  it('preserves import failure diagnostics when an optional token file cannot be read', async () => {
+    process.env.KILOCODE_TOKEN_FILE = path.join(tmpDir, 'missing-token');
+    mockFetchOk(makeSnapshot([]));
+    writeMockKilo(binDir, { exitCode: 1, stderr: 'diagnostic survives token-file read failure' });
+
+    const result = await restoreSession(SESSION_ID, workspace);
+
+    expect(result).toEqual({
+      ok: false,
+      error: 'kilo import failed exitCode=1',
+      code: null,
+      step: 'import',
+    });
+    const wrapperLog = fs.readFileSync(wrapperLogPath, 'utf8');
+    expect(wrapperLog).toContain('diagnostic survives token-file read failure');
+  });
+
+  it('drains and truncates large failed import output from both streams', async () => {
+    const retainedTail = 'retained-tail-sentinel';
+    const largeOutput = `${'x'.repeat(256 * 1_024)}\n${retainedTail}`;
+    process.env.IMPORT_SECRET = 'A';
+    mockFetchOk(makeSnapshot([]));
+    writeMockKilo(binDir, { exitCode: 1, stdout: largeOutput, stderr: largeOutput });
+
+    const result = await restoreSession(SESSION_ID, workspace);
+
+    expect(result.ok).toBe(false);
+    const wrapperLog = fs.readFileSync(wrapperLogPath, 'utf8');
+    expect(wrapperLog).toContain(
+      `kilo import diagnostics stream=stdout totalBytes=${largeOutput.length} retainedBytes=0 truncated=true`
+    );
+    expect(wrapperLog).toContain(
+      `kilo import diagnostics stream=stderr totalBytes=${largeOutput.length} retainedBytes=0 truncated=true`
+    );
+    expect(wrapperLog).not.toContain(retainedTail);
+    expect(wrapperLog).toContain('preview="[REDACTED]"');
+    expect(wrapperLog.length).toBeLessThan(20_000);
+  });
+
+  it('terminates imports that exceed the diagnostic output budget', async () => {
+    mockFetchOk(makeSnapshot([]));
+    writeMockKilo(binDir, {
+      exitCode: 0,
+      stdout: 'x'.repeat(1_048_577),
+      sleepSeconds: 2,
+    });
 
     const result = await restoreSession(SESSION_ID, workspace);
 
     expect(result.ok).toBe(false);
     if (!result.ok) {
-      expect(result.step).toBe('import');
       expect(result.error).toContain('kilo import failed');
+      expect(result.step).toBe('import');
     }
+    const wrapperLog = fs.readFileSync(wrapperLogPath, 'utf8');
+    expect(wrapperLog).toContain('terminationReason=excessive-output');
+  });
+
+  it('terminates imports when combined stream output exceeds the diagnostic budget', async () => {
+    const streamOutput = 'x'.repeat(600 * 1_024);
+    mockFetchOk(makeSnapshot([]));
+    writeMockKilo(binDir, {
+      exitCode: 0,
+      stdout: streamOutput,
+      stderr: streamOutput,
+      sleepSeconds: 2,
+    });
+
+    const result = await restoreSession(SESSION_ID, workspace);
+
+    expect(result.ok).toBe(false);
+    const wrapperLog = fs.readFileSync(wrapperLogPath, 'utf8');
+    expect(wrapperLog).toContain('terminationReason=excessive-output');
+  });
+
+  it('redacts a known secret suffix crossing the retained-tail boundary', async () => {
+    const crossingToken = 'cross-boundary-secret-value';
+    const retainedTokenSuffix = crossingToken.slice(8);
+    const retainedTail = `${retainedTokenSuffix}${'y'.repeat(4_096 - retainedTokenSuffix.length)}`;
+    process.env.KILOCODE_TOKEN = crossingToken;
+    mockFetchOk(makeSnapshot([]));
+    writeMockKilo(binDir, {
+      exitCode: 1,
+      stderr: `${'x'.repeat(4_096)}${crossingToken.slice(0, 8)}${retainedTail}`,
+    });
+
+    await restoreSession(SESSION_ID, workspace);
+
+    const wrapperLog = fs.readFileSync(wrapperLogPath, 'utf8');
+    expect(wrapperLog).toContain('preview="[REDACTED]"');
+    expect(wrapperLog).not.toContain(retainedTokenSuffix);
+  });
+
+  it('redacts an unknown credential suffix crossing the retained-tail boundary', async () => {
+    const bearerToken = `unknown-bearer-${'z'.repeat(512)}-recognizable-suffix`;
+    const retainedTokenSuffix = bearerToken.slice(8);
+    const retainedTail = `${retainedTokenSuffix}${'y'.repeat(4_096 - retainedTokenSuffix.length)}`;
+    mockFetchOk(makeSnapshot([]));
+    writeMockKilo(binDir, {
+      exitCode: 1,
+      stderr: `${'x'.repeat(4_096)}Bearer ${bearerToken.slice(0, 8)}${retainedTail}`,
+    });
+
+    await restoreSession(SESSION_ID, workspace);
+
+    const wrapperLog = fs.readFileSync(wrapperLogPath, 'utf8');
+    expect(wrapperLog).toContain('preview="[REDACTED]"');
+    expect(wrapperLog).not.toContain('-recognizable-suffix');
+  });
+
+  it('redacts multiline credential tails whose opening marker was truncated', async () => {
+    const privateKeyTailLine = 'private-key-tail-line-not-env';
+    const retainedTail =
+      `partial-private-key-line\n${privateKeyTailLine}\n-----END PRIVATE KEY-----`.padEnd(
+        4_096,
+        'y'
+      );
+    mockFetchOk(makeSnapshot([]));
+    writeMockKilo(binDir, { exitCode: 1, stderr: `${'x'.repeat(4_096)}${retainedTail}` });
+
+    await restoreSession(SESSION_ID, workspace);
+
+    const wrapperLog = fs.readFileSync(wrapperLogPath, 'utf8');
+    expect(wrapperLog).toContain('preview="[REDACTED]"');
+    expect(wrapperLog).not.toContain(privateKeyTailLine);
   });
 
   it('terminates and returns import error when kilo import exceeds its deadline', async () => {
     mockFetchOk(makeSnapshot([]));
     writeSlowMockKilo(binDir);
 
-    const result = await restoreSession(SESSION_ID, workspace, undefined, { importTimeoutMs: 50 });
+    const result = await restoreSession(SESSION_ID, workspace, undefined, { importTimeoutMs: 500 });
 
     expect(result.ok).toBe(false);
     if (!result.ok) {
@@ -338,6 +658,8 @@ describe('restoreSession', () => {
       expect(result.error).toContain('kilo import timed out');
     }
     expect(fs.existsSync(TMP_PATH)).toBe(false);
+    const wrapperLog = fs.readFileSync(wrapperLogPath, 'utf8');
+    expect(wrapperLog).toContain('recognizable timeout diagnostic');
   });
 
   it('returns import error when kilo import is terminated by a signal', async () => {
@@ -375,6 +697,21 @@ describe('restoreSession', () => {
   });
 
   // ---- Happy paths ----
+
+  it('drains but does not log successful import output', async () => {
+    const stdout = `${'x'.repeat(256 * 1_024)}successful stdout sentinel`;
+    const stderr = `${'y'.repeat(256 * 1_024)}successful stderr sentinel`;
+    mockFetchOk(makeSnapshot([]));
+    writeMockKilo(binDir, { exitCode: 0, stdout, stderr });
+
+    const result = await restoreSession(SESSION_ID, workspace);
+
+    expect(result.ok).toBe(true);
+    const wrapperLog = fs.readFileSync(wrapperLogPath, 'utf8');
+    expect(wrapperLog).not.toContain('successful stdout sentinel');
+    expect(wrapperLog).not.toContain('successful stderr sentinel');
+    expect(wrapperLog).not.toContain('kilo import diagnostics');
+  });
 
   it('downloads snapshot, imports, and applies diffs', async () => {
     const snapshot = makeSnapshot([
@@ -525,7 +862,7 @@ describe('restoreSession', () => {
 
   it('cleans up temp file on import failure', async () => {
     mockFetchOk(makeSnapshot([{ file: 'a.txt', after: 'content', status: 'modified' }]));
-    writeMockKilo(binDir, 1);
+    writeMockKilo(binDir, { exitCode: 1 });
 
     const result = await restoreSession(SESSION_ID, workspace);
     expect(result.ok).toBe(false);

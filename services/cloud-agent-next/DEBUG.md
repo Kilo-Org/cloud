@@ -102,6 +102,7 @@ High-value wrapper landmarks:
 - `bootstrap snapshot restore starting`
 - `restore-session: snapshot metadata validated`
 - `restore-session: kilo import finished`
+- `restore-session: kilo import diagnostics`
 - `post-bootstrap kilo session lookup begin`
 - `post-bootstrap kilo session lookup end`
 - `session/ready complete`
@@ -113,6 +114,7 @@ For stuck import/debugging, confirm all of these:
 - import input source (`provided` vs `downloaded`)
 - expected Kilo session ID vs snapshot `info.id`
 - import exit code
+- bounded, sanitized stdout/stderr previews from `restore-session: kilo import diagnostics` when import exits non-zero
 - `HOME` and workspace path used by import
 - post-import `getSession()` result
 

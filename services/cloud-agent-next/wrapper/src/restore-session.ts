@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { logToFile, runProcess } from './utils.js';
+import { logToFile, runProcess, type BoundedProcessOutput } from './utils.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -36,6 +36,137 @@ function log(msg: string): void {
   const message = `restore-session: ${msg}`;
   console.error(message);
   logToFile(message);
+}
+
+const IMPORT_DIAGNOSTIC_MAX_BYTES = 4_096;
+const IMPORT_DIAGNOSTIC_MAX_OBSERVED_BYTES = 1_048_576;
+const REDACTED = '[REDACTED]';
+const REDACTION_SENTINEL = String.fromCharCode(0);
+const SENSITIVE_NAME_PATTERN =
+  'TOKEN|SECRET|PASSWORD|CREDENTIAL|AUTHORIZATION|COOKIE|API[_-]?KEY|PRIVATE[_-]?KEY|ACCESS[_-]?KEY|SIGNATURE';
+const SENSITIVE_ENV_NAME = new RegExp(SENSITIVE_NAME_PATTERN, 'i');
+const SENSITIVE_DIAGNOSTIC_ASSIGNMENT = new RegExp(
+  `(["']?\\b[\\w.-]*(?:${SENSITIVE_NAME_PATTERN})[\\w.-]*["']?\\s*[:=]\\s*)[^\\r\\n]*`,
+  'gi'
+);
+const SENSITIVE_DIAGNOSTIC_FLAG = new RegExp(
+  `(^|\\s)(--?[\\w.-]*(?:${SENSITIVE_NAME_PATTERN})[\\w.-]*)(?:[=\\s]+)[^\\r\\n]*`,
+  'gim'
+);
+const PRIVATE_KEY_BLOCK =
+  /-----BEGIN(?: [A-Z0-9]+)* PRIVATE KEY-----[\s\S]*?(?:-----END(?: [A-Z0-9]+)* PRIVATE KEY-----|$)/gi;
+const ANSI_ESCAPE = String.fromCharCode(0x1b);
+const ANSI_BELL = String.fromCharCode(0x07);
+const ANSI_CONTROL_SEQUENCE_INTRODUCER = String.fromCharCode(0x9b);
+const ANSI_ESCAPE_SEQUENCE = new RegExp(
+  `${ANSI_ESCAPE}(?:\\][^${ANSI_BELL}]*(?:${ANSI_BELL}|${ANSI_ESCAPE}\\\\)|\\[[0-?]*[ -/]*[@-~]|[@-_])|${ANSI_CONTROL_SEQUENCE_INTRODUCER}[0-?]*[ -/]*[@-~]`,
+  'g'
+);
+
+function collectImportDiagnosticSecrets(): string[] {
+  const secrets = new Set<string>();
+  const token = process.env.KILOCODE_TOKEN;
+  if (token) secrets.add(token);
+
+  for (const [name, value] of Object.entries(process.env)) {
+    if (value && SENSITIVE_ENV_NAME.test(name)) secrets.add(value);
+  }
+
+  const tokenFile = process.env.KILOCODE_TOKEN_FILE;
+  if (tokenFile) {
+    try {
+      const fileToken = fs.readFileSync(tokenFile, 'utf8').replace(/[\r\n]+$/, '');
+      if (fileToken) secrets.add(fileToken);
+    } catch {
+      // Best-effort redaction must not replace the original import failure.
+    }
+  }
+
+  return Array.from(secrets).sort((left, right) => right.length - left.length);
+}
+
+function stripUnsafeControlCharacters(diagnostic: string): string {
+  let sanitized = '';
+  for (const character of diagnostic) {
+    const codePoint = character.codePointAt(0);
+    if (
+      codePoint !== undefined &&
+      ((codePoint >= 0x00 && codePoint <= 0x08) ||
+        codePoint === 0x0b ||
+        codePoint === 0x0c ||
+        (codePoint >= 0x0e && codePoint <= 0x1f) ||
+        (codePoint >= 0x7f && codePoint <= 0x9f))
+    ) {
+      continue;
+    }
+    sanitized += character;
+  }
+  return sanitized;
+}
+
+function redactKnownImportDiagnosticSecrets(diagnostic: string, secrets: string[]): string {
+  let sanitized = diagnostic;
+  for (const secret of secrets) {
+    sanitized = sanitized.replaceAll(secret, REDACTION_SENTINEL);
+  }
+  return sanitized.replaceAll(REDACTION_SENTINEL, REDACTED);
+}
+
+function retainSanitizedImportDiagnosticTail(diagnostic: string): string {
+  const encoder = new TextEncoder();
+  const encoded = encoder.encode(diagnostic);
+  if (encoded.byteLength <= IMPORT_DIAGNOSTIC_MAX_BYTES) return diagnostic;
+
+  const markerBytes = encoder.encode(REDACTED).byteLength;
+  const retainedByteLimit = IMPORT_DIAGNOSTIC_MAX_BYTES - markerBytes;
+  let retained = new TextDecoder().decode(encoded.slice(-retainedByteLimit));
+  while (encoder.encode(`${REDACTED}${retained}`).byteLength > IMPORT_DIAGNOSTIC_MAX_BYTES) {
+    retained = retained.slice(1);
+  }
+  return `${REDACTED}${retained}`;
+}
+
+function sanitizeImportDiagnostic(diagnostic: string, secrets: string[]): string {
+  const sanitized = redactKnownImportDiagnosticSecrets(
+    stripUnsafeControlCharacters(diagnostic.replace(ANSI_ESCAPE_SEQUENCE, '')),
+    secrets
+  )
+    .replace(PRIVATE_KEY_BLOCK, REDACTED)
+    .replace(/\b(Bearer|Basic)\s+[^\s"',;]+/gi, `$1 ${REDACTED}`)
+    .replace(/\b(oauth2|x-access-token|x-token-auth):[^@\s]+@/gi, `$1:${REDACTED}@`)
+    .replace(/([a-z][a-z\d+.-]*:\/\/)[^/\s@]+@/gi, `$1${REDACTED}@`)
+    .replace(/([a-z][a-z\d+.-]*:\/\/[^\s"'?#]+)\?[^\s"']*/gi, `$1?${REDACTED}`)
+    .replace(/([a-z][a-z\d+.-]*:\/\/[^\s"'#]+)#[^\s"']*/gi, `$1#${REDACTED}`)
+    .replace(SENSITIVE_DIAGNOSTIC_ASSIGNMENT, `$1${REDACTED}`)
+    .replace(SENSITIVE_DIAGNOSTIC_FLAG, `$1$2 ${REDACTED}`);
+
+  return retainSanitizedImportDiagnosticTail(sanitized);
+}
+
+function logImportDiagnostics(stdout: BoundedProcessOutput, stderr: BoundedProcessOutput): void {
+  const streams = [
+    { name: 'stdout', output: stdout },
+    { name: 'stderr', output: stderr },
+  ];
+  let loggedPreview = false;
+  let secrets: string[] | undefined;
+
+  for (const { name, output } of streams) {
+    if (output.totalBytes === 0) continue;
+    loggedPreview = true;
+    const preview = output.truncated
+      ? REDACTED
+      : sanitizeImportDiagnostic(output.preview, (secrets ??= collectImportDiagnosticSecrets()));
+    log(
+      `kilo import diagnostics stream=${name} totalBytes=${output.totalBytes} retainedBytes=${output.retainedBytes} truncated=${output.truncated} preview=${JSON.stringify(preview)}`
+    );
+  }
+
+  if (!loggedPreview) {
+    log(
+      `kilo import diagnostics stdoutBytes=${stdout.totalBytes} stderrBytes=${stderr.totalBytes}`
+    );
+  }
 }
 
 function fail(
@@ -519,6 +650,8 @@ export async function restoreSession(
       cwd: workspacePath,
       timeoutMs: importTimeoutMs,
       terminationGraceMs: options.importTerminationGraceMs,
+      maxCapturedOutputBytes: IMPORT_DIAGNOSTIC_MAX_BYTES,
+      maxObservedOutputBytes: IMPORT_DIAGNOSTIC_MAX_OBSERVED_BYTES,
     });
     const importElapsedMs = Date.now() - importStartedAt;
 
@@ -526,13 +659,15 @@ export async function restoreSession(
       log(
         `kilo import finished outcome=timeout kiloSessionId=${kiloSessionId} input=${downloaded ? 'downloaded' : 'provided'} cwd=${workspacePath} home=${process.env.HOME ?? '(unset)'} elapsedMs=${importElapsedMs} timeoutMs=${importTimeoutMs}`
       );
+      logImportDiagnostics(importResult.boundedOutput.stdout, importResult.boundedOutput.stderr);
       return fail(`kilo import timed out after ${importTimeoutMs}ms`, null, 'import');
     }
 
     if (importResult.exitCode !== 0) {
       log(
-        `kilo import finished outcome=error exitCode=${importResult.exitCode} kiloSessionId=${kiloSessionId} input=${downloaded ? 'downloaded' : 'provided'} cwd=${workspacePath} home=${process.env.HOME ?? '(unset)'} elapsedMs=${importElapsedMs}`
+        `kilo import finished outcome=error exitCode=${importResult.exitCode} kiloSessionId=${kiloSessionId} input=${downloaded ? 'downloaded' : 'provided'} cwd=${workspacePath} home=${process.env.HOME ?? '(unset)'} elapsedMs=${importElapsedMs} terminationReason=${importResult.terminationReason ?? '(none)'}`
       );
+      logImportDiagnostics(importResult.boundedOutput.stdout, importResult.boundedOutput.stderr);
       return fail(`kilo import failed exitCode=${importResult.exitCode}`, null, 'import');
     }
     log(

@@ -43,8 +43,8 @@ export const conversationTitleSchema = trimmedNonEmptyString(CONVERSATION_TITLE_
  * Validation for a single message text body. Shared source of truth so every
  * boundary that accepts message text (the `textBlockSchema` used at message
  * creation, and the `postMessageAsUserParamsSchema` HTTP boundary) enforces
- * the SAME rule — trimmed, non-empty, ≤ MESSAGE_TEXT_MAX_CHARS — and cannot
- * drift apart.
+ * the SAME rule (trimmed, non-empty, max MESSAGE_TEXT_MAX_CHARS), so they
+ * cannot drift apart.
  */
 export const messageTextSchema = trimmedNonEmptyString(MESSAGE_TEXT_MAX_CHARS);
 

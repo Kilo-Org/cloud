@@ -10,7 +10,6 @@ import { applyKiloExclusiveModelSettings } from '@/lib/ai-gateway/providers/kilo
 import { applyAnthropicModelSettings } from '@/lib/ai-gateway/providers/anthropic';
 import { isClaudeModel } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { OpenRouterInferenceProviderIdSchema } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
-import { applyGoogleModelSettings, isGeminiModel } from '@/lib/ai-gateway/providers/google';
 import { applyMoonshotModelSettings, isKimiModel } from '@/lib/ai-gateway/providers/moonshotai';
 import { isGlmModel } from '@/lib/ai-gateway/providers/zai';
 import { isMinimaxModel } from '@/lib/ai-gateway/providers/minimax';
@@ -107,10 +106,6 @@ export function applyProviderSpecificLogic(
 
   if (provider.id === 'openrouter' || provider.id === 'vercel') {
     applyPreferredProvider(requestedModel, requestToMutate.body);
-  }
-
-  if (isGeminiModel(requestedModel)) {
-    applyGoogleModelSettings(provider.id, requestToMutate);
   }
 
   if (isKimiModel(requestedModel)) {

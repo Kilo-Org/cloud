@@ -5,10 +5,7 @@ import {
   clearAnalysisStatus,
   getSecurityAgentConfigForOwner,
   getSecurityFindingById,
-  setFindingCompleted,
-  setFindingFailed,
   setFindingPending,
-  setFindingRunning,
   tryAcquireAnalysisStartLease,
 } from './db/queries.js';
 import { transitionAnalysisStartLifecycle } from './analysis-start-lifecycle.js';
@@ -20,10 +17,7 @@ vi.mock('./db/queries.js', () => ({
   clearAnalysisStatus: vi.fn(),
   getSecurityAgentConfigForOwner: vi.fn(),
   getSecurityFindingById: vi.fn(),
-  setFindingCompleted: vi.fn(),
-  setFindingFailed: vi.fn(),
   setFindingPending: vi.fn(),
-  setFindingRunning: vi.fn(),
   tryAcquireAnalysisStartLease: vi.fn(),
 }));
 vi.mock('./analysis-start-lifecycle.js', () => ({ transitionAnalysisStartLifecycle: vi.fn() }));
@@ -156,10 +150,11 @@ describe('buildSecurityAnalysisCallbackTarget', () => {
           SECURITY_ANALYSIS_CALLBACK_WORKER_BASE_URL: 'https://security-analysis.test/',
         },
         finding.id,
-        'callback-token'
+        'callback-token',
+        'attempt-token'
       )
     ).toEqual({
-      url: `https://security-analysis.test/internal/security-analysis-callback/${finding.id}`,
+      url: `https://security-analysis.test/internal/security-analysis-callback/${finding.id}?attempt=attempt-token`,
       headers: { 'X-Callback-Token': 'callback-token' },
     });
   });
@@ -173,10 +168,11 @@ describe('buildSecurityAnalysisCallbackTarget', () => {
           SECURITY_ANALYSIS_CALLBACK_WORKER_BASE_URL: '',
         },
         finding.id,
-        'callback-token'
+        'callback-token',
+        'attempt-token'
       )
     ).toEqual({
-      url: `https://app.kilo.ai/api/internal/security-analysis-callback/${finding.id}`,
+      url: `https://app.kilo.ai/api/internal/security-analysis-callback/${finding.id}?attempt=attempt-token`,
       headers: { 'X-Callback-Token': 'callback-token' },
     });
   });
@@ -190,7 +186,8 @@ describe('buildSecurityAnalysisCallbackTarget', () => {
           SECURITY_ANALYSIS_CALLBACK_WORKER_BASE_URL: '',
         },
         'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
-        'callback-token'
+        'callback-token',
+        'attempt-token'
       )
     ).toThrow('SECURITY_ANALYSIS_CALLBACK_WORKER_BASE_URL');
   });
@@ -205,10 +202,7 @@ describe('startSecurityAnalysis retrySandboxOnly', () => {
       auto_dismiss_enabled: true,
       auto_dismiss_confidence_threshold: 'high',
     } as never);
-    vi.mocked(setFindingCompleted).mockResolvedValue(true);
-    vi.mocked(setFindingFailed).mockResolvedValue(true);
     vi.mocked(setFindingPending).mockResolvedValue(undefined);
-    vi.mocked(setFindingRunning).mockResolvedValue(undefined);
     vi.mocked(clearAnalysisStatus).mockResolvedValue(undefined);
     vi.mocked(transitionAnalysisStartLifecycle).mockResolvedValue({ transitioned: true });
   });
@@ -227,7 +221,9 @@ describe('startSecurityAnalysis retrySandboxOnly', () => {
       return Response.json({ result: { data: { executionId: 'exec-123', status: 'running' } } });
     });
 
-    await expect(startSecurityAnalysis(createParams(false, cloudAgentFetch as never))).resolves.toEqual({
+    await expect(
+      startSecurityAnalysis(createParams(false, cloudAgentFetch as never))
+    ).resolves.toEqual({
       started: true,
       triageOnly: false,
     });
@@ -236,7 +232,7 @@ describe('startSecurityAnalysis retrySandboxOnly', () => {
     const expectedCallbackToken = await deriveCallbackToken({
       secret: CALLBACK_SECRET,
       scope: 'security-analysis-callback',
-      resourceParts: [finding.id],
+      resourceParts: [finding.id, 'manual-claim-token'],
     });
     expect(prepareBody).toMatchObject({
       callbackTarget: {
@@ -275,7 +271,9 @@ describe('startSecurityAnalysis retrySandboxOnly', () => {
         )
       );
 
-    await expect(startSecurityAnalysis(createParams(true, cloudAgentFetch as never))).resolves.toEqual({
+    await expect(
+      startSecurityAnalysis(createParams(true, cloudAgentFetch as never))
+    ).resolves.toEqual({
       started: true,
       triageOnly: false,
     });
@@ -299,7 +297,6 @@ describe('startSecurityAnalysis retrySandboxOnly', () => {
         },
       })
     );
-    expect(setFindingRunning).not.toHaveBeenCalled();
   });
 
   it('falls back to full triage when sandbox-only retry has no prior triage', async () => {
@@ -324,8 +321,6 @@ describe('startSecurityAnalysis retrySandboxOnly', () => {
         outcome: expect.objectContaining({ type: 'triage-only-completed' }),
       })
     );
-    expect(setFindingCompleted).not.toHaveBeenCalled();
-    expect(setFindingFailed).not.toHaveBeenCalled();
     expect(clearAnalysisStatus).not.toHaveBeenCalled();
   });
 
@@ -435,8 +430,6 @@ describe('startSecurityAnalysis retrySandboxOnly', () => {
       error: 'upstream unavailable',
       failureNeedsLifecycleTransition: true,
     });
-
-    expect(setFindingFailed).not.toHaveBeenCalled();
   });
 
   it('returns initiate failures for lifecycle settlement after the running transition', async () => {
@@ -466,6 +459,5 @@ describe('startSecurityAnalysis retrySandboxOnly', () => {
       {},
       expect.objectContaining({ outcome: expect.objectContaining({ type: 'sandbox-running' }) })
     );
-    expect(setFindingFailed).not.toHaveBeenCalled();
   });
 });

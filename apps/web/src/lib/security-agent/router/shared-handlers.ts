@@ -92,7 +92,6 @@ type SecurityAgentDeps<TExtra = {}> = {
   resolveResourceId: (ctx: TRPCContext, input: TExtra) => string;
   verifyFindingOwnership: (finding: SecurityFinding, ctx: TRPCContext, input: TExtra) => boolean;
   getIntegration: (ctx: TRPCContext, input: TExtra) => Promise<Integration>;
-  getGitHubToken: (ctx: TRPCContext, input: TExtra) => Promise<string | null>;
   trackingExtras: (ctx: TRPCContext, input: TExtra) => Record<string, string>;
 };
 

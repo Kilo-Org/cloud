@@ -66,10 +66,26 @@ export async function transitionAnalysisCallbackLifecycle(
   db: WorkerDb,
   params: {
     findingId: string;
+    attemptToken: string;
     outcome: AnalysisCallbackLifecycleOutcome;
   }
-): Promise<{ status: 'completed' | 'failed' | 'superseded' | 'already-terminal' }> {
+): Promise<{
+  status: 'completed' | 'failed' | 'superseded' | 'already-terminal' | 'stale-attempt';
+}> {
   return db.transaction(async tx => {
+    const activeAttemptRows = await tx.execute<{ id: string }>(sql`
+      SELECT id
+      FROM security_analysis_queue
+      WHERE finding_id = ${params.findingId}::uuid
+        AND claim_token = ${params.attemptToken}
+        AND queue_status IN ('pending', 'running')
+      FOR UPDATE
+    `);
+    const activeAttemptId = activeAttemptRows.rows[0]?.id;
+    if (!activeAttemptId) {
+      return { status: 'stale-attempt' };
+    }
+
     if (params.outcome.type === 'already-terminal') {
       await tx
         .update(security_analysis_queue)
@@ -83,8 +99,8 @@ export async function transitionAnalysisCallbackLifecycle(
         })
         .where(
           and(
-            eq(security_analysis_queue.finding_id, params.findingId),
-            inArray(security_analysis_queue.queue_status, ['pending', 'running'])
+            eq(security_analysis_queue.id, activeAttemptId),
+            eq(security_analysis_queue.claim_token, params.attemptToken)
           )
         );
       return { status: 'already-terminal' };
@@ -108,8 +124,8 @@ export async function transitionAnalysisCallbackLifecycle(
         })
         .where(
           and(
-            eq(security_analysis_queue.finding_id, params.findingId),
-            inArray(security_analysis_queue.queue_status, ['pending', 'running'])
+            eq(security_analysis_queue.id, activeAttemptId),
+            eq(security_analysis_queue.claim_token, params.attemptToken)
           )
         );
       return { status: 'superseded' };
@@ -162,8 +178,8 @@ export async function transitionAnalysisCallbackLifecycle(
         })
         .where(
           and(
-            eq(security_analysis_queue.finding_id, params.findingId),
-            inArray(security_analysis_queue.queue_status, ['pending', 'running'])
+            eq(security_analysis_queue.id, activeAttemptId),
+            eq(security_analysis_queue.claim_token, params.attemptToken)
           )
         );
       return { status: 'superseded' };
@@ -180,8 +196,8 @@ export async function transitionAnalysisCallbackLifecycle(
       })
       .where(
         and(
-          eq(security_analysis_queue.finding_id, params.findingId),
-          inArray(security_analysis_queue.queue_status, ['pending', 'running'])
+          eq(security_analysis_queue.id, activeAttemptId),
+          eq(security_analysis_queue.claim_token, params.attemptToken)
         )
       );
 

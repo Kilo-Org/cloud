@@ -113,7 +113,6 @@ function createHandlers() {
         platform_installation_id: 'installation-123',
         repositories: [{ full_name: 'kilo/repo' }],
       }) as never,
-    getGitHubToken: async () => null,
     trackingExtras: () => ({}),
   });
 }

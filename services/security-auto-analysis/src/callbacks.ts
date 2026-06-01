@@ -2,7 +2,11 @@ import { getWorkerDb, type WorkerDb } from '@kilocode/db/client';
 import { security_audit_log } from '@kilocode/db/schema';
 import { SecurityAuditLogAction } from '@kilocode/db/schema-types';
 import { z } from 'zod';
-import { getAnalysisActorById, getSecurityFindingById } from './db/queries.js';
+import {
+  getActiveAnalysisAttemptToken,
+  getAnalysisActorById,
+  getSecurityFindingById,
+} from './db/queries.js';
 import { transitionAnalysisCallbackLifecycle } from './analysis-start-lifecycle.js';
 import { generateApiToken } from './token.js';
 import { extractSandboxAnalysis as runSandboxExtraction } from './extraction.js';
@@ -30,6 +34,7 @@ export type SecurityAnalysisCallbackPayload = z.infer<typeof SecurityAnalysisCal
 
 export const SecurityAnalysisCallbackMessageSchema = z.object({
   findingId: z.string().uuid(),
+  attemptToken: z.string().min(1).optional(),
   payload: SecurityAnalysisCallbackPayloadSchema,
 });
 
@@ -40,12 +45,25 @@ type CallbackFindingState = Pick<
   'session_id' | 'cli_session_id' | 'ignored_reason' | 'analysis_status'
 >;
 
-export type CallbackDisposition = 'process' | 'stale-session' | 'superseded' | 'already-terminal';
+export type CallbackDisposition =
+  | 'process'
+  | 'stale-session'
+  | 'stale-attempt'
+  | 'superseded'
+  | 'already-terminal';
 
 export function classifyAnalysisCallback(
   finding: CallbackFindingState,
-  payload: SecurityAnalysisCallbackPayload
+  payload: SecurityAnalysisCallbackPayload,
+  attempt?: { expected: string; active: string | null | undefined }
 ): CallbackDisposition {
+  if (
+    attempt &&
+    attempt.active !== attempt.expected &&
+    (finding.analysis_status === 'pending' || finding.analysis_status === 'running')
+  ) {
+    return 'stale-attempt';
+  }
   const sessionMismatch =
     (payload.cloudAgentSessionId &&
       finding.session_id &&
@@ -139,6 +157,7 @@ export async function resolveCompletedCallbackMarkdown(params: {
 export async function finalizeCompletedAnalysisCallback(params: {
   db: WorkerDb;
   findingId: string;
+  attemptToken?: string;
   payload: SecurityAnalysisCallbackPayload;
   extractSandboxAnalysis: ExtractSandboxAnalysis;
   maybeAutoDismissAnalysis?: MaybeAutoDismissAnalysis;
@@ -150,13 +169,29 @@ export async function finalizeCompletedAnalysisCallback(params: {
 }> {
   const finding = await getSecurityFindingById(params.db, params.findingId);
   if (!finding) return { status: 'missing' };
+  const activeAttemptToken = await getActiveAnalysisAttemptToken(params.db, params.findingId);
+  const attemptToken = params.attemptToken ?? activeAttemptToken ?? undefined;
+  if (
+    !attemptToken &&
+    (finding.analysis_status === 'pending' || finding.analysis_status === 'running')
+  ) {
+    return { status: 'stale-attempt' };
+  }
 
-  const disposition = classifyAnalysisCallback(finding, params.payload);
+  const disposition = attemptToken
+    ? classifyAnalysisCallback(finding, params.payload, {
+        expected: attemptToken,
+        active: activeAttemptToken,
+      })
+    : classifyAnalysisCallback(finding, params.payload);
   if (disposition === 'stale-session') return { status: disposition };
+  if (disposition === 'stale-attempt') return { status: disposition };
   if (disposition === 'already-terminal') {
     const findingStatus = finding.analysis_status === 'failed' ? 'failed' : 'completed';
+    if (!attemptToken) return { status: disposition };
     await transitionAnalysisCallbackLifecycle(params.db, {
       findingId: params.findingId,
+      attemptToken,
       outcome: {
         type: 'already-terminal',
         findingStatus,
@@ -170,12 +205,15 @@ export async function finalizeCompletedAnalysisCallback(params: {
     return { status: disposition };
   }
   if (disposition === 'superseded') {
+    if (!attemptToken) return { status: disposition };
     await transitionAnalysisCallbackLifecycle(params.db, {
       findingId: params.findingId,
+      attemptToken,
       outcome: { type: 'superseded' },
     });
     return { status: disposition };
   }
+  if (!attemptToken) return { status: 'stale-attempt' };
 
   const rawMarkdown = await resolveCompletedCallbackMarkdown({
     payload: params.payload,
@@ -184,14 +222,17 @@ export async function finalizeCompletedAnalysisCallback(params: {
   });
   if (!rawMarkdown) {
     const errorMessage = 'Analysis completed but callback result text was missing';
-    await transitionAnalysisCallbackLifecycle(params.db, {
+    const lifecycleTransition = await transitionAnalysisCallbackLifecycle(params.db, {
       findingId: params.findingId,
+      attemptToken,
       outcome: {
         type: 'failed',
         errorMessage,
         failureCode: 'START_CALL_AMBIGUOUS',
       },
     });
+    if (lifecycleTransition.status === 'stale-attempt') return { status: 'stale-attempt' };
+    if (lifecycleTransition.status === 'superseded') return { status: 'superseded' };
     return { status: 'result-missing' };
   }
 
@@ -212,12 +253,14 @@ export async function finalizeCompletedAnalysisCallback(params: {
 
   const lifecycleTransition = await transitionAnalysisCallbackLifecycle(params.db, {
     findingId: params.findingId,
+    attemptToken,
     outcome: {
       type: 'completed',
       analysis: completedAnalysis,
     },
   });
   if (lifecycleTransition.status === 'superseded') return { status: 'superseded' };
+  if (lifecycleTransition.status === 'stale-attempt') return { status: 'stale-attempt' };
   await params.db.insert(security_audit_log).values({
     owned_by_organization_id: finding.owned_by_organization_id,
     owned_by_user_id: finding.owned_by_user_id,
@@ -252,13 +295,28 @@ export async function finalizeCompletedAnalysisCallback(params: {
 export async function finalizeFailedAnalysisCallback(params: {
   db: WorkerDb;
   findingId: string;
+  attemptToken?: string;
   payload: SecurityAnalysisCallbackPayload;
 }): Promise<{ status: 'missing' | CallbackDisposition | 'failed-finalized' }> {
   const finding = await getSecurityFindingById(params.db, params.findingId);
   if (!finding) return { status: 'missing' };
+  const activeAttemptToken = await getActiveAnalysisAttemptToken(params.db, params.findingId);
+  const attemptToken = params.attemptToken ?? activeAttemptToken ?? undefined;
+  if (
+    !attemptToken &&
+    (finding.analysis_status === 'pending' || finding.analysis_status === 'running')
+  ) {
+    return { status: 'stale-attempt' };
+  }
 
-  const disposition = classifyAnalysisCallback(finding, params.payload);
+  const disposition = attemptToken
+    ? classifyAnalysisCallback(finding, params.payload, {
+        expected: attemptToken,
+        active: activeAttemptToken,
+      })
+    : classifyAnalysisCallback(finding, params.payload);
   if (disposition === 'stale-session') return { status: disposition };
+  if (disposition === 'stale-attempt') return { status: disposition };
   if (disposition === 'already-terminal') {
     const findingStatus = finding.analysis_status === 'completed' ? 'completed' : 'failed';
     const failure =
@@ -268,8 +326,10 @@ export async function finalizeFailedAnalysisCallback(params: {
             errorMessage: params.payload.errorMessage,
           })
         : null;
+    if (!attemptToken) return { status: disposition };
     await transitionAnalysisCallbackLifecycle(params.db, {
       findingId: params.findingId,
+      attemptToken,
       outcome: {
         type: 'already-terminal',
         findingStatus,
@@ -280,12 +340,15 @@ export async function finalizeFailedAnalysisCallback(params: {
     return { status: disposition };
   }
   if (disposition === 'superseded') {
+    if (!attemptToken) return { status: disposition };
     await transitionAnalysisCallbackLifecycle(params.db, {
       findingId: params.findingId,
+      attemptToken,
       outcome: { type: 'superseded' },
     });
     return { status: disposition };
   }
+  if (!attemptToken) return { status: 'stale-attempt' };
 
   const failure = mapAnalysisCallbackFailure({
     status: params.payload.status === 'interrupted' ? 'interrupted' : 'failed',
@@ -293,6 +356,7 @@ export async function finalizeFailedAnalysisCallback(params: {
   });
   const lifecycleTransition = await transitionAnalysisCallbackLifecycle(params.db, {
     findingId: params.findingId,
+    attemptToken,
     outcome: {
       type: 'failed',
       errorMessage: failure.errorMessage,
@@ -300,18 +364,21 @@ export async function finalizeFailedAnalysisCallback(params: {
     },
   });
   if (lifecycleTransition.status === 'superseded') return { status: 'superseded' };
+  if (lifecycleTransition.status === 'stale-attempt') return { status: 'stale-attempt' };
   return { status: 'failed-finalized' };
 }
 
 export async function finalizeFailedAnalysisCallbackFromEnv(params: {
   env: CloudflareEnv;
   findingId: string;
+  attemptToken?: string;
   payload: SecurityAnalysisCallbackPayload;
 }): Promise<{ status: 'missing' | CallbackDisposition | 'failed-finalized' }> {
   const db = getWorkerDb(params.env.HYPERDRIVE.connectionString, { statement_timeout: 30_000 });
   return finalizeFailedAnalysisCallback({
     db,
     findingId: params.findingId,
+    attemptToken: params.attemptToken,
     payload: params.payload,
   });
 }
@@ -319,6 +386,7 @@ export async function finalizeFailedAnalysisCallbackFromEnv(params: {
 export async function finalizeCompletedAnalysisCallbackFromEnv(params: {
   env: CloudflareEnv;
   findingId: string;
+  attemptToken?: string;
   payload: SecurityAnalysisCallbackPayload;
 }): Promise<{
   status: 'missing' | CallbackDisposition | 'completed-finalized' | 'result-missing';
@@ -327,6 +395,7 @@ export async function finalizeCompletedAnalysisCallbackFromEnv(params: {
   return finalizeCompletedAnalysisCallback({
     db,
     findingId: params.findingId,
+    attemptToken: params.attemptToken,
     payload: params.payload,
     fetchLatestAssistantText: async ({ kiloSessionId }) => {
       const finding = await getSecurityFindingById(db, params.findingId);
@@ -386,6 +455,7 @@ export async function finalizeCompletedAnalysisCallbackFromEnv(params: {
 export async function finalizeAnalysisCallbackFromEnv(params: {
   env: CloudflareEnv;
   findingId: string;
+  attemptToken?: string;
   payload: SecurityAnalysisCallbackPayload;
 }): Promise<{
   status:
@@ -415,6 +485,7 @@ export async function consumeAnalysisCallbackBatch(
       await finalizeCallback({
         env,
         findingId: parsed.data.findingId,
+        attemptToken: parsed.data.attemptToken,
         payload: parsed.data.payload,
       });
       message.ack();

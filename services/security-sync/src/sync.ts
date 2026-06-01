@@ -367,7 +367,10 @@ async function markIntegrationAuthInvalid(
   }
 }
 
-async function clearIntegrationAuthInvalid(db: WorkerDb, platformIntegrationId: string): Promise<void> {
+async function clearIntegrationAuthInvalid(
+  db: WorkerDb,
+  platformIntegrationId: string
+): Promise<void> {
   try {
     const now = new Date().toISOString();
     await db

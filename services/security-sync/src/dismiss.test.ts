@@ -12,9 +12,28 @@ const finding = {
   owned_by_user_id: null,
 };
 
-function createDb(selectedFinding = finding) {
+function createDb(selectedFinding = finding, options: { failAuditInsert?: boolean } = {}) {
   const updates: unknown[] = [];
   const auditRows: unknown[] = [];
+  function createOperations(targetUpdates: unknown[], targetAuditRows: unknown[]) {
+    return {
+      update: () => ({
+        set: (values: unknown) => ({
+          where: async () => {
+            targetUpdates.push(values);
+          },
+        }),
+      }),
+      insert: () => ({
+        values: async (values: unknown) => {
+          if (options.failAuditInsert) {
+            throw new Error('audit insert failed');
+          }
+          targetAuditRows.push(values);
+        },
+      }),
+    };
+  }
   const db = {
     select: () => ({
       from: () => ({
@@ -23,18 +42,15 @@ function createDb(selectedFinding = finding) {
         }),
       }),
     }),
-    update: () => ({
-      set: (values: unknown) => ({
-        where: async () => {
-          updates.push(values);
-        },
-      }),
-    }),
-    insert: () => ({
-      values: async (values: unknown) => {
-        auditRows.push(values);
-      },
-    }),
+    ...createOperations(updates, auditRows),
+    transaction: async <T>(callback: (tx: unknown) => Promise<T>) => {
+      const stagedUpdates: unknown[] = [];
+      const stagedAuditRows: unknown[] = [];
+      const result = await callback(createOperations(stagedUpdates, stagedAuditRows));
+      updates.push(...stagedUpdates);
+      auditRows.push(...stagedAuditRows);
+      return result;
+    },
   };
 
   return { db: db as never, updates, auditRows };
@@ -97,6 +113,22 @@ describe('processSecurityFindingDismissal', () => {
         message: createMessage(),
       })
     ).rejects.toThrow('GitHub Dependabot dismissal failed with 503');
+
+    expect(updates).toHaveLength(0);
+    expect(auditRows).toHaveLength(0);
+  });
+
+  it('rolls back the local finding update when audit insert fails', async () => {
+    const { db, updates, auditRows } = createDb(finding, { failAuditInsert: true });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, status: 200 }));
+
+    await expect(
+      processSecurityFindingDismissal({
+        db,
+        gitTokenService: { getToken: async () => 'github-token' } as GitTokenService,
+        message: createMessage(),
+      })
+    ).rejects.toThrow('audit insert failed');
 
     expect(updates).toHaveLength(0);
     expect(auditRows).toHaveLength(0);

@@ -108,6 +108,10 @@ async function handleFetch(request: Request, env: CloudflareEnv): Promise<Respon
     if (!findingId) {
       return Response.json({ error: 'Missing finding id' }, { status: 400 });
     }
+    const attemptToken = url.searchParams.get('attempt');
+    if (!attemptToken) {
+      return Response.json({ error: 'Missing callback attempt token' }, { status: 400 });
+    }
     const callbackTokenSecret = await env.CALLBACK_TOKEN_SECRET.get();
     const callbackToken = request.headers.get('X-Callback-Token');
     const validCallbackToken =
@@ -116,7 +120,7 @@ async function handleFetch(request: Request, env: CloudflareEnv): Promise<Respon
         token: callbackToken,
         secret: callbackTokenSecret,
         scope: 'security-analysis-callback',
-        resourceParts: [findingId],
+        resourceParts: [findingId, attemptToken],
       }));
     if (!validCallbackToken) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
@@ -139,7 +143,7 @@ async function handleFetch(request: Request, env: CloudflareEnv): Promise<Respon
 
     await env.CALLBACK_QUEUE.sendBatch([
       {
-        body: { findingId, payload: parsedPayload.data },
+        body: { findingId, attemptToken, payload: parsedPayload.data },
         contentType: 'json',
       },
     ]);

@@ -17,6 +17,7 @@ const failedPayload = {
   status: 'failed',
   errorMessage: 'upstream 503',
 } satisfies SecurityAnalysisCallbackPayload;
+const ATTEMPT_TOKEN = 'attempt-token-123';
 
 vi.mock('./analysis-start-lifecycle.js', () => ({
   transitionAnalysisCallbackLifecycle: vi.fn(),
@@ -69,6 +70,36 @@ describe('classifyAnalysisCallback', () => {
       )
     ).toBe('superseded');
   });
+
+  it('rejects callbacks from an older active attempt', () => {
+    expect(
+      classifyAnalysisCallback(
+        {
+          session_id: null,
+          cli_session_id: null,
+          ignored_reason: null,
+          analysis_status: 'pending',
+        },
+        failedPayload,
+        { expected: 'old-attempt', active: ATTEMPT_TOKEN }
+      )
+    ).toBe('stale-attempt');
+  });
+
+  it('rejects callbacks when the active attempt has already disappeared', () => {
+    expect(
+      classifyAnalysisCallback(
+        {
+          session_id: null,
+          cli_session_id: null,
+          ignored_reason: null,
+          analysis_status: 'running',
+        },
+        failedPayload,
+        { expected: ATTEMPT_TOKEN, active: null }
+      )
+    ).toBe('stale-attempt');
+  });
 });
 
 describe('resolveCompletedCallbackMarkdown', () => {
@@ -110,6 +141,7 @@ describe('finalizeCompletedAnalysisCallback', () => {
                 cli_session_id: 'ses-123',
                 ignored_reason: null,
                 analysis_status: 'running',
+                claimToken: ATTEMPT_TOKEN,
                 owned_by_organization_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
                 owned_by_user_id: null,
                 analysis: {
@@ -151,6 +183,7 @@ describe('finalizeCompletedAnalysisCallback', () => {
       finalizeCompletedAnalysisCallback({
         db: db as never,
         findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        attemptToken: ATTEMPT_TOKEN,
         payload: {
           sessionId: 'session-123',
           cloudAgentSessionId: 'agent-123',
@@ -182,6 +215,7 @@ describe('finalizeCompletedAnalysisCallback', () => {
     expect(executes).toHaveLength(0);
     expect(transitionAnalysisCallbackLifecycle).toHaveBeenCalledWith(db, {
       findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      attemptToken: ATTEMPT_TOKEN,
       outcome: expect.objectContaining({
         type: 'completed',
         analysis: expect.objectContaining({
@@ -217,6 +251,7 @@ describe('finalizeCompletedAnalysisCallback', () => {
       finalizeCompletedAnalysisCallback({
         db: db as never,
         findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        attemptToken: ATTEMPT_TOKEN,
         payload: {
           sessionId: 'session-123',
           cloudAgentSessionId: 'agent-123',
@@ -232,6 +267,7 @@ describe('finalizeCompletedAnalysisCallback', () => {
     expect(extractSandboxAnalysis).not.toHaveBeenCalled();
     expect(transitionAnalysisCallbackLifecycle).toHaveBeenCalledWith(db, {
       findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      attemptToken: ATTEMPT_TOKEN,
       outcome: {
         type: 'already-terminal',
         findingStatus: 'completed',
@@ -252,6 +288,7 @@ describe('finalizeCompletedAnalysisCallback', () => {
                 cli_session_id: 'ses-123',
                 ignored_reason: 'superseded:canonical-finding',
                 analysis_status: 'running',
+                claimToken: ATTEMPT_TOKEN,
               },
             ],
           }),
@@ -266,6 +303,7 @@ describe('finalizeCompletedAnalysisCallback', () => {
       finalizeCompletedAnalysisCallback({
         db: db as never,
         findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        attemptToken: ATTEMPT_TOKEN,
         payload: {
           sessionId: 'session-123',
           cloudAgentSessionId: 'agent-123',
@@ -281,6 +319,7 @@ describe('finalizeCompletedAnalysisCallback', () => {
     expect(extractSandboxAnalysis).not.toHaveBeenCalled();
     expect(transitionAnalysisCallbackLifecycle).toHaveBeenCalledWith(db, {
       findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      attemptToken: ATTEMPT_TOKEN,
       outcome: { type: 'superseded' },
     });
   });
@@ -299,6 +338,7 @@ describe('finalizeCompletedAnalysisCallback', () => {
                 cli_session_id: 'ses-123',
                 ignored_reason: null,
                 analysis_status: 'running',
+                claimToken: ATTEMPT_TOKEN,
               },
             ],
           }),
@@ -324,6 +364,7 @@ describe('finalizeCompletedAnalysisCallback', () => {
       finalizeCompletedAnalysisCallback({
         db: db as never,
         findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        attemptToken: ATTEMPT_TOKEN,
         payload: {
           sessionId: 'session-123',
           cloudAgentSessionId: 'agent-123',
@@ -343,6 +384,7 @@ describe('finalizeCompletedAnalysisCallback', () => {
     expect(queueTransitions).toHaveLength(0);
     expect(transitionAnalysisCallbackLifecycle).toHaveBeenCalledWith(db, {
       findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      attemptToken: ATTEMPT_TOKEN,
       outcome: {
         type: 'failed',
         errorMessage: 'Analysis completed but callback result text was missing',
@@ -350,11 +392,61 @@ describe('finalizeCompletedAnalysisCallback', () => {
       },
     });
   });
+
+  it('rejects completed callbacks before extraction when no active attempt exists', async () => {
+    const extractSandboxAnalysis = vi.fn();
+    const db = {
+      select: vi
+        .fn()
+        .mockReturnValueOnce({
+          from: () => ({
+            where: () => ({
+              limit: async () => [
+                {
+                  session_id: 'agent-123',
+                  cli_session_id: 'ses-123',
+                  ignored_reason: null,
+                  analysis_status: 'running',
+                },
+              ],
+            }),
+          }),
+        })
+        .mockReturnValueOnce({
+          from: () => ({
+            where: () => ({
+              limit: async () => [],
+            }),
+          }),
+        }),
+    };
+
+    await expect(
+      finalizeCompletedAnalysisCallback({
+        db: db as never,
+        findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        attemptToken: ATTEMPT_TOKEN,
+        payload: {
+          sessionId: 'session-123',
+          cloudAgentSessionId: 'agent-123',
+          executionId: 'exec-123',
+          kiloSessionId: 'ses-123',
+          status: 'completed',
+          lastAssistantMessageText: '# Completed analysis',
+        },
+        extractSandboxAnalysis,
+      })
+    ).resolves.toEqual({ status: 'stale-attempt' });
+
+    expect(extractSandboxAnalysis).not.toHaveBeenCalled();
+    expect(transitionAnalysisCallbackLifecycle).not.toHaveBeenCalled();
+  });
 });
 
 describe('consumeAnalysisCallbackBatch', () => {
   const callbackBody = {
     findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+    attemptToken: ATTEMPT_TOKEN,
     payload: {
       sessionId: 'session-123',
       cloudAgentSessionId: 'agent-123',
@@ -376,6 +468,31 @@ describe('consumeAnalysisCallbackBatch', () => {
     );
 
     expect(finalizeCallback).toHaveBeenCalledTimes(1);
+    expect(ack).toHaveBeenCalledTimes(1);
+    expect(retry).not.toHaveBeenCalled();
+  });
+
+  it('accepts legacy callback messages without an attempt token', async () => {
+    const ack = vi.fn();
+    const retry = vi.fn();
+    const finalizeCallback = vi.fn().mockResolvedValue({ status: 'completed-finalized' });
+    const legacyBody = {
+      findingId: callbackBody.findingId,
+      payload: callbackBody.payload,
+    };
+
+    await consumeAnalysisCallbackBatch(
+      { messages: [{ body: legacyBody, ack, retry }] } as never,
+      {} as CloudflareEnv,
+      finalizeCallback
+    );
+
+    expect(finalizeCallback).toHaveBeenCalledWith({
+      env: {},
+      findingId: callbackBody.findingId,
+      attemptToken: undefined,
+      payload: callbackBody.payload,
+    });
     expect(ack).toHaveBeenCalledTimes(1);
     expect(retry).not.toHaveBeenCalled();
   });
@@ -420,12 +537,14 @@ describe('finalizeFailedAnalysisCallback', () => {
       finalizeFailedAnalysisCallback({
         db: db as never,
         findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        attemptToken: ATTEMPT_TOKEN,
         payload: failedPayload,
       })
     ).resolves.toEqual({ status: 'already-terminal' });
 
     expect(transitionAnalysisCallbackLifecycle).toHaveBeenCalledWith(db, {
       findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      attemptToken: ATTEMPT_TOKEN,
       outcome: {
         type: 'already-terminal',
         findingStatus: 'failed',
@@ -446,6 +565,7 @@ describe('finalizeFailedAnalysisCallback', () => {
                 cli_session_id: null,
                 ignored_reason: 'superseded:canonical-finding',
                 analysis_status: 'running',
+                claimToken: ATTEMPT_TOKEN,
               },
             ],
           }),
@@ -459,12 +579,14 @@ describe('finalizeFailedAnalysisCallback', () => {
       finalizeFailedAnalysisCallback({
         db: db as never,
         findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        attemptToken: ATTEMPT_TOKEN,
         payload: failedPayload,
       })
     ).resolves.toEqual({ status: 'superseded' });
 
     expect(transitionAnalysisCallbackLifecycle).toHaveBeenCalledWith(db, {
       findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      attemptToken: ATTEMPT_TOKEN,
       outcome: { type: 'superseded' },
     });
   });
@@ -482,6 +604,7 @@ describe('finalizeFailedAnalysisCallback', () => {
                 cli_session_id: null,
                 ignored_reason: null,
                 analysis_status: 'running',
+                claimToken: ATTEMPT_TOKEN,
               },
             ],
           }),
@@ -507,6 +630,7 @@ describe('finalizeFailedAnalysisCallback', () => {
       finalizeFailedAnalysisCallback({
         db: db as never,
         findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        attemptToken: ATTEMPT_TOKEN,
         payload: failedPayload,
       })
     ).resolves.toEqual({ status: 'failed-finalized' });
@@ -514,6 +638,45 @@ describe('finalizeFailedAnalysisCallback', () => {
     expect(queueTransitions).toHaveLength(0);
     expect(transitionAnalysisCallbackLifecycle).toHaveBeenCalledWith(db, {
       findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      attemptToken: ATTEMPT_TOKEN,
+      outcome: {
+        type: 'failed',
+        errorMessage: 'upstream 503',
+        failureCode: 'UPSTREAM_5XX',
+      },
+    });
+  });
+
+  it('resolves the active claim token for legacy failed callback messages', async () => {
+    const db = {
+      select: () => ({
+        from: () => ({
+          where: () => ({
+            limit: async () => [
+              {
+                session_id: 'agent-123',
+                cli_session_id: null,
+                ignored_reason: null,
+                analysis_status: 'running',
+                claimToken: ATTEMPT_TOKEN,
+              },
+            ],
+          }),
+        }),
+      }),
+    };
+
+    await expect(
+      finalizeFailedAnalysisCallback({
+        db: db as never,
+        findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        payload: failedPayload,
+      })
+    ).resolves.toEqual({ status: 'failed-finalized' });
+
+    expect(transitionAnalysisCallbackLifecycle).toHaveBeenCalledWith(db, {
+      findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      attemptToken: ATTEMPT_TOKEN,
       outcome: {
         type: 'failed',
         errorMessage: 'upstream 503',

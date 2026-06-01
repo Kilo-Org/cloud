@@ -493,6 +493,7 @@ export async function enqueueBacklogFindings(params: {
 
 export async function transitionAutoAnalysisQueueFromCallback(params: {
   findingId: string;
+  attemptToken?: string;
   toStatus: 'completed' | 'failed';
   failureCode?: AutoAnalysisFailureCode;
   errorMessage?: string;
@@ -515,6 +516,9 @@ export async function transitionAutoAnalysisQueueFromCallback(params: {
     .where(
       and(
         eq(security_analysis_queue.finding_id, params.findingId),
+        params.attemptToken
+          ? eq(security_analysis_queue.claim_token, params.attemptToken)
+          : undefined,
         or(
           eq(security_analysis_queue.queue_status, 'running'),
           eq(security_analysis_queue.queue_status, 'pending')

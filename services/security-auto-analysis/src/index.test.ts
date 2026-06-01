@@ -5,10 +5,11 @@ import worker from './index.js';
 const CALLBACK_SECRET = 'callback-token-secret';
 const FINDING_ID = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 const OTHER_FINDING_ID = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+const ATTEMPT_TOKEN = 'attempt-token-123';
 
 function callbackRequest(headers: Record<string, string> = {}): Request {
   return new Request(
-    `https://security-auto-analysis/internal/security-analysis-callback/${FINDING_ID}`,
+    `https://security-auto-analysis/internal/security-analysis-callback/${FINDING_ID}?attempt=${ATTEMPT_TOKEN}`,
     {
       method: 'POST',
       headers: { 'content-type': 'application/json', ...headers },
@@ -23,11 +24,14 @@ function callbackRequest(headers: Record<string, string> = {}): Request {
   );
 }
 
-async function callbackTokenFor(findingId = FINDING_ID): Promise<string> {
+async function callbackTokenFor(
+  findingId = FINDING_ID,
+  attemptToken = ATTEMPT_TOKEN
+): Promise<string> {
   return deriveCallbackToken({
     secret: CALLBACK_SECRET,
     scope: 'security-analysis-callback',
-    resourceParts: [findingId],
+    resourceParts: [findingId, attemptToken],
   });
 }
 
@@ -88,6 +92,7 @@ describe('security analysis callback ingress', () => {
     expect(queued).toHaveLength(1);
     expect(queued[0]?.[0]?.body).toMatchObject({
       findingId: FINDING_ID,
+      attemptToken: ATTEMPT_TOKEN,
       payload: { status: 'completed' },
     });
   });
@@ -95,7 +100,7 @@ describe('security analysis callback ingress', () => {
   it('accepts authenticated failed callbacks for durable Worker terminalization', async () => {
     const queued: MessageSendRequest<unknown>[][] = [];
     const request = new Request(
-      `https://security-auto-analysis/internal/security-analysis-callback/${FINDING_ID}`,
+      `https://security-auto-analysis/internal/security-analysis-callback/${FINDING_ID}?attempt=${ATTEMPT_TOKEN}`,
       {
         method: 'POST',
         headers: {
@@ -123,6 +128,7 @@ describe('security analysis callback ingress', () => {
     expect(response.status).toBe(202);
     expect(queued[0]?.[0]?.body).toMatchObject({
       findingId: FINDING_ID,
+      attemptToken: ATTEMPT_TOKEN,
       payload: { status: 'failed', errorMessage: 'sandbox failed' },
     });
   });

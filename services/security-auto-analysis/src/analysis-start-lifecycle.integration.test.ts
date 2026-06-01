@@ -98,6 +98,7 @@ describe('analysis start lifecycle durable transitions', () => {
     await expect(
       transitionAnalysisCallbackLifecycle(client.db as never, {
         findingId,
+        attemptToken: 'callback-completed-claim',
         outcome: {
           type: 'completed',
           analysis,
@@ -141,6 +142,7 @@ describe('analysis start lifecycle durable transitions', () => {
     await expect(
       transitionAnalysisCallbackLifecycle(client.db as never, {
         findingId,
+        attemptToken: 'callback-failed-claim',
         outcome: {
           type: 'failed',
           errorMessage: 'upstream 503',
@@ -187,6 +189,7 @@ describe('analysis start lifecycle durable transitions', () => {
     await expect(
       transitionAnalysisCallbackLifecycle(client.db as never, {
         findingId,
+        attemptToken: 'callback-superseded-claim',
         outcome: { type: 'superseded' },
       })
     ).resolves.toEqual({ status: 'superseded' });
@@ -223,6 +226,7 @@ describe('analysis start lifecycle durable transitions', () => {
     await expect(
       transitionAnalysisCallbackLifecycle(client.db as never, {
         findingId,
+        attemptToken: 'callback-superseded-completion-race-claim',
         outcome: {
           type: 'completed',
           analysis: createAnalysis('callback-superseded-completion-race'),
@@ -262,6 +266,7 @@ describe('analysis start lifecycle durable transitions', () => {
     await expect(
       transitionAnalysisCallbackLifecycle(client.db as never, {
         findingId,
+        attemptToken: 'callback-partial-completion-claim',
         outcome: {
           type: 'already-terminal',
           findingStatus: 'completed',

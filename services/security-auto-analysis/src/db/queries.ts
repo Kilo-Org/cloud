@@ -603,6 +603,24 @@ export async function getSecurityFindingById(db: WorkerDb, findingId: string) {
 
 export type SecurityFindingRecord = NonNullable<Awaited<ReturnType<typeof getSecurityFindingById>>>;
 
+export async function getActiveAnalysisAttemptToken(
+  db: WorkerDb,
+  findingId: string
+): Promise<string | null> {
+  const rows = await db
+    .select({ claimToken: security_analysis_queue.claim_token })
+    .from(security_analysis_queue)
+    .where(
+      and(
+        eq(security_analysis_queue.finding_id, findingId),
+        inArray(security_analysis_queue.queue_status, ['pending', 'running'])
+      )
+    )
+    .limit(1);
+
+  return rows[0]?.claimToken ?? null;
+}
+
 export async function tryAcquireAnalysisStartLease(
   db: WorkerDb,
   findingId: string
@@ -656,99 +674,6 @@ export async function setFindingPending(
     );
 }
 
-export async function setFindingRunning(
-  db: WorkerDb,
-  findingId: string,
-  cloudAgentSessionId: string,
-  kiloSessionId: string
-): Promise<void> {
-  await db
-    .update(security_findings)
-    .set({
-      analysis_status: 'running',
-      session_id: cloudAgentSessionId,
-      cli_session_id: kiloSessionId,
-      analysis_started_at: sql`coalesce(${security_findings.analysis_started_at}, now())`.mapWith(
-        String
-      ),
-      updated_at: sql`now()`.mapWith(String),
-    })
-    .where(
-      and(
-        eq(security_findings.id, findingId),
-        or(
-          isNull(security_findings.ignored_reason),
-          not(like(security_findings.ignored_reason, 'superseded:%'))
-        )
-      )
-    );
-}
-
-/**
- * Mark a finding's analysis as completed.
- * Returns false if the finding was superseded (guard tripped, no rows updated).
- * The caller should clear analysis_status when this returns false.
- */
-export async function setFindingCompleted(
-  db: WorkerDb,
-  findingId: string,
-  analysis: SecurityFindingAnalysis
-): Promise<boolean> {
-  const rows = await db
-    .update(security_findings)
-    .set({
-      analysis_status: 'completed',
-      analysis: sql`${JSON.stringify(analysis)}::jsonb`,
-      analysis_error: null,
-      analysis_completed_at: sql`now()`.mapWith(String),
-      updated_at: sql`now()`.mapWith(String),
-    })
-    .where(
-      and(
-        eq(security_findings.id, findingId),
-        or(
-          isNull(security_findings.ignored_reason),
-          not(like(security_findings.ignored_reason, 'superseded:%'))
-        )
-      )
-    )
-    .returning({ id: security_findings.id });
-
-  return rows.length > 0;
-}
-
-/**
- * Mark a finding's analysis as failed.
- * Returns false if the finding was superseded (guard tripped, no rows updated).
- * The caller should clear analysis_status when this returns false.
- */
-export async function setFindingFailed(
-  db: WorkerDb,
-  findingId: string,
-  errorMessage: string
-): Promise<boolean> {
-  const rows = await db
-    .update(security_findings)
-    .set({
-      analysis_status: 'failed',
-      analysis_error: errorMessage,
-      analysis_completed_at: sql`now()`.mapWith(String),
-      updated_at: sql`now()`.mapWith(String),
-    })
-    .where(
-      and(
-        eq(security_findings.id, findingId),
-        or(
-          isNull(security_findings.ignored_reason),
-          not(like(security_findings.ignored_reason, 'superseded:%'))
-        )
-      )
-    )
-    .returning({ id: security_findings.id });
-
-  return rows.length > 0;
-}
-
 /**
  * Clear analysis_status so a superseded finding no longer counts against
  * the owner's concurrency cap in countRunningAnalyses().
@@ -761,27 +686,6 @@ export async function clearAnalysisStatus(db: WorkerDb, findingId: string): Prom
       updated_at: sql`now()`.mapWith(String),
     })
     .where(eq(security_findings.id, findingId));
-}
-
-export async function transitionAnalysisQueueFromCallback(
-  db: WorkerDb,
-  params: {
-    findingId: string;
-    toStatus: 'completed' | 'failed';
-    failureCode: string | null;
-    errorMessage: string | null;
-  }
-): Promise<void> {
-  await db.execute(sql`
-    UPDATE security_analysis_queue
-    SET
-      queue_status = ${params.toStatus},
-      failure_code = ${params.failureCode},
-      last_error_redacted = ${params.errorMessage},
-      updated_at = now()
-    WHERE finding_id = ${params.findingId}::uuid
-      AND queue_status IN ('running', 'pending')
-  `);
 }
 
 export async function reconcileStaleAnalysisQueueRows(db: WorkerDb): Promise<{

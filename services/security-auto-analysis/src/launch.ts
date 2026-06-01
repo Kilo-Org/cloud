@@ -126,15 +126,17 @@ export function buildSecurityAnalysisCallbackTarget(
     | 'SECURITY_ANALYSIS_CALLBACK_WORKER_BASE_URL'
   >,
   findingId: string,
-  callbackToken: string
+  callbackToken: string,
+  attemptToken: string
 ): {
   url: string;
   headers: { 'X-Callback-Token': string };
 } {
+  const encodedAttemptToken = encodeURIComponent(attemptToken);
   if (env.SECURITY_ANALYSIS_CALLBACK_ROUTING_MODE === 'web') {
     const baseUrl = env.SECURITY_ANALYSIS_CALLBACK_WEB_BASE_URL.replace(/\/$/, '');
     return {
-      url: `${baseUrl}/api/internal/security-analysis-callback/${findingId}`,
+      url: `${baseUrl}/api/internal/security-analysis-callback/${findingId}?attempt=${encodedAttemptToken}`,
       headers: { 'X-Callback-Token': callbackToken },
     };
   }
@@ -147,7 +149,7 @@ export function buildSecurityAnalysisCallbackTarget(
   }
 
   return {
-    url: `${baseUrl}/internal/security-analysis-callback/${findingId}`,
+    url: `${baseUrl}/internal/security-analysis-callback/${findingId}?attempt=${encodedAttemptToken}`,
     headers: { 'X-Callback-Token': callbackToken },
   };
 }
@@ -250,12 +252,13 @@ export async function startSecurityAnalysis(
     const callbackToken = await deriveCallbackToken({
       secret: params.callbackTokenSecret,
       scope: 'security-analysis-callback',
-      resourceParts: [params.findingId],
+      resourceParts: [params.findingId, params.lifecycleClaim.claimToken],
     });
     const callbackTarget = buildSecurityAnalysisCallbackTarget(
       params.env,
       params.findingId,
-      callbackToken
+      callbackToken,
+      params.lifecycleClaim.claimToken
     );
 
     const prepareInput = {

@@ -17,8 +17,8 @@ import { fetchSessionSnapshot } from '@/lib/session-ingest-client';
 import { trackSecurityAgentAnalysisCompleted } from '@/lib/security-agent/posthog-tracking';
 import { generateApiToken } from '@/lib/tokens';
 import { db } from '@/lib/drizzle';
-import { kilocode_users } from '@kilocode/db/schema';
-import { eq } from 'drizzle-orm';
+import { kilocode_users, security_analysis_queue } from '@kilocode/db/schema';
+import { and, eq, inArray } from 'drizzle-orm';
 import { z } from 'zod';
 import { verifyCallbackToken } from '@kilocode/worker-utils/callback-token';
 import { logExceptInTest, sentryLogger } from '@/lib/utils.server';
@@ -84,6 +84,10 @@ export async function POST(
 ) {
   try {
     const { findingId } = await params;
+    const attemptToken = req.nextUrl.searchParams.get('attempt');
+    if (!attemptToken) {
+      return NextResponse.json({ error: 'Missing callback attempt token' }, { status: 400 });
+    }
     const callbackToken = req.headers.get('X-Callback-Token');
     const validCallbackToken =
       !!CALLBACK_TOKEN_SECRET &&
@@ -91,7 +95,7 @@ export async function POST(
         token: callbackToken,
         secret: CALLBACK_TOKEN_SECRET,
         scope: 'security-analysis-callback',
-        resourceParts: [findingId],
+        resourceParts: [findingId, attemptToken],
       }));
     if (!validCallbackToken) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -117,6 +121,28 @@ export async function POST(
     if (!finding) {
       logError('Finding not found for callback', { findingId });
       return NextResponse.json({ error: 'Finding not found' }, { status: 404 });
+    }
+
+    const [activeAttempt] = await db
+      .select({ claimToken: security_analysis_queue.claim_token })
+      .from(security_analysis_queue)
+      .where(
+        and(
+          eq(security_analysis_queue.finding_id, findingId),
+          inArray(security_analysis_queue.queue_status, ['pending', 'running'])
+        )
+      )
+      .limit(1);
+    if (
+      (finding.analysis_status === 'pending' || finding.analysis_status === 'running') &&
+      activeAttempt?.claimToken !== attemptToken
+    ) {
+      warn('Ignoring stale auto-analysis callback due to attempt mismatch', {
+        findingId,
+        callbackAttemptToken: attemptToken,
+        activeAttemptToken: activeAttempt?.claimToken ?? null,
+      });
+      return NextResponse.json({ success: true, message: 'Stale callback ignored' });
     }
 
     const sessionMismatch =
@@ -160,6 +186,7 @@ export async function POST(
       });
       await transitionAutoAnalysisQueueFromCallback({
         findingId,
+        attemptToken,
         toStatus: 'completed',
         failureCode: 'SKIPPED_NO_LONGER_ELIGIBLE',
       });
@@ -186,9 +213,9 @@ export async function POST(
     after(async () => {
       try {
         if (payload.status === 'completed') {
-          await handleAnalysisCompleted(findingId, payload, finding);
+          await handleAnalysisCompleted(findingId, attemptToken, payload, finding);
         } else if (payload.status === 'failed' || payload.status === 'interrupted') {
-          await handleAnalysisFailed(findingId, payload, finding);
+          await handleAnalysisFailed(findingId, attemptToken, payload, finding);
         } else {
           const unknownStatus = payload.status as string;
           logError('Unknown callback status received, marking as failed', {
@@ -204,6 +231,7 @@ export async function POST(
           }
           await transitionAutoAnalysisQueueFromCallback({
             findingId,
+            attemptToken,
             toStatus: 'failed',
             failureCode: 'STATE_GUARD_REJECTED',
             errorMessage: `Unknown callback status: ${unknownStatus}`,
@@ -257,6 +285,7 @@ function readAnalysisContext(analysis: SecurityFindingAnalysis | null | undefine
 
 async function handleAnalysisCompleted(
   findingId: string,
+  attemptToken: string,
   payload: ExecutionCallbackPayload,
   finding: Awaited<ReturnType<typeof getSecurityFindingById>> & {}
 ) {
@@ -283,6 +312,7 @@ async function handleAnalysisCompleted(
     }
     await transitionAutoAnalysisQueueFromCallback({
       findingId,
+      attemptToken,
       toStatus: 'failed',
       failureCode: 'STATE_GUARD_REJECTED',
       errorMessage: 'Cannot process callback — triggeredByUserId missing from analysis context',
@@ -302,6 +332,7 @@ async function handleAnalysisCompleted(
     }
     await transitionAutoAnalysisQueueFromCallback({
       findingId,
+      attemptToken,
       toStatus: 'failed',
       failureCode: 'STATE_GUARD_REJECTED',
       errorMessage: 'Callback missing kiloSessionId — cannot retrieve analysis result',
@@ -367,6 +398,7 @@ async function handleAnalysisCompleted(
     }
     await transitionAutoAnalysisQueueFromCallback({
       findingId,
+      attemptToken,
       toStatus: 'failed',
       failureCode: 'START_CALL_AMBIGUOUS',
       errorMessage: 'Analysis completed but result could not be retrieved from ingest service',
@@ -406,6 +438,7 @@ async function handleAnalysisCompleted(
     }
     await transitionAutoAnalysisQueueFromCallback({
       findingId,
+      attemptToken,
       toStatus: 'failed',
       failureCode: 'STATE_GUARD_REJECTED',
       errorMessage: `User ${triggeredByUserId} not found — cannot run Tier 3 extraction`,
@@ -451,6 +484,7 @@ async function handleAnalysisCompleted(
     });
     await transitionAutoAnalysisQueueFromCallback({
       findingId,
+      attemptToken,
       toStatus: 'failed',
       failureCode: 'START_CALL_AMBIGUOUS',
       errorMessage: error instanceof Error ? error.message : String(error),
@@ -460,10 +494,15 @@ async function handleAnalysisCompleted(
 
   const updatedFinding = await getSecurityFindingById(findingId);
   if (updatedFinding?.analysis_status === 'completed') {
-    await transitionAutoAnalysisQueueFromCallback({ findingId, toStatus: 'completed' });
+    await transitionAutoAnalysisQueueFromCallback({
+      findingId,
+      attemptToken,
+      toStatus: 'completed',
+    });
   } else if (updatedFinding?.analysis_status === 'failed') {
     await transitionAutoAnalysisQueueFromCallback({
       findingId,
+      attemptToken,
       toStatus: 'failed',
       failureCode: 'START_CALL_AMBIGUOUS',
       errorMessage: updatedFinding.analysis_error ?? undefined,
@@ -471,6 +510,7 @@ async function handleAnalysisCompleted(
   } else {
     await transitionAutoAnalysisQueueFromCallback({
       findingId,
+      attemptToken,
       toStatus: 'failed',
       failureCode: 'STATE_GUARD_REJECTED',
       errorMessage: `Unexpected post-finalize state: ${updatedFinding?.analysis_status ?? 'finding_not_found'}`,
@@ -480,6 +520,7 @@ async function handleAnalysisCompleted(
 
 async function handleAnalysisFailed(
   findingId: string,
+  attemptToken: string,
   payload: ExecutionCallbackPayload,
   finding: Awaited<ReturnType<typeof getSecurityFindingById>> & {}
 ) {
@@ -523,6 +564,7 @@ async function handleAnalysisFailed(
   }
   await transitionAutoAnalysisQueueFromCallback({
     findingId,
+    attemptToken,
     toStatus: 'failed',
     failureCode: callbackFailure.failureCode,
     errorMessage,

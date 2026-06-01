@@ -7,7 +7,6 @@ import {
 } from './utils';
 
 import { getIntegrationForOrganization } from '@/lib/integrations/db/platform-integrations';
-import { getGitHubTokenForOrganization } from '@/lib/cloud-agent/github-integration-helpers';
 import { createSecurityAgentHandlers } from '@/lib/security-agent/router/shared-handlers';
 
 const handlers = createSecurityAgentHandlers<{ organizationId: string }>({
@@ -24,8 +23,6 @@ const handlers = createSecurityAgentHandlers<{ organizationId: string }>({
     finding.owned_by_organization_id === input.organizationId,
   getIntegration: async (_ctx, input) =>
     await getIntegrationForOrganization(input.organizationId, 'github'),
-  getGitHubToken: async (_ctx, input) =>
-    (await getGitHubTokenForOrganization(input.organizationId)) ?? null,
   trackingExtras: (_ctx, input) => ({
     organizationId: input.organizationId,
   }),

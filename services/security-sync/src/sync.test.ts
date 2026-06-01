@@ -37,7 +37,10 @@ function createFakeDb(options: FakeDbOptions = {}) {
                   id: 'integration-1',
                   platform_installation_id: 'installation-1',
                   permissions: { vulnerability_alerts: 'read' },
-                  repositories: repositories.map((full_name, index) => ({ id: index + 1, full_name })),
+                  repositories: repositories.map((full_name, index) => ({
+                    id: index + 1,
+                    full_name,
+                  })),
                   authInvalidAt: options.authInvalidAt ?? null,
                 },
               ];

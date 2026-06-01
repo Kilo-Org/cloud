@@ -7,17 +7,17 @@ import {
 
 describe('free model data disclosure', () => {
   it('uses the disclosure label expected in model pickers', () => {
-    expect(FREE_MODEL_DATA_LABEL).toBe('Free - data collected');
+    expect(FREE_MODEL_DATA_LABEL).toBe('Data collected');
   });
 
   it('detects explicit and known free model options', () => {
     expect(isFreeModelOption({ id: 'anthropic/claude', isFree: true })).toBe(true);
     expect(isFreeModelOption({ id: 'openrouter/free' })).toBe(true);
-    expect(isFreeModelOption({ id: 'openrouter/model-alpha' })).toBe(true);
+    expect(isFreeModelOption({ id: 'openrouter/model-alpha' })).toBe(false);
     expect(isFreeModelOption({ id: 'anthropic/claude' })).toBe(false);
   });
 
-  it('describes why the free model indicator is shown', () => {
-    expect(getFreeModelDataTooltip()).toContain('model improvement');
+  it('uses the short disclosure text as tooltip content', () => {
+    expect(getFreeModelDataTooltip()).toBe('Data collected');
   });
 });

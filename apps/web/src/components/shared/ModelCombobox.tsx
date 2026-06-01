@@ -13,7 +13,7 @@ import {
   CommandItem,
   CommandList,
 } from '@/components/ui/command';
-import { ChevronsUpDown, Check, Image, Info } from 'lucide-react';
+import { AlertTriangle, ChevronsUpDown, Check, Image } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { preferredModels } from '@/lib/ai-gateway/models';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -439,7 +439,14 @@ function FreeModelDataIcon() {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <Info className="h-3.5 w-3.5 shrink-0 text-yellow-500" />
+        <span
+          aria-label={FREE_MODEL_DATA_LABEL}
+          className="inline-flex shrink-0 items-center rounded-sm text-yellow-500 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+          role="img"
+          tabIndex={0}
+        >
+          <AlertTriangle className="h-3.5 w-3.5" />
+        </span>
       </TooltipTrigger>
       <TooltipContent>{getFreeModelDataTooltip()}</TooltipContent>
     </Tooltip>
@@ -450,8 +457,13 @@ function FreeModelDataBadge() {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <span className="inline-flex max-w-36 shrink-0 items-center gap-1 rounded-full border border-yellow-500/30 bg-yellow-500/10 px-1.5 py-0.5 text-[10px] font-medium text-yellow-600 dark:text-yellow-300">
-          <Info className="h-3 w-3 shrink-0" />
+        <span
+          aria-label={FREE_MODEL_DATA_LABEL}
+          className="inline-flex max-w-36 shrink-0 items-center gap-1 rounded-full border border-yellow-500/30 bg-yellow-500/10 px-1.5 py-0.5 text-[10px] font-medium text-yellow-600 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none dark:text-yellow-300"
+          role="status"
+          tabIndex={0}
+        >
+          <AlertTriangle className="h-3 w-3 shrink-0" />
           <span className="truncate">{FREE_MODEL_DATA_LABEL}</span>
         </span>
       </TooltipTrigger>

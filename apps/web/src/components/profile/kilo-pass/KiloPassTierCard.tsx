@@ -24,19 +24,10 @@ export function KiloPassTierCard(props: {
   cadence: KiloPassCadence;
   pending: boolean;
   showFirstMonthPromo?: boolean;
-  showSecondMonthPromo?: boolean;
   isRecommended: boolean;
   onSelect: (tier: KiloPassTier) => void;
 }) {
-  const {
-    tier,
-    cadence,
-    pending,
-    showFirstMonthPromo = false,
-    showSecondMonthPromo = false,
-    isRecommended,
-    onSelect,
-  } = props;
+  const { tier, cadence, pending, showFirstMonthPromo = false, isRecommended, onSelect } = props;
   const config = KILO_PASS_TIER_CONFIG[tier];
   const handleSelect = () => {
     if (pending) return;
@@ -99,17 +90,13 @@ export function KiloPassTierCard(props: {
                 </span>{' '}
                 free bonus credits
               </span>
-              <KiloPassBonusRampDialog
-                tier={tier}
-                showFirstMonthPromo={showFirstMonthPromo}
-                showSecondMonthPromo={showSecondMonthPromo}
-              />
+              <KiloPassBonusRampDialog tier={tier} showFirstMonthPromo={showFirstMonthPromo} />
             </div>
 
             {showFirstMonthPromo && (
               <div className="text-xs leading-5 text-emerald-300">
-                {showSecondMonthPromo ? 'First 2 months:' : 'First month:'} +
-                {formatPercent(KILO_PASS_FIRST_MONTH_PROMO_BONUS_PERCENT)} free bonus credits
+                First month: +{formatPercent(KILO_PASS_FIRST_MONTH_PROMO_BONUS_PERCENT)} free bonus
+                credits
               </div>
             )}
           </>

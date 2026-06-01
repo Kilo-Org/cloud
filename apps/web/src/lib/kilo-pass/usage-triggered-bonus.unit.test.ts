@@ -5,7 +5,6 @@ import {
   computeUsageTriggeredMonthlyBonusDecision,
   computeUsageTriggeredYearlyIssueMonth,
 } from '@/lib/kilo-pass/usage-triggered-bonus';
-import { KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF } from '@/lib/kilo-pass/constants';
 
 describe('usage-triggered-bonus (unit)', () => {
   describe('computeUsageTriggeredMonthlyBonusDecision', () => {
@@ -31,9 +30,7 @@ describe('usage-triggered-bonus (unit)', () => {
     test('eligible promo => shouldIssueFirstMonthPromo=true, bonusKind=promo-50pct, and promo description', () => {
       const d = computeUsageTriggeredMonthlyBonusDecision({
         tier: KiloPassTier.Tier19,
-        startedAtIso: new Date(
-          KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF.valueOf() - 1
-        ).toISOString(),
+        startedAtIso: '2026-01-01T00:00:00.000Z',
         currentStreakMonths: 1,
         isFirstTimeSubscriberEver: true,
         issueMonth: '2026-01-01',
@@ -116,10 +113,10 @@ describe('usage-triggered-bonus (unit)', () => {
       }
     );
 
-    test('ineligible at promo cutoff => uses ramp (not 50%) and bonusKind=monthly-ramp', () => {
+    test('streak month 2 first-time subscriber uses ramp (not 50%) and bonusKind=monthly-ramp', () => {
       const d = computeUsageTriggeredMonthlyBonusDecision({
         tier: KiloPassTier.Tier49,
-        startedAtIso: KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF.toISOString(),
+        startedAtIso: '2026-01-01T00:00:00.000Z',
         currentStreakMonths: 2,
         isFirstTimeSubscriberEver: true,
         issueMonth: '2026-02-01',

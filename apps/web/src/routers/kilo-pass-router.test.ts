@@ -29,10 +29,6 @@ import {
   computeYearlyCadenceMonthlyBonusUsd,
   getMonthlyPriceUsd,
 } from '@/lib/kilo-pass/bonus';
-import {
-  KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_BONUS_PERCENT,
-  KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF,
-} from '@/lib/kilo-pass/constants';
 
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import type { insertMicrodollarUsageWithDailyRollup as insertMicrodollarUsageWithDailyRollupType } from '@/tests/helpers/microdollar-usage.helper';
@@ -854,7 +850,6 @@ describe('kiloPassRouter', () => {
         tier: KiloPassTier.Tier19,
         streakMonths: 1,
         isFirstTimeSubscriberEver: true,
-        subscriptionStartedAtIso: '2026-01-01T00:00:00.000Z',
       });
       const currentBonusUsd = Math.round(baseAmountUsd * currentBonusPercent * 100) / 100;
 
@@ -1102,13 +1097,13 @@ describe('kiloPassRouter', () => {
       );
     });
 
-    it('keeps App Store month-2 grandfather bonus after a post-cutoff renewal', async () => {
+    it('computes App Store month-2 bonus using standard ramp (no 50% grandfather promo)', async () => {
       freezeKiloPassClock('2026-06-15T00:00:00.000Z');
 
       const user = await insertTestUser({
-        google_user_email: 'kilo-pass-get-state-app-store-grandfathered-renewal@example.com',
+        google_user_email: 'kilo-pass-get-state-app-store-month2-ramp@example.com',
       });
-      const providerSubscriptionId = 'orig_get_state_app_store_grandfathered_renewal';
+      const providerSubscriptionId = 'orig_get_state_app_store_month2_ramp';
       const renewalExpiresAt = '2026-07-01T00:00:00.000Z';
       const { id: subscriptionId } = await insertSubscription({
         kiloUserId: user.id,
@@ -1129,7 +1124,7 @@ describe('kiloPassRouter', () => {
           payment_provider: KiloPassPaymentProvider.AppStore,
           product_id: 'kilo_pass_tier_19_monthly',
           provider_subscription_id: providerSubscriptionId,
-          provider_transaction_id: 'tx_get_state_app_store_grandfathered_initial',
+          provider_transaction_id: 'tx_get_state_app_store_month2_ramp_initial',
           provider_original_transaction_id: providerSubscriptionId,
           app_account_token: user.app_store_account_token,
           environment: 'Sandbox',
@@ -1143,7 +1138,7 @@ describe('kiloPassRouter', () => {
           payment_provider: KiloPassPaymentProvider.AppStore,
           product_id: 'kilo_pass_tier_19_monthly',
           provider_subscription_id: providerSubscriptionId,
-          provider_transaction_id: 'tx_get_state_app_store_grandfathered_renewal',
+          provider_transaction_id: 'tx_get_state_app_store_month2_ramp_renewal',
           provider_original_transaction_id: providerSubscriptionId,
           app_account_token: user.app_store_account_token,
           environment: 'Sandbox',
@@ -1157,10 +1152,12 @@ describe('kiloPassRouter', () => {
       const result = await caller.kiloPass.getState();
 
       const baseAmountUsd = getMonthlyPriceUsd(KiloPassTier.Tier19);
-      const expectedCurrentBonusUsd =
-        Math.round(
-          Math.round(baseAmountUsd * 100) * KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_BONUS_PERCENT
-        ) / 100;
+      const expectedPercent = computeMonthlyCadenceBonusPercent({
+        tier: KiloPassTier.Tier19,
+        streakMonths: 2,
+        isFirstTimeSubscriberEver: true,
+      });
+      const expectedCurrentBonusUsd = Math.round(baseAmountUsd * expectedPercent * 100) / 100;
 
       expect(result.subscription).toEqual(
         expect.objectContaining({
@@ -1173,12 +1170,12 @@ describe('kiloPassRouter', () => {
       );
     });
 
-    it('predicts monthly nextBonusCreditsUsd as 50% for promo month 2 (streak=1 -> predicted=2)', async () => {
+    it('predicts monthly nextBonusCreditsUsd using ramp for month 2 (streak=1 -> predicted=2)', async () => {
       const stripeMock = getStripeMock();
       const currentPeriodEndSeconds = 1_700_123_456;
       const currentPeriodStartSeconds = currentPeriodEndSeconds - 2_592_000;
       stripeMock.subscriptions.retrieve.mockResolvedValue({
-        id: 'sub_test_monthly_grandfathered_month2_next',
+        id: 'sub_test_monthly_month2_next',
         status: 'active',
         items: {
           data: [
@@ -1191,12 +1188,12 @@ describe('kiloPassRouter', () => {
       });
 
       const user = await insertTestUser({
-        google_user_email: 'kilo-pass-get-state-monthly-grandfathered-month2-next@example.com',
+        google_user_email: 'kilo-pass-get-state-monthly-month2-next@example.com',
       });
 
       await insertSubscription({
         kiloUserId: user.id,
-        stripeSubscriptionId: 'sub_test_monthly_grandfathered_month2_next',
+        stripeSubscriptionId: 'sub_test_monthly_month2_next',
         tier: KiloPassTier.Tier19,
         cadence: KiloPassCadence.Monthly,
         status: 'active',
@@ -1208,19 +1205,23 @@ describe('kiloPassRouter', () => {
       const result = await caller.kiloPass.getState();
 
       const baseAmountUsd = getMonthlyPriceUsd(KiloPassTier.Tier19);
-      const baseCents = Math.round(baseAmountUsd * 100);
+      const expectedNextPercent = computeMonthlyCadenceBonusPercent({
+        tier: KiloPassTier.Tier19,
+        streakMonths: 2,
+        isFirstTimeSubscriberEver: true,
+      });
       const expectedNextBonusUsd =
-        Math.round(baseCents * KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_BONUS_PERCENT) / 100;
+        Math.round(Math.round(baseAmountUsd * 100) * expectedNextPercent) / 100;
 
       expect(result.subscription?.nextBonusCreditsUsd).toBe(expectedNextBonusUsd);
     });
 
-    it('computes monthly currentPeriodBonusCreditsUsd as 50% for promo month 2 (streak=2)', async () => {
+    it('computes monthly currentPeriodBonusCreditsUsd using ramp for month 2 (streak=2)', async () => {
       const stripeMock = getStripeMock();
       const currentPeriodEndSeconds = 1_700_123_456;
       const currentPeriodStartSeconds = currentPeriodEndSeconds - 2_592_000;
       stripeMock.subscriptions.retrieve.mockResolvedValue({
-        id: 'sub_test_monthly_grandfathered_month2_current',
+        id: 'sub_test_monthly_month2_current',
         status: 'active',
         items: {
           data: [
@@ -1233,60 +1234,17 @@ describe('kiloPassRouter', () => {
       });
 
       const user = await insertTestUser({
-        google_user_email: 'kilo-pass-get-state-monthly-grandfathered-month2-current@example.com',
+        google_user_email: 'kilo-pass-get-state-monthly-month2-current@example.com',
       });
 
       await insertSubscription({
         kiloUserId: user.id,
-        stripeSubscriptionId: 'sub_test_monthly_grandfathered_month2_current',
+        stripeSubscriptionId: 'sub_test_monthly_month2_current',
         tier: KiloPassTier.Tier19,
         cadence: KiloPassCadence.Monthly,
         status: 'active',
         currentStreakMonths: 2,
         startedAt: '2026-01-01T00:00:00.000Z',
-      });
-
-      const caller = await createCallerForUser(user.id);
-      const result = await caller.kiloPass.getState();
-
-      const baseAmountUsd = getMonthlyPriceUsd(KiloPassTier.Tier19);
-      const expectedCurrentBonusUsd =
-        Math.round(
-          Math.round(baseAmountUsd * 100) * KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_BONUS_PERCENT
-        ) / 100;
-
-      expect(result.subscription?.currentPeriodBonusCreditsUsd).toBe(expectedCurrentBonusUsd);
-    });
-
-    it('does not apply 50% month-2 promo when started_at is at/after the cutoff (streak=2)', async () => {
-      const stripeMock = getStripeMock();
-      const currentPeriodEndSeconds = 1_700_123_456;
-      const currentPeriodStartSeconds = currentPeriodEndSeconds - 2_592_000;
-      stripeMock.subscriptions.retrieve.mockResolvedValue({
-        id: 'sub_test_monthly_grandfathered_month2_cutoff_ineligible',
-        status: 'active',
-        items: {
-          data: [
-            {
-              current_period_end: currentPeriodEndSeconds,
-              current_period_start: currentPeriodStartSeconds,
-            },
-          ],
-        },
-      });
-
-      const user = await insertTestUser({
-        google_user_email: 'kilo-pass-get-state-monthly-grandfathered-month2-cutoff@example.com',
-      });
-
-      await insertSubscription({
-        kiloUserId: user.id,
-        stripeSubscriptionId: 'sub_test_monthly_grandfathered_month2_cutoff_ineligible',
-        tier: KiloPassTier.Tier19,
-        cadence: KiloPassCadence.Monthly,
-        status: 'active',
-        currentStreakMonths: 2,
-        startedAt: KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF.toISOString(),
       });
 
       const caller = await createCallerForUser(user.id);
@@ -1301,11 +1259,6 @@ describe('kiloPassRouter', () => {
       const expectedCurrentBonusUsd = Math.round(baseAmountUsd * expectedPercent * 100) / 100;
 
       expect(result.subscription?.currentPeriodBonusCreditsUsd).toBe(expectedCurrentBonusUsd);
-      expect(result.subscription?.currentPeriodBonusCreditsUsd).not.toBe(
-        Math.round(
-          Math.round(baseAmountUsd * 100) * KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_BONUS_PERCENT
-        ) / 100
-      );
     });
 
     it('keeps month 3+ bonus ramp unchanged even for grandfathered subscriptions (streak=3)', async () => {

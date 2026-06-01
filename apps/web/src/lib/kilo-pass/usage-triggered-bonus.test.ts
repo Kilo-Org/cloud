@@ -19,7 +19,6 @@ import {
   KiloPassWelcomePromoEligibilityReason,
 } from '@/lib/kilo-pass/enums';
 import { computeMonthlyCadenceBonusPercent, getMonthlyPriceUsd } from '@/lib/kilo-pass/bonus';
-import { KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF } from '@/lib/kilo-pass/constants';
 import { maybeIssueKiloPassBonusFromUsageThreshold } from '@/lib/kilo-pass/usage-triggered-bonus';
 import { and, eq } from 'drizzle-orm';
 
@@ -129,10 +128,7 @@ describe('maybeIssueKiloPassBonusFromUsageThreshold', () => {
       stripeInvoiceId: 'inv_test_monthly',
       currentStreakMonths: 2,
       nextYearlyIssueAt: null,
-      // Ensure this test remains a "regular ramp" case, not eligible for the month-2 grandfathered promo.
-      startedAtIso: new Date(
-        KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF.valueOf() + 1
-      ).toISOString(),
+      startedAtIso: '2026-01-01T00:00:00.000Z',
     });
 
     await maybeIssueKiloPassBonusFromUsageThreshold({
@@ -162,107 +158,7 @@ describe('maybeIssueKiloPassBonusFromUsageThreshold', () => {
     expect(userRow?.kilo_pass_threshold).toBeNull();
   });
 
-  test('monthly: first-2-months promo eligible => 50% bonus (tier_49, streak=2)', async () => {
-    const user = await insertTestUser({
-      microdollars_used: 55_000_000,
-      kilo_pass_threshold: 49_000_000,
-    });
-
-    const { issuanceId } = await seedBaseIssuance({
-      kiloUserId: user.id,
-      cadence: KiloPassCadence.Monthly,
-      tier: KiloPassTier.Tier49,
-      issueMonth: '2026-02-01',
-      stripeInvoiceId: 'inv_test_monthly_month2_grandfathered_eligible',
-      currentStreakMonths: 2,
-      nextYearlyIssueAt: null,
-      startedAtIso: '2026-01-26T23:59:59.000Z',
-    });
-
-    await maybeIssueKiloPassBonusFromUsageThreshold({
-      kiloUserId: user.id,
-      nowIso: new Date('2026-02-15T00:00:00.000Z').toISOString(),
-      db,
-    });
-
-    const bonusItem = await db.query.kilo_pass_issuance_items.findFirst({
-      where: and(
-        eq(kilo_pass_issuance_items.kilo_pass_issuance_id, issuanceId),
-        eq(kilo_pass_issuance_items.kind, KiloPassIssuanceItemKind.Bonus)
-      ),
-    });
-    expect(bonusItem).toBeTruthy();
-
-    const bonusTx = await db.query.credit_transactions.findFirst({
-      where: eq(credit_transactions.id, bonusItem?.credit_transaction_id ?? ''),
-    });
-    // tier_49 monthly price is $49, 50% => $24.50.
-    expect(bonusTx?.amount_microdollars).toBe(24_500_000);
-
-    const auditRows = await db
-      .select({ payload: kilo_pass_audit_log.payload_json })
-      .from(kilo_pass_audit_log)
-      .where(
-        and(
-          eq(kilo_pass_audit_log.action, KiloPassAuditLogAction.BonusCreditsIssued),
-          eq(kilo_pass_audit_log.related_monthly_issuance_id, issuanceId)
-        )
-      );
-
-    const payload = auditRows[0]?.payload ?? null;
-    expect(isRecord(payload)).toBe(true);
-    if (!isRecord(payload))
-      throw new Error('Expected bonus issuance audit payload to be an object');
-
-    const decision = payload.monthlyBonusDecision;
-    expect(isRecord(decision)).toBe(true);
-    if (!isRecord(decision)) {
-      throw new Error('Expected audit payload to include monthlyBonusDecision object');
-    }
-
-    expect(decision.streakMonths).toBe(2);
-    expect(decision.issueMonth).toBe('2026-02-01');
-  });
-
-  test('monthly: first-2-months promo ineligible at cutoff => ramp applies (not 50%)', async () => {
-    const user = await insertTestUser({
-      microdollars_used: 55_000_000,
-      kilo_pass_threshold: 49_000_000,
-    });
-
-    const { issuanceId } = await seedBaseIssuance({
-      kiloUserId: user.id,
-      cadence: KiloPassCadence.Monthly,
-      tier: KiloPassTier.Tier49,
-      issueMonth: '2026-02-01',
-      stripeInvoiceId: 'inv_test_monthly_month2_grandfathered_ineligible_cutoff',
-      currentStreakMonths: 2,
-      nextYearlyIssueAt: null,
-      startedAtIso: KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF.toISOString(),
-    });
-
-    await maybeIssueKiloPassBonusFromUsageThreshold({
-      kiloUserId: user.id,
-      nowIso: new Date('2026-02-15T00:00:00.000Z').toISOString(),
-      db,
-    });
-
-    const bonusItem = await db.query.kilo_pass_issuance_items.findFirst({
-      where: and(
-        eq(kilo_pass_issuance_items.kilo_pass_issuance_id, issuanceId),
-        eq(kilo_pass_issuance_items.kind, KiloPassIssuanceItemKind.Bonus)
-      ),
-    });
-    expect(bonusItem).toBeTruthy();
-
-    const bonusTx = await db.query.credit_transactions.findFirst({
-      where: eq(credit_transactions.id, bonusItem?.credit_transaction_id ?? ''),
-    });
-    // tier_49 at streak=2 => base 5% + step 5% * 1 = 10% of $49.00 = $4.90.
-    expect(bonusTx?.amount_microdollars).toBe(4_900_000);
-  });
-
-  test('monthly: first-2-months promo started AFTER cutoff => ramp applies (not 50%)', async () => {
+  test('monthly: standard ramp applies for streak month 2 (no longer a promo)', async () => {
     const user = await insertTestUser({
       microdollars_used: 55_000_000,
       kilo_pass_threshold: 49_000_000,
@@ -270,16 +166,14 @@ describe('maybeIssueKiloPassBonusFromUsageThreshold', () => {
 
     const tier = KiloPassTier.Tier49;
     const streakMonths = 2;
-    const startedAtIso = new Date(
-      KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF.valueOf() + 1
-    ).toISOString();
+    const startedAtIso = '2026-01-01T00:00:00.000Z';
 
     const { issuanceId } = await seedBaseIssuance({
       kiloUserId: user.id,
       cadence: KiloPassCadence.Monthly,
       tier,
       issueMonth: '2026-02-01',
-      stripeInvoiceId: 'inv_test_monthly_month2_grandfathered_ineligible_after_cutoff',
+      stripeInvoiceId: 'inv_test_monthly_month2_ramp',
       currentStreakMonths: streakMonths,
       nextYearlyIssueAt: null,
       startedAtIso,
@@ -314,7 +208,6 @@ describe('maybeIssueKiloPassBonusFromUsageThreshold', () => {
     );
 
     expect(bonusTx?.amount_microdollars).toBe(expectedBonusMicrodollars);
-    expect(bonusTx?.amount_microdollars).not.toBe(24_500_000);
 
     const auditRows = await db
       .select({ payload: kilo_pass_audit_log.payload_json })

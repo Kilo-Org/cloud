@@ -130,7 +130,6 @@ function computeRefillRowModel(params: {
             tier: baseTier,
             streakMonths: Math.max(1, params.subscription.currentStreakMonths + 1),
             isFirstTimeSubscriberEver: params.subscription.isFirstTimeSubscriberEver,
-            subscriptionStartedAtIso: params.subscription.startedAt,
           })
         : null;
   if (typeof bonusUsd !== 'number' || bonusUsd <= 0) return null;

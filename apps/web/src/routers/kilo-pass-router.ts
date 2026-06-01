@@ -38,10 +38,7 @@ import { KiloPassError } from '@/lib/kilo-pass/errors';
 import { isStripeSubscriptionEnded } from '@/lib/kilo-pass/stripe-subscription-status';
 import { releaseScheduledChangeForSubscription } from '@/lib/kilo-pass/scheduled-change-release';
 import { appendKiloPassAuditLog } from '@/lib/kilo-pass/issuance';
-import {
-  KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF,
-  KILO_PASS_TIER_CONFIG,
-} from '@/lib/kilo-pass/constants';
+import { KILO_PASS_TIER_CONFIG } from '@/lib/kilo-pass/constants';
 import { fromMicrodollars } from '@/lib/utils';
 import { timedUsageQuery } from '@/lib/usage-query';
 import {
@@ -231,10 +228,6 @@ function mapAppStoreCompletionError(error: unknown, userId: string): TRPCError {
   });
 }
 
-function isTwoMonthPromoOfferActive(): boolean {
-  return dayjs().utc().isBefore(KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF);
-}
-
 function roundToCents(usd: number): number {
   return Math.round(usd * 100) / 100;
 }
@@ -275,7 +268,6 @@ function getNextKiloPassBonusCreditsUsd(params: {
     tier: params.subscription.tier,
     streakMonths: predictedStreakMonths,
     isFirstTimeSubscriberEver: params.isFirstTimeSubscriberEver,
-    subscriptionStartedAtIso: params.subscription.startedAt,
   });
 
   const baseCents = Math.round(params.baseAmountUsd * 100);
@@ -297,7 +289,6 @@ function getCurrentKiloPassBonusCreditsUsd(params: {
     tier: params.subscription.tier,
     streakMonths,
     isFirstTimeSubscriberEver: params.isFirstTimeSubscriberEver,
-    subscriptionStartedAtIso: params.subscription.startedAt,
   });
   const cents = Math.round(params.baseAmountUsd * bonusPercentApplied * 100);
   return cents / 100;
@@ -826,7 +817,7 @@ export const kiloPassRouter = createTRPCRouter({
   getState: baseProcedure.output(GetStateOutputSchema).query(async ({ ctx }) => {
     const subscriptionBase = await getKiloPassStateForUser(db, ctx.user.id);
     if (!subscriptionBase) {
-      return { subscription: null, isEligibleForFirstMonthPromo: isTwoMonthPromoOfferActive() };
+      return { subscription: null, isEligibleForFirstMonthPromo: false };
     }
 
     if (subscriptionBase.paymentProvider !== KiloPassPaymentProvider.Stripe) {

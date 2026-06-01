@@ -64,7 +64,6 @@ export function computeUsageTriggeredMonthlyBonusDecision(params: {
     tier: params.tier,
     streakMonths,
     isFirstTimeSubscriberEver: isEligibleForFirstMonthPromo,
-    subscriptionStartedAtIso: params.startedAtIso,
   });
 
   const shouldIssueFirstMonthPromo = bonusPercentApplied === 0.5 && streakMonths <= 2;

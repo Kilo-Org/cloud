@@ -26,29 +26,12 @@ const clampMonth = (month: number) => Math.min(12, Math.max(1, Math.round(month)
 export function KiloPassBonusRampDialog(props: {
   tier: KiloPassTier;
   showFirstMonthPromo?: boolean;
-  showSecondMonthPromo?: boolean;
   streakMonths?: number;
   showSlider?: boolean;
-  subscriptionStartedAtIso?: string;
 }) {
-  const {
-    tier,
-    showFirstMonthPromo = false,
-    showSecondMonthPromo = false,
-    streakMonths,
-    showSlider = true,
-    subscriptionStartedAtIso,
-  } = props;
+  const { tier, showFirstMonthPromo = false, streakMonths, showSlider = true } = props;
   const [open, setOpen] = useState(false);
 
-  const fallbackSubscriptionStartedAtIso = useMemo(() => {
-    const now = new Date();
-    now.setSeconds(0, 0);
-    return now.toISOString();
-  }, []);
-
-  const resolvedSubscriptionStartedAtIso =
-    subscriptionStartedAtIso ?? fallbackSubscriptionStartedAtIso;
   const resolvedMonth =
     typeof streakMonths === 'number' && !Number.isNaN(streakMonths) ? clampMonth(streakMonths) : 1;
   const [sliderMonth, setSliderMonth] = useState(resolvedMonth);
@@ -60,7 +43,6 @@ export function KiloPassBonusRampDialog(props: {
     tier,
     streakMonths: effectiveMonth,
     isFirstTimeSubscriberEver: showFirstMonthPromo,
-    subscriptionStartedAtIso: resolvedSubscriptionStartedAtIso,
   });
 
   const totalBonusUsd = useMemo(
@@ -71,18 +53,10 @@ export function KiloPassBonusRampDialog(props: {
               tier,
               streakMonths: index + 1,
               isFirstTimeSubscriberEver: showFirstMonthPromo,
-              subscriptionStartedAtIso: resolvedSubscriptionStartedAtIso,
             })
           ).reduce((total, percent) => total + config.monthlyPriceUsd * percent, 0)
         : 0,
-    [
-      config.monthlyPriceUsd,
-      effectiveMonth,
-      showFirstMonthPromo,
-      showSlider,
-      resolvedSubscriptionStartedAtIso,
-      tier,
-    ]
+    [config.monthlyPriceUsd, effectiveMonth, showFirstMonthPromo, showSlider, tier]
   );
 
   return (
@@ -172,9 +146,7 @@ export function KiloPassBonusRampDialog(props: {
 
             {showPromoCallout && (
               <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-emerald-100">
-                As a new subscriber, your{' '}
-                <strong>first {showSecondMonthPromo ? '2 paid months' : 'paid month'}</strong> get a
-                one-time promo of{' '}
+                As a new subscriber, your <strong>first paid month</strong> gets a one-time promo of{' '}
                 <strong>
                   +{formatPercent(KILO_PASS_FIRST_MONTH_PROMO_BONUS_PERCENT)} free bonus credits
                 </strong>{' '}

@@ -1,12 +1,9 @@
 import { KiloPassCadence, type KiloPassTier } from '@/lib/kilo-pass/enums';
 import {
   KILO_PASS_FIRST_MONTH_PROMO_BONUS_PERCENT,
-  KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_BONUS_PERCENT,
-  KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF,
   KILO_PASS_TIER_CONFIG,
   KILO_PASS_YEARLY_MONTHLY_BONUS_PERCENT,
 } from '@/lib/kilo-pass/constants';
-import { dayjs } from '@/lib/kilo-pass/dayjs';
 
 export const getMonthlyPriceUsd = (tier: KiloPassTier): number => {
   return KILO_PASS_TIER_CONFIG[tier].monthlyPriceUsd;
@@ -28,9 +25,8 @@ export const computeMonthlyCadenceBonusPercent = (params: {
   tier: KiloPassTier;
   streakMonths: number;
   isFirstTimeSubscriberEver: boolean;
-  subscriptionStartedAtIso?: string | null;
 }): number => {
-  const { tier, streakMonths, isFirstTimeSubscriberEver, subscriptionStartedAtIso } = params;
+  const { tier, streakMonths, isFirstTimeSubscriberEver } = params;
 
   if (streakMonths < 1) {
     throw new Error('streakMonths must be >= 1');
@@ -38,22 +34,6 @@ export const computeMonthlyCadenceBonusPercent = (params: {
 
   if (streakMonths === 1 && isFirstTimeSubscriberEver) {
     return KILO_PASS_FIRST_MONTH_PROMO_BONUS_PERCENT;
-  }
-
-  // Limited-time grandfathered promo: first-time subscribers who started strictly before the
-  // cutoff keep the 50% bonus for streak month 2.
-  if (streakMonths === 2 && isFirstTimeSubscriberEver) {
-    const startedAt = subscriptionStartedAtIso ?? null;
-    if (startedAt != null) {
-      const startedAtUtc = dayjs(startedAt).utc();
-
-      if (
-        startedAtUtc.isValid() &&
-        startedAtUtc.isBefore(KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF)
-      ) {
-        return KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_BONUS_PERCENT;
-      }
-    }
   }
 
   const config = KILO_PASS_TIER_CONFIG[tier];

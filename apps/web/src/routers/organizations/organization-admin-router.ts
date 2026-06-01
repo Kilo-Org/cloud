@@ -722,25 +722,32 @@ export const organizationAdminRouter = createTRPCRouter({
         .limit(limit)
         .offset((page - 1) * limit);
 
-      // Get total count using the same filtering logic. Must mirror baseQuery's
-      // joins so finalWhereCondition references (e.g. latestSubscriptions for the
-      // stripe_status filter) resolve.
-      const countQuery = db
+      // Get total count using the same filtering logic. Only join the
+      // latestSubscriptions windowed subquery when the stripe_status filter is
+      // active — that filter is the only branch where finalWhereCondition
+      // references a column from latestSubscriptions, so unconditional joining
+      // would do avoidable historical-subscription-table work on every list
+      // request.
+      const countBase = db
         .select({ count: count() })
         .from(organizations)
         .leftJoin(
           organization_memberships,
           eq(organizations.id, organization_memberships.organization_id)
-        )
-        .leftJoin(
-          latestSubscriptions,
-          and(
-            eq(organizations.id, latestSubscriptions.organization_id),
-            eq(latestSubscriptions.row_num, 1)
-          )
-        )
-        .where(finalWhereCondition)
-        .groupBy(organizations.id);
+        );
+
+      const countQuery = stripe_status
+        ? countBase
+            .leftJoin(
+              latestSubscriptions,
+              and(
+                eq(organizations.id, latestSubscriptions.organization_id),
+                eq(latestSubscriptions.row_num, 1)
+              )
+            )
+            .where(finalWhereCondition)
+            .groupBy(organizations.id)
+        : countBase.where(finalWhereCondition).groupBy(organizations.id);
 
       const totalCountResult = await countQuery;
       const totalOrganizationCount = totalCountResult.length;

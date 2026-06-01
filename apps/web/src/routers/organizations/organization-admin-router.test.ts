@@ -532,12 +532,14 @@ describe('organization admin router', () => {
     });
   });
 
-  // Regression: applying a stripe_status filter must not crash the count query.
-  // Previously the `countQuery` did not join `latestSubscriptions`, so any value
-  // for `stripe_status` referenced an alias missing from the FROM clause and
-  // Postgres rejected the request, blanking the entire admin table.
-  describe('list — stripe_status filter', () => {
-    it('does not throw when stripe_status filter is set', async () => {
+  // Regressions for the count query branches:
+  //   - the stripe_status branch joins latestSubscriptions; previously the
+  //     countQuery omitted that join, so any stripe_status value referenced
+  //     an alias missing from the FROM clause and Postgres rejected it
+  //   - the no-filter branch must not join latestSubscriptions (avoidable
+  //     historical-subscription-table work on every list request)
+  describe('list — count query', () => {
+    it('returns a total when stripe_status filter is set', async () => {
       const [purchase] = await db
         .insert(organization_seats_purchases)
         .values({
@@ -575,6 +577,23 @@ describe('organization admin router', () => {
             .where(eq(organization_seats_purchases.id, purchase.id));
         }
       }
+    });
+
+    it('returns a total when no stripe_status filter is set', async () => {
+      const caller = await createCallerForUser(adminUser.id);
+      const result = await caller.organizations.admin.list({
+        page: 1,
+        limit: 25,
+        sortBy: 'name',
+        sortOrder: 'desc',
+        search: '',
+        mode: 'all',
+        include_deleted: false,
+      });
+
+      expect(result.organizations).toBeDefined();
+      expect(result.pagination).toBeDefined();
+      expect(typeof result.pagination.total).toBe('number');
     });
   });
 });

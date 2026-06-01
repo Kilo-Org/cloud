@@ -203,6 +203,8 @@ function generateRandomRecord(
     ),
     market_cost: core.cost,
     is_free: Math.random() < 0.1,
+    abuse_delay: null,
+    abuse_downgraded_from: null,
   };
 
   return { core, metadata };

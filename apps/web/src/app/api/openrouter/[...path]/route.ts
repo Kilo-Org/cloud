@@ -517,10 +517,12 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   if (rulesEngineDecision.response) {
     return rulesEngineDecision.response;
   }
+  let abuseDowngradedFrom: string | null = null;
   if (rulesEngineDecision.modelOverride) {
     // Quarantine-3 rewrites non-BYOK requests to an auto-free candidate, so the
     // provider and derived policy flags must be resolved again for that model.
     const modelBeforeQuarantineOverride = effectiveModelIdLowerCased;
+    abuseDowngradedFrom = modelBeforeQuarantineOverride;
     requestBodyParsed.body.model = rulesEngineDecision.modelOverride;
     effectiveModelIdLowerCased = rulesEngineDecision.modelOverride;
     const quarantineProviderResult = await getProvider({
@@ -604,6 +606,8 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     mode: modeHeader,
     auto_model: autoModel,
     ttfb_ms: null,
+    abuse_delay: rulesEngineDecision.delayMs > 0 ? rulesEngineDecision.delayMs : null,
+    abuse_downgraded_from: abuseDowngradedFrom,
     clientRequestId,
   };
 

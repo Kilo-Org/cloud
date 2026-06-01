@@ -138,6 +138,8 @@ export function extractUsageContextInfo(usageContext: MicrodollarUsageContext) {
     mode: usageContext.mode,
     auto_model: usageContext.auto_model,
     ttfb_ms: usageContext.ttfb_ms,
+    abuse_delay: usageContext.abuse_delay ?? null,
+    abuse_downgraded_from: usageContext.abuse_downgraded_from ?? null,
   };
 }
 
@@ -216,6 +218,8 @@ export async function toInsertableDbUsageRecord(
     cancelled: usageStats.cancelled,
     market_cost: usageStats.market_cost ?? null,
     is_free: await isFreeModel(usageContextInfo.requested_model),
+    abuse_delay: metadataFromContext.abuse_delay,
+    abuse_downgraded_from: metadataFromContext.abuse_downgraded_from,
   };
 
   // Legacy heuristic classification removed - abuse_classification is now handled
@@ -524,6 +528,8 @@ async function insertUsageAndMetadataWithBalanceUpdate(
               session_id,
               market_cost,
               is_free,
+              abuse_delay,
+              abuse_downgraded_from,
 
               http_user_agent_id,
               http_ip_id,
@@ -562,6 +568,8 @@ async function insertUsageAndMetadataWithBalanceUpdate(
               ${metadataFields.session_id},
               ${metadataFields.market_cost},
               ${metadataFields.is_free},
+              ${metadataFields.abuse_delay},
+              ${metadataFields.abuse_downgraded_from},
 
               (SELECT http_user_agent_id FROM http_user_agent_cte),
               (SELECT http_ip_id FROM http_ip_cte),

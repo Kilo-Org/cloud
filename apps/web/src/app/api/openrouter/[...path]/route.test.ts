@@ -254,6 +254,10 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
     expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.model).toBe(
       'nvidia/nemotron-3-super-120b-a12b:free'
     );
+    expect(mockedAccountForMicrodollarUsage.mock.calls[0]?.[1]).toMatchObject({
+      abuse_delay: 6000,
+      abuse_downgraded_from: 'openai/gpt-4o',
+    });
   });
 
   it('applies quarantine-1 latency without model rewrite', async () => {
@@ -273,6 +277,10 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
     expect(response.status).toBe(200);
     expect(mockedGetProvider).toHaveBeenCalledTimes(1);
     expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.model).toBe('openai/gpt-4o');
+    expect(mockedAccountForMicrodollarUsage.mock.calls[0]?.[1]).toMatchObject({
+      abuse_delay: 2000,
+      abuse_downgraded_from: null,
+    });
   });
 
   it('applies quarantine-2 latency without model rewrite', async () => {

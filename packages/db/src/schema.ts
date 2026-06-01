@@ -1930,6 +1930,8 @@ export const microdollar_usage_metadata = pgTable(
     auto_model_id: integer(),
     market_cost: bigint({ mode: 'number' }),
     is_free: boolean(),
+    abuse_delay: integer(),
+    abuse_downgraded_from: text(),
   },
   table => [
     index('idx_microdollar_usage_metadata_created_at').on(table.created_at),
@@ -2126,6 +2128,8 @@ export const microdollar_usage_view = pgView('microdollar_usage_view', {
   auto_model: text(),
   market_cost: bigint({ mode: 'number' }),
   is_free: boolean(),
+  abuse_delay: integer(),
+  abuse_downgraded_from: text(),
 }).as(sql`
   SELECT
     mu.id,
@@ -2177,7 +2181,9 @@ export const microdollar_usage_view = pgView('microdollar_usage_view', {
     md.mode,
     am.auto_model,
     meta.market_cost,
-    meta.is_free
+    meta.is_free,
+    meta.abuse_delay,
+    meta.abuse_downgraded_from
   FROM ${microdollar_usage} mu
   LEFT JOIN ${microdollar_usage_metadata} meta ON mu.id = meta.id
   LEFT JOIN ${http_ip} ip ON meta.http_ip_id = ip.http_ip_id

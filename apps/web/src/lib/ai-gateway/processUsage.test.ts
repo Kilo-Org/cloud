@@ -459,6 +459,34 @@ describe('logMicrodollarUsage', () => {
     expect(metadataRecord?.session_id).toBe('task-abc123');
   });
 
+  test('stores abuse delay and original model when a request is quarantined', async () => {
+    const user = await insertTestUser({
+      id: 'test-log-user-abuse',
+      microdollars_used: 0,
+      google_user_email: 'abuse-test@example.com',
+    });
+
+    const usageStats: MicrodollarUsageStats = {
+      ...BASE_USAGE_STATS,
+      messageId: 'test-msg-abuse',
+      model: 'nvidia/nemotron-3-super-120b-a12b:free',
+    };
+    const usageContext: MicrodollarUsageContext = {
+      ...createBaseUsageContext(user),
+      requested_model: 'nvidia/nemotron-3-super-120b-a12b:free',
+      abuse_delay: 6000,
+      abuse_downgraded_from: 'openai/gpt-4o',
+    };
+
+    await logMicrodollarUsage(usageStats, usageContext);
+
+    const metadataRecord = await db.query.microdollar_usage_metadata.findFirst({
+      where: eq(microdollar_usage_metadata.message_id, 'test-msg-abuse'),
+    });
+    expect(metadataRecord?.abuse_delay).toBe(6000);
+    expect(metadataRecord?.abuse_downgraded_from).toBe('openai/gpt-4o');
+  });
+
   test('stores usage data without incrementing user microdollars for zero cost', async () => {
     const user = await insertTestUser({
       id: 'test-log-user-2',

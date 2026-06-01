@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { ExecutionError } from '../execution/errors.js';
 import type {
   ExecutionDeliveryContext,
   MessageDeliveryRequest,
@@ -1120,6 +1121,96 @@ describe('SessionMessageQueue', () => {
       kind: 'failed',
       failureStage: 'pre_dispatch',
       failureCode,
+    });
+  });
+
+  it('preserves a thrown workspace setup failure through retry exhaustion', async () => {
+    const error = 'Git clone failed: No space left on device';
+    const harness = createQueueHarness({
+      deliver: async () => Promise.reject(ExecutionError.workspaceSetupFailed(error)),
+    });
+    await harness.queue.admitSubmittedMessage({
+      userId: 'user_test' as UserId,
+      turn: { type: 'prompt', id: FIRST_MESSAGE_ID, prompt: 'clone a workspace' },
+    });
+
+    await harness.queue.drainNextPendingMessage();
+    const [pending] = await listPendingSessionMessages(harness.storage);
+    expect(pending?.lastFlushFailureCode).toBe('WORKSPACE_SETUP_FAILED');
+    expect(pending?.lastFlushError).toBe(error);
+    if (pending?.nextFlushAttemptAt === undefined) {
+      throw new Error('Expected workspace setup failure to be retried before terminalization');
+    }
+
+    vi.spyOn(Date, 'now').mockReturnValueOnce(pending.nextFlushAttemptAt);
+    await harness.queue.drainNextPendingMessage();
+    vi.restoreAllMocks();
+
+    expect(harness.terminalizations.at(-1)?.params).toMatchObject({
+      kind: 'failed',
+      error,
+      failureStage: 'pre_dispatch',
+      failureCode: 'workspace_setup_failed',
+    });
+  });
+
+  it('does not classify an ambiguous thrown wrapper execution failure as startup', async () => {
+    const harness = createQueueHarness({
+      deliver: async () =>
+        Promise.reject(
+          ExecutionError.wrapperStartFailed('Failed to execute wrapper bootstrap: dispatch unknown')
+        ),
+    });
+    await harness.queue.admitSubmittedMessage({
+      userId: 'user_test' as UserId,
+      turn: { type: 'prompt', id: FIRST_MESSAGE_ID, prompt: 'deliver ambiguously' },
+    });
+
+    await harness.queue.drainNextPendingMessage();
+    const [pending] = await listPendingSessionMessages(harness.storage);
+    if (pending?.nextFlushAttemptAt === undefined) {
+      throw new Error('Expected ambiguous delivery failure to be retried before terminalization');
+    }
+    vi.spyOn(Date, 'now').mockReturnValueOnce(pending.nextFlushAttemptAt);
+    await harness.queue.drainNextPendingMessage();
+    vi.restoreAllMocks();
+
+    expect(harness.terminalizations.at(-1)?.params).toMatchObject({
+      kind: 'failed',
+      failureStage: 'pre_dispatch',
+      failureCode: 'delivery_failure_unknown',
+    });
+  });
+
+  it('clears an earlier typed cause when exhaustion becomes ambiguous', async () => {
+    const deliver = vi
+      .fn<(_plan: MessageDeliveryRequest) => Promise<MessageDeliveryResult>>()
+      .mockRejectedValueOnce(
+        ExecutionError.workspaceSetupFailed('workspace temporarily unavailable')
+      )
+      .mockRejectedValueOnce(
+        ExecutionError.wrapperStartFailed('Failed to execute wrapper bootstrap: dispatch unknown')
+      );
+    const harness = createQueueHarness({ deliver });
+    await harness.queue.admitSubmittedMessage({
+      userId: 'user_test' as UserId,
+      turn: { type: 'prompt', id: FIRST_MESSAGE_ID, prompt: 'retry then dispatch ambiguously' },
+    });
+
+    await harness.queue.drainNextPendingMessage();
+    const [pending] = await listPendingSessionMessages(harness.storage);
+    expect(pending?.lastFlushFailureCode).toBe('WORKSPACE_SETUP_FAILED');
+    if (pending?.nextFlushAttemptAt === undefined) {
+      throw new Error('Expected workspace setup failure to be retried before terminalization');
+    }
+    vi.spyOn(Date, 'now').mockReturnValueOnce(pending.nextFlushAttemptAt);
+    await harness.queue.drainNextPendingMessage();
+    vi.restoreAllMocks();
+
+    expect(harness.terminalizations.at(-1)?.params).toMatchObject({
+      kind: 'failed',
+      failureStage: 'pre_dispatch',
+      failureCode: 'delivery_failure_unknown',
     });
   });
 

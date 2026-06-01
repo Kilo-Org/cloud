@@ -448,10 +448,11 @@ export async function recordPendingFlushFailure(
       | 'BAD_REQUEST'
       | 'INTERNAL'
       | 'PENDING_QUEUE_FULL'
-      | 'MODEL_MISSING';
+      | 'MODEL_MISSING'
+      | 'UNKNOWN';
   }
 ): Promise<PendingFlushFailureResult> {
-  if (options.code === undefined) {
+  if (options.code === undefined || options.code === 'UNKNOWN') {
     logger
       .withFields({
         messageId: message.messageId,
@@ -504,10 +505,12 @@ function isRetryableFlushCode(
     | 'INTERNAL'
     | 'PENDING_QUEUE_FULL'
     | 'MODEL_MISSING'
+    | 'UNKNOWN'
     | undefined
-): code is RetryableResultCode {
+): boolean {
   return (
     code === undefined ||
+    code === 'UNKNOWN' ||
     code === 'SANDBOX_CONNECT_FAILED' ||
     code === 'WORKSPACE_SETUP_FAILED' ||
     code === 'KILO_SERVER_FAILED' ||

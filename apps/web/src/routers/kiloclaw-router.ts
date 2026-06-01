@@ -3044,6 +3044,9 @@ export const kiloclawRouter = createTRPCRouter({
       z.object({
         source: z.enum(INSTALL_SOURCE_KEYS),
         slug: z.string().min(1).max(200),
+        // Signature of the payload the user reviewed; the dispatch re-verifies
+        // and requires the re-fetched payload to still match this.
+        signature: z.string().min(1).max(200),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -3051,6 +3054,7 @@ export const kiloclawRouter = createTRPCRouter({
         userId: ctx.user.id,
         source: input.source,
         slug: input.slug,
+        expectedSignature: input.signature,
       });
     }),
 

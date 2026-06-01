@@ -48,7 +48,13 @@ export function InstallClient({ source, sourceLabel, payload }: InstallClientPro
 
   async function onInstall() {
     try {
-      const result = await install.mutateAsync({ source, slug: payload.slug });
+      const result = await install.mutateAsync({
+        source,
+        slug: payload.slug,
+        // Bind the dispatch to the exact payload shown here; the server rejects
+        // if the byte changed since this page rendered.
+        signature: payload.signature,
+      });
       setNavigating(true);
       if (result.ok) {
         // Open the conversation the dispatch created, so the user lands
@@ -61,10 +67,14 @@ export function InstallClient({ source, sourceLabel, payload }: InstallClientPro
       // flow; the user finishes setup, then installs again from the byte page.
       router.push('/claw/new');
     } catch (err) {
-      const message =
-        err instanceof TRPCClientError && err.data?.code === 'NOT_FOUND'
-          ? 'This install link is no longer available.'
-          : 'Could not install this byte. Please try again.';
+      let message = 'Could not install this byte. Please try again.';
+      if (err instanceof TRPCClientError) {
+        if (err.data?.code === 'NOT_FOUND') {
+          message = 'This install link is no longer available.';
+        } else if (err.data?.code === 'CONFLICT') {
+          message = 'This byte changed since you opened this page. Please reload and try again.';
+        }
+      }
       toast.error(message);
     }
   }

@@ -37,6 +37,12 @@ export type DispatchInstallFromSourceArgs = {
   userId: string;
   source: InstallSource;
   slug: string;
+  // The Ed25519 signature of the payload the user actually reviewed on the
+  // confirmation page. We re-fetch + re-verify server-side, then require the
+  // re-fetched payload's signature to match this, so a byte edited+re-signed
+  // between preview and confirm can't dispatch a different (still-valid)
+  // prompt than the one the user approved.
+  expectedSignature: string;
 };
 
 export type DispatchInstallFromSourceResult =
@@ -91,13 +97,24 @@ export async function dispatchInstallFromSource(
   args: DispatchInstallFromSourceArgs,
   deps: DispatchInstallFromSourceDeps = defaultDeps
 ): Promise<DispatchInstallFromSourceResult> {
-  const { userId, source, slug } = args;
+  const { userId, source, slug, expectedSignature } = args;
 
   const payload = await deps.fetchInstallPayload(source, slug);
   if (!payload) {
     throw new TRPCError({
       code: 'NOT_FOUND',
       message: 'This install link is not available.',
+    });
+  }
+
+  // Bind the dispatch to exactly what the user reviewed. The signature is the
+  // cryptographic identity of the signed content (slug/title/description/
+  // prompt); if it no longer matches, the byte changed since the confirmation
+  // page rendered, so refuse rather than run a prompt the user didn't approve.
+  if (payload.signature !== expectedSignature) {
+    throw new TRPCError({
+      code: 'CONFLICT',
+      message: 'This byte changed since you reviewed it. Please reload and confirm again.',
     });
   }
 

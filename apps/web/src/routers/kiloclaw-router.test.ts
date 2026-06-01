@@ -216,6 +216,7 @@ let createCaller: (ctx: { user: Awaited<ReturnType<typeof insertTestUser>> }) =>
   installFromSource(input: {
     source: string;
     slug: string;
+    signature: string;
   }): Promise<
     | { ok: true; conversationId: string; messageId: string; conversationCreated: boolean }
     | { ok: false; code: 'no_instance' }
@@ -1251,7 +1252,7 @@ describe('kiloclawRouter installFromSource', () => {
     const caller = createCaller({ user });
 
     await expect(
-      caller.installFromSource({ source: 'byte', slug: 'deep-research' })
+      caller.installFromSource({ source: 'byte', slug: 'deep-research', signature: 'sig' })
     ).rejects.toMatchObject({ code: 'FORBIDDEN' });
     expect(installDispatchMock.__dispatchInstallFromSource).not.toHaveBeenCalled();
   });
@@ -1269,7 +1270,11 @@ describe('kiloclawRouter installFromSource', () => {
     });
     const caller = createCaller({ user });
 
-    const result = await caller.installFromSource({ source: 'byte', slug: 'deep-research' });
+    const result = await caller.installFromSource({
+      source: 'byte',
+      slug: 'deep-research',
+      signature: 'sig',
+    });
 
     expect(result).toEqual({
       ok: true,
@@ -1281,6 +1286,7 @@ describe('kiloclawRouter installFromSource', () => {
       userId: user.id,
       source: 'byte',
       slug: 'deep-research',
+      expectedSignature: 'sig',
     });
   });
 
@@ -1295,7 +1301,11 @@ describe('kiloclawRouter installFromSource', () => {
     });
     const caller = createCaller({ user });
 
-    const result = await caller.installFromSource({ source: 'byte', slug: 'deep-research' });
+    const result = await caller.installFromSource({
+      source: 'byte',
+      slug: 'deep-research',
+      signature: 'sig',
+    });
 
     expect(result).toEqual({ ok: false, code: 'no_instance' });
   });
@@ -1308,7 +1318,7 @@ describe('kiloclawRouter installFromSource', () => {
     const caller = createCaller({ user });
 
     await expect(
-      caller.installFromSource({ source: 'hacker', slug: 'deep-research' })
+      caller.installFromSource({ source: 'hacker', slug: 'deep-research', signature: 'sig' })
     ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
     expect(installDispatchMock.__dispatchInstallFromSource).not.toHaveBeenCalled();
   });

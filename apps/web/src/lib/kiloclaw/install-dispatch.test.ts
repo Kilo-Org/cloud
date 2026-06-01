@@ -42,7 +42,12 @@ function makeDeps(
   };
 }
 
-const ARGS = { userId: 'user-1', source: 'byte' as const, slug: 'deep-research' };
+const ARGS = {
+  userId: 'user-1',
+  source: 'byte' as const,
+  slug: 'deep-research',
+  expectedSignature: VALID_PAYLOAD.signature,
+};
 
 describe('dispatchInstallFromSource', () => {
   afterEach(() => {
@@ -112,6 +117,23 @@ describe('dispatchInstallFromSource', () => {
     await expect(
       dispatchInstallFromSource(ARGS, makeDeps({ fetchInstallPayload: async () => null }))
     ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+  });
+
+  it('throws CONFLICT (and does NOT dispatch) when the re-fetched signature differs', async () => {
+    const dispatchSpy = jest.fn();
+    // Re-fetched payload is a newer, still-validly-signed version (different
+    // signature) than the one the user reviewed.
+    const changed: InstallPayload = { ...VALID_PAYLOAD, signature: 'different-sig' };
+    await expect(
+      dispatchInstallFromSource(
+        ARGS,
+        makeDeps({
+          fetchInstallPayload: async () => changed,
+          postMessageAsUser: dispatchSpy as never,
+        })
+      )
+    ).rejects.toMatchObject({ code: 'CONFLICT' });
+    expect(dispatchSpy).not.toHaveBeenCalled();
   });
 
   it('returns no_instance (and does NOT dispatch) when user has no active instance', async () => {

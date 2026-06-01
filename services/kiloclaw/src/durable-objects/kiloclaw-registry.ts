@@ -515,6 +515,11 @@ export class KiloClawRegistry extends DurableObject<KiloClawEnv> {
       if (instance) {
         const hasSubscription = await hasSubscriptionForInstance(db, instance.id);
         if (!hasSubscription && isInstanceKeyedSandboxId(instance.sandboxId)) {
+          // Instance-keyed rows without a subscription are quarantine state.
+          // They must not be published through lazy migration, and later
+          // subscription recovery is responsible for publishing their route.
+          this.migrated = true;
+          await this.ctx.storage.put('migrated', true);
           return;
         }
         const doKey = doKeyFromActiveInstance(instance);

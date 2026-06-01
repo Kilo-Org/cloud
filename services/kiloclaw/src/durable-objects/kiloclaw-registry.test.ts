@@ -158,7 +158,7 @@ describe('KiloClawRegistry fresh provision reservations', () => {
     ]);
   });
 
-  it('does not lazily publish an active personal row until canonical subscription exists', async () => {
+  it('does not lazily publish an unpaired instance-keyed row or retry it after quarantine', async () => {
     const now = Date.now();
     vi.spyOn(Date, 'now').mockReturnValue(now);
     mockGetActivePersonalInstance.mockResolvedValue({
@@ -175,9 +175,8 @@ describe('KiloClawRegistry fresh provision reservations', () => {
 
     mockHasSubscriptionForInstance.mockResolvedValue(true);
     vi.mocked(Date.now).mockReturnValue(now + 60_001);
-    expect(await registry.listInstances('user:user-1')).toEqual([
-      expect.objectContaining({ instanceId: 'instance-1' }),
-    ]);
+    expect(await registry.listInstances('user:user-1')).toEqual([]);
+    expect(mockHasSubscriptionForInstance).toHaveBeenCalledTimes(1);
   });
 
   it('admits one unresolved personal provision and rejects a duplicate', async () => {

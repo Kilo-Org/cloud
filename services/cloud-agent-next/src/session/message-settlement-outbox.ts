@@ -92,6 +92,7 @@ export type MessageSettlementOutboxDependencies = {
     params: SendCloudAgentSessionNotificationParams
   ) => Promise<SendCloudAgentSessionNotificationResult>;
   hasConnectedStreamClients: () => boolean;
+  reportTerminalState?: (state: SessionMessageState) => void;
   getAssistantMessageForUserMessage: (
     sessionId: string,
     kiloSessionId: string,
@@ -139,6 +140,7 @@ export function createMessageSettlementOutbox(
     getCallbackQueue,
     sendPushNotification,
     hasConnectedStreamClients,
+    reportTerminalState,
     getAssistantMessageForUserMessage,
     ensureTerminalMessageEvent,
     hasObservedWrapperIdle,
@@ -212,6 +214,20 @@ export function createMessageSettlementOutbox(
       .info('Recorded idle-batch callback representative message');
   }
 
+  function reportPersistedTerminalState(state: SessionMessageState): void {
+    try {
+      reportTerminalState?.(state);
+    } catch {
+      logger
+        .withFields({
+          sessionId: getSessionIdForLogs(),
+          messageId: state.messageId,
+          finalStatus: state.status,
+        })
+        .warn('Cloud Agent terminal report scheduling failed');
+    }
+  }
+
   async function observeWrapperTerminalForIdleBatch(gateResult?: 'pass' | 'fail'): Promise<void> {
     const batch = await getCurrentIdleBatchCallbackState();
     if (!batch) return;
@@ -220,8 +236,14 @@ export function createMessageSettlementOutbox(
     const representativeMessageId = batch.representativeMessageId;
     if (representativeMessageId && gateResult !== undefined) {
       const representative = await getSessionMessageState(storage, representativeMessageId);
-      if (representative?.callbackRequired && !representative.callbackEnqueuedAt) {
-        await putSessionMessageState(storage, { ...representative, gateResult });
+      if (
+        representative?.callbackRequired &&
+        !representative.callbackEnqueuedAt &&
+        representative.gateResult === undefined
+      ) {
+        const updated = { ...representative, gateResult };
+        await putSessionMessageState(storage, updated);
+        reportPersistedTerminalState(updated);
       }
     }
 
@@ -664,11 +686,19 @@ export function createMessageSettlementOutbox(
     params: TerminalizeParams,
     opts?: TerminalizeSessionMessageOptions
   ): Promise<{ changed: boolean; state: SessionMessageState | null }> {
-    return persistTerminalStateTransition(storage, messageId, params, {
+    const classifiedParams: TerminalizeParams =
+      params.kind === 'failed' && params.failureStage === undefined
+        ? { ...params, failureStage: 'unknown', failureCode: 'unclassified' }
+        : params;
+    const result = await persistTerminalStateTransition(storage, messageId, classifiedParams, {
       suppressCallback: opts?.suppressCallback,
       suppressPush: opts?.suppressPush,
       allowIdleBatchWithoutObservedIdle: opts?.allowIdleBatchWithoutObservedIdle,
     });
+    if (result.changed && result.state) {
+      reportPersistedTerminalState(result.state);
+    }
+    return result;
   }
 
   async function repairTerminalMessageEffects(messageId: string): Promise<void> {

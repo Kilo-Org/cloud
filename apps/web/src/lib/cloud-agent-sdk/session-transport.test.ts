@@ -288,66 +288,68 @@ describe('session transport missing command methods (read-only session)', () => 
 describe('remote session send via typed transport methods', () => {
   const cliKiloSessionId = kiloId('ses_cli-live-session');
 
-  it('session.send() uses kiloSessionId for remote sessions', async () => {
+  function createUserWebConnection() {
+    return {
+      connect: jest.fn(),
+      disconnect: jest.fn(),
+      destroy: jest.fn(),
+      subscribeToCliSession: jest.fn(() => jest.fn()),
+      sendCommand: jest.fn(() => Promise.resolve({ ok: true })),
+      onCliEvent: jest.fn(() => jest.fn()),
+      onSystemEvent: jest.fn(() => jest.fn()),
+      onReconnect: jest.fn(() => jest.fn()),
+      onSessionEvent: jest.fn(() => jest.fn()),
+    };
+  }
+
+  it('uses the required user web connection without constructing a viewer socket', async () => {
+    const userWebConnection = createUserWebConnection();
+    const session = createCloudAgentSession({
+      kiloSessionId: cliKiloSessionId,
+      resolveSession: async () => ({ type: 'remote' as const, kiloSessionId: cliKiloSessionId }),
+      transport: { userWebConnection },
+    });
+
+    session.connect();
+    await new Promise(r => setTimeout(r, 0));
+    await new Promise(r => setTimeout(r, 0));
+
+    await session.send({ payload: { type: 'prompt', prompt: 'Hello remote' } });
+
+    expect(userWebConnection.subscribeToCliSession).toHaveBeenCalledWith(cliKiloSessionId);
+    expect(userWebConnection.sendCommand).toHaveBeenCalledWith(
+      cliKiloSessionId,
+      'send_message',
+      expect.objectContaining({ sessionID: cliKiloSessionId })
+    );
+    expect(jest.mocked(global.WebSocket)).not.toHaveBeenCalled();
+    session.destroy();
+  });
+
+  it('formats remote sends through userWebConnection using kiloSessionId', async () => {
+    const userWebConnection = createUserWebConnection();
     const session = createCloudAgentSession({
       kiloSessionId: cliKiloSessionId,
       resolveSession: async () => ({
         type: 'remote' as const,
         kiloSessionId: cliKiloSessionId,
       }),
-      transport: {
-        cliWebsocketUrl: 'wss://localhost:9999/api/user/web',
-        getAuthToken: () => 'test-token',
-      },
-      websocketBaseUrl: 'ws://localhost:9999',
+      transport: { userWebConnection },
     });
 
     session.connect();
-
-    // Allow resolveAndConnect to resolve + transport to be created
-    await new Promise(r => setTimeout(r, 0));
-    await new Promise(r => setTimeout(r, 0));
     await new Promise(r => setTimeout(r, 0));
 
-    // Open the WebSocket
-    mockWs.onopen?.(new Event('open'));
-
-    // Now send a message via the typed send method
-    const sendPromise = session.send({
+    await session.send({
       payload: { type: 'prompt', prompt: 'Hello world', mode: 'code', model: 'test/model-1' },
     });
 
-    // The transport wraps this into a WebSocket command
-    const lastCall = mockWs.send.mock.calls.at(-1);
-    expect(lastCall).toBeDefined();
-    const sentPayload = JSON.parse(lastCall![0]) as {
-      type: string;
-      command: string;
-      data: {
-        sessionID: string;
-        parts: unknown[];
-        model: string;
-        agent: string;
-      };
-    };
-    expect(sentPayload.type).toBe('command');
-    expect(sentPayload.command).toBe('send_message');
-    expect(sentPayload.data.sessionID).toBe(cliKiloSessionId);
-    expect(sentPayload.data.parts).toEqual([{ type: 'text', text: 'Hello world' }]);
-    expect(sentPayload.data.model).toBe('test/model-1');
-    expect(sentPayload.data.agent).toBe('code');
-
-    // Resolve the pending command so the promise completes
-    const cmdId = (JSON.parse(lastCall![0]) as { id: string }).id;
-    mockWs.onmessage?.({
-      data: JSON.stringify({
-        type: 'response',
-        id: cmdId,
-        result: { ok: true },
-      }),
-    } as MessageEvent);
-
-    await sendPromise;
+    expect(userWebConnection.sendCommand).toHaveBeenCalledWith(cliKiloSessionId, 'send_message', {
+      sessionID: cliKiloSessionId,
+      parts: [{ type: 'text', text: 'Hello world' }],
+      agent: 'code',
+      model: 'test/model-1',
+    });
     session.destroy();
   });
 });
@@ -376,8 +378,17 @@ describe('session capabilities', () => {
         kiloSessionId: kiloId('ses_cli-live'),
       }),
       transport: {
-        cliWebsocketUrl: 'wss://localhost:9999/api/user/web',
-        getAuthToken: () => 'test-token',
+        userWebConnection: {
+          connect: jest.fn(),
+          disconnect: jest.fn(),
+          destroy: jest.fn(),
+          subscribeToCliSession: jest.fn(() => jest.fn()),
+          sendCommand: jest.fn(() => Promise.resolve()),
+          onCliEvent: jest.fn(() => jest.fn()),
+          onSystemEvent: jest.fn(() => jest.fn()),
+          onReconnect: jest.fn(() => jest.fn()),
+          onSessionEvent: jest.fn(() => jest.fn()),
+        },
       },
     });
 

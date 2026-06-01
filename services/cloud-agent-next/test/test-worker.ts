@@ -9,6 +9,7 @@
  * to avoid the @cloudflare/sandbox import chain.
  */
 
+import type { CloudAgentQueueReport } from '@kilocode/worker-utils/cloud-agent-queue-report';
 import { CloudAgentSession as RealCloudAgentSession } from '../src/persistence/CloudAgentSession';
 import type {
   NotificationsBinding,
@@ -61,6 +62,7 @@ export class CloudAgentSession extends RealCloudAgentSession {
 // Minimal Env type for tests
 type TestEnv = {
   CLOUD_AGENT_SESSION: DurableObjectNamespace<CloudAgentSession>;
+  CLOUD_AGENT_REPORT_QUEUE: Queue<CloudAgentQueueReport>;
 };
 
 export default {

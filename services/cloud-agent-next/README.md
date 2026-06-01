@@ -36,7 +36,7 @@ By default, the script looks for kilo-cli at `$HOME/projects/kilo-cli`. Override
 
 **What's in Dockerfile.dev:**
 
-- Base image: `cloudflare/sandbox:0.10.1`
+- Base image: `cloudflare/sandbox:0.10.3`
 - Pre-built `kilo` binary (from `cloud-agent-build.sh`)
 - GitHub CLI (`gh`) and GitLab CLI (`glab`)
 - Wrapper bundle built inside the container
@@ -702,6 +702,8 @@ This project also ships with an on-demand GitHub Action (`Deploy Cloud Agent`) l
 Required secrets:
 
 - `CLOUDFLARE_API_TOKEN` — must have permission to deploy the worker for the selected environment.
+
+Cloud Agent Next owns its operational reporting projection. Deploy the reporting database migration before this worker release and provision `cloud-agent-next-report-queue` plus `cloud-agent-next-report-queue-dlq` with four-day message retention. A deployed `dev` environment requires isolated `cloud-agent-next-report-queue-dev` and `cloud-agent-next-report-queue-dlq-dev` resources with the same retention. New sessions synchronously create their reporting anchor before setup; queued run reports do not synthesize parents when an anchor is absent.
 
 ### Testing
 

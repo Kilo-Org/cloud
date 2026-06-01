@@ -82,6 +82,74 @@ export const WebOutboundMessageSchema = z.discriminatedUnion('type', [
     command: z.string(),
     data: z.unknown().optional(),
   }),
+  z.object({
+    type: z.literal('ping'),
+    nonce: z.string(),
+  }),
+]);
+
+// -- V2 session system events -------------------------------------------------
+
+export const SessionStatusSchema = z.enum(['idle', 'busy', 'question', 'permission', 'retry']);
+
+export const SessionEventV2RowSchema = z.object({
+  source: z.literal('v2'),
+  sessionId: z.string(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  title: z.string().nullable(),
+  createdOnPlatform: z.string().nullable(),
+  organizationId: z.string().nullable(),
+  gitUrl: z.string().nullable(),
+  gitBranch: z.string().nullable(),
+  parentSessionId: z.string().nullable(),
+  status: SessionStatusSchema.nullable(),
+  statusUpdatedAt: z.string().nullable(),
+});
+
+export const SessionRowEventPayloadSchema = z.object({
+  source: z.literal('v2'),
+  session: SessionEventV2RowSchema,
+  changedAt: z.string(),
+});
+
+// Temporary rollout compatibility: remove the lightweight branch after all web clients consume full session rows.
+export const SessionStatusUpdatedPayloadSchema = z.union([
+  z.object({
+    source: z.literal('v2'),
+    session: SessionEventV2RowSchema,
+    previousStatus: SessionStatusSchema.nullable(),
+    status: SessionStatusSchema.nullable(),
+    statusUpdatedAt: z.string().nullable(),
+    changedAt: z.string(),
+  }),
+  z.object({
+    source: z.literal('v2'),
+    sessionId: z.string(),
+    previousStatus: SessionStatusSchema.nullable(),
+    status: SessionStatusSchema.nullable(),
+    statusUpdatedAt: z.string().nullable(),
+    updatedAt: z.string().optional(),
+    changedAt: z.string(),
+  }),
+]);
+
+export const SessionDeletedPayloadSchema = z.object({
+  source: z.literal('v2'),
+  sessionId: z.string(),
+  parentSessionId: z.string().nullable(),
+  organizationId: z.string().nullable(),
+  gitUrl: z.string().nullable(),
+  gitBranch: z.string().nullable(),
+  createdOnPlatform: z.string().nullable(),
+  deletedAt: z.string(),
+});
+
+export const SessionEventPayloadSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('session.created'), data: SessionRowEventPayloadSchema }),
+  z.object({ type: z.literal('session.updated'), data: SessionRowEventPayloadSchema }),
+  z.object({ type: z.literal('session.status.updated'), data: SessionStatusUpdatedPayloadSchema }),
+  z.object({ type: z.literal('session.deleted'), data: SessionDeletedPayloadSchema }),
 ]);
 
 // -- DO → Web UI (WebInbound) -------------------------------------------------
@@ -105,6 +173,10 @@ export const WebInboundMessageSchema = z.discriminatedUnion('type', [
     result: z.unknown().optional(),
     error: z.unknown().optional(),
   }),
+  z.object({
+    type: z.literal('pong'),
+    nonce: z.string(),
+  }),
 ]);
 
 // -- Inferred types -----------------------------------------------------------
@@ -113,3 +185,8 @@ export type CLIOutboundMessage = z.infer<typeof CLIOutboundMessageSchema>;
 export type CLIInboundMessage = z.infer<typeof CLIInboundMessageSchema>;
 export type WebOutboundMessage = z.infer<typeof WebOutboundMessageSchema>;
 export type WebInboundMessage = z.infer<typeof WebInboundMessageSchema>;
+export type SessionEventV2Row = z.infer<typeof SessionEventV2RowSchema>;
+export type SessionRowEventPayload = z.infer<typeof SessionRowEventPayloadSchema>;
+export type SessionStatusUpdatedPayload = z.infer<typeof SessionStatusUpdatedPayloadSchema>;
+export type SessionDeletedPayload = z.infer<typeof SessionDeletedPayloadSchema>;
+export type SessionEventPayload = z.infer<typeof SessionEventPayloadSchema>;

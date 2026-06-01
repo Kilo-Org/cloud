@@ -7,6 +7,7 @@ import type {
 export const CLAUDE_SONNET_CURRENT_MODEL_ID = 'anthropic/claude-sonnet-4.6';
 export const CLAUDE_OPUS_CURRENT_MODEL_ID = 'anthropic/claude-opus-4.8';
 export const CLAUDE_HAIKU_CURRENT_MODEL_ID = 'anthropic/claude-haiku-4.5';
+export const CLAUDE_OPUS_4_8_STEALTH_MODEL_ID = 'stealth/claude-opus-4.8';
 export const CLAUDE_OPUS_STEALTH_MODEL_ID = 'stealth/claude-opus-4.7';
 export const CLAUDE_SONNET_STEALTH_MODEL_ID = 'stealth/claude-sonnet-4.6';
 export const CLAUDE_OPUS_4_6_STEALTH_MODEL_ID = 'stealth/claude-opus-4.6';
@@ -25,6 +26,22 @@ const CLAUDE_OPUS_STEALTH_PRICING: Pricing = {
     usage.totalOutputTokens * 20 +
     usage.cacheHitTokens * 0.4 +
     usage.cacheWriteTokens * 5,
+};
+
+export const claude_opus_4_8_stealth_model: KiloExclusiveModel = {
+  public_id: CLAUDE_OPUS_4_8_STEALTH_MODEL_ID,
+  internal_id: 'anthropic/claude-opus-4-8:optimized',
+  display_name: 'Stealth: Claude Opus 4.8 (20% off)',
+  description:
+    "Your prompts and completions may be retained and used to train or improve the provider's services. This third-party-served variant of Claude Opus 4.8 is offered at 20% lower cost than standard Claude Opus 4.8 pricing and is not served by Anthropic or Kilo Code.",
+  status: 'public',
+  context_length: 1_000_000,
+  max_completion_tokens: 128_000,
+  gateway: 'martian',
+  flags: ['reasoning', 'vision', 'stealth', 'requires-data-collection'],
+  pricing: CLAUDE_OPUS_STEALTH_PRICING,
+  exclusive_to: [],
+  inference_provider_restriction: [],
 };
 
 export const claude_opus_4_7_stealth_model: KiloExclusiveModel = {

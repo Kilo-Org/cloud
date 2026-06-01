@@ -239,6 +239,80 @@ describe('organizations.kiloclaw.listActiveInstances', () => {
   });
 });
 
+describe('organizations.kiloclaw.getNavState', () => {
+  beforeEach(async () => {
+    await cleanupDbForTest();
+  });
+
+  it('returns absent when the organization has no KiloClaw instance', async () => {
+    const user = await insertTestUser({
+      google_user_email: `org-kiloclaw-nav-absent-${Math.random()}@example.com`,
+    });
+    const organization = await createOrganization('Org KiloClaw Nav Absent Test', user.id);
+    const caller = await createCallerForUser(user.id);
+
+    const result = await caller.organizations.kiloclaw.getNavState({
+      organizationId: organization.id,
+    });
+
+    expect(result).toEqual({ hasActiveInstance: false });
+  });
+
+  it('returns active organization instance presence', async () => {
+    const user = await insertTestUser({
+      google_user_email: `org-kiloclaw-nav-present-${Math.random()}@example.com`,
+    });
+    const organization = await createOrganization('Org KiloClaw Nav Present Test', user.id);
+    await createActiveOrgInstance(user.id, organization.id);
+    const caller = await createCallerForUser(user.id);
+
+    const result = await caller.organizations.kiloclaw.getNavState({
+      organizationId: organization.id,
+    });
+
+    expect(result).toEqual({ hasActiveInstance: true });
+  });
+
+  it('does not leak a personal instance into organization nav state', async () => {
+    const user = await insertTestUser({
+      google_user_email: `org-kiloclaw-nav-personal-${Math.random()}@example.com`,
+    });
+    const organization = await createOrganization('Org KiloClaw Nav Personal Test', user.id);
+    const personalInstanceId = crypto.randomUUID();
+    await db.insert(kiloclaw_instances).values({
+      id: personalInstanceId,
+      user_id: user.id,
+      sandbox_id: `ki_${personalInstanceId.replace(/-/g, '')}`,
+    });
+    const caller = await createCallerForUser(user.id);
+
+    const result = await caller.organizations.kiloclaw.getNavState({
+      organizationId: organization.id,
+    });
+
+    expect(result).toEqual({ hasActiveInstance: false });
+  });
+
+  it('ignores destroyed organization instances', async () => {
+    const user = await insertTestUser({
+      google_user_email: `org-kiloclaw-nav-destroyed-${Math.random()}@example.com`,
+    });
+    const organization = await createOrganization('Org KiloClaw Nav Destroyed Test', user.id);
+    const instanceId = await createActiveOrgInstance(user.id, organization.id);
+    await db
+      .update(kiloclaw_instances)
+      .set({ destroyed_at: '2026-05-29T00:00:00.000Z' })
+      .where(eq(kiloclaw_instances.id, instanceId));
+    const caller = await createCallerForUser(user.id);
+
+    const result = await caller.organizations.kiloclaw.getNavState({
+      organizationId: organization.id,
+    });
+
+    expect(result).toEqual({ hasActiveInstance: false });
+  });
+});
+
 describe('organization kiloclaw destroy', () => {
   beforeEach(async () => {
     await cleanupDbForTest();

@@ -9,6 +9,11 @@ import { validateStreamTicket, validateKiloToken } from './auth.js';
 import { createErrorHandler, createNotFoundHandler } from '@kilocode/worker-utils';
 import { createCallbackQueueConsumer } from './callbacks/index.js';
 import type { CallbackJob } from './callbacks/index.js';
+import {
+  CLOUD_AGENT_REPORT_QUEUE_NAMES,
+  consumeCloudAgentReportBatch,
+  removeExpiredCloudAgentReportData,
+} from './telemetry/report-consumer.js';
 import { authMiddleware } from './middleware/auth.js';
 import { balanceMiddleware } from './middleware/balance.js';
 import { resolveTerminalWrapperClient } from './terminal/access.js';
@@ -327,13 +332,19 @@ export default {
 
     return app.fetch(request, env, ctx);
   },
-  async queue(batch: MessageBatch<unknown>, _env: Env): Promise<void> {
+  async queue(batch: MessageBatch<unknown>, env: Env): Promise<void> {
     if (batch.queue.startsWith('cloud-agent-next-callback-queue')) {
       const consumer = createCallbackQueueConsumer();
       return consumer(batch as MessageBatch<CallbackJob>);
     }
+    if (CLOUD_AGENT_REPORT_QUEUE_NAMES.has(batch.queue)) {
+      return consumeCloudAgentReportBatch(batch, env);
+    }
 
     logger.warn(`Received message from unexpected queue: ${batch.queue}`);
+  },
+  async scheduled(_controller: ScheduledController, env: Env): Promise<void> {
+    await removeExpiredCloudAgentReportData(env);
   },
 };
 

@@ -117,6 +117,7 @@ export async function generateUserNotifications(user: User): Promise<KiloNotific
     generateByokProvidersNotification,
     generateGrokCodeFast1OptimizedDiscontinuedNotification,
     generateKiloPassNotification,
+    generateKiloPassPromoMay29Notification,
   ];
 
   const resolvedConditionalNotifications = (
@@ -398,6 +399,29 @@ async function generateGrokCodeFast1OptimizedDiscontinuedNotification(
     console.error('[generateGrokCodeFast1OptimizedDiscontinuedNotification]', e);
     return [];
   }
+}
+
+async function generateKiloPassPromoMay29Notification(
+  user: User,
+  _ctx: NotificationContext
+): Promise<KiloNotification[]> {
+  if (!(await hasUserEverPaid(user.id))) {
+    return [];
+  }
+
+  return [
+    {
+      id: 'kilo-pass-promo-may-29',
+      title: 'Get more from every dollar with Kilo Pass',
+      message: 'A monthly AI token subscription with up to 50% bonus credits included.',
+      action: {
+        actionText: 'Explore Kilo Pass',
+        actionURL: 'https://kilo.ai/pricing/kilo-pass',
+      },
+      showIn: ['cli', 'extension'],
+      expiresAt: '2026-06-30T08:00:00Z',
+    },
+  ];
 }
 
 async function generateKiloPassNotification(

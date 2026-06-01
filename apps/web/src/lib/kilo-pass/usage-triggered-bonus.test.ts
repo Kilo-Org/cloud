@@ -37,6 +37,7 @@ async function seedBaseIssuance(params: {
   nextYearlyIssueAt: string | null;
   startedAtIso?: string | null;
   welcomePromoEligibilityReason?: KiloPassWelcomePromoEligibilityReason;
+  initialWelcomePromoEligibilityReason?: KiloPassWelcomePromoEligibilityReason;
 }) {
   const {
     kiloUserId,
@@ -48,6 +49,7 @@ async function seedBaseIssuance(params: {
     nextYearlyIssueAt,
     startedAtIso,
     welcomePromoEligibilityReason,
+    initialWelcomePromoEligibilityReason,
   } = params;
 
   const stripeSubscriptionId = `sub_${Math.random()}`;
@@ -70,6 +72,16 @@ async function seedBaseIssuance(params: {
 
   const subscriptionId = subscriptionRow[0]?.id;
   if (!subscriptionId) throw new Error('Failed to insert subscription');
+
+  if (initialWelcomePromoEligibilityReason != null && issueMonth !== '2026-01-01') {
+    await db.insert(kilo_pass_issuances).values({
+      kilo_pass_subscription_id: subscriptionId,
+      issue_month: '2026-01-01',
+      source: KiloPassIssuanceSource.StripeInvoice,
+      stripe_invoice_id: `${stripeInvoiceId ?? 'inv_test'}_initial`,
+      initial_welcome_promo_eligibility_reason: initialWelcomePromoEligibilityReason,
+    });
+  }
 
   const issuanceRow = await db
     .insert(kilo_pass_issuances)
@@ -177,6 +189,8 @@ describe('maybeIssueKiloPassBonusFromUsageThreshold', () => {
       currentStreakMonths: 2,
       nextYearlyIssueAt: null,
       startedAtIso: '2026-01-26T23:59:59.000Z',
+      initialWelcomePromoEligibilityReason:
+        KiloPassWelcomePromoEligibilityReason.FirstPaymentFingerprintClaim,
     });
 
     await maybeIssueKiloPassBonusFromUsageThreshold({
@@ -239,6 +253,8 @@ describe('maybeIssueKiloPassBonusFromUsageThreshold', () => {
       currentStreakMonths: 2,
       nextYearlyIssueAt: null,
       startedAtIso: KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF.toISOString(),
+      initialWelcomePromoEligibilityReason:
+        KiloPassWelcomePromoEligibilityReason.FirstPaymentFingerprintClaim,
     });
 
     await maybeIssueKiloPassBonusFromUsageThreshold({
@@ -283,6 +299,8 @@ describe('maybeIssueKiloPassBonusFromUsageThreshold', () => {
       currentStreakMonths: streakMonths,
       nextYearlyIssueAt: null,
       startedAtIso,
+      initialWelcomePromoEligibilityReason:
+        KiloPassWelcomePromoEligibilityReason.FirstPaymentFingerprintClaim,
     });
 
     await maybeIssueKiloPassBonusFromUsageThreshold({
@@ -357,6 +375,8 @@ describe('maybeIssueKiloPassBonusFromUsageThreshold', () => {
       currentStreakMonths: 3,
       nextYearlyIssueAt: null,
       startedAtIso: '2026-01-01T00:00:00.000Z',
+      initialWelcomePromoEligibilityReason:
+        KiloPassWelcomePromoEligibilityReason.FirstPaymentFingerprintClaim,
     });
 
     await maybeIssueKiloPassBonusFromUsageThreshold({

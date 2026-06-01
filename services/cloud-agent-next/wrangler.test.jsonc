@@ -20,7 +20,10 @@
     },
   ],
   "queues": {
-    "producers": [{ "binding": "EXECUTION_QUEUE", "queue": "cloud-agent-executions" }],
+    "producers": [
+      { "binding": "EXECUTION_QUEUE", "queue": "cloud-agent-executions" },
+      { "binding": "CLOUD_AGENT_REPORT_QUEUE", "queue": "cloud-agent-next-report-queue-test" },
+    ],
     "consumers": [
       {
         "queue": "cloud-agent-executions",

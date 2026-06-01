@@ -2985,6 +2985,13 @@ export const kiloclawRouter = createTRPCRouter({
     } satisfies KiloClawDashboardStatus;
   }),
 
+  getNavState: baseProcedure.query(async ({ ctx }) => {
+    const instance = await getActiveInstance(ctx.user.id);
+    return {
+      hasActiveInstance: instance !== null,
+    };
+  }),
+
   getDiskUsage: baseProcedure.query(async ({ ctx }) => {
     const instance = await getActiveInstance(ctx.user.id);
     if (!instance) {

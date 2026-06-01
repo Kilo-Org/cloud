@@ -305,7 +305,7 @@ function CreateExperimentDialog({
               id="exp-public-id"
               value={publicModelId}
               onChange={e => setPublicModelId(e.target.value)}
-              placeholder="e.g. kilo/preview-experiment-foo"
+              placeholder="e.g. partner/preview-experiment-foo"
               className="font-mono"
             />
           </div>

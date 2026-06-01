@@ -1,4 +1,4 @@
-import { describe, expect, it, jest } from '@jest/globals';
+import { afterAll, beforeAll, describe, expect, it, jest } from '@jest/globals';
 import {
   DeliveryStatus,
   NotificationTypeV2,
@@ -31,6 +31,8 @@ import { processAppStoreKiloPassNotification } from './apple-store-notifications
 import type { AppleStoreDecodedNotification } from './apple-store-notifications';
 import type { AppleStoreDecodedTransaction } from './apple-store-verifier';
 import { toMicrodollars } from '@/lib/utils';
+
+const APP_STORE_NOTIFICATION_TEST_NOW_MS = Date.parse('2026-05-15T00:00:00.000Z');
 
 function notification(
   overrides: Partial<AppleStoreDecodedNotification> = {}
@@ -95,6 +97,16 @@ async function insertProviderScopedSubscriptionRows(providerSubscriptionId: stri
 }
 
 describe('processAppStoreKiloPassNotification', () => {
+  let dateNowSpy: jest.SpiedFunction<typeof Date.now>;
+
+  beforeAll(() => {
+    dateNowSpy = jest.spyOn(Date, 'now').mockReturnValue(APP_STORE_NOTIFICATION_TEST_NOW_MS);
+  });
+
+  afterAll(() => {
+    dateNowSpy.mockRestore();
+  });
+
   it('records a renewal notification and completes the subscription once', async () => {
     const user = await insertTestUser();
     const decodedNotification = notification();

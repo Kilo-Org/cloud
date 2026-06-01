@@ -186,6 +186,22 @@ describe('createLifecycleManager', () => {
       expect(connectionFns.closeConnections).toHaveBeenCalled();
     });
 
+    it('defers drain while ingest reconnects and resumes it when connectivity is restored', async () => {
+      const mgr = createManager();
+      (connectionFns.isConnected as ReturnType<typeof vi.fn>).mockReturnValue(false);
+      state.bindSession(createSessionContext());
+      state.acceptMessage('msg_1', { autoCommit: false, condenseOnComplete: false });
+      mgr.onMessageComplete('msg_1');
+      mgr.onSessionIdle();
+      await vi.advanceTimersByTimeAsync(500);
+      expect(connectionFns.closeConnections).not.toHaveBeenCalled();
+
+      (connectionFns.isConnected as ReturnType<typeof vi.fn>).mockReturnValue(true);
+      mgr.onConnectionRestored();
+      await vi.advanceTimersByTimeAsync(500);
+      expect(connectionFns.closeConnections).toHaveBeenCalled();
+    });
+
     it('does not trigger drain when pending messages remain', async () => {
       const mgr = createManager();
       (connectionFns.isConnected as ReturnType<typeof vi.fn>).mockReturnValue(true);

@@ -604,12 +604,12 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         terminalizeSessionMessageOnce: async (messageId, params, wrapperRunId) => {
           await this.ensureAcceptedMessageBeforeTerminal(messageId, wrapperRunId);
           await this.recordCorrelatedAgentActivity(messageId);
-          await this.terminalizeSessionMessageOnce(messageId, {
-            ...params,
-            ...(params.kind === 'failed'
-              ? { failureStage: 'agent_activity', failureCode: 'assistant_error' }
-              : {}),
-          } as TerminalizeParams);
+          await this.terminalizeSessionMessageOnce(
+            messageId,
+            params.kind === 'failed'
+              ? { ...params, failureStage: 'agent_activity', failureCode: 'assistant_error' }
+              : params
+          );
         },
       };
 

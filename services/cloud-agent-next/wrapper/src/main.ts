@@ -373,6 +373,7 @@ async function main() {
         },
         onReconnected: () => {
           logToFile('ingest WS reconnected');
+          lifecycleManager?.onConnectionRestored();
           const lastError = state.getLastError();
           if (lastError?.code === 'DISCONNECT') {
             state.clearLastError();

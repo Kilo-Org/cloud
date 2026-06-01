@@ -198,6 +198,28 @@ describe('MessageSettlementOutbox', () => {
     });
   });
 
+  it('persists manual compact terminalization and emits one completion event', async () => {
+    const harness = createHarness();
+    await putSessionMessageState(harness.storage, acceptedMessageState(firstMessageId));
+
+    const result = await harness.outbox.terminalizeSessionMessageOnce(firstMessageId, {
+      kind: 'completed',
+      completionSource: 'manual_compact_summarize',
+    });
+
+    expect(result.changed).toBe(true);
+    expect(await getSessionMessageState(harness.storage, firstMessageId)).toMatchObject({
+      status: 'completed',
+      completionSource: 'manual_compact_summarize',
+    });
+    expect(harness.events).toHaveLength(1);
+    expect(JSON.parse(harness.events[0].payload)).toMatchObject({
+      messageId: firstMessageId,
+      status: 'completed',
+      completionSource: 'manual_compact_summarize',
+    });
+  });
+
   it('dispatches one web-session push using message identity and assistant text', async () => {
     const harness = createHarness({
       metadata: pushMetadata,

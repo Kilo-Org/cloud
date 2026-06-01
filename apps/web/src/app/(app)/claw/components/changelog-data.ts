@@ -17,13 +17,6 @@ export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
     deployHint: 'redeploy_suggested',
   },
   {
-    date: '2026-06-01',
-    description:
-      'Updated the controller so Control UI no longer requires device pairing on fresh installs.',
-    category: 'bugfix',
-    deployHint: 'redeploy_required',
-  },
-  {
     date: '2026-05-28',
     description: 'Updated OpenClaw to 2026.5.22.',
     category: 'feature',

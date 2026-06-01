@@ -55,6 +55,7 @@ import { closePauseEvent } from '@/lib/kilo-pass/pause-events';
 import { getAllMobileStoreKiloPassProducts } from '@/lib/kilo-pass/mobile-store-products';
 import { verifyAppleKiloPassTransactionJws } from '@/lib/kilo-pass/apple-store-verifier';
 import { completeStoreKiloPassPurchase } from '@/lib/kilo-pass/store-subscription-completion';
+import { computeUsageTriggeredMonthlyBonusDecision } from '@/lib/kilo-pass/usage-triggered-bonus';
 
 const CursorInputSchema = z.object({
   cursor: z.string().nullable().optional(),
@@ -287,18 +288,32 @@ function getCurrentKiloPassBonusCreditsUsd(params: {
   subscription: KiloPassSubscriptionState;
   baseAmountUsd: number;
   isFirstTimeSubscriberEver: boolean;
+  currentPeriodWelcomePromoEligibilityReason: KiloPassWelcomePromoEligibilityReason | null;
 }): number {
   if (params.subscription.cadence === KiloPassCadence.Yearly) {
     return roundToCents(computeYearlyCadenceMonthlyBonusUsd(params.subscription.tier));
   }
 
   const streakMonths = Math.max(1, params.subscription.currentStreakMonths);
-  const bonusPercentApplied = computeMonthlyCadenceBonusPercent({
-    tier: params.subscription.tier,
-    streakMonths,
-    isFirstTimeSubscriberEver: params.isFirstTimeSubscriberEver,
-    subscriptionStartedAtIso: params.subscription.startedAt,
-  });
+  const requiresSettledPaymentDecision =
+    params.subscription.paymentProvider === KiloPassPaymentProvider.Stripe &&
+    params.currentPeriodWelcomePromoEligibilityReason != null;
+  const bonusPercentApplied = requiresSettledPaymentDecision
+    ? computeUsageTriggeredMonthlyBonusDecision({
+        tier: params.subscription.tier,
+        startedAtIso: params.subscription.startedAt,
+        currentStreakMonths: streakMonths,
+        isFirstTimeSubscriberEver: params.isFirstTimeSubscriberEver,
+        requiresSettledPaymentDecision,
+        welcomePromoEligibilityReason: params.currentPeriodWelcomePromoEligibilityReason,
+        issueMonth: '',
+      }).bonusPercentApplied
+    : computeMonthlyCadenceBonusPercent({
+        tier: params.subscription.tier,
+        streakMonths,
+        isFirstTimeSubscriberEver: params.isFirstTimeSubscriberEver,
+        subscriptionStartedAtIso: params.subscription.startedAt,
+      });
   const cents = Math.round(params.baseAmountUsd * bonusPercentApplied * 100);
   return cents / 100;
 }
@@ -396,6 +411,21 @@ async function getIsBonusUnlockedForSubscriptionId(subscriptionId: string): Prom
   });
 
   return Boolean(unlockedItem);
+}
+
+async function getLatestWelcomePromoEligibilityReasonForSubscriptionId(
+  subscriptionId: string
+): Promise<KiloPassWelcomePromoEligibilityReason | null> {
+  const latestIssuance = await db
+    .select({
+      welcomePromoEligibilityReason: kilo_pass_issuances.initial_welcome_promo_eligibility_reason,
+    })
+    .from(kilo_pass_issuances)
+    .where(eq(kilo_pass_issuances.kilo_pass_subscription_id, subscriptionId))
+    .orderBy(desc(kilo_pass_issuances.issue_month))
+    .limit(1);
+
+  return latestIssuance[0]?.welcomePromoEligibilityReason ?? null;
 }
 
 /**
@@ -652,10 +682,12 @@ async function buildActiveKiloPassSubscriptionState(params: {
     kiloUserId: params.kiloUserId,
     subscriptionId: params.subscription.subscriptionId,
   });
-  const [isBonusUnlocked, baseCreditsIssuedAtIso] = await Promise.all([
-    getIsBonusUnlockedForSubscriptionId(params.subscription.subscriptionId),
-    getBaseCreditsIssuedAtForSubscription(params.subscription.subscriptionId),
-  ]);
+  const [isBonusUnlocked, baseCreditsIssuedAtIso, currentPeriodWelcomePromoEligibilityReason] =
+    await Promise.all([
+      getIsBonusUnlockedForSubscriptionId(params.subscription.subscriptionId),
+      getBaseCreditsIssuedAtForSubscription(params.subscription.subscriptionId),
+      getLatestWelcomePromoEligibilityReasonForSubscriptionId(params.subscription.subscriptionId),
+    ]);
   const usageStartInclusiveIso = getUsageStartInclusiveIso({
     subscription: params.subscription,
     baseCreditsIssuedAtIso,
@@ -684,6 +716,7 @@ async function buildActiveKiloPassSubscriptionState(params: {
       subscription: params.subscription,
       baseAmountUsd,
       isFirstTimeSubscriberEver,
+      currentPeriodWelcomePromoEligibilityReason,
     }),
     isBonusUnlocked,
     refillAt:

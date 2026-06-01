@@ -736,6 +736,107 @@ describe('kiloPassRouter', () => {
       expect(result.subscription?.refillAt).toBe(expectedNextBillingAt);
     });
 
+    it('keeps first-month current bonus visible for first-time subscribers with a new card', async () => {
+      const stripeMock = getStripeMock();
+      const currentPeriodEndSeconds = 1_700_123_456;
+      const currentPeriodStartSeconds = currentPeriodEndSeconds - 2_592_000;
+      stripeMock.subscriptions.retrieve.mockResolvedValue({
+        id: 'sub_test_monthly_new_card_current_bonus',
+        status: 'active',
+        items: {
+          data: [
+            {
+              current_period_end: currentPeriodEndSeconds,
+              current_period_start: currentPeriodStartSeconds,
+            },
+          ],
+        },
+      });
+
+      const user = await insertTestUser({
+        google_user_email: 'kilo-pass-get-state-new-card-current-bonus@example.com',
+      });
+      const { id: subscriptionId } = await insertSubscription({
+        kiloUserId: user.id,
+        stripeSubscriptionId: 'sub_test_monthly_new_card_current_bonus',
+        tier: KiloPassTier.Tier199,
+        cadence: KiloPassCadence.Monthly,
+        status: 'active',
+        currentStreakMonths: 1,
+        startedAt: '2026-06-01T00:00:00.000Z',
+      });
+      await insertBaseCreditsIssuance({
+        subscriptionId,
+        kiloUserId: user.id,
+        welcomePromoEligibilityReason:
+          KiloPassWelcomePromoEligibilityReason.FirstPaymentFingerprintClaim,
+      });
+
+      const caller = await createCallerForUser(user.id);
+      const result = await caller.kiloPass.getState();
+
+      const baseAmountUsd = getMonthlyPriceUsd(KiloPassTier.Tier199);
+      const expectedCurrentBonusUsd =
+        Math.round(baseAmountUsd * KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_BONUS_PERCENT * 100) /
+        100;
+
+      expect(result.subscription?.currentPeriodBonusCreditsUsd).toBe(expectedCurrentBonusUsd);
+    });
+
+    it('uses ramp current bonus instead of grandfathered month-2 promo for reused cards', async () => {
+      const stripeMock = getStripeMock();
+      const currentPeriodEndSeconds = 1_700_123_456;
+      const currentPeriodStartSeconds = currentPeriodEndSeconds - 2_592_000;
+      stripeMock.subscriptions.retrieve.mockResolvedValue({
+        id: 'sub_test_monthly_reused_card_month2_current_bonus',
+        status: 'active',
+        items: {
+          data: [
+            {
+              current_period_end: currentPeriodEndSeconds,
+              current_period_start: currentPeriodStartSeconds,
+            },
+          ],
+        },
+      });
+
+      const user = await insertTestUser({
+        google_user_email: 'kilo-pass-get-state-reused-card-month2-current-bonus@example.com',
+      });
+      const { id: subscriptionId } = await insertSubscription({
+        kiloUserId: user.id,
+        stripeSubscriptionId: 'sub_test_monthly_reused_card_month2_current_bonus',
+        tier: KiloPassTier.Tier199,
+        cadence: KiloPassCadence.Monthly,
+        status: 'active',
+        currentStreakMonths: 2,
+        startedAt: '2026-01-01T00:00:00.000Z',
+      });
+      await insertBaseCreditsIssuance({
+        subscriptionId,
+        kiloUserId: user.id,
+        welcomePromoEligibilityReason:
+          KiloPassWelcomePromoEligibilityReason.FingerprintPreviouslyClaimed,
+      });
+
+      const caller = await createCallerForUser(user.id);
+      const result = await caller.kiloPass.getState();
+
+      const baseAmountUsd = getMonthlyPriceUsd(KiloPassTier.Tier199);
+      const rampBonusPercent = computeMonthlyCadenceBonusPercent({
+        tier: KiloPassTier.Tier199,
+        streakMonths: 2,
+        isFirstTimeSubscriberEver: false,
+        subscriptionStartedAtIso: '2026-01-01T00:00:00.000Z',
+      });
+      const expectedCurrentBonusUsd = Math.round(baseAmountUsd * rampBonusPercent * 100) / 100;
+
+      expect(result.subscription?.currentPeriodBonusCreditsUsd).toBe(expectedCurrentBonusUsd);
+      expect(result.subscription?.currentPeriodBonusCreditsUsd).not.toBe(
+        Math.round(baseAmountUsd * KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_BONUS_PERCENT * 100) / 100
+      );
+    });
+
     it('uses the latest App Store purchase period and reports current usage, hosting, and bonus', async () => {
       freezeKiloPassClock('2026-02-15T12:00:00.000Z');
 

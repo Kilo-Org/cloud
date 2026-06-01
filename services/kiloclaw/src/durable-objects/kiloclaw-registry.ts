@@ -310,6 +310,10 @@ export class KiloClawRegistry extends DurableObject<KiloClawEnv> {
       if (reservation.status === 'released') {
         throw new Error('Cannot complete a released provision reservation');
       }
+      // A canonical active row plus subscription is stronger evidence than the
+      // transient provider-side failure that originally set reconciliation state.
+      // Repair deliberately clears that state only after the Worker has verified
+      // canonical success before invoking this method.
       if (
         reservationRequired &&
         reservation.status !== 'in_progress' &&

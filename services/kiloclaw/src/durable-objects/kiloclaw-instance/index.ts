@@ -2573,8 +2573,13 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
           releaseAllowed = destroyed !== null;
         }
       }
-      const registryKeys = [`user:${userId}`];
-      if (orgId) registryKeys.push(`org:${orgId}`);
+      const registryKeys = registryInstanceId
+        ? orgId
+          ? [`org:${orgId}`]
+          : [`user:${userId}`]
+        : orgId
+          ? [`user:${userId}`, `org:${orgId}`]
+          : [`user:${userId}`];
 
       for (const registryKey of registryKeys) {
         const registryStub = this.env.KILOCLAW_REGISTRY.get(

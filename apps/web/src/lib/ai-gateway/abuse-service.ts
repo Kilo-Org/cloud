@@ -26,7 +26,6 @@ import {
 } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
 import { ProxyErrorType } from '@/lib/proxy-error-types';
 import { getAutoFreeCandidates } from '@/lib/ai-gateway/auto-model/resolution';
-import { getOpenRouterModels } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import { redisGet, redisSet } from '@/lib/redis';
 import { abuseRulesClassificationRedisKey } from '@/lib/redis-keys';
 import type { FraudDetectionHeaders } from '@/lib/utils';
@@ -361,7 +360,7 @@ export function isRulesEngineBlockingAction(action: AbuseRuleAction | null | und
 export async function getQuarantineFreeModel(
   apiKind: GatewayRequest['kind']
 ): Promise<string | null> {
-  const candidates = getAutoFreeCandidates(await getOpenRouterModels(), apiKind);
+  const candidates = await getAutoFreeCandidates(apiKind);
   const candidate = candidates[0] ?? null;
   if (!candidate) {
     console.warn('No quarantine free model candidate available', { apiKind });

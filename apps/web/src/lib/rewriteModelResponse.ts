@@ -350,8 +350,7 @@ export async function rewriteFreeModelResponse(
 ): Promise<NextResponse | null> {
   const isFreeModelRequiringCostRemoval =
     (providerId === 'openrouter' || providerId === 'vercel') && isKiloExclusiveFreeModel(model);
-  const isStealthModelRequiringNameRemoval =
-    providerId !== 'martian' && isKiloStealthModel(model);
+  const isStealthModelRequiringNameRemoval = providerId !== 'martian' && isKiloStealthModel(model);
 
   if (!isFreeModelRequiringCostRemoval && !isStealthModelRequiringNameRemoval) {
     return null;

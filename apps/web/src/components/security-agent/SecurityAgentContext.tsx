@@ -110,7 +110,24 @@ function getOptionalStringField(source: unknown, key: string): string | undefine
   return typeof value === 'string' ? value : undefined;
 }
 
-const ACCEPTED_QUEUE_REFRESH_DELAYS_MS = [1000, 5000, 15000] as const;
+const ACCEPTED_QUEUE_POLL_INTERVAL_MS = 3000;
+const ACCEPTED_QUEUE_POLL_TIMEOUT_MS = 18000;
+
+function listFindingsDataHasActiveAnalysis(data: unknown): boolean {
+  if (typeof data !== 'object' || data === null) return false;
+
+  const runningCount = Reflect.get(data, 'runningCount');
+  if (typeof runningCount === 'number' && runningCount > 0) return true;
+
+  const findings = Reflect.get(data, 'findings');
+  if (!Array.isArray(findings)) return false;
+
+  return findings.some(finding => {
+    if (typeof finding !== 'object' || finding === null) return false;
+    const analysisStatus = Reflect.get(finding, 'analysis_status');
+    return analysisStatus === 'pending' || analysisStatus === 'running';
+  });
+}
 
 type SecurityAgentProviderProps = {
   organizationId?: string;
@@ -125,30 +142,96 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
   const [startingAnalysisIds, setStartingAnalysisIds] = useState<Set<string>>(new Set());
   const [gitHubError, setGitHubError] = useState<string | null>(null);
   const toggleEnabledInFlightRef = useRef(false);
-  const acceptedQueueRefreshTimersRef = useRef<number[]>([]);
+  const acceptedQueuePollRef = useRef<{ intervalId: number; timeoutId: number } | null>(null);
 
-  useEffect(
-    () => () => {
-      for (const timer of acceptedQueueRefreshTimersRef.current) {
-        window.clearTimeout(timer);
-      }
-      acceptedQueueRefreshTimersRef.current = [];
-    },
-    []
-  );
+  const clearAcceptedQueuePoll = useCallback(() => {
+    const activePoll = acceptedQueuePollRef.current;
+    if (!activePoll) return;
+    window.clearInterval(activePoll.intervalId);
+    window.clearTimeout(activePoll.timeoutId);
+    acceptedQueuePollRef.current = null;
+  }, []);
 
-  const refreshAcceptedQueueMutation = useCallback(() => {
-    void queryClient.invalidateQueries();
-    for (const delay of ACCEPTED_QUEUE_REFRESH_DELAYS_MS) {
-      const timer = window.setTimeout(() => {
-        void queryClient.invalidateQueries();
-        acceptedQueueRefreshTimersRef.current = acceptedQueueRefreshTimersRef.current.filter(
-          pendingTimer => pendingTimer !== timer
-        );
-      }, delay);
-      acceptedQueueRefreshTimersRef.current.push(timer);
+  useEffect(() => clearAcceptedQueuePoll, [clearAcceptedQueuePoll]);
+
+  const invalidateAcceptedQueueQueries = useCallback(() => {
+    if (isOrg && organizationId) {
+      const ownerInput = { organizationId };
+      void Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: trpc.organizations.securityAgent.listFindings.queryKey(ownerInput),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: trpc.organizations.securityAgent.getFinding.queryKey(ownerInput),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: trpc.organizations.securityAgent.getAnalysis.queryKey(ownerInput),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: trpc.organizations.securityAgent.getStats.queryKey(ownerInput),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: trpc.organizations.securityAgent.getDashboardStats.queryKey(ownerInput),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: trpc.organizations.securityAgent.getLastSyncTime.queryKey(ownerInput),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: trpc.organizations.securityAgent.getRepositories.queryKey(ownerInput),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: trpc.organizations.securityAgent.getOrphanedRepositories.queryKey(ownerInput),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: trpc.organizations.securityAgent.getAutoDismissEligible.queryKey(ownerInput),
+        }),
+      ]);
+      return;
     }
-  }, [queryClient]);
+
+    void Promise.all([
+      queryClient.invalidateQueries({ queryKey: trpc.securityAgent.listFindings.queryKey() }),
+      queryClient.invalidateQueries({ queryKey: trpc.securityAgent.getFinding.queryKey() }),
+      queryClient.invalidateQueries({ queryKey: trpc.securityAgent.getAnalysis.queryKey() }),
+      queryClient.invalidateQueries({ queryKey: trpc.securityAgent.getStats.queryKey() }),
+      queryClient.invalidateQueries({ queryKey: trpc.securityAgent.getDashboardStats.queryKey() }),
+      queryClient.invalidateQueries({ queryKey: trpc.securityAgent.getLastSyncTime.queryKey() }),
+      queryClient.invalidateQueries({ queryKey: trpc.securityAgent.getRepositories.queryKey() }),
+      queryClient.invalidateQueries({
+        queryKey: trpc.securityAgent.getOrphanedRepositories.queryKey(),
+      }),
+      queryClient.invalidateQueries({
+        queryKey: trpc.securityAgent.getAutoDismissEligible.queryKey(),
+      }),
+    ]);
+  }, [isOrg, organizationId, queryClient, trpc]);
+
+  const cachedListFindingsHasActiveAnalysis = useCallback(() => {
+    const queryKey = isOrg
+      ? trpc.organizations.securityAgent.listFindings.queryKey(
+          organizationId ? { organizationId } : undefined
+        )
+      : trpc.securityAgent.listFindings.queryKey();
+
+    return queryClient
+      .getQueriesData({ queryKey })
+      .some(([, data]) => listFindingsDataHasActiveAnalysis(data));
+  }, [isOrg, organizationId, queryClient, trpc]);
+
+  const pollAcceptedQueueMutation = useCallback(() => {
+    clearAcceptedQueuePoll();
+    invalidateAcceptedQueueQueries();
+
+    const intervalId = window.setInterval(() => {
+      invalidateAcceptedQueueQueries();
+      if (cachedListFindingsHasActiveAnalysis()) {
+        clearAcceptedQueuePoll();
+      }
+    }, ACCEPTED_QUEUE_POLL_INTERVAL_MS);
+
+    const timeoutId = window.setTimeout(clearAcceptedQueuePoll, ACCEPTED_QUEUE_POLL_TIMEOUT_MS);
+    acceptedQueuePollRef.current = { intervalId, timeoutId };
+  }, [cachedListFindingsHasActiveAnalysis, clearAcceptedQueuePoll, invalidateAcceptedQueueQueries]);
 
   // Permission status query
   const { data: permissionData, isLoading: isLoadingPermission } = useQuery(
@@ -188,7 +271,7 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
       onSuccess: () => {
         setGitHubError(null);
         toast.success('Sync queued');
-        refreshAcceptedQueueMutation();
+        pollAcceptedQueueMutation();
       },
       onError: error => {
         const message = error instanceof Error ? error.message : String(error);
@@ -209,7 +292,7 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
     trpc.organizations.securityAgent.dismissFinding.mutationOptions({
       onSuccess: () => {
         toast.success('Finding dismissed');
-        refreshAcceptedQueueMutation();
+        pollAcceptedQueueMutation();
       },
       onError: error => {
         toast.error('Failed to dismiss finding', { description: error.message });
@@ -256,7 +339,7 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
       onSuccess: async (_data, variables) => {
         setGitHubError(null);
         toast.success(manualAnalysisAdmissionCopy.successTitle);
-        refreshAcceptedQueueMutation();
+        pollAcceptedQueueMutation();
         setStartingAnalysisIds(prev => {
           const next = new Set(prev);
           next.delete(variables.findingId);
@@ -307,7 +390,7 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
       onSuccess: () => {
         setGitHubError(null);
         toast.success('Sync queued');
-        refreshAcceptedQueueMutation();
+        pollAcceptedQueueMutation();
       },
       onError: error => {
         const message = error instanceof Error ? error.message : String(error);
@@ -328,7 +411,7 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
     trpc.securityAgent.dismissFinding.mutationOptions({
       onSuccess: () => {
         toast.success('Finding dismissed');
-        refreshAcceptedQueueMutation();
+        pollAcceptedQueueMutation();
       },
       onError: error => {
         toast.error('Failed to dismiss finding', { description: error.message });
@@ -375,7 +458,7 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
       onSuccess: async (_data, variables) => {
         setGitHubError(null);
         toast.success(manualAnalysisAdmissionCopy.successTitle);
-        refreshAcceptedQueueMutation();
+        pollAcceptedQueueMutation();
         setStartingAnalysisIds(prev => {
           const next = new Set(prev);
           next.delete(variables.findingId);

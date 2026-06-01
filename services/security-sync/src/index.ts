@@ -9,7 +9,7 @@ import { processSecurityFindingDismissal } from './dismiss';
 const SecuritySyncOwnerSchema = z
   .object({
     organizationId: z.string().uuid().optional(),
-    userId: z.string().uuid().optional(),
+    userId: z.string().min(1).optional(),
   })
   .refine(value => Boolean(value.organizationId || value.userId), {
     message: 'owner.organizationId or owner.userId is required',

@@ -19,13 +19,14 @@ export type AutoAnalysisEligibilityDecision = {
   boundarySkipped: boolean;
 };
 
-const LOW_SEVERITY_RANK = 3;
+const LOWEST_SEVERITY_RANK = 3;
+const ALL_SEVERITIES_MAX_RANK = LOWEST_SEVERITY_RANK;
 
 const SEVERITY_RANKS = {
   critical: 0,
   high: 1,
   medium: 2,
-  low: LOW_SEVERITY_RANK,
+  low: LOWEST_SEVERITY_RANK,
 } as const satisfies Record<string, AutoAnalysisSeverityRank>;
 
 type KnownSeverity = keyof typeof SEVERITY_RANKS;
@@ -34,7 +35,7 @@ const MIN_SEVERITY_MAX_RANKS = {
   critical: SEVERITY_RANKS.critical,
   high: SEVERITY_RANKS.high,
   medium: SEVERITY_RANKS.medium,
-  all: LOW_SEVERITY_RANK,
+  all: ALL_SEVERITIES_MAX_RANK,
 } as const satisfies Record<AutoAnalysisMinSeverity, AutoAnalysisSeverityRank>;
 
 function isKnownSeverity(severity: string): severity is KnownSeverity {
@@ -53,7 +54,7 @@ export function decideAutoAnalysisEligibility(
   params: AutoAnalysisEligibilityParams
 ): AutoAnalysisEligibilityDecision {
   const normalizedSeverityRank = getSeverityRank(params.findingSeverity);
-  const severityRank = normalizedSeverityRank ?? LOW_SEVERITY_RANK;
+  const severityRank = normalizedSeverityRank ?? LOWEST_SEVERITY_RANK;
   const boundarySkipped =
     !params.autoAnalysisIncludeExisting &&
     params.autoAnalysisEnabledAt !== null &&

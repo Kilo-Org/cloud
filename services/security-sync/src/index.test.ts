@@ -179,6 +179,67 @@ describe('manual sync dispatch', () => {
     expect(retry).not.toHaveBeenCalled();
   });
 
+  it('accepts legacy OAuth user IDs in manual sync commands', async () => {
+    const queuedBatches: MessageSendRequest<SecuritySyncQueueMessage>[][] = [];
+    const legacyUserId = 'oauth:google:1234567890';
+    const response = await worker.fetch(
+      new Request('https://security-sync.test/internal/manual-sync', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-internal-api-key': 'worker-secret',
+        },
+        body: JSON.stringify({
+          schemaVersion: 1,
+          owner: { userId: legacyUserId },
+          actor: {
+            id: legacyUserId,
+            email: 'owner@example.com',
+            name: 'Owner Example',
+          },
+        }),
+      }),
+      {
+        INTERNAL_API_SECRET: { get: async () => 'worker-secret' },
+        SYNC_QUEUE: {
+          sendBatch: async batch => {
+            queuedBatches.push(batch);
+          },
+        },
+      } as CloudflareEnv
+    );
+
+    expect(response.status).toBe(202);
+    expect(queuedBatches[0]?.[0]?.body).toMatchObject({
+      trigger: 'manual',
+      owner: { userId: legacyUserId },
+      ownerKey: `user:${legacyUserId}`,
+      actor: {
+        id: legacyUserId,
+      },
+    });
+
+    vi.mocked(getWorkerDb).mockReturnValue({} as never);
+    vi.mocked(syncOwner).mockResolvedValue({ synced: 1, errors: 0, staleRepos: 0 } as never);
+    const ack = vi.fn();
+    const retry = vi.fn();
+    await worker.queue(
+      { messages: [{ body: queuedBatches[0]?.[0]?.body, ack, retry }] } as never,
+      {
+        HYPERDRIVE: { connectionString: 'postgres://worker' },
+        GIT_TOKEN_SERVICE: {},
+      } as CloudflareEnv
+    );
+
+    expect(syncOwner).toHaveBeenCalledWith(
+      expect.objectContaining({
+        owner: { userId: legacyUserId },
+      })
+    );
+    expect(ack).toHaveBeenCalledTimes(1);
+    expect(retry).not.toHaveBeenCalled();
+  });
+
   it('rejects migrated sync traffic when Worker command routing is paused', async () => {
     const response = await worker.fetch(
       new Request('https://security-sync.test/internal/manual-sync', { method: 'POST' }),
@@ -237,6 +298,48 @@ describe('manual dismissal dispatch', () => {
       installationId: 'installation-123',
       reason: 'not_used',
       comment: 'No production usage',
+    });
+  });
+
+  it('accepts legacy OAuth user IDs in dismissal commands', async () => {
+    const queuedBatches: MessageSendRequest<unknown>[][] = [];
+    const legacyUserId = 'oauth:google:1234567890';
+    const response = await worker.fetch(
+      new Request('https://security-sync.test/internal/dismiss-finding', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-internal-api-key': 'worker-secret',
+        },
+        body: JSON.stringify({
+          schemaVersion: 1,
+          owner: { userId: legacyUserId },
+          actor: {
+            id: legacyUserId,
+            email: 'owner@example.com',
+            name: 'Owner Example',
+          },
+          findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+          installationId: 'installation-123',
+          reason: 'not_used',
+          comment: 'No production usage',
+        }),
+      }),
+      {
+        INTERNAL_API_SECRET: { get: async () => 'worker-secret' },
+        SYNC_QUEUE: {
+          sendBatch: async batch => {
+            queuedBatches.push(batch);
+          },
+        },
+      } as CloudflareEnv
+    );
+
+    expect(response.status).toBe(202);
+    expect(queuedBatches[0]?.[0]?.body).toMatchObject({
+      kind: 'dismiss',
+      owner: { userId: legacyUserId },
+      actor: { id: legacyUserId, email: 'owner@example.com', name: 'Owner Example' },
     });
   });
 

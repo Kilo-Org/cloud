@@ -293,12 +293,12 @@ export async function lifecycleColdHot(args: LifecycleArgs): Promise<LifecycleRe
     const coldResult = await collectUntilTerminal(coldStream, timeoutMs);
     events.push(...coldResult.events);
     coldStream.close();
-    if (!coldResult.terminal) {
+    if (!coldResult.terminal || coldResult.terminal.streamEventType !== 'complete') {
       return {
         name: 'cold-hot',
         conversation,
         ok: false,
-        message: `cold turn: no terminal event within ${timeoutMs}ms`,
+        message: `cold turn: expected complete terminal, got ${coldResult.terminal?.streamEventType ?? 'none'}`,
         events,
         durationMs: Date.now() - start,
       };
@@ -322,11 +322,12 @@ export async function lifecycleColdHot(args: LifecycleArgs): Promise<LifecycleRe
       stream.close();
 
       const sandboxesAfter = await listSandboxContainers();
+      const completed = hotResult.terminal?.streamEventType === 'complete';
       const noPrepare = !hasEventOfType(hotResult.events, 'preparing');
       const sameContainers =
         sandboxesAfter.some(candidate => candidate.id === sandbox.id) &&
         sandboxesAfter.every(candidate => sandboxIdsBeforeFollowup.has(candidate.id));
-      if (!hotResult.terminal || !noPrepare || !sameContainers) {
+      if (!completed || !noPrepare || !sameContainers) {
         return {
           name: 'cold-hot',
           conversation,

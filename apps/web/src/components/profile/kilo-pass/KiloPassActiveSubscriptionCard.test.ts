@@ -23,7 +23,7 @@ function buildSubscription(
     startedAt: null,
     refillAt: null,
     nextBillingAt: null,
-    nextBonusCreditsUsd: 9.5,
+    nextBonusCreditsUsd: null,
     currentPeriodBaseCreditsUsd: 19,
     currentPeriodUsageUsd: 0,
     currentPeriodBonusCreditsUsd: 0,

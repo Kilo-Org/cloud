@@ -1946,6 +1946,7 @@ export const api_request_log = pgTable(
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     kilo_user_id: text(),
     organization_id: text(),
+    session_id: text(),
     provider: text(),
     model: text(),
     status_code: integer(),

@@ -683,6 +683,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     clonedResponse: response.clone(),
     user: maybeUser,
     organization_id: organizationId || null,
+    session_id: usageContext.session_id,
     provider: provider.id,
     model: originalModelIdLowerCased,
     request: requestBodyParsed,

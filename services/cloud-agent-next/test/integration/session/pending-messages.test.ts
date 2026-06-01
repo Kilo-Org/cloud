@@ -24,6 +24,7 @@ import {
   queueUserMessageInput,
   registerReadySession,
 } from '../../helpers/session-setup.js';
+import { getWrapperLease } from '../../../src/session/wrapper-runtime-state.js';
 
 const createMessage = (overrides: Partial<PendingSessionMessage>): PendingSessionMessage => ({
   messageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
@@ -836,9 +837,10 @@ describe('pending session messages', () => {
         }
         originalEnsure(params);
       };
-      instance['stopCurrentWrapperProcess'] = async () => {
-        throw new Error('stop failed');
-      };
+      instance['physicalWrapperStopper'] = async () => ({
+        status: 'inspection-failed',
+        error: 'stop failed',
+      });
 
       const interrupt = await instance.interruptExecution();
       await instance.alarm();
@@ -858,7 +860,59 @@ describe('pending session messages', () => {
     expect(result.runtime).toEqual({ wrapperGeneration: 2 });
   });
 
-  it('interrupt with accepted work and no live socket fences and stops current wrapper runtime', async () => {
+  it('interrupt with accepted work preserves durable physical cleanup when absence cannot be confirmed', async () => {
+    const userId = 'user_pending_interrupt_cleanup';
+    const sessionId = 'agent_pending_interrupt_cleanup';
+    const stub = env.CLOUD_AGENT_SESSION.get(
+      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
+    );
+
+    const result = await runInDurableObject(stub, async instance => {
+      await registerReadySession(instance, {
+        sessionId,
+        userId,
+        kiloSessionId: '87878787-8787-4878-8878-878787878787',
+        prompt: 'prepared prompt',
+        mode: 'code',
+        model: 'test-model',
+        kilocodeToken: 'token-interrupt-cleanup',
+      });
+      await instance.ctx.storage.put('wrapper_lease', {
+        state: 'owns_wrapper',
+        nextInstanceGeneration: 2,
+        instance: { instanceId: 'instance_interrupt', instanceGeneration: 1 },
+      });
+      await instance.ctx.storage.put('wrapper_runtime_state', {
+        wrapperGeneration: 1,
+        wrapperConnectionId: 'conn_interrupt_cleanup',
+        wrapperRunId: 'wr_interrupt_cleanup',
+      });
+      await putSessionMessageState(instance.ctx.storage, {
+        messageId: 'msg_018f1e2d3c4bIntrCleanAbCdE',
+        status: 'accepted',
+        prompt: 'active message',
+        createdAt: 1,
+        acceptedAt: 1,
+        wrapperRunId: 'wr_interrupt_cleanup',
+      });
+      instance['physicalWrapperStopper'] = async () => ({
+        status: 'still-present',
+        observed: [],
+      });
+
+      const interrupt = await instance.interruptExecution();
+      return { interrupt, lease: await getWrapperLease(instance.ctx.storage) };
+    });
+
+    expect(result.interrupt).toEqual({ success: true, executionId: undefined });
+    expect(result.lease).toMatchObject({
+      state: 'stop_needed',
+      reason: 'user-interrupt',
+      attempts: 1,
+    });
+  });
+
+  it('interrupt with accepted work and no live socket fences and requests current wrapper cleanup', async () => {
     const userId = 'user_pending_interrupt_no_socket';
     const sessionId = 'agent_pending_interrupt_no_socket';
     const stub = env.CLOUD_AGENT_SESSION.get(
@@ -867,9 +921,9 @@ describe('pending session messages', () => {
 
     const result = await runInDurableObject(stub, async instance => {
       const stopped: string[] = [];
-      instance['stopCurrentWrapperProcess'] = async reason => {
-        stopped.push(reason);
-        return true;
+      instance['physicalWrapperStopper'] = async request => {
+        stopped.push(request.reason);
+        return { status: 'absent' };
       };
       await registerReadySession(instance, {
         sessionId,
@@ -879,6 +933,11 @@ describe('pending session messages', () => {
         mode: 'code',
         model: 'test-model',
         kilocodeToken: 'token-followup',
+      });
+      await instance.ctx.storage.put('wrapper_lease', {
+        state: 'owns_wrapper',
+        nextInstanceGeneration: 2,
+        instance: { instanceId: 'instance_interrupt_missing', instanceGeneration: 1 },
       });
       await instance.ctx.storage.put('wrapper_runtime_state', {
         wrapperGeneration: 1,
@@ -898,12 +957,130 @@ describe('pending session messages', () => {
       const runtimeState = await instance.ctx.storage.get<{ wrapperGeneration: number }>(
         'wrapper_runtime_state'
       );
-      return { interrupt, runtimeState, stopped };
+      return {
+        interrupt,
+        runtimeState,
+        stopped,
+        lease: await getWrapperLease(instance.ctx.storage),
+      };
     });
 
     expect(result.interrupt).toEqual({ success: true, executionId: undefined });
     expect(result.runtimeState).toEqual({ wrapperGeneration: 2 });
     expect(result.stopped).toEqual(['user-interrupt']);
+    expect(result.lease).toMatchObject({ state: 'none' });
+  });
+
+  it('interrupt with a live fenced socket and no accepted work requests cleanup and fences reuse', async () => {
+    const userId = 'user_pending_interrupt_idle_wrapper';
+    const sessionId = 'agent_pending_interrupt_idle_wrapper';
+    const stub = env.CLOUD_AGENT_SESSION.get(
+      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
+    );
+
+    const result = await runInDurableObject(stub, async instance => {
+      const sentCommands: unknown[] = [];
+      const stopped: string[] = [];
+      instance.sendToWrapper = (_ingestTagId, command, _fence) => {
+        sentCommands.push(command);
+        return true;
+      };
+      instance['physicalWrapperStopper'] = async request => {
+        stopped.push(request.reason);
+        return { status: 'absent' };
+      };
+      await registerReadySession(instance, {
+        sessionId,
+        userId,
+        kiloSessionId: '97979797-9797-4979-8979-979797979797',
+        prompt: 'prepared prompt',
+        mode: 'code',
+        model: 'test-model',
+        kilocodeToken: 'token-followup',
+      });
+      await instance.ctx.storage.put('wrapper_lease', {
+        state: 'owns_wrapper',
+        nextInstanceGeneration: 2,
+        instance: { instanceId: 'instance_interrupt_idle', instanceGeneration: 1 },
+      });
+      await instance.ctx.storage.put('wrapper_runtime_state', {
+        wrapperGeneration: 1,
+        wrapperConnectionId: 'conn_interrupt_idle',
+        wrapperRunId: 'wr_interrupt_idle',
+      });
+
+      const interrupt = await instance.interruptExecution();
+      const runtimeState = await instance.ctx.storage.get<{ wrapperGeneration: number }>(
+        'wrapper_runtime_state'
+      );
+      return {
+        interrupt,
+        runtimeState,
+        sentCommands,
+        stopped,
+        lease: await getWrapperLease(instance.ctx.storage),
+      };
+    });
+
+    expect(result.interrupt).toEqual({ success: true, executionId: undefined });
+    expect(result.sentCommands).toEqual([{ type: 'kill', signal: 'SIGTERM' }]);
+    expect(result.runtimeState).toEqual({ wrapperGeneration: 2 });
+    expect(result.stopped).toEqual(['user-interrupt']);
+    expect(result.lease).toMatchObject({ state: 'none' });
+  });
+
+  it('interrupt fences a live wrapper when immediate kill signaling fails', async () => {
+    const userId = 'user_pending_interrupt_signal_failure';
+    const sessionId = 'agent_pending_interrupt_signal_failure';
+    const stub = env.CLOUD_AGENT_SESSION.get(
+      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
+    );
+
+    const result = await runInDurableObject(stub, async instance => {
+      const stopped: string[] = [];
+      instance.sendToWrapper = () => {
+        throw new Error('socket send failed');
+      };
+      instance['physicalWrapperStopper'] = async request => {
+        stopped.push(request.reason);
+        return { status: 'absent' };
+      };
+      await registerReadySession(instance, {
+        sessionId,
+        userId,
+        kiloSessionId: '98989898-9898-4989-8989-989898989898',
+        prompt: 'prepared prompt',
+        mode: 'code',
+        model: 'test-model',
+        kilocodeToken: 'token-followup',
+      });
+      await instance.ctx.storage.put('wrapper_lease', {
+        state: 'owns_wrapper',
+        nextInstanceGeneration: 2,
+        instance: { instanceId: 'instance_interrupt_signal_failure', instanceGeneration: 1 },
+      });
+      await instance.ctx.storage.put('wrapper_runtime_state', {
+        wrapperGeneration: 1,
+        wrapperConnectionId: 'conn_interrupt_signal_failure',
+        wrapperRunId: 'wr_interrupt_signal_failure',
+      });
+
+      const interrupt = await instance.interruptExecution();
+      const runtimeState = await instance.ctx.storage.get<{ wrapperGeneration: number }>(
+        'wrapper_runtime_state'
+      );
+      return {
+        interrupt,
+        runtimeState,
+        stopped,
+        lease: await getWrapperLease(instance.ctx.storage),
+      };
+    });
+
+    expect(result.interrupt).toEqual({ success: true, executionId: undefined });
+    expect(result.runtimeState).toEqual({ wrapperGeneration: 2 });
+    expect(result.stopped).toEqual(['user-interrupt']);
+    expect(result.lease).toMatchObject({ state: 'none' });
   });
 
   it('interrupt with a live fenced socket sends kill then fences accepted work', async () => {
@@ -975,7 +1152,6 @@ describe('pending session messages', () => {
     );
 
     const result = await runInDurableObject(stub, async instance => {
-      instance['stopCurrentWrapperProcess'] = async () => true;
       await registerReadySession(instance, {
         sessionId,
         userId,
@@ -1073,12 +1249,30 @@ describe('pending session messages', () => {
         gitUrl: 'https://example.com/repo.git',
         gitToken: 'old-token',
       });
+      await instance.ctx.storage.put('wrapper_lease', {
+        state: 'owns_wrapper',
+        nextInstanceGeneration: 2,
+        instance: { instanceId: 'instance_active_flush', instanceGeneration: 1 },
+      });
+      instance['physicalWrapperObserver'] = async () => ({
+        status: 'present',
+        observed: [
+          {
+            representation: 'process',
+            id: 'wrapper-active-flush',
+            port: 5000,
+            instanceId: 'instance_active_flush',
+            instanceGeneration: 1,
+          },
+        ],
+      });
       await instance.ctx.storage.put('wrapper_runtime_state', {
         wrapperGeneration: 1,
         wrapperConnectionId: 'conn_active_flush',
         wrapperRunId: 'wr_active_flush',
         lastWrapperMessageAt: Date.now(),
       });
+
       await putSessionMessageState(instance.ctx.storage, {
         messageId: 'msg_018f1e2d3c4bActBusyRunAbCd',
         status: 'accepted',

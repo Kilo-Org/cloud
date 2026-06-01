@@ -25,6 +25,7 @@ export type KiloPassActiveSubscriptionCardLogicSubscription = Pick<
   | 'startedAt'
   | 'refillAt'
   | 'nextBillingAt'
+  | 'nextBonusCreditsUsd'
   | 'currentPeriodBaseCreditsUsd'
   | 'currentPeriodUsageUsd'
   | 'currentPeriodBonusCreditsUsd'
@@ -121,18 +122,23 @@ function computeRefillRowModel(params: {
   const baseUsd = getMonthlyPriceUsd(baseTier);
   if (typeof baseUsd !== 'number' || baseUsd <= 0) return null;
 
+  const serverProjectedBonusUsd = params.scheduledChange
+    ? null
+    : params.subscription.nextBonusCreditsUsd;
   const bonusUsd =
-    baseCadence === KiloPassCadence.Yearly
-      ? computeYearlyCadenceMonthlyBonusUsd(baseTier)
-      : baseCadence === KiloPassCadence.Monthly
-        ? baseUsd *
-          computeMonthlyCadenceBonusPercent({
-            tier: baseTier,
-            streakMonths: Math.max(1, params.subscription.currentStreakMonths + 1),
-            isFirstTimeSubscriberEver: params.subscription.isFirstTimeSubscriberEver,
-            subscriptionStartedAtIso: params.subscription.startedAt,
-          })
-        : null;
+    typeof serverProjectedBonusUsd === 'number'
+      ? serverProjectedBonusUsd
+      : baseCadence === KiloPassCadence.Yearly
+        ? computeYearlyCadenceMonthlyBonusUsd(baseTier)
+        : baseCadence === KiloPassCadence.Monthly
+          ? baseUsd *
+            computeMonthlyCadenceBonusPercent({
+              tier: baseTier,
+              streakMonths: Math.max(1, params.subscription.currentStreakMonths + 1),
+              isFirstTimeSubscriberEver: params.subscription.isFirstTimeSubscriberEver,
+              subscriptionStartedAtIso: params.subscription.startedAt,
+            })
+          : null;
   if (typeof bonusUsd !== 'number' || bonusUsd <= 0) return null;
 
   const changeTierLabel = params.scheduledChange?.toTier

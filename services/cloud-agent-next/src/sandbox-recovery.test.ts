@@ -22,7 +22,12 @@ import {
   withPreparationInfrastructureRecovery,
 } from './sandbox-recovery.js';
 import { WrapperNotReadyError } from './kilo/wrapper-client.js';
-import { WorkspaceFilesystemPreparationError } from './workspace-errors.js';
+import {
+  SandboxCapacityInspectionError,
+  WorkspaceCapacityAdmissionRejectedError,
+  WorkspaceCapacityInspectionUnavailableError,
+  WorkspaceFilesystemPreparationError,
+} from './workspace-errors.js';
 
 describe('sandbox recovery', () => {
   it('classifies sandbox SDK internal server errors', () => {
@@ -104,7 +109,7 @@ describe('sandbox recovery', () => {
     await expect(
       withPreparationInfrastructureRecovery(
         {
-          sandbox,
+          deleteSandbox: () => sandbox.destroy(),
           sandboxId: 'ses-test',
           sessionId: 'agent_test',
           phase: 'asyncPreparation',
@@ -149,7 +154,7 @@ describe('sandbox recovery', () => {
     await expect(
       withPreparationInfrastructureRecovery(
         {
-          sandbox,
+          deleteSandbox: () => sandbox.destroy(),
           sandboxId: 'ses-test',
           sessionId: 'agent_test',
           phase: 'asyncPreparation',
@@ -176,7 +181,7 @@ describe('sandbox recovery', () => {
     await expect(
       withPreparationInfrastructureRecovery(
         {
-          sandbox,
+          deleteSandbox: () => sandbox.destroy(),
           sandboxId: 'ses-test',
           sessionId: 'agent_test',
           phase: 'asyncPreparation',
@@ -194,11 +199,82 @@ describe('sandbox recovery', () => {
     expect(mockInfo).toHaveBeenCalledWith('Destroyed sandbox after workspace Git probe timeout');
   });
 
+  it('destroys sandbox when capacity inspection reports filesystem unusable', async () => {
+    const sandbox = { destroy: vi.fn().mockResolvedValue(undefined) };
+    const error = new SandboxCapacityInspectionError(
+      'Disk capacity inspection cannot run because the sandbox filesystem is unusable',
+      new Error('ENOSPC: no space left on device')
+    );
+
+    await expect(
+      withPreparationInfrastructureRecovery(
+        {
+          deleteSandbox: () => sandbox.destroy(),
+          sandboxId: 'ses-test',
+          sessionId: 'agent_test',
+          phase: 'asyncPreparation',
+        },
+        async () => {
+          throw error;
+        }
+      )
+    ).rejects.toBe(error);
+
+    expect(sandbox.destroy).toHaveBeenCalledOnce();
+    expect(mockError).toHaveBeenCalledWith(
+      'Sandbox capacity inspection failed; destroying unusable sandbox'
+    );
+  });
+
+  it('does not destroy shared sandbox for low-capacity admission rejection', async () => {
+    const sandbox = { destroy: vi.fn().mockResolvedValue(undefined) };
+    const error = new WorkspaceCapacityAdmissionRejectedError({
+      availableMB: 900,
+      thresholdMB: 2048,
+      cleaned: 0,
+      skipped: 2,
+    });
+
+    const destroyed = await destroySandboxAfterPreparationInfrastructureFailure(
+      {
+        deleteSandbox: () => sandbox.destroy(),
+        sandboxId: 'ses-test',
+        sessionId: 'agent_test',
+        phase: 'asyncPreparation',
+      },
+      error
+    );
+
+    expect(destroyed).toBe(false);
+    expect(sandbox.destroy).not.toHaveBeenCalled();
+  });
+
+  it('does not destroy shared sandbox when capacity measurement fails without filesystem evidence', async () => {
+    const sandbox = { destroy: vi.fn().mockResolvedValue(undefined) };
+    const error = new WorkspaceCapacityInspectionUnavailableError(
+      'Workspace admission rejected because disk capacity could not be measured',
+      new Error('df: command not found')
+    );
+
+    const destroyed = await destroySandboxAfterPreparationInfrastructureFailure(
+      {
+        deleteSandbox: () => sandbox.destroy(),
+        sandboxId: 'ses-test',
+        sessionId: 'agent_test',
+        phase: 'asyncPreparation',
+      },
+      error
+    );
+
+    expect(destroyed).toBe(false);
+    expect(sandbox.destroy).not.toHaveBeenCalled();
+  });
+
   it('does not destroy sandbox for unrelated errors', async () => {
     const sandbox = { destroy: vi.fn().mockResolvedValue(undefined) };
     const destroyed = await destroySandboxAfterInternalServerError(
       {
-        sandbox,
+        deleteSandbox: () => sandbox.destroy(),
         sandboxId: 'ses-test',
         sessionId: 'agent_test',
         phase: 'asyncPreparation',
@@ -214,7 +290,7 @@ describe('sandbox recovery', () => {
     const sandbox = { destroy: vi.fn().mockResolvedValue(undefined) };
     const destroyed = await destroySandboxAfterPreparationInfrastructureFailure(
       {
-        sandbox,
+        deleteSandbox: () => sandbox.destroy(),
         sandboxId: 'ses-test',
         sessionId: 'agent_test',
         phase: 'asyncPreparation',

@@ -41,6 +41,7 @@ function createFakeDOContext(): IngestDOContext {
     updateKiloSessionId: vi.fn().mockResolvedValue(undefined),
     updateUpstreamBranch: vi.fn().mockResolvedValue(undefined),
     setAvailableCommands: vi.fn().mockResolvedValue(undefined),
+    terminalizeSessionMessageOnce: vi.fn().mockResolvedValue(undefined),
     wrapperSupervisor: {
       checkReconnect: vi.fn().mockResolvedValue({ accepted: true }),
       recordReconnectAccepted: vi.fn().mockResolvedValue(undefined),
@@ -930,6 +931,69 @@ describe('createIngestHandler', () => {
         }),
         WRAPPER_RUN_ID
       );
+    });
+
+    it('terminalizes on wrapper cloud.message.completed control event', async () => {
+      const state = createFakeState();
+      const doContext = createNewPathDOContext();
+      const eventQueries = createFakeEventQueries();
+      const broadcast = vi.fn();
+      const handler = createIngestHandler(state, eventQueries, SESSION_ID, broadcast, doContext);
+
+      const ws = createFakeWebSocket(makeNewPathAttachment());
+
+      const message = JSON.stringify({
+        streamEventType: 'cloud.message.completed',
+        data: {
+          messageId: 'msg_compact',
+          completionSource: 'manual_compact_summarize',
+        },
+        timestamp: new Date().toISOString(),
+      });
+
+      await handler.handleIngestMessage(ws, message);
+
+      expect(doContext.terminalizeSessionMessageOnce).toHaveBeenCalledWith(
+        'msg_compact',
+        {
+          kind: 'completed',
+          assistantMessageId: undefined,
+          completionSource: 'manual_compact_summarize',
+        },
+        WRAPPER_RUN_ID
+      );
+      expect(eventQueries.insert).not.toHaveBeenCalled();
+      expect(eventQueries.upsert).not.toHaveBeenCalled();
+      expect(broadcast).not.toHaveBeenCalled();
+    });
+
+    it('rejects unsupported wrapper cloud.message.completed sources', async () => {
+      const state = createFakeState();
+      const doContext = createNewPathDOContext();
+      const eventQueries = createFakeEventQueries();
+      const broadcast = vi.fn();
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+      const handler = createIngestHandler(state, eventQueries, SESSION_ID, broadcast, doContext);
+
+      const ws = createFakeWebSocket(makeNewPathAttachment());
+
+      const message = JSON.stringify({
+        streamEventType: 'cloud.message.completed',
+        data: {
+          messageId: 'msg_compact',
+          completionSource: 'unsupported_source',
+        },
+        timestamp: new Date().toISOString(),
+      });
+
+      await handler.handleIngestMessage(ws, message);
+
+      expect(doContext.terminalizeSessionMessageOnce).not.toHaveBeenCalled();
+      expect(warn).toHaveBeenCalledWith(
+        'Invalid cloud.message.completed event payload',
+        expect.anything()
+      );
+      warn.mockRestore();
     });
 
     it('terminalizes as failed on assistant message.updated with error', async () => {

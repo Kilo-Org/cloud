@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { handleCommandsAvailable } from './commands-available.js';
-import { DEFAULT_SLASH_COMMANDS } from '../../shared/default-slash-commands.generated';
+import { commandsOrDefault } from '../../shared/slash-commands.js';
 
 const silentLogger = { info: () => {}, warn: () => {} };
 
@@ -18,10 +18,13 @@ describe('handleCommandsAvailable', () => {
     );
 
     expect(setAvailableCommands).toHaveBeenCalledTimes(1);
-    expect(setAvailableCommands).toHaveBeenCalledWith([
-      { name: 'review', description: 'Review', hints: [] },
-      { name: 'init', hints: ['$ARGUMENTS'], source: 'command' },
-    ]);
+    expect(setAvailableCommands).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({ name: 'review', description: 'Review', hints: [] }),
+        expect.objectContaining({ name: 'init', hints: ['$ARGUMENTS'], source: 'command' }),
+        { name: 'compact', description: 'compact the current session context', hints: [] },
+      ])
+    );
   });
 
   it('drops items missing a name without rejecting the whole event', async () => {
@@ -31,7 +34,12 @@ describe('handleCommandsAvailable', () => {
       { setAvailableCommands, logger: silentLogger }
     );
 
-    expect(setAvailableCommands).toHaveBeenCalledWith([{ name: 'ok', hints: [] }]);
+    expect(setAvailableCommands).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({ name: 'ok', hints: [] }),
+        { name: 'compact', description: 'compact the current session context', hints: [] },
+      ])
+    );
   });
 
   it('warns and skips when commands array is missing', async () => {
@@ -60,7 +68,7 @@ describe('handleCommandsAvailable', () => {
     await handleCommandsAvailable({ commands: [] }, { setAvailableCommands, logger: silentLogger });
 
     expect(setAvailableCommands).toHaveBeenCalledTimes(1);
-    expect(setAvailableCommands).toHaveBeenCalledWith(DEFAULT_SLASH_COMMANDS);
+    expect(setAvailableCommands).toHaveBeenCalledWith(commandsOrDefault(undefined));
   });
 
   it('persists defaults when all items fail validation', async () => {
@@ -71,6 +79,6 @@ describe('handleCommandsAvailable', () => {
     );
 
     expect(setAvailableCommands).toHaveBeenCalledTimes(1);
-    expect(setAvailableCommands).toHaveBeenCalledWith(DEFAULT_SLASH_COMMANDS);
+    expect(setAvailableCommands).toHaveBeenCalledWith(commandsOrDefault(undefined));
   });
 });

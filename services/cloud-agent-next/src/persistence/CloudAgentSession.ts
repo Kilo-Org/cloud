@@ -91,7 +91,9 @@ import {
 } from '../session/session-message-queue.js';
 import {
   clearWrapperRuntimeIdentity,
+  getWrapperLease,
   getWrapperRuntimeState,
+  nextWrapperLeaseDeadline,
 } from '../session/wrapper-runtime-state.js';
 import {
   getSessionMessageState,
@@ -111,10 +113,16 @@ import {
   type AgentRuntime,
   type AgentRuntimeAcceptedDelivery,
   type AgentRuntimeOrchestrator,
-  type AgentRuntimeStopReason,
 } from '../session/agent-runtime.js';
 import { createWrapperSupervisor, type WrapperSupervisor } from '../session/wrapper-supervisor.js';
 import { emitRunStateReport } from '../telemetry/queue-reports.js';
+import { createAgentSandbox } from '../agent-sandbox/factory.js';
+import type {
+  StopWrappersResult,
+  WrapperObservation,
+  WrapperStopReason,
+  WrapperStopTarget,
+} from '../agent-sandbox/protocol.js';
 
 // ---------------------------------------------------------------------------
 // Alarm Constants
@@ -130,6 +138,7 @@ const EVENT_RETENTION_MS = Limits.SESSION_TTL_MS;
 
 /** Storage key for tracking last activity timestamp */
 const LAST_ACTIVITY_KEY = 'last_activity';
+const EXPLICIT_DELETION_PENDING_KEY = 'explicit_deletion_pending';
 
 /** Kilo server idle timeout: 15 minutes */
 const KILO_SERVER_IDLE_TIMEOUT_MS_DEFAULT = 15 * 60 * 1000;
@@ -257,6 +266,12 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
   private ingestHandlerSessionId?: SessionId;
   private sessionId?: SessionId;
   private orchestrator?: AgentRuntimeOrchestrator;
+  private physicalWrapperObserver?: () => Promise<WrapperObservation>;
+  private physicalWrapperStopper?: (request: {
+    target: WrapperStopTarget;
+    attemptId: string;
+    reason: WrapperStopReason;
+  }) => Promise<StopWrappersResult>;
   private agentRuntime?: AgentRuntime;
   private messageSettlementOutbox?: MessageSettlementOutbox;
   private sessionMessageQueue?: SessionMessageQueue;
@@ -484,6 +499,13 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         sendToWrapper: (ingestTagId, command, fence) =>
           this.sendToWrapper(ingestTagId, command, fence),
         getOrchestratorOverride: () => this.orchestrator,
+        discoverSessionWrappers: metadata =>
+          this.physicalWrapperObserver
+            ? this.physicalWrapperObserver()
+            : this.orchestrator
+              ? Promise.resolve({ status: 'absent' })
+              : createAgentSandbox(this.env, metadata).discoverSessionWrappers(),
+        requestAlarmAtOrBefore: deadline => this.scheduleAlarmAtOrBefore(deadline),
       });
     }
 
@@ -496,7 +518,6 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         storage: this.ctx.storage,
         agentRuntime: {
           sendPing: ingestTagId => this.getAgentRuntime().sendPing(ingestTagId),
-          stopWrapperProcess: reason => this.stopCurrentWrapperProcess(reason),
         },
         messageSettlementOutbox: this.getMessageSettlementOutbox(),
         sessionMessageQueue: this.getSessionMessageQueue(),
@@ -511,6 +532,17 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         hasActiveIngestConnection: async params =>
           (await this.getIngestHandler()).hasActiveConnection(params),
         clearInterruptRequest: () => this.executionQueries.clearInterrupt(),
+        stopWrappers: async request => {
+          if (this.physicalWrapperStopper) return this.physicalWrapperStopper(request);
+          if (this.orchestrator || (!this.env.Sandbox && !this.env.SandboxSmall)) {
+            return { status: 'absent' };
+          }
+          const metadata = await this.getMetadata();
+          if (!metadata)
+            return { status: 'inspection-failed', error: 'Session metadata unavailable' };
+          return createAgentSandbox(this.env, metadata).stopWrappers(request);
+        },
+        requestAlarmAtOrBefore: deadline => this.scheduleAlarmAtOrBefore(deadline),
         getSessionIdForLogs: () => this.sessionId,
       });
     }
@@ -604,12 +636,12 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         terminalizeSessionMessageOnce: async (messageId, params, wrapperRunId) => {
           await this.ensureAcceptedMessageBeforeTerminal(messageId, wrapperRunId);
           await this.recordCorrelatedAgentActivity(messageId);
-          await this.terminalizeSessionMessageOnce(messageId, {
-            ...params,
-            ...(params.kind === 'failed'
-              ? { failureStage: 'agent_activity', failureCode: 'assistant_error' }
-              : {}),
-          } as TerminalizeParams);
+          await this.terminalizeSessionMessageOnce(
+            messageId,
+            params.kind === 'failed'
+              ? { ...params, failureStage: 'agent_activity', failureCode: 'assistant_error' }
+              : params
+          );
         },
       };
 
@@ -1168,12 +1200,20 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
   private async interruptAcceptedWrapperMessages(): Promise<{
     acceptedMessageCount: number;
     wrapperCommandSent: boolean;
+    physicalWrapperStopRequested: boolean;
   }> {
     const state = await getWrapperRuntimeState(this.ctx.storage);
     const acceptedMessages = await listNonTerminalAcceptedMessages(
       this.ctx.storage,
       state.wrapperRunId
     );
+    const supervisor = this.getWrapperSupervisor();
+    const requiresPhysicalWrapperStop =
+      acceptedMessages.length > 0 ||
+      (state.wrapperRunId !== undefined && state.wrapperConnectionId !== undefined);
+    if (requiresPhysicalWrapperStop) {
+      await supervisor.requestPhysicalWrapperStop('user-interrupt');
+    }
     for (const msg of acceptedMessages) {
       const transition = await this.getMessageSettlementOutbox().persistTerminalTransition(
         msg.messageId,
@@ -1205,30 +1245,34 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       }
     }
 
-    const interrupt = await this.getAgentRuntime().interruptWrapper();
-    if (acceptedMessages.length > 0 && state.wrapperConnectionId) {
-      await clearWrapperRuntimeIdentity(
-        this.ctx.storage,
-        {
-          wrapperGeneration: state.wrapperGeneration,
-          wrapperConnectionId: state.wrapperConnectionId,
-        },
-        { incrementGeneration: true }
-      );
-      try {
-        await this.stopCurrentWrapperProcess('user-interrupt');
-      } catch (error) {
-        logger
-          .withFields({
-            sessionId: this.sessionId,
-            error: error instanceof Error ? error.message : String(error),
-          })
-          .warn('Failed to stop interrupted wrapper process after fencing');
+    let wrapperCommandSent = false;
+    try {
+      wrapperCommandSent = (await this.getAgentRuntime().interruptWrapper()).commandSent;
+    } catch (error) {
+      logger
+        .withFields({
+          sessionId: this.sessionId,
+          error: error instanceof Error ? error.message : String(error),
+        })
+        .warn('Failed to signal wrapper interruption; physical cleanup will continue');
+    }
+    if (requiresPhysicalWrapperStop) {
+      if (state.wrapperConnectionId) {
+        await clearWrapperRuntimeIdentity(
+          this.ctx.storage,
+          {
+            wrapperGeneration: state.wrapperGeneration,
+            wrapperConnectionId: state.wrapperConnectionId,
+          },
+          { incrementGeneration: true }
+        );
       }
+      await supervisor.runMaintenance(Date.now());
     }
     return {
       acceptedMessageCount: acceptedMessages.length,
-      wrapperCommandSent: interrupt.commandSent,
+      wrapperCommandSent,
+      physicalWrapperStopRequested: requiresPhysicalWrapperStop,
     };
   }
 
@@ -1239,17 +1283,24 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
   }> {
     let acceptedMessageCount = 0;
     let wrapperCommandSent = false;
+    let physicalWrapperStopRequested = false;
     const clearedMessages = await this.getSessionMessageQueue().interruptPendingQueuedMessages(
       async () => {
         const acceptedInterruption = await this.interruptAcceptedWrapperMessages();
         acceptedMessageCount = acceptedInterruption.acceptedMessageCount;
         wrapperCommandSent = acceptedInterruption.wrapperCommandSent;
+        physicalWrapperStopRequested = acceptedInterruption.physicalWrapperStopRequested;
       }
     );
 
     await this.finalizeIdleBatchCallbackIfReady({ allowWithoutObservedIdle: true });
 
-    if (!wrapperCommandSent && clearedMessages.length === 0 && acceptedMessageCount === 0) {
+    if (
+      !wrapperCommandSent &&
+      !physicalWrapperStopRequested &&
+      clearedMessages.length === 0 &&
+      acceptedMessageCount === 0
+    ) {
       return { success: false, message: 'No accepted wrapper messages or pending queued messages' };
     }
 
@@ -1349,15 +1400,61 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     }
   }
 
+  private async schedulePhysicalWrapperCleanupRetry(): Promise<void> {
+    const deadline =
+      nextWrapperLeaseDeadline(await getWrapperLease(this.ctx.storage)) ??
+      Date.now() + REAPER_INTERVAL_MS_DEFAULT;
+    await this.ctx.storage.setAlarm(deadline);
+  }
+
+  private async finalizeSessionDeletion(
+    reason: 'explicit' | 'retention-expired'
+  ): Promise<boolean> {
+    const metadata = await this.getMetadata();
+    if (!metadata) {
+      if ((await getWrapperLease(this.ctx.storage)).state !== 'none') {
+        await this.schedulePhysicalWrapperCleanupRetry();
+        return false;
+      }
+    } else {
+      const supervisor = this.getWrapperSupervisor();
+      await supervisor.requestPhysicalWrapperStop('session-delete', { kind: 'session' });
+      await supervisor.runMaintenance(Date.now());
+      if ((await getWrapperLease(this.ctx.storage)).state !== 'none') {
+        if (reason === 'explicit') {
+          await this.schedulePhysicalWrapperCleanupRetry();
+        }
+        return false;
+      }
+      if (!this.orchestrator && (this.env.Sandbox || this.env.SandboxSmall)) {
+        await createAgentSandbox(this.env, metadata).delete(reason);
+      }
+    }
+
+    await this.ctx.storage.deleteAlarm();
+    await this.ctx.storage.deleteAll();
+    return true;
+  }
+
+  private async isExplicitDeletionPending(): Promise<boolean> {
+    return (await this.ctx.storage.get<boolean>(EXPLICIT_DELETION_PENDING_KEY)) === true;
+  }
+
+  private async deletionPendingAdmissionFailure(): Promise<SessionMessageAdmissionResult | null> {
+    return (await this.isExplicitDeletionPending())
+      ? { success: false, code: 'NOT_FOUND', error: 'Session deletion is pending' }
+      : null;
+  }
+
   /**
-   * Delete session and all associated data.
+   * Delete session only after physical wrapper absence has been verified.
    */
   async deleteSession(): Promise<void> {
     logger.info('Explicit DELETE requested for Durable Object');
-
-    // Must delete alarm before deleteAll
-    await this.ctx.storage.deleteAlarm();
-    await this.ctx.storage.deleteAll();
+    await this.ctx.storage.put(EXPLICIT_DELETION_PENDING_KEY, true);
+    if (!(await this.finalizeSessionDeletion('explicit'))) {
+      throw new Error('Session deletion pending physical wrapper cleanup');
+    }
   }
 
   /**
@@ -1366,6 +1463,9 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
    * delivers the first message.
    */
   async registerSession(input: GroupedRegisterSessionInput): Promise<OperationResult> {
+    if (await this.isExplicitDeletionPending()) {
+      return { success: false, error: 'Session deletion is pending' };
+    }
     await this.requireSessionId(input.identity.sessionId as SessionId);
     const existing = await this.ctx.storage.get('metadata');
     if (existing) {
@@ -1476,6 +1576,8 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
   async createSessionWithInitialAdmission(
     input: CreateSessionWithInitialAdmissionInput
   ): Promise<SessionMessageAdmissionResult> {
+    const deletionPending = await this.deletionPendingAdmissionFailure();
+    if (deletionPending) return deletionPending;
     const initialTurn = input.message.initialTurn;
     const admitInitialTurn = () =>
       this.getSessionMessageQueue().admitAcceptedMessage({
@@ -1705,6 +1807,17 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     let alarmWorkFailed = false;
 
     try {
+      if (await this.isExplicitDeletionPending()) {
+        logger.withFields({ sessionId: this.sessionId }).info('Resuming explicit session deletion');
+        if (await this.finalizeSessionDeletion('explicit')) {
+          return;
+        }
+        logger
+          .withFields({ sessionId: this.sessionId })
+          .info('Postponing explicit session deletion until wrapper cleanup confirms absence');
+        return;
+      }
+
       // Check if session should be deleted due to inactivity (90 days)
       const lastActivity = await this.ctx.storage.get<number>(LAST_ACTIVITY_KEY);
       if (lastActivity && now - lastActivity > Limits.SESSION_TTL_MS) {
@@ -1712,9 +1825,12 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
           .withFields({ sessionId: this.sessionId, lastActivity })
           .info('Deleting session due to inactivity');
 
-        await this.ctx.storage.deleteAlarm();
-        await this.ctx.storage.deleteAll();
-        return;
+        if (await this.finalizeSessionDeletion('retention-expired')) {
+          return;
+        }
+        logger
+          .withFields({ sessionId: this.sessionId })
+          .info('Postponing inactive session deletion until wrapper cleanup confirms absence');
       }
 
       await this.getWrapperSupervisor().runMaintenance(now);
@@ -1919,27 +2035,19 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       })
       .info('Stopping idle kilo server');
 
-    const stopped = await this.getAgentRuntime().stopWrapperProcess('idle-timeout');
+    await this.getWrapperSupervisor().requestPhysicalWrapperStop('idle-timeout');
     const updated = {
       ...metadata,
       lifecycle: {
         ...metadata.lifecycle,
-        ...(stopped ? { kiloServerLastActivity: undefined } : {}),
+        kiloServerLastActivity: undefined,
         version: Date.now(),
       },
     };
     await this.updateMetadata(updated);
-
-    if (stopped) {
-      await this.getMessageSettlementOutbox().releaseWrapperTerminalWaitForIdleBatch();
-      await this.finalizeIdleBatchCallbackIfReady({ allowWithoutObservedIdle: true });
-      logger
-        .withFields({ sessionId: this.sessionId })
-        .info('Idle kilo server stopped successfully');
-      return;
-    }
-
-    logger.withFields({ sessionId: this.sessionId }).warn('Failed to stop idle kilo server');
+    await this.getMessageSettlementOutbox().releaseWrapperTerminalWaitForIdleBatch();
+    await this.finalizeIdleBatchCallbackIfReady({ allowWithoutObservedIdle: true });
+    logger.withFields({ sessionId: this.sessionId }).info('Idle kilo server cleanup requested');
   }
 
   /**
@@ -2233,6 +2341,9 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     const pendingCount = await countPendingSessionMessages(this.ctx.storage);
     if (pendingCount > 0) return true;
 
+    const physicalLease = await getWrapperLease(this.ctx.storage);
+    if (physicalLease.state !== 'none') return true;
+
     const state = await getWrapperRuntimeState(this.ctx.storage);
     if (!state.wrapperConnectionId) return false;
 
@@ -2258,10 +2369,6 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
 
   private async retryPendingCallbacks(now: number): Promise<void> {
     await this.getMessageSettlementOutbox().retryPendingCallbacks(now);
-  }
-
-  private async stopCurrentWrapperProcess(reason: AgentRuntimeStopReason): Promise<boolean> {
-    return this.getAgentRuntime().stopWrapperProcess(reason);
   }
 
   /**
@@ -2459,7 +2566,8 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
   async admitSubmittedMessage(
     request: SubmittedSessionMessageRequest
   ): Promise<SessionMessageAdmissionResult> {
-    return this.getSessionMessageQueue().admitSubmittedMessage(request);
+    const deletionPending = await this.deletionPendingAdmissionFailure();
+    return deletionPending ?? this.getSessionMessageQueue().admitSubmittedMessage(request);
   }
 
   async replayPreparedInitialMessage(
@@ -2476,6 +2584,8 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
   async admitPreparedInitialMessage(
     request: LegacyRegisteredInitialAdmissionRequest
   ): Promise<SessionMessageAdmissionResult> {
+    const deletionPending = await this.deletionPendingAdmissionFailure();
+    if (deletionPending) return deletionPending;
     const metadata = await this.getMetadata();
     if (!metadata) return { success: false, code: 'NOT_FOUND', error: 'Session not found' };
     const initialMessage = metadata.initialMessage;

@@ -1058,6 +1058,13 @@
       "when": 1780085204443,
       "tag": "0150_typical_scorpion",
       "breakpoints": true
+    },
+    {
+      "idx": 151,
+      "version": "7",
+      "when": 1780313423049,
+      "tag": "0151_shiny_bullseye",
+      "breakpoints": true
     }
   ]
 }

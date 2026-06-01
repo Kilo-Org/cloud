@@ -1,63 +1,29 @@
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
-import { getSandbox } from '@cloudflare/sandbox';
+import { createAgentSandbox } from '../../agent-sandbox/factory.js';
 import { logger, withLogTags } from '../../logger.js';
-import { generateSandboxId, getSandboxNamespace } from '../../sandbox-id.js';
-import type { SessionId, SandboxId, Env } from '../../types.js';
-import { SessionService, fetchSessionMetadata } from '../../session-service.js';
+import type { SessionId, Env } from '../../types.js';
+import { fetchSessionMetadata } from '../../session-service.js';
 import { protectedProcedure } from '../auth.js';
 import { sessionIdSchema } from '../schemas.js';
-import { findWrapperForSession } from '../../kilo/wrapper-manager.js';
-import { WrapperClient } from '../../kilo/wrapper-client.js';
+import type { WrapperClient } from '../../kilo/wrapper-client.js';
 
 async function resolveWrapperClient(opts: {
   sessionId: SessionId;
   userId: string;
   env: Env;
-  authToken: string;
 }): Promise<WrapperClient> {
-  const { sessionId, userId, env, authToken } = opts;
-
+  const { sessionId, userId, env } = opts;
   const metadata = await fetchSessionMetadata(env, userId, sessionId);
   if (!metadata) {
     throw new TRPCError({ code: 'NOT_FOUND', message: 'Session not found' });
   }
 
-  const sandboxId: SandboxId =
-    metadata.workspace?.sandboxId ??
-    (await generateSandboxId(
-      env.PER_SESSION_SANDBOX_ORG_IDS,
-      metadata.identity.orgId,
-      userId,
-      metadata.identity.sessionId,
-      metadata.identity.botId
-    ));
-  const sandbox = getSandbox(getSandboxNamespace(env, sandboxId), sandboxId);
-
-  const wrapperInfo = await findWrapperForSession(sandbox, sessionId);
-  if (!wrapperInfo) {
+  const wrapperClient = await createAgentSandbox(env, metadata).getRunningWrapper();
+  if (!wrapperClient) {
     throw new TRPCError({ code: 'NOT_FOUND', message: 'No wrapper found for session' });
   }
-
-  const sessionService = new SessionService();
-  const context = sessionService.buildContext({
-    sandboxId,
-    orgId: metadata.identity.orgId,
-    userId,
-    sessionId,
-    upstreamBranch: metadata.repository?.upstreamBranch,
-    botId: metadata.identity.botId,
-  });
-
-  const session = await sessionService.getOrCreateSession({
-    sandbox,
-    context,
-    env,
-    originalToken: authToken,
-    originalOrgId: metadata.identity.orgId,
-  });
-
-  return new WrapperClient({ session, port: wrapperInfo.port });
+  return wrapperClient;
 }
 
 export function createSessionQuestionHandlers() {
@@ -77,12 +43,7 @@ export function createSessionQuestionHandlers() {
 
           logger.setTags({ userId, sessionId });
           try {
-            const wrapperClient = await resolveWrapperClient({
-              sessionId,
-              userId,
-              env,
-              authToken: ctx.authToken,
-            });
+            const wrapperClient = await resolveWrapperClient({ sessionId, userId, env });
             const result = await wrapperClient.answerQuestion(input.questionId, input.answers);
             logger
               .withFields({ questionId: input.questionId, success: result.success })
@@ -114,12 +75,7 @@ export function createSessionQuestionHandlers() {
 
           logger.setTags({ userId, sessionId });
           try {
-            const wrapperClient = await resolveWrapperClient({
-              sessionId,
-              userId,
-              env,
-              authToken: ctx.authToken,
-            });
+            const wrapperClient = await resolveWrapperClient({ sessionId, userId, env });
             const result = await wrapperClient.rejectQuestion(input.questionId);
             logger
               .withFields({ questionId: input.questionId, success: result.success })
@@ -153,12 +109,7 @@ export function createSessionQuestionHandlers() {
 
           logger.setTags({ userId, sessionId });
           try {
-            const wrapperClient = await resolveWrapperClient({
-              sessionId,
-              userId,
-              env,
-              authToken: ctx.authToken,
-            });
+            const wrapperClient = await resolveWrapperClient({ sessionId, userId, env });
             const result = await wrapperClient.answerPermission(input.permissionId, input.response);
             logger
               .withFields({ permissionId: input.permissionId, success: result.success })

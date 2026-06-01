@@ -42,6 +42,7 @@ const createMockKiloClient = (): WrapperKiloClient => ({
   getSession: vi.fn(),
   sendPromptAsync: vi.fn(),
   abortSession: vi.fn(),
+  summarizeSession: vi.fn(),
   sendCommand: vi.fn(),
   answerPermission: vi.fn(),
   answerQuestion: vi.fn(),

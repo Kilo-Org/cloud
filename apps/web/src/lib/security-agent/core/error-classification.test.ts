@@ -135,6 +135,8 @@ describe('isUserActionableError', () => {
     ['CLONE_FAILED', true],
     ['AUTH_FAILED', true],
     ['REPO_NOT_FOUND', true],
+    ['FINDING_NOT_ELIGIBLE', true],
+    ['ANALYSIS_IN_PROGRESS', true],
     ['SANDBOX_FAILED', false],
     ['UNKNOWN', false],
   ])('%s → isUserActionable = %s', (code, expected) => {
@@ -147,6 +149,8 @@ describe('trpcCodeForAnalysisError', () => {
     ['CLONE_FAILED', 'BAD_REQUEST'],
     ['AUTH_FAILED', 'PRECONDITION_FAILED'],
     ['REPO_NOT_FOUND', 'NOT_FOUND'],
+    ['FINDING_NOT_ELIGIBLE', 'CONFLICT'],
+    ['ANALYSIS_IN_PROGRESS', 'CONFLICT'],
     ['SANDBOX_FAILED', 'INTERNAL_SERVER_ERROR'],
     ['UNKNOWN', 'INTERNAL_SERVER_ERROR'],
     [undefined, 'INTERNAL_SERVER_ERROR'],

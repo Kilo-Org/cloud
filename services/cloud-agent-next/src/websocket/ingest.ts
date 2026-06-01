@@ -28,6 +28,7 @@ import type { CompleteEventData, KilocodeEventData, CloudStatusData } from '../s
 import type { SlashCommandInfo } from '../shared/slash-commands.js';
 import { logger } from '../logger.js';
 import type { WrapperSupervisor } from '../session/wrapper-supervisor.js';
+import type { TerminalizeParams } from '../session/session-message-state.js';
 
 // ---------------------------------------------------------------------------
 // Ingest Attachment
@@ -58,6 +59,12 @@ const errorEventSchema = z.object({
   fatal: z.boolean().optional(),
   error: z.string().optional(),
   message: z.string().optional(),
+});
+
+const cloudMessageCompletedEventSchema = z.object({
+  messageId: z.string(),
+  assistantMessageId: z.string().optional(),
+  completionSource: z.literal('manual_compact_summarize'),
 });
 
 const wrapperGenerationParamSchema = z.coerce.number().int().nonnegative();
@@ -145,15 +152,9 @@ export type IngestDOContext = {
   >;
   keepContainerAlive?: () => void;
   observeCorrelatedAgentActivity?: (messageId: string) => Promise<void>;
-  terminalizeSessionMessageOnce?: (
+  terminalizeSessionMessageOnce: (
     messageId: string,
-    params: {
-      kind: 'completed' | 'failed' | 'interrupted';
-      assistantMessageId?: string;
-      completionSource: string;
-      reason?: string;
-      error?: string;
-    },
+    params: TerminalizeParams & { assistantMessageId?: string },
     wrapperRunId: string
   ) => Promise<void>;
   /** Persist the slash-command catalog so connecting clients can be hydrated. */
@@ -480,6 +481,30 @@ export function createIngestHandler(
           }
         }
 
+        if (eventType === 'cloud.message.completed') {
+          const parsedCloudMessageCompleted = cloudMessageCompletedEventSchema.safeParse(
+            ingestEvent.data
+          );
+          if (!parsedCloudMessageCompleted.success) {
+            console.warn(
+              'Invalid cloud.message.completed event payload',
+              parsedCloudMessageCompleted.error
+            );
+            return;
+          }
+
+          await doContext.terminalizeSessionMessageOnce(
+            parsedCloudMessageCompleted.data.messageId,
+            {
+              kind: 'completed',
+              assistantMessageId: parsedCloudMessageCompleted.data.assistantMessageId,
+              completionSource: parsedCloudMessageCompleted.data.completionSource,
+            },
+            wrapperRunId
+          );
+          return;
+        }
+
         let eventId: number;
 
         if (eventType === 'kilocode') {
@@ -617,15 +642,21 @@ export function createIngestHandler(
             if (parentMessageId !== undefined) {
               await doContext.observeCorrelatedAgentActivity?.(parentMessageId);
               if (isTerminal) {
-                await doContext.terminalizeSessionMessageOnce?.(
+                await doContext.terminalizeSessionMessageOnce(
                   parentMessageId,
-                  {
-                    kind: hasError ? 'failed' : 'completed',
-                    assistantMessageId: typeof info?.id === 'string' ? info.id : undefined,
-                    completionSource: 'assistant_message_event',
-                    reason: hasError ? 'assistant_error' : undefined,
-                    error: assistantError,
-                  },
+                  hasError
+                    ? {
+                        kind: 'failed',
+                        assistantMessageId: typeof info?.id === 'string' ? info.id : undefined,
+                        reason: 'assistant_error',
+                        error: assistantError,
+                        completionSource: 'assistant_message_event',
+                      }
+                    : {
+                        kind: 'completed',
+                        assistantMessageId: typeof info?.id === 'string' ? info.id : undefined,
+                        completionSource: 'assistant_message_event',
+                      },
                   wrapperRunId
                 );
               }

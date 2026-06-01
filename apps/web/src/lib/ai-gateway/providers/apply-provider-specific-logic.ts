@@ -5,12 +5,11 @@ import type {
   GatewayMessagesRequest,
 } from '@/lib/ai-gateway/providers/openrouter/types';
 import { applyMistralModelSettings, isMistralModel } from '@/lib/ai-gateway/providers/mistral';
-import { kiloExclusiveModels } from '@/lib/ai-gateway/models';
+import { findKiloExclusiveModel } from '@/lib/ai-gateway/models';
 import { applyKiloExclusiveModelSettings } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 import { applyAnthropicModelSettings } from '@/lib/ai-gateway/providers/anthropic';
 import { isClaudeModel } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { OpenRouterInferenceProviderIdSchema } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
-import { applyGoogleModelSettings, isGeminiModel } from '@/lib/ai-gateway/providers/google';
 import { applyMoonshotModelSettings, isKimiModel } from '@/lib/ai-gateway/providers/moonshotai';
 import { isGlmModel } from '@/lib/ai-gateway/providers/zai';
 import { isMinimaxModel } from '@/lib/ai-gateway/providers/minimax';
@@ -74,30 +73,16 @@ function applyPreferredProvider(
   }
 }
 
-export type ApplyProviderSpecificLogicOptions = {
-  /**
-   * When true, skip the kilo-exclusive `internal_id` rewrite + provider pin
-   * normally applied to public ids registered in `kiloExclusiveModels`.
-   * Generic provider-specific request fixes and `provider.transformRequest`
-   * still run.
-   *
-   * Set by experiment routing because the partner upstream is selected by
-   * the variant version, not by the registry.
-   */
-  skipKiloExclusiveModelSettings?: boolean;
-};
-
 export function applyProviderSpecificLogic(
   provider: Provider,
   requestedModel: string,
   requestToMutate: GatewayRequest,
   extraHeaders: Record<string, string>,
   userByok: BYOKResult[] | null,
-  originalHeaders: FraudDetectionHeaders,
-  options: ApplyProviderSpecificLogicOptions = {}
+  originalHeaders: FraudDetectionHeaders
 ) {
-  const kiloExclusiveModel = kiloExclusiveModels.find(m => m.public_id === requestedModel);
-  if (kiloExclusiveModel && !options.skipKiloExclusiveModelSettings) {
+  const kiloExclusiveModel = findKiloExclusiveModel(requestedModel);
+  if (kiloExclusiveModel) {
     applyKiloExclusiveModelSettings(requestToMutate, kiloExclusiveModel);
   }
 
@@ -107,10 +92,6 @@ export function applyProviderSpecificLogic(
 
   if (provider.id === 'openrouter' || provider.id === 'vercel') {
     applyPreferredProvider(requestedModel, requestToMutate.body);
-  }
-
-  if (isGeminiModel(requestedModel)) {
-    applyGoogleModelSettings(provider.id, requestToMutate);
   }
 
   if (isKimiModel(requestedModel)) {

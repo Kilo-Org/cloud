@@ -6,17 +6,13 @@ vi.mock('@cloudflare/sandbox', () => ({
   getSandbox: vi.fn(),
 }));
 
-const {
-  interruptMock,
-  buildContextMock,
-  getOrCreateSessionMock,
-  recordCloudAgentSessionFailureMock,
-} = vi.hoisted(() => ({
-  interruptMock: vi.fn(),
-  buildContextMock: vi.fn(),
-  getOrCreateSessionMock: vi.fn(),
-  recordCloudAgentSessionFailureMock: vi.fn(),
-}));
+const { buildContextMock, getOrCreateSessionMock, recordCloudAgentSessionFailureMock } = vi.hoisted(
+  () => ({
+    buildContextMock: vi.fn(),
+    getOrCreateSessionMock: vi.fn(),
+    recordCloudAgentSessionFailureMock: vi.fn(),
+  })
+);
 
 const { getSandboxIdForSessionMock, metadataMock } = vi.hoisted(() => ({
   getSandboxIdForSessionMock: vi.fn(),
@@ -74,7 +70,6 @@ vi.mock('./session-service.js', () => ({
       // eslint-disable-next-line @typescript-eslint/no-unsafe-return
       return metadataMock();
     }
-    static interrupt = interruptMock;
   },
 }));
 
@@ -297,11 +292,6 @@ describe('router sessionId validation', () => {
 
         beforeEach(() => {
           vi.clearAllMocks();
-          interruptMock.mockResolvedValue({
-            success: true,
-            message: 'stopped',
-            processesFound: true,
-          });
           buildContextMock.mockImplementation(
             ({
               sandboxId,
@@ -399,13 +389,10 @@ describe('router sessionId validation', () => {
               'test-user-123',
               sessionId
             );
-            expect(getSandbox).toHaveBeenCalledWith(
-              mockContext.env.Sandbox,
-              expect.stringMatching(/^org-[0-9a-f]{48}$/)
-            );
+            expect(getSandbox).not.toHaveBeenCalled();
             // eslint-disable-next-line @typescript-eslint/unbound-method
             const sandboxDelete = vi.mocked(mockSandbox.deleteSession);
-            expect(sandboxDelete).toHaveBeenCalledWith(sessionId);
+            expect(sandboxDelete).not.toHaveBeenCalled();
             expect(cloudAgentSession.idFromName).toHaveBeenCalledWith(
               `${metadata.identity.userId}:${sessionId}`
             );
@@ -457,11 +444,7 @@ describe('router sessionId validation', () => {
             const result = await caller.deleteSession({ sessionId });
 
             expect(result).toEqual({ success: true });
-            // Should use usr prefix for personal accounts
-            expect(getSandbox).toHaveBeenCalledWith(
-              mockContext.env.Sandbox,
-              expect.stringMatching(/^usr-[0-9a-f]{48}$/)
-            );
+            expect(getSandbox).not.toHaveBeenCalled();
           });
 
           it('should successfully delete session with botId', async () => {
@@ -480,11 +463,7 @@ describe('router sessionId validation', () => {
             const result = await caller.deleteSession({ sessionId });
 
             expect(result).toEqual({ success: true });
-            // Should include bot suffix
-            expect(getSandbox).toHaveBeenCalledWith(
-              mockContext.env.Sandbox,
-              expect.stringMatching(/^bot-[0-9a-f]{48}$/)
-            );
+            expect(getSandbox).not.toHaveBeenCalled();
           });
 
           it('should route per-session sandbox ID to SandboxSmall namespace', async () => {
@@ -504,11 +483,7 @@ describe('router sessionId validation', () => {
             const result = await caller.deleteSession({ sessionId });
 
             expect(result).toEqual({ success: true });
-            // ses- prefixed sandbox IDs should route to SandboxSmall, not Sandbox
-            expect(getSandbox).toHaveBeenCalledWith(
-              mockContext.env.SandboxSmall,
-              perSessionSandboxId
-            );
+            expect(getSandbox).not.toHaveBeenCalled();
           });
         });
 
@@ -528,8 +503,8 @@ describe('router sessionId validation', () => {
           });
         });
 
-        describe('sandbox deletion failure handling', () => {
-          it('should continue cleanup when sandbox deletion fails', async () => {
+        describe('provider deletion ownership', () => {
+          it('does not perform provider deletion outside the Durable Object', async () => {
             const sessionId: SessionId = 'agent_aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
             const metadata = legacySessionMetadata({
               version: 123456789,
@@ -540,9 +515,7 @@ describe('router sessionId validation', () => {
             });
 
             vi.mocked(fetchSessionMetadata).mockResolvedValue(metadata);
-            // Sandbox deletion fails
-            mockSandbox.deleteSession = vi.fn().mockRejectedValue(new Error('Sandbox unreachable'));
-            // DO cleanup succeeds
+            mockSandbox.deleteSession = vi.fn().mockRejectedValue(new Error('must not be called'));
             const deleteSessionMock = vi.mocked(cloudAgentSession.get).mockReturnValue({
               deleteSession: vi.fn().mockResolvedValue(undefined),
               markAsInterrupted: vi.fn().mockResolvedValue(undefined),
@@ -550,13 +523,12 @@ describe('router sessionId validation', () => {
 
             const result = await caller.deleteSession({ sessionId });
 
-            // Should still succeed overall
             expect(result).toEqual({ success: true });
-            // Should have attempted both cleanups
             // eslint-disable-next-line @typescript-eslint/unbound-method
             const sandboxDelete = vi.mocked(mockSandbox.deleteSession);
-            expect(sandboxDelete).toHaveBeenCalled();
-            expect(deleteSessionMock().deleteSession).toHaveBeenCalledWith();
+            expect(sandboxDelete).not.toHaveBeenCalled();
+            expect(getSandbox).not.toHaveBeenCalled();
+            expect(deleteSessionMock().deleteSession).toHaveBeenCalled();
           });
         });
 
@@ -722,38 +694,9 @@ describe('router sessionId validation', () => {
       let caller: ReturnType<typeof appRouter.createCaller>;
       let cloudAgentSession: MockCAS;
       let mockSessionStub: MockSessionStub;
-      let mockSandbox: ReturnType<typeof getSandbox>;
 
       beforeEach(() => {
         vi.clearAllMocks();
-        interruptMock.mockResolvedValue({
-          success: true,
-          message: 'Interrupted execution using pkill',
-          processesFound: true,
-        });
-        buildContextMock.mockImplementation(
-          ({
-            sandboxId,
-            orgId,
-            userId,
-            sessionId,
-          }: {
-            sandboxId: string;
-            orgId: string | undefined;
-            userId: string;
-            sessionId: string;
-          }) => ({
-            sandboxId,
-            orgId,
-            userId,
-            sessionId,
-            sessionHome: `/home/${sessionId}`,
-            workspacePath: `/workspace/${sessionId}`,
-            branchName: `session/${sessionId}`,
-          })
-        );
-        getOrCreateSessionMock.mockResolvedValue({ token: 'session' });
-
         mockSessionStub = {
           deleteSession: vi.fn().mockResolvedValue(undefined),
           markAsInterrupted: vi.fn().mockResolvedValue(undefined),
@@ -796,14 +739,29 @@ describe('router sessionId validation', () => {
         };
         cloudAgentSession = mockContext.env.CLOUD_AGENT_SESSION as unknown as MockCAS;
 
-        mockSandbox = {} as ReturnType<typeof getSandbox>;
-        vi.mocked(getSandbox).mockReturnValue(mockSandbox);
-
-        vi.stubGlobal('scheduler', {
-          wait: vi.fn().mockResolvedValue(undefined),
-        });
-
         caller = appRouter.createCaller(mockContext);
+      });
+
+      it('routes accepted interruption to the Durable Object without provider stopping', async () => {
+        const sessionId: SessionId = 'agent_87654321-1234-1234-1234-123456789abc';
+        const metadata = legacySessionMetadata({
+          version: 123456789,
+          sessionId,
+          orgId: 'org-123',
+          userId: 'test-user-123',
+          timestamp: 123456789,
+        });
+        vi.mocked(fetchSessionMetadata).mockResolvedValue(metadata);
+
+        const result = await caller.interruptSession({ sessionId });
+
+        expect(result).toEqual({
+          success: true,
+          message: 'Session interruption accepted',
+          processesFound: false,
+        });
+        expect(mockSessionStub.interruptExecution).toHaveBeenCalled();
+        expect(getSandbox).not.toHaveBeenCalled();
       });
 
       it('short-circuits queued-only interrupts before creating a sandbox session', async () => {
@@ -826,13 +784,13 @@ describe('router sessionId validation', () => {
 
         expect(result).toEqual({
           success: true,
-          message: 'Queued session messages interrupted',
+          message: 'Session interruption accepted',
           processesFound: false,
         });
+
         expect(mockSessionStub.markAsInterrupted).toHaveBeenCalled();
         expect(mockSessionStub.interruptExecution).toHaveBeenCalled();
         expect(getOrCreateSessionMock).not.toHaveBeenCalled();
-        expect(interruptMock).not.toHaveBeenCalled();
         expect(getSandbox).not.toHaveBeenCalled();
         expect(cloudAgentSession.idFromName).toHaveBeenCalledWith(`test-user-123:${sessionId}`);
       });

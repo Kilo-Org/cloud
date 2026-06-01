@@ -494,6 +494,7 @@ export type SessionSnapshotData = z.infer<typeof sessionSnapshotSchema>;
 
 export const errorShapeSchema = z
   .object({
+    message: z.string().optional(),
     data: z
       .object({
         code: z.string().optional(),

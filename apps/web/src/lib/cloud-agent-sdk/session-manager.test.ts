@@ -211,6 +211,36 @@ function createStoredMessage(
   };
 }
 
+function createStoredAssistantMessage(
+  messageId: string,
+  sessionID: string,
+  overrides: Partial<AssistantMessage> = {}
+): StoredMessage {
+  return {
+    info: {
+      id: messageId,
+      sessionID,
+      role: 'assistant',
+      time: { created: 1 },
+      parentID: 'msg-parent',
+      modelID: 'anthropic/claude-sonnet-4',
+      providerID: 'kilo',
+      mode: 'code',
+      agent: 'test-agent',
+      path: { cwd: '/', root: '/' },
+      cost: 1,
+      tokens: {
+        input: 10,
+        output: 1,
+        reasoning: 2,
+        cache: { read: 3, write: 4 },
+      },
+      ...overrides,
+    },
+    parts: [],
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -695,6 +725,34 @@ describe('createSessionManager', () => {
       );
     });
 
+    it('restores the prompt and explains how to recover from unavailable-model rejection', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+
+      mockSession.send.mockRejectedValue(
+        Object.assign(new Error('Selected model is not available for this cloud agent session'), {
+          data: { code: 'BAD_REQUEST', httpStatus: 400 },
+        })
+      );
+      const accepted = await mgr.send({
+        payload: { type: 'prompt', prompt: 'Hello', mode: 'code', model: 'removed-model' },
+      });
+
+      expect(accepted).toBe(false);
+      expect(atomValue<string | null>(config.store, mgr.atoms.failedPrompt)).toBe('Hello');
+      expect(
+        atomValue<{ type: string; message: string } | null>(config.store, mgr.atoms.statusIndicator)
+      ).toEqual(
+        expect.objectContaining({
+          type: 'error',
+          message:
+            'Selected model is unavailable for Cloud Agent. Choose another available model or select a different agent, then try again.',
+        })
+      );
+    });
+
     it('calls onSendFailed with prompt on failure', async () => {
       const onSendFailed = jest.fn();
       const config = createMockConfig({ onSendFailed });
@@ -996,6 +1054,116 @@ describe('createSessionManager', () => {
       );
 
       expect(childMessages('child-1')).toEqual([childOneFirst, childOneSecond]);
+    });
+  });
+
+  describe('context usage', () => {
+    it('exposes token footprint and runtime model identity from the root assistant response', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-root'));
+      if (!latestStorage) throw new Error('expected session storage');
+      latestStorage.upsertMessage(createStoredAssistantMessage('msg-001', 'ses-root').info);
+
+      expect(atomValue(config.store, mgr.atoms.contextUsage)).toEqual({
+        contextTokens: 20,
+        providerID: 'kilo',
+        modelID: 'anthropic/claude-sonnet-4',
+      });
+    });
+
+    it('replaces the metric with the latest eligible root assistant response', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-root'));
+      if (!latestStorage) throw new Error('expected session storage');
+      latestStorage.upsertMessage(createStoredAssistantMessage('msg-001', 'ses-root').info);
+      latestStorage.upsertMessage(
+        createStoredAssistantMessage('msg-002', 'ses-root', {
+          modelID: 'openai/gpt-5',
+          tokens: { input: 20, output: 5, reasoning: 1, cache: { read: 2, write: 3 } },
+        }).info
+      );
+
+      expect(atomValue(config.store, mgr.atoms.contextUsage)).toEqual({
+        contextTokens: 31,
+        providerID: 'kilo',
+        modelID: 'openai/gpt-5',
+      });
+    });
+
+    it('keeps the previous metric while the latest root assistant response has zero output', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-root'));
+      if (!latestStorage) throw new Error('expected session storage');
+      latestStorage.upsertMessage(createStoredAssistantMessage('msg-001', 'ses-root').info);
+      latestStorage.upsertMessage(
+        createStoredAssistantMessage('msg-002', 'ses-root', {
+          modelID: 'openai/gpt-5',
+          tokens: { input: 100, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+        }).info
+      );
+
+      expect(atomValue(config.store, mgr.atoms.contextUsage)).toEqual({
+        contextTokens: 20,
+        providerID: 'kilo',
+        modelID: 'anthropic/claude-sonnet-4',
+      });
+    });
+
+    it('ignores later child-session assistant responses', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-root'));
+      if (!latestStorage) throw new Error('expected session storage');
+      latestStorage.upsertMessage(createStoredAssistantMessage('msg-001', 'ses-root').info);
+      latestStorage.upsertMessage(
+        createStoredAssistantMessage('msg-002', 'ses-child', {
+          modelID: 'openai/gpt-5',
+          tokens: { input: 200, output: 20, reasoning: 0, cache: { read: 0, write: 0 } },
+        }).info
+      );
+
+      expect(atomValue(config.store, mgr.atoms.contextUsage)).toEqual({
+        contextTokens: 20,
+        providerID: 'kilo',
+        modelID: 'anthropic/claude-sonnet-4',
+      });
+    });
+
+    it('clears and replaces the metric when switching sessions', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-root'));
+      if (!latestStorage) throw new Error('expected session storage');
+      latestStorage.upsertMessage(createStoredAssistantMessage('msg-001', 'ses-root').info);
+      expect(atomValue(config.store, mgr.atoms.contextUsage)).toEqual({
+        contextTokens: 20,
+        providerID: 'kilo',
+        modelID: 'anthropic/claude-sonnet-4',
+      });
+
+      await mgr.switchSession(kiloId('ses-next'));
+      if (!latestStorage) throw new Error('expected session storage');
+      expect(atomValue(config.store, mgr.atoms.contextUsage)).toBeUndefined();
+
+      latestStorage.upsertMessage(
+        createStoredAssistantMessage('msg-002', 'ses-next', {
+          modelID: 'openai/gpt-5',
+          tokens: { input: 40, output: 10, reasoning: 0, cache: { read: 0, write: 0 } },
+        }).info
+      );
+      expect(atomValue(config.store, mgr.atoms.contextUsage)).toEqual({
+        contextTokens: 50,
+        providerID: 'kilo',
+        modelID: 'openai/gpt-5',
+      });
     });
   });
 
@@ -2087,6 +2255,34 @@ describe('formatError', () => {
       data: { code: 'SERVICE_UNAVAILABLE', httpStatus: 503 },
     });
     expect(formatError(err)).toBe('Service is temporarily unavailable. Please retry in a moment.');
+  });
+
+  it('explains how to recover when the selected model is unavailable', () => {
+    const err = Object.assign(
+      new Error('SELECTED MODEL IS NOT AVAILABLE FOR THIS CLOUD AGENT SESSION'),
+      {
+        data: { code: 'BAD_REQUEST', httpStatus: 400 },
+      }
+    );
+    expect(formatError(err)).toBe(
+      'Selected model is unavailable for Cloud Agent. Choose another available model or select a different agent, then try again.'
+    );
+  });
+
+  it('handles wrapped unavailable-model errors', () => {
+    const err = new Error(
+      'prepareSession failed (400): {"error":{"message":"Selected model is not available for this cloud agent session"}}'
+    );
+    expect(formatError(err)).toBe(
+      'Selected model is unavailable for Cloud Agent. Choose another available model or select a different agent, then try again.'
+    );
+  });
+
+  it('keeps unrelated BAD_REQUEST errors generic', () => {
+    const err = Object.assign(new Error('Some unrelated validation failure'), {
+      data: { code: 'BAD_REQUEST', httpStatus: 400 },
+    });
+    expect(formatError(err)).toBe('Something went wrong. Please retry in a moment.');
   });
 
   it('handles TRPCClientError-shaped Error instance with unmapped code', () => {

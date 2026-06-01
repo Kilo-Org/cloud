@@ -15,7 +15,7 @@ import {
   type WrapperReconnectDecision,
   type WrapperSupervisorStorage,
 } from './wrapper-supervisor.js';
-import { getWrapperRuntimeState } from './wrapper-runtime-state.js';
+import { getWrapperLease, getWrapperRuntimeState } from './wrapper-runtime-state.js';
 
 vi.mock('@cloudflare/sandbox', () => ({
   getSandbox: vi.fn(),
@@ -35,6 +35,14 @@ const WRAPPER_RUN_ID = 'wr_supervisor';
 const WRAPPER_CONNECTION_ID = 'conn_supervisor';
 const MESSAGE_ID = 'msg_018f1e2d3c4bSupvMsgAbCdEfG';
 const NEWER_MESSAGE_ID = 'msg_018f1e2d3c4bNewerMsgAbCdEF';
+const OWNED_WRAPPER_LEASE: [string, unknown] = [
+  'wrapper_lease',
+  {
+    state: 'owns_wrapper',
+    nextInstanceGeneration: 2,
+    instance: { instanceId: 'instance_supervisor', instanceGeneration: 1 },
+  },
+];
 
 function createMemoryStorage(
   initialEntries?: Array<[string, unknown]>,
@@ -102,6 +110,8 @@ function createHarness(
   const callbackJobs: CallbackJob[] = [];
   const sentPings: string[] = [];
   const stops: string[] = [];
+  const stopWrappers = vi.fn().mockResolvedValue({ status: 'absent' });
+  const requestedAlarms: number[] = [];
   const currentMetadata = options?.metadata ?? createMetadata();
   const settlementOutbox = createMessageSettlementOutbox({
     storage,
@@ -130,10 +140,6 @@ function createHarness(
       sendPing: ingestTagId => {
         sentPings.push(ingestTagId);
       },
-      stopWrapperProcess: async reason => {
-        stops.push(reason);
-        return true;
-      },
     },
     messageSettlementOutbox: settlementOutbox,
     sessionMessageQueue: { requestPendingDrainIfNeeded },
@@ -141,6 +147,10 @@ function createHarness(
     getAssistantMessageForUserMessage: () => null,
     hasActiveIngestConnection: async () => false,
     clearInterruptRequest: async () => {},
+    stopWrappers,
+    requestAlarmAtOrBefore: async deadline => {
+      requestedAlarms.push(deadline);
+    },
     getSessionIdForLogs: () => currentMetadata.identity.sessionId,
   });
 
@@ -150,6 +160,8 @@ function createHarness(
     callbackJobs,
     sentPings,
     stops,
+    stopWrappers,
+    requestedAlarms,
     requestPendingDrainIfNeeded,
     settlementOutbox,
     supervisor,
@@ -402,9 +414,13 @@ describe('WrapperSupervisor', () => {
     await expect(getWrapperRuntimeState(harness.storage)).resolves.toMatchObject({
       wrapperGeneration: 5,
     });
+    await expect(getWrapperLease(harness.storage)).resolves.toMatchObject({
+      state: 'stop_needed',
+      reason: 'unhealthy-wrapper',
+    });
     expect(harness.requestPendingDrainIfNeeded).not.toHaveBeenCalled();
     expect(harness.events.map(event => event.streamEventType)).toEqual(['cloud.message.failed']);
-    expect(harness.stops).toEqual(['unhealthy-wrapper']);
+    expect(harness.stops).toEqual([]);
   });
 
   it('rejects a stale wrapper run before reconnect grace can be cancelled', async () => {
@@ -456,14 +472,18 @@ describe('WrapperSupervisor', () => {
   });
 
   it.each([
-    { status: 'failed' as const, expected: 'failed' as const },
-    { status: 'interrupted' as const, expected: 'interrupted' as const },
+    { status: 'failed' as const, expected: 'failed' as const, reason: 'terminal-failed' as const },
+    {
+      status: 'interrupted' as const,
+      expected: 'interrupted' as const,
+      reason: 'terminal-interrupted' as const,
+    },
   ])(
-    'settles only matching-run messages on current $status terminal events',
-    async ({ status, expected }) => {
+    'settles matching-run messages and durably requests physical stop on current $status terminal events',
+    async ({ status, expected, reason }) => {
       const otherRunId = 'wr_other_run';
       const otherMessageId = NEWER_MESSAGE_ID;
-      const harness = createHarness([liveRuntimeState()]);
+      const harness = createHarness([liveRuntimeState(), OWNED_WRAPPER_LEASE]);
       await putSessionMessageState(harness.storage, acceptedMessage());
       await putSessionMessageState(harness.storage, {
         ...acceptedMessage(otherMessageId),
@@ -483,13 +503,56 @@ describe('WrapperSupervisor', () => {
         status: 'accepted',
         wrapperRunId: otherRunId,
       });
+      await expect(getWrapperLease(harness.storage)).resolves.toMatchObject({
+        state: 'stop_needed',
+        reason,
+        target: {
+          kind: 'instance',
+          instance: { instanceId: 'instance_supervisor', instanceGeneration: 1 },
+        },
+      });
+      expect(harness.stops).toEqual([]);
       expect(harness.requestPendingDrainIfNeeded).toHaveBeenCalledOnce();
     }
   );
 
-  it('fails accepted current work on liveness expiry without redispatch when no wrapper-local Kilo query remains', async () => {
+  it('persists physical stop obligation before reading messages for a failed terminal event', async () => {
+    const storageRef: { current?: MemoryStorage } = {};
+    let observedStopBeforeEffects = false;
+    const harness = createHarness([liveRuntimeState(), OWNED_WRAPPER_LEASE], {
+      storageHooks: {
+        beforeList: async prefix => {
+          if (
+            observedStopBeforeEffects ||
+            !prefix.startsWith('session_message:') ||
+            !storageRef.current
+          ) {
+            return;
+          }
+          observedStopBeforeEffects = true;
+          await expect(getWrapperLease(storageRef.current)).resolves.toMatchObject({
+            state: 'stop_needed',
+            reason: 'terminal-failed',
+          });
+        },
+      },
+    });
+    storageRef.current = harness.storage;
+    await putSessionMessageState(harness.storage, acceptedMessage());
+
+    await harness.supervisor.onTerminalEvent({
+      wrapperRunId: WRAPPER_RUN_ID,
+      status: 'failed',
+      error: 'terminal event',
+    });
+
+    expect(observedStopBeforeEffects).toBe(true);
+  });
+
+  it('fails accepted current work and requests durable cleanup on liveness expiry', async () => {
     const harness = createHarness([
       liveRuntimeState({ noOutputDeadlineAt: 9_000, nextPingAt: 30_000 }),
+      OWNED_WRAPPER_LEASE,
     ]);
     await putSessionMessageState(harness.storage, acceptedMessage());
 
@@ -506,9 +569,51 @@ describe('WrapperSupervisor', () => {
       failureCode: 'wrapper_no_output',
     });
     expect(runtimeState.wrapperConnectionId).toBeUndefined();
+    await expect(getWrapperLease(harness.storage)).resolves.toMatchObject({
+      state: 'stop_needed',
+      reason: 'unhealthy-wrapper',
+    });
     expect(harness.requestPendingDrainIfNeeded).not.toHaveBeenCalled();
-    expect(harness.stops).toEqual(['unhealthy-wrapper']);
+    expect(harness.stops).toEqual([]);
     expect(harness.events.map(event => event.streamEventType)).toEqual(['cloud.message.failed']);
+  });
+
+  it('aggregates concurrent physical, liveness, disconnect, and idle deadlines', async () => {
+    const harness = createHarness([
+      liveRuntimeState({
+        nextPingAt: 20_000,
+        noOutputDeadlineAt: 50_000,
+        idleReconcileAfter: 30_000,
+        wrapperIdleDeadlineAt: 40_000,
+      }),
+      [
+        'wrapper_lease',
+        {
+          state: 'owns_wrapper',
+          nextInstanceGeneration: 2,
+          instance: { instanceId: 'instance_deadlines', instanceGeneration: 1 },
+          startupDeadlineAt: 60_000,
+        },
+      ],
+      [
+        'disconnect_grace',
+        {
+          wrapperRunId: WRAPPER_RUN_ID,
+          disconnectedAt: 5_000,
+          wsCloseCode: 1006,
+          wsCloseReason: 'lost connection',
+          wrapperGeneration: 4,
+          wrapperConnectionId: WRAPPER_CONNECTION_ID,
+        },
+      ],
+    ]);
+    await putSessionMessageState(harness.storage, acceptedMessage());
+
+    const deadlines = await harness.supervisor.nextMaintenanceDeadlines();
+
+    expect(deadlines).toHaveLength(5);
+    expect(deadlines).toEqual(expect.arrayContaining([60_000, 20_000, 15_000, 30_000, 40_000]));
+    expect(Math.min(...deadlines)).toBe(15_000);
   });
 
   it('reconciles accepted idle work after its root-idle deadline', async () => {
@@ -574,24 +679,279 @@ describe('WrapperSupervisor', () => {
     });
   });
 
-  it('cleans up an idle keep-warm wrapper only after the deadline has no queued or accepted work', async () => {
-    const harness = createHarness([liveRuntimeState({ wrapperIdleDeadlineAt: 9_000 })]);
+  it('retains successful idle ownership with a bounded physical warm deadline', async () => {
+    const harness = createHarness([liveRuntimeState(), OWNED_WRAPPER_LEASE]);
+
+    await harness.supervisor.onTerminalEvent({
+      wrapperRunId: WRAPPER_RUN_ID,
+      status: 'completed',
+    });
+
+    await expect(getWrapperLease(harness.storage)).resolves.toMatchObject({
+      state: 'owns_wrapper',
+      keepWarmUntil: expect.any(Number),
+    });
+    await expect(getWrapperRuntimeState(harness.storage)).resolves.toEqual({
+      wrapperGeneration: 5,
+    });
+  });
+
+  it('requests durable cleanup when a physical keep-warm deadline expires without work', async () => {
+    const harness = createHarness([
+      liveRuntimeState({ wrapperIdleDeadlineAt: 9_000 }),
+      [
+        'wrapper_lease',
+        {
+          ...(OWNED_WRAPPER_LEASE[1] as object),
+          keepWarmUntil: 9_000,
+        },
+      ],
+    ]);
 
     await harness.supervisor.runMaintenance(10_000);
 
     const runtimeState = await getWrapperRuntimeState(harness.storage);
     expect(runtimeState.wrapperConnectionId).toBeUndefined();
     expect(runtimeState.wrapperGeneration).toBe(5);
-    expect(harness.stops).toEqual(['keep-warm-expired']);
+    await expect(getWrapperLease(harness.storage)).resolves.toMatchObject({
+      state: 'stop_needed',
+      reason: 'keep-warm-expired',
+    });
+    expect(harness.stops).toEqual([]);
+  });
+
+  it('turns an expired startup allowance into verified cleanup work', async () => {
+    const harness = createHarness([
+      [
+        'wrapper_lease',
+        {
+          state: 'owns_wrapper',
+          nextInstanceGeneration: 2,
+          instance: { instanceId: 'instance_starting', instanceGeneration: 1 },
+          startupDeadlineAt: 1_000,
+        },
+      ],
+    ]);
+
+    await harness.supervisor.runMaintenance(1_001);
+
+    expect(harness.stopWrappers).toHaveBeenCalledWith(
+      expect.objectContaining({
+        target: {
+          kind: 'instance',
+          instance: { instanceId: 'instance_starting', instanceGeneration: 1 },
+        },
+        reason: 'startup-failed',
+      })
+    );
+    await expect(getWrapperLease(harness.storage)).resolves.toEqual({
+      state: 'none',
+      nextInstanceGeneration: 2,
+    });
+  });
+
+  it('repairs an expired readiness deadline when accepted work already proves delivery', async () => {
+    const harness = createHarness([
+      liveRuntimeState({ lastWrapperMessageAt: 1_000 }),
+      [
+        'wrapper_lease',
+        {
+          state: 'owns_wrapper',
+          nextInstanceGeneration: 2,
+          instance: { instanceId: 'instance_accepted', instanceGeneration: 1 },
+          startupDeadlineAt: 1_000,
+        },
+      ],
+    ]);
+    await putSessionMessageState(harness.storage, acceptedMessage());
+
+    await harness.supervisor.runMaintenance(1_001);
+
+    await expect(getWrapperLease(harness.storage)).resolves.toMatchObject({
+      state: 'owns_wrapper',
+      startupDeadlineAt: undefined,
+    });
+    expect(harness.stopWrappers).not.toHaveBeenCalled();
+  });
+
+  it('claims due cleanup before provider I/O and confirms verified absence', async () => {
+    const harness = createHarness([
+      [
+        'wrapper_lease',
+        {
+          state: 'stop_needed',
+          nextInstanceGeneration: 2,
+          target: {
+            kind: 'instance',
+            instance: { instanceId: 'instance_stop', instanceGeneration: 1 },
+          },
+          reason: 'startup-failed',
+          requestedAt: 1_000,
+          nextAttemptAt: 1_000,
+          attempts: 0,
+        },
+      ],
+    ]);
+    harness.stopWrappers.mockImplementationOnce(async () => {
+      await expect(getWrapperLease(harness.storage)).resolves.toMatchObject({
+        state: 'stopping',
+        attemptId: expect.any(String),
+      });
+      expect(harness.requestedAlarms).toHaveLength(1);
+      return { status: 'absent' };
+    });
+
+    await harness.supervisor.runMaintenance(1_001);
+
+    expect(harness.stopWrappers).toHaveBeenCalledOnce();
+    await expect(getWrapperLease(harness.storage)).resolves.toEqual({
+      state: 'none',
+      nextInstanceGeneration: 2,
+    });
+  });
+
+  it.each([
+    { result: { status: 'still-present', observed: [] }, label: 'still-present' },
+    { result: { status: 'inspection-failed', error: 'unavailable' }, label: 'inspection-failed' },
+  ])('retries a $label cleanup result with its target preserved', async ({ result }) => {
+    const harness = createHarness([
+      [
+        'wrapper_lease',
+        {
+          state: 'stop_needed',
+          nextInstanceGeneration: 4,
+          target: { kind: 'session' },
+          reason: 'unexpected-wrapper',
+          requestedAt: 1_000,
+          nextAttemptAt: 1_000,
+          attempts: 0,
+        },
+      ],
+    ]);
+    harness.stopWrappers.mockResolvedValueOnce(result);
+
+    await harness.supervisor.runMaintenance(1_001);
+
+    await expect(getWrapperLease(harness.storage)).resolves.toMatchObject({
+      state: 'stop_needed',
+      target: { kind: 'session' },
+      attempts: 1,
+      nextAttemptAt: expect.any(Number),
+    });
+  });
+
+  it('backs off unconfirmed physical cleanup retries through the saturated delay tail', async () => {
+    const harness = createHarness([
+      [
+        'wrapper_lease',
+        {
+          state: 'stop_needed',
+          nextInstanceGeneration: 2,
+          target: { kind: 'session' },
+          reason: 'unexpected-wrapper',
+          requestedAt: 1_000,
+          nextAttemptAt: 1_000,
+          attempts: 0,
+        },
+      ],
+    ]);
+    harness.stopWrappers.mockResolvedValue({ status: 'still-present', observed: [] });
+    const expectedDelays = [5_000, 30_000, 120_000, 300_000, 300_000];
+    let now = 1_001;
+
+    for (const [index, expectedDelay] of expectedDelays.entries()) {
+      await harness.supervisor.runMaintenance(now);
+      const lease = await getWrapperLease(harness.storage);
+      if (lease.state !== 'stop_needed') {
+        throw new Error(`Expected a retryable cleanup lease after attempt ${index + 1}`);
+      }
+      expect(lease.attempts).toBe(index + 1);
+      expect(lease.nextAttemptAt - now).toBe(expectedDelay);
+      now = lease.nextAttemptAt;
+    }
+  });
+
+  it('retries thrown cleanup and does not issue a parallel stop during a valid watchdog', async () => {
+    const harness = createHarness([
+      [
+        'wrapper_lease',
+        {
+          state: 'stop_needed',
+          nextInstanceGeneration: 2,
+          target: { kind: 'session' },
+          reason: 'observation-failed',
+          requestedAt: 1_000,
+          nextAttemptAt: 1_000,
+          attempts: 0,
+        },
+      ],
+    ]);
+    harness.stopWrappers.mockRejectedValueOnce(new Error('stop failed'));
+    await harness.supervisor.runMaintenance(1_001);
+    await expect(getWrapperLease(harness.storage)).resolves.toMatchObject({ state: 'stop_needed' });
+
+    await harness.storage.put('wrapper_lease', {
+      state: 'stopping',
+      nextInstanceGeneration: 2,
+      target: { kind: 'session' },
+      reason: 'observation-failed',
+      requestedAt: 1_000,
+      attemptId: 'inflight',
+      attemptStartedAt: 2_000,
+      attemptDeadlineAt: 30_000,
+      attempts: 2,
+    });
+    await harness.supervisor.runMaintenance(20_000);
+    expect(harness.stopWrappers).toHaveBeenCalledOnce();
+    expect(await harness.supervisor.nextMaintenanceDeadlines()).toContain(30_000);
+  });
+
+  it('expires a stale watchdog into retryable cleanup without settling a late attempt', async () => {
+    const harness = createHarness([
+      [
+        'wrapper_lease',
+        {
+          state: 'stopping',
+          nextInstanceGeneration: 2,
+          target: { kind: 'session' },
+          reason: 'observation-failed',
+          requestedAt: 1_000,
+          attemptId: 'expired',
+          attemptStartedAt: 1_000,
+          attemptDeadlineAt: 2_000,
+          attempts: 1,
+        },
+      ],
+    ]);
+
+    await harness.supervisor.runMaintenance(2_001);
+
+    expect(harness.stopWrappers).not.toHaveBeenCalled();
+    await expect(getWrapperLease(harness.storage)).resolves.toMatchObject({
+      state: 'stop_needed',
+      attempts: 1,
+    });
   });
 
   it('releases a gate-waiting callback when keep-warm cleanup abandons wrapper terminal state', async () => {
-    const harness = createHarness([liveRuntimeState({ wrapperIdleDeadlineAt: 9_000 })], {
-      metadata: {
-        ...createMetadata(),
-        finalization: { gateThreshold: 'warning' },
-      },
-    });
+    const harness = createHarness(
+      [
+        liveRuntimeState({ wrapperIdleDeadlineAt: 9_000 }),
+        [
+          'wrapper_lease',
+          {
+            ...(OWNED_WRAPPER_LEASE[1] as object),
+            keepWarmUntil: 9_000,
+          },
+        ],
+      ],
+      {
+        metadata: {
+          ...createMetadata(),
+          finalization: { gateThreshold: 'warning' },
+        },
+      }
+    );
     await putSessionMessageState(harness.storage, {
       ...acceptedMessage(),
       callbackRequired: true,
@@ -604,7 +964,11 @@ describe('WrapperSupervisor', () => {
 
     await harness.supervisor.runMaintenance(10_000);
 
-    expect(harness.stops).toEqual(['keep-warm-expired']);
+    await expect(getWrapperLease(harness.storage)).resolves.toMatchObject({
+      state: 'stop_needed',
+      reason: 'keep-warm-expired',
+    });
+    expect(harness.stops).toEqual([]);
     expect(harness.callbackJobs).toHaveLength(1);
     expect(harness.callbackJobs[0].payload).toMatchObject({
       messageId: MESSAGE_ID,

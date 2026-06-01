@@ -425,7 +425,8 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   // intent. Refuse here regardless of org settings, anon/BYOK status,
   // or the org-level check below.
   if (
-    (effectiveProviderContext.experiment || isKiloExclusiveModelRequiringDataCollection(originalModelIdLowerCased)) &&
+    (effectiveProviderContext.experiment ||
+      isKiloExclusiveModelRequiringDataCollection(effectiveModelIdLowerCased)) &&
     isDataCollectionExplicitlyDisallowed(requestBodyParsed.body.provider)
   ) {
     return dataCollectionRequiredResponse();
@@ -649,7 +650,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     // Direct experiment upstreams must not have a Vercel/OpenRouter
     // provider config pinned onto them — the partner endpoint is selected
     // by the variant version.
-    if (providerConfig && !effectiveProviderContext.skipProviderPin) {
+    if (providerConfig && !effectiveProviderContext.experiment) {
       requestBodyParsed.body.provider = providerConfig;
     }
   }
@@ -703,11 +704,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     requestBodyParsed,
     extraHeaders,
     effectiveProviderContext.userByok,
-    fraudHeaders,
-    {
-      skipKiloExclusiveModelSettings:
-        effectiveProviderContext.skipKiloExclusiveModelSettings === true,
-    }
+    fraudHeaders
   );
 
   // Capture the bounded prompt for experimented requests AFTER provider
@@ -808,6 +805,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     organization_id: organizationId || null,
     provider: effectiveProviderContext.provider.id,
     model: effectiveModelIdLowerCased,
+    session_id: usageContext.session_id,
     request: requestBodyParsed,
   });
 

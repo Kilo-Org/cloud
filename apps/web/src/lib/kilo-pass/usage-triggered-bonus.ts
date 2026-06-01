@@ -12,7 +12,7 @@ import {
   KiloPassIssuanceItemKind,
   KiloPassIssuanceSource,
   KiloPassPaymentProvider,
-  KiloPassWelcomePromoEligibilityReason,
+  type KiloPassWelcomePromoEligibilityReason,
 } from '@/lib/kilo-pass/enums';
 import {
   KILO_PASS_BONUS_LIKE_ITEM_KINDS,

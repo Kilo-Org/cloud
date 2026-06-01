@@ -14,6 +14,11 @@ import { encryptApiKey } from '@/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
 import { ExperimentUpstreamSchema } from '@/lib/ai-gateway/experiments/upstream-schema';
 import { EXPERIMENTED_PUBLIC_IDS_REDIS_KEY } from '@/lib/redis-keys';
+import {
+  CUSTOM_LLM_PREFIX,
+  KILOCLAW_KILO_PROVIDER_PREFIX,
+  KILOCODE_KILO_PROVIDER_PREFIX,
+} from '@/lib/ai-gateway/model-utils';
 import { redisSet } from '@/lib/redis';
 import { TRPCError } from '@trpc/server';
 import { and, asc, count, desc, eq, inArray, sql } from 'drizzle-orm';
@@ -40,7 +45,11 @@ const variantIdSchema = z.object({ variantId: z.string().uuid() });
 
 // Public ids under these namespaces are reserved for Kilo-owned models and
 // must not be claimed by partner experiment public ids.
-const RESERVED_PUBLIC_ID_PREFIXES = ['kilo/', 'kilocode/', 'kilo-internal/'] as const;
+const RESERVED_PUBLIC_ID_PREFIXES = [
+  KILOCODE_KILO_PROVIDER_PREFIX,
+  KILOCLAW_KILO_PROVIDER_PREFIX,
+  CUSTOM_LLM_PREFIX,
+] as const;
 
 const publicModelIdSchema = z
   .string()

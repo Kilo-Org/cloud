@@ -69,6 +69,10 @@ import type {
   FencedWrapperDispatchRequest,
 } from './execution/types.js';
 import { normalizeAgentMode } from './schema.js';
+import {
+  isSandboxFilesystemUnusableError,
+  SandboxCapacityInspectionError,
+} from './workspace-errors.js';
 
 const SETUP_COMMAND_TIMEOUT_SECONDS = 300; // 5 minutes
 const DEFAULT_DENIED_COMMAND_PATTERNS = ['rm -rf', 'sudo rm', 'mkfs', 'dd if='];
@@ -1838,12 +1842,28 @@ export class SessionService {
     executor: SandboxInstance | ExecutionSession,
     workspacePath: string
   ): Promise<boolean> {
-    const result = await timedExec(
-      executor,
-      `test -d '${workspacePath}/.git' && echo exists`,
-      'session.prepareWorkspace.repoExists'
-    );
-    return result.stdout?.includes('exists') ?? false;
+    try {
+      const result = await timedExec(
+        executor,
+        `test -d '${workspacePath}/.git' && echo exists`,
+        'session.prepareWorkspace.repoExists'
+      );
+      if (result.exitCode !== 0 && isSandboxFilesystemUnusableError(result.stderr)) {
+        throw new SandboxCapacityInspectionError(
+          'Workspace admission probe cannot run because the sandbox filesystem is unusable',
+          new Error(result.stderr)
+        );
+      }
+      return result.stdout?.includes('exists') ?? false;
+    } catch (error) {
+      if (isSandboxFilesystemUnusableError(error)) {
+        throw new SandboxCapacityInspectionError(
+          'Workspace admission probe cannot run because the sandbox filesystem is unusable',
+          error
+        );
+      }
+      throw error;
+    }
   }
 
   private async cloneRepository(

@@ -4,6 +4,10 @@ import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { createEventQueries } from '../../../src/session/queries/events.js';
 import { storePendingSessionMessage } from '../../../src/session/pending-messages.js';
 import { putSessionMessageState } from '../../../src/session/session-message-state.js';
+import {
+  getWrapperLease,
+  getWrapperRuntimeState,
+} from '../../../src/session/wrapper-runtime-state.js';
 import type { ExecutionId } from '../../../src/types/ids.js';
 
 describe('Disconnect handling and compatibility execution RPCs', () => {
@@ -79,6 +83,56 @@ describe('Disconnect handling and compatibility execution RPCs', () => {
 
     expect(result.keptWithAccepted).toBeDefined();
     expect(result.keptWithPending).toBeDefined();
+  });
+
+  it('idle cleanup preserves a completed wrapper retained for warm fenced reuse', async () => {
+    const userId = 'user_idle_warm_reuse';
+    const sessionId = 'agent_idle_warm_reuse';
+    const stub = env.CLOUD_AGENT_SESSION.get(
+      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
+    );
+
+    const result = await runInDurableObject(stub, async (instance, state) => {
+      const now = Date.now();
+      const expiredActivity = now - 20 * 60 * 1000;
+      await instance.updateMetadata({
+        version: now,
+        sessionId,
+        userId,
+        timestamp: now,
+        kiloServerLastActivity: expiredActivity,
+      });
+      await state.storage.put('wrapper_runtime_state', {
+        wrapperRunId: 'wr_idle_warm_reuse',
+        wrapperGeneration: 1,
+        wrapperConnectionId: 'connection-completed',
+        lastWrapperMessageAt: now,
+      });
+      await state.storage.put('wrapper_lease', {
+        state: 'owns_wrapper',
+        nextInstanceGeneration: 2,
+        instance: { instanceId: 'instance_idle_warm_reuse', instanceGeneration: 1 },
+      });
+
+      await instance.handleWrapperTerminalEvent({
+        wrapperRunId: 'wr_idle_warm_reuse',
+        status: 'completed',
+      });
+      await instance.alarm();
+
+      return {
+        lease: await getWrapperLease(state.storage),
+        runtime: await getWrapperRuntimeState(state.storage),
+        activity: (await instance.getMetadata())?.lifecycle.kiloServerLastActivity,
+      };
+    });
+
+    expect(result.lease).toMatchObject({
+      state: 'owns_wrapper',
+      keepWarmUntil: expect.any(Number),
+    });
+    expect(result.runtime.wrapperConnectionId).toBeUndefined();
+    expect(result.activity).toBeDefined();
   });
 
   it('failExecutionRpc retains the public execution-record failure contract', async () => {

@@ -1,6 +1,11 @@
 import { z } from 'zod';
 import { logger } from '../logger.js';
 import type { SessionMetadata } from '../persistence/session-metadata.js';
+import type {
+  StopWrappersResult,
+  WrapperStopReason,
+  WrapperStopTarget,
+} from '../agent-sandbox/protocol.js';
 import type { AgentRuntime } from './agent-runtime.js';
 import { WRAPPER_NO_OUTPUT_TIMEOUT_MS, WRAPPER_PING_INTERVAL_MS } from './agent-runtime.js';
 import type { MessageSettlementOutbox } from './message-settlement-outbox.js';
@@ -16,20 +21,27 @@ import {
   clearCurrentWrapperRuntimeLivenessState,
   clearWrapperIdleState,
   clearWrapperRuntimeIdentity,
+  getWrapperLease,
   getWrapperRuntimeState,
   hasCompleteWrapperIdentity,
+  IDLE_KEEP_WARM_MS,
   IDLE_RECONCILIATION_GRACE_MS,
   isCurrentWrapperConnection,
   markWrapperPingSent,
+  nextWrapperLeaseDeadline,
+  putWrapperLease,
   recordMeaningfulWrapperOutput,
   recordRootSessionIdle,
   recordWrapperPong,
+  reduceWrapperLease,
   type WrapperConnectionFence,
   type WrapperRuntimeState,
 } from './wrapper-runtime-state.js';
 
 const DISCONNECT_GRACE_MS = 10_000;
 const WRAPPER_PING_TIMEOUT_MS = 30_000;
+const WRAPPER_STOP_ATTEMPT_TIMEOUT_MS = 45_000;
+const WRAPPER_STOP_RETRY_DELAYS_MS = [5_000, 30_000, 120_000, 300_000];
 const DISCONNECT_GRACE_KEY = 'disconnect_grace';
 
 const disconnectGraceStateSchema = z.object({
@@ -96,6 +108,7 @@ export type WrapperSupervisor = {
   ): Promise<void>;
   onDisconnected(input: WrapperDisconnectedInput): Promise<void>;
   onTerminalEvent(params: WrapperTerminalEvent): Promise<void>;
+  requestPhysicalWrapperStop(reason: WrapperStopReason, target?: WrapperStopTarget): Promise<void>;
   clearDisconnectGrace(): Promise<void>;
   runMaintenance(now: number): Promise<void>;
   nextMaintenanceDeadlines(): Promise<number[]>;
@@ -103,7 +116,7 @@ export type WrapperSupervisor = {
 
 export type WrapperSupervisorDependencies = {
   storage: WrapperSupervisorStorage;
-  agentRuntime: Pick<AgentRuntime, 'sendPing' | 'stopWrapperProcess'>;
+  agentRuntime: Pick<AgentRuntime, 'sendPing'>;
   messageSettlementOutbox: Pick<
     MessageSettlementOutbox,
     | 'terminalizeSessionMessageOnce'
@@ -127,6 +140,12 @@ export type WrapperSupervisorDependencies = {
     wrapperConnectionId: string;
   }) => Promise<boolean>;
   clearInterruptRequest: () => Promise<void>;
+  stopWrappers?: (request: {
+    target: WrapperStopTarget;
+    attemptId: string;
+    reason: WrapperStopReason;
+  }) => Promise<StopWrappersResult>;
+  requestAlarmAtOrBefore?: (deadline: number) => Promise<void>;
   getSessionIdForLogs: () => string | undefined;
 };
 
@@ -189,6 +208,8 @@ export function createWrapperSupervisor(
     observeCorrelatedAgentActivity,
     hasActiveIngestConnection,
     clearInterruptRequest,
+    stopWrappers,
+    requestAlarmAtOrBefore,
     getSessionIdForLogs,
   } = dependencies;
 
@@ -299,6 +320,30 @@ export function createWrapperSupervisor(
     );
   }
 
+  async function retainPhysicalWrapperWarm(now: number): Promise<void> {
+    const lease = await getWrapperLease(storage);
+    if (lease.state !== 'owns_wrapper') return;
+    const warm = reduceWrapperLease(lease, {
+      type: 'retain_warm',
+      instanceId: lease.instance.instanceId,
+      keepWarmUntil: now + IDLE_KEEP_WARM_MS,
+    });
+    await putWrapperLease(storage, warm);
+
+    const runtimeState = await getWrapperRuntimeState(storage);
+    if (runtimeState.wrapperConnectionId) {
+      await clearWrapperRuntimeIdentity(
+        storage,
+        {
+          wrapperGeneration: runtimeState.wrapperGeneration,
+          wrapperConnectionId: runtimeState.wrapperConnectionId,
+        },
+        { incrementGeneration: true }
+      );
+    }
+    await requestAlarmAtOrBefore?.(now + IDLE_KEEP_WARM_MS);
+  }
+
   async function observeRootIdle(
     wrapperGeneration: number,
     wrapperConnectionId: string,
@@ -361,6 +406,29 @@ export function createWrapperSupervisor(
     await startDisconnectGrace(input);
   }
 
+  async function requestPhysicalWrapperStop(
+    reason: WrapperStopReason,
+    target?: WrapperStopTarget
+  ): Promise<void> {
+    const current = await getWrapperLease(storage);
+    const resolvedTarget =
+      target ??
+      (current.state === 'owns_wrapper'
+        ? { kind: 'instance' as const, instance: current.instance }
+        : { kind: 'session' as const });
+    const now = Date.now();
+    const next = reduceWrapperLease(current, {
+      type: 'request_stop',
+      target: resolvedTarget,
+      reason,
+      now,
+    });
+    if (next !== current) {
+      await putWrapperLease(storage, next);
+      await requestAlarmAtOrBefore?.(now);
+    }
+  }
+
   async function handleUnhealthyWrapper(
     state: WrapperRuntimeState,
     error: string,
@@ -374,6 +442,8 @@ export function createWrapperSupervisor(
         wrapperConnectionId: state.wrapperConnectionId,
       })
       .warn('Handling unhealthy wrapper runtime');
+
+    await requestPhysicalWrapperStop('unhealthy-wrapper');
 
     const acceptedMessages = await listNonTerminalAcceptedMessages(storage, state.wrapperRunId);
     for (const message of acceptedMessages) {
@@ -399,8 +469,6 @@ export function createWrapperSupervisor(
         state.wrapperConnectionId
       );
     }
-
-    await agentRuntime.stopWrapperProcess('unhealthy-wrapper');
   }
 
   async function checkDisconnectGrace(now: number): Promise<void> {
@@ -408,17 +476,18 @@ export function createWrapperSupervisor(
     if (!graceState) return;
     if (now - graceState.disconnectedAt < DISCONNECT_GRACE_MS) return;
 
-    await storage.delete(DISCONNECT_GRACE_KEY);
     const { wrapperRunId } = graceState;
     const state = await getWrapperRuntimeState(storage);
     if (
       state.wrapperRunId !== wrapperRunId ||
       state.wrapperGeneration !== graceState.wrapperGeneration
     ) {
+      await storage.delete(DISCONNECT_GRACE_KEY);
       await releaseWrapperTerminalWaitForIdleBatchForWrapperRun(wrapperRunId);
       return;
     }
     if (state.wrapperConnectionId !== graceState.wrapperConnectionId) {
+      await storage.delete(DISCONNECT_GRACE_KEY);
       await releaseWrapperTerminalWaitForIdleBatchForWrapperRun(wrapperRunId);
       return;
     }
@@ -433,6 +502,7 @@ export function createWrapperSupervisor(
       logger
         .withFields({ wrapperRunId })
         .info('Wrapper reconnected during grace period — skipping failure');
+      await storage.delete(DISCONNECT_GRACE_KEY);
       return;
     }
 
@@ -441,6 +511,7 @@ export function createWrapperSupervisor(
       logger
         .withFields({ wrapperRunId })
         .info('No accepted messages during grace period - skipping failure');
+      await storage.delete(DISCONNECT_GRACE_KEY);
       await releaseWrapperTerminalWaitForIdleBatch();
       return;
     }
@@ -448,6 +519,8 @@ export function createWrapperSupervisor(
     logger
       .withFields({ wrapperRunId, messageCount: acceptedMessages.length })
       .warn('Grace period expired - failing accepted messages');
+    await requestPhysicalWrapperStop('unhealthy-wrapper');
+    await storage.delete(DISCONNECT_GRACE_KEY);
     for (const message of acceptedMessages) {
       const activityObserved = message.agentActivityObservedAt !== undefined;
       await messageSettlementOutbox.terminalizeSessionMessageOnce(message.messageId, {
@@ -467,7 +540,6 @@ export function createWrapperSupervisor(
       },
       { incrementGeneration: true }
     );
-    await agentRuntime.stopWrapperProcess('unhealthy-wrapper');
     await releaseWrapperTerminalWaitForIdleBatch();
   }
 
@@ -609,8 +681,26 @@ export function createWrapperSupervisor(
       })
       .info('Idle reconciliation processing accepted messages');
 
+    let failedTerminalObserved = !metadata.auth.kiloSessionId;
+    if (!failedTerminalObserved && metadata.auth.kiloSessionId) {
+      failedTerminalObserved = acceptedMessages.some(message => {
+        const assistantMessage = getAssistantMessageForUserMessage(
+          metadata.identity.sessionId,
+          metadata.auth.kiloSessionId ?? '',
+          message.messageId
+        );
+        return (
+          !assistantMessage || getAssistantErrorMessage(assistantMessage.info.error) !== undefined
+        );
+      });
+    }
+    if (failedTerminalObserved) {
+      await requestPhysicalWrapperStop('terminal-failed');
+    }
+
     for (const message of acceptedMessages) {
       if (!metadata.auth.kiloSessionId) {
+        failedTerminalObserved = true;
         await messageSettlementOutbox.terminalizeSessionMessageOnce(message.messageId, {
           kind: 'failed',
           reason: 'missing_assistant_reply',
@@ -628,6 +718,7 @@ export function createWrapperSupervisor(
         message.messageId
       );
       if (!assistantMessage) {
+        failedTerminalObserved = true;
         await messageSettlementOutbox.terminalizeSessionMessageOnce(message.messageId, {
           kind: 'failed',
           reason: 'missing_assistant_reply',
@@ -642,6 +733,7 @@ export function createWrapperSupervisor(
       await observeCorrelatedAgentActivity?.(message.messageId);
       const assistantError = getAssistantErrorMessage(assistantMessage.info.error);
       if (assistantError !== undefined) {
+        failedTerminalObserved = true;
         await messageSettlementOutbox.terminalizeSessionMessageOnce(message.messageId, {
           kind: 'failed',
           reason: 'assistant_error',
@@ -660,6 +752,16 @@ export function createWrapperSupervisor(
       });
     }
 
+    if (failedTerminalObserved) {
+      if (state.wrapperConnectionId) {
+        await clearWrapperRuntimeIdentity(storage, {
+          wrapperGeneration: state.wrapperGeneration,
+          wrapperConnectionId: state.wrapperConnectionId,
+        });
+      }
+    } else {
+      await retainPhysicalWrapperWarm(now);
+    }
     await messageSettlementOutbox.finalizeIdleBatchCallbackIfReady();
     logger
       .withFields({
@@ -671,9 +773,12 @@ export function createWrapperSupervisor(
   }
 
   async function checkKeepWarmCleanup(now: number): Promise<void> {
+    const lease = await getWrapperLease(storage);
+    if (lease.state === 'owns_wrapper' && lease.startupDeadlineAt !== undefined) return;
     const wrapperState = await getWrapperRuntimeState(storage);
-    if (wrapperState.wrapperIdleDeadlineAt === undefined) return;
-    if (wrapperState.wrapperIdleDeadlineAt > now) return;
+    const keepWarmUntil =
+      lease.state === 'owns_wrapper' ? lease.keepWarmUntil : wrapperState.wrapperIdleDeadlineAt;
+    if (keepWarmUntil === undefined || keepWarmUntil > now) return;
 
     const pendingCount = await countPendingSessionMessages(storage);
     const acceptedMessages = await listNonTerminalAcceptedMessages(
@@ -708,7 +813,97 @@ export function createWrapperSupervisor(
       );
     }
     await releaseWrapperTerminalWaitForIdleBatch();
-    await agentRuntime.stopWrapperProcess('keep-warm-expired');
+    await requestPhysicalWrapperStop('keep-warm-expired');
+  }
+
+  function stopRetryAt(now: number, attempts: number): number {
+    const delay =
+      WRAPPER_STOP_RETRY_DELAYS_MS[Math.min(attempts - 1, WRAPPER_STOP_RETRY_DELAYS_MS.length - 1)];
+    return now + delay;
+  }
+
+  async function reconcilePhysicalCleanup(now: number): Promise<void> {
+    if (!stopWrappers) return;
+    let lease = await getWrapperLease(storage);
+    if (
+      lease.state === 'owns_wrapper' &&
+      lease.startupDeadlineAt !== undefined &&
+      now >= lease.startupDeadlineAt
+    ) {
+      const runtimeState = await getWrapperRuntimeState(storage);
+      if (await hasActiveWrapperWork(runtimeState)) {
+        lease = reduceWrapperLease(lease, {
+          type: 'delivery_accepted',
+          instanceId: lease.instance.instanceId,
+        });
+      } else {
+        lease = reduceWrapperLease(lease, {
+          type: 'request_stop',
+          target: { kind: 'instance', instance: lease.instance },
+          reason: 'startup-failed',
+          now,
+        });
+      }
+      await putWrapperLease(storage, lease);
+    }
+    if (lease.state === 'stopping') {
+      if (now < lease.attemptDeadlineAt) return;
+      lease = reduceWrapperLease(lease, {
+        type: 'stop_attempt_expired',
+        attemptId: lease.attemptId,
+        retryAt: stopRetryAt(now, lease.attempts),
+      });
+      await putWrapperLease(storage, lease);
+      return;
+    }
+    if (lease.state !== 'stop_needed' || now < lease.nextAttemptAt) return;
+
+    const attemptId = crypto.randomUUID();
+    const stopping = reduceWrapperLease(lease, {
+      type: 'begin_stop_attempt',
+      attemptId,
+      now,
+      attemptDeadlineAt: now + WRAPPER_STOP_ATTEMPT_TIMEOUT_MS,
+    });
+    if (stopping.state !== 'stopping') return;
+    await putWrapperLease(storage, stopping);
+    await requestAlarmAtOrBefore?.(stopping.attemptDeadlineAt);
+
+    let result: StopWrappersResult;
+    try {
+      result = await stopWrappers({
+        target: stopping.target,
+        attemptId,
+        reason: stopping.reason,
+      });
+    } catch (error) {
+      result = {
+        status: 'inspection-failed',
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+
+    const latest = await getWrapperLease(storage);
+    if (result.status === 'absent') {
+      await putWrapperLease(
+        storage,
+        reduceWrapperLease(latest, { type: 'stop_absent', attemptId })
+      );
+      return;
+    }
+    const error =
+      result.status === 'inspection-failed'
+        ? result.error
+        : (result.error ?? 'Wrapper remains present');
+    await putWrapperLease(
+      storage,
+      reduceWrapperLease(latest, {
+        type: 'stop_not_confirmed',
+        attemptId,
+        retryAt: stopRetryAt(now, stopping.attempts),
+        error,
+      })
+    );
   }
 
   async function onTerminalEvent(params: WrapperTerminalEvent): Promise<void> {
@@ -738,6 +933,9 @@ export function createWrapperSupervisor(
       .info('Wrapper terminal event received by supervisor');
 
     if (status === 'failed' || status === 'interrupted') {
+      await requestPhysicalWrapperStop(
+        status === 'failed' ? 'terminal-failed' : 'terminal-interrupted'
+      );
       const acceptedMessages = await listNonTerminalAcceptedMessages(storage, wrapperRunId);
       for (const message of acceptedMessages) {
         if (status === 'failed') {
@@ -768,10 +966,7 @@ export function createWrapperSupervisor(
     if (status === 'completed') {
       const acceptedMessages = await listNonTerminalAcceptedMessages(storage, wrapperRunId);
       if (acceptedMessages.length === 0) {
-        await clearWrapperRuntimeIdentity(storage, {
-          wrapperGeneration: state.wrapperGeneration,
-          wrapperConnectionId: state.wrapperConnectionId,
-        });
+        await retainPhysicalWrapperWarm(Date.now());
         await clearInterruptRequest();
       }
     } else {
@@ -791,6 +986,7 @@ export function createWrapperSupervisor(
   }
 
   async function runMaintenance(now: number): Promise<void> {
+    await reconcilePhysicalCleanup(now);
     await checkDisconnectGrace(now);
     await checkWrapperLiveness(now);
     await checkIdleReconciliation(now);
@@ -799,6 +995,10 @@ export function createWrapperSupervisor(
 
   async function nextMaintenanceDeadlines(): Promise<number[]> {
     const deadlines: number[] = [];
+    const physicalDeadline = nextWrapperLeaseDeadline(await getWrapperLease(storage));
+    if (physicalDeadline !== undefined) {
+      deadlines.push(physicalDeadline);
+    }
     const livenessDeadline = await getNextWrapperLivenessDeadline();
     if (livenessDeadline !== undefined) {
       deadlines.push(livenessDeadline);
@@ -829,6 +1029,7 @@ export function createWrapperSupervisor(
     observeRootIdle,
     onDisconnected,
     onTerminalEvent,
+    requestPhysicalWrapperStop,
     clearDisconnectGrace,
     runMaintenance,
     nextMaintenanceDeadlines,

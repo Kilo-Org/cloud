@@ -150,7 +150,7 @@ export function apiKindNotSupportedResponse(
   supportedApiKinds: ReadonlyArray<GatewayChatApiKind>
 ) {
   const error = `This model does not support the ${apiKind} API, please use any of: ${supportedApiKinds.join()}`;
-  console.warn(`[apiKindNotSupportedResponse] ${error}`);
+  warnExceptInTest(`[apiKindNotSupportedResponse] ${error}`);
   return NextResponse.json(
     { error, error_type: ProxyErrorType.api_kind_not_supported, message: error },
     { status: 400 }

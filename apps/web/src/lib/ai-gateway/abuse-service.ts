@@ -240,6 +240,7 @@ export type RulesEngineActionDecision = {
 };
 
 export function sleepForRulesEngineAction(ms: number): Promise<void> {
+  console.warn(`SECURITY: Abuse delay of ${ms} ms applied`);
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 

@@ -99,33 +99,35 @@ export async function processSecurityFindingDismissal(params: {
     }
   }
 
-  await params.db
-    .update(security_findings)
-    .set({
-      status: 'ignored',
-      ignored_reason: params.message.reason,
-      ignored_by: params.message.actor.email ?? params.message.actor.id,
-      updated_at: sql`now()`,
-    })
-    .where(eq(security_findings.id, finding.id));
+  await params.db.transaction(async tx => {
+    await tx
+      .update(security_findings)
+      .set({
+        status: 'ignored',
+        ignored_reason: params.message.reason,
+        ignored_by: params.message.actor.email ?? params.message.actor.id,
+        updated_at: sql`now()`,
+      })
+      .where(eq(security_findings.id, finding.id));
 
-  await params.db.insert(security_audit_log).values({
-    owned_by_organization_id: params.message.owner.organizationId ?? null,
-    owned_by_user_id: params.message.owner.userId ?? null,
-    actor_id: params.message.actor.id,
-    actor_email: params.message.actor.email ?? null,
-    actor_name: params.message.actor.name ?? null,
-    action: SecurityAuditLogAction.FindingDismissed,
-    resource_type: 'security_finding',
-    resource_id: finding.id,
-    before_state: { status: finding.status },
-    after_state: { status: 'ignored', ignoredReason: params.message.reason },
-    metadata: {
-      source: finding.source,
-      runId: params.message.runId,
-      messageId: params.message.messageId,
-      trigger: 'worker_queue',
-    },
+    await tx.insert(security_audit_log).values({
+      owned_by_organization_id: params.message.owner.organizationId ?? null,
+      owned_by_user_id: params.message.owner.userId ?? null,
+      actor_id: params.message.actor.id,
+      actor_email: params.message.actor.email ?? null,
+      actor_name: params.message.actor.name ?? null,
+      action: SecurityAuditLogAction.FindingDismissed,
+      resource_type: 'security_finding',
+      resource_id: finding.id,
+      before_state: { status: finding.status },
+      after_state: { status: 'ignored', ignoredReason: params.message.reason },
+      metadata: {
+        source: finding.source,
+        runId: params.message.runId,
+        messageId: params.message.messageId,
+        trigger: 'worker_queue',
+      },
+    });
   });
 
   return { dismissed: true, findingSource: finding.source };

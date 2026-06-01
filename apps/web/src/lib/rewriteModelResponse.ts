@@ -89,7 +89,8 @@ export async function rewriteFreeModelResponse_ChatCompletions(response: Respons
             rewriteUsage(json.usage);
           }
 
-          controller.enqueue('data: ' + JSON.stringify(json) + '\n\n');
+          const eventLine = event.event ? 'event: ' + event.event + '\n' : '';
+          controller.enqueue(eventLine + 'data: ' + JSON.stringify(json) + '\n\n');
         },
         onComment() {
           controller.enqueue(': KILO PROCESSING\n\n');
@@ -100,6 +101,9 @@ export async function rewriteFreeModelResponse_ChatCompletions(response: Respons
       while (true) {
         const { done, value } = await reader.read();
         if (done) {
+          // Flush any event left buffered when the stream ends without a
+          // trailing blank line, so its data isn't silently dropped.
+          parser.reset({ consume: true });
           if (doneReceived) {
             controller.enqueue('data: [DONE]\n\n');
           }
@@ -220,6 +224,9 @@ export async function rewriteFreeModelResponse_Messages(response: Response, mode
       while (true) {
         const { done, value } = await reader.read();
         if (done) {
+          // Flush any event left buffered when the stream ends without a
+          // trailing blank line, so its data isn't silently dropped.
+          parser.reset({ consume: true });
           controller.close();
           break;
         }
@@ -295,7 +302,8 @@ export async function rewriteFreeModelResponse_Responses(response: Response, mod
               rewriteUsage(json.response.usage);
             }
           }
-          controller.enqueue('data: ' + JSON.stringify(json) + '\n\n');
+          const eventLine = event.event ? 'event: ' + event.event + '\n' : '';
+          controller.enqueue(eventLine + 'data: ' + JSON.stringify(json) + '\n\n');
         },
         onComment() {
           controller.enqueue(': KILO PROCESSING\n\n');
@@ -306,6 +314,9 @@ export async function rewriteFreeModelResponse_Responses(response: Response, mod
       while (true) {
         const { done, value } = await reader.read();
         if (done) {
+          // Flush any event left buffered when the stream ends without a
+          // trailing blank line, so its data isn't silently dropped.
+          parser.reset({ consume: true });
           if (doneReceived) {
             controller.enqueue('data: [DONE]\n\n');
           }

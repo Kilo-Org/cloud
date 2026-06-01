@@ -1,12 +1,13 @@
 import * as Haptics from 'expo-haptics';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { Check, Search } from 'lucide-react-native';
+import { AlertTriangle, Check, Search } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, TextInput, View } from 'react-native';
 
 import { Text } from '@/components/ui/text';
 import {
   FREE_MODEL_DATA_LABEL,
+  FREE_MODEL_FREE_LABEL,
   getFreeModelDataAccessibilityLabel,
   isFreeModelOption,
 } from '@/lib/free-model-data-disclosure';
@@ -239,20 +240,20 @@ export default function ModelPickerScreen() {
                   <Text className="text-base text-foreground">{modelOption.name}</Text>
                   <Text className="text-xs text-muted-foreground">{modelOption.id}</Text>
                   {collectsData ? (
-                    <View
-                      className="mt-1 self-start rounded-full border px-2 py-0.5"
-                      style={{
-                        borderColor: colors.warn,
-                        backgroundColor: `${colors.warn}1A`,
-                      }}
-                    >
-                      <Text
-                        className="text-[11px] font-medium"
-                        style={{ color: colors.warn }}
-                        numberOfLines={1}
+                    <View className="mt-1 flex-row items-center gap-1 self-start">
+                      <View
+                        className="rounded-full px-2 py-0.5"
+                        style={{ backgroundColor: colors.good }}
                       >
-                        {FREE_MODEL_DATA_LABEL}
-                      </Text>
+                        <Text className="text-[11px] font-medium text-white" numberOfLines={1}>
+                          {FREE_MODEL_FREE_LABEL}
+                        </Text>
+                      </View>
+                      <AlertTriangle
+                        accessibilityLabel={FREE_MODEL_DATA_LABEL}
+                        size={13}
+                        color={colors.warn}
+                      />
                     </View>
                   ) : null}
                 </View>

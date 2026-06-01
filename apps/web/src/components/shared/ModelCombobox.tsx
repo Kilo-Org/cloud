@@ -20,6 +20,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { formatShortModelDisplayName } from '@/lib/format-model-name';
 import {
   FREE_MODEL_DATA_LABEL,
+  FREE_MODEL_FREE_LABEL,
   getFreeModelDataTooltip,
   isFreeModelOption,
 } from '@/components/shared/free-model-data-disclosure';
@@ -455,19 +456,23 @@ function FreeModelDataIcon() {
 
 function FreeModelDataBadge() {
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <span
-          aria-label={FREE_MODEL_DATA_LABEL}
-          className="inline-flex max-w-36 shrink-0 items-center gap-1 rounded-full border border-yellow-500/30 bg-yellow-500/10 px-1.5 py-0.5 text-[10px] font-medium text-yellow-600 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none dark:text-yellow-300"
-          role="status"
-          tabIndex={0}
-        >
-          <AlertTriangle className="h-3 w-3 shrink-0" />
-          <span className="truncate">{FREE_MODEL_DATA_LABEL}</span>
-        </span>
-      </TooltipTrigger>
-      <TooltipContent>{getFreeModelDataTooltip()}</TooltipContent>
-    </Tooltip>
+    <span className="inline-flex shrink-0 items-center gap-1">
+      <span className="inline-flex shrink-0 items-center rounded-full bg-green-500 px-1.5 py-0.5 text-[10px] font-medium text-white">
+        {FREE_MODEL_FREE_LABEL}
+      </span>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span
+            aria-label={FREE_MODEL_DATA_LABEL}
+            className="inline-flex shrink-0 items-center rounded-sm text-yellow-500 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+            role="img"
+            tabIndex={0}
+          >
+            <AlertTriangle className="h-3 w-3" />
+          </span>
+        </TooltipTrigger>
+        <TooltipContent>{getFreeModelDataTooltip()}</TooltipContent>
+      </Tooltip>
+    </span>
   );
 }

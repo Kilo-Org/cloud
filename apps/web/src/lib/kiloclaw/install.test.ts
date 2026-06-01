@@ -3,7 +3,6 @@ import crypto from 'node:crypto';
 // Generate a real Ed25519 keypair once for the whole test file. Tests sign
 // fixtures with the private half and pin the public half via env var.
 const { privateKey, publicKey } = crypto.generateKeyPairSync('ed25519');
-const PRIVATE_PEM = privateKey.export({ type: 'pkcs8', format: 'pem' }) as string;
 const PUBLIC_PEM = publicKey.export({ type: 'spki', format: 'pem' }) as string;
 
 // Derive the matching kid the way the signer / verifier do.
@@ -98,6 +97,18 @@ describe('fetchInstallPayload', () => {
     await expect(fetchInstallPayload('byte', 'deep-research')).rejects.toThrow(/500/);
   });
 
+  it('rejects (does not follow) a redirect from the upstream origin (SSRF)', async () => {
+    // With `redirect: 'error'`, the platform fetch rejects rather than
+    // following a 3xx — so a compromised/abused trusted origin can't bounce
+    // the fetch to an attacker host. Simulate that rejection.
+    jest
+      .spyOn(global, 'fetch')
+      .mockRejectedValue(new TypeError('fetch failed: redirect mode is set to error'));
+    await expect(fetchInstallPayload('byte', 'deep-research')).rejects.toThrow(
+      /redirects are not followed/
+    );
+  });
+
   it('rejects payload signed by a different key (kid mismatch)', async () => {
     const { privateKey: foreignPriv, publicKey: foreignPub } =
       crypto.generateKeyPairSync('ed25519');
@@ -173,9 +184,17 @@ describe('fetchInstallPayload', () => {
     expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('in the future'));
   });
 
-  it('rejects an unsigned payload via Zod parse', async () => {
+  it('returns null and logs on an unsigned (Zod-invalid) payload', async () => {
+    // Treat schema-mismatched upstream responses as "unavailable" rather
+    // than throwing — matches the "byte not found" UX so the page can
+    // hand a single notFound() to the user.
     jest.spyOn(global, 'fetch').mockResolvedValue(jsonResponse(VALID_BASE));
-    await expect(fetchInstallPayload('byte', 'deep-research')).rejects.toThrow();
+    const errSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    const result = await fetchInstallPayload('byte', 'deep-research');
+
+    expect(result).toBeNull();
+    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('invalid upstream payload'));
   });
 
   it('rejects when signed payload.slug does not match the requested slug', async () => {

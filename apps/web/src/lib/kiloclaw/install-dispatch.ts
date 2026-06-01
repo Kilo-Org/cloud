@@ -122,13 +122,19 @@ export async function dispatchInstallFromSource(
   }
 
   const dispatchedAt = new Date().toISOString();
+  // Correlation.reason is capped at 200 chars in the shared schema. Install
+  // slugs are accepted up to 200, so `clawbyte:${slug}` can exceed 200 and
+  // get rejected as invalid_request. Truncate the audit field rather than
+  // bouncing an otherwise-valid install; the slug also appears verbatim in
+  // the install_dispatched log line below.
+  const reason = `clawbyte:${slug}`.slice(0, 200);
   const result = await deps.postMessageAsUser({
     userId,
     sandboxId: runtimeSandboxId,
     message: payload.prompt,
     source: 'install',
     autoCreateConversation: true,
-    correlation: { reason: `clawbyte:${slug}` },
+    correlation: { reason },
   });
 
   if (result.ok) {

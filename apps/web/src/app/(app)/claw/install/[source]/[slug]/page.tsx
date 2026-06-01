@@ -1,73 +1,60 @@
-import { cookies } from 'next/headers';
 import { notFound, redirect } from 'next/navigation';
 import { TRPCError } from '@trpc/server';
 import { getUserFromAuthOrRedirect } from '@/lib/user/server';
 import { requireKiloClawAccess } from '@/lib/kiloclaw/access-gate';
-import { dispatchInstallFromSource } from '@/lib/kiloclaw/install-dispatch';
-import { isInstallSource } from '@/lib/kiloclaw/install-sources';
+import { fetchInstallPayload } from '@/lib/kiloclaw/install';
+import { INSTALL_SOURCES, isInstallSource } from '@/lib/kiloclaw/install-sources';
+import { InstallClient } from './InstallClient';
 
 type InstallPageProps = {
   params: Promise<{ source: string; slug: string }>;
 };
 
 /**
- * One-click install for a signed source payload (ClawByte today, more
- * sources later). The user clicks "Try in KiloClaw" on kilo.ai, lands
- * here, and the server dispatches the byte's prompt into their kiloclaw
- * chat as a user-turn before redirecting to /claw/chat.
+ * One-click install preview for a signed source payload (ClawByte today,
+ * more sources later). Rendered as a Server Component — loading this page
+ * does NO install work. The actual chat dispatch happens only on an explicit
+ * Install click in `InstallClient`, which fires the `installFromSource` POST
+ * mutation. That split is load-bearing: a GET must never dispatch, or a
+ * third-party page could pop a prompt into a user's chat just by getting
+ * them to load the URL (CSRF / lure-a-click).
  *
- * No client component, no button, no second click — the install URL IS
- * the click. If we ever want a "review the prompt before running it"
- * gate, that lands on the chat/agent side later, not here.
+ * Gating, in order:
+ * 1. Auth — the parent claw layout (`getUserFromAuthOrRedirect`) bounces
+ *    unauth users to sign-in; `callbackPath` preserves this pathname so they
+ *    return here after signing in. We call it again to get the user id.
+ * 2. Active paid access — fetching + verifying the signed byte is paid-user
+ *    compute (outbound HTTP + Ed25519 verify). A logged-in user without an
+ *    active subscription/trial must NOT be able to trigger it, so we gate
+ *    before the fetch and route no-access users into the subscribe/provision
+ *    funnel (`/claw/new`) instead of pulling the byte.
+ * 3. Payload fetch + verify — only after the access gate passes.
  *
- * Auth + access:
- * - Parent claw layout's getUserFromAuthOrRedirect bounces unauth users
- *   to sign-in (pathname preserved by callbackPath, so they return
- *   here after signing in).
- * - requireKiloClawAccess throws TRPCError FORBIDDEN if the user has no
- *   active KiloClaw subscription/trial.
- *
- * Outcomes:
- * - Verified payload + active instance → as-user dispatch + redirect to
- *   /claw/chat.
- * - Verified payload + no instance yet → set pending_install cookie,
- *   redirect to /claw/new so provisioning can run; the chat page
- *   consumes the cookie once chat is ready.
- * - Unknown source / unsigned byte / failed verification / slug mismatch
- *   → notFound() (404). All cases logged in detail by the fetcher.
+ * Unknown source / unsigned byte / failed verification / slug mismatch →
+ * `notFound()` (404). All cases logged in detail by `fetchInstallPayload`.
  */
 export default async function InstallPage({ params }: InstallPageProps) {
   const { source, slug } = await params;
   if (!isInstallSource(source)) notFound();
 
   const user = await getUserFromAuthOrRedirect();
-  await requireKiloClawAccess(user.id);
 
-  let result: Awaited<ReturnType<typeof dispatchInstallFromSource>>;
   try {
-    result = await dispatchInstallFromSource({ userId: user.id, source, slug });
+    await requireKiloClawAccess(user.id);
   } catch (err) {
-    if (err instanceof TRPCError && err.code === 'NOT_FOUND') notFound();
-    // Let everything else bubble to Next.js's error boundary so we don't
-    // mask a real misconfiguration as a missing byte.
+    // No active subscription/trial → don't pull the byte. Send them into the
+    // provisioning/subscribe flow. (Preserving the install intent across that
+    // flow lands with the `pending_install` cookie consumer slice.)
+    if (err instanceof TRPCError && err.code === 'FORBIDDEN') {
+      redirect('/claw/new');
+    }
     throw err;
   }
 
-  if (result.ok) {
-    redirect('/claw/chat');
-  }
+  const payload = await fetchInstallPayload(source, slug);
+  if (!payload) notFound();
 
-  // result.ok === false, code === 'no_instance' — the user is entitled to
-  // install but hasn't provisioned a kiloclaw yet (or the runtime sandbox
-  // isn't reporting yet). Stash the install intent in a cookie and send
-  // them through provisioning; the chat page picks it up afterwards.
-  const cookieStore = await cookies();
-  cookieStore.set('pending_install', JSON.stringify({ source, slug }), {
-    path: '/claw',
-    sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
-    maxAge: 60 * 60, // 1h — generous enough for provisioning, short
-    // enough that a stale cookie isn't redispatched days later.
-  });
-  redirect('/claw/new');
+  return (
+    <InstallClient source={source} sourceLabel={INSTALL_SOURCES[source].label} payload={payload} />
+  );
 }

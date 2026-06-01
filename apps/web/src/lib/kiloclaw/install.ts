@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import { z } from 'zod';
+import { MESSAGE_TEXT_MAX_CHARS } from '@kilocode/kilo-chat';
 import { INSTALL_SOURCES, type InstallSource } from './install-sources';
 
 /**
@@ -30,7 +31,10 @@ const installPayloadSchema = z.object({
   slug: z.string().min(1).max(200),
   title: z.string().max(500),
   description: z.string().max(2000),
-  prompt: z.string().min(1).max(32000),
+  // Cap matches `MESSAGE_TEXT_MAX_CHARS` in @kilocode/kilo-chat so a valid
+  // signed payload can't pass install verification only to fail downstream
+  // as `invalid_request` when kilo-chat enforces its per-text-block limit.
+  prompt: z.string().min(1).max(MESSAGE_TEXT_MAX_CHARS),
   tagline: z.string().max(500).optional(),
   category: z.string().max(100).optional(),
   tags: z.array(z.string().max(100)).max(50).optional(),
@@ -166,7 +170,20 @@ export async function fetchInstallPayload(
   slug: string
 ): Promise<InstallPayload | null> {
   const url = INSTALL_SOURCES[source].urlTemplate.replace('{slug}', encodeURIComponent(slug));
-  const res = await fetch(url, { next: { revalidate: 300 } });
+  // `redirect: 'error'` is SSRF defense-in-depth: the host comes from the
+  // registry (not user input) and the slug is encoded into a single path
+  // segment, so a request can't target an off-registry origin directly. The
+  // one residual path would be the trusted origin itself answering 3xx →
+  // attacker host; refusing to follow redirects closes that before the
+  // signature check even runs. A redirect now rejects (caught below).
+  let res: Response;
+  try {
+    res = await fetch(url, { next: { revalidate: 300 }, redirect: 'error' });
+  } catch (err) {
+    throw new Error(
+      `fetchInstallPayload(${source}, ${slug}): request failed (redirects are not followed): ${err instanceof Error ? err.message : String(err)}`
+    );
+  }
 
   if (res.status === 404) return null;
   if (!res.ok) {
@@ -202,7 +219,18 @@ export async function fetchInstallPayload(
       `fetchInstallPayload(${source}, ${slug}): upstream returned invalid JSON: ${err instanceof Error ? err.message : String(err)}`
     );
   }
-  const payload = installPayloadSchema.parse(json);
+  // safeParse rather than parse: an unsigned, malformed, or
+  // rollout-mismatched upstream payload must not throw a 500 — collapse
+  // it into the same null-return path as "not found" so the page surfaces
+  // a controlled `notFound()`.
+  const parsed = installPayloadSchema.safeParse(json);
+  if (!parsed.success) {
+    console.error(
+      `[install] invalid upstream payload for ${source}/${slug}: ${parsed.error.message}`
+    );
+    return null;
+  }
+  const payload = parsed.data;
 
   const verify = verifySignedPayload(payload);
   if (!verify.ok) {

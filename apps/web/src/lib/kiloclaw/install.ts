@@ -138,7 +138,13 @@ function verifySignedPayload(payload: InstallPayload): VerifyOk | VerifyErr {
  * Returns null on overflow (caller logs and rejects).
  */
 async function readBoundedText(res: Response, maxBytes: number): Promise<string | null> {
-  if (!res.body) return await res.text();
+  if (!res.body) {
+    // No streamable body (some Response shims / edge stubs). Still enforce the
+    // cap: buffer the whole body, then reject if it overflows.
+    const buf = await res.arrayBuffer();
+    if (buf.byteLength > maxBytes) return null;
+    return new TextDecoder('utf-8').decode(buf);
+  }
   const reader = res.body.getReader();
   const chunks: Uint8Array[] = [];
   let total = 0;

@@ -91,7 +91,6 @@ describe('dispatchInstallFromSource', () => {
       sandboxId: RUNTIME_SANDBOX_ID, // NOT the registry row's sandboxId
       message: 'Research [topic] for me.',
       source: 'install',
-      autoCreateConversation: true,
       forceNewConversation: true, // each install gets its own conversation
       correlation: { reason: 'clawbyte:deep-research' },
     });

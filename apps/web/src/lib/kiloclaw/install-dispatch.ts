@@ -149,9 +149,9 @@ export async function dispatchInstallFromSource(
     sandboxId: runtimeSandboxId,
     message: payload.prompt,
     source: 'install',
-    autoCreateConversation: true,
     // Each install gets its own dedicated conversation rather than appending
-    // to whatever the user last chatted in.
+    // to whatever the user last chatted in. (`forceNewConversation` already
+    // implies creation, so `autoCreateConversation` is omitted as redundant.)
     forceNewConversation: true,
     correlation: { reason },
   });

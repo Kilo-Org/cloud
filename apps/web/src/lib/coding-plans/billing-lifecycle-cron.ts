@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { addDays, addHours } from 'date-fns';
-import { and, eq, inArray, lte, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, lte, sql } from 'drizzle-orm';
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 
 import { maybePerformAutoTopUp } from '@/lib/autoTopUp';
@@ -20,6 +20,7 @@ import type * as schema from '@kilocode/db/schema';
 
 const logInfo = sentryLogger('coding-plans-billing-cron', 'info');
 const logError = sentryLogger('coding-plans-billing-cron', 'error');
+const BILLING_LIFECYCLE_SWEEP_LIMIT = 1_000;
 
 export type CodingPlanCronSummary = {
   renewals: number;
@@ -111,7 +112,9 @@ async function sweepCancelAtPeriodEnd(
         eq(coding_plan_subscriptions.cancel_at_period_end, true),
         lte(coding_plan_subscriptions.current_period_end, nowIso)
       )
-    );
+    )
+    .orderBy(asc(coding_plan_subscriptions.current_period_end), asc(coding_plan_subscriptions.id))
+    .limit(BILLING_LIFECYCLE_SWEEP_LIMIT);
 
   for (const row of rows) {
     try {
@@ -196,7 +199,9 @@ async function sweepRenewals(
         eq(coding_plan_subscriptions.cancel_at_period_end, false),
         lte(coding_plan_subscriptions.credit_renewal_at, nowIso)
       )
-    );
+    )
+    .orderBy(asc(coding_plan_subscriptions.credit_renewal_at), asc(coding_plan_subscriptions.id))
+    .limit(BILLING_LIFECYCLE_SWEEP_LIMIT);
 
   for (const selectedRow of rows) {
     const row: RenewalRow = {
@@ -260,6 +265,9 @@ async function processRenewal(
   selectedRow: RenewalRow,
   nowIso: string
 ): Promise<RenewalResult> {
+  // Renewal processing has one durable outcome per due term, guarded by row locks
+  // and an idempotency key: charge and extend, start a single auto-top-up grace
+  // window, wait for in-flight grace recovery, or terminate and queue revocation.
   return database.transaction(async tx => {
     await tx.execute(
       sql`SELECT id FROM coding_plan_subscriptions WHERE id = ${selectedRow.id} FOR UPDATE`

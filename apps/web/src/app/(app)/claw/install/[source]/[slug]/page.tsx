@@ -42,9 +42,10 @@ export default async function InstallPage({ params }: InstallPageProps) {
   try {
     await requireKiloClawAccess(user.id);
   } catch (err) {
-    // No active subscription/trial → don't pull the byte. Send them into the
-    // provisioning/subscribe flow. (Preserving the install intent across that
-    // flow lands with the `pending_install` cookie consumer slice.)
+    // No active subscription/trial → don't pull the byte. Send them to the
+    // subscribe/provision flow (which presents the marketing/sign-up page).
+    // We intentionally don't persist install intent across that flow; the user
+    // installs again from the byte page once they're set up.
     if (err instanceof TRPCError && err.code === 'FORBIDDEN') {
       redirect('/claw/new');
     }

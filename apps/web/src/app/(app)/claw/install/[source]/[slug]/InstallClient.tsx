@@ -44,11 +44,10 @@ export function InstallClient({ source, sourceLabel, payload }: InstallClientPro
         router.push('/claw/chat');
         return;
       }
-      // No active instance yet — remember the install intent and route through
-      // provisioning. The chat page consumes `pending_install` once the
-      // instance is ready (separate slice). Cookie is intentionally not
-      // httpOnly so the client-side consumer can read + clear it.
-      setPendingInstallCookie(source, payload.slug);
+      // No active instance yet — send them to set one up. We intentionally do
+      // NOT persist the install intent across the (long, multi-step) onboarding
+      // flow; the user finishes setup, then installs again from the byte page.
+      // Re-running the install link is cheap and predictable.
       router.push('/claw/new');
     } catch (err) {
       const message =
@@ -75,14 +74,4 @@ export function InstallClient({ source, sourceLabel, payload }: InstallClientPro
       </Link>
     </div>
   );
-}
-
-/**
- * Short-lived intent cookie read by the chat page after provisioning. Mirrors
- * the attributes the old route handler used (path=/claw, SameSite=Lax, 1h).
- */
-function setPendingInstallCookie(source: string, slug: string) {
-  const value = encodeURIComponent(JSON.stringify({ source, slug }));
-  const secure = window.location.protocol === 'https:' ? '; secure' : '';
-  document.cookie = `pending_install=${value}; path=/claw; max-age=3600; samesite=lax${secure}`;
 }

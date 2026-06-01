@@ -20,9 +20,9 @@ import { postMessageAsUser } from './kilo-chat-internal-client';
  * - `{ ok: true, ... }` — payload verified, message dispatched to the user's
  *   kiloclaw chat as their own user-turn. Client redirects to `/claw/chat`.
  * - `{ ok: false, code: 'no_instance' }` — caller has no active kiloclaw
- *   instance yet. Client should drop a `pending_install` cookie and
- *   redirect to `/claw/new`; the chat page consumes the cookie after
- *   provisioning completes.
+ *   instance yet. Client redirects to `/claw/new` to provision; the install
+ *   intent is not persisted across that flow (the user re-installs from the
+ *   byte page once set up).
  *
  * Other failure modes throw a `TRPCError`:
  * - `NOT_FOUND` — byte missing upstream, signature failed, slug mismatch,
@@ -104,9 +104,8 @@ export async function dispatchInstallFromSource(
   const instance = await deps.getActiveInstance(userId);
   if (!instance) {
     // Don't dispatch yet — the user has no instance to deliver into. The
-    // client surfaces this as the "drop pending_install cookie + redirect
-    // to /claw/new" flow. Provisioning happens off the cookie; on chat-
-    // page load, the cookie triggers a re-call of this mutation.
+    // client redirects them to `/claw/new` to provision; they re-install
+    // from the byte page afterward (intent is intentionally not persisted).
     return { ok: false, code: 'no_instance' };
   }
 

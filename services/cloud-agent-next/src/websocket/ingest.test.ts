@@ -932,6 +932,40 @@ describe('createIngestHandler', () => {
       );
     });
 
+    it('terminalizes on wrapper cloud.message.completed control event', async () => {
+      const state = createFakeState();
+      const doContext = createNewPathDOContext();
+      const eventQueries = createFakeEventQueries();
+      const broadcast = vi.fn();
+      const handler = createIngestHandler(state, eventQueries, SESSION_ID, broadcast, doContext);
+
+      const ws = createFakeWebSocket(makeNewPathAttachment());
+
+      const message = JSON.stringify({
+        streamEventType: 'cloud.message.completed',
+        data: {
+          messageId: 'msg_compact',
+          completionSource: 'manual_compact_summarize',
+        },
+        timestamp: new Date().toISOString(),
+      });
+
+      await handler.handleIngestMessage(ws, message);
+
+      expect(doContext.terminalizeSessionMessageOnce).toHaveBeenCalledWith(
+        'msg_compact',
+        {
+          kind: 'completed',
+          assistantMessageId: undefined,
+          completionSource: 'manual_compact_summarize',
+        },
+        WRAPPER_RUN_ID
+      );
+      expect(eventQueries.insert).not.toHaveBeenCalled();
+      expect(eventQueries.upsert).not.toHaveBeenCalled();
+      expect(broadcast).not.toHaveBeenCalled();
+    });
+
     it('terminalizes as failed on assistant message.updated with error', async () => {
       const state = createFakeState();
       const doContext = createNewPathDOContext();

@@ -1482,6 +1482,11 @@ export class SessionService {
         command: turn.command,
         ...(turn.arguments.length > 0 ? { args: turn.arguments } : {}),
         messageId: turn.messageId,
+        agent: {
+          mode: promptAgent,
+          model: { modelID: agent.model },
+          ...(agent.variant ? { variant: agent.variant } : {}),
+        },
         ...(finalization?.autoCommit !== undefined ? { autoCommit: finalization.autoCommit } : {}),
         ...(finalization?.condenseOnComplete !== undefined
           ? { condenseOnComplete: finalization.condenseOnComplete }

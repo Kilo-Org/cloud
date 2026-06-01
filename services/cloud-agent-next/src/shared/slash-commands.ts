@@ -6,6 +6,14 @@ import {
 
 export { DEFAULT_SLASH_COMMANDS, DEFAULT_SLASH_COMMANDS_SOURCE, type SlashCommandInfo };
 
+const SESSION_SLASH_COMMANDS = [
+  {
+    name: 'compact',
+    description: 'compact the current session context',
+    hints: [],
+  },
+] satisfies SlashCommandInfo[];
+
 /** Parsed result of "/name rest of the line" from the chat composer. */
 export type SlashCommandInvocation = {
   command: string;
@@ -55,10 +63,19 @@ export function toSlashCommandInfo(raw: unknown): SlashCommandInfo | null {
  * Return the provided command list when it is non-empty, otherwise fall back
  * to the hardcoded default catalog. Used both server-side (DO storage) and
  * client-side (hook) so empty always means "defaults" rather than "none yet".
+ * Session actions such as compaction are local Kilo actions rather than
+ * registered prompt commands, so append them when the live catalog omits them.
  */
 export function commandsOrDefault(
   commands: SlashCommandInfo[] | null | undefined
 ): SlashCommandInfo[] {
-  if (commands && commands.length > 0) return commands;
-  return DEFAULT_SLASH_COMMANDS;
+  return withSessionSlashCommands(
+    commands && commands.length > 0 ? commands : DEFAULT_SLASH_COMMANDS
+  );
+}
+
+function withSessionSlashCommands(commands: SlashCommandInfo[]): SlashCommandInfo[] {
+  const names = new Set(commands.map(command => command.name));
+  const missing = SESSION_SLASH_COMMANDS.filter(command => !names.has(command.name));
+  return missing.length > 0 ? [...commands, ...missing] : commands;
 }

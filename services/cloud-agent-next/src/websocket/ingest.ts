@@ -60,6 +60,12 @@ const errorEventSchema = z.object({
   message: z.string().optional(),
 });
 
+const cloudMessageCompletedEventSchema = z.object({
+  messageId: z.string(),
+  assistantMessageId: z.string().optional(),
+  completionSource: z.string().optional(),
+});
+
 const wrapperGenerationParamSchema = z.coerce.number().int().nonnegative();
 
 function getAssistantErrorMessage(error: unknown): string | undefined {
@@ -478,6 +484,31 @@ export function createIngestHandler(
               now
             );
           }
+        }
+
+        if (eventType === 'cloud.message.completed') {
+          const parsedCloudMessageCompleted = cloudMessageCompletedEventSchema.safeParse(
+            ingestEvent.data
+          );
+          if (!parsedCloudMessageCompleted.success) {
+            console.warn(
+              'Invalid cloud.message.completed event payload',
+              parsedCloudMessageCompleted.error
+            );
+            return;
+          }
+
+          await doContext.terminalizeSessionMessageOnce?.(
+            parsedCloudMessageCompleted.data.messageId,
+            {
+              kind: 'completed',
+              assistantMessageId: parsedCloudMessageCompleted.data.assistantMessageId,
+              completionSource:
+                parsedCloudMessageCompleted.data.completionSource ?? 'wrapper_completion_event',
+            },
+            wrapperRunId
+          );
+          return;
         }
 
         let eventId: number;

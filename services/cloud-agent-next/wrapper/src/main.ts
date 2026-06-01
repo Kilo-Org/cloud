@@ -191,6 +191,7 @@ async function main() {
     closeConnection: () => connectionManager?.close() ?? Promise.resolve(),
     setAborted: () => lifecycleManager?.setAborted(),
     resetLifecycle: () => lifecycleManager?.reset(),
+    onMessageComplete: (messageId: string) => lifecycleManager?.onMessageComplete(messageId),
     readySession: readySession,
     materializePromptAttachments,
   };

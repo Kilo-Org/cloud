@@ -94,21 +94,34 @@ describe('toSlashCommandInfo', () => {
 });
 
 describe('commandsOrDefault', () => {
-  it('returns the provided list when non-empty', () => {
+  it('returns live commands with session actions when non-empty', () => {
     const live = [{ name: 'live', hints: [] }];
+    expect(commandsOrDefault(live)).toEqual([
+      { name: 'live', hints: [] },
+      { name: 'compact', description: 'compact the current session context', hints: [] },
+    ]);
+  });
+
+  it('does not duplicate live session actions', () => {
+    const live = [{ name: 'compact', description: 'live compact', hints: [] }];
     expect(commandsOrDefault(live)).toBe(live);
   });
 
   it('returns defaults for undefined', () => {
-    expect(commandsOrDefault(undefined)).toEqual(DEFAULT_SLASH_COMMANDS);
+    expect(commandsOrDefault(undefined)).toEqual(
+      expect.arrayContaining([
+        ...DEFAULT_SLASH_COMMANDS,
+        { name: 'compact', description: 'compact the current session context', hints: [] },
+      ])
+    );
   });
 
   it('returns defaults for null', () => {
-    expect(commandsOrDefault(null)).toEqual(DEFAULT_SLASH_COMMANDS);
+    expect(commandsOrDefault(null)).toEqual(commandsOrDefault(undefined));
   });
 
   it('returns defaults for empty array', () => {
-    expect(commandsOrDefault([])).toEqual(DEFAULT_SLASH_COMMANDS);
+    expect(commandsOrDefault([])).toEqual(commandsOrDefault(undefined));
   });
 
   it('default commands are non-empty and validate', () => {

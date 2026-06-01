@@ -33,6 +33,8 @@ import type { QuestionInfo } from '@/types/opencode.gen';
 import { splitByContiguousPrefix } from './array-utils';
 import type { UserWebConnection } from './user-web-connection';
 import { generateMessageId } from './message-id';
+import { findLatestContextUsage } from './context-usage';
+import type { ContextUsage } from './context-usage';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -187,6 +189,7 @@ type SessionManagerAtoms = {
   staticMessages: Atom<StoredMessage[]>;
   dynamicMessages: Atom<StoredMessage[]>;
   totalCost: Atom<number>;
+  contextUsage: Atom<ContextUsage | undefined>;
   childMessages: Atom<(childSessionId: string) => StoredMessage[]>;
   childSessionHydrationState: Atom<(childSessionId: string) => ChildSessionHydrationState>;
 };
@@ -368,6 +371,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     for (const m of get(messagesListAtom)) if (m.info.role === 'assistant') t += m.info.cost;
     return t;
   });
+  const contextUsageAtom = atom(get => findLatestContextUsage(get(messagesListAtom)));
   const childMessagesAtom = atom(get => {
     const storage = get(sessionStorageAtom);
     if (!storage) return (): StoredMessage[] => [];
@@ -949,6 +953,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       staticMessages: staticMessagesAtom,
       dynamicMessages: dynamicMessagesAtom,
       totalCost: totalCostAtom,
+      contextUsage: contextUsageAtom,
       childMessages: childMessagesAtom,
       childSessionHydrationState: childSessionHydrationStateAtom,
     },

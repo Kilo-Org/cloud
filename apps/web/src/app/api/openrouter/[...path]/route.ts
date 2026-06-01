@@ -1,7 +1,6 @@
 import { NextResponse, type NextResponse as NextResponseType } from 'next/server';
 import { type NextRequest } from 'next/server';
-import { isOpenCodeBasedClient, stripRequiredPrefix } from '@/lib/utils';
-import { applyTrackingIds } from '@/lib/ai-gateway/providerHash';
+import { stripRequiredPrefix } from '@/lib/utils';
 import { extractPromptInfo } from '@/lib/ai-gateway/extractPromptInfo';
 import { determineFallbackFeature } from '@/lib/ai-gateway/determineFallbackFeature';
 import {
@@ -57,7 +56,6 @@ import {
 } from '@/lib/ai-gateway/llm-proxy-helpers';
 import { ProxyErrorType } from '@/lib/proxy-error-types';
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
-import { repairTools, sanitizeBinaryToolResults } from '@/lib/ai-gateway/tool-calling';
 import { isDataCollectionExplicitlyDisallowed } from '@/lib/ai-gateway/providers/openrouter/types';
 import {
   rewriteFreeModelResponse_ChatCompletions,
@@ -98,11 +96,8 @@ import { isForbiddenFreeModel } from '@/lib/ai-gateway/forbidden-free-models';
 import { isCloudflareIP } from '@/lib/cloudflare-ip';
 import { isKiloAutoModel, KILO_AUTO_FREE_MODEL } from '@/lib/ai-gateway/auto-model';
 import { applyResolvedAutoModel } from '@/lib/ai-gateway/auto-model/resolution';
-import { fixOpenCodeDuplicateReasoning } from '@/lib/ai-gateway/providers/fixOpenCodeDuplicateReasoning';
 import type { MicrodollarUsageContext } from '@/lib/ai-gateway/processUsage.types';
 import {
-  enableReasoningSummaries,
-  fixResponsesRequest,
   getMaxTokens,
   hasMiddleOutTransform,
 } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
@@ -678,29 +673,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     op: 'http.client',
   });
 
-  applyTrackingIds(requestBodyParsed, effectiveProviderContext.provider, user.id, taskId ?? null);
-
-  sanitizeBinaryToolResults(requestBodyParsed);
-
-  if (requestBodyParsed.kind === 'chat_completions') {
-    // Mostly a workaround for bugs in the old extension.
-    repairTools(requestBodyParsed.body);
-
-    if (isOpenCodeBasedClient(fraudHeaders)) {
-      // Workaround for bugs in the chat completions client.
-      fixOpenCodeDuplicateReasoning(effectiveModelIdLowerCased, requestBodyParsed.body, taskId);
-    }
-  }
-
-  if (requestBodyParsed.kind === 'responses') {
-    fixResponsesRequest(requestBodyParsed.body);
-  }
-
-  enableReasoningSummaries(requestBodyParsed);
-
-  const toolsAvailable = getToolsAvailable(requestBodyParsed);
-  const toolsUsed = getToolsUsed(requestBodyParsed);
-
   const extraHeaders: Record<string, string> = {};
   applyProviderSpecificLogic(
     effectiveProviderContext.provider,
@@ -708,8 +680,13 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     requestBodyParsed,
     extraHeaders,
     effectiveProviderContext.userByok,
-    fraudHeaders
+    fraudHeaders,
+    user.id,
+    taskId ?? null
   );
+
+  const toolsAvailable = getToolsAvailable(requestBodyParsed);
+  const toolsUsed = getToolsUsed(requestBodyParsed);
 
   // Capture the bounded prompt for experimented requests AFTER provider
   // transforms have produced the canonical upstream body. Stored on the

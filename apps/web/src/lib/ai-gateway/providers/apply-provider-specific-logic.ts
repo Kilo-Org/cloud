@@ -16,7 +16,14 @@ import { isMinimaxModel } from '@/lib/ai-gateway/providers/minimax';
 import type { BYOKResult, Provider } from '@/lib/ai-gateway/providers/types';
 import { isStepModel } from '@/lib/ai-gateway/providers/stepfun';
 import { isDeepseekModel } from '@/lib/ai-gateway/providers/deepseek';
-import type { FraudDetectionHeaders } from '@/lib/utils';
+import { isOpenCodeBasedClient, type FraudDetectionHeaders } from '@/lib/utils';
+import { applyTrackingIds } from '@/lib/ai-gateway/providerHash';
+import { repairTools, sanitizeBinaryToolResults } from '@/lib/ai-gateway/tool-calling';
+import { fixOpenCodeDuplicateReasoning } from '@/lib/ai-gateway/providers/fixOpenCodeDuplicateReasoning';
+import {
+  enableReasoningSummaries,
+  fixResponsesRequest,
+} from '@/lib/ai-gateway/providers/openrouter/request-helpers';
 
 export function getPreferredProviderOrder(requestedModel: string): string[] {
   if (isClaudeModel(requestedModel)) {
@@ -79,8 +86,30 @@ export function applyProviderSpecificLogic(
   requestToMutate: GatewayRequest,
   extraHeaders: Record<string, string>,
   userByok: BYOKResult[] | null,
-  originalHeaders: FraudDetectionHeaders
+  originalHeaders: FraudDetectionHeaders,
+  userId: string,
+  taskId: string | null
 ) {
+  applyTrackingIds(requestToMutate, provider, userId, taskId);
+
+  sanitizeBinaryToolResults(requestToMutate);
+
+  if (requestToMutate.kind === 'chat_completions') {
+    // Mostly a workaround for bugs in the old extension.
+    repairTools(requestToMutate.body);
+
+    if (isOpenCodeBasedClient(originalHeaders)) {
+      // Workaround for bugs in the chat completions client.
+      fixOpenCodeDuplicateReasoning(requestedModel, requestToMutate.body, taskId ?? undefined);
+    }
+  }
+
+  if (requestToMutate.kind === 'responses') {
+    fixResponsesRequest(requestToMutate.body);
+  }
+
+  enableReasoningSummaries(requestToMutate);
+
   const kiloExclusiveModel = findKiloExclusiveModel(requestedModel);
   if (kiloExclusiveModel) {
     applyKiloExclusiveModelSettings(requestToMutate, kiloExclusiveModel);

@@ -8056,7 +8056,7 @@ describe('applyPinnedVersion', () => {
       isLatest: true,
     });
 
-    await instance.applyPinnedVersion(null, '123e4567-e89b-12d3-a456-426614174000');
+    await instance.applyPinnedVersion(null);
 
     expect(selectImageVersionForInstance).toHaveBeenCalledWith(
       expect.objectContaining({

@@ -4621,7 +4621,7 @@ platform.post('/versions/apply-pin', async c => {
       c.env,
       userId,
       instanceId,
-      stub => stub.applyPinnedVersion(imageTag, instanceId),
+      stub => stub.applyPinnedVersion(imageTag),
       'applyPinnedVersion'
     );
     return c.json({ ok: true, ...applied });

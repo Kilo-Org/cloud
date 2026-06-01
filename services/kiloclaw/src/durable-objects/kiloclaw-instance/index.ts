@@ -1911,10 +1911,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
    * Returns the resolved image metadata so the caller can surface what
    * was actually applied.
    */
-  async applyPinnedVersion(
-    imageTag: string | null,
-    _instanceId?: string
-  ): Promise<{
+  async applyPinnedVersion(imageTag: string | null): Promise<{
     openclawVersion: string | null;
     imageTag: string | null;
     imageDigest: string | null;

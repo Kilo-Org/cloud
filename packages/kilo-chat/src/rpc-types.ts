@@ -45,6 +45,11 @@ export const postMessageAsUserParamsSchema = z.object({
   // Default true. Pass false to fail the call if the user has never opened
   // a chat with this bot.
   autoCreateConversation: z.boolean().optional(),
+  // Default false. When true, always start a NEW conversation instead of
+  // reusing the user's most-recent one. The install flow sets this so each
+  // install lands in its own dedicated chat; webhook-style callers omit it to
+  // keep appending to the ongoing conversation.
+  forceNewConversation: z.boolean().optional(),
   correlation: postMessageAsUserCorrelationSchema.optional(),
 });
 

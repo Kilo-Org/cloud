@@ -133,6 +133,9 @@ export async function dispatchInstallFromSource(
     message: payload.prompt,
     source: 'install',
     autoCreateConversation: true,
+    // Each install gets its own dedicated conversation rather than appending
+    // to whatever the user last chatted in.
+    forceNewConversation: true,
     correlation: { reason },
   });
 

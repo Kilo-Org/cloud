@@ -87,6 +87,7 @@ describe('dispatchInstallFromSource', () => {
       message: 'Research [topic] for me.',
       source: 'install',
       autoCreateConversation: true,
+      forceNewConversation: true, // each install gets its own conversation
       correlation: { reason: 'clawbyte:deep-research' },
     });
 

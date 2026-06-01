@@ -43,6 +43,8 @@ type AnyMock = jest.Mock<(...args: any[]) => any>;
 type KiloClawClientMock = {
   KiloClawInternalClient: AnyMock;
   __getStatusMock: AnyMock;
+  __getLatestVersionMock: AnyMock;
+  __getLatestVersionForInstanceMock: AnyMock;
   __destroyMock: AnyMock;
   __startMock: AnyMock;
 };
@@ -109,11 +111,15 @@ jest.mock('@/lib/config.server', () => {
 
 jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => {
   const getStatusMock = jest.fn();
+  const getLatestVersionMock = jest.fn();
+  const getLatestVersionForInstanceMock = jest.fn();
   const destroyMock = jest.fn();
   const startMock = jest.fn();
   return {
     KiloClawInternalClient: jest.fn().mockImplementation(() => ({
       getStatus: getStatusMock,
+      getLatestVersion: getLatestVersionMock,
+      getLatestVersionForInstance: getLatestVersionForInstanceMock,
       start: startMock,
       destroy: destroyMock,
     })),
@@ -127,6 +133,8 @@ jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => {
       }
     },
     __getStatusMock: getStatusMock,
+    __getLatestVersionMock: getLatestVersionMock,
+    __getLatestVersionForInstanceMock: getLatestVersionForInstanceMock,
     __destroyMock: destroyMock,
     __startMock: startMock,
   };
@@ -142,6 +150,7 @@ jest.mock('@/lib/kiloclaw/install-dispatch', () => {
 
 let createCaller: (ctx: { user: Awaited<ReturnType<typeof insertTestUser>> }) => {
   getStatus: () => Promise<unknown>;
+  latestVersion: (input?: { currentImageTag?: string }) => Promise<unknown>;
   getNavState: () => Promise<{ hasActiveInstance: boolean }>;
   validateWeatherLocation: (input: { location: string }) => Promise<{
     location: string;
@@ -506,6 +515,55 @@ describe('kiloclawRouter getStatus', () => {
       .where(eq(kiloclaw_inbound_email_aliases.instance_id, instanceId));
     expect(rows.find(row => row.alias === alias)?.retired_at).not.toBeNull();
     expect(rows.filter(row => row.retired_at === null)).toHaveLength(1);
+  });
+});
+
+describe('kiloclawRouter latestVersion', () => {
+  beforeEach(async () => {
+    await cleanupDbForTest();
+    kiloclawClientMock.KiloClawInternalClient.mockClear();
+    kiloclawClientMock.__getLatestVersionMock.mockReset();
+    kiloclawClientMock.__getLatestVersionForInstanceMock.mockReset();
+  });
+
+  it('passes the active instance row for server-derived rollout lookup', async () => {
+    kiloclawClientMock.__getLatestVersionForInstanceMock.mockResolvedValue({
+      imageTag: 'candidate-tag',
+    });
+    const user = await insertTestUser({
+      google_user_email: `kiloclaw-latest-version-${crypto.randomUUID()}@example.com`,
+    });
+    const instanceId = crypto.randomUUID();
+    await db.insert(kiloclaw_instances).values({
+      id: instanceId,
+      user_id: user.id,
+      sandbox_id: `ki_${instanceId.replace(/-/g, '')}`,
+    });
+
+    const caller = createCaller({ user });
+    await caller.latestVersion({ currentImageTag: 'current-tag' });
+
+    expect(kiloclawClientMock.__getLatestVersionForInstanceMock).toHaveBeenCalledWith({
+      instanceId,
+      currentImageTag: 'current-tag',
+    });
+    expect(kiloclawClientMock.__getLatestVersionMock).not.toHaveBeenCalled();
+  });
+
+  it('uses anonymous latest version lookup when the user has no active instance', async () => {
+    kiloclawClientMock.__getLatestVersionMock.mockResolvedValue({
+      imageTag: 'anonymous-tag',
+    });
+    const user = await insertTestUser({
+      google_user_email: `kiloclaw-latest-version-${crypto.randomUUID()}@example.com`,
+    });
+
+    const caller = createCaller({ user });
+    const result = await caller.latestVersion({ currentImageTag: 'current-tag' });
+
+    expect(result).toEqual({ imageTag: 'anonymous-tag' });
+    expect(kiloclawClientMock.__getLatestVersionMock).toHaveBeenCalledWith();
+    expect(kiloclawClientMock.__getLatestVersionForInstanceMock).not.toHaveBeenCalled();
   });
 });
 

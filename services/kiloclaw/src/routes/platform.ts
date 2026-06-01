@@ -37,7 +37,10 @@ import {
   markImageAsLatest,
   disableImageAndClearRollout,
 } from '../lib/version-rollout';
-import { setKiloclawEarlyAccess, lookupKiloclawEarlyAccessByInstanceId } from '../lib/user-flags';
+import {
+  setKiloclawEarlyAccess,
+  lookupKiloclawRolloutContextByInstanceId,
+} from '../lib/user-flags';
 import { upsertCatalogVersion } from '../lib/catalog-registration';
 import { runScheduledActionNoticesSweep } from '../scheduled/scheduled-action-notices';
 import { flattenError, z } from 'zod';
@@ -4438,51 +4441,50 @@ platform.get('/versions', async c => {
 // GET /api/platform/versions/latest
 // Resolves the image version this caller should be on next.
 //
-// Query params (all optional):
-//   instanceId       — bucket subject for rollout candidate selection
-//   currentImageTag  — caller's current image; used to suppress self-upgrades
-//
-// Without instanceId, returns the current :latest pointer (back-compat for
-// anonymous callers — public version banner, CI, etc.). With instanceId, runs
-// the rollout-aware selector and returns the candidate when the instance falls
-// in cohort, the :latest baseline when not, or 404 when the caller is already
-// on the newest applicable image (banner: "no upgrade").
-//
-// The Early Access flag is looked up server-side from the instance's owning
-// user — callers cannot pass it as a query param. This keeps the service as
-// the single authoritative source: even an internal-key-holding caller can't
-// claim Early Access for an arbitrary instance.
+// Without rolloutSubject or instanceId, returns the current :latest pointer for
+// anonymous callers. With a rollout subject, runs the same rollout selector used
+// by restartMachine({ imageTag: 'latest' }). instanceId is the authoritative DB
+// row used to resolve Early Access and the rollout subject server-side.
 platform.get('/versions/latest', async c => {
   try {
+    const requestedRolloutSubject = c.req.query('rolloutSubject');
     const instanceId = c.req.query('instanceId');
     const currentImageTag = c.req.query('currentImageTag') ?? null;
 
-    if (!instanceId) {
+    let rolloutSubject = instanceId ?? requestedRolloutSubject;
+    if (!rolloutSubject) {
       const latest = await resolveLatestVersion(c.env.KV_CLAW_CACHE, 'default');
       if (!latest) return c.json({ error: 'No latest version registered' }, 404);
       return c.json(latest);
     }
 
-    // Resolve Early Access from the instance's owner. This requires Hyperdrive;
-    // without it we degrade gracefully to autoEnroll=false (the bucket math
-    // still works correctly — only the staff/beta-tester override is missing).
     let autoEnroll = false;
     const connectionString = c.env.HYPERDRIVE?.connectionString;
-    if (connectionString) {
+    if (instanceId && connectionString) {
       try {
-        autoEnroll = await lookupKiloclawEarlyAccessByInstanceId(connectionString, instanceId);
+        const rolloutContext = await lookupKiloclawRolloutContextByInstanceId(
+          connectionString,
+          instanceId
+        );
+        if (rolloutContext) {
+          rolloutSubject = rolloutContext.rolloutSubject;
+          autoEnroll = rolloutContext.earlyAccess;
+        } else {
+          rolloutSubject = instanceId;
+        }
       } catch (err) {
         console.warn(
-          '[platform] Early Access lookup failed; treating as false:',
+          '[platform] Instance rollout context lookup failed; treating as false:',
           err instanceof Error ? err.message : err
         );
+        rolloutSubject = instanceId;
       }
     }
 
     const selected = await selectImageVersionForInstance({
       kv: c.env.KV_CLAW_CACHE,
       variant: 'default',
-      instanceId,
+      rolloutSubject,
       currentImageTag,
       autoEnroll,
     });
@@ -4619,7 +4621,7 @@ platform.post('/versions/apply-pin', async c => {
       c.env,
       userId,
       instanceId,
-      stub => stub.applyPinnedVersion(imageTag, instanceId),
+      stub => stub.applyPinnedVersion(imageTag),
       'applyPinnedVersion'
     );
     return c.json({ ok: true, ...applied });

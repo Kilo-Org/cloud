@@ -3,6 +3,7 @@
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Select,
   SelectContent,
@@ -13,18 +14,27 @@ import {
 import { UserSearchInput } from './UserSearchInput';
 import { X, Filter } from 'lucide-react';
 
+import {
+  STRIPE_SUBSCRIPTION_STATUSES,
+  getStripeStatusLabel,
+} from '@/lib/admin/stripe-subscription-statuses';
+
 interface OrganizationFiltersProps {
   search: string;
   onSearchChange: (searchTerm: string) => void;
   isLoading: boolean;
-  seatsRequired?: string;
-  hasBalance?: string;
-  status?: string;
-  plan?: string;
-  onSeatsRequiredChange: (value: string) => void;
-  onHasBalanceChange: (value: string) => void;
-  onStatusChange: (value: string) => void;
+  includeDeleted: boolean;
+  stripeStatus: string;
+  plan: string;
+  hasUsage: boolean;
+  hasMultipleUsers: boolean;
+  showStripeStatus?: boolean;
+  showTrialFilters?: boolean;
+  onIncludeDeletedChange: (value: boolean) => void;
+  onStripeStatusChange: (value: string) => void;
   onPlanChange: (value: string) => void;
+  onHasUsageChange: (value: boolean) => void;
+  onHasMultipleUsersChange: (value: boolean) => void;
   onResetFilters: () => void;
   totalCount?: number;
   filteredCount?: number;
@@ -34,31 +44,35 @@ export function OrganizationFilters({
   search,
   onSearchChange,
   isLoading,
-  seatsRequired,
-  hasBalance,
-  status,
+  includeDeleted,
+  stripeStatus,
   plan,
-  onSeatsRequiredChange,
-  onHasBalanceChange,
-  onStatusChange,
+  hasUsage,
+  hasMultipleUsers,
+  showStripeStatus = true,
+  showTrialFilters = false,
+  onIncludeDeletedChange,
+  onStripeStatusChange,
   onPlanChange,
+  onHasUsageChange,
+  onHasMultipleUsersChange,
   onResetFilters,
   totalCount,
   filteredCount,
 }: OrganizationFiltersProps) {
-  const activeFiltersCount = [
-    seatsRequired,
-    hasBalance,
-    status !== 'all',
-    plan && plan !== 'all',
-  ].filter(Boolean).length;
-  const hasActiveFilters = activeFiltersCount > 0;
+  const hasActiveFilters =
+    includeDeleted ||
+    !!stripeStatus ||
+    (!!plan && plan !== 'all') ||
+    (showTrialFilters && (hasUsage || hasMultipleUsers));
+
+  const stripeStatusLabel = stripeStatus ? getStripeStatusLabel(stripeStatus) : undefined;
 
   return (
     <div className="space-y-4">
       {/* Filter Controls Row */}
       <div className="flex flex-wrap items-end gap-4">
-        {/* Main Search - Leftmost */}
+        {/* Main Search */}
         <div className="space-y-2">
           <Label className="text-sm font-medium">Search Organizations</Label>
           <div className="w-80">
@@ -71,57 +85,28 @@ export function OrganizationFilters({
           </div>
         </div>
 
-        {/* Seats Required Filter */}
-        <div className="space-y-2">
-          <Label className="text-sm font-medium">Seats Required</Label>
-          <Select
-            value={seatsRequired || 'all'}
-            onValueChange={value => onSeatsRequiredChange(value === 'all' ? '' : value)}
-          >
-            <SelectTrigger className="w-32">
-              <SelectValue placeholder="All" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All</SelectItem>
-              <SelectItem value="true">Yes</SelectItem>
-              <SelectItem value="false">No</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* Has Balance Filter */}
-        <div className="space-y-2">
-          <Label className="text-sm font-medium">Has Balance</Label>
-          <Select
-            value={hasBalance || 'all'}
-            onValueChange={value => onHasBalanceChange(value === 'all' ? '' : value)}
-          >
-            <SelectTrigger className="w-32">
-              <SelectValue placeholder="All" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All</SelectItem>
-              <SelectItem value="true">Yes</SelectItem>
-              <SelectItem value="false">No</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* Status Filter */}
-        <div className="space-y-2">
-          <Label className="text-sm font-medium">Status</Label>
-          <Select value={status || 'all'} onValueChange={value => onStatusChange(value)}>
-            <SelectTrigger className="w-32">
-              <SelectValue placeholder="All" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All</SelectItem>
-              <SelectItem value="active">Subscribed</SelectItem>
-              <SelectItem value="deleted">Deleted</SelectItem>
-              <SelectItem value="incomplete">Unsubscribed</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+        {/* Stripe Status Filter */}
+        {showStripeStatus && (
+          <div className="space-y-2">
+            <Label className="text-sm font-medium">Stripe Status</Label>
+            <Select
+              value={stripeStatus || 'all'}
+              onValueChange={value => onStripeStatusChange(value === 'all' ? '' : value)}
+            >
+              <SelectTrigger className="w-40">
+                <SelectValue placeholder="Any" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Any</SelectItem>
+                {STRIPE_SUBSCRIPTION_STATUSES.map(s => (
+                  <SelectItem key={s.value} value={s.value}>
+                    {s.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
 
         {/* Plan Filter */}
         <div className="space-y-2">
@@ -141,10 +126,47 @@ export function OrganizationFilters({
           </Select>
         </div>
 
+        {/* Include Deleted Checkbox */}
+        <div className="flex items-center gap-2 pb-1">
+          <Checkbox
+            id="include-deleted"
+            checked={includeDeleted}
+            onCheckedChange={checked => onIncludeDeletedChange(checked === true)}
+          />
+          <Label htmlFor="include-deleted" className="cursor-pointer text-sm font-medium">
+            Include deleted
+          </Label>
+        </div>
+
+        {/* Trial-tab filters */}
+        {showTrialFilters && (
+          <>
+            <div className="flex items-center gap-2 pb-1">
+              <Checkbox
+                id="has-usage"
+                checked={hasUsage}
+                onCheckedChange={checked => onHasUsageChange(checked === true)}
+              />
+              <Label htmlFor="has-usage" className="cursor-pointer text-sm font-medium">
+                Usage &gt; 0
+              </Label>
+            </div>
+            <div className="flex items-center gap-2 pb-1">
+              <Checkbox
+                id="has-multiple-users"
+                checked={hasMultipleUsers}
+                onCheckedChange={checked => onHasMultipleUsersChange(checked === true)}
+              />
+              <Label htmlFor="has-multiple-users" className="cursor-pointer text-sm font-medium">
+                Users &gt; 1
+              </Label>
+            </div>
+          </>
+        )}
+
         {/* Reset Filters Button */}
         {hasActiveFilters && (
-          <div className="space-y-2">
-            <Label className="text-sm font-medium opacity-0">Reset</Label>
+          <div className="pb-1">
             <Button variant="outline" size="sm" onClick={onResetFilters} className="h-9">
               <X className="mr-1 h-4 w-4" />
               Reset Filters
@@ -156,41 +178,15 @@ export function OrganizationFilters({
       {/* Active Filters and Count Display */}
       {(hasActiveFilters || (totalCount !== undefined && filteredCount !== undefined)) && (
         <div className="flex items-center justify-between">
-          {/* Active Filters Badges */}
           {hasActiveFilters && (
             <div className="flex items-center gap-2">
               <Filter className="text-muted-foreground h-4 w-4" />
               <span className="text-muted-foreground text-sm">Active filters:</span>
-              {seatsRequired && (
+              {stripeStatus && (
                 <Badge variant="secondary" className="text-xs">
-                  Seats Required: {seatsRequired === 'true' ? 'Yes' : 'No'}
+                  Status: {stripeStatusLabel ?? stripeStatus}
                   <button
-                    onClick={() => onSeatsRequiredChange('')}
-                    className="hover:bg-secondary-foreground/20 ml-1 rounded-full p-0.5"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </Badge>
-              )}
-              {hasBalance && (
-                <Badge variant="secondary" className="text-xs">
-                  Has Balance: {hasBalance === 'true' ? 'Yes' : 'No'}
-                  <button
-                    onClick={() => onHasBalanceChange('')}
-                    className="hover:bg-secondary-foreground/20 ml-1 rounded-full p-0.5"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </Badge>
-              )}
-              {status && status !== 'all' && (
-                <Badge variant="secondary" className="text-xs">
-                  Status:{' '}
-                  {status === 'active'
-                    ? 'Subscribed'
-                    : status.charAt(0).toUpperCase() + status.slice(1)}
-                  <button
-                    onClick={() => onStatusChange('all')}
+                    onClick={() => onStripeStatusChange('')}
                     className="hover:bg-secondary-foreground/20 ml-1 rounded-full p-0.5"
                   >
                     <X className="h-3 w-3" />
@@ -208,10 +204,42 @@ export function OrganizationFilters({
                   </button>
                 </Badge>
               )}
+              {includeDeleted && (
+                <Badge variant="secondary" className="text-xs">
+                  Includes deleted
+                  <button
+                    onClick={() => onIncludeDeletedChange(false)}
+                    className="hover:bg-secondary-foreground/20 ml-1 rounded-full p-0.5"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </Badge>
+              )}
+              {showTrialFilters && hasUsage && (
+                <Badge variant="secondary" className="text-xs">
+                  Usage &gt; 0
+                  <button
+                    onClick={() => onHasUsageChange(false)}
+                    className="hover:bg-secondary-foreground/20 ml-1 rounded-full p-0.5"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </Badge>
+              )}
+              {showTrialFilters && hasMultipleUsers && (
+                <Badge variant="secondary" className="text-xs">
+                  Users &gt; 1
+                  <button
+                    onClick={() => onHasMultipleUsersChange(false)}
+                    className="hover:bg-secondary-foreground/20 ml-1 rounded-full p-0.5"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </Badge>
+              )}
             </div>
           )}
 
-          {/* Results Count */}
           {totalCount !== undefined && filteredCount !== undefined && (
             <div className="text-muted-foreground text-sm">
               Showing {filteredCount.toLocaleString()} of {totalCount.toLocaleString()}{' '}

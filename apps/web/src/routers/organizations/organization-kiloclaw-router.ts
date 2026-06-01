@@ -308,9 +308,7 @@ export const organizationKiloclawRouter = createTRPCRouter({
       const client = new KiloClawInternalClient();
       const instance = await getActiveOrgInstance(ctx.user.id, input.organizationId);
       if (!instance) return client.getLatestVersion();
-      // Early Access is resolved server-side via the platform endpoint
-      // (instance → owner → kiloclaw_early_access lookup), not passed by us.
-      return client.getLatestVersion({
+      return client.getLatestVersionForInstance({
         instanceId: instance.id,
         currentImageTag: input.currentImageTag ?? null,
       });

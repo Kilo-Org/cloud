@@ -26,6 +26,8 @@ type AnyMock = jest.Mock<(...args: any[]) => any>;
 
 type KiloClawClientMock = {
   __destroyMock: AnyMock;
+  __getLatestVersionMock: AnyMock;
+  __getLatestVersionForInstanceMock: AnyMock;
   __patchWebSearchConfigMock: AnyMock;
   __provisionMock: AnyMock;
   __restartGatewayProcessMock: AnyMock;
@@ -73,6 +75,8 @@ jest.mock('@/lib/config.server', () => {
 
 jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => {
   const destroyMock = jest.fn();
+  const getLatestVersionMock = jest.fn();
+  const getLatestVersionForInstanceMock = jest.fn();
   const patchWebSearchConfigMock = jest.fn();
   const provisionMock = jest.fn();
   const restartGatewayProcessMock = jest.fn();
@@ -82,6 +86,8 @@ jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => {
   return {
     KiloClawInternalClient: jest.fn().mockImplementation(() => ({
       destroy: destroyMock,
+      getLatestVersion: getLatestVersionMock,
+      getLatestVersionForInstance: getLatestVersionForInstanceMock,
       patchWebSearchConfig: patchWebSearchConfigMock,
       provision: provisionMock,
       restartGatewayProcess: restartGatewayProcessMock,
@@ -99,6 +105,8 @@ jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => {
       }
     },
     __destroyMock: destroyMock,
+    __getLatestVersionMock: getLatestVersionMock,
+    __getLatestVersionForInstanceMock: getLatestVersionForInstanceMock,
     __patchWebSearchConfigMock: patchWebSearchConfigMock,
     __provisionMock: provisionMock,
     __restartGatewayProcessMock: restartGatewayProcessMock,
@@ -168,6 +176,37 @@ async function addOrganizationSeatEntitlement(organizationId: string): Promise<v
     subscription_status: 'past_due',
   });
 }
+
+describe('organizations.kiloclaw.latestVersion', () => {
+  beforeEach(async () => {
+    await cleanupDbForTest();
+    kiloclawClientMock.__getLatestVersionMock.mockReset();
+    kiloclawClientMock.__getLatestVersionForInstanceMock.mockReset();
+  });
+
+  it('passes the active org instance row for server-derived rollout lookup', async () => {
+    kiloclawClientMock.__getLatestVersionForInstanceMock.mockResolvedValue({
+      imageTag: 'candidate-tag',
+    });
+    const user = await insertTestUser({
+      google_user_email: `org-kiloclaw-latest-version-${crypto.randomUUID()}@example.com`,
+    });
+    const organization = await createOrganization('Org Latest Version Test', user.id);
+    const instanceId = await createActiveOrgInstance(user.id, organization.id);
+
+    const caller = await createCallerForUser(user.id);
+    await caller.organizations.kiloclaw.latestVersion({
+      organizationId: organization.id,
+      currentImageTag: 'current-tag',
+    });
+
+    expect(kiloclawClientMock.__getLatestVersionForInstanceMock).toHaveBeenCalledWith({
+      instanceId,
+      currentImageTag: 'current-tag',
+    });
+    expect(kiloclawClientMock.__getLatestVersionMock).not.toHaveBeenCalled();
+  });
+});
 
 describe('organizations.kiloclaw.listActiveInstances', () => {
   beforeEach(async () => {

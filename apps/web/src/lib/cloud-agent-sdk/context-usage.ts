@@ -51,7 +51,10 @@ export function findLatestContextUsage(
   messages: readonly { info: unknown }[]
 ): ContextUsage | undefined {
   for (let index = messages.length - 1; index >= 0; index -= 1) {
-    const result = getAssistantContextUsage(messages[index].info);
+    const message = messages[index];
+    if (!message) continue;
+
+    const result = getAssistantContextUsage(message.info);
     if (result.status === 'malformed') return undefined;
     if (result.status === 'usage') return result.contextUsage;
   }

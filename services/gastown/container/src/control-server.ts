@@ -24,6 +24,7 @@ import { log } from './logger';
 import { startHeartbeat, stopHeartbeat, notifyContainerReady } from './heartbeat';
 import { pushContext as pushDashboardContext } from './dashboard-context';
 import { mergeBranch, setupRigBrowseWorktree } from './git-manager';
+import { CONFIG_SYNC_ENV_KEYS, RESERVED_ENV_KEYS } from './env-keys';
 import {
   StartAgentRequest,
   SendMessageRequest,
@@ -41,6 +42,8 @@ import type {
 const MAX_TICKETS = 1000;
 const streamTickets = new Map<string, { agentId: string; expiresAt: number }>();
 
+export { RESERVED_ENV_KEYS };
+
 // Minimal Zod schema for the non-secret town config delivered via X-Town-Config header.
 // Uses z.record() so any string-keyed object is accepted and future keys are preserved.
 const TownConfigHeader = z.record(z.string(), z.unknown());
@@ -56,43 +59,6 @@ let lastBodySyncedEnvVars: Record<string, string> | null = null;
 
 // Track which custom env var keys were applied last sync so removed keys can be cleared.
 let lastAppliedEnvVarKeys = new Set<string>();
-
-// Env keys managed by the control plane that custom env_vars must never override.
-// If a custom key collides with a reserved key, the infra value wins and the
-// custom value is silently ignored — matching the !(key in env) guard in buildAgentEnv.
-export const RESERVED_ENV_KEYS = new Set([
-  'KILOCODE_TOKEN',
-  'GIT_TOKEN',
-  'GITHUB_TOKEN',
-  'GITLAB_TOKEN',
-  'GITLAB_INSTANCE_URL',
-  'GITHUB_CLI_PAT',
-  'GH_TOKEN',
-  'GASTOWN_GIT_AUTHOR_NAME',
-  'GASTOWN_GIT_AUTHOR_EMAIL',
-  'GASTOWN_DISABLE_AI_COAUTHOR',
-  'GASTOWN_ORGANIZATION_ID',
-  'GASTOWN_CONTAINER_TOKEN',
-  'GASTOWN_SESSION_TOKEN',
-  'GASTOWN_API_URL',
-  // Runtime routing vars read by pending-nudge routes and plugin clients —
-  // must never be overwritten by user-supplied env_vars.
-  'GASTOWN_TOWN_ID',
-  'GASTOWN_RIG_ID',
-]);
-
-const CONFIG_SYNC_ENV_KEYS = new Set([
-  'KILOCODE_TOKEN',
-  'GIT_TOKEN',
-  'GITLAB_TOKEN',
-  'GITLAB_INSTANCE_URL',
-  'GITHUB_CLI_PAT',
-  'GASTOWN_GIT_AUTHOR_NAME',
-  'GASTOWN_GIT_AUTHOR_EMAIL',
-  'GASTOWN_DISABLE_AI_COAUTHOR',
-  'GASTOWN_ORGANIZATION_ID',
-  'GASTOWN_API_URL',
-]);
 
 /** Get the latest non-secret town config delivered via X-Town-Config header. */
 export function getCurrentTownConfig(): Record<string, unknown> | null {

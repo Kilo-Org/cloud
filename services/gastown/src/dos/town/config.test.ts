@@ -1,6 +1,13 @@
 import { describe, it, expect } from 'vitest';
+import { CONFIG_SYNC_ENV_KEYS } from '../../../container/src/env-keys';
 import { TownConfigSchema } from '../../types';
-import { buildContainerConfig, buildContainerEnvVars, getTownConfig, resolveModel } from './config';
+import {
+  RESERVED_CONTAINER_ENV_KEYS,
+  buildContainerConfig,
+  buildContainerEnvVars,
+  getTownConfig,
+  resolveModel,
+} from './config';
 
 const HARDCODED_FALLBACK = 'anthropic/claude-sonnet-4.6';
 
@@ -258,5 +265,46 @@ describe('container config payloads', () => {
       KILOCODE_TOKEN: 'kilocode-secret-value',
     });
     expect(envVars.GH_TOKEN).toBeUndefined();
+  });
+
+  it('only emits reserved env vars that the container sync path applies', async () => {
+    const storage = makeFakeStorage(
+      new Map([
+        [
+          'town:config',
+          TownConfigSchema.parse({
+            env_vars: {
+              CUSTOM_SECRET: 'custom-secret-value',
+              GASTOWN_CONTAINER_TOKEN: 'reserved-custom-value',
+              GASTOWN_SESSION_TOKEN: 'reserved-custom-value',
+              GASTOWN_TOWN_ID: 'reserved-custom-value',
+              GASTOWN_RIG_ID: 'reserved-custom-value',
+            },
+            git_auth: {
+              github_token: 'github-secret-value',
+              gitlab_token: 'gitlab-secret-value',
+              gitlab_instance_url: 'https://gitlab.example.com',
+            },
+            github_cli_pat: 'github-cli-secret-value',
+            git_author_name: 'Kilo Bot',
+            git_author_email: 'kilo@example.com',
+            disable_ai_coauthor: true,
+            kilocode_token: 'kilocode-secret-value',
+            organization_id: 'org_123',
+          }),
+        ],
+      ])
+    );
+
+    const envVars = await buildContainerEnvVars(
+      storage,
+      { GASTOWN_API_URL: 'https://gastown.example.com' } as unknown as Env,
+      'town-1'
+    );
+    const emittedReservedKeys = Object.keys(envVars).filter(key =>
+      RESERVED_CONTAINER_ENV_KEYS.has(key)
+    );
+
+    expect(emittedReservedKeys.sort()).toEqual([...CONFIG_SYNC_ENV_KEYS].sort());
   });
 });

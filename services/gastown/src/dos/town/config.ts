@@ -9,6 +9,7 @@ import {
   type MergeStrategy,
   type RigOverrideConfig,
 } from '../../types';
+import { RESERVED_ENV_KEYS } from '../../../container/src/env-keys';
 import { resolveGitHubTokenString } from './town-scm';
 
 const CONFIG_KEY = 'town:config';
@@ -16,24 +17,7 @@ const NEW_TOWN_DEFAULTS_SEEDED_KEY = 'town:config:newDefaultsSeeded';
 
 const TOWN_LOG = '[Town.do]';
 
-const RESERVED_CONTAINER_ENV_KEYS = new Set([
-  'KILOCODE_TOKEN',
-  'GIT_TOKEN',
-  'GITHUB_TOKEN',
-  'GITLAB_TOKEN',
-  'GITLAB_INSTANCE_URL',
-  'GITHUB_CLI_PAT',
-  'GH_TOKEN',
-  'GASTOWN_GIT_AUTHOR_NAME',
-  'GASTOWN_GIT_AUTHOR_EMAIL',
-  'GASTOWN_DISABLE_AI_COAUTHOR',
-  'GASTOWN_ORGANIZATION_ID',
-  'GASTOWN_CONTAINER_TOKEN',
-  'GASTOWN_SESSION_TOKEN',
-  'GASTOWN_API_URL',
-  'GASTOWN_TOWN_ID',
-  'GASTOWN_RIG_ID',
-]);
+export const RESERVED_CONTAINER_ENV_KEYS = RESERVED_ENV_KEYS;
 
 /**
  * Defaults that were introduced for NEW towns in #2725 but that must NOT

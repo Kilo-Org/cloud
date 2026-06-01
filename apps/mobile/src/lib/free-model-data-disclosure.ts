@@ -13,6 +13,15 @@ export function isFreeModelOption(model: { id: string; isFree?: boolean } | unde
   );
 }
 
+export function isFreeKiloGatewayModelOption(model: { id: string; isFree?: boolean } | undefined) {
+  if (!model) {
+    return false;
+  }
+  return (
+    model.id === 'kilo-auto/free' || (model.isFree === true && model.id.startsWith('kilo-auto/'))
+  );
+}
+
 export function getFreeModelDataAccessibilityLabel(label: string) {
   return `${label}, ${FREE_MODEL_DATA_LABEL}`;
 }

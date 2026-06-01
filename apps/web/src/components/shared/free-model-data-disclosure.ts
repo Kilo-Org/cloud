@@ -16,3 +16,12 @@ export function isFreeModelOption(model: { id: string; isFree?: boolean } | unde
     model.id === 'openrouter/free'
   );
 }
+
+export function isFreeKiloGatewayModelOption(model: { id: string; isFree?: boolean } | undefined) {
+  if (!model) {
+    return false;
+  }
+  return (
+    model.id === 'kilo-auto/free' || (model.isFree === true && model.id.startsWith('kilo-auto/'))
+  );
+}

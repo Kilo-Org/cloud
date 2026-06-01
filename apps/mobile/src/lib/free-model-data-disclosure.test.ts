@@ -3,6 +3,7 @@ import {
   FREE_MODEL_DATA_LABEL,
   FREE_MODEL_FREE_LABEL,
   getFreeModelDataAccessibilityLabel,
+  isFreeKiloGatewayModelOption,
   isFreeModelOption,
 } from './free-model-data-disclosure';
 
@@ -17,6 +18,13 @@ describe('free model data disclosure', () => {
     expect(isFreeModelOption({ id: 'openrouter/free' })).toBe(true);
     expect(isFreeModelOption({ id: 'openrouter/model-alpha' })).toBe(false);
     expect(isFreeModelOption({ id: 'anthropic/claude' })).toBe(false);
+  });
+
+  it('only marks Kilo Gateway free models as data collected', () => {
+    expect(isFreeKiloGatewayModelOption({ id: 'kilo-auto/free' })).toBe(true);
+    expect(isFreeKiloGatewayModelOption({ id: 'kilo-auto/frontier', isFree: true })).toBe(true);
+    expect(isFreeKiloGatewayModelOption({ id: 'openrouter/free' })).toBe(false);
+    expect(isFreeKiloGatewayModelOption({ id: 'anthropic/claude', isFree: true })).toBe(false);
   });
 
   it('adds a data collection phrase to accessibility labels', () => {

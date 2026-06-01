@@ -9,6 +9,7 @@ import {
   FREE_MODEL_DATA_LABEL,
   FREE_MODEL_FREE_LABEL,
   getFreeModelDataAccessibilityLabel,
+  isFreeKiloGatewayModelOption,
   isFreeModelOption,
 } from '@/lib/free-model-data-disclosure';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -223,7 +224,8 @@ export default function ModelPickerScreen() {
 
           const modelOption = item.model;
           const selected = modelOption.id === selectedModel;
-          const collectsData = isFreeModelOption(modelOption);
+          const free = isFreeModelOption(modelOption);
+          const collectsData = isFreeKiloGatewayModelOption(modelOption);
           const hasVariants = modelOption.variants.length > 1;
 
           return (
@@ -239,7 +241,7 @@ export default function ModelPickerScreen() {
                 <View className="flex-1">
                   <Text className="text-base text-foreground">{modelOption.name}</Text>
                   <Text className="text-xs text-muted-foreground">{modelOption.id}</Text>
-                  {collectsData ? (
+                  {free ? (
                     <View className="mt-1 flex-row items-center gap-1 self-start">
                       <View
                         className="rounded-full px-2 py-0.5"
@@ -249,11 +251,13 @@ export default function ModelPickerScreen() {
                           {FREE_MODEL_FREE_LABEL}
                         </Text>
                       </View>
-                      <AlertTriangle
-                        accessibilityLabel={FREE_MODEL_DATA_LABEL}
-                        size={13}
-                        color={colors.warn}
-                      />
+                      {collectsData ? (
+                        <AlertTriangle
+                          accessibilityLabel={FREE_MODEL_DATA_LABEL}
+                          size={13}
+                          color={colors.warn}
+                        />
+                      ) : null}
                     </View>
                   ) : null}
                 </View>

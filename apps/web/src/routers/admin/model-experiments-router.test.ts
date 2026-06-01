@@ -124,8 +124,9 @@ describe('admin.modelExperiments — basic CRUD', () => {
   });
 
   it('lists the last experiment attribution requests with usage and variant metadata', async () => {
-    const { caller, experimentId, variantA } =
-      await makeDraftWithTwoVariants('partner/preview-requests');
+    const { caller, experimentId, variantA } = await makeDraftWithTwoVariants(
+      'partner/preview-requests'
+    );
     await caller.admin.modelExperiments.activate({ id: experimentId });
     const [version] = await db
       .select({ id: model_experiment_variant_version.id })
@@ -489,7 +490,8 @@ describe('admin.modelExperiments — variant ops', () => {
   });
 
   it('allows updateVariantLabel in non-terminal state', async () => {
-    const { caller, experimentId, variantA } = await makeDraftWithTwoVariants('partner/preview-label');
+    const { caller, experimentId, variantA } =
+      await makeDraftWithTwoVariants('partner/preview-label');
     await caller.admin.modelExperiments.activate({ id: experimentId });
     const renamed = await caller.admin.modelExperiments.updateVariantLabel({
       variantId: variantA.id,
@@ -499,8 +501,9 @@ describe('admin.modelExperiments — variant ops', () => {
   });
 
   it('rejects updateVariantLabel on completed', async () => {
-    const { caller, experimentId, variantA } =
-      await makeDraftWithTwoVariants('partner/preview-label-done');
+    const { caller, experimentId, variantA } = await makeDraftWithTwoVariants(
+      'partner/preview-label-done'
+    );
     await caller.admin.modelExperiments.activate({ id: experimentId });
     await caller.admin.modelExperiments.complete({ id: experimentId });
     await expect(
@@ -589,8 +592,9 @@ describe('admin.modelExperiments — versions and api keys', () => {
   });
 
   it('rejects hot-swap on completed', async () => {
-    const { caller, experimentId, variantA } =
-      await makeDraftWithTwoVariants('partner/preview-hot-done');
+    const { caller, experimentId, variantA } = await makeDraftWithTwoVariants(
+      'partner/preview-hot-done'
+    );
     await caller.admin.modelExperiments.activate({ id: experimentId });
     await caller.admin.modelExperiments.complete({ id: experimentId });
     await expect(

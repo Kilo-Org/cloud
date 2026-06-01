@@ -92,7 +92,9 @@ describe('isPublicIdExperimented', () => {
   });
 
   redisIt('returns true when the public id has only a paused experiment', async () => {
-    const { experimentId } = await makeActiveExperiment({ publicId: 'partner/preview-iset-paused' });
+    const { experimentId } = await makeActiveExperiment({
+      publicId: 'partner/preview-iset-paused',
+    });
     const caller = await createCallerForUser(admin.id);
     await caller.admin.modelExperiments.pause({ id: experimentId });
     expect(await seedExperimentedPublicIds(['partner/preview-iset-paused'])).toBe(true);

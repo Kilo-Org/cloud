@@ -49,6 +49,7 @@ import {
   isCodeReviewActionRequiredReason,
   type CodeReviewActionRequiredReason,
 } from '../action-required';
+import { isCodeReviewModelUnavailableFailure } from '../model-unavailable';
 import {
   activeCodeReviewWorkCondition,
   reconsiderableCodeReviewWorkCondition,
@@ -589,11 +590,22 @@ async function handleAmbiguousDispatchFailure(
 
     const completedAt = workerStatus.completedAt ? new Date(workerStatus.completedAt) : undefined;
     const workerTerminalReason = parseTerminalReason(workerStatus.terminalReason);
-    const classifiedReason = classifyCodeReviewActionRequiredFailure(workerStatus.errorMessage);
-    const terminalReason = workerTerminalReason ?? classifiedReason ?? undefined;
-    const actionRequiredReason = isCodeReviewActionRequiredReason(workerTerminalReason)
-      ? workerTerminalReason
-      : classifiedReason;
+    const isModelUnavailable = isCodeReviewModelUnavailableFailure(
+      workerTerminalReason,
+      workerStatus.errorMessage
+    );
+    const status = isModelUnavailable ? 'cancelled' : workerStatus.status;
+    const classifiedReason = isModelUnavailable
+      ? null
+      : classifyCodeReviewActionRequiredFailure(workerStatus.errorMessage);
+    const terminalReason = isModelUnavailable
+      ? 'model_not_found'
+      : (workerTerminalReason ?? classifiedReason ?? undefined);
+    const actionRequiredReason = isModelUnavailable
+      ? null
+      : isCodeReviewActionRequiredReason(workerTerminalReason)
+        ? workerTerminalReason
+        : classifiedReason;
 
     if (actionRequiredReason) {
       try {
@@ -621,7 +633,7 @@ async function handleAmbiguousDispatchFailure(
     await updateCodeReviewAttemptForCallback({
       codeReviewId: review.id,
       attemptId,
-      status: workerStatus.status,
+      status,
       sessionId: workerStatus.sessionId,
       cliSessionId: workerStatus.cliSessionId,
       errorMessage: workerStatus.errorMessage,
@@ -630,7 +642,7 @@ async function handleAmbiguousDispatchFailure(
     });
     const parentUpdated = await updateCodeReviewStatusIfNonTerminal(
       review.id,
-      workerStatus.status,
+      status,
       {
         sessionId: workerStatus.sessionId,
         cliSessionId: workerStatus.cliSessionId,
@@ -644,7 +656,7 @@ async function handleAmbiguousDispatchFailure(
     logExceptInTest('[dispatchReview] Worker returned terminal status for fresh dispatch', {
       reviewId: review.id,
       attemptId,
-      status: workerStatus.status,
+      status,
       parentUpdated,
     });
     return true;

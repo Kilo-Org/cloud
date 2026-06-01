@@ -13,6 +13,7 @@ import {
   staleQueuedCodeReviewCutoffSql,
   staleRunningCodeReviewCutoffSql,
 } from '@/lib/code-reviews/dispatch/dispatch-constants';
+import { CODE_REVIEW_MODEL_UNAVAILABLE_PREFLIGHT_SQL_LITERAL } from '@/lib/code-reviews/model-unavailable';
 
 /**
  * SQL condition that identifies billing/credits errors (402 Payment Required).
@@ -39,11 +40,13 @@ const isBillingAttemptError = sql`(
 const isModelNotFound = sql`(
   ${cloud_agent_code_reviews.terminal_reason} = 'model_not_found'
   OR ${cloud_agent_code_reviews.error_message} ILIKE '%model not found%'
+  OR ${cloud_agent_code_reviews.error_message} ILIKE ${sql.raw(CODE_REVIEW_MODEL_UNAVAILABLE_PREFLIGHT_SQL_LITERAL)}
 )`;
 
 const isModelNotFoundAttempt = sql`(
   ${cloud_agent_code_review_attempts.terminal_reason} = 'model_not_found'
   OR ${cloud_agent_code_review_attempts.error_message} ILIKE '%model not found%'
+  OR ${cloud_agent_code_review_attempts.error_message} ILIKE ${sql.raw(CODE_REVIEW_MODEL_UNAVAILABLE_PREFLIGHT_SQL_LITERAL)}
 )`;
 
 /**
@@ -63,10 +66,12 @@ const excludeBillingAttemptErrors = sql`COALESCE(${cloud_agent_code_review_attem
   AND COALESCE(${cloud_agent_code_review_attempts.error_message}, '') NOT ILIKE '%Credits Required%'`;
 
 const excludeModelNotFound = sql`COALESCE(${cloud_agent_code_reviews.terminal_reason}, '') <> 'model_not_found'
-  AND COALESCE(${cloud_agent_code_reviews.error_message}, '') NOT ILIKE '%model not found%'`;
+  AND COALESCE(${cloud_agent_code_reviews.error_message}, '') NOT ILIKE '%model not found%'
+  AND COALESCE(${cloud_agent_code_reviews.error_message}, '') NOT ILIKE ${sql.raw(CODE_REVIEW_MODEL_UNAVAILABLE_PREFLIGHT_SQL_LITERAL)}`;
 
 const excludeModelNotFoundAttempt = sql`COALESCE(${cloud_agent_code_review_attempts.terminal_reason}, '') <> 'model_not_found'
-  AND COALESCE(${cloud_agent_code_review_attempts.error_message}, '') NOT ILIKE '%model not found%'`;
+  AND COALESCE(${cloud_agent_code_review_attempts.error_message}, '') NOT ILIKE '%model not found%'
+  AND COALESCE(${cloud_agent_code_review_attempts.error_message}, '') NOT ILIKE ${sql.raw(CODE_REVIEW_MODEL_UNAVAILABLE_PREFLIGHT_SQL_LITERAL)}`;
 
 /**
  * Categorize error messages into high-level buckets via SQL CASE WHEN.
@@ -481,7 +486,7 @@ export const adminCodeReviewsRouter = createTRPCRouter({
     ] as SQL[];
 
     const cancellationReasonExpr = sql<string>`CASE
-      WHEN ${statusTable.terminal_reason} = 'model_not_found' OR ${statusTable.error_message} ILIKE '%model not found%' THEN 'Model no longer available'
+      WHEN ${statusTable.terminal_reason} = 'model_not_found' OR ${statusTable.error_message} ILIKE '%model not found%' OR ${statusTable.error_message} ILIKE ${sql.raw(CODE_REVIEW_MODEL_UNAVAILABLE_PREFLIGHT_SQL_LITERAL)} THEN 'Model no longer available'
       WHEN ${statusTable.terminal_reason} = 'superseded' OR ${statusTable.error_message} ILIKE '%superseded%' THEN 'Superseded by new commit'
       WHEN ${statusTable.error_message} ILIKE '%stream timeout%' THEN 'Stream timeout'
       WHEN ${statusTable.terminal_reason} = 'user_cancelled' OR ${statusTable.error_message} ILIKE '%cancelled%' OR ${statusTable.error_message} ILIKE '%canceled%' THEN 'Explicitly cancelled'

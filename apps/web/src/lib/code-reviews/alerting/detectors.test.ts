@@ -276,6 +276,34 @@ describe('code review alert detectors', () => {
     await expect(evaluateErrorSpike(db)).resolves.toEqual({ tripped: false });
   });
 
+  it('excludes legacy preflight model-unavailable failed rows without terminal reasons', async () => {
+    await insertReviews([
+      reviewValues({ status: 'failed', terminal_reason: null, error_message: 'Checkout failed' }),
+      reviewValues({ status: 'failed', terminal_reason: null, error_message: 'Checkout failed' }),
+      reviewValues({ status: 'failed', terminal_reason: null, error_message: 'Checkout failed' }),
+      reviewValues({ status: 'failed', terminal_reason: null, error_message: 'Checkout failed' }),
+      reviewValues({
+        status: 'failed',
+        terminal_reason: null,
+        error_message:
+          'prepareSession failed (400): Selected model is not available for this cloud agent session',
+      }),
+      ...Array.from({ length: 15 }, () => reviewValues()),
+    ]);
+
+    await expect(evaluateErrorSpike(db)).resolves.toMatchObject({
+      tripped: true,
+      details: {
+        kind: 'error_spike',
+        startedCount: 20,
+        errorCount: 4,
+        rate: 0.2,
+        topReason: 'unknown',
+        topReasonCount: 4,
+      },
+    });
+  });
+
   it('continues counting non-model not-found failures as errors', async () => {
     await insertReviews([
       reviewValues({

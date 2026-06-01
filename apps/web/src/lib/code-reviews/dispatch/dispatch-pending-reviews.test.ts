@@ -49,6 +49,7 @@ import {
   cloud_agent_code_reviews,
   kilocode_users,
   organizations,
+  platform_integrations,
   type User,
 } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
@@ -123,6 +124,14 @@ describe('tryDispatchPendingReviews', () => {
         or(
           eq(agent_configs.owned_by_user_id, testUser.id),
           eq(agent_configs.owned_by_organization_id, testOrganizationId)
+        )
+      );
+    await db
+      .delete(platform_integrations)
+      .where(
+        or(
+          eq(platform_integrations.owned_by_user_id, testUser.id),
+          eq(platform_integrations.owned_by_organization_id, testOrganizationId)
         )
       );
     mockDispatchReview.mockReset();
@@ -369,15 +378,90 @@ describe('tryDispatchPendingReviews', () => {
     expect(mockSendCodeReviewDisabledEmail).toHaveBeenCalledTimes(1);
   });
 
-  it('disables Code Reviewer for selected-model worker status failures', async () => {
+  it('normalizes old-worker preflight unavailable-model status without disabling Code Reviewer', async () => {
     const recentTimestamp = minutesAgo(1);
     const owner = { type: 'user', id: testUser.id } satisfies ReviewOwner;
     const errorMessage =
       'prepareSession failed (400): {"error":{"message":"Selected model is not available for this cloud agent session"}}';
     const agentConfig = await insertAgentConfigForUser();
+    const [integration] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_user_id: testUser.id,
+        platform: 'github',
+        integration_type: 'app',
+        platform_installation_id: 'selected-model-installation',
+      })
+      .returning({ id: platform_integrations.id });
     mockGetAgentConfigForOwner.mockResolvedValue(agentConfig);
     mockDispatchReview.mockRejectedValue(
       new Error("Dispatch returned terminal status 'failed' for review selected-model-review")
+    );
+    mockGetReviewStatus.mockResolvedValue({
+      reviewId: 'unused',
+      status: 'failed',
+      errorMessage,
+      terminalReason: 'selected_model_unavailable',
+    });
+
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values({
+        ...reviewValues({
+          owner,
+          status: 'pending',
+          createdAt: recentTimestamp,
+          updatedAt: recentTimestamp,
+        }),
+        check_run_id: 123,
+        platform_integration_id: integration.id,
+      })
+      .returning({ id: cloud_agent_code_reviews.id });
+
+    const result = await tryDispatchPendingReviews({
+      type: 'user',
+      id: testUser.id,
+      userId: testUser.id,
+    });
+
+    const storedReview = await getStoredReview(review.id);
+    const storedAttempt = await db.query.cloud_agent_code_review_attempts.findFirst({
+      where: eq(cloud_agent_code_review_attempts.code_review_id, review.id),
+    });
+    const storedConfig = await db.query.agent_configs.findFirst({
+      where: eq(agent_configs.id, agentConfig.id),
+    });
+
+    expect(result).toEqual({ dispatched: 1, notDispatched: 0, activeCount: 1 });
+    expect(storedReview).toEqual(
+      expect.objectContaining({
+        status: 'cancelled',
+        terminalReason: 'model_not_found',
+        errorMessage,
+      })
+    );
+    expect(storedAttempt).toEqual(
+      expect.objectContaining({
+        status: 'cancelled',
+        terminal_reason: 'model_not_found',
+        error_message: errorMessage,
+      })
+    );
+    expect(storedConfig?.is_enabled).toBe(true);
+    expect(mockSendCodeReviewDisabledEmail).not.toHaveBeenCalled();
+    expect(mockGetIntegrationById).not.toHaveBeenCalled();
+    expect(mockUpdateCheckRun).not.toHaveBeenCalled();
+  });
+
+  it('disables Code Reviewer for team-policy selected-model worker status failures', async () => {
+    const recentTimestamp = minutesAgo(1);
+    const owner = { type: 'user', id: testUser.id } satisfies ReviewOwner;
+    const errorMessage =
+      'prepareSession failed (404): {"error":{"message":"Not Found: The requested model is not allowed for your team."}}';
+    const agentConfig = await insertAgentConfigForUser();
+    mockGetAgentConfigForOwner.mockResolvedValue(agentConfig);
+    mockDispatchReview.mockRejectedValue(
+      new Error("Dispatch returned terminal status 'failed' for review team-policy-review")
     );
     mockGetReviewStatus.mockResolvedValue({
       reviewId: 'unused',
@@ -405,6 +489,9 @@ describe('tryDispatchPendingReviews', () => {
     });
 
     const storedReview = await getStoredReview(review.id);
+    const storedAttempt = await db.query.cloud_agent_code_review_attempts.findFirst({
+      where: eq(cloud_agent_code_review_attempts.code_review_id, review.id),
+    });
     const storedConfig = await db.query.agent_configs.findFirst({
       where: eq(agent_configs.id, agentConfig.id),
     });
@@ -415,6 +502,13 @@ describe('tryDispatchPendingReviews', () => {
         status: 'failed',
         terminalReason: 'selected_model_unavailable',
         errorMessage,
+      })
+    );
+    expect(storedAttempt).toEqual(
+      expect.objectContaining({
+        status: 'failed',
+        terminal_reason: 'selected_model_unavailable',
+        error_message: errorMessage,
       })
     );
     expect(storedConfig?.is_enabled).toBe(false);

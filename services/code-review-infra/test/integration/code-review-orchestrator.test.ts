@@ -886,7 +886,7 @@ describe('CodeReviewOrchestrator recovery', () => {
     expect(stored?.sandboxRetryAttempted).toBeUndefined();
   });
 
-  it('maps selected-model prepareSession 400 failures to action-required terminal reason', async () => {
+  it('maps selected-model prepareSession 400 failures to model-not-found cancellation', async () => {
     const stub = getReviewStub();
     const fetchMock = vi.fn(async (request: RequestInfo | URL) => {
       const url = String(request);
@@ -913,18 +913,80 @@ describe('CodeReviewOrchestrator recovery', () => {
 
     expect(ran).toBe(true);
     await expect(stub.status()).resolves.toMatchObject({
-      status: 'failed',
-      terminalReason: 'selected_model_unavailable',
+      status: 'cancelled',
+      terminalReason: 'model_not_found',
+      errorMessage: expect.stringContaining(
+        'prepareSession failed (400): {"error":{"message":"Selected model is not available for this cloud agent session"'
+      ),
     });
     expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(1);
     expect(fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toHaveLength(0);
     expect(lastStatusUpdateBody(fetchMock)).toMatchObject({
-      status: 'failed',
-      terminalReason: 'selected_model_unavailable',
+      status: 'cancelled',
+      terminalReason: 'model_not_found',
+      errorMessage: expect.stringContaining(
+        'prepareSession failed (400): {"error":{"message":"Selected model is not available for this cloud agent session"'
+      ),
     });
     await expect(storedReview(stub)).resolves.toMatchObject({
-      status: 'failed',
-      terminalReason: 'selected_model_unavailable',
+      status: 'cancelled',
+      terminalReason: 'model_not_found',
+      errorMessage: expect.stringContaining(
+        'prepareSession failed (400): {"error":{"message":"Selected model is not available for this cloud agent session"'
+      ),
+    });
+  });
+
+  it('maps model-not-found initiation failures to cancellation', async () => {
+    const stub = getReviewStub();
+    const fetchMock = vi.fn(async (request: RequestInfo | URL) => {
+      const url = String(request);
+      if (url.includes('/api/internal/code-review-status/')) {
+        return Response.json({ success: true });
+      }
+      if (url.includes('/trpc/prepareSession')) {
+        return trpcSuccess({
+          cloudAgentSessionId: 'agent-retired-model',
+          kiloSessionId: 'ses_retired_model',
+        });
+      }
+      if (url.includes('/trpc/initiateFromKilocodeSessionV2')) {
+        return trpcError(404, 'Model not found: kilo/retired-model', 'NOT_FOUND');
+      }
+      return new Response('unexpected fetch', { status: 500 });
+    });
+    globalThis.fetch = fetchMock;
+
+    await runInDurableObject(stub, async (_instance: CodeReviewOrchestrator, state) => {
+      await state.storage.put('state', codeReview());
+      await state.storage.setAlarm(Date.now() + 30_000);
+    });
+
+    const ran = await runDurableObjectAlarm(stub);
+
+    expect(ran).toBe(true);
+    await expect(stub.status()).resolves.toMatchObject({
+      status: 'cancelled',
+      terminalReason: 'model_not_found',
+      errorMessage: expect.stringContaining(
+        'initiateFromKilocodeSessionV2 failed (404): {"error":{"message":"Model not found: kilo/retired-model"'
+      ),
+    });
+    expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(1);
+    expect(fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toHaveLength(1);
+    expect(lastStatusUpdateBody(fetchMock)).toMatchObject({
+      status: 'cancelled',
+      terminalReason: 'model_not_found',
+      errorMessage: expect.stringContaining(
+        'initiateFromKilocodeSessionV2 failed (404): {"error":{"message":"Model not found: kilo/retired-model"'
+      ),
+    });
+    await expect(storedReview(stub)).resolves.toMatchObject({
+      status: 'cancelled',
+      terminalReason: 'model_not_found',
+      errorMessage: expect.stringContaining(
+        'initiateFromKilocodeSessionV2 failed (404): {"error":{"message":"Model not found: kilo/retired-model"'
+      ),
     });
   });
 

@@ -13,6 +13,8 @@ import { eq } from 'drizzle-orm';
 const REPO = `test-org/admin-code-review-wait-${Date.now()}`;
 const START_DATE = '2035-01-01T00:00:00.000Z';
 const END_DATE = '2035-01-20T00:00:00.000Z';
+const PREFLIGHT_MODEL_UNAVAILABLE_ERROR =
+  'prepareSession failed (400): Selected model is not available for this cloud agent session';
 
 type ReviewOwner = { type: 'user'; id: string } | { type: 'org'; id: string };
 type FilterInput = {
@@ -398,7 +400,7 @@ describe('adminCodeReviewsRouter', () => {
     expect(segmentation.ownershipBreakdown[0]).toMatchObject({ failed: 1 });
   });
 
-  it('buckets selected-model-unavailable terminal reasons as action required', async () => {
+  it('classifies historical preflight model-unavailable outcomes as cancellations', async () => {
     const owner = { type: 'user', id: adminUser.id } satisfies ReviewOwner;
     const [review] = await db
       .insert(cloud_agent_code_reviews)
@@ -408,7 +410,7 @@ describe('adminCodeReviewsRouter', () => {
           status: 'failed',
           createdAt: timestamp(760),
           terminalReason: 'selected_model_unavailable',
-          errorMessage: 'Selected model is not available for this cloud agent session',
+          errorMessage: PREFLIGHT_MODEL_UNAVAILABLE_ERROR,
         })
       )
       .returning({ id: cloud_agent_code_reviews.id });
@@ -418,7 +420,57 @@ describe('adminCodeReviewsRouter', () => {
       attempt_number: 1,
       status: 'failed',
       terminal_reason: 'selected_model_unavailable',
-      error_message: 'Selected model is not available for this cloud agent session',
+      error_message: PREFLIGHT_MODEL_UNAVAILABLE_ERROR,
+      created_at: timestamp(761),
+      started_at: timestamp(762),
+      completed_at: timestamp(763),
+    });
+
+    const caller = await createCallerForUser(adminUser.id);
+    for (const retryAccountingMode of ['final_outcome', 'all_attempts'] as const) {
+      const input = filterInput({ retryAccountingMode });
+      const overview = await caller.admin.codeReviews.getOverviewStats(input);
+      const daily = await caller.admin.codeReviews.getDailyStats(input);
+      const cancellations = await caller.admin.codeReviews.getCancellationAnalysis(input);
+      const errors = await caller.admin.codeReviews.getErrorAnalysis(input);
+      const sessions = await caller.admin.codeReviews.getErrorSessions({
+        ...input,
+        errorMessage: PREFLIGHT_MODEL_UNAVAILABLE_ERROR,
+      });
+      const segmentation = await caller.admin.codeReviews.getUserSegmentation(input);
+
+      expect(overview).toMatchObject({ failedCount: 0, cancelledCount: 1 });
+      expect(daily).toEqual([expect.objectContaining({ failed: 0, cancelled: 1 })]);
+      expect(cancellations).toEqual([
+        expect.objectContaining({ reason: 'Model no longer available', count: 1 }),
+      ]);
+      expect(errors).toEqual({ categories: [], details: [] });
+      expect(sessions).toEqual([]);
+      expect(segmentation.ownershipBreakdown[0]).toMatchObject({ failed: 0 });
+    }
+  });
+
+  it('buckets team-policy selected-model-unavailable terminal reasons as action required', async () => {
+    const owner = { type: 'user', id: adminUser.id } satisfies ReviewOwner;
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        reviewValues({
+          owner,
+          status: 'failed',
+          createdAt: timestamp(760),
+          terminalReason: 'selected_model_unavailable',
+          errorMessage: 'Not Found: The requested model is not allowed for your team.',
+        })
+      )
+      .returning({ id: cloud_agent_code_reviews.id });
+
+    await db.insert(cloud_agent_code_review_attempts).values({
+      code_review_id: review.id,
+      attempt_number: 1,
+      status: 'failed',
+      terminal_reason: 'selected_model_unavailable',
+      error_message: 'Not Found: The requested model is not allowed for your team.',
       created_at: timestamp(761),
       started_at: timestamp(762),
       completed_at: timestamp(763),

@@ -36,8 +36,6 @@ const CodeReviewActionRequiredStateSchema = z.object({
   emailSentAt: z.string().optional(),
 });
 
-const SELECTED_MODEL_UNAVAILABLE_MESSAGE =
-  'selected model is not available for this cloud agent session';
 const REQUESTED_MODEL_NOT_ALLOWED_FOR_TEAM_MESSAGE =
   'the requested model is not allowed for your team';
 
@@ -107,10 +105,7 @@ export function classifyCodeReviewActionRequiredFailure(
     return 'github_ip_allow_list';
   }
 
-  if (
-    normalized.includes(SELECTED_MODEL_UNAVAILABLE_MESSAGE) ||
-    normalized.includes(REQUESTED_MODEL_NOT_ALLOWED_FOR_TEAM_MESSAGE)
-  ) {
+  if (normalized.includes(REQUESTED_MODEL_NOT_ALLOWED_FOR_TEAM_MESSAGE)) {
     return 'selected_model_unavailable';
   }
 

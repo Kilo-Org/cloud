@@ -739,8 +739,12 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
 
     if (
       message.includes(SELECTED_MODEL_UNAVAILABLE_MESSAGE) ||
-      message.includes(REQUESTED_MODEL_NOT_ALLOWED_FOR_TEAM_MESSAGE)
+      /\bmodel\s+not\s+found\b/i.test(message)
     ) {
+      return 'model_not_found';
+    }
+
+    if (message.includes(REQUESTED_MODEL_NOT_ALLOWED_FOR_TEAM_MESSAGE)) {
       return 'selected_model_unavailable';
     }
 
@@ -1253,8 +1257,9 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       );
 
       const terminalReason = this.getTerminalReason(error);
+      const status = terminalReason === 'model_not_found' ? 'cancelled' : 'failed';
 
-      await this.updateStatus('failed', { errorMessage, terminalReason });
+      await this.updateStatus(status, { errorMessage, terminalReason });
 
       console.error('[CodeReviewOrchestrator] Review failed (cloud-agent-next):', {
         reviewId: this.state.reviewId,

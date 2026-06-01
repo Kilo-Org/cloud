@@ -2,6 +2,7 @@ import type { db as defaultDb } from '@/lib/drizzle';
 import { sql } from '@/lib/drizzle';
 import { cloud_agent_code_reviews } from '@kilocode/db/schema';
 import { CODE_REVIEW_BENIGN_TERMINAL_REASONS } from '@kilocode/db/schema-types';
+import { CODE_REVIEW_MODEL_UNAVAILABLE_PREFLIGHT_SQL_LITERAL } from '@/lib/code-reviews/model-unavailable';
 import {
   ERROR_SPIKE_RATE_THRESHOLD,
   ERROR_SPIKE_WINDOW_MINUTES,
@@ -61,6 +62,7 @@ const systemFailureSql = sql`(
 const modelNotFoundSql = sql`(
   COALESCE(terminal_reason, '') = 'model_not_found'
   OR COALESCE(error_message, '') ILIKE '%model not found%'
+  OR COALESCE(error_message, '') ILIKE ${sql.raw(CODE_REVIEW_MODEL_UNAVAILABLE_PREFLIGHT_SQL_LITERAL)}
 )`;
 
 const startedReviewsCteSql = sql`

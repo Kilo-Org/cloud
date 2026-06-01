@@ -75,6 +75,7 @@ import {
   type CodeReviewActionRequiredReason,
 } from '@/lib/code-reviews/action-required';
 import type { Owner } from '@/lib/code-reviews/core';
+import { isCodeReviewModelUnavailableFailure } from '@/lib/code-reviews/model-unavailable';
 
 /**
  * Payload from the orchestrator DO (legacy format).
@@ -169,7 +170,7 @@ function normalizePayload(raw: StatusUpdatePayload): {
 
   if (
     (raw.status === 'failed' || raw.status === 'interrupted') &&
-    isModelNotFoundCodeReviewTerminalReason(terminalReason, raw.errorMessage)
+    isCodeReviewModelUnavailableFailure(terminalReason, raw.errorMessage)
   ) {
     status = 'cancelled';
     terminalReason = 'model_not_found';
@@ -207,17 +208,6 @@ function isBillingCodeReviewTerminalReason(
   );
 }
 
-function isModelNotFoundCodeReviewTerminalReason(
-  terminalReason?: CodeReviewTerminalReason,
-  errorMessage?: string | null
-): boolean {
-  if (terminalReason === 'model_not_found') {
-    return true;
-  }
-
-  return /\bmodel\s+not\s+found\b/i.test(errorMessage ?? '');
-}
-
 function getActionRequiredTerminalReason(
   terminalReason?: CodeReviewTerminalReason,
   errorMessage?: string | null
@@ -239,7 +229,7 @@ function isRetryableInfraFailure(
   if (isCodeReviewActionRequiredReason(terminalReason)) return false;
   if (classifyCodeReviewActionRequiredFailure(errorMessage)) return false;
   if (isBillingCodeReviewTerminalReason(terminalReason, errorMessage)) return false;
-  if (isModelNotFoundCodeReviewTerminalReason(terminalReason, errorMessage)) return false;
+  if (isCodeReviewModelUnavailableFailure(terminalReason, errorMessage)) return false;
 
   const message = errorMessage?.toLowerCase();
   if (!message) return false;
@@ -431,7 +421,7 @@ function mapStatusToCheckRun(
       : null;
   const modelNotFoundCancellation =
     reviewStatus === 'cancelled' &&
-    isModelNotFoundCodeReviewTerminalReason(terminalReason, errorMessage);
+    isCodeReviewModelUnavailableFailure(terminalReason, errorMessage);
   const actionRequiredCopy = actionRequiredReason
     ? getCodeReviewActionRequiredCopy(actionRequiredReason)
     : null;
@@ -508,7 +498,7 @@ function getGitLabStatusDescription(
   if (reviewStatus === 'completed') return 'Kilo Code Review completed';
   if (
     reviewStatus === 'cancelled' &&
-    isModelNotFoundCodeReviewTerminalReason(terminalReason, errorMessage)
+    isCodeReviewModelUnavailableFailure(terminalReason, errorMessage)
   ) {
     return MODEL_NOT_FOUND_GITLAB_DESCRIPTION;
   }
@@ -988,8 +978,7 @@ export async function POST(
           : undefined,
     };
     const isModelNotFoundCancellation =
-      status === 'cancelled' &&
-      isModelNotFoundCodeReviewTerminalReason(terminalReason, errorMessage);
+      status === 'cancelled' && isCodeReviewModelUnavailableFailure(terminalReason, errorMessage);
 
     if (isModelNotFoundCancellation) {
       const claimedTerminalUpdate = await updateCodeReviewStatusIfNonTerminal(

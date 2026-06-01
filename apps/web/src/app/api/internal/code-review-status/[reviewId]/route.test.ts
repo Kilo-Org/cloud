@@ -534,10 +534,11 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       );
     });
 
-    it('infers selected-model-unavailable callbacks as action-required failures', async () => {
+    it('reclassifies preflight unavailable-model callbacks as atomic model-not-found cancellations', async () => {
       const errorMessage =
         'prepareSession failed (400): {"error":{"message":"Selected model is not available for this cloud agent session","code":-32600,"data":{"code":"BAD_REQUEST","httpStatus":400,"path":"prepareSession"}}}';
       mockGetCodeReviewById.mockResolvedValue(makeReview());
+      mockFindKiloReviewComment.mockResolvedValue(null);
 
       const response = await POST(
         makeRequest({
@@ -550,43 +551,78 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       expect(response.status).toBe(200);
       expect(mockUpdateCodeReviewAttemptForCallback).toHaveBeenCalledWith(
         expect.objectContaining({
-          status: 'failed',
+          status: 'cancelled',
           errorMessage,
-          terminalReason: 'selected_model_unavailable',
+          terminalReason: 'model_not_found',
         })
       );
-      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+      expect(mockUpdateCodeReviewStatusIfNonTerminal).toHaveBeenCalledWith(
         REVIEW_ID,
-        'failed',
+        'cancelled',
         expect.objectContaining({
           errorMessage,
-          terminalReason: 'selected_model_unavailable',
+          terminalReason: 'model_not_found',
         })
       );
-      expect(mockUpdateCodeReviewStatusIfNonTerminal).not.toHaveBeenCalled();
+      expect(mockUpdateCodeReviewStatus).not.toHaveBeenCalled();
       expect(mockCreateInfraRetryAttemptIfMissing).not.toHaveBeenCalled();
       expect(mockRetryReviewFresh).not.toHaveBeenCalled();
-      expect(mockDisableCodeReviewForActionRequiredFailure).toHaveBeenCalledWith(
-        expect.objectContaining({
-          owner: { type: 'user', id: 'user-1', userId: 'user-1' },
-          platform: 'github',
-          reviewId: REVIEW_ID,
-          reason: 'selected_model_unavailable',
-          errorMessage,
-        })
-      );
+      expect(mockDisableCodeReviewForActionRequiredFailure).not.toHaveBeenCalled();
       expect(mockUpdateCheckRun).toHaveBeenCalledWith(
         'inst-1',
         'owner',
         'repo',
         12345,
         expect.objectContaining({
-          conclusion: 'action_required',
-          output: expect.objectContaining({ title: 'Selected model unavailable' }),
+          status: 'completed',
+          conclusion: 'cancelled',
+          output: expect.objectContaining({ title: 'Selected model is no longer available' }),
         }),
         'standard'
       );
-      expect(mockFindKiloReviewComment).not.toHaveBeenCalled();
+      expect(mockCreatePRComment).toHaveBeenCalledWith(
+        'inst-1',
+        'owner',
+        'repo',
+        1,
+        expect.stringContaining('Choose another model in Kilo Code review settings'),
+        'standard'
+      );
+    });
+
+    it('reclassifies rolling-deploy selected-model-unavailable preflight callbacks as cancellations', async () => {
+      const errorMessage =
+        'prepareSession failed (400): {"error":{"message":"Selected model is not available for this cloud agent session","code":-32600,"data":{"code":"BAD_REQUEST","httpStatus":400,"path":"prepareSession"}}}';
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+      mockFindKiloReviewComment.mockResolvedValue(null);
+
+      const response = await POST(
+        makeRequest({
+          status: 'failed',
+          errorMessage,
+          terminalReason: 'selected_model_unavailable',
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockUpdateCodeReviewAttemptForCallback).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: 'cancelled',
+          errorMessage,
+          terminalReason: 'model_not_found',
+        })
+      );
+      expect(mockUpdateCodeReviewStatusIfNonTerminal).toHaveBeenCalledWith(
+        REVIEW_ID,
+        'cancelled',
+        expect.objectContaining({
+          errorMessage,
+          terminalReason: 'model_not_found',
+        })
+      );
+      expect(mockUpdateCodeReviewStatus).not.toHaveBeenCalled();
+      expect(mockDisableCodeReviewForActionRequiredFailure).not.toHaveBeenCalled();
     });
 
     it('infers model-not-allowed callbacks as action-required failures', async () => {

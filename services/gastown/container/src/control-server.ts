@@ -41,13 +41,18 @@ import type {
 const MAX_TICKETS = 1000;
 const streamTickets = new Map<string, { agentId: string; expiresAt: number }>();
 
-// Minimal Zod schema for the town config delivered via X-Town-Config header.
+// Minimal Zod schema for the non-secret town config delivered via X-Town-Config header.
 // Uses z.record() so any string-keyed object is accepted and future keys are preserved.
 const TownConfigHeader = z.record(z.string(), z.unknown());
+
+const SyncConfigRequest = z.object({
+  envVars: z.record(z.string(), z.string()).optional(),
+});
 
 // Last-known-good town config. Updated on every request that carries the header.
 // Used as a fallback by code that runs outside a request context (e.g. background tasks).
 let lastKnownTownConfig: Record<string, unknown> | null = null;
+let lastBodySyncedEnvVars: Record<string, string> | null = null;
 
 // Track which custom env var keys were applied last sync so removed keys can be cleared.
 let lastAppliedEnvVarKeys = new Set<string>();
@@ -76,7 +81,20 @@ export const RESERVED_ENV_KEYS = new Set([
   'GASTOWN_RIG_ID',
 ]);
 
-/** Get the latest town config delivered via X-Town-Config header. */
+const CONFIG_SYNC_ENV_KEYS = new Set([
+  'KILOCODE_TOKEN',
+  'GIT_TOKEN',
+  'GITLAB_TOKEN',
+  'GITLAB_INSTANCE_URL',
+  'GITHUB_CLI_PAT',
+  'GASTOWN_GIT_AUTHOR_NAME',
+  'GASTOWN_GIT_AUTHOR_EMAIL',
+  'GASTOWN_DISABLE_AI_COAUTHOR',
+  'GASTOWN_ORGANIZATION_ID',
+  'GASTOWN_API_URL',
+]);
+
+/** Get the latest non-secret town config delivered via X-Town-Config header. */
 export function getCurrentTownConfig(): Record<string, unknown> | null {
   return lastKnownTownConfig;
 }
@@ -87,18 +105,40 @@ export function getLastAppliedEnvVarKeys(): Set<string> {
 }
 
 /**
- * Sync config-derived env vars from the last-known town config into
- * process.env. Safe to call at any time — no-ops when no config is cached.
+ * Sync config-derived env vars into process.env. Secret-bearing values arrive
+ * in the JSON body because Cloudflare event logs can record request headers.
  */
-function syncTownConfigToProcessEnv(): void {
+function syncTownConfigToProcessEnv(envVars?: Record<string, string>): void {
+  if (envVars) {
+    for (const key of CONFIG_SYNC_ENV_KEYS) {
+      if (!(key in envVars)) delete process.env[key];
+    }
+    for (const [key, value] of Object.entries(envVars)) {
+      if (RESERVED_ENV_KEYS.has(key) && !CONFIG_SYNC_ENV_KEYS.has(key)) continue;
+      process.env[key] = value;
+    }
+
+    const customKeys = Object.keys(envVars).filter(key => !RESERVED_ENV_KEYS.has(key));
+    const newCustomKeys = new Set(customKeys);
+    const customEnvVars = Object.fromEntries(customKeys.map(key => [key, envVars[key]]));
+    for (const key of lastAppliedEnvVarKeys) {
+      if (!newCustomKeys.has(key) && !RESERVED_ENV_KEYS.has(key)) delete process.env[key];
+    }
+    lastAppliedEnvVarKeys = newCustomKeys;
+    lastBodySyncedEnvVars = customEnvVars;
+    lastKnownTownConfig = {
+      ...(lastKnownTownConfig ?? {}),
+      env_vars: customEnvVars,
+    };
+    return;
+  }
+
   const cfg = getCurrentTownConfig();
   if (!cfg) return;
 
   const CONFIG_ENV_MAP: Array<[string, string]> = [
-    ['github_cli_pat', 'GITHUB_CLI_PAT'],
     ['git_author_name', 'GASTOWN_GIT_AUTHOR_NAME'],
     ['git_author_email', 'GASTOWN_GIT_AUTHOR_EMAIL'],
-    ['kilocode_token', 'KILOCODE_TOKEN'],
   ];
   for (const [cfgKey, envKey] of CONFIG_ENV_MAP) {
     const val = cfg[cfgKey];
@@ -106,23 +146,6 @@ function syncTownConfigToProcessEnv(): void {
       process.env[envKey] = val;
     } else {
       delete process.env[envKey];
-    }
-  }
-
-  const gitAuth = cfg.git_auth;
-  if (typeof gitAuth === 'object' && gitAuth !== null) {
-    const auth = gitAuth as Record<string, unknown>;
-    for (const [authKey, envKey] of [
-      ['github_token', 'GIT_TOKEN'],
-      ['gitlab_token', 'GITLAB_TOKEN'],
-      ['gitlab_instance_url', 'GITLAB_INSTANCE_URL'],
-    ] as const) {
-      const val = auth[authKey];
-      if (typeof val === 'string' && val) {
-        process.env[envKey] = val;
-      } else {
-        delete process.env[envKey];
-      }
     }
   }
 
@@ -140,32 +163,11 @@ function syncTownConfigToProcessEnv(): void {
   } else {
     delete process.env.GASTOWN_ORGANIZATION_ID;
   }
-
-  // Apply custom env_vars from the town config. Reserved infra keys are
-  // skipped so the control-plane values always take precedence — matching the
-  // !(key in env) guard in buildAgentEnv.
-  const rawEnvVars = cfg.env_vars;
-  const customEnvVars: Record<string, string> =
-    rawEnvVars !== null && typeof rawEnvVars === 'object' && !Array.isArray(rawEnvVars)
-      ? (rawEnvVars as Record<string, string>)
-      : {};
-  const newCustomKeys = new Set(Object.keys(customEnvVars));
-  // Remove keys that were present in the previous sync but are gone now.
-  // Skip reserved keys — deleting those would wipe a control-plane value.
-  for (const key of lastAppliedEnvVarKeys) {
-    if (!newCustomKeys.has(key) && !RESERVED_ENV_KEYS.has(key)) delete process.env[key];
-  }
-  // Apply current custom env vars, skipping reserved keys.
-  for (const [key, value] of Object.entries(customEnvVars)) {
-    if (RESERVED_ENV_KEYS.has(key)) continue;
-    process.env[key] = String(value);
-  }
-  lastAppliedEnvVarKeys = newCustomKeys;
 }
 
 export const app = new Hono();
 
-// Parse and validate town config from X-Town-Config header (sent by TownDO on
+// Parse and validate non-secret town config from X-Town-Config header (sent by TownDO on
 // every request). The validated config is stored in a module-level cache
 // accessible via getCurrentTownConfig().
 app.use('*', async (c, next) => {
@@ -175,11 +177,14 @@ app.use('*', async (c, next) => {
       const raw: unknown = JSON.parse(configHeader);
       const result = TownConfigHeader.safeParse(raw);
       if (result.success) {
-        lastKnownTownConfig = result.data;
-        const hasToken =
-          typeof result.data.kilocode_token === 'string' && result.data.kilocode_token.length > 0;
+        const headerConfig = { ...result.data };
+        delete headerConfig.env_vars;
+        lastKnownTownConfig = {
+          ...headerConfig,
+          ...(lastBodySyncedEnvVars ? { env_vars: lastBodySyncedEnvVars } : {}),
+        };
         console.log(
-          `[control-server] X-Town-Config received: hasKilocodeToken=${hasToken} keys=${Object.keys(result.data).join(',')}`
+          `[control-server] X-Town-Config received: keys=${Object.keys(result.data).join(',')}`
         );
       } else {
         console.warn(
@@ -302,12 +307,17 @@ app.post('/refresh-token', async c => {
 });
 
 // POST /sync-config
-// Push config-derived env vars from X-Town-Config into process.env on
+// Push config-derived env vars from the JSON body into process.env on
 // the running container. Called by TownDO.syncConfigToContainer() after
 // persisting env vars to DO storage, so the live process picks up
 // changes (e.g. refreshed KILOCODE_TOKEN) without a container restart.
 app.post('/sync-config', async c => {
-  syncTownConfigToProcessEnv();
+  const body: unknown = await c.req.json().catch(() => ({}));
+  const parsed = SyncConfigRequest.safeParse(body);
+  if (!parsed.success) {
+    return c.json({ error: 'Invalid request body', issues: parsed.error.issues }, 400);
+  }
+  syncTownConfigToProcessEnv(parsed.data.envVars);
   return c.json({ synced: true });
 });
 
@@ -422,9 +432,8 @@ app.patch('/agents/:agentId/model', async c => {
     process.env.GASTOWN_ORGANIZATION_ID = parsed.data.organizationId;
   }
 
-  // Sync config-derived env vars from X-Town-Config into process.env so
-  // the SDK server restart picks up fresh tokens and git identity.
-  // The middleware already parsed the header into lastKnownTownConfig.
+  // Sync non-secret config fields from X-Town-Config into process.env.
+  // Secret-bearing values are refreshed through /sync-config or request envVars.
   syncTownConfigToProcessEnv();
 
   await updateAgentModel(

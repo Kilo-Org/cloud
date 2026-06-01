@@ -8,7 +8,13 @@ import { signAgentJWT, signContainerJWT } from '../../util/jwt.util';
 import { buildPolecatSystemPrompt } from '../../prompts/polecat-system.prompt';
 import { buildMayorSystemPrompt } from '../../prompts/mayor-system.prompt';
 import type { TownConfig, RigOverrideConfig } from '../../types';
-import { buildContainerConfig, resolveModel, resolveSmallModel, resolveRigConfig } from './config';
+import {
+  buildContainerConfig,
+  getContainerCustomEnvVars,
+  resolveModel,
+  resolveSmallModel,
+  resolveRigConfig,
+} from './config';
 import { writeEvent } from '../../util/analytics.util';
 import { resolveGitHubTokenString } from './town-scm';
 
@@ -341,7 +347,7 @@ export function branchForConvoyAgent(
 
 /**
  * Signal the container to start an agent process.
- * Attaches current town config via X-Town-Config header.
+ * Attaches non-secret town config via X-Town-Config header.
  */
 export async function startAgentInContainer(
   env: Env,
@@ -408,7 +414,7 @@ export async function startAgentInContainer(
     }
 
     // Build env vars from town config
-    const envVars: Record<string, string> = { ...(params.townConfig.env_vars ?? {}) };
+    const envVars: Record<string, string> = getContainerCustomEnvVars(params.townConfig);
 
     // Map git_auth tokens. Resolve GitHub token through resolveGitHubTokenString so
     // we mint a fresh installation token when a platform integration is
@@ -630,7 +636,7 @@ export async function startMergeInContainer(
       return false;
     }
 
-    const envVars: Record<string, string> = { ...(params.townConfig.env_vars ?? {}) };
+    const envVars: Record<string, string> = getContainerCustomEnvVars(params.townConfig);
     // Resolve GitHub token through resolveGitHubTokenString so a configured
     // platform integration mints a fresh installation token for the
     // merge process. See startAgentInContainer for the rationale.

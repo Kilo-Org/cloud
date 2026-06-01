@@ -963,10 +963,7 @@ export class TownDO extends DurableObject<Env> {
     // Resolve a fresh GitHub token here too — this method runs both at
     // initial config push and on every config change, so the persisted
     // GIT_TOKEN must be live rather than the stale value stored in
-    // git_auth.github_token from rig creation. The container's
-    // syncTownConfigToProcessEnv path reads `git_auth.github_token`
-    // from the X-Town-Config header on every request, so the in-process
-    // GIT_TOKEN follows the same source-of-truth as the persisted one.
+    // git_auth.github_token from rig creation.
     const githubToken = await scm.resolveGitHubTokenString({
       env: this.env,
       townId,
@@ -983,6 +980,7 @@ export class TownDO extends DurableObject<Env> {
       ['GASTOWN_GIT_AUTHOR_EMAIL', townConfig.git_author_email],
       ['GASTOWN_DISABLE_AI_COAUTHOR', townConfig.disable_ai_coauthor ? '1' : undefined],
       ['KILOCODE_TOKEN', townConfig.kilocode_token],
+      ['GASTOWN_ORGANIZATION_ID', townConfig.organization_id],
     ];
 
     for (const [key, value] of envMapping) {
@@ -1000,32 +998,14 @@ export class TownDO extends DurableObject<Env> {
     // Persist custom env_vars to DO storage so they survive container restarts.
     // Compare against the previously-persisted set of keys to clear removed ones.
     // Reserved infra keys are never overwritten or deleted — infra values always win.
-    const RESERVED_ENV_KEYS = new Set([
-      'KILOCODE_TOKEN',
-      'GIT_TOKEN',
-      'GITHUB_TOKEN',
-      'GITLAB_TOKEN',
-      'GITLAB_INSTANCE_URL',
-      'GITHUB_CLI_PAT',
-      'GH_TOKEN',
-      'GASTOWN_GIT_AUTHOR_NAME',
-      'GASTOWN_GIT_AUTHOR_EMAIL',
-      'GASTOWN_DISABLE_AI_COAUTHOR',
-      'GASTOWN_ORGANIZATION_ID',
-      'GASTOWN_CONTAINER_TOKEN',
-      'GASTOWN_SESSION_TOKEN',
-      'GASTOWN_API_URL',
-    ]);
     const CUSTOM_ENV_KEYS_STORAGE_KEY = 'container:custom_env_var_keys';
     const prevCustomKeys: string[] =
       (await this.ctx.storage.get<string[]>(CUSTOM_ENV_KEYS_STORAGE_KEY)) ?? [];
-    const newCustomKeys = Object.keys(townConfig.env_vars).filter(
-      key => !RESERVED_ENV_KEYS.has(key)
-    );
+    const customEnvVars = config.getContainerCustomEnvVars(townConfig);
+    const newCustomKeys = Object.keys(customEnvVars);
     const newCustomKeySet = new Set(newCustomKeys);
 
     for (const key of prevCustomKeys) {
-      if (RESERVED_ENV_KEYS.has(key)) continue;
       if (!newCustomKeySet.has(key)) {
         try {
           await container.deleteEnvVar(key);
@@ -1034,8 +1014,7 @@ export class TownDO extends DurableObject<Env> {
         }
       }
     }
-    for (const [key, value] of Object.entries(townConfig.env_vars)) {
-      if (RESERVED_ENV_KEYS.has(key)) continue;
+    for (const [key, value] of Object.entries(customEnvVars)) {
       try {
         await container.setEnvVar(key, value);
       } catch (err) {
@@ -1045,20 +1024,23 @@ export class TownDO extends DurableObject<Env> {
     await this.ctx.storage.put(CUSTOM_ENV_KEYS_STORAGE_KEY, newCustomKeys);
 
     // Phase 2: Push to the running container's process.env via the
-    // /sync-config endpoint. The X-Town-Config header delivers the
-    // full config; the endpoint applies CONFIG_ENV_MAP to process.env.
+    // /sync-config endpoint. Secret-bearing values are sent in the JSON
+    // body, not X-Town-Config, because request headers can appear in
+    // Cloudflare event logs.
     try {
       const containerConfig = await config.buildContainerConfig(
         this.ctx.storage,
         this.env,
         this.townId
       );
+      const envVars = await config.buildContainerEnvVars(this.ctx.storage, this.env, this.townId);
       await container.fetch('http://container/sync-config', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'X-Town-Config': JSON.stringify(containerConfig),
         },
+        body: JSON.stringify({ envVars }),
       });
     } catch (err) {
       // Best-effort — container may not be running yet.
@@ -4951,7 +4933,7 @@ export class TownDO extends DurableObject<Env> {
 
       // Always include X-Town-Config so the container populates
       // lastKnownTownConfig on startup — before any /agents/start arrives.
-      // This ensures org context and credentials are available immediately
+      // This ensures non-secret org context is available immediately
       // after a container restart when the first request is a model update
       // (PATCH /model) rather than a new agent start.
       const containerConfig = await config.buildContainerConfig(

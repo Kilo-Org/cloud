@@ -1530,7 +1530,7 @@ export async function sendMessage(agentId: string, prompt: string): Promise<void
  * 1. Agent's `organizationId` field — set at startup from StartAgentRequest,
  *    survives process.env restores and model hot-swaps.
  * 2. GASTOWN_ORGANIZATION_ID env var — set by control-server on /agents/start
- *    and updated on every PATCH /model via X-Town-Config.
+ *    and updated by config sync or PATCH /model.
  * 3. KILO_CONFIG_CONTENT — legacy fallback, may be absent after env restore.
  */
 function extractOrganizationId(agent?: ManagedAgent): string | undefined {

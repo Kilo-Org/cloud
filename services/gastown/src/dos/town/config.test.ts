@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { TownConfigSchema } from '../../types';
-import { getTownConfig, resolveModel } from './config';
+import { buildContainerConfig, buildContainerEnvVars, getTownConfig, resolveModel } from './config';
 
 const HARDCODED_FALLBACK = 'anthropic/claude-sonnet-4.6';
 
@@ -181,5 +181,82 @@ describe('getTownConfig seeding behavior', () => {
     expect(config.merge_strategy).toBe('direct');
     expect(config.staged_convoys_default).toBe(false);
     expect(config.refinery).toBeUndefined();
+  });
+});
+
+describe('container config payloads', () => {
+  it('keeps secret-bearing values out of X-Town-Config payloads', async () => {
+    const storage = makeFakeStorage(
+      new Map([
+        [
+          'town:config',
+          TownConfigSchema.parse({
+            env_vars: {
+              CUSTOM_SECRET: 'custom-secret-value',
+              GH_TOKEN: 'reserved-custom-value',
+            },
+            git_auth: {
+              github_token: 'github-secret-value',
+              gitlab_token: 'gitlab-secret-value',
+              gitlab_instance_url: 'https://gitlab.example.com',
+              platform_integration_id: 'integration-id',
+            },
+            github_cli_pat: 'github-cli-secret-value',
+            kilocode_token: 'kilocode-secret-value',
+            organization_id: 'org_123',
+          }),
+        ],
+      ])
+    );
+
+    const config = await buildContainerConfig(storage, {} as Env, 'town-1');
+    const serialized = JSON.stringify(config);
+
+    expect(serialized).not.toContain('github-secret-value');
+    expect(serialized).not.toContain('gitlab-secret-value');
+    expect(serialized).not.toContain('github-cli-secret-value');
+    expect(serialized).not.toContain('kilocode-secret-value');
+    expect(serialized).not.toContain('custom-secret-value');
+    expect(serialized).not.toContain('reserved-custom-value');
+    expect(config).toMatchObject({
+      git_auth: {
+        gitlab_instance_url: 'https://gitlab.example.com',
+        platform_integration_id: 'integration-id',
+      },
+      organization_id: 'org_123',
+    });
+  });
+
+  it('keeps container env vars available outside the logged header path', async () => {
+    const storage = makeFakeStorage(
+      new Map([
+        [
+          'town:config',
+          TownConfigSchema.parse({
+            env_vars: {
+              CUSTOM_SECRET: 'custom-secret-value',
+              GH_TOKEN: 'reserved-custom-value',
+            },
+            git_auth: {
+              github_token: 'github-secret-value',
+              gitlab_token: 'gitlab-secret-value',
+            },
+            github_cli_pat: 'github-cli-secret-value',
+            kilocode_token: 'kilocode-secret-value',
+          }),
+        ],
+      ])
+    );
+
+    const envVars = await buildContainerEnvVars(storage, {} as Env, 'town-1');
+
+    expect(envVars).toMatchObject({
+      CUSTOM_SECRET: 'custom-secret-value',
+      GIT_TOKEN: 'github-cli-secret-value',
+      GITLAB_TOKEN: 'gitlab-secret-value',
+      GITHUB_CLI_PAT: 'github-cli-secret-value',
+      KILOCODE_TOKEN: 'kilocode-secret-value',
+    });
+    expect(envVars.GH_TOKEN).toBeUndefined();
   });
 });

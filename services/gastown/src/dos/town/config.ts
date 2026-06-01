@@ -16,6 +16,25 @@ const NEW_TOWN_DEFAULTS_SEEDED_KEY = 'town:config:newDefaultsSeeded';
 
 const TOWN_LOG = '[Town.do]';
 
+const RESERVED_CONTAINER_ENV_KEYS = new Set([
+  'KILOCODE_TOKEN',
+  'GIT_TOKEN',
+  'GITHUB_TOKEN',
+  'GITLAB_TOKEN',
+  'GITLAB_INSTANCE_URL',
+  'GITHUB_CLI_PAT',
+  'GH_TOKEN',
+  'GASTOWN_GIT_AUTHOR_NAME',
+  'GASTOWN_GIT_AUTHOR_EMAIL',
+  'GASTOWN_DISABLE_AI_COAUTHOR',
+  'GASTOWN_ORGANIZATION_ID',
+  'GASTOWN_CONTAINER_TOKEN',
+  'GASTOWN_SESSION_TOKEN',
+  'GASTOWN_API_URL',
+  'GASTOWN_TOWN_ID',
+  'GASTOWN_RIG_ID',
+]);
+
 /**
  * Defaults that were introduced for NEW towns in #2725 but that must NOT
  * be retroactively applied to existing persisted configs (doing so would
@@ -293,26 +312,13 @@ export function resolveRigConfig(
   };
 }
 
-/**
- * Build the ContainerConfig payload for X-Town-Config header.
- * Sent with every fetch() to the container.
- *
- * The container's `syncTownConfigToProcessEnv` reads `git_auth.github_token`
- * from this payload on every request and writes it to `process.env.GIT_TOKEN`,
- * which the SDK server's `gh` CLI inherits via `GH_TOKEN`. To prevent serving
- * an expired installation token (TTL ~1h) we resolve through `resolveGitHubToken`
- * so a configured platform integration always returns a fresh value.
- *
- * `townId` is required so we can always perform the integration lookup.
- * Making it optional was a foot-gun — a forgotten arg silently re-introduces
- * the stale-token bug this function exists to prevent.
- */
-export async function buildContainerConfig(
+export async function buildContainerEnvVars(
   storage: DurableObjectStorage,
   env: Env,
   townId: string
-): Promise<Record<string, unknown>> {
+): Promise<Record<string, string>> {
   const config = await getTownConfig(storage);
+  const envVars = getContainerCustomEnvVars(config);
 
   let resolvedGithubToken = config.git_auth?.github_token;
   try {
@@ -324,21 +330,72 @@ export async function buildContainerConfig(
     if (fresh) resolvedGithubToken = fresh;
   } catch (err) {
     console.warn(
-      `${TOWN_LOG} buildContainerConfig: resolveGitHubTokenString failed; falling back to stored token`,
+      `${TOWN_LOG} buildContainerEnvVars: resolveGitHubTokenString failed; falling back to stored token`,
       err
     );
   }
 
+  if (resolvedGithubToken) {
+    envVars.GIT_TOKEN = resolvedGithubToken;
+  }
+  if (config.git_auth?.gitlab_token) {
+    envVars.GITLAB_TOKEN = config.git_auth.gitlab_token;
+  }
+  if (config.git_auth?.gitlab_instance_url) {
+    envVars.GITLAB_INSTANCE_URL = config.git_auth.gitlab_instance_url;
+  }
+  if (config.github_cli_pat) {
+    envVars.GITHUB_CLI_PAT = config.github_cli_pat;
+  }
+  if (config.git_author_name) {
+    envVars.GASTOWN_GIT_AUTHOR_NAME = config.git_author_name;
+  }
+  if (config.git_author_email) {
+    envVars.GASTOWN_GIT_AUTHOR_EMAIL = config.git_author_email;
+  }
+  if (config.disable_ai_coauthor) {
+    envVars.GASTOWN_DISABLE_AI_COAUTHOR = '1';
+  }
+  if (config.kilocode_token) {
+    envVars.KILOCODE_TOKEN = config.kilocode_token;
+  }
+  if (config.organization_id) {
+    envVars.GASTOWN_ORGANIZATION_ID = config.organization_id;
+  }
+  if (env.GASTOWN_API_URL) {
+    envVars.GASTOWN_API_URL = env.GASTOWN_API_URL;
+  }
+
+  return envVars;
+}
+
+export function getContainerCustomEnvVars(config: TownConfig): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(config.env_vars).filter(([key]) => !RESERVED_CONTAINER_ENV_KEYS.has(key))
+  );
+}
+
+/**
+ * Build the non-secret ContainerConfig payload for X-Town-Config.
+ *
+ * Cloudflare event logs can record request headers, so this payload must never
+ * contain credentials or user-defined env vars. Secrets are delivered through
+ * request bodies or persisted container env vars instead.
+ */
+export async function buildContainerConfig(
+  storage: DurableObjectStorage,
+  env: Env,
+  _townId: string
+): Promise<Record<string, unknown>> {
+  const config = await getTownConfig(storage);
+
   return {
-    env_vars: config.env_vars,
     default_model: resolveModel(config, null, ''),
     small_model: resolveSmallModel(config),
     git_auth: {
-      ...config.git_auth,
-      github_token: resolvedGithubToken,
+      gitlab_instance_url: config.git_auth?.gitlab_instance_url,
+      platform_integration_id: config.git_auth?.platform_integration_id,
     },
-    kilocode_token: config.kilocode_token,
-    github_cli_pat: config.github_cli_pat,
     git_author_name: config.git_author_name,
     git_author_email: config.git_author_email,
     disable_ai_coauthor: config.disable_ai_coauthor,

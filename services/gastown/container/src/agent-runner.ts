@@ -143,7 +143,8 @@ GASTOWN_AGENT_ID="${env.GASTOWN_AGENT_ID}"
 GASTOWN_RIG_ID="${env.GASTOWN_RIG_ID}"
 GASTOWN_TOWN_ID="${env.GASTOWN_TOWN_ID}"`);
 
-  // Fall back to X-Town-Config for KILOCODE_TOKEN if not in request or process.env
+  // Fall back to cached config for KILOCODE_TOKEN if not in request or process.env.
+  // New requests should provide this through envVars rather than X-Town-Config.
   if (!env.KILOCODE_TOKEN) {
     const townConfig = getCurrentTownConfig();
     const tokenFromConfig =

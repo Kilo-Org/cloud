@@ -492,6 +492,7 @@ function BonusStreakContent({
     bonusUsd: subscription.currentPeriodBonusCreditsUsd,
     isBonusUnlocked: subscription.isBonusUnlocked,
   });
+  const hasBonusCredits = model ? model.bonusUsd > 0 : false;
 
   const renewRows = computeRenewInfoRowModel({
     subscription,
@@ -527,26 +528,32 @@ function BonusStreakContent({
                   background: 'rgba(245,158,11,0.20)',
                 }}
               />
-              <div
-                className="absolute inset-y-0 opacity-40"
-                style={{
-                  left: `${model.pctOfBaseInTotal}%`,
-                  width: `${100 - model.pctOfBaseInTotal}%`,
-                  background: 'rgba(16,185,129,0.20)',
-                }}
-              />
+              {hasBonusCredits ? (
+                <div
+                  className="absolute inset-y-0 opacity-40"
+                  style={{
+                    left: `${model.pctOfBaseInTotal}%`,
+                    width: `${100 - model.pctOfBaseInTotal}%`,
+                    background: 'rgba(16,185,129,0.20)',
+                  }}
+                />
+              ) : null}
               <div
                 className="absolute inset-y-0 left-0 rounded-l-full bg-linear-to-r from-amber-500 to-amber-300 transition-[width]"
                 style={{ width: `${model.paidFillPct}%` }}
               />
-              <div
-                className="absolute inset-y-0 rounded-r-full bg-linear-to-r from-emerald-500 to-emerald-300 transition-[width]"
-                style={{ left: `${model.pctOfBaseInTotal}%`, width: `${model.bonusFillPct}%` }}
-              />
-              <div
-                className="absolute top-full mt-0.5 h-1.5 w-0.5 rounded bg-white/40"
-                style={{ left: `calc(${model.pctOfBaseInTotal}% - 1px)` }}
-              />
+              {hasBonusCredits ? (
+                <div
+                  className="absolute inset-y-0 rounded-r-full bg-linear-to-r from-emerald-500 to-emerald-300 transition-[width]"
+                  style={{ left: `${model.pctOfBaseInTotal}%`, width: `${model.bonusFillPct}%` }}
+                />
+              ) : null}
+              {hasBonusCredits ? (
+                <div
+                  className="absolute top-full mt-0.5 h-1.5 w-0.5 rounded bg-white/40"
+                  style={{ left: `calc(${model.pctOfBaseInTotal}% - 1px)` }}
+                />
+              ) : null}
             </div>
 
             <div className="relative h-4">
@@ -556,9 +563,11 @@ function BonusStreakContent({
               >
                 {formatDollars(model.baseUsd)}
               </span>
-              <span className="absolute right-0 font-mono text-xs font-semibold text-emerald-300">
-                {formatDollars(model.bonusUsd)}
-              </span>
+              {hasBonusCredits ? (
+                <span className="absolute right-0 font-mono text-xs font-semibold text-emerald-300">
+                  {formatDollars(model.bonusUsd)}
+                </span>
+              ) : null}
             </div>
 
             <div className="text-muted-foreground flex items-center justify-between text-xs">
@@ -566,10 +575,12 @@ function BonusStreakContent({
                 <span className="h-2 w-2 rounded-sm bg-amber-400/80" />
                 Paid
               </div>
-              <div className="flex items-center gap-2">
-                <span className="h-2 w-2 rounded-sm bg-emerald-400/80" />
-                Free bonus
-              </div>
+              {hasBonusCredits ? (
+                <div className="flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-sm bg-emerald-400/80" />
+                  Free bonus
+                </div>
+              ) : null}
             </div>
           </div>
         </div>

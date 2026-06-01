@@ -296,13 +296,22 @@ describe('KiloPassActiveSubscriptionCard.logic', () => {
       ).toBeNull();
     });
 
-    test('returns null when bonusUsd is not positive', () => {
-      expect(
-        computeUsageProgressModel({ baseUsd: 10, bonusUsd: 0, usageUsd: 5, isBonusUnlocked: false })
-      ).toBeNull();
+    test('returns a base-only model when bonusUsd is not positive', () => {
+      const model = computeUsageProgressModel({
+        baseUsd: 10,
+        bonusUsd: 0,
+        usageUsd: 5,
+        isBonusUnlocked: false,
+      });
+
+      expect(model).not.toBeNull();
+      expect(model?.bonusUsd).toBe(0);
+      expect(model?.totalAvailableUsd).toBe(10);
+      expect(model?.pctOfBaseInTotal).toBe(100);
+      expect(model?.bonusFillPct).toBe(0);
     });
 
-    test('caps percentages at [0,100] and uses amber when bonus not unlocked', () => {
+    test('does not count locked bonus credits toward available credits', () => {
       const model = computeUsageProgressModel({
         baseUsd: 20,
         bonusUsd: 10,
@@ -312,9 +321,12 @@ describe('KiloPassActiveSubscriptionCard.logic', () => {
 
       expect(model).not.toBeNull();
       expect(model?.statusClass).toBe('text-amber-300');
+      expect(model?.bonusUsd).toBe(0);
+      expect(model?.totalAvailableUsd).toBe(20);
+      expect(model?.pctOfBaseInTotal).toBe(100);
+      expect(model?.bonusFillPct).toBe(0);
       expect(model?.usagePctOfTotal).toBeGreaterThanOrEqual(0);
       expect(model?.usagePctOfTotal).toBeLessThanOrEqual(100);
-      expect(model?.pctOfBaseInTotal).toBeCloseTo((20 / 30) * 100, 5);
     });
 
     test('uses red when over available', () => {

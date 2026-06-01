@@ -233,10 +233,10 @@ export function computeUsageProgressModel(params: {
 }): UsageProgressModel | null {
   const baseUsd = params.baseUsd;
   const usageUsd = params.usageUsd ?? 0;
-  const bonusUsd = params.bonusUsd;
+  const bonusUsd = params.isBonusUnlocked === true ? params.bonusUsd : 0;
 
   if (typeof baseUsd !== 'number' || baseUsd <= 0) return null;
-  if (typeof bonusUsd !== 'number' || bonusUsd <= 0) return null;
+  if (typeof bonusUsd !== 'number' || bonusUsd < 0) return null;
 
   const totalAvailableUsd = baseUsd + bonusUsd;
   const nonNegativeUsageUsd = Math.max(0, usageUsd);
@@ -252,7 +252,7 @@ export function computeUsageProgressModel(params: {
   const isOverAvailable = usageUsd > totalAvailableUsd;
   const statusClass: UsageProgressModel['statusClass'] = isOverAvailable
     ? 'text-red-400'
-    : params.isBonusUnlocked
+    : bonusUsd > 0
       ? 'text-emerald-300'
       : 'text-amber-300';
 

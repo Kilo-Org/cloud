@@ -121,7 +121,6 @@ describe('session deletion physical cleanup', () => {
     });
 
     expect(result.lease).toMatchObject({ state: 'stop_needed', attempts: 1 });
-    expect(result.lease.state).toBe('stop_needed');
     if (result.lease.state !== 'stop_needed') throw new Error('Expected pending wrapper cleanup');
     expect(result.alarm).toBe(result.lease.nextAttemptAt);
   });

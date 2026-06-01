@@ -25,8 +25,10 @@ export type VercelProviderConfig = {
   anthropic?: AnthropicProviderOptions;
 };
 
-export function isFreePromptTrainingAllowed(provider: OpenRouterProviderConfig | undefined) {
-  return provider?.data_collection !== 'deny' && !provider?.zdr;
+export function isDataCollectionExplicitlyDisallowed(
+  provider: OpenRouterProviderConfig | undefined
+) {
+  return provider?.data_collection === 'deny' || provider?.zdr === true;
 }
 
 export type OpenRouterReasoningConfig = {

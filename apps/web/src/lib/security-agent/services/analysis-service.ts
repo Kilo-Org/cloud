@@ -473,11 +473,11 @@ export async function startSecurityAnalysis(params: {
           findingId,
           cloudAgentSessionId,
         });
-        void client.deleteSession(cloudAgentSessionId).catch(() => {});
+        void client.cleanupSession(cloudAgentSessionId).catch(() => {});
         throw initiateError;
       }
 
-      void client.deleteSession(cloudAgentSessionId).catch(() => {});
+      void client.cleanupSession(cloudAgentSessionId).catch(() => {});
 
       const classified = classifyAnalysisError(initiateError);
       const isUnknown = classified.code === 'UNKNOWN';

@@ -27,7 +27,7 @@ const mockPrepareSession = jest.fn<any>();
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const mockInitiateFromPreparedSession = jest.fn<any>();
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const mockDeleteSession = jest.fn<any>();
+const mockCleanupSession = jest.fn<any>();
 const mockInfoLogger = jest.fn();
 const mockErrorLogger = jest.fn();
 
@@ -69,7 +69,7 @@ jest.mock('@/lib/cloud-agent-next/cloud-agent-client', () => ({
   createCloudAgentNextClient: jest.fn(() => ({
     prepareSession: mockPrepareSession,
     initiateFromPreparedSession: mockInitiateFromPreparedSession,
-    deleteSession: mockDeleteSession,
+    cleanupSession: mockCleanupSession,
   })),
   InsufficientCreditsError: class InsufficientCreditsError extends Error {
     readonly httpStatus = 402;
@@ -419,7 +419,7 @@ describe('analysis-service', () => {
       kiloSessionId: 'ses_kilo-xyz',
     });
     mockInitiateFromPreparedSession.mockRejectedValue(new Error('Sandbox unavailable'));
-    mockDeleteSession.mockResolvedValue({ success: true });
+    mockCleanupSession.mockResolvedValue({ success: true });
 
     const result = await startSecurityAnalysis({
       findingId,
@@ -432,7 +432,7 @@ describe('analysis-service', () => {
     expect(result.error).toBe('Sandbox analysis failed to start. Please try again.');
     expect(result.errorCode).toBe('SANDBOX_FAILED');
     // Should attempt to clean up the prepared session
-    expect(mockDeleteSession).toHaveBeenCalledWith('agent-session-xyz');
+    expect(mockCleanupSession).toHaveBeenCalledWith('agent-session-xyz');
     // Should mark finding as failed
     expect(mockUpdateAnalysisStatus).toHaveBeenCalledWith(findingId, 'failed', {
       error: 'Sandbox analysis failed to start. Please try again.',

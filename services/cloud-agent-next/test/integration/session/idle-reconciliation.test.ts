@@ -16,6 +16,7 @@ import {
   allocateWrapperRuntimeState,
 } from '../../../src/session/wrapper-runtime-state.js';
 import {
+  getSessionMessageState,
   listNonTerminalAcceptedMessages,
   putSessionMessageState,
   type SessionMessageState,
@@ -200,15 +201,23 @@ describe('idle reconciliation scheduling', () => {
         instance.ctx.storage,
         wrapperRunId!
       );
+      const failedMessage = await getSessionMessageState(
+        instance.ctx.storage,
+        'msg_018f1e2d3c4b00000000000002'
+      );
 
       const db = drizzle(state.storage, { logger: false });
       const eventQueries = createEventQueries(db, state.storage.sql);
       const allEvents = eventQueries.findByFilters({});
 
-      return { nonTerminalMessages, allEvents };
+      return { nonTerminalMessages, failedMessage, allEvents };
     });
 
     expect(result.nonTerminalMessages).toHaveLength(0);
+    expect(result.failedMessage).toMatchObject({
+      failureStage: 'post_dispatch_no_activity',
+      failureCode: 'missing_assistant_reply',
+    });
 
     const failedEvents = result.allEvents.filter(
       event => event.stream_event_type === 'cloud.message.failed'

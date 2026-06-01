@@ -9,6 +9,7 @@ import { AuthProviderButtons } from '@/components/auth/sign-in/AuthProviderButto
 import { SignInButton } from '@/components/auth/SigninButton';
 import { FakeLoginForm } from '@/components/auth/FakeLoginForm';
 import { AuthErrorNotification } from '@/components/auth/AuthErrorNotification';
+import { AnimatedLogoMark } from '@/components/AnimatedLogoMark';
 import Link from 'next/link';
 import { Mail, SquareUserRound } from 'lucide-react';
 import type { SignInFormInitialState } from '@/hooks/useSignInFlow';
@@ -56,9 +57,10 @@ export function SignInForm({
   // This prevents flash of "new user" UI before switching to "returning user" UI
   if (!flow.isHintLoaded) {
     return (
-      <div className="w-full text-center">
+      <div className="mx-auto flex w-full max-w-sm flex-col items-center text-center">
+        <AnimatedLogoMark size={56} className="mb-6 opacity-0" />
         {title && (
-          <h1 className="text-foreground mb-8 text-4xl font-bold opacity-0 transition-opacity duration-300">
+          <h1 className="text-foreground mb-2 text-3xl font-bold tracking-tight opacity-0 transition-opacity duration-300">
             {title}
           </h1>
         )}
@@ -89,8 +91,11 @@ export function SignInForm({
   // Magic link sent confirmation state
   if (flow.flowState === 'magic-link-sent') {
     return (
-      <div className="w-full text-center">
-        {title && <h1 className="text-foreground mb-12 text-5xl font-bold">{title}</h1>}
+      <div className="mx-auto flex w-full max-w-sm flex-col items-center text-center">
+        <AnimatedLogoMark size={56} className="mb-6" />
+        {title && (
+          <h1 className="text-foreground mb-8 text-3xl font-bold tracking-tight">{title}</h1>
+        )}
         <MagicLinkSentConfirmation email={flow.email} onBack={flow.handleBack} />
       </div>
     );
@@ -99,9 +104,10 @@ export function SignInForm({
   // Redirecting state
   if (flow.flowState === 'redirecting') {
     return (
-      <div className="w-full text-center">
-        <h1 className="text-foreground mb-12 text-5xl font-bold">Redirecting...</h1>
-        <p className="text-muted-foreground text-xl">Taking you to your sign-in page...</p>
+      <div className="mx-auto flex w-full max-w-sm flex-col items-center text-center">
+        <AnimatedLogoMark size={56} className="mb-6" />
+        <h1 className="text-foreground mb-3 text-3xl font-bold tracking-tight">Redirecting…</h1>
+        <p className="text-muted-foreground text-sm">Taking you to your sign-in page…</p>
       </div>
     );
   }
@@ -109,8 +115,11 @@ export function SignInForm({
   // Provider select state (after email lookup)
   if (flow.flowState === 'provider-select') {
     return (
-      <div className="w-full text-center">
-        {title && <h1 className="text-foreground mb-12 text-5xl font-bold">{title}</h1>}
+      <div className="mx-auto flex w-full max-w-sm flex-col items-center text-center">
+        <AnimatedLogoMark size={56} className="mb-6" />
+        {title && (
+          <h1 className="text-foreground mb-8 text-3xl font-bold tracking-tight">{title}</h1>
+        )}
         {errorNotification}
         <ProviderSelectView
           email={flow.email}
@@ -128,15 +137,17 @@ export function SignInForm({
   return (
     <>
       {allowFakeLogin && <FakeLoginForm searchParams={searchParams} />}
-      <div className="w-full text-center">
+      <div className="mx-auto flex w-full max-w-sm flex-col items-center text-center">
+        <AnimatedLogoMark size={56} className="mb-6" />
+
         {title && (
-          <h1 className="text-foreground mb-8 text-4xl font-bold transition-all duration-300 ease-in-out">
+          <h1 className="text-foreground mb-2 text-3xl font-bold tracking-tight transition-all duration-300 ease-in-out">
             {title}
           </h1>
         )}
 
         {subtitle && !flow?.hint && (
-          <p className="text-muted-foreground mb-8 text-lg leading-relaxed">{subtitle}</p>
+          <p className="text-muted-foreground mb-8 text-sm leading-relaxed">{subtitle}</p>
         )}
 
         {errorNotification}
@@ -291,7 +302,7 @@ export function SignInForm({
               ) : (
                 // Provider buttons view (initial state)
                 <>
-                  <div className="mx-auto max-w-md space-y-4">
+                  <div className="space-y-2">
                     {/* OAuth provider buttons - Google first */}
                     <AuthProviderButtons
                       providers={OAuthProviderIds}
@@ -303,65 +314,73 @@ export function SignInForm({
                     </SignInButton>
                   </div>
 
-                  <p className="text-muted-foreground mx-auto mt-4 max-w-md text-sm">
+                  <p className="text-muted-foreground mt-4 text-xs leading-relaxed">
                     By continuing, you are agreeing to the{' '}
                     <a
                       href="https://kilo.ai/terms"
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="underline"
+                      className="hover:text-foreground underline underline-offset-4 transition-colors"
                     >
                       Terms &amp; Conditions
                     </a>
                   </p>
-
-                  {/* Divider */}
-                  <div className="mx-auto my-6 max-w-md">
-                    <div className="border-border w-full border-t"></div>
-                  </div>
-
-                  <div className="mx-auto max-w-md">
-                    <Link href="/users/sign_in?sso=true" className="block">
-                      <SignInButton>
-                        <SquareUserRound />
-                        Enterprise SSO
-                      </SignInButton>
-                    </Link>
-                  </div>
                 </>
               )}
             </>
           )}
 
-          {/* Sign up / Sign in links - hidden in emailOnly or SSO mode */}
-          {!emailOnly && !ssoMode && (
+          {/* Secondary actions footer - hidden in emailOnly or SSO mode and only on the new-user landing screen */}
+          {!emailOnly && !ssoMode && flow.tier === 'new' && !flow.showEmailInput && !isSignUp && (
+            <div className="border-border mt-8 flex flex-col items-center gap-3 border-t pt-6">
+              <Link
+                href="/users/sign_in?sso=true"
+                className="text-muted-foreground hover:text-foreground inline-flex items-center gap-2 text-sm transition-colors"
+              >
+                <SquareUserRound className="size-4" />
+                Enterprise SSO
+              </Link>
+              <Link
+                href="/get-started"
+                className="text-brand-primary text-sm font-medium underline-offset-4 hover:underline"
+              >
+                Get started with Kilo Code
+              </Link>
+            </div>
+          )}
+
+          {/* Sign-up mode footer - keep original treatment for now */}
+          {!emailOnly && !ssoMode && isSignUp && (
             <>
               <div className="mx-auto mt-8 max-w-md">
-                {isSignUp ? (
-                  <p className="text-muted-foreground text-sm">
-                    Already have an account?{' '}
-                    <Link
-                      href={signInHrefFromSearchParams(searchParams)}
-                      className="text-primary hover:underline"
-                    >
-                      Sign in
-                    </Link>
-                  </p>
-                ) : (
-                  <p className="text-muted-foreground text-sm">
-                    <Link href="/get-started" className="text-primary hover:underline">
-                      Get started with Kilo Code
-                    </Link>
-                  </p>
-                )}
-              </div>
-
-              {isSignUp && (
-                <p className="text-muted-foreground mt-8 mb-12 text-sm">
-                  We&rsquo;ll email on occasion. Unsubscribe with one click.
+                <p className="text-muted-foreground text-sm">
+                  Already have an account?{' '}
+                  <Link
+                    href={signInHrefFromSearchParams(searchParams)}
+                    className="text-brand-primary font-medium underline-offset-4 hover:underline"
+                  >
+                    Sign in
+                  </Link>
                 </p>
-              )}
+              </div>
+              <p className="text-muted-foreground mt-8 mb-12 text-sm">
+                We&rsquo;ll email on occasion. Unsubscribe with one click.
+              </p>
             </>
+          )}
+
+          {/* Other tiers (returning, invite, email-input, etc.) keep original "Get started" / "Sign in" link */}
+          {!emailOnly && !ssoMode && !isSignUp && (flow.tier !== 'new' || flow.showEmailInput) && (
+            <div className="mx-auto mt-8 max-w-md">
+              <p className="text-muted-foreground text-sm">
+                <Link
+                  href="/get-started"
+                  className="text-brand-primary font-medium underline-offset-4 hover:underline"
+                >
+                  Get started with Kilo Code
+                </Link>
+              </p>
+            </div>
           )}
         </div>
         {/* End min-height content area */}

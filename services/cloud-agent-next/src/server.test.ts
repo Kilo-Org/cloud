@@ -3,9 +3,16 @@ import jwt from 'jsonwebtoken';
 import type { Env } from './types.js';
 import { WRAPPER_VERSION } from './shared/wrapper-version.js';
 
-const { getSandboxMock, findWrapperForSessionMock } = vi.hoisted(() => ({
+const {
+  getSandboxMock,
+  findWrapperForSessionMock,
+  consumeCloudAgentReportBatchMock,
+  removeExpiredCloudAgentReportDataMock,
+} = vi.hoisted(() => ({
   getSandboxMock: vi.fn(),
   findWrapperForSessionMock: vi.fn(),
+  consumeCloudAgentReportBatchMock: vi.fn().mockResolvedValue(undefined),
+  removeExpiredCloudAgentReportDataMock: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('./logger.js', () => {
@@ -39,6 +46,16 @@ vi.mock('./router.js', () => ({
 
 vi.mock('./callbacks/index.js', () => ({
   createCallbackQueueConsumer: vi.fn(),
+}));
+
+vi.mock('./telemetry/report-consumer.js', () => ({
+  CLOUD_AGENT_REPORT_QUEUE_NAMES: new Set([
+    'cloud-agent-next-report-queue',
+    'cloud-agent-next-report-queue-dev',
+    'cloud-agent-next-report-queue-test',
+  ]),
+  consumeCloudAgentReportBatch: consumeCloudAgentReportBatchMock,
+  removeExpiredCloudAgentReportData: removeExpiredCloudAgentReportDataMock,
 }));
 
 vi.mock('./middleware/auth.js', () => ({
@@ -87,6 +104,8 @@ function fetchWorker(request: Request, env: MockEnv): Promise<Response> | Respon
 beforeEach(() => {
   getSandboxMock.mockReset();
   findWrapperForSessionMock.mockReset();
+  consumeCloudAgentReportBatchMock.mockClear();
+  removeExpiredCloudAgentReportDataMock.mockClear();
 });
 
 describe('server /stream', () => {
@@ -114,6 +133,52 @@ describe('server /stream', () => {
     await expect(response.text()).resolves.toBe('Ticket expired');
     expect(env.CLOUD_AGENT_SESSION.idFromName).not.toHaveBeenCalled();
     expect(env.CLOUD_AGENT_SESSION.get).not.toHaveBeenCalled();
+  });
+});
+
+describe('server background reporting', () => {
+  it('routes report queue batches to the Cloud Agent report consumer', async () => {
+    const env = createEnv();
+    const batch = {
+      queue: 'cloud-agent-next-report-queue',
+      messages: [],
+    } as unknown as MessageBatch<unknown>;
+
+    await worker.queue(batch, env as unknown as Env);
+
+    expect(consumeCloudAgentReportBatchMock).toHaveBeenCalledWith(batch, env);
+  });
+
+  it('routes report test queue batches to the Cloud Agent report consumer', async () => {
+    const env = createEnv();
+    const batch = {
+      queue: 'cloud-agent-next-report-queue-test',
+      messages: [],
+    } as unknown as MessageBatch<unknown>;
+
+    await worker.queue(batch, env as unknown as Env);
+
+    expect(consumeCloudAgentReportBatchMock).toHaveBeenCalledWith(batch, env);
+  });
+
+  it('routes isolated development report queue batches to the Cloud Agent report consumer', async () => {
+    const env = createEnv();
+    const batch = {
+      queue: 'cloud-agent-next-report-queue-dev',
+      messages: [],
+    } as unknown as MessageBatch<unknown>;
+
+    await worker.queue(batch, env as unknown as Env);
+
+    expect(consumeCloudAgentReportBatchMock).toHaveBeenCalledWith(batch, env);
+  });
+
+  it('runs reporting retention cleanup from the scheduled handler', async () => {
+    const env = createEnv();
+
+    await worker.scheduled({} as ScheduledController, env as unknown as Env);
+
+    expect(removeExpiredCloudAgentReportDataMock).toHaveBeenCalledWith(env);
   });
 });
 

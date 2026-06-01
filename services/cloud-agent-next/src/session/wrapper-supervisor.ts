@@ -120,6 +120,7 @@ export type WrapperSupervisorDependencies = {
     kiloSessionId: string,
     parentMessageId: string
   ) => LatestAssistantMessage | null;
+  observeCorrelatedAgentActivity?: (messageId: string) => Promise<void>;
   hasActiveIngestConnection: (params: {
     wrapperRunId: string;
     wrapperGeneration: number;
@@ -185,6 +186,7 @@ export function createWrapperSupervisor(
     sessionMessageQueue,
     getMetadata,
     getAssistantMessageForUserMessage,
+    observeCorrelatedAgentActivity,
     hasActiveIngestConnection,
     clearInterruptRequest,
     getSessionIdForLogs,
@@ -359,7 +361,11 @@ export function createWrapperSupervisor(
     await startDisconnectGrace(input);
   }
 
-  async function handleUnhealthyWrapper(state: WrapperRuntimeState, error: string): Promise<void> {
+  async function handleUnhealthyWrapper(
+    state: WrapperRuntimeState,
+    error: string,
+    failureCode: 'wrapper_no_output' | 'wrapper_ping_timeout'
+  ): Promise<void> {
     logger
       .withFields({
         sessionId: getSessionIdForLogs(),
@@ -371,11 +377,14 @@ export function createWrapperSupervisor(
 
     const acceptedMessages = await listNonTerminalAcceptedMessages(storage, state.wrapperRunId);
     for (const message of acceptedMessages) {
+      const activityObserved = message.agentActivityObservedAt !== undefined;
       await messageSettlementOutbox.terminalizeSessionMessageOnce(message.messageId, {
         kind: 'failed',
         reason: 'wrapper_failure',
         error,
         completionSource: 'wrapper_failure',
+        failureStage: activityObserved ? 'agent_activity' : 'post_dispatch_no_activity',
+        failureCode: activityObserved ? 'wrapper_error_after_activity' : failureCode,
       });
     }
     await messageSettlementOutbox.releaseWrapperTerminalWaitForIdleBatch();
@@ -440,11 +449,14 @@ export function createWrapperSupervisor(
       .withFields({ wrapperRunId, messageCount: acceptedMessages.length })
       .warn('Grace period expired - failing accepted messages');
     for (const message of acceptedMessages) {
+      const activityObserved = message.agentActivityObservedAt !== undefined;
       await messageSettlementOutbox.terminalizeSessionMessageOnce(message.messageId, {
         kind: 'failed',
         reason: 'wrapper_disconnected',
         error: 'Wrapper disconnected',
         completionSource: 'wrapper_failure',
+        failureStage: activityObserved ? 'agent_activity' : 'post_dispatch_no_activity',
+        failureCode: activityObserved ? 'wrapper_error_after_activity' : 'wrapper_disconnected',
       });
     }
     await clearWrapperRuntimeIdentity(
@@ -515,7 +527,11 @@ export function createWrapperSupervisor(
           noOutputDeadlineAt: state.noOutputDeadlineAt,
         })
         .warn('Wrapper liveness no-output deadline expired');
-      await handleUnhealthyWrapper(state, 'Wrapper accepted the message but produced no output');
+      await handleUnhealthyWrapper(
+        state,
+        'Wrapper accepted the message but produced no output',
+        'wrapper_no_output'
+      );
       return true;
     }
 
@@ -529,7 +545,11 @@ export function createWrapperSupervisor(
           pingDeadlineAt: state.pingDeadlineAt,
         })
         .warn('Wrapper liveness ping deadline expired');
-      await handleUnhealthyWrapper(state, 'Wrapper did not respond to liveness ping');
+      await handleUnhealthyWrapper(
+        state,
+        'Wrapper did not respond to liveness ping',
+        'wrapper_ping_timeout'
+      );
       return true;
     }
 
@@ -596,6 +616,8 @@ export function createWrapperSupervisor(
           reason: 'missing_assistant_reply',
           error: 'No assistant reply found after idle timeout',
           completionSource: 'idle_reconciliation',
+          failureStage: 'post_dispatch_no_activity',
+          failureCode: 'missing_assistant_reply',
         });
         continue;
       }
@@ -611,10 +633,13 @@ export function createWrapperSupervisor(
           reason: 'missing_assistant_reply',
           error: 'No assistant reply found after idle timeout',
           completionSource: 'idle_reconciliation',
+          failureStage: 'post_dispatch_no_activity',
+          failureCode: 'missing_assistant_reply',
         });
         continue;
       }
 
+      await observeCorrelatedAgentActivity?.(message.messageId);
       const assistantError = getAssistantErrorMessage(assistantMessage.info.error);
       if (assistantError !== undefined) {
         await messageSettlementOutbox.terminalizeSessionMessageOnce(message.messageId, {
@@ -622,6 +647,8 @@ export function createWrapperSupervisor(
           reason: 'assistant_error',
           error: assistantError,
           completionSource: 'idle_reconciliation',
+          failureStage: 'agent_activity',
+          failureCode: 'assistant_error',
         });
         continue;
       }
@@ -714,11 +741,16 @@ export function createWrapperSupervisor(
       const acceptedMessages = await listNonTerminalAcceptedMessages(storage, wrapperRunId);
       for (const message of acceptedMessages) {
         if (status === 'failed') {
+          const activityObserved = message.agentActivityObservedAt !== undefined;
           await messageSettlementOutbox.terminalizeSessionMessageOnce(message.messageId, {
             kind: 'failed',
             reason: 'wrapper_error',
             error: error ?? 'Wrapper error',
             completionSource: 'wrapper_failure',
+            failureStage: activityObserved ? 'agent_activity' : 'post_dispatch_no_activity',
+            failureCode: activityObserved
+              ? 'wrapper_error_after_activity'
+              : 'wrapper_error_before_activity',
           });
           continue;
         }
@@ -727,6 +759,8 @@ export function createWrapperSupervisor(
           kind: 'interrupted',
           error: error ?? 'Wrapper interrupted',
           completionSource: 'interrupt',
+          failureStage: 'interruption',
+          failureCode: 'system_interrupt',
         });
       }
     }

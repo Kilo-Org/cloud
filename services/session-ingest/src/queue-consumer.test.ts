@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
+import type * as SessionEvents from './session-events';
 
 // Mock cloudflare:workers before any imports that might pull in DO code
 vi.mock('cloudflare:workers', () => ({
@@ -26,13 +27,24 @@ vi.mock('./dos/SessionIngestDO', () => ({
   getSessionIngestDO: vi.fn(),
 }));
 
+vi.mock('./session-events', async importOriginal => {
+  const actual = await importOriginal<typeof SessionEvents>();
+  return {
+    ...actual,
+    notifyUserSessionEvent: vi.fn(),
+  };
+});
+
 // Mock ingest-limits so we can use a small MAX_SINGLE_ITEM_BYTES in oversize tests
 vi.mock('./util/ingest-limits', () => ({
   MAX_INGEST_ITEM_BYTES: 2 * 1024 * 1024,
   MAX_SINGLE_ITEM_BYTES: 50,
 }));
 
-import { createItemExtractor, computeSessionMetadataUpdates } from './queue-consumer';
+import { getWorkerDb } from '@kilocode/db/client';
+import { getSessionIngestDO } from './dos/SessionIngestDO';
+import { notifyUserSessionEvent } from './session-events';
+import { computeSessionMetadataUpdates, createItemExtractor, queue } from './queue-consumer';
 
 const encoder = new TextEncoder();
 
@@ -186,5 +198,102 @@ describe('computeSessionMetadataUpdates', () => {
   it('ignores a null "platform" change (creation value stays sticky)', () => {
     const updates = computeSessionMetadataUpdates(new Map([['platform', null]]), fixedNow);
     expect('created_on_platform' in updates).toBe(false);
+  });
+});
+
+describe('queue status notifications', () => {
+  it('emits a status update using the locked pre-update status instead of the intake snapshot', async () => {
+    vi.mocked(notifyUserSessionEvent).mockClear();
+    const persistedSession = {
+      session_id: 'ses_12345678901234567890123456',
+      created_at: '2026-05-05T00:00:00.000Z',
+      updated_at: '2026-05-05T00:00:01.000Z',
+      title: null,
+      created_on_platform: null,
+      organization_id: null,
+      git_url: null,
+      git_branch: null,
+      parent_session_id: null,
+      status: 'idle',
+      status_updated_at: '2026-05-05T00:00:01.000Z',
+    };
+    const selectResults: unknown[][] = [
+      [{ session_id: persistedSession.session_id, status: 'idle' }],
+      [{ status: 'busy' }],
+      [persistedSession],
+    ];
+    const selectResult = vi.fn(async () => selectResults.shift() ?? []);
+    const select = {
+      from: vi.fn(() => select),
+      where: vi.fn(() => select),
+      limit: vi.fn(() => select),
+      for: vi.fn(() => select),
+      then: vi.fn((resolve: (value: unknown) => unknown) => resolve(selectResult())),
+    };
+    const update = {
+      set: vi.fn(() => update),
+      where: vi.fn(() => update),
+      then: vi.fn((resolve: (value: undefined) => unknown) => resolve(undefined)),
+    };
+    const dbRef: Record<string, unknown> = {};
+    const db = {
+      select: vi.fn(() => select),
+      update: vi.fn(() => update),
+      transaction: vi.fn(async (fn: (tx: unknown) => Promise<unknown>) => fn(dbRef)),
+    } as unknown as ReturnType<typeof getWorkerDb>;
+    Object.assign(dbRef, db);
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    vi.mocked(getSessionIngestDO).mockReturnValue({
+      ingest: vi.fn(async () => ({ changes: [{ name: 'status', value: 'idle' }] })),
+    } as never);
+
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(
+          encoder.encode(
+            JSON.stringify({ data: [{ type: 'session_status', data: { status: 'idle' } }] })
+          )
+        );
+        controller.close();
+      },
+    });
+    const env = {
+      HYPERDRIVE: { connectionString: 'postgres://test' },
+      SESSION_INGEST_R2: {
+        get: vi.fn(async () => ({ body })),
+        delete: vi.fn(async () => undefined),
+        put: vi.fn(async () => undefined),
+      },
+    } as never;
+    const ack = vi.fn();
+    const batch = {
+      messages: [
+        {
+          body: {
+            r2Key: 'ingest/status-change',
+            kiloUserId: 'usr_test',
+            sessionId: persistedSession.session_id,
+            ingestVersion: 1,
+            ingestedAt: 1,
+          },
+          ack,
+          retry: vi.fn(),
+        },
+      ],
+    } as never;
+    const ctx = { waitUntil: vi.fn() } as unknown as ExecutionContext;
+
+    await queue(batch, env, ctx);
+
+    expect(ack).toHaveBeenCalledTimes(1);
+    expect(notifyUserSessionEvent).toHaveBeenCalledWith(
+      env,
+      'usr_test',
+      expect.objectContaining({
+        type: 'session.status.updated',
+        data: expect.objectContaining({ previousStatus: 'busy', status: 'idle' }),
+      }),
+      ctx
+    );
   });
 });

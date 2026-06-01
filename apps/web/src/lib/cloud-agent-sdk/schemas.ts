@@ -98,6 +98,7 @@ export const webInboundMessageSchema = z.discriminatedUnion('type', [
     data: z.unknown(),
   }),
   z.object({ type: z.literal('system'), event: z.string(), data: z.unknown() }),
+  z.object({ type: z.literal('pong'), nonce: z.string() }),
   z.object({
     type: z.literal('response'),
     id: z.string(),
@@ -108,22 +109,111 @@ export const webInboundMessageSchema = z.discriminatedUnion('type', [
 export type WebInboundMessage = z.infer<typeof webInboundMessageSchema>;
 
 // ---------------------------------------------------------------------------
-// Heartbeat
+// Active CLI sessions
 // ---------------------------------------------------------------------------
+
+export const activeSessionSchema = z
+  .object({
+    id: z.string(),
+    status: z.string(),
+    title: z.string(),
+    gitUrl: z.string().optional(),
+    gitBranch: z.string().optional(),
+    parentSessionId: z.string().optional(),
+  })
+  .passthrough();
+export type ActiveSessionData = z.infer<typeof activeSessionSchema>;
+
+export const activeSessionWithConnectionSchema = activeSessionSchema.extend({
+  connectionId: z.string(),
+});
+export type ActiveSessionWithConnectionData = z.infer<typeof activeSessionWithConnectionSchema>;
+
+export const sessionsListDataSchema = z.object({
+  sessions: z.array(activeSessionWithConnectionSchema),
+});
+export type SessionsListData = z.infer<typeof sessionsListDataSchema>;
 
 export const heartbeatDataSchema = z.object({
   connectionId: z.string(),
-  sessions: z.array(
-    z
-      .object({
-        id: z.string(),
-        status: z.string(),
-        title: z.string(),
-      })
-      .passthrough()
-  ),
+  sessions: z.array(activeSessionSchema),
 });
 export type HeartbeatData = z.infer<typeof heartbeatDataSchema>;
+
+export const cliConnectionDataSchema = z.object({
+  connectionId: z.string(),
+});
+export type CliConnectionData = z.infer<typeof cliConnectionDataSchema>;
+
+// ---------------------------------------------------------------------------
+// V2 session system events
+// ---------------------------------------------------------------------------
+
+export const sessionStatusValueSchema = z.enum(['idle', 'busy', 'question', 'permission', 'retry']);
+
+export const sessionEventV2RowSchema = z.object({
+  source: z.literal('v2'),
+  sessionId: z.string(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  title: z.string().nullable(),
+  createdOnPlatform: z.string().nullable(),
+  organizationId: z.string().nullable(),
+  gitUrl: z.string().nullable(),
+  gitBranch: z.string().nullable(),
+  parentSessionId: z.string().nullable(),
+  status: sessionStatusValueSchema.nullable(),
+  statusUpdatedAt: z.string().nullable(),
+});
+export type SessionEventV2Row = z.infer<typeof sessionEventV2RowSchema>;
+
+export const sessionRowEventPayloadSchema = z.object({
+  source: z.literal('v2'),
+  session: sessionEventV2RowSchema,
+  changedAt: z.string(),
+});
+export type SessionRowEventPayload = z.infer<typeof sessionRowEventPayloadSchema>;
+
+export const sessionStatusUpdatedPayloadSchema = z.union([
+  z.object({
+    source: z.literal('v2'),
+    session: sessionEventV2RowSchema,
+    previousStatus: sessionStatusValueSchema.nullable(),
+    status: sessionStatusValueSchema.nullable(),
+    statusUpdatedAt: z.string().nullable(),
+    changedAt: z.string(),
+  }),
+  z.object({
+    source: z.literal('v2'),
+    sessionId: z.string(),
+    previousStatus: sessionStatusValueSchema.nullable(),
+    status: sessionStatusValueSchema.nullable(),
+    statusUpdatedAt: z.string().nullable(),
+    updatedAt: z.string().optional(),
+    changedAt: z.string(),
+  }),
+]);
+export type SessionStatusUpdatedPayload = z.infer<typeof sessionStatusUpdatedPayloadSchema>;
+
+export const sessionDeletedPayloadSchema = z.object({
+  source: z.literal('v2'),
+  sessionId: z.string(),
+  parentSessionId: z.string().nullable(),
+  organizationId: z.string().nullable(),
+  gitUrl: z.string().nullable(),
+  gitBranch: z.string().nullable(),
+  createdOnPlatform: z.string().nullable(),
+  deletedAt: z.string(),
+});
+export type SessionDeletedPayload = z.infer<typeof sessionDeletedPayloadSchema>;
+
+export const sessionEventPayloadSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('session.created'), data: sessionRowEventPayloadSchema }),
+  z.object({ type: z.literal('session.updated'), data: sessionRowEventPayloadSchema }),
+  z.object({ type: z.literal('session.status.updated'), data: sessionStatusUpdatedPayloadSchema }),
+  z.object({ type: z.literal('session.deleted'), data: sessionDeletedPayloadSchema }),
+]);
+export type SessionEventPayload = z.infer<typeof sessionEventPayloadSchema>;
 
 // ---------------------------------------------------------------------------
 // Kilocode payload

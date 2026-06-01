@@ -67,6 +67,14 @@ import {
   CODE_REVIEW_TERMINAL_REASONS,
   type CodeReviewTerminalReason,
 } from '@kilocode/db/schema-types';
+import {
+  classifyCodeReviewActionRequiredFailure,
+  disableCodeReviewForActionRequiredFailure,
+  getCodeReviewActionRequiredCopy,
+  isCodeReviewActionRequiredReason,
+  type CodeReviewActionRequiredReason,
+} from '@/lib/code-reviews/action-required';
+import type { Owner } from '@/lib/code-reviews/core';
 
 /**
  * Payload from the orchestrator DO (legacy format).
@@ -96,6 +104,11 @@ type CloudAgentNextCallbackPayload = {
 };
 
 type StatusUpdatePayload = OrchestratorPayload | CloudAgentNextCallbackPayload;
+
+type TerminalOwnerResolution = {
+  owner: Owner;
+  canDispatch: boolean;
+};
 
 /**
  * Normalize a payload from either the orchestrator or cloud-agent-next callback
@@ -129,6 +142,20 @@ function normalizePayload(raw: StatusUpdatePayload): {
   const validReasons: ReadonlySet<string> = new Set(CODE_REVIEW_TERMINAL_REASONS);
   let terminalReason: CodeReviewTerminalReason | undefined =
     raw.terminalReason && validReasons.has(raw.terminalReason) ? raw.terminalReason : undefined;
+
+  if (terminalReason && isCodeReviewActionRequiredReason(terminalReason)) {
+    if (status === 'cancelled') {
+      status = 'failed';
+    }
+  }
+
+  const actionRequiredReason = classifyCodeReviewActionRequiredFailure(raw.errorMessage);
+  if (!terminalReason && actionRequiredReason) {
+    if (status === 'cancelled') {
+      status = 'failed';
+    }
+    terminalReason = actionRequiredReason;
+  }
 
   // Infer billing when no explicit terminalReason was provided.
   // v1: billing errors arrive as 'interrupted' (→ cancelled) with billing error text
@@ -191,6 +218,17 @@ function isModelNotFoundCodeReviewTerminalReason(
   return /\bmodel\s+not\s+found\b/i.test(errorMessage ?? '');
 }
 
+function getActionRequiredTerminalReason(
+  terminalReason?: CodeReviewTerminalReason,
+  errorMessage?: string | null
+): CodeReviewActionRequiredReason | null {
+  if (isCodeReviewActionRequiredReason(terminalReason)) {
+    return terminalReason;
+  }
+
+  return classifyCodeReviewActionRequiredFailure(errorMessage);
+}
+
 function isRetryableInfraFailure(
   status: 'running' | 'completed' | 'failed' | 'cancelled',
   terminalReason?: CodeReviewTerminalReason,
@@ -198,6 +236,8 @@ function isRetryableInfraFailure(
 ): boolean {
   if (status !== 'failed') return false;
   if (terminalReason === 'billing') return false;
+  if (isCodeReviewActionRequiredReason(terminalReason)) return false;
+  if (classifyCodeReviewActionRequiredFailure(errorMessage)) return false;
   if (isBillingCodeReviewTerminalReason(terminalReason, errorMessage)) return false;
   if (isModelNotFoundCodeReviewTerminalReason(terminalReason, errorMessage)) return false;
 
@@ -224,6 +264,51 @@ function isRetryableInfraFailure(
 
 function isSupersededReview(review: CloudAgentCodeReview): boolean {
   return review.terminal_reason === 'superseded';
+}
+
+async function resolveTerminalOwner(
+  review: CloudAgentCodeReview,
+  reviewId: string
+): Promise<TerminalOwnerResolution | undefined> {
+  if (review.owned_by_organization_id) {
+    const botUserId = await getBotUserId(review.owned_by_organization_id, 'code-review');
+    if (!botUserId) {
+      errorExceptInTest('[code-review-status] Bot user not found for organization', {
+        organizationId: review.owned_by_organization_id,
+        reviewId,
+      });
+      captureMessage('Bot user missing for organization code review', {
+        level: 'error',
+        tags: { source: 'code-review-status' },
+        extra: {
+          organizationId: review.owned_by_organization_id,
+          reviewId,
+        },
+      });
+    }
+
+    return {
+      owner: {
+        type: 'org',
+        id: review.owned_by_organization_id,
+        userId: botUserId ?? 'system',
+      },
+      canDispatch: !!botUserId,
+    };
+  }
+
+  if (review.owned_by_user_id) {
+    return {
+      owner: {
+        type: 'user',
+        id: review.owned_by_user_id,
+        userId: review.owned_by_user_id,
+      },
+      canDispatch: true,
+    };
+  }
+
+  return undefined;
 }
 
 const BILLING_NOTICE_MARKER = '<!-- kilo-billing-notice -->';
@@ -340,20 +425,31 @@ function mapStatusToCheckRun(
   const reviewFailed = reviewStatus === 'completed' && gateResult === 'fail';
   const billingFailure =
     reviewStatus === 'failed' && isBillingCodeReviewTerminalReason(terminalReason, errorMessage);
+  const actionRequiredReason =
+    reviewStatus === 'failed'
+      ? getActionRequiredTerminalReason(terminalReason, errorMessage)
+      : null;
   const modelNotFoundCancellation =
     reviewStatus === 'cancelled' &&
     isModelNotFoundCodeReviewTerminalReason(terminalReason, errorMessage);
+  const actionRequiredCopy = actionRequiredReason
+    ? getCodeReviewActionRequiredCopy(actionRequiredReason)
+    : null;
 
   const conclusionMap: Record<string, CheckRunConclusion> = {
     completed: reviewFailed ? 'failure' : 'success',
-    failed: billingFailure ? 'action_required' : 'failure',
+    failed: billingFailure || actionRequiredReason ? 'action_required' : 'failure',
     cancelled: 'cancelled',
   };
 
   const titleMap: Record<string, string> = {
     running: 'Kilo Code Review in progress',
     completed: reviewFailed ? 'Kilo Code Review found issues' : 'Kilo Code Review completed',
-    failed: billingFailure ? 'Insufficient credits to run review' : 'Kilo Code Review failed',
+    failed: actionRequiredCopy
+      ? actionRequiredCopy.checkTitle
+      : billingFailure
+        ? 'Insufficient credits to run review'
+        : 'Kilo Code Review failed',
     cancelled: modelNotFoundCancellation
       ? MODEL_NOT_FOUND_CHECK_TITLE
       : 'Kilo Code Review cancelled',
@@ -364,11 +460,13 @@ function mapStatusToCheckRun(
     completed: reviewFailed
       ? 'Code review completed with findings that require attention.'
       : 'Code review completed successfully.',
-    failed: billingFailure
-      ? 'Review could not start because the account has insufficient credits.'
-      : errorMessage
-        ? `Review failed: ${errorMessage}`
-        : 'Review failed.',
+    failed: actionRequiredCopy
+      ? actionRequiredCopy.checkSummary
+      : billingFailure
+        ? 'Review could not start because the account has insufficient credits.'
+        : errorMessage
+          ? `Review failed: ${errorMessage}`
+          : 'Review failed.',
     cancelled: modelNotFoundCancellation ? MODEL_NOT_FOUND_STATUS_SUMMARY : 'Review was cancelled.',
   };
 
@@ -420,6 +518,13 @@ function getGitLabStatusDescription(
     isBillingCodeReviewTerminalReason(terminalReason, errorMessage)
   ) {
     return 'Insufficient credits to run review';
+  }
+  const actionRequiredReason =
+    reviewStatus === 'failed'
+      ? getActionRequiredTerminalReason(terminalReason, errorMessage)
+      : null;
+  if (actionRequiredReason) {
+    return getCodeReviewActionRequiredCopy(actionRequiredReason).gitlabDescription;
   }
   if (reviewStatus === 'failed' && errorMessage) {
     const desc = `Review failed: ${errorMessage}`;
@@ -755,6 +860,12 @@ export async function POST(
       });
     }
 
+    let terminalOwnerResolution: TerminalOwnerResolution | undefined;
+    const getTerminalOwnerResolution = async () => {
+      terminalOwnerResolution ??= await resolveTerminalOwner(review, reviewId);
+      return terminalOwnerResolution;
+    };
+
     if (isRetryableInfraFailure(status, terminalReason, errorMessage)) {
       const retryableReview = await getCodeReviewById(reviewId);
       if (!retryableReview || isSupersededReview(retryableReview)) {
@@ -900,6 +1011,32 @@ export async function POST(
       await updateCodeReviewStatus(reviewId, status, parentStatusUpdates);
     }
 
+    const actionRequiredReason =
+      status === 'failed' ? getActionRequiredTerminalReason(terminalReason, errorMessage) : null;
+    if (actionRequiredReason) {
+      const ownerResolution = await getTerminalOwnerResolution();
+      if (ownerResolution) {
+        try {
+          await disableCodeReviewForActionRequiredFailure({
+            owner: ownerResolution.owner,
+            platform: review.platform === 'gitlab' ? 'gitlab' : 'github',
+            reviewId,
+            reason: actionRequiredReason,
+            errorMessage: errorMessage ?? actionRequiredReason,
+          });
+        } catch (disableError) {
+          logExceptInTest(
+            '[code-review-status] Failed to disable Code Reviewer for action-required failure:',
+            disableError
+          );
+          captureException(disableError, {
+            tags: { source: 'code-review-status-action-required-disable' },
+            extra: { reviewId, reason: actionRequiredReason },
+          });
+        }
+      }
+    }
+
     // Fetch integration once — used for gate check updates and post-completion actions
     const integration = review.platform_integration_id
       ? await getIntegrationById(review.platform_integration_id)
@@ -966,53 +1103,23 @@ export async function POST(
     // Only trigger dispatch for terminal states (completed/failed/cancelled)
     // This frees up a slot for the next pending review
     if (status === 'completed' || status === 'failed' || status === 'cancelled') {
-      let owner: Parameters<typeof tryDispatchPendingReviews>[0] | undefined;
-      if (review.owned_by_organization_id) {
-        const botUserId = await getBotUserId(review.owned_by_organization_id, 'code-review');
-        if (botUserId) {
-          owner = {
-            type: 'org' as const,
-            id: review.owned_by_organization_id,
-            userId: botUserId,
-          };
-        } else {
-          errorExceptInTest('[code-review-status] Bot user not found for organization', {
-            organizationId: review.owned_by_organization_id,
-            reviewId,
-          });
-          captureMessage('Bot user missing for organization code review', {
-            level: 'error',
-            tags: { source: 'code-review-status' },
-            extra: {
-              organizationId: review.owned_by_organization_id,
-              reviewId,
-            },
-          });
-        }
-      } else {
-        owner = {
-          type: 'user' as const,
-          id: review.owned_by_user_id || '',
-          userId: review.owned_by_user_id || '',
-        };
-      }
-
-      if (owner) {
+      const ownerResolution = await getTerminalOwnerResolution();
+      if (ownerResolution?.canDispatch) {
         // Trigger dispatch in background (don't await - fire and forget)
-        tryDispatchPendingReviews(owner).catch(dispatchError => {
+        tryDispatchPendingReviews(ownerResolution.owner).catch(dispatchError => {
           errorExceptInTest(
             '[code-review-status] Error dispatching pending reviews:',
             dispatchError
           );
           captureException(dispatchError, {
             tags: { source: 'code-review-status-dispatch' },
-            extra: { reviewId, owner },
+            extra: { reviewId, owner: ownerResolution.owner },
           });
         });
 
         logExceptInTest('[code-review-status] Triggered dispatch for pending reviews', {
           reviewId,
-          owner,
+          owner: ownerResolution.owner,
         });
       }
 

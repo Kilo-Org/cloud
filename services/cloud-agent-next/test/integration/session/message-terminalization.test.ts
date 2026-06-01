@@ -12,6 +12,7 @@ import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { createEventQueries } from '../../../src/session/queries/events.js';
 import type { CloudAgentSession } from '../../../src/persistence/CloudAgentSession.js';
 import type { CallbackJob } from '../../../src/callbacks/types.js';
+import type { CloudAgentQueueReport } from '@kilocode/worker-utils/cloud-agent-queue-report';
 import {
   getSessionMessageState,
   putSessionMessageState,
@@ -37,6 +38,21 @@ function createCapturedQueue(): CapturedQueue {
 
 function injectCallbackQueue(instance: CloudAgentSession, queue: CapturedQueue): void {
   (instance as unknown as { env: { CALLBACK_QUEUE: CapturedQueue } }).env.CALLBACK_QUEUE = queue;
+}
+
+function injectReportQueue(instance: CloudAgentSession, reports: CloudAgentQueueReport[]): void {
+  const runtimeEnv = (
+    instance as unknown as {
+      env: {
+        CLOUD_AGENT_REPORT_QUEUE: { send: (report: CloudAgentQueueReport) => Promise<void> };
+      };
+    }
+  ).env;
+  runtimeEnv.CLOUD_AGENT_REPORT_QUEUE = {
+    send: async report => {
+      reports.push(report);
+    },
+  };
 }
 
 const kiloSessionId = 'ses_term_callback';
@@ -103,6 +119,7 @@ describe('message terminalization and stream events', () => {
 
     const result = await runInDurableObject(stub, async (instance, state) => {
       injectCallbackQueue(instance, queue);
+
       await registerReadySession(instance, {
         sessionId,
         userId,
@@ -144,6 +161,32 @@ describe('message terminalization and stream events', () => {
     expect(queue.captured[0].payload.messageId).toBe('msg_018f1e2d3c4bRepairAlrmAbCd');
   });
 
+  it('does not emit session lifecycle reports for readiness or deletion', async () => {
+    const userId = 'user_runtime_reports';
+    const sessionId = 'agent_runtime_reports';
+    const stub = env.CLOUD_AGENT_SESSION.get(
+      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
+    );
+    const reports: CloudAgentQueueReport[] = [];
+
+    await runInDurableObject(stub, async instance => {
+      injectReportQueue(instance, reports);
+      await registerReadySession(instance, {
+        sessionId,
+        userId,
+        kiloSessionId,
+        prompt: 'runtime report',
+        mode: 'code',
+        model: 'test-model',
+        kilocodeToken: 'token-runtime-report',
+      });
+      await instance.deleteSession();
+    });
+    await Promise.resolve();
+
+    expect(reports).toEqual([]);
+  });
+
   it('terminal ingest reconstructs acceptance before the runtime acceptance hook persists', async () => {
     const userId = 'user_term_before_accept';
     const sessionId = 'agent_term_before_accept';
@@ -151,7 +194,9 @@ describe('message terminalization and stream events', () => {
       env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
     );
 
+    const reports: CloudAgentQueueReport[] = [];
     const result = await runInDurableObject(stub, async (instance, state) => {
+      injectReportQueue(instance, reports);
       await registerReadySession(instance, {
         sessionId,
         userId,
@@ -167,6 +212,7 @@ describe('message terminalization and stream events', () => {
       );
       const { state: runtimeState } = await allocateWrapperRuntimeState(instance.ctx.storage);
       await instance['ensureAcceptedMessageBeforeTerminal'](messageId, runtimeState.wrapperRunId);
+      await instance['recordCorrelatedAgentActivity'](messageId);
       await instance['terminalizeSessionMessageOnce'](messageId, {
         kind: 'completed',
         assistantMessageId: 'assistant_fast_accept',
@@ -186,7 +232,18 @@ describe('message terminalization and stream events', () => {
     expect(result.message).toMatchObject({
       status: 'completed',
       acceptedAt: expect.any(Number),
+      dispatchAcceptanceKind: 'inferred_from_terminal',
       wrapperRunId: expect.any(String),
+    });
+    expect(
+      reports.find(report => report.type === 'run.state' && report.run.status === 'completed')
+    ).toMatchObject({
+      type: 'run.state',
+      run: {
+        messageId: 'msg_018f1e2d3c4bTermFastAcptAB',
+        status: 'completed',
+        agentActivityObservedAt: expect.any(String),
+      },
     });
     expect(JSON.parse(result.events[0].payload)).toMatchObject({
       messageId: 'msg_018f1e2d3c4bTermFastAcptAB',
@@ -599,9 +656,11 @@ describe('message terminalization and stream events', () => {
     const stub = env.CLOUD_AGENT_SESSION.get(doId);
 
     const queue = createCapturedQueue();
+    const reports: CloudAgentQueueReport[] = [];
 
     const result = await runInDurableObject(stub, async instance => {
       injectCallbackQueue(instance, queue);
+      injectReportQueue(instance, reports);
 
       await registerReadySession(instance, {
         sessionId,
@@ -645,9 +704,16 @@ describe('message terminalization and stream events', () => {
         status: 'completed',
         gateResult: 'pass',
       });
+      await instance.handleWrapperTerminalEvent({
+        wrapperRunId,
+        status: 'completed',
+        gateResult: 'fail',
+      });
 
-      return { captured: queue.captured };
+      const persisted = await getSessionMessageState(instance.ctx.storage, messageId);
+      return { captured: queue.captured, persisted };
     });
+    await Promise.resolve();
 
     expect(result.captured).toHaveLength(1);
     expect(result.captured[0].payload).toMatchObject({
@@ -655,6 +721,20 @@ describe('message terminalization and stream events', () => {
       status: 'completed',
       gateResult: 'pass',
     });
+    expect(result.persisted?.gateResult).toBe('pass');
+    const completedReports = reports.filter(
+      report => report.type === 'run.state' && report.run.status === 'completed'
+    );
+    expect(completedReports).toHaveLength(2);
+    expect(completedReports[0].run).not.toHaveProperty('gateResult');
+    expect(completedReports[1]).toMatchObject({
+      type: 'run.state',
+      run: {
+        messageId: 'msg_018f1e2d3c4bgatepasscbabcd',
+        status: 'completed',
+      },
+    });
+    expect(completedReports[1].run).not.toHaveProperty('gateResult');
   });
 
   it('terminalization emits cloud.message.interrupted for interrupted kind', async () => {

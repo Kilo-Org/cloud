@@ -144,6 +144,7 @@ export type IngestDOContext = {
     | 'onTerminalEvent'
   >;
   keepContainerAlive?: () => void;
+  observeCorrelatedAgentActivity?: (messageId: string) => Promise<void>;
   terminalizeSessionMessageOnce?: (
     messageId: string,
     params: {
@@ -609,18 +610,25 @@ export function createIngestHandler(
             const assistantError = getAssistantErrorMessage(info?.error);
             const hasError = assistantError !== undefined;
             const isTerminal = isCompleted || hasError;
-            if (info?.role === 'assistant' && typeof info.parentID === 'string' && isTerminal) {
-              await doContext.terminalizeSessionMessageOnce?.(
-                info.parentID,
-                {
-                  kind: hasError ? 'failed' : 'completed',
-                  assistantMessageId: typeof info.id === 'string' ? info.id : undefined,
-                  completionSource: 'assistant_message_event',
-                  reason: hasError ? 'assistant_error' : undefined,
-                  error: assistantError,
-                },
-                wrapperRunId
-              );
+            const parentMessageId =
+              info?.role === 'assistant' && typeof info.parentID === 'string'
+                ? info.parentID
+                : undefined;
+            if (parentMessageId !== undefined) {
+              await doContext.observeCorrelatedAgentActivity?.(parentMessageId);
+              if (isTerminal) {
+                await doContext.terminalizeSessionMessageOnce?.(
+                  parentMessageId,
+                  {
+                    kind: hasError ? 'failed' : 'completed',
+                    assistantMessageId: typeof info?.id === 'string' ? info.id : undefined,
+                    completionSource: 'assistant_message_event',
+                    reason: hasError ? 'assistant_error' : undefined,
+                    error: assistantError,
+                  },
+                  wrapperRunId
+                );
+              }
             }
           }
         }

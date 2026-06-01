@@ -423,6 +423,7 @@ describe('recordPendingFlushFailure', () => {
       messageId: message.messageId,
       flushAttempts: 1,
       lastFlushError: 'bad',
+      lastFlushFailureCode: 'BAD_REQUEST',
       nextFlushAttemptAt: undefined,
       deliveryDisposition: 'terminalization-pending',
     });
@@ -445,6 +446,35 @@ describe('recordPendingFlushFailure', () => {
       code: 'BAD_REQUEST',
     });
     expect(exhausted.message.deliveryDisposition).toBe('terminalization-pending');
+    expect(exhausted.message.lastFlushFailureCode).toBe('BAD_REQUEST');
+  });
+
+  it('preserves a structured retryable delivery cause through unknown-code exhaustion', async () => {
+    const storage = createMemoryStorage();
+    let message = makeMessage();
+    await storePendingSessionMessage(storage, message);
+
+    const retry = await recordPendingFlushFailure(
+      storage,
+      message,
+      'workspace temporarily failed',
+      100_000,
+      {
+        policy: 'warm-followup',
+        code: 'WORKSPACE_SETUP_FAILED',
+      }
+    );
+    message = retry.message;
+    const exhausted = await recordPendingFlushFailure(
+      storage,
+      message,
+      'retry transport failed without code',
+      102_000,
+      { policy: 'warm-followup' }
+    );
+
+    expect(exhausted.exhausted).toBe(true);
+    expect(exhausted.message.lastFlushFailureCode).toBe('WORKSPACE_SETUP_FAILED');
   });
 
   it('keeps the message in storage when not exhausted', async () => {

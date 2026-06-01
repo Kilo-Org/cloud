@@ -84,6 +84,7 @@ jest.mock('./session', () => ({
         messageId: string,
         state: Extract<MessageDeliveryState, { status: 'failed' }>
       ) => void;
+      transport?: { userWebConnection?: unknown };
     }) => {
       latestStorage = sessionConfig.storage;
       mockSession.storage = sessionConfig.storage;
@@ -139,6 +140,7 @@ const defaultFetchedSession = {
 function createMockConfig(overrides: Partial<SessionManagerConfig> = {}): SessionManagerConfig {
   return {
     store: createStore(),
+    userWebConnection: { marker: 'test-user-web-connection' } as never,
     resolveSession: jest.fn().mockResolvedValue({
       type: 'cloud-agent',
       kiloSessionId: kiloId('ses-1'),
@@ -146,7 +148,6 @@ function createMockConfig(overrides: Partial<SessionManagerConfig> = {}): Sessio
     }),
     getTicket: jest.fn().mockResolvedValue('ticket-123'),
     fetchSnapshot: jest.fn().mockResolvedValue({ info: {}, messages: [] }),
-    getAuthToken: jest.fn().mockResolvedValue('token-123'),
     api: {
       send: jest.fn().mockResolvedValue({}),
       interrupt: jest.fn().mockResolvedValue({}),
@@ -399,6 +400,17 @@ describe('createSessionManager', () => {
         variant?: string | null;
       }>(config.store, mgr.atoms.sessionConfig);
       expect(sessionConfig?.variant).toBe('high');
+    });
+
+    it('forwards the required user web connection to session creation', async () => {
+      const userWebConnection = { marker: 'shared' } as never;
+      const config = createMockConfig({ userWebConnection });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+
+      const mockedCreate = jest.mocked(createCloudAgentSession);
+      expect(mockedCreate.mock.calls[0][0].transport.userWebConnection).toBe(userWebConnection);
     });
 
     it('defaults variant to null when fetched data has no variant', async () => {

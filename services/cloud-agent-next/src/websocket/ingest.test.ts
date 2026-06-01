@@ -183,12 +183,13 @@ describe('createIngestHandler', () => {
       const eventQueries = createFakeEventQueries();
       (eventQueries as unknown as Record<string, unknown>).upsert = vi.fn().mockReturnValue(42);
       const broadcastFn = vi.fn();
+      const doContext = createFakeDOContext();
       const handler = createIngestHandler(
         createFakeState(),
         eventQueries,
         SESSION_ID,
         broadcastFn,
-        createFakeDOContext()
+        doContext
       );
       const ws = createFakeWebSocket(makeAttachment());
 
@@ -217,12 +218,13 @@ describe('createIngestHandler', () => {
     ])('kilocode %s is plain-inserted', async eventName => {
       const eventQueries = createFakeEventQueries();
       const broadcastFn = vi.fn();
+      const doContext = createFakeDOContext();
       const handler = createIngestHandler(
         createFakeState(),
         eventQueries,
         SESSION_ID,
         broadcastFn,
-        createFakeDOContext()
+        doContext
       );
       const ws = createFakeWebSocket(makeAttachment());
 
@@ -245,12 +247,13 @@ describe('createIngestHandler', () => {
     ])('kilocode %s is broadcast-only', async eventName => {
       const eventQueries = createFakeEventQueries();
       const broadcastFn = vi.fn();
+      const doContext = createFakeDOContext();
       const handler = createIngestHandler(
         createFakeState(),
         eventQueries,
         SESSION_ID,
         broadcastFn,
-        createFakeDOContext()
+        doContext
       );
       const ws = createFakeWebSocket(makeAttachment());
 
@@ -847,11 +850,12 @@ describe('createIngestHandler', () => {
     function createNewPathDOContext() {
       return {
         ...createFakeDOContext(),
+        observeCorrelatedAgentActivity: vi.fn().mockResolvedValue(undefined),
         terminalizeSessionMessageOnce: vi.fn().mockResolvedValue(undefined),
       };
     }
 
-    it('does NOT terminalize on partial assistant message.updated (no time.completed)', async () => {
+    it('observes activity without terminalizing on partial assistant message.updated', async () => {
       const state = createFakeState();
       const doContext = createNewPathDOContext();
       const handler = createIngestHandler(
@@ -882,6 +886,7 @@ describe('createIngestHandler', () => {
 
       await handler.handleIngestMessage(ws, message);
 
+      expect(doContext.observeCorrelatedAgentActivity).toHaveBeenCalledWith('msg_user_111');
       expect(doContext.terminalizeSessionMessageOnce).not.toHaveBeenCalled();
     });
 

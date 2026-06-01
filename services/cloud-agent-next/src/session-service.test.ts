@@ -185,6 +185,7 @@ function createEnv(metadata?: CloudAgentSessionState | null): PersistenceEnv {
         glabIsOAuth2: true,
       }),
     },
+    NOTIFICATIONS: {} as unknown as PersistenceEnv['NOTIFICATIONS'],
   } satisfies PersistenceEnv;
 }
 
@@ -1249,6 +1250,27 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     expect(result.readyRequest.materialized.env.GITLAB_TOKEN).toBe('generic-git-token');
     expect(result.readyRequest.materialized.env.GITLAB_HOST).toBe('gitlab.com');
     expect(result.readyRequest.materialized.env.GLAB_IS_OAUTH2).toBeUndefined();
+  });
+});
+
+describe('SessionService session-ingest compatibility', () => {
+  it('creates a visible session without projecting reporting milestones', async () => {
+    const env = createEnv();
+    const service = new SessionService();
+
+    await service.createCliSessionViaSessionIngest(
+      'ses_12345678901234567890123456',
+      'agent_12345678-1234-1234-1234-123456789abc',
+      'user_test',
+      env,
+      undefined,
+      'cloud-agent'
+    );
+
+    // eslint-disable-next-line @typescript-eslint/unbound-method
+    expect(env.SESSION_INGEST.createSessionForCloudAgent).toHaveBeenCalledWith(
+      expect.not.objectContaining({ requireFullSessionReport: expect.anything() })
+    );
   });
 });
 

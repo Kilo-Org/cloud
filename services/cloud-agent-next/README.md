@@ -703,6 +703,8 @@ Required secrets:
 
 - `CLOUDFLARE_API_TOKEN` — must have permission to deploy the worker for the selected environment.
 
+Cloud Agent Next owns its operational reporting projection. Deploy the reporting database migration before this worker release and provision `cloud-agent-next-report-queue` plus `cloud-agent-next-report-queue-dlq` with four-day message retention. A deployed `dev` environment requires isolated `cloud-agent-next-report-queue-dev` and `cloud-agent-next-report-queue-dlq-dev` resources with the same retention. New sessions synchronously create their reporting anchor before setup; queued run reports do not synthesize parents when an anchor is absent.
+
 ### Testing
 
 This project uses a dual testing approach with separate configurations for unit and integration tests:

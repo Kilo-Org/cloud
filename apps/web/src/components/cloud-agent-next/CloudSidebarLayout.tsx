@@ -11,7 +11,6 @@ import { extractRepoFromGitUrl } from './utils/git-utils';
 import { ChatSidebar } from './ChatSidebar';
 import { useSidebarSessions } from './hooks/useSidebarSessions';
 import { useActiveSessions } from './hooks/useActiveSessions';
-import { isNewSession } from '@/lib/cloud-agent/session-type';
 import { deleteSessionFromStoreAtom } from './store/db-session-atoms';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
@@ -99,7 +98,6 @@ export function CloudSidebarLayout({ organizationId, children }: CloudSidebarLay
   const queryClient = useQueryClient();
   const deleteSessionFromStore = useSetAtom(deleteSessionFromStoreAtom);
 
-  const { mutateAsync: deleteCliSession } = useMutation(trpc.cliSessions.delete.mutationOptions());
   const { mutateAsync: deleteCliSessionV2 } = useMutation(
     trpc.cliSessionsV2.delete.mutationOptions()
   );
@@ -124,11 +122,7 @@ export function CloudSidebarLayout({ organizationId, children }: CloudSidebarLay
 
       // Delete from server
       try {
-        if (isNewSession(sessionId)) {
-          await deleteCliSessionV2({ session_id: sessionId });
-        } else {
-          await deleteCliSession({ session_id: sessionId });
-        }
+        await deleteCliSessionV2({ session_id: sessionId });
         toast('Session deleted successfully');
       } catch (error) {
         console.error('Error calling session deletion API:', error);
@@ -143,7 +137,6 @@ export function CloudSidebarLayout({ organizationId, children }: CloudSidebarLay
       organizationId,
       router,
       deleteSessionFromStore,
-      deleteCliSession,
       deleteCliSessionV2,
       queryClient,
       trpc,

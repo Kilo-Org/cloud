@@ -1,0 +1,1 @@
+CREATE INDEX "IDX_kiloclaw_instances_active_org_by_org_created" ON "kiloclaw_instances" USING btree ("organization_id","created_at") WHERE "kiloclaw_instances"."organization_id" IS NOT NULL AND "kiloclaw_instances"."destroyed_at" IS NULL;

@@ -231,6 +231,7 @@ export type AdmissionFailure = {
   success: false;
   code: 'NOT_FOUND' | 'BAD_REQUEST' | 'INTERNAL' | 'PENDING_QUEUE_FULL' | RetryableResultCode;
   error: string;
+  failureBoundary?: 'registration' | 'admission';
 };
 
 /** Durable acknowledgement that a message intent is stored for asynchronous delivery. */

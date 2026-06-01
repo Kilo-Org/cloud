@@ -13,6 +13,7 @@ import {
   services,
 } from './services';
 import { syncEnvVars } from './env-sync';
+import { getWranglerRegistryPath } from './wrangler-registry';
 import {
   getSessionName,
   sessionExists,
@@ -188,11 +189,13 @@ async function cmdUp(targets: string[], repoRoot: string): Promise<void> {
   }
 
   // --- Create tmux session ---
-  // Pass critical port env into the session so panes see it even when an
-  // existing tmux server (from a sibling worktree) is running with different
-  // values. Without this, new windows inherit the server env, not ours, and
-  // services can bind to the wrong ports.
-  const sessionEnv: Record<string, string> = { KILO_PORT_OFFSET: String(portOffset) };
+  // Pass critical runtime env into the session so panes see this worktree's
+  // values even when an existing tmux server is shared with sibling worktrees.
+  const wranglerRegistryPath = getWranglerRegistryPath(repoRoot);
+  const sessionEnv: Record<string, string> = {
+    KILO_PORT_OFFSET: String(portOffset),
+    WRANGLER_REGISTRY_PATH: wranglerRegistryPath,
+  };
   if (process.env.PORT !== undefined && process.env.PORT !== '') {
     sessionEnv.PORT = String(getService('nextjs').port);
   }
@@ -393,7 +396,7 @@ async function cmdUp(targets: string[], repoRoot: string): Promise<void> {
   selectWindow(sessionName, 0);
 
   // --- Write manifest for agents ---
-  writeManifest(repoRoot, sessionName, startedServices);
+  writeManifest(repoRoot, sessionName, wranglerRegistryPath, startedServices);
 
   console.log(
     `${GREEN}Started ${startedServices.length} services in session ${sessionName}${RESET}`
@@ -420,13 +423,20 @@ type ManifestEntry = {
 type Manifest = {
   session: string;
   portOffset: number;
+  wranglerRegistryPath: string;
   services: ManifestEntry[];
 };
 
-function writeManifest(repoRoot: string, sessionName: string, serviceNames: string[]): void {
+function writeManifest(
+  repoRoot: string,
+  sessionName: string,
+  wranglerRegistryPath: string,
+  serviceNames: string[]
+): void {
   const manifest: Manifest = {
     session: sessionName,
     portOffset,
+    wranglerRegistryPath,
     services: serviceNames.map(name => {
       const svc = getService(name);
       return { name, port: svc.port, group: svc.group, type: svc.type };

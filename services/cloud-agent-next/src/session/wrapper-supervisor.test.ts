@@ -113,6 +113,8 @@ function createHarness(
         callbackJobs.push(job);
       },
     }),
+    sendPushNotification: async () => ({ dispatched: true }),
+    hasConnectedStreamClients: () => false,
     getAssistantMessageForUserMessage: () => null,
     ensureTerminalMessageEvent: event => {
       if (!events.some(existing => existing.entityId === event.entityId)) events.push(event);
@@ -390,6 +392,8 @@ describe('WrapperSupervisor', () => {
       status: 'failed',
       failureReason: 'wrapper_disconnected',
       completionSource: 'wrapper_failure',
+      failureStage: 'post_dispatch_no_activity',
+      failureCode: 'wrapper_disconnected',
     });
     await expect(getSessionMessageState(harness.storage, NEWER_MESSAGE_ID)).resolves.toMatchObject({
       status: 'accepted',
@@ -498,6 +502,8 @@ describe('WrapperSupervisor', () => {
       failureReason: 'wrapper_failure',
       error: 'Wrapper accepted the message but produced no output',
       completionSource: 'wrapper_failure',
+      failureStage: 'post_dispatch_no_activity',
+      failureCode: 'wrapper_no_output',
     });
     expect(runtimeState.wrapperConnectionId).toBeUndefined();
     expect(harness.requestPendingDrainIfNeeded).not.toHaveBeenCalled();
@@ -522,6 +528,8 @@ describe('WrapperSupervisor', () => {
       failureReason: 'missing_assistant_reply',
       error: 'No assistant reply found after idle timeout',
       completionSource: 'idle_reconciliation',
+      failureStage: 'post_dispatch_no_activity',
+      failureCode: 'missing_assistant_reply',
     });
   });
 

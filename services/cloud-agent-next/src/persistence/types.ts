@@ -4,6 +4,7 @@ import type { CloudAgentSession } from './CloudAgentSession.js';
 import type { MCPSecretValue } from '../router/schemas.js';
 import type { SessionMetadata } from './session-metadata.js';
 import type { SessionIngestBinding } from '../session-ingest-binding.js';
+import type { NotificationsBinding } from '../notifications-binding.js';
 import type { GitTokenService } from '../types.js';
 
 /**
@@ -160,6 +161,8 @@ export type PersistenceEnv = {
   PER_SESSION_SANDBOX_ORG_IDS?: string;
   /** Service binding for centralized git token generation */
   GIT_TOKEN_SERVICE?: GitTokenService;
+  /** Service binding for dispatching push notifications */
+  NOTIFICATIONS: NotificationsBinding;
 };
 
 // Re-export commonly used types for convenience

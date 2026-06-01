@@ -31,6 +31,7 @@ import type {
 } from './types';
 import type { QuestionInfo } from '@/types/opencode.gen';
 import { splitByContiguousPrefix } from './array-utils';
+import type { UserWebConnection } from './user-web-connection';
 import { generateMessageId } from './message-id';
 
 // ---------------------------------------------------------------------------
@@ -132,9 +133,8 @@ type SessionManagerConfig = {
     sessionId: CloudAgentSessionId
   ) => CloudAgentStreamTicketResult | Promise<CloudAgentStreamTicketResult>;
   fetchSnapshot: (kiloSessionId: KiloSessionId) => Promise<SessionSnapshot>;
-  getAuthToken: () => string | Promise<string>;
-  cliWebsocketUrl?: string;
   websocketBaseUrl?: string;
+  userWebConnection: UserWebConnection;
   api: CloudAgentApi;
   lifecycleHooks?: ConnectionLifecycleHooks;
   websocketHeaders?: WebSocketHeaders;
@@ -657,8 +657,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         getTicket: config.getTicket,
         api: config.api,
         fetchSnapshot: config.fetchSnapshot,
-        getAuthToken: config.getAuthToken,
-        cliWebsocketUrl: config.cliWebsocketUrl,
+        userWebConnection: config.userWebConnection,
         lifecycleHooks: config.lifecycleHooks,
         websocketHeaders: config.websocketHeaders,
       },

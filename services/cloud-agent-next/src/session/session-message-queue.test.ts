@@ -1084,6 +1084,8 @@ describe('SessionMessageQueue', () => {
           reason: 'exhausted',
           error: 'invalid queued turn',
           completionSource: 'delivery_failure',
+          failureStage: 'pre_dispatch',
+          failureCode: 'invalid_delivery_request',
           attempts: 1,
         },
         options: { allowIdleBatchWithoutObservedIdle: true },
@@ -1091,6 +1093,34 @@ describe('SessionMessageQueue', () => {
     ]);
     expect(await listPendingSessionMessages(harness.storage)).toHaveLength(0);
     expect(harness.finalizedTerminalCallbacks).toEqual([{ allowWithoutObservedIdle: true }]);
+  });
+
+  it.each([
+    ['SANDBOX_CONNECT_FAILED', 'sandbox_connect_failed'],
+    ['WORKSPACE_SETUP_FAILED', 'workspace_setup_failed'],
+    ['KILO_SERVER_FAILED', 'kilo_server_failed'],
+    ['WRAPPER_START_FAILED', 'wrapper_start_failed'],
+  ] as const)('classifies exhausted %s delivery failures as %s', async (code, failureCode) => {
+    const harness = createQueueHarness({
+      deliver: async () => ({ success: false, code, error: 'transient exhausted' }),
+    });
+    await harness.queue.admitSubmittedMessage({
+      userId: 'user_test' as UserId,
+      turn: { type: 'prompt', id: FIRST_MESSAGE_ID, prompt: 'terminalize after retry' },
+    });
+    await harness.queue.drainNextPendingMessage();
+    const pending = await listPendingSessionMessages(harness.storage);
+    if (pending[0]?.nextFlushAttemptAt !== undefined) {
+      vi.spyOn(Date, 'now').mockReturnValueOnce(pending[0].nextFlushAttemptAt);
+      await harness.queue.drainNextPendingMessage();
+      vi.restoreAllMocks();
+    }
+
+    expect(harness.terminalizations.at(-1)?.params).toMatchObject({
+      kind: 'failed',
+      failureStage: 'pre_dispatch',
+      failureCode,
+    });
   });
 
   it('builds reconnect snapshots for pending and never-accepted terminal queued messages', async () => {
@@ -1273,6 +1303,8 @@ describe('SessionMessageQueue', () => {
           kind: 'interrupted',
           error: 'Pending queued message interrupted by user',
           completionSource: 'interrupt',
+          failureStage: 'interruption',
+          failureCode: 'user_interrupt',
         },
         options: { allowIdleBatchWithoutObservedIdle: true },
       },
@@ -1282,6 +1314,8 @@ describe('SessionMessageQueue', () => {
           kind: 'interrupted',
           error: 'Pending queued message interrupted by user',
           completionSource: 'interrupt',
+          failureStage: 'interruption',
+          failureCode: 'user_interrupt',
         },
         options: { allowIdleBatchWithoutObservedIdle: true },
       },
@@ -1337,6 +1371,8 @@ describe('SessionMessageQueue', () => {
           kind: 'interrupted',
           error: 'Pending queued message interrupted by user',
           completionSource: 'interrupt',
+          failureStage: 'interruption',
+          failureCode: 'user_interrupt',
         },
         options: { allowIdleBatchWithoutObservedIdle: true },
       },

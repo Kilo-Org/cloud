@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import { insertKiloClawSubscriptionChangeLog } from '@kilocode/db';
+import { CURRENT_KILOCLAW_PRICE_VERSION } from '@kilocode/db/kiloclaw-pricing-catalog';
 import {
   credit_transactions,
   kilocode_users,
@@ -358,6 +359,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
       .values({
         user_id: options.userId,
         instance_id: instance.id,
+        kiloclaw_price_version: CURRENT_KILOCLAW_PRICE_VERSION,
         payment_source: paymentSourceForPlan(options.plan),
         plan: options.plan,
         status: statusForPlan(options.plan),

@@ -300,6 +300,7 @@ describe('review agent config REVIEW.md setting', () => {
     const config = await caller.personalReviewAgent.getReviewConfig({ platform: 'github' });
 
     expect(config.disableReviewMd).toBe(true);
+    expect(config.actionRequired).toBeNull();
   });
 
   it('returns disableReviewMd true for organization default config', async () => {
@@ -311,6 +312,97 @@ describe('review agent config REVIEW.md setting', () => {
     });
 
     expect(config.disableReviewMd).toBe(true);
+    expect(config.actionRequired).toBeNull();
+  });
+
+  it('returns actionRequired runtime state for personal config', async () => {
+    const caller = await createCallerForUser(testUser.id);
+    await db.insert(agent_configs).values({
+      owned_by_user_id: testUser.id,
+      agent_type: 'code_review',
+      platform: 'github',
+      config: { disable_review_md: true },
+      is_enabled: false,
+      created_by: testUser.id,
+      runtime_state: {
+        code_review_action_required: {
+          reason: 'byok_invalid_key',
+          detectedAt: '2026-05-28T00:00:00.000Z',
+          lastSeenAt: '2026-05-28T00:00:00.000Z',
+          lastErrorMessage:
+            'Code Reviewer was disabled because the selected BYOK API key is invalid or has been revoked. Update the key or choose another model, then enable Code Reviewer again.',
+        },
+      },
+    });
+
+    const config = await caller.personalReviewAgent.getReviewConfig({ platform: 'github' });
+
+    expect(config.isEnabled).toBe(false);
+    expect(config.actionRequired).toEqual(expect.objectContaining({ reason: 'byok_invalid_key' }));
+  });
+
+  it('preserves disabled state when saving an existing personal config', async () => {
+    const caller = await createCallerForUser(testUser.id);
+    await db.insert(agent_configs).values({
+      owned_by_user_id: testUser.id,
+      agent_type: 'code_review',
+      platform: 'github',
+      config: { disable_review_md: true },
+      is_enabled: false,
+      created_by: testUser.id,
+    });
+
+    await caller.personalReviewAgent.saveReviewConfig({
+      platform: 'github',
+      reviewStyle: 'balanced',
+      focusAreas: [],
+      modelSlug: 'test-model',
+      disableReviewMd: true,
+    });
+
+    const config = await db.query.agent_configs.findFirst({
+      where: and(
+        eq(agent_configs.agent_type, 'code_review'),
+        eq(agent_configs.platform, 'github'),
+        eq(agent_configs.owned_by_user_id, testUser.id)
+      ),
+    });
+
+    expect(config?.is_enabled).toBe(false);
+  });
+
+  it('clears actionRequired state when toggling personal Code Reviewer', async () => {
+    const caller = await createCallerForUser(testUser.id);
+    await db.insert(agent_configs).values({
+      owned_by_user_id: testUser.id,
+      agent_type: 'code_review',
+      platform: 'github',
+      config: { disable_review_md: true },
+      is_enabled: false,
+      created_by: testUser.id,
+      runtime_state: {
+        code_review_action_required: {
+          reason: 'github_installation_required',
+          detectedAt: '2026-05-28T00:00:00.000Z',
+          lastSeenAt: '2026-05-28T00:00:00.000Z',
+          lastErrorMessage:
+            'Code Reviewer was disabled because Kilo cannot access this repository with an active GitHub App installation. Update the GitHub App installation, then enable Code Reviewer again.',
+        },
+      },
+    });
+
+    await caller.personalReviewAgent.toggleReviewAgent({ platform: 'github', isEnabled: true });
+
+    const config = await db.query.agent_configs.findFirst({
+      where: and(
+        eq(agent_configs.agent_type, 'code_review'),
+        eq(agent_configs.platform, 'github'),
+        eq(agent_configs.owned_by_user_id, testUser.id)
+      ),
+    });
+
+    expect(config?.is_enabled).toBe(true);
+    expect(JSON.stringify(config?.runtime_state)).not.toContain('code_review_action_required');
   });
 
   it('persists personal disableReviewMd true as disable_review_md true', async () => {
@@ -428,14 +520,29 @@ describe('codeReviewRouter attempts', () => {
     await db
       .delete(cloud_agent_code_reviews)
       .where(eq(cloud_agent_code_reviews.repo_full_name, REPO));
+    await db.delete(agent_configs).where(eq(agent_configs.owned_by_user_id, testUser.id));
     mockCancelReview.mockReset();
+    mockTryDispatchPendingReviews.mockReset();
   });
 
   afterAll(async () => {
     await db.delete(kilocode_users).where(eq(kilocode_users.id, testUser.id));
   });
 
+  async function insertEnabledAgentConfig(runtimeState: Record<string, unknown> = {}) {
+    await db.insert(agent_configs).values({
+      owned_by_user_id: testUser.id,
+      agent_type: 'code_review',
+      platform: 'github',
+      config: { disable_review_md: true },
+      is_enabled: true,
+      runtime_state: runtimeState,
+      created_by: testUser.id,
+    });
+  }
+
   it('returns attempts from get and preserves history during retrigger', async () => {
+    await insertEnabledAgentConfig();
     const [review] = await db
       .insert(cloud_agent_code_reviews)
       .values(
@@ -473,6 +580,7 @@ describe('codeReviewRouter attempts', () => {
   });
 
   it('retrigger dispatches using the newly created attempt id', async () => {
+    await insertEnabledAgentConfig();
     const [review] = await db
       .insert(cloud_agent_code_reviews)
       .values(
@@ -496,6 +604,47 @@ describe('codeReviewRouter attempts', () => {
 
     expect(latestAttempt?.retry_reason).toBe('manual_retrigger');
     expect(mockTryDispatchPendingReviews).toHaveBeenCalled();
+  });
+
+  it('blocks retrigger while Code Reviewer has action-required state', async () => {
+    await insertEnabledAgentConfig({
+      code_review_action_required: {
+        reason: 'byok_invalid_key',
+        detectedAt: '2026-05-28T00:00:00.000Z',
+        lastSeenAt: '2026-05-28T00:00:00.000Z',
+        lastErrorMessage:
+          'Code Reviewer was disabled because the selected BYOK API key is invalid or has been revoked. Update the key or choose another model, then enable Code Reviewer again.',
+      },
+    });
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        reviewValues(testUser.id, 'failed', {
+          session_id: 'agent-first',
+          cli_session_id: 'ses_first',
+          error_message: 'Container shutdown: SIGTERM',
+          terminal_reason: 'sandbox_error',
+        })
+      )
+      .returning({ id: cloud_agent_code_reviews.id });
+
+    const caller = await createCallerForUser(testUser.id);
+
+    await expect(caller.codeReviews.retrigger({ reviewId: review.id })).rejects.toThrow(
+      'Code Reviewer is disabled because configuration needs attention'
+    );
+
+    const attempts = await db
+      .select()
+      .from(cloud_agent_code_review_attempts)
+      .where(eq(cloud_agent_code_review_attempts.code_review_id, review.id));
+    const storedReview = await db.query.cloud_agent_code_reviews.findFirst({
+      where: eq(cloud_agent_code_reviews.id, review.id),
+    });
+
+    expect(attempts).toHaveLength(0);
+    expect(storedReview?.status).toBe('failed');
+    expect(mockTryDispatchPendingReviews).not.toHaveBeenCalled();
   });
 
   it('rejects stream info attempts from another review', async () => {

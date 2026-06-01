@@ -70,6 +70,7 @@ export enum KiloPassAuditLogAction {
   YearlyMonthlyBaseCronStarted = 'yearly_monthly_base_cron_started',
   YearlyMonthlyBaseCronCompleted = 'yearly_monthly_base_cron_completed',
   IssueYearlyRemainingCredits = 'issue_yearly_remaining_credits',
+  DuplicateCardSubscriptionCanceled = 'duplicate_card_subscription_canceled',
 
   /* Not removed because I didn't want to deal with the migration. */
   /**
@@ -1283,6 +1284,10 @@ export type StripeSubscriptionStatus =
 export const CODE_REVIEW_TERMINAL_REASONS = [
   'billing',
   'model_not_found',
+  'github_installation_required',
+  'github_ip_allow_list',
+  'byok_invalid_key',
+  'selected_model_unavailable',
   'user_cancelled',
   'superseded',
   'interrupted',
@@ -1306,6 +1311,10 @@ export type CodeReviewTerminalReason = (typeof CODE_REVIEW_TERMINAL_REASONS)[num
 export const CODE_REVIEW_BENIGN_TERMINAL_REASONS = [
   'billing',
   'model_not_found',
+  'github_installation_required',
+  'github_ip_allow_list',
+  'byok_invalid_key',
+  'selected_model_unavailable',
   'user_cancelled',
   'superseded',
 ] as const satisfies readonly CodeReviewTerminalReason[];

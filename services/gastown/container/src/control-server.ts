@@ -37,7 +37,7 @@ import type {
   StreamTicketResponse,
   MergeResult,
 } from './types';
-import { sanitizeStartupError } from './startup-error';
+import { classifyStartupError } from './startup-error';
 
 const MAX_TICKETS = 1000;
 const streamTickets = new Map<string, { agentId: string; expiresAt: number }>();
@@ -360,7 +360,7 @@ app.post('/agents/start', async c => {
     } = agent;
     return c.json(safeAgent, 201);
   } catch (err) {
-    const failure = sanitizeStartupError(err);
+    const failure = classifyStartupError(err);
     const details = [
       `error=${failure.error}`,
       failure.phase ? `phase=${failure.phase}` : null,

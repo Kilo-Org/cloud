@@ -147,7 +147,7 @@ function messageFromError(err: unknown): string {
   return 'Agent startup failed';
 }
 
-export function sanitizeStartupError(
+export function classifyStartupError(
   err: unknown,
   phase?: AgentStartupPhase
 ): AgentStartupErrorPayload {

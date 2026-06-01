@@ -23,7 +23,7 @@ import {
 } from './control-server';
 import { log } from './logger';
 import { refreshTokenIfNearExpiry } from './token-refresh';
-import { AgentStartupError, sanitizeStartupError } from './startup-error';
+import { AgentStartupError, classifyStartupError } from './startup-error';
 
 const MANAGER_LOG = '[process-manager]';
 
@@ -1330,7 +1330,7 @@ async function startAgentImpl(
           },
         });
       } catch (err) {
-        throw new AgentStartupError(sanitizeStartupError(err, 'initial_prompt'));
+        throw new AgentStartupError(classifyStartupError(err, 'initial_prompt'));
       }
 
       // If the event stream errored while we were awaiting the prompt,

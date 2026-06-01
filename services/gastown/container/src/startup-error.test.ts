@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { AgentStartupError, sanitizeStartupError } from './startup-error';
+import { AgentStartupError, classifyStartupError } from './startup-error';
 
-describe('sanitizeStartupError', () => {
+describe('classifyStartupError', () => {
   it('classifies initial prompt rate-limit gateway failures', () => {
-    const payload = sanitizeStartupError(
+    const payload = classifyStartupError(
       {
         status: 429,
         body: {
@@ -24,7 +24,7 @@ describe('sanitizeStartupError', () => {
   });
 
   it('extracts gateway details embedded in SDK error messages', () => {
-    const payload = sanitizeStartupError(
+    const payload = classifyStartupError(
       new Error(
         'Request failed: {"error":{"message":"quota exhausted"},"error_type":"rate_limit_exceeded"}'
       ),
@@ -38,16 +38,16 @@ describe('sanitizeStartupError', () => {
     });
   });
 
-  it('preserves already-sanitized startup payloads', () => {
+  it('preserves already-classified startup payloads', () => {
     const error = new AgentStartupError({
-      error: 'safe failure',
+      error: 'classified failure',
       phase: 'initial_prompt',
       status: 500,
       error_type: 'server_error',
     });
 
-    expect(sanitizeStartupError(error)).toEqual({
-      error: 'safe failure',
+    expect(classifyStartupError(error)).toEqual({
+      error: 'classified failure',
       phase: 'initial_prompt',
       status: 500,
       error_type: 'server_error',

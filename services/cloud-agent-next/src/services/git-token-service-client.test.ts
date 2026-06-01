@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { GitTokenService } from '../types.js';
 import {
+  issueCloudAgentGitHubSessionCapability,
+  issueCloudAgentGitLabSessionCapability,
   resolveCloudAgentGitHubAuthForRepo,
   resolveManagedGitLabToken,
 } from './git-token-service-client.js';
@@ -8,6 +10,7 @@ import {
 vi.mock('../logger.js', () => ({
   logger: {
     info: vi.fn(),
+    error: vi.fn(),
     withFields: vi.fn(() => ({ info: vi.fn(), error: vi.fn(), warn: vi.fn() })),
   },
 }));
@@ -17,6 +20,10 @@ function createGitTokenService() {
     getTokenForRepo: vi.fn(),
     getToken: vi.fn(),
     getGitLabToken: vi.fn(),
+    issueGitHubSessionCapability: vi.fn(),
+    redeemGitHubSessionCapability: vi.fn(),
+    issueGitLabSessionCapability: vi.fn(),
+    redeemGitLabSessionCapability: vi.fn(),
   } satisfies GitTokenService;
 }
 
@@ -81,6 +88,190 @@ describe('resolveManagedGitLabToken', () => {
   });
 });
 
+describe('issueCloudAgentGitHubSessionCapability', () => {
+  it('returns an opaque capability and preserves managed identity metadata', async () => {
+    const issueGitHubSessionCapability = vi.fn().mockResolvedValue({
+      success: true,
+      capability: 'kgh2.opaque',
+      installationId: '123',
+      accountLogin: 'acme',
+      appType: 'standard',
+      source: 'user',
+      gitAuthor: { name: 'octocat', email: '101+octocat@users.noreply.github.com' },
+      commitCoAuthor: { name: 'kiloconnect[bot]', email: 'bot@example.com' },
+    });
+    const getCloudAgentAuthForRepo = vi.fn();
+    const getTokenForRepo = vi.fn();
+
+    const result = await issueCloudAgentGitHubSessionCapability(
+      createEnv({ issueGitHubSessionCapability, getCloudAgentAuthForRepo, getTokenForRepo }),
+      {
+        githubRepo: 'acme/repo',
+        userId: 'user_1',
+        outboundContainerId: 'container-test',
+        allowUserAuthorization: true,
+      }
+    );
+
+    expect(issueGitHubSessionCapability).toHaveBeenCalledWith({
+      githubRepo: 'acme/repo',
+      userId: 'user_1',
+      outboundContainerId: 'container-test',
+      allowUserAuthorization: true,
+    });
+    expect(getCloudAgentAuthForRepo).not.toHaveBeenCalled();
+    expect(getTokenForRepo).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      success: true,
+      value: {
+        capability: 'kgh2.opaque',
+        source: 'user',
+        gitAuthor: { name: 'octocat' },
+      },
+    });
+  });
+
+  it('reports issuance failure without resolving raw authentication', async () => {
+    const issueGitHubSessionCapability = vi.fn().mockResolvedValue({
+      success: false,
+      reason: 'capability_configuration_error',
+    });
+    const getCloudAgentAuthForRepo = vi.fn();
+    const getTokenForRepo = vi.fn();
+
+    const result = await issueCloudAgentGitHubSessionCapability(
+      createEnv({ issueGitHubSessionCapability, getCloudAgentAuthForRepo, getTokenForRepo }),
+      {
+        githubRepo: 'acme/repo',
+        userId: 'user_1',
+        outboundContainerId: 'container-test',
+        allowUserAuthorization: false,
+      }
+    );
+
+    expect(result).toEqual({
+      success: false,
+      error: {
+        reason: 'capability_configuration_error',
+        message: 'GitHub managed auth lookup failed (capability_configuration_error)',
+      },
+    });
+    expect(getCloudAgentAuthForRepo).not.toHaveBeenCalled();
+    expect(getTokenForRepo).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when capability RPC throws without a raw token fallback', async () => {
+    const issueGitHubSessionCapability = vi
+      .fn()
+      .mockRejectedValue(new Error('service unavailable'));
+    const getCloudAgentAuthForRepo = vi.fn();
+    const getTokenForRepo = vi.fn();
+
+    const result = await issueCloudAgentGitHubSessionCapability(
+      createEnv({ issueGitHubSessionCapability, getCloudAgentAuthForRepo, getTokenForRepo }),
+      {
+        githubRepo: 'acme/repo',
+        userId: 'user_1',
+        outboundContainerId: 'container-test',
+        allowUserAuthorization: true,
+      }
+    );
+
+    expect(result).toMatchObject({ success: false, error: { reason: 'rpc_error' } });
+    expect(getCloudAgentAuthForRepo).not.toHaveBeenCalled();
+    expect(getTokenForRepo).not.toHaveBeenCalled();
+  });
+});
+
+describe('issueCloudAgentGitLabSessionCapability', () => {
+  it('returns an opaque code-review project capability and preserves CLI mode metadata', async () => {
+    const issueGitLabSessionCapability = vi.fn().mockResolvedValue({
+      success: true,
+      capability: 'kgl2.project',
+      instanceOrigin: 'https://gitlab.example.com:8443/gitlab',
+      instanceHost: 'gitlab.example.com:8443',
+      projectPath: 'acme/platform/repo',
+      integrationId: 'project_token_1',
+      authType: 'pat',
+      identity: { accountId: null, accountLogin: null },
+      glabIsOAuth2: false,
+    });
+    const getGitLabToken = vi.fn();
+
+    const result = await issueCloudAgentGitLabSessionCapability(
+      createEnv({ issueGitLabSessionCapability, getGitLabToken }),
+      {
+        gitUrl: 'https://gitlab.example.com:8443/gitlab/acme/platform/repo.git',
+        userId: 'user_1',
+        outboundContainerId: 'container-test',
+        createdOnPlatform: 'code-review',
+      }
+    );
+
+    expect(issueGitLabSessionCapability).toHaveBeenCalledWith({
+      gitUrl: 'https://gitlab.example.com:8443/gitlab/acme/platform/repo.git',
+      userId: 'user_1',
+      outboundContainerId: 'container-test',
+      createdOnPlatform: 'code-review',
+    });
+    expect(getGitLabToken).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      success: true,
+      value: {
+        capability: 'kgl2.project',
+        gitUrl: 'https://gitlab.example.com:8443/gitlab/acme/platform/repo.git',
+        instanceOrigin: 'https://gitlab.example.com:8443/gitlab',
+        instanceHost: 'gitlab.example.com:8443',
+        projectPath: 'acme/platform/repo',
+        integrationId: 'project_token_1',
+        authType: 'pat',
+        identity: { accountId: null, accountLogin: null },
+        glabIsOAuth2: false,
+      },
+    });
+    expect(JSON.stringify(result)).not.toContain('project-access-token');
+  });
+
+  it('reports issuance failure without resolving a raw token', async () => {
+    const issueGitLabSessionCapability = vi.fn().mockResolvedValue({
+      success: false,
+      reason: 'capability_configuration_error',
+    });
+    const getGitLabToken = vi.fn();
+
+    const result = await issueCloudAgentGitLabSessionCapability(
+      createEnv({ issueGitLabSessionCapability, getGitLabToken }),
+      {
+        gitUrl: 'https://gitlab.com/acme/repo.git',
+        userId: 'user_1',
+        outboundContainerId: 'container-test',
+      }
+    );
+
+    expect(result).toEqual({ success: false, reason: 'capability_configuration_error' });
+    expect(getGitLabToken).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when capability RPC throws without a raw token fallback', async () => {
+    const issueGitLabSessionCapability = vi
+      .fn()
+      .mockRejectedValue(new Error('service unavailable'));
+    const getGitLabToken = vi.fn();
+
+    const result = await issueCloudAgentGitLabSessionCapability(
+      createEnv({ issueGitLabSessionCapability, getGitLabToken }),
+      {
+        gitUrl: 'https://gitlab.com/acme/repo.git',
+        userId: 'user_1',
+        outboundContainerId: 'container-test',
+      }
+    );
+
+    expect(result).toEqual({ success: false, reason: 'rpc_error' });
+    expect(getGitLabToken).not.toHaveBeenCalled();
+  });
+});
+
 describe('resolveCloudAgentGitHubAuthForRepo', () => {
   it('passes explicit user-auth eligibility to the managed resolver when it is available', async () => {
     const getCloudAgentAuthForRepo = vi.fn().mockResolvedValue({
@@ -97,7 +288,11 @@ describe('resolveCloudAgentGitHubAuthForRepo', () => {
 
     const result = await resolveCloudAgentGitHubAuthForRepo(
       createEnv({ getCloudAgentAuthForRepo, getTokenForRepo }),
-      { githubRepo: 'acme/repo', userId: 'user_1', allowUserAuthorization: true }
+      {
+        githubRepo: 'acme/repo',
+        userId: 'user_1',
+        allowUserAuthorization: true,
+      }
     );
 
     expect(getCloudAgentAuthForRepo).toHaveBeenCalledWith({
@@ -127,7 +322,11 @@ describe('resolveCloudAgentGitHubAuthForRepo', () => {
 
     const result = await resolveCloudAgentGitHubAuthForRepo(
       createEnv({ getCloudAgentAuthForRepo, getTokenForRepo }),
-      { githubRepo: 'acme/repo', userId: 'user_1', allowUserAuthorization: true }
+      {
+        githubRepo: 'acme/repo',
+        userId: 'user_1',
+        allowUserAuthorization: true,
+      }
     );
 
     expect(getTokenForRepo).not.toHaveBeenCalled();
@@ -159,7 +358,11 @@ describe('resolveCloudAgentGitHubAuthForRepo', () => {
 
     const result = await resolveCloudAgentGitHubAuthForRepo(
       createEnv({ getCloudAgentAuthForRepo, getTokenForRepo }),
-      { githubRepo: 'acme/repo', userId: 'user_1', allowUserAuthorization: true }
+      {
+        githubRepo: 'acme/repo',
+        userId: 'user_1',
+        allowUserAuthorization: true,
+      }
     );
 
     expect(getCloudAgentAuthForRepo).toHaveBeenCalledWith({

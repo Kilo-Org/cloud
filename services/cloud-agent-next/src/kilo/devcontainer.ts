@@ -114,6 +114,33 @@ export function getDevContainerOverridePath(
 /** Label that records the wrapper HTTP port published by the dev container. */
 export const KILO_WRAPPER_PORT_LABEL = 'kilo.wrapperPort';
 
+export function getDevContainerTrustedCaBundlePath(sessionHome: string): string {
+  return `${sessionHome}/${DEVCONTAINER_TRUSTED_CA_BUNDLE_RELATIVE_PATH}`;
+}
+
+export function buildDevContainerTrustedCaBundleSetupCommand(sessionHome: string): string {
+  const trustedCaBundle = getDevContainerTrustedCaBundlePath(sessionHome);
+  const trustedCaBundleDir = pathPosix.dirname(trustedCaBundle);
+  return [
+    `source=\${GIT_SSL_CAINFO:-${OUTER_TRUSTED_CA_BUNDLE_FALLBACK}}`,
+    'test -f "$source"',
+    `mkdir -p ${shellQuote(trustedCaBundleDir)}`,
+    `cp "$source" ${shellQuote(trustedCaBundle)}`,
+    `chmod 444 ${shellQuote(trustedCaBundle)}`,
+  ].join(' && ');
+}
+
+function buildDevContainerTrustEnv(sessionHome: string): Record<string, string> {
+  const trustedCaBundle = getDevContainerTrustedCaBundlePath(sessionHome);
+  return {
+    GIT_SSL_CAINFO: trustedCaBundle,
+    SSL_CERT_FILE: trustedCaBundle,
+    CURL_CA_BUNDLE: trustedCaBundle,
+    REQUESTS_CA_BUNDLE: trustedCaBundle,
+    NODE_EXTRA_CA_CERTS: trustedCaBundle,
+  };
+}
+
 /**
  * Pinned kilo CLI version installed *inside* the dev container.
  *
@@ -125,6 +152,9 @@ export const KILO_CLI_VERSION = '7.3.12';
 
 const DEVCONTAINER_RUNTIME_BUN_VERSION = '1.3.14';
 const DEVCONTAINER_RUNTIME_BOOTSTRAP_TIMEOUT_MS = 10 * 60 * 1000;
+const OUTER_TRUSTED_CA_BUNDLE_FALLBACK = '/etc/ssl/certs/ca-certificates.crt';
+const DEVCONTAINER_TRUSTED_CA_BUNDLE_RELATIVE_PATH =
+  '.kilocode/platform/outer-trusted-ca-bundle.crt';
 
 /** `devcontainer up` prints multiple JSON lines on stdout — we look for this final line. */
 const UP_OUTCOME_SUCCESS = 'success';
@@ -334,9 +364,20 @@ export async function bringUpDevContainer(
   // `remoteUser: root` in `buildOverrideConfig`), so file ownership lines up
   // by construction without any chown/chmod or uid-rewrite trickery.
   await session.exec(
-    `mkdir -p "${sessionHome}/.cache" "${sessionHome}/.local/share/kilo" "${sessionHome}/tmp"`,
+    `mkdir -p ${shellQuote(`${sessionHome}/.cache`)} ${shellQuote(`${sessionHome}/.local/share/kilo`)} ${shellQuote(`${sessionHome}/tmp`)}`,
     { timeout: 10_000 }
   );
+  const trustedCaSetupResult = await session.exec(
+    buildDevContainerTrustedCaBundleSetupCommand(sessionHome),
+    { timeout: 10_000 }
+  );
+  if (trustedCaSetupResult.exitCode !== 0) {
+    throw new DevContainerUpError(
+      `Failed to prepare dev container trusted CA bundle (exit ${trustedCaSetupResult.exitCode})`,
+      trustedCaSetupResult.stdout ?? '',
+      trustedCaSetupResult.stderr ?? ''
+    );
+  }
 
   onProgress?.('Preparing dev container configuration…');
 
@@ -473,7 +514,7 @@ export async function bringUpDevContainer(
 
 /**
  * Build the override JSON merged on top of the user's `devcontainer.json`.
- * Adds Kilo's `mounts`/`runArgs`/`remoteEnv` without changing
+ * Adds Kilo's `mounts`/`runArgs`/`containerEnv`/`remoteEnv` without changing
  * `workspaceMount`/`workspaceFolder`; `remoteUser` is forced to `root` so
  * that file ownership across the outer→inner bind mount lines up by
  * construction. The user's `"remoteUser": "vscode"` (or similar) is replaced
@@ -490,6 +531,8 @@ export function buildOverrideConfig(opts: {
   agentSessionId: string;
 }): Record<string, unknown> {
   const { sessionHome, wrapperPort, agentSessionId } = opts;
+  const trustedCaBundle = getDevContainerTrustedCaBundlePath(sessionHome);
+  const trustEnv = buildDevContainerTrustEnv(sessionHome);
 
   return {
     remoteUser: 'root',
@@ -498,6 +541,8 @@ export function buildOverrideConfig(opts: {
       `source=/opt/kilo-cloud,target=/opt/kilo-cloud,type=bind,readonly`,
       // HOME alignment — kilo's xdg-basedir paths must resolve identically inside and out.
       `source=${sessionHome},target=${sessionHome},type=bind`,
+      // Narrow read-only CA propagation for nested HTTPS tooling.
+      `source=${trustedCaBundle},target=${trustedCaBundle},type=bind,readonly`,
     ],
     runArgs: [
       '--network=host',
@@ -510,9 +555,11 @@ export function buildOverrideConfig(opts: {
       '--label',
       `${KILO_WRAPPER_PORT_LABEL}=${wrapperPort}`,
     ],
+    containerEnv: trustEnv,
     remoteEnv: {
       HOME: sessionHome,
       KILO_CLOUD_AGENT: '1',
+      ...trustEnv,
     },
   };
 }
@@ -594,6 +641,10 @@ export function mergeDevContainerConfig(
     ...(typeof override.remoteUser === 'string' ? { remoteUser: override.remoteUser } : {}),
     mounts: [...baseMounts, ...overrideMounts],
     runArgs: [...sanitizeDevContainerRunArgs(sanitizedBaseConfig.runArgs), ...overrideRunArgs],
+    containerEnv: {
+      ...(isRecord(sanitizedBaseConfig.containerEnv) ? sanitizedBaseConfig.containerEnv : {}),
+      ...(isRecord(override.containerEnv) ? override.containerEnv : {}),
+    },
     remoteEnv: {
       ...(isRecord(sanitizedBaseConfig.remoteEnv) ? sanitizedBaseConfig.remoteEnv : {}),
       ...(isRecord(override.remoteEnv) ? override.remoteEnv : {}),

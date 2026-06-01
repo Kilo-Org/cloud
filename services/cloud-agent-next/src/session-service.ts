@@ -8,11 +8,11 @@ import type {
   GitAuthorConfig,
   ManagedGitHubFallbackReason,
 } from './types.js';
-import { generateSandboxId } from './sandbox-id.js';
+import { generateSandboxId, getOutboundContainerId } from './sandbox-id.js';
 import { normalizeKilocodeModel } from './persistence/model-utils.js';
 import {
-  resolveCloudAgentGitHubAuthForRepo,
-  resolveManagedGitLabToken,
+  issueCloudAgentGitHubSessionCapability,
+  issueCloudAgentGitLabSessionCapability,
 } from './services/git-token-service-client.js';
 import { ExecutionError } from './execution/errors.js';
 import {
@@ -340,7 +340,9 @@ export type ResolvedWorkspaceTokens = {
   githubCommitCoAuthor?: GitAuthorConfig;
   githubFallbackReason?: ManagedGitHubFallbackReason;
   gitToken?: string;
+  gitlabCapabilityGitUrl?: string;
   gitlabTokenManaged?: boolean;
+  gitlabInstanceUrl?: string;
   glabIsOAuth2?: boolean;
 };
 
@@ -905,6 +907,7 @@ export class SessionService {
     gitUrl?: string;
     gitToken?: string;
     gitlabTokenManaged?: boolean;
+    gitlabInstanceUrl?: string;
     glabIsOAuth2?: boolean;
     upstreamBranch?: string;
     branchName?: string;
@@ -935,6 +938,7 @@ export class SessionService {
       gitUrl: options.gitUrl,
       gitToken: options.gitToken,
       gitlabTokenManaged: options.gitlabTokenManaged,
+      gitlabInstanceUrl: options.gitlabInstanceUrl,
       glabIsOAuth2: options.glabIsOAuth2,
       platform: options.platform,
       envVars: options.envVars,
@@ -964,6 +968,7 @@ export class SessionService {
       appendSystemPrompt: opts.appendSystemPrompt,
       gitUrl: context.gitUrl,
       gitToken: context.gitToken,
+      gitlabInstanceUrl: context.gitlabInstanceUrl,
       glabIsOAuth2: context.glabIsOAuth2,
       platform: context.platform,
       profile: effectiveProfile,
@@ -985,6 +990,7 @@ export class SessionService {
       appendSystemPrompt,
       gitUrl,
       gitToken,
+      gitlabInstanceUrl,
       glabIsOAuth2,
       platform,
       profile,
@@ -1196,7 +1202,11 @@ export class SessionService {
         if (gitUrl) {
           try {
             const url = new URL(gitUrl);
+            const instanceUrl = gitlabInstanceUrl ? new URL(gitlabInstanceUrl) : undefined;
             envVars.GITLAB_HOST = url.host;
+            if (instanceUrl && instanceUrl.pathname !== '/') {
+              envVars.GITLAB_SUBFOLDER = instanceUrl.pathname.replace(/^\/+|\/+$/g, '');
+            }
           } catch {
             envVars.GITLAB_HOST = 'gitlab.com';
           }
@@ -1284,8 +1294,10 @@ export class SessionService {
 
   async resolveWorkspaceTokens(
     env: PersistenceEnv,
-    metadata: CloudAgentSessionState
+    metadata: CloudAgentSessionState,
+    sandboxId: SandboxId
   ): Promise<ResolvedWorkspaceTokens> {
+    const outboundContainerId = getOutboundContainerId(env, sandboxId);
     const github = githubRepository(metadata);
     const git = gitRepository(metadata);
     let githubToken: string | undefined;
@@ -1297,16 +1309,18 @@ export class SessionService {
     let githubFallbackReason: ManagedGitHubFallbackReason | undefined;
 
     if (github) {
-      const result = await resolveCloudAgentGitHubAuthForRepo(env, {
+      const authParams = {
         githubRepo: github.repo,
         userId: metadata.identity.userId,
+        outboundContainerId,
         orgId: metadata.identity.orgId,
         allowUserAuthorization:
           metadata.identity.createdOnPlatform === 'cloud-agent-web' ||
           metadata.identity.createdOnPlatform === 'slack',
-      });
+      };
+      const result = await issueCloudAgentGitHubSessionCapability(env, authParams);
       if (result.success) {
-        githubToken = result.value.githubToken;
+        githubToken = result.value.capability;
         githubInstallationId = result.value.installationId;
         githubAppType = result.value.appType;
         githubSource = result.value.source;
@@ -1326,23 +1340,27 @@ export class SessionService {
     }
 
     let gitToken = repositoryPlatform(metadata) === 'gitlab' ? undefined : git?.token;
+    let gitlabCapabilityGitUrl: string | undefined;
     let gitlabTokenManaged = git?.type === 'gitlab' ? git.gitlabTokenManaged : undefined;
+    let gitlabInstanceUrl: string | undefined;
     let glabIsOAuth2: boolean | undefined;
     if (git?.url && repositoryPlatform(metadata) === 'gitlab') {
       if (!env.GIT_TOKEN_SERVICE) {
         throw ExecutionError.invalidRequest('Git token service is not configured');
       }
-
-      const result = await resolveManagedGitLabToken(env, {
+      const result = await issueCloudAgentGitLabSessionCapability(env, {
+        gitUrl: git.url,
         userId: metadata.identity.userId,
+        outboundContainerId,
         orgId: metadata.identity.orgId,
-        repositoryUrl: git.url,
         createdOnPlatform: metadata.identity.createdOnPlatform,
       });
       if (result.success) {
-        gitToken = result.token;
+        gitToken = result.value.capability;
+        gitlabCapabilityGitUrl = result.value.gitUrl;
         gitlabTokenManaged = true;
-        glabIsOAuth2 = result.glabIsOAuth2;
+        gitlabInstanceUrl = result.value.instanceOrigin;
+        glabIsOAuth2 = result.value.glabIsOAuth2;
       } else {
         throw ExecutionError.invalidRequest(gitLabTokenLookupFailureMessage(result.reason));
       }
@@ -1363,7 +1381,9 @@ export class SessionService {
       githubCommitCoAuthor,
       githubFallbackReason,
       gitToken,
+      gitlabCapabilityGitUrl,
       gitlabTokenManaged,
+      gitlabInstanceUrl,
       glabIsOAuth2,
     };
   }
@@ -1392,7 +1412,9 @@ export class SessionService {
       throw ExecutionError.invalidRequest('Missing kiloSessionId in session metadata');
     }
 
-    const resolvedTokens = await this.resolveWorkspaceTokens(env, metadata);
+    const devcontainerRequested =
+      metadata.workspace?.devcontainerRequested === true || metadata.devcontainer !== undefined;
+    const resolvedTokens = await this.resolveWorkspaceTokens(env, metadata, sandboxId as SandboxId);
     const workspacePath = getSessionWorkspacePath(orgId, userId, sessionId);
     const sessionHome = getSessionHomePath(sessionId);
     const branchName =
@@ -1402,8 +1424,6 @@ export class SessionService {
     const github = githubRepository(metadata);
     const git = gitRepository(metadata);
     const platform = repositoryPlatform(metadata);
-    const devcontainerRequested =
-      metadata.workspace?.devcontainerRequested === true || metadata.devcontainer !== undefined;
     const context = this.buildContext({
       sandboxId: sandboxId as SandboxId,
       orgId,
@@ -1413,9 +1433,10 @@ export class SessionService {
       sessionHome,
       githubRepo: github?.repo,
       githubToken: resolvedTokens.githubToken,
-      gitUrl: git?.url,
+      gitUrl: resolvedTokens.gitlabCapabilityGitUrl ?? git?.url,
       gitToken: resolvedTokens.gitToken,
       gitlabTokenManaged: resolvedTokens.gitlabTokenManaged,
+      gitlabInstanceUrl: resolvedTokens.gitlabInstanceUrl,
       glabIsOAuth2: resolvedTokens.glabIsOAuth2,
       upstreamBranch: metadata.repository?.upstreamBranch,
       branchName,
@@ -1436,8 +1457,9 @@ export class SessionService {
       githubRepo: github?.repo,
       createdOnPlatform: metadata.identity.createdOnPlatform,
       appendSystemPrompt: metadata.agent?.appendSystemPrompt,
-      gitUrl: git?.url,
+      gitUrl: resolvedTokens.gitlabCapabilityGitUrl ?? git?.url,
       gitToken: resolvedTokens.gitToken,
+      gitlabInstanceUrl: resolvedTokens.gitlabInstanceUrl,
       glabIsOAuth2: resolvedTokens.glabIsOAuth2,
       platform,
       profile,
@@ -1577,7 +1599,7 @@ export class SessionService {
     if (git) {
       return {
         kind: 'git',
-        url: git.url,
+        url: tokens.gitlabCapabilityGitUrl ?? git.url,
         ...(tokens.gitToken ? { token: tokens.gitToken } : {}),
         ...(repositoryPlatform(metadata) ? { platform: repositoryPlatform(metadata) } : {}),
         ...(repositoryShallow(metadata) !== undefined
@@ -1616,7 +1638,7 @@ export class SessionService {
       throw ExecutionError.invalidRequest('Missing kiloSessionId in session metadata');
     }
 
-    const resolvedTokens = await this.resolveWorkspaceTokens(env, metadata);
+    const resolvedTokens = await this.resolveWorkspaceTokens(env, metadata, sandboxId);
     const github = githubRepository(metadata);
     const git = gitRepository(metadata);
     const platform = repositoryPlatform(metadata);
@@ -1638,9 +1660,10 @@ export class SessionService {
       sessionHome,
       githubRepo: github?.repo,
       githubToken: resolvedTokens.githubToken,
-      gitUrl: git?.url,
+      gitUrl: resolvedTokens.gitlabCapabilityGitUrl ?? git?.url,
       gitToken: resolvedTokens.gitToken,
       gitlabTokenManaged: resolvedTokens.gitlabTokenManaged,
+      gitlabInstanceUrl: resolvedTokens.gitlabInstanceUrl,
       glabIsOAuth2: resolvedTokens.glabIsOAuth2,
       upstreamBranch: metadata.repository?.upstreamBranch,
       branchName,
@@ -1916,10 +1939,17 @@ export class SessionService {
     const cloneOptions = repositoryShallow(metadata) ? { shallow: true } : undefined;
     const git = gitRepository(metadata);
     if (git) {
-      await cloneGitRepo(session, workspacePath, git.url, tokens.gitToken, undefined, {
-        ...cloneOptions,
-        platform: repositoryPlatform(metadata),
-      });
+      await cloneGitRepo(
+        session,
+        workspacePath,
+        tokens.gitlabCapabilityGitUrl ?? git.url,
+        tokens.gitToken,
+        undefined,
+        {
+          ...cloneOptions,
+          platform: repositoryPlatform(metadata),
+        }
+      );
       return;
     }
     const github = githubRepository(metadata);
@@ -2013,7 +2043,7 @@ export class SessionService {
         await updateGitRemoteToken(
           session,
           context.workspacePath,
-          git.url,
+          tokens.gitlabCapabilityGitUrl ?? git.url,
           tokens.gitToken,
           repositoryPlatform(metadata)
         );
@@ -2292,6 +2322,7 @@ type GetSaferEnvVarsOptions = {
   appendSystemPrompt?: string;
   gitUrl?: string;
   gitToken?: string;
+  gitlabInstanceUrl?: string;
   glabIsOAuth2?: boolean;
   platform?: 'github' | 'gitlab';
   profile?: SessionProfileBundle;

@@ -77,6 +77,7 @@
         {
           "binding": "SCM_SESSION_CAPABILITY_ENCRYPTION_KEY",
           "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+          // @dev-generate base64 32
           "secret_name": "SCM_SESSION_CAPABILITY_ENCRYPTION_KEY_DEV",
         },
       ],

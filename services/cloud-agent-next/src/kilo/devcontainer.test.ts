@@ -16,8 +16,10 @@ import {
   bringUpDevContainer,
   buildRestoreCommand,
   buildOverrideConfig,
+  buildDevContainerTrustedCaBundleSetupCommand,
   detectDevContainer,
   getDevContainerOverridePath,
+  getDevContainerTrustedCaBundlePath,
   KILO_AGENT_SESSION_LABEL,
   KILO_WRAPPER_PORT_LABEL,
   mergeDevContainerConfig,
@@ -53,6 +55,7 @@ describe('sandbox image versions', () => {
 
     expect(dockerfile).toContain(`FROM docker.io/cloudflare/sandbox:${sandboxVersion}`);
     expect(devDockerfile).toContain(`FROM docker.io/cloudflare/sandbox:${sandboxVersion}`);
+    expect(devDockerfile).toMatch(/apt-get install[^;]+\bgh\b/s);
     expect(dindDockerfile).toContain(`ARG SANDBOX_VERSION="${sandboxVersion}"`);
   });
 });
@@ -197,6 +200,9 @@ describe('bringUpDevContainer', () => {
     const commands = execCalls.map(([cmd]) => cmd);
     const bootstrapCall = execCalls.find(([cmd]) => cmd.includes('nvm install --lts'));
     expect(preflightCount).toBe(2);
+    expect(commands).toContain(
+      "source=${GIT_SSL_CAINFO:-/etc/ssl/certs/ca-certificates.crt} && test -f \"$source\" && mkdir -p '/home/agent_xyz/.kilocode/platform' && cp \"$source\" '/home/agent_xyz/.kilocode/platform/outer-trusted-ca-bundle.crt' && chmod 444 '/home/agent_xyz/.kilocode/platform/outer-trusted-ca-bundle.crt'"
+    );
     expect(commands.some(cmd => cmd.includes('bun --version'))).toBe(true);
     expect(commands.some(cmd => cmd.includes('nvm install --lts'))).toBe(true);
     expect(commands.some(cmd => cmd.includes('nvm use --lts'))).toBe(false);
@@ -328,6 +334,7 @@ describe('buildOverrideConfig', () => {
     expect(cfg.mounts).toEqual([
       'source=/opt/kilo-cloud,target=/opt/kilo-cloud,type=bind,readonly',
       'source=/home/agent_xyz,target=/home/agent_xyz,type=bind',
+      'source=/home/agent_xyz/.kilocode/platform/outer-trusted-ca-bundle.crt,target=/home/agent_xyz/.kilocode/platform/outer-trusted-ca-bundle.crt,type=bind,readonly',
     ]);
   });
 
@@ -344,11 +351,21 @@ describe('buildOverrideConfig', () => {
     ]);
   });
 
-  it('sets HOME without exposing the outer Docker socket', () => {
+  it('sets platform-owned nested trust env for lifecycle hooks and remote execution', () => {
     const cfg = buildOverrideConfig(baseOpts);
+    const trustedCaBundle = '/home/agent_xyz/.kilocode/platform/outer-trusted-ca-bundle.crt';
+    const platformTrustEnv = {
+      GIT_SSL_CAINFO: trustedCaBundle,
+      SSL_CERT_FILE: trustedCaBundle,
+      CURL_CA_BUNDLE: trustedCaBundle,
+      REQUESTS_CA_BUNDLE: trustedCaBundle,
+      NODE_EXTRA_CA_CERTS: trustedCaBundle,
+    };
+    expect(cfg.containerEnv).toEqual(platformTrustEnv);
     expect(cfg.remoteEnv).toEqual({
       HOME: '/home/agent_xyz',
       KILO_CLOUD_AGENT: '1',
+      ...platformTrustEnv,
     });
   });
 
@@ -364,6 +381,9 @@ describe('writeMergedOverrideConfig', () => {
       expect(cmd).toContain('const outputPath = "/tmp/merged-devcontainer.json"');
       expect(cmd).toContain('source=/opt/kilo-cloud,target=/opt/kilo-cloud,type=bind,readonly');
       expect(cmd).toContain('source=/home/agent_xyz,target=/home/agent_xyz,type=bind');
+      expect(cmd).toContain(
+        'source=/home/agent_xyz/.kilocode/platform/outer-trusted-ca-bundle.crt,target=/home/agent_xyz/.kilocode/platform/outer-trusted-ca-bundle.crt,type=bind,readonly'
+      );
       expect(cmd).toContain(`${KILO_AGENT_SESSION_LABEL}=agent_xyz`);
       expect(cmd).toContain(`${KILO_WRAPPER_PORT_LABEL}=5050`);
       return { exitCode: 0 };
@@ -414,6 +434,7 @@ describe('mergeDevContainerConfig', () => {
       'source=/user,target=/user,type=bind',
       'source=/opt/kilo-cloud,target=/opt/kilo-cloud,type=bind,readonly',
       'source=/home/agent_xyz,target=/home/agent_xyz,type=bind',
+      'source=/home/agent_xyz/.kilocode/platform/outer-trusted-ca-bundle.crt,target=/home/agent_xyz/.kilocode/platform/outer-trusted-ca-bundle.crt,type=bind,readonly',
     ]);
     expect(merged.runArgs).toEqual([
       '--env',
@@ -426,10 +447,22 @@ describe('mergeDevContainerConfig', () => {
       '--label',
       `${KILO_WRAPPER_PORT_LABEL}=5050`,
     ]);
+    expect(merged.containerEnv).toEqual({
+      GIT_SSL_CAINFO: '/home/agent_xyz/.kilocode/platform/outer-trusted-ca-bundle.crt',
+      SSL_CERT_FILE: '/home/agent_xyz/.kilocode/platform/outer-trusted-ca-bundle.crt',
+      CURL_CA_BUNDLE: '/home/agent_xyz/.kilocode/platform/outer-trusted-ca-bundle.crt',
+      REQUESTS_CA_BUNDLE: '/home/agent_xyz/.kilocode/platform/outer-trusted-ca-bundle.crt',
+      NODE_EXTRA_CA_CERTS: '/home/agent_xyz/.kilocode/platform/outer-trusted-ca-bundle.crt',
+    });
     expect(merged.remoteEnv).toEqual({
       USER_ENV: '1',
       HOME: '/home/agent_xyz',
       KILO_CLOUD_AGENT: '1',
+      GIT_SSL_CAINFO: '/home/agent_xyz/.kilocode/platform/outer-trusted-ca-bundle.crt',
+      SSL_CERT_FILE: '/home/agent_xyz/.kilocode/platform/outer-trusted-ca-bundle.crt',
+      CURL_CA_BUNDLE: '/home/agent_xyz/.kilocode/platform/outer-trusted-ca-bundle.crt',
+      REQUESTS_CA_BUNDLE: '/home/agent_xyz/.kilocode/platform/outer-trusted-ca-bundle.crt',
+      NODE_EXTRA_CA_CERTS: '/home/agent_xyz/.kilocode/platform/outer-trusted-ca-bundle.crt',
     });
   });
 
@@ -440,6 +473,26 @@ describe('mergeDevContainerConfig', () => {
     );
 
     expect(merged.remoteUser).toBe('root');
+  });
+
+  it('preserves user env while ensuring platform trust paths win', () => {
+    const merged = mergeDevContainerConfig(
+      {
+        image: 'debian:bookworm',
+        containerEnv: { USER_CONTAINER_ENV: '1', GIT_SSL_CAINFO: '/user/container-ca.crt' },
+        remoteEnv: { USER_REMOTE_ENV: '1', GIT_SSL_CAINFO: '/user/remote-ca.crt' },
+      },
+      { sessionHome: '/home/agent_xyz', wrapperPort: 5050, agentSessionId: 'agent_xyz' }
+    );
+
+    expect(merged.containerEnv).toMatchObject({
+      USER_CONTAINER_ENV: '1',
+      GIT_SSL_CAINFO: '/home/agent_xyz/.kilocode/platform/outer-trusted-ca-bundle.crt',
+    });
+    expect(merged.remoteEnv).toMatchObject({
+      USER_REMOTE_ENV: '1',
+      GIT_SSL_CAINFO: '/home/agent_xyz/.kilocode/platform/outer-trusted-ca-bundle.crt',
+    });
   });
 
   it('removes host-side initializeCommand while preserving in-container lifecycle hooks', () => {
@@ -473,6 +526,7 @@ describe('mergeDevContainerConfig', () => {
       'source=/workspace/cache,target=/cache,type=bind',
       'source=/opt/kilo-cloud,target=/opt/kilo-cloud,type=bind,readonly',
       'source=/home/agent_xyz,target=/home/agent_xyz,type=bind',
+      'source=/home/agent_xyz/.kilocode/platform/outer-trusted-ca-bundle.crt,target=/home/agent_xyz/.kilocode/platform/outer-trusted-ca-bundle.crt,type=bind,readonly',
     ]);
   });
 
@@ -648,6 +702,26 @@ describe('buildRestoreCommand', () => {
     expect(command).toContain("SAFE_ENV='safe-value'");
     expect(command).not.toContain('touch /tmp/pwned');
     expect(command).not.toContain('X;');
+  });
+});
+
+describe('nested devcontainer trusted CA bundle', () => {
+  it('uses a stable path inside the session-home bind mount', () => {
+    expect(getDevContainerTrustedCaBundlePath('/home/agent_xyz')).toBe(
+      '/home/agent_xyz/.kilocode/platform/outer-trusted-ca-bundle.crt'
+    );
+  });
+
+  it('copies the effective outer bundle with safe shell quoting and read-only permissions', () => {
+    const command = buildDevContainerTrustedCaBundleSetupCommand("/home/agent_'xyz");
+    expect(command).toContain('source=${GIT_SSL_CAINFO:-/etc/ssl/certs/ca-certificates.crt}');
+    expect(command).toContain("mkdir -p '/home/agent_'\\''xyz/.kilocode/platform'");
+    expect(command).toContain(
+      "cp \"$source\" '/home/agent_'\\''xyz/.kilocode/platform/outer-trusted-ca-bundle.crt'"
+    );
+    expect(command).toContain(
+      "chmod 444 '/home/agent_'\\''xyz/.kilocode/platform/outer-trusted-ca-bundle.crt'"
+    );
   });
 });
 

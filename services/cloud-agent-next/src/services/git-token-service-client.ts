@@ -85,6 +85,17 @@ export type ResolvedCloudAgentGitHubAuth = {
   fallbackReason?: ManagedGitHubFallbackReason;
 };
 
+export type ResolvedCloudAgentGitHubCapability = {
+  capability: string;
+  installationId: string;
+  appType: 'standard' | 'lite';
+  accountLogin: string;
+  source: 'user' | 'installation';
+  gitAuthor: GitAuthorConfig;
+  commitCoAuthor?: GitAuthorConfig;
+  fallbackReason?: ManagedGitHubFallbackReason;
+};
+
 type CloudAgentGitHubAuthResult =
   | { success: true; value: ResolvedCloudAgentGitHubAuth }
   | { success: false; error: ResolveGitHubTokenError };
@@ -176,9 +187,136 @@ export async function resolveCloudAgentGitHubAuthForRepo(
   }
 }
 
+export async function issueCloudAgentGitHubSessionCapability(
+  env: GitTokenServiceEnv,
+  params: {
+    githubRepo: string;
+    userId: string;
+    outboundContainerId: string;
+    orgId?: string;
+    allowUserAuthorization: boolean;
+  }
+): Promise<
+  | { success: true; value: ResolvedCloudAgentGitHubCapability }
+  | { success: false; error: ResolveGitHubTokenError }
+> {
+  if (!env.GIT_TOKEN_SERVICE) {
+    return {
+      success: false,
+      error: {
+        reason: 'service_not_configured',
+        message: 'git-token-service capability issuance is not configured',
+      },
+    };
+  }
+
+  try {
+    const result = await env.GIT_TOKEN_SERVICE.issueGitHubSessionCapability(params);
+    if (!result.success) {
+      return {
+        success: false,
+        error: {
+          reason: result.reason,
+          message: `GitHub managed auth lookup failed (${result.reason})`,
+        },
+      };
+    }
+    logger
+      .withFields({
+        installationId: result.installationId,
+        accountLogin: result.accountLogin,
+        githubAppType: result.appType,
+        source: result.source,
+        fallbackReason: result.fallbackReason,
+      })
+      .info('Issued managed GitHub session capability via git-token-service');
+    return {
+      success: true,
+      value: {
+        capability: result.capability,
+        installationId: result.installationId,
+        appType: result.appType,
+        accountLogin: result.accountLogin,
+        source: result.source,
+        gitAuthor: result.gitAuthor,
+        ...(result.commitCoAuthor ? { commitCoAuthor: result.commitCoAuthor } : {}),
+        ...(result.fallbackReason ? { fallbackReason: result.fallbackReason } : {}),
+      },
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    logger.error('Failed to issue managed GitHub session capability');
+    return {
+      success: false,
+      error: { reason: 'rpc_error', message: `git-token-service RPC failed: ${message}` },
+    };
+  }
+}
+
+export type ResolvedCloudAgentGitLabCapability = {
+  capability: string;
+  gitUrl: string;
+  instanceOrigin: string;
+  instanceHost: string;
+  projectPath: string;
+  integrationId: string;
+  authType: 'oauth' | 'pat';
+  identity: { accountId: string | null; accountLogin: string | null };
+  glabIsOAuth2: boolean;
+};
+
 export type ResolveManagedGitLabTokenResult =
   | { success: true; token: string; glabIsOAuth2: boolean }
   | { success: false; reason: string };
+
+export async function issueCloudAgentGitLabSessionCapability(
+  env: GitTokenServiceEnv,
+  params: {
+    gitUrl: string;
+    userId: string;
+    outboundContainerId: string;
+    orgId?: string;
+    createdOnPlatform?: string;
+  }
+): Promise<
+  { success: true; value: ResolvedCloudAgentGitLabCapability } | { success: false; reason: string }
+> {
+  if (!env.GIT_TOKEN_SERVICE) {
+    return { success: false, reason: 'service_not_configured' };
+  }
+
+  try {
+    const result = await env.GIT_TOKEN_SERVICE.issueGitLabSessionCapability(params);
+    if (!result.success) return result;
+    logger
+      .withFields({
+        instanceHost: result.instanceHost,
+        projectPath: result.projectPath,
+        authType: result.authType,
+      })
+      .info('Issued managed GitLab session capability via git-token-service');
+    return {
+      success: true,
+      value: {
+        capability: result.capability,
+        gitUrl: `${result.instanceOrigin}/${result.projectPath}.git`,
+        instanceOrigin: result.instanceOrigin,
+        instanceHost: result.instanceHost,
+        projectPath: result.projectPath,
+        integrationId: result.integrationId,
+        authType: result.authType,
+        identity: result.identity,
+        glabIsOAuth2: result.glabIsOAuth2,
+      },
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    logger
+      .withFields({ error: message })
+      .error('Failed to issue managed GitLab session capability');
+    return { success: false, reason: 'rpc_error' };
+  }
+}
 
 export async function resolveManagedGitLabToken(
   env: GitTokenServiceEnv,

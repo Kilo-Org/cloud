@@ -1,4 +1,5 @@
 import { spawnSync } from 'node:child_process';
+import { randomBytes } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -219,12 +220,124 @@ function isProvidedByWranglerVars(
   return entry.defaultValue === wranglerValue;
 }
 
+const DEV_GENERATED_BASE64_BYTES_FIELD_PREFIX = '__kilo_dev_generated_base64_bytes_';
+const MAX_DEV_GENERATED_SECRET_BYTES = 1024;
+
+function injectDevSecretGenerationMetadata(content: string): string {
+  let directiveIndex = 0;
+  const transformed = content.replace(
+    /^(\s*)\/\/\s*@dev-generate([^\r\n]*)$/gm,
+    (_line, indent, args: string) => {
+      const directive = args.trim().match(/^base64\s+(\d+)$/);
+      if (!directive) {
+        throw new Error(
+          'Invalid @dev-generate directive; expected `// @dev-generate base64 <bytes>`'
+        );
+      }
+
+      const bytes = Number(directive[1]);
+      if (!Number.isSafeInteger(bytes) || bytes < 1 || bytes > MAX_DEV_GENERATED_SECRET_BYTES) {
+        throw new Error(
+          `@dev-generate bytes must be between 1 and ${MAX_DEV_GENERATED_SECRET_BYTES}`
+        );
+      }
+
+      return `${indent}"${DEV_GENERATED_BASE64_BYTES_FIELD_PREFIX}${directiveIndex++}": ${bytes},`;
+    }
+  );
+
+  if (/\/\/\s*@dev-generate/.test(transformed)) {
+    throw new Error('@dev-generate must be a standalone comment inside a Secrets Store binding');
+  }
+  return transformed;
+}
+
+function rejectReservedDevSecretGenerationMetadata(value: unknown): void {
+  if (Array.isArray(value)) {
+    for (const item of value) rejectReservedDevSecretGenerationMetadata(item);
+    return;
+  }
+  if (!isJsonObject(value)) return;
+
+  if (Object.keys(value).some(key => key.startsWith(DEV_GENERATED_BASE64_BYTES_FIELD_PREFIX))) {
+    throw new Error('@dev-generate field prefix is reserved for generated-secret metadata');
+  }
+  for (const nestedValue of Object.values(value))
+    rejectReservedDevSecretGenerationMetadata(nestedValue);
+}
+
+function getDevGeneratedBase64Bytes(value: JsonObject): number | undefined {
+  const metadata = Object.entries(value).filter(([key]) =>
+    key.startsWith(DEV_GENERATED_BASE64_BYTES_FIELD_PREFIX)
+  );
+  if (metadata.length === 0) return undefined;
+  if (metadata.length > 1) {
+    throw new Error('A Secrets Store binding can have only one @dev-generate directive');
+  }
+
+  const bytes = metadata[0]?.[1];
+  if (
+    typeof bytes !== 'number' ||
+    !Number.isSafeInteger(bytes) ||
+    bytes < 1 ||
+    bytes > MAX_DEV_GENERATED_SECRET_BYTES
+  ) {
+    throw new Error('Invalid @dev-generate metadata');
+  }
+  return bytes;
+}
+
+function validateDevSecretGenerationMetadata(value: unknown): void {
+  if (Array.isArray(value)) {
+    for (const item of value) validateDevSecretGenerationMetadata(item);
+    return;
+  }
+  if (!isJsonObject(value)) return;
+
+  if (getDevGeneratedBase64Bytes(value) !== undefined) {
+    if (
+      typeof value.binding !== 'string' ||
+      typeof value.store_id !== 'string' ||
+      typeof value.secret_name !== 'string'
+    ) {
+      throw new Error('@dev-generate must annotate a Secrets Store binding object');
+    }
+  }
+  for (const nestedValue of Object.values(value)) validateDevSecretGenerationMetadata(nestedValue);
+}
+
 function extractSecretsStoreBindings(repoRoot: string, workerDir: string): SecretStoreBinding[] {
-  const config = readWranglerConfig(repoRoot, workerDir);
-  if (!config) return [];
+  const wranglerPath = path.join(repoRoot, workerDir, 'wrangler.jsonc');
+  if (!fs.existsSync(wranglerPath)) return [];
+
+  const content = fs.readFileSync(wranglerPath, 'utf-8');
+  try {
+    const originalConfig = parseJsonc(content);
+    if (!isJsonObject(originalConfig)) return [];
+    rejectReservedDevSecretGenerationMetadata(originalConfig);
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('@dev-generate')) throw error;
+    return [];
+  }
+
+  let annotatedConfig: JsonObject;
+  try {
+    const parsed = parseJsonc(injectDevSecretGenerationMetadata(content));
+    if (!isJsonObject(parsed)) return [];
+    validateDevSecretGenerationMetadata(parsed);
+    annotatedConfig = parsed;
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('@dev-generate')) throw error;
+    if (content.includes('@dev-generate')) {
+      throw new Error('@dev-generate must annotate a Secrets Store binding object', {
+        cause: error,
+      });
+    }
+    return [];
+  }
 
   const envName = detectWranglerEnv(repoRoot, workerDir);
-  const secretsSection = getWranglerSection(config, envName, 'secrets_store_secrets');
+  const secretsSection = getWranglerSection(annotatedConfig, envName, 'secrets_store_secrets');
   if (!Array.isArray(secretsSection)) return [];
 
   const bindings: SecretStoreBinding[] = [];
@@ -240,7 +353,13 @@ function extractSecretsStoreBindings(repoRoot: string, workerDir: string): Secre
     ) {
       continue;
     }
-    bindings.push({ binding, store_id: storeId, secret_name: secretName });
+    const generatedBytes = getDevGeneratedBase64Bytes(secret);
+    bindings.push({
+      binding,
+      store_id: storeId,
+      secret_name: secretName,
+      ...(typeof generatedBytes === 'number' ? { devGeneratedBase64Bytes: generatedBytes } : {}),
+    });
   }
   return bindings;
 }
@@ -570,8 +689,17 @@ function computePlan(repoRoot: string, serviceFilter?: Set<string>): EnvSyncPlan
         continue; // Secret exists, nothing to do
       }
 
-      const source = resolveSecretStoreSource(b.secret_name, envLocal, localSecretSources);
+      if (b.devGeneratedBase64Bytes) {
+        secretStoreAutoCreates.push({
+          workerDir: svc.dir,
+          binding: b,
+          sourceKey: `@dev-generate base64 ${b.devGeneratedBase64Bytes}`,
+          value: randomBytes(b.devGeneratedBase64Bytes).toString('base64'),
+        });
+        continue;
+      }
 
+      const source = resolveSecretStoreSource(b.secret_name, envLocal, localSecretSources);
       if (source) {
         // Can auto-create from .env.local or another local worker's dev vars.
         secretStoreAutoCreates.push({

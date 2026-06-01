@@ -79,6 +79,8 @@ function createTestFetch(overrides?: {
       sessionId: 'kilo_sess_test',
       agentSessionId: 'agent_00000000-0000-0000-0000-000000000000',
       userId: 'user_test',
+      wrapperInstanceId: 'instance_test',
+      wrapperInstanceGeneration: 8,
     },
     {
       state: new WrapperState(),
@@ -96,6 +98,21 @@ function createTestFetch(overrides?: {
 
 afterEach(async () => {
   await Promise.all(servers.splice(0).map(server => server.stop()));
+});
+
+describe('wrapper health', () => {
+  it('reports leased physical wrapper identity separately from session identity', async () => {
+    const { fetchHandler } = createTestFetch();
+    const response = await fetchHandler(new Request('http://wrapper.test/health'));
+    if (!response) throw new Error('Expected health response');
+
+    const body = await response.json();
+    expect(body).toMatchObject({
+      sessionId: 'kilo_sess_test',
+      wrapperInstanceId: 'instance_test',
+      wrapperInstanceGeneration: 8,
+    });
+  });
 });
 
 describe('wrapper PTY routes', () => {

@@ -1,14 +1,15 @@
 import { useEffect, useState } from 'react';
 import type { ModelOption } from '@/components/shared/ModelCombobox';
+import { KILOCLAW_KILO_PROVIDER_PREFIX } from '@/lib/ai-gateway/model-utils';
 
 export function getDefaultSelectedModel(
   kilocodeDefaultModel: string | null | undefined,
   modelOptions: ModelOption[]
 ) {
   if (modelOptions.length === 0) return '';
-  if (!kilocodeDefaultModel?.startsWith('kilocode/')) return '';
+  if (!kilocodeDefaultModel?.startsWith(KILOCLAW_KILO_PROVIDER_PREFIX)) return '';
 
-  const defaultModel = kilocodeDefaultModel.replace(/^kilocode\//, '');
+  const defaultModel = kilocodeDefaultModel.slice(KILOCLAW_KILO_PROVIDER_PREFIX.length);
   if (modelOptions.some(model => model.id === defaultModel)) return defaultModel;
   return '';
 }

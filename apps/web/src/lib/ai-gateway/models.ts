@@ -10,9 +10,11 @@ import {
 } from '@/lib/ai-gateway/auto-model';
 import {
   CLAUDE_OPUS_CURRENT_MODEL_ID,
+  CLAUDE_OPUS_4_8_STEALTH_MODEL_ID,
   CLAUDE_OPUS_STEALTH_MODEL_ID,
   CLAUDE_SONNET_STEALTH_MODEL_ID,
   CLAUDE_OPUS_4_6_STEALTH_MODEL_ID,
+  claude_opus_4_8_stealth_model,
   claude_opus_4_7_stealth_model,
   claude_sonnet_4_6_stealth_model,
   claude_opus_4_6_stealth_model,
@@ -57,6 +59,7 @@ export const preferredModels = [
   KILO_AUTO_FREE_MODEL.id,
   ...autoFreeModels,
   CLAUDE_OPUS_CURRENT_MODEL_ID,
+  CLAUDE_OPUS_4_8_STEALTH_MODEL_ID,
   CLAUDE_OPUS_STEALTH_MODEL_ID,
   CLAUDE_SONNET_STEALTH_MODEL_ID,
   CLAUDE_OPUS_4_6_STEALTH_MODEL_ID,
@@ -93,6 +96,7 @@ export const kiloExclusiveModels = [
   ...deepseekDiscountedModels,
   qwen36_plus_stealth_model,
   claude_sonnet_clawsetup_model,
+  claude_opus_4_8_stealth_model,
   claude_opus_4_7_stealth_model,
   claude_sonnet_4_6_stealth_model,
   claude_opus_4_6_stealth_model,

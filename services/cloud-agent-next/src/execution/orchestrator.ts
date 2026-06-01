@@ -1,16 +1,12 @@
 /**
- * ExecutionOrchestrator - Handles prompt execution.
+ * ExecutionOrchestrator - Handles provider-neutral wrapper delivery.
  *
- * This module handles workspace preparation and execution, called directly
- * from the DO when a client sends a prompt.
+ * AgentSandbox obtains the usable runtime/wrapper. This module preserves the
+ * business sequence: prepare requests, ready the session when required, then
+ * hand the accepted prompt or command to the wrapper.
  */
 
-import type {
-  Env,
-  SandboxInstance,
-  SandboxId as ServiceSandboxId,
-  SessionId as ServiceSessionId,
-} from '../types.js';
+import type { Env } from '../types.js';
 import type { CloudAgentSession } from '../persistence/CloudAgentSession.js';
 import type {
   ExecutionResult,
@@ -21,21 +17,14 @@ import type {
 import { ExecutionError } from './errors.js';
 import { SessionService } from '../session-service.js';
 import { logger } from '../logger.js';
-import {
-  FAST_SANDBOX_COMMAND_TIMEOUT_MS,
-  logSandboxOperationTimeout,
-  timedExec,
-} from '../sandbox-timeout-logging.js';
-import { WrapperClient, WrapperError } from '../kilo/wrapper-client.js';
+import { WrapperError } from '../kilo/wrapper-client.js';
 import { withDORetry } from '../utils/do-retry.js';
 import { withTimeout } from '@kilocode/worker-utils';
-import {
-  SANDBOX_WORKSPACE_PROBE_TIMEOUT_MESSAGE,
-  withPreparationInfrastructureRecovery,
-} from '../sandbox-recovery.js';
-import { checkDiskAndCleanBeforeSetup } from '../workspace.js';
+import { logSandboxOperationTimeout } from '../sandbox-timeout-logging.js';
+import { withPreparationInfrastructureRecovery } from '../sandbox-recovery.js';
+import type { AgentSandbox, WrapperInstanceLease } from '../agent-sandbox/protocol.js';
 
-/** Maximum time allowed for workspace preparation (resume, init, fast path). */
+/** Maximum time allowed for wrapper readiness workspace preparation. */
 const PREPARE_WORKSPACE_TIMEOUT_MS = 10 * 60 * 1000;
 
 const CODE_REVIEW_DISABLED_TOOLS = {
@@ -58,46 +47,27 @@ function withWorkspacePreparationTimeout<T>(operation: Promise<T>, step: string)
   );
 }
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-/**
- * Dependencies for the orchestrator (for testability via dependency injection).
- */
 export type OrchestratorDeps = {
-  /** Get a sandbox instance by ID */
-  getSandbox: (sandboxId: string) => Promise<SandboxInstance>;
-  /** Get a Durable Object stub for a session */
+  getAgentSandbox: (
+    plan: FencedWrapperDispatchRequest | FencedLegacyExecutionRequest
+  ) => AgentSandbox;
   getSessionStub: (userId: string, sessionId: string) => DurableObjectStub<CloudAgentSession>;
-  /** Environment bindings */
   env: Env;
 };
 
-// ---------------------------------------------------------------------------
-// ExecutionOrchestrator
-// ---------------------------------------------------------------------------
-
 export class ExecutionOrchestrator {
-  private readonly deps: OrchestratorDeps;
   private readonly sessionService: SessionService;
 
-  constructor(deps: OrchestratorDeps) {
-    this.deps = deps;
+  constructor(private readonly deps: OrchestratorDeps) {
     this.sessionService = new SessionService();
   }
 
-  /**
-   * Execute a prompt. Handles all setup and returns immediately after prompt is sent.
-   * Events stream asynchronously via wrapper -> ingest WS.
-   *
-   * @throws ExecutionError with appropriate code on failure (no internal retry)
-   */
   async execute(
     plan: FencedWrapperDispatchRequest | FencedLegacyExecutionRequest,
     options?: {
       onProgress?: (step: string, message: string) => void;
       onWorkspaceReady?: (ready: WorkspaceReady) => Promise<void>;
+      leasedInstance?: WrapperInstanceLease;
     }
   ): Promise<ExecutionResult> {
     const executionId = 'executionId' in plan ? plan.executionId : undefined;
@@ -111,7 +81,6 @@ export class ExecutionOrchestrator {
       orgId: orgId ?? '(personal)',
       mode: agent.mode,
     });
-
     logger
       .withFields({
         messageId: turn.messageId,
@@ -123,151 +92,33 @@ export class ExecutionOrchestrator {
       })
       .info('ExecutionOrchestrator starting execution');
 
-    const sandboxId = workspace.sandboxId;
-    if (!sandboxId) {
+    if (!workspace.sandboxId) {
       throw ExecutionError.invalidRequest('Missing sandboxId in workspace plan');
     }
 
-    let sandbox: SandboxInstance;
-    try {
-      sandbox = await this.deps.getSandbox(sandboxId);
-    } catch (error) {
-      throw ExecutionError.sandboxConnectFailed(
-        `Failed to connect to sandbox: ${error instanceof Error ? error.message : String(error)}`,
-        error
-      );
-    }
-
+    const sandbox = this.deps.getAgentSandbox(plan);
     return withPreparationInfrastructureRecovery(
       {
-        sandbox,
-        sandboxId,
+        deleteSandbox: reason => sandbox.delete(reason),
+        sandboxId: workspace.sandboxId,
         sessionId,
         phase: 'executionWorkspacePreparation',
       },
-      () => this.executeWithWrapperBootstrap(sandbox, plan, options)
+      () => this.executeThroughAgentSandbox(sandbox, plan, options)
     );
   }
 
-  private requiresPreparedDevcontainerRuntime(
-    plan: FencedWrapperDispatchRequest | FencedLegacyExecutionRequest
-  ): boolean {
-    return (
-      plan.workspace.metadata.workspace?.devcontainerRequested === true ||
-      plan.workspace.metadata.devcontainer !== undefined
-    );
-  }
-
-  private async executeWithPreparedDevcontainerWorkspace(
-    sandbox: SandboxInstance,
-    plan: FencedWrapperDispatchRequest | FencedLegacyExecutionRequest,
-    prepared: Awaited<ReturnType<SessionService['buildWrapperSessionReadyAndPromptRequests']>>,
-    options?: {
-      onProgress?: (step: string, message: string) => void;
-      onWorkspaceReady?: (ready: WorkspaceReady) => Promise<void>;
-    }
-  ): Promise<ExecutionResult> {
-    const { sessionId, userId, orgId } = plan.scope;
-    const { turn, workspace, agent } = plan;
-    const preparedWorkspace = await withWorkspacePreparationTimeout(
-      this.sessionService.prepareWorkspace({
-        sandbox,
-        sandboxId: workspace.sandboxId as ServiceSandboxId,
-        orgId,
-        userId,
-        sessionId: sessionId as ServiceSessionId,
-        kilocodeModel: agent.model,
-        env: this.deps.env,
-        metadata: workspace.metadata,
-        onProgress: options?.onProgress,
-      }),
-      'devcontainer workspace preparation'
-    );
-
-    if (!preparedWorkspace.devcontainer || !preparedWorkspace.ready.devcontainer) {
-      throw ExecutionError.workspaceSetupFailed(
-        'Devcontainer workspace preparation did not resolve runtime metadata'
-      );
-    }
-
-    let wrapperClient: WrapperClient;
-    let kiloSessionId: string;
-    try {
-      const wrapper = await WrapperClient.ensureWrapper(sandbox, preparedWorkspace.session, {
-        agentSessionId: sessionId,
-        userId,
-        workspacePath: preparedWorkspace.context.workspacePath,
-        sessionId: plan.wrapper.kiloSessionId,
-        runtimeEnv: preparedWorkspace.runtimeEnv,
-        devcontainer: preparedWorkspace.devcontainer,
-        fixedPort: preparedWorkspace.ready.devcontainer.wrapperPort,
-      });
-      wrapperClient = wrapper.client;
-      kiloSessionId = wrapper.sessionId;
-    } catch (error) {
-      throw ExecutionError.wrapperStartFailed(
-        `Failed to start devcontainer wrapper: ${error instanceof Error ? error.message : String(error)}`,
-        error
-      );
-    }
-
-    await options?.onWorkspaceReady?.(preparedWorkspace.ready);
-
-    if (prepared.type === 'command') {
-      await wrapperClient.command(prepared.commandRequest);
-    } else {
-      await wrapperClient.prompt(prepared.promptRequest);
-    }
-
-    try {
-      await withDORetry(
-        () => this.deps.getSessionStub(userId, sessionId),
-        stub => stub.recordKiloServerActivity(),
-        'recordKiloServerActivity'
-      );
-    } catch {
-      logger
-        .withFields({ sessionId, messageId: turn.messageId })
-        .warn('Failed to record kilo server activity');
-    }
-
-    logger
-      .withFields({ sessionId, messageId: turn.messageId })
-      .info('ExecutionOrchestrator devcontainer execution started successfully');
-    return { kiloSessionId };
-  }
-
-  private async workspaceHasGit(sandbox: SandboxInstance, workspacePath: string): Promise<boolean> {
-    const timeoutMs = FAST_SANDBOX_COMMAND_TIMEOUT_MS;
-    const result = await withTimeout(
-      timedExec(
-        sandbox,
-        `test -d '${workspacePath}/.git' && echo exists`,
-        'execution.wrapperBootstrap.repoExists'
-      ),
-      timeoutMs,
-      `${SANDBOX_WORKSPACE_PROBE_TIMEOUT_MESSAGE} after ${timeoutMs}ms`,
-      () =>
-        logSandboxOperationTimeout({
-          operation: 'execution.wrapperBootstrap.repoExists',
-          timeoutMs,
-          timeoutLayer: 'outer',
-        })
-    );
-    return result.stdout?.includes('exists') ?? false;
-  }
-
-  private async executeWithWrapperBootstrap(
-    sandbox: SandboxInstance,
+  private async executeThroughAgentSandbox(
+    sandbox: AgentSandbox,
     plan: FencedWrapperDispatchRequest | FencedLegacyExecutionRequest,
     options?: {
       onProgress?: (step: string, message: string) => void;
       onWorkspaceReady?: (ready: WorkspaceReady) => Promise<void>;
+      leasedInstance?: WrapperInstanceLease;
     }
   ): Promise<ExecutionResult> {
-    const { sessionId, userId, orgId } = plan.scope;
+    const { sessionId, userId } = plan.scope;
     const { turn } = plan;
-
     const prepared = await this.sessionService.buildWrapperSessionReadyAndPromptRequests({
       env: this.deps.env,
       plan,
@@ -280,65 +131,34 @@ export class ExecutionOrchestrator {
       };
     }
 
-    if (this.requiresPreparedDevcontainerRuntime(plan)) {
-      return this.executeWithPreparedDevcontainerWorkspace(sandbox, plan, prepared, options);
-    }
-
-    const workspaceWarm = await this.workspaceHasGit(sandbox, prepared.context.workspacePath);
-    logger
-      .withFields({
-        sessionId,
-        messageId: turn.messageId,
-        workspacePath: prepared.context.workspacePath,
-        workspaceWarm,
-      })
-      .info('Workspace warmth probe completed');
-    if (!workspaceWarm) {
-      options?.onProgress?.('disk_check', 'Checking disk space...');
-      await checkDiskAndCleanBeforeSetup(sandbox, orgId, userId, sessionId);
-    }
-
-    const bootstrapSession = await sandbox.createSession({
-      name: `${sessionId}-bootstrap`,
-      env: {},
-      cwd: '/',
-    });
-
-    let wrapperClient: WrapperClient;
+    let ensured;
     try {
-      if (!workspaceWarm) {
-        options?.onProgress?.('kilo_server', 'Starting Kilo...');
-      }
-      const result = await WrapperClient.ensureBootstrapWrapper(sandbox, bootstrapSession, {
-        agentSessionId: sessionId,
-        userId,
+      ensured = await sandbox.ensureWrapper({
+        plan,
+        prepared,
+        onProgress: options?.onProgress,
+        ...(options?.leasedInstance ? { leasedInstance: options.leasedInstance } : {}),
       });
-      wrapperClient = result.client;
-      logger
-        .withFields({ sessionId, messageId: turn.messageId, workspaceWarm })
-        .info('Bootstrap wrapper ready');
     } catch (error) {
+      if (error instanceof ExecutionError) throw error;
       throw ExecutionError.wrapperStartFailed(
         `Failed to start wrapper: ${error instanceof Error ? error.message : String(error)}`,
         error
       );
     }
 
+    let kiloSessionId: string;
     try {
-      const readyResult = await withWorkspacePreparationTimeout(
-        wrapperClient.ensureSessionReady(prepared.readyRequest),
-        'wrapper readiness'
-      );
-      logger
-        .withFields({
-          sessionId,
-          messageId: turn.messageId,
-          kiloSessionId: readyResult.kiloSessionId,
-        })
-        .info('Wrapper session readiness completed');
-
-      if (options?.onWorkspaceReady) {
-        await options.onWorkspaceReady(
+      if (ensured.status === 'session-ready') {
+        kiloSessionId = ensured.kiloSessionId;
+        await options?.onWorkspaceReady?.(ensured.ready);
+      } else {
+        const readyResult = await withWorkspacePreparationTimeout(
+          ensured.client.ensureSessionReady(prepared.readyRequest),
+          'wrapper readiness'
+        );
+        kiloSessionId = readyResult.kiloSessionId;
+        await options?.onWorkspaceReady?.(
           readyResult.workspaceReady
             ? { ...prepared.ready, ...readyResult.workspaceReady }
             : prepared.ready
@@ -346,7 +166,7 @@ export class ExecutionOrchestrator {
       }
 
       if (prepared.type === 'command') {
-        await wrapperClient.command(prepared.commandRequest);
+        await ensured.client.command(prepared.commandRequest);
         logger
           .withFields({
             sessionId,
@@ -355,7 +175,7 @@ export class ExecutionOrchestrator {
           })
           .info('Wrapper accepted command dispatch');
       } else {
-        await wrapperClient.prompt(prepared.promptRequest);
+        await ensured.client.prompt(prepared.promptRequest);
         logger
           .withFields({ sessionId, messageId: turn.messageId })
           .info('Wrapper accepted prompt dispatch');
@@ -372,9 +192,8 @@ export class ExecutionOrchestrator {
           .withFields({ sessionId, messageId: turn.messageId })
           .warn('Failed to record kilo server activity');
       }
-
-      logger.info('ExecutionOrchestrator wrapper bootstrap execution started successfully');
-      return { kiloSessionId: readyResult.kiloSessionId };
+      logger.info('ExecutionOrchestrator wrapper execution started successfully');
+      return { kiloSessionId };
     } catch (error) {
       logger
         .withFields({
@@ -383,7 +202,7 @@ export class ExecutionOrchestrator {
           errorClass: error instanceof Error ? error.name : 'UnknownError',
           wrapperErrorCode: error instanceof WrapperError ? error.code : undefined,
         })
-        .warn('ExecutionOrchestrator wrapper bootstrap path failed');
+        .warn('ExecutionOrchestrator wrapper dispatch failed');
       if (error instanceof WrapperError) {
         if (error.code === 'WORKSPACE_SETUP_FAILED') {
           throw ExecutionError.workspaceSetupFailed(error.message, error);
@@ -400,16 +219,10 @@ export class ExecutionOrchestrator {
     }
   }
 
-  private getCreatedOnPlatform(
-    plan: FencedWrapperDispatchRequest | FencedLegacyExecutionRequest
-  ): string | undefined {
-    return plan.workspace.metadata?.identity?.createdOnPlatform;
-  }
-
   private getToolOverrides(
     plan: FencedWrapperDispatchRequest | FencedLegacyExecutionRequest
   ): Record<string, boolean> | undefined {
-    return this.getCreatedOnPlatform(plan) === 'code-review'
+    return plan.workspace.metadata.identity?.createdOnPlatform === 'code-review'
       ? CODE_REVIEW_DISABLED_TOOLS
       : undefined;
   }

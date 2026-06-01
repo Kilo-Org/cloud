@@ -20,6 +20,6 @@ export function isMinimaxModel(model: string) {
   return model.includes('minimax');
 }
 
-export const MINIMAX_CURRENT_MODEL_ID = 'minimax/minimax-m2.7';
+export const MINIMAX_CURRENT_MODEL_ID = 'minimax/minimax-m3';
 
-export const MINIMAX_CURRENT_MODEL_NAME = 'MiniMax M2.7';
+export const MINIMAX_CURRENT_MODEL_NAME = 'MiniMax M3';

@@ -1,0 +1,1 @@
+ALTER TABLE "api_request_log" ADD COLUMN "session_id" text;

@@ -23,6 +23,7 @@ function buildSubscription(
     startedAt: null,
     refillAt: null,
     nextBillingAt: null,
+    nextBonusCreditsUsd: null,
     currentPeriodBaseCreditsUsd: 19,
     currentPeriodUsageUsd: 0,
     currentPeriodBonusCreditsUsd: 0,
@@ -286,6 +287,27 @@ describe('KiloPassActiveSubscriptionCard.logic', () => {
         throw new Error('expected renews_and_adds_bonus');
       }
       expect(day2.labelPrefix).toContain('Renews in 2 days');
+    });
+
+    test('uses server-projected next bonus credits when there is no scheduled change', () => {
+      const rows = computeRenewInfoRowModel({
+        subscription: buildSubscription({
+          cadence: KiloPassCadence.Monthly,
+          tier: KiloPassTier.Tier19,
+          refillAt: '2026-02-01T00:00:00Z',
+          nextBonusCreditsUsd: 1.9,
+        }),
+        isPendingCancellation: false,
+        scheduledChange: null,
+        nowIso: '2026-01-31T00:00:00Z',
+      });
+
+      const row = rows[0];
+      if (row?.kind !== 'renews_and_adds_bonus') {
+        throw new Error('expected renews_and_adds_bonus');
+      }
+
+      expect(row.bonusUsd).toBe(1.9);
     });
   });
 

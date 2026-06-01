@@ -4,6 +4,7 @@ import {
   getSessionMessageState,
   putSessionMessageState,
   markMessageAccepted,
+  markAgentActivityObserved,
   markMessageCompleted,
   markMessageFailed,
   markMessageInterrupted,
@@ -229,6 +230,26 @@ describe('getSessionMessageState / putSessionMessageState', () => {
     expect(loaded).not.toHaveProperty('agent');
   });
 
+  it('reads predecessor rows without new report classification fields', async () => {
+    const storage = createFakeStorage();
+    await storage.put(`session_message:${VALID_MESSAGE_ID}`, {
+      messageId: VALID_MESSAGE_ID,
+      status: 'failed',
+      prompt: 'legacy failed prompt',
+      createdAt: 1000,
+      terminalAt: 2000,
+      completionSource: 'delivery_failure',
+      failureReason: 'exhausted',
+    });
+
+    const loaded = await getSessionMessageState(storage, VALID_MESSAGE_ID);
+    expect(loaded).toMatchObject({ status: 'failed', completionSource: 'delivery_failure' });
+    expect(loaded?.failureStage).toBeUndefined();
+    expect(loaded?.failureCode).toBeUndefined();
+    expect(loaded?.dispatchAcceptanceKind).toBeUndefined();
+    expect(loaded?.agentActivityObservedAt).toBeUndefined();
+  });
+
   it('returns undefined for unknown messageId', async () => {
     const storage = createFakeStorage();
     const loaded = await getSessionMessageState(storage, 'msg_unknown00000000ABCDEFGHIJKLMN');
@@ -250,7 +271,26 @@ describe('markMessageAccepted', () => {
     expect(updated).not.toBeNull();
     expect(updated!.status).toBe('accepted');
     expect(updated!.acceptedAt).toBe(2000);
+    expect(updated!.dispatchAcceptanceKind).toBe('observed');
     expect(updated!.wrapperRunId).toBe('wr_abc123');
+  });
+
+  it('records inferred acceptance when terminal ingest reconstructs dispatch', async () => {
+    const storage = createFakeStorage();
+    await putSessionMessageState(
+      storage,
+      createQueuedSessionMessageState(createIntent(VALID_MESSAGE_ID, 'hello'), undefined, 1000)
+    );
+
+    const updated = await markMessageAccepted(
+      storage,
+      VALID_MESSAGE_ID,
+      'wr_abc123',
+      2000,
+      'inferred_from_terminal'
+    );
+
+    expect(updated?.dispatchAcceptanceKind).toBe('inferred_from_terminal');
   });
 
   it('returns null if message not found', async () => {
@@ -271,6 +311,27 @@ describe('markMessageAccepted', () => {
 
     const secondAccept = await markMessageAccepted(storage, VALID_MESSAGE_ID, 'wr_def456', 3000);
     expect(secondAccept).toBeNull();
+  });
+});
+
+describe('markAgentActivityObserved', () => {
+  it('records first attributable activity only after acceptance', async () => {
+    const storage = createFakeStorage();
+    await putSessionMessageState(
+      storage,
+      createQueuedSessionMessageState(createIntent(VALID_MESSAGE_ID, 'hello'), undefined, 1000)
+    );
+    expect(await markAgentActivityObserved(storage, VALID_MESSAGE_ID, 1500)).toBeNull();
+
+    await markMessageAccepted(storage, VALID_MESSAGE_ID, 'wr_abc123', 2000);
+    const observed = await markAgentActivityObserved(storage, VALID_MESSAGE_ID, 3000);
+    const duplicate = await markAgentActivityObserved(storage, VALID_MESSAGE_ID, 4000);
+
+    expect(observed?.agentActivityObservedAt).toBe(3000);
+    expect(duplicate).toBeNull();
+    expect((await getSessionMessageState(storage, VALID_MESSAGE_ID))?.agentActivityObservedAt).toBe(
+      3000
+    );
   });
 });
 
@@ -342,6 +403,8 @@ describe('markMessageFailed', () => {
         reason: 'missing_assistant_reply',
         error: 'No reply found',
         completionSource: 'idle_reconciliation',
+        failureStage: 'post_dispatch_no_activity',
+        failureCode: 'missing_assistant_reply',
       },
       3000
     );
@@ -350,6 +413,8 @@ describe('markMessageFailed', () => {
     expect(failed!.failureReason).toBe('missing_assistant_reply');
     expect(failed!.error).toBe('No reply found');
     expect(failed!.completionSource).toBe('idle_reconciliation');
+    expect(failed!.failureStage).toBe('post_dispatch_no_activity');
+    expect(failed!.failureCode).toBe('missing_assistant_reply');
     expect(failed!.terminalAt).toBe(3000);
   });
 
@@ -391,7 +456,11 @@ describe('markMessageInterrupted', () => {
     const interrupted = await markMessageInterrupted(
       storage,
       VALID_MESSAGE_ID,
-      { error: 'User interrupted' },
+      {
+        error: 'User interrupted',
+        failureStage: 'interruption',
+        failureCode: 'user_interrupt',
+      },
       2000
     );
     expect(interrupted).not.toBeNull();
@@ -399,6 +468,8 @@ describe('markMessageInterrupted', () => {
     expect(interrupted!.failureReason).toBe('interrupted');
     expect(interrupted!.error).toBe('User interrupted');
     expect(interrupted!.completionSource).toBe('interrupt');
+    expect(interrupted!.failureStage).toBe('interruption');
+    expect(interrupted!.failureCode).toBe('user_interrupt');
   });
 });
 
@@ -426,6 +497,26 @@ describe('terminalizeMessageOnce', () => {
       callback: { disposition: 'not-required' },
       push: { disposition: 'pending' },
     });
+  });
+
+  it('marks predecessor accepted terminalization as inferred acceptance for reporting', async () => {
+    const storage = createFakeStorage();
+    await putSessionMessageState(storage, {
+      ...createQueuedSessionMessageState(createIntent(VALID_MESSAGE_ID, 'hello'), undefined, 1000),
+      status: 'accepted',
+      acceptedAt: 2000,
+      wrapperRunId: 'wr_legacy',
+    });
+
+    const result = await terminalizeMessageOnce(
+      storage,
+      VALID_MESSAGE_ID,
+      { kind: 'completed', completionSource: 'assistant_message_event' },
+      {},
+      3000
+    );
+
+    expect(result.state?.dispatchAcceptanceKind).toBe('inferred_from_terminal');
   });
 
   it('does not double-terminalize and reports changed=false', async () => {

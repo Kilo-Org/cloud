@@ -29,7 +29,13 @@ import { queueUserMessageInput, registerReadySession } from '../../helpers/sessi
 describe('execution-id removal - queue and start response', () => {
   beforeEach(async () => {
     const ids = await listDurableObjectIds(env.CLOUD_AGENT_SESSION);
-    await Promise.all(ids.map(id => env.CLOUD_AGENT_SESSION.get(id).deleteSession()));
+    await Promise.all(
+      ids.map(id =>
+        runInDurableObject(env.CLOUD_AGENT_SESSION.get(id), instance =>
+          instance.ctx.storage.deleteAll()
+        )
+      )
+    );
   });
 
   it('new-path admission result omits executionId', async () => {
@@ -118,7 +124,13 @@ describe('execution-id removal - queue and start response', () => {
 describe('execution-id removal - flush does not create execution rows', () => {
   beforeEach(async () => {
     const ids = await listDurableObjectIds(env.CLOUD_AGENT_SESSION);
-    await Promise.all(ids.map(id => env.CLOUD_AGENT_SESSION.get(id).deleteSession()));
+    await Promise.all(
+      ids.map(id =>
+        runInDurableObject(env.CLOUD_AGENT_SESSION.get(id), instance =>
+          instance.ctx.storage.deleteAll()
+        )
+      )
+    );
   });
 
   it('new-path flush does not insert an execution metadata row', async () => {
@@ -385,7 +397,13 @@ describe('execution-id removal - flush does not create execution rows', () => {
 describe('execution-id removal - stream events do not expose fake executionIds', () => {
   beforeEach(async () => {
     const ids = await listDurableObjectIds(env.CLOUD_AGENT_SESSION);
-    await Promise.all(ids.map(id => env.CLOUD_AGENT_SESSION.get(id).deleteSession()));
+    await Promise.all(
+      ids.map(id =>
+        runInDurableObject(env.CLOUD_AGENT_SESSION.get(id), instance =>
+          instance.ctx.storage.deleteAll()
+        )
+      )
+    );
   });
 
   it('new-path message queued event payload does not contain executionId', async () => {
@@ -544,7 +562,13 @@ describe('execution-id removal - stream events do not expose fake executionIds',
 describe('execution-id removal - ingest does not alias wrapperRunId as execution_id', () => {
   beforeEach(async () => {
     const ids = await listDurableObjectIds(env.CLOUD_AGENT_SESSION);
-    await Promise.all(ids.map(id => env.CLOUD_AGENT_SESSION.get(id).deleteSession()));
+    await Promise.all(
+      ids.map(id =>
+        runInDurableObject(env.CLOUD_AGENT_SESSION.get(id), instance =>
+          instance.ctx.storage.deleteAll()
+        )
+      )
+    );
   });
 
   it('new-path ingest events do not use wrapperRunId as execution_id in StoredEvent', async () => {

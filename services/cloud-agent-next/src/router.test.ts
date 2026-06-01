@@ -6,11 +6,13 @@ vi.mock('@cloudflare/sandbox', () => ({
   getSandbox: vi.fn(),
 }));
 
-const { interruptMock, buildContextMock, getOrCreateSessionMock } = vi.hoisted(() => ({
-  interruptMock: vi.fn(),
-  buildContextMock: vi.fn(),
-  getOrCreateSessionMock: vi.fn(),
-}));
+const { buildContextMock, getOrCreateSessionMock, recordCloudAgentSessionFailureMock } = vi.hoisted(
+  () => ({
+    buildContextMock: vi.fn(),
+    getOrCreateSessionMock: vi.fn(),
+    recordCloudAgentSessionFailureMock: vi.fn(),
+  })
+);
 
 const { getSandboxIdForSessionMock, metadataMock } = vi.hoisted(() => ({
   getSandboxIdForSessionMock: vi.fn(),
@@ -27,6 +29,19 @@ const { preflightExistingPromptModelMock, preflightPreparedInitialPromptModelMoc
 vi.mock('./session/model-preflight.js', () => ({
   preflightExistingPromptModel: preflightExistingPromptModelMock,
   preflightPreparedInitialPromptModel: preflightPreparedInitialPromptModelMock,
+}));
+
+vi.mock('./telemetry/session-reports.js', () => ({
+  createCloudAgentSessionReport: vi.fn().mockResolvedValue(undefined),
+  recordCloudAgentSandboxIdentity: vi.fn().mockResolvedValue(undefined),
+  recordCloudAgentSessionFailure: async (params: {
+    cloudAgentSessionId: string;
+    failure: unknown;
+  }) =>
+    recordCloudAgentSessionFailureMock({
+      ...params,
+      occurredAt: new Date().toISOString(),
+    }),
 }));
 
 vi.mock('./session-service.js', () => ({
@@ -55,7 +70,6 @@ vi.mock('./session-service.js', () => ({
       // eslint-disable-next-line @typescript-eslint/no-unsafe-return
       return metadataMock();
     }
-    static interrupt = interruptMock;
   },
 }));
 
@@ -278,11 +292,6 @@ describe('router sessionId validation', () => {
 
         beforeEach(() => {
           vi.clearAllMocks();
-          interruptMock.mockResolvedValue({
-            success: true,
-            message: 'stopped',
-            processesFound: true,
-          });
           buildContextMock.mockImplementation(
             ({
               sandboxId,
@@ -329,6 +338,7 @@ describe('router sessionId validation', () => {
                 fetch: vi.fn(),
               } as unknown as TRPCContext['env']['SESSION_INGEST'],
               R2_BUCKET: {} as TRPCContext['env']['R2_BUCKET'],
+              CLOUD_AGENT_REPORT_QUEUE: {} as TRPCContext['env']['CLOUD_AGENT_REPORT_QUEUE'],
               GIT_TOKEN_SERVICE: {} as Env['GIT_TOKEN_SERVICE'],
               NEXTAUTH_SECRET: 'test-secret',
               INTERNAL_API_SECRET_PROD: {
@@ -379,17 +389,44 @@ describe('router sessionId validation', () => {
               'test-user-123',
               sessionId
             );
-            expect(getSandbox).toHaveBeenCalledWith(
-              mockContext.env.Sandbox,
-              expect.stringMatching(/^org-[0-9a-f]{48}$/)
-            );
+            expect(getSandbox).not.toHaveBeenCalled();
             // eslint-disable-next-line @typescript-eslint/unbound-method
             const sandboxDelete = vi.mocked(mockSandbox.deleteSession);
-            expect(sandboxDelete).toHaveBeenCalledWith(sessionId);
+            expect(sandboxDelete).not.toHaveBeenCalled();
             expect(cloudAgentSession.idFromName).toHaveBeenCalledWith(
               `${metadata.identity.userId}:${sessionId}`
             );
-            expect(deleteSessionMock).toHaveBeenCalled();
+            expect(deleteSessionMock).toHaveBeenCalledWith();
+          });
+
+          it('trusted cleanup deletes Durable Object state', async () => {
+            const sessionId: SessionId = 'agent_12121212-3434-5656-7878-909090909090';
+            const metadata = legacySessionMetadata({
+              version: 123456789,
+              sessionId,
+              orgId: 'org-123',
+              userId: 'test-user-123',
+              timestamp: 123456789,
+            });
+            vi.mocked(fetchSessionMetadata).mockResolvedValue(metadata);
+            const deleteSessionMock = vi.fn().mockResolvedValue(undefined);
+            vi.mocked(cloudAgentSession.get).mockReturnValue({
+              deleteSession: deleteSessionMock,
+              markAsInterrupted: vi.fn().mockResolvedValue(undefined),
+            });
+            const headers = new Headers({ 'x-internal-api-key': 'test-internal-api-secret' });
+            const cleanupContext = {
+              ...mockContext,
+              request: new Request('https://cloud-agent-next.test/trpc', { headers }),
+              env: { ...mockContext.env, INTERNAL_API_SECRET: 'test-internal-api-secret' },
+            } as TRPCContext;
+
+            const result = await appRouter
+              .createCaller(cleanupContext)
+              .cleanupSession({ sessionId });
+
+            expect(result).toEqual({ success: true });
+            expect(deleteSessionMock).toHaveBeenCalledWith();
           });
 
           it('should successfully delete session for personal account', async () => {
@@ -407,11 +444,7 @@ describe('router sessionId validation', () => {
             const result = await caller.deleteSession({ sessionId });
 
             expect(result).toEqual({ success: true });
-            // Should use usr prefix for personal accounts
-            expect(getSandbox).toHaveBeenCalledWith(
-              mockContext.env.Sandbox,
-              expect.stringMatching(/^usr-[0-9a-f]{48}$/)
-            );
+            expect(getSandbox).not.toHaveBeenCalled();
           });
 
           it('should successfully delete session with botId', async () => {
@@ -430,11 +463,7 @@ describe('router sessionId validation', () => {
             const result = await caller.deleteSession({ sessionId });
 
             expect(result).toEqual({ success: true });
-            // Should include bot suffix
-            expect(getSandbox).toHaveBeenCalledWith(
-              mockContext.env.Sandbox,
-              expect.stringMatching(/^bot-[0-9a-f]{48}$/)
-            );
+            expect(getSandbox).not.toHaveBeenCalled();
           });
 
           it('should route per-session sandbox ID to SandboxSmall namespace', async () => {
@@ -454,18 +483,13 @@ describe('router sessionId validation', () => {
             const result = await caller.deleteSession({ sessionId });
 
             expect(result).toEqual({ success: true });
-            // ses- prefixed sandbox IDs should route to SandboxSmall, not Sandbox
-            expect(getSandbox).toHaveBeenCalledWith(
-              mockContext.env.SandboxSmall,
-              perSessionSandboxId
-            );
+            expect(getSandbox).not.toHaveBeenCalled();
           });
         });
 
         describe('idempotency', () => {
-          it('should return success for non-existent session', async () => {
+          it('treats deletion without runtime metadata as idempotent', async () => {
             const sessionId: SessionId = 'agent_00000000-0000-0000-0000-000000000000';
-
             vi.mocked(fetchSessionMetadata).mockResolvedValue(null);
 
             const result = await caller.deleteSession({ sessionId });
@@ -474,14 +498,13 @@ describe('router sessionId validation', () => {
               success: true,
               message: 'Session not found or already deleted',
             });
-            // Should not attempt to delete from sandbox or destroy session
             expect(getSandbox).not.toHaveBeenCalled();
             expect(cloudAgentSession.get).not.toHaveBeenCalled();
           });
         });
 
-        describe('sandbox deletion failure handling', () => {
-          it('should continue cleanup when sandbox deletion fails', async () => {
+        describe('provider deletion ownership', () => {
+          it('does not perform provider deletion outside the Durable Object', async () => {
             const sessionId: SessionId = 'agent_aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
             const metadata = legacySessionMetadata({
               version: 123456789,
@@ -492,9 +515,7 @@ describe('router sessionId validation', () => {
             });
 
             vi.mocked(fetchSessionMetadata).mockResolvedValue(metadata);
-            // Sandbox deletion fails
-            mockSandbox.deleteSession = vi.fn().mockRejectedValue(new Error('Sandbox unreachable'));
-            // DO cleanup succeeds
+            mockSandbox.deleteSession = vi.fn().mockRejectedValue(new Error('must not be called'));
             const deleteSessionMock = vi.mocked(cloudAgentSession.get).mockReturnValue({
               deleteSession: vi.fn().mockResolvedValue(undefined),
               markAsInterrupted: vi.fn().mockResolvedValue(undefined),
@@ -502,12 +523,11 @@ describe('router sessionId validation', () => {
 
             const result = await caller.deleteSession({ sessionId });
 
-            // Should still succeed overall
             expect(result).toEqual({ success: true });
-            // Should have attempted both cleanups
             // eslint-disable-next-line @typescript-eslint/unbound-method
             const sandboxDelete = vi.mocked(mockSandbox.deleteSession);
-            expect(sandboxDelete).toHaveBeenCalled();
+            expect(sandboxDelete).not.toHaveBeenCalled();
+            expect(getSandbox).not.toHaveBeenCalled();
             expect(deleteSessionMock().deleteSession).toHaveBeenCalled();
           });
         });
@@ -599,20 +619,17 @@ describe('router sessionId validation', () => {
             ).rejects.toThrow('Authentication required');
           });
 
-          it('should only allow users to delete their own sessions', async () => {
+          it('does not delete runtime state for a guessed session belonging to another user', async () => {
             const sessionId: SessionId = 'agent_99999999-8888-7777-6666-555555555555';
-
-            // fetchSessionMetadata is called with the requesting user's ID
-            // It will return null or throw if the user doesn't own the session
             vi.mocked(fetchSessionMetadata).mockResolvedValue(null);
 
             const result = await caller.deleteSession({ sessionId });
 
-            // Should treat as non-existent (user can't access other user's sessions)
             expect(result).toEqual({
               success: true,
               message: 'Session not found or already deleted',
             });
+            expect(getSandbox).not.toHaveBeenCalled();
           });
         });
 
@@ -677,38 +694,9 @@ describe('router sessionId validation', () => {
       let caller: ReturnType<typeof appRouter.createCaller>;
       let cloudAgentSession: MockCAS;
       let mockSessionStub: MockSessionStub;
-      let mockSandbox: ReturnType<typeof getSandbox>;
 
       beforeEach(() => {
         vi.clearAllMocks();
-        interruptMock.mockResolvedValue({
-          success: true,
-          message: 'Interrupted execution using pkill',
-          processesFound: true,
-        });
-        buildContextMock.mockImplementation(
-          ({
-            sandboxId,
-            orgId,
-            userId,
-            sessionId,
-          }: {
-            sandboxId: string;
-            orgId: string | undefined;
-            userId: string;
-            sessionId: string;
-          }) => ({
-            sandboxId,
-            orgId,
-            userId,
-            sessionId,
-            sessionHome: `/home/${sessionId}`,
-            workspacePath: `/workspace/${sessionId}`,
-            branchName: `session/${sessionId}`,
-          })
-        );
-        getOrCreateSessionMock.mockResolvedValue({ token: 'session' });
-
         mockSessionStub = {
           deleteSession: vi.fn().mockResolvedValue(undefined),
           markAsInterrupted: vi.fn().mockResolvedValue(undefined),
@@ -738,6 +726,7 @@ describe('router sessionId validation', () => {
             } as unknown as TRPCContext['env']['SESSION_INGEST'],
             GIT_TOKEN_SERVICE: {} as Env['GIT_TOKEN_SERVICE'],
             R2_BUCKET: {} as TRPCContext['env']['R2_BUCKET'],
+            CLOUD_AGENT_REPORT_QUEUE: {} as TRPCContext['env']['CLOUD_AGENT_REPORT_QUEUE'],
             NEXTAUTH_SECRET: 'test-secret',
             INTERNAL_API_SECRET_PROD: {
               get: vi.fn().mockResolvedValue('test-secret'),
@@ -750,14 +739,29 @@ describe('router sessionId validation', () => {
         };
         cloudAgentSession = mockContext.env.CLOUD_AGENT_SESSION as unknown as MockCAS;
 
-        mockSandbox = {} as ReturnType<typeof getSandbox>;
-        vi.mocked(getSandbox).mockReturnValue(mockSandbox);
-
-        vi.stubGlobal('scheduler', {
-          wait: vi.fn().mockResolvedValue(undefined),
-        });
-
         caller = appRouter.createCaller(mockContext);
+      });
+
+      it('routes accepted interruption to the Durable Object without provider stopping', async () => {
+        const sessionId: SessionId = 'agent_87654321-1234-1234-1234-123456789abc';
+        const metadata = legacySessionMetadata({
+          version: 123456789,
+          sessionId,
+          orgId: 'org-123',
+          userId: 'test-user-123',
+          timestamp: 123456789,
+        });
+        vi.mocked(fetchSessionMetadata).mockResolvedValue(metadata);
+
+        const result = await caller.interruptSession({ sessionId });
+
+        expect(result).toEqual({
+          success: true,
+          message: 'Session interruption accepted',
+          processesFound: false,
+        });
+        expect(mockSessionStub.interruptExecution).toHaveBeenCalled();
+        expect(getSandbox).not.toHaveBeenCalled();
       });
 
       it('short-circuits queued-only interrupts before creating a sandbox session', async () => {
@@ -780,13 +784,13 @@ describe('router sessionId validation', () => {
 
         expect(result).toEqual({
           success: true,
-          message: 'Queued session messages interrupted',
+          message: 'Session interruption accepted',
           processesFound: false,
         });
+
         expect(mockSessionStub.markAsInterrupted).toHaveBeenCalled();
         expect(mockSessionStub.interruptExecution).toHaveBeenCalled();
         expect(getOrCreateSessionMock).not.toHaveBeenCalled();
-        expect(interruptMock).not.toHaveBeenCalled();
         expect(getSandbox).not.toHaveBeenCalled();
         expect(cloudAgentSession.idFromName).toHaveBeenCalledWith(`test-user-123:${sessionId}`);
       });
@@ -829,6 +833,7 @@ describe('router sessionId validation', () => {
               fetch: vi.fn(),
             } as unknown as TRPCContext['env']['SESSION_INGEST'],
             R2_BUCKET: {} as TRPCContext['env']['R2_BUCKET'],
+            CLOUD_AGENT_REPORT_QUEUE: {} as TRPCContext['env']['CLOUD_AGENT_REPORT_QUEUE'],
             GIT_TOKEN_SERVICE: {} as Env['GIT_TOKEN_SERVICE'],
             NEXTAUTH_SECRET: 'test-secret',
             INTERNAL_API_SECRET_PROD: {
@@ -1129,6 +1134,7 @@ describe('router sessionId validation', () => {
               fetch: vi.fn(),
             } as unknown as TRPCContext['env']['SESSION_INGEST'],
             R2_BUCKET: {} as TRPCContext['env']['R2_BUCKET'],
+            CLOUD_AGENT_REPORT_QUEUE: {} as TRPCContext['env']['CLOUD_AGENT_REPORT_QUEUE'],
             GIT_TOKEN_SERVICE: {} as Env['GIT_TOKEN_SERVICE'],
             NEXTAUTH_SECRET: 'test-secret',
             INTERNAL_API_SECRET_PROD: {
@@ -1377,6 +1383,7 @@ describe('router sessionId validation', () => {
               fetch: vi.fn(),
             } as unknown as TRPCContext['env']['SESSION_INGEST'],
             R2_BUCKET: {} as TRPCContext['env']['R2_BUCKET'],
+            CLOUD_AGENT_REPORT_QUEUE: {} as TRPCContext['env']['CLOUD_AGENT_REPORT_QUEUE'],
             GIT_TOKEN_SERVICE: {} as Env['GIT_TOKEN_SERVICE'],
             NEXTAUTH_SECRET: 'test-secret',
             INTERNAL_API_SECRET_PROD: {
@@ -1578,6 +1585,7 @@ describe('legacy V2 execution response compatibility', () => {
     });
     const hasMessageAdmission = vi.fn().mockResolvedValue(false);
     const replayPreparedInitialMessage = vi.fn().mockResolvedValue(undefined);
+    recordCloudAgentSessionFailureMock.mockReset().mockResolvedValue({});
     const context = {
       userId: 'test-user-123',
       authToken: 'test-token',
@@ -1593,6 +1601,7 @@ describe('legacy V2 execution response compatibility', () => {
             replayPreparedInitialMessage,
           })),
         },
+        SESSION_INGEST: {},
       },
     } as unknown as TRPCContext;
 
@@ -1602,11 +1611,12 @@ describe('legacy V2 execution response compatibility', () => {
       admitSubmittedMessage,
       hasMessageAdmission,
       replayPreparedInitialMessage,
+      recordCloudAgentSessionFailure: recordCloudAgentSessionFailureMock,
     };
   }
 
   it('initiateFromKilocodeSessionV2 returns executionId as the queued messageId', async () => {
-    const { caller } = createLegacyExecutionCaller();
+    const { caller, recordCloudAgentSessionFailure } = createLegacyExecutionCaller();
 
     const result = await caller.initiateFromKilocodeSessionV2({
       cloudAgentSessionId: validSessionId,
@@ -1614,6 +1624,81 @@ describe('legacy V2 execution response compatibility', () => {
 
     expect(result.messageId).toBe(acceptedMessageId);
     expect(result.executionId).toBe(acceptedMessageId);
+    expect(recordCloudAgentSessionFailure).not.toHaveBeenCalled();
+  });
+
+  it('does not write a setup failure for queued legacy admission', async () => {
+    const { caller, recordCloudAgentSessionFailure } = createLegacyExecutionCaller();
+
+    const result = await caller.initiateFromKilocodeSessionV2({
+      cloudAgentSessionId: validSessionId,
+    });
+
+    expect(result.messageId).toBe(acceptedMessageId);
+    expect(result.delivery).toBe('queued');
+    expect(recordCloudAgentSessionFailure).not.toHaveBeenCalled();
+  });
+
+  it('reports failed legacy initial admission without asserting metadata readiness', async () => {
+    const { caller, admitPreparedInitialMessage, recordCloudAgentSessionFailure } =
+      createLegacyExecutionCaller();
+    admitPreparedInitialMessage.mockResolvedValue({
+      success: false,
+      code: 'PENDING_QUEUE_FULL',
+      error: 'queue full',
+    });
+
+    await expect(
+      caller.initiateFromKilocodeSessionV2({ cloudAgentSessionId: validSessionId })
+    ).rejects.toThrow('queue full');
+
+    expect(recordCloudAgentSessionFailure).toHaveBeenCalledWith(
+      expect.objectContaining({
+        failure: { stage: 'initial_admission', code: 'initial_queue_full' },
+      })
+    );
+  });
+
+  it('reports an unknown legacy initial admission RPC outcome', async () => {
+    const { caller, admitPreparedInitialMessage, recordCloudAgentSessionFailure } =
+      createLegacyExecutionCaller();
+    admitPreparedInitialMessage.mockRejectedValue(new Error('rpc result unavailable'));
+
+    await expect(
+      caller.initiateFromKilocodeSessionV2({ cloudAgentSessionId: validSessionId })
+    ).rejects.toThrow('rpc result unavailable');
+
+    expect(recordCloudAgentSessionFailure).toHaveBeenCalledWith(
+      expect.objectContaining({
+        failure: { stage: 'transport', code: 'do_rpc_outcome_unknown' },
+      })
+    );
+  });
+
+  it('preserves failed legacy admission when failure fact persistence fails', async () => {
+    const { caller, admitPreparedInitialMessage, recordCloudAgentSessionFailure } =
+      createLegacyExecutionCaller();
+    admitPreparedInitialMessage.mockResolvedValue({
+      success: false,
+      code: 'PENDING_QUEUE_FULL',
+      error: 'queue full',
+    });
+    recordCloudAgentSessionFailure.mockRejectedValueOnce(new Error('reporting unavailable'));
+
+    await expect(
+      caller.initiateFromKilocodeSessionV2({ cloudAgentSessionId: validSessionId })
+    ).rejects.toThrow('queue full');
+  });
+
+  it('preserves unknown legacy admission when failure fact persistence fails', async () => {
+    const { caller, admitPreparedInitialMessage, recordCloudAgentSessionFailure } =
+      createLegacyExecutionCaller();
+    admitPreparedInitialMessage.mockRejectedValue(new Error('rpc result unavailable'));
+    recordCloudAgentSessionFailure.mockRejectedValueOnce(new Error('reporting unavailable'));
+
+    await expect(
+      caller.initiateFromKilocodeSessionV2({ cloudAgentSessionId: validSessionId })
+    ).rejects.toThrow('rpc result unavailable');
   });
 
   it('rejects unavailable prepared prompt models before initial admission', async () => {

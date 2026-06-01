@@ -72,6 +72,10 @@ import type { CloudAgentSessionState, PersistenceEnv } from './persistence/types
 import { parseSessionMetadata } from './persistence/session-metadata.js';
 import type { ExecutionSession, SandboxInstance, SessionId } from './types.js';
 import type { FencedWrapperDispatchRequest } from './execution/types.js';
+import {
+  SandboxCapacityInspectionError,
+  WorkspaceCapacityAdmissionRejectedError,
+} from './workspace-errors.js';
 
 type MockExecutionSession = ExecutionSession & {
   exec: ReturnType<typeof vi.fn>;
@@ -132,13 +136,19 @@ function createSession(repoExists = false): MockExecutionSession {
   return { exec, gitCheckout } as unknown as MockExecutionSession;
 }
 
+type TestSandbox = SandboxInstance & {
+  createSessionMock: ReturnType<typeof vi.fn>;
+};
+
 function createSandbox(
   session: ExecutionSession,
   repoExists = false,
   writeFile = vi.fn().mockResolvedValue(undefined)
-): SandboxInstance {
+): TestSandbox {
+  const createSessionMock = vi.fn().mockResolvedValue(session);
   return {
-    createSession: vi.fn().mockResolvedValue(session),
+    createSession: createSessionMock,
+    createSessionMock,
     writeFile,
     mkdir: vi.fn().mockResolvedValue(undefined),
     exec: vi.fn(async (command: string) => {
@@ -147,7 +157,7 @@ function createSandbox(
       }
       return { exitCode: 0, stdout: '', stderr: '' };
     }),
-  } as unknown as SandboxInstance;
+  } as unknown as TestSandbox;
 }
 
 function createEnv(metadata?: CloudAgentSessionState | null): PersistenceEnv {
@@ -301,6 +311,73 @@ describe('SessionService.prepareWorkspace', () => {
       gitToken: 'resolved-gitlab-token',
       gitlabTokenManaged: true,
     });
+  });
+
+  it('types ENOSPC during the cold devcontainer probe before provisioning', async () => {
+    const session = createSession(false);
+    const sandbox = createSandbox(session);
+    (sandbox.exec as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      exitCode: 1,
+      stdout: '',
+      stderr: 'ENOSPC: no space left on device',
+    });
+    const metadata = {
+      ...createMetadata(),
+      workspace: {
+        sandboxId: 'dind-abcdef' as const,
+        devcontainerRequested: true,
+      },
+    } satisfies CloudAgentSessionState;
+
+    await expect(
+      new SessionService().prepareWorkspace({
+        sandbox,
+        sandboxId: 'dind-abcdef',
+        userId: 'user_test',
+        sessionId: 'agent_test' as SessionId,
+        env: createEnv(),
+        metadata,
+        kilocodeModel: 'test-model',
+      })
+    ).rejects.toBeInstanceOf(SandboxCapacityInspectionError);
+
+    expect(workspaceMocks.setupWorkspace).not.toHaveBeenCalled();
+    expect(sandbox.createSessionMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects cold devcontainer preparation before workspace or runtime provisioning when admission fails', async () => {
+    const session = createSession(false);
+    const sandbox = createSandbox(session);
+    const metadata = {
+      ...createMetadata(),
+      workspace: {
+        sandboxId: 'dind-abcdef' as const,
+        devcontainerRequested: true,
+      },
+    } satisfies CloudAgentSessionState;
+    const rejection = new WorkspaceCapacityAdmissionRejectedError({
+      availableMB: 512,
+      thresholdMB: 2048,
+      cleaned: 0,
+      skipped: 1,
+    });
+    workspaceMocks.checkDiskAndCleanBeforeSetup.mockRejectedValueOnce(rejection);
+
+    await expect(
+      new SessionService().prepareWorkspace({
+        sandbox,
+        sandboxId: 'dind-abcdef',
+        userId: 'user_test',
+        sessionId: 'agent_test' as SessionId,
+        env: createEnv(),
+        metadata,
+        kilocodeModel: 'test-model',
+      })
+    ).rejects.toBe(rejection);
+
+    expect(workspaceMocks.setupWorkspace).not.toHaveBeenCalled();
+    expect(sandbox.createSessionMock).not.toHaveBeenCalled();
+    expect(devcontainerMocks.bringUpDevContainer).not.toHaveBeenCalled();
   });
 
   it('hydrates requested devcontainer metadata while preparing a cold DIND workspace', async () => {
@@ -1250,6 +1327,27 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     expect(result.readyRequest.materialized.env.GITLAB_TOKEN).toBe('generic-git-token');
     expect(result.readyRequest.materialized.env.GITLAB_HOST).toBe('gitlab.com');
     expect(result.readyRequest.materialized.env.GLAB_IS_OAUTH2).toBeUndefined();
+  });
+});
+
+describe('SessionService session-ingest compatibility', () => {
+  it('creates a visible session without projecting reporting milestones', async () => {
+    const env = createEnv();
+    const service = new SessionService();
+
+    await service.createCliSessionViaSessionIngest(
+      'ses_12345678901234567890123456',
+      'agent_12345678-1234-1234-1234-123456789abc',
+      'user_test',
+      env,
+      undefined,
+      'cloud-agent'
+    );
+
+    // eslint-disable-next-line @typescript-eslint/unbound-method
+    expect(env.SESSION_INGEST.createSessionForCloudAgent).toHaveBeenCalledWith(
+      expect.not.objectContaining({ requireFullSessionReport: expect.anything() })
+    );
   });
 });
 

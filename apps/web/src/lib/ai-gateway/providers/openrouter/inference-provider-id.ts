@@ -126,7 +126,7 @@ export const UserByokTestModels = {
   [VercelUserByokInferenceProviderIdSchema.enum.novita]: 'openai/gpt-oss-20b',
   [VercelUserByokInferenceProviderIdSchema.enum.google]: 'google/gemini-2.5-flash-lite',
   [VercelUserByokInferenceProviderIdSchema.enum.minimax]: 'minimax/minimax-m2.5',
-  [VercelUserByokInferenceProviderIdSchema.enum.mistral]: 'mistral/devstral-2',
+  [VercelUserByokInferenceProviderIdSchema.enum.mistral]: 'mistral/mistral-medium-3.5',
   [VercelUserByokInferenceProviderIdSchema.enum.openai]: 'openai/gpt-5-nano',
   [VercelUserByokInferenceProviderIdSchema.enum.perplexity]: 'perplexity/sonar',
   [VercelUserByokInferenceProviderIdSchema.enum.xai]: 'xai/grok-4.1-fast-non-reasoning',

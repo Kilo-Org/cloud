@@ -9,6 +9,7 @@ import { getSessionIngestDO } from './dos/SessionIngestDO';
 import { getSessionAccessCacheDO } from './dos/SessionAccessCacheDO';
 import { withDORetry } from '@kilocode/worker-utils';
 import { app } from './app';
+import { mapSessionEventRow, notifyUserSessionEvent } from './session-events';
 
 const sessionIdSchema = z.string().startsWith('ses_').length(30);
 
@@ -47,7 +48,25 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> {
 
     const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
 
-    await db
+    const existingRows = await db
+      .select()
+      .from(cli_sessions_v2)
+      .where(
+        and(
+          eq(cli_sessions_v2.session_id, parsed.sessionId),
+          eq(cli_sessions_v2.kilo_user_id, parsed.kiloUserId)
+        )
+      )
+      .limit(1);
+    const existingRow = existingRows[0];
+
+    const hasMeaningfulChange = existingRow
+      ? existingRow.cloud_agent_session_id !== parsed.cloudAgentSessionId ||
+        (parsed.organizationId !== undefined &&
+          existingRow.organization_id !== parsed.organizationId)
+      : true;
+
+    const [persistedRow] = await db
       .insert(cli_sessions_v2)
       .values({
         session_id: parsed.sessionId,
@@ -66,7 +85,21 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> {
             ? { organization_id: parsed.organizationId }
             : {}),
         },
-      });
+      })
+      .returning();
+
+    if (hasMeaningfulChange && persistedRow) {
+      const session = mapSessionEventRow(persistedRow);
+      notifyUserSessionEvent(
+        this.env,
+        parsed.kiloUserId,
+        {
+          type: existingRow ? 'session.updated' : 'session.created',
+          data: { source: 'v2', session, changedAt: session.updatedAt },
+        },
+        this.ctx
+      );
+    }
 
     // Warm the session cache so subsequent ingests can skip Postgres.
     // Best-effort: cache miss is acceptable; don't fail the create if the DO is unavailable.
@@ -124,6 +157,18 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> {
 
     const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
 
+    const deletedRows = await db
+      .select()
+      .from(cli_sessions_v2)
+      .where(
+        and(
+          eq(cli_sessions_v2.session_id, parsed.sessionId),
+          eq(cli_sessions_v2.kilo_user_id, parsed.kiloUserId)
+        )
+      )
+      .limit(1);
+    const deletedRow = deletedRows[0];
+
     await db
       .delete(cli_sessions_v2)
       .where(
@@ -132,6 +177,27 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> {
           eq(cli_sessions_v2.kilo_user_id, parsed.kiloUserId)
         )
       );
+
+    if (deletedRow) {
+      notifyUserSessionEvent(
+        this.env,
+        parsed.kiloUserId,
+        {
+          type: 'session.deleted',
+          data: {
+            source: 'v2',
+            sessionId: deletedRow.session_id,
+            parentSessionId: deletedRow.parent_session_id,
+            organizationId: deletedRow.organization_id,
+            gitUrl: deletedRow.git_url,
+            gitBranch: deletedRow.git_branch,
+            createdOnPlatform: deletedRow.created_on_platform,
+            deletedAt: new Date().toISOString(),
+          },
+        },
+        this.ctx
+      );
+    }
 
     // Clear caches — best-effort; don't fail the delete if DOs are unavailable.
     const cacheErrors: string[] = [];

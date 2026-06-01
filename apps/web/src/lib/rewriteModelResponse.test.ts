@@ -245,7 +245,18 @@ describe('rewriteFreeModelResponse_Messages', () => {
     expect(events[1].usage?.is_byok).toBeUndefined();
     expect(events[1].usage?.output_tokens).toBe(9);
 
-    // Anthropic-style streams must not carry the OpenRouter [DONE] sentinel.
+    // The [DONE] sentinel is re-emitted when upstream sends it.
+    expect(dataPayloads(sse)).toContain('[DONE]');
+  });
+
+  test('does not synthesize a [DONE] sentinel when upstream omits it', async () => {
+    const upstream = sseResponse(
+      'data: {"type":"message_delta","usage":{"output_tokens":9},"delta":{}}\n\n'
+    );
+
+    const result = await rewriteFreeModelResponse_Messages(upstream, REWRITTEN_MODEL);
+    const sse = await readOutputStream(result);
+
     expect(dataPayloads(sse)).not.toContain('[DONE]');
   });
 });

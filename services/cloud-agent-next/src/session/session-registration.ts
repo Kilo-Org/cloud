@@ -2,10 +2,11 @@
  * Session creation helpers for the grouped `start` path and retained legacy
  * `prepareSession` path.
  *
- * Both paths allocate canonical IDs and first create the external
- * `cli_sessions_v2` ownership row required by stream-ticket authorization.
- * `start` then asks its Durable Object to register metadata and durably admit
- * the already accepted initial turn through one grouped operation. Legacy
+ * Both paths allocate canonical IDs and create the session report row before
+ * creating the external `cli_sessions_v2` ownership row required
+ * by stream-ticket authorization. `start` then asks its Durable Object to
+ * register metadata and durably admit the already accepted initial turn through
+ * one grouped operation. Legacy
  * `prepareSession` retains registration-only behavior and can queue later.
  *
  * Managed git-token resolution (GitHub App installation, managed GitLab) is
@@ -20,6 +21,11 @@ import type { CloudAgentSession } from '../persistence/CloudAgentSession.js';
 import { logger } from '../logger.js';
 import { withDORetry } from '../utils/do-retry.js';
 import { generateSessionId, SessionService } from '../session-service.js';
+import {
+  createCloudAgentSessionReport,
+  recordCloudAgentSandboxIdentity,
+  recordCloudAgentSessionFailure,
+} from '../telemetry/session-reports.js';
 import { generateSandboxId } from '../sandbox-id.js';
 import { generateKiloSessionId } from '../utils/kilo-session-id.js';
 import { createMessageId } from './message-id.js';
@@ -89,9 +95,39 @@ export function executionTurnSubmissionFromAcceptedTurn(
       };
 }
 
+type SessionEstablishmentFailure =
+  | { stage: 'sandbox_identity'; code: 'sandbox_id_derivation_failed' }
+  | { stage: 'registration'; code: 'do_registration_rejected' }
+  | {
+      stage: 'initial_admission';
+      code: 'initial_admission_rejected' | 'initial_queue_full' | 'invalid_initial_intent';
+    }
+  | { stage: 'transport'; code: 'do_rpc_outcome_unknown' };
+
 type NewSessionAllocation = SessionRegistrationResult & {
+  sessionService: SessionService;
   rollbackCliSession: () => Promise<void>;
 };
+
+function initialAdmissionFailure(
+  result: Extract<SessionMessageAdmissionResult, { success: false }>
+): Extract<SessionEstablishmentFailure, { stage: 'initial_admission' }> {
+  if (result.code === 'PENDING_QUEUE_FULL') {
+    return { stage: 'initial_admission', code: 'initial_queue_full' };
+  }
+  if (result.code === 'BAD_REQUEST') {
+    return { stage: 'initial_admission', code: 'invalid_initial_intent' };
+  }
+  return { stage: 'initial_admission', code: 'initial_admission_rejected' };
+}
+
+async function recordPostSetupFailure(record: () => Promise<void>): Promise<void> {
+  try {
+    await record();
+  } catch {
+    logger.warn('Failed to record Cloud Agent setup failure after Durable Object outcome');
+  }
+}
 
 async function allocateNewSession(
   input: SessionRegistrationInput,
@@ -100,15 +136,36 @@ async function allocateNewSession(
   const sessionService = new SessionService();
   const initialTurn = acceptInitialTurn(input.initialTurn);
   const cloudAgentSessionId = generateSessionId();
-  const sandboxId = await generateSandboxId(
-    ctx.env.PER_SESSION_SANDBOX_ORG_IDS,
-    input.options?.kilocodeOrganizationId,
-    ctx.userId,
-    cloudAgentSessionId,
-    ctx.botId,
-    input.runtime?.devcontainer
-  );
   const kiloSessionId = generateKiloSessionId();
+  const createdOnPlatform = input.options?.createdOnPlatform ?? 'cloud-agent';
+
+  await createCloudAgentSessionReport(
+    { cloudAgentSessionId, kiloSessionId, initialMessageId: initialTurn.messageId },
+    ctx.env
+  );
+
+  let sandboxId: Awaited<ReturnType<typeof generateSandboxId>>;
+  try {
+    sandboxId = await generateSandboxId(
+      ctx.env.PER_SESSION_SANDBOX_ORG_IDS,
+      input.options?.kilocodeOrganizationId,
+      ctx.userId,
+      cloudAgentSessionId,
+      ctx.botId,
+      input.runtime?.devcontainer
+    );
+  } catch (error) {
+    await recordCloudAgentSessionFailure(
+      {
+        cloudAgentSessionId,
+        failure: { stage: 'sandbox_identity', code: 'sandbox_id_derivation_failed' },
+      },
+      ctx.env
+    );
+    throw error;
+  }
+
+  await recordCloudAgentSandboxIdentity({ cloudAgentSessionId, sandboxId }, ctx.env);
 
   logger.setTags({
     cloudAgentSessionId,
@@ -120,33 +177,46 @@ async function allocateNewSession(
   logger.info('Creating new session ownership row');
 
   const defaultTitle = `New session - ${new Date().toISOString()}`;
-  await sessionService.createCliSessionViaSessionIngest(
-    kiloSessionId,
-    cloudAgentSessionId,
-    ctx.userId,
-    ctx.env,
-    input.options?.kilocodeOrganizationId,
-    input.options?.createdOnPlatform ?? 'cloud-agent',
-    defaultTitle
-  );
+  try {
+    await sessionService.createCliSessionViaSessionIngest(
+      kiloSessionId,
+      cloudAgentSessionId,
+      ctx.userId,
+      ctx.env,
+      input.options?.kilocodeOrganizationId,
+      createdOnPlatform,
+      defaultTitle
+    );
+  } catch (error) {
+    await recordCloudAgentSessionFailure(
+      {
+        cloudAgentSessionId,
+        failure: { stage: 'transport', code: 'do_rpc_outcome_unknown' },
+      },
+      ctx.env
+    );
+    throw error;
+  }
 
   return {
     cloudAgentSessionId,
     kiloSessionId,
     sandboxId,
     initialTurn,
-    rollbackCliSession: () =>
-      sessionService
-        .deleteCliSessionViaSessionIngest(kiloSessionId, ctx.userId, ctx.env, {
+    sessionService,
+    rollbackCliSession: async () => {
+      try {
+        await sessionService.deleteCliSessionViaSessionIngest(kiloSessionId, ctx.userId, ctx.env, {
           onlyIfEmpty: true,
-        })
-        .catch((rollbackError: unknown) => {
-          logger
-            .withFields({
-              error: rollbackError instanceof Error ? rollbackError.message : String(rollbackError),
-            })
-            .error('Failed to rollback cli_sessions_v2 record');
-        }),
+        });
+      } catch (rollbackError: unknown) {
+        logger
+          .withFields({
+            error: rollbackError instanceof Error ? rollbackError.message : String(rollbackError),
+          })
+          .error('Failed to rollback cli_sessions_v2 record');
+      }
+    },
   };
 }
 
@@ -203,11 +273,32 @@ export async function registerNewSession(
     `${ctx.userId}:${allocation.cloudAgentSessionId}`
   );
   const stub = ctx.env.CLOUD_AGENT_SESSION.get(doId);
-  const registerResult = await stub.registerSession(
-    buildSessionRegistrationCommand(input, ctx, allocation)
-  );
+  let registerResult: Awaited<ReturnType<typeof stub.registerSession>>;
+  try {
+    registerResult = await stub.registerSession(
+      buildSessionRegistrationCommand(input, ctx, allocation)
+    );
+  } catch (error) {
+    await recordPostSetupFailure(() =>
+      recordCloudAgentSessionFailure(
+        {
+          cloudAgentSessionId: allocation.cloudAgentSessionId,
+          failure: { stage: 'transport', code: 'do_rpc_outcome_unknown' },
+        },
+        ctx.env
+      )
+    );
+    throw error;
+  }
 
   if (!registerResult.success) {
+    const failure = { stage: 'registration', code: 'do_registration_rejected' } as const;
+    await recordPostSetupFailure(() =>
+      recordCloudAgentSessionFailure(
+        { cloudAgentSessionId: allocation.cloudAgentSessionId, failure },
+        ctx.env
+      )
+    );
     await allocation.rollbackCliSession();
     logger.withFields({ error: registerResult.error }).error('Failed to register session in DO');
     throw new TRPCError({
@@ -237,20 +328,44 @@ export async function startNewSession(
   const doId = ctx.env.CLOUD_AGENT_SESSION.idFromName(
     `${ctx.userId}:${allocation.cloudAgentSessionId}`
   );
-  const admission = await withDORetry<
-    DurableObjectStub<CloudAgentSession>,
-    SessionMessageAdmissionResult
-  >(
-    () => ctx.env.CLOUD_AGENT_SESSION.get(doId),
-    stub =>
-      stub.createSessionWithInitialAdmission({
-        ...buildSessionRegistrationCommand(input, ctx, allocation),
-        message: { initialTurn: allocation.initialTurn },
-      }),
-    'createSessionWithInitialAdmission'
-  );
+  let admission: SessionMessageAdmissionResult;
+  try {
+    admission = await withDORetry<
+      DurableObjectStub<CloudAgentSession>,
+      SessionMessageAdmissionResult
+    >(
+      () => ctx.env.CLOUD_AGENT_SESSION.get(doId),
+      stub =>
+        stub.createSessionWithInitialAdmission({
+          ...buildSessionRegistrationCommand(input, ctx, allocation),
+          message: { initialTurn: allocation.initialTurn },
+        }),
+      'createSessionWithInitialAdmission'
+    );
+  } catch (error) {
+    await recordPostSetupFailure(() =>
+      recordCloudAgentSessionFailure(
+        {
+          cloudAgentSessionId: allocation.cloudAgentSessionId,
+          failure: { stage: 'transport', code: 'do_rpc_outcome_unknown' },
+        },
+        ctx.env
+      )
+    );
+    throw error;
+  }
 
   if (!admission.success) {
+    const failure =
+      admission.failureBoundary === 'registration'
+        ? ({ stage: 'registration', code: 'do_registration_rejected' } as const)
+        : initialAdmissionFailure(admission);
+    await recordPostSetupFailure(() =>
+      recordCloudAgentSessionFailure(
+        { cloudAgentSessionId: allocation.cloudAgentSessionId, failure },
+        ctx.env
+      )
+    );
     await allocation.rollbackCliSession();
     logger
       .withFields({ error: admission.error, resultCode: admission.code })

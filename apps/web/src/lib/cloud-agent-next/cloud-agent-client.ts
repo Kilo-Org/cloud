@@ -426,6 +426,9 @@ type CloudAgentNextTRPCClient = {
   deleteSession: {
     mutate: (input: { sessionId: string }) => Promise<{ success: boolean; message?: string }>;
   };
+  cleanupSession: {
+    mutate: (input: { sessionId: string }) => Promise<{ success: boolean; message?: string }>;
+  };
   interruptSession: {
     mutate: (input: { sessionId: string }) => Promise<InterruptResult>;
   };
@@ -545,6 +548,23 @@ export class CloudAgentNextClient {
       console.error(`Error deleting session ${sessionId}:`, error);
       captureException(error, {
         tags: { source: 'cloud-agent-next-client', endpoint: 'deleteSession' },
+        extra: { sessionId },
+      });
+      return { success: false };
+    }
+  }
+
+  /**
+   * Clean up a caller-created session and classify its runtime deletion as caller cleanup.
+   */
+  async cleanupSession(sessionId: string): Promise<{ success: boolean }> {
+    try {
+      const result = await this.client.cleanupSession.mutate({ sessionId });
+      return { success: result.success };
+    } catch (error) {
+      console.error(`Error cleaning up session ${sessionId}:`, error);
+      captureException(error, {
+        tags: { source: 'cloud-agent-next-client', endpoint: 'cleanupSession' },
         extra: { sessionId },
       });
       return { success: false };

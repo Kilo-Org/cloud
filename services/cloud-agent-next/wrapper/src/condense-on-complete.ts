@@ -50,14 +50,18 @@ export async function runCondenseOnComplete(
   try {
     sendStatus('Condensing context...');
 
+    if (!opts.model) {
+      throw new Error('No model specified for condense');
+    }
+
     // Arm the completion waiter BEFORE sending the prompt
     opts.expectCompletion();
 
-    // Send /compact command via server API
-    logToFile(`condense: sending /compact command to session ${opts.kiloSessionId}`);
-    await opts.kiloClient.sendCommand({
+    logToFile(`condense: summarizing session ${opts.kiloSessionId}`);
+    await opts.kiloClient.summarizeSession({
       sessionId: opts.kiloSessionId,
-      command: 'compact',
+      model: { modelID: opts.model },
+      auto: true,
     });
 
     // Wait for completion with timeout

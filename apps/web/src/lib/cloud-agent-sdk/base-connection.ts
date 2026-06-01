@@ -28,6 +28,7 @@ export type BaseConnectionConfig<T = unknown> = {
   onDisconnected: () => void;
   onReconnected?: () => void;
   onUnexpectedDisconnect?: () => void;
+  onReplacingConnection?: () => void;
   onError?: (message: string) => void;
   isAuthFailure?: (event: CloseEvent) => boolean;
   refreshAuth?: () => Promise<void>;
@@ -47,6 +48,7 @@ export type BaseConnectionConfig<T = unknown> = {
 export type Connection = {
   connect: () => void;
   disconnect: () => void;
+  reconnectWithRefreshedAuth?: () => void;
   destroy: () => void;
 };
 
@@ -93,6 +95,11 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
       clearTimeout(stalenessTimeoutId);
       stalenessTimeoutId = null;
     }
+  }
+
+  function notifyReplacingConnection(expectedGeneration = generation): boolean {
+    config.onReplacingConnection?.();
+    return !destroyed && !intentionalDisconnect && expectedGeneration === generation;
   }
 
   async function refreshAuthAndReconnect(expectedGeneration: number) {
@@ -177,9 +184,11 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
     // inherit timing from a previous connection.
     lastMessageTime = Date.now();
 
-    // Close existing socket - clear reference first so onclose ignores it
+    // Close existing socket - clear reference first so onclose ignores it.
+    // Notify route loss because onOpen consumers may already have sent commands.
     const oldWs = ws;
     if (oldWs !== null) {
+      if (!notifyReplacingConnection(expectedGeneration)) return;
       ws = null;
       oldWs.close();
     }
@@ -257,12 +266,15 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
       const isAuthFailure = config.isAuthFailure?.(event) ?? false;
 
       if (isAuthFailure && !authRefreshAttempted && config.refreshAuth) {
+        if (!notifyReplacingConnection(expectedGeneration)) return;
         void refreshAuthAndReconnect(expectedGeneration);
         return;
       }
 
-      // Already tried refreshing auth and still failing - stop retrying
+      // Already tried refreshing auth and still failing - stop retrying.
+      // The current physical route is gone even though no new socket follows.
       if (isAuthFailure && authRefreshAttempted) {
+        notifyReplacingConnection(expectedGeneration);
         return;
       }
 
@@ -300,6 +312,7 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
     stalenessTimeoutId = setTimeout(() => {
       stalenessTimeoutId = null;
       if (destroyed || intentionalDisconnect || currentGeneration !== generation) return;
+      if (!notifyReplacingConnection(currentGeneration)) return;
       const staleWs = ws;
       if (staleWs !== null) {
         ws = null;
@@ -327,6 +340,7 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
     reconnectAttempt = 0;
     clearReconnectTimer();
     clearStalenessTimeout();
+    if (!notifyReplacingConnection()) return;
 
     const staleWs = ws;
     if (staleWs !== null) {
@@ -411,6 +425,26 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
     }
   }
 
+  function reconnectWithRefreshedAuth() {
+    if (destroyed || intentionalDisconnect) return;
+
+    reconnectAttempt = 0;
+    clearReconnectTimer();
+    clearStalenessTimeout();
+    if (!notifyReplacingConnection()) return;
+
+    const staleWs = ws;
+    if (staleWs !== null) {
+      ws = null;
+      staleWs.close();
+    }
+    if (connected) {
+      connected = false;
+      config.onDisconnected();
+    }
+    void refreshAndConnect(generation);
+  }
+
   function destroy() {
     destroyed = true;
     generation += 1;
@@ -429,7 +463,7 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
     connected = false;
   }
 
-  return { connect, disconnect, destroy };
+  return { connect, disconnect, reconnectWithRefreshedAuth, destroy };
 }
 
 export function createBrowserLifecycleHooks(): ConnectionLifecycleHooks {

@@ -7,8 +7,10 @@
 
 import { dirname } from 'node:path';
 import type { ExecutionSession, SandboxInstance } from '../types.js';
+import type { WrapperInstanceLease } from '../agent-sandbox/protocol.js';
 import { logger } from '../logger.js';
 import {
+  discoverSessionWrappers,
   findWrapperForSession,
   findWrapperForSessionInProcesses,
   getWrapperSessionMarker,
@@ -50,6 +52,7 @@ export type EnsureRunningOptions = {
   maxWaitMs?: number;
   workspacePath?: string;
   sessionId?: string;
+  leasedInstance?: WrapperInstanceLease;
   /**
    * Prepared session runtime environment for Kilo. This is the same env used to
    * create the sandbox execution session; wrapper-owned values below are layered
@@ -70,6 +73,7 @@ export type EnsureWrapperOptions = {
   userId: string;
   workspacePath: string;
   sessionId?: string;
+  leasedInstance?: WrapperInstanceLease;
   /** See {@link EnsureRunningOptions.runtimeEnv}. */
   runtimeEnv?: Record<string, string | undefined>;
   /** See {@link EnsureRunningOptions.devcontainer}. */
@@ -88,6 +92,7 @@ export type EnsureBootstrapWrapperOptions = {
   userId: string;
   wrapperPath?: string;
   maxWaitMs?: number;
+  leasedInstance?: WrapperInstanceLease;
 };
 
 export type SessionBinding = {
@@ -111,6 +116,8 @@ export type WrapperHealthResponse = {
   state: 'idle' | 'active';
   version: string;
   sessionId: string;
+  wrapperInstanceId?: string;
+  wrapperInstanceGeneration?: number;
 };
 
 export type WrapperPty = {
@@ -199,6 +206,48 @@ const ERROR_STATUS_CODES: Record<string, number> = {
 
 /** Max attempts for port allocation in ensureWrapper (retry with new random port on failure) */
 const MAX_PORT_ATTEMPTS = 3;
+
+function healthMatchesLease(
+  health: WrapperHealthResponse,
+  leasedInstance: WrapperInstanceLease | undefined,
+  allowUnreportedIdentity = false
+): boolean {
+  if (!leasedInstance) return true;
+  if (
+    health.wrapperInstanceId === leasedInstance.instanceId &&
+    health.wrapperInstanceGeneration === leasedInstance.instanceGeneration
+  ) {
+    return true;
+  }
+  return (
+    allowUnreportedIdentity &&
+    health.wrapperInstanceId === undefined &&
+    health.wrapperInstanceGeneration === undefined
+  );
+}
+
+async function observationMatchesLease(
+  sandbox: SandboxInstance,
+  agentSessionId: string,
+  leasedInstance: WrapperInstanceLease,
+  options: { inspectContainers: boolean; expectedContainerId?: string }
+): Promise<boolean> {
+  const observation = await discoverSessionWrappers(sandbox, agentSessionId, {
+    inspectContainers: options.inspectContainers,
+  });
+  if (observation.status !== 'present' || observation.observed.length !== 1) return false;
+  const wrapper = observation.observed[0];
+  if (!wrapper) return false;
+  if (options.expectedContainerId !== undefined) {
+    if (wrapper.representation !== 'container' || wrapper.id !== options.expectedContainerId) {
+      return false;
+    }
+  }
+  return (
+    wrapper.instanceId === leasedInstance.instanceId &&
+    wrapper.instanceGeneration === leasedInstance.instanceGeneration
+  );
+}
 
 function buildExportFileContent(env: Record<string, string | undefined>): string {
   return `${validShellEnvEntries(env)
@@ -467,7 +516,7 @@ export class WrapperClient {
    * NOTE: This method assumes the WrapperClient was created with a port.
    * Port retry on EADDRINUSE is handled by the static ensureWrapper() method.
    */
-  async ensureRunning(options: EnsureRunningOptions): Promise<void> {
+  async ensureRunning(options: EnsureRunningOptions): Promise<{ started: boolean }> {
     const {
       agentSessionId,
       userId,
@@ -475,6 +524,7 @@ export class WrapperClient {
       maxWaitMs = 30_000,
       workspacePath,
       sessionId,
+      leasedInstance,
       runtimeEnv,
       devcontainer,
     } = options;
@@ -483,7 +533,7 @@ export class WrapperClient {
     try {
       await this.health();
       logger.debug('WrapperClient: wrapper already running');
-      return; // Already running
+      return { started: false };
     } catch {
       // Not running, need to start
       logger.debug('WrapperClient: wrapper not running, starting...');
@@ -515,6 +565,12 @@ export class WrapperClient {
       WRAPPER_LOG_PATH: wrapperLogPath,
       KILO_SESSION_RETRY_LIMIT: '5',
       KILO_CLOUD_AGENT: '1',
+      ...(leasedInstance
+        ? {
+            WRAPPER_INSTANCE_ID: leasedInstance.instanceId,
+            WRAPPER_INSTANCE_GENERATION: String(leasedInstance.instanceGeneration),
+          }
+        : {}),
     };
     const commandEnvParts = [
       `WRAPPER_PORT=${this.port}`,
@@ -522,6 +578,13 @@ export class WrapperClient {
       `WRAPPER_LOG_PATH=${wrapperLogPath}`,
       `KILO_SESSION_RETRY_LIMIT=5`,
       `KILO_CLOUD_AGENT=1`,
+      // Environment markers let pre-lease wrapper bundles launch during a rolling deploy.
+      ...(leasedInstance
+        ? [
+            `WRAPPER_INSTANCE_ID=${shellQuote(leasedInstance.instanceId)}`,
+            `WRAPPER_INSTANCE_GENERATION=${leasedInstance.instanceGeneration}`,
+          ]
+        : []),
       ...dockerEnvParts,
     ];
     const devContainerSessionHome =
@@ -593,7 +656,7 @@ export class WrapperClient {
       clearTimeout(waitTimeoutId);
 
       logger.debug('WrapperClient: wrapper is ready', { port: this.port, processId: proc.id });
-      return;
+      return { started: true };
     } catch (error) {
       const startupError = error instanceof Error ? error : new Error(String(error));
 
@@ -714,7 +777,39 @@ export class WrapperClient {
       try {
         const healthResponse = await client.health();
         if (healthResponse.version === WRAPPER_VERSION) {
+          let allowUnreportedIdentity = false;
+          if (
+            options.leasedInstance &&
+            healthResponse.wrapperInstanceId === undefined &&
+            healthResponse.wrapperInstanceGeneration === undefined
+          ) {
+            allowUnreportedIdentity = await observationMatchesLease(
+              sandbox,
+              agentSessionId,
+              options.leasedInstance,
+              {
+                inspectContainers: existing.kind === 'container',
+                ...(existing.kind === 'container'
+                  ? { expectedContainerId: existing.process.id }
+                  : {}),
+              }
+            );
+          }
+          if (
+            options.leasedInstance &&
+            !healthMatchesLease(healthResponse, options.leasedInstance, allowUnreportedIdentity)
+          ) {
+            throw new WrapperNotReadyError(
+              `Existing wrapper does not match leased physical instance ${options.leasedInstance.instanceId}`
+            );
+          }
           return { client, sessionId: healthResponse.sessionId };
+        }
+
+        if (options.leasedInstance) {
+          throw new WrapperNotReadyError(
+            'Existing leased wrapper reported an incompatible version'
+          );
         }
 
         logger
@@ -761,7 +856,10 @@ export class WrapperClient {
             })
             .warn('Failed to stop version-mismatched wrapper, starting replacement anyway');
         }
-      } catch {
+      } catch (error) {
+        if (options.leasedInstance) {
+          throw error;
+        }
         logger
           .withFields({ agentSessionId, port })
           .warn('Existing wrapper not healthy, will start new one');
@@ -784,11 +882,30 @@ export class WrapperClient {
       const client = new WrapperClient({ session, port });
 
       try {
-        await client.ensureRunning(options);
+        const running = await client.ensureRunning(options);
         const healthResponse = await client.health();
         if (healthResponse.version !== WRAPPER_VERSION) {
           throw new WrapperNotReadyError(
             `Wrapper version mismatch after startup: expected ${WRAPPER_VERSION}, got ${healthResponse.version}`
+          );
+        }
+        let allowUnreportedIdentity = false;
+        if (
+          running.started &&
+          options.leasedInstance &&
+          healthResponse.wrapperInstanceId === undefined &&
+          healthResponse.wrapperInstanceGeneration === undefined
+        ) {
+          allowUnreportedIdentity = await observationMatchesLease(
+            sandbox,
+            agentSessionId,
+            options.leasedInstance,
+            { inspectContainers: options.devcontainer !== undefined }
+          );
+        }
+        if (!healthMatchesLease(healthResponse, options.leasedInstance, allowUnreportedIdentity)) {
+          throw new WrapperNotReadyError(
+            'Started wrapper did not report the leased physical instance'
           );
         }
 
@@ -831,10 +948,32 @@ export class WrapperClient {
       try {
         const healthResponse = await client.health();
         if (healthResponse.version === WRAPPER_VERSION) {
+          const allowUnreportedIdentity =
+            options.leasedInstance !== undefined &&
+            healthResponse.wrapperInstanceId === undefined &&
+            healthResponse.wrapperInstanceGeneration === undefined
+              ? await observationMatchesLease(sandbox, agentSessionId, options.leasedInstance, {
+                  inspectContainers: false,
+                })
+              : false;
+          if (
+            options.leasedInstance &&
+            !healthMatchesLease(healthResponse, options.leasedInstance, allowUnreportedIdentity)
+          ) {
+            throw new WrapperNotReadyError(
+              `Existing bootstrap wrapper does not match leased physical instance ${options.leasedInstance.instanceId}`
+            );
+          }
           return { client };
         }
+        if (options.leasedInstance) {
+          throw new WrapperNotReadyError(
+            'Existing leased bootstrap wrapper reported an incompatible version'
+          );
+        }
         await sandbox.exec(`pkill -f -- '${getWrapperSessionMarker(agentSessionId)}'`);
-      } catch {
+      } catch (error) {
+        if (options.leasedInstance) throw error;
         logger
           .withFields({ agentSessionId, port })
           .warn('Existing bootstrap wrapper not healthy, will start new one');
@@ -850,11 +989,25 @@ export class WrapperClient {
         transport: new ContainerFetchWrapperTransport({ sandbox, port }),
       });
       try {
-        await client.ensureRunning(options);
+        const running = await client.ensureRunning(options);
         const healthResponse = await client.health();
         if (healthResponse.version !== WRAPPER_VERSION) {
           throw new WrapperNotReadyError(
             `Wrapper version mismatch after startup: expected ${WRAPPER_VERSION}, got ${healthResponse.version}`
+          );
+        }
+        const allowUnreportedIdentity =
+          running.started &&
+          options.leasedInstance !== undefined &&
+          healthResponse.wrapperInstanceId === undefined &&
+          healthResponse.wrapperInstanceGeneration === undefined
+            ? await observationMatchesLease(sandbox, agentSessionId, options.leasedInstance, {
+                inspectContainers: false,
+              })
+            : false;
+        if (!healthMatchesLease(healthResponse, options.leasedInstance, allowUnreportedIdentity)) {
+          throw new WrapperNotReadyError(
+            'Started bootstrap wrapper did not report the leased physical instance'
           );
         }
         return { client };

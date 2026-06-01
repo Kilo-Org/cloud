@@ -1,5 +1,6 @@
 import type { getSandbox, ExecutionSession, Sandbox } from '@cloudflare/sandbox';
 import type { CloudAgentSession } from './persistence/CloudAgentSession.js';
+import type { CloudAgentQueueReport } from '@kilocode/worker-utils/cloud-agent-queue-report';
 import type { CallbackJob } from './callbacks/index.js';
 import type { NotificationsBinding } from './notifications-binding.js';
 import type { SessionIngestBinding } from './session-ingest-binding.js';
@@ -157,6 +158,8 @@ export type Env = {
   R2_BUCKET: R2Bucket;
   /** Queue for callback messages (optional - supports incremental rollout) */
   CALLBACK_QUEUE?: Queue<CallbackJob>;
+  /** Dedicated best-effort Cloud Agent reporting queue. */
+  CLOUD_AGENT_REPORT_QUEUE: Queue<CloudAgentQueueReport>;
   /** Service binding for centralized git token generation */
   GIT_TOKEN_SERVICE: GitTokenService;
   /** Service binding for dispatching push notifications */

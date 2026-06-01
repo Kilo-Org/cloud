@@ -17,6 +17,17 @@ export function useOrgKiloClawStatus(organizationId?: string) {
   );
 }
 
+export function useOrgKiloClawNavState(organizationId?: string) {
+  const trpc = useTRPC();
+  const resolvedOrganizationId = organizationId ?? NIL_UUID;
+  return useQuery(
+    trpc.organizations.kiloclaw.getNavState.queryOptions(
+      { organizationId: resolvedOrganizationId },
+      { enabled: !!organizationId, staleTime: 60_000 }
+    )
+  );
+}
+
 export function useOrgKiloClawConfig(organizationId: string) {
   const trpc = useTRPC();
   return useQuery(trpc.organizations.kiloclaw.getConfig.queryOptions({ organizationId }));
@@ -198,12 +209,17 @@ export function useOrgKiloClawMutations(
   const queryClient = useQueryClient();
 
   const invalidateStatus = async () => {
-    await queryClient.invalidateQueries({
-      queryKey: trpc.organizations.kiloclaw.getStatus.queryKey({ organizationId }),
-    });
-    await queryClient.invalidateQueries({
-      queryKey: trpc.organizations.kiloclaw.controllerVersion.queryKey({ organizationId }),
-    });
+    await Promise.all([
+      queryClient.invalidateQueries({
+        queryKey: trpc.organizations.kiloclaw.getStatus.queryKey({ organizationId }),
+      }),
+      queryClient.invalidateQueries({
+        queryKey: trpc.organizations.kiloclaw.getNavState.queryKey({ organizationId }),
+      }),
+      queryClient.invalidateQueries({
+        queryKey: trpc.organizations.kiloclaw.controllerVersion.queryKey({ organizationId }),
+      }),
+    ]);
   };
 
   const resetAllInstanceState = async () => {

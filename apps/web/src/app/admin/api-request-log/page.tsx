@@ -20,6 +20,7 @@ export default function ApiRequestLogPage() {
   const [startDate, setStartDate] = useState(weekAgo);
   const [endDate, setEndDate] = useState(today);
   const [model, setModel] = useState('');
+  const [sessionId, setSessionId] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   const trpc = useTRPC();
@@ -44,6 +45,9 @@ export default function ApiRequestLogPage() {
     });
     if (model.trim()) {
       params.set('model', model.trim());
+    }
+    if (sessionId.trim()) {
+      params.set('sessionId', sessionId.trim());
     }
 
     // Navigate directly to preserve server-side streaming
@@ -88,6 +92,16 @@ export default function ApiRequestLogPage() {
                 placeholder="e.g. claude-sonnet-4-20250514"
                 value={model}
                 onChange={e => setModel(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="sessionId">Session ID (optional)</Label>
+              <Input
+                id="sessionId"
+                placeholder="Enter session ID"
+                value={sessionId}
+                onChange={e => setSessionId(e.target.value)}
               />
             </div>
 

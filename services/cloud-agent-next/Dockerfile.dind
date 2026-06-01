@@ -1,4 +1,4 @@
-ARG SANDBOX_VERSION="0.10.1"
+ARG SANDBOX_VERSION="0.10.3"
 
 FROM docker.io/cloudflare/sandbox:${SANDBOX_VERSION}-musl AS cloudflare-sandbox
 
@@ -9,7 +9,7 @@ USER root
 # Build arguments for metadata (all optional with defaults)
 ARG BUILD_DATE=""
 ARG VCS_REF=""
-ARG KILOCODE_CLI_VERSION="7.2.52"
+ARG KILOCODE_CLI_VERSION="7.3.12"
 
 # Cloudflare Containers run without root privileges, so Docker must run in
 # rootless mode. The Sandbox SDK server is copied into this image so the

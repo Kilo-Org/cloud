@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { ExecutionError } from '../execution/errors.js';
 import type {
   ExecutionDeliveryContext,
   MessageDeliveryRequest,
@@ -1084,6 +1085,8 @@ describe('SessionMessageQueue', () => {
           reason: 'exhausted',
           error: 'invalid queued turn',
           completionSource: 'delivery_failure',
+          failureStage: 'pre_dispatch',
+          failureCode: 'invalid_delivery_request',
           attempts: 1,
         },
         options: { allowIdleBatchWithoutObservedIdle: true },
@@ -1091,6 +1094,124 @@ describe('SessionMessageQueue', () => {
     ]);
     expect(await listPendingSessionMessages(harness.storage)).toHaveLength(0);
     expect(harness.finalizedTerminalCallbacks).toEqual([{ allowWithoutObservedIdle: true }]);
+  });
+
+  it.each([
+    ['SANDBOX_CONNECT_FAILED', 'sandbox_connect_failed'],
+    ['WORKSPACE_SETUP_FAILED', 'workspace_setup_failed'],
+    ['KILO_SERVER_FAILED', 'kilo_server_failed'],
+    ['WRAPPER_START_FAILED', 'wrapper_start_failed'],
+  ] as const)('classifies exhausted %s delivery failures as %s', async (code, failureCode) => {
+    const harness = createQueueHarness({
+      deliver: async () => ({ success: false, code, error: 'transient exhausted' }),
+    });
+    await harness.queue.admitSubmittedMessage({
+      userId: 'user_test' as UserId,
+      turn: { type: 'prompt', id: FIRST_MESSAGE_ID, prompt: 'terminalize after retry' },
+    });
+    await harness.queue.drainNextPendingMessage();
+    const pending = await listPendingSessionMessages(harness.storage);
+    if (pending[0]?.nextFlushAttemptAt !== undefined) {
+      vi.spyOn(Date, 'now').mockReturnValueOnce(pending[0].nextFlushAttemptAt);
+      await harness.queue.drainNextPendingMessage();
+      vi.restoreAllMocks();
+    }
+
+    expect(harness.terminalizations.at(-1)?.params).toMatchObject({
+      kind: 'failed',
+      failureStage: 'pre_dispatch',
+      failureCode,
+    });
+  });
+
+  it('preserves a thrown workspace setup failure through retry exhaustion', async () => {
+    const error = 'Git clone failed: No space left on device';
+    const harness = createQueueHarness({
+      deliver: async () => Promise.reject(ExecutionError.workspaceSetupFailed(error)),
+    });
+    await harness.queue.admitSubmittedMessage({
+      userId: 'user_test' as UserId,
+      turn: { type: 'prompt', id: FIRST_MESSAGE_ID, prompt: 'clone a workspace' },
+    });
+
+    await harness.queue.drainNextPendingMessage();
+    const [pending] = await listPendingSessionMessages(harness.storage);
+    expect(pending?.lastFlushFailureCode).toBe('WORKSPACE_SETUP_FAILED');
+    expect(pending?.lastFlushError).toBe(error);
+    if (pending?.nextFlushAttemptAt === undefined) {
+      throw new Error('Expected workspace setup failure to be retried before terminalization');
+    }
+
+    vi.spyOn(Date, 'now').mockReturnValueOnce(pending.nextFlushAttemptAt);
+    await harness.queue.drainNextPendingMessage();
+    vi.restoreAllMocks();
+
+    expect(harness.terminalizations.at(-1)?.params).toMatchObject({
+      kind: 'failed',
+      error,
+      failureStage: 'pre_dispatch',
+      failureCode: 'workspace_setup_failed',
+    });
+  });
+
+  it('does not classify an ambiguous thrown wrapper execution failure as startup', async () => {
+    const harness = createQueueHarness({
+      deliver: async () =>
+        Promise.reject(
+          ExecutionError.wrapperStartFailed('Failed to execute wrapper bootstrap: dispatch unknown')
+        ),
+    });
+    await harness.queue.admitSubmittedMessage({
+      userId: 'user_test' as UserId,
+      turn: { type: 'prompt', id: FIRST_MESSAGE_ID, prompt: 'deliver ambiguously' },
+    });
+
+    await harness.queue.drainNextPendingMessage();
+    const [pending] = await listPendingSessionMessages(harness.storage);
+    if (pending?.nextFlushAttemptAt === undefined) {
+      throw new Error('Expected ambiguous delivery failure to be retried before terminalization');
+    }
+    vi.spyOn(Date, 'now').mockReturnValueOnce(pending.nextFlushAttemptAt);
+    await harness.queue.drainNextPendingMessage();
+    vi.restoreAllMocks();
+
+    expect(harness.terminalizations.at(-1)?.params).toMatchObject({
+      kind: 'failed',
+      failureStage: 'pre_dispatch',
+      failureCode: 'delivery_failure_unknown',
+    });
+  });
+
+  it('clears an earlier typed cause when exhaustion becomes ambiguous', async () => {
+    const deliver = vi
+      .fn<(_plan: MessageDeliveryRequest) => Promise<MessageDeliveryResult>>()
+      .mockRejectedValueOnce(
+        ExecutionError.workspaceSetupFailed('workspace temporarily unavailable')
+      )
+      .mockRejectedValueOnce(
+        ExecutionError.wrapperStartFailed('Failed to execute wrapper bootstrap: dispatch unknown')
+      );
+    const harness = createQueueHarness({ deliver });
+    await harness.queue.admitSubmittedMessage({
+      userId: 'user_test' as UserId,
+      turn: { type: 'prompt', id: FIRST_MESSAGE_ID, prompt: 'retry then dispatch ambiguously' },
+    });
+
+    await harness.queue.drainNextPendingMessage();
+    const [pending] = await listPendingSessionMessages(harness.storage);
+    expect(pending?.lastFlushFailureCode).toBe('WORKSPACE_SETUP_FAILED');
+    if (pending?.nextFlushAttemptAt === undefined) {
+      throw new Error('Expected workspace setup failure to be retried before terminalization');
+    }
+    vi.spyOn(Date, 'now').mockReturnValueOnce(pending.nextFlushAttemptAt);
+    await harness.queue.drainNextPendingMessage();
+    vi.restoreAllMocks();
+
+    expect(harness.terminalizations.at(-1)?.params).toMatchObject({
+      kind: 'failed',
+      failureStage: 'pre_dispatch',
+      failureCode: 'delivery_failure_unknown',
+    });
   });
 
   it('builds reconnect snapshots for pending and never-accepted terminal queued messages', async () => {
@@ -1273,6 +1394,8 @@ describe('SessionMessageQueue', () => {
           kind: 'interrupted',
           error: 'Pending queued message interrupted by user',
           completionSource: 'interrupt',
+          failureStage: 'interruption',
+          failureCode: 'user_interrupt',
         },
         options: { allowIdleBatchWithoutObservedIdle: true },
       },
@@ -1282,6 +1405,8 @@ describe('SessionMessageQueue', () => {
           kind: 'interrupted',
           error: 'Pending queued message interrupted by user',
           completionSource: 'interrupt',
+          failureStage: 'interruption',
+          failureCode: 'user_interrupt',
         },
         options: { allowIdleBatchWithoutObservedIdle: true },
       },
@@ -1337,6 +1462,8 @@ describe('SessionMessageQueue', () => {
           kind: 'interrupted',
           error: 'Pending queued message interrupted by user',
           completionSource: 'interrupt',
+          failureStage: 'interruption',
+          failureCode: 'user_interrupt',
         },
         options: { allowIdleBatchWithoutObservedIdle: true },
       },

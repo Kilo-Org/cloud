@@ -97,6 +97,8 @@ export async function POST(
     auto_model: null,
     market_cost: cost_mUsd,
     is_free: false,
+    abuse_delay: null,
+    abuse_downgraded_from: null,
   };
 
   await insertUsageRecord(coreUsageFields, metadataFields);

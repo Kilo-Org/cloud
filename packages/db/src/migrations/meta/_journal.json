@@ -1037,6 +1037,41 @@
       "when": 1779979914171,
       "tag": "0147_curvy_millenium_guard",
       "breakpoints": true
+    },
+    {
+      "idx": 148,
+      "version": "7",
+      "when": 1780051885348,
+      "tag": "0148_cuddly_stryfe",
+      "breakpoints": true
+    },
+    {
+      "idx": 149,
+      "version": "7",
+      "when": 1780080850427,
+      "tag": "0149_pink_tag",
+      "breakpoints": true
+    },
+    {
+      "idx": 150,
+      "version": "7",
+      "when": 1780085204443,
+      "tag": "0150_typical_scorpion",
+      "breakpoints": true
+    },
+    {
+      "idx": 151,
+      "version": "7",
+      "when": 1780313423049,
+      "tag": "0151_shiny_bullseye",
+      "breakpoints": true
+    },
+    {
+      "idx": 152,
+      "version": "7",
+      "when": 1780319034603,
+      "tag": "0152_giant_wendell_vaughn",
+      "breakpoints": true
     }
   ]
 }

@@ -1,4 +1,5 @@
 import { initTRPC, TRPCError } from '@trpc/server';
+import { timingSafeEqual } from '@kilocode/encryption';
 import type { TRPCContext } from '../types.js';
 
 /**
@@ -58,7 +59,7 @@ export const internalApiProtectedProcedure = t.procedure.use(async ({ ctx, next 
       message: 'Internal API secret not configured',
     });
   }
-  if (!internalApiKey || internalApiKey !== ctx.env.INTERNAL_API_SECRET) {
+  if (!internalApiKey || !timingSafeEqual(internalApiKey, ctx.env.INTERNAL_API_SECRET)) {
     throw new TRPCError({
       code: 'UNAUTHORIZED',
       message: 'Invalid or missing internal API key',

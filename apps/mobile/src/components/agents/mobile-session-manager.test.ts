@@ -1,10 +1,28 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createStore } from 'jotai';
+import { type UserWebConnection } from 'cloud-agent-sdk';
 
 const mocks = vi.hoisted(() => ({
   createSessionManager: vi.fn(config => ({ config })),
   getWithRuntimeStateQuery: vi.fn(),
 }));
+
+function noCleanup(): void {
+  return undefined;
+}
+
+const userWebConnection: UserWebConnection = {
+  retain: vi.fn(() => noCleanup),
+  connect: vi.fn(() => undefined),
+  disconnect: vi.fn(() => undefined),
+  destroy: vi.fn(() => undefined),
+  subscribeToCliSession: vi.fn(() => noCleanup),
+  sendCommand: vi.fn(),
+  onCliEvent: vi.fn(() => noCleanup),
+  onSystemEvent: vi.fn(() => noCleanup),
+  onReconnect: vi.fn(() => noCleanup),
+  onSessionEvent: vi.fn(() => noCleanup),
+};
 
 vi.mock('cloud-agent-sdk', () => ({
   createSessionManager: mocks.createSessionManager,
@@ -35,7 +53,6 @@ vi.mock('@/components/agents/mobile-session-diagnostics', () => ({
 vi.mock('@/lib/config', () => ({
   API_BASE_URL: 'https://api.example.com',
   CLOUD_AGENT_WS_URL: 'wss://agent.example.com',
-  SESSION_INGEST_WS_URL: 'wss://ingest.example.com',
   WEB_BASE_URL: 'https://web.example.com',
 }));
 
@@ -48,12 +65,30 @@ vi.mock('@/lib/trpc', () => ({
 }));
 
 type CapturedSessionManagerConfig = {
+  userWebConnection: unknown;
+  cliWebsocketUrl?: string;
+  getAuthToken?: () => Promise<string>;
   fetchSession: (kiloSessionId: string) => Promise<{ associatedPr: unknown }>;
 };
 
 describe('createMobileAgentSessionManager', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it('injects the app-scoped user web connection without raw viewer transport options', async () => {
+    const { createMobileAgentSessionManager } =
+      await import('@/components/agents/mobile-session-manager');
+
+    createMobileAgentSessionManager({
+      store: createStore(),
+      userWebConnection,
+    });
+
+    const config = mocks.createSessionManager.mock.calls[0]?.[0] as CapturedSessionManagerConfig;
+    expect(config.userWebConnection).toBe(userWebConnection);
+    expect(config.cliWebsocketUrl).toBeUndefined();
+    expect(config.getAuthToken).toBeUndefined();
   });
 
   it('propagates associatedPr from fetched session data', async () => {
@@ -78,7 +113,10 @@ describe('createMobileAgentSessionManager', () => {
       runtimeState: null,
     });
 
-    createMobileAgentSessionManager({ store: createStore() });
+    createMobileAgentSessionManager({
+      store: createStore(),
+      userWebConnection,
+    });
 
     const config = mocks.createSessionManager.mock.calls[0]?.[0] as CapturedSessionManagerConfig;
     const session = await config.fetchSession('ses_123');

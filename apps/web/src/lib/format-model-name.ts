@@ -1,3 +1,5 @@
+import { KILOCODE_KILO_PROVIDER_PREFIX } from '@/lib/ai-gateway/model-utils';
+
 /**
  * Strips provider prefixes from a model slug to produce a short display name.
  *
@@ -9,7 +11,9 @@
 export function formatShortModelName(slug: string): string {
   if (!slug) return slug;
   // Strip kilo/ prefix first
-  const withoutKilo = slug.startsWith('kilo/') ? slug.slice(5) : slug;
+  const withoutKilo = slug.startsWith(KILOCODE_KILO_PROVIDER_PREFIX)
+    ? slug.slice(KILOCODE_KILO_PROVIDER_PREFIX.length)
+    : slug;
   // Strip provider prefix (everything before and including the first /)
   const slashIndex = withoutKilo.indexOf('/');
   return slashIndex === -1 ? withoutKilo : withoutKilo.slice(slashIndex + 1);

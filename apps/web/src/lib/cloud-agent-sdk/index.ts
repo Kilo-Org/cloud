@@ -59,6 +59,17 @@ export type { CliHistoricalTransportConfig } from './cli-historical-transport';
 export { createCliLiveTransport } from './cli-live-transport';
 export type { CliLiveTransportConfig } from './cli-live-transport';
 
+export { createUserWebConnection } from './user-web-connection';
+export type {
+  UserWebConnection,
+  UserWebConnectionConfig,
+  UserWebSessionEventName,
+  UserWebSessionEventData,
+  SessionEventPayload,
+  UserWebCliEvent,
+  UserWebSystemEvent,
+} from './user-web-connection';
+
 export type {
   CloudAgentApi,
   CloudAgentStreamTicket,

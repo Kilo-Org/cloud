@@ -228,6 +228,7 @@ const OpenRouterModelSchema = z.object({
   context_length: z.number(),
   per_request_limits: z.record(z.string(), z.unknown()).nullable().optional(),
   supported_parameters: z.array(z.string()).optional(),
+  expiration_date: z.string().nullable().optional(), // format: yyyy-MM-dd
 });
 
 export const OpenRouterModelsResponseSchema = z.object({

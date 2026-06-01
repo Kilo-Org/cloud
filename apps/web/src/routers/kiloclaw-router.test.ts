@@ -134,6 +134,7 @@ jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => {
 
 let createCaller: (ctx: { user: Awaited<ReturnType<typeof insertTestUser>> }) => {
   getStatus: () => Promise<unknown>;
+  getNavState: () => Promise<{ hasActiveInstance: boolean }>;
   validateWeatherLocation: (input: { location: string }) => Promise<{
     location: string;
     currentWeatherText: string;
@@ -486,6 +487,64 @@ describe('kiloclawRouter getStatus', () => {
       .where(eq(kiloclaw_inbound_email_aliases.instance_id, instanceId));
     expect(rows.find(row => row.alias === alias)?.retired_at).not.toBeNull();
     expect(rows.filter(row => row.retired_at === null)).toHaveLength(1);
+  });
+});
+
+describe('kiloclawRouter getNavState', () => {
+  beforeEach(async () => {
+    await cleanupDbForTest();
+    kiloclawClientMock.KiloClawInternalClient.mockClear();
+    kiloclawClientMock.__getStatusMock.mockReset();
+  });
+
+  it('returns absent without querying the KiloClaw worker', async () => {
+    const user = await insertTestUser({
+      google_user_email: `kiloclaw-nav-absent-${Math.random()}@example.com`,
+    });
+    const caller = createCaller({ user });
+
+    const result = await caller.getNavState();
+
+    expect(result).toEqual({ hasActiveInstance: false });
+    expect(kiloclawClientMock.KiloClawInternalClient).not.toHaveBeenCalled();
+    expect(kiloclawClientMock.__getStatusMock).not.toHaveBeenCalled();
+  });
+
+  it('returns active personal instance presence without requiring subscription access', async () => {
+    const user = await insertTestUser({
+      google_user_email: `kiloclaw-nav-present-${Math.random()}@example.com`,
+    });
+    const instanceId = crypto.randomUUID();
+    await db.insert(kiloclaw_instances).values({
+      id: instanceId,
+      user_id: user.id,
+      sandbox_id: `ki_${instanceId.replace(/-/g, '')}`,
+    });
+    const caller = createCaller({ user });
+
+    const result = await caller.getNavState();
+
+    expect(result).toEqual({ hasActiveInstance: true });
+    expect(kiloclawClientMock.KiloClawInternalClient).not.toHaveBeenCalled();
+    expect(kiloclawClientMock.__getStatusMock).not.toHaveBeenCalled();
+  });
+
+  it('ignores destroyed personal instances', async () => {
+    const user = await insertTestUser({
+      google_user_email: `kiloclaw-nav-destroyed-${Math.random()}@example.com`,
+    });
+    const instanceId = crypto.randomUUID();
+    await db.insert(kiloclaw_instances).values({
+      id: instanceId,
+      user_id: user.id,
+      sandbox_id: `ki_${instanceId.replace(/-/g, '')}`,
+      destroyed_at: '2026-05-29T00:00:00.000Z',
+    });
+    const caller = createCaller({ user });
+
+    const result = await caller.getNavState();
+
+    expect(result).toEqual({ hasActiveInstance: false });
   });
 });
 

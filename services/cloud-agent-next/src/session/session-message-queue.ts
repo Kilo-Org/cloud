@@ -4,6 +4,7 @@ import type {
   AdmitAcceptedSessionMessageRequest,
   MessageDeliveryRequest,
   MessageDeliveryResult,
+  RetryableResultCode,
   SessionMessageAdmissionResult,
   SessionMessageIntent,
   SubmittedSessionMessageRequest,
@@ -32,6 +33,7 @@ import {
   type PendingFlushFailureResult,
   type PendingFlushPolicy,
   type PendingSessionExecutionDefaults,
+  type PendingFlushFailureCode,
   type PendingSessionMessage,
   type SessionQueueStorage,
 } from './pending-messages.js';
@@ -40,8 +42,10 @@ import {
   getSessionMessageState,
   listReconnectVisibleTerminalQueuedMessages,
   putSessionMessageState,
+  type SessionMessageFailureCode,
   type SessionMessageStorage,
   type TerminalizeParams,
+  type SessionMessageState,
 } from './session-message-state.js';
 import type { QueuedMessageSnapshot } from '../websocket/stream.js';
 
@@ -122,6 +126,7 @@ export type SessionMessageQueueDependencies = {
   getDeliveryContext: () => Promise<ExecutionDeliveryContext | null>;
   deliver: (plan: MessageDeliveryRequest) => Promise<MessageDeliveryResult>;
   ensureQueuedMessageEvent: (event: PersistedQueuedMessageEvent & { entityId: string }) => void;
+  reportQueuedState?: (state: SessionMessageState) => void;
   ensureAcceptedMessageEffects: (messageId: string) => Promise<void>;
   persistTerminalTransition: (
     messageId: string,
@@ -153,6 +158,48 @@ function toFailureResult(
     ...failure,
     remainingCount: totalCount,
   };
+}
+
+function classifyDeliveryFailure(code: PendingFlushFailureCode | undefined): {
+  failureStage: 'pre_dispatch';
+  failureCode: SessionMessageFailureCode;
+} {
+  switch (code) {
+    case 'SANDBOX_CONNECT_FAILED':
+      return { failureStage: 'pre_dispatch', failureCode: 'sandbox_connect_failed' };
+    case 'WORKSPACE_SETUP_FAILED':
+      return { failureStage: 'pre_dispatch', failureCode: 'workspace_setup_failed' };
+    case 'KILO_SERVER_FAILED':
+      return { failureStage: 'pre_dispatch', failureCode: 'kilo_server_failed' };
+    case 'WRAPPER_START_FAILED':
+      return { failureStage: 'pre_dispatch', failureCode: 'wrapper_start_failed' };
+    case 'NOT_FOUND':
+      return { failureStage: 'pre_dispatch', failureCode: 'session_metadata_missing' };
+    case 'BAD_REQUEST':
+    case 'PENDING_QUEUE_FULL':
+      return { failureStage: 'pre_dispatch', failureCode: 'invalid_delivery_request' };
+    case 'MODEL_MISSING':
+      return { failureStage: 'pre_dispatch', failureCode: 'model_missing' };
+    case 'INTERNAL':
+    case 'UNKNOWN':
+    case undefined:
+      return { failureStage: 'pre_dispatch', failureCode: 'delivery_failure_unknown' };
+  }
+}
+
+function knownPreDispatchExecutionFailureCode(error: unknown): RetryableResultCode | undefined {
+  if (!isExecutionError(error) || !error.retryable) return undefined;
+  switch (error.code) {
+    case 'SANDBOX_CONNECT_FAILED':
+    case 'WORKSPACE_SETUP_FAILED':
+    case 'KILO_SERVER_FAILED':
+      return error.code;
+    case 'WRAPPER_START_FAILED':
+      // Orchestration also uses this code when prompt dispatch fails after wrapper readiness.
+      return undefined;
+    default:
+      return undefined;
+  }
 }
 
 function getPendingFlushPolicy(
@@ -306,7 +353,7 @@ export async function flushNextPendingSessionMessage(params: {
       message,
       'Session is missing a valid model',
       params.now,
-      { policy, code: 'BAD_REQUEST' }
+      { policy, code: 'MODEL_MISSING' }
     );
     return toFailureResult(failure, totalCount);
   }
@@ -352,13 +399,13 @@ export async function flushNextPendingSessionMessage(params: {
         ? error.code
         : isSandboxWorkspaceProbeTimeoutError(error)
           ? 'INTERNAL'
-          : undefined;
+          : knownPreDispatchExecutionFailureCode(error);
     const failure = await recordPendingFlushFailure(
       params.storage,
       message,
       error instanceof Error ? error.message : String(error),
       params.now,
-      code === undefined ? { policy } : { policy, code }
+      { policy, code: code ?? 'UNKNOWN' }
     );
     return toFailureResult(failure, totalCount);
   }
@@ -407,6 +454,7 @@ export function createSessionMessageQueue(
     getDeliveryContext,
     deliver,
     ensureQueuedMessageEvent,
+    reportQueuedState,
     ensureAcceptedMessageEffects,
     persistTerminalTransition,
     repairTerminalMessageEffects,
@@ -466,6 +514,8 @@ export function createSessionMessageQueue(
       }),
       timestamp: Date.now(),
     });
+    const queuedState = await getSessionMessageState(storage, intent.turn.messageId);
+    if (queuedState?.status === 'queued') reportQueuedState?.(queuedState);
     await requestPendingDrain();
     logger
       .withFields({ sessionId, messageId: intent.turn.messageId })
@@ -597,10 +647,12 @@ export function createSessionMessageQueue(
       (metadata?.callback?.target
         ? { required: true, target: metadata.callback.target }
         : undefined);
-    await putSessionMessageState(
-      storage,
-      createQueuedSessionMessageState(intent, callbackSnapshot, message.createdAt)
+    const repairedState = createQueuedSessionMessageState(
+      intent,
+      callbackSnapshot,
+      message.createdAt
     );
+    await putSessionMessageState(storage, repairedState);
   }
 
   async function admitIntent(intent: SessionMessageIntent): Promise<SessionMessageAdmissionResult> {
@@ -809,6 +861,7 @@ export function createSessionMessageQueue(
       })
       .warn('Failed to flush pending session message');
     if (flushResult.exhausted) {
+      const failure = classifyDeliveryFailure(flushResult.message.lastFlushFailureCode);
       await persistTerminalTransition(
         flushResult.message.messageId,
         {
@@ -816,6 +869,7 @@ export function createSessionMessageQueue(
           reason: 'exhausted',
           error: flushResult.message.lastFlushError ?? 'Pending message delivery failed',
           completionSource: 'delivery_failure',
+          ...failure,
           attempts: flushResult.attempts,
         },
         { allowIdleBatchWithoutObservedIdle: true }
@@ -909,6 +963,8 @@ export function createSessionMessageQueue(
           kind: 'interrupted',
           error: 'Pending queued message interrupted by user',
           completionSource: 'interrupt',
+          failureStage: 'interruption',
+          failureCode: 'user_interrupt',
         },
         { allowIdleBatchWithoutObservedIdle: true }
       );

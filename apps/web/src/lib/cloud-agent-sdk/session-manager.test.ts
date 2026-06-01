@@ -695,6 +695,34 @@ describe('createSessionManager', () => {
       );
     });
 
+    it('restores the prompt and explains how to recover from unavailable-model rejection', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+
+      mockSession.send.mockRejectedValue(
+        Object.assign(new Error('Selected model is not available for this cloud agent session'), {
+          data: { code: 'BAD_REQUEST', httpStatus: 400 },
+        })
+      );
+      const accepted = await mgr.send({
+        payload: { type: 'prompt', prompt: 'Hello', mode: 'code', model: 'removed-model' },
+      });
+
+      expect(accepted).toBe(false);
+      expect(atomValue<string | null>(config.store, mgr.atoms.failedPrompt)).toBe('Hello');
+      expect(
+        atomValue<{ type: string; message: string } | null>(config.store, mgr.atoms.statusIndicator)
+      ).toEqual(
+        expect.objectContaining({
+          type: 'error',
+          message:
+            'Selected model is unavailable for Cloud Agent. Choose another available model or select a different agent, then try again.',
+        })
+      );
+    });
+
     it('calls onSendFailed with prompt on failure', async () => {
       const onSendFailed = jest.fn();
       const config = createMockConfig({ onSendFailed });
@@ -2087,6 +2115,34 @@ describe('formatError', () => {
       data: { code: 'SERVICE_UNAVAILABLE', httpStatus: 503 },
     });
     expect(formatError(err)).toBe('Service is temporarily unavailable. Please retry in a moment.');
+  });
+
+  it('explains how to recover when the selected model is unavailable', () => {
+    const err = Object.assign(
+      new Error('SELECTED MODEL IS NOT AVAILABLE FOR THIS CLOUD AGENT SESSION'),
+      {
+        data: { code: 'BAD_REQUEST', httpStatus: 400 },
+      }
+    );
+    expect(formatError(err)).toBe(
+      'Selected model is unavailable for Cloud Agent. Choose another available model or select a different agent, then try again.'
+    );
+  });
+
+  it('handles wrapped unavailable-model errors', () => {
+    const err = new Error(
+      'prepareSession failed (400): {"error":{"message":"Selected model is not available for this cloud agent session"}}'
+    );
+    expect(formatError(err)).toBe(
+      'Selected model is unavailable for Cloud Agent. Choose another available model or select a different agent, then try again.'
+    );
+  });
+
+  it('keeps unrelated BAD_REQUEST errors generic', () => {
+    const err = Object.assign(new Error('Some unrelated validation failure'), {
+      data: { code: 'BAD_REQUEST', httpStatus: 400 },
+    });
+    expect(formatError(err)).toBe('Something went wrong. Please retry in a moment.');
   });
 
   it('handles TRPCClientError-shaped Error instance with unmapped code', () => {

@@ -121,7 +121,7 @@ export const KILO_WRAPPER_PORT_LABEL = 'kilo.wrapperPort';
  * `wrangler.jsonc#image_vars` so the kilo running in the dev container
  * matches the one we use on the outer sandbox.
  */
-export const KILO_CLI_VERSION = '7.2.52';
+export const KILO_CLI_VERSION = '7.3.12';
 
 const DEVCONTAINER_RUNTIME_BUN_VERSION = '1.3.14';
 const DEVCONTAINER_RUNTIME_BOOTSTRAP_TIMEOUT_MS = 10 * 60 * 1000;

@@ -57,6 +57,39 @@ function computeCloudAgentNextPlan(root: string) {
   return plan;
 }
 
+const gitTokenServiceDir = 'services/git-token-service';
+const annotatedCapabilitySecretBinding = `{
+  "binding": "SCM_SESSION_CAPABILITY_ENCRYPTION_KEY",
+  "store_id": "store-id",
+  // @dev-generate base64 32
+  "secret_name": "SCM_SESSION_CAPABILITY_ENCRYPTION_KEY_DEV"
+}`;
+
+function createGitTokenServiceRepo(options: {
+  envLocal?: string;
+  devSecretBinding?: string;
+  rootSecretBinding?: string;
+}): TestRepo {
+  const rootSecrets = options.rootSecretBinding
+    ? `"secrets_store_secrets": [${options.rootSecretBinding}],`
+    : '';
+  return createRepo({
+    '.env.local': options.envLocal ?? '',
+    [`${gitTokenServiceDir}/package.json`]: JSON.stringify({
+      scripts: { dev: 'wrangler dev --env dev' },
+    }),
+    [`${gitTokenServiceDir}/.dev.vars.example`]: '',
+    [`${gitTokenServiceDir}/wrangler.jsonc`]: `{
+      ${rootSecrets}
+      "env": {
+        "dev": {
+          "secrets_store_secrets": [${options.devSecretBinding ?? annotatedCapabilitySecretBinding}]
+        }
+      }
+    }`,
+  });
+}
+
 function withFakePnpm(output: string, fn: () => void): void {
   const binDir = fs.mkdtempSync(path.join(os.tmpdir(), 'env-sync-bin-'));
   const oldPath = process.env.PATH;
@@ -258,6 +291,132 @@ test('writes example defaults to .dev.vars when they override wrangler vars', ()
     assert.ok(change.newFileContent?.includes('FLY_ORG_SLUG=kilo-dev'));
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('generates an annotated missing secret directly into the local Secrets Store', () => {
+  const repo = createGitTokenServiceRepo({});
+  try {
+    withFakePnpm('', () => {
+      const plan = computePlan(repo.root, new Set(['cloudflare-git-token-service']));
+      assert.equal(plan.missingEnvLocal, false);
+      assert.deepEqual(plan.devVarsChanges, []);
+      assert.deepEqual(plan.envLocalAutoCreates, []);
+      assert.deepEqual(plan.secretStoreWarnings, []);
+      assert.equal(plan.secretStoreAutoCreates.length, 1);
+      const [create] = plan.secretStoreAutoCreates;
+      assert.ok(create);
+      assert.equal(create.binding.secret_name, 'SCM_SESSION_CAPABILITY_ENCRYPTION_KEY_DEV');
+      assert.equal(create.sourceKey, '@dev-generate base64 32');
+      assert.equal(Buffer.from(create.value, 'base64').length, 32);
+    });
+  } finally {
+    repo.cleanup();
+  }
+});
+
+test('generates an annotated secret instead of copying a plaintext env source', () => {
+  const repo = createGitTokenServiceRepo({
+    envLocal: 'SCM_SESSION_CAPABILITY_ENCRYPTION_KEY=plaintext-source\n',
+  });
+  try {
+    withFakePnpm('', () => {
+      const plan = computePlan(repo.root, new Set(['cloudflare-git-token-service']));
+      const [create] = plan.secretStoreAutoCreates;
+      assert.ok(create);
+      assert.equal(create.sourceKey, '@dev-generate base64 32');
+      assert.notEqual(create.value, 'plaintext-source');
+      assert.equal(Buffer.from(create.value, 'base64').length, 32);
+    });
+  } finally {
+    repo.cleanup();
+  }
+});
+
+test('applies generation only to the annotated Secrets Store binding', () => {
+  const repo = createGitTokenServiceRepo({
+    rootSecretBinding: `{
+      "binding": "SHARED_SECRET",
+      "store_id": "shared-store",
+      // @dev-generate base64 32
+      "secret_name": "SHARED_SECRET"
+    }`,
+    devSecretBinding: `{
+      "binding": "SHARED_SECRET",
+      "store_id": "shared-store",
+      "secret_name": "SHARED_SECRET"
+    }`,
+  });
+  try {
+    withFakePnpm('', () => {
+      const plan = computePlan(repo.root, new Set(['cloudflare-git-token-service']));
+      assert.deepEqual(plan.secretStoreAutoCreates, []);
+      assert.deepEqual(plan.secretStoreWarnings, [
+        {
+          workerDir: 'services/git-token-service',
+          bindings: [
+            {
+              binding: 'SHARED_SECRET',
+              store_id: 'shared-store',
+              secret_name: 'SHARED_SECRET',
+            },
+          ],
+        },
+      ]);
+    });
+  } finally {
+    repo.cleanup();
+  }
+});
+
+test('rejects malformed Secrets Store generation annotations', () => {
+  const repo = createGitTokenServiceRepo({
+    devSecretBinding: `{
+      "binding": "SCM_SESSION_CAPABILITY_ENCRYPTION_KEY",
+      "store_id": "store-id",
+      // @dev-generate base64 nope
+      "secret_name": "SCM_SESSION_CAPABILITY_ENCRYPTION_KEY_DEV"
+    }`,
+  });
+  try {
+    assert.throws(
+      () => computePlan(repo.root, new Set(['cloudflare-git-token-service'])),
+      /Invalid @dev-generate directive/
+    );
+  } finally {
+    repo.cleanup();
+  }
+});
+
+test('rejects reserved generated-secret metadata in source Wrangler config', () => {
+  const repo = createGitTokenServiceRepo({
+    devSecretBinding: `{
+      "binding": "SCM_SESSION_CAPABILITY_ENCRYPTION_KEY",
+      "store_id": "store-id",
+      "__kilo\\u005fdev_generated_base64_bytes_0": 4096,
+      "secret_name": "SCM_SESSION_CAPABILITY_ENCRYPTION_KEY_DEV"
+    }`,
+  });
+  try {
+    assert.throws(
+      () => computePlan(repo.root, new Set(['cloudflare-git-token-service'])),
+      /reserved for generated-secret metadata/
+    );
+  } finally {
+    repo.cleanup();
+  }
+});
+
+test('preserves an existing annotated local Secrets Store secret', () => {
+  const repo = createGitTokenServiceRepo({});
+  try {
+    withFakePnpm('SCM_SESSION_CAPABILITY_ENCRYPTION_KEY_DEV\n', () => {
+      const plan = computePlan(repo.root, new Set(['cloudflare-git-token-service']));
+      assert.deepEqual(plan.secretStoreAutoCreates, []);
+      assert.deepEqual(plan.secretStoreWarnings, []);
+    });
+  } finally {
+    repo.cleanup();
   }
 });
 

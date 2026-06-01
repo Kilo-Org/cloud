@@ -94,6 +94,37 @@ describe('session deletion physical cleanup', () => {
     });
   });
 
+  it('retains physical cleanup backoff while explicit deletion is pending', async () => {
+    const userId = 'user_delete_backoff';
+    const sessionId = 'agent_delete_backoff';
+    const stub = env.CLOUD_AGENT_SESSION.get(
+      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
+    );
+
+    const result = await runInDurableObject(stub, async instance => {
+      await registerReadySession(instance, {
+        sessionId,
+        userId,
+        prompt: 'delete backoff',
+        mode: 'code',
+        model: 'test-model',
+      });
+      await establishOwnedWrapper(instance);
+
+      await expect(instance.deleteSession()).rejects.toThrow(
+        'Session deletion pending physical wrapper cleanup'
+      );
+      const lease = await getWrapperLease(instance.ctx.storage);
+      const alarm = await instance.ctx.storage.getAlarm();
+      await instance.ctx.storage.deleteAll();
+      return { lease, alarm };
+    });
+
+    expect(result.lease).toMatchObject({ state: 'stop_needed', attempts: 1 });
+    if (result.lease.state !== 'stop_needed') throw new Error('Expected pending wrapper cleanup');
+    expect(result.alarm).toBe(result.lease.nextAttemptAt);
+  });
+
   it('rejects new message admission while explicit deletion is pending', async () => {
     const userId = 'user_delete_reject_admission';
     const sessionId = 'agent_delete_reject_admission';

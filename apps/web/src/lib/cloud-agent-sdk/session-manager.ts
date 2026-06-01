@@ -216,10 +216,19 @@ type SessionManager = {
 // ---------------------------------------------------------------------------
 
 const GENERIC_ERROR = 'Something went wrong. Please retry in a moment.';
+const SELECTED_MODEL_UNAVAILABLE_MESSAGE =
+  'selected model is not available for this cloud agent session';
+const SELECTED_MODEL_UNAVAILABLE_ERROR =
+  'Selected model is unavailable for Cloud Agent. Choose another available model or select a different agent, then try again.';
+
+function isSelectedModelUnavailable(message: string | undefined): boolean {
+  return message?.toLowerCase().includes(SELECTED_MODEL_UNAVAILABLE_MESSAGE) ?? false;
+}
 
 function formatError(err: unknown): string {
   const r = errorShapeSchema.safeParse(err);
   if (r.success) {
+    if (isSelectedModelUnavailable(r.data.message)) return SELECTED_MODEL_UNAVAILABLE_ERROR;
     const code = r.data.data?.code ?? r.data.shape?.code;
     const http = r.data.data?.httpStatus ?? r.data.shape?.data?.httpStatus;
     if (code === 'PAYMENT_REQUIRED' || http === 402)

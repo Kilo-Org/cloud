@@ -1,6 +1,6 @@
 import { isClaudeModel, isHaikuModel, isOpusModel } from './anthropic.constants';
 import { isOpenAiModel, isGptOssModel } from './openai';
-import { isGeminiModel, isGemmaModel, isGemini3Model } from './google';
+import { isGemmaModel, isGemini3Model } from './google';
 import { isKimiModel } from './moonshotai';
 import { isGrokModel } from './xai';
 import { isGlmModel } from './zai';
@@ -33,8 +33,6 @@ describe('provider predicates match substrings, regardless of prefix', () => {
   });
 
   test('google helpers', () => {
-    expect(isGeminiModel('~google/gemini-2.5-flash-lite')).toBe(true);
-    expect(isGeminiModel('gemini-2.5-flash-lite')).toBe(true);
     expect(isGemmaModel('~google/gemma-4-31b-it')).toBe(true);
     expect(isGemini3Model('~google/gemini-3-pro')).toBe(true);
     expect(isGemini3Model('gemini-3-pro')).toBe(true);

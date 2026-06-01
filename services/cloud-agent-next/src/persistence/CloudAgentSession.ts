@@ -93,6 +93,7 @@ import {
   clearWrapperRuntimeIdentity,
   getWrapperLease,
   getWrapperRuntimeState,
+  nextWrapperLeaseDeadline,
 } from '../session/wrapper-runtime-state.js';
 import {
   getSessionMessageState,
@@ -1399,13 +1400,20 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     }
   }
 
+  private async schedulePhysicalWrapperCleanupRetry(): Promise<void> {
+    const deadline =
+      nextWrapperLeaseDeadline(await getWrapperLease(this.ctx.storage)) ??
+      Date.now() + REAPER_INTERVAL_MS_DEFAULT;
+    await this.ctx.storage.setAlarm(deadline);
+  }
+
   private async finalizeSessionDeletion(
     reason: 'explicit' | 'retention-expired'
   ): Promise<boolean> {
     const metadata = await this.getMetadata();
     if (!metadata) {
       if ((await getWrapperLease(this.ctx.storage)).state !== 'none') {
-        await this.scheduleAlarmAtOrBefore(Date.now() + 1_000);
+        await this.schedulePhysicalWrapperCleanupRetry();
         return false;
       }
     } else {
@@ -1414,7 +1422,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       await supervisor.runMaintenance(Date.now());
       if ((await getWrapperLease(this.ctx.storage)).state !== 'none') {
         if (reason === 'explicit') {
-          await this.scheduleAlarmAtOrBefore(Date.now() + 1_000);
+          await this.schedulePhysicalWrapperCleanupRetry();
         }
         return false;
       }

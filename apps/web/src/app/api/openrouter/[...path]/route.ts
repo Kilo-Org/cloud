@@ -402,14 +402,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   if (providerResult.kind === 'unavailable') {
     return temporarilyUnavailableResponse();
   }
-  const {
-    provider,
-    userByok,
-    bypassAccessCheck,
-    skipProviderPin,
-    skipKiloExclusiveModelSettings,
-    experiment,
-  } = providerResult;
+  const { provider, userByok, bypassAccessCheck, experiment } = providerResult;
 
   // Request-level data-collection opt-out: a caller can set
   // `provider.data_collection: 'deny'` or `provider.zdr: true` on any
@@ -535,7 +528,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     // Direct experiment upstreams must not have a Vercel/OpenRouter
     // provider config pinned onto them — the partner endpoint is selected
     // by the variant version.
-    if (providerConfig && !skipProviderPin) {
+    if (providerConfig && !experiment) {
       requestBodyParsed.body.provider = providerConfig;
     }
   }
@@ -587,8 +580,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     requestBodyParsed,
     extraHeaders,
     userByok,
-    fraudHeaders,
-    { skipKiloExclusiveModelSettings: skipKiloExclusiveModelSettings === true }
+    fraudHeaders
   );
 
   // Capture the bounded prompt for experimented requests AFTER provider

@@ -1051,7 +1051,12 @@ async function useGenerationLookup(
     (await isFreeModel(usageContext.requested_model)) ||
     usageContext.user_byok ||
     (usageStats?.cost_mUsd ?? 0) > 0;
-  return isGatewayProvider && isSuccessStatusCode && (!hasOutputTokens || !hasCostWhenPaid);
+  const hasInferenceProvider = Boolean(usageStats?.inference_provider);
+  return (
+    isGatewayProvider &&
+    isSuccessStatusCode &&
+    (!hasOutputTokens || !hasCostWhenPaid || !hasInferenceProvider)
+  );
 }
 
 export const mapToUsageStats = (

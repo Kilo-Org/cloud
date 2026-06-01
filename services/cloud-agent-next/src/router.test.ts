@@ -6,17 +6,13 @@ vi.mock('@cloudflare/sandbox', () => ({
   getSandbox: vi.fn(),
 }));
 
-const {
-  interruptMock,
-  buildContextMock,
-  getOrCreateSessionMock,
-  recordCloudAgentSessionFailureMock,
-} = vi.hoisted(() => ({
-  interruptMock: vi.fn(),
-  buildContextMock: vi.fn(),
-  getOrCreateSessionMock: vi.fn(),
-  recordCloudAgentSessionFailureMock: vi.fn(),
-}));
+const { buildContextMock, getOrCreateSessionMock, recordCloudAgentSessionFailureMock } = vi.hoisted(
+  () => ({
+    buildContextMock: vi.fn(),
+    getOrCreateSessionMock: vi.fn(),
+    recordCloudAgentSessionFailureMock: vi.fn(),
+  })
+);
 
 const { getSandboxIdForSessionMock, metadataMock } = vi.hoisted(() => ({
   getSandboxIdForSessionMock: vi.fn(),
@@ -74,7 +70,6 @@ vi.mock('./session-service.js', () => ({
       // eslint-disable-next-line @typescript-eslint/no-unsafe-return
       return metadataMock();
     }
-    static interrupt = interruptMock;
   },
 }));
 
@@ -297,11 +292,6 @@ describe('router sessionId validation', () => {
 
         beforeEach(() => {
           vi.clearAllMocks();
-          interruptMock.mockResolvedValue({
-            success: true,
-            message: 'stopped',
-            processesFound: true,
-          });
           buildContextMock.mockImplementation(
             ({
               sandboxId,
@@ -704,38 +694,9 @@ describe('router sessionId validation', () => {
       let caller: ReturnType<typeof appRouter.createCaller>;
       let cloudAgentSession: MockCAS;
       let mockSessionStub: MockSessionStub;
-      let mockSandbox: ReturnType<typeof getSandbox>;
 
       beforeEach(() => {
         vi.clearAllMocks();
-        interruptMock.mockResolvedValue({
-          success: true,
-          message: 'Interrupted execution using pkill',
-          processesFound: true,
-        });
-        buildContextMock.mockImplementation(
-          ({
-            sandboxId,
-            orgId,
-            userId,
-            sessionId,
-          }: {
-            sandboxId: string;
-            orgId: string | undefined;
-            userId: string;
-            sessionId: string;
-          }) => ({
-            sandboxId,
-            orgId,
-            userId,
-            sessionId,
-            sessionHome: `/home/${sessionId}`,
-            workspacePath: `/workspace/${sessionId}`,
-            branchName: `session/${sessionId}`,
-          })
-        );
-        getOrCreateSessionMock.mockResolvedValue({ token: 'session' });
-
         mockSessionStub = {
           deleteSession: vi.fn().mockResolvedValue(undefined),
           markAsInterrupted: vi.fn().mockResolvedValue(undefined),
@@ -778,13 +739,6 @@ describe('router sessionId validation', () => {
         };
         cloudAgentSession = mockContext.env.CLOUD_AGENT_SESSION as unknown as MockCAS;
 
-        mockSandbox = {} as ReturnType<typeof getSandbox>;
-        vi.mocked(getSandbox).mockReturnValue(mockSandbox);
-
-        vi.stubGlobal('scheduler', {
-          wait: vi.fn().mockResolvedValue(undefined),
-        });
-
         caller = appRouter.createCaller(mockContext);
       });
 
@@ -808,7 +762,6 @@ describe('router sessionId validation', () => {
         });
         expect(mockSessionStub.interruptExecution).toHaveBeenCalled();
         expect(getSandbox).not.toHaveBeenCalled();
-        expect(interruptMock).not.toHaveBeenCalled();
       });
 
       it('short-circuits queued-only interrupts before creating a sandbox session', async () => {
@@ -838,7 +791,6 @@ describe('router sessionId validation', () => {
         expect(mockSessionStub.markAsInterrupted).toHaveBeenCalled();
         expect(mockSessionStub.interruptExecution).toHaveBeenCalled();
         expect(getOrCreateSessionMock).not.toHaveBeenCalled();
-        expect(interruptMock).not.toHaveBeenCalled();
         expect(getSandbox).not.toHaveBeenCalled();
         expect(cloudAgentSession.idFromName).toHaveBeenCalledWith(`test-user-123:${sessionId}`);
       });

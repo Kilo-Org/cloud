@@ -11,6 +11,8 @@ export default async function TrialOrganizationsPage() {
         pageTitle="Trial Organizations"
         create={{ label: 'Create Org Trial' }}
         defaultTab="usage"
+        showTrialEndDate
+        showTrialFilters
       />
     </Suspense>
   );

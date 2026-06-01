@@ -38,7 +38,20 @@ type OrganizationsTableProps = {
   pageTitle?: string;
   create?: CreateButtonConfig;
   defaultTab?: TableVariant;
+  // Trial-specific surfaces: extra column + extra filters. When `showTrialFilters`
+  // is true, the `has_usage` and `has_multiple_users` filters default to ON
+  // (admins typically want trials worth investigating); explicit URL params
+  // override.
+  showTrialEndDate?: boolean;
+  showTrialFilters?: boolean;
+  // Default Stripe-status filter applied when the URL has no `stripe_status`
+  // param at all. The user can clear it to "Any" via the filter dropdown,
+  // which sets `stripe_status=any` in the URL so the default no longer kicks
+  // in on refresh.
+  defaultStripeStatus?: string;
 };
+
+const ANY_STRIPE_STATUS_TOKEN = 'any';
 
 export function OrganizationsTable({
   mode = 'paying',
@@ -47,6 +60,9 @@ export function OrganizationsTable({
   pageTitle = 'Organizations',
   create,
   defaultTab = 'entitlements',
+  showTrialEndDate = false,
+  showTrialFilters = false,
+  defaultStripeStatus,
 }: OrganizationsTableProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -58,9 +74,36 @@ export function OrganizationsTable({
   const currentSortOrder = searchParams.get('sortOrder') || 'desc';
   const currentSearch = searchParams.get('search') || '';
   const currentIncludeDeleted = searchParams.get('include_deleted') === 'true';
-  const currentStripeStatus = searchParams.get('stripe_status') || '';
+  // Stripe status: an absent param falls back to the page-level default (e.g.
+  // 'active' on /admin/organizations). The user clears the filter to "Any" by
+  // writing the sentinel `stripe_status=any` to the URL so the default no
+  // longer kicks in on refresh.
+  const rawStripeStatus = searchParams.get('stripe_status');
+  const currentStripeStatus =
+    rawStripeStatus === null
+      ? (defaultStripeStatus ?? '')
+      : rawStripeStatus === ANY_STRIPE_STATUS_TOKEN
+        ? ''
+        : rawStripeStatus;
   const currentPlan = searchParams.get('plan') || '';
   const currentTab = (searchParams.get('tab') || defaultTab) as TableVariant;
+
+  // When trial filters are surfaced, default both checkboxes to true. We
+  // distinguish "absent" from "explicitly off" by reading the raw param: an
+  // empty/missing param means "use the default", and 'false' means "explicitly
+  // unchecked". Trial filters do nothing when `showTrialFilters` is false.
+  const rawHasUsage = searchParams.get('has_usage');
+  const rawHasMultipleUsers = searchParams.get('has_multiple_users');
+  const currentHasUsage = showTrialFilters
+    ? rawHasUsage === null
+      ? true
+      : rawHasUsage === 'true'
+    : false;
+  const currentHasMultipleUsers = showTrialFilters
+    ? rawHasMultipleUsers === null
+      ? true
+      : rawHasMultipleUsers === 'true'
+    : false;
 
   const sortConfig: OrganizationSortConfig = useMemo(
     () => ({
@@ -80,6 +123,8 @@ export function OrganizationsTable({
     include_deleted: currentIncludeDeleted,
     stripe_status: currentStripeStatus,
     plan: currentPlan,
+    has_usage: currentHasUsage,
+    has_multiple_users: currentHasMultipleUsers,
   });
 
   const updateUrl = useCallback(
@@ -105,18 +150,26 @@ export function OrganizationsTable({
       sortBy: currentSortBy,
       sortOrder: currentSortOrder,
       include_deleted: currentIncludeDeleted ? 'true' : '',
-      stripe_status: currentStripeStatus,
+      // Preserve the raw URL value so the page-level default + the user's
+      // explicit "Any" sentinel both survive across sort/page/search changes.
+      stripe_status: rawStripeStatus ?? '',
       plan: currentPlan === 'all' ? '' : currentPlan,
       tab: currentTab,
+      // Preserve whatever's currently in the URL. `has_usage`/`has_multiple_users`
+      // can be absent (= default true on trials), or explicitly 'true' / 'false'.
+      has_usage: rawHasUsage ?? '',
+      has_multiple_users: rawHasMultipleUsers ?? '',
     }),
     [
       currentPageSize,
       currentSortBy,
       currentSortOrder,
       currentIncludeDeleted,
-      currentStripeStatus,
+      rawStripeStatus,
       currentPlan,
       currentTab,
+      rawHasUsage,
+      rawHasMultipleUsers,
     ]
   );
 
@@ -141,7 +194,36 @@ export function OrganizationsTable({
 
   const handleStripeStatusChange = useCallback(
     (value: string) => {
-      updateUrl({ ...sharedParams(), stripe_status: value, search: currentSearch, page: '1' });
+      // Write the sentinel for an explicit "Any" choice so a page-level default
+      // (e.g. 'active' on /admin/organizations) doesn't re-apply on refresh.
+      const next = value === '' ? ANY_STRIPE_STATUS_TOKEN : value;
+      updateUrl({ ...sharedParams(), stripe_status: next, search: currentSearch, page: '1' });
+    },
+    [sharedParams, currentSearch, updateUrl]
+  );
+
+  const handleHasUsageChange = useCallback(
+    (value: boolean) => {
+      updateUrl({
+        ...sharedParams(),
+        // Always set explicitly so the user's choice is sticky (the default-true
+        // semantics only apply when the param is entirely absent).
+        has_usage: value ? 'true' : 'false',
+        search: currentSearch,
+        page: '1',
+      });
+    },
+    [sharedParams, currentSearch, updateUrl]
+  );
+
+  const handleHasMultipleUsersChange = useCallback(
+    (value: boolean) => {
+      updateUrl({
+        ...sharedParams(),
+        has_multiple_users: value ? 'true' : 'false',
+        search: currentSearch,
+        page: '1',
+      });
     },
     [sharedParams, currentSearch, updateUrl]
   );
@@ -168,6 +250,10 @@ export function OrganizationsTable({
       include_deleted: '',
       stripe_status: '',
       plan: '',
+      // Clearing returns the trial filters to their default-true state on the
+      // trials page (and to inert/false elsewhere).
+      has_usage: '',
+      has_multiple_users: '',
       tab: currentTab,
     });
   }, [currentSearch, currentPageSize, currentSortBy, currentSortOrder, currentTab, updateUrl]);
@@ -236,6 +322,7 @@ export function OrganizationsTable({
             onSort={handleSort}
             showDeleted={currentIncludeDeleted}
             showStripeStatus={showStripeStatus}
+            showTrialEndDate={showTrialEndDate}
           />
           <OrganizationTableBody
             variant={variant}
@@ -244,6 +331,7 @@ export function OrganizationsTable({
             searchTerm={currentSearch}
             showDeleted={currentIncludeDeleted}
             showStripeStatus={showStripeStatus}
+            showTrialEndDate={showTrialEndDate}
           />
         </Table>
       </div>
@@ -280,10 +368,15 @@ export function OrganizationsTable({
             includeDeleted={currentIncludeDeleted}
             stripeStatus={currentStripeStatus}
             plan={currentPlan}
+            hasUsage={currentHasUsage}
+            hasMultipleUsers={currentHasMultipleUsers}
             showStripeStatus={showStripeStatus}
+            showTrialFilters={showTrialFilters}
             onIncludeDeletedChange={handleIncludeDeletedChange}
             onStripeStatusChange={handleStripeStatusChange}
             onPlanChange={handlePlanChange}
+            onHasUsageChange={handleHasUsageChange}
+            onHasMultipleUsersChange={handleHasMultipleUsersChange}
             onResetFilters={handleResetFilters}
             totalCount={data?.pagination.total}
             filteredCount={data?.pagination.total}

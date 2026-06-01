@@ -8,7 +8,7 @@ import {
   credit_transactions,
   platform_integrations,
 } from '@kilocode/db/schema';
-import { ilike, or, asc, desc, count, eq, and, isNull, sql, type SQL } from 'drizzle-orm';
+import { ilike, or, asc, desc, count, eq, gt, and, isNull, sql, type SQL } from 'drizzle-orm';
 import type { PgColumn } from 'drizzle-orm/pg-core';
 import * as z from 'zod';
 import { OrganizationsApiGetResponseSchema } from '@/types/admin';
@@ -44,6 +44,9 @@ const OrganizationListInputSchema = z.object({
   // Stripe status registry; '' clears the filter.
   stripe_status: z.union([z.enum(STRIPE_SUBSCRIPTION_STATUS_VALUES), z.literal('')]).optional(),
   plan: z.enum(['enterprise', 'teams', '']).optional(),
+  // Trial-tab filters: hide orgs with no recorded usage / a single member.
+  has_usage: z.boolean().default(false),
+  has_multiple_users: z.boolean().default(false),
 });
 
 const OrganizationSearchInputSchema = z.object({
@@ -542,8 +545,19 @@ export const organizationAdminRouter = createTRPCRouter({
       ): SQL<boolean> =>
         sql<boolean>`EXISTS (SELECT 1 FROM ${platform_integrations} pi WHERE pi.owned_by_organization_id = ${orgIdColumn} AND pi.platform = ${platform} AND pi.integration_status IN ('active', 'pending'))`;
 
-      const { page, limit, sortBy, sortOrder, search, mode, include_deleted, stripe_status, plan } =
-        input;
+      const {
+        page,
+        limit,
+        sortBy,
+        sortOrder,
+        search,
+        mode,
+        include_deleted,
+        stripe_status,
+        plan,
+        has_usage,
+        has_multiple_users,
+      } = input;
 
       const searchTerm = search.trim();
       const sortField = sortBy;
@@ -572,6 +586,11 @@ export const organizationAdminRouter = createTRPCRouter({
       // Deleted filter: unless include_deleted is true, hide soft-deleted orgs
       if (!include_deleted) {
         conditions.push(isNull(organizations.deleted_at));
+      }
+
+      // Trial-tab filter: only orgs that have actually used credits.
+      if (has_usage) {
+        conditions.push(gt(organizations.microdollars_used, 0));
       }
 
       const whereCondition = conditions.length > 0 ? and(...conditions) : undefined;
@@ -710,6 +729,12 @@ export const organizationAdminRouter = createTRPCRouter({
       const finalWhereCondition =
         statusConditions.length > 0 ? and(...statusConditions) : undefined;
 
+      // Trial-tab "users > 1" filter is on the aggregate member_count, so it
+      // has to go in HAVING (not WHERE).
+      const havingCondition = has_multiple_users
+        ? gt(count(organization_memberships.id), 1)
+        : undefined;
+
       // Execute main query with pagination
       const filteredOrganizations = await baseQuery
         .where(finalWhereCondition)
@@ -718,6 +743,7 @@ export const organizationAdminRouter = createTRPCRouter({
           latestSubscriptions.amount_usd,
           latestSubscriptions.subscription_status
         )
+        .having(havingCondition)
         .orderBy(orderCondition)
         .limit(limit)
         .offset((page - 1) * limit);
@@ -747,7 +773,8 @@ export const organizationAdminRouter = createTRPCRouter({
             )
             .where(finalWhereCondition)
             .groupBy(organizations.id)
-        : countBase.where(finalWhereCondition).groupBy(organizations.id);
+            .having(havingCondition)
+        : countBase.where(finalWhereCondition).groupBy(organizations.id).having(havingCondition);
 
       const totalCountResult = await countQuery;
       const totalOrganizationCount = totalCountResult.length;

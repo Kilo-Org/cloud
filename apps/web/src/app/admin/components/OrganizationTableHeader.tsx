@@ -17,6 +17,7 @@ interface OrganizationTableHeaderProps {
   onSort: (field: OrganizationSortableField) => void;
   showDeleted?: boolean;
   showStripeStatus?: boolean;
+  showTrialEndDate?: boolean;
 }
 
 export function OrganizationTableHeader({
@@ -25,6 +26,7 @@ export function OrganizationTableHeader({
   onSort,
   showDeleted,
   showStripeStatus = true,
+  showTrialEndDate = false,
 }: OrganizationTableHeaderProps) {
   if (variant === 'entitlements') {
     return (
@@ -54,6 +56,7 @@ export function OrganizationTableHeader({
             Name
           </SortableButton>
         </TableHead>
+        {showTrialEndDate && <TableHead>Trial End</TableHead>}
         <TableHead>
           <SortableButton field="microdollars_used" sortConfig={sortConfig} onSort={onSort}>
             Usage

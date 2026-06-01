@@ -4,7 +4,7 @@ import { TableBody, TableCell, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
-import { formatMicrodollars } from '@/lib/admin-utils';
+import { formatDateOnly, formatMicrodollars, formatRelativeTime } from '@/lib/admin-utils';
 import type { AdminOrganizationSchema } from '@/types/admin';
 import type { z } from 'zod';
 import { ExternalLink } from 'lucide-react';
@@ -96,10 +96,17 @@ type OrganizationTableBodyProps = {
   searchTerm?: string;
   showDeleted?: boolean;
   showStripeStatus?: boolean;
+  showTrialEndDate?: boolean;
 };
 
-function getColumnCount(variant: TableVariant, showDeleted?: boolean, showStripeStatus?: boolean) {
-  const base = variant === 'entitlements' ? (showStripeStatus ? 6 : 5) : 9;
+function getColumnCount(
+  variant: TableVariant,
+  showDeleted?: boolean,
+  showStripeStatus?: boolean,
+  showTrialEndDate?: boolean
+) {
+  const usageBase = showTrialEndDate ? 10 : 9;
+  const base = variant === 'entitlements' ? (showStripeStatus ? 6 : 5) : usageBase;
   return showDeleted ? base + 1 : base;
 }
 
@@ -170,15 +177,31 @@ function EntitlementsRow({
 function UsageRow({
   organization,
   showDeleted,
+  showTrialEndDate = false,
 }: {
   organization: AdminOrganization;
   showDeleted?: boolean;
+  showTrialEndDate?: boolean;
 }) {
   return (
     <>
       <TableCell className="min-w-40 font-medium">
         <span>{organization.name}</span>
       </TableCell>
+      {showTrialEndDate && (
+        <TableCell className="min-w-32">
+          {organization.free_trial_end_at ? (
+            <div className="flex flex-col leading-tight">
+              <span className="text-sm">{formatDateOnly(organization.free_trial_end_at)}</span>
+              <span className="text-muted-foreground text-xs">
+                {formatRelativeTime(organization.free_trial_end_at)}
+              </span>
+            </div>
+          ) : (
+            <span className="text-muted-foreground text-sm">—</span>
+          )}
+        </TableCell>
+      )}
       <TableCell className="min-w-28">
         <span className="font-mono text-sm">
           {formatMicrodollars(organization.microdollars_used)}
@@ -260,9 +283,10 @@ export function OrganizationTableBody({
   searchTerm,
   showDeleted,
   showStripeStatus = true,
+  showTrialEndDate = false,
 }: OrganizationTableBodyProps) {
   const router = useRouter();
-  const colSpan = getColumnCount(variant, showDeleted, showStripeStatus);
+  const colSpan = getColumnCount(variant, showDeleted, showStripeStatus, showTrialEndDate);
 
   const handleRowClick = (organizationId: string) => {
     router.push(`/admin/organizations/${encodeURIComponent(organizationId)}`);
@@ -322,7 +346,11 @@ export function OrganizationTableBody({
               showStripeStatus={showStripeStatus}
             />
           ) : (
-            <UsageRow organization={organization} showDeleted={showDeleted} />
+            <UsageRow
+              organization={organization}
+              showDeleted={showDeleted}
+              showTrialEndDate={showTrialEndDate}
+            />
           )}
         </TableRow>
       ))}

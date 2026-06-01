@@ -74,6 +74,8 @@ type UseOrganizationsListParams = {
   include_deleted?: boolean;
   stripe_status?: string;
   plan?: string;
+  has_usage?: boolean;
+  has_multiple_users?: boolean;
 };
 
 export function useOrganizationsList(params: UseOrganizationsListParams) {
@@ -89,6 +91,8 @@ export function useOrganizationsList(params: UseOrganizationsListParams) {
       include_deleted: params.include_deleted ?? false,
       stripe_status: params.stripe_status as StripeSubscriptionStatusValue | '' | undefined,
       plan: params.plan as '' | OrganizationPlan | undefined,
+      has_usage: params.has_usage ?? false,
+      has_multiple_users: params.has_multiple_users ?? false,
     })
   );
 }

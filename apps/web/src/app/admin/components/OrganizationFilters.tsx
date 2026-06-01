@@ -26,10 +26,15 @@ interface OrganizationFiltersProps {
   includeDeleted: boolean;
   stripeStatus: string;
   plan: string;
+  hasUsage: boolean;
+  hasMultipleUsers: boolean;
   showStripeStatus?: boolean;
+  showTrialFilters?: boolean;
   onIncludeDeletedChange: (value: boolean) => void;
   onStripeStatusChange: (value: string) => void;
   onPlanChange: (value: string) => void;
+  onHasUsageChange: (value: boolean) => void;
+  onHasMultipleUsersChange: (value: boolean) => void;
   onResetFilters: () => void;
   totalCount?: number;
   filteredCount?: number;
@@ -42,15 +47,24 @@ export function OrganizationFilters({
   includeDeleted,
   stripeStatus,
   plan,
+  hasUsage,
+  hasMultipleUsers,
   showStripeStatus = true,
+  showTrialFilters = false,
   onIncludeDeletedChange,
   onStripeStatusChange,
   onPlanChange,
+  onHasUsageChange,
+  onHasMultipleUsersChange,
   onResetFilters,
   totalCount,
   filteredCount,
 }: OrganizationFiltersProps) {
-  const hasActiveFilters = includeDeleted || !!stripeStatus || (!!plan && plan !== 'all');
+  const hasActiveFilters =
+    includeDeleted ||
+    !!stripeStatus ||
+    (!!plan && plan !== 'all') ||
+    (showTrialFilters && (hasUsage || hasMultipleUsers));
 
   const stripeStatusLabel = stripeStatus ? getStripeStatusLabel(stripeStatus) : undefined;
 
@@ -124,6 +138,32 @@ export function OrganizationFilters({
           </Label>
         </div>
 
+        {/* Trial-tab filters */}
+        {showTrialFilters && (
+          <>
+            <div className="flex items-center gap-2 pb-1">
+              <Checkbox
+                id="has-usage"
+                checked={hasUsage}
+                onCheckedChange={checked => onHasUsageChange(checked === true)}
+              />
+              <Label htmlFor="has-usage" className="cursor-pointer text-sm font-medium">
+                Usage &gt; 0
+              </Label>
+            </div>
+            <div className="flex items-center gap-2 pb-1">
+              <Checkbox
+                id="has-multiple-users"
+                checked={hasMultipleUsers}
+                onCheckedChange={checked => onHasMultipleUsersChange(checked === true)}
+              />
+              <Label htmlFor="has-multiple-users" className="cursor-pointer text-sm font-medium">
+                Users &gt; 1
+              </Label>
+            </div>
+          </>
+        )}
+
         {/* Reset Filters Button */}
         {hasActiveFilters && (
           <div className="pb-1">
@@ -169,6 +209,28 @@ export function OrganizationFilters({
                   Includes deleted
                   <button
                     onClick={() => onIncludeDeletedChange(false)}
+                    className="hover:bg-secondary-foreground/20 ml-1 rounded-full p-0.5"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </Badge>
+              )}
+              {showTrialFilters && hasUsage && (
+                <Badge variant="secondary" className="text-xs">
+                  Usage &gt; 0
+                  <button
+                    onClick={() => onHasUsageChange(false)}
+                    className="hover:bg-secondary-foreground/20 ml-1 rounded-full p-0.5"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </Badge>
+              )}
+              {showTrialFilters && hasMultipleUsers && (
+                <Badge variant="secondary" className="text-xs">
+                  Users &gt; 1
+                  <button
+                    onClick={() => onHasMultipleUsersChange(false)}
                     className="hover:bg-secondary-foreground/20 ml-1 rounded-full p-0.5"
                   >
                     <X className="h-3 w-3" />

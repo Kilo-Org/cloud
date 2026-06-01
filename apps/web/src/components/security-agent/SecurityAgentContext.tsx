@@ -143,6 +143,7 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
   const [gitHubError, setGitHubError] = useState<string | null>(null);
   const toggleEnabledInFlightRef = useRef(false);
   const acceptedQueuePollRef = useRef<{ intervalId: number; timeoutId: number } | null>(null);
+  const acceptedQueuePollHasSeenActiveRef = useRef(false);
 
   const clearAcceptedQueuePoll = useCallback(() => {
     const activePoll = acceptedQueuePollRef.current;
@@ -220,11 +221,17 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
 
   const pollAcceptedQueueMutation = useCallback(() => {
     clearAcceptedQueuePoll();
+    acceptedQueuePollHasSeenActiveRef.current = false;
     invalidateAcceptedQueueQueries();
 
     const intervalId = window.setInterval(() => {
       invalidateAcceptedQueueQueries();
-      if (cachedListFindingsHasActiveAnalysis()) {
+      const hasActiveAnalysis = cachedListFindingsHasActiveAnalysis();
+      if (hasActiveAnalysis) {
+        acceptedQueuePollHasSeenActiveRef.current = true;
+        return;
+      }
+      if (acceptedQueuePollHasSeenActiveRef.current) {
         clearAcceptedQueuePoll();
       }
     }, ACCEPTED_QUEUE_POLL_INTERVAL_MS);

@@ -8037,6 +8037,36 @@ describe('applyPinnedVersion', () => {
     );
   });
 
+  it('when cleared through an instance-id-aware route, uses legacy sandbox rollout subject for legacy instances', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, {
+      sandboxId: 'sandbox-1',
+      trackedImageTag: 'candidate-tag',
+      openclawVersion: '2026.4.9',
+      imageVariant: 'default',
+    });
+
+    (selectImageVersionForInstance as Mock).mockResolvedValueOnce({
+      openclawVersion: '2026.4.23',
+      variant: 'default',
+      imageTag: 'latest-tag',
+      imageDigest: 'sha256:latest',
+      publishedAt: new Date().toISOString(),
+      rolloutPercent: 100,
+      isLatest: true,
+    });
+
+    await instance.applyPinnedVersion(null, '123e4567-e89b-12d3-a456-426614174000');
+
+    expect(selectImageVersionForInstance).toHaveBeenCalledWith(
+      expect.objectContaining({
+        rolloutSubject: 'user-1',
+        currentImageTag: null,
+      })
+    );
+    expect(storage._store.get('trackedImageTag')).toBe('latest-tag');
+  });
+
   it('when cleared and no rollout target, leaves existing tracked image alone', async () => {
     const { instance, storage } = createInstance();
     await seedRunning(storage, {

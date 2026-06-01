@@ -1913,7 +1913,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
    */
   async applyPinnedVersion(
     imageTag: string | null,
-    instanceId?: string
+    _instanceId?: string
   ): Promise<{
     openclawVersion: string | null;
     imageTag: string | null;
@@ -1933,8 +1933,13 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     if (!this.s.userId) {
       throw Object.assign(new Error('Cannot apply pin: instance has no userId'), { status: 404 });
     }
+    if (!this.s.sandboxId) {
+      throw Object.assign(new Error('Cannot apply pin: instance has no sandboxId'), {
+        status: 404,
+      });
+    }
 
-    const rolloutSubject = instanceId ?? this.s.userId;
+    const rolloutSubject = imageRolloutSubjectFromSandboxId(this.s.sandboxId, this.s.userId);
     await this.resolveImageStateForPin(imageTag, this.s.userId, rolloutSubject, {
       isNew: false,
       // When clearing a pin (imageTag === null), force a fresh rollout

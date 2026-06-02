@@ -26,6 +26,7 @@ import type { Owner } from '@/lib/code-reviews/core';
 import { getBotUserId } from '@/lib/bot-users/bot-user-service';
 import type { CodeReviewAgentConfig } from '@/lib/agent-config/core/types';
 import { addReactionToMR, isMergeCommit, setCommitStatus } from '../adapter';
+import { normalizeGitLabInstanceUrl } from '../instance-url';
 import { resolveMergeRequestCheckoutRef } from './merge-request-checkout-ref';
 import { codeReviewWorkerClient } from '@/lib/code-reviews/client/code-review-worker-client';
 import { getIntegrationById } from '@/lib/integrations/db/platform-integrations';
@@ -255,7 +256,7 @@ export async function handleMergeRequestCodeReview(
     const metadata = fullIntegration?.metadata as {
       gitlab_instance_url?: string;
     } | null;
-    const instanceUrl = metadata?.gitlab_instance_url || 'https://gitlab.com';
+    const instanceUrl = normalizeGitLabInstanceUrl(metadata?.gitlab_instance_url);
 
     if (cancelledReviews.length > 0 && fullIntegration) {
       const gitlabCancelledReviews = cancelledReviews.flatMap(review => {
@@ -482,7 +483,7 @@ async function migrateInFlightReviewsToMergeCommitHead(args: {
     const fullIntegration = await getIntegrationById(args.integrationId);
     if (!fullIntegration) return;
     const metadata = fullIntegration.metadata as { gitlab_instance_url?: string } | null;
-    const instanceUrl = metadata?.gitlab_instance_url || 'https://gitlab.com';
+    const instanceUrl = normalizeGitLabInstanceUrl(metadata?.gitlab_instance_url);
 
     // In practice an MR has at most one active review; migrate the first.
     const [reviewId] = activeReviewIds;

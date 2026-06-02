@@ -14,11 +14,14 @@ import {
   calculateTokenExpiry,
 } from '@/lib/integrations/platforms/gitlab/adapter';
 import { normalizeInstanceUrl } from '@/lib/integrations/gitlab-service';
+import {
+  isDefaultGitLabInstanceUrl,
+  normalizeGitLabInstanceUrl,
+} from '@/lib/integrations/platforms/gitlab/instance-url';
 import { resetCodeReviewConfigForOwner } from '@/lib/agent-config/db/agent-configs';
 import { APP_URL } from '@/lib/constants';
 import { createHash, randomBytes } from 'crypto';
 import {
-  DEFAULT_GITLAB_OAUTH_INSTANCE_URL,
   type VerifiedGitLabOAuthState,
   verifyGitLabOAuthState,
 } from '@/lib/integrations/platforms/gitlab/oauth-state';
@@ -106,6 +109,7 @@ export async function handleGitLabOAuthCallback(request: NextRequest) {
     }
 
     const { owner, instanceUrl, customCredentialsRef } = verifiedState;
+    const normalizedInstanceUrl = normalizeGitLabInstanceUrl(instanceUrl);
 
     if (owner.type === 'org') {
       await ensureOrganizationAccess({ user }, owner.id);
@@ -153,13 +157,13 @@ export async function handleGitLabOAuthCallback(request: NextRequest) {
       return NextResponse.redirect(new URL(redirectPath, APP_URL));
     }
 
-    const tokens = await exchangeGitLabOAuthCode(code, instanceUrl, customCredentials);
+    const tokens = await exchangeGitLabOAuthCode(code, normalizedInstanceUrl, customCredentials);
 
-    const gitlabUser = await fetchGitLabUser(tokens.access_token, instanceUrl);
+    const gitlabUser = await fetchGitLabUser(tokens.access_token, normalizedInstanceUrl);
 
     let repositories = null;
     try {
-      repositories = await fetchGitLabProjects(tokens.access_token, instanceUrl);
+      repositories = await fetchGitLabProjects(tokens.access_token, normalizedInstanceUrl);
     } catch (repoError) {
       // Non-fatal - user can refresh later
       console.error('Failed to fetch GitLab projects:', repoError);
@@ -184,7 +188,7 @@ export async function handleGitLabOAuthCallback(request: NextRequest) {
     const isInstanceChange =
       existing !== undefined &&
       normalizeInstanceUrl(existingMetadata?.gitlab_instance_url as string | undefined) !==
-        normalizeInstanceUrl(instanceUrl);
+        normalizeInstanceUrl(normalizedInstanceUrl);
 
     const webhookSecret = isInstanceChange
       ? generateWebhookSecret()
@@ -194,8 +198,9 @@ export async function handleGitLabOAuthCallback(request: NextRequest) {
       access_token: tokens.access_token,
       refresh_token: tokens.refresh_token,
       token_expires_at: tokenExpiresAt,
-      gitlab_instance_url:
-        instanceUrl !== DEFAULT_GITLAB_OAUTH_INSTANCE_URL ? instanceUrl : undefined,
+      gitlab_instance_url: isDefaultGitLabInstanceUrl(normalizedInstanceUrl)
+        ? undefined
+        : normalizedInstanceUrl,
       webhook_secret: webhookSecret,
       auth_type: 'oauth',
       // Only preserve webhooks/tokens if same instance

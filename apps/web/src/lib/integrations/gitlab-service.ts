@@ -28,8 +28,11 @@ import {
 } from '@/lib/integrations/platforms/gitlab/adapter';
 import { randomBytes } from 'crypto';
 import { logExceptInTest } from '@/lib/utils.server';
-
-const DEFAULT_GITLAB_INSTANCE_URL = 'https://gitlab.com';
+import {
+  DEFAULT_GITLAB_INSTANCE_URL,
+  GitLabInstanceUrlError,
+  normalizeGitLabInstanceUrl,
+} from '@/lib/integrations/platforms/gitlab/instance-url';
 
 /**
  * GitLab Integration Service
@@ -43,8 +46,7 @@ const DEFAULT_GITLAB_INSTANCE_URL = 'https://gitlab.com';
  * Strips trailing slashes, lowercases, and treats undefined/empty as gitlab.com.
  */
 export function normalizeInstanceUrl(url?: string): string {
-  const effectiveUrl = url || DEFAULT_GITLAB_INSTANCE_URL;
-  return effectiveUrl.replace(/\/+$/, '').toLowerCase();
+  return normalizeGitLabInstanceUrl(url || DEFAULT_GITLAB_INSTANCE_URL);
 }
 
 /**
@@ -106,7 +108,7 @@ export async function getValidGitLabToken(integration: PlatformIntegration): Pro
       });
     }
 
-    const instanceUrl = metadata.gitlab_instance_url || 'https://gitlab.com';
+    const instanceUrl = normalizeInstanceUrl(metadata.gitlab_instance_url);
 
     const customCredentials =
       metadata.client_id && metadata.client_secret
@@ -177,7 +179,7 @@ export async function listGitLabRepositories(
   if (forceRefresh || !integration.repositories?.length || !integration.repositories_synced_at) {
     const accessToken = await getValidGitLabToken(integration);
     const metadata = integration.metadata as { gitlab_instance_url?: string } | null;
-    const instanceUrl = metadata?.gitlab_instance_url || 'https://gitlab.com';
+    const instanceUrl = normalizeInstanceUrl(metadata?.gitlab_instance_url);
 
     const repos = await fetchGitLabProjects(accessToken, instanceUrl);
     await updateRepositoriesForIntegration(integrationId, repos);
@@ -230,7 +232,7 @@ export async function listGitLabBranches(
 
   const accessToken = await getValidGitLabToken(integration);
   const metadata = integration.metadata as { gitlab_instance_url?: string } | null;
-  const instanceUrl = metadata?.gitlab_instance_url || 'https://gitlab.com';
+  const instanceUrl = normalizeInstanceUrl(metadata?.gitlab_instance_url);
 
   const branches = await fetchGitLabBranches(accessToken, projectPath, instanceUrl);
 
@@ -452,7 +454,7 @@ export async function getOrCreateProjectAccessToken(
     });
   }
 
-  const instanceUrl = metadata.gitlab_instance_url || 'https://gitlab.com';
+  const instanceUrl = normalizeInstanceUrl(metadata.gitlab_instance_url);
   const projectIdStr = String(projectId);
 
   // Check if we already have a stored token for this project
@@ -681,7 +683,7 @@ export async function removeStoredProjectAccessToken(
   }
 
   const storedToken = metadata.project_tokens[projectIdStr];
-  const instanceUrl = metadata.gitlab_instance_url || 'https://gitlab.com';
+  const instanceUrl = normalizeInstanceUrl(metadata.gitlab_instance_url);
 
   // Try to revoke the token in GitLab
   try {
@@ -768,7 +770,7 @@ export async function importExistingProjectAccessToken(
     });
   }
 
-  const instanceUrl = metadata.gitlab_instance_url || 'https://gitlab.com';
+  const instanceUrl = normalizeInstanceUrl(metadata.gitlab_instance_url);
   const userToken = await getValidGitLabToken(integration);
 
   // Find existing Kilo token on GitLab
@@ -837,8 +839,19 @@ export async function connectWithPAT(
   };
   warnings?: string[];
 }> {
+  let normalizedInstanceUrl: string;
+  try {
+    normalizedInstanceUrl = normalizeInstanceUrl(instanceUrl);
+  } catch (error) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message:
+        error instanceof GitLabInstanceUrlError ? error.message : 'Invalid GitLab instance URL',
+    });
+  }
+
   // 1. Validate the PAT
-  const validation = await validatePersonalAccessToken(token, instanceUrl);
+  const validation = await validatePersonalAccessToken(token, normalizedInstanceUrl);
 
   if (!validation.valid || !validation.user) {
     throw new TRPCError({
@@ -854,19 +867,22 @@ export async function connectWithPAT(
     const existingMetadata = (existingIntegration.metadata || {}) as GitLabIntegrationMetadata;
 
     // Detect if the GitLab instance URL changed (e.g. gitlab.com → self-hosted)
-    const isInstanceChange = instanceUrlChanged(existingMetadata.gitlab_instance_url, instanceUrl);
+    const isInstanceChange = instanceUrlChanged(
+      existingMetadata.gitlab_instance_url,
+      normalizedInstanceUrl
+    );
 
     if (isInstanceChange) {
       logExceptInTest('[connectWithPAT] Instance URL changed — clearing stale config', {
         integrationId: existingIntegration.id,
         oldInstanceUrl: existingMetadata.gitlab_instance_url,
-        newInstanceUrl: instanceUrl,
+        newInstanceUrl: normalizedInstanceUrl,
       });
     }
 
     const updatedMetadata: GitLabIntegrationMetadata = {
       access_token: token,
-      gitlab_instance_url: instanceUrl,
+      gitlab_instance_url: normalizedInstanceUrl,
       auth_type: 'pat',
       // If instance changed: generate fresh webhook secret, clear webhooks & tokens
       // If same instance: preserve existing config for continuity
@@ -901,7 +917,7 @@ export async function connectWithPAT(
       integrationId: existingIntegration.id,
       userId: validation.user.id,
       username: validation.user.username,
-      instanceUrl,
+      instanceUrl: normalizedInstanceUrl,
       authType: 'pat',
       instanceChanged: isInstanceChange,
       preservedWebhookSecret: !isInstanceChange && !!existingMetadata.webhook_secret,
@@ -911,7 +927,7 @@ export async function connectWithPAT(
     });
 
     // Fetch and cache repositories
-    const repos = await fetchGitLabProjects(token, instanceUrl);
+    const repos = await fetchGitLabProjects(token, normalizedInstanceUrl);
     await updateRepositoriesForIntegration(existingIntegration.id, repos);
 
     return {
@@ -920,7 +936,7 @@ export async function connectWithPAT(
         id: existingIntegration.id,
         accountLogin: validation.user.username,
         accountId: String(validation.user.id),
-        instanceUrl,
+        instanceUrl: normalizedInstanceUrl,
       },
       warnings: validation.warnings,
     };
@@ -933,7 +949,7 @@ export async function connectWithPAT(
   const metadata: GitLabIntegrationMetadata = {
     access_token: token,
     // No refresh_token for PAT (PATs don't refresh)
-    gitlab_instance_url: instanceUrl,
+    gitlab_instance_url: normalizedInstanceUrl,
     webhook_secret: webhookSecret,
     auth_type: 'pat',
   };
@@ -962,12 +978,12 @@ export async function connectWithPAT(
     integrationId: integration.id,
     userId: validation.user.id,
     username: validation.user.username,
-    instanceUrl,
+    instanceUrl: normalizedInstanceUrl,
     authType: 'pat',
   });
 
   // 6. Fetch and cache repositories
-  const repos = await fetchGitLabProjects(token, instanceUrl);
+  const repos = await fetchGitLabProjects(token, normalizedInstanceUrl);
   await updateRepositoriesForIntegration(integration.id, repos);
 
   logExceptInTest('[connectWithPAT] Repositories cached', {
@@ -981,7 +997,7 @@ export async function connectWithPAT(
       id: integration.id,
       accountLogin: validation.user.username,
       accountId: String(validation.user.id),
-      instanceUrl,
+      instanceUrl: normalizedInstanceUrl,
     },
     warnings: validation.warnings,
   };

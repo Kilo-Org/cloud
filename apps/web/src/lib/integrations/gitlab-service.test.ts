@@ -28,6 +28,16 @@ describe('normalizeInstanceUrl', () => {
     expect(normalizeInstanceUrl('http://selfhosted.test:3123')).toBe('http://selfhosted.test:3123');
   });
 
+  it('preserves self-hosted base paths', () => {
+    expect(normalizeInstanceUrl('https://GitLab.Example.com/gitlab/')).toBe(
+      'https://gitlab.example.com/gitlab'
+    );
+  });
+
+  it('rejects unsafe self-hosted URLs', () => {
+    expect(() => normalizeInstanceUrl('http://127.0.0.1:8080')).toThrow('host is not allowed');
+  });
+
   it('detects instance URL changes', () => {
     // same instance (both default to gitlab.com)
     expect(normalizeInstanceUrl(undefined)).toBe(normalizeInstanceUrl('https://gitlab.com'));

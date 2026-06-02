@@ -164,6 +164,27 @@ describe('GET /api/integrations/gitlab/callback', () => {
     expect(mockedExchangeGitLabOAuthCode).not.toHaveBeenCalled();
   });
 
+  test('rejects signed state with an unsafe instance URL before exchanging an OAuth code', async () => {
+    const state = createGitLabOAuthState(
+      {
+        owner: { type: 'user', id: USER_ID },
+        instanceUrl: 'http://127.0.0.1:8080',
+        customCredentialsRef: 'cached-credentials-ref',
+      },
+      USER_ID
+    );
+
+    const response = await callGitLabCallback(
+      makeRequest(
+        `/api/integrations/gitlab/callback?code=anything&state=${encodeURIComponent(state)}`
+      )
+    );
+
+    expectRedirectLocation(response, '/integrations/gitlab?error=connection_failed');
+    expect(mockedGetGitLabOAuthCredentials).not.toHaveBeenCalled();
+    expect(mockedExchangeGitLabOAuthCode).not.toHaveBeenCalled();
+  });
+
   test('loads cached custom OAuth credentials before the code exchange', async () => {
     mockedGetGitLabOAuthCredentials.mockResolvedValue({
       clientId: 'self-hosted-client',

@@ -151,7 +151,7 @@ describe('GET /api/integrations/gitlab/connect', () => {
   test('stores self-hosted credentials and binds only their Redis reference into signed state', async () => {
     const response = await callGitLabConnectPost(
       makeJsonRequest('/api/integrations/gitlab/connect', {
-        instanceUrl: 'https://gitlab.example.com',
+        instanceUrl: 'https://GitLab.Example.com/gitlab/',
         clientId: 'client-id',
         clientSecret: 'client-secret',
       })
@@ -165,20 +165,37 @@ describe('GET /api/integrations/gitlab/connect', () => {
     expect(mockedCreateGitLabOAuthState).toHaveBeenCalledWith(
       {
         owner: { type: 'user', id: USER_ID },
-        instanceUrl: 'https://gitlab.example.com',
+        instanceUrl: 'https://gitlab.example.com/gitlab',
         customCredentialsRef: 'cached-credentials-ref',
       },
       USER_ID
     );
     expect(mockedBuildGitLabOAuthUrl).toHaveBeenCalledWith(
       'signed-gitlab-state',
-      'https://gitlab.example.com',
+      'https://gitlab.example.com/gitlab',
       {
         clientId: 'client-id',
         clientSecret: 'client-secret',
       }
     );
     expect(responseBody.url).toBe('https://gitlab.com/oauth/authorize?state=signed');
+  });
+
+  test('does not initialize self-hosted OAuth for unsafe instance URLs', async () => {
+    const response = await callGitLabConnectPost(
+      makeJsonRequest('/api/integrations/gitlab/connect', {
+        instanceUrl: 'http://127.0.0.1:8080',
+        clientId: 'client-id',
+        clientSecret: 'client-secret',
+      })
+    );
+    const responseBody = (await response.json()) as { error?: string };
+
+    expect(response.status).toBe(500);
+    expect(responseBody.error).toBe('oauth_init_failed');
+    expect(mockedStoreGitLabOAuthCredentials).not.toHaveBeenCalled();
+    expect(mockedCreateGitLabOAuthState).not.toHaveBeenCalled();
+    expect(mockedBuildGitLabOAuthUrl).not.toHaveBeenCalled();
   });
 
   test('supports authenticated legacy GET self-hosted credentials during rollout', async () => {

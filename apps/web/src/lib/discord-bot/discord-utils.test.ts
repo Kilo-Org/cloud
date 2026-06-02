@@ -18,7 +18,9 @@ describe('discord-utils', () => {
   });
 
   it('rejects malformed message link IDs', () => {
-    expect(() => buildDiscordMessageLink('1', '2/../3', '4')).toThrow('Invalid Discord channel ID');
+    expect(() => buildDiscordMessageLink('111111111111111111', '2/../3', '4')).toThrow(
+      'Invalid Discord channel ID'
+    );
   });
 
   it('does not fetch members when the guild ID is malformed', async () => {

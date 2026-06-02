@@ -69,6 +69,8 @@ export type LifecycleManager = {
   onSessionIdle: () => void;
   /** Called when the root Kilo session emits activity after idle. */
   onRootSessionActivity: () => void;
+  /** Called when ingest connectivity is restored after a reconnect. */
+  onConnectionRestored: () => void;
   /** Called to trigger drain and close sequence */
   triggerDrainAndClose: () => void;
   /** Signal completion for post-processing waiters (called by connection on completion events) */
@@ -342,6 +344,10 @@ export function createLifecycleManager(
     rootSessionIdleBarrierPresent = false;
   }
 
+  function onConnectionRestored(): void {
+    maybeFinalizeIdleBatch();
+  }
+
   return {
     start: () => {
       logToFile('lifecycle started (transport timer is event-driven)');
@@ -361,6 +367,7 @@ export function createLifecycleManager(
     onMessageComplete,
     onSessionIdle,
     onRootSessionActivity,
+    onConnectionRestored,
     triggerDrainAndClose,
     signalCompletion,
 

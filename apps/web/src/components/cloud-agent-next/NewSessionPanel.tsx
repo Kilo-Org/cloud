@@ -67,6 +67,7 @@ import {
   detectGitPlatform,
 } from '@/components/cloud-agent-next/utils/git-utils';
 import type { AgentMode } from './types';
+import { formatSessionError } from '@/lib/cloud-agent-sdk';
 import { generateMessageId } from '@/lib/cloud-agent-sdk/message-id';
 import { useCloudAgentAttachmentUpload } from '@/hooks/useCloudAgentAttachmentUpload';
 import { AttachmentPreviewStrip } from './AttachmentPreviewStrip';
@@ -782,7 +783,9 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
       router.push(`${basePath}/chat?sessionId=${result.kiloSessionId}`);
     } catch (error) {
       console.error('Failed to prepare session:', error);
-      toast.error('Failed to create session. Please try again.');
+      toast.error('Failed to create session', {
+        description: formatSessionError(error),
+      });
     } finally {
       setIsPreparing(false);
     }

@@ -5,7 +5,7 @@ import type { SlashCommandInfo } from './slash-commands.js';
  *
  * From wrapper -> DO:
  *   started, kilocode, output, status, heartbeat, pong, error, interrupted, complete, wrapper_resumed,
- *   autocommit_started, autocommit_completed
+ *   autocommit_started, autocommit_completed, cloud.message.completed
  *
  * From DO -> /stream clients:
  *   All of the above, plus wrapper_disconnected, wrapper_reconnected, preparing,

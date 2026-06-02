@@ -100,6 +100,7 @@ export type WrapperCommandRequest = {
   command: string;
   args?: string;
   messageId: string;
+  agent?: WrapperPromptAgent;
   autoCommit?: boolean;
   condenseOnComplete?: boolean;
   session: WrapperSessionBinding;

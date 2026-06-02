@@ -1,8 +1,8 @@
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
-import { getSandbox } from '@cloudflare/sandbox';
+import { createAgentSandbox } from '../../agent-sandbox/factory.js';
 import { logger, withLogTags } from '../../logger.js';
-import { generateSandboxId, getSandboxNamespace } from '../../sandbox-id.js';
+import { generateSandboxId } from '../../sandbox-id.js';
 import type { SessionId, InterruptResult, TRPCContext } from '../../types.js';
 import type { SandboxId } from '../../types.js';
 import {
@@ -10,7 +10,6 @@ import {
   SessionService,
   fetchSessionMetadata,
 } from '../../session-service.js';
-import { cleanupWorkspace, getSessionWorkspacePath, getSessionHomePath } from '../../workspace.js';
 import { withDORetry } from '../../utils/do-retry.js';
 import { protectedProcedure, publicProcedure, internalApiProtectedProcedure } from '../auth.js';
 import {
@@ -57,39 +56,6 @@ async function deleteSessionResources(
       return { success: true, message: 'Session not found or already deleted' };
     }
 
-    const sandboxId: SandboxId =
-      metadata.workspace?.sandboxId ??
-      (await generateSandboxId(
-        env.PER_SESSION_SANDBOX_ORG_IDS,
-        metadata.identity.orgId,
-        userId,
-        metadata.identity.sessionId,
-        metadata.identity.botId
-      ));
-    logger.setTags({ sandboxId, orgId: metadata.identity.orgId ?? '(personal)' });
-    const sandbox = getSandbox(getSandboxNamespace(env, sandboxId), sandboxId);
-    const workspacePath = getSessionWorkspacePath(metadata.identity.orgId, userId, sessionId);
-    const sessionHome = getSessionHomePath(sessionId);
-
-    try {
-      const session = await sandbox.getSession(sessionId);
-      await cleanupWorkspace(session, workspacePath, sessionHome);
-      logger.info('Workspace directories cleaned up');
-    } catch (error) {
-      logger
-        .withFields({ error: error instanceof Error ? error.message : String(error) })
-        .warn('Failed to clean up workspace directories, continuing with deletion');
-    }
-
-    await sandbox
-      .deleteSession(sessionId)
-      .then(() => logger.info('Cloudflare sandbox session deleted'))
-      .catch(error => {
-        logger
-          .withFields({ error: error instanceof Error ? error.message : String(error) })
-          .warn('Failed to delete Cloudflare sandbox session, continuing with cleanup');
-      });
-
     try {
       const doKey = `${userId}:${sessionId}`;
       await withDORetry(
@@ -126,7 +92,6 @@ async function deleteSessionResources(
  * These handlers manage session lifecycle (delete, interrupt, logs) and health checks.
  */
 export function createSessionManagementHandlers() {
-  const INTERRUPT_GRACE_MS = 2000;
   return {
     /**
      * Delete a session and clean up all associated resources.
@@ -160,14 +125,9 @@ export function createSessionManagementHandlers() {
       }),
 
     /**
-     * Interrupt a running session by killing all associated kilocode processes.
-     *
-     * This endpoint allows clients to stop running executions in a session without
-     * deleting the session itself. Useful for canceling long-running or stuck operations.
-     *
-     * Idempotency:
-     * - Returns success even if no processes are found (already stopped or none running)
-     * - Safe to call multiple times for the same session
+     * Interrupt current session work through the owning Durable Object.
+     * The DO may signal a connected wrapper immediately and durably supervises
+     * physical cleanup without letting this route issue provider teardown.
      */
     interruptSession: protectedProcedure
       .input(
@@ -219,89 +179,14 @@ export function createSessionManagementHandlers() {
                 .info('No accepted current messages or pending queued messages to interrupt');
             }
 
-            const targetExecutionId = interruptResult.executionId;
-            if (!targetExecutionId) {
-              logger.info('Session interruption completed');
-              return {
-                success: true,
-                message: 'Queued session messages interrupted',
-                processesFound: false,
-              };
-            }
-
-            const sandboxId: SandboxId =
-              metadata.workspace?.sandboxId ??
-              (await generateSandboxId(
-                env.PER_SESSION_SANDBOX_ORG_IDS,
-                metadata.identity.orgId,
-                userId,
-                metadata.identity.sessionId,
-                metadata.identity.botId
-              ));
-
-            logger.setTags({ sandboxId, orgId: metadata.identity.orgId ?? '(personal)' });
-
-            const sandbox = getSandbox(getSandboxNamespace(env, sandboxId), sandboxId);
-
-            // Build session context for interrupt service
-            const sessionService = new SessionService();
-            const context = sessionService.buildContext({
-              sandboxId,
-              orgId: metadata.identity.orgId,
-              userId,
-              sessionId,
-              upstreamBranch: metadata.repository?.upstreamBranch,
-              botId: metadata.identity.botId,
-            });
-
-            await scheduler.wait(INTERRUPT_GRACE_MS);
-
-            // Get or create the session to use for killing processes
-            const session = await sessionService.getOrCreateSession({
-              sandbox,
-              context,
-              env,
-              originalToken: ctx.authToken,
-              originalOrgId: metadata.identity.orgId,
-              createdOnPlatform: metadata.identity.createdOnPlatform,
-              appendSystemPrompt: metadata.agent?.appendSystemPrompt,
-              profile: readProfileBundle(metadata),
-            });
-
-            // Kill all kilocode processes in this session
-            // Use pkill method as a temporary workaround for sandbox API reliability issues
-            const usePkill = true;
-            const result = await SessionService.interrupt(
-              sandbox,
-              session,
-              context,
-              usePkill,
-              targetExecutionId
-            );
-
             logger.info('Session interruption completed');
-
-            // If no processes were found but there's still a runtime execution,
-            // the wrapper is already dead - fail the stale execution immediately.
-            // Note: pkill always returns killedProcessIds: [], so we check
-            // processesFound instead to distinguish "killed" from "nothing to kill".
-            if (!result.processesFound && targetExecutionId) {
-              logger
-                .withFields({ executionId: targetExecutionId })
-                .info('No processes found during interrupt - failing stale runtime execution');
-
-              await withDORetry(
-                getStub,
-                stub =>
-                  stub.failExecutionRpc({
-                    executionId: targetExecutionId,
-                    error: 'Interrupted - no running processes found',
-                  }),
-                'failExecutionRpc'
-              );
-            }
-
-            return result;
+            return {
+              success: interruptResult.success,
+              message: interruptResult.success
+                ? 'Session interruption accepted'
+                : (interruptResult.message ?? 'No session work to interrupt'),
+              processesFound: false,
+            };
           } catch (error) {
             const errorMsg = error instanceof Error ? error.message : String(error);
             logger.withFields({ error: errorMsg }).error('Session interruption failed');
@@ -489,10 +374,9 @@ export function createSessionManagementHandlers() {
           const activeExecutionStatus = activeMessageWork?.status;
           const executionHealth = activeMessageWork?.health ?? 'none';
 
-          const sandbox = getSandbox(getSandboxNamespace(env, sandboxId), sandboxId);
           let sandboxStatus: 'healthy' | 'unreachable' = 'healthy';
           try {
-            await sandbox.listProcesses();
+            await createAgentSandbox(env, metadata).probeHealth();
           } catch (error) {
             sandboxStatus = 'unreachable';
             logger
@@ -606,105 +490,30 @@ export function createSessionManagementHandlers() {
             orgId: sessionService.metadata?.identity.orgId ?? '(personal)',
           });
 
-          const sandbox = getSandbox(getSandboxNamespace(env, sandboxId), sandboxId);
-
-          // Get or create a session to read files
-          const context = sessionService.buildContext({
-            sandboxId,
-            orgId: sessionService.metadata?.identity.orgId,
-            userId,
-            sessionId,
-            botId: sessionService.metadata?.identity.botId,
-          });
-
-          const session = await sessionService.getOrCreateSession({
-            sandbox,
-            context,
-            env,
-            originalToken: ctx.authToken,
-            originalOrgId: sessionService.metadata?.identity.orgId,
-            createdOnPlatform: sessionService.metadata?.identity.createdOnPlatform,
-            appendSystemPrompt: sessionService.metadata?.agent?.appendSystemPrompt,
-            profile: sessionService.metadata
-              ? readProfileBundle(sessionService.metadata)
-              : undefined,
-          });
-
-          // Discover all log files from the sandbox
-          const logPaths: string[] = [];
-
-          // 1. Wrapper logs: /tmp/kilocode-wrapper-*.log (one per execution)
-          try {
-            const tmpFiles = await session.listFiles('/tmp');
-            if (tmpFiles.success) {
-              for (const f of tmpFiles.files) {
-                if (
-                  f.type === 'file' &&
-                  f.name.startsWith('kilocode-wrapper-') &&
-                  f.name.endsWith('.log')
-                ) {
-                  logPaths.push(f.absolutePath);
-                }
-              }
-            }
-          } catch {
-            logger.debug('Could not list /tmp for wrapper logs');
+          const metadata = sessionService.metadata;
+          if (!metadata) {
+            throw new TRPCError({
+              code: 'PRECONDITION_FAILED',
+              message: 'Session metadata is invalid or unavailable.',
+            });
           }
 
-          // 2. CLI logs: {sessionHome}/.local/share/kilo/log/ (matches wrapper R2 uploader)
-          const sessionHome = getSessionHomePath(sessionId);
-          const cliLogsDir = `${sessionHome}/.local/share/kilo/log`;
-          try {
-            const cliFiles = await session.listFiles(cliLogsDir, { recursive: true });
-            if (cliFiles.success) {
-              for (const f of cliFiles.files) {
-                if (f.type === 'file') {
-                  logPaths.push(f.absolutePath);
-                }
-              }
-            }
-          } catch {
-            logger.debug('Could not list CLI logs directory', { cliLogsDir });
-          }
-
-          // Read all discovered files in parallel (best-effort per file)
-          const files: Record<string, string> = {};
-          const readResults = await Promise.allSettled(
-            logPaths.map(async path => {
-              const fileInfo = await session.readFile(path, { encoding: 'utf-8' });
-              return { path, content: fileInfo.content };
-            })
-          );
-          for (const result of readResults) {
-            if (result.status === 'fulfilled') {
-              files[result.value.path] = result.value.content;
-            }
-          }
-
-          // Fetch running processes (best-effort)
-          let processes: Array<{ pid: number; command: string; status: string }> | undefined;
-          try {
-            type ProcessInfo = { id: string; status: string; command: string };
-            const allProcesses = (await sandbox.listProcesses()) as ProcessInfo[];
-            processes = allProcesses.map((p: ProcessInfo) => ({
-              pid: parseInt(p.id, 10) || 0,
-              command: p.command,
-              status: p.status,
-            }));
-          } catch (err) {
-            logger.debug('Could not fetch sandbox processes', {
-              error: err instanceof Error ? err.message : String(err),
+          const logs = await createAgentSandbox(env, metadata).readWrapperLogs();
+          if (!logs) {
+            throw new TRPCError({
+              code: 'PRECONDITION_FAILED',
+              message: 'Wrapper logs are unavailable because the session wrapper is not running',
             });
           }
 
           logger.info('Successfully retrieved session logs', {
-            fileCount: Object.keys(files).length,
+            fileCount: Object.keys(logs.files).length,
           });
 
           return {
             sessionId,
-            files,
-            processes,
+            files: logs.files,
+            processes: logs.processes,
           };
         });
       }),

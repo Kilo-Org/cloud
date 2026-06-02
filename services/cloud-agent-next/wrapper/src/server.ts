@@ -21,6 +21,7 @@ import { logToFile } from './utils.js';
 import { materializePromptAttachments as defaultMaterializePromptAttachments } from './session-bootstrap.js';
 import {
   isWrapperSessionReadyRequest,
+  type WrapperPromptAgent,
   type WrapperPromptRequest,
   type WrapperSessionReadyRequest,
   type WrapperSessionReadyResponse,
@@ -40,6 +41,9 @@ export type ServerConfig = {
   agentSessionId: string;
   /** Stable Cloud Agent user ID, passed at wrapper startup */
   userId: string;
+  /** Stable physical wrapper identity, present after leased startup. */
+  wrapperInstanceId?: string;
+  wrapperInstanceGeneration?: number;
   /** Product surface that created the session, e.g. code-review. */
   platform?: string;
 };
@@ -54,6 +58,8 @@ export type ServerDependencies = {
   setAborted: () => void;
   /** Reset lifecycle state for a new execution */
   resetLifecycle: () => void;
+  /** Mark a submitted message complete when the wrapper handles a synchronous session action. */
+  onMessageComplete?: (messageId: string) => void;
   /** Compatibility hook for callers that still construct wrapper server test deps. */
   setPerTurnConfig?: (config: PerTurnConfig) => void;
   /** Workspace/Kilo readiness path */
@@ -78,6 +84,7 @@ type CommandBody = {
   command: string;
   args?: string;
   messageId?: string;
+  agent?: WrapperPromptAgent;
   autoCommit?: boolean;
   condenseOnComplete?: boolean;
   session?: SessionBinding;
@@ -298,6 +305,10 @@ function createHealthHandler(config: ServerConfig, state: WrapperState) {
       state: state.isActive ? 'active' : 'idle',
       version: config.version,
       sessionId: config.sessionId,
+      ...(config.wrapperInstanceId ? { wrapperInstanceId: config.wrapperInstanceId } : {}),
+      ...(config.wrapperInstanceGeneration !== undefined
+        ? { wrapperInstanceGeneration: config.wrapperInstanceGeneration }
+        : {}),
       pendingMessages: state.pendingMessageIds.length,
     });
   };
@@ -396,7 +407,7 @@ export function createPromptHandler(config: ServerConfig, deps: ServerDependenci
   };
 }
 
-function createCommandHandler(config: ServerConfig, deps: ServerDependencies) {
+export function createCommandHandler(config: ServerConfig, deps: ServerDependencies) {
   return async (req: Request): Promise<Response> => {
     const { state, kiloClient, openConnection } = deps;
 
@@ -418,6 +429,10 @@ function createCommandHandler(config: ServerConfig, deps: ServerDependencies) {
     if (!body.command) {
       return errorResponse('INVALID_REQUEST', 'command is required', 400);
     }
+    const compactModel = body.command === 'compact' ? body.agent?.model : undefined;
+    if (body.command === 'compact' && !compactModel?.modelID) {
+      return errorResponse('INVALID_REQUEST', 'model is required for compact', 400);
+    }
 
     const binding = body.session ?? body.execution;
     const messageId = body.messageId;
@@ -425,6 +440,7 @@ function createCommandHandler(config: ServerConfig, deps: ServerDependencies) {
       state.acceptMessage(messageId, {
         autoCommit: body.autoCommit ?? false,
         condenseOnComplete: body.condenseOnComplete ?? false,
+        model: body.agent?.model?.modelID,
         upstreamBranch: binding?.upstreamBranch,
       });
     }
@@ -442,12 +458,31 @@ function createCommandHandler(config: ServerConfig, deps: ServerDependencies) {
     }
 
     try {
-      const result = await kiloClient.sendCommand({
-        sessionId: session.kiloSessionId,
-        command: body.command,
-        args: body.args,
-        messageId,
-      });
+      let result: unknown;
+      if (compactModel) {
+        result = await kiloClient.summarizeSession({
+          sessionId: session.kiloSessionId,
+          model: compactModel,
+        });
+        if (messageId) {
+          state.sendToIngest({
+            streamEventType: 'cloud.message.completed',
+            data: {
+              messageId,
+              completionSource: 'manual_compact_summarize',
+            },
+            timestamp: new Date().toISOString(),
+          });
+          deps.onMessageComplete?.(messageId);
+        }
+      } else {
+        result = await kiloClient.sendCommand({
+          sessionId: session.kiloSessionId,
+          command: body.command,
+          args: body.args,
+          messageId,
+        });
+      }
       state.updateActivity();
       logToFile(`job/command: sent command=${body.command}`);
       return jsonResponse({ status: 'sent', result });

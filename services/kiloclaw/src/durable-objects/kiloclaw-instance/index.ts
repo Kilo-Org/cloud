@@ -38,6 +38,7 @@ import type {
   KiloclawStopReason,
 } from '@kilocode/worker-utils';
 import {
+  imageRolloutSubjectFromSandboxId,
   isInstanceKeyedSandboxId,
   instanceIdFromSandboxId,
 } from '@kilocode/worker-utils/instance-id';
@@ -258,7 +259,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   private async resolveImageStateForPin(
     pinnedImageTag: string | null,
     userId: string,
-    instanceId: string,
+    rolloutSubject: string,
     opts: { isNew: boolean; ignoreCurrentImageTag?: boolean }
   ): Promise<void> {
     if (pinnedImageTag) {
@@ -345,7 +346,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     const selected = await selectImageVersionForInstance({
       kv: this.env.KV_CLAW_CACHE,
       variant,
-      instanceId,
+      rolloutSubject,
       currentImageTag: selectorCurrentImageTag,
       autoEnroll,
     });
@@ -1931,10 +1932,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
    * Returns the resolved image metadata so the caller can surface what
    * was actually applied.
    */
-  async applyPinnedVersion(
-    imageTag: string | null,
-    instanceId?: string
-  ): Promise<{
+  async applyPinnedVersion(imageTag: string | null): Promise<{
     openclawVersion: string | null;
     imageTag: string | null;
     imageDigest: string | null;
@@ -1953,9 +1951,14 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     if (!this.s.userId) {
       throw Object.assign(new Error('Cannot apply pin: instance has no userId'), { status: 404 });
     }
+    if (!this.s.sandboxId) {
+      throw Object.assign(new Error('Cannot apply pin: instance has no sandboxId'), {
+        status: 404,
+      });
+    }
 
-    const resolvedInstanceId = instanceId ?? this.s.userId;
-    await this.resolveImageStateForPin(imageTag, this.s.userId, resolvedInstanceId, {
+    const rolloutSubject = imageRolloutSubjectFromSandboxId(this.s.sandboxId, this.s.userId);
+    await this.resolveImageStateForPin(imageTag, this.s.userId, rolloutSubject, {
       isNew: false,
       // When clearing a pin (imageTag === null), force a fresh rollout
       // decision instead of preserving the currently-tracked tag. Without
@@ -4182,10 +4185,10 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       if (options?.imageTag) {
         if (options.imageTag === 'latest') {
           const variant: ImageVariant = 'default';
-          const instanceIdForBucket =
-            this.s.sandboxId && isInstanceKeyedSandboxId(this.s.sandboxId)
-              ? instanceIdFromSandboxId(this.s.sandboxId)
-              : (this.s.userId ?? '');
+          const rolloutSubject = imageRolloutSubjectFromSandboxId(
+            this.s.sandboxId,
+            this.s.userId ?? ''
+          );
           let autoEnroll = false;
           if (this.s.userId && this.env.HYPERDRIVE?.connectionString) {
             try {
@@ -4202,7 +4205,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
           const latest = await selectImageVersionForInstance({
             kv: this.env.KV_CLAW_CACHE,
             variant,
-            instanceId: instanceIdForBucket,
+            rolloutSubject,
             currentImageTag: this.s.trackedImageTag,
             autoEnroll,
           });

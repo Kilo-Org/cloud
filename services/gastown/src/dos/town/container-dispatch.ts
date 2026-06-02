@@ -3,6 +3,7 @@
  * All container communication goes through the TownContainerDO stub.
  */
 
+import { z } from 'zod';
 import { getTownContainerStub } from '../TownContainer.do';
 import { signAgentJWT, signContainerJWT } from '../../util/jwt.util';
 import { buildPolecatSystemPrompt } from '../../prompts/polecat-system.prompt';
@@ -13,6 +14,14 @@ import { writeEvent } from '../../util/analytics.util';
 import { resolveGitHubTokenString } from './town-scm';
 
 const TOWN_LOG = '[Town.do]';
+
+const ContainerStartError = z.object({
+  error: z.string(),
+  phase: z.string().optional(),
+  status: z.number().optional(),
+  error_type: z.string().optional(),
+  action: z.string().optional(),
+});
 
 // Allowlist of git push flags that are safe to pass from rig config.
 // Flags that bypass hooks (--no-verify), rewrite history (--force,
@@ -58,6 +67,26 @@ function filterGitPushFlags(raw: string): string | undefined {
 let lastStartError: string | null = null;
 export function getLastStartError(): string | null {
   return lastStartError;
+}
+
+function formatContainerStartError(status: number, bodyText: string): string {
+  let parsedJson: unknown;
+  try {
+    parsedJson = JSON.parse(bodyText);
+  } catch {
+    return `(${status}) ${bodyText.slice(0, 300)}`;
+  }
+  const parsed = ContainerStartError.safeParse(parsedJson);
+  if (!parsed.success) return `(${status}) ${bodyText.slice(0, 300)}`;
+
+  const failure = parsed.data;
+  const details = [
+    failure.phase ? `${failure.phase} failed` : 'container start failed',
+    failure.error_type ?? null,
+    failure.status ? `upstream ${failure.status}` : null,
+  ].filter(value => value !== null);
+  const action = failure.action ? ` Action: ${failure.action}` : '';
+  return `(${status}) ${details.join(': ')}: ${failure.error}${action}`.slice(0, 500);
 }
 
 /**
@@ -553,7 +582,7 @@ export async function startAgentInContainer(
         });
         return { started: true, containerFetchMs: durationMs };
       }
-      const errorMsg = `(${response.status}) ${text.slice(0, 300)}`;
+      const errorMsg = formatContainerStartError(response.status, text);
       console.error(
         `${TOWN_LOG} startAgentInContainer: error response for ` +
           `agent=${params.agentId} role=${params.role}: ${errorMsg}`

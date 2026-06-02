@@ -289,6 +289,8 @@ describe('WebSocket proxy', () => {
       forwarded: 'for=1.2.3.4;proto=https',
       'x-forwarded-for': '1.2.3.4',
       'x-forwarded-proto': 'https',
+      'x-forwarded-port': '443',
+      'x-forwarded-ssl': 'on',
       'x-real-ip': '1.2.3.4',
       'x-forwarded-host': 'claw.kilo.ai',
     });
@@ -344,6 +346,8 @@ describe('WebSocket proxy', () => {
     expect(forwarded?.['forwarded']).toBeUndefined();
     expect(forwarded?.['x-forwarded-for']).toBeUndefined();
     expect(forwarded?.['x-forwarded-proto']).toBeUndefined();
+    expect(forwarded?.['x-forwarded-port']).toBeUndefined();
+    expect(forwarded?.['x-forwarded-ssl']).toBeUndefined();
     expect(forwarded?.['x-real-ip']).toBeUndefined();
     expect(forwarded?.['x-forwarded-host']).toBeUndefined();
     expect((clientSocket as unknown as FakeSocket).pipe).toHaveBeenCalledWith(backendSocket);

@@ -57,6 +57,7 @@ const USER_RATE_LIMITED_FEATURES: ReadonlySet<FeatureValue> = new Set([
   'cloud-agent',
   'code-review',
   'app-builder',
+  'gastown',
 ]);
 
 export function isUserRateLimitedFeature(feature: FeatureValue | null): boolean {

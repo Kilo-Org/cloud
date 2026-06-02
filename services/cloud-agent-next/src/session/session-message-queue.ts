@@ -4,6 +4,7 @@ import type {
   AdmitAcceptedSessionMessageRequest,
   MessageDeliveryRequest,
   MessageDeliveryResult,
+  RetryableResultCode,
   SessionMessageAdmissionResult,
   SessionMessageIntent,
   SubmittedSessionMessageRequest,
@@ -183,6 +184,21 @@ function classifyDeliveryFailure(code: PendingFlushFailureCode | undefined): {
     case 'UNKNOWN':
     case undefined:
       return { failureStage: 'pre_dispatch', failureCode: 'delivery_failure_unknown' };
+  }
+}
+
+function knownPreDispatchExecutionFailureCode(error: unknown): RetryableResultCode | undefined {
+  if (!isExecutionError(error) || !error.retryable) return undefined;
+  switch (error.code) {
+    case 'SANDBOX_CONNECT_FAILED':
+    case 'WORKSPACE_SETUP_FAILED':
+    case 'KILO_SERVER_FAILED':
+      return error.code;
+    case 'WRAPPER_START_FAILED':
+      // Orchestration also uses this code when prompt dispatch fails after wrapper readiness.
+      return undefined;
+    default:
+      return undefined;
   }
 }
 
@@ -383,13 +399,13 @@ export async function flushNextPendingSessionMessage(params: {
         ? error.code
         : isSandboxWorkspaceProbeTimeoutError(error)
           ? 'INTERNAL'
-          : undefined;
+          : knownPreDispatchExecutionFailureCode(error);
     const failure = await recordPendingFlushFailure(
       params.storage,
       message,
       error instanceof Error ? error.message : String(error),
       params.now,
-      code === undefined ? { policy } : { policy, code }
+      { policy, code: code ?? 'UNKNOWN' }
     );
     return toFailureResult(failure, totalCount);
   }

@@ -5,19 +5,25 @@ import type {
   GatewayMessagesRequest,
 } from '@/lib/ai-gateway/providers/openrouter/types';
 import { applyMistralModelSettings, isMistralModel } from '@/lib/ai-gateway/providers/mistral';
-import { kiloExclusiveModels } from '@/lib/ai-gateway/models';
+import { findKiloExclusiveModel } from '@/lib/ai-gateway/models';
 import { applyKiloExclusiveModelSettings } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 import { applyAnthropicModelSettings } from '@/lib/ai-gateway/providers/anthropic';
 import { isClaudeModel } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { OpenRouterInferenceProviderIdSchema } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
-import { applyGoogleModelSettings, isGeminiModel } from '@/lib/ai-gateway/providers/google';
 import { applyMoonshotModelSettings, isKimiModel } from '@/lib/ai-gateway/providers/moonshotai';
 import { isGlmModel } from '@/lib/ai-gateway/providers/zai';
 import { isMinimaxModel } from '@/lib/ai-gateway/providers/minimax';
 import type { BYOKResult, Provider } from '@/lib/ai-gateway/providers/types';
 import { isStepModel } from '@/lib/ai-gateway/providers/stepfun';
 import { isDeepseekModel } from '@/lib/ai-gateway/providers/deepseek';
-import type { FraudDetectionHeaders } from '@/lib/utils';
+import { isOpenCodeBasedClient, type FraudDetectionHeaders } from '@/lib/utils';
+import { applyTrackingIds } from '@/lib/ai-gateway/providerHash';
+import { repairTools, sanitizeBinaryToolResults } from '@/lib/ai-gateway/tool-calling';
+import { fixOpenCodeDuplicateReasoning } from '@/lib/ai-gateway/providers/fixOpenCodeDuplicateReasoning';
+import {
+  enableReasoningSummaries,
+  fixResponsesRequest,
+} from '@/lib/ai-gateway/providers/openrouter/request-helpers';
 
 export function getPreferredProviderOrder(requestedModel: string): string[] {
   if (isClaudeModel(requestedModel)) {
@@ -74,19 +80,6 @@ function applyPreferredProvider(
   }
 }
 
-export type ApplyProviderSpecificLogicOptions = {
-  /**
-   * When true, skip the kilo-exclusive `internal_id` rewrite + provider pin
-   * normally applied to public ids registered in `kiloExclusiveModels`.
-   * Generic provider-specific request fixes and `provider.transformRequest`
-   * still run.
-   *
-   * Set by experiment routing because the partner upstream is selected by
-   * the variant version, not by the registry.
-   */
-  skipKiloExclusiveModelSettings?: boolean;
-};
-
 export function applyProviderSpecificLogic(
   provider: Provider,
   requestedModel: string,
@@ -94,10 +87,31 @@ export function applyProviderSpecificLogic(
   extraHeaders: Record<string, string>,
   userByok: BYOKResult[] | null,
   originalHeaders: FraudDetectionHeaders,
-  options: ApplyProviderSpecificLogicOptions = {}
+  userId: string,
+  taskId: string | null
 ) {
-  const kiloExclusiveModel = kiloExclusiveModels.find(m => m.public_id === requestedModel);
-  if (kiloExclusiveModel && !options.skipKiloExclusiveModelSettings) {
+  applyTrackingIds(requestToMutate, provider, userId, taskId);
+
+  sanitizeBinaryToolResults(requestToMutate);
+
+  if (requestToMutate.kind === 'chat_completions') {
+    // Mostly a workaround for bugs in the old extension.
+    repairTools(requestToMutate.body);
+
+    if (isOpenCodeBasedClient(originalHeaders)) {
+      // Workaround for bugs in the chat completions client.
+      fixOpenCodeDuplicateReasoning(requestedModel, requestToMutate.body, taskId ?? undefined);
+    }
+  }
+
+  if (requestToMutate.kind === 'responses') {
+    fixResponsesRequest(requestToMutate.body);
+  }
+
+  enableReasoningSummaries(requestToMutate);
+
+  const kiloExclusiveModel = findKiloExclusiveModel(requestedModel);
+  if (kiloExclusiveModel) {
     applyKiloExclusiveModelSettings(requestToMutate, kiloExclusiveModel);
   }
 
@@ -107,10 +121,6 @@ export function applyProviderSpecificLogic(
 
   if (provider.id === 'openrouter' || provider.id === 'vercel') {
     applyPreferredProvider(requestedModel, requestToMutate.body);
-  }
-
-  if (isGeminiModel(requestedModel)) {
-    applyGoogleModelSettings(provider.id, requestToMutate);
   }
 
   if (isKimiModel(requestedModel)) {

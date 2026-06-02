@@ -76,6 +76,7 @@ function removeNonSensicalMaxTokens(
     const maxCompletionTokens = requestToMutate.body.max_completion_tokens;
     if (
       maxCompletionTokens !== undefined &&
+      maxCompletionTokens !== null &&
       maxCompletionTokens > kiloExclusiveModel.max_completion_tokens
     ) {
       logMaxTokenMutation(
@@ -96,7 +97,11 @@ function removeNonSensicalMaxTokens(
   }
   if (requestToMutate.kind === 'responses') {
     const maxOutputTokens = requestToMutate.body.max_output_tokens;
-    if (maxOutputTokens !== undefined && maxOutputTokens > kiloExclusiveModel.max_completion_tokens) {
+    if (
+      maxOutputTokens !== undefined &&
+      maxOutputTokens !== null &&
+      maxOutputTokens > kiloExclusiveModel.max_completion_tokens
+    ) {
       logMaxTokenMutation(
         requestToMutate,
         kiloExclusiveModel,

@@ -2362,7 +2362,7 @@ describe('UserKiloFacade producer messages', () => {
     }
   });
 
-  it('suppresses rewritten global envelopes with unsafe sibling paths before safe sentinel fanout', async () => {
+  it('rewrites only the outer producer directory while preserving sibling envelope fields', async () => {
     const validateKiloGlobalFeedProducer = vi.fn(async () => ({ success: true as const }));
     const env = {
       CLOUD_AGENT_SESSION: {
@@ -2390,29 +2390,19 @@ describe('UserKiloFacade producer messages', () => {
 
     try {
       await readSseFrame(reader);
-      await facade.webSocketMessage(
-        ws,
-        JSON.stringify({
-          directory: '/workspace/private',
-          artifact: { path: '/workspace/private/envelope-secret.ts' },
-          payload: {
-            type: 'message.updated',
-            properties: { sessionID: kiloSessionId, id: 'unsafe-envelope' },
-          },
-        })
-      );
-      await facade.webSocketMessage(
-        ws,
-        JSON.stringify({
-          directory: '/workspace/private',
-          payload: {
-            type: 'message.updated',
-            properties: { sessionID: kiloSessionId, id: 'safe-after-envelope-suppressed' },
-          },
-        })
-      );
-      const next = await readSseFrame<{ payload: { properties: { id: string } } }>(reader);
-      expect(next.payload.properties.id).toBe('safe-after-envelope-suppressed');
+      const event = {
+        directory: '/workspace/private',
+        artifact: { path: '/workspace/private/envelope-secret.ts' },
+        payload: {
+          type: 'message.updated',
+          properties: { sessionID: kiloSessionId, id: 'preserved-envelope' },
+        },
+      };
+      await facade.webSocketMessage(ws, JSON.stringify(event));
+      await expect(readSseFrame(reader)).resolves.toEqual({
+        ...event,
+        directory: publicCloudAgentDirectory(kiloSessionId),
+      });
     } finally {
       await reader.cancel().catch(() => undefined);
     }
@@ -2615,7 +2605,23 @@ describe('UserKiloFacade producer messages', () => {
       await facade.webSocketMessage(
         matchingWs,
         JSON.stringify({
-          payload: { id: 'evt_synthetic', type: 'server.connected', properties: {} },
+          directory: '/workspace/root',
+          payload: {
+            id: 'evt_synthetic_connected',
+            type: 'server.connected',
+            properties: { sessionID: kiloSessionId },
+          },
+        })
+      );
+      await facade.webSocketMessage(
+        matchingWs,
+        JSON.stringify({
+          directory: '/workspace/root',
+          payload: {
+            id: 'evt_synthetic_heartbeat',
+            type: 'server.heartbeat',
+            properties: { sessionID: kiloSessionId },
+          },
         })
       );
       await facade.webSocketMessage(
@@ -2636,12 +2642,15 @@ describe('UserKiloFacade producer messages', () => {
         type: 'message.updated',
         properties: { sessionID: kiloSessionId, info: { id: 'msg_match' } },
       });
+      expect(
+        (matchingWs as unknown as { send: ReturnType<typeof vi.fn> }).send
+      ).not.toHaveBeenCalled();
     } finally {
       await reader.cancel().catch(() => undefined);
     }
   });
 
-  it('projects embedded session and message entities before scoped and global fanout', async () => {
+  it('preserves embedded session and message entities during scoped and global fanout', async () => {
     const validateKiloGlobalFeedProducer = vi.fn(async () => ({ success: true as const }));
     const env = {
       CLOUD_AGENT_SESSION: {
@@ -2707,7 +2716,13 @@ describe('UserKiloFacade producer messages', () => {
           directory: '/workspace/private',
           payload: {
             type: 'message.part.updated',
-            properties: { sessionID: kiloSessionId, part: sdkMessageHistory()[1].parts[1] },
+            properties: {
+              sessionID: kiloSessionId,
+              part: {
+                ...sdkMessageHistory()[1].parts[1],
+                sessionID: 'ses_22222222222222222222222222',
+              },
+            },
           },
         })
       );
@@ -2716,38 +2731,57 @@ describe('UserKiloFacade producer messages', () => {
         globalReader
       );
       const scopedSession = await readSseFrame<{ properties: { info: unknown } }>(scopedReader);
-      expect(globalSession.payload.properties.info).toEqual(projectedSdkSessionInfo(kiloSessionId));
-      expect(scopedSession.properties.info).toEqual(projectedSdkSessionInfo(kiloSessionId));
+      expect(globalSession.payload.properties.info).toEqual(sdkSessionInfo(kiloSessionId));
+      expect(scopedSession.properties.info).toEqual(sdkSessionInfo(kiloSessionId));
       const globalMessage = await readSseFrame<{
         payload: { properties: { info: { path: unknown } } };
       }>(globalReader);
       const scopedMessage = await readSseFrame<{ properties: { info: { path: unknown } } }>(
         scopedReader
       );
-      const directory = publicCloudAgentDirectory(kiloSessionId);
       expect(globalMessage.payload.properties.info.path).toEqual({
-        cwd: directory,
-        root: directory,
+        cwd: '/workspace/private/session',
+        root: '/workspace/private',
       });
-      expect(scopedMessage.properties.info.path).toEqual({ cwd: directory, root: directory });
+      expect(scopedMessage.properties.info.path).toEqual({
+        cwd: '/workspace/private/session',
+        root: '/workspace/private',
+      });
       const globalUserMessage = await readSseFrame<{
         payload: { properties: { info: { editorContext: { activeFile: string } } } };
       }>(globalReader);
       const scopedUserMessage = await readSseFrame<{
         properties: { info: { editorContext: { activeFile: string } } };
       }>(scopedReader);
-      expect(globalUserMessage.payload.properties.info.editorContext.activeFile).toBe(directory);
-      expect(scopedUserMessage.properties.info.editorContext.activeFile).toBe(directory);
+      expect(globalUserMessage.payload.properties.info.editorContext.activeFile).toBe(
+        '/workspace/private/active.ts'
+      );
+      expect(scopedUserMessage.properties.info.editorContext.activeFile).toBe(
+        '/workspace/private/active.ts'
+      );
       const globalPart = await readSseFrame<{
         payload: {
-          properties: { part: { state: { attachments: Array<{ source: { path: string } }> } } };
+          properties: {
+            part: {
+              sessionID: string;
+              state: { attachments: Array<{ source: { path: string } }> };
+            };
+          };
         };
       }>(globalReader);
       const scopedPart = await readSseFrame<{
-        properties: { part: { state: { attachments: Array<{ source: { path: string } }> } } };
+        properties: {
+          part: { sessionID: string; state: { attachments: Array<{ source: { path: string } }> } };
+        };
       }>(scopedReader);
-      expect(globalPart.payload.properties.part.state.attachments[0].source.path).toBe(directory);
-      expect(scopedPart.properties.part.state.attachments[0].source.path).toBe(directory);
+      expect(globalPart.payload.properties.part.sessionID).toBe('ses_22222222222222222222222222');
+      expect(scopedPart.properties.part.sessionID).toBe('ses_22222222222222222222222222');
+      expect(globalPart.payload.properties.part.state.attachments[0].source.path).toBe(
+        '/workspace/private/symbol.ts'
+      );
+      expect(scopedPart.properties.part.state.attachments[0].source.path).toBe(
+        '/workspace/private/symbol.ts'
+      );
     } finally {
       await globalReader.cancel().catch(() => undefined);
       await scopedReader.cancel().catch(() => undefined);
@@ -2787,7 +2821,10 @@ describe('UserKiloFacade producer messages', () => {
           directory: '/workspace/private',
           payload: {
             type: 'cloud.status',
-            properties: { internalDetail: 'secret backend lifecycle detail' },
+            properties: {
+              sessionID: kiloSessionId,
+              internalDetail: 'secret backend lifecycle detail',
+            },
           },
         })
       );
@@ -2808,7 +2845,7 @@ describe('UserKiloFacade producer messages', () => {
     }
   });
 
-  it('suppresses identityless and unreviewed wrapper native variants rather than leaking them', async () => {
+  it('suppresses identityless and foreign-root wrapper events using top-level attribution', async () => {
     const validateKiloGlobalFeedProducer = vi.fn(async () => ({ success: true as const }));
     const env = {
       CLOUD_AGENT_SESSION: {
@@ -2867,24 +2904,20 @@ describe('UserKiloFacade producer messages', () => {
             type: 'message.updated',
             properties: {
               sessionID: kiloSessionId,
+              id: 'matching-after-suppressed',
               info: sdkMessageHistory()[1].info,
               artifact: { path: '/workspace/private/unreviewed.ts' },
             },
           },
         })
       );
-      await facade.webSocketMessage(
-        ws,
-        JSON.stringify({
-          directory: '/workspace/private',
-          payload: {
-            type: 'message.updated',
-            properties: { sessionID: kiloSessionId, id: 'safe-after-suppressed' },
-          },
-        })
-      );
-      const next = await readSseFrame<{ payload: { properties: { id: string } } }>(reader);
-      expect(next.payload.properties.id).toBe('safe-after-suppressed');
+      const next = await readSseFrame<{
+        payload: { properties: { id: string; artifact: { path: string } } };
+      }>(reader);
+      expect(next.payload.properties).toMatchObject({
+        id: 'matching-after-suppressed',
+        artifact: { path: '/workspace/private/unreviewed.ts' },
+      });
     } finally {
       await reader.cancel().catch(() => undefined);
     }

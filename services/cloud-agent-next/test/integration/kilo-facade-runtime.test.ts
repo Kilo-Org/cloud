@@ -216,7 +216,7 @@ describe('UserKiloFacade in the Workers runtime', () => {
     }
   });
 
-  it('fans a projected producer event out to global and session-scoped public SSE', async () => {
+  it('fans a producer event through to global and session-scoped public SSE', async () => {
     const identity = {
       wrapperRunId: 'wr_facade_runtime_1',
       wrapperGeneration: 1,
@@ -287,7 +287,7 @@ describe('UserKiloFacade in the Workers runtime', () => {
               id: 'msg_runtime_assistant',
               sessionID: kiloSessionId,
               role: 'assistant',
-              path: { cwd: publicDirectory, root: publicDirectory },
+              path: { cwd: '/workspace/private/session', root: '/workspace/private' },
             },
           },
         },
@@ -301,7 +301,7 @@ describe('UserKiloFacade in the Workers runtime', () => {
             id: 'msg_runtime_assistant',
             sessionID: kiloSessionId,
             role: 'assistant',
-            path: { cwd: publicDirectory, root: publicDirectory },
+            path: { cwd: '/workspace/private/session', root: '/workspace/private' },
           },
         },
       });

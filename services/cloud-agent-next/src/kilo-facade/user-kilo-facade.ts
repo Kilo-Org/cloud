@@ -32,7 +32,6 @@ import {
 import { createProxyRequest } from '../shared/http-proxy.js';
 import {
   hasUnprojectedPrivateStructuredPath,
-  projectPublicEvent,
   projectPublicListedSession,
   projectPublicSession,
   projectPublicStoredMessages,
@@ -1534,17 +1533,10 @@ export class UserKiloFacade extends DurableObject<Env> implements KiloFacadeGlob
       return;
     }
 
-    const projectedPayload = projectPublicEvent(parsed.payload, source.kiloSessionId);
-    if (!projectedPayload) {
+    if (parsed.payload.properties.sessionID !== source.kiloSessionId) {
       return;
     }
-    const publicEnvelope = rewriteGlobalEventDirectory(
-      { ...parsed, payload: projectedPayload },
-      source.kiloSessionId
-    );
-    if (hasUnprojectedPrivateStructuredPath(publicEnvelope)) {
-      return;
-    }
+    const publicEnvelope = rewriteGlobalEventDirectory(parsed, source.kiloSessionId);
     this.broadcastGlobalEvent(publicEnvelope, source.kiloSessionId);
   }
 

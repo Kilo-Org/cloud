@@ -31,13 +31,13 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@cloudflare/vitest-pool-workers": "^0.12.8",
+    "@cloudflare/vitest-pool-workers": "catalog:",
     "@cloudflare/workers-types": "catalog:",
     "@sentry/cli": "^2.58.2",
     "@types/node": "^22",
     "@typescript/native-preview": "7.0.0-dev.20251019.1",
     "typescript": "catalog:",
-    "vitest": "^3.2.4",
+    "vitest": "catalog:",
     "wrangler": "catalog:"
   }
 }

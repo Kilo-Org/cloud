@@ -33,10 +33,13 @@ import { MiniMaxPlanIcon } from './MiniMaxPlanIcon';
 
 const TOKEN_PLAN_PLUS_BENEFITS = [
   'Kilo automatically configures MiniMax in your BYOK settings.',
-  '1.7B tokens per month of M3 usage.',
-  'Full access to the MiniMax model family (M3 / M2.7 / etc.)',
-  'Access image understanding and the web search MCP.',
-  'Generate images and speech.',
+  '~1.7B tokens per month of M3 usage.',
+  'Full access to the MiniMax model family (M3 / M2.7 / image / speech / music).',
+  '1M context window — built for long documents and large codebases.',
+  'Native multimodal understanding: image and video input.',
+  'Run 3–4 concurrent agents.',
+  'Access the web search MCP.',
+  'Text, image, speech, and music share one quota.',
 ];
 
 export function CodingPlansGroup({

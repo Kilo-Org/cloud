@@ -6,7 +6,7 @@ describe('discord-id', () => {
     expect(parseDiscordSnowflake('123456789012345678', 'user ID')).toBe('123456789012345678');
   });
 
-  it.each(['', ' ', 'abc', '123/456', '123?limit=1', '123#frag', '%2f', '..', '1'.repeat(21)])(
+  it.each(['', ' ', 'abc', '123/456', '123?limit=1', '123#frag', '%2f', '..', '1', '1234', '1234567890123456', '1'.repeat(21)])(
     'rejects malformed snowflake value %p',
     value => {
       expect(isDiscordSnowflake(value)).toBe(false);

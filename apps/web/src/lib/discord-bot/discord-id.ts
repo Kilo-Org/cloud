@@ -1,5 +1,5 @@
 const DISCORD_API_BASE_URL = 'https://discord.com/api/v10/';
-const DISCORD_SNOWFLAKE_PATTERN = /^\d{1,20}$/;
+const DISCORD_SNOWFLAKE_PATTERN = /^\d{17,20}$/;
 
 export function isDiscordSnowflake(value: string): boolean {
   return DISCORD_SNOWFLAKE_PATTERN.test(value);

@@ -16,6 +16,7 @@ import {
 } from '@/lib/model-allow.server';
 import { DEFAULT_BOT_MODEL } from '@/lib/bot/constants';
 import { getEffectiveModelRestrictions } from '@/lib/organizations/model-restrictions';
+import { buildDiscordApiUrl, parseDiscordSnowflake } from '@/lib/discord-bot/discord-id';
 
 // Discord OAuth2 scopes for the bot integration
 // 'bot' scope is needed for the bot to join servers
@@ -176,7 +177,7 @@ export async function upsertDiscordInstallation(
 
   const existing = await getInstallation(owner);
 
-  const guildId = oauthResponse.guild.id;
+  const guildId = parseDiscordSnowflake(oauthResponse.guild.id, 'guild ID');
   const guildName = oauthResponse.guild.name || 'Unknown Server';
   const scopes = oauthResponse.scope?.split(' ') || null;
 
@@ -299,9 +300,16 @@ export async function testConnection(owner: Owner): Promise<{ success: boolean; 
     return { success: false, error: 'No guild ID found for this installation' };
   }
 
+  let validatedGuildId: string;
+  try {
+    validatedGuildId = parseDiscordSnowflake(guildId, 'guild ID');
+  } catch {
+    return { success: false, error: 'Invalid guild ID found for this installation' };
+  }
+
   try {
     // Verify the bot can access this guild
-    const response = await fetch(`https://discord.com/api/v10/guilds/${guildId}`, {
+    const response = await fetch(buildDiscordApiUrl(['guilds', validatedGuildId]), {
       headers: {
         Authorization: `Bot ${DISCORD_BOT_TOKEN}`,
       },
@@ -403,13 +411,32 @@ export async function postDiscordMessage(
     return { ok: false, error: 'DISCORD_BOT_TOKEN is not configured' };
   }
 
+  let validatedChannelId: string;
+  try {
+    validatedChannelId = parseDiscordSnowflake(channelId, 'channel ID');
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : 'Invalid channel ID' };
+  }
+
   try {
     const body: Record<string, unknown> = { content };
     if (options?.messageReference) {
-      body.message_reference = options.messageReference;
+      try {
+        body.message_reference = {
+          message_id: parseDiscordSnowflake(
+            options.messageReference.message_id,
+            'message reference ID'
+          ),
+        };
+      } catch (error) {
+        return {
+          ok: false,
+          error: error instanceof Error ? error.message : 'Invalid message reference ID',
+        };
+      }
     }
 
-    const response = await fetch(`https://discord.com/api/v10/channels/${channelId}/messages`, {
+    const response = await fetch(buildDiscordApiUrl(['channels', validatedChannelId, 'messages']), {
       method: 'POST',
       headers: {
         Authorization: `Bot ${DISCORD_BOT_TOKEN}`,
@@ -444,10 +471,26 @@ export async function addDiscordReaction(
     return { ok: false, error: 'DISCORD_BOT_TOKEN is not configured' };
   }
 
+  let validatedChannelId: string;
+  let validatedMessageId: string;
   try {
-    const encodedEmoji = encodeURIComponent(emoji);
+    validatedChannelId = parseDiscordSnowflake(channelId, 'channel ID');
+    validatedMessageId = parseDiscordSnowflake(messageId, 'message ID');
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : 'Invalid Discord ID' };
+  }
+
+  try {
     const response = await fetch(
-      `https://discord.com/api/v10/channels/${channelId}/messages/${messageId}/reactions/${encodedEmoji}/@me`,
+      buildDiscordApiUrl([
+        'channels',
+        validatedChannelId,
+        'messages',
+        validatedMessageId,
+        'reactions',
+        emoji,
+        '@me',
+      ]),
       {
         method: 'PUT',
         headers: { Authorization: `Bot ${DISCORD_BOT_TOKEN}` },
@@ -479,10 +522,26 @@ export async function removeDiscordReaction(
     return { ok: false, error: 'DISCORD_BOT_TOKEN is not configured' };
   }
 
+  let validatedChannelId: string;
+  let validatedMessageId: string;
   try {
-    const encodedEmoji = encodeURIComponent(emoji);
+    validatedChannelId = parseDiscordSnowflake(channelId, 'channel ID');
+    validatedMessageId = parseDiscordSnowflake(messageId, 'message ID');
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : 'Invalid Discord ID' };
+  }
+
+  try {
     const response = await fetch(
-      `https://discord.com/api/v10/channels/${channelId}/messages/${messageId}/reactions/${encodedEmoji}/@me`,
+      buildDiscordApiUrl([
+        'channels',
+        validatedChannelId,
+        'messages',
+        validatedMessageId,
+        'reactions',
+        emoji,
+        '@me',
+      ]),
       {
         method: 'DELETE',
         headers: { Authorization: `Bot ${DISCORD_BOT_TOKEN}` },

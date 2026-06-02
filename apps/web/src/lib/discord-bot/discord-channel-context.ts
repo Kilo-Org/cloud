@@ -1,6 +1,7 @@
 import 'server-only';
 import { DISCORD_BOT_TOKEN } from '@/lib/config.server';
 import { captureException } from '@sentry/nextjs';
+import { buildDiscordApiUrl, parseDiscordSnowflake } from './discord-id';
 
 export type DiscordEventContext = {
   channelId: string;
@@ -44,14 +45,15 @@ type DiscordApiMessage = {
 };
 
 async function fetchDiscordApi<T>(
-  path: string
+  pathSegments: string[],
+  query?: Record<string, string | number>
 ): Promise<{ ok: true; data: T } | { ok: false; error: string }> {
   if (!DISCORD_BOT_TOKEN) {
     return { ok: false, error: 'DISCORD_BOT_TOKEN is not configured' };
   }
 
   try {
-    const response = await fetch(`https://discord.com/api/v10${path}`, {
+    const response = await fetch(buildDiscordApiUrl(pathSegments, query), {
       headers: { Authorization: `Bot ${DISCORD_BOT_TOKEN}` },
     });
 
@@ -71,7 +73,14 @@ async function fetchDiscordApi<T>(
 async function getChannelInfo(
   channelId: string
 ): Promise<{ ok: true; channel: DiscordChannelInfo } | { ok: false; error: string }> {
-  const result = await fetchDiscordApi<DiscordApiChannel>(`/channels/${channelId}`);
+  let validatedChannelId: string;
+  try {
+    validatedChannelId = parseDiscordSnowflake(channelId, 'channel ID');
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : 'Invalid channel ID' };
+  }
+
+  const result = await fetchDiscordApi<DiscordApiChannel>(['channels', validatedChannelId]);
   if (!result.ok) return result;
 
   return {
@@ -89,8 +98,22 @@ async function getChannelMessages(
   channelId: string,
   limit: number
 ): Promise<{ ok: true; messages: DiscordMessageForPrompt[] } | { ok: false; error: string }> {
+  let validatedChannelId: string;
+  try {
+    validatedChannelId = parseDiscordSnowflake(channelId, 'channel ID');
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : 'Invalid channel ID' };
+  }
+
+  if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
+    return { ok: false, error: 'Invalid Discord channel message limit' };
+  }
+
   const result = await fetchDiscordApi<DiscordApiMessage[]>(
-    `/channels/${channelId}/messages?limit=${limit}`
+    ['channels', validatedChannelId, 'messages'],
+    {
+      limit,
+    }
   );
   if (!result.ok) return result;
 
@@ -110,6 +133,31 @@ export async function getDiscordConversationContext(
 ): Promise<DiscordConversationContext> {
   const channelMessagesLimit = limits?.channelMessages ?? 12;
   const errors: string[] = [];
+
+  const contextIds = [
+    { fieldName: 'guild ID', value: context.guildId },
+    { fieldName: 'channel ID', value: context.channelId },
+    { fieldName: 'user ID', value: context.userId },
+    { fieldName: 'message ID', value: context.messageId },
+  ];
+
+  for (const { fieldName, value } of contextIds) {
+    try {
+      parseDiscordSnowflake(value, fieldName);
+    } catch (error) {
+      errors.push(error instanceof Error ? error.message : `Invalid Discord ${fieldName}`);
+    }
+  }
+
+  if (errors.length > 0) {
+    captureException(new Error('Invalid Discord conversation context'), {
+      level: 'warning',
+      tags: { source: 'discord_conversation_context' },
+      extra: { errors },
+    });
+
+    return { channel: null, recentMessages: [], errors };
+  }
 
   const [channelInfoResult, messagesResult] = await Promise.all([
     getChannelInfo(context.channelId),

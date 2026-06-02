@@ -109,6 +109,10 @@ import {
   type MessageSettlementOutbox,
 } from '../session/message-settlement-outbox.js';
 import {
+  resolveSessionMessageResult,
+  type MessageResultRPCResponse,
+} from '../session/message-result.js';
+import {
   createAgentRuntime,
   type AgentRuntime,
   type AgentRuntimeAcceptedDelivery,
@@ -977,6 +981,41 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     const metadata = await this.getMetadata();
     if (!metadata?.auth.kiloSessionId) return null;
     return this.eventQueries.getLatestAssistantMessage(sessionId, metadata.auth.kiloSessionId);
+  }
+
+  async getMessageResult(messageId: string): Promise<MessageResultRPCResponse> {
+    const metadata = await this.getMetadata();
+    if (!metadata) return { type: 'session-not-found' };
+
+    const resolved = await resolveSessionMessageResult(this.ctx.storage, messageId);
+    if (!resolved) return { type: 'message-not-found' };
+    if (resolved.type === 'state-invalid') return resolved;
+
+    const sessionId = await this.requireSessionId();
+    const assistantMessage =
+      metadata.auth.kiloSessionId && resolved.assistantLookup
+        ? this.eventQueries.getAssistantMessageById(
+            sessionId,
+            metadata.auth.kiloSessionId,
+            resolved.assistantLookup.messageId,
+            resolved.assistantLookup.parentMessageId
+          )
+        : null;
+    const assistant = assistantMessage
+      ? {
+          messageId: assistantMessage.info.id,
+          text: extractAssistantTextFromParts(assistantMessage.parts) || undefined,
+        }
+      : undefined;
+
+    return {
+      type: 'found',
+      result: {
+        cloudAgentSessionId: sessionId,
+        ...resolved.result,
+        ...(assistant ? { assistant } : {}),
+      },
+    };
   }
 
   private async getLatestAssistantMessageText(): Promise<string | undefined> {

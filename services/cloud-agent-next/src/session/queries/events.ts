@@ -320,6 +320,45 @@ export function createEventQueries(db: DrizzleSqliteDODatabase, rawSql: SqlStora
       return buildLatestAssistantMessage(sessionId, rawSql, messageRow);
     },
 
+    getAssistantMessageById(
+      sessionId: string,
+      kiloSessionId: string,
+      assistantMessageId: string,
+      parentMessageId: string
+    ): LatestAssistantMessage | null {
+      const messageRow = parseStoredEventRow(
+        rawSql
+          .exec(
+            `
+            SELECT id, execution_id, session_id, stream_event_type, payload, timestamp
+            FROM events
+            WHERE session_id = ?
+              AND stream_event_type = 'kilocode'
+              AND entity_id = ?
+              AND json_extract(payload, '$.event') = 'message.updated'
+              AND json_extract(payload, '$.properties.info.id') = ?
+              AND json_extract(payload, '$.properties.info.role') = 'assistant'
+              AND json_extract(payload, '$.properties.info.sessionID') = ?
+              AND json_extract(payload, '$.properties.info.parentID') = ?
+              AND (
+                json_extract(payload, '$.properties.info.time.completed') IS NOT NULL
+                OR json_extract(payload, '$.properties.info.error') IS NOT NULL
+              )
+            LIMIT 1
+            `,
+            sessionId,
+            `message/${assistantMessageId}`,
+            assistantMessageId,
+            kiloSessionId,
+            parentMessageId
+          )
+          .toArray()[0]
+      );
+      if (!messageRow) return null;
+
+      return buildLatestAssistantMessage(sessionId, rawSql, messageRow);
+    },
+
     getAssistantMessageForUserMessage(
       sessionId: string,
       kiloSessionId: string,

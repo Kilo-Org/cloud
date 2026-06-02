@@ -18,6 +18,11 @@ import {
 } from '../persistence/schemas.js';
 import { AgentModeSchema, BUILTIN_AGENT_MODES, Limits } from '../schema.js';
 import { MESSAGE_ID_FORMAT_DESCRIPTION, MESSAGE_ID_PATTERN } from '../session/message-id.js';
+import {
+  SessionMessageCompletionSourceSchema,
+  SessionMessageFailureCodeSchema,
+  SessionMessageFailureStageSchema,
+} from '../session/session-message-state.js';
 
 // Re-export schemas from types.ts and persistence/schemas.ts for convenience
 export { sessionIdSchema, githubRepoSchema, gitUrlSchema, envVarsSchema };
@@ -850,6 +855,96 @@ export const GetSessionOutput = z.object({
 });
 
 export type GetSessionResponse = z.infer<typeof GetSessionOutput>;
+
+export const GetMessageResultInput = z
+  .object({
+    cloudAgentSessionId: sessionIdSchema.describe('Cloud-agent session ID to inspect'),
+    messageId: MessageIdSchema.describe('Exact submitted message ID to inspect'),
+  })
+  .strict();
+
+export const GetMessageResultOutput = z
+  .object({
+    cloudAgentSessionId: sessionIdSchema,
+    messageId: MessageIdSchema,
+    status: z.enum(['queued', 'running', 'completed', 'failed', 'interrupted']),
+    createdAt: z.number(),
+    queuedAt: z.number().optional(),
+    acceptedAt: z.number().optional(),
+    terminalAt: z.number().optional(),
+    completionSource: SessionMessageCompletionSourceSchema.optional(),
+    failure: z
+      .object({
+        stage: SessionMessageFailureStageSchema.optional(),
+        code: SessionMessageFailureCodeSchema.optional(),
+        attempts: z.number().int().nonnegative().optional(),
+      })
+      .strict()
+      .optional(),
+    gateResult: z.enum(['pass', 'fail']).optional(),
+    assistant: z
+      .object({
+        messageId: z.string(),
+        text: z.string().optional(),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict()
+  .superRefine((result, ctx) => {
+    const isTerminal =
+      result.status === 'completed' ||
+      result.status === 'failed' ||
+      result.status === 'interrupted';
+    if (result.status === 'queued' && result.acceptedAt !== undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Queued results cannot include acceptedAt',
+        path: ['acceptedAt'],
+      });
+    }
+    if (!isTerminal && result.terminalAt !== undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Active results cannot include terminalAt',
+        path: ['terminalAt'],
+      });
+    }
+    if (!isTerminal && result.completionSource !== undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Active results cannot include completionSource',
+        path: ['completionSource'],
+      });
+    }
+    if (
+      result.status !== 'failed' &&
+      result.status !== 'interrupted' &&
+      result.failure !== undefined
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Only failed or interrupted results can include failure details',
+        path: ['failure'],
+      });
+    }
+    if (result.status !== 'completed' && result.gateResult !== undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Only completed results can include gateResult',
+        path: ['gateResult'],
+      });
+    }
+    if (result.status !== 'completed' && result.assistant !== undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Only completed results can include an assistant response',
+        path: ['assistant'],
+      });
+    }
+  });
+
+export type GetMessageResultResponse = z.infer<typeof GetMessageResultOutput>;
 
 export const GetLatestAssistantMessageInput = z.object({
   cloudAgentSessionId: sessionIdSchema.describe('Cloud-agent session ID to inspect'),

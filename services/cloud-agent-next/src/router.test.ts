@@ -91,6 +91,7 @@ type MockSessionStub = {
   getActiveExecutionId?: ReturnType<typeof vi.fn>;
   getExecution?: ReturnType<typeof vi.fn>;
   getLatestAssistantMessage?: ReturnType<typeof vi.fn>;
+  getMessageResult?: ReturnType<typeof vi.fn>;
   createTerminal?: ReturnType<typeof vi.fn>;
   resizeTerminal?: ReturnType<typeof vi.fn>;
   closeTerminal?: ReturnType<typeof vi.fn>;
@@ -1502,6 +1503,111 @@ describe('router sessionId validation', () => {
         ).rejects.toThrow('Authentication required');
       });
     });
+  });
+});
+
+describe('getMessageResult procedure', () => {
+  const sessionId: SessionId = 'agent_12345678-1234-1234-1234-123456789abc';
+  const messageId = 'msg_018f1e2d3c4bAbCdEfGhIjKlMn';
+  let mockContext: TRPCContext;
+  let caller: ReturnType<typeof appRouter.createCaller>;
+  let cloudAgentSession: MockCAS;
+  let mockGetMessageResult: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetMessageResult = vi.fn().mockResolvedValue({
+      type: 'found',
+      result: {
+        cloudAgentSessionId: sessionId,
+        messageId,
+        status: 'completed',
+        createdAt: 1,
+        terminalAt: 2,
+        assistant: { messageId: 'assistant_done', text: 'done' },
+      },
+    });
+    mockContext = {
+      userId: 'test-user-123',
+      authToken: 'test-token',
+      botId: undefined,
+      request: {} as Request,
+      env: {
+        CLOUD_AGENT_SESSION: {
+          idFromName: vi.fn((id: string) => ({ id })),
+          get: vi.fn(() => ({ getMessageResult: mockGetMessageResult })),
+        } as unknown as TRPCContext['env']['CLOUD_AGENT_SESSION'],
+      } as unknown as TRPCContext['env'],
+    };
+    cloudAgentSession = mockContext.env.CLOUD_AGENT_SESSION as unknown as MockCAS;
+    caller = appRouter.createCaller(mockContext);
+  });
+
+  it('returns an ownership-isolated safe exact message result with one Durable Object RPC', async () => {
+    await expect(
+      caller.getMessageResult({ cloudAgentSessionId: sessionId, messageId })
+    ).resolves.toEqual({
+      cloudAgentSessionId: sessionId,
+      messageId,
+      status: 'completed',
+      createdAt: 1,
+      terminalAt: 2,
+      assistant: { messageId: 'assistant_done', text: 'done' },
+    });
+    expect(cloudAgentSession.idFromName).toHaveBeenCalledWith(`test-user-123:${sessionId}`);
+    expect(mockGetMessageResult).toHaveBeenCalledOnce();
+    expect(mockGetMessageResult).toHaveBeenCalledWith(messageId);
+  });
+
+  it('returns Session not found when the Durable Object has no metadata', async () => {
+    mockGetMessageResult.mockResolvedValue({ type: 'session-not-found' });
+    await expect(
+      caller.getMessageResult({ cloudAgentSessionId: sessionId, messageId })
+    ).rejects.toMatchObject({ code: 'NOT_FOUND', message: 'Session not found' });
+  });
+
+  it('returns Message not found for an unknown message ID', async () => {
+    mockGetMessageResult.mockResolvedValue({ type: 'message-not-found' });
+    await expect(
+      caller.getMessageResult({ cloudAgentSessionId: sessionId, messageId })
+    ).rejects.toMatchObject({ code: 'NOT_FOUND', message: 'Message not found' });
+  });
+
+  it('fails closed when persisted message state is invalid', async () => {
+    mockGetMessageResult.mockResolvedValue({ type: 'state-invalid' });
+    await expect(
+      caller.getMessageResult({ cloudAgentSessionId: sessionId, messageId })
+    ).rejects.toMatchObject({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'Message result unavailable',
+    });
+  });
+
+  it('requires authentication', async () => {
+    const unauthenticatedCaller = appRouter.createCaller({
+      ...mockContext,
+      userId: undefined,
+      authToken: undefined,
+    } as unknown as TRPCContext);
+    await expect(
+      unauthenticatedCaller.getMessageResult({ cloudAgentSessionId: sessionId, messageId })
+    ).rejects.toThrow('Authentication required');
+  });
+
+  it('rejects extra sensitive RPC response fields at the output boundary', async () => {
+    mockGetMessageResult.mockResolvedValue({
+      type: 'found',
+      result: {
+        cloudAgentSessionId: sessionId,
+        messageId,
+        status: 'failed',
+        createdAt: 1,
+        error: 'private raw error',
+      },
+    });
+    await expect(
+      caller.getMessageResult({ cloudAgentSessionId: sessionId, messageId })
+    ).rejects.toThrow();
   });
 });
 

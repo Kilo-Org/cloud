@@ -29,15 +29,12 @@ import {
 import { KiloPassIssuanceItemKind } from '@/lib/kilo-pass/enums';
 import { and, asc, desc, eq, inArray, isNull, ne, sql, sum } from 'drizzle-orm';
 import * as z from 'zod';
-import {
-  computeMonthlyCadenceBonusPercent,
-  computeYearlyCadenceMonthlyBonusUsd,
-  getMonthlyPriceUsd,
-} from '@/lib/kilo-pass/bonus';
+import { getMonthlyPriceUsd } from '@/lib/kilo-pass/bonus';
+import { computeKiloPassBonusCreditsUsd } from '@/lib/kilo-pass/bonus-decision';
 import { KiloPassError } from '@/lib/kilo-pass/errors';
 import { isStripeSubscriptionEnded } from '@/lib/kilo-pass/stripe-subscription-status';
 import { releaseScheduledChangeForSubscription } from '@/lib/kilo-pass/scheduled-change-release';
-import { appendKiloPassAuditLog } from '@/lib/kilo-pass/issuance';
+import { KILO_PASS_BONUS_LIKE_ITEM_KINDS, appendKiloPassAuditLog } from '@/lib/kilo-pass/issuance';
 import {
   KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF,
   KILO_PASS_TIER_CONFIG,
@@ -55,6 +52,7 @@ import { closePauseEvent } from '@/lib/kilo-pass/pause-events';
 import { getAllMobileStoreKiloPassProducts } from '@/lib/kilo-pass/mobile-store-products';
 import { verifyAppleKiloPassTransactionJws } from '@/lib/kilo-pass/apple-store-verifier';
 import { completeStoreKiloPassPurchase } from '@/lib/kilo-pass/store-subscription-completion';
+import { getInitialWelcomePromoEligibilityReasonForSubscription } from '@/lib/kilo-pass/welcome-promo-context';
 
 const CursorInputSchema = z.object({
   cursor: z.string().nullable().optional(),
@@ -263,44 +261,34 @@ function getNextBillingAtFromSubscriptionStart(subscription: {
 
 function getNextKiloPassBonusCreditsUsd(params: {
   subscription: KiloPassSubscriptionState;
-  baseAmountUsd: number;
   isFirstTimeSubscriberEver: boolean;
+  welcomePromoEligibilityReason: KiloPassWelcomePromoEligibilityReason | null;
 }): number {
-  if (params.subscription.cadence === KiloPassCadence.Yearly) {
-    return roundToCents(computeYearlyCadenceMonthlyBonusUsd(params.subscription.tier));
-  }
-
-  const predictedStreakMonths = Math.max(1, params.subscription.currentStreakMonths + 1);
-  const bonusPercentApplied = computeMonthlyCadenceBonusPercent({
+  return computeKiloPassBonusCreditsUsd({
     tier: params.subscription.tier,
-    streakMonths: predictedStreakMonths,
+    cadence: params.subscription.cadence,
+    startedAtIso: params.subscription.startedAt,
+    streakMonths: Math.max(1, params.subscription.currentStreakMonths + 1),
     isFirstTimeSubscriberEver: params.isFirstTimeSubscriberEver,
-    subscriptionStartedAtIso: params.subscription.startedAt,
+    paymentProvider: params.subscription.paymentProvider,
+    welcomePromoEligibilityReason: params.welcomePromoEligibilityReason,
   });
-
-  const baseCents = Math.round(params.baseAmountUsd * 100);
-  const bonusCents = Math.round(baseCents * bonusPercentApplied);
-  return bonusCents / 100;
 }
 
 function getCurrentKiloPassBonusCreditsUsd(params: {
   subscription: KiloPassSubscriptionState;
-  baseAmountUsd: number;
   isFirstTimeSubscriberEver: boolean;
+  welcomePromoEligibilityReason: KiloPassWelcomePromoEligibilityReason | null;
 }): number {
-  if (params.subscription.cadence === KiloPassCadence.Yearly) {
-    return roundToCents(computeYearlyCadenceMonthlyBonusUsd(params.subscription.tier));
-  }
-
-  const streakMonths = Math.max(1, params.subscription.currentStreakMonths);
-  const bonusPercentApplied = computeMonthlyCadenceBonusPercent({
+  return computeKiloPassBonusCreditsUsd({
     tier: params.subscription.tier,
-    streakMonths,
+    cadence: params.subscription.cadence,
+    startedAtIso: params.subscription.startedAt,
+    streakMonths: Math.max(1, params.subscription.currentStreakMonths),
     isFirstTimeSubscriberEver: params.isFirstTimeSubscriberEver,
-    subscriptionStartedAtIso: params.subscription.startedAt,
+    paymentProvider: params.subscription.paymentProvider,
+    welcomePromoEligibilityReason: params.welcomePromoEligibilityReason,
   });
-  const cents = Math.round(params.baseAmountUsd * bonusPercentApplied * 100);
-  return cents / 100;
 }
 
 function getUsageStartInclusiveIso(params: {
@@ -387,11 +375,7 @@ async function getIsBonusUnlockedForSubscriptionId(subscriptionId: string): Prom
     columns: { id: true },
     where: and(
       eq(kilo_pass_issuance_items.kilo_pass_issuance_id, issuanceId),
-      inArray(kilo_pass_issuance_items.kind, [
-        KiloPassIssuanceItemKind.Bonus,
-        KiloPassIssuanceItemKind.PromoFirstMonth50Pct,
-        KiloPassIssuanceItemKind.ReferralBonus,
-      ])
+      inArray(kilo_pass_issuance_items.kind, KILO_PASS_BONUS_LIKE_ITEM_KINDS)
     ),
   });
 
@@ -652,10 +636,14 @@ async function buildActiveKiloPassSubscriptionState(params: {
     kiloUserId: params.kiloUserId,
     subscriptionId: params.subscription.subscriptionId,
   });
-  const [isBonusUnlocked, baseCreditsIssuedAtIso] = await Promise.all([
-    getIsBonusUnlockedForSubscriptionId(params.subscription.subscriptionId),
-    getBaseCreditsIssuedAtForSubscription(params.subscription.subscriptionId),
-  ]);
+  const [isBonusUnlocked, baseCreditsIssuedAtIso, welcomePromoEligibilityReason] =
+    await Promise.all([
+      getIsBonusUnlockedForSubscriptionId(params.subscription.subscriptionId),
+      getBaseCreditsIssuedAtForSubscription(params.subscription.subscriptionId),
+      getInitialWelcomePromoEligibilityReasonForSubscription(db, {
+        subscriptionId: params.subscription.subscriptionId,
+      }),
+    ]);
   const usageStartInclusiveIso = getUsageStartInclusiveIso({
     subscription: params.subscription,
     baseCreditsIssuedAtIso,
@@ -672,8 +660,8 @@ async function buildActiveKiloPassSubscriptionState(params: {
     ...params.subscription,
     nextBonusCreditsUsd: getNextKiloPassBonusCreditsUsd({
       subscription: params.subscription,
-      baseAmountUsd,
       isFirstTimeSubscriberEver,
+      welcomePromoEligibilityReason,
     }),
     nextBillingAt: params.nextBillingAt,
     isFirstTimeSubscriberEver,
@@ -682,8 +670,8 @@ async function buildActiveKiloPassSubscriptionState(params: {
     currentPeriodHostingCostUsd,
     currentPeriodBonusCreditsUsd: getCurrentKiloPassBonusCreditsUsd({
       subscription: params.subscription,
-      baseAmountUsd,
       isFirstTimeSubscriberEver,
+      welcomePromoEligibilityReason,
     }),
     isBonusUnlocked,
     refillAt:

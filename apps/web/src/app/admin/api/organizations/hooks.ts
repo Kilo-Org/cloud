@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useInvalidateAllOrganizationData } from '@/app/api/organizations/hooks';
 import { useTRPC } from '@/lib/trpc/utils';
 import type { OrganizationPlan } from '@/lib/organizations/organization-types';
+import type { StripeSubscriptionStatusValue } from '@/lib/admin/stripe-subscription-statuses';
 
 export function useDeleteOrganization() {
   const queryClient = useQueryClient();
@@ -69,10 +70,12 @@ type UseOrganizationsListParams = {
   sortBy: OrganizationSortableField;
   sortOrder: 'asc' | 'desc';
   search: string;
-  seatsRequired?: string;
-  hasBalance?: string;
-  status?: string;
+  mode?: 'paying' | 'trial' | 'all';
+  include_deleted?: boolean;
+  stripe_status?: string;
   plan?: string;
+  has_usage?: boolean;
+  has_multiple_users?: boolean;
 };
 
 export function useOrganizationsList(params: UseOrganizationsListParams) {
@@ -84,10 +87,12 @@ export function useOrganizationsList(params: UseOrganizationsListParams) {
       sortBy: params.sortBy,
       sortOrder: params.sortOrder,
       search: params.search,
-      seatsRequired: params.seatsRequired as '' | 'true' | 'false' | undefined,
-      hasBalance: params.hasBalance as '' | 'true' | 'false' | undefined,
-      status: params.status as 'active' | 'all' | 'incomplete' | 'deleted' | undefined,
+      mode: params.mode,
+      include_deleted: params.include_deleted ?? false,
+      stripe_status: params.stripe_status as StripeSubscriptionStatusValue | '' | undefined,
       plan: params.plan as '' | OrganizationPlan | undefined,
+      has_usage: params.has_usage ?? false,
+      has_multiple_users: params.has_multiple_users ?? false,
     })
   );
 }

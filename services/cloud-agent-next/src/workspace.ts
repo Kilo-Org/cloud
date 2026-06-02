@@ -4,6 +4,7 @@ import { logger } from './logger.js';
 import {
   inspectWrapperContainers,
   isWrapperLiveInProcessesOrContainers,
+  type LabeledWrapperRow,
 } from './kilo/wrapper-manager.js';
 import {
   DISK_CHECK_TIMEOUT_MS,
@@ -190,6 +191,10 @@ export type StaleWorkspaceCleanupResult = {
   skipped: number;
 };
 
+export type StaleWorkspaceCleanupOptions = {
+  inspectContainers: boolean;
+};
+
 export type WorkspaceAdmissionResult = {
   availableMB: number;
   thresholdMB: number;
@@ -212,7 +217,8 @@ export async function checkDiskAndCleanBeforeSetup(
   sandbox: SandboxInstance,
   orgId: string | undefined,
   userId: string,
-  sessionId: string
+  sessionId: string,
+  options: StaleWorkspaceCleanupOptions
 ): Promise<WorkspaceAdmissionResult> {
   try {
     const initialCapacity = await checkDiskSpace(sandbox);
@@ -229,7 +235,8 @@ export async function checkDiskAndCleanBeforeSetup(
     const cleanup = await cleanupStaleWorkspaces(
       sandbox,
       getBaseWorkspacePath(orgId, userId),
-      sessionId
+      sessionId,
+      options
     );
     const recheckedCapacity = await checkDiskSpace(sandbox);
     if (recheckedCapacity.isLow) {
@@ -406,7 +413,8 @@ async function cleanupWorkspaceBestEffort(
 export async function cleanupStaleWorkspaces(
   sandbox: SandboxInstance,
   baseWorkspacePath: string,
-  currentSessionId: string
+  currentSessionId: string,
+  options: StaleWorkspaceCleanupOptions
 ): Promise<StaleWorkspaceCleanupResult> {
   logger
     .withFields({ baseWorkspacePath, currentSessionId })
@@ -460,22 +468,25 @@ export async function cleanupStaleWorkspaces(
     return { cleaned: 0, skipped: sessionDirs.length };
   }
 
-  const wrapperContainerInspection = await inspectWrapperContainers(sandbox);
-  if (wrapperContainerInspection.status === 'inspection-failed') {
-    throwIfSandboxFilesystemUnusable(
-      'Stale devcontainer wrapper inspection',
-      wrapperContainerInspection.error
-    );
-    logger
-      .withFields({
-        error: wrapperContainerInspection.error,
-        cleaned: 0,
-        skipped: sessionDirs.length,
-      })
-      .warn('Failed to inspect devcontainer wrappers, skipping cleanup');
-    return { cleaned: 0, skipped: sessionDirs.length };
+  let wrapperContainers: LabeledWrapperRow[] = [];
+  if (options.inspectContainers) {
+    const wrapperContainerInspection = await inspectWrapperContainers(sandbox);
+    if (wrapperContainerInspection.status === 'inspection-failed') {
+      throwIfSandboxFilesystemUnusable(
+        'Stale devcontainer wrapper inspection',
+        wrapperContainerInspection.error
+      );
+      logger
+        .withFields({
+          error: wrapperContainerInspection.error,
+          cleaned: 0,
+          skipped: sessionDirs.length,
+        })
+        .warn('Failed to inspect devcontainer wrappers, skipping cleanup');
+      return { cleaned: 0, skipped: sessionDirs.length };
+    }
+    wrapperContainers = wrapperContainerInspection.containers;
   }
-  const wrapperContainers = wrapperContainerInspection.containers;
 
   // Get current epoch once so we can age-check directories without re-shelling per candidate
   const nowSeconds = Math.floor(Date.now() / 1000);

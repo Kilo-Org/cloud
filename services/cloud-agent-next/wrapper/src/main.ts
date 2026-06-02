@@ -258,6 +258,7 @@ async function main() {
     closeConnection: () => connectionManager?.close() ?? Promise.resolve(),
     setAborted: () => lifecycleManager?.setAborted(),
     resetLifecycle: () => lifecycleManager?.reset(),
+    onMessageComplete: (messageId: string) => lifecycleManager?.onMessageComplete(messageId),
     readySession: readySession,
     materializePromptAttachments,
   };
@@ -439,6 +440,7 @@ async function main() {
         },
         onReconnected: () => {
           logToFile('ingest WS reconnected');
+          lifecycleManager?.onConnectionRestored();
           const lastError = state.getLastError();
           if (lastError?.code === 'DISCONNECT') {
             state.clearLastError();

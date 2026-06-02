@@ -7821,10 +7821,40 @@ describe('restartMachine image tag override', () => {
     const result = await instance.restartMachine({ imageTag: 'latest' });
 
     expect(result.success).toBe(true);
-    expect(selectImageVersionForInstance).toHaveBeenCalledOnce();
+    expect(selectImageVersionForInstance).toHaveBeenCalledWith(
+      expect.objectContaining({ rolloutSubject: 'user-1' })
+    );
     expect(storage._store.get('trackedImageTag')).toBe('new-tag-from-kv');
     expect(storage._store.get('openclawVersion')).toBe('2.0.0');
     expect(storage._store.get('imageVariant')).toBe('default');
+  });
+
+  it('resolves latest with the instance UUID for instance-keyed sandboxes', async () => {
+    const { instance, storage } = createInstance();
+    const instanceId = '123e4567-e89b-12d3-a456-426614174000';
+    await seedRunning(storage, {
+      sandboxId: 'ki_123e4567e89b12d3a456426614174000',
+      trackedImageTag: 'old-tag',
+      openclawVersion: '1.0.0',
+      imageVariant: 'default',
+    });
+
+    (selectImageVersionForInstance as Mock).mockResolvedValueOnce({
+      openclawVersion: '2.0.0',
+      variant: 'default',
+      imageTag: 'new-tag-from-kv',
+      imageDigest: null,
+      publishedAt: new Date().toISOString(),
+      rolloutPercent: 0,
+      isLatest: true,
+    });
+
+    const result = await instance.restartMachine({ imageTag: 'latest' });
+
+    expect(result.success).toBe(true);
+    expect(selectImageVersionForInstance).toHaveBeenCalledWith(
+      expect.objectContaining({ rolloutSubject: instanceId })
+    );
   });
 
   it('falls back gracefully when "latest" but selector returns null', async () => {
@@ -8005,6 +8035,36 @@ describe('applyPinnedVersion', () => {
     expect(selectImageVersionForInstance).toHaveBeenCalledWith(
       expect.objectContaining({ currentImageTag: null })
     );
+  });
+
+  it('when cleared through an instance-id-aware route, uses legacy sandbox rollout subject for legacy instances', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, {
+      sandboxId: 'sandbox-1',
+      trackedImageTag: 'candidate-tag',
+      openclawVersion: '2026.4.9',
+      imageVariant: 'default',
+    });
+
+    (selectImageVersionForInstance as Mock).mockResolvedValueOnce({
+      openclawVersion: '2026.4.23',
+      variant: 'default',
+      imageTag: 'latest-tag',
+      imageDigest: 'sha256:latest',
+      publishedAt: new Date().toISOString(),
+      rolloutPercent: 100,
+      isLatest: true,
+    });
+
+    await instance.applyPinnedVersion(null);
+
+    expect(selectImageVersionForInstance).toHaveBeenCalledWith(
+      expect.objectContaining({
+        rolloutSubject: 'user-1',
+        currentImageTag: null,
+      })
+    );
+    expect(storage._store.get('trackedImageTag')).toBe('latest-tag');
   });
 
   it('when cleared and no rollout target, leaves existing tracked image alone', async () => {

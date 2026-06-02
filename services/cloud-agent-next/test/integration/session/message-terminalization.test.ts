@@ -258,6 +258,72 @@ describe('message terminalization and stream events', () => {
     });
   });
 
+  it('reports a safe insufficient-credit diagnostic for a wrapper failure after activity', async () => {
+    const userId = 'user_term_credit_report';
+    const sessionId = 'agent_term_credit_report';
+    const stub = env.CLOUD_AGENT_SESSION.get(
+      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
+    );
+    const reports: CloudAgentQueueReport[] = [];
+
+    const message = await runInDurableObject(stub, async instance => {
+      injectReportQueue(instance, reports);
+      await registerReadySession(instance, {
+        sessionId,
+        userId,
+        kiloSessionId,
+        prompt: 'send a model request',
+        mode: 'code',
+        model: 'test-model',
+        kilocodeToken: 'token-term-credit-report',
+      });
+      const { state: runtimeState } = await allocateWrapperRuntimeState(instance.ctx.storage);
+      const messageId = 'msg_018f1e2d3c4bTermCreditAbCd';
+      await putSessionMessageState(instance.ctx.storage, {
+        messageId,
+        status: 'accepted',
+        prompt: 'send a model request',
+        createdAt: Date.now(),
+        acceptedAt: Date.now(),
+        dispatchAcceptanceKind: 'observed',
+        wrapperRunId: runtimeState.wrapperRunId,
+        callbackRequired: false,
+      });
+      await instance['recordCorrelatedAgentActivity'](messageId);
+      await instance.handleWrapperTerminalEvent({
+        wrapperRunId: runtimeState.wrapperRunId,
+        status: 'failed',
+        error: 'Insufficient credits',
+      });
+      return getSessionMessageState(instance.ctx.storage, messageId);
+    });
+
+    expect(message).toMatchObject({
+      status: 'failed',
+      failureStage: 'agent_activity',
+      failureCode: 'wrapper_error_after_activity',
+      error: 'Insufficient credits',
+    });
+    const failedReport = reports.find(report => report.run.status === 'failed');
+    expect(failedReport).toMatchObject({
+      type: 'run.state',
+      run: {
+        status: 'failed',
+        failureStage: 'agent_activity',
+        failureCode: 'wrapper_error_after_activity',
+        diagnostic: { errorMessageRedacted: 'Model request failed: insufficient credits' },
+      },
+    });
+    if (!failedReport?.run.terminalAt || !failedReport.run.diagnostic) {
+      throw new Error('Expected failed report to contain terminal diagnostics');
+    }
+    expect(
+      Date.parse(failedReport.run.diagnostic.errorExpiresAt) -
+        Date.parse(failedReport.run.terminalAt)
+    ).toBe(30 * 24 * 60 * 60 * 1000);
+    expect(JSON.stringify(failedReport)).not.toContain('Insufficient credits');
+  });
+
   it('ignores terminal acceptance reconstruction for a non-current wrapper run', async () => {
     const userId = 'user_term_stale_accept';
     const sessionId = 'agent_term_stale_accept';

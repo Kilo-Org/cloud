@@ -41,6 +41,10 @@
       "schedule": "*/9 * * * *"
     },
     {
+      "path": "/api/cron/coding-plans-billing",
+      "schedule": "0 * * * *"
+    },
+    {
       "path": "/api/cron/db-pool-metrics",
       "schedule": "* * * * *"
     },

@@ -13,6 +13,7 @@ import {
   createRejectQuestionHandler,
   createAbortHandler,
   createPromptHandler,
+  createCommandHandler,
   createSessionReadyHandler,
   bindSessionContext,
   type ServerConfig,
@@ -30,6 +31,7 @@ function createMockKiloClient(): WrapperKiloClient {
     getSession: vi.fn().mockResolvedValue({ id: 'kilo_sess' }),
     sendPromptAsync: vi.fn().mockResolvedValue(undefined),
     abortSession: vi.fn().mockResolvedValue(true),
+    summarizeSession: vi.fn().mockResolvedValue(true),
     sendCommand: vi.fn().mockResolvedValue(undefined),
     answerPermission: vi.fn().mockResolvedValue(true),
     answerQuestion: vi.fn().mockResolvedValue(true),
@@ -51,6 +53,7 @@ function createMockDeps(state: WrapperState) {
     closeConnection: vi.fn().mockResolvedValue(undefined),
     setAborted: vi.fn(),
     resetLifecycle: vi.fn(),
+    onMessageComplete: vi.fn(),
     readySession: vi.fn(),
     materializePromptAttachments: vi.fn(async prompt => prompt),
   };
@@ -550,6 +553,107 @@ describe('createPromptHandler', () => {
 
     expect(response.status).toBe(400);
     expect(state.hasSession).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Command Handler
+// ---------------------------------------------------------------------------
+
+describe('createCommandHandler', () => {
+  it('routes compact through session summarize with the selected model', async () => {
+    const state = new WrapperState();
+    const sendToIngest = vi.fn();
+    state.setSendToIngestFn(sendToIngest);
+    const deps = createMockDeps(state);
+    const handler = createCommandHandler(defaultServerConfig, deps);
+
+    const response = await handler(
+      jsonRequest({
+        command: 'compact',
+        messageId: 'msg_compact',
+        agent: {
+          model: { providerID: 'kilo', modelID: 'anthropic/claude-sonnet-4-20250514' },
+        },
+        session: completeBinding,
+      })
+    );
+    const data = await readJson(response);
+
+    expect(response.status).toBe(200);
+    expect(data).toEqual({ status: 'sent', result: true });
+    expect(deps.openConnection).toHaveBeenCalledOnce();
+    expect(deps.kiloClient.summarizeSession).toHaveBeenCalledWith({
+      sessionId: 'kilo_sess_1',
+      model: { providerID: 'kilo', modelID: 'anthropic/claude-sonnet-4-20250514' },
+    });
+    expect(deps.kiloClient.sendCommand).not.toHaveBeenCalled();
+    expect(sendToIngest).toHaveBeenCalledWith({
+      streamEventType: 'cloud.message.completed',
+      data: {
+        messageId: 'msg_compact',
+        completionSource: 'manual_compact_summarize',
+      },
+      timestamp: expect.any(String),
+    });
+    expect(deps.onMessageComplete).toHaveBeenCalledWith('msg_compact');
+    expect(state.getMessageConfig('msg_compact')).toEqual({
+      autoCommit: false,
+      condenseOnComplete: false,
+      model: 'anthropic/claude-sonnet-4-20250514',
+      upstreamBranch: undefined,
+    });
+  });
+
+  it('rejects compact without a model', async () => {
+    const state = new WrapperState();
+    const deps = createMockDeps(state);
+    const handler = createCommandHandler(defaultServerConfig, deps);
+
+    const response = await handler(
+      jsonRequest({
+        command: 'compact',
+        messageId: 'msg_compact',
+        session: completeBinding,
+      })
+    );
+    const data = await readJson(response);
+
+    expect(response.status).toBe(400);
+    expect(data).toEqual({ error: 'INVALID_REQUEST', message: 'model is required for compact' });
+    expect(deps.openConnection).not.toHaveBeenCalled();
+    expect(deps.kiloClient.summarizeSession).not.toHaveBeenCalled();
+    expect(deps.kiloClient.sendCommand).not.toHaveBeenCalled();
+  });
+
+  it('does not complete compact message when summarize fails', async () => {
+    const state = new WrapperState();
+    const sendToIngest = vi.fn();
+    state.setSendToIngestFn(sendToIngest);
+    const deps = createMockDeps(state);
+    deps.kiloClient.summarizeSession = vi.fn().mockRejectedValue(new Error('summarize failed'));
+    const handler = createCommandHandler(defaultServerConfig, deps);
+
+    const response = await handler(
+      jsonRequest({
+        command: 'compact',
+        messageId: 'msg_compact',
+        agent: {
+          model: { providerID: 'kilo', modelID: 'anthropic/claude-sonnet-4-20250514' },
+        },
+        session: completeBinding,
+      })
+    );
+    const data = await readJson(response);
+
+    expect(response.status).toBe(500);
+    expect(data).toEqual({
+      error: 'COMMAND_ERROR',
+      message: 'Failed to send command: summarize failed',
+    });
+    expect(sendToIngest).not.toHaveBeenCalled();
+    expect(deps.onMessageComplete).not.toHaveBeenCalled();
+    expect(state.getMessageConfig('msg_compact')).toBeNull();
   });
 });
 

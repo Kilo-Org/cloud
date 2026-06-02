@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowRight } from 'lucide-react';
 import { toast } from 'sonner';
@@ -66,10 +66,8 @@ export function KiloClawDetail({ instanceId }: { instanceId: string }) {
   const detailQuery = useQuery(trpc.kiloclaw.getSubscriptionDetail.queryOptions({ instanceId }));
   const billingQuery = useQuery(trpc.kiloclaw.getBillingHistory.queryOptions({ instanceId }));
 
-  const fetchMoreBilling = useCallback(
-    (cursor: string) => trpcClient.kiloclaw.getBillingHistory.query({ instanceId, cursor }),
-    [trpcClient, instanceId]
-  );
+  const fetchMoreBilling = (cursor: string) =>
+    trpcClient.kiloclaw.getBillingHistory.query({ instanceId, cursor });
   const billing = useCursorPagination({
     initialData: billingQuery.data,
     fetchMore: fetchMoreBilling,
@@ -276,7 +274,7 @@ export function KiloClawDetail({ instanceId }: { instanceId: string }) {
   return (
     <div className="space-y-6">
       <DetailPageHeader
-        backHref="/subscriptions"
+        backHref="/subscriptions#kiloclaw"
         backLabel="Back to subscriptions"
         title={subscription.instanceName ?? 'KiloClaw'}
         status={getKiloclawDisplayStatus(subscription)}

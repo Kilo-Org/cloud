@@ -1058,6 +1058,27 @@
       "when": 1780085204443,
       "tag": "0150_typical_scorpion",
       "breakpoints": true
+    },
+    {
+      "idx": 151,
+      "version": "7",
+      "when": 1780313423049,
+      "tag": "0151_shiny_bullseye",
+      "breakpoints": true
+    },
+    {
+      "idx": 152,
+      "version": "7",
+      "when": 1780319034603,
+      "tag": "0152_giant_wendell_vaughn",
+      "breakpoints": true
+    },
+    {
+      "idx": 153,
+      "version": "7",
+      "when": 1780333010122,
+      "tag": "0153_perpetual_bromley",
+      "breakpoints": true
     }
   ]
 }

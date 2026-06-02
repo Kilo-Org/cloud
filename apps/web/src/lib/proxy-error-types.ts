@@ -28,6 +28,7 @@ export const proxyErrorTypeSchema = z.enum([
   'byok_key_required',
   'upstream_error',
   'no_free_models_available',
+  'abuse_blocked',
 ]);
 
 export type ProxyErrorType = z.infer<typeof proxyErrorTypeSchema>;

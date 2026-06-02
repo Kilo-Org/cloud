@@ -47,9 +47,16 @@ export type UsersApiResponse = {
 
 export const AdminOrganizationSchema = OrganizationSchema.extend({
   member_count: z.number(),
-  created_by_user_email: z.string().nullable(),
-  created_by_user_name: z.string().nullable(),
   subscription_amount_usd: z.number().nullable(),
+  latest_stripe_status: z.string().nullable(),
+  kilo_pass_tier: z.string().nullable(),
+  kiloclaw_count: z.number(),
+  has_github_integration: z.boolean(),
+  has_gitlab_integration: z.boolean(),
+  has_slack_integration: z.boolean(),
+  has_sso_configured: z.boolean(),
+  has_provider_controls: z.boolean(),
+  has_data_privacy: z.boolean(),
 });
 
 export const OrganizationsApiGetResponseSchema = z.object({
@@ -94,12 +101,7 @@ export type SortableField = (typeof sortableFields)[number];
 
 export const ascendingFirstFields: SortableField[] = ['google_user_email'];
 
-export type OrganizationSortableField =
-  | 'name'
-  | 'created_at'
-  | 'microdollars_used'
-  | 'balance'
-  | 'member_count';
+export type OrganizationSortableField = 'name' | 'microdollars_used' | 'balance' | 'member_count';
 
 export type CreditCategorySortableField =
   | 'credit_category'

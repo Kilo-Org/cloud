@@ -62,7 +62,13 @@ function jsonError(message: string, status: number) {
   });
 }
 
-function buildFilter(userId: string, parsedStart: Date, parsedEnd: Date, model: string | null) {
+function buildFilter(
+  userId: string,
+  parsedStart: Date,
+  parsedEnd: Date,
+  model: string | null,
+  sessionId: string | null
+) {
   const conditions = [
     eq(api_request_log.kilo_user_id, userId),
     gte(api_request_log.created_at, parsedStart.toISOString()),
@@ -70,6 +76,9 @@ function buildFilter(userId: string, parsedStart: Date, parsedEnd: Date, model: 
   ];
   if (model) {
     conditions.push(eq(api_request_log.model, model));
+  }
+  if (sessionId) {
+    conditions.push(eq(api_request_log.session_id, sessionId));
   }
   return and(...conditions);
 }
@@ -87,6 +96,7 @@ export async function GET(request: NextRequest) {
   const startDate = searchParams.get('startDate');
   const endDate = searchParams.get('endDate');
   const model = searchParams.get('model');
+  const sessionId = searchParams.get('sessionId') || searchParams.get('session_id');
 
   if (!userId || !startDate || !endDate) {
     return jsonError('userId, startDate, and endDate are required', 400);
@@ -98,7 +108,7 @@ export async function GET(request: NextRequest) {
     return jsonError('Invalid date format. Use YYYY-MM-DD.', 400);
   }
 
-  const filter = buildFilter(userId, parsedStart, parsedEnd, model);
+  const filter = buildFilter(userId, parsedStart, parsedEnd, model, sessionId);
 
   const [result] = await db.select({ total: count() }).from(api_request_log).where(filter);
   if (result.total === 0) {
@@ -171,7 +181,8 @@ export async function GET(request: NextRequest) {
   const sanitize = (s: string) => s.replaceAll('/', '-').replaceAll(':', '-');
   const safeUserId = sanitize(userId);
   const safeModel = model ? `_${sanitize(model)}` : '';
-  const filename = `api-request-log_${safeUserId}_${startDate}_${endDate}${safeModel}.zip`;
+  const safeSessionId = sessionId ? `_${sanitize(sessionId)}` : '';
+  const filename = `api-request-log_${safeUserId}_${startDate}_${endDate}${safeModel}${safeSessionId}.zip`;
 
   return new Response(webStream, {
     headers: {

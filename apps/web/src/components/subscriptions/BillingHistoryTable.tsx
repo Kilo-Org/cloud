@@ -21,29 +21,61 @@ export function BillingHistoryTable({
   hasMore,
   onLoadMore,
   isLoading = false,
+  formatCredits = formatCreditAmount,
 }: {
   variant: 'stripe' | 'credits';
   entries: BillingHistoryEntry[];
   hasMore: boolean;
   onLoadMore: () => void;
   isLoading?: boolean;
+  formatCredits?: (amountMicrodollars: number) => string;
 }) {
   const headerCellClassName = 'h-14 bg-muted/20 px-4 text-sm font-semibold';
   const bodyCellClassName = 'px-4 py-4';
 
   return (
     <div className="space-y-3">
-      <div className="overflow-hidden rounded-xl border">
+      {variant === 'credits' ? (
+        <div className="divide-y overflow-hidden rounded-xl border sm:hidden">
+          {entries.length === 0 ? (
+            <div className="text-muted-foreground px-4 py-10 text-center text-sm">
+              No billing history yet.
+            </div>
+          ) : (
+            entries.map(entry =>
+              entry.kind === 'credits' ? (
+                <div key={entry.id} className="space-y-2 p-4 text-sm">
+                  <div className="flex items-start justify-between gap-3">
+                    <span className="text-muted-foreground tabular-nums">
+                      {formatIsoDateString_UsaDateOnlyFormat(entry.date)}
+                    </span>
+                    <span className="shrink-0 font-medium tabular-nums">
+                      {formatCredits(entry.amountMicrodollars)}
+                    </span>
+                  </div>
+                  <p>{entry.description}</p>
+                </div>
+              ) : null
+            )
+          )}
+        </div>
+      ) : null}
+      <div
+        className={cn(
+          'overflow-x-auto rounded-xl border',
+          variant === 'credits' && 'hidden sm:block'
+        )}
+      >
         <Table>
           <TableHeader className="bg-muted/20">
             <TableRow className="hover:bg-transparent">
               <TableHead className={headerCellClassName}>Date</TableHead>
               {variant === 'stripe' ? (
-                <TableHead className={headerCellClassName}>Amount</TableHead>
+                <TableHead className={cn(headerCellClassName, 'text-right')}>Amount</TableHead>
               ) : (
                 <TableHead className={headerCellClassName}>Description</TableHead>
               )}
-              <TableHead className={headerCellClassName}>
+              <TableHead className={cn(headerCellClassName, variant === 'credits' && 'text-right')}>
                 {variant === 'stripe' ? 'Status' : 'Amount'}
               </TableHead>
               {variant === 'stripe' ? (
@@ -64,12 +96,12 @@ export function BillingHistoryTable({
             ) : (
               entries.map(entry => (
                 <TableRow key={entry.id}>
-                  <TableCell className={bodyCellClassName}>
+                  <TableCell className={cn(bodyCellClassName, 'tabular-nums')}>
                     {formatIsoDateString_UsaDateOnlyFormat(entry.date)}
                   </TableCell>
                   {entry.kind === 'stripe' ? (
                     <>
-                      <TableCell className={bodyCellClassName}>
+                      <TableCell className={cn(bodyCellClassName, 'text-right tabular-nums')}>
                         {formatCents(entry.amountCents, entry.currency)}
                       </TableCell>
                       <TableCell className={bodyCellClassName}>
@@ -93,8 +125,8 @@ export function BillingHistoryTable({
                   ) : (
                     <>
                       <TableCell className={bodyCellClassName}>{entry.description}</TableCell>
-                      <TableCell className={bodyCellClassName}>
-                        {formatCreditAmount(entry.amountMicrodollars)}
+                      <TableCell className={cn(bodyCellClassName, 'text-right tabular-nums')}>
+                        {formatCredits(entry.amountMicrodollars)}
                       </TableCell>
                     </>
                   )}

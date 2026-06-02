@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useReducer, useState } from 'react';
 import { useTRPC } from '@/lib/trpc/utils';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/Button';
@@ -11,6 +11,16 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import {
   Select,
   SelectContent,
@@ -40,6 +50,7 @@ import {
 import { toast } from 'sonner';
 import {
   DirectUserByokInferenceProviderIdSchema,
+  UserByokProviderIdSchema,
   VercelUserByokInferenceProviderIdSchema,
   AwsCredentialsSchema,
   type VercelUserByokInferenceProviderId,
@@ -82,12 +93,18 @@ const BYOK_PROVIDERS = [...DIRECT_BYOK_PROVIDERS_LIST, ...VERCEL_BYOK_PROVIDERS]
   a.name.localeCompare(b.name)
 );
 
-function BYOKDescription() {
+function BYOKDescription({ showsCodingPlanKey = false }: { showsCodingPlanKey?: boolean }) {
   return (
-    <p className="text-muted-foreground">
-      Supply your own key provider API keys. Your Kilo balance will not be used when using these
-      providers: you will be billed by the provider directly.
-    </p>
+    <div className="text-muted-foreground space-y-2">
+      <p>Keys you create here use provider billing instead of your Kilo balance.</p>
+      {showsCodingPlanKey ? (
+        <p>
+          Token Plan Plus configured your MiniMax key using Kilo Credits. Updating, disabling, or
+          deleting that key changes routing only; subscription billing continues until canceled in
+          Subscriptions.
+        </p>
+      ) : null}
+    </div>
   );
 }
 
@@ -116,7 +133,7 @@ function SupportedModelsList({ models }: { models: string[] }) {
         onClick={() => setExpanded(v => !v)}
         className="text-muted-foreground hover:text-foreground flex items-center gap-1 text-xs transition-colors"
       >
-        {expanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+        {expanded ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
         {models.length} supported model{models.length !== 1 ? 's' : ''}
       </button>
       {expanded && (
@@ -134,13 +151,59 @@ type BYOKKeysManagerProps = {
   organizationId?: string;
 };
 
+type InstalledKeyWarningAction =
+  | { type: 'disable'; keyId: string }
+  | { type: 'update'; keyId: string }
+  | { type: 'delete'; keyId: string; providerName: string };
+
+type BYOKDialogState = {
+  isDialogOpen: boolean;
+  editingKeyId: string | null;
+  selectedProvider: string;
+  apiKey: string;
+  showApiKey: boolean;
+  awsCredentialError: string | null;
+  installedKeyWarningAction: InstalledKeyWarningAction | null;
+};
+
+const INITIAL_BYOK_DIALOG_STATE: BYOKDialogState = {
+  isDialogOpen: false,
+  editingKeyId: null,
+  selectedProvider: '',
+  apiKey: '',
+  showApiKey: false,
+  awsCredentialError: null,
+  installedKeyWarningAction: null,
+};
+
+function updateBYOKDialogState(state: BYOKDialogState, update: Partial<BYOKDialogState>) {
+  return { ...state, ...update };
+}
+
 export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingKeyId, setEditingKeyId] = useState<string | null>(null);
-  const [selectedProvider, setSelectedProvider] = useState('');
-  const [apiKey, setApiKey] = useState('');
-  const [showApiKey, setShowApiKey] = useState(false);
-  const [awsCredentialError, setAwsCredentialError] = useState<string | null>(null);
+  const [dialogState, updateDialogState] = useReducer(
+    updateBYOKDialogState,
+    INITIAL_BYOK_DIALOG_STATE
+  );
+  const {
+    isDialogOpen,
+    editingKeyId,
+    selectedProvider,
+    apiKey,
+    showApiKey,
+    awsCredentialError,
+    installedKeyWarningAction,
+  } = dialogState;
+  const setIsDialogOpen = (isDialogOpen: boolean) => updateDialogState({ isDialogOpen });
+  const setEditingKeyId = (editingKeyId: string | null) => updateDialogState({ editingKeyId });
+  const setSelectedProvider = (selectedProvider: string) => updateDialogState({ selectedProvider });
+  const setApiKey = (apiKey: string) => updateDialogState({ apiKey });
+  const setShowApiKey = (showApiKey: boolean) => updateDialogState({ showApiKey });
+  const setAwsCredentialError = (awsCredentialError: string | null) =>
+    updateDialogState({ awsCredentialError });
+  const setInstalledKeyWarningAction = (
+    installedKeyWarningAction: InstalledKeyWarningAction | null
+  ) => updateDialogState({ installedKeyWarningAction });
 
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -153,6 +216,10 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
   );
 
   const { data: supportedModels } = useQuery(trpc.byok.listSupportedModels.queryOptions());
+  const showsCodingPlanKey =
+    !organizationId &&
+    (keys?.some(key => key.provider_id === 'minimax' && key.management_source === 'coding_plan') ??
+      false);
 
   const createMutation = useMutation(
     trpc.byok.create.mutationOptions({
@@ -232,6 +299,10 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
     return keys?.some(k => k.provider_id === providerSlug) ?? false;
   };
 
+  const isInstalledCodingPlanKey = (keyId: string) =>
+    !organizationId &&
+    (keys?.some(key => key.id === keyId && key.management_source === 'coding_plan') ?? false);
+
   const validateAwsCredentials = (value: string): string | null => {
     if (!value) return null;
     let parsed: unknown;
@@ -263,15 +334,24 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
       if (error) return;
     }
     if (editingKeyId) {
+      if (isInstalledCodingPlanKey(editingKeyId)) {
+        setInstalledKeyWarningAction({ type: 'update', keyId: editingKeyId });
+        return;
+      }
       updateMutation.mutate({
         ...(organizationId && { organizationId }),
         id: editingKeyId,
         api_key: apiKey,
       });
     } else {
+      const providerId = UserByokProviderIdSchema.safeParse(selectedProvider);
+      if (!providerId.success) {
+        toast.error('Select a supported provider.');
+        return;
+      }
       createMutation.mutate({
         ...(organizationId && { organizationId }),
-        provider_id: selectedProvider,
+        provider_id: providerId.data,
         api_key: apiKey,
       });
     }
@@ -287,12 +367,20 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
   };
 
   const handleDelete = (keyId: string, providerName: string) => {
+    if (isInstalledCodingPlanKey(keyId)) {
+      setInstalledKeyWarningAction({ type: 'delete', keyId, providerName });
+      return;
+    }
     if (confirm(`Are you sure you want to delete the API key for ${providerName}?`)) {
       deleteMutation.mutate({ ...(organizationId && { organizationId }), id: keyId });
     }
   };
 
   const handleToggleEnabled = (keyId: string, is_enabled: boolean) => {
+    if (!is_enabled && isInstalledCodingPlanKey(keyId)) {
+      setInstalledKeyWarningAction({ type: 'disable', keyId });
+      return;
+    }
     setEnabledMutation.mutate({
       ...(organizationId && { organizationId }),
       id: keyId,
@@ -300,10 +388,26 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
     });
   };
 
+  const confirmInstalledKeyChange = () => {
+    if (!installedKeyWarningAction) return;
+
+    if (installedKeyWarningAction.type === 'update') {
+      updateMutation.mutate({
+        id: installedKeyWarningAction.keyId,
+        api_key: apiKey,
+      });
+    } else if (installedKeyWarningAction.type === 'delete') {
+      deleteMutation.mutate({ id: installedKeyWarningAction.keyId });
+    } else {
+      setEnabledMutation.mutate({ id: installedKeyWarningAction.keyId, is_enabled: false });
+    }
+    setInstalledKeyWarningAction(null);
+  };
+
   if (keysLoading) {
     return (
       <div className="space-y-4">
-        <BYOKDescription />
+        <BYOKDescription showsCodingPlanKey={showsCodingPlanKey} />
         <Card>
           <CardHeader>
             <div className="flex flex-col gap-2">
@@ -311,7 +415,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-muted-foreground">Loading...</div>
+            <div className="text-muted-foreground">Loading&hellip;</div>
           </CardContent>
           <CardFooter>
             <BYOKSetupGuideLink />
@@ -319,6 +423,35 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
         </Card>
       </div>
     );
+  }
+
+  function getInstalledKeyWarning(action: InstalledKeyWarningAction | null): {
+    title: string;
+    description: string;
+    actionLabel: string;
+  } {
+    if (action?.type === 'update') {
+      return {
+        title: 'Replace Token Plan Plus MiniMax key?',
+        description:
+          'Replacing this key changes MiniMax routing and makes it user-managed. Token Plan Plus billing continues until you cancel it in Subscription Center.',
+        actionLabel: 'Replace key',
+      };
+    }
+    if (action?.type === 'delete') {
+      return {
+        title: `Delete ${action.providerName} key?`,
+        description:
+          'Deleting this key stops MiniMax routing through this configuration. Token Plan Plus billing continues until you cancel it in Subscription Center.',
+        actionLabel: 'Delete key',
+      };
+    }
+    return {
+      title: 'Disable Token Plan Plus MiniMax key?',
+      description:
+        'Disabling this key stops MiniMax routing while it is disabled. Token Plan Plus billing continues until you cancel it in Subscription Center.',
+      actionLabel: 'Disable key',
+    };
   }
 
   // Map provider IDs to display names
@@ -330,17 +463,18 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
   const getProviderModels = (providerId: string): string[] => {
     return supportedModels?.[providerId] ?? [];
   };
+  const installedKeyWarning = getInstalledKeyWarning(installedKeyWarningAction);
 
   return (
     <div className="space-y-4">
-      <BYOKDescription />
+      <BYOKDescription showsCodingPlanKey={showsCodingPlanKey} />
       <Card>
-        <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0 pb-4">
+        <CardHeader className="grid grid-cols-[1fr_auto] items-start gap-4 pb-4">
           <div className="flex flex-col gap-2">
             <CardTitle>BYOK API Keys</CardTitle>
           </div>
           <Button onClick={() => setIsDialogOpen(true)} size="sm">
-            <Plus className="mr-2 h-4 w-4" />
+            <Plus className="mr-2 size-4" />
             Add Key
           </Button>
         </CardHeader>
@@ -362,6 +496,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                       id: string;
                       provider_id: string;
                       created_at: string;
+                      management_source: 'user' | 'coding_plan';
                       is_enabled: boolean;
                     }) => (
                       <tr
@@ -374,6 +509,14 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                       >
                         <td className={!key.is_enabled ? 'text-muted-foreground p-4' : 'p-4'}>
                           <div>{getProviderDisplayName(key.provider_id)}</div>
+                          {!organizationId &&
+                          key.provider_id === 'minimax' &&
+                          key.management_source === 'coding_plan' ? (
+                            <p className="text-muted-foreground mt-1 text-xs">
+                              Configured by Token Plan Plus. BYOK changes do not cancel subscription
+                              billing.
+                            </p>
+                          ) : null}
                           <SupportedModelsList models={getProviderModels(key.provider_id)} />
                         </td>
                         <td className="text-muted-foreground p-4">
@@ -404,16 +547,18 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                             }
                             disabled={testMutation.isPending}
                             title="Test API key"
+                            aria-label={`Test ${getProviderDisplayName(key.provider_id)} API key`}
                           >
-                            <FlaskConical className="h-4 w-4" />
+                            <FlaskConical className="size-4" />
                           </Button>
                           <Button
                             variant="secondary"
                             size="sm"
                             onClick={() => handleEdit(key.id)}
                             disabled={updateMutation.isPending}
+                            aria-label={`Update ${getProviderDisplayName(key.provider_id)} API key`}
                           >
-                            <Edit className="h-4 w-4" />
+                            <Edit className="size-4" />
                           </Button>
                           <Button
                             variant="secondary"
@@ -422,8 +567,9 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                               handleDelete(key.id, getProviderDisplayName(key.provider_id))
                             }
                             disabled={deleteMutation.isPending}
+                            aria-label={`Delete ${getProviderDisplayName(key.provider_id)} API key`}
                           >
-                            <Trash2 className="h-4 w-4" />
+                            <Trash2 className="size-4" />
                           </Button>
                         </td>
                       </tr>
@@ -507,6 +653,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                       placeholder='{"accessKeyId": "...", "secretAccessKey": "...", "region": "us-east-1"}'
                       className="border-input bg-background placeholder:text-muted-foreground focus-visible:ring-ring flex min-h-20 w-full rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
                       rows={4}
+                      aria-label="AWS credentials"
                     />
                     {awsCredentialError && (
                       <Alert variant="destructive">
@@ -532,14 +679,15 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                       size="sm"
                       className="absolute top-0 right-0 h-full px-3"
                       onClick={() => setShowApiKey(!showApiKey)}
+                      aria-label={showApiKey ? 'Hide API key value' : 'Reveal API key value'}
                     >
-                      {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      {showApiKey ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                     </Button>
                   </div>
                 )}
                 {selectedProvider === VercelUserByokInferenceProviderIdSchema.enum.bedrock && (
                   <Alert>
-                    <Info className="h-4 w-4" />
+                    <Info className="size-4" />
                     <AlertDescription>
                       <p>Enter your AWS credentials as JSON:</p>
                       <code className="mt-1 block text-xs break-all">
@@ -555,14 +703,14 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                 )}
                 {editingKeyId ? (
                   <Alert>
-                    <Lock className="h-4 w-4" />
+                    <Lock className="size-4" />
                     <AlertDescription>
                       An API key is already saved for this provider. Enter a new key to replace it.
                     </AlertDescription>
                   </Alert>
                 ) : (
                   <Alert>
-                    <Info className="h-4 w-4" />
+                    <Info className="size-4" />
                     <AlertDescription>
                       Your API key will be encrypted and stored securely. Once saved, it cannot be
                       viewed again.
@@ -594,7 +742,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                   if (directProvider) {
                     return (
                       <Alert className="border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400">
-                        <AlertTriangle className="h-4 w-4 text-amber-500" />
+                        <AlertTriangle className="size-4 text-amber-500" />
                         <AlertDescription>
                           <p className="font-medium">
                             Important: You must use a model with{' '}
@@ -611,7 +759,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                   }
                   return (
                     <Alert>
-                      <Info className="h-4 w-4" />
+                      <Info className="size-4" />
                       <AlertDescription>
                         Once saved, your key will automatically be used whenever your client
                         requests one of the supported models above. If multiple keys apply to the
@@ -642,6 +790,26 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        <AlertDialog
+          open={installedKeyWarningAction !== null}
+          onOpenChange={open => !open && setInstalledKeyWarningAction(null)}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>{installedKeyWarning.title}</AlertDialogTitle>
+              <AlertDialogDescription>{installedKeyWarning.description}</AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Keep configuration</AlertDialogCancel>
+              <AlertDialogAction
+                variant={installedKeyWarningAction?.type === 'delete' ? 'destructive' : 'default'}
+                onClick={confirmInstalledKeyChange}
+              >
+                {installedKeyWarning.actionLabel}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
         <CardFooter>
           <BYOKSetupGuideLink />
         </CardFooter>

@@ -58,10 +58,10 @@ function resolveMode(modeHeader: string | null, featureHeader: FeatureValue | nu
  * cache). Kilo-exclusive free models are included when their gateway supports
  * the current `apiKind`; when `apiKind` is null no API-kind filtering is applied.
  */
-export function getAutoFreeCandidates(
-  openRouterModels: ReadonlySet<string>,
+export async function getAutoFreeCandidates(
   apiKind: GatewayRequest['kind'] | null
-): ReadonlyArray<string> {
+): Promise<ReadonlyArray<string>> {
+  const openRouterModels = await getOpenRouterModels();
   const candidates = new Set<string>();
   for (const model of autoFreeModels) {
     if (isKiloExclusiveFreeModel(model)) {
@@ -96,8 +96,7 @@ export async function resolveAutoModel(
 ): Promise<ResolveAutoModelResult> {
   const { model, modeHeader, featureHeader, sessionId, apiKind, clientIp } = params;
   if (model === KILO_AUTO_FREE_MODEL.id) {
-    const openRouterModels = await getOpenRouterModels();
-    const candidates = getAutoFreeCandidates(openRouterModels, apiKind);
+    const candidates = await getAutoFreeCandidates(apiKind);
     if (candidates.length === 0) {
       return { kind: 'no_free_models_available' };
     }

@@ -1,6 +1,6 @@
 import { Hono, type Context } from 'hono';
 import { z } from 'zod';
-import { sql, eq, and, isNull } from 'drizzle-orm';
+import { sql, eq, and, inArray, isNull } from 'drizzle-orm';
 import { getWorkerDb } from '@kilocode/db/client';
 import { cli_sessions_v2 } from '@kilocode/db/schema';
 
@@ -146,7 +146,10 @@ api.delete('/session/:sessionId', async c => {
     .select()
     .from(cli_sessions_v2)
     .where(
-      sql`${cli_sessions_v2.session_id} = ANY(${orderedSessionIds}) AND ${cli_sessions_v2.kilo_user_id} = ${kiloUserId}`
+      and(
+        inArray(cli_sessions_v2.session_id, orderedSessionIds),
+        eq(cli_sessions_v2.kilo_user_id, kiloUserId)
+      )
     );
 
   await db.transaction(async tx => {

@@ -178,7 +178,7 @@ async function resolveHostnameSafely(
     return {};
   }
 
-  if (isDefaultGitLabInstanceUrl(origin) || isIP(hostname)) {
+  if (isDefaultGitLabInstanceUrl(origin)) {
     return {};
   }
 

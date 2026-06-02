@@ -39,6 +39,7 @@ function mockSelfHostedGitLabResponse(args: {
   json?: unknown;
   statusMessage?: string;
   headers?: Record<string, string>;
+  responseError?: Error;
 }) {
   mockHttpsRequest.mockImplementationOnce((_options, callback) => {
     const response = new PassThrough() as PassThrough & {
@@ -59,6 +60,10 @@ function mockSelfHostedGitLabResponse(args: {
     request.destroy = jest.fn();
     request.end = jest.fn(() => {
       callback?.(response as never);
+      if (args.responseError) {
+        response.emit('error', args.responseError);
+        return;
+      }
       response.end(args.body ?? JSON.stringify(args.json ?? {}));
     });
 
@@ -770,6 +775,17 @@ describe('deleteProjectWebhook', () => {
       }),
       expect.any(Function)
     );
+  });
+
+  it('rejects self-hosted response stream errors', async () => {
+    mockSelfHostedGitLabResponse({
+      status: 200,
+      responseError: new Error('response interrupted'),
+    });
+
+    await expect(
+      deleteProjectWebhook('test-token', 123, 456, 'https://gitlab.example.com')
+    ).rejects.toThrow('response interrupted');
   });
 
   it('strips authorization headers when redirects change origin', async () => {

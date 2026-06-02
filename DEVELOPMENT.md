@@ -226,7 +226,6 @@ All tests should pass against the local PostgreSQL database.
 ## Git Workflow
 
 - Direct commits to `main` are blocked by a git hook. Always work on a feature branch.
-- The pre-push hook runs `pnpm format:check`, `lint`, and `typecheck --changes-only` in parallel.
 
 ## Stripe Webhook Testing
 

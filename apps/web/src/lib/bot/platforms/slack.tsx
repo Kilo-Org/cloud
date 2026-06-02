@@ -5,7 +5,6 @@ import {
   collectMessages,
   type ContextTriggerMessage,
   formatMessage,
-  formatUserMessage,
   MAX_MESSAGE_TEXT_LENGTH,
   sanitizeForDelimiters,
   truncate,
@@ -33,6 +32,66 @@ import {
 } from 'chat';
 
 const LINK_ACCOUNT_PATH = '/api/chat/link-account';
+
+const MAX_ATTACHMENT_TEXT_LENGTH = 300;
+
+// Slack attachment fields present on unfurled link previews but not on file uploads.
+type SlackUnfurlAttachment = {
+  original_url?: string;
+  from_url?: string;
+  title?: string;
+  title_link?: string;
+  text?: string;
+  fallback?: string;
+  service_name?: string;
+  author_name?: string;
+  pretext?: string;
+};
+
+function formatSlackUnfurledAttachments(rawAttachments: unknown): string {
+  if (!Array.isArray(rawAttachments) || rawAttachments.length === 0) return '';
+
+  const lines: string[] = [];
+  for (const raw of rawAttachments) {
+    if (typeof raw !== 'object' || raw === null) continue;
+    const att = raw as SlackUnfurlAttachment;
+    // Only include link-preview / unfurled attachments — they have original_url or from_url.
+    // File-upload attachments have id/mimetype but no original_url.
+    const url = att.original_url ?? att.from_url;
+    if (!url) continue;
+
+    const titlePart = att.title ? sanitizeForDelimiters(att.title) : null;
+    const textPart = att.text
+      ? sanitizeForDelimiters(
+          truncate(att.text.replace(/\s+/g, ' ').trim(), MAX_ATTACHMENT_TEXT_LENGTH)
+        )
+      : att.fallback
+        ? sanitizeForDelimiters(
+            truncate(att.fallback.replace(/\s+/g, ' ').trim(), MAX_ATTACHMENT_TEXT_LENGTH)
+          )
+        : null;
+    const servicePart = att.service_name ? sanitizeForDelimiters(att.service_name) : null;
+    const authorPart = att.author_name ? sanitizeForDelimiters(att.author_name) : null;
+
+    const meta: string[] = [];
+    if (servicePart) meta.push(servicePart);
+    if (authorPart) meta.push(`by ${authorPart}`);
+
+    let line = `[Unfurled link: ${titlePart ?? url} (${url})`;
+    if (meta.length > 0) line += ` — ${meta.join(', ')}`;
+    if (textPart) line += ` — ${textPart}`;
+    line += ']';
+    lines.push(line);
+  }
+  return lines.join('\n');
+}
+
+function formatMessageWithAttachments(msg: Message<SlackEvent>): string {
+  const formatted = formatMessage(msg);
+  const attachmentText = formatSlackUnfurledAttachments(msg.raw?.attachments);
+  const body = attachmentText ? `${formatted.text}\n${attachmentText}` : formatted.text;
+  return `<user_message author="${formatted.authorName}" time="${formatted.time}">${body}</user_message>`;
+}
 
 const LINK_ACCOUNT_ACTION_PREFIX = `link-${APP_URL}${LINK_ACCOUNT_PATH}`;
 
@@ -172,12 +231,12 @@ async function getSlackConversationContext(
 
   const threadMessages = threadMessagesRaw
     .filter(m => m.id !== triggerMessage.id)
-    .map(m => formatMessage(m))
+    .map(m => formatMessageWithAttachments(m as Message<SlackEvent>))
     .reverse();
 
   const channelMessages = channelMessagesRaw
     .filter(m => m.id !== triggerMessage.id)
-    .map(m => formatMessage(m))
+    .map(m => formatMessageWithAttachments(m as Message<SlackEvent>))
     .reverse();
 
   const metadata = channelInfo?.metadata ?? {};
@@ -202,12 +261,12 @@ async function getSlackConversationContext(
 
   if (channelMessages.length > 0) {
     lines.push('', 'Recent channel messages (oldest first):');
-    for (const msg of channelMessages) lines.push(formatUserMessage(msg));
+    for (const msg of channelMessages) lines.push(msg);
   }
 
   if (threadMessages.length > 0) {
     lines.push('', 'Thread messages (oldest first):');
-    for (const msg of threadMessages) lines.push(formatUserMessage(msg));
+    for (const msg of threadMessages) lines.push(msg);
   }
 
   if (lines.length <= 2 && channelMessages.length === 0) return '';

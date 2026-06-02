@@ -9,8 +9,14 @@
   "observability": {
     "enabled": true,
   },
+  "routes": [
+    {
+      "pattern": "security-sync.kilosessions.ai",
+      "custom_domain": true,
+    },
+  ],
   "dev": {
-    "port": 8796,
+    "port": 8812,
     "local_protocol": "http",
     "ip": "0.0.0.0",
   },

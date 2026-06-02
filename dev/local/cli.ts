@@ -592,8 +592,8 @@ Usage:
   dev:env --check         Validate env vars (CI mode)
   dev:env -y              Sync without confirmation
 
-Targets: app, app-builder, agents, mobile, all, or any service/group name
-Multiple targets can be specified: dev:start kiloclaw agents`);
+Targets: app, app-builder, agents, security-agent, mobile, all, or any service/group name
+Multiple targets can be specified: dev:start kiloclaw security-agent`);
 }
 
 // ---------------------------------------------------------------------------

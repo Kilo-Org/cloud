@@ -16,6 +16,7 @@ import {
   type WrapperSupervisorStorage,
 } from './wrapper-supervisor.js';
 import { getWrapperLease, getWrapperRuntimeState } from './wrapper-runtime-state.js';
+import type { LatestAssistantMessage } from './types.js';
 
 vi.mock('@cloudflare/sandbox', () => ({
   getSandbox: vi.fn(),
@@ -103,8 +104,15 @@ function createHarness(
   options?: {
     metadata?: SessionMetadata;
     storageHooks?: { beforeList?: (prefix: string) => Promise<void> };
+    getAssistantMessageForUserMessage?: (
+      sessionId: string,
+      kiloSessionId: string,
+      parentMessageId: string
+    ) => LatestAssistantMessage | null;
   }
 ) {
+  const getAssistantMessageForUserMessage =
+    options?.getAssistantMessageForUserMessage ?? (() => null);
   const storage = createMemoryStorage(initialEntries, options?.storageHooks);
   const events: MessageEvent[] = [];
   const callbackJobs: CallbackJob[] = [];
@@ -144,7 +152,7 @@ function createHarness(
     messageSettlementOutbox: settlementOutbox,
     sessionMessageQueue: { requestPendingDrainIfNeeded },
     getMetadata: async () => currentMetadata,
-    getAssistantMessageForUserMessage: () => null,
+    getAssistantMessageForUserMessage,
     hasActiveIngestConnection: async () => false,
     clearInterruptRequest: async () => {},
     stopWrappers,
@@ -631,7 +639,7 @@ describe('WrapperSupervisor', () => {
     await expect(getSessionMessageState(harness.storage, MESSAGE_ID)).resolves.toMatchObject({
       status: 'failed',
       failureReason: 'missing_assistant_reply',
-      error: 'No assistant reply found after idle timeout',
+      error: 'No assistant reply found during reconciliation',
       completionSource: 'idle_reconciliation',
       failureStage: 'post_dispatch_no_activity',
       failureCode: 'missing_assistant_reply',
@@ -676,6 +684,66 @@ describe('WrapperSupervisor', () => {
       lastWrapperIdleAt: 2_000,
       idleReconcileAfter: 12_000,
       wrapperIdleDeadlineAt: 60_000,
+    });
+  });
+
+  it('settles a still-accepted message and enqueues its callback when the wrapper completes without a terminal assistant event', async () => {
+    // Reproduces the webhook hang: the final assistant message.updated never
+    // carried time.completed (so assistant_message_event never settled it), and
+    // post-idle autocommit refreshed liveness while clearing the idle-reconcile
+    // deadline (idle fields absent below). The race-free `complete` event must
+    // still terminalize the message and release the gated callback.
+    const assistantMessageId = 'ase_complete_reconcile';
+    const harness = createHarness([liveRuntimeState(), OWNED_WRAPPER_LEASE], {
+      getAssistantMessageForUserMessage: () =>
+        ({
+          info: { id: assistantMessageId, role: 'assistant' },
+          parts: [],
+        }) as unknown as LatestAssistantMessage,
+    });
+    await putSessionMessageState(harness.storage, {
+      ...acceptedMessage(),
+      callbackRequired: true,
+      callbackTarget: { url: 'https://example.com/complete-reconcile' },
+    });
+
+    await harness.supervisor.onTerminalEvent({
+      wrapperRunId: WRAPPER_RUN_ID,
+      status: 'completed',
+    });
+
+    await expect(getSessionMessageState(harness.storage, MESSAGE_ID)).resolves.toMatchObject({
+      status: 'completed',
+      completionSource: 'idle_reconciliation',
+      assistantMessageId,
+    });
+    expect(harness.callbackJobs).toHaveLength(1);
+    expect(harness.callbackJobs[0].payload).toMatchObject({
+      messageId: MESSAGE_ID,
+      status: 'completed',
+    });
+    expect(harness.requestPendingDrainIfNeeded).toHaveBeenCalledOnce();
+  });
+
+  it('keeps the idle-reconcile deadline armed when post-completion output is observed', async () => {
+    // Layer 2: autocommit/condense events after session.idle must refresh
+    // liveness without disarming the reconciler that finalizes the in-flight
+    // message. Before the fix, observeMeaningfulOutput cleared these fields.
+    const harness = createHarness([
+      liveRuntimeState({
+        lastWrapperIdleAt: 1_000,
+        idleReconcileAfter: 9_000,
+        wrapperIdleDeadlineAt: 50_000,
+      }),
+    ]);
+
+    await harness.supervisor.observeMeaningfulOutput(4, WRAPPER_CONNECTION_ID, 2_000);
+
+    await expect(getWrapperRuntimeState(harness.storage)).resolves.toMatchObject({
+      lastWrapperIdleAt: 1_000,
+      idleReconcileAfter: 9_000,
+      wrapperIdleDeadlineAt: 50_000,
+      lastWrapperMessageAt: 2_000,
     });
   });
 

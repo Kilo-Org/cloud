@@ -28,16 +28,39 @@ const POST_MESSAGE_AS_USER_TIMEOUT_MS = 5_000;
  *   binding. Already used by other cloud → service integrations.
  */
 
+// Origins the internal API key may be sent to. The destination comes from
+// NEXT_PUBLIC_KILO_CHAT_URL (deploy config), so this is defense in depth: a
+// misconfigured or tampered value must not be able to forward the key (and the
+// prompt) to an unexpected host. `chat.kiloapps.io` is the single deployed
+// kilo-chat origin (services/kilo-chat/wrangler.jsonc). Loopback covers local
+// dev on any port (KILO_PORT_OFFSET can shift it). Add new deployed origins
+// here if kilo-chat ever gains a staging domain.
+function isAllowedKiloChatOrigin(url: URL): boolean {
+  if (url.protocol === 'https:' && url.hostname === 'chat.kiloapps.io') return true;
+  if (url.hostname === 'localhost' || url.hostname === '127.0.0.1') return true;
+  return false;
+}
+
 function getKiloChatBaseUrl(): string {
-  // We deliberately read process.env directly here rather than importing
-  // KILO_CHAT_URL from `@/lib/constants` — the constants file marks it as a
-  // *required* env var at import time, which causes test setups to crash if
-  // the var isn't set. This server-only client should fail loudly only when
-  // it's actually called.
+  // Read process.env directly rather than importing KILO_CHAT_URL from
+  // `@/lib/constants`: that constant is marked required at import time, which
+  // crashes test setups if the var is unset. This server-only client should
+  // fail loudly only when it is actually called.
   const raw = process.env.NEXT_PUBLIC_KILO_CHAT_URL;
   if (!raw) {
     throw new Error(
-      'NEXT_PUBLIC_KILO_CHAT_URL is not configured — cannot reach kilo-chat internal routes'
+      'NEXT_PUBLIC_KILO_CHAT_URL is not configured, cannot reach kilo-chat internal routes'
+    );
+  }
+  let parsed: URL;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    throw new Error(`NEXT_PUBLIC_KILO_CHAT_URL is not a valid URL: ${raw}`);
+  }
+  if (!isAllowedKiloChatOrigin(parsed)) {
+    throw new Error(
+      `Refusing to send the internal API key: ${parsed.origin} is not an allowed kilo-chat origin`
     );
   }
   return raw.replace(/\/$/, '');

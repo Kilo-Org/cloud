@@ -1,6 +1,6 @@
 // Env must be set BEFORE importing the module under test so its constants
 // resolve to the test values.
-process.env.NEXT_PUBLIC_KILO_CHAT_URL = 'https://kilo-chat.test.example.com';
+process.env.NEXT_PUBLIC_KILO_CHAT_URL = 'https://chat.kiloapps.io';
 
 jest.mock('@/lib/config.server', () => ({
   INTERNAL_API_SECRET: 'test-internal-secret',
@@ -48,7 +48,7 @@ describe('postMessageAsUser (cloud → kilo-chat internal HTTP)', () => {
 
     expect(fetchSpy).toHaveBeenCalledTimes(1);
     const [url, init] = fetchSpy.mock.calls[0]!;
-    expect(url).toBe('https://kilo-chat.test.example.com/internal/v1/post-message-as-user');
+    expect(url).toBe('https://chat.kiloapps.io/internal/v1/post-message-as-user');
     expect(init?.method).toBe('POST');
     const headers = init?.headers as Record<string, string>;
     expect(headers['x-internal-api-key']).toBe('test-internal-secret');
@@ -120,6 +120,20 @@ describe('postMessageAsUser (cloud → kilo-chat internal HTTP)', () => {
       await expect(postMessageAsUser(VALID_PARAMS)).rejects.toThrow(
         /NEXT_PUBLIC_KILO_CHAT_URL is not configured/
       );
+    } finally {
+      process.env.NEXT_PUBLIC_KILO_CHAT_URL = saved;
+    }
+  });
+
+  it('refuses to send the key to an off-allowlist origin (never fetches)', async () => {
+    const saved = process.env.NEXT_PUBLIC_KILO_CHAT_URL;
+    process.env.NEXT_PUBLIC_KILO_CHAT_URL = 'https://evil.example.com';
+    const fetchSpy = jest.spyOn(global, 'fetch');
+    try {
+      await expect(postMessageAsUser(VALID_PARAMS)).rejects.toThrow(
+        /not an allowed kilo-chat origin/
+      );
+      expect(fetchSpy).not.toHaveBeenCalled();
     } finally {
       process.env.NEXT_PUBLIC_KILO_CHAT_URL = saved;
     }

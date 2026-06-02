@@ -48,12 +48,42 @@ export type KiloExclusiveModel = {
   inference_provider_restriction: ReadonlyArray<OpenRouterInferenceProviderId>;
 };
 
+function removeNonSensicalMaxTokens(
+  requestToMutate: GatewayRequest,
+  kiloExclusiveModel: KiloExclusiveModel
+) {
+  // OpenClaw sometimes puts numbers in that are too large and some providers will reject the request.
+  if (requestToMutate.kind === 'chat_completions') {
+    if (
+      (requestToMutate.body.max_completion_tokens ?? 0) > kiloExclusiveModel.max_completion_tokens
+    ) {
+      delete requestToMutate.body.max_completion_tokens;
+    }
+    if ((requestToMutate.body.max_tokens ?? 0) > kiloExclusiveModel.max_completion_tokens) {
+      delete requestToMutate.body.max_tokens;
+    }
+  }
+  if (
+    requestToMutate.kind === 'responses' &&
+    (requestToMutate.body.max_output_tokens ?? 0) > kiloExclusiveModel.max_completion_tokens
+  ) {
+    delete requestToMutate.body.max_output_tokens;
+  }
+  if (
+    requestToMutate.kind === 'messages' &&
+    (requestToMutate.body.max_tokens ?? 0) > kiloExclusiveModel.max_completion_tokens
+  ) {
+    requestToMutate.body.max_tokens = kiloExclusiveModel.max_completion_tokens;
+  }
+}
+
 /** Rewrites a gateway request to target a Kilo-exclusive model. */
 export function applyKiloExclusiveModelSettings(
   requestToMutate: GatewayRequest,
   kiloExclusiveModel: KiloExclusiveModel
 ) {
   requestToMutate.body.model = kiloExclusiveModel.internal_id;
+  removeNonSensicalMaxTokens(requestToMutate, kiloExclusiveModel);
   const restriction = kiloExclusiveModel.inference_provider_restriction;
   if (restriction.length === 0) {
     return;

@@ -9,6 +9,7 @@ import {
   qwen36_max_preview_model,
   qwen36_plus_model,
   qwen37_max_model,
+  qwen37_plus_model,
 } from '@/lib/ai-gateway/providers/qwen';
 
 const makeUsage = (overrides: Partial<JustTheCostsUsageStats> = {}): JustTheCostsUsageStats => ({
@@ -38,6 +39,44 @@ describe('calculatKiloExclusiveCost_mUsd with qwen3.7-max', () => {
     );
 
     expect(result).toBe(Math.round(50_000 * 1.625 + 20_000 * 0.1625 + 30_000 * 2.03125));
+  });
+});
+
+describe('calculatKiloExclusiveCost_mUsd with qwen3.7-plus', () => {
+  test('uses direct Alibaba pricing with the Kilo discount in the <=256k tier', () => {
+    const result = calculateKiloExclusiveCost_mUsd(
+      qwen37_plus_model,
+      makeUsage({ inputTokens: 100_000, outputTokens: 10_000 })
+    );
+
+    expect(result).toBe(Math.round(100_000 * 0.26 + 10_000 * 1.04));
+  });
+
+  test('charges explicit cache reads and writes at discounted rates', () => {
+    const result = calculateKiloExclusiveCost_mUsd(
+      qwen37_plus_model,
+      makeUsage({ inputTokens: 100_000, cacheHitTokens: 20_000, cacheWriteTokens: 30_000 })
+    );
+
+    expect(result).toBe(Math.round(50_000 * 0.26 + 20_000 * 0.026 + 30_000 * 0.325));
+  });
+
+  test('uses direct Alibaba pricing with the Kilo discount in the >256k tier', () => {
+    const result = calculateKiloExclusiveCost_mUsd(
+      qwen37_plus_model,
+      makeUsage({ inputTokens: 300_000, outputTokens: 10_000 })
+    );
+
+    expect(result).toBe(Math.round(300_000 * 0.78 + 10_000 * 3.12));
+  });
+
+  test('moves to the long-context tier above the 256k boundary', () => {
+    expect(
+      calculateKiloExclusiveCost_mUsd(qwen37_plus_model, makeUsage({ inputTokens: 262_144 }))
+    ).toBe(Math.round(262_144 * 0.26));
+    expect(
+      calculateKiloExclusiveCost_mUsd(qwen37_plus_model, makeUsage({ inputTokens: 262_145 }))
+    ).toBe(Math.round(262_145 * 0.78));
   });
 });
 

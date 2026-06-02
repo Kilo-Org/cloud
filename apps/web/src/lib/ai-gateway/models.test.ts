@@ -12,7 +12,12 @@ import {
   claude_sonnet_4_6_stealth_model,
   claude_opus_4_6_stealth_model,
 } from './providers/anthropic.constants';
-import { isAlibabaDirectModel, qwen36_plus_model, qwen37_max_model } from './providers/qwen';
+import {
+  isAlibabaDirectModel,
+  qwen36_plus_model,
+  qwen37_max_model,
+  qwen37_plus_model,
+} from './providers/qwen';
 
 describe('isFreeModel', () => {
   describe('free models', () => {
@@ -77,6 +82,14 @@ describe('isFreeModel', () => {
       expect(qwen37_max_model.gateway).toBe('alibaba');
       expect(qwen37_max_model.internal_id).toBe('qwen3.7-max');
       expect(getInferenceProvider(qwen37_max_model)).toBe('alibaba');
+    });
+
+    test('routes Qwen3.7 Plus directly through Alibaba', () => {
+      expect(findKiloExclusiveModel(qwen37_plus_model.public_id)).toBe(qwen37_plus_model);
+      expect(isAlibabaDirectModel(qwen37_plus_model.public_id)).toBe(true);
+      expect(qwen37_plus_model.gateway).toBe('alibaba');
+      expect(qwen37_plus_model.internal_id).toBe('qwen3.7-plus');
+      expect(getInferenceProvider(qwen37_plus_model)).toBe('alibaba');
     });
 
     test('requires data collection for paid training-enabled offerings', () => {

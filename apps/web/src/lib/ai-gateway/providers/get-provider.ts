@@ -110,7 +110,7 @@ async function checkCustomLlm(
   }
   return {
     kind: 'provider',
-    provider: buildDirectProvider({
+    provider: buildDirectProvider('custom', {
       internal_id: customLlm.internal_id,
       base_url: customLlm.base_url,
       api_key: customLlm.api_key,
@@ -121,6 +121,7 @@ async function checkCustomLlm(
       extra_headers: customLlm.extra_headers,
       remove_from_body: customLlm.remove_from_body,
       add_cache_breakpoints: customLlm.add_cache_breakpoints,
+      remove_cache_breakpoints: customLlm.remove_cache_breakpoints,
       inject_reasoning_into_content: customLlm.inject_reasoning_into_content,
     }),
     userByok: null,
@@ -209,7 +210,7 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
     if (selection?.status === 'active') {
       return {
         kind: 'provider',
-        provider: buildDirectProvider(selection.upstream),
+        provider: buildDirectProvider('experiment', selection.upstream),
         userByok: null,
         bypassAccessCheck: false,
         experiment: {

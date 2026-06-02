@@ -20,7 +20,7 @@ import { CustomLlmExtraBodySchema, OpenCodeSettingsSchema } from '@kilocode/db/s
 export const ExperimentUpstreamSchema = z
   .object({
     internal_id: z.string().min(1),
-    base_url: z.string().url(),
+    base_url: z.url(),
     opencode_settings: z
       .object({
         ai_sdk_provider: OpenCodeSettingsSchema.shape.ai_sdk_provider,
@@ -30,6 +30,7 @@ export const ExperimentUpstreamSchema = z
     extra_body: CustomLlmExtraBodySchema.optional(),
     remove_from_body: z.array(z.string()).optional(),
     add_cache_breakpoints: z.boolean().optional(),
+    remove_cache_breakpoints: z.boolean().optional(),
     inject_reasoning_into_content: z.boolean().optional(),
   })
   .strict();

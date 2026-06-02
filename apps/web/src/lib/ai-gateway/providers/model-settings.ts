@@ -16,7 +16,7 @@ import { ReasoningEffortSchema } from '@kilocode/db/schema-types';
 
 export const REASONING_VARIANTS_BINARY = {
   instant: { reasoning: { enabled: false, effort: 'none' } },
-  thinking: { reasoning: { enabled: true, effort: 'medium' } },
+  thinking: { reasoning: { enabled: true, effort: 'high' } },
 } as const;
 
 export const REASONING_VARIANTS_LOW_MEDIUM_HIGH = {
@@ -83,6 +83,9 @@ export function getModelVariants(model: string): OpenCodeSettings['variants'] {
         .filter(e => e !== 'minimal')
         .map(effort => [effort, { reasoning: { enabled: effort !== 'none', effort } }])
     );
+  }
+  if (model.includes('mistral-medium-3-5')) {
+    return REASONING_VARIANTS_BINARY;
   }
   if (
     isKimiModel(model) ||

@@ -23,7 +23,8 @@ function normalizeCommandForDisplay(command: string): string {
 
 function getCommandPreview(command: string): string {
   // Get first line or first 60 chars, whichever is shorter
-  const firstLine = normalizeCommandForDisplay(command).split('\n')[0] || normalizeCommandForDisplay(command);
+  const firstLine =
+    normalizeCommandForDisplay(command).split('\n')[0] || normalizeCommandForDisplay(command);
   if (firstLine.length > 60) {
     return firstLine.slice(0, 57) + '...';
   }

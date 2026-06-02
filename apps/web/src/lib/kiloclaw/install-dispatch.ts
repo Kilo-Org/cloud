@@ -2,6 +2,7 @@ import 'server-only';
 import { TRPCError } from '@trpc/server';
 import { fetchInstallPayload } from './install';
 import type { InstallSource } from './install-sources';
+import { requireKiloClawAccessAtInstance } from './access-gate';
 import {
   getActiveInstance,
   workerInstanceId,
@@ -63,6 +64,7 @@ export type DispatchInstallFromSourceDeps = {
     userId: string,
     instance: ActiveKiloClawInstance
   ) => Promise<string | null>;
+  requireKiloClawAccessAtInstance: typeof requireKiloClawAccessAtInstance;
   postMessageAsUser: typeof postMessageAsUser;
 };
 
@@ -90,6 +92,7 @@ const defaultDeps: DispatchInstallFromSourceDeps = {
   fetchInstallPayload,
   getActiveInstance,
   resolveRuntimeSandboxId: defaultResolveRuntimeSandboxId,
+  requireKiloClawAccessAtInstance,
   postMessageAsUser,
 };
 
@@ -125,6 +128,15 @@ export async function dispatchInstallFromSource(
     // from the byte page afterward (intent is intentionally not persisted).
     return { ok: false, code: 'no_instance' };
   }
+
+  // Bind entitlement to THIS exact instance. The `clawAccessProcedure` gate
+  // only proves the user has some active access; in an inconsistent billing
+  // state (e.g. the current subscription anchored to a different/destroyed row
+  // while an orphaned active instance remains) that gate can pass while the
+  // resolved instance is not entitled. Re-check access for the resolved
+  // instance and fail closed, so a prompt is never dispatched into an
+  // unentitled runtime. Throws TRPCError FORBIDDEN/NOT_FOUND on mismatch.
+  await deps.requireKiloClawAccessAtInstance(userId, instance.id);
 
   // Use the runtime sandbox id (not the registry row's `sandboxId`) so
   // half-migrated rows don't dispatch into a stale conversation. See

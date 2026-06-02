@@ -64,6 +64,11 @@ export async function postMessageAsUser(
       body: JSON.stringify(params),
       // Internal-only call between services; no caching.
       cache: 'no-store',
+      // Never follow redirects on a request that carries the internal API key:
+      // a misconfigured or redirecting destination must not be able to forward
+      // the secret (and the prompt) to another origin. A redirect fails here
+      // and surfaces as a typed `internal` result below.
+      redirect: 'error',
       signal: AbortSignal.timeout(POST_MESSAGE_AS_USER_TIMEOUT_MS),
     });
   } catch (err) {

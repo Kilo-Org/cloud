@@ -30,6 +30,7 @@ function makeDeps(
     fetchInstallPayload: overrides.fetchInstallPayload ?? (async () => VALID_PAYLOAD),
     getActiveInstance: overrides.getActiveInstance ?? (async () => ACTIVE_INSTANCE),
     resolveRuntimeSandboxId: overrides.resolveRuntimeSandboxId ?? (async () => RUNTIME_SANDBOX_ID),
+    requireKiloClawAccessAtInstance: overrides.requireKiloClawAccessAtInstance ?? (async () => {}),
     postMessageAsUser:
       overrides.postMessageAsUser ??
       (async () =>
@@ -146,6 +147,28 @@ describe('dispatchInstallFromSource', () => {
     );
 
     expect(result).toEqual({ ok: false, code: 'no_instance' });
+    expect(dispatchSpy).not.toHaveBeenCalled();
+  });
+
+  it('fails closed (and does NOT dispatch) when the resolved instance is not entitled', async () => {
+    // clawAccessProcedure passed, but the resolved instance is not entitled
+    // (inconsistent billing anchor). The per-instance check throws.
+    const dispatchSpy = jest.fn();
+    const resolveSpy = jest.fn(async () => RUNTIME_SANDBOX_ID);
+    await expect(
+      dispatchInstallFromSource(
+        ARGS,
+        makeDeps({
+          requireKiloClawAccessAtInstance: async () => {
+            throw new TRPCError({ code: 'FORBIDDEN', message: 'not entitled' });
+          },
+          resolveRuntimeSandboxId: resolveSpy,
+          postMessageAsUser: dispatchSpy as never,
+        })
+      )
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    // Refused before resolving the sandbox or dispatching.
+    expect(resolveSpy).not.toHaveBeenCalled();
     expect(dispatchSpy).not.toHaveBeenCalled();
   });
 

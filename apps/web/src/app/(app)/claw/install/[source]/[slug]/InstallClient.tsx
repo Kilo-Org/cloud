@@ -89,7 +89,7 @@ export function InstallClient({ source, sourceLabel, payload }: InstallClientPro
             <KiloClawbsterIcon className="h-4 w-auto" />
             {sourceLabel}
           </Badge>
-          <CardTitle className="mt-2 text-xl">{payload.title}</CardTitle>
+          <CardTitle className="mt-2 text-xl break-words">{payload.title}</CardTitle>
           <CardDescription className="leading-relaxed">
             You’re installing a {sourceLabel} from kilo.ai. Clicking Confirm Install starts a new
             KiloClaw conversation and runs its prompt on your behalf. If you don’t want to install
@@ -100,7 +100,9 @@ export function InstallClient({ source, sourceLabel, payload }: InstallClientPro
           <p className="text-muted-foreground text-sm font-medium">
             This {sourceLabel} installs a skill to:
           </p>
-          <p className="text-foreground mt-2 text-sm leading-relaxed">{payload.description}</p>
+          <p className="text-foreground mt-2 text-sm leading-relaxed break-words">
+            {payload.description}
+          </p>
         </CardContent>
         <CardFooter className="justify-end gap-3">
           <Button

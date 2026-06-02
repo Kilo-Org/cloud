@@ -1,4 +1,4 @@
-name: Deploy Web to Production
+name: Redeploy Web to Production
 
 on:
   workflow_dispatch:

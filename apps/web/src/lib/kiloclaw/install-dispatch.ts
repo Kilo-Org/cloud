@@ -102,7 +102,10 @@ export async function dispatchInstallFromSource(
 ): Promise<DispatchInstallFromSourceResult> {
   const { userId, source, slug, expectedSignature } = args;
 
-  const payload = await deps.fetchInstallPayload(source, slug);
+  // Uncached read: this is the confirm-time dispatch, so a byte changed,
+  // revoked, or deleted since the preview rendered must be seen now (a stale
+  // cached payload would still match the reviewed signature and dispatch).
+  const payload = await deps.fetchInstallPayload(source, slug, { bypassCache: true });
   if (!payload) {
     throw new TRPCError({
       code: 'NOT_FOUND',

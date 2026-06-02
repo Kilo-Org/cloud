@@ -85,7 +85,8 @@ describe('dispatchInstallFromSource', () => {
       conversationCreated: true,
     });
 
-    expect(fetchSpy).toHaveBeenCalledWith('byte', 'deep-research');
+    // Dispatch re-fetches uncached so a changed/revoked/deleted byte is seen.
+    expect(fetchSpy).toHaveBeenCalledWith('byte', 'deep-research', { bypassCache: true });
     expect(instanceSpy).toHaveBeenCalledWith('user-1');
     expect(dispatchSpy).toHaveBeenCalledWith({
       userId: 'user-1',

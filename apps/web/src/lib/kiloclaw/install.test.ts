@@ -83,6 +83,22 @@ describe('fetchInstallPayload', () => {
     expect(result?.signatureKeyId).toBe(EXPECTED_KID);
   });
 
+  it('reads cached by default and uncached when bypassCache is set', async () => {
+    const signed = signPayload(VALID_BASE);
+    // Fresh Response per call: a single Response body can only be read once.
+    const fetchSpy = jest
+      .spyOn(global, 'fetch')
+      .mockImplementation(async () => jsonResponse(signed));
+
+    await fetchInstallPayload('byte', 'deep-research');
+    await fetchInstallPayload('byte', 'deep-research', { bypassCache: true });
+
+    // Preview: short revalidate window. Dispatch: no-store, so a changed or
+    // revoked byte is seen immediately rather than served from cache.
+    expect(fetchSpy.mock.calls[0]![1]).toMatchObject({ next: { revalidate: 300 } });
+    expect(fetchSpy.mock.calls[1]![1]).toMatchObject({ cache: 'no-store' });
+  });
+
   it('returns null when upstream is 404', async () => {
     jest.spyOn(global, 'fetch').mockResolvedValue(new Response(null, { status: 404 }));
     const result = await fetchInstallPayload('byte', 'missing-slug');

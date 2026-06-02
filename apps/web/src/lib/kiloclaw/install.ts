@@ -178,18 +178,28 @@ async function readBoundedText(res: Response, maxBytes: number): Promise<string 
 
 export async function fetchInstallPayload(
   source: InstallSource,
-  slug: string
+  slug: string,
+  opts: { bypassCache?: boolean } = {}
 ): Promise<InstallPayload | null> {
   const url = INSTALL_SOURCES[source].urlTemplate.replace('{slug}', encodeURIComponent(slug));
-  // `redirect: 'error'` is SSRF defense-in-depth: the host comes from the
+  // `redirect: 'error'` is SSRF defense in depth: the host comes from the
   // registry (not user input) and the slug is encoded into a single path
   // segment, so a request can't target an off-registry origin directly. The
-  // one residual path would be the trusted origin itself answering 3xx →
+  // one residual path would be the trusted origin itself answering 3xx to an
   // attacker host; refusing to follow redirects closes that before the
   // signature check even runs. A redirect now rejects (caught below).
+  //
+  // Caching: the preview render uses a short revalidate window so repeated
+  // page loads are cheap. The CONFIRM-TIME dispatch passes `bypassCache` for an
+  // uncached read, so a byte that was changed, revoked, or deleted upstream
+  // takes effect immediately (a stale cached payload would otherwise still
+  // match the reviewed signature and dispatch within the revalidate window).
+  const fetchInit: RequestInit = opts.bypassCache
+    ? { cache: 'no-store', redirect: 'error' }
+    : { next: { revalidate: 300 }, redirect: 'error' };
   let res: Response;
   try {
-    res = await fetch(url, { next: { revalidate: 300 }, redirect: 'error' });
+    res = await fetch(url, fetchInit);
   } catch (err) {
     throw new Error(
       `fetchInstallPayload(${source}, ${slug}): request failed (redirects are not followed): ${err instanceof Error ? err.message : String(err)}`

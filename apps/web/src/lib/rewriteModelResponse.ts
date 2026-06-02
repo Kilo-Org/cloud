@@ -1,3 +1,6 @@
+import { isKiloExclusiveFreeModel, isKiloStealthModel } from '@/lib/ai-gateway/models';
+import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
+import type { ProviderId } from '@/lib/ai-gateway/providers/types';
 import { getOutputHeaders } from '@/lib/ai-gateway/llm-proxy-helpers';
 import type { ChatCompletionChunk, OpenRouterUsage } from '@/lib/ai-gateway/processUsage.types';
 import type { EventSourceMessage } from 'eventsource-parser';
@@ -337,4 +340,31 @@ export async function rewriteFreeModelResponse_Responses(response: Response, mod
     statusText: response.statusText,
     headers,
   });
+}
+
+export async function rewriteFreeModelResponse(
+  response: Response,
+  model: string,
+  providerId: ProviderId,
+  kind: GatewayRequest['kind']
+): Promise<NextResponse | null> {
+  const isFreeModelRequiringCostRemoval =
+    (providerId === 'openrouter' || providerId === 'vercel') && isKiloExclusiveFreeModel(model);
+  const isStealthModelRequiringNameRemoval = providerId !== 'martian' && isKiloStealthModel(model);
+
+  if (!isFreeModelRequiringCostRemoval && !isStealthModelRequiringNameRemoval) {
+    return null;
+  }
+
+  if (kind === 'chat_completions') {
+    return rewriteFreeModelResponse_ChatCompletions(response, model);
+  }
+  if (kind === 'responses') {
+    return rewriteFreeModelResponse_Responses(response, model);
+  }
+  if (kind === 'messages') {
+    return rewriteFreeModelResponse_Messages(response, model);
+  }
+
+  return null;
 }

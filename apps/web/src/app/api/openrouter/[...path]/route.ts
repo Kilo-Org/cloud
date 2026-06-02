@@ -28,7 +28,6 @@ import {
   isDeadFreeModel,
   isExcludedForFeature,
   isKiloExclusiveFreeModel,
-  isKiloStealthModel,
   isKiloExclusiveModelRequiringDataCollection,
 } from '@/lib/ai-gateway/models';
 import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
@@ -57,11 +56,7 @@ import {
 import { ProxyErrorType } from '@/lib/proxy-error-types';
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
 import { isDataCollectionExplicitlyDisallowed } from '@/lib/ai-gateway/providers/openrouter/types';
-import {
-  rewriteFreeModelResponse_ChatCompletions,
-  rewriteFreeModelResponse_Messages,
-  rewriteFreeModelResponse_Responses,
-} from '@/lib/rewriteModelResponse';
+import { rewriteFreeModelResponse } from '@/lib/rewriteModelResponse';
 import {
   createAnonymousContext,
   isAnonymousContext,
@@ -430,8 +425,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   if (!effectiveProviderContext.provider.supportedChatApis.includes(requestBodyParsed.kind)) {
     return apiKindNotSupportedResponse(
       requestBodyParsed.kind,
-      effectiveProviderContext.provider.supportedChatApis,
-      fraudHeaders
+      effectiveProviderContext.provider.supportedChatApis
     );
   }
 
@@ -565,8 +559,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       }
       return apiKindNotSupportedResponse(
         requestBodyParsed.kind,
-        effectiveProviderContext.provider.supportedChatApis,
-        fraudHeaders
+        effectiveProviderContext.provider.supportedChatApis
       );
     }
   }
@@ -801,24 +794,14 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     }
   }
 
-  const isFreeModelRequiringCostRemoval =
-    (effectiveProviderContext.provider.id === 'openrouter' ||
-      effectiveProviderContext.provider.id === 'vercel') &&
-    isKiloExclusiveFreeModel(effectiveModelIdLowerCased);
-  const isStealthModelRequiringNameRemoval =
-    effectiveProviderContext.provider.id !== 'martian' &&
-    isKiloStealthModel(effectiveModelIdLowerCased);
-
-  if (isFreeModelRequiringCostRemoval || isStealthModelRequiringNameRemoval) {
-    if (requestBodyParsed.kind === 'chat_completions') {
-      return rewriteFreeModelResponse_ChatCompletions(response, effectiveModelIdLowerCased);
-    }
-    if (requestBodyParsed.kind === 'responses') {
-      return rewriteFreeModelResponse_Responses(response, effectiveModelIdLowerCased);
-    }
-    if (requestBodyParsed.kind === 'messages') {
-      return rewriteFreeModelResponse_Messages(response, effectiveModelIdLowerCased);
-    }
+  const rewrittenResponse = await rewriteFreeModelResponse(
+    response,
+    effectiveModelIdLowerCased,
+    effectiveProviderContext.provider.id,
+    requestBodyParsed.kind
+  );
+  if (rewrittenResponse) {
+    return rewrittenResponse;
   }
 
   return wrapInSafeNextResponse(response);

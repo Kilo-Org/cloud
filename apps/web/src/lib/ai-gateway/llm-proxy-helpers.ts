@@ -147,12 +147,10 @@ export function dataCollectionRequiredResponse() {
 
 export function apiKindNotSupportedResponse(
   apiKind: GatewayChatApiKind,
-  supportedApiKinds: ReadonlyArray<GatewayChatApiKind>,
-  fraudHeaders: FraudDetectionHeaders
+  supportedApiKinds: ReadonlyArray<GatewayChatApiKind>
 ) {
-  const error = isRooCodeBasedClient(fraudHeaders)
-    ? 'This model requires Kilo v7 or newer. Please upgrade Kilo and try again.'
-    : `This model does not support the ${apiKind} API, please use any of: ${supportedApiKinds.join()}`;
+  const error = `This model does not support the ${apiKind} API, please use any of: ${supportedApiKinds.join()}`;
+  warnExceptInTest(`[apiKindNotSupportedResponse] ${error}`);
   return NextResponse.json(
     { error, error_type: ProxyErrorType.api_kind_not_supported, message: error },
     { status: 400 }

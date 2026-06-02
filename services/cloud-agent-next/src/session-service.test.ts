@@ -286,6 +286,13 @@ describe('SessionService.prepareWorkspace', () => {
       onProgress: progress,
     });
 
+    expect(workspaceMocks.checkDiskAndCleanBeforeSetup).toHaveBeenCalledWith(
+      sandbox,
+      undefined,
+      'user_test',
+      'agent_test',
+      { inspectContainers: false }
+    );
     expect(workspaceMocks.cloneGitRepo).toHaveBeenCalledWith(
       session,
       '/workspace/user/sessions/agent_test',
@@ -375,9 +382,55 @@ describe('SessionService.prepareWorkspace', () => {
       })
     ).rejects.toBe(rejection);
 
+    expect(workspaceMocks.checkDiskAndCleanBeforeSetup).toHaveBeenCalledWith(
+      sandbox,
+      undefined,
+      'user_test',
+      'agent_test',
+      { inspectContainers: true }
+    );
     expect(workspaceMocks.setupWorkspace).not.toHaveBeenCalled();
     expect(sandbox.createSessionMock).not.toHaveBeenCalled();
     expect(devcontainerMocks.bringUpDevContainer).not.toHaveBeenCalled();
+  });
+
+  it('keeps requested devcontainer cleanup fail-closed when the sandbox ID is not DIND', async () => {
+    const session = createSession(false);
+    const sandbox = createSandbox(session);
+    const metadata = {
+      ...createMetadata(),
+      workspace: {
+        sandboxId: 'usr-abcdef' as const,
+        devcontainerRequested: true,
+      },
+    } satisfies CloudAgentSessionState;
+    const rejection = new WorkspaceCapacityAdmissionRejectedError({
+      availableMB: 512,
+      thresholdMB: 2048,
+      cleaned: 0,
+      skipped: 1,
+    });
+    workspaceMocks.checkDiskAndCleanBeforeSetup.mockRejectedValueOnce(rejection);
+
+    await expect(
+      new SessionService().prepareWorkspace({
+        sandbox,
+        sandboxId: 'usr-abcdef',
+        userId: 'user_test',
+        sessionId: 'agent_test' as SessionId,
+        env: createEnv(),
+        metadata,
+        kilocodeModel: 'test-model',
+      })
+    ).rejects.toBe(rejection);
+
+    expect(workspaceMocks.checkDiskAndCleanBeforeSetup).toHaveBeenCalledWith(
+      sandbox,
+      undefined,
+      'user_test',
+      'agent_test',
+      { inspectContainers: true }
+    );
   });
 
   it('hydrates requested devcontainer metadata while preparing a cold DIND workspace', async () => {

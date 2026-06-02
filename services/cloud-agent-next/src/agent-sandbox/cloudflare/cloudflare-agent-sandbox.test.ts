@@ -146,6 +146,78 @@ describe('CloudflareAgentSandbox', () => {
     ensureBootstrapWrapper.mockRestore();
   });
 
+  it('reclaims stale bootstrap workspaces without inspecting Docker', async () => {
+    const bootstrapSession = {};
+    const createSession = vi.fn().mockResolvedValue(bootstrapSession);
+    const ensureBootstrapWrapper = vi
+      .spyOn(WrapperClient, 'ensureBootstrapWrapper')
+      .mockResolvedValueOnce({ client: {} as WrapperClient });
+    const exec = vi
+      .fn()
+      .mockResolvedValueOnce({ exitCode: 1, stdout: '', stderr: '' })
+      .mockResolvedValueOnce({ exitCode: 0, stdout: '536870912  10485760000\n', stderr: '' })
+      .mockResolvedValueOnce({
+        exitCode: 0,
+        stdout: 'agent_stale-aaaa\nagent_cloudflare\n',
+        stderr: '',
+      })
+      .mockResolvedValueOnce({ exitCode: 0, stdout: '0\n', stderr: '' })
+      .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' })
+      .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' })
+      .mockResolvedValueOnce({ exitCode: 0, stdout: '3145728000  10485760000\n', stderr: '' });
+    const sandbox = new CloudflareAgentSandbox({} as Env, metadata(), {
+      resolveSandbox: () =>
+        ({
+          exec,
+          listProcesses: vi.fn().mockResolvedValue([]),
+          createSession,
+        }) as unknown as SandboxInstance,
+    });
+
+    await expect(sandbox.ensureWrapper(ensureRequest())).resolves.toMatchObject({
+      status: 'wrapper-running',
+    });
+    expect(exec.mock.calls.every(call => !call[0].includes('docker'))).toBe(true);
+    expect(createSession).toHaveBeenCalled();
+    ensureBootstrapWrapper.mockRestore();
+  });
+
+  it('keeps unresolved DIND bootstrap cleanup fail-closed', async () => {
+    const unresolvedDindMetadata = {
+      ...metadata(),
+      workspace: { sandboxId: 'dind-unresolved' },
+    } satisfies SessionMetadata;
+    const request = ensureRequest();
+    request.plan.workspace = { sandboxId: 'dind-unresolved', metadata: unresolvedDindMetadata };
+    const exec = vi
+      .fn()
+      .mockResolvedValueOnce({ exitCode: 1, stdout: '', stderr: '' })
+      .mockResolvedValueOnce({ exitCode: 0, stdout: '536870912  10485760000\n', stderr: '' })
+      .mockResolvedValueOnce({ exitCode: 0, stdout: 'agent_stale-aaaa\n', stderr: '' })
+      .mockResolvedValueOnce({
+        exitCode: 0,
+        stdout: '/run/user/1000/docker.sock',
+        stderr: '',
+      })
+      .mockRejectedValueOnce(new Error('docker inspection unavailable'))
+      .mockResolvedValueOnce({ exitCode: 0, stdout: '536870912  10485760000\n', stderr: '' });
+    const sandbox = new CloudflareAgentSandbox({} as Env, unresolvedDindMetadata, {
+      resolveSandbox: () =>
+        ({
+          exec,
+          listProcesses: vi.fn().mockResolvedValue([]),
+          createSession: vi.fn(),
+        }) as unknown as SandboxInstance,
+    });
+
+    await expect(sandbox.ensureWrapper(request)).rejects.toBeInstanceOf(
+      WorkspaceCapacityAdmissionRejectedError
+    );
+    expect(exec.mock.calls[4][0]).toContain('docker ps');
+    expect(exec.mock.calls.every(call => !call[0].includes('stat'))).toBe(true);
+    expect(exec.mock.calls.every(call => !call[0].includes('rm -rf'))).toBe(true);
+  });
+
   it('passes a leased physical identity into bootstrap startup', async () => {
     const bootstrapSession = {};
     const ensureBootstrapWrapper = vi

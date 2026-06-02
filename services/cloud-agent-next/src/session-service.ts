@@ -1703,7 +1703,12 @@ export class SessionService {
     }
 
     onProgress?.('disk_check', 'Checking disk space…');
-    await checkDiskAndCleanBeforeSetup(sandbox, orgId, userId, sessionId);
+    await checkDiskAndCleanBeforeSetup(sandbox, orgId, userId, sessionId, {
+      inspectContainers:
+        sandboxId.startsWith('dind-') ||
+        metadata.workspace?.devcontainerRequested === true ||
+        metadata.devcontainer !== undefined,
+    });
 
     onProgress?.('workspace_setup', 'Setting up workspace…');
     await setupWorkspace(sandbox, userId, orgId, sessionId);

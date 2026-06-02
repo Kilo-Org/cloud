@@ -230,7 +230,9 @@ export class CloudflareAgentSandbox implements AgentSandbox {
     const workspaceWarm = await this.workspaceHasGit(sandbox, prepared.context.workspacePath);
     if (!workspaceWarm) {
       request.onProgress?.('disk_check', 'Checking disk space...');
-      await checkDiskAndCleanBeforeSetup(sandbox, orgId, userId, sessionId);
+      await checkDiskAndCleanBeforeSetup(sandbox, orgId, userId, sessionId, {
+        inspectContainers: sandboxId.startsWith('dind-'),
+      });
     }
     request.onProgress?.('kilo_server', 'Starting Kilo...');
     const bootstrapSession = await sandbox.createSession({

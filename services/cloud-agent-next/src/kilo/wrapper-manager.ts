@@ -164,7 +164,7 @@ export async function findWrapperForSession(
  * `kilo.agentSession=<id>`. The published port we want is buried in the
  * `Ports` column (`0.0.0.0:5xxx->5xxx/tcp` or `127.0.0.1:5xxx->5xxx/tcp`).
  */
-type LabeledWrapperRow = {
+export type LabeledWrapperRow = {
   containerId: string;
   agentSessionId: string;
   port?: number;

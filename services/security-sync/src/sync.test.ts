@@ -73,6 +73,41 @@ function stubFetch(response: Response | (() => Response)) {
   return fetchStub;
 }
 
+function createDependabotAlert(overrides: Record<string, unknown> = {}) {
+  return {
+    number: 23,
+    state: 'open',
+    dependency: {
+      package: { ecosystem: 'npm', name: 'lodash' },
+      manifest_path: 'package.json',
+      scope: 'runtime',
+    },
+    security_advisory: {
+      ghsa_id: 'GHSA-1234-5678-90ab',
+      cve_id: null,
+      summary: 'Prototype pollution in lodash',
+      description: 'A vulnerable lodash version allows prototype pollution.',
+      severity: 'high',
+      cvss: { score: 7.5, vector_string: 'CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H' },
+      cwes: [{ cwe_id: 'CWE-1321', name: 'Improperly Controlled Modification' }],
+    },
+    security_vulnerability: {
+      vulnerable_version_range: '< 4.17.21',
+      first_patched_version: { identifier: '4.17.21' },
+    },
+    created_at: '2026-05-18T10:00:00Z',
+    updated_at: '2026-05-18T10:00:00Z',
+    fixed_at: null,
+    dismissed_at: null,
+    dismissed_by: null,
+    dismissed_reason: null,
+    dismissed_comment: null,
+    html_url: 'https://github.com/acme/widgets/security/dependabot/23',
+    url: 'https://api.github.com/repos/acme/widgets/dependabot/alerts/23',
+    ...overrides,
+  };
+}
+
 describe('selectRepositoriesForSync', () => {
   it('allows a manual repository command to target an accessible repo outside configured sync selection', () => {
     const repositories = selectRepositoriesForSync(
@@ -91,6 +126,25 @@ describe('selectRepositoriesForSync', () => {
 });
 
 describe('Worker GitHub auth-invalid sync', () => {
+  it('accepts Dependabot alerts with nullable advisory fields', async () => {
+    const alert = createDependabotAlert({
+      security_advisory: {
+        ...createDependabotAlert().security_advisory,
+        cvss: { score: 7.5, vector_string: null },
+      },
+      security_vulnerability: {
+        vulnerable_version_range: '< 4.17.21',
+        first_patched_version: null,
+      },
+    });
+    stubFetch(new Response(JSON.stringify([alert]), { status: 200 }));
+
+    await expect(fetchAllDependabotAlerts('github-token', 'acme', 'widgets')).resolves.toEqual({
+      status: 'success',
+      alerts: [alert],
+    });
+  });
+
   it('classifies a direct GitHub 401 as auth_invalid', async () => {
     stubFetch(new Response('Bad credentials', { status: 401 }));
 

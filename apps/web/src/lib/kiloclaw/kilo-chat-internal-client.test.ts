@@ -1,5 +1,8 @@
 // Env must be set BEFORE importing the module under test so its constants
-// resolve to the test values.
+// resolve to the test values. KILO_CHAT_INTERNAL_URL is the preferred
+// server-only destination; NEXT_PUBLIC_KILO_CHAT_URL is the migration-safe
+// fallback.
+process.env.KILO_CHAT_INTERNAL_URL = 'https://chat.kiloapps.io';
 process.env.NEXT_PUBLIC_KILO_CHAT_URL = 'https://chat.kiloapps.io';
 
 jest.mock('@/lib/config.server', () => ({
@@ -113,21 +116,73 @@ describe('postMessageAsUser (cloud → kilo-chat internal HTTP)', () => {
     await expect(postMessageAsUser(VALID_PARAMS)).rejects.toThrow(/unexpected payload/);
   });
 
-  it('throws when NEXT_PUBLIC_KILO_CHAT_URL is missing', async () => {
-    const saved = process.env.NEXT_PUBLIC_KILO_CHAT_URL;
+  it('prefers KILO_CHAT_INTERNAL_URL over NEXT_PUBLIC_KILO_CHAT_URL', async () => {
+    const savedInternal = process.env.KILO_CHAT_INTERNAL_URL;
+    const savedPublic = process.env.NEXT_PUBLIC_KILO_CHAT_URL;
+    // Point the public var somewhere off-allowlist: if it were used, the call
+    // would be refused. The internal var must win and the fetch must go to it.
+    process.env.KILO_CHAT_INTERNAL_URL = 'https://chat.kiloapps.io';
+    process.env.NEXT_PUBLIC_KILO_CHAT_URL = 'https://evil.example.com';
+    const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue(
+      jsonResponse({
+        ok: true,
+        conversationId: 'conv-1',
+        messageId: 'msg-1',
+        conversationCreated: false,
+      })
+    );
+    try {
+      await postMessageAsUser(VALID_PARAMS);
+      const [url] = fetchSpy.mock.calls[0]!;
+      expect(url).toBe('https://chat.kiloapps.io/internal/v1/post-message-as-user');
+    } finally {
+      process.env.KILO_CHAT_INTERNAL_URL = savedInternal;
+      process.env.NEXT_PUBLIC_KILO_CHAT_URL = savedPublic;
+    }
+  });
+
+  it('falls back to NEXT_PUBLIC_KILO_CHAT_URL with a warning when the internal var is unset', async () => {
+    const savedInternal = process.env.KILO_CHAT_INTERNAL_URL;
+    delete process.env.KILO_CHAT_INTERNAL_URL;
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue(
+      jsonResponse({
+        ok: true,
+        conversationId: 'conv-1',
+        messageId: 'msg-1',
+        conversationCreated: false,
+      })
+    );
+    try {
+      await postMessageAsUser(VALID_PARAMS);
+      const [url] = fetchSpy.mock.calls[0]!;
+      expect(url).toBe('https://chat.kiloapps.io/internal/v1/post-message-as-user');
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringMatching(/KILO_CHAT_INTERNAL_URL is not set/)
+      );
+    } finally {
+      process.env.KILO_CHAT_INTERNAL_URL = savedInternal;
+    }
+  });
+
+  it('throws when neither destination var is configured', async () => {
+    const savedInternal = process.env.KILO_CHAT_INTERNAL_URL;
+    const savedPublic = process.env.NEXT_PUBLIC_KILO_CHAT_URL;
+    delete process.env.KILO_CHAT_INTERNAL_URL;
     delete process.env.NEXT_PUBLIC_KILO_CHAT_URL;
     try {
       await expect(postMessageAsUser(VALID_PARAMS)).rejects.toThrow(
-        /NEXT_PUBLIC_KILO_CHAT_URL is not configured/
+        /Neither KILO_CHAT_INTERNAL_URL nor NEXT_PUBLIC_KILO_CHAT_URL is configured/
       );
     } finally {
-      process.env.NEXT_PUBLIC_KILO_CHAT_URL = saved;
+      process.env.KILO_CHAT_INTERNAL_URL = savedInternal;
+      process.env.NEXT_PUBLIC_KILO_CHAT_URL = savedPublic;
     }
   });
 
   it('refuses to send the key to an off-allowlist origin (never fetches)', async () => {
-    const saved = process.env.NEXT_PUBLIC_KILO_CHAT_URL;
-    process.env.NEXT_PUBLIC_KILO_CHAT_URL = 'https://evil.example.com';
+    const saved = process.env.KILO_CHAT_INTERNAL_URL;
+    process.env.KILO_CHAT_INTERNAL_URL = 'https://evil.example.com';
     const fetchSpy = jest.spyOn(global, 'fetch');
     try {
       await expect(postMessageAsUser(VALID_PARAMS)).rejects.toThrow(
@@ -135,7 +190,7 @@ describe('postMessageAsUser (cloud → kilo-chat internal HTTP)', () => {
       );
       expect(fetchSpy).not.toHaveBeenCalled();
     } finally {
-      process.env.NEXT_PUBLIC_KILO_CHAT_URL = saved;
+      process.env.KILO_CHAT_INTERNAL_URL = saved;
     }
   });
 

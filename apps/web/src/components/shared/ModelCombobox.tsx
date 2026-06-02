@@ -217,10 +217,12 @@ export function ModelCombobox({
             className={cn('h-9 justify-between gap-1.5', className)}
             ref={triggerRef}
           >
-            <span className="min-w-0 truncate">
-              {selectedModel ? formatShortModelDisplayName(selectedModel.name) : placeholder}
+            <span className="flex min-w-0 items-center gap-1.5">
+              <span className="min-w-0 truncate">
+                {selectedModel ? formatShortModelDisplayName(selectedModel.name) : placeholder}
+              </span>
+              {selectedCollectsData && <FreeModelDataIcon />}
             </span>
-            {selectedCollectsData && <FreeModelDataIcon />}
             <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 opacity-50" />
           </Button>
         </PopoverTrigger>
@@ -253,9 +255,7 @@ export function ModelCombobox({
                               <TooltipContent>Supports vision</TooltipContent>
                             </Tooltip>
                           )}
-                          {isFreeModelOption(model) && (
-                            <FreeModelDataBadge collectsData={isFreeModelOption(model)} />
-                          )}
+                          {isFreeModelOption(model) && <FreeModelDataBadge />}
                         </div>
                         <span className="text-muted-foreground truncate text-xs">{model.id}</span>
                       </div>
@@ -293,9 +293,7 @@ export function ModelCombobox({
                               <TooltipContent>Supports vision</TooltipContent>
                             </Tooltip>
                           )}
-                          {isFreeModelOption(model) && (
-                            <FreeModelDataBadge collectsData={isFreeModelOption(model)} />
-                          )}
+                          {isFreeModelOption(model) && <FreeModelDataBadge />}
                         </div>
                         <span className="text-muted-foreground truncate text-xs">{model.id}</span>
                       </div>
@@ -339,10 +337,12 @@ export function ModelCombobox({
             className={cn('w-full justify-between', className)}
             ref={triggerRef}
           >
-            <span className="min-w-0 truncate">
-              {selectedModel ? selectedModel.name : placeholder}
+            <span className="flex min-w-0 items-center gap-1.5">
+              <span className="min-w-0 truncate">
+                {selectedModel ? selectedModel.name : placeholder}
+              </span>
+              {selectedCollectsData && <FreeModelDataIcon />}
             </span>
-            {selectedCollectsData && <FreeModelDataIcon />}
             <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
           </Button>
         </PopoverTrigger>
@@ -379,9 +379,7 @@ export function ModelCombobox({
                               <TooltipContent>Supports vision</TooltipContent>
                             </Tooltip>
                           )}
-                          {isFreeModelOption(model) && (
-                            <FreeModelDataBadge collectsData={isFreeModelOption(model)} />
-                          )}
+                          {isFreeModelOption(model) && <FreeModelDataBadge />}
                         </div>
                         <span className="text-muted-foreground truncate text-xs">{model.id}</span>
                       </div>
@@ -419,9 +417,7 @@ export function ModelCombobox({
                               <TooltipContent>Supports vision</TooltipContent>
                             </Tooltip>
                           )}
-                          {isFreeModelOption(model) && (
-                            <FreeModelDataBadge collectsData={isFreeModelOption(model)} />
-                          )}
+                          {isFreeModelOption(model) && <FreeModelDataBadge />}
                         </div>
                         <span className="text-muted-foreground truncate text-xs">{model.id}</span>
                       </div>
@@ -462,27 +458,25 @@ function FreeModelDataIcon() {
   );
 }
 
-function FreeModelDataBadge(props: { collectsData: boolean }) {
+function FreeModelDataBadge() {
   return (
     <span className="inline-flex shrink-0 items-center gap-1">
       <span className="inline-flex shrink-0 items-center rounded-full bg-green-500 px-1.5 py-0.5 text-[10px] font-medium text-white">
         {FREE_MODEL_FREE_LABEL}
       </span>
-      {props.collectsData ? (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span
-              aria-label={FREE_MODEL_DATA_LABEL}
-              className="inline-flex shrink-0 items-center rounded-sm text-yellow-500 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-              role="img"
-              tabIndex={0}
-            >
-              <AlertTriangle className="h-3 w-3" />
-            </span>
-          </TooltipTrigger>
-          <TooltipContent>{getFreeModelDataTooltip()}</TooltipContent>
-        </Tooltip>
-      ) : null}
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span
+            aria-label={FREE_MODEL_DATA_LABEL}
+            className="inline-flex shrink-0 items-center rounded-sm text-yellow-500 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+            role="img"
+            tabIndex={0}
+          >
+            <AlertTriangle className="h-3 w-3" />
+          </span>
+        </TooltipTrigger>
+        <TooltipContent>{getFreeModelDataTooltip()}</TooltipContent>
+      </Tooltip>
     </span>
   );
 }

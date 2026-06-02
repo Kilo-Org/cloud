@@ -223,7 +223,7 @@ describe('idle reconciliation scheduling', () => {
     expect(JSON.parse(result.failedEvents[0].payload)).toMatchObject({
       messageId: 'msg_018f1e2d3c4b00000000000002',
       status: 'failed',
-      error: 'No assistant reply found after idle timeout',
+      error: 'No assistant reply found during reconciliation',
       delivery: 'sent',
       accepted: true,
       completionSource: 'idle_reconciliation',
@@ -309,7 +309,7 @@ describe('idle reconciliation scheduling', () => {
     expect(result.lease).toMatchObject({ state: 'stop_needed', reason: 'terminal-failed' });
   });
 
-  it('meaningful wrapper output clears idle state', async () => {
+  it('meaningful wrapper output refreshes liveness without clearing idle state', async () => {
     const userId = 'user_idle_output';
     const sessionId = 'agent_idle_output';
     const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
@@ -331,13 +331,16 @@ describe('idle reconciliation scheduling', () => {
       const { wrapperRunId, wrapperConnectionId, wrapperGeneration } = wrapperState;
 
       // Set idle state
+      const idleAt = Date.now();
+      const reconcileAt = idleAt + 15_000;
+      const keepWarmAt = idleAt + 5 * 60 * 1000;
       await instance.ctx.storage.put('wrapper_runtime_state', {
         wrapperGeneration,
         wrapperConnectionId,
         wrapperRunId,
-        lastWrapperIdleAt: Date.now(),
-        idleReconcileAfter: Date.now() + 15_000,
-        wrapperIdleDeadlineAt: Date.now() + 5 * 60 * 1000,
+        lastWrapperIdleAt: idleAt,
+        idleReconcileAfter: reconcileAt,
+        wrapperIdleDeadlineAt: keepWarmAt,
       });
 
       const handler = await (instance as any).getIngestHandler();
@@ -356,7 +359,9 @@ describe('idle reconciliation scheduling', () => {
         send: () => {},
       } as unknown as WebSocket;
 
-      // Simulate a non-fatal error event (meaningful output that clears idle)
+      // Simulate a non-fatal error event. This is post-completion infrastructure
+      // output: it must refresh wrapper liveness but must NOT disarm the idle
+      // reconciler that is about to finalize the in-flight message.
       await handler.handleIngestMessage(
         ws,
         JSON.stringify({
@@ -367,12 +372,15 @@ describe('idle reconciliation scheduling', () => {
       );
 
       const runtimeState = await getWrapperRuntimeState(instance.ctx.storage);
-      return { runtimeState };
+      return { runtimeState, idleAt, reconcileAt, keepWarmAt };
     });
 
-    expect(result.runtimeState.lastWrapperIdleAt).toBeUndefined();
-    expect(result.runtimeState.idleReconcileAfter).toBeUndefined();
-    expect(result.runtimeState.wrapperIdleDeadlineAt).toBeUndefined();
+    // Idle reconciliation fields stay armed so the reconciler still fires.
+    expect(result.runtimeState.lastWrapperIdleAt).toBe(result.idleAt);
+    expect(result.runtimeState.idleReconcileAfter).toBe(result.reconcileAt);
+    expect(result.runtimeState.wrapperIdleDeadlineAt).toBe(result.keepWarmAt);
+    // Liveness is refreshed by the output.
+    expect(result.runtimeState.lastWrapperMessageAt).toBeDefined();
   });
 
   it('root session.idle records wrapperIdleDeadlineAt for keep-warm', async () => {

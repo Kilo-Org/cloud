@@ -76,6 +76,7 @@ type UseOrganizationsListParams = {
   plan?: string;
   has_usage?: boolean;
   has_multiple_users?: boolean;
+  trial_ending_in_future?: boolean;
 };
 
 export function useOrganizationsList(params: UseOrganizationsListParams) {
@@ -93,6 +94,7 @@ export function useOrganizationsList(params: UseOrganizationsListParams) {
       plan: params.plan as '' | OrganizationPlan | undefined,
       has_usage: params.has_usage ?? false,
       has_multiple_users: params.has_multiple_users ?? false,
+      trial_ending_in_future: params.trial_ending_in_future ?? false,
     })
   );
 }

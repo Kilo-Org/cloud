@@ -35,12 +35,34 @@ pnpm install
 
 ### 2. Set up environment variables
 
-If you do not have Vercel access, copy `.env.local.example` to `.env.local` and set at least:
+Copy `.env.local.example` to `.env.local` and adjust URLs as needed:
 
-- `NEXTAUTH_SECRET`: `openssl rand -base64 32`
-- `INTERNAL_API_SECRET`: `openssl rand -base64 32`
+- `NEXTAUTH_URL` — auth redirect URL (defaults to `http://localhost:3000`)
+- `POSTGRES_URL` — database connection (defaults to `postgres://postgres:postgres@localhost:5432/postgres`)
+
+Then generate secrets and add Stripe test keys:
+
+```bash
+openssl rand -base64 32   # NEXTAUTH_SECRET
+openssl rand -base64 32   # INTERNAL_API_SECRET
+openssl rand -base64 32   # CALLBACK_TOKEN_SECRET
+openssl rand -base64 32   # BYOK_ENCRYPTION_KEY
+```
+
+Get Stripe test keys from https://dashboard.stripe.com/test/apikeys.
+
+Required in `.env.local`:
+
+- `NEXTAUTH_SECRET`
+- `INTERNAL_API_SECRET`
+- `CALLBACK_TOKEN_SECRET`
+- `BYOK_ENCRYPTION_KEY`
+- `STRIPE_SECRET_KEY`
+- `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`
 
 Then run `pnpm dev:env` to derive worker `.dev.vars` files from `.env.local`.
+
+For the full list of environment variables, see [ENVIRONMENT.md](./ENVIRONMENT.md).
 
 ### 3. Start the database
 

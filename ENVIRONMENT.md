@@ -65,6 +65,7 @@ This document lists all environment variables used in the Kilo Code cloud monore
 - `STYTCH_PROJECT_SECRET` - Stytch project secret. `[SECRET]`
 - `STYTCH_PUBLIC_TOKEN` - Stytch legacy public token alias used in some test fixtures. [PUBLIC]
 - `INTERNAL_API_SECRET` - Shared secret for internal API calls between services; used in `apps/web/src/lib/kiloclaw/cli-runs.test.ts`, `kiloclaw-router.test.ts`, dev seed scripts, and other service routers. `[SECRET]`
+- `CALLBACK_TOKEN_SECRET` - Secret for signing callback tokens. Required for local development. `[SECRET]`
 - `INTERNAL_SECRET` - Alias/fallback for `INTERNAL_API_SECRET`; used in KiloClaw E2E scripts (`services/kiloclaw/e2e/`). `[SECRET]`
 
 ### Social OAuth Clients
@@ -342,7 +343,6 @@ This document lists all environment variables used in the Kilo Code cloud monore
 
 - `DOCKER_SOCKET` - Path or URL for the Docker daemon socket; used by `services/cloud-agent-next/scripts/docker-privileged-proxy.mjs`. [SERVER]
 - `DOCKER_PROXY_SOCKET` - Path to the Docker privileged proxy socket. [SERVER]
-- `CALLBACK_TOKEN_SECRET` - Secret for signing callback tokens. `[SECRET]`
 - `SECRET` - Generic secret env var used in `services/kiloclaw/src/auth/sandbox-id-adversarial.test.ts` for sandbox auth tests. `[SECRET]`
 
 ## Mobile
@@ -376,5 +376,3 @@ This document lists all environment variables used in the Kilo Code cloud monore
 - `E2E_MODEL` - Model identifier string for E2E inference tests (e.g. a fake/small model name). [SERVER]
 - `KILOCLAW_USER_LOCATION` - User location parameter for lifecycle tests of the morning briefing plugin. [SERVER]
 - `KILOCLAW_USER_TIMEZONE` - User timezone parameter for lifecycle tests of the morning briefing plugin. [SERVER]
-
-

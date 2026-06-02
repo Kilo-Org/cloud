@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAtom, useSetAtom } from 'jotai';
 import { toast } from 'sonner';
@@ -89,6 +90,12 @@ import {
   setLastUsedRepo,
   setLastUsedVariant,
 } from '@/components/cloud-agent-next/model-preferences';
+import {
+  GITHUB_IDENTITY_HINT_DISMISSED_STORAGE_KEY,
+  getGitHubIdentityHint,
+  getGitHubIdentityHintDismissed,
+  markGitHubIdentityHintDismissed,
+} from '@/components/cloud-agent-next/github-identity-hint';
 
 type Repository = {
   id: number;
@@ -102,6 +109,13 @@ type NewSessionPanelProps = {
   isDevcontainerAvailable: boolean;
 };
 
+type ContextualTipProps = {
+  body: string;
+  linkLabel: string;
+  href: string;
+  onDismiss: () => void;
+};
+
 export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: NewSessionPanelProps) {
   const router = useRouter();
   const trpc = useTRPC();
@@ -111,6 +125,9 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
   const fileInputRef = useRef<HTMLInputElement>(null);
   const commandListRef = useRef<HTMLDivElement>(null);
   const [devcontainer, setDevcontainer] = useState(false);
+  const [isGitHubIdentityHintDismissed, setIsGitHubIdentityHintDismissed] = useState<
+    boolean | null
+  >(null);
   const { mutateAsync: personalUploadUrl } = useMutation(
     trpc.cloudAgentNext.getAttachmentUploadUrl.mutationOptions()
   );
@@ -173,6 +190,21 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
   const [isPreparing, setIsPreparing] = useState(false);
   const [attachmentMessageUuid, setAttachmentMessageUuid] = useState(() => crypto.randomUUID());
 
+  // ---------------------------------------------------------------------------
+  // GitHub identity awareness
+  // ---------------------------------------------------------------------------
+  const {
+    data: githubUserAuthorization,
+    isLoading: isGitHubUserAuthorizationLoading,
+    isError: isGitHubUserAuthorizationError,
+  } = useQuery({
+    ...trpc.githubApps.getUserAuthorization.queryOptions(),
+    enabled:
+      isGitHubIdentityHintDismissed === false &&
+      selectedRepo.length > 0 &&
+      selectedPlatform === 'github',
+  });
+
   const attachmentUpload = useCloudAgentAttachmentUpload({
     messageUuid: attachmentMessageUuid,
     organizationId,
@@ -197,6 +229,15 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
 
   useEffect(() => {
     setDevcontainer(getDevcontainerEnabled());
+    setIsGitHubIdentityHintDismissed(getGitHubIdentityHintDismissed());
+
+    const handleGitHubIdentityHintStorage = (event: StorageEvent) => {
+      if (event.key === GITHUB_IDENTITY_HINT_DISMISSED_STORAGE_KEY && event.newValue === 'true') {
+        setIsGitHubIdentityHintDismissed(true);
+      }
+    };
+    window.addEventListener('storage', handleGitHubIdentityHintStorage);
+    return () => window.removeEventListener('storage', handleGitHubIdentityHintStorage);
   }, []);
 
   const handleDevcontainerChange = useCallback((enabled: boolean) => {
@@ -865,6 +906,20 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
     [handleAutocompleteKeyDown, isFormValid, handleStartSession]
   );
 
+  const githubIdentityHint = getGitHubIdentityHint({
+    selectedRepo,
+    selectedPlatform,
+    authorization: githubUserAuthorization,
+    isLoading: isGitHubUserAuthorizationLoading,
+    isError: isGitHubUserAuthorizationError,
+    isDismissed: isGitHubIdentityHintDismissed !== false,
+  });
+
+  const handleDismissGitHubIdentityHint = useCallback(() => {
+    markGitHubIdentityHintDismissed();
+    setIsGitHubIdentityHintDismissed(true);
+  }, []);
+
   // ---------------------------------------------------------------------------
   // Integration missing view
   // ---------------------------------------------------------------------------
@@ -1326,6 +1381,42 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
             />
           </div>
         </div>
+
+        {githubIdentityHint && (
+          <ContextualTip {...githubIdentityHint} onDismiss={handleDismissGitHubIdentityHint} />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ContextualTip({ body, linkLabel, href, onDismiss }: ContextualTipProps) {
+  return (
+    <div className="group/tip flex max-w-full justify-center text-center" role="status">
+      <div className="text-muted-foreground inline-flex max-w-full items-start justify-center gap-1 text-xs">
+        <span aria-hidden="true" className="invisible mr-1 shrink-0 px-1">
+          Dismiss
+        </span>
+        <span className="text-foreground font-medium">Tip:</span>
+        <span aria-hidden="true" className="text-border">
+          &middot;
+        </span>
+        <span className="min-w-0">
+          {body}{' '}
+          <Link
+            href={href}
+            className="text-blue-400 hover:text-blue-300 hover:underline focus-visible:underline"
+          >
+            {linkLabel}
+          </Link>
+        </span>
+        <button
+          type="button"
+          className="text-muted-foreground/70 hover:text-foreground focus-visible:text-foreground focus-visible:ring-ring pointer-events-none -my-4 ml-1 shrink-0 cursor-pointer rounded-sm px-1 py-4 underline decoration-border underline-offset-4 opacity-0 transition-opacity group-focus-within/tip:pointer-events-auto group-focus-within/tip:opacity-100 group-hover/tip:pointer-events-auto group-hover/tip:opacity-100 focus-visible:ring-1 focus-visible:outline-none [@media(any-pointer:coarse)]:pointer-events-auto [@media(any-pointer:coarse)]:opacity-100 [@media(hover:none)]:pointer-events-auto [@media(hover:none)]:opacity-100"
+          onClick={onDismiss}
+        >
+          Dismiss
+        </button>
       </div>
     </div>
   );
@@ -1334,7 +1425,6 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
 // ---------------------------------------------------------------------------
 // Internal sub-component for repo items in the Command list
 // ---------------------------------------------------------------------------
-
 function RepoCommandItem({
   repo,
   isSelected,

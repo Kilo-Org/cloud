@@ -34,9 +34,9 @@ type IntegrationDetailRegistryEntry = {
 const integrationDetailRegistry = {
   [PLATFORM.GITHUB]: {
     title: 'GitHub Integration',
-    userSubtitle: 'Manage your personal GitHub App installation',
+    userSubtitle: 'Set up personal repository access and optional Cloud Agent attribution',
     organizationSubtitle: organizationName =>
-      `Manage GitHub App installation for ${organizationName}`,
+      `Manage repository access for ${organizationName} and link your personal identity.`,
     render: async ({ organizationId, search }) => {
       const { GitHubIntegrationDetails } =
         await import('@/components/integrations/GitHubIntegrationDetails');
@@ -44,6 +44,7 @@ const integrationDetailRegistry = {
         <GitHubIntegrationDetails
           organizationId={organizationId}
           success={search.success === 'installed'}
+          userConnectionSuccess={search.success === 'user_connected'}
           error={search.error}
           pendingApproval={search.pending_approval === 'true'}
           existingPendingOrg={search.org}

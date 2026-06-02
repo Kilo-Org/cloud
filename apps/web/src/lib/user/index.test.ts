@@ -67,6 +67,7 @@ import {
   impact_advocate_reward_redemptions,
   impact_conversion_reports,
   github_branch_pull_requests,
+  user_github_app_tokens,
   model_eval_ingestions,
   microdollar_usage,
   model_experiment,
@@ -195,6 +196,7 @@ describe('User', () => {
     await db.delete(agent_environment_profile_mcp_servers);
     await db.delete(agent_environment_profiles);
     await db.delete(github_branch_pull_requests);
+    await db.delete(user_github_app_tokens);
     await db.delete(organizations);
     await db.delete(kilocode_users);
   });
@@ -1941,6 +1943,48 @@ describe('User', () => {
         .from(github_branch_pull_requests)
         .where(eq(github_branch_pull_requests.owned_by_user_id, user.id));
       expect(rows).toHaveLength(0);
+    });
+
+    it('should delete stored GitHub user authorization credentials', async () => {
+      const user = await insertTestUser();
+      const otherUser = await insertTestUser();
+
+      await db.insert(user_github_app_tokens).values([
+        {
+          kilo_user_id: user.id,
+          github_app_type: 'standard',
+          github_user_id: '101',
+          github_login: 'deleted-user',
+          access_token_encrypted: 'encrypted-access-deleted',
+          access_token_expires_at: '2026-06-01T00:00:00.000Z',
+          refresh_token_encrypted: 'encrypted-refresh-deleted',
+          refresh_token_expires_at: '2026-11-01T00:00:00.000Z',
+        },
+        {
+          kilo_user_id: otherUser.id,
+          github_app_type: 'standard',
+          github_user_id: '102',
+          github_login: 'retained-user',
+          access_token_encrypted: 'encrypted-access-retained',
+          access_token_expires_at: '2026-06-01T00:00:00.000Z',
+          refresh_token_encrypted: 'encrypted-refresh-retained',
+          refresh_token_expires_at: '2026-11-01T00:00:00.000Z',
+        },
+      ]);
+
+      await softDeleteUser(user.id);
+
+      const deletedCredentials = await db
+        .select()
+        .from(user_github_app_tokens)
+        .where(eq(user_github_app_tokens.kilo_user_id, user.id));
+      const retainedCredentials = await db
+        .select()
+        .from(user_github_app_tokens)
+        .where(eq(user_github_app_tokens.kilo_user_id, otherUser.id));
+
+      expect(deletedCredentials).toHaveLength(0);
+      expect(retainedCredentials).toHaveLength(1);
     });
 
     it('should nullify free_model_usage FK', async () => {

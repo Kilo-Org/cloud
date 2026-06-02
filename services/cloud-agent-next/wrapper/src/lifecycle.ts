@@ -8,6 +8,7 @@
  */
 
 import type { WrapperState } from './state.js';
+import type { WrapperCommitCoAuthor } from '../../src/shared/wrapper-bootstrap.js';
 import type { WrapperKiloClient } from './kilo-api.js';
 import { runAutoCommit } from './auto-commit.js';
 import { runCondenseOnComplete } from './condense-on-complete.js';
@@ -45,6 +46,7 @@ export type PerTurnConfig = {
   condenseOnComplete: boolean;
   model?: string;
   upstreamBranch?: string;
+  commitCoAuthor?: WrapperCommitCoAuthor;
 };
 
 export type LifecycleDependencies = {
@@ -165,6 +167,7 @@ export function createLifecycleManager(
           kiloClient,
           messageId: state.lastAssistantMessageId ?? undefined,
           upstreamBranch: msgConfig.upstreamBranch,
+          ...(msgConfig.commitCoAuthor ? { commitCoAuthor: msgConfig.commitCoAuthor } : {}),
           signal: autoCommitController.signal,
         }).finally(() => clearTimeout(timeout));
         if (autoCommitTimedOut && !result.success) {

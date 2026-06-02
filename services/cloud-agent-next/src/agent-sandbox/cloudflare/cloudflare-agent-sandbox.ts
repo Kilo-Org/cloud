@@ -219,6 +219,7 @@ export class CloudflareAgentSandbox implements AgentSandbox {
           error
         );
       }
+      await wrapper.client.updateRuntimeEnvironment(preparedWorkspace.runtimeEnv);
       return {
         status: 'session-ready' as const,
         client: wrapper.client,

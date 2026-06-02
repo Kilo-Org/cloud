@@ -2835,6 +2835,46 @@ export const platform_integrations = pgTable(
 
 export type PlatformIntegration = typeof platform_integrations.$inferSelect;
 
+export const user_github_app_tokens = pgTable(
+  'user_github_app_tokens',
+  {
+    id: idPrimaryKeyColumn,
+    kilo_user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    github_app_type: text().$type<'standard' | 'lite'>().notNull().default('standard'),
+    github_user_id: text().notNull(),
+    github_login: text().notNull(),
+    access_token_encrypted: text().notNull(),
+    access_token_expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    refresh_token_encrypted: text().notNull(),
+    refresh_token_expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    credential_version: integer().notNull().default(1),
+    revoked_at: timestamp({ withTimezone: true, mode: 'string' }),
+    revocation_reason: text(),
+    last_used_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    uniqueIndex('UQ_user_github_app_tokens_user_app').on(table.kilo_user_id, table.github_app_type),
+    uniqueIndex('UQ_user_github_app_tokens_github_user_app').on(
+      table.github_user_id,
+      table.github_app_type
+    ),
+    check(
+      'user_github_app_tokens_app_type_check',
+      sql`${table.github_app_type} IN ('standard', 'lite')`
+    ),
+  ]
+);
+
+export type UserGitHubAppToken = typeof user_github_app_tokens.$inferSelect;
+export type NewUserGitHubAppToken = typeof user_github_app_tokens.$inferInsert;
+
 // User Deployments
 
 export const deployments = pgTable(

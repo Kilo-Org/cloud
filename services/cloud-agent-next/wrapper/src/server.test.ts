@@ -39,11 +39,13 @@ function createTestFetch(overrides?: {
   ptyCalls?: PtyCall[];
   resizeCalls?: Array<{ ptyId: string; cols: number; rows: number }>;
   deleteCalls?: string[];
+  runtimeEnvironmentUpdates?: Array<Record<string, string>>;
   resizeError?: Error;
 }) {
   const ptyCalls = overrides?.ptyCalls ?? [];
   const resizeCalls = overrides?.resizeCalls ?? [];
   const deleteCalls = overrides?.deleteCalls ?? [];
+  const runtimeEnvironmentUpdates = overrides?.runtimeEnvironmentUpdates ?? [];
 
   const pty: WrapperPty = {
     id: 'pty_123',
@@ -90,10 +92,13 @@ function createTestFetch(overrides?: {
       setAborted: () => {},
       resetLifecycle: () => {},
       setPerTurnConfig: () => {},
+      updateRuntimeEnvironment: async env => {
+        runtimeEnvironmentUpdates.push(env);
+      },
     },
     () => {}
   );
-  return { fetchHandler, ptyCalls, resizeCalls, deleteCalls };
+  return { fetchHandler, ptyCalls, resizeCalls, deleteCalls, runtimeEnvironmentUpdates };
 }
 
 afterEach(async () => {
@@ -251,6 +256,26 @@ describe('wrapper PTY routes', () => {
       code: 1000,
       reason: 'PTY session ended',
     });
+  });
+});
+
+describe('wrapper runtime environment', () => {
+  it('delegates environment updates to the active runtime updater', async () => {
+    const runtimeEnvironmentUpdates: Array<Record<string, string>> = [];
+    const { fetchHandler } = createTestFetch({ runtimeEnvironmentUpdates });
+
+    const response = await fetchHandler(
+      new Request('http://wrapper.test/session/environment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ env: { GH_TOKEN: 'next-token' } }),
+      })
+    );
+
+    expect(response).toBeDefined();
+    if (!response) throw new Error('Expected runtime environment response');
+    expect(response.status).toBe(200);
+    expect(runtimeEnvironmentUpdates).toEqual([{ GH_TOKEN: 'next-token' }]);
   });
 });
 

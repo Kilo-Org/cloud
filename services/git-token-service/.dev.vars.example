@@ -4,6 +4,25 @@
 GITHUB_APP_ID=
 # @pkcs8
 GITHUB_APP_PRIVATE_KEY=
+GITHUB_APP_CLIENT_ID=
+GITHUB_APP_CLIENT_SECRET=
+# Dedicated active RSA/AES envelope keypair for persisted GitHub user tokens.
+# Generate once per environment outside the repository; store private.pem and private.env securely
+# and never commit them:
+#   pnpm exec tsx dev/generate-rsa-env-keypair.ts -- --out-dir <secure-output-dir> \
+#     --public-env USER_GITHUB_APP_TOKEN_ACTIVE_PUBLIC_KEY \
+#     --private-env USER_GITHUB_APP_TOKEN_ACTIVE_PRIVATE_KEY
+# Copy values from public.env and private.env into the matching environment variables.
+# Use a stable non-secret key ID, for example github-user-token-prod-v1.
+# Rotation is not configured; do not replace the keypair while stored envelopes exist.
+USER_GITHUB_APP_TOKEN_ACTIVE_KEY_ID=
+# Base64-encoded PEM RSA public key; same public value configured in Web
+USER_GITHUB_APP_TOKEN_ACTIVE_PUBLIC_KEY=
+# Base64-encoded PKCS#8 PEM RSA private key; Worker only
+USER_GITHUB_APP_TOKEN_ACTIVE_PRIVATE_KEY=
+# @from NEXTAUTH_SECRET
+# Short-lived user-token verification for POST /internal/github-user-authorizations/disconnect
+NEXTAUTH_SECRET=
 
 # GitHub Lite App credentials (for OSS organizations with read-only permissions)
 # Same format as standard app credentials above

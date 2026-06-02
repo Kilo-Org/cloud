@@ -19,6 +19,13 @@ import {
 } from '@/lib/integrations/resolve-owner';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
+import { APP_URL } from '@/lib/constants';
+import { getGitHubAppCredentials } from '@/lib/integrations/platforms/github/app-selector';
+import { createGitHubUserAuthorizationState } from '@/lib/integrations/platforms/github/user-authorization-state';
+import {
+  disconnectGitHubUserAuthorization,
+  getGitHubUserAuthorizationStatus,
+} from '@/lib/integrations/platforms/github/user-authorization';
 
 export const githubAppsRouter = createTRPCRouter({
   // List all integrations
@@ -28,6 +35,43 @@ export const githubAppsRouter = createTRPCRouter({
     }
     const owner = resolveOwner(ctx, input?.organizationId);
     return githubAppsService.listIntegrations(owner);
+  }),
+
+  getUserAuthorization: baseProcedure.query(async ({ ctx }) => {
+    return getGitHubUserAuthorizationStatus(ctx.user.id);
+  }),
+
+  connectUserAuthorization: baseProcedure.mutation(async ({ ctx }) => {
+    const authorization = await getGitHubUserAuthorizationStatus(ctx.user.id);
+    if (authorization.connected) {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: 'Disconnect your current GitHub identity before connecting another account',
+      });
+    }
+    const credentials = getGitHubAppCredentials('standard');
+    if (!credentials.clientId) {
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'GitHub App is not configured',
+      });
+    }
+    const { state, codeChallenge } = await createGitHubUserAuthorizationState(ctx.user.id);
+    const authorizeUrl = new URL('https://github.com/login/oauth/authorize');
+    authorizeUrl.searchParams.set('client_id', credentials.clientId);
+    authorizeUrl.searchParams.set(
+      'redirect_uri',
+      new URL('/api/integrations/github/user-connect/callback', APP_URL).toString()
+    );
+    authorizeUrl.searchParams.set('state', state);
+    authorizeUrl.searchParams.set('code_challenge', codeChallenge);
+    authorizeUrl.searchParams.set('code_challenge_method', 'S256');
+    return { authorizationUrl: authorizeUrl.toString() };
+  }),
+
+  disconnectUserAuthorization: baseProcedure.mutation(async ({ ctx }) => {
+    await disconnectGitHubUserAuthorization(ctx.user.id);
+    return { success: true };
   }),
 
   // Get GitHub App installation status

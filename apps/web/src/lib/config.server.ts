@@ -23,6 +23,13 @@ export const GOOGLE_WORKSPACE_REFRESH_TOKEN_ENCRYPTION_KEY = getEnvVariable(
 );
 export const GITHUB_CLIENT_ID = getEnvVariable('GITHUB_CLIENT_ID');
 export const GITHUB_CLIENT_SECRET = getEnvVariable('GITHUB_CLIENT_SECRET');
+export const USER_GITHUB_APP_TOKEN_ACTIVE_KEY_ID = getEnvVariable(
+  'USER_GITHUB_APP_TOKEN_ACTIVE_KEY_ID'
+);
+export const USER_GITHUB_APP_TOKEN_ACTIVE_PUBLIC_KEY = getEnvVariable(
+  'USER_GITHUB_APP_TOKEN_ACTIVE_PUBLIC_KEY'
+);
+export const GIT_TOKEN_SERVICE_API_URL = getEnvVariable('GIT_TOKEN_SERVICE_API_URL') || '';
 // Admin-only GitHub access (used for admin dashboards)
 export const GITHUB_ADMIN_STATS_TOKEN = getEnvVariable('GITHUB_ADMIN_STATS_TOKEN');
 export const CONTRIBUTOR_CHAMPION_TEAM_EMAILS =

@@ -32,6 +32,7 @@ import {
   manageBranch,
   cloneGitHubRepo,
   cloneGitRepo,
+  updateGitAuthor,
   updateGitRemoteToken,
   checkDiskSpace,
   checkDiskAndCleanBeforeSetup,
@@ -706,6 +707,29 @@ describe('disk space checking', () => {
         expect((err as Error).message).not.toContain('secret123');
         expect((err as Error).message).toContain('x-access-token:***@');
       }
+    });
+  });
+
+  describe('updateGitAuthor', () => {
+    it('shell-quotes author values and passes the workspace as cwd', async () => {
+      const workspacePath = "/workspace/repo with ' quote";
+      mockExec.mockResolvedValue({ exitCode: 0, stdout: '', stderr: '' });
+
+      await updateGitAuthor(fakeSession, workspacePath, {
+        name: `User "$(touch /tmp/name)" O'Brien`,
+        email: `user'$(touch /tmp/email)'@example.com`,
+      });
+
+      expect(mockExec).toHaveBeenNthCalledWith(
+        1,
+        `git config user.name 'User "$(touch /tmp/name)" O'\\''Brien'`,
+        expect.objectContaining({ cwd: workspacePath })
+      );
+      expect(mockExec).toHaveBeenNthCalledWith(
+        2,
+        `git config user.email 'user'\\''$(touch /tmp/email)'\\''@example.com'`,
+        expect.objectContaining({ cwd: workspacePath })
+      );
     });
   });
 

@@ -1,3 +1,8 @@
+export type WrapperCommitCoAuthor = {
+  name: string;
+  email: string;
+};
+
 export type WrapperBootstrapRepoSource =
   | {
       kind: 'github';
@@ -92,6 +97,7 @@ export type WrapperPromptRequest = {
   finalization?: {
     autoCommit?: boolean;
     condenseOnComplete?: boolean;
+    commitCoAuthor?: WrapperCommitCoAuthor;
   };
   session: WrapperSessionBinding;
 };
@@ -103,6 +109,7 @@ export type WrapperCommandRequest = {
   agent?: WrapperPromptAgent;
   autoCommit?: boolean;
   condenseOnComplete?: boolean;
+  commitCoAuthor?: WrapperCommitCoAuthor;
   session: WrapperSessionBinding;
 };
 

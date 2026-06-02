@@ -1,3 +1,4 @@
+import { extractBearerToken, verifyKiloToken } from '@kilocode/worker-utils';
 import { WorkerEntrypoint } from 'cloudflare:workers';
 import { GitHubTokenService, type GitHubAppType } from './github-token-service.js';
 import { GitLabLookupService } from './gitlab-lookup-service.js';
@@ -8,6 +9,11 @@ import {
 } from './gitlab-runtime-token-resolver.js';
 import { GitLabTokenService } from './gitlab-token-service.js';
 import { InstallationLookupService } from './installation-lookup-service.js';
+import {
+  GitHubUserAuthorizationService,
+  type GitAuthorConfig,
+  type ManagedGitHubFallbackReason as UserAuthorizationFallbackReason,
+} from './github-user-authorization-service.js';
 
 export type GetTokenForRepoParams = {
   githubRepo: string;
@@ -29,6 +35,7 @@ export type GetTokenForRepoFailure = {
     | 'database_not_configured'
     | 'invalid_repo_format'
     | 'no_installation_found'
+    | 'repository_not_installed'
     | 'invalid_org_id';
 };
 
@@ -40,11 +47,44 @@ export type {
   GetGitLabTokenResult,
 } from './gitlab-runtime-token-resolver.js';
 
+export type ManagedGitHubFallbackReason = UserAuthorizationFallbackReason | 'lite_installation';
+
+export type GetCloudAgentAuthForRepoParams = GetTokenForRepoParams & {
+  allowUserAuthorization?: boolean;
+};
+
+export type GetCloudAgentAuthForRepoSuccess = {
+  success: true;
+  githubToken: string;
+  installationId: string;
+  accountLogin: string;
+  appType: GitHubAppType;
+  source: 'user' | 'installation';
+  gitAuthor: GitAuthorConfig;
+  commitCoAuthor?: GitAuthorConfig;
+  fallbackReason?: ManagedGitHubFallbackReason;
+};
+
+export type GetCloudAgentAuthForRepoResult =
+  | GetCloudAgentAuthForRepoSuccess
+  | GetTokenForRepoFailure;
+
+const DISCONNECT_PATH = '/internal/github-user-authorizations/disconnect';
+
+type DisconnectEnv = CloudflareEnv & {
+  NEXTAUTH_SECRET: SecretsStoreSecret | string;
+};
+
+async function resolveJwtSecret(secret: SecretsStoreSecret | string): Promise<string> {
+  return typeof secret === 'string' ? secret : secret.get();
+}
+
 export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
   private githubService: GitHubTokenService;
   private installationLookupService: InstallationLookupService;
   private gitlabLookupService: GitLabLookupService;
   private gitlabTokenService: GitLabTokenService;
+  private githubUserAuthorizationService: GitHubUserAuthorizationService;
 
   constructor(ctx: ExecutionContext, env: CloudflareEnv) {
     super(ctx, env);
@@ -52,6 +92,7 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
     this.installationLookupService = new InstallationLookupService(env);
     this.gitlabLookupService = new GitLabLookupService(env);
     this.gitlabTokenService = new GitLabTokenService(env);
+    this.githubUserAuthorizationService = new GitHubUserAuthorizationService(env);
   }
 
   private async refreshGitHubInstallationLogins(params: GetTokenForRepoParams): Promise<void> {
@@ -148,6 +189,87 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
     };
   }
 
+  async getCloudAgentAuthForRepo(
+    params: GetCloudAgentAuthForRepoParams
+  ): Promise<GetCloudAgentAuthForRepoResult> {
+    let installation = await this.installationLookupService.findManagedInstallationForRepo(params);
+    if (!installation.success && installation.reason === 'no_installation_found') {
+      await this.refreshGitHubInstallationLogins(params);
+      installation = await this.installationLookupService.findManagedInstallationForRepo(params);
+    }
+    if (!installation.success) {
+      switch (installation.reason) {
+        case 'ambiguous_installation':
+          return { success: false, reason: 'no_installation_found' };
+        case 'database_not_configured':
+        case 'invalid_repo_format':
+        case 'no_installation_found':
+        case 'repository_not_installed':
+        case 'invalid_org_id':
+          return { success: false, reason: installation.reason };
+      }
+    }
+
+    const installationAuthor = this.getInstallationAuthor(installation.githubAppType);
+    const installationAuth = async (
+      fallbackReason?: ManagedGitHubFallbackReason
+    ): Promise<GetCloudAgentAuthForRepoSuccess> => ({
+      success: true,
+      githubToken: await this.githubService.getTokenForRepo(
+        installation.installationId,
+        installation.repoName,
+        installation.githubAppType
+      ),
+      installationId: installation.installationId,
+      accountLogin: installation.accountLogin,
+      appType: installation.githubAppType,
+      source: 'installation',
+      gitAuthor: installationAuthor,
+      ...(fallbackReason !== undefined ? { fallbackReason } : {}),
+    });
+
+    if (params.allowUserAuthorization !== true) return installationAuth();
+    if (installation.githubAppType === 'lite') return installationAuth('lite_installation');
+    if (
+      installation.permissions?.contents !== 'write' ||
+      installation.permissions?.pull_requests !== 'write'
+    ) {
+      return installationAuth('insufficient_user_access');
+    }
+
+    const selection = await this.githubUserAuthorizationService.selectUserAuthorization(params);
+    if (!selection.selected) return installationAuth(selection.reason);
+
+    return {
+      success: true,
+      githubToken: selection.token,
+      installationId: installation.installationId,
+      accountLogin: installation.accountLogin,
+      appType: installation.githubAppType,
+      source: 'user',
+      gitAuthor: selection.gitAuthor,
+      commitCoAuthor: installationAuthor,
+    };
+  }
+
+  private getInstallationAuthor(appType: GitHubAppType): GitAuthorConfig {
+    const slug =
+      appType === 'lite'
+        ? this.env.GITHUB_LITE_APP_SLUG || this.env.GITHUB_APP_SLUG
+        : this.env.GITHUB_APP_SLUG;
+    const userId =
+      appType === 'lite'
+        ? this.env.GITHUB_LITE_APP_BOT_USER_ID || this.env.GITHUB_APP_BOT_USER_ID
+        : this.env.GITHUB_APP_BOT_USER_ID;
+    if (!slug || !userId) {
+      throw new Error(`GitHub ${appType} App bot identity is not configured`);
+    }
+    return {
+      name: `${slug}[bot]`,
+      email: `${userId}+${slug}[bot]@users.noreply.github.com`,
+    };
+  }
+
   /**
    * Get a GitHub installation access token by installation ID.
    *
@@ -176,8 +298,36 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
 }
 
 export default {
-  // Cloudflare requires a fetch handler to deploy, even for RPC-only workers
-  fetch() {
-    return new Response(null, { status: 404 });
+  async fetch(request: Request, env: DisconnectEnv): Promise<Response> {
+    const url = new URL(request.url);
+    if (url.pathname !== DISCONNECT_PATH) return new Response(null, { status: 404 });
+    if (request.method !== 'POST') return new Response(null, { status: 405 });
+
+    const token = extractBearerToken(request.headers.get('Authorization'));
+    if (!token) return Response.json({ error: 'unauthorized' }, { status: 401 });
+
+    let secret: string;
+    try {
+      secret = await resolveJwtSecret(env.NEXTAUTH_SECRET);
+    } catch {
+      return Response.json({ error: 'authentication_unavailable' }, { status: 503 });
+    }
+    if (!secret) return Response.json({ error: 'authentication_unavailable' }, { status: 503 });
+
+    let kiloUserId: string;
+    try {
+      const authorization = await verifyKiloToken(token, secret);
+      kiloUserId = authorization.kiloUserId;
+    } catch {
+      return Response.json({ error: 'unauthorized' }, { status: 401 });
+    }
+
+    try {
+      const service = new GitHubUserAuthorizationService(env);
+      await service.disconnectUserAuthorization(kiloUserId);
+      return Response.json({ disconnected: true });
+    } catch {
+      return Response.json({ error: 'disconnect_failed' }, { status: 502 });
+    }
   },
-};
+} satisfies ExportedHandler<DisconnectEnv>;

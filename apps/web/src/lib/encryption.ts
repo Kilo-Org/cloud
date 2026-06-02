@@ -9,6 +9,7 @@ export {
   EncryptionFormatError,
   encryptWithPublicKey,
   decryptWithPrivateKey,
+  encryptKeyedEnvelope,
   encryptWithSymmetricKey,
   decryptWithSymmetricKey,
   decryptSecrets,

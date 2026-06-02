@@ -272,6 +272,7 @@ describe('CloudflareAgentSandbox', () => {
       teardown: vi.fn(),
     };
     const request = ensureRequest({ devcontainer: true, leased: true });
+    const updateRuntimeEnvironment = vi.fn().mockResolvedValue(undefined);
     const prepareWorkspace = vi.fn().mockResolvedValue({
       context: { workspacePath: '/workspace/cloudflare' },
       ready: {
@@ -283,12 +284,12 @@ describe('CloudflareAgentSandbox', () => {
           configPath: '.devcontainer/devcontainer.json',
         },
       },
-      runtimeEnv: {},
+      runtimeEnv: { GH_TOKEN: 'next-token' },
       session: {},
       devcontainer,
     });
     const ensureWrapper = vi.spyOn(WrapperClient, 'ensureWrapper').mockResolvedValueOnce({
-      client: {} as WrapperClient,
+      client: { updateRuntimeEnvironment } as unknown as WrapperClient,
       sessionId: 'kilo_cloudflare',
     });
     const sandbox = new CloudflareAgentSandbox({} as Env, metadata({ devcontainer: true }), {
@@ -309,6 +310,7 @@ describe('CloudflareAgentSandbox', () => {
         leasedInstance: { instanceId: 'instance_cloudflare', instanceGeneration: 3 },
       })
     );
+    expect(updateRuntimeEnvironment).toHaveBeenCalledWith({ GH_TOKEN: 'next-token' });
     ensureWrapper.mockRestore();
   });
 

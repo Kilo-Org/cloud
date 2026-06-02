@@ -5,8 +5,13 @@
  * reject-question, abort) work when `currentSession` is set.
  */
 
-import { describe, expect, it, vi } from 'vitest';
+import { mkdir, mkdtemp, rm, writeFile } from 'fs/promises';
+import { tmpdir } from 'os';
+import { join } from 'path';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { WrapperState } from '../../../wrapper/src/state.js';
+import { configureCommitCoAuthorHook } from '../../../wrapper/src/commit-co-author-hook.js';
+import { git } from '../../../wrapper/src/utils.js';
 import {
   createAnswerPermissionHandler,
   createAnswerQuestionHandler,
@@ -56,6 +61,7 @@ function createMockDeps(state: WrapperState) {
     onMessageComplete: vi.fn(),
     readySession: vi.fn(),
     materializePromptAttachments: vi.fn(async prompt => prompt),
+    configureCommitCoAuthor: vi.fn().mockResolvedValue(undefined),
   };
 }
 
@@ -70,6 +76,29 @@ function jsonRequest(body: unknown): Request {
 async function readJson(response: Response): Promise<unknown> {
   return response.json();
 }
+
+const createdRepos: string[] = [];
+const BOT_CO_AUTHOR = {
+  name: 'kiloconnect[bot]',
+  email: '240665456+kiloconnect[bot]@users.noreply.github.com',
+};
+const BOT_CO_AUTHOR_TRAILER =
+  'Co-authored-by: kiloconnect[bot] <240665456+kiloconnect[bot]@users.noreply.github.com>';
+
+async function createRepo(): Promise<string> {
+  const repoPath = await mkdtemp(join(tmpdir(), 'wrapper-server-commit-co-author-'));
+  createdRepos.push(repoPath);
+  await git(['init'], { cwd: repoPath, timeoutMs: 5_000 });
+  await git(['config', 'user.email', 'author@example.com'], { cwd: repoPath, timeoutMs: 5_000 });
+  await git(['config', 'user.name', 'Author'], { cwd: repoPath, timeoutMs: 5_000 });
+  return repoPath;
+}
+
+afterEach(async () => {
+  await Promise.all(
+    createdRepos.splice(0).map(repoPath => rm(repoPath, { recursive: true, force: true }))
+  );
+});
 
 // ---------------------------------------------------------------------------
 // Answer Permission
@@ -484,6 +513,7 @@ describe('createPromptHandler', () => {
         finalization: {
           autoCommit: true,
           condenseOnComplete: true,
+          commitCoAuthor: { name: 'kiloconnect[bot]', email: 'bot@example.com' },
         },
         session: {
           ...completeBinding,
@@ -498,6 +528,7 @@ describe('createPromptHandler', () => {
       condenseOnComplete: true,
       model: 'anthropic/claude-sonnet-4-20250514',
       upstreamBranch: 'main',
+      commitCoAuthor: { name: 'kiloconnect[bot]', email: 'bot@example.com' },
     });
     expect(deps.kiloClient.sendPromptAsync).toHaveBeenCalledWith({
       sessionId: 'kilo_sess_1',
@@ -510,6 +541,214 @@ describe('createPromptHandler', () => {
       system: 'You are a helpful assistant',
       tools: { read_file: true, write_file: false },
     });
+  });
+
+  it('adds the selected bot co-author to direct agent commits before dispatch', async () => {
+    const repoPath = await createRepo();
+    const state = new WrapperState();
+    const deps = createMockDeps(state);
+    deps.configureCommitCoAuthor.mockImplementation(configureCommitCoAuthorHook);
+    deps.kiloClient.sendPromptAsync = vi.fn(async () => {
+      await writeFile(join(repoPath, 'direct.txt'), 'direct\n');
+      await git(['add', 'direct.txt'], { cwd: repoPath, timeoutMs: 5_000 });
+      const commit = await git(['commit', '--no-verify', '-m', 'Direct agent commit'], {
+        cwd: repoPath,
+        timeoutMs: 5_000,
+      });
+      expect(commit.exitCode).toBe(0);
+    });
+    const handler = createPromptHandler({ ...defaultServerConfig, workspacePath: repoPath }, deps);
+
+    const response = await handler(
+      jsonRequest({
+        message: { id: 'msg_direct_commit', prompt: 'Commit the change' },
+        finalization: { commitCoAuthor: BOT_CO_AUTHOR },
+        session: completeBinding,
+      })
+    );
+    const commitMessage = await git(['log', '-1', '--format=%B'], {
+      cwd: repoPath,
+      timeoutMs: 5_000,
+    });
+
+    expect(response.status).toBe(200);
+    expect(commitMessage.stdout).toContain(BOT_CO_AUTHOR_TRAILER);
+  });
+
+  it('chains existing hooks and suppresses co-authorship when the bot becomes primary author', async () => {
+    const repoPath = await createRepo();
+    const hooksPath = join(repoPath, '.custom-hooks');
+    await mkdir(hooksPath);
+    await writeFile(
+      join(hooksPath, 'existing-hook-helper'),
+      '#!/bin/sh\nprintf "\\nExisting-hook: applied\\n" >> "$1"\n',
+      { mode: 0o755 }
+    );
+    await writeFile(
+      join(hooksPath, 'prepare-commit-msg'),
+      '#!/bin/sh\n"$(dirname "$0")/existing-hook-helper" "$1"\n',
+      { mode: 0o755 }
+    );
+    await git(['config', '--local', 'core.hooksPath', '.custom-hooks'], {
+      cwd: repoPath,
+      timeoutMs: 5_000,
+    });
+    await git(['add', '.custom-hooks'], { cwd: repoPath, timeoutMs: 5_000 });
+    await git(['commit', '-m', 'Configure custom hooks'], { cwd: repoPath, timeoutMs: 5_000 });
+
+    const state = new WrapperState();
+    const deps = createMockDeps(state);
+    deps.configureCommitCoAuthor.mockImplementation(configureCommitCoAuthorHook);
+    let commitNumber = 0;
+    deps.kiloClient.sendPromptAsync = vi.fn(async () => {
+      commitNumber++;
+      await writeFile(join(repoPath, `direct-${commitNumber}.txt`), `direct ${commitNumber}\n`);
+      await git(['add', `direct-${commitNumber}.txt`], { cwd: repoPath, timeoutMs: 5_000 });
+      const commit = await git(['commit', '-m', `Direct commit ${commitNumber}`], {
+        cwd: repoPath,
+        timeoutMs: 5_000,
+      });
+      expect(commit.exitCode).toBe(0);
+    });
+    const handler = createPromptHandler({ ...defaultServerConfig, workspacePath: repoPath }, deps);
+
+    const attributedResponse = await handler(
+      jsonRequest({
+        message: { id: 'msg_attributed', prompt: 'Commit the attributed change' },
+        finalization: { commitCoAuthor: BOT_CO_AUTHOR },
+        session: completeBinding,
+      })
+    );
+    const attributedMessage = await git(['log', '-1', '--format=%B'], {
+      cwd: repoPath,
+      timeoutMs: 5_000,
+    });
+    const originalHooksStatus = await git(['status', '--porcelain', '--', '.custom-hooks'], {
+      cwd: repoPath,
+      timeoutMs: 5_000,
+    });
+    await git(['config', 'user.name', BOT_CO_AUTHOR.name], { cwd: repoPath, timeoutMs: 5_000 });
+    await git(['config', 'user.email', BOT_CO_AUTHOR.email], { cwd: repoPath, timeoutMs: 5_000 });
+
+    const fallbackResponse = await handler(
+      jsonRequest({
+        message: { id: 'msg_fallback', prompt: 'Commit using bot fallback' },
+        session: completeBinding,
+      })
+    );
+    const fallbackMessage = await git(['log', '-1', '--format=%B'], {
+      cwd: repoPath,
+      timeoutMs: 5_000,
+    });
+    const configuredHooksPath = await git(['config', '--local', '--get', 'core.hooksPath'], {
+      cwd: repoPath,
+      timeoutMs: 5_000,
+    });
+
+    expect(attributedResponse.status).toBe(200);
+    expect(attributedMessage.stdout).toContain(BOT_CO_AUTHOR_TRAILER);
+    expect(attributedMessage.stdout).toContain('Existing-hook: applied');
+    expect(originalHooksStatus.stdout).toBe('');
+    expect(fallbackResponse.status).toBe(200);
+    expect(fallbackMessage.stdout).not.toContain(BOT_CO_AUTHOR_TRAILER);
+    expect(fallbackMessage.stdout).toContain('Existing-hook: applied');
+    expect(configuredHooksPath.stdout.trim()).toContain('kilo-managed-hooks');
+  });
+
+  it('keeps repository pre-commit hooks active while adding co-authorship', async () => {
+    const repoPath = await createRepo();
+    const hooksPath = join(repoPath, '.custom-hooks');
+    await mkdir(hooksPath);
+    await writeFile(join(hooksPath, 'pre-commit'), '#!/bin/sh\nexit 1\n', { mode: 0o755 });
+    await git(['config', '--local', 'core.hooksPath', '.custom-hooks'], {
+      cwd: repoPath,
+      timeoutMs: 5_000,
+    });
+
+    const state = new WrapperState();
+    const deps = createMockDeps(state);
+    deps.configureCommitCoAuthor.mockImplementation(configureCommitCoAuthorHook);
+    let commitExitCode: number | undefined;
+    deps.kiloClient.sendPromptAsync = vi.fn(async () => {
+      await writeFile(join(repoPath, 'blocked.txt'), 'blocked\n');
+      await git(['add', 'blocked.txt'], { cwd: repoPath, timeoutMs: 5_000 });
+      const commit = await git(['commit', '-m', 'Blocked commit'], {
+        cwd: repoPath,
+        timeoutMs: 5_000,
+      });
+      commitExitCode = commit.exitCode;
+    });
+    const handler = createPromptHandler({ ...defaultServerConfig, workspacePath: repoPath }, deps);
+
+    const response = await handler(
+      jsonRequest({
+        message: { id: 'msg_pre_commit', prompt: 'Commit the blocked change' },
+        finalization: { commitCoAuthor: BOT_CO_AUTHOR },
+        session: completeBinding,
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(commitExitCode).not.toBe(0);
+  });
+
+  it('delegates repository hooks created after attribution is configured', async () => {
+    const repoPath = await createRepo();
+    const hooksPath = join(repoPath, '.custom-hooks');
+    await mkdir(hooksPath);
+    await git(['config', '--local', 'core.hooksPath', '.custom-hooks'], {
+      cwd: repoPath,
+      timeoutMs: 5_000,
+    });
+
+    const state = new WrapperState();
+    const deps = createMockDeps(state);
+    deps.configureCommitCoAuthor.mockImplementation(configureCommitCoAuthorHook);
+    let commitExitCode: number | undefined;
+    deps.kiloClient.sendPromptAsync = vi.fn(async () => {
+      await writeFile(join(hooksPath, 'pre-commit'), '#!/bin/sh\nexit 1\n', { mode: 0o755 });
+      await writeFile(join(repoPath, 'late-hook.txt'), 'late hook\n');
+      await git(['add', 'late-hook.txt'], { cwd: repoPath, timeoutMs: 5_000 });
+      const commit = await git(['commit', '-m', 'Blocked by newly added hook'], {
+        cwd: repoPath,
+        timeoutMs: 5_000,
+      });
+      commitExitCode = commit.exitCode;
+    });
+    const handler = createPromptHandler({ ...defaultServerConfig, workspacePath: repoPath }, deps);
+
+    const response = await handler(
+      jsonRequest({
+        message: { id: 'msg_late_hook', prompt: 'Create a hook then commit' },
+        finalization: { commitCoAuthor: BOT_CO_AUTHOR },
+        session: completeBinding,
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(commitExitCode).not.toBe(0);
+  });
+
+  it('fails closed when managed hook state is missing from an active private hook path', async () => {
+    const repoPath = await createRepo();
+    const gitDirectory = await git(['rev-parse', '--absolute-git-dir'], {
+      cwd: repoPath,
+      timeoutMs: 5_000,
+    });
+    const managedHooksPath = join(gitDirectory.stdout.trim(), 'kilo-managed-hooks');
+    await git(['config', '--local', 'core.hooksPath', managedHooksPath], {
+      cwd: repoPath,
+      timeoutMs: 5_000,
+    });
+
+    await expect(configureCommitCoAuthorHook(repoPath, BOT_CO_AUTHOR)).rejects.toThrow(
+      'Managed git hook state is missing'
+    );
+    const configuredHooksPath = await git(['config', '--local', '--get', 'core.hooksPath'], {
+      cwd: repoPath,
+      timeoutMs: 5_000,
+    });
+    expect(configuredHooksPath.stdout.trim()).toBe(managedHooksPath);
   });
 
   it('rejects the old flat prompt body', async () => {

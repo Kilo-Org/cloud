@@ -394,6 +394,19 @@ The `@url` annotation accepts multiple comma-separated services (e.g., `# @url s
 
 Run `pnpm dev:env` again after pulling changes that add new env vars to any `.dev.vars.example`.
 
+### RSA environment keypair generation
+
+Generate a dedicated RSA keypair when one runtime encrypts environment-backed secrets and another runtime decrypts them:
+
+```bash
+pnpm exec tsx dev/generate-rsa-env-keypair.ts -- \
+  --out-dir <secure-output-dir> \
+  --public-env <PUBLIC_KEY_ENV> \
+  --private-env <PRIVATE_KEY_ENV>
+```
+
+The command requires a new output directory outside the repository, then writes restricted PKCS#8 private-key, SPKI public-key, and base64 env-assignment files without overwriting existing output. Store `private.pem` and `private.env` in an approved secrets manager and never commit them. Generate a separate keypair for each encryption domain; do not reuse deployment, agent-profile, or GitHub user-token keypairs.
+
 ### Local Grafana (reads prod Analytics Engine)
 
 KiloClaw emits events to Cloudflare Analytics Engine (datasets `kiloclaw_events`, `kiloclaw_controller_telemetry`). A local-only Grafana is available for querying those datasets against the real production CF account — there is no local ClickHouse, and `wrangler dev` cannot simulate AE writes, but Grafana can always read what prod has already written.

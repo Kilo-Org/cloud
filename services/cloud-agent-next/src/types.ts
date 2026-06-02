@@ -108,6 +108,42 @@ type GetTokenForRepoResult =
         | 'invalid_org_id';
     };
 
+export type ManagedGitHubFallbackReason =
+  | 'no_user_authorization'
+  | 'revoked'
+  | 'refresh_failed'
+  | 'insufficient_user_access'
+  | 'lite_installation'
+  | 'credential_unreadable'
+  | 'credential_configuration_error';
+
+export type GitAuthorConfig = {
+  name: string;
+  email: string;
+};
+
+type GetCloudAgentAuthForRepoResult =
+  | {
+      success: true;
+      githubToken: string;
+      installationId: string;
+      accountLogin: string;
+      appType: 'standard' | 'lite';
+      source: 'user' | 'installation';
+      gitAuthor: GitAuthorConfig;
+      commitCoAuthor?: GitAuthorConfig;
+      fallbackReason?: ManagedGitHubFallbackReason;
+    }
+  | {
+      success: false;
+      reason:
+        | 'database_not_configured'
+        | 'invalid_repo_format'
+        | 'no_installation_found'
+        | 'repository_not_installed'
+        | 'invalid_org_id';
+    };
+
 type GetGitLabTokenResult =
   | { success: true; token: string; instanceUrl: string; glabIsOAuth2: boolean }
   | {
@@ -134,6 +170,12 @@ export type GitTokenService = {
     orgId?: string;
   }): Promise<GetTokenForRepoResult>;
   getToken(installationId: string, appType?: 'standard' | 'lite'): Promise<string>;
+  getCloudAgentAuthForRepo?(params: {
+    githubRepo: string;
+    userId: string;
+    orgId?: string;
+    allowUserAuthorization: boolean;
+  }): Promise<GetCloudAgentAuthForRepoResult>;
   getGitLabToken(params: {
     userId: string;
     orgId?: string;

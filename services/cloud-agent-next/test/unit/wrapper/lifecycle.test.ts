@@ -555,7 +555,11 @@ describe('createLifecycleManager', () => {
       (connectionFns.isConnected as ReturnType<typeof vi.fn>).mockReturnValue(true);
 
       state.bindSession(createSessionContext());
-      state.acceptMessage('msg_1', { autoCommit: true, condenseOnComplete: false });
+      state.acceptMessage('msg_1', {
+        autoCommit: true,
+        condenseOnComplete: false,
+        commitCoAuthor: { name: 'kiloconnect[bot]', email: 'bot@example.com' },
+      });
 
       mgr.start();
       mgr.onMessageComplete('msg_1');
@@ -564,6 +568,11 @@ describe('createLifecycleManager', () => {
       mgr.signalCompletion();
 
       await vi.advanceTimersByTimeAsync(1000);
+      expect(mockRunAutoCommit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          commitCoAuthor: { name: 'kiloconnect[bot]', email: 'bot@example.com' },
+        })
+      );
     });
 
     it('runs condense when enabled', async () => {

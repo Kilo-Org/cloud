@@ -9,7 +9,6 @@ import {
   FREE_MODEL_DATA_LABEL,
   FREE_MODEL_FREE_LABEL,
   getFreeModelDataAccessibilityLabel,
-  isFreeKiloGatewayModelOption,
   isFreeModelOption,
 } from '@/lib/free-model-data-disclosure';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -225,7 +224,7 @@ export default function ModelPickerScreen() {
           const modelOption = item.model;
           const selected = modelOption.id === selectedModel;
           const free = isFreeModelOption(modelOption);
-          const collectsData = isFreeKiloGatewayModelOption(modelOption);
+          const collectsData = isFreeModelOption(modelOption);
           const hasVariants = modelOption.variants.length > 1;
 
           return (

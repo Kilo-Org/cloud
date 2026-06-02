@@ -6,22 +6,5 @@ export function getFreeModelDataTooltip() {
 }
 
 export function isFreeModelOption(model: { id: string; isFree?: boolean } | undefined) {
-  if (!model) {
-    return false;
-  }
-  return (
-    model.isFree === true ||
-    model.id === 'kilo-auto/free' ||
-    model.id.endsWith(':free') ||
-    model.id === 'openrouter/free'
-  );
-}
-
-export function isFreeKiloGatewayModelOption(model: { id: string; isFree?: boolean } | undefined) {
-  if (!model) {
-    return false;
-  }
-  return (
-    model.id === 'kilo-auto/free' || (model.isFree === true && model.id.startsWith('kilo-auto/'))
-  );
+  return model?.isFree === true;
 }

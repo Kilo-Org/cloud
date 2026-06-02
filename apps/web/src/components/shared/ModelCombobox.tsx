@@ -22,7 +22,6 @@ import {
   FREE_MODEL_DATA_LABEL,
   FREE_MODEL_FREE_LABEL,
   getFreeModelDataTooltip,
-  isFreeKiloGatewayModelOption,
   isFreeModelOption,
 } from '@/components/shared/free-model-data-disclosure';
 
@@ -119,7 +118,7 @@ export function ModelCombobox({
   const selectedModel = models.find(model => model.id === value);
   const isCompact = variant === 'compact';
   const showLabel = !isCompact && label;
-  const selectedCollectsData = isFreeKiloGatewayModelOption(selectedModel);
+  const selectedCollectsData = isFreeModelOption(selectedModel);
 
   if (isLoading) {
     if (isCompact) {
@@ -255,9 +254,7 @@ export function ModelCombobox({
                             </Tooltip>
                           )}
                           {isFreeModelOption(model) && (
-                            <FreeModelDataBadge
-                              collectsData={isFreeKiloGatewayModelOption(model)}
-                            />
+                            <FreeModelDataBadge collectsData={isFreeModelOption(model)} />
                           )}
                         </div>
                         <span className="text-muted-foreground truncate text-xs">{model.id}</span>
@@ -297,9 +294,7 @@ export function ModelCombobox({
                             </Tooltip>
                           )}
                           {isFreeModelOption(model) && (
-                            <FreeModelDataBadge
-                              collectsData={isFreeKiloGatewayModelOption(model)}
-                            />
+                            <FreeModelDataBadge collectsData={isFreeModelOption(model)} />
                           )}
                         </div>
                         <span className="text-muted-foreground truncate text-xs">{model.id}</span>
@@ -385,9 +380,7 @@ export function ModelCombobox({
                             </Tooltip>
                           )}
                           {isFreeModelOption(model) && (
-                            <FreeModelDataBadge
-                              collectsData={isFreeKiloGatewayModelOption(model)}
-                            />
+                            <FreeModelDataBadge collectsData={isFreeModelOption(model)} />
                           )}
                         </div>
                         <span className="text-muted-foreground truncate text-xs">{model.id}</span>
@@ -427,9 +420,7 @@ export function ModelCombobox({
                             </Tooltip>
                           )}
                           {isFreeModelOption(model) && (
-                            <FreeModelDataBadge
-                              collectsData={isFreeKiloGatewayModelOption(model)}
-                            />
+                            <FreeModelDataBadge collectsData={isFreeModelOption(model)} />
                           )}
                         </div>
                         <span className="text-muted-foreground truncate text-xs">{model.id}</span>

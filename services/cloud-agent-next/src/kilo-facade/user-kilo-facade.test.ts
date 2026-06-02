@@ -1915,6 +1915,51 @@ describe('handleKiloFacadeRequest', () => {
     expect(admitSubmittedMessage).not.toHaveBeenCalled();
   });
 
+  it('rejects malformed or oversized prompt_async bodies before balance or admission side effects', async () => {
+    const validatePromptBalance = vi.fn();
+    const admitPrompt = vi.fn();
+    const supportedPromptBody = JSON.stringify({ parts: [{ type: 'text', text: 'hello' }] });
+    for (const requestInit of [
+      { body: '{', headers: new Headers({ 'Content-Type': 'application/json' }) },
+      {
+        body: supportedPromptBody,
+        headers: new Headers({
+          'Content-Type': 'application/json',
+          'Content-Length': String(256 * 1024 + 1),
+        }),
+      },
+      {
+        body: supportedPromptBody.padEnd(256 * 1024 + 1, ' '),
+        headers: new Headers({ 'Content-Type': 'application/json' }),
+      },
+    ]) {
+      const response = await handleKiloFacadeRequest({
+        request: new Request(`http://worker.test/kilo/session/${kiloSessionId}/prompt_async`, {
+          method: 'POST',
+          ...requestInit,
+        }),
+        env: envStub(),
+        userId: 'usr_1',
+        authToken: 'validated-token',
+        deps: {
+          resolveRootSessionForKiloSession: vi.fn(async () => ({
+            cloudAgentSessionId: 'agent_cold',
+          })),
+          validatePromptBalance,
+          admitPrompt,
+        },
+      });
+
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toEqual({
+        error: 'KILO_BASIC_PROMPT_UNSUPPORTED',
+        message: 'Basic Kilo prompt body is not supported',
+      });
+    }
+    expect(validatePromptBalance).not.toHaveBeenCalled();
+    expect(admitPrompt).not.toHaveBeenCalled();
+  });
+
   it('rejects prompt_async attempts to bypass public balance validation after owner resolution', async () => {
     const env = envStub();
     const validatePromptBalance = vi.fn();

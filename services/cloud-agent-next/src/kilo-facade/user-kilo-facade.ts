@@ -689,35 +689,48 @@ function promptPreflightError(error: unknown): Response {
   }
 }
 
-async function readRequestJson(request: Request): Promise<unknown> {
+type ReadRequestJsonResult =
+  | { success: true; value: unknown }
+  | { success: false; response: Response };
+
+async function readRequestJson(request: Request): Promise<ReadRequestJsonResult> {
   const declaredLength = request.headers.get('content-length');
   if (declaredLength !== null) {
     const bodyBytes = Number(declaredLength);
     if (!Number.isSafeInteger(bodyBytes) || bodyBytes > MAX_KILO_PROMPT_JSON_BYTES) {
-      return facadeError(
-        400,
-        'KILO_BASIC_PROMPT_UNSUPPORTED',
-        'Basic Kilo prompt body is not supported'
-      );
+      return {
+        success: false,
+        response: facadeError(
+          400,
+          'KILO_BASIC_PROMPT_UNSUPPORTED',
+          'Basic Kilo prompt body is not supported'
+        ),
+      };
     }
   }
   const response = new Response(request.body);
   const bytes = await readBoundedBody(response, MAX_KILO_PROMPT_JSON_BYTES);
   if (!bytes) {
-    return facadeError(
-      400,
-      'KILO_BASIC_PROMPT_UNSUPPORTED',
-      'Basic Kilo prompt body is not supported'
-    );
+    return {
+      success: false,
+      response: facadeError(
+        400,
+        'KILO_BASIC_PROMPT_UNSUPPORTED',
+        'Basic Kilo prompt body is not supported'
+      ),
+    };
   }
   try {
-    return JSON.parse(new TextDecoder().decode(bytes));
+    return { success: true, value: JSON.parse(new TextDecoder().decode(bytes)) };
   } catch {
-    return facadeError(
-      400,
-      'KILO_BASIC_PROMPT_UNSUPPORTED',
-      'Basic Kilo prompt body is not supported'
-    );
+    return {
+      success: false,
+      response: facadeError(
+        400,
+        'KILO_BASIC_PROMPT_UNSUPPORTED',
+        'Basic Kilo prompt body is not supported'
+      ),
+    };
   }
 }
 
@@ -755,11 +768,11 @@ async function admitBasicPrompt(params: {
   cloudAgentSessionId: string;
   deps?: KiloFacadeRequestDeps;
 }): Promise<SessionMessageAdmissionResult | Response> {
-  const value = await readRequestJson(params.request);
-  if (value instanceof Response) {
-    return value;
+  const body = await readRequestJson(params.request);
+  if (!body.success) {
+    return body.response;
   }
-  const parsed = parseBasicKiloPrompt(value);
+  const parsed = parseBasicKiloPrompt(body.value);
   if (!parsed.success) {
     return facadeError(
       400,

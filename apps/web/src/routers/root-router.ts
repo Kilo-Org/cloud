@@ -38,6 +38,7 @@ import { cloudAgentNextFeedbackRouter } from '@/routers/cloud-agent-next-feedbac
 import { kiloChatRouter } from '@/routers/kilo-chat-router';
 import { kiloclawRouter } from '@/routers/kiloclaw-router';
 import { modelsRouter } from '@/routers/models-router';
+import { codingPlansRouter } from '@/routers/coding-plans-router';
 import { unifiedSessionsRouter } from '@/routers/unified-sessions-router';
 import { activeSessionsRouter } from '@/routers/active-sessions-router';
 import { usageAnalyticsRouter } from '@/routers/usage-analytics-router';
@@ -80,6 +81,7 @@ export const rootRouter = createTRPCRouter({
   kiloChat: kiloChatRouter,
   kiloclaw: kiloclawRouter,
   models: modelsRouter,
+  codingPlans: codingPlansRouter,
   unifiedSessions: unifiedSessionsRouter,
   activeSessions: activeSessionsRouter,
   usageAnalytics: usageAnalyticsRouter,

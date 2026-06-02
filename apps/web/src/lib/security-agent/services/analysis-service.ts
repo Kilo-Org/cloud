@@ -258,9 +258,14 @@ export async function startSecurityAnalysis(params: {
       return {
         started: false,
         error: `Finding status is '${finding.status}', analysis requires 'open' status`,
+        errorCode: 'FINDING_NOT_ELIGIBLE',
       };
     }
-    return { started: false, error: 'Analysis already in progress' };
+    return {
+      started: false,
+      error: 'Analysis already in progress',
+      errorCode: 'ANALYSIS_IN_PROGRESS',
+    };
   }
 
   const existingTriage = retrySandboxOnly ? finding.analysis?.triage : undefined;

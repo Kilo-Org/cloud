@@ -54,6 +54,11 @@ export const IMPACT_ADVOCATE_API_BASE_URL =
 export const IMPACT_ADVOCATE_DEBUG_LOGGING =
   getEnvVariable('IMPACT_ADVOCATE_DEBUG_LOGGING') === 'true';
 
+// Gates the Coding Plans UI on the /subscriptions route. Hidden by default so
+// the feature can ship dark; set CODING_PLANS_PURCHASE_ENABLED=true to reveal it.
+export const CODING_PLANS_PURCHASE_ENABLED =
+  getEnvVariable('CODING_PLANS_PURCHASE_ENABLED') === 'true';
+
 if (!NEXTAUTH_SECRET) throw new Error('NEXTAUTH_SECRET is required JWT signing');
 if (!TURNSTILE_SECRET_KEY) throw new Error('TURNSTILE_SECRET_KEY is required');
 if (!CALLBACK_TOKEN_SECRET) throw new Error('CALLBACK_TOKEN_SECRET is required');

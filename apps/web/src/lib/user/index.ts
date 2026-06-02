@@ -78,6 +78,8 @@ import {
   github_branch_pull_requests,
   model_eval_ingestions,
   stripe_early_fraud_warning_cases,
+  coding_plan_availability_intents,
+  coding_plan_subscriptions,
 } from '@kilocode/db/schema';
 import { eq, and, inArray, isNotNull, isNull, sql, or, gte, count } from 'drizzle-orm';
 import { allow_fake_login, IS_DEVELOPMENT } from '@/lib/constants';
@@ -692,7 +694,10 @@ export async function createOrUpdateUser(
   });
 
   // Set up user identification via user ID
-  posthogClient.alias({ distinctId: savedUser.google_user_email, alias: savedUser.id });
+  posthogClient.alias({
+    distinctId: savedUser.google_user_email,
+    alias: savedUser.id,
+  });
 
   await tryVerifyDiscordGuildMembership(args.provider, args.provider_account_id, savedUser.id);
 
@@ -821,7 +826,7 @@ export class SoftDeletePreconditionError extends Error {
  *   auto_triage/fix_tickets, slack_bot_requests, bot_requests,
  *   cloud_agent_code_reviews, device_auth_requests, auto_top_up_configs,
  *   kiloclaw_instances/inbound_email_aliases/access_codes, user_period_cache,
- *   kilo_pass_scheduled_changes)
+ *   kilo_pass_scheduled_changes, coding_plan_availability_intents)
  * - kiloclaw_instances.admin_size_override JSONB (contains admin actorEmail
  *   + free-form reason; cleared on the deleted user's retained destroyed
  *   instances, AND on any other instances where this user was the admin
@@ -860,7 +865,10 @@ export async function softDeleteUser(userId: string) {
     // trialing — the user may have a running Fly instance, and deleting the
     // row without destroying the instance would orphan it.
     const liveClawSubscriptions = await tx
-      .select({ id: kiloclaw_subscriptions.id, status: kiloclaw_subscriptions.status })
+      .select({
+        id: kiloclaw_subscriptions.id,
+        status: kiloclaw_subscriptions.status,
+      })
       .from(kiloclaw_subscriptions)
       .where(
         and(
@@ -1022,7 +1030,44 @@ export async function softDeleteUser(userId: string) {
     await tx
       .delete(platform_integrations)
       .where(eq(platform_integrations.owned_by_user_id, userId));
+    await tx.execute(sql`
+       UPDATE coding_plan_key_inventory
+       SET status = 'revocation_pending',
+           encrypted_api_key = NULL,
+           assigned_to_user_id = NULL,
+           revocation_requested_at = now(),
+          last_revocation_error = NULL,
+          updated_at = now()
+      WHERE id IN (
+        SELECT key_inventory_id
+        FROM coding_plan_subscriptions
+        WHERE user_id = ${userId}
+          AND status IN ('active', 'past_due')
+          AND key_inventory_id IS NOT NULL
+      )
+    `);
+    await tx
+      .update(coding_plan_subscriptions)
+      .set({
+        status: 'canceled',
+        canceled_at: sql`now()`,
+        cancellation_reason: 'account_deleted',
+        installed_byok_key_id: null,
+        cancel_at_period_end: false,
+        past_due_started_at: null,
+        payment_grace_expires_at: null,
+        auto_top_up_attempted_for_due: null,
+      })
+      .where(
+        and(
+          eq(coding_plan_subscriptions.user_id, userId),
+          inArray(coding_plan_subscriptions.status, ['active', 'past_due'])
+        )
+      );
     await tx.delete(byok_api_keys).where(eq(byok_api_keys.kilo_user_id, userId));
+    await tx
+      .delete(coding_plan_availability_intents)
+      .where(eq(coding_plan_availability_intents.user_id, userId));
     await tx.delete(agent_configs).where(eq(agent_configs.owned_by_user_id, userId));
     await tx.delete(webhook_events).where(eq(webhook_events.owned_by_user_id, userId));
     await tx
@@ -1381,7 +1426,9 @@ export async function getAllUserProviders(email: string): Promise<{
  * @returns The WorkOS organization, or null if not found
  */
 export async function getWorkOSOrganization(domain: string) {
-  const orgResult = await workos.organizations.listOrganizations({ domains: [domain] });
+  const orgResult = await workos.organizations.listOrganizations({
+    domains: [domain],
+  });
 
   if (orgResult.data.length === 1) {
     return orgResult.data[0];
@@ -1448,7 +1495,9 @@ async function tryVerifyDiscordGuildMembership(
     if (isMember) {
       await db
         .update(kilocode_users)
-        .set({ discord_server_membership_verified_at: new Date().toISOString() })
+        .set({
+          discord_server_membership_verified_at: new Date().toISOString(),
+        })
         .where(eq(kilocode_users.id, kiloUserId));
     }
   } catch (error) {

@@ -32,7 +32,7 @@ export const CloudAgentRunFailureClassifications = [
 
 const MAX_OPERATIONAL_IDENTIFIER_LENGTH = 128;
 const MAX_DIAGNOSTIC_MESSAGE_LENGTH = 4096;
-const DIAGNOSTIC_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+export const DIAGNOSTIC_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
 const IsoTimestampSchema = z.string().datetime({ offset: true });
 const OperationalIdentifierSchema = z.string().min(1).max(MAX_OPERATIONAL_IDENTIFIER_LENGTH);

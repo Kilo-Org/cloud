@@ -1,13 +1,15 @@
 'use client';
 
 import Link from 'next/link';
-import { Check } from 'lucide-react';
+import { ArrowRight, Check } from 'lucide-react';
 import {
   createKiloClawSignupDisplay,
   PLAN_COST_MICRODOLLARS,
   type KiloClawSignupDisplay,
 } from '@/app/(app)/claw/components/billing/billing-types';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 
 type KiloClawSubscribeCardProps = {
@@ -40,17 +42,12 @@ function KiloClawPlanCard({
   isRecommended = false,
 }: KiloClawPlanCardProps) {
   return (
-    <div
-      className={cn(
-        'group bg-background relative flex h-full flex-col rounded-xl border p-4 text-left transition-colors',
-        'hover:border-blue-400/70 hover:shadow-[0_0_0_1px_rgba(59,130,246,0.25)]',
-        isRecommended
-          ? 'border-blue-500/60 shadow-[0_0_0_1px_rgba(59,130,246,0.35)]'
-          : 'border-border/70'
-      )}
-    >
+    <Card className="border-border/60 relative flex h-full flex-col p-4 text-left shadow-sm">
       {isRecommended && badge ? (
-        <Badge className="absolute -top-2 left-1/2 -translate-x-1/2 rounded-full bg-blue-600 px-3 text-white">
+        <Badge
+          variant="secondary"
+          className="absolute -top-2 left-1/2 -translate-x-1/2 rounded-full px-3"
+        >
           {badge}
         </Badge>
       ) : null}
@@ -76,32 +73,35 @@ function KiloClawPlanCard({
             key={detail}
             className="text-muted-foreground flex items-start gap-2 text-xs leading-5"
           >
-            <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
+            <Check className="mt-0.5 size-4 shrink-0 text-emerald-400" />
             <span>{detail}</span>
           </div>
         ))}
         {accentDetail ? (
           <div className="flex items-start gap-2 text-xs leading-5 text-emerald-300">
-            <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
+            <Check className="mt-0.5 size-4 shrink-0 text-emerald-400" />
             <span>{accentDetail}</span>
           </div>
         ) : null}
       </div>
 
-      <div className="mt-4 flex items-center justify-end pt-2">
-        <Link
-          href="/claw"
+      <div className="mt-4 pt-2">
+        <Button
+          asChild
+          variant={isRecommended ? 'default' : 'secondary'}
           className={cn(
-            'inline-flex items-center gap-2 rounded-full border border-blue-500/40 bg-blue-500/10 px-4 py-1.5 text-sm font-semibold text-blue-100 transition',
-            'hover:border-blue-400 hover:bg-blue-500/20 hover:text-white',
-            'focus-visible:ring-offset-background focus-visible:ring-2 focus-visible:ring-blue-400/60 focus-visible:ring-offset-2 focus-visible:outline-none'
+            'h-11 w-full sm:h-9',
+            isRecommended &&
+              'bg-brand-primary text-primary-foreground hover:bg-brand-primary/90 focus-visible:ring-brand-primary/50'
           )}
         >
-          {ctaLabel}
-          <span className="text-base">→</span>
-        </Link>
+          <Link href="/claw">
+            {ctaLabel}
+            <ArrowRight />
+          </Link>
+        </Button>
       </div>
-    </div>
+    </Card>
   );
 }
 
@@ -174,7 +174,7 @@ export function KiloClawSubscribeCard({
       <div className="space-y-2 text-xs">
         {benefits.map(benefit => (
           <div key={benefit} className="text-muted-foreground flex items-start gap-2">
-            <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
+            <Check className="mt-0.5 size-4 shrink-0 text-emerald-400" />
             <span>{benefit}</span>
           </div>
         ))}

@@ -1,12 +1,19 @@
-import { describe, test, expect, beforeAll, afterEach } from '@jest/globals';
+import { describe, test, expect, beforeAll, afterEach, jest } from '@jest/globals';
 import { createCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
 import { addUserToOrganization } from '@/lib/organizations/organizations';
 import { db } from '@/lib/drizzle';
-import { byok_api_keys, organization_audit_logs } from '@kilocode/db/schema';
+import {
+  byok_api_keys,
+  coding_plan_key_inventory,
+  coding_plan_subscriptions,
+  organization_audit_logs,
+} from '@kilocode/db/schema';
 import { eq, and } from 'drizzle-orm';
 import type { User, Organization } from '@kilocode/db/schema';
+import { encryptApiKey } from '@/lib/ai-gateway/byok/encryption';
+import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
 
 describe('BYOK Router', () => {
   let ownerUser: User;
@@ -41,9 +48,16 @@ describe('BYOK Router', () => {
   });
 
   afterEach(async () => {
+    await db
+      .delete(coding_plan_subscriptions)
+      .where(eq(coding_plan_subscriptions.user_id, ownerUser.id));
+    await db
+      .delete(coding_plan_key_inventory)
+      .where(eq(coding_plan_key_inventory.assigned_to_user_id, ownerUser.id));
     // Clean up BYOK keys after each test
     await db.delete(byok_api_keys).where(eq(byok_api_keys.organization_id, organizationA.id));
     await db.delete(byok_api_keys).where(eq(byok_api_keys.organization_id, organizationB.id));
+    await db.delete(byok_api_keys).where(eq(byok_api_keys.kilo_user_id, ownerUser.id));
   });
 
   describe('list', () => {
@@ -459,6 +473,126 @@ describe('BYOK Router', () => {
       const keys = await db.select().from(byok_api_keys).where(eq(byok_api_keys.id, keyA.id));
 
       expect(keys).toHaveLength(1);
+    });
+  });
+
+  describe('key validation error safety', () => {
+    test('does not return upstream provider error bodies from API key tests', async () => {
+      const caller = await createCallerForUser(ownerUser.id);
+      const key = await caller.byok.create({ provider_id: 'codestral', api_key: 'stored-secret' });
+      const fetchSpy = jest
+        .spyOn(global, 'fetch')
+        .mockResolvedValue(
+          new Response('authorization=stored-secret provider detail', { status: 401 })
+        );
+
+      try {
+        await expect(caller.byok.testApiKey({ id: key.id })).resolves.toEqual({
+          success: false,
+          message:
+            'API key test failed. Check the credential and supported models, then try again.',
+        });
+      } finally {
+        fetchSpy.mockRestore();
+      }
+    });
+  });
+
+  describe('Token Plan Plus-installed MiniMax credentials', () => {
+    test('rejects removed dedicated provider identity in manual creation requests', async () => {
+      const caller = await createCallerForUser(ownerUser.id);
+
+      await expect(
+        caller.byok.create({
+          provider_id: 'minimax-token-plan-plus-managed' as never,
+          api_key: 'not-supported',
+        })
+      ).rejects.toThrow();
+    });
+
+    async function createInstalledMiniMaxKey() {
+      const encrypted = encryptApiKey('installed-minimax-key', BYOK_ENCRYPTION_KEY);
+      const [inventory] = await db
+        .insert(coding_plan_key_inventory)
+        .values({
+          plan_id: 'minimax-token-plan-plus',
+          provider_id: 'minimax',
+          upstream_plan_id: 'minimax-installed-plan',
+          encrypted_api_key: encrypted,
+          credential_fingerprint: crypto.randomUUID(),
+          status: 'assigned',
+          assigned_to_user_id: ownerUser.id,
+        })
+        .returning();
+      const [key] = await db
+        .insert(byok_api_keys)
+        .values({
+          kilo_user_id: ownerUser.id,
+          provider_id: 'minimax',
+          encrypted_api_key: encrypted,
+          management_source: 'coding_plan',
+          created_by: ownerUser.id,
+        })
+        .returning();
+      const now = new Date().toISOString();
+      const [subscription] = await db
+        .insert(coding_plan_subscriptions)
+        .values({
+          user_id: ownerUser.id,
+          plan_id: 'minimax-token-plan-plus',
+          provider_id: 'minimax',
+          key_inventory_id: inventory.id,
+          installed_byok_key_id: key.id,
+          status: 'active',
+          cost_microdollars: 20_000_000,
+          billing_period_days: 30,
+          current_period_start: now,
+          current_period_end: now,
+          credit_renewal_at: now,
+        })
+        .returning();
+      return { key, subscription };
+    }
+
+    test('identifies installed origin and allows disable without affecting ownership', async () => {
+      const { key } = await createInstalledMiniMaxKey();
+      const caller = await createCallerForUser(ownerUser.id);
+      const listed = await caller.byok.list({});
+
+      expect(listed[0].provider_id).toBe('minimax');
+      expect(listed[0].management_source).toBe('coding_plan');
+      const disabled = await caller.byok.setEnabled({ id: key.id, is_enabled: false });
+      expect(disabled.is_enabled).toBe(false);
+      expect(disabled.management_source).toBe('coding_plan');
+    });
+
+    test('transfers cleanup ownership when installed MiniMax credential is updated', async () => {
+      const { key, subscription } = await createInstalledMiniMaxKey();
+      const caller = await createCallerForUser(ownerUser.id);
+
+      const updated = await caller.byok.update({ id: key.id, api_key: 'replacement-key' });
+      const [updatedSubscription] = await db
+        .select()
+        .from(coding_plan_subscriptions)
+        .where(eq(coding_plan_subscriptions.id, subscription.id));
+
+      expect(updated.management_source).toBe('user');
+      expect(updatedSubscription.status).toBe('active');
+      expect(updatedSubscription.installed_byok_key_id).toBeNull();
+    });
+
+    test('allows deleting installed MiniMax key without canceling subscription', async () => {
+      const { key, subscription } = await createInstalledMiniMaxKey();
+      const caller = await createCallerForUser(ownerUser.id);
+
+      await expect(caller.byok.delete({ id: key.id })).resolves.toEqual({ success: true });
+      const [updatedSubscription] = await db
+        .select()
+        .from(coding_plan_subscriptions)
+        .where(eq(coding_plan_subscriptions.id, subscription.id));
+
+      expect(updatedSubscription.status).toBe('active');
+      expect(updatedSubscription.installed_byok_key_id).toBeNull();
     });
   });
 

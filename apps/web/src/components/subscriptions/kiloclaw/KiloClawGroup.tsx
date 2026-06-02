@@ -20,9 +20,11 @@ import {
 export function KiloClawGroup({
   showTerminal,
   accordionValue,
+  hideHeader = false,
 }: {
   showTerminal: boolean;
   accordionValue?: string;
+  hideHeader?: boolean;
 }) {
   const trpc = useTRPC();
   const query = useQuery(trpc.kiloclaw.listPersonalSubscriptions.queryOptions());
@@ -40,19 +42,21 @@ export function KiloClawGroup({
     <SubscriptionGroup
       title="KiloClaw"
       description="View hosting subscriptions for your personal KiloClaw instances."
-      headerIcon={<KiloCrabIcon className="h-5 w-5" />}
+      headerIcon={<KiloCrabIcon className="size-5" />}
       isLoading={query.isLoading}
       isError={query.isError}
       error={query.error}
       onRetry={() => void query.refetch()}
       accordionValue={accordionValue}
+      hideHeader={hideHeader}
+      unframed={hideHeader}
     >
       {visibleSubscriptions.length > 0 ? (
         <div className="grid gap-3">
           {visibleSubscriptions.map(subscription => (
             <SubscriptionCard
               key={subscription.instanceId}
-              icon={<KiloCrabIcon className="h-5 w-5" />}
+              icon={<KiloCrabIcon className="size-5" />}
               title={subscription.instanceName ?? 'KiloClaw instance'}
               subtitle={subscription.instanceName || subscription.instanceId}
               status={getKiloclawDisplayStatus(subscription)}

@@ -75,6 +75,10 @@ import {
   model_experiment_request,
   stripe_early_fraud_warning_cases,
   stripe_early_fraud_warning_actions,
+  coding_plan_availability_intents,
+  coding_plan_key_inventory,
+  coding_plan_subscriptions,
+  byok_api_keys,
 } from '@kilocode/db/schema';
 
 import { eq, count, sql } from 'drizzle-orm';
@@ -174,6 +178,10 @@ describe('User', () => {
     await db.delete(magic_link_tokens);
     await db.delete(bot_request_cloud_agent_sessions);
     await db.delete(bot_requests);
+    await db.delete(coding_plan_availability_intents);
+    await db.delete(coding_plan_subscriptions);
+    await db.delete(byok_api_keys);
+    await db.delete(coding_plan_key_inventory);
     await db.delete(stytch_fingerprints);
     await db.delete(kiloclaw_cli_runs);
     await db.delete(kiloclaw_email_log);
@@ -1901,6 +1909,22 @@ describe('User', () => {
       expect(tokens).toHaveLength(0);
     });
 
+    it('should delete Coding Plan availability notification intents', async () => {
+      const user = await insertTestUser();
+      await db.insert(coding_plan_availability_intents).values({
+        user_id: user.id,
+        plan_id: 'minimax-token-plan-plus',
+      });
+
+      await softDeleteUser(user.id);
+
+      const intents = await db
+        .select()
+        .from(coding_plan_availability_intents)
+        .where(eq(coding_plan_availability_intents.user_id, user.id));
+      expect(intents).toHaveLength(0);
+    });
+
     it('should delete github_branch_pull_requests owned by user', async () => {
       const user = await insertTestUser();
       await db.insert(github_branch_pull_requests).values({
@@ -2623,6 +2647,77 @@ describe('User', () => {
       await expect(softDeleteUser(user.id)).rejects.toThrow(SoftDeletePreconditionError);
       const userAfter = await findUserById(user.id);
       expect(userAfter!.google_user_email).toBe(user.google_user_email);
+    });
+
+    it('should terminate managed Coding Plan access and anonymize inventory on soft delete', async () => {
+      const { encryptApiKey } = await import('@/lib/ai-gateway/byok/encryption');
+      const { BYOK_ENCRYPTION_KEY } = await import('@/lib/config.server');
+      const user = await insertTestUser();
+      const encrypted = encryptApiKey('test-key-for-gdpr', BYOK_ENCRYPTION_KEY);
+      const [inventoryKey] = await db
+        .insert(coding_plan_key_inventory)
+        .values({
+          plan_id: 'minimax-token-plan-plus',
+          provider_id: 'minimax',
+          upstream_plan_id: 'minimax-gdpr-plan',
+          encrypted_api_key: encrypted,
+          credential_fingerprint: `gdpr-${randomUUID()}`,
+          status: 'assigned',
+          assigned_to_user_id: user.id,
+          assigned_at: new Date().toISOString(),
+        })
+        .returning();
+      const [byokKey] = await db
+        .insert(byok_api_keys)
+        .values({
+          kilo_user_id: user.id,
+          provider_id: 'minimax',
+          encrypted_api_key: encrypted,
+          management_source: 'coding_plan',
+          created_by: user.id,
+        })
+        .returning();
+
+      await db.insert(coding_plan_subscriptions).values({
+        user_id: user.id,
+        plan_id: 'minimax-token-plan-plus',
+        provider_id: 'minimax',
+        key_inventory_id: inventoryKey.id,
+        installed_byok_key_id: byokKey.id,
+        status: 'active',
+        cost_microdollars: 20_000_000,
+        billing_period_days: 30,
+        current_period_start: new Date().toISOString(),
+        current_period_end: new Date(Date.now() + 30 * 86_400_000).toISOString(),
+        credit_renewal_at: new Date(Date.now() + 30 * 86_400_000).toISOString(),
+      });
+
+      await softDeleteUser(user.id);
+
+      const [subscription] = await db
+        .select()
+        .from(coding_plan_subscriptions)
+        .where(eq(coding_plan_subscriptions.user_id, user.id));
+      expect(subscription.status).toBe('canceled');
+      expect(subscription.cancellation_reason).toBe('account_deleted');
+      expect(subscription.canceled_at).not.toBeNull();
+      expect(subscription.installed_byok_key_id).toBeNull();
+
+      const [retainedInventory] = await db
+        .select()
+        .from(coding_plan_key_inventory)
+        .where(eq(coding_plan_key_inventory.id, inventoryKey.id));
+      expect(retainedInventory.status).toBe('revocation_pending');
+      expect(retainedInventory.upstream_plan_id).toBe('minimax-gdpr-plan');
+      expect(retainedInventory.encrypted_api_key).toBeNull();
+      expect(retainedInventory.assigned_to_user_id).toBeNull();
+      expect(retainedInventory.revocation_requested_at).not.toBeNull();
+
+      const byokKeys = await db
+        .select()
+        .from(byok_api_keys)
+        .where(eq(byok_api_keys.kilo_user_id, user.id));
+      expect(byokKeys).toHaveLength(0);
     });
 
     it('should throw SoftDeletePreconditionError for active KiloClaw instance even without live subscription', async () => {

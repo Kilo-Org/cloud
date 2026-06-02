@@ -67,6 +67,8 @@ function defineDefaultContextInfo(): UsageContextInfo {
     mode: null,
     auto_model: null,
     ttfb_ms: null,
+    abuse_delay: null,
+    abuse_downgraded_from: null,
   };
 }
 

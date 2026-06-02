@@ -17,7 +17,7 @@ export type SlashCommandInfo = {
  *
  * Regenerate with `pnpm --filter cloud-agent-next update-default-slash-commands`.
  */
-export const DEFAULT_SLASH_COMMANDS_SOURCE = 'kilo@7.2.49';
+export const DEFAULT_SLASH_COMMANDS_SOURCE = 'kilo@7.3.12';
 
 /**
  * Default slash command catalog used when no live wrapper-reported catalog is
@@ -25,26 +25,34 @@ export const DEFAULT_SLASH_COMMANDS_SOURCE = 'kilo@7.2.49';
  */
 export const DEFAULT_SLASH_COMMANDS = [
   {
-    name: 'init',
-    description: 'guided AGENTS.md setup',
-    source: 'command',
-    hints: ['$ARGUMENTS'],
+    name: "init",
+    description: "guided AGENTS.md setup",
+    source: "command",
+    hints: [
+      "$ARGUMENTS"
+    ]
   },
   {
-    name: 'local-review',
-    description: 'local review (current branch)',
-    hints: [],
+    name: "local-review",
+    description: "local review (current branch, optional base or instructions)",
+    hints: [
+      "$ARGUMENTS"
+    ]
   },
   {
-    name: 'local-review-uncommitted',
-    description: 'local review (uncommitted changes)',
-    hints: [],
+    name: "local-review-uncommitted",
+    description: "local review (uncommitted changes)",
+    hints: [
+      "$ARGUMENTS"
+    ]
   },
   {
-    name: 'review',
-    description: 'review changes [commit|branch|pr], defaults to uncommitted',
-    source: 'command',
+    name: "review",
+    description: "review changes [commit|branch|pr], defaults to uncommitted",
+    source: "command",
     subtask: true,
-    hints: ['$ARGUMENTS'],
-  },
+    hints: [
+      "$ARGUMENTS"
+    ]
+  }
 ] satisfies SlashCommandInfo[];

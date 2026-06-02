@@ -22,12 +22,12 @@
     "typecheck": "tsgo --noEmit"
   },
   "peerDependencies": {
-    "openclaw": "2026.5.22"
+    "openclaw": "2026.5.26"
   },
   "devDependencies": {
     "@sinclair/typebox": "0.34.41",
     "esbuild": "0.25.12",
-    "openclaw": "2026.5.22",
+    "openclaw": "2026.5.26",
     "vitest": "catalog:"
   }
 }

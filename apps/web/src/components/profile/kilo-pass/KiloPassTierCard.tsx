@@ -1,8 +1,10 @@
 'use client';
 
-import { Check } from 'lucide-react';
+import { ArrowRight, Check } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import {
   KILO_PASS_FIRST_MONTH_PROMO_BONUS_PERCENT,
   KILO_PASS_TIER_CONFIG,
@@ -49,18 +51,17 @@ export function KiloPassTierCard(props: {
   const cadenceLabel = cadence === KiloPassCadence.Monthly ? '/month' : '/year';
 
   return (
-    <div
+    <Card
       className={cn(
-        'group bg-background relative rounded-xl border p-4 text-left transition-colors',
-        'hover:border-blue-400/70 hover:shadow-[0_0_0_1px_rgba(59,130,246,0.25)]',
-        pending ? 'cursor-not-allowed opacity-70' : 'cursor-default',
-        isRecommended
-          ? 'border-blue-500/60 shadow-[0_0_0_1px_rgba(59,130,246,0.35)]'
-          : 'border-border/70'
+        'border-border/60 relative flex h-full flex-col p-4 text-left shadow-sm',
+        pending ? 'cursor-not-allowed opacity-70' : 'cursor-default'
       )}
     >
       {isRecommended && (
-        <Badge className="absolute -top-2 left-1/2 -translate-x-1/2 rounded-full bg-blue-600 px-3 text-white">
+        <Badge
+          variant="secondary"
+          className="absolute -top-2 left-1/2 -translate-x-1/2 rounded-full px-3"
+        >
           Recommended
         </Badge>
       )}
@@ -79,11 +80,11 @@ export function KiloPassTierCard(props: {
         <div className="text-muted-foreground text-xs">{cadenceLabel}</div>
       </div>
 
-      <div className="mt-4 space-y-2">
+      <div className="mt-4 flex-1 space-y-2">
         {cadence === KiloPassCadence.Monthly ? (
           <>
             <div className="text-muted-foreground flex items-start gap-2 text-xs leading-5">
-              <Check className="mt-0.5 h-3.5 w-3.5 flex-none text-emerald-400" />
+              <Check className="mt-0.5 size-3.5 flex-none text-emerald-400" />
               <span>
                 Includes <span className="text-amber-300">{getBaseCreditsLabel({ tier })}</span>{' '}
                 paid credits
@@ -91,7 +92,7 @@ export function KiloPassTierCard(props: {
             </div>
 
             <div className="text-muted-foreground flex items-start gap-2 text-xs leading-5">
-              <Check className="mt-0.5 h-3.5 w-3.5 flex-none text-emerald-400" />
+              <Check className="mt-0.5 size-3.5 flex-none text-emerald-400" />
               <span className="flex-1">
                 Up to{' '}
                 <span className="text-emerald-300">
@@ -116,14 +117,14 @@ export function KiloPassTierCard(props: {
         ) : (
           <>
             <div className="text-muted-foreground flex items-start gap-2 text-xs leading-5">
-              <Check className="mt-0.5 h-3.5 w-3.5 flex-none text-emerald-400" />
+              <Check className="mt-0.5 size-3.5 flex-none text-emerald-400" />
               <span>
                 Includes <span className="text-amber-300">{getBaseCreditsLabel({ tier })}</span>{' '}
                 pass credits
               </span>
             </div>
             <div className="text-muted-foreground flex items-start gap-2 text-xs leading-5">
-              <Check className="mt-0.5 h-3.5 w-3.5 flex-none text-emerald-400" />
+              <Check className="mt-0.5 size-3.5 flex-none text-emerald-400" />
               <span>
                 Includes{' '}
                 <span className="text-emerald-300">{getYearlyMonthlyBonusLabel(tier)}</span> bonus
@@ -134,23 +135,22 @@ export function KiloPassTierCard(props: {
         )}
       </div>
 
-      <div className="mt-4 flex items-center justify-end">
-        <button
+      <div className="mt-4">
+        <Button
           type="button"
+          variant={isRecommended ? 'default' : 'secondary'}
           onClick={handleSelect}
           disabled={pending}
           className={cn(
-            'inline-flex items-center gap-2 rounded-full border border-blue-500/40 bg-blue-500/10 px-4 py-1.5 text-sm font-semibold text-blue-100 transition',
-            'hover:border-blue-400 hover:bg-blue-500/20 hover:text-white',
-            'focus-visible:ring-offset-background focus-visible:ring-2 focus-visible:ring-blue-400/60 focus-visible:ring-offset-2 focus-visible:outline-none',
-            'disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-blue-500/10',
-            pending ? 'cursor-not-allowed' : 'cursor-pointer'
+            'h-11 w-full sm:h-9',
+            isRecommended &&
+              'bg-brand-primary text-primary-foreground hover:bg-brand-primary/90 focus-visible:ring-brand-primary/50'
           )}
         >
           Buy now
-          <span className="text-base">→</span>
-        </button>
+          <ArrowRight />
+        </Button>
       </div>
-    </div>
+    </Card>
   );
 }

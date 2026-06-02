@@ -37,6 +37,7 @@ import type {
   StreamTicketResponse,
   MergeResult,
 } from './types';
+import { classifyStartupError } from './startup-error';
 
 const MAX_TICKETS = 1000;
 const streamTickets = new Map<string, { agentId: string; expiresAt: number }>();
@@ -359,9 +360,17 @@ app.post('/agents/start', async c => {
     } = agent;
     return c.json(safeAgent, 201);
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    console.error(`[control-server] /agents/start: FAILED for ${parsed.data.name}: ${message}`);
-    return c.json({ error: message }, 500);
+    const failure = classifyStartupError(err);
+    const details = [
+      `error=${failure.error}`,
+      failure.phase ? `phase=${failure.phase}` : null,
+      failure.status ? `status=${failure.status}` : null,
+      failure.error_type ? `error_type=${failure.error_type}` : null,
+    ].filter(value => value !== null);
+    console.error(
+      `[control-server] /agents/start: FAILED for ${parsed.data.name}: ${details.join(' ')}`
+    );
+    return c.json(failure, 500);
   }
 });
 

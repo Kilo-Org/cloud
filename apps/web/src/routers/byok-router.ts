@@ -3,7 +3,12 @@ import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 import { db } from '@/lib/drizzle';
-import { byok_api_keys, MODELS_BY_PROVIDER_ADMIN_URL } from '@kilocode/db/schema';
+import { sentryLogger } from '@/lib/utils.server';
+import {
+  byok_api_keys,
+  coding_plan_subscriptions,
+  MODELS_BY_PROVIDER_ADMIN_URL,
+} from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { encryptApiKey } from '@/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
@@ -43,6 +48,9 @@ import {
 
 const CODESTRAL_FIM_URL = 'https://codestral.mistral.ai/v1/fim/completions';
 const CODESTRAL_TEST_MODEL = 'codestral-2508';
+const GENERIC_TEST_FAILURE_MESSAGE =
+  'API key test failed. Check the credential and supported models, then try again.';
+const logByokWarning = sentryLogger('byok-key-test', 'warning');
 
 async function testCodestralApiKey(apiKey: string): Promise<{ success: boolean; message: string }> {
   try {
@@ -60,26 +68,22 @@ async function testCodestralApiKey(apiKey: string): Promise<{ success: boolean; 
         stream: false,
       }),
     });
-    // Always drain the body so the underlying Undici connection is released,
-    // regardless of whether we care about the response payload.
-    const bodyText = await res.text().catch(() => '');
+    // Always drain the body so the underlying Undici connection is released.
+    await res.text().catch(() => '');
     if (res.ok) {
       return {
         success: true,
         message: `API key test success. Provider: codestral. Model: ${CODESTRAL_TEST_MODEL}.`,
       };
     }
-    return {
-      success: false,
-      message: `API key (codestral) test failed with status ${res.status}${
-        bodyText ? `: ${bodyText.slice(0, 200)}` : ''
-      }`,
-    };
-  } catch (e) {
-    return {
-      success: false,
-      message: `API key (codestral) test failed with: ${e instanceof Error ? e.message : String(e)}`,
-    };
+    logByokWarning('Codestral BYOK key test failed', {
+      providerId: 'codestral',
+      status: res.status,
+    });
+    return { success: false, message: GENERIC_TEST_FAILURE_MESSAGE };
+  } catch {
+    logByokWarning('Codestral BYOK key test request failed', { providerId: 'codestral' });
+    return { success: false, message: GENERIC_TEST_FAILURE_MESSAGE };
   }
 }
 
@@ -158,6 +162,7 @@ export const byokRouter = createTRPCRouter({
           created_at: byok_api_keys.created_at,
           updated_at: byok_api_keys.updated_at,
           created_by: byok_api_keys.created_by,
+          management_source: byok_api_keys.management_source,
           is_enabled: byok_api_keys.is_enabled,
         })
         .from(byok_api_keys)
@@ -204,6 +209,7 @@ export const byokRouter = createTRPCRouter({
           created_at: byok_api_keys.created_at,
           updated_at: byok_api_keys.updated_at,
           created_by: byok_api_keys.created_by,
+          management_source: byok_api_keys.management_source,
           is_enabled: byok_api_keys.is_enabled,
         });
 
@@ -242,6 +248,7 @@ export const byokRouter = createTRPCRouter({
           organization_id: byok_api_keys.organization_id,
           kilo_user_id: byok_api_keys.kilo_user_id,
           provider_id: byok_api_keys.provider_id,
+          management_source: byok_api_keys.management_source,
         })
         .from(byok_api_keys)
         .where(eq(byok_api_keys.id, id));
@@ -270,24 +277,40 @@ export const byokRouter = createTRPCRouter({
         }
       }
 
-      // Encrypt the new API key
       const encrypted = encryptApiKey(api_key, BYOK_ENCRYPTION_KEY);
+      const transfersCodingPlanOwnership =
+        !organizationId && existingKey.management_source === 'coding_plan';
 
-      // Update in database
-      const [updatedKey] = await db
-        .update(byok_api_keys)
-        .set({
-          encrypted_api_key: encrypted,
-        })
-        .where(eq(byok_api_keys.id, id))
-        .returning({
-          id: byok_api_keys.id,
-          provider_id: byok_api_keys.provider_id,
-          created_at: byok_api_keys.created_at,
-          updated_at: byok_api_keys.updated_at,
-          created_by: byok_api_keys.created_by,
-          is_enabled: byok_api_keys.is_enabled,
-        });
+      const updatedKey = await db.transaction(async tx => {
+        const [updated] = await tx
+          .update(byok_api_keys)
+          .set(
+            transfersCodingPlanOwnership
+              ? { encrypted_api_key: encrypted, management_source: 'user' }
+              : { encrypted_api_key: encrypted }
+          )
+          .where(eq(byok_api_keys.id, id))
+          .returning({
+            id: byok_api_keys.id,
+            provider_id: byok_api_keys.provider_id,
+            created_at: byok_api_keys.created_at,
+            updated_at: byok_api_keys.updated_at,
+            created_by: byok_api_keys.created_by,
+            management_source: byok_api_keys.management_source,
+            is_enabled: byok_api_keys.is_enabled,
+          });
+
+        if (!updated) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'BYOK key not found' });
+        }
+        if (transfersCodingPlanOwnership) {
+          await tx
+            .update(coding_plan_subscriptions)
+            .set({ installed_byok_key_id: null })
+            .where(eq(coding_plan_subscriptions.installed_byok_key_id, id));
+        }
+        return updated;
+      });
 
       // Create audit log only for organization keys
       if (existingKey.organization_id) {
@@ -322,6 +345,7 @@ export const byokRouter = createTRPCRouter({
           organization_id: byok_api_keys.organization_id,
           kilo_user_id: byok_api_keys.kilo_user_id,
           provider_id: byok_api_keys.provider_id,
+          management_source: byok_api_keys.management_source,
         })
         .from(byok_api_keys)
         .where(eq(byok_api_keys.id, id));
@@ -361,6 +385,7 @@ export const byokRouter = createTRPCRouter({
           created_at: byok_api_keys.created_at,
           updated_at: byok_api_keys.updated_at,
           created_by: byok_api_keys.created_by,
+          management_source: byok_api_keys.management_source,
           is_enabled: byok_api_keys.is_enabled,
         });
 
@@ -397,6 +422,7 @@ export const byokRouter = createTRPCRouter({
           kilo_user_id: byok_api_keys.kilo_user_id,
           provider_id: byok_api_keys.provider_id,
           encrypted_api_key: byok_api_keys.encrypted_api_key,
+          management_source: byok_api_keys.management_source,
         })
         .from(byok_api_keys)
         .where(eq(byok_api_keys.id, id));
@@ -461,10 +487,10 @@ export const byokRouter = createTRPCRouter({
         });
 
         if (output.finishReason !== 'stop') {
-          return {
-            success: false,
-            message: `API key (${decryptedKey.providerId}) test failed with finish reason: ${output.finishReason}`,
-          };
+          logByokWarning('BYOK key test returned an unsuccessful completion', {
+            providerId: decryptedKey.providerId,
+          });
+          return { success: false, message: GENERIC_TEST_FAILURE_MESSAGE };
         }
 
         const metadata = output.providerMetadata?.gateway?.routing as
@@ -473,14 +499,11 @@ export const byokRouter = createTRPCRouter({
 
         return {
           success: true,
-          message: `API key test success. Provider: ${metadata?.finalProvider ?? finalProvider}. Model: ${metadata?.originalModelId ?? model.modelId}. Model output: ${output.text}`,
+          message: `API key test success. Provider: ${metadata?.finalProvider ?? finalProvider}. Model: ${metadata?.originalModelId ?? model.modelId}.`,
         };
-      } catch (e) {
-        console.error(e);
-        return {
-          success: false,
-          message: `API key (${decryptedKey.providerId}) test failed with: ${e instanceof Error ? e.message : e}`,
-        };
+      } catch {
+        logByokWarning('BYOK key test request failed', { providerId: decryptedKey.providerId });
+        return { success: false, message: GENERIC_TEST_FAILURE_MESSAGE };
       }
     }),
 
@@ -501,6 +524,7 @@ export const byokRouter = createTRPCRouter({
           organization_id: byok_api_keys.organization_id,
           kilo_user_id: byok_api_keys.kilo_user_id,
           provider_id: byok_api_keys.provider_id,
+          management_source: byok_api_keys.management_source,
         })
         .from(byok_api_keys)
         .where(eq(byok_api_keys.id, id));

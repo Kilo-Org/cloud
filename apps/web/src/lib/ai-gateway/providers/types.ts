@@ -13,6 +13,7 @@ export type ProviderId =
   | 'morph'
   | 'vercel'
   | 'custom'
+  | 'experiment'
   | 'dev-tools';
 
 export type BYOKResult = {

@@ -12,6 +12,7 @@ export type SessionMessageStatus = 'queued' | 'accepted' | 'completed' | 'failed
 
 export type SessionMessageCompletionSource =
   | 'assistant_message_event'
+  | 'manual_compact_summarize'
   | 'idle_reconciliation'
   | 'wrapper_failure'
   | 'interrupt'
@@ -167,6 +168,7 @@ export const SessionMessageStateSchema = z
     completionSource: z
       .enum([
         'assistant_message_event',
+        'manual_compact_summarize',
         'idle_reconciliation',
         'wrapper_failure',
         'interrupt',

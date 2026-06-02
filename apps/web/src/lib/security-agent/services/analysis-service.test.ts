@@ -128,6 +128,33 @@ describe('analysis-service', () => {
     expect(result).toEqual({
       started: false,
       error: "Finding status is 'fixed', analysis requires 'open' status",
+      errorCode: 'FINDING_NOT_ELIGIBLE',
+    });
+    expect(mockUpdateAnalysisStatus).not.toHaveBeenCalledWith(findingId, 'pending');
+  });
+
+  it('reports analysis in progress when lease is held for an open finding', async () => {
+    const findingId = 'finding-lease-busy';
+    const user = { id: 'user-1', google_user_email: 'test@example.com' } as User;
+
+    mockGetSecurityFindingById.mockResolvedValue({
+      id: findingId,
+      status: 'open',
+      analysis_status: 'running',
+    } as Awaited<ReturnType<typeof mockGetSecurityFindingById>>);
+    mockTryAcquireAnalysisStartLease.mockResolvedValue(false);
+
+    const result = await startSecurityAnalysis({
+      findingId,
+      user,
+      githubRepo: 'acme/repo',
+      githubToken: 'gh-token',
+    });
+
+    expect(result).toEqual({
+      started: false,
+      error: 'Analysis already in progress',
+      errorCode: 'ANALYSIS_IN_PROGRESS',
     });
     expect(mockUpdateAnalysisStatus).not.toHaveBeenCalledWith(findingId, 'pending');
   });

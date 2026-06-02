@@ -64,7 +64,7 @@ RUN git config --system url."https://github.com/".insteadOf "ssh://git@github.co
 # under boot load routinely need 27-35s for the first TLS+fetch to complete.
 # Match the KiloCode chunk explicitly because OpenClaw also ships other provider
 # discovery timeout constants. Remove this patch once the timeout is configurable.
-RUN npm install -g pnpm openclaw@2026.5.22 clawhub mcporter@0.7.3 @steipete/summarize@0.12.0 @kilocode/cli@7.2.31 \
+RUN npm install -g pnpm openclaw@2026.5.26 clawhub mcporter@0.7.3 @steipete/summarize@0.12.0 @kilocode/cli@7.2.31 \
     && OC_DIST=/usr/local/lib/node_modules/openclaw/dist \
     && PM_FILES=$(grep -l 'KILOCODE_MODELS_URL' "$OC_DIST"/provider-models-*.js 2>/dev/null || true) \
     && PM_FILE_COUNT=$(printf '%s\n' "$PM_FILES" | grep -c .) \
@@ -98,7 +98,7 @@ RUN COMPOSIO_INSTALL_TAG="%40composio%2Fcli%40${COMPOSIO_CLI_VERSION}" \
 # Bake bundled plugin runtime deps into OpenClaw's external stage dir so first
 # boot is pure startup — no npm install from `openclaw doctor` or gateway plugin
 # load on shared-cpu Fly machines. The stage-root naming mirrors OpenClaw
-# 2026.5.22's resolveExternalBundledRuntimeDepsInstallRoot().
+# 2026.5.26's resolveExternalBundledRuntimeDepsInstallRoot().
 RUN cd /usr/local/lib/node_modules/openclaw \
     && OPENCLAW_PACKAGE_ROOT="$(pwd -P)" \
     && OPENCLAW_PACKAGE_VERSION="$(node -p "require('./package.json').version")" \
@@ -257,8 +257,8 @@ RUN mkdir -p /root/.openclaw \
     && mkdir -p /root/clawd/skills
 
 # Copy helper scripts (used at runtime by the controller/gateway)
-# Build cache bust: 2026-05-28-v68-openclaw-2026.5.22
-RUN echo "13"
+# Build cache bust: 2026-06-01-v69-openclaw-2026.5.26
+RUN echo "14"
 COPY openclaw-pairing-list.js /usr/local/bin/openclaw-pairing-list.js
 COPY openclaw-device-pairing-list.js /usr/local/bin/openclaw-device-pairing-list.js
 

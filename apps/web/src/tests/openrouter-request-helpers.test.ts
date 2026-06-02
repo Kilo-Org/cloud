@@ -1,5 +1,8 @@
 import { describe, expect, test } from '@jest/globals';
-import { addCacheBreakpoints } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
+import {
+  addCacheBreakpoints,
+  removeCacheBreakpoints,
+} from '@/lib/ai-gateway/providers/openrouter/request-helpers';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 import type OpenAI from 'openai';
 
@@ -251,3 +254,109 @@ describe('addCacheBreakpoints', () => {
     expect(request.body.cache_control).toBeUndefined();
   });
 });
+
+describe('removeCacheBreakpoints', () => {
+  test('removes all cache breakpoints added to a chat completions request', () => {
+    const request: GatewayRequest = {
+      kind: 'chat_completions',
+      body: {
+        model: 'test-model',
+        messages: [
+          { role: 'system', content: 'You are helpful.' },
+          { role: 'user', content: 'First prompt' },
+          { role: 'assistant', content: 'First response' },
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: 'Latest prompt' },
+              { type: 'text', text: 'Latest detail' },
+            ],
+          },
+        ],
+      },
+    };
+
+    addCacheBreakpoints(request);
+    expect(containsCacheControlDeep(request.body.messages)).toBe(true);
+
+    removeCacheBreakpoints(request);
+
+    expect(containsCacheControlDeep(request.body.messages)).toBe(false);
+  });
+
+  test('removes all cache breakpoints added to a responses request', () => {
+    const request: GatewayRequest = {
+      kind: 'responses',
+      body: {
+        model: 'test-model',
+        input: [
+          { type: 'message', role: 'system', content: 'You are helpful.' },
+          {
+            type: 'message',
+            role: 'user',
+            content: [{ type: 'input_text', text: 'First prompt' }],
+          },
+          {
+            type: 'function_call_output',
+            call_id: 'call_123',
+            output: [
+              { type: 'input_text', text: 'Tool output' },
+              { type: 'input_text', text: 'Tool detail' },
+            ],
+          },
+        ],
+      },
+    };
+
+    addCacheBreakpoints(request);
+    if (request.kind !== 'responses' || !Array.isArray(request.body.input)) return;
+    expect(containsCacheControlDeep(request.body.input)).toBe(true);
+
+    removeCacheBreakpoints(request);
+
+    expect(containsCacheControlDeep(request.body.input)).toBe(false);
+  });
+
+  test('removes top-level and nested cache_control from a messages request', () => {
+    const request: GatewayRequest = {
+      kind: 'messages',
+      body: {
+        model: 'anthropic/claude-sonnet-4-5',
+        max_tokens: 1024,
+        cache_control: { type: 'ephemeral' },
+        messages: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'text',
+                text: 'First prompt',
+                cache_control: { type: 'ephemeral' },
+              },
+            ],
+          },
+          { role: 'assistant', content: 'First response' },
+          { role: 'user', content: 'Latest prompt' },
+        ],
+      },
+    };
+
+    removeCacheBreakpoints(request);
+
+    expect(request.body.cache_control).toBeUndefined();
+    expect(containsCacheControlDeep(request.body.messages)).toBe(false);
+  });
+});
+
+function containsCacheControlDeep(value: unknown): boolean {
+  if (Array.isArray(value)) {
+    return value.some(containsCacheControlDeep);
+  }
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+  if (Object.hasOwn(value, 'cache_control')) {
+    return true;
+  }
+  return Object.values(value).some(containsCacheControlDeep);
+}

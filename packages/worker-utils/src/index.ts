@@ -99,6 +99,7 @@ export {
   CloudAgentQueueReportSchema,
   CloudAgentRunStatuses,
   CloudAgentRunFailureClassifications,
+  DIAGNOSTIC_RETENTION_MS,
 } from './cloud-agent-queue-report.js';
 export type {
   CloudAgentQueueReport,

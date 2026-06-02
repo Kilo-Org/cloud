@@ -33,6 +33,8 @@ import type { QuestionInfo } from '@/types/opencode.gen';
 import { splitByContiguousPrefix } from './array-utils';
 import type { UserWebConnection } from './user-web-connection';
 import { generateMessageId } from './message-id';
+import { findLatestContextUsage } from './context-usage';
+import type { ContextUsage } from './context-usage';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -187,6 +189,7 @@ type SessionManagerAtoms = {
   staticMessages: Atom<StoredMessage[]>;
   dynamicMessages: Atom<StoredMessage[]>;
   totalCost: Atom<number>;
+  contextUsage: Atom<ContextUsage | undefined>;
   childMessages: Atom<(childSessionId: string) => StoredMessage[]>;
   childSessionHydrationState: Atom<(childSessionId: string) => ChildSessionHydrationState>;
 };
@@ -216,10 +219,19 @@ type SessionManager = {
 // ---------------------------------------------------------------------------
 
 const GENERIC_ERROR = 'Something went wrong. Please retry in a moment.';
+const SELECTED_MODEL_UNAVAILABLE_MESSAGE =
+  'selected model is not available for this cloud agent session';
+const SELECTED_MODEL_UNAVAILABLE_ERROR =
+  'Selected model is unavailable for Cloud Agent. Choose another available model or select a different agent, then try again.';
+
+function isSelectedModelUnavailable(message: string | undefined): boolean {
+  return message?.toLowerCase().includes(SELECTED_MODEL_UNAVAILABLE_MESSAGE) ?? false;
+}
 
 function formatError(err: unknown): string {
   const r = errorShapeSchema.safeParse(err);
   if (r.success) {
+    if (isSelectedModelUnavailable(r.data.message)) return SELECTED_MODEL_UNAVAILABLE_ERROR;
     const code = r.data.data?.code ?? r.data.shape?.code;
     const http = r.data.data?.httpStatus ?? r.data.shape?.data?.httpStatus;
     if (code === 'PAYMENT_REQUIRED' || http === 402)
@@ -368,6 +380,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     for (const m of get(messagesListAtom)) if (m.info.role === 'assistant') t += m.info.cost;
     return t;
   });
+  const contextUsageAtom = atom(get => findLatestContextUsage(get(messagesListAtom)));
   const childMessagesAtom = atom(get => {
     const storage = get(sessionStorageAtom);
     if (!storage) return (): StoredMessage[] => [];
@@ -949,6 +962,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       staticMessages: staticMessagesAtom,
       dynamicMessages: dynamicMessagesAtom,
       totalCost: totalCostAtom,
+      contextUsage: contextUsageAtom,
       childMessages: childMessagesAtom,
       childSessionHydrationState: childSessionHydrationStateAtom,
     },

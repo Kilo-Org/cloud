@@ -485,6 +485,43 @@ export const ImpactAdvocateRewardRedemptionState = {
 export type ImpactAdvocateRewardRedemptionState =
   (typeof ImpactAdvocateRewardRedemptionState)[keyof typeof ImpactAdvocateRewardRedemptionState];
 
+// --- Coding Plan enums ---
+
+export const BYOKManagementSource = {
+  User: 'user',
+  CodingPlan: 'coding_plan',
+} as const;
+
+export type BYOKManagementSource = (typeof BYOKManagementSource)[keyof typeof BYOKManagementSource];
+
+export const CodingPlanCredentialStatus = {
+  Available: 'available',
+  Assigned: 'assigned',
+  RevocationPending: 'revocation_pending',
+  Revoked: 'revoked',
+  RevocationFailed: 'revocation_failed',
+} as const;
+
+export type CodingPlanCredentialStatus =
+  (typeof CodingPlanCredentialStatus)[keyof typeof CodingPlanCredentialStatus];
+
+export const CodingPlanSubscriptionStatus = {
+  Active: 'active',
+  PastDue: 'past_due',
+  Canceled: 'canceled',
+} as const;
+
+export type CodingPlanSubscriptionStatus =
+  (typeof CodingPlanSubscriptionStatus)[keyof typeof CodingPlanSubscriptionStatus];
+
+export const CodingPlanTermKind = {
+  Activation: 'activation',
+  Extension: 'extension',
+  Renewal: 'renewal',
+} as const;
+
+export type CodingPlanTermKind = (typeof CodingPlanTermKind)[keyof typeof CodingPlanTermKind];
+
 // NOTE: Do not change these action names. Use present tense for consistency.
 export const KiloClawAdminAuditAction = z.enum([
   'kiloclaw.volume.extend',
@@ -1205,11 +1242,12 @@ export const CustomLlmDefinitionSchema = z.object({
   display_name: z.string(),
   context_length: z.number(),
   max_completion_tokens: z.number(),
-  base_url: z.string(),
+  base_url: z.url(),
   api_key: z.string(),
   organization_ids: z.array(z.string()),
   supports_image_input: z.boolean().optional(),
   add_cache_breakpoints: z.boolean().optional(),
+  remove_cache_breakpoints: z.boolean().optional(),
   inject_reasoning_into_content: z.boolean().optional(),
   extra_headers: CustomLlmExtraHeadersSchema.optional(),
   extra_body: CustomLlmExtraBodySchema.optional(),

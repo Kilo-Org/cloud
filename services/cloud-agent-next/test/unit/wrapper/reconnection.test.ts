@@ -157,6 +157,7 @@ const createMockKiloClient = (overrides: Partial<WrapperKiloClient> = {}): Wrapp
   getSession: vi.fn().mockResolvedValue({ id: 'kilo_sess' }),
   sendPromptAsync: vi.fn().mockResolvedValue(undefined),
   abortSession: vi.fn().mockResolvedValue(true),
+  summarizeSession: vi.fn().mockResolvedValue(true),
   sendCommand: vi.fn().mockResolvedValue(undefined),
   answerPermission: vi.fn().mockResolvedValue(true),
   answerQuestion: vi.fn().mockResolvedValue(true),
@@ -650,8 +651,14 @@ describe('ingest WS reconnection', () => {
       timestamp: new Date().toISOString(),
       data: { text: 'some output' },
     };
+    const event3: IngestEvent = {
+      streamEventType: 'cloud.message.completed',
+      timestamp: new Date().toISOString(),
+      data: { messageId: 'msg_compact', completionSource: 'manual_compact_summarize' },
+    };
     state.sendToIngest(event1);
     state.sendToIngest(event2);
+    state.sendToIngest(event3);
 
     // Events should NOT have been sent to the old WS
     // (old WS is closed, so nothing is sent — events are buffered internally).
@@ -664,6 +671,12 @@ describe('ingest WS reconnection', () => {
         return true;
       }
       if (parsed.streamEventType === 'kilocode' && parsed.data?.event === 'test_event_1') {
+        return true;
+      }
+      if (
+        parsed.streamEventType === 'cloud.message.completed' &&
+        parsed.data?.messageId === 'msg_compact'
+      ) {
         return true;
       }
       return false;
@@ -684,7 +697,7 @@ describe('ingest WS reconnection', () => {
     });
     expect(resumeMsg).toBeDefined();
     const parsedResume = JSON.parse(resumeMsg!);
-    expect(parsedResume.data.bufferedEvents).toBe(2);
+    expect(parsedResume.data.bufferedEvents).toBe(3);
     expect(parsedResume.data.eventsLost).toBe(false);
 
     // Verify buffered events were flushed to new WS. Filter to the specific
@@ -692,14 +705,29 @@ describe('ingest WS reconnection', () => {
     // session.status kilocode event, which we ignore.
     const flushedEvents = newWs.sent
       .map(msg => JSON.parse(msg))
-      .filter((e: { streamEventType: string; data?: { event?: string; text?: string } }) => {
-        if (e.streamEventType === 'kilocode' && e.data?.event === 'test_event_1') return true;
-        if (e.streamEventType === 'output' && e.data?.text === 'some output') return true;
-        return false;
-      });
-    expect(flushedEvents).toHaveLength(2);
+      .filter(
+        (e: {
+          streamEventType: string;
+          data?: { event?: string; text?: string; messageId?: string };
+        }) => {
+          if (e.streamEventType === 'kilocode' && e.data?.event === 'test_event_1') return true;
+          if (e.streamEventType === 'output' && e.data?.text === 'some output') return true;
+          if (
+            e.streamEventType === 'cloud.message.completed' &&
+            e.data?.messageId === 'msg_compact'
+          ) {
+            return true;
+          }
+          return false;
+        }
+      );
+    expect(flushedEvents).toHaveLength(3);
     expect(flushedEvents[0].data.event).toBe('test_event_1');
     expect(flushedEvents[1].data.text).toBe('some output');
+    expect(flushedEvents[2]).toMatchObject({
+      streamEventType: 'cloud.message.completed',
+      data: { messageId: 'msg_compact', completionSource: 'manual_compact_summarize' },
+    });
   });
 
   // -------------------------------------------------------------------------

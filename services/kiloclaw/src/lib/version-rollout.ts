@@ -46,8 +46,8 @@ async function readPointer(kv: KVNamespace, key: string): Promise<ImageVersionEn
 export interface SelectImageVersionOptions {
   kv: KVNamespace;
   variant: ImageVariant;
-  /** Instance whose bucket determines candidate eligibility. */
-  instanceId: string;
+  /** Subject whose bucket determines candidate eligibility. */
+  rolloutSubject: string;
   /** Tag the instance is currently running, if any. Used to skip self-upgrades. */
   currentImageTag?: string | null;
   /** When true, the candidate (if any) is always offered regardless of bucket. */
@@ -84,7 +84,7 @@ export async function selectImageVersionForInstance(
       return candidate;
     }
     if (candidate.rolloutPercent > 0) {
-      const bucket = await rolloutBucket(`${candidate.imageTag}:instance:${opts.instanceId}`);
+      const bucket = await rolloutBucket(`${candidate.imageTag}:instance:${opts.rolloutSubject}`);
       if (bucket < candidate.rolloutPercent) {
         return candidate;
       }

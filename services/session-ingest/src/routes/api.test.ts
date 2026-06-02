@@ -1,3 +1,5 @@
+import { SQL } from 'drizzle-orm';
+import { PgDialect } from 'drizzle-orm/pg-core';
 import { Hono } from 'hono';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
@@ -79,7 +81,7 @@ function makeDbFakes() {
   const selectResult = vi.fn<() => Promise<unknown[]>>(async () => []);
   const select = {
     from: vi.fn(() => select),
-    where: vi.fn(() => select),
+    where: vi.fn((_condition: unknown) => select),
     limit: vi.fn(() => select),
     then: vi.fn((resolve: (v: unknown) => unknown) => resolve(selectResult())),
   };
@@ -99,7 +101,7 @@ function makeDbFakes() {
   // Drizzle delete chain: db.delete(table).where()
   const deleteResult = vi.fn<() => Promise<unknown>>(async () => undefined);
   const del = {
-    where: vi.fn(() => del),
+    where: vi.fn((_condition: unknown) => del),
     then: vi.fn((resolve: (v: unknown) => unknown) => resolve(deleteResult())),
   };
 
@@ -131,11 +133,13 @@ function makeDbFakes() {
       insert: insertFn,
       insertResult,
       select: selectFn,
+      selectWhere: select.where,
       update: updateFn,
       updateSet,
       updateWhere,
       updateReturning,
       delete: deleteFn,
+      deleteWhere: del.where,
       selectResult,
       updateResult,
       deleteResult,
@@ -488,15 +492,36 @@ describe('api routes', () => {
     expect(ingestStub.getAllStream).toHaveBeenCalled();
   });
 
-  it('DELETE /session/:sessionId revokes cache, clears DO, and deletes row', async () => {
+  it('DELETE /session/:sessionId revokes cache, clears DO, and deletes descendants child-first', async () => {
+    const parentSessionId = 'ses_12345678901234567890123456';
+    const childSessionId = 'ses_abcdefghijklmnopqrstuvwxyz';
     const { db, fns } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db);
     // Ownership check
-    fns.selectResult.mockResolvedValueOnce([{ session_id: 'ses_12345678901234567890123456' }]);
+    fns.selectResult.mockResolvedValueOnce([{ session_id: parentSessionId }]);
     // Recursive CTE
     fns.executeResult.mockResolvedValueOnce({
-      rows: [{ session_id: 'ses_12345678901234567890123456' }],
+      rows: [{ session_id: childSessionId }, { session_id: parentSessionId }],
     });
+    // Rows selected for session.deleted events
+    fns.selectResult.mockResolvedValueOnce([
+      {
+        session_id: parentSessionId,
+        parent_session_id: null,
+        organization_id: null,
+        git_url: null,
+        git_branch: null,
+        created_on_platform: null,
+      },
+      {
+        session_id: childSessionId,
+        parent_session_id: parentSessionId,
+        organization_id: null,
+        git_url: null,
+        git_branch: null,
+        created_on_platform: null,
+      },
+    ]);
 
     const sessionCache = {
       remove: vi.fn(async () => undefined),
@@ -513,17 +538,75 @@ describe('api routes', () => {
     );
 
     const app = makeApiApp();
+    const env = makeTestEnv();
     const res = await app.fetch(
-      new Request('http://local/session/ses_12345678901234567890123456', {
+      new Request(`http://local/session/${parentSessionId}`, {
         method: 'DELETE',
       }),
-      makeTestEnv()
+      env
     );
 
     expect(res.status).toBe(200);
-    expect(sessionCache.remove).toHaveBeenCalledWith('ses_12345678901234567890123456');
-    expect(ingestStub.clear).toHaveBeenCalled();
-    expect(fns.deleteResult).toHaveBeenCalled();
+
+    const deletedRowsPredicate = fns.selectWhere.mock.calls[1]?.[0];
+    if (!(deletedRowsPredicate instanceof SQL)) {
+      throw new Error('Expected pre-delete predicate');
+    }
+    const dialect = new PgDialect();
+    const deletedRowsQuery = dialect.sqlToQuery(deletedRowsPredicate);
+    expect(deletedRowsQuery.sql).toContain(
+      '"cli_sessions_v2"."session_id" in ($1, $2) and "cli_sessions_v2"."kilo_user_id" = $3'
+    );
+    expect(deletedRowsQuery.params).toEqual([childSessionId, parentSessionId, 'usr_test']);
+
+    expect(fns.deleteWhere).toHaveBeenCalledTimes(2);
+    const deletedSessionParams = fns.deleteWhere.mock.calls.map(([predicate]) => {
+      if (!(predicate instanceof SQL)) {
+        throw new Error('Expected delete predicate');
+      }
+      return dialect.sqlToQuery(predicate).params;
+    });
+    expect(deletedSessionParams).toEqual([
+      [childSessionId, 'usr_test'],
+      [parentSessionId, 'usr_test'],
+    ]);
+    expect(sessionCache.remove).toHaveBeenNthCalledWith(1, childSessionId);
+    expect(sessionCache.remove).toHaveBeenNthCalledWith(2, parentSessionId);
+    expect(getSessionIngestDO).toHaveBeenNthCalledWith(1, env, {
+      kiloUserId: 'usr_test',
+      sessionId: childSessionId,
+    });
+    expect(getSessionIngestDO).toHaveBeenNthCalledWith(2, env, {
+      kiloUserId: 'usr_test',
+      sessionId: parentSessionId,
+    });
+    expect(ingestStub.clear).toHaveBeenCalledTimes(2);
+    expect(notifyUserSessionEvent).toHaveBeenNthCalledWith(1, env, 'usr_test', {
+      type: 'session.deleted',
+      data: {
+        source: 'v2',
+        sessionId: childSessionId,
+        parentSessionId: parentSessionId,
+        organizationId: null,
+        gitUrl: null,
+        gitBranch: null,
+        createdOnPlatform: null,
+        deletedAt: expect.any(String),
+      },
+    });
+    expect(notifyUserSessionEvent).toHaveBeenNthCalledWith(2, env, 'usr_test', {
+      type: 'session.deleted',
+      data: {
+        source: 'v2',
+        sessionId: parentSessionId,
+        parentSessionId: null,
+        organizationId: null,
+        gitUrl: null,
+        gitBranch: null,
+        createdOnPlatform: null,
+        deletedAt: expect.any(String),
+      },
+    });
   });
 
   it('POST /session/:sessionId/share returns existing public_id when already shared', async () => {

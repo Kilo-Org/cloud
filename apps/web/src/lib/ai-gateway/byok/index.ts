@@ -1,6 +1,6 @@
 import { type db } from '@/lib/drizzle';
 import { byok_api_keys } from '@kilocode/db/schema';
-import { eq, and, inArray } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import type { EncryptedData } from '@/lib/ai-gateway/byok/encryption';
 import { decryptApiKey } from '@/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
@@ -19,7 +19,7 @@ export async function getModelUserByokProviders(modelId: string): Promise<UserBy
     return ['codestral'];
   }
   const vercelModelMetadata = await getVercelModelsMetadata();
-  if (Object.keys(vercelModelMetadata).length == 0) {
+  if (Object.keys(vercelModelMetadata).length === 0) {
     console.error('[getModelUserByokProviders] no Vercel model metadata in the database');
     return [];
   }
@@ -53,6 +53,9 @@ export async function getBYOKforUser(
   userId: string,
   providerIds: UserByokProviderId[]
 ): Promise<BYOKResult[] | null> {
+  if (providerIds.length === 0) {
+    return null;
+  }
   const rows = await fromDb
     .select({
       encrypted_api_key: byok_api_keys.encrypted_api_key,
@@ -68,11 +71,7 @@ export async function getBYOKforUser(
     )
     .orderBy(byok_api_keys.created_at);
 
-  if (rows.length === 0) {
-    return null;
-  }
-
-  return rows.map(row => decryptByokRow(row));
+  return rows.length === 0 ? null : rows.map(row => decryptByokRow(row));
 }
 
 export async function getBYOKforOrganization(
@@ -80,6 +79,9 @@ export async function getBYOKforOrganization(
   organizationId: string,
   providerIds: UserByokProviderId[]
 ): Promise<BYOKResult[] | null> {
+  if (providerIds.length === 0) {
+    return null;
+  }
   const rows = await fromDb
     .select({
       encrypted_api_key: byok_api_keys.encrypted_api_key,
@@ -95,9 +97,5 @@ export async function getBYOKforOrganization(
     )
     .orderBy(byok_api_keys.created_at);
 
-  if (rows.length === 0) {
-    return null;
-  }
-
-  return rows.map(row => decryptByokRow(row));
+  return rows.length === 0 ? null : rows.map(row => decryptByokRow(row));
 }

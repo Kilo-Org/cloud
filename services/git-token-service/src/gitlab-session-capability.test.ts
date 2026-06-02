@@ -10,6 +10,7 @@ const encryptionKey = Buffer.alloc(32, 7).toString('base64');
 const anotherEncryptionKey = Buffer.alloc(32, 8).toString('base64');
 const claims = {
   userId: 'user_1',
+  outboundContainerId: 'outbound-container-1',
   orgId: 'ef2eb5c7-27ce-4f43-b6d3-8f282abc145b',
   integrationId: 'ef2eb5c7-27ce-4f43-b6d3-8f282abc145c',
   instanceOrigin: 'https://gitlab.example.com',
@@ -31,17 +32,32 @@ describe('GitLabSessionCapabilityCodec', () => {
 
     const capability = codec.issue(claims);
 
-    expect(capability).toMatch(/^kgl1\./);
+    expect(capability).toMatch(/^kgl2\./);
     expect(capability).not.toContain('user_1');
     expect(capability).not.toContain('gitlab.example.com');
     expect(codec.decode(capability)).toEqual({
       purpose: 'gitlab_scm_session',
-      version: 1,
+      version: 2,
       ...claims,
       issuedAt: Date.parse('2026-05-31T12:00:00.000Z'),
       expiresAt: Date.parse('2026-05-31T13:00:00.000Z'),
     });
     vi.useRealTimers();
+  });
+
+  it('produces and decodes a legacy unbound v1 capability when the container is omitted', () => {
+    const codec = new GitLabSessionCapabilityCodec(encryptionKey);
+    const { outboundContainerId: _outboundContainerId, ...legacyClaims } = claims;
+
+    const capability = codec.issue(legacyClaims);
+
+    expect(capability).toMatch(/^kgl1\./);
+    expect(codec.decode(capability)).toMatchObject({
+      version: 1,
+      userId: 'user_1',
+      projectPath: 'Acme/platform/widgets',
+    });
+    expect(codec.decode(capability)).not.toHaveProperty('outboundContainerId');
   });
 
   it('rejects expiry, tampering, and another encryption key', () => {
@@ -73,9 +89,24 @@ describe('GitLabSessionCapabilityCodec', () => {
   ])('rejects encrypted claims with %s', (_description, overriddenClaims) => {
     const serializedClaims = JSON.stringify({
       purpose: 'gitlab_scm_session',
-      version: 1,
+      version: 2,
       ...claims,
       ...overriddenClaims,
+      issuedAt: Date.now(),
+      expiresAt: Date.now() + 60_000,
+    });
+    const capability = `kgl2.${encryptWithSymmetricKey(serializedClaims, encryptionKey)}`;
+
+    expect(() => new GitLabSessionCapabilityCodec(encryptionKey).decode(capability)).toThrowError(
+      expect.objectContaining({ reason: 'invalid_capability' })
+    );
+  });
+
+  it('rejects a v2 claim under the legacy marker', () => {
+    const serializedClaims = JSON.stringify({
+      purpose: 'gitlab_scm_session',
+      version: 2,
+      ...claims,
       issuedAt: Date.now(),
       expiresAt: Date.now() + 60_000,
     });

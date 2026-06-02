@@ -92,7 +92,7 @@ describe('issueCloudAgentGitHubSessionCapability', () => {
   it('returns an opaque capability and preserves managed identity metadata', async () => {
     const issueGitHubSessionCapability = vi.fn().mockResolvedValue({
       success: true,
-      capability: 'kgh1.opaque',
+      capability: 'kgh2.opaque',
       installationId: '123',
       accountLogin: 'acme',
       appType: 'standard',
@@ -105,12 +105,18 @@ describe('issueCloudAgentGitHubSessionCapability', () => {
 
     const result = await issueCloudAgentGitHubSessionCapability(
       createEnv({ issueGitHubSessionCapability, getCloudAgentAuthForRepo, getTokenForRepo }),
-      { githubRepo: 'acme/repo', userId: 'user_1', allowUserAuthorization: true }
+      {
+        githubRepo: 'acme/repo',
+        userId: 'user_1',
+        outboundContainerId: 'container-test',
+        allowUserAuthorization: true,
+      }
     );
 
     expect(issueGitHubSessionCapability).toHaveBeenCalledWith({
       githubRepo: 'acme/repo',
       userId: 'user_1',
+      outboundContainerId: 'container-test',
       allowUserAuthorization: true,
     });
     expect(getCloudAgentAuthForRepo).not.toHaveBeenCalled();
@@ -118,7 +124,7 @@ describe('issueCloudAgentGitHubSessionCapability', () => {
     expect(result).toMatchObject({
       success: true,
       value: {
-        capability: 'kgh1.opaque',
+        capability: 'kgh2.opaque',
         source: 'user',
         gitAuthor: { name: 'octocat' },
       },
@@ -135,7 +141,12 @@ describe('issueCloudAgentGitHubSessionCapability', () => {
 
     const result = await issueCloudAgentGitHubSessionCapability(
       createEnv({ issueGitHubSessionCapability, getCloudAgentAuthForRepo, getTokenForRepo }),
-      { githubRepo: 'acme/repo', userId: 'user_1', allowUserAuthorization: false }
+      {
+        githubRepo: 'acme/repo',
+        userId: 'user_1',
+        outboundContainerId: 'container-test',
+        allowUserAuthorization: false,
+      }
     );
 
     expect(result).toEqual({
@@ -158,7 +169,12 @@ describe('issueCloudAgentGitHubSessionCapability', () => {
 
     const result = await issueCloudAgentGitHubSessionCapability(
       createEnv({ issueGitHubSessionCapability, getCloudAgentAuthForRepo, getTokenForRepo }),
-      { githubRepo: 'acme/repo', userId: 'user_1', allowUserAuthorization: true }
+      {
+        githubRepo: 'acme/repo',
+        userId: 'user_1',
+        outboundContainerId: 'container-test',
+        allowUserAuthorization: true,
+      }
     );
 
     expect(result).toMatchObject({ success: false, error: { reason: 'rpc_error' } });
@@ -171,7 +187,7 @@ describe('issueCloudAgentGitLabSessionCapability', () => {
   it('returns an opaque code-review project capability and preserves CLI mode metadata', async () => {
     const issueGitLabSessionCapability = vi.fn().mockResolvedValue({
       success: true,
-      capability: 'kgl1.project',
+      capability: 'kgl2.project',
       instanceOrigin: 'https://gitlab.example.com',
       instanceHost: 'gitlab.example.com',
       projectPath: 'acme/platform/repo',
@@ -187,6 +203,7 @@ describe('issueCloudAgentGitLabSessionCapability', () => {
       {
         gitUrl: 'https://gitlab.example.com/acme/platform/repo.git',
         userId: 'user_1',
+        outboundContainerId: 'container-test',
         createdOnPlatform: 'code-review',
       }
     );
@@ -194,13 +211,14 @@ describe('issueCloudAgentGitLabSessionCapability', () => {
     expect(issueGitLabSessionCapability).toHaveBeenCalledWith({
       gitUrl: 'https://gitlab.example.com/acme/platform/repo.git',
       userId: 'user_1',
+      outboundContainerId: 'container-test',
       createdOnPlatform: 'code-review',
     });
     expect(getGitLabToken).not.toHaveBeenCalled();
     expect(result).toEqual({
       success: true,
       value: {
-        capability: 'kgl1.project',
+        capability: 'kgl2.project',
         gitUrl: 'https://gitlab.example.com/acme/platform/repo.git',
         instanceOrigin: 'https://gitlab.example.com',
         instanceHost: 'gitlab.example.com',
@@ -223,7 +241,11 @@ describe('issueCloudAgentGitLabSessionCapability', () => {
 
     const result = await issueCloudAgentGitLabSessionCapability(
       createEnv({ issueGitLabSessionCapability, getGitLabToken }),
-      { gitUrl: 'https://gitlab.com/acme/repo.git', userId: 'user_1' }
+      {
+        gitUrl: 'https://gitlab.com/acme/repo.git',
+        userId: 'user_1',
+        outboundContainerId: 'container-test',
+      }
     );
 
     expect(result).toEqual({ success: false, reason: 'capability_configuration_error' });
@@ -238,7 +260,11 @@ describe('issueCloudAgentGitLabSessionCapability', () => {
 
     const result = await issueCloudAgentGitLabSessionCapability(
       createEnv({ issueGitLabSessionCapability, getGitLabToken }),
-      { gitUrl: 'https://gitlab.com/acme/repo.git', userId: 'user_1' }
+      {
+        gitUrl: 'https://gitlab.com/acme/repo.git',
+        userId: 'user_1',
+        outboundContainerId: 'container-test',
+      }
     );
 
     expect(result).toEqual({ success: false, reason: 'rpc_error' });
@@ -262,7 +288,11 @@ describe('resolveCloudAgentGitHubAuthForRepo', () => {
 
     const result = await resolveCloudAgentGitHubAuthForRepo(
       createEnv({ getCloudAgentAuthForRepo, getTokenForRepo }),
-      { githubRepo: 'acme/repo', userId: 'user_1', allowUserAuthorization: true }
+      {
+        githubRepo: 'acme/repo',
+        userId: 'user_1',
+        allowUserAuthorization: true,
+      }
     );
 
     expect(getCloudAgentAuthForRepo).toHaveBeenCalledWith({
@@ -292,7 +322,11 @@ describe('resolveCloudAgentGitHubAuthForRepo', () => {
 
     const result = await resolveCloudAgentGitHubAuthForRepo(
       createEnv({ getCloudAgentAuthForRepo, getTokenForRepo }),
-      { githubRepo: 'acme/repo', userId: 'user_1', allowUserAuthorization: true }
+      {
+        githubRepo: 'acme/repo',
+        userId: 'user_1',
+        allowUserAuthorization: true,
+      }
     );
 
     expect(getTokenForRepo).not.toHaveBeenCalled();
@@ -324,7 +358,11 @@ describe('resolveCloudAgentGitHubAuthForRepo', () => {
 
     const result = await resolveCloudAgentGitHubAuthForRepo(
       createEnv({ getCloudAgentAuthForRepo, getTokenForRepo }),
-      { githubRepo: 'acme/repo', userId: 'user_1', allowUserAuthorization: true }
+      {
+        githubRepo: 'acme/repo',
+        userId: 'user_1',
+        allowUserAuthorization: true,
+      }
     );
 
     expect(getCloudAgentAuthForRepo).toHaveBeenCalledWith({

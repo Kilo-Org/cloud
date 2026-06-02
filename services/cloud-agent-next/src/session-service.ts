@@ -8,7 +8,7 @@ import type {
   GitAuthorConfig,
   ManagedGitHubFallbackReason,
 } from './types.js';
-import { generateSandboxId } from './sandbox-id.js';
+import { generateSandboxId, getOutboundContainerId } from './sandbox-id.js';
 import { normalizeKilocodeModel } from './persistence/model-utils.js';
 import {
   issueCloudAgentGitHubSessionCapability,
@@ -1286,8 +1286,10 @@ export class SessionService {
 
   async resolveWorkspaceTokens(
     env: PersistenceEnv,
-    metadata: CloudAgentSessionState
+    metadata: CloudAgentSessionState,
+    sandboxId: SandboxId
   ): Promise<ResolvedWorkspaceTokens> {
+    const outboundContainerId = getOutboundContainerId(env, sandboxId);
     const github = githubRepository(metadata);
     const git = gitRepository(metadata);
     let githubToken: string | undefined;
@@ -1302,6 +1304,7 @@ export class SessionService {
       const authParams = {
         githubRepo: github.repo,
         userId: metadata.identity.userId,
+        outboundContainerId,
         orgId: metadata.identity.orgId,
         allowUserAuthorization:
           metadata.identity.createdOnPlatform === 'cloud-agent-web' ||
@@ -1339,6 +1342,7 @@ export class SessionService {
       const result = await issueCloudAgentGitLabSessionCapability(env, {
         gitUrl: git.url,
         userId: metadata.identity.userId,
+        outboundContainerId,
         orgId: metadata.identity.orgId,
         createdOnPlatform: metadata.identity.createdOnPlatform,
       });
@@ -1399,7 +1403,7 @@ export class SessionService {
 
     const devcontainerRequested =
       metadata.workspace?.devcontainerRequested === true || metadata.devcontainer !== undefined;
-    const resolvedTokens = await this.resolveWorkspaceTokens(env, metadata);
+    const resolvedTokens = await this.resolveWorkspaceTokens(env, metadata, sandboxId as SandboxId);
     const workspacePath = getSessionWorkspacePath(orgId, userId, sessionId);
     const sessionHome = getSessionHomePath(sessionId);
     const branchName =
@@ -1621,7 +1625,7 @@ export class SessionService {
       throw ExecutionError.invalidRequest('Missing kiloSessionId in session metadata');
     }
 
-    const resolvedTokens = await this.resolveWorkspaceTokens(env, metadata);
+    const resolvedTokens = await this.resolveWorkspaceTokens(env, metadata, sandboxId);
     const github = githubRepository(metadata);
     const git = gitRepository(metadata);
     const platform = repositoryPlatform(metadata);

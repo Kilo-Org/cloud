@@ -475,6 +475,8 @@ describe('GitTokenRPCEntrypoint.getTokenForRepo', () => {
   });
 });
 
+const outboundContainerId = 'outbound-container-1';
+
 describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -498,6 +500,7 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
     const result = await createService().issueGitHubSessionCapability({
       githubRepo: 'Acme/Repo',
       userId: 'user_1',
+      outboundContainerId,
       allowUserAuthorization: true,
     });
 
@@ -510,7 +513,7 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
       gitAuthor: { name: 'octocat' },
     });
     if (!result.success) throw new Error('Expected successful issuance');
-    expect(result.capability).toMatch(/^kgh1\./);
+    expect(result.capability).toMatch(/^kgh2\./);
     expect(JSON.stringify(result)).not.toContain('user-token');
     expect(result).not.toHaveProperty('githubToken');
   });
@@ -519,6 +522,7 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
     const result = await createService().issueGitHubSessionCapability({
       githubRepo: 'acme/repo',
       userId: 'user_1',
+      outboundContainerId,
     });
 
     expect(result).toMatchObject({ success: true, source: 'installation' });
@@ -540,8 +544,80 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
     );
 
     await expect(
-      service.issueGitHubSessionCapability({ githubRepo: 'acme/repo', userId: 'user_1' })
+      service.issueGitHubSessionCapability({
+        githubRepo: 'acme/repo',
+        userId: 'user_1',
+        outboundContainerId,
+      })
     ).resolves.toEqual({ success: false, reason: 'capability_configuration_error' });
+  });
+
+  it('does not redeem a capability from another outbound container or resolve authorization', async () => {
+    const service = createService();
+    const issued = await service.issueGitHubSessionCapability({
+      githubRepo: 'acme/repo',
+      userId: 'user_1',
+      outboundContainerId,
+    });
+    if (!issued.success) throw new Error('Expected successful issuance');
+    serviceMocks.findManagedInstallationForRepo.mockClear();
+    serviceMocks.getTokenForRepo.mockClear();
+
+    await expect(
+      service.redeemGitHubSessionCapability({
+        capability: issued.capability,
+        outboundContainerId: 'another-outbound-container',
+        requestMethod: 'GET',
+        requestUrl: 'https://github.com/acme/repo.git/info/refs?service=git-upload-pack',
+      })
+    ).resolves.toEqual({ success: false, reason: 'container_mismatch' });
+    expect(serviceMocks.findManagedInstallationForRepo).not.toHaveBeenCalled();
+    expect(serviceMocks.getTokenForRepo).not.toHaveBeenCalled();
+  });
+
+  it('does not redeem a bound capability without an outbound container or resolve authorization', async () => {
+    const service = createService();
+    const issued = await service.issueGitHubSessionCapability({
+      githubRepo: 'acme/repo',
+      userId: 'user_1',
+      outboundContainerId,
+    });
+    if (!issued.success) throw new Error('Expected successful issuance');
+    serviceMocks.findManagedInstallationForRepo.mockClear();
+    serviceMocks.getTokenForRepo.mockClear();
+
+    await expect(
+      service.redeemGitHubSessionCapability({
+        capability: issued.capability,
+        requestMethod: 'GET',
+        requestUrl: 'https://github.com/acme/repo.git/info/refs?service=git-upload-pack',
+      })
+    ).resolves.toEqual({ success: false, reason: 'container_mismatch' });
+    expect(serviceMocks.findManagedInstallationForRepo).not.toHaveBeenCalled();
+    expect(serviceMocks.getTokenForRepo).not.toHaveBeenCalled();
+  });
+
+  it('temporarily issues and redeems a legacy unbound GitHub capability for an old caller', async () => {
+    const service = createService();
+    const issued = await service.issueGitHubSessionCapability({
+      githubRepo: 'acme/repo',
+      userId: 'user_1',
+    });
+    if (!issued.success) throw new Error('Expected successful issuance');
+    expect(issued.capability).toMatch(/^kgh1\./);
+    serviceMocks.getTokenForRepo.mockClear();
+
+    await expect(
+      service.redeemGitHubSessionCapability({
+        capability: issued.capability,
+        requestMethod: 'GET',
+        requestUrl: 'https://github.com/acme/repo.git/info/refs?service=git-upload-pack',
+      })
+    ).resolves.toEqual({
+      success: true,
+      authorization: `Basic ${Buffer.from('x-access-token:installation-token').toString('base64')}`,
+    });
+    expect(serviceMocks.getTokenForRepo).toHaveBeenCalledOnce();
   });
 
   it('rejects tampered capabilities before resolving any upstream authorization', async () => {
@@ -549,6 +625,7 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
     const issued = await service.issueGitHubSessionCapability({
       githubRepo: 'acme/repo',
       userId: 'user_1',
+      outboundContainerId,
     });
     if (!issued.success) throw new Error('Expected successful issuance');
     serviceMocks.findManagedInstallationForRepo.mockClear();
@@ -560,6 +637,7 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
     await expect(
       service.redeemGitHubSessionCapability({
         capability: tamperedCapability,
+        outboundContainerId,
         requestMethod: 'GET',
         requestUrl: 'https://github.com/acme/repo.git/info/refs?service=git-upload-pack',
       })
@@ -580,12 +658,14 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
       const issued = await service.issueGitHubSessionCapability({
         githubRepo: 'Acme/Repo',
         userId: 'user_1',
+        outboundContainerId,
       });
       if (!issued.success) throw new Error('Expected successful issuance');
       serviceMocks.getTokenForRepo.mockClear();
 
       const redemption = await service.redeemGitHubSessionCapability({
         capability: issued.capability,
+        outboundContainerId,
         requestMethod,
         requestUrl,
       });
@@ -604,6 +684,7 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
     const issued = await service.issueGitHubSessionCapability({
       githubRepo: 'acme/repo',
       userId: 'user_1',
+      outboundContainerId,
     });
     if (!issued.success) throw new Error('Expected successful issuance');
     serviceMocks.getTokenForRepo.mockRejectedValueOnce(
@@ -612,6 +693,7 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
 
     const redemption = await service.redeemGitHubSessionCapability({
       capability: issued.capability,
+      outboundContainerId,
       requestMethod: 'GET',
       requestUrl: 'https://github.com/acme/repo.git/info/refs?service=git-upload-pack',
     });
@@ -629,12 +711,14 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
     const issued = await service.issueGitHubSessionCapability({
       githubRepo: 'acme/repo',
       userId: 'user_1',
+      outboundContainerId,
     });
     if (!issued.success) throw new Error('Expected successful issuance');
     serviceMocks.getTokenForRepo.mockClear();
 
     const redemption = await service.redeemGitHubSessionCapability({
       capability: issued.capability,
+      outboundContainerId,
       requestMethod: 'POST',
       requestUrl,
     });
@@ -662,6 +746,7 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
       const issued = await service.issueGitHubSessionCapability({
         githubRepo: 'acme/repo',
         userId: 'user_1',
+        outboundContainerId,
       });
       if (!issued.success) throw new Error('Expected successful issuance');
       serviceMocks.getTokenForRepo.mockClear();
@@ -669,6 +754,7 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
       await expect(
         service.redeemGitHubSessionCapability({
           capability: issued.capability,
+          outboundContainerId,
           requestMethod,
           requestUrl,
         })
@@ -682,6 +768,7 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
     const issued = await service.issueGitHubSessionCapability({
       githubRepo: 'acme/repo',
       userId: 'user_1',
+      outboundContainerId,
       allowUserAuthorization: true,
     });
     if (!issued.success) throw new Error('Expected successful issuance');
@@ -694,6 +781,7 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
 
     const redemption = await service.redeemGitHubSessionCapability({
       capability: issued.capability,
+      outboundContainerId,
       requestMethod: 'GET',
       requestUrl: 'https://api.github.com/user/repos',
     });
@@ -712,6 +800,7 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
       const issued = await service.issueGitHubSessionCapability({
         githubRepo: 'acme/repo',
         userId: 'user_1',
+        outboundContainerId,
         allowUserAuthorization: true,
       });
       if (!issued.success) throw new Error('Expected successful issuance');
@@ -721,6 +810,7 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
       await expect(
         service.redeemGitHubSessionCapability({
           capability: issued.capability,
+          outboundContainerId,
           requestMethod,
           requestUrl,
         })
@@ -771,6 +861,7 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
       const issued = await service.issueGitHubSessionCapability({
         githubRepo: 'acme/repo',
         userId: 'user_1',
+        outboundContainerId,
       });
       if (!issued.success) throw new Error('Expected successful issuance');
       serviceMocks.getTokenForRepo.mockClear();
@@ -778,6 +869,7 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
       await expect(
         service.redeemGitHubSessionCapability({
           capability: issued.capability,
+          outboundContainerId,
           requestMethod,
           requestUrl,
         })
@@ -791,6 +883,7 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
     const issued = await service.issueGitHubSessionCapability({
       githubRepo: 'acme/repo',
       userId: 'user_1',
+      outboundContainerId,
       allowUserAuthorization: true,
     });
     if (!issued.success) throw new Error('Expected successful issuance');
@@ -803,6 +896,7 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
     await expect(
       service.redeemGitHubSessionCapability({
         capability: issued.capability,
+        outboundContainerId,
         requestMethod: 'GET',
         requestUrl: 'https://api.github.com/repos/acme/repo',
       })
@@ -815,6 +909,7 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
     const issued = await service.issueGitHubSessionCapability({
       githubRepo: 'acme/repo',
       userId: 'user_1',
+      outboundContainerId,
       allowUserAuthorization: true,
     });
     if (!issued.success) throw new Error('Expected successful issuance');
@@ -827,6 +922,7 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
     await expect(
       service.redeemGitHubSessionCapability({
         capability: issued.capability,
+        outboundContainerId,
         requestMethod: 'GET',
         requestUrl: 'https://api.github.com/user/repos',
       })
@@ -838,6 +934,7 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
     const issued = await service.issueGitHubSessionCapability({
       githubRepo: 'acme/repo',
       userId: 'user_1',
+      outboundContainerId,
     });
     if (!issued.success) throw new Error('Expected successful issuance');
     serviceMocks.findManagedInstallationForRepo.mockResolvedValueOnce({
@@ -852,6 +949,7 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
     await expect(
       service.redeemGitHubSessionCapability({
         capability: issued.capability,
+        outboundContainerId,
         requestMethod: 'GET',
         requestUrl: 'https://github.com/acme/repo.git/info/refs?service=git-upload-pack',
       })
@@ -863,12 +961,14 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
     const issued = await service.issueGitHubSessionCapability({
       githubRepo: 'acme/repo',
       userId: 'user_1',
+      outboundContainerId,
     });
     if (!issued.success) throw new Error('Expected successful issuance');
 
     await expect(
       service.redeemGitHubSessionCapability({
         capability: issued.capability,
+        outboundContainerId,
         requestMethod: 'GET',
         requestUrl: 'https://redirect.example.com/acme/repo.git/info/refs?service=git-upload-pack',
       })
@@ -929,6 +1029,7 @@ describe('GitTokenRPCEntrypoint GitLab session capability RPCs', () => {
       const result = await createService().issueGitLabSessionCapability({
         gitUrl,
         userId: 'user_1',
+        outboundContainerId,
       });
 
       expect(result).toMatchObject({
@@ -941,11 +1042,85 @@ describe('GitTokenRPCEntrypoint GitLab session capability RPCs', () => {
         identity: { accountId: '42', accountLogin: 'octocat' },
       });
       if (!result.success) throw new Error('Expected successful issuance');
-      expect(result.capability).toMatch(/^kgl1\./);
+      expect(result.capability).toMatch(/^kgl2\./);
       expect(JSON.stringify(result)).not.toContain('gitlab-oauth-token');
       expect(result).not.toHaveProperty('token');
     }
   );
+
+  it('does not redeem a capability from another outbound container or resolve its source', async () => {
+    const service = createService();
+    const issued = await service.issueGitLabSessionCapability({
+      gitUrl: 'https://gitlab.com/acme/widgets.git',
+      userId: 'user_1',
+      outboundContainerId,
+    });
+    if (!issued.success) throw new Error('Expected successful issuance');
+    serviceMocks.findGitLabIntegration.mockClear();
+    serviceMocks.getGitLabToken.mockClear();
+
+    await expect(
+      service.redeemGitLabSessionCapability({
+        capability: issued.capability,
+        outboundContainerId: 'another-outbound-container',
+        requestMethod: 'GET',
+        requestUrl: 'https://gitlab.com/api/v4/projects',
+      })
+    ).resolves.toEqual({ success: false, reason: 'container_mismatch' });
+    expect(serviceMocks.findGitLabIntegration).not.toHaveBeenCalled();
+    expect(serviceMocks.getGitLabToken).not.toHaveBeenCalled();
+  });
+
+  it('does not redeem a bound capability without an outbound container or resolve its source', async () => {
+    const service = createService();
+    const issued = await service.issueGitLabSessionCapability({
+      gitUrl: 'https://gitlab.com/acme/widgets.git',
+      userId: 'user_1',
+      outboundContainerId,
+    });
+    if (!issued.success) throw new Error('Expected successful issuance');
+    serviceMocks.findGitLabIntegration.mockClear();
+    serviceMocks.getGitLabToken.mockClear();
+
+    await expect(
+      service.redeemGitLabSessionCapability({
+        capability: issued.capability,
+        requestMethod: 'GET',
+        requestUrl: 'https://gitlab.com/api/v4/projects',
+      })
+    ).resolves.toEqual({ success: false, reason: 'container_mismatch' });
+    expect(serviceMocks.findGitLabIntegration).not.toHaveBeenCalled();
+    expect(serviceMocks.getGitLabToken).not.toHaveBeenCalled();
+  });
+
+  it('temporarily issues and redeems a legacy unbound GitLab capability for an old caller', async () => {
+    const service = createService();
+    const issued = await service.issueGitLabSessionCapability({
+      gitUrl: 'https://gitlab.com/acme/widgets.git',
+      userId: 'user_1',
+    });
+    if (!issued.success) throw new Error('Expected successful issuance');
+    expect(issued.capability).toMatch(/^kgl1\./);
+    serviceMocks.findGitLabIntegration.mockClear();
+    serviceMocks.getGitLabToken.mockResolvedValueOnce({
+      success: true,
+      token: 'refreshed-gitlab-token',
+      instanceUrl: 'https://gitlab.com',
+    });
+
+    await expect(
+      service.redeemGitLabSessionCapability({
+        capability: issued.capability,
+        requestMethod: 'GET',
+        requestUrl: 'https://gitlab.com/api/v4/projects',
+      })
+    ).resolves.toEqual({
+      success: true,
+      headers: { authorization: 'Bearer refreshed-gitlab-token' },
+    });
+    expect(serviceMocks.findGitLabIntegration).toHaveBeenCalledOnce();
+    expect(serviceMocks.getGitLabToken).toHaveBeenCalledTimes(2);
+  });
 
   it('issues an opaque project-source capability for a code-review repository without exposing its token', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ id: 42 })));
@@ -978,6 +1153,7 @@ describe('GitTokenRPCEntrypoint GitLab session capability RPCs', () => {
     const result = await createService().issueGitLabSessionCapability({
       gitUrl: 'https://gitlab.com/acme/widgets.git',
       userId: 'user_1',
+      outboundContainerId,
       createdOnPlatform: 'code-review',
     });
 
@@ -991,7 +1167,7 @@ describe('GitTokenRPCEntrypoint GitLab session capability RPCs', () => {
       glabIsOAuth2: false,
     });
     if (!result.success) throw new Error('Expected successful issuance');
-    expect(result.capability).toMatch(/^kgl1\./);
+    expect(result.capability).toMatch(/^kgl2\./);
     expect(JSON.stringify(result)).not.toContain('project-access-token');
     expect(result).not.toHaveProperty('token');
   });
@@ -1032,6 +1208,7 @@ describe('GitTokenRPCEntrypoint GitLab session capability RPCs', () => {
       const issued = await service.issueGitLabSessionCapability({
         gitUrl: 'https://gitlab.com/acme/widgets.git',
         userId: 'user_1',
+        outboundContainerId,
         createdOnPlatform: 'code-review',
       });
       if (!issued.success) throw new Error('Expected successful issuance');
@@ -1040,6 +1217,7 @@ describe('GitTokenRPCEntrypoint GitLab session capability RPCs', () => {
       await expect(
         service.redeemGitLabSessionCapability({
           capability: issued.capability,
+          outboundContainerId,
           requestMethod,
           requestUrl,
         })
@@ -1071,6 +1249,7 @@ describe('GitTokenRPCEntrypoint GitLab session capability RPCs', () => {
     const issued = await service.issueGitLabSessionCapability({
       gitUrl: 'https://gitlab.com/acme/widgets.git',
       userId: 'user_1',
+      outboundContainerId,
       createdOnPlatform: 'code-review',
     });
     if (!issued.success) throw new Error('Expected successful issuance');
@@ -1085,6 +1264,7 @@ describe('GitTokenRPCEntrypoint GitLab session capability RPCs', () => {
     await expect(
       service.redeemGitLabSessionCapability({
         capability: issued.capability,
+        outboundContainerId,
         requestMethod: 'GET',
         requestUrl: 'https://gitlab.com/api/v4/projects/42/issues',
       })
@@ -1122,6 +1302,7 @@ describe('GitTokenRPCEntrypoint GitLab session capability RPCs', () => {
       const issued = await service.issueGitLabSessionCapability({
         gitUrl: 'https://gitlab.com/acme/widgets.git',
         userId: 'user_1',
+        outboundContainerId,
       });
       if (!issued.success) throw new Error('Expected successful issuance');
       serviceMocks.getGitLabToken.mockResolvedValueOnce({
@@ -1133,6 +1314,7 @@ describe('GitTokenRPCEntrypoint GitLab session capability RPCs', () => {
       await expect(
         service.redeemGitLabSessionCapability({
           capability: issued.capability,
+          outboundContainerId,
           requestMethod,
           requestUrl,
         })
@@ -1177,6 +1359,7 @@ describe('GitTokenRPCEntrypoint GitLab session capability RPCs', () => {
       const issued = await service.issueGitLabSessionCapability({
         gitUrl: 'https://gitlab.example.com/acme/platform/widgets.git',
         userId: 'user_1',
+        outboundContainerId,
       });
       if (!issued.success) throw new Error('Expected successful issuance');
       serviceMocks.getGitLabToken.mockResolvedValueOnce({
@@ -1188,6 +1371,7 @@ describe('GitTokenRPCEntrypoint GitLab session capability RPCs', () => {
       await expect(
         service.redeemGitLabSessionCapability({
           capability: issued.capability,
+          outboundContainerId,
           requestMethod,
           requestUrl,
         })
@@ -1226,6 +1410,7 @@ describe('GitTokenRPCEntrypoint GitLab session capability RPCs', () => {
     const issued = await service.issueGitLabSessionCapability({
       gitUrl: 'https://gitlab.example.com/acme/platform/widgets.git',
       userId: 'user_1',
+      outboundContainerId,
     });
     if (!issued.success) throw new Error('Expected successful issuance');
     serviceMocks.findGitLabIntegration.mockClear();
@@ -1233,6 +1418,7 @@ describe('GitTokenRPCEntrypoint GitLab session capability RPCs', () => {
     await expect(
       service.redeemGitLabSessionCapability({
         capability: issued.capability,
+        outboundContainerId,
         requestMethod: 'GET',
         requestUrl,
       })
@@ -1252,6 +1438,7 @@ describe('GitTokenRPCEntrypoint GitLab session capability RPCs', () => {
       service.issueGitLabSessionCapability({
         gitUrl: 'https://gitlab.com/acme/widgets.git',
         userId: 'user_1',
+        outboundContainerId,
       })
     ).resolves.toEqual({ success: false, reason: 'capability_configuration_error' });
   });
@@ -1274,6 +1461,7 @@ describe('GitTokenRPCEntrypoint GitLab session capability RPCs', () => {
     const result = await createService().issueGitLabSessionCapability({
       gitUrl: 'https://gitlab.com/acme/widgets.git',
       userId: 'user_1',
+      outboundContainerId,
     });
 
     expect(result).toMatchObject({ success: true, authType: 'pat' });
@@ -1294,6 +1482,7 @@ describe('GitTokenRPCEntrypoint GitLab session capability RPCs', () => {
     const issued = await service.issueGitLabSessionCapability({
       gitUrl: 'https://gitlab.com/acme/widgets.git',
       userId: 'user_1',
+      outboundContainerId,
     });
     if (!issued.success) throw new Error('Expected successful issuance');
     serviceMocks.findGitLabIntegration.mockClear();
@@ -1305,6 +1494,7 @@ describe('GitTokenRPCEntrypoint GitLab session capability RPCs', () => {
 
     const result = await service.redeemGitLabSessionCapability({
       capability: issued.capability,
+      outboundContainerId,
       requestMethod,
       requestUrl,
     });
@@ -1345,6 +1535,7 @@ describe('GitTokenRPCEntrypoint GitLab session capability RPCs', () => {
     const issued = await service.issueGitLabSessionCapability({
       gitUrl: 'https://gitlab.com/acme/widgets.git',
       userId: 'user_1',
+      outboundContainerId,
     });
     if (!issued.success) throw new Error('Expected successful issuance');
     serviceMocks.findGitLabIntegration.mockClear();
@@ -1352,6 +1543,7 @@ describe('GitTokenRPCEntrypoint GitLab session capability RPCs', () => {
     await expect(
       service.redeemGitLabSessionCapability({
         capability: issued.capability,
+        outboundContainerId,
         requestMethod,
         requestUrl,
       })
@@ -1364,6 +1556,7 @@ describe('GitTokenRPCEntrypoint GitLab session capability RPCs', () => {
     const issued = await service.issueGitLabSessionCapability({
       gitUrl: 'https://gitlab.com/acme/widgets.git',
       userId: 'user_1',
+      outboundContainerId,
     });
     if (!issued.success) throw new Error('Expected successful issuance');
     serviceMocks.findGitLabIntegration.mockResolvedValueOnce({
@@ -1375,6 +1568,7 @@ describe('GitTokenRPCEntrypoint GitLab session capability RPCs', () => {
     await expect(
       service.redeemGitLabSessionCapability({
         capability: issued.capability,
+        outboundContainerId,
         requestMethod: 'GET',
         requestUrl: 'https://gitlab.com/api/v4/projects',
       })
@@ -1387,6 +1581,7 @@ describe('GitTokenRPCEntrypoint GitLab session capability RPCs', () => {
     const issued = await service.issueGitLabSessionCapability({
       gitUrl: 'https://gitlab.com/acme/widgets.git',
       userId: 'user_1',
+      outboundContainerId,
     });
     if (!issued.success) throw new Error('Expected successful issuance');
     serviceMocks.findGitLabIntegration.mockResolvedValueOnce({
@@ -1401,6 +1596,7 @@ describe('GitTokenRPCEntrypoint GitLab session capability RPCs', () => {
     await expect(
       service.redeemGitLabSessionCapability({
         capability: issued.capability,
+        outboundContainerId,
         requestMethod: 'GET',
         requestUrl: 'https://gitlab.com/api/v4/projects',
       })

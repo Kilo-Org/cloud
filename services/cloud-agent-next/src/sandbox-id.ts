@@ -1,6 +1,8 @@
 import type { SandboxId, Env } from './types.js';
 import type { Sandbox } from '@cloudflare/sandbox';
 
+type SandboxNamespaceEnv = Pick<Env, 'Sandbox' | 'SandboxSmall' | 'SandboxDIND'>;
+
 /**
  * Parses a comma-separated org ID list into a set.
  * Returns an empty set when the value is falsy or blank.
@@ -21,9 +23,16 @@ function parseOrgIdList(raw: string | undefined): Set<string> {
  * - Per-session sandboxes (ses-* prefix) use SandboxSmall
  * - All others use Sandbox
  */
-export function getSandboxNamespace(env: Env, sandboxId: string): DurableObjectNamespace<Sandbox> {
+export function getSandboxNamespace(
+  env: SandboxNamespaceEnv,
+  sandboxId: string
+): DurableObjectNamespace<Sandbox> {
   if (sandboxId.startsWith('dind-')) return env.SandboxDIND;
   return sandboxId.startsWith('ses-') ? env.SandboxSmall : env.Sandbox;
+}
+
+export function getOutboundContainerId(env: SandboxNamespaceEnv, sandboxId: string): string {
+  return getSandboxNamespace(env, sandboxId).idFromName(sandboxId).toString();
 }
 
 async function hashToSandboxId(input: string, prefix: string): Promise<SandboxId> {

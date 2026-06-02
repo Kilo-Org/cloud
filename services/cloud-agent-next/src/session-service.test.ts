@@ -165,7 +165,15 @@ function createSandbox(
 
 function createEnv(metadata?: CloudAgentSessionState | null): PersistenceEnv {
   return {
-    Sandbox: {} as PersistenceEnv['Sandbox'],
+    Sandbox: {
+      idFromName: vi.fn(() => 'sandbox-do-id' as unknown as DurableObjectId),
+    } as unknown as PersistenceEnv['Sandbox'],
+    SandboxSmall: {
+      idFromName: vi.fn(() => 'small-sandbox-do-id' as unknown as DurableObjectId),
+    } as unknown as PersistenceEnv['SandboxSmall'],
+    SandboxDIND: {
+      idFromName: vi.fn(() => 'dind-sandbox-do-id' as unknown as DurableObjectId),
+    } as unknown as PersistenceEnv['SandboxDIND'],
     CLOUD_AGENT_SESSION: {
       idFromName: vi.fn(() => 'do-id' as unknown as DurableObjectId),
       get: vi.fn(() => ({
@@ -202,7 +210,7 @@ function createEnv(metadata?: CloudAgentSessionState | null): PersistenceEnv {
       }),
       issueGitHubSessionCapability: vi.fn().mockResolvedValue({
         success: true,
-        capability: 'kgh1.default',
+        capability: 'kgh2.default',
         installationId: '123',
         accountLogin: 'acme',
         appType: 'standard',
@@ -289,7 +297,7 @@ describe('SessionService.prepareWorkspace', () => {
     tokenMocks.issueCloudAgentGitHubSessionCapability.mockResolvedValue({
       success: true,
       value: {
-        capability: 'kgh1.default',
+        capability: 'kgh2.default',
         installationId: '123',
         accountLogin: 'acme',
         appType: 'standard',
@@ -300,7 +308,7 @@ describe('SessionService.prepareWorkspace', () => {
     tokenMocks.issueCloudAgentGitLabSessionCapability.mockResolvedValue({
       success: true,
       value: {
-        capability: 'kgl1.default',
+        capability: 'kgl2.default',
         instanceOrigin: 'https://gitlab.com',
         instanceHost: 'gitlab.com',
         projectPath: 'acme/repo',
@@ -348,7 +356,7 @@ describe('SessionService.prepareWorkspace', () => {
       session,
       '/workspace/user/sessions/agent_test',
       'https://gitlab.com/acme/repo.git',
-      'kgl1.default',
+      'kgl2.default',
       undefined,
       { platform: 'gitlab' }
     );
@@ -368,7 +376,7 @@ describe('SessionService.prepareWorkspace', () => {
       sessionHome: '/home/agent_test',
       branchName: 'main',
       kiloSessionId: 'kilo-session',
-      gitToken: 'kgl1.default',
+      gitToken: 'kgl2.default',
       gitlabTokenManaged: true,
     });
   });
@@ -667,6 +675,7 @@ describe('SessionService.prepareWorkspace', () => {
       {
         githubRepo: 'acme/repo',
         userId: 'user_test',
+        outboundContainerId: 'sandbox-do-id',
         orgId: undefined,
         allowUserAuthorization: false,
       }
@@ -676,7 +685,7 @@ describe('SessionService.prepareWorkspace', () => {
       session,
       '/workspace/user/sessions/agent_test',
       'https://github.com/acme/repo.git',
-      'kgh1.default'
+      'kgh2.default'
     );
   });
 
@@ -858,7 +867,7 @@ describe('SessionService.prepareWorkspace', () => {
       session,
       '/workspace/user/sessions/agent_test',
       'https://github.com/acme/repo.git',
-      'kgh1.default'
+      'kgh2.default'
     );
   });
 
@@ -893,7 +902,7 @@ describe('SessionService.prepareWorkspace', () => {
       session,
       '/workspace/user/sessions/agent_test',
       'https://gitlab.com/acme/repo.git',
-      'kgl1.default',
+      'kgl2.default',
       'gitlab'
     );
   });
@@ -904,7 +913,7 @@ describe('SessionService.prepareWorkspace', () => {
     tokenMocks.issueCloudAgentGitLabSessionCapability.mockResolvedValueOnce({
       success: true,
       value: {
-        capability: 'kgl1.project',
+        capability: 'kgl2.project',
         gitUrl: 'https://gitlab.com/acme/repo.git',
         instanceOrigin: 'https://gitlab.com',
         instanceHost: 'gitlab.com',
@@ -931,6 +940,7 @@ describe('SessionService.prepareWorkspace', () => {
       {
         gitUrl: 'https://gitlab.com/acme/repo.git',
         userId: 'user_test',
+        outboundContainerId: 'sandbox-do-id',
         orgId: undefined,
         createdOnPlatform: 'code-review',
       }
@@ -940,7 +950,7 @@ describe('SessionService.prepareWorkspace', () => {
       session,
       '/workspace/user/sessions/agent_test',
       'https://gitlab.com/acme/repo.git',
-      'kgl1.project',
+      'kgl2.project',
       'gitlab'
     );
   });
@@ -977,7 +987,7 @@ describe('SessionService.prepareWorkspace', () => {
       session,
       '/workspace/user/sessions/agent_test',
       'https://github.com/acme/repo.git',
-      'kgh1.default'
+      'kgh2.default'
     );
   });
 
@@ -1024,7 +1034,7 @@ describe('SessionService.prepareWorkspace', () => {
       session,
       '/workspace/user/sessions/agent_test',
       'acme/repo',
-      'kgh1.default',
+      'kgh2.default',
       { name: 'kiloconnect[bot]', email: 'bot@example.com' },
       undefined
     );
@@ -1108,7 +1118,7 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     tokenMocks.issueCloudAgentGitHubSessionCapability.mockResolvedValue({
       success: true,
       value: {
-        capability: 'kgh1.default',
+        capability: 'kgh2.default',
         installationId: '123',
         accountLogin: 'acme',
         appType: 'standard',
@@ -1119,7 +1129,7 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     tokenMocks.issueCloudAgentGitLabSessionCapability.mockResolvedValue({
       success: true,
       value: {
-        capability: 'kgl1.default',
+        capability: 'kgl2.default',
         instanceOrigin: 'https://gitlab.com',
         instanceHost: 'gitlab.com',
         projectPath: 'acme/repo',
@@ -1235,11 +1245,29 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     expect(tokenMocks.issueCloudAgentGitLabSessionCapability).toHaveBeenCalled();
     expect(tokenMocks.resolveManagedGitLabToken).not.toHaveBeenCalled();
     expect(result.readyRequest.repo).toMatchObject({
-      token: 'kgl1.default',
+      token: 'kgl2.default',
     });
-    expect(result.readyRequest.materialized.env.GITLAB_TOKEN).toBe('kgl1.default');
+    expect(result.readyRequest.materialized.env.GITLAB_TOKEN).toBe('kgl2.default');
     expect(JSON.stringify(result.readyRequest)).not.toContain('resolved-gitlab-token');
   });
+
+  it.each([
+    ['ses-abcdef', 'small-sandbox-do-id'],
+    ['dind-abcdef', 'dind-sandbox-do-id'],
+  ] as const)(
+    'derives managed capability outboundContainerId for %s through its sandbox namespace',
+    async (sandboxId, outboundContainerId) => {
+      await buildPromptWrapperRequests({
+        ...createMetadata(),
+        workspace: { sandboxId },
+      } satisfies CloudAgentSessionState);
+
+      expect(tokenMocks.issueCloudAgentGitLabSessionCapability).toHaveBeenCalledWith(
+        expect.any(Object),
+        expect.objectContaining({ outboundContainerId })
+      );
+    }
+  );
 
   it('uses managed GitLab capability authentication in DIND devcontainer wrapper readiness', async () => {
     const result = await buildPromptWrapperRequests({
@@ -1254,10 +1282,10 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     expect(tokenMocks.resolveManagedGitLabToken).not.toHaveBeenCalled();
     expect(result.readyRequest.repo).toMatchObject({
       kind: 'git',
-      token: 'kgl1.default',
+      token: 'kgl2.default',
       platform: 'gitlab',
     });
-    expect(result.readyRequest.materialized.env.GITLAB_TOKEN).toBe('kgl1.default');
+    expect(result.readyRequest.materialized.env.GITLAB_TOKEN).toBe('kgl2.default');
     expect(JSON.stringify(result.readyRequest)).not.toContain('resolved-gitlab-token');
   });
 
@@ -1304,9 +1332,9 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     expect(tokenMocks.issueCloudAgentGitLabSessionCapability).toHaveBeenCalled();
     expect(tokenMocks.resolveManagedGitLabToken).not.toHaveBeenCalled();
     expect(result.readyRequest.repo).toMatchObject({
-      token: 'kgl1.default',
+      token: 'kgl2.default',
     });
-    expect(result.readyRequest.materialized.env.GITLAB_TOKEN).toBe('kgl1.default');
+    expect(result.readyRequest.materialized.env.GITLAB_TOKEN).toBe('kgl2.default');
     expect(JSON.stringify(result.readyRequest)).not.toContain('resolved-gitlab-token');
   });
 
@@ -1325,9 +1353,9 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     expect(tokenMocks.issueCloudAgentGitLabSessionCapability).toHaveBeenCalled();
     expect(tokenMocks.resolveManagedGitLabToken).not.toHaveBeenCalled();
     expect(result.readyRequest.repo).toMatchObject({
-      token: 'kgl1.default',
+      token: 'kgl2.default',
     });
-    expect(result.readyRequest.materialized.env.GITLAB_TOKEN).toBe('kgl1.default');
+    expect(result.readyRequest.materialized.env.GITLAB_TOKEN).toBe('kgl2.default');
     expect(JSON.stringify(result.readyRequest)).not.toContain('resolved-gitlab-token');
   });
 
@@ -1349,9 +1377,9 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     expect(tokenMocks.resolveCloudAgentGitHubAuthForRepo).not.toHaveBeenCalled();
     expect(result.readyRequest.repo).toMatchObject({
       kind: 'github',
-      token: 'kgh1.default',
+      token: 'kgh2.default',
     });
-    expect(result.readyRequest.materialized.env.GH_TOKEN).toBe('kgh1.default');
+    expect(result.readyRequest.materialized.env.GH_TOKEN).toBe('kgh2.default');
     expect(JSON.stringify(result.readyRequest)).not.toContain('resolved-gh-token');
   });
 
@@ -1378,9 +1406,9 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     expect(tokenMocks.resolveCloudAgentGitHubAuthForRepo).not.toHaveBeenCalled();
     expect(result.readyRequest.repo).toMatchObject({
       kind: 'github',
-      token: 'kgh1.default',
+      token: 'kgh2.default',
     });
-    expect(result.readyRequest.materialized.env.GH_TOKEN).toBe('kgh1.default');
+    expect(result.readyRequest.materialized.env.GH_TOKEN).toBe('kgh2.default');
     expect(JSON.stringify(result.readyRequest)).not.toContain('resolved-gh-token');
     expect(result.readyRequest.devcontainer).toEqual({ requested: true, resolved: devcontainer });
   });
@@ -1438,7 +1466,7 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
       sessionHome: '/home/agent_test',
       branchName: 'main',
       kiloSessionId: 'kilo-session',
-      gitToken: 'kgl1.default',
+      gitToken: 'kgl2.default',
       gitlabTokenManaged: true,
     });
     expect(tokenMocks.issueCloudAgentGitLabSessionCapability).toHaveBeenCalledWith(
@@ -1446,6 +1474,7 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
       {
         gitUrl: 'https://gitlab.com/acme/repo.git',
         userId: 'user_test',
+        outboundContainerId: 'sandbox-do-id',
         orgId: undefined,
       }
     );
@@ -1464,7 +1493,7 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
       repo: {
         kind: 'git',
         url: 'https://gitlab.com/acme/repo.git',
-        token: 'kgl1.default',
+        token: 'kgl2.default',
         platform: 'gitlab',
       },
       materialized: {
@@ -1478,7 +1507,7 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     expect(result.promptRequest).not.toHaveProperty('materialized');
     expect(result.readyRequest.materialized.env.PUBLIC_VALUE).toBe('visible');
     expect(result.readyRequest.materialized.env.KILOCODE_TOKEN).toBe('kilo-token');
-    expect(result.readyRequest.materialized.env.GITLAB_TOKEN).toBe('kgl1.default');
+    expect(result.readyRequest.materialized.env.GITLAB_TOKEN).toBe('kgl2.default');
     expect(JSON.stringify(result.readyRequest)).not.toContain('resolved-gitlab-token');
     expect(result.readyRequest.materialized.env.GITLAB_HOST).toBe('gitlab.com');
     expect(result.readyRequest.materialized.env.GLAB_IS_OAUTH2).toBe('true');
@@ -1612,7 +1641,7 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     tokenMocks.issueCloudAgentGitHubSessionCapability.mockResolvedValueOnce({
       success: true,
       value: {
-        capability: 'kgh1.selected-user',
+        capability: 'kgh2.selected-user',
         installationId: '123',
         accountLogin: 'acme',
         appType: 'standard',
@@ -1635,6 +1664,7 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
       {
         githubRepo: 'acme/repo',
         userId: 'user_test',
+        outboundContainerId: 'sandbox-do-id',
         orgId: undefined,
         allowUserAuthorization: true,
       }
@@ -1642,10 +1672,10 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     expect(tokenMocks.resolveCloudAgentGitHubAuthForRepo).not.toHaveBeenCalled();
     expect(result.readyRequest.repo).toMatchObject({
       kind: 'github',
-      token: 'kgh1.selected-user',
+      token: 'kgh2.selected-user',
       gitAuthor: { name: 'octocat', email: '1+octocat@users.noreply.github.com' },
     });
-    expect(result.readyRequest.materialized.env.GH_TOKEN).toBe('kgh1.selected-user');
+    expect(result.readyRequest.materialized.env.GH_TOKEN).toBe('kgh2.selected-user');
     expect(JSON.stringify(result.readyRequest)).not.toContain('selected-user-token');
     if (result.type !== 'prompt') throw new Error('Expected prompt delivery request');
     expect(result.promptRequest.finalization?.commitCoAuthor).toEqual({
@@ -1669,6 +1699,7 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
       {
         githubRepo: 'acme/repo',
         userId: 'user_test',
+        outboundContainerId: 'sandbox-do-id',
         orgId: undefined,
         allowUserAuthorization: true,
       }
@@ -1693,6 +1724,7 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
         {
           githubRepo: 'acme/repo',
           userId: 'user_test',
+          outboundContainerId: 'sandbox-do-id',
           orgId: undefined,
           allowUserAuthorization: false,
         }
@@ -1704,7 +1736,7 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     tokenMocks.issueCloudAgentGitHubSessionCapability.mockResolvedValueOnce({
       success: true,
       value: {
-        capability: 'kgh1.installation',
+        capability: 'kgh2.installation',
         installationId: '123',
         accountLogin: 'acme',
         appType: 'standard',
@@ -1726,7 +1758,7 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
 
     expect(result.readyRequest.repo).toMatchObject({
       kind: 'github',
-      token: 'kgh1.installation',
+      token: 'kgh2.installation',
       gitAuthor: {
         name: 'kiloconnect-development[bot]',
         email: '242397087+kiloconnect-development[bot]@users.noreply.github.com',
@@ -1738,7 +1770,7 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     tokenMocks.issueCloudAgentGitHubSessionCapability.mockResolvedValueOnce({
       success: true,
       value: {
-        capability: 'kgh1.selected-user',
+        capability: 'kgh2.selected-user',
         installationId: '123',
         accountLogin: 'acme',
         appType: 'standard',
@@ -1765,7 +1797,7 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     tokenMocks.issueCloudAgentGitLabSessionCapability.mockResolvedValueOnce({
       success: true,
       value: {
-        capability: 'kgl1.self-managed',
+        capability: 'kgl2.self-managed',
         gitUrl: 'https://gitlab.example.com/acme/platform/repo.git',
         instanceOrigin: 'https://gitlab.example.com',
         instanceHost: 'gitlab.example.com',
@@ -1784,7 +1816,7 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     );
 
     expect(result.ready).toMatchObject({
-      gitToken: 'kgl1.self-managed',
+      gitToken: 'kgl2.self-managed',
       gitlabTokenManaged: true,
     });
     expect(tokenMocks.issueCloudAgentGitLabSessionCapability).toHaveBeenCalledWith(
@@ -1792,16 +1824,17 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
       {
         gitUrl: 'https://gitlab.example.com:443/acme/platform/repo',
         userId: 'user_test',
+        outboundContainerId: 'sandbox-do-id',
         orgId: undefined,
       }
     );
     expect(result.readyRequest.repo).toMatchObject({
       kind: 'git',
       url: 'https://gitlab.example.com/acme/platform/repo.git',
-      token: 'kgl1.self-managed',
+      token: 'kgl2.self-managed',
       platform: 'gitlab',
     });
-    expect(result.readyRequest.materialized.env.GITLAB_TOKEN).toBe('kgl1.self-managed');
+    expect(result.readyRequest.materialized.env.GITLAB_TOKEN).toBe('kgl2.self-managed');
     expect(result.readyRequest.materialized.env.GITLAB_HOST).toBe('gitlab.example.com');
     expect(result.readyRequest.materialized.env.GLAB_IS_OAUTH2).toBe('true');
   });
@@ -1818,7 +1851,7 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     );
 
     expect(result.readyRequest.repo).toMatchObject({
-      token: 'kgl1.default',
+      token: 'kgl2.default',
       platform: 'gitlab',
     });
     expect(result.readyRequest.materialized.env.GITLAB_TOKEN).toBe('explicit-profile-token');
@@ -1836,14 +1869,14 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     );
 
     expect(result.ready).toMatchObject({
-      gitToken: 'kgl1.default',
+      gitToken: 'kgl2.default',
       gitlabTokenManaged: true,
     });
     expect(result.readyRequest.repo).toMatchObject({
-      token: 'kgl1.default',
+      token: 'kgl2.default',
       platform: 'gitlab',
     });
-    expect(result.readyRequest.materialized.env.GITLAB_TOKEN).toBe('kgl1.default');
+    expect(result.readyRequest.materialized.env.GITLAB_TOKEN).toBe('kgl2.default');
     expect(result.readyRequest.materialized.env.GITLAB_HOST).toBe('gitlab.com');
     expect(result.readyRequest.materialized.env.GLAB_IS_OAUTH2).toBe('false');
   });
@@ -1852,7 +1885,7 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     tokenMocks.issueCloudAgentGitLabSessionCapability.mockResolvedValueOnce({
       success: true,
       value: {
-        capability: 'kgl1.project',
+        capability: 'kgl2.project',
         gitUrl: 'https://gitlab.com/acme/repo.git',
         instanceOrigin: 'https://gitlab.com',
         instanceHost: 'gitlab.com',
@@ -1870,6 +1903,7 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
       {
         gitUrl: 'https://gitlab.com/acme/repo.git',
         userId: 'user_test',
+        outboundContainerId: 'sandbox-do-id',
         orgId: undefined,
         createdOnPlatform: 'code-review',
       }
@@ -1877,11 +1911,11 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     expect(tokenMocks.resolveManagedGitLabToken).not.toHaveBeenCalled();
     expect(result.readyRequest.repo).toMatchObject({
       kind: 'git',
-      token: 'kgl1.project',
+      token: 'kgl2.project',
       platform: 'gitlab',
       refreshRemote: true,
     });
-    expect(result.readyRequest.materialized.env.GITLAB_TOKEN).toBe('kgl1.project');
+    expect(result.readyRequest.materialized.env.GITLAB_TOKEN).toBe('kgl2.project');
     expect(result.readyRequest.materialized.env.GLAB_IS_OAUTH2).toBe('false');
     expect(JSON.stringify(result.readyRequest)).not.toContain('resolved-project-token');
   });
@@ -1890,7 +1924,7 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     tokenMocks.issueCloudAgentGitLabSessionCapability.mockResolvedValueOnce({
       success: true,
       value: {
-        capability: 'kgl1.project',
+        capability: 'kgl2.project',
         gitUrl: 'https://gitlab.com/acme/repo.git',
         instanceOrigin: 'https://gitlab.com',
         instanceHost: 'gitlab.com',
@@ -1915,7 +1949,7 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     const result = await buildPromptWrapperRequests(metadata);
 
     expect(tokenMocks.resolveManagedGitLabToken).not.toHaveBeenCalled();
-    expect(result.readyRequest.materialized.env.GITLAB_TOKEN).toBe('kgl1.project');
+    expect(result.readyRequest.materialized.env.GITLAB_TOKEN).toBe('kgl2.project');
     expect(result.readyRequest.materialized.env.GLAB_IS_OAUTH2).toBe('false');
     expect(result.readyRequest.materialized.env.GITLAB_HOST).toBe('gitlab.com');
     expect(JSON.stringify(result.readyRequest)).not.toContain('configured-human-token');
@@ -1966,6 +2000,7 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
         {
           gitUrl: 'https://gitlab.com/acme/repo.git',
           userId: 'user_test',
+          outboundContainerId: 'sandbox-do-id',
           orgId: undefined,
           createdOnPlatform: 'code-review',
         }

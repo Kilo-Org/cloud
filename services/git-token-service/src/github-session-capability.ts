@@ -2,9 +2,9 @@ import { decryptWithSymmetricKey, encryptWithSymmetricKey } from '@kilocode/encr
 import { Buffer } from 'node:buffer';
 import { z } from 'zod';
 
-const CAPABILITY_PREFIX = 'kgh1.';
+const LEGACY_CAPABILITY_PREFIX = 'kgh1.';
+const BOUND_CAPABILITY_PREFIX = 'kgh2.';
 const CAPABILITY_PURPOSE = 'github_scm_session';
-const CAPABILITY_VERSION = 1;
 const MAX_GITHUB_SCM_SESSION_CAPABILITY_LIFETIME_MS = 60 * 60 * 1000;
 const GitHubPathPartSchema = z
   .string()
@@ -29,20 +29,29 @@ const GitHubSessionIdentitySchema = z
     commitCoAuthor: GitAuthorSchema.optional(),
   })
   .strict();
+const GitHubSessionCapabilityClaimsBaseSchema = z.object({
+  purpose: z.literal(CAPABILITY_PURPOSE),
+  userId: z.string().min(1),
+  orgId: z.string().uuid().optional(),
+  owner: GitHubPathPartSchema,
+  repo: GitHubPathPartSchema,
+  source: z.enum(['user', 'installation']),
+  identity: GitHubSessionIdentitySchema,
+  issuedAt: z.number().int().nonnegative(),
+  expiresAt: z.number().int().positive(),
+});
+const GitHubLegacySessionCapabilityClaimsSchema = GitHubSessionCapabilityClaimsBaseSchema.extend({
+  version: z.literal(1),
+}).strict();
+const GitHubBoundSessionCapabilityClaimsSchema = GitHubSessionCapabilityClaimsBaseSchema.extend({
+  version: z.literal(2),
+  outboundContainerId: z.string().min(1),
+}).strict();
 const GitHubSessionCapabilityClaimsSchema = z
-  .object({
-    purpose: z.literal(CAPABILITY_PURPOSE),
-    version: z.literal(CAPABILITY_VERSION),
-    userId: z.string().min(1),
-    orgId: z.string().uuid().optional(),
-    owner: GitHubPathPartSchema,
-    repo: GitHubPathPartSchema,
-    source: z.enum(['user', 'installation']),
-    identity: GitHubSessionIdentitySchema,
-    issuedAt: z.number().int().nonnegative(),
-    expiresAt: z.number().int().positive(),
-  })
-  .strict()
+  .discriminatedUnion('version', [
+    GitHubLegacySessionCapabilityClaimsSchema,
+    GitHubBoundSessionCapabilityClaimsSchema,
+  ])
   .refine(claims => claims.expiresAt > claims.issuedAt)
   .refine(
     claims => claims.expiresAt - claims.issuedAt <= MAX_GITHUB_SCM_SESSION_CAPABILITY_LIFETIME_MS
@@ -52,6 +61,7 @@ export type GitHubAuthSource = 'user' | 'installation';
 export type GitHubSessionIdentity = z.infer<typeof GitHubSessionIdentitySchema>;
 export type GitHubSessionCapabilitySubject = {
   userId: string;
+  outboundContainerId?: string;
   orgId?: string;
   owner: string;
   repo: string;
@@ -107,9 +117,10 @@ export class GitHubSessionCapabilityCodec {
 
   issue(subject: GitHubSessionCapabilitySubject): string {
     const issuedAt = Date.now();
+    const bound = subject.outboundContainerId !== undefined;
     const parsed = GitHubSessionCapabilityClaimsSchema.safeParse({
       purpose: CAPABILITY_PURPOSE,
-      version: CAPABILITY_VERSION,
+      version: bound ? 2 : 1,
       ...subject,
       issuedAt,
       expiresAt: issuedAt + MAX_GITHUB_SCM_SESSION_CAPABILITY_LIFETIME_MS,
@@ -117,21 +128,22 @@ export class GitHubSessionCapabilityCodec {
     if (!parsed.success) throw new GitHubSessionCapabilityError('invalid_capability');
 
     try {
-      return `${CAPABILITY_PREFIX}${encryptWithSymmetricKey(
-        JSON.stringify(parsed.data),
-        this.encryptionKey
-      )}`;
+      const prefix = bound ? BOUND_CAPABILITY_PREFIX : LEGACY_CAPABILITY_PREFIX;
+      return `${prefix}${encryptWithSymmetricKey(JSON.stringify(parsed.data), this.encryptionKey)}`;
     } catch {
       throw new GitHubSessionCapabilityError('capability_configuration_error');
     }
   }
 
   decode(capability: string): GitHubSessionCapabilityClaims {
-    if (!capability.startsWith(CAPABILITY_PREFIX)) {
-      throw new GitHubSessionCapabilityError('invalid_capability');
-    }
+    const format = capability.startsWith(LEGACY_CAPABILITY_PREFIX)
+      ? { prefix: LEGACY_CAPABILITY_PREFIX, version: 1 as const }
+      : capability.startsWith(BOUND_CAPABILITY_PREFIX)
+        ? { prefix: BOUND_CAPABILITY_PREFIX, version: 2 as const }
+        : null;
+    if (!format) throw new GitHubSessionCapabilityError('invalid_capability');
 
-    const encrypted = capability.slice(CAPABILITY_PREFIX.length);
+    const encrypted = capability.slice(format.prefix.length);
     if (!hasCanonicalEncryptedValueFormat(encrypted)) {
       throw new GitHubSessionCapabilityError('invalid_capability');
     }
@@ -149,7 +161,9 @@ export class GitHubSessionCapabilityCodec {
       throw new GitHubSessionCapabilityError('invalid_capability');
     }
     const parsed = GitHubSessionCapabilityClaimsSchema.safeParse(value);
-    if (!parsed.success) throw new GitHubSessionCapabilityError('invalid_capability');
+    if (!parsed.success || parsed.data.version !== format.version) {
+      throw new GitHubSessionCapabilityError('invalid_capability');
+    }
     if (parsed.data.expiresAt <= Date.now()) {
       throw new GitHubSessionCapabilityError('expired_capability');
     }

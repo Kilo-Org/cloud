@@ -182,6 +182,7 @@ type RedeemGitHubSessionCapabilityResult =
         | 'invalid_capability'
         | 'expired_capability'
         | 'capability_configuration_error'
+        | 'container_mismatch'
         | 'invalid_upstream_url'
         | 'upstream_host_not_allowed'
         | 'repository_mismatch'
@@ -249,6 +250,7 @@ type RedeemGitLabSessionCapabilityResult =
         | 'invalid_capability'
         | 'expired_capability'
         | 'capability_configuration_error'
+        | 'container_mismatch'
         | 'invalid_upstream_url'
         | 'upstream_origin_not_allowed'
         | 'repository_mismatch'
@@ -268,10 +270,11 @@ export type GitTokenService = {
     params: ManagedGitHubAuthParams
   ): Promise<GetCloudAgentAuthForRepoResult>;
   issueGitHubSessionCapability(
-    params: ManagedGitHubAuthParams
+    params: ManagedGitHubAuthParams & { outboundContainerId: string }
   ): Promise<IssueGitHubSessionCapabilityResult>;
   redeemGitHubSessionCapability(params: {
     capability: string;
+    outboundContainerId: string;
     requestMethod: string;
     requestUrl: string;
   }): Promise<RedeemGitHubSessionCapabilityResult>;
@@ -284,11 +287,13 @@ export type GitTokenService = {
   issueGitLabSessionCapability(params: {
     gitUrl: string;
     userId: string;
+    outboundContainerId: string;
     orgId?: string;
     createdOnPlatform?: string;
   }): Promise<IssueGitLabSessionCapabilityResult>;
   redeemGitLabSessionCapability(params: {
     capability: string;
+    outboundContainerId: string;
     requestMethod: string;
     requestUrl: string;
   }): Promise<RedeemGitLabSessionCapabilityResult>;

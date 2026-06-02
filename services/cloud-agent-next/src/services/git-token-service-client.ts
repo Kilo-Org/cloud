@@ -192,6 +192,7 @@ export async function issueCloudAgentGitHubSessionCapability(
   params: {
     githubRepo: string;
     userId: string;
+    outboundContainerId: string;
     orgId?: string;
     allowUserAuthorization: boolean;
   }
@@ -270,7 +271,13 @@ export type ResolveManagedGitLabTokenResult =
 
 export async function issueCloudAgentGitLabSessionCapability(
   env: GitTokenServiceEnv,
-  params: { gitUrl: string; userId: string; orgId?: string; createdOnPlatform?: string }
+  params: {
+    gitUrl: string;
+    userId: string;
+    outboundContainerId: string;
+    orgId?: string;
+    createdOnPlatform?: string;
+  }
 ): Promise<
   { success: true; value: ResolvedCloudAgentGitLabCapability } | { success: false; reason: string }
 > {

@@ -90,7 +90,9 @@ export type GetCloudAgentAuthForRepoResult =
   | GetCloudAgentAuthForRepoSuccess
   | GetTokenForRepoFailure;
 
-export type IssueGitHubSessionCapabilityParams = GetCloudAgentAuthForRepoParams;
+export type IssueGitHubSessionCapabilityParams = GetCloudAgentAuthForRepoParams & {
+  outboundContainerId?: string;
+};
 export type IssueGitHubSessionCapabilitySuccess = Omit<
   GetCloudAgentAuthForRepoSuccess,
   'githubToken'
@@ -104,6 +106,7 @@ export type IssueGitHubSessionCapabilityResult =
 
 export type RedeemGitHubSessionCapabilityParams = {
   capability: string;
+  outboundContainerId?: string;
   requestMethod: string;
   requestUrl: string;
 };
@@ -113,6 +116,7 @@ export type RedeemGitHubSessionCapabilitySuccess = {
 };
 export type RedeemGitHubSessionCapabilityFailureReason =
   | GitHubSessionCapabilityFailureReason
+  | 'container_mismatch'
   | 'invalid_upstream_url'
   | 'upstream_host_not_allowed'
   | 'repository_mismatch'
@@ -125,6 +129,7 @@ export type RedeemGitHubSessionCapabilityResult =
 
 export type IssueGitLabSessionCapabilityParams = GetGitLabTokenParams & {
   gitUrl: string;
+  outboundContainerId?: string;
 };
 export type IssueGitLabSessionCapabilitySuccess = {
   success: true;
@@ -144,11 +149,13 @@ export type IssueGitLabSessionCapabilityResult =
   | { success: false; reason: GitLabCloneUrlFailureReason | 'capability_configuration_error' };
 export type RedeemGitLabSessionCapabilityParams = {
   capability: string;
+  outboundContainerId?: string;
   requestMethod: string;
   requestUrl: string;
 };
 export type RedeemGitLabSessionCapabilityFailureReason =
   | GitLabSessionCapabilityFailureReason
+  | 'container_mismatch'
   | 'invalid_upstream_url'
   | 'upstream_origin_not_allowed'
   | 'repository_mismatch'
@@ -477,6 +484,9 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
       const encryptionKey = await resolveSecret(this.env.SCM_SESSION_CAPABILITY_ENCRYPTION_KEY);
       capability = new GitHubSessionCapabilityCodec(encryptionKey).issue({
         userId: params.userId,
+        ...(params.outboundContainerId !== undefined
+          ? { outboundContainerId: params.outboundContainerId }
+          : {}),
         ...(params.orgId !== undefined ? { orgId: params.orgId } : {}),
         ...repository,
         source: auth.source,
@@ -510,6 +520,10 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
         return { success: false, reason: error.reason };
       }
       return { success: false, reason: 'capability_configuration_error' };
+    }
+
+    if (claims.version === 2 && claims.outboundContainerId !== params.outboundContainerId) {
+      return { success: false, reason: 'container_mismatch' };
     }
 
     const upstreamFailure = validateGitHubCapabilityUpstream(
@@ -670,6 +684,9 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
       const encryptionKey = await resolveSecret(this.env.SCM_SESSION_CAPABILITY_ENCRYPTION_KEY);
       capability = new GitLabSessionCapabilityCodec(encryptionKey).issue({
         userId: params.userId,
+        ...(params.outboundContainerId !== undefined
+          ? { outboundContainerId: params.outboundContainerId }
+          : {}),
         ...(params.orgId !== undefined ? { orgId: params.orgId } : {}),
         integrationId: integration.integrationId,
         instanceOrigin: repository.instanceOrigin,
@@ -707,6 +724,10 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
         return { success: false, reason: error.reason };
       }
       return { success: false, reason: 'capability_configuration_error' };
+    }
+
+    if (claims.version === 2 && claims.outboundContainerId !== params.outboundContainerId) {
+      return { success: false, reason: 'container_mismatch' };
     }
 
     const upstream = validateGitLabCapabilityUpstream(

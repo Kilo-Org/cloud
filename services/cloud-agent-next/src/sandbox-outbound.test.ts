@@ -20,8 +20,11 @@ import {
   handleManagedScmOutbound,
 } from './sandbox-outbound.js';
 
-const CAPABILITY = 'kgh1.opaque';
-const GITLAB_CAPABILITY = 'kgl1.opaque';
+const CAPABILITY = 'kgh2.opaque';
+const LEGACY_CAPABILITY = 'kgh1.opaque';
+const GITLAB_CAPABILITY = 'kgl2.opaque';
+const LEGACY_GITLAB_CAPABILITY = 'kgl1.opaque';
+const OUTBOUND_CONTEXT = { containerId: 'container-test', className: 'Sandbox' };
 const REDEEMED_GIT_AUTHORIZATION = `Basic ${Buffer.from('x-access-token:upstream-token').toString('base64')}`;
 const REDEEMED_GITLAB_AUTHORIZATION = `Basic ${Buffer.from('oauth2:upstream-token').toString('base64')}`;
 
@@ -36,6 +39,10 @@ function createEnv(
   return {
     GIT_TOKEN_SERVICE: { redeemGitHubSessionCapability, redeemGitLabSessionCapability },
   } as never;
+}
+
+function handleOutbound(request: Request, env: Cloudflare.Env): Promise<Response> {
+  return handleManagedScmOutbound(request, env, OUTBOUND_CONTEXT);
 }
 
 describe('managed GitHub sandbox outbound configuration', () => {
@@ -110,10 +117,11 @@ describe('handleManagedScmOutbound', () => {
       body: 'git-body',
     });
 
-    await handleManagedScmOutbound(request, createEnv(redeemGitHubSessionCapability));
+    await handleOutbound(request, createEnv(redeemGitHubSessionCapability));
 
     expect(redeemGitHubSessionCapability).toHaveBeenCalledWith({
       capability: CAPABILITY,
+      outboundContainerId: OUTBOUND_CONTEXT.containerId,
       requestMethod: 'POST',
       requestUrl: 'https://github.com/acme/repo.git/git-receive-pack',
     });
@@ -132,7 +140,7 @@ describe('handleManagedScmOutbound', () => {
     const forward = vi.fn();
     vi.stubGlobal('fetch', forward);
 
-    const response = await handleManagedScmOutbound(
+    const response = await handleOutbound(
       new Request('https://github.com/acme/repo.git/info/refs?service=git-upload-pack', {
         headers: { Authorization: basicCredential(CAPABILITY, 'bAsIc') },
       }),
@@ -141,6 +149,7 @@ describe('handleManagedScmOutbound', () => {
 
     expect(redeemGitHubSessionCapability).toHaveBeenCalledWith({
       capability: CAPABILITY,
+      outboundContainerId: OUTBOUND_CONTEXT.containerId,
       requestMethod: 'GET',
       requestUrl: 'https://github.com/acme/repo.git/info/refs?service=git-upload-pack',
     });
@@ -154,7 +163,7 @@ describe('handleManagedScmOutbound', () => {
     vi.stubGlobal('fetch', forward);
     const authorization = basicCredential('explicit-profile-token');
 
-    await handleManagedScmOutbound(
+    await handleOutbound(
       new Request('https://github.com/acme/repo.git/info/refs?service=git-upload-pack', {
         headers: { Authorization: authorization },
       }),
@@ -166,7 +175,7 @@ describe('handleManagedScmOutbound', () => {
     expect(forwarded.headers.get('Authorization')).toBe(authorization);
     expect(forwarded.redirect).toBe('follow');
 
-    await handleManagedScmOutbound(
+    await handleOutbound(
       new Request('https://github.com/acme/repo.git/info/refs?service=git-upload-pack', {
         headers: { Authorization: 'Basic %not-base64%' },
       }),
@@ -183,7 +192,7 @@ describe('handleManagedScmOutbound', () => {
     const forward = vi.fn().mockResolvedValue(new Response('forwarded'));
     vi.stubGlobal('fetch', forward);
 
-    await handleManagedScmOutbound(
+    await handleOutbound(
       new Request('https://github.com/acme/repo.git/info/lfs/objects/batch', {
         method: 'POST',
         headers: { Authorization: basicCredential(CAPABILITY) },
@@ -194,6 +203,7 @@ describe('handleManagedScmOutbound', () => {
 
     expect(redeemGitHubSessionCapability).toHaveBeenCalledWith({
       capability: CAPABILITY,
+      outboundContainerId: OUTBOUND_CONTEXT.containerId,
       requestMethod: 'POST',
       requestUrl: 'https://github.com/acme/repo.git/info/lfs/objects/batch',
     });
@@ -211,10 +221,48 @@ describe('handleManagedScmOutbound', () => {
       headers: { Authorization: 'Bearer explicit-profile-token' },
     });
 
-    await handleManagedScmOutbound(request, createEnv(redeemGitHubSessionCapability));
+    await handleOutbound(request, createEnv(redeemGitHubSessionCapability));
 
     expect(redeemGitHubSessionCapability).not.toHaveBeenCalled();
     expect(forward).toHaveBeenCalledWith(request);
+  });
+
+  it('continues redeeming legacy capabilities during staged rollout', async () => {
+    const redeemGitHubSessionCapability = vi.fn().mockResolvedValue({
+      success: false,
+      reason: 'invalid_capability',
+    });
+    const redeemGitLabSessionCapability = vi.fn().mockResolvedValue({
+      success: false,
+      reason: 'invalid_capability',
+    });
+    const env = createEnv(redeemGitHubSessionCapability, redeemGitLabSessionCapability);
+
+    await handleOutbound(
+      new Request('https://github.com/acme/repo.git/info/refs?service=git-upload-pack', {
+        headers: { Authorization: basicCredential(LEGACY_CAPABILITY) },
+      }),
+      env
+    );
+    await handleOutbound(
+      new Request('https://gitlab.com/api/v4/projects', {
+        headers: { Authorization: `Bearer ${LEGACY_GITLAB_CAPABILITY}` },
+      }),
+      env
+    );
+
+    expect(redeemGitHubSessionCapability).toHaveBeenCalledWith({
+      capability: LEGACY_CAPABILITY,
+      outboundContainerId: OUTBOUND_CONTEXT.containerId,
+      requestMethod: 'GET',
+      requestUrl: 'https://github.com/acme/repo.git/info/refs?service=git-upload-pack',
+    });
+    expect(redeemGitLabSessionCapability).toHaveBeenCalledWith({
+      capability: LEGACY_GITLAB_CAPABILITY,
+      outboundContainerId: OUTBOUND_CONTEXT.containerId,
+      requestMethod: 'GET',
+      requestUrl: 'https://gitlab.com/api/v4/projects',
+    });
   });
 
   it.each([
@@ -228,7 +276,7 @@ describe('handleManagedScmOutbound', () => {
       const forward = vi.fn();
       vi.stubGlobal('fetch', forward);
 
-      const response = await handleManagedScmOutbound(
+      const response = await handleOutbound(
         new Request('https://example.com/resource', { headers: { Authorization: authorization } }),
         createEnv(redeemGitHubSessionCapability, redeemGitLabSessionCapability)
       );
@@ -246,7 +294,7 @@ describe('handleManagedScmOutbound', () => {
     const forward = vi.fn();
     vi.stubGlobal('fetch', forward);
 
-    const response = await handleManagedScmOutbound(
+    const response = await handleOutbound(
       new Request('https://example.com/resource', {
         headers: { 'PRIVATE-TOKEN': ` \t${CAPABILITY}\t ` },
       }),
@@ -267,7 +315,7 @@ describe('handleManagedScmOutbound', () => {
     const forward = vi.fn();
     vi.stubGlobal('fetch', forward);
 
-    const response = await handleManagedScmOutbound(
+    const response = await handleOutbound(
       new Request('https://example.com/resource', {
         headers: { Authorization: `Bearer ${CAPABILITY}` },
       }),
@@ -276,6 +324,7 @@ describe('handleManagedScmOutbound', () => {
 
     expect(redeemGitHubSessionCapability).toHaveBeenCalledWith({
       capability: CAPABILITY,
+      outboundContainerId: OUTBOUND_CONTEXT.containerId,
       requestMethod: 'GET',
       requestUrl: 'https://example.com/resource',
     });
@@ -300,13 +349,14 @@ describe('handleManagedScmOutbound', () => {
       const forward = vi.fn();
       vi.stubGlobal('fetch', forward);
 
-      const response = await handleManagedScmOutbound(
+      const response = await handleOutbound(
         new Request('https://example.com/resource', { headers: { Authorization: authorization } }),
         createEnv(redeemGitHubSessionCapability)
       );
 
       expect(redeemGitHubSessionCapability).toHaveBeenCalledWith({
         capability: CAPABILITY,
+        outboundContainerId: OUTBOUND_CONTEXT.containerId,
         requestMethod: 'GET',
         requestUrl: 'https://example.com/resource',
       });
@@ -322,11 +372,11 @@ describe('handleManagedScmOutbound', () => {
       new Request('https://github.com/acme/repo.git/info/refs?service=git-upload-pack', {
         headers: { Authorization: basicCredential(CAPABILITY) },
       });
-    const rejected = await handleManagedScmOutbound(
+    const rejected = await handleOutbound(
       request(),
       createEnv(vi.fn().mockResolvedValue({ success: false, reason: 'expired_capability' }))
     );
-    const thrown = await handleManagedScmOutbound(
+    const thrown = await handleOutbound(
       request(),
       createEnv(vi.fn().mockRejectedValue(new Error('RPC unavailable')))
     );
@@ -355,7 +405,7 @@ describe('handleManagedScmOutbound GitLab authorization', () => {
     ];
 
     for (const [index, url] of urls.entries()) {
-      await handleManagedScmOutbound(
+      await handleOutbound(
         new Request(url, {
           method: index === 0 ? 'GET' : 'POST',
           headers: { Authorization: basicCredential(GITLAB_CAPABILITY, 'bAsIc', 'oauth2') },
@@ -367,11 +417,13 @@ describe('handleManagedScmOutbound GitLab authorization', () => {
 
     expect(redeemGitLabSessionCapability).toHaveBeenNthCalledWith(1, {
       capability: GITLAB_CAPABILITY,
+      outboundContainerId: OUTBOUND_CONTEXT.containerId,
       requestMethod: 'GET',
       requestUrl: urls[0],
     });
     expect(redeemGitLabSessionCapability).toHaveBeenNthCalledWith(2, {
       capability: GITLAB_CAPABILITY,
+      outboundContainerId: OUTBOUND_CONTEXT.containerId,
       requestMethod: 'POST',
       requestUrl: urls[1],
     });
@@ -391,7 +443,7 @@ describe('handleManagedScmOutbound GitLab authorization', () => {
     const forward = vi.fn().mockResolvedValue(new Response('forwarded'));
     vi.stubGlobal('fetch', forward);
 
-    await handleManagedScmOutbound(
+    await handleOutbound(
       new Request('https://gitlab.com/api/v4/projects/1/merge_requests', {
         method: 'POST',
         headers: { [name]: value },
@@ -402,6 +454,7 @@ describe('handleManagedScmOutbound GitLab authorization', () => {
 
     expect(redeemGitLabSessionCapability).toHaveBeenCalledWith({
       capability: GITLAB_CAPABILITY,
+      outboundContainerId: OUTBOUND_CONTEXT.containerId,
       requestMethod: 'POST',
       requestUrl: 'https://gitlab.com/api/v4/projects/1/merge_requests',
     });
@@ -419,7 +472,7 @@ describe('handleManagedScmOutbound GitLab authorization', () => {
     const forward = vi.fn().mockResolvedValue(new Response('forwarded'));
     vi.stubGlobal('fetch', forward);
 
-    await handleManagedScmOutbound(
+    await handleOutbound(
       new Request('https://gitlab.com/api/v4/projects/42/merge_requests', {
         method: 'POST',
         headers: { 'PRIVATE-TOKEN': GITLAB_CAPABILITY },
@@ -430,6 +483,7 @@ describe('handleManagedScmOutbound GitLab authorization', () => {
 
     expect(redeemGitLabSessionCapability).toHaveBeenCalledWith({
       capability: GITLAB_CAPABILITY,
+      outboundContainerId: OUTBOUND_CONTEXT.containerId,
       requestMethod: 'POST',
       requestUrl: 'https://gitlab.com/api/v4/projects/42/merge_requests',
     });
@@ -445,7 +499,7 @@ describe('handleManagedScmOutbound GitLab authorization', () => {
     const forward = vi.fn();
     vi.stubGlobal('fetch', forward);
 
-    const response = await handleManagedScmOutbound(
+    const response = await handleOutbound(
       new Request('https://gitlab.com/api/v4/user', {
         headers: {
           Authorization: `Bearer ${GITLAB_CAPABILITY}`,
@@ -472,7 +526,7 @@ describe('handleManagedScmOutbound GitLab authorization', () => {
       const forward = vi.fn();
       vi.stubGlobal('fetch', forward);
 
-      const response = await handleManagedScmOutbound(
+      const response = await handleOutbound(
         new Request('https://example.com/resource', { headers: { Authorization: authorization } }),
         createEnv(vi.fn(), redeemGitLabSessionCapability)
       );
@@ -491,7 +545,7 @@ describe('handleManagedScmOutbound GitLab authorization', () => {
     const forward = vi.fn();
     vi.stubGlobal('fetch', forward);
 
-    const response = await handleManagedScmOutbound(
+    const response = await handleOutbound(
       new Request('https://example.com/resource', {
         headers: { Authorization: `Bearer ${GITLAB_CAPABILITY}` },
       }),
@@ -510,14 +564,14 @@ describe('handleManagedScmOutbound GitLab authorization', () => {
         headers: { Authorization: `Bearer ${GITLAB_CAPABILITY}` },
       });
 
-    const rejected = await handleManagedScmOutbound(
+    const rejected = await handleOutbound(
       request(),
       createEnv(
         vi.fn(),
         vi.fn().mockResolvedValue({ success: false, reason: 'invalid_capability' })
       )
     );
-    const thrown = await handleManagedScmOutbound(
+    const thrown = await handleOutbound(
       request(),
       createEnv(vi.fn(), vi.fn().mockRejectedValue(new Error('RPC unavailable')))
     );
@@ -536,7 +590,7 @@ describe('handleManagedScmOutbound GitLab authorization', () => {
     vi.stubGlobal('fetch', forward);
     const request = new Request('https://gitlab.com/api/v4/user', { headers });
 
-    await handleManagedScmOutbound(request, createEnv(vi.fn(), redeemGitLabSessionCapability));
+    await handleOutbound(request, createEnv(vi.fn(), redeemGitLabSessionCapability));
 
     expect(redeemGitLabSessionCapability).not.toHaveBeenCalled();
     expect(forward).toHaveBeenCalledWith(request);
@@ -558,7 +612,7 @@ describe('handleManagedScmOutbound API authorization', () => {
       const forward = vi.fn().mockResolvedValue(new Response('forwarded'));
       vi.stubGlobal('fetch', forward);
 
-      await handleManagedScmOutbound(
+      await handleOutbound(
         new Request('https://api.github.com/repos/acme/repo/issues/1/comments', {
           method: 'POST',
           headers: { Authorization: `${scheme} ${CAPABILITY}` },
@@ -569,6 +623,7 @@ describe('handleManagedScmOutbound API authorization', () => {
 
       expect(redeemGitHubSessionCapability).toHaveBeenCalledWith({
         capability: CAPABILITY,
+        outboundContainerId: OUTBOUND_CONTEXT.containerId,
         requestMethod: 'POST',
         requestUrl: 'https://api.github.com/repos/acme/repo/issues/1/comments',
       });
@@ -583,7 +638,7 @@ describe('handleManagedScmOutbound API authorization', () => {
     const forward = vi.fn().mockResolvedValue(new Response('forwarded'));
     vi.stubGlobal('fetch', forward);
 
-    await handleManagedScmOutbound(
+    await handleOutbound(
       new Request('https://api.github.com/user', {
         headers: { Authorization: 'token explicit-profile-token' },
       }),
@@ -599,7 +654,7 @@ describe('handleManagedScmOutbound API authorization', () => {
     const forward = vi.fn();
     vi.stubGlobal('fetch', forward);
 
-    const response = await handleManagedScmOutbound(
+    const response = await handleOutbound(
       new Request('https://api.github.com/user', {
         headers: { Authorization: `Bearer ${CAPABILITY}` },
       }),

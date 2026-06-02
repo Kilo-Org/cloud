@@ -2,9 +2,9 @@ import { decryptWithSymmetricKey, encryptWithSymmetricKey } from '@kilocode/encr
 import { z } from 'zod';
 import { hasCanonicalEncryptedValueFormat } from './github-session-capability.js';
 
-const CAPABILITY_PREFIX = 'kgl1.';
+const LEGACY_CAPABILITY_PREFIX = 'kgl1.';
+const BOUND_CAPABILITY_PREFIX = 'kgl2.';
 const CAPABILITY_PURPOSE = 'gitlab_scm_session';
-const CAPABILITY_VERSION = 1;
 const MAX_GITLAB_SCM_SESSION_CAPABILITY_LIFETIME_MS = 60 * 60 * 1000;
 const GitLabProjectPathSchema = z
   .string()
@@ -30,22 +30,31 @@ const GitLabCapabilityCredentialSourceSchema = z.discriminatedUnion('type', [
     })
     .strict(),
 ]);
+const GitLabSessionCapabilityClaimsBaseSchema = z.object({
+  purpose: z.literal(CAPABILITY_PURPOSE),
+  userId: z.string().min(1),
+  orgId: z.string().uuid().optional(),
+  integrationId: z.string().uuid(),
+  instanceOrigin: z.string().url().refine(isCanonicalGitLabInstanceOrigin),
+  projectPath: GitLabProjectPathSchema,
+  authType: z.enum(['oauth', 'pat']),
+  identity: GitLabSessionIdentitySchema,
+  source: GitLabCapabilityCredentialSourceSchema,
+  issuedAt: z.number().int().nonnegative(),
+  expiresAt: z.number().int().positive(),
+});
+const GitLabLegacySessionCapabilityClaimsSchema = GitLabSessionCapabilityClaimsBaseSchema.extend({
+  version: z.literal(1),
+}).strict();
+const GitLabBoundSessionCapabilityClaimsSchema = GitLabSessionCapabilityClaimsBaseSchema.extend({
+  version: z.literal(2),
+  outboundContainerId: z.string().min(1),
+}).strict();
 const GitLabSessionCapabilityClaimsSchema = z
-  .object({
-    purpose: z.literal(CAPABILITY_PURPOSE),
-    version: z.literal(CAPABILITY_VERSION),
-    userId: z.string().min(1),
-    orgId: z.string().uuid().optional(),
-    integrationId: z.string().uuid(),
-    instanceOrigin: z.string().url().refine(isCanonicalGitLabInstanceOrigin),
-    projectPath: GitLabProjectPathSchema,
-    authType: z.enum(['oauth', 'pat']),
-    identity: GitLabSessionIdentitySchema,
-    source: GitLabCapabilityCredentialSourceSchema,
-    issuedAt: z.number().int().nonnegative(),
-    expiresAt: z.number().int().positive(),
-  })
-  .strict()
+  .discriminatedUnion('version', [
+    GitLabLegacySessionCapabilityClaimsSchema,
+    GitLabBoundSessionCapabilityClaimsSchema,
+  ])
   .refine(claims => claims.expiresAt > claims.issuedAt)
   .refine(
     claims => claims.expiresAt - claims.issuedAt <= MAX_GITLAB_SCM_SESSION_CAPABILITY_LIFETIME_MS
@@ -58,6 +67,7 @@ export type GitLabCapabilityCredentialSource = z.infer<
 >;
 export type GitLabSessionCapabilitySubject = {
   userId: string;
+  outboundContainerId?: string;
   orgId?: string;
   integrationId: string;
   instanceOrigin: string;
@@ -179,29 +189,32 @@ export class GitLabSessionCapabilityCodec {
 
   issue(subject: GitLabSessionCapabilitySubject): string {
     const issuedAt = Date.now();
+    const bound = subject.outboundContainerId !== undefined;
     const parsed = GitLabSessionCapabilityClaimsSchema.safeParse({
       purpose: CAPABILITY_PURPOSE,
-      version: CAPABILITY_VERSION,
+      version: bound ? 2 : 1,
       ...subject,
       issuedAt,
       expiresAt: issuedAt + MAX_GITLAB_SCM_SESSION_CAPABILITY_LIFETIME_MS,
     });
     if (!parsed.success) throw new GitLabSessionCapabilityError('invalid_capability');
     try {
-      return `${CAPABILITY_PREFIX}${encryptWithSymmetricKey(
-        JSON.stringify(parsed.data),
-        this.encryptionKey
-      )}`;
+      const prefix = bound ? BOUND_CAPABILITY_PREFIX : LEGACY_CAPABILITY_PREFIX;
+      return `${prefix}${encryptWithSymmetricKey(JSON.stringify(parsed.data), this.encryptionKey)}`;
     } catch {
       throw new GitLabSessionCapabilityError('capability_configuration_error');
     }
   }
 
   decode(capability: string): GitLabSessionCapabilityClaims {
-    if (!capability.startsWith(CAPABILITY_PREFIX)) {
-      throw new GitLabSessionCapabilityError('invalid_capability');
-    }
-    const encrypted = capability.slice(CAPABILITY_PREFIX.length);
+    const format = capability.startsWith(LEGACY_CAPABILITY_PREFIX)
+      ? { prefix: LEGACY_CAPABILITY_PREFIX, version: 1 as const }
+      : capability.startsWith(BOUND_CAPABILITY_PREFIX)
+        ? { prefix: BOUND_CAPABILITY_PREFIX, version: 2 as const }
+        : null;
+    if (!format) throw new GitLabSessionCapabilityError('invalid_capability');
+
+    const encrypted = capability.slice(format.prefix.length);
     if (!hasCanonicalEncryptedValueFormat(encrypted)) {
       throw new GitLabSessionCapabilityError('invalid_capability');
     }
@@ -218,7 +231,9 @@ export class GitLabSessionCapabilityCodec {
       throw new GitLabSessionCapabilityError('invalid_capability');
     }
     const parsed = GitLabSessionCapabilityClaimsSchema.safeParse(value);
-    if (!parsed.success) throw new GitLabSessionCapabilityError('invalid_capability');
+    if (!parsed.success || parsed.data.version !== format.version) {
+      throw new GitLabSessionCapabilityError('invalid_capability');
+    }
     if (parsed.data.expiresAt <= Date.now()) {
       throw new GitLabSessionCapabilityError('expired_capability');
     }

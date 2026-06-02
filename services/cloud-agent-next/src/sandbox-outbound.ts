@@ -2,11 +2,12 @@ import { Buffer } from 'node:buffer';
 import { ContainerProxy, Sandbox as StockSandbox } from '@cloudflare/sandbox';
 import type { GitTokenService } from './types.js';
 
-const GITHUB_CAPABILITY_PREFIX = 'kgh1.';
-const GITLAB_CAPABILITY_PREFIX = 'kgl1.';
+const GITHUB_CAPABILITY_PREFIXES = ['kgh1.', 'kgh2.'];
+const GITLAB_CAPABILITY_PREFIXES = ['kgl1.', 'kgl2.'];
 
 type GitHubTokenRedemptionBinding = Pick<GitTokenService, 'redeemGitHubSessionCapability'>;
 type GitLabTokenRedemptionBinding = Pick<GitTokenService, 'redeemGitLabSessionCapability'>;
+type ManagedScmOutboundContext = { containerId: string };
 type RedeemableAuthorization = { provider: 'github' | 'gitlab'; capability: string };
 type AuthorizationExtraction =
   | { type: 'none' }
@@ -38,8 +39,12 @@ function supportsGitLabSessionCapabilityRedemption(
 }
 
 function identifyCapability(capability: string): RedeemableAuthorization | null {
-  if (capability.startsWith(GITHUB_CAPABILITY_PREFIX)) return { provider: 'github', capability };
-  if (capability.startsWith(GITLAB_CAPABILITY_PREFIX)) return { provider: 'gitlab', capability };
+  if (GITHUB_CAPABILITY_PREFIXES.some(prefix => capability.startsWith(prefix))) {
+    return { provider: 'github', capability };
+  }
+  if (GITLAB_CAPABILITY_PREFIXES.some(prefix => capability.startsWith(prefix))) {
+    return { provider: 'gitlab', capability };
+  }
   return null;
 }
 
@@ -111,7 +116,8 @@ async function forwardRedeemedRequest(
 async function handleManagedGitHubOutbound(
   request: Request,
   env: Cloudflare.Env,
-  capability: { capability: string }
+  capability: { capability: string },
+  outboundContainerId: string
 ): Promise<Response> {
   const tokenService = env.GIT_TOKEN_SERVICE;
   if (!supportsGitHubSessionCapabilityRedemption(tokenService)) {
@@ -120,6 +126,7 @@ async function handleManagedGitHubOutbound(
   try {
     const result = await tokenService.redeemGitHubSessionCapability({
       capability: capability.capability,
+      outboundContainerId,
       requestMethod: request.method,
       requestUrl: request.url,
     });
@@ -135,7 +142,8 @@ async function handleManagedGitHubOutbound(
 async function handleManagedGitLabOutbound(
   request: Request,
   env: Cloudflare.Env,
-  capability: { capability: string }
+  capability: { capability: string },
+  outboundContainerId: string
 ): Promise<Response> {
   const tokenService = env.GIT_TOKEN_SERVICE;
   if (!supportsGitLabSessionCapabilityRedemption(tokenService)) {
@@ -144,6 +152,7 @@ async function handleManagedGitLabOutbound(
   try {
     const result = await tokenService.redeemGitLabSessionCapability({
       capability: capability.capability,
+      outboundContainerId,
       requestMethod: request.method,
       requestUrl: request.url,
     });
@@ -156,7 +165,11 @@ async function handleManagedGitLabOutbound(
   }
 }
 
-export function handleManagedScmOutbound(request: Request, env: Cloudflare.Env): Promise<Response> {
+export function handleManagedScmOutbound(
+  request: Request,
+  env: Cloudflare.Env,
+  ctx: ManagedScmOutboundContext
+): Promise<Response> {
   const authorization = request.headers.get('Authorization');
   const gitCapability = extractGitCapability(authorization);
   const apiCapability = extractApiCapability(authorization);
@@ -189,8 +202,8 @@ export function handleManagedScmOutbound(request: Request, env: Cloudflare.Env):
   const capability = authorizationCapability ?? gitLabPrivateTokenCapability;
   if (!capability) return fetch(request);
   return capability.provider === 'github'
-    ? handleManagedGitHubOutbound(request, env, capability)
-    : handleManagedGitLabOutbound(request, env, capability);
+    ? handleManagedGitHubOutbound(request, env, capability, ctx.containerId)
+    : handleManagedGitLabOutbound(request, env, capability, ctx.containerId);
 }
 
 export class Sandbox extends StockSandbox<Cloudflare.Env> {

@@ -9,6 +9,7 @@ const encryptionKey = Buffer.alloc(32, 7).toString('base64');
 const anotherEncryptionKey = Buffer.alloc(32, 8).toString('base64');
 const claims = {
   userId: 'user_1',
+  outboundContainerId: 'outbound-container-1',
   orgId: 'ef2eb5c7-27ce-4f43-b6d3-8f282abc145b',
   owner: 'acme',
   repo: 'widgets',
@@ -34,13 +35,14 @@ describe('GitHubSessionCapabilityCodec', () => {
     const capability = codec.issue(claims);
     const decoded = codec.decode(capability);
 
-    expect(capability).toMatch(/^kgh1\./);
+    expect(capability).toMatch(/^kgh2\./);
     expect(capability).not.toContain('user_1');
     expect(capability).not.toContain('acme');
     expect(decoded).toEqual({
       purpose: 'github_scm_session',
-      version: 1,
+      version: 2,
       userId: 'user_1',
+      outboundContainerId: claims.outboundContainerId,
       orgId: claims.orgId,
       owner: 'acme',
       repo: 'widgets',
@@ -50,6 +52,22 @@ describe('GitHubSessionCapabilityCodec', () => {
       expiresAt: Date.parse('2026-05-30T13:00:00.000Z'),
     });
     vi.useRealTimers();
+  });
+
+  it('produces and decodes a legacy unbound v1 capability when the container is omitted', () => {
+    const codec = new GitHubSessionCapabilityCodec(encryptionKey);
+    const { outboundContainerId: _outboundContainerId, ...legacyClaims } = claims;
+
+    const capability = codec.issue(legacyClaims);
+
+    expect(capability).toMatch(/^kgh1\./);
+    expect(codec.decode(capability)).toMatchObject({
+      version: 1,
+      userId: 'user_1',
+      owner: 'acme',
+      repo: 'widgets',
+    });
+    expect(codec.decode(capability)).not.toHaveProperty('outboundContainerId');
   });
 
   it('rejects expired and tampered capabilities', () => {
@@ -82,13 +100,14 @@ describe('GitHubSessionCapabilityCodec', () => {
   });
 
   it.each([
-    { purpose: 'another_use', version: 1 },
-    { purpose: 'github_scm_session', version: 2 },
-  ])('rejects decrypted claims bound to $purpose purpose and v$version', boundClaims => {
+    ['another purpose', 'kgh2.', { purpose: 'another_use', version: 2 }],
+    ['a v2 claim under the legacy marker', 'kgh1.', { purpose: 'github_scm_session', version: 2 }],
+  ])('rejects decrypted claims with %s', (_description, prefix, boundClaims) => {
     const codec = new GitHubSessionCapabilityCodec(encryptionKey);
     const serializedClaims = JSON.stringify({
       ...boundClaims,
       userId: 'user_1',
+      outboundContainerId: claims.outboundContainerId,
       owner: 'acme',
       repo: 'widgets',
       source: 'installation',
@@ -104,7 +123,7 @@ describe('GitHubSessionCapabilityCodec', () => {
       issuedAt: Date.now(),
       expiresAt: Date.now() + 60_000,
     });
-    const capability = `kgh1.${encryptWithSymmetricKey(serializedClaims, encryptionKey)}`;
+    const capability = `${prefix}${encryptWithSymmetricKey(serializedClaims, encryptionKey)}`;
 
     expect(() => codec.decode(capability)).toThrowError(
       expect.objectContaining({ reason: 'invalid_capability' })

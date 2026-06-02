@@ -112,14 +112,17 @@ async function cloneRepository(
     repo.kind === 'github' ? (repo.gitAuthor?.name ?? 'Kilo Code Cloud') : 'Kilo Code Cloud';
   const authorEmail =
     repo.kind === 'github' ? (repo.gitAuthor?.email ?? 'agent@kilocode.ai') : 'agent@kilocode.ai';
-  await runGit(['config', 'user.name', authorName], {
+  const authorNameResult = await runGit(['config', 'user.name', authorName], {
     cwd: request.workspace.workspacePath,
     timeoutMs: GIT_COMMAND_TIMEOUT_MS,
   });
-  await runGit(['config', 'user.email', authorEmail], {
+  const authorEmailResult = await runGit(['config', 'user.email', authorEmail], {
     cwd: request.workspace.workspacePath,
     timeoutMs: GIT_COMMAND_TIMEOUT_MS,
   });
+  if (authorNameResult.exitCode !== 0 || authorEmailResult.exitCode !== 0) {
+    throw new Error('Failed to configure git author identity');
+  }
 }
 
 async function branchExists(
@@ -232,6 +235,19 @@ async function refreshGitRemoteToken(
   });
   if (result.exitCode !== 0) {
     throw new Error('Failed to update git remote URL');
+  }
+  if (repo.kind === 'github' && repo.gitAuthor) {
+    const nameResult = await runGit(['config', 'user.name', repo.gitAuthor.name], {
+      cwd: request.workspace.workspacePath,
+      timeoutMs: GIT_COMMAND_TIMEOUT_MS,
+    });
+    const emailResult = await runGit(['config', 'user.email', repo.gitAuthor.email], {
+      cwd: request.workspace.workspacePath,
+      timeoutMs: GIT_COMMAND_TIMEOUT_MS,
+    });
+    if (nameResult.exitCode !== 0 || emailResult.exitCode !== 0) {
+      throw new Error('Failed to configure git author identity');
+    }
   }
 }
 

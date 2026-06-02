@@ -5,11 +5,13 @@ import type {
   SandboxId,
   SessionContext,
   SessionId,
+  GitAuthorConfig,
+  ManagedGitHubFallbackReason,
 } from './types.js';
 import { generateSandboxId } from './sandbox-id.js';
 import { normalizeKilocodeModel } from './persistence/model-utils.js';
 import {
-  resolveGitHubTokenForRepo,
+  resolveCloudAgentGitHubAuthForRepo,
   resolveManagedGitLabToken,
 } from './services/git-token-service-client.js';
 import { ExecutionError } from './execution/errors.js';
@@ -23,6 +25,7 @@ import {
   GIT_COMMAND_TIMEOUT_MS,
   manageBranch,
   setupWorkspace,
+  updateGitAuthor,
   updateGitRemoteToken,
 } from './workspace.js';
 import { logger, WithLogTags } from './logger.js';
@@ -332,10 +335,33 @@ export type ResolvedWorkspaceTokens = {
   githubToken?: string;
   githubInstallationId?: string;
   githubAppType?: 'standard' | 'lite';
+  githubSource?: 'user' | 'installation';
+  githubGitAuthor?: GitAuthorConfig;
+  githubCommitCoAuthor?: GitAuthorConfig;
+  githubFallbackReason?: ManagedGitHubFallbackReason;
   gitToken?: string;
   gitlabTokenManaged?: boolean;
   glabIsOAuth2?: boolean;
 };
+
+function installationGitAuthorFromEnv(
+  env: PersistenceEnv,
+  githubAppType: 'standard' | 'lite'
+): GitAuthorConfig | undefined {
+  const slug =
+    githubAppType === 'lite'
+      ? env.GITHUB_LITE_APP_SLUG || env.GITHUB_APP_SLUG
+      : env.GITHUB_APP_SLUG;
+  const userId =
+    githubAppType === 'lite'
+      ? env.GITHUB_LITE_APP_BOT_USER_ID || env.GITHUB_APP_BOT_USER_ID
+      : env.GITHUB_APP_BOT_USER_ID;
+  if (!slug || !userId) return undefined;
+  return {
+    name: `${slug}[bot]`,
+    email: `${userId}+${slug}[bot]@users.noreply.github.com`,
+  };
+}
 
 function parseRestoreScriptOutput(stdout: string | undefined): {
   code?: number;
@@ -1266,29 +1292,33 @@ export class SessionService {
     let githubToken: string | undefined;
     let githubInstallationId = github?.githubInstallationId;
     let githubAppType = github?.githubAppType;
+    let githubSource: 'user' | 'installation' | undefined;
+    let githubGitAuthor: GitAuthorConfig | undefined;
+    let githubCommitCoAuthor: GitAuthorConfig | undefined;
+    let githubFallbackReason: ManagedGitHubFallbackReason | undefined;
 
     if (github) {
-      if (githubInstallationId) {
-        if (!env.GIT_TOKEN_SERVICE) {
-          throw ExecutionError.invalidRequest('Git token service is not configured');
-        }
-        githubAppType = githubAppType ?? 'standard';
-        githubToken = await env.GIT_TOKEN_SERVICE.getToken(githubInstallationId, githubAppType);
+      const result = await resolveCloudAgentGitHubAuthForRepo(env, {
+        githubRepo: github.repo,
+        userId: metadata.identity.userId,
+        orgId: metadata.identity.orgId,
+        allowUserAuthorization:
+          metadata.identity.createdOnPlatform === 'cloud-agent-web' ||
+          metadata.identity.createdOnPlatform === 'slack',
+      });
+      if (result.success) {
+        githubToken = result.value.githubToken;
+        githubInstallationId = result.value.installationId;
+        githubAppType = result.value.appType;
+        githubSource = result.value.source;
+        githubGitAuthor =
+          result.value.gitAuthor ?? installationGitAuthorFromEnv(env, result.value.appType);
+        githubCommitCoAuthor = result.value.commitCoAuthor;
+        githubFallbackReason = result.value.fallbackReason;
       } else {
-        const result = await resolveGitHubTokenForRepo(env, {
-          githubRepo: github.repo,
-          userId: metadata.identity.userId,
-          orgId: metadata.identity.orgId,
-        });
-        if (result.success) {
-          githubToken = result.value.token;
-          githubInstallationId = result.value.installationId;
-          githubAppType = result.value.appType;
-        } else {
-          throw ExecutionError.invalidRequest(
-            `GitHub token or active app installation required for this repository (${result.error.reason})`
-          );
-        }
+        throw ExecutionError.invalidRequest(
+          `GitHub token or active app installation required for this repository (${result.error.reason})`
+        );
       }
     }
 
@@ -1329,6 +1359,10 @@ export class SessionService {
       githubToken,
       githubInstallationId,
       githubAppType,
+      githubSource,
+      githubGitAuthor,
+      githubCommitCoAuthor,
+      githubFallbackReason,
       gitToken,
       gitlabTokenManaged,
       glabIsOAuth2,
@@ -1423,7 +1457,7 @@ export class SessionService {
       ...(metadata.devcontainer ? { devcontainer: metadata.devcontainer } : {}),
     } satisfies WrapperWorkspaceReady;
 
-    const repo = this.buildWrapperRepoSource(env, metadata, resolvedTokens);
+    const repo = this.buildWrapperRepoSource(metadata, resolvedTokens);
     const session = buildWrapperSessionBinding({
       workerUrl: env.WORKER_URL,
       kilocodeToken: metadata.auth.kilocodeToken,
@@ -1494,6 +1528,9 @@ export class SessionService {
         ...(finalization?.condenseOnComplete !== undefined
           ? { condenseOnComplete: finalization.condenseOnComplete }
           : {}),
+        ...(resolvedTokens.githubCommitCoAuthor
+          ? { commitCoAuthor: resolvedTokens.githubCommitCoAuthor }
+          : {}),
         session,
       };
       return { type: 'command', readyRequest, commandRequest, ready, context };
@@ -1510,14 +1547,19 @@ export class SessionService {
         model: { modelID: agent.model },
         ...(agent.variant ? { variant: agent.variant } : {}),
       },
-      ...(finalization?.autoCommit !== undefined || finalization?.condenseOnComplete !== undefined
+      ...(finalization?.autoCommit !== undefined ||
+      finalization?.condenseOnComplete !== undefined ||
+      resolvedTokens.githubCommitCoAuthor
         ? {
             finalization: {
-              ...(finalization.autoCommit !== undefined
+              ...(finalization?.autoCommit !== undefined
                 ? { autoCommit: finalization.autoCommit }
                 : {}),
-              ...(finalization.condenseOnComplete !== undefined
+              ...(finalization?.condenseOnComplete !== undefined
                 ? { condenseOnComplete: finalization.condenseOnComplete }
+                : {}),
+              ...(resolvedTokens.githubCommitCoAuthor
+                ? { commitCoAuthor: resolvedTokens.githubCommitCoAuthor }
                 : {}),
             },
           }
@@ -1529,7 +1571,6 @@ export class SessionService {
   }
 
   private buildWrapperRepoSource(
-    env: PersistenceEnv,
     metadata: CloudAgentSessionState,
     tokens: ResolvedWorkspaceTokens
   ): WrapperBootstrapRepoSource | undefined {
@@ -1549,14 +1590,6 @@ export class SessionService {
 
     const github = githubRepository(metadata);
     if (github) {
-      const authorEnv = getGitAuthorEnv(env, tokens.githubAppType ?? github.githubAppType);
-      const gitAuthor =
-        authorEnv.GITHUB_APP_SLUG && authorEnv.GITHUB_APP_BOT_USER_ID
-          ? {
-              name: `${authorEnv.GITHUB_APP_SLUG}[bot]`,
-              email: `${authorEnv.GITHUB_APP_BOT_USER_ID}+${authorEnv.GITHUB_APP_SLUG}[bot]@users.noreply.github.com`,
-            }
-          : undefined;
       return {
         kind: 'github',
         repo: github.repo,
@@ -1564,7 +1597,7 @@ export class SessionService {
         ...(repositoryShallow(metadata) !== undefined
           ? { shallow: repositoryShallow(metadata) }
           : {}),
-        ...(gitAuthor ? { gitAuthor } : {}),
+        ...(tokens.githubGitAuthor ? { gitAuthor: tokens.githubGitAuthor } : {}),
         refreshRemote: tokens.githubInstallationId !== undefined,
       };
     }
@@ -1726,7 +1759,7 @@ export class SessionService {
     let dockerEnv: Record<string, string> | undefined;
     try {
       onProgress?.('cloning', 'Cloning repository…');
-      await this.cloneRepository(env, session, workspacePath, metadata, resolvedTokens);
+      await this.cloneRepository(session, workspacePath, metadata, resolvedTokens);
 
       onProgress?.('branch', 'Setting up branch…');
       await this.prepareBranch(session, workspacePath, branchName, metadata);
@@ -1876,7 +1909,6 @@ export class SessionService {
   }
 
   private async cloneRepository(
-    env: PersistenceEnv,
     session: ExecutionSession,
     workspacePath: string,
     metadata: CloudAgentSessionState,
@@ -1898,7 +1930,7 @@ export class SessionService {
         workspacePath,
         github.repo,
         tokens.githubToken,
-        getGitAuthorEnv(env, tokens.githubAppType ?? github.githubAppType),
+        tokens.githubGitAuthor,
         cloneOptions
       );
       return;
@@ -1970,6 +2002,9 @@ export class SessionService {
           `https://github.com/${github.repo}.git`,
           tokens.githubToken
         );
+        if (tokens.githubGitAuthor) {
+          await updateGitAuthor(session, context.workspacePath, tokens.githubGitAuthor);
+        }
       }
     }
 
@@ -2212,26 +2247,6 @@ export class SessionService {
       throw error;
     }
   }
-}
-
-/**
- * Returns the correct GitHub App slug and bot user ID for git author attribution,
- * based on whether this is a standard or lite app session.
- */
-function getGitAuthorEnv(
-  env: PersistenceEnv,
-  githubAppType?: 'standard' | 'lite'
-): { GITHUB_APP_SLUG?: string; GITHUB_APP_BOT_USER_ID?: string } {
-  if (githubAppType === 'lite') {
-    return {
-      GITHUB_APP_SLUG: env.GITHUB_LITE_APP_SLUG || env.GITHUB_APP_SLUG,
-      GITHUB_APP_BOT_USER_ID: env.GITHUB_LITE_APP_BOT_USER_ID || env.GITHUB_APP_BOT_USER_ID,
-    };
-  }
-  return {
-    GITHUB_APP_SLUG: env.GITHUB_APP_SLUG,
-    GITHUB_APP_BOT_USER_ID: env.GITHUB_APP_BOT_USER_ID,
-  };
 }
 
 export type PreparedSession = {

@@ -35,12 +35,15 @@ export const TOKEN_EXPIRY = {
 /**
  * Generate a short-lived JWT for authenticating with internal Cloudflare Worker services
  * (e.g. session-ingest). Contains only the minimal fields the workers require:
- * kiloUserId and version. Expires in 1 hour.
+ * kiloUserId and version. Defaults to a 1-hour expiry.
  */
-export function generateInternalServiceToken(userId: string): string {
+export function generateInternalServiceToken(
+  userId: string,
+  options?: { expiresIn?: number }
+): string {
   return jwt.sign({ kiloUserId: userId, version: JWT_TOKEN_VERSION }, NEXTAUTH_SECRET, {
     algorithm: jwtSigningAlgorithm,
-    expiresIn: '1h',
+    expiresIn: options?.expiresIn ?? ONE_HOUR_IN_SECONDS,
   });
 }
 

@@ -1926,6 +1926,12 @@ importers:
       '@kilocode/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@kilocode/encryption':
+        specifier: workspace:*
+        version: link:../../packages/encryption
+      '@kilocode/worker-utils':
+        specifier: workspace:*
+        version: link:../../packages/worker-utils
       '@octokit/auth-app':
         specifier: 'catalog:'
         version: 8.2.0

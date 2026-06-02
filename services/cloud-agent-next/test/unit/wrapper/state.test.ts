@@ -514,6 +514,7 @@ describe('WrapperState', () => {
           condenseOnComplete: true,
           model: 'claude-3',
           upstreamBranch: 'main',
+          commitCoAuthor: { name: 'kiloconnect[bot]', email: 'bot@example.com' },
         });
 
         const config = state.activeMessageConfig;
@@ -522,6 +523,7 @@ describe('WrapperState', () => {
           condenseOnComplete: true,
           model: 'claude-3',
           upstreamBranch: 'main',
+          commitCoAuthor: { name: 'kiloconnect[bot]', email: 'bot@example.com' },
         });
       });
 

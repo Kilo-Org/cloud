@@ -53,3 +53,6 @@ export const EXPERIMENTED_PUBLIC_IDS_REDIS_KEY = redisKey(
 
 export const gitLabOAuthCredentialsRedisKey = (credentialRef: string) =>
   redisKey(`auth-credentials:gitlab:${credentialRef}`);
+
+export const githubUserAuthorizationPkceRedisKey = (verifierRef: string) =>
+  redisKey(`auth-pkce:github-user:${verifierRef}`);

@@ -14,6 +14,7 @@ import {
   IssuePayloadSchema,
   PullRequestReviewCommentPayloadSchema,
   PullRequestReviewPayloadSchema,
+  GitHubAppAuthorizationRevokedPayloadSchema,
 } from '@/lib/integrations/platforms/github/webhook-schemas';
 import { findIntegrationByInstallationId } from '@/lib/integrations/db/platform-integrations';
 import {
@@ -35,6 +36,7 @@ import { logExceptInTest } from '@/lib/utils.server';
 import { logWebhookEvent, updateWebhookEvent } from '@/lib/integrations/db/webhook-events';
 import type { Owner } from '@/lib/integrations/core/types';
 import type { GitHubAppType } from './app-selector';
+import { revokeStoredGitHubUserAuthorization } from './user-authorization';
 import { redactSensitiveHeaders } from '@kilocode/worker-utils/redact-headers';
 
 /**
@@ -136,6 +138,19 @@ export async function handleGitHubWebhook(
     };
 
     // 5. Route based on event type with type-safe Zod parsing
+
+    if (eventType === GITHUB_EVENT.APP_AUTHORIZATION) {
+      const parseResult = GitHubAppAuthorizationRevokedPayloadSchema.safeParse(payload);
+      if (!parseResult.success) {
+        return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
+      }
+      await revokeStoredGitHubUserAuthorization(
+        parseResult.data.sender.id.toString(),
+        appType,
+        GITHUB_ACTION.REVOKED
+      );
+      return NextResponse.json({ message: 'Authorization revoked' }, { status: 200 });
+    }
 
     // Handle installation events
     if (eventType === GITHUB_EVENT.INSTALLATION) {

@@ -12,6 +12,9 @@ type InstallationRow = {
   platform_account_login: string | null;
   github_app_type: 'standard' | 'lite' | null;
   owned_by_organization_id: string | null;
+  repository_access?: string | null;
+  repositories?: { full_name: string }[] | null;
+  permissions?: Record<string, unknown> | null;
 };
 
 function createDb(rows: InstallationRow[], updatedRows = [{ id: 'integration-1' }]) {
@@ -154,6 +157,34 @@ describe('InstallationLookupService', () => {
       installationId: '100',
       accountLogin: 'renamed-owner',
       githubAppType: 'standard',
+    });
+  });
+
+  it('accepts selected repository metadata with a stale owner after account rename', async () => {
+    const service = createService([
+      {
+        platform_installation_id: '100',
+        platform_account_login: 'renamed-owner',
+        github_app_type: 'standard',
+        owned_by_organization_id: null,
+        repository_access: 'selected',
+        repositories: [{ full_name: 'pre-rename-owner/repository' }],
+        permissions: { contents: 'write', pull_requests: 'write' },
+      },
+    ]);
+
+    const result = await service.findManagedInstallationForRepo({
+      githubRepo: 'renamed-owner/repository',
+      userId: 'user-1',
+    });
+
+    expect(result).toEqual({
+      success: true,
+      installationId: '100',
+      accountLogin: 'renamed-owner',
+      githubAppType: 'standard',
+      repoName: 'repository',
+      permissions: { contents: 'write', pull_requests: 'write' },
     });
   });
 

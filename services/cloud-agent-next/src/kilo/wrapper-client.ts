@@ -1047,6 +1047,10 @@ export class WrapperClient {
     return this.request<WrapperSessionReadySuccessResponse>('POST', '/session/ready', request);
   }
 
+  async updateRuntimeEnvironment(env: Record<string, string>): Promise<void> {
+    await this.request<{ status: 'updated' }>('POST', '/session/environment', { env });
+  }
+
   // ---------------------------------------------------------------------------
   // Action Methods (synchronous, no inflight tracking)
   // ---------------------------------------------------------------------------

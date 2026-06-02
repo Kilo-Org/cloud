@@ -17,6 +17,7 @@ import {
 } from './sandbox-timeout-logging.js';
 import { withTimeout } from '@kilocode/worker-utils';
 import { isSandboxInternalServerError } from './sandbox-recovery.js';
+import { shellQuote } from './kilo/utils.js';
 import {
   isSandboxFilesystemUnusableError,
   SandboxCapacityInspectionError,
@@ -695,21 +696,10 @@ export async function cloneGitHubRepo(
   workspacePath: string,
   githubRepo: string,
   githubToken?: string,
-  env?: { GITHUB_APP_SLUG?: string; GITHUB_APP_BOT_USER_ID?: string },
+  gitAuthor?: GitAuthorConfig,
   options?: { shallow?: boolean }
 ): Promise<void> {
-  // Convert GitHub repo format (org/repo) to full HTTPS URL and delegate to cloneGitRepo
   const gitUrl = `https://github.com/${githubRepo}.git`;
-
-  // Build git author config from GitHub App environment variables
-  let gitAuthor: GitAuthorConfig | undefined;
-  if (env?.GITHUB_APP_SLUG && env?.GITHUB_APP_BOT_USER_ID) {
-    gitAuthor = {
-      name: `${env.GITHUB_APP_SLUG}[bot]`,
-      email: `${env.GITHUB_APP_BOT_USER_ID}+${env.GITHUB_APP_SLUG}[bot]@users.noreply.github.com`,
-    };
-  }
-
   await cloneGitRepo(session, workspacePath, gitUrl, githubToken, gitAuthor, options);
 }
 
@@ -766,18 +756,10 @@ export async function cloneGitRepo(
       throw new Error(`gitCheckout failed with exit code ${result.exitCode ?? 'unknown'}`);
     }
 
-    const authorName = gitAuthor?.name ?? 'Kilo Code Cloud';
-    const authorEmail = gitAuthor?.email ?? 'agent@kilocode.ai';
-
-    await timedExec(
+    await updateGitAuthor(
       session,
-      `cd ${workspacePath} && git config user.name "${authorName}"`,
-      'git.config.userName'
-    );
-    await timedExec(
-      session,
-      `cd ${workspacePath} && git config user.email "${authorEmail}"`,
-      'git.config.userEmail'
+      workspacePath,
+      gitAuthor ?? { name: 'Kilo Code Cloud', email: 'agent@kilocode.ai' }
     );
 
     logger.info('Successfully cloned generic git repository');
@@ -819,7 +801,7 @@ export type RestoreWorkspaceOptions = {
   githubToken?: string;
   gitUrl?: string;
   gitToken?: string;
-  gitAuthorEnv?: { GITHUB_APP_SLUG?: string; GITHUB_APP_BOT_USER_ID?: string };
+  gitAuthor?: GitAuthorConfig;
   lastSeenBranch?: string;
   platform?: 'github' | 'gitlab';
 };
@@ -840,7 +822,7 @@ export async function restoreWorkspace(
       workspacePath,
       options.githubRepo,
       options.githubToken,
-      options.gitAuthorEnv
+      options.gitAuthor
     );
   } else {
     throw new Error('No repository source provided for workspace restore');
@@ -848,6 +830,28 @@ export async function restoreWorkspace(
 
   const targetBranchName = options.lastSeenBranch ?? branchName;
   await manageBranch(session, workspacePath, targetBranchName, false);
+}
+
+export async function updateGitAuthor(
+  session: ExecutionSession,
+  workspacePath: string,
+  gitAuthor: GitAuthorConfig
+): Promise<void> {
+  const nameResult = await timedExec(
+    session,
+    `git config user.name ${shellQuote(gitAuthor.name)}`,
+    'git.config.userName',
+    { cwd: workspacePath }
+  );
+  const emailResult = await timedExec(
+    session,
+    `git config user.email ${shellQuote(gitAuthor.email)}`,
+    'git.config.userEmail',
+    { cwd: workspacePath }
+  );
+  if (nameResult.exitCode !== 0 || emailResult.exitCode !== 0) {
+    throw new Error('Failed to configure git author identity');
+  }
 }
 
 /**

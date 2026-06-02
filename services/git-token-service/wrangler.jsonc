@@ -7,6 +7,13 @@
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": false,
   "preview_urls": false,
+  "routes": [{ "pattern": "git-token-service.kilosessions.ai", "custom_domain": true }],
+  "vars": {
+    "GITHUB_APP_SLUG": "kiloconnect",
+    "GITHUB_APP_BOT_USER_ID": "240665456",
+    "GITHUB_LITE_APP_SLUG": "kiloconnect-lite",
+    "GITHUB_LITE_APP_BOT_USER_ID": "257753004",
+  },
   "observability": {
     "enabled": true,
   },
@@ -24,12 +31,25 @@
       "localConnectionString": "postgres://postgres:postgres@localhost:5432/postgres",
     },
   ],
+  "secrets_store_secrets": [
+    {
+      "binding": "NEXTAUTH_SECRET",
+      "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+      "secret_name": "NEXTAUTH_SECRET_PROD",
+    },
+  ],
   "dev": {
     "port": 8802,
   },
   "env": {
     "dev": {
       "name": "git-token-service-dev",
+      "vars": {
+        "GITHUB_APP_SLUG": "kiloconnect-development",
+        "GITHUB_APP_BOT_USER_ID": "242397087",
+        "GITHUB_LITE_APP_SLUG": "",
+        "GITHUB_LITE_APP_BOT_USER_ID": "",
+      },
       "kv_namespaces": [
         {
           "binding": "TOKEN_CACHE",
@@ -41,6 +61,13 @@
           "binding": "HYPERDRIVE",
           "id": "624ec80650dd414199349f4e217ddb10",
           "localConnectionString": "postgres://postgres:postgres@localhost:5432/postgres",
+        },
+      ],
+      "secrets_store_secrets": [
+        {
+          "binding": "NEXTAUTH_SECRET",
+          "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+          "secret_name": "NEXTAUTH_SECRET_DEV",
         },
       ],
     },

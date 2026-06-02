@@ -13,6 +13,7 @@
  */
 
 import type { IngestEvent } from '../../src/shared/protocol.js';
+import type { WrapperCommitCoAuthor } from '../../src/shared/wrapper-bootstrap.js';
 import type { LogUploader } from './log-uploader.js';
 export type { LogUploader } from './log-uploader.js';
 
@@ -41,6 +42,7 @@ export type MessageInfo = {
   condenseOnComplete: boolean;
   model?: string;
   upstreamBranch?: string;
+  commitCoAuthor?: WrapperCommitCoAuthor;
 };
 
 export type LastError = {
@@ -92,6 +94,7 @@ export class WrapperState {
     condenseOnComplete: boolean;
     model?: string;
     upstreamBranch?: string;
+    commitCoAuthor?: WrapperCommitCoAuthor;
   } | null = null;
 
   // Callbacks for sending events to ingest
@@ -339,6 +342,7 @@ export class WrapperState {
       condenseOnComplete: boolean;
       model?: string;
       upstreamBranch?: string;
+      commitCoAuthor?: WrapperCommitCoAuthor;
     }
   ): void {
     const info: MessageInfo = {
@@ -429,6 +433,7 @@ export class WrapperState {
     condenseOnComplete: boolean;
     model?: string;
     upstreamBranch?: string;
+    commitCoAuthor?: WrapperCommitCoAuthor;
   } | null {
     if (!this._activeMessageId) return null;
     const info = this.messages.get(this._activeMessageId);
@@ -438,6 +443,7 @@ export class WrapperState {
       condenseOnComplete: info.condenseOnComplete,
       model: info.model,
       upstreamBranch: info.upstreamBranch,
+      ...(info.commitCoAuthor ? { commitCoAuthor: info.commitCoAuthor } : {}),
     };
   }
 
@@ -446,6 +452,7 @@ export class WrapperState {
     condenseOnComplete: boolean;
     model?: string;
     upstreamBranch?: string;
+    commitCoAuthor?: WrapperCommitCoAuthor;
   } | null {
     return this._completedMessageConfig;
   }
@@ -455,6 +462,7 @@ export class WrapperState {
     condenseOnComplete: boolean;
     model?: string;
     upstreamBranch?: string;
+    commitCoAuthor?: WrapperCommitCoAuthor;
   }): void {
     this._completedMessageConfig = config;
   }
@@ -468,6 +476,7 @@ export class WrapperState {
     condenseOnComplete: boolean;
     model?: string;
     upstreamBranch?: string;
+    commitCoAuthor?: WrapperCommitCoAuthor;
   } | null {
     const info = this.messages.get(messageId);
     if (!info) return null;
@@ -476,6 +485,7 @@ export class WrapperState {
       condenseOnComplete: info.condenseOnComplete,
       model: info.model,
       upstreamBranch: info.upstreamBranch,
+      ...(info.commitCoAuthor ? { commitCoAuthor: info.commitCoAuthor } : {}),
     };
   }
 
@@ -486,6 +496,7 @@ export class WrapperState {
       condenseOnComplete?: boolean;
       model?: string;
       upstreamBranch?: string;
+      commitCoAuthor?: WrapperCommitCoAuthor;
     }
   ): void {
     const info = this.messages.get(messageId);
@@ -495,6 +506,7 @@ export class WrapperState {
       info.condenseOnComplete = config.condenseOnComplete;
     if (config.model !== undefined) info.model = config.model;
     if (config.upstreamBranch !== undefined) info.upstreamBranch = config.upstreamBranch;
+    if (config.commitCoAuthor !== undefined) info.commitCoAuthor = config.commitCoAuthor;
   }
 
   removeMessage(messageId: string): void {

@@ -1,11 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { GitTokenService } from '../types.js';
-import { resolveManagedGitLabToken } from './git-token-service-client.js';
+import {
+  resolveCloudAgentGitHubAuthForRepo,
+  resolveManagedGitLabToken,
+} from './git-token-service-client.js';
 
 vi.mock('../logger.js', () => ({
   logger: {
     info: vi.fn(),
-    withFields: vi.fn(() => ({ info: vi.fn(), error: vi.fn() })),
+    withFields: vi.fn(() => ({ info: vi.fn(), error: vi.fn(), warn: vi.fn() })),
   },
 }));
 
@@ -15,6 +18,10 @@ function createGitTokenService() {
     getToken: vi.fn(),
     getGitLabToken: vi.fn(),
   } satisfies GitTokenService;
+}
+
+function createEnv(service: Partial<GitTokenService>) {
+  return { GIT_TOKEN_SERVICE: service as GitTokenService };
 }
 
 describe('resolveManagedGitLabToken', () => {
@@ -70,6 +77,105 @@ describe('resolveManagedGitLabToken', () => {
     await expect(resolveManagedGitLabToken({}, reviewParams)).resolves.toEqual({
       success: false,
       reason: 'service_not_configured',
+    });
+  });
+});
+
+describe('resolveCloudAgentGitHubAuthForRepo', () => {
+  it('passes explicit user-auth eligibility to the managed resolver when it is available', async () => {
+    const getCloudAgentAuthForRepo = vi.fn().mockResolvedValue({
+      success: true,
+      githubToken: 'user-token',
+      installationId: '123',
+      accountLogin: 'acme',
+      appType: 'standard',
+      source: 'user',
+      gitAuthor: { name: 'octocat', email: '101+octocat@users.noreply.github.com' },
+      commitCoAuthor: { name: 'kiloconnect[bot]', email: 'bot@example.com' },
+    });
+    const getTokenForRepo = vi.fn();
+
+    const result = await resolveCloudAgentGitHubAuthForRepo(
+      createEnv({ getCloudAgentAuthForRepo, getTokenForRepo }),
+      { githubRepo: 'acme/repo', userId: 'user_1', allowUserAuthorization: true }
+    );
+
+    expect(getCloudAgentAuthForRepo).toHaveBeenCalledWith({
+      githubRepo: 'acme/repo',
+      userId: 'user_1',
+      allowUserAuthorization: true,
+    });
+    expect(getTokenForRepo).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      success: true,
+      value: { source: 'user', githubToken: 'user-token' },
+    });
+  });
+
+  it('passes through sanitized credential fallback reasons on successful installation auth', async () => {
+    const getCloudAgentAuthForRepo = vi.fn().mockResolvedValue({
+      success: true,
+      githubToken: 'installation-token',
+      installationId: '123',
+      accountLogin: 'acme',
+      appType: 'standard',
+      source: 'installation',
+      gitAuthor: { name: 'kiloconnect[bot]', email: 'bot@example.com' },
+      fallbackReason: 'credential_unreadable',
+    });
+    const getTokenForRepo = vi.fn();
+
+    const result = await resolveCloudAgentGitHubAuthForRepo(
+      createEnv({ getCloudAgentAuthForRepo, getTokenForRepo }),
+      { githubRepo: 'acme/repo', userId: 'user_1', allowUserAuthorization: true }
+    );
+
+    expect(getTokenForRepo).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      success: true,
+      value: {
+        githubToken: 'installation-token',
+        installationId: '123',
+        accountLogin: 'acme',
+        appType: 'standard',
+        source: 'installation',
+        gitAuthor: { name: 'kiloconnect[bot]', email: 'bot@example.com' },
+        fallbackReason: 'credential_unreadable',
+      },
+    });
+  });
+
+  it('falls back to installation authentication when an older service rejects the managed RPC', async () => {
+    const getCloudAgentAuthForRepo = vi
+      .fn()
+      .mockRejectedValue(new Error('RPC method getCloudAgentAuthForRepo is not available'));
+    const getTokenForRepo = vi.fn().mockResolvedValue({
+      success: true,
+      token: 'installation-token',
+      installationId: '123',
+      accountLogin: 'acme',
+      appType: 'standard',
+    });
+
+    const result = await resolveCloudAgentGitHubAuthForRepo(
+      createEnv({ getCloudAgentAuthForRepo, getTokenForRepo }),
+      { githubRepo: 'acme/repo', userId: 'user_1', allowUserAuthorization: true }
+    );
+
+    expect(getCloudAgentAuthForRepo).toHaveBeenCalledWith({
+      githubRepo: 'acme/repo',
+      userId: 'user_1',
+      allowUserAuthorization: true,
+    });
+    expect(getTokenForRepo).toHaveBeenCalledWith({ githubRepo: 'acme/repo', userId: 'user_1' });
+    expect(result).toMatchObject({
+      success: true,
+      value: {
+        githubToken: 'installation-token',
+        installationId: '123',
+        appType: 'standard',
+        source: 'installation',
+      },
     });
   });
 });

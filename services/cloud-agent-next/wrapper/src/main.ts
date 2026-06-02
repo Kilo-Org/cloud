@@ -260,6 +260,7 @@ async function main() {
     resetLifecycle: () => lifecycleManager?.reset(),
     onMessageComplete: (messageId: string) => lifecycleManager?.onMessageComplete(messageId),
     readySession: readySession,
+    updateRuntimeEnvironment: updateRuntimeEnvironment,
     materializePromptAttachments,
   };
 
@@ -288,12 +289,13 @@ async function main() {
 
   async function startKiloRuntime(
     workspacePath: string,
-    expectedSessionId?: string
+    expectedSessionId?: string,
+    forceRestart = false
   ): Promise<void> {
     logToFile(
       `startKiloRuntime requested workspacePath=${workspacePath} expectedSessionId=${expectedSessionId ?? '(none)'} currentSessionId=${kiloSessionId || '(unset)'} hasClient=${Boolean(kiloClient)} runtimeWorkspacePath=${runtimeWorkspacePath ?? '(unset)'} home=${process.env.HOME ?? '(unset)'}`
     );
-    if (kiloClient && runtimeWorkspacePath === workspacePath) {
+    if (!forceRestart && kiloClient && runtimeWorkspacePath === workspacePath) {
       if (expectedSessionId && expectedSessionId !== kiloSessionId) {
         await verifyExistingKiloSession(kiloClient, expectedSessionId, 'reused', workspacePath);
         kiloSessionId = expectedSessionId;
@@ -316,6 +318,8 @@ async function main() {
       closeKiloServer();
       closeKiloServer = undefined;
     }
+    kiloClient = undefined;
+    serverDeps.kiloClient = unavailableKiloClient;
 
     process.chdir(workspacePath);
     logToFile('starting kilo server in-process via @kilocode/sdk');
@@ -463,6 +467,16 @@ async function main() {
       }
     );
     lifecycleManager.start();
+  }
+
+  async function updateRuntimeEnvironment(env: Record<string, string>): Promise<void> {
+    const environmentChanged = Object.entries(env).some(
+      ([name, value]) => process.env[name] !== value
+    );
+    Object.assign(process.env, env);
+    if (runtimeWorkspacePath && (environmentChanged || !kiloClient)) {
+      await startKiloRuntime(runtimeWorkspacePath, kiloSessionId || undefined, true);
+    }
   }
 
   async function readySession(

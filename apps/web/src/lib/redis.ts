@@ -66,6 +66,18 @@ export async function redisGet(key: RedisKey): Promise<string | null> {
   }
 }
 
+export async function redisGetDel(key: RedisKey): Promise<string | null> {
+  const c = getOrCreateClient();
+  if (!c) return null;
+  try {
+    await withTimeout(ensureConnected(c), CONNECT_TIMEOUT_MS);
+    return await withTimeout(c.getDel(key), COMMAND_TIMEOUT_MS);
+  } catch (err) {
+    captureException(err, { tags: { service: 'redis', operation: 'getdel' }, extra: { key } });
+    throw err;
+  }
+}
+
 /** Returns false if Redis is not configured (REDIS_URL unset). */
 export async function redisSet(
   key: RedisKey,

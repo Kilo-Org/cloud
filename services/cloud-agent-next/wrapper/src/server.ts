@@ -17,10 +17,12 @@ import type { WrapperState, SessionContext } from './state.js';
 import type { WrapperKiloClient, WrapperPtySize } from './kilo-api.js';
 import type { PerTurnConfig } from './lifecycle.js';
 import { createLogUploader } from './log-uploader.js';
+import { configureCommitCoAuthorHook } from './commit-co-author-hook.js';
 import { logToFile } from './utils.js';
 import { materializePromptAttachments as defaultMaterializePromptAttachments } from './session-bootstrap.js';
 import {
   isWrapperSessionReadyRequest,
+  type WrapperCommitCoAuthor,
   type WrapperPromptAgent,
   type WrapperPromptRequest,
   type WrapperSessionReadyRequest,
@@ -64,8 +66,15 @@ export type ServerDependencies = {
   setPerTurnConfig?: (config: PerTurnConfig) => void;
   /** Workspace/Kilo readiness path */
   readySession?: (request: WrapperSessionReadyRequest) => Promise<WrapperSessionReadyResponse>;
+  /** Apply refreshed runtime variables to the active Kilo runtime. */
+  updateRuntimeEnvironment?: (env: Record<string, string>) => Promise<void>;
   /** Materialize signed prompt attachments into local file parts. */
   materializePromptAttachments?: (prompt: WrapperPromptRequest) => Promise<WrapperPromptRequest>;
+  /** Apply Git commit attribution before Kilo may execute git commands. */
+  configureCommitCoAuthor?: (
+    workspacePath: string,
+    commitCoAuthor: WrapperCommitCoAuthor | undefined
+  ) => Promise<void>;
 };
 
 export type SessionBinding = {
@@ -87,6 +96,7 @@ type CommandBody = {
   agent?: WrapperPromptAgent;
   autoCommit?: boolean;
   condenseOnComplete?: boolean;
+  commitCoAuthor?: WrapperCommitCoAuthor;
   session?: SessionBinding;
   execution?: SessionBinding;
 };
@@ -144,6 +154,22 @@ function jsonResponse(data: unknown, status = 200): Response {
 
 function errorResponse(error: string, message: string, status: number): Response {
   return jsonResponse({ error, message }, status);
+}
+
+async function applyCommitAttribution(
+  workspacePath: string,
+  commitCoAuthor: WrapperCommitCoAuthor | undefined,
+  configureCommitCoAuthor: NonNullable<ServerDependencies['configureCommitCoAuthor']>
+): Promise<Response | null> {
+  try {
+    await configureCommitCoAuthor(workspacePath, commitCoAuthor);
+    return null;
+  } catch (error) {
+    logToFile(
+      `commit-co-author: failed to configure git hook: ${error instanceof Error ? error.message : String(error)}`
+    );
+    return errorResponse('SEND_ERROR', 'Failed to configure git commit attribution', 500);
+  }
 }
 
 async function readJsonBody<T>(req: Request, defaultValue: T): Promise<T> {
@@ -365,6 +391,13 @@ export function createPromptHandler(config: ServerConfig, deps: ServerDependenci
       }
     }
 
+    const attributionError = await applyCommitAttribution(
+      config.workspacePath,
+      prompt.finalization?.commitCoAuthor,
+      deps.configureCommitCoAuthor ?? configureCommitCoAuthorHook
+    );
+    if (attributionError) return attributionError;
+
     if (!state.isConnected) {
       try {
         await openConnection();
@@ -381,6 +414,9 @@ export function createPromptHandler(config: ServerConfig, deps: ServerDependenci
       condenseOnComplete: prompt.finalization?.condenseOnComplete ?? false,
       model: prompt.agent?.model?.modelID,
       upstreamBranch: binding?.upstreamBranch,
+      ...(prompt.finalization?.commitCoAuthor
+        ? { commitCoAuthor: prompt.finalization.commitCoAuthor }
+        : {}),
     });
 
     try {
@@ -434,6 +470,13 @@ export function createCommandHandler(config: ServerConfig, deps: ServerDependenc
       return errorResponse('INVALID_REQUEST', 'model is required for compact', 400);
     }
 
+    const attributionError = await applyCommitAttribution(
+      config.workspacePath,
+      body.commitCoAuthor,
+      deps.configureCommitCoAuthor ?? configureCommitCoAuthorHook
+    );
+    if (attributionError) return attributionError;
+
     const binding = body.session ?? body.execution;
     const messageId = body.messageId;
     if (messageId) {
@@ -442,6 +485,7 @@ export function createCommandHandler(config: ServerConfig, deps: ServerDependenc
         condenseOnComplete: body.condenseOnComplete ?? false,
         model: body.agent?.model?.modelID,
         upstreamBranch: binding?.upstreamBranch,
+        ...(body.commitCoAuthor ? { commitCoAuthor: body.commitCoAuthor } : {}),
       });
     }
 
@@ -871,6 +915,50 @@ export function createSessionReadyHandler(deps: ServerDependencies) {
   };
 }
 
+export function createRuntimeEnvironmentHandler(deps: ServerDependencies) {
+  return async (req: Request): Promise<Response> => {
+    if (!deps.updateRuntimeEnvironment) {
+      return errorResponse('NOT_READY', 'Runtime environment updater is not configured', 503);
+    }
+
+    let body: unknown;
+    try {
+      body = await req.json();
+    } catch {
+      return errorResponse('INVALID_REQUEST', 'Invalid JSON body', 400);
+    }
+    if (
+      typeof body !== 'object' ||
+      body === null ||
+      !('env' in body) ||
+      typeof body.env !== 'object' ||
+      body.env === null ||
+      Array.isArray(body.env)
+    ) {
+      return errorResponse('INVALID_REQUEST', 'Invalid runtime environment request', 400);
+    }
+
+    const env: Record<string, string> = {};
+    for (const [name, value] of Object.entries(body.env)) {
+      if (typeof value !== 'string') {
+        return errorResponse('INVALID_REQUEST', 'Invalid runtime environment request', 400);
+      }
+      env[name] = value;
+    }
+
+    try {
+      await deps.updateRuntimeEnvironment(env);
+    } catch {
+      return errorResponse(
+        'RUNTIME_ENVIRONMENT_UPDATE_FAILED',
+        'Failed to update runtime environment',
+        500
+      );
+    }
+    return jsonResponse({ status: 'updated' });
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Server Creation
 // ---------------------------------------------------------------------------
@@ -898,6 +986,7 @@ export function createFetchHandler(
   const abortHandler = createAbortHandler(deps, triggerDrainAndClose);
   const ptyCreateHandler = createPtyCreateHandler(config, deps);
   const sessionReadyHandler = createSessionReadyHandler(deps);
+  const runtimeEnvironmentHandler = createRuntimeEnvironmentHandler(deps);
 
   // Route table
   type RouteHandler = (req: Request) => Response | Promise<Response>;
@@ -915,6 +1004,7 @@ export function createFetchHandler(
       '/job/abort': abortHandler,
       '/pty': ptyCreateHandler,
       '/session/ready': sessionReadyHandler,
+      '/session/environment': runtimeEnvironmentHandler,
     },
   };
 

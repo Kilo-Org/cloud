@@ -30,6 +30,14 @@ export const GitHubSenderSchema = z.object({
   login: z.string(),
 });
 
+export const GitHubAppAuthorizationRevokedPayloadSchema = z.object({
+  action: z.literal('revoked'),
+  sender: z.object({
+    id: z.number(),
+    login: z.string(),
+  }),
+});
+
 // installation.created webhook payload
 export const InstallationCreatedPayloadSchema = z.object({
   action: z.literal('created'),
@@ -288,6 +296,9 @@ export const PullRequestReviewPayloadSchema = z.object({
 });
 
 // Type exports for use in the webhook handler
+export type GitHubAppAuthorizationRevokedPayload = z.infer<
+  typeof GitHubAppAuthorizationRevokedPayloadSchema
+>;
 export type InstallationCreatedPayload = z.infer<typeof InstallationCreatedPayloadSchema>;
 export type InstallationDeletedPayload = z.infer<typeof InstallationDeletedPayloadSchema>;
 export type InstallationSuspendPayload = z.infer<typeof InstallationSuspendPayloadSchema>;

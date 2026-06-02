@@ -24,6 +24,18 @@ const InstallationRefreshCandidateSchema = InstallationLookupResultSchema.extend
   id: z.string(),
 });
 
+const ManagedInstallationLookupResultSchema = InstallationLookupResultSchema.extend({
+  repository_access: z.string().nullable(),
+  repositories: z
+    .array(
+      z.object({
+        full_name: z.string(),
+      })
+    )
+    .nullable(),
+  permissions: z.record(z.string(), z.unknown()).nullable(),
+});
+
 const MAX_INSTALLATION_LOGIN_REFRESH_CANDIDATES = 10;
 
 export type InstallationLookupSuccess = {
@@ -56,6 +68,16 @@ export type InstallationRefreshCandidatesResult =
   | { success: true; candidates: InstallationRefreshCandidate[] }
   | InstallationLookupFailure;
 
+export type ManagedInstallationLookupSuccess = InstallationLookupSuccess & {
+  repoName: string;
+  permissions: Record<string, unknown> | null;
+};
+
+export type ManagedInstallationLookupResult =
+  | ManagedInstallationLookupSuccess
+  | InstallationLookupFailure
+  | { success: false; reason: 'repository_not_installed' };
+
 function buildAuthorizedInstallationsQuery(
   db: WorkerDb,
   params: FindInstallationParams,
@@ -73,6 +95,9 @@ function buildAuthorizedInstallationsQuery(
       platform_account_login: platform_integrations.platform_account_login,
       github_app_type: platform_integrations.github_app_type,
       owned_by_organization_id: platform_integrations.owned_by_organization_id,
+      repository_access: platform_integrations.repository_access,
+      repositories: platform_integrations.repositories,
+      permissions: platform_integrations.permissions,
     })
     .from(platform_integrations)
     .leftJoin(
@@ -128,23 +153,23 @@ export function buildInstallationRefreshCandidatesQuery(
   );
 }
 
-export class InstallationLookupService {
-  private db: WorkerDb | null = null;
+export function buildManagedInstallationLookupQuery(db: WorkerDb, params: FindInstallationParams) {
+  const [repoOwner = ''] = params.githubRepo.split('/');
+  return buildAuthorizedInstallationsQuery(db, params, repoOwner).limit(2);
+}
 
+export class InstallationLookupService {
   constructor(private env: CloudflareEnv) {}
 
   isConfigured(): boolean {
     return Boolean(this.env.HYPERDRIVE);
   }
 
-  private getDb(): WorkerDb {
-    if (!this.db) {
-      if (!this.env.HYPERDRIVE) {
-        throw new Error('Hyperdrive not configured');
-      }
-      this.db = getWorkerDb(this.env.HYPERDRIVE.connectionString, { statement_timeout: 10_000 });
+  private getDb() {
+    if (!this.env.HYPERDRIVE) {
+      throw new Error('Hyperdrive not configured');
     }
-    return this.db;
+    return getWorkerDb(this.env.HYPERDRIVE.connectionString, { statement_timeout: 10_000 });
   }
 
   private validateParams(params: FindInstallationParams): InstallationLookupFailure | null {
@@ -164,23 +189,13 @@ export class InstallationLookupService {
     return null;
   }
 
-  /**
-   * Find a GitHub App installation ID for a requested repository and user/org context.
-   *
-   * SECURITY: When looking up org installations, we JOIN with organization_memberships
-   * to verify the user is actually a member of the organization. This prevents users
-   * from accessing installations for orgs they don't belong to.
-   *
-   * Prioritizes org installations over user installations.
-   */
   async findInstallationId(params: FindInstallationParams): Promise<InstallationLookupResult> {
     const validationFailure = this.validateParams(params);
     if (validationFailure) {
       return validationFailure;
     }
 
-    const db = this.getDb();
-    const rows = await buildInstallationLookupQuery(db, params);
+    const rows = await buildInstallationLookupQuery(this.getDb(), params);
 
     if (rows.length === 0) {
       return { success: false, reason: 'no_installation_found' };
@@ -242,5 +257,62 @@ export class InstallationLookupService {
       .returning({ id: platform_integrations.id });
 
     return updatedRows.length > 0;
+  }
+
+  async findManagedInstallationForRepo(
+    params: FindInstallationParams
+  ): Promise<ManagedInstallationLookupResult> {
+    const validationFailure = this.validateParams(params);
+    if (validationFailure) {
+      return validationFailure;
+    }
+
+    const [, repoName] = params.githubRepo.split('/');
+    if (!repoName) {
+      return { success: false, reason: 'invalid_repo_format' };
+    }
+
+    const rows = await buildManagedInstallationLookupQuery(this.getDb(), params);
+    if (rows.length === 0) {
+      return { success: false, reason: 'no_installation_found' };
+    }
+
+    const [selected, other] = rows.map(row => ManagedInstallationLookupResultSchema.parse(row));
+    if (!selected) {
+      return { success: false, reason: 'no_installation_found' };
+    }
+
+    if (other) {
+      console.warn(
+        JSON.stringify({
+          message: 'Multiple exact GitHub App integrations found during managed token resolution',
+        })
+      );
+      return { success: false, reason: 'ambiguous_installation' };
+    }
+
+    if (
+      selected.repository_access === 'selected' &&
+      !selected.repositories?.some(repository => {
+        const [storedOwner, storedRepoName, ...unexpectedParts] = repository.full_name.split('/');
+        return (
+          storedOwner !== undefined &&
+          storedOwner.length > 0 &&
+          storedRepoName?.toLowerCase() === repoName.toLowerCase() &&
+          unexpectedParts.length === 0
+        );
+      })
+    ) {
+      return { success: false, reason: 'repository_not_installed' };
+    }
+
+    return {
+      success: true,
+      installationId: selected.platform_installation_id,
+      accountLogin: selected.platform_account_login ?? '',
+      githubAppType: selected.github_app_type ?? 'standard',
+      repoName,
+      permissions: selected.permissions,
+    };
   }
 }

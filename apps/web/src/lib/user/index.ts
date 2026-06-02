@@ -76,6 +76,7 @@ import {
   impact_advocate_reward_redemptions,
   impact_conversion_reports,
   github_branch_pull_requests,
+  user_github_app_tokens,
   model_eval_ingestions,
   stripe_early_fraud_warning_cases,
   coding_plan_availability_intents,
@@ -825,8 +826,8 @@ export class SoftDeletePreconditionError extends Error {
  *   security_analysis_queue (via cascade when security_findings are deleted),
  *   auto_triage/fix_tickets, slack_bot_requests, bot_requests,
  *   cloud_agent_code_reviews, device_auth_requests, auto_top_up_configs,
- *   kiloclaw_instances/inbound_email_aliases/access_codes, user_period_cache,
- *   kilo_pass_scheduled_changes, coding_plan_availability_intents)
+ *   user_github_app_tokens, kiloclaw_instances/inbound_email_aliases/access_codes,
+ *   user_period_cache, kilo_pass_scheduled_changes, coding_plan_availability_intents)
  * - kiloclaw_instances.admin_size_override JSONB (contains admin actorEmail
  *   + free-form reason; cleared on the deleted user's retained destroyed
  *   instances, AND on any other instances where this user was the admin
@@ -1064,6 +1065,7 @@ export async function softDeleteUser(userId: string) {
           inArray(coding_plan_subscriptions.status, ['active', 'past_due'])
         )
       );
+    await tx.delete(user_github_app_tokens).where(eq(user_github_app_tokens.kilo_user_id, userId));
     await tx.delete(byok_api_keys).where(eq(byok_api_keys.kilo_user_id, userId));
     await tx
       .delete(coding_plan_availability_intents)

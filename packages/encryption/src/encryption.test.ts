@@ -30,7 +30,7 @@ describe('RSA envelope encryption', () => {
     ({ privateKey: wrongPrivateKey } = generateTestKeyPair());
   });
 
-  test('round-trip encrypt + decrypt', () => {
+  test('round-trip encrypt + decrypt without additional authenticated data', () => {
     const value = 'test secret value';
     const envelope = encryptWithPublicKey(value, publicKey);
 
@@ -40,6 +40,25 @@ describe('RSA envelope encryption', () => {
     expect(envelope.encryptedDEK.length).toBeGreaterThan(0);
 
     expect(decryptWithPrivateKey(envelope, privateKey)).toBe(value);
+  });
+
+  test('round-trips when the same additional authenticated data is supplied', () => {
+    const aad = 'authorization:v1:user-1:access';
+    const envelope = encryptWithPublicKey('scoped token', publicKey, aad);
+
+    expect(decryptWithPrivateKey(envelope, privateKey, aad)).toBe('scoped token');
+  });
+
+  test('fails authentication when additional authenticated data differs', () => {
+    const envelope = encryptWithPublicKey(
+      'scoped token',
+      publicKey,
+      'authorization:v1:user-1:access'
+    );
+
+    expect(() =>
+      decryptWithPrivateKey(envelope, privateKey, 'authorization:v1:user-1:refresh')
+    ).toThrow('Decryption failed');
   });
 
   test('empty strings, long strings, unicode', () => {

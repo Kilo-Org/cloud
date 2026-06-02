@@ -43,7 +43,8 @@ export type EncryptedEnvelope = {
  */
 export function encryptWithPublicKey(
   value: string,
-  publicKeyPem: string | Buffer
+  publicKeyPem: string | Buffer,
+  aad?: string
 ): EncryptedEnvelope {
   if (!publicKeyPem) {
     throw new EncryptionConfigurationError('Public key parameter is required');
@@ -55,6 +56,9 @@ export function encryptWithPublicKey(
 
     const iv = randomBytes(16);
     const cipher = createCipheriv('aes-256-gcm', dekBuffer, iv);
+    if (aad !== undefined) {
+      cipher.setAAD(Buffer.from(aad, 'utf8'));
+    }
 
     let encrypted = cipher.update(value, 'utf8');
     encrypted = Buffer.concat([encrypted, cipher.final()]);
@@ -99,7 +103,8 @@ export function encryptWithPublicKey(
  */
 export function decryptWithPrivateKey(
   envelope: EncryptedEnvelope,
-  privateKeyPem: string | Buffer
+  privateKeyPem: string | Buffer,
+  aad?: string
 ): string {
   if (!privateKeyPem) {
     throw new EncryptionConfigurationError('Private key parameter is required');
@@ -150,6 +155,9 @@ export function decryptWithPrivateKey(
     const encryptedData = encryptedDataBuffer.subarray(16, encryptedDataBuffer.length - 16);
 
     const decipher = createDecipheriv('aes-256-gcm', dekBuffer, iv);
+    if (aad !== undefined) {
+      decipher.setAAD(Buffer.from(aad, 'utf8'));
+    }
     decipher.setAuthTag(authTag);
 
     let decrypted = decipher.update(encryptedData, undefined, 'utf8');

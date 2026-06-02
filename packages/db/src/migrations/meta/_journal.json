@@ -1079,6 +1079,13 @@
       "when": 1780333010122,
       "tag": "0153_perpetual_bromley",
       "breakpoints": true
+    },
+    {
+      "idx": 154,
+      "version": "7",
+      "when": 1780401682134,
+      "tag": "0154_familiar_franklin_richards",
+      "breakpoints": true
     }
   ]
 }

@@ -67,6 +67,7 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     originalEnv = {
       HOME: process.env.HOME,
       KILOCODE_TOKEN: process.env.KILOCODE_TOKEN,
+      GH_TOKEN: process.env.GH_TOKEN,
     };
   });
 
@@ -345,6 +346,43 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     expect(progress).not.toHaveBeenCalled();
     expect(gitCalls).toEqual([
       ['remote', 'set-url', 'origin', 'https://oauth2:gitlab-token@gitlab.com/acme/repo.git'],
+    ]);
+  });
+
+  it('refreshes a warm GitHub remote, author, and selected CLI credential', async () => {
+    const request = makeRequest(tmpDir, {
+      workspace: {
+        workspacePath: path.join(tmpDir, 'workspace'),
+        sessionHome: path.join(tmpDir, 'home'),
+        branchName: 'session/test',
+        preferSnapshot: true,
+      },
+      repo: {
+        kind: 'github',
+        repo: 'acme/repo',
+        token: 'user-token',
+        gitAuthor: { name: 'octocat', email: '1+octocat@users.noreply.github.com' },
+        refreshRemote: true,
+      },
+      materialized: {
+        env: { GH_TOKEN: 'user-token' },
+      },
+    });
+    await fsp.mkdir(path.join(request.workspace.workspacePath, '.git'), { recursive: true });
+    const gitCalls: string[][] = [];
+
+    await prepareWrapperBootstrapWorkspace(request, undefined, {
+      git: async args => {
+        gitCalls.push(args);
+        return { stdout: '', stderr: '', exitCode: 0 };
+      },
+    });
+
+    expect(process.env.GH_TOKEN).toBe('user-token');
+    expect(gitCalls).toEqual([
+      ['remote', 'set-url', 'origin', 'https://x-access-token:user-token@github.com/acme/repo.git'],
+      ['config', 'user.name', 'octocat'],
+      ['config', 'user.email', '1+octocat@users.noreply.github.com'],
     ]);
   });
 

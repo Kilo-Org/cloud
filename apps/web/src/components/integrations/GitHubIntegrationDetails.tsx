@@ -4,8 +4,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { CheckCircle2, XCircle, GitBranch, Settings, ExternalLink, RefreshCw } from 'lucide-react';
+import {
+  CheckCircle2,
+  XCircle,
+  GitBranch,
+  Settings,
+  ExternalLink,
+  RefreshCw,
+  UserRound,
+} from 'lucide-react';
 import { toast } from 'sonner';
+import Link from 'next/link';
 import { useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
@@ -16,6 +25,7 @@ import { useOrganizationWithMembers } from '@/app/api/organizations/hooks';
 type GitHubIntegrationDetailsProps = {
   organizationId?: string;
   success?: boolean;
+  userConnectionSuccess?: boolean;
   error?: string;
   pendingApproval?: boolean;
   existingPendingOrg?: string;
@@ -24,6 +34,7 @@ type GitHubIntegrationDetailsProps = {
 export function GitHubIntegrationDetails({
   organizationId,
   success,
+  userConnectionSuccess,
   error,
   pendingApproval,
   existingPendingOrg,
@@ -56,6 +67,30 @@ export function GitHubIntegrationDetails({
   // Check if user has pending installation in another org
   const { data: pendingCheck } = useQuery(
     trpc.githubApps.checkUserPendingInstallation.queryOptions(input)
+  );
+
+  const { data: userAuthorization } = useQuery({
+    ...trpc.githubApps.getUserAuthorization.queryOptions(),
+    enabled: !organizationId,
+  });
+
+  const connectUserAuthorization = useMutation(
+    trpc.githubApps.connectUserAuthorization.mutationOptions({
+      onSuccess: result => {
+        window.location.href = result.authorizationUrl;
+      },
+    })
+  );
+
+  const disconnectUserAuthorization = useMutation(
+    trpc.githubApps.disconnectUserAuthorization.mutationOptions({
+      onSuccess: () => {
+        void queryClient.invalidateQueries({
+          queryKey: trpc.githubApps.getUserAuthorization.queryKey(),
+        });
+        toast.success('GitHub identity disconnected');
+      },
+    })
   );
 
   const uninstallApp = useMutation(
@@ -102,6 +137,9 @@ export function GitHubIntegrationDetails({
     if (success) {
       toast.success('GitHub App installed successfully!');
     }
+    if (userConnectionSuccess) {
+      toast.success('GitHub identity connected');
+    }
     if (pendingApproval) {
       toast.info('Installation pending admin approval');
     }
@@ -110,10 +148,14 @@ export function GitHubIntegrationDetails({
         description: `You already have a pending GitHub installation in another organization. Please complete or cancel that installation first.`,
         duration: 8000,
       });
+    } else if (error === 'already_connected_to_another_account') {
+      toast.error('This GitHub identity is already connected to another Kilo account.');
+    } else if (error === 'disconnect_existing_identity_first') {
+      toast.error('Disconnect your current GitHub identity before connecting another account.');
     } else if (error) {
-      toast.error(`Installation failed: ${error}`);
+      toast.error(`GitHub connection failed: ${error}`);
     }
-  }, [success, error, pendingApproval, existingPendingOrg]);
+  }, [success, userConnectionSuccess, error, pendingApproval, existingPendingOrg]);
 
   const { data: user } = useUser();
 
@@ -121,6 +163,24 @@ export function GitHubIntegrationDetails({
     const state = organizationId ? `org_${organizationId}` : `user_${user?.id}`;
     const installUrl = `https://github.com/apps/${githubAppName}/installations/new?state=${state}`;
     window.location.href = installUrl;
+  };
+
+  const handleConnectIdentity = () => {
+    connectUserAuthorization.mutate(undefined, {
+      onError: error => {
+        toast.error('Failed to start GitHub connection', { description: error.message });
+      },
+    });
+  };
+
+  const handleDisconnectIdentity = () => {
+    if (confirm('Disconnect your GitHub identity from Kilo?')) {
+      disconnectUserAuthorization.mutate(undefined, {
+        onError: error => {
+          toast.error('Failed to disconnect GitHub identity', { description: error.message });
+        },
+      });
+    }
   };
 
   const handleUninstall = () => {
@@ -225,30 +285,31 @@ export function GitHubIntegrationDetails({
       {/* Installation Status Card */}
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="space-y-1.5">
               <CardTitle className="flex items-center gap-2">
                 <GitBranch className="h-5 w-5" />
-                Kilo Code GitHub App
+                {organizationId ? 'Kilo Code GitHub App' : 'Repository access'}
               </CardTitle>
               <CardDescription>
-                Integrate your GitHub repositories with Kilocode for AI-powered code reviews,
-                deployments, and more
+                {organizationId
+                  ? 'Integrate your GitHub repositories with Kilo Code for code reviews, deployments, and more.'
+                  : 'Required for personal repositories. Install the Kilo GitHub App and choose which repositories Kilo Code can access.'}
               </CardDescription>
             </div>
             {isInstalled && !isPendingApproval ? (
-              <Badge variant="default" className="flex items-center gap-1">
+              <Badge variant="default" className="flex shrink-0 items-center gap-1">
                 <CheckCircle2 className="h-3 w-3" />
                 Installed
               </Badge>
             ) : isPendingApproval ? (
-              <Badge variant="secondary" className="flex items-center gap-1">
-                Pending Approval
+              <Badge variant="secondary" className="flex shrink-0 items-center gap-1">
+                Pending approval
               </Badge>
             ) : (
-              <Badge variant="secondary" className="flex items-center gap-1">
+              <Badge variant="secondary" className="flex shrink-0 items-center gap-1">
                 <XCircle className="h-3 w-3" />
-                Not Installed
+                Not installed
               </Badge>
             )}
           </div>
@@ -337,20 +398,19 @@ export function GitHubIntegrationDetails({
               {/* Not Installed State */}
               <Alert>
                 <AlertDescription>
-                  Install the Kilo GitHub App to integrate your repositories with Kilocode. Enable
-                  AI-powered code reviews, automated deployments, and other intelligent workflows
-                  for your projects.
+                  {organizationId
+                    ? 'Install the Kilo GitHub App to give Kilo Code access to your organization repositories.'
+                    : 'Install the Kilo GitHub App to give Kilo Code access to your personal repositories. Organization repositories may already be available through an organization installation.'}
                 </AlertDescription>
               </Alert>
 
               <div className="space-y-2 rounded-lg border p-4">
-                <h4 className="font-medium">What happens when you install:</h4>
-                <ul className="text-muted-foreground space-y-1 text-sm">
-                  <li>✓ Select which repositories to integrate with Kilocode</li>
-                  <li>✓ Enable AI-powered code reviews on pull requests</li>
-                  <li>✓ Set up automated deployment workflows</li>
-                  <li>✓ Configure intelligent agents for your repositories</li>
-                  <li>✓ Seamless integration with your existing GitHub workflows</li>
+                <h4 className="font-medium">What repository access enables</h4>
+                <ul className="text-muted-foreground list-disc space-y-1 pl-5 text-sm">
+                  <li>Select which repositories Kilo Code can access</li>
+                  <li>Run enabled code reviews on pull requests</li>
+                  <li>Run configured deployment and agent workflows</li>
+                  <li>Manage repository access later in GitHub settings</li>
                 </ul>
               </div>
 
@@ -380,6 +440,111 @@ export function GitHubIntegrationDetails({
           )}
         </CardContent>
       </Card>
+
+      {!organizationId ? (
+        <Card id="github-identity">
+          <CardHeader>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="space-y-1.5">
+                <div className="flex flex-wrap items-center gap-2">
+                  <CardTitle className="flex items-center gap-2">
+                    <UserRound className="h-5 w-5" />
+                    Use your GitHub identity
+                  </CardTitle>
+                  <Badge variant="outline">Optional</Badge>
+                </div>
+                <CardDescription>
+                  Connect your GitHub account so eligible Cloud Agent sessions can act as you in
+                  repositories where the Kilo GitHub App is installed.
+                </CardDescription>
+              </div>
+              {userAuthorization?.connected ? (
+                <Badge variant="default" className="flex shrink-0 items-center gap-1">
+                  <CheckCircle2 className="h-3 w-3" />
+                  Connected
+                </Badge>
+              ) : (
+                <Badge variant="secondary" className="shrink-0">
+                  Not connected
+                </Badge>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {userAuthorization?.revoked && (
+              <Alert variant="destructive">
+                <AlertDescription>
+                  Your GitHub authorization is no longer valid. Reconnect your account to perform
+                  eligible GitHub actions as yourself.
+                </AlertDescription>
+              </Alert>
+            )}
+            {userAuthorization?.githubLogin && (
+              <div className="flex flex-col gap-1 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between">
+                <span className="text-muted-foreground text-sm">Connected account</span>
+                <span className="font-mono text-sm">@{userAuthorization.githubLogin}</span>
+              </div>
+            )}
+            <div className="flex flex-wrap gap-3">
+              {!userAuthorization?.connected && (
+                <Button
+                  variant="outline"
+                  onClick={handleConnectIdentity}
+                  disabled={connectUserAuthorization.isPending}
+                >
+                  {connectUserAuthorization.isPending
+                    ? 'Connecting...'
+                    : userAuthorization?.revoked
+                      ? 'Reconnect GitHub account'
+                      : 'Connect GitHub account'}
+                </Button>
+              )}
+              {userAuthorization?.githubLogin && (
+                <Button
+                  variant="outline"
+                  onClick={handleDisconnectIdentity}
+                  disabled={disconnectUserAuthorization.isPending}
+                >
+                  {disconnectUserAuthorization.isPending
+                    ? 'Disconnecting...'
+                    : 'Disconnect account'}
+                </Button>
+              )}
+            </div>
+            {userAuthorization?.connected && (
+              <p className="text-muted-foreground text-sm">
+                {isInstalled
+                  ? 'Eligible Cloud Agent sessions can use your GitHub identity instead of the Kilo bot.'
+                  : 'To act as you, Cloud Agent also needs repository access from an installed Kilo GitHub App, either for your repository or through an organization.'}
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <CardHeader>
+            <div className="space-y-1.5">
+              <div className="flex flex-wrap items-center gap-2">
+                <CardTitle className="flex items-center gap-2">
+                  <UserRound className="h-5 w-5" />
+                  Use your GitHub identity
+                </CardTitle>
+                <Badge variant="outline">Optional</Badge>
+              </div>
+              <CardDescription>
+                Your GitHub identity is personal, not owned by this organization. Manage it from
+                your personal integration to let eligible Cloud Agent sessions act as you where
+                supported repository access is available.
+              </CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <Button asChild variant="outline">
+              <Link href="/integrations/github#github-identity">Manage GitHub identity</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Dev-only card for adding existing installations - only show when no app is installed */}
       {!isInstalled && (

@@ -9,6 +9,7 @@ const mockUpdateWebhookEvent = jest.fn();
 const mockHandlePullRequest = jest.fn();
 const mockHandlePRReviewComment = jest.fn();
 const mockHandleInstallationTargetRenamed = jest.fn();
+const mockRevokeStoredGitHubUserAuthorization = jest.fn();
 
 jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
   verifyGitHubWebhookSignature: (payload: string, signature: string, appType: string) =>
@@ -24,6 +25,11 @@ jest.mock('@/lib/integrations/db/webhook-events', () => ({
   logWebhookEvent: (data: unknown) => mockLogWebhookEvent(data),
   updateWebhookEvent: (eventId: string, updates: unknown) =>
     mockUpdateWebhookEvent(eventId, updates),
+}));
+
+jest.mock('@/lib/integrations/platforms/github/user-authorization', () => ({
+  revokeStoredGitHubUserAuthorization: (githubUserId: string, appType: string, reason: string) =>
+    mockRevokeStoredGitHubUserAuthorization(githubUserId, appType, reason),
 }));
 
 jest.mock('@/lib/integrations/platforms/github/webhook-handlers', () => ({
@@ -171,6 +177,7 @@ describe('handleGitHubWebhook', () => {
     mockHandleInstallationTargetRenamed.mockResolvedValue(
       Response.json({ message: 'Installation target updated' })
     );
+    mockRevokeStoredGitHubUserAuthorization.mockResolvedValue({ kiloUserId: 'user_1' });
   });
 
   it('routes installation_target renamed events through authoritative login synchronization', async () => {
@@ -242,6 +249,24 @@ describe('handleGitHubWebhook', () => {
 
     expect(await response.json()).toEqual({ message: 'Duplicate event' });
     expect(mockHandleInstallationTargetRenamed).toHaveBeenCalledTimes(1);
+  });
+
+  it('revokes user authorization without requiring an installation payload', async () => {
+    const response = await handleGitHubWebhook(
+      signedGitHubRequest('github_app_authorization', {
+        action: 'revoked',
+        sender: { id: 123, login: 'octocat' },
+      }),
+      'standard'
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockRevokeStoredGitHubUserAuthorization).toHaveBeenCalledWith(
+      '123',
+      'standard',
+      'revoked'
+    );
+    expect(mockFindIntegrationByInstallationId).not.toHaveBeenCalled();
   });
 
   it('keeps pull_request webhooks on the code review path', async () => {

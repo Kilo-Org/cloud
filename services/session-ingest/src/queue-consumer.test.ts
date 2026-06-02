@@ -35,10 +35,10 @@ vi.mock('./session-events', async importOriginal => {
   };
 });
 
-// Mock ingest-limits so we can use a small MAX_SINGLE_ITEM_BYTES in oversize tests
+// Mock ingest-limits so we can exercise both streaming and SQLite-row compaction thresholds.
 vi.mock('./util/ingest-limits', () => ({
-  MAX_INGEST_ITEM_BYTES: 2 * 1024 * 1024,
-  MAX_SINGLE_ITEM_BYTES: 50,
+  MAX_INGEST_ITEM_BYTES: 100,
+  MAX_SINGLE_ITEM_BYTES: 500,
 }));
 
 import { getWorkerDb } from '@kilocode/db/client';
@@ -80,11 +80,11 @@ describe('createItemExtractor', () => {
   });
 
   it('skips oversized items (byte budget)', () => {
-    // MAX_SINGLE_ITEM_BYTES is mocked to 50
+    // MAX_SINGLE_ITEM_BYTES is mocked to 500
     const ext = createItemExtractor('test-key');
 
-    // Create an item that exceeds 50 bytes
-    const bigValue = 'x'.repeat(60);
+    // Create an item that exceeds 500 bytes
+    const bigValue = 'x'.repeat(600);
     const payload = JSON.stringify({
       data: [
         { type: 'big', data: { content: bigValue } },
@@ -100,12 +100,12 @@ describe('createItemExtractor', () => {
   });
 
   it('clears skippingItem when oversize item ends on closing brace', () => {
-    // MAX_SINGLE_ITEM_BYTES is mocked to 50
+    // MAX_SINGLE_ITEM_BYTES is mocked to 500
     const ext = createItemExtractor('test-key');
 
     // A flat object (no nested braces) that exceeds budget — the closing }
     // is the token that triggers the budget check AND ends the item at depth=2
-    const bigValue = 'y'.repeat(60);
+    const bigValue = 'y'.repeat(600);
     const payload = JSON.stringify({
       data: [{ big: bigValue }, { type: 'after', ok: true }],
     });
@@ -139,6 +139,71 @@ describe('createItemExtractor', () => {
 
     expect(ext.pending).toHaveLength(1);
     expect(ext.pending[0]).toEqual({ type: 'included', data: {} });
+  });
+});
+
+describe('queue', () => {
+  it('passes full parsed oversized message data and its R2 reference into ingest', async () => {
+    const ingest = vi.fn(async () => ({ changes: [] }));
+    vi.mocked(getSessionIngestDO).mockReturnValue({ ingest } as never);
+    const limit = vi.fn(async () => [{ session_id: 'ses_compacted' }]);
+    const where = vi.fn(() => ({ limit }));
+    const from = vi.fn(() => ({ where }));
+    vi.mocked(getWorkerDb).mockReturnValue({ select: vi.fn(() => ({ from })) } as never);
+    const data = {
+      id: 'msg_compacted',
+      sessionID: 'ses_compacted',
+      time: { created: 123 },
+      content: 'x'.repeat(150),
+    };
+    const body = JSON.stringify({ data: [{ type: 'message', data }] });
+    const put = vi.fn(async () => undefined);
+    const deleteObject = vi.fn(async () => undefined);
+    const env = {
+      HYPERDRIVE: { connectionString: 'postgres://unused' },
+      SESSION_INGEST_R2: {
+        get: vi.fn(async () => new Response(body)),
+        put,
+        delete: deleteObject,
+      },
+    } as never;
+    const ack = vi.fn();
+    const retry = vi.fn();
+    const ctx = { waitUntil: vi.fn() } as unknown as ExecutionContext;
+
+    await queue(
+      {
+        messages: [
+          {
+            body: {
+              r2Key: 'staging/items',
+              kiloUserId: 'usr_compacted',
+              sessionId: 'ses_compacted',
+              ingestVersion: 1,
+              ingestedAt: 456,
+            },
+            ack,
+            retry,
+          },
+        ],
+      } as never,
+      env,
+      ctx
+    );
+
+    const expectedR2Key = 'items/usr_compacted/ses_compacted/message/msg_compacted/456';
+    expect(put).toHaveBeenCalledWith(expectedR2Key, JSON.stringify(data));
+    expect(ingest).toHaveBeenCalledWith(
+      [{ type: 'message', data }],
+      'usr_compacted',
+      'ses_compacted',
+      1,
+      456,
+      { 'message/msg_compacted': expectedR2Key }
+    );
+    expect(deleteObject).toHaveBeenCalledWith('staging/items');
+    expect(ack).toHaveBeenCalledTimes(1);
+    expect(retry).not.toHaveBeenCalled();
   });
 });
 

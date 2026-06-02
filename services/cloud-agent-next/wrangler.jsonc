@@ -190,6 +190,10 @@
         "class_name": "CloudAgentSession",
         "name": "CLOUD_AGENT_SESSION",
       },
+      {
+        "class_name": "UserKiloFacade",
+        "name": "USER_KILO_FACADE",
+      },
     ],
   },
   "migrations": [
@@ -208,6 +212,10 @@
     {
       "new_sqlite_classes": ["SandboxDIND"],
       "tag": "v4",
+    },
+    {
+      "new_sqlite_classes": ["UserKiloFacade"],
+      "tag": "v5",
     },
   ],
   /**
@@ -362,6 +370,10 @@
           {
             "class_name": "CloudAgentSession",
             "name": "CLOUD_AGENT_SESSION",
+          },
+          {
+            "class_name": "UserKiloFacade",
+            "name": "USER_KILO_FACADE",
           },
         ],
       },

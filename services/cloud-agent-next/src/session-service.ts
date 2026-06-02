@@ -515,11 +515,9 @@ export async function runSetupCommands(
   logger.info('Setup commands completed');
 }
 
-// Write Kilo auth file so the CLI's KiloSessions can call session ingest.
-// The CLI reads ~/.local/share/kilo/auth.json via Auth.get("kilo") but we
-// never run `kilo auth login` — credentials are injected purely via env vars
-// for config (KILO_CONFIG_CONTENT). The session ingest code path ignores the
-// provider config and only reads the auth file.
+// Persist Kilo auth for workspace preparation paths that do not receive the
+// wrapper process environment; wrapper-launched Kilo receives the same auth
+// shape through KILO_AUTH_CONTENT.
 export async function writeAuthFile(
   sandbox: SandboxInstance,
   sessionHome: string,
@@ -1027,6 +1025,7 @@ export class SessionService {
       SESSION_HOME: sessionHome,
       // Inject Kilocode credentials (with override support)
       KILOCODE_TOKEN: kilocodeToken,
+      KILO_AUTH_CONTENT: JSON.stringify({ kilo: { type: 'api', key: originalToken } }),
       // Platform identifier - defaults to 'cloud-agent' if not specified
       KILO_PLATFORM: createdOnPlatform ?? 'cloud-agent',
       KILO_DISABLE_AUTOUPDATE: 'true',

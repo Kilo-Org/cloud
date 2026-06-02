@@ -19,6 +19,8 @@ import { createWrapperKiloClient, type WrapperKiloClient } from './kilo-api.js';
 import { createConnectionManager, openIngestProgressChannel } from './connection.js';
 import { createLifecycleManager } from './lifecycle.js';
 import { bindSessionContext, createServer } from './server.js';
+import { openKiloGlobalFeed } from './global-feed.js';
+import { createGlobalFeedManager, type SessionBoundFeedPolicy } from './global-feed-manager.js';
 import { logToFile } from './utils.js';
 import type { WrapperCommand } from '../../src/shared/protocol.js';
 import type {
@@ -262,6 +264,8 @@ async function main() {
     readySession: readySession,
     updateRuntimeEnvironment: updateRuntimeEnvironment,
     materializePromptAttachments,
+    onSessionBound: (feedPolicy: SessionBoundFeedPolicy) =>
+      globalFeedManager.onSessionBound(feedPolicy),
   };
 
   async function verifyExistingKiloSession(
@@ -287,6 +291,28 @@ async function main() {
     }
   }
 
+  const globalFeedManager = createGlobalFeedManager({
+    canOpen: () => Boolean(kiloClient && state.currentSession),
+    open: () => {
+      if (!kiloClient) {
+        throw new Error('Cannot open Kilo global feed: no Kilo client');
+      }
+      return openKiloGlobalFeed({ state, kiloClient });
+    },
+    onConnectionError: error => {
+      logToFile(
+        `kilo global feed failed: ${error instanceof Error ? error.message : String(error)}`
+      );
+    },
+    onOpenError: error => {
+      logToFile(
+        `failed to start kilo global feed: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+    },
+  });
+
   async function startKiloRuntime(
     workspacePath: string,
     expectedSessionId?: string,
@@ -306,12 +332,14 @@ async function main() {
           `startKiloRuntime reused existing runtime without session rebinding sessionId=${kiloSessionId || '(unset)'}`
         );
       }
+      globalFeedManager.onRuntimeReady();
       return;
     }
 
     logToFile(
       `startKiloRuntime preparing new runtime workspacePath=${workspacePath} previousWorkspacePath=${runtimeWorkspacePath ?? '(unset)'} hadLifecycle=${Boolean(lifecycleManager)} hadConnection=${Boolean(connectionManager)} hadServer=${Boolean(closeKiloServer)}`
     );
+    globalFeedManager.close();
     lifecycleManager?.stop();
     await connectionManager?.close();
     if (closeKiloServer) {
@@ -467,6 +495,7 @@ async function main() {
       }
     );
     lifecycleManager.start();
+    globalFeedManager.onRuntimeReady();
   }
 
   async function updateRuntimeEnvironment(env: Record<string, string>): Promise<void> {
@@ -492,7 +521,12 @@ async function main() {
       serverConfig.sessionId = request.kiloSessionId;
       serverConfig.platform = request.materialized.env.KILO_PLATFORM ?? process.env.KILO_PLATFORM;
 
-      const bindError = await bindSessionContext(request.session, serverConfig, serverDeps);
+      const bindError = await bindSessionContext(
+        request.session,
+        serverConfig,
+        serverDeps,
+        'close-until-runtime-ready'
+      );
       if (bindError) {
         const error = (await bindError.json()) as { error?: string; message?: string };
         logToFile(
@@ -603,6 +637,7 @@ async function main() {
 
     // Stop lifecycle timers
     lifecycleManager?.stop();
+    globalFeedManager.close();
 
     // Force exit after timeout
     setTimeout(() => {

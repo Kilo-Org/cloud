@@ -20,6 +20,7 @@ import type { CloudAgentSession } from '../persistence/CloudAgentSession.js';
 import type { QueueAckResponse } from '../router/schemas.js';
 import { withDORetry } from '../utils/do-retry.js';
 import { logger } from '../logger.js';
+import { preflightExistingPromptModel } from './model-preflight.js';
 
 /** Retryable error codes that should map to 503 Service Unavailable. */
 const RETRYABLE_CODES: readonly RetryableResultCode[] = [
@@ -95,23 +96,44 @@ export function projectAdmissionToPublicAck(
   };
 }
 
-export async function replayMessageIfAlreadyAdmitted(
-  input: QueueMessageInput,
-  ctx: QueueMessageContext
-): Promise<QueueAckResponse | undefined> {
+async function hasMessageAdmission(input: QueueMessageInput, ctx: QueueMessageContext) {
   const messageId = input.turn.id;
-  if (messageId === undefined || messageId === null) return undefined;
+  if (messageId === undefined || messageId === null) return false;
 
   const sessionId = input.cloudAgentSessionId as SessionId;
   const doId = ctx.env.CLOUD_AGENT_SESSION.idFromName(`${ctx.userId}:${sessionId}`);
-  const alreadyAdmitted = await withDORetry<DurableObjectStub<CloudAgentSession>, boolean>(
+  return withDORetry<DurableObjectStub<CloudAgentSession>, boolean>(
     () => ctx.env.CLOUD_AGENT_SESSION.get(doId),
     stub => stub.hasMessageAdmission(messageId),
     'hasMessageAdmission'
   );
-  if (!alreadyAdmitted) return undefined;
+}
 
-  return queueMessage(input, ctx);
+export async function preflightAndAdmitPromptMessage<T>(
+  input: QueueMessageInput,
+  ctx: QueueMessageContext,
+  procedure: string,
+  admit: (input: QueueMessageInput, ctx: QueueMessageContext) => Promise<T>
+): Promise<T> {
+  if (await hasMessageAdmission(input, ctx)) return admit(input, ctx);
+
+  await preflightExistingPromptModel({
+    env: ctx.env,
+    userId: ctx.userId,
+    cloudAgentSessionId: input.cloudAgentSessionId,
+    requestedModel: input.agent?.model,
+    procedure,
+  });
+
+  return admit(input, ctx);
+}
+
+export function preflightAndQueuePromptMessage(
+  input: QueueMessageInput,
+  ctx: QueueMessageContext,
+  procedure: string
+): Promise<QueueAckResponse> {
+  return preflightAndAdmitPromptMessage(input, ctx, procedure, queueMessage);
 }
 
 export async function queueMessage(

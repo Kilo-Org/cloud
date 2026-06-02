@@ -334,6 +334,7 @@ describe('router sessionId validation', () => {
                   getCurrentRuntimeExecution: vi.fn().mockResolvedValue(null),
                 })),
               } as unknown as TRPCContext['env']['CLOUD_AGENT_SESSION'],
+              USER_KILO_FACADE: {} as TRPCContext['env']['USER_KILO_FACADE'],
               SESSION_INGEST: {
                 fetch: vi.fn(),
               } as unknown as TRPCContext['env']['SESSION_INGEST'],
@@ -721,6 +722,7 @@ describe('router sessionId validation', () => {
               idFromName: vi.fn((id: string) => ({ id })),
               get: vi.fn(() => mockSessionStub),
             } as unknown as TRPCContext['env']['CLOUD_AGENT_SESSION'],
+            USER_KILO_FACADE: {} as TRPCContext['env']['USER_KILO_FACADE'],
             SESSION_INGEST: {
               fetch: vi.fn(),
             } as unknown as TRPCContext['env']['SESSION_INGEST'],
@@ -829,6 +831,7 @@ describe('router sessionId validation', () => {
                 getCurrentMessageWork: mockGetCurrentMessageWork,
               })),
             } as unknown as TRPCContext['env']['CLOUD_AGENT_SESSION'],
+            USER_KILO_FACADE: {} as TRPCContext['env']['USER_KILO_FACADE'],
             SESSION_INGEST: {
               fetch: vi.fn(),
             } as unknown as TRPCContext['env']['SESSION_INGEST'],
@@ -1130,6 +1133,7 @@ describe('router sessionId validation', () => {
                 getCurrentMessageWork: mockGetCurrentMessageWork,
               })),
             } as unknown as TRPCContext['env']['CLOUD_AGENT_SESSION'],
+            USER_KILO_FACADE: {} as TRPCContext['env']['USER_KILO_FACADE'],
             SESSION_INGEST: {
               fetch: vi.fn(),
             } as unknown as TRPCContext['env']['SESSION_INGEST'],
@@ -1379,6 +1383,7 @@ describe('router sessionId validation', () => {
                 getLatestAssistantMessage: mockGetLatestAssistantMessage,
               })),
             } as unknown as TRPCContext['env']['CLOUD_AGENT_SESSION'],
+            USER_KILO_FACADE: {} as TRPCContext['env']['USER_KILO_FACADE'],
             SESSION_INGEST: {
               fetch: vi.fn(),
             } as unknown as TRPCContext['env']['SESSION_INGEST'],

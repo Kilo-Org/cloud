@@ -19,6 +19,7 @@ import jwt from 'jsonwebtoken';
 import { computeDatabaseUrl, createDrizzleClient, kilocode_users, sql } from '@kilocode/db';
 
 export const DRIVER_USER_EMAIL_SUFFIX = '@cloud-agent-next-e2e.example.com';
+export const FUNDED_DRIVER_BALANCE_MICRODOLLARS = 10_000_000;
 const JWT_TOKEN_VERSION = 3;
 
 // ---------------------------------------------------------------------------
@@ -100,7 +101,8 @@ export type TestUser = {
  */
 export async function ensureTestUser(
   databaseUrl: string | undefined,
-  email: string
+  email: string,
+  options?: { funded?: boolean }
 ): Promise<TestUser> {
   const resolvedUrl = databaseUrl ?? computeDatabaseUrl();
   const driver = createDrizzleClient({
@@ -110,6 +112,12 @@ export async function ensureTestUser(
   try {
     const apiTokenPepper = createHash('sha256').update(email).digest('hex').slice(0, 32);
     const userId = 'usr_e2e_' + createHash('sha256').update(email).digest('hex').slice(0, 16);
+    const fundedValues = options?.funded
+      ? {
+          microdollars_used: 0,
+          total_microdollars_acquired: FUNDED_DRIVER_BALANCE_MICRODOLLARS,
+        }
+      : {};
 
     // Upsert via INSERT ... ON CONFLICT DO UPDATE so we can return the row.
     const db = driver.db;
@@ -123,11 +131,13 @@ export async function ensureTestUser(
         stripe_customer_id: 'cus_e2e_' + userId,
         api_token_pepper: apiTokenPepper,
         is_admin: false,
+        ...fundedValues,
       })
       .onConflictDoUpdate({
         target: kilocode_users.id,
         set: {
           api_token_pepper: apiTokenPepper,
+          ...fundedValues,
           updated_at: sql`now()`,
         },
       });

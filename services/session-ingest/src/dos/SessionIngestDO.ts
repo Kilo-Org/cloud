@@ -1,5 +1,5 @@
 import { DurableObject } from 'cloudflare:workers';
-import { eq, ne, gt, and, sql, inArray, isNotNull } from 'drizzle-orm';
+import { eq, ne, gt, gte, lt, and, inArray, isNotNull } from 'drizzle-orm';
 import { drizzle, type DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 
@@ -7,7 +7,7 @@ import { ingestItems, ingestMeta } from '../db/sqlite-schema';
 import type { Env } from '../env';
 import type { IngestBatch } from '../types/session-sync';
 import type { SessionDataItem } from '../types/session-sync';
-import { getItemIdentity } from '../util/compaction';
+import { getItemIdentity, getPartItemIdentityRange } from '../util/compaction';
 import {
   extractNormalizedGitBranchFromItem,
   extractNormalizedGitUrlFromItem,
@@ -24,6 +24,11 @@ import {
   type TerminationReason,
 } from './session-metrics';
 import migrations from '../../drizzle/migrations';
+import {
+  readKiloSdkMessages,
+  readKiloSdkSessionSnapshot,
+  type KiloSdkSessionSnapshotRead,
+} from './kilo-sdk-materialization';
 
 type IngestMetaKey =
   | ExtractableMetaKey
@@ -254,6 +259,14 @@ export class SessionIngestDO extends DurableObject<Env> {
     };
   }
 
+  async readKiloSdkSessionSnapshot(): Promise<KiloSdkSessionSnapshotRead> {
+    return readKiloSdkSessionSnapshot(this.db, this.env.SESSION_INGEST_R2);
+  }
+
+  async readKiloSdkMessages(params: { limit?: number; before?: string }) {
+    return readKiloSdkMessages(this.db, this.env.SESSION_INGEST_R2, params);
+  }
+
   async getAllStream(): Promise<ReadableStream<Uint8Array>> {
     const db = this.db;
     const r2 = this.env.SESSION_INGEST_R2;
@@ -312,8 +325,7 @@ export class SessionIngestDO extends DurableObject<Env> {
 
               // parts for this message: item_id = '{msgId}/{partId}'
               const msgId = msgRow.item_id.slice('message/'.length);
-              // Escape LIKE wildcards (% and _) so they match literally, with ESCAPE clause
-              const likePattern = msgId.replace(/[%_\\]/g, '\\$&') + '/%';
+              const partRange = getPartItemIdentityRange(msgId);
               controller.enqueue(encoder.encode(',"parts":['));
               let partCursor = 0;
               let firstPart = true;
@@ -329,7 +341,8 @@ export class SessionIngestDO extends DurableObject<Env> {
                   .where(
                     and(
                       eq(ingestItems.item_type, 'part'),
-                      sql`${ingestItems.item_id} LIKE ${likePattern} ESCAPE '\\'`,
+                      gte(ingestItems.item_id, partRange.start),
+                      lt(ingestItems.item_id, partRange.end),
                       gt(ingestItems.id, partCursor)
                     )
                   )

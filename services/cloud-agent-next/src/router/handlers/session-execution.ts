@@ -20,7 +20,7 @@ import {
   LegacyExecutionResponse,
 } from '../schemas.js';
 import type { SessionId } from '../../types/ids.js';
-import { queueMessage, replayMessageIfAlreadyAdmitted } from '../../session/queue-message.js';
+import { preflightAndQueuePromptMessage, queueMessage } from '../../session/queue-message.js';
 import {
   admitLegacyPreparedInitialMessage,
   replayLegacyPreparedInitialMessageIfAlreadyAdmitted,
@@ -31,10 +31,7 @@ import type {
   TurnFinalization,
 } from '../../execution/types.js';
 import type { QueueAckResponse } from '../schemas.js';
-import {
-  preflightExistingPromptModel,
-  preflightPreparedInitialPromptModel,
-} from '../../session/model-preflight.js';
+import { preflightPreparedInitialPromptModel } from '../../session/model-preflight.js';
 
 function withLegacyExecutionId(ack: QueueAckResponse): LegacyExecutionResponse {
   return {
@@ -131,20 +128,14 @@ export function createSessionExecutionV2Handlers() {
             } satisfies TurnFinalization,
           };
           const admissionContext = { env: ctx.env, userId: ctx.userId, botId: ctx.botId };
-          if (turn.type === 'prompt') {
-            const replay = await replayMessageIfAlreadyAdmitted(queuedMessage, admissionContext);
-            if (replay) return withLegacyExecutionId(replay);
-
-            await preflightExistingPromptModel({
-              env: ctx.env,
-              userId: ctx.userId,
-              cloudAgentSessionId: input.cloudAgentSessionId,
-              requestedModel: agent?.model,
-              procedure: 'sendMessageV2',
-            });
-          }
-
-          const ack = await queueMessage(queuedMessage, admissionContext);
+          const ack =
+            turn.type === 'prompt'
+              ? await preflightAndQueuePromptMessage(
+                  queuedMessage,
+                  admissionContext,
+                  'sendMessageV2'
+                )
+              : await queueMessage(queuedMessage, admissionContext);
           return withLegacyExecutionId(ack);
         });
       }),

@@ -166,7 +166,12 @@ api.delete('/session/:sessionId', async c => {
   });
 
   const deletedAt = new Date().toISOString();
-  for (const row of deletedRows) {
+  const deletedRowsBySessionId = new Map(deletedRows.map(row => [row.session_id, row]));
+  for (const sessionId of orderedSessionIds) {
+    const row = deletedRowsBySessionId.get(sessionId);
+    if (!row) {
+      continue;
+    }
     notifyUserSessionEventFromContext(c, kiloUserId, {
       type: 'session.deleted',
       data: {

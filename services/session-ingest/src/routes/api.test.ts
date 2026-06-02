@@ -506,16 +506,16 @@ describe('api routes', () => {
     // Rows selected for session.deleted events
     fns.selectResult.mockResolvedValueOnce([
       {
-        session_id: childSessionId,
-        parent_session_id: parentSessionId,
+        session_id: parentSessionId,
+        parent_session_id: null,
         organization_id: null,
         git_url: null,
         git_branch: null,
         created_on_platform: null,
       },
       {
-        session_id: parentSessionId,
-        parent_session_id: null,
+        session_id: childSessionId,
+        parent_session_id: parentSessionId,
         organization_id: null,
         git_url: null,
         git_branch: null,

@@ -179,7 +179,9 @@ describe('GET /v1/attachments/:id/url (user)', () => {
     expect(body.mimeType).toBe('image/png');
     expect(body.size).toBe(1234);
     expect(body.filename).toBe('pic.png');
-    expect(body.expiresAt).toBeGreaterThan(Date.now());
+    const nowSec = Math.floor(Date.now() / 1000);
+    expect(body.expiresAt).toBeGreaterThan(nowSec + 3000);
+    expect(body.expiresAt).toBeLessThanOrEqual(nowSec + 3600);
   });
 
   it('forces download disposition for non-image mime types', async () => {

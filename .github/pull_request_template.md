@@ -18,8 +18,8 @@
 <!-- If there are no visual changes, replace the table with: N/A -->
 
 | Before | After |
-| ------ | ----- |
-|        |       |
+|---|---|
+|  |  |
 
 ## Reviewer Notes
 

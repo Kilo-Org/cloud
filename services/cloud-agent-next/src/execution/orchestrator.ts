@@ -1,42 +1,30 @@
 /**
- * ExecutionOrchestrator - Handles prompt execution.
+ * ExecutionOrchestrator - Handles provider-neutral wrapper delivery.
  *
- * This module handles workspace preparation and execution, called directly
- * from the DO when a client sends a prompt.
- *
+ * AgentSandbox obtains the usable runtime/wrapper. This module preserves the
+ * business sequence: prepare requests, ready the session when required, then
+ * hand the accepted prompt or command to the wrapper.
  */
 
-import type {
-  Env,
-  SandboxInstance,
-  SandboxId as ServiceSandboxId,
-  SessionId as ServiceSessionId,
-  SessionContext,
-} from '../types.js';
+import type { Env } from '../types.js';
 import type { CloudAgentSession } from '../persistence/CloudAgentSession.js';
-import type { ExecutionPlan, ExecutionResult } from './types.js';
-import type { DevContainerHandle } from '../kilo/devcontainer.js';
+import type {
+  ExecutionResult,
+  FencedLegacyExecutionRequest,
+  FencedWrapperDispatchRequest,
+  WorkspaceReady,
+} from './types.js';
 import { ExecutionError } from './errors.js';
-import { SessionService, type PreparedSession } from '../session-service.js';
-import type { SessionProfileBundle } from '../session-profile.js';
+import { SessionService } from '../session-service.js';
 import { logger } from '../logger.js';
-import { logSandboxOperationTimeout } from '../sandbox-timeout-logging.js';
-import { updateGitRemoteToken } from '../workspace.js';
-import { WrapperClient } from '../kilo/wrapper-client.js';
-import {
-  bringUpDevContainer,
-  getDevContainerOverridePath,
-  KILO_CLI_VERSION,
-} from '../kilo/devcontainer.js';
-import { findWrapperContainerForSession } from '../kilo/wrapper-manager.js';
+import { WrapperError } from '../kilo/wrapper-client.js';
 import { withDORetry } from '../utils/do-retry.js';
-import { normalizeAgentMode } from '../schema.js';
-import { downloadImagePromptParts } from './image-prompt-parts.js';
-import { dispatchToWrapper, type WrapperCallContext } from './wrapper-call.js';
 import { withTimeout } from '@kilocode/worker-utils';
+import { logSandboxOperationTimeout } from '../sandbox-timeout-logging.js';
 import { withPreparationInfrastructureRecovery } from '../sandbox-recovery.js';
+import type { AgentSandbox, WrapperInstanceLease } from '../agent-sandbox/protocol.js';
 
-/** Maximum time allowed for workspace preparation (resume, init, fast path). */
+/** Maximum time allowed for wrapper readiness workspace preparation. */
 const PREPARE_WORKSPACE_TIMEOUT_MS = 10 * 60 * 1000;
 
 const CODE_REVIEW_DISABLED_TOOLS = {
@@ -59,136 +47,140 @@ function withWorkspacePreparationTimeout<T>(operation: Promise<T>, step: string)
   );
 }
 
-/**
- * Build the profile bundle for the fast path: prefer `initContext.profile`,
- * but fall back to `existingMetadata.profile` for `mcpServers`, `runtimeSkills`,
- * and `runtimeAgents` — fields that were "previously dropped on the fast
- * path" and must flow back in when we recreate the sandbox session.
- *
- * `envVars`, `encryptedSecrets`, and `setupCommands` come from `initContext`
- * only (no existing-metadata fallback) to match the prior behaviour.
- */
-function mergeFastPathProfile(
-  initProfile: SessionProfileBundle | undefined,
-  existingProfile: SessionProfileBundle | undefined
-): SessionProfileBundle {
-  return {
-    envVars: initProfile?.envVars,
-    encryptedSecrets: initProfile?.encryptedSecrets,
-    setupCommands: initProfile?.setupCommands,
-    mcpServers: initProfile?.mcpServers ?? existingProfile?.mcpServers,
-    runtimeSkills: initProfile?.runtimeSkills ?? existingProfile?.runtimeSkills,
-    runtimeAgents: initProfile?.runtimeAgents ?? existingProfile?.runtimeAgents,
-  };
-}
-
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-/**
- * Dependencies for the orchestrator (for testability via dependency injection).
- */
 export type OrchestratorDeps = {
-  /** Get a sandbox instance by ID */
-  getSandbox: (sandboxId: string) => Promise<SandboxInstance>;
-  /** Get a Durable Object stub for a session */
+  getAgentSandbox: (
+    plan: FencedWrapperDispatchRequest | FencedLegacyExecutionRequest
+  ) => AgentSandbox;
   getSessionStub: (userId: string, sessionId: string) => DurableObjectStub<CloudAgentSession>;
-  /** Get the ingest URL for the session */
-  getIngestUrl: (sessionId: string, userId: string) => string;
-  /** Environment bindings */
   env: Env;
 };
 
-// ---------------------------------------------------------------------------
-// ExecutionOrchestrator
-// ---------------------------------------------------------------------------
-
 export class ExecutionOrchestrator {
-  private readonly deps: OrchestratorDeps;
   private readonly sessionService: SessionService;
 
-  constructor(deps: OrchestratorDeps) {
-    this.deps = deps;
+  constructor(private readonly deps: OrchestratorDeps) {
     this.sessionService = new SessionService();
   }
 
-  /**
-   * Execute a prompt. Handles all setup and returns immediately after prompt is sent.
-   * Events stream asynchronously via wrapper -> ingest WS.
-   *
-   * @throws ExecutionError with appropriate code on failure (no internal retry)
-   */
   async execute(
-    plan: ExecutionPlan,
-    options?: { onProgress?: (step: string, message: string) => void }
+    plan: FencedWrapperDispatchRequest | FencedLegacyExecutionRequest,
+    options?: {
+      onProgress?: (step: string, message: string) => void;
+      onWorkspaceReady?: (ready: WorkspaceReady) => Promise<void>;
+      leasedInstance?: WrapperInstanceLease;
+    }
   ): Promise<ExecutionResult> {
-    const { executionId, sessionId, userId, orgId, payload, mode, workspace, wrapper } = plan;
+    const executionId = 'executionId' in plan ? plan.executionId : undefined;
+    const { sessionId, userId, orgId } = plan.scope;
+    const { workspace, agent, turn } = plan;
 
     logger.setTags({
       executionId,
       sessionId,
       userId,
       orgId: orgId ?? '(personal)',
-      mode,
-      isInitialize: workspace.shouldPrepare,
+      mode: agent.mode,
     });
+    logger
+      .withFields({
+        messageId: turn.messageId,
+        hasLegacyExecutionId: executionId !== undefined,
+        sandboxId: workspace.sandboxId,
+        hasAttachments: turn.type === 'prompt' && turn.attachments !== undefined,
+        attachmentCount: turn.type === 'prompt' ? (turn.attachments?.files.length ?? 0) : 0,
+        wrapperHasKiloSessionId: plan.wrapper.kiloSessionId !== undefined,
+      })
+      .info('ExecutionOrchestrator starting execution');
 
-    logger.info('ExecutionOrchestrator starting execution');
-
-    // 1. Get sandbox (may throw SANDBOX_CONNECT_FAILED)
-    const sandboxId = workspace.sandboxId;
-    if (!sandboxId) {
+    if (!workspace.sandboxId) {
       throw ExecutionError.invalidRequest('Missing sandboxId in workspace plan');
     }
 
-    let sandbox: SandboxInstance;
+    const sandbox = this.deps.getAgentSandbox(plan);
+    return withPreparationInfrastructureRecovery(
+      {
+        deleteSandbox: reason => sandbox.delete(reason),
+        sandboxId: workspace.sandboxId,
+        sessionId,
+        phase: 'executionWorkspacePreparation',
+      },
+      () => this.executeThroughAgentSandbox(sandbox, plan, options)
+    );
+  }
+
+  private async executeThroughAgentSandbox(
+    sandbox: AgentSandbox,
+    plan: FencedWrapperDispatchRequest | FencedLegacyExecutionRequest,
+    options?: {
+      onProgress?: (step: string, message: string) => void;
+      onWorkspaceReady?: (ready: WorkspaceReady) => Promise<void>;
+      leasedInstance?: WrapperInstanceLease;
+    }
+  ): Promise<ExecutionResult> {
+    const { sessionId, userId } = plan.scope;
+    const { turn } = plan;
+    const prepared = await this.sessionService.buildWrapperSessionReadyAndPromptRequests({
+      env: this.deps.env,
+      plan,
+    });
+    const toolOverrides = this.getToolOverrides(plan);
+    if (toolOverrides && prepared.type === 'prompt') {
+      prepared.promptRequest.agent = {
+        ...prepared.promptRequest.agent,
+        tools: toolOverrides,
+      };
+    }
+
+    let ensured;
     try {
-      sandbox = await this.deps.getSandbox(sandboxId);
+      ensured = await sandbox.ensureWrapper({
+        plan,
+        prepared,
+        onProgress: options?.onProgress,
+        ...(options?.leasedInstance ? { leasedInstance: options.leasedInstance } : {}),
+      });
     } catch (error) {
-      throw ExecutionError.sandboxConnectFailed(
-        `Failed to connect to sandbox: ${error instanceof Error ? error.message : String(error)}`,
+      if (error instanceof ExecutionError) throw error;
+      throw ExecutionError.wrapperStartFailed(
+        `Failed to start wrapper: ${error instanceof Error ? error.message : String(error)}`,
         error
       );
     }
 
-    const prepareExecution = async () => {
-      // 2. Workspace preparation (may throw WORKSPACE_SETUP_FAILED)
-      const prepared = await this.prepareWorkspace(sandbox, plan, options?.onProgress);
-
-      // 3. Update git remote token if needed (resume path with token overrides)
-      if (!workspace.shouldPrepare) {
-        const resumeContext = workspace.resumeContext;
-        if (resumeContext.githubToken || resumeContext.gitToken) {
-          await this.updateTokenOverrides(prepared, workspace);
-        }
-      }
-
-      // 4. Ensure wrapper is running (starts kilo server in-process)
-      let wrapperClient: WrapperClient;
-      let kiloSessionId: string;
-      try {
-        const devcontainer = await this.ensureDevContainerHandleIfNeeded(prepared, plan);
-        const fixedPort = plan.workspace.existingMetadata?.devcontainer?.wrapperPort;
-        const result = await WrapperClient.ensureWrapper(sandbox, prepared.session, {
-          agentSessionId: sessionId,
-          userId,
-          workspacePath: prepared.context.workspacePath,
-          sessionId: wrapper.kiloSessionId,
-          runtimeEnv: prepared.runtimeEnv,
-          devcontainer,
-          fixedPort: devcontainer ? fixedPort : undefined,
-        });
-        wrapperClient = result.client;
-        kiloSessionId = result.sessionId;
-      } catch (error) {
-        throw ExecutionError.wrapperStartFailed(
-          `Failed to start wrapper: ${error instanceof Error ? error.message : String(error)}`,
-          error
+    let kiloSessionId: string;
+    try {
+      if (ensured.status === 'session-ready') {
+        kiloSessionId = ensured.kiloSessionId;
+        await options?.onWorkspaceReady?.(ensured.ready);
+      } else {
+        const readyResult = await withWorkspacePreparationTimeout(
+          ensured.client.ensureSessionReady(prepared.readyRequest),
+          'wrapper readiness'
+        );
+        kiloSessionId = readyResult.kiloSessionId;
+        await options?.onWorkspaceReady?.(
+          readyResult.workspaceReady
+            ? { ...prepared.ready, ...readyResult.workspaceReady }
+            : prepared.ready
         );
       }
 
-      // 5. Record activity for idle timeout tracking
+      if (prepared.type === 'command') {
+        await ensured.client.command(prepared.commandRequest);
+        logger
+          .withFields({
+            sessionId,
+            messageId: turn.messageId,
+            command: prepared.commandRequest.command,
+          })
+          .info('Wrapper accepted command dispatch');
+      } else {
+        await ensured.client.prompt(prepared.promptRequest);
+        logger
+          .withFields({ sessionId, messageId: turn.messageId })
+          .info('Wrapper accepted prompt dispatch');
+      }
+
       try {
         await withDORetry(
           () => this.deps.getSessionStub(userId, sessionId),
@@ -196,377 +188,42 @@ export class ExecutionOrchestrator {
           'recordKiloServerActivity'
         );
       } catch {
-        // Non-fatal - log but continue
-        logger.warn('Failed to record kilo server activity');
+        logger
+          .withFields({ sessionId, messageId: turn.messageId })
+          .warn('Failed to record kilo server activity');
       }
-
-      // 6. Download images from R2 to sandbox if provided
-      const fileParts = await downloadImagePromptParts({
-        env: this.deps.env,
-        session: prepared.session,
-        userId: plan.userId,
-        images: plan.images,
-        createdOnPlatform: this.getCreatedOnPlatform(plan),
-      });
-
-      return { prepared, wrapperClient, kiloSessionId, fileParts };
-    };
-
-    const { prepared, wrapperClient, kiloSessionId, fileParts } =
-      await withPreparationInfrastructureRecovery(
-        {
-          sandbox,
-          sandboxId,
+      logger.info('ExecutionOrchestrator wrapper execution started successfully');
+      return { kiloSessionId };
+    } catch (error) {
+      logger
+        .withFields({
           sessionId,
-          phase: 'executionWorkspacePreparation',
-        },
-        prepareExecution
-      );
-
-    // 7. Send prompt with execution binding (async - returns messageId immediately)
-    const ingestUrl = this.deps.getIngestUrl(sessionId, userId);
-    const ingestToken = executionId;
-    const kilocodeToken = this.getKilocodeToken(plan);
-
-    const execution = {
-      executionId,
-      ingestUrl,
-      ingestToken,
-      workerAuthToken: kilocodeToken,
-      upstreamBranch: prepared.context.upstreamBranch,
-    };
-
-    // Normalize mode to internal mode (e.g., 'architect' -> 'plan', 'orchestrator' -> 'code')
-    const normalizedMode = normalizeAgentMode(mode);
-
-    const wrapperCtx: WrapperCallContext = {
-      execution,
-      normalizedMode,
-      model: wrapper.model,
-      variant: wrapper.variant,
-      autoCommit: wrapper.autoCommit,
-      condenseOnComplete: wrapper.condenseOnComplete,
-      tools: this.getToolOverrides(plan),
-      messageId: plan.messageId,
-      fileParts,
-    };
-
-    try {
-      const result = await dispatchToWrapper(wrapperClient, wrapperCtx, payload);
-      const action = payload.type === 'command' ? 'Command' : 'Prompt';
-      if (result.messageId) {
-        logger.withFields({ messageId: result.messageId }).info(`${action} sent to wrapper`);
-      } else {
-        logger.info(`${action} sent to wrapper`);
-      }
-    } catch (error) {
-      throw ExecutionError.wrapperStartFailed(
-        `Failed to send ${payload.type}: ${error instanceof Error ? error.message : String(error)}`,
-        error
-      );
-    }
-
-    logger.info('ExecutionOrchestrator execution started successfully');
-    return { kiloSessionId };
-  }
-
-  // ---------------------------------------------------------------------------
-  // Private Helpers
-  // ---------------------------------------------------------------------------
-
-  private async ensureDevContainerHandleIfNeeded(
-    prepared: PreparedSession,
-    plan: ExecutionPlan
-  ): Promise<DevContainerHandle | undefined> {
-    if (prepared.devcontainer) return prepared.devcontainer;
-
-    const devcontainer = plan.workspace.existingMetadata?.devcontainer;
-    if (!devcontainer) return undefined;
-
-    const existingContainer = await findWrapperContainerForSession(
-      prepared.session,
-      plan.sessionId
-    );
-    if (existingContainer) {
-      return {
-        containerId: existingContainer.process.id,
-        innerWorkspaceFolder: devcontainer.innerWorkspaceFolder,
-        workspacePath: devcontainer.workspacePath,
-        agentSessionId: plan.sessionId,
-        overrideConfigPath: getDevContainerOverridePath(
-          plan.sessionId,
-          devcontainer.workspacePath,
-          devcontainer.configPath
-        ),
-        teardown: async () => undefined,
-      };
-    }
-
-    return bringUpDevContainer(prepared.session, {
-      workspacePath: devcontainer.workspacePath,
-      sessionHome: prepared.context.sessionHome,
-      agentSessionId: plan.sessionId,
-      wrapperPort: devcontainer.wrapperPort,
-      kiloCliVersion: KILO_CLI_VERSION,
-      configPath: devcontainer.configPath,
-    });
-  }
-
-  /**
-   * Prepare workspace based on the workspace plan.
-   * Handles three paths: resume, fast path (fully prepared), and full init.
-   */
-  private async prepareWorkspace(
-    sandbox: SandboxInstance,
-    plan: ExecutionPlan,
-    onProgress?: (step: string, message: string) => void
-  ): Promise<PreparedSession> {
-    const { workspace, sessionId, userId, orgId } = plan;
-
-    try {
-      if (!workspace.shouldPrepare) {
-        // Resume path - workspace already set up
-        const resumeContext = workspace.resumeContext;
-
-        if (!resumeContext.kilocodeToken) {
-          throw new Error('Missing kilocodeToken in resume context');
+          messageId: turn.messageId,
+          errorClass: error instanceof Error ? error.name : 'UnknownError',
+          wrapperErrorCode: error instanceof WrapperError ? error.code : undefined,
+        })
+        .warn('ExecutionOrchestrator wrapper dispatch failed');
+      if (error instanceof WrapperError) {
+        if (error.code === 'WORKSPACE_SETUP_FAILED') {
+          throw ExecutionError.workspaceSetupFailed(error.message, error);
         }
-
-        return await withWorkspacePreparationTimeout(
-          this.sessionService.resume({
-            sandbox,
-            sandboxId: workspace.sandboxId as ServiceSandboxId,
-            orgId,
-            userId,
-            sessionId: sessionId as ServiceSessionId,
-            kilocodeToken: resumeContext.kilocodeToken,
-            kilocodeModel: resumeContext.kilocodeModel ?? 'default',
-            env: this.deps.env,
-            githubToken: resumeContext.githubToken,
-            gitToken: resumeContext.gitToken,
-            onProgress,
-          }),
-          'resume'
-        );
-      }
-
-      const initContext = workspace.initContext;
-      if (!initContext) {
-        throw new Error('Missing initContext in workspace plan');
-      }
-
-      const existingMetadata = workspace.existingMetadata;
-
-      // Fast path: fully prepared via prepareSession
-      // Fast path: fully prepared session with all required metadata
-      if (
-        initContext.isPreparedSession &&
-        existingMetadata?.workspacePath &&
-        existingMetadata?.sandboxId &&
-        existingMetadata?.sessionHome &&
-        existingMetadata?.branchName
-      ) {
-        logger.info('Using fast path for fully prepared session');
-
-        const context: SessionContext = {
-          sandboxId: existingMetadata.sandboxId as ServiceSandboxId,
-          sessionId: sessionId as ServiceSessionId,
-          sessionHome: existingMetadata.sessionHome,
-          workspacePath: existingMetadata.workspacePath,
-          branchName: existingMetadata.branchName,
-          upstreamBranch: existingMetadata.upstreamBranch,
-          orgId,
-          userId,
-          botId: initContext.botId,
-          githubRepo: initContext.githubRepo,
-          githubToken: initContext.githubToken,
-          gitUrl: initContext.gitUrl,
-          gitToken: initContext.gitToken,
-          platform: initContext.platform,
-          envVars: initContext.profile?.envVars,
-        };
-
-        const sessionOptions = {
-          sandbox,
-          context,
-          env: this.deps.env,
-          originalToken: initContext.kilocodeToken,
-          kilocodeModel: initContext.kilocodeModel ?? 'default',
-          originalOrgId: orgId,
-          createdOnPlatform: this.getCreatedOnPlatform(plan),
-          appendSystemPrompt: existingMetadata.appendSystemPrompt,
-          profile: mergeFastPathProfile(initContext.profile, existingMetadata.profile),
-        };
-        const runtimeEnv = this.sessionService.buildRuntimeEnv(sessionOptions);
-        const session = await withWorkspacePreparationTimeout(
-          this.sessionService.getOrCreateSession({
-            ...sessionOptions,
-            sandbox,
-          }),
-          'prepared session creation'
-        );
-
-        return {
-          context,
-          session,
-          runtimeEnv,
-        };
-      }
-
-      // Legacy prepared session path
-      if (initContext.isPreparedSession && initContext.kiloSessionId) {
-        logger.info('Using legacy prepared session path');
-
-        const gitSource = initContext.githubRepo
-          ? { githubRepo: initContext.githubRepo, githubToken: initContext.githubToken }
-          : initContext.gitUrl
-            ? { gitUrl: initContext.gitUrl, gitToken: initContext.gitToken }
-            : null;
-
-        if (!gitSource) {
-          throw new Error('Prepared session is missing git source');
+        if (error.code === 'KILO_SERVER_FAILED') {
+          throw ExecutionError.kiloServerFailed(error.message, error);
         }
-
-        if (!initContext.kiloSessionId) {
-          throw new Error('Prepared session is missing kiloSessionId');
-        }
-
-        return await withWorkspacePreparationTimeout(
-          this.sessionService.initiateFromKiloSessionWithRetry({
-            getSandbox: () => this.deps.getSandbox(workspace.sandboxId ?? ''),
-            sandboxId: (workspace.sandboxId ?? '') as ServiceSandboxId,
-            orgId,
-            userId,
-            sessionId: sessionId as ServiceSessionId,
-            kilocodeToken: initContext.kilocodeToken,
-            kilocodeModel: initContext.kilocodeModel ?? 'default',
-            kiloSessionId: initContext.kiloSessionId,
-            env: this.deps.env,
-            profile: initContext.profile,
-            botId: initContext.botId,
-            githubAppType: initContext.githubAppType,
-            createdOnPlatform: initContext.createdOnPlatform,
-            // Note: existingMetadata requires CloudAgentSessionState, not our simplified type
-            ...gitSource,
-          }),
-          'legacy prepared session initialization'
-        );
       }
-
-      // Brand new session
-      logger.info('Initializing new session');
-      return await withWorkspacePreparationTimeout(
-        this.sessionService.initiateWithRetry({
-          getSandbox: () => this.deps.getSandbox(workspace.sandboxId ?? ''),
-          sandboxId: (workspace.sandboxId ?? '') as ServiceSandboxId,
-          orgId,
-          userId,
-          sessionId: sessionId as ServiceSessionId,
-          kilocodeToken: initContext.kilocodeToken,
-          kilocodeModel: initContext.kilocodeModel ?? 'default',
-          githubRepo: initContext.githubRepo,
-          githubToken: initContext.githubToken,
-          gitUrl: initContext.gitUrl,
-          gitToken: initContext.gitToken,
-          env: this.deps.env,
-          profile: initContext.profile,
-          upstreamBranch: initContext.upstreamBranch,
-          botId: initContext.botId,
-          githubAppType: initContext.githubAppType,
-          platform: initContext.platform,
-          createdOnPlatform: initContext.createdOnPlatform,
-        }),
-        'new session initialization'
-      );
-    } catch (error) {
       if (error instanceof ExecutionError) throw error;
-      throw ExecutionError.workspaceSetupFailed(
-        `Failed to prepare workspace: ${error instanceof Error ? error.message : String(error)}`,
+      throw ExecutionError.wrapperStartFailed(
+        `Failed to execute wrapper bootstrap: ${error instanceof Error ? error.message : String(error)}`,
         error
       );
     }
   }
 
-  /**
-   * Update git remote token for resume path with token overrides.
-   */
-  private async updateTokenOverrides(
-    prepared: PreparedSession,
-    workspace: ExecutionPlan['workspace']
-  ): Promise<void> {
-    if (workspace.shouldPrepare) return;
-
-    const resumeContext = workspace.resumeContext;
-    const existingMetadata = workspace.existingMetadata;
-
-    if (!existingMetadata) {
-      logger.warn('Missing metadata for token override update');
-      return;
-    }
-
-    try {
-      if (resumeContext.githubToken && existingMetadata.githubRepo) {
-        const gitUrl = `https://github.com/${existingMetadata.githubRepo}.git`;
-        await updateGitRemoteToken(
-          prepared.session,
-          prepared.context.workspacePath,
-          gitUrl,
-          resumeContext.githubToken
-        );
-      }
-
-      if (resumeContext.gitToken && existingMetadata.gitUrl) {
-        await updateGitRemoteToken(
-          prepared.session,
-          prepared.context.workspacePath,
-          existingMetadata.gitUrl,
-          resumeContext.gitToken,
-          prepared.context.platform
-        );
-      }
-    } catch (error) {
-      throw ExecutionError.workspaceSetupFailed(
-        `Failed to update git remote token: ${error instanceof Error ? error.message : String(error)}`,
-        error
-      );
-    }
-  }
-
-  private getCreatedOnPlatform(plan: ExecutionPlan): string | undefined {
-    if (plan.workspace.shouldPrepare) {
-      return (
-        plan.workspace.initContext.createdOnPlatform ??
-        plan.workspace.existingMetadata?.createdOnPlatform
-      );
-    }
-
-    return (
-      plan.workspace.resumeContext.createdOnPlatform ??
-      plan.workspace.existingMetadata?.createdOnPlatform
-    );
-  }
-
-  private getToolOverrides(plan: ExecutionPlan): Record<string, boolean> | undefined {
-    return this.getCreatedOnPlatform(plan) === 'code-review'
+  private getToolOverrides(
+    plan: FencedWrapperDispatchRequest | FencedLegacyExecutionRequest
+  ): Record<string, boolean> | undefined {
+    return plan.workspace.metadata.identity?.createdOnPlatform === 'code-review'
       ? CODE_REVIEW_DISABLED_TOOLS
       : undefined;
-  }
-
-  /**
-   * Get the kilocode token from the plan.
-   */
-  private getKilocodeToken(plan: ExecutionPlan): string {
-    const { workspace } = plan;
-
-    if (!workspace.shouldPrepare) {
-      return workspace.resumeContext.kilocodeToken;
-    }
-
-    const initContext = workspace.initContext;
-    if (initContext?.kilocodeToken) {
-      return initContext.kilocodeToken;
-    }
-
-    throw ExecutionError.invalidRequest('Missing kilocodeToken in execution plan');
   }
 }

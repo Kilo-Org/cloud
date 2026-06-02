@@ -42,6 +42,7 @@ import type {
   OpenclawConfigResponse,
   MorningBriefingStatusResponse,
   MorningBriefingActionResponse,
+  OnboardingBriefingResponse,
   MorningBriefingInterestsResponse,
   MorningBriefingUserLocationResponse,
   MorningBriefingReadResponse,
@@ -52,6 +53,8 @@ import type {
   GmailNotificationsResponse,
   CandidateVolumesResponse,
   ReassociateVolumeResponse,
+  OrphanVolumeScanResponse,
+  OrphanVolumeDestroyResponse,
   ResizeMachineResponse,
   SetAdminMachineSizeOverrideResponse,
   ClearAdminMachineSizeOverrideResponse,
@@ -72,6 +75,17 @@ export interface FileNode {
   type: 'file' | 'directory';
   children?: FileNode[];
 }
+
+export type OpenclawFileWriteValidation = 'warn-before-write' | 'allow-invalid';
+
+export type FileWriteResponse =
+  | { etag: string }
+  | {
+      outcome: 'openclaw-validation-warning';
+      valid: false;
+      reason: 'invalid' | 'validation-unavailable';
+      issues: Array<{ path: string; message: string; allowedValues?: string[] }>;
+    };
 
 /**
  * Error thrown when the KiloClaw API returns a non-OK response.
@@ -138,19 +152,22 @@ export class KiloClawInternalClient {
     return this.request('/api/platform/versions');
   }
 
-  async getLatestVersion(opts?: {
-    instanceId?: string;
+  async getLatestVersion(): Promise<ImageVersionEntry | null> {
+    return this.requestLatestVersion('/api/platform/versions/latest');
+  }
+
+  async getLatestVersionForInstance(opts: {
+    instanceId: string;
     currentImageTag?: string | null;
   }): Promise<ImageVersionEntry | null> {
-    // Note: Early Access is resolved server-side from the instance's owning
-    // user — callers do NOT pass it as a param. Trying to set it here would
-    // be ignored.
-    let path = '/api/platform/versions/latest';
-    if (opts?.instanceId) {
-      const params = new URLSearchParams({ instanceId: opts.instanceId });
-      if (opts.currentImageTag) params.set('currentImageTag', opts.currentImageTag);
-      path += `?${params.toString()}`;
-    }
+    const params = new URLSearchParams({
+      instanceId: opts.instanceId,
+    });
+    if (opts.currentImageTag) params.set('currentImageTag', opts.currentImageTag);
+    return this.requestLatestVersion(`/api/platform/versions/latest?${params.toString()}`);
+  }
+
+  private async requestLatestVersion(path: string): Promise<ImageVersionEntry | null> {
     try {
       return await this.request(path);
     } catch (err) {
@@ -426,6 +443,22 @@ export class KiloClawInternalClient {
       {
         method: 'POST',
         body: JSON.stringify({ userId }),
+      },
+      { userId }
+    );
+  }
+
+  async startOnboardingBriefing(
+    userId: string,
+    settingsHref: string,
+    instanceId?: string
+  ): Promise<OnboardingBriefingResponse> {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
+    return this.request(
+      `/api/platform/morning-briefing/onboarding-briefing${params}`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ userId, settingsHref }),
       },
       { userId }
     );
@@ -895,6 +928,20 @@ export class KiloClawInternalClient {
     });
   }
 
+  async writeOpenclawConfigFile(
+    userId: string,
+    content: string,
+    etag: string | undefined,
+    instanceId: string | undefined,
+    mode: OpenclawFileWriteValidation
+  ): Promise<FileWriteResponse> {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
+    return this.request(`/api/platform/files/write-openclaw-config${params}`, {
+      method: 'POST',
+      body: JSON.stringify({ userId, content, etag, mode }),
+    });
+  }
+
   async importOpenclawWorkspace(
     userId: string,
     files: Array<{ path: string; content: string }>,
@@ -1035,6 +1082,42 @@ export class KiloClawInternalClient {
     return this.request(`/api/platform/candidate-volumes?${params.toString()}`, undefined, {
       userId,
     });
+  }
+
+  /**
+   * Scan a destroyed instance's Fly app for orphaned volumes. Read-only.
+   * The worker derives the Fly app + expected volume name from the instance
+   * identity, so callers never compute Fly resource names themselves.
+   */
+  async scanOrphanVolumes(
+    userId: string,
+    instanceId: string,
+    sandboxId: string
+  ): Promise<OrphanVolumeScanResponse> {
+    const params = new URLSearchParams({ userId, instanceId, sandboxId });
+    return this.request(`/api/platform/admin/orphan-volume-scan?${params.toString()}`, undefined, {
+      userId,
+    });
+  }
+
+  /**
+   * Destroy a single orphaned Fly volume. The worker re-verifies every
+   * Fly/DO-side invariant before deleting — see the route for the guards.
+   */
+  async destroyOrphanVolume(
+    userId: string,
+    instanceId: string,
+    sandboxId: string,
+    volumeId: string
+  ): Promise<OrphanVolumeDestroyResponse> {
+    return this.request(
+      '/api/platform/admin/orphan-volume-destroy',
+      {
+        method: 'POST',
+        body: JSON.stringify({ userId, instanceId, sandboxId, volumeId }),
+      },
+      { userId }
+    );
   }
 
   async reassociateVolume(

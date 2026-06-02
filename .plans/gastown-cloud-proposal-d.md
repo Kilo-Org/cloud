@@ -23,11 +23,11 @@ Gastown solves four problems that arise when deploying AI agents at engineering 
 
 Gastown's design is governed by three foundational principles:
 
-| Principle                                   | Acronym | Meaning                                                                                                                                                                                                                                                     |
-| ------------------------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Molecular Expression of Work**            | MEOW    | Breaking large goals into detailed, trackable, atomic instructions for agents. Supported by Beads, Formulas, and Molecules.                                                                                                                                 |
-| **Gas Town Universal Propulsion Principle** | GUPP    | "If there is work on your Hook, YOU MUST RUN IT." Agents autonomously proceed with available work without waiting for external input. The hook is your assignment — execute immediately.                                                                    |
-| **Nondeterministic Idempotence**            | NDI     | Useful outcomes are achieved through orchestration of potentially unreliable processes. Persistent Beads and oversight agents (Witness, Deacon) guarantee eventual workflow completion even when individual operations may fail or produce varying results. |
+| Principle | Acronym | Meaning |
+|---|---|---|
+| **Molecular Expression of Work** | MEOW | Breaking large goals into detailed, trackable, atomic instructions for agents. Supported by Beads, Formulas, and Molecules. |
+| **Gas Town Universal Propulsion Principle** | GUPP | "If there is work on your Hook, YOU MUST RUN IT." Agents autonomously proceed with available work without waiting for external input. The hook is your assignment — execute immediately. |
+| **Nondeterministic Idempotence** | NDI | Useful outcomes are achieved through orchestration of potentially unreliable processes. Persistent Beads and oversight agents (Witness, Deacon) guarantee eventual workflow completion even when individual operations may fail or produce varying results. |
 
 Additionally:
 
@@ -40,19 +40,19 @@ The fundamental data model is **Beads** — git-backed atomic work units stored 
 
 Gastown uses a **two-level Beads architecture**:
 
-| Level    | Location                  | Prefix                             | Purpose                                                                                                            |
-| -------- | ------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| **Town** | `~/gt/.beads/`            | `hq-*`                             | Cross-rig coordination: Mayor mail, convoy tracking, strategic decisions, town-level agent beads, role definitions |
-| **Rig**  | `<rig>/mayor/rig/.beads/` | project prefix (e.g. `gt-`, `bd-`) | Implementation work: bugs, features, tasks, merge requests, project-specific molecules, rig-level agent beads      |
+| Level | Location | Prefix | Purpose |
+|---|---|---|---|
+| **Town** | `~/gt/.beads/` | `hq-*` | Cross-rig coordination: Mayor mail, convoy tracking, strategic decisions, town-level agent beads, role definitions |
+| **Rig** | `<rig>/mayor/rig/.beads/` | project prefix (e.g. `gt-`, `bd-`) | Implementation work: bugs, features, tasks, merge requests, project-specific molecules, rig-level agent beads |
 
 **Beads routing** is prefix-based. The file `~/gt/.beads/routes.jsonl` maps issue ID prefixes to rig locations. When you run `bd show gt-xyz`, the prefix `gt-` routes to the gastown rig's beads database. This is transparent — agents don't need to know which database to use.
 
 ### 4. Environments: Towns and Rigs
 
-| Concept  | Description                                                                                                                                                                                                                                                                                                             |
-| -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Town** | The management headquarters (e.g., `~/gt/`). A town coordinates all workers across multiple rigs. It houses town-level agents (Mayor, Deacon) and the town-level Beads database.                                                                                                                                        |
-| **Rig**  | A project-specific git repository under Gastown management. Each rig has its own Polecats, Refinery, Witness, and Crew members. Rigs are where actual development work happens. The rig root is a _container directory_, not a git clone itself — it holds a bare repo (`.repo.git/`) from which worktrees are created. |
+| Concept | Description |
+|---|---|
+| **Town** | The management headquarters (e.g., `~/gt/`). A town coordinates all workers across multiple rigs. It houses town-level agents (Mayor, Deacon) and the town-level Beads database. |
+| **Rig** | A project-specific git repository under Gastown management. Each rig has its own Polecats, Refinery, Witness, and Crew members. Rigs are where actual development work happens. The rig root is a _container directory_, not a git clone itself — it holds a bare repo (`.repo.git/`) from which worktrees are created. |
 
 #### Directory Structure
 
@@ -90,20 +90,20 @@ Gastown has seven distinct agent roles organized into two tiers:
 
 #### Town-Level Agents (Cross-Rig)
 
-| Role       | Description                                                                                                                                                                            | Lifecycle                 | Location            |
-| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------- | ------------------- |
-| **Mayor**  | Global coordinator. Initiates convoys, distributes work across rigs, handles escalations, coordinates cross-rig communication.                                                         | Singleton, persistent     | `~/gt/mayor/`       |
-| **Deacon** | Daemon beacon. Background supervisor running continuous patrol cycles. Monitors system health, ensures worker activity, triggers recovery.                                             | Singleton, persistent     | `~/gt/deacon/`      |
-| **Dogs**   | The Deacon's helper agents for infrastructure tasks (NOT project work). Example: Boot (health triage dog). Dogs are lightweight Go routines or ephemeral AI sessions for narrow tasks. | Ephemeral, Deacon-managed | `~/gt/deacon/dogs/` |
+| Role | Description | Lifecycle | Location |
+|---|---|---|---|
+| **Mayor** | Global coordinator. Initiates convoys, distributes work across rigs, handles escalations, coordinates cross-rig communication. | Singleton, persistent | `~/gt/mayor/` |
+| **Deacon** | Daemon beacon. Background supervisor running continuous patrol cycles. Monitors system health, ensures worker activity, triggers recovery. | Singleton, persistent | `~/gt/deacon/` |
+| **Dogs** | The Deacon's helper agents for infrastructure tasks (NOT project work). Example: Boot (health triage dog). Dogs are lightweight Go routines or ephemeral AI sessions for narrow tasks. | Ephemeral, Deacon-managed | `~/gt/deacon/dogs/` |
 
 #### Rig-Level Agents (Per-Project)
 
-| Role         | Description                                                                                                                                                                                                                                                                   | Lifecycle                  | Location                     |
-| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------- | ---------------------------- |
-| **Witness**  | Per-rig polecat lifecycle manager. Monitors polecat health, nudges stuck workers, handles cleanup, triggers escalations.                                                                                                                                                      | One per rig, persistent    | `<rig>/witness/`             |
-| **Refinery** | Per-rig merge queue processor. Intelligently merges changes from polecats, handles conflicts, runs quality gates, ensures code quality before changes reach main.                                                                                                             | One per rig, persistent    | `<rig>/refinery/rig/`        |
-| **Polecat**  | Ephemeral worker agents that produce merge requests. Spawned for specific tasks, work in isolated git worktrees, submit to merge queue when done, then self-clean. There is **no idle state** — polecats are either working, stalled (crashed), or zombie (`gt done` failed). | Transient, Witness-managed | `<rig>/polecats/<name>/rig/` |
-| **Crew**     | Persistent worker agents for long-lived collaboration. Human-managed, no automatic monitoring. Push to main directly (no merge queue).                                                                                                                                        | Long-lived, user-managed   | `<rig>/crew/<name>/rig/`     |
+| Role | Description | Lifecycle | Location |
+|---|---|---|---|
+| **Witness** | Per-rig polecat lifecycle manager. Monitors polecat health, nudges stuck workers, handles cleanup, triggers escalations. | One per rig, persistent | `<rig>/witness/` |
+| **Refinery** | Per-rig merge queue processor. Intelligently merges changes from polecats, handles conflicts, runs quality gates, ensures code quality before changes reach main. | One per rig, persistent | `<rig>/refinery/rig/` |
+| **Polecat** | Ephemeral worker agents that produce merge requests. Spawned for specific tasks, work in isolated git worktrees, submit to merge queue when done, then self-clean. There is **no idle state** — polecats are either working, stalled (crashed), or zombie (`gt done` failed). | Transient, Witness-managed | `<rig>/polecats/<name>/rig/` |
+| **Crew** | Persistent worker agents for long-lived collaboration. Human-managed, no automatic monitoring. Push to main directly (no merge queue). | Long-lived, user-managed | `<rig>/crew/<name>/rig/` |
 
 #### Key Distinctions
 
@@ -114,21 +114,21 @@ Gastown has seven distinct agent roles organized into two tiers:
 
 Polecats have three distinct lifecycle layers that operate independently:
 
-| Layer       | Component                                    | Lifecycle  | Persistence             |
-| ----------- | -------------------------------------------- | ---------- | ----------------------- |
-| **Session** | AI agent instance (e.g., Claude in tmux)     | Ephemeral  | Cycles per step/handoff |
-| **Sandbox** | Git worktree (the working directory)         | Persistent | Until nuke              |
-| **Slot**    | Name from pool (Toast, Shadow, Copper, etc.) | Persistent | Until nuke              |
+| Layer | Component | Lifecycle | Persistence |
+|---|---|---|---|
+| **Session** | AI agent instance (e.g., Claude in tmux) | Ephemeral | Cycles per step/handoff |
+| **Sandbox** | Git worktree (the working directory) | Persistent | Until nuke |
+| **Slot** | Name from pool (Toast, Shadow, Copper, etc.) | Persistent | Until nuke |
 
 **Session cycling is normal operation**, not failure. A polecat may cycle through many sessions while working on a single task (via `gt handoff` between molecule steps, compaction triggers, or crash recovery). The sandbox and slot persist across all session cycles.
 
 **Polecat states** (there are exactly three — no idle state):
 
-| State       | Description                                                         |
-| ----------- | ------------------------------------------------------------------- |
-| **Working** | Actively doing assigned work                                        |
+| State | Description |
+|---|---|
+| **Working** | Actively doing assigned work |
 | **Stalled** | Session stopped mid-work (crashed/interrupted without being nudged) |
-| **Zombie**  | Completed work but failed to die (`gt done` failed during cleanup)  |
+| **Zombie** | Completed work but failed to die (`gt done` failed during cleanup) |
 
 **Lifecycle flow**: `gt sling` → allocate slot → create worktree → start session → hook molecule → work happens (with session cycling) → `gt done` → push branch → submit to merge queue → request self-nuke → polecat is gone.
 
@@ -138,15 +138,15 @@ Polecats have three distinct lifecycle layers that operate independently:
 
 #### Work Units
 
-| Concept           | Description                                                                                                                                                                       |
-| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Bead**          | Git-backed atomic work unit (JSONL). The fundamental tracking primitive. Can represent issues, tasks, messages, escalations, MRs, agent identity records.                         |
-| **Hook**          | A special pinned Bead for each agent — their current assignment. GUPP: if work is on your hook, you run it immediately.                                                           |
-| **Formula**       | TOML-based workflow source template. Defines reusable patterns for multi-step operations (e.g., polecat work, patrol cycles, code review).                                        |
-| **Protomolecule** | A frozen template created from a formula via `bd cook`. Ready for instantiation.                                                                                                  |
-| **Molecule**      | A durable, active workflow instance with trackable steps. Each step is a Bead. Molecules survive agent restarts and ensure complex workflows complete. Created via `bd mol pour`. |
-| **Wisp**          | An ephemeral molecule for patrol cycles and operational loops. Never synced to persistent storage. Created via `bd mol wisp`. Used by patrol agents to avoid accumulating data.   |
-| **Convoy**        | A persistent tracking unit that monitors related beads across multiple rigs. Convoys group related tasks and track progress to "landing" (all tracked issues closed).             |
+| Concept | Description |
+|---|---|
+| **Bead** | Git-backed atomic work unit (JSONL). The fundamental tracking primitive. Can represent issues, tasks, messages, escalations, MRs, agent identity records. |
+| **Hook** | A special pinned Bead for each agent — their current assignment. GUPP: if work is on your hook, you run it immediately. |
+| **Formula** | TOML-based workflow source template. Defines reusable patterns for multi-step operations (e.g., polecat work, patrol cycles, code review). |
+| **Protomolecule** | A frozen template created from a formula via `bd cook`. Ready for instantiation. |
+| **Molecule** | A durable, active workflow instance with trackable steps. Each step is a Bead. Molecules survive agent restarts and ensure complex workflows complete. Created via `bd mol pour`. |
+| **Wisp** | An ephemeral molecule for patrol cycles and operational loops. Never synced to persistent storage. Created via `bd mol wisp`. Used by patrol agents to avoid accumulating data. |
+| **Convoy** | A persistent tracking unit that monitors related beads across multiple rigs. Convoys group related tasks and track progress to "landing" (all tracked issues closed). |
 
 #### Molecule Lifecycle
 
@@ -177,16 +177,16 @@ Agents navigate molecules with `bd mol current` (where am I?), `bd close <step> 
 
 Agents coordinate via typed mail messages routed through the Beads system. Key message types:
 
-| Type             | Route                        | Purpose                                          |
-| ---------------- | ---------------------------- | ------------------------------------------------ |
-| `POLECAT_DONE`   | Polecat → Witness            | Signal work completion, trigger cleanup          |
-| `MERGE_READY`    | Witness → Refinery           | Branch ready for merge queue processing          |
-| `MERGED`         | Refinery → Witness           | Branch merged successfully, safe to nuke polecat |
-| `MERGE_FAILED`   | Refinery → Witness           | Merge failed (tests/build), needs rework         |
-| `REWORK_REQUEST` | Refinery → Witness → Polecat | Rebase needed due to merge conflicts             |
-| `WITNESS_PING`   | Witness → Deacon             | Second-order monitoring (ensure Deacon is alive) |
-| `HELP`           | Any → Mayor                  | Request intervention for stuck/blocked work      |
-| `HANDOFF`        | Agent → self                 | Session continuity data across context limits    |
+| Type | Route | Purpose |
+|---|---|---|
+| `POLECAT_DONE` | Polecat → Witness | Signal work completion, trigger cleanup |
+| `MERGE_READY` | Witness → Refinery | Branch ready for merge queue processing |
+| `MERGED` | Refinery → Witness | Branch merged successfully, safe to nuke polecat |
+| `MERGE_FAILED` | Refinery → Witness | Merge failed (tests/build), needs rework |
+| `REWORK_REQUEST` | Refinery → Witness → Polecat | Rebase needed due to merge conflicts |
+| `WITNESS_PING` | Witness → Deacon | Second-order monitoring (ensure Deacon is alive) |
+| `HELP` | Any → Mayor | Request intervention for stuck/blocked work |
+| `HANDOFF` | Agent → self | Session continuity data across context limits |
 
 Mail addresses use slash-separated path format: `gastown/witness`, `gastown/polecats/toast`, `mayor/`, `deacon/`.
 
@@ -206,14 +206,14 @@ Advanced messaging primitives:
 
 All work is attributed to the agent who performed it via the `BD_ACTOR` environment variable:
 
-| Role     | BD_ACTOR Format         | Example                  |
-| -------- | ----------------------- | ------------------------ |
-| Mayor    | `mayor`                 | `mayor`                  |
-| Deacon   | `deacon`                | `deacon`                 |
-| Witness  | `{rig}/witness`         | `gastown/witness`        |
-| Refinery | `{rig}/refinery`        | `gastown/refinery`       |
-| Crew     | `{rig}/crew/{name}`     | `gastown/crew/joe`       |
-| Polecat  | `{rig}/polecats/{name}` | `gastown/polecats/toast` |
+| Role | BD_ACTOR Format | Example |
+|---|---|---|
+| Mayor | `mayor` | `mayor` |
+| Deacon | `deacon` | `deacon` |
+| Witness | `{rig}/witness` | `gastown/witness` |
+| Refinery | `{rig}/refinery` | `gastown/refinery` |
+| Crew | `{rig}/crew/{name}` | `gastown/crew/joe` |
+| Polecat | `{rig}/polecats/{name}` | `gastown/polecats/toast` |
 
 Attribution flows through:
 
@@ -245,12 +245,12 @@ Daemon (Go process)           ← Dumb transport, 3-min heartbeat tick
 
 **Boot decision matrix**:
 
-| Condition                         | Action                                             |
-| --------------------------------- | -------------------------------------------------- |
-| Deacon session dead               | START (exit; daemon calls `ensureDeaconRunning()`) |
-| Heartbeat > 15 min                | WAKE (nudge Deacon)                                |
-| Heartbeat 5–15 min + pending mail | NUDGE (send check-in)                              |
-| Heartbeat fresh                   | NOTHING (exit silently)                            |
+| Condition | Action |
+|---|---|
+| Deacon session dead | START (exit; daemon calls `ensureDeaconRunning()`) |
+| Heartbeat > 15 min | WAKE (nudge Deacon) |
+| Heartbeat 5–15 min + pending mail | NUDGE (send check-in) |
+| Heartbeat fresh | NOTHING (exit silently) |
 
 **Why two AI agents?** The Deacon can't observe itself (a hung Deacon can't detect it's hung). Boot provides an external observer with fresh context each tick.
 
@@ -270,11 +270,11 @@ Convoys are the primary unit for tracking batched work across rigs. Even a singl
 
 Severity-routed escalation with tiered routing and auto-re-escalation:
 
-| Severity   | Default Route                         |
-| ---------- | ------------------------------------- |
-| `low`      | Bead only (record)                    |
-| `medium`   | Bead + mail Mayor                     |
-| `high`     | Bead + mail Mayor + email human       |
+| Severity | Default Route |
+|---|---|
+| `low` | Bead only (record) |
+| `medium` | Bead + mail Mayor |
+| `high` | Bead + mail Mayor + email human |
 | `critical` | Bead + mail Mayor + email + SMS human |
 
 **Escalation categories**: `decision`, `help`, `blocked`, `failed`, `emergency`, `gate_timeout`, `lifecycle`.
@@ -338,9 +338,9 @@ Event types include: `patrol.muted`, `patrol.unmuted`, `agent.started`, `agent.s
 
 Agent context (role instructions, environment) is delivered via two mechanisms:
 
-| Method                                 | Roles                           | How                                                                                     |
-| -------------------------------------- | ------------------------------- | --------------------------------------------------------------------------------------- |
-| **On-disk CLAUDE.md**                  | Mayor, Refinery                 | Written to the agent's working directory inside the git worktree                        |
+| Method | Roles | How |
+|---|---|---|
+| **On-disk CLAUDE.md** | Mayor, Refinery | Written to the agent's working directory inside the git worktree |
 | **Ephemeral injection via `gt prime`** | Deacon, Witness, Crew, Polecats | Injected at `SessionStart` hook. Not persisted to disk to avoid polluting source repos. |
 
 **Sparse checkout** is used to exclude context files (`.claude/`, `CLAUDE.md`, `.mcp.json`) from source repos, ensuring agents use Gastown's context rather than the project's.
@@ -1012,24 +1012,24 @@ cloud/cloudflare-gastown/plugin/
 
 #### Tools (Phase 1 — minimum viable set)
 
-| Tool             | Description                                                              | Rig DO Method                    |
-| ---------------- | ------------------------------------------------------------------------ | -------------------------------- |
-| `gt_prime`       | Get full role context: identity, hooked work, instructions, pending mail | `prime(agentId)`                 |
-| `gt_bead_status` | Read the status of a bead                                                | `getBeadAsync(beadId)`           |
-| `gt_bead_close`  | Close current bead or molecule step                                      | `closeBead(beadId)`              |
-| `gt_done`        | Signal work complete — push branch, submit to review queue               | `agentDone(agentId, ...)`        |
-| `gt_mail_send`   | Send a typed message to another agent                                    | `sendMail(...)`                  |
-| `gt_mail_check`  | Read and acknowledge pending mail                                        | `checkMail(agentId)`             |
-| `gt_escalate`    | Escalate an issue with severity and category                             | `createBead(type: 'escalation')` |
-| `gt_checkpoint`  | Write crash-recovery data                                                | `writeCheckpoint(agentId, ...)`  |
+| Tool | Description | Rig DO Method |
+|---|---|---|
+| `gt_prime` | Get full role context: identity, hooked work, instructions, pending mail | `prime(agentId)` |
+| `gt_bead_status` | Read the status of a bead | `getBeadAsync(beadId)` |
+| `gt_bead_close` | Close current bead or molecule step | `closeBead(beadId)` |
+| `gt_done` | Signal work complete — push branch, submit to review queue | `agentDone(agentId, ...)` |
+| `gt_mail_send` | Send a typed message to another agent | `sendMail(...)` |
+| `gt_mail_check` | Read and acknowledge pending mail | `checkMail(agentId)` |
+| `gt_escalate` | Escalate an issue with severity and category | `createBead(type: 'escalation')` |
+| `gt_checkpoint` | Write crash-recovery data | `writeCheckpoint(agentId, ...)` |
 
 #### Plugin Event Hooks
 
-| Event               | Action                                                               |
-| ------------------- | -------------------------------------------------------------------- |
-| `session.created`   | Auto-call `gt_prime` and inject result into session context          |
-| `session.compacted` | Re-call `gt_prime` to restore context after compaction               |
-| `session.deleted`   | Notify Rig DO that the session has ended (for cleanup/cost tracking) |
+| Event | Action |
+|---|---|
+| `session.created` | Auto-call `gt_prime` and inject result into session context |
+| `session.compacted` | Re-call `gt_prime` to restore context after compaction |
+| `session.deleted` | Notify Rig DO that the session has ended (for cleanup/cost tracking) |
 
 #### Changes from original proposal
 
@@ -1037,13 +1037,13 @@ The plugin is unchanged in its tool definitions and event hooks. The difference 
 
 #### Environment Variables (set by the container's control server when spawning a Kilo CLI process)
 
-| Var                     | Value                                               |
-| ----------------------- | --------------------------------------------------- |
-| `GASTOWN_API_URL`       | Worker URL: `https://gastown.<account>.workers.dev` |
-| `GASTOWN_SESSION_TOKEN` | Short-lived JWT for this agent session              |
-| `GASTOWN_AGENT_ID`      | This agent's UUID                                   |
-| `GASTOWN_RIG_ID`        | This rig's UUID                                     |
-| `KILO_API_URL`          | Kilo gateway URL (for LLM calls)                    |
+| Var | Value |
+|---|---|
+| `GASTOWN_API_URL` | Worker URL: `https://gastown.<account>.workers.dev` |
+| `GASTOWN_SESSION_TOKEN` | Short-lived JWT for this agent session |
+| `GASTOWN_AGENT_ID` | This agent's UUID |
+| `GASTOWN_RIG_ID` | This rig's UUID |
+| `KILO_API_URL` | Kilo gateway URL (for LLM calls) |
 
 ---
 
@@ -1445,14 +1445,14 @@ Each agent becomes a **session** within a `kilo serve` instance rather than its 
 
 #### Component Changes
 
-| Component                                 | Current                                           | After                                                             |
-| ----------------------------------------- | ------------------------------------------------- | ----------------------------------------------------------------- |
-| `process-manager.ts`                      | Raw `Bun.spawn` child process management          | `kilo serve` instances via SDK, session-based agent tracking      |
-| `agent-runner.ts`                         | Builds CLI args for `kilo code --non-interactive` | Creates sessions on running server, sends initial prompt via HTTP |
-| `control-server.ts` `/agents/start`       | Spawns a process                                  | Creates a session on an existing (or new) server instance         |
-| `control-server.ts` `/agents/:id/message` | Writes to stdin pipe                              | `POST /session/:id/message`                                       |
-| `control-server.ts` `/agents/:id/status`  | Process lifecycle (pid, exit code)                | Session-level status with tool/message detail                     |
-| `heartbeat.ts`                            | Reports process alive/dead                        | Reports session status + active tool calls from SSE events        |
+| Component | Current | After |
+|---|---|---|
+| `process-manager.ts` | Raw `Bun.spawn` child process management | `kilo serve` instances via SDK, session-based agent tracking |
+| `agent-runner.ts` | Builds CLI args for `kilo code --non-interactive` | Creates sessions on running server, sends initial prompt via HTTP |
+| `control-server.ts` `/agents/start` | Spawns a process | Creates a session on an existing (or new) server instance |
+| `control-server.ts` `/agents/:id/message` | Writes to stdin pipe | `POST /session/:id/message` |
+| `control-server.ts` `/agents/:id/status` | Process lifecycle (pid, exit code) | Session-level status with tool/message detail |
+| `heartbeat.ts` | Reports process alive/dead | Reports session status + active tool calls from SSE events |
 
 #### What Stays the Same
 
@@ -1588,10 +1588,10 @@ export const gastownRouter = router({
 
 #### Pages
 
-| Route                            | Component  | Purpose                                                   |
-| -------------------------------- | ---------- | --------------------------------------------------------- |
-| `/gastown`                       | Town list  | List user's towns, create new town                        |
-| `/gastown/[townId]`              | Town home  | Split view: Mayor chat (left) + town dashboard (right)    |
+| Route | Component | Purpose |
+|---|---|---|
+| `/gastown` | Town list | List user's towns, create new town |
+| `/gastown/[townId]` | Town home | Split view: Mayor chat (left) + town dashboard (right) |
 | `/gastown/[townId]/rigs/[rigId]` | Rig detail | Bead board, agent roster, merge queue, agent stream panel |
 
 #### Town Home — Mayor Chat + Dashboard
@@ -1648,15 +1648,15 @@ New tRPC subscription or SSE endpoint: `GET /api/towns/:townId/events`
 
 #### New tRPC Procedures Needed
 
-| Procedure               | Type             | Purpose                                    |
-| ----------------------- | ---------------- | ------------------------------------------ |
-| `getConvoys`            | query            | List convoys for a town (with bead counts) |
-| `getConvoy`             | query            | Single convoy with all tracked beads       |
-| `getBeadEvents`         | query            | Append-only event history for a bead       |
-| `getAgentHistory`       | query            | Completed beads for an agent (CV)          |
-| `getAgentMail`          | query            | Recent mail for an agent                   |
-| `getTownEvents`         | subscription/SSE | Real-time event stream for the town        |
-| `acknowledgeEscalation` | mutation         | Mark escalation as acknowledged            |
+| Procedure | Type | Purpose |
+|---|---|---|
+| `getConvoys` | query | List convoys for a town (with bead counts) |
+| `getConvoy` | query | Single convoy with all tracked beads |
+| `getBeadEvents` | query | Append-only event history for a bead |
+| `getAgentHistory` | query | Completed beads for an agent (CV) |
+| `getAgentMail` | query | Recent mail for an agent |
+| `getTownEvents` | subscription/SSE | Real-time event stream for the town |
+| `acknowledgeEscalation` | mutation | Mark escalation as acknowledged |
 
 ---
 
@@ -1831,12 +1831,12 @@ A new **Settings** page in the town sidebar (`/gastown/[townId]/settings`):
 
 #### tRPC Procedures
 
-| Procedure           | Type     | Purpose                                  |
-| ------------------- | -------- | ---------------------------------------- |
-| `getTownConfig`     | query    | Read town configuration                  |
-| `updateTownConfig`  | mutation | Update town-level config (partial merge) |
-| `getAgentConfig`    | query    | Read agent-level overrides               |
-| `updateAgentConfig` | mutation | Update per-agent overrides               |
+| Procedure | Type | Purpose |
+|---|---|---|
+| `getTownConfig` | query | Read town configuration |
+| `updateTownConfig` | mutation | Update town-level config (partial merge) |
+| `getAgentConfig` | query | Read agent-level overrides |
+| `updateAgentConfig` | mutation | Update per-agent overrides |
 
 #### Security
 
@@ -1991,14 +1991,14 @@ New DO binding `MAYOR` for `MayorDO`, new migration tag `v3`.
 
 #### Tools
 
-| Tool               | Description                                 | Proxies to                    |
-| ------------------ | ------------------------------------------- | ----------------------------- |
-| `gt_sling`         | Sling a task to a polecat in a specific rig | `RigDO.slingBead(rigId, ...)` |
-| `gt_list_rigs`     | List all rigs in the town                   | `GastownUserDO.listRigs()`    |
-| `gt_list_beads`    | List beads in a rig (filterable by status)  | `RigDO.listBeads(filter)`     |
-| `gt_list_agents`   | List agents in a rig                        | `RigDO.listAgents(filter)`    |
-| `gt_mail_send`     | Send mail to an agent in any rig            | `RigDO.sendMail(...)`         |
-| `gt_convoy_create` | Create a convoy tracking multiple beads     | Future — convoy system        |
+| Tool | Description | Proxies to |
+|---|---|---|
+| `gt_sling` | Sling a task to a polecat in a specific rig | `RigDO.slingBead(rigId, ...)` |
+| `gt_list_rigs` | List all rigs in the town | `GastownUserDO.listRigs()` |
+| `gt_list_beads` | List beads in a rig (filterable by status) | `RigDO.listBeads(filter)` |
+| `gt_list_agents` | List agents in a rig | `RigDO.listAgents(filter)` |
+| `gt_mail_send` | Send mail to an agent in any rig | `RigDO.sendMail(...)` |
+| `gt_convoy_create` | Create a convoy tracking multiple beads | Future — convoy system |
 
 Tools are HTTP endpoints on the Gastown worker, called by the mayor's kilo serve process using `GASTOWN_SESSION_TOKEN` for auth. The mayor's system prompt describes available tools and when to use them.
 
@@ -2048,10 +2048,10 @@ The refinery agent can reason about test failures — if tests fail, it can exam
 
 #### New Tools (added to plugin)
 
-| Tool             | Description                                                  |
-| ---------------- | ------------------------------------------------------------ |
+| Tool | Description |
+|---|---|
 | `gt_mol_current` | Get current molecule step (title, instructions, step N of M) |
-| `gt_mol_advance` | Complete current step with summary, advance to next          |
+| `gt_mol_advance` | Complete current step with summary, advance to next |
 
 ---
 
@@ -2075,11 +2075,11 @@ The refinery agent can reason about test failures — if tests fail, it can exam
 
 #### Severity Routing
 
-| Severity   | Action                                    |
-| ---------- | ----------------------------------------- |
-| `low`      | Record in bead events only                |
-| `medium`   | + send mail to Mayor agent                |
-| `high`     | + webhook to user (email/Slack)           |
+| Severity | Action |
+|---|---|
+| `low` | Record in bead events only |
+| `medium` | + send mail to Mayor agent |
+| `high` | + webhook to user (email/Slack) |
 | `critical` | + mark convoy as blocked, alert dashboard |
 
 #### Auto-Re-Escalation
@@ -2394,23 +2394,23 @@ The product vision requires a live activity feed showing "beads created, agents 
 
 ### Assessment Summary
 
-| Aspect                                                    | Status         | Verdict                                                        |
-| --------------------------------------------------------- | -------------- | -------------------------------------------------------------- |
-| Core loop (sling → alarm → dispatch → agent works → done) | ✅ Implemented | Works, needs Refinery endpoint to close the loop               |
-| Rig DO state machine                                      | ✅ Solid       | Production-quality, well-tested                                |
-| Container + kilo serve                                    | ✅ Solid       | Fully adopted, clean architecture                              |
-| Tool plugin                                               | ✅ Complete    | 8 tools, good tests, security boundaries                       |
-| Mayor persistent session                                  | ✅ Working     | Session lifecycle, health monitoring                           |
-| Mayor tools (delegation)                                  | ❌ Missing     | #339 — highest priority for product vision                     |
-| Agent streaming to browser                                | ❌ Incomplete  | Stream tickets exist but no WebSocket/SSE endpoint serves them |
-| Refinery / merge flow                                     | ❌ Missing     | Container has no `/merge` endpoint; review queue is a dead end |
-| Witness as agent                                          | ⚠️ Alarm-only  | Works mechanically but not transparent/observable              |
-| Town DO / convoys                                         | ❌ Missing     | No cross-rig coordination, no convoy tracking                  |
-| Event log for dashboard                                   | ❌ Missing     | No append-only event stream for real-time feed                 |
-| Postgres read replica                                     | ❌ Not started | All reads go through DO RPCs                                   |
-| Molecules                                                 | ⚠️ Schema only | Table exists, no business logic                                |
-| Polecat system prompt                                     | ⚠️ Not wired   | Detailed prompt exists but isn't used                          |
-| Identity / attribution                                    | ⚠️ Partial     | `GIT_AUTHOR_NAME` is set but no CV / AgentIdentity tracking    |
+| Aspect | Status | Verdict |
+|---|---|---|
+| Core loop (sling → alarm → dispatch → agent works → done) | ✅ Implemented | Works, needs Refinery endpoint to close the loop |
+| Rig DO state machine | ✅ Solid | Production-quality, well-tested |
+| Container + kilo serve | ✅ Solid | Fully adopted, clean architecture |
+| Tool plugin | ✅ Complete | 8 tools, good tests, security boundaries |
+| Mayor persistent session | ✅ Working | Session lifecycle, health monitoring |
+| Mayor tools (delegation) | ❌ Missing | #339 — highest priority for product vision |
+| Agent streaming to browser | ❌ Incomplete | Stream tickets exist but no WebSocket/SSE endpoint serves them |
+| Refinery / merge flow | ❌ Missing | Container has no `/merge` endpoint; review queue is a dead end |
+| Witness as agent | ⚠️ Alarm-only | Works mechanically but not transparent/observable |
+| Town DO / convoys | ❌ Missing | No cross-rig coordination, no convoy tracking |
+| Event log for dashboard | ❌ Missing | No append-only event stream for real-time feed |
+| Postgres read replica | ❌ Not started | All reads go through DO RPCs |
+| Molecules | ⚠️ Schema only | Table exists, no business logic |
+| Polecat system prompt | ⚠️ Not wired | Detailed prompt exists but isn't used |
+| Identity / attribution | ⚠️ Partial | `GIT_AUTHOR_NAME` is set but no CV / AgentIdentity tracking |
 
 ### Recommended Priority Adjustments
 

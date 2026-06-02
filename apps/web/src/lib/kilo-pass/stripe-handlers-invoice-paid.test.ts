@@ -10,16 +10,20 @@ import {
   kilo_pass_pause_events,
   kilo_pass_scheduled_changes,
   kilo_pass_subscriptions,
+  kilo_pass_welcome_promo_payment_fingerprint_claims,
+  user_affiliate_attributions,
+  user_affiliate_events,
 } from '@kilocode/db/schema';
 import { KiloPassAuditLogAction } from './enums';
 import { KiloPassIssuanceItemKind } from './enums';
 import { KiloPassIssuanceSource } from './enums';
 import { KiloPassCadence } from './enums';
 import { KiloPassScheduledChangeStatus } from './enums';
-import { KiloPassTier } from '@/lib/kilo-pass/enums';
+import { KiloPassTier, KiloPassWelcomePromoEligibilityReason } from '@/lib/kilo-pass/enums';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { and, eq } from 'drizzle-orm';
 import type Stripe from 'stripe';
+import type * as affiliateEventsModule from '@/lib/impact/affiliate-events';
 import { randomUUID } from 'node:crypto';
 
 function ensureKiloPassStripePriceIdEnv(): void {
@@ -71,10 +75,14 @@ function makeStripeInvoice(params: {
   period_start_seconds?: number;
   created_seconds?: number;
   paid_seconds?: number;
+  currency?: string;
   subscriptionIdOrExpanded?: string | Stripe.Subscription | null;
   metadata?: Stripe.Metadata | null;
   priceId: string | null;
   invoicePaymentId?: string | null;
+  paymentIntentId?: string;
+  invoicePayment?: Stripe.InvoicePayment.Payment;
+  promotionCode?: string;
 }): Stripe.Invoice {
   const subscriptionUnion = params.subscriptionIdOrExpanded ?? null;
   const metadata = params.metadata ?? null;
@@ -87,12 +95,26 @@ function makeStripeInvoice(params: {
     id: params.id,
     object: 'invoice',
     amount_paid: params.amount_paid_cents,
+    currency: params.currency ?? 'usd',
     period_start: params.period_start_seconds,
     created: params.created_seconds,
     status_transitions:
       typeof params.paid_seconds === 'number'
         ? ({ paid_at: params.paid_seconds } as Stripe.Invoice.StatusTransitions)
         : null,
+    discounts: params.promotionCode
+      ? ([
+          {
+            id: `di_${Math.random()}`,
+            object: 'discount',
+            promotion_code: {
+              id: `promo_${Math.random()}`,
+              object: 'promotion_code',
+              code: params.promotionCode,
+            },
+          },
+        ] as unknown as Stripe.Invoice['discounts'])
+      : [],
     payments:
       invoicePaymentId === null
         ? undefined
@@ -107,11 +129,14 @@ function makeStripeInvoice(params: {
                 amount_paid: params.amount_paid_cents,
                 amount_requested: params.amount_paid_cents,
                 created: params.created_seconds ?? 1_735_689_600,
-                currency: 'usd',
+                currency: params.currency ?? 'usd',
                 invoice: params.id,
                 is_default: true,
                 livemode: false,
-                payment: { type: 'payment_intent', payment_intent: `pi_${Math.random()}` },
+                payment: params.invoicePayment ?? {
+                  type: 'payment_intent',
+                  payment_intent: params.paymentIntentId ?? `pi_${Math.random()}`,
+                },
                 status: 'paid',
                 status_transitions: { canceled_at: null, paid_at: params.paid_seconds ?? null },
               } as unknown as Stripe.InvoicePayment,
@@ -149,6 +174,52 @@ function makeStripeInvoice(params: {
   } as unknown as Stripe.Invoice;
 }
 
+type SupportedFingerprintMethodType =
+  | 'card'
+  | 'sepa_debit'
+  | 'us_bank_account'
+  | 'bacs_debit'
+  | 'au_becs_debit';
+
+function makeFingerprintPaymentMethod(
+  type: SupportedFingerprintMethodType,
+  fingerprint: string | null
+): Stripe.PaymentMethod {
+  return {
+    id: `pm_${type}_${fingerprint ?? 'missing'}`,
+    object: 'payment_method',
+    type,
+    [type]: { fingerprint },
+  } as unknown as Stripe.PaymentMethod;
+}
+
+function makeFingerprintPaymentIntent(
+  id: string,
+  type: SupportedFingerprintMethodType,
+  fingerprint: string | null
+): Stripe.PaymentIntent {
+  return {
+    id,
+    object: 'payment_intent',
+    payment_method: makeFingerprintPaymentMethod(type, fingerprint),
+  } as unknown as Stripe.PaymentIntent;
+}
+
+function makeFingerprintCharge(
+  id: string,
+  type: SupportedFingerprintMethodType,
+  fingerprint: string | null
+): Stripe.Charge {
+  return {
+    id,
+    object: 'charge',
+    payment_method_details: {
+      type,
+      [type]: { fingerprint },
+    },
+  } as unknown as Stripe.Charge;
+}
+
 function kiloPassMetadata(params: {
   kiloUserId: string;
   tier: KiloPassTier;
@@ -164,6 +235,30 @@ function kiloPassMetadata(params: {
       ? { kiloPassScheduledChangeId: params.kiloPassScheduledChangeId }
       : {}),
   };
+}
+
+async function seedDeliveredImpactSignupEvent(userId: string, email: string): Promise<void> {
+  const { recordAffiliateAttributionAndQueueParentEvent } =
+    await import('@/lib/impact/affiliate-events');
+  const parentEvent = await recordAffiliateAttributionAndQueueParentEvent({
+    userId,
+    provider: 'impact',
+    trackingId: 'impact-click-123',
+    customerEmail: email,
+    eventDate: new Date('2026-04-09T09:50:00.000Z'),
+  });
+
+  expect(parentEvent).not.toBeNull();
+  if (!parentEvent) throw new Error('Expected Impact signup event');
+
+  await db
+    .update(user_affiliate_events)
+    .set({
+      delivery_state: 'delivered',
+      claimed_at: '2026-04-09T09:55:00.000Z',
+      next_retry_at: null,
+    })
+    .where(eq(user_affiliate_events.id, parentEvent.id));
 }
 
 async function seedBaseIssuance(params: {
@@ -300,6 +395,665 @@ describe('handleKiloPassInvoicePaid', () => {
     expect(retrieve).not.toHaveBeenCalled();
   });
 
+  test('monthly: attributed paid invoice queues Impact sale from settled invoice facts', async () => {
+    const { handleKiloPassInvoicePaid } =
+      await import('@/lib/kilo-pass/stripe-handlers-invoice-paid');
+
+    const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
+    await seedDeliveredImpactSignupEvent(user.id, user.google_user_email);
+
+    const stripeSubId = `sub_affiliate_${Math.random()}`;
+    const meta = kiloPassMetadata({
+      kiloUserId: user.id,
+      tier: KiloPassTier.Tier19,
+      cadence: KiloPassCadence.Monthly,
+    });
+    const subscription = makeStripeSubscription({
+      id: stripeSubId,
+      start_date_seconds: 1_767_225_600,
+      metadata: meta,
+    });
+    const stripe = {
+      subscriptions: {
+        retrieve: jest.fn(async () => subscription),
+      },
+    };
+    const priceId = await getKiloPassPriceId({
+      tier: KiloPassTier.Tier19,
+      cadence: KiloPassCadence.Monthly,
+    });
+    const invoiceId = `inv_affiliate_${Math.random()}`;
+    const invoice = makeStripeInvoice({
+      id: invoiceId,
+      amount_paid_cents: 1234,
+      currency: 'eur',
+      period_start_seconds: 1_767_225_600,
+      created_seconds: 1_767_225_600,
+      paid_seconds: 1_767_830_400,
+      priceId,
+      subscriptionIdOrExpanded: stripeSubId,
+      metadata: meta,
+    });
+
+    await handleKiloPassInvoicePaid({
+      eventId: 'evt_affiliate_sale',
+      invoice,
+      stripe: stripe as unknown as Stripe,
+    });
+
+    const events = await db
+      .select()
+      .from(user_affiliate_events)
+      .where(eq(user_affiliate_events.user_id, user.id));
+    expect(events.map(event => event.event_type).sort()).toEqual(['sale', 'signup']);
+
+    const saleEvent = events.find(event => event.event_type === 'sale');
+    expect(saleEvent).toEqual(
+      expect.objectContaining({
+        delivery_state: 'queued',
+        dedupe_key: `affiliate:impact:sale:${invoiceId}`,
+        payload_json: expect.objectContaining({
+          orderId: invoiceId,
+          amount: 12.34,
+          currencyCode: 'eur',
+          eventDate: '2026-01-08T00:00:00.000Z',
+          itemCategory: 'kilo-pass-tier-19-monthly',
+          itemName: 'Kilo Pass Tier 19 Monthly',
+          itemSku: priceId,
+        }),
+      })
+    );
+  });
+
+  test('monthly: sale fallback occurrence time preserves recoverable Stripe charge identity', async () => {
+    const observedBeforeHandling = Date.now();
+    const { handleKiloPassInvoicePaid } =
+      await import('@/lib/kilo-pass/stripe-handlers-invoice-paid');
+    const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
+    await seedDeliveredImpactSignupEvent(user.id, user.google_user_email);
+    const stripeSubId = `sub_affiliate_charge_${Math.random()}`;
+    const meta = kiloPassMetadata({
+      kiloUserId: user.id,
+      tier: KiloPassTier.Tier19,
+      cadence: KiloPassCadence.Monthly,
+    });
+    const subscription = makeStripeSubscription({
+      id: stripeSubId,
+      start_date_seconds: 1_767_225_600,
+      metadata: meta,
+    });
+    const priceId = await getKiloPassPriceId({
+      tier: KiloPassTier.Tier19,
+      cadence: KiloPassCadence.Monthly,
+    });
+    const invoiceId = `inv_affiliate_charge_${Math.random()}`;
+    const invoice = makeStripeInvoice({
+      id: invoiceId,
+      amount_paid_cents: 1900,
+      period_start_seconds: 1_767_225_600,
+      created_seconds: 1_767_225_600,
+      priceId,
+      subscriptionIdOrExpanded: stripeSubId,
+      metadata: meta,
+      invoicePaymentId: 'inpay_affiliate_charge',
+    });
+    const stripe = {
+      subscriptions: {
+        retrieve: jest.fn(async () => subscription),
+      },
+      paymentIntents: {
+        retrieve: jest.fn(async () => ({ latest_charge: 'ch_kilo_pass_sale' })),
+      },
+    };
+
+    await handleKiloPassInvoicePaid({
+      eventId: 'evt_affiliate_charge',
+      invoice,
+      stripe: stripe as unknown as Stripe,
+    });
+    const observedAfterHandling = Date.now();
+
+    const events = await db
+      .select()
+      .from(user_affiliate_events)
+      .where(eq(user_affiliate_events.user_id, user.id));
+    const saleEvent = events.find(event => event.event_type === 'sale');
+    expect(saleEvent).toEqual(
+      expect.objectContaining({
+        stripe_charge_id: 'ch_kilo_pass_sale',
+        payload_json: expect.objectContaining({
+          stripeChargeId: 'ch_kilo_pass_sale',
+        }),
+      })
+    );
+    const fallbackEventDate = Date.parse(saleEvent?.payload_json.eventDate ?? '');
+    expect(fallbackEventDate).toBeGreaterThanOrEqual(observedBeforeHandling);
+    expect(fallbackEventDate).toBeLessThanOrEqual(observedAfterHandling);
+  });
+
+  test('monthly: metadata-resolved paid invoice reports an eligible sale without synthesized SKU', async () => {
+    const { handleKiloPassInvoicePaid } =
+      await import('@/lib/kilo-pass/stripe-handlers-invoice-paid');
+    const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
+    await seedDeliveredImpactSignupEvent(user.id, user.google_user_email);
+    const stripeSubId = `sub_affiliate_sku_less_${Math.random()}`;
+    const meta = kiloPassMetadata({
+      kiloUserId: user.id,
+      tier: KiloPassTier.Tier199,
+      cadence: KiloPassCadence.Monthly,
+    });
+    const subscription = makeStripeSubscription({
+      id: stripeSubId,
+      start_date_seconds: 1_767_225_600,
+      metadata: meta,
+    });
+    const stripe = {
+      subscriptions: {
+        retrieve: jest.fn(async () => subscription),
+      },
+    };
+    const invoiceId = `inv_affiliate_sku_less_${Math.random()}`;
+    const invoice = makeStripeInvoice({
+      id: invoiceId,
+      amount_paid_cents: 19900,
+      period_start_seconds: 1_767_225_600,
+      created_seconds: 1_767_225_600,
+      paid_seconds: 1_767_225_660,
+      priceId: null,
+      subscriptionIdOrExpanded: stripeSubId,
+      metadata: meta,
+    });
+
+    await handleKiloPassInvoicePaid({
+      eventId: 'evt_affiliate_sku_less',
+      invoice,
+      stripe: stripe as unknown as Stripe,
+    });
+
+    const events = await db
+      .select()
+      .from(user_affiliate_events)
+      .where(eq(user_affiliate_events.user_id, user.id));
+    const saleEvent = events.find(event => event.event_type === 'sale');
+    expect(saleEvent?.payload_json).toEqual(
+      expect.objectContaining({
+        itemCategory: 'kilo-pass-tier-199-monthly',
+        itemName: 'Kilo Pass Tier 199 Monthly',
+        itemSku: null,
+      })
+    );
+  });
+
+  test.each([
+    {
+      tier: KiloPassTier.Tier19,
+      cadence: KiloPassCadence.Monthly,
+      itemCategory: 'kilo-pass-tier-19-monthly',
+      itemName: 'Kilo Pass Tier 19 Monthly',
+    },
+    {
+      tier: KiloPassTier.Tier19,
+      cadence: KiloPassCadence.Yearly,
+      itemCategory: 'kilo-pass-tier-19-yearly',
+      itemName: 'Kilo Pass Tier 19 Yearly',
+    },
+    {
+      tier: KiloPassTier.Tier49,
+      cadence: KiloPassCadence.Monthly,
+      itemCategory: 'kilo-pass-tier-49-monthly',
+      itemName: 'Kilo Pass Tier 49 Monthly',
+    },
+    {
+      tier: KiloPassTier.Tier49,
+      cadence: KiloPassCadence.Yearly,
+      itemCategory: 'kilo-pass-tier-49-yearly',
+      itemName: 'Kilo Pass Tier 49 Yearly',
+    },
+    {
+      tier: KiloPassTier.Tier199,
+      cadence: KiloPassCadence.Monthly,
+      itemCategory: 'kilo-pass-tier-199-monthly',
+      itemName: 'Kilo Pass Tier 199 Monthly',
+    },
+    {
+      tier: KiloPassTier.Tier199,
+      cadence: KiloPassCadence.Yearly,
+      itemCategory: 'kilo-pass-tier-199-yearly',
+      itemName: 'Kilo Pass Tier 199 Yearly',
+    },
+  ])('reports exact $itemCategory category/name classification', async classification => {
+    const { handleKiloPassInvoicePaid } =
+      await import('@/lib/kilo-pass/stripe-handlers-invoice-paid');
+    const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
+    await seedDeliveredImpactSignupEvent(user.id, user.google_user_email);
+    const stripeSubId = `sub_affiliate_classification_${classification.cadence}_${Math.random()}`;
+    const meta = kiloPassMetadata({
+      kiloUserId: user.id,
+      tier: classification.tier,
+      cadence: classification.cadence,
+    });
+    const subscription = makeStripeSubscription({
+      id: stripeSubId,
+      start_date_seconds: 1_767_225_600,
+      metadata: meta,
+    });
+    const priceId = await getKiloPassPriceId({
+      tier: classification.tier,
+      cadence: classification.cadence,
+    });
+    const invoice = makeStripeInvoice({
+      id: `inv_affiliate_classification_${classification.cadence}_${Math.random()}`,
+      amount_paid_cents: 1900,
+      period_start_seconds: 1_767_225_600,
+      created_seconds: 1_767_225_600,
+      paid_seconds: 1_767_225_660,
+      priceId,
+      subscriptionIdOrExpanded: stripeSubId,
+      metadata: meta,
+    });
+    const stripe = {
+      subscriptions: {
+        retrieve: jest.fn(async () => subscription),
+      },
+    };
+
+    await handleKiloPassInvoicePaid({
+      eventId: `evt_affiliate_classification_${classification.cadence}`,
+      invoice,
+      stripe: stripe as unknown as Stripe,
+    });
+
+    const events = await db
+      .select()
+      .from(user_affiliate_events)
+      .where(eq(user_affiliate_events.user_id, user.id));
+    const saleEvent = events.find(event => event.event_type === 'sale');
+    expect(saleEvent?.payload_json).toEqual(
+      expect.objectContaining({
+        itemCategory: classification.itemCategory,
+        itemName: classification.itemName,
+        itemSku: priceId,
+      })
+    );
+  });
+
+  test('monthly: sale eligibility excludes non-attributed, zero-paid, and unresolved metadata invoices', async () => {
+    const { handleKiloPassInvoicePaid } =
+      await import('@/lib/kilo-pass/stripe-handlers-invoice-paid');
+    const priceId = await getKiloPassPriceId({
+      tier: KiloPassTier.Tier19,
+      cadence: KiloPassCadence.Monthly,
+    });
+
+    const nonAttributedUser = await insertTestUser({
+      total_microdollars_acquired: 0,
+      microdollars_used: 0,
+    });
+    const nonAttributedSubscriptionId = `sub_non_attributed_${Math.random()}`;
+    const nonAttributedMetadata = kiloPassMetadata({
+      kiloUserId: nonAttributedUser.id,
+      tier: KiloPassTier.Tier19,
+      cadence: KiloPassCadence.Monthly,
+    });
+    await handleKiloPassInvoicePaid({
+      eventId: 'evt_non_attributed_sale_exclusion',
+      invoice: makeStripeInvoice({
+        id: `inv_non_attributed_${Math.random()}`,
+        amount_paid_cents: 1900,
+        period_start_seconds: 1_767_225_600,
+        created_seconds: 1_767_225_600,
+        priceId,
+        subscriptionIdOrExpanded: nonAttributedSubscriptionId,
+        metadata: nonAttributedMetadata,
+      }),
+      stripe: {
+        subscriptions: {
+          retrieve: jest.fn(async () =>
+            makeStripeSubscription({
+              id: nonAttributedSubscriptionId,
+              start_date_seconds: 1_767_225_600,
+              metadata: nonAttributedMetadata,
+            })
+          ),
+        },
+      } as unknown as Stripe,
+    });
+
+    const zeroPaidUser = await insertTestUser({
+      total_microdollars_acquired: 0,
+      microdollars_used: 0,
+    });
+    await seedDeliveredImpactSignupEvent(zeroPaidUser.id, zeroPaidUser.google_user_email);
+    const zeroPaidSubscriptionId = `sub_zero_paid_${Math.random()}`;
+    const zeroPaidMetadata = kiloPassMetadata({
+      kiloUserId: zeroPaidUser.id,
+      tier: KiloPassTier.Tier19,
+      cadence: KiloPassCadence.Monthly,
+    });
+    await handleKiloPassInvoicePaid({
+      eventId: 'evt_zero_paid_sale_exclusion',
+      invoice: makeStripeInvoice({
+        id: `inv_zero_paid_${Math.random()}`,
+        amount_paid_cents: 0,
+        period_start_seconds: 1_767_225_600,
+        created_seconds: 1_767_225_600,
+        priceId,
+        subscriptionIdOrExpanded: zeroPaidSubscriptionId,
+        metadata: zeroPaidMetadata,
+      }),
+      stripe: {
+        subscriptions: {
+          retrieve: jest.fn(async () =>
+            makeStripeSubscription({
+              id: zeroPaidSubscriptionId,
+              start_date_seconds: 1_767_225_600,
+              metadata: zeroPaidMetadata,
+            })
+          ),
+        },
+      } as unknown as Stripe,
+    });
+
+    const unresolvedUser = await insertTestUser({
+      total_microdollars_acquired: 0,
+      microdollars_used: 0,
+    });
+    await seedDeliveredImpactSignupEvent(unresolvedUser.id, unresolvedUser.google_user_email);
+    await handleKiloPassInvoicePaid({
+      eventId: 'evt_unresolved_sale_exclusion',
+      invoice: makeStripeInvoice({
+        id: `inv_unresolved_${Math.random()}`,
+        amount_paid_cents: 1900,
+        period_start_seconds: 1_767_225_600,
+        created_seconds: 1_767_225_600,
+        priceId: null,
+        subscriptionIdOrExpanded: `sub_unresolved_${Math.random()}`,
+        metadata: {
+          type: 'kilo-pass',
+          kiloUserId: unresolvedUser.id,
+          tier: 'tier_unknown',
+          cadence: KiloPassCadence.Monthly,
+        },
+      }),
+      stripe: {
+        subscriptions: {
+          retrieve: jest.fn(),
+        },
+      } as unknown as Stripe,
+    });
+
+    const excludedEvents = await db
+      .select()
+      .from(user_affiliate_events)
+      .where(
+        and(
+          eq(user_affiliate_events.event_type, 'sale'),
+          eq(user_affiliate_events.provider, 'impact')
+        )
+      );
+    expect(excludedEvents).toHaveLength(0);
+  });
+
+  test('monthly: stored attribution without Click ID still queues eligible sale', async () => {
+    const { handleKiloPassInvoicePaid } =
+      await import('@/lib/kilo-pass/stripe-handlers-invoice-paid');
+    const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
+    await db.insert(user_affiliate_attributions).values({
+      user_id: user.id,
+      provider: 'impact',
+      tracking_id: '',
+    });
+    const stripeSubId = `sub_blank_click_${Math.random()}`;
+    const meta = kiloPassMetadata({
+      kiloUserId: user.id,
+      tier: KiloPassTier.Tier19,
+      cadence: KiloPassCadence.Monthly,
+    });
+    const subscription = makeStripeSubscription({
+      id: stripeSubId,
+      start_date_seconds: 1_767_225_600,
+      metadata: meta,
+    });
+    const priceId = await getKiloPassPriceId({
+      tier: KiloPassTier.Tier19,
+      cadence: KiloPassCadence.Monthly,
+    });
+
+    await handleKiloPassInvoicePaid({
+      eventId: 'evt_blank_click_sale',
+      invoice: makeStripeInvoice({
+        id: `inv_blank_click_${Math.random()}`,
+        amount_paid_cents: 1900,
+        period_start_seconds: 1_767_225_600,
+        created_seconds: 1_767_225_600,
+        priceId,
+        subscriptionIdOrExpanded: stripeSubId,
+        metadata: meta,
+      }),
+      stripe: {
+        subscriptions: {
+          retrieve: jest.fn(async () => subscription),
+        },
+      } as unknown as Stripe,
+    });
+
+    const events = await db
+      .select()
+      .from(user_affiliate_events)
+      .where(eq(user_affiliate_events.user_id, user.id));
+    const saleEvent = events.find(event => event.event_type === 'sale');
+    expect(saleEvent?.payload_json.trackingId).toBe('');
+  });
+
+  test('monthly: expanded applied promotion code persists on eligible Impact sale', async () => {
+    const { handleKiloPassInvoicePaid } =
+      await import('@/lib/kilo-pass/stripe-handlers-invoice-paid');
+    const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
+    await seedDeliveredImpactSignupEvent(user.id, user.google_user_email);
+    const stripeSubId = `sub_promo_code_${Math.random()}`;
+    const meta = kiloPassMetadata({
+      kiloUserId: user.id,
+      tier: KiloPassTier.Tier49,
+      cadence: KiloPassCadence.Yearly,
+    });
+    const subscription = makeStripeSubscription({
+      id: stripeSubId,
+      start_date_seconds: 1_767_225_600,
+      metadata: meta,
+    });
+    const priceId = await getKiloPassPriceId({
+      tier: KiloPassTier.Tier49,
+      cadence: KiloPassCadence.Yearly,
+    });
+
+    await handleKiloPassInvoicePaid({
+      eventId: 'evt_kilo_pass_promo_code',
+      invoice: makeStripeInvoice({
+        id: `inv_promo_code_${Math.random()}`,
+        amount_paid_cents: 4900 * 12,
+        period_start_seconds: 1_767_225_600,
+        created_seconds: 1_767_225_600,
+        paid_seconds: 1_767_225_660,
+        priceId,
+        subscriptionIdOrExpanded: stripeSubId,
+        metadata: meta,
+        promotionCode: 'PASS49YEAR',
+      }),
+      stripe: {
+        subscriptions: {
+          retrieve: jest.fn(async () => subscription),
+        },
+      } as unknown as Stripe,
+    });
+
+    const events = await db
+      .select()
+      .from(user_affiliate_events)
+      .where(eq(user_affiliate_events.user_id, user.id));
+    const saleEvent = events.find(event => event.event_type === 'sale');
+    expect(saleEvent?.payload_json.promoCode).toBe('PASS49YEAR');
+  });
+
+  test('monthly: affiliate enqueue failure does not roll back invoice settlement', async () => {
+    const enqueueAffiliateEventForUser = jest.fn(async () => {
+      throw new Error('affiliate queue unavailable');
+    });
+
+    try {
+      jest.resetModules();
+      jest.doMock('@/lib/impact/affiliate-events', () => {
+        const actual = jest.requireActual<typeof affiliateEventsModule>(
+          '@/lib/impact/affiliate-events'
+        );
+        return {
+          __esModule: true,
+          ...actual,
+          enqueueAffiliateEventForUser,
+        };
+      });
+
+      const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
+      await seedDeliveredImpactSignupEvent(user.id, user.google_user_email);
+      const stripeSubId = `sub_enqueue_failure_${Math.random()}`;
+      const meta = kiloPassMetadata({
+        kiloUserId: user.id,
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+      });
+      const subscription = makeStripeSubscription({
+        id: stripeSubId,
+        start_date_seconds: 1_767_225_600,
+        metadata: meta,
+      });
+      const priceId = await getKiloPassPriceId({
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+      });
+      const invoiceId = `inv_enqueue_failure_${Math.random()}`;
+
+      await jest.isolateModulesAsync(async () => {
+        const { handleKiloPassInvoicePaid } =
+          await import('@/lib/kilo-pass/stripe-handlers-invoice-paid');
+        await expect(
+          handleKiloPassInvoicePaid({
+            eventId: 'evt_enqueue_failure',
+            invoice: makeStripeInvoice({
+              id: invoiceId,
+              amount_paid_cents: 1900,
+              period_start_seconds: 1_767_225_600,
+              created_seconds: 1_767_225_600,
+              priceId,
+              subscriptionIdOrExpanded: stripeSubId,
+              metadata: meta,
+            }),
+            stripe: {
+              subscriptions: {
+                retrieve: jest.fn(async () => subscription),
+              },
+            } as unknown as Stripe,
+          })
+        ).resolves.toBeUndefined();
+      });
+
+      expect(enqueueAffiliateEventForUser).toHaveBeenCalledTimes(1);
+      const issuance = await db.query.kilo_pass_issuances.findFirst({
+        where: eq(kilo_pass_issuances.stripe_invoice_id, invoiceId),
+      });
+      expect(issuance).toBeTruthy();
+    } finally {
+      jest.dontMock('@/lib/impact/affiliate-events');
+      jest.resetModules();
+    }
+  });
+
+  test('monthly: attributed renewal duplicate handling keeps one Impact sale for the invoice', async () => {
+    const { handleKiloPassInvoicePaid } =
+      await import('@/lib/kilo-pass/stripe-handlers-invoice-paid');
+
+    const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
+    await seedDeliveredImpactSignupEvent(user.id, user.google_user_email);
+    const stripeSubId = `sub_affiliate_renewal_${Math.random()}`;
+    const meta = kiloPassMetadata({
+      kiloUserId: user.id,
+      tier: KiloPassTier.Tier49,
+      cadence: KiloPassCadence.Monthly,
+    });
+    const subscription = makeStripeSubscription({
+      id: stripeSubId,
+      start_date_seconds: 1_764_633_600,
+      metadata: meta,
+    });
+    const [subscriptionRow] = await db
+      .insert(kilo_pass_subscriptions)
+      .values({
+        kilo_user_id: user.id,
+        provider_subscription_id: stripeSubId,
+        stripe_subscription_id: stripeSubId,
+        tier: KiloPassTier.Tier49,
+        cadence: KiloPassCadence.Monthly,
+        status: 'active',
+        started_at: '2025-12-01T00:00:00.000Z',
+        ended_at: null,
+        current_streak_months: 1,
+      })
+      .returning({ id: kilo_pass_subscriptions.id });
+    if (!subscriptionRow) throw new Error('Expected seeded Kilo Pass subscription');
+    await seedBaseIssuance({
+      subscriptionId: subscriptionRow.id,
+      kiloUserId: user.id,
+      issueMonth: '2025-12-01',
+      amountUsd: 49,
+    });
+
+    const priceId = await getKiloPassPriceId({
+      tier: KiloPassTier.Tier49,
+      cadence: KiloPassCadence.Monthly,
+    });
+    const invoiceId = `inv_affiliate_renewal_${Math.random()}`;
+    const invoice = makeStripeInvoice({
+      id: invoiceId,
+      amount_paid_cents: 4900,
+      period_start_seconds: 1_767_225_600,
+      created_seconds: 1_767_225_600,
+      paid_seconds: 1_767_225_660,
+      priceId,
+      subscriptionIdOrExpanded: stripeSubId,
+      metadata: meta,
+    });
+    const stripe = {
+      subscriptions: {
+        retrieve: jest.fn(async () => subscription),
+      },
+    };
+
+    await Promise.all([
+      handleKiloPassInvoicePaid({
+        eventId: 'evt_affiliate_renewal_a',
+        invoice,
+        stripe: stripe as unknown as Stripe,
+      }),
+      handleKiloPassInvoicePaid({
+        eventId: 'evt_affiliate_renewal_b',
+        invoice,
+        stripe: stripe as unknown as Stripe,
+      }),
+    ]);
+    await handleKiloPassInvoicePaid({
+      eventId: 'evt_affiliate_renewal_replay',
+      invoice,
+      stripe: stripe as unknown as Stripe,
+    });
+
+    const events = await db
+      .select()
+      .from(user_affiliate_events)
+      .where(eq(user_affiliate_events.user_id, user.id));
+    const sales = events.filter(event => event.event_type === 'sale');
+    expect(sales).toHaveLength(1);
+    expect(sales[0]?.dedupe_key).toBe(`affiliate:impact:sale:${invoiceId}`);
+    expect(sales[0]?.payload_json.itemCategory).toBe('kilo-pass-tier-49-monthly');
+  });
+
   test('monthly: first invoice creates subscription, issuance, base credits; sets streak=1', async () => {
     const { handleKiloPassInvoicePaid } =
       await import('@/lib/kilo-pass/stripe-handlers-invoice-paid');
@@ -376,6 +1130,9 @@ describe('handleKiloPassInvoicePaid', () => {
       ),
     });
     expect(issuance).toBeTruthy();
+    expect(issuance?.initial_welcome_promo_eligibility_reason).toBe(
+      KiloPassWelcomePromoEligibilityReason.SettlementUnresolved
+    );
 
     const items = await db
       .select({
@@ -420,6 +1177,228 @@ describe('handleKiloPassInvoicePaid', () => {
         KiloPassAuditLogAction.KiloPassInvoicePaidHandled,
         KiloPassAuditLogAction.BaseCreditsIssued,
       ])
+    );
+  });
+
+  test('monthly: reused settled SEPA fingerprint records ineligible welcome promo decision', async () => {
+    const { handleKiloPassInvoicePaid } =
+      await import('@/lib/kilo-pass/stripe-handlers-invoice-paid');
+    const firstUser = await insertTestUser({
+      total_microdollars_acquired: 0,
+      microdollars_used: 0,
+    });
+    const secondUser = await insertTestUser({
+      total_microdollars_acquired: 0,
+      microdollars_used: 0,
+    });
+    const priceId = await getKiloPassPriceId({
+      tier: KiloPassTier.Tier19,
+      cadence: KiloPassCadence.Monthly,
+    });
+    const fingerprint = `fp_${Math.random()}`;
+
+    async function settleInitialMonthlyInvoice(userId: string, suffix: string): Promise<string> {
+      const stripeSubscriptionId = `sub_${suffix}_${Math.random()}`;
+      const paymentIntentId = `pi_${suffix}_${Math.random()}`;
+      const invoiceId = `inv_${suffix}_${Math.random()}`;
+      const metadata = kiloPassMetadata({
+        kiloUserId: userId,
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+      });
+      const stripe = {
+        subscriptions: {
+          retrieve: jest.fn(async () =>
+            makeStripeSubscription({
+              id: stripeSubscriptionId,
+              start_date_seconds: 1_767_225_600,
+              metadata,
+            })
+          ),
+        },
+        paymentIntents: {
+          retrieve: jest.fn(async () =>
+            makeFingerprintPaymentIntent(paymentIntentId, 'sepa_debit', fingerprint)
+          ),
+        },
+      };
+      const invoice = makeStripeInvoice({
+        id: invoiceId,
+        amount_paid_cents: 1900,
+        created_seconds: 1_767_225_600,
+        priceId,
+        subscriptionIdOrExpanded: stripeSubscriptionId,
+        metadata,
+        invoicePaymentId: `inpay_${suffix}`,
+        paymentIntentId,
+      });
+
+      await handleKiloPassInvoicePaid({
+        eventId: `evt_${suffix}`,
+        invoice,
+        stripe: stripe as unknown as Stripe,
+      });
+      return invoiceId;
+    }
+
+    const firstInvoiceId = await settleInitialMonthlyInvoice(firstUser.id, 'first_sepa_claim');
+    const secondInvoiceId = await settleInitialMonthlyInvoice(secondUser.id, 'reused_sepa');
+
+    const claim = await db.query.kilo_pass_welcome_promo_payment_fingerprint_claims.findFirst({
+      where: eq(kilo_pass_welcome_promo_payment_fingerprint_claims.stripe_fingerprint, fingerprint),
+    });
+    expect(claim?.source_stripe_invoice_id).toBe(firstInvoiceId);
+
+    const firstIssuance = await db.query.kilo_pass_issuances.findFirst({
+      where: eq(kilo_pass_issuances.stripe_invoice_id, firstInvoiceId),
+    });
+    expect(firstIssuance?.initial_welcome_promo_eligibility_reason).toBe(
+      KiloPassWelcomePromoEligibilityReason.FirstPaymentFingerprintClaim
+    );
+
+    const secondIssuance = await db.query.kilo_pass_issuances.findFirst({
+      where: eq(kilo_pass_issuances.stripe_invoice_id, secondInvoiceId),
+    });
+    expect(secondIssuance?.initial_welcome_promo_eligibility_reason).toBe(
+      KiloPassWelcomePromoEligibilityReason.FingerprintPreviouslyClaimed
+    );
+  });
+
+  test('monthly: settled direct charge card payment creates a fingerprint claim', async () => {
+    const { handleKiloPassInvoicePaid } =
+      await import('@/lib/kilo-pass/stripe-handlers-invoice-paid');
+    const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
+    const stripeSubscriptionId = `sub_charge_fingerprint_${Math.random()}`;
+    const fingerprint = `fp_charge_${Math.random()}`;
+    const metadata = kiloPassMetadata({
+      kiloUserId: user.id,
+      tier: KiloPassTier.Tier19,
+      cadence: KiloPassCadence.Monthly,
+    });
+    const invoiceId = `inv_charge_fingerprint_${Math.random()}`;
+    const priceId = await getKiloPassPriceId({
+      tier: KiloPassTier.Tier19,
+      cadence: KiloPassCadence.Monthly,
+    });
+
+    await handleKiloPassInvoicePaid({
+      eventId: 'evt_charge_fingerprint',
+      invoice: makeStripeInvoice({
+        id: invoiceId,
+        amount_paid_cents: 1900,
+        created_seconds: 1_767_225_600,
+        priceId,
+        subscriptionIdOrExpanded: stripeSubscriptionId,
+        metadata,
+        invoicePaymentId: 'inpay_charge_fingerprint',
+        invoicePayment: {
+          type: 'charge',
+          charge: makeFingerprintCharge('ch_fingerprint', 'card', fingerprint),
+        },
+      }),
+      stripe: {
+        subscriptions: {
+          retrieve: jest.fn(async () =>
+            makeStripeSubscription({
+              id: stripeSubscriptionId,
+              start_date_seconds: 1_767_225_600,
+              metadata,
+            })
+          ),
+        },
+      } as unknown as Stripe,
+    });
+
+    const claim = await db.query.kilo_pass_welcome_promo_payment_fingerprint_claims.findFirst({
+      where: eq(kilo_pass_welcome_promo_payment_fingerprint_claims.stripe_fingerprint, fingerprint),
+    });
+    expect(claim?.source_stripe_invoice_id).toBe(invoiceId);
+  });
+
+  test('monthly: zero-value initial invoice blocks introductory promo without claiming later paid instrument', async () => {
+    const { handleKiloPassInvoicePaid } =
+      await import('@/lib/kilo-pass/stripe-handlers-invoice-paid');
+    const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
+    const stripeSubscriptionId = `sub_zero_then_paid_${Math.random()}`;
+    const fingerprint = `fp_zero_then_paid_${Math.random()}`;
+    const metadata = kiloPassMetadata({
+      kiloUserId: user.id,
+      tier: KiloPassTier.Tier19,
+      cadence: KiloPassCadence.Monthly,
+    });
+    const priceId = await getKiloPassPriceId({
+      tier: KiloPassTier.Tier19,
+      cadence: KiloPassCadence.Monthly,
+    });
+    const stripe = {
+      subscriptions: {
+        retrieve: jest.fn(async () =>
+          makeStripeSubscription({
+            id: stripeSubscriptionId,
+            start_date_seconds: 1_767_225_600,
+            metadata,
+          })
+        ),
+      },
+      paymentIntents: {
+        retrieve: jest.fn(async (id: string) =>
+          makeFingerprintPaymentIntent(id, 'us_bank_account', fingerprint)
+        ),
+      },
+    } as unknown as Stripe;
+
+    await handleKiloPassInvoicePaid({
+      eventId: 'evt_zero_initial',
+      invoice: makeStripeInvoice({
+        id: 'inv_zero_initial',
+        amount_paid_cents: 0,
+        created_seconds: 1_767_225_600,
+        priceId,
+        subscriptionIdOrExpanded: stripeSubscriptionId,
+        metadata,
+      }),
+      stripe,
+    });
+
+    const initialIssuance = await db.query.kilo_pass_issuances.findFirst({
+      where: eq(kilo_pass_issuances.stripe_invoice_id, 'inv_zero_initial'),
+    });
+    expect(initialIssuance?.initial_welcome_promo_eligibility_reason).toBe(
+      KiloPassWelcomePromoEligibilityReason.NoPositiveSettlement
+    );
+    expect(
+      await db.query.kilo_pass_welcome_promo_payment_fingerprint_claims.findFirst({
+        where: eq(
+          kilo_pass_welcome_promo_payment_fingerprint_claims.stripe_fingerprint,
+          fingerprint
+        ),
+      })
+    ).toBeUndefined();
+
+    await handleKiloPassInvoicePaid({
+      eventId: 'evt_paid_after_zero',
+      invoice: makeStripeInvoice({
+        id: 'inv_paid_after_zero',
+        amount_paid_cents: 1900,
+        created_seconds: 1_769_904_000,
+        priceId,
+        subscriptionIdOrExpanded: stripeSubscriptionId,
+        metadata,
+        invoicePaymentId: 'inpay_paid_after_zero',
+        paymentIntentId: 'pi_paid_after_zero',
+      }),
+      stripe,
+    });
+
+    const claim = await db.query.kilo_pass_welcome_promo_payment_fingerprint_claims.findFirst({
+      where: eq(kilo_pass_welcome_promo_payment_fingerprint_claims.stripe_fingerprint, fingerprint),
+    });
+    expect(claim?.source_stripe_invoice_id).toBe('inv_paid_after_zero');
+    const preservedInitialIssuance = await db.query.kilo_pass_issuances.findFirst({
+      where: eq(kilo_pass_issuances.stripe_invoice_id, 'inv_zero_initial'),
+    });
+    expect(preservedInitialIssuance?.initial_welcome_promo_eligibility_reason).toBe(
+      KiloPassWelcomePromoEligibilityReason.NoPositiveSettlement
     );
   });
 

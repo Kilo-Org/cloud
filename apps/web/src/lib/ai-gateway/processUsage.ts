@@ -21,7 +21,8 @@ import { eq, sql } from 'drizzle-orm';
 import { sentryRootSpan } from '../getRootSpan';
 import { ingestOrganizationTokenUsage } from '@/lib/organizations/organization-usage';
 import type { ProviderId } from '@/lib/ai-gateway/providers/types';
-import { findKiloExclusiveModel, isFreeModel, isKiloStealthModel } from '@/lib/ai-gateway/models';
+import { findKiloExclusiveModel, isKiloStealthModel } from '@/lib/ai-gateway/models';
+import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
 import { sentryLogger } from '@/lib/utils.server';
 import { maybeIssueKiloPassBonusFromUsageThreshold } from '@/lib/kilo-pass/usage-triggered-bonus';
 import { getEffectiveKiloPassThreshold } from '@/lib/kilo-pass/threshold';
@@ -137,6 +138,8 @@ export function extractUsageContextInfo(usageContext: MicrodollarUsageContext) {
     mode: usageContext.mode,
     auto_model: usageContext.auto_model,
     ttfb_ms: usageContext.ttfb_ms,
+    abuse_delay: usageContext.abuse_delay ?? null,
+    abuse_downgraded_from: usageContext.abuse_downgraded_from ?? null,
   };
 }
 
@@ -170,10 +173,10 @@ export function stripNulBytesInPlace(obj: Record<string, unknown>, dirtyFields: 
   }
 }
 
-export function toInsertableDbUsageRecord(
+export async function toInsertableDbUsageRecord(
   usageStats: MicrodollarUsageStats,
   usageContextInfo: UsageContextInfo
-): CoreUsageWithMetaData {
+): Promise<CoreUsageWithMetaData> {
   const id = randomUUID();
   const created_at = new Date().toISOString();
 
@@ -214,7 +217,9 @@ export function toInsertableDbUsageRecord(
     streamed: usageStats.streamed,
     cancelled: usageStats.cancelled,
     market_cost: usageStats.market_cost ?? null,
-    is_free: isFreeModel(usageContextInfo.requested_model),
+    is_free: await isFreeModel(usageContextInfo.requested_model),
+    abuse_delay: metadataFromContext.abuse_delay,
+    abuse_downgraded_from: metadataFromContext.abuse_downgraded_from,
   };
 
   // Legacy heuristic classification removed - abuse_classification is now handled
@@ -254,7 +259,7 @@ export async function logMicrodollarUsage(
 ): Promise<{ usageId: string; createdAt: string } | null> {
   usageContext.status_code = usageStats.status_code;
   const contextInfo = extractUsageContextInfo(usageContext);
-  const { core, metadata } = toInsertableDbUsageRecord(usageStats, contextInfo);
+  const { core, metadata } = await toInsertableDbUsageRecord(usageStats, contextInfo);
 
   const inserted = await saveUsageRelatedData(
     core,
@@ -523,6 +528,8 @@ async function insertUsageAndMetadataWithBalanceUpdate(
               session_id,
               market_cost,
               is_free,
+              abuse_delay,
+              abuse_downgraded_from,
 
               http_user_agent_id,
               http_ip_id,
@@ -561,6 +568,8 @@ async function insertUsageAndMetadataWithBalanceUpdate(
               ${metadataFields.session_id},
               ${metadataFields.market_cost},
               ${metadataFields.is_free},
+              ${metadataFields.abuse_delay},
+              ${metadataFields.abuse_downgraded_from},
 
               (SELECT http_user_agent_id FROM http_user_agent_cte),
               (SELECT http_ip_id FROM http_ip_cte),
@@ -967,7 +976,7 @@ export async function processTokenData(
   const provider = Object.values(PROVIDERS).find(p => p.id === usageContext.provider);
   const generation =
     provider &&
-    useGenerationLookup(usageStats, usageContext) &&
+    (await useGenerationLookup(usageStats, usageContext)) &&
     usageStats.messageId &&
     (await fetchGeneration(usageStats.messageId, provider));
   if (usageStats.messageId) {
@@ -1026,7 +1035,7 @@ export async function processTokenData(
   // Preserve the real cost before zeroing for free/BYOK
   usageStats.market_cost = usageStats.cost_mUsd;
 
-  if (isFreeModel(usageContext.requested_model) || usageContext.user_byok) {
+  if ((await isFreeModel(usageContext.requested_model)) || usageContext.user_byok) {
     usageStats.cost_mUsd = 0;
     usageStats.cacheDiscount_mUsd = 0;
   }
@@ -1038,19 +1047,24 @@ function useAnthropicStyleTokenCounting(requestedModel: string, provider: Provid
   return provider === 'vercel' && (isClaudeModel(requestedModel) || isMinimaxModel(requestedModel));
 }
 
-function useGenerationLookup(
+async function useGenerationLookup(
   usageStats: MicrodollarUsageStats | null,
   usageContext: MicrodollarUsageContext
-) {
+): Promise<boolean> {
   const isGatewayProvider =
     usageContext.provider === 'openrouter' || usageContext.provider === 'vercel';
   const isSuccessStatusCode = (usageStats?.status_code ?? 200) < 400;
   const hasOutputTokens = (usageStats?.outputTokens ?? 0) > 0;
   const hasCostWhenPaid =
-    isFreeModel(usageContext.requested_model) ||
+    (await isFreeModel(usageContext.requested_model)) ||
     usageContext.user_byok ||
     (usageStats?.cost_mUsd ?? 0) > 0;
-  return isGatewayProvider && isSuccessStatusCode && (!hasOutputTokens || !hasCostWhenPaid);
+  const hasInferenceProvider = Boolean(usageStats?.inference_provider);
+  return (
+    isGatewayProvider &&
+    isSuccessStatusCode &&
+    (!hasOutputTokens || !hasCostWhenPaid || !hasInferenceProvider)
+  );
 }
 
 export const mapToUsageStats = (

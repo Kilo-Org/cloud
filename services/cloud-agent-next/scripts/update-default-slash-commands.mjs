@@ -199,7 +199,15 @@ async function main() {
     const sourceLine = `kilo@${version}`;
     const json = JSON.stringify(commands, null, 2);
 
-    const file = `import type { SlashCommandInfo } from './slash-commands.js';
+    const file = `export type SlashCommandInfo = {
+  name: string;
+  description?: string;
+  agent?: string;
+  model?: string;
+  source?: 'command' | 'mcp' | 'skill';
+  hints: string[];
+  subtask?: boolean;
+};
 
 /**
  * Source Kilo version / ref used to generate this catalog.

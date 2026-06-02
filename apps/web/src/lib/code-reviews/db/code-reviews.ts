@@ -18,6 +18,7 @@ import { captureException } from '@sentry/nextjs';
 import type { CreateReviewParams, CodeReviewStatus, ListReviewsParams, Owner } from '../core';
 import type { CloudAgentCodeReview, CloudAgentCodeReviewAttempt } from '@kilocode/db/schema';
 import type { CodeReviewTerminalReason } from '@kilocode/db/schema-types';
+import { isCodeReviewActionRequiredReason } from '../action-required-shared';
 import {
   activeCodeReviewWorkCondition,
   reconsiderableCodeReviewWorkCondition,
@@ -27,6 +28,7 @@ import {
   MAX_CONCURRENT_CODE_REVIEWS_PER_ORG,
   staleQueuedCodeReviewCutoffSql,
   staleRunningCodeReviewCutoffSql,
+  type PendingCodeReviewCreatedAtWindow,
 } from '../dispatch/dispatch-constants';
 
 type CodeReviewAttemptStatus = CodeReviewStatus;
@@ -118,6 +120,7 @@ const RETRYABLE_PARENT_REVIEW_STATUSES = ['queued', 'running'];
 function canCreateInfraRetryAttempt(review: { status: string; terminal_reason: string | null }) {
   return (
     review.terminal_reason !== 'superseded' &&
+    !isCodeReviewActionRequiredReason(review.terminal_reason) &&
     RETRYABLE_PARENT_REVIEW_STATUSES.includes(review.status)
   );
 }
@@ -184,11 +187,13 @@ export async function getCodeReviewById(reviewId: string): Promise<CloudAgentCod
 export async function listDispatchableCodeReviewOwnerCandidates(
   params: {
     limit?: number;
+    pendingCreatedAtWindow?: PendingCodeReviewCreatedAtWindow;
   } = {}
 ): Promise<DispatchableCodeReviewOwnerCandidatesResult> {
   const limit = Math.max(1, Math.min(params.limit ?? 100, 1_000));
   const staleQueuedCutoff = staleQueuedCodeReviewCutoffSql();
   const staleRunningCutoff = staleRunningCodeReviewCutoffSql();
+  const { pendingCreatedAtWindow } = params;
 
   try {
     const result = await db.execute<{ owner_type: 'user' | 'org'; owner_id: string }>(sql`
@@ -204,7 +209,7 @@ export async function listDispatchableCodeReviewOwnerCandidates(
           ) AS owner_id,
           MIN(${cloud_agent_code_reviews.created_at}) AS oldest_reconsiderable_at
         FROM ${cloud_agent_code_reviews}
-        WHERE ${reconsiderableCodeReviewWorkCondition(staleQueuedCutoff)}
+        WHERE ${reconsiderableCodeReviewWorkCondition(staleQueuedCutoff, pendingCreatedAtWindow)}
         GROUP BY owner_type, owner_id
       ), active_work AS (
         SELECT
@@ -951,17 +956,24 @@ export async function releaseQueuedReviewClaim(
 export async function failReservedQueuedReview(
   reviewId: string,
   dispatchReservationId: string,
-  errorMessage: string
+  errorMessage: string,
+  terminalReason?: CodeReviewTerminalReason
 ): Promise<boolean> {
   try {
+    const updateData: Partial<typeof cloud_agent_code_reviews.$inferInsert> = {
+      status: 'failed',
+      error_message: errorMessage,
+      dispatch_reservation_id: null,
+      completed_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    if (terminalReason !== undefined) {
+      updateData.terminal_reason = terminalReason;
+    }
+
     const failed = await db
       .update(cloud_agent_code_reviews)
-      .set({
-        status: 'failed',
-        error_message: errorMessage,
-        completed_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
+      .set(updateData)
       .where(
         and(
           eq(cloud_agent_code_reviews.id, reviewId),
@@ -1441,20 +1453,33 @@ export async function cancelSupersededReviewsForPR(
   }
 }
 
+export type ReviewContinuationScope =
+  | { platform: 'github' }
+  | { platform: 'gitlab'; integrationId: string; projectId: number };
+
 /**
  * Finds the most recent completed review for the same PR with a different SHA.
  * Used for incremental reviews: returns the previous HEAD SHA so the agent
  * can diff against it instead of re-reviewing the entire PR.
  * Also returns session_id (nullable) so the caller can derive both the
  * incremental diff base and the session continuation target from a single row.
+ * GitLab continuation requires the exact integration and project identity so
+ * equivalent project paths on separate GitLab instances never share sessions.
  */
 export async function findPreviousCompletedReview(
   repoFullName: string,
   prNumber: number,
   excludeSha: string,
-  platform: string = 'github'
+  scope: ReviewContinuationScope = { platform: 'github' }
 ): Promise<{ head_sha: string; session_id: string | null } | null> {
   try {
+    const gitLabScopeFilter =
+      scope.platform === 'gitlab'
+        ? and(
+            eq(cloud_agent_code_reviews.platform_integration_id, scope.integrationId),
+            eq(cloud_agent_code_reviews.platform_project_id, scope.projectId)
+          )
+        : undefined;
     const [review] = await db
       .select({
         head_sha: cloud_agent_code_reviews.head_sha,
@@ -1465,7 +1490,8 @@ export async function findPreviousCompletedReview(
         and(
           eq(cloud_agent_code_reviews.repo_full_name, repoFullName),
           eq(cloud_agent_code_reviews.pr_number, prNumber),
-          eq(cloud_agent_code_reviews.platform, platform),
+          eq(cloud_agent_code_reviews.platform, scope.platform),
+          gitLabScopeFilter,
           ne(cloud_agent_code_reviews.head_sha, excludeSha),
           eq(cloud_agent_code_reviews.status, 'completed')
         )
@@ -1477,7 +1503,7 @@ export async function findPreviousCompletedReview(
   } catch (error) {
     captureException(error, {
       tags: { operation: 'findPreviousCompletedReview' },
-      extra: { repoFullName, prNumber, excludeSha, platform },
+      extra: { repoFullName, prNumber, excludeSha, scope },
     });
     throw error;
   }

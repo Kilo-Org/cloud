@@ -60,3 +60,20 @@ export async function mintGetUrl(
   });
   return { url: signed.url };
 }
+
+export async function headObject(params: Cfg & { key: string }): Promise<{ size: number } | null> {
+  const url = new URL(`${r2Origin(params.accountId)}/${params.bucket}/${params.key}`);
+  const signed = await makeClient(params).sign(new Request(url, { method: 'HEAD' }));
+  const response = await fetch(signed);
+  if (response.status === 404) return null;
+  if (!response.ok) {
+    throw new Error(`R2 HEAD responded ${response.status}`);
+  }
+
+  const contentLength = response.headers.get('Content-Length');
+  const size = contentLength === null ? NaN : Number.parseInt(contentLength, 10);
+  if (!Number.isFinite(size) || size < 0) {
+    throw new Error('R2 HEAD response is missing a valid Content-Length');
+  }
+  return { size };
+}

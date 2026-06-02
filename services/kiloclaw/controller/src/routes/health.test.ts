@@ -4,6 +4,10 @@ import { registerHealthRoute, parseOpenclawVersion, startKiloChatHealthProbe } f
 import type { KiloChatHealthProbe } from './health';
 import type { Supervisor } from '../supervisor';
 import type { ControllerStateRef } from '../bootstrap';
+import {
+  CONTROLLER_API_VERSION,
+  getControllerEndpointCapabilities,
+} from '../endpoint-capabilities';
 
 const MOCK_STATS = {
   state: 'running' as const,
@@ -195,11 +199,16 @@ describe('GET /_kilo/version', () => {
     const body = (await resp.json()) as {
       version: string;
       commit: string;
+      apiVersion: number;
+      capabilities: string[];
       gateway: typeof MOCK_STATS;
       controllerState: { state: string };
     };
     expect(body.version).toBe('dev');
     expect(body.commit).toBe('unknown');
+    expect(body.apiVersion).toBe(CONTROLLER_API_VERSION);
+    expect(body.capabilities).toEqual(getControllerEndpointCapabilities());
+    expect(body.capabilities).not.toContain('kilo-chat.attachments');
     expect(body.gateway).toEqual(MOCK_STATS);
     expect(body.controllerState).toEqual({ state: 'ready' });
   });
@@ -256,6 +265,19 @@ describe('GET /_kilo/version', () => {
 
     const body = (await resp.json()) as { gateway: null };
     expect(body.gateway).toBeNull();
+  });
+
+  it('includes Kilo Chat capabilities only when the route set is registered', async () => {
+    const app = new Hono();
+    registerHealthRoute(app, null, undefined, undefined, undefined, {
+      includeKiloChatCapabilities: true,
+    });
+
+    const resp = await app.request('/_kilo/version');
+    expect(resp.status).toBe(200);
+
+    const body = (await resp.json()) as { capabilities: string[] };
+    expect(body.capabilities).toContain('kilo-chat.attachments');
   });
 });
 

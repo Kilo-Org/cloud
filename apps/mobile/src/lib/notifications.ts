@@ -2,18 +2,20 @@ import expoConstants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
 import { type Href, router } from 'expo-router';
 import { Platform } from 'react-native';
+import { z } from 'zod';
 
 import { type PushData, pushDataSchema } from '@kilocode/notifications';
 
 import { notificationPathForData } from './notification-path';
 
+const easConfigSchema = z.object({ projectId: z.string().min(1) });
+
 function getProjectId(): string {
-  const eas = expoConstants.expoConfig?.extra?.eas as { projectId?: string } | undefined;
-  const projectId = eas?.projectId;
-  if (!projectId) {
+  const parsed = easConfigSchema.safeParse(expoConstants.expoConfig?.extra?.eas);
+  if (!parsed.success) {
     throw new Error('Missing extra.eas.projectId in app config');
   }
-  return projectId;
+  return parsed.data.projectId;
 }
 
 // Tracks which conversation screen is currently focused.
@@ -43,7 +45,7 @@ const shown = {
   shouldSetBadge: true,
   shouldShowBanner: true,
   shouldShowList: true,
-} as const;
+} satisfies Notifications.NotificationBehavior;
 
 const suppressed = {
   shouldShowAlert: false,
@@ -51,7 +53,7 @@ const suppressed = {
   shouldSetBadge: false,
   shouldShowBanner: false,
   shouldShowList: false,
-} as const;
+} satisfies Notifications.NotificationBehavior;
 
 export function setupNotificationHandler() {
   Notifications.setNotificationHandler({
@@ -66,7 +68,6 @@ export function setupNotificationHandler() {
       ) {
         return suppressed;
       }
-
       return shown;
     },
   });
@@ -82,23 +83,16 @@ export function getPendingNotificationLink(): string | null {
   return link;
 }
 
-function instanceChatPath(data: PushData | null): string | null {
-  if (!data) {
-    return null;
-  }
-  return notificationPathForData(data);
-}
-
 export function setupNotificationResponseHandler() {
   const subscription = Notifications.addNotificationResponseReceivedListener(response => {
     const data = parseNotificationData(response.notification.request.content.data);
-    const path = instanceChatPath(data);
-    if (!path) {
+    if (!data) {
       return;
     }
 
-    // If the router is ready (has segments), navigate immediately.
-    // Otherwise store as pending for consumption after auth completes.
+    const path = notificationPathForData(data);
+    Notifications.clearLastNotificationResponse();
+    // If the router is ready, navigate immediately; otherwise store as pending.
     try {
       router.replace(path as Href);
     } catch {
@@ -116,9 +110,8 @@ export function checkInitialNotification(): void {
     return;
   }
   const data = parseNotificationData(response.notification.request.content.data);
-  const path = instanceChatPath(data);
-  if (path) {
-    pendingNotificationLink = path;
+  if (data) {
+    pendingNotificationLink = notificationPathForData(data);
   }
   Notifications.clearLastNotificationResponse();
 }
@@ -163,5 +156,12 @@ export async function getNotificationPermissionStatus(): Promise<
 }
 
 export function getPlatform(): 'ios' | 'android' {
-  return Platform.OS as 'ios' | 'android';
+  if (Platform.OS === 'ios') {
+    return 'ios';
+  }
+  if (Platform.OS === 'android') {
+    return 'android';
+  }
+
+  throw new Error('Unsupported platform for push notifications');
 }

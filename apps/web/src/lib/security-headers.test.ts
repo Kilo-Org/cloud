@@ -7,6 +7,10 @@ import {
   getSentrySecurityReportUri,
 } from '@/lib/security-headers';
 
+function getPolicyDirective(policy: string, directive: string): string {
+  return policy.split('; ').find(entry => entry.startsWith(`${directive} `)) ?? '';
+}
+
 describe('security headers', () => {
   it('builds CSP with required third-party sources', () => {
     const policy = buildContentSecurityPolicy({
@@ -42,6 +46,14 @@ describe('security headers', () => {
     expect(policy).toContain('https://www.youtube.com');
     expect(policy).toContain("'wasm-unsafe-eval'");
     expect(policy).toContain('wss://cloud-agent.example.com');
+  });
+
+  it('allows Kilo Chat R2 attachment URLs for fetching and rendered images', () => {
+    const r2Origin = 'https://e115e769bcdd4c3d66af59d3332cb394.r2.cloudflarestorage.com';
+    const policy = buildContentSecurityPolicy();
+
+    expect(getPolicyDirective(policy, 'connect-src')).toContain(r2Origin);
+    expect(getPolicyDirective(policy, 'img-src')).toContain(r2Origin);
   });
 
   it('aligns Turnstile CSP sources with Cloudflare documentation', () => {

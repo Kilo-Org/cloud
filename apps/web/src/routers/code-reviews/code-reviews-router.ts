@@ -49,6 +49,8 @@ import { DEFAULT_LIST_LIMIT } from '@/lib/code-reviews/core/constants';
 import { codeReviewWorkerClient } from '@/lib/code-reviews/client/code-review-worker-client';
 import { tryDispatchPendingReviews } from '@/lib/code-reviews/dispatch/dispatch-pending-reviews';
 import { getBotUserId } from '@/lib/bot-users/bot-user-service';
+import { getAgentConfigForOwner } from '@/lib/agent-config/db/agent-configs';
+import { getCodeReviewActionRequiredState } from '@/lib/code-reviews/action-required';
 import type { CloudAgentCodeReview } from '@kilocode/db/schema';
 import { cliSessions, cli_sessions_v2 } from '@kilocode/db/schema';
 import { isNewSession } from '@/lib/cloud-agent/session-type';
@@ -492,17 +494,6 @@ export const codeReviewRouter = createTRPCRouter({
           });
         }
 
-        const currentAttempt = await ensureCurrentCodeReviewAttemptFromReview(review);
-
-        // Reset the review for retry
-        await resetCodeReviewForRetry(input.reviewId);
-        await createCodeReviewAttempt({
-          codeReviewId: input.reviewId,
-          retryOfAttemptId: currentAttempt.id,
-          retryReason: 'manual_retrigger',
-          status: 'pending',
-        });
-
         // Build owner object for dispatch.
         // For org reviews, use the bot user ID so retrigger dispatch matches webhook-created reviews.
         let owner: Owner;
@@ -516,6 +507,35 @@ export const codeReviewRouter = createTRPCRouter({
         } else {
           owner = { type: 'user', id: review.owned_by_user_id as string, userId: ctx.user.id };
         }
+
+        const platform = review.platform === 'gitlab' ? 'gitlab' : 'github';
+        const agentConfig = await getAgentConfigForOwner(owner, 'code_review', platform);
+        const actionRequiredState = getCodeReviewActionRequiredState(agentConfig);
+        if (actionRequiredState) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message:
+              'Code Reviewer is disabled because configuration needs attention. Fix settings, enable Code Reviewer again, then retry this review.',
+          });
+        }
+
+        if (!agentConfig?.is_enabled) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Enable Code Reviewer before retrying this review.',
+          });
+        }
+
+        const currentAttempt = await ensureCurrentCodeReviewAttemptFromReview(review);
+
+        // Reset the review for retry
+        await resetCodeReviewForRetry(input.reviewId);
+        await createCodeReviewAttempt({
+          codeReviewId: input.reviewId,
+          retryOfAttemptId: currentAttempt.id,
+          retryReason: 'manual_retrigger',
+          status: 'pending',
+        });
 
         // Re-create PR gate check so status callbacks can update it.
         try {

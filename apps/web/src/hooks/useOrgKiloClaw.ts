@@ -17,23 +17,20 @@ export function useOrgKiloClawStatus(organizationId?: string) {
   );
 }
 
+export function useOrgKiloClawNavState(organizationId?: string) {
+  const trpc = useTRPC();
+  const resolvedOrganizationId = organizationId ?? NIL_UUID;
+  return useQuery(
+    trpc.organizations.kiloclaw.getNavState.queryOptions(
+      { organizationId: resolvedOrganizationId },
+      { enabled: !!organizationId, staleTime: 60_000 }
+    )
+  );
+}
+
 export function useOrgKiloClawConfig(organizationId: string) {
   const trpc = useTRPC();
   return useQuery(trpc.organizations.kiloclaw.getConfig.queryOptions({ organizationId }));
-}
-
-export function useOrgKiloClawComposioOnboardingStatus(
-  organizationId: string,
-  enabled = true,
-  pollingEnabled = enabled
-) {
-  const trpc = useTRPC();
-  return useQuery(
-    trpc.organizations.kiloclaw.getComposioOnboardingStatus.queryOptions(
-      { organizationId },
-      { enabled, refetchInterval: enabled && pollingEnabled ? 15_000 : false }
-    )
-  );
 }
 
 export function useOrgKiloClawPairing(organizationId: string, enabled = true) {
@@ -212,12 +209,17 @@ export function useOrgKiloClawMutations(
   const queryClient = useQueryClient();
 
   const invalidateStatus = async () => {
-    await queryClient.invalidateQueries({
-      queryKey: trpc.organizations.kiloclaw.getStatus.queryKey({ organizationId }),
-    });
-    await queryClient.invalidateQueries({
-      queryKey: trpc.organizations.kiloclaw.controllerVersion.queryKey({ organizationId }),
-    });
+    await Promise.all([
+      queryClient.invalidateQueries({
+        queryKey: trpc.organizations.kiloclaw.getStatus.queryKey({ organizationId }),
+      }),
+      queryClient.invalidateQueries({
+        queryKey: trpc.organizations.kiloclaw.getNavState.queryKey({ organizationId }),
+      }),
+      queryClient.invalidateQueries({
+        queryKey: trpc.organizations.kiloclaw.controllerVersion.queryKey({ organizationId }),
+      }),
+    ]);
   };
 
   const resetAllInstanceState = async () => {
@@ -318,26 +320,6 @@ export function useOrgKiloClawMutations(
         await queryClient.invalidateQueries({
           queryKey: trpc.organizations.kiloclaw.getConfig.queryKey({ organizationId }),
         });
-        await queryClient.invalidateQueries({
-          queryKey: trpc.organizations.kiloclaw.getComposioOnboardingStatus.queryKey({
-            organizationId,
-          }),
-        });
-      },
-    })
-  );
-  const rawCreateComposioGoogleCalendarLink = useMutation(
-    trpc.organizations.kiloclaw.createComposioGoogleCalendarLink.mutationOptions({
-      onSuccess: async () => {
-        await invalidateStatus();
-        await queryClient.invalidateQueries({
-          queryKey: trpc.organizations.kiloclaw.getComposioOnboardingStatus.queryKey({
-            organizationId,
-          }),
-        });
-        await queryClient.invalidateQueries({
-          queryKey: trpc.organizations.kiloclaw.getConfig.queryKey({ organizationId }),
-        });
       },
     })
   );
@@ -427,7 +409,8 @@ export function useOrgKiloClawMutations(
   );
   const rawWriteFile = useMutation(
     trpc.organizations.kiloclaw.writeFile.mutationOptions({
-      onSuccess: async () => {
+      onSuccess: async result => {
+        if ('outcome' in result) return;
         await queryClient.invalidateQueries({
           queryKey: trpc.organizations.kiloclaw.fileTree.queryKey(),
         });
@@ -531,6 +514,9 @@ export function useOrgKiloClawMutations(
       },
     })
   );
+  const rawStartOnboardingBriefing = useMutation(
+    trpc.organizations.kiloclaw.startOnboardingBriefing.mutationOptions()
+  );
   const rawUpdateBriefingInterests = useMutation(
     trpc.organizations.kiloclaw.updateBriefingInterests.mutationOptions({
       onSuccess: async () => {
@@ -559,7 +545,6 @@ export function useOrgKiloClawMutations(
     updateKiloCodeConfig: bind(rawUpdateKiloCodeConfig),
     patchChannels: bind(rawPatchChannels),
     patchSecrets: bind(rawPatchSecrets),
-    createComposioGoogleCalendarLink: bind(rawCreateComposioGoogleCalendarLink),
     restartMachine: bind(rawRestartMachine),
     restartOpenClaw: bindVoid(rawRestartOpenClaw),
     approvePairingRequest: bind(rawApprovePairing),
@@ -579,6 +564,7 @@ export function useOrgKiloClawMutations(
     enableMorningBriefing: bind(rawEnableMorningBriefing),
     disableMorningBriefing: bindVoid(rawDisableMorningBriefing),
     runMorningBriefing: bindVoid(rawRunMorningBriefing),
+    startOnboardingBriefing: bindVoid(rawStartOnboardingBriefing),
     updateBriefingInterests: bind(rawUpdateBriefingInterests),
     updateUserLocation: bind(rawUpdateUserLocation),
     startKiloCliRun: bind(rawStartKiloCliRun),

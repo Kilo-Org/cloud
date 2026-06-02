@@ -1,4 +1,8 @@
+import { STANDARD_OAUTH_PLATFORMS } from '@/lib/integrations/oauth/paths';
+
 const CALLBACK_PATH_REGEX = /^\/(users\/)?[-a-zA-Z0-9]+\/?(\?.*)?(#.*)?$/;
+const PLACEHOLDER_ORIGIN = 'https://placeholder.invalid';
+const STANDARD_OAUTH_PLATFORM_SET: ReadonlySet<string> = new Set(STANDARD_OAUTH_PLATFORMS);
 
 export function stripHost(url: string): string {
   try {
@@ -28,7 +32,40 @@ export function isValidCallbackPath(path: string): boolean {
   ) {
     return true;
   }
+  if (isValidIntegrationOAuthConnectCallbackPath(path)) {
+    return true;
+  }
   return CALLBACK_PATH_REGEX.test(path);
+}
+
+function isValidIntegrationOAuthConnectCallbackPath(path: string): boolean {
+  if (!path.startsWith('/api/integrations/') || path.startsWith('//')) {
+    return false;
+  }
+
+  let url: URL;
+  try {
+    url = new URL(path, PLACEHOLDER_ORIGIN);
+  } catch {
+    return false;
+  }
+
+  if (url.origin !== PLACEHOLDER_ORIGIN || url.hash) {
+    return false;
+  }
+
+  if (url.searchParams.has('clientSecret')) {
+    return false;
+  }
+
+  const [, api, integrations, platform, action, ...rest] = url.pathname.split('/');
+  return (
+    api === 'api' &&
+    integrations === 'integrations' &&
+    action === 'connect' &&
+    rest.length === 0 &&
+    STANDARD_OAUTH_PLATFORM_SET.has(platform)
+  );
 }
 
 export default function getSignInCallbackUrl(searchParams?: NextAppSearchParams): string {

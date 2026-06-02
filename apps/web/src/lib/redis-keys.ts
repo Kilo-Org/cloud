@@ -33,6 +33,9 @@ export const posthogQueryRedisKey = (name: string) => redisKey(`posthog-query:${
 
 export const requestLogRedisKey = (hash: string) => redisKey(`ai-gateway.request-log:${hash}`);
 
+export const abuseRulesClassificationRedisKey = (identityKey: string) =>
+  redisKey(`ai-gateway.abuse-rules:last-classification:${identityKey}`);
+
 export const botIdentityRedisKey = (platform: string, teamId: string, userId: string) =>
   redisKey(`identity:${platform}:${teamId}:${userId}`);
 
@@ -47,17 +50,6 @@ export const botIdentityRedisKey = (platform: string, teamId: string, userId: st
 export const EXPERIMENTED_PUBLIC_IDS_REDIS_KEY = redisKey(
   'ai-gateway.model-experiments:experimented-public-ids'
 );
-
-/**
- * Per-public-id resolved experiment payload (variants + current versions,
- * with decrypted api keys merged in for hot-path use).
- *
- * Cached for ~10 minutes; invalidated by every admin mutation that affects
- * routing for the experiment. The cached value contains decrypted upstream
- * api keys, so the TTL doubles as a key-rotation lag bound.
- */
-export const modelExperimentRedisKey = (publicId: string) =>
-  redisKey(`ai-gateway.model-experiments:by-public-id:${publicId}`);
 
 export const gitLabOAuthCredentialsRedisKey = (credentialRef: string) =>
   redisKey(`auth-credentials:gitlab:${credentialRef}`);

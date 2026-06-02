@@ -183,6 +183,27 @@ describe('CloudAgentNextFetchClient billing error detection', () => {
   });
 });
 
+describe('CloudAgentNextFetchClient internal session updates', () => {
+  it('posts only callback routing data for a continued session', async () => {
+    const fetchMock = mockFetch(200, { result: { data: { success: true } } });
+    vi.stubGlobal('fetch', fetchMock);
+    const client = createCloudAgentNextFetchClient(BASE_URL);
+    const callbackTarget = { url: 'https://example.test/callback' };
+
+    await client.updateSession(
+      { Authorization: 'Bearer token' },
+      { cloudAgentSessionId: 'agent_123', callbackTarget }
+    );
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      `${BASE_URL}/trpc/updateSession`,
+      expect.objectContaining({
+        body: JSON.stringify({ cloudAgentSessionId: 'agent_123', callbackTarget }),
+      })
+    );
+  });
+});
+
 describe('CloudAgentNextFetchClient getSessionHealth', () => {
   it('posts to getSessionHealth and parses a healthy response', async () => {
     const fetchMock = mockFetch(200, {
@@ -240,5 +261,64 @@ describe('CloudAgentNextFetchClient getSessionHealth', () => {
     await expect(client.getSessionHealth({}, { cloudAgentSessionId: 'agent_123' })).rejects.toThrow(
       'Unexpected getSessionHealth response shape'
     );
+  });
+});
+
+describe('CloudAgentNextFetchClient legacy execution responses', () => {
+  it('parses initiateFromPreparedSession response with executionId as messageId alias', async () => {
+    vi.stubGlobal(
+      'fetch',
+      mockFetch(200, {
+        result: {
+          data: {
+            cloudAgentSessionId: 'agent_123',
+            status: 'started',
+            streamUrl: '/stream?cloudAgentSessionId=agent_123',
+            messageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
+            executionId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
+            delivery: 'queued',
+          },
+        },
+      })
+    );
+    const client = createCloudAgentNextFetchClient(BASE_URL);
+
+    const result = await client.initiateFromPreparedSession(
+      {},
+      { cloudAgentSessionId: 'agent_123' }
+    );
+
+    expect(result.executionId).toBe('msg_018f1e2d3c4bAbCdEfGhIjKlMn');
+  });
+
+  it('parses sendMessageV2 response with executionId as messageId alias', async () => {
+    vi.stubGlobal(
+      'fetch',
+      mockFetch(200, {
+        result: {
+          data: {
+            cloudAgentSessionId: 'agent_123',
+            status: 'started',
+            streamUrl: '/stream?cloudAgentSessionId=agent_123',
+            messageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
+            executionId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
+            delivery: 'sent',
+          },
+        },
+      })
+    );
+    const client = createCloudAgentNextFetchClient(BASE_URL);
+
+    const result = await client.sendMessageV2(
+      {},
+      {
+        cloudAgentSessionId: 'agent_123',
+        prompt: 'follow up',
+        mode: 'code',
+        model: 'test-model',
+      }
+    );
+
+    expect(result.executionId).toBe('msg_018f1e2d3c4bAbCdEfGhIjKlMn');
   });
 });

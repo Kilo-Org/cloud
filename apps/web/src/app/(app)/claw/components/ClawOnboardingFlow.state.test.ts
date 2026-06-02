@@ -101,20 +101,6 @@ describe('ClawOnboardingFlow state machine', () => {
     expect(state.instanceStatus).toBeNull();
   });
 
-  test('allows managed tools before initial provisioning starts', () => {
-    const state = getClawOnboardingFlowState(
-      createInput({
-        onboardingStep: 'tools',
-        hasBotIdentity: true,
-        hasToolsStep: true,
-      })
-    );
-
-    expect(state.renderStep).toBe('tools');
-    expect(state.createSetupActive).toBe(false);
-    expect(state.instanceStatus).toBeNull();
-  });
-
   test('keeps create setup active once an instance status exists', () => {
     const state = getClawOnboardingFlowState(
       createInput({
@@ -130,16 +116,6 @@ describe('ClawOnboardingFlow state machine', () => {
     expect(getClawOnboardingFlowState(createInput({ createSetupStarted: true })).renderStep).toBe(
       'identity'
     );
-    expect(
-      getClawOnboardingFlowState(
-        createInput({
-          createSetupStarted: true,
-          onboardingStep: 'tools',
-          hasBotIdentity: true,
-          hasToolsStep: true,
-        })
-      ).renderStep
-    ).toBe('tools');
     expect(
       getClawOnboardingFlowState(
         createInput({
@@ -177,11 +153,10 @@ describe('ClawOnboardingFlow state machine', () => {
     ).toBe('complete');
   });
 
-  test('the active wizard has five steps when all admin-gated steps are visible', () => {
-    // Channels and pairing were removed from the active wizard. The
-    // counter is 5 with all admin-gated steps visible: identity,
-    // calendar, email, interests, provisioning. Non-admins skip the
-    // calendar and interests steps (see the describe block below).
+  test('the active wizard has five steps when all optional steps are visible', () => {
+    // Channels and pairing were removed from the active wizard. The counter
+    // is 5 with all optional steps visible: identity, calendar, email,
+    // interests, provisioning.
     const defaultState = getClawOnboardingFlowState(createInput());
     expect(defaultState.totalSteps).toBe(5);
     expect(defaultState.currentStep).toBe(1);
@@ -209,28 +184,6 @@ describe('ClawOnboardingFlow state machine', () => {
       totalSteps: 5,
     });
     expect(getClawOnboardingStepProgress('done')).toEqual({ currentStep: 5, totalSteps: 5 });
-  });
-
-  test('managed tools step replaces calendar in the active wizard', () => {
-    const state = getClawOnboardingFlowState(
-      createInput({
-        createSetupStarted: true,
-        onboardingStep: 'calendar',
-        hasBotIdentity: true,
-        hasToolsStep: true,
-      })
-    );
-
-    expect(state.renderStep).toBe('tools');
-    expect(state.totalSteps).toBe(5);
-    expect(getClawOnboardingStepProgress('tools', true, true, true)).toEqual({
-      currentStep: 2,
-      totalSteps: 5,
-    });
-    expect(getClawOnboardingStepProgress('calendar', true, true, true)).toEqual({
-      currentStep: 2,
-      totalSteps: 5,
-    });
   });
 
   test.each(CLAW_ONBOARDING_PROVISIONING_STATUSES)(
@@ -331,11 +284,9 @@ describe('ClawOnboardingFlow state machine', () => {
     ).toBe('provisioning');
   });
 
-  describe('when admin-gated steps are hidden (non-admin user)', () => {
-    // A real non-admin has BOTH calendar and interests hidden (they share
-    // the same admin gate). Each test passes both flags as `false` so the
-    // total step count reflects the actual non-admin wizard: identity,
-    // email, provisioning = 3 steps.
+  describe('when optional calendar and interests steps are hidden', () => {
+    // Each test passes both flags as `false` so the total step count reflects
+    // the shortened wizard: identity, email, provisioning = 3 steps.
     test('drops calendar and interests from total step count', () => {
       const nonAdmin = getClawOnboardingFlowState(
         createInput({ hasCalendarStep: false, hasInterestsStep: false })
@@ -376,9 +327,9 @@ describe('ClawOnboardingFlow state machine', () => {
     });
 
     test('reports email as step 2 of 3 even when stored onboardingStep is calendar', () => {
-      // A non-admin briefly sitting on onboardingStep='calendar' (e.g. via a
-      // stale URL) gets normalized for both the rendered step and the
-      // progress indicator so the header doesn't read "Step 0 of 3".
+      // A user briefly sitting on onboardingStep='calendar' (e.g. via a stale
+      // URL) gets normalized for both the rendered step and the progress
+      // indicator so the header doesn't read "Step 0 of 3".
       const state = getClawOnboardingFlowState(
         createInput({
           createSetupStarted: true,
@@ -444,21 +395,6 @@ describe('ClawOnboardingFlow state machine', () => {
     );
 
     expect(state.renderStep).toBe('calendar');
-  });
-
-  test('renders tools in post-provisioning mode when explicit Composio resume is requested', () => {
-    const state = getClawOnboardingFlowState(
-      createInput({
-        mode: 'post-provisioning',
-        status: createStatus('running'),
-        onboardingStep: 'tools',
-        hasBotIdentity: true,
-        hasToolsStep: true,
-        gatewayState: 'running',
-      })
-    );
-
-    expect(state.renderStep).toBe('tools');
   });
 
   test('renders calendar in post-provisioning mode even before the gateway is ready', () => {

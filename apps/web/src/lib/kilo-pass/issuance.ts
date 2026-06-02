@@ -20,11 +20,18 @@ import { toMicrodollars } from '@/lib/utils';
 import { and, eq } from 'drizzle-orm';
 
 import type { DrizzleTransaction } from '@/lib/drizzle';
+import { computeKiloPassBonusUsd } from '@/lib/kilo-pass/bonus-decision';
 import { dayjs } from '@/lib/kilo-pass/dayjs';
 import type { Dayjs } from 'dayjs';
 
 type Db = typeof defaultDb;
 type DbOrTx = Db | DrizzleTransaction;
+
+export const KILO_PASS_BONUS_LIKE_ITEM_KINDS = [
+  KiloPassIssuanceItemKind.Bonus,
+  KiloPassIssuanceItemKind.PromoFirstMonth50Pct,
+  KiloPassIssuanceItemKind.ReferralBonus,
+];
 
 export function computeIssueMonth(date: Dayjs): string {
   return date.utc().format('YYYY-MM-01');
@@ -534,11 +541,38 @@ export async function issueBonusCreditsForIssuance(
     };
   }
 
+  const existingReferralBonus = await getExistingIssuanceItem(tx, {
+    issuanceId,
+    kind: KiloPassIssuanceItemKind.ReferralBonus,
+  });
+
+  if (existingReferralBonus) {
+    await appendKiloPassAuditLog(tx, {
+      action: KiloPassAuditLogAction.BonusCreditsSkippedIdempotent,
+      result: KiloPassAuditLogResult.SkippedIdempotent,
+      kiloUserId,
+      kiloPassSubscriptionId: subscriptionId,
+      stripeInvoiceId: stripeInvoiceId ?? null,
+      relatedMonthlyIssuanceId: issuanceId,
+      payload: withAuditPayload({
+        reason: 'existing_referral_bonus_item',
+        referralBonusIssuanceItemId: existingReferralBonus.issuanceItemId,
+      }),
+    });
+
+    return {
+      wasIssued: false,
+      issuanceItemId: null,
+      creditTransactionId: null,
+      amountUsd: 0,
+      amountMicrodollars: 0,
+    };
+  }
+
   const user = await getUserForCreditMutations(tx, kiloUserId);
   const baseCents = roundUsdToCents(baseAmountUsd);
-  const bonusCents = Math.round(baseCents * bonusPercentApplied);
-  const bonusUsd = centsToUsd(bonusCents);
-  const bonusMicrodollars = toMicrodollars(centsToUsd(bonusCents));
+  const bonusUsd = computeKiloPassBonusUsd({ baseAmountUsd, bonusPercentApplied });
+  const bonusMicrodollars = toMicrodollars(bonusUsd);
 
   const creditExpiryDate = await computeKiloPassBonusExpiryDate(tx, {
     issuanceId,

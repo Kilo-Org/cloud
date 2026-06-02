@@ -3,7 +3,7 @@ import { isNewSession } from '@/lib/cloud-agent/session-type';
 import { LegacySessionViewer } from '@/components/cloud-agent-next/LegacySessionViewer';
 import { CloudChatPageWrapperNext } from './CloudChatPageWrapperNext';
 import { getAuthorizedOrgContext } from '@/lib/organizations/organization-auth';
-import { signInUrlWithCallbackPath } from '@/lib/user.server';
+import { signInUrlWithCallbackPath } from '@/lib/user/server';
 
 type PageProps = {
   params: Promise<{ id: string }>;

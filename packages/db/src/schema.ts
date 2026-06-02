@@ -31,6 +31,8 @@ import {
   KiloPassPaymentProvider,
   KiloPassIssuanceSource,
   KiloPassIssuanceItemKind,
+  KiloPassWelcomePromoPaymentFingerprintType,
+  KiloPassWelcomePromoEligibilityReason,
   KiloPassAuditLogAction,
   KiloPassAuditLogResult,
   KiloPassScheduledChangeStatus,
@@ -50,17 +52,25 @@ import {
   KiloClawTerminalRenewalFailureStatus,
   KiloClawTerminalRenewalFailureCode,
   KiloClawTerminalRenewalFailureResolutionActorType,
+  StripeEarlyFraudWarningOwnerClassification,
+  StripeEarlyFraudWarningCaseStatus,
+  StripeEarlyFraudWarningActionType,
+  StripeEarlyFraudWarningActionStatus,
   AffiliateProvider,
   AffiliateEventType,
   AffiliateEventDeliveryState,
-  KiloClawAttributionTouchType,
-  KiloClawAttributionTouchProvider,
+  ImpactReferralProduct,
+  ImpactAdvocateProgramKey,
+  ImpactAttributionTouchType,
+  ImpactAttributionTouchProvider,
   ImpactAdvocateRegistrationState,
   ImpactAdvocateAttemptDeliveryState,
-  KiloClawReferralBeneficiaryRole,
-  KiloClawReferralWinningTouchType,
-  KiloClawReferralDecisionOutcome,
-  KiloClawReferralRewardStatus,
+  ImpactReferralBeneficiaryRole,
+  ImpactReferralWinningTouchType,
+  ImpactReferralDecisionOutcome,
+  ImpactReferralRewardStatus,
+  ImpactReferralRewardKind,
+  ImpactReferralPaymentProvider,
   ImpactConversionReportState,
   ImpactAdvocateRewardRedemptionState,
 } from './schema-types';
@@ -133,6 +143,8 @@ export const SCHEMA_CHECK_ENUMS = {
   KiloPassPaymentProvider,
   KiloPassIssuanceSource,
   KiloPassIssuanceItemKind,
+  KiloPassWelcomePromoPaymentFingerprintType,
+  KiloPassWelcomePromoEligibilityReason,
   KiloPassAuditLogAction,
   KiloPassAuditLogResult,
   KiloPassScheduledChangeStatus,
@@ -148,17 +160,25 @@ export const SCHEMA_CHECK_ENUMS = {
   KiloClawTerminalRenewalFailureStatus,
   KiloClawTerminalRenewalFailureCode,
   KiloClawTerminalRenewalFailureResolutionActorType,
+  StripeEarlyFraudWarningOwnerClassification,
+  StripeEarlyFraudWarningCaseStatus,
+  StripeEarlyFraudWarningActionType,
+  StripeEarlyFraudWarningActionStatus,
   AffiliateProvider,
   AffiliateEventType,
   AffiliateEventDeliveryState,
-  KiloClawAttributionTouchType,
-  KiloClawAttributionTouchProvider,
+  ImpactReferralProduct,
+  ImpactAdvocateProgramKey,
+  ImpactAttributionTouchType,
+  ImpactAttributionTouchProvider,
   ImpactAdvocateRegistrationState,
   ImpactAdvocateAttemptDeliveryState,
-  KiloClawReferralBeneficiaryRole,
-  KiloClawReferralWinningTouchType,
-  KiloClawReferralDecisionOutcome,
-  KiloClawReferralRewardStatus,
+  ImpactReferralBeneficiaryRole,
+  ImpactReferralWinningTouchType,
+  ImpactReferralDecisionOutcome,
+  ImpactReferralRewardStatus,
+  ImpactReferralRewardKind,
+  ImpactReferralPaymentProvider,
   ImpactConversionReportState,
   ImpactAdvocateRewardRedemptionState,
 } as const;
@@ -466,6 +486,156 @@ export const pending_impact_sale_reversals = pgTable(
 
 export type PendingImpactSaleReversal = typeof pending_impact_sale_reversals.$inferSelect;
 
+export const stripe_early_fraud_warning_cases = pgTable(
+  'stripe_early_fraud_warning_cases',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    stripe_early_fraud_warning_id: text().notNull(),
+    stripe_event_id: text().notNull(),
+    stripe_charge_id: text(),
+    stripe_payment_intent_id: text(),
+    stripe_customer_id: text(),
+    amount_minor_units: integer(),
+    currency: text(),
+    owner_classification: text().notNull().$type<StripeEarlyFraudWarningOwnerClassification>(),
+    kilo_user_id: text().references(() => kilocode_users.id, {
+      onDelete: 'set null',
+      onUpdate: 'cascade',
+    }),
+    organization_id: uuid().references(() => organizations.id, {
+      onDelete: 'set null',
+      onUpdate: 'cascade',
+    }),
+    status: text()
+      .notNull()
+      .$type<StripeEarlyFraudWarningCaseStatus>()
+      .default(StripeEarlyFraudWarningCaseStatus.Queued),
+    reason: text(),
+    failure_context: text(),
+    warning_created_at: timestamp({ withTimezone: true, mode: 'string' }),
+    contained_at: timestamp({ withTimezone: true, mode: 'string' }),
+    processing_started_at: timestamp({ withTimezone: true, mode: 'string' }),
+    completed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    review_required_at: timestamp({ withTimezone: true, mode: 'string' }),
+    remediated_at: timestamp({ withTimezone: true, mode: 'string' }),
+    dismissed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    unique('UQ_stripe_early_fraud_warning_cases_warning_id').on(
+      table.stripe_early_fraud_warning_id
+    ),
+    index('IDX_stripe_early_fraud_warning_cases_event_id').on(table.stripe_event_id),
+    index('IDX_stripe_early_fraud_warning_cases_charge_id').on(table.stripe_charge_id),
+    index('IDX_stripe_early_fraud_warning_cases_payment_intent_id').on(
+      table.stripe_payment_intent_id
+    ),
+    index('IDX_stripe_early_fraud_warning_cases_customer_id').on(table.stripe_customer_id),
+    index('IDX_stripe_early_fraud_warning_cases_kilo_user_id').on(table.kilo_user_id),
+    index('IDX_stripe_early_fraud_warning_cases_organization_id').on(table.organization_id),
+    index('IDX_stripe_early_fraud_warning_cases_status_created_at').on(
+      table.status,
+      table.created_at
+    ),
+    enumCheck(
+      'stripe_early_fraud_warning_cases_owner_classification_check',
+      table.owner_classification,
+      StripeEarlyFraudWarningOwnerClassification
+    ),
+    enumCheck(
+      'stripe_early_fraud_warning_cases_status_check',
+      table.status,
+      StripeEarlyFraudWarningCaseStatus
+    ),
+    check(
+      'stripe_early_fraud_warning_cases_amount_minor_units_non_negative_check',
+      sql`${table.amount_minor_units} IS NULL OR ${table.amount_minor_units} >= 0`
+    ),
+  ]
+);
+
+export type StripeEarlyFraudWarningCase = typeof stripe_early_fraud_warning_cases.$inferSelect;
+export type NewStripeEarlyFraudWarningCase = typeof stripe_early_fraud_warning_cases.$inferInsert;
+
+export const stripe_early_fraud_warning_actions = pgTable(
+  'stripe_early_fraud_warning_actions',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    case_id: uuid()
+      .notNull()
+      .references(() => stripe_early_fraud_warning_cases.id, {
+        onDelete: 'restrict',
+        onUpdate: 'cascade',
+      }),
+    action_type: text().notNull().$type<StripeEarlyFraudWarningActionType>(),
+    target_key: text().notNull(),
+    status: text()
+      .notNull()
+      .$type<StripeEarlyFraudWarningActionStatus>()
+      .default(StripeEarlyFraudWarningActionStatus.Queued),
+    attempt_count: integer().notNull().default(0),
+    next_retry_at: timestamp({ withTimezone: true, mode: 'string' }),
+    claimed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    last_attempt_at: timestamp({ withTimezone: true, mode: 'string' }),
+    completed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    terminal_at: timestamp({ withTimezone: true, mode: 'string' }),
+    result_code: text(),
+    result_reference_id: text(),
+    failure_context: text(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    unique('UQ_stripe_early_fraud_warning_actions_case_type_target').on(
+      table.case_id,
+      table.action_type,
+      table.target_key
+    ),
+    index('IDX_stripe_early_fraud_warning_actions_case_id').on(table.case_id),
+    index('IDX_stripe_early_fraud_warning_actions_claim_path').on(
+      table.status,
+      sql`coalesce(${table.next_retry_at}, '-infinity'::timestamptz)`,
+      table.created_at,
+      table.id
+    ),
+    enumCheck(
+      'stripe_early_fraud_warning_actions_action_type_check',
+      table.action_type,
+      StripeEarlyFraudWarningActionType
+    ),
+    enumCheck(
+      'stripe_early_fraud_warning_actions_status_check',
+      table.status,
+      StripeEarlyFraudWarningActionStatus
+    ),
+    check(
+      'stripe_early_fraud_warning_actions_attempt_count_non_negative_check',
+      sql`${table.attempt_count} >= 0`
+    ),
+    check(
+      'stripe_early_fraud_warning_actions_target_key_not_empty_check',
+      sql`length(${table.target_key}) > 0`
+    ),
+  ]
+);
+
+export type StripeEarlyFraudWarningAction = typeof stripe_early_fraud_warning_actions.$inferSelect;
+export type NewStripeEarlyFraudWarningAction =
+  typeof stripe_early_fraud_warning_actions.$inferInsert;
+
 export const deleted_user_email_tombstones = pgTable('deleted_user_email_tombstones', {
   normalized_email_hash: text().primaryKey().notNull(),
   created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
@@ -473,21 +643,28 @@ export const deleted_user_email_tombstones = pgTable('deleted_user_email_tombsto
 
 export type DeletedUserEmailTombstone = typeof deleted_user_email_tombstones.$inferSelect;
 
-export const kiloclaw_attribution_touches = pgTable(
-  'kiloclaw_attribution_touches',
+export const impact_attribution_touches = pgTable(
+  'impact_attribution_touches',
   {
     id: uuid()
       .default(sql`pg_catalog.gen_random_uuid()`)
       .primaryKey()
       .notNull(),
+    product: text()
+      .notNull()
+      .$type<ImpactReferralProduct>()
+      .default(ImpactReferralProduct.KiloClaw),
+    program_key: text()
+      .$type<ImpactAdvocateProgramKey>()
+      .default(ImpactAdvocateProgramKey.KiloClaw),
     dedupe_key: text().notNull(),
     anonymous_id: text(),
     user_id: text().references(() => kilocode_users.id, {
       onDelete: 'set null',
       onUpdate: 'cascade',
     }),
-    touch_type: text().notNull().$type<KiloClawAttributionTouchType>(),
-    provider: text().notNull().$type<KiloClawAttributionTouchProvider>(),
+    touch_type: text().notNull().$type<ImpactAttributionTouchType>(),
+    provider: text().notNull().$type<ImpactAttributionTouchProvider>(),
     opaque_tracking_value: text(),
     tracking_value_length: integer().notNull(),
     is_tracking_value_accepted: boolean().notNull().default(true),
@@ -507,29 +684,36 @@ export const kiloclaw_attribution_touches = pgTable(
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
   },
   table => [
-    unique('UQ_kiloclaw_attribution_touches_dedupe_key').on(table.dedupe_key),
-    index('IDX_kiloclaw_attribution_touches_user_id').on(table.user_id),
-    index('IDX_kiloclaw_attribution_touches_anonymous_id').on(table.anonymous_id),
-    index('IDX_kiloclaw_attribution_touches_expires_at').on(table.expires_at),
-    index('IDX_kiloclaw_attribution_touches_sale_attributed_at').on(table.sale_attributed_at),
+    unique('UQ_impact_attribution_touches_dedupe_key').on(table.dedupe_key),
+    index('IDX_impact_attribution_touches_product_user_id').on(table.product, table.user_id),
+    index('IDX_impact_attribution_touches_user_id').on(table.user_id),
+    index('IDX_impact_attribution_touches_anonymous_id').on(table.anonymous_id),
+    index('IDX_impact_attribution_touches_expires_at').on(table.expires_at),
+    index('IDX_impact_attribution_touches_sale_attributed_at').on(table.sale_attributed_at),
+    enumCheck('impact_attribution_touches_product_check', table.product, ImpactReferralProduct),
     enumCheck(
-      'kiloclaw_attribution_touches_touch_type_check',
-      table.touch_type,
-      KiloClawAttributionTouchType
+      'impact_attribution_touches_program_key_check',
+      table.program_key,
+      ImpactAdvocateProgramKey
     ),
     enumCheck(
-      'kiloclaw_attribution_touches_provider_check',
+      'impact_attribution_touches_touch_type_check',
+      table.touch_type,
+      ImpactAttributionTouchType
+    ),
+    enumCheck(
+      'impact_attribution_touches_provider_check',
       table.provider,
-      KiloClawAttributionTouchProvider
+      ImpactAttributionTouchProvider
     ),
     check(
-      'kiloclaw_attribution_touches_tracking_value_length_non_negative_check',
+      'impact_attribution_touches_tracking_value_length_non_negative_check',
       sql`${table.tracking_value_length} >= 0`
     ),
   ]
 );
 
-export type KiloClawAttributionTouch = typeof kiloclaw_attribution_touches.$inferSelect;
+export type ImpactAttributionTouch = typeof impact_attribution_touches.$inferSelect;
 
 export const impact_advocate_participants = pgTable(
   'impact_advocate_participants',
@@ -538,6 +722,10 @@ export const impact_advocate_participants = pgTable(
       .default(sql`pg_catalog.gen_random_uuid()`)
       .primaryKey()
       .notNull(),
+    program_key: text()
+      .notNull()
+      .$type<ImpactAdvocateProgramKey>()
+      .default(ImpactAdvocateProgramKey.KiloClaw),
     user_id: text()
       .notNull()
       .references(() => kilocode_users.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
@@ -562,11 +750,16 @@ export const impact_advocate_participants = pgTable(
       .$onUpdateFn(() => sql`now()`),
   },
   table => [
-    unique('UQ_impact_advocate_participants_user_id').on(table.user_id),
-    unique('UQ_impact_advocate_participants_opaque_referral_identifier').on(
-      table.opaque_referral_identifier
-    ),
+    unique('UQ_impact_advocate_participants_program_user').on(table.program_key, table.user_id),
+    uniqueIndex('UQ_impact_advocate_participants_program_referral_identifier')
+      .on(table.program_key, table.opaque_referral_identifier)
+      .where(sql`${table.opaque_referral_identifier} IS NOT NULL`),
     index('IDX_impact_advocate_participants_registration_state').on(table.registration_state),
+    enumCheck(
+      'impact_advocate_participants_program_key_check',
+      table.program_key,
+      ImpactAdvocateProgramKey
+    ),
     enumCheck(
       'impact_advocate_participants_registration_state_check',
       table.registration_state,
@@ -584,6 +777,10 @@ export const impact_advocate_registration_attempts = pgTable(
       .default(sql`pg_catalog.gen_random_uuid()`)
       .primaryKey()
       .notNull(),
+    program_key: text()
+      .notNull()
+      .$type<ImpactAdvocateProgramKey>()
+      .default(ImpactAdvocateProgramKey.KiloClaw),
     participant_id: uuid()
       .notNull()
       .references(() => impact_advocate_participants.id, {
@@ -614,6 +811,11 @@ export const impact_advocate_registration_attempts = pgTable(
     index('IDX_impact_advocate_registration_attempts_participant_id').on(table.participant_id),
     index('IDX_impact_advocate_registration_attempts_delivery_state').on(table.delivery_state),
     enumCheck(
+      'impact_advocate_registration_attempts_program_key_check',
+      table.program_key,
+      ImpactAdvocateProgramKey
+    ),
+    enumCheck(
       'impact_advocate_registration_attempts_delivery_state_check',
       table.delivery_state,
       ImpactAdvocateAttemptDeliveryState
@@ -632,13 +834,17 @@ export const impact_advocate_registration_attempts = pgTable(
 export type ImpactAdvocateRegistrationAttempt =
   typeof impact_advocate_registration_attempts.$inferSelect;
 
-export const kiloclaw_referrals = pgTable(
-  'kiloclaw_referrals',
+export const impact_referrals = pgTable(
+  'impact_referrals',
   {
     id: uuid()
       .default(sql`pg_catalog.gen_random_uuid()`)
       .primaryKey()
       .notNull(),
+    product: text()
+      .notNull()
+      .$type<ImpactReferralProduct>()
+      .default(ImpactReferralProduct.KiloClaw),
     referee_user_id: text()
       .notNull()
       .references(() => kilocode_users.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
@@ -646,7 +852,7 @@ export const kiloclaw_referrals = pgTable(
       onDelete: 'set null',
       onUpdate: 'cascade',
     }),
-    source_touch_id: uuid().references(() => kiloclaw_attribution_touches.id, {
+    source_touch_id: uuid().references(() => impact_attribution_touches.id, {
       onDelete: 'set null',
       onUpdate: 'cascade',
     }),
@@ -654,21 +860,27 @@ export const kiloclaw_referrals = pgTable(
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
   },
   table => [
-    unique('UQ_kiloclaw_referrals_referee_user_id').on(table.referee_user_id),
-    index('IDX_kiloclaw_referrals_referrer_user_id').on(table.referrer_user_id),
-    index('IDX_kiloclaw_referrals_source_touch_id').on(table.source_touch_id),
+    unique('UQ_impact_referrals_product_referee_user_id').on(table.product, table.referee_user_id),
+    index('IDX_impact_referrals_referrer_user_id').on(table.referrer_user_id),
+    index('IDX_impact_referrals_source_touch_id').on(table.source_touch_id),
+    enumCheck('impact_referrals_product_check', table.product, ImpactReferralProduct),
   ]
 );
 
-export type KiloClawReferral = typeof kiloclaw_referrals.$inferSelect;
+export type ImpactReferral = typeof impact_referrals.$inferSelect;
+export type KiloClawReferral = ImpactReferral;
 
-export const kiloclaw_referral_conversions = pgTable(
-  'kiloclaw_referral_conversions',
+export const impact_referral_conversions = pgTable(
+  'impact_referral_conversions',
   {
     id: uuid()
       .default(sql`pg_catalog.gen_random_uuid()`)
       .primaryKey()
       .notNull(),
+    product: text()
+      .notNull()
+      .$type<ImpactReferralProduct>()
+      .default(ImpactReferralProduct.KiloClaw),
     referee_user_id: text()
       .notNull()
       .references(() => kilocode_users.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
@@ -676,11 +888,15 @@ export const kiloclaw_referral_conversions = pgTable(
       onDelete: 'set null',
       onUpdate: 'cascade',
     }),
-    source_touch_id: uuid().references(() => kiloclaw_attribution_touches.id, {
+    source_touch_id: uuid().references(() => impact_attribution_touches.id, {
       onDelete: 'set null',
       onUpdate: 'cascade',
     }),
-    winning_touch_type: text().notNull().$type<KiloClawReferralWinningTouchType>(),
+    winning_touch_type: text().notNull().$type<ImpactReferralWinningTouchType>(),
+    payment_provider: text()
+      .notNull()
+      .$type<ImpactReferralPaymentProvider>()
+      .default(ImpactReferralPaymentProvider.Credits),
     source_payment_id: text().notNull(),
     qualified: boolean().notNull().default(false),
     disqualification_reason: text(),
@@ -688,97 +904,142 @@ export const kiloclaw_referral_conversions = pgTable(
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
   },
   table => [
-    unique('UQ_kiloclaw_referral_conversions_source_payment_id').on(table.source_payment_id),
-    index('IDX_kiloclaw_referral_conversions_referee_user_id').on(table.referee_user_id),
-    index('IDX_kiloclaw_referral_conversions_referrer_user_id').on(table.referrer_user_id),
+    unique('UQ_impact_referral_conversions_product_payment_source').on(
+      table.product,
+      table.payment_provider,
+      table.source_payment_id
+    ),
+    index('IDX_impact_referral_conversions_referee_user_id').on(table.referee_user_id),
+    index('IDX_impact_referral_conversions_referrer_user_id').on(table.referrer_user_id),
+    enumCheck('impact_referral_conversions_product_check', table.product, ImpactReferralProduct),
     enumCheck(
-      'kiloclaw_referral_conversions_winning_touch_type_check',
+      'impact_referral_conversions_winning_touch_type_check',
       table.winning_touch_type,
-      KiloClawReferralWinningTouchType
+      ImpactReferralWinningTouchType
+    ),
+    enumCheck(
+      'impact_referral_conversions_payment_provider_check',
+      table.payment_provider,
+      ImpactReferralPaymentProvider
     ),
   ]
 );
 
-export type KiloClawReferralConversion = typeof kiloclaw_referral_conversions.$inferSelect;
+export type ImpactReferralConversion = typeof impact_referral_conversions.$inferSelect;
+export type KiloClawReferralConversion = ImpactReferralConversion;
 
-export const kiloclaw_referral_reward_decisions = pgTable(
-  'kiloclaw_referral_reward_decisions',
+export const impact_referral_reward_decisions = pgTable(
+  'impact_referral_reward_decisions',
   {
     id: uuid()
       .default(sql`pg_catalog.gen_random_uuid()`)
       .primaryKey()
       .notNull(),
+    product: text()
+      .notNull()
+      .$type<ImpactReferralProduct>()
+      .default(ImpactReferralProduct.KiloClaw),
     conversion_id: uuid()
       .notNull()
-      .references(() => kiloclaw_referral_conversions.id, {
+      .references(() => impact_referral_conversions.id, {
         onDelete: 'cascade',
         onUpdate: 'cascade',
       }),
     beneficiary_user_id: text()
       .notNull()
       .references(() => kilocode_users.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
-    beneficiary_role: text().notNull().$type<KiloClawReferralBeneficiaryRole>(),
-    outcome: text().notNull().$type<KiloClawReferralDecisionOutcome>(),
+    beneficiary_role: text().notNull().$type<ImpactReferralBeneficiaryRole>(),
+    outcome: text().notNull().$type<ImpactReferralDecisionOutcome>(),
     reason: text(),
+    reward_kind: text()
+      .notNull()
+      .$type<ImpactReferralRewardKind>()
+      .default(ImpactReferralRewardKind.KiloClawFreeMonth),
     months_granted: integer().notNull().default(0),
+    reward_percent: decimal({ precision: 6, scale: 4, mode: 'number' }),
+    source_tier: text(),
+    reward_amount_usd: decimal({ precision: 12, scale: 2, mode: 'number' }),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
   },
   table => [
-    unique('UQ_kiloclaw_referral_reward_decisions_conversion_role').on(
+    unique('UQ_impact_referral_reward_decisions_conversion_role').on(
       table.conversion_id,
       table.beneficiary_role
     ),
-    index('IDX_kiloclaw_referral_reward_decisions_beneficiary_user_id').on(
-      table.beneficiary_user_id
+    index('IDX_impact_referral_reward_decisions_beneficiary_user_id').on(table.beneficiary_user_id),
+    enumCheck(
+      'impact_referral_reward_decisions_product_check',
+      table.product,
+      ImpactReferralProduct
     ),
     enumCheck(
-      'kiloclaw_referral_reward_decisions_beneficiary_role_check',
+      'impact_referral_reward_decisions_beneficiary_role_check',
       table.beneficiary_role,
-      KiloClawReferralBeneficiaryRole
+      ImpactReferralBeneficiaryRole
     ),
     enumCheck(
-      'kiloclaw_referral_reward_decisions_outcome_check',
+      'impact_referral_reward_decisions_outcome_check',
       table.outcome,
-      KiloClawReferralDecisionOutcome
+      ImpactReferralDecisionOutcome
+    ),
+    enumCheck(
+      'impact_referral_reward_decisions_reward_kind_check',
+      table.reward_kind,
+      ImpactReferralRewardKind
     ),
     check(
-      'kiloclaw_referral_reward_decisions_months_granted_non_negative_check',
+      'impact_referral_reward_decisions_months_granted_non_negative_check',
       sql`${table.months_granted} >= 0`
     ),
   ]
 );
 
-export type KiloClawReferralRewardDecision = typeof kiloclaw_referral_reward_decisions.$inferSelect;
+export type ImpactReferralRewardDecision = typeof impact_referral_reward_decisions.$inferSelect;
+export type KiloClawReferralRewardDecision = ImpactReferralRewardDecision;
 
-export const kiloclaw_referral_rewards = pgTable(
-  'kiloclaw_referral_rewards',
+export const impact_referral_rewards = pgTable(
+  'impact_referral_rewards',
   {
     id: uuid()
       .default(sql`pg_catalog.gen_random_uuid()`)
       .primaryKey()
       .notNull(),
+    product: text()
+      .notNull()
+      .$type<ImpactReferralProduct>()
+      .default(ImpactReferralProduct.KiloClaw),
     conversion_id: uuid()
       .notNull()
-      .references(() => kiloclaw_referral_conversions.id, {
+      .references(() => impact_referral_conversions.id, {
         onDelete: 'cascade',
         onUpdate: 'cascade',
       }),
     decision_id: uuid()
       .notNull()
-      .references(() => kiloclaw_referral_reward_decisions.id, {
+      .references(() => impact_referral_reward_decisions.id, {
         onDelete: 'cascade',
         onUpdate: 'cascade',
       }),
     beneficiary_user_id: text()
       .notNull()
       .references(() => kilocode_users.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
-    beneficiary_role: text().notNull().$type<KiloClawReferralBeneficiaryRole>(),
+    beneficiary_role: text().notNull().$type<ImpactReferralBeneficiaryRole>(),
+    reward_kind: text()
+      .notNull()
+      .$type<ImpactReferralRewardKind>()
+      .default(ImpactReferralRewardKind.KiloClawFreeMonth),
     months_granted: integer().notNull().default(1),
+    reward_percent: decimal({ precision: 6, scale: 4, mode: 'number' }),
+    source_tier: text(),
+    reward_amount_usd: decimal({ precision: 12, scale: 2, mode: 'number' }),
     status: text()
       .notNull()
-      .$type<KiloClawReferralRewardStatus>()
-      .default(KiloClawReferralRewardStatus.Pending),
+      .$type<ImpactReferralRewardStatus>()
+      .default(ImpactReferralRewardStatus.Pending),
     applies_to_subscription_id: uuid(),
+    applies_to_kilo_pass_subscription_id: uuid(),
+    consumed_kilo_pass_issuance_id: uuid(),
+    consumed_kilo_pass_issuance_item_id: uuid(),
     earned_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
     applied_at: timestamp({ withTimezone: true, mode: 'string' }),
     reversed_at: timestamp({ withTimezone: true, mode: 'string' }),
@@ -787,38 +1048,70 @@ export const kiloclaw_referral_rewards = pgTable(
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
   },
   table => [
-    unique('UQ_kiloclaw_referral_rewards_conversion_role').on(
+    unique('UQ_impact_referral_rewards_conversion_role').on(
       table.conversion_id,
       table.beneficiary_role
     ),
-    unique('UQ_kiloclaw_referral_rewards_decision_id').on(table.decision_id),
-    index('IDX_kiloclaw_referral_rewards_beneficiary_user_id').on(table.beneficiary_user_id),
-    index('IDX_kiloclaw_referral_rewards_status').on(table.status),
+    unique('UQ_impact_referral_rewards_decision_id').on(table.decision_id),
+    index('IDX_impact_referral_rewards_beneficiary_user_id').on(table.beneficiary_user_id),
+    index('IDX_impact_referral_rewards_status').on(table.status),
+    enumCheck('impact_referral_rewards_product_check', table.product, ImpactReferralProduct),
     enumCheck(
-      'kiloclaw_referral_rewards_beneficiary_role_check',
+      'impact_referral_rewards_beneficiary_role_check',
       table.beneficiary_role,
-      KiloClawReferralBeneficiaryRole
+      ImpactReferralBeneficiaryRole
     ),
-    enumCheck('kiloclaw_referral_rewards_status_check', table.status, KiloClawReferralRewardStatus),
+    enumCheck(
+      'impact_referral_rewards_reward_kind_check',
+      table.reward_kind,
+      ImpactReferralRewardKind
+    ),
+    enumCheck('impact_referral_rewards_status_check', table.status, ImpactReferralRewardStatus),
+    foreignKey({
+      columns: [table.applies_to_kilo_pass_subscription_id],
+      foreignColumns: [kilo_pass_subscriptions.id],
+      name: 'FK_impact_referral_rewards_kilo_pass_subscription',
+    })
+      .onDelete('set null')
+      .onUpdate('cascade'),
+    foreignKey({
+      columns: [table.consumed_kilo_pass_issuance_id],
+      foreignColumns: [kilo_pass_issuances.id],
+      name: 'FK_impact_referral_rewards_kilo_pass_issuance',
+    })
+      .onDelete('set null')
+      .onUpdate('cascade'),
+    foreignKey({
+      columns: [table.consumed_kilo_pass_issuance_item_id],
+      foreignColumns: [kilo_pass_issuance_items.id],
+      name: 'FK_impact_referral_rewards_kilo_pass_issuance_item',
+    })
+      .onDelete('set null')
+      .onUpdate('cascade'),
     check(
-      'kiloclaw_referral_rewards_months_granted_positive_check',
-      sql`${table.months_granted} > 0`
+      'impact_referral_rewards_months_granted_non_negative_check',
+      sql`${table.months_granted} >= 0`
     ),
   ]
 );
 
-export type KiloClawReferralReward = typeof kiloclaw_referral_rewards.$inferSelect;
+export type ImpactReferralReward = typeof impact_referral_rewards.$inferSelect;
+export type KiloClawReferralReward = ImpactReferralReward;
 
-export const kiloclaw_referral_reward_applications = pgTable(
-  'kiloclaw_referral_reward_applications',
+export const impact_referral_reward_applications = pgTable(
+  'impact_referral_reward_applications',
   {
     id: uuid()
       .default(sql`pg_catalog.gen_random_uuid()`)
       .primaryKey()
       .notNull(),
+    product: text()
+      .notNull()
+      .$type<ImpactReferralProduct>()
+      .default(ImpactReferralProduct.KiloClaw),
     reward_id: uuid()
       .notNull()
-      .references(() => kiloclaw_referral_rewards.id, {
+      .references(() => impact_referral_rewards.id, {
         onDelete: 'cascade',
         onUpdate: 'cascade',
       }),
@@ -835,15 +1128,21 @@ export const kiloclaw_referral_reward_applications = pgTable(
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
   },
   table => [
-    index('IDX_kiloclaw_referral_reward_applications_reward_id').on(table.reward_id),
-    index('IDX_kiloclaw_referral_reward_applications_beneficiary_user_id').on(
+    index('IDX_impact_referral_reward_applications_reward_id').on(table.reward_id),
+    index('IDX_impact_referral_reward_applications_beneficiary_user_id').on(
       table.beneficiary_user_id
+    ),
+    enumCheck(
+      'impact_referral_reward_applications_product_check',
+      table.product,
+      ImpactReferralProduct
     ),
   ]
 );
 
-export type KiloClawReferralRewardApplication =
-  typeof kiloclaw_referral_reward_applications.$inferSelect;
+export type ImpactReferralRewardApplication =
+  typeof impact_referral_reward_applications.$inferSelect;
+export type KiloClawReferralRewardApplication = ImpactReferralRewardApplication;
 
 export const impact_advocate_reward_redemptions = pgTable(
   'impact_advocate_reward_redemptions',
@@ -854,7 +1153,7 @@ export const impact_advocate_reward_redemptions = pgTable(
       .notNull(),
     reward_id: uuid()
       .notNull()
-      .references(() => kiloclaw_referral_rewards.id, {
+      .references(() => impact_referral_rewards.id, {
         onDelete: 'cascade',
         onUpdate: 'cascade',
       }),
@@ -908,7 +1207,7 @@ export const impact_conversion_reports = pgTable(
       .default(sql`pg_catalog.gen_random_uuid()`)
       .primaryKey()
       .notNull(),
-    conversion_id: uuid().references(() => kiloclaw_referral_conversions.id, {
+    conversion_id: uuid().references(() => impact_referral_conversions.id, {
       onDelete: 'set null',
       onUpdate: 'cascade',
     }),
@@ -1156,6 +1455,7 @@ export const kilo_pass_issuances = pgTable(
     issue_month: date().notNull(),
     source: text().notNull().$type<KiloPassIssuanceSource>(),
     stripe_invoice_id: text(),
+    initial_welcome_promo_eligibility_reason: text().$type<KiloPassWelcomePromoEligibilityReason>(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()
@@ -1177,11 +1477,44 @@ export const kilo_pass_issuances = pgTable(
       sql`EXTRACT(DAY FROM ${table.issue_month}) = 1`
     ),
     enumCheck('kilo_pass_issuances_source_check', table.source, KiloPassIssuanceSource),
+    enumCheck(
+      'kilo_pass_issuances_initial_welcome_promo_reason_check',
+      table.initial_welcome_promo_eligibility_reason,
+      KiloPassWelcomePromoEligibilityReason
+    ),
   ]
 );
 
 export type KiloPassIssuance = typeof kilo_pass_issuances.$inferSelect;
 export type NewKiloPassIssuance = typeof kilo_pass_issuances.$inferInsert;
+
+export const kilo_pass_welcome_promo_payment_fingerprint_claims = pgTable(
+  'kilo_pass_welcome_promo_payment_fingerprint_claims',
+  {
+    stripe_payment_method_type: text()
+      .notNull()
+      .$type<KiloPassWelcomePromoPaymentFingerprintType>(),
+    stripe_fingerprint: text().notNull(),
+    source_stripe_invoice_id: text().notNull(),
+    claimed_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    primaryKey({ columns: [table.stripe_payment_method_type, table.stripe_fingerprint] }),
+    enumCheck(
+      'kilo_pass_welcome_promo_payment_fingerprint_claims_type_check',
+      table.stripe_payment_method_type,
+      KiloPassWelcomePromoPaymentFingerprintType
+    ),
+    unique('UQ_kilo_pass_welcome_promo_payment_fingerprint_claims_source_invoice_id').on(
+      table.source_stripe_invoice_id
+    ),
+  ]
+);
+
+export type KiloPassWelcomePromoPaymentFingerprintClaim =
+  typeof kilo_pass_welcome_promo_payment_fingerprint_claims.$inferSelect;
+export type NewKiloPassWelcomePromoPaymentFingerprintClaim =
+  typeof kilo_pass_welcome_promo_payment_fingerprint_claims.$inferInsert;
 
 export const kilo_pass_pause_events = pgTable(
   'kilo_pass_pause_events',
@@ -1597,6 +1930,8 @@ export const microdollar_usage_metadata = pgTable(
     auto_model_id: integer(),
     market_cost: bigint({ mode: 'number' }),
     is_free: boolean(),
+    abuse_delay: integer(),
+    abuse_downgraded_from: text(),
   },
   table => [
     index('idx_microdollar_usage_metadata_created_at').on(table.created_at),
@@ -1613,6 +1948,7 @@ export const api_request_log = pgTable(
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     kilo_user_id: text(),
     organization_id: text(),
+    session_id: text(),
     provider: text(),
     model: text(),
     status_code: integer(),
@@ -1792,6 +2128,8 @@ export const microdollar_usage_view = pgView('microdollar_usage_view', {
   auto_model: text(),
   market_cost: bigint({ mode: 'number' }),
   is_free: boolean(),
+  abuse_delay: integer(),
+  abuse_downgraded_from: text(),
 }).as(sql`
   SELECT
     mu.id,
@@ -1843,7 +2181,9 @@ export const microdollar_usage_view = pgView('microdollar_usage_view', {
     md.mode,
     am.auto_model,
     meta.market_cost,
-    meta.is_free
+    meta.is_free,
+    meta.abuse_delay,
+    meta.abuse_downgraded_from
   FROM ${microdollar_usage} mu
   LEFT JOIN ${microdollar_usage_metadata} meta ON mu.id = meta.id
   LEFT JOIN ${http_ip} ip ON meta.http_ip_id = ip.http_ip_id
@@ -2387,6 +2727,8 @@ export const platform_integrations = pgTable(
     repository_access: text(), // nullable for pending installations
     repositories: jsonb().$type<PlatformRepository[]>(),
     repositories_synced_at: timestamp({ withTimezone: true, mode: 'string' }),
+    auth_invalid_at: timestamp({ withTimezone: true, mode: 'string' }),
+    auth_invalid_reason: text(),
 
     // Metadata for storing additional platform-specific data (e.g., pending approval info)
     metadata: jsonb(),
@@ -2692,7 +3034,6 @@ export const agent_configs = pgTable(
     //   "review_style": "balanced",
     //   "focus_areas": ["security", "performance"],
     //   "model_slug": "anthropic/claude-4.5-sonnet",
-    //   "max_review_time_minutes": 10,
     //   "custom_instructions": "..."
     // }
     config: jsonb().$type<CodeReviewAgentConfig | Record<string, unknown>>().notNull().default({}),
@@ -2934,6 +3275,11 @@ export const ModelStatsBenchmarksSchema = z
             avgCacheReadTokens: z.number().nullable(),
             avgExecutionMs: z.number().nullable(),
             nTotalTrials: z.number(),
+            nAttempts: z.number().nullable().optional(),
+            avgAttemptCostUsd: z.number().nullable().optional(),
+            avgAttemptInputTokens: z.number().nullable().optional(),
+            avgAttemptOutputTokens: z.number().nullable().optional(),
+            avgAttemptCacheReadTokens: z.number().nullable().optional(),
             nErrored: z.number(),
             lastPromotedAt: z.string(),
           })
@@ -3053,13 +3399,18 @@ export const model_eval_ingestions = pgTable(
     variant: text('variant'),
     task_source: text('task_source').notNull(),
     n_total_trials: integer('n_total_trials').notNull(),
+    n_attempts: integer('n_attempts'),
     total_score: decimal('total_score', { precision: 14, scale: 6, mode: 'number' }).notNull(),
     overall_score: decimal('overall_score', { precision: 12, scale: 8, mode: 'number' }).notNull(),
     n_errored: integer('n_errored').notNull(),
     avg_cost_microdollars: bigint('avg_cost_microdollars', { mode: 'number' }),
+    total_cost_microdollars: bigint('total_cost_microdollars', { mode: 'number' }),
     avg_input_tokens: integer('avg_input_tokens'),
+    total_input_tokens: bigint('total_input_tokens', { mode: 'number' }),
     avg_output_tokens: integer('avg_output_tokens'),
+    total_output_tokens: bigint('total_output_tokens', { mode: 'number' }),
     avg_cache_read_tokens: integer('avg_cache_read_tokens'),
+    total_cache_read_tokens: bigint('total_cache_read_tokens', { mode: 'number' }),
     avg_execution_ms: integer('avg_execution_ms'),
     promoted_at: timestamp('promoted_at', { withTimezone: true, mode: 'string' }).notNull(),
     promoted_by_email: text('promoted_by_email').notNull(),
@@ -3491,6 +3842,176 @@ export const cli_sessions_v2 = pgTable(
 
 export type CliSessionV2 = typeof cli_sessions_v2.$inferSelect;
 export type NewCliSessionV2 = typeof cli_sessions_v2.$inferInsert;
+
+export type CloudAgentSessionFailureStage =
+  | 'sandbox_identity'
+  | 'registration'
+  | 'initial_admission'
+  | 'transport';
+export type CloudAgentSessionFailureCode =
+  | 'sandbox_id_derivation_failed'
+  | 'do_registration_rejected'
+  | 'initial_admission_rejected'
+  | 'initial_queue_full'
+  | 'invalid_initial_intent'
+  | 'do_rpc_outcome_unknown';
+
+export const cloud_agent_sessions = pgTable(
+  'cloud_agent_sessions',
+  {
+    cloud_agent_session_id: text().primaryKey().notNull(),
+    kilo_session_id: text().notNull(),
+    initial_message_id: text().notNull(),
+    sandbox_id: text(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    failure_at: timestamp({ withTimezone: true, mode: 'string' }),
+    failure_stage: text().$type<CloudAgentSessionFailureStage>(),
+    failure_code: text().$type<CloudAgentSessionFailureCode>(),
+    error_message_redacted: text(),
+    error_expires_at: timestamp({ withTimezone: true, mode: 'string' }),
+  },
+  table => [
+    uniqueIndex('UQ_cloud_agent_sessions_kilo_session_id').on(table.kilo_session_id),
+    uniqueIndex('UQ_cloud_agent_sessions_initial_message_id').on(table.initial_message_id),
+    index('IDX_cloud_agent_sessions_sandbox_id')
+      .on(table.sandbox_id)
+      .where(isNotNull(table.sandbox_id)),
+    index('IDX_cloud_agent_sessions_created_at').on(table.created_at),
+    index('IDX_cloud_agent_sessions_failure_created').on(
+      table.failure_stage,
+      table.failure_code,
+      table.created_at
+    ),
+    index('IDX_cloud_agent_sessions_failure_at')
+      .on(table.failure_at)
+      .where(isNotNull(table.failure_at)),
+    index('IDX_cloud_agent_sessions_failure_classification_at')
+      .on(table.failure_stage, table.failure_code, table.failure_at)
+      .where(isNotNull(table.failure_at)),
+    index('IDX_cloud_agent_sessions_error_expires_at')
+      .on(table.error_expires_at)
+      .where(isNotNull(table.error_expires_at)),
+    check(
+      'cloud_agent_sessions_failure_classification_check',
+      sql`(${table.failure_at} IS NULL AND ${table.failure_stage} IS NULL AND ${table.failure_code} IS NULL) OR
+        (${table.failure_at} IS NOT NULL AND ${table.failure_stage} = 'sandbox_identity' AND ${table.failure_code} = 'sandbox_id_derivation_failed') OR
+        (${table.failure_at} IS NOT NULL AND ${table.failure_stage} = 'registration' AND ${table.failure_code} = 'do_registration_rejected') OR
+        (${table.failure_at} IS NOT NULL AND ${table.failure_stage} = 'initial_admission' AND ${table.failure_code} IN ('initial_admission_rejected', 'initial_queue_full', 'invalid_initial_intent')) OR
+        (${table.failure_at} IS NOT NULL AND ${table.failure_stage} = 'transport' AND ${table.failure_code} = 'do_rpc_outcome_unknown')`
+    ),
+    check(
+      'cloud_agent_sessions_error_message_bounded_check',
+      sql`${table.error_message_redacted} IS NULL OR char_length(${table.error_message_redacted}) <= 4096`
+    ),
+    check(
+      'cloud_agent_sessions_error_expiry_check',
+      sql`(${table.error_message_redacted} IS NULL AND ${table.error_expires_at} IS NULL) OR
+        (${table.error_message_redacted} IS NOT NULL AND ${table.error_expires_at} IS NOT NULL)`
+    ),
+  ]
+);
+
+export type CloudAgentSession = typeof cloud_agent_sessions.$inferSelect;
+export type NewCloudAgentSession = typeof cloud_agent_sessions.$inferInsert;
+
+export type CloudAgentSessionRunStatus =
+  | 'queued'
+  | 'accepted'
+  | 'completed'
+  | 'failed'
+  | 'interrupted';
+export type CloudAgentSessionRunFailureStage =
+  | 'pre_dispatch'
+  | 'post_dispatch_no_activity'
+  | 'agent_activity'
+  | 'interruption'
+  | 'unknown';
+export type CloudAgentSessionRunFailureCode =
+  | 'sandbox_connect_failed'
+  | 'workspace_setup_failed'
+  | 'kilo_server_failed'
+  | 'wrapper_start_failed'
+  | 'invalid_delivery_request'
+  | 'session_metadata_missing'
+  | 'model_missing'
+  | 'delivery_failure_unknown'
+  | 'wrapper_disconnected'
+  | 'wrapper_no_output'
+  | 'wrapper_ping_timeout'
+  | 'wrapper_error_before_activity'
+  | 'assistant_error'
+  | 'wrapper_error_after_activity'
+  | 'missing_assistant_reply'
+  | 'user_interrupt'
+  | 'container_shutdown'
+  | 'system_interrupt'
+  | 'unclassified';
+
+export const cloud_agent_session_runs = pgTable(
+  'cloud_agent_session_runs',
+  {
+    cloud_agent_session_id: text()
+      .notNull()
+      .references(() => cloud_agent_sessions.cloud_agent_session_id, { onDelete: 'cascade' }),
+    message_id: text().notNull(),
+    wrapper_run_id: text(),
+    status: text().notNull().$type<CloudAgentSessionRunStatus>(),
+    queued_at: timestamp({ withTimezone: true, mode: 'string' }),
+    dispatch_accepted_at: timestamp({ withTimezone: true, mode: 'string' }),
+    agent_activity_observed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    terminal_at: timestamp({ withTimezone: true, mode: 'string' }),
+    failure_stage: text().$type<CloudAgentSessionRunFailureStage>(),
+    failure_code: text().$type<CloudAgentSessionRunFailureCode>(),
+    error_message_redacted: text(),
+    error_expires_at: timestamp({ withTimezone: true, mode: 'string' }),
+  },
+  table => [
+    primaryKey({ columns: [table.cloud_agent_session_id, table.message_id] }),
+    index('IDX_cloud_agent_session_runs_wrapper_run_id')
+      .on(table.wrapper_run_id)
+      .where(isNotNull(table.wrapper_run_id)),
+    index('IDX_cloud_agent_session_runs_session_queued').on(
+      table.cloud_agent_session_id,
+      table.queued_at
+    ),
+    index('IDX_cloud_agent_session_runs_queued_at').on(table.queued_at),
+    index('IDX_cloud_agent_session_runs_terminal_at').on(table.terminal_at),
+    index('IDX_cloud_agent_session_runs_status_terminal').on(table.status, table.terminal_at),
+    index('IDX_cloud_agent_session_runs_failure_terminal').on(
+      table.failure_stage,
+      table.failure_code,
+      table.terminal_at
+    ),
+    index('IDX_cloud_agent_session_runs_error_expires_at')
+      .on(table.error_expires_at)
+      .where(isNotNull(table.error_expires_at)),
+    check(
+      'cloud_agent_session_runs_status_check',
+      sql`${table.status} IN ('queued', 'accepted', 'completed', 'failed', 'interrupted')`
+    ),
+    check(
+      'cloud_agent_session_runs_failure_classification_check',
+      sql`(${table.failure_stage} IS NULL AND ${table.failure_code} IS NULL) OR
+        (${table.failure_stage} = 'pre_dispatch' AND ${table.failure_code} IN ('sandbox_connect_failed', 'workspace_setup_failed', 'kilo_server_failed', 'wrapper_start_failed', 'invalid_delivery_request', 'session_metadata_missing', 'model_missing', 'delivery_failure_unknown')) OR
+        (${table.failure_stage} = 'post_dispatch_no_activity' AND ${table.failure_code} IN ('wrapper_disconnected', 'wrapper_no_output', 'wrapper_ping_timeout', 'wrapper_error_before_activity', 'missing_assistant_reply')) OR
+        (${table.failure_stage} = 'agent_activity' AND ${table.failure_code} IN ('assistant_error', 'wrapper_error_after_activity')) OR
+        (${table.failure_stage} = 'interruption' AND ${table.failure_code} IN ('user_interrupt', 'container_shutdown', 'system_interrupt')) OR
+        (${table.failure_stage} = 'unknown' AND ${table.failure_code} = 'unclassified')`
+    ),
+    check(
+      'cloud_agent_session_runs_error_message_bounded_check',
+      sql`${table.error_message_redacted} IS NULL OR char_length(${table.error_message_redacted}) <= 4096`
+    ),
+    check(
+      'cloud_agent_session_runs_error_expiry_check',
+      sql`(${table.error_message_redacted} IS NULL AND ${table.error_expires_at} IS NULL) OR
+        (${table.error_message_redacted} IS NOT NULL AND ${table.error_expires_at} IS NOT NULL)`
+    ),
+  ]
+);
+
+export type CloudAgentSessionRun = typeof cloud_agent_session_runs.$inferSelect;
+export type NewCloudAgentSessionRun = typeof cloud_agent_session_runs.$inferInsert;
 
 /**
  * Per-tenant cache of the latest GitHub pull request observed for a
@@ -4817,8 +5338,6 @@ export type NewCloudAgentFeedback = typeof cloud_agent_feedback.$inferInsert;
 
 // ─── KiloClaw (multi-tenant sandbox instances) ──────────────────────
 
-export type KiloClawComposioInstanceConfigSource = 'managed' | 'manual';
-
 export const kiloclaw_instances = pgTable(
   'kiloclaw_instances',
   {
@@ -4853,7 +5372,6 @@ export const kiloclaw_instances = pgTable(
     // set/clear, plus auto-cleared as part of a tier resize.
     // Shape: { size: { cpus, memory_mb, cpu_kind? }, reason, actorId, actorEmail, setAt }.
     admin_size_override: jsonb(),
-    composio_config_source: text().$type<KiloClawComposioInstanceConfigSource>(),
   },
   table => [
     // One active instance per user+sandbox combination.
@@ -4865,6 +5383,9 @@ export const kiloclaw_instances = pgTable(
       .where(sql`${table.organization_id} IS NULL AND ${table.destroyed_at} IS NULL`),
     index('IDX_kiloclaw_instances_active_org_by_user_org')
       .on(table.user_id, table.organization_id)
+      .where(sql`${table.organization_id} IS NOT NULL AND ${table.destroyed_at} IS NULL`),
+    index('IDX_kiloclaw_instances_active_org_by_org_created')
+      .on(table.organization_id, table.created_at)
       .where(sql`${table.organization_id} IS NOT NULL AND ${table.destroyed_at} IS NULL`),
     // Non-partial index over all rows (including destroyed) so we can answer
     // "what is this user's earliest instance" without a sequential scan. Used
@@ -4892,10 +5413,6 @@ export const kiloclaw_instances = pgTable(
     index('IDX_kiloclaw_instances_admin_size_override')
       .on(table.id)
       .where(sql`${table.admin_size_override} IS NOT NULL AND ${table.destroyed_at} IS NULL`),
-    check(
-      'kiloclaw_instances_composio_config_source_check',
-      sql`${table.composio_config_source} IS NULL OR ${table.composio_config_source} IN ('managed', 'manual')`
-    ),
   ]
 );
 
@@ -4968,69 +5485,6 @@ export const kiloclaw_google_oauth_connections = pgTable(
 export type KiloClawGoogleOAuthConnection = typeof kiloclaw_google_oauth_connections.$inferSelect;
 export type NewKiloClawGoogleOAuthConnection =
   typeof kiloclaw_google_oauth_connections.$inferInsert;
-
-export type KiloClawComposioIdentityOwnerType = 'user' | 'organization_user';
-export type KiloClawComposioIdentityStatus = 'pending' | 'active' | 'revoked';
-
-export const kiloclaw_composio_identities = pgTable(
-  'kiloclaw_composio_identities',
-  {
-    id: uuid()
-      .default(sql`gen_random_uuid()`)
-      .primaryKey()
-      .notNull(),
-    owner_type: text().$type<KiloClawComposioIdentityOwnerType>().notNull(),
-    user_id: text()
-      .notNull()
-      .references(() => kilocode_users.id),
-    organization_id: uuid().references(() => organizations.id),
-    status: text().$type<KiloClawComposioIdentityStatus>().default('pending').notNull(),
-    composio_agent_key_encrypted: text(),
-    composio_user_api_key_encrypted: text(),
-    composio_api_key_encrypted: text(),
-    composio_org_id: text(),
-    composio_org_name: text(),
-    composio_project_id: text(),
-    composio_consumer_user_id: text(),
-    google_calendar_connected_account_id: text(),
-    composio_agent_email: text(),
-    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-    updated_at: timestamp({ withTimezone: true, mode: 'string' })
-      .defaultNow()
-      .notNull()
-      .$onUpdateFn(() => sql`now()`),
-    revoked_at: timestamp({ withTimezone: true, mode: 'string' }),
-  },
-  table => [
-    uniqueIndex('UQ_kiloclaw_composio_identities_current_user')
-      .on(table.user_id)
-      .where(sql`${table.owner_type} = 'user' AND ${table.revoked_at} IS NULL`),
-    uniqueIndex('UQ_kiloclaw_composio_identities_current_org_user')
-      .on(table.organization_id, table.user_id)
-      .where(sql`${table.owner_type} = 'organization_user' AND ${table.revoked_at} IS NULL`),
-    index('IDX_kiloclaw_composio_identities_user').on(table.user_id),
-    index('IDX_kiloclaw_composio_identities_organization').on(table.organization_id),
-    check(
-      'kiloclaw_composio_identities_owner_type_check',
-      sql`${table.owner_type} IN ('user', 'organization_user')`
-    ),
-    check(
-      'kiloclaw_composio_identities_status_check',
-      sql`${table.status} IN ('pending', 'active', 'revoked')`
-    ),
-    check(
-      'kiloclaw_composio_identities_owner_scope_check',
-      sql`(${table.owner_type} = 'user' AND ${table.organization_id} IS NULL) OR (${table.owner_type} = 'organization_user' AND ${table.organization_id} IS NOT NULL)`
-    ),
-    check(
-      'kiloclaw_composio_identities_active_complete_check',
-      sql`${table.status} <> 'active' OR (${table.composio_agent_key_encrypted} IS NOT NULL AND ${table.composio_user_api_key_encrypted} IS NOT NULL AND ${table.composio_org_id} IS NOT NULL AND ${table.composio_project_id} IS NOT NULL AND ${table.composio_consumer_user_id} IS NOT NULL AND ${table.revoked_at} IS NULL)`
-    ),
-  ]
-);
-
-export type KiloClawComposioIdentity = typeof kiloclaw_composio_identities.$inferSelect;
-export type NewKiloClawComposioIdentity = typeof kiloclaw_composio_identities.$inferInsert;
 
 export const kiloclaw_inbound_email_reserved_aliases = pgTable(
   'kiloclaw_inbound_email_reserved_aliases',
@@ -6323,7 +6777,9 @@ export const model_experiment_variant_version = pgTable(
 export type ModelExperimentVariantVersion = typeof model_experiment_variant_version.$inferSelect;
 export type NewModelExperimentVariantVersion = typeof model_experiment_variant_version.$inferInsert;
 
-// One row per experimented request, keyed on usage_id (1:1 with microdollar_usage).
+// One row per experimented request, linked 1:1 to microdollar_usage by usage_id.
+// The physical table is monthly range-partitioned on created_at; PostgreSQL
+// therefore requires the primary key to include created_at as well as usage_id.
 // Stores attribution + a single R2 prompt hash for the post-`transformRequest`
 // upstream body. `request_body_sha256` holds either a 64-char lowercase hex
 // digest pointing at an R2 object, or one of the reserved sentinels:
@@ -6334,7 +6790,6 @@ export const model_experiment_request = pgTable(
   'model_experiment_request',
   {
     usage_id: uuid()
-      .primaryKey()
       .notNull()
       .references(() => microdollar_usage.id, { onDelete: 'cascade' }),
     variant_version_id: uuid()
@@ -6351,6 +6806,7 @@ export const model_experiment_request = pgTable(
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
   },
   table => [
+    primaryKey({ columns: [table.usage_id, table.created_at] }),
     index('IDX_model_experiment_request_variant_version_created_at').on(
       table.variant_version_id,
       table.created_at

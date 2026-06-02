@@ -58,6 +58,18 @@ export const ControllerVersionResponseSchema = z.object({
   // optional() for backward compat with older controllers that don't include these fields
   openclawVersion: z.string().nullable().optional(),
   openclawCommit: z.string().nullable().optional(),
+  apiVersion: z.number().int().positive().optional(),
+  capabilities: z
+    .array(z.string().regex(/^[a-z][a-z0-9]*(?:[.-][a-z][a-z0-9]*)*$/))
+    .refine(
+      capabilities =>
+        capabilities.every((capability, index) => {
+          if (index === 0) return true;
+          return capabilities[index - 1] < capability;
+        }),
+      { message: 'Capabilities must be sorted and unique' }
+    )
+    .optional(),
 });
 
 export type ControllerHealthResponse = {
@@ -165,6 +177,18 @@ export const MorningBriefingActionResponseSchema = z.object({
   error: z.string().optional(),
 });
 
+/**
+ * Response from `POST /_kilo/morning-briefing/onboarding-briefing`. The plugin
+ * creates (or returns the existing) "Today's briefing" conversation and kicks
+ * off briefing generation in the background.
+ */
+export const OnboardingBriefingResponseSchema = z.object({
+  ok: z.boolean(),
+  conversationId: z.string().optional(),
+  alreadyStarted: z.boolean().optional(),
+  error: z.string().optional(),
+});
+
 export const MorningBriefingInterestsRequestSchema = z.object({
   topics: z.array(z.string()),
 });
@@ -209,6 +233,26 @@ export const OpenclawConfigResponseSchema = z.object({
   config: z.record(z.string(), z.unknown()),
   etag: z.string(),
 });
+
+export const OpenclawFileWriteValidationSchema = z.enum(['warn-before-write', 'allow-invalid']);
+export type OpenclawFileWriteValidation = z.infer<typeof OpenclawFileWriteValidationSchema>;
+
+const OpenclawValidationIssueSchema = z.object({
+  path: z.string(),
+  message: z.string(),
+  allowedValues: z.array(z.string()).optional(),
+});
+
+export const FileWriteResponseSchema = z.union([
+  z.object({ etag: z.string() }),
+  z.object({
+    outcome: z.literal('openclaw-validation-warning'),
+    valid: z.literal(false),
+    reason: z.enum(['invalid', 'validation-unavailable']),
+    issues: z.array(OpenclawValidationIssueSchema),
+  }),
+]);
+export type FileWriteResponse = z.infer<typeof FileWriteResponseSchema>;
 
 // ──────────────────────────────────────────────────────────────────────
 // Controller pairing responses

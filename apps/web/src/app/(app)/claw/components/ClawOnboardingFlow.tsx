@@ -9,31 +9,17 @@ import { Loader2, TriangleAlert, X } from 'lucide-react';
 import { KILO_AUTO_BALANCED_MODEL } from '@/lib/ai-gateway/auto-model';
 import type { KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
 import { controllerVersionOk, gatewayStatusOk } from '@/lib/kiloclaw/types';
-import {
-  useKiloClawComposioOnboardingStatus,
-  useKiloClawGatewayStatus,
-  useKiloClawMutations,
-} from '@/hooks/useKiloClaw';
-import {
-  useOrgKiloClawComposioOnboardingStatus,
-  useOrgKiloClawGatewayStatus,
-  useOrgKiloClawMutations,
-} from '@/hooks/useOrgKiloClaw';
-import { useUser } from '@/hooks/useUser';
+import { useKiloClawGatewayStatus, useKiloClawMutations } from '@/hooks/useKiloClaw';
+import { useOrgKiloClawGatewayStatus, useOrgKiloClawMutations } from '@/hooks/useOrgKiloClaw';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import {
-  useClawConfig,
-  useClawControllerVersion,
-  useClawServiceDegraded,
-} from '../hooks/useClawHooks';
+import { useClawControllerVersion, useClawServiceDegraded } from '../hooks/useClawHooks';
 import { useOnboardingSaves } from '../hooks/useOnboardingSaves';
 import { useGatewayUrl } from '../hooks/useGatewayUrl';
 import { BillingWrapper } from './billing/BillingWrapper';
 import { BotIdentityStep } from './BotIdentityStep';
 import { CalendarConnectStepView } from './CalendarConnectStep';
-import { ConnectToolsStepView } from './ConnectToolsStep';
 import { InboundEmailStepView } from './InboundEmailStep';
 import { InterestsStepView } from './InterestsStep';
 import {
@@ -77,161 +63,6 @@ function getBrowserTimeZone(): string | undefined {
   } catch {
     return undefined;
   }
-}
-
-function writeComposioPopupLoadingPage(popup: Window) {
-  popup.document.write(`<!doctype html>
-<html>
-  <head>
-    <meta charset="utf-8" />
-    <title>Preparing Google Calendar connection</title>
-    <style>
-      :root { color-scheme: dark; }
-      body {
-        margin: 0;
-        min-height: 100vh;
-        display: grid;
-        place-items: center;
-        background: oklch(0.145 0 0);
-        color: oklch(0.985 0 0);
-        font-family: Inter, ui-sans-serif, system-ui, sans-serif;
-      }
-      main {
-        width: min(360px, calc(100vw - 48px));
-        border: 1px solid oklch(1 0 0 / 0.1);
-        border-radius: 14px;
-        background: oklch(0.205 0 0);
-        padding: 24px;
-      }
-      .eyebrow {
-        color: oklch(0.95 0.15 108);
-        font-size: 11px;
-        font-weight: 700;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-      }
-      h1 {
-        margin: 10px 0 8px;
-        font-size: 20px;
-        line-height: 1.25;
-      }
-      p {
-        margin: 0;
-        color: oklch(0.708 0 0);
-        font-size: 14px;
-        line-height: 1.5;
-      }
-      .dot {
-        width: 8px;
-        height: 8px;
-        margin-top: 18px;
-        border-radius: 999px;
-        background: oklch(0.95 0.15 108);
-        animation: pulse 1s ease-out infinite;
-      }
-      @keyframes pulse {
-        0%, 100% { opacity: 0.35; transform: scale(0.85); }
-        50% { opacity: 1; transform: scale(1); }
-      }
-      @media (prefers-reduced-motion: reduce) {
-        .dot { animation: none; }
-      }
-    </style>
-  </head>
-  <body>
-    <main>
-      <div class="eyebrow">KiloClaw</div>
-      <h1>Preparing Google Calendar connection</h1>
-      <p>Keep this window open. Google approval will load here, then Kilo will return you to onboarding.</p>
-      <div class="dot" aria-hidden="true"></div>
-    </main>
-  </body>
-</html>`);
-  popup.document.close();
-}
-
-function isComposioPopupMessage(value: unknown): value is {
-  type: 'kiloclaw:composio-connect';
-  result: 'success' | 'failed' | 'unknown';
-  attemptId: string;
-} {
-  if (typeof value !== 'object' || value === null) return false;
-  const candidate = value as Record<string, unknown>;
-  return (
-    candidate.type === 'kiloclaw:composio-connect' &&
-    (candidate.result === 'success' ||
-      candidate.result === 'failed' ||
-      candidate.result === 'unknown') &&
-    typeof candidate.attemptId === 'string' &&
-    candidate.attemptId.length > 0
-  );
-}
-
-function createComposioConnectAttemptId(): string {
-  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID();
-  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-}
-
-const ONBOARDING_DRAFT_STORAGE_PREFIX = 'kiloclaw:onboarding-draft:';
-
-type OnboardingDraft = {
-  userId: string;
-  botIdentity: BotIdentity;
-  userLocation: string | null;
-};
-
-function onboardingDraftStorageKey(organizationId?: string): string {
-  return `${ONBOARDING_DRAFT_STORAGE_PREFIX}${organizationId ?? 'personal'}`;
-}
-
-function readOnboardingDraft(
-  organizationId: string | undefined,
-  userId: string
-): OnboardingDraft | null {
-  if (typeof window === 'undefined') return null;
-  try {
-    const raw = window.sessionStorage.getItem(onboardingDraftStorageKey(organizationId));
-    if (!raw) return null;
-    const parsed: unknown = JSON.parse(raw);
-    if (typeof parsed !== 'object' || parsed === null) return null;
-    const record = parsed as Record<string, unknown>;
-    if (record.userId !== userId) return null;
-    const botIdentity = record.botIdentity;
-    if (typeof botIdentity !== 'object' || botIdentity === null) return null;
-    const identity = botIdentity as Record<string, unknown>;
-    if (
-      typeof identity.botName !== 'string' ||
-      typeof identity.botNature !== 'string' ||
-      typeof identity.botVibe !== 'string' ||
-      typeof identity.botEmoji !== 'string'
-    ) {
-      return null;
-    }
-    const userLocation = record.userLocation;
-    if (userLocation !== null && typeof userLocation !== 'string') return null;
-    return {
-      userId,
-      botIdentity: {
-        botName: identity.botName,
-        botNature: identity.botNature,
-        botVibe: identity.botVibe,
-        botEmoji: identity.botEmoji,
-      },
-      userLocation,
-    };
-  } catch {
-    return null;
-  }
-}
-
-function writeOnboardingDraft(organizationId: string | undefined, draft: OnboardingDraft): void {
-  if (typeof window === 'undefined') return;
-  window.sessionStorage.setItem(onboardingDraftStorageKey(organizationId), JSON.stringify(draft));
-}
-
-function clearOnboardingDraft(organizationId?: string): void {
-  if (typeof window === 'undefined') return;
-  window.sessionStorage.removeItem(onboardingDraftStorageKey(organizationId));
 }
 
 export type { ClawOnboardingMode };
@@ -287,21 +118,9 @@ function ClawOnboardingFlowInner({
   const personalMutations = useKiloClawMutations();
   const orgMutations = useOrgKiloClawMutations(organizationId ?? '');
   const mutations = organizationId ? orgMutations : personalMutations;
+  const searchParams = useSearchParams();
 
-  const { data: currentUser, isPending: isUserPending } = useUser();
-  // Calendar OAuth is admin-only — both `/api/integrations/google/connect` and
-  // `/disconnect` require `adminOnly: true`. Hide the calendar step from
-  // non-admins so the wizard advances identity → email directly.
-  //
-  // While `useUser` is loading we default to `true` (admin assumption). This
-  // matters most for admins returning from the OAuth round-trip on a full
-  // page reload: defaulting to `false` would briefly flip the wizard into
-  // the 3-step non-admin layout and — if they race-clicked Continue before
-  // the query resolved — silently skip the calendar step entirely. The
-  // theoretical inverse (a non-admin race-clicking Continue and seeing one
-  // frame of the calendar UI before the state machine redirects to email)
-  // is harmless: the connect endpoint enforces admin too.
-  const hasCalendarStep = isUserPending ? true : currentUser?.is_admin === true;
+  const hasCalendarStep = true;
   // Morning briefing is generally available — the Interests step shows for
   // all users (it still gates on controller version below).
   // Gate on controller version. The plugin route that backs
@@ -334,26 +153,8 @@ function ClawOnboardingFlowInner({
   const [onboardingStep, setOnboardingStep] = useState<OnboardingStep>(() => {
     if (typeof window === 'undefined') return 'identity';
     const initialStep = new URLSearchParams(window.location.search).get('step');
-    if (initialStep === 'tools') return 'tools';
     return initialStep === 'calendar' ? 'calendar' : 'identity';
   });
-  const [composioPopupPending, setComposioPopupPending] = useState(false);
-  const composioStatusPolling = onboardingStep === 'tools' || composioPopupPending;
-  const personalComposioStatus = useKiloClawComposioOnboardingStatus(
-    !organizationId,
-    composioStatusPolling
-  );
-  const orgComposioStatus = useOrgKiloClawComposioOnboardingStatus(
-    organizationId ?? '',
-    !!organizationId,
-    composioStatusPolling
-  );
-  const composioStatus = organizationId ? orgComposioStatus : personalComposioStatus;
-  const hasToolsStep = hasCalendarStep && composioStatus.data?.enabled !== false;
-  const configQuery = useClawConfig(status !== undefined && status.status !== null);
-  const composioManualConfigured = composioStatus.data?.sandboxConfigSource === 'manual';
-  const composioConfigPending =
-    status !== undefined && status.status !== null && configQuery.isPending;
 
   const gatewayUrl = useGatewayUrl(status);
 
@@ -370,29 +171,11 @@ function ClawOnboardingFlowInner({
   const [localCreateSetupStarted, setLocalCreateSetupStarted] = useState(false);
   const [onboardingSaveSession, setOnboardingSaveSession] = useState(0);
   const hasCapturedIdentityView = useRef(false);
-  const hasCapturedToolsView = useRef(false);
   const hasCapturedCalendarView = useRef(false);
   const hasCapturedEmailView = useRef(false);
   const hasCapturedInterestsView = useRef(false);
   const hasCapturedDoneView = useRef(false);
-  const composioPopupRef = useRef<Window | null>(null);
-  const composioPopupPendingRef = useRef(false);
-  const composioPopupResultHandledRef = useRef(false);
-  const composioPopupAwaitingConfirmationRef = useRef(false);
-  const composioPopupConfirmationTimeoutRef = useRef<number | null>(null);
-  const composioPopupAttemptIdRef = useRef<string | null>(null);
   const createSetupStarted = createFlowStarted || localCreateSetupStarted;
-
-  useEffect(() => {
-    if (!currentUser?.id || botIdentity !== null) return;
-    const draft = readOnboardingDraft(organizationId, currentUser.id);
-    if (!draft) {
-      clearOnboardingDraft(organizationId);
-      return;
-    }
-    setBotIdentity(draft.botIdentity);
-    setPendingUserLocation(draft.userLocation);
-  }, [botIdentity, currentUser?.id, organizationId]);
 
   const stateInput = {
     status,
@@ -401,7 +184,6 @@ function ClawOnboardingFlowInner({
     setupFailed,
     onboardingStep,
     hasBotIdentity: botIdentity !== null,
-    hasToolsStep,
     hasCalendarStep,
     hasInterestsStep,
   };
@@ -431,7 +213,6 @@ function ClawOnboardingFlowInner({
   const posthog = usePostHog();
   const router = useRouter();
   const pathname = usePathname();
-  const searchParams = useSearchParams();
 
   // Save bot identity and exec preset as soon as the instance row exists.
   // This closes the tab-close window where customizations entered during the
@@ -450,175 +231,6 @@ function ClawOnboardingFlowInner({
     mutations,
   });
 
-  const clearComposioPopupConfirmationTimeout = useCallback(() => {
-    if (composioPopupConfirmationTimeoutRef.current === null) return;
-    window.clearTimeout(composioPopupConfirmationTimeoutRef.current);
-    composioPopupConfirmationTimeoutRef.current = null;
-  }, []);
-
-  const setComposioPopupPendingState = useCallback(
-    (pending: boolean) => {
-      composioPopupPendingRef.current = pending;
-      if (pending) {
-        composioPopupResultHandledRef.current = false;
-        composioPopupAwaitingConfirmationRef.current = false;
-        clearComposioPopupConfirmationTimeout();
-      }
-      setComposioPopupPending(pending);
-    },
-    [clearComposioPopupConfirmationTimeout]
-  );
-
-  useEffect(() => {
-    return () => clearComposioPopupConfirmationTimeout();
-  }, [clearComposioPopupConfirmationTimeout]);
-
-  const handleComposioPopupResult = useCallback(
-    (message: { result: 'success' | 'failed' | 'unknown'; attemptId: string }) => {
-      if (!composioPopupPendingRef.current || composioPopupResultHandledRef.current) return;
-      if (message.attemptId !== composioPopupAttemptIdRef.current) return;
-      composioPopupResultHandledRef.current = true;
-      composioPopupRef.current?.close();
-      composioPopupRef.current = null;
-      composioPopupAttemptIdRef.current = null;
-      setOnboardingStep('tools');
-      void composioStatus.refetch();
-
-      if (message.result === 'success') {
-        composioPopupAwaitingConfirmationRef.current = true;
-        clearComposioPopupConfirmationTimeout();
-        composioPopupConfirmationTimeoutRef.current = window.setTimeout(() => {
-          if (!composioPopupAwaitingConfirmationRef.current) return;
-          composioPopupAwaitingConfirmationRef.current = false;
-          composioPopupConfirmationTimeoutRef.current = null;
-          setComposioPopupPendingState(false);
-          posthog?.capture('claw_setup_tools_connect_failed', {
-            toolkit: 'googlecalendar',
-            reason: 'status_confirmation_timeout',
-          });
-          toast.error('Could not confirm Google Calendar. Try again or skip for now.');
-        }, 45_000);
-        return;
-      }
-
-      clearComposioPopupConfirmationTimeout();
-      setComposioPopupPendingState(false);
-      posthog?.capture('claw_setup_tools_connect_failed', {
-        toolkit: 'googlecalendar',
-      });
-      toast.error('Could not connect Google Calendar. Try again or skip for now.');
-    },
-    [clearComposioPopupConfirmationTimeout, composioStatus, posthog, setComposioPopupPendingState]
-  );
-
-  useEffect(() => {
-    function handleMessage(event: MessageEvent) {
-      if (event.origin !== window.location.origin) return;
-      if (!isComposioPopupMessage(event.data)) return;
-      handleComposioPopupResult(event.data);
-    }
-
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
-  }, [handleComposioPopupResult]);
-
-  useEffect(() => {
-    function handleStorage(event: StorageEvent) {
-      if (event.key !== 'kiloclaw:composio-connect-result' || !event.newValue) return;
-      try {
-        const parsed: unknown = JSON.parse(event.newValue);
-        if (!isComposioPopupMessage(parsed)) return;
-        handleComposioPopupResult(parsed);
-      } catch {
-        return;
-      }
-    }
-
-    window.addEventListener('storage', handleStorage);
-    return () => window.removeEventListener('storage', handleStorage);
-  }, [handleComposioPopupResult]);
-
-  useEffect(() => {
-    if (typeof BroadcastChannel === 'undefined') return;
-    const channel = new BroadcastChannel('kiloclaw:composio-connect');
-    channel.onmessage = event => {
-      if (!isComposioPopupMessage(event.data)) return;
-      handleComposioPopupResult(event.data);
-    };
-    return () => channel.close();
-  }, [handleComposioPopupResult]);
-
-  useEffect(() => {
-    if (!composioPopupPending) return;
-
-    let closedChecks = 0;
-    const intervalId = window.setInterval(() => {
-      const popup = composioPopupRef.current;
-      if (!popup?.closed || composioPopupAwaitingConfirmationRef.current) {
-        closedChecks = 0;
-        return;
-      }
-
-      // Cross-origin popup navigation can transiently look closed during the
-      // handoff from our pre-opened window to Composio. Require consecutive
-      // closed observations before treating it as a user dismissal.
-      closedChecks += 1;
-      if (closedChecks < 3) return;
-
-      composioPopupRef.current = null;
-      composioPopupAttemptIdRef.current = null;
-      clearComposioPopupConfirmationTimeout();
-      setComposioPopupPendingState(false);
-      void composioStatus.refetch();
-      posthog?.capture('claw_setup_tools_connect_failed', {
-        toolkit: 'googlecalendar',
-        reason: 'popup_closed',
-      });
-    }, 700);
-
-    return () => window.clearInterval(intervalId);
-  }, [
-    clearComposioPopupConfirmationTimeout,
-    composioPopupPending,
-    composioStatus,
-    posthog,
-    setComposioPopupPendingState,
-  ]);
-
-  useEffect(() => {
-    if (!composioPopupPending || composioStatus.data?.status !== 'connected') return;
-
-    composioPopupRef.current?.close();
-    composioPopupRef.current = null;
-    composioPopupAttemptIdRef.current = null;
-    composioPopupAwaitingConfirmationRef.current = false;
-    clearComposioPopupConfirmationTimeout();
-    setComposioPopupPendingState(false);
-    posthog?.capture('claw_setup_tools_composio_completed', { source: 'status_refetch' });
-    toast.success('Google Calendar connected');
-  }, [
-    clearComposioPopupConfirmationTimeout,
-    composioPopupPending,
-    composioStatus.data?.status,
-    posthog,
-    setComposioPopupPendingState,
-  ]);
-
-  useEffect(() => {
-    if (!composioPopupPending) return;
-
-    function refetchComposioStatus() {
-      void composioStatus.refetch();
-    }
-
-    window.addEventListener('focus', refetchComposioStatus);
-    document.addEventListener('visibilitychange', refetchComposioStatus);
-    return () => {
-      window.removeEventListener('focus', refetchComposioStatus);
-      document.removeEventListener('visibilitychange', refetchComposioStatus);
-    };
-  }, [composioPopupPending, composioStatus]);
-
   useEffect(() => {
     if (flowState.renderStep !== 'identity' || hasCapturedIdentityView.current) return;
     hasCapturedIdentityView.current = true;
@@ -634,12 +246,6 @@ function ClawOnboardingFlowInner({
     if (flowState.renderStep !== 'calendar' || hasCapturedCalendarView.current) return;
     hasCapturedCalendarView.current = true;
     posthog?.capture('claw_setup_calendar_viewed');
-  }, [flowState.renderStep, posthog]);
-
-  useEffect(() => {
-    if (flowState.renderStep !== 'tools' || hasCapturedToolsView.current) return;
-    hasCapturedToolsView.current = true;
-    posthog?.capture('claw_setup_tools_viewed');
   }, [flowState.renderStep, posthog]);
 
   // Same pattern for the inbound email step.
@@ -672,8 +278,7 @@ function ClawOnboardingFlowInner({
     setOnboardingStep('identity');
     setBotIdentity(null);
     setPendingUserLocation(null);
-    clearOnboardingDraft(organizationId);
-  }, [organizationId]);
+  }, []);
 
   const handleCreateFlowStarted = useCallback(() => {
     setLocalCreateSetupStarted(true);
@@ -707,13 +312,9 @@ function ClawOnboardingFlowInner({
     });
   }, [flowState.instanceStatus, botIdentity]);
 
-  // Resume the wizard at a specific step when returning from a flow that
-  // leaves the page (e.g. the Google OAuth round-trip on the calendar step
-  // posts the user back to /claw/new?step=calendar). The effect only acts
-  // when stepParam === 'calendar' — otherwise stale `?error=` or `?success=`
-  // params from elsewhere would fire calendar-specific toasts on the wrong
-  // screen. Also waits until botIdentity has been hydrated before consuming
-  // `step`, otherwise the state machine would override us with identity.
+  // Resume the calendar step after the full-page Google OAuth round trip.
+  // Remove stale `tools` URLs from the retired integration flow without
+  // displaying obsolete connection feedback.
   const hasResumedFromQuery = useRef(false);
 
   // Allowlist of known OAuth error codes that the callback route can emit.
@@ -724,6 +325,7 @@ function ClawOnboardingFlowInner({
     'oauth_error',
     'missing_code',
     'missing_instance',
+    'missing_permissions',
     'connection_failed',
     'invalid_state',
     'unauthorized',
@@ -740,25 +342,12 @@ function ClawOnboardingFlowInner({
   useEffect(() => {
     if (hasResumedFromQuery.current) return;
     const stepParam = searchParams?.get('step');
-    if (stepParam !== 'calendar' && stepParam !== 'tools') return;
-    // The OAuth round-trip is a full-page reload, so `useUser` starts fresh
-    // and the query is in-flight on the first render(s). Gate on `isPending`
-    // (not `currentUser === undefined`) so that a `/api/user` fetch that
-    // settles in error after retries — `data` stays undefined, `isPending`
-    // flips to false — still falls through to the cleanup branch below
-    // instead of stranding the URL params forever.
-    if (isUserPending) return;
-    // Calendar is admin-only; a non-admin (or any user we couldn't classify
-    // as admin, e.g. /api/user errored after retries) landing here shouldn't
-    // trigger calendar-specific toasts or set onboardingStep to 'calendar'.
-    // Strip the params and move on. An admin who just completed OAuth but
-    // had /api/user error can re-verify the connection in settings.
-    if (stepParam === 'calendar' && !hasCalendarStep) {
+    if (stepParam === 'tools') {
       hasResumedFromQuery.current = true;
       cleanupResumeQueryParams();
       return;
     }
-    if (botIdentity === null) return;
+    if (stepParam !== 'calendar' || botIdentity === null) return;
     const successParam = searchParams?.get('success');
     const errorParamRaw = searchParams?.get('error');
     const errorReason = errorParamRaw
@@ -767,57 +356,23 @@ function ClawOnboardingFlowInner({
         : 'unknown'
       : null;
     hasResumedFromQuery.current = true;
-    setOnboardingStep(stepParam);
-    posthog?.capture(
-      stepParam === 'tools' ? 'claw_setup_tools_resumed' : 'claw_setup_calendar_resumed',
-      {
-        outcome: successParam ? 'connected' : errorParamRaw ? 'error' : 'unknown',
-      }
-    );
-    if (successParam === 'google_connected' || successParam === 'composio_connected') {
-      posthog?.capture(
-        stepParam === 'tools'
-          ? 'claw_setup_tools_composio_completed'
-          : 'claw_setup_calendar_oauth_completed'
-      );
-      toast.success(stepParam === 'tools' ? 'Google Calendar connected' : 'Calendar connected');
+    setOnboardingStep('calendar');
+    posthog?.capture('claw_setup_calendar_resumed', {
+      outcome: successParam ? 'connected' : errorParamRaw ? 'error' : 'unknown',
+    });
+    if (successParam === 'google_connected') {
+      posthog?.capture('claw_setup_calendar_oauth_completed');
+      toast.success('Calendar connected');
     } else if (errorParamRaw) {
-      posthog?.capture(
-        stepParam === 'tools'
-          ? 'claw_setup_tools_connect_failed'
-          : 'claw_setup_calendar_oauth_failed',
-        { reason: errorReason }
+      posthog?.capture('claw_setup_calendar_oauth_failed', { reason: errorReason });
+      toast.error(
+        errorReason === 'missing_permissions'
+          ? 'Calendar permission was not granted. Allow Calendar access to connect or skip for now.'
+          : 'Could not connect calendar. Try again or skip for now.'
       );
-      toast.error('Could not connect calendar. Try again or skip for now.');
     }
     cleanupResumeQueryParams();
-  }, [
-    searchParams,
-    botIdentity,
-    posthog,
-    cleanupResumeQueryParams,
-    hasCalendarStep,
-    isUserPending,
-  ]);
-
-  // Watchdog: if `?step=calendar` is in the URL but botIdentity hydration
-  // never completes (e.g. patchBotIdentity hadn't propagated to the DB
-  // before the OAuth round-trip), don't silently strand the user on the
-  // identity step with stale params lingering in the URL. After a short
-  // grace period, clean the URL and surface a soft warning.
-  useEffect(() => {
-    if (hasResumedFromQuery.current) return;
-    const stepParam = searchParams?.get('step');
-    if (stepParam !== 'calendar' && stepParam !== 'tools') return;
-    const timeoutId = window.setTimeout(() => {
-      if (hasResumedFromQuery.current) return;
-      if (botIdentity !== null) return;
-      hasResumedFromQuery.current = true;
-      toast.error("Couldn't restore your onboarding progress — continuing from here.");
-      cleanupResumeQueryParams();
-    }, 5000);
-    return () => window.clearTimeout(timeoutId);
-  }, [searchParams, botIdentity, cleanupResumeQueryParams]);
+  }, [searchParams, botIdentity, posthog, cleanupResumeQueryParams]);
 
   // NOTE: When mode === 'post-provisioning' (i.e. an existing instance is
   // already running) and the gateway is ready, renderStep is 'complete' on
@@ -838,14 +393,34 @@ function ClawOnboardingFlowInner({
     }
     hasRedirectedToChat.current = true;
     posthog?.capture('claw_setup_open_chat_clicked', { auto_redirect: true });
-    router.push(`${basePath}/chat`);
-  }, [flowState.renderStep, flowState.gatewayReady, basePath, router, posthog]);
 
-  function provisionInstance(
-    userLocation?: string,
-    composioManualCredentials?: { composioUserApiKey: string; composioOrg: string },
-    skipIncompleteManagedComposioConnection?: boolean
-  ) {
+    // Only a freshly-onboarded user (`create-first` mode) gets the morning
+    // briefing as their first chat message. Returning users resolving to
+    // `complete` in `post-provisioning` mode just go straight to chat.
+    if (mode !== 'create-first') {
+      router.push(`${basePath}/chat`);
+      return;
+    }
+
+    // Kick off the in-chat onboarding briefing: this creates the "Today's
+    // briefing" conversation and starts generation, then we route the user
+    // straight into it. Best effort — any failure falls back to the plain
+    // chat redirect (PR-1 behavior) so onboarding never gets stuck here.
+    void (async () => {
+      let target = `${basePath}/chat`;
+      try {
+        const result = await mutations.startOnboardingBriefing.mutateAsync();
+        if (result?.conversationId) {
+          target = `${basePath}/chat/${result.conversationId}`;
+        }
+      } catch {
+        // Fall through to the plain chat redirect.
+      }
+      router.push(target);
+    })();
+  }, [flowState.renderStep, flowState.gatewayReady, basePath, router, posthog, mode, mutations]);
+
+  function provisionInstance(userLocation?: string) {
     posthog?.capture('claw_create_instance_clicked', {
       selected_model: KILO_AUTO_BALANCED_MODEL.id,
     });
@@ -856,13 +431,8 @@ function ClawOnboardingFlowInner({
         kilocodeDefaultModel: `kilocode/${KILO_AUTO_BALANCED_MODEL.id}`,
         userTimezone: getBrowserTimeZone(),
         ...(userLocation ? { userLocation } : undefined),
-        ...(composioManualCredentials ? { secrets: composioManualCredentials } : undefined),
-        ...(skipIncompleteManagedComposioConnection
-          ? { skipIncompleteManagedComposioConnection: true }
-          : undefined),
       },
       {
-        onSuccess: () => clearOnboardingDraft(organizationId),
         onError: err => {
           posthog?.capture('claw_setup_provision_failed', {
             selected_model: KILO_AUTO_BALANCED_MODEL.id,
@@ -875,16 +445,9 @@ function ClawOnboardingFlowInner({
     );
   }
 
-  function startProvisionForCreateFlow(
-    composioManualCredentials?: { composioUserApiKey: string; composioOrg: string },
-    skipIncompleteManagedComposioConnection?: boolean
-  ) {
+  function startProvisionForCreateFlow() {
     if (mode !== 'create-first' || flowState.instanceStatus !== null || createSetupStarted) return;
-    provisionInstance(
-      pendingUserLocation ?? undefined,
-      composioManualCredentials,
-      skipIncompleteManagedComposioConnection
-    );
+    provisionInstance(pendingUserLocation ?? undefined);
   }
 
   function renderIdentityStep() {
@@ -919,20 +482,15 @@ function ClawOnboardingFlowInner({
             defaulted: true,
           });
           setBotIdentity(identity);
-          if (hasToolsStep) {
-            if (!flowState.instanceStatus && currentUser?.id) {
-              writeOnboardingDraft(organizationId, {
-                userId: currentUser.id,
-                botIdentity: identity,
-                userLocation: weatherLocation?.location ?? null,
-              });
+          if (hasCalendarStep) {
+            if (!flowState.instanceStatus) {
+              provisionInstance(weatherLocation?.location);
             }
-            setOnboardingStep('tools');
-          } else if (hasCalendarStep) {
-            if (!flowState.instanceStatus) provisionInstance(weatherLocation?.location);
             setOnboardingStep('calendar');
           } else {
-            if (!flowState.instanceStatus) provisionInstance(weatherLocation?.location);
+            if (!flowState.instanceStatus) {
+              provisionInstance(weatherLocation?.location);
+            }
             setOnboardingStep('email');
           }
         }}
@@ -973,103 +531,6 @@ function ClawOnboardingFlowInner({
         onContinue={() => {
           posthog?.capture('claw_setup_calendar_completed', { connected: true, skipped: false });
           advanceToEmail();
-        }}
-      />
-    );
-  }
-
-  function renderToolsStep() {
-    function advanceToEmail(
-      composioManualCredentials?: { composioUserApiKey: string; composioOrg: string },
-      skipIncompleteManagedComposioConnection?: boolean
-    ) {
-      startProvisionForCreateFlow(
-        composioManualCredentials,
-        skipIncompleteManagedComposioConnection
-      );
-      setOnboardingStep('email');
-    }
-
-    return (
-      <ConnectToolsStepView
-        currentStep={flowState.currentStep}
-        totalSteps={flowState.totalSteps}
-        status={composioStatus.data?.status ?? 'disconnected'}
-        loading={composioStatus.isPending || composioConfigPending}
-        connecting={mutations.createComposioGoogleCalendarLink.isPending || composioPopupPending}
-        savingManual={mutations.patchSecrets.isPending}
-        readyToConnect={botIdentity !== null && !composioConfigPending}
-        readyToSaveManualCredentials={
-          botIdentity !== null && (flowState.instanceStatus === null || onboardingSaves.ready)
-        }
-        manualConfigured={composioManualConfigured}
-        organizationContext={!!organizationId}
-        onConnect={() => {
-          const returnTo = `${basePath}/new?step=tools`;
-          posthog?.capture('claw_setup_tools_connect_clicked', { toolkit: 'googlecalendar' });
-          const popup = window.open(
-            'about:blank',
-            'kiloclaw-composio-connect',
-            'popup,width=520,height=720'
-          );
-          composioPopupRef.current = popup;
-          const attemptId = popup ? createComposioConnectAttemptId() : undefined;
-          composioPopupAttemptIdRef.current = attemptId ?? null;
-          if (popup) {
-            setComposioPopupPendingState(true);
-            writeComposioPopupLoadingPage(popup);
-          }
-          mutations.createComposioGoogleCalendarLink.mutate(
-            { returnTo, popup: popup !== null, attemptId },
-            {
-              onSuccess: result => {
-                if (popup) {
-                  popup.location.href = result.redirectUrl;
-                } else {
-                  window.location.href = result.redirectUrl;
-                }
-              },
-              onError: err => {
-                popup?.close();
-                composioPopupRef.current = null;
-                composioPopupAttemptIdRef.current = null;
-                setComposioPopupPendingState(false);
-                posthog?.capture('claw_setup_tools_connect_failed', {
-                  toolkit: 'googlecalendar',
-                });
-                toast.error(err.message);
-              },
-            }
-          );
-        }}
-        onSkip={() => {
-          posthog?.capture('claw_setup_tools_completed', { connected: false, skipped: true });
-          advanceToEmail(undefined, true);
-        }}
-        onContinue={() => {
-          posthog?.capture('claw_setup_tools_completed', { connected: true, skipped: false });
-          advanceToEmail();
-        }}
-        onSaveManualCredentials={credentials => {
-          posthog?.capture('claw_setup_tools_manual_credentials_save_clicked');
-          if (flowState.instanceStatus === null) {
-            posthog?.capture('claw_setup_tools_manual_credentials_saved', {
-              provision_input: true,
-            });
-            advanceToEmail(credentials);
-            return;
-          }
-          mutations.patchSecrets.mutate(
-            { secrets: credentials },
-            {
-              onSuccess: () => {
-                toast.success('Composio credentials saved');
-                posthog?.capture('claw_setup_tools_manual_credentials_saved');
-                advanceToEmail();
-              },
-              onError: err => toast.error(err.message),
-            }
-          );
         }}
       />
     );
@@ -1224,8 +685,6 @@ function ClawOnboardingFlowInner({
     switch (renderStep) {
       case 'identity':
         return renderIdentityStep();
-      case 'tools':
-        return renderToolsStep();
       case 'calendar':
         return renderCalendarStep();
       case 'email':

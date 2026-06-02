@@ -7,6 +7,7 @@
 
 import { env, runInDurableObject } from 'cloudflare:test';
 import { describe, it, expect } from 'vitest';
+import { groupedRegisterSessionInput } from '../../helpers/session-setup.js';
 
 describe('CloudAgentSession sessionId parsing from DO name', () => {
   it('extracts sessionId correctly when userId contains a colon (OAuth provider)', async () => {
@@ -16,14 +17,16 @@ describe('CloudAgentSession sessionId parsing from DO name', () => {
     const stub = env.CLOUD_AGENT_SESSION.get(doId);
 
     const result = await runInDurableObject(stub, async instance => {
-      return instance.prepare({
-        sessionId,
-        userId,
-        kiloSessionId: 'kilo_test_session',
-        prompt: 'test prompt',
-        mode: 'code',
-        model: 'test-model',
-      });
+      return instance.registerSession(
+        groupedRegisterSessionInput({
+          sessionId,
+          userId,
+          kiloSessionId: 'kilo_test_session',
+          prompt: 'test prompt',
+          mode: 'code',
+          model: 'test-model',
+        })
+      );
     });
 
     expect(result.success).toBe(true);
@@ -36,14 +39,16 @@ describe('CloudAgentSession sessionId parsing from DO name', () => {
     const stub = env.CLOUD_AGENT_SESSION.get(doId);
 
     const result = await runInDurableObject(stub, async instance => {
-      return instance.prepare({
-        sessionId,
-        userId,
-        kiloSessionId: 'kilo_test_session',
-        prompt: 'test prompt',
-        mode: 'code',
-        model: 'test-model',
-      });
+      return instance.registerSession(
+        groupedRegisterSessionInput({
+          sessionId,
+          userId,
+          kiloSessionId: 'kilo_test_session',
+          prompt: 'test prompt',
+          mode: 'code',
+          model: 'test-model',
+        })
+      );
     });
 
     expect(result.success).toBe(true);
@@ -56,19 +61,21 @@ describe('CloudAgentSession sessionId parsing from DO name', () => {
     const stub = env.CLOUD_AGENT_SESSION.get(doId);
 
     const metadata = await runInDurableObject(stub, async instance => {
-      await instance.prepare({
-        sessionId,
-        userId,
-        kiloSessionId: 'kilo_test_session',
-        prompt: 'test prompt',
-        mode: 'code',
-        model: 'test-model',
-      });
+      await instance.registerSession(
+        groupedRegisterSessionInput({
+          sessionId,
+          userId,
+          kiloSessionId: 'kilo_test_session',
+          prompt: 'test prompt',
+          mode: 'code',
+          model: 'test-model',
+        })
+      );
       return instance.getMetadata();
     });
 
     // The stored sessionId must be the agent session ID, not the OAuth numeric ID
-    expect(metadata?.sessionId).toBe(sessionId);
-    expect(metadata?.sessionId).not.toBe('99999');
+    expect(metadata?.identity.sessionId).toBe(sessionId);
+    expect(metadata?.identity.sessionId).not.toBe('99999');
   });
 });

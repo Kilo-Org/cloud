@@ -1,5 +1,9 @@
 import { logger } from '../logger.js';
-import type { Env as WorkerEnv } from '../types.js';
+import type { GitTokenService } from '../types.js';
+
+type GitTokenServiceEnv = {
+  GIT_TOKEN_SERVICE?: GitTokenService;
+};
 
 export type ResolvedGitHubToken = {
   token: string;
@@ -18,10 +22,19 @@ export type ResolveGitHubTokenResult =
   | { success: false; error: ResolveGitHubTokenError };
 
 export async function resolveGitHubTokenForRepo(
-  env: WorkerEnv,
+  env: GitTokenServiceEnv,
   params: { githubRepo: string; userId: string; orgId?: string }
 ): Promise<ResolveGitHubTokenResult> {
   try {
+    if (!env.GIT_TOKEN_SERVICE) {
+      return {
+        success: false,
+        error: {
+          reason: 'service_not_configured',
+          message: 'git-token-service binding is not configured',
+        },
+      };
+    }
     const result = await env.GIT_TOKEN_SERVICE.getTokenForRepo(params);
     if (result.success) {
       logger
@@ -62,18 +75,26 @@ export async function resolveGitHubTokenForRepo(
 }
 
 export type ResolveManagedGitLabTokenResult =
-  | { success: true; token: string }
+  | { success: true; token: string; glabIsOAuth2: boolean }
   | { success: false; reason: string };
 
 export async function resolveManagedGitLabToken(
-  env: WorkerEnv,
-  params: { userId: string; orgId?: string }
+  env: GitTokenServiceEnv,
+  params: {
+    userId: string;
+    orgId?: string;
+    repositoryUrl?: string;
+    createdOnPlatform?: string;
+  }
 ): Promise<ResolveManagedGitLabTokenResult> {
   try {
+    if (!env.GIT_TOKEN_SERVICE) {
+      return { success: false, reason: 'service_not_configured' };
+    }
     const result = await env.GIT_TOKEN_SERVICE.getGitLabToken(params);
     if (result.success) {
       logger.info('Resolved GitLab token via git-token-service');
-      return { success: true, token: result.token };
+      return { success: true, token: result.token, glabIsOAuth2: result.glabIsOAuth2 };
     }
     logger.withFields({ reason: result.reason }).info('GitLab token lookup failed');
     return { success: false, reason: result.reason };

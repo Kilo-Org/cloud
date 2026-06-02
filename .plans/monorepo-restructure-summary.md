@@ -4,18 +4,18 @@ Executed on 2026-04-05. Implements the plan in `plans/monorepo-restructure.md`.
 
 ## Commits
 
-| Commit    | Phase | Description                                                                   |
-| --------- | ----- | ----------------------------------------------------------------------------- |
-| `358df11` | 1     | Create directory scaffolding (`apps/`, `services/`)                           |
-| `ca0a269` | 2 + 8 | Move Next.js app to `apps/web/`, split package.json, create lean root         |
-| `20cd5df` | 3     | Move Storybook to `apps/storybook/`, kilo-app to `apps/mobile/`               |
-| `3668663` | 4     | Move 19 workers to `services/`, strip `cloudflare-` prefix                    |
-| `fa4bd0f` | 5     | Move `kiloclaw/packages/secret-catalog` to `packages/kiloclaw-secret-catalog` |
-| `4096f4f` | 6     | Switch `pnpm-workspace.yaml` to globs, rewrite shell scripts                  |
-| `3da92cf` | 7     | Update all 8 GitHub Actions workflows                                         |
-| `09cf1f7` | 9     | Update `.prettierignore`, `.gitignore`, `.kilocodeignore`                     |
-| `97e6678` | 10    | Add `@typescript/native-preview` to root devDeps (verification fix)           |
-| `bc35ced` | 10    | Fix lint: `@jest/globals` in `@kilocode/db`, `.oxlintrc.json` ignorePatterns  |
+| Commit | Phase | Description |
+|---|---|---|
+| `358df11` | 1 | Create directory scaffolding (`apps/`, `services/`) |
+| `ca0a269` | 2 + 8 | Move Next.js app to `apps/web/`, split package.json, create lean root |
+| `20cd5df` | 3 | Move Storybook to `apps/storybook/`, kilo-app to `apps/mobile/` |
+| `3668663` | 4 | Move 19 workers to `services/`, strip `cloudflare-` prefix |
+| `fa4bd0f` | 5 | Move `kiloclaw/packages/secret-catalog` to `packages/kiloclaw-secret-catalog` |
+| `4096f4f` | 6 | Switch `pnpm-workspace.yaml` to globs, rewrite shell scripts |
+| `3da92cf` | 7 | Update all 8 GitHub Actions workflows |
+| `09cf1f7` | 9 | Update `.prettierignore`, `.gitignore`, `.kilocodeignore` |
+| `97e6678` | 10 | Add `@typescript/native-preview` to root devDeps (verification fix) |
+| `bc35ced` | 10 | Fix lint: `@jest/globals` in `@kilocode/db`, `.oxlintrc.json` ignorePatterns |
 
 Phase 8 (lean root `package.json`) was done atomically with Phase 2 since both must happen together. Phase 11 (external configuration) is manual post-merge work.
 
@@ -103,14 +103,14 @@ All 8 workflows updated (trufflehog needed no changes):
 
 ## Verification results
 
-| Check                                              | Result                               |
-| -------------------------------------------------- | ------------------------------------ |
-| `pnpm install`                                     | Pass                                 |
-| `pnpm --filter web typecheck`                      | Pass                                 |
-| `pnpm --filter kilo-app typecheck`                 | Pass                                 |
-| `pnpm --filter cloud-agent-next typecheck`         | Pass                                 |
-| `pnpm -r lint`                                     | Pass (0 errors across 31 workspaces) |
-| `scripts/changed-workspaces.sh --exclude apps/web` | Pass (correct JSON output)           |
+| Check | Result |
+|---|---|
+| `pnpm install` | Pass |
+| `pnpm --filter web typecheck` | Pass |
+| `pnpm --filter kilo-app typecheck` | Pass |
+| `pnpm --filter cloud-agent-next typecheck` | Pass |
+| `pnpm -r lint` | Pass (0 errors across 31 workspaces) |
+| `scripts/changed-workspaces.sh --exclude apps/web` | Pass (correct JSON output) |
 
 ## Post-merge manual steps (Phase 11)
 

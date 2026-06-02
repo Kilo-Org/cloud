@@ -39,16 +39,16 @@ docker run -it ghcr.io/kilo-org/google-setup \
 
 ## Additional flags
 
-| Flag                            | Description                                                                |
-| ------------------------------- | -------------------------------------------------------------------------- |
-| `--token=<jwt>`                 | Session JWT from kilo.ai (required for solo and member modes)              |
-| `--instance-id=<uuid>`          | Target a specific org instance                                             |
-| `--worker-url=<url>`            | Override the kiloclaw worker URL (default: `https://claw.kilosessions.ai`) |
-| `--gmail-push-worker-url=<url>` | Override the Gmail push worker URL                                         |
-| `--client-id=<id>`              | OAuth client ID (member mode)                                              |
-| `--client-secret=<secret>`      | OAuth client secret (member mode)                                          |
-| `--project-id=<pid>`            | GCP project ID (member mode)                                               |
-| `--admin`                       | Run in admin mode                                                          |
+| Flag | Description |
+|---|---|
+| `--token=<jwt>` | Session JWT from kilo.ai (required for solo and member modes) |
+| `--instance-id=<uuid>` | Target a specific org instance |
+| `--worker-url=<url>` | Override the kiloclaw worker URL (default: `https://claw.kilosessions.ai`) |
+| `--gmail-push-worker-url=<url>` | Override the Gmail push worker URL |
+| `--client-id=<id>` | OAuth client ID (member mode) |
+| `--client-secret=<secret>` | OAuth client secret (member mode) |
+| `--project-id=<pid>` | GCP project ID (member mode) |
+| `--admin` | Run in admin mode |
 
 ## Local development
 

@@ -47,6 +47,7 @@ export function createSessionTerminalHandlers() {
         return withLogTags({ source: 'createTerminal' }, async () => {
           const sessionId = input.cloudAgentSessionId as SessionId;
           logger.setTags({ userId: ctx.userId, sessionId });
+          logger.withFields({ cols: input.cols, rows: input.rows }).info('Creating terminal');
 
           const result = await withDORetry<
             DurableObjectStub<CloudAgentSession>,
@@ -65,6 +66,7 @@ export function createSessionTerminalHandlers() {
             throwTerminalError(result);
           }
 
+          logger.withFields({ ptyId: result.data.pty.id }).info('Terminal created');
           return { pty: result.data.pty };
         });
       }),
@@ -76,7 +78,6 @@ export function createSessionTerminalHandlers() {
         return withLogTags({ source: 'resizeTerminal' }, async () => {
           const sessionId = input.cloudAgentSessionId as SessionId;
           logger.setTags({ userId: ctx.userId, sessionId, ptyId: input.ptyId });
-
           const result = await withDORetry<
             DurableObjectStub<CloudAgentSession>,
             OperationResult<{ pty: WrapperPty }>
@@ -106,6 +107,7 @@ export function createSessionTerminalHandlers() {
         return withLogTags({ source: 'closeTerminal' }, async () => {
           const sessionId = input.cloudAgentSessionId as SessionId;
           logger.setTags({ userId: ctx.userId, sessionId, ptyId: input.ptyId });
+          logger.info('Closing terminal');
 
           const result = await withDORetry<
             DurableObjectStub<CloudAgentSession>,
@@ -120,6 +122,7 @@ export function createSessionTerminalHandlers() {
             throwTerminalError(result);
           }
 
+          logger.withFields({ success: result.data.success }).info('Terminal close completed');
           return { success: result.data.success };
         });
       }),

@@ -6,9 +6,9 @@ import { validateFeatureHeader, FEATURE_HEADER } from '@/lib/feature-detection';
 import { getEmbeddingProvider } from '@/lib/ai-gateway/providers/get-provider';
 import { debugSaveProxyRequest } from '@/lib/debugUtils';
 import { captureException, setTag, startInactiveSpan } from '@sentry/nextjs';
-import { getUserFromAuth } from '@/lib/user.server';
+import { getUserFromAuth } from '@/lib/user/server';
 import { sentryRootSpan } from '@/lib/getRootSpan';
-import { isFreeModel } from '@/lib/ai-gateway/models';
+import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
 import {
   captureProxyError,
   checkOrganizationModelRestrictions,
@@ -35,6 +35,7 @@ import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 import {
   buildUpstreamBody,
   type EmbeddingProxyRequest,
+  validateEmbeddingDimensions,
 } from '@/lib/ai-gateway/embeddings/embedding-request';
 import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import { getVercelInferenceProviderConfigForUserByok } from '@/lib/ai-gateway/providers/vercel';
@@ -132,7 +133,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   const tokenSource: string | undefined = authTokenSource;
 
   if (authFailedResponse) {
-    if (!isFreeModel(requestedModelLowerCased)) {
+    if (!(await isFreeModel(requestedModelLowerCased))) {
       return NextResponse.json(
         {
           error: {
@@ -199,7 +200,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   if (!isAnonymousContext(user)) {
     const { balance, settings, plan } = await getBalanceAndOrgSettings(organizationId, user);
 
-    if (balance <= 0 && !isFreeModel(requestedModelLowerCased) && !userByok) {
+    if (balance <= 0 && !(await isFreeModel(requestedModelLowerCased)) && !userByok) {
       return await usageLimitExceededResponse(user, balance);
     }
 
@@ -220,6 +221,21 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     performance.now() - requestStartedAt
   );
 
+  const dimensionError = validateEmbeddingDimensions(requestBodyParsed, requestedModelLowerCased);
+  if (dimensionError) {
+    return NextResponse.json(
+      {
+        error: {
+          message: dimensionError,
+          type: 'invalid_request_error',
+          param: 'dimensions',
+          code: null,
+        },
+      },
+      { status: 400 }
+    );
+  }
+
   const embeddingRequestSpan = startInactiveSpan({
     name: 'embedding-request-start',
     op: 'http.client',
@@ -235,7 +251,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     requestBodyParsed.model = mapModelIdToVercel(requestBodyParsed.model, false);
   }
 
-  const upstreamBody = buildUpstreamBody(requestBodyParsed);
+  const upstreamBody = buildUpstreamBody(requestBodyParsed, requestedModelLowerCased);
 
   if (userByok && userByok.length > 0 && provider.id === 'vercel') {
     const byokProviders: Record<string, unknown[]> = {};

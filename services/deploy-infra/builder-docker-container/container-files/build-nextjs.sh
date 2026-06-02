@@ -22,10 +22,27 @@ error_exit() {
 
 cd "$PROJECT_DIR" || error_exit "Failed to change directory"
 
-# Validate Next.js version
-NEXTJS_VERSION=$(jq -r '.dependencies.next // .devDependencies.next // ""' package.json | sed 's/[^0-9.]//g' | cut -d. -f1)
-[ -z "$NEXTJS_VERSION" ] && error_exit "Next.js not found in package.json"
-[ "$NEXTJS_VERSION" != "14" ] && [ "$NEXTJS_VERSION" != "15" ] && [ "$NEXTJS_VERSION" != "16" ] && error_exit "Unsupported Next.js version: $NEXTJS_VERSION"
+# Validate Next.js version against the OpenNext support range.
+NEXTJS_SPEC=$(jq -r '.dependencies.next // .devDependencies.next // ""' package.json)
+[ -z "$NEXTJS_SPEC" ] && error_exit "Next.js not found in package.json"
+
+NEXTJS_VERSION=$(printf '%s' "$NEXTJS_SPEC" | sed -nE 's/^[^0-9]*([0-9]+\.[0-9]+\.[0-9]+).*/\1/p')
+if [[ "$NEXTJS_VERSION" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+    NEXTJS_MAJOR="${BASH_REMATCH[1]}"
+    NEXTJS_MINOR="${BASH_REMATCH[2]}"
+    NEXTJS_PATCH="${BASH_REMATCH[3]}"
+else
+    error_exit "Unsupported Next.js version spec: $NEXTJS_SPEC. OpenNext requires Next.js >=15.5.18 <16 or >=16.2.6"
+fi
+
+NEXTJS_SUPPORTED=false
+if [ "$NEXTJS_MAJOR" = "15" ]; then
+    [ "$NEXTJS_MINOR" -gt 5 ] || { [ "$NEXTJS_MINOR" -eq 5 ] && [ "$NEXTJS_PATCH" -ge 18 ]; } && NEXTJS_SUPPORTED=true
+elif [ "$NEXTJS_MAJOR" = "16" ]; then
+    [ "$NEXTJS_MINOR" -gt 2 ] || { [ "$NEXTJS_MINOR" -eq 2 ] && [ "$NEXTJS_PATCH" -ge 6 ]; } && NEXTJS_SUPPORTED=true
+fi
+
+[ "$NEXTJS_SUPPORTED" != "true" ] && error_exit "Unsupported Next.js version: $NEXTJS_SPEC. OpenNext requires Next.js >=15.5.18 <16 or >=16.2.6"
 
 echo "Next.js version $NEXTJS_VERSION"
 

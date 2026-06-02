@@ -20,16 +20,15 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { OpenclawImportCard } from './OpenclawImportCard';
 
 import { usePostHog } from 'posthog-js/react';
+import Link from 'next/link';
 import { toast } from 'sonner';
 import { useModelSelectorList } from '@/app/api/openrouter/hooks';
-import { useUser } from '@/hooks/useUser';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import type { KiloClawDashboardStatus, MorningBriefingStatusLite } from '@/lib/kiloclaw/types';
 import { morningBriefingStatusOk } from '@/lib/kiloclaw/types';
 import { calverAtLeast, cleanVersion, controllerCalverSupports } from '@/lib/kiloclaw/version';
 import type { useKiloClawMutations } from '@/hooks/useKiloClaw';
 import {
-  useClawComposioOnboardingStatus,
   useClawConfig,
   useClawMyPin,
   useClawGoogleSetupCommand,
@@ -1890,9 +1889,7 @@ export function SettingsTab({
   organizationName?: string;
 }) {
   const posthog = usePostHog();
-  const { data: user } = useUser();
   const { data: config } = useClawConfig();
-  const { data: composioOnboardingStatus } = useClawComposioOnboardingStatus();
   const { organizationId } = useClawContext();
   const { data: modelsData, isLoading: isLoadingModels } = useModelSelectorList(organizationId);
   const isRunning = status.status === 'running';
@@ -2006,6 +2003,8 @@ export function SettingsTab({
     cleanVersion(controllerVersion?.version),
     OPENCLAW_IMPORT_UI_MIN_CONTROLLER_VERSION
   );
+  const supportsOpenclawSaveValidation =
+    controllerVersion?.capabilities?.includes('files.write-openclaw-config') === true;
   // Fail OPEN: hide the interests editor only when the controller
   // version is positively parsed as too old, OR the worker reports an
   // explicit `version: null` (its positive old-controller signal for a
@@ -2021,14 +2020,6 @@ export function SettingsTab({
   );
 
   const configuredSecrets = config?.configuredSecrets ?? {};
-  const composioManagedConfigured = composioOnboardingStatus?.sandboxConfigSource === 'managed';
-  const composioManagedConnected =
-    composioManagedConfigured && composioOnboardingStatus?.status === 'connected';
-  const composioManualConfigured = composioOnboardingStatus?.sandboxConfigSource === 'manual';
-  const composioConfigured =
-    (configuredSecrets['composio'] ?? false) ||
-    composioManagedConfigured ||
-    composioManualConfigured;
   const kiloExaSearchMode = config?.kiloExaSearchMode ?? null;
   const braveSearchConfigured = configuredSecrets['brave-search'] ?? false;
   // Reflects which provider is actually active. Mirrors controller arbitration
@@ -2042,26 +2033,6 @@ export function SettingsTab({
     supportsExaSearchUi && kiloExaSearchMode === null ? 'kilo-proxy' : kiloExaSearchMode;
   const braveSearchEnabled = braveSearchConfigured && !exaSearchConfigured;
   const toolEntries = getEntriesByCategory('tool');
-  const googleCalendarConnectHref = useMemo(() => {
-    const params = new URLSearchParams({ capabilities: 'calendar_read' });
-    if (organizationId) {
-      params.set('organizationId', organizationId);
-    }
-
-    return `/api/integrations/google/connect?${params.toString()}`;
-  }, [organizationId]);
-  const googleCalendarDisconnectHref = useMemo(() => {
-    const params = new URLSearchParams();
-    if (organizationId) {
-      params.set('organizationId', organizationId);
-    }
-
-    const qs = params.toString();
-    return qs.length > 0
-      ? `/api/integrations/google/disconnect?${qs}`
-      : '/api/integrations/google/disconnect';
-  }, [organizationId]);
-  const canSeeGoogleCalendar = !!user?.is_admin;
 
   function handleCycleInboundEmailAddress() {
     mutations.cycleInboundEmailAddress.mutate(undefined, {
@@ -2242,6 +2213,13 @@ export function SettingsTab({
               <p className="text-muted-foreground text-xs">
                 Used for new conversations. Can be changed per-conversation.
               </p>
+              <p className="text-muted-foreground mt-2 text-xs">
+                Configure your own model provider keys in{' '}
+                <Link href="/byok" target="_blank" className="underline">
+                  Kilo BYOK settings
+                </Link>
+                .
+              </p>
             </div>
             <div className="flex items-center gap-2">
               <ModelCombobox
@@ -2286,35 +2264,6 @@ export function SettingsTab({
 
       {/* ── Webhook Integration ── */}
       <WebhookIntegrationSection />
-
-      {canSeeGoogleCalendar && (
-        <div className="rounded-lg border px-4 py-3">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-3">
-              <GoogleGIcon className="h-5 w-5 shrink-0" />
-              <div>
-                <p className="text-sm font-medium">Google Calendar</p>
-                <div className="text-muted-foreground text-xs">
-                  {status.googleOAuthConnected
-                    ? `Connected${status.googleOAuthAccountEmail ? ` as ${status.googleOAuthAccountEmail}` : ''}`
-                    : 'Not connected'}
-                </div>
-              </div>
-            </div>
-            {status.googleOAuthConnected ? (
-              <form action={googleCalendarDisconnectHref} method="POST">
-                <Button type="submit" variant="outline" size="sm">
-                  Disconnect
-                </Button>
-              </form>
-            ) : (
-              <Button asChild variant="outline" size="sm">
-                <a href={googleCalendarConnectHref}>Connect</a>
-              </Button>
-            )}
-          </div>
-        </div>
-      )}
 
       {/* ── Messaging Channels ── */}
       <div>
@@ -2464,39 +2413,11 @@ export function SettingsTab({
                 <SecretEntrySection
                   key={entry.id}
                   entry={entry}
-                  configured={composioConfigured}
+                  configured={configuredSecrets[entry.id] ?? false}
                   mutations={mutations}
                   onSecretsChanged={onSecretsChanged}
                   isDirty={dirtySecrets.has(entry.id)}
                   onRedeploy={onRedeploy}
-                  statusInlineExtra={
-                    composioManagedConfigured ? (
-                      <Badge
-                        variant="secondary"
-                        className="gap-1 px-1.5 py-0 text-[10px] leading-4"
-                      >
-                        <ShieldCheck className="h-3 w-3" />
-                        Kilo-managed
-                      </Badge>
-                    ) : undefined
-                  }
-                  actionRowExtra={
-                    composioManagedConnected ? (
-                      <p className="text-muted-foreground flex items-start gap-2 text-xs">
-                        <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                        Google Calendar is connected through Kilo-managed Composio for this OpenClaw
-                        instance. Saving your own Composio credentials here will switch this
-                        instance to manual setup.
-                      </p>
-                    ) : composioManagedConfigured ? (
-                      <p className="text-muted-foreground flex items-start gap-2 text-xs">
-                        <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                        Kilo-managed Composio is configured for this OpenClaw instance. Reconnect
-                        Google Calendar from onboarding, or save your own Composio credentials here
-                        to switch this instance to manual setup.
-                      </p>
-                    ) : undefined
-                  }
                 />
               ))}
           </div>
@@ -2686,6 +2607,7 @@ export function SettingsTab({
                   enabled={isRunning}
                   mutations={mutations}
                   onOpenChange={setEditConfigOpen}
+                  enableOpenclawValidation={supportsOpenclawSaveValidation}
                 />
               </div>
             )}

@@ -15,7 +15,7 @@ import {
   getGitLabInstanceUrlForUser,
   buildGitLabCloneUrl,
 } from '@/lib/cloud-agent/gitlab-integration-helpers';
-import type { Images } from '@/lib/images-schema';
+import type { CloudAgentAttachments } from '@/lib/cloud-agent/constants';
 import { APP_URL } from '@/lib/constants';
 import { CALLBACK_TOKEN_SECRET } from '@/lib/config.server';
 import { parseBotCallbackStep } from '@/lib/bot/step-budget';
@@ -98,7 +98,12 @@ export default async function spawnCloudAgentSession(
   ticketUserId: string,
   botRequestId: string,
   onSessionReady?: RunSessionInput['onSessionReady'],
-  options?: { prSignature?: string; chatPlatform?: string; currentStep?: number; images?: Images }
+  options?: {
+    prSignature?: string;
+    chatPlatform?: string;
+    currentStep?: number;
+    attachments?: CloudAgentAttachments;
+  }
 ): Promise<SpawnCloudAgentResult> {
   console.log('[KiloBot] spawnCloudAgentSession called with args:', JSON.stringify(args, null, 2));
 
@@ -113,9 +118,8 @@ export default async function spawnCloudAgentSession(
     throw error;
   }
 
-  // Build platform-specific prepareInput and initiateInput
+  // Build platform-specific prepare input
   let prepareInput: PrepareSessionInput;
-  let initiateInput: { githubToken?: string; kilocodeOrganizationId?: string };
   const mode: AgentMode = args.mode;
   const chatPlatform = options?.chatPlatform ?? 'slack';
   const callbackTarget = {
@@ -184,7 +188,7 @@ export default async function spawnCloudAgentSession(
       kilocodeOrganizationId,
       createdOnPlatform: chatPlatform,
       callbackTarget,
-      images: options?.images,
+      attachments: options?.attachments,
       envVars: profileConfig.envVars,
       encryptedSecrets: profileConfig.encryptedSecrets,
       setupCommands: profileConfig.setupCommands,
@@ -192,7 +196,6 @@ export default async function spawnCloudAgentSession(
       runtimeSkills: profileConfig.skills,
       runtimeAgents: profileConfig.agents,
     };
-    initiateInput = { kilocodeOrganizationId };
   } else {
     // GitHub path: get token, use githubRepo/githubToken
     const githubToken =
@@ -216,7 +219,7 @@ export default async function spawnCloudAgentSession(
       kilocodeOrganizationId,
       createdOnPlatform: chatPlatform,
       callbackTarget,
-      images: options?.images,
+      attachments: options?.attachments,
       envVars: profileConfig.envVars,
       encryptedSecrets: profileConfig.encryptedSecrets,
       setupCommands: profileConfig.setupCommands,
@@ -224,7 +227,6 @@ export default async function spawnCloudAgentSession(
       runtimeSkills: profileConfig.skills,
       runtimeAgents: profileConfig.agents,
     };
-    initiateInput = { githubToken, kilocodeOrganizationId };
   }
 
   const client = createCloudAgentNextClient(authToken, { skipBalanceCheck: true });
@@ -244,7 +246,6 @@ export default async function spawnCloudAgentSession(
   try {
     await client.initiateFromPreparedSession({
       cloudAgentSessionId,
-      ...initiateInput,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

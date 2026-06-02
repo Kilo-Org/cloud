@@ -1,5 +1,7 @@
 'use client';
 
+import React from 'react';
+import Link from 'next/link';
 import {
   AlertCircle,
   AlertTriangle,
@@ -148,6 +150,19 @@ function getBannerContent(state: ClawBannerState, billing: ClawBillingStatus) {
         action: 'reactivate' as const,
       };
     case 'subscription_past_due':
+      if (
+        billing.subscription &&
+        !billing.subscription.hasStripeFunding &&
+        billing.subscription.paymentSource === 'credits'
+      ) {
+        return {
+          title: 'Payment failed — action required',
+          message:
+            'Your credit balance is insufficient for the next renewal. Add credits to avoid service interruption.',
+          cta: 'Add Credits',
+          action: 'add_credits' as const,
+        };
+      }
       return {
         title: 'Payment failed — action required',
         message:
@@ -211,23 +226,28 @@ export function BillingBanner({
         <p className="text-muted-foreground text-sm">{content.message}</p>
       </div>
 
-      {content.cta && (
-        <Button
-          onClick={handleCta}
-          variant="primary"
-          className="shrink-0"
-          disabled={content.action === 'reactivate' && isReactivating}
-        >
-          {content.action === 'reactivate' && isReactivating ? (
-            <>
-              <Loader2 className="animate-spin" />
-              Reactivating...
-            </>
-          ) : (
-            content.cta
-          )}
-        </Button>
-      )}
+      {content.cta &&
+        (content.action === 'add_credits' ? (
+          <Button variant="primary" className="shrink-0" asChild>
+            <Link href="/credits">{content.cta}</Link>
+          </Button>
+        ) : (
+          <Button
+            onClick={handleCta}
+            variant="primary"
+            className="shrink-0"
+            disabled={content.action === 'reactivate' && isReactivating}
+          >
+            {content.action === 'reactivate' && isReactivating ? (
+              <>
+                <Loader2 className="animate-spin" />
+                Reactivating...
+              </>
+            ) : (
+              content.cta
+            )}
+          </Button>
+        ))}
     </div>
   );
 }

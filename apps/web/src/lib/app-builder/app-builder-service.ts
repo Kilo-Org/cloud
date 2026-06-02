@@ -330,6 +330,8 @@ async function createCloudAgentNextSession(
     executionId: result.executionId,
     status: result.status,
     streamUrl: result.streamUrl,
+    messageId: result.messageId,
+    delivery: result.delivery,
   };
 }
 
@@ -375,6 +377,8 @@ async function sendToExistingCloudAgentNextSession(
     executionId: result.executionId,
     status: result.status,
     streamUrl: result.streamUrl,
+    messageId: result.messageId,
+    delivery: result.delivery,
   };
 }
 
@@ -854,6 +858,8 @@ export async function startSessionForProject(
     executionId: result.executionId,
     status: result.status,
     streamUrl: result.streamUrl,
+    messageId: result.messageId,
+    delivery: result.delivery,
   };
 }
 

@@ -17,6 +17,9 @@ const mockGetCodeReviewById = jest.fn() as jest.MockedFunction<
 const mockUpdateCodeReviewStatus = jest.fn() as jest.MockedFunction<
   typeof codeReviewsDbModule.updateCodeReviewStatus
 >;
+const mockUpdateCodeReviewStatusIfNonTerminal = jest.fn() as jest.MockedFunction<
+  typeof codeReviewsDbModule.updateCodeReviewStatusIfNonTerminal
+>;
 const mockUpdateCodeReviewUsage = jest.fn() as jest.MockedFunction<
   typeof codeReviewsDbModule.updateCodeReviewUsage
 >;
@@ -71,6 +74,8 @@ const mockCaptureMessage = jest.fn<any>();
 const mockAppendReviewSummaryFooter = jest.fn<any>();
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const mockRetryReviewFresh = jest.fn<any>();
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const mockDisableCodeReviewForActionRequiredFailure = jest.fn<any>();
 
 // --- Module mocks ---
 
@@ -81,6 +86,7 @@ jest.mock('@/lib/config.server', () => ({
 jest.mock('@/lib/code-reviews/db/code-reviews', () => ({
   getCodeReviewById: mockGetCodeReviewById,
   updateCodeReviewStatus: mockUpdateCodeReviewStatus,
+  updateCodeReviewStatusIfNonTerminal: mockUpdateCodeReviewStatusIfNonTerminal,
   updateCodeReviewUsage: mockUpdateCodeReviewUsage,
   getSessionUsageFromBilling: mockGetSessionUsageFromBilling,
   updateCodeReviewAttemptForCallback: mockUpdateCodeReviewAttemptForCallback,
@@ -137,6 +143,15 @@ jest.mock('@sentry/nextjs', () => ({
 jest.mock('@/lib/code-reviews/summary/usage-footer', () => ({
   appendReviewSummaryFooter: (...args: unknown[]) => mockAppendReviewSummaryFooter(...args),
 }));
+
+jest.mock('@/lib/code-reviews/action-required', () => {
+  const actual = jest.requireActual<Record<string, unknown>>('@/lib/code-reviews/action-required');
+  return {
+    ...actual,
+    disableCodeReviewForActionRequiredFailure: (...args: unknown[]) =>
+      mockDisableCodeReviewForActionRequiredFailure(...args),
+  };
+});
 
 jest.mock('@/lib/constants', () => ({
   APP_URL: 'https://test.kilo.ai',
@@ -261,6 +276,8 @@ function makeIntegration(overrides: Partial<PlatformIntegration> = {}): Platform
     repository_access: null,
     repositories: null,
     repositories_synced_at: null,
+    auth_invalid_at: null,
+    auth_invalid_reason: null,
     metadata: null,
     kilo_requester_user_id: null,
     platform_requester_account_id: null,
@@ -314,6 +331,7 @@ beforeEach(async () => {
   mockGetBotUserId.mockResolvedValue(null);
   mockGetIntegrationById.mockResolvedValue(makeIntegration());
   mockUpdateCheckRun.mockResolvedValue(undefined);
+  mockSetCommitStatus.mockResolvedValue(undefined);
   mockAddReactionToPR.mockResolvedValue(undefined);
   mockCreatePRComment.mockResolvedValue(undefined);
   mockHasPRCommentWithMarker.mockResolvedValue(false);
@@ -325,7 +343,9 @@ beforeEach(async () => {
   mockUpdateKiloReviewNote.mockResolvedValue(undefined);
   mockGetSessionUsageFromBilling.mockResolvedValue(null);
   mockUpdateCodeReviewUsage.mockResolvedValue(undefined);
+  mockUpdateCodeReviewStatusIfNonTerminal.mockResolvedValue(true);
   mockAppendReviewSummaryFooter.mockReturnValue('body with footer');
+  mockDisableCodeReviewForActionRequiredFailure.mockResolvedValue(undefined);
   ({ POST } = await import('./route'));
 });
 
@@ -471,6 +491,192 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       );
     });
 
+    it('infers BYOK invalid-key callbacks as action-required failures', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+
+      const response = await POST(
+        makeRequest({
+          status: 'failed',
+          errorMessage:
+            '[BYOK] Your API key is invalid or has been revoked. Please check your API key configuration.',
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+        REVIEW_ID,
+        'failed',
+        expect.objectContaining({
+          terminalReason: 'byok_invalid_key',
+        })
+      );
+      expect(mockCreateInfraRetryAttemptIfMissing).not.toHaveBeenCalled();
+      expect(mockRetryReviewFresh).not.toHaveBeenCalled();
+      expect(mockDisableCodeReviewForActionRequiredFailure).toHaveBeenCalledWith(
+        expect.objectContaining({
+          owner: { type: 'user', id: 'user-1', userId: 'user-1' },
+          platform: 'github',
+          reviewId: REVIEW_ID,
+          reason: 'byok_invalid_key',
+        })
+      );
+      expect(mockUpdateCheckRun).toHaveBeenCalledWith(
+        'inst-1',
+        'owner',
+        'repo',
+        12345,
+        expect.objectContaining({
+          conclusion: 'action_required',
+          output: expect.objectContaining({ title: 'BYOK API key needs attention' }),
+        }),
+        'standard'
+      );
+    });
+
+    it('infers selected-model-unavailable callbacks as action-required failures', async () => {
+      const errorMessage =
+        'prepareSession failed (400): {"error":{"message":"Selected model is not available for this cloud agent session","code":-32600,"data":{"code":"BAD_REQUEST","httpStatus":400,"path":"prepareSession"}}}';
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+
+      const response = await POST(
+        makeRequest({
+          status: 'failed',
+          errorMessage,
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockUpdateCodeReviewAttemptForCallback).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: 'failed',
+          errorMessage,
+          terminalReason: 'selected_model_unavailable',
+        })
+      );
+      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+        REVIEW_ID,
+        'failed',
+        expect.objectContaining({
+          errorMessage,
+          terminalReason: 'selected_model_unavailable',
+        })
+      );
+      expect(mockUpdateCodeReviewStatusIfNonTerminal).not.toHaveBeenCalled();
+      expect(mockCreateInfraRetryAttemptIfMissing).not.toHaveBeenCalled();
+      expect(mockRetryReviewFresh).not.toHaveBeenCalled();
+      expect(mockDisableCodeReviewForActionRequiredFailure).toHaveBeenCalledWith(
+        expect.objectContaining({
+          owner: { type: 'user', id: 'user-1', userId: 'user-1' },
+          platform: 'github',
+          reviewId: REVIEW_ID,
+          reason: 'selected_model_unavailable',
+          errorMessage,
+        })
+      );
+      expect(mockUpdateCheckRun).toHaveBeenCalledWith(
+        'inst-1',
+        'owner',
+        'repo',
+        12345,
+        expect.objectContaining({
+          conclusion: 'action_required',
+          output: expect.objectContaining({ title: 'Selected model unavailable' }),
+        }),
+        'standard'
+      );
+      expect(mockFindKiloReviewComment).not.toHaveBeenCalled();
+    });
+
+    it('infers model-not-allowed callbacks as action-required failures', async () => {
+      const errorMessage =
+        'prepareSession failed (400): {"error":{"message":"Not Found: The requested model is not allowed for your team.","code":-32600,"data":{"code":"BAD_REQUEST","httpStatus":400,"path":"prepareSession"}}}';
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+
+      const response = await POST(
+        makeRequest({
+          status: 'failed',
+          errorMessage,
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+        REVIEW_ID,
+        'failed',
+        expect.objectContaining({
+          errorMessage,
+          terminalReason: 'selected_model_unavailable',
+        })
+      );
+      expect(mockDisableCodeReviewForActionRequiredFailure).toHaveBeenCalledWith(
+        expect.objectContaining({
+          reason: 'selected_model_unavailable',
+          errorMessage,
+        })
+      );
+      expect(mockUpdateCheckRun).toHaveBeenCalledWith(
+        'inst-1',
+        'owner',
+        'repo',
+        12345,
+        expect.objectContaining({
+          conclusion: 'action_required',
+          output: expect.objectContaining({ title: 'Selected model unavailable' }),
+        }),
+        'standard'
+      );
+    });
+
+    it('infers GitHub installation and IP allow-list callback failures', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+
+      await POST(
+        makeRequest({
+          status: 'failed',
+          errorMessage:
+            'Dispatch failed: GitHub token or active app installation required for this repository (no_installation_found)',
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(mockUpdateCodeReviewStatus).toHaveBeenLastCalledWith(
+        REVIEW_ID,
+        'failed',
+        expect.objectContaining({ terminalReason: 'github_installation_required' })
+      );
+
+      jest.clearAllMocks();
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+      mockUpdateCodeReviewAttemptForCallback.mockImplementation(async params =>
+        makeAttempt({
+          status: params.status,
+          error_message: params.errorMessage ?? null,
+          terminal_reason: params.terminalReason ?? null,
+        })
+      );
+      mockGetLatestCodeReviewAttempt.mockResolvedValue(makeAttempt());
+      mockGetIntegrationById.mockResolvedValue(makeIntegration());
+      mockDisableCodeReviewForActionRequiredFailure.mockResolvedValue(undefined);
+
+      await POST(
+        makeRequest({
+          status: 'failed',
+          errorMessage:
+            'Although you appear to have the correct authorization credentials, the `acme` organization has an IP allow list enabled, and 192.0.2.1 is not permitted.',
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(mockUpdateCodeReviewStatus).toHaveBeenLastCalledWith(
+        REVIEW_ID,
+        'failed',
+        expect.objectContaining({ terminalReason: 'github_ip_allow_list' })
+      );
+    });
+
     it('keeps interrupted non-billing callbacks as cancelled', async () => {
       mockGetCodeReviewById.mockResolvedValue(makeReview());
 
@@ -490,6 +696,76 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
           errorMessage: 'User cancelled the review',
           terminalReason: 'interrupted',
         })
+      );
+    });
+
+    it('reclassifies failed model-not-found callbacks as cancelled while preserving the error message', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+      mockFindKiloReviewComment.mockResolvedValue(null);
+
+      const response = await POST(
+        makeRequest({
+          status: 'failed',
+          errorMessage: 'Model not found: kilo/retired-model',
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockUpdateCodeReviewAttemptForCallback).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: 'cancelled',
+          errorMessage: 'Model not found: kilo/retired-model',
+          terminalReason: 'model_not_found',
+        })
+      );
+      expect(mockUpdateCodeReviewStatusIfNonTerminal).toHaveBeenCalledWith(
+        REVIEW_ID,
+        'cancelled',
+        expect.objectContaining({
+          errorMessage: 'Model not found: kilo/retired-model',
+          terminalReason: 'model_not_found',
+        })
+      );
+      expect(mockCreateInfraRetryAttemptIfMissing).not.toHaveBeenCalled();
+      expect(mockRetryReviewFresh).not.toHaveBeenCalled();
+    });
+
+    it('recognizes model-not-found messages case-insensitively but not generic not-found messages', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+
+      await POST(
+        makeRequest({ status: 'failed', errorMessage: 'MODEL NOT FOUND: kilo/retired-model' }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(mockUpdateCodeReviewStatusIfNonTerminal).toHaveBeenLastCalledWith(
+        REVIEW_ID,
+        'cancelled',
+        expect.objectContaining({ terminalReason: 'model_not_found' })
+      );
+
+      jest.clearAllMocks();
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+      mockUpdateCodeReviewAttemptForCallback.mockImplementation(async params =>
+        makeAttempt({
+          status: params.status,
+          error_message: params.errorMessage ?? null,
+          terminal_reason: params.terminalReason ?? null,
+        })
+      );
+      mockGetLatestCodeReviewAttempt.mockResolvedValue(makeAttempt());
+      mockGetIntegrationById.mockResolvedValue(makeIntegration());
+
+      await POST(
+        makeRequest({ status: 'failed', errorMessage: 'Repository not found' }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(mockUpdateCodeReviewStatus).toHaveBeenLastCalledWith(
+        REVIEW_ID,
+        'failed',
+        expect.objectContaining({ terminalReason: undefined })
       );
     });
 
@@ -965,6 +1241,91 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
     });
   });
 
+  describe('best-effort terminal gate publication', () => {
+    it('persists GitLab terminal status before failed publication and continues dispatch', async () => {
+      const callOrder: string[] = [];
+      mockGetCodeReviewById.mockResolvedValue(
+        makeReview({ platform: 'gitlab', platform_project_id: 42, check_run_id: null })
+      );
+      mockUpdateCodeReviewStatus.mockImplementation(async () => {
+        callOrder.push('persist');
+      });
+      mockSetCommitStatus.mockImplementation(async () => {
+        callOrder.push('publish');
+        throw new Error('GitLab unavailable');
+      });
+
+      const response = await POST(
+        makeRequest({ status: 'completed', gateResult: 'fail' }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      expect(callOrder.slice(0, 2)).toEqual(['persist', 'publish']);
+      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+        REVIEW_ID,
+        'completed',
+        expect.any(Object)
+      );
+      expect(mockSetCommitStatus).toHaveBeenCalledWith(
+        'mock-token',
+        42,
+        'abc123',
+        'failed',
+        expect.objectContaining({
+          description: 'Kilo Code Review found issues that require attention',
+        }),
+        'https://gitlab.com'
+      );
+      expect(mockCaptureException).toHaveBeenCalledWith(
+        expect.any(Error),
+        expect.objectContaining({ tags: { source: 'code-review-status-gate-check' } })
+      );
+      expect(mockTryDispatchPendingReviews).toHaveBeenCalled();
+    });
+
+    it('persists GitHub terminal status when check run publication fails', async () => {
+      const callOrder: string[] = [];
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+      mockUpdateCodeReviewStatus.mockImplementation(async () => {
+        callOrder.push('persist');
+      });
+      mockUpdateCheckRun.mockImplementation(async () => {
+        callOrder.push('publish');
+        throw new Error('GitHub unavailable');
+      });
+
+      const response = await POST(
+        makeRequest({ status: 'completed', gateResult: 'fail' }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      expect(callOrder.slice(0, 2)).toEqual(['persist', 'publish']);
+      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+        REVIEW_ID,
+        'completed',
+        expect.any(Object)
+      );
+      expect(mockUpdateCheckRun).toHaveBeenCalledWith(
+        'inst-1',
+        'owner',
+        'repo',
+        12345,
+        expect.objectContaining({
+          status: 'completed',
+          conclusion: 'failure',
+          output: expect.objectContaining({ title: 'Kilo Code Review found issues' }),
+        }),
+        'standard'
+      );
+      expect(mockCaptureException).toHaveBeenCalledWith(
+        expect.any(Error),
+        expect.objectContaining({ tags: { source: 'code-review-status-gate-check' } })
+      );
+    });
+  });
+
   describe('GitHub check run billing messaging', () => {
     it('uses action_required conclusion for billing failures', async () => {
       mockGetCodeReviewById.mockResolvedValue(makeReview());
@@ -1227,6 +1588,256 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         expect.stringContaining('switch to a free model'),
         'standard'
       );
+    });
+  });
+
+  describe('model-not-found provider output', () => {
+    it('updates GitHub check runs with actionable cancelled copy', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+      mockFindKiloReviewComment.mockResolvedValue(null);
+
+      await POST(
+        makeRequest({ status: 'failed', errorMessage: 'Model not found: kilo/retired-model' }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(mockUpdateCheckRun).toHaveBeenCalledWith(
+        'inst-1',
+        'owner',
+        'repo',
+        12345,
+        expect.objectContaining({
+          status: 'completed',
+          conclusion: 'cancelled',
+          output: expect.objectContaining({
+            title: 'Selected model is no longer available',
+            summary: expect.stringContaining('https://app.kilo.ai/code-reviews'),
+          }),
+        }),
+        'standard'
+      );
+    });
+
+    it('updates GitLab commit status with actionable cancelled copy', async () => {
+      mockGetCodeReviewById.mockResolvedValue(
+        makeReview({ platform: 'gitlab', platform_project_id: 42, check_run_id: null })
+      );
+      mockFindKiloReviewNote.mockResolvedValue(null);
+
+      await POST(
+        makeRequest({ status: 'failed', errorMessage: 'Model not found: kilo/retired-model' }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(mockSetCommitStatus).toHaveBeenCalledWith(
+        'mock-token',
+        42,
+        'abc123',
+        'canceled',
+        expect.objectContaining({
+          description: expect.stringContaining('https://app.kilo.ai/code-reviews'),
+        }),
+        'https://gitlab.com'
+      );
+    });
+
+    it('creates the canonical GitHub summary when absent', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+      mockFindKiloReviewComment.mockResolvedValue(null);
+
+      await POST(
+        makeRequest({ status: 'failed', errorMessage: 'Model not found: kilo/retired-model' }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(mockFindKiloReviewComment).toHaveBeenCalledWith(
+        'inst-1',
+        'owner',
+        'repo',
+        1,
+        'standard'
+      );
+      expect(mockCreatePRComment).toHaveBeenCalledWith(
+        'inst-1',
+        'owner',
+        'repo',
+        1,
+        expect.stringContaining('<!-- kilo-review -->'),
+        'standard'
+      );
+      expect(mockCreatePRComment).toHaveBeenCalledWith(
+        'inst-1',
+        'owner',
+        'repo',
+        1,
+        expect.stringContaining('https://app.kilo.ai/code-reviews'),
+        'standard'
+      );
+      expect(mockHasPRCommentWithMarker).not.toHaveBeenCalled();
+    });
+
+    it('updates the canonical GitHub summary when present', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+      mockFindKiloReviewComment.mockResolvedValue({ commentId: 123, body: 'old summary' });
+
+      await POST(
+        makeRequest({ status: 'failed', errorMessage: 'Model not found: kilo/retired-model' }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(mockUpdateKiloReviewComment).toHaveBeenCalledWith(
+        'inst-1',
+        'owner',
+        'repo',
+        123,
+        expect.stringContaining('selected model is no longer available'),
+        'standard'
+      );
+      expect(mockCreatePRComment).not.toHaveBeenCalled();
+    });
+
+    it('continues model-unavailable summary publication after gate publication fails', async () => {
+      const callOrder: string[] = [];
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+      mockUpdateCodeReviewStatusIfNonTerminal.mockImplementation(async () => {
+        callOrder.push('persist');
+        return true;
+      });
+      mockUpdateCheckRun.mockImplementation(async () => {
+        callOrder.push('publish-gate');
+        throw new Error('GitHub unavailable');
+      });
+      mockFindKiloReviewComment.mockImplementation(async () => {
+        callOrder.push('find-summary');
+        return null;
+      });
+      mockCreatePRComment.mockImplementation(async () => {
+        callOrder.push('create-summary');
+      });
+
+      const response = await POST(
+        makeRequest({ status: 'failed', errorMessage: 'Model not found: kilo/retired-model' }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      expect(callOrder).toEqual(['persist', 'publish-gate', 'find-summary', 'create-summary']);
+      expect(mockUpdateCodeReviewStatusIfNonTerminal).toHaveBeenCalledWith(
+        REVIEW_ID,
+        'cancelled',
+        expect.objectContaining({ terminalReason: 'model_not_found' })
+      );
+      expect(mockCaptureException).toHaveBeenCalledWith(
+        expect.any(Error),
+        expect.objectContaining({ tags: { source: 'code-review-status-gate-check' } })
+      );
+    });
+
+    it('persists the cancellation if the model-unavailable summary fails to publish', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+      mockFindKiloReviewComment.mockResolvedValue(null);
+      mockCreatePRComment.mockRejectedValue(new Error('GitHub unavailable'));
+
+      const response = await POST(
+        makeRequest({ status: 'failed', errorMessage: 'Model not found: kilo/retired-model' }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockUpdateCodeReviewStatusIfNonTerminal).toHaveBeenCalledWith(
+        REVIEW_ID,
+        'cancelled',
+        expect.objectContaining({ terminalReason: 'model_not_found' })
+      );
+      expect(mockCaptureException).toHaveBeenCalledWith(
+        expect.any(Error),
+        expect.objectContaining({
+          tags: { source: 'code-review-status-model-not-found-summary' },
+        })
+      );
+    });
+
+    it('creates and updates the canonical GitLab note through the same summary path', async () => {
+      mockGetCodeReviewById.mockResolvedValue(
+        makeReview({ platform: 'gitlab', platform_project_id: 42, check_run_id: null })
+      );
+      mockFindKiloReviewNote.mockResolvedValue(null);
+
+      await POST(
+        makeRequest({ status: 'failed', errorMessage: 'Model not found: kilo/retired-model' }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(mockCreateMRNote).toHaveBeenCalledWith(
+        'mock-token',
+        'owner/repo',
+        1,
+        expect.stringContaining('<!-- kilo-review -->'),
+        'https://gitlab.com'
+      );
+
+      jest.clearAllMocks();
+      mockUpdateCodeReviewStatusIfNonTerminal.mockResolvedValue(true);
+      mockGetCodeReviewById.mockResolvedValue(
+        makeReview({ platform: 'gitlab', platform_project_id: 42, check_run_id: null })
+      );
+      mockGetLatestCodeReviewAttempt.mockResolvedValue(makeAttempt());
+      mockGetIntegrationById.mockResolvedValue(makeIntegration());
+      mockFindKiloReviewNote.mockResolvedValue({ noteId: 321, body: 'old summary' });
+
+      await POST(
+        makeRequest({ status: 'failed', errorMessage: 'Model not found: kilo/retired-model' }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(mockUpdateKiloReviewNote).toHaveBeenCalledWith(
+        'mock-token',
+        'owner/repo',
+        1,
+        321,
+        expect.stringContaining('https://app.kilo.ai/code-reviews'),
+        'https://gitlab.com'
+      );
+      expect(mockCreateMRNote).not.toHaveBeenCalled();
+    });
+
+    it('claims the terminal update before publishing a model-unavailable summary', async () => {
+      const callOrder: string[] = [];
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+      mockUpdateCodeReviewStatusIfNonTerminal.mockImplementation(async () => {
+        callOrder.push('update-parent');
+        return true;
+      });
+      mockFindKiloReviewComment.mockImplementation(async () => {
+        callOrder.push('find-summary');
+        return null;
+      });
+      mockCreatePRComment.mockImplementation(async () => {
+        callOrder.push('create-summary');
+      });
+
+      await POST(
+        makeRequest({ status: 'failed', errorMessage: 'Model not found: kilo/retired-model' }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(callOrder).toEqual(['update-parent', 'find-summary', 'create-summary']);
+    });
+
+    it('does not publish a duplicate summary if another callback claimed cancellation', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+      mockUpdateCodeReviewStatusIfNonTerminal.mockResolvedValue(false);
+
+      const response = await POST(
+        makeRequest({ status: 'failed', errorMessage: 'Model not found: kilo/retired-model' }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockUpdateCheckRun).not.toHaveBeenCalled();
+      expect(mockFindKiloReviewComment).not.toHaveBeenCalled();
+      expect(mockCreatePRComment).not.toHaveBeenCalled();
+      expect(mockUpdateCodeReviewStatus).not.toHaveBeenCalled();
     });
   });
 

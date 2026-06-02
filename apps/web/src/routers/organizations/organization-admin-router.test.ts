@@ -1,6 +1,10 @@
 import { createCallerForUser } from '@/routers/test-utils';
 import { db } from '@/lib/drizzle';
-import { organizations, credit_transactions } from '@kilocode/db/schema';
+import {
+  organizations,
+  credit_transactions,
+  organization_seats_purchases,
+} from '@kilocode/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createOrganization } from '@/lib/organizations/organizations';
@@ -525,6 +529,71 @@ describe('organization admin router', () => {
         .where(eq(organizations.id, testOrganization.id));
 
       expect(updatedOrg.microdollars_balance).toBe(0);
+    });
+  });
+
+  // Regressions for the count query branches:
+  //   - the stripe_status branch joins latestSubscriptions; previously the
+  //     countQuery omitted that join, so any stripe_status value referenced
+  //     an alias missing from the FROM clause and Postgres rejected it
+  //   - the no-filter branch must not join latestSubscriptions (avoidable
+  //     historical-subscription-table work on every list request)
+  describe('list — count query', () => {
+    it('returns a total when stripe_status filter is set', async () => {
+      const [purchase] = await db
+        .insert(organization_seats_purchases)
+        .values({
+          organization_id: testOrganization.id,
+          subscription_stripe_id: 'sub_test_admin_list_stripe_status',
+          subscription_status: 'active',
+          seat_count: 2,
+          amount_usd: 42,
+          starts_at: '2026-04-01T00:00:00.000Z',
+          expires_at: '2027-04-01T00:00:00.000Z',
+          billing_cycle: 'yearly',
+        })
+        .returning();
+
+      try {
+        const caller = await createCallerForUser(adminUser.id);
+        const result = await caller.organizations.admin.list({
+          page: 1,
+          limit: 25,
+          sortBy: 'name',
+          sortOrder: 'desc',
+          search: '',
+          mode: 'all',
+          include_deleted: false,
+          stripe_status: 'active',
+        });
+
+        expect(result.organizations).toBeDefined();
+        expect(result.pagination).toBeDefined();
+        expect(typeof result.pagination.total).toBe('number');
+      } finally {
+        if (purchase) {
+          await db
+            .delete(organization_seats_purchases)
+            .where(eq(organization_seats_purchases.id, purchase.id));
+        }
+      }
+    });
+
+    it('returns a total when no stripe_status filter is set', async () => {
+      const caller = await createCallerForUser(adminUser.id);
+      const result = await caller.organizations.admin.list({
+        page: 1,
+        limit: 25,
+        sortBy: 'name',
+        sortOrder: 'desc',
+        search: '',
+        mode: 'all',
+        include_deleted: false,
+      });
+
+      expect(result.organizations).toBeDefined();
+      expect(result.pagination).toBeDefined();
+      expect(typeof result.pagination.total).toBe('number');
     });
   });
 });

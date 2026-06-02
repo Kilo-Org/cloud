@@ -12,19 +12,18 @@ export function useKiloClawStatus() {
   );
 }
 
+export function useKiloClawNavState() {
+  const trpc = useTRPC();
+  return useQuery(
+    trpc.kiloclaw.getNavState.queryOptions(undefined, {
+      staleTime: 60_000,
+    })
+  );
+}
+
 export function useKiloClawConfig() {
   const trpc = useTRPC();
   return useQuery(trpc.kiloclaw.getConfig.queryOptions());
-}
-
-export function useKiloClawComposioOnboardingStatus(enabled = true, pollingEnabled = enabled) {
-  const trpc = useTRPC();
-  return useQuery(
-    trpc.kiloclaw.getComposioOnboardingStatus.queryOptions(undefined, {
-      enabled,
-      refetchInterval: enabled && pollingEnabled ? 15_000 : false,
-    })
-  );
 }
 
 export function useKiloClawPairing(enabled = true) {
@@ -139,10 +138,13 @@ export function useKiloClawMutations() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const invalidateStatus = async () => {
-    await queryClient.invalidateQueries({ queryKey: trpc.kiloclaw.getStatus.queryKey() });
-    await queryClient.invalidateQueries({
-      queryKey: trpc.kiloclaw.controllerVersion.queryKey(),
-    });
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: trpc.kiloclaw.getStatus.queryKey() }),
+      queryClient.invalidateQueries({ queryKey: trpc.kiloclaw.getNavState.queryKey() }),
+      queryClient.invalidateQueries({
+        queryKey: trpc.kiloclaw.controllerVersion.queryKey(),
+      }),
+    ]);
   };
 
   const invalidateStatusAndBilling = async () => {
@@ -232,20 +234,6 @@ export function useKiloClawMutations() {
       trpc.kiloclaw.patchSecrets.mutationOptions({
         onSuccess: async () => {
           await invalidateStatus();
-          await queryClient.invalidateQueries({ queryKey: trpc.kiloclaw.getConfig.queryKey() });
-          await queryClient.invalidateQueries({
-            queryKey: trpc.kiloclaw.getComposioOnboardingStatus.queryKey(),
-          });
-        },
-      })
-    ),
-    createComposioGoogleCalendarLink: useMutation(
-      trpc.kiloclaw.createComposioGoogleCalendarLink.mutationOptions({
-        onSuccess: async () => {
-          await invalidateStatus();
-          await queryClient.invalidateQueries({
-            queryKey: trpc.kiloclaw.getComposioOnboardingStatus.queryKey(),
-          });
           await queryClient.invalidateQueries({ queryKey: trpc.kiloclaw.getConfig.queryKey() });
         },
       })
@@ -347,7 +335,8 @@ export function useKiloClawMutations() {
     ),
     writeFile: useMutation(
       trpc.kiloclaw.writeFile.mutationOptions({
-        onSuccess: async () => {
+        onSuccess: async result => {
+          if ('outcome' in result) return;
           await queryClient.invalidateQueries({
             queryKey: trpc.kiloclaw.fileTree.queryKey(),
           });
@@ -420,6 +409,7 @@ export function useKiloClawMutations() {
         },
       })
     ),
+    startOnboardingBriefing: useMutation(trpc.kiloclaw.startOnboardingBriefing.mutationOptions()),
     updateBriefingInterests: useMutation(
       trpc.kiloclaw.updateBriefingInterests.mutationOptions({
         onSuccess: async () => {

@@ -5,6 +5,23 @@ type KeyboardPaddingEvent =
   | { type: 'keyboard-hidden' }
   | { type: 'app-state-change'; appState: KeyboardPaddingAppState };
 
+type KeyboardPaddingPlatformEvents = {
+  show: 'keyboardDidShow' | 'keyboardWillShow';
+  hide: 'keyboardDidHide' | 'keyboardWillHide';
+};
+
+export function resolveKeyboardPaddingEventsForPlatform(
+  platform: string
+): KeyboardPaddingPlatformEvents | null {
+  if (platform === 'android') {
+    return { show: 'keyboardDidShow', hide: 'keyboardDidHide' };
+  }
+  if (platform === 'ios') {
+    return { show: 'keyboardWillShow', hide: 'keyboardWillHide' };
+  }
+  return null;
+}
+
 export function resolveAppAwareKeyboardPadding({
   currentPadding,
   event,

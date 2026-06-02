@@ -1,12 +1,11 @@
 import { logger } from './logger.js';
-import { WorkspaceFilesystemPreparationError } from './workspace-errors.js';
-
-type DestroyableSandbox = {
-  destroy(): Promise<void>;
-};
+import {
+  SandboxCapacityInspectionError,
+  WorkspaceFilesystemPreparationError,
+} from './workspace-errors.js';
 
 type RecoveryContext = {
-  sandbox: DestroyableSandbox;
+  deleteSandbox(reason: 'recovery'): Promise<void>;
   sandboxId: string;
   sessionId?: string;
   phase: string;
@@ -19,8 +18,18 @@ type PreparationInfrastructureFailure =
       message: 'Sandbox returned 500 during workspace preparation';
     }
   | {
+      type: 'sandbox_workspace_probe_timeout';
+      error: unknown;
+      message: string;
+    }
+  | {
       type: 'workspace_filesystem_preparation_error';
       error: WorkspaceFilesystemPreparationError;
+      message: string;
+    }
+  | {
+      type: 'sandbox_capacity_inspection_error';
+      error: SandboxCapacityInspectionError;
       message: string;
     };
 
@@ -50,6 +59,14 @@ function getNestedProperty(value: unknown, key: string): unknown {
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
   return String(error);
+}
+
+export const SANDBOX_WORKSPACE_PROBE_TIMEOUT_MESSAGE =
+  'Sandbox workspace Git probe timed out before wrapper bootstrap';
+
+export function isSandboxWorkspaceProbeTimeoutError(error: unknown): boolean {
+  const message = getStringProperty(error, 'message') ?? getErrorMessage(error);
+  return message.startsWith(SANDBOX_WORKSPACE_PROBE_TIMEOUT_MESSAGE);
 }
 
 function messageLooksLikeSandboxInternalServerError(message: string): boolean {
@@ -147,6 +164,23 @@ function getWorkspaceFilesystemPreparationError(
   return getWorkspaceFilesystemPreparationErrorWithSeen(error, new WeakSet());
 }
 
+function getSandboxCapacityInspectionErrorWithSeen(
+  error: unknown,
+  seen: WeakSet<object>
+): SandboxCapacityInspectionError | undefined {
+  if (!isRecord(error)) return undefined;
+  if (seen.has(error)) return undefined;
+  seen.add(error);
+  if (error instanceof SandboxCapacityInspectionError) return error;
+  return getSandboxCapacityInspectionErrorWithSeen(getNestedProperty(error, 'cause'), seen);
+}
+
+function getSandboxCapacityInspectionError(
+  error: unknown
+): SandboxCapacityInspectionError | undefined {
+  return getSandboxCapacityInspectionErrorWithSeen(error, new WeakSet());
+}
+
 export function getPreparationInfrastructureFailure(
   error: unknown
 ): PreparationInfrastructureFailure | undefined {
@@ -162,6 +196,29 @@ export function getPreparationInfrastructureFailure(
       type: 'sandbox_internal_server_error',
       error: sandboxError,
       message: 'Sandbox returned 500 during workspace preparation',
+    };
+  }
+
+  const workspaceProbeTimeoutError = isSandboxWorkspaceProbeTimeoutError(cause)
+    ? cause
+    : isSandboxWorkspaceProbeTimeoutError(error)
+      ? error
+      : undefined;
+
+  if (workspaceProbeTimeoutError !== undefined) {
+    return {
+      type: 'sandbox_workspace_probe_timeout',
+      error: workspaceProbeTimeoutError,
+      message: SANDBOX_WORKSPACE_PROBE_TIMEOUT_MESSAGE,
+    };
+  }
+
+  const capacityInspectionError = getSandboxCapacityInspectionError(error);
+  if (capacityInspectionError) {
+    return {
+      type: 'sandbox_capacity_inspection_error',
+      error: capacityInspectionError,
+      message: capacityInspectionError.message,
     };
   }
 
@@ -197,7 +254,7 @@ export async function destroySandboxAfterInternalServerError(
     .error('Sandbox returned 500 during workspace preparation; destroying sandbox');
 
   try {
-    await context.sandbox.destroy();
+    await context.deleteSandbox('recovery');
     logger
       .withFields({
         sandboxId: context.sandboxId,
@@ -235,6 +292,82 @@ export async function destroySandboxAfterPreparationInfrastructureFailure(
     return destroySandboxAfterInternalServerError(context, failure.error);
   }
 
+  if (failure.type === 'sandbox_workspace_probe_timeout') {
+    const errorMessage = getErrorMessage(failure.error);
+    logger
+      .withFields({
+        sandboxId: context.sandboxId,
+        sessionId: context.sessionId,
+        phase: context.phase,
+        error: errorMessage,
+        logTag: 'sandbox_workspace_probe_timeout_detected',
+      })
+      .error('Sandbox workspace Git probe timed out; destroying sandbox');
+
+    try {
+      await context.deleteSandbox('recovery');
+      logger
+        .withFields({
+          sandboxId: context.sandboxId,
+          sessionId: context.sessionId,
+          phase: context.phase,
+          logTag: 'sandbox_workspace_probe_timeout_destroyed',
+        })
+        .info('Destroyed sandbox after workspace Git probe timeout');
+      return true;
+    } catch (destroyError) {
+      logger
+        .withFields({
+          sandboxId: context.sandboxId,
+          sessionId: context.sessionId,
+          phase: context.phase,
+          originalError: errorMessage,
+          destroyError: getErrorMessage(destroyError),
+          logTag: 'sandbox_workspace_probe_timeout_destroy_failed',
+        })
+        .error('Failed to destroy sandbox after workspace Git probe timeout');
+      return false;
+    }
+  }
+
+  if (failure.type === 'sandbox_capacity_inspection_error') {
+    const errorMessage = getErrorMessage(failure.error);
+    logger
+      .withFields({
+        sandboxId: context.sandboxId,
+        sessionId: context.sessionId,
+        phase: context.phase,
+        error: errorMessage,
+        reason: 'sandbox_filesystem_unusable',
+        logTag: 'sandbox_capacity_inspection_failed',
+      })
+      .error('Sandbox capacity inspection failed; destroying unusable sandbox');
+    try {
+      await context.deleteSandbox('recovery');
+      logger
+        .withFields({
+          sandboxId: context.sandboxId,
+          sessionId: context.sessionId,
+          phase: context.phase,
+          logTag: 'sandbox_capacity_inspection_destroyed',
+        })
+        .info('Destroyed sandbox after capacity inspection failure');
+      return true;
+    } catch (destroyError) {
+      logger
+        .withFields({
+          sandboxId: context.sandboxId,
+          sessionId: context.sessionId,
+          phase: context.phase,
+          originalError: errorMessage,
+          destroyError: getErrorMessage(destroyError),
+          logTag: 'sandbox_capacity_inspection_destroy_failed',
+        })
+        .error('Failed to destroy sandbox after capacity inspection failure');
+      return false;
+    }
+  }
+
   const errorMessage = getErrorMessage(failure.error);
   logger
     .withFields({
@@ -248,7 +381,7 @@ export async function destroySandboxAfterPreparationInfrastructureFailure(
     .error('Workspace filesystem preparation failed; destroying sandbox');
 
   try {
-    await context.sandbox.destroy();
+    await context.deleteSandbox('recovery');
     logger
       .withFields({
         sandboxId: context.sandboxId,

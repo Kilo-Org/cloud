@@ -5,6 +5,7 @@ import { and, eq } from 'drizzle-orm';
 import type { User } from '@kilocode/db/schema';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { PLATFORM, INTEGRATION_STATUS } from '@/lib/integrations/core/constants';
+import { DEFAULT_BOT_MODEL } from '@/lib/bot/constants';
 import { LinearWorkspaceAlreadyConnectedError, upsertLinearInstallation } from './linear-service';
 
 describe('upsertLinearInstallation', () => {
@@ -59,6 +60,11 @@ describe('upsertLinearInstallation', () => {
     expect(result.platform_installation_id).toBe('workspace-a');
     expect(result.platform_account_login).toBe('Workspace A');
     expect(result.integration_status).toBe(INTEGRATION_STATUS.ACTIVE);
+    expect(result.metadata).toEqual(
+      expect.objectContaining({
+        model_slug: DEFAULT_BOT_MODEL,
+      })
+    );
   });
 
   test('rejects when another owner already holds the same Linear workspace', async () => {

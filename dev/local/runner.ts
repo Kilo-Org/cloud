@@ -96,7 +96,7 @@ export function buildStartCommand(serviceName: string): string {
   }
 
   const parts: string[] = [];
-  if (svc.dir !== '.') parts.push(`cd ${svc.dir}`);
+  if (svc.dir !== '.') parts.push(`cd ${shellQuote(path.join(findRepoRoot(), svc.dir))}`);
   parts.push(svc.command.join(' '));
 
   return parts.join(' && ');

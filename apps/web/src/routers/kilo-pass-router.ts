@@ -4,6 +4,7 @@ import { db, readDb } from '@/lib/drizzle';
 import { getKiloPassStateForUser, type KiloPassSubscriptionState } from '@/lib/kilo-pass/state';
 import { client as stripe } from '@/lib/stripe-client';
 import { getStripePriceIdForKiloPass } from '@/lib/kilo-pass/stripe-price-ids.server';
+import { getAffiliateAttribution } from '@/lib/affiliate-attribution';
 import { APP_URL } from '@/lib/constants';
 import { TRPCError } from '@trpc/server';
 import {
@@ -23,19 +24,17 @@ import {
   KiloPassScheduledChangeStatus,
   KiloPassTier,
   KiloPassPaymentProvider,
+  KiloPassWelcomePromoEligibilityReason,
 } from '@/lib/kilo-pass/enums';
 import { KiloPassIssuanceItemKind } from '@/lib/kilo-pass/enums';
-import { and, desc, eq, inArray, isNull, ne, sql, sum } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNull, ne, sql, sum } from 'drizzle-orm';
 import * as z from 'zod';
-import {
-  computeMonthlyCadenceBonusPercent,
-  computeYearlyCadenceMonthlyBonusUsd,
-  getMonthlyPriceUsd,
-} from '@/lib/kilo-pass/bonus';
+import { getMonthlyPriceUsd } from '@/lib/kilo-pass/bonus';
+import { computeKiloPassBonusCreditsUsd } from '@/lib/kilo-pass/bonus-decision';
 import { KiloPassError } from '@/lib/kilo-pass/errors';
 import { isStripeSubscriptionEnded } from '@/lib/kilo-pass/stripe-subscription-status';
 import { releaseScheduledChangeForSubscription } from '@/lib/kilo-pass/scheduled-change-release';
-import { appendKiloPassAuditLog } from '@/lib/kilo-pass/issuance';
+import { KILO_PASS_BONUS_LIKE_ITEM_KINDS, appendKiloPassAuditLog } from '@/lib/kilo-pass/issuance';
 import {
   KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF,
   KILO_PASS_TIER_CONFIG,
@@ -53,6 +52,7 @@ import { closePauseEvent } from '@/lib/kilo-pass/pause-events';
 import { getAllMobileStoreKiloPassProducts } from '@/lib/kilo-pass/mobile-store-products';
 import { verifyAppleKiloPassTransactionJws } from '@/lib/kilo-pass/apple-store-verifier';
 import { completeStoreKiloPassPurchase } from '@/lib/kilo-pass/store-subscription-completion';
+import { getInitialWelcomePromoEligibilityReasonForSubscription } from '@/lib/kilo-pass/welcome-promo-context';
 
 const CursorInputSchema = z.object({
   cursor: z.string().nullable().optional(),
@@ -67,6 +67,7 @@ const KiloPassCreditHistoryEntrySchema = z.object({
     KiloPassIssuanceItemKind.Base,
     KiloPassIssuanceItemKind.Bonus,
     KiloPassIssuanceItemKind.PromoFirstMonth50Pct,
+    KiloPassIssuanceItemKind.ReferralBonus,
   ]),
   description: z.string(),
 });
@@ -260,44 +261,34 @@ function getNextBillingAtFromSubscriptionStart(subscription: {
 
 function getNextKiloPassBonusCreditsUsd(params: {
   subscription: KiloPassSubscriptionState;
-  baseAmountUsd: number;
   isFirstTimeSubscriberEver: boolean;
+  welcomePromoEligibilityReason: KiloPassWelcomePromoEligibilityReason | null;
 }): number {
-  if (params.subscription.cadence === KiloPassCadence.Yearly) {
-    return roundToCents(computeYearlyCadenceMonthlyBonusUsd(params.subscription.tier));
-  }
-
-  const predictedStreakMonths = Math.max(1, params.subscription.currentStreakMonths + 1);
-  const bonusPercentApplied = computeMonthlyCadenceBonusPercent({
+  return computeKiloPassBonusCreditsUsd({
     tier: params.subscription.tier,
-    streakMonths: predictedStreakMonths,
+    cadence: params.subscription.cadence,
+    startedAtIso: params.subscription.startedAt,
+    streakMonths: Math.max(1, params.subscription.currentStreakMonths + 1),
     isFirstTimeSubscriberEver: params.isFirstTimeSubscriberEver,
-    subscriptionStartedAtIso: params.subscription.startedAt,
+    paymentProvider: params.subscription.paymentProvider,
+    welcomePromoEligibilityReason: params.welcomePromoEligibilityReason,
   });
-
-  const baseCents = Math.round(params.baseAmountUsd * 100);
-  const bonusCents = Math.round(baseCents * bonusPercentApplied);
-  return bonusCents / 100;
 }
 
 function getCurrentKiloPassBonusCreditsUsd(params: {
   subscription: KiloPassSubscriptionState;
-  baseAmountUsd: number;
   isFirstTimeSubscriberEver: boolean;
+  welcomePromoEligibilityReason: KiloPassWelcomePromoEligibilityReason | null;
 }): number {
-  if (params.subscription.cadence === KiloPassCadence.Yearly) {
-    return roundToCents(computeYearlyCadenceMonthlyBonusUsd(params.subscription.tier));
-  }
-
-  const streakMonths = Math.max(1, params.subscription.currentStreakMonths);
-  const bonusPercentApplied = computeMonthlyCadenceBonusPercent({
+  return computeKiloPassBonusCreditsUsd({
     tier: params.subscription.tier,
-    streakMonths,
+    cadence: params.subscription.cadence,
+    startedAtIso: params.subscription.startedAt,
+    streakMonths: Math.max(1, params.subscription.currentStreakMonths),
     isFirstTimeSubscriberEver: params.isFirstTimeSubscriberEver,
-    subscriptionStartedAtIso: params.subscription.startedAt,
+    paymentProvider: params.subscription.paymentProvider,
+    welcomePromoEligibilityReason: params.welcomePromoEligibilityReason,
   });
-  const cents = Math.round(params.baseAmountUsd * bonusPercentApplied * 100);
-  return cents / 100;
 }
 
 function getUsageStartInclusiveIso(params: {
@@ -384,10 +375,7 @@ async function getIsBonusUnlockedForSubscriptionId(subscriptionId: string): Prom
     columns: { id: true },
     where: and(
       eq(kilo_pass_issuance_items.kilo_pass_issuance_id, issuanceId),
-      inArray(kilo_pass_issuance_items.kind, [
-        KiloPassIssuanceItemKind.Bonus,
-        KiloPassIssuanceItemKind.PromoFirstMonth50Pct,
-      ])
+      inArray(kilo_pass_issuance_items.kind, KILO_PASS_BONUS_LIKE_ITEM_KINDS)
     ),
   });
 
@@ -648,10 +636,14 @@ async function buildActiveKiloPassSubscriptionState(params: {
     kiloUserId: params.kiloUserId,
     subscriptionId: params.subscription.subscriptionId,
   });
-  const [isBonusUnlocked, baseCreditsIssuedAtIso] = await Promise.all([
-    getIsBonusUnlockedForSubscriptionId(params.subscription.subscriptionId),
-    getBaseCreditsIssuedAtForSubscription(params.subscription.subscriptionId),
-  ]);
+  const [isBonusUnlocked, baseCreditsIssuedAtIso, welcomePromoEligibilityReason] =
+    await Promise.all([
+      getIsBonusUnlockedForSubscriptionId(params.subscription.subscriptionId),
+      getBaseCreditsIssuedAtForSubscription(params.subscription.subscriptionId),
+      getInitialWelcomePromoEligibilityReasonForSubscription(db, {
+        subscriptionId: params.subscription.subscriptionId,
+      }),
+    ]);
   const usageStartInclusiveIso = getUsageStartInclusiveIso({
     subscription: params.subscription,
     baseCreditsIssuedAtIso,
@@ -668,8 +660,8 @@ async function buildActiveKiloPassSubscriptionState(params: {
     ...params.subscription,
     nextBonusCreditsUsd: getNextKiloPassBonusCreditsUsd({
       subscription: params.subscription,
-      baseAmountUsd,
       isFirstTimeSubscriberEver,
+      welcomePromoEligibilityReason,
     }),
     nextBillingAt: params.nextBillingAt,
     isFirstTimeSubscriberEver,
@@ -678,8 +670,8 @@ async function buildActiveKiloPassSubscriptionState(params: {
     currentPeriodHostingCostUsd,
     currentPeriodBonusCreditsUsd: getCurrentKiloPassBonusCreditsUsd({
       subscription: params.subscription,
-      baseAmountUsd,
       isFirstTimeSubscriberEver,
+      welcomePromoEligibilityReason,
     }),
     isBonusUnlocked,
     refillAt:
@@ -718,6 +710,7 @@ async function buildEndedKiloPassSubscriptionState(params: {
 const GetCheckoutReturnStateOutputSchema = z.object({
   subscription: KiloPassSubscriptionStateBaseSchema.nullable(),
   creditsAwarded: z.boolean(),
+  welcomePromoIneligibleDueToReusedFingerprint: z.boolean(),
 });
 
 const CreateCheckoutSessionInputSchema = z.object({
@@ -933,15 +926,51 @@ export const kiloPassRouter = createTRPCRouter({
    * we've issued the initial base credits for that subscription.
    */
   getCheckoutReturnState: baseProcedure
+    .input(z.object({ sessionId: z.string().min(1) }))
     .output(GetCheckoutReturnStateOutputSchema)
-    .query(async ({ ctx }) => {
+    .query(async ({ ctx, input }) => {
       const subscription = await getKiloPassStateForUser(db, ctx.user.id);
       if (!subscription) {
-        return { subscription: null, creditsAwarded: false };
+        return {
+          subscription: null,
+          creditsAwarded: false,
+          welcomePromoIneligibleDueToReusedFingerprint: false,
+        };
+      }
+
+      const checkoutSession = await stripe.checkout.sessions.retrieve(input.sessionId);
+      const stripeSubscription = checkoutSession.subscription;
+      const stripeSubscriptionId =
+        typeof stripeSubscription === 'string' ? stripeSubscription : stripeSubscription?.id;
+      if (!stripeSubscriptionId) {
+        return {
+          subscription: null,
+          creditsAwarded: false,
+          welcomePromoIneligibleDueToReusedFingerprint: false,
+        };
+      }
+
+      const settledSubscription = await db.query.kilo_pass_subscriptions.findFirst({
+        columns: { id: true },
+        where: and(
+          eq(kilo_pass_subscriptions.kilo_user_id, ctx.user.id),
+          eq(kilo_pass_subscriptions.stripe_subscription_id, stripeSubscriptionId)
+        ),
+      });
+      if (!settledSubscription) {
+        return {
+          subscription: null,
+          creditsAwarded: false,
+          welcomePromoIneligibleDueToReusedFingerprint: false,
+        };
       }
 
       const issuedBaseCredits = await db
-        .select({ id: kilo_pass_issuance_items.id })
+        .select({
+          id: kilo_pass_issuance_items.id,
+          welcomePromoEligibilityReason:
+            kilo_pass_issuances.initial_welcome_promo_eligibility_reason,
+        })
         .from(kilo_pass_issuance_items)
         .innerJoin(
           kilo_pass_issuances,
@@ -949,15 +978,19 @@ export const kiloPassRouter = createTRPCRouter({
         )
         .where(
           and(
-            eq(kilo_pass_issuances.kilo_pass_subscription_id, subscription.subscriptionId),
+            eq(kilo_pass_issuances.kilo_pass_subscription_id, settledSubscription.id),
             eq(kilo_pass_issuance_items.kind, KiloPassIssuanceItemKind.Base)
           )
         )
+        .orderBy(asc(kilo_pass_issuances.issue_month))
         .limit(1);
 
       return {
         subscription,
         creditsAwarded: issuedBaseCredits.length > 0,
+        welcomePromoIneligibleDueToReusedFingerprint:
+          issuedBaseCredits[0]?.welcomePromoEligibilityReason ===
+          KiloPassWelcomePromoEligibilityReason.FingerprintPreviouslyClaimed,
       };
     }),
 
@@ -1513,6 +1546,14 @@ export const kiloPassRouter = createTRPCRouter({
       }
 
       const priceId = getStripePriceIdForKiloPass({ tier, cadence });
+      const attribution = await getAffiliateAttribution(ctx.user.id, 'impact');
+      const sessionMetadata = {
+        type: 'kilo-pass',
+        kiloUserId: ctx.user.id,
+        tier,
+        cadence,
+        affiliateTrackingId: attribution?.tracking_id ?? '',
+      };
 
       const session = await stripe.checkout.sessions.create({
         mode: 'subscription',
@@ -1531,19 +1572,9 @@ export const kiloPassRouter = createTRPCRouter({
         success_url: `${APP_URL}/payments/kilo-pass/awarding?session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${APP_URL}/profile?kilo_pass_checkout=cancelled`,
         subscription_data: {
-          metadata: {
-            type: 'kilo-pass',
-            kiloUserId: ctx.user.id,
-            tier,
-            cadence,
-          },
+          metadata: sessionMetadata,
         },
-        metadata: {
-          type: 'kilo-pass',
-          kiloUserId: ctx.user.id,
-          tier,
-          cadence,
-        },
+        metadata: sessionMetadata,
       });
 
       return { url: typeof session.url === 'string' ? session.url : null };

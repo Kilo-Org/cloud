@@ -19,8 +19,10 @@ background jobs). All consumers MUST comply with the rules below.
 
 ## Status
 
-Draft — created 2026-04-15.
+Draft -- created 2026-04-15.
 Updated 2026-05-12 -- required KiloClaw price-version lineage invariants.
+Updated 2026-05-27 -- required durable fresh-provision admission reservations.
+Updated 2026-05-28 -- fraud-enforcement subscription mutation invariants.
 
 ## Conventions
 
@@ -57,13 +59,21 @@ capitals, as shown here.
 - **Actor**: The entity responsible for a subscription mutation.
   An actor is either a user (identified by user ID) or the system
   (identified by a service or process name).
-- **Context**: The ownership scope of an instance — either
+- **Context**: The ownership scope of an instance -- either
   _personal_ (not associated with any organization) or
   _organizational_ (associated with a specific organization). A user
   has one personal context and one organizational context per
   organization they belong to.
+- **Fraud-enforcement mutation**: Exceptional personal subscription
+  cancellation or suspension required by an enforced Stripe Early
+  Fraud Warning under `.specs/stripe-early-fraud-warnings.md`.
 - **Active instance**: An instance record that has not been marked
   as destroyed.
+- **Provision reservation**: Durable coordination state for one fresh
+  provisioning attempt in a user context. A reservation assigns the
+  candidate instance identifier that the attempt MUST use if it succeeds,
+  but it is not an instance record, does not assert that infrastructure
+  exists, and does not grant access.
 - **Mutation**: Any database write (INSERT or UPDATE) to a
   `kiloclaw_subscription` row that changes one or more of its
   business-relevant fields (status, plan, billing period, payment
@@ -183,6 +193,40 @@ KiloClaw billing.
 9. When the single-instance limit is relaxed in the future, no
    schema migration SHALL be required.
 
+### Fresh Provision Admission
+
+1. Before a fresh personal or organization-context provision invokes an
+   instance Durable Object or any infra provider operation, the KiloClaw
+   Worker MUST persist a provision reservation for the requesting user and
+   context.
+2. A provision reservation MUST remain coordination metadata only. It MUST
+   NOT be stored as an instance record, routed as an active instance, treated
+   as billing access, or reported as completed onboarding.
+3. A provision reservation MUST assign one candidate instance identifier.
+   An admitted attempt MUST carry that identifier through Durable Object
+   routing, instance record insertion, subscription bootstrap, and routing
+   registry publication; runtime MUST NOT silently choose a replacement
+   identifier during that attempt.
+4. While an admitted fresh attempt is in progress or its provider-side
+   outcome requires reconciliation, another fresh attempt for the same user
+   and context MUST NOT execute provider creation work. The system MUST fail
+   closed or report a retryable conflict rather than risk duplicate
+   infrastructure.
+5. Before performing provider creation under an admitted reservation, the
+   Worker MUST reconcile authoritative active-instance state for the same
+   user/context. Existing active state MUST prevent another fresh provision
+   even if a routing index entry is absent or stale.
+6. If a provision attempt fails after provider resources may have been
+   created, its reservation MUST remain blocked or marked for reconciliation
+   until cleanup or canonical recovery has been confirmed. An expired request
+   or lease alone MUST NOT authorize another fresh attempt.
+7. A completed instance that is intentionally destroyed MAY later be
+   reprovisioned when no active instance remains in the context, subject to
+   subscription successor-transfer and entitlement rules.
+8. Reservation storage and admission enforcement MUST remain application/
+   Worker-layer behavior; they MUST NOT introduce a schema-level constraint
+   that prevents future multi-instance product behavior.
+
 ### Operational Instance Markers
 
 Instance records MAY store operational lifecycle markers that do not
@@ -269,6 +313,13 @@ and serves as the authoritative audit trail for subscription state.
     identifiers (e.g., Stripe subscription ID, invoice ID) MAY be
     included as context.
 
+### Fraud-Enforcement Mutations
+
+- An enforced personal Stripe Early Fraud Warning is an exceptional immediate mutation path. It MUST cancel or suspend affected personal subscription state without relying on ordinary paid-period continuation.
+- A fraud-enforcement cancellation or suspension MUST write subscription change log entries with a system actor, consistent action labels, and a non-sensitive fraud-enforcement reason.
+- A fraud-enforcement suspension MUST retain the associated instance and subscription records and MUST assign the seven-day destruction grace defined by KiloClaw billing rather than destroying data immediately.
+- Organization-managed subscription and instance rows MUST NOT be mutated automatically for an organization-owned Early Fraud Warning in the initial rollout.
+
 ### Record Creation Order
 
 The creation order below reflects the target lifecycle. This order
@@ -276,10 +327,12 @@ MUST be enforced only after the existing data model has been brought
 into the desired state (rules 1–6 satisfied, early-bird backfill
 complete).
 
-19. A Cloudflare Worker Durable Object and a infra provider base resource MUST both exist
+19. A Cloudflare Worker Durable Object and an infra provider base resource MUST both exist
     before an instance record is created in `kiloclaw_instance`.
     Infrastructure MUST be provisioned first; the record is a
-    reflection of existing infrastructure, not a reservation.
+    reflection of existing infrastructure, not a reservation. A
+    provision reservation created under Fresh Provision Admission is
+    coordination metadata and does not violate this creation order.
 20. If either infrastructure component fails to provision, the system
     MUST NOT create an instance record. Cleanup of any partially
     provisioned infrastructure is the responsibility of the
@@ -339,8 +392,24 @@ not yet enforced in the current codebase:
    across all services that mutate subscription records. Some
    subscription-creation paths may already write change-log entries;
    complete cross-service coverage remains the intended invariant.
+4. Fresh Provision Admission SHOULD be implemented in the Registry-backed
+   Worker admission flow before the existing web advisory lock is removed.
+   (Currently, web requests use transitional PostgreSQL advisory-lock
+   coordination that is being replaced because it is unsafe through
+   transaction-pooled production connections.)
 
 ## Changelog
+
+### 2026-05-28 -- Fraud-enforcement subscription mutations
+
+- Defined enforced personal Stripe Early Fraud Warnings as exceptional immediate cancellation/suspension mutations that retain instance history, write system-attributed change logs, and preserve the seven-day destruction grace.
+- Excluded organization-owned warnings from automatic organization-managed instance or subscription mutation.
+
+### 2026-05-27 -- Required durable fresh-provision admission reservations
+
+- Defined provision reservations as non-routable, non-entitling coordination state.
+- Required Worker-side admission before any fresh provider creation and fail-closed handling for concurrent or ambiguous failed attempts.
+- Preserved Worker-only instance insertion and infrastructure-before-row ordering.
 
 ### 2026-05-12 -- Required KiloClaw price-version lineage invariants
 

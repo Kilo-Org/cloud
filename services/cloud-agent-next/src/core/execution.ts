@@ -14,7 +14,7 @@ import { STALE_THRESHOLD_MS } from './lease.js';
 /** Possible states of an execution */
 export type ExecutionStatus = 'pending' | 'running' | 'completed' | 'failed' | 'interrupted';
 
-/** Health status for active executions */
+/** Health status for running executions */
 export type ExecutionHealth = 'healthy' | 'stale' | 'unknown';
 
 // ---------------------------------------------------------------------------

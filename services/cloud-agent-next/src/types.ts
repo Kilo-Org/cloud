@@ -1,6 +1,8 @@
 import type { getSandbox, ExecutionSession, Sandbox } from '@cloudflare/sandbox';
 import type { CloudAgentSession } from './persistence/CloudAgentSession.js';
+import type { CloudAgentQueueReport } from '@kilocode/worker-utils/cloud-agent-queue-report';
 import type { CallbackJob } from './callbacks/index.js';
+import type { NotificationsBinding } from './notifications-binding.js';
 import type { SessionIngestBinding } from './session-ingest-binding.js';
 import * as z from 'zod';
 import { Limits } from './schema.js';
@@ -73,6 +75,10 @@ export type SessionContext = {
   gitUrl?: string;
   /** Token for generic git authentication (e.g., GitLab token) */
   gitToken?: string;
+  /** Whether the GitLab token was resolved server-side and its remote should be refreshed. */
+  gitlabTokenManaged?: boolean;
+  /** GitLab CLI bearer-mode instruction returned with a server-resolved credential. */
+  glabIsOAuth2?: boolean;
   /** Git platform type for correct token/env var handling */
   platform?: 'github' | 'gitlab';
   envVars?: Record<string, string>;
@@ -103,7 +109,7 @@ type GetTokenForRepoResult =
     };
 
 type GetGitLabTokenResult =
-  | { success: true; token: string; instanceUrl: string }
+  | { success: true; token: string; instanceUrl: string; glabIsOAuth2: boolean }
   | {
       success: false;
       reason:
@@ -112,7 +118,13 @@ type GetGitLabTokenResult =
         | 'invalid_org_id'
         | 'no_token'
         | 'token_refresh_failed'
-        | 'token_expired_no_refresh';
+        | 'token_expired_no_refresh'
+        | 'repository_url_required'
+        | 'invalid_repository_url'
+        | 'no_matching_integration'
+        | 'ambiguous_integration'
+        | 'project_lookup_failed'
+        | 'no_project_token';
     };
 
 export type GitTokenService = {
@@ -122,7 +134,12 @@ export type GitTokenService = {
     orgId?: string;
   }): Promise<GetTokenForRepoResult>;
   getToken(installationId: string, appType?: 'standard' | 'lite'): Promise<string>;
-  getGitLabToken(params: { userId: string; orgId?: string }): Promise<GetGitLabTokenResult>;
+  getGitLabToken(params: {
+    userId: string;
+    orgId?: string;
+    repositoryUrl?: string;
+    createdOnPlatform?: string;
+  }): Promise<GetGitLabTokenResult>;
 };
 
 export type Env = {
@@ -141,8 +158,12 @@ export type Env = {
   R2_BUCKET: R2Bucket;
   /** Queue for callback messages (optional - supports incremental rollout) */
   CALLBACK_QUEUE?: Queue<CallbackJob>;
+  /** Dedicated best-effort Cloud Agent reporting queue. */
+  CLOUD_AGENT_REPORT_QUEUE: Queue<CloudAgentQueueReport>;
   /** Service binding for centralized git token generation */
   GIT_TOKEN_SERVICE: GitTokenService;
+  /** Service binding for dispatching push notifications */
+  NOTIFICATIONS: NotificationsBinding;
   /** GitHub Lite App slug for git commit attribution (e.g., 'kiloconnect-lite') */
   GITHUB_LITE_APP_SLUG?: string;
   /** GitHub Lite App bot user ID for git commit email */
@@ -159,10 +180,6 @@ export type Env = {
   CLI_TIMEOUT_SECONDS?: string;
   /** Reaper interval override (ms) */
   REAPER_INTERVAL_MS?: string;
-  /** Execution stale threshold override (ms) */
-  STALE_THRESHOLD_MS?: string;
-  /** Pending execution start timeout override (ms) */
-  PENDING_START_TIMEOUT_MS?: string;
   /** Kilo server idle timeout override (ms) - defaults to 15 minutes */
   KILO_SERVER_IDLE_TIMEOUT_MS?: string;
   /** Shared secret for backend-to-backend authentication (prepareSession/updateSession) */

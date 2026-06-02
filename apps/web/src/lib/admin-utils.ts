@@ -36,6 +36,18 @@ export function formatDate(date: Date | string): string {
   }).format(dateObj);
 }
 
+/**
+ * Formats a date as a date-only string (no time component).
+ */
+export function formatDateOnly(date: Date | string): string {
+  const dateObj = typeof date === 'string' ? new Date(date) : date;
+  return new Intl.DateTimeFormat('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  }).format(dateObj);
+}
+
 export function getPaymentMethodBadgeVariant(
   status?: PaymentMethodStatus
 ): 'default' | 'secondary' | 'outline' {

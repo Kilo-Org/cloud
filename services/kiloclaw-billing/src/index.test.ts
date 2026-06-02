@@ -16,6 +16,7 @@ vi.mock('./lifecycle.js', () => ({
   processTrialInactivityStopCandidate: vi.fn(),
   processCreditRenewalDiscovery: vi.fn(),
   processCreditRenewalItem: vi.fn(),
+  processOrganizationTrialExpiryPage: vi.fn(),
   processTrialExpiryPage: vi.fn(),
   recordCreditRenewalTerminalFailure: vi.fn(),
 }));
@@ -29,6 +30,7 @@ import { bootstrapProvisionSubscription } from './bootstrap.js';
 import {
   processCreditRenewalDiscovery,
   processCreditRenewalItem,
+  processOrganizationTrialExpiryPage,
   processTrialExpiryPage,
   processTrialInactivityStopCandidate,
   recordCreditRenewalTerminalFailure,
@@ -119,9 +121,13 @@ describe('kiloclaw billing worker handler', () => {
       trial_warnings: 0,
       earlybird_warnings: 0,
       sweep1_trial_expiry: 0,
+      organization_trial_expiry_suspensions: 0,
+      organization_trial_entitlement_recoveries: 0,
       sweep2_subscription_expiry: 0,
       destruction_warnings: 0,
+      organization_destruction_warnings: 0,
       sweep3_instance_destruction: 0,
+      organization_instance_destructions: 0,
       sweep4_past_due_cleanup: 0,
       sweep5_intro_schedules_repaired: 0,
       complementary_inference_ended_emails: 0,
@@ -134,6 +140,10 @@ describe('kiloclaw billing worker handler', () => {
     vi.mocked(processCreditRenewalDiscovery).mockResolvedValue(emptySummary);
     vi.mocked(processCreditRenewalItem).mockResolvedValue(emptySummary);
     vi.mocked(processTrialExpiryPage).mockResolvedValue({
+      summary: emptySummary,
+      continuationEnqueued: false,
+    });
+    vi.mocked(processOrganizationTrialExpiryPage).mockResolvedValue({
       summary: emptySummary,
       continuationEnqueued: false,
     });
@@ -353,7 +363,7 @@ describe('kiloclaw billing worker handler', () => {
     expect(message.retry).not.toHaveBeenCalled();
   });
 
-  it('enqueues subscription expiry only after a final trial-expiry page completes', async () => {
+  it('enqueues organization trial expiry only after a final trial-expiry page completes', async () => {
     const { env, lifecycleSend } = createEnv();
     const runId = '31313131-3131-4313-8313-313131313131';
     const message = {
@@ -377,13 +387,13 @@ describe('kiloclaw billing worker handler', () => {
     expect(lifecycleSend).toHaveBeenCalledWith({
       kind: 'lifecycle',
       runId,
-      sweep: 'subscription_expiry',
+      sweep: 'organization_trial_expiry',
     });
     expect(message.ack).toHaveBeenCalledTimes(1);
     expect(message.retry).not.toHaveBeenCalled();
   });
 
-  it('does not enqueue subscription expiry while trial-expiry continuation remains', async () => {
+  it('does not enqueue organization trial expiry while trial-expiry continuation remains', async () => {
     const { env, lifecycleSend } = createEnv();
     vi.mocked(processTrialExpiryPage).mockResolvedValueOnce({
       summary: {
@@ -402,9 +412,13 @@ describe('kiloclaw billing worker handler', () => {
         trial_warnings: 0,
         earlybird_warnings: 0,
         sweep1_trial_expiry: 0,
+        organization_trial_expiry_suspensions: 0,
+        organization_trial_entitlement_recoveries: 0,
         sweep2_subscription_expiry: 0,
         destruction_warnings: 0,
+        organization_destruction_warnings: 0,
         sweep3_instance_destruction: 0,
+        organization_instance_destructions: 0,
         sweep4_past_due_cleanup: 0,
         sweep5_intro_schedules_repaired: 0,
         complementary_inference_ended_emails: 0,
@@ -429,6 +443,123 @@ describe('kiloclaw billing worker handler', () => {
     await handler.queue?.(createBatch(message), env, {} as ExecutionContext);
 
     expect(processTrialExpiryPage).toHaveBeenCalledWith(env, message.body, 1);
+    expect(lifecycleSend).not.toHaveBeenCalled();
+    expect(message.ack).toHaveBeenCalledTimes(1);
+    expect(message.retry).not.toHaveBeenCalled();
+  });
+
+  it('starts paginated organization trial-expiry processing without advancing to subscription expiry', async () => {
+    const { env, lifecycleSend } = createEnv();
+    const runId = '51515151-5151-4515-8515-515151515151';
+    const message = {
+      body: { kind: 'lifecycle', runId, sweep: 'organization_trial_expiry' },
+      attempts: 1,
+      ack: vi.fn(),
+      retry: vi.fn(),
+    };
+
+    await handler.queue?.(createBatch(message), env, {} as ExecutionContext);
+
+    expect(runSweep).not.toHaveBeenCalled();
+    expect(processOrganizationTrialExpiryPage).not.toHaveBeenCalled();
+    expect(lifecycleSend).toHaveBeenCalledTimes(1);
+    expect(lifecycleSend).toHaveBeenCalledWith({
+      kind: 'organization_trial_expiry_page',
+      runId,
+      sweep: 'organization_trial_expiry',
+    });
+    expect(message.ack).toHaveBeenCalledTimes(1);
+    expect(message.retry).not.toHaveBeenCalled();
+  });
+
+  it('enqueues subscription expiry only after a final organization-trial-expiry page completes', async () => {
+    const { env, lifecycleSend } = createEnv();
+    const runId = '61616161-6161-4616-8616-616161616161';
+    const message = {
+      body: {
+        kind: 'organization_trial_expiry_continuation',
+        runId,
+        sweep: 'organization_trial_expiry',
+        cutoffTime: '2026-05-18T00:00:00.000Z',
+        cursorSubscriptionId: '11111111-1111-4111-8111-111111111111',
+        cursorHardExpiryBoundary: '2026-05-17T00:00:00.000Z',
+      },
+      attempts: 1,
+      ack: vi.fn(),
+      retry: vi.fn(),
+    };
+
+    await handler.queue?.(createBatch(message), env, {} as ExecutionContext);
+
+    expect(processOrganizationTrialExpiryPage).toHaveBeenCalledWith(env, message.body, 1);
+    expect(lifecycleSend).toHaveBeenCalledTimes(1);
+    expect(lifecycleSend).toHaveBeenCalledWith({
+      kind: 'lifecycle',
+      runId,
+      sweep: 'subscription_expiry',
+    });
+    expect(message.ack).toHaveBeenCalledTimes(1);
+    expect(message.retry).not.toHaveBeenCalled();
+    expect(findLogRecord('Completed organization-trial-expiry page message')).toMatchObject({
+      event: 'run_completed',
+      outcome: 'completed',
+      continuationEnqueued: false,
+      summary: expect.objectContaining({
+        organization_trial_expiry_suspensions: 0,
+      }),
+    });
+  });
+
+  it('does not enqueue subscription expiry while organization-trial-expiry continuation remains', async () => {
+    const { env, lifecycleSend } = createEnv();
+    vi.mocked(processOrganizationTrialExpiryPage).mockResolvedValueOnce({
+      summary: {
+        credit_renewals: 0,
+        credit_renewals_canceled: 0,
+        credit_renewals_past_due: 0,
+        credit_renewals_auto_top_up: 0,
+        credit_renewals_skipped_duplicate: 0,
+        interrupted_auto_resume_requests: 0,
+        trial_inactivity_candidates: 0,
+        trial_inactivity_batches: 0,
+        trial_inactivity_batch_fallbacks: 0,
+        trial_inactivity_stop_messages_enqueued: 0,
+        trial_inactivity_stops: 0,
+        trial_inactivity_dry_run_candidates: 0,
+        trial_warnings: 0,
+        earlybird_warnings: 0,
+        sweep1_trial_expiry: 0,
+        organization_trial_expiry_suspensions: 0,
+        organization_trial_entitlement_recoveries: 0,
+        sweep2_subscription_expiry: 0,
+        destruction_warnings: 0,
+        organization_destruction_warnings: 0,
+        sweep3_instance_destruction: 0,
+        organization_instance_destructions: 0,
+        sweep4_past_due_cleanup: 0,
+        sweep5_intro_schedules_repaired: 0,
+        complementary_inference_ended_emails: 0,
+        emails_sent: 0,
+        emails_skipped: 0,
+        errors: 0,
+      },
+      continuationEnqueued: true,
+    });
+    const message = {
+      body: {
+        kind: 'organization_trial_expiry_page',
+        runId: '71717171-7171-4717-8717-717171717171',
+        sweep: 'organization_trial_expiry',
+        pageBudget: 1,
+      },
+      attempts: 1,
+      ack: vi.fn(),
+      retry: vi.fn(),
+    };
+
+    await handler.queue?.(createBatch(message), env, {} as ExecutionContext);
+
+    expect(processOrganizationTrialExpiryPage).toHaveBeenCalledWith(env, message.body, 1);
     expect(lifecycleSend).not.toHaveBeenCalled();
     expect(message.ack).toHaveBeenCalledTimes(1);
     expect(message.retry).not.toHaveBeenCalled();

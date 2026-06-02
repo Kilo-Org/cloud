@@ -112,11 +112,11 @@ For production apps, consider [`durable-utils`](https://github.com/lambrospetrou
 
 ### State Types
 
-| Type              | Speed    | Persistence       | Use Case                    |
-| ----------------- | -------- | ----------------- | --------------------------- |
-| Class properties  | Fastest  | Lost on eviction  | Caching, active connections |
-| SQLite storage    | Fast     | Durable           | Primary data                |
-| External (R2, D1) | Variable | Durable, cross-DO | Large files, shared data    |
+| Type | Speed | Persistence | Use Case |
+|---|---|---|---|
+| Class properties | Fastest | Lost on eviction | Caching, active connections |
+| SQLite storage | Fast | Durable | Primary data |
+| External (R2, D1) | Variable | Durable, cross-DO | Large files, shared data |
 
 **Rule**: Always persist critical state to SQLite first, then update in-memory cache.
 

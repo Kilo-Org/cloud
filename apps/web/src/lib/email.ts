@@ -17,6 +17,7 @@ export const subjects = {
   magicLink: 'Sign in to Kilo Code',
   balanceAlert: 'Kilo: Low Balance Alert',
   autoTopUpFailed: 'Kilo: Auto Top-Up Failed',
+  codeReviewDisabled: 'Action Required: Code Reviewer Disabled',
   ossInviteNewUser: 'Kilo: OSS Sponsorship Offer',
   ossInviteExistingUser: 'Kilo: OSS Sponsorship Offer',
   ossExistingOrgProvisioned: 'Kilo: OSS Sponsorship Offer',
@@ -28,6 +29,16 @@ export const subjects = {
   clawSuspendedPayment: 'Action Required: KiloClaw Payment Overdue',
   clawDestructionWarning: 'Your KiloClaw Instance Will Be Deleted in 2 Days',
   clawInstanceDestroyed: 'Your KiloClaw Instance Has Been Deleted',
+  clawOrganizationTrialSuspendedBillingAuthority:
+    'Action Required: Organization KiloClaw Instance Suspended',
+  clawOrganizationTrialSuspendedUser: 'Organization KiloClaw Instance Suspended',
+  clawOrganizationDestructionWarningBillingAuthority:
+    'Action Required: Organization KiloClaw Instance Will Be Deleted in 2 Days',
+  clawOrganizationDestructionWarningUser:
+    'Organization KiloClaw Instance Will Be Deleted in 2 Days',
+  clawOrganizationInstanceDestroyedBillingAuthority:
+    'Organization KiloClaw Instance Has Been Deleted',
+  clawOrganizationInstanceDestroyedUser: 'Organization KiloClaw Instance Has Been Deleted',
   clawEarlybirdEndingSoon: 'Your KiloClaw Earlybird Access Ends Soon',
   clawEarlybirdExpiresTomorrow: 'Your KiloClaw Earlybird Access Expires Tomorrow',
   clawInstanceReady: 'Your KiloClaw Instance Is Ready',
@@ -43,6 +54,7 @@ export const subjects = {
   accountDeletionRequest: 'Kilo: Account Deletion Request Received',
   creditsTopUp: 'Your Kilo credit top-up',
   kiloClawSubscriptionStarted: 'Your KiloClaw subscription is active',
+  kiloPassDuplicateCardCanceled: 'Kilo Pass: Subscription Cancelled',
 } as const;
 
 export type TemplateName = keyof typeof subjects;
@@ -215,6 +227,21 @@ export async function sendAutoTopUpFailedEmail(
     to,
     templateName: 'autoTopUpFailed',
     templateVars: { reason: props.reason, credits_url },
+  });
+}
+
+export async function sendCodeReviewDisabledEmail(
+  to: string,
+  props: { reason: string; recoveryUrl: string; recoveryLabel: string }
+): Promise<SendResult> {
+  return send({
+    to,
+    templateName: 'codeReviewDisabled',
+    templateVars: {
+      reason: props.reason,
+      recovery_url: props.recoveryUrl,
+      recovery_label: props.recoveryLabel,
+    },
   });
 }
 
@@ -527,5 +554,17 @@ export async function sendKiloClawSubscriptionStartedEmail(
       next_billing_date: formatDate(props.nextBillingDate),
       manage_url,
     },
+  });
+}
+
+export async function sendKiloPassDuplicateCardCanceledEmail(
+  to: string,
+  props: { supportUrl?: string }
+): Promise<SendResult> {
+  const support_url = props.supportUrl ?? `mailto:hi@kilocode.ai`;
+  return send({
+    to,
+    templateName: 'kiloPassDuplicateCardCanceled',
+    templateVars: { support_url },
   });
 }

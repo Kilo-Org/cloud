@@ -9,6 +9,7 @@ function makeInitResponse() {
     attachmentId: ATTACHMENT_ULID,
     putUrl: 'https://r2.example.com/upload-signed-url?sig=abc',
     putHeaders: { 'content-type': 'image/png', 'content-length': '1024' },
+    putUrlExpiresAt: 1_700_000_900,
   };
 }
 

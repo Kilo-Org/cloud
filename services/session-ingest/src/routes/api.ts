@@ -1,4 +1,4 @@
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import { z } from 'zod';
 import { sql, eq, and, isNull } from 'drizzle-orm';
 import { getWorkerDb } from '@kilocode/db/client';
@@ -10,6 +10,7 @@ import { getSessionIngestDO } from '../dos/SessionIngestDO';
 import { getSessionAccessCacheDO } from '../dos/SessionAccessCacheDO';
 import { getUserConnectionDO } from '../dos/UserConnectionDO';
 import { getSessionExport } from '../services/session-export';
+import { mapSessionEventRow, notifyUserSessionEvent } from '../session-events';
 import type { IngestQueueMessage } from '../queue-consumer';
 
 export type ApiContext = {
@@ -20,6 +21,35 @@ export type ApiContext = {
 };
 
 export const api = new Hono<ApiContext>();
+
+type SessionEvent = Parameters<typeof notifyUserSessionEvent>[2];
+type SessionEventExecutionContext = NonNullable<Parameters<typeof notifyUserSessionEvent>[3]>;
+
+function getOptionalExecutionContext(
+  c: Context<ApiContext>
+): SessionEventExecutionContext | undefined {
+  try {
+    return c.executionCtx;
+  } catch (error) {
+    if (error instanceof Error && error.message === 'This context has no ExecutionContext') {
+      return undefined;
+    }
+    throw error;
+  }
+}
+
+function notifyUserSessionEventFromContext(
+  c: Context<ApiContext>,
+  kiloUserId: string,
+  event: SessionEvent
+): void {
+  const executionContext = getOptionalExecutionContext(c);
+  if (executionContext) {
+    notifyUserSessionEvent(c.env, kiloUserId, event, executionContext);
+    return;
+  }
+  notifyUserSessionEvent(c.env, kiloUserId, event);
+}
 
 const createSessionSchema = z.object({
   sessionId: z.string().startsWith('ses_').length(30),
@@ -37,7 +67,7 @@ api.post('/session', zodJsonValidator(createSessionSchema), async c => {
   const db = getWorkerDb(c.env.HYPERDRIVE.connectionString);
   const kiloUserId = c.get('user_id');
 
-  await db
+  const [createdRow] = await db
     .insert(cli_sessions_v2)
     .values({
       session_id: body.sessionId,
@@ -45,7 +75,16 @@ api.post('/session', zodJsonValidator(createSessionSchema), async c => {
     })
     .onConflictDoNothing({
       target: [cli_sessions_v2.session_id, cli_sessions_v2.kilo_user_id],
+    })
+    .returning();
+
+  if (createdRow) {
+    const session = mapSessionEventRow(createdRow);
+    notifyUserSessionEventFromContext(c, kiloUserId, {
+      type: 'session.created',
+      data: { source: 'v2', session, changedAt: session.updatedAt },
     });
+  }
 
   // Warm the session cache so the first ingest can skip Postgres.
   await withDORetry(
@@ -103,6 +142,12 @@ api.delete('/session/:sessionId', async c => {
 
   const treeRows = treeResult.rows;
   const orderedSessionIds = treeRows.length > 0 ? treeRows.map(r => r.session_id) : [parsed.data];
+  const deletedRows = await db
+    .select()
+    .from(cli_sessions_v2)
+    .where(
+      sql`${cli_sessions_v2.session_id} = ANY(${orderedSessionIds}) AND ${cli_sessions_v2.kilo_user_id} = ${kiloUserId}`
+    );
 
   await db.transaction(async tx => {
     for (const sessionId of orderedSessionIds) {
@@ -116,6 +161,23 @@ api.delete('/session/:sessionId', async c => {
         );
     }
   });
+
+  const deletedAt = new Date().toISOString();
+  for (const row of deletedRows) {
+    notifyUserSessionEventFromContext(c, kiloUserId, {
+      type: 'session.deleted',
+      data: {
+        source: 'v2',
+        sessionId: row.session_id,
+        parentSessionId: row.parent_session_id,
+        organizationId: row.organization_id,
+        gitUrl: row.git_url,
+        gitBranch: row.git_branch,
+        createdOnPlatform: row.created_on_platform,
+        deletedAt,
+      },
+    });
+  }
 
   for (const sessionId of orderedSessionIds) {
     await withDORetry(

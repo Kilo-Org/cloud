@@ -13,9 +13,13 @@ import {
   EnvPatchResponseSchema,
   ToolsMdSectionSyncResponseSchema,
   OpenclawConfigResponseSchema,
+  FileWriteResponseSchema as ValidationAwareFileWriteResponseSchema,
+  type FileWriteResponse,
+  type OpenclawFileWriteValidation,
   MorningBriefingStatusResponseSchema,
   MorningBriefingActionResponseSchema,
   MorningBriefingInterestsResponseSchema,
+  OnboardingBriefingResponseSchema,
   MorningBriefingUserLocationResponseSchema,
   MorningBriefingReadResponseSchema,
   OpenclawWorkspaceImportResponseSchema,
@@ -300,6 +304,9 @@ export async function getControllerVersion(
   version: string;
   commit: string;
   openclawVersion?: string | null;
+  openclawCommit?: string | null;
+  apiVersion?: number;
+  capabilities?: string[];
 } | null> {
   try {
     return await callGatewayController(
@@ -450,9 +457,7 @@ export async function readFile(
   }
 }
 
-const FileWriteResponseSchema = z.object({
-  etag: z.string(),
-});
+const LegacyFileWriteResponseSchema = z.object({ etag: z.string() });
 
 export async function writeFile(
   state: InstanceMutableState,
@@ -467,8 +472,30 @@ export async function writeFile(
       env,
       '/_kilo/files/write',
       'POST',
-      FileWriteResponseSchema,
+      LegacyFileWriteResponseSchema,
       { path: filePath, content, etag }
+    );
+  } catch (error) {
+    if (isErrorUnknownRoute(error)) return null;
+    throw error;
+  }
+}
+
+export async function writeOpenclawConfigFile(
+  state: InstanceMutableState,
+  env: KiloClawEnv,
+  content: string,
+  etag: string | undefined,
+  mode: OpenclawFileWriteValidation
+): Promise<FileWriteResponse | null> {
+  try {
+    return await callGatewayController(
+      state,
+      env,
+      '/_kilo/files/write-openclaw-config',
+      'POST',
+      ValidationAwareFileWriteResponseSchema,
+      { content, etag, mode }
     );
   } catch (error) {
     if (isErrorUnknownRoute(error)) return null;
@@ -621,6 +648,28 @@ export async function runMorningBriefing(
       MorningBriefingActionResponseSchema,
       {},
       { timeoutMs: 120_000 }
+    );
+  } catch (error) {
+    if (isErrorUnknownRoute(error)) return null;
+    throw error;
+  }
+}
+
+export async function startOnboardingBriefing(
+  state: InstanceMutableState,
+  env: KiloClawEnv,
+  settingsHref?: string
+): Promise<z.infer<typeof OnboardingBriefingResponseSchema> | null> {
+  try {
+    // Returns fast: the plugin creates the conversation + loading bubble and
+    // generates the briefing fire-and-forget, so the default timeout is fine.
+    return await callGatewayController(
+      state,
+      env,
+      '/_kilo/morning-briefing/onboarding-briefing',
+      'POST',
+      OnboardingBriefingResponseSchema,
+      settingsHref ? { settingsHref } : {}
     );
   } catch (error) {
     if (isErrorUnknownRoute(error)) return null;

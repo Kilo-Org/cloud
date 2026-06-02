@@ -1,9 +1,9 @@
 import {
-  isFreeModel,
   isPdfSupportingModel,
   kiloExclusiveModels,
   preferredModels,
 } from '@/lib/ai-gateway/models';
+import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
 import PROVIDERS from '@/lib/ai-gateway/providers/provider-definitions';
 import type { OpenRouterModel } from '@/lib/organizations/organization-types';
 import {
@@ -14,12 +14,12 @@ import { errorExceptInTest } from '@/lib/utils.server';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { convertFromKiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 import { isForbiddenFreeModel } from '@/lib/ai-gateway/forbidden-free-models';
-import {
-  getOpenClawSettings,
-  getOpenCodeSettings,
-} from '@/lib/ai-gateway/providers/model-settings';
+import { getOpenCodeSettings } from '@/lib/ai-gateway/providers/model-settings';
 import { AUTO_MODELS } from '@/lib/ai-gateway/auto-model';
 import { ATTRIBUTION_HEADERS } from '@/lib/ai-gateway/providers/openrouter/attribution-headers';
+import { getOpenRouterModelsMetadata } from '@/lib/ai-gateway/providers/gateway-models-cache';
+import { getPreferredProviderOrder } from '@/lib/ai-gateway/providers/apply-provider-specific-logic';
+import { normalizeInferenceProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 
 // Re-export from shared module for backwards compatibility
 export { normalizeModelId } from '@/lib/ai-gateway/model-utils';
@@ -71,49 +71,73 @@ function buildAutoModels(): OpenRouterModel[] {
   });
 }
 
-function formatName(model: OpenRouterModel, preferredIndex: number) {
+export function formatName(model: OpenRouterModel, preferredIndex: number) {
   const promptPrice = Number.parseFloat(model.pricing.prompt);
-  const isExpensive = Number.isFinite(promptPrice) && promptPrice >= 0.00003; // Opus Fast / GPT Pro price
+  const isExpensive = Number.isFinite(promptPrice) && promptPrice >= 0.00001; // Opus 4.8 Fast price
   if (isExpensive) return model.name + ' ($$$$)';
   if (model.name.endsWith(')')) return model.name;
   const ageDays = (Date.now() / 1_000 - model.created) / (24 * 3600);
   const isNew = preferredIndex >= 0 && ageDays >= 0 && ageDays < 7;
   if (isNew) return model.name + ' (new)';
+  if (model.expiration_date) {
+    const suffix = new Date(model.expiration_date).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      timeZone: 'UTC',
+    });
+    return model.name + ' (retires ' + suffix + ')';
+  }
   return model.name;
 }
 
-function enhancedModelList(models: OpenRouterModel[]) {
+async function enhancedModelList(models: OpenRouterModel[]) {
   const autoModels = buildAutoModels();
-  const enhancedModels = models
-    .filter(
-      (model: OpenRouterModel) =>
-        !kiloExclusiveModels.some(m => m.public_id === model.id) && !isForbiddenFreeModel(model.id)
-    )
-    .concat(
-      kiloExclusiveModels
-        .filter(m => m.status === 'public')
-        .map(model => convertFromKiloExclusiveModel(model))
-    )
-    .concat(autoModels)
-    .map((model: OpenRouterModel) => {
-      const preferredIndex = preferredModels.indexOf(model.id);
-      const addPdf =
-        isPdfSupportingModel(model.id) && !model.architecture.input_modalities.includes('pdf');
-      return {
-        ...model,
-        name: formatName(model, preferredIndex),
-        preferredIndex: preferredIndex >= 0 ? preferredIndex : undefined,
-        isFree: isFreeModel(model.id),
-        opencode: model.opencode ?? getOpenCodeSettings(model.id),
-        openclaw: model.openclaw ?? getOpenClawSettings(model.id),
-        architecture: addPdf
-          ? {
-              ...model.architecture,
-              input_modalities: model.architecture.input_modalities.concat(['pdf']),
-            }
-          : model.architecture,
-      };
-    });
+  const endpointsMetadata = await getOpenRouterModelsMetadata();
+  const enhancedModels = await Promise.all(
+    models
+      .filter(
+        (model: OpenRouterModel) =>
+          !kiloExclusiveModels.some(m => m.public_id === model.id) &&
+          !isForbiddenFreeModel(model.id)
+      )
+      .map(model => {
+        const preferredProvider = getPreferredProviderOrder(model.id).at(0);
+        const endpoints = endpointsMetadata[model.id]?.endpoints ?? [];
+        const pricing = preferredProvider
+          ? (endpoints.find(e => e.tag === preferredProvider)?.pricing ??
+            endpoints.find(
+              e =>
+                normalizeInferenceProviderId(e.tag) ===
+                normalizeInferenceProviderId(preferredProvider)
+            )?.pricing)
+          : undefined;
+        return pricing ? { ...model, pricing } : model;
+      })
+      .concat(
+        kiloExclusiveModels
+          .filter(m => m.status === 'public')
+          .map(model => convertFromKiloExclusiveModel(model))
+      )
+      .concat(autoModels)
+      .map(async (model: OpenRouterModel) => {
+        const preferredIndex = preferredModels.indexOf(model.id);
+        const addPdf =
+          isPdfSupportingModel(model.id) && !model.architecture.input_modalities.includes('pdf');
+        return {
+          ...model,
+          name: formatName(model, preferredIndex),
+          preferredIndex: preferredIndex >= 0 ? preferredIndex : undefined,
+          isFree: await isFreeModel(model.id),
+          opencode: model.opencode ?? getOpenCodeSettings(model.id),
+          architecture: addPdf
+            ? {
+                ...model.architecture,
+                input_modalities: model.architecture.input_modalities.concat(['pdf']),
+              }
+            : model.architecture,
+        };
+      })
+  );
   const sortedModels = enhancedModels.sort((a, b) => {
     // Sort by preferredIndex (undefined values last)
     if (a.preferredIndex !== undefined && b.preferredIndex === undefined) return -1;
@@ -189,7 +213,7 @@ export async function getEnhancedOpenRouterModels(): Promise<OpenRouterModelsRes
     return rawResponse;
   }
 
-  return { data: enhancedModelList(rawResponse.data) };
+  return { data: await enhancedModelList(rawResponse.data) };
 }
 /**
  * Fetch speech-to-text models from the OpenRouter API.

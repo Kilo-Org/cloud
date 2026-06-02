@@ -1,16 +1,19 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AlertCircle, Check, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useRouter } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import KiloLogo from '@/components/KiloLogo';
-import { useTRPC } from '@/lib/trpc/utils';
 import { useUser } from '@/hooks/useUser';
+import {
+  getPlatformOAuthConnectPath,
+  type StandardOAuthPlatform,
+} from '@/lib/integrations/oauth/paths';
 import { getPlatform, type PlatformId, type PlatformOption } from '../../_components/platforms';
+import { buildReturnToPath } from './authorize-path';
 
 type ProgressListProps = {
   count: number;
@@ -19,50 +22,46 @@ type ProgressListProps = {
 
 type AuthorizeFlowProps = {
   serviceIds: PlatformId[];
+  connectedServiceIds: PlatformId[];
   organizationId?: string;
   initialIndex: number;
   initialError?: string;
 };
 
 export function AuthorizeFlow(props: AuthorizeFlowProps) {
-  const { serviceIds, organizationId, initialIndex, initialError } = props;
+  const { serviceIds, connectedServiceIds, organizationId, initialIndex, initialError } = props;
   const router = useRouter();
-  const trpc = useTRPC();
   const { data: user } = useUser();
   const [index, setIndex] = useState(initialIndex);
   const [done, setDone] = useState(initialIndex >= serviceIds.length);
   const [connectionError, setConnectionError] = useState<string | null>(initialError ?? null);
+  const [isStartingOAuth, setIsStartingOAuth] = useState(false);
 
   const services = serviceIds.map(id => getPlatform(id)).filter(p => p !== undefined);
   const current = services[index];
-  const isLast = index === services.length - 1;
-  const returnTo = buildReturnToPath({ serviceIds, organizationId, step: index });
-  const oauthInput = {
-    ...(organizationId ? { organizationId } : {}),
-    returnTo,
-  };
-
-  const { refetch: refetchSlackOAuthUrl, isFetching: isFetchingSlackOAuthUrl } = useQuery(
-    trpc.slack.getOAuthUrl.queryOptions(oauthInput, { enabled: false })
-  );
-  const { refetch: refetchDiscordOAuthUrl, isFetching: isFetchingDiscordOAuthUrl } = useQuery(
-    trpc.discord.getOAuthUrl.queryOptions(oauthInput, { enabled: false })
-  );
-  const { refetch: refetchLinearOAuthUrl, isFetching: isFetchingLinearOAuthUrl } = useQuery(
-    trpc.linear.getOAuthUrl.queryOptions(oauthInput, { enabled: false })
-  );
+  const getAuthorizePath = (step: number) =>
+    buildReturnToPath({
+      serviceIds,
+      connectedServiceIds,
+      organizationId,
+      step,
+    });
+  const returnTo = getAuthorizePath(index);
 
   const isLoadingGitHubUser = current?.id === 'github' && !organizationId && !user;
-  const isStartingOAuth =
-    isFetchingSlackOAuthUrl || isFetchingDiscordOAuthUrl || isFetchingLinearOAuthUrl;
+
+  useEffect(() => {
+    setIndex(initialIndex);
+    setDone(initialIndex >= serviceIds.length);
+    setConnectionError(initialError ?? null);
+  }, [initialError, initialIndex, serviceIds.length]);
 
   const advance = () => {
+    const nextIndex = index + 1;
     setConnectionError(null);
-    if (isLast) {
-      setDone(true);
-      return;
-    }
-    setIndex(i => i + 1);
+    setIndex(nextIndex);
+    setDone(nextIndex >= services.length);
+    router.push(getAuthorizePath(nextIndex), { scroll: false });
   };
 
   const handleAuthorize = async () => {
@@ -70,22 +69,22 @@ export function AuthorizeFlow(props: AuthorizeFlowProps) {
     setConnectionError(null);
 
     try {
+      setIsStartingOAuth(true);
       const oauthUrl = await getOAuthUrl(current.id, {
         organizationId,
         returnTo,
         userId: user?.id,
-        getSlackOAuthUrl: refetchSlackOAuthUrl,
-        getDiscordOAuthUrl: refetchDiscordOAuthUrl,
-        getLinearOAuthUrl: refetchLinearOAuthUrl,
       });
 
       if (!oauthUrl) {
         setConnectionError(`${current.name} setup is not available from this flow yet.`);
+        setIsStartingOAuth(false);
         return;
       }
 
       window.location.href = oauthUrl;
     } catch (error) {
+      setIsStartingOAuth(false);
       setConnectionError(
         error instanceof Error ? error.message : `Couldn't start ${current.name}.`
       );
@@ -93,13 +92,18 @@ export function AuthorizeFlow(props: AuthorizeFlowProps) {
   };
 
   const handleSkip = () => {
+    if (isStartingOAuth) return;
     advance();
   };
 
   if (done || !current) {
     return (
       <div className="flex w-full flex-col items-center gap-12">
-        <Completed hasSelectedServices={services.length > 0} onContinue={() => router.push('/')} />
+        <Completed
+          hasSelectedServices={services.length > 0}
+          connectedServiceIds={connectedServiceIds}
+          onContinue={() => router.push('/')}
+        />
       </div>
     );
   }
@@ -150,7 +154,8 @@ export function AuthorizeFlow(props: AuthorizeFlowProps) {
             <button
               type="button"
               onClick={handleSkip}
-              className="text-muted-foreground hover:text-foreground text-sm underline-offset-4 hover:underline"
+              disabled={isStartingOAuth}
+              className="text-muted-foreground hover:text-foreground disabled:text-muted-foreground/60 text-sm underline-offset-4 hover:underline disabled:cursor-not-allowed disabled:no-underline"
             >
               Skip for now
             </button>
@@ -161,44 +166,16 @@ export function AuthorizeFlow(props: AuthorizeFlowProps) {
   );
 }
 
-function buildReturnToPath({
-  serviceIds,
-  organizationId,
-  step,
-}: {
-  serviceIds: PlatformId[];
-  organizationId?: string;
-  step: number;
-}): string {
-  const params = new URLSearchParams({ services: serviceIds.join(','), step: step.toString() });
-  if (organizationId) params.set('organizationId', organizationId);
-  return `/collab/authorize?${params.toString()}`;
-}
-
 async function getOAuthUrl(
   platformId: PlatformId,
   options: {
     organizationId?: string;
     returnTo: string;
     userId?: string;
-    getSlackOAuthUrl: () => Promise<{ data?: { url: string } }>;
-    getDiscordOAuthUrl: () => Promise<{ data?: { url: string } }>;
-    getLinearOAuthUrl: () => Promise<{ data?: { url: string } }>;
   }
 ): Promise<string | null> {
-  if (platformId === 'slack') {
-    return (await options.getSlackOAuthUrl()).data?.url ?? null;
-  }
-  if (platformId === 'discord') {
-    return (await options.getDiscordOAuthUrl()).data?.url ?? null;
-  }
-  if (platformId === 'linear') {
-    return (await options.getLinearOAuthUrl()).data?.url ?? null;
-  }
-  if (platformId === 'gitlab') {
-    const params = new URLSearchParams({ returnTo: options.returnTo });
-    if (options.organizationId) params.set('organizationId', options.organizationId);
-    return `/api/integrations/gitlab/connect?${params.toString()}`;
+  if (isCollabOAuthConnectPlatform(platformId)) {
+    return getPlatformOAuthConnectPath(platformId, options.organizationId, options.returnTo);
   }
   if (platformId === 'github') {
     const ownerToken = options.organizationId
@@ -212,6 +189,19 @@ async function getOAuthUrl(
     return `https://github.com/apps/${githubAppName}/installations/new?state=${encodeURIComponent(state)}`;
   }
   return null;
+}
+
+const COLLAB_OAUTH_CONNECT_PLATFORM_IDS = new Set<PlatformId>([
+  'slack',
+  'discord',
+  'linear',
+  'gitlab',
+]);
+
+function isCollabOAuthConnectPlatform(
+  platformId: PlatformId
+): platformId is Extract<PlatformId, StandardOAuthPlatform> {
+  return COLLAB_OAUTH_CONNECT_PLATFORM_IDS.has(platformId);
 }
 
 function ConnectionBadge({ service }: { service: PlatformOption }) {
@@ -266,11 +256,15 @@ function ProgressList({ count, activeIndex }: ProgressListProps) {
 
 function Completed({
   hasSelectedServices,
+  connectedServiceIds,
   onContinue,
 }: {
   hasSelectedServices: boolean;
+  connectedServiceIds: PlatformId[];
   onContinue: () => void;
 }) {
+  const connectedServiceNames = connectedServiceIds.map(getPlatformName);
+
   return (
     <motion.section
       initial={{ opacity: 0, y: 8 }}
@@ -284,9 +278,7 @@ function Completed({
       <div className="flex w-full flex-col gap-4 text-center">
         <h1 className="text-2xl font-bold tracking-tight">Kilo is ready</h1>
         <p className="text-muted-foreground text-sm leading-relaxed">
-          {hasSelectedServices
-            ? 'Setup is complete. You can connect more services or fine-tune access from settings later.'
-            : 'No services were connected. You can connect chat, code, and issue tools from settings later.'}
+          {getCompletionDescription({ hasSelectedServices, connectedServiceNames })}
         </p>
       </div>
       <Button onClick={onContinue} size="lg" className="w-full">
@@ -294,4 +286,34 @@ function Completed({
       </Button>
     </motion.section>
   );
+}
+
+function getCompletionDescription({
+  hasSelectedServices,
+  connectedServiceNames,
+}: {
+  hasSelectedServices: boolean;
+  connectedServiceNames: string[];
+}): string {
+  if (hasSelectedServices) {
+    return 'Setup is complete. You can connect more services or fine-tune access from settings later.';
+  }
+
+  if (connectedServiceNames.length > 0) {
+    const serviceList = formatServiceList(connectedServiceNames);
+    const verb = connectedServiceNames.length === 1 ? 'is' : 'are';
+    return `${serviceList} ${verb} already set up. You can connect more services or fine-tune access from settings later.`;
+  }
+
+  return 'No services were connected. You can connect chat, code, and issue tools from settings later.';
+}
+
+function getPlatformName(platformId: PlatformId): string {
+  return getPlatform(platformId)?.name ?? platformId;
+}
+
+function formatServiceList(names: string[]): string {
+  if (names.length <= 1) return names[0] ?? 'Selected services';
+  if (names.length === 2) return `${names[0]} and ${names[1]}`;
+  return `${names.slice(0, -1).join(', ')}, and ${names[names.length - 1]}`;
 }

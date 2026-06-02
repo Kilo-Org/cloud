@@ -5,6 +5,7 @@ import {
   Users,
   DollarSign,
   Building2,
+  Clock,
   Shield,
   Ban,
   Database,
@@ -67,6 +68,11 @@ const userManagementItems: MenuItem[] = [
     icon: () => <Building2 />,
   },
   {
+    title: () => 'Trial Organizations',
+    url: '/admin/organizations/trials',
+    icon: () => <Clock />,
+  },
+  {
     title: () => 'Bulk Block',
     url: '/admin/bulk-block',
     icon: () => <Ban />,
@@ -108,6 +114,11 @@ const financialItems: MenuItem[] = [
     title: () => 'Kilo Pass Bulk Cancel',
     url: '/admin/kilo-pass/bulk-cancel',
     icon: () => <Coins />,
+  },
+  {
+    title: () => 'Early Fraud Warnings',
+    url: '/admin/early-fraud-warnings',
+    icon: () => <Shield />,
   },
   {
     title: () => 'Revenue KPI',
@@ -184,6 +195,11 @@ const analyticsObservabilityItems: MenuItem[] = [
     title: () => 'Model Benchmarks',
     url: '/admin/model-eval-ingest',
     icon: () => <FileSearch />,
+  },
+  {
+    title: () => 'Cloud Agent health',
+    url: '/admin/cloud-agent-next',
+    icon: () => <BarChart />,
   },
   {
     title: () => 'Session Traces',

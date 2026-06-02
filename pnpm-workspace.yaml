@@ -59,10 +59,12 @@ minimumReleaseAgeExclude:
   - '@typescript/native-preview-linux-x64'
   - '@typescript/native-preview-win32-arm64'
   - '@typescript/native-preview-win32-x64'
+  # KiloClaw pins and live-smoke-validates OpenClaw image upgrades before rollout.
+  - openclaw
 overrides:
   '@sentry/cli': 3.4.2
   mdast-util-to-hast: 13.2.1
-  storybook: 9.1.17
+  storybook: 9.1.20
   next: 16.2.6
   preact: 10.28.4
   glob: '>=13.0.1'
@@ -125,3 +127,4 @@ allowBuilds:
   '@google/genai': false
   koffi: false
   openclaw: false
+  tree-sitter-bash: false

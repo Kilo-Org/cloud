@@ -1,97 +1,15 @@
 import type { OrgTrialStatus } from './organization-types';
-import { TRIAL_DURATION_DAYS } from '@/lib/constants';
-import type { Organization } from '@kilocode/db/schema';
 
-/**
- * Calculate days remaining in trial period from free trial end date
- * @param freeTrialEndAt - ISO 8601 date string of free trial end date (nullable)
- * @param createdAt - ISO 8601 date string of organization creation (fallback if freeTrialEndAt is null)
- * @returns Number of days remaining (negative if expired)
- */
-export function getDaysRemainingInTrial(freeTrialEndAt: string | null, createdAt: string): number {
-  const now = new Date();
-  let endDate: Date;
+export {
+  classifyOrganizationEntitlement,
+  getDaysRemainingInTrial,
+  getOrgTrialStatusFromDays,
+} from '@kilocode/organization-entitlement';
+export type {
+  OrganizationEntitlementBypassReason,
+  OrganizationEntitlementClassification,
+} from '@kilocode/organization-entitlement';
 
-  if (freeTrialEndAt) {
-    endDate = new Date(freeTrialEndAt);
-  } else {
-    // Fallback to created_at + TRIAL_DURATION_DAYS for backward compatibility
-    const created = new Date(createdAt);
-    endDate = new Date(created.getTime() + TRIAL_DURATION_DAYS * 24 * 60 * 60 * 1000);
-  }
-
-  const daysRemaining = Math.floor((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-  return daysRemaining;
-}
-
-/**
- * Determine organization trial status based on days remaining
- * @param daysRemaining - Number of days remaining in trial
- * @returns Current organization trial status
- */
-export function getOrgTrialStatusFromDays(daysRemaining: number): OrgTrialStatus {
-  if (daysRemaining >= 8) {
-    return 'trial_active';
-  }
-  if (daysRemaining > 3) {
-    return 'trial_ending_soon';
-  }
-  if (daysRemaining > 0) {
-    return 'trial_ending_very_soon';
-  }
-  if (daysRemaining === 0) {
-    return 'trial_expires_today';
-  }
-  if (daysRemaining >= -3) {
-    return 'trial_expired_soft';
-  }
-  return 'trial_expired_hard';
-}
-
-/**
- * Determine if a trial status indicates read-only mode
- * @param status - Organization trial status
- * @returns True if organization is in read-only mode
- */
 export function isStatusReadOnly(status: OrgTrialStatus): boolean {
   return status === 'trial_expired_soft' || status === 'trial_expired_hard';
-}
-
-/**
- * Check if organization is hard-locked (trial expired 4+ days ago, no active subscription).
- *
- * Pass `hasActiveSubscription` when available to avoid false positives for subscribed
- * orgs whose `free_trial_end_at` is in the past.
- */
-export function isOrganizationHardLocked(
-  organization: Organization,
-  hasActiveSubscription = false
-): boolean {
-  // Organizations with an active subscription are never hard-locked
-  if (hasActiveSubscription) {
-    return false;
-  }
-
-  // OSS program participants are never hard-locked (authoritative check)
-  if (organization.settings.oss_sponsorship_tier != null) {
-    return false;
-  }
-
-  // Other special accounts with suppressed trial messaging (design partners, etc.)
-  if (organization.settings.suppress_trial_messaging) {
-    return false;
-  }
-
-  // Accounts that don't require seats are never hard-locked (design partners, internal testing, etc.)
-  if (!organization.require_seats) {
-    return false;
-  }
-
-  const daysRemaining = getDaysRemainingInTrial(
-    organization.free_trial_end_at,
-    organization.created_at
-  );
-  const status = getOrgTrialStatusFromDays(daysRemaining);
-
-  return status === 'trial_expired_hard';
 }

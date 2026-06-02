@@ -6,21 +6,34 @@ import { cleanupDbForTest, db } from '@/lib/drizzle';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createOrganization } from '@/lib/organizations/organizations';
 import type { createCallerForUser as TestUtilsCallerFactory } from '@/routers/test-utils';
+import { LEGACY_KILOCLAW_PRICE_VERSION } from '@kilocode/db';
 import {
   kiloclaw_image_catalog,
   kiloclaw_instances,
   kiloclaw_subscription_change_log,
   kiloclaw_subscriptions,
   kiloclaw_version_pins,
+  organization_seats_purchases,
+  organizations,
 } from '@kilocode/db/schema';
 import { and, eq } from 'drizzle-orm';
+
+(kiloclaw_subscriptions.kiloclaw_price_version as { defaultFn: () => string }).defaultFn = () =>
+  LEGACY_KILOCLAW_PRICE_VERSION;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyMock = jest.Mock<(...args: any[]) => any>;
 
 type KiloClawClientMock = {
   __destroyMock: AnyMock;
+  __getLatestVersionMock: AnyMock;
+  __getLatestVersionForInstanceMock: AnyMock;
   __patchWebSearchConfigMock: AnyMock;
+  __provisionMock: AnyMock;
+  __restartGatewayProcessMock: AnyMock;
+  __startMock: AnyMock;
+  __stopMock: AnyMock;
+  __writeOpenclawConfigFileMock: AnyMock;
 };
 
 type KiloClawUserClientMock = {
@@ -62,11 +75,25 @@ jest.mock('@/lib/config.server', () => {
 
 jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => {
   const destroyMock = jest.fn();
+  const getLatestVersionMock = jest.fn();
+  const getLatestVersionForInstanceMock = jest.fn();
   const patchWebSearchConfigMock = jest.fn();
+  const provisionMock = jest.fn();
+  const restartGatewayProcessMock = jest.fn();
+  const startMock = jest.fn();
+  const stopMock = jest.fn();
+  const writeOpenclawConfigFileMock = jest.fn();
   return {
     KiloClawInternalClient: jest.fn().mockImplementation(() => ({
       destroy: destroyMock,
+      getLatestVersion: getLatestVersionMock,
+      getLatestVersionForInstance: getLatestVersionForInstanceMock,
       patchWebSearchConfig: patchWebSearchConfigMock,
+      provision: provisionMock,
+      restartGatewayProcess: restartGatewayProcessMock,
+      start: startMock,
+      stop: stopMock,
+      writeOpenclawConfigFile: writeOpenclawConfigFileMock,
     })),
     KiloClawApiError: class KiloClawApiError extends Error {
       statusCode: number;
@@ -78,7 +105,14 @@ jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => {
       }
     },
     __destroyMock: destroyMock,
+    __getLatestVersionMock: getLatestVersionMock,
+    __getLatestVersionForInstanceMock: getLatestVersionForInstanceMock,
     __patchWebSearchConfigMock: patchWebSearchConfigMock,
+    __provisionMock: provisionMock,
+    __restartGatewayProcessMock: restartGatewayProcessMock,
+    __startMock: startMock,
+    __stopMock: stopMock,
+    __writeOpenclawConfigFileMock: writeOpenclawConfigFileMock,
   };
 });
 
@@ -123,6 +157,200 @@ async function createActiveOrgInstance(userId: string, organizationId: string): 
   if (!row) throw new Error('Failed to create organization KiloClaw instance');
   return row.id;
 }
+
+async function markOrganizationHardExpired(organizationId: string): Promise<void> {
+  await db
+    .update(organizations)
+    .set({ free_trial_end_at: '2020-01-01T00:00:00.000Z' })
+    .where(eq(organizations.id, organizationId));
+}
+
+async function addOrganizationSeatEntitlement(organizationId: string): Promise<void> {
+  await db.insert(organization_seats_purchases).values({
+    organization_id: organizationId,
+    subscription_stripe_id: `sub_${crypto.randomUUID()}`,
+    seat_count: 1,
+    amount_usd: 72,
+    starts_at: '2026-05-01T00:00:00.000Z',
+    expires_at: '2026-06-01T00:00:00.000Z',
+    subscription_status: 'past_due',
+  });
+}
+
+describe('organizations.kiloclaw.latestVersion', () => {
+  beforeEach(async () => {
+    await cleanupDbForTest();
+    kiloclawClientMock.__getLatestVersionMock.mockReset();
+    kiloclawClientMock.__getLatestVersionForInstanceMock.mockReset();
+  });
+
+  it('passes the active org instance row for server-derived rollout lookup', async () => {
+    kiloclawClientMock.__getLatestVersionForInstanceMock.mockResolvedValue({
+      imageTag: 'candidate-tag',
+    });
+    const user = await insertTestUser({
+      google_user_email: `org-kiloclaw-latest-version-${crypto.randomUUID()}@example.com`,
+    });
+    const organization = await createOrganization('Org Latest Version Test', user.id);
+    const instanceId = await createActiveOrgInstance(user.id, organization.id);
+
+    const caller = await createCallerForUser(user.id);
+    await caller.organizations.kiloclaw.latestVersion({
+      organizationId: organization.id,
+      currentImageTag: 'current-tag',
+    });
+
+    expect(kiloclawClientMock.__getLatestVersionForInstanceMock).toHaveBeenCalledWith({
+      instanceId,
+      currentImageTag: 'current-tag',
+    });
+    expect(kiloclawClientMock.__getLatestVersionMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('organizations.kiloclaw.listActiveInstances', () => {
+  beforeEach(async () => {
+    await cleanupDbForTest();
+  });
+
+  it('excludes orphan and destroyed organization instances', async () => {
+    const user = await insertTestUser({
+      google_user_email: `org-kiloclaw-list-${crypto.randomUUID()}@example.com`,
+    });
+    const organization = await createOrganization('Org KiloClaw List Test', user.id);
+    await createActiveOrgInstance(user.id, organization.id);
+    const activeInstanceId = await createActiveOrgInstance(user.id, organization.id);
+    const suspendedInstanceId = await createActiveOrgInstance(user.id, organization.id);
+    const destroyedInstanceId = await createActiveOrgInstance(user.id, organization.id);
+
+    await db.insert(kiloclaw_subscriptions).values([
+      {
+        user_id: user.id,
+        instance_id: activeInstanceId,
+        plan: 'standard',
+        status: 'active',
+        payment_source: 'credits',
+        cancel_at_period_end: false,
+      },
+      {
+        user_id: user.id,
+        instance_id: suspendedInstanceId,
+        plan: 'standard',
+        status: 'canceled',
+        payment_source: 'credits',
+        cancel_at_period_end: false,
+        suspended_at: '2026-05-28T00:00:00.000Z',
+      },
+      {
+        user_id: user.id,
+        instance_id: destroyedInstanceId,
+        plan: 'standard',
+        status: 'active',
+        payment_source: 'credits',
+        cancel_at_period_end: false,
+      },
+    ]);
+    await db
+      .update(kiloclaw_instances)
+      .set({ destroyed_at: '2026-05-28T00:00:00.000Z' })
+      .where(eq(kiloclaw_instances.id, destroyedInstanceId));
+
+    const caller = await createCallerForUser(user.id);
+    const result = await caller.organizations.kiloclaw.listActiveInstances({
+      organizationId: organization.id,
+    });
+
+    expect(result).toHaveLength(2);
+    expect(result).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: activeInstanceId,
+          userEmail: user.google_user_email,
+          isSuspended: false,
+        }),
+        expect.objectContaining({
+          id: suspendedInstanceId,
+          userEmail: user.google_user_email,
+          isSuspended: true,
+        }),
+      ])
+    );
+  });
+});
+
+describe('organizations.kiloclaw.getNavState', () => {
+  beforeEach(async () => {
+    await cleanupDbForTest();
+  });
+
+  it('returns absent when the organization has no KiloClaw instance', async () => {
+    const user = await insertTestUser({
+      google_user_email: `org-kiloclaw-nav-absent-${Math.random()}@example.com`,
+    });
+    const organization = await createOrganization('Org KiloClaw Nav Absent Test', user.id);
+    const caller = await createCallerForUser(user.id);
+
+    const result = await caller.organizations.kiloclaw.getNavState({
+      organizationId: organization.id,
+    });
+
+    expect(result).toEqual({ hasActiveInstance: false });
+  });
+
+  it('returns active organization instance presence', async () => {
+    const user = await insertTestUser({
+      google_user_email: `org-kiloclaw-nav-present-${Math.random()}@example.com`,
+    });
+    const organization = await createOrganization('Org KiloClaw Nav Present Test', user.id);
+    await createActiveOrgInstance(user.id, organization.id);
+    const caller = await createCallerForUser(user.id);
+
+    const result = await caller.organizations.kiloclaw.getNavState({
+      organizationId: organization.id,
+    });
+
+    expect(result).toEqual({ hasActiveInstance: true });
+  });
+
+  it('does not leak a personal instance into organization nav state', async () => {
+    const user = await insertTestUser({
+      google_user_email: `org-kiloclaw-nav-personal-${Math.random()}@example.com`,
+    });
+    const organization = await createOrganization('Org KiloClaw Nav Personal Test', user.id);
+    const personalInstanceId = crypto.randomUUID();
+    await db.insert(kiloclaw_instances).values({
+      id: personalInstanceId,
+      user_id: user.id,
+      sandbox_id: `ki_${personalInstanceId.replace(/-/g, '')}`,
+    });
+    const caller = await createCallerForUser(user.id);
+
+    const result = await caller.organizations.kiloclaw.getNavState({
+      organizationId: organization.id,
+    });
+
+    expect(result).toEqual({ hasActiveInstance: false });
+  });
+
+  it('ignores destroyed organization instances', async () => {
+    const user = await insertTestUser({
+      google_user_email: `org-kiloclaw-nav-destroyed-${Math.random()}@example.com`,
+    });
+    const organization = await createOrganization('Org KiloClaw Nav Destroyed Test', user.id);
+    const instanceId = await createActiveOrgInstance(user.id, organization.id);
+    await db
+      .update(kiloclaw_instances)
+      .set({ destroyed_at: '2026-05-29T00:00:00.000Z' })
+      .where(eq(kiloclaw_instances.id, instanceId));
+    const caller = await createCallerForUser(user.id);
+
+    const result = await caller.organizations.kiloclaw.getNavState({
+      organizationId: organization.id,
+    });
+
+    expect(result).toEqual({ hasActiveInstance: false });
+  });
+});
 
 describe('organization kiloclaw destroy', () => {
   beforeEach(async () => {
@@ -202,6 +430,172 @@ describe('organization kiloclaw destroy', () => {
   });
 });
 
+describe('organizations.kiloclaw.provision trial entitlement gate', () => {
+  beforeEach(async () => {
+    await cleanupDbForTest();
+  });
+
+  it('rejects hard-expired unentitled organizations before provisioning', async () => {
+    const user = await insertTestUser({
+      google_user_email: `org-kiloclaw-provision-expired-${crypto.randomUUID()}@example.com`,
+    });
+    const organization = await createOrganization('Org KiloClaw Provision Expired Test', user.id);
+
+    await markOrganizationHardExpired(organization.id);
+
+    const caller = await createCallerForUser(user.id);
+    await expect(
+      caller.organizations.kiloclaw.provision({
+        organizationId: organization.id,
+      })
+    ).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      message: 'Organization KiloClaw entitlement has expired.',
+    });
+  });
+});
+
+describe('organizations.kiloclaw compute entitlement gates', () => {
+  beforeEach(async () => {
+    await cleanupDbForTest();
+    kiloclawClientMock.__destroyMock.mockReset();
+    kiloclawClientMock.__provisionMock.mockReset();
+    kiloclawClientMock.__restartGatewayProcessMock.mockReset();
+    kiloclawClientMock.__startMock.mockReset();
+    kiloclawClientMock.__stopMock.mockReset();
+    kiloclawUserClientMock.__restartMachineMock.mockReset();
+    kiloclawClientMock.__destroyMock.mockResolvedValue({ ok: true });
+    kiloclawClientMock.__startMock.mockResolvedValue({ ok: true, started: true });
+    kiloclawClientMock.__stopMock.mockResolvedValue({ ok: true, stopped: true });
+  });
+
+  it('returns entitlement failure before missing-instance lookup on hard-expired start', async () => {
+    const user = await insertTestUser({
+      google_user_email: `org-kiloclaw-start-expired-${crypto.randomUUID()}@example.com`,
+    });
+    const organization = await createOrganization('Org KiloClaw Start Expired Test', user.id);
+    await markOrganizationHardExpired(organization.id);
+
+    const caller = await createCallerForUser(user.id);
+    await expect(
+      caller.organizations.kiloclaw.start({ organizationId: organization.id })
+    ).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      message: 'Organization KiloClaw entitlement has expired.',
+    });
+    expect(kiloclawClientMock.__startMock).not.toHaveBeenCalled();
+  });
+
+  it('blocks hard-expired organization reprovision before upstream provision', async () => {
+    const user = await insertTestUser({
+      google_user_email: `org-kiloclaw-update-expired-${crypto.randomUUID()}@example.com`,
+    });
+    const organization = await createOrganization('Org KiloClaw Update Expired Test', user.id);
+    await createActiveOrgInstance(user.id, organization.id);
+    await markOrganizationHardExpired(organization.id);
+
+    const caller = await createCallerForUser(user.id);
+    await expect(
+      caller.organizations.kiloclaw.updateConfig({ organizationId: organization.id })
+    ).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      message: 'Organization KiloClaw entitlement has expired.',
+    });
+    expect(kiloclawClientMock.__provisionMock).not.toHaveBeenCalled();
+  });
+
+  it('blocks hard-expired organization machine restart before upstream restart', async () => {
+    const user = await insertTestUser({
+      google_user_email: `org-kiloclaw-restart-expired-${crypto.randomUUID()}@example.com`,
+    });
+    const organization = await createOrganization('Org KiloClaw Restart Expired Test', user.id);
+    await createActiveOrgInstance(user.id, organization.id);
+    await markOrganizationHardExpired(organization.id);
+
+    const caller = await createCallerForUser(user.id);
+    await expect(
+      caller.organizations.kiloclaw.restartMachine({ organizationId: organization.id })
+    ).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      message: 'Organization KiloClaw entitlement has expired.',
+    });
+    expect(kiloclawUserClientMock.__restartMachineMock).not.toHaveBeenCalled();
+  });
+
+  it('blocks hard-expired organization gateway-process restart before upstream restart', async () => {
+    const user = await insertTestUser({
+      google_user_email: `org-kiloclaw-gateway-restart-expired-${crypto.randomUUID()}@example.com`,
+    });
+    const organization = await createOrganization(
+      'Org KiloClaw Gateway Restart Expired Test',
+      user.id
+    );
+    await createActiveOrgInstance(user.id, organization.id);
+    await markOrganizationHardExpired(organization.id);
+
+    const caller = await createCallerForUser(user.id);
+    await expect(
+      caller.organizations.kiloclaw.restartOpenClaw({ organizationId: organization.id })
+    ).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      message: 'Organization KiloClaw entitlement has expired.',
+    });
+    expect(kiloclawClientMock.__restartGatewayProcessMock).not.toHaveBeenCalled();
+  });
+
+  it('keeps start available after hard expiry when seat entitlement remains', async () => {
+    const user = await insertTestUser({
+      google_user_email: `org-kiloclaw-start-paid-${crypto.randomUUID()}@example.com`,
+    });
+    const organization = await createOrganization('Org KiloClaw Start Paid Test', user.id);
+    const instanceId = await createActiveOrgInstance(user.id, organization.id);
+    await markOrganizationHardExpired(organization.id);
+    await addOrganizationSeatEntitlement(organization.id);
+
+    const caller = await createCallerForUser(user.id);
+    await expect(
+      caller.organizations.kiloclaw.start({ organizationId: organization.id })
+    ).resolves.toEqual({ ok: true, started: true });
+    expect(kiloclawClientMock.__startMock).toHaveBeenCalledWith(user.id, instanceId, {
+      reason: 'manual_user_request',
+    });
+  });
+
+  it('keeps manual stop available for hard-expired unentitled organizations', async () => {
+    const user = await insertTestUser({
+      google_user_email: `org-kiloclaw-stop-expired-${crypto.randomUUID()}@example.com`,
+    });
+    const organization = await createOrganization('Org KiloClaw Stop Expired Test', user.id);
+    const instanceId = await createActiveOrgInstance(user.id, organization.id);
+    await markOrganizationHardExpired(organization.id);
+
+    const caller = await createCallerForUser(user.id);
+    await expect(
+      caller.organizations.kiloclaw.stop({ organizationId: organization.id })
+    ).resolves.toEqual({ ok: true, stopped: true });
+    expect(kiloclawClientMock.__stopMock).toHaveBeenCalledWith(user.id, instanceId, {
+      reason: 'manual_user_request',
+    });
+  });
+
+  it('keeps manual destroy available for hard-expired unentitled organizations', async () => {
+    const user = await insertTestUser({
+      google_user_email: `org-kiloclaw-destroy-expired-${crypto.randomUUID()}@example.com`,
+    });
+    const organization = await createOrganization('Org KiloClaw Destroy Expired Test', user.id);
+    const instanceId = await createActiveOrgInstance(user.id, organization.id);
+    await markOrganizationHardExpired(organization.id);
+
+    const caller = await createCallerForUser(user.id);
+    await expect(
+      caller.organizations.kiloclaw.destroy({ organizationId: organization.id })
+    ).resolves.toEqual({ ok: true });
+    expect(kiloclawClientMock.__destroyMock).toHaveBeenCalledWith(user.id, instanceId, {
+      reason: 'manual_user_request',
+    });
+  });
+});
+
 describe('organizations.kiloclaw.patchWebSearchConfig', () => {
   beforeEach(async () => {
     await cleanupDbForTest();
@@ -255,6 +649,46 @@ describe('organizations.kiloclaw.patchWebSearchConfig', () => {
     });
 
     expect(kiloclawClientMock.__patchWebSearchConfigMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('organizations.kiloclaw.writeFile validation mode', () => {
+  beforeEach(async () => {
+    await cleanupDbForTest();
+    kiloclawClientMock.__writeOpenclawConfigFileMock.mockReset();
+  });
+
+  it('normalizes openclaw.json and forwards validation-aware saves', async () => {
+    const user = await insertTestUser({
+      google_user_email: `org-kiloclaw-write-file-${crypto.randomUUID()}@example.com`,
+    });
+    const organization = await createOrganization('Org KiloClaw File Write Test', user.id);
+    const instanceId = await createActiveOrgInstance(user.id, organization.id);
+    kiloclawClientMock.__writeOpenclawConfigFileMock.mockResolvedValue({
+      outcome: 'openclaw-validation-warning',
+      valid: false,
+      reason: 'invalid',
+      issues: [{ path: 'gateway.mode', message: 'Expected local' }],
+    });
+
+    const caller = await createCallerForUser(user.id);
+    await expect(
+      caller.organizations.kiloclaw.writeFile({
+        organizationId: organization.id,
+        path: 'openclaw.json',
+        content: '{"gateway":{"mode":"remote"}}',
+        etag: 'etag-1',
+        openclawValidation: 'warn-before-write',
+      })
+    ).resolves.toMatchObject({ outcome: 'openclaw-validation-warning', reason: 'invalid' });
+
+    expect(kiloclawClientMock.__writeOpenclawConfigFileMock).toHaveBeenCalledWith(
+      user.id,
+      '{\n  "gateway": {\n    "mode": "remote"\n  }\n}',
+      'etag-1',
+      instanceId,
+      'warn-before-write'
+    );
   });
 });
 

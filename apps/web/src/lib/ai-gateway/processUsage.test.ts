@@ -459,6 +459,34 @@ describe('logMicrodollarUsage', () => {
     expect(metadataRecord?.session_id).toBe('task-abc123');
   });
 
+  test('stores abuse delay and original model when a request is quarantined', async () => {
+    const user = await insertTestUser({
+      id: 'test-log-user-abuse',
+      microdollars_used: 0,
+      google_user_email: 'abuse-test@example.com',
+    });
+
+    const usageStats: MicrodollarUsageStats = {
+      ...BASE_USAGE_STATS,
+      messageId: 'test-msg-abuse',
+      model: 'nvidia/nemotron-3-super-120b-a12b:free',
+    };
+    const usageContext: MicrodollarUsageContext = {
+      ...createBaseUsageContext(user),
+      requested_model: 'nvidia/nemotron-3-super-120b-a12b:free',
+      abuse_delay: 6000,
+      abuse_downgraded_from: 'openai/gpt-4o',
+    };
+
+    await logMicrodollarUsage(usageStats, usageContext);
+
+    const metadataRecord = await db.query.microdollar_usage_metadata.findFirst({
+      where: eq(microdollar_usage_metadata.message_id, 'test-msg-abuse'),
+    });
+    expect(metadataRecord?.abuse_delay).toBe(6000);
+    expect(metadataRecord?.abuse_downgraded_from).toBe('openai/gpt-4o');
+  });
+
   test('stores usage data without incrementing user microdollars for zero cost', async () => {
     const user = await insertTestUser({
       id: 'test-log-user-2',
@@ -952,7 +980,7 @@ describe('toInsertableDbUsageRecord NUL-byte sanitization', () => {
       ...overrides,
     }) satisfies MicrodollarUsageContext;
 
-  test('strips NUL bytes from body- and upstream-sourced string fields', () => {
+  test('strips NUL bytes from body- and upstream-sourced string fields', async () => {
     // Fields whose values cross the CTE insert as individual SQL parameters.
     // A NUL byte in any of them crashes the insert with Postgres 22021 --
     // see KILOCODE-WEB-1G3Z.
@@ -973,7 +1001,7 @@ describe('toInsertableDbUsageRecord NUL-byte sanitization', () => {
       },
     });
 
-    const { core, metadata } = toInsertableDbUsageRecord(
+    const { core, metadata } = await toInsertableDbUsageRecord(
       usageStats,
       extractUsageContextInfo(usageContext)
     );
@@ -999,7 +1027,7 @@ describe('toInsertableDbUsageRecord NUL-byte sanitization', () => {
     }
   });
 
-  test('strips NUL bytes from a directly-constructed fraudHeaders object', () => {
+  test('strips NUL bytes from a directly-constructed fraudHeaders object', async () => {
     // Bypass Node's Headers validation to exercise the defensive coverage of
     // HTTP-header-sourced fields. This documents that IF a NUL byte ever
     // reaches these fields (e.g. through a future upstream change), the
@@ -1016,7 +1044,7 @@ describe('toInsertableDbUsageRecord NUL-byte sanitization', () => {
       },
     });
 
-    const { metadata } = toInsertableDbUsageRecord(
+    const { metadata } = await toInsertableDbUsageRecord(
       baseUsageStats,
       extractUsageContextInfo(usageContext)
     );
@@ -1028,8 +1056,8 @@ describe('toInsertableDbUsageRecord NUL-byte sanitization', () => {
     expect(metadata.http_x_vercel_ja4_digest).toBe('abc');
   });
 
-  test('is a no-op on records without NUL bytes', () => {
-    const { core, metadata } = toInsertableDbUsageRecord(
+  test('is a no-op on records without NUL bytes', async () => {
+    const { core, metadata } = await toInsertableDbUsageRecord(
       baseUsageStats,
       extractUsageContextInfo(makeUsageContext())
     );
@@ -1045,8 +1073,8 @@ describe('toInsertableDbUsageRecord NUL-byte sanitization', () => {
     expect(metadata.message_id).toBe('msg-id');
   });
 
-  test('stores audio transcription api kind metadata', () => {
-    const { metadata } = toInsertableDbUsageRecord(
+  test('stores audio transcription api kind metadata', async () => {
+    const { metadata } = await toInsertableDbUsageRecord(
       baseUsageStats,
       extractUsageContextInfo(makeUsageContext({ api_kind: 'audio_transcriptions' }))
     );

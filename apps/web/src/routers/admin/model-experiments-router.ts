@@ -1,19 +1,27 @@
 import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import { db } from '@/lib/drizzle';
 import {
+  kilocode_users,
   microdollar_usage,
+  microdollar_usage_metadata,
   model_experiment,
   model_experiment_request,
   model_experiment_variant,
   model_experiment_variant_version,
+  system_prompt_prefix,
 } from '@kilocode/db/schema';
 import { encryptApiKey } from '@/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
 import { ExperimentUpstreamSchema } from '@/lib/ai-gateway/experiments/upstream-schema';
-import { EXPERIMENTED_PUBLIC_IDS_REDIS_KEY, modelExperimentRedisKey } from '@/lib/redis-keys';
-import { redisDel, redisSet } from '@/lib/redis';
+import { EXPERIMENTED_PUBLIC_IDS_REDIS_KEY } from '@/lib/redis-keys';
+import {
+  CUSTOM_LLM_PREFIX,
+  KILOCLAW_KILO_PROVIDER_PREFIX,
+  KILOCODE_KILO_PROVIDER_PREFIX,
+} from '@/lib/ai-gateway/model-utils';
+import { redisSet } from '@/lib/redis';
 import { TRPCError } from '@trpc/server';
-import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, inArray, sql } from 'drizzle-orm';
 import * as z from 'zod';
 
 type TrpcErrorCode = ConstructorParameters<typeof TRPCError>[0]['code'];
@@ -34,6 +42,22 @@ const ROUTING_STATUSES: Status[] = ['active', 'paused'];
 
 const idSchema = z.object({ id: z.string().uuid() });
 const variantIdSchema = z.object({ variantId: z.string().uuid() });
+
+// Public ids under these namespaces are reserved for Kilo-owned models and
+// must not be claimed by partner experiment public ids.
+const RESERVED_PUBLIC_ID_PREFIXES = [
+  KILOCODE_KILO_PROVIDER_PREFIX,
+  KILOCLAW_KILO_PROVIDER_PREFIX,
+  CUSTOM_LLM_PREFIX,
+] as const;
+
+const publicModelIdSchema = z
+  .string()
+  .min(1)
+  .refine(
+    value => !RESERVED_PUBLIC_ID_PREFIXES.some(prefix => value.startsWith(prefix)),
+    `public_model_id must not start with a reserved prefix (${RESERVED_PUBLIC_ID_PREFIXES.join(', ')})`
+  );
 
 const labelSchema = z.string().min(1).max(64);
 const weightSchema = z.number().int().positive();
@@ -111,7 +135,7 @@ async function applyExperimentTransition(opts: {
       .where(eq(model_experiment.id, opts.id))
       .returning();
     if (!updated) notFound('Experiment');
-    await invalidateExperimentCaches(updated.public_model_id);
+    await refreshExperimentedPublicIdsCache();
     return updated;
   } catch (err) {
     if (isUniqueViolation(err)) {
@@ -124,15 +148,8 @@ async function applyExperimentTransition(opts: {
   }
 }
 
-async function invalidateExperimentCaches(publicModelId: string) {
-  // Per-public-id cache and the membership set are both touched by every
-  // routing-affecting mutation. Best-effort — Redis being down does not block
-  // admin writes.
-  try {
-    await redisDel(modelExperimentRedisKey(publicModelId));
-  } catch {
-    // already captured by redis helper
-  }
+async function refreshExperimentedPublicIdsCache() {
+  // Best-effort — Redis being down does not block admin writes.
   try {
     await recomputeExperimentedPublicIds();
   } catch {
@@ -143,7 +160,7 @@ async function invalidateExperimentCaches(publicModelId: string) {
 // ---- Selectors ----------------------------------------------------------
 
 // NEVER select encrypted_api_key here. Plaintext keys are decrypted only by
-// the gateway-side cache loader (Phase 3); admin reads must not see them.
+// gateway request routing; admin reads must not see them.
 const variantVersionPublicColumns = {
   id: model_experiment_variant_version.id,
   variant_id: model_experiment_variant_version.variant_id,
@@ -234,7 +251,7 @@ async function assertActivatable(experimentId: string, publicModelId: string) {
 // ---- Router -------------------------------------------------------------
 
 const CreateExperimentSchema = z.object({
-  public_model_id: z.string().min(1),
+  public_model_id: publicModelIdSchema,
   name: z.string().min(1).max(200),
   description: z.string().max(2000).optional(),
 });
@@ -243,7 +260,7 @@ const UpdateExperimentSchema = idSchema.extend({
   name: z.string().min(1).max(200).optional(),
   description: z.string().max(2000).nullable().optional(),
   // public_model_id is editable only on draft.
-  public_model_id: z.string().min(1).optional(),
+  public_model_id: publicModelIdSchema.optional(),
 });
 
 const AddVariantSchema = idSchema.extend({
@@ -274,6 +291,19 @@ const SetArchivedSchema = idSchema.extend({
   archived: z.boolean(),
 });
 
+const ListRequestsSchema = z
+  .object({
+    page: z.number().int().min(1).default(1),
+    limit: z.union([z.literal(10), z.literal(25), z.literal(50), z.literal(100)]).default(25),
+    experimentId: z.string().uuid().optional(),
+    variantId: z.string().uuid().optional(),
+    clientRequestId: z.string().trim().min(1).max(200).optional(),
+    requestKind: z.enum(['chat_completions', 'messages', 'responses']).optional(),
+    outcome: z.enum(['all', 'success', 'error']).default('all'),
+    bodyState: z.enum(['all', 'available', 'truncated', 'failed', 'deleted']).default('all'),
+  })
+  .optional();
+
 export const adminModelExperimentsRouter = createTRPCRouter({
   // ---- Experiment-level ------------------------------------------------
 
@@ -289,51 +319,136 @@ export const adminModelExperimentsRouter = createTRPCRouter({
       return { items: rows };
     }),
 
-  listRequests: adminProcedure.query(async () => {
-    const rows = await db
-      .select({
-        usageId: model_experiment_request.usage_id,
-        createdAt: model_experiment_request.created_at,
-        experimentId: model_experiment.id,
-        experimentName: model_experiment.name,
-        publicModelId: model_experiment.public_model_id,
-        variantId: model_experiment_variant.id,
-        variantLabel: model_experiment_variant.label,
-        variantVersionId: model_experiment_variant_version.id,
-        allocationSubject: model_experiment_request.allocation_subject,
-        clientRequestId: model_experiment_request.client_request_id,
-        requestKind: model_experiment_request.request_kind,
-        requestBodySha256: model_experiment_request.request_body_sha256,
-        wasTruncated: model_experiment_request.was_truncated,
-        userId: microdollar_usage.kilo_user_id,
-        organizationId: microdollar_usage.organization_id,
-        requestedModel: microdollar_usage.requested_model,
-        upstreamModel: microdollar_usage.model,
-        provider: microdollar_usage.provider,
-        inferenceProvider: microdollar_usage.inference_provider,
-        inputTokens: microdollar_usage.input_tokens,
-        outputTokens: microdollar_usage.output_tokens,
-        cacheWriteTokens: microdollar_usage.cache_write_tokens,
-        cacheHitTokens: microdollar_usage.cache_hit_tokens,
-        costMicrodollars: microdollar_usage.cost,
-        cacheDiscountMicrodollars: microdollar_usage.cache_discount,
-        hasError: microdollar_usage.has_error,
-      })
-      .from(model_experiment_request)
-      .innerJoin(microdollar_usage, eq(model_experiment_request.usage_id, microdollar_usage.id))
-      .innerJoin(
-        model_experiment_variant_version,
-        eq(model_experiment_request.variant_version_id, model_experiment_variant_version.id)
-      )
-      .innerJoin(
-        model_experiment_variant,
-        eq(model_experiment_variant_version.variant_id, model_experiment_variant.id)
-      )
-      .innerJoin(model_experiment, eq(model_experiment_variant.experiment_id, model_experiment.id))
-      .orderBy(desc(model_experiment_request.created_at))
-      .limit(100);
+  listRequests: adminProcedure.input(ListRequestsSchema).query(async ({ input }) => {
+    const page = input?.page ?? 1;
+    const limit = input?.limit ?? 25;
+    const offset = (page - 1) * limit;
+    const conditions = [sql`true`];
 
-    return { items: rows };
+    if (input?.experimentId) {
+      conditions.push(eq(model_experiment.id, input.experimentId));
+    }
+    if (input?.variantId) {
+      conditions.push(eq(model_experiment_variant.id, input.variantId));
+    }
+    if (input?.clientRequestId) {
+      conditions.push(eq(model_experiment_request.client_request_id, input.clientRequestId));
+    }
+    if (input?.requestKind) {
+      conditions.push(eq(model_experiment_request.request_kind, input.requestKind));
+    }
+    if (input?.outcome === 'success') {
+      conditions.push(eq(microdollar_usage.has_error, false));
+    } else if (input?.outcome === 'error') {
+      conditions.push(eq(microdollar_usage.has_error, true));
+    }
+    if (input?.bodyState === 'available') {
+      conditions.push(
+        sql`${model_experiment_request.request_body_sha256} NOT IN ('__failed__', '__deleted__')`
+      );
+    } else if (input?.bodyState === 'truncated') {
+      conditions.push(eq(model_experiment_request.was_truncated, true));
+    } else if (input?.bodyState === 'failed') {
+      conditions.push(eq(model_experiment_request.request_body_sha256, '__failed__'));
+    } else if (input?.bodyState === 'deleted') {
+      conditions.push(eq(model_experiment_request.request_body_sha256, '__deleted__'));
+    }
+
+    const filter = and(...conditions);
+    const [totals, rows] = await Promise.all([
+      db
+        .select({ total: count() })
+        .from(model_experiment_request)
+        .innerJoin(microdollar_usage, eq(model_experiment_request.usage_id, microdollar_usage.id))
+        .innerJoin(
+          model_experiment_variant_version,
+          eq(model_experiment_request.variant_version_id, model_experiment_variant_version.id)
+        )
+        .innerJoin(
+          model_experiment_variant,
+          eq(model_experiment_variant_version.variant_id, model_experiment_variant.id)
+        )
+        .innerJoin(
+          model_experiment,
+          eq(model_experiment_variant.experiment_id, model_experiment.id)
+        )
+        .where(filter),
+      db
+        .select({
+          usageId: model_experiment_request.usage_id,
+          createdAt: model_experiment_request.created_at,
+          experimentId: model_experiment.id,
+          experimentName: model_experiment.name,
+          publicModelId: model_experiment.public_model_id,
+          variantId: model_experiment_variant.id,
+          variantLabel: model_experiment_variant.label,
+          variantVersionId: model_experiment_variant_version.id,
+          allocationSubject: model_experiment_request.allocation_subject,
+          clientRequestId: model_experiment_request.client_request_id,
+          requestKind: model_experiment_request.request_kind,
+          requestBodySha256: model_experiment_request.request_body_sha256,
+          wasTruncated: model_experiment_request.was_truncated,
+          userId: microdollar_usage.kilo_user_id,
+          userName: kilocode_users.google_user_name,
+          userEmail: kilocode_users.google_user_email,
+          userImageUrl: kilocode_users.google_user_image_url,
+          requestedModel: microdollar_usage.requested_model,
+          upstreamModel: microdollar_usage.model,
+          provider: microdollar_usage.provider,
+          inferenceProvider: microdollar_usage.inference_provider,
+          inputTokens: microdollar_usage.input_tokens,
+          outputTokens: microdollar_usage.output_tokens,
+          cacheWriteTokens: microdollar_usage.cache_write_tokens,
+          cacheHitTokens: microdollar_usage.cache_hit_tokens,
+          costMicrodollars: microdollar_usage.cost,
+          cacheDiscountMicrodollars: microdollar_usage.cache_discount,
+          hasError: microdollar_usage.has_error,
+          userPromptPrefix: microdollar_usage_metadata.user_prompt_prefix,
+          systemPromptPrefix: system_prompt_prefix.system_prompt_prefix,
+          systemPromptLength: microdollar_usage_metadata.system_prompt_length,
+        })
+        .from(model_experiment_request)
+        .innerJoin(microdollar_usage, eq(model_experiment_request.usage_id, microdollar_usage.id))
+        .leftJoin(
+          microdollar_usage_metadata,
+          eq(model_experiment_request.usage_id, microdollar_usage_metadata.id)
+        )
+        .leftJoin(
+          system_prompt_prefix,
+          eq(
+            microdollar_usage_metadata.system_prompt_prefix_id,
+            system_prompt_prefix.system_prompt_prefix_id
+          )
+        )
+        .leftJoin(kilocode_users, eq(microdollar_usage.kilo_user_id, kilocode_users.id))
+        .innerJoin(
+          model_experiment_variant_version,
+          eq(model_experiment_request.variant_version_id, model_experiment_variant_version.id)
+        )
+        .innerJoin(
+          model_experiment_variant,
+          eq(model_experiment_variant_version.variant_id, model_experiment_variant.id)
+        )
+        .innerJoin(
+          model_experiment,
+          eq(model_experiment_variant.experiment_id, model_experiment.id)
+        )
+        .where(filter)
+        .orderBy(desc(model_experiment_request.created_at), desc(model_experiment_request.usage_id))
+        .limit(limit)
+        .offset(offset),
+    ]);
+
+    const total = totals[0]?.total ?? 0;
+    return {
+      items: rows,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
   }),
 
   get: adminProcedure.input(idSchema).query(async ({ input }) => {
@@ -371,11 +486,10 @@ export const adminModelExperimentsRouter = createTRPCRouter({
       .set(next)
       .where(eq(model_experiment.id, input.id))
       .returning();
-    // Only routing-relevant edits touch the per-public-id cache; cosmetic
-    // name/description-only changes don't invalidate.
+    // Only routing-relevant edits touch the experimented-public-id cache;
+    // cosmetic name/description-only changes don't refresh it.
     if (existing.public_model_id !== updated.public_model_id) {
-      await invalidateExperimentCaches(updated.public_model_id);
-      await invalidateExperimentCaches(existing.public_model_id);
+      await refreshExperimentedPublicIdsCache();
     }
     return updated;
   }),
@@ -519,7 +633,7 @@ export const adminModelExperimentsRouter = createTRPCRouter({
           created_by: ctx.user.id,
         })
         .returning(variantVersionPublicColumns);
-      await invalidateExperimentCaches(experiment.public_model_id);
+      await refreshExperimentedPublicIdsCache();
       return inserted;
     }),
 
@@ -560,7 +674,7 @@ export const adminModelExperimentsRouter = createTRPCRouter({
         created_by: ctx.user.id,
       })
       .returning(variantVersionPublicColumns);
-    await invalidateExperimentCaches(experiment.public_model_id);
+    await refreshExperimentedPublicIdsCache();
     return inserted;
   }),
 });

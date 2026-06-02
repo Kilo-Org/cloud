@@ -67,14 +67,16 @@ function defineDefaultContextInfo(): UsageContextInfo {
     mode: null,
     auto_model: null,
     ttfb_ms: null,
+    abuse_delay: null,
+    abuse_downgraded_from: null,
   };
 }
 
 // Returns structured type for new usage
-export function defineMicrodollarUsage(): CoreUsageWithMetaData {
+export async function defineMicrodollarUsage(): Promise<CoreUsageWithMetaData> {
   const stats = defineDefaultUsageStats();
   const context = defineDefaultContextInfo();
-  const result = toInsertableDbUsageRecord(stats, context);
+  const result = await toInsertableDbUsageRecord(stats, context);
 
   return {
     core: { ...result.core, created_at: '2025-08-15T12:00:00Z' },
@@ -86,7 +88,7 @@ export function defineMicrodollarUsage(): CoreUsageWithMetaData {
 export async function insertUsageWithOverrides(
   overrides: Partial<MicrodollarUsage>
 ): Promise<void> {
-  const { core, metadata } = defineMicrodollarUsage();
+  const { core, metadata } = await defineMicrodollarUsage();
   await insertUsageRecord({ ...core, ...overrides }, metadata);
 }
 
@@ -125,12 +127,12 @@ export function createMockUsageContext(
   };
 }
 
-export function createOrganizationUsage(
+export async function createOrganizationUsage(
   cost: number,
   kilo_user_id: string,
   organization_id: string
-): MicrodollarUsage {
-  const { core } = defineMicrodollarUsage();
+): Promise<MicrodollarUsage> {
+  const { core } = await defineMicrodollarUsage();
   return { ...core, kilo_user_id, cost, organization_id };
 }
 

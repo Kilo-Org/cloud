@@ -65,6 +65,10 @@ async function verifyInstanceOwnership(
   return null;
 }
 
+function restartMachineFailureStatus(error: string | undefined): 404 | 500 {
+  return error === 'No machine exists' ? 404 : 500;
+}
+
 /**
  * Admin API routes -- all operations go through the KiloClawInstance DO.
  */
@@ -111,7 +115,10 @@ adminApi.post('/machine/restart', c =>
           : 'Machine restarting with updated configuration...',
       });
     } else {
-      return c.json({ success: false, error: result.error }, 500);
+      return c.json(
+        { success: false, error: result.error },
+        restartMachineFailureStatus(result.error)
+      );
     }
   })
 );
@@ -144,7 +151,10 @@ adminApi.post('/gateway/restart', c =>
           : 'Machine restarting with updated configuration...',
       });
     } else {
-      return c.json({ success: false, error: result.error }, 500);
+      return c.json(
+        { success: false, error: result.error },
+        restartMachineFailureStatus(result.error)
+      );
     }
   })
 );

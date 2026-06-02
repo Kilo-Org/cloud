@@ -23,6 +23,7 @@ import {
 } from './control-server';
 import { log } from './logger';
 import { refreshTokenIfNearExpiry } from './token-refresh';
+import { AgentStartupError, classifyStartupError } from './startup-error';
 
 const MANAGER_LOG = '[process-manager]';
 
@@ -1319,14 +1320,18 @@ async function startAgentImpl(
     // history is already in kilo.db and re-sending the startup prompt
     // would create a duplicate turn.
     if (!resumed) {
-      await client.session.prompt({
-        path: { id: sessionId },
-        body: {
-          parts: [{ type: 'text', text: request.prompt }],
-          ...(modelParam ? { model: modelParam } : {}),
-          ...(request.systemPrompt ? { system: request.systemPrompt } : {}),
-        },
-      });
+      try {
+        await client.session.prompt({
+          path: { id: sessionId },
+          body: {
+            parts: [{ type: 'text', text: request.prompt }],
+            ...(modelParam ? { model: modelParam } : {}),
+            ...(request.systemPrompt ? { system: request.systemPrompt } : {}),
+          },
+        });
+      } catch (err) {
+        throw new AgentStartupError(classifyStartupError(err, 'initial_prompt'));
+      }
 
       // If the event stream errored while we were awaiting the prompt,
       // the stream-error handler already set the agent to 'failed',

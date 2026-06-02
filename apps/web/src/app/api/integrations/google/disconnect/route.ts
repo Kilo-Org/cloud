@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { APP_URL } from '@/lib/constants';
-import { getUserFromAuth } from '@/lib/user.server';
+import { getUserFromAuth } from '@/lib/user/server';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import { getActiveInstance, getActiveOrgInstance } from '@/lib/kiloclaw/instance-registry';
 import {
@@ -41,7 +41,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.redirect(new URL('/claw/settings?error=invalid_origin', APP_URL), 303);
     }
 
-    const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: true });
+    // Disconnect revokes stored OAuth credentials, so authenticated owners can perform it after billing access expires.
+    const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
     if (authFailedResponse) {
       return NextResponse.redirect(new URL('/users/sign_in', APP_URL), 303);
     }

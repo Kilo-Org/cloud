@@ -1,7 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { UserAdminDashboard } from '@/app/admin/components/UserAdmin/UserAdminDashboard';
 import type { UserDetailProps } from '@/types/admin';
-import { getUserFromAuth, isUserBlacklistedByDomain } from '@/lib/user.server';
+import { getUserFromAuth, isUserBlacklistedByDomain } from '@/lib/user/server';
 import { getPaymentStatusByUserIds, describePaymentMethods } from '@/lib/admin-utils-serverside';
 import { db } from '@/lib/drizzle';
 import type { PaymentMethod } from '@kilocode/db/schema';
@@ -14,7 +14,7 @@ import {
 } from '@kilocode/db/schema';
 import { eq, inArray, desc } from 'drizzle-orm';
 import { findUserById } from '@/lib/user';
-import { getBalanceForUser } from '@/lib/user.balance';
+import { getBalanceForUser } from '@/lib/user/balance';
 import { hasReceivedAnyFreeWelcomeCredits } from '@/lib/welcomeCredits';
 import { redirect } from 'next/navigation';
 import { doesOrgWithSSODomainExist } from '@/lib/organizations/organizations';

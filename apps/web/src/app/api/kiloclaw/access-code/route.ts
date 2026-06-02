@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getUserFromAuth } from '@/lib/user.server';
+import { getUserFromAuth } from '@/lib/user/server';
 import { generateAccessCode } from '@/lib/kiloclaw/access-codes';
 
 export async function POST() {

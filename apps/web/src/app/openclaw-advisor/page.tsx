@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { getUserFromAuthOrRedirect } from '@/lib/user.server';
+import { getUserFromAuthOrRedirect } from '@/lib/user/server';
 // Single source of truth for the device-auth code shape. The shared
 // `isOpenclawAdvisorCallback` helper applies the same regex on the
 // callback-path side so the page-level guard here and the attribution

@@ -8,13 +8,18 @@ export const PromotionRecordSchema = z.object({
   variant: z.string().nullable(),
   task_source: z.string().min(1),
   n_total_trials: z.number().int().nonnegative(),
+  n_attempts: z.number().int().positive().nullable().optional(),
   total_score: z.number().finite(),
   overall_score: z.number().finite(),
   n_errored: z.number().int().nonnegative(),
   avg_cost_usd: z.number().finite().nullable(),
+  total_cost_usd: z.number().finite().nullable().optional(),
   avg_input_tokens: z.number().finite().nullable(),
+  total_input_tokens: z.number().finite().nullable().optional(),
   avg_output_tokens: z.number().finite().nullable(),
+  total_output_tokens: z.number().finite().nullable().optional(),
   avg_cache_read_tokens: z.number().finite().nullable(),
+  total_cache_read_tokens: z.number().finite().nullable().optional(),
   avg_execution_ms: z.number().finite().nullable(),
   promoted_at: z.number().int().nonnegative(),
   promoted_by_email: z.string().min(1),
@@ -33,6 +38,11 @@ export type KiloBenchEval = {
   avgCacheReadTokens: number | null;
   avgExecutionMs: number | null;
   nTotalTrials: number;
+  nAttempts: number | null;
+  avgAttemptCostUsd: number | null;
+  avgAttemptInputTokens: number | null;
+  avgAttemptOutputTokens: number | null;
+  avgAttemptCacheReadTokens: number | null;
   nErrored: number;
   lastPromotedAt: string;
 };
@@ -52,6 +62,11 @@ export type LatestPromotion = {
   avgCacheReadTokens: number | null;
   avgExecutionMs: number | null;
   nTotalTrials: number;
+  nAttempts: number | null;
+  totalCostMicrodollars: number | null;
+  totalInputTokens: number | null;
+  totalOutputTokens: number | null;
+  totalCacheReadTokens: number | null;
   nErrored: number;
   promotedAt: string;
 };

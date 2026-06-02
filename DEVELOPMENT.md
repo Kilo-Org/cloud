@@ -205,23 +205,23 @@ All tests should pass against the local PostgreSQL database.
 
 ## Common Development Commands
 
-| Command                         | Description                                                                                                               |
-| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `pnpm dev:start`                | Start all local services in a tmux dashboard                                                                              |
-| `pnpm dev:stop`                 | Stop the tmux session and all services                                                                                    |
-| `pnpm dev:env`                  | Sync `.dev.vars` files from `.env.local` (see [Worker `.dev.vars` setup](#worker-dev-vars-setup))                         |
-| `pnpm test`                     | Run the Jest test suite                                                                                                   |
-| `pnpm typecheck`                | Run the TypeScript type checker                                                                                           |
-| `pnpm lint`                     | Lint all source files                                                                                                     |
-| `pnpm format`                   | Format all supported files with oxfmt                                                                                     |
-| `pnpm format:changed`           | Format only files changed since `main`                                                                                    |
-| `pnpm validate`                 | Run typecheck, lint, and tests                                                                                            |
-| `pnpm drizzle migrate`          | Apply pending database migrations                                                                                         |
-| `pnpm drizzle generate`         | Generate a new migration after schema changes                                                                             |
-| `pnpm drizzle:verify-bootstrap` | Create a temporary empty database and verify `pnpm drizzle migrate` bootstraps it cleanly                                 |
-| `pnpm dev:db:reset`             | Drop all app-owned schemas in the local dev database, recreate `public`, and leave the DB truly empty before re-migrating |
-| `pnpm --filter web stripe`      | Start Stripe webhook forwarding to localhost                                                                              |
-| `pnpm test:e2e`                 | Run Playwright end-to-end tests                                                                                           |
+| Command | Description |
+|---|---|
+| `pnpm dev:start` | Start all local services in a tmux dashboard |
+| `pnpm dev:stop` | Stop the tmux session and all services |
+| `pnpm dev:env` | Sync `.dev.vars` files from `.env.local` (see [Worker `.dev.vars` setup](#worker-dev-vars-setup)) |
+| `pnpm test` | Run the Jest test suite |
+| `pnpm typecheck` | Run the TypeScript type checker |
+| `pnpm lint` | Lint all source files |
+| `pnpm format` | Format all supported files with oxfmt |
+| `pnpm format:changed` | Format only files changed since `main` |
+| `pnpm validate` | Run typecheck, lint, and tests |
+| `pnpm drizzle migrate` | Apply pending database migrations |
+| `pnpm drizzle generate` | Generate a new migration after schema changes |
+| `pnpm drizzle:verify-bootstrap` | Create a temporary empty database and verify `pnpm drizzle migrate` bootstraps it cleanly |
+| `pnpm dev:db:reset` | Drop all app-owned schemas in the local dev database, recreate `public`, and leave the DB truly empty before re-migrating |
+| `pnpm --filter web stripe` | Start Stripe webhook forwarding to localhost |
+| `pnpm test:e2e` | Run Playwright end-to-end tests |
 
 ## Git Workflow
 
@@ -321,11 +321,11 @@ UPDATE organizations SET require_seats = false WHERE id = '<your-org-id>';
 
 Trial status is checked at three layers:
 
-| Layer          | Mechanism                                                                         | Bypassed by `require_seats = false` |
-| -------------- | --------------------------------------------------------------------------------- | ----------------------------------- |
-| tRPC mutations | `requireActiveSubscriptionOrTrial()` middleware throws `FORBIDDEN` on hard expiry | Yes                                 |
-| Login redirect | `isOrganizationHardLocked()` redirects to `/profile`                              | Yes                                 |
-| Client UI      | `OrganizationTrialWrapper` shows banners and lock dialogs                         | Yes                                 |
+| Layer | Mechanism | Bypassed by `require_seats = false` |
+|---|---|---|
+| tRPC mutations | `requireActiveSubscriptionOrTrial()` middleware throws `FORBIDDEN` on hard expiry | Yes |
+| Login redirect | `isOrganizationHardLocked()` redirects to `/profile` | Yes |
+| Client UI | `OrganizationTrialWrapper` shows banners and lock dialogs | Yes |
 
 ### Test organizations with various trial states
 
@@ -368,16 +368,17 @@ Most workers require a `.dev.vars` file with secrets like `NEXTAUTH_SECRET` and 
 pnpm dev:env
 ```
 
-The script (`dev/local/env-sync/`) scans every `.dev.vars.example` in the repo, resolves each variable's value, and writes (or patches) the corresponding `.dev.vars` file. Before applying, it shows a diff of what will change and asks for confirmation.
+The script (`dev/local/env-sync/`) scans every `.dev.vars.example` in the repo and `apps/web/.env.development.local.example`, resolves each variable's value, and writes (or patches) the corresponding generated local env file. Before applying, it shows a diff of what will change and asks for confirmation.
 
-Values are resolved using annotations in `.dev.vars.example` comment lines:
+Values are resolved using annotations in example env file comment lines:
 
-| Annotation         | What it does                                                                       | Example                                   |
-| ------------------ | ---------------------------------------------------------------------------------- | ----------------------------------------- |
-| _(none)_           | Copies the value from `.env.local` if the key matches, otherwise keeps the default | `INTERNAL_API_SECRET=your-secret-here`    |
-| `# @url <service>` | Builds `http://localhost:<port>` from the service's dev port in `wrangler.jsonc`   | `# @url nextjs` → `http://localhost:3000` |
-| `# @from <KEY>`    | Copies the value of a _different_ key from `.env.local`                            | `# @from CODE_REVIEW_WORKER_AUTH_TOKEN`   |
-| `# @pkcs8`         | Copies from `.env.local` and converts PKCS#1 PEM keys to PKCS#8 format             | `# @pkcs8` above a private key var        |
+| Annotation | What it does | Example |
+|---|---|---|
+| _(none)_ | Copies the value from `.env.local` if the key matches, otherwise keeps the template literal | `INTERNAL_API_SECRET=your-secret-here` |
+| `# @override` | Always uses the template literal, even when `.env.local` contains the same key | `# @override` above a development-only bucket name |
+| `# @url <service>` | Builds `http://localhost:<port>` from the service's dev port in `wrangler.jsonc` | `# @url nextjs` → `http://localhost:3000` |
+| `# @from <KEY>` | Copies the value of a _different_ key from `.env.local` | `# @from CODE_REVIEW_WORKER_AUTH_TOKEN` |
+| `# @pkcs8` | Copies from `.env.local` and converts PKCS#1 PEM keys to PKCS#8 format | `# @pkcs8` above a private key var |
 
 For example, in a `.dev.vars.example`:
 
@@ -414,7 +415,7 @@ If `CF_AE_TOKEN` is missing, Grafana will still boot — only dashboard queries 
 
 ### Limitations in local dev
 
-- **Service bindings** between workers don't function in local `wrangler dev`. This affects chains like session-ingest → o11y, webhook-agent → cloud-agent, and app-builder → db-proxy/git-token-service.
+- **Service bindings** resolve locally for Workers launched together by `pnpm dev:start` when the bound target is running. Bindings to optional services remain unavailable unless their owning group is started (for example, session-ingest -> o11y requires the `observability` group).
 - **Webhook → KiloClaw Chat** triggers require the KiloClaw worker running on port 8795. The webhook worker calls it via `KILOCLAW_API_URL` (HTTP, not a service binding) to deliver messages to Stream Chat. Stream Chat credentials (`STREAM_CHAT_API_KEY`, `STREAM_CHAT_API_SECRET`) must be in `kiloclaw/.dev.vars`.
 - **Cloudflare Containers** (used by cloud-agent, cloud-agent-next, app-builder) always run on Cloudflare's remote infrastructure, even in dev mode. Purely local execution is not possible.
 - **Analytics Engine writes** are no-ops in `wrangler dev` — there is no local AE simulator. Reads against the real prod datasets still work via the local Grafana above. **Pipelines** and **dispatch namespaces** don't work locally.
@@ -435,9 +436,11 @@ export KILO_PORT_OFFSET=auto
 export KILO_PORT_OFFSET=100
 ```
 
-With `auto`, the primary worktree gets offset 0 (default ports), and secondary worktrees get a deterministic offset based on the directory name. The offset is added to the Next.js port (3000), all worker dev ports, and the URLs generated by `pnpm dev:env`.
+With `auto`, the primary worktree gets offset 0 (default ports), and secondary worktrees get a deterministic offset based on the directory name. The offset is added to the Next.js port (3000), all worker dev ports, and the URLs generated by `pnpm dev:env`. Use the same offset when syncing env values and starting or restarting services in a worktree.
 
-Infrastructure containers (`postgres` on 5432, `redis` on 6379, `grafana` on 4000) always bind to their fixed host ports regardless of the offset — they are single shared services, not per-worktree. Only one worktree can run the infra stack at a time; secondary worktrees should either reuse the primary worktree's infra or run `pnpm dev:stop` before starting the infra in another worktree.
+`pnpm dev:start` also passes a worktree-local Wrangler service-discovery registry at `.wrangler/dev-registry` into its tmux session. For worktrees with distinct `kilo-dev-*` session names, this allows concurrent offset Worker stacks such as `agents` to use the same local Worker names without resolving bindings to Workers running from sibling worktrees. The absolute registry path is recorded in `dev/logs/manifest.json` for diagnostics.
+
+Infrastructure containers (`postgres` on 5432, `redis` on 6379, `grafana` on 4000) always bind to their fixed host ports regardless of the offset - they are shared services, not per-worktree instances. Concurrent worktrees reuse those containers, and `pnpm dev:stop` leaves them running while another `kilo-dev-*` session remains active.
 
 ## Troubleshooting
 

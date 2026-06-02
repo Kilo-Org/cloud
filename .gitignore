@@ -67,6 +67,7 @@ yarn-error.log*
 /.plans/*
 !/.plans/experimental-models-1.md
 !/.plans/experimental-models-2.md
+!/.plans/kilo-pass-welcome-promo-card-fingerprint-guard.md
 /.plan/
 .kilo/plans
 .superpowers/
@@ -99,6 +100,9 @@ supabase/.temp
 # linter cache
 .eslintcache
 
+# Expo cache (any Expo app in the repo)
+**/.expo/
+
 # husky generated hook shims
 .husky/_/
 
@@ -116,3 +120,11 @@ run-milvus-test.sh
 .beads/
 .env*.local
 .tests/
+
+# Ignore stray .env-prefixed files but preserve committed example/test/envrc files.
+.env
+.env.*
+!.env.example
+!.env.*.example
+!.env.test
+!.envrc

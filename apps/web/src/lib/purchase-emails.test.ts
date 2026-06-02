@@ -55,7 +55,7 @@ jest.mock('@/lib/kilo-pass/usage-triggered-bonus', () => ({
   maybeIssueKiloPassBonusFromUsageThreshold: jest.fn(async () => {}),
 }));
 
-jest.mock('@/lib/affiliate-events', () => ({
+jest.mock('@/lib/impact/affiliate-events', () => ({
   enqueueAffiliateEventForUser: jest.fn(async () => {}),
   buildAffiliateEventDedupeKey: jest.fn(() => 'test-dedupe-key'),
   recordAffiliateAttributionAndQueueParentEvent: jest.fn(async () => {}),
@@ -130,6 +130,23 @@ describe('subjects map', () => {
   test('includes transactional purchase templates', () => {
     expect(subjects.creditsTopUp).toBeTruthy();
     expect(subjects.kiloClawSubscriptionStarted).toBeTruthy();
+    expect(subjects.codeReviewDisabled).toBe('Action Required: Code Reviewer Disabled');
+  });
+});
+
+describe('codeReviewDisabled template', () => {
+  test('renders reason and recovery link', () => {
+    const html = renderTemplate('codeReviewDisabled', {
+      reason: 'The selected BYOK API key is invalid or has been revoked.',
+      recovery_url: 'https://app.kilocode.ai/byok',
+      recovery_label: 'Update BYOK settings',
+      year: '2026',
+    });
+
+    expect(html).toContain('Code Reviewer Disabled');
+    expect(html).toContain('The selected BYOK API key is invalid or has been revoked.');
+    expect(html).toContain('https://app.kilocode.ai/byok');
+    expect(html).toContain('Update BYOK settings');
   });
 });
 
@@ -150,6 +167,77 @@ describe('kiloClawSubscriptionStarted template', () => {
     expect(html).toContain('May 1, 2026 - June 1, 2026');
     expect(html).toContain('June 1, 2026');
     expect(html).toContain('https://app.kilocode.ai/claw/subscription');
+  });
+});
+
+describe('organization KiloClaw lifecycle templates', () => {
+  const commonVars = {
+    organization_name: 'Acme Corp',
+    instance_label: 'Research Claw',
+    year: '2026',
+  };
+
+  test('renders billing-authority suspension copy with organization billing CTA', () => {
+    const html = renderTemplate('clawOrganizationTrialSuspendedBillingAuthority', {
+      ...commonVars,
+      destruction_date: 'May 25, 2026',
+      organization_billing_url: 'https://app.kilocode.ai/organizations/org-123/payment-details',
+    });
+
+    expect(html).toContain('Organization KiloClaw Suspended');
+    expect(html).toContain('Restore Organization Access');
+    expect(html).toContain('Acme Corp');
+    expect(html).toContain('Research Claw');
+    expect(html).toContain('https://app.kilocode.ai/organizations/org-123/payment-details');
+    expect(html).not.toContain('https://app.kilocode.ai/claw');
+  });
+
+  test('renders associated-user warning copy with contact-admin guidance and organization CTA', () => {
+    const html = renderTemplate('clawOrganizationDestructionWarningUser', {
+      ...commonVars,
+      destruction_date: 'May 25, 2026',
+      organization_claw_url: 'https://app.kilocode.ai/organizations/org-123/claw',
+    });
+
+    expect(html).toContain('Ask an organization owner or billing manager');
+    expect(html).toContain('View Organization KiloClaw');
+    expect(html).toContain('https://app.kilocode.ai/organizations/org-123/claw');
+    expect(html).not.toContain('https://app.kilocode.ai/claw');
+  });
+
+  test('renders user suspension and billing-authority warning variants', () => {
+    const suspendedUserHtml = renderTemplate('clawOrganizationTrialSuspendedUser', {
+      ...commonVars,
+      destruction_date: 'May 25, 2026',
+      organization_claw_url: 'https://app.kilocode.ai/organizations/org-123/claw',
+    });
+    const authorityWarningHtml = renderTemplate(
+      'clawOrganizationDestructionWarningBillingAuthority',
+      {
+        ...commonVars,
+        destruction_date: 'May 25, 2026',
+        organization_billing_url: 'https://app.kilocode.ai/organizations/org-123/payment-details',
+      }
+    );
+
+    expect(suspendedUserHtml).toContain('Ask an organization owner or billing manager');
+    expect(authorityWarningHtml).toContain('Restore Organization Access');
+  });
+
+  test('renders both destroyed variants with organization destinations', () => {
+    const billingHtml = renderTemplate('clawOrganizationInstanceDestroyedBillingAuthority', {
+      ...commonVars,
+      organization_billing_url: 'https://app.kilocode.ai/organizations/org-123/payment-details',
+    });
+    const userHtml = renderTemplate('clawOrganizationInstanceDestroyedUser', {
+      ...commonVars,
+      organization_claw_url: 'https://app.kilocode.ai/organizations/org-123/claw',
+    });
+
+    expect(billingHtml).toContain('View Organization Billing');
+    expect(billingHtml).toContain('https://app.kilocode.ai/organizations/org-123/payment-details');
+    expect(userHtml).toContain('Ask an organization owner or billing');
+    expect(userHtml).toContain('https://app.kilocode.ai/organizations/org-123/claw');
   });
 });
 

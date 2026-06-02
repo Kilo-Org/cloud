@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test } from '@jest/globals';
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserFromAuth } from '@/lib/user.server';
+import { getUserFromAuth } from '@/lib/user/server';
 import { getActiveInstance, getActiveOrgInstance } from '@/lib/kiloclaw/instance-registry';
 import {
   clearKiloClawGoogleOAuthConnection,
@@ -9,7 +9,7 @@ import {
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { failureResult } from '@/lib/maybe-result';
 
-jest.mock('@/lib/user.server');
+jest.mock('@/lib/user/server');
 const mockedEnsureOrganizationAccess = jest.fn();
 jest.mock('@/routers/organizations/utils', () => ({
   ensureOrganizationAccess: mockedEnsureOrganizationAccess,
@@ -96,7 +96,7 @@ describe('POST /api/integrations/google/disconnect', () => {
 
     expect(response.status).toBe(303);
     expectRedirectLocation(response, '/claw/settings?success=google_disconnected');
-    expect(mockedGetUserFromAuth).toHaveBeenCalledWith({ adminOnly: true });
+    expect(mockedGetUserFromAuth).toHaveBeenCalledWith({ adminOnly: false });
     expect(mockedGetActiveInstance).toHaveBeenCalledWith(USER_ID);
     expect(mockedGetKiloClawGoogleOAuthConnection).toHaveBeenCalledWith(INSTANCE_ID);
     expect(mockedClearKiloClawGoogleOAuthConnection).toHaveBeenCalledWith(INSTANCE_ID);

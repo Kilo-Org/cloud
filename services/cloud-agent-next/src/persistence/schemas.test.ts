@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  AttachmentsSchema,
   ImagesSchema,
   MCPServerConfigSchema,
   MetadataSchema,
@@ -9,8 +10,47 @@ import {
 } from './schemas.js';
 import type { MCPServerConfig } from './types.js';
 
+describe('AttachmentsSchema', () => {
+  it('accepts image and document UUID filenames up to the message limit', () => {
+    const attachments = {
+      path: '123e4567-e89b-12d3-a456-426614174000',
+      files: [
+        '123e4567-e89b-12d3-a456-426614174001.pdf',
+        '123e4567-e89b-12d3-a456-426614174002.txt',
+        '123e4567-e89b-12d3-a456-426614174003.md',
+        '123e4567-e89b-12d3-a456-426614174004.csv',
+        '123e4567-e89b-12d3-a456-426614174005.jpeg',
+      ],
+    };
+
+    expect(AttachmentsSchema.parse(attachments)).toEqual(attachments);
+  });
+
+  it('rejects unsupported document filename suffixes and more than five attachments', () => {
+    expect(
+      AttachmentsSchema.safeParse({
+        path: '123e4567-e89b-12d3-a456-426614174000',
+        files: ['123e4567-e89b-12d3-a456-426614174001.docx'],
+      }).success
+    ).toBe(false);
+    expect(
+      AttachmentsSchema.safeParse({
+        path: '123e4567-e89b-12d3-a456-426614174000',
+        files: [
+          '123e4567-e89b-12d3-a456-426614174001.pdf',
+          '123e4567-e89b-12d3-a456-426614174002.txt',
+          '123e4567-e89b-12d3-a456-426614174003.md',
+          '123e4567-e89b-12d3-a456-426614174004.png',
+          '123e4567-e89b-12d3-a456-426614174005.jpg',
+          '123e4567-e89b-12d3-a456-426614174006.gif',
+        ],
+      }).success
+    ).toBe(false);
+  });
+});
+
 describe('ImagesSchema', () => {
-  it('accepts a bare message UUID and up to five UUID image filenames', () => {
+  it('retains legacy image descriptor acceptance without accepting document suffixes', () => {
     const images = {
       path: '123e4567-e89b-12d3-a456-426614174000',
       files: [
@@ -23,6 +63,12 @@ describe('ImagesSchema', () => {
     };
 
     expect(ImagesSchema.parse(images)).toEqual(images);
+    expect(
+      ImagesSchema.safeParse({
+        path: images.path,
+        files: ['123e4567-e89b-12d3-a456-426614174006.pdf'],
+      }).success
+    ).toBe(false);
   });
 
   it('rejects client-provided R2 service prefixes', () => {

@@ -118,12 +118,16 @@ describe('POST /v1/attachments/init (user)', () => {
       attachmentId: string;
       putUrl: string;
       putHeaders: Record<string, string>;
+      putUrlExpiresAt: number;
     }>();
     expect(body.attachmentId).toMatch(/^[0-9A-HJKMNP-TV-Z]{26}$/);
     expect(body.putUrl).toContain('.r2.cloudflarestorage.com/');
     expect(body.putUrl).toContain('X-Amz-Expires=900');
     expect(body.putHeaders['Content-Type']).toBe('image/png');
     expect(body.putHeaders['Content-Length']).toBe('1024');
+    const nowSec = Math.floor(Date.now() / 1000);
+    expect(body.putUrlExpiresAt).toBeGreaterThan(nowSec + 800);
+    expect(body.putUrlExpiresAt).toBeLessThanOrEqual(nowSec + 900);
   });
 
   it('rejects size > 100 MB with 400', async () => {
@@ -145,6 +149,37 @@ describe('POST /v1/attachments/init (user)', () => {
       testEnv
     );
     expect(res.status).toBe(400);
+  });
+
+  it('accepts a long multi-byte UTF-8 filename without timing out', async () => {
+    const { userId, conversationId, testEnv } = await createConversationAsUser('att-init-utf8');
+    const userApp = makeUserApp(userId);
+
+    const filename =
+      'very-long-attachment-filename-with-unicode-åß∂ƒ-and-many-segments-for-truncation-check.txt';
+
+    const start = Date.now();
+    const res = await userApp.request(
+      '/v1/attachments/init',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          conversationId,
+          mimeType: 'text/plain',
+          size: 21,
+          filename,
+        }),
+      },
+      testEnv
+    );
+    const elapsedMs = Date.now() - start;
+
+    expect(res.status).toBe(200);
+    expect(elapsedMs).toBeLessThan(5_000);
+    const body = await res.json<{ attachmentId: string; putUrl: string }>();
+    expect(body.attachmentId).toMatch(/^[0-9A-HJKMNP-TV-Z]{26}$/);
+    expect(body.putUrl).toContain('.r2.cloudflarestorage.com/');
   });
 
   it('rejects non-member with 403', async () => {
@@ -198,11 +233,13 @@ describe('POST /bot/v1/sandboxes/:sandboxId/attachments/init (bot)', () => {
       attachmentId: string;
       putUrl: string;
       putHeaders: Record<string, string>;
+      putUrlExpiresAt: number;
     }>();
     expect(body.attachmentId).toMatch(/^[0-9A-HJKMNP-TV-Z]{26}$/);
     expect(body.putUrl).toContain('.r2.cloudflarestorage.com/');
     expect(body.putHeaders['Content-Type']).toBe('image/png');
     expect(body.putHeaders['Content-Length']).toBe('256');
+    expect(typeof body.putUrlExpiresAt).toBe('number');
   });
 
   it('rejects bot from sandbox-B accessing a conversation owned by sandbox-A with 403', async () => {

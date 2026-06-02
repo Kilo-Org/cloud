@@ -3,7 +3,7 @@ import { mockOpenRouterModels, createMockResponse } from './helpers/openrouter-m
 import { GET } from '../app/api/openrouter/models/route';
 import { NextRequest } from 'next/server';
 
-jest.mock('@/lib/user.server', () => ({
+jest.mock('@/lib/user/server', () => ({
   getUserByAuthorizationHeader: jest.fn().mockImplementation(async () => ({
     user: { id: 'test-user-id' },
     authFailedResponse: null,

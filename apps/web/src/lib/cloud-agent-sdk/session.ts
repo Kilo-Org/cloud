@@ -6,6 +6,7 @@
  * CLI live, or CLI historical transport.
  */
 import type { QuestionInfo } from '@/types/opencode.gen';
+import type { CloudAgentAttachments } from '@/lib/cloud-agent/constants';
 import type { Images } from '@/lib/images-schema';
 import type { NormalizedEvent } from './normalizer';
 import type { SuggestionAction } from './types';
@@ -16,6 +17,7 @@ import { createCloudAgentTransport } from './cloud-agent-transport';
 import { createCliLiveTransport } from './cli-live-transport';
 import { createCliHistoricalTransport } from './cli-historical-transport';
 import type { ConnectionLifecycleHooks, WebSocketHeaders } from './base-connection';
+import type { UserWebConnection } from './user-web-connection';
 import type {
   CloudAgentApi,
   CloudAgentStreamTicketResult,
@@ -29,6 +31,7 @@ import type { SessionStorage } from './storage/types';
 import type {
   CloudAgentSessionId,
   KiloSessionId,
+  MessageDeliveryState,
   ResolvedSession,
   SessionInfo,
   SessionSnapshot,
@@ -63,11 +66,18 @@ type CloudAgentSessionConfig = {
   onSessionCreated?: (info: SessionInfo) => void;
   onSessionUpdated?: (info: SessionInfo) => void;
   onEvent?: (event: NormalizedEvent) => void;
+  onMessageQueued?: (messageId: string) => void;
+  onMessageCompleted?: (messageId: string) => void;
+  onMessageFailed?: (
+    messageId: string,
+    state: Extract<MessageDeliveryState, { status: 'failed' }>
+  ) => void;
 };
 
 type CloudAgentSessionSendInput = {
   payload: TransportSendPayload;
   messageId?: string;
+  attachments?: CloudAgentAttachments;
   images?: Images;
 };
 
@@ -108,9 +118,8 @@ type CloudAgentSessionTransport = {
   lifecycleHooks?: ConnectionLifecycleHooks;
   websocketHeaders?: WebSocketHeaders;
 
-  // CLI live transport construction
-  getAuthToken?: () => string | Promise<string>;
-  cliWebsocketUrl?: string;
+  // Remote CLI live transport construction
+  userWebConnection?: UserWebConnection;
 };
 
 type CloudAgentSession = {
@@ -157,6 +166,9 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
     onBranchChanged: config.onBranchChanged,
     onSessionCreated: config.onSessionCreated,
     onSessionUpdated: config.onSessionUpdated,
+    onMessageQueued: config.onMessageQueued,
+    onMessageCompleted: config.onMessageCompleted,
+    onMessageFailed: config.onMessageFailed,
   });
 
   let transport: Transport | null = null;
@@ -169,6 +181,16 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
     },
     onServiceEvent(event) {
       serviceState.process(event);
+      // `cloud.message.queued` also drives chat storage — materializes a
+      // synthetic user message when none exists so the UI renders the
+      // prompt as soon as the server acknowledges it.
+      if (event.type === 'cloud.message.queued') {
+        chatProcessor.synthesizeQueuedUserMessage({
+          messageId: event.messageId,
+          sessionId: config.kiloSessionId,
+          content: event.content,
+        });
+      }
       config.onEvent?.(event);
     },
   };
@@ -176,19 +198,16 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
   function pickTransportFactory(resolved: ResolvedSession): TransportFactory {
     switch (resolved.type) {
       case 'remote': {
-        if (!config.transport.cliWebsocketUrl || !config.transport.getAuthToken) {
+        if (!config.transport.userWebConnection) {
           throw new Error(
-            'CloudAgentSession transport.cliWebsocketUrl and getAuthToken are required for remote CLI sessions'
+            'CloudAgentSession transport.userWebConnection is required for remote CLI sessions'
           );
         }
         return createCliLiveTransport({
           kiloSessionId: resolved.kiloSessionId,
-          websocketUrl: config.transport.cliWebsocketUrl,
-          getAuthToken: config.transport.getAuthToken,
+          userWebConnection: config.transport.userWebConnection,
           fetchSnapshot: config.transport.fetchSnapshot,
           onError: config.onError,
-          lifecycleHooks: config.transport.lifecycleHooks,
-          websocketHeaders: config.transport.websocketHeaders,
         });
       }
       case 'cloud-agent': {

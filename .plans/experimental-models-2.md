@@ -51,13 +51,13 @@ Consent handling:
 
 Replay bundles, SWE-bench/OpenHands adapters, and held-out replay-eval are out of scope for v1 because key capture artifacts do not exist yet. Required follow-on work lives mostly in the kilocode CLI repo:
 
-| Gap                      | Required capture                                                                                                      |
-| ------------------------ | --------------------------------------------------------------------------------------------------------------------- |
-| Resolved agent config    | `agent_snapshot` ingest item per user-message turn with canonical hash and `Agent.Info`.                              |
-| Lossless part bodies     | `part_raw` ingest path with checksum and no read-path stripping.                                                      |
+| Gap | Required capture |
+|---|---|
+| Resolved agent config | `agent_snapshot` ingest item per user-message turn with canonical hash and `Agent.Info`. |
+| Lossless part bodies | `part_raw` ingest path with checksum and no read-path stripping. |
 | Workspace reconstruction | `workspace_ref` at session start with sanitized git remote, base commit, branch, dirty-start diff, and touched paths. |
-| Per-step replay          | `step_diff` items with full file diffs, including patch text.                                                         |
-| Retry analytics          | Structured `RetryPart` producer rather than only session-level `"retry"` status.                                      |
+| Per-step replay | `step_diff` items with full file diffs, including patch text. |
+| Retry analytics | Structured `RetryPart` producer rather than only session-level `"retry"` status. |
 
 Future packages/services:
 

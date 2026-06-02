@@ -9,6 +9,11 @@ import { validateStreamTicket, validateKiloToken } from './auth.js';
 import { createErrorHandler, createNotFoundHandler } from '@kilocode/worker-utils';
 import { createCallbackQueueConsumer } from './callbacks/index.js';
 import type { CallbackJob } from './callbacks/index.js';
+import {
+  CLOUD_AGENT_REPORT_QUEUE_NAMES,
+  consumeCloudAgentReportBatch,
+  removeExpiredCloudAgentReportData,
+} from './telemetry/report-consumer.js';
 import { authMiddleware } from './middleware/auth.js';
 import { balanceMiddleware } from './middleware/balance.js';
 import { resolveTerminalWrapperClient } from './terminal/access.js';
@@ -24,6 +29,7 @@ function isAllowedWebSocketOrigin(env: Env, origin: string | undefined): boolean
   return allowedOrigins.length === 0 || !isRealOrigin || allowedOrigins.includes(origin);
 }
 
+// TODO: the name is not very clear. I thought it is a termination of a websocket, not that websocket is for PTY
 async function handleTerminalWebSocket(request: Request, env: Env): Promise<Response> {
   const upgradeHeader = request.headers.get('Upgrade');
   if (upgradeHeader?.toLowerCase() !== 'websocket') {
@@ -120,6 +126,7 @@ app.get('/health', (c: Context<HonoContext>) => {
   });
 });
 
+// TODO: I think this and /terminal share a bit of code. Could be worth extracting to middleware or just a common method?
 app.get('/stream', async (c: Context<HonoContext>) => {
   const upgradeHeader = c.req.header('Upgrade');
   if (upgradeHeader?.toLowerCase() !== 'websocket') {
@@ -325,13 +332,19 @@ export default {
 
     return app.fetch(request, env, ctx);
   },
-  async queue(batch: MessageBatch<unknown>, _env: Env): Promise<void> {
+  async queue(batch: MessageBatch<unknown>, env: Env): Promise<void> {
     if (batch.queue.startsWith('cloud-agent-next-callback-queue')) {
       const consumer = createCallbackQueueConsumer();
       return consumer(batch as MessageBatch<CallbackJob>);
     }
+    if (CLOUD_AGENT_REPORT_QUEUE_NAMES.has(batch.queue)) {
+      return consumeCloudAgentReportBatch(batch, env);
+    }
 
     logger.warn(`Received message from unexpected queue: ${batch.queue}`);
+  },
+  async scheduled(_controller: ScheduledController, env: Env): Promise<void> {
+    await removeExpiredCloudAgentReportData(env);
   },
 };
 

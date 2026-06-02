@@ -2,6 +2,7 @@ import { createContext, type ReactNode, useContext, useEffect, useRef } from 're
 import { createStore, Provider as JotaiProvider } from 'jotai';
 import { type SessionManager } from 'cloud-agent-sdk';
 import { createMobileAgentSessionManager } from '@/components/agents/mobile-session-manager';
+import { useUserWebConnection } from '@/components/agents/user-web-connection-provider';
 
 const ManagerContext = createContext<SessionManager | null>(null);
 
@@ -14,10 +15,12 @@ export function AgentSessionProvider({
   children,
   organizationId,
 }: Readonly<AgentSessionProviderProps>) {
+  const userWebConnection = useUserWebConnection();
   const storeRef = useRef(createStore());
   const managerRef = useRef<SessionManager | null>(null);
   managerRef.current ??= createMobileAgentSessionManager({
     store: storeRef.current,
+    userWebConnection,
     organizationId,
   });
 

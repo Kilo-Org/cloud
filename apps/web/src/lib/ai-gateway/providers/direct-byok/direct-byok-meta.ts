@@ -7,6 +7,8 @@ export const DIRECT_BYOK_PROVIDERS_META = {
   'kimi-coding': 'Kimi Code',
   neuralwatt: 'Neuralwatt',
   'ollama-cloud': 'Ollama Cloud',
+  'xiaomi-token-plan-ams': 'Xiaomi Token Plan (Europe)',
+  'xiaomi-token-plan-sgp': 'Xiaomi Token Plan (Singapore)',
   'zai-coding': 'Z.ai Coding Plan',
 } as const satisfies Record<Exclude<DirectUserByokInferenceProviderId, 'codestral'>, string>;
 

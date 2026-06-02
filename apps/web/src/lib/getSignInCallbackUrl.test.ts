@@ -39,6 +39,15 @@ describe('getSignInCallbackUrl', () => {
 
       expect(result).toBe('/users/after-sign-in?callbackPath=%2Fsign-in-to-editor');
     });
+
+    test('passes standard OAuth connect API callback paths through after-sign-in', () => {
+      const callbackPath = '/api/integrations/linear/connect?organizationId=org-linear-123';
+      const result = getSignInCallbackUrl({ callbackPath });
+
+      expect(result).toBe(
+        '/users/after-sign-in?callbackPath=%2Fapi%2Fintegrations%2Flinear%2Fconnect%3ForganizationId%3Dorg-linear-123'
+      );
+    });
   });
 
   describe('isValidCallbackPath', () => {
@@ -76,6 +85,18 @@ describe('getSignInCallbackUrl', () => {
       test('accepts integrations/ prefixed paths', () => {
         expect(isValidCallbackPath('/integrations/github')).toBe(true);
         expect(isValidCallbackPath('/integrations/gitlab')).toBe(true);
+      });
+
+      test('accepts standard OAuth connect API paths', () => {
+        expect(isValidCallbackPath('/api/integrations/slack/connect')).toBe(true);
+        expect(isValidCallbackPath('/api/integrations/linear/connect?organizationId=org-123')).toBe(
+          true
+        );
+        expect(
+          isValidCallbackPath(
+            '/api/integrations/gitlab/connect?instanceUrl=https%3A%2F%2Fgitlab.example.com'
+          )
+        ).toBe(true);
       });
     });
 
@@ -115,6 +136,16 @@ describe('getSignInCallbackUrl', () => {
 
       test('rejects users/ with multiple segments', () => {
         expect(isValidCallbackPath('/users/admin/panel')).toBe(false);
+      });
+
+      test('rejects non-connect and unsupported OAuth API paths', () => {
+        expect(isValidCallbackPath('/api/integrations/linear/callback')).toBe(false);
+        expect(isValidCallbackPath('/api/integrations/github/connect')).toBe(false);
+        expect(isValidCallbackPath('/api/integrations/linear/connect/extra')).toBe(false);
+        expect(isValidCallbackPath('/api/integrations/gitlab/connect?clientSecret=secret')).toBe(
+          false
+        );
+        expect(isValidCallbackPath('/api/v1/users')).toBe(false);
       });
 
       test('rejects paths with spaces', () => {

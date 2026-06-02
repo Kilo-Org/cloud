@@ -10,6 +10,7 @@
 
 import { DurableObject } from 'cloudflare:workers';
 import type { KiloClawEnv } from '../../types';
+import type { OpenclawFileWriteValidation } from '../gateway-controller-types';
 import type {
   InstanceConfig,
   PersistedState,
@@ -36,6 +37,7 @@ import type {
   KiloclawStopReason,
 } from '@kilocode/worker-utils';
 import {
+  imageRolloutSubjectFromSandboxId,
   isInstanceKeyedSandboxId,
   instanceIdFromSandboxId,
 } from '@kilocode/worker-utils/instance-id';
@@ -244,7 +246,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   private async resolveImageStateForPin(
     pinnedImageTag: string | null,
     userId: string,
-    instanceId: string,
+    rolloutSubject: string,
     opts: { isNew: boolean; ignoreCurrentImageTag?: boolean }
   ): Promise<void> {
     if (pinnedImageTag) {
@@ -331,7 +333,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     const selected = await selectImageVersionForInstance({
       kv: this.env.KV_CLAW_CACHE,
       variant,
-      instanceId,
+      rolloutSubject,
       currentImageTag: selectorCurrentImageTag,
       autoEnroll,
     });
@@ -1909,10 +1911,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
    * Returns the resolved image metadata so the caller can surface what
    * was actually applied.
    */
-  async applyPinnedVersion(
-    imageTag: string | null,
-    instanceId?: string
-  ): Promise<{
+  async applyPinnedVersion(imageTag: string | null): Promise<{
     openclawVersion: string | null;
     imageTag: string | null;
     imageDigest: string | null;
@@ -1931,9 +1930,14 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     if (!this.s.userId) {
       throw Object.assign(new Error('Cannot apply pin: instance has no userId'), { status: 404 });
     }
+    if (!this.s.sandboxId) {
+      throw Object.assign(new Error('Cannot apply pin: instance has no sandboxId'), {
+        status: 404,
+      });
+    }
 
-    const resolvedInstanceId = instanceId ?? this.s.userId;
-    await this.resolveImageStateForPin(imageTag, this.s.userId, resolvedInstanceId, {
+    const rolloutSubject = imageRolloutSubjectFromSandboxId(this.s.sandboxId, this.s.userId);
+    await this.resolveImageStateForPin(imageTag, this.s.userId, rolloutSubject, {
       isNew: false,
       // When clearing a pin (imageTag === null), force a fresh rollout
       // decision instead of preserving the currently-tracked tag. Without
@@ -3712,6 +3716,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     version: string;
     commit: string;
     openclawVersion?: string | null;
+    openclawCommit?: string | null;
+    apiVersion?: number;
+    capabilities?: string[];
   } | null> {
     await this.loadState();
     return gateway.getControllerVersion(this.s, this.env);
@@ -3760,6 +3767,15 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   async writeFile(filePath: string, content: string, etag?: string) {
     await this.loadState();
     return gateway.writeFile(this.s, this.env, filePath, content, etag);
+  }
+
+  async writeOpenclawConfigFile(
+    content: string,
+    etag: string | undefined,
+    mode: OpenclawFileWriteValidation
+  ) {
+    await this.loadState();
+    return gateway.writeOpenclawConfigFile(this.s, this.env, content, etag, mode);
   }
 
   async importOpenclawWorkspace(files: Array<{ path: string; content: string }>) {
@@ -3907,6 +3923,17 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   }
 
   /**
+   * Create (or return) the "Today's briefing" conversation and start the
+   * in-chat onboarding briefing. Returns fast — generation runs in the
+   * plugin background. `settingsHref` is the org-aware Settings link the
+   * worker derived for the "Connect more" items.
+   */
+  async startOnboardingBriefing(settingsHref?: string) {
+    await this.loadState();
+    return gateway.startOnboardingBriefing(this.s, this.env, settingsHref);
+  }
+
+  /**
    * Post-provisioning user-location update from the Settings UI. Mirrors
    * the shape of `updateBriefingInterests`: a focused mutation that
    * bypasses the heavy `provision()` lock + envvar rebuild path. The
@@ -4042,10 +4069,10 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       if (options?.imageTag) {
         if (options.imageTag === 'latest') {
           const variant: ImageVariant = 'default';
-          const instanceIdForBucket =
-            this.s.sandboxId && isInstanceKeyedSandboxId(this.s.sandboxId)
-              ? instanceIdFromSandboxId(this.s.sandboxId)
-              : (this.s.userId ?? '');
+          const rolloutSubject = imageRolloutSubjectFromSandboxId(
+            this.s.sandboxId,
+            this.s.userId ?? ''
+          );
           let autoEnroll = false;
           if (this.s.userId && this.env.HYPERDRIVE?.connectionString) {
             try {
@@ -4062,7 +4089,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
           const latest = await selectImageVersionForInstance({
             kv: this.env.KV_CLAW_CACHE,
             variant,
-            instanceId: instanceIdForBucket,
+            rolloutSubject,
             currentImageTag: this.s.trackedImageTag,
             autoEnroll,
           });

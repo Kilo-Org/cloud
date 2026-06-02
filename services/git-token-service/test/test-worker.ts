@@ -11,7 +11,7 @@
  * Endpoints:
  *   POST /getTokenForRepo - { githubRepo, userId, orgId? }
  *   POST /getToken - { installationId, appType? }
- *   POST /getGitLabToken - { userId, orgId? }
+ *   POST /getGitLabToken - { userId, orgId?, repositoryUrl?, createdOnPlatform? }
  */
 import type {
   GitTokenRPCEntrypoint,
@@ -64,7 +64,7 @@ export default {
           endpoints: [
             'POST /getTokenForRepo - { githubRepo, userId, orgId? }',
             'POST /getToken - { installationId, appType? }',
-            'POST /getGitLabToken - { userId, orgId? }',
+            'POST /getGitLabToken - { userId, orgId?, repositoryUrl?, createdOnPlatform? }',
           ],
         },
         { status: 404 }

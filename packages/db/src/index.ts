@@ -17,10 +17,19 @@ export {
 export {
   collapseOrphanPersonalSubscriptionsOnDestroy,
   FundedRowDemotionRefusedError,
+  isAccessGrantingSubscription,
   markInstanceDestroyedWithPersonalSubscriptionCollapse,
+  PersonalSubscriptionCollapseUQConflictError,
   PersonalSubscriptionDestroyConflictError,
   type DestroyedInstanceRow,
 } from './kiloclaw-personal-subscription-collapse';
+export {
+  getOrphanVolumeContextProtections,
+  ORPHAN_VOLUME_GRACE_PERIOD_MS,
+  orphanVolumeSubscriptionContextKey,
+  type OrphanVolumeContextProtections,
+  type OrphanVolumeSubscriptionContext,
+} from './kiloclaw-orphan-volume';
 export { computeDatabaseUrl, getDatabaseClientConfig } from './database-url';
 export {
   countUnresolvedTerminalRenewalFailures,

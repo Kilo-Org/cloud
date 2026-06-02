@@ -21,12 +21,13 @@ const groups: ServiceGroup[] = [
     alwaysOn: false,
     sectionBreakBefore: true,
   },
-  { id: 'kiloclaw', label: 'KiloClaw', alwaysOn: false },
+  { id: 'notifications', label: 'Notifications', alwaysOn: false },
+  { id: 'kiloclaw', label: 'KiloClaw', alwaysOn: false, groupDependsOn: ['notifications'] },
   {
     id: 'cloud-agent',
     label: 'Cloud Agent',
     alwaysOn: false,
-    groupDependsOn: ['git-token-service'],
+    groupDependsOn: ['git-token-service', 'notifications'],
   },
   { id: 'code-review', label: 'Code Review', alwaysOn: false, groupDependsOn: ['cloud-agent'] },
   { id: 'app-builder', label: 'App Builder', alwaysOn: false, groupDependsOn: ['cloud-agent'] },
@@ -72,7 +73,13 @@ const serviceMeta: Record<string, ServiceMeta> = {
   // cloud-agent
   'cloud-agent-next': {
     group: 'cloud-agent',
-    dependsOn: ['postgres', 'nextjs', 'cloudflare-session-ingest', 'cloudflare-git-token-service'],
+    dependsOn: [
+      'postgres',
+      'nextjs',
+      'cloudflare-session-ingest',
+      'cloudflare-git-token-service',
+      'notifications',
+    ],
     dir: 'services/cloud-agent-next',
     useLanIp: true,
   },
@@ -85,6 +92,11 @@ const serviceMeta: Record<string, ServiceMeta> = {
     group: 'cloud-agent',
     dependsOn: ['postgres'],
     dir: 'services/session-ingest',
+  },
+  'fake-llm': {
+    group: 'cloud-agent',
+    dependsOn: [],
+    dir: 'services/cloud-agent-next/test/e2e',
   },
   // git-token-service (shared by cloud-agent, app-builder, gastown)
   'cloudflare-git-token-service': {
@@ -138,7 +150,7 @@ const serviceMeta: Record<string, ServiceMeta> = {
   'kiloclaw-tunnel': { group: 'kiloclaw', dependsOn: [] },
   'kiloclaw-docker-tcp': { group: 'kiloclaw', dependsOn: [] },
   notifications: {
-    group: 'kiloclaw',
+    group: 'notifications',
     dependsOn: ['postgres'],
     dir: 'services/notifications',
   },
@@ -360,6 +372,20 @@ function buildServiceDefs(): ServiceDef[] {
       continue;
     }
 
+    if (name === 'fake-llm') {
+      const fakeLlmPort = 8811 + portOffset;
+      defs.push({
+        name,
+        type: 'process',
+        dir: meta.dir ?? name,
+        port: fakeLlmPort,
+        dependsOn: meta.dependsOn,
+        command: ['env', `PORT=${fakeLlmPort}`, 'pnpm', 'exec', 'tsx', 'fake-llm-server.ts'],
+        group: meta.group,
+      });
+      continue;
+    }
+
     if (name in INFRA_PORTS) {
       defs.push({
         name,
@@ -444,23 +470,25 @@ function buildServiceDefs(): ServiceDef[] {
     const port = basePort + portOffset;
     const inspectorPort = port + 10000;
 
+    const command = [
+      'pnpm',
+      'run',
+      'dev',
+      '--port',
+      String(port),
+      '--inspector-port',
+      String(inspectorPort),
+      '--ip',
+      '0.0.0.0',
+    ];
+
     defs.push({
       name,
       type: 'worker',
       dir,
       port,
       dependsOn: meta.dependsOn,
-      command: [
-        'pnpm',
-        'run',
-        'dev',
-        '--port',
-        String(port),
-        '--inspector-port',
-        String(inspectorPort),
-        '--ip',
-        '0.0.0.0',
-      ],
+      command,
       group: meta.group,
       ...(meta.useLanIp ? { useLanIp: true } : {}),
     });

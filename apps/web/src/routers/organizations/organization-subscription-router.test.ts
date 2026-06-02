@@ -4,6 +4,7 @@ import { createOrganization, addUserToOrganization } from '@/lib/organizations/o
 import { db } from '@/lib/drizzle';
 import { organization_seats_purchases } from '@kilocode/db/schema';
 import type { User, Organization } from '@kilocode/db/schema';
+import { eq } from 'drizzle-orm';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyMock = jest.Mock<(...args: any[]) => any>;
@@ -13,6 +14,7 @@ jest.mock('@/lib/stripe-client', () => {
     billingPortal: { sessions: { create: jest.fn() } },
     invoices: { list: jest.fn() },
     checkout: { sessions: { create: jest.fn() } },
+    subscriptions: { retrieve: jest.fn() },
     createStripeCustomer: jest.fn(async () => ({ id: 'cus_test_org' })),
   };
 
@@ -27,6 +29,7 @@ type StripeMock = {
   billingPortal: { sessions: { create: AnyMock } };
   invoices: { list: AnyMock };
   checkout: { sessions: { create: AnyMock } };
+  subscriptions: { retrieve: AnyMock };
   createStripeCustomer: AnyMock;
 };
 
@@ -85,6 +88,10 @@ describe('organizations subscription trpc router', () => {
     stripeMock.checkout.sessions.create.mockResolvedValue({
       url: 'https://stripe.example.test/checkout',
     });
+    stripeMock.subscriptions.retrieve.mockReset();
+    stripeMock.subscriptions.retrieve.mockResolvedValue({
+      items: { data: [] },
+    });
     stripeMock.createStripeCustomer.mockReset();
     stripeMock.createStripeCustomer.mockImplementation(async () => ({ id: 'cus_test_org' }));
   });
@@ -108,6 +115,98 @@ describe('organizations subscription trpc router', () => {
           organizationId: 'invalid-uuid',
         })
       ).rejects.toThrow();
+    });
+
+    it('returns no latest seat purchase status when none exists', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.organizations.subscription.get({
+        organizationId: testOrganization.id,
+      });
+
+      expect(result.latestSeatPurchaseStatus).toBeNull();
+    });
+
+    it('returns the latest local seat purchase status for entitlement consumers', async () => {
+      const [purchase] = await db
+        .insert(organization_seats_purchases)
+        .values({
+          organization_id: testOrganization.id,
+          subscription_stripe_id: 'sub_test_latest_status',
+          subscription_status: 'past_due',
+          seat_count: 2,
+          amount_usd: 42,
+          starts_at: '2026-04-01T00:00:00.000Z',
+          expires_at: '2027-04-01T00:00:00.000Z',
+          billing_cycle: 'yearly',
+        })
+        .returning();
+
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.organizations.subscription.get({
+        organizationId: testOrganization.id,
+      });
+
+      expect(result.latestSeatPurchaseStatus).toBe('past_due');
+
+      if (purchase) {
+        await db
+          .delete(organization_seats_purchases)
+          .where(eq(organization_seats_purchases.id, purchase.id));
+      }
+    });
+  });
+
+  describe('getLatestSeatPurchaseStatus procedure', () => {
+    it('allows organization members to read an empty entitlement status without billing details', async () => {
+      const caller = await createCallerForUser(memberUser.id);
+      const result = await caller.organizations.subscription.getLatestSeatPurchaseStatus({
+        organizationId: testOrganization.id,
+      });
+
+      expect(result).toEqual({ latestSeatPurchaseStatus: null });
+      expect(result).not.toHaveProperty('subscription');
+      expect(result).not.toHaveProperty('paidSeatItemId');
+      expect(result).not.toHaveProperty('seatsUsed');
+      expect(stripeMock.subscriptions.retrieve).not.toHaveBeenCalled();
+    });
+
+    it('allows organization members to read the latest local paid-seat status', async () => {
+      const [purchase] = await db
+        .insert(organization_seats_purchases)
+        .values({
+          organization_id: testOrganization.id,
+          subscription_stripe_id: 'sub_test_member_latest_status',
+          subscription_status: 'past_due',
+          seat_count: 2,
+          amount_usd: 42,
+          starts_at: '2026-04-01T00:00:00.000Z',
+          expires_at: '2027-04-01T00:00:00.000Z',
+          billing_cycle: 'yearly',
+        })
+        .returning();
+
+      const caller = await createCallerForUser(memberUser.id);
+      const result = await caller.organizations.subscription.getLatestSeatPurchaseStatus({
+        organizationId: testOrganization.id,
+      });
+
+      expect(result).toEqual({ latestSeatPurchaseStatus: 'past_due' });
+      expect(stripeMock.subscriptions.retrieve).not.toHaveBeenCalled();
+
+      if (purchase) {
+        await db
+          .delete(organization_seats_purchases)
+          .where(eq(organization_seats_purchases.id, purchase.id));
+      }
+    });
+
+    it('rejects non-members from reading entitlement status', async () => {
+      const caller = await createCallerForUser(_nonMemberUser.id);
+      await expect(
+        caller.organizations.subscription.getLatestSeatPurchaseStatus({
+          organizationId: testOrganization.id,
+        })
+      ).rejects.toThrow('You do not have access to this organization');
     });
   });
 
@@ -311,7 +410,6 @@ describe('organizations subscription trpc router', () => {
 
       // Clean up
       if (purchase) {
-        const { eq } = await import('drizzle-orm');
         await db
           .delete(organization_seats_purchases)
           .where(eq(organization_seats_purchases.id, purchase.id));

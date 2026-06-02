@@ -12,10 +12,7 @@ import type {
   VercelInferenceProviderConfig,
   VercelProviderConfig,
 } from '@/lib/ai-gateway/providers/openrouter/types';
-import {
-  isReasoningExplicitlyDisabled,
-  isReasoningExplicitlyEnabled,
-} from '@/lib/ai-gateway/providers/openrouter/request-helpers';
+import { isReasoningExplicitlyDisabled } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
 import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import { redisGet } from '@/lib/redis';
 import { createCachedFetch } from '@/lib/cached-fetch';
@@ -101,17 +98,9 @@ function parseAwsCredentials(input: string) {
 }
 
 export function getAnthropicProviderOptionsForVercel(
-  requestedModel: string,
   request: GatewayRequest
 ): AnthropicProviderOptions | undefined {
   const anthropicOptions: AnthropicProviderOptions = {};
-
-  // Workaround for Vercel not displaying thinking by default, unlike OpenRouter.
-  const isOpus47Thinking =
-    requestedModel.includes('opus-4.7') && isReasoningExplicitlyEnabled(request);
-  if (isOpus47Thinking) {
-    anthropicOptions.thinking = { type: 'adaptive', display: 'summarized' };
-  }
 
   if (request.kind === 'chat_completions' && request.body.verbosity) {
     anthropicOptions.effort = request.body.verbosity;
@@ -188,7 +177,7 @@ export function applyVercelSettings(
   }
 
   if (requestToMutate.body.providerOptions) {
-    const anthropicOptions = getAnthropicProviderOptionsForVercel(requestedModel, requestToMutate);
+    const anthropicOptions = getAnthropicProviderOptionsForVercel(requestToMutate);
     if (anthropicOptions) {
       requestToMutate.body.providerOptions.anthropic = anthropicOptions;
     }

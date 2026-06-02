@@ -65,6 +65,17 @@ export const InstallationUnsuspendPayloadSchema = z.object({
   sender: GitHubSenderSchema.optional(),
 });
 
+// installation_target.renamed webhook payload
+export const InstallationTargetRenamedPayloadSchema = z.object({
+  action: z.literal('renamed'),
+  installation: z.object({
+    id: z.number(),
+  }),
+  account: z.object({}).passthrough(),
+  changes: z.object({}).passthrough(),
+  target_type: z.string(),
+});
+
 // installation_repositories webhook payload
 export const InstallationRepositoriesPayloadSchema = z.object({
   action: z.enum(['added', 'removed']),
@@ -281,6 +292,9 @@ export type InstallationCreatedPayload = z.infer<typeof InstallationCreatedPaylo
 export type InstallationDeletedPayload = z.infer<typeof InstallationDeletedPayloadSchema>;
 export type InstallationSuspendPayload = z.infer<typeof InstallationSuspendPayloadSchema>;
 export type InstallationUnsuspendPayload = z.infer<typeof InstallationUnsuspendPayloadSchema>;
+export type InstallationTargetRenamedPayload = z.infer<
+  typeof InstallationTargetRenamedPayloadSchema
+>;
 export type InstallationRepositoriesPayload = z.infer<typeof InstallationRepositoriesPayloadSchema>;
 export type PushEventPayload = z.infer<typeof PushEventPayloadSchema>;
 export type PullRequestPayload = z.infer<typeof PullRequestPayloadSchema>;

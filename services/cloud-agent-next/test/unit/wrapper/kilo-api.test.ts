@@ -11,6 +11,77 @@ function createSdkClient(): SDKClient {
 
 const workspacePath = '/workspace/project';
 
+describe('createWrapperKiloClient prompt handoff', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('throws when the command SDK response contains an error result', async () => {
+    const sdkClient = {
+      session: {
+        command: vi.fn().mockResolvedValue({ error: { message: 'command rejected' } }),
+      },
+    } as unknown as SDKClient;
+    const client = createWrapperKiloClient(sdkClient, 'http://127.0.0.1:0', workspacePath);
+
+    await expect(
+      client.sendCommand({ sessionId: 'kilo_sess', command: 'compact', messageId: 'msg_command' })
+    ).rejects.toThrow('Command for session kilo_sess failed: command rejected');
+  });
+
+  it('summarizes sessions through the dedicated Kilo endpoint', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify(true), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const client = createWrapperKiloClient(createSdkClient(), 'http://127.0.0.1:0', workspacePath);
+
+    const result = await client.summarizeSession({
+      sessionId: 'kilo_sess',
+      model: { modelID: 'anthropic/claude-sonnet-4-20250514' },
+    });
+
+    expect(result).toBe(true);
+    const request = fetchMock.mock.calls[0]?.[0];
+    expect(request).toBeInstanceOf(Request);
+    const url = new URL((request as Request).url);
+    expect(url.pathname).toBe('/session/kilo_sess/summarize');
+    await expect((request as Request).clone().json()).resolves.toEqual({
+      providerID: 'kilo',
+      modelID: 'anthropic/claude-sonnet-4-20250514',
+    });
+  });
+
+  it('throws when the SDK async prompt response contains an error', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ message: 'server rejected prompt' }), {
+          status: 409,
+          headers: { 'content-type': 'application/json' },
+        })
+      )
+    );
+
+    const client = createWrapperKiloClient(createSdkClient(), 'http://127.0.0.1:0', workspacePath);
+
+    await expect(
+      client.sendPromptAsync({
+        sessionId: 'kilo_sess_rejected',
+        messageId: 'msg_rejected',
+        prompt: 'queue this prompt',
+      })
+    ).rejects.toThrow('Async prompt for session kilo_sess_rejected failed: server rejected prompt');
+  });
+});
+
 describe('createWrapperKiloClient network endpoints', () => {
   beforeEach(() => {
     vi.clearAllMocks();

@@ -1,4 +1,4 @@
-import { getUserFromAuthOrRedirect } from '@/lib/user.server';
+import { getUserFromAuthOrRedirect } from '@/lib/user/server';
 import { NewWastelandWizardClient } from './NewWastelandWizardClient';
 
 export default async function NewWastelandPage() {

@@ -1,4 +1,4 @@
-import { getUserFromAuthOrRedirect } from '@/lib/user.server';
+import { getUserFromAuthOrRedirect } from '@/lib/user/server';
 import { PylonWidget } from '@/components/pylon-widget';
 import { PylonSupportButton } from '@/components/pylon-support-button';
 import { PersonalInstancePresenceMount } from './components/PersonalInstancePresenceMount';

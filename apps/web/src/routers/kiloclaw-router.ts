@@ -29,6 +29,7 @@ import {
   getKiloClawPlanCostMicrodollars,
   getKiloClawPricingCatalogEntry,
   insertKiloClawSubscriptionChangeLog,
+  PersonalSubscriptionCollapseUQConflictError,
 } from '@kilocode/db';
 import {
   kiloclaw_version_pins,
@@ -36,10 +37,10 @@ import {
   kiloclaw_earlybird_purchases,
   kiloclaw_subscriptions,
   kiloclaw_instances,
-  kiloclaw_referrals,
-  kiloclaw_referral_conversions,
-  kiloclaw_referral_reward_applications,
-  kiloclaw_referral_rewards,
+  impact_referrals,
+  impact_referral_conversions,
+  impact_referral_reward_applications,
+  impact_referral_rewards,
   kiloclaw_email_log,
   kiloclaw_cli_runs,
   kiloclaw_scheduled_actions,
@@ -52,6 +53,7 @@ import {
   organizations,
 } from '@kilocode/db/schema';
 import { and, asc, eq, ne, desc, isNull, inArray, sql, like, or } from 'drizzle-orm';
+import { ImpactReferralProduct, ImpactReferralRewardKind } from '@kilocode/db/schema-types';
 import { alias } from 'drizzle-orm/pg-core';
 import { deleteWorkerTrigger } from '@/lib/webhook-agent/webhook-agent-client';
 import { sentryLogger } from '@/lib/utils.server';
@@ -76,15 +78,6 @@ import {
 } from '@/lib/kiloclaw/provision-lock';
 import { encryptProvisionSecretsForWorker } from '@/lib/kiloclaw/provision-secrets';
 import {
-  buildComposioProvisionSecrets,
-  composioSecretsPatchSource,
-  createManagedComposioGoogleCalendarLink,
-  clearComposioInstanceConfig,
-  getManagedComposioGoogleCalendarStatus,
-  getComposioInstanceConfigSource,
-  markComposioInstanceConfig,
-} from '@/lib/kiloclaw/composio-onboarding';
-import {
   clearSubscriptionLifecycleAfterInstanceDestroy,
   clearTrialInactivityStopAfterStart,
 } from '@/lib/kiloclaw/instance-lifecycle';
@@ -97,7 +90,10 @@ import {
 import { client as stripe } from '@/lib/stripe-client';
 import { APP_URL } from '@/lib/constants';
 import { getAffiliateAttribution } from '@/lib/affiliate-attribution';
-import { buildAffiliateEventDedupeKey, enqueueAffiliateEventForUser } from '@/lib/affiliate-events';
+import {
+  buildAffiliateEventDedupeKey,
+  enqueueAffiliateEventForUser,
+} from '@/lib/impact/affiliate-events';
 import { clawAccessProcedure } from '@/lib/kiloclaw/access-gate';
 import { cancelCliRun, createCliRun, getCliRunStatus } from '@/lib/kiloclaw/cli-runs';
 import { KILOCLAW_EARLYBIRD_EXPIRY_DATE } from '@/lib/kiloclaw/constants';
@@ -579,6 +575,20 @@ function getKiloClawApiErrorPayload(err: KiloClawApiError): { message?: string; 
   }
 }
 
+function handleRestartMachineError(err: unknown): never {
+  if (err instanceof KiloClawApiError && err.statusCode === 404) {
+    const { message } = getKiloClawApiErrorPayload(err);
+    if (message === 'No machine exists') {
+      throw new TRPCError({
+        code: 'NOT_FOUND',
+        message,
+      });
+    }
+  }
+
+  throw err;
+}
+
 /**
  * True when the user has ever had a paid (non-trial) subscription that is now
  * canceled. Used to gate intro pricing eligibility (spec Credit Enrollment rule 3).
@@ -832,7 +842,6 @@ const updateConfigSchema = z.object({
   kilocodeDefaultModel: kilocodeDefaultModelSchema.nullable().optional(),
   userTimezone: userTimezoneSchema.nullable().optional(),
   userLocation: userLocationSchema.nullable().optional(),
-  skipIncompleteManagedComposioConnection: z.boolean().optional(),
 });
 
 const updateKiloCodeConfigSchema = z.object({
@@ -858,18 +867,6 @@ const patchBotIdentitySchema = z.object({
   botNature: z.string().trim().min(1).max(120).nullable().optional(),
   botVibe: z.string().trim().min(1).max(120).nullable().optional(),
   botEmoji: z.string().trim().min(1).max(16).nullable().optional(),
-});
-
-const composioConnectLinkSchema = z.object({
-  returnTo: z
-    .string()
-    .min(1)
-    .max(500)
-    .refine(value => value.startsWith('/'), {
-      message: 'returnTo must be a relative path',
-    }),
-  popup: z.boolean().optional(),
-  attemptId: z.string().min(1).max(100).optional(),
 });
 
 /**
@@ -1096,14 +1093,7 @@ async function provisionInstance(
   params: { instanceId: string | null; bootstrapSubscription: boolean },
   executor: typeof db | DrizzleTransaction = db
 ) {
-  const composioProvision = await buildComposioProvisionSecrets({
-    scope: { ownerType: 'user', userId: user.id },
-    instanceId: params.instanceId,
-    secrets: input.secrets,
-    skipIncompleteManagedConnection: input.skipIncompleteManagedComposioConnection,
-  });
-
-  const encryptedSecrets = encryptProvisionSecretsForWorker(composioProvision.secrets);
+  const encryptedSecrets = encryptProvisionSecretsForWorker(input.secrets);
 
   const expiresInSeconds = TOKEN_EXPIRY.thirtyDays;
   const kilocodeApiKey = generateApiToken(user, undefined, {
@@ -1142,15 +1132,6 @@ async function provisionInstance(
         }
       : undefined
   );
-
-  if (composioProvision.configToMark?.source === 'manual') {
-    await markComposioInstanceConfig({ instanceId: result.instanceId, source: 'manual' });
-  } else if (composioProvision.configToMark?.source === 'managed') {
-    await markComposioInstanceConfig({
-      instanceId: result.instanceId,
-      source: 'managed',
-    });
-  }
 
   return result;
 }
@@ -1979,25 +1960,31 @@ async function getCustomerReferralRewardSummary(
 ): Promise<KiloclawReferralRewardSummary> {
   const rows = await db
     .select({
-      role: kiloclaw_referral_rewards.beneficiary_role,
-      status: kiloclaw_referral_rewards.status,
-      monthsGranted: kiloclaw_referral_rewards.months_granted,
-      earnedAt: kiloclaw_referral_rewards.earned_at,
-      appliedAt: kiloclaw_referral_rewards.applied_at,
-      expiresAt: kiloclaw_referral_rewards.expires_at,
-      reviewReason: kiloclaw_referral_rewards.review_reason,
-      applicationAppliedAt: kiloclaw_referral_reward_applications.applied_at,
-      applicationSubscriptionId: kiloclaw_referral_reward_applications.subscription_id,
-      previousRenewalBoundary: kiloclaw_referral_reward_applications.previous_renewal_boundary,
-      newRenewalBoundary: kiloclaw_referral_reward_applications.new_renewal_boundary,
+      role: impact_referral_rewards.beneficiary_role,
+      status: impact_referral_rewards.status,
+      monthsGranted: impact_referral_rewards.months_granted,
+      earnedAt: impact_referral_rewards.earned_at,
+      appliedAt: impact_referral_rewards.applied_at,
+      expiresAt: impact_referral_rewards.expires_at,
+      reviewReason: impact_referral_rewards.review_reason,
+      applicationAppliedAt: impact_referral_reward_applications.applied_at,
+      applicationSubscriptionId: impact_referral_reward_applications.subscription_id,
+      previousRenewalBoundary: impact_referral_reward_applications.previous_renewal_boundary,
+      newRenewalBoundary: impact_referral_reward_applications.new_renewal_boundary,
     })
-    .from(kiloclaw_referral_rewards)
+    .from(impact_referral_rewards)
     .leftJoin(
-      kiloclaw_referral_reward_applications,
-      eq(kiloclaw_referral_reward_applications.reward_id, kiloclaw_referral_rewards.id)
+      impact_referral_reward_applications,
+      eq(impact_referral_reward_applications.reward_id, impact_referral_rewards.id)
     )
-    .where(eq(kiloclaw_referral_rewards.beneficiary_user_id, userId))
-    .orderBy(desc(kiloclaw_referral_rewards.earned_at), desc(kiloclaw_referral_rewards.created_at));
+    .where(
+      and(
+        eq(impact_referral_rewards.product, ImpactReferralProduct.KiloClaw),
+        eq(impact_referral_rewards.reward_kind, ImpactReferralRewardKind.KiloClawFreeMonth),
+        eq(impact_referral_rewards.beneficiary_user_id, userId)
+      )
+    )
+    .orderBy(desc(impact_referral_rewards.earned_at), desc(impact_referral_rewards.created_at));
 
   const rewards = rows.map(row => ({
     role: row.role,
@@ -2023,19 +2010,25 @@ async function getCustomerReferralRewardSummary(
   const referredRows = await db
     .select({
       refereeEmail: kilocode_users.google_user_email,
-      qualified: kiloclaw_referral_conversions.qualified,
+      qualified: impact_referral_conversions.qualified,
     })
-    .from(kiloclaw_referrals)
-    .innerJoin(kilocode_users, eq(kilocode_users.id, kiloclaw_referrals.referee_user_id))
+    .from(impact_referrals)
+    .innerJoin(kilocode_users, eq(kilocode_users.id, impact_referrals.referee_user_id))
     .leftJoin(
-      kiloclaw_referral_conversions,
+      impact_referral_conversions,
       and(
-        eq(kiloclaw_referral_conversions.referee_user_id, kiloclaw_referrals.referee_user_id),
-        eq(kiloclaw_referral_conversions.referrer_user_id, userId)
+        eq(impact_referral_conversions.product, ImpactReferralProduct.KiloClaw),
+        eq(impact_referral_conversions.referee_user_id, impact_referrals.referee_user_id),
+        eq(impact_referral_conversions.referrer_user_id, userId)
       )
     )
-    .where(eq(kiloclaw_referrals.referrer_user_id, userId))
-    .orderBy(desc(kiloclaw_referrals.created_at));
+    .where(
+      and(
+        eq(impact_referrals.product, ImpactReferralProduct.KiloClaw),
+        eq(impact_referrals.referrer_user_id, userId)
+      )
+    )
+    .orderBy(desc(impact_referrals.created_at));
   const referredPeople = referredRows
     .filter(row => row.qualified !== false)
     .map(row => ({
@@ -2071,29 +2064,32 @@ async function getAppliedReferralRewardsForSubscription(params: {
 }): Promise<KiloclawSubscriptionReferralRewards> {
   const rows = await db
     .select({
-      role: kiloclaw_referral_rewards.beneficiary_role,
-      appliedAt: kiloclaw_referral_reward_applications.applied_at,
-      monthsGranted: kiloclaw_referral_rewards.months_granted,
-      previousRenewalBoundary: kiloclaw_referral_reward_applications.previous_renewal_boundary,
-      newRenewalBoundary: kiloclaw_referral_reward_applications.new_renewal_boundary,
+      role: impact_referral_rewards.beneficiary_role,
+      appliedAt: impact_referral_reward_applications.applied_at,
+      monthsGranted: impact_referral_rewards.months_granted,
+      previousRenewalBoundary: impact_referral_reward_applications.previous_renewal_boundary,
+      newRenewalBoundary: impact_referral_reward_applications.new_renewal_boundary,
     })
-    .from(kiloclaw_referral_reward_applications)
+    .from(impact_referral_reward_applications)
     .innerJoin(
-      kiloclaw_referral_rewards,
-      eq(kiloclaw_referral_rewards.id, kiloclaw_referral_reward_applications.reward_id)
+      impact_referral_rewards,
+      eq(impact_referral_rewards.id, impact_referral_reward_applications.reward_id)
     )
     .where(
       and(
-        eq(kiloclaw_referral_reward_applications.subscription_id, params.subscriptionId),
-        eq(kiloclaw_referral_reward_applications.beneficiary_user_id, params.userId),
-        eq(kiloclaw_referral_rewards.applies_to_subscription_id, params.subscriptionId),
-        eq(kiloclaw_referral_rewards.beneficiary_user_id, params.userId),
-        eq(kiloclaw_referral_rewards.status, 'applied')
+        eq(impact_referral_reward_applications.product, ImpactReferralProduct.KiloClaw),
+        eq(impact_referral_reward_applications.subscription_id, params.subscriptionId),
+        eq(impact_referral_reward_applications.beneficiary_user_id, params.userId),
+        eq(impact_referral_rewards.product, ImpactReferralProduct.KiloClaw),
+        eq(impact_referral_rewards.reward_kind, ImpactReferralRewardKind.KiloClawFreeMonth),
+        eq(impact_referral_rewards.applies_to_subscription_id, params.subscriptionId),
+        eq(impact_referral_rewards.beneficiary_user_id, params.userId),
+        eq(impact_referral_rewards.status, 'applied')
       )
     )
     .orderBy(
-      asc(kiloclaw_referral_reward_applications.applied_at),
-      asc(kiloclaw_referral_reward_applications.created_at)
+      asc(impact_referral_reward_applications.applied_at),
+      asc(impact_referral_reward_applications.created_at)
     );
 
   return {
@@ -2861,25 +2857,11 @@ export const kiloclawRouter = createTRPCRouter({
   latestVersion: baseProcedure
     .input(z.object({ currentImageTag: z.string().min(1).optional() }).optional())
     .query(async ({ ctx, input }) => {
-      // Pass instance + currentImageTag through; Early Access is resolved
-      // server-side from the instance's owning user (the platform endpoint
-      // does the kilocode_users lookup itself, so callers can't fake it).
-      const [instance] = await db
-        .select({ id: kiloclaw_instances.id })
-        .from(kiloclaw_instances)
-        .where(
-          and(
-            eq(kiloclaw_instances.user_id, ctx.user.id),
-            isNull(kiloclaw_instances.organization_id),
-            isNull(kiloclaw_instances.destroyed_at)
-          )
-        )
-        .limit(1);
-
+      const instance = await getActiveInstance(ctx.user.id);
       const client = new KiloClawInternalClient();
       if (!instance) return client.getLatestVersion();
 
-      return client.getLatestVersion({
+      return client.getLatestVersionForInstance({
         instanceId: instance.id,
         currentImageTag: input?.currentImageTag ?? null,
       });
@@ -2989,6 +2971,13 @@ export const kiloclawRouter = createTRPCRouter({
     } satisfies KiloClawDashboardStatus;
   }),
 
+  getNavState: baseProcedure.query(async ({ ctx }) => {
+    const instance = await getActiveInstance(ctx.user.id);
+    return {
+      hasActiveInstance: instance !== null,
+    };
+  }),
+
   getDiskUsage: baseProcedure.query(async ({ ctx }) => {
     const instance = await getActiveInstance(ctx.user.id);
     if (!instance) {
@@ -3065,6 +3054,22 @@ export const kiloclawRouter = createTRPCRouter({
     return client.runMorningBriefing(ctx.user.id, workerInstanceId(instance));
   }),
 
+  // Creates the "Today's briefing" conversation and starts the in-chat
+  // onboarding briefing. Fired by the onboarding wizard once the gateway is
+  // ready; the returned conversationId is the post-onboarding chat redirect
+  // target.
+  startOnboardingBriefing: clawAccessProcedure.mutation(async ({ ctx }) => {
+    const instance = await getActiveInstance(ctx.user.id);
+    const client = new KiloClawInternalClient();
+    // Personal instances: "Connect more" links point at the personal
+    // Settings page.
+    return client.startOnboardingBriefing(
+      ctx.user.id,
+      '/claw/settings',
+      workerInstanceId(instance)
+    );
+  }),
+
   updateBriefingInterests: clawAccessProcedure
     .input(
       z.object({
@@ -3137,7 +3142,26 @@ export const kiloclawRouter = createTRPCRouter({
   }),
 
   destroy: baseProcedure.mutation(async ({ ctx }) => {
-    const destroyedRow = await markActiveInstanceDestroyed(ctx.user.id);
+    let destroyedRow: Awaited<ReturnType<typeof markActiveInstanceDestroyed>>;
+    try {
+      destroyedRow = await markActiveInstanceDestroyed(ctx.user.id);
+    } catch (error) {
+      if (error instanceof PersonalSubscriptionCollapseUQConflictError) {
+        logBillingError('personal subscription collapse UQ conflict', {
+          userId: error.userId,
+          selfSubscriptionId: error.selfSubscriptionId,
+          targetSubscriptionId: error.targetSubscriptionId,
+          conflictingOccupantId: error.conflictingOccupantId,
+        });
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message:
+            'Your subscription state needs support review before this instance can be destroyed.',
+          cause: error,
+        });
+      }
+      throw error;
+    }
     const client = new KiloClawInternalClient();
     let result: Awaited<ReturnType<KiloClawInternalClient['destroy']>>;
     try {
@@ -3422,18 +3446,11 @@ export const kiloclawRouter = createTRPCRouter({
       const instance = await getActiveInstance(ctx.user.id);
       const client = new KiloClawInternalClient();
       try {
-        const result = await client.patchSecrets(
+        return await client.patchSecrets(
           ctx.user.id,
           { secrets: encryptedPatch, meta: input.meta },
           workerInstanceId(instance)
         );
-        const sourceAction = instance ? composioSecretsPatchSource(secrets) : 'none';
-        if (instance && sourceAction === 'upsert_manual') {
-          await markComposioInstanceConfig({ instanceId: instance.id, source: 'manual' });
-        } else if (instance && sourceAction === 'clear') {
-          await clearComposioInstanceConfig(instance.id);
-        }
-        return result;
       } catch (err) {
         if (err instanceof KiloClawApiError && err.statusCode >= 400 && err.statusCode < 500) {
           // Extract message from worker response body (JSON or plain text)
@@ -3459,58 +3476,6 @@ export const kiloclawRouter = createTRPCRouter({
     );
     return client.getConfig({ userId: ctx.user.id, instanceId: workerInstanceId(instance) });
   }),
-
-  getComposioOnboardingStatus: baseProcedure.query(async ({ ctx }) => {
-    const instance = await getActiveInstance(ctx.user.id);
-    let sandboxHasComposioSecrets = false;
-    if (instance) {
-      const client = new KiloClawUserClient(
-        generateApiToken(ctx.user, undefined, { expiresIn: TOKEN_EXPIRY.fiveMinutes })
-      );
-      const config = await client.getConfig({
-        userId: ctx.user.id,
-        instanceId: workerInstanceId(instance),
-      });
-      sandboxHasComposioSecrets = config.configuredSecrets.composio === true;
-    }
-    return await getManagedComposioGoogleCalendarStatus({
-      scope: {
-        ownerType: 'user',
-        userId: ctx.user.id,
-      },
-      instance,
-      sandboxHasComposioSecrets,
-    });
-  }),
-
-  createComposioGoogleCalendarLink: baseProcedure
-    .input(composioConnectLinkSchema)
-    .mutation(async ({ ctx, input }) => {
-      return await withKiloclawProvisionContextLock(
-        getPersonalProvisionLockKey(ctx.user.id),
-        async () => {
-          await ensureProvisionAccess(ctx.user.id, ctx.user.google_user_email);
-          const instance = await getActiveInstance(ctx.user.id);
-          const sandboxConfigSource = instance
-            ? await getComposioInstanceConfigSource(instance.id)
-            : null;
-          if (sandboxConfigSource === 'manual') {
-            throw new TRPCError({
-              code: 'CONFLICT',
-              message: 'This sandbox already uses your own Composio credentials.',
-            });
-          }
-
-          return await createManagedComposioGoogleCalendarLink({
-            userId: ctx.user.id,
-            scope: { ownerType: 'user', userId: ctx.user.id },
-            returnTo: input.returnTo,
-            popup: input.popup,
-            attemptId: input.attemptId,
-          });
-        }
-      );
-    }),
 
   getChannelCatalog: baseProcedure.query(async ({ ctx }) => {
     const instance = await getActiveInstance(ctx.user.id);
@@ -3681,10 +3646,12 @@ export const kiloclawRouter = createTRPCRouter({
       const client = new KiloClawUserClient(
         generateApiToken(ctx.user, undefined, { expiresIn: TOKEN_EXPIRY.fiveMinutes })
       );
-      const result = await client.restartMachine(
-        input?.imageTag ? { imageTag: input.imageTag } : undefined,
-        { userId: ctx.user.id, instanceId: workerInstanceId(instance) }
-      );
+      const result = await client
+        .restartMachine(input?.imageTag ? { imageTag: input.imageTag } : undefined, {
+          userId: ctx.user.id,
+          instanceId: workerInstanceId(instance),
+        })
+        .catch(handleRestartMachineError);
       if (result.success) {
         PostHogClient().capture({
           distinctId: ctx.user.google_user_email,
@@ -4231,6 +4198,7 @@ export const kiloclawRouter = createTRPCRouter({
         path: z.string().min(1),
         content: z.string(),
         etag: z.string().min(1),
+        openclawValidation: z.enum(['warn-before-write', 'allow-invalid']).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -4258,6 +4226,21 @@ export const kiloclawRouter = createTRPCRouter({
           content = JSON.stringify(userConfig, null, 2);
         }
 
+        if (input.openclawValidation) {
+          if (input.path !== 'openclaw.json') {
+            throw new TRPCError({
+              code: 'BAD_REQUEST',
+              message: 'OpenClaw validation is only available for openclaw.json',
+            });
+          }
+          return await client.writeOpenclawConfigFile(
+            ctx.user.id,
+            content,
+            input.etag,
+            workerInstanceId(instance),
+            input.openclawValidation
+          );
+        }
         return await client.writeFile(
           ctx.user.id,
           input.path,
@@ -4826,6 +4809,14 @@ export const kiloclawRouter = createTRPCRouter({
         tier: kiloPassTier,
         cadence: kiloPassCadence,
       });
+      const attribution = await getAffiliateAttribution(ctx.user.id, 'impact');
+      const sessionMetadata = {
+        type: 'kilo-pass',
+        kiloUserId: ctx.user.id,
+        tier: kiloPassTier,
+        cadence: kiloPassCadence,
+        affiliateTrackingId: attribution?.tracking_id ?? '',
+      };
 
       const session = await stripe.checkout.sessions.create({
         mode: 'subscription',
@@ -4844,19 +4835,9 @@ export const kiloclawRouter = createTRPCRouter({
         success_url: `${APP_URL}/payments/kilo-pass/awarding?session_id={CHECKOUT_SESSION_ID}&clawHostingPlan=${input.hostingPlan}&clawInstanceId=${anchorInstance.id}`,
         cancel_url: `${APP_URL}/claw?checkout=cancelled`,
         subscription_data: {
-          metadata: {
-            type: 'kilo-pass',
-            kiloUserId: ctx.user.id,
-            tier: kiloPassTier,
-            cadence: kiloPassCadence,
-          },
+          metadata: sessionMetadata,
         },
-        metadata: {
-          type: 'kilo-pass',
-          kiloUserId: ctx.user.id,
-          tier: kiloPassTier,
-          cadence: kiloPassCadence,
-        },
+        metadata: sessionMetadata,
       });
 
       return { url: typeof session.url === 'string' ? session.url : null };

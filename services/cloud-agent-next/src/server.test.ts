@@ -1,11 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import jwt from 'jsonwebtoken';
 import type { Env } from './types.js';
-import { WRAPPER_VERSION } from './shared/wrapper-version.js';
 
-const { getSandboxMock, findWrapperForSessionMock } = vi.hoisted(() => ({
-  getSandboxMock: vi.fn(),
-  findWrapperForSessionMock: vi.fn(),
+const {
+  getRunningTerminalClientMock,
+  consumeCloudAgentReportBatchMock,
+  removeExpiredCloudAgentReportDataMock,
+} = vi.hoisted(() => ({
+  getRunningTerminalClientMock: vi.fn(),
+  consumeCloudAgentReportBatchMock: vi.fn().mockResolvedValue(undefined),
+  removeExpiredCloudAgentReportDataMock: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('./logger.js', () => {
@@ -26,11 +30,13 @@ vi.mock('./logger.js', () => {
 
 vi.mock('@cloudflare/sandbox', () => ({
   Sandbox: class Sandbox {},
-  getSandbox: getSandboxMock,
+  getSandbox: vi.fn(),
 }));
 
-vi.mock('./kilo/wrapper-manager.js', () => ({
-  findWrapperForSession: findWrapperForSessionMock,
+vi.mock('./agent-sandbox/factory.js', () => ({
+  createAgentSandbox: vi.fn(() => ({
+    getRunningTerminalClient: getRunningTerminalClientMock,
+  })),
 }));
 
 vi.mock('./router.js', () => ({
@@ -39,6 +45,16 @@ vi.mock('./router.js', () => ({
 
 vi.mock('./callbacks/index.js', () => ({
   createCallbackQueueConsumer: vi.fn(),
+}));
+
+vi.mock('./telemetry/report-consumer.js', () => ({
+  CLOUD_AGENT_REPORT_QUEUE_NAMES: new Set([
+    'cloud-agent-next-report-queue',
+    'cloud-agent-next-report-queue-dev',
+    'cloud-agent-next-report-queue-test',
+  ]),
+  consumeCloudAgentReportBatch: consumeCloudAgentReportBatchMock,
+  removeExpiredCloudAgentReportData: removeExpiredCloudAgentReportDataMock,
 }));
 
 vi.mock('./middleware/auth.js', () => ({
@@ -85,8 +101,9 @@ function fetchWorker(request: Request, env: MockEnv): Promise<Response> | Respon
 }
 
 beforeEach(() => {
-  getSandboxMock.mockReset();
-  findWrapperForSessionMock.mockReset();
+  getRunningTerminalClientMock.mockReset();
+  consumeCloudAgentReportBatchMock.mockClear();
+  removeExpiredCloudAgentReportDataMock.mockClear();
 });
 
 describe('server /stream', () => {
@@ -117,6 +134,52 @@ describe('server /stream', () => {
   });
 });
 
+describe('server background reporting', () => {
+  it('routes report queue batches to the Cloud Agent report consumer', async () => {
+    const env = createEnv();
+    const batch = {
+      queue: 'cloud-agent-next-report-queue',
+      messages: [],
+    } as unknown as MessageBatch<unknown>;
+
+    await worker.queue(batch, env as unknown as Env);
+
+    expect(consumeCloudAgentReportBatchMock).toHaveBeenCalledWith(batch, env);
+  });
+
+  it('routes report test queue batches to the Cloud Agent report consumer', async () => {
+    const env = createEnv();
+    const batch = {
+      queue: 'cloud-agent-next-report-queue-test',
+      messages: [],
+    } as unknown as MessageBatch<unknown>;
+
+    await worker.queue(batch, env as unknown as Env);
+
+    expect(consumeCloudAgentReportBatchMock).toHaveBeenCalledWith(batch, env);
+  });
+
+  it('routes isolated development report queue batches to the Cloud Agent report consumer', async () => {
+    const env = createEnv();
+    const batch = {
+      queue: 'cloud-agent-next-report-queue-dev',
+      messages: [],
+    } as unknown as MessageBatch<unknown>;
+
+    await worker.queue(batch, env as unknown as Env);
+
+    expect(consumeCloudAgentReportBatchMock).toHaveBeenCalledWith(batch, env);
+  });
+
+  it('runs reporting retention cleanup from the scheduled handler', async () => {
+    const env = createEnv();
+
+    await worker.scheduled({} as ScheduledController, env as unknown as Env);
+
+    expect(removeExpiredCloudAgentReportDataMock).toHaveBeenCalledWith(env);
+  });
+});
+
 describe('server /terminal', () => {
   it('proxies valid terminal tickets directly to the wrapper container', async () => {
     const ticket = jwt.sign(
@@ -133,27 +196,29 @@ describe('server /terminal', () => {
     const env = createEnv();
     const sandboxId = `usr-${'a'.repeat(48)}`;
     const metadata = {
-      version: 1,
-      sessionId: 'session-1',
-      userId: 'user-1',
-      sandboxId,
-      createdOnPlatform: 'cloud-agent-web',
-      preparedAt: Date.now(),
-      workspacePath: '/workspace/user/repo',
+      metadataSchemaVersion: 2,
+      identity: {
+        sessionId: 'session-1',
+        userId: 'user-1',
+        createdOnPlatform: 'cloud-agent-web',
+      },
+      auth: {},
+      workspace: {
+        sandboxId,
+        workspacePath: '/workspace/user/repo',
+      },
+      lifecycle: {
+        version: 1,
+        timestamp: Date.now(),
+        preparedAt: Date.now(),
+      },
     };
     const terminalResponse = new Response('proxied', { status: 200 });
-    const wsConnect = vi.fn().mockResolvedValueOnce(terminalResponse);
-    const containerFetch = vi.fn().mockResolvedValueOnce(
-      Response.json({
-        healthy: true,
-        state: 'idle',
-        version: WRAPPER_VERSION,
-        sessionId: 'session-1',
-      })
-    );
-    const sandbox = { containerFetch, wsConnect };
-    getSandboxMock.mockReturnValue(sandbox);
-    findWrapperForSessionMock.mockResolvedValue({ port: 59954 });
+    const connectTerminal = vi.fn().mockResolvedValueOnce(terminalResponse);
+    getRunningTerminalClientMock.mockResolvedValue({
+      status: 'ready',
+      client: { connectTerminal },
+    });
     const getMetadata = vi.fn().mockResolvedValue(metadata);
     const fetch = vi.fn();
     env.CLOUD_AGENT_SESSION.idFromName.mockReturnValue('do-id');
@@ -172,19 +237,8 @@ describe('server /terminal', () => {
     expect(env.CLOUD_AGENT_SESSION.idFromName).toHaveBeenCalledWith('user-1:session-1');
     expect(getMetadata).toHaveBeenCalledTimes(1);
     expect(fetch).not.toHaveBeenCalled();
-    expect(getSandboxMock).toHaveBeenCalledWith(env.Sandbox, sandboxId, expect.any(Object));
-    expect(findWrapperForSessionMock).toHaveBeenCalledWith(sandbox, 'session-1');
-    expect(containerFetch).toHaveBeenCalledTimes(1);
-    expect(containerFetch.mock.calls[0]).toEqual([
-      'http://container/health',
-      { method: 'GET', headers: { 'Content-Type': 'application/json' } },
-      59954,
-    ]);
-    expect(wsConnect).toHaveBeenCalledTimes(1);
-    const connectRequest = wsConnect.mock.calls[0]?.[0];
-    expect(connectRequest).toBeInstanceOf(Request);
-    expect(new URL((connectRequest as Request).url).pathname).toBe('/pty/pty_123/connect');
-    expect(wsConnect.mock.calls[0]?.[1]).toBe(59954);
+    expect(getRunningTerminalClientMock).toHaveBeenCalledOnce();
+    expect(connectTerminal).toHaveBeenCalledWith('pty_123', request);
   });
 
   it('rejects stream-purpose tickets', async () => {

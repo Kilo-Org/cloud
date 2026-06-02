@@ -9,6 +9,7 @@ import { Hono } from 'hono';
 import type { Context } from 'hono';
 import * as fly from '../fly/client';
 import type { InstanceStatus } from '../durable-objects/kiloclaw-instance/types';
+import type { FileWriteResponse } from '../durable-objects/gateway-controller-types';
 import type { AppEnv } from '../types';
 import {
   ProvisionRequestSchema,
@@ -36,7 +37,10 @@ import {
   markImageAsLatest,
   disableImageAndClearRollout,
 } from '../lib/version-rollout';
-import { setKiloclawEarlyAccess, lookupKiloclawEarlyAccessByInstanceId } from '../lib/user-flags';
+import {
+  setKiloclawEarlyAccess,
+  lookupKiloclawRolloutContextByInstanceId,
+} from '../lib/user-flags';
 import { upsertCatalogVersion } from '../lib/catalog-registration';
 import { runScheduledActionNoticesSweep } from '../scheduled/scheduled-action-notices';
 import { flattenError, z } from 'zod';
@@ -47,9 +51,12 @@ import {
 } from '@kilocode/worker-utils';
 import { readBillingCorrelationHeaders } from '@kilocode/worker-utils/kiloclaw-billing-observability';
 import {
+  getOrphanVolumeContextProtections,
   getKiloClawPricingCatalogEntry,
   isKiloClawPriceVersion,
   markInstanceDestroyedWithPersonalSubscriptionCollapse,
+  ORPHAN_VOLUME_GRACE_PERIOD_MS,
+  orphanVolumeSubscriptionContextKey,
   type KiloClawPriceVersion,
   type KiloClawSubscriptionChangeActor,
 } from '@kilocode/db';
@@ -74,7 +81,12 @@ import {
 import type { ProviderId } from '../schemas/instance-config';
 import { doKeyFromActiveInstance, resolveDoKeyForUser } from '../lib/instance-routing';
 import { getInstanceById, getInstanceByIdIncludingDestroyed, getWorkerDb } from '../db';
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, isNull, sql } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
+import { volumeNameFromSandboxId } from '../durable-objects/machine-config';
+import { fallbackAppNameForRestore } from '../durable-objects/kiloclaw-instance/postgres';
+import { getAppKey } from '../durable-objects/kiloclaw-instance/types';
+import type { FlyVolume } from '../fly/types';
 import {
   BootstrapProvisionFallbackError,
   bootstrapProvisionedSubscriptionWithFallback,
@@ -943,6 +955,7 @@ const SAFE_ERROR_PREFIXES = [
   'Cannot destroy: ', // destroy while restoring
   'Cannot resize: ', // resize during destroying/restoring/recovering
   'Cannot retry recovery', // force-retry-recovery guard messages
+  'Organization KiloClaw entitlement ', // org provision fail-closed entitlement gate
   'Stream Chat sendMessage failed', // sendMessage HTTP errors
   'Stream Chat is not set up', // no Stream Chat on this instance
   'Provider ', // explicit not-implemented provider errors
@@ -2548,6 +2561,51 @@ platform.post('/morning-briefing/run', async c => {
   }
 });
 
+// POST /api/platform/morning-briefing/onboarding-briefing
+platform.post('/morning-briefing/onboarding-briefing', async c => {
+  // `settingsHref` is the org-aware Settings link the web router derived for
+  // the briefing's "Connect more" items. The plugin re-validates it.
+  const result = await parseBody(
+    c,
+    UserIdRequestSchema.extend({ settingsHref: z.string().optional() })
+  );
+  if ('error' in result) return result.error;
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
+  try {
+    const response = await withMorningBriefingWarmupRetry(
+      () =>
+        withResolvedDORetry(
+          c.env,
+          result.data.userId,
+          iidResult.instanceId,
+          stub => stub.startOnboardingBriefing(result.data.settingsHref),
+          'startOnboardingBriefing'
+        ),
+      { includeTimeout: false }
+    );
+    if (!response) {
+      return jsonError(
+        'Morning Briefing unavailable (controller too old)',
+        404,
+        'controller_route_unavailable'
+      );
+    }
+    return c.json(response, 200);
+  } catch (err) {
+    if (isMorningBriefingWarmupError(err, { includeTimeout: false })) {
+      return jsonError('Gateway warming up, retrying shortly.', 503, 'gateway_warming_up');
+    }
+    const { message, status, code } = sanitizeOpenclawConfigError(
+      err,
+      'morning-briefing/onboarding-briefing'
+    );
+    return jsonError(message, status, code);
+  }
+});
+
 // GET /api/platform/morning-briefing/read/{today|yesterday}?userId=...
 platform.get('/morning-briefing/read/:day', async c => {
   const userId = setValidatedQueryUserId(c);
@@ -2663,6 +2721,13 @@ const WriteFileSchema = z.object({
   etag: z.string().optional(),
 });
 
+const WriteOpenclawConfigFileSchema = z.object({
+  userId: z.string().min(1),
+  content: z.string(),
+  etag: z.string().optional(),
+  mode: z.enum(['warn-before-write', 'allow-invalid']),
+});
+
 const OpenclawWorkspaceImportSchema = z.object({
   userId: z.string().min(1),
   files: z
@@ -2703,6 +2768,40 @@ platform.post('/files/write', async c => {
     return c.json(response, 200);
   } catch (err) {
     const { message, status, code } = sanitizeOpenclawConfigError(err, 'files/write');
+    return jsonError(message, status, code);
+  }
+});
+
+// POST /api/platform/files/write-openclaw-config
+platform.post('/files/write-openclaw-config', async c => {
+  const result = await parseBody(c, WriteOpenclawConfigFileSchema);
+  if ('error' in result) return result.error;
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
+  const { userId, content, etag, mode } = result.data;
+  try {
+    const response = await withResolvedDORetry<FileWriteResponse | null>(
+      c.env,
+      userId,
+      iidResult.instanceId,
+      stub => stub.writeOpenclawConfigFile(content, etag, mode),
+      'writeOpenclawConfigFile'
+    );
+    if (!response) {
+      return jsonError(
+        'OpenClaw validation-aware writing not available (controller too old)',
+        404,
+        'controller_route_unavailable'
+      );
+    }
+    return c.json(response, 200);
+  } catch (err) {
+    const { message, status, code } = sanitizeOpenclawConfigError(
+      err,
+      'files/write-openclaw-config'
+    );
     return jsonError(message, status, code);
   }
 });
@@ -3786,6 +3885,396 @@ platform.post('/reassociate-volume', async c => {
   }
 });
 
+// ── Admin orphan-volume reaper ────────────────────────────────────────────
+//
+// Two admin-only endpoints that back the web app's "Orphan volumes" admin
+// tab. They exist because the web app has no Fly API token — every Fly call
+// must go through this worker. The worker is also the single source of truth
+// for Fly app-name + volume-name derivation, so the web app never computes
+// those strings itself (drift there would silently misattribute volumes).
+//
+// Safety model: the volume↔instance attribution is by *exact volume name*,
+// the volume must be in a quiescent (`created`/`detached`) state, and a live
+// Durable Object that still references the volume — or whose state we cannot
+// confirm — blocks the destroy. The web router layers the DB-side guards
+// (instance is destroyed, grace period elapsed, no access-granting
+// subscription) on top before ever calling these.
+
+const OrphanVolumeIdentitySchema = z.object({
+  userId: z.string().min(1),
+  instanceId: z.string().uuid(),
+  sandboxId: z.string().min(1).max(128),
+});
+
+/** The six DO state fields that can hold a live Fly volume ID. */
+function liveDoVolumeIds(debug: {
+  flyVolumeId: string | null;
+  pendingDestroyVolumeId: string | null;
+  pendingRecoveryVolumeId: string | null;
+  recoveryPreviousVolumeId: string | null;
+  previousVolumeId: string | null;
+  pendingRestoreVolumeId: string | null;
+}): string[] {
+  return [
+    debug.flyVolumeId,
+    debug.pendingDestroyVolumeId,
+    debug.pendingRecoveryVolumeId,
+    debug.recoveryPreviousVolumeId,
+    debug.previousVolumeId,
+    debug.pendingRestoreVolumeId,
+  ].filter((id): id is string => id !== null);
+}
+
+/**
+ * Build a DO stub factory for the orphan-volume endpoints, deriving the DO
+ * key deterministically from the sandbox ID via `doKeyFromActiveInstance`.
+ *
+ * Deliberately NOT `withResolvedDORetry`: that resolver does a second,
+ * best-effort Postgres lookup and falls back to the raw instanceId on any
+ * hiccup. For a legacy (non-`ki_`) sandbox the real DO is user-keyed, so
+ * that fallback would read an unrelated, empty instanceId-keyed DO —
+ * `getDebugState()` would report `status: null` and no tracked volumes,
+ * silently passing the destroy guards against the wrong instance. The key
+ * derivation runs inside the returned factory so a malformed sandbox
+ * surfaces as a DO-call failure (fail closed) rather than a sync throw.
+ */
+function orphanVolumeDoStubFactory(
+  env: AppEnv['Bindings'],
+  identity: { id: string; sandboxId: string }
+): () => KiloClawInstanceStub {
+  return () =>
+    env.KILOCLAW_INSTANCE.get(env.KILOCLAW_INSTANCE.idFromName(doKeyFromActiveInstance(identity)));
+}
+
+async function resolveOrphanVolumeFlyAppName(
+  env: AppEnv['Bindings'],
+  identity: { userId: string; sandboxId: string }
+): Promise<string> {
+  const appKey = getAppKey(identity);
+  const appStub = env.KILOCLAW_APP.get(env.KILOCLAW_APP.idFromName(appKey));
+  const prefix = env.WORKER_ENV === 'development' ? 'dev' : undefined;
+  const fallbackAppName = await fallbackAppNameForRestore(
+    identity.userId,
+    identity.sandboxId,
+    prefix
+  );
+
+  return (await appStub.getAppName()) ?? fallbackAppName;
+}
+
+// GET /api/platform/admin/orphan-volume-scan?userId=&instanceId=&sandboxId=
+// Lists the Fly volumes in the instance's app and annotates each with whether
+// it belongs to this instance (exact name match) and whether a live DO still
+// tracks it. Read-only — never deletes anything.
+platform.get('/admin/orphan-volume-scan', async c => {
+  const parsed = OrphanVolumeIdentitySchema.safeParse({
+    userId: c.req.query('userId'),
+    instanceId: c.req.query('instanceId'),
+    sandboxId: c.req.query('sandboxId'),
+  });
+  if (!parsed.success) {
+    return c.json({ error: 'Invalid request', details: parsed.error.flatten().fieldErrors }, 400);
+  }
+  const { userId, instanceId, sandboxId } = parsed.data;
+  c.set('userId', userId);
+
+  const apiToken = c.env.FLY_API_TOKEN;
+  if (!apiToken) {
+    return c.json({ error: 'FLY_API_TOKEN is not configured' }, 503);
+  }
+
+  const flyApp = await resolveOrphanVolumeFlyAppName(c.env, { userId, sandboxId });
+  const expectedVolumeName = volumeNameFromSandboxId(sandboxId);
+
+  // Fetch the volume list and the DO debug state concurrently. Either can fail
+  // independently; a failure is surfaced (not swallowed) so the web UI can
+  // distinguish "no orphans" from "could not check" — a swallowed listVolumes
+  // failure would otherwise read as a false negative.
+  const [volumesResult, debugResult] = await Promise.allSettled([
+    fly.listVolumes({ apiToken, appName: flyApp }),
+    withDORetry(
+      orphanVolumeDoStubFactory(c.env, { id: instanceId, sandboxId }),
+      stub => stub.getDebugState(),
+      'getDebugState'
+    ),
+  ]);
+
+  let volumes: FlyVolume[] = [];
+  let appExists = true;
+  let scanError: string | null = null;
+  if (volumesResult.status === 'fulfilled') {
+    volumes = volumesResult.value;
+  } else if (fly.isFlyNotFound(volumesResult.reason)) {
+    // App is gone — deleting an app removes its volumes, so there is nothing
+    // to reap. Not an error.
+    appExists = false;
+  } else {
+    scanError =
+      volumesResult.reason instanceof Error ? volumesResult.reason.message : 'listVolumes failed';
+    console.error(`[platform] orphan-volume-scan listVolumes failed app=${flyApp}:`, scanError);
+  }
+
+  let doStatus: string | null = null;
+  let doStatusError: string | null = null;
+  let doVolumeIds: string[] = [];
+  if (debugResult.status === 'fulfilled') {
+    doStatus = debugResult.value.status;
+    doVolumeIds = liveDoVolumeIds(debugResult.value);
+  } else {
+    doStatusError =
+      debugResult.reason instanceof Error ? debugResult.reason.message : 'getDebugState failed';
+    console.error(
+      `[platform] orphan-volume-scan getDebugState failed user=${userId}:`,
+      doStatusError
+    );
+  }
+
+  return c.json({
+    flyApp,
+    appExists,
+    expectedVolumeName,
+    doStatus,
+    doStatusError,
+    scanError,
+    volumes: volumes.map(v => ({
+      id: v.id,
+      name: v.name,
+      state: v.state,
+      size_gb: v.size_gb,
+      region: v.region,
+      attached_machine_id: v.attached_machine_id,
+      created_at: v.created_at,
+      // Attribution: this volume belongs to THIS instance only if its name is
+      // an exact match for the instance's derived volume name.
+      nameMatchesInstance: v.name === expectedVolumeName,
+      // A live DO that still references this volume must not have it deleted.
+      trackedByLiveDo: doVolumeIds.includes(v.id),
+    })),
+  });
+});
+
+// POST /api/platform/admin/orphan-volume-destroy
+// Destroys a single orphaned Fly volume. Re-verifies every Fly/DO-side
+// invariant server-side; never trusts the caller's view of the volume.
+const OrphanVolumeDestroySchema = OrphanVolumeIdentitySchema.extend({
+  volumeId: z
+    .string()
+    .min(1)
+    .regex(/^vol_[a-zA-Z0-9]+$/, 'Invalid Fly volume ID'),
+});
+
+platform.post('/admin/orphan-volume-destroy', async c => {
+  const result = await parseBody(c, OrphanVolumeDestroySchema);
+  if ('error' in result) return result.error;
+  const { userId, instanceId, sandboxId, volumeId } = result.data;
+
+  const apiToken = c.env.FLY_API_TOKEN;
+  if (!apiToken) {
+    return c.json({ error: 'FLY_API_TOKEN is not configured' }, 503);
+  }
+
+  // Resolve the instance row and re-enforce every DB-side safety gate here.
+  // The web router applies the same gates, but this is a destructive
+  // endpoint reachable by any internal-API-key caller, so it must fail
+  // closed on its own rather than trust the caller to have checked.
+  const connectionString = c.env.HYPERDRIVE?.connectionString;
+  if (!connectionString) {
+    return c.json({ error: 'Database connection is not configured' }, 503);
+  }
+  const workerDb = getWorkerDb(connectionString);
+  // Aliased outer table so the correlated subquery below can refer to it as
+  // `target_inst.*`. Drizzle interpolates `${kiloclaw_instances.X}` inside a
+  // raw `sql` template as a BARE `"X"` column reference (no table qualifier).
+  // Postgres then resolves that bare reference to the most-local scope — the
+  // inner `sandbox_destroys` alias — which collapses the correlation to a
+  // trivially-true `sandbox_destroys.user_id = sandbox_destroys.user_id` and
+  // turns the subquery into a table-wide `max(destroyed_at)`. With many
+  // users in production that max is always recent, so the grace gate would
+  // fail closed for every destroy regardless of the target. Aliasing the
+  // outer table and writing the correlation columns as literal SQL keeps
+  // every reference explicitly qualified.
+  const targetInstance = alias(kiloclaw_instances, 'target_inst');
+  const [instance] = await workerDb
+    .select({
+      id: targetInstance.id,
+      userId: targetInstance.user_id,
+      sandboxId: targetInstance.sandbox_id,
+      organizationId: targetInstance.organization_id,
+      destroyedAt: targetInstance.destroyed_at,
+      // Whether the orphan-volume grace period has elapsed, evaluated entirely
+      // in Postgres. Grace runs from the LATEST destruction of this
+      // (user, sandbox): a reprovisioned sandbox has several destroyed rows
+      // sharing one Fly volume, so the clock follows the most recent
+      // destruction, not whichever row the caller happened to submit.
+      // Computing this in SQL avoids parsing a database timestamp with the JS
+      // `Date` constructor, whose handling of Postgres timestamp text differs
+      // across the Vercel and Cloudflare runtimes.
+      gracePeriodElapsed: sql<boolean>`
+        extract(epoch from (now() - (
+          select max(sandbox_destroys.destroyed_at)
+          from ${kiloclaw_instances} as sandbox_destroys
+          where sandbox_destroys.user_id = target_inst.user_id
+            and sandbox_destroys.sandbox_id = target_inst.sandbox_id
+            and sandbox_destroys.destroyed_at is not null
+        ))) * 1000 > ${ORPHAN_VOLUME_GRACE_PERIOD_MS}`,
+    })
+    .from(targetInstance)
+    .where(eq(targetInstance.id, instanceId))
+    .limit(1);
+
+  if (!instance) {
+    return c.json({ error: 'Instance not found' }, 404);
+  }
+  // Identity — the caller-supplied tuple must be internally consistent so the
+  // Fly-side name guard and the DO-side guard both anchor to one instance.
+  if (instance.userId !== userId || instance.sandboxId !== sandboxId) {
+    return c.json(
+      { error: 'Instance identity mismatch: userId/sandboxId do not match instanceId' },
+      409
+    );
+  }
+  // Gate A — the instance must be destroyed. A live instance still owns its
+  // volume; this endpoint only reaps orphans of destroyed instances.
+  if (instance.destroyedAt === null) {
+    return c.json({ error: 'Instance is not destroyed; its volume is not an orphan' }, 409);
+  }
+  // Gate B — grace period, measured from the LATEST destruction of this
+  // sandbox. A reprovisioned sandbox has several destroyed rows sharing one
+  // Fly volume; the volume's cleanup clock runs from the most recent
+  // destruction, so an older submitted row must not shorten the grace.
+  // `gracePeriodElapsed` is computed by Postgres in the query above; `false`
+  // or `null` (no destroyed row, already ruled out by gate A) both fail closed.
+  if (instance.gracePeriodElapsed !== true) {
+    return c.json({ error: 'Instance is still within the orphan-volume grace period' }, 409);
+  }
+  // Gate C — never destroy data while this ownership context still has
+  // product access, or while the billing lifecycle reaper is still scheduled
+  // to destroy it (a future `destruction_deadline`). Reprovision transfers
+  // move access to a current successor row; a detached current row has no
+  // resolvable context, so the shared lookup fails closed for the user.
+  const context = {
+    user_id: instance.userId,
+    organization_id: instance.organizationId,
+  };
+  const { accessGrantingContextKeys, pendingDestructionContextKeys } =
+    await getOrphanVolumeContextProtections(workerDb, [context], new Date());
+  const contextKey = orphanVolumeSubscriptionContextKey(context);
+  if (accessGrantingContextKeys.has(contextKey)) {
+    return c.json({ error: 'User has an access-granting subscription; volume preserved' }, 409);
+  }
+  if (pendingDestructionContextKeys.has(contextKey)) {
+    return c.json(
+      { error: 'A billing destruction deadline is still pending; volume preserved' },
+      409
+    );
+  }
+
+  const flyApp = await resolveOrphanVolumeFlyAppName(c.env, {
+    userId: instance.userId,
+    sandboxId: instance.sandboxId,
+  });
+  const expectedVolumeName = volumeNameFromSandboxId(instance.sandboxId);
+  const flyConfig = { apiToken, appName: flyApp };
+
+  // 1. Re-list and locate the target volume by its immutable ID. We act on the
+  //    freshly-fetched volume, never on caller-supplied state.
+  let volume: FlyVolume | undefined;
+  try {
+    volume = (await fly.listVolumes(flyConfig)).find(v => v.id === volumeId);
+  } catch (err) {
+    if (fly.isFlyNotFound(err)) {
+      return c.json({ error: 'Fly app not found; nothing to destroy' }, 404);
+    }
+    const { message, status } = sanitizeError(err, 'orphan-volume-destroy listVolumes');
+    return jsonError(message, status);
+  }
+  if (!volume) {
+    return c.json({ error: 'Volume not found in Fly app' }, 404);
+  }
+
+  // 2. Attribution guard — the volume name must exactly match this instance.
+  if (volume.name !== expectedVolumeName) {
+    return c.json(
+      {
+        error: `Volume name "${volume.name}" does not match this instance's volume "${expectedVolumeName}"`,
+      },
+      409
+    );
+  }
+
+  // 3. State guard — only quiescent, unattached volumes are reapable. An
+  //    attached volume still backs a machine; a *_destroy state means Fly is
+  //    already reaping it.
+  if (volume.state !== 'created' && volume.state !== 'detached') {
+    return c.json(
+      { error: `Volume is in state "${volume.state}"; only created/detached volumes are reapable` },
+      409
+    );
+  }
+  if (volume.attached_machine_id !== null) {
+    return c.json(
+      {
+        error: `Volume is attached to machine ${volume.attached_machine_id}; destroy the machine first`,
+      },
+      409
+    );
+  }
+
+  // 4. DO cross-check — refuse if a live DO references this volume, if the DO
+  //    is alive at all (the instance is supposed to be destroyed), or if we
+  //    cannot confirm DO state. "Cannot confirm" fails closed.
+  let debug: Awaited<ReturnType<KiloClawInstanceStub['getDebugState']>>;
+  try {
+    debug = await withDORetry(
+      orphanVolumeDoStubFactory(c.env, instance),
+      stub => stub.getDebugState(),
+      'getDebugState'
+    );
+  } catch (err) {
+    const { message } = sanitizeError(err, 'orphan-volume-destroy getDebugState');
+    return c.json(
+      { error: `Could not confirm Durable Object state; refusing to destroy (${message})` },
+      502
+    );
+  }
+  if (liveDoVolumeIds(debug).includes(volumeId)) {
+    return c.json(
+      {
+        error: `Durable Object still references this volume (status: ${debug.status}); refusing to destroy`,
+      },
+      409
+    );
+  }
+  if (debug.status !== null) {
+    return c.json(
+      {
+        error: `Durable Object is alive (status: ${debug.status}); resolve its state before reaping this volume`,
+      },
+      409
+    );
+  }
+
+  // 5. Destroy. A concurrent deletion (404 / missing-volume) is treated as
+  //    success — the goal state is reached either way.
+  try {
+    await fly.deleteVolume(flyConfig, volumeId);
+  } catch (err) {
+    if (fly.isFlyNotFound(err) || fly.isFlyMissingVolume(err)) {
+      console.log(
+        `[platform] orphan-volume-destroy: volume already gone app=${flyApp} volume=${volumeId}`
+      );
+      return c.json({ ok: true, flyApp, volumeId, volumeName: volume.name, alreadyGone: true });
+    }
+    const { message, status } = sanitizeError(err, 'orphan-volume-destroy deleteVolume');
+    return jsonError(message, status);
+  }
+
+  console.log(
+    `[platform] orphan-volume-destroy ok: app=${flyApp} volume=${volumeId} name=${volume.name}`
+  );
+  return c.json({ ok: true, flyApp, volumeId, volumeName: volume.name, alreadyGone: false });
+});
+
 // POST /api/platform/resize-machine
 // Updates the machine size for an instance. Takes effect on next start/restart.
 const ResizeMachineSchema = z.object({
@@ -3952,51 +4441,50 @@ platform.get('/versions', async c => {
 // GET /api/platform/versions/latest
 // Resolves the image version this caller should be on next.
 //
-// Query params (all optional):
-//   instanceId       — bucket subject for rollout candidate selection
-//   currentImageTag  — caller's current image; used to suppress self-upgrades
-//
-// Without instanceId, returns the current :latest pointer (back-compat for
-// anonymous callers — public version banner, CI, etc.). With instanceId, runs
-// the rollout-aware selector and returns the candidate when the instance falls
-// in cohort, the :latest baseline when not, or 404 when the caller is already
-// on the newest applicable image (banner: "no upgrade").
-//
-// The Early Access flag is looked up server-side from the instance's owning
-// user — callers cannot pass it as a query param. This keeps the service as
-// the single authoritative source: even an internal-key-holding caller can't
-// claim Early Access for an arbitrary instance.
+// Without rolloutSubject or instanceId, returns the current :latest pointer for
+// anonymous callers. With a rollout subject, runs the same rollout selector used
+// by restartMachine({ imageTag: 'latest' }). instanceId is the authoritative DB
+// row used to resolve Early Access and the rollout subject server-side.
 platform.get('/versions/latest', async c => {
   try {
+    const requestedRolloutSubject = c.req.query('rolloutSubject');
     const instanceId = c.req.query('instanceId');
     const currentImageTag = c.req.query('currentImageTag') ?? null;
 
-    if (!instanceId) {
+    let rolloutSubject = instanceId ?? requestedRolloutSubject;
+    if (!rolloutSubject) {
       const latest = await resolveLatestVersion(c.env.KV_CLAW_CACHE, 'default');
       if (!latest) return c.json({ error: 'No latest version registered' }, 404);
       return c.json(latest);
     }
 
-    // Resolve Early Access from the instance's owner. This requires Hyperdrive;
-    // without it we degrade gracefully to autoEnroll=false (the bucket math
-    // still works correctly — only the staff/beta-tester override is missing).
     let autoEnroll = false;
     const connectionString = c.env.HYPERDRIVE?.connectionString;
-    if (connectionString) {
+    if (instanceId && connectionString) {
       try {
-        autoEnroll = await lookupKiloclawEarlyAccessByInstanceId(connectionString, instanceId);
+        const rolloutContext = await lookupKiloclawRolloutContextByInstanceId(
+          connectionString,
+          instanceId
+        );
+        if (rolloutContext) {
+          rolloutSubject = rolloutContext.rolloutSubject;
+          autoEnroll = rolloutContext.earlyAccess;
+        } else {
+          rolloutSubject = instanceId;
+        }
       } catch (err) {
         console.warn(
-          '[platform] Early Access lookup failed; treating as false:',
+          '[platform] Instance rollout context lookup failed; treating as false:',
           err instanceof Error ? err.message : err
         );
+        rolloutSubject = instanceId;
       }
     }
 
     const selected = await selectImageVersionForInstance({
       kv: c.env.KV_CLAW_CACHE,
       variant: 'default',
-      instanceId,
+      rolloutSubject,
       currentImageTag,
       autoEnroll,
     });
@@ -4133,7 +4621,7 @@ platform.post('/versions/apply-pin', async c => {
       c.env,
       userId,
       instanceId,
-      stub => stub.applyPinnedVersion(imageTag, instanceId),
+      stub => stub.applyPinnedVersion(imageTag),
       'applyPinnedVersion'
     );
     return c.json({ ok: true, ...applied });

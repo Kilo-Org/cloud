@@ -20,6 +20,14 @@ function sessionInput(): SessionInput {
   };
 }
 
+function gitlabSessionInput(): SessionInput {
+  return {
+    ...sessionInput(),
+    gitUrl: 'https://gitlab.example.test/acme/repo.git',
+    platform: 'gitlab',
+  };
+}
+
 function codeReview(overrides: Partial<CodeReview> = {}): CodeReview {
   return {
     reviewId: `review-${crypto.randomUUID()}`,
@@ -221,6 +229,34 @@ describe('CodeReviewOrchestrator recovery', () => {
       headers: { 'X-Callback-Token': expectedCallbackToken },
     });
     expect(prepareBody.callbackTarget.headers).not.toHaveProperty('X-Internal-Secret');
+  });
+
+  it('prepares fresh GitLab code-review sessions without selector transport', async () => {
+    const fetchMock = mockSuccessfulCloudAgentNextRun();
+    const reviewId = crypto.randomUUID();
+    const attemptId = crypto.randomUUID();
+
+    const response = await SELF.fetch('https://worker.test/review', {
+      method: 'POST',
+      headers: { ...workerAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        reviewId,
+        attemptId,
+        authToken: 'test-auth-token',
+        sessionInput: gitlabSessionInput(),
+        owner: { type: 'user', id: 'user-id', userId: 'user-id' },
+        agentVersion: 'v2',
+      }),
+    });
+
+    expect(response.status).toBe(202);
+    await SELF.fetch(`https://worker.test/reviews/${reviewId}/status?attemptId=${attemptId}`, {
+      headers: workerAuthHeaders(),
+    });
+    const prepareCall = getFetchCall(fetchMock, '/trpc/prepareSession');
+    const prepareBody = JSON.parse(String(prepareCall?.[1]?.body));
+    expect(prepareBody).toMatchObject({ platform: 'gitlab' });
+    expect(prepareBody).not.toHaveProperty('gitlabCodeReviewTokenRef');
   });
 
   it('fresh attempt dispatch does not reuse failed state from an earlier attempt', async () => {
@@ -850,6 +886,86 @@ describe('CodeReviewOrchestrator recovery', () => {
     expect(stored?.sandboxRetryAttempted).toBeUndefined();
   });
 
+  it('maps selected-model prepareSession 400 failures to action-required terminal reason', async () => {
+    const stub = getReviewStub();
+    const fetchMock = vi.fn(async (request: RequestInfo | URL) => {
+      const url = String(request);
+      if (url.includes('/api/internal/code-review-status/')) {
+        return Response.json({ success: true });
+      }
+      if (url.includes('/trpc/prepareSession')) {
+        return trpcError(
+          400,
+          'Selected model is not available for this cloud agent session',
+          'BAD_REQUEST'
+        );
+      }
+      return new Response('unexpected fetch', { status: 500 });
+    });
+    globalThis.fetch = fetchMock;
+
+    await runInDurableObject(stub, async (_instance: CodeReviewOrchestrator, state) => {
+      await state.storage.put('state', codeReview());
+      await state.storage.setAlarm(Date.now() + 30_000);
+    });
+
+    const ran = await runDurableObjectAlarm(stub);
+
+    expect(ran).toBe(true);
+    await expect(stub.status()).resolves.toMatchObject({
+      status: 'failed',
+      terminalReason: 'selected_model_unavailable',
+    });
+    expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(1);
+    expect(fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toHaveLength(0);
+    expect(lastStatusUpdateBody(fetchMock)).toMatchObject({
+      status: 'failed',
+      terminalReason: 'selected_model_unavailable',
+    });
+    await expect(storedReview(stub)).resolves.toMatchObject({
+      status: 'failed',
+      terminalReason: 'selected_model_unavailable',
+    });
+  });
+
+  it('maps model-not-allowed prepareSession 400 failures to action-required terminal reason', async () => {
+    const stub = getReviewStub();
+    const fetchMock = vi.fn(async (request: RequestInfo | URL) => {
+      const url = String(request);
+      if (url.includes('/api/internal/code-review-status/')) {
+        return Response.json({ success: true });
+      }
+      if (url.includes('/trpc/prepareSession')) {
+        return trpcError(
+          400,
+          'Not Found: The requested model is not allowed for your team.',
+          'BAD_REQUEST'
+        );
+      }
+      return new Response('unexpected fetch', { status: 500 });
+    });
+    globalThis.fetch = fetchMock;
+
+    await runInDurableObject(stub, async (_instance: CodeReviewOrchestrator, state) => {
+      await state.storage.put('state', codeReview());
+      await state.storage.setAlarm(Date.now() + 30_000);
+    });
+
+    const ran = await runDurableObjectAlarm(stub);
+
+    expect(ran).toBe(true);
+    await expect(stub.status()).resolves.toMatchObject({
+      status: 'failed',
+      terminalReason: 'selected_model_unavailable',
+    });
+    expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(1);
+    expect(fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toHaveLength(0);
+    expect(lastStatusUpdateBody(fetchMock)).toMatchObject({
+      status: 'failed',
+      terminalReason: 'selected_model_unavailable',
+    });
+  });
+
   it('does not retry configured-session lookup failures nested in wrapper readiness output', async () => {
     const stub = getReviewStub();
     const fetchMock = vi.fn(async (request: RequestInfo | URL) => {
@@ -947,6 +1063,7 @@ describe('CodeReviewOrchestrator recovery', () => {
         'state',
         codeReview({
           previousCloudAgentSessionId: previousSessionId,
+          sessionInput: gitlabSessionInput(),
         })
       );
       await state.storage.setAlarm(Date.now() + 30_000);
@@ -966,6 +1083,10 @@ describe('CodeReviewOrchestrator recovery', () => {
     expect(hasFetchCall(fetchMock, '/trpc/sendMessageV2')).toBe(true);
     expect(hasFetchCall(fetchMock, '/trpc/prepareSession')).toBe(false);
     expect(hasFetchCall(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toBe(false);
+    const updateCall = getFetchCall(fetchMock, '/trpc/updateSession');
+    const updateBody = JSON.parse(String(updateCall?.[1]?.body));
+    expect(updateBody).not.toHaveProperty('gitlabCodeReviewTokenRef');
+    expect(updateBody).not.toHaveProperty('gitlabCodeReviewRepositoryUrl');
   });
 
   it('skips continuation and prepares a fresh session when previous sandbox is unreachable', async () => {
@@ -1020,6 +1141,46 @@ describe('CodeReviewOrchestrator recovery', () => {
     expect(hasFetchCall(fetchMock, '/trpc/sendMessageV2')).toBe(false);
     expect(hasFetchCall(fetchMock, '/trpc/prepareSession')).toBe(true);
     expect(hasFetchCall(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toBe(true);
+  });
+
+  it('continues a session when abandoned legacy execution rows are omitted from current health', async () => {
+    const stub = getReviewStub();
+    const previousSessionId = 'agent_previous_stranded_legacy';
+    const fetchMock = vi.fn(async (request: RequestInfo | URL) => {
+      const url = String(request);
+      if (url.includes('/api/internal/code-review-status/'))
+        return Response.json({ success: true });
+      if (url.includes('/trpc/getSessionHealth')) {
+        return trpcSuccess({
+          cloudAgentSessionId: previousSessionId,
+          sandboxStatus: 'healthy',
+          executionHealth: 'none',
+        });
+      }
+      if (url.includes('/trpc/updateSession')) return trpcSuccess({ success: true });
+      if (url.includes('/trpc/sendMessageV2')) {
+        return trpcSuccess({
+          executionId: 'msg_followup',
+          status: 'started',
+          messageId: 'msg_followup',
+          delivery: 'queued',
+        });
+      }
+      return new Response('unexpected fetch', { status: 500 });
+    });
+    globalThis.fetch = fetchMock;
+    await runInDurableObject(stub, async (_instance: CodeReviewOrchestrator, state) => {
+      await state.storage.put(
+        'state',
+        codeReview({ previousCloudAgentSessionId: previousSessionId })
+      );
+      await state.storage.setAlarm(Date.now() + 30_000);
+    });
+
+    await runDurableObjectAlarm(stub);
+
+    expect(hasFetchCall(fetchMock, '/trpc/sendMessageV2')).toBe(true);
+    expect(hasFetchCall(fetchMock, '/trpc/prepareSession')).toBe(false);
   });
 
   it('skips continuation and prepares a fresh session when previous execution is stale', async () => {

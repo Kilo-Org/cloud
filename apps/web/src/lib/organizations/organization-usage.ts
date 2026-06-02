@@ -20,7 +20,7 @@ import { and, eq, sql, gte, lte, not, inArray, count } from 'drizzle-orm';
 import { fromMicrodollars, toMicrodollars } from '@/lib/utils';
 import { logExceptInTest } from '@/lib/utils.server';
 import type { OrganizationSettings } from '@/lib/organizations/organization-types';
-import { getBalanceForUser } from '@/lib/user.balance';
+import { getBalanceForUser } from '@/lib/user/balance';
 import { processOrganizationExpirations } from '@/lib/creditExpiration';
 import { startInactiveSpan } from '@sentry/nextjs';
 import { AUTOCOMPLETE_MODEL } from '@/lib/constants';

@@ -20,15 +20,135 @@ function message(overrides: Partial<Message> = {}): Message {
 
 describe('canSubmitMessageInput', () => {
   it('waits for the current user id before allowing submit', () => {
-    expect(canSubmitMessageInput(null, true, false, 'hello')).toBe(false);
-    expect(canSubmitMessageInput('user-1', true, false, 'hello')).toBe(true);
+    expect(
+      canSubmitMessageInput({
+        currentUserId: null,
+        canSend: true,
+        overLimit: false,
+        text: 'hello',
+        readyAttachmentCount: 0,
+        isUploading: false,
+        hasFailedAttachments: false,
+      })
+    ).toBe(false);
+    expect(
+      canSubmitMessageInput({
+        currentUserId: 'user-1',
+        canSend: true,
+        overLimit: false,
+        text: 'hello',
+        readyAttachmentCount: 0,
+        isUploading: false,
+        hasFailedAttachments: false,
+      })
+    ).toBe(true);
   });
 
   it('blocks unavailable, empty, and over-limit sends', () => {
-    expect(canSubmitMessageInput('user-1', false, false, 'hello')).toBe(false);
-    expect(canSubmitMessageInput('user-1', true, false, '   ')).toBe(false);
     expect(
-      canSubmitMessageInput('user-1', true, true, 'x'.repeat(MESSAGE_TEXT_MAX_CHARS + 1))
+      canSubmitMessageInput({
+        currentUserId: 'user-1',
+        canSend: false,
+        overLimit: false,
+        text: 'hello',
+        readyAttachmentCount: 0,
+        isUploading: false,
+        hasFailedAttachments: false,
+      })
+    ).toBe(false);
+    expect(
+      canSubmitMessageInput({
+        currentUserId: 'user-1',
+        canSend: true,
+        overLimit: false,
+        text: '   ',
+        readyAttachmentCount: 0,
+        isUploading: false,
+        hasFailedAttachments: false,
+      })
+    ).toBe(false);
+    expect(
+      canSubmitMessageInput({
+        currentUserId: 'user-1',
+        canSend: true,
+        overLimit: true,
+        text: 'x'.repeat(MESSAGE_TEXT_MAX_CHARS + 1),
+        readyAttachmentCount: 0,
+        isUploading: false,
+        hasFailedAttachments: false,
+      })
+    ).toBe(false);
+  });
+});
+
+describe('canSubmitMessageInput with attachments', () => {
+  it('allows submit with text only', () => {
+    expect(
+      canSubmitMessageInput({
+        currentUserId: 'user-1',
+        canSend: true,
+        overLimit: false,
+        text: 'hi',
+        readyAttachmentCount: 0,
+        isUploading: false,
+        hasFailedAttachments: false,
+      })
+    ).toBe(true);
+  });
+
+  it('allows submit with attachments only and blank text', () => {
+    expect(
+      canSubmitMessageInput({
+        currentUserId: 'user-1',
+        canSend: true,
+        overLimit: false,
+        text: '',
+        readyAttachmentCount: 1,
+        isUploading: false,
+        hasFailedAttachments: false,
+      })
+    ).toBe(true);
+  });
+
+  it('blocks submit while any upload is in progress', () => {
+    expect(
+      canSubmitMessageInput({
+        currentUserId: 'user-1',
+        canSend: true,
+        overLimit: false,
+        text: 'hi',
+        readyAttachmentCount: 0,
+        isUploading: true,
+        hasFailedAttachments: false,
+      })
+    ).toBe(false);
+  });
+
+  it('blocks submit while any attachment failed', () => {
+    expect(
+      canSubmitMessageInput({
+        currentUserId: 'user-1',
+        canSend: true,
+        overLimit: false,
+        text: 'hi',
+        readyAttachmentCount: 1,
+        isUploading: false,
+        hasFailedAttachments: true,
+      })
+    ).toBe(false);
+  });
+
+  it('blocks submit with empty text and no ready attachments', () => {
+    expect(
+      canSubmitMessageInput({
+        currentUserId: 'user-1',
+        canSend: true,
+        overLimit: false,
+        text: '   ',
+        readyAttachmentCount: 0,
+        isUploading: false,
+        hasFailedAttachments: false,
+      })
     ).toBe(false);
   });
 });

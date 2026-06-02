@@ -13,7 +13,10 @@ import {
   okResponseSchema,
   executeActionResponseSchema,
   getBotStatusResponseSchema,
+  requestBotStatusResponseSchema,
   getConversationStatusResponseSchema,
+  attachmentInitResponseSchema,
+  attachmentGetUrlResponseSchema,
   type listConversationsQuerySchema,
   type listMessagesQuerySchema,
   type deleteMessageQuerySchema,
@@ -60,6 +63,11 @@ import type {
   ConversationStatusEvent,
   GetBotStatusResponse,
   GetConversationStatusResponse,
+  RequestBotStatusResponse,
+  AttachmentInitRequest,
+  AttachmentInitResponse,
+  AttachmentGetUrlRequest,
+  AttachmentGetUrlResponse,
 } from './types';
 
 // Accept any response body for fire-and-forget endpoints. The server may
@@ -239,6 +247,23 @@ export class KiloChatClient {
     );
   }
 
+  async initAttachment(req: AttachmentInitRequest): Promise<AttachmentInitResponse> {
+    const body = req satisfies AttachmentInitRequest;
+    return this.httpRequest('/v1/attachments/init', {
+      method: 'POST',
+      body,
+      schema: attachmentInitResponseSchema,
+    });
+  }
+
+  async getAttachmentUrl(req: AttachmentGetUrlRequest): Promise<AttachmentGetUrlResponse> {
+    return this.httpRequest(`/v1/attachments/${encodeURIComponent(req.attachmentId)}/url`, {
+      method: 'GET',
+      query: { conversationId: req.conversationId },
+      schema: attachmentGetUrlResponseSchema,
+    });
+  }
+
   // ── Queries via HTTP ──────────────────────────────────────────────────────
 
   async listConversations(
@@ -268,13 +293,15 @@ export class KiloChatClient {
     });
   }
 
-  // Fire-and-forget: nudges the bot to push a fresh `bot.status` event over
-  // event-service. Server dedupes per sandbox; subscribed clients call this
-  // every ~15s while the user is on a chat surface.
-  async requestBotStatus(sandboxId: string): Promise<void> {
-    await this.httpRequest(`/v1/sandboxes/${sandboxId}/request-bot-status`, {
+  // Nudges the bot to push a fresh `bot.status` event over event-service.
+  // Returns cached status when available so the caller can paint the UI
+  // immediately without waiting for the WS event. Server dedupes within a
+  // short window; subscribed clients call this every ~15s while on a chat
+  // surface.
+  async requestBotStatus(sandboxId: string): Promise<RequestBotStatusResponse> {
+    return this.httpRequest(`/v1/sandboxes/${sandboxId}/request-bot-status`, {
       method: 'POST',
-      schema: voidSchema,
+      schema: requestBotStatusResponseSchema,
     });
   }
 

@@ -6,11 +6,11 @@ This runbook walks you through the full cycle: making a change to the Docker ima
 
 ### Files you'll typically change
 
-| File                                   | Purpose                                                                 |
-| -------------------------------------- | ----------------------------------------------------------------------- |
-| `kiloclaw/Dockerfile`                  | Base image, dependencies, OpenClaw version                              |
+| File | Purpose |
+|---|---|
+| `kiloclaw/Dockerfile` | Base image, dependencies, OpenClaw version |
 | `kiloclaw/controller/src/bootstrap.ts` | Controller bootstrap (config generation, env decryption, feature flags) |
-| `kiloclaw/scripts/push-dev.sh`         | Dev image build and push script                                         |
+| `kiloclaw/scripts/push-dev.sh` | Dev image build and push script |
 
 ### Workflow at a glance
 
@@ -141,7 +141,7 @@ docker rm kiloclaw-gateway
 ```bash
 # Check versions
 docker run --rm kiloclaw:test node --version        # v24.15.0
-docker run --rm kiloclaw:test openclaw --version    # 2026.4.23
+docker run --rm kiloclaw:test openclaw --version    # 2026.5.26
 
 # Check directories
 docker run --rm kiloclaw:test ls -la /root/.openclaw

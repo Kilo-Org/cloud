@@ -358,6 +358,10 @@ export const getBotStatusResponseSchema = z.object({
   status: botStatusRecordSchema.nullable(),
 });
 
+export const requestBotStatusResponseSchema = okResponseSchema.extend({
+  cached: botStatusRecordSchema.nullable(),
+});
+
 export const getConversationStatusResponseSchema = z.object({
   status: conversationStatusRecordSchema.nullable(),
 });
@@ -402,6 +406,9 @@ export const attachmentInitResponseSchema = z.object({
   attachmentId: ulidSchema,
   putUrl: z.string().url(),
   putHeaders: z.record(z.string(), z.string()),
+  // Unix seconds when the signed PUT URL expires. Clients should re-init
+  // before this if a queued upload has been deferred past the lifetime.
+  putUrlExpiresAt: z.number().int().nonnegative(),
 });
 
 export const attachmentGetUrlRequestSchema = z.object({

@@ -5,11 +5,11 @@ import { db } from '@/lib/drizzle';
 import { kilocode_users, cliSessions } from '@kilocode/db/schema';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { failureResult } from '@/lib/maybe-result';
-import { getUserFromAuth } from '@/lib/user.server';
+import { getUserFromAuth } from '@/lib/user/server';
 import { generateSignedUploadUrl } from '@/lib/r2/cli-sessions';
 import { eq } from 'drizzle-orm';
 
-jest.mock('@/lib/user.server');
+jest.mock('@/lib/user/server');
 jest.mock('@/lib/r2/cli-sessions');
 
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);

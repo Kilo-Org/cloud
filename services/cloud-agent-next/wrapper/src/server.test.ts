@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'bun:test';
 import { createServer as createNetServer } from 'node:net';
 import { WrapperState } from './state';
 import {
+  bindSessionContext,
   createFetchHandler,
   createServer,
   resolvePtyClientClose,
@@ -78,6 +79,8 @@ function createTestFetch(overrides?: {
       sessionId: 'kilo_sess_test',
       agentSessionId: 'agent_00000000-0000-0000-0000-000000000000',
       userId: 'user_test',
+      wrapperInstanceId: 'instance_test',
+      wrapperInstanceGeneration: 8,
     },
     {
       state: new WrapperState(),
@@ -95,6 +98,21 @@ function createTestFetch(overrides?: {
 
 afterEach(async () => {
   await Promise.all(servers.splice(0).map(server => server.stop()));
+});
+
+describe('wrapper health', () => {
+  it('reports leased physical wrapper identity separately from session identity', async () => {
+    const { fetchHandler } = createTestFetch();
+    const response = await fetchHandler(new Request('http://wrapper.test/health'));
+    if (!response) throw new Error('Expected health response');
+
+    const body = await response.json();
+    expect(body).toMatchObject({
+      sessionId: 'kilo_sess_test',
+      wrapperInstanceId: 'instance_test',
+      wrapperInstanceGeneration: 8,
+    });
+  });
 });
 
 describe('wrapper PTY routes', () => {
@@ -233,5 +251,58 @@ describe('wrapper PTY routes', () => {
       code: 1000,
       reason: 'PTY session ended',
     });
+  });
+});
+
+describe('wrapper session binding', () => {
+  it('resets lifecycle state when warm rebinding an existing connected session', async () => {
+    const state = new WrapperState();
+    state.bindSession({
+      kiloSessionId: 'kilo_sess_test',
+      ingestUrl: 'ws://worker.test/ingest',
+      workerAuthToken: 'worker-token',
+      wrapperRunId: 'run_1',
+      wrapperGeneration: 1,
+      wrapperConnectionId: 'conn_1',
+      agentSessionId: 'agent_00000000-0000-0000-0000-000000000000',
+    });
+    state.setConnections({ readyState: WebSocket.OPEN } as WebSocket, new AbortController());
+
+    let closeConnectionCalls = 0;
+    let resetLifecycleCalls = 0;
+    const response = await bindSessionContext(
+      {
+        ingestUrl: 'ws://worker.test/ingest',
+        workerAuthToken: 'worker-token',
+        wrapperRunId: 'run_2',
+        wrapperGeneration: 2,
+        wrapperConnectionId: 'conn_2',
+      },
+      {
+        port: 5000,
+        workspacePath: '/workspace/repo',
+        version: 'test',
+        sessionId: 'kilo_sess_test',
+        agentSessionId: 'agent_00000000-0000-0000-0000-000000000000',
+        userId: 'user_test',
+      },
+      {
+        state,
+        kiloClient: {} as WrapperKiloClient,
+        openConnection: async () => {},
+        closeConnection: async () => {
+          closeConnectionCalls += 1;
+          state.clearConnectionRefs();
+        },
+        setAborted: () => {},
+        resetLifecycle: () => {
+          resetLifecycleCalls += 1;
+        },
+      }
+    );
+
+    expect(response).toBeNull();
+    expect(closeConnectionCalls).toBe(1);
+    expect(resetLifecycleCalls).toBe(1);
   });
 });

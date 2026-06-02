@@ -821,9 +821,6 @@ function compareId(left: string, right: string): number {
 }
 
 function compareKiloSdkPart(left: Record<string, unknown>, right: Record<string, unknown>): number {
-  const idSchema = z.object({ id: z.string() });
-  const leftId = idSchema.safeParse(left);
-  const rightId = idSchema.safeParse(right);
-  if (!leftId.success || !rightId.success) return 0;
-  return compareId(leftId.data.id, rightId.data.id);
+  if (typeof left.id !== 'string' || typeof right.id !== 'string') return 0;
+  return compareId(left.id, right.id);
 }

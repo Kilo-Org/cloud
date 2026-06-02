@@ -40,12 +40,10 @@ type SlackUnfurlAttachment = {
   original_url?: string;
   from_url?: string;
   title?: string;
-  title_link?: string;
   text?: string;
   fallback?: string;
   service_name?: string;
   author_name?: string;
-  pretext?: string;
 };
 
 function formatSlackUnfurledAttachments(rawAttachments: unknown): string {
@@ -77,7 +75,8 @@ function formatSlackUnfurledAttachments(rawAttachments: unknown): string {
     if (servicePart) meta.push(servicePart);
     if (authorPart) meta.push(`by ${authorPart}`);
 
-    let line = `[Unfurled link: ${titlePart ?? url} (${url})`;
+    const sanitizedUrl = sanitizeForDelimiters(url);
+    let line = `[Unfurled link: ${titlePart ?? sanitizedUrl} (${sanitizedUrl})`;
     if (meta.length > 0) line += ` — ${meta.join(', ')}`;
     if (textPart) line += ` — ${textPart}`;
     line += ']';

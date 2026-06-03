@@ -340,13 +340,16 @@ const GOOGLE_CALENDAR_FEATURES: Array<{ included: boolean; label: string }> = [
 ];
 
 // Friendly messages for the `?error=` codes the Google OAuth connect/callback/
-// disconnect routes append when they redirect back to settings. Only these
-// known codes (plus the two success values) are handled, so unrelated query
-// params on the settings page are left untouched.
+// disconnect routes append when they redirect back to settings. Known codes get
+// tailored copy; any other error value (e.g. a sanitized provider description)
+// falls back to the generic message below so failures are never silent.
+const GOOGLE_OAUTH_GENERIC_ERROR = 'Could not connect Google Calendar. Please try again.';
+
 const GOOGLE_OAUTH_ERROR_MESSAGES: Record<string, string> = {
+  access_denied: 'Google Calendar connection was cancelled.',
   missing_permissions:
     'Calendar access was not granted. Please allow calendar permission and try again.',
-  connection_failed: 'Could not connect Google Calendar. Please try again.',
+  connection_failed: GOOGLE_OAUTH_GENERIC_ERROR,
   oauth_init_failed: 'Could not start the Google connection. Please try again.',
   missing_instance: 'Your KiloClaw instance is still starting. Try again in a moment.',
   missing_code: 'Google did not return an authorization code. Please try again.',
@@ -2119,7 +2122,13 @@ export function SettingsTab({
 
     const success = searchParams.get('success');
     const error = searchParams.get('error');
-    const errorMessage = error ? GOOGLE_OAUTH_ERROR_MESSAGES[error] : undefined;
+    // Any `error=` on this route comes from the Google OAuth routes, so map
+    // known codes to friendly copy and fall back to a generic message for the
+    // rest (e.g. access_denied/cancel, or a sanitized provider description) so
+    // the failure is always surfaced and the param is always cleaned up.
+    const errorMessage = error
+      ? (GOOGLE_OAUTH_ERROR_MESSAGES[error] ?? GOOGLE_OAUTH_GENERIC_ERROR)
+      : undefined;
     const isGoogleSuccess = success === 'google_connected' || success === 'google_disconnected';
 
     if (!isGoogleSuccess && !errorMessage) return;

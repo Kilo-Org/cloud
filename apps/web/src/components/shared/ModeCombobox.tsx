@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/command';
 import { ChevronsUpDown, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Badge } from '@/components/ui/badge';
 
 /**
  * Mode option type for customizable mode lists.
@@ -22,6 +23,7 @@ export type ModeOption<T extends string = string> = {
   value: T;
   label: string;
   description: string;
+  deprecated?: boolean;
 };
 
 /**
@@ -44,7 +46,12 @@ export const NEXT_MODE_OPTIONS: ModeOption<'code' | 'plan' | 'debug' | 'orchestr
   { value: 'code', label: 'Code', description: 'Write and modify code' },
   { value: 'plan', label: 'Plan', description: 'Plan and design solutions' },
   { value: 'debug', label: 'Debug', description: 'Find and fix issues' },
-  { value: 'orchestrator', label: 'Orchestrator', description: 'Coordinate complex tasks' },
+  {
+    value: 'orchestrator',
+    label: 'Orchestrator',
+    description: 'Coordinate complex tasks',
+    deprecated: true,
+  },
   { value: 'ask', label: 'Ask', description: 'Get answers and explanations' },
 ];
 
@@ -214,7 +221,10 @@ function ModeComboboxGroups<T extends string>({
       className="flex items-center gap-2"
     >
       <div className="flex min-w-0 flex-1 flex-col">
-        <span className="truncate">{mode.label}</span>
+        <div className="flex items-center gap-2">
+          <span className="truncate">{mode.label}</span>
+          {mode.deprecated && <Badge variant="warning">Deprecated</Badge>}
+        </div>
         {mode.description && (
           <span className="text-muted-foreground truncate text-xs">{mode.description}</span>
         )}

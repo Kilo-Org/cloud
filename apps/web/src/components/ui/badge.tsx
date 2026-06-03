@@ -18,6 +18,8 @@ const badgeVariants = cva(
         outline: 'text-foreground [a&]:hover:bg-accent [a&]:hover:text-accent-foreground',
         beta: 'rounded-full bg-blue-500/10 px-3 py-1 font-semibold text-blue-400 ring-1 ring-blue-500/20 border-transparent',
         new: 'rounded-full bg-green-500/10 px-3 py-1 font-semibold text-green-400 ring-1 ring-green-500/20 border-transparent',
+        warning:
+          'rounded-full bg-yellow-500/10 px-3 py-1 font-semibold text-yellow-400 ring-1 ring-yellow-500/20 border-transparent',
       },
     },
     defaultVariants: {

@@ -548,6 +548,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       const act = session.state.getActivity();
       const st = session.state.getStatus();
       const cs = session.state.getCloudStatus();
+      const previousStatus = store.get(agentStatusAtom);
       store.set(activityAtom, act);
       if (!firstActivityFired && act.type !== 'connecting') {
         firstActivityFired = true;
@@ -572,6 +573,11 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       }
       store.set(canSendAtom, session.canSend && cloudReady);
       store.set(canInterruptAtom, session.canInterrupt);
+
+      if (previousStatus.type === 'disconnected' && st.type !== 'disconnected') {
+        store.set(errorAtom, null);
+        setIndicator(null);
+      }
 
       if (act.type !== prevAct) {
         if (act.type === 'busy') {

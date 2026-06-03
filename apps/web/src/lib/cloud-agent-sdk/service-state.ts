@@ -379,6 +379,9 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
 
     // Clear terminated on connected
     terminated = false;
+    if (status.type === 'disconnected') {
+      status = IDLE_STATUS;
+    }
 
     // Clear pending-message delivery state — replayed cloud.message.queued
     // events following the snapshot will repopulate it with the current truth.

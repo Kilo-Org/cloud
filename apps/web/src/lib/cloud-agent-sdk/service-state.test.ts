@@ -673,6 +673,17 @@ describe('createServiceState', () => {
       expect(onError).toHaveBeenCalledWith('New error');
     });
 
+    it('clears disconnected status on reconnect', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({ type: 'stopped', reason: 'disconnected' });
+      expect(state.getStatus()).toEqual({ type: 'disconnected' });
+
+      state.process({ type: 'connected', sessionStatus: { type: 'idle' } });
+
+      expect(state.getStatus()).toEqual({ type: 'idle' });
+    });
+
     it('sets all fields in one shot', () => {
       const state = createServiceState(makeConfig());
       state.process({

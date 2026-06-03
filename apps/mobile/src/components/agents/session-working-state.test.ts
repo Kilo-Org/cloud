@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { shouldShowAgentWorkingIndicator } from '@/components/agents/session-working-state';
+import {
+  shouldShowAgentWorkingIndicator,
+  shouldShowFooterWorkingIndicator,
+} from '@/components/agents/session-working-state';
 
 describe('shouldShowAgentWorkingIndicator', () => {
   it('shows while the agent is streaming', () => {
@@ -26,6 +29,35 @@ describe('shouldShowAgentWorkingIndicator', () => {
       shouldShowAgentWorkingIndicator({
         isStreaming: false,
         pendingMessageCount: 0,
+      })
+    ).toBe(false);
+  });
+});
+
+describe('shouldShowFooterWorkingIndicator', () => {
+  it('shows the working indicator when the agent is working and no status indicator is visible', () => {
+    expect(
+      shouldShowFooterWorkingIndicator({
+        isAgentWorking: true,
+        hasStatusIndicator: false,
+      })
+    ).toBe(true);
+  });
+
+  it('hides the working indicator when a status indicator is already visible', () => {
+    expect(
+      shouldShowFooterWorkingIndicator({
+        isAgentWorking: true,
+        hasStatusIndicator: true,
+      })
+    ).toBe(false);
+  });
+
+  it('hides the working indicator when the agent is idle', () => {
+    expect(
+      shouldShowFooterWorkingIndicator({
+        isAgentWorking: false,
+        hasStatusIndicator: false,
       })
     ).toBe(false);
   });

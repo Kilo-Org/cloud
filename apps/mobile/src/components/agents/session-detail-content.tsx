@@ -13,7 +13,10 @@ import { QuestionCard } from '@/components/agents/question-card';
 import { getSessionKeyboardContainerKind } from '@/components/agents/session-keyboard-container-state';
 import { useSessionManager } from '@/components/agents/session-provider';
 import { SessionStatusIndicator } from '@/components/agents/session-status-indicator';
-import { shouldShowAgentWorkingIndicator } from '@/components/agents/session-working-state';
+import {
+  shouldShowAgentWorkingIndicator,
+  shouldShowFooterWorkingIndicator,
+} from '@/components/agents/session-working-state';
 import { AppAwareKeyboardPaddingView } from '@/components/kilo-chat/app-aware-keyboard-padding';
 import { useInteractionHandlers } from '@/components/agents/use-interaction-handlers';
 import { useSessionAutoScroll } from '@/components/agents/use-session-auto-scroll';
@@ -135,6 +138,10 @@ export function SessionDetailContent({ sessionId }: Readonly<SessionDetailConten
   const shouldShowWorkingIndicator = shouldShowAgentWorkingIndicator({
     isStreaming,
     pendingMessageCount: pendingMessages.size,
+  });
+  const shouldShowFooterWorking = shouldShowFooterWorkingIndicator({
+    isAgentWorking: shouldShowWorkingIndicator,
+    hasStatusIndicator: statusIndicator !== null,
   });
 
   const emptyStateText = error ?? (statusIndicator ? null : 'No messages yet');
@@ -301,7 +308,7 @@ export function SessionDetailContent({ sessionId }: Readonly<SessionDetailConten
         scrollEventThrottle={16}
         ListFooterComponent={
           <>
-            <WorkingIndicator messages={messages} isStreaming={shouldShowWorkingIndicator} />
+            <WorkingIndicator messages={messages} isStreaming={shouldShowFooterWorking} />
             {statusIndicator ? <SessionStatusIndicator indicator={statusIndicator} /> : null}
           </>
         }

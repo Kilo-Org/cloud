@@ -52,9 +52,16 @@ export function notifyUserSessionEvent(
   ctx?: { waitUntil(promise: Promise<unknown>): void }
 ): void {
   const notify = async () => {
+    const startedAt = Date.now();
     try {
       const stub = getUserConnectionDO(env, { kiloUserId });
       await stub.notifySessionEvent(event);
+      const durationMs = Date.now() - startedAt;
+      console.info('session-ingest notify timing', {
+        event: event.type,
+        sessionId: 'session' in event.data ? event.data.session.sessionId : event.data.sessionId,
+        durationMs,
+      });
     } catch (error) {
       console.error('Failed to notify session event (non-fatal)', {
         event: event.type,

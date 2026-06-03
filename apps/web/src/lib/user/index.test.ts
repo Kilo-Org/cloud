@@ -664,6 +664,7 @@ describe('User', () => {
       });
       const touchId = randomUUID();
       const participantId = randomUUID();
+      const kiloPassParticipantId = randomUUID();
       const conversionId = randomUUID();
       const decisionId = randomUUID();
       const rewardId = randomUUID();
@@ -680,21 +681,46 @@ describe('User', () => {
         touched_at: '2026-04-23T00:00:00.000Z',
         expires_at: '2026-05-23T00:00:00.000Z',
       });
-      await db.insert(impact_advocate_participants).values({
-        id: participantId,
-        user_id: user.id,
-        advocate_id: user.id,
-        advocate_account_id: user.id,
-        contact_email: user.google_user_email,
-        registration_state: 'pending',
-      });
-      await db.insert(impact_advocate_registration_attempts).values({
-        participant_id: participantId,
-        dedupe_key: 'registration-dedupe',
-        opaque_cookie_value: 'sq-cookie',
-        cookie_value_length: 9,
-        delivery_state: 'queued',
-      });
+      await db.insert(impact_advocate_participants).values([
+        {
+          id: participantId,
+          program_key: 'kiloclaw',
+          user_id: user.id,
+          advocate_id: user.google_user_email,
+          advocate_account_id: user.google_user_email,
+          contact_email: user.google_user_email,
+          registration_state: 'pending',
+        },
+        {
+          id: kiloPassParticipantId,
+          program_key: 'kilo_pass',
+          user_id: user.id,
+          advocate_id: user.google_user_email,
+          advocate_account_id: user.google_user_email,
+          contact_email: user.google_user_email,
+          registration_state: 'pending',
+        },
+      ]);
+      await db.insert(impact_advocate_registration_attempts).values([
+        {
+          program_key: 'kiloclaw',
+          participant_id: participantId,
+          dedupe_key: 'registration-dedupe-kiloclaw',
+          opaque_cookie_value: 'sq-cookie',
+          cookie_value_length: 9,
+          delivery_state: 'queued',
+          request_payload: { id: user.google_user_email, email: user.google_user_email },
+        },
+        {
+          program_key: 'kilo_pass',
+          participant_id: kiloPassParticipantId,
+          dedupe_key: 'registration-dedupe-kilo-pass',
+          opaque_cookie_value: 'sq-cookie-kilo-pass',
+          cookie_value_length: 19,
+          delivery_state: 'queued',
+          request_payload: { id: user.google_user_email, email: user.google_user_email },
+        },
+      ]);
       await db.insert(impact_referrals).values({
         referee_user_id: user.id,
         referrer_user_id: referrer.id,
@@ -782,6 +808,11 @@ describe('User', () => {
         .where(eq(impact_advocate_participants.user_id, user.id));
       expect(participantCount.count).toBe(0);
 
+      const [registrationAttemptCount] = await db
+        .select({ count: count() })
+        .from(impact_advocate_registration_attempts);
+      expect(registrationAttemptCount.count).toBe(0);
+
       const [redemptionCount] = await db
         .select({ count: count() })
         .from(impact_advocate_reward_redemptions)
@@ -793,6 +824,15 @@ describe('User', () => {
         .from(impact_referral_conversions)
         .where(eq(impact_referral_conversions.referee_user_id, user.id));
       expect(conversionCount.count).toBe(0);
+
+      expect((await db.select({ count: count() }).from(impact_referrals))[0].count).toBe(0);
+      expect((await db.select({ count: count() }).from(impact_referral_rewards))[0].count).toBe(0);
+      expect(
+        (await db.select({ count: count() }).from(impact_referral_reward_applications))[0].count
+      ).toBe(0);
+      expect((await db.select({ count: count() }).from(impact_conversion_reports))[0].count).toBe(
+        0
+      );
     });
 
     it('falls back to google_user_email when normalized_email is null', async () => {

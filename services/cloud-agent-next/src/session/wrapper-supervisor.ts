@@ -645,41 +645,37 @@ export function createWrapperSupervisor(
     return false;
   }
 
-  async function checkIdleReconciliation(now: number): Promise<void> {
-    const metadata = await getMetadata();
-    if (!metadata) return;
-
-    const state = await getWrapperRuntimeState(storage);
-    if (!state.wrapperRunId) return;
-
-    const acceptedMessages = await listNonTerminalAcceptedMessages(storage, state.wrapperRunId);
-    if (acceptedMessages.length === 0) {
-      if (
-        state.wrapperConnectionId &&
-        (state.lastWrapperIdleAt !== undefined || state.idleReconcileAfter !== undefined)
-      ) {
-        await clearWrapperIdleState(storage, state.wrapperGeneration, state.wrapperConnectionId);
-      }
-      return;
-    }
-
-    if (state.idleReconcileAfter !== undefined) {
-      if (now < state.idleReconcileAfter) return;
-    } else {
-      const hasRecentOutput =
-        state.lastWrapperMessageAt !== undefined &&
-        now - state.lastWrapperMessageAt < WRAPPER_NO_OUTPUT_TIMEOUT_MS;
-      if (hasRecentOutput) return;
-    }
-
+  /**
+   * Terminalize the wrapper run's still-accepted messages against the latest
+   * assistant reply, mirroring how a finished turn would have settled them.
+   *
+   * Shared by two triggers:
+   *  - `idle`: the idle-reconciliation grace deadline elapsed.
+   *  - `wrapper_complete`: the wrapper emitted its terminal `complete` event,
+   *    which is the race-free "fully done" signal (it fires only after all
+   *    post-completion work). This is the authoritative backstop for the case
+   *    where the assistant `message.updated` arrived without `time.completed`,
+   *    so neither the assistant-event nor the idle path settled the message.
+   *
+   * `terminalizeSessionMessageOnce` is idempotent, so re-running here after a
+   * partial settlement is safe.
+   */
+  async function reconcileAcceptedMessages(
+    now: number,
+    state: WrapperRuntimeState,
+    metadata: SessionMetadata,
+    acceptedMessages: Awaited<ReturnType<typeof listNonTerminalAcceptedMessages>>,
+    trigger: 'idle' | 'wrapper_complete'
+  ): Promise<void> {
     logger
       .withFields({
         sessionId: metadata.identity.sessionId,
         wrapperRunId: state.wrapperRunId,
         acceptedMessageCount: acceptedMessages.length,
         hasKiloSessionId: metadata.auth.kiloSessionId !== undefined,
+        trigger,
       })
-      .info('Idle reconciliation processing accepted messages');
+      .info('Reconciling accepted messages');
 
     let failedTerminalObserved = !metadata.auth.kiloSessionId;
     if (!failedTerminalObserved && metadata.auth.kiloSessionId) {
@@ -704,7 +700,7 @@ export function createWrapperSupervisor(
         await messageSettlementOutbox.terminalizeSessionMessageOnce(message.messageId, {
           kind: 'failed',
           reason: 'missing_assistant_reply',
-          error: 'No assistant reply found after idle timeout',
+          error: 'No assistant reply found during reconciliation',
           completionSource: 'idle_reconciliation',
           failureStage: 'post_dispatch_no_activity',
           failureCode: 'missing_assistant_reply',
@@ -722,7 +718,7 @@ export function createWrapperSupervisor(
         await messageSettlementOutbox.terminalizeSessionMessageOnce(message.messageId, {
           kind: 'failed',
           reason: 'missing_assistant_reply',
-          error: 'No assistant reply found after idle timeout',
+          error: 'No assistant reply found during reconciliation',
           completionSource: 'idle_reconciliation',
           failureStage: 'post_dispatch_no_activity',
           failureCode: 'missing_assistant_reply',
@@ -768,8 +764,39 @@ export function createWrapperSupervisor(
         sessionId: metadata.identity.sessionId,
         wrapperRunId: state.wrapperRunId,
         acceptedMessageCount: acceptedMessages.length,
+        trigger,
       })
-      .info('Idle reconciliation pass completed');
+      .info('Reconciliation pass completed');
+  }
+
+  async function checkIdleReconciliation(now: number): Promise<void> {
+    const metadata = await getMetadata();
+    if (!metadata) return;
+
+    const state = await getWrapperRuntimeState(storage);
+    if (!state.wrapperRunId) return;
+
+    const acceptedMessages = await listNonTerminalAcceptedMessages(storage, state.wrapperRunId);
+    if (acceptedMessages.length === 0) {
+      if (
+        state.wrapperConnectionId &&
+        (state.lastWrapperIdleAt !== undefined || state.idleReconcileAfter !== undefined)
+      ) {
+        await clearWrapperIdleState(storage, state.wrapperGeneration, state.wrapperConnectionId);
+      }
+      return;
+    }
+
+    if (state.idleReconcileAfter !== undefined) {
+      if (now < state.idleReconcileAfter) return;
+    } else {
+      const hasRecentOutput =
+        state.lastWrapperMessageAt !== undefined &&
+        now - state.lastWrapperMessageAt < WRAPPER_NO_OUTPUT_TIMEOUT_MS;
+      if (hasRecentOutput) return;
+    }
+
+    await reconcileAcceptedMessages(now, state, metadata, acceptedMessages, 'idle');
   }
 
   async function checkKeepWarmCleanup(now: number): Promise<void> {
@@ -967,6 +994,28 @@ export function createWrapperSupervisor(
       const acceptedMessages = await listNonTerminalAcceptedMessages(storage, wrapperRunId);
       if (acceptedMessages.length === 0) {
         await retainPhysicalWrapperWarm(Date.now());
+        await clearInterruptRequest();
+      } else {
+        // `complete` is the race-free "fully done" signal: it is emitted only
+        // after all post-completion work. If messages are still accepted here,
+        // the assistant-event and idle-reconcile paths both missed them (e.g.
+        // the final assistant `message.updated` lacked `time.completed`, and
+        // post-idle autocommit refreshed liveness). Settle them now rather than
+        // leaving the callback gated indefinitely.
+        const metadata = await getMetadata();
+        if (metadata) {
+          await reconcileAcceptedMessages(
+            Date.now(),
+            state,
+            metadata,
+            acceptedMessages,
+            'wrapper_complete'
+          );
+        } else {
+          logger
+            .withFields({ sessionId, wrapperRunId, acceptedMessageCount: acceptedMessages.length })
+            .warn('Wrapper complete with accepted messages but no session metadata to reconcile');
+        }
         await clearInterruptRequest();
       }
     } else {

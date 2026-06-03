@@ -37,6 +37,7 @@ import {
   alibabaDirectModels,
   qwen36_plus_model,
   qwen36_plus_stealth_model,
+  qwen37_plus_free_model,
 } from '@/lib/ai-gateway/providers/qwen';
 import { stepfun_37_flash_free_model } from '@/lib/ai-gateway/providers/stepfun';
 import { isGrokModel } from '@/lib/ai-gateway/providers/xai';
@@ -95,6 +96,7 @@ export const kiloExclusiveModels = [
   ...alibabaDirectModels,
   ...deepseekDiscountedModels,
   qwen36_plus_stealth_model,
+  qwen37_plus_free_model,
   claude_sonnet_clawsetup_model,
   claude_opus_4_8_stealth_model,
   claude_opus_4_7_stealth_model,

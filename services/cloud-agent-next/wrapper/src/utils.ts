@@ -26,6 +26,7 @@ export type TimeoutAbortOptions = {
 
 const EXEC_TIMEOUT_EXIT_CODE = 124;
 const EXEC_TERMINATION_GRACE_MS = 2_000;
+const EXEC_TERMINATION_POLL_MS = 25;
 const EXEC_TIMEOUT_MESSAGE = 'exec timeout reached';
 const EXEC_ABORTED_MESSAGE = 'exec aborted';
 
@@ -60,6 +61,7 @@ export function runProcess(
     let settled = false;
     let terminationReason: TerminationReason | null = null;
     let terminationTimer: ReturnType<typeof setTimeout> | undefined;
+    let terminationPollTimer: ReturnType<typeof setTimeout> | undefined;
 
     function abortHandler(): void {
       terminate('abort');
@@ -68,6 +70,7 @@ export function runProcess(
     const clearTimers = () => {
       if (timer) clearTimeout(timer);
       if (terminationTimer) clearTimeout(terminationTimer);
+      if (terminationPollTimer) clearTimeout(terminationPollTimer);
     };
 
     const removeAbortHandler = () => {
@@ -107,6 +110,25 @@ export function runProcess(
       }
     };
 
+    const processGroupExists = (): boolean => {
+      if (proc.pid === undefined) return false;
+      try {
+        process.kill(-proc.pid, 0);
+        return true;
+      } catch {
+        return false;
+      }
+    };
+
+    const waitForTerminatedGroup = (): void => {
+      if (settled || terminationReason === null) return;
+      if (!processGroupExists()) {
+        resolveTermination();
+        return;
+      }
+      terminationPollTimer = setTimeout(waitForTerminatedGroup, EXEC_TERMINATION_POLL_MS);
+    };
+
     const terminate = (reason: TerminationReason): void => {
       if (settled || terminationReason !== null) return;
       terminationReason = reason;
@@ -133,16 +155,16 @@ export function runProcess(
         opts.signal.addEventListener('abort', abortHandler, { once: true });
       }
     }
-    proc.on('close', code => {
+    proc.on('close', (code, signal) => {
       if (settled) return;
       if (terminationReason !== null) {
-        resolveTermination();
+        waitForTerminatedGroup();
         return;
       }
       settled = true;
       clearTimers();
       removeAbortHandler();
-      resolve({ stdout, stderr, exitCode: code ?? 0 });
+      resolve({ stdout, stderr, exitCode: code ?? (signal === null ? 0 : 1) });
     });
     proc.on('error', err => {
       if (!settled) {

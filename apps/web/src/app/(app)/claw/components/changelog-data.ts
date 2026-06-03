@@ -11,6 +11,13 @@ export type ChangelogEntry = {
 // Newest entries first. Developers add new entries to the top of this array.
 export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: '2026-06-03',
+    description:
+      "Google Calendar now connects through KiloCode's official Google approved OAuth client. Connect it from Settings → Productivity → Google Calendar for read-only calendar access. We encourage everyone to use this instead of the legacy Google (Gog) connection. If you already have the legacy connection set up, it keeps working and nothing is removed. New legacy setups are no longer offered, so switch over when convenient.",
+    category: 'feature',
+    deployHint: null,
+  },
+  {
     date: '2026-06-01',
     description: 'Updated OpenClaw to 2026.5.26.',
     category: 'feature',

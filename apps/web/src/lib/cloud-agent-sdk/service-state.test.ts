@@ -219,6 +219,19 @@ describe('createServiceState', () => {
       expect(onError).toHaveBeenCalledWith('Connection to agent lost');
     });
 
+    it('ignores wrapper disconnect after a completed idle session', () => {
+      const onError = jest.fn();
+      const state = createServiceState(makeConfig({ onError }));
+      state.setActivity({ type: 'busy' });
+
+      state.process({ type: 'stopped', reason: 'complete' });
+      state.process({ type: 'stopped', reason: 'disconnected' });
+
+      expect(state.getActivity()).toEqual({ type: 'idle' });
+      expect(state.getStatus()).toEqual({ type: 'idle' });
+      expect(onError).not.toHaveBeenCalledWith('Connection to agent lost');
+    });
+
     it('stopped resets cloudStatus to null when it was preparing', () => {
       const state = createServiceState(makeConfig());
       state.process({
@@ -671,6 +684,39 @@ describe('createServiceState', () => {
       // session.error should fire again
       state.process({ type: 'session.error', error: 'New error' });
       expect(onError).toHaveBeenCalledWith('New error');
+    });
+
+    it('clears disconnected status on reconnect', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({ type: 'stopped', reason: 'disconnected' });
+      expect(state.getStatus()).toEqual({ type: 'disconnected' });
+
+      state.process({ type: 'connected', sessionStatus: { type: 'idle' } });
+
+      expect(state.getStatus()).toEqual({ type: 'idle' });
+    });
+
+    it('preserves disconnected status on synthetic viewer reconnect without sessionStatus', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({ type: 'stopped', reason: 'disconnected' });
+      expect(state.getStatus()).toEqual({ type: 'disconnected' });
+
+      state.process({ type: 'connected' });
+
+      expect(state.getStatus()).toEqual({ type: 'disconnected' });
+    });
+
+    it('clears transport-disconnected status on synthetic viewer reconnect', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({ type: 'stopped', reason: 'transport-disconnected' });
+      expect(state.getStatus()).toEqual({ type: 'disconnected' });
+
+      state.process({ type: 'connected' });
+
+      expect(state.getStatus()).toEqual({ type: 'idle' });
     });
 
     it('sets all fields in one shot', () => {

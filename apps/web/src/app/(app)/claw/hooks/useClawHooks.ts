@@ -393,31 +393,6 @@ export function useClawReadFile(path: string | null, enabled: boolean) {
   return organizationId ? org : personal;
 }
 
-// Google integration
-
-export function useClawGoogleSetupCommand(enabled: boolean) {
-  const trpc = useTRPC();
-  const { organizationId } = useClawContext();
-
-  const personal = useQuery({
-    ...trpc.kiloclaw.getGoogleSetupCommand.queryOptions(undefined, {
-      refetchInterval: 50 * 60 * 1000,
-      refetchOnWindowFocus: false,
-    }),
-    enabled: enabled && !organizationId,
-  });
-
-  const org = useQuery({
-    ...trpc.organizations.kiloclaw.getGoogleSetupCommand.queryOptions(
-      { organizationId: organizationId ?? '' },
-      { refetchInterval: 50 * 60 * 1000, refetchOnWindowFocus: false }
-    ),
-    enabled: enabled && !!organizationId,
-  });
-
-  return organizationId ? org : personal;
-}
-
 // Kilo CLI Run
 
 export function useClawKiloCliRunStatus(runId: string | null) {

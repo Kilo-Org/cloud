@@ -1061,10 +1061,11 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     expect(result.ready.devcontainer).toBeUndefined();
   });
 
-  it('materializes workspace setup and prompt delivery into separate wrapper requests', async () => {
+  it('materializes workspace setup and prompt delivery without using provider token overrides for ingest auth', async () => {
     const service = new SessionService();
     const env = createEnv();
     env.WORKER_URL = 'https://cloud-agent.example.com';
+    env.KILOCODE_TOKEN_OVERRIDE = 'provider-override-token';
     const metadata = createMetadata({
       setupCommands: ['pnpm install'],
       envVars: { PUBLIC_VALUE: 'visible' },
@@ -1144,7 +1145,10 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     expect(result.promptRequest).not.toHaveProperty('workspace');
     expect(result.promptRequest).not.toHaveProperty('materialized');
     expect(result.readyRequest.materialized.env.PUBLIC_VALUE).toBe('visible');
-    expect(result.readyRequest.materialized.env.KILOCODE_TOKEN).toBe('kilo-token');
+    expect(result.readyRequest.materialized.env.KILOCODE_TOKEN).toBe('provider-override-token');
+    expect(JSON.parse(result.readyRequest.materialized.env.KILO_AUTH_CONTENT)).toEqual({
+      kilo: { type: 'api', key: 'kilo-token' },
+    });
     expect(result.readyRequest.materialized.env.GITLAB_TOKEN).toBe('resolved-gitlab-token');
     expect(result.readyRequest.materialized.env.GITLAB_HOST).toBe('gitlab.com');
     expect(result.readyRequest.materialized.env.GLAB_IS_OAUTH2).toBe('true');

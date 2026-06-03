@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAtom, useSetAtom } from 'jotai';
 import { toast } from 'sonner';
+import { v4 as uuidv4 } from 'uuid';
 import {
   AlertCircle,
   Brain,
@@ -189,7 +190,7 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
   const [isRepoUserSelected, setIsRepoUserSelected] = useState(false);
   const [showRepositoryRequiredMessage, setShowRepositoryRequiredMessage] = useState(false);
   const [isPreparing, setIsPreparing] = useState(false);
-  const [attachmentMessageUuid, setAttachmentMessageUuid] = useState(() => crypto.randomUUID());
+  const [attachmentMessageUuid, setAttachmentMessageUuid] = useState(() => uuidv4());
 
   // ---------------------------------------------------------------------------
   // GitHub identity awareness
@@ -819,7 +820,7 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
       });
 
       attachmentUpload.clearAttachments();
-      setAttachmentMessageUuid(crypto.randomUUID());
+      setAttachmentMessageUuid(uuidv4());
 
       const basePath = organizationId ? `/organizations/${organizationId}/cloud` : '/cloud';
       router.push(`${basePath}/chat?sessionId=${result.kiloSessionId}`);

@@ -42,7 +42,7 @@ export function ProfileKiloPassSection() {
           toast.error('Failed to create Stripe checkout session');
           return;
         }
-        window.location.href = result.url;
+        window.location.assign(result.url);
       },
       onError: error => {
         toast.error(error.message || 'Failed to start checkout');

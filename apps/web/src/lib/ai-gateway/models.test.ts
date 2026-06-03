@@ -16,8 +16,10 @@ import {
   isAlibabaDirectModel,
   qwen36_plus_model,
   qwen37_max_model,
+  qwen37_plus_free_model,
   qwen37_plus_model,
 } from './providers/qwen';
+import { getModelVariants, REASONING_VARIANTS_BINARY } from './providers/model-settings';
 
 describe('isFreeModel', () => {
   describe('free models', () => {
@@ -90,6 +92,15 @@ describe('isFreeModel', () => {
       expect(qwen37_plus_model.gateway).toBe('alibaba');
       expect(qwen37_plus_model.internal_id).toBe('qwen3.7-plus');
       expect(getInferenceProvider(qwen37_plus_model)).toBe('alibaba');
+    });
+
+    test('routes free Qwen3.7 Plus through Vercel with binary thinking variants', () => {
+      expect(findKiloExclusiveModel(qwen37_plus_free_model.public_id)).toBe(qwen37_plus_free_model);
+      expect(isAlibabaDirectModel(qwen37_plus_free_model.public_id)).toBe(false);
+      expect(qwen37_plus_free_model.gateway).toBe('vercel');
+      expect(qwen37_plus_free_model.internal_id).toBe('alibaba/qwen3.7-plus');
+      expect(getInferenceProvider(qwen37_plus_free_model)).toBe(null);
+      expect(getModelVariants(qwen37_plus_free_model.public_id)).toBe(REASONING_VARIANTS_BINARY);
     });
 
     test('requires data collection for paid training-enabled offerings', () => {

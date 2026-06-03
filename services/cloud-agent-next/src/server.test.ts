@@ -25,6 +25,8 @@ vi.mock('./logger.js', () => {
   return {
     logger,
     withLogTags: async (_tags: unknown, fn: () => Promise<void>) => fn(),
+    WithLogTags: () => (_target: unknown, _propertyKey: string, descriptor: PropertyDescriptor) =>
+      descriptor,
   };
 });
 
@@ -37,6 +39,12 @@ vi.mock('./agent-sandbox/factory.js', () => ({
   createAgentSandbox: vi.fn(() => ({
     getRunningTerminalClient: getRunningTerminalClientMock,
   })),
+}));
+
+vi.mock('cloudflare:workers', () => ({
+  DurableObject: class DurableObject {
+    constructor(_state: unknown, _env: unknown) {}
+  },
 }));
 
 vi.mock('./router.js', () => ({
@@ -82,6 +90,10 @@ type MockEnv = {
     idFromName: ReturnType<typeof vi.fn>;
     get: ReturnType<typeof vi.fn>;
   };
+  USER_KILO_FACADE: {
+    idFromName: ReturnType<typeof vi.fn>;
+    get: ReturnType<typeof vi.fn>;
+  };
 };
 
 function createEnv(): MockEnv {
@@ -93,11 +105,26 @@ function createEnv(): MockEnv {
       idFromName: vi.fn(),
       get: vi.fn(),
     },
+    USER_KILO_FACADE: {
+      idFromName: vi.fn(),
+      get: vi.fn(),
+    },
   };
 }
 
 function fetchWorker(request: Request, env: MockEnv): Promise<Response> | Response {
   return worker.fetch(request, env as unknown as Env, {} as ExecutionContext);
+}
+
+function signKiloToken(userId = 'usr_1'): string {
+  return jwt.sign(
+    {
+      version: 3,
+      kiloUserId: userId,
+    },
+    secret,
+    { algorithm: 'HS256' }
+  );
 }
 
 beforeEach(() => {
@@ -322,6 +349,204 @@ describe('server /terminal', () => {
 
     expect(response.status).toBe(403);
     await expect(response.text()).resolves.toBe('Origin not allowed');
+    expect(env.CLOUD_AGENT_SESSION.idFromName).not.toHaveBeenCalled();
+  });
+});
+
+describe('server /kilo facade route', () => {
+  for (const path of ['/kilo', '/kilo/event']) {
+    it(`returns 401 before facade dispatch when auth is missing for ${path}`, async () => {
+      const env = createEnv();
+
+      const response = await fetchWorker(new Request(`http://worker.test${path}`), env);
+
+      expect(response.status).toBe(401);
+      expect(env.USER_KILO_FACADE.idFromName).not.toHaveBeenCalled();
+      expect(env.USER_KILO_FACADE.get).not.toHaveBeenCalled();
+    });
+  }
+
+  it('routes the authenticated root facade path through its explicit registration', async () => {
+    const env = createEnv();
+    const facadeFetch = vi.fn<(request: Request) => Promise<Response>>(
+      async () => new Response('facade root response', { status: 209 })
+    );
+    env.USER_KILO_FACADE.idFromName.mockReturnValue('facade-id');
+    env.USER_KILO_FACADE.get.mockReturnValue({ fetch: facadeFetch });
+    const token = signKiloToken('usr_facade');
+
+    const response = await fetchWorker(
+      new Request('http://worker.test/kilo', {
+        headers: { Authorization: `Bearer ${token}` },
+      }),
+      env
+    );
+
+    expect(response.status).toBe(209);
+    expect(facadeFetch).toHaveBeenCalledOnce();
+    expect(new URL(facadeFetch.mock.calls[0][0].url).pathname).toBe('/kilo');
+  });
+
+  it('routes valid bearer-authenticated requests to the per-user facade without public credentials', async () => {
+    const env = createEnv();
+    const facadeFetch = vi.fn<(request: Request) => Promise<Response>>(
+      async () => new Response('facade response', { status: 209 })
+    );
+    env.USER_KILO_FACADE.idFromName.mockReturnValue('facade-id');
+    env.USER_KILO_FACADE.get.mockReturnValue({ fetch: facadeFetch });
+    const token = signKiloToken('usr_facade');
+
+    const response = await fetchWorker(
+      new Request('http://worker.test/kilo/session/ses_12345678901234567890123456/message', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Cookie: 'session=secret',
+          'Content-Type': 'application/json',
+          'x-kilo-facade-user-id': 'usr_attacker',
+          'x-kilo-facade-auth-token': 'attacker-token',
+        },
+        body: JSON.stringify({ ok: true }),
+      }),
+      env
+    );
+
+    expect(response.status).toBe(209);
+    expect(env.USER_KILO_FACADE.idFromName).toHaveBeenCalledWith('usr_facade');
+    expect(env.USER_KILO_FACADE.get).toHaveBeenCalledWith('facade-id');
+    expect(facadeFetch).toHaveBeenCalledOnce();
+
+    const forwarded = facadeFetch.mock.calls[0][0];
+    expect(forwarded.headers.get('authorization')).toBeNull();
+    expect(forwarded.headers.get('cookie')).toBeNull();
+    expect(forwarded.headers.get('x-kilo-facade-user-id')).toBe('usr_facade');
+    expect(forwarded.headers.get('x-kilo-facade-auth-token')).toBe(token);
+    expect(forwarded.headers.get('content-type')).toBe('application/json');
+    await expect(forwarded.text()).resolves.toBe('{"ok":true}');
+  });
+});
+
+describe('server raw global feed route', () => {
+  it('validates producer fencing and forwards accepted producer WebSockets to the user facade', async () => {
+    const env = createEnv();
+    const validateKiloGlobalFeedProducer = vi.fn(async () => ({ success: true as const }));
+    env.CLOUD_AGENT_SESSION.idFromName.mockReturnValue('session-do-id');
+    env.CLOUD_AGENT_SESSION.get.mockReturnValue({ validateKiloGlobalFeedProducer });
+    const facadeFetch = vi.fn<(request: Request) => Promise<Response>>(
+      async () => new Response('accepted', { status: 200 })
+    );
+    env.USER_KILO_FACADE.idFromName.mockReturnValue('facade-id');
+    env.USER_KILO_FACADE.get.mockReturnValue({ fetch: facadeFetch });
+    const token = signKiloToken('usr_feed');
+
+    const response = await fetchWorker(
+      new Request(
+        'http://worker.test/sessions/usr_feed/agent_live/kilo-global-ingest?kiloSessionId=ses_12345678901234567890123456&wrapperRunId=wr_1&wrapperGeneration=2&wrapperConnectionId=conn_1',
+        {
+          headers: {
+            Upgrade: 'websocket',
+            Authorization: `Bearer ${token}`,
+            Cookie: 'session=secret',
+            'x-kilo-facade-user-id': 'usr_attacker',
+            'x-kilo-facade-auth-token': 'attacker-token',
+          },
+        }
+      ),
+      env
+    );
+
+    expect(response.status).toBe(200);
+    expect(env.CLOUD_AGENT_SESSION.idFromName).toHaveBeenCalledWith('usr_feed:agent_live');
+    expect(validateKiloGlobalFeedProducer).toHaveBeenCalledWith({
+      kiloSessionId: 'ses_12345678901234567890123456',
+      wrapperRunId: 'wr_1',
+      wrapperGeneration: 2,
+      wrapperConnectionId: 'conn_1',
+    });
+
+    const forwarded = facadeFetch.mock.calls[0][0];
+    const forwardedUrl = new URL(forwarded.url);
+    expect(forwardedUrl.pathname).toBe('/internal/kilo/global-feed');
+    expect(forwardedUrl.searchParams.get('userId')).toBe('usr_feed');
+    expect(forwardedUrl.searchParams.get('cloudAgentSessionId')).toBe('agent_live');
+    expect(forwardedUrl.searchParams.get('kiloSessionId')).toBe('ses_12345678901234567890123456');
+    expect(forwarded.headers.get('upgrade')).toBe('websocket');
+    expect(forwarded.headers.get('authorization')).toBeNull();
+    expect(forwarded.headers.get('cookie')).toBeNull();
+    expect(forwarded.headers.get('x-kilo-facade-user-id')).toBeNull();
+    expect(forwarded.headers.get('x-kilo-facade-auth-token')).toBeNull();
+  });
+
+  it('rejects stale producer fencing before facade dispatch', async () => {
+    const env = createEnv();
+    env.CLOUD_AGENT_SESSION.idFromName.mockReturnValue('session-do-id');
+    env.CLOUD_AGENT_SESSION.get.mockReturnValue({
+      validateKiloGlobalFeedProducer: vi.fn(async () => ({
+        success: false as const,
+        status: 409,
+        message: 'Stale wrapper connection',
+      })),
+    });
+    const facadeFetch = vi.fn();
+    env.USER_KILO_FACADE.get.mockReturnValue({ fetch: facadeFetch });
+    const token = signKiloToken('usr_feed');
+
+    const response = await fetchWorker(
+      new Request(
+        'http://worker.test/sessions/usr_feed/agent_live/kilo-global-ingest?kiloSessionId=ses_12345678901234567890123456&wrapperRunId=wr_1&wrapperGeneration=2&wrapperConnectionId=conn_1',
+        {
+          headers: {
+            Upgrade: 'websocket',
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      ),
+      env
+    );
+
+    expect(response.status).toBe(409);
+    expect(facadeFetch).not.toHaveBeenCalled();
+  });
+
+  it('rejects repeated producer identity parameters before session validation', async () => {
+    const env = createEnv();
+    const token = signKiloToken('usr_feed');
+
+    const response = await fetchWorker(
+      new Request(
+        'http://worker.test/sessions/usr_feed/agent_live/kilo-global-ingest?kiloSessionId=ses_12345678901234567890123456&wrapperRunId=wr_1&wrapperRunId=wr_2&wrapperGeneration=2&wrapperConnectionId=conn_1',
+        {
+          headers: {
+            Upgrade: 'websocket',
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      ),
+      env
+    );
+
+    expect(response.status).toBe(400);
+    expect(env.CLOUD_AGENT_SESSION.idFromName).not.toHaveBeenCalled();
+  });
+
+  it('rejects malformed producer generation before session validation', async () => {
+    const env = createEnv();
+    const token = signKiloToken('usr_feed');
+
+    const response = await fetchWorker(
+      new Request(
+        'http://worker.test/sessions/usr_feed/agent_live/kilo-global-ingest?kiloSessionId=ses_12345678901234567890123456&wrapperRunId=wr_1&wrapperGeneration=2abc&wrapperConnectionId=conn_1',
+        {
+          headers: {
+            Upgrade: 'websocket',
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      ),
+      env
+    );
+
+    expect(response.status).toBe(400);
     expect(env.CLOUD_AGENT_SESSION.idFromName).not.toHaveBeenCalled();
   });
 });

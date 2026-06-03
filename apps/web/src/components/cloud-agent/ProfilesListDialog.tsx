@@ -4,6 +4,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { v4 as uuidv4 } from 'uuid';
 import {
   FolderCog,
   Star,
@@ -1184,7 +1185,7 @@ type VarsTabProps = {
 type DraftVar = { id: string; key: string; value: string; isSecret: boolean; showValue: boolean };
 
 const makeDraft = (partial?: Partial<DraftVar>): DraftVar => ({
-  id: crypto.randomUUID(),
+  id: uuidv4(),
   key: '',
   value: '',
   isSecret: false,

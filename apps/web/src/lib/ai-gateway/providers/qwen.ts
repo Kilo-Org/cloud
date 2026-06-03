@@ -131,6 +131,22 @@ export const qwen37_plus_model: KiloExclusiveModel = {
   inference_provider_restriction: [],
 };
 
+export const qwen37_plus_free_model: KiloExclusiveModel = {
+  public_id: 'qwen/qwen3.7-plus:free',
+  display_name: 'Qwen: Qwen3.7 Plus (free)',
+  description:
+    "Qwen3.7-Plus is Alibaba's native multimodal agent model for visual-language reasoning, agentic coding, tool use, and productivity workflows. It supports text, image, and video inputs. For this free endpoint, your prompts and completions may be retained and used to train or improve the provider's services.",
+  context_length: 1_000_000,
+  max_completion_tokens: 65_536,
+  status: 'public',
+  flags: ['reasoning', 'vision', 'requires-data-collection'],
+  gateway: 'vercel',
+  internal_id: 'alibaba/qwen3.7-plus',
+  pricing: null,
+  exclusive_to: [],
+  inference_provider_restriction: [],
+};
+
 export const qwen36_plus_model: KiloExclusiveModel = {
   public_id: 'qwen/qwen3.6-plus',
   display_name: 'Qwen: Qwen3.6 Plus',

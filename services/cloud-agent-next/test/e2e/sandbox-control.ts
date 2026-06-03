@@ -5,14 +5,22 @@
  * containers with synthesized names. The exact naming convention isn't pinned
  * by this repo, so we match on a stable substring (`Sandbox`) plus the worker
  * name (`cloud-agent-next-dev`) when present. Lifecycle tests snapshot the
- * current set before starting a session when they need to identify that session's
- * newly created sandbox.
+ * current set before starting a session when they need to identify a newly
+ * created sandbox. Scenarios that may overlap other sandbox creation use the
+ * wrapper log filename to prove a container belongs to their Cloud Agent root.
  */
 
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
+
+export type DockerCommandExecutor = (args: string[]) => Promise<{ stdout: string }>;
+
+const executeDockerCommand: DockerCommandExecutor = async args => {
+  const { stdout } = await execFileAsync('docker', args);
+  return { stdout };
+};
 
 export type SandboxContainer = {
   id: string;
@@ -25,12 +33,10 @@ export type SandboxContainer = {
  * List running sandbox containers. Returns proxy containers separately so
  * callers can kill them together with their primary.
  */
-export async function listSandboxContainers(): Promise<SandboxContainer[]> {
-  const { stdout } = await execFileAsync('docker', [
-    'ps',
-    '--format',
-    '{{.ID}}\t{{.Names}}\t{{.Image}}',
-  ]);
+export async function listSandboxContainers(
+  executeDocker: DockerCommandExecutor = executeDockerCommand
+): Promise<SandboxContainer[]> {
+  const { stdout } = await executeDocker(['ps', '--format', '{{.ID}}\t{{.Names}}\t{{.Image}}']);
   const result: SandboxContainer[] = [];
   for (const line of stdout.trim().split('\n')) {
     if (!line) continue;
@@ -54,9 +60,12 @@ export async function listSandboxContainers(): Promise<SandboxContainer[]> {
  * Kill a container by ID. Swallows "no such container" errors so callers can
  * be defensive without try/catch.
  */
-export async function killContainer(idOrName: string): Promise<void> {
+export async function killContainer(
+  idOrName: string,
+  executeDocker: DockerCommandExecutor = executeDockerCommand
+): Promise<void> {
   try {
-    await execFileAsync('docker', ['kill', idOrName]);
+    await executeDocker(['kill', idOrName]);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     if (msg.includes('No such container') || msg.includes('is not running')) return;
@@ -79,19 +88,83 @@ export async function waitForNewSandboxPresent(
   return null;
 }
 
+async function sandboxHasWrapperLogForAgentSession(
+  containerId: string,
+  agentSessionId: string,
+  executeDocker: DockerCommandExecutor
+): Promise<boolean> {
+  try {
+    await executeDocker([
+      'exec',
+      containerId,
+      'sh',
+      '-c',
+      'for log in /tmp/kilocode-wrapper-"$1"-*.log; do test -e "$log" && exit 0; done; exit 1',
+      'sandbox-wrapper-log-match',
+      agentSessionId,
+    ]);
+    return true;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes('No such container') || msg.includes('is not running')) return false;
+    if (typeof err === 'object' && err !== null && 'code' in err && err.code === 1) return false;
+    throw err;
+  }
+}
+
+/** Return primary sandboxes proven to belong to `agentSessionId` by wrapper log filename. */
+export async function listSandboxesForAgentSession(
+  agentSessionId: string,
+  executeDocker: DockerCommandExecutor = executeDockerCommand
+): Promise<SandboxContainer[]> {
+  const containers = await listSandboxContainers(executeDocker);
+  const matches: SandboxContainer[] = [];
+  for (const container of containers) {
+    if (container.isProxy) continue;
+    if (await sandboxHasWrapperLogForAgentSession(container.id, agentSessionId, executeDocker)) {
+      matches.push(container);
+    }
+  }
+  return matches;
+}
+
+/**
+ * Block until a running primary sandbox proves it belongs to `agentSessionId`.
+ * Unmatched containers are never returned, even when they appeared recently.
+ */
+export async function waitForSandboxForAgentSession(
+  agentSessionId: string,
+  timeoutMs: number
+): Promise<SandboxContainer | null> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const [sandbox] = await listSandboxesForAgentSession(agentSessionId);
+    if (sandbox) return sandbox;
+    await new Promise(r => setTimeout(r, 500));
+  }
+  return null;
+}
+
+export function sandboxFamilyKey(sandbox: SandboxContainer): string {
+  return sandbox.isProxy ? sandbox.name.replace(/-proxy$/, '') : sandbox.name;
+}
+
 function sandboxFamilyNames(sandbox: SandboxContainer): Set<string> {
   const primaryName = sandbox.isProxy ? sandbox.name.replace(/-proxy$/, '') : sandbox.name;
   return new Set([primaryName, `${primaryName}-proxy`]);
 }
 
 /** Kill one sandbox container plus its proxy sibling when present. */
-export async function killSandboxFamily(sandbox: SandboxContainer): Promise<string[]> {
+export async function killSandboxFamily(
+  sandbox: SandboxContainer,
+  executeDocker: DockerCommandExecutor = executeDockerCommand
+): Promise<string[]> {
   const familyNames = sandboxFamilyNames(sandbox);
-  const containers = await listSandboxContainers();
+  const containers = await listSandboxContainers(executeDocker);
   const killed: string[] = [];
   for (const container of containers) {
     if (!familyNames.has(container.name)) continue;
-    await killContainer(container.id);
+    await killContainer(container.id, executeDocker);
     killed.push(container.name);
   }
   return killed;

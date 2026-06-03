@@ -98,6 +98,11 @@ describe('getSignInCallbackUrl', () => {
           )
         ).toBe(true);
       });
+
+      test('accepts Kilo Pass referral paths', () => {
+        expect(isValidCallbackPath('/subscriptions/kilo-pass')).toBe(true);
+        expect(isValidCallbackPath('/subscriptions/kilo-pass/refer')).toBe(true);
+      });
     });
 
     describe('invalid paths', () => {
@@ -274,6 +279,21 @@ describe('getSignInCallbackUrl', () => {
 
       expect(result).toBe(
         '/users/after-sign-in?_saasquatch=opaque-referral-cookie&rsCode=ref-code&utm_source=invite&utm_medium=link&utm_campaign=saasquatch&callbackPath=%2Fclaw%2Fnew'
+      );
+    });
+
+    test('preserves Kilo Pass callback paths and referral UTM metadata', () => {
+      const result = getSignInCallbackUrl({
+        callbackPath: '/subscriptions/kilo-pass/refer',
+        _saasquatch: 'opaque-referral-cookie',
+        rsCode: 'ref-code',
+        utm_source: 'invite',
+        utm_medium: 'link',
+        utm_campaign: 'saasquatch',
+      });
+
+      expect(result).toBe(
+        '/users/after-sign-in?_saasquatch=opaque-referral-cookie&rsCode=ref-code&utm_source=invite&utm_medium=link&utm_campaign=saasquatch&callbackPath=%2Fsubscriptions%2Fkilo-pass%2Frefer'
       );
     });
   });

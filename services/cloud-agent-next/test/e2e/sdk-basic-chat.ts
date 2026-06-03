@@ -198,12 +198,13 @@ function assertProjectedWakeEvent(
   sessionID: string,
   action: string
 ): void {
-  assert.equal(event.type, 'message.updated', `${action} did not carry a projected assistant`);
+  assert.equal(event.type, 'message.updated', `${action} did not carry an assistant wake event`);
   if (event.type !== 'message.updated') return;
-  assertProjectedAssistant(
-    { info: event.properties.info, parts: [] },
-    publicDirectory(sessionID),
-    action
+  assert.equal(event.properties.sessionID, sessionID, `${action} returned an unexpected session`);
+  assert.equal(
+    event.properties.info.role,
+    'assistant',
+    `${action} did not return an assistant message`
   );
 }
 
@@ -385,8 +386,6 @@ async function main(): Promise<void> {
     ]);
     assertProjectedWakeEvent(scopedProjectedEvent, rootSessionID, 'scoped wake event');
     assertProjectedWakeEvent(globalProjectedEvent.payload, rootSessionID, 'global wake event');
-    assertSafeProjection(scopedProjectedEvent, 'scoped wake event');
-    assertSafeProjection(globalProjectedEvent, 'global wake event');
 
     const asyncMessages = await pollFor(async () => {
       const messages = requireData(

@@ -809,6 +809,24 @@ describe('deleteProjectWebhook', () => {
       expect.any(Function)
     );
   });
+
+  it('preserves DELETE methods across 302 redirects', async () => {
+    mockSelfHostedGitLabResponse({
+      status: 302,
+      headers: { location: 'https://gitlab.example.com/api/v4/projects/123/hooks/456' },
+    });
+    mockSelfHostedGitLabResponse({ status: 204, body: '' });
+
+    await expect(
+      deleteProjectWebhook('test-token', 123, 456, 'https://gitlab.example.com')
+    ).resolves.toBeUndefined();
+
+    expect(mockHttpsRequest).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ method: 'DELETE' }),
+      expect.any(Function)
+    );
+  });
 });
 
 describe('createProjectWebhook', () => {

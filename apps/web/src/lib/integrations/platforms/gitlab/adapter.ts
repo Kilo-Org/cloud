@@ -94,9 +94,8 @@ function buildRedirectRequestInit(
 
   const method = init.method?.toUpperCase() ?? 'GET';
   if (
-    (status === 301 || status === 302 || status === 303) &&
-    method !== 'GET' &&
-    method !== 'HEAD'
+    ((status === 301 || status === 302) && method === 'POST') ||
+    (status === 303 && method !== 'GET' && method !== 'HEAD')
   ) {
     headers.delete('content-length');
     headers.delete('content-type');

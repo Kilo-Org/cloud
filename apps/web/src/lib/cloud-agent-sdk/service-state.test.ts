@@ -695,6 +695,17 @@ describe('createServiceState', () => {
       expect(state.getStatus()).toEqual({ type: 'disconnected' });
     });
 
+    it('clears transport-disconnected status on synthetic viewer reconnect', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({ type: 'stopped', reason: 'transport-disconnected' });
+      expect(state.getStatus()).toEqual({ type: 'disconnected' });
+
+      state.process({ type: 'connected' });
+
+      expect(state.getStatus()).toEqual({ type: 'idle' });
+    });
+
     it('sets all fields in one shot', () => {
       const state = createServiceState(makeConfig());
       state.process({

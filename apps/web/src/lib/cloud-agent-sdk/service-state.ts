@@ -94,6 +94,7 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
   let permission: PermissionState | null = null;
   let suggestion: SuggestionState | null = null;
   const pendingMessages = new Map<string, MessageDeliveryState>();
+  let disconnectedSource: 'transport' | 'wrapper' | null = null;
 
   // Tracks whether we've received a terminal stopped event (error/interrupted/disconnected).
   // While terminated, session.error events are suppressed as aftershocks.
@@ -114,10 +115,17 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
   function processSessionStatus(event: Extract<ServiceEvent, { type: 'session.status' }>): void {
     const { sessionId, status: sessionStatus } = event;
 
+    if (isRootSession(sessionId) && status.type === 'disconnected') {
+      status = IDLE_STATUS;
+      disconnectedSource = null;
+      terminated = false;
+    }
+
     if (sessionStatus.type === 'busy') {
       if (isRootSession(sessionId)) {
         activity = { type: 'busy' };
         status = IDLE_STATUS;
+        disconnectedSource = null;
         terminated = false;
       }
       // Child session busy → no activity change
@@ -147,15 +155,24 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
         break;
       case 'interrupted':
         terminated = true;
+        disconnectedSource = null;
         status = { type: 'interrupted' };
         break;
       case 'error':
         terminated = true;
+        disconnectedSource = null;
         status = { type: 'error', message: 'Session terminated' };
         config.onError?.('Session terminated');
         break;
       case 'disconnected':
         terminated = true;
+        disconnectedSource = 'wrapper';
+        status = { type: 'disconnected' };
+        config.onError?.('Connection to agent lost');
+        break;
+      case 'transport-disconnected':
+        terminated = true;
+        disconnectedSource = 'transport';
         status = { type: 'disconnected' };
         config.onError?.('Connection to agent lost');
         break;
@@ -379,8 +396,12 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
 
     // Clear terminated on connected
     terminated = false;
-    if (sessionStatus !== undefined && status.type === 'disconnected') {
+    if (
+      status.type === 'disconnected' &&
+      (sessionStatus !== undefined || disconnectedSource === 'transport')
+    ) {
       status = IDLE_STATUS;
+      disconnectedSource = null;
     }
 
     // Clear pending-message delivery state — replayed cloud.message.queued
@@ -525,6 +546,7 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
       suggestion = null;
       pendingMessages.clear();
       terminated = false;
+      disconnectedSource = null;
       notify();
     },
   };

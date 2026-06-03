@@ -156,7 +156,7 @@ export function useDeviceAuth(): DeviceAuthResult {
         const browserUrl =
           mode === 'signup'
             ? `${WEB_BASE_URL}/users/sign_in?${new URLSearchParams({
-                callbackPath: `/device-auth?code=${data.code}`,
+                callbackPath: `/device-auth?code=${data.code}&app=1`,
                 signup: 'true',
               }).toString()}`
             : data.verificationUrl;

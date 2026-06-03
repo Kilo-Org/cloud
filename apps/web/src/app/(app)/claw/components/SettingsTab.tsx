@@ -21,7 +21,6 @@ import { OpenclawImportCard } from './OpenclawImportCard';
 
 import { usePostHog } from 'posthog-js/react';
 import Link from 'next/link';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { useModelSelectorList } from '@/app/api/openrouter/hooks';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
@@ -339,28 +338,6 @@ const GOOGLE_CALENDAR_FEATURES: Array<{ included: boolean; label: string }> = [
   { included: false, label: 'Create, modify, or delete events (we never request write access)' },
 ];
 
-// Friendly messages for the `?error=` codes the Google OAuth connect/callback/
-// disconnect routes append when they redirect back to settings. Known codes get
-// tailored copy; any other error value (e.g. a sanitized provider description)
-// falls back to the generic message below so failures are never silent.
-const GOOGLE_OAUTH_GENERIC_ERROR = 'Could not connect Google Calendar. Please try again.';
-
-const GOOGLE_OAUTH_ERROR_MESSAGES: Record<string, string> = {
-  access_denied: 'Google Calendar connection was cancelled.',
-  missing_permissions:
-    'Calendar access was not granted. Please allow calendar permission and try again.',
-  connection_failed: GOOGLE_OAUTH_GENERIC_ERROR,
-  oauth_init_failed: 'Could not start the Google connection. Please try again.',
-  missing_instance: 'Your KiloClaw instance is still starting. Try again in a moment.',
-  missing_code: 'Google did not return an authorization code. Please try again.',
-  invalid_state: 'The connection link expired. Please try connecting again.',
-  invalid_origin: 'Could not complete the request. Please try again.',
-  invalid_organization: 'Invalid organization for this connection.',
-  unauthorized: 'You are not authorized to complete this connection.',
-  disconnect_failed: 'Could not disconnect Google Calendar. Please try again.',
-  method_not_allowed: 'That request could not be completed. Please try again.',
-};
-
 /**
  * Settings card for the officially-approved Kilo OAuth client. This is the
  * preferred Google Calendar connection and the successor to the legacy Gog
@@ -528,12 +505,14 @@ function GoogleAccountCard({
   connected,
   gmailNotificationsEnabled,
   inboundEmailAddress,
+  inboundEmailEnabled,
   mutations,
   onRedeploy,
 }: {
   connected: boolean;
   gmailNotificationsEnabled: boolean;
   inboundEmailAddress: string | null;
+  inboundEmailEnabled: boolean;
   mutations: ClawMutations;
   onRedeploy?: () => void;
 }) {
@@ -599,15 +578,20 @@ function GoogleAccountCard({
                   <p className="text-muted-foreground">
                     {"For email functionality, use your bot's automatically provisioned "}
                     <span className="text-foreground font-medium">Inbound Email</span>
-                    {' address below:'}
+                    {' address:'}
                   </p>
-                  {inboundEmailAddress ? (
+                  {/* Only present the alias as usable when delivery is actually
+                      enabled — the backend rejects disabled aliases (410), so
+                      showing a disabled one would send users to a dead path. */}
+                  {inboundEmailAddress && inboundEmailEnabled ? (
                     <code className="bg-muted text-foreground inline-block max-w-full truncate rounded px-2 py-1 text-xs">
                       {inboundEmailAddress}
                     </code>
                   ) : (
                     <span className="text-muted-foreground">
-                      Your Inbound Email address appears in the Inbound Email card below.
+                      {inboundEmailAddress
+                        ? 'Inbound Email is currently disabled for this instance. Enable it in the Inbound Email section on this page before relying on it.'
+                        : 'See the Inbound Email section on this page to set it up.'}
                     </span>
                   )}
                 </div>
@@ -2079,10 +2063,6 @@ export function SettingsTab({
   organizationName?: string;
 }) {
   const posthog = usePostHog();
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const googleOAuthParamHandledRef = useRef(false);
   const { data: config } = useClawConfig();
   const { organizationId } = useClawContext();
   const { data: modelsData, isLoading: isLoadingModels } = useModelSelectorList(organizationId);
@@ -2124,40 +2104,6 @@ export function SettingsTab({
     }
     previousStatusRef.current = status.status;
   }, [status.status]);
-
-  // Surface the one-shot success/error param the Google OAuth routes append
-  // when they redirect back to settings, then strip it so it doesn't re-fire.
-  useEffect(() => {
-    if (googleOAuthParamHandledRef.current) return;
-
-    const success = searchParams.get('success');
-    const error = searchParams.get('error');
-    // Any `error=` on this route comes from the Google OAuth routes, so map
-    // known codes to friendly copy and fall back to a generic message for the
-    // rest (e.g. access_denied/cancel, or a sanitized provider description) so
-    // the failure is always surfaced and the param is always cleaned up.
-    const errorMessage = error
-      ? (GOOGLE_OAUTH_ERROR_MESSAGES[error] ?? GOOGLE_OAUTH_GENERIC_ERROR)
-      : undefined;
-    const isGoogleSuccess = success === 'google_connected' || success === 'google_disconnected';
-
-    if (!isGoogleSuccess && !errorMessage) return;
-    googleOAuthParamHandledRef.current = true;
-
-    if (success === 'google_connected') {
-      toast.success('Google Calendar connected');
-    } else if (success === 'google_disconnected') {
-      toast.success('Google Calendar disconnected');
-    } else if (errorMessage) {
-      toast.error(errorMessage);
-    }
-
-    const next = new URLSearchParams(searchParams);
-    next.delete('success');
-    next.delete('error');
-    const query = next.toString();
-    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
-  }, [searchParams, pathname, router]);
 
   const hasFreshGatewayReady =
     isRunning &&
@@ -2719,6 +2665,7 @@ export function SettingsTab({
               connected={status.googleConnected}
               gmailNotificationsEnabled={status.gmailNotificationsEnabled}
               inboundEmailAddress={status.inboundEmailAddress}
+              inboundEmailEnabled={status.inboundEmailEnabled}
               mutations={mutations}
               onRedeploy={onRedeploy}
             />

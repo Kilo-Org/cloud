@@ -1,9 +1,10 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Settings } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { resolveGoogleOAuthFeedback } from './google-oauth-feedback';
 import { TRPCClientError } from '@trpc/client';
 import type { KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
 import { useKiloClawStatus, useKiloClawMutations, useKiloClawMyPin } from '@/hooks/useKiloClaw';
@@ -159,6 +160,9 @@ function ClawSettingsWithStatus({
   organizationName?: string;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const oauthFeedbackHandledRef = useRef(false);
   const personalStatus = useKiloClawStatus();
   const orgStatus = useOrgKiloClawStatus(organizationId);
   const { data: status, isLoading, error } = organizationId ? orgStatus : personalStatus;
@@ -172,6 +176,37 @@ function ClawSettingsWithStatus({
       router.replace(clawUrl);
     }
   }, [shouldRedirect, clawUrl, router]);
+
+  // Surface the one-shot success/error param the Google OAuth routes append
+  // when they redirect back to settings. This lives above the no-instance gate
+  // so feedback (e.g. ?error=missing_instance) still shows even when settings
+  // bounces to onboarding. Wait for status so `shouldRedirect` is meaningful.
+  useEffect(() => {
+    if (oauthFeedbackHandledRef.current || isLoading) return;
+    const feedback = resolveGoogleOAuthFeedback(
+      searchParams.get('success'),
+      searchParams.get('error')
+    );
+    if (!feedback) return;
+    oauthFeedbackHandledRef.current = true;
+
+    if (feedback.kind === 'success') {
+      toast.success(feedback.message);
+    } else {
+      toast.error(feedback.message);
+    }
+
+    // When staying on settings, strip the one-shot param so it can't re-fire.
+    // When redirecting to onboarding, the redirect drops the query string
+    // anyway, so skip the extra replace to avoid racing the redirect.
+    if (!shouldRedirect) {
+      const next = new URLSearchParams(searchParams);
+      next.delete('success');
+      next.delete('error');
+      const query = next.toString();
+      router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+    }
+  }, [isLoading, shouldRedirect, searchParams, pathname, router]);
 
   if (isLoading || shouldRedirect) {
     return (

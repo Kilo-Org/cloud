@@ -354,14 +354,37 @@ describe('server /terminal', () => {
 });
 
 describe('server /kilo facade route', () => {
-  it('returns 401 before facade dispatch when auth is missing', async () => {
+  for (const path of ['/kilo', '/kilo/event']) {
+    it(`returns 401 before facade dispatch when auth is missing for ${path}`, async () => {
+      const env = createEnv();
+
+      const response = await fetchWorker(new Request(`http://worker.test${path}`), env);
+
+      expect(response.status).toBe(401);
+      expect(env.USER_KILO_FACADE.idFromName).not.toHaveBeenCalled();
+      expect(env.USER_KILO_FACADE.get).not.toHaveBeenCalled();
+    });
+  }
+
+  it('routes the authenticated root facade path through its explicit registration', async () => {
     const env = createEnv();
+    const facadeFetch = vi.fn<(request: Request) => Promise<Response>>(
+      async () => new Response('facade root response', { status: 209 })
+    );
+    env.USER_KILO_FACADE.idFromName.mockReturnValue('facade-id');
+    env.USER_KILO_FACADE.get.mockReturnValue({ fetch: facadeFetch });
+    const token = signKiloToken('usr_facade');
 
-    const response = await fetchWorker(new Request('http://worker.test/kilo/event'), env);
+    const response = await fetchWorker(
+      new Request('http://worker.test/kilo', {
+        headers: { Authorization: `Bearer ${token}` },
+      }),
+      env
+    );
 
-    expect(response.status).toBe(401);
-    expect(env.USER_KILO_FACADE.idFromName).not.toHaveBeenCalled();
-    expect(env.USER_KILO_FACADE.get).not.toHaveBeenCalled();
+    expect(response.status).toBe(209);
+    expect(facadeFetch).toHaveBeenCalledOnce();
+    expect(new URL(facadeFetch.mock.calls[0][0].url).pathname).toBe('/kilo');
   });
 
   it('routes valid bearer-authenticated requests to the per-user facade without public credentials', async () => {
@@ -483,6 +506,27 @@ describe('server raw global feed route', () => {
 
     expect(response.status).toBe(409);
     expect(facadeFetch).not.toHaveBeenCalled();
+  });
+
+  it('rejects repeated producer identity parameters before session validation', async () => {
+    const env = createEnv();
+    const token = signKiloToken('usr_feed');
+
+    const response = await fetchWorker(
+      new Request(
+        'http://worker.test/sessions/usr_feed/agent_live/kilo-global-ingest?kiloSessionId=ses_12345678901234567890123456&wrapperRunId=wr_1&wrapperRunId=wr_2&wrapperGeneration=2&wrapperConnectionId=conn_1',
+        {
+          headers: {
+            Upgrade: 'websocket',
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      ),
+      env
+    );
+
+    expect(response.status).toBe(400);
+    expect(env.CLOUD_AGENT_SESSION.idFromName).not.toHaveBeenCalled();
   });
 
   it('rejects malformed producer generation before session validation', async () => {

@@ -18,6 +18,7 @@ import { authMiddleware } from './middleware/auth.js';
 import { balanceMiddleware } from './middleware/balance.js';
 import { resolveTerminalWrapperClient } from './terminal/access.js';
 import { requestMethodAllowsBody } from './shared/http-proxy.js';
+import { hasDuplicateQueryParameters } from './shared/http-query.js';
 import {
   KILO_FACADE_AUTH_TOKEN_HEADER,
   KILO_FACADE_GLOBAL_FEED_PATH,
@@ -171,7 +172,7 @@ async function routeToUserKiloFacade(
   return stub.fetch(request);
 }
 
-app.all('/kilo', async (c: Context<HonoContext>) => {
+async function routeAuthenticatedKiloFacade(c: Context<HonoContext>): Promise<Response> {
   const authResult = await validateKiloToken(
     c.req.header('Authorization') ?? null,
     c.env.NEXTAUTH_SECRET
@@ -180,18 +181,10 @@ app.all('/kilo', async (c: Context<HonoContext>) => {
     return c.text(authResult.error, 401);
   }
   return routeToUserKiloFacade(c, authResult.userId, authResult.token);
-});
+}
 
-app.all('/kilo/*', async (c: Context<HonoContext>) => {
-  const authResult = await validateKiloToken(
-    c.req.header('Authorization') ?? null,
-    c.env.NEXTAUTH_SECRET
-  );
-  if (!authResult.success) {
-    return c.text(authResult.error, 401);
-  }
-  return routeToUserKiloFacade(c, authResult.userId, authResult.token);
-});
+app.all('/kilo', routeAuthenticatedKiloFacade);
+app.all('/kilo/*', routeAuthenticatedKiloFacade);
 
 // TODO: I think this and /terminal share a bit of code. Could be worth extracting to middleware or just a common method?
 app.get('/stream', async (c: Context<HonoContext>) => {
@@ -283,6 +276,9 @@ app.all('/sessions/:userId/:sessionId/kilo-global-ingest', async (c: Context<Hon
   }
 
   const url = new URL(c.req.url);
+  if (hasDuplicateQueryParameters(url.searchParams)) {
+    return c.text('Invalid global feed producer identity', 400);
+  }
   const kiloSessionId = url.searchParams.get('kiloSessionId');
   const wrapperRunId = url.searchParams.get('wrapperRunId');
   const wrapperGenerationParam = url.searchParams.get('wrapperGeneration');

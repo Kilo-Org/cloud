@@ -472,23 +472,64 @@ function normalizePersistedSnapshotFileDiffs(value: unknown): unknown {
   return parsed.success ? parsed.data : value;
 }
 
-function normalizePersistedKiloSdkStoredMessage(value: unknown): unknown {
-  if (!isRecord(value) || !isRecord(value.info) || value.info.role !== 'user') {
-    return value;
+function isKnownKiloSdkPartType(type: string): boolean {
+  return kiloSdkPartSchema.options.some(option => option.shape.type.safeParse(type).success);
+}
+
+type NormalizedPersistedStoredMessage = {
+  message: unknown;
+  omittedItemCount: number;
+};
+
+function normalizePersistedKiloSdkParts(value: unknown): {
+  parts: unknown;
+  omittedItemCount: number;
+} {
+  if (!Array.isArray(value)) {
+    return { parts: value, omittedItemCount: 0 };
+  }
+  const parts: unknown[] = [];
+  let omittedItemCount = 0;
+  for (const part of value) {
+    if (
+      isRecord(part) &&
+      typeof part.type === 'string' &&
+      !isKnownKiloSdkPartType(part.type) &&
+      sdkPartBaseSchema.safeParse(part).success
+    ) {
+      omittedItemCount += 1;
+      continue;
+    }
+    parts.push(part);
+  }
+  return { parts, omittedItemCount };
+}
+
+function normalizePersistedKiloSdkStoredMessage(value: unknown): NormalizedPersistedStoredMessage {
+  if (!isRecord(value)) {
+    return { message: value, omittedItemCount: 0 };
+  }
+  const normalizedParts = normalizePersistedKiloSdkParts(value.parts);
+  const message = { ...value, parts: normalizedParts.parts };
+  if (!isRecord(value.info) || value.info.role !== 'user') {
+    return { message, omittedItemCount: normalizedParts.omittedItemCount };
   }
   const summary = value.info.summary;
   if (!isRecord(summary) || !('diffs' in summary)) {
-    return value;
+    return { message, omittedItemCount: normalizedParts.omittedItemCount };
   }
   return {
-    ...value,
-    info: {
-      ...value.info,
-      summary: {
-        ...summary,
-        diffs: normalizePersistedSnapshotFileDiffs(summary.diffs),
+    message: {
+      ...message,
+      info: {
+        ...value.info,
+        summary: {
+          ...summary,
+          diffs: normalizePersistedSnapshotFileDiffs(summary.diffs),
+        },
       },
     },
+    omittedItemCount: normalizedParts.omittedItemCount,
   };
 }
 
@@ -496,7 +537,25 @@ function normalizePersistedKiloSdkMessageHistory(value: unknown): unknown {
   if (!isRecord(value) || !Array.isArray(value.messages)) {
     return value;
   }
-  return { ...value, messages: value.messages.map(normalizePersistedKiloSdkStoredMessage) };
+  const normalizedMessages = value.messages.map(normalizePersistedKiloSdkStoredMessage);
+  const additionalOmittedItemCount = normalizedMessages.reduce(
+    (count, message) => count + message.omittedItemCount,
+    0
+  );
+  const omittedItemCount = z.number().int().nonnegative().safeParse(value.omittedItemCount);
+  return {
+    ...value,
+    messages: normalizedMessages.map(message => message.message),
+    ...(additionalOmittedItemCount === 0
+      ? {}
+      : {
+          omittedItemCount: omittedItemCount.success
+            ? omittedItemCount.data + additionalOmittedItemCount
+            : value.omittedItemCount === undefined
+              ? additionalOmittedItemCount
+              : value.omittedItemCount,
+        }),
+  };
 }
 
 export const persistedKiloSdkMessageHistorySchema = z.preprocess(

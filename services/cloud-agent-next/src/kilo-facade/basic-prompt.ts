@@ -1,6 +1,6 @@
 import * as z from 'zod';
 import { Limits } from '../schema.js';
-import { MessageIdSchema } from '../router/schemas.js';
+import { MessageIdSchema, ModeSlugSchema, modelIdSchema } from '../router/schemas.js';
 
 const basicTextPartSchema = z
   .object({
@@ -12,6 +12,14 @@ const basicTextPartSchema = z
 const basicPromptBodySchema = z
   .object({
     messageID: MessageIdSchema.optional(),
+    agent: ModeSlugSchema.optional(),
+    model: z
+      .object({
+        providerID: z.literal('kilo'),
+        modelID: modelIdSchema,
+      })
+      .strict()
+      .optional(),
     parts: z.array(basicTextPartSchema).min(1),
   })
   .strict();
@@ -19,6 +27,10 @@ const basicPromptBodySchema = z
 export type BasicKiloPrompt = {
   messageId?: string;
   prompt: string;
+  agent?: {
+    mode?: string;
+    model?: string;
+  };
 };
 
 export type BasicKiloPromptParseResult =
@@ -36,11 +48,21 @@ export function parseBasicKiloPrompt(value: unknown): BasicKiloPromptParseResult
     return { success: false };
   }
 
+  const mode = result.data.agent;
+  const model = result.data.model?.modelID;
   return {
     success: true,
     prompt: {
       messageId: result.data.messageID,
       prompt,
+      ...(mode !== undefined || model !== undefined
+        ? {
+            agent: {
+              ...(mode !== undefined ? { mode } : {}),
+              ...(model !== undefined ? { model } : {}),
+            },
+          }
+        : {}),
     },
   };
 }

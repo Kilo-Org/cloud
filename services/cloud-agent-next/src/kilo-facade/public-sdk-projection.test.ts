@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  hasUnprojectedPrivateStructuredPath,
-  projectPublicStoredMessage,
-} from './public-sdk-projection';
+import { projectPublicStoredMessage } from './public-sdk-projection';
 
 const kiloSessionId = 'ses_12345678901234567890123456';
 
@@ -74,7 +71,7 @@ describe('projectPublicStoredMessage', () => {
     ]);
   });
 
-  it('exposes typed resource file URIs to the final fail-closed boundary check', () => {
+  it('preserves owner-visible typed resource file URIs', () => {
     const projected = projectPublicStoredMessage(
       {
         info: {
@@ -105,6 +102,8 @@ describe('projectPublicStoredMessage', () => {
       kiloSessionId
     );
 
-    expect(hasUnprojectedPrivateStructuredPath(projected)).toBe(true);
+    expect(projected.parts).toMatchObject([
+      { source: { type: 'resource', uri: 'file:///workspace/private/resource.txt' } },
+    ]);
   });
 });

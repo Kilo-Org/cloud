@@ -36,14 +36,6 @@ function publicPath(path: string, kiloSessionId: string): string {
   return isAbsoluteStructuredPath(path) ? publicCloudAgentDirectory(kiloSessionId) : path;
 }
 
-function isPrivateStructuredPath(path: string): boolean {
-  return (
-    isAbsoluteStructuredPath(path) &&
-    path !== '/cloud-agent' &&
-    !path.startsWith('/cloud-agent/sessions/')
-  );
-}
-
 export function projectPublicSession(
   session: KiloSdkSessionInfo,
   kiloSessionId: string
@@ -190,28 +182,4 @@ export function projectPublicStoredMessages(
   kiloSessionId: string
 ): KiloSdkStoredMessage[] {
   return messages.map(message => projectPublicStoredMessage(message, kiloSessionId));
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
-}
-
-export function hasUnprojectedPrivateStructuredPath(value: unknown, key?: string): boolean {
-  if (typeof value === 'string') {
-    return (
-      isLocalFileUri(value) ||
-      (key !== undefined &&
-        ['path', 'directory', 'cwd', 'root', 'file', 'pattern', 'url'].includes(key) &&
-        isPrivateStructuredPath(value))
-    );
-  }
-  if (Array.isArray(value)) {
-    return value.some(item =>
-      hasUnprojectedPrivateStructuredPath(item, key === 'files' ? 'file' : key)
-    );
-  }
-  if (!isRecord(value)) return false;
-  return Object.entries(value).some(([childKey, child]) =>
-    hasUnprojectedPrivateStructuredPath(child, childKey)
-  );
 }

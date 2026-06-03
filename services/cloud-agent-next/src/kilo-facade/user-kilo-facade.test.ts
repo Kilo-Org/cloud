@@ -220,6 +220,71 @@ function sdkMessageHistory(): KiloSdkStoredMessage[] {
   ];
 }
 
+function sdkMessageHistoryWithOwnerVisibleStructuredPaths(): KiloSdkStoredMessage[] {
+  const history = sdkMessageHistory();
+  const assistant = history[1];
+  if (!assistant || assistant.info.role !== 'assistant') {
+    throw new Error('Expected assistant message fixture');
+  }
+  const tool = assistant.parts.find(part => part.type === 'tool');
+  if (!tool) {
+    throw new Error('Expected tool part fixture');
+  }
+  history[1] = {
+    ...assistant,
+    parts: [
+      ...assistant.parts.map(part =>
+        part.id === tool.id
+          ? { ...tool, state: { ...tool.state, input: { path: '/workspace/repo' } } }
+          : part
+      ),
+      {
+        id: 'prt_metadata_private',
+        sessionID: kiloSessionId,
+        messageID: assistant.info.id,
+        type: 'text',
+        text: 'file: src/foo.ts was updated',
+        metadata: { path: '/workspace/private/unreviewed.ts' },
+      },
+      {
+        id: 'prt_resource_private',
+        sessionID: kiloSessionId,
+        messageID: assistant.info.id,
+        type: 'file',
+        mime: 'text/plain',
+        url: 'data:text/plain,safe',
+        source: {
+          type: 'resource',
+          text: { value: 'private', start: 0, end: 7 },
+          clientName: 'wrapper',
+          uri: 'file:///workspace/private/resource.txt',
+        },
+      },
+    ],
+  };
+  return history;
+}
+
+function expectOwnerVisibleStructuredMessagePaths(body: KiloSdkStoredMessage[]): void {
+  expect(body[1]?.parts).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        id: 'prt_tool_1',
+        state: expect.objectContaining({ input: { path: '/workspace/repo' } }),
+      }),
+      expect.objectContaining({
+        id: 'prt_metadata_private',
+        text: 'file: src/foo.ts was updated',
+        metadata: { path: '/workspace/private/unreviewed.ts' },
+      }),
+      expect.objectContaining({
+        id: 'prt_resource_private',
+        source: expect.objectContaining({ uri: 'file:///workspace/private/resource.txt' }),
+      }),
+    ])
+  );
+}
+
 function projectedSdkMessageHistory(): KiloSdkStoredMessage[] {
   const history = sdkMessageHistory();
   const userMessage = history[0];
@@ -380,6 +445,20 @@ describe('handleKiloFacadeRequest', () => {
     });
   });
 
+  it('rejects repeated session list selectors before listing roots', async () => {
+    const env = envStub();
+
+    const response = await handleKiloFacadeRequest({
+      request: new Request('http://worker.test/kilo/session?limit=1&limit=2'),
+      env,
+      userId: 'usr_1',
+    });
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({ error: 'KILO_QUERY_INVALID' });
+    expect(env.SESSION_INGEST.listCloudAgentRootSessions).not.toHaveBeenCalled();
+  });
+
   it('rejects selectors on the global event route before opening the stream', async () => {
     const openPublicGlobalEventStream = vi.fn();
     const response = await handleKiloFacadeRequest({
@@ -457,6 +536,29 @@ describe('handleKiloFacadeRequest', () => {
       error: 'KILO_EVENT_SELECTOR_UNSUPPORTED',
     });
     expect(resolveRootSessionForKiloSession).not.toHaveBeenCalled();
+  });
+
+  it('rejects repeated scoped event selectors before ownership lookup', async () => {
+    const resolveRootSessionForKiloSession = vi.fn();
+    const openPublicSessionEventStream = vi.fn();
+    const directory = encodeURIComponent(publicCloudAgentDirectory(kiloSessionId));
+
+    const response = await handleKiloFacadeRequest({
+      request: new Request(
+        `http://worker.test/kilo/event?directory=${directory}&directory=${directory}`
+      ),
+      env: envStub(),
+      userId: 'usr_1',
+      deps: {
+        resolveRootSessionForKiloSession,
+        globalEvents: { openPublicGlobalEventStream: vi.fn(), openPublicSessionEventStream },
+      },
+    });
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({ error: 'KILO_QUERY_INVALID' });
+    expect(resolveRootSessionForKiloSession).not.toHaveBeenCalled();
+    expect(openPublicSessionEventStream).not.toHaveBeenCalled();
   });
 
   it('rejects a non-Cloud-Agent scoped event directory selector', async () => {
@@ -727,7 +829,7 @@ describe('handleKiloFacadeRequest', () => {
     });
   });
 
-  it('fails closed when a cold session snapshot contains an unreviewed structured path', async () => {
+  it('preserves owner-visible structured paths in a cold session snapshot', async () => {
     const env = envStub();
     vi.mocked(env.SESSION_INGEST.getCloudAgentRootSessionSnapshot).mockResolvedValue({
       kiloSessionId,
@@ -753,9 +855,9 @@ describe('handleKiloFacadeRequest', () => {
       },
     });
 
-    expect(response.status).toBe(502);
+    expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({
-      error: 'KILO_UPSTREAM_RESPONSE_INVALID',
+      share: { url: '/workspace/private/share' },
     });
   });
 
@@ -893,11 +995,12 @@ describe('handleKiloFacadeRequest', () => {
     });
   });
 
-  it('rewrites a fresh live session detail response without exposing its private directory', async () => {
+  it('rewrites fresh live session routing fields while preserving owner-visible structured paths', async () => {
     const containerFetch = vi.fn<ContainerFetch>(async () =>
-      Response.json(sdkSessionInfo(kiloSessionId), {
-        headers: { 'X-Upstream': 'kept' },
-      })
+      Response.json(
+        { ...sdkSessionInfo(kiloSessionId), share: { url: '/workspace/private/share' } },
+        { headers: { 'X-Upstream': 'kept' } }
+      )
     );
 
     const response = await handleKiloFacadeRequest({
@@ -914,7 +1017,10 @@ describe('handleKiloFacadeRequest', () => {
 
     expect(response.status).toBe(200);
     expect(response.headers.get('x-upstream')).toBe('kept');
-    await expect(response.json()).resolves.toEqual(projectedSdkSessionInfo(kiloSessionId));
+    await expect(response.json()).resolves.toEqual({
+      ...projectedSdkSessionInfo(kiloSessionId),
+      share: { url: '/workspace/private/share' },
+    });
   });
 
   it('bounds successful live detail JSON before projection', async () => {
@@ -1018,6 +1124,29 @@ describe('handleKiloFacadeRequest', () => {
     });
   });
 
+  it('rejects repeated SDK session detail selectors before live wrapper lookup', async () => {
+    const resolveLiveWrapper = vi.fn();
+    const directory = encodeURIComponent(publicCloudAgentDirectory(kiloSessionId));
+
+    const response = await handleKiloFacadeRequest({
+      request: new Request(
+        `http://worker.test/kilo/session/${kiloSessionId}?directory=${directory}&directory=${directory}`
+      ),
+      env: envStub(),
+      userId: 'usr_1',
+      deps: {
+        resolveRootSessionForKiloSession: vi.fn(async () => ({
+          cloudAgentSessionId: 'agent_live',
+        })),
+        resolveLiveWrapper,
+      },
+    });
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({ error: 'KILO_QUERY_INVALID' });
+    expect(resolveLiveWrapper).not.toHaveBeenCalled();
+  });
+
   it('rejects unsupported session list selectors instead of broadening the result', async () => {
     const env = envStub();
 
@@ -1062,9 +1191,7 @@ describe('handleKiloFacadeRequest', () => {
     await expect(response.json()).resolves.toEqual(projectedSdkMessageHistory());
     expect(response.headers.get('x-kilo-omitted-item-count')).toBe('0');
     expect(response.headers.get('x-next-cursor')).toBe(nextCursor);
-    expect(response.headers.get('access-control-expose-headers')).toBe(
-      'X-Kilo-Omitted-Item-Count, Link, X-Next-Cursor'
-    );
+    expect(response.headers.get('access-control-expose-headers')).toBeNull();
     expect(response.headers.get('link')).toBe(
       `<http://worker.test/kilo/session/${kiloSessionId}/message?limit=1&before=${nextCursor}>; rel="next"`
     );
@@ -1098,7 +1225,7 @@ describe('handleKiloFacadeRequest', () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual(projectedSdkMessageHistory());
     expect(response.headers.get('x-kilo-omitted-item-count')).toBe('3');
-    expect(response.headers.get('access-control-expose-headers')).toBe('X-Kilo-Omitted-Item-Count');
+    expect(response.headers.get('access-control-expose-headers')).toBeNull();
     expect(response.headers.get('link')).toBeNull();
     expect(response.headers.get('x-next-cursor')).toBeNull();
   });
@@ -1335,6 +1462,27 @@ describe('handleKiloFacadeRequest', () => {
     expect(new URL(forwardedRequest.url).search).toBe('?limit=1');
   });
 
+  it('preserves owner-visible structured paths and file text in live messages', async () => {
+    const containerFetch = vi.fn<ContainerFetch>(async () =>
+      Response.json(sdkMessageHistoryWithOwnerVisibleStructuredPaths())
+    );
+
+    const response = await handleKiloFacadeRequest({
+      request: new Request(`http://worker.test/kilo/session/${kiloSessionId}/message`),
+      env: envStub(),
+      userId: 'usr_1',
+      deps: {
+        resolveRootSessionForKiloSession: vi.fn(async () => ({
+          cloudAgentSessionId: 'agent_live',
+        })),
+        resolveLiveWrapper: vi.fn(async () => liveWrapperTarget(containerFetch)),
+      },
+    });
+
+    expect(response.status).toBe(200);
+    expectOwnerVisibleStructuredMessagePaths((await response.json()) as KiloSdkStoredMessage[]);
+  });
+
   it('bounds and validates successful live message JSON before public projection', async () => {
     const oversizedResponse = await handleKiloFacadeRequest({
       request: new Request(`http://worker.test/kilo/session/${kiloSessionId}/message`),
@@ -1410,27 +1558,9 @@ describe('handleKiloFacadeRequest', () => {
     });
   });
 
-  it('fails closed when cold messages contain an unreviewed structured path', async () => {
+  it('preserves owner-visible structured paths and file text in cold messages', async () => {
     const env = envStub();
-    const history = sdkMessageHistory();
-    const assistant = history[1];
-    if (!assistant || assistant.info.role !== 'assistant') {
-      throw new Error('Expected assistant message fixture');
-    }
-    history[1] = {
-      ...assistant,
-      parts: [
-        ...assistant.parts,
-        {
-          id: 'prt_metadata_private',
-          sessionID: kiloSessionId,
-          messageID: assistant.info.id,
-          type: 'text',
-          text: 'safe freeform text',
-          metadata: { path: '/workspace/private/unreviewed.ts' },
-        },
-      ],
-    };
+    const history = sdkMessageHistoryWithOwnerVisibleStructuredPaths();
     vi.mocked(env.SESSION_INGEST.getCloudAgentRootSessionMessages).mockResolvedValue({
       kiloSessionId,
       cloudAgentSessionId: 'agent_cold',
@@ -1448,10 +1578,8 @@ describe('handleKiloFacadeRequest', () => {
       },
     });
 
-    expect(response.status).toBe(502);
-    await expect(response.json()).resolves.toMatchObject({
-      error: 'KILO_UPSTREAM_RESPONSE_INVALID',
-    });
+    expect(response.status).toBe(200);
+    expectOwnerVisibleStructuredMessagePaths((await response.json()) as KiloSdkStoredMessage[]);
   });
 
   it('preserves non-enumerating not-found behavior for a cold transcript miss', async () => {
@@ -1649,6 +1777,38 @@ describe('handleKiloFacadeRequest', () => {
     expect(admitPrompt).not.toHaveBeenCalled();
   });
 
+  it('rejects repeated prompt selectors before balance or admission side effects', async () => {
+    const validatePromptBalance = vi.fn();
+    const admitPrompt = vi.fn();
+    const directory = encodeURIComponent(publicCloudAgentDirectory(kiloSessionId));
+
+    const response = await handleKiloFacadeRequest({
+      request: new Request(
+        `http://worker.test/kilo/session/${kiloSessionId}/prompt_async?directory=${directory}&directory=${directory}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ parts: [{ type: 'text', text: 'blocked' }] }),
+        }
+      ),
+      env: envStub(),
+      userId: 'usr_1',
+      authToken: 'validated-token',
+      deps: {
+        resolveRootSessionForKiloSession: vi.fn(async () => ({
+          cloudAgentSessionId: 'agent_cold',
+        })),
+        validatePromptBalance,
+        admitPrompt,
+      },
+    });
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({ error: 'KILO_QUERY_INVALID' });
+    expect(validatePromptBalance).not.toHaveBeenCalled();
+    expect(admitPrompt).not.toHaveBeenCalled();
+  });
+
   it('rejects abort selectors before interruption side effects', async () => {
     const interruptPrompt = vi.fn();
     const response = await handleKiloFacadeRequest({
@@ -1725,6 +1885,94 @@ describe('handleKiloFacadeRequest', () => {
         prompt: 'hello world',
       },
     });
+  });
+
+  it('forwards native SDK agent and Kilo model selections through prompt_async admission', async () => {
+    const env = envStub();
+    const admitSubmittedMessage = vi.fn().mockResolvedValue({
+      success: true,
+      outcome: 'queued',
+      messageId: 'msg_018f1e2d3c4bAgentModAbCdEf',
+      compatibilityDelivery: 'queued',
+    });
+    vi.spyOn(env.CLOUD_AGENT_SESSION, 'get').mockReturnValue({
+      hasMessageAdmission: vi.fn().mockResolvedValue(false),
+      admitSubmittedMessage,
+    } as never);
+
+    const response = await handleKiloFacadeRequest({
+      request: new Request(`http://worker.test/kilo/session/${kiloSessionId}/prompt_async`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messageID: 'msg_018f1e2d3c4bAgentModAbCdEf',
+          agent: 'plan',
+          model: { providerID: 'kilo', modelID: 'anthropic/claude-sonnet-4' },
+          parts: [{ type: 'text', text: 'use my selection' }],
+        }),
+      }),
+      env,
+      userId: 'usr_1',
+      authToken: 'validated-token',
+      deps: {
+        resolveRootSessionForKiloSession: vi.fn(async () => ({
+          cloudAgentSessionId: 'agent_cold',
+        })),
+        validatePromptBalance: vi.fn(async () => ({ success: true as const })),
+      },
+    });
+
+    expect(response.status).toBe(204);
+    expect(preflightExistingPromptModelMock).toHaveBeenCalledWith({
+      env,
+      userId: 'usr_1',
+      cloudAgentSessionId: 'agent_cold',
+      requestedModel: 'anthropic/claude-sonnet-4',
+      procedure: 'kilo.prompt_async',
+    });
+    expect(admitSubmittedMessage).toHaveBeenCalledWith({
+      userId: 'usr_1',
+      turn: {
+        type: 'prompt',
+        id: 'msg_018f1e2d3c4bAgentModAbCdEf',
+        prompt: 'use my selection',
+      },
+      agent: { mode: 'plan', model: 'anthropic/claude-sonnet-4' },
+    });
+  });
+
+  it('rejects non-Kilo SDK model providers before prompt_async side effects', async () => {
+    const validatePromptBalance = vi.fn();
+    const admitPrompt = vi.fn();
+
+    const response = await handleKiloFacadeRequest({
+      request: new Request(`http://worker.test/kilo/session/${kiloSessionId}/prompt_async`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: { providerID: 'anthropic', modelID: 'claude-sonnet-4' },
+          parts: [{ type: 'text', text: 'unsupported provider' }],
+        }),
+      }),
+      env: envStub(),
+      userId: 'usr_1',
+      authToken: 'validated-token',
+      deps: {
+        resolveRootSessionForKiloSession: vi.fn(async () => ({
+          cloudAgentSessionId: 'agent_cold',
+        })),
+        validatePromptBalance,
+        admitPrompt,
+      },
+    });
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      error: 'KILO_BASIC_PROMPT_UNSUPPORTED',
+    });
+    expect(validatePromptBalance).not.toHaveBeenCalled();
+    expect(preflightExistingPromptModelMock).not.toHaveBeenCalled();
+    expect(admitPrompt).not.toHaveBeenCalled();
   });
 
   it('preflights the stored session model before admitting a new prompt_async message', async () => {
@@ -2923,7 +3171,31 @@ describe('UserKiloFacade producer messages', () => {
     }
   });
 
-  it('closes producer messages once their wrapper fence is no longer current', async () => {
+  it('rejects repeated internal producer identity parameters before fence validation', async () => {
+    const validateKiloGlobalFeedProducer = vi.fn();
+    const idFromName = vi.fn();
+    const env = {
+      CLOUD_AGENT_SESSION: {
+        idFromName,
+        get: vi.fn(() => ({ validateKiloGlobalFeedProducer })),
+      },
+    } as unknown as Env;
+    const facade = new UserKiloFacade({} as DurableObjectState, env);
+
+    const response = await facade.fetch(
+      new Request(
+        `http://worker.test/internal/kilo/global-feed?userId=usr_1&cloudAgentSessionId=agent_live&kiloSessionId=${kiloSessionId}&wrapperRunId=wr_first&wrapperRunId=wr_second&wrapperGeneration=1&wrapperConnectionId=conn_current`,
+        { headers: { Upgrade: 'websocket' } }
+      )
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({ error: 'INVALID_GLOBAL_FEED_SOURCE' });
+    expect(idFromName).not.toHaveBeenCalled();
+    expect(validateKiloGlobalFeedProducer).not.toHaveBeenCalled();
+  });
+
+  it('rejects a producer connection once its wrapper fence is no longer current', async () => {
     const validateKiloGlobalFeedProducer = vi.fn(async () => ({
       success: false as const,
       status: 409,
@@ -2937,30 +3209,12 @@ describe('UserKiloFacade producer messages', () => {
       },
     } as unknown as Env;
     const facade = new UserKiloFacade({} as DurableObjectState, env);
-    const close = vi.fn();
-    const ws = {
-      close,
-      send: vi.fn(),
-      deserializeAttachment: () => ({
-        userId: 'usr_1',
-        cloudAgentSessionId: 'agent_live',
-        kiloSessionId,
-        wrapperRunId: 'wr_stale',
-        wrapperGeneration: 1,
-        wrapperConnectionId: 'conn_stale',
-      }),
-    } as unknown as WebSocket;
 
-    await facade.webSocketMessage(
-      ws,
-      JSON.stringify({
-        directory: '/workspace/root',
-        payload: {
-          id: 'evt_msg_1',
-          type: 'message.updated',
-          properties: { sessionID: kiloSessionId, id: 'msg_1' },
-        },
-      })
+    const response = await facade.fetch(
+      new Request(
+        `http://worker.test/internal/kilo/global-feed?userId=usr_1&cloudAgentSessionId=agent_live&kiloSessionId=${kiloSessionId}&wrapperRunId=wr_stale&wrapperGeneration=1&wrapperConnectionId=conn_stale`,
+        { headers: { Upgrade: 'websocket' } }
+      )
     );
 
     expect(idFromName).toHaveBeenCalledWith('usr_1:agent_live');
@@ -2970,7 +3224,8 @@ describe('UserKiloFacade producer messages', () => {
       wrapperGeneration: 1,
       wrapperConnectionId: 'conn_stale',
     });
-    expect(close).toHaveBeenCalledWith(4401, 'Stale wrapper connection');
+    expect(response.status).toBe(409);
+    await expect(response.text()).resolves.toBe('Stale wrapper connection');
   });
 
   it('terminates a public subscriber that falls behind the live event stream', async () => {
@@ -3022,20 +3277,12 @@ describe('UserKiloFacade producer messages', () => {
     }
   });
 
-  it('preserves producer event order while fence validation is asynchronous', async () => {
-    let resolveFirstValidation: ((result: { success: true }) => void) | undefined;
-    const validateKiloGlobalFeedProducer = vi
-      .fn()
-      .mockImplementationOnce(
-        () =>
-          new Promise<{ success: true }>(resolve => {
-            resolveFirstValidation = resolve;
-          })
-      )
-      .mockResolvedValue({ success: true as const });
+  it('preserves producer event order without revalidating each frame', async () => {
+    const validateKiloGlobalFeedProducer = vi.fn();
+    const idFromName = vi.fn();
     const env = {
       CLOUD_AGENT_SESSION: {
-        idFromName: vi.fn(() => 'session-do-id'),
+        idFromName,
         get: vi.fn(() => ({ validateKiloGlobalFeedProducer })),
       },
     } as unknown as Env;
@@ -3059,7 +3306,7 @@ describe('UserKiloFacade producer messages', () => {
       }),
     } as unknown as WebSocket;
 
-    const first = facade.webSocketMessage(
+    await facade.webSocketMessage(
       ws,
       JSON.stringify({
         directory: '/workspace/root',
@@ -3070,7 +3317,7 @@ describe('UserKiloFacade producer messages', () => {
         },
       })
     );
-    const second = facade.webSocketMessage(
+    await facade.webSocketMessage(
       ws,
       JSON.stringify({
         directory: '/workspace/root',
@@ -3081,14 +3328,6 @@ describe('UserKiloFacade producer messages', () => {
         },
       })
     );
-    await vi.waitFor(() => {
-      expect(validateKiloGlobalFeedProducer).toHaveBeenCalledTimes(1);
-    });
-    if (!resolveFirstValidation) {
-      throw new Error('Expected the first producer validation to be pending');
-    }
-    resolveFirstValidation({ success: true });
-    await Promise.all([first, second]);
 
     const readEvent = async (): Promise<{ payload: { properties?: { id?: string } } }> => {
       const frame = await reader.read();
@@ -3102,6 +3341,8 @@ describe('UserKiloFacade producer messages', () => {
       await readEvent();
       expect((await readEvent()).payload.properties?.id).toBe('first');
       expect((await readEvent()).payload.properties?.id).toBe('second');
+      expect(idFromName).not.toHaveBeenCalled();
+      expect(validateKiloGlobalFeedProducer).not.toHaveBeenCalled();
     } finally {
       await reader.cancel().catch(() => undefined);
     }

@@ -16,6 +16,7 @@ import {
   type BalanceOnlyResult,
 } from '../balance-validation.js';
 import type {
+  QueueExecutionTurnCommand,
   SubmittedSessionMessageRequest,
   SessionMessageAdmissionResult,
 } from '../execution/types.js';
@@ -30,8 +31,8 @@ import {
   type PublicCloudAgentExtensionEvent,
 } from './cloud-agent-extension-events.js';
 import { createProxyRequest } from '../shared/http-proxy.js';
+import { hasDuplicateQueryParameters } from '../shared/http-query.js';
 import {
-  hasUnprojectedPrivateStructuredPath,
   projectPublicListedSession,
   projectPublicSession,
   projectPublicStoredMessages,
@@ -189,34 +190,6 @@ function pendingSessionSnapshotResponse(): Response {
   );
   response.headers.set('Retry-After', '1');
   return response;
-}
-
-function unsupportedStructuredPathsResponse(entity: 'session' | 'messages'): Response {
-  return facadeError(
-    502,
-    'KILO_UPSTREAM_RESPONSE_INVALID',
-    `Kilo ${entity} response contains unsupported structured paths`
-  );
-}
-
-function projectSafePublicSession(
-  info: KiloSdkSessionInfo,
-  kiloSessionId: string
-): KiloSdkSessionInfo | Response {
-  const publicInfo = projectPublicSession(info, kiloSessionId);
-  return hasUnprojectedPrivateStructuredPath(publicInfo)
-    ? unsupportedStructuredPathsResponse('session')
-    : publicInfo;
-}
-
-function projectSafePublicMessages(
-  messages: KiloSdkStoredMessage[],
-  kiloSessionId: string
-): KiloSdkStoredMessage[] | Response {
-  const publicMessages = projectPublicStoredMessages(messages, kiloSessionId);
-  return hasUnprojectedPrivateStructuredPath(publicMessages)
-    ? unsupportedStructuredPathsResponse('messages')
-    : publicMessages;
 }
 
 function sessionSnapshotTooLargeResponse(): Response {
@@ -402,8 +375,7 @@ async function rewriteLiveSessionDetailResponse(
   if (info instanceof Response) {
     return info;
   }
-  const publicInfo = projectSafePublicSession(info, kiloSessionId);
-  if (publicInfo instanceof Response) return publicInfo;
+  const publicInfo = projectPublicSession(info, kiloSessionId);
   const headers = new Headers(response.headers);
   headers.delete('content-length');
   headers.delete('content-encoding');
@@ -506,8 +478,7 @@ async function rewriteLiveMessagesResponse(
       'Kilo messages response is not valid'
     );
   }
-  const publicMessages = projectSafePublicMessages(parsed, kiloSessionId);
-  if (publicMessages instanceof Response) return publicMessages;
+  const publicMessages = projectPublicStoredMessages(parsed, kiloSessionId);
   const headers = new Headers(response.headers);
   headers.delete('content-length');
   headers.delete('content-encoding');
@@ -517,6 +488,10 @@ async function rewriteLiveMessagesResponse(
     statusText: response.statusText,
     headers,
   });
+}
+
+function duplicateQueryParametersResponse(): Response {
+  return facadeError(400, 'KILO_QUERY_INVALID', 'Query parameters must be unique');
 }
 
 function parseSessionListQuery(
@@ -530,6 +505,9 @@ function parseSessionListQuery(
         `Session list query parameter is not supported: ${key}`
       );
     }
+  }
+  if (hasDuplicateQueryParameters(url.searchParams)) {
+    return duplicateQueryParametersResponse();
   }
 
   const params: Omit<ListCloudAgentRootSessionsParams, 'kiloUserId'> = {};
@@ -577,6 +555,9 @@ function validateIdScopedSelectors(
     if (paginationKeys.has(key)) continue;
     if (key !== 'directory') return unsupportedSessionSelectorResponse();
   }
+  if (hasDuplicateQueryParameters(url.searchParams)) {
+    return duplicateQueryParametersResponse();
+  }
   const directory = url.searchParams.get('directory');
   if (directory !== null && directory !== publicCloudAgentDirectory(kiloSessionId)) {
     return unsupportedSessionSelectorResponse();
@@ -587,21 +568,11 @@ function validateIdScopedSelectors(
 function parseSessionMessagesQuery(
   url: URL
 ): Pick<GetCloudAgentRootSessionMessagesParams, 'limit' | 'before'> | Response {
-  const seenParams = new Set<string>();
   for (const key of url.searchParams.keys()) {
     if (!SUPPORTED_SESSION_MESSAGES_QUERY_PARAMS.has(key)) {
       return unsupportedSessionSelectorResponse();
     }
-    if (seenParams.has(key)) {
-      return facadeError(
-        400,
-        'KILO_QUERY_INVALID',
-        'Session messages query parameters must be unique'
-      );
-    }
-    seenParams.add(key);
   }
-
   const params: Pick<GetCloudAgentRootSessionMessagesParams, 'limit' | 'before'> = {};
   const limitParam = url.searchParams.get('limit');
   if (limitParam !== null) {
@@ -798,18 +769,22 @@ async function admitBasicPrompt(params: {
   if (!balance.success) {
     return facadeError(balance.status, 'KILO_BALANCE_VALIDATION_FAILED', balance.message);
   }
-  const request: SubmittedSessionMessageRequest = {
-    userId: params.userId as UserId,
+  const command = {
     turn: {
       type: 'prompt',
       id: parsed.prompt.messageId,
       prompt: parsed.prompt.prompt,
     },
+    ...(parsed.prompt.agent ? { agent: parsed.prompt.agent } : {}),
+  } satisfies QueueExecutionTurnCommand;
+  const request: SubmittedSessionMessageRequest = {
+    userId: params.userId as UserId,
+    ...command,
   };
   const admitPrompt = params.deps?.admitPrompt ?? defaultAdmitPrompt;
   try {
     return await preflightAndAdmitPromptMessage(
-      { cloudAgentSessionId: params.cloudAgentSessionId, turn: request.turn },
+      { cloudAgentSessionId: params.cloudAgentSessionId, ...command },
       { env: params.env, userId: params.userId },
       'kilo.prompt_async',
       () =>
@@ -881,7 +856,6 @@ function messagesPageResponse(
   nextCursor: string | null,
   omittedItemCount: number
 ): Response {
-  const exposedHeaders = ['X-Kilo-Omitted-Item-Count'];
   const headers = new Headers({
     'content-type': 'application/json',
     'X-Kilo-Omitted-Item-Count': String(omittedItemCount),
@@ -889,11 +863,9 @@ function messagesPageResponse(
   if (nextCursor !== null) {
     const nextUrl = new URL(requestUrl);
     nextUrl.searchParams.set('before', nextCursor);
-    exposedHeaders.push('Link', 'X-Next-Cursor');
     headers.set('Link', `<${nextUrl.toString()}>; rel="next"`);
     headers.set('X-Next-Cursor', nextCursor);
   }
-  headers.set('Access-Control-Expose-Headers', exposedHeaders.join(', '));
   return new Response(JSON.stringify(messages), { headers });
 }
 
@@ -918,10 +890,8 @@ async function persistedSessionDetailResponse(params: {
       return retryableSessionReadResponse();
     case 'invalid_data':
       return invalidPersistedSessionDataResponse('session');
-    case 'value': {
-      const publicInfo = projectSafePublicSession(snapshot.snapshot.info, snapshot.kiloSessionId);
-      return publicInfo instanceof Response ? publicInfo : Response.json(publicInfo);
-    }
+    case 'value':
+      return Response.json(projectPublicSession(snapshot.snapshot.info, snapshot.kiloSessionId));
   }
 }
 
@@ -953,8 +923,7 @@ async function persistedSessionMessagesResponse(params: {
         return invalidPersistedSessionDataResponse('messages');
     }
   }
-  const publicMessages = projectSafePublicMessages(result.history.messages, params.kiloSessionId);
-  if (publicMessages instanceof Response) return publicMessages;
+  const publicMessages = projectPublicStoredMessages(result.history.messages, params.kiloSessionId);
   return messagesPageResponse(
     params.url,
     publicMessages,
@@ -1068,6 +1037,9 @@ async function eventStreamResponse(params: {
       'KILO_EVENT_SELECTOR_UNSUPPORTED',
       'Only the Cloud Agent session directory selector is supported'
     );
+  }
+  if (hasDuplicateQueryParameters(url.searchParams)) {
+    return duplicateQueryParametersResponse();
   }
   const directory = url.searchParams.get('directory');
   if (!directory) {
@@ -1244,23 +1216,26 @@ export async function handleKiloFacadeRequest(params: {
     return facadeError(decision.status, decision.code, decision.message);
   }
 
-  const detailRead = isExactSessionDetailRead(request.method, kiloPath, route.encodedKiloSessionId);
-  const messagesRoute = isExactSessionMessagesRead(
-    request.method,
-    kiloPath,
-    route.encodedKiloSessionId
-  );
-  const mutationRoute =
-    isExactSessionPromptAsync(request.method, kiloPath, route.encodedKiloSessionId) ||
-    isExactSessionAbort(request.method, kiloPath, route.encodedKiloSessionId);
-  if (detailRead || messagesRoute || mutationRoute) {
-    const paginationKeys =
-      request.method === 'GET' && messagesRoute ? new Set(['limit', 'before']) : new Set<string>();
+  const routeClassification = {
+    detailRead: isExactSessionDetailRead(request.method, kiloPath, route.encodedKiloSessionId),
+    messagesRead: isExactSessionMessagesRead(request.method, kiloPath, route.encodedKiloSessionId),
+    promptAsync: isExactSessionPromptAsync(request.method, kiloPath, route.encodedKiloSessionId),
+    abort: isExactSessionAbort(request.method, kiloPath, route.encodedKiloSessionId),
+  };
+  if (
+    routeClassification.detailRead ||
+    routeClassification.messagesRead ||
+    routeClassification.promptAsync ||
+    routeClassification.abort
+  ) {
+    const paginationKeys = routeClassification.messagesRead
+      ? new Set(['limit', 'before'])
+      : new Set<string>();
     const selectorResponse = validateIdScopedSelectors(url, route.kiloSessionId, paginationKeys);
     if (selectorResponse) return selectorResponse;
   }
 
-  if (isExactSessionPromptAsync(request.method, kiloPath, route.encodedKiloSessionId)) {
+  if (routeClassification.promptAsync) {
     return handlePromptAsyncMutation({
       request,
       env,
@@ -1270,7 +1245,7 @@ export async function handleKiloFacadeRequest(params: {
       deps,
     });
   }
-  if (isExactSessionAbort(request.method, kiloPath, route.encodedKiloSessionId)) {
+  if (routeClassification.abort) {
     return handleAbortMutation({
       env,
       userId,
@@ -1279,23 +1254,13 @@ export async function handleKiloFacadeRequest(params: {
     });
   }
 
-  const sessionDetailRead = isExactSessionDetailRead(
-    request.method,
-    kiloPath,
-    route.encodedKiloSessionId
-  );
-  const sessionMessagesRead = isExactSessionMessagesRead(
-    request.method,
-    kiloPath,
-    route.encodedKiloSessionId
-  );
-  const messageQuery = sessionMessagesRead ? parseSessionMessagesQuery(url) : null;
+  const messageQuery = routeClassification.messagesRead ? parseSessionMessagesQuery(url) : null;
   if (messageQuery instanceof Response) {
     return messageQuery;
   }
-  const persistedRead: PersistedSessionRead | null = sessionDetailRead
+  const persistedRead: PersistedSessionRead | null = routeClassification.detailRead
     ? { kind: 'detail' }
-    : sessionMessagesRead && messageQuery !== null
+    : routeClassification.messagesRead && messageQuery !== null
       ? { kind: 'messages', query: messageQuery }
       : null;
   return proxyOwnedKiloSessionRequest({
@@ -1313,6 +1278,9 @@ export async function handleKiloFacadeRequest(params: {
 
 function parseGlobalFeedSource(request: Request): GlobalFeedSource | Response {
   const url = new URL(request.url);
+  if (hasDuplicateQueryParameters(url.searchParams)) {
+    return facadeError(400, 'INVALID_GLOBAL_FEED_SOURCE', 'Invalid global feed source');
+  }
   const userId = url.searchParams.get('userId');
   const cloudAgentSessionId = url.searchParams.get('cloudAgentSessionId');
   const kiloSessionId = url.searchParams.get('kiloSessionId');
@@ -1366,7 +1334,6 @@ function mayReplaceGlobalFeedProducer(
 
 export class UserKiloFacade extends DurableObject<Env> implements KiloFacadeGlobalEvents {
   private subscribers = new Map<string, PublicSubscriber>();
-  private producerMessageTails = new WeakMap<WebSocket, Promise<void>>();
 
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
@@ -1461,18 +1428,7 @@ export class UserKiloFacade extends DurableObject<Env> implements KiloFacadeGlob
   }
 
   async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
-    const previous = this.producerMessageTails.get(ws) ?? Promise.resolve();
-    const next = previous
-      .catch(() => undefined)
-      .then(() => this.handleGlobalFeedMessage(ws, message));
-    this.producerMessageTails.set(ws, next);
-    try {
-      await next;
-    } finally {
-      if (this.producerMessageTails.get(ws) === next) {
-        this.producerMessageTails.delete(ws);
-      }
-    }
+    this.handleGlobalFeedMessage(ws, message);
   }
 
   private validateGlobalFeedProducer(source: GlobalFeedSource) {
@@ -1488,10 +1444,7 @@ export class UserKiloFacade extends DurableObject<Env> implements KiloFacadeGlob
     });
   }
 
-  private async handleGlobalFeedMessage(
-    ws: WebSocket,
-    message: string | ArrayBuffer
-  ): Promise<void> {
+  private handleGlobalFeedMessage(ws: WebSocket, message: string | ArrayBuffer): void {
     if (typeof message !== 'string') {
       ws.send(JSON.stringify({ error: 'Binary global feed messages are not supported' }));
       return;
@@ -1500,12 +1453,6 @@ export class UserKiloFacade extends DurableObject<Env> implements KiloFacadeGlob
     const source = ws.deserializeAttachment() as GlobalFeedSource | null;
     if (!source) {
       ws.close(1011, 'Missing global feed source');
-      return;
-    }
-
-    const validation = await this.validateGlobalFeedProducer(source);
-    if (!validation.success) {
-      ws.close(4401, validation.message);
       return;
     }
 
@@ -1540,14 +1487,8 @@ export class UserKiloFacade extends DurableObject<Env> implements KiloFacadeGlob
     this.broadcastGlobalEvent(publicEnvelope, source.kiloSessionId);
   }
 
-  async webSocketClose(ws: WebSocket): Promise<void> {
-    const source = ws.deserializeAttachment() as GlobalFeedSource | null;
-    if (!source) return;
-    const tag = producerTag(source);
-    const remaining = this.ctx.getWebSockets(tag).filter(existing => existing !== ws);
-    if (remaining.length === 0) {
-      await this.ctx.storage.delete(`producer:${source.cloudAgentSessionId}`);
-    }
+  webSocketClose(): void {
+    // Socket attachments expire with the socket; no persistent cleanup is needed.
   }
 
   private async handleGlobalFeedRequest(request: Request): Promise<Response> {
@@ -1586,11 +1527,6 @@ export class UserKiloFacade extends DurableObject<Env> implements KiloFacadeGlob
     const server = pair[1];
     this.ctx.acceptWebSocket(server, [tag]);
     server.serializeAttachment(source);
-    await this.ctx.storage.put(`producer:${source.cloudAgentSessionId}`, {
-      wrapperRunId: source.wrapperRunId,
-      wrapperGeneration: source.wrapperGeneration,
-      wrapperConnectionId: source.wrapperConnectionId,
-    });
 
     return new Response(null, { status: 101, webSocket: client });
   }

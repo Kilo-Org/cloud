@@ -448,6 +448,108 @@ describe('SessionIngestRPC.getCloudAgentRootSessionMessages', () => {
     expect(readKiloSdkMessages).toHaveBeenCalledWith({ limit: 2, before: cursor });
   });
 
+  it('omits identity-valid future parts from persisted history and reports the omission', async () => {
+    const { db } = makeDbFakes([{ cloudAgentSessionId: 'agent_owned_root' }]);
+    vi.mocked(getSessionIngestDO).mockReturnValue({
+      readKiloSdkMessages: vi.fn(async () => ({
+        messages: [
+          {
+            info: sdkUserMessageFixture,
+            parts: [
+              sdkTextPartFixture,
+              {
+                id: 'prt_future_01',
+                sessionID: sdkSessionInfoFixture.id,
+                messageID: sdkUserMessageFixture.id,
+                type: 'future-safe-part',
+                payload: { value: 'new CLI field' },
+              },
+            ],
+          },
+        ],
+        nextCursor: null,
+        omittedItemCount: 3,
+      })),
+    } as never);
+    const rpc = makeRpc(db);
+
+    await expect(
+      rpc.getCloudAgentRootSessionMessages({
+        kiloUserId: 'usr_owner',
+        kiloSessionId: sdkSessionInfoFixture.id,
+      })
+    ).resolves.toEqual({
+      kiloSessionId: sdkSessionInfoFixture.id,
+      cloudAgentSessionId: 'agent_owned_root',
+      history: {
+        messages: [sdkStoredMessageFixture],
+        nextCursor: null,
+        omittedItemCount: 4,
+      },
+    });
+  });
+
+  it('returns invalid_data for future parts with malformed persisted identities', async () => {
+    const { db } = makeDbFakes([{ cloudAgentSessionId: 'agent_owned_root' }]);
+    vi.mocked(getSessionIngestDO).mockReturnValue({
+      readKiloSdkMessages: vi.fn(async () => ({
+        messages: [
+          {
+            info: sdkUserMessageFixture,
+            parts: [
+              {
+                id: 'other_future_01',
+                sessionID: sdkSessionInfoFixture.id,
+                messageID: sdkUserMessageFixture.id,
+                type: 'future-safe-part',
+              },
+            ],
+          },
+        ],
+        nextCursor: null,
+      })),
+    } as never);
+    const rpc = makeRpc(db);
+
+    await expect(
+      rpc.getCloudAgentRootSessionMessages({
+        kiloUserId: 'usr_owner',
+        kiloSessionId: sdkSessionInfoFixture.id,
+      })
+    ).resolves.toEqual({
+      kiloSessionId: sdkSessionInfoFixture.id,
+      cloudAgentSessionId: 'agent_owned_root',
+      history: { kind: 'invalid_data' },
+    });
+  });
+
+  it('strips additive fields from recognized persisted parts', async () => {
+    const { db } = makeDbFakes([{ cloudAgentSessionId: 'agent_owned_root' }]);
+    vi.mocked(getSessionIngestDO).mockReturnValue({
+      readKiloSdkMessages: vi.fn(async () => ({
+        messages: [
+          {
+            info: sdkUserMessageFixture,
+            parts: [{ ...sdkTextPartFixture, futureField: 'not-yet-reviewed' }],
+          },
+        ],
+        nextCursor: null,
+      })),
+    } as never);
+    const rpc = makeRpc(db);
+
+    await expect(
+      rpc.getCloudAgentRootSessionMessages({
+        kiloUserId: 'usr_owner',
+        kiloSessionId: sdkSessionInfoFixture.id,
+      })
+    ).resolves.toEqual({
+      kiloSessionId: sdkSessionInfoFixture.id,
+      cloudAgentSessionId: 'agent_owned_root',
+      history: { messages: [sdkStoredMessageFixture], nextCursor: null, omittedItemCount: 0 },
+    });
+  });
+
   it('omits legacy before/after summary diffs while preserving current patch diffs for public projection', async () => {
     const { db } = makeDbFakes([{ cloudAgentSessionId: 'agent_owned_root' }]);
     const currentDiff = {

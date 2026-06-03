@@ -315,7 +315,7 @@ describe('UserKiloFacade in the Workers runtime', () => {
     }
   });
 
-  it('replaces an older producer while keeping the replacement marker current', async () => {
+  it('replaces an older producer and rejects its stale reconnect', async () => {
     const firstIdentity = {
       wrapperRunId: 'wr_facade_replaced_1',
       wrapperGeneration: 1,
@@ -328,6 +328,7 @@ describe('UserKiloFacade in the Workers runtime', () => {
     } satisfies WrapperIdentity;
     await configureCurrentProducer(firstIdentity);
     const first = await connectProducer(firstIdentity);
+    await expect(readProducerMarker()).resolves.toBeUndefined();
     const replaced = closeEvent(first);
 
     await configureCurrentProducer(nextIdentity);
@@ -349,8 +350,9 @@ describe('UserKiloFacade in the Workers runtime', () => {
       { headers: { Upgrade: 'websocket' } }
     );
     expect(staleResponse.status).toBe(409);
-    await expect(readProducerMarker()).resolves.toEqual(nextIdentity);
+    await expect(readProducerMarker()).resolves.toBeUndefined();
 
     next.close(1000, 'test complete');
+    await expect(readProducerMarker()).resolves.toBeUndefined();
   });
 });

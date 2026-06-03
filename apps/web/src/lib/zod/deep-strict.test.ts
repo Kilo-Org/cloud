@@ -115,10 +115,7 @@ describe('deepStrict', () => {
 
   test('rejects unknown keys inside object intersections', () => {
     const schema = deepStrict(
-      z.intersection(
-        z.object({ a: z.object({ value: z.string() }) }),
-        z.object({ b: z.number() })
-      )
+      z.intersection(z.object({ a: z.object({ value: z.string() }) }), z.object({ b: z.number() }))
     );
 
     expect(schema.safeParse({ a: { value: 'x' }, b: 1 }).success).toBe(true);
@@ -128,7 +125,8 @@ describe('deepStrict', () => {
 
   test('supports chained object intersections', () => {
     const schema = deepStrict(
-      z.object({ a: z.string() })
+      z
+        .object({ a: z.string() })
         .and(z.object({ b: z.number() }))
         .and(z.object({ c: z.boolean() }))
     );

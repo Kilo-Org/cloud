@@ -1,4 +1,6 @@
 import { describe, expect, it } from '@jest/globals';
+import fs from 'node:fs';
+import path from 'node:path';
 import {
   FREE_MODEL_DATA_LABEL,
   FREE_MODEL_FREE_LABEL,
@@ -22,5 +24,15 @@ describe('free model data disclosure', () => {
 
   it('uses the short disclosure text as tooltip content', () => {
     expect(getFreeModelDataTooltip()).toBe('Data collected');
+  });
+
+  it('uses the brain circuit icon in model combobox disclosures', () => {
+    const source = fs.readFileSync(
+      path.join(process.cwd(), 'src/components/shared/ModelCombobox.tsx'),
+      'utf8'
+    );
+
+    expect(source).toContain('BrainCircuit');
+    expect(source).not.toContain('AlertTriangle');
   });
 });

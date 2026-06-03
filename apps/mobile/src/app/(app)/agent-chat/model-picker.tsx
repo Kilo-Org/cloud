@@ -1,6 +1,6 @@
 import * as Haptics from 'expo-haptics';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { AlertTriangle, Check, Search } from 'lucide-react-native';
+import { BrainCircuit, Check, Search } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, TextInput, View } from 'react-native';
 
@@ -251,7 +251,7 @@ export default function ModelPickerScreen() {
                         </Text>
                       </View>
                       {collectsData ? (
-                        <AlertTriangle
+                        <BrainCircuit
                           accessibilityLabel={FREE_MODEL_DATA_LABEL}
                           size={13}
                           color={colors.warn}

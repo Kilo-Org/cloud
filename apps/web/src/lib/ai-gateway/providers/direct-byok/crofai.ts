@@ -3,8 +3,8 @@ import type { DirectByokProvider } from '@/lib/ai-gateway/providers/direct-byok/
 import { REASONING_VARIANTS_LOW_MEDIUM_HIGH } from '@/lib/ai-gateway/providers/model-settings';
 
 export default {
-  id: 'chutes-byok',
-  base_url: 'https://llm.chutes.ai/v1',
+  id: 'crofai',
+  base_url: 'https://crof.ai/v1',
   supported_chat_apis: ['chat_completions'],
   default_ai_sdk_provider: 'openai-compatible',
   transformRequest(context) {
@@ -15,11 +15,11 @@ export default {
     request.body.reasoning_effort ??= request.body.reasoning?.effort ?? undefined;
   },
   models: cachedEnhancedDirectByokModelList({
-    providerId: 'chutes-byok',
+    providerId: 'crofai',
     recommendedModels: [
       {
-        id: 'moonshotai/Kimi-K2.6-TEE',
-        name: 'Kimi-K2.6',
+        id: 'kimi-k2.6',
+        name: 'Kimi K2.6',
         flags: ['vision'],
         context_length: 262144,
         max_completion_tokens: 65535,

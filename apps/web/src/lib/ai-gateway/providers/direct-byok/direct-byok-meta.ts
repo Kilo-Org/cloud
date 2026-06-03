@@ -4,9 +4,13 @@ import type { DirectUserByokInferenceProviderId } from '@/lib/ai-gateway/provide
 export const DIRECT_BYOK_PROVIDERS_META = {
   'byteplus-coding': 'BytePlus Coding Plan',
   'chutes-byok': 'Chutes BYOK',
+  crofai: 'CrofAI',
   'kimi-coding': 'Kimi Code',
+  martian: 'Martian',
   neuralwatt: 'Neuralwatt',
   'ollama-cloud': 'Ollama Cloud',
+  orcarouter: 'OrcaRouter',
+  synthetic: 'Synthetic',
   'xiaomi-token-plan-ams': 'Xiaomi Token Plan (Europe)',
   'xiaomi-token-plan-sgp': 'Xiaomi Token Plan (Singapore)',
   'zai-coding': 'Z.ai Coding Plan',

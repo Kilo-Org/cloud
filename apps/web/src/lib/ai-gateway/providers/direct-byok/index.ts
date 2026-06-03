@@ -11,6 +11,7 @@ import { readDb } from '@/lib/drizzle';
 import { preferredModels } from '@/lib/ai-gateway/models';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import type { OpenCodeSettings } from '@kilocode/db';
+import { getCreatorRecommendedAiSdkProvider } from '@/lib/ai-gateway/providers/model-settings';
 
 export function formatDirectByokModelId(provider: DirectByokProvider, model: DirectByokModel) {
   return (provider.id + '/' + model.id).toLowerCase();
@@ -57,7 +58,7 @@ function convertModel(
     default_parameters: {},
     preferredIndex: model.flags?.includes('recommended') ? preferredIndex : undefined,
     opencode: {
-      ai_sdk_provider: provider.ai_sdk_provider,
+      ai_sdk_provider: getCreatorRecommendedAiSdkProvider(id) ?? provider.default_ai_sdk_provider,
       variants: model.variants,
     } satisfies OpenCodeSettings,
   };
@@ -110,8 +111,9 @@ export async function getDirectByokModelsForUser(userId: string) {
 
 export function createAiSdkProvider(directByokProvider: DirectByokProvider, apiKey: string) {
   if (
-    directByokProvider.ai_sdk_provider === 'openai-compatible' ||
-    directByokProvider.ai_sdk_provider === 'alibaba'
+    directByokProvider.default_ai_sdk_provider === 'openai-compatible' ||
+    directByokProvider.default_ai_sdk_provider === 'openrouter' ||
+    directByokProvider.default_ai_sdk_provider === 'alibaba'
   ) {
     return createOpenAICompatible({
       baseURL: directByokProvider.base_url,
@@ -124,6 +126,6 @@ export function createAiSdkProvider(directByokProvider: DirectByokProvider, apiK
       },
     });
   } else {
-    throw new Error('Unrecognized AI SDK provider: ' + directByokProvider.ai_sdk_provider);
+    throw new Error('Unrecognized AI SDK provider: ' + directByokProvider.default_ai_sdk_provider);
   }
 }

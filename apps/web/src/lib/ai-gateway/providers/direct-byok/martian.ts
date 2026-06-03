@@ -1,21 +1,24 @@
 import { cachedEnhancedDirectByokModelList } from '@/lib/ai-gateway/providers/direct-byok/model-list';
 import type { DirectByokProvider } from '@/lib/ai-gateway/providers/direct-byok/types';
+import { REASONING_VARIANTS_LOW_MEDIUM_HIGH } from '@/lib/ai-gateway/providers/model-settings';
 
 export default {
-  id: 'neuralwatt',
-  base_url: 'https://api.neuralwatt.com/v1',
-  supported_chat_apis: ['chat_completions'],
-  default_ai_sdk_provider: 'openai-compatible',
-  transformRequest(_context) {},
+  id: 'martian',
+  base_url: 'https://api.withmartian.com/v1',
+  supported_chat_apis: ['chat_completions', 'messages', 'responses'],
+  default_ai_sdk_provider: 'openrouter',
+  transformRequest() {},
   models: cachedEnhancedDirectByokModelList({
-    providerId: 'neuralwatt',
+    providerId: 'martian',
     recommendedModels: [
       {
         id: 'moonshotai/Kimi-K2.6',
         name: 'Kimi-K2.6',
+        flags: ['vision'],
         context_length: 262144,
-        max_completion_tokens: 32000,
+        max_completion_tokens: 65535,
       },
     ],
+    variants: REASONING_VARIANTS_LOW_MEDIUM_HIGH,
   }),
 } satisfies DirectByokProvider;

@@ -5,7 +5,8 @@ import { REASONING_VARIANTS_NONE_LOW_MEDIUM_HIGH } from '@/lib/ai-gateway/provid
 export default {
   id: 'ollama-cloud',
   base_url: 'https://ollama.com/v1',
-  ai_sdk_provider: 'openai-compatible',
+  supported_chat_apis: ['chat_completions'],
+  default_ai_sdk_provider: 'openai-compatible',
   transformRequest(context) {
     const { request } = context;
     if (request.kind !== 'chat_completions') {

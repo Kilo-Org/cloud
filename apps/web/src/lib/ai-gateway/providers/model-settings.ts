@@ -109,7 +109,24 @@ export function getModelVariants(model: string): OpenCodeSettings['variants'] {
   return undefined;
 }
 
+export function getCreatorRecommendedAiSdkProvider(model: string): CustomLlmProvider | undefined {
+  if (isClaudeModel(model)) {
+    // on Vercel AI Gateway, this is necessary to support document attachments
+    return 'anthropic';
+  }
+  if (isOpenAiModel(model) || isGrokModel(model)) {
+    // OpenAI: "While Chat Completions remains supported, Responses is recommended for all new projects.""
+    // xAI: "The Responses API is the recommended way to interact with xAI models."
+    return 'openai';
+  }
+  return undefined;
+}
+
 function getAiSdkProvider(model: string): CustomLlmProvider | undefined {
+  const creatorRecommendedAiSdkProvider = getCreatorRecommendedAiSdkProvider(model);
+  if (creatorRecommendedAiSdkProvider) {
+    return creatorRecommendedAiSdkProvider;
+  }
   if (isAlibabaDirectModel(model)) {
     // with 'openai' (Responses) prompt caching doesn't work
     // with 'openai-compatible' (Chat Completions) cost is wrong (cache writes are not counted)
@@ -121,15 +138,6 @@ function getAiSdkProvider(model: string): CustomLlmProvider | undefined {
   if (seed_20_code_free_model.public_id === model) {
     // with 'openai' (Responses API) prompt caching doesn't work
     return 'openai-compatible';
-  }
-  if (isClaudeModel(model)) {
-    // on Vercel AI Gateway, this is necessary to support document attachments
-    return 'anthropic';
-  }
-  if (isOpenAiModel(model) || isGrokModel(model)) {
-    // OpenAI: "While Chat Completions remains supported, Responses is recommended for all new projects.""
-    // xAI: "The Responses API is the recommended way to interact with xAI models."
-    return 'openai';
   }
   return undefined;
 }

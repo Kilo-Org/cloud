@@ -4,6 +4,7 @@ import type { DirectUserByokInferenceProviderId } from '@/lib/ai-gateway/provide
 import { redisSet } from '@/lib/redis';
 import { directByokModelsRedisKey } from '@/lib/redis-keys';
 
+const DEFAULT_CONTENT_LENGTH = 200_000;
 const DEFAULT_MAX_COMPLETION_TOKENS = 32_000;
 
 const ModalitySchema = z
@@ -134,6 +135,26 @@ const FETCHERS: ReadonlyArray<ProviderFetcher> = [
     label: 'Chutes',
     url: 'https://llm.chutes.ai/v1/models',
   }),
+  openAICompatibleFetcher({
+    providerId: 'crofai',
+    label: 'CrofAI',
+    url: 'https://crof.ai/v1/models',
+  }),
+  openAICompatibleFetcher({
+    providerId: 'orcarouter',
+    label: 'OrcaRouter',
+    url: 'https://api.orcarouter.ai/v1/models',
+  }),
+  openAICompatibleFetcher({
+    providerId: 'martian',
+    label: 'Martian',
+    url: 'https://api.withmartian.com/v1/models',
+  }),
+  openAICompatibleFetcher({
+    providerId: 'synthetic',
+    label: 'Synthetic',
+    url: 'https://api.synthetic.new/v1/models',
+  }),
   modelsDevFetcher('zai-coding', 'zai-coding-plan'),
   modelsDevFetcher('ollama-cloud', 'ollama-cloud'),
   modelsDevFetcher('xiaomi-token-plan-ams', 'xiaomi-token-plan-ams'),
@@ -151,7 +172,7 @@ async function syncProvider(fetcher: ProviderFetcher, ctx: SyncContext): Promise
 
   for (const raw of fetched) {
     const name = raw.name ?? modelIdToDisplayName(raw.id);
-    const context_length = raw.context_length ?? DEFAULT_MAX_COMPLETION_TOKENS;
+    const context_length = raw.context_length ?? DEFAULT_CONTENT_LENGTH;
     const max_completion_tokens = Math.min(
       raw.max_completion_tokens ?? DEFAULT_MAX_COMPLETION_TOKENS,
       context_length

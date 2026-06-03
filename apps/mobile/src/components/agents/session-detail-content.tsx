@@ -10,9 +10,11 @@ import { ConnectivityBanner } from '@/components/agents/connectivity-banner';
 import { MessageBubble } from '@/components/agents/message-bubble';
 import { PermissionCard } from '@/components/agents/permission-card';
 import { QuestionCard } from '@/components/agents/question-card';
+import { getSessionKeyboardContainerKind } from '@/components/agents/session-keyboard-container-state';
 import { useSessionManager } from '@/components/agents/session-provider';
 import { SessionStatusIndicator } from '@/components/agents/session-status-indicator';
 import { shouldShowAgentWorkingIndicator } from '@/components/agents/session-working-state';
+import { AppAwareKeyboardPaddingView } from '@/components/kilo-chat/app-aware-keyboard-padding';
 import { useInteractionHandlers } from '@/components/agents/use-interaction-handlers';
 import { useSessionAutoScroll } from '@/components/agents/use-session-auto-scroll';
 import { useSessionConfigSync } from '@/components/agents/use-session-config-sync';
@@ -149,6 +151,7 @@ export function SessionDetailContent({ sessionId }: Readonly<SessionDetailConten
     (requiresModel && !currentModel);
   const showInteractionCards = activeQuestion ?? activePermission;
   const composerPlaceholder = getComposerPlaceholder(cloudStatus?.type);
+  const keyboardContainerKind = getSessionKeyboardContainerKind(Platform.OS);
 
   const handleSend = useCallback(
     async (text: string) => {
@@ -186,10 +189,23 @@ export function SessionDetailContent({ sessionId }: Readonly<SessionDetailConten
 
       {!isConnected && <ConnectivityBanner />}
 
-      <KeyboardAvoidingView
-        className="flex-1"
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
+      {keyboardContainerKind === 'app-aware-padding' ? (
+        <AppAwareKeyboardPaddingView className="flex-1">
+          {renderKeyboardBody()}
+        </AppAwareKeyboardPaddingView>
+      ) : (
+        <KeyboardAvoidingView className="flex-1" behavior="padding">
+          {renderKeyboardBody()}
+        </KeyboardAvoidingView>
+      )}
+
+      <View style={{ height: bottom }} className="bg-background" />
+    </View>
+  );
+
+  function renderKeyboardBody() {
+    return (
+      <>
         <View className="flex-1">{renderContent()}</View>
 
         {activeQuestion ? (
@@ -242,11 +258,9 @@ export function SessionDetailContent({ sessionId }: Readonly<SessionDetailConten
               }}
             />
           ))}
-      </KeyboardAvoidingView>
-
-      <View style={{ height: bottom }} className="bg-background" />
-    </View>
-  );
+      </>
+    );
+  }
 
   function renderContent() {
     if (shouldBlockMessages) {

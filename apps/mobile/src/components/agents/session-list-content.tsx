@@ -17,8 +17,8 @@ import { useSessionMutations } from '@/lib/hooks/use-session-mutations';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { getTabBarOverlayHeight } from '@/lib/tab-bar-layout';
 
-// Height of the hidden-by-default search bar (mt-3 12 + border 1 + py-14 28 + line-20 + border 1 + mb-14 14 = 76).
-const SEARCH_BAR_HEIGHT = 76;
+// Height of the hidden-by-default search bar (mt-3 12 + border 1 + py-1.5 12 + line-20 + border 1 + mb-14 14 = 60).
+const SEARCH_BAR_HEIGHT = 60;
 
 type AgentSessionListContentProps = {
   sections: SessionSection[];
@@ -53,10 +53,10 @@ export function AgentSessionListContent({
 
   const listHeader = useMemo(
     () => (
-      <View className="mx-[22px] mb-[14px] mt-3 flex-row items-center gap-2 rounded-[10px] border border-border bg-card px-4 py-[14px]">
+      <View className="mx-[22px] mb-[14px] mt-3 flex-row items-center gap-2 rounded-[10px] border border-border bg-card px-4 py-1.5">
         <Search size={18} color={colors.mutedForeground} />
         <TextInput
-          className="flex-1 text-[15px] leading-5 text-foreground"
+          className="flex-1 text-[15px] text-foreground"
           placeholder="Search sessions..."
           placeholderTextColor={colors.mutedForeground}
           onChangeText={onSearchChange}

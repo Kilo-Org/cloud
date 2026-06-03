@@ -219,15 +219,17 @@ describe('queue status notifications', () => {
     } as unknown as ReturnType<typeof getWorkerDb>;
     vi.mocked(getWorkerDb).mockReturnValue(db);
 
+    const r2Get = vi.fn(async () => null);
+    const slowQueueSend = vi.fn(async () => undefined);
     const env = {
       HYPERDRIVE: { connectionString: 'postgres://test' },
       SESSION_INGEST_R2: {
-        get: vi.fn(async () => null),
+        get: r2Get,
         delete: vi.fn(async () => undefined),
         put: vi.fn(async () => undefined),
       },
       SLOW_INGEST_QUEUE: {
-        send: vi.fn(async () => undefined),
+        send: slowQueueSend,
       },
     } as unknown as Env;
     const ack = vi.fn();
@@ -252,8 +254,8 @@ describe('queue status notifications', () => {
 
     await queue(batch, env, { waitUntil: vi.fn() } as unknown as ExecutionContext);
 
-    expect(env.SESSION_INGEST_R2.get).toHaveBeenCalledWith('ingest/missing');
-    expect(env.SLOW_INGEST_QUEUE.send).toHaveBeenCalledWith(
+    expect(r2Get).toHaveBeenCalledWith('ingest/missing');
+    expect(slowQueueSend).toHaveBeenCalledWith(
       { ...body, missingR2SlowAttempt: true },
       { delaySeconds: SLOW_INGEST_DELAY_SECONDS }
     );
@@ -272,6 +274,7 @@ describe('queue status notifications', () => {
     } as unknown as ReturnType<typeof getWorkerDb>;
     vi.mocked(getWorkerDb).mockReturnValue(db);
 
+    const slowQueueSend = vi.fn(async () => undefined);
     const env = {
       HYPERDRIVE: { connectionString: 'postgres://test' },
       SESSION_INGEST_R2: {
@@ -280,7 +283,7 @@ describe('queue status notifications', () => {
         put: vi.fn(async () => undefined),
       },
       SLOW_INGEST_QUEUE: {
-        send: vi.fn(async () => undefined),
+        send: slowQueueSend,
       },
     } as unknown as Env;
     const ack = vi.fn();
@@ -305,7 +308,7 @@ describe('queue status notifications', () => {
 
     await queue(batch, env, { waitUntil: vi.fn() } as unknown as ExecutionContext);
 
-    expect(env.SLOW_INGEST_QUEUE.send).not.toHaveBeenCalled();
+    expect(slowQueueSend).not.toHaveBeenCalled();
     expect(ack).toHaveBeenCalledTimes(1);
     expect(retry).not.toHaveBeenCalled();
   });

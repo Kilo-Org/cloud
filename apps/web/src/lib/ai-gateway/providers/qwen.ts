@@ -141,10 +141,10 @@ export const qwen37_plus_free_model: KiloExclusiveModel = {
   status: 'public',
   flags: ['reasoning', 'vision', 'requires-data-collection'],
   gateway: 'vercel',
-  internal_id: 'qwen/qwen3.7-plus',
+  internal_id: 'alibaba/qwen3.7-plus',
   pricing: null,
   exclusive_to: [],
-  inference_provider_restriction: ['alibaba'],
+  inference_provider_restriction: [],
 };
 
 export const qwen36_plus_model: KiloExclusiveModel = {

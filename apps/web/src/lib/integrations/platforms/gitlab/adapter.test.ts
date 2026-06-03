@@ -15,6 +15,7 @@ import {
   refreshGitLabOAuthToken,
   validateGitLabInstance,
   validatePersonalAccessToken,
+  createProjectWebhook,
   deleteProjectWebhook,
   searchGitLabProjects,
   normalizeGitLabSearchQuery,
@@ -807,6 +808,31 @@ describe('deleteProjectWebhook', () => {
       }),
       expect.any(Function)
     );
+  });
+});
+
+describe('createProjectWebhook', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+  });
+
+  it('rejects cross-origin 307 redirects before replaying request bodies', async () => {
+    mockSelfHostedGitLabResponse({
+      status: 307,
+      headers: { location: 'https://redirect.example/api/v4/projects/123/hooks' },
+    });
+
+    await expect(
+      createProjectWebhook(
+        'test-token',
+        123,
+        'https://example.com/webhook',
+        'webhook-secret',
+        'https://gitlab.example.com'
+      )
+    ).rejects.toThrow('GitLab request refused cross-origin redirect with request body');
+
+    expect(mockHttpsRequest).toHaveBeenCalledTimes(1);
   });
 });
 

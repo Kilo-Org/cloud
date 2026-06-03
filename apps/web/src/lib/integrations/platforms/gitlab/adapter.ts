@@ -84,6 +84,10 @@ function buildRedirectRequestInit(
   }
 
   if (from.origin !== to.origin) {
+    if ((status === 307 || status === 308) && init.body != null) {
+      throw new Error('GitLab request refused cross-origin redirect with request body');
+    }
+
     headers.delete('authorization');
     headers.delete('cookie');
   }

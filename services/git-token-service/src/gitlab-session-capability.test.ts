@@ -25,7 +25,7 @@ const claims = {
 } as const;
 
 describe('GitLabSessionCapabilityCodec', () => {
-  it('produces an opaque one-hour prefixed capability with GitLab-bound claims', () => {
+  it('produces an opaque four-hour prefixed capability with GitLab-bound claims', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-05-31T12:00:00.000Z'));
     const codec = new GitLabSessionCapabilityCodec(encryptionKey);
@@ -40,12 +40,14 @@ describe('GitLabSessionCapabilityCodec', () => {
       version: 2,
       ...claims,
       issuedAt: Date.parse('2026-05-31T12:00:00.000Z'),
-      expiresAt: Date.parse('2026-05-31T13:00:00.000Z'),
+      expiresAt: Date.parse('2026-05-31T16:00:00.000Z'),
     });
     vi.useRealTimers();
   });
 
-  it('produces and decodes a legacy unbound v1 capability when the container is omitted', () => {
+  it('produces and decodes a two-hour legacy unbound v1 capability when the container is omitted', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-31T12:00:00.000Z'));
     const codec = new GitLabSessionCapabilityCodec(encryptionKey);
     const { outboundContainerId: _outboundContainerId, ...legacyClaims } = claims;
 
@@ -56,9 +58,35 @@ describe('GitLabSessionCapabilityCodec', () => {
       version: 1,
       userId: 'user_1',
       projectPath: 'Acme/platform/widgets',
+      issuedAt: Date.parse('2026-05-31T12:00:00.000Z'),
+      expiresAt: Date.parse('2026-05-31T14:00:00.000Z'),
     });
     expect(codec.decode(capability)).not.toHaveProperty('outboundContainerId');
+    vi.useRealTimers();
   });
+
+  it.each([
+    ['legacy unbound v1', 'kgl1.', 1, 2 * 60 * 60 * 1000, false],
+    ['container-bound v2', 'kgl2.', 2, 4 * 60 * 60 * 1000, true],
+  ] as const)(
+    'rejects an overlong %s capability',
+    (_description, prefix, version, maximumLifetimeMs, bound) => {
+      const { outboundContainerId: _outboundContainerId, ...legacyClaims } = claims;
+      const issuedAt = Date.now();
+      const serializedClaims = JSON.stringify({
+        purpose: 'gitlab_scm_session',
+        version,
+        ...(bound ? claims : legacyClaims),
+        issuedAt,
+        expiresAt: issuedAt + maximumLifetimeMs + 1,
+      });
+      const capability = `${prefix}${encryptWithSymmetricKey(serializedClaims, encryptionKey)}`;
+
+      expect(() => new GitLabSessionCapabilityCodec(encryptionKey).decode(capability)).toThrowError(
+        expect.objectContaining({ reason: 'invalid_capability' })
+      );
+    }
+  );
 
   it('rejects expiry, tampering, and another encryption key', () => {
     vi.useFakeTimers();
@@ -73,7 +101,9 @@ describe('GitLabSessionCapabilityCodec', () => {
     expect(() =>
       new GitLabSessionCapabilityCodec(anotherEncryptionKey).decode(capability)
     ).toThrowError(expect.objectContaining({ reason: 'invalid_capability' }));
-    vi.setSystemTime(new Date('2026-05-31T13:00:00.000Z'));
+    vi.setSystemTime(new Date('2026-05-31T15:59:59.999Z'));
+    expect(codec.decode(capability)).toMatchObject({ source: claims.source });
+    vi.setSystemTime(new Date('2026-05-31T16:00:00.000Z'));
     expect(() => codec.decode(capability)).toThrowError(
       expect.objectContaining({ reason: 'expired_capability' })
     );

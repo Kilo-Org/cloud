@@ -5,7 +5,15 @@ import { z } from 'zod';
 const LEGACY_CAPABILITY_PREFIX = 'kgh1.';
 const BOUND_CAPABILITY_PREFIX = 'kgh2.';
 const CAPABILITY_PURPOSE = 'github_scm_session';
-const MAX_GITHUB_SCM_SESSION_CAPABILITY_LIFETIME_MS = 60 * 60 * 1000;
+const MAX_LEGACY_GITHUB_SCM_SESSION_CAPABILITY_LIFETIME_MS = 2 * 60 * 60 * 1000;
+const MAX_BOUND_GITHUB_SCM_SESSION_CAPABILITY_LIFETIME_MS = 4 * 60 * 60 * 1000;
+
+function getGitHubSessionCapabilityLifetimeMs(version: 1 | 2): number {
+  return version === 1
+    ? MAX_LEGACY_GITHUB_SCM_SESSION_CAPABILITY_LIFETIME_MS
+    : MAX_BOUND_GITHUB_SCM_SESSION_CAPABILITY_LIFETIME_MS;
+}
+
 const GitHubPathPartSchema = z
   .string()
   .trim()
@@ -54,7 +62,8 @@ const GitHubSessionCapabilityClaimsSchema = z
   ])
   .refine(claims => claims.expiresAt > claims.issuedAt)
   .refine(
-    claims => claims.expiresAt - claims.issuedAt <= MAX_GITHUB_SCM_SESSION_CAPABILITY_LIFETIME_MS
+    claims =>
+      claims.expiresAt - claims.issuedAt <= getGitHubSessionCapabilityLifetimeMs(claims.version)
   );
 
 export type GitHubAuthSource = 'user' | 'installation';
@@ -118,12 +127,13 @@ export class GitHubSessionCapabilityCodec {
   issue(subject: GitHubSessionCapabilitySubject): string {
     const issuedAt = Date.now();
     const bound = subject.outboundContainerId !== undefined;
+    const version = bound ? 2 : 1;
     const parsed = GitHubSessionCapabilityClaimsSchema.safeParse({
       purpose: CAPABILITY_PURPOSE,
-      version: bound ? 2 : 1,
+      version,
       ...subject,
       issuedAt,
-      expiresAt: issuedAt + MAX_GITHUB_SCM_SESSION_CAPABILITY_LIFETIME_MS,
+      expiresAt: issuedAt + getGitHubSessionCapabilityLifetimeMs(version),
     });
     if (!parsed.success) throw new GitHubSessionCapabilityError('invalid_capability');
 

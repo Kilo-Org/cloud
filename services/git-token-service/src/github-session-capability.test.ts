@@ -49,12 +49,14 @@ describe('GitHubSessionCapabilityCodec', () => {
       source: 'user',
       identity: claims.identity,
       issuedAt: Date.parse('2026-05-30T12:00:00.000Z'),
-      expiresAt: Date.parse('2026-05-30T13:00:00.000Z'),
+      expiresAt: Date.parse('2026-05-30T16:00:00.000Z'),
     });
     vi.useRealTimers();
   });
 
-  it('produces and decodes a legacy unbound v1 capability when the container is omitted', () => {
+  it('produces and decodes a two-hour legacy unbound v1 capability when the container is omitted', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-30T12:00:00.000Z'));
     const codec = new GitHubSessionCapabilityCodec(encryptionKey);
     const { outboundContainerId: _outboundContainerId, ...legacyClaims } = claims;
 
@@ -66,9 +68,35 @@ describe('GitHubSessionCapabilityCodec', () => {
       userId: 'user_1',
       owner: 'acme',
       repo: 'widgets',
+      issuedAt: Date.parse('2026-05-30T12:00:00.000Z'),
+      expiresAt: Date.parse('2026-05-30T14:00:00.000Z'),
     });
     expect(codec.decode(capability)).not.toHaveProperty('outboundContainerId');
+    vi.useRealTimers();
   });
+
+  it.each([
+    ['legacy unbound v1', 'kgh1.', 1, 2 * 60 * 60 * 1000, false],
+    ['container-bound v2', 'kgh2.', 2, 4 * 60 * 60 * 1000, true],
+  ] as const)(
+    'rejects an overlong %s capability',
+    (_description, prefix, version, maximumLifetimeMs, bound) => {
+      const { outboundContainerId: _outboundContainerId, ...legacyClaims } = claims;
+      const issuedAt = Date.now();
+      const serializedClaims = JSON.stringify({
+        purpose: 'github_scm_session',
+        version,
+        ...(bound ? claims : legacyClaims),
+        issuedAt,
+        expiresAt: issuedAt + maximumLifetimeMs + 1,
+      });
+      const capability = `${prefix}${encryptWithSymmetricKey(serializedClaims, encryptionKey)}`;
+
+      expect(() => new GitHubSessionCapabilityCodec(encryptionKey).decode(capability)).toThrowError(
+        expect.objectContaining({ reason: 'invalid_capability' })
+      );
+    }
+  );
 
   it('rejects expired and tampered capabilities', () => {
     vi.useFakeTimers();
@@ -76,10 +104,10 @@ describe('GitHubSessionCapabilityCodec', () => {
     const codec = new GitHubSessionCapabilityCodec(encryptionKey);
     const capability = codec.issue(claims);
 
-    vi.setSystemTime(new Date('2026-05-30T12:59:59.999Z'));
+    vi.setSystemTime(new Date('2026-05-30T15:59:59.999Z'));
     expect(codec.decode(capability)).toMatchObject({ source: 'user' });
 
-    vi.setSystemTime(new Date('2026-05-30T13:00:00.000Z'));
+    vi.setSystemTime(new Date('2026-05-30T16:00:00.000Z'));
     expect(() => codec.decode(capability)).toThrowError(
       expect.objectContaining({ reason: 'expired_capability' })
     );

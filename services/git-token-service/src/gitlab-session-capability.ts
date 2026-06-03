@@ -8,7 +8,15 @@ export type { GitLabCloneUrlFailureReason, GitLabCloneUrlResult } from './gitlab
 const LEGACY_CAPABILITY_PREFIX = 'kgl1.';
 const BOUND_CAPABILITY_PREFIX = 'kgl2.';
 const CAPABILITY_PURPOSE = 'gitlab_scm_session';
-const MAX_GITLAB_SCM_SESSION_CAPABILITY_LIFETIME_MS = 60 * 60 * 1000;
+const MAX_LEGACY_GITLAB_SCM_SESSION_CAPABILITY_LIFETIME_MS = 2 * 60 * 60 * 1000;
+const MAX_BOUND_GITLAB_SCM_SESSION_CAPABILITY_LIFETIME_MS = 4 * 60 * 60 * 1000;
+
+function getGitLabSessionCapabilityLifetimeMs(version: 1 | 2): number {
+  return version === 1
+    ? MAX_LEGACY_GITLAB_SCM_SESSION_CAPABILITY_LIFETIME_MS
+    : MAX_BOUND_GITLAB_SCM_SESSION_CAPABILITY_LIFETIME_MS;
+}
+
 const GitLabSessionIdentitySchema = z
   .object({
     accountId: z.string().min(1).nullable(),
@@ -54,7 +62,8 @@ const GitLabSessionCapabilityClaimsSchema = z
   ])
   .refine(claims => claims.expiresAt > claims.issuedAt)
   .refine(
-    claims => claims.expiresAt - claims.issuedAt <= MAX_GITLAB_SCM_SESSION_CAPABILITY_LIFETIME_MS
+    claims =>
+      claims.expiresAt - claims.issuedAt <= getGitLabSessionCapabilityLifetimeMs(claims.version)
   );
 
 export type GitLabAuthType = 'oauth' | 'pat';
@@ -100,12 +109,13 @@ export class GitLabSessionCapabilityCodec {
   issue(subject: GitLabSessionCapabilitySubject): string {
     const issuedAt = Date.now();
     const bound = subject.outboundContainerId !== undefined;
+    const version = bound ? 2 : 1;
     const parsed = GitLabSessionCapabilityClaimsSchema.safeParse({
       purpose: CAPABILITY_PURPOSE,
-      version: bound ? 2 : 1,
+      version,
       ...subject,
       issuedAt,
-      expiresAt: issuedAt + MAX_GITLAB_SCM_SESSION_CAPABILITY_LIFETIME_MS,
+      expiresAt: issuedAt + getGitLabSessionCapabilityLifetimeMs(version),
     });
     if (!parsed.success) throw new GitLabSessionCapabilityError('invalid_capability');
     try {

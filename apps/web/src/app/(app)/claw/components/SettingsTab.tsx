@@ -358,6 +358,7 @@ const GOOGLE_OAUTH_ERROR_MESSAGES: Record<string, string> = {
   invalid_organization: 'Invalid organization for this connection.',
   unauthorized: 'You are not authorized to complete this connection.',
   disconnect_failed: 'Could not disconnect Google Calendar. Please try again.',
+  method_not_allowed: 'That request could not be completed. Please try again.',
 };
 
 /**
@@ -502,8 +503,17 @@ function GoogleCalendarCard({
         isPending={isDisconnecting}
         pendingLabel="Disconnecting..."
         onConfirm={() => {
+          const form = disconnectFormRef.current;
+          if (!form) {
+            toast.error('Could not disconnect Google Calendar. Please try again.');
+            return;
+          }
+          // The disconnect route always 303-redirects, so once we submit the
+          // page navigates away; isDisconnecting intentionally stays true until
+          // then. Only set it after confirming the form exists so a missing ref
+          // can't leave the button permanently disabled.
           setIsDisconnecting(true);
-          disconnectFormRef.current?.submit();
+          form.submit();
         }}
       />
     </>

@@ -95,6 +95,7 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
   let suggestion: SuggestionState | null = null;
   const pendingMessages = new Map<string, MessageDeliveryState>();
   let disconnectedSource: 'transport' | 'wrapper' | null = null;
+  let completed = false;
 
   // Tracks whether we've received a terminal stopped event (error/interrupted/disconnected).
   // While terminated, session.error events are suppressed as aftershocks.
@@ -126,6 +127,7 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
         activity = { type: 'busy' };
         status = IDLE_STATUS;
         disconnectedSource = null;
+        completed = false;
         terminated = false;
       }
       // Child session busy → no activity change
@@ -150,21 +152,25 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
 
     switch (event.reason) {
       case 'complete':
+        completed = true;
         // Status stays as-is (idle, or committed if was committing)
         if (event.branch) config.onBranchChanged?.(event.branch);
         break;
       case 'interrupted':
         terminated = true;
         disconnectedSource = null;
+        completed = false;
         status = { type: 'interrupted' };
         break;
       case 'error':
         terminated = true;
         disconnectedSource = null;
+        completed = false;
         status = { type: 'error', message: 'Session terminated' };
         config.onError?.('Session terminated');
         break;
       case 'disconnected':
+        if (completed) break;
         terminated = true;
         disconnectedSource = 'wrapper';
         status = { type: 'disconnected' };
@@ -173,6 +179,7 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
       case 'transport-disconnected':
         terminated = true;
         disconnectedSource = 'transport';
+        completed = false;
         status = { type: 'disconnected' };
         config.onError?.('Connection to agent lost');
         break;
@@ -547,6 +554,7 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
       pendingMessages.clear();
       terminated = false;
       disconnectedSource = null;
+      completed = false;
       notify();
     },
   };

@@ -44,16 +44,23 @@ function createSources(initialAppState: AppState = 'active') {
   };
 }
 
+function createBooleanSetterMock() {
+  return vi.fn((value: boolean): void => {
+    void value;
+  });
+}
+
 describe('installQueryClientNativeLifecycle', () => {
   it('mirrors native app focus into React Query focus state', () => {
     const native = createSources('background');
-    const setFocused = vi.fn();
+    const setFocused = createBooleanSetterMock();
+    const setOnline = createBooleanSetterMock();
 
     const cleanup = installQueryClientNativeLifecycle({
       sources: native.sources,
       managers: {
         focus: { setFocused },
-        online: { setOnline: vi.fn() },
+        online: { setOnline },
       },
     });
 
@@ -69,12 +76,13 @@ describe('installQueryClientNativeLifecycle', () => {
 
   it('mirrors native connectivity into React Query online state', () => {
     const native = createSources();
-    const setOnline = vi.fn();
+    const setFocused = createBooleanSetterMock();
+    const setOnline = createBooleanSetterMock();
 
     const cleanup = installQueryClientNativeLifecycle({
       sources: native.sources,
       managers: {
-        focus: { setFocused: vi.fn() },
+        focus: { setFocused },
         online: { setOnline },
       },
     });
@@ -90,12 +98,13 @@ describe('installQueryClientNativeLifecycle', () => {
 
   it('falls back to isConnected when isInternetReachable is null', () => {
     const native = createSources();
-    const setOnline = vi.fn();
+    const setFocused = createBooleanSetterMock();
+    const setOnline = createBooleanSetterMock();
 
     const cleanup = installQueryClientNativeLifecycle({
       sources: native.sources,
       managers: {
-        focus: { setFocused: vi.fn() },
+        focus: { setFocused },
         online: { setOnline },
       },
     });

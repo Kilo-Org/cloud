@@ -97,8 +97,8 @@ export type VercelUserByokInferenceProviderId = z.infer<
 export const DirectUserByokInferenceProviderIdSchema = z.enum([
   'byteplus-coding',
   'chutes-byok',
-  'crofai',
   'codestral',
+  'crofai',
   'kimi-coding',
   'martian',
   'neuralwatt',

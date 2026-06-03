@@ -9,7 +9,7 @@ import {
   View,
 } from 'react-native';
 import { type Href, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { generateMessageId } from 'cloud-agent-sdk/message-id';
 import * as Haptics from 'expo-haptics';
 import { toast } from 'sonner-native';
@@ -21,6 +21,7 @@ import { useTextHeight } from '@/components/agents/use-text-height';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { ScreenHeader } from '@/components/screen-header';
+import { invalidateAgentSessionQueries } from '@/lib/agent-session-cache';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { trpcClient, useTRPC } from '@/lib/trpc';
@@ -46,6 +47,7 @@ export default function NewSessionScreen() {
   const router = useRouter();
   const navigation = useNavigation();
   const colors = useThemeColors();
+  const queryClient = useQueryClient();
   const { organizationId } = useLocalSearchParams<{ organizationId?: string }>();
 
   // ── Selectors state ──────────────────────────────────────────────
@@ -139,6 +141,7 @@ export default function NewSessionScreen() {
           })
         : await trpcClient.cloudAgentNext.prepareSession.mutate(baseInput);
 
+      await invalidateAgentSessionQueries(queryClient, trpc);
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       const path = organizationId
         ? `/(app)/agent-chat/${result.kiloSessionId}?organizationId=${organizationId}`
@@ -163,7 +166,7 @@ export default function NewSessionScreen() {
     } finally {
       setIsCreating(false);
     }
-  }, [selectedRepo, model, mode, variant, organizationId, router, navigation]);
+  }, [selectedRepo, model, mode, variant, organizationId, queryClient, trpc, router, navigation]);
 
   const canStart = hasPrompt && selectedRepo.length > 0 && model.length > 0 && !isCreating;
 

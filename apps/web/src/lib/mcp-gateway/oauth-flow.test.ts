@@ -59,6 +59,38 @@ function createTestConfig(): Promise<GatewayAppConfig> {
   });
 }
 
+function providerDiscoveryResponse(url: string): Response | null {
+  if (url === 'https://example.com/.well-known/oauth-protected-resource') {
+    return new Response(JSON.stringify({ authorization_servers: ['https://example.com'] }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+  if (
+    url === 'https://example.com/.well-known/oauth-authorization-server' ||
+    url === 'https://example.com/.well-known/openid-configuration'
+  ) {
+    return new Response(
+      JSON.stringify({
+        issuer: 'https://example.com',
+        authorization_endpoint: 'https://example.com/authorize',
+        token_endpoint: 'https://example.com/token',
+        registration_endpoint: 'https://example.com/register',
+      }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+  return null;
+}
+
+const providerDiscoveryFetch: typeof fetch = async input => {
+  const url =
+    typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+  const response = providerDiscoveryResponse(url);
+  if (response) return response;
+  throw new Error(`Unexpected discovery fetch: ${url}`);
+};
+
 async function cleanupGatewayTables() {
   await db.delete(mcp_gateway_pending_provider_authorizations);
   await db.delete(mcp_gateway_authorization_codes);
@@ -332,11 +364,64 @@ describe('MCP gateway app OAuth flow', () => {
     ).rejects.toMatchObject({ code: 'access_denied' });
   });
 
+  it('discovers provider metadata during OAuth config creation', async () => {
+    const config = await createTestConfig();
+    const services = createGatewayServices({ config, fetchImpl: providerDiscoveryFetch });
+    const user = await insertTestUser({ id: `gateway-user-${crypto.randomUUID()}` });
+    const created = await services.configService.createPersonalConfig({
+      userId: user.id,
+      name: 'OAuth MCP',
+      remoteUrl: 'https://example.com/mcp',
+      authMode: 'oauth_static',
+    });
+    expect(created.config.discovered_provider_metadata).toMatchObject({
+      issuer: 'https://example.com',
+      authorization_endpoint: 'https://example.com/authorize',
+      token_endpoint: 'https://example.com/token',
+    });
+  });
+
+  it('rejects oauth_dynamic configs when the provider has no registration endpoint', async () => {
+    const config = await createTestConfig();
+    const fetchImpl: typeof fetch = async input => {
+      const url =
+        typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url === 'https://example.com/.well-known/oauth-protected-resource') {
+        return new Response(JSON.stringify({ authorization_servers: ['https://example.com'] }), {
+          status: 200,
+        });
+      }
+      if (url === 'https://example.com/.well-known/oauth-authorization-server') {
+        return new Response(
+          JSON.stringify({
+            issuer: 'https://example.com',
+            authorization_endpoint: 'https://example.com/authorize',
+            token_endpoint: 'https://example.com/token',
+          }),
+          { status: 200 }
+        );
+      }
+      throw new Error(`Unexpected discovery fetch: ${url}`);
+    };
+    const services = createGatewayServices({ config, fetchImpl });
+    const user = await insertTestUser({ id: `gateway-user-${crypto.randomUUID()}` });
+    await expect(
+      services.configService.createPersonalConfig({
+        userId: user.id,
+        name: 'OAuth MCP',
+        remoteUrl: 'https://example.com/mcp',
+        authMode: 'oauth_dynamic',
+      })
+    ).rejects.toMatchObject({ code: 'invalid_request' });
+  });
+
   it('consumes provider state when the provider returns an error', async () => {
     const config = await createTestConfig();
     const fetchImpl: typeof fetch = async input => {
       const url =
         typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      const discovery = providerDiscoveryResponse(url);
+      if (discovery) return discovery;
       if (url === 'https://example.com/token') {
         return new Response(
           JSON.stringify({
@@ -427,6 +512,8 @@ describe('MCP gateway app OAuth flow', () => {
     const fetchImpl: typeof fetch = async input => {
       const url =
         typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      const discovery = providerDiscoveryResponse(url);
+      if (discovery) return discovery;
       if (url === 'https://example.com/token') {
         return new Response(
           JSON.stringify({
@@ -506,6 +593,8 @@ describe('MCP gateway app OAuth flow', () => {
     const fetchImpl: typeof fetch = async input => {
       const url =
         typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      const discovery = providerDiscoveryResponse(url);
+      if (discovery) return discovery;
       if (url === 'https://example.com/token') {
         return new Response(
           JSON.stringify({
@@ -596,7 +685,7 @@ describe('MCP gateway app OAuth flow', () => {
 
   it('keeps grant versions strictly advancing across replacement', async () => {
     const config = await createTestConfig();
-    const services = createGatewayServices({ config });
+    const services = createGatewayServices({ config, fetchImpl: providerDiscoveryFetch });
     const user = await insertTestUser({ id: `gateway-user-${crypto.randomUUID()}` });
     const created = await services.configService.createPersonalConfig({
       userId: user.id,
@@ -650,7 +739,7 @@ describe('MCP gateway app OAuth flow', () => {
 
   it('requires provider reauthorization for needs-reauth instances', async () => {
     const config = await createTestConfig();
-    const services = createGatewayServices({ config });
+    const services = createGatewayServices({ config, fetchImpl: providerDiscoveryFetch });
     const user = await insertTestUser({ id: `gateway-user-${crypto.randomUUID()}` });
     const created = await services.configService.createPersonalConfig({
       userId: user.id,

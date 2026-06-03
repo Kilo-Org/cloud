@@ -6,6 +6,7 @@ import {
   GatewayOAuthClientAuthMethod,
   createGatewayError,
   GatewayErrorCode,
+  GatewayError,
   filterSupportedScopes,
   parseScopeString,
   type OAuthAuthorizationQuery,
@@ -24,6 +25,22 @@ import type { GatewayProviderOAuthService } from './provider-oauth-service';
 import { expiresAtIso, hashToken, randomToken } from './crypto';
 import type { GatewayAppConfig } from './config';
 import { createAuditService } from './audit-service';
+
+type OAuthErrorCode = (typeof GatewayErrorCode)[keyof typeof GatewayErrorCode];
+
+function createOAuthRedirectError(params: {
+  code: OAuthErrorCode;
+  message: string;
+  redirectUri: string;
+  state?: string;
+}) {
+  return new OAuthAuthorizationRedirectError(
+    params.code,
+    params.message,
+    params.redirectUri,
+    params.state
+  );
+}
 
 export class OAuthAuthorizationRedirectError extends Error {
   readonly code: string;
@@ -202,16 +219,16 @@ export function createAuthorizationService(params: {
         400
       );
     }
-    const redirectError = (code: GatewayErrorCode, message: string) => {
+    const redirectError = (code: OAuthErrorCode, message: string) => {
       if (input.redirectErrors) {
-        throw new OAuthAuthorizationRedirectError(
+        throw createOAuthRedirectError({
           code,
           message,
-          input.query.redirect_uri,
-          input.query.state
-        );
+          redirectUri: input.query.redirect_uri,
+          state: input.query.state,
+        });
       }
-      throw createGatewayError(code as GatewayErrorCode, message, 400);
+      throw createGatewayError(code, message, 400);
     };
     if (
       !client.response_types.includes('code') ||
@@ -283,61 +300,77 @@ export function createAuthorizationService(params: {
       ...input,
       redirectErrors: true,
     });
-    const instance = await params.repository.ensureConnectionInstance({
-      ownerScope: resolved.config.owner_scope,
-      ownerId: resolved.config.owner_id,
-      configId: resolved.config.config_id,
-      userId: input.userId,
-    });
-    const request = await createAuthorizationRequestWithInstance({
-      client,
-      route,
-      resolved,
-      userId: input.userId,
-      redirectUri: input.query.redirect_uri,
-      scopes,
-      oauthState: input.query.state,
-      codeChallenge: input.query.code_challenge ?? null,
-      executionContext: input.executionContext,
-      instanceId: instance.instance_id,
-    });
-    if (
-      resolved.config.auth_mode === GatewayAuthMode.OAuthDynamic ||
-      resolved.config.auth_mode === GatewayAuthMode.OAuthStatic
-    ) {
-      const grant = await params.repository.findActiveGrant(instance.instance_id);
-      if (!grant || instance.instance_status !== GatewayInstanceStatus.Active) {
-        const provider = await params.providerOAuthService.initiateProviderAuthorization({
-          authorizationRequest: request,
-          resolved,
-          instanceId: instance.instance_id,
-          scopes,
-        });
-        await createAuditService(params.repository).record({
-          actorUserId: input.userId,
-          ownerScope: resolved.config.owner_scope,
-          ownerId: resolved.config.owner_id,
-          configId: resolved.config.config_id,
-          connectResourceId: resolved.route.connect_resource_id,
-          instanceId: instance.instance_id,
-          eventType: 'authorization_pending_provider',
-          outcome: 'success',
-        });
-        return { kind: 'provider_redirect' as const, authorizationUrl: provider.authorizationUrl };
+    try {
+      const instance = await params.repository.ensureConnectionInstance({
+        ownerScope: resolved.config.owner_scope,
+        ownerId: resolved.config.owner_id,
+        configId: resolved.config.config_id,
+        userId: input.userId,
+      });
+      const request = await createAuthorizationRequestWithInstance({
+        client,
+        route,
+        resolved,
+        userId: input.userId,
+        redirectUri: input.query.redirect_uri,
+        scopes,
+        oauthState: input.query.state,
+        codeChallenge: input.query.code_challenge ?? null,
+        executionContext: input.executionContext,
+        instanceId: instance.instance_id,
+      });
+      if (
+        resolved.config.auth_mode === GatewayAuthMode.OAuthDynamic ||
+        resolved.config.auth_mode === GatewayAuthMode.OAuthStatic
+      ) {
+        const grant = await params.repository.findActiveGrant(instance.instance_id);
+        if (!grant || instance.instance_status !== GatewayInstanceStatus.Active) {
+          const provider = await params.providerOAuthService.initiateProviderAuthorization({
+            authorizationRequest: request,
+            resolved,
+            instanceId: instance.instance_id,
+            scopes,
+          });
+          await createAuditService(params.repository).record({
+            actorUserId: input.userId,
+            ownerScope: resolved.config.owner_scope,
+            ownerId: resolved.config.owner_id,
+            configId: resolved.config.config_id,
+            connectResourceId: resolved.route.connect_resource_id,
+            instanceId: instance.instance_id,
+            eventType: 'authorization_pending_provider',
+            outcome: 'success',
+          });
+          return {
+            kind: 'provider_redirect' as const,
+            authorizationUrl: provider.authorizationUrl,
+          };
+        }
       }
+      const finalized = await finalizeAuthorizationRequest(request);
+      await createAuditService(params.repository).record({
+        actorUserId: input.userId,
+        ownerScope: resolved.config.owner_scope,
+        ownerId: resolved.config.owner_id,
+        configId: resolved.config.config_id,
+        connectResourceId: resolved.route.connect_resource_id,
+        instanceId: instance.instance_id,
+        eventType: 'authorization_completed',
+        outcome: 'success',
+      });
+      return { kind: 'redirect' as const, redirectUrl: finalized.redirectUrl };
+    } catch (error) {
+      if (error instanceof OAuthAuthorizationRedirectError) throw error;
+      if (error instanceof GatewayError) {
+        throw createOAuthRedirectError({
+          code: error.code,
+          message: error.message,
+          redirectUri: input.query.redirect_uri,
+          state: input.query.state,
+        });
+      }
+      throw error;
     }
-    const finalized = await finalizeAuthorizationRequest(request);
-    await createAuditService(params.repository).record({
-      actorUserId: input.userId,
-      ownerScope: resolved.config.owner_scope,
-      ownerId: resolved.config.owner_id,
-      configId: resolved.config.config_id,
-      connectResourceId: resolved.route.connect_resource_id,
-      instanceId: instance.instance_id,
-      eventType: 'authorization_completed',
-      outcome: 'success',
-    });
-    return { kind: 'redirect' as const, redirectUrl: finalized.redirectUrl };
   }
 
   async function completeProviderAuthorization(paramsInput: {

@@ -1,6 +1,6 @@
 import { DurableObject } from 'cloudflare:workers';
 import { drizzle, type DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
-import migration from './mcp-gateway-instance/migrations.v1.sql';
+import initialMigration from './mcp-gateway-instance/001_initial.sql';
 import {
   RefreshProviderGrantInputSchema,
   refreshProviderGrant as runRefreshProviderGrant,
@@ -20,7 +20,15 @@ export class MCPGatewayInstance extends DurableObject<Env> {
     super(state, env);
     this.sqlite = drizzle(state.storage, { schema: { mcpGatewayInstanceState } });
     void state.blockConcurrencyWhile(async () => {
-      state.storage.sql.exec(migration);
+      const schemaVersion = await state.storage.get<number>('schema_version');
+      if (schemaVersion === undefined) {
+        state.storage.sql.exec(initialMigration);
+        await state.storage.put('schema_version', 1);
+        return;
+      }
+      if (schemaVersion !== 1) {
+        throw new Error(`Unsupported MCP gateway DO schema version: ${schemaVersion}`);
+      }
     });
   }
 

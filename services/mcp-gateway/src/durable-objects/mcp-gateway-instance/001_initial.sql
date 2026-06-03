@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS mcp_gateway_instance_state (
+CREATE TABLE mcp_gateway_instance_state (
   instance_key TEXT PRIMARY KEY NOT NULL,
   grant_version INTEGER,
   refresh_started_at TEXT,

@@ -24,6 +24,7 @@ import type { GatewayAppConfig } from './config';
 import { createGatewayRepository, type GatewayRepository } from './repository';
 import { configSecretAad, nowIso, randomToken } from './crypto';
 import { validatePublicHttpsDestination } from './discovery-service';
+import type { GatewayDiscoveryService } from './discovery-service';
 import { createAuditService } from './audit-service';
 
 const secretScheme = 'mcp-gateway-credential-rsa-aes-256-gcm';
@@ -31,7 +32,29 @@ const secretScheme = 'mcp-gateway-credential-rsa-aes-256-gcm';
 export function createConfigService(params: {
   repository: GatewayRepository;
   config: GatewayAppConfig;
+  discoveryService: GatewayDiscoveryService;
 }) {
+  async function discoverProviderMetadata(input: { remoteUrl: string; authMode: GatewayAuthMode }) {
+    if (input.authMode !== 'oauth_dynamic' && input.authMode !== 'oauth_static') return null;
+    const discovery = await params.discoveryService.discoverRemoteProvider(input.remoteUrl);
+    const provider = discovery.providerCandidates[0];
+    if (!provider) {
+      throw createGatewayError(
+        GatewayErrorCode.InvalidRequest,
+        'Remote provider metadata could not be discovered',
+        400
+      );
+    }
+    if (input.authMode === 'oauth_dynamic' && !provider.registration_endpoint) {
+      throw createGatewayError(
+        GatewayErrorCode.InvalidRequest,
+        'Remote provider does not support dynamic registration',
+        400
+      );
+    }
+    return provider;
+  }
+
   async function createPersonalConfig(input: {
     userId: string;
     name: string;
@@ -40,6 +63,7 @@ export function createConfigService(params: {
     pathPassthrough?: boolean;
   }) {
     await validatePublicHttpsDestination(input.remoteUrl);
+    const discoveredProviderMetadata = await discoverProviderMetadata(input);
     return await params.repository.database.transaction(async tx => {
       const repository = createGatewayRepository(tx);
       const created = await repository.createConfigWithRoute({
@@ -50,6 +74,7 @@ export function createConfigService(params: {
         authMode: input.authMode,
         sharingMode: GatewaySharingMode.SingleUser,
         pathPassthrough: input.pathPassthrough ?? false,
+        discoveredProviderMetadata,
         createdByUserId: input.userId,
         gatewayBaseUrl: params.config.gatewayBaseUrl,
       });
@@ -77,6 +102,7 @@ export function createConfigService(params: {
     pathPassthrough?: boolean;
   }) {
     await validatePublicHttpsDestination(input.remoteUrl);
+    const discoveredProviderMetadata = await discoverProviderMetadata(input);
     if (input.sharingMode === GatewaySharingMode.SingleUser && !input.initialAssignedUserId) {
       throw createGatewayError(
         GatewayErrorCode.InvalidRequest,
@@ -107,6 +133,7 @@ export function createConfigService(params: {
         authMode: input.authMode,
         sharingMode: input.sharingMode,
         pathPassthrough: input.pathPassthrough ?? false,
+        discoveredProviderMetadata,
         createdByUserId: input.actorUserId,
         gatewayBaseUrl: params.config.gatewayBaseUrl,
       });

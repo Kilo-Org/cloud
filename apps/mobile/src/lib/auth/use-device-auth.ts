@@ -127,7 +127,7 @@ export function useDeviceAuth(): DeviceAuthResult {
       });
 
       try {
-        const response = await fetch(`${API_BASE_URL}/api/device-auth/codes`, {
+        const response = await fetch(`${API_BASE_URL}/api/device-auth/codes?app=1`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
         });

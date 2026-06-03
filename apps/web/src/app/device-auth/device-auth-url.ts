@@ -30,6 +30,10 @@ export function isDeviceAuthAppMode(value: string | string[] | undefined): boole
   return normalized === '1' || normalized === 'true';
 }
 
+export function getDeviceAuthAppModeFromRequestUrl(requestUrl: string): boolean {
+  return isDeviceAuthAppMode(new URL(requestUrl).searchParams.get('app') ?? undefined);
+}
+
 export function getDeviceAuthShellClassName(isAppMode: boolean): string {
   return cn(
     'bg-background flex items-center justify-center',

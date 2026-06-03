@@ -3,6 +3,7 @@ import { describe, expect, test } from '@jest/globals';
 import {
   buildDeviceAuthVerificationUrl,
   closeDeviceAuthWindowIfAppMode,
+  getDeviceAuthAppModeFromRequestUrl,
   getDeviceAuthSignInUrl,
   getDeviceAuthShellClassName,
 } from './device-auth-url';
@@ -28,9 +29,29 @@ describe('getDeviceAuthSignInUrl', () => {
 });
 
 describe('buildDeviceAuthVerificationUrl', () => {
+  test('omits app mode by default for non-app callers', () => {
+    expect(buildDeviceAuthVerificationUrl('https://app.kilo.ai', 'ABC-123')).toBe(
+      'https://app.kilo.ai/device-auth?code=ABC-123'
+    );
+  });
+
   test('adds the app mode query parameter for mobile browser launches', () => {
     expect(buildDeviceAuthVerificationUrl('https://app.kilo.ai', 'ABC-123', { app: true })).toBe(
       'https://app.kilo.ai/device-auth?code=ABC-123&app=1'
+    );
+  });
+});
+
+describe('getDeviceAuthAppModeFromRequestUrl', () => {
+  test('derives app mode from the API request URL', () => {
+    expect(
+      getDeviceAuthAppModeFromRequestUrl('https://app.kilo.ai/api/device-auth/codes?app=1')
+    ).toBe(true);
+  });
+
+  test('leaves app mode off unless explicitly requested', () => {
+    expect(getDeviceAuthAppModeFromRequestUrl('https://app.kilo.ai/api/device-auth/codes')).toBe(
+      false
     );
   });
 });

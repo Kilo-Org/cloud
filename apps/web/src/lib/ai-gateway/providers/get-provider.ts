@@ -16,10 +16,7 @@ import type { BYOKResult, Provider } from '@/lib/ai-gateway/providers/types';
 import PROVIDERS from '@/lib/ai-gateway/providers/provider-definitions';
 import { getDirectByokModel } from '@/lib/ai-gateway/providers/direct-byok';
 import { CustomLlmDefinitionSchema } from '@kilocode/db';
-import {
-  buildDirectProvider,
-  inferSupportedChatApis,
-} from '@/lib/ai-gateway/experiments/build-direct-provider';
+import { buildDirectProvider } from '@/lib/ai-gateway/experiments/build-direct-provider';
 import { isPublicIdExperimented } from '@/lib/ai-gateway/experiments/membership';
 import {
   pickModelExperimentVariant,

@@ -240,6 +240,10 @@ function isUnsafeIpv6(hostname: string): boolean {
     normalized.startsWith('fe9') ||
     normalized.startsWith('fea') ||
     normalized.startsWith('feb') ||
+    normalized.startsWith('fec') ||
+    normalized.startsWith('fed') ||
+    normalized.startsWith('fee') ||
+    normalized.startsWith('fef') ||
     normalized.startsWith('ff') ||
     normalized.startsWith('2001:db8')
   );

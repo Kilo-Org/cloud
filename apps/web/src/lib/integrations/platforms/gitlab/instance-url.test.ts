@@ -45,6 +45,7 @@ describe('GitLab instance URL safety', () => {
     ['http://localhost:8080', 'host is not allowed'],
     ['http://127.0.0.1:8080', 'host is not allowed'],
     ['http://[::1]:8080', 'host is not allowed'],
+    ['http://[fec0::1]:8080', 'host is not allowed'],
     ['http://169.254.169.254/latest/meta-data', 'host is not allowed'],
     ['http://10.0.0.1', 'host is not allowed'],
     ['http://172.16.0.1', 'host is not allowed'],
@@ -67,6 +68,14 @@ describe('GitLab instance URL safety', () => {
 
   it('rejects hostnames that resolve to unsafe addresses', async () => {
     mockLookup.mockResolvedValueOnce([{ address: '192.168.1.10', family: 4 }]);
+
+    await expect(
+      assertGitLabUrlResolvesSafely('https://gitlab.example.com/api/v4/user')
+    ).rejects.toThrow('resolves to an address that is not allowed');
+  });
+
+  it('rejects hostnames that resolve to deprecated IPv6 site-local addresses', async () => {
+    mockLookup.mockResolvedValueOnce([{ address: 'fec0::1', family: 6 }]);
 
     await expect(
       assertGitLabUrlResolvesSafely('https://gitlab.example.com/api/v4/user')

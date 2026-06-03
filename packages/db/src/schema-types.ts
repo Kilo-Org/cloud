@@ -1281,6 +1281,7 @@ export const EndpointSchema = z.object({
       input_cache_write: z.string().optional(),
       web_search: z.string().optional(),
       internal_reasoning: z.string().optional(),
+      discount: z.number().optional(),
     })
     .optional(),
 });

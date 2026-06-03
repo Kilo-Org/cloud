@@ -5,6 +5,7 @@ import {
 } from '@/lib/ai-gateway/models';
 import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
 import PROVIDERS from '@/lib/ai-gateway/providers/provider-definitions';
+import type { StoredModel } from '@kilocode/db';
 import type { OpenRouterModel } from '@/lib/organizations/organization-types';
 import {
   OpenRouterModelsResponseSchema,
@@ -90,6 +91,23 @@ export function formatName(model: OpenRouterModel, preferredIndex: number) {
   return model.name;
 }
 
+type EndpointPricing = NonNullable<StoredModel['endpoints'][number]['pricing']>;
+
+export function undoPricingDiscount(pricing: EndpointPricing): EndpointPricing {
+  const { discount, ...prices } = pricing;
+  if (discount === undefined || discount <= 0) return pricing;
+  const factor = 1 - discount;
+  if (factor <= 0) return prices;
+  const result = { ...prices };
+  for (const key of Object.keys(prices) as (keyof typeof prices)[]) {
+    const value = prices[key];
+    if (value !== undefined) {
+      result[key] = (Number.parseFloat(value) / factor).toFixed(12);
+    }
+  }
+  return result;
+}
+
 async function enhancedModelList(models: OpenRouterModel[]) {
   const autoModels = buildAutoModels();
   const endpointsMetadata = await getOpenRouterModelsMetadata();
@@ -103,14 +121,15 @@ async function enhancedModelList(models: OpenRouterModel[]) {
       .map(model => {
         const preferredProvider = getPreferredProviderOrder(model.id).at(0);
         const endpoints = endpointsMetadata[model.id]?.endpoints ?? [];
-        const pricing = preferredProvider
-          ? (endpoints.find(e => e.tag === preferredProvider)?.pricing ??
+        const rawPricing = !preferredProvider
+          ? endpoints[0]?.pricing
+          : (endpoints.find(e => e.tag === preferredProvider)?.pricing ??
             endpoints.find(
               e =>
                 normalizeInferenceProviderId(e.tag) ===
                 normalizeInferenceProviderId(preferredProvider)
-            )?.pricing)
-          : undefined;
+            )?.pricing);
+        const pricing = rawPricing ? undoPricingDiscount(rawPricing) : rawPricing;
         return pricing ? { ...model, pricing } : model;
       })
       .concat(

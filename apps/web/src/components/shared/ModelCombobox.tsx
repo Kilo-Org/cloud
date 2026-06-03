@@ -446,7 +446,7 @@ function FreeModelDataIcon() {
       <TooltipTrigger asChild>
         <span
           aria-label={FREE_MODEL_DATA_LABEL}
-          className="inline-flex shrink-0 items-center rounded-sm text-yellow-500 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+          className="inline-flex shrink-0 items-center rounded-sm text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
           role="img"
           tabIndex={0}
         >
@@ -468,7 +468,7 @@ function FreeModelDataBadge() {
         <TooltipTrigger asChild>
           <span
             aria-label={FREE_MODEL_DATA_LABEL}
-            className="inline-flex shrink-0 items-center rounded-sm text-yellow-500 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+            className="inline-flex shrink-0 items-center rounded-sm text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
             role="img"
             tabIndex={0}
           >

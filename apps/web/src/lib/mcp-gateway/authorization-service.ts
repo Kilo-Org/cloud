@@ -1,0 +1,275 @@
+import 'server-only';
+import {
+  GatewayAuthMode,
+  GatewayAuthorizationRequestStatus,
+  GatewayInstanceStatus,
+  GatewayOAuthClientAuthMethod,
+  createGatewayError,
+  GatewayErrorCode,
+  filterSupportedScopes,
+  parseScopeString,
+  type OAuthAuthorizationQuery,
+  type ScopedConnectRoute,
+  type GatewayExecutionContext,
+} from '@kilocode/mcp-gateway';
+import {
+  mcp_gateway_authorization_codes,
+  mcp_gateway_authorization_requests,
+} from '@kilocode/db/schema';
+import { and, eq, gt, sql } from 'drizzle-orm';
+import type { GatewayRepository, ResolvedGatewayRoute } from './repository';
+import type { GatewayRouteService } from './route-service';
+import type { GatewayOAuthClientService } from './oauth-client-service';
+import type { GatewayProviderOAuthService } from './provider-oauth-service';
+import { expiresAtIso, hashToken, randomToken } from './crypto';
+import type { GatewayAppConfig } from './config';
+import { createAuditService } from './audit-service';
+
+export function createAuthorizationService(params: {
+  repository: GatewayRepository;
+  routeService: GatewayRouteService;
+  clientService: GatewayOAuthClientService;
+  providerOAuthService: GatewayProviderOAuthService;
+  config: GatewayAppConfig;
+}) {
+  async function resolveAuthorizationRoute(input: {
+    query: OAuthAuthorizationQuery;
+    route?: ScopedConnectRoute;
+  }): Promise<{ route: ScopedConnectRoute; resolved: ResolvedGatewayRoute }> {
+    if (input.route) {
+      const resolved = await params.routeService.resolveRouteParams(input.route);
+      if (input.query.resource) {
+        const resource = params.routeService.parseResource(input.query.resource);
+        if (resource.rootPath !== input.route.rootPath) {
+          throw createGatewayError(
+            GatewayErrorCode.InvalidRequest,
+            'Resource does not match route',
+            400
+          );
+        }
+      }
+      return { route: input.route, resolved };
+    }
+    if (!input.query.resource) {
+      throw createGatewayError(GatewayErrorCode.InvalidRequest, 'Resource is required', 400);
+    }
+    return await params.routeService.resolveResource(input.query.resource);
+  }
+
+  function grantedScopes(clientScopes: string[], requested: string | undefined): string[] {
+    const requestedScopes = filterSupportedScopes(parseScopeString(requested));
+    return requestedScopes.filter(scope => clientScopes.includes(scope));
+  }
+
+  async function createAuthorizationRequestWithInstance(paramsInput: {
+    client: NonNullable<Awaited<ReturnType<GatewayOAuthClientService['findClientById']>>>;
+    route: ScopedConnectRoute;
+    resolved: ResolvedGatewayRoute;
+    userId: string;
+    redirectUri: string;
+    scopes: string[];
+    oauthState?: string;
+    codeChallenge: string | null;
+    executionContext: GatewayExecutionContext;
+    instanceId: string;
+  }) {
+    const [request] = await params.repository.database
+      .insert(mcp_gateway_authorization_requests)
+      .values({
+        request_state_hash: hashToken(randomToken(32)),
+        oauth_client_id: paramsInput.client.oauth_client_id,
+        client_id: paramsInput.client.client_id,
+        owner_scope: paramsInput.resolved.config.owner_scope,
+        owner_id: paramsInput.resolved.config.owner_id,
+        config_id: paramsInput.resolved.config.config_id,
+        route_key: paramsInput.resolved.route.route_key,
+        canonical_resource_url: paramsInput.resolved.route.canonical_url,
+        redirect_uri: paramsInput.redirectUri,
+        requested_scopes: paramsInput.scopes,
+        granted_scopes: paramsInput.scopes,
+        oauth_state: paramsInput.oauthState ?? null,
+        code_challenge: paramsInput.codeChallenge,
+        code_challenge_method: 'S256',
+        execution_context: paramsInput.executionContext,
+        kilo_user_id: paramsInput.userId,
+        instance_id: paramsInput.instanceId,
+        request_status: GatewayAuthorizationRequestStatus.Pending,
+        expires_at: expiresAtIso(params.config.authorizationRequestTtlSeconds),
+      })
+      .returning();
+    return request;
+  }
+
+  async function finalizeAuthorizationRequest(
+    request: typeof mcp_gateway_authorization_requests.$inferSelect
+  ) {
+    const code = randomToken(32);
+    const codeHash = hashToken(code);
+    const [updated] = await params.repository.database
+      .update(mcp_gateway_authorization_requests)
+      .set({
+        request_status: GatewayAuthorizationRequestStatus.Completed,
+        consumed_at: new Date().toISOString(),
+      })
+      .where(
+        and(
+          eq(
+            mcp_gateway_authorization_requests.authorization_request_id,
+            request.authorization_request_id
+          ),
+          eq(
+            mcp_gateway_authorization_requests.request_status,
+            GatewayAuthorizationRequestStatus.Pending
+          ),
+          gt(mcp_gateway_authorization_requests.expires_at, sql`NOW()`)
+        )
+      )
+      .returning();
+    if (!updated) {
+      throw createGatewayError(
+        GatewayErrorCode.InvalidGrant,
+        'Authorization request is no longer available',
+        400
+      );
+    }
+    await params.repository.database.insert(mcp_gateway_authorization_codes).values({
+      code_hash: codeHash,
+      authorization_request_id: updated.authorization_request_id,
+      oauth_client_id: updated.oauth_client_id,
+      client_id: updated.client_id,
+      owner_scope: updated.owner_scope,
+      owner_id: updated.owner_id,
+      config_id: updated.config_id,
+      route_key: updated.route_key,
+      canonical_resource_url: updated.canonical_resource_url,
+      redirect_uri: updated.redirect_uri,
+      granted_scopes: updated.granted_scopes,
+      code_challenge: updated.code_challenge,
+      code_challenge_method: updated.code_challenge_method,
+      execution_context: updated.execution_context,
+      kilo_user_id: updated.kilo_user_id,
+      instance_id: updated.instance_id,
+      expires_at: expiresAtIso(params.config.authorizationCodeTtlSeconds),
+    });
+    const redirect = new URL(updated.redirect_uri);
+    redirect.searchParams.set('code', code);
+    if (updated.oauth_state) {
+      redirect.searchParams.set('state', updated.oauth_state);
+    }
+    return { code, redirectUrl: redirect.toString() };
+  }
+
+  async function authorize(input: {
+    query: OAuthAuthorizationQuery;
+    route?: ScopedConnectRoute;
+    userId: string;
+    executionContext: GatewayExecutionContext;
+  }) {
+    const client = await params.clientService.findClientById(input.query.client_id);
+    if (!client) {
+      throw createGatewayError(GatewayErrorCode.InvalidClient, 'Unknown client', 400);
+    }
+    if (!client.redirect_uris.includes(input.query.redirect_uri)) {
+      throw createGatewayError(
+        GatewayErrorCode.InvalidRequest,
+        'Redirect URI is not registered',
+        400
+      );
+    }
+    if (
+      !client.response_types.includes('code') ||
+      !client.grant_types.includes('authorization_code')
+    ) {
+      throw createGatewayError(
+        GatewayErrorCode.UnauthorizedClient,
+        'Client cannot use authorization code',
+        400
+      );
+    }
+    if (client.token_endpoint_auth_method === GatewayOAuthClientAuthMethod.None) {
+      if (!input.query.code_challenge || input.query.code_challenge_method !== 'S256') {
+        throw createGatewayError(
+          GatewayErrorCode.InvalidRequest,
+          'PKCE is required for public clients',
+          400
+        );
+      }
+    }
+    const { route, resolved } = await resolveAuthorizationRoute({
+      query: input.query,
+      route: input.route,
+    });
+    await params.routeService.authorize({
+      resolved,
+      route,
+      userId: input.userId,
+      executionContext: input.executionContext,
+    });
+    const instance = await params.repository.ensureConnectionInstance({
+      ownerScope: resolved.config.owner_scope,
+      ownerId: resolved.config.owner_id,
+      configId: resolved.config.config_id,
+      userId: input.userId,
+    });
+    const scopes = grantedScopes(client.declared_scopes, input.query.scope);
+    const request = await createAuthorizationRequestWithInstance({
+      client,
+      route,
+      resolved,
+      userId: input.userId,
+      redirectUri: input.query.redirect_uri,
+      scopes,
+      oauthState: input.query.state,
+      codeChallenge: input.query.code_challenge ?? null,
+      executionContext: input.executionContext,
+      instanceId: instance.instance_id,
+    });
+    if (
+      resolved.config.auth_mode === GatewayAuthMode.OAuthDynamic ||
+      resolved.config.auth_mode === GatewayAuthMode.OAuthStatic
+    ) {
+      const grant = await params.repository.findActiveGrant(instance.instance_id);
+      if (!grant || instance.instance_status !== GatewayInstanceStatus.Active) {
+        const provider = await params.providerOAuthService.initiateProviderAuthorization({
+          authorizationRequest: request,
+          resolved,
+          instanceId: instance.instance_id,
+          scopes,
+        });
+        await createAuditService(params.repository).record({
+          actorUserId: input.userId,
+          ownerScope: resolved.config.owner_scope,
+          ownerId: resolved.config.owner_id,
+          configId: resolved.config.config_id,
+          connectResourceId: resolved.route.connect_resource_id,
+          instanceId: instance.instance_id,
+          eventType: 'authorization_pending_provider',
+          outcome: 'success',
+        });
+        return { kind: 'provider_redirect' as const, authorizationUrl: provider.authorizationUrl };
+      }
+    }
+    const finalized = await finalizeAuthorizationRequest(request);
+    await createAuditService(params.repository).record({
+      actorUserId: input.userId,
+      ownerScope: resolved.config.owner_scope,
+      ownerId: resolved.config.owner_id,
+      configId: resolved.config.config_id,
+      connectResourceId: resolved.route.connect_resource_id,
+      instanceId: instance.instance_id,
+      eventType: 'authorization_completed',
+      outcome: 'success',
+    });
+    return { kind: 'redirect' as const, redirectUrl: finalized.redirectUrl };
+  }
+
+  async function completeProviderAuthorization(paramsInput: {
+    authorizationRequest: typeof mcp_gateway_authorization_requests.$inferSelect;
+  }) {
+    return await finalizeAuthorizationRequest(paramsInput.authorizationRequest);
+  }
+
+  return { authorize, finalizeAuthorizationRequest, completeProviderAuthorization };
+}
+
+export type GatewayAuthorizationService = ReturnType<typeof createAuthorizationService>;

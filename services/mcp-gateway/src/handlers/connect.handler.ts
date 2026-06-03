@@ -1,19 +1,192 @@
 import type { Context } from 'hono';
-import type { MCPGatewayEnv } from '../types';
 import {
-  OrgConnectRouteParamsSchema,
+  buildMCPID,
+  buildScopedConnectCanonicalUrl,
+  parseScopedConnectPath,
+  parseAuxiliaryHeaders,
+  type ScopedConnectRoute,
   UserConnectRouteParamsSchema,
-  type OrgConnectRouteParams,
+  OrgConnectRouteParamsSchema,
   type UserConnectRouteParams,
-} from '../schemas/routes.schema';
-import { notImplementedResponse } from '../lib/responses';
+  type OrgConnectRouteParams,
+} from '@kilocode/mcp-gateway';
+import {
+  GatewayAuthMode,
+  GatewayError,
+  GatewayErrorCode,
+  createGatewayError,
+} from '@kilocode/mcp-gateway';
+import type { MCPGatewayEnv } from '../types';
+import { resolveSecret } from '../lib/secret';
+import { verifyGatewayToken } from '../lib/jwt';
+import { recordRuntimeAudit, resolveRuntimeState } from '../db/runtime-repository';
+import { resolveProviderAuthorization } from '../lib/provider-refresh';
+import { loadStaticHeaders } from '../lib/credentials';
+import { proxyUpstream } from '../lib/upstream-proxy';
+import { challengeResponse, forbiddenResponse } from '../lib/responses';
+import { validateIncomingOrigin } from '../lib/origin';
 
-export function handleUserConnect(c: Context<MCPGatewayEnv>, params: UserConnectRouteParams) {
-  const validatedParams = UserConnectRouteParamsSchema.parse(params);
-  return notImplementedResponse(c, validatedParams);
+function bearerToken(header: string | undefined): string | null {
+  if (!header?.toLowerCase().startsWith('bearer ')) return null;
+  const token = header.slice(7).trim();
+  return token.length > 0 ? token : null;
 }
 
-export function handleOrgConnect(c: Context<MCPGatewayEnv>, params: OrgConnectRouteParams) {
-  const validatedParams = OrgConnectRouteParamsSchema.parse(params);
-  return notImplementedResponse(c, validatedParams);
+function requestRoute(c: Context<MCPGatewayEnv>): ScopedConnectRoute {
+  const route = parseScopedConnectPath(c.req.path);
+  if (!route) {
+    throw createGatewayError(GatewayErrorCode.InvalidRequest, 'Invalid scoped route', 400);
+  }
+  return route;
+}
+
+async function handleConnect(
+  c: Context<MCPGatewayEnv>,
+  _params: UserConnectRouteParams | OrgConnectRouteParams
+) {
+  const route = requestRoute(c);
+  const canonicalUrl = buildScopedConnectCanonicalUrl(c.env.MCP_GATEWAY_BASE_URL, {
+    ownerScope: route.ownerScope,
+    ownerId: route.ownerId,
+    configId: route.configId,
+    routeKey: route.routeKey,
+  });
+  validateIncomingOrigin({ request: c.req.raw, env: c.env });
+  const token = bearerToken(c.req.header('authorization'));
+  if (!token) {
+    return challengeResponse(c, canonicalUrl);
+  }
+  const publicKeysetJson = await resolveSecret(c.env.MCP_GATEWAY_JWT_PUBLIC_KEYSET_JSON);
+  if (!publicKeysetJson) {
+    return c.json({ error: 'server_error' }, 500);
+  }
+  let claims;
+  try {
+    claims = await verifyGatewayToken({
+      token,
+      jwksJson: publicKeysetJson,
+      issuer: c.env.MCP_GATEWAY_JWT_ISSUER,
+      expectedAudience: canonicalUrl,
+    });
+  } catch {
+    return challengeResponse(c, canonicalUrl);
+  }
+  if (
+    claims.sub.length === 0 ||
+    claims.owner_scope !== route.ownerScope ||
+    claims.owner_id !== route.ownerId ||
+    claims.config_id !== route.configId ||
+    claims.route_key !== route.routeKey ||
+    (route.ownerScope === 'personal' && claims.execution_context.type !== 'personal') ||
+    (route.ownerScope === 'organization' &&
+      (claims.execution_context.type !== 'organization' ||
+        claims.execution_context.organizationId !== route.ownerId)) ||
+    claims.MCPID !==
+      buildMCPID({
+        ownerScope: route.ownerScope,
+        ownerId: route.ownerId,
+        configId: route.configId,
+        routeKey: route.routeKey,
+      })
+  ) {
+    return forbiddenResponse(c);
+  }
+  let resolution = await resolveRuntimeState({ env: c.env, route, userId: claims.sub });
+  if (!resolution) {
+    return forbiddenResponse(c);
+  }
+  if (
+    resolution.instance.instance_id !== claims.instance_id ||
+    resolution.config.config_version !== claims.config_version ||
+    resolution.route.route_key !== route.routeKey
+  ) {
+    return forbiddenResponse(c);
+  }
+  if (
+    resolution.config.auth_mode !== GatewayAuthMode.None &&
+    resolution.config.auth_mode !== GatewayAuthMode.StaticHeaders
+  ) {
+    if (resolution.instance.instance_status !== 'active') {
+      return forbiddenResponse(c);
+    }
+  }
+
+  let staticHeaders: Record<string, string> | undefined;
+  if (resolution.config.auth_mode === GatewayAuthMode.StaticHeaders) {
+    if (!resolution.staticSecret) return forbiddenResponse(c);
+    staticHeaders = await loadStaticHeaders({
+      env: c.env,
+      configId: resolution.config.config_id,
+      encryptedSecret: resolution.staticSecret.encrypted_secret,
+    });
+  }
+  let providerAuthorization: string | undefined;
+  if (
+    resolution.config.auth_mode === GatewayAuthMode.OAuthDynamic ||
+    resolution.config.auth_mode === GatewayAuthMode.OAuthStatic
+  ) {
+    const refreshed = await resolveProviderAuthorization({ env: c.env, resolution, route });
+    if (!refreshed) return forbiddenResponse(c);
+    providerAuthorization = refreshed.providerAuthorization;
+    resolution = refreshed.resolution;
+    if (
+      resolution.instance.instance_id !== claims.instance_id ||
+      resolution.config.config_version !== claims.config_version ||
+      resolution.route.route_key !== route.routeKey
+    ) {
+      return forbiddenResponse(c);
+    }
+  }
+  let auxiliaryHeaders: Record<string, string> | undefined;
+  try {
+    auxiliaryHeaders = parseAuxiliaryHeaders(resolution.config.auxiliary_headers);
+  } catch {
+    return forbiddenResponse(c);
+  }
+  const response = await proxyUpstream({
+    env: c.env,
+    request: c.req.raw,
+    remoteUrl: resolution.config.remote_url,
+    descendantPath: route.descendantPath,
+    pathPassthrough: resolution.config.path_passthrough,
+    staticHeaders,
+    auxiliaryHeaders,
+    providerAuthorization,
+  });
+  await recordRuntimeAudit({
+    env: c.env,
+    resolution,
+    eventType: 'runtime_proxy',
+    outcome: response.ok ? 'success' : 'failure',
+    metadata: { status: response.status, method: c.req.method },
+  });
+  return response;
+}
+
+function gatewayHandlerError(c: Context<MCPGatewayEnv>, error: GatewayError) {
+  if (error.code === GatewayErrorCode.Forbidden) return forbiddenResponse(c);
+  return new Response(JSON.stringify({ error: error.code }), {
+    status: error.status,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+export async function handleUserConnect(c: Context<MCPGatewayEnv>, params: UserConnectRouteParams) {
+  try {
+    const validatedParams = UserConnectRouteParamsSchema.parse(params);
+    return await handleConnect(c, validatedParams);
+  } catch (error) {
+    if (error instanceof GatewayError) return gatewayHandlerError(c, error);
+    return c.json({ error: 'server_error' }, 500);
+  }
+}
+
+export async function handleOrgConnect(c: Context<MCPGatewayEnv>, params: OrgConnectRouteParams) {
+  try {
+    const validatedParams = OrgConnectRouteParamsSchema.parse(params);
+    return await handleConnect(c, validatedParams);
+  } catch (error) {
+    if (error instanceof GatewayError) return gatewayHandlerError(c, error);
+    return c.json({ error: 'server_error' }, 500);
+  }
 }

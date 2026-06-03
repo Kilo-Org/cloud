@@ -7,6 +7,12 @@
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": false,
   "preview_urls": false,
+  "routes": [
+    {
+      "pattern": "mcp.kilo.ai/*",
+      "zone_name": "kilo.ai",
+    },
+  ],
   "dev": {
     "port": 8806,
   },
@@ -40,6 +46,24 @@
       "dataset": "mcp_gateway_events",
     },
   ],
+  "secrets_store_secrets": [
+    {
+      "binding": "MCP_GATEWAY_JWT_PUBLIC_KEYSET_JSON",
+      "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+      "secret_name": "MCP_GATEWAY_JWT_PUBLIC_KEYSET_JSON",
+    },
+    {
+      "binding": "MCP_GATEWAY_CREDENTIAL_KEYSET_JSON",
+      "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+      "secret_name": "MCP_GATEWAY_CREDENTIAL_KEYSET_JSON",
+    },
+    {
+      "binding": "MCP_GATEWAY_RATE_LIMIT_SECRET",
+      "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+      "secret_name": "MCP_GATEWAY_RATE_LIMIT_SECRET",
+    },
+  ],
+
   "vars": {
     "ENVIRONMENT": "production",
     "APP_BASE_URL": "https://app.kilo.ai",
@@ -47,6 +71,11 @@
     "SUPPORTED_SCOPES": "profile",
     "GATEWAY_ACCESS_TOKEN_TTL_SECONDS": "900",
     "AUDIT_RETENTION_DAYS": "60",
+    "UPSTREAM_REQUIRE_HTTPS": "true",
+    "MCP_GATEWAY_JWT_ISSUER": "https://app.kilo.ai",
+  },
+  "triggers": {
+    "crons": ["0 3 * * *"],
   },
   "env": {
     "dev": {
@@ -59,6 +88,8 @@
         "SUPPORTED_SCOPES": "profile",
         "GATEWAY_ACCESS_TOKEN_TTL_SECONDS": "900",
         "AUDIT_RETENTION_DAYS": "60",
+        "UPSTREAM_REQUIRE_HTTPS": "true",
+        "MCP_GATEWAY_JWT_ISSUER": "http://localhost:3000",
       },
       "durable_objects": {
         "bindings": [
@@ -79,6 +110,23 @@
         {
           "binding": "MCP_GATEWAY_ANALYTICS",
           "dataset": "mcp_gateway_events",
+        },
+      ],
+      "secrets_store_secrets": [
+        {
+          "binding": "MCP_GATEWAY_JWT_PUBLIC_KEYSET_JSON",
+          "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+          "secret_name": "MCP_GATEWAY_JWT_PUBLIC_KEYSET_JSON",
+        },
+        {
+          "binding": "MCP_GATEWAY_CREDENTIAL_KEYSET_JSON",
+          "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+          "secret_name": "MCP_GATEWAY_CREDENTIAL_KEYSET_JSON",
+        },
+        {
+          "binding": "MCP_GATEWAY_RATE_LIMIT_SECRET",
+          "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+          "secret_name": "MCP_GATEWAY_RATE_LIMIT_SECRET",
         },
       ],
     },

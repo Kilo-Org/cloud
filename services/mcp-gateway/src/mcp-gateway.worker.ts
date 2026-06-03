@@ -7,6 +7,7 @@ import {
   handleUserProtectedResourceMetadata,
 } from './handlers/protected-resource.handler';
 import type { MCPGatewayEnv } from './types';
+import { runCleanup } from './lib/cleanup';
 
 export { MCPGatewayInstance } from './durable-objects/MCPGatewayInstance.do';
 
@@ -16,17 +17,27 @@ app.get('/health', c => handleHealth(c));
 
 app.get('/mcp-connect/user/:userId/:configId/:routeKey', c => handleUserConnect(c, c.req.param()));
 app.post('/mcp-connect/user/:userId/:configId/:routeKey', c => handleUserConnect(c, c.req.param()));
+app.delete('/mcp-connect/user/:userId/:configId/:routeKey', c =>
+  handleUserConnect(c, c.req.param())
+);
 app.get('/mcp-connect/user/:userId/:configId/:routeKey/*', c =>
   handleUserConnect(c, c.req.param())
 );
 app.post('/mcp-connect/user/:userId/:configId/:routeKey/*', c =>
   handleUserConnect(c, c.req.param())
 );
+app.delete('/mcp-connect/user/:userId/:configId/:routeKey/*', c =>
+  handleUserConnect(c, c.req.param())
+);
 
 app.get('/mcp-connect/org/:orgId/:configId/:routeKey', c => handleOrgConnect(c, c.req.param()));
 app.post('/mcp-connect/org/:orgId/:configId/:routeKey', c => handleOrgConnect(c, c.req.param()));
+app.delete('/mcp-connect/org/:orgId/:configId/:routeKey', c => handleOrgConnect(c, c.req.param()));
 app.get('/mcp-connect/org/:orgId/:configId/:routeKey/*', c => handleOrgConnect(c, c.req.param()));
 app.post('/mcp-connect/org/:orgId/:configId/:routeKey/*', c => handleOrgConnect(c, c.req.param()));
+app.delete('/mcp-connect/org/:orgId/:configId/:routeKey/*', c =>
+  handleOrgConnect(c, c.req.param())
+);
 
 app.get('/.well-known/oauth-protected-resource', c => handleProtectedResourceMetadata(c));
 app.get('/.well-known/oauth-protected-resource/mcp-connect/user/:userId/:configId/:routeKey', c =>
@@ -39,6 +50,11 @@ app.get('/.well-known/oauth-protected-resource/mcp-connect/org/:orgId/:configId/
 const fetchHandler: ExportedHandler<Env>['fetch'] = (request, env, ctx) =>
   app.fetch(request, env, ctx);
 
+const scheduledHandler: ExportedHandler<Env>['scheduled'] = async (_event, env) => {
+  await runCleanup(env);
+};
+
 export default {
   fetch: fetchHandler,
+  scheduled: scheduledHandler,
 } satisfies ExportedHandler<Env>;

@@ -1,15 +1,23 @@
 import type { Context } from 'hono';
-import type { MCPGatewayEnv } from '../types';
 import {
+  buildScopedConnectCanonicalUrl,
   OrgConnectRouteParamsSchema,
   UserConnectRouteParamsSchema,
   type OrgConnectRouteParams,
   type UserConnectRouteParams,
-} from '../schemas/routes.schema';
-import { notImplementedResponse } from '../lib/responses';
+} from '@kilocode/mcp-gateway';
+import type { MCPGatewayEnv } from '../types';
+
+function metadata(c: Context<MCPGatewayEnv>, resource: string) {
+  return c.json({
+    resource,
+    authorization_servers: [c.env.APP_BASE_URL],
+    scopes_supported: ['profile'],
+  });
+}
 
 export function handleProtectedResourceMetadata(c: Context<MCPGatewayEnv>) {
-  return notImplementedResponse(c);
+  return metadata(c, new URL('/mcp-connect', c.env.MCP_GATEWAY_BASE_URL).toString());
 }
 
 export function handleUserProtectedResourceMetadata(
@@ -17,7 +25,13 @@ export function handleUserProtectedResourceMetadata(
   params: UserConnectRouteParams
 ) {
   const validatedParams = UserConnectRouteParamsSchema.parse(params);
-  return notImplementedResponse(c, validatedParams);
+  const resource = buildScopedConnectCanonicalUrl(c.env.MCP_GATEWAY_BASE_URL, {
+    ownerScope: 'personal',
+    ownerId: validatedParams.userId,
+    configId: validatedParams.configId,
+    routeKey: validatedParams.routeKey,
+  });
+  return metadata(c, resource);
 }
 
 export function handleOrgProtectedResourceMetadata(
@@ -25,5 +39,11 @@ export function handleOrgProtectedResourceMetadata(
   params: OrgConnectRouteParams
 ) {
   const validatedParams = OrgConnectRouteParamsSchema.parse(params);
-  return notImplementedResponse(c, validatedParams);
+  const resource = buildScopedConnectCanonicalUrl(c.env.MCP_GATEWAY_BASE_URL, {
+    ownerScope: 'organization',
+    ownerId: validatedParams.orgId,
+    configId: validatedParams.configId,
+    routeKey: validatedParams.routeKey,
+  });
+  return metadata(c, resource);
 }

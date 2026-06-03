@@ -82,6 +82,12 @@ import {
   coding_plan_key_inventory,
   coding_plan_subscriptions,
   byok_api_keys,
+  mcp_gateway_configs,
+  mcp_gateway_config_secrets,
+  mcp_gateway_connect_resources,
+  mcp_gateway_connection_instances,
+  mcp_gateway_provider_grants,
+  mcp_gateway_pending_provider_authorizations,
 } from '@kilocode/db/schema';
 
 import { eq, count, sql } from 'drizzle-orm';
@@ -199,6 +205,11 @@ describe('User', () => {
     await db.delete(agent_environment_profile_skills);
     await db.delete(agent_environment_profile_mcp_servers);
     await db.delete(agent_environment_profiles);
+    await db.delete(mcp_gateway_pending_provider_authorizations);
+    await db.delete(mcp_gateway_provider_grants);
+    await db.delete(mcp_gateway_connection_instances);
+    await db.delete(mcp_gateway_connect_resources);
+    await db.delete(mcp_gateway_configs);
     await db.delete(github_branch_pull_requests);
     await db.delete(user_github_app_tokens);
     await db.delete(organizations);
@@ -424,6 +435,90 @@ describe('User', () => {
   });
 
   describe('softDeleteUser', () => {
+    it('deletes gateway provider grants and pending provider state', async () => {
+      const user = await insertTestUser();
+      const [config] = await db
+        .insert(mcp_gateway_configs)
+        .values({
+          owner_scope: 'personal',
+          owner_id: user.id,
+          name: 'Gateway config',
+          remote_url: 'https://example.com/mcp',
+          auth_mode: 'oauth_static',
+          sharing_mode: 'single_user',
+        })
+        .returning();
+      await db.insert(mcp_gateway_config_secrets).values({
+        config_id: config.config_id,
+        secret_kind: 'static_headers',
+        encrypted_secret: 'encrypted-config-secret',
+      });
+      const [route] = await db
+        .insert(mcp_gateway_connect_resources)
+        .values({
+          config_id: config.config_id,
+          owner_scope: 'personal',
+          owner_id: user.id,
+          route_key: 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_',
+          canonical_url: 'https://mcp.kilo.ai/mcp-connect/user/test/config/key',
+          route_status: 'active',
+        })
+        .returning();
+      const [instance] = await db
+        .insert(mcp_gateway_connection_instances)
+        .values({
+          config_id: config.config_id,
+          owner_scope: 'personal',
+          owner_id: user.id,
+          kilo_user_id: user.id,
+          instance_status: 'active',
+        })
+        .returning();
+      await db.insert(mcp_gateway_provider_grants).values({
+        instance_id: instance.instance_id,
+        encrypted_grant: 'encrypted-provider-token',
+        provider_subject: 'provider-user',
+        grant_status: 'active',
+      });
+      await db.insert(mcp_gateway_pending_provider_authorizations).values({
+        state_hash: 'pending-state-hash',
+        config_id: config.config_id,
+        instance_id: instance.instance_id,
+        owner_scope: 'personal',
+        owner_id: user.id,
+        kilo_user_id: user.id,
+        route_key: route.route_key,
+        canonical_resource_url: route.canonical_url,
+        remote_url: config.remote_url,
+        auth_mode: 'oauth_static',
+        provider_authorization_endpoint: 'https://example.com/authorize',
+        provider_token_endpoint: 'https://example.com/token',
+        encrypted_state: 'encrypted-provider-state',
+        execution_context: { type: 'personal' },
+        config_version: 1,
+        pending_status: 'pending',
+        expires_at: new Date(Date.now() + 60_000).toISOString(),
+      });
+
+      await softDeleteUser(user.id);
+
+      const grants = await db
+        .select()
+        .from(mcp_gateway_provider_grants)
+        .where(eq(mcp_gateway_provider_grants.instance_id, instance.instance_id));
+      const configSecrets = await db
+        .select()
+        .from(mcp_gateway_config_secrets)
+        .where(eq(mcp_gateway_config_secrets.config_id, config.config_id));
+      const pending = await db
+        .select()
+        .from(mcp_gateway_pending_provider_authorizations)
+        .where(eq(mcp_gateway_pending_provider_authorizations.kilo_user_id, user.id));
+      expect(grants).toHaveLength(0);
+      expect(configSecrets).toHaveLength(0);
+      expect(pending).toHaveLength(0);
+    });
+
     it('should anonymize the user row and preserve it', async () => {
       const user = await insertTestUser({
         google_user_email: 'real-email@example.com',

@@ -65,7 +65,29 @@ describe('keyed envelopes', () => {
     ).toThrow('malformed ciphertext');
   });
 
-  test('rejects an envelope whose key ID does not match the active key', () => {
+  test('decrypts old ciphertext from a configured retired slot', () => {
+    const { publicKey: retiredPublicKey, privateKey: retiredPrivateKey } = generateTestKeyPair();
+    const { publicKey: activePublicKey, privateKey: activePrivateKey } = generateTestKeyPair();
+    const serialized = encryptKeyedEnvelope('retired token', scheme, {
+      keyId: 'retired-key',
+      publicKeyPem: retiredPublicKey,
+    });
+
+    expect(
+      decryptKeyedEnvelope(serialized, scheme, {
+        active: { keyId: 'active-key', privateKeyPem: activePrivateKey },
+        decrypt: [{ keyId: 'retired-key', privateKeyPem: retiredPrivateKey }],
+      })
+    ).toBe('retired token');
+
+    const activeSerialized = encryptKeyedEnvelope('active token', scheme, {
+      keyId: 'active-key',
+      publicKeyPem: activePublicKey,
+    });
+    expect(parseKeyedEnvelope(activeSerialized, scheme).keyId).toBe('active-key');
+  });
+
+  test('rejects an envelope whose key ID does not match an active or decrypt slot', () => {
     const { publicKey } = generateTestKeyPair();
     const serialized = encryptKeyedEnvelope('retired token', scheme, {
       keyId: 'retired-key',

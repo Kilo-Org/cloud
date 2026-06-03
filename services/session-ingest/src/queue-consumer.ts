@@ -540,7 +540,7 @@ export async function queue(
         sessionId: msg.body.sessionId,
         error: err instanceof Error ? err.message : String(err),
       });
-      msg.retry();
+      msg.retry({ delaySeconds: 60 });
     }
   }
 }

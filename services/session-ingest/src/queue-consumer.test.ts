@@ -143,6 +143,42 @@ describe('createItemExtractor', () => {
 });
 
 describe('queue', () => {
+  it('delays failed queue message retries to avoid immediately hammering hot DOs', async () => {
+    const limit = vi.fn(async () => [{ session_id: 'ses_retry' }]);
+    const where = vi.fn(() => ({ limit }));
+    const from = vi.fn(() => ({ where }));
+    vi.mocked(getWorkerDb).mockReturnValue({ select: vi.fn(() => ({ from })) } as never);
+    const env = {
+      HYPERDRIVE: { connectionString: 'postgres://unused' },
+      SESSION_INGEST_R2: { get: vi.fn(async () => null) },
+    } as never;
+    const ack = vi.fn();
+    const retry = vi.fn();
+
+    await queue(
+      {
+        messages: [
+          {
+            body: {
+              r2Key: 'ingest/retry-missing',
+              kiloUserId: 'usr_retry',
+              sessionId: 'ses_retry',
+              ingestVersion: 1,
+              ingestedAt: 1,
+            },
+            ack,
+            retry,
+          },
+        ],
+      } as never,
+      env,
+      { waitUntil: vi.fn() } as unknown as ExecutionContext
+    );
+
+    expect(ack).not.toHaveBeenCalled();
+    expect(retry).toHaveBeenCalledWith({ delaySeconds: 60 });
+  });
+
   it('passes full parsed oversized message data and its R2 reference into ingest', async () => {
     const ingest = vi.fn(async () => ({ changes: [] }));
     vi.mocked(getSessionIngestDO).mockReturnValue({ ingest } as never);

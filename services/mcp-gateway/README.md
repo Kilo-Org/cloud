@@ -32,4 +32,4 @@ pnpm --filter cloudflare-mcp-gateway dev
 The Next.js app owns the interactive OAuth and control plane. This Worker owns the
 runtime plane: protected-resource discovery, gateway-token verification, runtime
 rechecks, upstream credential injection, streaming proxying, and per-instance refresh
-coordination. See `.specs/mcp-gateway-auth.md` and `.specs/mcp-gateway-auth-v1-profile.md`.
+coordination. The gateway architecture notes remain in the planning workspace until PR2.

@@ -16,14 +16,14 @@ export function handleUserProtectedResourceMetadata(
   c: Context<MCPGatewayEnv>,
   params: UserConnectRouteParams
 ) {
-  UserConnectRouteParamsSchema.parse(params);
-  return notImplementedResponse(c);
+  const validatedParams = UserConnectRouteParamsSchema.parse(params);
+  return notImplementedResponse(c, validatedParams);
 }
 
 export function handleOrgProtectedResourceMetadata(
   c: Context<MCPGatewayEnv>,
   params: OrgConnectRouteParams
 ) {
-  OrgConnectRouteParamsSchema.parse(params);
-  return notImplementedResponse(c);
+  const validatedParams = OrgConnectRouteParamsSchema.parse(params);
+  return notImplementedResponse(c, validatedParams);
 }

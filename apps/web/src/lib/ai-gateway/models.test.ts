@@ -98,7 +98,7 @@ describe('isFreeModel', () => {
       expect(findKiloExclusiveModel(qwen37_plus_free_model.public_id)).toBe(qwen37_plus_free_model);
       expect(isAlibabaDirectModel(qwen37_plus_free_model.public_id)).toBe(false);
       expect(qwen37_plus_free_model.gateway).toBe('vercel');
-      expect(qwen37_plus_free_model.internal_id).toBe('qwen/qwen3.7-plus');
+      expect(qwen37_plus_free_model.internal_id).toBe('alibaba/qwen3.7-plus');
       expect(getInferenceProvider(qwen37_plus_free_model)).toBe(null);
       expect(getModelVariants(qwen37_plus_free_model.public_id)).toBe(REASONING_VARIANTS_BINARY);
     });

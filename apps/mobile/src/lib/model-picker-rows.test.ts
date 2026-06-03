@@ -29,8 +29,15 @@ describe('buildModelPickerRows', () => {
     ]);
   });
 
-  it('filters models by name and id', () => {
-    expect(buildModelPickerRows({ models, search: 'gpt-5' })).toEqual([
+  it('filters models by name', () => {
+    expect(buildModelPickerRows({ models, search: 'Sonnet 4' })).toEqual([
+      { key: 'recommended', title: 'RECOMMENDED', type: 'header' },
+      { key: 'model:anthropic/claude-sonnet-4', model: models[0], type: 'model' },
+    ]);
+  });
+
+  it('filters models by id', () => {
+    expect(buildModelPickerRows({ models, search: 'openai/' })).toEqual([
       { key: 'all', title: 'ALL MODELS', type: 'header' },
       { key: 'model:openai/gpt-5', model: models[1], type: 'model' },
     ]);

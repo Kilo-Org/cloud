@@ -377,10 +377,9 @@ export async function ensureManualAnalysisQueueRow(
         : params.finding.severity === 'medium'
           ? 2
           : 3;
-  // Insert a fresh manual-analysis claim, or revive a prior row that is in a
-  // terminal state (completed/failed) so users can rerun analysis after a
-  // previous attempt finished. Active rows (queued/pending/running) are left
-  // alone and the caller treats this as a duplicate.
+  // Insert a fresh manual-analysis claim, revive a terminal row, or let an
+  // explicit user retry supersede an unclaimed scheduled retry. Pending and
+  // running rows remain untouched because another launch already owns them.
   const rows = await db
     .insert(security_analysis_queue)
     .values({
@@ -410,10 +409,7 @@ export async function ensureManualAnalysisQueueRow(
         last_error_redacted: null,
         updated_at: sql`now()`,
       },
-      setWhere: or(
-        eq(security_analysis_queue.queue_status, 'completed'),
-        eq(security_analysis_queue.queue_status, 'failed')
-      ),
+      setWhere: inArray(security_analysis_queue.queue_status, ['queued', 'completed', 'failed']),
     })
     .returning({ id: security_analysis_queue.id });
   return rows.length > 0;

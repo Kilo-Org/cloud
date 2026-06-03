@@ -137,6 +137,57 @@ describe('security analysis durable database invariants', () => {
     ]);
   });
 
+  it('lets manual retry supersede an unclaimed scheduled retry', async () => {
+    const findingId = await insertFinding('manual-supersedes-scheduled-retry', 'failed');
+    const finding = await getSecurityFindingById(client.db as never, findingId);
+    expect(finding).not.toBeNull();
+    if (!finding) return;
+
+    await client.db.insert(security_analysis_queue).values({
+      finding_id: findingId,
+      owned_by_user_id: testUserId,
+      queue_status: 'queued',
+      severity_rank: 1,
+      queued_at: '2026-05-18T08:00:00.000Z',
+      attempt_count: 2,
+      next_retry_at: '2026-05-18T09:00:00.000Z',
+      failure_code: 'NETWORK_TIMEOUT',
+      last_error_redacted: 'prior scheduled failure',
+    });
+
+    await expect(
+      ensureManualAnalysisQueueRow(client.db as never, {
+        finding,
+        claimToken: 'manual-claim-token',
+        jobId: 'manual-job',
+      })
+    ).resolves.toBe(true);
+
+    const queueRows = await client.db
+      .select({
+        queueStatus: security_analysis_queue.queue_status,
+        claimToken: security_analysis_queue.claim_token,
+        claimedByJobId: security_analysis_queue.claimed_by_job_id,
+        failureCode: security_analysis_queue.failure_code,
+        lastErrorRedacted: security_analysis_queue.last_error_redacted,
+        attemptCount: security_analysis_queue.attempt_count,
+        nextRetryAt: security_analysis_queue.next_retry_at,
+      })
+      .from(security_analysis_queue)
+      .where(eq(security_analysis_queue.finding_id, findingId));
+    expect(queueRows).toEqual([
+      {
+        queueStatus: 'pending',
+        claimToken: 'manual-claim-token',
+        claimedByJobId: 'manual-job',
+        failureCode: null,
+        lastErrorRedacted: null,
+        attemptCount: 0,
+        nextRetryAt: null,
+      },
+    ]);
+  });
+
   it('requeues stale pending rows and terminalizes stale running rows in real SQL', async () => {
     const pendingFindingId = await insertFinding('stale-pending');
     const runningFindingId = await insertFinding('stale-running', 'running');

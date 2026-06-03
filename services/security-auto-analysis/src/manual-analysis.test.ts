@@ -467,9 +467,9 @@ describe('ensureManualAnalysisQueueRow', () => {
       claim_token: 'claim-token',
       claimed_by_job_id: 'manual-job',
     });
-    // Reviving terminal rows requires a setWhere clause that scopes the
-    // ON CONFLICT update to completed/failed rows. Active rows (queued/
-    // pending/running) must remain untouched and surface as duplicates.
+    // Manual starts may revive terminal rows or supersede unclaimed queued
+    // work. Active pending/running rows remain untouched and surface as
+    // duplicates.
     expect(updateConfigs[0]).toMatchObject({
       set: expect.objectContaining({
         queue_status: 'pending',

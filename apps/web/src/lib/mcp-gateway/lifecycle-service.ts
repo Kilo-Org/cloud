@@ -1,6 +1,7 @@
 import 'server-only';
 import {
   mcp_gateway_assignments,
+  mcp_gateway_authorization_codes,
   mcp_gateway_authorization_requests,
   mcp_gateway_config_secrets,
   mcp_gateway_configs,
@@ -92,23 +93,14 @@ export async function revokeGatewayStateForUser(database: GatewayDatabase, userI
     .delete(mcp_gateway_pending_provider_authorizations)
     .where(eq(mcp_gateway_pending_provider_authorizations.kilo_user_id, userId));
   await database
-    .update(mcp_gateway_authorization_requests)
-    .set({ request_status: 'error', consumed_at: nowIso() })
-    .where(
-      and(
-        eq(mcp_gateway_authorization_requests.kilo_user_id, userId),
-        eq(mcp_gateway_authorization_requests.request_status, 'pending')
-      )
-    );
+    .delete(mcp_gateway_authorization_codes)
+    .where(eq(mcp_gateway_authorization_codes.kilo_user_id, userId));
   await database
-    .update(mcp_gateway_refresh_tokens)
-    .set({ revoked_at: nowIso() })
-    .where(
-      and(
-        eq(mcp_gateway_refresh_tokens.kilo_user_id, userId),
-        isNull(mcp_gateway_refresh_tokens.revoked_at)
-      )
-    );
+    .delete(mcp_gateway_authorization_requests)
+    .where(eq(mcp_gateway_authorization_requests.kilo_user_id, userId));
+  await database
+    .delete(mcp_gateway_refresh_tokens)
+    .where(eq(mcp_gateway_refresh_tokens.kilo_user_id, userId));
 }
 
 export async function revokeGatewayStateForOrganizationMember(

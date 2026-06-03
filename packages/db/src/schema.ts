@@ -7427,6 +7427,7 @@ export const mcp_gateway_assignments = pgTable(
       .notNull()
       .references(() => kilocode_users.id, { onDelete: 'cascade' }),
     assigned_by_kilo_user_id: text().references(() => kilocode_users.id, { onDelete: 'set null' }),
+    single_user_slot: text(),
     revoked_at: timestamp({ withTimezone: true, mode: 'string' }),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
@@ -7438,6 +7439,9 @@ export const mcp_gateway_assignments = pgTable(
     uniqueIndex('UQ_mcp_gateway_assignments_active')
       .on(table.config_id, table.kilo_user_id)
       .where(isNull(table.revoked_at)),
+    uniqueIndex('UQ_mcp_gateway_assignments_single_user_slot')
+      .on(table.config_id, table.single_user_slot)
+      .where(sql`${table.revoked_at} is null and ${table.single_user_slot} is not null`),
     index('IDX_mcp_gateway_assignments_config').on(table.config_id),
     index('IDX_mcp_gateway_assignments_user').on(table.kilo_user_id),
   ]

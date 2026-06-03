@@ -719,6 +719,38 @@ describe('MCP gateway app OAuth flow', () => {
     expect(authorization.kind).toBe('provider_redirect');
   });
 
+  it('enforces one active assignee for single-user org configs', async () => {
+    const config = await createTestConfig();
+    const services = createGatewayServices({ config });
+    const owner = await insertTestUser({ id: `gateway-user-${crypto.randomUUID()}` });
+    const firstUser = await insertTestUser({ id: `gateway-user-${crypto.randomUUID()}` });
+    const secondUser = await insertTestUser({ id: `gateway-user-${crypto.randomUUID()}` });
+    const organizationId = crypto.randomUUID();
+    await db.insert(organizations).values({ id: organizationId, name: 'Gateway Org' });
+    await db.insert(organization_memberships).values([
+      { organization_id: organizationId, kilo_user_id: owner.id, role: 'owner' },
+      { organization_id: organizationId, kilo_user_id: firstUser.id, role: 'member' },
+      { organization_id: organizationId, kilo_user_id: secondUser.id, role: 'member' },
+    ]);
+    const created = await services.configService.createOrganizationConfig({
+      organizationId,
+      actorUserId: owner.id,
+      name: 'Org MCP',
+      remoteUrl: 'https://example.com/mcp',
+      authMode: 'none',
+      sharingMode: 'single_user',
+      initialAssignedUserId: firstUser.id,
+    });
+    await expect(
+      db.insert(mcp_gateway_assignments).values({
+        config_id: created.config.config_id,
+        kilo_user_id: secondUser.id,
+        assigned_by_kilo_user_id: owner.id,
+        single_user_slot: 'single_user',
+      })
+    ).rejects.toThrow();
+  });
+
   it('does not list unassigned org configs in the current execution context', async () => {
     const config = await createTestConfig();
     const services = createGatewayServices({ config });

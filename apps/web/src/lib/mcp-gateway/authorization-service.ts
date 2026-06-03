@@ -262,6 +262,7 @@ export function createAuthorizationService(params: {
     route?: ScopedConnectRoute;
     userId: string;
     executionContext: GatewayExecutionContext;
+    redirectErrors?: boolean;
   }) {
     const prepared = await prepareAuthorization(input);
     return {

@@ -115,6 +115,8 @@ export function createConfigService(params: {
           config_id: created.config.config_id,
           kilo_user_id: input.initialAssignedUserId,
           assigned_by_kilo_user_id: input.actorUserId,
+          single_user_slot:
+            input.sharingMode === GatewaySharingMode.SingleUser ? 'single_user' : null,
         });
       }
       await createAuditService(repository).record({
@@ -417,6 +419,8 @@ export function createConfigService(params: {
           config_id: input.configId,
           kilo_user_id: input.userId,
           assigned_by_kilo_user_id: input.actorUserId,
+          single_user_slot:
+            config.sharing_mode === GatewaySharingMode.SingleUser ? 'single_user' : null,
         })
         .onConflictDoNothing();
       const assignment = await repository.findActiveAssignment(input.configId, input.userId);

@@ -38,7 +38,7 @@ function formParams(form: FormData): Record<string, string> {
   return params;
 }
 
-function redirectOAuthError(error: OAuthAuthorizationRedirectError) {
+export function redirectOAuthError(error: OAuthAuthorizationRedirectError) {
   const redirect = new URL(error.redirectUri);
   redirect.searchParams.set('error', error.code);
   redirect.searchParams.set('error_description', error.message);
@@ -98,6 +98,7 @@ async function consentResponse(request: NextRequest, route?: ScopedConnectRoute)
     route,
     userId: identity.user.id,
     executionContext: identity.executionContext,
+    redirectErrors: true,
   });
   const approvalState = randomToken(32);
   const approvalCookie = `${approvalState}.${approvalSignature({
@@ -144,6 +145,7 @@ async function approveRequest(request: NextRequest, route?: ScopedConnectRoute) 
     route,
     userId: identity.user.id,
     executionContext: identity.executionContext,
+    redirectErrors: true,
   });
   const cookieState = request.cookies.get(consentCookieName)?.value;
   const [cookieApprovalState, cookieSignature] = cookieState?.split('.') ?? [];
@@ -185,6 +187,9 @@ export async function GET(request: NextRequest) {
   try {
     return await consentResponse(request);
   } catch (error) {
+    if (error instanceof OAuthAuthorizationRedirectError) {
+      return redirectOAuthError(error);
+    }
     return gatewayErrorResponse(error);
   }
 }

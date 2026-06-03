@@ -104,6 +104,8 @@ async function handleConnect(
     return forbiddenResponse(c);
   }
   if (
+    resolution.config.owner_scope !== route.ownerScope ||
+    resolution.config.owner_id !== route.ownerId ||
     resolution.instance.instance_id !== claims.instance_id ||
     resolution.config.config_version !== claims.config_version ||
     resolution.route.route_key !== route.routeKey
@@ -138,6 +140,8 @@ async function handleConnect(
     providerAuthorization = refreshed.providerAuthorization;
     resolution = refreshed.resolution;
     if (
+      resolution.config.owner_scope !== route.ownerScope ||
+      resolution.config.owner_id !== route.ownerId ||
       resolution.instance.instance_id !== claims.instance_id ||
       resolution.config.config_version !== claims.config_version ||
       resolution.route.route_key !== route.routeKey

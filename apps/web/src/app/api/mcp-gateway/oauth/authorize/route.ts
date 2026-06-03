@@ -8,6 +8,7 @@ import { gatewayErrorResponse } from '@/lib/mcp-gateway/http';
 import type { ScopedConnectRoute } from '@kilocode/mcp-gateway';
 import { executionContextFromAuth } from '@/lib/mcp-gateway/context';
 import { hmacValue, randomToken } from '@/lib/mcp-gateway/crypto';
+import { OAuthAuthorizationRedirectError } from '@/lib/mcp-gateway/authorization-service';
 
 const consentCookieName = 'mcp_gateway_authorization_approval';
 
@@ -35,6 +36,14 @@ function formParams(form: FormData): Record<string, string> {
     params[key] = value;
   }
   return params;
+}
+
+function redirectOAuthError(error: OAuthAuthorizationRedirectError) {
+  const redirect = new URL(error.redirectUri);
+  redirect.searchParams.set('error', error.code);
+  redirect.searchParams.set('error_description', error.message);
+  if (error.state) redirect.searchParams.set('state', error.state);
+  return NextResponse.redirect(redirect.toString());
 }
 
 async function authorizationIdentity() {
@@ -153,7 +162,14 @@ async function approveRequest(request: NextRequest, route?: ScopedConnectRoute) 
     !timingSafeEqual(approvalState, cookieApprovalState) ||
     !timingSafeEqual(expectedSignature, cookieSignature)
   ) {
-    return NextResponse.json({ error: 'access_denied' }, { status: 403 });
+    return redirectOAuthError(
+      new OAuthAuthorizationRedirectError(
+        'access_denied',
+        'Authorization approval was not confirmed',
+        parsed.data.redirect_uri,
+        parsed.data.state
+      )
+    );
   }
   const response = await authorizeRequest(
     parsed.data,
@@ -177,6 +193,9 @@ export async function POST(request: NextRequest) {
   try {
     return await approveRequest(request);
   } catch (error) {
+    if (error instanceof OAuthAuthorizationRedirectError) {
+      return redirectOAuthError(error);
+    }
     return gatewayErrorResponse(error);
   }
 }

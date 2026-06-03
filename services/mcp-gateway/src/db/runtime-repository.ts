@@ -61,6 +61,8 @@ export async function resolveActiveRoute(params: {
         eq(mcp_gateway_connect_resources.config_id, params.route.configId),
         eq(mcp_gateway_connect_resources.route_key, params.route.routeKey),
         eq(mcp_gateway_connect_resources.route_status, GatewayRouteStatus.Active),
+        eq(mcp_gateway_configs.owner_scope, params.route.ownerScope),
+        eq(mcp_gateway_configs.owner_id, params.route.ownerId),
         eq(mcp_gateway_configs.enabled, true),
         isNull(mcp_gateway_configs.deleted_at)
       )

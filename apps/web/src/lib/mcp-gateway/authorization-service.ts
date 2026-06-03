@@ -25,6 +25,20 @@ import { expiresAtIso, hashToken, randomToken } from './crypto';
 import type { GatewayAppConfig } from './config';
 import { createAuditService } from './audit-service';
 
+export class OAuthAuthorizationRedirectError extends Error {
+  readonly code: string;
+  readonly redirectUri: string;
+  readonly state?: string;
+
+  constructor(code: string, message: string, redirectUri: string, state?: string) {
+    super(message);
+    this.name = 'OAuthAuthorizationRedirectError';
+    this.code = code;
+    this.redirectUri = redirectUri;
+    this.state = state;
+  }
+}
+
 export function createAuthorizationService(params: {
   repository: GatewayRepository;
   routeService: GatewayRouteService;
@@ -175,6 +189,7 @@ export function createAuthorizationService(params: {
     route?: ScopedConnectRoute;
     userId: string;
     executionContext: GatewayExecutionContext;
+    redirectErrors?: boolean;
   }) {
     const client = await params.clientService.findClientById(input.query.client_id);
     if (!client) {
@@ -187,36 +202,58 @@ export function createAuthorizationService(params: {
         400
       );
     }
+    const redirectError = (code: GatewayErrorCode, message: string) => {
+      if (input.redirectErrors) {
+        throw new OAuthAuthorizationRedirectError(
+          code,
+          message,
+          input.query.redirect_uri,
+          input.query.state
+        );
+      }
+      throw createGatewayError(code as GatewayErrorCode, message, 400);
+    };
     if (
       !client.response_types.includes('code') ||
       !client.grant_types.includes('authorization_code')
     ) {
-      throw createGatewayError(
-        GatewayErrorCode.UnauthorizedClient,
-        'Client cannot use authorization code',
-        400
-      );
+      redirectError(GatewayErrorCode.UnauthorizedClient, 'Client cannot use authorization code');
     }
     if (client.token_endpoint_auth_method === GatewayOAuthClientAuthMethod.None) {
       if (!input.query.code_challenge || input.query.code_challenge_method !== 'S256') {
-        throw createGatewayError(
-          GatewayErrorCode.InvalidRequest,
-          'PKCE is required for public clients',
-          400
-        );
+        redirectError(GatewayErrorCode.InvalidRequest, 'PKCE is required for public clients');
       }
     }
-    const { route, resolved } = await resolveAuthorizationRoute({
-      query: input.query,
-      route: input.route,
-    });
-    await params.routeService.authorize({
-      resolved,
-      route,
-      userId: input.userId,
-      executionContext: input.executionContext,
-    });
-    const scopes = grantedScopes(client.declared_scopes, input.query.scope);
+    let route: ScopedConnectRoute;
+    let resolved: ResolvedGatewayRoute;
+    try {
+      const resolvedRoute = await resolveAuthorizationRoute({
+        query: input.query,
+        route: input.route,
+      });
+      route = resolvedRoute.route;
+      resolved = resolvedRoute.resolved;
+      await params.routeService.authorize({
+        resolved,
+        route,
+        userId: input.userId,
+        executionContext: input.executionContext,
+      });
+    } catch (error) {
+      if (input.redirectErrors && error instanceof Error) {
+        redirectError(GatewayErrorCode.AccessDenied, error.message);
+      }
+      throw error;
+    }
+    let scopes: string[];
+    try {
+      scopes = grantedScopes(client.declared_scopes, input.query.scope);
+    } catch (error) {
+      if (input.redirectErrors && error instanceof Error) {
+        redirectError(GatewayErrorCode.InvalidScope, error.message);
+      }
+      throw error;
+    }
     return { client, route, resolved, scopes };
   }
 
@@ -241,7 +278,10 @@ export function createAuthorizationService(params: {
     userId: string;
     executionContext: GatewayExecutionContext;
   }) {
-    const { client, route, resolved, scopes } = await prepareAuthorization(input);
+    const { client, route, resolved, scopes } = await prepareAuthorization({
+      ...input,
+      redirectErrors: true,
+    });
     const instance = await params.repository.ensureConnectionInstance({
       ownerScope: resolved.config.owner_scope,
       ownerId: resolved.config.owner_id,

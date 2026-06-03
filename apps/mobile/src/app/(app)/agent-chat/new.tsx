@@ -2,6 +2,7 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   type LayoutChangeEvent,
+  Platform,
   ScrollView,
   TextInput,
   type TextStyle,
@@ -28,7 +29,8 @@ const PROMPT_INPUT_DEFAULT_LINES = 3;
 const PROMPT_INPUT_MAX_LINES = 6;
 const PROMPT_INPUT_LINE_HEIGHT = 24;
 const PROMPT_INPUT_VERTICAL_PADDING = 32;
-const PROMPT_INPUT_HORIZONTAL_PADDING = 32;
+const PROMPT_INPUT_HORIZONTAL_PADDING = Platform.OS === 'android' ? 48 : 32;
+const PROMPT_INPUT_ANDROID_HORIZONTAL_INSET = 24;
 const PROMPT_INPUT_MIN_HEIGHT =
   PROMPT_INPUT_LINE_HEIGHT * PROMPT_INPUT_DEFAULT_LINES + PROMPT_INPUT_VERTICAL_PADDING;
 const PROMPT_INPUT_MAX_HEIGHT =
@@ -187,7 +189,13 @@ export default function NewSessionScreen() {
             placeholderTextColor={colors.mutedForeground}
             multiline
             className="px-4 py-4 text-base leading-6 text-foreground"
-            style={[promptInputStyle, { height: promptMeasure.height }]}
+            style={[
+              promptInputStyle,
+              { height: promptMeasure.height },
+              Platform.OS === 'android'
+                ? { paddingHorizontal: PROMPT_INPUT_ANDROID_HORIZONTAL_INSET }
+                : undefined,
+            ]}
             onChangeText={text => {
               promptRef.current = text;
               promptMeasure.setText(text);

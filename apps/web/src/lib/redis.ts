@@ -32,13 +32,17 @@ function getOrCreateClient(): RedisClient | null {
 }
 
 async function ensureConnected(c: RedisClient): Promise<RedisClient> {
-  if (c.isOpen) return c;
+  if (c.isReady) return c;
   if (!connectPromise) {
-    connectPromise = c.connect().catch(err => {
-      captureException(err, { tags: { service: 'redis', operation: 'connect' } });
-      connectPromise = null;
-      throw err;
-    });
+    connectPromise = c
+      .connect()
+      .catch(err => {
+        captureException(err, { tags: { service: 'redis', operation: 'connect' } });
+        throw err;
+      })
+      .finally(() => {
+        connectPromise = null;
+      });
   }
   await connectPromise;
   return c;

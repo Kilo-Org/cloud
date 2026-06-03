@@ -1196,6 +1196,23 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     });
   });
 
+  it.each([
+    ['cloud-agent-web', true],
+    [undefined, false],
+    ['app-builder', false],
+    ['code-review', false],
+    ['slack', false],
+  ])('sets Kilo snapshots for %s-origin sessions to %s', async (createdOnPlatform, snapshot) => {
+    const result = await buildPromptWrapperRequests(createMetadata({ createdOnPlatform }));
+    const kiloConfig = JSON.parse(result.readyRequest.materialized.env.KILO_CONFIG_CONTENT) as {
+      snapshot?: boolean;
+    };
+    const opencodeConfig = JSON.parse(result.readyRequest.materialized.env.OPENCODE_CONFIG_CONTENT);
+
+    expect(kiloConfig.snapshot).toBe(snapshot);
+    expect(opencodeConfig).toEqual(kiloConfig);
+  });
+
   it('passes canonical document attachments through signed wrapper prompt construction', async () => {
     const service = new SessionService();
     const env = createEnv();

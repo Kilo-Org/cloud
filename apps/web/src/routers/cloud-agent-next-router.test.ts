@@ -209,7 +209,7 @@ describe('cloudAgentNextRouter.prepareSession', () => {
     });
 
     expect(mockPrepareSession).toHaveBeenCalledWith(
-      expect.objectContaining({ attachments: images })
+      expect.objectContaining({ attachments: images, createdOnPlatform: 'cloud-agent-web' })
     );
     expect(mockPrepareSession).not.toHaveBeenCalledWith(expect.objectContaining({ images }));
   });

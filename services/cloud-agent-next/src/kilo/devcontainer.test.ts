@@ -19,6 +19,7 @@ import {
   detectDevContainer,
   getDevContainerOverridePath,
   KILO_AGENT_SESSION_LABEL,
+  KILO_CLI_VERSION,
   KILO_WRAPPER_PORT_LABEL,
   mergeDevContainerConfig,
   parseDevContainerConfig,
@@ -26,6 +27,7 @@ import {
   writeMergedOverrideConfig,
 } from './devcontainer.js';
 import type { ExecutionSession } from '../types.js';
+import { DEFAULT_SLASH_COMMANDS_SOURCE } from '../shared/default-slash-commands.generated.js';
 
 const mockSessionExec = (impl: (cmd: string) => { exitCode: number; stdout?: string }) =>
   ({
@@ -54,6 +56,39 @@ describe('sandbox image versions', () => {
     expect(dockerfile).toContain(`FROM docker.io/cloudflare/sandbox:${sandboxVersion}`);
     expect(devDockerfile).toContain(`FROM docker.io/cloudflare/sandbox:${sandboxVersion}`);
     expect(dindDockerfile).toContain(`ARG SANDBOX_VERSION="${sandboxVersion}"`);
+  });
+
+  it('keeps the Kilo SDK and CLI pins aligned across sandbox runtimes', () => {
+    const wrapperPackageJson = JSON.parse(
+      readFileSync(
+        fileURLToPath(new URL('../../wrapper/package.json', import.meta.url).href),
+        'utf8'
+      )
+    ) as { dependencies: Record<string, string> };
+    const dockerfile = readFileSync(
+      fileURLToPath(new URL('../../Dockerfile', import.meta.url).href),
+      'utf8'
+    );
+    const devDockerfile = readFileSync(
+      fileURLToPath(new URL('../../Dockerfile.dev', import.meta.url).href),
+      'utf8'
+    );
+    const dindDockerfile = readFileSync(
+      fileURLToPath(new URL('../../Dockerfile.dind', import.meta.url).href),
+      'utf8'
+    );
+    const wranglerConfig = readFileSync(
+      fileURLToPath(new URL('../../wrangler.jsonc', import.meta.url).href),
+      'utf8'
+    );
+    const imageVar = `"KILOCODE_CLI_VERSION": "${KILO_CLI_VERSION}"`;
+
+    expect(wrapperPackageJson.dependencies['@kilocode/sdk']).toBe(KILO_CLI_VERSION);
+    expect(dockerfile).toContain(`ARG KILOCODE_CLI_VERSION="${KILO_CLI_VERSION}"`);
+    expect(devDockerfile).toContain(`ARG KILOCODE_CLI_VERSION="${KILO_CLI_VERSION}"`);
+    expect(dindDockerfile).toContain(`ARG KILOCODE_CLI_VERSION="${KILO_CLI_VERSION}"`);
+    expect(wranglerConfig.split(imageVar)).toHaveLength(7);
+    expect(DEFAULT_SLASH_COMMANDS_SOURCE).toBe(`kilo@${KILO_CLI_VERSION}`);
   });
 });
 

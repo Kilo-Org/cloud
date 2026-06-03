@@ -1120,7 +1120,7 @@ export class SessionService {
         },
       },
       autoupdate: false,
-      snapshot: false,
+      snapshot: createdOnPlatform === 'cloud-agent-web',
     };
     if (mcpServers && Object.keys(mcpServers).length > 0) {
       const materialized = materializeMcpServers(mcpServers, env.AGENT_ENV_VARS_PRIVATE_KEY);

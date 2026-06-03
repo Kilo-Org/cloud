@@ -1621,8 +1621,8 @@ importers:
   services/cloud-agent-next/wrapper:
     dependencies:
       '@kilocode/sdk':
-        specifier: 7.3.12
-        version: 7.3.12
+        specifier: 7.3.21
+        version: 7.3.21
     devDependencies:
       '@types/bun':
         specifier: 1.3.14
@@ -4971,8 +4971,8 @@ packages:
   '@kilocode/sdk@7.2.52':
     resolution: {integrity: sha512-j8w6ewvo7dyu/qxjJAg0bcjHGUGGvIZ4F2f5tJnpMwLzPTAu26DJoO/08aoxf1BhfuZLzNS9tA2q+ZPdzPT8Jg==}
 
-  '@kilocode/sdk@7.3.12':
-    resolution: {integrity: sha512-wnodVXM7ThX1nvPMao2fMBUXykoVxzMTP0fKe0FIr+R3xWlK9kXGnqnj8614+e9xgIGHhNAPJ8XQtMpoMJBXNw==}
+  '@kilocode/sdk@7.3.21':
+    resolution: {integrity: sha512-sdoV7l+rIzsAF/bSpKn6crmwQ3HGYo+59HbbdpVmGAfTj758N40CDGqPrgyzwOL7GHAcHgl6LlQKPvk+f69Qmw==}
 
   '@lexical/clipboard@0.35.0':
     resolution: {integrity: sha512-ko7xSIIiayvDiqjNDX6fgH9RlcM6r9vrrvJYTcfGVBor5httx16lhIi0QJZ4+RNPvGtTjyFv4bwRmsixRRwImg==}
@@ -19893,7 +19893,7 @@ snapshots:
     dependencies:
       cross-spawn: 7.0.6
 
-  '@kilocode/sdk@7.3.12':
+  '@kilocode/sdk@7.3.21':
     dependencies:
       cross-spawn: 7.0.6
 

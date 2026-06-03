@@ -556,6 +556,48 @@ describe('createPromptHandler', () => {
     expect(deps.openConnection).toHaveBeenCalled();
   });
 
+  it('waits silently for slow snapshot initialization in Cloud Agent web prompts', async () => {
+    const state = new WrapperState();
+    const deps = createMockDeps(state);
+    const handler = createPromptHandler(
+      { ...defaultServerConfig, platform: 'cloud-agent-web' },
+      deps
+    );
+
+    const response = await handler(
+      jsonRequest({
+        message: { id: 'msg_web_snapshot', prompt: 'Hello' },
+        session: completeBinding,
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(deps.kiloClient.sendPromptAsync).toHaveBeenCalledWith(
+      expect.objectContaining({ snapshotInitialization: 'wait' })
+    );
+  });
+
+  it.each([undefined, 'slack', 'code-review', 'app-builder'])(
+    'does not wait for snapshot initialization in %s-origin prompts',
+    async platform => {
+      const state = new WrapperState();
+      const deps = createMockDeps(state);
+      const handler = createPromptHandler({ ...defaultServerConfig, platform }, deps);
+
+      const response = await handler(
+        jsonRequest({
+          message: { id: 'msg_non_web_snapshot', prompt: 'Hello' },
+          session: completeBinding,
+        })
+      );
+
+      expect(response.status).toBe(200);
+      expect(deps.kiloClient.sendPromptAsync).toHaveBeenCalledWith(
+        expect.not.objectContaining({ snapshotInitialization: expect.anything() })
+      );
+    }
+  );
+
   it('materializes a PDF before opening ingest and sends its local file part to Kilo', async () => {
     const state = new WrapperState();
     const deps = createMockDeps(state);
@@ -933,6 +975,50 @@ describe('createPromptHandler', () => {
 // ---------------------------------------------------------------------------
 
 describe('createCommandHandler', () => {
+  it('waits silently for slow snapshot initialization in Cloud Agent web commands', async () => {
+    const state = new WrapperState();
+    const deps = createMockDeps(state);
+    const handler = createCommandHandler(
+      { ...defaultServerConfig, platform: 'cloud-agent-web' },
+      deps
+    );
+
+    const response = await handler(
+      jsonRequest({ command: 'review', messageId: 'msg_web_command', session: completeBinding })
+    );
+
+    expect(response.status).toBe(200);
+    expect(deps.kiloClient.sendCommand).toHaveBeenCalledWith({
+      sessionId: 'kilo_sess_1',
+      command: 'review',
+      args: undefined,
+      messageId: 'msg_web_command',
+      snapshotInitialization: 'wait',
+    });
+  });
+
+  it.each([undefined, 'slack', 'code-review', 'app-builder'])(
+    'does not wait for snapshot initialization in %s-origin commands',
+    async platform => {
+      const state = new WrapperState();
+      const deps = createMockDeps(state);
+      const handler = createCommandHandler({ ...defaultServerConfig, platform }, deps);
+
+      const response = await handler(
+        jsonRequest({
+          command: 'review',
+          messageId: 'msg_non_web_command',
+          session: completeBinding,
+        })
+      );
+
+      expect(response.status).toBe(200);
+      expect(deps.kiloClient.sendCommand).toHaveBeenCalledWith(
+        expect.not.objectContaining({ snapshotInitialization: expect.anything() })
+      );
+    }
+  );
+
   it('routes compact through session summarize with the selected model', async () => {
     const state = new WrapperState();
     const sendToIngest = vi.fn();

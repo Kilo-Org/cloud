@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { toast } from 'sonner';
+import { v4 as uuidv4 } from 'uuid';
 import {
   APP_BUILDER_IMAGE_MAX_COUNT,
   APP_BUILDER_IMAGE_MAX_SIZE_BYTES,
@@ -415,7 +416,7 @@ export function useImageUpload(options: UseImageUploadOptions): UseImageUploadRe
       }
 
       const processingImages = filesToAdd.map(file => ({
-        id: crypto.randomUUID(),
+        id: uuidv4(),
         file,
         previewUrl: URL.createObjectURL(file),
         status: 'processing' as const,

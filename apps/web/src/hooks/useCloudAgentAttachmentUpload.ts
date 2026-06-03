@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { v4 as uuidv4 } from 'uuid';
 import { useTRPC } from '@/lib/trpc/utils';
 import {
   CLOUD_AGENT_ATTACHMENT_ALLOWED_TYPES,
@@ -329,7 +330,7 @@ export function useCloudAgentAttachmentUpload(
       const kind = contentType.startsWith('image/') ? ('image' as const) : ('document' as const);
       return [
         {
-          id: crypto.randomUUID(),
+          id: uuidv4(),
           file,
           contentType,
           kind,

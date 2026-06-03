@@ -20,8 +20,21 @@ socket="${DOCKER_PROXY_SOCKET:-${TMPDIR:-/tmp}/cloud-agent-dind-${hash}.sock}"
 socket="$(printf '%s' "$socket" | sed 's:/\{1,\}:/:g')"
 export DOCKER_PROXY_SOCKET="$socket"
 
+probe_docker_architecture() {
+  if [ -n "${DOCKER_SOCKET:-}" ]; then
+    case "$DOCKER_SOCKET" in
+      unix://*) probe_docker_host="$DOCKER_SOCKET" ;;
+      *) probe_docker_host="unix://$DOCKER_SOCKET" ;;
+    esac
+    DOCKER_HOST="$probe_docker_host" docker info --format '{{.Architecture}}'
+    return
+  fi
+
+  docker info --format '{{.Architecture}}'
+}
+
 if [ -z "${MINIFLARE_CONTAINER_EGRESS_IMAGE:-}" ]; then
-  docker_arch="$(docker info --format '{{.Architecture}}' 2>/dev/null || true)"
+  docker_arch="$(probe_docker_architecture 2>/dev/null || true)"
   case "$docker_arch" in
     aarch64 | arm64)
       # Work around wrangler/miniflare launching the amd64 proxy-everything

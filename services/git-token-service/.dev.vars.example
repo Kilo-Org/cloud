@@ -23,6 +23,8 @@ USER_GITHUB_APP_TOKEN_ACTIVE_PRIVATE_KEY=
 # @from NEXTAUTH_SECRET
 # Short-lived user-token verification for POST /internal/github-user-authorizations/disconnect
 NEXTAUTH_SECRET=
+# Dedicated 32-byte base64 AES-GCM key for short-lived SCM session capabilities
+SCM_SESSION_CAPABILITY_ENCRYPTION_KEY=
 
 # GitHub Lite App credentials (for OSS organizations with read-only permissions)
 # Same format as standard app credentials above

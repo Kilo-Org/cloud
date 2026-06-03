@@ -53,8 +53,13 @@ export function normalizeInstanceUrl(url?: string): string {
  * Returns true if the GitLab instance URL has changed between
  * the existing integration and the new connection.
  */
-function instanceUrlChanged(existingUrl?: string, newUrl?: string): boolean {
-  return normalizeInstanceUrl(existingUrl) !== normalizeInstanceUrl(newUrl);
+export function instanceUrlChanged(existingUrl: string | undefined, newUrl: string): boolean {
+  const normalizedNewUrl = normalizeInstanceUrl(newUrl);
+  try {
+    return normalizeInstanceUrl(existingUrl) !== normalizedNewUrl;
+  } catch {
+    return true;
+  }
 }
 
 /**

@@ -181,10 +181,10 @@ describe('GET /api/integrations/gitlab/connect', () => {
     expect(responseBody.url).toBe('https://gitlab.com/oauth/authorize?state=signed');
   });
 
-  test('does not initialize self-hosted OAuth for unsafe instance URLs', async () => {
+  test('does not initialize self-hosted OAuth for http instance URLs', async () => {
     const response = await callGitLabConnectPost(
       makeJsonRequest('/api/integrations/gitlab/connect', {
-        instanceUrl: 'http://127.0.0.1:8080',
+        instanceUrl: 'http://gitlab.example.com',
         clientId: 'client-id',
         clientSecret: 'client-secret',
       })

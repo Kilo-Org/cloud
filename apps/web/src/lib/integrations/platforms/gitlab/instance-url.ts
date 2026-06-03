@@ -42,6 +42,10 @@ export function normalizeGitLabInstanceUrl(instanceUrl?: string): string {
     throw new GitLabInstanceUrlError('GitLab instance URL host is not allowed.');
   }
 
+  if (url.protocol !== 'https:') {
+    throw new GitLabInstanceUrlError('Invalid URL protocol. GitLab instance URLs must use https.');
+  }
+
   const path = normalizeBasePath(url.pathname);
   return `${url.protocol}//${url.host.toLowerCase()}${path}`;
 }

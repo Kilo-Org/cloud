@@ -132,6 +132,10 @@ describe('mapModelIdToVercel', () => {
       );
     });
 
+    it('maps a forced Vercel exclusive through the inferred Alibaba model id', () => {
+      expect(mapModelIdToVercel('qwen/qwen3.7-plus:free', false)).toBe('alibaba/qwen3.7-plus');
+    });
+
     it('does not use internal_id for exclusives that are not vercel-routed', () => {
       // claude_sonnet_clawsetup_model has gateway 'openrouter' and no
       // 'vercel-routing' flag, so the mapping must pass the public id through

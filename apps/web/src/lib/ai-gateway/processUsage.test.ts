@@ -248,13 +248,7 @@ describe('mapToUsageStats approval tests', () => {
   test(claudeSonnetGeneration, async () => {
     const inputFile = join(sampleDir, claudeSonnetGeneration);
     const generationData = JSON.parse(await readFile(inputFile, 'utf-8')) as OpenRouterGeneration;
-    const result = mapToUsageStats(
-      generationData,
-      'nonsense',
-      'fake-user-id',
-      'fake-model',
-      'openrouter'
-    );
+    const result = mapToUsageStats(generationData, 'nonsense', 'fake-user-id', 'openrouter');
     const resultString = JSON.stringify(result, null, 2);
     const approvalFilePath = inputFile + '.mapToUsageStats.approved.json';
     await verifyApproval(resultString, approvalFilePath);
@@ -292,13 +286,7 @@ describe('mapToUsageStats', () => {
     };
 
     // Call mapToUsageStats with the BYOK generation
-    const result = mapToUsageStats(
-      byokGeneration,
-      'test response',
-      'fake-user-id',
-      'fake-model',
-      'openrouter'
-    );
+    const result = mapToUsageStats(byokGeneration, 'test response', 'fake-user-id', 'openrouter');
 
     // Verify that the cost is multiplied by OPENROUTER_BYOK_COST_MULTIPLIER
     expect(result.cost_mUsd).toBe(toMicrodollars(0.1 * 20.0)); // 0.1 * 20 = 2, then convert to microdollars
@@ -326,7 +314,6 @@ describe('mapToUsageStats', () => {
       nonByokGeneration,
       'test response',
       ' fake-user-id',
-      'fake-model',
       'openrouter'
     );
 

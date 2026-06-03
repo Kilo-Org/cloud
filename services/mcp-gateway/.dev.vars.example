@@ -1,0 +1,9 @@
+# MCP Gateway Worker local development values.
+#
+# This service is intentionally non-functional in PR1. It has no OAuth,
+# provider, database, or proxy behavior yet. Wrangler reads non-secret vars
+# from wrangler.jsonc; keep secrets out of this file until PR2 introduces
+# the corresponding runtime behavior.
+#
+# Hyperdrive is configured in wrangler.jsonc. For local Postgres development,
+# the binding uses the local connection string declared there.

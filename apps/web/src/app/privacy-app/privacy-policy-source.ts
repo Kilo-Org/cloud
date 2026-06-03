@@ -1,5 +1,11 @@
 export const PRIVACY_POLICY_SOURCE_URL = 'https://kilo.ai/privacy';
 
+export const PRIVACY_POLICY_FALLBACK_HTML = `
+<h1>Privacy Policy</h1>
+<p>The full Kilo privacy policy is temporarily unavailable. Please try again shortly.</p>
+<p>For privacy questions or requests, contact <a href="mailto:support@kilo.ai">support@kilo.ai</a>.</p>
+`.trim();
+
 function absolutizeKiloLinks(html: string): string {
   return html.replaceAll(/(href|src)="\/(?!\/)/g, `$1="${new URL('/', PRIVACY_POLICY_SOURCE_URL)}`);
 }
@@ -21,13 +27,17 @@ export function extractPrivacyPolicyMainHtml(html: string): string {
 }
 
 export async function fetchPrivacyPolicyMainHtml(): Promise<string> {
-  const response = await fetch(PRIVACY_POLICY_SOURCE_URL, {
-    next: { revalidate: 3600 },
-  });
+  try {
+    const response = await fetch(PRIVACY_POLICY_SOURCE_URL, {
+      next: { revalidate: 3600 },
+    });
 
-  if (!response.ok) {
-    throw new Error(`Failed to fetch privacy policy: ${response.status}`);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch privacy policy: ${response.status}`);
+    }
+
+    return extractPrivacyPolicyMainHtml(await response.text());
+  } catch {
+    return PRIVACY_POLICY_FALLBACK_HTML;
   }
-
-  return extractPrivacyPolicyMainHtml(await response.text());
 }

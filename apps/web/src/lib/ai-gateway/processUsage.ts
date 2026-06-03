@@ -1011,9 +1011,6 @@ export async function processTokenData(
     usageStats = genStats;
   }
 
-  if (usageStats.inputTokens - usageStats.cacheHitTokens > 100000)
-    console.warn(`Abuse?: Large uncached token request detected:`, usageStats);
-
   if (
     !usageStats.model || // fallback for failure cases
     isKiloStealthModel(usageContext.requested_model) // this can probably be removed once we're sure we only present requested_model to users

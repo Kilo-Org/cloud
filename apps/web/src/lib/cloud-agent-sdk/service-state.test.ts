@@ -684,6 +684,17 @@ describe('createServiceState', () => {
       expect(state.getStatus()).toEqual({ type: 'idle' });
     });
 
+    it('preserves disconnected status on synthetic viewer reconnect without sessionStatus', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({ type: 'stopped', reason: 'disconnected' });
+      expect(state.getStatus()).toEqual({ type: 'disconnected' });
+
+      state.process({ type: 'connected' });
+
+      expect(state.getStatus()).toEqual({ type: 'disconnected' });
+    });
+
     it('sets all fields in one shot', () => {
       const state = createServiceState(makeConfig());
       state.process({

@@ -379,7 +379,7 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
 
     // Clear terminated on connected
     terminated = false;
-    if (status.type === 'disconnected') {
+    if (sessionStatus !== undefined && status.type === 'disconnected') {
       status = IDLE_STATUS;
     }
 

@@ -17,27 +17,17 @@ app.get('/health', c => handleHealth(c));
 
 app.get('/mcp-connect/user/:userId/:configId/:routeKey', c => handleUserConnect(c, c.req.param()));
 app.post('/mcp-connect/user/:userId/:configId/:routeKey', c => handleUserConnect(c, c.req.param()));
-app.delete('/mcp-connect/user/:userId/:configId/:routeKey', c =>
-  handleUserConnect(c, c.req.param())
-);
 app.get('/mcp-connect/user/:userId/:configId/:routeKey/*', c =>
   handleUserConnect(c, c.req.param())
 );
 app.post('/mcp-connect/user/:userId/:configId/:routeKey/*', c =>
   handleUserConnect(c, c.req.param())
 );
-app.delete('/mcp-connect/user/:userId/:configId/:routeKey/*', c =>
-  handleUserConnect(c, c.req.param())
-);
 
 app.get('/mcp-connect/org/:orgId/:configId/:routeKey', c => handleOrgConnect(c, c.req.param()));
 app.post('/mcp-connect/org/:orgId/:configId/:routeKey', c => handleOrgConnect(c, c.req.param()));
-app.delete('/mcp-connect/org/:orgId/:configId/:routeKey', c => handleOrgConnect(c, c.req.param()));
 app.get('/mcp-connect/org/:orgId/:configId/:routeKey/*', c => handleOrgConnect(c, c.req.param()));
 app.post('/mcp-connect/org/:orgId/:configId/:routeKey/*', c => handleOrgConnect(c, c.req.param()));
-app.delete('/mcp-connect/org/:orgId/:configId/:routeKey/*', c =>
-  handleOrgConnect(c, c.req.param())
-);
 
 app.get('/.well-known/oauth-protected-resource', c => handleProtectedResourceMetadata(c));
 app.get('/.well-known/oauth-protected-resource/mcp-connect/user/:userId/:configId/:routeKey', c =>

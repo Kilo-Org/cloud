@@ -19,7 +19,11 @@ import {
 import type { MCPGatewayEnv } from '../types';
 import { resolveSecret } from '../lib/secret';
 import { verifyGatewayToken } from '../lib/jwt';
-import { recordRuntimeAudit, resolveRuntimeState } from '../db/runtime-repository';
+import {
+  recordRuntimeAudit,
+  resolveActiveRoute,
+  resolveRuntimeState,
+} from '../db/runtime-repository';
 import { resolveProviderAuthorization } from '../lib/provider-refresh';
 import { loadStaticHeaders } from '../lib/credentials';
 import { proxyUpstream } from '../lib/upstream-proxy';
@@ -52,6 +56,10 @@ async function handleConnect(
     routeKey: route.routeKey,
   });
   validateIncomingOrigin({ request: c.req.raw, env: c.env });
+  const activeRoute = await resolveActiveRoute({ env: c.env, route });
+  if (!activeRoute) {
+    return c.json({ error: 'not_found' }, 404);
+  }
   const token = bearerToken(c.req.header('authorization'));
   if (!token) {
     return challengeResponse(c, canonicalUrl);
@@ -153,13 +161,15 @@ async function handleConnect(
     auxiliaryHeaders,
     providerAuthorization,
   });
-  await recordRuntimeAudit({
-    env: c.env,
-    resolution,
-    eventType: 'runtime_proxy',
-    outcome: response.ok ? 'success' : 'failure',
-    metadata: { status: response.status, method: c.req.method },
-  });
+  c.executionCtx.waitUntil(
+    recordRuntimeAudit({
+      env: c.env,
+      resolution,
+      eventType: 'runtime_proxy',
+      outcome: response.ok ? 'success' : 'failure',
+      metadata: { status: response.status, method: c.req.method },
+    }).catch(() => undefined)
+  );
   return response;
 }
 

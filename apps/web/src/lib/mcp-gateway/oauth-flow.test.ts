@@ -168,6 +168,54 @@ describe('MCP gateway app OAuth flow', () => {
     ).rejects.toMatchObject({ code: 'invalid_grant' });
   });
 
+  it('redeems client_secret_basic credentials with namespace client IDs', async () => {
+    const config = await createTestConfig();
+    const services = createGatewayServices({ config });
+    const user = await insertTestUser({ id: `gateway-user-${crypto.randomUUID()}` });
+    const created = await services.configService.createPersonalConfig({
+      userId: user.id,
+      name: 'Test MCP',
+      remoteUrl: 'https://example.com/mcp',
+      authMode: 'none',
+    });
+    const registration = await services.clientService.registerClient({
+      metadata: {
+        redirect_uris: ['https://client.example/callback'],
+        token_endpoint_auth_method: 'client_secret_basic',
+        grant_types: ['authorization_code', 'refresh_token'],
+        response_types: ['code'],
+        scope: 'profile',
+      },
+      headers: new Headers({ 'x-vercel-forwarded-for': '203.0.113.31' }),
+    });
+    if (!registration.clientSecret) throw new Error('Expected confidential client secret');
+    const authorization = await services.authorizationService.authorize({
+      query: OAuthAuthorizationQuerySchema.parse({
+        client_id: registration.clientId,
+        redirect_uri: 'https://client.example/callback',
+        response_type: 'code',
+        resource: created.route.canonical_url,
+      }),
+      userId: user.id,
+      executionContext: { type: 'personal' },
+    });
+    if (authorization.kind !== 'redirect') return;
+    const code = new URL(authorization.redirectUrl).searchParams.get('code');
+    if (!code) return;
+    const basic = Buffer.from(
+      `${encodeURIComponent(registration.clientId)}:${encodeURIComponent(registration.clientSecret)}`
+    ).toString('base64');
+    const tokenResponse = await services.tokenService.exchangeToken({
+      request: {
+        grant_type: 'authorization_code',
+        code,
+        redirect_uri: 'https://client.example/callback',
+      },
+      headers: new Headers({ Authorization: `Basic ${basic}` }),
+    });
+    expect(tokenResponse.access_token).toBeTruthy();
+  });
+
   it('does not redeem an authorization code after it expires', async () => {
     const config = await createTestConfig();
     const services = createGatewayServices({ config });

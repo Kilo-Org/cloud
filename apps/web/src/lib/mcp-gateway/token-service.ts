@@ -46,6 +46,14 @@ function activeSigningKey(config: GatewayAppConfig): GatewayJWTKey & { privateKe
   return { ...key, privateKeyPem: key.privateKeyPem };
 }
 
+function decodeBasicComponent(value: string): string | null {
+  try {
+    return decodeURIComponent(value.replaceAll('+', ' '));
+  } catch {
+    return null;
+  }
+}
+
 function parseBasicAuthorization(
   header: string | null
 ): { clientId: string; clientSecret: string } | null {
@@ -58,7 +66,10 @@ function parseBasicAuthorization(
   }
   const separator = decoded.indexOf(':');
   if (separator < 0) return null;
-  return { clientId: decoded.slice(0, separator), clientSecret: decoded.slice(separator + 1) };
+  const clientId = decodeBasicComponent(decoded.slice(0, separator));
+  const clientSecret = decodeBasicComponent(decoded.slice(separator + 1));
+  if (!clientId || !clientSecret) return null;
+  return { clientId, clientSecret };
 }
 
 export function createTokenService(params: {

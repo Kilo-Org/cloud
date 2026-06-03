@@ -39,10 +39,20 @@ export const GatewayTokenMintInputSchema = GatewayTokenClaimsSchema.omit({
 
 export type GatewayTokenMintInput = z.infer<typeof GatewayTokenMintInputSchema>;
 
+const OAuthRedirectUriSchema = z
+  .string()
+  .url()
+  .refine(value => {
+    const url = new URL(value);
+    if (url.protocol === 'https:') return true;
+    if (url.protocol !== 'http:') return false;
+    return url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname === '[::1]';
+  }, 'Redirect URI must use HTTPS or loopback HTTP');
+
 export const OAuthClientMetadataSchema = z
   .object({
     client_name: z.string().min(1).max(200).optional(),
-    redirect_uris: z.array(z.string().url()).min(1),
+    redirect_uris: z.array(OAuthRedirectUriSchema).min(1),
     token_endpoint_auth_method: z.enum([
       GatewayOAuthClientAuthMethod.None,
       GatewayOAuthClientAuthMethod.ClientSecretPost,
@@ -59,7 +69,7 @@ export type OAuthClientMetadata = z.infer<typeof OAuthClientMetadataSchema>;
 export const OAuthAuthorizationQuerySchema = z
   .object({
     client_id: z.string().regex(/^[A-Za-z0-9._-]+:[A-Za-z0-9._-]+$/),
-    redirect_uri: z.string().url(),
+    redirect_uri: OAuthRedirectUriSchema,
     response_type: z.literal('code'),
     scope: z.string().optional(),
     state: z.string().min(1).max(2048).optional(),
@@ -76,7 +86,7 @@ export const OAuthTokenRequestSchema = z
     grant_type: z.enum(['authorization_code', 'refresh_token']),
     code: z.string().min(1).optional(),
     refresh_token: z.string().min(1).optional(),
-    redirect_uri: z.string().url().optional(),
+    redirect_uri: OAuthRedirectUriSchema.optional(),
     client_id: z.string().min(1).optional(),
     client_secret: z.string().min(1).optional(),
     code_verifier: z.string().min(43).max(128).optional(),

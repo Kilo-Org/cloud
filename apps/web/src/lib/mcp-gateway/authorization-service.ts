@@ -57,8 +57,19 @@ export function createAuthorizationService(params: {
   }
 
   function grantedScopes(clientScopes: string[], requested: string | undefined): string[] {
-    const requestedScopes = filterSupportedScopes(parseScopeString(requested));
-    return requestedScopes.filter(scope => clientScopes.includes(scope));
+    const requestedScopes = parseScopeString(requested);
+    const supportedScopes = filterSupportedScopes(requestedScopes);
+    if (supportedScopes.length !== requestedScopes.length) {
+      throw createGatewayError(GatewayErrorCode.InvalidScope, 'Unsupported scope requested', 400);
+    }
+    if (supportedScopes.some(scope => !clientScopes.includes(scope))) {
+      throw createGatewayError(
+        GatewayErrorCode.InvalidScope,
+        'Scope is not declared by client',
+        400
+      );
+    }
+    return supportedScopes;
   }
 
   async function createAuthorizationRequestWithInstance(paramsInput: {
@@ -159,7 +170,7 @@ export function createAuthorizationService(params: {
     return { code, redirectUrl: redirect.toString() };
   }
 
-  async function authorize(input: {
+  async function prepareAuthorization(input: {
     query: OAuthAuthorizationQuery;
     route?: ScopedConnectRoute;
     userId: string;
@@ -205,13 +216,38 @@ export function createAuthorizationService(params: {
       userId: input.userId,
       executionContext: input.executionContext,
     });
+    const scopes = grantedScopes(client.declared_scopes, input.query.scope);
+    return { client, route, resolved, scopes };
+  }
+
+  async function previewAuthorization(input: {
+    query: OAuthAuthorizationQuery;
+    route?: ScopedConnectRoute;
+    userId: string;
+    executionContext: GatewayExecutionContext;
+  }) {
+    const prepared = await prepareAuthorization(input);
+    return {
+      clientId: prepared.client.client_id,
+      clientName: prepared.client.client_name,
+      resource: prepared.resolved.route.canonical_url,
+      scopes: prepared.scopes,
+    };
+  }
+
+  async function authorize(input: {
+    query: OAuthAuthorizationQuery;
+    route?: ScopedConnectRoute;
+    userId: string;
+    executionContext: GatewayExecutionContext;
+  }) {
+    const { client, route, resolved, scopes } = await prepareAuthorization(input);
     const instance = await params.repository.ensureConnectionInstance({
       ownerScope: resolved.config.owner_scope,
       ownerId: resolved.config.owner_id,
       configId: resolved.config.config_id,
       userId: input.userId,
     });
-    const scopes = grantedScopes(client.declared_scopes, input.query.scope);
     const request = await createAuthorizationRequestWithInstance({
       client,
       route,
@@ -269,7 +305,12 @@ export function createAuthorizationService(params: {
     return await finalizeAuthorizationRequest(paramsInput.authorizationRequest);
   }
 
-  return { authorize, finalizeAuthorizationRequest, completeProviderAuthorization };
+  return {
+    previewAuthorization,
+    authorize,
+    finalizeAuthorizationRequest,
+    completeProviderAuthorization,
+  };
 }
 
 export type GatewayAuthorizationService = ReturnType<typeof createAuthorizationService>;

@@ -8,6 +8,8 @@ import {
   parseScopedConnectPath,
   isPublicIp,
   ProviderGrantBundleSchema,
+  OAuthClientMetadataSchema,
+  OAuthAuthorizationQuerySchema,
 } from './index';
 
 describe('scoped routes', () => {
@@ -63,6 +65,34 @@ describe('provider grant schema', () => {
         expiresAt: null,
       })
     ).toThrow();
+  });
+});
+
+describe('OAuth redirect URI policy', () => {
+  test('requires HTTPS except loopback HTTP redirects', () => {
+    expect(
+      OAuthClientMetadataSchema.safeParse({
+        redirect_uris: ['https://client.example/callback'],
+        token_endpoint_auth_method: 'none',
+        grant_types: ['authorization_code'],
+        response_types: ['code'],
+      }).success
+    ).toBe(true);
+    expect(
+      OAuthClientMetadataSchema.safeParse({
+        redirect_uris: ['http://localhost:3000/callback'],
+        token_endpoint_auth_method: 'none',
+        grant_types: ['authorization_code'],
+        response_types: ['code'],
+      }).success
+    ).toBe(true);
+    expect(
+      OAuthAuthorizationQuerySchema.safeParse({
+        client_id: 'mcp:client',
+        redirect_uri: 'http://example.com/callback',
+        response_type: 'code',
+      }).success
+    ).toBe(false);
   });
 });
 

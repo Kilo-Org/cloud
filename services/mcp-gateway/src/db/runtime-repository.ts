@@ -26,6 +26,11 @@ export function getRuntimeDb(env: MCPGatewayEnv['Bindings']) {
   return getWorkerDb(env.HYPERDRIVE.connectionString, { statement_timeout: 5_000 });
 }
 
+export type ActiveRouteResolution = {
+  route: typeof mcp_gateway_connect_resources.$inferSelect;
+  config: typeof mcp_gateway_configs.$inferSelect;
+};
+
 export type RuntimeResolution = {
   route: typeof mcp_gateway_connect_resources.$inferSelect;
   config: typeof mcp_gateway_configs.$inferSelect;
@@ -37,13 +42,12 @@ export type RuntimeResolution = {
   staticSecret: typeof mcp_gateway_config_secrets.$inferSelect | null;
 };
 
-export async function resolveRuntimeState(params: {
+export async function resolveActiveRoute(params: {
   env: MCPGatewayEnv['Bindings'];
   route: ScopedConnectRoute;
-  userId: string;
-}): Promise<RuntimeResolution | null> {
+}): Promise<ActiveRouteResolution | null> {
   const db = getRuntimeDb(params.env);
-  const routeRows = await db
+  const rows = await db
     .select({ route: mcp_gateway_connect_resources, config: mcp_gateway_configs })
     .from(mcp_gateway_connect_resources)
     .innerJoin(
@@ -62,7 +66,16 @@ export async function resolveRuntimeState(params: {
       )
     )
     .limit(1);
-  const resolved = routeRows[0];
+  return rows[0] ?? null;
+}
+
+export async function resolveRuntimeState(params: {
+  env: MCPGatewayEnv['Bindings'];
+  route: ScopedConnectRoute;
+  userId: string;
+}): Promise<RuntimeResolution | null> {
+  const db = getRuntimeDb(params.env);
+  const resolved = await resolveActiveRoute(params);
   if (!resolved) return null;
 
   const [user] = await db

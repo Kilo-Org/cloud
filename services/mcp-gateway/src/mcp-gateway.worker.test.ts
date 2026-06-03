@@ -1,6 +1,15 @@
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 
+vi.mock('./db/runtime-repository', () => ({
+  resolveActiveRoute: async ({ route }: { route: { routeKey: string } }) =>
+    route.routeKey === 'abcdefghijklmnopqrstuvwxyzABCDEF'
+      ? { route: { route_key: route.routeKey }, config: { enabled: true } }
+      : null,
+  resolveRuntimeState: async () => null,
+  recordRuntimeAudit: async () => undefined,
+}));
+
 vi.mock('cloudflare:workers', () => ({
   DurableObject: class FakeDurableObject {
     constructor(..._args: unknown[]) {}
@@ -36,10 +45,8 @@ describe('MCP gateway route surface', () => {
     const responses = await Promise.all([
       request(userRoute),
       request(userRoute, 'POST'),
-      request(userRoute, 'DELETE'),
       request(orgRoute),
       request(orgRoute, 'POST'),
-      request(orgRoute, 'DELETE'),
     ]);
 
     for (const response of responses) {
@@ -111,6 +118,23 @@ describe('MCP gateway route surface', () => {
     for (const response of responses) {
       expect(response.status).toBe(404);
     }
+  });
+
+  it('does not expose DELETE on scoped runtime routes', async () => {
+    const responses = await Promise.all([
+      request(userRoute, 'DELETE'),
+      request(orgRoute, 'DELETE'),
+    ]);
+    for (const response of responses) {
+      expect(response.status).toBe(404);
+    }
+  });
+
+  it('fails closed for unknown scoped routes', async () => {
+    const response = await request(
+      '/mcp-connect/user/user-123/11111111-1111-4111-8111-111111111111/abcdefghijklmnopqrstuvwxyzABCDEZ'
+    );
+    expect(response.status).toBe(404);
   });
 
   it('does not expose legacy opaque connect routes', async () => {

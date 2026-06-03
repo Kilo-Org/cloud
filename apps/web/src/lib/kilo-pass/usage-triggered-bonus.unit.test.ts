@@ -1,5 +1,6 @@
 import { describe, expect, test } from '@jest/globals';
 
+import { KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF } from '@/lib/kilo-pass/constants';
 import { KiloPassTier, KiloPassWelcomePromoEligibilityReason } from '@/lib/kilo-pass/enums';
 import {
   computeUsageTriggeredMonthlyBonusDecision,
@@ -113,7 +114,7 @@ describe('usage-triggered-bonus (unit)', () => {
       }
     );
 
-    test('first-time month 2 uses ramp (not 50%) and bonusKind=monthly-ramp', () => {
+    test('first-time month 2 before cutoff retains promo and bonusKind=promo-50pct', () => {
       const d = computeUsageTriggeredMonthlyBonusDecision({
         tier: KiloPassTier.Tier49,
         startedAtIso: '2026-01-01T00:00:00.000Z',
@@ -122,8 +123,23 @@ describe('usage-triggered-bonus (unit)', () => {
         issueMonth: '2026-02-01',
       });
 
+      expect(d.shouldIssueFirstMonthPromo).toBe(true);
+      expect(d.bonusPercentApplied).toBe(0.5);
+      expect(d.description).toBe('Kilo Pass promo 50% bonus (tier_49, streak=2)');
+      expect(d.auditPayload).toEqual(expect.objectContaining({ bonusKind: 'promo-50pct' }));
+    });
+
+    test('first-time month 2 at cutoff uses ramp and bonusKind=monthly-ramp', () => {
+      const d = computeUsageTriggeredMonthlyBonusDecision({
+        tier: KiloPassTier.Tier49,
+        startedAtIso: KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF.toISOString(),
+        currentStreakMonths: 2,
+        isFirstTimeSubscriberEver: true,
+        issueMonth: '2026-06-01',
+      });
+
       expect(d.shouldIssueFirstMonthPromo).toBe(false);
-      expect(d.bonusPercentApplied).not.toBe(0.5);
+      expect(d.bonusPercentApplied).toBe(0.1);
       expect(d.description).toBe('Kilo Pass monthly bonus (tier_49, streak=2)');
       expect(d.auditPayload).toEqual(expect.objectContaining({ bonusKind: 'monthly-ramp' }));
     });

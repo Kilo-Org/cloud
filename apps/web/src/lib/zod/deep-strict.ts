@@ -9,15 +9,16 @@ import { z } from 'zod';
  * document (e.g. an admin editing a custom-LLM definition).
  *
  * Handled wrappers: object, optional, nullable, array, record, union
- * (covers `z.discriminatedUnion`, which shares `type: 'union'`). These are
- * the wrappers used by `CustomLlmDefinitionSchema` today.
+ * (covers `z.discriminatedUnion`, which shares `type: 'union'`), and
+ * intersection. These include the wrappers used by `CustomLlmDefinitionSchema`
+ * today.
  *
  * Recognised leaves (string, number, boolean, date, enum, literal,
  * template_literal, bigint, symbol, null, undefined, void, never, any,
  * unknown, nan, file) are returned unchanged.
  *
- * Any other Zod type (intersection, tuple, map, set, nonoptional, default,
- * prefault, readonly, catch, pipe, lazy, transform, promise, function,
+ * Any other Zod type (tuple, map, set, nonoptional, default, prefault,
+ * readonly, catch, pipe, lazy, transform, promise, function,
  * custom, success) throws, so a future schema change that introduces a new
  * wrapper surfaces here instead of silently skipping deep-strict and
  * allowing unknown keys through.
@@ -42,6 +43,30 @@ const LEAF_TYPES = new Set<string>([
   'literal',
   'template_literal',
 ]);
+
+type ZodShape = Record<string, z.ZodTypeAny>;
+
+function mergeIntersectionShapes(left: ZodShape, right: ZodShape): ZodShape {
+  const merged = { ...left };
+  for (const [key, value] of Object.entries(right)) {
+    merged[key] = Object.hasOwn(merged, key) ? z.intersection(merged[key], value) : value;
+  }
+  return merged;
+}
+
+function getIntersectionObjectShape(schema: z.ZodTypeAny): ZodShape | null {
+  if (schema.type === 'object') {
+    return (schema as z.ZodObject).shape;
+  }
+  if (schema.type !== 'intersection') {
+    return null;
+  }
+
+  const intersection = schema as z.ZodIntersection;
+  const left = getIntersectionObjectShape(intersection.def.left as z.ZodTypeAny);
+  const right = getIntersectionObjectShape(intersection.def.right as z.ZodTypeAny);
+  return left && right ? mergeIntersectionShapes(left, right) : null;
+}
 
 export function deepStrict<T extends z.ZodType>(schema: T): z.ZodType<z.infer<T>> {
   const anySchema = schema as unknown as z.ZodTypeAny;
@@ -78,6 +103,18 @@ export function deepStrict<T extends z.ZodType>(schema: T): z.ZodType<z.infer<T>
       const strictOptions = options.map(o => deepStrict(o));
       return z.union(
         strictOptions as unknown as readonly [z.ZodTypeAny, z.ZodTypeAny, ...z.ZodTypeAny[]]
+      ) as unknown as z.ZodType<z.infer<T>>;
+    }
+    case 'intersection': {
+      const objectShape = getIntersectionObjectShape(anySchema);
+      if (objectShape) {
+        return deepStrict(z.object(objectShape)) as unknown as z.ZodType<z.infer<T>>;
+      }
+
+      const intersection = anySchema as z.ZodIntersection;
+      return z.intersection(
+        deepStrict(intersection.def.left as z.ZodTypeAny),
+        deepStrict(intersection.def.right as z.ZodTypeAny)
       ) as unknown as z.ZodType<z.infer<T>>;
     }
     default: {

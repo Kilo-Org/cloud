@@ -100,9 +100,9 @@ describe('undoPricingDiscount', () => {
       discount: 0.7,
     });
     expect(result).toEqual({
-      prompt: '0.0000002',
-      completion: '0.000002',
-      input_cache_read: '0.00000005',
+      prompt: '0.000000200000',
+      completion: '0.000002000000',
+      input_cache_read: '0.000000050000',
     });
     expect('discount' in result).toBe(false);
     for (const value of Object.values(result)) {

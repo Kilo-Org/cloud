@@ -328,7 +328,7 @@ function GoogleGIcon({ className }: { className?: string }) {
 }
 
 // ---------------------------------------------------------------------------
-// Google Calendar (official Kilo OAuth client — credential_profile=kilo_owned)
+// Google Calendar (official Kilo OAuth client, credential_profile=kilo_owned)
 // ---------------------------------------------------------------------------
 
 // Read-only capability summary, mirrored from the onboarding calendar step
@@ -336,7 +336,7 @@ function GoogleGIcon({ className }: { className?: string }) {
 const GOOGLE_CALENDAR_FEATURES: Array<{ included: boolean; label: string }> = [
   { included: true, label: 'Read your calendar events (titles, times, attendees, locations)' },
   { included: true, label: 'Read calendars you own and subscribe to' },
-  { included: false, label: 'Create, modify, or delete events — we never request write access' },
+  { included: false, label: 'Create, modify, or delete events (we never request write access)' },
 ];
 
 // Friendly messages for the `?error=` codes the Google OAuth connect/callback/
@@ -514,17 +514,19 @@ function GoogleCalendarCard({
 function GoogleAccountCard({
   connected,
   gmailNotificationsEnabled,
+  inboundEmailAddress,
   mutations,
   onRedeploy,
 }: {
   connected: boolean;
   gmailNotificationsEnabled: boolean;
+  inboundEmailAddress: string | null;
   mutations: ClawMutations;
   onRedeploy?: () => void;
 }) {
   // This card is rendered only for users who already have the legacy Gog
   // connection (status.googleConnected). The self-service setup-command flow
-  // is intentionally not surfaced — Gog is being retired in favor of the
+  // is intentionally not surfaced; Gog is being retired in favor of the
   // official Google Calendar OAuth card above, so we only offer disconnect.
   const [open, setOpen] = useState(false);
   const [confirmDisconnect, setConfirmDisconnect] = useState(false);
@@ -554,7 +556,7 @@ function GoogleAccountCard({
                   </Badge>
                 </div>
                 <span className="text-muted-foreground text-xs">
-                  Legacy Google connection — being retired
+                  Legacy Google connection, being retired
                 </span>
               </div>
               <ChevronDown
@@ -568,17 +570,33 @@ function GoogleAccountCard({
             <div className="space-y-4 px-4 py-3">
               <div className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 p-3">
                 <Info className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
-                <div className="space-y-1 text-xs">
-                  <p className="text-foreground font-medium">
-                    This connection method is being retired.
+                <div className="space-y-2 text-xs">
+                  <p className="text-muted-foreground">
+                    {
+                      "This integration is being retired. We recommend disconnecting your current integration and switching to KiloCode's official Google approved OAuth client."
+                    }
                   </p>
                   <p className="text-muted-foreground">
-                    We recommend disconnecting and using the{' '}
-                    <span className="text-foreground font-medium">Google Calendar</span> card above,
-                    which connects with Kilo&apos;s official OAuth. For email, use your{' '}
-                    <span className="text-foreground font-medium">Inbound Email</span> address below
-                    — it&apos;s set up automatically.
+                    {'To reconnect, use the '}
+                    <span className="text-foreground font-medium">Google Calendar</span>
+                    {
+                      " integration listed above. This integration uses KiloCode's official OAuth application and is fully supported going forward."
+                    }
                   </p>
+                  <p className="text-muted-foreground">
+                    {"For email functionality, use your bot's automatically provisioned "}
+                    <span className="text-foreground font-medium">Inbound Email</span>
+                    {' address below:'}
+                  </p>
+                  {inboundEmailAddress ? (
+                    <code className="bg-muted text-foreground inline-block max-w-full truncate rounded px-2 py-1 text-xs">
+                      {inboundEmailAddress}
+                    </code>
+                  ) : (
+                    <span className="text-muted-foreground">
+                      Your Inbound Email address appears in the Inbound Email card below.
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -637,7 +655,7 @@ function GoogleAccountCard({
         open={confirmDisconnect}
         onOpenChange={setConfirmDisconnect}
         title="Disconnect Google Account"
-        description="This removes your legacy Google credentials. This connection method is being retired — to keep calendar access, use the Google Calendar (OAuth) card; for email, use your Inbound Email address. Redeploy after disconnecting to apply."
+        description="This removes your legacy Google credentials. This connection method is being retired. To keep calendar access, use the Google Calendar (OAuth) card; for email, use your Inbound Email address. Redeploy after disconnecting to apply."
         confirmLabel="Disconnect"
         confirmIcon={<X className="mr-1 h-4 w-4" />}
         isPending={isDisconnecting}
@@ -2681,6 +2699,7 @@ export function SettingsTab({
             <GoogleAccountCard
               connected={status.googleConnected}
               gmailNotificationsEnabled={status.gmailNotificationsEnabled}
+              inboundEmailAddress={status.inboundEmailAddress}
               mutations={mutations}
               onRedeploy={onRedeploy}
             />

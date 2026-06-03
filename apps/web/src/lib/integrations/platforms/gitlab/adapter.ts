@@ -29,6 +29,8 @@ const GITLAB_REDIRECT_URI = getPlatformOAuthCallbackUrl(PLATFORM.GITLAB);
 
 const DEFAULT_GITLAB_URL = DEFAULT_GITLAB_INSTANCE_URL;
 const MAX_GITLAB_REDIRECTS = 5;
+const MAX_GITLAB_RESPONSE_BYTES = 10 * 1024 * 1024;
+const GITLAB_REQUEST_TIMEOUT_MS = 30_000;
 
 async function fetchGitLab(url: string, init?: RequestInit, redirectCount = 0): Promise<Response> {
   const response = await fetchGitLabOnce(url, init);
@@ -132,8 +134,19 @@ function fetchGitLabBoundToAddress(
       },
       response => {
         const chunks: Buffer[] = [];
+        let responseBytes = 0;
         response.on('data', chunk => {
-          chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+          const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+          responseBytes += buffer.byteLength;
+          if (responseBytes > MAX_GITLAB_RESPONSE_BYTES) {
+            const error = new Error('GitLab response exceeded size limit');
+            response.destroy(error);
+            req.destroy(error);
+            reject(error);
+            return;
+          }
+
+          chunks.push(buffer);
         });
         response.on('error', reject);
         response.on('end', () => {
@@ -155,6 +168,9 @@ function fetchGitLabBoundToAddress(
     );
 
     req.on('error', reject);
+    req.setTimeout(GITLAB_REQUEST_TIMEOUT_MS, () => {
+      req.destroy(new Error('GitLab request timed out'));
+    });
 
     const signal = init?.signal;
     if (signal) {

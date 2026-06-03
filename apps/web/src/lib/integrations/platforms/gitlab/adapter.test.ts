@@ -56,9 +56,11 @@ function mockSelfHostedGitLabResponse(args: {
       write: jest.Mock;
       end: jest.Mock;
       destroy: jest.Mock;
+      setTimeout: jest.Mock;
     };
     request.write = jest.fn();
     request.destroy = jest.fn();
+    request.setTimeout = jest.fn();
     request.end = jest.fn(() => {
       callback?.(response as never);
       if (args.responseError) {
@@ -78,9 +80,11 @@ function mockSelfHostedGitLabError(error: Error) {
       write: jest.Mock;
       end: jest.Mock;
       destroy: jest.Mock;
+      setTimeout: jest.Mock;
     };
     request.write = jest.fn();
     request.destroy = jest.fn();
+    request.setTimeout = jest.fn();
     request.end = jest.fn(() => {
       request.emit('error', error);
     });
@@ -787,6 +791,14 @@ describe('deleteProjectWebhook', () => {
     await expect(
       deleteProjectWebhook('test-token', 123, 456, 'https://gitlab.example.com')
     ).rejects.toThrow('response interrupted');
+  });
+
+  it('rejects oversized self-hosted responses', async () => {
+    mockSelfHostedGitLabResponse({ status: 200, body: 'x'.repeat(10 * 1024 * 1024 + 1) });
+
+    await expect(
+      deleteProjectWebhook('test-token', 123, 456, 'https://gitlab.example.com')
+    ).rejects.toThrow('GitLab response exceeded size limit');
   });
 
   it('strips authorization headers when redirects change origin', async () => {

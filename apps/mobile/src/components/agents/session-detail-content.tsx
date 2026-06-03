@@ -141,7 +141,8 @@ export function SessionDetailContent({ sessionId }: Readonly<SessionDetailConten
   });
   const shouldShowFooterWorking = shouldShowFooterWorkingIndicator({
     isAgentWorking: shouldShowWorkingIndicator,
-    hasStatusIndicator: statusIndicator !== null,
+    hasStatusIndicator:
+      statusIndicator !== null || (cloudStatus !== null && cloudStatus.type !== 'ready'),
   });
 
   const emptyStateText = error ?? (statusIndicator ? null : 'No messages yet');

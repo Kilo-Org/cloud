@@ -11,6 +11,7 @@ declare namespace Cloudflare {
 		SESSION_INGEST_R2: R2Bucket;
 		HYPERDRIVE: Hyperdrive;
 		INGEST_QUEUE: Queue;
+		SLOW_INGEST_QUEUE: Queue;
 		NEXTAUTH_SECRET_PROD: SecretsStoreSecret;
 		INTERNAL_API_SECRET_PROD: SecretsStoreSecret;
 		SESSION_INGEST_DO: DurableObjectNamespace<import("./src/index").SessionIngestDO>;

@@ -47,6 +47,10 @@
         "binding": "INGEST_QUEUE",
         "queue": "session-ingest-processing-test",
       },
+      {
+        "binding": "SLOW_INGEST_QUEUE",
+        "queue": "session-ingest-processing-slow-test",
+      },
     ],
   },
 }

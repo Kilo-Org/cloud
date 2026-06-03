@@ -81,10 +81,19 @@
         "binding": "INGEST_QUEUE",
         "queue": "session-ingest-processing",
       },
+      {
+        "binding": "SLOW_INGEST_QUEUE",
+        "queue": "session-ingest-processing-slow",
+      },
     ],
     "consumers": [
       {
         "queue": "session-ingest-processing",
+        "max_retries": 3,
+        "dead_letter_queue": "session-ingest-dlq",
+      },
+      {
+        "queue": "session-ingest-processing-slow",
         "max_retries": 3,
         "dead_letter_queue": "session-ingest-dlq",
       },

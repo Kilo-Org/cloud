@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import type * as SessionEvents from './session-events';
+import type { Env } from './env';
 
 // Mock cloudflare:workers before any imports that might pull in DO code
 vi.mock('cloudflare:workers', () => ({
@@ -44,7 +45,12 @@ vi.mock('./util/ingest-limits', () => ({
 import { getWorkerDb } from '@kilocode/db/client';
 import { getSessionIngestDO } from './dos/SessionIngestDO';
 import { notifyUserSessionEvent } from './session-events';
-import { computeSessionMetadataUpdates, createItemExtractor, queue } from './queue-consumer';
+import {
+  SLOW_INGEST_DELAY_SECONDS,
+  computeSessionMetadataUpdates,
+  createItemExtractor,
+  queue,
+} from './queue-consumer';
 
 const encoder = new TextEncoder();
 
@@ -202,6 +208,157 @@ describe('computeSessionMetadataUpdates', () => {
 });
 
 describe('queue status notifications', () => {
+  it('moves messages with missing staging objects from the fast queue to the slow queue', async () => {
+    const select = {
+      from: vi.fn(() => select),
+      where: vi.fn(() => select),
+      limit: vi.fn(async () => [{ session_id: 'ses_12345678901234567890123456' }]),
+    };
+    const db = {
+      select: vi.fn(() => select),
+    } as unknown as ReturnType<typeof getWorkerDb>;
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+
+    const env = {
+      HYPERDRIVE: { connectionString: 'postgres://test' },
+      SESSION_INGEST_R2: {
+        get: vi.fn(async () => null),
+        delete: vi.fn(async () => undefined),
+        put: vi.fn(async () => undefined),
+      },
+      SLOW_INGEST_QUEUE: {
+        send: vi.fn(async () => undefined),
+      },
+    } as unknown as Env;
+    const ack = vi.fn();
+    const retry = vi.fn();
+    const body = {
+      r2Key: 'ingest/missing',
+      kiloUserId: 'usr_test',
+      sessionId: 'ses_12345678901234567890123456',
+      ingestVersion: 1,
+      ingestedAt: 1,
+    };
+    const batch = {
+      queue: 'session-ingest-processing',
+      messages: [
+        {
+          body,
+          ack,
+          retry,
+        },
+      ],
+    } as never;
+
+    await queue(batch, env, { waitUntil: vi.fn() } as unknown as ExecutionContext);
+
+    expect(env.SESSION_INGEST_R2.get).toHaveBeenCalledWith('ingest/missing');
+    expect(env.SLOW_INGEST_QUEUE.send).toHaveBeenCalledWith(
+      { ...body, missingR2SlowAttempt: true },
+      { delaySeconds: SLOW_INGEST_DELAY_SECONDS }
+    );
+    expect(ack).toHaveBeenCalledTimes(1);
+    expect(retry).not.toHaveBeenCalled();
+  });
+
+  it('acks stale flagged messages when the staging object is still missing', async () => {
+    const select = {
+      from: vi.fn(() => select),
+      where: vi.fn(() => select),
+      limit: vi.fn(async () => [{ session_id: 'ses_12345678901234567890123456' }]),
+    };
+    const db = {
+      select: vi.fn(() => select),
+    } as unknown as ReturnType<typeof getWorkerDb>;
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+
+    const env = {
+      HYPERDRIVE: { connectionString: 'postgres://test' },
+      SESSION_INGEST_R2: {
+        get: vi.fn(async () => null),
+        delete: vi.fn(async () => undefined),
+        put: vi.fn(async () => undefined),
+      },
+      SLOW_INGEST_QUEUE: {
+        send: vi.fn(async () => undefined),
+      },
+    } as unknown as Env;
+    const ack = vi.fn();
+    const retry = vi.fn();
+    const batch = {
+      queue: 'any-queue-name',
+      messages: [
+        {
+          body: {
+            r2Key: 'ingest/missing',
+            kiloUserId: 'usr_test',
+            sessionId: 'ses_12345678901234567890123456',
+            ingestVersion: 1,
+            ingestedAt: 1,
+            missingR2SlowAttempt: true,
+          },
+          ack,
+          retry,
+        },
+      ],
+    } as never;
+
+    await queue(batch, env, { waitUntil: vi.fn() } as unknown as ExecutionContext);
+
+    expect(env.SLOW_INGEST_QUEUE.send).not.toHaveBeenCalled();
+    expect(ack).toHaveBeenCalledTimes(1);
+    expect(retry).not.toHaveBeenCalled();
+  });
+
+  it('retries the original message when slow-queue enqueue fails', async () => {
+    const select = {
+      from: vi.fn(() => select),
+      where: vi.fn(() => select),
+      limit: vi.fn(async () => [{ session_id: 'ses_12345678901234567890123456' }]),
+    };
+    const db = {
+      select: vi.fn(() => select),
+    } as unknown as ReturnType<typeof getWorkerDb>;
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+
+    const env = {
+      HYPERDRIVE: { connectionString: 'postgres://test' },
+      SESSION_INGEST_R2: {
+        get: vi.fn(async () => null),
+        delete: vi.fn(async () => undefined),
+        put: vi.fn(async () => undefined),
+      },
+      SLOW_INGEST_QUEUE: {
+        send: vi.fn(async () => {
+          throw new Error('slow queue unavailable');
+        }),
+      },
+    } as unknown as Env;
+    const ack = vi.fn();
+    const retry = vi.fn();
+    const batch = {
+      queue: 'session-ingest-processing',
+      messages: [
+        {
+          body: {
+            r2Key: 'ingest/missing',
+            kiloUserId: 'usr_test',
+            sessionId: 'ses_12345678901234567890123456',
+            ingestVersion: 1,
+            ingestedAt: 1,
+          },
+          ack,
+          retry,
+        },
+      ],
+    } as never;
+
+    await queue(batch, env, { waitUntil: vi.fn() } as unknown as ExecutionContext);
+
+    expect(ack).not.toHaveBeenCalled();
+    expect(retry).toHaveBeenCalledTimes(1);
+  });
+
   it('emits a status update using the locked pre-update status instead of the intake snapshot', async () => {
     vi.mocked(notifyUserSessionEvent).mockClear();
     const persistedSession = {

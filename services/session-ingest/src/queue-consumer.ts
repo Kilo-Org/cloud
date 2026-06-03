@@ -18,7 +18,10 @@ export interface IngestQueueMessage {
   sessionId: string;
   ingestVersion: number;
   ingestedAt: number;
+  missingR2SlowAttempt?: boolean;
 }
+
+export const SLOW_INGEST_DELAY_SECONDS = 300;
 
 /**
  * Creates a streaming item extractor that uses a low-level Tokenizer to parse
@@ -174,7 +177,24 @@ async function processMessage(
 
   const obj = await env.SESSION_INGEST_R2.get(r2Key);
   if (!obj) {
-    throw new Error(`R2 staging object not found: ${r2Key}`);
+    if (msg.missingR2SlowAttempt) {
+      console.warn('R2 staging object not found on slow queue, dropping stale queue message', {
+        r2Key,
+        sessionId,
+      });
+      return;
+    }
+
+    console.warn('R2 staging object not found, moving queue message to slow ingest queue', {
+      r2Key,
+      sessionId,
+      delaySeconds: SLOW_INGEST_DELAY_SECONDS,
+    });
+    await env.SLOW_INGEST_QUEUE.send(
+      { ...msg, missingR2SlowAttempt: true },
+      { delaySeconds: SLOW_INGEST_DELAY_SECONDS }
+    );
+    return;
   }
 
   const mergedChanges = new Map<string, string | null>();

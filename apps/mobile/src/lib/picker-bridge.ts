@@ -13,7 +13,7 @@ type ModePickerBridge = {
   onSelect: (mode: AgentMode) => void;
 };
 
-type RepoOption = {
+export type RepoOption = {
   fullName: string;
   isPrivate: boolean;
 };

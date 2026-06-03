@@ -20,6 +20,7 @@ import { ATTRIBUTION_HEADERS } from '@/lib/ai-gateway/providers/openrouter/attri
 import { getOpenRouterModelsMetadata } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import { getPreferredProviderOrder } from '@/lib/ai-gateway/providers/apply-provider-specific-logic';
 import { normalizeInferenceProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import { getTerminalBenchSummaries, terminalBenchFor } from '@/lib/model-stats/terminal-bench';
 
 // Re-export from shared module for backwards compatibility
 export { normalizeModelId } from '@/lib/ai-gateway/model-utils';
@@ -93,6 +94,7 @@ export function formatName(model: OpenRouterModel, preferredIndex: number) {
 async function enhancedModelList(models: OpenRouterModel[]) {
   const autoModels = buildAutoModels();
   const endpointsMetadata = await getOpenRouterModelsMetadata();
+  const summaries = await getTerminalBenchSummaries();
   const enhancedModels = await Promise.all(
     models
       .filter(
@@ -111,7 +113,12 @@ async function enhancedModelList(models: OpenRouterModel[]) {
                 normalizeInferenceProviderId(preferredProvider)
             )?.pricing)
           : undefined;
-        return pricing ? { ...model, pricing } : model;
+        const terminalBench = terminalBenchFor(summaries, model.id);
+        return {
+          ...model,
+          ...(pricing && { pricing }),
+          ...(terminalBench && { terminalBench }),
+        };
       })
       .concat(
         kiloExclusiveModels

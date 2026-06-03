@@ -203,7 +203,7 @@ function validateGitHubCapabilityUpstream(
   if (url.username || url.password || url.hash) return 'invalid_upstream_url';
   const method = requestMethod.toUpperCase();
   if (url.hostname === 'api.github.com' && url.port === '') {
-    if (!['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD'].includes(method)) {
+    if (!['GET', 'POST', 'PATCH', 'HEAD'].includes(method)) {
       return 'invalid_upstream_request';
     }
     const repositoryApiPath = `/repos/${repository.owner}/${repository.repo}`;

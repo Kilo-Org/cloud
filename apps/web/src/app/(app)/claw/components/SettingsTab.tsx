@@ -21,6 +21,7 @@ import { OpenclawImportCard } from './OpenclawImportCard';
 
 import { usePostHog } from 'posthog-js/react';
 import Link from 'next/link';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { useModelSelectorList } from '@/app/api/openrouter/hooks';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
@@ -31,7 +32,6 @@ import type { useKiloClawMutations } from '@/hooks/useKiloClaw';
 import {
   useClawConfig,
   useClawMyPin,
-  useClawGoogleSetupCommand,
   useClawGatewayReady,
   useClawMorningBriefingStatus,
   useClawReadMorningBriefing,
@@ -328,6 +328,186 @@ function GoogleGIcon({ className }: { className?: string }) {
 }
 
 // ---------------------------------------------------------------------------
+// Google Calendar (official Kilo OAuth client — credential_profile=kilo_owned)
+// ---------------------------------------------------------------------------
+
+// Read-only capability summary, mirrored from the onboarding calendar step
+// (CalendarConnectStep.tsx) so the settings copy stays consistent.
+const GOOGLE_CALENDAR_FEATURES: Array<{ included: boolean; label: string }> = [
+  { included: true, label: 'Read your calendar events (titles, times, attendees, locations)' },
+  { included: true, label: 'Read calendars you own and subscribe to' },
+  { included: false, label: 'Create, modify, or delete events — we never request write access' },
+];
+
+// Friendly messages for the `?error=` codes the Google OAuth connect/callback/
+// disconnect routes append when they redirect back to settings. Only these
+// known codes (plus the two success values) are handled, so unrelated query
+// params on the settings page are left untouched.
+const GOOGLE_OAUTH_ERROR_MESSAGES: Record<string, string> = {
+  missing_permissions:
+    'Calendar access was not granted. Please allow calendar permission and try again.',
+  connection_failed: 'Could not connect Google Calendar. Please try again.',
+  oauth_init_failed: 'Could not start the Google connection. Please try again.',
+  missing_instance: 'Your KiloClaw instance is still starting. Try again in a moment.',
+  missing_code: 'Google did not return an authorization code. Please try again.',
+  invalid_state: 'The connection link expired. Please try connecting again.',
+  invalid_origin: 'Could not complete the request. Please try again.',
+  invalid_organization: 'Invalid organization for this connection.',
+  unauthorized: 'You are not authorized to complete this connection.',
+  disconnect_failed: 'Could not disconnect Google Calendar. Please try again.',
+};
+
+/**
+ * Settings card for the officially-approved Kilo OAuth client. This is the
+ * preferred Google Calendar connection and the successor to the legacy Gog
+ * flow (GoogleAccountCard). Connect/disconnect reuse the existing
+ * /api/integrations/google/{connect,disconnect} routes; disconnect is a native
+ * same-origin form POST so the route's Origin check passes and the 303 redirect
+ * lands back on settings with a success/error param.
+ */
+function GoogleCalendarCard({
+  connected,
+  oauthStatus,
+  accountEmail,
+  organizationId,
+}: {
+  connected: boolean;
+  oauthStatus: 'active' | 'action_required' | 'disconnected';
+  accountEmail: string | null;
+  organizationId: string | null;
+}) {
+  const [open, setOpen] = useState(false);
+  const [confirmDisconnect, setConfirmDisconnect] = useState(false);
+  const [isDisconnecting, setIsDisconnecting] = useState(false);
+  const disconnectFormRef = useRef<HTMLFormElement>(null);
+
+  const settingsPath = organizationId
+    ? `/organizations/${organizationId}/claw/settings`
+    : '/claw/settings';
+  const connectParams = new URLSearchParams({ returnTo: settingsPath });
+  if (organizationId) {
+    connectParams.set('organizationId', organizationId);
+  }
+  const connectUrl = `/api/integrations/google/connect?${connectParams.toString()}`;
+  const disconnectAction = organizationId
+    ? `/api/integrations/google/disconnect?organizationId=${encodeURIComponent(organizationId)}`
+    : '/api/integrations/google/disconnect';
+
+  const needsReconnect = oauthStatus === 'action_required';
+  const isHealthyConnected = connected && !needsReconnect;
+
+  return (
+    <>
+      <Collapsible open={open} onOpenChange={setOpen}>
+        <div className="rounded-lg border">
+          <CollapsibleTrigger asChild>
+            <button
+              type="button"
+              className="hover:bg-muted/50 flex w-full cursor-pointer items-center gap-3 rounded-lg px-4 py-3 transition-colors"
+            >
+              <GoogleGIcon className="h-5 w-5 shrink-0" />
+              <div className="flex min-w-0 flex-1 flex-col items-start">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium">Google Calendar</span>
+                  <Badge
+                    variant={isHealthyConnected ? 'default' : 'secondary'}
+                    className="px-1.5 py-0 text-[10px] leading-4"
+                  >
+                    {connected ? (needsReconnect ? 'Reconnect' : 'Connected') : 'Not connected'}
+                  </Badge>
+                </div>
+                <span className="text-muted-foreground text-xs">
+                  Read-only calendar access · via Kilo OAuth
+                </span>
+              </div>
+              <ChevronDown
+                className={`text-muted-foreground h-4 w-4 shrink-0 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
+              />
+            </button>
+          </CollapsibleTrigger>
+
+          <CollapsibleContent>
+            <Separator />
+            <div className="space-y-4 px-4 py-3">
+              {isHealthyConnected ? (
+                <>
+                  <p className="text-muted-foreground text-xs">
+                    {accountEmail ? `Connected as ${accountEmail}` : 'Connected'} · read-only access
+                    to your calendar events.
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={isDisconnecting}
+                    onClick={() => setConfirmDisconnect(true)}
+                  >
+                    <X className="h-4 w-4" />
+                    {isDisconnecting ? 'Disconnecting...' : 'Disconnect'}
+                  </Button>
+                </>
+              ) : (
+                <>
+                  {needsReconnect && (
+                    <p className="text-xs text-amber-500">
+                      Your calendar connection needs to be re-authorized. Reconnect to resume
+                      access.
+                    </p>
+                  )}
+                  <ul className="space-y-2">
+                    {GOOGLE_CALENDAR_FEATURES.map(feature => (
+                      <li key={feature.label} className="flex items-start gap-2">
+                        {feature.included ? (
+                          <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-500" />
+                        ) : (
+                          <X className="text-muted-foreground/60 mt-0.5 h-3.5 w-3.5 shrink-0" />
+                        )}
+                        <span
+                          className={
+                            feature.included
+                              ? 'text-muted-foreground text-xs'
+                              : 'text-muted-foreground/70 text-xs'
+                          }
+                        >
+                          {feature.label}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                  <Button asChild size="sm">
+                    <Link href={connectUrl}>
+                      {needsReconnect ? 'Reconnect Google Calendar' : 'Connect Google Calendar'}
+                    </Link>
+                  </Button>
+                </>
+              )}
+            </div>
+          </CollapsibleContent>
+        </div>
+      </Collapsible>
+
+      {/* Native form POST so the disconnect route's same-origin Origin check
+          passes; the 303 redirect navigates back to settings. */}
+      <form ref={disconnectFormRef} method="POST" action={disconnectAction} className="hidden" />
+
+      <ConfirmActionDialog
+        open={confirmDisconnect}
+        onOpenChange={setConfirmDisconnect}
+        title="Disconnect Google Calendar"
+        description="This removes Kilo's read-only access to your Google Calendar. You can reconnect anytime."
+        confirmLabel="Disconnect"
+        confirmIcon={<X className="mr-1 h-4 w-4" />}
+        isPending={isDisconnecting}
+        pendingLabel="Disconnecting..."
+        onConfirm={() => {
+          setIsDisconnecting(true);
+          disconnectFormRef.current?.submit();
+        }}
+      />
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Google Account (collapsible card, matches SecretEntrySection card style)
 // ---------------------------------------------------------------------------
 
@@ -342,19 +522,13 @@ function GoogleAccountCard({
   mutations: ClawMutations;
   onRedeploy?: () => void;
 }) {
-  const { data: setupData } = useClawGoogleSetupCommand(!connected);
+  // This card is rendered only for users who already have the legacy Gog
+  // connection (status.googleConnected). The self-service setup-command flow
+  // is intentionally not surfaced — Gog is being retired in favor of the
+  // official Google Calendar OAuth card above, so we only offer disconnect.
   const [open, setOpen] = useState(false);
-  const [copied, setCopied] = useState(false);
   const [confirmDisconnect, setConfirmDisconnect] = useState(false);
   const isDisconnecting = mutations.disconnectGoogle.isPending;
-  const command = setupData?.command;
-
-  function handleCopy() {
-    if (!command) return;
-    void navigator.clipboard.writeText(command);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }
 
   return (
     <>
@@ -375,9 +549,12 @@ function GoogleAccountCard({
                   >
                     {connected ? 'Connected' : 'Not connected'}
                   </Badge>
+                  <Badge variant="outline" className="px-1.5 py-0 text-[10px] leading-4">
+                    Legacy
+                  </Badge>
                 </div>
                 <span className="text-muted-foreground text-xs">
-                  Access Gmail, Calendar, and Docs
+                  Legacy Google connection — being retired
                 </span>
               </div>
               <ChevronDown
@@ -389,86 +566,68 @@ function GoogleAccountCard({
           <CollapsibleContent>
             <Separator />
             <div className="space-y-4 px-4 py-3">
-              {!connected && command && (
-                <div className="space-y-2">
-                  <p className="text-muted-foreground text-xs">
-                    Run this command in a terminal on your local machine to connect your Google
-                    account:
+              <div className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 p-3">
+                <Info className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+                <div className="space-y-1 text-xs">
+                  <p className="text-foreground font-medium">
+                    This connection method is being retired.
                   </p>
-                  <div className="relative">
-                    <pre className="bg-muted overflow-x-auto rounded-md p-3 pr-10 text-xs">
-                      <code>{command}</code>
-                    </pre>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="absolute top-1 right-1 h-7 w-7 p-0"
-                      onClick={handleCopy}
-                    >
-                      {copied ? (
-                        <Check className="h-3.5 w-3.5 text-green-500" />
-                      ) : (
-                        <Copy className="h-3.5 w-3.5" />
-                      )}
-                    </Button>
-                  </div>
+                  <p className="text-muted-foreground">
+                    We recommend disconnecting and using the{' '}
+                    <span className="text-foreground font-medium">Google Calendar</span> card above,
+                    which connects with Kilo&apos;s official OAuth. For email, use your{' '}
+                    <span className="text-foreground font-medium">Inbound Email</span> address below
+                    — it&apos;s set up automatically.
+                  </p>
                 </div>
-              )}
+              </div>
 
-              {connected && (
-                <>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={isDisconnecting}
-                      onClick={() => setConfirmDisconnect(true)}
-                    >
-                      <X className="h-4 w-4" />
-                      {isDisconnecting ? 'Disconnecting...' : 'Disconnect'}
-                    </Button>
-                  </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={isDisconnecting}
+                  onClick={() => setConfirmDisconnect(true)}
+                >
+                  <X className="h-4 w-4" />
+                  {isDisconnecting ? 'Disconnecting...' : 'Disconnect'}
+                </Button>
+              </div>
 
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="text-foreground text-sm font-medium">Gmail Notifications</h4>
-                      <p className="text-muted-foreground text-xs">
-                        Notify your bot when new emails arrive
-                      </p>
-                    </div>
-                    <Button
-                      variant={gmailNotificationsEnabled ? 'default' : 'outline'}
-                      size="sm"
-                      disabled={mutations.setGmailNotifications.isPending}
-                      onClick={() => {
-                        mutations.setGmailNotifications.mutate(
-                          { enabled: !gmailNotificationsEnabled },
-                          {
-                            onSuccess: data => {
-                              toast.success(
-                                data.gmailNotificationsEnabled
-                                  ? 'Gmail notifications enabled'
-                                  : 'Gmail notifications disabled'
-                              );
-                            },
-                            onError: err => toast.error(`Failed: ${err.message}`),
-                          }
-                        );
-                      }}
-                    >
-                      {mutations.setGmailNotifications.isPending
-                        ? 'Saving...'
-                        : gmailNotificationsEnabled
-                          ? 'Enabled'
-                          : 'Disabled'}
-                    </Button>
-                  </div>
-                </>
-              )}
-
-              {!connected && !command && (
-                <p className="text-muted-foreground text-xs">Loading setup command...</p>
-              )}
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="text-foreground text-sm font-medium">Gmail Notifications</h4>
+                  <p className="text-muted-foreground text-xs">
+                    Notify your bot when new emails arrive
+                  </p>
+                </div>
+                <Button
+                  variant={gmailNotificationsEnabled ? 'default' : 'outline'}
+                  size="sm"
+                  disabled={mutations.setGmailNotifications.isPending}
+                  onClick={() => {
+                    mutations.setGmailNotifications.mutate(
+                      { enabled: !gmailNotificationsEnabled },
+                      {
+                        onSuccess: data => {
+                          toast.success(
+                            data.gmailNotificationsEnabled
+                              ? 'Gmail notifications enabled'
+                              : 'Gmail notifications disabled'
+                          );
+                        },
+                        onError: err => toast.error(`Failed: ${err.message}`),
+                      }
+                    );
+                  }}
+                >
+                  {mutations.setGmailNotifications.isPending
+                    ? 'Saving...'
+                    : gmailNotificationsEnabled
+                      ? 'Enabled'
+                      : 'Disabled'}
+                </Button>
+              </div>
             </div>
           </CollapsibleContent>
         </div>
@@ -478,7 +637,7 @@ function GoogleAccountCard({
         open={confirmDisconnect}
         onOpenChange={setConfirmDisconnect}
         title="Disconnect Google Account"
-        description="This will remove your Google credentials. Reconnecting requires re-running the Docker setup flow (gcloud login, project setup, OAuth consent). Redeploy after disconnecting to apply."
+        description="This removes your legacy Google credentials. This connection method is being retired — to keep calendar access, use the Google Calendar (OAuth) card; for email, use your Inbound Email address. Redeploy after disconnecting to apply."
         confirmLabel="Disconnect"
         confirmIcon={<X className="mr-1 h-4 w-4" />}
         isPending={isDisconnecting}
@@ -1889,6 +2048,10 @@ export function SettingsTab({
   organizationName?: string;
 }) {
   const posthog = usePostHog();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const googleOAuthParamHandledRef = useRef(false);
   const { data: config } = useClawConfig();
   const { organizationId } = useClawContext();
   const { data: modelsData, isLoading: isLoadingModels } = useModelSelectorList(organizationId);
@@ -1930,6 +2093,34 @@ export function SettingsTab({
     }
     previousStatusRef.current = status.status;
   }, [status.status]);
+
+  // Surface the one-shot success/error param the Google OAuth routes append
+  // when they redirect back to settings, then strip it so it doesn't re-fire.
+  useEffect(() => {
+    if (googleOAuthParamHandledRef.current) return;
+
+    const success = searchParams.get('success');
+    const error = searchParams.get('error');
+    const errorMessage = error ? GOOGLE_OAUTH_ERROR_MESSAGES[error] : undefined;
+    const isGoogleSuccess = success === 'google_connected' || success === 'google_disconnected';
+
+    if (!isGoogleSuccess && !errorMessage) return;
+    googleOAuthParamHandledRef.current = true;
+
+    if (success === 'google_connected') {
+      toast.success('Google Calendar connected');
+    } else if (success === 'google_disconnected') {
+      toast.success('Google Calendar disconnected');
+    } else if (errorMessage) {
+      toast.error(errorMessage);
+    }
+
+    const next = new URLSearchParams(searchParams);
+    next.delete('success');
+    next.delete('error');
+    const query = next.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  }, [searchParams, pathname, router]);
 
   const hasFreshGatewayReady =
     isRunning &&
@@ -2478,12 +2669,22 @@ export function SettingsTab({
       <div>
         <h2 className="text-foreground mb-3 text-base font-semibold">Productivity</h2>
         <div className="space-y-3">
-          <GoogleAccountCard
-            connected={status.googleConnected}
-            gmailNotificationsEnabled={status.gmailNotificationsEnabled}
-            mutations={mutations}
-            onRedeploy={onRedeploy}
+          <GoogleCalendarCard
+            connected={status.googleOAuthConnected}
+            oauthStatus={status.googleOAuthStatus}
+            accountEmail={status.googleOAuthAccountEmail}
+            organizationId={organizationId ?? null}
           />
+          {/* Legacy Gog connection: only surfaced to users who already have it,
+              so new users are never offered the retired setup flow. */}
+          {status.googleConnected && (
+            <GoogleAccountCard
+              connected={status.googleConnected}
+              gmailNotificationsEnabled={status.gmailNotificationsEnabled}
+              mutations={mutations}
+              onRedeploy={onRedeploy}
+            />
+          )}
           <MorningBriefingCard
             mutations={mutations}
             briefingStatus={morningBriefingStatus}

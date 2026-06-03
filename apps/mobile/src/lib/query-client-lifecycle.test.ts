@@ -87,4 +87,26 @@ describe('installQueryClientNativeLifecycle', () => {
     expect(setOnline).toHaveBeenNthCalledWith(2, true);
     expect(native.removeConnectivityListener).toHaveBeenCalledTimes(1);
   });
+
+  it('falls back to isConnected when isInternetReachable is null', () => {
+    const native = createSources();
+    const setOnline = vi.fn();
+
+    const cleanup = installQueryClientNativeLifecycle({
+      sources: native.sources,
+      managers: {
+        focus: { setFocused: vi.fn() },
+        online: { setOnline },
+      },
+    });
+
+    native.setConnectivity({ isConnected: false, isInternetReachable: null });
+    native.setConnectivity({ isConnected: true, isInternetReachable: null });
+    native.setConnectivity({ isConnected: null, isInternetReachable: null });
+    cleanup();
+
+    expect(setOnline).toHaveBeenNthCalledWith(1, false);
+    expect(setOnline).toHaveBeenNthCalledWith(2, true);
+    expect(setOnline).toHaveBeenNthCalledWith(3, true);
+  });
 });

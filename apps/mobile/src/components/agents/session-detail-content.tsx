@@ -12,6 +12,7 @@ import { PermissionCard } from '@/components/agents/permission-card';
 import { QuestionCard } from '@/components/agents/question-card';
 import { useSessionManager } from '@/components/agents/session-provider';
 import { SessionStatusIndicator } from '@/components/agents/session-status-indicator';
+import { shouldShowAgentWorkingIndicator } from '@/components/agents/session-working-state';
 import { useInteractionHandlers } from '@/components/agents/use-interaction-handlers';
 import { useSessionAutoScroll } from '@/components/agents/use-session-auto-scroll';
 import { useSessionConfigSync } from '@/components/agents/use-session-config-sync';
@@ -54,6 +55,7 @@ export function SessionDetailContent({ sessionId }: Readonly<SessionDetailConten
   const activePermission = useAtomValue(manager.atoms.activePermission);
   const totalCost = useAtomValue(manager.atoms.totalCost);
   const getChildMessages = useAtomValue(manager.atoms.childMessages);
+  const pendingMessages = useAtomValue(manager.atoms.pendingMessages);
 
   const { isConnected } = useAppLifecycle();
   const { bottom } = useSafeAreaInsets();
@@ -128,6 +130,10 @@ export function SessionDetailContent({ sessionId }: Readonly<SessionDetailConten
     (fetchedData === null && !statusIndicator && !error) ||
     (fetchedData !== null && fetchedData.kiloSessionId !== sessionId);
   const shouldBlockMessages = shouldShowLoading;
+  const shouldShowWorkingIndicator = shouldShowAgentWorkingIndicator({
+    isStreaming,
+    pendingMessageCount: pendingMessages.size,
+  });
 
   const emptyStateText = error ?? (statusIndicator ? null : 'No messages yet');
 
@@ -281,7 +287,7 @@ export function SessionDetailContent({ sessionId }: Readonly<SessionDetailConten
         scrollEventThrottle={16}
         ListFooterComponent={
           <>
-            <WorkingIndicator messages={messages} isStreaming={isStreaming} />
+            <WorkingIndicator messages={messages} isStreaming={shouldShowWorkingIndicator} />
             {statusIndicator ? <SessionStatusIndicator indicator={statusIndicator} /> : null}
           </>
         }

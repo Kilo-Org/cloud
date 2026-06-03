@@ -20,6 +20,8 @@ export interface IngestQueueMessage {
   ingestedAt: number;
 }
 
+export const QUEUE_RETRY_DELAY_SECONDS = 5 * 60;
+
 function elapsedMs(startedAt: number): number {
   return Date.now() - startedAt;
 }
@@ -540,7 +542,7 @@ export async function queue(
         sessionId: msg.body.sessionId,
         error: err instanceof Error ? err.message : String(err),
       });
-      msg.retry({ delaySeconds: 60 });
+      msg.retry({ delaySeconds: QUEUE_RETRY_DELAY_SECONDS });
     }
   }
 }

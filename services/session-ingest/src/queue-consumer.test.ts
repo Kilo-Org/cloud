@@ -44,7 +44,12 @@ vi.mock('./util/ingest-limits', () => ({
 import { getWorkerDb } from '@kilocode/db/client';
 import { getSessionIngestDO } from './dos/SessionIngestDO';
 import { notifyUserSessionEvent } from './session-events';
-import { computeSessionMetadataUpdates, createItemExtractor, queue } from './queue-consumer';
+import {
+  QUEUE_RETRY_DELAY_SECONDS,
+  computeSessionMetadataUpdates,
+  createItemExtractor,
+  queue,
+} from './queue-consumer';
 
 const encoder = new TextEncoder();
 
@@ -176,7 +181,7 @@ describe('queue', () => {
     );
 
     expect(ack).not.toHaveBeenCalled();
-    expect(retry).toHaveBeenCalledWith({ delaySeconds: 60 });
+    expect(retry).toHaveBeenCalledWith({ delaySeconds: QUEUE_RETRY_DELAY_SECONDS });
   });
 
   it('passes full parsed oversized message data and its R2 reference into ingest', async () => {

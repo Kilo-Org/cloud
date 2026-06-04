@@ -16,6 +16,14 @@ jest.mock('@/lib/config.server', () => ({
 jest.mock('@/lib/user/server');
 jest.mock('@/lib/organizations/organization-usage');
 jest.mock('@/lib/ai-gateway/byok');
+jest.mock('@/lib/redis', () => ({
+  redisClient: {
+    get: jest.fn().mockResolvedValue(null),
+    set: jest.fn().mockResolvedValue('OK'),
+    del: jest.fn().mockResolvedValue(0),
+    getdel: jest.fn().mockResolvedValue(null),
+  },
+}));
 jest.mock('@/lib/debugUtils', () => ({
   debugSaveProxyRequest: jest.fn(),
   debugSaveProxyResponseStream: jest.fn(),

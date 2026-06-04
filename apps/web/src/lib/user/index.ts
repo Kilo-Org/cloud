@@ -58,6 +58,8 @@ import {
   security_advisor_scans,
   kilo_pass_scheduled_changes,
   security_analysis_owner_state,
+  security_agent_commands,
+  security_agent_repository_sync_state,
   kiloclaw_subscriptions,
   kiloclaw_admin_audit_logs,
   kiloclaw_cli_runs,
@@ -825,7 +827,8 @@ export class SoftDeletePreconditionError extends Error {
  * - Various user-owned resources (platform_integrations, byok_api_keys,
  *   agent_configs, webhook_events, code_indexing_*, source_embeddings,
  *   cloud_agent_webhook_triggers, agent_environment_profiles,
- *   security_findings, security_analysis_owner_state,
+ *   security_findings, security_analysis_owner_state, security_agent_commands,
+ *   security_agent_repository_sync_state,
  *   security_analysis_queue (via cascade when security_findings are deleted),
  *   auto_triage/fix_tickets, slack_bot_requests, bot_requests,
  *   cloud_agent_code_reviews, device_auth_requests, auto_top_up_configs,
@@ -1081,6 +1084,12 @@ export async function softDeleteUser(userId: string) {
     await tx
       .delete(security_analysis_owner_state)
       .where(eq(security_analysis_owner_state.owned_by_user_id, userId));
+    await tx
+      .delete(security_agent_commands)
+      .where(eq(security_agent_commands.owned_by_user_id, userId));
+    await tx
+      .delete(security_agent_repository_sync_state)
+      .where(eq(security_agent_repository_sync_state.owned_by_user_id, userId));
     await tx.delete(security_findings).where(eq(security_findings.owned_by_user_id, userId));
     await tx.delete(auto_fix_tickets).where(eq(auto_fix_tickets.owned_by_user_id, userId));
     await tx.delete(auto_triage_tickets).where(eq(auto_triage_tickets.owned_by_user_id, userId));

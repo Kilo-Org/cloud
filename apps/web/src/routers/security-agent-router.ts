@@ -55,6 +55,10 @@ export const securityAgentRouter = createTRPCRouter({
   getAnalysis: baseProcedure
     .input(handlers.getAnalysis.inputSchema)
     .query(handlers.getAnalysis.handler),
+  getCommandStatus: baseProcedure
+    .input(handlers.getCommandStatus.inputSchema)
+    .query(handlers.getCommandStatus.handler),
+  listActiveCommands: baseProcedure.query(handlers.listActiveCommands),
   getOrphanedRepositories: baseProcedure.query(handlers.getOrphanedRepositories),
   deleteFindingsByRepository: baseProcedure
     .input(handlers.deleteFindingsByRepository.inputSchema)

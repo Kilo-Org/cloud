@@ -1,6 +1,12 @@
 import { timingSafeEqual as nodeTimingSafeEqual } from 'crypto';
 import { z } from 'zod';
-import { getWorkerDb } from '@kilocode/db/client';
+import {
+  createSecurityAgentCommand,
+  markSecurityAgentCommandQueueAdmissionFailed,
+  transitionSecurityAgentCommand,
+  type SecurityAgentCommandOwner,
+} from '@kilocode/db';
+import { getWorkerDb, type WorkerDb } from '@kilocode/db/client';
 import { agent_configs } from '@kilocode/db/schema';
 import { eq, and, isNotNull, or } from 'drizzle-orm';
 import { syncOwner } from './sync';
@@ -11,8 +17,8 @@ const SecuritySyncOwnerSchema = z
     organizationId: z.string().uuid().optional(),
     userId: z.string().min(1).optional(),
   })
-  .refine(value => Boolean(value.organizationId || value.userId), {
-    message: 'owner.organizationId or owner.userId is required',
+  .refine(value => Boolean(value.organizationId) !== Boolean(value.userId), {
+    message: 'exactly one of owner.organizationId or owner.userId is required',
   });
 
 const SecuritySyncActorSchema = z.object({
@@ -21,24 +27,31 @@ const SecuritySyncActorSchema = z.object({
   name: z.string().min(1).nullable().optional(),
 });
 
-const SecuritySyncMessageSchema = z.object({
-  schemaVersion: z.literal(1),
-  runId: z.string().uuid(),
-  messageId: z.string().min(1),
-  trigger: z.enum(['scheduled', 'manual']),
-  owner: SecuritySyncOwnerSchema,
-  ownerKey: z.string().min(1),
-  chunkIndex: z.number().int().nonnegative(),
-  chunkCount: z.number().int().positive(),
-  dispatchedAt: z.string().datetime(),
-  actor: SecuritySyncActorSchema.optional(),
-  repoFullName: z.string().min(1).optional(),
-});
+const SecuritySyncMessageSchema = z
+  .object({
+    schemaVersion: z.literal(1),
+    commandId: z.string().uuid().optional(),
+    runId: z.string().uuid(),
+    messageId: z.string().min(1),
+    trigger: z.enum(['scheduled', 'manual']),
+    owner: SecuritySyncOwnerSchema,
+    ownerKey: z.string().min(1),
+    chunkIndex: z.number().int().nonnegative(),
+    chunkCount: z.number().int().positive(),
+    dispatchedAt: z.string().datetime(),
+    actor: SecuritySyncActorSchema.optional(),
+    repoFullName: z.string().min(1).optional(),
+  })
+  .refine(message => message.trigger === 'scheduled' || Boolean(message.commandId), {
+    message: 'commandId is required for manual sync commands',
+    path: ['commandId'],
+  });
 
 const ManualSecuritySyncCommandSchema = z.object({
   schemaVersion: z.literal(1),
   owner: SecuritySyncOwnerSchema,
   actor: SecuritySyncActorSchema,
+  origin: z.enum(['manual', 'dashboard_refresh', 'enable_initial_sync']).default('manual'),
   repoFullName: z.string().min(1).optional(),
 });
 
@@ -62,6 +75,7 @@ const ManualFindingDismissalCommandSchema = z.object({
 
 const SecurityDismissMessageSchema = ManualFindingDismissalCommandSchema.extend({
   kind: z.literal('dismiss'),
+  commandId: z.string().uuid(),
   runId: z.string().uuid(),
   messageId: z.string().min(1),
   dispatchedAt: z.string().datetime(),
@@ -143,6 +157,12 @@ function createOwnerKey(owner: SecuritySyncMessage['owner']): string {
   throw new Error('owner.organizationId or owner.userId is required');
 }
 
+function toCommandOwner(owner: SecuritySyncMessage['owner']): SecurityAgentCommandOwner {
+  if (owner.organizationId) return { type: 'org', id: owner.organizationId };
+  if (owner.userId) return { type: 'user', id: owner.userId };
+  throw new Error('owner.organizationId or owner.userId is required');
+}
+
 async function timingSafeEqual(left: string, right: string): Promise<boolean> {
   const encoder = new TextEncoder();
   const [leftDigest, rightDigest] = await Promise.all([
@@ -153,56 +173,90 @@ async function timingSafeEqual(left: string, right: string): Promise<boolean> {
 }
 
 async function enqueueManualSyncCommand(
+  db: WorkerDb,
   queue: Queue<SecuritySyncQueueMessage>,
   command: z.infer<typeof ManualSecuritySyncCommandSchema>
-): Promise<{ runId: string; messageId: string }> {
+): Promise<{ commandId: string; runId: string; messageId: string }> {
   const runId = crypto.randomUUID();
   const ownerKey = createOwnerKey(command.owner);
   const messageId = `${runId}:${ownerKey}:manual`;
+  const ledgerCommand = await createSecurityAgentCommand(db, {
+    commandType: 'sync',
+    origin: command.origin,
+    owner: toCommandOwner(command.owner),
+    repoFullName: command.repoFullName,
+  });
 
-  await queue.sendBatch([
-    {
-      body: {
-        schemaVersion: 1,
-        runId,
-        messageId,
-        trigger: 'manual',
-        owner: command.owner,
-        ownerKey,
-        chunkIndex: 0,
-        chunkCount: 1,
-        dispatchedAt: new Date().toISOString(),
-        actor: command.actor,
-        repoFullName: command.repoFullName,
+  try {
+    await queue.sendBatch([
+      {
+        body: {
+          schemaVersion: 1,
+          commandId: ledgerCommand.id,
+          runId,
+          messageId,
+          trigger: 'manual',
+          owner: command.owner,
+          ownerKey,
+          chunkIndex: 0,
+          chunkCount: 1,
+          dispatchedAt: new Date().toISOString(),
+          actor: command.actor,
+          repoFullName: command.repoFullName,
+        },
+        contentType: 'json',
       },
-      contentType: 'json',
-    },
-  ]);
+    ]);
+  } catch (error) {
+    await markSecurityAgentCommandQueueAdmissionFailed(
+      db,
+      ledgerCommand.id,
+      'Queue admission failed'
+    );
+    throw error;
+  }
 
-  return { runId, messageId };
+  return { commandId: ledgerCommand.id, runId, messageId };
 }
 
 async function enqueueDismissFindingCommand(
+  db: WorkerDb,
   queue: Queue<SecuritySyncQueueMessage>,
   command: z.infer<typeof ManualFindingDismissalCommandSchema>
-): Promise<{ runId: string; messageId: string }> {
+): Promise<{ commandId: string; runId: string; messageId: string }> {
   const runId = crypto.randomUUID();
   const messageId = `${runId}:${command.findingId}:dismiss`;
+  const ledgerCommand = await createSecurityAgentCommand(db, {
+    commandType: 'dismiss_finding',
+    origin: 'manual',
+    owner: toCommandOwner(command.owner),
+    findingId: command.findingId,
+  });
 
-  await queue.sendBatch([
-    {
-      body: {
-        ...command,
-        kind: 'dismiss',
-        runId,
-        messageId,
-        dispatchedAt: new Date().toISOString(),
+  try {
+    await queue.sendBatch([
+      {
+        body: {
+          ...command,
+          kind: 'dismiss',
+          commandId: ledgerCommand.id,
+          runId,
+          messageId,
+          dispatchedAt: new Date().toISOString(),
+        },
+        contentType: 'json',
       },
-      contentType: 'json',
-    },
-  ]);
+    ]);
+  } catch (error) {
+    await markSecurityAgentCommandQueueAdmissionFailed(
+      db,
+      ledgerCommand.id,
+      'Queue admission failed'
+    );
+    throw error;
+  }
 
-  return { runId, messageId };
+  return { commandId: ledgerCommand.id, runId, messageId };
 }
 
 async function enqueueOwners(
@@ -258,6 +312,25 @@ function resolveOwner(
   return null;
 }
 
+function syncCommandTerminalState(result: Awaited<ReturnType<typeof syncOwner>>): {
+  status: 'succeeded' | 'failed' | 'no_op';
+  resultCode: string;
+} {
+  if (result.commandResultCode === 'CONFIG_DISABLED') {
+    return { status: 'no_op', resultCode: 'CONFIG_DISABLED' };
+  }
+  if (result.commandResultCode === 'REPOSITORY_UNAVAILABLE' || result.staleRepos.length > 0) {
+    return { status: 'failed', resultCode: 'REPOSITORY_UNAVAILABLE' };
+  }
+  if (result.reauthRequired || result.authInvalid > 0) {
+    return { status: 'failed', resultCode: 'GITHUB_AUTH_INVALID' };
+  }
+  if (result.errors > 0) {
+    return { status: 'failed', resultCode: 'SYNC_PARTIAL_FAILURE' };
+  }
+  return { status: 'succeeded', resultCode: 'SYNC_COMPLETED' };
+}
+
 async function processSecurityDismissMessage(
   message: Message<SecuritySyncQueueMessage>,
   env: CloudflareEnv
@@ -266,10 +339,27 @@ async function processSecurityDismissMessage(
   if (!parsed.success) return false;
 
   const db = getWorkerDb(env.HYPERDRIVE.connectionString, { statement_timeout: 30_000 });
-  await processSecurityFindingDismissal({
+  await transitionSecurityAgentCommand(db, {
+    commandId: parsed.data.commandId,
+    fromStatuses: ['accepted', 'running'],
+    status: 'running',
+  });
+  const result = await processSecurityFindingDismissal({
     db,
     gitTokenService: env.GIT_TOKEN_SERVICE,
     message: parsed.data,
+  });
+  await transitionSecurityAgentCommand(db, {
+    commandId: parsed.data.commandId,
+    fromStatuses: ['accepted', 'running'],
+    status: result.commandStatus,
+    resultCode: result.resultCode,
+  });
+  console.info('Security Agent dismissal command completed', {
+    command_id: parsed.data.commandId,
+    command_type: 'dismiss_finding',
+    owner_type: parsed.data.owner.organizationId ? 'org' : 'user',
+    result_code: result.resultCode,
   });
   message.ack();
   return true;
@@ -303,6 +393,13 @@ async function processSecuritySyncMessage(
 
   const db = getWorkerDb(env.HYPERDRIVE.connectionString, { statement_timeout: 30_000 });
   const startTime = Date.now();
+  if (body.commandId) {
+    await transitionSecurityAgentCommand(db, {
+      commandId: body.commandId,
+      fromStatuses: ['accepted', 'running'],
+      status: 'running',
+    });
+  }
 
   const result = await syncOwner({
     db,
@@ -314,7 +411,19 @@ async function processSecuritySyncMessage(
     repoFullName: body.repoFullName,
   });
 
+  const terminal = syncCommandTerminalState(result);
+  if (body.commandId) {
+    await transitionSecurityAgentCommand(db, {
+      commandId: body.commandId,
+      fromStatuses: ['accepted', 'running'],
+      status: terminal.status,
+      resultCode: terminal.resultCode,
+    });
+  }
   console.info('Security sync completed for owner', {
+    command_id: body.commandId,
+    command_type: body.commandId ? 'sync' : undefined,
+    result_code: body.commandId ? terminal.resultCode : undefined,
     runId: body.runId,
     ownerKey: body.ownerKey,
     synced: result.synced,
@@ -369,7 +478,8 @@ export default {
         );
       }
 
-      const accepted = await enqueueManualSyncCommand(env.SYNC_QUEUE, parsed.data);
+      const db = getWorkerDb(env.HYPERDRIVE.connectionString, { statement_timeout: 30_000 });
+      const accepted = await enqueueManualSyncCommand(db, env.SYNC_QUEUE, parsed.data);
       return jsonResponse({ success: true, accepted: true, ...accepted }, 202);
     }
 
@@ -408,7 +518,8 @@ export default {
         );
       }
 
-      const accepted = await enqueueDismissFindingCommand(env.SYNC_QUEUE, parsed.data);
+      const db = getWorkerDb(env.HYPERDRIVE.connectionString, { statement_timeout: 30_000 });
+      const accepted = await enqueueDismissFindingCommand(db, env.SYNC_QUEUE, parsed.data);
       return jsonResponse({ success: true, accepted: true, ...accepted }, 202);
     }
 

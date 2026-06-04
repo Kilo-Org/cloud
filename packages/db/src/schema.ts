@@ -4829,6 +4829,117 @@ export const security_analysis_owner_state = pgTable(
 
 export type SecurityAnalysisOwnerState = typeof security_analysis_owner_state.$inferSelect;
 
+export type SecurityAgentCommandType = 'sync' | 'dismiss_finding' | 'start_analysis';
+export type SecurityAgentCommandOrigin = 'manual' | 'dashboard_refresh' | 'enable_initial_sync';
+export type SecurityAgentCommandStatus = 'accepted' | 'running' | 'succeeded' | 'failed' | 'no_op';
+
+export const security_agent_commands = pgTable(
+  'security_agent_commands',
+  {
+    id: idPrimaryKeyColumn,
+    command_type: text().$type<SecurityAgentCommandType>().notNull(),
+    origin: text().$type<SecurityAgentCommandOrigin>().notNull(),
+    owned_by_organization_id: uuid().references(() => organizations.id, {
+      onDelete: 'cascade',
+    }),
+    owned_by_user_id: text().references(() => kilocode_users.id, {
+      onDelete: 'cascade',
+    }),
+    finding_id: uuid().references(() => security_findings.id, { onDelete: 'set null' }),
+    repo_full_name: text(),
+    status: text().$type<SecurityAgentCommandStatus>().notNull().default('accepted'),
+    result_code: text(),
+    last_error_redacted: text(),
+    accepted_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    started_at: timestamp({ withTimezone: true, mode: 'string' }),
+    completed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    check(
+      'security_agent_commands_owner_check',
+      sql`(
+        (${table.owned_by_user_id} IS NOT NULL AND ${table.owned_by_organization_id} IS NULL) OR
+        (${table.owned_by_user_id} IS NULL AND ${table.owned_by_organization_id} IS NOT NULL)
+      )`
+    ),
+    check(
+      'security_agent_commands_type_check',
+      sql`${table.command_type} IN ('sync', 'dismiss_finding', 'start_analysis')`
+    ),
+    check(
+      'security_agent_commands_origin_check',
+      sql`${table.origin} IN ('manual', 'dashboard_refresh', 'enable_initial_sync')`
+    ),
+    check(
+      'security_agent_commands_status_check',
+      sql`${table.status} IN ('accepted', 'running', 'succeeded', 'failed', 'no_op')`
+    ),
+    index('idx_security_agent_commands_org_created').on(
+      table.owned_by_organization_id,
+      table.created_at.desc()
+    ),
+    index('idx_security_agent_commands_user_created').on(
+      table.owned_by_user_id,
+      table.created_at.desc()
+    ),
+    index('idx_security_agent_commands_status_updated').on(table.status, table.updated_at),
+    index('idx_security_agent_commands_finding_created').on(
+      table.finding_id,
+      table.created_at.desc()
+    ),
+  ]
+);
+
+export type SecurityAgentCommand = typeof security_agent_commands.$inferSelect;
+export type NewSecurityAgentCommand = typeof security_agent_commands.$inferInsert;
+
+export const security_agent_repository_sync_state = pgTable(
+  'security_agent_repository_sync_state',
+  {
+    id: idPrimaryKeyColumn,
+    owned_by_organization_id: uuid().references(() => organizations.id, {
+      onDelete: 'cascade',
+    }),
+    owned_by_user_id: text().references(() => kilocode_users.id, {
+      onDelete: 'cascade',
+    }),
+    repo_full_name: text().notNull(),
+    last_attempted_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    last_succeeded_at: timestamp({ withTimezone: true, mode: 'string' }),
+    last_failure_code: text(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    check(
+      'security_agent_repository_sync_state_owner_check',
+      sql`(
+        (${table.owned_by_user_id} IS NOT NULL AND ${table.owned_by_organization_id} IS NULL) OR
+        (${table.owned_by_user_id} IS NULL AND ${table.owned_by_organization_id} IS NOT NULL)
+      )`
+    ),
+    uniqueIndex('UQ_security_agent_repository_sync_state_org_repo')
+      .on(table.owned_by_organization_id, table.repo_full_name)
+      .where(isNotNull(table.owned_by_organization_id)),
+    uniqueIndex('UQ_security_agent_repository_sync_state_user_repo')
+      .on(table.owned_by_user_id, table.repo_full_name)
+      .where(isNotNull(table.owned_by_user_id)),
+  ]
+);
+
+export type SecurityAgentRepositorySyncState =
+  typeof security_agent_repository_sync_state.$inferSelect;
+export type NewSecurityAgentRepositorySyncState =
+  typeof security_agent_repository_sync_state.$inferInsert;
+
 // Security Audit Log — SOC2-compliant audit trail for security agent actions
 export const security_audit_log = pgTable(
   'security_audit_log',

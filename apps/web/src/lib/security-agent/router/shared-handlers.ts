@@ -20,6 +20,10 @@ import {
 } from '@/lib/security-agent/db/security-findings';
 import { getDashboardStats } from '@/lib/security-agent/db/dashboard-stats';
 import {
+  getSecurityAgentCommandStatus,
+  listActiveSecurityAgentCommands,
+} from '@/lib/security-agent/db/security-commands';
+import {
   canStartAnalysis,
   enqueueBacklogFindings,
 } from '@/lib/security-agent/db/security-analysis';
@@ -45,6 +49,7 @@ import {
   SetEnabledInputSchema,
   StartAnalysisInputSchema,
   GetAnalysisInputSchema,
+  GetCommandStatusInputSchema,
   DeleteFindingsByRepoInputSchema,
   GetDashboardStatsInputSchema,
   type SaveSecurityConfigInput,
@@ -55,6 +60,7 @@ import {
   type SetEnabledInput,
   type StartAnalysisInput,
   type GetAnalysisInput,
+  type GetCommandStatusInput,
   type DeleteFindingsByRepoInput,
   type GetDashboardStatsInput,
 } from '@/lib/security-agent/core/schemas';
@@ -306,18 +312,22 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         const autoAnalysisReEnabled =
           isAutoAnalysisOn && !wasAutoAnalysisOn && isNowIncludeExisting;
 
+        let existingFindingsQueuedCount: number | undefined;
+        let backlogAdmissionWarning: string | undefined;
         if (isAutoAnalysisOn && (includeExistingJustTurnedOn || autoAnalysisReEnabled)) {
-          enqueueBacklogFindings({
-            owner: securityOwner,
-            autoAnalysisMinSeverity:
-              input.autoAnalysisMinSeverity ??
-              existingConfig?.config.auto_analysis_min_severity ??
-              'high',
-          }).catch(error => {
-            // Fire-and-forget: don't fail the config save if backlog enqueue errors.
-            // The next sync cron will pick up any missed findings.
+          try {
+            existingFindingsQueuedCount = await enqueueBacklogFindings({
+              owner: securityOwner,
+              autoAnalysisMinSeverity:
+                input.autoAnalysisMinSeverity ??
+                existingConfig?.config.auto_analysis_min_severity ??
+                'high',
+            });
+          } catch (error) {
             console.error('Failed to enqueue backlog findings', error);
-          });
+            backlogAdmissionWarning =
+              'Settings saved, but existing findings could not be queued. Retry saving settings.';
+          }
         }
 
         trackSecurityAgentConfigSaved({
@@ -364,7 +374,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           },
         });
 
-        return { success: true };
+        return { success: true, existingFindingsQueuedCount, backlogAdmissionWarning };
       },
     },
 
@@ -441,14 +451,22 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
             }
 
             if (repositoriesToSync.length > 0) {
-              const initialSync = await submitManualSecuritySync({
-                owner: securityOwner,
-                actor: {
-                  id: ctx.user.id,
-                  email: ctx.user.google_user_email,
-                  name: ctx.user.google_user_name,
-                },
-              });
+              let initialSync: Awaited<ReturnType<typeof submitManualSecuritySync>> | undefined;
+              let initialSyncAdmissionFailed = false;
+              try {
+                initialSync = await submitManualSecuritySync({
+                  owner: securityOwner,
+                  actor: {
+                    id: ctx.user.id,
+                    email: ctx.user.google_user_email,
+                    name: ctx.user.google_user_name,
+                  },
+                  origin: 'enable_initial_sync',
+                });
+              } catch (error) {
+                initialSyncAdmissionFailed = true;
+                console.error('Security Agent enabled but initial sync admission failed', error);
+              }
 
               trackSecurityAgentEnabled({
                 distinctId: ctx.user.id,
@@ -473,6 +491,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
               return {
                 success: true,
                 initialSync,
+                initialSyncAdmissionFailed,
               };
             }
           }
@@ -703,6 +722,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
               email: ctx.user.google_user_email,
               name: ctx.user.google_user_name,
             },
+            origin: 'dashboard_refresh',
             repoFullName: input.repoFullName,
           });
 
@@ -770,6 +790,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
             email: ctx.user.google_user_email,
             name: ctx.user.google_user_name,
           },
+          origin: 'dashboard_refresh',
         });
 
         trackSecurityAgentSync({
@@ -983,7 +1004,37 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
     },
 
     // -----------------------------------------------------------------------
-    // 14. getOrphanedRepositories
+    // 14. getCommandStatus
+    // -----------------------------------------------------------------------
+    getCommandStatus: {
+      inputSchema: GetCommandStatusInputSchema,
+      handler: async ({
+        ctx,
+        input: rawInput,
+      }: {
+        ctx: TRPCContext;
+        input: GetCommandStatusInput & TExtra;
+      }) => {
+        const input = rawInput;
+        const securityOwner = deps.resolveSecurityOwner(ctx, input);
+        const command = await getSecurityAgentCommandStatus(securityOwner, input.commandId);
+        if (!command) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'Security Agent command not found' });
+        }
+        return command;
+      },
+    },
+
+    // -----------------------------------------------------------------------
+    // 15. listActiveCommands
+    // -----------------------------------------------------------------------
+    listActiveCommands: async ({ ctx, input }: { ctx: TRPCContext; input: unknown }) => {
+      const extra = toExtra(input);
+      return listActiveSecurityAgentCommands(deps.resolveSecurityOwner(ctx, extra));
+    },
+
+    // -----------------------------------------------------------------------
+    // 16. getOrphanedRepositories
     // -----------------------------------------------------------------------
     getOrphanedRepositories: async ({ ctx, input }: { ctx: TRPCContext; input: unknown }) => {
       const extra = toExtra(input);

@@ -63,6 +63,10 @@ export const organizationSecurityAgentRouter = createTRPCRouter({
   getAnalysis: organizationMemberProcedure
     .input(OrganizationIdInputSchema.merge(handlers.getAnalysis.inputSchema))
     .query(handlers.getAnalysis.handler),
+  getCommandStatus: organizationMemberProcedure
+    .input(OrganizationIdInputSchema.merge(handlers.getCommandStatus.inputSchema))
+    .query(handlers.getCommandStatus.handler),
+  listActiveCommands: organizationMemberProcedure.query(handlers.listActiveCommands),
   getOrphanedRepositories: organizationMemberProcedure.query(handlers.getOrphanedRepositories),
   deleteFindingsByRepository: organizationBillingMutationProcedure
     .input(OrganizationIdInputSchema.merge(handlers.deleteFindingsByRepository.inputSchema))

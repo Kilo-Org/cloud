@@ -38,6 +38,8 @@ import {
   security_findings,
   security_analysis_queue,
   security_analysis_owner_state,
+  security_agent_commands,
+  security_agent_repository_sync_state,
   kiloclaw_earlybird_purchases,
   kiloclaw_subscriptions,
   kiloclaw_email_log,
@@ -174,6 +176,8 @@ describe('User', () => {
     await db.delete(kiloclaw_google_oauth_connections);
     await db.delete(kiloclaw_inbound_email_aliases);
     await db.delete(security_analysis_queue);
+    await db.delete(security_agent_commands);
+    await db.delete(security_agent_repository_sync_state);
     await db.delete(security_findings);
     await db.delete(security_analysis_owner_state);
     await db.delete(organization_invitations);
@@ -1719,6 +1723,59 @@ describe('User', () => {
           .select({ count: count() })
           .from(security_analysis_owner_state)
           .where(eq(security_analysis_owner_state.owned_by_user_id, user2.id))
+          .then(r => r[0].count)
+      ).toBe(1);
+    });
+
+    it('should delete personal Security Agent command and repository sync rows', async () => {
+      const user1 = await insertTestUser();
+      const user2 = await insertTestUser();
+
+      await db.insert(security_agent_commands).values([
+        { command_type: 'sync', origin: 'manual', owned_by_user_id: user1.id },
+        { command_type: 'sync', origin: 'manual', owned_by_user_id: user2.id },
+      ]);
+      await db.insert(security_agent_repository_sync_state).values([
+        {
+          owned_by_user_id: user1.id,
+          repo_full_name: 'kilo-org/cloud-user-1',
+          last_attempted_at: new Date().toISOString(),
+        },
+        {
+          owned_by_user_id: user2.id,
+          repo_full_name: 'kilo-org/cloud-user-2',
+          last_attempted_at: new Date().toISOString(),
+        },
+      ]);
+
+      await softDeleteUser(user1.id);
+
+      expect(
+        await db
+          .select({ count: count() })
+          .from(security_agent_commands)
+          .where(eq(security_agent_commands.owned_by_user_id, user1.id))
+          .then(r => r[0].count)
+      ).toBe(0);
+      expect(
+        await db
+          .select({ count: count() })
+          .from(security_agent_repository_sync_state)
+          .where(eq(security_agent_repository_sync_state.owned_by_user_id, user1.id))
+          .then(r => r[0].count)
+      ).toBe(0);
+      expect(
+        await db
+          .select({ count: count() })
+          .from(security_agent_commands)
+          .where(eq(security_agent_commands.owned_by_user_id, user2.id))
+          .then(r => r[0].count)
+      ).toBe(1);
+      expect(
+        await db
+          .select({ count: count() })
+          .from(security_agent_repository_sync_state)
+          .where(eq(security_agent_repository_sync_state.owned_by_user_id, user2.id))
           .then(r => r[0].count)
       ).toBe(1);
     });

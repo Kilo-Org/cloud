@@ -1,5 +1,6 @@
 import type { AlertSeverity } from './slo-config';
 
+// Queue used for ingest.
 export const MONITORED_QUEUE_ID = '965459cfc1a349c190bb813855a65b02';
 
 export const QUEUE_BACKLOG_THRESHOLDS = {

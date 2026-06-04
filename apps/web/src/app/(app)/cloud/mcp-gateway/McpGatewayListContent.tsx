@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { getMcpGatewayRoutes } from '@/lib/mcp-gateway/routes';
 import { Button } from '@/components/ui/button';
@@ -18,7 +18,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Copy, ExternalLink, Plus, RotateCw } from 'lucide-react';
+import { Copy, ExternalLink, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 
 type McpGatewayListContentProps = {
@@ -51,26 +51,12 @@ function authLabel(authMode: string) {
 
 export function McpGatewayListContent({ organizationId }: McpGatewayListContentProps) {
   const trpc = useTRPC();
-  const queryClient = useQueryClient();
   const routes = getMcpGatewayRoutes(organizationId);
   const [filter, setFilter] = useState('');
   const listQuery = useQuery(
     organizationId
       ? trpc.mcpGateway.listOrganization.queryOptions({ organizationId })
       : trpc.mcpGateway.listPersonal.queryOptions()
-  );
-  const rotateMutation = useMutation(
-    trpc.mcpGateway.rotateRoute.mutationOptions({
-      onSuccess: () => {
-        toast.success('Connect URL rotated');
-        void queryClient.invalidateQueries({
-          queryKey: organizationId
-            ? trpc.mcpGateway.listOrganization.queryKey({ organizationId })
-            : trpc.mcpGateway.listPersonal.queryKey(),
-        });
-      },
-      onError: () => toast.error('Could not rotate the connect URL'),
-    })
   );
   const filteredConnections = useMemo(() => {
     const connections = listQuery.data ?? [];
@@ -214,14 +200,6 @@ export function McpGatewayListContent({ organizationId }: McpGatewayListContentP
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
                           <Button
-                            variant="ghost"
-                            size="icon"
-                            aria-label={`Copy connect URL for ${connection.name}`}
-                            onClick={() => copyConnectUrl(connection.canonicalUrl)}
-                          >
-                            <Copy />
-                          </Button>
-                          <Button
                             asChild
                             variant="ghost"
                             size="icon"
@@ -234,16 +212,10 @@ export function McpGatewayListContent({ organizationId }: McpGatewayListContentP
                           <Button
                             variant="ghost"
                             size="icon"
-                            aria-label={`Rotate connect URL for ${connection.name}`}
-                            onClick={() =>
-                              rotateMutation.mutate({
-                                configId: connection.configId,
-                                organizationId,
-                              })
-                            }
-                            disabled={rotateMutation.isPending}
+                            aria-label={`Copy connect URL for ${connection.name}`}
+                            onClick={() => copyConnectUrl(connection.canonicalUrl)}
                           >
-                            <RotateCw />
+                            <Copy />
                           </Button>
                         </div>
                       </TableCell>

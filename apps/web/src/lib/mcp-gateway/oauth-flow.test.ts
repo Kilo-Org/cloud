@@ -294,6 +294,40 @@ describe('MCP gateway app OAuth flow', () => {
     expect(tokenResponse.access_token).toBeTruthy();
   });
 
+  it('rejects changes to a registered client authentication method', async () => {
+    const config = await createTestConfig();
+    const services = createGatewayServices({ config });
+    const registration = await services.clientService.registerClient({
+      metadata: {
+        redirect_uris: ['http://localhost:3000/callback'],
+        token_endpoint_auth_method: 'none',
+        grant_types: ['authorization_code', 'refresh_token'],
+        response_types: ['code'],
+        scope: 'profile',
+      },
+      headers: new Headers({ 'x-vercel-forwarded-for': '203.0.113.32' }),
+    });
+
+    await expect(
+      services.clientService.updateClient({
+        clientId: registration.clientId,
+        metadata: {
+          redirect_uris: ['http://localhost:3000/callback'],
+          token_endpoint_auth_method: 'client_secret_post',
+          grant_types: ['authorization_code', 'refresh_token'],
+          response_types: ['code'],
+          scope: 'profile',
+        },
+      })
+    ).rejects.toMatchObject({ code: 'invalid_client_metadata' });
+    await expect(
+      services.clientService.findClientById(registration.clientId)
+    ).resolves.toMatchObject({
+      token_endpoint_auth_method: 'none',
+      client_secret_hash: null,
+    });
+  });
+
   it('does not redeem an authorization code after it expires', async () => {
     const config = await createTestConfig();
     const services = createGatewayServices({ config });

@@ -10,6 +10,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { SecretTokenInput } from '@/components/ui/secret-token-input';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { ArrowLeft, Copy, RotateCw, ShieldAlert, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
@@ -51,6 +62,9 @@ export function McpGatewayDetailContent({
   const [providerClientId, setProviderClientId] = useState('');
   const [providerClientSecret, setProviderClientSecret] = useState('');
   const [assignedUserId, setAssignedUserId] = useState('');
+  const [rotateDialogOpen, setRotateDialogOpen] = useState(false);
+  const [disableDialogOpen, setDisableDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const detailQuery = useQuery(
     organizationId
       ? trpc.mcpGateway.getOrganization.queryOptions({ organizationId, configId })
@@ -72,6 +86,7 @@ export function McpGatewayDetailContent({
     trpc.mcpGateway.rotateRoute.mutationOptions({
       onSuccess: () => {
         toast.success('Connect URL rotated');
+        setRotateDialogOpen(false);
         refresh();
       },
       onError: error => toast.error(error.message || 'Could not rotate the connect URL'),
@@ -81,6 +96,7 @@ export function McpGatewayDetailContent({
     trpc.mcpGateway.disable.mutationOptions({
       onSuccess: () => {
         toast.success('Connection disabled');
+        setDisableDialogOpen(false);
         refresh();
       },
       onError: error => toast.error(error.message || 'Could not disable the connection'),
@@ -90,6 +106,7 @@ export function McpGatewayDetailContent({
     trpc.mcpGateway.delete.mutationOptions({
       onSuccess: () => {
         toast.success('Connection deleted');
+        setDeleteDialogOpen(false);
         window.location.assign(routes.list);
       },
       onError: error => toast.error(error.message || 'Could not delete the connection'),
@@ -430,14 +447,35 @@ export function McpGatewayDetailContent({
                   <Copy />
                   Copy
                 </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => rotateMutation.mutate(managedConfigInput)}
-                  disabled={rotateMutation.isPending}
-                >
-                  <RotateCw />
-                  Rotate URL
-                </Button>
+                <AlertDialog open={rotateDialogOpen} onOpenChange={setRotateDialogOpen}>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="outline" disabled={rotateMutation.isPending}>
+                      <RotateCw />
+                      Rotate URL
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Rotate this connect URL?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        The current URL and any gateway tokens bound to it stop working immediately.
+                        Provider sign-in grants remain available on the new URL.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel disabled={rotateMutation.isPending}>
+                        Cancel
+                      </AlertDialogCancel>
+                      <AlertDialogAction
+                        variant="destructive"
+                        onClick={() => rotateMutation.mutate(managedConfigInput)}
+                        disabled={rotateMutation.isPending}
+                      >
+                        Rotate URL
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               </div>
             </div>
             <p className="text-muted-foreground text-xs">
@@ -448,22 +486,67 @@ export function McpGatewayDetailContent({
           <section className="space-y-3">
             <h2 className="text-sm font-medium text-destructive">Danger zone</h2>
             <div className="flex flex-wrap gap-2">
-              <Button
-                variant="outline"
-                onClick={() => disableMutation.mutate(managedConfigInput)}
-                disabled={!connection.enabled || disableMutation.isPending}
-              >
-                <ShieldAlert />
-                Disable connection
-              </Button>
-              <Button
-                variant="destructive"
-                onClick={() => deleteMutation.mutate(managedConfigInput)}
-                disabled={deleteMutation.isPending}
-              >
-                <Trash2 />
-                Delete connection
-              </Button>
+              <AlertDialog open={disableDialogOpen} onOpenChange={setDisableDialogOpen}>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="outline"
+                    disabled={!connection.enabled || disableMutation.isPending}
+                  >
+                    <ShieldAlert />
+                    Disable connection
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Disable this connection?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Requests through this connection will be blocked immediately after this
+                      action.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel disabled={disableMutation.isPending}>
+                      Cancel
+                    </AlertDialogCancel>
+                    <AlertDialogAction
+                      variant="destructive"
+                      onClick={() => disableMutation.mutate(managedConfigInput)}
+                      disabled={disableMutation.isPending}
+                    >
+                      Disable connection
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+              <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+                <AlertDialogTrigger asChild>
+                  <Button variant="destructive" disabled={deleteMutation.isPending}>
+                    <Trash2 />
+                    Delete connection
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete this connection?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This permanently invalidates its connect URL and revokes dependent instances,
+                      provider grants, and pending provider sign-ins.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel disabled={deleteMutation.isPending}>
+                      Cancel
+                    </AlertDialogCancel>
+                    <AlertDialogAction
+                      variant="destructive"
+                      onClick={() => deleteMutation.mutate(managedConfigInput)}
+                      disabled={deleteMutation.isPending}
+                    >
+                      Delete connection
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </div>
           </section>
         </CardContent>

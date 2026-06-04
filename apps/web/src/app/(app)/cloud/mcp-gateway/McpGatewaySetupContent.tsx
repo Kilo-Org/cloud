@@ -107,10 +107,14 @@ export function McpGatewaySetupContent({ organizationId }: McpGatewaySetupConten
     discoveryMutation.data && discoveryMutation.data.remoteUrl === currentRemoteUrl
       ? discoveryMutation.data
       : undefined;
-  const dynamicAvailable =
-    discovery?.providerCandidates.some(candidate => candidate.hasRegistrationEndpoint) ?? false;
-  const selectedProviderIssuer =
-    draft.providerIssuer || discovery?.providerCandidates[0]?.issuer || '';
+  const defaultProvider =
+    discovery?.providerCandidates.find(candidate => candidate.hasRegistrationEndpoint) ??
+    discovery?.providerCandidates[0];
+  const selectedProvider =
+    discovery?.providerCandidates.find(candidate => candidate.issuer === draft.providerIssuer) ??
+    defaultProvider;
+  const selectedProviderIssuer = selectedProvider?.issuer ?? '';
+  const dynamicAvailable = selectedProvider?.hasRegistrationEndpoint ?? false;
   const selectedAuthMode = useMemo(() => {
     if (draft.authMode === 'oauth_dynamic' && !dynamicAvailable && discovery) return 'oauth_static';
     return draft.authMode;

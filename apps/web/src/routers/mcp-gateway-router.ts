@@ -43,6 +43,12 @@ type RouteRow = typeof mcp_gateway_connect_resources.$inferSelect;
 type AssignmentRow = typeof mcp_gateway_assignments.$inferSelect;
 type InstanceRow = typeof mcp_gateway_connection_instances.$inferSelect;
 
+function serializeTimestamp(value: string): string;
+function serializeTimestamp(value: string | null): string | null;
+function serializeTimestamp(value: string | null) {
+  return value ? new Date(value).toISOString() : null;
+}
+
 function configProjection(params: {
   config: ConfigRow;
   route: RouteRow;
@@ -67,8 +73,8 @@ function configProjection(params: {
     routeStatus: params.route.route_status,
     registryMetadata: params.config.registry_metadata,
     auxiliaryHeaders: params.config.auxiliary_headers,
-    createdAt: params.config.created_at,
-    updatedAt: params.config.updated_at,
+    createdAt: serializeTimestamp(params.config.created_at),
+    updatedAt: serializeTimestamp(params.config.updated_at),
     assignmentCount: params.assignments.length,
     instanceCount: params.instances.length,
     activeGrantCount: params.activeGrantCount,
@@ -93,13 +99,13 @@ function detailProjection(params: {
       assignmentId: assignment.assignment_id,
       userId: assignment.kilo_user_id,
       assignedByUserId: assignment.assigned_by_kilo_user_id,
-      createdAt: assignment.created_at,
+      createdAt: serializeTimestamp(assignment.created_at),
     })),
     instances: params.instances.map(instance => ({
       instanceId: instance.instance_id,
       userId: instance.kilo_user_id,
       status: instance.instance_status,
-      lastUsedAt: instance.last_used_at,
+      lastUsedAt: serializeTimestamp(instance.last_used_at),
     })),
   };
 }
@@ -206,8 +212,8 @@ async function getConfigDetail(params: {
   ownerScope: (typeof GatewayOwnerScope)[keyof typeof GatewayOwnerScope];
   ownerId: string;
 }) {
-  const services = createGatewayServices();
-  const resolved = await services.repository.findActiveRouteByConfigId(params.configId);
+  const repository = createGatewayRepository(db);
+  const resolved = await repository.findActiveRouteByConfigId(params.configId);
   if (
     !resolved ||
     resolved.config.owner_scope !== params.ownerScope ||

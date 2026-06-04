@@ -175,6 +175,15 @@ export function createOAuthClientService(params: {
         400
       );
     }
+    const existing = await findClientById(input.clientId);
+    if (!existing) return null;
+    if (existing.token_endpoint_auth_method !== metadata.data.token_endpoint_auth_method) {
+      throw createGatewayError(
+        GatewayErrorCode.InvalidClientMetadata,
+        'Token endpoint authentication method cannot be changed after registration',
+        400
+      );
+    }
     const rows = await params.repository.database
       .update(mcp_gateway_oauth_clients)
       .set({

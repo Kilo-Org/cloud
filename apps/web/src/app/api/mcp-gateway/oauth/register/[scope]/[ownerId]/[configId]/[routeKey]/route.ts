@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { createGatewayServices } from '@/lib/mcp-gateway/services';
 import { gatewayErrorResponse } from '@/lib/mcp-gateway/http';
 import { parseScopedRouteParams } from '@/lib/mcp-gateway/route-params';
+import { serializeRegistrationResponse } from '@/lib/mcp-gateway/oauth-client-response';
 
 export async function POST(
   request: NextRequest,
@@ -20,17 +21,10 @@ export async function POST(
       headers: request.headers,
     });
     return NextResponse.json(
+      serializeRegistrationResponse(registration, services.config.appBaseUrl),
       {
-        client_id: registration.clientId,
-        client_secret: registration.clientSecret,
-        registration_access_token: registration.registrationAccessToken,
-        registration_access_token_expires_at: registration.registrationAccessTokenExpiresAt,
-        registration_client_uri: new URL(
-          `/api/mcp-gateway/oauth/register/${registration.clientId}`,
-          services.config.appBaseUrl
-        ).toString(),
-      },
-      { status: 201 }
+        status: 201,
+      }
     );
   } catch (error) {
     return gatewayErrorResponse(error);

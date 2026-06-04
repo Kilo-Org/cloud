@@ -68,6 +68,29 @@ describe('provider grant schema', () => {
   });
 });
 
+describe('OAuth client metadata', () => {
+  test('ignores unsupported RFC metadata fields', () => {
+    const parsed = OAuthClientMetadataSchema.parse({
+      client_name: 'Codex',
+      redirect_uris: ['http://localhost:3000/callback'],
+      token_endpoint_auth_method: 'none',
+      grant_types: ['authorization_code'],
+      response_types: ['code'],
+      client_uri: 'https://client.example',
+      logo_uri: 'https://client.example/logo.svg',
+      software_id: 'codex',
+    });
+
+    expect(parsed).toEqual({
+      client_name: 'Codex',
+      redirect_uris: ['http://localhost:3000/callback'],
+      token_endpoint_auth_method: 'none',
+      grant_types: ['authorization_code'],
+      response_types: ['code'],
+    });
+  });
+});
+
 describe('OAuth redirect URI policy', () => {
   test('requires HTTPS except loopback HTTP redirects', () => {
     expect(

@@ -62,7 +62,7 @@ export const OAuthClientMetadataSchema = z
     response_types: z.array(z.literal('code')).min(1),
     scope: z.string().optional(),
   })
-  .strict();
+  .strip();
 
 export type OAuthClientMetadata = z.infer<typeof OAuthClientMetadataSchema>;
 

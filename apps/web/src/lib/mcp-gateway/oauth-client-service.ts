@@ -8,6 +8,7 @@ import {
   createGatewayError,
   GatewayErrorCode,
 } from '@kilocode/mcp-gateway';
+import type { OAuthClientMetadata } from '@kilocode/mcp-gateway';
 import { mcp_gateway_oauth_clients, mcp_gateway_rate_limit_windows } from '@kilocode/db/schema';
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import type { GatewayRepository } from './repository';
@@ -15,6 +16,15 @@ import { expiresAtIso, floorToMinuteIso, hashToken, hmacValue, randomToken } fro
 import type { GatewayAppConfig } from './config';
 
 const PUBLIC_REGISTRATION_LIMIT_PER_MINUTE = 10;
+
+export type GatewayOAuthClientRegistration = {
+  clientId: string;
+  clientSecret: string | null;
+  registrationAccessToken: string;
+  registrationAccessTokenExpiresAt: string;
+  metadata: OAuthClientMetadata;
+  declaredScopes: string[];
+};
 
 function clientIp(headers: Headers): string {
   // apps/web is deployed behind Vercel, which overwrites this header at the edge.
@@ -63,12 +73,10 @@ export function createOAuthClientService(params: {
     return declaredScopes.length > 0 ? declaredScopes : [...GatewaySupportedScopes];
   }
 
-  async function registerClient(input: { metadata: unknown; headers: Headers }): Promise<{
-    clientId: string;
-    clientSecret: string | null;
-    registrationAccessToken: string;
-    registrationAccessTokenExpiresAt: string;
-  }> {
+  async function registerClient(input: {
+    metadata: unknown;
+    headers: Headers;
+  }): Promise<GatewayOAuthClientRegistration> {
     await consumeRegistrationRateLimit(input.headers);
     const metadata = OAuthClientMetadataSchema.safeParse(input.metadata);
     if (!metadata.success) {
@@ -79,6 +87,7 @@ export function createOAuthClientService(params: {
       );
     }
 
+    const declaredScopes = validateDeclaredScopes(metadata.data.scope);
     const clientId = `mcp:${randomToken(18)}`;
     const registrationAccessToken = randomToken(32);
     const registrationAccessTokenExpiresAt = expiresAtIso(
@@ -98,7 +107,7 @@ export function createOAuthClientService(params: {
       redirect_uris: metadata.data.redirect_uris,
       grant_types: metadata.data.grant_types,
       response_types: metadata.data.response_types,
-      declared_scopes: validateDeclaredScopes(metadata.data.scope),
+      declared_scopes: declaredScopes,
       registration_access_token_expires_at: registrationAccessTokenExpiresAt,
     });
 
@@ -107,6 +116,8 @@ export function createOAuthClientService(params: {
       clientSecret,
       registrationAccessToken,
       registrationAccessTokenExpiresAt,
+      metadata: metadata.data,
+      declaredScopes,
     };
   }
 

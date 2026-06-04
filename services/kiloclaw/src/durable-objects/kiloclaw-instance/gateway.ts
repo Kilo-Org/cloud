@@ -363,6 +363,20 @@ async function requireControllerCapability(
 // Each is capability-gated and fails closed on older controllers.
 // ──────────────────────────────────────────────────────────────────────
 
+/**
+ * Timeout for the mutating agent endpoints. The controller serializes ALL agent
+ * mutations (CLI create/delete AND native update/update-defaults) through one
+ * per-config queue, and the CLI ops have their own 30s timeout. The default
+ * 30s gateway timeout equals the CLI timeout, so the outer request can abort
+ * (→ 503) before a queued or in-flight mutation finishes — masking the
+ * controller's own typed outcome (e.g. 504 openclaw_cli_timeout) and leaving
+ * retries with ambiguous agent_exists/agent_not_found state. This headroom
+ * (one queued 30s CLI op + our own 30s CLI op + the post-CLI config read +
+ * network) lets the controller's typed response win the race. Reads are not
+ * queued and keep the 30s default.
+ */
+const AGENT_MUTATION_REQUEST_TIMEOUT_MS = 90_000;
+
 /** GET /_kilo/config/agents — list the fleet (+ inherited defaults). */
 export async function listAgents(
   state: InstanceMutableState,
@@ -418,7 +432,8 @@ export async function updateAgent(
     `/_kilo/config/agents/${encodeURIComponent(agentId)}`,
     'PATCH',
     AgentMutationResponseSchema,
-    patch
+    patch,
+    { timeoutMs: AGENT_MUTATION_REQUEST_TIMEOUT_MS }
   );
 }
 
@@ -440,7 +455,8 @@ export async function updateAgentDefaults(
     '/_kilo/config/agent-defaults',
     'PATCH',
     AgentDefaultsMutationResponseSchema,
-    patch
+    patch,
+    { timeoutMs: AGENT_MUTATION_REQUEST_TIMEOUT_MS }
   );
 }
 
@@ -463,7 +479,8 @@ export async function createAgent(
     '/_kilo/config/agents',
     'POST',
     AgentCreateResponseSchema,
-    body
+    body,
+    { timeoutMs: AGENT_MUTATION_REQUEST_TIMEOUT_MS }
   );
 }
 
@@ -484,7 +501,9 @@ export async function deleteAgent(
     env,
     `/_kilo/config/agents/${encodeURIComponent(agentId)}`,
     'DELETE',
-    AgentDeleteResponseSchema
+    AgentDeleteResponseSchema,
+    undefined,
+    { timeoutMs: AGENT_MUTATION_REQUEST_TIMEOUT_MS }
   );
 }
 

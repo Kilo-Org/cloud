@@ -1919,6 +1919,7 @@ export const microdollar_usage_metadata = pgTable(
     id: uuid().notNull().primaryKey(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }),
     message_id: text().notNull(),
+    response_model: text(),
     http_user_agent_id: integer().references(() => http_user_agent.http_user_agent_id),
     http_ip_id: integer().references(() => http_ip.http_ip_id),
     vercel_ip_city_id: integer().references(() => vercel_ip_city.vercel_ip_city_id),

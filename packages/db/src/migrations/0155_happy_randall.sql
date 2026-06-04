@@ -1,0 +1,1 @@
+ALTER TABLE "microdollar_usage_metadata" ADD COLUMN "response_model" text;

@@ -1086,6 +1086,13 @@
       "when": 1780401682134,
       "tag": "0154_familiar_franklin_richards",
       "breakpoints": true
+    },
+    {
+      "idx": 155,
+      "version": "7",
+      "when": 1780561358044,
+      "tag": "0155_happy_randall",
+      "breakpoints": true
     }
   ]
 }

@@ -24,6 +24,10 @@ import {
   MorningBriefingReadResponseSchema,
   OpenclawWorkspaceImportResponseSchema,
   GatewayControllerError,
+  AgentConfigListResponseSchema,
+  type AgentConfigListResponse,
+  AgentReadResponseSchema,
+  type AgentReadResponse,
 } from '../gateway-controller-types';
 import { HEALTH_PROBE_TIMEOUT_SECONDS, HEALTH_PROBE_INTERVAL_MS } from '../../config';
 import type { InstanceMutableState } from './types';
@@ -322,6 +326,69 @@ export async function getControllerVersion(
     }
     throw error;
   }
+}
+
+/**
+ * Server-side fail-closed capability gate. Throws a typed GatewayControllerError
+ * (501 `capability_unavailable`) when the controller image does not advertise the
+ * required capability — so newer cloud code never silently proxies an agent
+ * operation to an older controller that can't honor it. This is the real
+ * enforcement boundary (UI gating is cosmetic; see plan §3c).
+ */
+async function requireControllerCapability(
+  state: InstanceMutableState,
+  env: KiloClawEnv,
+  capability: string
+): Promise<void> {
+  const version = await getControllerVersion(state, env);
+  if (!version?.capabilities?.includes(capability)) {
+    throw new GatewayControllerError(
+      501,
+      `Controller does not advertise required capability "${capability}"`,
+      'capability_unavailable'
+    );
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────
+// Agent config CRUD wrappers (controller: /_kilo/config/agents*)
+// Each is capability-gated and fails closed on older controllers.
+// ──────────────────────────────────────────────────────────────────────
+
+/** GET /_kilo/config/agents — list the fleet (+ inherited defaults). */
+export async function listAgents(
+  state: InstanceMutableState,
+  env: KiloClawEnv
+): Promise<AgentConfigListResponse> {
+  await requireControllerCapability(state, env, 'config.agents.read');
+  return callGatewayController(
+    state,
+    env,
+    '/_kilo/config/agents',
+    'GET',
+    AgentConfigListResponseSchema
+  );
+}
+
+/**
+ * GET /_kilo/config/agents/:id — read one agent's normalized config.
+ * The controller 404s (`agent_not_found`) for an unknown id; that surfaces as a
+ * GatewayControllerError(404, code='agent_not_found') — distinct from an old
+ * controller missing the route entirely (which the capability gate rejects first).
+ */
+export async function getAgent(
+  state: InstanceMutableState,
+  env: KiloClawEnv,
+  agentId: string
+): Promise<AgentReadResponse> {
+  await requireControllerCapability(state, env, 'config.agents.read');
+  return callGatewayController(
+    state,
+    env,
+    `/_kilo/config/agents/${encodeURIComponent(agentId)}`,
+    'GET',
+    AgentReadResponseSchema
+  );
 }
 
 export async function getGatewayReady(

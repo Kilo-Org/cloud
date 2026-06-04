@@ -80,6 +80,10 @@ import {
   parseMachineSizeFromFlyGuest,
 } from '../machine-config';
 import type { GatewayProcessStatus } from '../gateway-controller-types';
+import type {
+  AgentConfigListResponse,
+  AgentReadResponse,
+} from '../gateway-controller-types';
 
 // Domain modules
 import type { InstanceMutableState, InstanceStatus, DestroyResult } from './types';
@@ -3868,6 +3872,25 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   ): Promise<{ ok: boolean } | null> {
     await this.loadState();
     return gateway.replaceConfigOnMachine(this.s, this.env, config, etag);
+  }
+
+  /**
+   * List the agent fleet (+ inherited defaults). Fails closed with a typed
+   * `capability_unavailable` error when the controller lacks `config.agents.read`.
+   */
+  async listAgents(): Promise<AgentConfigListResponse> {
+    await this.loadState();
+    return gateway.listAgents(this.s, this.env);
+  }
+
+  /**
+   * Read one agent's normalized config. Throws a typed 404 (`agent_not_found`)
+   * for an unknown id, or `capability_unavailable` when the controller lacks
+   * `config.agents.read`.
+   */
+  async getAgent(agentId: string): Promise<AgentReadResponse> {
+    await this.loadState();
+    return gateway.getAgent(this.s, this.env, agentId);
   }
 
   async getFileTree() {

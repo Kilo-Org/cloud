@@ -255,6 +255,73 @@ export const FileWriteResponseSchema = z.union([
 export type FileWriteResponse = z.infer<typeof FileWriteResponseSchema>;
 
 // ──────────────────────────────────────────────────────────────────────
+// Agent config CRUD responses
+// Mirror (controller side):
+//   - controller/src/openclaw-agent-config.ts → AgentSummary, AgentConfigSummary
+//   - controller/src/openclaw-agent-cli.ts     → CreateResultSchema, DeleteResultSchema
+// Response schemas are intentionally lenient (settings as nullable strings, not
+// enums) so a newer controller adding an enum value never fails cloud-side parsing.
+// ──────────────────────────────────────────────────────────────────────
+
+// Raw model value as authored in openclaw.json: a bare string or an object.
+const AgentRawModelSchema = z.union([
+  z.string(),
+  z
+    .object({
+      primary: z.string().optional(),
+      fallbacks: z.array(z.string()).optional(),
+    })
+    .passthrough(),
+]);
+
+const AgentModelSummarySchema = z.object({
+  primary: z.string().nullable(),
+  fallbacks: z.array(z.string()),
+});
+
+const AgentSettingsSummarySchema = z.object({
+  thinkingDefault: z.string().nullable(),
+  verboseDefault: z.string().nullable(),
+  reasoningDefault: z.string().nullable(),
+  fastModeDefault: z.boolean().nullable(),
+});
+
+export const AgentSummarySchema = z.object({
+  id: z.string(),
+  name: z.string().nullable(),
+  configured: z.boolean(),
+  workspace: z.string().nullable(),
+  agentDir: z.string().nullable(),
+  model: AgentModelSummarySchema.extend({
+    source: z.enum(['agent', 'defaults']).nullable(),
+  }),
+  rawModel: AgentRawModelSchema.nullable(),
+  settings: AgentSettingsSummarySchema,
+});
+export type AgentSummary = z.infer<typeof AgentSummarySchema>;
+
+export const AgentDefaultsSummarySchema = z.object({
+  model: AgentModelSummarySchema.nullable(),
+  settings: AgentSettingsSummarySchema,
+});
+export type AgentDefaultsSummary = z.infer<typeof AgentDefaultsSummarySchema>;
+
+// GET /_kilo/config/agents → { etag, defaults, agents[] }
+export const AgentConfigListResponseSchema = z.object({
+  etag: z.string(),
+  defaults: AgentDefaultsSummarySchema,
+  agents: z.array(AgentSummarySchema),
+});
+export type AgentConfigListResponse = z.infer<typeof AgentConfigListResponseSchema>;
+
+// GET /_kilo/config/agents/:id → { etag, agent }
+export const AgentReadResponseSchema = z.object({
+  etag: z.string(),
+  agent: AgentSummarySchema,
+});
+export type AgentReadResponse = z.infer<typeof AgentReadResponseSchema>;
+
+// ──────────────────────────────────────────────────────────────────────
 // Controller pairing responses
 //
 // These schemas describe the wire format returned by the controller's

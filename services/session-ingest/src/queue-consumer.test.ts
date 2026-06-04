@@ -184,7 +184,7 @@ describe('queue', () => {
     expect(retry).toHaveBeenCalledWith({ delaySeconds: QUEUE_RETRY_DELAY_SECONDS });
   });
 
-  it('passes full parsed oversized message data and its R2 reference into ingest', async () => {
+  it('passes a slim oversized message and its R2 reference into ingest', async () => {
     const ingest = vi.fn(async () => ({ changes: [] }));
     vi.mocked(getSessionIngestDO).mockReturnValue({ ingest } as never);
     const limit = vi.fn(async () => [{ session_id: 'ses_compacted' }]);
@@ -235,7 +235,7 @@ describe('queue', () => {
     const expectedR2Key = 'items/usr_compacted/ses_compacted/message/msg_compacted/456';
     expect(put).toHaveBeenCalledWith(expectedR2Key, JSON.stringify(data));
     expect(ingest).toHaveBeenCalledWith(
-      [{ type: 'message', data }],
+      [{ type: 'message', data: { id: 'msg_compacted' } }],
       'usr_compacted',
       'ses_compacted',
       1,

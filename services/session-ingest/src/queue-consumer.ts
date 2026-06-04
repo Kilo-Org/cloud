@@ -281,6 +281,30 @@ async function streamSessionItems(
   return getParseError();
 }
 
+function slimItemForR2Reference(item: SessionDataItem): SessionDataItem {
+  switch (item.type) {
+    case 'message':
+      return { type: 'message', data: { id: item.data.id } };
+    case 'part':
+      return { type: 'part', data: { id: item.data.id, messageID: item.data.messageID } };
+    case 'session': {
+      const data: Record<string, unknown> = {};
+      if ('title' in item.data) data.title = item.data.title;
+      if ('parentID' in item.data) data.parentID = item.data.parentID;
+      return { type: 'session', data };
+    }
+    case 'session_diff':
+      return { type: 'session_diff', data: [] };
+    case 'model':
+      return { type: 'model', data: [] };
+    case 'session_open':
+    case 'session_close':
+    case 'session_status':
+    case 'kilo_meta':
+      return item;
+  }
+}
+
 function createIngestChunker(
   env: Env,
   msg: IngestQueueMessage,
@@ -323,17 +347,20 @@ function createIngestChunker(
     const item = parsed.data;
     const { item_id } = getItemIdentity(item);
 
-    // Offload data above the DO SQLite row limit to R2; the DO stores a
-    // reference and an empty inline blob.
     const itemDataJson = JSON.stringify(item.data);
     const itemDataBytes = encoder.encode(itemDataJson).byteLength;
+
+    // Offload data above the DO SQLite row limit to R2; the DO stores a
+    // reference and an empty inline blob. Send only identity fields over RPC so
+    // a single oversized item cannot exceed Cloudflare's RPC payload limit.
+    const itemForRpc = itemDataBytes > MAX_INGEST_ITEM_BYTES ? slimItemForR2Reference(item) : item;
     if (itemDataBytes > MAX_INGEST_ITEM_BYTES) {
       const itemR2Key = `items/${kiloUserId}/${sessionId}/${item_id}/${ingestedAt}`;
       await env.SESSION_INGEST_R2.put(itemR2Key, itemDataJson);
       chunkR2References[item_id] = itemR2Key;
     }
 
-    chunk.push(item);
+    chunk.push(itemForRpc);
     chunkBytes += itemDataBytes;
     if (chunk.length >= INGEST_CHUNK_MAX_ITEMS || chunkBytes >= INGEST_CHUNK_MAX_BYTES) {
       await flushChunkToSessionDO();

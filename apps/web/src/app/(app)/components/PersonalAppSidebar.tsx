@@ -137,6 +137,15 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
       icon: Cloud,
       url: '/cloud',
     },
+    ...(user?.is_admin
+      ? [
+          {
+            title: 'MCP Gateway',
+            icon: Cable,
+            url: '/cloud/mcp-gateway',
+          },
+        ]
+      : []),
     {
       title: 'Sessions',
       icon: List,

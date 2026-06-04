@@ -111,6 +111,7 @@ function createBundle(options) {
       {
         keyId: jwtKeyId,
         publicJwk,
+        publicKeyPem: jwtPair.publicKey,
         privateKeyPem: jwtPair.privateKey,
       },
     ],

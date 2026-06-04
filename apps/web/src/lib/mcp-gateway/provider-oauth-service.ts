@@ -6,6 +6,7 @@ import {
   ProviderAuthorizationServerMetadataSchema,
   ProviderTokenResponseSchema,
   GatewayExecutionContextSchema,
+  GatewayOwnerScope,
   createGatewayError,
   GatewayErrorCode,
 } from '@kilocode/mcp-gateway';
@@ -15,8 +16,13 @@ import {
   mcp_gateway_config_secrets,
   mcp_gateway_pending_provider_authorizations,
 } from '@kilocode/db/schema';
+import type {
+  mcp_gateway_connection_instances,
+  mcp_gateway_provider_grants,
+} from '@kilocode/db/schema';
 import { and, eq, gt, sql } from 'drizzle-orm';
 import { z } from 'zod';
+import type { GatewayExecutionContext, ScopedConnectRoute } from '@kilocode/mcp-gateway';
 import type { GatewayAppConfig } from './config';
 import type { GatewayRepository, ResolvedGatewayRoute } from './repository';
 import type { GatewayRouteService } from './route-service';
@@ -53,6 +59,16 @@ type ProviderCredentials = {
   metadata: z.infer<typeof ProviderAuthorizationServerMetadataSchema>;
   clientId: string;
   clientSecret?: string;
+};
+
+type ProviderCallbackResult = {
+  pending: typeof mcp_gateway_pending_provider_authorizations.$inferSelect;
+  authorizationRequest: typeof mcp_gateway_authorization_requests.$inferSelect | null;
+  grant: typeof mcp_gateway_provider_grants.$inferSelect;
+  instance: typeof mcp_gateway_connection_instances.$inferSelect;
+  resolved: ResolvedGatewayRoute;
+  route: ScopedConnectRoute;
+  completionUrl: string;
 };
 
 function pendingStateAad(pendingId: string): string {
@@ -306,6 +322,87 @@ export function createProviderOAuthService(params: {
     return { pending, authorizationUrl: url.toString() };
   }
 
+  async function startDashboardProviderSignIn(paramsInput: {
+    resolved: ResolvedGatewayRoute;
+    route: ScopedConnectRoute;
+    userId: string;
+    executionContext: GatewayExecutionContext;
+  }) {
+    await params.routeService.authorize({
+      resolved: paramsInput.resolved,
+      route: paramsInput.route,
+      userId: paramsInput.userId,
+      executionContext: paramsInput.executionContext,
+    });
+    const instance = await params.repository.ensureConnectionInstance({
+      ownerScope: paramsInput.resolved.config.owner_scope,
+      ownerId: paramsInput.resolved.config.owner_id,
+      configId: paramsInput.resolved.config.config_id,
+      userId: paramsInput.userId,
+    });
+    const credentials = await getProviderCredentials(paramsInput.resolved);
+    if (!credentials) {
+      throw createGatewayError(
+        GatewayErrorCode.InvalidRequest,
+        'Config does not require provider OAuth',
+        400
+      );
+    }
+    const authorizationEndpoint = await validatePublicHttpsDestination(
+      credentials.metadata.authorization_endpoint
+    );
+    const tokenEndpoint = await validatePublicHttpsDestination(credentials.metadata.token_endpoint);
+    const codeVerifier = randomToken(48);
+    const state = randomToken(32);
+    const redirectUri = new URL(
+      '/api/mcp-gateway/oauth/mcp/callback',
+      params.config.appBaseUrl
+    ).toString();
+    const scopes = ['profile'];
+    const encryptedState = encryptKeyedEnvelope(
+      JSON.stringify({
+        codeVerifier,
+        clientId: credentials.clientId,
+        clientSecret: credentials.clientSecret,
+        tokenEndpoint: tokenEndpoint.toString(),
+        redirectUri,
+        scopes,
+      }),
+      pendingStateScheme,
+      params.config.credentialKeyset.active,
+      pendingStateAad(state)
+    );
+    await params.repository.database.insert(mcp_gateway_pending_provider_authorizations).values({
+      state_hash: hashToken(state),
+      authorization_request_id: null,
+      config_id: paramsInput.resolved.config.config_id,
+      instance_id: instance.instance_id,
+      owner_scope: paramsInput.resolved.config.owner_scope,
+      owner_id: paramsInput.resolved.config.owner_id,
+      kilo_user_id: paramsInput.userId,
+      route_key: paramsInput.resolved.route.route_key,
+      canonical_resource_url: paramsInput.resolved.route.canonical_url,
+      remote_url: paramsInput.resolved.config.remote_url,
+      auth_mode: paramsInput.resolved.config.auth_mode,
+      provider_authorization_endpoint: authorizationEndpoint.toString(),
+      provider_token_endpoint: tokenEndpoint.toString(),
+      encrypted_state: encryptedState,
+      execution_context: paramsInput.executionContext,
+      config_version: paramsInput.resolved.config.config_version,
+      pending_status: GatewayPendingProviderAuthorizationStatus.Pending,
+      expires_at: expiresAtIso(30 * 60),
+    });
+    const url = new URL(authorizationEndpoint.toString());
+    url.searchParams.set('response_type', 'code');
+    url.searchParams.set('client_id', credentials.clientId);
+    url.searchParams.set('redirect_uri', redirectUri);
+    url.searchParams.set('state', state);
+    url.searchParams.set('code_challenge', pkceChallenge(codeVerifier));
+    url.searchParams.set('code_challenge_method', 'S256');
+    url.searchParams.set('scope', scopes.join(' '));
+    return { authorizationUrl: url.toString() };
+  }
+
   async function consumeProviderError(paramsInput: { state: string; userId: string }) {
     const [pending] = await params.repository.database
       .update(mcp_gateway_pending_provider_authorizations)
@@ -351,7 +448,7 @@ export function createProviderOAuthService(params: {
     state: string;
     code: string;
     userId: string;
-  }) {
+  }): Promise<ProviderCallbackResult> {
     const [pending] = await params.repository.database
       .update(mcp_gateway_pending_provider_authorizations)
       .set({
@@ -429,31 +526,30 @@ export function createProviderOAuthService(params: {
       );
     }
     const state = PendingProviderStateSchema.parse(rawState);
-    if (!pending.authorization_request_id) {
+    const authorizationRequest = pending.authorization_request_id
+      ? await params.repository.database
+          .select()
+          .from(mcp_gateway_authorization_requests)
+          .where(
+            eq(
+              mcp_gateway_authorization_requests.authorization_request_id,
+              pending.authorization_request_id
+            )
+          )
+          .limit(1)
+          .then(rows => rows[0] ?? null)
+      : null;
+    if (pending.authorization_request_id && !authorizationRequest) {
       throw createGatewayError(
         GatewayErrorCode.InvalidRequest,
         'Authorization request is unavailable',
         400
       );
     }
-    const [authorizationRequest] = await params.repository.database
-      .select()
-      .from(mcp_gateway_authorization_requests)
-      .where(
-        eq(
-          mcp_gateway_authorization_requests.authorization_request_id,
-          pending.authorization_request_id
-        )
-      )
-      .limit(1);
-    if (!authorizationRequest) {
-      throw createGatewayError(
-        GatewayErrorCode.InvalidRequest,
-        'Authorization request is unavailable',
-        400
-      );
-    }
-    if (authorizationRequest.granted_scopes.join(' ') !== state.scopes.join(' ')) {
+    if (
+      authorizationRequest &&
+      authorizationRequest.granted_scopes.join(' ') !== state.scopes.join(' ')
+    ) {
       throw createGatewayError(
         GatewayErrorCode.AccessDenied,
         'Provider authorization scope mismatch',
@@ -528,12 +624,23 @@ export function createProviderOAuthService(params: {
       eventType: 'provider_authorization_completed',
       outcome: 'success',
     });
-    return { pending, authorizationRequest, grant, instance, resolved, route };
+    const completionUrl =
+      resolved.config.owner_scope === GatewayOwnerScope.Organization
+        ? new URL(
+            `/organizations/${resolved.config.owner_id}/cloud/mcp-gateway/${resolved.config.config_id}`,
+            params.config.appBaseUrl
+          ).toString()
+        : new URL(
+            `/cloud/mcp-gateway/${resolved.config.config_id}`,
+            params.config.appBaseUrl
+          ).toString();
+    return { pending, authorizationRequest, grant, instance, resolved, route, completionUrl };
   }
 
   return {
     getProviderCredentials,
     initiateProviderAuthorization,
+    startDashboardProviderSignIn,
     consumeProviderError,
     handleProviderCallback,
   };

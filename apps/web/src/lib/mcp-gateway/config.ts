@@ -1,14 +1,11 @@
 import 'server-only';
 import { getEnvVariable } from '@/lib/dotenvx';
-import type { JsonWebKey } from 'node:crypto';
 import { z } from 'zod';
 
 const JWTKeySchema = z.object({
   keyId: z.string().min(1),
-  publicJwk: z.custom<JsonWebKey>(
-    value => value !== null && typeof value === 'object',
-    'publicJwk must be an object'
-  ),
+  publicJwk: z.record(z.string(), z.unknown()),
+  publicKeyPem: z.string().min(1),
   privateKeyPem: z.string().min(1).optional(),
 });
 
@@ -35,7 +32,8 @@ const CredentialKeysetSchema = z.object({
 
 export type GatewayJWTKey = {
   keyId: string;
-  publicJwk: JsonWebKey;
+  publicJwk: Record<string, unknown>;
+  publicKeyPem: string;
   privateKeyPem?: string;
 };
 

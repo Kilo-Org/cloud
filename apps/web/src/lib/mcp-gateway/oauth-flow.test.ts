@@ -51,7 +51,14 @@ function createTestConfig(): Promise<GatewayAppConfig> {
     jwtKeyset: {
       issuer: 'https://app.kilo.ai',
       activeKeyId: 'jwt-active',
-      keys: [{ keyId: 'jwt-active', publicJwk, privateKeyPem: jwtKeys.privateKey }],
+      keys: [
+        {
+          keyId: 'jwt-active',
+          publicJwk,
+          publicKeyPem: jwtKeys.publicKey,
+          privateKeyPem: jwtKeys.privateKey,
+        },
+      ],
     },
     credentialKeyset: {
       active: { keyId: 'credential-active', publicKeyPem: credentialKeys.publicKey },
@@ -420,6 +427,46 @@ describe('MCP gateway app OAuth flow', () => {
     });
   });
 
+  it('persists initial static provider credentials atomically without a version rotation', async () => {
+    const config = await createTestConfig();
+    const services = createGatewayServices({ config, fetchImpl: providerDiscoveryFetch });
+    const user = await insertTestUser({ id: `gateway-user-${crypto.randomUUID()}` });
+    const created = await services.configService.createPersonalConfig({
+      userId: user.id,
+      name: 'Static OAuth MCP',
+      remoteUrl: 'https://example.com/mcp',
+      authMode: 'oauth_static',
+      staticProviderClientId: 'provider-client',
+      staticProviderClientSecret: 'provider-secret',
+    });
+
+    const persistedConfig = await db
+      .select()
+      .from(mcp_gateway_configs)
+      .where(eq(mcp_gateway_configs.config_id, created.config.config_id))
+      .then(rows => rows[0]);
+    expect(persistedConfig?.config_version).toBe(1);
+    await expect(
+      services.repository.findActiveSecret(created.config.config_id, 'static_provider_credentials')
+    ).resolves.toBeTruthy();
+  });
+
+  it('rejects partial initial static provider credentials', async () => {
+    const config = await createTestConfig();
+    const services = createGatewayServices({ config, fetchImpl: providerDiscoveryFetch });
+    const user = await insertTestUser({ id: `gateway-user-${crypto.randomUUID()}` });
+
+    await expect(
+      services.configService.createPersonalConfig({
+        userId: user.id,
+        name: 'Static OAuth MCP',
+        remoteUrl: 'https://example.com/mcp',
+        authMode: 'oauth_static',
+        staticProviderClientId: 'provider-client',
+      })
+    ).rejects.toMatchObject({ code: 'invalid_request' });
+  });
+
   it('rejects oauth_dynamic configs when the provider has no registration endpoint', async () => {
     const config = await createTestConfig();
     const fetchImpl: typeof fetch = async input => {
@@ -716,6 +763,7 @@ describe('MCP gateway app OAuth flow', () => {
       .from(mcp_gateway_provider_grants)
       .where(eq(mcp_gateway_provider_grants.instance_id, callback.instance.instance_id));
     expect(grants).toHaveLength(1);
+    if (!callback.authorizationRequest) throw new Error('Expected authorization request');
     const finalized = await services.authorizationService.completeProviderAuthorization({
       authorizationRequest: callback.authorizationRequest,
     });

@@ -174,6 +174,15 @@ export default function OrganizationAppSidebar({
       icon: Cloud,
       url: `/organizations/${organizationId}/cloud`,
     },
+    ...(user?.is_admin
+      ? [
+          {
+            title: 'MCP Gateway',
+            icon: Cable,
+            url: `/organizations/${organizationId}/cloud/mcp-gateway`,
+          },
+        ]
+      : []),
     {
       title: 'Sessions',
       icon: List,

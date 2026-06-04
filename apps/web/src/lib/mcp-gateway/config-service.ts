@@ -7,6 +7,7 @@ import {
   buildScopedConnectRootPath,
   createGatewayError,
   GatewayErrorCode,
+  GatewayAuthMode,
 } from '@kilocode/mcp-gateway';
 import {
   mcp_gateway_assignments,
@@ -19,7 +20,6 @@ import {
 } from '@kilocode/db/schema';
 import { encryptKeyedEnvelope } from '@kilocode/encryption';
 import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
-import type { GatewayAuthMode } from '@kilocode/mcp-gateway';
 import type { GatewayAppConfig } from './config';
 import { createGatewayRepository, type GatewayRepository } from './repository';
 import { configSecretAad, nowIso, randomToken } from './crypto';
@@ -34,10 +34,16 @@ export function createConfigService(params: {
   config: GatewayAppConfig;
   discoveryService: GatewayDiscoveryService;
 }) {
-  async function discoverProviderMetadata(input: { remoteUrl: string; authMode: GatewayAuthMode }) {
+  async function discoverProviderMetadata(input: {
+    remoteUrl: string;
+    authMode: GatewayAuthMode;
+    providerIssuer?: string;
+  }) {
     if (input.authMode !== 'oauth_dynamic' && input.authMode !== 'oauth_static') return null;
     const discovery = await params.discoveryService.discoverRemoteProvider(input.remoteUrl);
-    const provider = discovery.providerCandidates[0];
+    const provider = input.providerIssuer
+      ? discovery.providerCandidates.find(candidate => candidate.issuer === input.providerIssuer)
+      : discovery.providerCandidates[0];
     if (!provider) {
       throw createGatewayError(
         GatewayErrorCode.InvalidRequest,
@@ -55,17 +61,77 @@ export function createConfigService(params: {
     return provider;
   }
 
+  function initialStaticProviderCredentials(input: {
+    authMode: GatewayAuthMode;
+    staticProviderClientId?: string;
+    staticProviderClientSecret?: string;
+  }) {
+    const hasClientId = input.staticProviderClientId !== undefined;
+    const hasClientSecret = input.staticProviderClientSecret !== undefined;
+    if (!hasClientId && !hasClientSecret) return null;
+    if (
+      input.authMode !== GatewayAuthMode.OAuthStatic ||
+      !input.staticProviderClientId ||
+      !input.staticProviderClientSecret
+    ) {
+      throw createGatewayError(
+        GatewayErrorCode.InvalidRequest,
+        'Manual provider credentials require OAuth static mode and both credential values',
+        400
+      );
+    }
+    return {
+      clientId: input.staticProviderClientId,
+      clientSecret: input.staticProviderClientSecret,
+    };
+  }
+
+  function encryptSecret(input: {
+    configId: string;
+    kind: (typeof GatewaySecretKind)[keyof typeof GatewaySecretKind];
+    value: Record<string, unknown>;
+  }) {
+    return encryptKeyedEnvelope(
+      JSON.stringify({ kind: input.kind, value: input.value }),
+      secretScheme,
+      params.config.credentialKeyset.active,
+      configSecretAad(input.configId, input.kind)
+    );
+  }
+
+  async function insertInitialStaticProviderCredentials(
+    tx: GatewayRepository['database'],
+    configId: string,
+    credentials: { clientId: string; clientSecret: string } | null
+  ) {
+    if (!credentials) return;
+    await tx.insert(mcp_gateway_config_secrets).values({
+      config_id: configId,
+      secret_kind: GatewaySecretKind.StaticProviderCredentials,
+      encrypted_secret: encryptSecret({
+        configId,
+        kind: GatewaySecretKind.StaticProviderCredentials,
+        value: credentials,
+      }),
+    });
+  }
+
   async function createPersonalConfig(input: {
     userId: string;
     name: string;
     remoteUrl: string;
     authMode: GatewayAuthMode;
+    providerIssuer?: string;
+    staticProviderClientId?: string;
+    staticProviderClientSecret?: string;
     pathPassthrough?: boolean;
   }) {
+    const staticProviderCredentials = initialStaticProviderCredentials(input);
     await validatePublicHttpsDestination(input.remoteUrl);
     const discoveredProviderMetadata = await discoverProviderMetadata(input);
     return await params.repository.database.transaction(async tx => {
       const repository = createGatewayRepository(tx);
+      const auditService = createAuditService(repository);
       const created = await repository.createConfigWithRoute({
         ownerScope: GatewayOwnerScope.Personal,
         ownerId: input.userId,
@@ -78,7 +144,12 @@ export function createConfigService(params: {
         createdByUserId: input.userId,
         gatewayBaseUrl: params.config.gatewayBaseUrl,
       });
-      await createAuditService(repository).record({
+      await insertInitialStaticProviderCredentials(
+        tx,
+        created.config.config_id,
+        staticProviderCredentials
+      );
+      await auditService.record({
         actorUserId: input.userId,
         ownerScope: created.config.owner_scope,
         ownerId: created.config.owner_id,
@@ -87,6 +158,17 @@ export function createConfigService(params: {
         eventType: 'config_created',
         outcome: 'success',
       });
+      if (staticProviderCredentials) {
+        await auditService.record({
+          actorUserId: input.userId,
+          ownerScope: created.config.owner_scope,
+          ownerId: created.config.owner_id,
+          configId: created.config.config_id,
+          eventType: 'config_secret_updated',
+          outcome: 'success',
+          metadata: { kind: GatewaySecretKind.StaticProviderCredentials },
+        });
+      }
       return created;
     });
   }
@@ -97,10 +179,14 @@ export function createConfigService(params: {
     name: string;
     remoteUrl: string;
     authMode: GatewayAuthMode;
+    providerIssuer?: string;
+    staticProviderClientId?: string;
+    staticProviderClientSecret?: string;
     sharingMode: GatewaySharingMode;
     initialAssignedUserId?: string;
     pathPassthrough?: boolean;
   }) {
+    const staticProviderCredentials = initialStaticProviderCredentials(input);
     await validatePublicHttpsDestination(input.remoteUrl);
     const discoveredProviderMetadata = await discoverProviderMetadata(input);
     if (input.sharingMode === GatewaySharingMode.SingleUser && !input.initialAssignedUserId) {
@@ -112,6 +198,7 @@ export function createConfigService(params: {
     }
     return await params.repository.database.transaction(async tx => {
       const repository = createGatewayRepository(tx);
+      const auditService = createAuditService(repository);
       if (input.initialAssignedUserId) {
         const membership = await repository.findMembership(
           input.initialAssignedUserId,
@@ -146,7 +233,12 @@ export function createConfigService(params: {
             input.sharingMode === GatewaySharingMode.SingleUser ? 'single_user' : null,
         });
       }
-      await createAuditService(repository).record({
+      await insertInitialStaticProviderCredentials(
+        tx,
+        created.config.config_id,
+        staticProviderCredentials
+      );
+      await auditService.record({
         actorUserId: input.actorUserId,
         ownerScope: created.config.owner_scope,
         ownerId: created.config.owner_id,
@@ -155,6 +247,17 @@ export function createConfigService(params: {
         eventType: 'config_created',
         outcome: 'success',
       });
+      if (staticProviderCredentials) {
+        await auditService.record({
+          actorUserId: input.actorUserId,
+          ownerScope: created.config.owner_scope,
+          ownerId: created.config.owner_id,
+          configId: created.config.config_id,
+          eventType: 'config_secret_updated',
+          outcome: 'success',
+          metadata: { kind: GatewaySecretKind.StaticProviderCredentials },
+        });
+      }
       return created;
     });
   }
@@ -219,12 +322,7 @@ export function createConfigService(params: {
       parseStaticHeaders(stringHeaders);
     }
 
-    const encryptedSecret = encryptKeyedEnvelope(
-      JSON.stringify({ kind: input.kind, value: input.value }),
-      secretScheme,
-      params.config.credentialKeyset.active,
-      configSecretAad(input.configId, input.kind)
-    );
+    const encryptedSecret = encryptSecret(input);
     const materialChange = input.kind === GatewaySecretKind.StaticProviderCredentials;
 
     return await params.repository.database.transaction(async tx => {

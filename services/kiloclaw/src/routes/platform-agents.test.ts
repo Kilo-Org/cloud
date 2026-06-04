@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { platform } from './platform';
-import { GatewayControllerError } from '../durable-objects/gateway-controller-types';
 
 vi.mock('cloudflare:workers', () => ({
   DurableObject: class {},
@@ -193,15 +192,22 @@ describe('platform agent config routes', () => {
   });
 
   // ── error-code passthrough ──────────────────────────────────────────
+  // Typed errors cross the DO RPC boundary as a RETURNED envelope (GatewayController
+  // .status/.code would be stripped if thrown), so these mocks resolve an envelope
+  // — the shape the real DO actually returns — and assert the route reconstructs it.
+
+  function errorEnvelope(status: number, code: string | null, message: string) {
+    return { agentError: { status, code, message } };
+  }
 
   it('fails closed (501) when the controller lacks the capability', async () => {
     const createAgent = vi
       .fn()
-      .mockRejectedValue(
-        new GatewayControllerError(
+      .mockResolvedValue(
+        errorEnvelope(
           501,
-          'Controller does not advertise required capability "config.agents.create.basic.cli"',
-          'capability_unavailable'
+          'capability_unavailable',
+          'Controller does not advertise required capability "config.agents.create.basic.cli"'
         )
       );
     const response = await platform.request(
@@ -214,10 +220,10 @@ describe('platform agent config routes', () => {
     expect(await response.json()).toMatchObject({ code: 'capability_unavailable' });
   });
 
-  it('forwards 404 agent_not_found', async () => {
+  it('forwards 404 agent_not_found from a returned envelope', async () => {
     const getAgent = vi
       .fn()
-      .mockRejectedValue(new GatewayControllerError(404, 'Agent not found', 'agent_not_found'));
+      .mockResolvedValue(errorEnvelope(404, 'agent_not_found', 'Agent not found'));
     const response = await platform.request(
       '/agents/ghost?userId=user-1',
       {},
@@ -228,10 +234,10 @@ describe('platform agent config routes', () => {
     expect(await response.json()).toMatchObject({ code: 'agent_not_found' });
   });
 
-  it('forwards 409 config_etag_conflict', async () => {
+  it('forwards 409 config_etag_conflict from a returned envelope', async () => {
     const updateAgent = vi
       .fn()
-      .mockRejectedValue(new GatewayControllerError(409, 'Config changed', 'config_etag_conflict'));
+      .mockResolvedValue(errorEnvelope(409, 'config_etag_conflict', 'Config changed'));
     const response = await platform.request(
       '/agents/work',
       jsonInit('PATCH', {
@@ -245,12 +251,10 @@ describe('platform agent config routes', () => {
     expect(await response.json()).toMatchObject({ code: 'config_etag_conflict' });
   });
 
-  it('redacts the message for an unknown error code but keeps the status', async () => {
+  it('redacts the message for an unknown envelope code but keeps the status', async () => {
     const deleteAgent = vi
       .fn()
-      .mockRejectedValue(
-        new GatewayControllerError(500, 'super secret internal detail', 'unexpected_internal')
-      );
+      .mockResolvedValue(errorEnvelope(500, 'unexpected_internal', 'super secret internal detail'));
     const response = await platform.request(
       '/agents/work?userId=user-1',
       { method: 'DELETE' },
@@ -260,6 +264,15 @@ describe('platform agent config routes', () => {
     expect(response.status).toBe(500);
     const body = (await response.json()) as { error: string };
     expect(body.error).not.toContain('super secret internal detail');
+  });
+
+  it('maps an unexpected thrown error (not an envelope) to a generic 500', async () => {
+    const listAgents = vi.fn().mockRejectedValue(new Error('DO unreachable'));
+    const response = await platform.request('/agents?userId=user-1', {}, baseEnv({ listAgents }));
+
+    expect(response.status).toBe(500);
+    const body = (await response.json()) as { error: string };
+    expect(body.error).not.toContain('DO unreachable');
   });
 
   // ── retry policy (non-idempotent mutations must not auto-replay) ─────

@@ -378,6 +378,32 @@ export const AgentDeleteResponseSchema = z.object({
 });
 export type AgentDeleteResponse = z.infer<typeof AgentDeleteResponseSchema>;
 
+/**
+ * Error envelope RETURNED (never thrown) by the agent gateway/DO methods.
+ * Custom error properties (`.status`/`.code` on GatewayControllerError) are
+ * stripped crossing the DO RPC boundary — only `.message` survives — so a typed
+ * agent error must be returned as a serializable value and reconstructed into an
+ * HTTP response in the platform route. Same pattern as kilo-cli-run.ts /
+ * doctor-run.ts. `agentError` is a unique key not present on any success shape.
+ */
+export type AgentConfigErrorEnvelope = {
+  agentError: {
+    status: number;
+    code: string | null;
+    message: string;
+  };
+};
+
+export function isAgentConfigErrorEnvelope(value: unknown): value is AgentConfigErrorEnvelope {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'agentError' in value &&
+    typeof (value as { agentError: unknown }).agentError === 'object' &&
+    (value as { agentError: unknown }).agentError !== null
+  );
+}
+
 // ──────────────────────────────────────────────────────────────────────
 // Controller pairing responses
 //

@@ -36,6 +36,7 @@ import {
   type AgentCreateResponse,
   AgentDeleteResponseSchema,
   type AgentDeleteResponse,
+  type AgentConfigErrorEnvelope,
 } from '../gateway-controller-types';
 import { HEALTH_PROBE_TIMEOUT_SECONDS, HEALTH_PROBE_INTERVAL_MS } from '../../config';
 import type { InstanceMutableState } from './types';
@@ -361,7 +362,29 @@ async function requireControllerCapability(
 // ──────────────────────────────────────────────────────────────────────
 // Agent config CRUD wrappers (controller: /_kilo/config/agents*)
 // Each is capability-gated and fails closed on older controllers.
+//
+// Typed errors are RETURNED as an AgentConfigErrorEnvelope rather than thrown:
+// GatewayControllerError's .status/.code are stripped crossing the DO RPC
+// boundary (only .message survives), so the platform route reconstructs the
+// HTTP response from the returned envelope. Unexpected non-controller errors
+// still throw (→ generic 500 at the route). Same pattern as kilo-cli-run.ts.
 // ──────────────────────────────────────────────────────────────────────
+
+/**
+ * Run an agent gateway call, converting any GatewayControllerError (capability
+ * gate or controller response) into a serializable error envelope. Non-controller
+ * errors propagate (the route maps them to a generic 500).
+ */
+async function callAgentEndpoint<T>(fn: () => Promise<T>): Promise<T | AgentConfigErrorEnvelope> {
+  try {
+    return await fn();
+  } catch (error) {
+    if (error instanceof GatewayControllerError) {
+      return { agentError: { status: error.status, code: error.code, message: error.message } };
+    }
+    throw error;
+  }
+}
 
 /**
  * Timeout for the mutating agent endpoints. The controller serializes ALL agent
@@ -387,36 +410,40 @@ const AGENT_MUTATION_REQUEST_TIMEOUT_MS = 180_000;
 export async function listAgents(
   state: InstanceMutableState,
   env: KiloClawEnv
-): Promise<AgentConfigListResponse> {
-  await requireControllerCapability(state, env, 'config.agents.read');
-  return callGatewayController(
-    state,
-    env,
-    '/_kilo/config/agents',
-    'GET',
-    AgentConfigListResponseSchema
-  );
+): Promise<AgentConfigListResponse | AgentConfigErrorEnvelope> {
+  return callAgentEndpoint(async () => {
+    await requireControllerCapability(state, env, 'config.agents.read');
+    return callGatewayController(
+      state,
+      env,
+      '/_kilo/config/agents',
+      'GET',
+      AgentConfigListResponseSchema
+    );
+  });
 }
 
 /**
  * GET /_kilo/config/agents/:id — read one agent's normalized config.
  * The controller 404s (`agent_not_found`) for an unknown id; that surfaces as a
- * GatewayControllerError(404, code='agent_not_found') — distinct from an old
- * controller missing the route entirely (which the capability gate rejects first).
+ * returned envelope { status: 404, code: 'agent_not_found' } — distinct from an
+ * old controller missing the route entirely (which the capability gate rejects).
  */
 export async function getAgent(
   state: InstanceMutableState,
   env: KiloClawEnv,
   agentId: string
-): Promise<AgentReadResponse> {
-  await requireControllerCapability(state, env, 'config.agents.read');
-  return callGatewayController(
-    state,
-    env,
-    `/_kilo/config/agents/${encodeURIComponent(agentId)}`,
-    'GET',
-    AgentReadResponseSchema
-  );
+): Promise<AgentReadResponse | AgentConfigErrorEnvelope> {
+  return callAgentEndpoint(async () => {
+    await requireControllerCapability(state, env, 'config.agents.read');
+    return callGatewayController(
+      state,
+      env,
+      `/_kilo/config/agents/${encodeURIComponent(agentId)}`,
+      'GET',
+      AgentReadResponseSchema
+    );
+  });
 }
 
 /**
@@ -430,17 +457,19 @@ export async function updateAgent(
   env: KiloClawEnv,
   agentId: string,
   patch: Record<string, unknown>
-): Promise<AgentMutationResponse> {
-  await requireControllerCapability(state, env, 'config.agents.update');
-  return callGatewayController(
-    state,
-    env,
-    `/_kilo/config/agents/${encodeURIComponent(agentId)}`,
-    'PATCH',
-    AgentMutationResponseSchema,
-    patch,
-    { timeoutMs: AGENT_MUTATION_REQUEST_TIMEOUT_MS }
-  );
+): Promise<AgentMutationResponse | AgentConfigErrorEnvelope> {
+  return callAgentEndpoint(async () => {
+    await requireControllerCapability(state, env, 'config.agents.update');
+    return callGatewayController(
+      state,
+      env,
+      `/_kilo/config/agents/${encodeURIComponent(agentId)}`,
+      'PATCH',
+      AgentMutationResponseSchema,
+      patch,
+      { timeoutMs: AGENT_MUTATION_REQUEST_TIMEOUT_MS }
+    );
+  });
 }
 
 /**
@@ -453,17 +482,19 @@ export async function updateAgentDefaults(
   state: InstanceMutableState,
   env: KiloClawEnv,
   patch: Record<string, unknown>
-): Promise<AgentDefaultsMutationResponse> {
-  await requireControllerCapability(state, env, 'config.agent-defaults.update');
-  return callGatewayController(
-    state,
-    env,
-    '/_kilo/config/agent-defaults',
-    'PATCH',
-    AgentDefaultsMutationResponseSchema,
-    patch,
-    { timeoutMs: AGENT_MUTATION_REQUEST_TIMEOUT_MS }
-  );
+): Promise<AgentDefaultsMutationResponse | AgentConfigErrorEnvelope> {
+  return callAgentEndpoint(async () => {
+    await requireControllerCapability(state, env, 'config.agent-defaults.update');
+    return callGatewayController(
+      state,
+      env,
+      '/_kilo/config/agent-defaults',
+      'PATCH',
+      AgentDefaultsMutationResponseSchema,
+      patch,
+      { timeoutMs: AGENT_MUTATION_REQUEST_TIMEOUT_MS }
+    );
+  });
 }
 
 /**
@@ -477,17 +508,19 @@ export async function createAgent(
   state: InstanceMutableState,
   env: KiloClawEnv,
   body: Record<string, unknown>
-): Promise<AgentCreateResponse> {
-  await requireControllerCapability(state, env, 'config.agents.create.basic.cli');
-  return callGatewayController(
-    state,
-    env,
-    '/_kilo/config/agents',
-    'POST',
-    AgentCreateResponseSchema,
-    body,
-    { timeoutMs: AGENT_MUTATION_REQUEST_TIMEOUT_MS }
-  );
+): Promise<AgentCreateResponse | AgentConfigErrorEnvelope> {
+  return callAgentEndpoint(async () => {
+    await requireControllerCapability(state, env, 'config.agents.create.basic.cli');
+    return callGatewayController(
+      state,
+      env,
+      '/_kilo/config/agents',
+      'POST',
+      AgentCreateResponseSchema,
+      body,
+      { timeoutMs: AGENT_MUTATION_REQUEST_TIMEOUT_MS }
+    );
+  });
 }
 
 /**
@@ -500,17 +533,19 @@ export async function deleteAgent(
   state: InstanceMutableState,
   env: KiloClawEnv,
   agentId: string
-): Promise<AgentDeleteResponse> {
-  await requireControllerCapability(state, env, 'config.agents.delete.cli');
-  return callGatewayController(
-    state,
-    env,
-    `/_kilo/config/agents/${encodeURIComponent(agentId)}`,
-    'DELETE',
-    AgentDeleteResponseSchema,
-    undefined,
-    { timeoutMs: AGENT_MUTATION_REQUEST_TIMEOUT_MS }
-  );
+): Promise<AgentDeleteResponse | AgentConfigErrorEnvelope> {
+  return callAgentEndpoint(async () => {
+    await requireControllerCapability(state, env, 'config.agents.delete.cli');
+    return callGatewayController(
+      state,
+      env,
+      `/_kilo/config/agents/${encodeURIComponent(agentId)}`,
+      'DELETE',
+      AgentDeleteResponseSchema,
+      undefined,
+      { timeoutMs: AGENT_MUTATION_REQUEST_TIMEOUT_MS }
+    );
+  });
 }
 
 export async function getGatewayReady(

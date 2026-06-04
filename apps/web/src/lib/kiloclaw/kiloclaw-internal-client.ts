@@ -993,9 +993,12 @@ export class KiloClawInternalClient {
     agentId: string,
     instanceId?: string
   ): Promise<AgentDeleteResponse> {
-    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
+    // DELETE has no body, so userId must travel in the query string (the route
+    // reads it via setValidatedQueryUserId), like the other DELETE methods.
+    const params = new URLSearchParams({ userId });
+    if (instanceId) params.set('instanceId', instanceId);
     return this.request(
-      `/api/platform/agents/${encodeURIComponent(agentId)}${params}`,
+      `/api/platform/agents/${encodeURIComponent(agentId)}?${params.toString()}`,
       { method: 'DELETE' },
       { userId }
     );

@@ -4,6 +4,7 @@ import { createMutableState } from './state';
 import {
   createAgent,
   deleteAgent,
+  getAgent,
   getGatewayProcessStatus,
   getMorningBriefingStatus,
   listAgents,
@@ -461,5 +462,67 @@ describe('agent config mutation timeouts', () => {
 
     expect(timeoutSpy).not.toHaveBeenCalledWith(AGENT_MUTATION_TIMEOUT_MS);
     expect(timeoutSpy).toHaveBeenCalledWith(DEFAULT_TIMEOUT_MS);
+  });
+
+  // Typed errors must be RETURNED as an envelope (not thrown), because .status/.code
+  // are stripped crossing the DO RPC boundary. These assert the real conversion.
+
+  it('returns a capability_unavailable envelope when the controller lacks the capability', async () => {
+    // Version response advertises no capabilities → requireControllerCapability fails closed.
+    const fetchMock: FetchMock = vi.fn().mockResolvedValueOnce(versionResponse([]));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await getAgent(runningState(), ENV, 'work');
+
+    expect(result).toEqual({
+      agentError: {
+        status: 501,
+        code: 'capability_unavailable',
+        message: expect.stringContaining('config.agents.read'),
+      },
+    });
+    // Only the version probe ran — the agent endpoint was never reached.
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns an agent_not_found envelope when the controller 404s', async () => {
+    const fetchMock: FetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(versionResponse(['config.agents.read']))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ code: 'agent_not_found', error: 'Agent not found' }), {
+          status: 404,
+          headers: { 'content-type': 'application/json' },
+        })
+      );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await getAgent(runningState(), ENV, 'ghost');
+
+    expect(result).toEqual({
+      agentError: { status: 404, code: 'agent_not_found', message: 'Agent not found' },
+    });
+  });
+
+  it('returns a config_etag_conflict envelope when an update 409s', async () => {
+    const fetchMock: FetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(versionResponse(['config.agents.update']))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ code: 'config_etag_conflict', error: 'Config changed' }), {
+          status: 409,
+          headers: { 'content-type': 'application/json' },
+        })
+      );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await updateAgent(runningState(), ENV, 'work', {
+      etag: 'stale',
+      set: { thinkingDefault: 'high' },
+    });
+
+    expect(result).toEqual({
+      agentError: { status: 409, code: 'config_etag_conflict', message: 'Config changed' },
+    });
   });
 });

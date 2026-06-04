@@ -10,6 +10,7 @@ import type { Context } from 'hono';
 import * as fly from '../fly/client';
 import type { InstanceStatus } from '../durable-objects/kiloclaw-instance/types';
 import type { FileWriteResponse } from '../durable-objects/gateway-controller-types';
+import { isAgentConfigErrorEnvelope } from '../durable-objects/gateway-controller-types';
 import type { AppEnv } from '../types';
 import {
   ProvisionRequestSchema,
@@ -1174,6 +1175,24 @@ function sanitizeAgentConfigError(
     return { message: normalized, status, code };
   }
 
+  return { message: `${operation} failed`, status, ...(code ? { code } : {}) };
+}
+
+/**
+ * Reconstruct an HTTP error from the serializable envelope a DO agent method
+ * RETURNS (typed errors can't be thrown across the DO RPC boundary; see
+ * gateway.ts). Forwards the message only for known-safe codes; otherwise redacts
+ * the message but preserves the status.
+ */
+function reconstructAgentError(
+  operation: string,
+  agentError: { status: number; code: string | null; message: string }
+): { message: string; status: number; code?: string } {
+  const { status, code, message } = agentError;
+  if (code && AGENT_CONFIG_ERROR_CODES.has(code)) {
+    return { message, status, code };
+  }
+  console.error(`[platform] ${operation} returned error envelope:`, { status, code, message });
   return { message: `${operation} failed`, status, ...(code ? { code } : {}) };
 }
 
@@ -2739,9 +2758,13 @@ platform.get('/agents', async c => {
       c.env,
       userId,
       iidResult.instanceId,
-      stub => stub.listAgents(),
+      stub => stub.listAgents().then(r => r),
       'listAgents'
     );
+    if (isAgentConfigErrorEnvelope(response)) {
+      const { message, status, code } = reconstructAgentError('agents list', response.agentError);
+      return jsonError(message, status, code);
+    }
     return c.json(response, 200);
   } catch (err) {
     const { message, status, code } = sanitizeAgentConfigError(err, 'agents list');
@@ -2766,9 +2789,13 @@ platform.get('/agents/:agentId', async c => {
       c.env,
       userId,
       iidResult.instanceId,
-      stub => stub.getAgent(agentId),
+      stub => stub.getAgent(agentId).then(r => r),
       'getAgent'
     );
+    if (isAgentConfigErrorEnvelope(response)) {
+      const { message, status, code } = reconstructAgentError('agent read', response.agentError);
+      return jsonError(message, status, code);
+    }
     return c.json(response, 200);
   } catch (err) {
     const { message, status, code } = sanitizeAgentConfigError(err, 'agent read');
@@ -2796,10 +2823,14 @@ platform.post('/agents', async c => {
       c.env,
       userId,
       iidResult.instanceId,
-      stub => stub.createAgent(agent),
+      stub => stub.createAgent(agent).then(r => r),
       'createAgent',
       NO_DO_RETRY
     );
+    if (isAgentConfigErrorEnvelope(response)) {
+      const { message, status, code } = reconstructAgentError('agent create', response.agentError);
+      return jsonError(message, status, code);
+    }
     return c.json(response, 200);
   } catch (err) {
     const { message, status, code } = sanitizeAgentConfigError(err, 'agent create');
@@ -2828,10 +2859,14 @@ platform.patch('/agents/:agentId', async c => {
       c.env,
       userId,
       iidResult.instanceId,
-      stub => stub.updateAgent(agentId, patch),
+      stub => stub.updateAgent(agentId, patch).then(r => r),
       'updateAgent',
       NO_DO_RETRY
     );
+    if (isAgentConfigErrorEnvelope(response)) {
+      const { message, status, code } = reconstructAgentError('agent update', response.agentError);
+      return jsonError(message, status, code);
+    }
     return c.json(response, 200);
   } catch (err) {
     const { message, status, code } = sanitizeAgentConfigError(err, 'agent update');
@@ -2859,10 +2894,17 @@ platform.patch('/agent-defaults', async c => {
       c.env,
       userId,
       iidResult.instanceId,
-      stub => stub.updateAgentDefaults(patch),
+      stub => stub.updateAgentDefaults(patch).then(r => r),
       'updateAgentDefaults',
       NO_DO_RETRY
     );
+    if (isAgentConfigErrorEnvelope(response)) {
+      const { message, status, code } = reconstructAgentError(
+        'agent-defaults update',
+        response.agentError
+      );
+      return jsonError(message, status, code);
+    }
     return c.json(response, 200);
   } catch (err) {
     const { message, status, code } = sanitizeAgentConfigError(err, 'agent-defaults update');
@@ -2887,10 +2929,14 @@ platform.delete('/agents/:agentId', async c => {
       c.env,
       userId,
       iidResult.instanceId,
-      stub => stub.deleteAgent(agentId),
+      stub => stub.deleteAgent(agentId).then(r => r),
       'deleteAgent',
       NO_DO_RETRY
     );
+    if (isAgentConfigErrorEnvelope(response)) {
+      const { message, status, code } = reconstructAgentError('agent delete', response.agentError);
+      return jsonError(message, status, code);
+    }
     return c.json(response, 200);
   } catch (err) {
     const { message, status, code } = sanitizeAgentConfigError(err, 'agent delete');

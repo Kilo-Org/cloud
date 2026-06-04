@@ -87,6 +87,7 @@ import type {
   AgentDefaultsMutationResponse,
   AgentCreateResponse,
   AgentDeleteResponse,
+  AgentConfigErrorEnvelope,
 } from '../gateway-controller-types';
 
 // Domain modules
@@ -3882,17 +3883,17 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
    * List the agent fleet (+ inherited defaults). Fails closed with a typed
    * `capability_unavailable` error when the controller lacks `config.agents.read`.
    */
-  async listAgents(): Promise<AgentConfigListResponse> {
+  async listAgents(): Promise<AgentConfigListResponse | AgentConfigErrorEnvelope> {
     await this.loadState();
     return gateway.listAgents(this.s, this.env);
   }
 
   /**
-   * Read one agent's normalized config. Throws a typed 404 (`agent_not_found`)
-   * for an unknown id, or `capability_unavailable` when the controller lacks
-   * `config.agents.read`.
+   * Read one agent's normalized config. Returns an error envelope for an unknown
+   * id (`agent_not_found`) or a missing capability (`capability_unavailable`) —
+   * typed errors are returned, not thrown, so they survive the DO RPC boundary.
    */
-  async getAgent(agentId: string): Promise<AgentReadResponse> {
+  async getAgent(agentId: string): Promise<AgentReadResponse | AgentConfigErrorEnvelope> {
     await this.loadState();
     return gateway.getAgent(this.s, this.env, agentId);
   }
@@ -3905,29 +3906,32 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   async updateAgent(
     agentId: string,
     patch: Record<string, unknown>
-  ): Promise<AgentMutationResponse> {
+  ): Promise<AgentMutationResponse | AgentConfigErrorEnvelope> {
     await this.loadState();
     return gateway.updateAgent(this.s, this.env, agentId, patch);
   }
 
   /**
    * Edit the fleet-wide inherited agent defaults ({ etag?, set, unset }).
-   * Throws typed errors for stale etag (`config_etag_conflict`) or missing
+   * Returns an error envelope for stale etag (`config_etag_conflict`) or missing
    * capability (`capability_unavailable`).
    */
   async updateAgentDefaults(
     patch: Record<string, unknown>
-  ): Promise<AgentDefaultsMutationResponse> {
+  ): Promise<AgentDefaultsMutationResponse | AgentConfigErrorEnvelope> {
     await this.loadState();
     return gateway.updateAgentDefaults(this.s, this.env, patch);
   }
 
   /**
    * Create an agent (config + workspace + session dirs) via the OpenClaw CLI.
-   * Throws typed errors: `agent_exists`, `reserved_agent_id`,
-   * `openclaw_cli_failed`, `openclaw_cli_timeout`, `capability_unavailable`.
+   * Returns an error envelope for typed failures: `agent_exists`,
+   * `reserved_agent_id`, `openclaw_cli_failed`, `openclaw_cli_timeout`,
+   * `capability_unavailable`.
    */
-  async createAgent(body: Record<string, unknown>): Promise<AgentCreateResponse> {
+  async createAgent(
+    body: Record<string, unknown>
+  ): Promise<AgentCreateResponse | AgentConfigErrorEnvelope> {
     await this.loadState();
     return gateway.createAgent(this.s, this.env, body);
   }
@@ -3935,10 +3939,10 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   /**
    * Delete an agent + clean up its references via the OpenClaw CLI. On-disk files
    * are not confirmed removed (`filesystemDisposition: 'unverified'`). Rejects
-   * `main` (`reserved_agent_id`). Throws `openclaw_cli_failed`/`_timeout` or
-   * `capability_unavailable`.
+   * `main` (`reserved_agent_id`). Returns an error envelope for
+   * `openclaw_cli_failed`/`_timeout` or `capability_unavailable`.
    */
-  async deleteAgent(agentId: string): Promise<AgentDeleteResponse> {
+  async deleteAgent(agentId: string): Promise<AgentDeleteResponse | AgentConfigErrorEnvelope> {
     await this.loadState();
     return gateway.deleteAgent(this.s, this.env, agentId);
   }

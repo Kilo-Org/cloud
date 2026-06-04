@@ -354,6 +354,10 @@ function createIngestChunker(
     // reference and an empty inline blob. Send only identity fields over RPC so
     // a single oversized item cannot exceed Cloudflare's RPC payload limit.
     const itemForRpc = itemDataBytes > MAX_INGEST_ITEM_BYTES ? slimItemForR2Reference(item) : item;
+    const itemForRpcDataBytes =
+      itemDataBytes > MAX_INGEST_ITEM_BYTES
+        ? encoder.encode(JSON.stringify(itemForRpc.data)).byteLength
+        : itemDataBytes;
     if (itemDataBytes > MAX_INGEST_ITEM_BYTES) {
       const itemR2Key = `items/${kiloUserId}/${sessionId}/${item_id}/${ingestedAt}`;
       await env.SESSION_INGEST_R2.put(itemR2Key, itemDataJson);
@@ -361,7 +365,7 @@ function createIngestChunker(
     }
 
     chunk.push(itemForRpc);
-    chunkBytes += itemDataBytes;
+    chunkBytes += itemForRpcDataBytes;
     if (chunk.length >= INGEST_CHUNK_MAX_ITEMS || chunkBytes >= INGEST_CHUNK_MAX_BYTES) {
       await flushChunkToSessionDO();
     }

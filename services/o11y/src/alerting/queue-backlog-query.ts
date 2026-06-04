@@ -8,14 +8,20 @@ type QueryEnv = {
 
 type FetchFn = (url: string, init?: RequestInit) => Promise<Response>;
 
-const QueueMetricsResponseSchema = z.object({
-  success: z.literal(true),
-  result: z.object({
-    backlog_count: z.number().nonnegative(),
-    backlog_bytes: z.number().nonnegative(),
-    oldest_message_timestamp_ms: z.number().nonnegative(),
+const QueueMetricsResponseSchema = z.discriminatedUnion('success', [
+  z.object({
+    success: z.literal(true),
+    result: z.object({
+      backlog_count: z.number().nonnegative(),
+      backlog_bytes: z.number().nonnegative(),
+      oldest_message_timestamp_ms: z.number().nonnegative(),
+    }),
   }),
-});
+  z.object({
+    success: z.literal(false),
+    errors: z.array(z.object({ message: z.string() })).optional(),
+  }),
+]);
 
 const CF_API_BASE = 'https://api.cloudflare.com/client/v4';
 
@@ -41,6 +47,11 @@ export async function queryQueueBacklog(
   }
 
   const parsed = QueueMetricsResponseSchema.parse(await response.json());
+  if (!parsed.success) {
+    const details = parsed.errors?.map(error => error.message).join('; ') || 'unknown error';
+    throw new Error(`Queue metrics request failed: ${details}`);
+  }
+
   const oldestMessageTimestamp =
     parsed.result.oldest_message_timestamp_ms > 0
       ? new Date(parsed.result.oldest_message_timestamp_ms)

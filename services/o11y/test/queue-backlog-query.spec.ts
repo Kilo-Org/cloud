@@ -74,6 +74,18 @@ describe('queryQueueBacklog', () => {
     );
   });
 
+  it('includes Cloudflare errors from a successful HTTP response', async () => {
+    const fetchFn: FetchFn = async () =>
+      Response.json({
+        success: false,
+        errors: [{ code: 10000, message: 'Authentication error' }],
+      });
+
+    await expect(queryQueueBacklog(makeEnv(), fetchFn)).rejects.toThrow(
+      'Queue metrics request failed: Authentication error'
+    );
+  });
+
   it('throws when the API token is not configured', async () => {
     const fetchFn: FetchFn = async () => Response.json({});
 

@@ -1,5 +1,5 @@
 import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
-import { redisClient, redisSet } from '@/lib/redis';
+import { redisClient } from '@/lib/redis';
 import {
   GatewayConfigSchema,
   GatewayConfigInputSchema,
@@ -32,7 +32,7 @@ export const adminGatewayConfigRouter = createTRPCRouter({
       updated_by_email: ctx.user.google_user_email,
       note: input.note,
     };
-    const written = await redisSet(VERCEL_ROUTING_REDIS_KEY, JSON.stringify(config));
+    const written = await redisClient.set(VERCEL_ROUTING_REDIS_KEY, JSON.stringify(config));
     if (!written) {
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',

@@ -1,5 +1,5 @@
 import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
-import { redisClient, redisSet } from '@/lib/redis';
+import { redisClient } from '@/lib/redis';
 import {
   BlacklistDomainsConfigSchema,
   BlacklistDomainsInputSchema,
@@ -47,7 +47,7 @@ export const adminBlacklistDomainsRouter = createTRPCRouter({
       updated_by: ctx.user.id,
       updated_by_email: ctx.user.google_user_email,
     };
-    const written = await redisSet(BLACKLIST_DOMAINS_REDIS_KEY, JSON.stringify(config));
+    const written = await redisClient.set(BLACKLIST_DOMAINS_REDIS_KEY, JSON.stringify(config));
     if (!written) {
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',

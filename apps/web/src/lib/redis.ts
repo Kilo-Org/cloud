@@ -2,7 +2,7 @@ import { Redis } from '@upstash/redis';
 import { captureException } from '@sentry/nextjs';
 import type { RedisKey } from '@/lib/redis-keys';
 
-type RedisOperation = 'get' | 'getdel' | 'set' | 'del';
+type RedisOperation = 'getdel' | 'del';
 type RedisConfig = {
   url: string;
   token: string;
@@ -105,27 +105,6 @@ export async function redisGetDel(key: RedisKey): Promise<string | null> {
     return await withTimeout(redis.client.getdel<string>(key), COMMAND_TIMEOUT_MS);
   } catch (err) {
     captureRedisOperationException(err, 'getdel', key, redis.config);
-    throw err;
-  }
-}
-
-/** Returns false if Redis is not configured. */
-export async function redisSet(
-  key: RedisKey,
-  value: string,
-  ttlSeconds?: number
-): Promise<boolean> {
-  const redis = getOrCreateClient();
-  if (!redis) return false;
-  try {
-    if (ttlSeconds) {
-      await withTimeout(redis.client.set(key, value, { ex: ttlSeconds }), COMMAND_TIMEOUT_MS);
-    } else {
-      await withTimeout(redis.client.set(key, value), COMMAND_TIMEOUT_MS);
-    }
-    return true;
-  } catch (err) {
-    captureRedisOperationException(err, 'set', key, redis.config);
     throw err;
   }
 }

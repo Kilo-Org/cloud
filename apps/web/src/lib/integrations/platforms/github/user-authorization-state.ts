@@ -7,7 +7,7 @@ import {
   OAUTH_STATE_TTL_SECONDS,
   verifyOAuthState,
 } from '@/lib/integrations/oauth-state';
-import { redisGetDel, redisSet } from '@/lib/redis';
+import { redisClient, redisGetDel } from '@/lib/redis';
 import { githubUserAuthorizationPkceRedisKey } from '@/lib/redis-keys';
 
 const STATE_PREFIX = 'github-user-authorization:';
@@ -26,10 +26,10 @@ export async function createGitHubUserAuthorizationState(
 ): Promise<GitHubUserAuthorizationState> {
   const codeVerifier = randomBytes(32).toString('base64url');
   const verifierRef = randomBytes(16).toString('base64url');
-  const stored = await redisSet(
+  const stored = await redisClient.set(
     githubUserAuthorizationPkceRedisKey(verifierRef),
     codeVerifier,
-    PKCE_TTL_SECONDS
+    { ex: PKCE_TTL_SECONDS }
   );
   if (!stored) {
     throw new Error('GitHub user authorization requires configured transient state storage');

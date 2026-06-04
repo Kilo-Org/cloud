@@ -1,7 +1,7 @@
 import * as z from 'zod';
 import { type DirectByokModel } from '@/lib/ai-gateway/providers/direct-byok/types';
 import type { DirectUserByokInferenceProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
-import { redisSet } from '@/lib/redis';
+import { redisClient } from '@/lib/redis';
 import { directByokModelsRedisKey } from '@/lib/redis-keys';
 
 const DEFAULT_MAX_COMPLETION_TOKENS = 32_000;
@@ -165,7 +165,7 @@ async function syncProvider(fetcher: ProviderFetcher, ctx: SyncContext): Promise
     });
   }
 
-  await redisSet(directByokModelsRedisKey(fetcher.providerId), JSON.stringify(models));
+  await redisClient.set(directByokModelsRedisKey(fetcher.providerId), JSON.stringify(models));
   return models.length;
 }
 

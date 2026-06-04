@@ -321,6 +321,63 @@ export const AgentReadResponseSchema = z.object({
 });
 export type AgentReadResponse = z.infer<typeof AgentReadResponseSchema>;
 
+// PATCH /_kilo/config/agents/:id → { ok, etag, agent }
+export const AgentMutationResponseSchema = z.object({
+  ok: z.boolean(),
+  etag: z.string(),
+  agent: AgentSummarySchema,
+});
+export type AgentMutationResponse = z.infer<typeof AgentMutationResponseSchema>;
+
+// PATCH /_kilo/config/agent-defaults → { ok, etag, defaults }
+export const AgentDefaultsMutationResponseSchema = z.object({
+  ok: z.boolean(),
+  etag: z.string(),
+  defaults: AgentDefaultsSummarySchema,
+});
+export type AgentDefaultsMutationResponse = z.infer<typeof AgentDefaultsMutationResponseSchema>;
+
+// CLI create result — mirror controller/src/openclaw-agent-cli.ts CreateResultSchema.
+const AgentCreateResultSchema = z.object({
+  agentId: z.string(),
+  name: z.string(),
+  workspace: z.string(),
+  agentDir: z.string(),
+  model: z.string().optional(),
+  bindings: z
+    .object({
+      added: z.array(z.string()),
+      updated: z.array(z.string()),
+      skipped: z.array(z.string()),
+      conflicts: z.array(z.string()),
+    })
+    .optional(),
+});
+
+// POST /_kilo/config/agents → { ok, etag, agent, created }
+export const AgentCreateResponseSchema = z.object({
+  ok: z.boolean(),
+  etag: z.string(),
+  agent: AgentSummarySchema,
+  created: AgentCreateResultSchema,
+});
+export type AgentCreateResponse = z.infer<typeof AgentCreateResponseSchema>;
+
+// DELETE /_kilo/config/agents/:id → { ok, filesystemDisposition, agentId, ... }
+// filesystemDisposition is always 'unverified' — the controller does not confirm
+// the workspace/state/session dirs were removed. The UI must surface this honestly.
+export const AgentDeleteResponseSchema = z.object({
+  ok: z.boolean(),
+  filesystemDisposition: z.literal('unverified'),
+  agentId: z.string(),
+  workspace: z.string(),
+  agentDir: z.string(),
+  sessionsDir: z.string(),
+  removedBindings: z.number().int(),
+  removedAllow: z.number().int(),
+});
+export type AgentDeleteResponse = z.infer<typeof AgentDeleteResponseSchema>;
+
 // ──────────────────────────────────────────────────────────────────────
 // Controller pairing responses
 //

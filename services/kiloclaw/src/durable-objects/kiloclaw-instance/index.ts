@@ -83,6 +83,10 @@ import type { GatewayProcessStatus } from '../gateway-controller-types';
 import type {
   AgentConfigListResponse,
   AgentReadResponse,
+  AgentMutationResponse,
+  AgentDefaultsMutationResponse,
+  AgentCreateResponse,
+  AgentDeleteResponse,
 } from '../gateway-controller-types';
 
 // Domain modules
@@ -3891,6 +3895,52 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   async getAgent(agentId: string): Promise<AgentReadResponse> {
     await this.loadState();
     return gateway.getAgent(this.s, this.env, agentId);
+  }
+
+  /**
+   * Edit one agent's model & behavioral settings ({ etag?, set, unset }).
+   * Throws typed errors for stale etag (`config_etag_conflict`), unknown agent
+   * (`agent_not_found`), or missing capability (`capability_unavailable`).
+   */
+  async updateAgent(
+    agentId: string,
+    patch: Record<string, unknown>
+  ): Promise<AgentMutationResponse> {
+    await this.loadState();
+    return gateway.updateAgent(this.s, this.env, agentId, patch);
+  }
+
+  /**
+   * Edit the fleet-wide inherited agent defaults ({ etag?, set, unset }).
+   * Throws typed errors for stale etag (`config_etag_conflict`) or missing
+   * capability (`capability_unavailable`).
+   */
+  async updateAgentDefaults(
+    patch: Record<string, unknown>
+  ): Promise<AgentDefaultsMutationResponse> {
+    await this.loadState();
+    return gateway.updateAgentDefaults(this.s, this.env, patch);
+  }
+
+  /**
+   * Create an agent (config + workspace + session dirs) via the OpenClaw CLI.
+   * Throws typed errors: `agent_exists`, `reserved_agent_id`,
+   * `openclaw_cli_failed`, `openclaw_cli_timeout`, `capability_unavailable`.
+   */
+  async createAgent(body: Record<string, unknown>): Promise<AgentCreateResponse> {
+    await this.loadState();
+    return gateway.createAgent(this.s, this.env, body);
+  }
+
+  /**
+   * Delete an agent + clean up its references via the OpenClaw CLI. On-disk files
+   * are not confirmed removed (`filesystemDisposition: 'unverified'`). Rejects
+   * `main` (`reserved_agent_id`). Throws `openclaw_cli_failed`/`_timeout` or
+   * `capability_unavailable`.
+   */
+  async deleteAgent(agentId: string): Promise<AgentDeleteResponse> {
+    await this.loadState();
+    return gateway.deleteAgent(this.s, this.env, agentId);
   }
 
   async getFileTree() {

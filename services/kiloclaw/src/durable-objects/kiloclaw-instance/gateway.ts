@@ -28,6 +28,14 @@ import {
   type AgentConfigListResponse,
   AgentReadResponseSchema,
   type AgentReadResponse,
+  AgentMutationResponseSchema,
+  type AgentMutationResponse,
+  AgentDefaultsMutationResponseSchema,
+  type AgentDefaultsMutationResponse,
+  AgentCreateResponseSchema,
+  type AgentCreateResponse,
+  AgentDeleteResponseSchema,
+  type AgentDeleteResponse,
 } from '../gateway-controller-types';
 import { HEALTH_PROBE_TIMEOUT_SECONDS, HEALTH_PROBE_INTERVAL_MS } from '../../config';
 import type { InstanceMutableState } from './types';
@@ -80,7 +88,7 @@ export async function callGatewayController<T>(
   state: InstanceMutableState,
   env: KiloClawEnv,
   path: string,
-  method: 'GET' | 'POST',
+  method: 'GET' | 'POST' | 'PATCH' | 'DELETE',
   responseSchema: ZodType<T>,
   jsonBody?: unknown,
   options?: { timeoutMs?: number }
@@ -388,6 +396,95 @@ export async function getAgent(
     `/_kilo/config/agents/${encodeURIComponent(agentId)}`,
     'GET',
     AgentReadResponseSchema
+  );
+}
+
+/**
+ * PATCH /_kilo/config/agents/:id — surgical edit of one agent's model & behavior.
+ * The body ({ etag?, set, unset }) is forwarded opaquely; the tRPC layer (PR B)
+ * supplies Zod-validated input and the controller re-validates. A stale etag
+ * surfaces as GatewayControllerError(409, code='config_etag_conflict').
+ */
+export async function updateAgent(
+  state: InstanceMutableState,
+  env: KiloClawEnv,
+  agentId: string,
+  patch: Record<string, unknown>
+): Promise<AgentMutationResponse> {
+  await requireControllerCapability(state, env, 'config.agents.update');
+  return callGatewayController(
+    state,
+    env,
+    `/_kilo/config/agents/${encodeURIComponent(agentId)}`,
+    'PATCH',
+    AgentMutationResponseSchema,
+    patch
+  );
+}
+
+/**
+ * PATCH /_kilo/config/agent-defaults — edit the fleet-wide inherited defaults
+ * (model + thinking/verbose only; no reasoning/fastMode at the defaults level).
+ * Body ({ etag?, set, unset }) forwarded opaquely; stale etag →
+ * GatewayControllerError(409, code='config_etag_conflict').
+ */
+export async function updateAgentDefaults(
+  state: InstanceMutableState,
+  env: KiloClawEnv,
+  patch: Record<string, unknown>
+): Promise<AgentDefaultsMutationResponse> {
+  await requireControllerCapability(state, env, 'config.agent-defaults.update');
+  return callGatewayController(
+    state,
+    env,
+    '/_kilo/config/agent-defaults',
+    'PATCH',
+    AgentDefaultsMutationResponseSchema,
+    patch
+  );
+}
+
+/**
+ * POST /_kilo/config/agents — create an agent end-to-end (config + workspace +
+ * session dirs) by delegating to the OpenClaw CLI. Body
+ * ({ name, workspace, agentDir?, model?, bindings?[] }) forwarded opaquely.
+ * Distinct error surface: 409 agent_exists, 400 reserved_agent_id,
+ * 502 openclaw_cli_failed, 504 openclaw_cli_timeout.
+ */
+export async function createAgent(
+  state: InstanceMutableState,
+  env: KiloClawEnv,
+  body: Record<string, unknown>
+): Promise<AgentCreateResponse> {
+  await requireControllerCapability(state, env, 'config.agents.create.basic.cli');
+  return callGatewayController(
+    state,
+    env,
+    '/_kilo/config/agents',
+    'POST',
+    AgentCreateResponseSchema,
+    body
+  );
+}
+
+/**
+ * DELETE /_kilo/config/agents/:id — remove an agent + clean up references
+ * (bindings, agent-to-agent allow rules) via the OpenClaw CLI. Does NOT confirm
+ * on-disk files are gone (filesystemDisposition: 'unverified'). Rejects `main`
+ * (400 reserved_agent_id). 502/504 on CLI failure/timeout.
+ */
+export async function deleteAgent(
+  state: InstanceMutableState,
+  env: KiloClawEnv,
+  agentId: string
+): Promise<AgentDeleteResponse> {
+  await requireControllerCapability(state, env, 'config.agents.delete.cli');
+  return callGatewayController(
+    state,
+    env,
+    `/_kilo/config/agents/${encodeURIComponent(agentId)}`,
+    'DELETE',
+    AgentDeleteResponseSchema
   );
 }
 

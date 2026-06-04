@@ -6,6 +6,10 @@ import {
   handleProtectedResourceMetadata,
   handleUserProtectedResourceMetadata,
 } from './handlers/protected-resource.handler';
+import {
+  redirectToAuthorizationServerAuthorizeMetadata,
+  redirectToAuthorizationServerMetadata,
+} from './handlers/authorization-server-metadata.handler';
 import type { MCPGatewayEnv } from './types';
 import { runCleanup } from './lib/cleanup';
 
@@ -35,6 +39,19 @@ app.get('/.well-known/oauth-protected-resource/mcp-connect/user/:userId/:configI
 );
 app.get('/.well-known/oauth-protected-resource/mcp-connect/org/:orgId/:configId/:routeKey', c =>
   handleOrgProtectedResourceMetadata(c, c.req.param())
+);
+
+// These are discovery aliases only. The app remains the owner of first-level OAuth
+// metadata, registration, authorization, token, JWKS, and user-info routes.
+app.get('/.well-known/oauth-authorization-server', c => redirectToAuthorizationServerMetadata(c));
+app.get('/.well-known/oauth-authorization-server/oauth/authorize', c =>
+  redirectToAuthorizationServerAuthorizeMetadata(c)
+);
+app.get('/.well-known/oauth-authorization-server/mcp-connect/user/:userId/:configId/:routeKey', c =>
+  redirectToAuthorizationServerMetadata(c)
+);
+app.get('/.well-known/oauth-authorization-server/mcp-connect/org/:orgId/:configId/:routeKey', c =>
+  redirectToAuthorizationServerMetadata(c)
 );
 
 const fetchHandler: ExportedHandler<Env>['fetch'] = (request, env, ctx) =>

@@ -49,9 +49,15 @@ describe('MCP gateway route surface', () => {
       request(orgRoute, 'POST'),
     ]);
 
-    for (const response of responses) {
+    const expectedRoutes = [userRoute, userRoute, orgRoute, orgRoute];
+    for (const [index, response] of responses.entries()) {
       expect(response.status).toBe(401);
-      expect(response.headers.get('www-authenticate')).toContain('authorization_uri=');
+      const challenge = response.headers.get('www-authenticate');
+      expect(challenge).toContain('authorization_uri=');
+      expect(challenge).toContain(
+        `resource_metadata="https://mcp.kilo.ai/.well-known/oauth-protected-resource${expectedRoutes[index]}"`
+      );
+      expect(challenge).toContain('scope="profile"');
     }
   });
 
@@ -90,6 +96,30 @@ describe('MCP gateway route surface', () => {
       const body = metadataSchema.parse(await response.json());
       expect(body.authorization_servers).toEqual(['https://app.kilo.ai']);
       expect(body.scopes_supported).toEqual(['profile']);
+    }
+  });
+
+  it('redirects authorization-server discovery aliases to app-owned metadata', async () => {
+    const responses = await Promise.all([
+      request('/.well-known/oauth-authorization-server'),
+      request('/.well-known/oauth-authorization-server/oauth/authorize'),
+      request(`/.well-known/oauth-authorization-server${userRoute}`),
+      request(`/.well-known/oauth-authorization-server${orgRoute}`),
+    ]);
+
+    expect(responses[0].status).toBe(307);
+    expect(responses[0].headers.get('location')).toBe(
+      'https://app.kilo.ai/.well-known/oauth-authorization-server'
+    );
+    expect(responses[1].status).toBe(307);
+    expect(responses[1].headers.get('location')).toBe(
+      'https://app.kilo.ai/.well-known/oauth-authorization-server/oauth/authorize'
+    );
+    for (const response of responses.slice(2)) {
+      expect(response.status).toBe(307);
+      expect(response.headers.get('location')).toBe(
+        'https://app.kilo.ai/.well-known/oauth-authorization-server'
+      );
     }
   });
 

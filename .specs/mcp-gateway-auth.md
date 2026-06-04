@@ -70,9 +70,10 @@ when they appear in all capitals.
 ## Architecture And Ownership
 
 1. The app is the only first-level OAuth authorization server in v1.
-2. The Worker MUST NOT implement first-level OAuth registration, authorization,
-   token, provider callback, JWKS, user-info, config CRUD, assignment CRUD, or
-   app management routes.
+2. The Worker MAY expose same-origin discovery aliases that redirect to app-owned
+   authorization-server metadata, but it MUST NOT implement first-level OAuth
+   registration, authorization, token, provider callback, JWKS, user-info, config
+   CRUD, assignment CRUD, or app management routes.
 3. The Worker is the only upstream credential injection boundary in v1.
 4. Postgres is the shared system of record for configs, routes, assignments,
    instances, grants, OAuth artifacts, and audit state.
@@ -106,8 +107,9 @@ when they appear in all capitals.
 | Descendants under scoped connect routes | Worker | Allowed only when config path passthrough is enabled and authorized against the root route. |
 | `GET /.well-known/oauth-protected-resource` | Worker | Generic protected-resource metadata for `{base_url}/mcp-connect`. |
 | `GET /.well-known/oauth-protected-resource/mcp-connect/...` | Worker | Scoped protected-resource metadata for one canonical route. |
-| `GET /.well-known/oauth-authorization-server` | App | Authorization-server metadata. |
-| `GET /.well-known/oauth-authorization-server/oauth/authorize` | App | Metadata alias for clients that discover from the authorization route. |
+| `GET /.well-known/oauth-authorization-server` | App canonical route, Worker discovery alias | Authorization-server metadata. The Worker alias redirects to the app canonical route. |
+| `GET /.well-known/oauth-authorization-server/oauth/authorize` | App canonical route, Worker discovery alias | Metadata alias for clients that discover from the authorization route. The Worker alias redirects to the app canonical route. |
+| `GET /.well-known/oauth-authorization-server/mcp-connect/...` | Worker discovery alias | Path-aware compatibility alias for clients that start discovery from one scoped connect URL; redirects to app canonical metadata. |
 | `POST /api/mcp-gateway/oauth/register` | App | Dynamic client registration. |
 | `POST /api/mcp-gateway/oauth/register/{scope}/{owner_id}/{config_id}/{route_key}` | App | Resource-specific registration after route eligibility discovery. |
 | `GET|PUT|DELETE /api/mcp-gateway/oauth/register/{client_id}` | App | Registration management authorized by registration token. |

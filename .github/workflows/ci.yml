@@ -217,7 +217,7 @@ jobs:
           SRH_TOKEN: example_token
           SRH_CONNECTION_STRING: redis://redis:6379
         options: >-
-          --health-cmd "wget -qO- http://localhost:80/ >/dev/null || exit 1"
+          --health-cmd "wget -qO- http://127.0.0.1:80/ >/dev/null || exit 1"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5

@@ -929,6 +929,41 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       return client.getRegistryEntries(input.userId, input.orgId ?? undefined);
     }),
 
+  // Release a STUCK provision reservation (status in_progress /
+  // failed_requires_reconciliation) so the user can provision again. The worker
+  // endpoint is guarded: it refuses reservations backing an active instance or
+  // already completed/released, and performs no provider/Postgres mutations.
+  releaseReservation: adminProcedure
+    .input(
+      z.object({
+        userId: z.string().min(1),
+        instanceId: z.string().uuid(),
+        orgId: z.string().uuid().optional(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const client = new KiloClawInternalClient();
+      const result = await client.releaseProvisionReservation(
+        input.userId,
+        input.instanceId,
+        input.orgId
+      );
+      await createKiloClawAdminAuditLog({
+        action: 'kiloclaw.provision_reservation.release',
+        actor_id: ctx.user.id,
+        actor_email: ctx.user.google_user_email,
+        actor_name: ctx.user.google_user_name,
+        target_user_id: input.userId,
+        message: `Released stuck provision reservation ${input.instanceId} (was ${result.previousStatus})`,
+        metadata: {
+          instanceId: input.instanceId,
+          orgId: input.orgId ?? null,
+          previousStatus: result.previousStatus,
+        },
+      });
+      return result;
+    }),
+
   list: adminProcedure.input(ListInstancesSchema).query(async ({ input }) => {
     const { offset, limit, sortBy, sortOrder, search, status, imageTag, hasSizeOverride } = input;
     const searchTerm = search?.trim() || '';

@@ -1407,6 +1407,20 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
     })
   );
 
+  const { mutateAsync: releaseReservation, isPending: isReleasingReservation } = useMutation(
+    trpc.admin.kiloclawInstances.releaseReservation.mutationOptions({
+      onSuccess: result => {
+        toast.success(`Reservation released (was ${result.previousStatus})`);
+        void queryClient.invalidateQueries({
+          queryKey: trpc.admin.kiloclawInstances.registryEntries.queryKey(),
+        });
+      },
+      onError: err => {
+        toast.error(`Failed to release reservation: ${err.message}`);
+      },
+    })
+  );
+
   const { mutateAsync: restoreSnapshot, isPending: isRestoring } = useMutation(
     trpc.admin.kiloclawInstances.restoreVolumeSnapshot.mutationOptions({
       onSuccess: () => {
@@ -2639,6 +2653,79 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                       })}
                     </tbody>
                   </table>
+                </div>
+              )}
+
+              {registry.reservations.length > 0 && (
+                <div className="mt-6">
+                  <h4 className="mb-2 text-sm font-medium">Provision Reservations</h4>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b text-left text-muted-foreground">
+                          <th className="pb-2 pr-4">Instance ID</th>
+                          <th className="pb-2 pr-4">Status</th>
+                          <th className="pb-2 pr-4">Failure</th>
+                          <th className="pb-2 pr-4">Started</th>
+                          <th className="pb-2">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {registry.reservations.map(reservation => {
+                          const isStuck =
+                            reservation.status === 'in_progress' ||
+                            reservation.status === 'failed_requires_reconciliation';
+                          const reservationOrgId = registry.registryKey.startsWith('org:')
+                            ? registry.registryKey.slice('org:'.length)
+                            : undefined;
+                          return (
+                            <tr key={reservation.instanceId} className="border-b">
+                              <td className="py-2 pr-4">
+                                <code className="text-xs">
+                                  {reservation.instanceId.slice(0, 8)}...
+                                </code>
+                              </td>
+                              <td className="py-2 pr-4">
+                                <Badge variant={isStuck ? 'destructive' : 'secondary'}>
+                                  {reservation.status}
+                                </Badge>
+                              </td>
+                              <td className="py-2 pr-4 text-xs text-muted-foreground">
+                                {reservation.failureCode ?? '—'}
+                              </td>
+                              <td className="py-2 pr-4 text-xs text-muted-foreground">
+                                {new Date(reservation.startedAt).toLocaleString()}
+                              </td>
+                              <td className="py-2">
+                                {isStuck ? (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={isReleasingReservation}
+                                    title="Release this stuck reservation (no provider/Postgres changes) so the user can provision again"
+                                    onClick={() =>
+                                      void releaseReservation({
+                                        userId: reservation.assignedUserId,
+                                        instanceId: reservation.instanceId,
+                                        orgId: reservationOrgId,
+                                      })
+                                    }
+                                  >
+                                    {isReleasingReservation ? (
+                                      <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                                    ) : null}
+                                    Release
+                                  </Button>
+                                ) : (
+                                  <span className="text-xs text-muted-foreground">—</span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               )}
             </CardContent>

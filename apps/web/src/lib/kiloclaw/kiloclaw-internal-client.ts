@@ -318,6 +318,21 @@ export class KiloClawInternalClient {
     );
   }
 
+  async releaseProvisionReservation(
+    userId: string,
+    instanceId: string,
+    orgId?: string
+  ): Promise<{ ok: true; previousStatus: string }> {
+    return this.request(
+      '/api/platform/provision/release-reservation',
+      {
+        method: 'POST',
+        body: JSON.stringify({ userId, instanceId, orgId }),
+      },
+      { userId }
+    );
+  }
+
   async start(
     userId: string,
     instanceId?: string,

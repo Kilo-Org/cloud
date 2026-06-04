@@ -1866,6 +1866,71 @@ platform.post('/provision/repair-reservation', async c => {
   }
 });
 
+// POST /api/platform/provision/release-reservation
+// Surgically resolves a STUCK provision reservation (status `in_progress` or
+// `failed_requires_reconciliation`) so the user can provision again. A failed
+// fresh provision can leave such a row behind (e.g. `provider_provision_failed`
+// during a provider outage); the partial unique index then rejects every new
+// provision with `provision_in_progress` ("An instance is already being
+// created"), and nothing auto-heals it because no instance/DO exists to finalize
+// a destroy.
+//
+// Unlike `/destroy`, this issues NO provider (Fly) calls and mutates NO Postgres
+// state -- it flips a single registry bookkeeping row to `released`. It is
+// guarded to refuse releasing a reservation that backs a live active instance or
+// that is already `completed`/`released`.
+platform.post('/provision/release-reservation', async c => {
+  const result = await parseBody(c, ProvisionReservationRepairSchema);
+  if ('error' in result) return result.error;
+  const { userId, instanceId, orgId } = result.data;
+
+  try {
+    // Defense in depth: never release a reservation that belongs to a
+    // currently-active instance.
+    const activeInstance = await getActiveProvisionContextInstance(c.env, userId, orgId);
+    if (activeInstance?.id === instanceId) {
+      return jsonError(
+        'Reservation belongs to an active instance; refusing to release',
+        409,
+        'reservation_active'
+      );
+    }
+
+    const { registryKey, stub } = getProvisionRegistryStub(c.env, userId, orgId);
+    const { reservations } = await stub.listAllInstances(registryKey);
+    const reservation = reservations.find(r => r.instanceId === instanceId);
+    if (!reservation) {
+      return jsonError('No provision reservation found for instance', 404, 'reservation_not_found');
+    }
+    if (
+      reservation.status !== 'in_progress' &&
+      reservation.status !== 'failed_requires_reconciliation'
+    ) {
+      return jsonError(
+        `Reservation is not in a releasable state (status=${reservation.status})`,
+        409,
+        'reservation_not_releasable'
+      );
+    }
+
+    await stub.releaseFreshProvision(registryKey, userId, instanceId, 'manual_admin_release');
+
+    writeEvent(c.env, {
+      event: 'instance.provision_reservation_released',
+      delivery: 'http',
+      route: '/api/platform/provision/release-reservation',
+      userId,
+      instanceId,
+      orgId: orgId ?? undefined,
+      label: reservation.status,
+    });
+    return c.json({ ok: true, previousStatus: reservation.status });
+  } catch (error) {
+    const { message, status } = sanitizeError(error, 'provision reservation release');
+    return jsonError(message, status);
+  }
+});
+
 // PATCH /api/platform/kilocode-config
 
 platform.patch('/kilocode-config', async c => {

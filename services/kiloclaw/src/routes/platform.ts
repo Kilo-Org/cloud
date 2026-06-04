@@ -3049,9 +3049,10 @@ platform.get('/morning-briefing/read/:day', async c => {
   }
 });
 
-// GET /api/platform/files/tree?userId=...
+// GET /api/platform/files/tree?userId=...[&path=...]
 platform.get('/files/tree', async c => {
   const userId = setValidatedQueryUserId(c);
+  const filePath = c.req.query('path');
   if (!userId) {
     return c.json({ error: 'userId query parameter is required' }, 400);
   }
@@ -3064,7 +3065,7 @@ platform.get('/files/tree', async c => {
       c.env,
       userId,
       iidResult.instanceId,
-      stub => stub.getFileTree(),
+      stub => stub.getFileTree(filePath),
       'getFileTree'
     );
     if (!result) {

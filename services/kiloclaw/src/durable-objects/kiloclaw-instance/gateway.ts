@@ -416,16 +416,15 @@ const FileTreeResponseSchema = z.object({
 
 export async function getFileTree(
   state: InstanceMutableState,
-  env: KiloClawEnv
+  env: KiloClawEnv,
+  filePath?: string
 ): Promise<{ tree: unknown[] } | null> {
+  const params = new URLSearchParams();
+  if (filePath !== undefined) params.set('path', filePath);
+  const path = `/_kilo/files/tree${params.toString() ? `?${params.toString()}` : ''}`;
+
   try {
-    return await callGatewayController(
-      state,
-      env,
-      '/_kilo/files/tree',
-      'GET',
-      FileTreeResponseSchema
-    );
+    return await callGatewayController(state, env, path, 'GET', FileTreeResponseSchema);
   } catch (error) {
     if (isErrorUnknownRoute(error)) return null;
     throw error;

@@ -3870,9 +3870,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     return gateway.replaceConfigOnMachine(this.s, this.env, config, etag);
   }
 
-  async getFileTree() {
+  async getFileTree(filePath?: string) {
     await this.loadState();
-    return gateway.getFileTree(this.s, this.env);
+    return gateway.getFileTree(this.s, this.env, filePath);
   }
 
   async readFile(filePath: string) {

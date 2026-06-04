@@ -69,12 +69,12 @@ import type {
 import type { InstanceTierKey } from '@kilocode/kiloclaw-instance-tiers';
 
 /** Keep in sync with: kiloclaw/controller/src/routes/files.ts, kiloclaw/src/.../gateway.ts (Zod) */
-export interface FileNode {
+export type FileNode = {
   name: string;
   path: string;
   type: 'file' | 'directory';
   children?: FileNode[];
-}
+};
 
 export type OpenclawFileWriteValidation = 'warn-before-write' | 'allow-invalid';
 
@@ -913,9 +913,13 @@ export class KiloClawInternalClient {
     );
   }
 
-  async getFileTree(userId: string, instanceId?: string): Promise<{ tree: FileNode[] }> {
+  async getFileTree(
+    userId: string,
+    opts: { instanceId?: string; path?: string } = {}
+  ): Promise<{ tree: FileNode[] }> {
     const params = new URLSearchParams({ userId });
-    if (instanceId) params.set('instanceId', instanceId);
+    if (opts.instanceId) params.set('instanceId', opts.instanceId);
+    if (opts.path !== undefined) params.set('path', opts.path);
     return this.request(`/api/platform/files/tree?${params.toString()}`);
   }
 

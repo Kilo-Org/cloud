@@ -112,7 +112,7 @@ export function AdminFileEditor({
       onSuccess: async result => {
         if ('outcome' in result) return;
         await queryClient.invalidateQueries({
-          queryKey: trpc.admin.kiloclawInstances.fileTree.queryKey({ userId, instanceId }),
+          queryKey: trpc.admin.kiloclawInstances.fileTree.queryKey(),
         });
         await queryClient.invalidateQueries({
           queryKey: trpc.admin.kiloclawInstances.readFile.queryKey({ userId, instanceId }),
@@ -137,6 +137,14 @@ export function AdminFileEditor({
       error={error}
       refetch={refetch}
       height="600px"
+      loadChildren={path =>
+        queryClient.fetchQuery(
+          trpc.admin.kiloclawInstances.fileTree.queryOptions(
+            { userId, instanceId, path },
+            { refetchOnWindowFocus: false }
+          )
+        )
+      }
       renderPane={(selectedPath, onDirtyChange) => (
         <AdminFileEditorPaneInner
           key={selectedPath}

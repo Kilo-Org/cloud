@@ -1461,16 +1461,21 @@ export const organizationKiloclawRouter = createTRPCRouter({
 
   // ── File operations ───────────────────────────────────────────
 
-  fileTree: organizationMemberProcedure.query(async ({ ctx, input }) => {
-    try {
-      const instance = await getActiveOrgInstance(ctx.user.id, input.organizationId);
-      const client = new KiloClawInternalClient();
-      const result = await client.getFileTree(ctx.user.id, workerInstanceId(instance));
-      return result.tree;
-    } catch (err) {
-      handleFileOperationError(err, 'fetch file tree');
-    }
-  }),
+  fileTree: organizationMemberProcedure
+    .input(z.object({ organizationId: z.uuid(), path: z.string().min(1).optional() }))
+    .query(async ({ ctx, input }) => {
+      try {
+        const instance = await getActiveOrgInstance(ctx.user.id, input.organizationId);
+        const client = new KiloClawInternalClient();
+        const result = await client.getFileTree(ctx.user.id, {
+          instanceId: workerInstanceId(instance),
+          path: input.path,
+        });
+        return result.tree;
+      } catch (err) {
+        handleFileOperationError(err, 'fetch file tree');
+      }
+    }),
 
   readFile: organizationMemberProcedure
     .input(z.object({ organizationId: z.uuid(), path: z.string().min(1) }))

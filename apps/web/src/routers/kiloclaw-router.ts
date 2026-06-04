@@ -4179,16 +4179,21 @@ export const kiloclawRouter = createTRPCRouter({
     return { success: true, deleted: !!deleted, worker_sync: workerSync };
   }),
 
-  fileTree: clawAccessProcedure.query(async ({ ctx }) => {
-    try {
-      const instance = await getActiveInstance(ctx.user.id);
-      const client = new KiloClawInternalClient();
-      const result = await client.getFileTree(ctx.user.id, workerInstanceId(instance));
-      return result.tree;
-    } catch (err) {
-      handleFileOperationError(err, 'fetch file tree');
-    }
-  }),
+  fileTree: clawAccessProcedure
+    .input(z.object({ path: z.string().min(1).optional() }).optional())
+    .query(async ({ ctx, input }) => {
+      try {
+        const instance = await getActiveInstance(ctx.user.id);
+        const client = new KiloClawInternalClient();
+        const result = await client.getFileTree(ctx.user.id, {
+          instanceId: workerInstanceId(instance),
+          path: input?.path,
+        });
+        return result.tree;
+      } catch (err) {
+        handleFileOperationError(err, 'fetch file tree');
+      }
+    }),
 
   readFile: clawAccessProcedure
     .input(z.object({ path: z.string().min(1) }))

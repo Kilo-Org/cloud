@@ -21,10 +21,7 @@ const upstreamB = {
   base_url: 'https://partner.example.com/v1',
 };
 const redisIt =
-  (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) ||
-  (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN)
-    ? it
-    : it.skip;
+  process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN ? it : it.skip;
 
 beforeEach(async () => {
   await cleanupDbForTest();

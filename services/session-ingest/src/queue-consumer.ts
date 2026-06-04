@@ -22,10 +22,6 @@ export interface IngestQueueMessage {
 
 export const QUEUE_RETRY_DELAY_SECONDS = 5 * 60;
 
-function elapsedMs(startedAt: number): number {
-  return Date.now() - startedAt;
-}
-
 /**
  * Creates a streaming item extractor that uses a low-level Tokenizer to parse
  * items from `$.data[]` one at a time, with a per-item byte budget.
@@ -200,7 +196,6 @@ async function processMessage(
     while (pending.length > 0) {
       const rawItem = pending.shift();
       if (!rawItem) break;
-      const itemStartedAt = Date.now();
       try {
         await processItem(
           env,
@@ -216,7 +211,6 @@ async function processMessage(
         console.error('Error processing single item in queue consumer, continuing', {
           r2Key,
           type: rawItem['type'],
-          durationMs: elapsedMs(itemStartedAt),
           error: err instanceof Error ? err.message : String(err),
         });
       }
@@ -261,45 +255,25 @@ async function processItem(
 
   const item = parsed.data;
   const { item_id } = getItemIdentity(item);
-  const startedAt = Date.now();
 
   // Check if item data exceeds DO SQLite row limit (use byte length for non-ASCII safety)
   const itemDataJson = JSON.stringify(item.data);
-  const itemDataBytes = new TextEncoder().encode(itemDataJson).byteLength;
   let r2References: Record<string, string> | undefined;
-  let r2PutMs = 0;
-  if (itemDataBytes > MAX_INGEST_ITEM_BYTES) {
+  if (new TextEncoder().encode(itemDataJson).byteLength > MAX_INGEST_ITEM_BYTES) {
     const itemR2Key = `items/${kiloUserId}/${sessionId}/${item_id}/${ingestedAt}`;
-    const r2PutStartedAt = Date.now();
     await env.SESSION_INGEST_R2.put(itemR2Key, itemDataJson);
-    r2PutMs = elapsedMs(r2PutStartedAt);
     r2References = { [item_id]: itemR2Key };
   }
 
-  const doIngestStartedAt = Date.now();
   const ingestResult = await withDORetry(
     () => getSessionIngestDO(env, { kiloUserId, sessionId }),
     stub => stub.ingest([item], kiloUserId, sessionId, ingestVersion, ingestedAt, r2References),
     'SessionIngestDO.ingest'
   );
-  const doIngestMs = elapsedMs(doIngestStartedAt);
 
   for (const change of ingestResult.changes) {
     mergedChanges.set(change.name, change.value);
   }
-
-  const durationMs = elapsedMs(startedAt);
-  console.info('session-ingest processItem timing', {
-    r2Key,
-    sessionId,
-    type: item.type,
-    itemDataBytes,
-    r2Referenced: r2References !== undefined,
-    r2PutMs,
-    doIngestMs,
-    durationMs,
-    changes: ingestResult.changes.length,
-  });
 }
 
 type SessionMetadataUpdates = Partial<
@@ -377,7 +351,6 @@ async function applyMetadataChanges(
     mergedChanges.has('gitBranch') ||
     parentSessionId !== undefined;
 
-  const transactionStartedAt = Date.now();
   const notification = await db.transaction(async tx => {
     const statusChange =
       status === undefined
@@ -483,13 +456,6 @@ async function applyMetadataChanges(
       session: mapSessionEventRow(persistedRow),
     };
   });
-  const transactionMs = elapsedMs(transactionStartedAt);
-  console.info('session-ingest applyMetadataChanges transaction timing', {
-    sessionId,
-    metadataChanges: mergedChanges.size,
-    transactionMs,
-  });
-
   if (!notification) return;
 
   if (notification.changedNonStatus) {

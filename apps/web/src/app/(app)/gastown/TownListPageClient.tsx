@@ -82,12 +82,12 @@ export function TownListPageClient() {
             transparency: every object is clickable; every outcome is attributable.
           </p>
 
-          <div className="flex items-end gap-3">
+          <div className="flex flex-wrap items-end gap-3">
             <div className="min-w-[120px] rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3">
               <div className="text-[11px] tracking-wider text-white/40 uppercase">Towns</div>
               <div className="mt-1 text-2xl font-semibold text-white/90">
                 {townsQuery.isLoading ? (
-                  <span className="inline-block h-5 w-6 animate-pulse rounded bg-white/20" />
+                  <Skeleton className="h-8 w-6 bg-white/20" />
                 ) : (
                   (townsQuery.data ?? []).length
                 )}

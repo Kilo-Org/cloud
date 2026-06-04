@@ -173,7 +173,8 @@ export function stripNulBytesInPlace(obj: Record<string, unknown>, dirtyFields: 
 
 export async function toInsertableDbUsageRecord(
   usageStats: MicrodollarUsageStats,
-  usageContextInfo: UsageContextInfo
+  usageContextInfo: UsageContextInfo,
+  responseModel: string | null = usageStats.model
 ): Promise<CoreUsageWithMetaData> {
   const id = randomUUID();
   const created_at = new Date().toISOString();
@@ -192,7 +193,7 @@ export async function toInsertableDbUsageRecord(
     cache_write_tokens: usageStats.cacheWriteTokens,
     cache_hit_tokens: usageStats.cacheHitTokens,
     created_at,
-    model: usageStats.model,
+    model: usageContextInfo.requested_model,
     requested_model: usageContextInfo.requested_model,
     cache_discount: usageStats.cacheDiscount_mUsd ?? null,
     has_error: usageStats.hasError,
@@ -206,6 +207,7 @@ export async function toInsertableDbUsageRecord(
     id,
     created_at,
     message_id: usageStats.messageId ?? '<missing>',
+    response_model: responseModel,
     upstream_id: usageStats.upstream_id,
     finish_reason: usageStats.finish_reason,
     latency: usageStats.latency ?? ttfb_ms,
@@ -253,11 +255,12 @@ export async function toInsertableDbUsageRecord(
 
 export async function logMicrodollarUsage(
   usageStats: MicrodollarUsageStats,
-  usageContext: MicrodollarUsageContext
+  usageContext: MicrodollarUsageContext,
+  responseModel: string | null = usageStats.model
 ): Promise<{ usageId: string; createdAt: string } | null> {
   usageContext.status_code = usageStats.status_code;
   const contextInfo = extractUsageContextInfo(usageContext);
-  const { core, metadata } = await toInsertableDbUsageRecord(usageStats, contextInfo);
+  const { core, metadata } = await toInsertableDbUsageRecord(usageStats, contextInfo, responseModel);
 
   const inserted = await saveUsageRelatedData(
     core,
@@ -506,6 +509,7 @@ async function insertUsageAndMetadataWithBalanceUpdate(
               id,
               message_id,
               created_at,
+              response_model,
               user_prompt_prefix,
               vercel_ip_latitude,
               vercel_ip_longitude,
@@ -546,6 +550,7 @@ async function insertUsageAndMetadataWithBalanceUpdate(
               ${metadataFields.id},
               ${metadataFields.message_id ?? '<missing>'},
               ${metadataFields.created_at},
+              ${metadataFields.response_model},
               ${metadataFields.user_prompt_prefix},
               ${metadataFields.http_x_vercel_ip_latitude},
               ${metadataFields.http_x_vercel_ip_longitude},
@@ -1013,6 +1018,8 @@ export async function processTokenData(
     usageStats = genStats;
   }
 
+  const responseModel = usageStats.model;
+
   if (
     !usageStats.model || // fallback for failure cases
     isKiloStealthModel(usageContext.requested_model) // this can probably be removed once we're sure we only present requested_model to users
@@ -1039,7 +1046,7 @@ export async function processTokenData(
     usageStats.cacheDiscount_mUsd = 0;
   }
 
-  return logMicrodollarUsage(usageStats, usageContext);
+  return logMicrodollarUsage(usageStats, usageContext, responseModel);
 }
 
 async function useGenerationLookup(

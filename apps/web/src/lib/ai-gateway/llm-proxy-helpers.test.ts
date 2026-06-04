@@ -626,11 +626,7 @@ describe('parseTranscriptionUsageFromResponse', () => {
   }
 
   it('uses upstream cost and token fields', () => {
-    const result = parseTranscriptionUsageFromResponse(
-      makeResponse(),
-      200,
-      'openai/gpt-4o-mini-transcribe'
-    );
+    const result = parseTranscriptionUsageFromResponse(makeResponse(), 200);
 
     expect(result.cost_mUsd).toBe(20);
     expect(result.inputTokens).toBe(10);
@@ -650,8 +646,7 @@ describe('parseTranscriptionUsageFromResponse', () => {
           cost_details: { upstream_inference_cost: 0.00004 },
         },
       }),
-      200,
-      'openai/gpt-4o-mini-transcribe'
+      200
     );
 
     expect(result.cost_mUsd).toBe(40);
@@ -659,37 +654,25 @@ describe('parseTranscriptionUsageFromResponse', () => {
   });
 
   it('stores duration as generation time', () => {
-    const result = parseTranscriptionUsageFromResponse(
-      makeResponse(),
-      200,
-      'openai/gpt-4o-mini-transcribe'
-    );
+    const result = parseTranscriptionUsageFromResponse(makeResponse(), 200);
 
     expect(result.generation_time).toBe(2.5);
   });
 
-  it('falls back to requested model when response model is absent', () => {
+  it('leaves the model null when response model is absent', () => {
     const parsed = JSON.parse(makeResponse());
     delete parsed.model;
 
-    const result = parseTranscriptionUsageFromResponse(
-      JSON.stringify(parsed),
-      200,
-      'openai/whisper-1'
-    );
+    const result = parseTranscriptionUsageFromResponse(JSON.stringify(parsed), 200);
 
-    expect(result.model).toBe('openai/whisper-1');
+    expect(result.model).toBeNull();
   });
 
   it('marks non-text responses as errors', () => {
     const parsed = JSON.parse(makeResponse());
     delete parsed.text;
 
-    const result = parseTranscriptionUsageFromResponse(
-      JSON.stringify(parsed),
-      200,
-      'openai/gpt-4o-mini-transcribe'
-    );
+    const result = parseTranscriptionUsageFromResponse(JSON.stringify(parsed), 200);
 
     expect(result.hasError).toBe(true);
   });

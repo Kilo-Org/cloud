@@ -121,6 +121,7 @@ function generateRandomRecord(
       metaStats.message_id_max_len
     ),
     created_at,
+    response_model: core.model,
     http_user_agent: maybeNull(
       pickRandom(uniquePools.userAgents, Math.random()),
       metaStats.http_user_agent_id_null_pct

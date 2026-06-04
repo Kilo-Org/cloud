@@ -65,6 +65,7 @@ export async function POST(
     id,
     message_id: id,
     created_at,
+    response_model: null,
     http_x_forwarded_for: null,
     http_x_vercel_ip_city: null,
     http_x_vercel_ip_country: null,

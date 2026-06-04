@@ -385,7 +385,7 @@ describe('logMicrodollarUsage', () => {
       google_user_email: 'test@example.com',
     });
 
-    const usageStats = BASE_USAGE_STATS;
+    const usageStats = { ...BASE_USAGE_STATS, model: 'provider/response-model' };
     const usageContext = createBaseUsageContext(user);
 
     await logMicrodollarUsage(usageStats, usageContext);
@@ -410,6 +410,8 @@ describe('logMicrodollarUsage', () => {
     expect(usageRecord?.cache_hit_tokens).toBe(5);
     expect(usageRecord?.provider).toBe('openrouter');
     expect(usageRecord?.model).toBe('anthropic/claude-3.7-sonnet');
+    expect(usageRecord?.requested_model).toBe('anthropic/claude-3.7-sonnet');
+    expect(metadataRecord?.response_model).toBe('provider/response-model');
     expect(metadataRecord?.system_prompt_length).toBe(27);
     expect(metadataRecord?.user_prompt_prefix).toBe('Please help me with');
     expect(metadataRecord?.max_tokens).toBe(200);
@@ -993,12 +995,13 @@ describe('toInsertableDbUsageRecord NUL-byte sanitization', () => {
       extractUsageContextInfo(usageContext)
     );
 
-    // core fields (from the LLM response body)
-    expect(core.model).toBe('provider/modelevil');
+    // core fields
+    expect(core.model).toBe('reqmodel');
     expect(core.inference_provider).toBe('prov');
     expect(core.requested_model).toBe('reqmodel');
 
     // metadata fields (from prompt extraction + upstream response)
+    expect(metadata.response_model).toBe('provider/modelevil');
     expect(metadata.system_prompt_prefix).toBe('sysprefix');
     expect(metadata.user_prompt_prefix).toBe('usrprefix');
     expect(metadata.upstream_id).toBe('up');
@@ -1049,15 +1052,27 @@ describe('toInsertableDbUsageRecord NUL-byte sanitization', () => {
       extractUsageContextInfo(makeUsageContext())
     );
 
-    expect(core.model).toBe('provider/model');
+    expect(core.model).toBe('provider/requested-model');
     expect(core.inference_provider).toBe('prov');
     expect(core.requested_model).toBe('provider/requested-model');
+    expect(metadata.response_model).toBe('provider/model');
     expect(metadata.machine_id).toBe('machine');
     expect(metadata.session_id).toBe('session');
     expect(metadata.editor_name).toBe('vscode');
     expect(metadata.upstream_id).toBe('up');
     expect(metadata.finish_reason).toBe('stop');
     expect(metadata.message_id).toBe('msg-id');
+  });
+
+  test('leaves response model null when it could not be retrieved', async () => {
+    const { core, metadata } = await toInsertableDbUsageRecord(
+      { ...baseUsageStats, model: null },
+      extractUsageContextInfo(makeUsageContext())
+    );
+
+    expect(core.model).toBe('provider/requested-model');
+    expect(core.requested_model).toBe('provider/requested-model');
+    expect(metadata.response_model).toBeNull();
   });
 
   test('stores audio transcription api kind metadata', async () => {

@@ -903,13 +903,12 @@ export function parseEmbeddingUsageFromResponse(
 
 export function parseTranscriptionUsageFromResponse(
   responseText: string,
-  statusCode: number,
-  requestedModel: string
+  statusCode: number
 ): MicrodollarUsageStats {
   const json: TranscriptionResponse = JSON.parse(responseText);
   const base = {
     messageId: json.id ?? null,
-    model: json.model ?? requestedModel,
+    model: json.model ?? null,
     responseContent: json.text ?? '',
     hasError: statusCode >= 400 || typeof json.text !== 'string',
     inference_provider: null,
@@ -1007,7 +1006,7 @@ export function countAndStoreTranscriptionUsage(
     : clonedResponse
         .text()
         .then(text =>
-          parseTranscriptionUsageFromResponse(text, statusCode, usageContext.requested_model)
+          parseTranscriptionUsageFromResponse(text, statusCode)
         )
         .catch(() => null);
 

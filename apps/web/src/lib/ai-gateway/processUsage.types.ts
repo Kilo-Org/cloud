@@ -192,6 +192,7 @@ export type UsageMetaData = {
   id: string;
   message_id: string;
   created_at: string;
+  response_model: string | null;
   http_x_forwarded_for: string | null;
   http_x_vercel_ip_city: string | null;
   http_x_vercel_ip_country: string | null;

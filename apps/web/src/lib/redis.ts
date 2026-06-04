@@ -15,6 +15,12 @@ const COMMAND_TIMEOUT_MS = 200;
 
 let client: Redis | null = null;
 
+export const redisClient = Redis.fromEnv({
+  automaticDeserialization: false,
+  retry: false,
+  signal: () => AbortSignal.timeout(COMMAND_TIMEOUT_MS),
+});
+
 class RedisTimeoutError extends Error {
   constructor(readonly redisTimeoutMs: number) {
     super('Redis timeout (command)');
@@ -90,17 +96,6 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
       timer = setTimeout(() => reject(new RedisTimeoutError(ms)), ms);
     }),
   ]);
-}
-
-export async function redisGet(key: RedisKey): Promise<string | null> {
-  const redis = getOrCreateClient();
-  if (!redis) return null;
-  try {
-    return await withTimeout(redis.client.get<string>(key), COMMAND_TIMEOUT_MS);
-  } catch (err) {
-    captureRedisOperationException(err, 'get', key, redis.config);
-    throw err;
-  }
 }
 
 export async function redisGetDel(key: RedisKey): Promise<string | null> {

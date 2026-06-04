@@ -1,5 +1,5 @@
 import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
-import { redisGet, redisSet } from '@/lib/redis';
+import { redisClient, redisSet } from '@/lib/redis';
 import {
   GatewayConfigSchema,
   GatewayConfigInputSchema,
@@ -11,7 +11,7 @@ import { TRPCError } from '@trpc/server';
 
 async function readConfig(): Promise<GatewayConfig> {
   try {
-    const raw = await redisGet(VERCEL_ROUTING_REDIS_KEY);
+    const raw = await redisClient.get<string>(VERCEL_ROUTING_REDIS_KEY);
     if (!raw) return DEFAULT_GATEWAY_CONFIG;
     return GatewayConfigSchema.parse(JSON.parse(raw));
   } catch {

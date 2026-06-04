@@ -26,7 +26,7 @@ import {
 } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
 import { ProxyErrorType } from '@/lib/proxy-error-types';
 import { getAutoFreeCandidates } from '@/lib/ai-gateway/auto-model/resolution';
-import { redisGet, redisSet } from '@/lib/redis';
+import { redisClient, redisSet } from '@/lib/redis';
 import { abuseRulesClassificationRedisKey } from '@/lib/redis-keys';
 import type { FraudDetectionHeaders } from '@/lib/utils';
 import { z } from 'zod';
@@ -315,7 +315,7 @@ export async function getCachedRulesEngineAction(
   identityKey: string
 ): Promise<CachedRulesEngineAction | null> {
   try {
-    const raw = await redisGet(abuseRulesClassificationRedisKey(identityKey));
+    const raw = await redisClient.get<string>(abuseRulesClassificationRedisKey(identityKey));
     if (!raw) return null;
     const action = parseCachedRulesEngineAction(raw);
     return action !== undefined ? { identityKey, action } : null;

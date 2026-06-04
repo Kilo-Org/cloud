@@ -1,15 +1,15 @@
 import { beforeEach, describe, expect, test } from '@jest/globals';
 import { OAUTH_STATE_TTL_SECONDS } from '@/lib/integrations/oauth-state';
-import { redisGet, redisSet } from '@/lib/redis';
+import { redisClient, redisSet } from '@/lib/redis';
 import { gitLabOAuthCredentialsRedisKey } from '@/lib/redis-keys';
 import { getGitLabOAuthCredentials, storeGitLabOAuthCredentials } from './oauth-credentials';
 
 jest.mock('@/lib/redis', () => ({
-  redisGet: jest.fn(),
+  redisClient: { get: jest.fn() },
   redisSet: jest.fn(),
 }));
 
-const mockedRedisGet = jest.mocked(redisGet);
+const mockedRedisGet = jest.mocked(redisClient.get);
 const mockedRedisSet = jest.mocked(redisSet);
 
 const customCredentials = {

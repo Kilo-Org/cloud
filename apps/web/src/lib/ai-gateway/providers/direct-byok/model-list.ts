@@ -4,7 +4,7 @@ import {
 } from '@/lib/ai-gateway/providers/direct-byok/types';
 import type { DirectUserByokInferenceProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { createCachedFetch } from '@/lib/cached-fetch';
-import { redisGet } from '@/lib/redis';
+import { redisClient } from '@/lib/redis';
 import { directByokModelsRedisKey } from '@/lib/redis-keys';
 import type { OpenCodeVariant } from '@kilocode/db/schema-types';
 
@@ -24,7 +24,7 @@ export function cachedEnhancedDirectByokModelList({
       enhanceDirectByokModelList({
         recommendedModels,
         remainingModels: DirectByokModelArraySchema.parse(
-          JSON.parse((await redisGet(directByokModelsRedisKey(providerId))) ?? '[]')
+          JSON.parse((await redisClient.get<string>(directByokModelsRedisKey(providerId))) ?? '[]')
         ),
         variants,
       }),

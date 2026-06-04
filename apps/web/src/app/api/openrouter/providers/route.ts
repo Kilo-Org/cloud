@@ -3,12 +3,12 @@ import { NextResponse } from 'next/server';
 import { captureException } from '@sentry/nextjs';
 import { OpenRouterProvidersResponseSchema } from '@/lib/organizations/organization-types';
 import { createCachedFetch } from '@/lib/cached-fetch';
-import { redisGet } from '@/lib/redis';
+import { redisClient } from '@/lib/redis';
 import { GATEWAY_METADATA_REDIS_KEYS } from '@/lib/redis-keys';
 
 const getProviders = createCachedFetch(
   async () => {
-    const raw = await redisGet(GATEWAY_METADATA_REDIS_KEYS.openrouterProviders);
+    const raw = await redisClient.get<string>(GATEWAY_METADATA_REDIS_KEYS.openrouterProviders);
     if (raw === null) return null;
     return OpenRouterProvidersResponseSchema.shape.data.parse(JSON.parse(raw));
   },

@@ -908,6 +908,42 @@ describe('WrapperSupervisor', () => {
     });
   });
 
+  it('schedules an unconfirmed cleanup retry from the time its result is observed', async () => {
+    const harness = createHarness([
+      [
+        'wrapper_lease',
+        {
+          state: 'stop_needed',
+          nextInstanceGeneration: 2,
+          target: { kind: 'session' },
+          reason: 'unexpected-wrapper',
+          requestedAt: 1_000,
+          nextAttemptAt: 1_000,
+          attempts: 0,
+        },
+      ],
+    ]);
+    const attemptStartedAt = 1_000;
+    const failedAt = 20_000;
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(attemptStartedAt);
+    harness.stopWrappers.mockImplementationOnce(async () => {
+      clock.mockReturnValue(failedAt);
+      return { status: 'still-present', observed: [] };
+    });
+
+    try {
+      await harness.supervisor.runMaintenance(attemptStartedAt);
+    } finally {
+      clock.mockRestore();
+    }
+
+    await expect(getWrapperLease(harness.storage)).resolves.toMatchObject({
+      state: 'stop_needed',
+      attempts: 1,
+      nextAttemptAt: failedAt + 5_000,
+    });
+  });
+
   it('backs off unconfirmed physical cleanup retries through the saturated delay tail', async () => {
     const harness = createHarness([
       [
@@ -926,16 +962,22 @@ describe('WrapperSupervisor', () => {
     harness.stopWrappers.mockResolvedValue({ status: 'still-present', observed: [] });
     const expectedDelays = [5_000, 30_000, 120_000, 300_000, 300_000];
     let now = 1_001;
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(now);
 
-    for (const [index, expectedDelay] of expectedDelays.entries()) {
-      await harness.supervisor.runMaintenance(now);
-      const lease = await getWrapperLease(harness.storage);
-      if (lease.state !== 'stop_needed') {
-        throw new Error(`Expected a retryable cleanup lease after attempt ${index + 1}`);
+    try {
+      for (const [index, expectedDelay] of expectedDelays.entries()) {
+        clock.mockReturnValue(now);
+        await harness.supervisor.runMaintenance(now);
+        const lease = await getWrapperLease(harness.storage);
+        if (lease.state !== 'stop_needed') {
+          throw new Error(`Expected a retryable cleanup lease after attempt ${index + 1}`);
+        }
+        expect(lease.attempts).toBe(index + 1);
+        expect(lease.nextAttemptAt - now).toBe(expectedDelay);
+        now = lease.nextAttemptAt;
       }
-      expect(lease.attempts).toBe(index + 1);
-      expect(lease.nextAttemptAt - now).toBe(expectedDelay);
-      now = lease.nextAttemptAt;
+    } finally {
+      clock.mockRestore();
     }
   });
 

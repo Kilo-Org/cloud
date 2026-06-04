@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   emptyWrapperLease,
   getWrapperLease,
+  nextWrapperCleanupDeadline,
   nextWrapperLeaseDeadline,
   putWrapperLease,
   reduceWrapperLease,
@@ -80,6 +81,7 @@ describe('WrapperLease', () => {
       startupDeadlineAt: undefined,
       keepWarmUntil: 20_000,
     });
+    expect(nextWrapperCleanupDeadline(warm)).toBeUndefined();
     expect(nextWrapperLeaseDeadline(warm)).toBe(20_000);
 
     const reusing = reduceWrapperLease(warm, {
@@ -191,6 +193,7 @@ describe('WrapperLease', () => {
       nextAttemptAt: 5_200,
       lastError: 'inspection failed',
     });
+    expect(nextWrapperCleanupDeadline(retrying)).toBe(5_200);
     expect(nextWrapperLeaseDeadline(retrying)).toBe(5_200);
   });
 

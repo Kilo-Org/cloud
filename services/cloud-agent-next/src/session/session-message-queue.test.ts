@@ -17,6 +17,7 @@ import {
   createPendingSessionMessage,
   createPendingSessionMessageFromIntent,
   listPendingSessionMessages,
+  PENDING_FLUSH_RETRY_BASE_DELAY_MS,
   PENDING_SESSION_MESSAGE_LIMIT,
   recordPendingFlushFailure,
   storePendingSessionMessage,
@@ -121,6 +122,7 @@ function createQueueHarness(options?: {
   failAlarmOnce?: boolean;
   failTerminalizationOnce?: boolean;
   ensureAcceptedMessageEffects?: (messageId: string) => Promise<void>;
+  getDeliveryBlock?: () => Promise<{ retryAt: number } | null>;
 }) {
   const storage = options?.storage ?? createMemoryStorage();
   const events: QueueEvent[] = [];
@@ -155,6 +157,7 @@ function createQueueHarness(options?: {
       requireSessionId: async () => metadata?.identity.sessionId ?? 'agent_test',
       validateModeAgainstRuntimeAgents: () => null,
       getDeliveryContext: async () => (metadata ? createContext(metadata) : null),
+      getDeliveryBlock: options?.getDeliveryBlock ?? (async () => null),
       deliver,
       ensureQueuedMessageEvent: event => {
         if (failQueuedEvent) {
@@ -336,6 +339,84 @@ describe('flushNextPendingSessionMessage', () => {
     expect((await storage.list({ prefix: 'pending_message:' })).size).toBe(0);
   });
 
+  it('schedules a retry from the time a delivery failure is observed', async () => {
+    const storage = createMemoryStorage();
+    await storePendingSessionMessage(
+      storage,
+      createPendingSessionMessage({
+        messageId: FIRST_MESSAGE_ID,
+        role: 'user',
+        content: 'slow failed delivery',
+        createdAt: 1,
+      })
+    );
+    const attemptStartedAt = 100_000;
+    const failedAt = 160_000;
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(attemptStartedAt);
+    const deliver = vi.fn(async () => {
+      clock.mockReturnValue(failedAt);
+      throw ExecutionError.workspaceSetupFailed('workspace failed late');
+    });
+
+    const result = await (async () => {
+      try {
+        return await flushNextPendingSessionMessage({
+          storage,
+          now: attemptStartedAt,
+          getDeliveryContext: async () => createContext(),
+          validateModeAgainstRuntimeAgents: () => null,
+          deliver,
+        });
+      } finally {
+        clock.mockRestore();
+      }
+    })();
+
+    expect(result).toMatchObject({
+      type: 'failure',
+      nextFlushAttemptAt: failedAt + PENDING_FLUSH_RETRY_BASE_DELAY_MS,
+    });
+  });
+
+  it('schedules an unsuccessful delivery result retry from the time it is observed', async () => {
+    const storage = createMemoryStorage();
+    await storePendingSessionMessage(
+      storage,
+      createPendingSessionMessage({
+        messageId: FIRST_MESSAGE_ID,
+        role: 'user',
+        content: 'slow unsuccessful delivery',
+        createdAt: 1,
+      })
+    );
+    const attemptStartedAt = 100_000;
+    const failedAt = 160_000;
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(attemptStartedAt);
+    const deliver = vi.fn(async (): Promise<MessageDeliveryResult> => {
+      clock.mockReturnValue(failedAt);
+      return { success: false, code: 'WORKSPACE_SETUP_FAILED', error: 'workspace failed late' };
+    });
+
+    const result = await (async () => {
+      try {
+        return await flushNextPendingSessionMessage({
+          storage,
+          now: attemptStartedAt,
+          getDeliveryContext: async () => createContext(),
+          validateModeAgainstRuntimeAgents: () => null,
+          deliver,
+        });
+      } finally {
+        clock.mockRestore();
+      }
+    })();
+
+    expect(result).toMatchObject({
+      type: 'failure',
+      nextFlushAttemptAt: failedAt + PENDING_FLUSH_RETRY_BASE_DELAY_MS,
+    });
+  });
+
   it('delivers the next current message without execution-runtime blocking', async () => {
     const storage = createMemoryStorage();
     await storePendingSessionMessage(
@@ -442,6 +523,31 @@ describe('SessionMessageQueue', () => {
     });
 
     await expect(harness.queue.hasMessageAdmission(FIRST_MESSAGE_ID)).resolves.toBe(true);
+  });
+
+  it('repairs queued effects without consuming delivery attempts while delivery is blocked', async () => {
+    const retryAt = 50_000;
+    const harness = createQueueHarness({
+      getDeliveryBlock: async () => ({ retryAt }),
+    });
+    await storePendingSessionMessage(
+      harness.storage,
+      createPendingSessionMessage({
+        messageId: FIRST_MESSAGE_ID,
+        role: 'user',
+        content: 'repair before blocked delivery',
+        createdAt: 1,
+      })
+    );
+
+    const drain = await harness.queue.drainNextPendingMessage();
+    const [pending] = await listPendingSessionMessages(harness.storage);
+
+    expect(drain).toEqual({ retryAt, remainingPendingCount: 1 });
+    expect(harness.events).toHaveLength(1);
+    expect(harness.deliver).not.toHaveBeenCalled();
+    expect(pending?.flushAttempts).toBeUndefined();
+    expect(pending?.lastFlushError).toBeUndefined();
   });
 
   it('admits a durable queued message once and replays the original acknowledgement', async () => {

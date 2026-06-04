@@ -927,7 +927,7 @@ export function createWrapperSupervisor(
       reduceWrapperLease(latest, {
         type: 'stop_not_confirmed',
         attemptId,
-        retryAt: stopRetryAt(now, stopping.attempts),
+        retryAt: stopRetryAt(Date.now(), stopping.attempts),
         error,
       })
     );

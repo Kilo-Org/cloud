@@ -320,7 +320,7 @@ describe('agent config mutation timeouts', () => {
   // own 30s timeout. If the outer gateway request used the default 30s it could
   // abort before the controller reports its typed outcome, leaving retries with
   // ambiguous state. These mutations must use a longer timeout; reads must not.
-  const AGENT_MUTATION_TIMEOUT_MS = 90_000;
+  const AGENT_MUTATION_TIMEOUT_MS = 180_000;
   const DEFAULT_TIMEOUT_MS = 30_000;
 
   const ENV = {

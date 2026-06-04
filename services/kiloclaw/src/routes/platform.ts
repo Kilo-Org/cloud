@@ -48,6 +48,7 @@ import {
   KiloclawStartReasonSchema,
   KiloclawStopReasonSchema,
   withDORetry,
+  type DORetryConfig,
 } from '@kilocode/worker-utils';
 import { readBillingCorrelationHeaders } from '@kilocode/worker-utils/kiloclaw-billing-observability';
 import {
@@ -417,10 +418,28 @@ async function withResolvedDORetry<TResult>(
   userId: string,
   instanceId: string | undefined,
   operation: (stub: KiloClawInstanceStub) => Promise<TResult>,
-  operationName: string
+  operationName: string,
+  config?: DORetryConfig
 ): Promise<TResult> {
-  return withDORetry(await instanceStubFactory(env, userId, instanceId), operation, operationName);
+  return withDORetry(
+    await instanceStubFactory(env, userId, instanceId),
+    operation,
+    operationName,
+    config
+  );
 }
+
+/**
+ * Opt non-idempotent operations out of automatic DO retries. Cloudflare's
+ * `.retryable` retries are only safe for idempotent operations: agent
+ * create/delete are non-idempotent, and etag-guarded updates are not
+ * response-idempotent, so an auto-replay after a lost-but-committed success
+ * would surface a misleading agent_exists / agent_not_found / config_etag_conflict
+ * for an action that already succeeded. With retries disabled, a transient DO
+ * failure surfaces to the caller, who retries explicitly once state has settled
+ * and the typed outcome is accurate. Reads keep the default retry.
+ */
+const NO_DO_RETRY: DORetryConfig = { maxAttempts: 1, baseBackoffMs: 0, maxBackoffMs: 0 };
 
 type ProvisionedInstanceRecord = {
   id: string;
@@ -2778,7 +2797,8 @@ platform.post('/agents', async c => {
       userId,
       iidResult.instanceId,
       stub => stub.createAgent(agent),
-      'createAgent'
+      'createAgent',
+      NO_DO_RETRY
     );
     return c.json(response, 200);
   } catch (err) {
@@ -2809,7 +2829,8 @@ platform.patch('/agents/:agentId', async c => {
       userId,
       iidResult.instanceId,
       stub => stub.updateAgent(agentId, patch),
-      'updateAgent'
+      'updateAgent',
+      NO_DO_RETRY
     );
     return c.json(response, 200);
   } catch (err) {
@@ -2839,7 +2860,8 @@ platform.patch('/agent-defaults', async c => {
       userId,
       iidResult.instanceId,
       stub => stub.updateAgentDefaults(patch),
-      'updateAgentDefaults'
+      'updateAgentDefaults',
+      NO_DO_RETRY
     );
     return c.json(response, 200);
   } catch (err) {
@@ -2866,7 +2888,8 @@ platform.delete('/agents/:agentId', async c => {
       userId,
       iidResult.instanceId,
       stub => stub.deleteAgent(agentId),
-      'deleteAgent'
+      'deleteAgent',
+      NO_DO_RETRY
     );
     return c.json(response, 200);
   } catch (err) {

@@ -370,12 +370,18 @@ async function requireControllerCapability(
  * 30s gateway timeout equals the CLI timeout, so the outer request can abort
  * (→ 503) before a queued or in-flight mutation finishes — masking the
  * controller's own typed outcome (e.g. 504 openclaw_cli_timeout) and leaving
- * retries with ambiguous agent_exists/agent_not_found state. This headroom
- * (one queued 30s CLI op + our own 30s CLI op + the post-CLI config read +
- * network) lets the controller's typed response win the race. Reads are not
- * queued and keep the 30s default.
+ * the caller with ambiguous agent_exists/agent_not_found state.
+ *
+ * 180s budgets for several queued 30s CLI ops plus our own op, the post-CLI
+ * config read, and network, so the controller's typed response wins the race
+ * in realistic conditions. NOTE: the controller queue is unbounded, so this is
+ * a pragmatic bound, not a guarantee — under pathological concurrency to a
+ * single instance's config (many simultaneous mutations, which the single-user
+ * isPending-gated UI does not produce) the queue wait could still exceed it.
+ * Eliminating that entirely would require async operation IDs / stable replay
+ * across Worker→DO→controller (deferred). Reads are not queued → 30s default.
  */
-const AGENT_MUTATION_REQUEST_TIMEOUT_MS = 90_000;
+const AGENT_MUTATION_REQUEST_TIMEOUT_MS = 180_000;
 
 /** GET /_kilo/config/agents — list the fleet (+ inherited defaults). */
 export async function listAgents(

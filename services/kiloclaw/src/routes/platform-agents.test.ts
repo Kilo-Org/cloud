@@ -261,4 +261,55 @@ describe('platform agent config routes', () => {
     const body = (await response.json()) as { error: string };
     expect(body.error).not.toContain('super secret internal detail');
   });
+
+  // ── retry policy (non-idempotent mutations must not auto-replay) ─────
+
+  function retryableError(message: string) {
+    return Object.assign(new Error(message), { retryable: true });
+  }
+
+  it('does not auto-retry createAgent on a retryable DO error', async () => {
+    const createAgent = vi.fn().mockRejectedValue(retryableError('DO transient'));
+    const response = await platform.request(
+      '/agents',
+      jsonInit('POST', { userId: 'user-1', agent: { name: 'Work', workspace: '/w' } }),
+      baseEnv({ createAgent })
+    );
+
+    expect(response.status).toBe(500);
+    // A non-idempotent create must surface the failure, never replay (which could
+    // return agent_exists for an action that already committed).
+    expect(createAgent).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not auto-retry deleteAgent on a retryable DO error', async () => {
+    const deleteAgent = vi.fn().mockRejectedValue(retryableError('DO transient'));
+    const response = await platform.request(
+      '/agents/work?userId=user-1',
+      { method: 'DELETE' },
+      baseEnv({ deleteAgent })
+    );
+
+    expect(response.status).toBe(500);
+    expect(deleteAgent).toHaveBeenCalledTimes(1);
+  });
+
+  it('still auto-retries reads (listAgents) on a retryable DO error', async () => {
+    vi.useFakeTimers();
+    try {
+      const listAgents = vi
+        .fn()
+        .mockRejectedValueOnce(retryableError('DO transient'))
+        .mockResolvedValueOnce({ etag: 'e1', defaults: DEFAULTS_SUMMARY, agents: [] });
+
+      const requestPromise = platform.request('/agents?userId=user-1', {}, baseEnv({ listAgents }));
+      await vi.runAllTimersAsync();
+      const response = await requestPromise;
+
+      expect(response.status).toBe(200);
+      expect(listAgents).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

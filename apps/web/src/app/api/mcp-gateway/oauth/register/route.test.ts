@@ -1,7 +1,11 @@
 import { describe, expect, jest, test } from '@jest/globals';
 import { NextRequest } from 'next/server';
+import type { GatewayOAuthClientRegistration } from '@/lib/mcp-gateway/oauth-client-service';
 
-const mockRegisterClient = jest.fn();
+const mockRegisterClient =
+  jest.fn<
+    (input: { metadata: unknown; headers: Headers }) => Promise<GatewayOAuthClientRegistration>
+  >();
 
 jest.mock('@/lib/mcp-gateway/services', () => ({
   createGatewayServices: () => ({

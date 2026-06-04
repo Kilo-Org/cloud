@@ -158,12 +158,12 @@ describe('detectContextOverflow', () => {
   });
 
   it('triggers on a generic 500 when our estimate exceeds the window', async () => {
-    // minimax_m25_free_model has context_length 204_800 and max_completion_tokens 131_072.
-    // Provide enough text so the estimate (text/4 + max_tokens) exceeds the window.
+    // MiniMax M3 has context_length 524_288 and max_completion_tokens 512_000.
+    // This request estimates to more than 612_000 tokens, exceeding the context window.
     const hugeRequest = chatRequest({
       model: minimax_m3_discounted_model.public_id,
       messages: [{ role: 'user', content: 'x'.repeat(400_000) }],
-      max_tokens: 131_072,
+      max_tokens: 512_000,
     });
 
     const result = await detectContextOverflow({

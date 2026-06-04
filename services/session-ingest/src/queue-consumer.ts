@@ -289,6 +289,7 @@ function createIngestChunker(
   const { r2Key, kiloUserId, sessionId, ingestVersion, ingestedAt } = msg;
   const encoder = new TextEncoder();
   const chunk: SessionDataItem[] = [];
+  const chunkItemIds = new Set<string>();
   let chunkR2References: Record<string, string> = {};
   let chunkBytes = 0;
 
@@ -296,6 +297,7 @@ function createIngestChunker(
     if (chunk.length === 0) return;
     const items = chunk.splice(0);
     const r2References = Object.keys(chunkR2References).length > 0 ? chunkR2References : undefined;
+    chunkItemIds.clear();
     chunkR2References = {};
     chunkBytes = 0;
 
@@ -323,10 +325,15 @@ function createIngestChunker(
     const item = parsed.data;
     const { item_id } = getItemIdentity(item);
 
-    // Offload data above the DO SQLite row limit to R2; the DO stores a
-    // reference and an empty inline blob.
     const itemDataJson = JSON.stringify(item.data);
     const itemDataBytes = encoder.encode(itemDataJson).byteLength;
+
+    if (chunkItemIds.has(item_id)) {
+      await flushChunkToSessionDO();
+    }
+
+    // Offload data above the DO SQLite row limit to R2; the DO stores a
+    // reference and an empty inline blob.
     if (itemDataBytes > MAX_INGEST_ITEM_BYTES) {
       const itemR2Key = `items/${kiloUserId}/${sessionId}/${item_id}/${ingestedAt}`;
       await env.SESSION_INGEST_R2.put(itemR2Key, itemDataJson);
@@ -334,6 +341,7 @@ function createIngestChunker(
     }
 
     chunk.push(item);
+    chunkItemIds.add(item_id);
     chunkBytes += itemDataBytes;
     if (chunk.length >= INGEST_CHUNK_MAX_ITEMS || chunkBytes >= INGEST_CHUNK_MAX_BYTES) {
       await flushChunkToSessionDO();

@@ -247,6 +247,78 @@ describe('queue', () => {
     expect(retry).not.toHaveBeenCalled();
   });
 
+  it('splits duplicate item identities so inline updates do not reuse prior R2 refs', async () => {
+    const ingest = vi.fn(async () => ({ changes: [] }));
+    vi.mocked(getSessionIngestDO).mockReturnValue({ ingest } as never);
+    const limit = vi.fn(async () => [{ session_id: 'ses_duplicate' }]);
+    const where = vi.fn(() => ({ limit }));
+    const from = vi.fn(() => ({ where }));
+    vi.mocked(getWorkerDb).mockReturnValue({ select: vi.fn(() => ({ from })) } as never);
+
+    const oversizedData = { id: 'msg_same', content: 'x'.repeat(150) };
+    const inlineData = { id: 'msg_same', content: 'small' };
+    const oversizedItem = { type: 'message', data: oversizedData };
+    const inlineItem = { type: 'message', data: inlineData };
+    const body = JSON.stringify({ data: [oversizedItem, inlineItem] });
+    const put = vi.fn(async () => undefined);
+    const deleteObject = vi.fn(async () => undefined);
+    const env = {
+      HYPERDRIVE: { connectionString: 'postgres://unused' },
+      SESSION_INGEST_R2: {
+        get: vi.fn(async () => new Response(body)),
+        put,
+        delete: deleteObject,
+      },
+    } as never;
+    const ack = vi.fn();
+    const retry = vi.fn();
+
+    await queue(
+      {
+        messages: [
+          {
+            body: {
+              r2Key: 'staging/duplicate',
+              kiloUserId: 'usr_duplicate',
+              sessionId: 'ses_duplicate',
+              ingestVersion: 1,
+              ingestedAt: 1,
+            },
+            ack,
+            retry,
+          },
+        ],
+      } as never,
+      env,
+      { waitUntil: vi.fn() } as unknown as ExecutionContext
+    );
+
+    const expectedR2Key = 'items/usr_duplicate/ses_duplicate/message/msg_same/1';
+    expect(put).toHaveBeenCalledWith(expectedR2Key, JSON.stringify(oversizedData));
+    expect(ingest).toHaveBeenCalledTimes(2);
+    expect(ingest).toHaveBeenNthCalledWith(
+      1,
+      [oversizedItem],
+      'usr_duplicate',
+      'ses_duplicate',
+      1,
+      1,
+      { 'message/msg_same': expectedR2Key }
+    );
+    expect(ingest).toHaveBeenNthCalledWith(
+      2,
+      [inlineItem],
+      'usr_duplicate',
+      'ses_duplicate',
+      1,
+      1,
+      undefined
+    );
+    expect(deleteObject).toHaveBeenCalledWith('staging/duplicate');
+    expect(ack).toHaveBeenCalledTimes(1);
+    expect(retry).not.toHaveBeenCalled();
+  });
+
   it('batches all items in a message into a single DO ingest call', async () => {
     const ingest = vi.fn(async () => ({ changes: [] }));
     vi.mocked(getSessionIngestDO).mockReturnValue({ ingest } as never);

@@ -10,7 +10,7 @@ official `anchore/sbom-action`. SBOMs are **never committed** to the repo.
 ## What we generate, where it lives, and when
 
 | Target | Tooling | When | Stored as |
-| --- | --- | --- | --- |
+|---|---|---|---|
 | **Source dependency tree** (repo-wide pnpm graph) | `.github/workflows/sbom.yml` | push to `main`, weekly cron, manual dispatch | Retained CI **workflow artifact** (`cloud-sbom-<sha>`) |
 | **KiloClaw container image** (OS packages + Go + Node + OpenClaw + npm) | `.github/workflows/deploy-kiloclaw.yml` | at image **build time** (only when content changes) | Signed **attestation in GHCR**, bound to the image digest |
 

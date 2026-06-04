@@ -1,6 +1,6 @@
-import { evaluateQueueBacklog, type QueueBacklogMetrics } from './queue-backlog';
+import { type QueueBacklogMetrics, QUEUE_BACKLOG_THRESHOLDS } from './queue-backlog';
+import { evaluateAndUpdateQueueBacklogState } from './queue-backlog-state';
 import { queryQueueBacklog } from './queue-backlog-query';
-import { shouldSuppress, recordAlertFired } from './dedup';
 import { sendAlertNotification, type AlertPayload } from './notify';
 
 type QueueBacklogEnv = {
@@ -22,42 +22,30 @@ export async function evaluateQueueBacklogAlert(
   queryFn: QueryFn = queryQueueBacklog,
   notifyFn: NotifyFn = sendAlertNotification
 ): Promise<void> {
-  const alert = evaluateQueueBacklog(await queryFn(env));
-  if (alert === null) return;
+  const metrics = await queryFn(env);
 
-  const provider = 'cloudflare';
-  const clientName = 'queues';
-  const suppressed = await shouldSuppress(
+  const severity = await evaluateAndUpdateQueueBacklogState(
     env.O11Y_ALERT_STATE,
-    alert.severity,
-    'queue_backlog',
-    provider,
-    alert.queueId,
-    clientName
+    metrics.backlogCount
   );
-  if (suppressed) return;
+
+  if (severity === null) return;
+
+  const thresholdCount =
+    severity === 'page' ? QUEUE_BACKLOG_THRESHOLDS.page : QUEUE_BACKLOG_THRESHOLDS.ticket;
 
   await notifyFn(
     {
       alertType: 'queue_backlog',
-      severity: alert.severity,
-      provider,
-      model: alert.queueId,
-      clientName,
-      backlogCount: alert.backlogCount,
-      backlogBytes: alert.backlogBytes,
-      thresholdCount: alert.thresholdCount,
-      oldestMessageTimestamp: alert.oldestMessageTimestamp,
+      severity,
+      provider: 'cloudflare',
+      model: metrics.queueId,
+      clientName: 'queues',
+      backlogCount: metrics.backlogCount,
+      backlogBytes: metrics.backlogBytes,
+      thresholdCount,
+      oldestMessageTimestamp: metrics.oldestMessageTimestamp,
     },
     env
-  );
-
-  await recordAlertFired(
-    env.O11Y_ALERT_STATE,
-    alert.severity,
-    'queue_backlog',
-    provider,
-    alert.queueId,
-    clientName
   );
 }

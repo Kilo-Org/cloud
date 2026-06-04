@@ -204,7 +204,9 @@ export async function cancelAndRefundKiloPassForUser({
         organization_id: null,
         is_free: true,
         amount_microdollars: -currentBalanceMicrodollars,
-        credit_category: 'admin-cancel-refund-kilo-pass',
+        credit_category: refundLatestPayment
+          ? 'admin-cancel-refund-kilo-pass'
+          : 'admin-cancel-kilo-pass-no-refund',
         description: `Balance zeroed by admin: ${reason}`,
         original_baseline_microdollars_used: freshUser.microdollars_used,
       });

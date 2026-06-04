@@ -360,6 +360,12 @@ describe('admin.kiloPass.cancelAndRefundKiloPassBulk', () => {
     expect(userRow?.blocked_reason).toBe('policy');
     expect(userRow?.blocked_by_kilo_user_id).toBe(adminUser.id);
 
+    const txnRows = await db.query.credit_transactions.findMany({
+      where: eq(credit_transactions.kilo_user_id, target.id),
+    });
+    expect(txnRows).toHaveLength(1);
+    expect(txnRows[0].credit_category).toBe('admin-cancel-kilo-pass-no-refund');
+
     const noteRows = await db.query.user_admin_notes.findMany({
       where: eq(user_admin_notes.kilo_user_id, target.id),
     });

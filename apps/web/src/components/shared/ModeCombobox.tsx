@@ -14,7 +14,6 @@ import {
 } from '@/components/ui/command';
 import { ChevronsUpDown, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Badge } from '@/components/ui/badge';
 
 /**
  * Mode option type for customizable mode lists.
@@ -221,12 +220,16 @@ function ModeComboboxGroups<T extends string>({
       className="flex items-center gap-2"
     >
       <div className="flex min-w-0 flex-1 flex-col">
-        <div className="flex items-center gap-2">
-          <span className="truncate">{mode.label}</span>
-          {mode.deprecated && <Badge variant="warning">Deprecated</Badge>}
-        </div>
-        {mode.description && (
-          <span className="text-muted-foreground truncate text-xs">{mode.description}</span>
+        <span className="truncate">{mode.label}</span>
+        {(mode.deprecated || mode.description) && (
+          <span
+            className={cn(
+              'truncate text-xs',
+              mode.deprecated ? 'text-amber-400/80' : 'text-muted-foreground'
+            )}
+          >
+            {mode.deprecated ? 'Deprecated' : mode.description}
+          </span>
         )}
       </div>
       <Check

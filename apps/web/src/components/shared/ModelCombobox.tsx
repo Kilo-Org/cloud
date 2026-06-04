@@ -13,7 +13,7 @@ import {
   CommandItem,
   CommandList,
 } from '@/components/ui/command';
-import { BrainCircuit, ChevronsUpDown, Check, Image } from 'lucide-react';
+import { BookOpenCheck, ChevronsUpDown, Check, Image } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { preferredModels } from '@/lib/ai-gateway/models';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -450,7 +450,7 @@ function FreeModelDataIcon() {
           role="img"
           tabIndex={0}
         >
-          <BrainCircuit className="h-3.5 w-3.5" />
+          <BookOpenCheck className="h-3.5 w-3.5" />
         </span>
       </TooltipTrigger>
       <TooltipContent>{getFreeModelDataTooltip()}</TooltipContent>
@@ -472,7 +472,7 @@ function FreeModelDataBadge() {
             role="img"
             tabIndex={0}
           >
-            <BrainCircuit className="h-3 w-3" />
+            <BookOpenCheck className="h-3 w-3" />
           </span>
         </TooltipTrigger>
         <TooltipContent>{getFreeModelDataTooltip()}</TooltipContent>

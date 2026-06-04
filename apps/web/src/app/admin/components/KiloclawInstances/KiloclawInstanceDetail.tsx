@@ -2767,12 +2767,12 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                       provisioning provider:
                       <ol className="mt-1 list-decimal space-y-0.5 pl-5 text-xs">
                         <li>
-                          Fly: run orphan-volume-scan for this instanceId and confirm the app
-                          (<code>inst-…</code>) has no machines or volumes, or is deleted.
+                          Fly: run orphan-volume-scan for this instanceId and confirm the app (
+                          <code>inst-…</code>) has no machines or volumes, or is deleted.
                         </li>
                         <li>
-                          Northflank: confirm the project (<code>kc-ki-…</code>) and its services and
-                          volumes no longer exist in the Northflank console.
+                          Northflank: confirm the project (<code>kc-ki-…</code>) and its services
+                          and volumes no longer exist in the Northflank console.
                         </li>
                       </ol>
                     </li>

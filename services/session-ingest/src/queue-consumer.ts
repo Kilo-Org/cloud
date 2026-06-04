@@ -245,12 +245,12 @@ async function ingestStagedSessionItems(
   const chunker = createIngestChunker(env, msg, mergedChanges);
   const parseError = await streamSessionItems(msg.r2Key, body, rawItem => chunker.stage(rawItem));
 
-  // Handle any remaining items not flushed yet.
-  await chunker.flushChunkToSessionDO();
-
   if (parseError) {
     throw new Error(`Malformed JSON in staging object ${msg.r2Key}: ${parseError.message}`);
   }
+
+  // Handle any remaining items not flushed yet.
+  await chunker.flushChunkToSessionDO();
 }
 
 async function streamSessionItems(
@@ -287,6 +287,7 @@ function createIngestChunker(
   mergedChanges: Map<string, string | null>
 ) {
   const { r2Key, kiloUserId, sessionId, ingestVersion, ingestedAt } = msg;
+  const encoder = new TextEncoder();
   const chunk: SessionDataItem[] = [];
   let chunkR2References: Record<string, string> = {};
   let chunkBytes = 0;
@@ -325,7 +326,7 @@ function createIngestChunker(
     // Offload data above the DO SQLite row limit to R2; the DO stores a
     // reference and an empty inline blob.
     const itemDataJson = JSON.stringify(item.data);
-    const itemDataBytes = new TextEncoder().encode(itemDataJson).byteLength;
+    const itemDataBytes = encoder.encode(itemDataJson).byteLength;
     if (itemDataBytes > MAX_INGEST_ITEM_BYTES) {
       const itemR2Key = `items/${kiloUserId}/${sessionId}/${item_id}/${ingestedAt}`;
       await env.SESSION_INGEST_R2.put(itemR2Key, itemDataJson);

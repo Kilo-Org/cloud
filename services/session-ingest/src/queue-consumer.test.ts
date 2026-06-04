@@ -427,6 +427,57 @@ describe('queue', () => {
     expect(deleteObject).not.toHaveBeenCalled();
   });
 
+  it('does not flush buffered items when malformed JSON forces a retry', async () => {
+    const ingest = vi.fn(async () => ({ changes: [] }));
+    vi.mocked(getSessionIngestDO).mockReturnValue({ ingest } as never);
+
+    const transaction = vi.fn(async () => null);
+    const limit = vi.fn(async () => [{ session_id: 'ses_malformed' }]);
+    const where = vi.fn(() => ({ limit }));
+    const from = vi.fn(() => ({ where }));
+    const select = vi.fn(() => ({ from }));
+    vi.mocked(getWorkerDb).mockReturnValue({ select, transaction } as never);
+
+    const body = '{"data":[{"type":"message","data":{"id":"msg_1"}},broken';
+    const deleteObject = vi.fn(async () => undefined);
+    const env = {
+      HYPERDRIVE: { connectionString: 'postgres://unused' },
+      SESSION_INGEST_R2: {
+        get: vi.fn(async () => new Response(body)),
+        put: vi.fn(async () => undefined),
+        delete: deleteObject,
+      },
+    } as never;
+    const ack = vi.fn();
+    const retry = vi.fn();
+
+    await queue(
+      {
+        messages: [
+          {
+            body: {
+              r2Key: 'staging/malformed',
+              kiloUserId: 'usr_malformed',
+              sessionId: 'ses_malformed',
+              ingestVersion: 1,
+              ingestedAt: 1,
+            },
+            ack,
+            retry,
+          },
+        ],
+      } as never,
+      env,
+      { waitUntil: vi.fn() } as unknown as ExecutionContext
+    );
+
+    expect(ingest).not.toHaveBeenCalled();
+    expect(transaction).not.toHaveBeenCalled();
+    expect(retry).toHaveBeenCalledWith({ delaySeconds: QUEUE_RETRY_DELAY_SECONDS });
+    expect(ack).not.toHaveBeenCalled();
+    expect(deleteObject).not.toHaveBeenCalled();
+  });
+
   it('flushes already-committed metadata changes when a later chunk fails', async () => {
     // First chunk (128 items) commits and reports a metadata change; the second
     // chunk's ingest fails. The committed change must reach Postgres before the

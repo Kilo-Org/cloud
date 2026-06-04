@@ -47,7 +47,7 @@ async function assertOk(resp: Response, context: string): Promise<void> {
 }
 
 function isRetryableSecretStatus(status: number): boolean {
-  return status === 408 || status === 429 || status >= 500;
+  return status === 408 || status === 429 || [500, 502, 503, 504, 520].includes(status);
 }
 
 function sleep(ms: number): Promise<void> {

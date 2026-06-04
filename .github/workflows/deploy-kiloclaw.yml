@@ -25,7 +25,12 @@ jobs:
       image-tag: ${{ steps.image-hash.outputs.tag }}
       image-hash: ${{ steps.image-hash.outputs.hash }}
       image-digest: ${{ steps.image-digest.outputs.digest }}
-      image-built: ${{ steps.check-image.outputs.exists != 'true' }}
+      # True only when the build step actually ran and succeeded (it is skipped
+      # when the content-hash tag already exists). Keyed off the step outcome
+      # rather than the pre-build registry check so a failed build never reports
+      # as "built". `outcome` (not `conclusion`) stays correct if a future
+      # continue-on-error is added to the build step.
+      image-built: ${{ steps.docker-build.outcome == 'success' }}
       openclaw-version: ${{ steps.openclaw-version.outputs.version }}
 
     steps:

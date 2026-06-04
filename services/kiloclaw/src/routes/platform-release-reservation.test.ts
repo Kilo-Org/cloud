@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { platform } from './platform';
-import { getActivePersonalInstance } from '../db';
+import { getActivePersonalInstance, getActiveOrganizationInstance } from '../db';
 import type * as DbModule from '../db';
 
 vi.mock('cloudflare:workers', () => ({
@@ -14,11 +14,13 @@ vi.mock('../db', async () => {
     ...actual,
     getWorkerDb: vi.fn(() => ({})),
     getActivePersonalInstance: vi.fn(),
+    getActiveOrganizationInstance: vi.fn(),
   };
 });
 
 const USER_ID = 'user-1';
 const INSTANCE_ID = '0ef67a15-64d5-450e-a128-df0f22969ac9';
+const ORG_ID = '11111111-2222-4333-8444-555555555555';
 
 type Reservation = { instanceId: string; status: string };
 
@@ -57,6 +59,7 @@ function releaseInit(body?: Record<string, unknown>) {
 
 beforeEach(() => {
   vi.mocked(getActivePersonalInstance).mockReset().mockResolvedValue(null);
+  vi.mocked(getActiveOrganizationInstance).mockReset().mockResolvedValue(null);
   vi.spyOn(console, 'error').mockImplementation(() => undefined);
 });
 
@@ -98,6 +101,55 @@ describe('POST /provision/release-reservation', () => {
     expect(res.status).toBe(409);
     expect(((await res.json()) as { code?: string }).code).toBe('reservation_active');
     expect(adminReleaseStuckReservation).not.toHaveBeenCalled();
+  });
+
+  it('refuses an org-context reservation backing a live active org instance', async () => {
+    vi.mocked(getActiveOrganizationInstance).mockResolvedValue({ id: INSTANCE_ID } as never);
+    const { env, adminReleaseStuckReservation } = makeEnv();
+
+    const res = await platform.request(
+      '/provision/release-reservation',
+      releaseInit({
+        userId: USER_ID,
+        instanceId: INSTANCE_ID,
+        orgId: ORG_ID,
+        acknowledgeCleanupVerified: true,
+      }),
+      env
+    );
+    expect(res.status).toBe(409);
+    expect(((await res.json()) as { code?: string }).code).toBe('reservation_active');
+    // The org path must use the org lookup, not the personal one.
+    expect(getActiveOrganizationInstance).toHaveBeenCalled();
+    expect(getActivePersonalInstance).not.toHaveBeenCalled();
+    expect(adminReleaseStuckReservation).not.toHaveBeenCalled();
+  });
+
+  it('releases an org-context reservation', async () => {
+    const { env, adminReleaseStuckReservation } = makeEnv({
+      reservations: [{ instanceId: INSTANCE_ID, status: 'failed_requires_reconciliation' }],
+      releaseResult: { outcome: 'released', previousStatus: 'failed_requires_reconciliation' },
+    });
+
+    const res = await platform.request(
+      '/provision/release-reservation',
+      releaseInit({
+        userId: USER_ID,
+        instanceId: INSTANCE_ID,
+        orgId: ORG_ID,
+        acknowledgeCleanupVerified: true,
+      }),
+      env
+    );
+    expect(res.status).toBe(200);
+    expect(getActiveOrganizationInstance).toHaveBeenCalled();
+    expect(adminReleaseStuckReservation).toHaveBeenCalledWith(
+      expect.any(String),
+      USER_ID,
+      INSTANCE_ID,
+      'failed_requires_reconciliation',
+      'manual_admin_release'
+    );
   });
 
   it('returns 404 when no reservation exists for the instance', async () => {

@@ -246,25 +246,6 @@ export class SessionIngestDO extends DurableObject<Env> {
       }
     }
 
-    const changes: Changes = [];
-
-    for (const key of Object.keys(incomingByKey) as ExtractableMetaKey[]) {
-      const incoming = incomingByKey[key];
-      if (incoming === undefined) continue;
-      const meta = writeIngestMetaIfChanged(this.db, {
-        key,
-        incomingValue: incoming,
-      });
-      if (meta.changed) {
-        changes.push({ name: key, value: meta.value });
-      }
-    }
-
-    // Clean up orphaned R2 blobs (e.g. replaced or stale oversized items)
-    if (orphanedR2Keys.length > 0) {
-      await this.env.SESSION_INGEST_R2.delete(orphanedR2Keys);
-    }
-
     if (ingestVersion >= 1) {
       // v1 clients send explicit open/close pairs. Only those events drive alarms.
       for (const event of lifecycleEvents) {
@@ -287,6 +268,35 @@ export class SessionIngestDO extends DurableObject<Env> {
     } else {
       // v0 (legacy): no open/close signals, rely on inactivity timeout.
       await this.ctx.storage.setAlarm(Date.now() + INACTIVITY_TIMEOUT_MS);
+    }
+
+    const changes: Changes = [];
+    for (const key of Object.keys(incomingByKey) as ExtractableMetaKey[]) {
+      const incoming = incomingByKey[key];
+      if (incoming === undefined) continue;
+      const meta = writeIngestMetaIfChanged(this.db, {
+        key,
+        incomingValue: incoming,
+      });
+      if (meta.changed) {
+        changes.push({ name: key, value: meta.value });
+      }
+    }
+
+    // Clean up orphaned R2 blobs after metadata is persisted. R2 is external I/O,
+    // so awaiting it before metadata writes can let another DO request interleave
+    // and then be overwritten by stale pre-await metadata from this request.
+    if (orphanedR2Keys.length > 0) {
+      this.ctx.waitUntil(
+        this.env.SESSION_INGEST_R2.delete(orphanedR2Keys).catch(error => {
+          console.error('Failed to delete orphaned session-ingest R2 blobs', {
+            kiloUserId,
+            sessionId,
+            count: orphanedR2Keys.length,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        })
+      );
     }
 
     return {

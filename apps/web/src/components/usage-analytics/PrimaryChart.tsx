@@ -13,7 +13,8 @@ import { isDateOnlyString } from '@/lib/utils';
 import { OTHER_COLOR, colorForIndex as paletteColorForIndex } from './colors';
 import { formatMetric } from './format';
 import {
-  METRIC_LABELS,
+  metricLabelForCostSource,
+  type CostSource,
   type Granularity,
   type MetricKey,
   type PeriodOption,
@@ -25,6 +26,7 @@ const OTHER_KEY = '__other__';
 
 type PrimaryChartProps = {
   metric: MetricKey;
+  costSource: CostSource;
   data: UsageTimeseries | undefined;
   loading: boolean;
   splitByLabel?: string;
@@ -41,6 +43,7 @@ type PrimaryChartProps = {
 
 export function PrimaryChart({
   metric,
+  costSource,
   data,
   loading,
   splitByLabel,
@@ -120,7 +123,7 @@ export function PrimaryChart({
   };
 
   const labelForKey = (key: string) => {
-    if (key === 'value') return METRIC_LABELS[metric];
+    if (key === 'value') return metricLabelForCostSource(metric, costSource);
     if (key === OTHER_KEY) return `Other (${otherCount})`;
     const resolved = seriesLabelFor ? seriesLabelFor(key) : key;
     return resolved || '—';

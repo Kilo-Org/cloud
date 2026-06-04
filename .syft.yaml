@@ -1,0 +1,15 @@
+# syft configuration — keeps local `syft scan dir:.` runs consistent with CI.
+# In CI (a fresh checkout) node_modules/.next/dist don't exist, so these
+# excludes are no-ops there; they matter when generating an SBOM locally where
+# an installed tree would otherwise add filesystem-duplicate noise.
+#
+# Source SBOMs are built from pnpm-lock.yaml (the resolved dependency tree),
+# not from a walk of node_modules.
+exclude:
+  - ./node_modules/**
+  - ./**/node_modules/**
+  - ./.next/**
+  - ./**/.next/**
+  - ./**/dist/**
+  - ./.wrangler/**
+  - ./**/.wrangler/**

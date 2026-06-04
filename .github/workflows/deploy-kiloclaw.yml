@@ -7,6 +7,8 @@ on:
 permissions:
   contents: read
   packages: write
+  id-token: write # required by actions/attest-sbom for OIDC signing
+  attestations: write # required by actions/attest-sbom to write the attestation
 
 jobs:
   deploy:
@@ -203,6 +205,31 @@ jobs:
           else
             echo "digest=" >> "$GITHUB_OUTPUT"
           fi
+
+      # ── Generate + attest image SBOM ────────────────────────────
+      # Runs only when a NEW image was built. The content-hash skip path
+      # leaves the prior attestation in place (identical content → identical
+      # digest), so we avoid pulling a large unchanged image on no-op deploys.
+      # syft scans the GHCR image by digest (runner is already logged in);
+      # attest-sbom binds a signed SBOM to that digest, stored in GHCR.
+      - name: Generate image SBOM
+        if: steps.check-image.outputs.exists != 'true'
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
+        with:
+          image: ghcr.io/kilo-org/kiloclaw@${{ steps.image-digest.outputs.digest }}
+          format: cyclonedx-json
+          output-file: kiloclaw-sbom.cyclonedx.json
+          upload-artifact: true
+          artifact-name: kiloclaw-sbom-${{ steps.image-hash.outputs.tag }}
+
+      - name: Attest image SBOM
+        if: steps.check-image.outputs.exists != 'true'
+        uses: actions/attest-sbom@c604332985a26aa8cf1bdc465b92731239ec6b9e # v4.1.0
+        with:
+          subject-name: ghcr.io/kilo-org/kiloclaw
+          subject-digest: ${{ steps.image-digest.outputs.digest }}
+          sbom-path: kiloclaw-sbom.cyclonedx.json
+          push-to-registry: true
 
       # ── Extract OpenClaw version ────────────────────────────────
       - name: Extract OpenClaw version

@@ -28,6 +28,7 @@ const RETRYABLE_CODES: readonly RetryableResultCode[] = [
   'WORKSPACE_SETUP_FAILED',
   'KILO_SERVER_FAILED',
   'WRAPPER_START_FAILED',
+  'WRAPPER_FINALIZING',
 ] as const;
 
 function isRetryableCode(code: string): code is RetryableResultCode {

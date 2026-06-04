@@ -10,6 +10,7 @@ import {
   markMessageInterrupted,
   terminalizeMessageOnce,
   listNonTerminalAcceptedMessages,
+  listMessagesForWrapperRun,
   listMessagesWithPendingCallbacks,
   isTerminalMessageState,
   type SessionMessageState,
@@ -19,10 +20,13 @@ import type { SessionMessageIntent } from '../execution/types.js';
 
 function createFakeStorage(): SessionMessageStorage & {
   store: Map<string, unknown>;
+  listPrefixes: string[];
 } {
   const store = new Map<string, unknown>();
+  const listPrefixes: string[] = [];
   return {
     store,
+    listPrefixes,
     async get<T = unknown>(key: string): Promise<T | undefined> {
       return store.get(key) as T | undefined;
     },
@@ -30,6 +34,7 @@ function createFakeStorage(): SessionMessageStorage & {
       store.set(key, value);
     },
     async list<T = unknown>(options: { prefix: string }): Promise<Map<string, T>> {
+      listPrefixes.push(options.prefix);
       const result = new Map<string, T>();
       for (const [key, value] of store.entries()) {
         if (key.startsWith(options.prefix)) {
@@ -610,6 +615,134 @@ describe('listNonTerminalAcceptedMessages', () => {
 
     const accepted = await listNonTerminalAcceptedMessages(storage);
     expect(accepted).toHaveLength(0);
+  });
+});
+
+describe('listMessagesForWrapperRun', () => {
+  it('lists accepted and terminal messages fenced to the wrapper run', async () => {
+    const storage = createFakeStorage();
+    const acceptedId = 'msg_0123456789abAAAAAAAAAAAAAA';
+    const completedId = 'msg_0123456789abBBBBBBBBBBBBBB';
+    const failedId = 'msg_0123456789abCCCCCCCCCCCCCC';
+    const queuedId = 'msg_0123456789abDDDDDDDDDDDDDD';
+    const otherRunId = 'msg_0123456789abEEEEEEEEEEEEEE';
+
+    for (const [messageId, status, wrapperRunId] of [
+      [acceptedId, 'accepted', 'wr_run1'],
+      [completedId, 'completed', 'wr_run1'],
+      [failedId, 'failed', 'wr_run1'],
+      [queuedId, 'queued', undefined],
+      [otherRunId, 'completed', 'wr_run2'],
+    ] as const) {
+      await putSessionMessageState(storage, {
+        ...createQueuedSessionMessageState(createIntent(messageId, messageId), undefined, 1000),
+        status,
+        acceptedAt: status === 'queued' ? undefined : 2000,
+        terminalAt: status === 'accepted' || status === 'queued' ? undefined : 3000,
+        wrapperRunId,
+      });
+    }
+
+    const messages = await listMessagesForWrapperRun(storage, 'wr_run1');
+
+    expect(messages.map(message => message.messageId)).toEqual([acceptedId, completedId, failedId]);
+    expect(storage.listPrefixes).toContain('session_message:');
+  });
+
+  it('falls back to history after an older writer drops the live run index version', async () => {
+    const storage = createFakeStorage();
+    const legacyId = 'msg_0123456789abAAAAAAAAAAAAAA';
+    const indexedId = 'msg_0123456789abBBBBBBBBBBBBBB';
+
+    await storage.put('wrapper_runtime_state', {
+      wrapperGeneration: 1,
+      wrapperConnectionId: 'conn_live',
+      wrapperRunId: 'wr_live',
+      messageIndexVersion: 1,
+    });
+    await putSessionMessageState(storage, {
+      ...createQueuedSessionMessageState(createIntent(indexedId, 'indexed'), undefined, 1000),
+      status: 'accepted',
+      acceptedAt: 2000,
+      wrapperRunId: 'wr_live',
+    });
+    await storage.put('wrapper_runtime_state', {
+      wrapperGeneration: 1,
+      wrapperConnectionId: 'conn_live',
+      wrapperRunId: 'wr_live',
+    });
+    await storage.put(`session_message:${legacyId}`, {
+      ...createQueuedSessionMessageState(createIntent(legacyId, 'legacy'), undefined, 1000),
+      status: 'accepted',
+      acceptedAt: 2000,
+      wrapperRunId: 'wr_live',
+    });
+
+    const messages = await listMessagesForWrapperRun(storage, 'wr_live');
+
+    expect(messages.map(message => message.messageId).sort()).toEqual([legacyId, indexedId]);
+    expect(storage.listPrefixes).toContain('session_message:');
+  });
+
+  it('reads only an initialized wrapper run index and preserves accepted filtering', async () => {
+    const storage = createFakeStorage();
+    const acceptedId = 'msg_0123456789abAAAAAAAAAAAAAA';
+    const completedId = 'msg_0123456789abBBBBBBBBBBBBBB';
+    const historicalId = 'msg_0123456789abCCCCCCCCCCCCCC';
+    await storage.put('wrapper_runtime_state', {
+      wrapperGeneration: 1,
+      wrapperConnectionId: 'conn_current',
+      wrapperRunId: 'wr_current',
+      messageIndexVersion: 1,
+    });
+
+    for (const [messageId, status, wrapperRunId] of [
+      [acceptedId, 'accepted', 'wr_current'],
+      [completedId, 'completed', 'wr_current'],
+      [historicalId, 'completed', 'wr_historical'],
+    ] as const) {
+      await putSessionMessageState(storage, {
+        ...createQueuedSessionMessageState(createIntent(messageId, messageId), undefined, 1000),
+        status,
+        acceptedAt: 2000,
+        terminalAt: status === 'completed' ? 3000 : undefined,
+        wrapperRunId,
+      });
+    }
+    storage.listPrefixes.length = 0;
+
+    await expect(listNonTerminalAcceptedMessages(storage, 'wr_current')).resolves.toMatchObject([
+      { messageId: acceptedId, status: 'accepted' },
+    ]);
+    expect(storage.listPrefixes).toEqual(['session_message_wrapper_run:wr_current:']);
+  });
+
+  it('does not expose an indexed member whose primary state write failed', async () => {
+    const storage = createFakeStorage();
+    const messageId = 'msg_0123456789abAAAAAAAAAAAAAA';
+    await storage.put('wrapper_runtime_state', {
+      wrapperGeneration: 1,
+      wrapperConnectionId: 'conn_current',
+      wrapperRunId: 'wr_current',
+      messageIndexVersion: 1,
+    });
+    const put = storage.put.bind(storage);
+    storage.put = async (key, value) => {
+      if (key === `session_message:${messageId}`) throw new Error('primary write failed');
+      await put(key, value);
+    };
+
+    await expect(
+      putSessionMessageState(storage, {
+        ...createQueuedSessionMessageState(createIntent(messageId, 'message'), undefined, 1000),
+        status: 'accepted',
+        acceptedAt: 2000,
+        wrapperRunId: 'wr_current',
+      })
+    ).rejects.toThrow('primary write failed');
+    storage.put = put;
+
+    await expect(listMessagesForWrapperRun(storage, 'wr_current')).resolves.toEqual([]);
   });
 });
 

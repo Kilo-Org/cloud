@@ -5,7 +5,7 @@ import type { SlashCommandInfo } from './slash-commands.js';
  *
  * From wrapper -> DO:
  *   started, kilocode, output, status, heartbeat, pong, error, interrupted, complete, wrapper_resumed,
- *   autocommit_started, autocommit_completed, cloud.message.completed
+ *   wrapper_finalizing, autocommit_started, autocommit_completed, cloud.message.completed
  *
  * From DO -> /stream clients:
  *   All of the above, plus wrapper_disconnected, wrapper_reconnected, preparing,
@@ -21,7 +21,8 @@ export type StreamEventType =
   | 'pong' // Response to ping command from DO
   | 'error' // Error occurred { error: string, fatal: boolean }
   | 'interrupted' // User/signal interrupt
-  | 'complete' // Execution finished { exitCode, currentBranch? }
+  | 'complete' // Execution finished { exitCode, currentBranch?, messageIds }
+  | 'wrapper_finalizing' // Wrapper sealed the current run batch before post-processing
   | 'wrapper_resumed' // Wrapper reconnected after disconnect (may have lost events)
   | 'autocommit_started' // Auto-commit process began
   | 'autocommit_completed' // Auto-commit finished (success, skip, or failure)
@@ -65,6 +66,7 @@ export type CompleteEventData = {
   exitCode: number;
   currentBranch?: string; // Omitted if detached HEAD
   gateResult?: 'pass' | 'fail';
+  messageIds?: string[];
 };
 
 /**

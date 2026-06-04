@@ -260,7 +260,8 @@ async function main() {
     closeConnection: () => connectionManager?.close() ?? Promise.resolve(),
     setAborted: () => lifecycleManager?.setAborted(),
     resetLifecycle: () => lifecycleManager?.reset(),
-    onMessageComplete: (messageId: string) => lifecycleManager?.onMessageComplete(messageId),
+    onDeliveryAcknowledged: (kind: 'async-prompt' | 'sync-command' | 'failed') =>
+      lifecycleManager?.onDeliveryAcknowledged(kind),
     readySession: readySession,
     updateRuntimeEnvironment: updateRuntimeEnvironment,
     materializePromptAttachments,
@@ -392,9 +393,6 @@ async function main() {
       state,
       { kiloClient: nextKiloClient },
       {
-        onMessageComplete: (messageId: string) => {
-          lifecycleManager?.onMessageComplete(messageId);
-        },
         onTerminalError: (reason: string) => {
           logToFile(`terminal error: ${reason}`);
           state.sendToIngest({
@@ -455,7 +453,6 @@ async function main() {
             nextKiloClient.abortSession({ sessionId: targetSessionId }).catch(() => {});
           }
           lifecycleManager?.setAborted();
-          state.setActive(false);
           lifecycleManager?.triggerDrainAndClose();
         },
         onCompletionSignal: () => {
@@ -517,10 +514,6 @@ async function main() {
       `session/ready received agentSessionId=${request.agentSessionId} kiloSessionId=${request.kiloSessionId} preferSnapshot=${request.workspace.preferSnapshot} workspacePath=${request.workspace.workspacePath} sessionHome=${request.workspace.sessionHome} branchName=${request.workspace.branchName} strictBranch=${request.workspace.strictBranch ?? false} repoKind=${request.repo?.kind ?? '(none)'} setupCommandCount=${request.materialized.setupCommands?.length ?? 0} runtimeSkillCount=${request.materialized.runtimeSkills?.length ?? 0} platform=${request.materialized.env.KILO_PLATFORM ?? process.env.KILO_PLATFORM ?? '(unset)'} stateConnected=${state.isConnected}`
     );
     try {
-      serverConfig.workspacePath = request.workspace.workspacePath;
-      serverConfig.sessionId = request.kiloSessionId;
-      serverConfig.platform = request.materialized.env.KILO_PLATFORM ?? process.env.KILO_PLATFORM;
-
       const bindError = await bindSessionContext(
         request.session,
         serverConfig,
@@ -528,19 +521,30 @@ async function main() {
         'close-until-runtime-ready'
       );
       if (bindError) {
-        const error = (await bindError.json()) as { error?: string; message?: string };
+        const error = (await bindError.json()) as {
+          error?: string;
+          message?: string;
+          wrapperRunId?: string;
+        };
+        const code =
+          error.error === 'WRAPPER_FINALIZING' ? 'WRAPPER_FINALIZING' : 'INVALID_REQUEST';
         logToFile(
           `session/ready binding rejected kiloSessionId=${request.kiloSessionId} status=${bindError.status} message=${error.message ?? error.error ?? 'Invalid session binding'} elapsedMs=${Date.now() - readyStartedAt}`
         );
         return {
           status: 'error',
           error: {
-            code: 'INVALID_REQUEST',
+            code,
             message: error.message ?? error.error ?? 'Invalid session binding',
-            retryable: false,
+            retryable: code === 'WRAPPER_FINALIZING',
+            ...(error.wrapperRunId ? { wrapperRunId: error.wrapperRunId } : {}),
           },
         };
       }
+
+      serverConfig.workspacePath = request.workspace.workspacePath;
+      serverConfig.sessionId = request.kiloSessionId;
+      serverConfig.platform = request.materialized.env.KILO_PLATFORM ?? process.env.KILO_PLATFORM;
 
       if (!state.isConnected) {
         progressChannel = await openIngestProgressChannel(state);

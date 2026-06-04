@@ -1,10 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import {
+  allocateWrapperRuntimeState,
+  clearCurrentWrapperRuntimeLivenessState,
   emptyWrapperLease,
   getWrapperLease,
+  getWrapperRuntimeState,
+  hasCompleteWrapperRunMessageIndex,
+  isWrapperDeliveryHeld,
+  markWrapperFinalizing,
   nextWrapperCleanupDeadline,
   nextWrapperLeaseDeadline,
   putWrapperLease,
+  recordMeaningfulWrapperOutput,
+  recordWrapperAcceptedMessage,
   reduceWrapperLease,
 } from './wrapper-runtime-state.js';
 
@@ -196,6 +204,146 @@ describe('WrapperLease', () => {
     expect(nextWrapperCleanupDeadline(retrying)).toBe(5_200);
     expect(nextWrapperLeaseDeadline(retrying)).toBe(5_200);
   });
+
+  it('marks a newly allocated wrapper run as maintaining its message index', async () => {
+    const storage = createMemoryStorage();
+
+    const { state } = await allocateWrapperRuntimeState(storage, 1_000);
+
+    expect(state.messageIndexVersion).toBe(1);
+    await recordWrapperAcceptedMessage(storage, state, 5_000, 4_000);
+    await expect(getWrapperRuntimeState(storage)).resolves.toMatchObject({
+      messageIndexVersion: 1,
+    });
+  });
+
+  it('preserves the message index version while clearing current liveness deadlines', async () => {
+    const storage = createMemoryStorage();
+    const { state } = await allocateWrapperRuntimeState(storage, 1_000);
+    await storage.put('wrapper_runtime_state', {
+      ...state,
+      nextPingAt: 2_000,
+      noOutputDeadlineAt: 3_000,
+    });
+
+    await clearCurrentWrapperRuntimeLivenessState(
+      storage,
+      state.wrapperGeneration,
+      state.wrapperConnectionId
+    );
+
+    await expect(getWrapperRuntimeState(storage)).resolves.toMatchObject({
+      wrapperRunId: state.wrapperRunId,
+      messageIndexVersion: 1,
+    });
+  });
+
+  it('preserves runtime identity while treating a future message index version as untrusted', async () => {
+    const storage = createMemoryStorage();
+    await storage.put('wrapper_runtime_state', {
+      wrapperGeneration: 2,
+      wrapperConnectionId: 'conn_future_index',
+      wrapperRunId: 'wr_future_index',
+      messageIndexVersion: 2,
+    });
+
+    const state = await getWrapperRuntimeState(storage);
+
+    expect(state).toMatchObject({
+      wrapperGeneration: 2,
+      wrapperConnectionId: 'conn_future_index',
+      wrapperRunId: 'wr_future_index',
+      messageIndexVersion: 2,
+    });
+    expect(hasCompleteWrapperRunMessageIndex(state, 'wr_future_index')).toBe(false);
+  });
+
+  it('persists finalizing only for the matching current wrapper run', async () => {
+    const storage = createMemoryStorage();
+    await storage.put('wrapper_runtime_state', {
+      wrapperGeneration: 2,
+      wrapperConnectionId: 'conn_finalizing',
+      wrapperRunId: 'wr_finalizing',
+    });
+
+    await expect(markWrapperFinalizing(storage, 'wr_stale')).resolves.toBeNull();
+    await expect(markWrapperFinalizing(storage, 'wr_finalizing')).resolves.toMatchObject({
+      finalizingWrapperRunId: 'wr_finalizing',
+    });
+  });
+
+  it('preserves run-level finalizing while refreshing liveness output', async () => {
+    const storage = createMemoryStorage();
+    await storage.put('wrapper_runtime_state', {
+      wrapperGeneration: 2,
+      wrapperConnectionId: 'conn_housekeeping',
+      wrapperRunId: 'wr_housekeeping',
+      finalizingWrapperRunId: 'wr_housekeeping',
+      wrapperIdleDeadlineAt: 3_000,
+    });
+
+    await recordMeaningfulWrapperOutput(storage, 2, 'conn_housekeeping', 1_500, 4_000, 5_000);
+
+    await expect(getWrapperRuntimeState(storage)).resolves.toMatchObject({
+      finalizingWrapperRunId: 'wr_housekeeping',
+      lastWrapperMessageAt: 1_500,
+      noOutputDeadlineAt: 5_000,
+      nextPingAt: 4_000,
+      wrapperIdleDeadlineAt: 3_000,
+    });
+  });
+
+  it('does not clear finalizing when an acceptance write races after complete', async () => {
+    const storage = createMemoryStorage();
+    const allocated = {
+      wrapperGeneration: 2,
+      wrapperConnectionId: 'conn_new_work',
+      wrapperRunId: 'wr_new_work',
+      finalizingWrapperRunId: 'wr_new_work',
+      wrapperIdleDeadlineAt: 3_000,
+    };
+    await storage.put('wrapper_runtime_state', allocated);
+
+    await recordWrapperAcceptedMessage(storage, allocated, 5_000, 4_000);
+
+    await expect(getWrapperRuntimeState(storage)).resolves.toMatchObject({
+      finalizingWrapperRunId: 'wr_new_work',
+      noOutputDeadlineAt: 5_000,
+      nextPingAt: 4_000,
+    });
+  });
+
+  it.each(['stop_needed', 'stopping'] as const)(
+    'holds delivery while physical cleanup is %s',
+    state => {
+      const runtime = { wrapperGeneration: 2 };
+      const lease =
+        state === 'stop_needed'
+          ? reduceWrapperLease(emptyWrapperLease(), {
+              type: 'request_stop',
+              target: { kind: 'session' },
+              reason: 'terminal-failed',
+              now: 1_000,
+            })
+          : reduceWrapperLease(
+              reduceWrapperLease(emptyWrapperLease(), {
+                type: 'request_stop',
+                target: { kind: 'session' },
+                reason: 'terminal-failed',
+                now: 1_000,
+              }),
+              {
+                type: 'begin_stop_attempt',
+                attemptId: 'attempt',
+                now: 1_000,
+                attemptDeadlineAt: 2_000,
+              }
+            );
+
+      expect(isWrapperDeliveryHeld(runtime, lease)).toBe(true);
+      expect(isWrapperDeliveryHeld(runtime, emptyWrapperLease())).toBe(false);
+    }
+  );
 
   it('validates the separately persisted physical ownership record', async () => {
     const storage = createMemoryStorage();

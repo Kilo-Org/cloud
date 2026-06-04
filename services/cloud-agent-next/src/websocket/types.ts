@@ -29,6 +29,7 @@ export type StreamEventType =
   | 'metadata' // execution metadata updates
   | 'error' // error occurred during execution
   | 'complete' // execution completed successfully
+  | 'wrapper_finalizing' // wrapper sealed its current admitted batch
   | 'interrupted' // execution was interrupted
   | 'started' // execution started
   | 'progress' // progress update (e.g., tokens consumed)

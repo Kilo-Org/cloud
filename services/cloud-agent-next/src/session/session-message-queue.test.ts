@@ -417,6 +417,37 @@ describe('flushNextPendingSessionMessage', () => {
     });
   });
 
+  it('holds typed wrapper finalizing without consuming a flush attempt', async () => {
+    const storage = createMemoryStorage();
+    await storePendingSessionMessage(
+      storage,
+      createPendingSessionMessage({
+        messageId: FIRST_MESSAGE_ID,
+        role: 'user',
+        content: 'hold during finalization',
+        createdAt: 1,
+      })
+    );
+    const deliver = vi.fn().mockResolvedValue({
+      success: false,
+      code: 'WRAPPER_FINALIZING',
+      error: 'Wrapper batch is finalizing',
+    });
+
+    const result = await flushNextPendingSessionMessage({
+      storage,
+      now: 10,
+      getDeliveryContext: async () => createContext(),
+      validateModeAgainstRuntimeAgents: () => null,
+      deliver,
+    });
+
+    expect(result).toEqual({ type: 'held', remainingCount: 1 });
+    const [pending] = await listPendingSessionMessages(storage);
+    expect(pending?.flushAttempts).toBeUndefined();
+    expect(pending?.lastFlushError).toBeUndefined();
+  });
+
   it('delivers the next current message without execution-runtime blocking', async () => {
     const storage = createMemoryStorage();
     await storePendingSessionMessage(

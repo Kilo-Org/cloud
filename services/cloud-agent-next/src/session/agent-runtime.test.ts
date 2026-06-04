@@ -6,6 +6,7 @@ import type {
   MessageDeliveryRequest,
   WorkspaceReady,
 } from '../execution/types.js';
+import { WrapperFinalizingError } from '../kilo/wrapper-client.js';
 import { createAgentRuntime } from './agent-runtime.js';
 import { getWrapperLease, getWrapperRuntimeState } from './wrapper-runtime-state.js';
 import type { SessionMetadata } from '../persistence/session-metadata.js';
@@ -48,6 +49,7 @@ function createMetadata(): SessionMetadata {
     },
     auth: {
       kiloSessionId: 'kilo_runtime',
+      kilocodeToken: 'kilo_token',
     },
     lifecycle: {
       version: 1,
@@ -188,6 +190,46 @@ describe('AgentRuntime', () => {
     expect(wrapperState.nextPingAt).toEqual(expect.any(Number));
   });
 
+  it('fences the dispatching message until acceptance bookkeeping completes', async () => {
+    const storage = createMemoryStorage();
+    const messageId = createPlan().turn.messageId;
+    const runtime = createAgentRuntime({
+      storage,
+      env: {} as Env,
+      getMetadata: async () => createMetadata(),
+      getOrchestratorOverride: () => ({
+        execute: async (_plan, options) => {
+          await expect(getWrapperRuntimeState(storage)).resolves.not.toHaveProperty(
+            'dispatchingMessageId'
+          );
+          await options?.onWorkspaceReady?.(createWorkspaceReady());
+          await expect(getWrapperRuntimeState(storage)).resolves.toMatchObject({
+            dispatchingMessageId: messageId,
+          });
+          return { kiloSessionId: 'kilo_runtime' };
+        },
+      }),
+      getSessionIdForLogs: () => 'agent_runtime',
+      sendToWrapper: () => false,
+      createAgentSandbox: () =>
+        ({
+          discoverSessionWrappers: vi.fn().mockResolvedValue({ status: 'absent' }),
+        }) as unknown as AgentSandbox,
+    });
+
+    await runtime.send(createPlan(), {
+      onAccepted: async () => {
+        await expect(getWrapperRuntimeState(storage)).resolves.toMatchObject({
+          dispatchingMessageId: messageId,
+        });
+      },
+    });
+
+    await expect(getWrapperRuntimeState(storage)).resolves.not.toHaveProperty(
+      'dispatchingMessageId'
+    );
+  });
+
   it('keeps an accepted new delivery supervised when physical lease acceptance persistence fails', async () => {
     let rejectedAcceptedLeaseWrite = false;
     const storage = createMemoryStorage(undefined, (key, value) => {
@@ -236,6 +278,180 @@ describe('AgentRuntime', () => {
     await expect(getWrapperLease(storage)).resolves.toMatchObject({
       state: 'owns_wrapper',
       startupDeadlineAt: expect.any(Number),
+    });
+  });
+
+  it('holds a typed finalizing race from the real orchestrator without clearing the current run', async () => {
+    const storage = createMemoryStorage([
+      [
+        'wrapper_runtime_state',
+        { wrapperGeneration: 3, wrapperConnectionId: 'conn_hot', wrapperRunId: 'wr_hot' },
+      ],
+      [
+        'wrapper_lease',
+        {
+          state: 'owns_wrapper',
+          nextInstanceGeneration: 2,
+          instance: { instanceId: 'instance_hot', instanceGeneration: 1 },
+        },
+      ],
+    ]);
+    const prompt = vi
+      .fn()
+      .mockRejectedValue(new WrapperFinalizingError('Wrapper batch is finalizing', 'wr_hot'));
+    const wrapper = {
+      ensureSessionReady: vi.fn().mockResolvedValue({ kiloSessionId: 'kilo_runtime' }),
+      prompt,
+      command: vi.fn(),
+    };
+    const sandbox = {
+      discoverSessionWrappers: vi.fn().mockResolvedValue({
+        status: 'present',
+        observed: [
+          {
+            representation: 'process',
+            id: 'wrapper-hot',
+            port: 5_000,
+            instanceId: 'instance_hot',
+            instanceGeneration: 1,
+          },
+        ],
+      }),
+      ensureWrapper: vi.fn().mockResolvedValue({ status: 'wrapper-running', client: wrapper }),
+      delete: vi.fn(),
+    } as unknown as AgentSandbox;
+    const runtime = createAgentRuntime({
+      storage,
+      env: { WORKER_URL: 'https://worker.example.com' } as Env,
+      getMetadata: async () => createMetadata(),
+      getSessionIdForLogs: () => 'agent_runtime',
+      sendToWrapper: () => false,
+      createAgentSandbox: () => sandbox,
+    });
+
+    await expect(runtime.send(createPlan())).resolves.toEqual({
+      success: false,
+      code: 'WRAPPER_FINALIZING',
+      error: 'Wrapper batch is finalizing',
+    });
+    expect(prompt).toHaveBeenCalledOnce();
+    await expect(getWrapperRuntimeState(storage)).resolves.toMatchObject({
+      wrapperRunId: 'wr_hot',
+      finalizingWrapperRunId: 'wr_hot',
+    });
+  });
+
+  it('does not mark a fresh run finalizing when the old wrapper rejects it during close delay', async () => {
+    const storage = createMemoryStorage([
+      [
+        'wrapper_runtime_state',
+        { wrapperGeneration: 4, wrapperConnectionId: 'conn_fresh', wrapperRunId: 'wr_fresh' },
+      ],
+      [
+        'wrapper_lease',
+        {
+          state: 'owns_wrapper',
+          nextInstanceGeneration: 2,
+          instance: { instanceId: 'instance_hot', instanceGeneration: 1 },
+        },
+      ],
+    ]);
+    const wrapper = {
+      ensureSessionReady: vi.fn().mockResolvedValue({ kiloSessionId: 'kilo_runtime' }),
+      prompt: vi
+        .fn()
+        .mockRejectedValue(new WrapperFinalizingError('Wrapper batch is finalizing', 'wr_old')),
+      command: vi.fn(),
+    };
+    const sandbox = {
+      discoverSessionWrappers: vi.fn().mockResolvedValue({
+        status: 'present',
+        observed: [
+          {
+            representation: 'process',
+            id: 'wrapper-closing',
+            port: 5_000,
+            instanceId: 'instance_hot',
+            instanceGeneration: 1,
+          },
+        ],
+      }),
+      ensureWrapper: vi.fn().mockResolvedValue({ status: 'wrapper-running', client: wrapper }),
+      delete: vi.fn(),
+    } as unknown as AgentSandbox;
+    const runtime = createAgentRuntime({
+      storage,
+      env: { WORKER_URL: 'https://worker.example.com' } as Env,
+      getMetadata: async () => createMetadata(),
+      getSessionIdForLogs: () => 'agent_runtime',
+      sendToWrapper: () => false,
+      createAgentSandbox: () => sandbox,
+    });
+
+    await expect(runtime.send(createPlan())).resolves.toEqual({
+      success: false,
+      code: 'WRAPPER_FINALIZING',
+      error: 'Wrapper batch is finalizing',
+    });
+    const runtimeState = await getWrapperRuntimeState(storage);
+    expect(runtimeState.wrapperRunId).toBe('wr_fresh');
+    expect(runtimeState.finalizingWrapperRunId).toBeUndefined();
+  });
+
+  it('preserves older finalizing errors without a wrapper run identity conservatively', async () => {
+    const storage = createMemoryStorage([
+      [
+        'wrapper_runtime_state',
+        { wrapperGeneration: 3, wrapperConnectionId: 'conn_hot', wrapperRunId: 'wr_hot' },
+      ],
+      [
+        'wrapper_lease',
+        {
+          state: 'owns_wrapper',
+          nextInstanceGeneration: 2,
+          instance: { instanceId: 'instance_hot', instanceGeneration: 1 },
+        },
+      ],
+    ]);
+    const sandbox = {
+      discoverSessionWrappers: vi.fn().mockResolvedValue({
+        status: 'present',
+        observed: [
+          {
+            representation: 'process',
+            id: 'wrapper-hot',
+            port: 5_000,
+            instanceId: 'instance_hot',
+            instanceGeneration: 1,
+          },
+        ],
+      }),
+      ensureWrapper: vi.fn().mockResolvedValue({
+        status: 'wrapper-running',
+        client: {
+          ensureSessionReady: vi.fn().mockResolvedValue({ kiloSessionId: 'kilo_runtime' }),
+          prompt: vi.fn().mockRejectedValue(new WrapperFinalizingError('legacy finalizing')),
+          command: vi.fn(),
+        },
+      }),
+      delete: vi.fn(),
+    } as unknown as AgentSandbox;
+    const runtime = createAgentRuntime({
+      storage,
+      env: { WORKER_URL: 'https://worker.example.com' } as Env,
+      getMetadata: async () => createMetadata(),
+      getSessionIdForLogs: () => 'agent_runtime',
+      sendToWrapper: () => false,
+      createAgentSandbox: () => sandbox,
+    });
+
+    await expect(runtime.send(createPlan())).resolves.toMatchObject({
+      success: false,
+      code: 'WRAPPER_FINALIZING',
+    });
+    await expect(getWrapperRuntimeState(storage)).resolves.toMatchObject({
+      wrapperRunId: 'wr_hot',
+      finalizingWrapperRunId: 'wr_hot',
     });
   });
 

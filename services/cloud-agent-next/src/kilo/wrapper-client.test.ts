@@ -12,6 +12,7 @@ import {
   WrapperClient,
   WrapperContainerClient,
   WrapperError,
+  WrapperFinalizingError,
   WrapperNotReadyError,
   WrapperNoJobError,
   WrapperJobConflictError,
@@ -361,6 +362,14 @@ describe('WrapperClient', () => {
       expect(result.lastError).toBeDefined();
       expect(result.lastError?.code).toBe('INFLIGHT_TIMEOUT');
     });
+
+    it('returns finalizing status', async () => {
+      const statusResponse: JobStatus = { state: 'finalizing', sessionId: 'kilo_456' };
+      const session = createMockSession(createSuccessResponse(statusResponse));
+      const client = new WrapperClient({ session, port: defaultPort });
+
+      await expect(client.status()).resolves.toEqual(statusResponse);
+    });
   });
 
   // -------------------------------------------------------------------------
@@ -394,6 +403,41 @@ describe('WrapperClient', () => {
       });
 
       expect(result.messageId).toBeUndefined();
+    });
+
+    it('parses finalizing responses with the wrapper run identity', async () => {
+      const session = createMockSession({
+        exitCode: 0,
+        stdout: JSON.stringify({
+          error: 'WRAPPER_FINALIZING',
+          message: 'Wrapper batch is finalizing',
+          wrapperRunId: 'wr_old',
+        }),
+      });
+      const client = new WrapperClient({ session, port: defaultPort });
+
+      await expect(client.prompt(createPromptOptions())).rejects.toEqual(
+        expect.objectContaining({
+          name: 'WrapperFinalizingError',
+          code: 'WRAPPER_FINALIZING',
+          wrapperRunId: 'wr_old',
+        })
+      );
+    });
+
+    it('parses legacy finalizing responses without a wrapper run identity', async () => {
+      const session = createMockSession(
+        createErrorResponse('WRAPPER_FINALIZING', 'Wrapper batch is finalizing')
+      );
+      const client = new WrapperClient({ session, port: defaultPort });
+
+      await expect(client.prompt(createPromptOptions())).rejects.toEqual(
+        expect.objectContaining({
+          name: 'WrapperFinalizingError',
+          code: 'WRAPPER_FINALIZING',
+          wrapperRunId: undefined,
+        })
+      );
     });
 
     it('sends prompt text', async () => {
@@ -2074,6 +2118,11 @@ describe('WrapperClient', () => {
   // -------------------------------------------------------------------------
 
   describe('error classes', () => {
+    it('WrapperFinalizingError carries optional wrapper run identity', () => {
+      expect(new WrapperFinalizingError('finalizing', 'wr_old').wrapperRunId).toBe('wr_old');
+      expect(new WrapperFinalizingError('legacy').wrapperRunId).toBeUndefined();
+    });
+
     it('WrapperError has correct properties', () => {
       const error = new WrapperError('Test message', 'TEST_CODE', 500);
 

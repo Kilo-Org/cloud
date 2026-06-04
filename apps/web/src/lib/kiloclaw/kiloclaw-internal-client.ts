@@ -40,6 +40,12 @@ import type {
   GatewayReadyResponse,
   ControllerVersionResponse,
   OpenclawConfigResponse,
+  AgentConfigListResponse,
+  AgentReadResponse,
+  AgentMutationResponse,
+  AgentDefaultsMutationResponse,
+  AgentCreateResponse,
+  AgentDeleteResponse,
   MorningBriefingStatusResponse,
   MorningBriefingActionResponse,
   OnboardingBriefingResponse,
@@ -909,6 +915,88 @@ export class KiloClawInternalClient {
         method: 'PATCH',
         body: JSON.stringify({ userId, patch }),
       },
+      { userId }
+    );
+  }
+
+  // ── Agent config CRUD (→ /api/platform/agents*) ─────────────────────
+  // Write payloads are forwarded opaquely (like patchOpenclawConfig); the tRPC
+  // layer validates input with Zod and the controller re-validates.
+
+  async listAgents(userId: string, instanceId?: string): Promise<AgentConfigListResponse> {
+    const params = new URLSearchParams({ userId });
+    if (instanceId) params.set('instanceId', instanceId);
+    return this.request(`/api/platform/agents?${params.toString()}`, undefined, { userId });
+  }
+
+  async getAgent(userId: string, agentId: string, instanceId?: string): Promise<AgentReadResponse> {
+    const params = new URLSearchParams({ userId });
+    if (instanceId) params.set('instanceId', instanceId);
+    return this.request(
+      `/api/platform/agents/${encodeURIComponent(agentId)}?${params.toString()}`,
+      undefined,
+      { userId }
+    );
+  }
+
+  async createAgent(
+    userId: string,
+    agent: Record<string, unknown>,
+    instanceId?: string
+  ): Promise<AgentCreateResponse> {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
+    return this.request(
+      `/api/platform/agents${params}`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ userId, agent }),
+      },
+      { userId }
+    );
+  }
+
+  async updateAgent(
+    userId: string,
+    agentId: string,
+    patch: Record<string, unknown>,
+    instanceId?: string
+  ): Promise<AgentMutationResponse> {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
+    return this.request(
+      `/api/platform/agents/${encodeURIComponent(agentId)}${params}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ userId, patch }),
+      },
+      { userId }
+    );
+  }
+
+  async updateAgentDefaults(
+    userId: string,
+    patch: Record<string, unknown>,
+    instanceId?: string
+  ): Promise<AgentDefaultsMutationResponse> {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
+    return this.request(
+      `/api/platform/agent-defaults${params}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ userId, patch }),
+      },
+      { userId }
+    );
+  }
+
+  async deleteAgent(
+    userId: string,
+    agentId: string,
+    instanceId?: string
+  ): Promise<AgentDeleteResponse> {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
+    return this.request(
+      `/api/platform/agents/${encodeURIComponent(agentId)}${params}`,
+      { method: 'DELETE' },
       { userId }
     );
   }

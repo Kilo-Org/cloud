@@ -25,7 +25,7 @@ import { seed_20_code_free_model } from '@/lib/ai-gateway/providers/seed';
 import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 import {
   MINIMAX_CURRENT_MODEL_ID,
-  minimax_m25_free_model,
+  minimax_m3_discounted_model,
 } from '@/lib/ai-gateway/providers/minimax';
 import { KIMI_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/moonshotai';
 import { morph_warp_grep_free_model } from '@/lib/ai-gateway/providers/morph';
@@ -90,7 +90,7 @@ export function isKiloExclusiveModel(model: string): boolean {
 
 export const kiloExclusiveModels = [
   gemma_4_26b_a4b_it_free_model,
-  minimax_m25_free_model,
+  minimax_m3_discounted_model,
   morph_warp_grep_free_model,
   seed_20_code_free_model,
   ...alibabaDirectModels,

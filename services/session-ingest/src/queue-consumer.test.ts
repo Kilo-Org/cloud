@@ -246,6 +246,256 @@ describe('queue', () => {
     expect(ack).toHaveBeenCalledTimes(1);
     expect(retry).not.toHaveBeenCalled();
   });
+
+  it('batches all items in a message into a single DO ingest call', async () => {
+    const ingest = vi.fn(async () => ({ changes: [] }));
+    vi.mocked(getSessionIngestDO).mockReturnValue({ ingest } as never);
+    const limit = vi.fn(async () => [{ session_id: 'ses_batch' }]);
+    const where = vi.fn(() => ({ limit }));
+    const from = vi.fn(() => ({ where }));
+    vi.mocked(getWorkerDb).mockReturnValue({ select: vi.fn(() => ({ from })) } as never);
+
+    const items = [
+      { type: 'session', data: { title: 'Hello' } },
+      { type: 'message', data: { id: 'msg_1' } },
+      { type: 'part', data: { id: 'part_1', messageID: 'msg_1' } },
+    ];
+    const body = JSON.stringify({ data: items });
+    const deleteObject = vi.fn(async () => undefined);
+    const env = {
+      HYPERDRIVE: { connectionString: 'postgres://unused' },
+      SESSION_INGEST_R2: {
+        get: vi.fn(async () => new Response(body)),
+        put: vi.fn(async () => undefined),
+        delete: deleteObject,
+      },
+    } as never;
+    const ack = vi.fn();
+    const retry = vi.fn();
+
+    await queue(
+      {
+        messages: [
+          {
+            body: {
+              r2Key: 'staging/batch',
+              kiloUserId: 'usr_batch',
+              sessionId: 'ses_batch',
+              ingestVersion: 1,
+              ingestedAt: 789,
+            },
+            ack,
+            retry,
+          },
+        ],
+      } as never,
+      env,
+      { waitUntil: vi.fn() } as unknown as ExecutionContext
+    );
+
+    expect(ingest).toHaveBeenCalledTimes(1);
+    expect(ingest).toHaveBeenCalledWith(items, 'usr_batch', 'ses_batch', 1, 789, undefined);
+    expect(deleteObject).toHaveBeenCalledWith('staging/batch');
+    expect(ack).toHaveBeenCalledTimes(1);
+    expect(retry).not.toHaveBeenCalled();
+  });
+
+  it('splits a message past the chunk cap into ordered DO ingest calls', async () => {
+    // 129 items exceed INGEST_CHUNK_MAX_ITEMS (128) -> two chunks: 128 then 1.
+    // Both chunks must commit in order; non-empty changes trigger the final metadata flush.
+    const ingest = vi.fn(async (items: unknown[]) =>
+      items.length === 128
+        ? { changes: [{ name: 'title', value: 'Hello' }] }
+        : { changes: [{ name: 'gitBranch', value: 'main' }] }
+    );
+    vi.mocked(getSessionIngestDO).mockReturnValue({ ingest } as never);
+
+    const transaction = vi.fn(async () => null);
+    const limit = vi.fn(async () => [{ session_id: 'ses_split' }]);
+    const where = vi.fn(() => ({ limit }));
+    const from = vi.fn(() => ({ where }));
+    const select = vi.fn(() => ({ from }));
+    vi.mocked(getWorkerDb).mockReturnValue({ select, transaction } as never);
+
+    const items = Array.from({ length: 129 }, (_, i) => ({
+      type: 'message',
+      data: { id: `msg_${i}` },
+    }));
+    const body = JSON.stringify({ data: items });
+    const deleteObject = vi.fn(async () => undefined);
+    const env = {
+      HYPERDRIVE: { connectionString: 'postgres://unused' },
+      SESSION_INGEST_R2: {
+        get: vi.fn(async () => new Response(body)),
+        put: vi.fn(async () => undefined),
+        delete: deleteObject,
+      },
+    } as never;
+    const ack = vi.fn();
+    const retry = vi.fn();
+
+    await queue(
+      {
+        messages: [
+          {
+            body: {
+              r2Key: 'staging/split',
+              kiloUserId: 'usr_split',
+              sessionId: 'ses_split',
+              ingestVersion: 1,
+              ingestedAt: 1,
+            },
+            ack,
+            retry,
+          },
+        ],
+      } as never,
+      env,
+      { waitUntil: vi.fn() } as unknown as ExecutionContext
+    );
+
+    expect(ingest).toHaveBeenCalledTimes(2);
+    expect(ingest).toHaveBeenNthCalledWith(
+      1,
+      items.slice(0, 128),
+      'usr_split',
+      'ses_split',
+      1,
+      1,
+      undefined
+    );
+    expect(ingest).toHaveBeenNthCalledWith(
+      2,
+      items.slice(128),
+      'usr_split',
+      'ses_split',
+      1,
+      1,
+      undefined
+    );
+    expect(transaction).toHaveBeenCalledTimes(1);
+    expect(deleteObject).toHaveBeenCalledWith('staging/split');
+    expect(ack).toHaveBeenCalledTimes(1);
+    expect(retry).not.toHaveBeenCalled();
+  });
+
+  it('retries the message when DO ingest fails instead of dropping items', async () => {
+    const ingest = vi.fn(async () => {
+      throw new Error('Durable Object is overloaded.');
+    });
+    vi.mocked(getSessionIngestDO).mockReturnValue({ ingest } as never);
+    const limit = vi.fn(async () => [{ session_id: 'ses_overload' }]);
+    const where = vi.fn(() => ({ limit }));
+    const from = vi.fn(() => ({ where }));
+    vi.mocked(getWorkerDb).mockReturnValue({ select: vi.fn(() => ({ from })) } as never);
+
+    const body = JSON.stringify({ data: [{ type: 'message', data: { id: 'msg_1' } }] });
+    const deleteObject = vi.fn(async () => undefined);
+    const env = {
+      HYPERDRIVE: { connectionString: 'postgres://unused' },
+      SESSION_INGEST_R2: {
+        get: vi.fn(async () => new Response(body)),
+        put: vi.fn(async () => undefined),
+        delete: deleteObject,
+      },
+    } as never;
+    const ack = vi.fn();
+    const retry = vi.fn();
+
+    await queue(
+      {
+        messages: [
+          {
+            body: {
+              r2Key: 'staging/overload',
+              kiloUserId: 'usr_overload',
+              sessionId: 'ses_overload',
+              ingestVersion: 1,
+              ingestedAt: 1,
+            },
+            ack,
+            retry,
+          },
+        ],
+      } as never,
+      env,
+      { waitUntil: vi.fn() } as unknown as ExecutionContext
+    );
+
+    expect(retry).toHaveBeenCalledWith({ delaySeconds: QUEUE_RETRY_DELAY_SECONDS });
+    expect(ack).not.toHaveBeenCalled();
+    expect(deleteObject).not.toHaveBeenCalled();
+  });
+
+  it('flushes already-committed metadata changes when a later chunk fails', async () => {
+    // First chunk (128 items) commits and reports a metadata change; the second
+    // chunk's ingest fails. The committed change must reach Postgres before the
+    // message is retried — on reprocessing the DO won't re-emit it (its stored
+    // value already matches), so it would otherwise be lost.
+    let ingestCalls = 0;
+    const ingest = vi.fn(async () => {
+      ingestCalls += 1;
+      if (ingestCalls === 1) return { changes: [{ name: 'title', value: 'Hello' }] };
+      throw new Error('Durable Object is overloaded.');
+    });
+    vi.mocked(getSessionIngestDO).mockReturnValue({ ingest } as never);
+
+    // db.select powers the session-exists guard; db.transaction is the metadata flush.
+    const transaction = vi.fn(async () => null);
+    const limit = vi.fn(async () => [{ session_id: 'ses_partial' }]);
+    const where = vi.fn(() => ({ limit }));
+    const from = vi.fn(() => ({ where }));
+    const select = vi.fn(() => ({ from }));
+    vi.mocked(getWorkerDb).mockReturnValue({ select, transaction } as never);
+
+    // 129 items -> chunk 1 = 128 items (flush succeeds), chunk 2 = 1 item (flush throws).
+    const items = Array.from({ length: 129 }, (_, i) => ({
+      type: 'message',
+      data: { id: `msg_${i}` },
+    }));
+    const body = JSON.stringify({ data: items });
+    const deleteObject = vi.fn(async () => undefined);
+    const env = {
+      HYPERDRIVE: { connectionString: 'postgres://unused' },
+      SESSION_INGEST_R2: {
+        get: vi.fn(async () => new Response(body)),
+        put: vi.fn(async () => undefined),
+        delete: deleteObject,
+      },
+    } as never;
+    const ack = vi.fn();
+    const retry = vi.fn();
+
+    await queue(
+      {
+        messages: [
+          {
+            body: {
+              r2Key: 'staging/partial',
+              kiloUserId: 'usr_partial',
+              sessionId: 'ses_partial',
+              ingestVersion: 1,
+              ingestedAt: 1,
+            },
+            ack,
+            retry,
+          },
+        ],
+      } as never,
+      env,
+      { waitUntil: vi.fn() } as unknown as ExecutionContext
+    );
+
+    // First chunk carried the full 128 items and committed.
+    const firstChunkItems = (ingest.mock.calls[0] as unknown[])[0];
+    expect(firstChunkItems).toHaveLength(128);
+    // Its metadata change was flushed to Postgres despite the later failure.
+    expect(transaction).toHaveBeenCalledTimes(1);
+    // The message is retried and the staging object is preserved for reprocessing.
+    expect(retry).toHaveBeenCalledWith({ delaySeconds: QUEUE_RETRY_DELAY_SECONDS });
+    expect(ack).not.toHaveBeenCalled();
+    expect(deleteObject).not.toHaveBeenCalled();
+  });
 });
 
 describe('computeSessionMetadataUpdates', () => {

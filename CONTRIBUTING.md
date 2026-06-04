@@ -35,32 +35,19 @@ pnpm install
 
 ### 2. Set up environment variables
 
-Copy `.env.local.example` to `.env.local` and adjust URLs as needed:
-
-- `NEXTAUTH_URL` — auth redirect URL (defaults to `http://localhost:3000`)
-- `POSTGRES_URL` — database connection (defaults to `postgres://postgres:postgres@localhost:5432/postgres`)
-
-Then generate secrets and add Stripe test keys:
+Run the interactive setup CLI to bootstrap `.env.local` from the example:
 
 ```bash
-openssl rand -base64 32   # NEXTAUTH_SECRET
-openssl rand -base64 32   # INTERNAL_API_SECRET
-openssl rand -base64 32   # CALLBACK_TOKEN_SECRET
-openssl rand -base64 32   # BYOK_ENCRYPTION_KEY
+pnpm dev:setup-env
 ```
 
-Get Stripe test keys from https://dashboard.stripe.com/test/apikeys.
+This prompts for the 8 required env vars only, generates secrets automatically where appropriate, then writes `.env.local`. If you already have a `.env.local` (e.g., from Vercel pull or a previous setup), the CLI warns you before overwriting anything.
 
-Required in `.env.local`:
+After it completes, run:
 
-- `NEXTAUTH_SECRET`
-- `INTERNAL_API_SECRET`
-- `CALLBACK_TOKEN_SECRET`
-- `BYOK_ENCRYPTION_KEY`
-- `STRIPE_SECRET_KEY`
-- `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`
-
-Then run `pnpm dev:env` to derive worker `.dev.vars` files from `.env.local`.
+```bash
+pnpm dev:env
+```
 
 For the full list of environment variables, see [ENVIRONMENT.md](./ENVIRONMENT.md).
 

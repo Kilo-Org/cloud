@@ -7,7 +7,7 @@ import {
   OAUTH_STATE_TTL_SECONDS,
   verifyOAuthState,
 } from '@/lib/integrations/oauth-state';
-import { redisClient, redisGetDel } from '@/lib/redis';
+import { redisClient } from '@/lib/redis';
 import { githubUserAuthorizationPkceRedisKey } from '@/lib/redis-keys';
 
 const STATE_PREFIX = 'github-user-authorization:';
@@ -58,7 +58,7 @@ export async function consumeGitHubUserAuthorizationState(
     );
     if (!parsed.success) return null;
 
-    const codeVerifier = await redisGetDel(
+    const codeVerifier = await redisClient.getdel<string>(
       githubUserAuthorizationPkceRedisKey(parsed.data.verifierRef)
     );
     return codeVerifier ? { codeVerifier } : null;

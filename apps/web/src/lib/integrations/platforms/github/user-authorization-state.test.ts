@@ -1,16 +1,15 @@
 import { createHash } from 'node:crypto';
-import { redisClient, redisGetDel } from '@/lib/redis';
+import { redisClient } from '@/lib/redis';
 import {
   consumeGitHubUserAuthorizationState,
   createGitHubUserAuthorizationState,
 } from './user-authorization-state';
 
 jest.mock('@/lib/redis', () => ({
-  redisClient: { set: jest.fn() },
-  redisGetDel: jest.fn(),
+  redisClient: { set: jest.fn(), getdel: jest.fn() },
 }));
 
-const mockedRedisGetDel = jest.mocked(redisGetDel);
+const mockedRedisGetDel = jest.mocked(redisClient.getdel);
 const mockedRedisSet = jest.mocked(redisClient.set);
 
 describe('GitHub user authorization state', () => {

@@ -6,7 +6,7 @@ import { model_experiment, model_experiment_variant_version } from '@kilocode/db
 import { eq } from 'drizzle-orm';
 import { isPublicIdExperimented } from './membership';
 import { pickModelExperimentVariant } from './pick-variant';
-import { redisClient, redisDel } from '@/lib/redis';
+import { redisClient } from '@/lib/redis';
 import { EXPERIMENTED_PUBLIC_IDS_REDIS_KEY } from '@/lib/redis-keys';
 import type { User } from '@kilocode/db/schema';
 
@@ -37,7 +37,7 @@ beforeEach(async () => {
 async function clearRoutingCaches() {
   // Tests share the dev Redis instance across runs; flush the membership key
   // so each test sees a fresh load path.
-  await redisDel(EXPERIMENTED_PUBLIC_IDS_REDIS_KEY);
+  await redisClient.del(EXPERIMENTED_PUBLIC_IDS_REDIS_KEY);
 }
 
 async function seedExperimentedPublicIds(ids: string[]): Promise<string | null> {
@@ -45,7 +45,7 @@ async function seedExperimentedPublicIds(ids: string[]): Promise<string | null> 
 }
 
 afterEach(async () => {
-  await redisDel(EXPERIMENTED_PUBLIC_IDS_REDIS_KEY);
+  await redisClient.del(EXPERIMENTED_PUBLIC_IDS_REDIS_KEY);
 });
 
 async function makeActiveExperiment(opts: {

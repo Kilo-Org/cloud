@@ -174,15 +174,6 @@ export default function OrganizationAppSidebar({
       icon: Cloud,
       url: `/organizations/${organizationId}/cloud`,
     },
-    ...(user?.is_admin
-      ? [
-          {
-            title: 'MCP Gateway',
-            icon: Cable,
-            url: `/organizations/${organizationId}/cloud/mcp-gateway`,
-          },
-        ]
-      : []),
     {
       title: 'Sessions',
       icon: List,
@@ -238,6 +229,15 @@ export default function OrganizationAppSidebar({
             title: 'Managed Indexing',
             icon: Database,
             url: `/organizations/${organizationId}/code-indexing`,
+          },
+        ]
+      : []),
+    ...(user?.is_admin
+      ? [
+          {
+            title: 'MCP Gateway',
+            icon: Cable,
+            url: `/organizations/${organizationId}/cloud/mcp-gateway`,
           },
         ]
       : []),

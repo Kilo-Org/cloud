@@ -1,6 +1,10 @@
 import 'server-only';
 import { NextResponse, type NextRequest } from 'next/server';
-import { OAuthAuthorizationQuerySchema, type OAuthAuthorizationQuery } from '@kilocode/mcp-gateway';
+import {
+  OAuthAuthorizationQuerySchema,
+  type GatewayExecutionContext,
+  type OAuthAuthorizationQuery,
+} from '@kilocode/mcp-gateway';
 import { timingSafeEqual } from '@kilocode/encryption';
 import { getUserFromAuth } from '@/lib/user/server';
 import { createGatewayServices } from '@/lib/mcp-gateway/services';
@@ -51,6 +55,22 @@ async function authorizationIdentity() {
   if (authFailedResponse) return { response: authFailedResponse };
   if (!user) return { response: NextResponse.json({ error: 'access_denied' }, { status: 401 }) };
   return { user, executionContext: executionContextFromAuth(organizationId) };
+}
+
+export function authorizationExecutionContext(params: {
+  query: OAuthAuthorizationQuery;
+  route?: ScopedConnectRoute;
+  defaultExecutionContext: GatewayExecutionContext;
+  parseResource: (resource: string) => ScopedConnectRoute;
+}): GatewayExecutionContext {
+  const route =
+    params.route ??
+    (params.query.resource ? params.parseResource(params.query.resource) : undefined);
+  if (!route) return params.defaultExecutionContext;
+  if (route.ownerScope === 'organization') {
+    return { type: 'organization', organizationId: route.ownerId };
+  }
+  return { type: 'personal' };
 }
 
 async function authorizeRequest(
@@ -275,11 +295,17 @@ async function consentResponse(request: NextRequest, route?: ScopedConnectRoute)
     return NextResponse.json({ error: 'invalid_request' }, { status: 400 });
   }
   const services = createGatewayServices();
+  const executionContext = authorizationExecutionContext({
+    query: parsed.data,
+    route,
+    defaultExecutionContext: identity.executionContext,
+    parseResource: services.routeService.parseResource,
+  });
   const preview = await services.authorizationService.previewAuthorization({
     query: parsed.data,
     route,
     userId: identity.user.id,
-    executionContext: identity.executionContext,
+    executionContext,
     redirectErrors: true,
   });
   const approvalState = randomToken(32);
@@ -288,7 +314,7 @@ async function consentResponse(request: NextRequest, route?: ScopedConnectRoute)
     clientId: preview.clientId,
     resource: preview.resource,
     scopes: preview.scopes,
-    executionContext: identity.executionContext,
+    executionContext,
     secret: services.config.rateLimitSecret,
   })}`;
   const inputs = Object.entries(parsed.data)
@@ -329,11 +355,17 @@ async function approveRequest(request: NextRequest, route?: ScopedConnectRoute) 
     return NextResponse.json({ error: 'invalid_request' }, { status: 400 });
   }
   const services = createGatewayServices();
+  const executionContext = authorizationExecutionContext({
+    query: parsed.data,
+    route,
+    defaultExecutionContext: identity.executionContext,
+    parseResource: services.routeService.parseResource,
+  });
   const preview = await services.authorizationService.previewAuthorization({
     query: parsed.data,
     route,
     userId: identity.user.id,
-    executionContext: identity.executionContext,
+    executionContext,
     redirectErrors: true,
   });
   const cookieState = request.cookies.get(consentCookieName)?.value;
@@ -343,7 +375,7 @@ async function approveRequest(request: NextRequest, route?: ScopedConnectRoute) 
     clientId: preview.clientId,
     resource: preview.resource,
     scopes: preview.scopes,
-    executionContext: identity.executionContext,
+    executionContext,
     secret: services.config.rateLimitSecret,
   });
   if (
@@ -362,12 +394,7 @@ async function approveRequest(request: NextRequest, route?: ScopedConnectRoute) 
       )
     );
   }
-  const response = await authorizeRequest(
-    parsed.data,
-    route,
-    identity.user.id,
-    identity.executionContext
-  );
+  const response = await authorizeRequest(parsed.data, route, identity.user.id, executionContext);
   response.cookies.delete(consentCookieName);
   return response;
 }

@@ -114,7 +114,7 @@ export async function redisGetDel(key: RedisKey): Promise<string | null> {
   }
 }
 
-/** Returns false if Redis REST env vars are not configured. */
+/** Returns false if Redis is not configured. */
 export async function redisSet(
   key: RedisKey,
   value: string,
@@ -135,7 +135,7 @@ export async function redisSet(
   }
 }
 
-/** Returns false if Redis REST env vars are not configured. */
+/** Returns false if Redis is not configured. */
 export async function redisDel(key: RedisKey): Promise<boolean> {
   const redis = getOrCreateClient();
   if (!redis) return false;

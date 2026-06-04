@@ -452,7 +452,9 @@ With `auto`, the primary worktree gets offset 0 (default ports), and secondary w
 
 `pnpm dev:start` also passes a worktree-local Wrangler service-discovery registry at `.wrangler/dev-registry` into its tmux session. For worktrees with distinct `kilo-dev-*` session names, this allows concurrent offset Worker stacks such as `agents` to use the same local Worker names without resolving bindings to Workers running from sibling worktrees. The absolute registry path is recorded in `dev/logs/manifest.json` for diagnostics.
 
-Infrastructure containers (`postgres` on 5432, `redis` on 6379, `grafana` on 4000) always bind to their fixed host ports regardless of the offset - they are shared services, not per-worktree instances. Concurrent worktrees reuse those containers, and `pnpm dev:stop` leaves them running while another `kilo-dev-*` session remains active.
+Infrastructure containers (`postgres` on 5432, `redis` on 6379, `redis-http` on 8079, `grafana` on 4000) always bind to their fixed host ports regardless of the offset - they are shared services, not per-worktree instances. Concurrent worktrees reuse those containers, and `pnpm dev:stop` leaves them running while another `kilo-dev-*` session remains active.
+
+The Next.js dev script exports local Redis defaults before `next dev` starts: `UPSTASH_REDIS_REST_URL=http://localhost:8079` and `UPSTASH_REDIS_REST_TOKEN=example_token` for the shared `@upstash/redis` REST helper, plus `REDIS_URL=redis://localhost:6379` for Chat SDK state because `@chat-adapter/state-redis` uses the Redis TCP protocol.
 
 ## Troubleshooting
 

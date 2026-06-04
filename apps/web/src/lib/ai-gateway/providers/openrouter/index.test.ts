@@ -11,7 +11,11 @@ import type { OpenRouterModel } from '@/lib/organizations/organization-types';
 import { minimax_m3_discounted_model } from '@/lib/ai-gateway/providers/minimax';
 import { seed_20_code_free_model } from '@/lib/ai-gateway/providers/seed';
 import { morph_warp_grep_free_model } from '@/lib/ai-gateway/providers/morph';
-import { findKiloExclusiveModel, isDeadFreeModel, kiloExclusiveModels } from '@/lib/ai-gateway/models';
+import {
+  findKiloExclusiveModel,
+  isDeadFreeModel,
+  kiloExclusiveModels,
+} from '@/lib/ai-gateway/models';
 import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 
 jest.mock('@/lib/ai-gateway/providers/gateway-models-cache', () => ({

@@ -28,7 +28,13 @@ type Slice = {
   sourceKeys?: string[];
 };
 
-export function BreakdownPieChart({ title, data, loading, metric, labelFor }: BreakdownPieChartProps) {
+export function BreakdownPieChart({
+  title,
+  data,
+  loading,
+  metric,
+  labelFor,
+}: BreakdownPieChartProps) {
   const [hoveredKey, setHoveredKey] = useState<string | null>(null);
 
   const slices = useMemo<Slice[]>(() => {
@@ -149,9 +155,7 @@ export function BreakdownPieChart({ title, data, loading, metric, labelFor }: Br
                   <span className="text-muted-foreground shrink-0">
                     {slice.percentage.toFixed(1)}%
                   </span>
-                  <span className="shrink-0 font-mono">
-                    {formatMetric(metric, slice.value)}
-                  </span>
+                  <span className="shrink-0 font-mono">{formatMetric(metric, slice.value)}</span>
                 </li>
               ))}
             </ul>

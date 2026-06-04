@@ -1005,9 +1005,7 @@ export function countAndStoreTranscriptionUsage(
     ? Promise.resolve(null)
     : clonedResponse
         .text()
-        .then(text =>
-          parseTranscriptionUsageFromResponse(text, statusCode)
-        )
+        .then(text => parseTranscriptionUsageFromResponse(text, statusCode))
         .catch(() => null);
 
   after(

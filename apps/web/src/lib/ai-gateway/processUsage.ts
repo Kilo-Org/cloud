@@ -260,7 +260,11 @@ export async function logMicrodollarUsage(
 ): Promise<{ usageId: string; createdAt: string } | null> {
   usageContext.status_code = usageStats.status_code;
   const contextInfo = extractUsageContextInfo(usageContext);
-  const { core, metadata } = await toInsertableDbUsageRecord(usageStats, contextInfo, responseModel);
+  const { core, metadata } = await toInsertableDbUsageRecord(
+    usageStats,
+    contextInfo,
+    responseModel
+  );
 
   const inserted = await saveUsageRelatedData(
     core,

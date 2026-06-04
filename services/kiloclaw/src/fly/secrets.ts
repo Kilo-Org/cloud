@@ -69,17 +69,26 @@ export async function setAppSecret(
   const path = `/secrets/${encodeURIComponent(name)}`;
 
   for (let attempt = 0; attempt <= SET_SECRET_RETRY_DELAYS_MS.length; attempt++) {
-    const resp = await secretsFetch(config, path, {
-      method: 'POST',
-      body: JSON.stringify({ value }),
-    });
+    const retryDelayMs = SET_SECRET_RETRY_DELAYS_MS[attempt];
+
+    let resp: Response;
+    try {
+      resp = await secretsFetch(config, path, {
+        method: 'POST',
+        body: JSON.stringify({ value }),
+      });
+    } catch (err) {
+      // Network-level failure (connection reset, DNS, TLS, etc.)
+      if (retryDelayMs === undefined) throw err;
+      await sleep(retryDelayMs);
+      continue;
+    }
 
     if (resp.ok) {
       const data: { version?: number } = await resp.json();
       return { version: data.version ?? 0 };
     }
 
-    const retryDelayMs = SET_SECRET_RETRY_DELAYS_MS[attempt];
     if (retryDelayMs === undefined || !isRetryableSecretStatus(resp.status)) {
       await assertOk(resp, 'setAppSecret');
       throw new Error('unreachable setAppSecret error state');

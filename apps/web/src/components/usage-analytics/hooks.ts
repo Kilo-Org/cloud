@@ -182,7 +182,7 @@ export function useUsageTimeseries(
 export function useUsageBreakdown(
   args: CommonArgs & {
     dimension: Dimension;
-    metric: 'cost' | 'requests' | 'tokens';
+    metric: MetricKey;
     limit?: number;
     enabled?: boolean;
   }

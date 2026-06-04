@@ -1,7 +1,7 @@
 /**
  * Pools of dimension values used by the mock usage generator.
  *
- * Snowflake groups by `model`, `feature`, `mode`, `provider`, `project_id`,
+ * Snowflake groups by `requested_model`, `feature`, `mode`, `provider`, `project_id`,
  * plus the user and org scope. We generate records with enough variety across
  * those dimensions that every breakdown chart has multiple slices.
  */

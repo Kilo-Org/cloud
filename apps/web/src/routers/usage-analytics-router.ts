@@ -19,6 +19,8 @@ export type Granularity = z.infer<typeof GranularitySchema>;
 export const DimensionSchema = z.enum(['feature', 'model', 'mode', 'user', 'provider', 'project']);
 export type Dimension = z.infer<typeof DimensionSchema>;
 
+const AdditiveMetricSchema = z.enum(['cost', 'requests', 'tokens', 'inputTokens', 'outputTokens']);
+
 export const MetricSchema = z.enum([
   'cost',
   'requests',
@@ -311,12 +313,12 @@ function buildDimensionConditions(where: WhereBuilder, filters: UsageAnalyticsFi
   };
 
   addInIfNonEmpty('feature', filters.features);
-  addInIfNonEmpty('model', filters.models);
+  addInIfNonEmpty('requested_model', filters.models);
   addInIfNonEmpty('mode', filters.modes);
   addInIfNonEmpty('provider', filters.providers);
   addInIfNonEmpty('project_id', filters.projects);
   addNotInIfNonEmpty('feature', filters.excludedFeatures);
-  addNotInIfNonEmpty('model', filters.excludedModels);
+  addNotInIfNonEmpty('requested_model', filters.excludedModels);
   addNotInIfNonEmpty('mode', filters.excludedModes);
   addNotInIfNonEmpty('provider', filters.excludedProviders);
   addNotInIfNonEmpty('project_id', filters.excludedProjects);
@@ -421,7 +423,7 @@ function dimensionColumn(dimension: Dimension): string {
     case 'feature':
       return 'feature';
     case 'model':
-      return 'model';
+      return 'requested_model';
     case 'mode':
       return 'mode';
     case 'user':
@@ -590,7 +592,7 @@ const TimeseriesOutputSchema = z.object({
 
 const BreakdownInputSchema = UsageAnalyticsFiltersSchema.extend({
   dimension: DimensionSchema,
-  metric: z.enum(['cost', 'requests', 'tokens']),
+  metric: MetricSchema,
   limit: z.number().int().min(1).max(100).default(15),
 });
 
@@ -939,9 +941,10 @@ export const usageAnalyticsRouter = createTRPCRouter({
       );
 
       const values = rows.map(row => ({ key: row[0] ?? '', value: toSafeNumber(row[1]) }));
+      const isAdditive = AdditiveMetricSchema.safeParse(input.metric).success;
       // Percentages are relative to the *returned* rows (limited by input.limit).
       // They will not reflect the true share when the result set is capped.
-      const totalValue = values.reduce((s, r) => s + r.value, 0);
+      const totalValue = isAdditive ? values.reduce((s, r) => s + r.value, 0) : 0;
 
       return {
         breakdown: values.map(r => ({
@@ -975,7 +978,7 @@ export const usageAnalyticsRouter = createTRPCRouter({
       // For dimensions not in groupBy, emit an empty string constant so the
       // row shape stays stable regardless of which dimensions were requested.
       const featExpr = requestedDims.includes('feature') ? 'feature' : "''";
-      const modelExpr = requestedDims.includes('model') ? 'model' : "''";
+      const modelExpr = requestedDims.includes('model') ? 'requested_model' : "''";
       const modeExpr = requestedDims.includes('mode') ? 'mode' : "''";
       const userExpr = requestedDims.includes('user') ? 'kilo_user_id' : "''";
       const providerExpr = requestedDims.includes('provider') ? 'provider' : "''";

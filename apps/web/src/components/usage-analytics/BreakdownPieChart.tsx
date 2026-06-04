@@ -4,8 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts';
 import { cn } from '@/lib/utils';
 import { OTHER_COLOR, PALETTE } from './colors';
-import { formatDollarsFromMicrodollars } from './format';
-import type { Dimension, UsageBreakdown } from './types';
+import { formatMetric } from './format';
+import type { AdditiveMetricKey, Dimension, UsageBreakdown } from './types';
 
 const TOP_N = 8;
 
@@ -14,6 +14,7 @@ type BreakdownPieChartProps = {
   dimension: Dimension;
   data: UsageBreakdown | undefined;
   loading: boolean;
+  metric: AdditiveMetricKey;
   labelFor?: (value: string) => string;
 };
 
@@ -27,7 +28,7 @@ type Slice = {
   sourceKeys?: string[];
 };
 
-export function BreakdownPieChart({ title, data, loading, labelFor }: BreakdownPieChartProps) {
+export function BreakdownPieChart({ title, data, loading, metric, labelFor }: BreakdownPieChartProps) {
   const [hoveredKey, setHoveredKey] = useState<string | null>(null);
 
   const slices = useMemo<Slice[]>(() => {
@@ -120,7 +121,7 @@ export function BreakdownPieChart({ title, data, loading, labelFor }: BreakdownP
                         const raw = Number(value);
                         const pct = (item?.payload as Slice | undefined)?.percentage ?? 0;
                         return [
-                          `${formatDollarsFromMicrodollars(raw)} (${pct.toFixed(1)}%)`,
+                          `${formatMetric(metric, raw)} (${pct.toFixed(1)}%)`,
                           (item?.payload as Slice | undefined)?.label ?? '',
                         ];
                       }}
@@ -149,7 +150,7 @@ export function BreakdownPieChart({ title, data, loading, labelFor }: BreakdownP
                     {slice.percentage.toFixed(1)}%
                   </span>
                   <span className="shrink-0 font-mono">
-                    {formatDollarsFromMicrodollars(slice.value)}
+                    {formatMetric(metric, slice.value)}
                   </span>
                 </li>
               ))}

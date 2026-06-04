@@ -21,6 +21,23 @@ export type MetricKey =
   | 'cacheHitRatio'
   | 'outputInputRatio';
 
+export type AdditiveMetricKey = Extract<
+  MetricKey,
+  'cost' | 'requests' | 'tokens' | 'inputTokens' | 'outputTokens'
+>;
+
+const ADDITIVE_METRICS = new Set<MetricKey>([
+  'cost',
+  'requests',
+  'tokens',
+  'inputTokens',
+  'outputTokens',
+]);
+
+export function isAdditiveMetric(metric: MetricKey): metric is AdditiveMetricKey {
+  return ADDITIVE_METRICS.has(metric);
+}
+
 export type FilterDirection = 'include' | 'exclude';
 
 export type DimensionFilter = {

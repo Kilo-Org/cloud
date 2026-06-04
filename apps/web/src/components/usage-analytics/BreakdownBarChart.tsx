@@ -12,16 +12,15 @@ import {
   YAxis,
 } from 'recharts';
 import { colorForIndex } from './colors';
-import { formatDollarsFromMicrodollars, formatMetric } from './format';
-import { formatLargeNumber } from '@/lib/utils';
-import type { Dimension, UsageBreakdown } from './types';
+import { formatMetric } from './format';
+import { isAdditiveMetric, type Dimension, type MetricKey, type UsageBreakdown } from './types';
 
 type BreakdownBarChartProps = {
   title: string;
   dimension: Dimension;
   data: UsageBreakdown | undefined;
   loading: boolean;
-  metric: 'cost' | 'requests' | 'tokens';
+  metric: MetricKey;
   labelFor?: (value: string) => string;
 };
 
@@ -43,12 +42,6 @@ const LABEL_MIN_WIDTH = 120;
 const LABEL_MAX_WIDTH = 280;
 const LABEL_RIGHT_PADDING = 16;
 
-function formatBarValue(metric: 'cost' | 'requests' | 'tokens', value: number): string {
-  if (metric === 'cost') return formatDollarsFromMicrodollars(value);
-  if (metric === 'requests') return formatLargeNumber(value);
-  return formatMetric('tokens', value);
-}
-
 export function BreakdownBarChart({
   title,
   data,
@@ -69,6 +62,7 @@ export function BreakdownBarChart({
   }, [data, labelFor]);
 
   const chartHeight = Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, items.length * ROW_HEIGHT + 24));
+  const showPercentage = isAdditiveMetric(metric);
 
   /** Size the Y-axis to fit the longest label so names aren't truncated. */
   const yAxisWidth = useMemo(() => {
@@ -107,7 +101,7 @@ export function BreakdownBarChart({
                   type="number"
                   stroke="currentColor"
                   fontSize={11}
-                  tickFormatter={v => formatBarValue(metric, Number(v))}
+                  tickFormatter={v => formatMetric(metric, Number(v))}
                 />
                 <YAxis
                   dataKey="label"
@@ -131,8 +125,10 @@ export function BreakdownBarChart({
                   cursor={{ fill: 'rgba(255, 255, 255, 0.04)' }}
                   formatter={(value, _name, item) => {
                     const raw = Number(value);
+                    const formatted = formatMetric(metric, raw);
+                    if (!showPercentage) return [formatted];
                     const pct = (item?.payload as BarDatum | undefined)?.percentage ?? 0;
-                    return [`${formatBarValue(metric, raw)} (${pct.toFixed(1)}%)`];
+                    return [`${formatted} (${pct.toFixed(1)}%)`];
                   }}
                 />
                 <Bar dataKey="value" radius={[0, 4, 4, 0]} isAnimationActive={false}>

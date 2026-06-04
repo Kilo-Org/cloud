@@ -44,6 +44,8 @@ import {
 import { useUsageDashboardState } from './useUsageDashboardState';
 import {
   DIMENSION_LABELS,
+  METRIC_LABELS,
+  isAdditiveMetric,
   type Dimension,
   type FilterDirection,
   type Granularity,
@@ -229,28 +231,29 @@ export function UsageAnalyticsDashboard({
     splitBy: splitByDimension,
   });
 
+  const featureBreakdownMetric = isAdditiveMetric(chartMetric) ? chartMetric : 'cost';
   const { data: featureBreakdown, isLoading: featureBreakdownLoading } = useUsageBreakdown({
     ...commonArgs,
     dimension: 'feature',
-    metric: 'cost',
+    metric: featureBreakdownMetric,
     limit: 20,
   });
   const { data: modelBreakdown, isLoading: modelBreakdownLoading } = useUsageBreakdown({
     ...commonArgs,
     dimension: 'model',
-    metric: 'cost',
+    metric: chartMetric,
     limit: 10,
   });
   const { data: projectBreakdown, isLoading: projectBreakdownLoading } = useUsageBreakdown({
     ...commonArgs,
     dimension: 'project',
-    metric: 'cost',
+    metric: chartMetric,
     limit: 10,
   });
   const { data: userBreakdown, isLoading: userBreakdownLoading } = useUsageBreakdown({
     ...commonArgs,
     dimension: 'user',
-    metric: 'cost',
+    metric: chartMetric,
     limit: 10,
     enabled: isOrgWideView,
   });
@@ -535,34 +538,35 @@ export function UsageAnalyticsDashboard({
             />
 
             <BreakdownPieChart
-              title="Features"
+              title={`Features by ${METRIC_LABELS[featureBreakdownMetric]}`}
               dimension="feature"
               data={featureBreakdown}
               loading={featureBreakdownLoading}
+              metric={featureBreakdownMetric}
               labelFor={featureLabelFor}
             />
             <BreakdownBarChart
-              title="Models"
+              title={`Models by ${METRIC_LABELS[chartMetric]}`}
               dimension="model"
               data={modelBreakdown}
               loading={modelBreakdownLoading}
-              metric="cost"
+              metric={chartMetric}
             />
             <BreakdownBarChart
-              title="Top Projects"
+              title={`Top Projects by ${METRIC_LABELS[chartMetric]}`}
               dimension="project"
               data={projectBreakdown}
               loading={projectBreakdownLoading}
-              metric="cost"
+              metric={chartMetric}
               labelFor={projectLabelFor}
             />
             {isOrgWideView && (
               <BreakdownBarChart
-                title="Users"
+                title={`Users by ${METRIC_LABELS[chartMetric]}`}
                 dimension="user"
                 data={userBreakdown}
                 loading={userBreakdownLoading}
-                metric="cost"
+                metric={chartMetric}
                 labelFor={userLabelFor}
               />
             )}

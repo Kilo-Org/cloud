@@ -1,6 +1,7 @@
 import type { OrganizationTrialStage } from './types';
 
-const ORGANIZATION_TRIAL_DURATION_DAYS = 14;
+export const ORGANIZATION_TRIAL_DURATION_DAYS = 14;
+export const ORGANIZATION_TRIAL_ACTIVE_MIN_DAYS_REMAINING = 8;
 
 export function getDaysRemainingInTrial(
   freeTrialEndAt: string | null,
@@ -17,7 +18,7 @@ export function getDaysRemainingInTrial(
 }
 
 export function getOrgTrialStatusFromDays(daysRemaining: number): OrganizationTrialStage {
-  if (daysRemaining >= 8) {
+  if (daysRemaining >= ORGANIZATION_TRIAL_ACTIVE_MIN_DAYS_REMAINING) {
     return 'trial_active';
   }
   if (daysRemaining > 3) {

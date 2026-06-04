@@ -35,9 +35,9 @@ import {
 } from '@/lib/ai-gateway/providers/google';
 import {
   alibabaDirectModels,
-  qwen36_plus_model,
   qwen36_plus_stealth_model,
   qwen37_plus_free_model,
+  qwen37_plus_model,
 } from '@/lib/ai-gateway/providers/qwen';
 import { stepfun_37_flash_free_model } from '@/lib/ai-gateway/providers/stepfun';
 import { isGrokModel } from '@/lib/ai-gateway/providers/xai';
@@ -69,7 +69,7 @@ export const preferredModels = [
   GPT_CURRENT_MODEL_ID,
   GEMINI_PRO_CURRENT_MODEL_ID,
   MINIMAX_CURRENT_MODEL_ID,
-  qwen36_plus_model.public_id,
+  qwen37_plus_model.public_id,
   qwen36_plus_stealth_model.public_id,
   GLM_CURRENT_MODEL_ID,
 ];

@@ -221,6 +221,26 @@ describe('sanitizeError: Instance-not-* status correction', () => {
   });
 });
 
+describe('sanitizeOpenclawConfigError: file tree RPC limit', () => {
+  it('returns a stable code and bounded message for oversized file trees', async () => {
+    const err = new Error(
+      'Serialized RPC arguments or return values are limited to 32MiB, but the size of this value was: 37110765 bytes.'
+    );
+    const env = envWithDOError(err);
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const resp = await platform.request('/files/tree?userId=user-1', {}, env);
+
+    expect(resp.status).toBe(413);
+    await expect(jsonBody(resp)).resolves.toEqual({
+      code: 'file_tree_too_large',
+      error:
+        'File tree is too large to load through the Cloudflare RPC limit (32 MiB; returned 37110765 bytes).',
+    });
+    expect(consoleSpy).toHaveBeenCalledWith('[platform] files/tree failed:', err.message);
+  });
+});
+
 describe('kilo-cli-run/start: conflict response handling', () => {
   function envWithStartRun(startRun: () => Promise<unknown>) {
     return {

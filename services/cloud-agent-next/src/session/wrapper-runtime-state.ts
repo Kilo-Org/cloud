@@ -183,9 +183,15 @@ export function reduceWrapperLease(state: WrapperLease, event: WrapperLeaseEvent
   }
 }
 
-export function nextWrapperLeaseDeadline(lease: WrapperLease): number | undefined {
+export function nextWrapperCleanupDeadline(lease: WrapperLease): number | undefined {
   if (lease.state === 'stop_needed') return lease.nextAttemptAt;
   if (lease.state === 'stopping') return lease.attemptDeadlineAt;
+  return undefined;
+}
+
+export function nextWrapperLeaseDeadline(lease: WrapperLease): number | undefined {
+  const cleanupDeadline = nextWrapperCleanupDeadline(lease);
+  if (cleanupDeadline !== undefined) return cleanupDeadline;
   if (lease.state !== 'owns_wrapper') return undefined;
   return lease.startupDeadlineAt ?? lease.keepWarmUntil;
 }

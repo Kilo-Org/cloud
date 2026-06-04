@@ -98,6 +98,7 @@ import {
   clearWrapperRuntimeIdentity,
   getWrapperLease,
   getWrapperRuntimeState,
+  nextWrapperCleanupDeadline,
   nextWrapperLeaseDeadline,
 } from '../session/wrapper-runtime-state.js';
 import {
@@ -598,6 +599,10 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         requireSessionId: () => this.requireSessionId(),
         validateModeAgainstRuntimeAgents,
         getDeliveryContext: () => this.getPendingMessageDeliveryContext(),
+        getDeliveryBlock: async () => {
+          const retryAt = nextWrapperCleanupDeadline(await getWrapperLease(this.ctx.storage));
+          return retryAt === undefined ? null : { retryAt };
+        },
         deliver: plan => this.executeDirectly(plan),
         ensureQueuedMessageEvent: event => {
           this.ensureQueuedMessageEvent({

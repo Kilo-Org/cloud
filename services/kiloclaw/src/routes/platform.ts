@@ -1066,6 +1066,27 @@ const OPENCLAW_CONFIG_ERROR_CODES = new Set([
   'invalid_request_body',
 ]);
 
+const FILE_TREE_RPC_LIMIT_ERROR_PREFIX =
+  'Serialized RPC arguments or return values are limited to 32MiB';
+
+function sanitizeFileTreeRpcLimitError(message: string): {
+  message: string;
+  status: number;
+  code: string;
+} | null {
+  if (!message.startsWith(FILE_TREE_RPC_LIMIT_ERROR_PREFIX)) return null;
+
+  const sizeMatch = message.match(/size of this value was: (\d+) bytes/);
+  const returnedSize = sizeMatch?.[1];
+  const returnedSizeSegment = returnedSize ? `; returned ${returnedSize} bytes` : '';
+
+  return {
+    message: `File tree is too large to load through the Cloudflare RPC limit (32 MiB${returnedSizeSegment}).`,
+    status: 413,
+    code: 'file_tree_too_large',
+  };
+}
+
 function isSafeOpenclawConfigCode(code: string): boolean {
   return OPENCLAW_CONFIG_ERROR_CODES.has(code) || code.startsWith('openclaw_import_');
 }
@@ -1080,6 +1101,11 @@ function sanitizeOpenclawConfigError(
   const code = getErrorCode(err);
 
   console.error(`[platform] ${operation} failed:`, raw);
+
+  if (operation === 'files/tree') {
+    const fileTreeRpcLimitError = sanitizeFileTreeRpcLimitError(normalized);
+    if (fileTreeRpcLimitError) return fileTreeRpcLimitError;
+  }
 
   if (code && isSafeOpenclawConfigCode(code)) {
     return { message: normalized, status, code };

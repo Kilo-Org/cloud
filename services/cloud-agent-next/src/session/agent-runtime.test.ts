@@ -500,6 +500,98 @@ describe('AgentRuntime', () => {
     }
   );
 
+  it('does not overwrite cleanup requested while physical wrapper observation is in flight', async () => {
+    const storage = createMemoryStorage();
+    const execute = vi.fn();
+    const sandbox = {
+      discoverSessionWrappers: vi.fn().mockImplementation(async () => {
+        await storage.put('wrapper_lease', {
+          state: 'stop_needed',
+          nextInstanceGeneration: 1,
+          target: { kind: 'session' },
+          reason: 'user-interrupt',
+          requestedAt: 10_000,
+          nextAttemptAt: 10_000,
+          attempts: 0,
+        });
+        return { status: 'absent' };
+      }),
+    } as unknown as AgentSandbox;
+    const runtime = createAgentRuntime({
+      storage,
+      env: {} as Env,
+      getMetadata: async () => createMetadata(),
+      getOrchestratorOverride: () => ({ execute }),
+      getSessionIdForLogs: () => 'agent_runtime',
+      sendToWrapper: () => false,
+      createAgentSandbox: () => sandbox,
+    });
+
+    await expect(runtime.send(createPlan())).rejects.toThrow(/cleanup is required/i);
+    expect(execute).not.toHaveBeenCalled();
+    await expect(getWrapperLease(storage)).resolves.toMatchObject({
+      state: 'stop_needed',
+      reason: 'user-interrupt',
+    });
+  });
+
+  it('reauthorizes when cleanup completes during physical wrapper observation', async () => {
+    const storage = createMemoryStorage([
+      [
+        'wrapper_lease',
+        {
+          state: 'owns_wrapper',
+          nextInstanceGeneration: 2,
+          instance: { instanceId: 'instance_stale', instanceGeneration: 1 },
+        },
+      ],
+    ]);
+    const leasedInstances: Array<{ instanceId: string; instanceGeneration: number } | undefined> =
+      [];
+    const discoverSessionWrappers = vi
+      .fn()
+      .mockImplementationOnce(async () => {
+        await storage.put('wrapper_lease', { state: 'none', nextInstanceGeneration: 2 });
+        return {
+          status: 'present',
+          observed: [
+            {
+              representation: 'process',
+              id: 'stale-wrapper',
+              port: 5_000,
+              instanceId: 'instance_stale',
+              instanceGeneration: 1,
+            },
+          ],
+        };
+      })
+      .mockResolvedValueOnce({ status: 'absent' });
+    const sandbox = { discoverSessionWrappers } as unknown as AgentSandbox;
+
+    const runtime = createAgentRuntime({
+      storage,
+      env: {} as Env,
+      getMetadata: async () => createMetadata(),
+      getOrchestratorOverride: () => ({
+        execute: async (_plan, options) => {
+          leasedInstances.push(options?.leasedInstance);
+          return { kiloSessionId: 'kilo_runtime' };
+        },
+      }),
+      getSessionIdForLogs: () => 'agent_runtime',
+      sendToWrapper: () => false,
+      createAgentSandbox: () => sandbox,
+    });
+
+    await expect(runtime.send(createPlan())).resolves.toMatchObject({ success: true });
+    expect(discoverSessionWrappers).toHaveBeenCalledTimes(2);
+    expect(leasedInstances).toEqual([expect.objectContaining({ instanceGeneration: 2 })]);
+    await expect(getWrapperLease(storage)).resolves.toMatchObject({
+      state: 'owns_wrapper',
+      instance: { instanceGeneration: 2 },
+    });
+  });
+
   it('blocks migrated run-fence state when no durable physical owner authorizes the visible wrapper', async () => {
     const storage = createMemoryStorage([
       [

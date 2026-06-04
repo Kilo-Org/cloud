@@ -450,6 +450,149 @@ describe('pending session messages', () => {
     expect(result.alarm).toBeGreaterThan(Date.now());
   });
 
+  it('does not consume a delivery attempt while physical wrapper cleanup is still in progress', async () => {
+    const userId = 'user_pending_cleanup_gate';
+    const sessionId = 'agent_pending_cleanup_gate';
+    const stub = env.CLOUD_AGENT_SESSION.get(
+      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
+    );
+
+    const result = await runInDurableObject(stub, async instance => {
+      let deliveryAttempts = 0;
+      (instance as any).orchestrator = {
+        execute: async (plan: any) => {
+          deliveryAttempts += 1;
+          return { messageId: plan.turn.messageId, kiloSessionId: 'kilo_test' };
+        },
+      };
+      await registerReadySession(instance, {
+        sessionId,
+        userId,
+        kiloSessionId: '46464646-4646-4646-8646-464646464646',
+        prompt: 'prepared prompt',
+        mode: 'code',
+        model: 'test-model',
+        kilocodeToken: 'token-cleanup-gate',
+      });
+      const cleanupDeadline = Date.now() + 60_000;
+      await instance.ctx.storage.put('wrapper_lease', {
+        state: 'stopping',
+        nextInstanceGeneration: 2,
+        target: { kind: 'session' },
+        reason: 'unexpected-wrapper',
+        requestedAt: Date.now() - 1_000,
+        attemptId: 'attempt_cleanup_gate',
+        attemptStartedAt: Date.now() - 500,
+        attemptDeadlineAt: cleanupDeadline,
+        attempts: 1,
+      });
+      await storePendingSessionMessage(
+        instance.ctx.storage,
+        createMessage({
+          messageId: 'msg_018f1e2d3c4bCleanGateAbCdE',
+          content: 'deliver after cleanup',
+          createdAt: 1,
+        })
+      );
+
+      await instance.alarm();
+      const blockedPending = await listPendingSessionMessages(instance.ctx.storage);
+      const blockedLease = await getWrapperLease(instance.ctx.storage);
+      const blockedAlarm = await instance.ctx.storage.getAlarm();
+
+      await instance.ctx.storage.put('wrapper_lease', {
+        state: 'stop_needed',
+        nextInstanceGeneration: 2,
+        target: { kind: 'session' },
+        reason: 'unexpected-wrapper',
+        requestedAt: Date.now() - 1_000,
+        nextAttemptAt: Date.now(),
+        attempts: 1,
+      });
+      await instance.alarm();
+      return {
+        deliveryAttempts,
+        cleanupDeadline,
+        blockedPending,
+        blockedLease,
+        blockedAlarm,
+        finalPending: await listPendingSessionMessages(instance.ctx.storage),
+        finalLease: await getWrapperLease(instance.ctx.storage),
+      };
+    });
+
+    expect(result.blockedPending).toHaveLength(1);
+    expect(result.blockedPending[0]?.flushAttempts).toBeUndefined();
+    expect(result.blockedPending[0]?.lastFlushError).toBeUndefined();
+    expect(result.blockedPending[0]?.deliveryDisposition).toBeUndefined();
+    expect(result.blockedLease.state).toBe('stopping');
+    expect(result.blockedAlarm).toBe(result.cleanupDeadline);
+    expect(result.deliveryAttempts).toBe(1);
+    expect(result.finalPending).toHaveLength(0);
+    expect(result.finalLease.state).toBe('owns_wrapper');
+  });
+
+  it('does not consume a delivery attempt when wrapper authorization discovers required cleanup', async () => {
+    const userId = 'user_pending_cleanup_discovery';
+    const sessionId = 'agent_pending_cleanup_discovery';
+    const stub = env.CLOUD_AGENT_SESSION.get(
+      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
+    );
+
+    const result = await runInDurableObject(stub, async instance => {
+      let deliveryAttempts = 0;
+      let authorizationInspections = 0;
+      (instance as any).orchestrator = {
+        execute: async () => {
+          deliveryAttempts += 1;
+          throw new Error('delivery must wait for cleanup');
+        },
+      };
+      instance['physicalWrapperObserver'] = async () => {
+        authorizationInspections += 1;
+        return { status: 'inspection-failed', error: 'provider unavailable' };
+      };
+      await registerReadySession(instance, {
+        sessionId,
+        userId,
+        kiloSessionId: '47474747-4747-4747-8747-474747474747',
+        prompt: 'prepared prompt',
+        mode: 'code',
+        model: 'test-model',
+        kilocodeToken: 'token-cleanup-discovery',
+      });
+      await storePendingSessionMessage(
+        instance.ctx.storage,
+        createMessage({
+          messageId: 'msg_018f1e2d3c4bCleanDiscAbCdE',
+          content: 'deliver after cleanup discovery',
+          createdAt: 1,
+        })
+      );
+
+      await instance.alarm();
+      return {
+        authorizationInspections,
+        deliveryAttempts,
+        pending: await listPendingSessionMessages(instance.ctx.storage),
+        lease: await getWrapperLease(instance.ctx.storage),
+      };
+    });
+
+    expect(result.authorizationInspections).toBe(1);
+    expect(result.deliveryAttempts).toBe(0);
+    expect(result.pending).toHaveLength(1);
+    expect(result.pending[0]?.flushAttempts).toBeUndefined();
+    expect(result.pending[0]?.lastFlushError).toBeUndefined();
+    expect(result.pending[0]?.deliveryDisposition).toBeUndefined();
+    expect(result.lease).toMatchObject({
+      state: 'stop_needed',
+      target: { kind: 'session' },
+      reason: 'observation-failed',
+      attempts: 0,
+    });
+  });
+
   it('exhausts failed flush retries, emits cloud.message.failed, and removes the pending message', async () => {
     const userId = 'user_pending_flush_exhaust';
     const sessionId = 'agent_pending_flush_exhaust';
@@ -1711,6 +1854,7 @@ describe('pending session messages', () => {
           throw new Error('wrapper unavailable');
         },
       };
+
       await registerReadySession(instance, {
         sessionId,
         userId,

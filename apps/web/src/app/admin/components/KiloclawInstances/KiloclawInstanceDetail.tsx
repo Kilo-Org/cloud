@@ -1331,6 +1331,12 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
   const [restoreReason, setRestoreReason] = useState('');
   const [cleanupRecoveryVolumeDialogOpen, setCleanupRecoveryVolumeDialogOpen] = useState(false);
   const [inboundEmailCycleDialogOpen, setInboundEmailCycleDialogOpen] = useState(false);
+  const [releaseReservationTarget, setReleaseReservationTarget] = useState<{
+    instanceId: string;
+    userId: string;
+    orgId?: string;
+    status: string;
+  } | null>(null);
   const [awaitingRestoreCompletion, setAwaitingRestoreCompletion] = useState(false);
   const [sizeOverrideDialogOpen, setSizeOverrideDialogOpen] = useState(false);
   const [sizeOverrideMode, setSizeOverrideMode] = useState<'set' | 'clear'>('set');
@@ -2702,18 +2708,16 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                                     variant="outline"
                                     size="sm"
                                     disabled={isReleasingReservation}
-                                    title="Release this stuck reservation (no provider/Postgres changes) so the user can provision again"
+                                    title="Operator override — opens a confirmation with required pre-flight checks before releasing the admission lock"
                                     onClick={() =>
-                                      void releaseReservation({
+                                      setReleaseReservationTarget({
                                         userId: reservation.assignedUserId,
                                         instanceId: reservation.instanceId,
                                         orgId: reservationOrgId,
+                                        status: reservation.status,
                                       })
                                     }
                                   >
-                                    {isReleasingReservation ? (
-                                      <Loader2 className="mr-1 h-4 w-4 animate-spin" />
-                                    ) : null}
                                     Release
                                   </Button>
                                 ) : (
@@ -2731,6 +2735,86 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
             </CardContent>
           </Card>
         ))}
+
+        {/* Break-glass confirm dialog for releasing a stuck provision reservation. */}
+        <Dialog
+          open={releaseReservationTarget !== null}
+          onOpenChange={open => {
+            if (!open) setReleaseReservationTarget(null);
+          }}
+        >
+          <DialogContent className="sm:max-w-[560px]">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <ShieldAlert className="h-5 w-5" />
+                Release stuck provision reservation
+              </DialogTitle>
+              <DialogDescription asChild>
+                <div className="max-h-[60vh] space-y-3 overflow-y-auto pr-1 text-sm">
+                  <p>
+                    This is a break-glass operator action. It clears the admission lock so the user
+                    can provision again. It does <strong>not</strong> delete any provider resources
+                    and does not touch Postgres.
+                  </p>
+                  <p className="font-medium text-foreground">
+                    Confirm ALL of the following before releasing:
+                  </p>
+                  <ul className="list-disc space-y-1 pl-5">
+                    <li>The provisioning attempt is dead (not still running).</li>
+                    <li>No active instance exists for this user/context.</li>
+                    <li>
+                      Provider resources from the failed attempt are destroyed — verify per the
+                      provisioning provider:
+                      <ol className="mt-1 list-decimal space-y-0.5 pl-5 text-xs">
+                        <li>
+                          Fly: run orphan-volume-scan for this instanceId and confirm the app
+                          (<code>inst-…</code>) has no machines or volumes, or is deleted.
+                        </li>
+                        <li>
+                          Northflank: confirm the project (<code>kc-ki-…</code>) and its services and
+                          volumes no longer exist in the Northflank console.
+                        </li>
+                      </ol>
+                    </li>
+                    <li>
+                      You understand that releasing while orphaned resources still exist can leave
+                      infrastructure that may hold the user&apos;s secrets.
+                    </li>
+                  </ul>
+                  {releaseReservationTarget && (
+                    <p className="text-xs text-muted-foreground">
+                      Reservation <code>{releaseReservationTarget.instanceId}</code> · status{' '}
+                      <code>{releaseReservationTarget.status}</code>
+                    </p>
+                  )}
+                </div>
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="gap-2 sm:gap-0">
+              <DialogClose asChild>
+                <Button variant="outline">Cancel</Button>
+              </DialogClose>
+              <Button
+                variant="destructive"
+                disabled={isReleasingReservation}
+                onClick={() => {
+                  if (!releaseReservationTarget) return;
+                  void releaseReservation({
+                    userId: releaseReservationTarget.userId,
+                    instanceId: releaseReservationTarget.instanceId,
+                    orgId: releaseReservationTarget.orgId,
+                    acknowledgeCleanupVerified: true,
+                  })
+                    .then(() => setReleaseReservationTarget(null))
+                    .catch(() => undefined);
+                }}
+              >
+                {isReleasingReservation ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : null}
+                I&apos;ve verified — release
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         <Card>
           <CardHeader>

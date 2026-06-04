@@ -328,8 +328,6 @@ describe('KiloClawRegistry fresh provision reservations', () => {
 });
 
 describe('KiloClawRegistry.adminReleaseStuckReservation', () => {
-  const STALE_MS = 15 * 60 * 1000;
-
   beforeEach(() => {
     databaseRows.instances.length = 0;
     databaseRows.reservations.length = 0;
@@ -348,8 +346,8 @@ describe('KiloClawRegistry.adminReleaseStuckReservation', () => {
       'user:user-1',
       'user-1',
       'instance-1',
-      'manual_admin_release',
-      STALE_MS
+      'failed_requires_reconciliation',
+      'manual_admin_release'
     );
     expect(result).toEqual({
       outcome: 'released',
@@ -361,53 +359,40 @@ describe('KiloClawRegistry.adminReleaseStuckReservation', () => {
     expect(retry.outcome).toBe('admitted');
   });
 
-  it('releases an in_progress reservation only once it is stale', async () => {
+  it('releases an in_progress reservation matching the expected status', async () => {
     const registry = new KiloClawRegistry(createState() as never, {} as never);
     await registry.beginFreshProvision('user:user-1', 'user-1', 'instance-1', 'do-1');
-    // Age the reservation past the staleness threshold.
-    databaseRows.reservations[0].updated_at = new Date(Date.now() - 20 * 60 * 1000).toISOString();
 
     const result = await registry.adminReleaseStuckReservation(
       'user:user-1',
       'user-1',
       'instance-1',
-      'manual_admin_release',
-      STALE_MS
+      'in_progress',
+      'manual_admin_release'
     );
     expect(result).toEqual({ outcome: 'released', previousStatus: 'in_progress' });
   });
 
-  it('refuses to release a fresh in_progress reservation (executor may still be running)', async () => {
+  it('reports status_changed when the row no longer matches the expected status', async () => {
     const registry = new KiloClawRegistry(createState() as never, {} as never);
     await registry.beginFreshProvision('user:user-1', 'user-1', 'instance-1', 'do-1');
-
-    const result = await registry.adminReleaseStuckReservation(
-      'user:user-1',
-      'user-1',
-      'instance-1',
-      'manual_admin_release',
-      STALE_MS
-    );
-    expect(result.outcome).toBe('in_progress_too_fresh');
-
-    // Still blocks a duplicate provision.
-    const blocked = await registry.beginFreshProvision('user:user-1', 'user-1', 'instance-2', 'do-2');
-    expect(blocked.outcome).toBe('conflict');
-  });
-
-  it('refuses to release a completed reservation', async () => {
-    const registry = new KiloClawRegistry(createState() as never, {} as never);
-    await registry.beginFreshProvision('user:user-1', 'user-1', 'instance-1', 'do-1');
+    // Caller validated in_progress, but it completed before the release landed.
     await registry.completeFreshProvision('user:user-1', 'user-1', 'instance-1', 'do-1');
 
     const result = await registry.adminReleaseStuckReservation(
       'user:user-1',
       'user-1',
       'instance-1',
-      'manual_admin_release',
-      STALE_MS
+      'in_progress',
+      'manual_admin_release'
     );
-    expect(result).toEqual({ outcome: 'not_releasable', status: 'completed' });
+    expect(result).toEqual({ outcome: 'status_changed', status: 'completed' });
+
+    // The completed reservation is untouched.
+    const all = await registry.listAllInstances('user:user-1');
+    expect(all.reservations).toEqual([
+      expect.objectContaining({ instanceId: 'instance-1', status: 'completed' }),
+    ]);
   });
 
   it('returns not_found when no reservation exists for the instance', async () => {
@@ -417,8 +402,8 @@ describe('KiloClawRegistry.adminReleaseStuckReservation', () => {
       'user:user-1',
       'user-1',
       'missing-instance',
-      'manual_admin_release',
-      STALE_MS
+      'failed_requires_reconciliation',
+      'manual_admin_release'
     );
     expect(result).toEqual({ outcome: 'not_found' });
   });

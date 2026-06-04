@@ -929,16 +929,22 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       return client.getRegistryEntries(input.userId, input.orgId ?? undefined);
     }),
 
-  // Release a STUCK provision reservation (status in_progress /
-  // failed_requires_reconciliation) so the user can provision again. The worker
-  // endpoint is guarded: it refuses reservations backing an active instance or
-  // already completed/released, and performs no provider/Postgres mutations.
+  // Admin break-glass: release a STUCK provision reservation (status
+  // in_progress / failed_requires_reconciliation) so the user can provision
+  // again. This is an operator action — the admin asserts (via the UI confirm
+  // dialog) that they have verified the attempt is dead and any provider
+  // resources are cleaned up. The worker mutates only the registry bookkeeping
+  // row (no provider/Postgres changes) and refuses reservations backing an
+  // active instance or in a non-releasable state.
   releaseReservation: adminProcedure
     .input(
       z.object({
         userId: z.string().min(1),
         instanceId: z.string().uuid(),
         orgId: z.string().uuid().optional(),
+        // Caller (the break-glass confirmation dialog) must supply this; enforced
+        // at the API boundary, not auto-inserted by the client.
+        acknowledgeCleanupVerified: z.literal(true),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -946,7 +952,8 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       const result = await client.releaseProvisionReservation(
         input.userId,
         input.instanceId,
-        input.orgId
+        input.orgId,
+        input.acknowledgeCleanupVerified
       );
       await createKiloClawAdminAuditLog({
         action: 'kiloclaw.provision_reservation.release',
@@ -954,11 +961,14 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         actor_email: ctx.user.google_user_email,
         actor_name: ctx.user.google_user_name,
         target_user_id: input.userId,
-        message: `Released stuck provision reservation ${input.instanceId} (was ${result.previousStatus})`,
+        message:
+          `Break-glass released stuck provision reservation ${input.instanceId} ` +
+          `(was ${result.previousStatus}); operator asserted provider cleanup verified`,
         metadata: {
           instanceId: input.instanceId,
           orgId: input.orgId ?? null,
           previousStatus: result.previousStatus,
+          acknowledgeCleanupVerified: true,
         },
       });
       return result;

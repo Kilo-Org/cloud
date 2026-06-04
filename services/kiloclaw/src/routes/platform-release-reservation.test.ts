@@ -1,9 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { platform } from './platform';
-import * as fly from '../fly/client';
-import type * as FlyClient from '../fly/client';
-import * as flyApps from '../fly/apps';
-import type * as FlyApps from '../fly/apps';
 import { getActivePersonalInstance } from '../db';
 import type * as DbModule from '../db';
 
@@ -11,20 +7,6 @@ vi.mock('cloudflare:workers', () => ({
   DurableObject: class {},
   waitUntil: (promise: Promise<unknown>) => promise,
 }));
-
-vi.mock('../fly/client', async () => {
-  const actual = await vi.importActual<typeof FlyClient>('../fly/client');
-  return { ...actual, listMachines: vi.fn(), listVolumes: vi.fn() };
-});
-
-vi.mock('../fly/apps', async () => {
-  const actual = await vi.importActual<typeof FlyApps>('../fly/apps');
-  return {
-    ...actual,
-    getApp: vi.fn(),
-    appNameFromInstanceId: vi.fn().mockResolvedValue('inst-testapp'),
-  };
-});
 
 vi.mock('../db', async () => {
   const actual = await vi.importActual<typeof DbModule>('../db');
@@ -40,21 +22,18 @@ const INSTANCE_ID = '0ef67a15-64d5-450e-a128-df0f22969ac9';
 
 type Reservation = { instanceId: string; status: string };
 
-function makeEnv(opts?: {
-  flyApiToken?: string | null;
-  reservations?: Reservation[];
-  releaseResult?: unknown;
-}) {
+function makeEnv(opts?: { reservations?: Reservation[]; releaseResult?: unknown }) {
   const listAllInstances = vi
     .fn()
     .mockResolvedValue({ entries: [], reservations: opts?.reservations ?? [], migrated: true });
-  const adminReleaseStuckReservation = vi
-    .fn()
-    .mockResolvedValue(opts?.releaseResult ?? { outcome: 'released', previousStatus: 'in_progress' });
-  const flyApiToken = opts?.flyApiToken === undefined ? 'test-token' : opts.flyApiToken;
+  const adminReleaseStuckReservation = vi.fn().mockResolvedValue(
+    opts?.releaseResult ?? {
+      outcome: 'released',
+      previousStatus: 'failed_requires_reconciliation',
+    }
+  );
   return {
     env: {
-      FLY_API_TOKEN: flyApiToken ?? undefined,
       HYPERDRIVE: { connectionString: 'postgres://test' },
       KILOCLAW_REGISTRY: {
         idFromName: (id: string) => id,
@@ -66,19 +45,18 @@ function makeEnv(opts?: {
   };
 }
 
-function releaseInit() {
+function releaseInit(body?: Record<string, unknown>) {
   return {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ userId: USER_ID, instanceId: INSTANCE_ID }),
+    body: JSON.stringify(
+      body ?? { userId: USER_ID, instanceId: INSTANCE_ID, acknowledgeCleanupVerified: true }
+    ),
   };
 }
 
 beforeEach(() => {
   vi.mocked(getActivePersonalInstance).mockReset().mockResolvedValue(null);
-  vi.mocked(fly.listMachines).mockReset().mockResolvedValue([]);
-  vi.mocked(fly.listVolumes).mockReset().mockResolvedValue([]);
-  vi.mocked(flyApps.getApp).mockReset().mockResolvedValue(null);
   vi.spyOn(console, 'error').mockImplementation(() => undefined);
 });
 
@@ -87,6 +65,31 @@ afterEach(() => {
 });
 
 describe('POST /provision/release-reservation', () => {
+  it('rejects a request missing the cleanup acknowledgement', async () => {
+    const { env, adminReleaseStuckReservation } = makeEnv({
+      reservations: [{ instanceId: INSTANCE_ID, status: 'failed_requires_reconciliation' }],
+    });
+    const res = await platform.request(
+      '/provision/release-reservation',
+      releaseInit({ userId: USER_ID, instanceId: INSTANCE_ID }),
+      env
+    );
+    expect(res.status).toBe(400);
+    expect(adminReleaseStuckReservation).not.toHaveBeenCalled();
+  });
+
+  it('rejects a falsey cleanup acknowledgement', async () => {
+    const { env } = makeEnv({
+      reservations: [{ instanceId: INSTANCE_ID, status: 'failed_requires_reconciliation' }],
+    });
+    const res = await platform.request(
+      '/provision/release-reservation',
+      releaseInit({ userId: USER_ID, instanceId: INSTANCE_ID, acknowledgeCleanupVerified: false }),
+      env
+    );
+    expect(res.status).toBe(400);
+  });
+
   it('refuses when the reservation backs a live active instance', async () => {
     vi.mocked(getActivePersonalInstance).mockResolvedValue({ id: INSTANCE_ID } as never);
     const { env, adminReleaseStuckReservation } = makeEnv();
@@ -114,21 +117,7 @@ describe('POST /provision/release-reservation', () => {
     expect(adminReleaseStuckReservation).not.toHaveBeenCalled();
   });
 
-  it('refuses failed_requires_reconciliation when provider resources still exist', async () => {
-    vi.mocked(flyApps.getApp).mockResolvedValue({ id: 'app', created_at: 1 } as never);
-    vi.mocked(fly.listMachines).mockResolvedValue([{ id: 'm1' } as never]);
-    const { env, adminReleaseStuckReservation } = makeEnv({
-      reservations: [{ instanceId: INSTANCE_ID, status: 'failed_requires_reconciliation' }],
-    });
-
-    const res = await platform.request('/provision/release-reservation', releaseInit(), env);
-    expect(res.status).toBe(409);
-    expect(((await res.json()) as { code?: string }).code).toBe('provider_resources_present');
-    expect(adminReleaseStuckReservation).not.toHaveBeenCalled();
-  });
-
-  it('releases failed_requires_reconciliation when no Fly app remains', async () => {
-    vi.mocked(flyApps.getApp).mockResolvedValue(null);
+  it('releases a failed_requires_reconciliation reservation with the validated status', async () => {
     const { env, adminReleaseStuckReservation } = makeEnv({
       reservations: [{ instanceId: INSTANCE_ID, status: 'failed_requires_reconciliation' }],
       releaseResult: { outcome: 'released', previousStatus: 'failed_requires_reconciliation' },
@@ -140,31 +129,24 @@ describe('POST /provision/release-reservation', () => {
       ok: true,
       previousStatus: 'failed_requires_reconciliation',
     });
-    expect(adminReleaseStuckReservation).toHaveBeenCalledOnce();
+    expect(adminReleaseStuckReservation).toHaveBeenCalledWith(
+      expect.any(String),
+      USER_ID,
+      INSTANCE_ID,
+      'failed_requires_reconciliation',
+      'manual_admin_release'
+    );
   });
 
-  it('returns 503 when FLY_API_TOKEN is missing for a reconciliation release', async () => {
-    const { env, adminReleaseStuckReservation } = makeEnv({
-      flyApiToken: null,
-      reservations: [{ instanceId: INSTANCE_ID, status: 'failed_requires_reconciliation' }],
-    });
-
-    const res = await platform.request('/provision/release-reservation', releaseInit(), env);
-    expect(res.status).toBe(503);
-    expect(((await res.json()) as { code?: string }).code).toBe('provider_check_unavailable');
-    expect(adminReleaseStuckReservation).not.toHaveBeenCalled();
-  });
-
-  it('maps a still-fresh in_progress reservation to 409 (no Fly check needed)', async () => {
+  it('maps a concurrent status change to 409', async () => {
     const { env } = makeEnv({
       reservations: [{ instanceId: INSTANCE_ID, status: 'in_progress' }],
-      releaseResult: { outcome: 'in_progress_too_fresh', updatedAt: '2026-06-04T13:54:51.966Z' },
+      releaseResult: { outcome: 'status_changed', status: 'completed' },
     });
 
     const res = await platform.request('/provision/release-reservation', releaseInit(), env);
     expect(res.status).toBe(409);
-    expect(((await res.json()) as { code?: string }).code).toBe('reservation_in_progress_active');
-    expect(flyApps.getApp).not.toHaveBeenCalled();
+    expect(((await res.json()) as { code?: string }).code).toBe('reservation_status_changed');
   });
 
   it('releases a stale in_progress reservation', async () => {

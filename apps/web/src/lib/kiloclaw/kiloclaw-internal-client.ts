@@ -321,13 +321,16 @@ export class KiloClawInternalClient {
   async releaseProvisionReservation(
     userId: string,
     instanceId: string,
-    orgId?: string
+    orgId: string | undefined,
+    acknowledgeCleanupVerified: true
   ): Promise<{ ok: true; previousStatus: string }> {
     return this.request(
       '/api/platform/provision/release-reservation',
       {
         method: 'POST',
-        body: JSON.stringify({ userId, instanceId, orgId }),
+        // The acknowledgement is threaded from the admin UI's break-glass
+        // confirmation through tRPC; the worker requires it to be exactly `true`.
+        body: JSON.stringify({ userId, instanceId, orgId, acknowledgeCleanupVerified }),
       },
       { userId }
     );

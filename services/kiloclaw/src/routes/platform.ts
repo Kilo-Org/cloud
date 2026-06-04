@@ -8,7 +8,6 @@
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import * as fly from '../fly/client';
-import { appNameFromInstanceId, getApp } from '../fly/apps';
 import type { InstanceStatus } from '../durable-objects/kiloclaw-instance/types';
 import type { FileWriteResponse } from '../durable-objects/gateway-controller-types';
 import type { AppEnv } from '../types';
@@ -132,6 +131,16 @@ const ProvisionReservationRepairSchema = z.object({
   userId: z.string().min(1),
   instanceId: z.uuid(),
   orgId: z.uuid().nullable().optional(),
+});
+
+const ProvisionReservationReleaseSchema = z.object({
+  userId: z.string().min(1),
+  instanceId: z.uuid(),
+  orgId: z.uuid().nullable().optional(),
+  // Break-glass: the operator must explicitly assert they have confirmed the
+  // attempt is dead and any provider resources are cleaned up. `z.literal(true)`
+  // makes the request fail validation unless the flag is present and true.
+  acknowledgeCleanupVerified: z.literal(true),
 });
 
 const KILOCLAW_WORKER_DESTROY_ACTOR = {
@@ -1867,14 +1876,8 @@ platform.post('/provision/repair-reservation', async c => {
   }
 });
 
-// An `in_progress` reservation is only releasable once it is provably stale: a
-// Cloudflare Worker provision request is bounded to a few minutes, so a
-// reservation untouched for longer than this means the creating executor is
-// gone and cannot still be allocating provider resources.
-const RELEASE_IN_PROGRESS_STALE_MS = 15 * 60 * 1000;
-
 // POST /api/platform/provision/release-reservation
-// Resolves a STUCK provision reservation (`in_progress` or
+// Admin break-glass: release a stuck provision reservation (`in_progress` or
 // `failed_requires_reconciliation`) so the user can provision again. A failed
 // fresh provision can leave such a row behind (e.g. `provider_provision_failed`
 // during a provider outage); the partial unique index then rejects every new
@@ -1882,24 +1885,21 @@ const RELEASE_IN_PROGRESS_STALE_MS = 15 * 60 * 1000;
 // created"), and nothing auto-heals it because no instance/DO exists to finalize
 // a destroy.
 //
-// This is FAIL-CLOSED. It does NOT destroy anything; it only flips the bookkeeping
-// row to `released`, and only once it can prove the release is safe:
-//   - refuses if the reservation backs a live active instance;
-//   - refuses `in_progress` unless it is stale (executor provably dead);
-//   - for `failed_requires_reconciliation` (provider side effects MAY exist),
-//     confirms via Fly that no app / machines / volumes remain for this
-//     instanceId before releasing — otherwise it refuses so the orphaned
-//     resources are reaped first (orphan-volume reaper / DO destroy);
-//   - performs the validate+transition atomically in one DO RPC so it cannot
-//     race a concurrent provision completion.
+// This is an OPERATOR action, not an autonomous safety decision. The admin must
+// have already confirmed the attempt is dead and any provider resources are
+// cleaned up; `acknowledgeCleanupVerified: true` records that assertion (and the
+// admin identity is captured in the tRPC audit log upstream). It mutates only
+// the registry bookkeeping row — no provider (Fly/Northflank) or Postgres
+// changes. Guards: refuses a reservation backing a live active instance, refuses
+// non-releasable statuses, and releases atomically via a compare-and-set on the
+// validated status so a concurrent completion is reported, not clobbered.
 platform.post('/provision/release-reservation', async c => {
-  const result = await parseBody(c, ProvisionReservationRepairSchema);
+  const result = await parseBody(c, ProvisionReservationReleaseSchema);
   if ('error' in result) return result.error;
   const { userId, instanceId, orgId } = result.data;
 
   try {
-    // Defense in depth: never release a reservation that belongs to a
-    // currently-active instance.
+    // Never release a reservation that belongs to a currently-active instance.
     const activeInstance = await getActiveProvisionContextInstance(c.env, userId, orgId);
     if (activeInstance?.id === instanceId) {
       return jsonError(
@@ -1926,48 +1926,13 @@ platform.post('/provision/release-reservation', async c => {
       );
     }
 
-    // `failed_requires_reconciliation` is fail-closed by design: provider side
-    // effects may exist. Releasing the admission lock while a Fly app / machine /
-    // volume for this instanceId is still around would orphan infrastructure that
-    // may hold the user's encrypted env/secrets. Confirm there is nothing to
-    // reconcile (read-only) before releasing; if we can't confirm, refuse.
-    if (reservation.status === 'failed_requires_reconciliation') {
-      const apiToken = c.env.FLY_API_TOKEN;
-      if (!apiToken) {
-        return jsonError(
-          'FLY_API_TOKEN is not configured; cannot confirm provider cleanup before release',
-          503,
-          'provider_check_unavailable'
-        );
-      }
-      const prefix = c.env.WORKER_ENV === 'development' ? 'dev' : undefined;
-      const appName = await appNameFromInstanceId(instanceId, prefix);
-      const app = await getApp({ apiToken }, appName);
-      if (app) {
-        const flyConfig = { apiToken, appName };
-        const [machines, volumes] = await Promise.all([
-          fly.listMachines(flyConfig),
-          fly.listVolumes(flyConfig),
-        ]);
-        if (machines.length > 0 || volumes.length > 0) {
-          return jsonError(
-            `Provider resources still exist for this instance (app=${appName}, ` +
-              `machines=${machines.length}, volumes=${volumes.length}). Reap them ` +
-              `before releasing the reservation.`,
-            409,
-            'provider_resources_present'
-          );
-        }
-      }
-    }
-
-    // Atomic validate + transition (no read/write split, no completed->released).
+    // Atomic compare-and-set on the exact status we validated.
     const release = await stub.adminReleaseStuckReservation(
       registryKey,
       userId,
       instanceId,
-      'manual_admin_release',
-      RELEASE_IN_PROGRESS_STALE_MS
+      reservation.status,
+      'manual_admin_release'
     );
     switch (release.outcome) {
       case 'not_found':
@@ -1976,18 +1941,11 @@ platform.post('/provision/release-reservation', async c => {
           404,
           'reservation_not_found'
         );
-      case 'not_releasable':
+      case 'status_changed':
         return jsonError(
-          `Reservation is not in a releasable state (status=${release.status})`,
+          `Reservation status changed to ${release.status} during release; re-check and retry`,
           409,
-          'reservation_not_releasable'
-        );
-      case 'in_progress_too_fresh':
-        return jsonError(
-          'Reservation is still in progress and not yet stale; the provision may ' +
-            'still be running. Try again later.',
-          409,
-          'reservation_in_progress_active'
+          'reservation_status_changed'
         );
       case 'released':
         writeEvent(c.env, {

@@ -39,11 +39,12 @@ export type BeginFreshProvisionResult =
   | { outcome: 'admitted'; reservation: ProvisionReservationEntry }
   | { outcome: 'conflict'; reservation: ProvisionReservationEntry };
 
+export type ReleasableReservationStatus = 'in_progress' | 'failed_requires_reconciliation';
+
 export type AdminReleaseReservationResult =
-  | { outcome: 'released'; previousStatus: 'in_progress' | 'failed_requires_reconciliation' }
+  | { outcome: 'released'; previousStatus: ReleasableReservationStatus }
   | { outcome: 'not_found' }
-  | { outcome: 'not_releasable'; status: ProvisionReservationStatus }
-  | { outcome: 'in_progress_too_fresh'; updatedAt: string };
+  | { outcome: 'status_changed'; status: ProvisionReservationStatus };
 
 function rowToEntry(row: typeof registryInstances.$inferSelect): RegistryEntry {
   return {
@@ -286,26 +287,27 @@ export class KiloClawRegistry extends DurableObject<KiloClawEnv> {
   }
 
   /**
-   * Atomically release a STUCK reservation for an admin/operator. Unlike
-   * `releaseFreshProvision`, this validates and transitions in a single
-   * `transactionSync` so it cannot race a concurrent
-   * `completeFreshProvision`/`finalizeDestroyedInstance` (the read+write are
-   * not split across RPCs), and it refuses to touch `completed`/`released`.
+   * Atomically release a stuck reservation as an explicit admin/operator
+   * break-glass action. This is NOT an autonomous safety decision: the caller
+   * (an authenticated admin) is asserting they have already confirmed the
+   * attempt is dead and any provider resources are cleaned up. The audit log on
+   * the route records that assertion.
    *
-   * `in_progress` is only releasable once it is provably stale (older than
-   * `inProgressMaxAgeMs`) — a live in-flight provision must keep its admission
-   * lock. `failed_requires_reconciliation` is releasable here; the route layer
-   * is responsible for confirming no provider resources remain first.
+   * Validation + transition happen in a single `transactionSync` so the read
+   * and write cannot be split across RPCs. The release is a compare-and-set on
+   * `expectedStatus` — the exact status the caller validated — so a reservation
+   * that changed underneath (e.g. a concurrent `completeFreshProvision`) is
+   * reported as `status_changed` rather than silently released.
    */
   async adminReleaseStuckReservation(
     ownerKey: string,
     assignedUserId: string,
     instanceId: string,
-    reason: string,
-    inProgressMaxAgeMs: number
+    expectedStatus: ReleasableReservationStatus,
+    reason: string
   ): Promise<AdminReleaseReservationResult> {
     await this.ensureOwnerKey(ownerKey);
-    const now = new Date();
+    const now = new Date().toISOString();
     return this.ctx.storage.transactionSync(() => {
       const row = this.db
         .select()
@@ -318,30 +320,21 @@ export class KiloClawRegistry extends DurableObject<KiloClawEnv> {
         )
         .get();
       if (!row) return { outcome: 'not_found' };
-      const previousStatus = row.status;
-      if (previousStatus !== 'in_progress' && previousStatus !== 'failed_requires_reconciliation') {
-        return { outcome: 'not_releasable', status: previousStatus };
+      if (row.status !== expectedStatus) {
+        return { outcome: 'status_changed', status: row.status };
       }
-      if (previousStatus === 'in_progress') {
-        const ageMs = now.getTime() - new Date(row.updated_at).getTime();
-        if (ageMs < inProgressMaxAgeMs) {
-          return { outcome: 'in_progress_too_fresh', updatedAt: row.updated_at };
-        }
-      }
-      // Compare-and-set on the exact observed status. Redundant with the
-      // surrounding transaction but makes the intended invariant explicit.
       this.db
         .update(registryProvisionReservations)
-        .set({ status: 'released', updated_at: now.toISOString(), resolution_reason: reason })
+        .set({ status: 'released', updated_at: now, resolution_reason: reason })
         .where(
           and(
             eq(registryProvisionReservations.instance_id, instanceId),
             eq(registryProvisionReservations.assigned_user_id, assignedUserId),
-            eq(registryProvisionReservations.status, previousStatus)
+            eq(registryProvisionReservations.status, expectedStatus)
           )
         )
         .run();
-      return { outcome: 'released', previousStatus };
+      return { outcome: 'released', previousStatus: expectedStatus };
     });
   }
 

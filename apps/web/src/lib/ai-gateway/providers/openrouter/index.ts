@@ -13,7 +13,10 @@ import {
 } from '@/lib/organizations/organization-types';
 import { errorExceptInTest } from '@/lib/utils.server';
 import { captureException, captureMessage } from '@sentry/nextjs';
-import { convertFromKiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
+import {
+  convertFromKiloExclusiveModel,
+  type KiloExclusiveModel,
+} from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 import { isForbiddenFreeModel } from '@/lib/ai-gateway/forbidden-free-models';
 import { getOpenCodeSettings } from '@/lib/ai-gateway/providers/model-settings';
 import { AUTO_MODELS } from '@/lib/ai-gateway/auto-model';
@@ -109,6 +112,10 @@ export function undoPricingDiscount(pricing: EndpointPricing): EndpointPricing {
   return result;
 }
 
+export function shouldSuppressOpenRouterModel(model: KiloExclusiveModel): boolean {
+  return model.status !== 'disabled' || model.pricing === null;
+}
+
 async function enhancedModelList(models: OpenRouterModel[]) {
   const autoModels = buildAutoModels();
   const endpointsMetadata = await getOpenRouterModelsMetadata();
@@ -116,8 +123,9 @@ async function enhancedModelList(models: OpenRouterModel[]) {
     models
       .filter(
         (model: OpenRouterModel) =>
-          !kiloExclusiveModels.some(m => m.public_id === model.id) &&
-          !isForbiddenFreeModel(model.id)
+          !kiloExclusiveModels.some(
+            m => m.public_id === model.id && shouldSuppressOpenRouterModel(m)
+          ) && !isForbiddenFreeModel(model.id)
       )
       .map(model => {
         const preferredProvider = getPreferredProviderOrder(model.id).at(0);

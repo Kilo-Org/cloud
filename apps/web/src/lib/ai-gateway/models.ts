@@ -49,7 +49,7 @@ import { deepseekDiscountedModels } from '@/lib/ai-gateway/providers/deepseek';
 export const PRIMARY_DEFAULT_MODEL = CLAUDE_SONNET_CURRENT_MODEL_ID;
 
 export const autoFreeModels = [
-  'nvidia/nemotron-3-super-120b-a12b:free',
+  'nvidia/nemotron-3-ultra-550b-a55b:free',
   'poolside/laguna-m.1:free',
   stepfun_37_flash_free_model.status === 'public' ? stepfun_37_flash_free_model.public_id : null,
 ].filter(m => m !== null);

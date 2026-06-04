@@ -87,9 +87,9 @@ async function authorizeRequest(
     executionContext,
   });
   if (result.kind === 'provider_redirect') {
-    return NextResponse.redirect(result.authorizationUrl);
+    return NextResponse.redirect(result.authorizationUrl, 303);
   }
-  return NextResponse.redirect(result.redirectUrl);
+  return NextResponse.redirect(result.redirectUrl, 303);
 }
 
 function approvalSignature(params: {

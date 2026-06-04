@@ -173,15 +173,20 @@ export function McpGatewaySetupContent({ organizationId }: McpGatewaySetupConten
   const defaultProvider =
     discovery?.providerCandidates.find(candidate => candidate.hasRegistrationEndpoint) ??
     discovery?.providerCandidates[0];
+  const hasProvider = (discovery?.providerCandidates.length ?? 0) > 0;
   const selectedProvider =
     discovery?.providerCandidates.find(candidate => candidate.issuer === draft.providerIssuer) ??
     defaultProvider;
   const selectedProviderIssuer = selectedProvider?.issuer ?? '';
   const dynamicAvailable = selectedProvider?.hasRegistrationEndpoint ?? false;
   const selectedAuthMode = useMemo(() => {
-    if (draft.authMode === 'oauth_dynamic' && !dynamicAvailable && discovery) return 'oauth_static';
+    if (!discovery) return draft.authMode;
+    if (!hasProvider && (draft.authMode === 'oauth_dynamic' || draft.authMode === 'oauth_static')) {
+      return 'static_headers';
+    }
+    if (draft.authMode === 'oauth_dynamic' && !dynamicAvailable) return 'oauth_static';
     return draft.authMode;
-  }, [draft.authMode, discovery, dynamicAvailable]);
+  }, [draft.authMode, discovery, dynamicAvailable, hasProvider]);
 
   function updateDraft(values: Partial<SetupDraft>) {
     setDraft(current => ({ ...current, ...values }));
@@ -216,11 +221,10 @@ export function McpGatewaySetupContent({ organizationId }: McpGatewaySetupConten
   const canLeaveServerStep = Boolean(draft.name.trim() && currentRemoteUrl && discovery);
   const credentialsIncomplete =
     selectedAuthMode === 'oauth_static' &&
-    (!draft.staticProviderClientId || !draft.staticProviderClientSecret);
+    (!selectedProviderIssuer || !draft.staticProviderClientId || !draft.staticProviderClientSecret);
   const staticHeaderIncomplete =
     selectedAuthMode === 'static_headers' &&
-    draft.staticHeaderValue.trim().length > 0 &&
-    draft.staticHeaderName.trim().length === 0;
+    (draft.staticHeaderName.trim().length === 0 || draft.staticHeaderValue.trim().length === 0);
   const accessIncomplete = credentialsIncomplete || staticHeaderIncomplete;
   const isCreating = createPersonalMutation.isPending || createOrganizationMutation.isPending;
 
@@ -269,7 +273,7 @@ export function McpGatewaySetupContent({ organizationId }: McpGatewaySetupConten
   }
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto w-full max-w-5xl space-y-6">
       <div className="space-y-1.5">
         <Link
           href={routes.list}
@@ -293,7 +297,7 @@ export function McpGatewaySetupContent({ organizationId }: McpGatewaySetupConten
             {step === 1 && (
               <div
                 key="step-server"
-                className="space-y-5 motion-safe:animate-in motion-safe:fade-in-0"
+                className="max-w-3xl space-y-5 motion-safe:animate-in motion-safe:fade-in-0"
               >
                 <div className="space-y-2">
                   <Label htmlFor="remote-url">Remote MCP URL</Label>
@@ -372,7 +376,7 @@ export function McpGatewaySetupContent({ organizationId }: McpGatewaySetupConten
             {step === 2 && (
               <div
                 key="step-access"
-                className="space-y-5 motion-safe:animate-in motion-safe:fade-in-0"
+                className="max-w-3xl space-y-5 motion-safe:animate-in motion-safe:fade-in-0"
               >
                 {discovery && discovery.providerCandidates.length > 1 && (
                   <div className="space-y-2">
@@ -413,7 +417,9 @@ export function McpGatewaySetupContent({ organizationId }: McpGatewaySetupConten
                       <SelectItem value="oauth_dynamic" disabled={!dynamicAvailable}>
                         Automatic provider sign-in
                       </SelectItem>
-                      <SelectItem value="oauth_static">Manual provider credentials</SelectItem>
+                      <SelectItem value="oauth_static" disabled={!hasProvider}>
+                        Manual provider credentials
+                      </SelectItem>
                       <SelectItem value="static_headers">Static headers</SelectItem>
                       <SelectItem value="none">No provider sign-in</SelectItem>
                     </SelectContent>
@@ -421,57 +427,91 @@ export function McpGatewaySetupContent({ organizationId }: McpGatewaySetupConten
                   {selectedAuthMode === 'oauth_dynamic' && (
                     <p className="text-muted-foreground text-xs">
                       {selectedProviderIssuer
-                        ? `${hostOf(selectedProviderIssuer)} registers Kilo Code automatically. Each assigned user signs in with their own provider account after the connection is created.`
-                        : 'The server registers Kilo Code automatically. Each assigned user signs in with their own provider account after the connection is created.'}
+                        ? `${hostOf(selectedProviderIssuer)} registers Kilo Code automatically. ${
+                            organizationId
+                              ? 'Each assigned user signs in with their own provider account after the connection is created.'
+                              : 'You sign in with your provider account after the connection is created.'
+                          }`
+                        : organizationId
+                          ? 'The server registers Kilo Code automatically. Each assigned user signs in with their own provider account after the connection is created.'
+                          : 'The server registers Kilo Code automatically. You sign in with your provider account after the connection is created.'}
                     </p>
                   )}
                   {selectedAuthMode === 'oauth_static' && (
                     <div className="space-y-2 pt-1">
                       <p className="text-muted-foreground text-xs">
                         {dynamicAvailable
-                          ? 'Use a provider app you registered yourself; each assigned user still signs in with their own account.'
-                          : "This server doesn't advertise automatic registration, so register a provider app and add its credentials here. Each assigned user still signs in with their own account."}{' '}
+                          ? organizationId
+                            ? 'Use a provider app you registered yourself. Each assigned user still signs in with their own account.'
+                            : 'Use a provider app you registered yourself. You still sign in with your own account.'
+                          : organizationId
+                            ? "This server doesn't advertise automatic registration, so register a provider app and add its credentials here. Each assigned user still signs in with their own account."
+                            : "This server doesn't advertise automatic registration, so register a provider app and add its credentials here. You still sign in with your own account."}{' '}
                         Credentials are encrypted and not shown again after saving.
                       </p>
-                      <SecretTokenInput
-                        value={draft.staticProviderClientId}
-                        onChange={event =>
-                          updateDraft({ staticProviderClientId: event.target.value })
-                        }
-                        placeholder="Provider client ID"
-                        aria-label="Provider client ID"
-                        toggleLabel="Show provider client ID"
-                      />
-                      <SecretTokenInput
-                        value={draft.staticProviderClientSecret}
-                        onChange={event =>
-                          updateDraft({ staticProviderClientSecret: event.target.value })
-                        }
-                        placeholder="Provider client secret"
-                        aria-label="Provider client secret"
-                        toggleLabel="Show provider client secret"
-                      />
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label htmlFor="static-provider-client-id">Provider client ID</Label>
+                          <SecretTokenInput
+                            id="static-provider-client-id"
+                            value={draft.staticProviderClientId}
+                            onChange={event =>
+                              updateDraft({ staticProviderClientId: event.target.value })
+                            }
+                            placeholder="Client ID"
+                            toggleLabel="Show provider client ID"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="static-provider-client-secret">
+                            Provider client secret
+                          </Label>
+                          <SecretTokenInput
+                            id="static-provider-client-secret"
+                            value={draft.staticProviderClientSecret}
+                            onChange={event =>
+                              updateDraft({ staticProviderClientSecret: event.target.value })
+                            }
+                            placeholder="Client secret"
+                            toggleLabel="Show provider client secret"
+                          />
+                        </div>
+                      </div>
                     </div>
                   )}
                   {selectedAuthMode === 'static_headers' && (
                     <div className="space-y-2 pt-1">
                       <p className="text-muted-foreground text-xs">
-                        Sent on every upstream request and shared by all assigned users. Encrypted
-                        and not shown again after saving.
+                        {organizationId
+                          ? 'Sent on every upstream request and shared by all assigned users.'
+                          : 'Sent on every upstream request.'}{' '}
+                        Encrypted and not shown again after saving.
                       </p>
-                      <Input
-                        value={draft.staticHeaderName}
-                        onChange={event => updateDraft({ staticHeaderName: event.target.value })}
-                        placeholder="Header name"
-                        aria-label="Static header name"
-                      />
-                      <SecretTokenInput
-                        value={draft.staticHeaderValue}
-                        onChange={event => updateDraft({ staticHeaderValue: event.target.value })}
-                        placeholder="Header value"
-                        aria-label="Static header value"
-                        toggleLabel="Show header value"
-                      />
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label htmlFor="static-header-name">Header name</Label>
+                          <Input
+                            id="static-header-name"
+                            value={draft.staticHeaderName}
+                            onChange={event =>
+                              updateDraft({ staticHeaderName: event.target.value })
+                            }
+                            placeholder="Authorization"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="static-header-value">Header value</Label>
+                          <SecretTokenInput
+                            id="static-header-value"
+                            value={draft.staticHeaderValue}
+                            onChange={event =>
+                              updateDraft({ staticHeaderValue: event.target.value })
+                            }
+                            placeholder="Header value"
+                            toggleLabel="Show header value"
+                          />
+                        </div>
+                      </div>
                     </div>
                   )}
                   {selectedAuthMode === 'none' && (
@@ -484,11 +524,11 @@ export function McpGatewaySetupContent({ organizationId }: McpGatewaySetupConten
                 <dl className="rounded-lg border text-sm">
                   <ReviewRow label="Name" value={draft.name} />
                   <ReviewRow label="Remote server" value={draft.remoteUrl} mono />
-                  <ReviewRow
-                    label="Provider sign-in"
-                    value={authModeLabel(selectedAuthMode)}
-                    last
-                  />
+                  <ReviewRow label="Provider sign-in" value={authModeLabel(selectedAuthMode)} />
+                  {organizationId && (
+                    <ReviewRow label="Org access" value="Assign members later" last />
+                  )}
+                  {!organizationId && <ReviewRow label="Owner" value="Personal" last />}
                 </dl>
               </div>
             )}

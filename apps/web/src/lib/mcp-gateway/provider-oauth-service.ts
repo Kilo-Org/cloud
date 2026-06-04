@@ -33,6 +33,7 @@ import { createAuditService } from './audit-service';
 
 const secretScheme = 'mcp-gateway-credential-rsa-aes-256-gcm';
 const pendingStateScheme = 'mcp-gateway-provider-pending-state-rsa-aes-256-gcm';
+const dynamicProviderClientName = 'Kilo MCP Gateway';
 
 const ProviderCredentialSchema = z.object({
   clientId: z.string().min(1),
@@ -163,6 +164,7 @@ export function createProviderOAuthService(params: {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify({
+        client_name: dynamicProviderClientName,
         redirect_uris: [redirectUri],
         grant_types: ['authorization_code', 'refresh_token'],
         response_types: ['code'],

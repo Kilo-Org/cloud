@@ -535,6 +535,66 @@ describe('MCP gateway app OAuth flow', () => {
     ).rejects.toMatchObject({ code: 'invalid_request' });
   });
 
+  it('identifies Kilo when dynamically registering with a provider', async () => {
+    const config = await createTestConfig();
+    let registrationBody: unknown = null;
+    const fetchImpl: typeof fetch = async (input, init) => {
+      const url =
+        typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      const discovery = providerDiscoveryResponse(url);
+      if (discovery) return discovery;
+      if (url === 'https://example.com/register') {
+        registrationBody = JSON.parse(String(init?.body));
+        return new Response(
+          JSON.stringify({ client_id: 'provider-client', client_secret: 'provider-secret' }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    };
+    const services = createGatewayServices({ config, fetchImpl });
+    const user = await insertTestUser({ id: `gateway-user-${crypto.randomUUID()}` });
+    const created = await services.configService.createPersonalConfig({
+      userId: user.id,
+      name: 'OAuth MCP',
+      remoteUrl: 'https://example.com/mcp',
+      authMode: 'oauth_dynamic',
+    });
+    const registration = await services.clientService.registerClient({
+      metadata: {
+        redirect_uris: ['http://localhost:3000/callback'],
+        token_endpoint_auth_method: 'none',
+        grant_types: ['authorization_code', 'refresh_token'],
+        response_types: ['code'],
+        scope: 'profile',
+      },
+      headers: new Headers({ 'x-vercel-forwarded-for': '203.0.113.32' }),
+    });
+    const verifier =
+      'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~abcdefghijk';
+    const authorization = await services.authorizationService.authorize({
+      query: OAuthAuthorizationQuerySchema.parse({
+        client_id: registration.clientId,
+        redirect_uri: 'http://localhost:3000/callback',
+        response_type: 'code',
+        resource: created.route.canonical_url,
+        code_challenge: pkceChallenge(verifier),
+        code_challenge_method: 'S256',
+      }),
+      userId: user.id,
+      executionContext: { type: 'personal' },
+    });
+
+    expect(authorization.kind).toBe('provider_redirect');
+    expect(registrationBody).toMatchObject({
+      client_name: 'Kilo MCP Gateway',
+      redirect_uris: ['https://app.kilo.ai/api/mcp-gateway/oauth/mcp/callback'],
+      grant_types: ['authorization_code', 'refresh_token'],
+      response_types: ['code'],
+      token_endpoint_auth_method: 'client_secret_post',
+    });
+  });
+
   it('consumes provider state when the provider returns an error', async () => {
     const config = await createTestConfig();
     const fetchImpl: typeof fetch = async input => {

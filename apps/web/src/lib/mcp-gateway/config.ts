@@ -1,4 +1,5 @@
 import 'server-only';
+import { APP_URL } from '@/lib/constants';
 import { getEnvVariable } from '@/lib/dotenvx';
 import { z } from 'zod';
 
@@ -94,7 +95,7 @@ export function getGatewayAppConfig(): GatewayAppConfig {
   }
 
   return {
-    appBaseUrl: getEnvVariable('MCP_GATEWAY_APP_BASE_URL') || 'https://app.kilo.ai',
+    appBaseUrl: getEnvVariable('MCP_GATEWAY_APP_BASE_URL') || APP_URL,
     gatewayBaseUrl: getEnvVariable('MCP_GATEWAY_BASE_URL') || 'https://mcp.kilo.ai',
     issuer: jwtKeyset.issuer,
     accessTokenTtlSeconds: Number(getEnvVariable('MCP_GATEWAY_ACCESS_TOKEN_TTL_SECONDS') || '900'),

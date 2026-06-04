@@ -62,7 +62,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 function Stat({ label, value }: { label: string; value: number }) {
   return (
-    <div className="space-y-0.5">
+    <div className="bg-muted/20 rounded-lg border px-4 py-3">
       <div className="text-2xl font-semibold tabular-nums">{value}</div>
       <div className="text-muted-foreground text-xs">{label}</div>
     </div>
@@ -242,7 +242,7 @@ export function McpGatewayDetailContent({
     connection.authMode === 'oauth_static' && !connection.hasStaticProviderCredentials;
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto w-full max-w-6xl space-y-6">
       <div className="space-y-1.5">
         <Link
           href={routes.list}
@@ -261,22 +261,22 @@ export function McpGatewayDetailContent({
       <Card>
         <CardHeader className="pb-4">
           <CardTitle className="text-base">Overview</CardTitle>
-          <CardDescription>What this connection points at, and its live usage.</CardDescription>
+          <CardDescription>Endpoint, auth, and current connection state.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <dl className="grid gap-4 sm:grid-cols-2">
+          <dl className="grid gap-x-8 gap-y-5 sm:grid-cols-2">
             <Field label="Remote MCP URL">
               <span className="font-mono text-xs break-all">{connection.remoteUrl}</span>
             </Field>
-            <Field label="Sharing mode">
-              {connection.sharingMode === 'single_user' ? 'Single user' : 'Multiple users'}
+            <Field label="Access">
+              {organizationId ? 'Assigned organization members' : 'Personal owner'}
             </Field>
             <Field label="Provider sign-in">{authLabel(connection.authMode)}</Field>
             <Field label="Descendant paths">
               {connection.pathPassthrough ? 'Allowed' : 'Exact endpoint only'}
             </Field>
           </dl>
-          <div className="flex flex-wrap gap-x-12 gap-y-4 border-t pt-6">
+          <div className="grid gap-3 border-t pt-5 sm:grid-cols-2 lg:grid-cols-3">
             {organizationId && <Stat label="Assigned users" value={connection.assignmentCount} />}
             <Stat label="Active instances" value={connection.instanceCount} />
             <Stat label="Provider grants" value={connection.activeGrantCount} />
@@ -288,7 +288,7 @@ export function McpGatewayDetailContent({
         <Card>
           <CardHeader className="pb-4">
             <CardTitle className="text-base">Access</CardTitle>
-            <CardDescription>Choose who can use this connection.</CardDescription>
+            <CardDescription>Assign each member who can use this connection.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
@@ -375,16 +375,17 @@ export function McpGatewayDetailContent({
                     {organizationId ? 'Provider sign-in active' : "You're signed in"}
                   </p>
                   <p className="text-muted-foreground text-sm">
-                    {connection.activeGrantCount === 1
-                      ? '1 active provider grant.'
-                      : `${connection.activeGrantCount} active provider grants.`}{' '}
-                    Kilo Code can reach this server now.
+                    {organizationId
+                      ? connection.activeGrantCount === 1
+                        ? '1 assigned user has an active provider grant.'
+                        : `${connection.activeGrantCount} assigned users have active provider grants.`
+                      : 'Kilo Code can reach this server now.'}
                   </p>
                 </div>
               </div>
             ) : (
-              <div className="flex items-start gap-3 rounded-lg border border-amber-500/20 bg-amber-500/5 p-4">
-                <span aria-hidden className="mt-1.5 size-2 shrink-0 rounded-full bg-amber-400" />
+              <div className="flex items-start gap-3 rounded-lg border border-yellow-500/20 bg-yellow-500/5 p-4">
+                <span aria-hidden className="mt-1.5 size-2 shrink-0 rounded-full bg-yellow-400" />
                 <div className="space-y-0.5">
                   <p className="text-sm font-medium">Not signed in yet</p>
                   <p className="text-muted-foreground text-sm">
@@ -396,7 +397,7 @@ export function McpGatewayDetailContent({
               </div>
             )}
             {missingStaticCredentials && (
-              <p className="text-xs text-amber-200">
+              <p className="text-xs text-yellow-300">
                 Add provider credentials in the Credentials section below before signing in.
               </p>
             )}
@@ -511,7 +512,7 @@ export function McpGatewayDetailContent({
         </CardHeader>
         <CardContent>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <code className="bg-muted flex-1 rounded-md px-3 py-2 text-xs break-all">
+            <code className="bg-muted/70 min-w-0 flex-1 rounded-md px-3 py-2 text-xs break-all">
               {connection.canonicalUrl}
             </code>
             <div className="flex gap-2">
@@ -536,7 +537,7 @@ export function McpGatewayDetailContent({
                   </AlertDialogHeader>
                   <AlertDialogFooter>
                     <AlertDialogCancel disabled={rotateMutation.isPending}>
-                      Cancel
+                      Keep current URL
                     </AlertDialogCancel>
                     <AlertDialogAction
                       variant="destructive"
@@ -578,7 +579,9 @@ export function McpGatewayDetailContent({
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogCancel disabled={disableMutation.isPending}>Cancel</AlertDialogCancel>
+                  <AlertDialogCancel disabled={disableMutation.isPending}>
+                    Keep connection
+                  </AlertDialogCancel>
                   <AlertDialogAction
                     variant="destructive"
                     onClick={() => disableMutation.mutate(managedConfigInput)}
@@ -591,7 +594,7 @@ export function McpGatewayDetailContent({
             </AlertDialog>
             <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
               <AlertDialogTrigger asChild>
-                <Button variant="destructive" disabled={deleteMutation.isPending}>
+                <Button variant="outline" disabled={deleteMutation.isPending}>
                   <Trash2 className="size-4" />
                   Delete connection
                 </Button>
@@ -605,7 +608,9 @@ export function McpGatewayDetailContent({
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogCancel disabled={deleteMutation.isPending}>Cancel</AlertDialogCancel>
+                  <AlertDialogCancel disabled={deleteMutation.isPending}>
+                    Keep connection
+                  </AlertDialogCancel>
                   <AlertDialogAction
                     variant="destructive"
                     onClick={() => deleteMutation.mutate(managedConfigInput)}

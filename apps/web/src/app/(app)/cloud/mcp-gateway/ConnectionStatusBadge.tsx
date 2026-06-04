@@ -29,14 +29,14 @@ export function getConnectionStatus(connection: ConnectionStatusInput): Connecti
 
 const toneDot: Record<StatusTone, string> = {
   positive: 'bg-green-400',
-  attention: 'bg-amber-400',
+  attention: 'bg-yellow-400',
   neutral: 'bg-muted-foreground',
 };
 
-const toneText: Record<StatusTone, string> = {
-  positive: 'text-foreground',
-  attention: 'text-amber-200',
-  neutral: 'text-muted-foreground',
+const toneClassName: Record<StatusTone, string> = {
+  positive: 'bg-green-500/10 text-green-400 ring-green-500/20',
+  attention: 'bg-yellow-500/10 text-yellow-300 ring-yellow-500/20',
+  neutral: 'bg-secondary text-muted-foreground ring-border',
 };
 
 export function ConnectionStatusBadge({
@@ -49,10 +49,15 @@ export function ConnectionStatusBadge({
   const status = getConnectionStatus(connection);
   return (
     <span
-      className={cn('inline-flex items-center gap-2 text-sm', toneText[status.tone], className)}
+      className={cn(
+        'inline-flex h-6 items-center gap-1.5 rounded-md px-2 text-xs font-medium ring-1',
+        toneClassName[status.tone],
+        className
+      )}
+      aria-label={`${status.label}: ${status.description}`}
       title={status.description}
     >
-      <span aria-hidden className={cn('size-2 rounded-full', toneDot[status.tone])} />
+      <span aria-hidden className={cn('size-1.5 rounded-full', toneDot[status.tone])} />
       {status.label}
     </span>
   );

@@ -11,6 +11,7 @@ import {
 } from '@kilocode/mcp-gateway';
 
 const maxDiscoveryBodyBytes = 128 * 1024;
+const dynamicProviderClientName = 'Kilo MCP Gateway';
 
 export function validatePublicHttpsUrl(value: string): URL {
   let url: URL;
@@ -190,6 +191,7 @@ export function createDiscoveryService(params: { fetchImpl?: typeof fetch }) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify({
+        client_name: dynamicProviderClientName,
         redirect_uris: [paramsInput.redirectUri],
         grant_types: ['authorization_code', 'refresh_token'],
         response_types: ['code'],

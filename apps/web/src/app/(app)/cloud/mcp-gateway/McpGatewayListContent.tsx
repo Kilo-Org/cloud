@@ -29,7 +29,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { Copy, Plus, Settings, Trash2, User, Users } from 'lucide-react';
+import { Copy, Plus, Settings, Trash2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
 
@@ -42,21 +42,6 @@ function remoteHost(remoteUrl: string) {
     return new URL(remoteUrl).host;
   } catch {
     return remoteUrl;
-  }
-}
-
-function authLabel(authMode: string) {
-  switch (authMode) {
-    case 'none':
-      return 'No provider sign-in';
-    case 'static_headers':
-      return 'Static headers';
-    case 'oauth_dynamic':
-      return 'Provider sign-in';
-    case 'oauth_static':
-      return 'Provider sign-in';
-    default:
-      return authMode;
   }
 }
 
@@ -76,7 +61,7 @@ export function McpGatewayListContent({ organizationId }: McpGatewayListContentP
     const query = filter.trim().toLowerCase();
     if (!query) return connections;
     return connections.filter(connection =>
-      [connection.name, connection.authMode, connection.sharingMode]
+      [connection.name, connection.remoteUrl, remoteHost(connection.remoteUrl), connection.authMode]
         .join(' ')
         .toLowerCase()
         .includes(query)
@@ -110,7 +95,7 @@ export function McpGatewayListContent({ organizationId }: McpGatewayListContentP
   }
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto w-full max-w-6xl space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="space-y-1.5">
           <h1 className="text-2xl font-semibold tracking-tight">MCP Gateway</h1>
@@ -127,12 +112,17 @@ export function McpGatewayListContent({ organizationId }: McpGatewayListContentP
       </div>
 
       <Card>
-        <CardHeader className="flex flex-col gap-3 pb-4 sm:flex-row sm:items-center sm:justify-between">
+        <CardHeader className="flex flex-col gap-4 pb-5 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-1.5">
-            <CardTitle className="text-base">Connections</CardTitle>
-            <CardDescription>
-              Remote MCP servers that can be connected through Kilo Code.
-            </CardDescription>
+            <div className="flex items-center gap-2">
+              <CardTitle className="text-base">Connections</CardTitle>
+              {!listQuery.isLoading && !listQuery.isError && (
+                <span className="text-muted-foreground text-xs tabular-nums">
+                  {listQuery.data?.length ?? 0}
+                </span>
+              )}
+            </div>
+            <CardDescription>Remote MCP servers available to Kilo Code.</CardDescription>
           </div>
           <Input
             value={filter}
@@ -142,16 +132,16 @@ export function McpGatewayListContent({ organizationId }: McpGatewayListContentP
             className="w-full sm:w-64"
           />
         </CardHeader>
-        <CardContent className="p-0">
+        <CardContent className="px-6 pb-6 pt-0">
           {listQuery.isLoading && (
-            <div className="space-y-3 p-6">
+            <div className="space-y-3 rounded-lg border p-4">
               <Skeleton className="h-9 w-full" />
               <Skeleton className="h-9 w-full" />
               <Skeleton className="h-9 w-full" />
             </div>
           )}
           {listQuery.isError && (
-            <div className="space-y-3 p-6">
+            <div className="space-y-3 rounded-lg border p-5">
               <p className="text-sm">We couldn't load connections. Try again.</p>
               <Button variant="outline" onClick={() => listQuery.refetch()}>
                 Retry loading connections
@@ -159,7 +149,7 @@ export function McpGatewayListContent({ organizationId }: McpGatewayListContentP
             </div>
           )}
           {!listQuery.isLoading && !listQuery.isError && filteredConnections.length === 0 && (
-            <div className="space-y-3 p-6">
+            <div className="space-y-3 rounded-lg border p-5">
               <p className="text-sm font-medium">
                 {listQuery.data?.length
                   ? 'No connections match that filter.'
@@ -185,23 +175,21 @@ export function McpGatewayListContent({ organizationId }: McpGatewayListContentP
             </div>
           )}
           {!listQuery.isLoading && !listQuery.isError && filteredConnections.length > 0 && (
-            <div className="overflow-x-auto border-t">
-              <Table>
+            <div className="overflow-x-auto rounded-lg border">
+              <Table className="min-w-[720px] table-fixed">
                 <TableHeader>
                   <TableRow>
                     <TableHead>Name</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Provider sign-in</TableHead>
-                    <TableHead>Sharing</TableHead>
-                    {organizationId && <TableHead>Assigned users</TableHead>}
-                    <TableHead>Last updated</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                    <TableHead className="w-36">Status</TableHead>
+                    {organizationId && <TableHead className="w-32">Assigned users</TableHead>}
+                    <TableHead className="w-40">Last updated</TableHead>
+                    <TableHead className="w-28 text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredConnections.map(connection => (
                     <TableRow key={connection.configId}>
-                      <TableCell>
+                      <TableCell className="py-3">
                         <div className="flex flex-col gap-0.5">
                           <Link
                             href={routes.detail(connection.configId)}
@@ -216,28 +204,6 @@ export function McpGatewayListContent({ organizationId }: McpGatewayListContentP
                       </TableCell>
                       <TableCell className="whitespace-nowrap">
                         <ConnectionStatusBadge connection={connection} />
-                      </TableCell>
-                      <TableCell className="text-muted-foreground text-sm">
-                        {authLabel(connection.authMode)}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground text-sm whitespace-nowrap">
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <span className="inline-flex items-center gap-2">
-                              {connection.sharingMode === 'single_user' ? (
-                                <User className="size-4" />
-                              ) : (
-                                <Users className="size-4" />
-                              )}
-                              {connection.sharingMode === 'single_user' ? 'Single' : 'Shared'}
-                            </span>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            {connection.sharingMode === 'single_user'
-                              ? 'Only one user can be assigned'
-                              : 'Multiple users can be assigned'}
-                          </TooltipContent>
-                        </Tooltip>
                       </TableCell>
                       {organizationId && (
                         <TableCell className="tabular-nums">{connection.assignmentCount}</TableCell>
@@ -285,7 +251,7 @@ export function McpGatewayListContent({ organizationId }: McpGatewayListContentP
                                 variant="ghost"
                                 size="icon"
                                 aria-label={`Delete ${connection.name}`}
-                                className="text-destructive hover:text-destructive"
+                                className="text-muted-foreground hover:text-foreground"
                                 disabled={deleteMutation.isPending}
                                 onClick={() => setDeleteConfigId(connection.configId)}
                               >
@@ -324,6 +290,7 @@ export function McpGatewayListContent({ organizationId }: McpGatewayListContentP
               Keep connection
             </AlertDialogCancel>
             <AlertDialogAction
+              variant="destructive"
               disabled={deleteMutation.isPending || !deletingConnection}
               onClick={() => {
                 if (!deletingConnection) return;

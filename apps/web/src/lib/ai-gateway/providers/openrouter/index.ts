@@ -21,6 +21,7 @@ import { ATTRIBUTION_HEADERS } from '@/lib/ai-gateway/providers/openrouter/attri
 import { getOpenRouterModelsMetadata } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import { getPreferredProviderOrder } from '@/lib/ai-gateway/providers/apply-provider-specific-logic';
 import { normalizeInferenceProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import { isFreeNemotronModel, NVIDIA_TRIAL_TOS } from '@/lib/ai-gateway/providers/nvidia';
 
 // Re-export from shared module for backwards compatibility
 export { normalizeModelId } from '@/lib/ai-gateway/model-utils';
@@ -142,9 +143,13 @@ async function enhancedModelList(models: OpenRouterModel[]) {
         const preferredIndex = preferredModels.indexOf(model.id);
         const addPdf =
           isPdfSupportingModel(model.id) && !model.architecture.input_modalities.includes('pdf');
+        const description = isFreeNemotronModel(model.id)
+          ? model.description + '\n\n**Terms of service** ' + NVIDIA_TRIAL_TOS
+          : model.description;
         return {
           ...model,
           name: formatName(model, preferredIndex),
+          description,
           preferredIndex: preferredIndex >= 0 ? preferredIndex : undefined,
           isFree: await isFreeModel(model.id),
           opencode: model.opencode ?? getOpenCodeSettings(model.id),

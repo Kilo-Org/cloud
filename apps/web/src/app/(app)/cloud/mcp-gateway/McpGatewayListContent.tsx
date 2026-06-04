@@ -2,11 +2,11 @@
 
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { getMcpGatewayRoutes } from '@/lib/mcp-gateway/routes';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { ConnectionStatusBadge } from './ConnectionStatusBadge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import {
@@ -18,20 +18,31 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Copy, ExternalLink, Plus } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { Copy, Plus, Settings, Trash2, User, Users } from 'lucide-react';
+import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
 
 type McpGatewayListContentProps = {
   organizationId?: string;
 };
 
-function statusBadge(params: { enabled: boolean; activeGrantCount: number; authMode: string }) {
-  if (!params.enabled) return <Badge variant="outline">Disabled</Badge>;
-  if (params.authMode === 'none' || params.authMode === 'static_headers') {
-    return <Badge variant="secondary">Ready</Badge>;
+function remoteHost(remoteUrl: string) {
+  try {
+    return new URL(remoteUrl).host;
+  } catch {
+    return remoteUrl;
   }
-  if (params.activeGrantCount > 0) return <Badge variant="secondary">Provider signed in</Badge>;
-  return <Badge variant="outline">Needs sign-in</Badge>;
 }
 
 function authLabel(authMode: string) {
@@ -51,8 +62,10 @@ function authLabel(authMode: string) {
 
 export function McpGatewayListContent({ organizationId }: McpGatewayListContentProps) {
   const trpc = useTRPC();
+  const queryClient = useQueryClient();
   const routes = getMcpGatewayRoutes(organizationId);
   const [filter, setFilter] = useState('');
+  const [deleteConfigId, setDeleteConfigId] = useState<string | null>(null);
   const listQuery = useQuery(
     organizationId
       ? trpc.mcpGateway.listOrganization.queryOptions({ organizationId })
@@ -69,6 +82,23 @@ export function McpGatewayListContent({ organizationId }: McpGatewayListContentP
         .includes(query)
     );
   }, [filter, listQuery.data]);
+  const deletingConnection = (listQuery.data ?? []).find(
+    connection => connection.configId === deleteConfigId
+  );
+  const deleteMutation = useMutation(
+    trpc.mcpGateway.delete.mutationOptions({
+      onSuccess: () => {
+        toast.success('Connection deleted');
+        setDeleteConfigId(null);
+        void queryClient.invalidateQueries({
+          queryKey: organizationId
+            ? trpc.mcpGateway.listOrganization.queryKey({ organizationId })
+            : trpc.mcpGateway.listPersonal.queryKey(),
+        });
+      },
+      onError: error => toast.error(error.message || 'Could not delete the connection'),
+    })
+  );
 
   async function copyConnectUrl(url: string) {
     try {
@@ -172,7 +202,7 @@ export function McpGatewayListContent({ organizationId }: McpGatewayListContentP
                   {filteredConnections.map(connection => (
                     <TableRow key={connection.configId}>
                       <TableCell>
-                        <div className="flex flex-col gap-1">
+                        <div className="flex flex-col gap-0.5">
                           <Link
                             href={routes.detail(connection.configId)}
                             className="font-medium hover:underline"
@@ -180,43 +210,90 @@ export function McpGatewayListContent({ organizationId }: McpGatewayListContentP
                             {connection.name}
                           </Link>
                           <span className="text-muted-foreground font-mono text-xs">
-                            {connection.canonicalUrl}
+                            {remoteHost(connection.remoteUrl)}
                           </span>
                         </div>
                       </TableCell>
-                      <TableCell>{statusBadge(connection)}</TableCell>
+                      <TableCell className="whitespace-nowrap">
+                        <ConnectionStatusBadge connection={connection} />
+                      </TableCell>
                       <TableCell className="text-muted-foreground text-sm">
                         {authLabel(connection.authMode)}
                       </TableCell>
-                      <TableCell className="text-muted-foreground text-sm">
-                        {connection.sharingMode === 'single_user' ? 'Single user' : 'Shared'}
+                      <TableCell className="text-muted-foreground text-sm whitespace-nowrap">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="inline-flex items-center gap-2">
+                              {connection.sharingMode === 'single_user' ? (
+                                <User className="size-4" />
+                              ) : (
+                                <Users className="size-4" />
+                              )}
+                              {connection.sharingMode === 'single_user' ? 'Single' : 'Shared'}
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            {connection.sharingMode === 'single_user'
+                              ? 'Only one user can be assigned'
+                              : 'Multiple users can be assigned'}
+                          </TooltipContent>
+                        </Tooltip>
                       </TableCell>
                       {organizationId && (
                         <TableCell className="tabular-nums">{connection.assignmentCount}</TableCell>
                       )}
-                      <TableCell className="text-muted-foreground text-sm">
-                        {new Date(connection.updatedAt).toLocaleString()}
+                      <TableCell className="text-muted-foreground text-sm whitespace-nowrap">
+                        <span title={new Date(connection.updatedAt).toLocaleString()}>
+                          {formatDistanceToNow(new Date(connection.updatedAt), {
+                            addSuffix: true,
+                          })}
+                        </span>
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
-                          <Button
-                            asChild
-                            variant="ghost"
-                            size="icon"
-                            aria-label={`Open ${connection.name}`}
-                          >
-                            <Link href={routes.detail(connection.configId)}>
-                              <ExternalLink />
-                            </Link>
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            aria-label={`Copy connect URL for ${connection.name}`}
-                            onClick={() => copyConnectUrl(connection.canonicalUrl)}
-                          >
-                            <Copy />
-                          </Button>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                asChild
+                                variant="ghost"
+                                size="icon"
+                                aria-label={`Manage ${connection.name}`}
+                              >
+                                <Link href={routes.detail(connection.configId)}>
+                                  <Settings />
+                                </Link>
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Manage connection</TooltipContent>
+                          </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                aria-label={`Copy connect URL for ${connection.name}`}
+                                onClick={() => copyConnectUrl(connection.canonicalUrl)}
+                              >
+                                <Copy />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Copy connect URL</TooltipContent>
+                          </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                aria-label={`Delete ${connection.name}`}
+                                className="text-destructive hover:text-destructive"
+                                disabled={deleteMutation.isPending}
+                                onClick={() => setDeleteConfigId(connection.configId)}
+                              >
+                                <Trash2 />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Delete connection</TooltipContent>
+                          </Tooltip>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -227,6 +304,37 @@ export function McpGatewayListContent({ organizationId }: McpGatewayListContentP
           )}
         </CardContent>
       </Card>
+      <AlertDialog
+        open={deleteConfigId !== null}
+        onOpenChange={open => {
+          if (!open) setDeleteConfigId(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this connection?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deletingConnection
+                ? `${deletingConnection.name} will stop working immediately. Existing connect URLs and provider sign-ins for this connection will no longer be usable.`
+                : 'This connection will stop working immediately. Existing connect URLs and provider sign-ins for this connection will no longer be usable.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteMutation.isPending}>
+              Keep connection
+            </AlertDialogCancel>
+            <AlertDialogAction
+              disabled={deleteMutation.isPending || !deletingConnection}
+              onClick={() => {
+                if (!deletingConnection) return;
+                deleteMutation.mutate({ configId: deletingConnection.configId, organizationId });
+              }}
+            >
+              {deleteMutation.isPending ? 'Deleting...' : 'Delete connection'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

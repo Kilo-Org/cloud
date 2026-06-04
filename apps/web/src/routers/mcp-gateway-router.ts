@@ -306,6 +306,7 @@ export const mcpGatewayRouter = createTRPCRouter({
         providerIssuer: z.string().url().optional(),
         staticProviderClientId: z.string().min(1).optional(),
         staticProviderClientSecret: z.string().min(1).optional(),
+        staticHeaders: StaticHeadersSchema.optional(),
         pathPassthrough: z.boolean().optional(),
       })
     )
@@ -319,6 +320,7 @@ export const mcpGatewayRouter = createTRPCRouter({
         providerIssuer: input.providerIssuer,
         staticProviderClientId: input.staticProviderClientId,
         staticProviderClientSecret: input.staticProviderClientSecret,
+        staticHeaders: input.staticHeaders,
         pathPassthrough: input.pathPassthrough,
       });
       return { configId: created.config.config_id };
@@ -333,6 +335,7 @@ export const mcpGatewayRouter = createTRPCRouter({
         providerIssuer: z.string().url().optional(),
         staticProviderClientId: z.string().min(1).optional(),
         staticProviderClientSecret: z.string().min(1).optional(),
+        staticHeaders: StaticHeadersSchema.optional(),
         sharingMode: SharingModeSchema,
         initialAssignedUserId: z.string().min(1).optional(),
         pathPassthrough: z.boolean().optional(),
@@ -349,6 +352,7 @@ export const mcpGatewayRouter = createTRPCRouter({
         providerIssuer: input.providerIssuer,
         staticProviderClientId: input.staticProviderClientId,
         staticProviderClientSecret: input.staticProviderClientSecret,
+        staticHeaders: input.staticHeaders,
         sharingMode: input.sharingMode,
         initialAssignedUserId: input.initialAssignedUserId,
         pathPassthrough: input.pathPassthrough,

@@ -86,6 +86,22 @@ export function createConfigService(params: {
     };
   }
 
+  function initialStaticHeaders(input: {
+    authMode: GatewayAuthMode;
+    staticHeaders?: Record<string, string>;
+  }) {
+    if (!input.staticHeaders || Object.keys(input.staticHeaders).length === 0) return null;
+    if (input.authMode !== GatewayAuthMode.StaticHeaders) {
+      throw createGatewayError(
+        GatewayErrorCode.InvalidRequest,
+        'Static headers require static-headers auth mode',
+        400
+      );
+    }
+    parseStaticHeaders(input.staticHeaders);
+    return input.staticHeaders;
+  }
+
   function encryptSecret(input: {
     configId: string;
     kind: (typeof GatewaySecretKind)[keyof typeof GatewaySecretKind];
@@ -116,6 +132,23 @@ export function createConfigService(params: {
     });
   }
 
+  async function insertInitialStaticHeaders(
+    tx: GatewayRepository['database'],
+    configId: string,
+    headers: Record<string, string> | null
+  ) {
+    if (!headers) return;
+    await tx.insert(mcp_gateway_config_secrets).values({
+      config_id: configId,
+      secret_kind: GatewaySecretKind.StaticHeaders,
+      encrypted_secret: encryptSecret({
+        configId,
+        kind: GatewaySecretKind.StaticHeaders,
+        value: { headers },
+      }),
+    });
+  }
+
   async function createPersonalConfig(input: {
     userId: string;
     name: string;
@@ -124,9 +157,11 @@ export function createConfigService(params: {
     providerIssuer?: string;
     staticProviderClientId?: string;
     staticProviderClientSecret?: string;
+    staticHeaders?: Record<string, string>;
     pathPassthrough?: boolean;
   }) {
     const staticProviderCredentials = initialStaticProviderCredentials(input);
+    const staticHeaders = initialStaticHeaders(input);
     await validatePublicHttpsDestination(input.remoteUrl);
     const discoveredProviderMetadata = await discoverProviderMetadata(input);
     return await params.repository.database.transaction(async tx => {
@@ -149,6 +184,7 @@ export function createConfigService(params: {
         created.config.config_id,
         staticProviderCredentials
       );
+      await insertInitialStaticHeaders(tx, created.config.config_id, staticHeaders);
       await auditService.record({
         actorUserId: input.userId,
         ownerScope: created.config.owner_scope,
@@ -169,6 +205,17 @@ export function createConfigService(params: {
           metadata: { kind: GatewaySecretKind.StaticProviderCredentials },
         });
       }
+      if (staticHeaders) {
+        await auditService.record({
+          actorUserId: input.userId,
+          ownerScope: created.config.owner_scope,
+          ownerId: created.config.owner_id,
+          configId: created.config.config_id,
+          eventType: 'config_secret_updated',
+          outcome: 'success',
+          metadata: { kind: GatewaySecretKind.StaticHeaders },
+        });
+      }
       return created;
     });
   }
@@ -182,11 +229,13 @@ export function createConfigService(params: {
     providerIssuer?: string;
     staticProviderClientId?: string;
     staticProviderClientSecret?: string;
+    staticHeaders?: Record<string, string>;
     sharingMode: GatewaySharingMode;
     initialAssignedUserId?: string;
     pathPassthrough?: boolean;
   }) {
     const staticProviderCredentials = initialStaticProviderCredentials(input);
+    const staticHeaders = initialStaticHeaders(input);
     await validatePublicHttpsDestination(input.remoteUrl);
     const discoveredProviderMetadata = await discoverProviderMetadata(input);
     if (input.sharingMode === GatewaySharingMode.SingleUser && !input.initialAssignedUserId) {
@@ -238,6 +287,7 @@ export function createConfigService(params: {
         created.config.config_id,
         staticProviderCredentials
       );
+      await insertInitialStaticHeaders(tx, created.config.config_id, staticHeaders);
       await auditService.record({
         actorUserId: input.actorUserId,
         ownerScope: created.config.owner_scope,
@@ -256,6 +306,17 @@ export function createConfigService(params: {
           eventType: 'config_secret_updated',
           outcome: 'success',
           metadata: { kind: GatewaySecretKind.StaticProviderCredentials },
+        });
+      }
+      if (staticHeaders) {
+        await auditService.record({
+          actorUserId: input.actorUserId,
+          ownerScope: created.config.owner_scope,
+          ownerId: created.config.owner_id,
+          configId: created.config.config_id,
+          eventType: 'config_secret_updated',
+          outcome: 'success',
+          metadata: { kind: GatewaySecretKind.StaticHeaders },
         });
       }
       return created;

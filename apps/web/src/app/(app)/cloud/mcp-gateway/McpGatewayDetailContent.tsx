@@ -5,10 +5,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { getMcpGatewayRoutes } from '@/lib/mcp-gateway/routes';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { ConnectionStatusBadge } from './ConnectionStatusBadge';
+import { OrgMemberPicker } from './OrgMemberPicker';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Skeleton } from '@/components/ui/skeleton';
 import { SecretTokenInput } from '@/components/ui/secret-token-input';
 import {
   AlertDialog,
@@ -21,8 +23,8 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { ArrowLeft, Copy, RotateCw, ShieldAlert, Trash2 } from 'lucide-react';
-import { useState } from 'react';
+import { ArrowLeft, CheckCircle2, Copy, RotateCw, ShieldAlert, Trash2 } from 'lucide-react';
+import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 type McpGatewayDetailContentProps = {
@@ -41,12 +43,30 @@ function authLabel(authMode: string) {
     case 'static_headers':
       return 'Static headers';
     case 'oauth_dynamic':
-      return 'Provider sign-in';
+      return 'Automatic provider sign-in';
     case 'oauth_static':
-      return 'Provider sign-in';
+      return 'Manual provider credentials';
     default:
       return authMode;
   }
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-1">
+      <dt className="text-muted-foreground text-xs">{label}</dt>
+      <dd className="text-sm">{children}</dd>
+    </div>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="space-y-0.5">
+      <div className="text-2xl font-semibold tabular-nums">{value}</div>
+      <div className="text-muted-foreground text-xs">{label}</div>
+    </div>
+  );
 }
 
 export function McpGatewayDetailContent({
@@ -70,6 +90,18 @@ export function McpGatewayDetailContent({
       ? trpc.mcpGateway.getOrganization.queryOptions({ organizationId, configId })
       : trpc.mcpGateway.getPersonal.queryOptions({ configId })
   );
+  const membersQuery = useQuery({
+    ...trpc.organizations.withMembers.queryOptions({ organizationId: organizationId ?? '' }),
+    enabled: Boolean(organizationId),
+  });
+  const memberById = useMemo(() => {
+    const map = new Map<string, { name: string; email: string }>();
+    for (const member of membersQuery.data?.members ?? []) {
+      if (member.status === 'active')
+        map.set(member.id, { name: member.name, email: member.email });
+    }
+    return map;
+  }, [membersQuery.data]);
   const refresh = () => {
     void queryClient.invalidateQueries({
       queryKey: organizationId
@@ -170,7 +202,26 @@ export function McpGatewayDetailContent({
   }
 
   if (detailQuery.isLoading) {
-    return <div className="p-6 text-sm">Loading connection…</div>;
+    return (
+      <div className="space-y-6">
+        <div className="space-y-2">
+          <Skeleton className="h-4 w-32" />
+          <Skeleton className="h-8 w-64" />
+          <Skeleton className="h-4 w-80" />
+        </div>
+        <Card>
+          <CardHeader className="pb-4">
+            <Skeleton className="h-5 w-28" />
+          </CardHeader>
+          <CardContent className="grid gap-4 sm:grid-cols-2">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
   if (detailQuery.isError || !detailQuery.data) {
     return (
@@ -183,6 +234,12 @@ export function McpGatewayDetailContent({
     );
   }
   const connection = detailQuery.data;
+  const needsSignIn = requiresProviderSignIn(connection.authMode);
+  const signedIn = connection.activeGrantCount > 0;
+  const managesCredentials =
+    connection.authMode === 'static_headers' || connection.authMode === 'oauth_static';
+  const missingStaticCredentials =
+    connection.authMode === 'oauth_static' && !connection.hasStaticProviderCredentials;
 
   return (
     <div className="space-y-6">
@@ -191,174 +248,186 @@ export function McpGatewayDetailContent({
           href={routes.list}
           className="text-muted-foreground inline-flex items-center gap-2 text-sm hover:text-foreground"
         >
-          <ArrowLeft />
+          <ArrowLeft className="size-4" />
           Back to connections
         </Link>
         <div className="flex flex-wrap items-center gap-3">
           <h1 className="text-2xl font-semibold tracking-tight">{connection.name}</h1>
-          <Badge variant={connection.enabled ? 'secondary' : 'outline'}>
-            {connection.enabled ? 'Active' : 'Disabled'}
-          </Badge>
+          <ConnectionStatusBadge connection={connection} />
         </div>
-        <p className="text-muted-foreground text-sm">{connection.remoteUrl}</p>
+        <p className="text-muted-foreground font-mono text-xs break-all">{connection.remoteUrl}</p>
       </div>
 
       <Card>
         <CardHeader className="pb-4">
-          <CardTitle className="text-base">Connection</CardTitle>
-          <CardDescription>Current connection definition and runtime status.</CardDescription>
+          <CardTitle className="text-base">Overview</CardTitle>
+          <CardDescription>What this connection points at, and its live usage.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <section className="space-y-3 border-b pb-6">
-            <h2 className="text-sm font-medium">Connection</h2>
-            <dl className="grid gap-3 text-sm sm:grid-cols-2">
-              <div className="space-y-1">
-                <dt className="text-muted-foreground text-xs">Remote MCP URL</dt>
-                <dd className="font-mono text-xs break-all">{connection.remoteUrl}</dd>
-              </div>
-              <div className="space-y-1">
-                <dt className="text-muted-foreground text-xs">Sharing mode</dt>
-                <dd>
-                  {connection.sharingMode === 'single_user' ? 'Single user' : 'Shared endpoint'}
-                </dd>
-              </div>
-              <div className="space-y-1">
-                <dt className="text-muted-foreground text-xs">Provider sign-in</dt>
-                <dd>{authLabel(connection.authMode)}</dd>
-              </div>
-              <div className="space-y-1">
-                <dt className="text-muted-foreground text-xs">Path passthrough</dt>
-                <dd>{connection.pathPassthrough ? 'Allowed' : 'Disabled'}</dd>
-              </div>
-            </dl>
-          </section>
+          <dl className="grid gap-4 sm:grid-cols-2">
+            <Field label="Remote MCP URL">
+              <span className="font-mono text-xs break-all">{connection.remoteUrl}</span>
+            </Field>
+            <Field label="Sharing mode">
+              {connection.sharingMode === 'single_user' ? 'Single user' : 'Multiple users'}
+            </Field>
+            <Field label="Provider sign-in">{authLabel(connection.authMode)}</Field>
+            <Field label="Descendant paths">
+              {connection.pathPassthrough ? 'Allowed' : 'Exact endpoint only'}
+            </Field>
+          </dl>
+          <div className="flex flex-wrap gap-x-12 gap-y-4 border-t pt-6">
+            {organizationId && <Stat label="Assigned users" value={connection.assignmentCount} />}
+            <Stat label="Active instances" value={connection.instanceCount} />
+            <Stat label="Provider grants" value={connection.activeGrantCount} />
+          </div>
+        </CardContent>
+      </Card>
 
-          <section className="space-y-3 border-b pb-6">
-            <h2 className="text-sm font-medium">Access</h2>
-            <dl className="grid gap-3 text-sm sm:grid-cols-3">
-              {organizationId && (
-                <div className="space-y-1">
-                  <dt className="text-muted-foreground text-xs">Assigned users</dt>
-                  <dd className="tabular-nums">{connection.assignmentCount}</dd>
-                </div>
-              )}
-              <div className="space-y-1">
-                <dt className="text-muted-foreground text-xs">Active instances</dt>
-                <dd className="tabular-nums">{connection.instanceCount}</dd>
-              </div>
-              <div className="space-y-1">
-                <dt className="text-muted-foreground text-xs">Provider grants</dt>
-                <dd className="tabular-nums">{connection.activeGrantCount}</dd>
-              </div>
-            </dl>
-            {!organizationId && (
-              <p className="text-muted-foreground text-sm">
-                Personal connections are available only in your personal context.
-              </p>
-            )}
-            {organizationId && (
-              <>
-                <div className="flex flex-col gap-2 sm:flex-row">
-                  <Input
+      {organizationId && (
+        <Card>
+          <CardHeader className="pb-4">
+            <CardTitle className="text-base">Access</CardTitle>
+            <CardDescription>Choose who can use this connection.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="assign-user">Assign a member</Label>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                {organizationId && (
+                  <OrgMemberPicker
+                    id="assign-user"
+                    organizationId={organizationId}
                     value={assignedUserId}
-                    onChange={event => setAssignedUserId(event.target.value)}
-                    placeholder="User ID"
-                    aria-label="Assign user ID"
-                    className="sm:max-w-xs"
+                    onValueChange={setAssignedUserId}
+                    excludeUserIds={connection.assignments.map(assignment => assignment.userId)}
                   />
-                  <Button
-                    variant="outline"
-                    onClick={() =>
-                      assignMutation.mutate({ ...managedConfigInput, userId: assignedUserId })
-                    }
-                    disabled={!assignedUserId || assignMutation.isPending}
-                  >
-                    Assign user
-                  </Button>
-                </div>
-                {connection.assignments.length > 0 && (
-                  <div className="border-border mt-3 divide-y rounded-md border">
-                    {connection.assignments.map(assignment => (
-                      <div
-                        key={assignment.assignmentId}
-                        className="flex flex-col gap-2 px-3 py-2 text-sm sm:flex-row sm:items-center sm:justify-between"
-                      >
-                        <span className="min-w-0 break-all font-mono text-xs">
-                          {assignment.userId}
-                        </span>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() =>
-                            revokeAssignmentMutation.mutate({
-                              ...managedConfigInput,
-                              userId: assignment.userId,
-                            })
-                          }
-                          disabled={revokeAssignmentMutation.isPending}
-                        >
-                          Revoke access
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
                 )}
-              </>
+                <Button
+                  variant="outline"
+                  onClick={() =>
+                    assignMutation.mutate({ ...managedConfigInput, userId: assignedUserId })
+                  }
+                  disabled={!assignedUserId || assignMutation.isPending}
+                >
+                  {assignMutation.isPending ? 'Assigning...' : 'Assign member'}
+                </Button>
+              </div>
+            </div>
+            {connection.assignments.length > 0 ? (
+              <div className="border-border divide-y rounded-md border">
+                {connection.assignments.map(assignment => {
+                  const member = memberById.get(assignment.userId);
+                  return (
+                    <div
+                      key={assignment.assignmentId}
+                      className="flex flex-col gap-2 px-3 py-2 text-sm sm:flex-row sm:items-center sm:justify-between"
+                    >
+                      <div className="min-w-0">
+                        <div className="truncate">
+                          {member?.name || member?.email || 'Unknown member'}
+                        </div>
+                        <div className="text-muted-foreground truncate text-xs">
+                          {member?.name ? member.email : assignment.userId}
+                        </div>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-muted-foreground hover:text-foreground"
+                        onClick={() =>
+                          revokeAssignmentMutation.mutate({
+                            ...managedConfigInput,
+                            userId: assignment.userId,
+                          })
+                        }
+                        disabled={revokeAssignmentMutation.isPending}
+                      >
+                        Revoke access
+                      </Button>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="text-muted-foreground text-sm">No members assigned yet.</p>
             )}
-          </section>
+          </CardContent>
+        </Card>
+      )}
 
-          <section className="space-y-3 border-b pb-6">
-            <h2 className="text-sm font-medium">Provider sign-in</h2>
-            {!requiresProviderSignIn(connection.authMode) && (
-              <p className="text-muted-foreground text-sm">
-                This connection does not require provider sign-in.
+      {needsSignIn && (
+        <Card>
+          <CardHeader className="pb-4">
+            <CardTitle className="text-base">Provider sign-in</CardTitle>
+            <CardDescription>
+              {organizationId
+                ? 'Assigned users sign in with their own provider account.'
+                : 'Sign in so Kilo Code can call this server on your behalf.'}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {signedIn ? (
+              <div className="flex items-start gap-3 rounded-lg border border-green-500/20 bg-green-500/5 p-4">
+                <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-green-400" />
+                <div className="space-y-0.5">
+                  <p className="text-sm font-medium">
+                    {organizationId ? 'Provider sign-in active' : "You're signed in"}
+                  </p>
+                  <p className="text-muted-foreground text-sm">
+                    {connection.activeGrantCount === 1
+                      ? '1 active provider grant.'
+                      : `${connection.activeGrantCount} active provider grants.`}{' '}
+                    Kilo Code can reach this server now.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-start gap-3 rounded-lg border border-amber-500/20 bg-amber-500/5 p-4">
+                <span aria-hidden className="mt-1.5 size-2 shrink-0 rounded-full bg-amber-400" />
+                <div className="space-y-0.5">
+                  <p className="text-sm font-medium">Not signed in yet</p>
+                  <p className="text-muted-foreground text-sm">
+                    {organizationId
+                      ? 'Assigned users complete sign-in when they first use this connection.'
+                      : 'Sign in to start using this connection.'}
+                  </p>
+                </div>
+              </div>
+            )}
+            {missingStaticCredentials && (
+              <p className="text-xs text-amber-200">
+                Add provider credentials in the Credentials section below before signing in.
               </p>
             )}
-            {requiresProviderSignIn(connection.authMode) && (
-              <>
-                <p className="text-muted-foreground text-sm">
-                  {connection.activeGrantCount > 0
-                    ? 'At least one assigned user has an active provider sign-in.'
-                    : organizationId
-                      ? 'Assigned users complete provider sign-in when they start using this connection.'
-                      : 'No active provider sign-in yet. Start sign-in before using this connection.'}
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {!organizationId && (
-                    <Button
-                      variant="outline"
-                      onClick={() => providerSignInMutation.mutate(managedConfigInput)}
-                      disabled={providerSignInMutation.isPending}
-                    >
-                      Start provider sign-in
-                    </Button>
-                  )}
-                  <Badge variant={connection.hasDynamicRegistration ? 'secondary' : 'outline'}>
-                    {connection.hasDynamicRegistration
-                      ? 'Automatic provider sign-in available'
-                      : 'Automatic provider sign-in not available'}
-                  </Badge>
-                  <Badge
-                    variant={connection.hasStaticProviderCredentials ? 'secondary' : 'outline'}
-                  >
-                    {connection.hasStaticProviderCredentials
-                      ? 'Manual provider credentials saved'
-                      : 'Manual provider credentials not saved'}
-                  </Badge>
-                </div>
-              </>
+            {!organizationId && (
+              <Button
+                variant="outline"
+                onClick={() => providerSignInMutation.mutate(managedConfigInput)}
+                disabled={providerSignInMutation.isPending || missingStaticCredentials}
+              >
+                {providerSignInMutation.isPending
+                  ? 'Starting...'
+                  : signedIn
+                    ? 'Re-authenticate'
+                    : 'Start provider sign-in'}
+              </Button>
             )}
-          </section>
+          </CardContent>
+        </Card>
+      )}
 
-          <section className="space-y-3 border-b pb-6">
-            <h2 className="text-sm font-medium">Credentials</h2>
-            <p className="text-muted-foreground text-sm">
-              Stored secrets are not shown again after saving.
-            </p>
+      {managesCredentials && (
+        <Card>
+          <CardHeader className="pb-4">
+            <CardTitle className="text-base">Credentials</CardTitle>
+            <CardDescription>Stored secrets are not shown again after saving.</CardDescription>
+          </CardHeader>
+          <CardContent>
             {connection.authMode === 'static_headers' && (
               <div className="max-w-lg space-y-3">
                 <div className="space-y-2">
-                  <Label htmlFor="static-header-name">Static header name</Label>
+                  <Label htmlFor="static-header-name">Header name</Label>
                   <Input
                     id="static-header-name"
                     value={staticHeaderName}
@@ -366,7 +435,7 @@ export function McpGatewayDetailContent({
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="static-header-value">Static header value</Label>
+                  <Label htmlFor="static-header-value">Header value</Label>
                   <SecretTokenInput
                     id="static-header-value"
                     value={staticHeaderValue}
@@ -387,7 +456,7 @@ export function McpGatewayDetailContent({
                     !staticHeaderName || !staticHeaderValue || staticHeadersMutation.isPending
                   }
                 >
-                  Save static header
+                  {staticHeadersMutation.isPending ? 'Saving...' : 'Save static header'}
                 </Button>
               </div>
             )}
@@ -425,130 +494,129 @@ export function McpGatewayDetailContent({
                     !providerClientId || !providerClientSecret || staticProviderMutation.isPending
                   }
                 >
-                  Save provider credentials
+                  {staticProviderMutation.isPending ? 'Saving...' : 'Save provider credentials'}
                 </Button>
               </div>
             )}
-            {(connection.authMode === 'none' || connection.authMode === 'oauth_dynamic') && (
-              <p className="text-muted-foreground text-sm">
-                This connection does not use manually managed credentials.
-              </p>
-            )}
-          </section>
+          </CardContent>
+        </Card>
+      )}
 
-          <section className="space-y-3 border-b pb-6">
-            <h2 className="text-sm font-medium">Connect URL</h2>
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-              <code className="bg-muted rounded-md px-3 py-2 text-xs break-all flex-1">
-                {connection.canonicalUrl}
-              </code>
-              <div className="flex gap-2">
-                <Button variant="outline" onClick={() => copyConnectUrl(connection.canonicalUrl)}>
-                  <Copy />
-                  Copy
-                </Button>
-                <AlertDialog open={rotateDialogOpen} onOpenChange={setRotateDialogOpen}>
-                  <AlertDialogTrigger asChild>
-                    <Button variant="outline" disabled={rotateMutation.isPending}>
-                      <RotateCw />
+      <Card>
+        <CardHeader className="pb-4">
+          <CardTitle className="text-base">Connect URL</CardTitle>
+          <CardDescription>
+            Point Kilo Code at this URL. Rotating it invalidates the old URL immediately.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <code className="bg-muted flex-1 rounded-md px-3 py-2 text-xs break-all">
+              {connection.canonicalUrl}
+            </code>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => copyConnectUrl(connection.canonicalUrl)}>
+                <Copy className="size-4" />
+                Copy
+              </Button>
+              <AlertDialog open={rotateDialogOpen} onOpenChange={setRotateDialogOpen}>
+                <AlertDialogTrigger asChild>
+                  <Button variant="outline" disabled={rotateMutation.isPending}>
+                    <RotateCw className="size-4" />
+                    Rotate URL
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Rotate this connect URL?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      The current URL and any gateway tokens bound to it stop working immediately.
+                      Provider sign-in grants remain available on the new URL.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel disabled={rotateMutation.isPending}>
+                      Cancel
+                    </AlertDialogCancel>
+                    <AlertDialogAction
+                      variant="destructive"
+                      onClick={() => rotateMutation.mutate(managedConfigInput)}
+                      disabled={rotateMutation.isPending}
+                    >
                       Rotate URL
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Rotate this connect URL?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        The current URL and any gateway tokens bound to it stop working immediately.
-                        Provider sign-in grants remain available on the new URL.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel disabled={rotateMutation.isPending}>
-                        Cancel
-                      </AlertDialogCancel>
-                      <AlertDialogAction
-                        variant="destructive"
-                        onClick={() => rotateMutation.mutate(managedConfigInput)}
-                        disabled={rotateMutation.isPending}
-                      >
-                        Rotate URL
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              </div>
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </div>
-            <p className="text-muted-foreground text-xs">
-              Rotating the route key invalidates the old connect URL immediately.
-            </p>
-          </section>
+          </div>
+        </CardContent>
+      </Card>
 
-          <section className="space-y-3">
-            <h2 className="text-sm font-medium text-destructive">Danger zone</h2>
-            <div className="flex flex-wrap gap-2">
-              <AlertDialog open={disableDialogOpen} onOpenChange={setDisableDialogOpen}>
-                <AlertDialogTrigger asChild>
-                  <Button
-                    variant="outline"
-                    disabled={!connection.enabled || disableMutation.isPending}
+      <Card className="border-destructive/30">
+        <CardHeader className="pb-4">
+          <CardTitle className="text-destructive text-base">Danger zone</CardTitle>
+          <CardDescription>These actions take effect immediately.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap gap-2">
+            <AlertDialog open={disableDialogOpen} onOpenChange={setDisableDialogOpen}>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="outline"
+                  disabled={!connection.enabled || disableMutation.isPending}
+                >
+                  <ShieldAlert className="size-4" />
+                  Disable connection
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Disable this connection?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Requests through this connection will be blocked immediately after this action.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel disabled={disableMutation.isPending}>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    variant="destructive"
+                    onClick={() => disableMutation.mutate(managedConfigInput)}
+                    disabled={disableMutation.isPending}
                   >
-                    <ShieldAlert />
                     Disable connection
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Disable this connection?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      Requests through this connection will be blocked immediately after this
-                      action.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel disabled={disableMutation.isPending}>
-                      Cancel
-                    </AlertDialogCancel>
-                    <AlertDialogAction
-                      variant="destructive"
-                      onClick={() => disableMutation.mutate(managedConfigInput)}
-                      disabled={disableMutation.isPending}
-                    >
-                      Disable connection
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-              <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-                <AlertDialogTrigger asChild>
-                  <Button variant="destructive" disabled={deleteMutation.isPending}>
-                    <Trash2 />
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+            <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" disabled={deleteMutation.isPending}>
+                  <Trash2 className="size-4" />
+                  Delete connection
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete this connection?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This permanently invalidates its connect URL and revokes dependent instances,
+                    provider grants, and pending provider sign-ins.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel disabled={deleteMutation.isPending}>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    variant="destructive"
+                    onClick={() => deleteMutation.mutate(managedConfigInput)}
+                    disabled={deleteMutation.isPending}
+                  >
                     Delete connection
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Delete this connection?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      This permanently invalidates its connect URL and revokes dependent instances,
-                      provider grants, and pending provider sign-ins.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel disabled={deleteMutation.isPending}>
-                      Cancel
-                    </AlertDialogCancel>
-                    <AlertDialogAction
-                      variant="destructive"
-                      onClick={() => deleteMutation.mutate(managedConfigInput)}
-                      disabled={deleteMutation.isPending}
-                    >
-                      Delete connection
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            </div>
-          </section>
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
         </CardContent>
       </Card>
     </div>

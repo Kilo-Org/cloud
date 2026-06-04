@@ -706,4 +706,21 @@ describe('makeErrorReadable', () => {
     });
     expect(result).toBeUndefined();
   });
+
+  it('redacts custom LLM error responses', async () => {
+    const response = new Response('sensitive upstream error', { status: 500 });
+    const result = await makeErrorReadable({
+      requestedModel: 'kilo-internal/custom-model',
+      request: { kind: 'chat_completions', body: { model: 'test', messages: [] } },
+      response,
+      isUserByok: false,
+    });
+
+    expect(result?.status).toBe(500);
+    await expect(result?.json()).resolves.toEqual({
+      error: 'Stealth model unable to process request',
+      error_type: 'stealth_model_error',
+      message: 'Stealth model unable to process request',
+    });
+  });
 });

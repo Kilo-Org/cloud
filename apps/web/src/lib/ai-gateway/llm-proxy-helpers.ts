@@ -34,6 +34,7 @@ import { normalizeModelId } from '@/lib/ai-gateway/providers/openrouter';
 import { createParser, type EventSourceMessage } from 'eventsource-parser';
 import { sentryRootSpan } from '../getRootSpan';
 import { findKiloExclusiveModel, isKiloStealthModel } from '@/lib/ai-gateway/models';
+import { CUSTOM_LLM_PREFIX } from '@/lib/ai-gateway/model-utils';
 import type {
   MicrodollarUsageContext,
   MicrodollarUsageStats,
@@ -210,7 +211,7 @@ export async function makeErrorReadable({
   const overflowResponse = await detectContextOverflow({ requestedModel, request, response });
   if (overflowResponse) return overflowResponse;
 
-  if (isKiloStealthModel(requestedModel)) {
+  if (isKiloStealthModel(requestedModel) || requestedModel.startsWith(CUSTOM_LLM_PREFIX)) {
     return await stealthModelError(response);
   }
 

@@ -1,4 +1,4 @@
-import { type QueueBacklogMetrics, QUEUE_BACKLOG_THRESHOLDS } from './queue-backlog';
+import type { QueueBacklogMetrics } from './queue-backlog';
 import {
   readQueueBacklogState,
   transitionQueueBacklogState,
@@ -30,22 +30,17 @@ export async function evaluateQueueBacklogAlert(
   const currentState = await readQueueBacklogState(env.O11Y_ALERT_STATE, metrics.queueId);
   const transition = transitionQueueBacklogState(currentState, metrics.backlogCount);
 
-  if (transition.severityToNotify !== null) {
-    const thresholdCount =
-      transition.severityToNotify === 'page'
-        ? QUEUE_BACKLOG_THRESHOLDS.page
-        : QUEUE_BACKLOG_THRESHOLDS.ticket;
-
+  if (transition.alert !== null) {
     await notifyFn(
       {
         alertType: 'queue_backlog',
-        severity: transition.severityToNotify,
+        severity: transition.alert.severity,
         provider: 'cloudflare',
         model: metrics.queueId,
         clientName: 'queues',
         backlogCount: metrics.backlogCount,
         backlogBytes: metrics.backlogBytes,
-        thresholdCount,
+        thresholdCount: transition.alert.thresholdCount,
         oldestMessageTimestamp: metrics.oldestMessageTimestamp,
       },
       env

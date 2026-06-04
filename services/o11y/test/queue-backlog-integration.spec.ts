@@ -43,7 +43,7 @@ describe('evaluateAlerts queue backlog integration', () => {
         return Response.json({
           success: true,
           result: {
-            backlog_count: 250_000,
+            backlog_count: 50_000,
             backlog_bytes: 12_345_678,
             oldest_message_timestamp_ms: 1_780_560_000_000,
           },

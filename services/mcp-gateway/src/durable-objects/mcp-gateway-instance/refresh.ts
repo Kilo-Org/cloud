@@ -13,7 +13,6 @@ import type { DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
 import type { MCPGatewayEnv } from '../../types';
 import { decryptProviderGrant } from '../../lib/credentials';
 import { validateResolvedPublicUrl } from '../../lib/url-policy';
-import { resolveSecret } from '../../lib/secret';
 import { MCPGatewayInstanceStateRecord, mcpGatewayInstanceState } from './state.table';
 
 export const RefreshProviderGrantInputSchema = z.object({
@@ -72,8 +71,8 @@ function requireBearerTokenType(tokenResponse: z.infer<typeof ProviderTokenRespo
   }
 }
 
-async function activeCredentialKey(env: MCPGatewayEnv['Bindings']) {
-  const serialized = await resolveSecret(env.MCP_GATEWAY_CREDENTIAL_KEYSET_JSON);
+function activeCredentialKey(env: MCPGatewayEnv['Bindings']) {
+  const serialized = env.MCP_GATEWAY_CREDENTIAL_KEYSET_JSON;
   if (!serialized) return null;
   let parsed: unknown;
   try {
@@ -194,7 +193,7 @@ export async function refreshProviderGrant(params: {
     const expiresAt = tokenResponse.expires_in
       ? new Date(Date.now() + tokenResponse.expires_in * 1000).toISOString()
       : null;
-    const keyset = await activeCredentialKey(params.env);
+    const keyset = activeCredentialKey(params.env);
     if (!keyset || !keyset.success) {
       throw new Error('Credential keyset is unavailable');
     }

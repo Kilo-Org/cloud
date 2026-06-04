@@ -46,23 +46,13 @@
       "dataset": "mcp_gateway_events",
     },
   ],
-  "secrets_store_secrets": [
-    {
-      "binding": "MCP_GATEWAY_JWT_PUBLIC_KEYSET_JSON",
-      "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
-      "secret_name": "MCP_GATEWAY_JWT_PUBLIC_KEYSET_JSON",
-    },
-    {
-      "binding": "MCP_GATEWAY_CREDENTIAL_KEYSET_JSON",
-      "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
-      "secret_name": "MCP_GATEWAY_CREDENTIAL_KEYSET_JSON",
-    },
-    {
-      "binding": "MCP_GATEWAY_RATE_LIMIT_SECRET",
-      "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
-      "secret_name": "MCP_GATEWAY_RATE_LIMIT_SECRET",
-    },
-  ],
+  "secrets": {
+    "required": [
+      "MCP_GATEWAY_JWT_PUBLIC_KEYSET_JSON",
+      "MCP_GATEWAY_CREDENTIAL_KEYSET_JSON",
+      "MCP_GATEWAY_RATE_LIMIT_SECRET",
+    ],
+  },
 
   "vars": {
     "ENVIRONMENT": "production",
@@ -112,23 +102,13 @@
           "dataset": "mcp_gateway_events",
         },
       ],
-      "secrets_store_secrets": [
-        {
-          "binding": "MCP_GATEWAY_JWT_PUBLIC_KEYSET_JSON",
-          "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
-          "secret_name": "MCP_GATEWAY_JWT_PUBLIC_KEYSET_JSON",
-        },
-        {
-          "binding": "MCP_GATEWAY_CREDENTIAL_KEYSET_JSON",
-          "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
-          "secret_name": "MCP_GATEWAY_CREDENTIAL_KEYSET_JSON",
-        },
-        {
-          "binding": "MCP_GATEWAY_RATE_LIMIT_SECRET",
-          "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
-          "secret_name": "MCP_GATEWAY_RATE_LIMIT_SECRET",
-        },
-      ],
+      "secrets": {
+        "required": [
+          "MCP_GATEWAY_JWT_PUBLIC_KEYSET_JSON",
+          "MCP_GATEWAY_CREDENTIAL_KEYSET_JSON",
+          "MCP_GATEWAY_RATE_LIMIT_SECRET",
+        ],
+      },
     },
   },
 }

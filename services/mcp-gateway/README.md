@@ -40,8 +40,36 @@ pnpm --filter cloudflare-mcp-gateway keys:generate -- --format env --target app 
 ```
 
 For local Worker startup, `cp .dev.vars.example .dev.vars` provides test-only values.
-For end-to-end local OAuth smoke tests, the app and Worker must use a matching generated
+Wrangler loads the keyset values in `.dev.vars` as ordinary local Worker secrets. For
+end-to-end local OAuth smoke tests, the app and Worker must use a matching generated
 bundle.
+
+For deployed environments, set the three Worker secrets with Wrangler:
+
+```bash
+wrangler secret put MCP_GATEWAY_JWT_PUBLIC_KEYSET_JSON
+wrangler secret put MCP_GATEWAY_CREDENTIAL_KEYSET_JSON
+wrangler secret put MCP_GATEWAY_RATE_LIMIT_SECRET
+```
+
+Local app and Worker origins must also agree. In the Worker `.dev.vars`, set
+`APP_BASE_URL` to the Next.js app origin and `MCP_GATEWAY_BASE_URL` to the Worker
+origin:
+
+```bash
+APP_BASE_URL=http://localhost:3000
+MCP_GATEWAY_BASE_URL=http://localhost:8806
+```
+
+In `apps/web/.env.local`, set the app-side gateway origin to the same Worker
+origin:
+
+```bash
+MCP_GATEWAY_BASE_URL=http://localhost:8806
+```
+
+`apps/web` derives its own app origin from `APP_URL`; only set
+`MCP_GATEWAY_APP_BASE_URL` if the OAuth app origin differs from `APP_URL`.
 
 ## Architecture
 

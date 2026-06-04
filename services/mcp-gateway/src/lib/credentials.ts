@@ -9,7 +9,6 @@ import {
 import { decryptKeyedEnvelope, type EnvelopePrivateKeySlots } from '@kilocode/encryption';
 import { z } from 'zod';
 import type { MCPGatewayEnv } from '../types';
-import { resolveSecret } from './secret';
 
 const secretScheme = 'mcp-gateway-credential-rsa-aes-256-gcm';
 const grantScheme = 'mcp-gateway-provider-grant-rsa-aes-256-gcm';
@@ -36,7 +35,7 @@ function providerGrantAad(instanceId: string): string {
 }
 
 async function credentialKeyset(env: MCPGatewayEnv['Bindings']): Promise<EnvelopePrivateKeySlots> {
-  const serialized = await resolveSecret(env.MCP_GATEWAY_CREDENTIAL_KEYSET_JSON);
+  const serialized = env.MCP_GATEWAY_CREDENTIAL_KEYSET_JSON;
   if (!serialized) {
     throw createGatewayError(GatewayErrorCode.ServerError, 'Credential keyset is unavailable', 500);
   }

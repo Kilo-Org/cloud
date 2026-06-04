@@ -260,25 +260,39 @@ async function streamSessionItems(
 ): Promise<Error | null> {
   const { tokenizer, pending, getParseError } = createItemExtractor(r2Key);
   const reader = body.getReader();
+  let completed = false;
 
-  while (true) {
-    const result: ReadableStreamReadResult<Uint8Array> = await reader.read();
-    if (result.done) {
-      tokenizer.end();
-    } else {
-      tokenizer.write(result.value);
+  try {
+    while (true) {
+      const result: ReadableStreamReadResult<Uint8Array> = await reader.read();
+      if (result.done) {
+        tokenizer.end();
+        completed = true;
+      } else {
+        tokenizer.write(result.value);
+      }
+
+      while (pending.length > 0) {
+        const rawItem = pending.shift();
+        if (!rawItem) break;
+        await onItem(rawItem);
+      }
+
+      if (result.done) break;
     }
 
-    while (pending.length > 0) {
-      const rawItem = pending.shift();
-      if (!rawItem) break;
-      await onItem(rawItem);
+    return getParseError();
+  } finally {
+    if (!completed) {
+      await reader.cancel().catch(err => {
+        console.warn('Failed to cancel queue consumer R2 stream', {
+          r2Key,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      });
     }
-
-    if (result.done) break;
+    reader.releaseLock();
   }
-
-  return getParseError();
 }
 
 function createIngestChunker(

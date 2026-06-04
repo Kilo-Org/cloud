@@ -427,6 +427,66 @@ describe('queue', () => {
     expect(deleteObject).not.toHaveBeenCalled();
   });
 
+  it('cancels the unread R2 stream when item processing fails', async () => {
+    const ingest = vi.fn(async () => {
+      throw new Error('Durable Object is overloaded.');
+    });
+    vi.mocked(getSessionIngestDO).mockReturnValue({ ingest } as never);
+
+    const limit = vi.fn(async () => [{ session_id: 'ses_cancel' }]);
+    const where = vi.fn(() => ({ limit }));
+    const from = vi.fn(() => ({ where }));
+    vi.mocked(getWorkerDb).mockReturnValue({ select: vi.fn(() => ({ from })) } as never);
+
+    const items = Array.from({ length: 128 }, (_, i) => ({
+      type: 'message',
+      data: { id: `msg_${i}` },
+    }));
+    const cancel = vi.fn();
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(encoder.encode(JSON.stringify({ data: items })));
+      },
+      cancel,
+    });
+    const deleteObject = vi.fn(async () => undefined);
+    const env = {
+      HYPERDRIVE: { connectionString: 'postgres://unused' },
+      SESSION_INGEST_R2: {
+        get: vi.fn(async () => ({ body })),
+        put: vi.fn(async () => undefined),
+        delete: deleteObject,
+      },
+    } as never;
+    const ack = vi.fn();
+    const retry = vi.fn();
+
+    await queue(
+      {
+        messages: [
+          {
+            body: {
+              r2Key: 'staging/cancel',
+              kiloUserId: 'usr_cancel',
+              sessionId: 'ses_cancel',
+              ingestVersion: 1,
+              ingestedAt: 1,
+            },
+            ack,
+            retry,
+          },
+        ],
+      } as never,
+      env,
+      { waitUntil: vi.fn() } as unknown as ExecutionContext
+    );
+
+    expect(cancel).toHaveBeenCalledTimes(1);
+    expect(retry).toHaveBeenCalledWith({ delaySeconds: QUEUE_RETRY_DELAY_SECONDS });
+    expect(ack).not.toHaveBeenCalled();
+    expect(deleteObject).not.toHaveBeenCalled();
+  });
+
   it('does not flush buffered items when malformed JSON forces a retry', async () => {
     const ingest = vi.fn(async () => ({ changes: [] }));
     vi.mocked(getSessionIngestDO).mockReturnValue({ ingest } as never);

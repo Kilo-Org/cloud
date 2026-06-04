@@ -80,7 +80,11 @@ function Stepper({ current }: { current: number }) {
         const isDone = current > step.id;
         const isCurrent = current === step.id;
         return (
-          <li key={step.id} className="flex items-center gap-3">
+          <li
+            key={step.id}
+            aria-current={isCurrent ? 'step' : undefined}
+            className="flex items-center gap-3"
+          >
             <div className="flex items-center gap-2">
               <span
                 aria-hidden
@@ -99,7 +103,11 @@ function Stepper({ current }: { current: number }) {
                   isCurrent ? 'text-foreground font-medium' : 'text-muted-foreground'
                 )}
               >
+                <span className="sr-only">Step {step.id} of 2: </span>
                 {step.label}
+                <span className="sr-only">
+                  {isCurrent ? ', current step' : isDone ? ', completed' : ', not started'}
+                </span>
               </span>
             </div>
             {index < STEPS.length - 1 && (
@@ -277,7 +285,7 @@ export function McpGatewaySetupContent({ organizationId }: McpGatewaySetupConten
       <div className="space-y-1.5">
         <Link
           href={routes.list}
-          className="text-muted-foreground inline-flex items-center gap-2 text-sm hover:text-foreground"
+          className="text-muted-foreground inline-flex min-h-11 items-center gap-2 text-sm hover:text-foreground sm:min-h-0"
         >
           <ArrowLeft className="size-4" />
           Back to connections
@@ -306,6 +314,7 @@ export function McpGatewaySetupContent({ organizationId }: McpGatewaySetupConten
                     type="url"
                     inputMode="url"
                     autoFocus
+                    className="h-11 sm:h-9"
                     value={draft.remoteUrl}
                     onChange={event => {
                       discoveryMutation.reset();
@@ -340,6 +349,7 @@ export function McpGatewaySetupContent({ organizationId }: McpGatewaySetupConten
                   <Label htmlFor="connection-name">Connection name</Label>
                   <Input
                     id="connection-name"
+                    className="h-11 sm:h-9"
                     value={draft.name}
                     onChange={event => updateDraft({ name: event.target.value })}
                     placeholder="Production tools"
@@ -357,9 +367,9 @@ export function McpGatewaySetupContent({ organizationId }: McpGatewaySetupConten
                   </p>
                 )}
 
-                <label className="flex items-start gap-3 text-sm">
+                <label className="flex min-h-11 items-start gap-3 text-sm">
                   <Checkbox
-                    className="mt-0.5"
+                    className="mt-1"
                     checked={draft.pathPassthrough}
                     onCheckedChange={checked => updateDraft({ pathPassthrough: checked === true })}
                   />
@@ -385,7 +395,7 @@ export function McpGatewaySetupContent({ organizationId }: McpGatewaySetupConten
                       value={selectedProviderIssuer}
                       onValueChange={value => updateDraft({ providerIssuer: value })}
                     >
-                      <SelectTrigger id="provider-issuer" className="w-full">
+                      <SelectTrigger id="provider-issuer" className="h-11 w-full sm:h-9">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -410,7 +420,15 @@ export function McpGatewaySetupContent({ organizationId }: McpGatewaySetupConten
                       if (isAuthMode(value)) updateDraft({ authMode: value });
                     }}
                   >
-                    <SelectTrigger id="auth-mode" className="w-full">
+                    <SelectTrigger
+                      id="auth-mode"
+                      aria-describedby={
+                        discovery && (!hasProvider || (hasProvider && !dynamicAvailable))
+                          ? 'auth-mode-hint'
+                          : undefined
+                      }
+                      className="h-11 w-full sm:h-9"
+                    >
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -424,6 +442,18 @@ export function McpGatewaySetupContent({ organizationId }: McpGatewaySetupConten
                       <SelectItem value="none">No provider sign-in</SelectItem>
                     </SelectContent>
                   </Select>
+                  {discovery && !hasProvider && (
+                    <p id="auth-mode-hint" className="text-muted-foreground text-xs">
+                      This server did not advertise an OAuth provider, so use static headers or no
+                      provider sign-in.
+                    </p>
+                  )}
+                  {discovery && hasProvider && !dynamicAvailable && (
+                    <p id="auth-mode-hint" className="text-muted-foreground text-xs">
+                      Automatic provider sign-in is unavailable because this provider does not
+                      advertise dynamic registration.
+                    </p>
+                  )}
                   {selectedAuthMode === 'oauth_dynamic' && (
                     <p className="text-muted-foreground text-xs">
                       {selectedProviderIssuer
@@ -454,6 +484,7 @@ export function McpGatewaySetupContent({ organizationId }: McpGatewaySetupConten
                           <Label htmlFor="static-provider-client-id">Provider client ID</Label>
                           <SecretTokenInput
                             id="static-provider-client-id"
+                            className="h-11 sm:h-9"
                             value={draft.staticProviderClientId}
                             onChange={event =>
                               updateDraft({ staticProviderClientId: event.target.value })
@@ -468,6 +499,7 @@ export function McpGatewaySetupContent({ organizationId }: McpGatewaySetupConten
                           </Label>
                           <SecretTokenInput
                             id="static-provider-client-secret"
+                            className="h-11 sm:h-9"
                             value={draft.staticProviderClientSecret}
                             onChange={event =>
                               updateDraft({ staticProviderClientSecret: event.target.value })
@@ -492,6 +524,7 @@ export function McpGatewaySetupContent({ organizationId }: McpGatewaySetupConten
                           <Label htmlFor="static-header-name">Header name</Label>
                           <Input
                             id="static-header-name"
+                            className="h-11 sm:h-9"
                             value={draft.staticHeaderName}
                             onChange={event =>
                               updateDraft({ staticHeaderName: event.target.value })
@@ -503,6 +536,7 @@ export function McpGatewaySetupContent({ organizationId }: McpGatewaySetupConten
                           <Label htmlFor="static-header-value">Header value</Label>
                           <SecretTokenInput
                             id="static-header-value"
+                            className="h-11 sm:h-9"
                             value={draft.staticHeaderValue}
                             onChange={event =>
                               updateDraft({ staticHeaderValue: event.target.value })
@@ -535,22 +569,31 @@ export function McpGatewaySetupContent({ organizationId }: McpGatewaySetupConten
 
             <div className="flex items-center justify-between gap-3 border-t pt-5">
               {step === 1 ? (
-                <Button variant="ghost" type="button" asChild>
+                <Button variant="ghost" type="button" className="h-11 sm:h-9" asChild>
                   <Link href={routes.list}>Cancel</Link>
                 </Button>
               ) : (
-                <Button variant="outline" type="button" onClick={() => setStep(1)}>
+                <Button
+                  variant="outline"
+                  type="button"
+                  className="h-11 sm:h-9"
+                  onClick={() => setStep(1)}
+                >
                   <ArrowLeft className="size-4" />
                   Back
                 </Button>
               )}
               {step === 1 ? (
-                <Button type="submit" disabled={!canLeaveServerStep}>
+                <Button type="submit" className="h-11 sm:h-9" disabled={!canLeaveServerStep}>
                   Continue
                   <ArrowRight className="size-4" />
                 </Button>
               ) : (
-                <Button type="submit" disabled={accessIncomplete || isCreating}>
+                <Button
+                  type="submit"
+                  className="h-11 sm:h-9"
+                  disabled={accessIncomplete || isCreating}
+                >
                   <Check className="size-4" />
                   {isCreating ? 'Creating...' : 'Create connection'}
                 </Button>

@@ -290,68 +290,75 @@ export function McpGatewayDetailContent({
             <CardTitle className="text-base">Access</CardTitle>
             <CardDescription>Assign each member who can use this connection.</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="assign-user">Assign a member</Label>
-              <div className="flex flex-col gap-2 sm:flex-row">
-                {organizationId && (
-                  <OrgMemberPicker
-                    id="assign-user"
-                    organizationId={organizationId}
-                    value={assignedUserId}
-                    onValueChange={setAssignedUserId}
-                    excludeUserIds={connection.assignments.map(assignment => assignment.userId)}
-                  />
-                )}
-                <Button
-                  variant="outline"
-                  onClick={() =>
-                    assignMutation.mutate({ ...managedConfigInput, userId: assignedUserId })
-                  }
-                  disabled={!assignedUserId || assignMutation.isPending}
-                >
-                  {assignMutation.isPending ? 'Assigning...' : 'Assign member'}
-                </Button>
+          <CardContent>
+            <div className="max-w-3xl space-y-5">
+              <div className="space-y-2">
+                <Label htmlFor="assign-user">Assign a member</Label>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  {organizationId && (
+                    <OrgMemberPicker
+                      id="assign-user"
+                      organizationId={organizationId}
+                      value={assignedUserId}
+                      onValueChange={setAssignedUserId}
+                      excludeUserIds={connection.assignments.map(assignment => assignment.userId)}
+                    />
+                  )}
+                  <Button
+                    variant="outline"
+                    onClick={() =>
+                      assignMutation.mutate({ ...managedConfigInput, userId: assignedUserId })
+                    }
+                    disabled={!assignedUserId || assignMutation.isPending}
+                  >
+                    {assignMutation.isPending ? 'Assigning...' : 'Assign member'}
+                  </Button>
+                </div>
               </div>
+              {connection.assignments.length > 0 ? (
+                <div className="space-y-2">
+                  <p className="text-muted-foreground text-xs">
+                    Assigned members ({connection.assignments.length})
+                  </p>
+                  <div className="border-border divide-y rounded-md border">
+                    {connection.assignments.map(assignment => {
+                      const member = memberById.get(assignment.userId);
+                      return (
+                        <div
+                          key={assignment.assignmentId}
+                          className="flex flex-col gap-2 px-3 py-2.5 text-sm sm:flex-row sm:items-center sm:justify-between"
+                        >
+                          <div className="min-w-0">
+                            <div className="truncate">
+                              {member?.name || member?.email || 'Unknown member'}
+                            </div>
+                            <div className="text-muted-foreground truncate text-xs">
+                              {member?.name ? member.email : assignment.userId}
+                            </div>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-muted-foreground hover:text-foreground sm:-mr-2"
+                            onClick={() =>
+                              revokeAssignmentMutation.mutate({
+                                ...managedConfigInput,
+                                userId: assignment.userId,
+                              })
+                            }
+                            disabled={revokeAssignmentMutation.isPending}
+                          >
+                            Revoke access
+                          </Button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : (
+                <p className="text-muted-foreground text-sm">No members assigned yet.</p>
+              )}
             </div>
-            {connection.assignments.length > 0 ? (
-              <div className="border-border divide-y rounded-md border">
-                {connection.assignments.map(assignment => {
-                  const member = memberById.get(assignment.userId);
-                  return (
-                    <div
-                      key={assignment.assignmentId}
-                      className="flex flex-col gap-2 px-3 py-2 text-sm sm:flex-row sm:items-center sm:justify-between"
-                    >
-                      <div className="min-w-0">
-                        <div className="truncate">
-                          {member?.name || member?.email || 'Unknown member'}
-                        </div>
-                        <div className="text-muted-foreground truncate text-xs">
-                          {member?.name ? member.email : assignment.userId}
-                        </div>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-muted-foreground hover:text-foreground"
-                        onClick={() =>
-                          revokeAssignmentMutation.mutate({
-                            ...managedConfigInput,
-                            userId: assignment.userId,
-                          })
-                        }
-                        disabled={revokeAssignmentMutation.isPending}
-                      >
-                        Revoke access
-                      </Button>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <p className="text-muted-foreground text-sm">No members assigned yet.</p>
-            )}
           </CardContent>
         </Card>
       )}
@@ -366,9 +373,9 @@ export function McpGatewayDetailContent({
                 : 'Sign in so Kilo Code can call this server on your behalf.'}
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent>
             {signedIn ? (
-              <div className="flex items-start gap-3 rounded-lg border border-green-500/20 bg-green-500/5 p-4">
+              <div className="flex max-w-3xl items-start gap-3 rounded-lg border border-green-500/20 bg-green-500/5 p-4">
                 <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-green-400" />
                 <div className="space-y-0.5">
                   <p className="text-sm font-medium">
@@ -384,7 +391,7 @@ export function McpGatewayDetailContent({
                 </div>
               </div>
             ) : (
-              <div className="flex items-start gap-3 rounded-lg border border-yellow-500/20 bg-yellow-500/5 p-4">
+              <div className="flex max-w-3xl items-start gap-3 rounded-lg border border-yellow-500/20 bg-yellow-500/5 p-4">
                 <span aria-hidden className="mt-1.5 size-2 shrink-0 rounded-full bg-yellow-400" />
                 <div className="space-y-0.5">
                   <p className="text-sm font-medium">Not signed in yet</p>

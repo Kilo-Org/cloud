@@ -1,17 +1,28 @@
 import { describe, expect, it } from 'vitest';
 import { evaluateQueueBacklogAlert } from '../src/alerting/queue-backlog-evaluate';
-import { MONITORED_QUEUE_ID, type QueueBacklogMetrics } from '../src/alerting/queue-backlog';
+import {
+  MONITORED_QUEUE_ID,
+  QUEUE_BACKLOG_THRESHOLDS,
+  type QueueBacklogMetrics,
+} from '../src/alerting/queue-backlog';
 import type { AlertPayload } from '../src/alerting/notify';
+
+const STATE_KEY = `o11y:queue_backlog:${MONITORED_QUEUE_ID}`;
 
 function makeKv() {
   const store = new Map<string, string>();
+  let putCount = 0;
   return {
     get: async (key: string) => store.get(key) ?? null,
     put: async (key: string, value: string) => {
+      putCount += 1;
       store.set(key, value);
     },
     store,
-  } as unknown as KVNamespace & { store: Map<string, string> };
+    get putCount() {
+      return putCount;
+    },
+  } as unknown as KVNamespace & { store: Map<string, string>; putCount: number };
 }
 
 function makeSecret(value: string): SecretsStoreSecret {
@@ -38,16 +49,22 @@ function makeMetrics(backlogCount: number): QueueBacklogMetrics {
 }
 
 describe('evaluateQueueBacklogAlert', () => {
-  it('sends a ticket alert and records its dedup marker', async () => {
+  it('sends one ticket alert and persists queue-scoped state', async () => {
     const kv = makeKv();
     const sentAlerts: AlertPayload[] = [];
+    const notify = async (alert: AlertPayload) => {
+      sentAlerts.push(alert);
+    };
 
     await evaluateQueueBacklogAlert(
       makeEnv(kv),
-      async () => makeMetrics(25_000),
-      async alert => {
-        sentAlerts.push(alert);
-      }
+      async () => makeMetrics(QUEUE_BACKLOG_THRESHOLDS.ticket),
+      notify
+    );
+    await evaluateQueueBacklogAlert(
+      makeEnv(kv),
+      async () => makeMetrics(QUEUE_BACKLOG_THRESHOLDS.ticket),
+      notify
     );
 
     expect(sentAlerts).toEqual([
@@ -57,24 +74,27 @@ describe('evaluateQueueBacklogAlert', () => {
         provider: 'cloudflare',
         model: MONITORED_QUEUE_ID,
         clientName: 'queues',
-        backlogCount: 25_000,
+        backlogCount: QUEUE_BACKLOG_THRESHOLDS.ticket,
         backlogBytes: 12_345_678,
-        thresholdCount: 25_000,
+        thresholdCount: QUEUE_BACKLOG_THRESHOLDS.ticket,
         oldestMessageTimestamp: new Date('2026-06-04T08:00:00.000Z'),
       },
     ]);
-    expect(
-      kv.store.has(`o11y:alert:ticket:queue_backlog:cloudflare:${MONITORED_QUEUE_ID}:queues`)
-    ).toBe(true);
+    expect(kv.store.size).toBe(1);
+    expect(JSON.parse(kv.store.get(STATE_KEY) ?? '')).toEqual({
+      ticket: { active: true, consecutiveBelowCount: 0 },
+      page: { active: false, consecutiveBelowCount: 0 },
+    });
+    expect(kv.putCount).toBe(1);
   });
 
-  it('does not send an alert below the ticket threshold', async () => {
+  it('does not write state below the ticket threshold while inactive', async () => {
     const kv = makeKv();
     const sentAlerts: AlertPayload[] = [];
 
     await evaluateQueueBacklogAlert(
       makeEnv(kv),
-      async () => makeMetrics(24_999),
+      async () => makeMetrics(QUEUE_BACKLOG_THRESHOLDS.ticket - 1),
       async alert => {
         sentAlerts.push(alert);
       }
@@ -82,40 +102,121 @@ describe('evaluateQueueBacklogAlert', () => {
 
     expect(sentAlerts).toEqual([]);
     expect(kv.store.size).toBe(0);
+    expect(kv.putCount).toBe(0);
   });
 
-  it('suppresses a ticket while a page cooldown marker is active', async () => {
+  it('sends only a page alert on a direct jump across both thresholds', async () => {
     const kv = makeKv();
-    kv.store.set(
-      `o11y:alert:page:queue_backlog:cloudflare:${MONITORED_QUEUE_ID}:queues`,
-      new Date().toISOString()
-    );
     const sentAlerts: AlertPayload[] = [];
 
     await evaluateQueueBacklogAlert(
       makeEnv(kv),
-      async () => makeMetrics(25_000),
+      async () => makeMetrics(QUEUE_BACKLOG_THRESHOLDS.page),
       async alert => {
         sentAlerts.push(alert);
       }
     );
 
-    expect(sentAlerts).toEqual([]);
+    expect(sentAlerts.map(alert => alert.severity)).toEqual(['page']);
+    expect(JSON.parse(kv.store.get(STATE_KEY) ?? '')).toEqual({
+      ticket: { active: true, consecutiveBelowCount: 0 },
+      page: { active: true, consecutiveBelowCount: 0 },
+    });
   });
 
-  it('does not record a cooldown marker when notification fails', async () => {
+  it('retries an alert when notification delivery fails', async () => {
     const kv = makeKv();
+    let attempts = 0;
+    const notify = async () => {
+      attempts += 1;
+      if (attempts === 1) throw new Error('Slack unavailable');
+    };
 
     await expect(
       evaluateQueueBacklogAlert(
         makeEnv(kv),
-        async () => makeMetrics(25_000),
-        async () => {
-          throw new Error('Slack unavailable');
-        }
+        async () => makeMetrics(QUEUE_BACKLOG_THRESHOLDS.ticket),
+        notify
       )
     ).rejects.toThrow('Slack unavailable');
-
     expect(kv.store.size).toBe(0);
+
+    await evaluateQueueBacklogAlert(
+      makeEnv(kv),
+      async () => makeMetrics(QUEUE_BACKLOG_THRESHOLDS.ticket),
+      notify
+    );
+
+    expect(attempts).toBe(2);
+    expect(kv.store.has(STATE_KEY)).toBe(true);
+  });
+
+  it('re-arms only after three consecutive below-threshold checks', async () => {
+    const kv = makeKv();
+    const sentAlerts: AlertPayload[] = [];
+    const notify = async (alert: AlertPayload) => {
+      sentAlerts.push(alert);
+    };
+
+    await evaluateQueueBacklogAlert(
+      makeEnv(kv),
+      async () => makeMetrics(QUEUE_BACKLOG_THRESHOLDS.ticket),
+      notify
+    );
+
+    for (let check = 0; check < 2; check += 1) {
+      await evaluateQueueBacklogAlert(
+        makeEnv(kv),
+        async () => makeMetrics(QUEUE_BACKLOG_THRESHOLDS.ticket - 1),
+        notify
+      );
+    }
+
+    await evaluateQueueBacklogAlert(
+      makeEnv(kv),
+      async () => makeMetrics(QUEUE_BACKLOG_THRESHOLDS.ticket),
+      notify
+    );
+    expect(sentAlerts).toHaveLength(1);
+
+    for (let check = 0; check < 3; check += 1) {
+      await evaluateQueueBacklogAlert(
+        makeEnv(kv),
+        async () => makeMetrics(QUEUE_BACKLOG_THRESHOLDS.ticket - 1),
+        notify
+      );
+    }
+
+    await evaluateQueueBacklogAlert(
+      makeEnv(kv),
+      async () => makeMetrics(QUEUE_BACKLOG_THRESHOLDS.ticket),
+      notify
+    );
+    expect(sentAlerts).toHaveLength(2);
+  });
+
+  it('recovers safely from invalid persisted state', async () => {
+    const kv = makeKv();
+    kv.store.set(
+      STATE_KEY,
+      JSON.stringify({
+        ticket: { active: true, consecutiveBelowCount: 'invalid' },
+        page: { active: false, consecutiveBelowCount: 0 },
+      })
+    );
+    const sentAlerts: AlertPayload[] = [];
+
+    await evaluateQueueBacklogAlert(
+      makeEnv(kv),
+      async () => makeMetrics(QUEUE_BACKLOG_THRESHOLDS.ticket),
+      async alert => {
+        sentAlerts.push(alert);
+      }
+    );
+
+    expect(sentAlerts.map(alert => alert.severity)).toEqual(['ticket']);
+    expect(JSON.parse(kv.store.get(STATE_KEY) ?? '')).toMatchObject({
+      ticket: { active: true },
+    });
   });
 });

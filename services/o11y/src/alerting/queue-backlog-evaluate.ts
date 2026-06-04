@@ -1,5 +1,9 @@
 import { type QueueBacklogMetrics, QUEUE_BACKLOG_THRESHOLDS } from './queue-backlog';
-import { evaluateAndUpdateQueueBacklogState } from './queue-backlog-state';
+import {
+  readQueueBacklogState,
+  transitionQueueBacklogState,
+  writeQueueBacklogState,
+} from './queue-backlog-state';
 import { queryQueueBacklog } from './queue-backlog-query';
 import { sendAlertNotification, type AlertPayload } from './notify';
 
@@ -23,29 +27,32 @@ export async function evaluateQueueBacklogAlert(
   notifyFn: NotifyFn = sendAlertNotification
 ): Promise<void> {
   const metrics = await queryFn(env);
+  const currentState = await readQueueBacklogState(env.O11Y_ALERT_STATE, metrics.queueId);
+  const transition = transitionQueueBacklogState(currentState, metrics.backlogCount);
 
-  const severity = await evaluateAndUpdateQueueBacklogState(
-    env.O11Y_ALERT_STATE,
-    metrics.backlogCount
-  );
+  if (transition.severityToNotify !== null) {
+    const thresholdCount =
+      transition.severityToNotify === 'page'
+        ? QUEUE_BACKLOG_THRESHOLDS.page
+        : QUEUE_BACKLOG_THRESHOLDS.ticket;
 
-  if (severity === null) return;
+    await notifyFn(
+      {
+        alertType: 'queue_backlog',
+        severity: transition.severityToNotify,
+        provider: 'cloudflare',
+        model: metrics.queueId,
+        clientName: 'queues',
+        backlogCount: metrics.backlogCount,
+        backlogBytes: metrics.backlogBytes,
+        thresholdCount,
+        oldestMessageTimestamp: metrics.oldestMessageTimestamp,
+      },
+      env
+    );
+  }
 
-  const thresholdCount =
-    severity === 'page' ? QUEUE_BACKLOG_THRESHOLDS.page : QUEUE_BACKLOG_THRESHOLDS.ticket;
-
-  await notifyFn(
-    {
-      alertType: 'queue_backlog',
-      severity,
-      provider: 'cloudflare',
-      model: metrics.queueId,
-      clientName: 'queues',
-      backlogCount: metrics.backlogCount,
-      backlogBytes: metrics.backlogBytes,
-      thresholdCount,
-      oldestMessageTimestamp: metrics.oldestMessageTimestamp,
-    },
-    env
-  );
+  if (transition.stateChanged) {
+    await writeQueueBacklogState(env.O11Y_ALERT_STATE, metrics.queueId, transition.state);
+  }
 }

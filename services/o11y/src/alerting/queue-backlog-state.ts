@@ -1,121 +1,122 @@
-/**
- * Stateful alert tracking for the queue backlog monitor.
- *
- * Each alert tier (page / ticket) has an independent state machine:
- *
- *   - Fires ONCE when the backlog first crosses the tier threshold.
- *   - Resolves (resets) only after CONSECUTIVE_BELOW_TO_RESOLVE consecutive
- *     calls where the backlog is below the tier threshold.
- *   - While the page tier is active, the ticket tier state is frozen — the
- *     page alert already covers the elevated backlog.
- *
- * State is persisted in the O11Y_ALERT_STATE KV namespace so it survives
- * across cron invocations (runs every minute).
- */
-
+import { z } from 'zod';
 import type { AlertSeverity } from './slo-config';
 import { QUEUE_BACKLOG_THRESHOLDS } from './queue-backlog';
 
-// Number of consecutive below-threshold observations required before an
-// active alert is considered resolved and can fire again.
-export const CONSECUTIVE_BELOW_TO_RESOLVE = 3;
+const CONSECUTIVE_BELOW_TO_RESOLVE = 3;
 
-type TierState = {
-  active: boolean;
-  consecutiveBelowCount: number;
+const TierStateSchema = z.discriminatedUnion('active', [
+  z.object({ active: z.literal(false), consecutiveBelowCount: z.literal(0) }),
+  z.object({
+    active: z.literal(true),
+    consecutiveBelowCount: z
+      .number()
+      .int()
+      .min(0)
+      .max(CONSECUTIVE_BELOW_TO_RESOLVE - 1),
+  }),
+]);
+
+const QueueBacklogStateSchema = z
+  .object({
+    ticket: TierStateSchema,
+    page: TierStateSchema,
+  })
+  .refine(state => !state.page.active || state.ticket.active);
+
+type TierState = z.infer<typeof TierStateSchema>;
+export type QueueBacklogState = z.infer<typeof QueueBacklogStateSchema>;
+
+type QueueBacklogTransition = {
+  state: QueueBacklogState;
+  severityToNotify: AlertSeverity | null;
+  stateChanged: boolean;
 };
 
-function stateKey(severity: AlertSeverity): string {
-  return `o11y:qb:state:${severity}`;
+function inactiveTierState(): TierState {
+  return { active: false, consecutiveBelowCount: 0 };
 }
 
-async function readTierState(kv: KVNamespace, severity: AlertSeverity): Promise<TierState> {
-  const raw = await kv.get(stateKey(severity));
-  if (!raw) return { active: false, consecutiveBelowCount: 0 };
-  try {
-    // KV stores trusted internal JSON we wrote ourselves.
-    return JSON.parse(raw) as TierState;
-  } catch {
-    return { active: false, consecutiveBelowCount: 0 };
-  }
+function inactiveQueueBacklogState(): QueueBacklogState {
+  return {
+    ticket: inactiveTierState(),
+    page: inactiveTierState(),
+  };
 }
 
-function writeTierState(kv: KVNamespace, severity: AlertSeverity, state: TierState): Promise<void> {
-  return kv.put(stateKey(severity), JSON.stringify(state));
-}
-
-/**
- * Pure state-transition function for a single alert tier.
- * Returns whether the alert should fire and the new state to persist.
- */
-function evaluateTier(
+function transitionTier(
   state: TierState,
-  isAboveThreshold: boolean,
-): { shouldFire: boolean; newState: TierState } {
-  if (isAboveThreshold) {
-    if (state.active) {
-      // Already alerted — suppress. Reset any accumulated below-count so a
-      // brief dip that doesn't sustain won't erode the resolve counter.
-      return { shouldFire: false, newState: { active: true, consecutiveBelowCount: 0 } };
+  aboveThreshold: boolean
+): { state: TierState; crossedThreshold: boolean } {
+  if (aboveThreshold) {
+    if (!state.active) {
+      return {
+        state: { active: true, consecutiveBelowCount: 0 },
+        crossedThreshold: true,
+      };
     }
-    // First crossing — fire.
-    return { shouldFire: true, newState: { active: true, consecutiveBelowCount: 0 } };
+
+    if (state.consecutiveBelowCount > 0) {
+      return {
+        state: { active: true, consecutiveBelowCount: 0 },
+        crossedThreshold: false,
+      };
+    }
+
+    return { state, crossedThreshold: false };
   }
 
-  // Below threshold.
-  if (!state.active) {
-    return { shouldFire: false, newState: { active: false, consecutiveBelowCount: 0 } };
+  if (!state.active) return { state, crossedThreshold: false };
+
+  const consecutiveBelowCount = state.consecutiveBelowCount + 1;
+  if (consecutiveBelowCount >= CONSECUTIVE_BELOW_TO_RESOLVE) {
+    return { state: inactiveTierState(), crossedThreshold: false };
   }
 
-  const newCount = state.consecutiveBelowCount + 1;
-  if (newCount >= CONSECUTIVE_BELOW_TO_RESOLVE) {
-    // Sustained recovery — clear the alert so it can fire again next time.
-    return { shouldFire: false, newState: { active: false, consecutiveBelowCount: 0 } };
-  }
-  return { shouldFire: false, newState: { active: true, consecutiveBelowCount: newCount } };
+  return {
+    state: { active: true, consecutiveBelowCount },
+    crossedThreshold: false,
+  };
 }
 
-/**
- * Evaluates both alert tiers against the current backlog count,
- * persists updated state, and returns the severity that should fire (or null).
- *
- * Resolution rules:
- *   - Page tier (≥ 250,000 messages) is evaluated first.
- *   - Ticket tier (≥ 100,000 messages) is only updated when page is not
- *     active — the page alert already signals the elevated backlog.
- *   - When page is active, ticket state is frozen until page resolves.
- */
-export async function evaluateAndUpdateQueueBacklogState(
+export function transitionQueueBacklogState(
+  state: QueueBacklogState,
+  backlogCount: number
+): QueueBacklogTransition {
+  const ticket = transitionTier(state.ticket, backlogCount >= QUEUE_BACKLOG_THRESHOLDS.ticket);
+  const page = transitionTier(state.page, backlogCount >= QUEUE_BACKLOG_THRESHOLDS.page);
+  const stateChanged = ticket.state !== state.ticket || page.state !== state.page;
+
+  return {
+    state: stateChanged ? { ticket: ticket.state, page: page.state } : state,
+    // A page covers a direct jump across both thresholds; latching ticket avoids a downgrade alert.
+    severityToNotify: page.crossedThreshold ? 'page' : ticket.crossedThreshold ? 'ticket' : null,
+    stateChanged,
+  };
+}
+
+function stateKey(queueId: string): string {
+  return `o11y:queue_backlog:${queueId}`;
+}
+
+export async function readQueueBacklogState(
   kv: KVNamespace,
-  backlogCount: number,
-): Promise<AlertSeverity | null> {
-  const [pageState, ticketState] = await Promise.all([
-    readTierState(kv, 'page'),
-    readTierState(kv, 'ticket'),
-  ]);
+  queueId: string
+): Promise<QueueBacklogState> {
+  const raw = await kv.get(stateKey(queueId));
+  if (raw === null) return inactiveQueueBacklogState();
 
-  const abovePage = backlogCount >= QUEUE_BACKLOG_THRESHOLDS.page;
-  const aboveTicket = backlogCount >= QUEUE_BACKLOG_THRESHOLDS.ticket;
-
-  const { shouldFire: pageFire, newState: newPageState } = evaluateTier(pageState, abovePage);
-  const pageNowActive = newPageState.active;
-
-  let ticketFire = false;
-  let newTicketState = ticketState; // frozen by default when page is active
-
-  if (!pageNowActive) {
-    const result = evaluateTier(ticketState, aboveTicket);
-    ticketFire = result.shouldFire;
-    newTicketState = result.newState;
+  try {
+    const parsed = QueueBacklogStateSchema.safeParse(JSON.parse(raw));
+    return parsed.success ? parsed.data : inactiveQueueBacklogState();
+  } catch {
+    return inactiveQueueBacklogState();
   }
+}
 
-  const writes: Promise<void>[] = [writeTierState(kv, 'page', newPageState)];
-  if (!pageNowActive) {
-    writes.push(writeTierState(kv, 'ticket', newTicketState));
-  }
-  await Promise.all(writes);
-
-  if (pageFire) return 'page';
-  if (ticketFire) return 'ticket';
-  return null;
+export async function writeQueueBacklogState(
+  kv: KVNamespace,
+  queueId: string,
+  state: QueueBacklogState
+): Promise<void> {
+  await kv.put(stateKey(queueId), JSON.stringify(state));
 }

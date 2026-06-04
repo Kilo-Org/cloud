@@ -58,7 +58,7 @@
     { "pipeline": "82c1fc4073bb4830a6670e920b9823c2", "binding": "SESSION_METRICS_STREAM" },
   ],
   /**
-   * KV Namespace — stores alert dedup state (TTL-based cooldowns)
+   * KV Namespace — stores alert cooldown and lifecycle state
    */
   "kv_namespaces": [{ "binding": "O11Y_ALERT_STATE", "id": "aef43060c5334b9995450a780eea94fb" }],
   /**

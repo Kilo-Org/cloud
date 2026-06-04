@@ -43,7 +43,7 @@ describe('evaluateAlerts queue backlog integration', () => {
         return Response.json({
           success: true,
           result: {
-            backlog_count: 50_000,
+            backlog_count: 250_000,
             backlog_bytes: 12_345_678,
             oldest_message_timestamp_ms: 1_780_560_000_000,
           },
@@ -71,8 +71,6 @@ describe('evaluateAlerts queue backlog integration', () => {
 
     expect(slackMessages).toHaveLength(1);
     expect(JSON.stringify(slackMessages[0])).toContain('Queue Backlog Alert');
-    expect(
-      kv.store.has(`o11y:alert:page:queue_backlog:cloudflare:${MONITORED_QUEUE_ID}:queues`)
-    ).toBe(true);
+    expect(kv.store.has(`o11y:queue_backlog:${MONITORED_QUEUE_ID}`)).toBe(true);
   });
 });

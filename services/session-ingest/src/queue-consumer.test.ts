@@ -184,7 +184,7 @@ describe('queue', () => {
     expect(retry).toHaveBeenCalledWith({ delaySeconds: QUEUE_RETRY_DELAY_SECONDS });
   });
 
-  it('passes full parsed oversized message data and its R2 reference into ingest', async () => {
+  it('passes a slim oversized message and its R2 reference into ingest', async () => {
     const ingest = vi.fn(async () => ({ changes: [] }));
     vi.mocked(getSessionIngestDO).mockReturnValue({ ingest } as never);
     const limit = vi.fn(async () => [{ session_id: 'ses_compacted' }]);
@@ -235,7 +235,7 @@ describe('queue', () => {
     const expectedR2Key = 'items/usr_compacted/ses_compacted/message/msg_compacted/456';
     expect(put).toHaveBeenCalledWith(expectedR2Key, JSON.stringify(data));
     expect(ingest).toHaveBeenCalledWith(
-      [{ type: 'message', data }],
+      [{ type: 'message', data: { id: 'msg_compacted' } }],
       'usr_compacted',
       'ses_compacted',
       1,
@@ -243,6 +243,78 @@ describe('queue', () => {
       { 'message/msg_compacted': expectedR2Key }
     );
     expect(deleteObject).toHaveBeenCalledWith('staging/items');
+    expect(ack).toHaveBeenCalledTimes(1);
+    expect(retry).not.toHaveBeenCalled();
+  });
+
+  it('splits duplicate item identities so inline updates do not reuse prior R2 refs', async () => {
+    const ingest = vi.fn(async () => ({ changes: [] }));
+    vi.mocked(getSessionIngestDO).mockReturnValue({ ingest } as never);
+    const limit = vi.fn(async () => [{ session_id: 'ses_duplicate' }]);
+    const where = vi.fn(() => ({ limit }));
+    const from = vi.fn(() => ({ where }));
+    vi.mocked(getWorkerDb).mockReturnValue({ select: vi.fn(() => ({ from })) } as never);
+
+    const oversizedData = { id: 'msg_same', content: 'x'.repeat(150) };
+    const inlineData = { id: 'msg_same', content: 'small' };
+    const oversizedItem = { type: 'message', data: oversizedData };
+    const inlineItem = { type: 'message', data: inlineData };
+    const body = JSON.stringify({ data: [oversizedItem, inlineItem] });
+    const put = vi.fn(async () => undefined);
+    const deleteObject = vi.fn(async () => undefined);
+    const env = {
+      HYPERDRIVE: { connectionString: 'postgres://unused' },
+      SESSION_INGEST_R2: {
+        get: vi.fn(async () => new Response(body)),
+        put,
+        delete: deleteObject,
+      },
+    } as never;
+    const ack = vi.fn();
+    const retry = vi.fn();
+
+    await queue(
+      {
+        messages: [
+          {
+            body: {
+              r2Key: 'staging/duplicate',
+              kiloUserId: 'usr_duplicate',
+              sessionId: 'ses_duplicate',
+              ingestVersion: 1,
+              ingestedAt: 1,
+            },
+            ack,
+            retry,
+          },
+        ],
+      } as never,
+      env,
+      { waitUntil: vi.fn() } as unknown as ExecutionContext
+    );
+
+    const expectedR2Key = 'items/usr_duplicate/ses_duplicate/message/msg_same/1';
+    expect(put).toHaveBeenCalledWith(expectedR2Key, JSON.stringify(oversizedData));
+    expect(ingest).toHaveBeenCalledTimes(2);
+    expect(ingest).toHaveBeenNthCalledWith(
+      1,
+      [{ type: 'message', data: { id: 'msg_same' } }],
+      'usr_duplicate',
+      'ses_duplicate',
+      1,
+      1,
+      { 'message/msg_same': expectedR2Key }
+    );
+    expect(ingest).toHaveBeenNthCalledWith(
+      2,
+      [inlineItem],
+      'usr_duplicate',
+      'ses_duplicate',
+      1,
+      1,
+      undefined
+    );
+    expect(deleteObject).toHaveBeenCalledWith('staging/duplicate');
     expect(ack).toHaveBeenCalledTimes(1);
     expect(retry).not.toHaveBeenCalled();
   });
@@ -422,6 +494,66 @@ describe('queue', () => {
       { waitUntil: vi.fn() } as unknown as ExecutionContext
     );
 
+    expect(retry).toHaveBeenCalledWith({ delaySeconds: QUEUE_RETRY_DELAY_SECONDS });
+    expect(ack).not.toHaveBeenCalled();
+    expect(deleteObject).not.toHaveBeenCalled();
+  });
+
+  it('cancels the unread R2 stream when item processing fails', async () => {
+    const ingest = vi.fn(async () => {
+      throw new Error('Durable Object is overloaded.');
+    });
+    vi.mocked(getSessionIngestDO).mockReturnValue({ ingest } as never);
+
+    const limit = vi.fn(async () => [{ session_id: 'ses_cancel' }]);
+    const where = vi.fn(() => ({ limit }));
+    const from = vi.fn(() => ({ where }));
+    vi.mocked(getWorkerDb).mockReturnValue({ select: vi.fn(() => ({ from })) } as never);
+
+    const items = Array.from({ length: 128 }, (_, i) => ({
+      type: 'message',
+      data: { id: `msg_${i}` },
+    }));
+    const cancel = vi.fn();
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(encoder.encode(JSON.stringify({ data: items })));
+      },
+      cancel,
+    });
+    const deleteObject = vi.fn(async () => undefined);
+    const env = {
+      HYPERDRIVE: { connectionString: 'postgres://unused' },
+      SESSION_INGEST_R2: {
+        get: vi.fn(async () => ({ body })),
+        put: vi.fn(async () => undefined),
+        delete: deleteObject,
+      },
+    } as never;
+    const ack = vi.fn();
+    const retry = vi.fn();
+
+    await queue(
+      {
+        messages: [
+          {
+            body: {
+              r2Key: 'staging/cancel',
+              kiloUserId: 'usr_cancel',
+              sessionId: 'ses_cancel',
+              ingestVersion: 1,
+              ingestedAt: 1,
+            },
+            ack,
+            retry,
+          },
+        ],
+      } as never,
+      env,
+      { waitUntil: vi.fn() } as unknown as ExecutionContext
+    );
+
+    expect(cancel).toHaveBeenCalledTimes(1);
     expect(retry).toHaveBeenCalledWith({ delaySeconds: QUEUE_RETRY_DELAY_SECONDS });
     expect(ack).not.toHaveBeenCalled();
     expect(deleteObject).not.toHaveBeenCalled();

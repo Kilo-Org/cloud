@@ -50,6 +50,16 @@ export type CancelAndRefundKiloPassParams = {
   noteSuffix?: string;
 };
 
+function isAlreadyCanceledStripeSubscriptionError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  const normalizedMessage = message.toLowerCase();
+  return (
+    (normalizedMessage.includes('already') && normalizedMessage.includes('cancel')) ||
+    normalizedMessage.includes('has been canceled') ||
+    normalizedMessage.includes('is canceled')
+  );
+}
+
 /**
  * Cancels a user's Kilo Pass subscription, optionally refunds the latest Stripe
  * payment, zeroes their balance, blocks the account if not already blocked, and
@@ -124,7 +134,13 @@ export async function cancelAndRefundKiloPassForUser({
     });
   }
 
-  await stripe.subscriptions.cancel(stripeSubscriptionId);
+  try {
+    await stripe.subscriptions.cancel(stripeSubscriptionId);
+  } catch (error) {
+    if (!isAlreadyCanceledStripeSubscriptionError(error)) {
+      throw error;
+    }
+  }
 
   let refundedAmountCents: number | null = null;
   if (refundLatestPayment) {

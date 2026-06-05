@@ -93,69 +93,6 @@ export function classifyGitHubReviewCommentReply(body: string): {
   return classifyReviewCommentReply(body);
 }
 
-async function findOrUpsertCommentSubject(params: {
-  owner: ReviewMemoryOwner;
-  integration: PlatformIntegration;
-  repoFullName: string;
-  prNumber: number | null;
-  prUrl: string | null;
-  headSha?: string | null;
-  comment: {
-    id: number;
-    body?: string;
-    html_url?: string;
-    path?: string;
-    line?: number | null;
-    diff_hunk?: string;
-  };
-}) {
-  const externalId = String(params.comment.id);
-  const body = params.comment.body ?? '';
-  const existingInline = await findFeedbackSubject({
-    owner: params.owner,
-    platform: 'github',
-    repoFullName: params.repoFullName,
-    subjectType: 'inline_comment',
-    externalId,
-  });
-  if (existingInline) return existingInline;
-
-  const existingSummary = await findFeedbackSubject({
-    owner: params.owner,
-    platform: 'github',
-    repoFullName: params.repoFullName,
-    subjectType: 'summary_comment',
-    externalId,
-  });
-  if (existingSummary) return existingSummary;
-
-  const isSummary = body.includes('<!-- kilo-review -->');
-  const isInline = isLikelyKiloInlineReviewBody(body);
-  if (!isSummary && !isInline) return null;
-
-  const metadata = isInline ? parseReviewFindingMetadata(body) : null;
-  return await upsertFeedbackSubject({
-    owner: params.owner,
-    platform: 'github',
-    platformIntegrationId: params.integration.id,
-    subjectType: isSummary ? 'summary_comment' : 'inline_comment',
-    externalId,
-    externalUrl: params.comment.html_url ?? null,
-    repoFullName: params.repoFullName,
-    prNumber: params.prNumber,
-    prUrl: params.prUrl,
-    headSha: params.headSha,
-    filePath: params.comment.path ?? null,
-    lineNumber: params.comment.line ?? null,
-    diffHunk: params.comment.diff_hunk ?? null,
-    bodyExcerpt: body,
-    severity: metadata?.severity ?? null,
-    findingTitle: metadata?.findingTitle ?? null,
-    findingFingerprint: metadata?.findingFingerprint ?? null,
-    state: 'active',
-  });
-}
-
 export async function handleGitHubReviewCommentFeedback(input: {
   payload: PullRequestReviewCommentPayload;
   integration: PlatformIntegration;

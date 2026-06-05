@@ -12,6 +12,21 @@ test.describe('local setup smoke', () => {
     const uniqueId = randomUUID().slice(0, 8);
     const testEmail = `setup-smoke-${uniqueId}+stytchpass@example.com`;
     const signInUrl = `/users/sign_in?fakeUser=${encodeURIComponent(testEmail)}&callbackPath=${encodeURIComponent('/profile')}`;
+    const [{ db }, { hosted_domain_specials }, { kilocode_users }] = await Promise.all([
+      import('@/lib/drizzle'),
+      import('@/lib/auth/constants'),
+      import('@kilocode/db/schema'),
+    ]);
+
+    await db.insert(kilocode_users).values({
+      id: `setup-smoke-${uniqueId}`,
+      google_user_email: testEmail,
+      google_user_name: `setup-smoke-${uniqueId}`,
+      google_user_image_url: '',
+      hosted_domain: hosted_domain_specials.fake_devonly,
+      stripe_customer_id: `cus_setup_smoke_${uniqueId}`,
+      completed_welcome_form: true,
+    });
 
     await page.goto(signInUrl);
     await page.waitForURL(

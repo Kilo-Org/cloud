@@ -58,7 +58,8 @@ test.describe('local setup smoke', () => {
     const profileResponse = await page.goto('/profile', { waitUntil: 'domcontentloaded' });
     expect(profileResponse?.ok()).toBe(true);
     await expect(page).toHaveURL(/\/profile$/);
-    await expect(page.getByRole('heading', { name: 'Profile' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Your Profile' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Edit profile' })).toBeVisible();
     await expect(page.getByText(testEmail)).toBeVisible();
   });
 });

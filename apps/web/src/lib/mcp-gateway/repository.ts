@@ -92,6 +92,27 @@ export function createGatewayRepository(database: GatewayDatabase = db) {
     return rows[0] ?? null;
   }
 
+  async function findDashboardRouteByConfigId(
+    configId: string
+  ): Promise<ResolvedGatewayRoute | null> {
+    const rows = await database
+      .select({ config: mcp_gateway_configs, route: mcp_gateway_connect_resources })
+      .from(mcp_gateway_connect_resources)
+      .innerJoin(
+        mcp_gateway_configs,
+        eq(mcp_gateway_configs.config_id, mcp_gateway_connect_resources.config_id)
+      )
+      .where(
+        and(
+          eq(mcp_gateway_connect_resources.config_id, configId),
+          eq(mcp_gateway_connect_resources.route_status, GatewayRouteStatus.Active),
+          isNull(mcp_gateway_configs.deleted_at)
+        )
+      )
+      .limit(1);
+    return rows[0] ?? null;
+  }
+
   async function findActiveRouteByCanonicalUrl(
     canonicalUrl: string
   ): Promise<ResolvedGatewayRoute | null> {
@@ -344,6 +365,7 @@ export function createGatewayRepository(database: GatewayDatabase = db) {
     database,
     findActiveRouteByRoute,
     findActiveRouteByConfigId,
+    findDashboardRouteByConfigId,
     findActiveRouteByCanonicalUrl,
     findUser,
     findMembership,

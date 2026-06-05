@@ -6,6 +6,7 @@ import { gatewayErrorResponse } from '@/lib/mcp-gateway/http';
 import type { ScopedConnectRoute } from '@kilocode/mcp-gateway';
 import {
   hasDuplicateSingletonParams,
+  readFormData,
   stringFormParams,
 } from '@/lib/mcp-gateway/oauth-request-params';
 
@@ -21,7 +22,7 @@ const tokenSingletonParams = [
 ] as const;
 
 async function exchangeToken(request: NextRequest, route?: ScopedConnectRoute) {
-  const form = await request.formData();
+  const form = await readFormData(request);
   if (hasDuplicateSingletonParams(form, tokenSingletonParams)) {
     return NextResponse.json({ error: 'invalid_request' }, { status: 400 });
   }

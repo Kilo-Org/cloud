@@ -13,6 +13,8 @@ const hopByHopResponseHeaders = new Set([
   'upgrade',
 ]);
 
+const unsafeResponseHeaders = new Set(['set-cookie', 'set-cookie2']);
+
 function validatedQuery(searchParams: URLSearchParams): URLSearchParams {
   const result = new URLSearchParams();
   for (const [name, value] of searchParams.entries()) {
@@ -49,7 +51,7 @@ function combinePath(remotePath: string, descendantPath: string | null): string 
 
 function sanitizedResponseHeaders(headers: Headers): Headers {
   const result = new Headers(headers);
-  for (const name of hopByHopResponseHeaders) {
+  for (const name of [...hopByHopResponseHeaders, ...unsafeResponseHeaders]) {
     result.delete(name);
   }
   return result;

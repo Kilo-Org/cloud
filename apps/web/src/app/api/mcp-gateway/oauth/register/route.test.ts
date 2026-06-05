@@ -1,18 +1,30 @@
-import { describe, expect, jest, test } from '@jest/globals';
+import { beforeEach, describe, expect, jest, test } from '@jest/globals';
 import { NextRequest } from 'next/server';
 import type { GatewayOAuthClientRegistration } from '@/lib/mcp-gateway/oauth-client-service';
 
 const mockRegisterClient =
   jest.fn<
-    (input: { metadata: unknown; headers: Headers }) => Promise<GatewayOAuthClientRegistration>
+    (input: {
+      metadata: unknown;
+      headers: Headers;
+      rateLimitConsumed?: boolean;
+    }) => Promise<GatewayOAuthClientRegistration>
   >();
+const mockConsumeRegistrationRateLimit = jest.fn<(headers: Headers) => Promise<void>>();
 
 jest.mock('@/lib/mcp-gateway/services', () => ({
   createGatewayServices: () => ({
     config: { appBaseUrl: 'http://localhost:3000' },
-    clientService: { registerClient: mockRegisterClient },
+    clientService: {
+      consumeRegistrationRateLimit: mockConsumeRegistrationRateLimit,
+      registerClient: mockRegisterClient,
+    },
   }),
 }));
+
+beforeEach(() => {
+  jest.clearAllMocks();
+});
 
 function request(body: Record<string, unknown>) {
   return new NextRequest('http://localhost:3000/api/mcp-gateway/oauth/register', {
@@ -58,6 +70,25 @@ describe('POST /api/mcp-gateway/oauth/register', () => {
         'http://localhost:3000/api/mcp-gateway/oauth/register/mcp:public-client',
     });
     expect(body).not.toHaveProperty('client_secret');
+  });
+
+  test('returns a stable invalid_request response for malformed JSON', async () => {
+    const { POST } = await import('./route');
+    const response = await POST(
+      new NextRequest('http://localhost:3000/api/mcp-gateway/oauth/register', {
+        method: 'POST',
+        body: '{',
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: 'invalid_request',
+      error_description: 'Request body is malformed',
+    });
+    expect(mockConsumeRegistrationRateLimit).toHaveBeenCalledTimes(1);
+    expect(mockRegisterClient).not.toHaveBeenCalled();
   });
 
   test.each([

@@ -82,8 +82,11 @@ export function createOAuthClientService(params: {
   async function registerClient(input: {
     metadata: unknown;
     headers: Headers;
+    rateLimitConsumed?: boolean;
   }): Promise<GatewayOAuthClientRegistration> {
-    await consumeRegistrationRateLimit(input.headers);
+    if (!input.rateLimitConsumed) {
+      await consumeRegistrationRateLimit(input.headers);
+    }
     const metadata = OAuthClientMetadataSchema.safeParse(input.metadata);
     if (!metadata.success) {
       throw createGatewayError(
@@ -197,6 +200,7 @@ export function createOAuthClientService(params: {
   }
 
   return {
+    consumeRegistrationRateLimit,
     registerClient,
     findClientById,
     findClientByRegistrationToken,

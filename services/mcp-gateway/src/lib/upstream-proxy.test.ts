@@ -16,7 +16,11 @@ describe('proxyUpstream', () => {
       calls.push({ url, headers: new Headers(init?.headers) });
       return new Response('upstream-body', {
         status: 200,
-        headers: { 'Content-Type': 'text/plain' },
+        headers: {
+          'Content-Type': 'text/plain',
+          'Set-Cookie': 'upstream-session=value; Path=/',
+          'Set-Cookie2': 'legacy-session=value; Path=/',
+        },
       });
     };
     const response = await proxyUpstream({
@@ -40,6 +44,8 @@ describe('proxyUpstream', () => {
     });
 
     expect(response.status).toBe(200);
+    expect(response.headers.get('set-cookie')).toBeNull();
+    expect(response.headers.get('set-cookie2')).toBeNull();
     await expect(response.text()).resolves.toBe('upstream-body');
     expect(calls).toHaveLength(1);
     expect(calls[0].url).toBe('https://remote.example/mcp/tools/list?mode=test');

@@ -4,14 +4,13 @@ import { getUserFromAuth } from '@/lib/user/server';
 import { createGatewayServices } from '@/lib/mcp-gateway/services';
 import { gatewayErrorResponse } from '@/lib/mcp-gateway/http';
 import { parseScopedConnectPath } from '@kilocode/mcp-gateway';
-import { executionContextFromAuth } from '@/lib/mcp-gateway/context';
 
 export async function POST(
   _request: Request,
   { params }: { params: Promise<{ configId: string }> }
 ) {
   try {
-    const { user, authFailedResponse, organizationId } = await getUserFromAuth({
+    const { user, authFailedResponse } = await getUserFromAuth({
       adminOnly: false,
     });
     if (authFailedResponse) return authFailedResponse;
@@ -31,7 +30,7 @@ export async function POST(
     const token = await services.tokenService.mintDerivedConnectToken({
       route,
       userId: user.id,
-      executionContext: executionContextFromAuth(organizationId),
+      executionContext: { type: 'personal' },
     });
     return NextResponse.json({
       access_token: token.token,

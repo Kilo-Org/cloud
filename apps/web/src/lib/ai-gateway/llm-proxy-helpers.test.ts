@@ -699,6 +699,7 @@ describe('makeErrorReadable', () => {
   it('returns undefined for non-error responses', async () => {
     const response = new Response('{}', { status: 200 });
     const result = await makeErrorReadable({
+      providerId: 'openrouter',
       requestedModel: 'anything',
       request: { kind: 'chat_completions', body: { model: 'test', messages: [] } },
       response,

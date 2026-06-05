@@ -5,6 +5,7 @@ import { TRPCError } from '@trpc/server';
 import { baseProcedure, createTRPCRouter, UpstreamApiError } from '@/lib/trpc/init';
 import { generateApiToken, TOKEN_EXPIRY } from '@/lib/tokens';
 import { KiloClawInternalClient, KiloClawApiError } from '@/lib/kiloclaw/kiloclaw-internal-client';
+import { kiloclawFilePathSchema } from '@/lib/kiloclaw/file-path-schema';
 import { pushPinToWorker } from '@/lib/kiloclaw/pin-sync';
 import { KiloClawUserClient } from '@/lib/kiloclaw/kiloclaw-user-client';
 import { encryptKiloClawSecret } from '@/lib/kiloclaw/encryption';
@@ -4180,7 +4181,7 @@ export const kiloclawRouter = createTRPCRouter({
   }),
 
   fileTree: clawAccessProcedure
-    .input(z.object({ path: z.string().min(1).optional() }).optional())
+    .input(z.object({ path: kiloclawFilePathSchema.optional() }).optional())
     .query(async ({ ctx, input }) => {
       try {
         const instance = await getActiveInstance(ctx.user.id);
@@ -4196,7 +4197,7 @@ export const kiloclawRouter = createTRPCRouter({
     }),
 
   readFile: clawAccessProcedure
-    .input(z.object({ path: z.string().min(1) }))
+    .input(z.object({ path: kiloclawFilePathSchema }))
     .query(async ({ ctx, input }) => {
       try {
         const instance = await getActiveInstance(ctx.user.id);
@@ -4210,7 +4211,7 @@ export const kiloclawRouter = createTRPCRouter({
   writeFile: clawAccessProcedure
     .input(
       z.object({
-        path: z.string().min(1),
+        path: kiloclawFilePathSchema,
         content: z.string(),
         etag: z.string().min(1),
         openclawValidation: z.enum(['warn-before-write', 'allow-invalid']).optional(),
@@ -4274,7 +4275,7 @@ export const kiloclawRouter = createTRPCRouter({
         files: z
           .array(
             z.object({
-              path: z.string().min(1),
+              path: kiloclawFilePathSchema,
               content: z.string(),
             })
           )

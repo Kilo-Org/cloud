@@ -26,6 +26,7 @@ import {
   getInboundEmailAddressForInstance,
 } from '@/lib/kiloclaw/inbound-email-alias';
 import { KiloClawInternalClient, KiloClawApiError } from '@/lib/kiloclaw/kiloclaw-internal-client';
+import { kiloclawFilePathSchema } from '@/lib/kiloclaw/file-path-schema';
 import { KiloClawUserClient } from '@/lib/kiloclaw/kiloclaw-user-client';
 import { pushPinToWorker } from '@/lib/kiloclaw/pin-sync';
 import {
@@ -1598,7 +1599,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       z.object({
         userId: z.string().min(1),
         instanceId: z.string().uuid().optional(),
-        path: z.string().min(1).optional(),
+        path: kiloclawFilePathSchema.optional(),
       })
     )
     .query(async ({ input }) => {
@@ -1620,7 +1621,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       z.object({
         userId: z.string().min(1),
         instanceId: z.string().uuid().optional(),
-        path: z.string().min(1),
+        path: kiloclawFilePathSchema,
       })
     )
     .query(async ({ input }) => {
@@ -1638,7 +1639,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       z.object({
         userId: z.string().min(1),
         instanceId: z.string().uuid().optional(),
-        path: z.string().min(1),
+        path: kiloclawFilePathSchema,
         content: z.string(),
         etag: z.string().optional(),
         openclawValidation: z.enum(['warn-before-write', 'allow-invalid']).optional(),

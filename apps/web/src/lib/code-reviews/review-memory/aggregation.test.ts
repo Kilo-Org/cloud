@@ -2,6 +2,7 @@
 import { db } from '@/lib/drizzle';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import {
+  agent_configs,
   code_review_feedback_events,
   code_review_feedback_subjects,
   code_review_memory_aggregation_runs,
@@ -30,8 +31,25 @@ describe('review memory aggregation', () => {
     await db.delete(code_review_feedback_events);
     await db.delete(code_review_feedback_subjects);
     await db.delete(code_review_memory_aggregation_state);
+    await db.delete(agent_configs);
     await db.delete(kilocode_users);
   });
+
+  async function enableReviewMemory(
+    owner: ReviewMemoryOwner,
+    platform: 'github' | 'gitlab' = 'github'
+  ) {
+    await db.insert(agent_configs).values({
+      ...(owner.type === 'org'
+        ? { owned_by_organization_id: owner.id }
+        : { owned_by_user_id: owner.id }),
+      agent_type: 'code_review',
+      platform,
+      config: { review_memory_enabled: true },
+      is_enabled: false,
+      created_by: owner.id,
+    });
+  }
 
   async function seedSubject(
     owner: ReviewMemoryOwner,
@@ -110,6 +128,7 @@ describe('review memory aggregation', () => {
   it('aggregates actionable feedback into proposals and included evidence', async () => {
     const user = await insertTestUser();
     const owner = { type: 'user' as const, id: user.id };
+    await enableReviewMemory(owner);
     const events = await seedActionableFeedback(owner);
     const generateOpportunities = jest.fn(async () => ({
       opportunities: [
@@ -168,6 +187,7 @@ describe('review memory aggregation', () => {
     const otherUser = await insertTestUser();
     const targetOwner = { type: 'user' as const, id: targetUser.id };
     const otherOwner = { type: 'user' as const, id: otherUser.id };
+    await enableReviewMemory(targetOwner);
     await seedActionableFeedback(targetOwner, 'acme/target');
     await seedActionableFeedback(otherOwner, 'acme/other');
 
@@ -198,6 +218,7 @@ describe('review memory aggregation', () => {
   it('keeps events outside processed clusters fresh', async () => {
     const user = await insertTestUser();
     const owner = { type: 'user' as const, id: user.id };
+    await enableReviewMemory(owner);
     for (let i = 0; i < 21; i += 1) {
       const subject = await seedSubject(owner, `cluster-limit-${i}`, i + 1);
       await recordFeedbackEvent({
@@ -274,6 +295,7 @@ describe('review memory aggregation', () => {
   it('skips weak MR-level-only feedback without calling the model', async () => {
     const user = await insertTestUser();
     const owner = { type: 'user' as const, id: user.id };
+    await enableReviewMemory(owner, 'gitlab');
     for (let i = 0; i < 5; i += 1) {
       await recordFeedbackEvent({
         owner,
@@ -306,6 +328,27 @@ describe('review memory aggregation', () => {
       .select()
       .from(code_review_memory_aggregation_state)
       .where(eq(code_review_memory_aggregation_state.repo_full_name, 'acme/widgets'));
+    expect(state.status).toBe('idle');
+  });
+
+  it('skips claimed scopes when review memory is disabled', async () => {
+    const user = await insertTestUser();
+    const owner = { type: 'user' as const, id: user.id };
+    await seedActionableFeedback(owner, 'acme/disabled');
+    const generateOpportunities = jest.fn();
+
+    const summary = await dispatchManualReviewMemoryAggregation({ generateOpportunities });
+
+    expect(summary).toEqual({ claimed: 1, completed: 0, skipped: 1, failed: 0, proposals: 0 });
+    expect(generateOpportunities).not.toHaveBeenCalled();
+    await expect(db.select().from(code_review_memory_proposals)).resolves.toHaveLength(0);
+    await expect(db.select().from(code_review_memory_aggregation_runs)).resolves.toHaveLength(0);
+    const events = await db.select().from(code_review_feedback_events);
+    expect(events.every(event => event.aggregation_state === 'fresh')).toBe(true);
+    const [state] = await db
+      .select()
+      .from(code_review_memory_aggregation_state)
+      .where(eq(code_review_memory_aggregation_state.repo_full_name, 'acme/disabled'));
     expect(state.status).toBe('idle');
   });
 });

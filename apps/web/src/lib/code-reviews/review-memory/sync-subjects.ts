@@ -15,6 +15,7 @@ import {
   type ReviewMemoryOwner,
   upsertFeedbackSubject,
 } from './db';
+import { isReviewMemoryEnabled } from './settings';
 
 type ReviewSubjectSyncReview = Pick<
   CloudAgentCodeReview,
@@ -139,6 +140,9 @@ export async function syncFetchedReviewMemorySubjects(
 ): Promise<SyncReviewMemorySubjectsResult> {
   const owner = ownerFromReview(input.review);
   if (!owner) return { summarySynced: false, inlineSynced: 0 };
+  if (!(await isReviewMemoryEnabled({ owner, platform: input.platform }))) {
+    return { summarySynced: false, inlineSynced: 0 };
+  }
 
   let summarySynced = false;
   if (input.summary?.body.includes(KILO_REVIEW_MARKER)) {

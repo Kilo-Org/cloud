@@ -1002,6 +1002,7 @@ export const CodeReviewAgentConfigSchema = z.object({
   //   'warning'  — gate fails on warnings and above
   //   'critical' — gate fails only on critical issues
   gate_threshold: z.enum(['off', 'all', 'warning', 'critical']).optional(),
+  review_memory_enabled: z.boolean().optional(),
 });
 
 export type CodeReviewAgentConfig = z.infer<typeof CodeReviewAgentConfigSchema>;

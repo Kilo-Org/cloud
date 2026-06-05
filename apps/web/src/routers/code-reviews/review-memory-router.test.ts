@@ -30,6 +30,7 @@ import { createCallerForUser } from '@/routers/test-utils';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import {
+  agent_configs,
   code_review_feedback_events,
   code_review_feedback_subjects,
   code_review_memory_aggregation_runs,
@@ -54,6 +55,7 @@ describe('reviewMemoryRouter', () => {
     await db.delete(code_review_feedback_events);
     await db.delete(code_review_feedback_subjects);
     await db.delete(code_review_memory_aggregation_state);
+    await db.delete(agent_configs);
     await db.delete(organization_memberships);
     await db.delete(organizations);
     await db.delete(kilocode_users);
@@ -94,6 +96,19 @@ describe('reviewMemoryRouter', () => {
     });
   }
 
+  async function enableReviewMemory(owner: ReviewMemoryOwner) {
+    await db.insert(agent_configs).values({
+      ...(owner.type === 'org'
+        ? { owned_by_organization_id: owner.id }
+        : { owned_by_user_id: owner.id }),
+      agent_type: 'code_review',
+      platform: 'github',
+      config: { review_memory_enabled: true },
+      is_enabled: false,
+      created_by: owner.id,
+    });
+  }
+
   it('lists and returns personal proposals for the authenticated owner', async () => {
     const user = await insertTestUser();
     const owner = { type: 'user' as const, id: user.id };
@@ -113,6 +128,7 @@ describe('reviewMemoryRouter', () => {
 
     await expect(caller.reviewMemory.getDashboardSummary({ platform: 'github' })).resolves.toEqual(
       expect.objectContaining({
+        enabled: false,
         actionableProposalCount: 1,
         repositories: [expect.objectContaining({ repoFullName: 'acme/widgets' })],
       })
@@ -142,6 +158,7 @@ describe('reviewMemoryRouter', () => {
   it('edits and rejects proposals for the authenticated owner', async () => {
     const user = await insertTestUser();
     const owner = { type: 'user' as const, id: user.id };
+    await enableReviewMemory(owner);
     const proposal = await seedProposal(owner);
     const caller = await createCallerForUser(user.id);
 
@@ -172,6 +189,7 @@ describe('reviewMemoryRouter', () => {
 
   it('refreshes a scope and dispatches aggregation when manually triggered', async () => {
     const user = await insertTestUser();
+    await enableReviewMemory({ type: 'user', id: user.id });
     const caller = await createCallerForUser(user.id);
 
     await expect(
@@ -191,6 +209,7 @@ describe('reviewMemoryRouter', () => {
   it('approves proposals through the change-request workflow', async () => {
     const user = await insertTestUser();
     const owner = { type: 'user' as const, id: user.id };
+    await enableReviewMemory(owner);
     const proposal = await seedProposal(owner);
     const caller = await createCallerForUser(user.id);
 
@@ -212,6 +231,65 @@ describe('reviewMemoryRouter', () => {
         name: user.google_user_name,
       },
     });
+  });
+
+  it('sets personal review memory enablement without enabling Code Reviewer', async () => {
+    const user = await insertTestUser();
+    const caller = await createCallerForUser(user.id);
+
+    await expect(
+      caller.reviewMemory.setEnabled({ platform: 'github', enabled: true })
+    ).resolves.toEqual({ success: true, enabled: true });
+
+    const config = await db.query.agent_configs.findFirst({
+      where: (fields, { and, eq }) =>
+        and(
+          eq(fields.agent_type, 'code_review'),
+          eq(fields.platform, 'github'),
+          eq(fields.owned_by_user_id, user.id)
+        ),
+    });
+
+    expect(config?.is_enabled).toBe(false);
+    expect(config?.config).toEqual(expect.objectContaining({ review_memory_enabled: true }));
+    await expect(caller.reviewMemory.getDashboardSummary({ platform: 'github' })).resolves.toEqual(
+      expect.objectContaining({ enabled: true })
+    );
+  });
+
+  it('rejects manual analysis when review memory is disabled', async () => {
+    const user = await insertTestUser();
+    const caller = await createCallerForUser(user.id);
+
+    await expect(
+      caller.reviewMemory.triggerAnalysis({ platform: 'github', repoFullName: 'acme/widgets' })
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect(mockDispatchManualReviewMemoryAggregation).not.toHaveBeenCalled();
+  });
+
+  it('rejects proposal actions when review memory is disabled', async () => {
+    const user = await insertTestUser();
+    const owner = { type: 'user' as const, id: user.id };
+    const proposal = await seedProposal(owner);
+    const caller = await createCallerForUser(user.id);
+
+    await expect(
+      caller.reviewMemory.updateProposal({
+        proposalId: proposal.id,
+        title: 'Edited widget guidance',
+        rationale: 'The rationale was reviewed by a maintainer.',
+        proposedMarkdown: '### Edited widget guidance\n\nNarrow this check to generated widgets.',
+        scopeKind: 'file',
+        scopeValue: 'src/widget.ts',
+      })
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    await expect(
+      caller.reviewMemory.rejectProposal({ proposalId: proposal.id })
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    await expect(
+      caller.reviewMemory.approveAndOpenChangeRequest({ proposalId: proposal.id })
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect(mockApproveAndOpenReviewMemoryChangeRequest).not.toHaveBeenCalled();
   });
 
   it('prevents billing managers from opening organization change requests', async () => {

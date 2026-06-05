@@ -8,6 +8,7 @@ import type {
 } from '@/lib/integrations/platforms/github/webhook-schemas';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import {
+  agent_configs,
   auto_fix_tickets,
   code_review_feedback_events,
   code_review_feedback_subjects,
@@ -30,11 +31,12 @@ describe('GitHub review memory feedback', () => {
     await db.delete(code_review_feedback_subjects);
     await db.delete(code_review_memory_aggregation_state);
     await db.delete(auto_fix_tickets);
+    await db.delete(agent_configs);
     await db.delete(platform_integrations);
     await db.delete(kilocode_users);
   });
 
-  async function seedIntegration() {
+  async function seedIntegration({ enableMemory = true }: { enableMemory?: boolean } = {}) {
     const user = await insertTestUser();
     const [integration] = await db
       .insert(platform_integrations)
@@ -48,6 +50,16 @@ describe('GitHub review memory feedback', () => {
       .returning();
 
     if (!integration) throw new Error('Failed to seed platform integration');
+    if (enableMemory) {
+      await db.insert(agent_configs).values({
+        owned_by_user_id: user.id,
+        agent_type: 'code_review',
+        platform: 'github',
+        config: { review_memory_enabled: true },
+        is_enabled: false,
+        created_by: user.id,
+      });
+    }
     return { user, owner: { type: 'user' as const, id: user.id }, integration };
   }
 
@@ -146,6 +158,43 @@ describe('GitHub review memory feedback', () => {
         }),
       ])
     );
+  });
+
+  it('skips feedback without writing events when review memory is disabled', async () => {
+    const { owner, integration } = await seedIntegration({ enableMemory: false });
+    await seedInlineSubject(owner);
+    const payload = {
+      action: 'created',
+      comment: {
+        id: 509,
+        in_reply_to_id: 500,
+        body: 'This is a false positive in this repository.',
+        user: { login: 'maintainer', type: 'User' },
+        html_url: 'https://github.com/acme/widgets/pull/42#discussion_r509',
+        path: 'src/widget.ts',
+        line: 12,
+        diff_hunk: '@@ -1 +1 @@',
+        author_association: 'MEMBER',
+      },
+      pull_request: {
+        ...pullRequest(),
+        title: 'Add widgets',
+        user: { login: 'author' },
+        base: { ref: 'main' },
+      },
+      repository: repository(),
+      installation: { id: 98765 },
+      sender: { login: 'maintainer' },
+    } satisfies PullRequestReviewCommentPayload;
+
+    await expect(
+      handleGitHubReviewCommentFeedback({
+        payload,
+        integration,
+        deliveryId: 'delivery-disabled-reply',
+      })
+    ).resolves.toEqual({ recorded: false, reason: 'review-memory-disabled' });
+    await expect(db.select().from(code_review_feedback_events)).resolves.toHaveLength(0);
   });
 
   it('records replies from maintainers with kilo in their login', async () => {

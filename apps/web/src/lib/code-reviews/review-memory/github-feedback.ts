@@ -12,6 +12,7 @@ import {
   type ReviewMemoryOwner,
 } from './db';
 import { classifyReviewCommentReply } from './reply-classification';
+import { isReviewMemoryEnabled } from './settings';
 import { isLikelyKiloInlineReviewBody, parseReviewFindingMetadata } from './sync-subjects';
 
 type GitHubFeedbackResult =
@@ -105,6 +106,9 @@ export async function handleGitHubReviewCommentFeedback(input: {
 
   const owner = ownerFromIntegration(input.integration);
   if (!owner) return { recorded: false, reason: 'missing-owner' };
+  if (!(await isReviewMemoryEnabled({ owner, platform: 'github' }))) {
+    return { recorded: false, reason: 'review-memory-disabled' };
+  }
 
   const classification = classifyGitHubReviewCommentReply(input.payload.comment.body);
   const parentCommentId = input.payload.comment.in_reply_to_id ?? null;
@@ -154,6 +158,9 @@ export async function handleGitHubReviewFeedback(input: {
 }): Promise<GitHubFeedbackResult> {
   const owner = ownerFromIntegration(input.integration);
   if (!owner) return { recorded: false, reason: 'missing-owner' };
+  if (!(await isReviewMemoryEnabled({ owner, platform: 'github' }))) {
+    return { recorded: false, reason: 'review-memory-disabled' };
+  }
 
   if (input.payload.action === 'dismissed') {
     if (!isLikelyKiloBotActor(input.payload.review.user)) {
@@ -228,6 +235,9 @@ export async function handleGitHubReviewThreadFeedback(input: {
   }
   const owner = ownerFromIntegration(input.integration);
   if (!owner) return { recorded: false, reason: 'missing-owner' };
+  if (!(await isReviewMemoryEnabled({ owner, platform: 'github' }))) {
+    return { recorded: false, reason: 'review-memory-disabled' };
+  }
 
   const kiloComment = input.payload.thread.comments.find(comment =>
     isLikelyKiloInlineReviewBody(comment.body)
@@ -292,6 +302,9 @@ export async function recordGitHubAutoFixFeedback(input: {
 
   const owner = ownerFromAutoFixTicket(input.ticket);
   if (!owner) return { recorded: false, reason: 'missing-owner' };
+  if (!(await isReviewMemoryEnabled({ owner, platform: 'github' }))) {
+    return { recorded: false, reason: 'review-memory-disabled' };
+  }
 
   const subject = await findFeedbackSubject({
     owner,

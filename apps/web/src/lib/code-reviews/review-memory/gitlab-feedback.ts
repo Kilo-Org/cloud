@@ -14,6 +14,7 @@ import {
   type ReviewMemoryOwner,
 } from './db';
 import { classifyReviewCommentReply } from './reply-classification';
+import { isReviewMemoryEnabled } from './settings';
 import { isLikelyKiloInlineReviewBody, parseReviewFindingMetadata } from './sync-subjects';
 
 type GitLabFeedbackResult = {
@@ -167,6 +168,9 @@ export async function handleGitLabNoteFeedback(input: {
 
   const owner = ownerFromIntegration(input.integration);
   if (!owner) return skipped('missing-owner');
+  if (!(await isReviewMemoryEnabled({ owner, platform: 'gitlab' }))) {
+    return skipped('review-memory-disabled');
+  }
 
   const repoFullName = input.payload.project.path_with_namespace;
   const prNumber = input.payload.merge_request.iid;
@@ -252,6 +256,9 @@ export async function handleGitLabEmojiFeedback(input: {
 
   const owner = ownerFromIntegration(input.integration);
   if (!owner) return skipped('missing-owner');
+  if (!(await isReviewMemoryEnabled({ owner, platform: 'gitlab' }))) {
+    return skipped('review-memory-disabled');
+  }
 
   const sentiment = emojiSentiment(emoji.name);
   if (!sentiment) return skipped('unsupported-emoji');
@@ -342,6 +349,9 @@ export async function handleGitLabMergeRequestFeedback(input: {
 }): Promise<GitLabFeedbackResult> {
   const owner = ownerFromIntegration(input.integration);
   if (!owner) return skipped('missing-owner');
+  if (!(await isReviewMemoryEnabled({ owner, platform: 'gitlab' }))) {
+    return skipped('review-memory-disabled');
+  }
 
   const eventIds: string[] = [];
   const action = input.payload.object_attributes.action;

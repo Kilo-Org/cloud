@@ -3,6 +3,7 @@ import { db } from '@/lib/drizzle';
 import { createCodeReview, getCodeReviewById } from '@/lib/code-reviews/db/code-reviews';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import {
+  agent_configs,
   cloud_agent_code_reviews,
   code_review_feedback_subjects,
   kilocode_users,
@@ -14,11 +15,24 @@ describe('review memory subject sync', () => {
   afterEach(async () => {
     await db.delete(code_review_feedback_subjects);
     await db.delete(cloud_agent_code_reviews);
+    await db.delete(agent_configs);
     await db.delete(kilocode_users);
   });
 
+  async function enableReviewMemory(userId: string, platform: 'github' | 'gitlab') {
+    await db.insert(agent_configs).values({
+      owned_by_user_id: userId,
+      agent_type: 'code_review',
+      platform,
+      config: { review_memory_enabled: true },
+      is_enabled: false,
+      created_by: userId,
+    });
+  }
+
   it('syncs GitHub summary and likely Kilo inline subjects', async () => {
     const user = await insertTestUser();
+    await enableReviewMemory(user.id, 'github');
     const reviewId = await createCodeReview({
       owner: { type: 'user', id: user.id, userId: user.id },
       repoFullName: 'owner/repo',
@@ -94,6 +108,7 @@ describe('review memory subject sync', () => {
 
   it('updates existing GitLab discussion subjects when resolved state changes', async () => {
     const user = await insertTestUser();
+    await enableReviewMemory(user.id, 'gitlab');
     const reviewId = await createCodeReview({
       owner: { type: 'user', id: user.id, userId: user.id },
       repoFullName: 'group/project',
@@ -151,6 +166,42 @@ describe('review memory subject sync', () => {
         state: 'outdated',
       })
     );
+  });
+
+  it('does not sync subjects when review memory is disabled', async () => {
+    const user = await insertTestUser();
+    const reviewId = await createCodeReview({
+      owner: { type: 'user', id: user.id, userId: user.id },
+      repoFullName: 'owner/repo',
+      prNumber: 42,
+      prUrl: 'https://github.com/owner/repo/pull/42',
+      prTitle: 'Review memory',
+      prAuthor: 'octocat',
+      baseRef: 'main',
+      headRef: 'feature/review-memory',
+      headSha: 'abc1234',
+      platform: 'github',
+    });
+    const review = await getCodeReviewById(reviewId);
+    if (!review) throw new Error('Expected review to be created');
+
+    const result = await syncFetchedReviewMemorySubjects({
+      review,
+      platform: 'github',
+      summary: {
+        externalId: '1001',
+        body: '<!-- kilo-review -->\n## Code Review Summary\n\n**Status:** 1 Issues Found',
+      },
+      inlineComments: [
+        {
+          externalId: '2001',
+          body: '**WARNING:** Missing error handling for failed requests.',
+        },
+      ],
+    });
+
+    expect(result).toEqual({ summarySynced: false, inlineSynced: 0 });
+    await expect(db.select().from(code_review_feedback_subjects)).resolves.toHaveLength(0);
   });
 
   it('parses severity, title, and stable fingerprints from review comment bodies', () => {

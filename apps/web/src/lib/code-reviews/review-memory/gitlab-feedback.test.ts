@@ -7,6 +7,7 @@ import type {
 } from '@/lib/integrations/platforms/gitlab/webhook-schemas';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import {
+  agent_configs,
   code_review_feedback_events,
   code_review_feedback_subjects,
   code_review_memory_aggregation_state,
@@ -26,11 +27,12 @@ describe('GitLab review memory feedback', () => {
     await db.delete(code_review_feedback_events);
     await db.delete(code_review_feedback_subjects);
     await db.delete(code_review_memory_aggregation_state);
+    await db.delete(agent_configs);
     await db.delete(platform_integrations);
     await db.delete(kilocode_users);
   });
 
-  async function seedIntegration() {
+  async function seedIntegration({ enableMemory = true }: { enableMemory?: boolean } = {}) {
     const user = await insertTestUser();
     const [integration] = await db
       .insert(platform_integrations)
@@ -47,6 +49,16 @@ describe('GitLab review memory feedback', () => {
       .returning();
 
     if (!integration) throw new Error('Failed to seed platform integration');
+    if (enableMemory) {
+      await db.insert(agent_configs).values({
+        owned_by_user_id: user.id,
+        agent_type: 'code_review',
+        platform: 'gitlab',
+        config: { review_memory_enabled: true },
+        is_enabled: false,
+        created_by: user.id,
+      });
+    }
     return { user, owner: { type: 'user' as const, id: user.id }, integration };
   }
 
@@ -148,6 +160,41 @@ describe('GitLab review memory feedback', () => {
         strength: 3,
       })
     );
+  });
+
+  it('skips feedback without writing events when review memory is disabled', async () => {
+    const { owner, integration } = await seedIntegration({ enableMemory: false });
+    await seedDiscussionSubject(owner);
+    const payload = {
+      object_kind: 'note',
+      event_type: 'note',
+      user: user(),
+      project_id: 123,
+      project: project(),
+      object_attributes: {
+        id: 509,
+        note: 'This is a false positive for this MR.',
+        action: 'create',
+        discussion_id: 'discussion-1',
+        noteable_type: 'MergeRequest',
+        author_id: 7,
+        created_at: '2026-01-01T00:02:00.000Z',
+        updated_at: '2026-01-01T00:02:00.000Z',
+        project_id: 123,
+        system: false,
+        url: 'https://gitlab.example.com/acme/widgets/-/merge_requests/42#note_509',
+      },
+      merge_request: mergeRequestAttributes(),
+    } satisfies NoteEventPayload;
+
+    await expect(
+      handleGitLabNoteFeedback({
+        payload,
+        integration,
+        deliveryId: 'delivery-disabled-note',
+      })
+    ).resolves.toEqual({ recorded: false, eventIds: [], reason: 'review-memory-disabled' });
+    await expect(db.select().from(code_review_feedback_events)).resolves.toHaveLength(0);
   });
 
   it('records notes from maintainers with kilo in their username', async () => {

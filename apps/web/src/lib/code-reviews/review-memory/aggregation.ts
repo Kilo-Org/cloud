@@ -37,6 +37,7 @@ import {
   upsertReviewMemoryProposal,
   type ReviewMemoryOwner,
 } from './db';
+import { isReviewMemoryEnabled } from './settings';
 
 export const REVIEW_MEMORY_AGGREGATION_THRESHOLDS = {
   minFreshEvents: 5,
@@ -377,6 +378,17 @@ async function processClaimedAggregationScope(
   const owner = ownerFromState(state);
   if (!owner || !state.claim_token) {
     return { status: 'failed', proposals: 0, reason: 'missing-owner-or-claim' };
+  }
+
+  if (!(await isReviewMemoryEnabled({ owner, platform: state.platform }))) {
+    await finishClaimedAggregationState({
+      stateId: state.id,
+      claimToken: state.claim_token,
+      status: 'idle',
+      nextEligibleAt: addMs(options.now, REVIEW_MEMORY_AGGREGATION_THRESHOLDS.cooldownMs),
+      lastErrorMessage: null,
+    });
+    return { status: 'skipped', proposals: 0, reason: 'review-memory-disabled' };
   }
 
   const { modelSlug } = await resolveAggregationModel({ owner, platform: state.platform });

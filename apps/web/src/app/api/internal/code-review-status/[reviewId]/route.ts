@@ -68,6 +68,7 @@ import {
   syncGitHubReviewMemorySubjects,
   syncGitLabReviewMemorySubjects,
 } from '@/lib/code-reviews/review-memory/sync-subjects';
+import { isReviewMemoryEnabled } from '@/lib/code-reviews/review-memory/settings';
 import { APP_URL } from '@/lib/constants';
 import type { CloudAgentCodeReview, PlatformIntegration } from '@kilocode/db/schema';
 import type { GitHubAppType } from '@/lib/integrations/platforms/github/app-selector';
@@ -126,6 +127,8 @@ async function getReviewMemoryFooterData(review: CloudAgentCodeReview) {
   if (!owner) return undefined;
 
   const platform = review.platform === PLATFORM.GITLAB ? 'gitlab' : 'github';
+  if (!(await isReviewMemoryEnabled({ owner, platform }))) return undefined;
+
   const proposalCount = await countActionableProposals({
     owner,
     platform,
@@ -140,6 +143,13 @@ async function getReviewMemoryFooterData(review: CloudAgentCodeReview) {
   });
   const path = owner.type === 'org' ? `/organizations/${owner.id}/code-reviews` : '/code-reviews';
   return { proposalCount, url: `${APP_URL}${path}?${params.toString()}` };
+}
+
+async function shouldSyncReviewMemorySubjects(review: CloudAgentCodeReview): Promise<boolean> {
+  const owner = reviewMemoryOwnerFromReview(review);
+  if (!owner) return false;
+  const platform = review.platform === PLATFORM.GITLAB ? 'gitlab' : 'github';
+  return await isReviewMemoryEnabled({ owner, platform });
 }
 
 type StatusUpdatePayload = OrchestratorPayload | CloudAgentNextCallbackPayload;
@@ -1263,21 +1273,23 @@ export async function POST(
                   );
                 }
 
-                try {
-                  await syncGitHubReviewMemorySubjects({
-                    review,
-                    installationId: integration.platform_installation_id,
-                    appType,
-                  });
-                } catch (subjectSyncError) {
-                  logExceptInTest('[code-review-status] Failed to sync GitHub review subjects:', {
-                    reviewId,
-                    error: subjectSyncError,
-                  });
-                  captureException(subjectSyncError, {
-                    tags: { source: 'code-review-status-review-memory-sync' },
-                    extra: { reviewId, platform },
-                  });
+                if (await shouldSyncReviewMemorySubjects(review)) {
+                  try {
+                    await syncGitHubReviewMemorySubjects({
+                      review,
+                      installationId: integration.platform_installation_id,
+                      appType,
+                    });
+                  } catch (subjectSyncError) {
+                    logExceptInTest('[code-review-status] Failed to sync GitHub review subjects:', {
+                      reviewId,
+                      error: subjectSyncError,
+                    });
+                    captureException(subjectSyncError, {
+                      tags: { source: 'code-review-status-review-memory-sync' },
+                      extra: { reviewId, platform },
+                    });
+                  }
                 }
               }
             } else if (platform === PLATFORM.GITLAB) {
@@ -1373,21 +1385,23 @@ export async function POST(
                   );
                 }
 
-                try {
-                  await syncGitLabReviewMemorySubjects({
-                    review,
-                    accessToken,
-                    instanceUrl,
-                  });
-                } catch (subjectSyncError) {
-                  logExceptInTest('[code-review-status] Failed to sync GitLab review subjects:', {
-                    reviewId,
-                    error: subjectSyncError,
-                  });
-                  captureException(subjectSyncError, {
-                    tags: { source: 'code-review-status-review-memory-sync' },
-                    extra: { reviewId, platform },
-                  });
+                if (await shouldSyncReviewMemorySubjects(review)) {
+                  try {
+                    await syncGitLabReviewMemorySubjects({
+                      review,
+                      accessToken,
+                      instanceUrl,
+                    });
+                  } catch (subjectSyncError) {
+                    logExceptInTest('[code-review-status] Failed to sync GitLab review subjects:', {
+                      reviewId,
+                      error: subjectSyncError,
+                    });
+                    captureException(subjectSyncError, {
+                      tags: { source: 'code-review-status-review-memory-sync' },
+                      extra: { reviewId, platform },
+                    });
+                  }
                 }
               }
             }

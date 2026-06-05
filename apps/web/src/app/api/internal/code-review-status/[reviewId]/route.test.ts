@@ -80,6 +80,8 @@ const mockSyncGitHubReviewMemorySubjects = jest.fn<any>();
 const mockSyncGitLabReviewMemorySubjects = jest.fn<any>();
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const mockDisableCodeReviewForActionRequiredFailure = jest.fn<any>();
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const mockIsReviewMemoryEnabled = jest.fn<any>();
 
 // --- Module mocks ---
 
@@ -153,6 +155,10 @@ jest.mock('@/lib/code-reviews/review-memory/sync-subjects', () => ({
     mockSyncGitHubReviewMemorySubjects(...args),
   syncGitLabReviewMemorySubjects: (...args: unknown[]) =>
     mockSyncGitLabReviewMemorySubjects(...args),
+}));
+
+jest.mock('@/lib/code-reviews/review-memory/settings', () => ({
+  isReviewMemoryEnabled: (...args: unknown[]) => mockIsReviewMemoryEnabled(...args),
 }));
 
 jest.mock('@/lib/code-reviews/action-required', () => {
@@ -359,6 +365,7 @@ beforeEach(async () => {
   mockSyncGitHubReviewMemorySubjects.mockResolvedValue({ summarySynced: true, inlineSynced: 0 });
   mockSyncGitLabReviewMemorySubjects.mockResolvedValue({ summarySynced: true, inlineSynced: 0 });
   mockDisableCodeReviewForActionRequiredFailure.mockResolvedValue(undefined);
+  mockIsReviewMemoryEnabled.mockResolvedValue(true);
   ({ POST } = await import('./route'));
 });
 
@@ -1974,6 +1981,29 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         review,
         installationId: 'inst-1',
         appType: 'standard',
+      });
+    });
+
+    it('does not append memory footer links or sync subjects when review memory is disabled', async () => {
+      mockIsReviewMemoryEnabled.mockResolvedValue(false);
+      const review = makeReview({
+        repository_review_instructions_used: false,
+        repository_review_instructions_ref: null,
+        repository_review_instructions_truncated: false,
+        model: null,
+        total_tokens_in: null,
+        total_tokens_out: null,
+      });
+      mockGetCodeReviewById.mockResolvedValue(review);
+
+      await POST(makeRequest({ status: 'completed' }), makeParams(REVIEW_ID));
+
+      expect(mockAppendReviewSummaryFooter).not.toHaveBeenCalled();
+      expect(mockUpdateKiloReviewComment).not.toHaveBeenCalled();
+      expect(mockSyncGitHubReviewMemorySubjects).not.toHaveBeenCalled();
+      expect(mockIsReviewMemoryEnabled).toHaveBeenCalledWith({
+        owner: { type: 'user', id: 'user-1' },
+        platform: 'github',
       });
     });
   });

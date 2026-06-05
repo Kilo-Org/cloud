@@ -302,7 +302,7 @@ describe('calculatKiloExclusiveCost_mUsd with qwen3.6-flash', () => {
   //   CacheRead: $0.1/1M → $0.1/1M   Output: $4/1M → $4/1M
 
   test('input-only cost in <=256k tier', () => {
-    // 1M tokens * 0.25 = 162_500 mUsd
+    // 100k tokens * 0.25 = 25_000 mUsd
     const result = calculateKiloExclusiveCost_mUsd(
       qwen36_flash_model,
       makeUsage({ inputTokens: 100_000 })

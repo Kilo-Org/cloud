@@ -7,10 +7,7 @@ import type {
 const KILO_DISCOUNT_FACTOR = 0.65;
 const KILO_STEALTH_DISCOUNT_FACTOR = 0.5;
 
-function applyKiloDiscount(
-  price: Pricing,
-  discountFactor: number = KILO_DISCOUNT_FACTOR
-): Pricing {
+function applyKiloDiscount(price: Pricing, discountFactor: number = KILO_DISCOUNT_FACTOR): Pricing {
   return {
     prompt_per_million: price.prompt_per_million * discountFactor,
     completion_per_million: price.completion_per_million * discountFactor,

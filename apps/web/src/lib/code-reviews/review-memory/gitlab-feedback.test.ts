@@ -276,5 +276,8 @@ describe('GitLab review memory feedback', () => {
       .from(code_review_feedback_subjects)
       .where(eq(code_review_feedback_subjects.id, subject.id));
     expect(updatedSubject.state).toBe('resolved');
+
+    const [state] = await db.select().from(code_review_memory_aggregation_state);
+    expect(state.fresh_event_count).toBe(2);
   });
 });

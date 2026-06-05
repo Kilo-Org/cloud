@@ -9,6 +9,7 @@ import {
   findFeedbackSubjectByExternalThreadId,
   listFeedbackSubjectsForPullRequest,
   recordFeedbackEvent,
+  refreshAggregationStateForScope,
   upsertFeedbackSubject,
   type ReviewMemoryOwner,
 } from './db';
@@ -431,8 +432,18 @@ export async function handleGitLabMergeRequestFeedback(input: {
           : 'Review discussion reopened.',
         metadata: { discussion_id: subject.external_thread_id },
         occurredAt: input.payload.object_attributes.updated_at,
+        refreshAggregationState: false,
       });
       eventIds.push(result.event.id);
+    }
+
+    if (subjects.length > 0) {
+      await refreshAggregationStateForScope({
+        owner,
+        platform: 'gitlab',
+        repoFullName: input.payload.project.path_with_namespace,
+        platformProjectId: input.payload.project.id,
+      });
     }
   }
 

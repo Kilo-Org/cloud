@@ -393,6 +393,7 @@ export type RecordFeedbackEventInput = {
   evidenceExcerpt?: string | null;
   metadata?: Record<string, unknown>;
   occurredAt?: string | Date | null;
+  refreshAggregationState?: boolean;
   database?: ReviewMemoryDatabase;
 };
 
@@ -449,14 +450,17 @@ export async function recordFeedbackEvent(
     .onConflictDoNothing({ target: code_review_feedback_events.dedupe_hash })
     .returning();
 
+  const shouldRefreshAggregationState = input.refreshAggregationState !== false;
   if (inserted) {
-    await refreshAggregationStateForScope({
-      owner: input.owner,
-      platform: input.platform,
-      repoFullName: input.repoFullName,
-      platformProjectId: input.platformProjectId,
-      database,
-    });
+    if (shouldRefreshAggregationState) {
+      await refreshAggregationStateForScope({
+        owner: input.owner,
+        platform: input.platform,
+        repoFullName: input.repoFullName,
+        platformProjectId: input.platformProjectId,
+        database,
+      });
+    }
     return { event: inserted, created: true };
   }
 
@@ -470,13 +474,15 @@ export async function recordFeedbackEvent(
     throw new Error('Failed to read deduped review memory feedback event');
   }
 
-  await refreshAggregationStateForScope({
-    owner: input.owner,
-    platform: input.platform,
-    repoFullName: input.repoFullName,
-    platformProjectId: input.platformProjectId,
-    database,
-  });
+  if (shouldRefreshAggregationState) {
+    await refreshAggregationStateForScope({
+      owner: input.owner,
+      platform: input.platform,
+      repoFullName: input.repoFullName,
+      platformProjectId: input.platformProjectId,
+      database,
+    });
+  }
 
   return { event: existing, created: false };
 }

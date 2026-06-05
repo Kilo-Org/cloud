@@ -286,6 +286,12 @@ const AgentSettingsSummarySchema = z.object({
   fastModeDefault: z.boolean().nullable(),
 });
 
+const AgentBindingSummarySchema = z.object({
+  channel: z.string(),
+  accountId: z.string().nullable(),
+  advanced: z.boolean(),
+});
+
 export const AgentSummarySchema = z.object({
   id: z.string(),
   name: z.string().nullable(),
@@ -297,6 +303,9 @@ export const AgentSummarySchema = z.object({
   }),
   rawModel: AgentRawModelSchema.nullable(),
   settings: AgentSettingsSummarySchema,
+  // `.default([])` keeps reads from older controllers (which omit bindings)
+  // parsing cleanly during rollout.
+  bindings: z.array(AgentBindingSummarySchema).default([]),
 });
 export type AgentSummary = z.infer<typeof AgentSummarySchema>;
 

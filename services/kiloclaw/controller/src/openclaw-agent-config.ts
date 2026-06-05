@@ -302,32 +302,32 @@ const ConfigBindingSchema = z
 // Match keys that make a binding more specific than a channel(/account) route.
 const ADVANCED_MATCH_KEYS = ['peer', 'parentPeer', 'guildId', 'teamId', 'roles'];
 
-function summarizeBindingsForAgent(
-  config: OpenClawAgentConfig,
-  agentId: string
-): AgentBindingSummary[] {
+// Parse the top-level bindings array once and group summaries by normalized
+// agent id, so summarizing the fleet stays O(agents + bindings) rather than
+// re-scanning every binding per agent.
+function summarizeBindingsByAgent(config: OpenClawAgentConfig): Map<string, AgentBindingSummary[]> {
+  const byAgent = new Map<string, AgentBindingSummary[]>();
   const raw = (config as { bindings?: unknown }).bindings;
   if (!Array.isArray(raw)) {
-    return [];
+    return byAgent;
   }
-  const bindings: AgentBindingSummary[] = [];
   for (const item of raw) {
     const parsed = ConfigBindingSchema.safeParse(item);
     if (!parsed.success) {
       continue;
     }
     const binding = parsed.data;
-    if (normalizeAgentId(binding.agentId) !== agentId) {
-      continue;
-    }
+    const agentId = normalizeAgentId(binding.agentId);
     const match = binding.match as Record<string, unknown>;
     const accountId = typeof match.accountId === 'string' ? match.accountId : null;
     const advanced =
       (binding.type !== undefined && binding.type !== 'route') ||
       ADVANCED_MATCH_KEYS.some(key => match[key] !== undefined);
-    bindings.push({ channel: binding.match.channel, accountId, advanced });
+    const summaries = byAgent.get(agentId) ?? [];
+    summaries.push({ channel: binding.match.channel, accountId, advanced });
+    byAgent.set(agentId, summaries);
   }
-  return bindings;
+  return byAgent;
 }
 
 function assertUniqueAgentIds(config: OpenClawAgentConfig): void {
@@ -373,6 +373,7 @@ export function summarizeAgentConfig(config: OpenClawAgentConfig): AgentConfigSu
   const defaults = config.agents?.defaults;
   const defaultsModel = normalizeModel(defaults?.model);
   const entries = config.agents?.list?.length ? config.agents.list : [{ id: DEFAULT_AGENT_ID }];
+  const bindingsByAgent = summarizeBindingsByAgent(config);
   return {
     defaults: {
       model: defaultsModel,
@@ -394,7 +395,7 @@ export function summarizeAgentConfig(config: OpenClawAgentConfig): AgentConfigSu
         },
         rawModel: entry.model ?? null,
         settings: settingsOf(entry),
-        bindings: summarizeBindingsForAgent(config, id),
+        bindings: bindingsByAgent.get(id) ?? [],
       };
     }),
   };

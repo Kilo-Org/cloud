@@ -68,7 +68,7 @@ async function loadTerminalBench(): Promise<TerminalBenchSummaries> {
   return summarizeTerminalBench(rows);
 }
 
-export function createTerminalBenchFetch(load = loadTerminalBench) {
+function createTerminalBenchFetch(load = loadTerminalBench) {
   return createCachedFetch(
     () =>
       load().catch(err => {

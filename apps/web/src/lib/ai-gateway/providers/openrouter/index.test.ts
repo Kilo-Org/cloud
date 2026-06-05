@@ -165,8 +165,12 @@ describe('shouldSuppressOpenRouterModel', () => {
     expect(shouldSuppressOpenRouterModel(seed_20_code_free_model)).toBe(true);
   });
 
-  it('suppresses public and hidden Kilo-exclusive models from OpenRouter', () => {
-    expect(shouldSuppressOpenRouterModel(minimax_m3_discounted_model)).toBe(true);
+  it('does not suppress disabled paid Kilo-exclusive models from OpenRouter', () => {
+    expect(minimax_m3_discounted_model.status).toBe('disabled');
+    expect(shouldSuppressOpenRouterModel(minimax_m3_discounted_model)).toBe(false);
+  });
+
+  it('suppresses hidden Kilo-exclusive models from OpenRouter', () => {
     expect(morph_warp_grep_free_model.status).toBe('hidden');
     expect(shouldSuppressOpenRouterModel(morph_warp_grep_free_model)).toBe(true);
   });

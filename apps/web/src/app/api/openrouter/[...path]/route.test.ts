@@ -164,7 +164,7 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
     mockedRedisGet.mockResolvedValue(null);
     mockedRedisSet.mockResolvedValue('OK');
     mockedGetOpenRouterModels.mockResolvedValue(
-      new Set(['nvidia/nemotron-3-ultra-550b-a55b:free'])
+      new Set(['stepfun/step-3.7-flash:free'])
     );
     mockedUpstreamRequest.mockResolvedValue(
       upstreamJsonResponse({ id: 'chatcmpl-1', model: 'openai/gpt-4o', choices: [] })
@@ -251,10 +251,10 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
     expect(response.status).toBe(200);
     expect(mockedGetProvider).toHaveBeenCalledTimes(2);
     expect(mockedGetProvider.mock.calls[1]?.[0].requestedModel).toBe(
-      'nvidia/nemotron-3-ultra-550b-a55b:free'
+      'stepfun/step-3.7-flash:free'
     );
     expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.model).toBe(
-      'nvidia/nemotron-3-ultra-550b-a55b:free'
+      'stepfun/step-3.7-flash:free'
     );
     expect(mockedAccountForMicrodollarUsage.mock.calls[0]?.[1]).toMatchObject({
       abuse_delay: 6000,

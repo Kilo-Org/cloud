@@ -356,9 +356,7 @@ describe('calculatKiloExclusiveCost_mUsd with qwen3.6-flash', () => {
         cacheWriteTokens: 100_000,
       })
     );
-    expect(result).toBe(
-      Math.round(350_000 * 1 + 20_000 * 4 + 50_000 * 0.1 + 100_000 * 1.25)
-    );
+    expect(result).toBe(Math.round(350_000 * 1 + 20_000 * 4 + 50_000 * 0.1 + 100_000 * 1.25));
   });
 
   test('tier boundary: exactly 256k total input uses <=256k pricing', () => {
@@ -423,9 +421,7 @@ describe('calculatKiloExclusiveCost_mUsd with qwen3.6-max-preview', () => {
         cacheWriteTokens: 30_000,
       })
     );
-    expect(result).toBe(
-      Math.round(50_000 * 1.3 + 5_000 * 7.8 + 20_000 * 0.2 + 30_000 * 2.5)
-    );
+    expect(result).toBe(Math.round(50_000 * 1.3 + 5_000 * 7.8 + 20_000 * 0.2 + 30_000 * 2.5));
   });
 
   test('input-only cost in >128k tier', () => {

@@ -43,6 +43,26 @@ function stripNestedChildren(nodes: FileNode[]): FileNode[] {
   });
 }
 
+function indexNodesByPath(nodes: FileNode[], index = new Map<string, FileNode>()) {
+  for (const node of nodes) {
+    index.set(node.path, node);
+    if (node.children) indexNodesByPath(node.children, index);
+  }
+  return index;
+}
+
+function preserveLoadedDirectoryChildren(nodes: FileNode[], existingNodes: FileNode[]): FileNode[] {
+  const existingByPath = indexNodesByPath(existingNodes);
+  return nodes.map(node => {
+    if (node.type !== 'directory') return node;
+
+    const existing = existingByPath.get(node.path);
+    if (!existing?.children) return node;
+
+    return { ...node, children: existing.children };
+  });
+}
+
 function validatePathScopedChildren(path: string, children: FileNode[]): void {
   const prefix = `${path}/`;
   if (children.every(child => child.path.startsWith(prefix))) return;
@@ -76,16 +96,33 @@ export function FileEditorShell({
     { type: 'switch'; path: string } | { type: 'close' } | null
   >(null);
   const [mergedTree, setMergedTree] = useState<FileNode[] | undefined>(tree);
+  const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set());
   const [loadedPaths, setLoadedPaths] = useState<Set<string>>(new Set());
   const [loadingPaths, setLoadingPaths] = useState<Set<string>>(new Set());
   const [loadErrors, setLoadErrors] = useState<Map<string, string>>(new Map());
+  const expandedPathsRef = useRef(new Set<string>());
+  const loadedPathsRef = useRef(new Set<string>());
+  const loadingPathsRef = useRef(new Set<string>());
   const hasUnsavedChangesRef = useRef(false);
   const { width: sidebarWidth, startDrag } = useResizableSidebar();
 
   useEffect(() => {
-    setMergedTree(tree ? stripNestedChildren(tree) : tree);
-    setLoadedPaths(new Set());
-    setLoadingPaths(new Set());
+    if (!tree) {
+      setMergedTree(tree);
+      expandedPathsRef.current = new Set();
+      loadedPathsRef.current = new Set();
+      loadingPathsRef.current = new Set();
+      setExpandedPaths(expandedPathsRef.current);
+      setLoadedPaths(loadedPathsRef.current);
+      setLoadingPaths(loadingPathsRef.current);
+      setLoadErrors(new Map());
+      return;
+    }
+
+    const shallowTree = stripNestedChildren(tree);
+    setMergedTree(prev =>
+      prev ? preserveLoadedDirectoryChildren(shallowTree, prev) : shallowTree
+    );
     setLoadErrors(new Map());
   }, [tree]);
 
@@ -116,9 +153,13 @@ export function FileEditorShell({
 
   const handleLoadChildren = useCallback(
     async (path: string) => {
-      if (!loadChildren || loadingPaths.has(path) || loadedPaths.has(path)) return;
+      if (!loadChildren || loadingPathsRef.current.has(path) || loadedPathsRef.current.has(path)) {
+        return;
+      }
 
-      setLoadingPaths(prev => new Set(prev).add(path));
+      const nextLoadingPaths = new Set(loadingPathsRef.current).add(path);
+      loadingPathsRef.current = nextLoadingPaths;
+      setLoadingPaths(nextLoadingPaths);
       setLoadErrors(prev => {
         const next = new Map(prev);
         next.delete(path);
@@ -132,19 +173,39 @@ export function FileEditorShell({
         setMergedTree(prev =>
           prev ? replaceDirectoryChildren(prev, path, shallowChildren) : prev
         );
-        setLoadedPaths(prev => new Set(prev).add(path));
+        const nextLoadedPaths = new Set(loadedPathsRef.current).add(path);
+        loadedPathsRef.current = nextLoadedPaths;
+        setLoadedPaths(nextLoadedPaths);
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to load folder';
         setLoadErrors(prev => new Map(prev).set(path, message));
       } finally {
-        setLoadingPaths(prev => {
-          const next = new Set(prev);
-          next.delete(path);
-          return next;
-        });
+        const nextLoadingPaths = new Set(loadingPathsRef.current);
+        nextLoadingPaths.delete(path);
+        loadingPathsRef.current = nextLoadingPaths;
+        setLoadingPaths(nextLoadingPaths);
       }
     },
-    [loadChildren, loadedPaths, loadingPaths]
+    [loadChildren]
+  );
+
+  const handleToggleDirectory = useCallback(
+    (node: FileNode) => {
+      if (node.type !== 'directory') return;
+
+      const isExpanded = expandedPathsRef.current.has(node.path);
+      const nextExpandedPaths = new Set(expandedPathsRef.current);
+      if (isExpanded) {
+        nextExpandedPaths.delete(node.path);
+      } else {
+        nextExpandedPaths.add(node.path);
+      }
+      expandedPathsRef.current = nextExpandedPaths;
+      setExpandedPaths(nextExpandedPaths);
+
+      if (!isExpanded) void handleLoadChildren(node.path);
+    },
+    [handleLoadChildren]
   );
 
   if (isLoading) {
@@ -189,11 +250,13 @@ export function FileEditorShell({
           <FileTree
             tree={visibleTree}
             selectedPath={selectedPath}
+            expandedPaths={expandedPaths}
             loadedPaths={loadedPaths}
             loadingPaths={loadingPaths}
             loadErrors={loadErrors}
             onSelect={handleSelect}
             onLoadChildren={loadChildren ? path => void handleLoadChildren(path) : undefined}
+            onToggleDirectory={handleToggleDirectory}
           />
         </div>
         <div

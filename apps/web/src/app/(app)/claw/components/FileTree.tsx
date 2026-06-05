@@ -1,6 +1,5 @@
 'use client';
 
-import { useState, useCallback } from 'react';
 import { ChevronRight, ChevronDown, File, Folder, Loader2 } from 'lucide-react';
 import type { FileNode } from '@/lib/kiloclaw/kiloclaw-internal-client';
 
@@ -26,7 +25,7 @@ function FileTreeNode({
   node: FileNode;
   depth: number;
   selectedPath: string | null;
-  expanded: Set<string>;
+  expanded: ReadonlySet<string>;
   loadedPaths: ReadonlySet<string>;
   loadingPaths: ReadonlySet<string>;
   loadErrors: ReadonlyMap<string, string>;
@@ -111,41 +110,24 @@ function FileTreeNode({
 export function FileTree({
   tree,
   selectedPath,
+  expandedPaths,
   loadedPaths = new Set(),
   loadingPaths = new Set(),
   loadErrors = new Map(),
   onSelect,
   onLoadChildren,
+  onToggleDirectory,
 }: {
   tree: FileNode[];
   selectedPath: string | null;
+  expandedPaths: ReadonlySet<string>;
   loadedPaths?: ReadonlySet<string>;
   loadingPaths?: ReadonlySet<string>;
   loadErrors?: ReadonlyMap<string, string>;
   onSelect: (path: string) => void;
   onLoadChildren?: (path: string) => void;
+  onToggleDirectory: (node: FileNode) => void;
 }) {
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
-
-  const handleToggle = useCallback(
-    (node: FileNode) => {
-      const shouldExpand = !expanded.has(node.path);
-      setExpanded(prev => {
-        const next = new Set(prev);
-        if (next.has(node.path)) {
-          next.delete(node.path);
-        } else {
-          next.add(node.path);
-        }
-        return next;
-      });
-      if (shouldExpand && node.type === 'directory' && !loadedPaths.has(node.path)) {
-        onLoadChildren?.(node.path);
-      }
-    },
-    [expanded, loadedPaths, onLoadChildren]
-  );
-
   return (
     <div className="flex flex-col overflow-y-auto">
       <div className="text-muted-foreground px-3 py-2 text-[10px] font-medium tracking-wider uppercase">
@@ -157,12 +139,12 @@ export function FileTree({
           node={node}
           depth={0}
           selectedPath={selectedPath}
-          expanded={expanded}
+          expanded={expandedPaths}
           loadedPaths={loadedPaths}
           loadingPaths={loadingPaths}
           loadErrors={loadErrors}
           onSelect={onSelect}
-          onToggle={handleToggle}
+          onToggle={onToggleDirectory}
           onLoadChildren={onLoadChildren}
         />
       ))}

@@ -115,6 +115,11 @@ export type WrapperKiloClient = {
     tools?: Record<string, boolean>;
   }) => Promise<void>;
   abortSession: (opts: { sessionId: string }) => Promise<boolean>;
+  summarizeSession: (opts: {
+    sessionId: string;
+    model: { providerID?: string; modelID: string };
+    auto?: boolean;
+  }) => Promise<boolean>;
   sendCommand: (opts: {
     sessionId: string;
     command: string;
@@ -254,6 +259,21 @@ export function createWrapperKiloClient(
     abortSession: async opts => {
       await sdkClient.session.abort({ path: { id: opts.sessionId } });
       return true;
+    },
+
+    summarizeSession: async opts => {
+      const result = await v2Client.session.summarize({
+        sessionID: opts.sessionId,
+        providerID: opts.model.providerID ?? 'kilo',
+        modelID: opts.model.modelID,
+        ...(opts.auto !== undefined ? { auto: opts.auto } : {}),
+      });
+      if (result.error !== undefined) {
+        throw new Error(
+          `Session summarize for ${opts.sessionId} failed: ${formatSdkError(result.error)}`
+        );
+      }
+      return result.data ?? true;
     },
 
     sendCommand: async opts => {

@@ -7,6 +7,7 @@ import {
 import type { OpenRouterReasoningConfig } from '@/lib/ai-gateway/providers/openrouter/types';
 import type { OpenCodeSettings, Verbosity } from '@kilocode/db/schema-types';
 import { qwen36_plus_model } from '@/lib/ai-gateway/providers/qwen';
+import { NVIDIA_TRIAL_TOS } from '@/lib/ai-gateway/providers/nvidia';
 
 type AutoModel = {
   id: string;
@@ -120,7 +121,8 @@ export const KILO_AUTO_FREE_MODEL: AutoModel = {
   id: 'kilo-auto/free',
   name: 'Auto Free',
   description:
-    'Rotates through available free models. Limited capability and no credits required.\n\n**Warning:** prompts may be logged by the upstream provider and used to improve their services. Not suitable for production or sensitive data workloads.\n\n[Learn more](https://kilo.ai/docs/code-with-ai/agents/auto-model)',
+    'Rotates through available free models. Limited capability and no credits required. [Learn more](https://kilo.ai/docs/code-with-ai/agents/auto-model)\n\n**Warning** Prompts may be logged by the upstream provider and used to improve their services. Not suitable for production or sensitive data workloads.\n\n**In particular** ' +
+    NVIDIA_TRIAL_TOS,
   context_length: 256_000,
   max_completion_tokens: 10_000,
   prompt_price: '0',

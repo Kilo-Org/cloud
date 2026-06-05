@@ -5,10 +5,11 @@ import { getUserFromAuth } from '@/lib/user/server';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import { captureException } from '@sentry/nextjs';
 import { buildGitLabOAuthUrl } from '@/lib/integrations/platforms/gitlab/adapter';
+import { createGitLabOAuthState } from '@/lib/integrations/platforms/gitlab/oauth-state';
 import {
-  createGitLabOAuthState,
-  DEFAULT_GITLAB_OAUTH_INSTANCE_URL,
-} from '@/lib/integrations/platforms/gitlab/oauth-state';
+  isDefaultGitLabInstanceUrl,
+  normalizeGitLabInstanceUrl,
+} from '@/lib/integrations/platforms/gitlab/instance-url';
 import { storeGitLabOAuthCredentials } from '@/lib/integrations/platforms/gitlab/oauth-credentials';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { validateReturnPath } from '@/lib/integrations/validate-return-path';
@@ -165,7 +166,9 @@ async function buildGitLabConnectOAuthUrl(
 ): Promise<string> {
   const owner = await resolveGitLabOAuthOwner(user, organizationId);
   const customCredentials = clientId && clientSecret ? { clientId, clientSecret } : undefined;
-  const usesCustomInstance = !!instanceUrl && instanceUrl !== DEFAULT_GITLAB_OAUTH_INSTANCE_URL;
+  const normalizedInstanceUrl = instanceUrl ? normalizeGitLabInstanceUrl(instanceUrl) : undefined;
+  const usesCustomInstance =
+    !!normalizedInstanceUrl && !isDefaultGitLabInstanceUrl(normalizedInstanceUrl);
 
   if (usesCustomInstance && !customCredentials) {
     throw new Error('Custom GitLab OAuth credentials are required for self-hosted instances');
@@ -182,14 +185,14 @@ async function buildGitLabConnectOAuthUrl(
   const state = createGitLabOAuthState(
     {
       owner,
-      ...(usesCustomInstance ? { instanceUrl } : {}),
+      ...(usesCustomInstance ? { instanceUrl: normalizedInstanceUrl } : {}),
       ...(customCredentialsRef ? { customCredentialsRef } : {}),
       ...(returnTo ? { returnTo } : {}),
     },
     user.id
   );
 
-  return buildGitLabOAuthUrl(state, instanceUrl, customCredentials);
+  return buildGitLabOAuthUrl(state, normalizedInstanceUrl, customCredentials);
 }
 
 async function resolveGitLabOAuthOwner(

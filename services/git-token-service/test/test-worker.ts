@@ -12,6 +12,10 @@
  *   POST /getTokenForRepo - { githubRepo, userId, orgId? }
  *   POST /getToken - { installationId, appType? }
  *   POST /getGitLabToken - { userId, orgId?, repositoryUrl?, createdOnPlatform? }
+ *   POST /issueGitHubSessionCapability
+ *   POST /redeemGitHubSessionCapability
+ *   POST /issueGitLabSessionCapability
+ *   POST /redeemGitLabSessionCapability
  */
 import type {
   GitTokenRPCEntrypoint,
@@ -19,6 +23,14 @@ import type {
   GetTokenForRepoResult,
   GetGitLabTokenParams,
   GetGitLabTokenResult,
+  IssueGitHubSessionCapabilityParams,
+  IssueGitHubSessionCapabilityResult,
+  RedeemGitHubSessionCapabilityParams,
+  RedeemGitHubSessionCapabilityResult,
+  IssueGitLabSessionCapabilityParams,
+  IssueGitLabSessionCapabilityResult,
+  RedeemGitLabSessionCapabilityParams,
+  RedeemGitLabSessionCapabilityResult,
 } from '../src/index.js';
 import type { GitHubAppType } from '../src/github-token-service.js';
 
@@ -58,6 +70,34 @@ export default {
         return Response.json(result);
       }
 
+      if (url.pathname === '/issueGitHubSessionCapability' && request.method === 'POST') {
+        const body = (await request.json()) as IssueGitHubSessionCapabilityParams;
+        const result: IssueGitHubSessionCapabilityResult =
+          await env.GIT_TOKEN_SERVICE.issueGitHubSessionCapability(body);
+        return Response.json(result, { status: result.success ? 200 : 400 });
+      }
+
+      if (url.pathname === '/redeemGitHubSessionCapability' && request.method === 'POST') {
+        const body = (await request.json()) as RedeemGitHubSessionCapabilityParams;
+        const result: RedeemGitHubSessionCapabilityResult =
+          await env.GIT_TOKEN_SERVICE.redeemGitHubSessionCapability(body);
+        return Response.json(result, { status: result.success ? 200 : 400 });
+      }
+
+      if (url.pathname === '/issueGitLabSessionCapability' && request.method === 'POST') {
+        const body = (await request.json()) as IssueGitLabSessionCapabilityParams;
+        const result: IssueGitLabSessionCapabilityResult =
+          await env.GIT_TOKEN_SERVICE.issueGitLabSessionCapability(body);
+        return Response.json(result, { status: result.success ? 200 : 400 });
+      }
+
+      if (url.pathname === '/redeemGitLabSessionCapability' && request.method === 'POST') {
+        const body = (await request.json()) as RedeemGitLabSessionCapabilityParams;
+        const result: RedeemGitLabSessionCapabilityResult =
+          await env.GIT_TOKEN_SERVICE.redeemGitLabSessionCapability(body);
+        return Response.json(result, { status: result.success ? 200 : 400 });
+      }
+
       return Response.json(
         {
           error: 'Not Found',
@@ -65,6 +105,10 @@ export default {
             'POST /getTokenForRepo - { githubRepo, userId, orgId? }',
             'POST /getToken - { installationId, appType? }',
             'POST /getGitLabToken - { userId, orgId?, repositoryUrl?, createdOnPlatform? }',
+            'POST /issueGitHubSessionCapability',
+            'POST /redeemGitHubSessionCapability',
+            'POST /issueGitLabSessionCapability',
+            'POST /redeemGitLabSessionCapability',
           ],
         },
         { status: 404 }

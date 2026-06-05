@@ -46,6 +46,7 @@ declare type GitTokenService = {
     userId: string;
     orgId?: string;
   }): Promise<GitTokenForRepoResult>;
+  getToken(installationId: string, appType?: 'standard' | 'lite'): Promise<string>;
 };
 
 declare type SecretBinding = {
@@ -66,13 +67,22 @@ declare type ExecutionContext = {
 declare type CloudflareEnv = {
   HYPERDRIVE: Hyperdrive;
   OWNER_QUEUE: Queue<import('./src/types').AutoAnalysisOwnerMessage>;
+  CALLBACK_QUEUE: Queue<import('./src/callbacks').SecurityAnalysisCallbackMessage>;
+  MANUAL_ANALYSIS_QUEUE: Queue<import('./src/manual-analysis').ManualAnalysisStartCommand>;
   CLOUD_AGENT_NEXT: { fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> };
   GIT_TOKEN_SERVICE: GitTokenService;
   NEXTAUTH_SECRET: SecretBinding;
   INTERNAL_API_SECRET: SecretBinding;
   CALLBACK_TOKEN_SECRET: SecretBinding;
   KILOCODE_BACKEND_BASE_URL: string;
+  SESSION_INGEST_WORKER_URL: string;
   ENVIRONMENT: string;
+  SECURITY_ANALYSIS_CALLBACK_ROUTING_MODE: 'worker' | 'web';
+  SECURITY_ANALYSIS_CALLBACK_WEB_BASE_URL: string;
+  SECURITY_ANALYSIS_CALLBACK_WORKER_BASE_URL: string;
+  SECURITY_ANALYSIS_CALLBACK_WORKER_INGRESS_ENABLED: string | undefined;
+  MANUAL_ANALYSIS_COMMAND_ROUTING_ENABLED: string | undefined;
+  NEXT_PUBLIC_POSTHOG_KEY: string | undefined;
   BETTERSTACK_HEARTBEAT_URL: string | undefined;
 };
 

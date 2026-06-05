@@ -8,6 +8,7 @@ import { Toaster } from 'sonner-native';
 import { AuthProvider } from '@/lib/auth/auth-context';
 import { OrganizationProvider } from '@/lib/organization-context';
 import { queryClient } from '@/lib/query-client';
+import { QueryClientNativeLifecycle } from '@/lib/query-client-lifecycle';
 import { trpcClient, TRPCProvider } from '@/lib/trpc';
 
 export function AppRootProviders({ children }: { readonly children: ReactNode }) {
@@ -15,6 +16,7 @@ export function AppRootProviders({ children }: { readonly children: ReactNode })
     <GestureHandlerRootView className="flex-1">
       <TRPCProvider trpcClient={trpcClient} queryClient={queryClient}>
         <QueryClientProvider client={queryClient}>
+          <QueryClientNativeLifecycle />
           <AuthProvider>
             <OrganizationProvider>
               <ActionSheetProvider>

@@ -8,6 +8,7 @@
  */
 
 import type { WrapperState } from './state.js';
+import type { WrapperCommitCoAuthor } from '../../src/shared/wrapper-bootstrap.js';
 import type { WrapperKiloClient } from './kilo-api.js';
 import { runAutoCommit } from './auto-commit.js';
 import { runCondenseOnComplete } from './condense-on-complete.js';
@@ -45,6 +46,7 @@ export type PerTurnConfig = {
   condenseOnComplete: boolean;
   model?: string;
   upstreamBranch?: string;
+  commitCoAuthor?: WrapperCommitCoAuthor;
 };
 
 export type LifecycleDependencies = {
@@ -69,6 +71,8 @@ export type LifecycleManager = {
   onSessionIdle: () => void;
   /** Called when the root Kilo session emits activity after idle. */
   onRootSessionActivity: () => void;
+  /** Called when ingest connectivity is restored after a reconnect. */
+  onConnectionRestored: () => void;
   /** Called to trigger drain and close sequence */
   triggerDrainAndClose: () => void;
   /** Signal completion for post-processing waiters (called by connection on completion events) */
@@ -163,6 +167,7 @@ export function createLifecycleManager(
           kiloClient,
           messageId: state.lastAssistantMessageId ?? undefined,
           upstreamBranch: msgConfig.upstreamBranch,
+          ...(msgConfig.commitCoAuthor ? { commitCoAuthor: msgConfig.commitCoAuthor } : {}),
           signal: autoCommitController.signal,
         }).finally(() => clearTimeout(timeout));
         if (autoCommitTimedOut && !result.success) {
@@ -342,6 +347,10 @@ export function createLifecycleManager(
     rootSessionIdleBarrierPresent = false;
   }
 
+  function onConnectionRestored(): void {
+    maybeFinalizeIdleBatch();
+  }
+
   return {
     start: () => {
       logToFile('lifecycle started (transport timer is event-driven)');
@@ -361,6 +370,7 @@ export function createLifecycleManager(
     onMessageComplete,
     onSessionIdle,
     onRootSessionActivity,
+    onConnectionRestored,
     triggerDrainAndClose,
     signalCompletion,
 

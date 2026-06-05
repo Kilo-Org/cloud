@@ -1,6 +1,7 @@
 import {
   addCacheBreakpoints,
   injectReasoningIntoContent,
+  removeCacheBreakpoints,
 } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
 import type { CustomLlmProvider } from '@kilocode/db';
 import type { GatewayChatApiKind, Provider } from '@/lib/ai-gateway/providers/types';
@@ -65,9 +66,12 @@ export type DirectProviderInput = ResolvedExperimentUpstream & {
  * contacted. The route layer is responsible for not applying provider
  * pinning or kilo-exclusive model rewrites on top of this provider.
  */
-export function buildDirectProvider(upstream: DirectProviderInput): Provider {
+export function buildDirectProvider(
+  id: 'custom' | 'experiment',
+  upstream: DirectProviderInput
+): Provider {
   return {
-    id: 'custom',
+    id,
     apiUrl: upstream.base_url,
     apiKey: upstream.api_key,
     supportedChatApis: inferSupportedChatApis(upstream.opencode_settings?.ai_sdk_provider),
@@ -83,6 +87,9 @@ export function buildDirectProvider(upstream: DirectProviderInput): Provider {
         Object.assign(context.extraHeaders, upstream.extra_headers);
       }
       context.request.body.model = upstream.internal_id;
+      if (upstream.remove_cache_breakpoints) {
+        removeCacheBreakpoints(context.request);
+      }
       if (upstream.add_cache_breakpoints) {
         addCacheBreakpoints(context.request);
       }

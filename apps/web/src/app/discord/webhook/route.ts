@@ -17,6 +17,10 @@ import {
   truncateForDiscord,
 } from '@/lib/discord-bot/discord-utils';
 import { getDevUserSuffix } from '@/lib/slack-bot/dev-user-info';
+import {
+  parseForwardedGatewayMessageEvent,
+  type ForwardedGatewayEvent,
+} from '@/lib/discord-bot/forwarded-gateway-event';
 
 export const maxDuration = 800;
 
@@ -25,24 +29,6 @@ export const maxDuration = 800;
  */
 const PROCESSING_EMOJI = '\u23f3'; // hourglass
 const COMPLETE_EMOJI = '\u2705'; // white check mark
-
-/**
- * Forwarded Gateway event shape (from the Gateway listener)
- */
-type ForwardedGatewayEvent = {
-  type: string;
-  timestamp: number;
-  botUserId: string | null;
-  data: {
-    id: string;
-    content: string;
-    channel_id: string;
-    guild_id: string;
-    author: { id: string; username: string; bot?: boolean };
-    mentions?: Array<{ id: string }>;
-    message_reference?: { message_id: string };
-  };
-};
 
 /**
  * Discord webhook handler.
@@ -60,10 +46,19 @@ export async function POST(request: NextRequest) {
       return new NextResponse('Unauthorized', { status: 401 });
     }
 
-    const event = JSON.parse(rawBody) as ForwardedGatewayEvent;
-    if (event.type === 'GATEWAY_MESSAGE_CREATE') {
-      after(processGatewayMessage(event));
+    let parsedBody: unknown;
+    try {
+      parsedBody = JSON.parse(rawBody);
+    } catch {
+      return new NextResponse('Invalid gateway event', { status: 400 });
     }
+
+    const event = parseForwardedGatewayMessageEvent(parsedBody);
+    if (!event) {
+      return new NextResponse('Invalid gateway event', { status: 400 });
+    }
+
+    after(processGatewayMessage(event));
     return new NextResponse(null, { status: 200 });
   }
 

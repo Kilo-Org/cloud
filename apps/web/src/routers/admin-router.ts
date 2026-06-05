@@ -31,6 +31,7 @@ import { adminKiloclawRegionsRouter } from '@/routers/admin-kiloclaw-regions-rou
 import { adminKiloclawProvidersRouter } from '@/routers/admin-kiloclaw-providers-router';
 import { adminFeatureInterestRouter } from '@/routers/admin-feature-interest-router';
 import { adminCodeReviewsRouter } from '@/routers/admin-code-reviews-router';
+import { adminCloudAgentNextRouter } from '@/routers/admin-cloud-agent-next-router';
 import { adminAIAttributionRouter } from '@/routers/admin-ai-attribution-router';
 import { ossSponsorshipRouter } from '@/routers/admin/oss-sponsorship-router';
 import { contributorChampionsRouter } from '@/routers/admin/contributor-champions-router';
@@ -1674,6 +1675,8 @@ export const adminRouter = createTRPCRouter({
   featureInterest: adminFeatureInterestRouter,
 
   codeReviews: adminCodeReviewsRouter,
+
+  cloudAgentNext: adminCloudAgentNextRouter,
 
   sessionTraces: createTRPCRouter({
     resolveCloudAgentSession: adminProcedure

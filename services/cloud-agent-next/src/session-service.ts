@@ -5,12 +5,13 @@ import type {
   SandboxId,
   SessionContext,
   SessionId,
-  InterruptResult,
+  GitAuthorConfig,
+  ManagedGitHubFallbackReason,
 } from './types.js';
 import { generateSandboxId } from './sandbox-id.js';
 import { normalizeKilocodeModel } from './persistence/model-utils.js';
 import {
-  resolveGitHubTokenForRepo,
+  resolveCloudAgentGitHubAuthForRepo,
   resolveManagedGitLabToken,
 } from './services/git-token-service-client.js';
 import { ExecutionError } from './execution/errors.js';
@@ -24,6 +25,7 @@ import {
   GIT_COMMAND_TIMEOUT_MS,
   manageBranch,
   setupWorkspace,
+  updateGitAuthor,
   updateGitRemoteToken,
 } from './workspace.js';
 import { logger, WithLogTags } from './logger.js';
@@ -69,6 +71,10 @@ import type {
   FencedWrapperDispatchRequest,
 } from './execution/types.js';
 import { normalizeAgentMode } from './schema.js';
+import {
+  isSandboxFilesystemUnusableError,
+  SandboxCapacityInspectionError,
+} from './workspace-errors.js';
 
 const SETUP_COMMAND_TIMEOUT_SECONDS = 300; // 5 minutes
 const DEFAULT_DENIED_COMMAND_PATTERNS = ['rm -rf', 'sudo rm', 'mkfs', 'dd if='];
@@ -329,10 +335,33 @@ export type ResolvedWorkspaceTokens = {
   githubToken?: string;
   githubInstallationId?: string;
   githubAppType?: 'standard' | 'lite';
+  githubSource?: 'user' | 'installation';
+  githubGitAuthor?: GitAuthorConfig;
+  githubCommitCoAuthor?: GitAuthorConfig;
+  githubFallbackReason?: ManagedGitHubFallbackReason;
   gitToken?: string;
   gitlabTokenManaged?: boolean;
   glabIsOAuth2?: boolean;
 };
+
+function installationGitAuthorFromEnv(
+  env: PersistenceEnv,
+  githubAppType: 'standard' | 'lite'
+): GitAuthorConfig | undefined {
+  const slug =
+    githubAppType === 'lite'
+      ? env.GITHUB_LITE_APP_SLUG || env.GITHUB_APP_SLUG
+      : env.GITHUB_APP_SLUG;
+  const userId =
+    githubAppType === 'lite'
+      ? env.GITHUB_LITE_APP_BOT_USER_ID || env.GITHUB_APP_BOT_USER_ID
+      : env.GITHUB_APP_BOT_USER_ID;
+  if (!slug || !userId) return undefined;
+  return {
+    name: `${slug}[bot]`,
+    email: `${userId}+${slug}[bot]@users.noreply.github.com`,
+  };
+}
 
 function parseRestoreScriptOutput(stdout: string | undefined): {
   code?: number;
@@ -486,11 +515,9 @@ export async function runSetupCommands(
   logger.info('Setup commands completed');
 }
 
-// Write Kilo auth file so the CLI's KiloSessions can call session ingest.
-// The CLI reads ~/.local/share/kilo/auth.json via Auth.get("kilo") but we
-// never run `kilo auth login` — credentials are injected purely via env vars
-// for config (KILO_CONFIG_CONTENT). The session ingest code path ignores the
-// provider config and only reads the auth file.
+// Persist Kilo auth for workspace preparation paths that do not receive the
+// wrapper process environment; wrapper-launched Kilo receives the same auth
+// shape through KILO_AUTH_CONTENT.
 export async function writeAuthFile(
   sandbox: SandboxInstance,
   sessionHome: string,
@@ -998,6 +1025,7 @@ export class SessionService {
       SESSION_HOME: sessionHome,
       // Inject Kilocode credentials (with override support)
       KILOCODE_TOKEN: kilocodeToken,
+      KILO_AUTH_CONTENT: JSON.stringify({ kilo: { type: 'api', key: originalToken } }),
       // Platform identifier - defaults to 'cloud-agent' if not specified
       KILO_PLATFORM: createdOnPlatform ?? 'cloud-agent',
       KILO_DISABLE_AUTOUPDATE: 'true',
@@ -1263,29 +1291,33 @@ export class SessionService {
     let githubToken: string | undefined;
     let githubInstallationId = github?.githubInstallationId;
     let githubAppType = github?.githubAppType;
+    let githubSource: 'user' | 'installation' | undefined;
+    let githubGitAuthor: GitAuthorConfig | undefined;
+    let githubCommitCoAuthor: GitAuthorConfig | undefined;
+    let githubFallbackReason: ManagedGitHubFallbackReason | undefined;
 
     if (github) {
-      if (githubInstallationId) {
-        if (!env.GIT_TOKEN_SERVICE) {
-          throw ExecutionError.invalidRequest('Git token service is not configured');
-        }
-        githubAppType = githubAppType ?? 'standard';
-        githubToken = await env.GIT_TOKEN_SERVICE.getToken(githubInstallationId, githubAppType);
+      const result = await resolveCloudAgentGitHubAuthForRepo(env, {
+        githubRepo: github.repo,
+        userId: metadata.identity.userId,
+        orgId: metadata.identity.orgId,
+        allowUserAuthorization:
+          metadata.identity.createdOnPlatform === 'cloud-agent-web' ||
+          metadata.identity.createdOnPlatform === 'slack',
+      });
+      if (result.success) {
+        githubToken = result.value.githubToken;
+        githubInstallationId = result.value.installationId;
+        githubAppType = result.value.appType;
+        githubSource = result.value.source;
+        githubGitAuthor =
+          result.value.gitAuthor ?? installationGitAuthorFromEnv(env, result.value.appType);
+        githubCommitCoAuthor = result.value.commitCoAuthor;
+        githubFallbackReason = result.value.fallbackReason;
       } else {
-        const result = await resolveGitHubTokenForRepo(env, {
-          githubRepo: github.repo,
-          userId: metadata.identity.userId,
-          orgId: metadata.identity.orgId,
-        });
-        if (result.success) {
-          githubToken = result.value.token;
-          githubInstallationId = result.value.installationId;
-          githubAppType = result.value.appType;
-        } else {
-          throw ExecutionError.invalidRequest(
-            `GitHub token or active app installation required for this repository (${result.error.reason})`
-          );
-        }
+        throw ExecutionError.invalidRequest(
+          `GitHub token or active app installation required for this repository (${result.error.reason})`
+        );
       }
     }
 
@@ -1326,6 +1358,10 @@ export class SessionService {
       githubToken,
       githubInstallationId,
       githubAppType,
+      githubSource,
+      githubGitAuthor,
+      githubCommitCoAuthor,
+      githubFallbackReason,
       gitToken,
       gitlabTokenManaged,
       glabIsOAuth2,
@@ -1420,7 +1456,7 @@ export class SessionService {
       ...(metadata.devcontainer ? { devcontainer: metadata.devcontainer } : {}),
     } satisfies WrapperWorkspaceReady;
 
-    const repo = this.buildWrapperRepoSource(env, metadata, resolvedTokens);
+    const repo = this.buildWrapperRepoSource(metadata, resolvedTokens);
     const session = buildWrapperSessionBinding({
       workerUrl: env.WORKER_URL,
       kilocodeToken: metadata.auth.kilocodeToken,
@@ -1482,9 +1518,17 @@ export class SessionService {
         command: turn.command,
         ...(turn.arguments.length > 0 ? { args: turn.arguments } : {}),
         messageId: turn.messageId,
+        agent: {
+          mode: promptAgent,
+          model: { modelID: agent.model },
+          ...(agent.variant ? { variant: agent.variant } : {}),
+        },
         ...(finalization?.autoCommit !== undefined ? { autoCommit: finalization.autoCommit } : {}),
         ...(finalization?.condenseOnComplete !== undefined
           ? { condenseOnComplete: finalization.condenseOnComplete }
+          : {}),
+        ...(resolvedTokens.githubCommitCoAuthor
+          ? { commitCoAuthor: resolvedTokens.githubCommitCoAuthor }
           : {}),
         session,
       };
@@ -1502,14 +1546,19 @@ export class SessionService {
         model: { modelID: agent.model },
         ...(agent.variant ? { variant: agent.variant } : {}),
       },
-      ...(finalization?.autoCommit !== undefined || finalization?.condenseOnComplete !== undefined
+      ...(finalization?.autoCommit !== undefined ||
+      finalization?.condenseOnComplete !== undefined ||
+      resolvedTokens.githubCommitCoAuthor
         ? {
             finalization: {
-              ...(finalization.autoCommit !== undefined
+              ...(finalization?.autoCommit !== undefined
                 ? { autoCommit: finalization.autoCommit }
                 : {}),
-              ...(finalization.condenseOnComplete !== undefined
+              ...(finalization?.condenseOnComplete !== undefined
                 ? { condenseOnComplete: finalization.condenseOnComplete }
+                : {}),
+              ...(resolvedTokens.githubCommitCoAuthor
+                ? { commitCoAuthor: resolvedTokens.githubCommitCoAuthor }
                 : {}),
             },
           }
@@ -1521,7 +1570,6 @@ export class SessionService {
   }
 
   private buildWrapperRepoSource(
-    env: PersistenceEnv,
     metadata: CloudAgentSessionState,
     tokens: ResolvedWorkspaceTokens
   ): WrapperBootstrapRepoSource | undefined {
@@ -1541,14 +1589,6 @@ export class SessionService {
 
     const github = githubRepository(metadata);
     if (github) {
-      const authorEnv = getGitAuthorEnv(env, tokens.githubAppType ?? github.githubAppType);
-      const gitAuthor =
-        authorEnv.GITHUB_APP_SLUG && authorEnv.GITHUB_APP_BOT_USER_ID
-          ? {
-              name: `${authorEnv.GITHUB_APP_SLUG}[bot]`,
-              email: `${authorEnv.GITHUB_APP_BOT_USER_ID}+${authorEnv.GITHUB_APP_SLUG}[bot]@users.noreply.github.com`,
-            }
-          : undefined;
       return {
         kind: 'github',
         repo: github.repo,
@@ -1556,7 +1596,7 @@ export class SessionService {
         ...(repositoryShallow(metadata) !== undefined
           ? { shallow: repositoryShallow(metadata) }
           : {}),
-        ...(gitAuthor ? { gitAuthor } : {}),
+        ...(tokens.githubGitAuthor ? { gitAuthor: tokens.githubGitAuthor } : {}),
         refreshRemote: tokens.githubInstallationId !== undefined,
       };
     }
@@ -1695,7 +1735,12 @@ export class SessionService {
     }
 
     onProgress?.('disk_check', 'Checking disk space…');
-    await checkDiskAndCleanBeforeSetup(sandbox, orgId, userId, sessionId);
+    await checkDiskAndCleanBeforeSetup(sandbox, orgId, userId, sessionId, {
+      inspectContainers:
+        sandboxId.startsWith('dind-') ||
+        metadata.workspace?.devcontainerRequested === true ||
+        metadata.devcontainer !== undefined,
+    });
 
     onProgress?.('workspace_setup', 'Setting up workspace…');
     await setupWorkspace(sandbox, userId, orgId, sessionId);
@@ -1713,7 +1758,7 @@ export class SessionService {
     let dockerEnv: Record<string, string> | undefined;
     try {
       onProgress?.('cloning', 'Cloning repository…');
-      await this.cloneRepository(env, session, workspacePath, metadata, resolvedTokens);
+      await this.cloneRepository(session, workspacePath, metadata, resolvedTokens);
 
       onProgress?.('branch', 'Setting up branch…');
       await this.prepareBranch(session, workspacePath, branchName, metadata);
@@ -1838,16 +1883,31 @@ export class SessionService {
     executor: SandboxInstance | ExecutionSession,
     workspacePath: string
   ): Promise<boolean> {
-    const result = await timedExec(
-      executor,
-      `test -d '${workspacePath}/.git' && echo exists`,
-      'session.prepareWorkspace.repoExists'
-    );
-    return result.stdout?.includes('exists') ?? false;
+    try {
+      const result = await timedExec(
+        executor,
+        `test -d '${workspacePath}/.git' && echo exists`,
+        'session.prepareWorkspace.repoExists'
+      );
+      if (result.exitCode !== 0 && isSandboxFilesystemUnusableError(result.stderr)) {
+        throw new SandboxCapacityInspectionError(
+          'Workspace admission probe cannot run because the sandbox filesystem is unusable',
+          new Error(result.stderr)
+        );
+      }
+      return result.stdout?.includes('exists') ?? false;
+    } catch (error) {
+      if (isSandboxFilesystemUnusableError(error)) {
+        throw new SandboxCapacityInspectionError(
+          'Workspace admission probe cannot run because the sandbox filesystem is unusable',
+          error
+        );
+      }
+      throw error;
+    }
   }
 
   private async cloneRepository(
-    env: PersistenceEnv,
     session: ExecutionSession,
     workspacePath: string,
     metadata: CloudAgentSessionState,
@@ -1869,7 +1929,7 @@ export class SessionService {
         workspacePath,
         github.repo,
         tokens.githubToken,
-        getGitAuthorEnv(env, tokens.githubAppType ?? github.githubAppType),
+        tokens.githubGitAuthor,
         cloneOptions
       );
       return;
@@ -1941,6 +2001,9 @@ export class SessionService {
           `https://github.com/${github.repo}.git`,
           tokens.githubToken
         );
+        if (tokens.githubGitAuthor) {
+          await updateGitAuthor(session, context.workspacePath, tokens.githubGitAuthor);
+        }
       }
     }
 
@@ -2122,221 +2185,6 @@ export class SessionService {
   }
 
   /**
-   * Identifies and kills all kilocode processes running in a specific session's workspace.
-   * This allows clients to stop running executions in a session without deleting the session itself.
-   *
-   * @param usePkill - If true, uses `pkill -f` with sessionId pattern instead of sandbox.listProcesses/killProcess.
-   *                   This is a temporary workaround for environments where sandbox process APIs are unreliable.
-   */
-  static async interrupt(
-    sandbox: SandboxInstance,
-    session: ExecutionSession,
-    sessionContext: SessionContext,
-    usePkill: boolean = false,
-    executionId?: string
-  ): Promise<InterruptResult> {
-    if (usePkill) {
-      return SessionService.interruptWithPkill(session, sessionContext, executionId);
-    }
-    return SessionService.interruptWithSandboxApi(sandbox, session, sessionContext);
-  }
-
-  /**
-   * Interrupt using pkill -f with the sessionId as the pattern.
-   * This kills any process whose command line contains the sessionId.
-   */
-  private static async interruptWithPkill(
-    session: ExecutionSession,
-    sessionContext: SessionContext,
-    executionId?: string
-  ): Promise<InterruptResult> {
-    const startTime = Date.now();
-    const { sessionId } = sessionContext;
-
-    try {
-      const attemptPkill = async (pattern: string, label: string) => {
-        logger.info('Interrupting session using pkill', {
-          sessionId,
-          label,
-          pattern,
-        });
-        return session.exec(`pkill -f -- '${pattern}'`);
-      };
-
-      let execIdError: string | null = null;
-
-      if (executionId) {
-        // Prefer the wrapper execution ID for v2 sessions.
-        // pkill -f matches against the full command line.
-        const execResult = await attemptPkill(`--execution-id=${executionId}`, 'executionId');
-        if (execResult.exitCode === 0) {
-          return {
-            success: true,
-            message: 'Interrupted execution using pkill (executionId)',
-            processesFound: true,
-          };
-        }
-        if (execResult.exitCode !== 1) {
-          execIdError = `pkill failed with exit code ${execResult.exitCode}: ${execResult.stderr}`;
-          logger.error('pkill command failed for executionId', {
-            sessionId,
-            executionId,
-            exitCode: execResult.exitCode,
-            stderr: execResult.stderr,
-          });
-        }
-      }
-
-      // Fall back to sessionId for legacy sessions.
-      const sessionResult = await attemptPkill(sessionId, 'sessionId');
-      const elapsed = Date.now() - startTime;
-
-      if (sessionResult.exitCode === 0) {
-        logger.info('pkill successfully killed processes', {
-          sessionId,
-          elapsedMs: elapsed,
-        });
-
-        return {
-          success: true,
-          message: execIdError
-            ? `Interrupted execution using pkill (sessionId fallback). ${execIdError}`
-            : 'Interrupted execution using pkill',
-          processesFound: true,
-        };
-      }
-      if (sessionResult.exitCode === 1) {
-        logger.info('No matching processes found for pkill', {
-          sessionId,
-          elapsedMs: elapsed,
-        });
-
-        return {
-          success: true,
-          message: execIdError
-            ? `No running processes found for this session. ${execIdError}`
-            : 'No running processes found for this session',
-          processesFound: false,
-        };
-      }
-
-      logger.error('pkill command failed for sessionId', {
-        sessionId,
-        exitCode: sessionResult.exitCode,
-        stderr: sessionResult.stderr,
-        elapsedMs: elapsed,
-      });
-
-      return {
-        success: false,
-        message: execIdError
-          ? `${execIdError}; sessionId pkill failed with exit code ${sessionResult.exitCode}: ${sessionResult.stderr}`
-          : `pkill failed with exit code ${sessionResult.exitCode}: ${sessionResult.stderr}`,
-        processesFound: false,
-      };
-    } catch (error) {
-      logger.error('Interrupt with pkill failed', {
-        sessionId,
-        error: error instanceof Error ? error.message : String(error),
-      });
-
-      throw error;
-    }
-  }
-
-  /**
-   * Interrupt using sandbox.listProcesses and session.killProcess APIs.
-   * This is the original implementation that enumerates and kills processes individually.
-   */
-  private static async interruptWithSandboxApi(
-    sandbox: SandboxInstance,
-    session: ExecutionSession,
-    sessionContext: SessionContext
-  ): Promise<InterruptResult> {
-    type ProcessInfo = {
-      id: string;
-      status: string;
-      command: string;
-    };
-
-    const startTime = Date.now();
-
-    try {
-      // List all processes in the sandbox
-      const processes = await sandbox.listProcesses();
-
-      // Filter for kilocode processes in this session's workspace
-      const targetProcesses = processes.filter((proc: ProcessInfo) => {
-        const isRunning = proc.status === 'running';
-        const isKilocode = proc.command.includes('kilocode');
-        const isInWorkspace = proc.command.includes(`--workspace=${sessionContext.workspacePath}`);
-
-        return isRunning && isKilocode && isInWorkspace;
-      });
-
-      if (targetProcesses.length === 0) {
-        logger.info('No matching kilocode processes found to interrupt', {
-          sessionId: sessionContext.sessionId,
-          workspacePath: sessionContext.workspacePath,
-        });
-
-        return {
-          success: true,
-          message: 'No running kilocode processes found for this session',
-          processesFound: false,
-        };
-      }
-
-      // Kill each target process
-      const killed: string[] = [];
-      const failed: string[] = [];
-
-      for (const proc of targetProcesses) {
-        try {
-          // Send SIGTERM for graceful termination (exit code 143)
-          // This allows the SSE stream to properly close with an expected exit code
-          await session.killProcess(proc.id, 'SIGTERM');
-          killed.push(proc.id);
-          logger.info('Successfully killed process', {
-            processId: proc.id,
-            command: proc.command,
-          });
-        } catch (error) {
-          failed.push(proc.id);
-          logger.error('Failed to kill process', {
-            processId: proc.id,
-            error: error instanceof Error ? error.message : String(error),
-          });
-        }
-      }
-
-      const elapsed = Date.now() - startTime;
-      logger.info('Interrupt operation completed', {
-        sessionId: sessionContext.sessionId,
-        killedCount: killed.length,
-        failedCount: failed.length,
-        elapsedMs: elapsed,
-      });
-
-      return {
-        success: killed.length > 0,
-        message:
-          killed.length > 0
-            ? `Interrupted execution: killed ${killed.length} process(es)${failed.length > 0 ? `, ${failed.length} failed` : ''}`
-            : `Failed to kill any processes (${failed.length} attempts failed)`,
-        processesFound: true,
-      };
-    } catch (error) {
-      logger.error('Interrupt operation failed', {
-        sessionId: sessionContext.sessionId,
-        error: error instanceof Error ? error.message : String(error),
-      });
-
-      throw error;
-    }
-  }
-
-  /**
    * Create a cli_sessions_v2 record via session-ingest RPC.
    * Called during session preparation so the DB record exists before execution.
    */
@@ -2398,26 +2246,6 @@ export class SessionService {
       throw error;
     }
   }
-}
-
-/**
- * Returns the correct GitHub App slug and bot user ID for git author attribution,
- * based on whether this is a standard or lite app session.
- */
-function getGitAuthorEnv(
-  env: PersistenceEnv,
-  githubAppType?: 'standard' | 'lite'
-): { GITHUB_APP_SLUG?: string; GITHUB_APP_BOT_USER_ID?: string } {
-  if (githubAppType === 'lite') {
-    return {
-      GITHUB_APP_SLUG: env.GITHUB_LITE_APP_SLUG || env.GITHUB_APP_SLUG,
-      GITHUB_APP_BOT_USER_ID: env.GITHUB_LITE_APP_BOT_USER_ID || env.GITHUB_APP_BOT_USER_ID,
-    };
-  }
-  return {
-    GITHUB_APP_SLUG: env.GITHUB_APP_SLUG,
-    GITHUB_APP_BOT_USER_ID: env.GITHUB_APP_BOT_USER_ID,
-  };
 }
 
 export type PreparedSession = {

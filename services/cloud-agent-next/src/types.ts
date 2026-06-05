@@ -1,5 +1,7 @@
 import type { getSandbox, ExecutionSession, Sandbox } from '@cloudflare/sandbox';
 import type { CloudAgentSession } from './persistence/CloudAgentSession.js';
+import type { CloudAgentQueueReport } from '@kilocode/worker-utils/cloud-agent-queue-report';
+import type { UserKiloFacade } from './kilo-facade/user-kilo-facade.js';
 import type { CallbackJob } from './callbacks/index.js';
 import type { NotificationsBinding } from './notifications-binding.js';
 import type { SessionIngestBinding } from './session-ingest-binding.js';
@@ -107,6 +109,42 @@ type GetTokenForRepoResult =
         | 'invalid_org_id';
     };
 
+export type ManagedGitHubFallbackReason =
+  | 'no_user_authorization'
+  | 'revoked'
+  | 'refresh_failed'
+  | 'insufficient_user_access'
+  | 'lite_installation'
+  | 'credential_unreadable'
+  | 'credential_configuration_error';
+
+export type GitAuthorConfig = {
+  name: string;
+  email: string;
+};
+
+type GetCloudAgentAuthForRepoResult =
+  | {
+      success: true;
+      githubToken: string;
+      installationId: string;
+      accountLogin: string;
+      appType: 'standard' | 'lite';
+      source: 'user' | 'installation';
+      gitAuthor: GitAuthorConfig;
+      commitCoAuthor?: GitAuthorConfig;
+      fallbackReason?: ManagedGitHubFallbackReason;
+    }
+  | {
+      success: false;
+      reason:
+        | 'database_not_configured'
+        | 'invalid_repo_format'
+        | 'no_installation_found'
+        | 'repository_not_installed'
+        | 'invalid_org_id';
+    };
+
 type GetGitLabTokenResult =
   | { success: true; token: string; instanceUrl: string; glabIsOAuth2: boolean }
   | {
@@ -133,6 +171,12 @@ export type GitTokenService = {
     orgId?: string;
   }): Promise<GetTokenForRepoResult>;
   getToken(installationId: string, appType?: 'standard' | 'lite'): Promise<string>;
+  getCloudAgentAuthForRepo?(params: {
+    githubRepo: string;
+    userId: string;
+    orgId?: string;
+    allowUserAuthorization: boolean;
+  }): Promise<GetCloudAgentAuthForRepoResult>;
   getGitLabToken(params: {
     userId: string;
     orgId?: string;
@@ -149,6 +193,8 @@ export type Env = {
   SandboxDIND: DurableObjectNamespace<Sandbox>;
   /** Durable Object namespace for CloudAgentSession metadata (SQLite-backed) with RPC support */
   CLOUD_AGENT_SESSION: DurableObjectNamespace<CloudAgentSession>;
+  /** Durable Object namespace for per-user Kilo SDK facade coordination */
+  USER_KILO_FACADE: DurableObjectNamespace<UserKiloFacade>;
   /** Service binding for the session ingest worker */
   SESSION_INGEST: SessionIngestBinding;
   /** Shared secret for internal service-to-service authentication */
@@ -157,6 +203,8 @@ export type Env = {
   R2_BUCKET: R2Bucket;
   /** Queue for callback messages (optional - supports incremental rollout) */
   CALLBACK_QUEUE?: Queue<CallbackJob>;
+  /** Dedicated best-effort Cloud Agent reporting queue. */
+  CLOUD_AGENT_REPORT_QUEUE: Queue<CloudAgentQueueReport>;
   /** Service binding for centralized git token generation */
   GIT_TOKEN_SERVICE: GitTokenService;
   /** Service binding for dispatching push notifications */

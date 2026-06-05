@@ -12,6 +12,7 @@ import {
   kiloclaw_scheduled_actions,
   kiloclaw_scheduled_action_stages,
   kiloclaw_scheduled_action_targets,
+  kiloclaw_subscriptions,
   kiloclaw_version_pins,
 } from '@kilocode/db/schema';
 import type { KiloClawScheduledActionStatus } from '@kilocode/db/schema-types';
@@ -103,6 +104,49 @@ export async function getActivePersonalInstance(db: WorkerDb, userId: string) {
 
   if (!row) return null;
   return { id: row.id, sandboxId: row.sandbox_id, orgId: row.organization_id };
+}
+
+// Admission assumes one active organization instance per assigned user. If
+// legacy drift leaves multiple rows, the oldest row is the deterministic
+// representative until reconciliation collapses the duplicate state.
+export async function getActiveOrganizationInstance(
+  db: WorkerDb,
+  userId: string,
+  organizationId: string
+) {
+  const row = await db
+    .select({
+      id: kiloclaw_instances.id,
+      sandbox_id: kiloclaw_instances.sandbox_id,
+      organization_id: kiloclaw_instances.organization_id,
+    })
+    .from(kiloclaw_instances)
+    .where(
+      and(
+        eq(kiloclaw_instances.user_id, userId),
+        eq(kiloclaw_instances.organization_id, organizationId),
+        isNull(kiloclaw_instances.destroyed_at)
+      )
+    )
+    .orderBy(kiloclaw_instances.created_at)
+    .limit(1)
+    .then(rows => rows[0] ?? null);
+
+  if (!row) return null;
+  return { id: row.id, sandboxId: row.sandbox_id, orgId: row.organization_id };
+}
+
+export async function hasSubscriptionForInstance(
+  db: WorkerDb,
+  instanceId: string
+): Promise<boolean> {
+  const row = await db
+    .select({ id: kiloclaw_subscriptions.id })
+    .from(kiloclaw_subscriptions)
+    .where(eq(kiloclaw_subscriptions.instance_id, instanceId))
+    .limit(1)
+    .then(rows => rows[0] ?? null);
+  return row !== null;
 }
 
 /**

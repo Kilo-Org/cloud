@@ -1,4 +1,5 @@
 import { DISCORD_OAUTH_BOT_TOKEN, DISCORD_SERVER_ID } from '@/lib/config.server';
+import { buildDiscordApiUrl, parseDiscordSnowflake } from '@/lib/discord-bot/discord-id';
 
 /**
  * Check if a Discord user is a member of the Kilo Discord server.
@@ -13,15 +14,15 @@ export async function checkDiscordGuildMembership(discordUserId: string): Promis
     throw new Error('DISCORD_OAUTH_BOT_TOKEN or DISCORD_SERVER_ID not configured');
   }
 
-  const response = await fetch(
-    `https://discord.com/api/v10/guilds/${DISCORD_SERVER_ID}/members/${discordUserId}`,
-    {
-      headers: {
-        Authorization: `Bot ${DISCORD_OAUTH_BOT_TOKEN}`,
-      },
-      signal: AbortSignal.timeout(5_000),
-    }
-  );
+  const guildId = parseDiscordSnowflake(DISCORD_SERVER_ID, 'server ID');
+  const userId = parseDiscordSnowflake(discordUserId, 'user ID');
+
+  const response = await fetch(buildDiscordApiUrl(['guilds', guildId, 'members', userId]), {
+    headers: {
+      Authorization: `Bot ${DISCORD_OAUTH_BOT_TOKEN}`,
+    },
+    signal: AbortSignal.timeout(5_000),
+  });
 
   if (response.ok) return true;
   if (response.status === 404) return false;

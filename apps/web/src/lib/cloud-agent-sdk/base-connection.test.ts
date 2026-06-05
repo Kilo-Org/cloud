@@ -340,6 +340,22 @@ describe('createBaseConnection – stale WebSocket recovery', () => {
 
       connection.destroy();
     });
+
+    it('notifies route replacement when online replaces an open socket before first inbound data', async () => {
+      const refreshAuth = jest.fn(() => Promise.resolve());
+      const onReplacingConnection = jest.fn();
+      const { connection } = createTestConnection({ refreshAuth, onReplacingConnection });
+      connection.connect();
+
+      mockWindow.dispatchEvent(new Event('online'));
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(onReplacingConnection).toHaveBeenCalledTimes(1);
+      expect(sockets[0].close).toHaveBeenCalledTimes(1);
+      expect(sockets).toHaveLength(2);
+      connection.destroy();
+    });
   });
 
   describe('reconnect attempts reset after exhaustion', () => {
@@ -438,9 +454,80 @@ describe('createBaseConnection – stale WebSocket recovery', () => {
   });
 
   describe('proactive auth refresh on reconnect', () => {
+    it('notifies replacement before refreshing after an authenticated socket closes for auth failure', async () => {
+      const refreshAuth = jest.fn(() => Promise.resolve());
+      const onReplacingConnection = jest.fn();
+      const { connection } = createTestConnection({
+        refreshAuth,
+        onReplacingConnection,
+        isAuthFailure: event => event.code === 4001 || event.code === 1008,
+      });
+      connection.connect();
+      connectSocket(0);
+
+      closeSocket(0, 4001);
+
+      expect(onReplacingConnection).toHaveBeenCalledTimes(1);
+      expect(refreshAuth).toHaveBeenCalledTimes(1);
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(sockets).toHaveLength(2);
+
+      connection.destroy();
+    });
+
+    it('notifies route loss when the refreshed socket also closes for auth failure', async () => {
+      const refreshAuth = jest.fn(() => Promise.resolve());
+      const onReplacingConnection = jest.fn();
+      const { connection } = createTestConnection({
+        refreshAuth,
+        onReplacingConnection,
+        isAuthFailure: event => event.code === 4001 || event.code === 1008,
+      });
+      connection.connect();
+      connectSocket(0);
+      closeSocket(0, 4001);
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(sockets).toHaveLength(2);
+      closeSocket(1, 4001);
+
+      expect(onReplacingConnection).toHaveBeenCalledTimes(2);
+      expect(refreshAuth).toHaveBeenCalledTimes(1);
+      jest.advanceTimersByTime(60_000);
+      expect(sockets).toHaveLength(2);
+      connection.destroy();
+    });
+
+    it('force-replaces an open socket after refreshing auth', async () => {
+      const refreshAuth = jest.fn(() => Promise.resolve());
+      const onReplacingConnection = jest.fn();
+      const { connection, onDisconnected } = createTestConnection({
+        refreshAuth,
+        onReplacingConnection,
+      });
+      connection.connect();
+      connectSocket(0);
+
+      connection.reconnectWithRefreshedAuth?.();
+
+      expect(refreshAuth).toHaveBeenCalledTimes(1);
+      expect(onReplacingConnection).toHaveBeenCalledTimes(1);
+      expect(sockets[0].close).toHaveBeenCalledTimes(1);
+      expect(onDisconnected).toHaveBeenCalledTimes(1);
+
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(sockets).toHaveLength(2);
+
+      connection.destroy();
+    });
+
     it('calls refreshAuth before reconnecting after staleness timeout', async () => {
       const refreshAuth = jest.fn(() => Promise.resolve());
-      const { connection } = createTestConnection({ refreshAuth });
+      const onReplacingConnection = jest.fn();
+      const { connection } = createTestConnection({ refreshAuth, onReplacingConnection });
       connection.connect();
       connectSocket(0);
 
@@ -454,6 +541,7 @@ describe('createBaseConnection – stale WebSocket recovery', () => {
 
       // refreshAuth should be called to get a fresh ticket before reconnecting
       expect(refreshAuth).toHaveBeenCalledTimes(1);
+      expect(onReplacingConnection).toHaveBeenCalledTimes(1);
 
       // Allow the async refresh to complete
       await Promise.resolve();
@@ -467,13 +555,15 @@ describe('createBaseConnection – stale WebSocket recovery', () => {
 
     it('calls refreshAuth before reconnecting after BFCache restore', async () => {
       const refreshAuth = jest.fn(() => Promise.resolve());
-      const { connection } = createTestConnection({ refreshAuth });
+      const onReplacingConnection = jest.fn();
+      const { connection } = createTestConnection({ refreshAuth, onReplacingConnection });
       connection.connect();
       connectSocket(0);
 
       simulatePageshow(true);
 
       expect(refreshAuth).toHaveBeenCalledTimes(1);
+      expect(onReplacingConnection).toHaveBeenCalledTimes(1);
 
       await Promise.resolve();
       await Promise.resolve();

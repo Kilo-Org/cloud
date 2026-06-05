@@ -4,6 +4,8 @@ import type { Env } from '../env';
 import {
   CLIOutboundMessageSchema,
   type CLIInboundMessage,
+  type SessionEventPayload,
+  SessionEventPayloadSchema,
   type WebInboundMessage,
   WebOutboundMessageSchema,
 } from '../types/user-connection-protocol';
@@ -19,7 +21,7 @@ type HeartbeatSession = {
 
 type WSAttachment =
   | { role: 'cli'; connectionId: string; sessions: HeartbeatSession[] }
-  | { role: 'web'; connectionId: string; subscribedSessions: string[] };
+  | { role: 'web'; connectionId: string; subscribedSessions: string[]; replaced?: true };
 
 export class UserConnectionDO extends DurableObject<Env> {
   private static readonly HEARTBEAT_TIMEOUT_MS = 30_000;
@@ -61,6 +63,7 @@ export class UserConnectionDO extends DurableObject<Env> {
         }
         this.lastHeartbeatAt.set(connectionId, Date.now());
       } else {
+        if (attachment.replaced) continue;
         webCount++;
         for (const sessionId of attachment.subscribedSessions) {
           let subs = this.webSubscriptions.get(sessionId);
@@ -122,6 +125,8 @@ export class UserConnectionDO extends DurableObject<Env> {
         });
       }
     } else {
+      this.replaceWebSocket(connectionId);
+
       const attachment: WSAttachment = { role: 'web', connectionId, subscribedSessions: [] };
       this.ctx.acceptWebSocket(server, ['web']);
       server.serializeAttachment(attachment);
@@ -164,7 +169,7 @@ export class UserConnectionDO extends DurableObject<Env> {
 
     if (attachment.role === 'cli') {
       this.handleCliMessage(ws, attachment, parsed);
-    } else {
+    } else if (!attachment.replaced) {
       this.handleWebMessage(ws, attachment, parsed);
     }
   }
@@ -388,6 +393,9 @@ export class UserConnectionDO extends DurableObject<Env> {
       case 'command':
         this.handleWebCommand(ws, msg);
         break;
+      case 'ping':
+        this.sendToWeb(ws, { type: 'pong', nonce: msg.nonce });
+        break;
     }
   }
 
@@ -408,6 +416,12 @@ export class UserConnectionDO extends DurableObject<Env> {
       attachment.subscribedSessions.push(sessionId);
       ws.serializeAttachment(attachment);
     }
+
+    this.sendToWeb(ws, {
+      type: 'system',
+      event: 'sessions.list',
+      data: { sessions: this.aggregateSessions() },
+    });
 
     // Tell the owning CLI to start forwarding events for this session.
     // If we know the owner (from heartbeats), send to that CLI only.
@@ -595,6 +609,28 @@ export class UserConnectionDO extends DurableObject<Env> {
     return this.aggregateSessions();
   }
 
+  async notifySessionEvent(event: SessionEventPayload): Promise<{ delivered: number }> {
+    this.ensureState();
+    const parsed = SessionEventPayloadSchema.parse(event);
+    const msg: WebInboundMessage = {
+      type: 'system',
+      event: parsed.type,
+      data: parsed.data,
+    };
+
+    let delivered = 0;
+    const json = JSON.stringify(msg);
+    for (const ws of this.activeWebSockets()) {
+      try {
+        ws.send(json);
+        delivered++;
+      } catch (err) {
+        console.warn('notifySessionEvent: skipping failed web socket:', err);
+      }
+    }
+    return { delivered };
+  }
+
   // ---------------------------------------------------------------------------
   // Helpers
   // ---------------------------------------------------------------------------
@@ -617,7 +653,7 @@ export class UserConnectionDO extends DurableObject<Env> {
 
   private broadcastToWeb(msg: WebInboundMessage, exclude?: WebSocket): void {
     const json = JSON.stringify(msg);
-    for (const ws of this.ctx.getWebSockets('web')) {
+    for (const ws of this.activeWebSockets()) {
       if (ws !== exclude) {
         try {
           ws.send(json);
@@ -640,6 +676,30 @@ export class UserConnectionDO extends DurableObject<Env> {
       }
     }
     return false;
+  }
+
+  private replaceWebSocket(connectionId: string): void {
+    for (const ws of this.ctx.getWebSockets('web')) {
+      const attachment = ws.deserializeAttachment() as WSAttachment | null;
+      if (
+        attachment?.role !== 'web' ||
+        attachment.connectionId !== connectionId ||
+        attachment.replaced
+      ) {
+        continue;
+      }
+
+      ws.serializeAttachment({ ...attachment, replaced: true });
+      this.handleWebDisconnect(ws);
+      ws.close(1000, 'replaced by reconnect');
+    }
+  }
+
+  private activeWebSockets(): WebSocket[] {
+    return this.ctx.getWebSockets('web').filter(ws => {
+      const attachment = ws.deserializeAttachment() as WSAttachment | null;
+      return attachment?.role === 'web' && !attachment.replaced;
+    });
   }
 
   private findCliForSession(sessionId: string): WebSocket | undefined {

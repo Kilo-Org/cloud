@@ -12,9 +12,10 @@ import {
   KiloPassIssuanceItemKind,
   KiloPassIssuanceSource,
   KiloPassPaymentProvider,
-  KiloPassWelcomePromoEligibilityReason,
+  type KiloPassWelcomePromoEligibilityReason,
 } from '@/lib/kilo-pass/enums';
 import {
+  KILO_PASS_BONUS_LIKE_ITEM_KINDS,
   computeIssueMonth,
   createOrGetIssuanceHeader,
   issueBonusCreditsForIssuance,
@@ -23,10 +24,11 @@ import {
   KILO_PASS_TIER_CONFIG,
   KILO_PASS_YEARLY_MONTHLY_BONUS_PERCENT,
 } from '@/lib/kilo-pass/constants';
-import { computeMonthlyCadenceBonusPercent } from '@/lib/kilo-pass/bonus';
+import { computeMonthlyKiloPassBonusDecision } from '@/lib/kilo-pass/bonus-decision';
 import { dayjs } from '@/lib/kilo-pass/dayjs';
 import { getKiloPassStateForUser, type KiloPassSubscriptionState } from '@/lib/kilo-pass/state';
 import { getEffectiveKiloPassThreshold } from '@/lib/kilo-pass/threshold';
+import { getInitialWelcomePromoEligibilityReasonForSubscription } from '@/lib/kilo-pass/welcome-promo-context';
 import { and, desc, eq, inArray, ne } from 'drizzle-orm';
 
 type Db = typeof defaultDb;
@@ -48,48 +50,15 @@ export function computeUsageTriggeredMonthlyBonusDecision(params: {
   welcomePromoEligibilityReason?: KiloPassWelcomePromoEligibilityReason | null;
   issueMonth: string;
 }): UsageTriggeredMonthlyBonusDecision {
-  const streakMonths = Math.max(1, params.currentStreakMonths);
-  const isAllowedStripeWelcomePromoReason =
-    params.welcomePromoEligibilityReason ===
-      KiloPassWelcomePromoEligibilityReason.FirstPaymentFingerprintClaim ||
-    params.welcomePromoEligibilityReason ===
-      KiloPassWelcomePromoEligibilityReason.MissingFingerprint ||
-    params.welcomePromoEligibilityReason ===
-      KiloPassWelcomePromoEligibilityReason.NoSupportedFingerprint;
-  const isEligibleForFirstMonthPromo =
-    params.isFirstTimeSubscriberEver &&
-    (params.requiresSettledPaymentDecision ? isAllowedStripeWelcomePromoReason : true);
-
-  const bonusPercentApplied = computeMonthlyCadenceBonusPercent({
+  return computeMonthlyKiloPassBonusDecision({
     tier: params.tier,
-    streakMonths,
-    isFirstTimeSubscriberEver: isEligibleForFirstMonthPromo,
-    subscriptionStartedAtIso: params.startedAtIso,
+    startedAtIso: params.startedAtIso,
+    streakMonths: params.currentStreakMonths,
+    isFirstTimeSubscriberEver: params.isFirstTimeSubscriberEver,
+    requiresSettledPaymentDecision: params.requiresSettledPaymentDecision,
+    welcomePromoEligibilityReason: params.welcomePromoEligibilityReason,
+    issueMonth: params.issueMonth,
   });
-
-  const shouldIssueFirstMonthPromo = bonusPercentApplied === 0.5 && streakMonths <= 2;
-
-  const decisionWithContext = {
-    monthlyBonusDecision: {
-      streakMonths,
-      startedAt: params.startedAtIso,
-      issueMonth: params.issueMonth,
-      bonusPercentApplied,
-      welcomePromoEligibilityReason: params.welcomePromoEligibilityReason ?? null,
-    },
-  } satisfies Record<string, unknown>;
-
-  return {
-    bonusPercentApplied,
-    shouldIssueFirstMonthPromo,
-    description: shouldIssueFirstMonthPromo
-      ? `Kilo Pass promo 50% bonus (${params.tier}, streak=${streakMonths})`
-      : `Kilo Pass monthly bonus (${params.tier}, streak=${streakMonths})`,
-    auditPayload: {
-      ...decisionWithContext,
-      bonusKind: shouldIssueFirstMonthPromo ? 'promo-50pct' : 'monthly-ramp',
-    },
-  };
 }
 
 export function computeUsageTriggeredYearlyIssueMonth(params: {
@@ -154,14 +123,12 @@ async function getLatestIssuanceForMonthlyCadence(
   issuanceId: string;
   issueMonth: string;
   stripeInvoiceId: string | null;
-  welcomePromoEligibilityReason: KiloPassWelcomePromoEligibilityReason | null;
 } | null> {
   const issuanceRows = await tx
     .select({
       issuanceId: kilo_pass_issuances.id,
       issueMonth: kilo_pass_issuances.issue_month,
       stripeInvoiceId: kilo_pass_issuances.stripe_invoice_id,
-      welcomePromoEligibilityReason: kilo_pass_issuances.initial_welcome_promo_eligibility_reason,
     })
     .from(kilo_pass_issuances)
     .where(eq(kilo_pass_issuances.kilo_pass_subscription_id, params.subscriptionId))
@@ -175,7 +142,6 @@ async function getLatestIssuanceForMonthlyCadence(
     issuanceId: latestIssuance.issuanceId,
     issueMonth: latestIssuance.issueMonth,
     stripeInvoiceId: latestIssuance.stripeInvoiceId,
-    welcomePromoEligibilityReason: latestIssuance.welcomePromoEligibilityReason,
   };
 }
 
@@ -190,7 +156,6 @@ async function getOrCreateIssuanceForYearlyCadence(
   issuanceId: string;
   issueMonth: string;
   stripeInvoiceId: string | null;
-  welcomePromoEligibilityReason: KiloPassWelcomePromoEligibilityReason | null;
 } | null> {
   const { issueMonth } = computeUsageTriggeredYearlyIssueMonth({
     nextYearlyIssueAtIso: params.nextYearlyIssueAtIso,
@@ -215,7 +180,6 @@ async function getOrCreateIssuanceForYearlyCadence(
     issuanceId: issuanceHeader.issuanceId,
     issueMonth,
     stripeInvoiceId: issuanceRow?.stripe_invoice_id ?? null,
-    welcomePromoEligibilityReason: null,
   };
 }
 
@@ -261,11 +225,7 @@ async function maybeIssueBonusFromUsageThreshold(
     columns: { id: true },
     where: and(
       eq(kilo_pass_issuance_items.kilo_pass_issuance_id, issuance.issuanceId),
-      inArray(kilo_pass_issuance_items.kind, [
-        KiloPassIssuanceItemKind.Bonus,
-        KiloPassIssuanceItemKind.PromoFirstMonth50Pct,
-        KiloPassIssuanceItemKind.ReferralBonus,
-      ])
+      inArray(kilo_pass_issuance_items.kind, KILO_PASS_BONUS_LIKE_ITEM_KINDS)
     ),
   });
   if (alreadyIssuedItem) {
@@ -293,14 +253,21 @@ async function maybeIssueBonusFromUsageThreshold(
       .limit(1);
 
     const isFirstTimeSubscriberEver = otherSubscription.length === 0;
+    const welcomePromoEligibilityReason =
+      subscription.paymentProvider === KiloPassPaymentProvider.Stripe
+        ? await getInitialWelcomePromoEligibilityReasonForSubscription(tx, {
+            subscriptionId: subscription.subscriptionId,
+          })
+        : null;
     const monthlyDecision = computeUsageTriggeredMonthlyBonusDecision({
       tier: subscription.tier,
       startedAtIso: subscription.startedAt,
       currentStreakMonths: subscription.currentStreakMonths,
       isFirstTimeSubscriberEver,
       requiresSettledPaymentDecision:
-        subscription.paymentProvider === KiloPassPaymentProvider.Stripe,
-      welcomePromoEligibilityReason: issuance.welcomePromoEligibilityReason,
+        subscription.paymentProvider === KiloPassPaymentProvider.Stripe &&
+        welcomePromoEligibilityReason != null,
+      welcomePromoEligibilityReason,
       issueMonth: issuance.issueMonth,
     });
 

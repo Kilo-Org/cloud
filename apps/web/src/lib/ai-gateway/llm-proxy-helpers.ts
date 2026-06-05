@@ -33,7 +33,7 @@ import { getXKiloCodeVersionNumber } from '@/lib/userAgent';
 import { normalizeModelId } from '@/lib/ai-gateway/providers/openrouter';
 import { createParser, type EventSourceMessage } from 'eventsource-parser';
 import { sentryRootSpan } from '../getRootSpan';
-import { isKiloStealthModel, kiloExclusiveModels } from '@/lib/ai-gateway/models';
+import { findKiloExclusiveModel, isKiloStealthModel } from '@/lib/ai-gateway/models';
 import type {
   MicrodollarUsageContext,
   MicrodollarUsageStats,
@@ -147,12 +147,10 @@ export function dataCollectionRequiredResponse() {
 
 export function apiKindNotSupportedResponse(
   apiKind: GatewayChatApiKind,
-  supportedApiKinds: ReadonlyArray<GatewayChatApiKind>,
-  fraudHeaders: FraudDetectionHeaders
+  supportedApiKinds: ReadonlyArray<GatewayChatApiKind>
 ) {
-  const error = isRooCodeBasedClient(fraudHeaders)
-    ? 'This model requires Kilo v7 or newer. Please upgrade Kilo and try again.'
-    : `This model does not support the ${apiKind} API, please use any of: ${supportedApiKinds.join()}`;
+  const error = `This model does not support the ${apiKind} API, please use any of: ${supportedApiKinds.join()}`;
+  warnExceptInTest(`[apiKindNotSupportedResponse] ${error}`);
   return NextResponse.json(
     { error, error_type: ProxyErrorType.api_kind_not_supported, message: error },
     { status: 400 }
@@ -265,7 +263,7 @@ export function noFreeModelsAvailableResponse() {
 }
 
 export function featureExclusiveModelResponse(modelId: string) {
-  const exclusiveTo = kiloExclusiveModels.find(m => m.public_id === modelId)?.exclusive_to ?? [];
+  const exclusiveTo = findKiloExclusiveModel(modelId)?.exclusive_to ?? [];
   const error = `${modelId} is only available for ${exclusiveTo.join(', ')}. Use ${KILO_AUTO_FREE_MODEL.id} as a free alternative.`;
   return NextResponse.json(
     { error, error_type: ProxyErrorType.feature_exclusive_model, message: error },

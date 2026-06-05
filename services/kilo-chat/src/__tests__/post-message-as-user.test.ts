@@ -96,6 +96,35 @@ describe('postMessageAsUser', () => {
     expect(second.conversationId).toBe(first.conversationId);
   });
 
+  it('forceNewConversation always creates a fresh conversation even when one exists', async () => {
+    const userId = `user-${crypto.randomUUID()}`;
+    const sandboxId = `sandbox-${crypto.randomUUID()}`;
+    grantSandbox(userId, sandboxId);
+    const testEnv = makeEnv();
+
+    const first = await runPost(testEnv, {
+      userId,
+      sandboxId,
+      message: 'first',
+      source: 'webhook',
+    });
+    expect(first.ok).toBe(true);
+    if (!first.ok) return;
+
+    const installed = await runPost(testEnv, {
+      userId,
+      sandboxId,
+      message: 'installed byte prompt',
+      source: 'install',
+      forceNewConversation: true,
+    });
+    expect(installed.ok).toBe(true);
+    if (!installed.ok) return;
+    // A brand-new conversation, not the pre-existing one.
+    expect(installed.conversationCreated).toBe(true);
+    expect(installed.conversationId).not.toBe(first.conversationId);
+  });
+
   it('returns no_conversation when autoCreateConversation is false and none exists', async () => {
     const userId = `user-${crypto.randomUUID()}`;
     const sandboxId = `sandbox-${crypto.randomUUID()}`;

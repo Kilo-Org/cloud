@@ -42,28 +42,21 @@ USER_DEPLOYMENTS_API_AUTH_KEY=<same-value-as-BACKEND_AUTH_TOKEN>
 
 ### 4. Generate Encryption Keys
 
-Generate an RSA key pair for encrypting environment variables:
+Generate a dedicated RSA key pair for encrypting environment variables from the repository root:
 
 ```bash
-# Generate 4096-bit RSA private key
-openssl genrsa -out env-vars-private.pem 4096
-
-# Extract public key from private key
-openssl rsa -in env-vars-private.pem -pubout -out env-vars-public.pem
-
-# Base64 encode private key (for builder's ENV_ENCRYPTION_PRIVATE_KEY)
-base64 -i env-vars-private.pem | tr -d '\n'
-
-# Base64 encode public key (for backend's USER_DEPLOYMENTS_ENV_VARS_PUBLIC_KEY)
-base64 -i env-vars-public.pem | tr -d '\n'
+pnpm exec tsx dev/generate-rsa-env-keypair.ts -- \
+  --out-dir <secure-output-dir> \
+  --public-env USER_DEPLOYMENTS_ENV_VARS_PUBLIC_KEY \
+  --private-env ENV_ENCRYPTION_PRIVATE_KEY
 ```
 
-Set the environment variables:
+The command requires a new output directory outside the repository, then creates restricted `public.pem`, `private.pem`, `public.env`, and `private.env` files without overwriting existing output. Set the environment variables from the generated env files:
 
-- **Builder** (`.dev.vars`): `ENV_ENCRYPTION_PRIVATE_KEY=<base64-encoded-private-key>`
-- **Backend** (`.env`): `USER_DEPLOYMENTS_ENV_VARS_PUBLIC_KEY=<base64-encoded-public-key>`
+- **Builder** (`.dev.vars`): copy `ENV_ENCRYPTION_PRIVATE_KEY` from `private.env`
+- **Backend** (`.env`): copy `USER_DEPLOYMENTS_ENV_VARS_PUBLIC_KEY` from `public.env`
 
-> Note: `tr -d '\n'` removes newlines from the base64 output to create a single-line string suitable for environment variables.
+Store `private.pem` and `private.env` in an approved secrets manager and never commit them.
 
 ### 5. Run Services
 

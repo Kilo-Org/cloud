@@ -9,12 +9,15 @@ import { useOrganizationDefaults } from '@/app/api/organizations/hooks';
 import { useModelSelectorList } from '@/app/api/openrouter/hooks';
 import type { ModelOption } from '@/components/shared/ModelCombobox';
 import { appendCloudAgentNextLocalTestModel } from '@/components/cloud-agent-next/model-preferences';
+import { buildContextLengthByModelId } from '@/components/cloud-agent-next/model-context-lengths';
 
 type UseOrganizationModelsReturn = {
   /** Models formatted for the ModelCombobox component */
   modelOptions: ModelOption[];
   /** Whether models are still loading */
   isLoadingModels: boolean;
+  /** Context windows keyed by exact catalog model ID */
+  contextLengthByModelId: ReadonlyMap<string, number>;
   /** The organization's default model */
   defaultModel: string | undefined;
 };
@@ -39,14 +42,21 @@ export function useOrganizationModels(organizationId?: string): UseOrganizationM
       openRouterModels?.data.map(model => ({
         id: model.id,
         name: model.name,
+        isFree: model.isFree,
         variants: model.opencode?.variants ? Object.keys(model.opencode.variants) : undefined,
       })) ?? []
     );
   }, [openRouterModels]);
 
+  const contextLengthByModelId = useMemo(
+    () => buildContextLengthByModelId(openRouterModels?.data ?? []),
+    [openRouterModels]
+  );
+
   return {
     modelOptions,
     isLoadingModels: isLoadingOpenRouter,
+    contextLengthByModelId,
     defaultModel: defaultsData?.defaultModel,
   };
 }

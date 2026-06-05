@@ -30,12 +30,13 @@
     "update-default-slash-commands": "node scripts/update-default-slash-commands.mjs"
   },
   "dependencies": {
-    "@cloudflare/sandbox": "0.10.1",
+    "@cloudflare/sandbox": "0.10.3",
     "@hono/trpc-server": "0.4.2",
     "@kilocode/cloud-agent-profile": "workspace:*",
     "@kilocode/db": "workspace:*",
     "@kilocode/encryption": "workspace:*",
     "@kilocode/notifications": "workspace:*",
+    "@kilocode/session-ingest-contracts": "workspace:*",
     "@kilocode/worker-utils": "workspace:*",
     "@trpc/server": "catalog:",
     "drizzle-orm": "catalog:",
@@ -47,8 +48,9 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@cloudflare/containers": "0.3.4",
+    "@cloudflare/containers": "0.3.5",
     "@cloudflare/vitest-pool-workers": "catalog:",
+    "@kilocode/sdk": "7.2.52",
     "@types/jsonwebtoken": "catalog:",
     "@types/node": "catalog:",
     "@types/ws": "^8.5.12",

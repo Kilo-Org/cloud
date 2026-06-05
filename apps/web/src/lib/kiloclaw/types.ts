@@ -263,6 +263,17 @@ export type RegistryResult = {
     createdAt: string;
     destroyedAt: string | null;
   }>;
+  reservations: Array<{
+    instanceId: string;
+    doKey: string;
+    assignedUserId: string;
+    status: 'in_progress' | 'completed' | 'failed_requires_reconciliation' | 'released';
+    startedAt: string;
+    updatedAt: string;
+    completedAt: string | null;
+    failureCode: string | null;
+    resolutionReason: string | null;
+  }>;
   migrated: boolean;
 };
 

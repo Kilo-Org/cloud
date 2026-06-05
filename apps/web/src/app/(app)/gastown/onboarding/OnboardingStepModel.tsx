@@ -327,7 +327,12 @@ export function OnboardingStepModel() {
   } = useModelSelectorList(undefined);
 
   const modelOptions = useMemo<ModelOption[]>(
-    () => modelsData?.data.map(model => ({ id: model.id, name: model.name })) ?? [],
+    () =>
+      modelsData?.data.map(model => ({
+        id: model.id,
+        name: model.name,
+        isFree: model.isFree,
+      })) ?? [],
     [modelsData]
   );
 

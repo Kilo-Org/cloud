@@ -43,7 +43,23 @@ cloud-agent-next refactor.
 
 ## Running
 
-Single scenario:
+Official SDK basic-chat acceptance (pinned `@kilocode/sdk/v2` `7.2.52`):
+
+```bash
+pnpm --filter cloud-agent-next exec tsx test/e2e/sdk-basic-chat.ts
+```
+
+This uses a funded ephemeral local user and sends only `Authorization: Bearer ...`
+to `/kilo`; prompt mutations therefore pass through real public balance
+validation rather than the legacy lifecycle driver's tRPC bypass header. Because
+`client.session.create()` is deliberately unsupported by the basic facade, the
+driver first materializes one owned root through the existing lifecycle setup,
+then proves SDK attach/chat behavior: warm and cold projected reads, cold event
+wake-up plus `promptAsync()`, intentional `prompt()` rejection, active `abort()`,
+stable warm/cold message pagination, and selector rejection without transcript mutation.
+It stops owned sandbox families and releases any fake-LLM gate in cleanup.
+
+Focused lifecycle scenario:
 
 ```bash
 tsx services/cloud-agent-next/test/e2e/run.ts [--api=unified|legacy] <lifecycle> <conversation>
@@ -125,6 +141,15 @@ The fake gateway serves the Kilo routes used in this harness:
 - `GET /api/openrouter/models` - runtime model discovery inside sandboxed kilo.
 - `POST /api/openrouter/models/validate` - Worker-side fail-fast model validation.
 - `POST /api/openrouter/chat/completions` - deterministic streamed completion scenarios.
+
+### SDK coverage boundary
+
+`sdk-basic-chat.ts` intentionally avoids timing-sensitive assertions already
+covered by focused unit or Workers-runtime fixtures: multi-root mapping
+ordering and zero-DO list projection, R2 replacement races, private-path
+optional fixture variants, and SSE heartbeat/comment parsing. The normal acceptance
+scenario asserts that blocking `prompt()` remains intentionally unsupported;
+chat admission and wake-up are tested exclusively through `promptAsync()`.
 
 ## Conversation directives
 

@@ -43,7 +43,22 @@ export type ContainerCapacityAlertPayload = {
   health?: HealthInstances;
 };
 
-export type AlertPayload = SloAlertPayload | ContainerCapacityAlertPayload;
+export type QueueBacklogAlertPayload = {
+  alertType: 'queue_backlog';
+  severity: AlertSeverity;
+  provider: string;
+  model: string;
+  clientName: string;
+  backlogCount: number;
+  backlogBytes: number;
+  thresholdCount: number;
+  oldestMessageTimestamp?: Date;
+};
+
+export type AlertPayload =
+  | SloAlertPayload
+  | ContainerCapacityAlertPayload
+  | QueueBacklogAlertPayload;
 
 // ── Formatting helpers ───────────────────────────────────────────────────────
 
@@ -59,6 +74,8 @@ function formatAlertTypeLabel(alertType: AlertPayload['alertType']): string {
       return 'TTFB Latency';
     case 'container_capacity':
       return 'Container Capacity';
+    case 'queue_backlog':
+      return 'Queue Backlog';
   }
 }
 
@@ -145,17 +162,50 @@ function buildCapacitySlackBlocks(alert: ContainerCapacityAlertPayload): object[
   ];
 }
 
+function buildQueueBacklogSlackBlocks(alert: QueueBacklogAlertPayload): object[] {
+  const severityLabel = alert.severity === 'page' ? ':rotating_light: PAGE' : ':ticket: TICKET';
+  const oldestMessageTimestamp = alert.oldestMessageTimestamp?.toISOString() ?? 'Unknown';
+
+  return [
+    {
+      type: 'header',
+      text: {
+        type: 'plain_text',
+        text: `${severityLabel} — Queue Backlog Alert`,
+      },
+    },
+    {
+      type: 'section',
+      fields: [
+        { type: 'mrkdwn', text: `*Queue ID:*\n${alert.model}` },
+        { type: 'mrkdwn', text: `*Backlog:*\n${alert.backlogCount.toLocaleString()} messages` },
+        { type: 'mrkdwn', text: `*Threshold:*\n${alert.thresholdCount.toLocaleString()} messages` },
+        { type: 'mrkdwn', text: `*Backlog bytes:*\n${alert.backlogBytes.toLocaleString()}` },
+      ],
+    },
+    {
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: `Oldest message: ${oldestMessageTimestamp}`,
+      },
+    },
+  ];
+}
+
 /**
  * Builds a Slack Block Kit message body for the given alert.
  * Exported for testing.
  */
 export function buildSlackMessage(alert: AlertPayload): object {
-  const blocks =
-    alert.alertType === 'container_capacity'
-      ? buildCapacitySlackBlocks(alert)
-      : buildSloSlackBlocks(alert);
-
-  return { blocks };
+  switch (alert.alertType) {
+    case 'container_capacity':
+      return { blocks: buildCapacitySlackBlocks(alert) };
+    case 'queue_backlog':
+      return { blocks: buildQueueBacklogSlackBlocks(alert) };
+    default:
+      return { blocks: buildSloSlackBlocks(alert) };
+  }
 }
 
 // ── Notification delivery ───────────────────────────────────────────────────

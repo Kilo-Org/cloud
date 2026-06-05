@@ -1,8 +1,22 @@
+jest.mock('dns/promises', () => ({
+  lookup: jest.fn(),
+}));
+jest.mock('https', () => ({
+  request: jest.fn(),
+}));
+
+import { lookup } from 'dns/promises';
+import { EventEmitter } from 'events';
+import * as https from 'https';
+import { PassThrough } from 'stream';
 import {
   buildGitLabOAuthUrl,
   exchangeGitLabOAuthCode,
   refreshGitLabOAuthToken,
   validateGitLabInstance,
+  validatePersonalAccessToken,
+  createProjectWebhook,
+  deleteProjectWebhook,
   searchGitLabProjects,
   normalizeGitLabSearchQuery,
   fetchGitLabRootTextFileAtRef,
@@ -10,13 +24,79 @@ import {
   createGitLabBranch,
   createOrUpdateGitLabTextFile,
   createGitLabMergeRequest,
-  createProjectWebhook,
   updateProjectWebhook,
 } from './adapter';
 
 // Mock fetch globally
 const mockFetch = jest.fn();
 global.fetch = mockFetch;
+const mockLookup = lookup as jest.Mock;
+const mockHttpsRequest = https.request as jest.Mock;
+
+beforeEach(() => {
+  mockLookup.mockReset();
+  mockLookup.mockResolvedValue([{ address: '93.184.216.34', family: 4 }]);
+  mockHttpsRequest.mockReset();
+});
+
+function mockSelfHostedGitLabResponse(args: {
+  status: number;
+  body?: string;
+  json?: unknown;
+  statusMessage?: string;
+  headers?: Record<string, string>;
+  responseError?: Error;
+}) {
+  mockHttpsRequest.mockImplementationOnce((_options, callback) => {
+    const response = new PassThrough() as PassThrough & {
+      statusCode?: number;
+      statusMessage?: string;
+      headers: Record<string, string>;
+    };
+    response.statusCode = args.status;
+    response.statusMessage = args.statusMessage ?? 'OK';
+    response.headers = { 'content-type': 'application/json', ...args.headers };
+
+    const request = new EventEmitter() as EventEmitter & {
+      write: jest.Mock;
+      end: jest.Mock;
+      destroy: jest.Mock;
+      setTimeout: jest.Mock;
+    };
+    request.write = jest.fn();
+    request.destroy = jest.fn();
+    request.setTimeout = jest.fn();
+    request.end = jest.fn(() => {
+      callback?.(response as never);
+      if (args.responseError) {
+        response.emit('error', args.responseError);
+        return;
+      }
+      response.end(args.body ?? JSON.stringify(args.json ?? {}));
+    });
+
+    return request as never;
+  });
+}
+
+function mockSelfHostedGitLabError(error: Error) {
+  mockHttpsRequest.mockImplementationOnce(() => {
+    const request = new EventEmitter() as EventEmitter & {
+      write: jest.Mock;
+      end: jest.Mock;
+      destroy: jest.Mock;
+      setTimeout: jest.Mock;
+    };
+    request.write = jest.fn();
+    request.destroy = jest.fn();
+    request.setTimeout = jest.fn();
+    request.end = jest.fn(() => {
+      request.emit('error', error);
+    });
+
+    return request as never;
+  });
+}
 
 describe('normalizeGitLabSearchQuery', () => {
   it('should extract project path from full GitLab URL', () => {
@@ -117,14 +197,14 @@ describe('validateGitLabInstance', () => {
   });
 
   it('should return valid for a valid GitLab instance', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
+    mockSelfHostedGitLabResponse({
+      status: 200,
+      json: {
         version: '16.8.0',
         revision: 'abc123',
         kas: { enabled: true, externalUrl: null, version: null },
         enterprise: false,
-      }),
+      },
     });
 
     const result = await validateGitLabInstance('https://gitlab.example.com');
@@ -134,24 +214,26 @@ describe('validateGitLabInstance', () => {
     expect(result.revision).toBe('abc123');
     expect(result.enterprise).toBe(false);
     expect(result.error).toBeUndefined();
-    expect(mockFetch).toHaveBeenCalledWith(
-      'https://gitlab.example.com/api/v4/version',
+    expect(mockHttpsRequest).toHaveBeenCalledWith(
       expect.objectContaining({
+        hostname: 'gitlab.example.com',
+        lookup: expect.any(Function),
         method: 'GET',
-        headers: { Accept: 'application/json' },
-      })
+        headers: { accept: 'application/json' },
+      }),
+      expect.any(Function)
     );
   });
 
   it('should return valid for GitLab Enterprise Edition', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
+    mockSelfHostedGitLabResponse({
+      status: 200,
+      json: {
         version: '16.8.0-ee',
         revision: 'abc123',
         kas: { enabled: true, externalUrl: null, version: null },
         enterprise: true,
-      }),
+      },
     });
 
     const result = await validateGitLabInstance('https://gitlab.example.com');
@@ -162,29 +244,26 @@ describe('validateGitLabInstance', () => {
   });
 
   it('should normalize URL by removing trailing slash', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
+    mockSelfHostedGitLabResponse({
+      status: 200,
+      json: {
         version: '16.8.0',
         revision: 'abc123',
         kas: { enabled: true, externalUrl: null, version: null },
         enterprise: false,
-      }),
+      },
     });
 
     await validateGitLabInstance('https://gitlab.example.com/');
 
-    expect(mockFetch).toHaveBeenCalledWith(
-      'https://gitlab.example.com/api/v4/version',
-      expect.anything()
+    expect(mockHttpsRequest).toHaveBeenCalledWith(
+      expect.objectContaining({ path: '/api/v4/version' }),
+      expect.any(Function)
     );
   });
 
   it('should return valid with warning when version endpoint requires auth (401)', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: false,
-      status: 401,
-    });
+    mockSelfHostedGitLabResponse({ status: 401 });
 
     const result = await validateGitLabInstance('https://gitlab.example.com');
 
@@ -193,10 +272,7 @@ describe('validateGitLabInstance', () => {
   });
 
   it('should return valid with warning when version endpoint requires auth (403)', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: false,
-      status: 403,
-    });
+    mockSelfHostedGitLabResponse({ status: 403 });
 
     const result = await validateGitLabInstance('https://gitlab.example.com');
 
@@ -205,12 +281,11 @@ describe('validateGitLabInstance', () => {
   });
 
   it('should return invalid for non-GitLab responses', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        // Not a GitLab version response
+    mockSelfHostedGitLabResponse({
+      status: 200,
+      json: {
         name: 'Some other API',
-      }),
+      },
     });
 
     const result = await validateGitLabInstance('https://not-gitlab.example.com');
@@ -220,15 +295,48 @@ describe('validateGitLabInstance', () => {
   });
 
   it('should return invalid for 404 responses', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: false,
-      status: 404,
-    });
+    mockSelfHostedGitLabResponse({ status: 404 });
 
     const result = await validateGitLabInstance('https://not-gitlab.example.com');
 
     expect(result.valid).toBe(false);
     expect(result.error).toContain('returned status 404');
+  });
+
+  it('should follow self-hosted redirects after revalidating each destination', async () => {
+    mockSelfHostedGitLabResponse({
+      status: 302,
+      headers: { location: 'https://gitlab.example.com/gitlab/api/v4/version' },
+    });
+    mockSelfHostedGitLabResponse({
+      status: 200,
+      json: {
+        version: '16.8.0',
+        revision: 'abc123',
+        kas: { enabled: true, externalUrl: null, version: null },
+        enterprise: false,
+      },
+    });
+
+    const result = await validateGitLabInstance('https://gitlab.example.com');
+
+    expect(result.valid).toBe(true);
+    expect(mockHttpsRequest).toHaveBeenCalledTimes(2);
+    expect(mockLookup).toHaveBeenCalledTimes(2);
+  });
+
+  it('should reject redirects to unsafe literal IP addresses before fetching them', async () => {
+    mockSelfHostedGitLabResponse({
+      status: 302,
+      headers: { location: 'https://127.0.0.1/api/v4/version' },
+    });
+
+    const result = await validateGitLabInstance('https://gitlab.example.com');
+
+    expect(result.valid).toBe(false);
+    expect(result.error).toContain('host is not allowed');
+    expect(mockHttpsRequest).toHaveBeenCalledTimes(1);
+    expect(mockFetch).not.toHaveBeenCalled();
   });
 
   it('should return invalid for invalid URL format', async () => {
@@ -247,8 +355,48 @@ describe('validateGitLabInstance', () => {
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
+  it('should return invalid for http instances before fetching', async () => {
+    const result = await validateGitLabInstance('http://gitlab.example.com');
+
+    expect(result.valid).toBe(false);
+    expect(result.error).toContain('must use https');
+    expect(mockLookup).not.toHaveBeenCalled();
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it('should return invalid for unsafe hosts before fetching', async () => {
+    const result = await validateGitLabInstance('http://127.0.0.1:8080');
+
+    expect(result.valid).toBe(false);
+    expect(result.error).toContain('host is not allowed');
+    expect(mockLookup).not.toHaveBeenCalled();
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it('should return invalid when hostnames resolve to unsafe addresses before fetching', async () => {
+    mockLookup.mockResolvedValueOnce([{ address: '127.0.0.1', family: 4 }]);
+
+    const result = await validateGitLabInstance('https://gitlab.example.com');
+
+    expect(result.valid).toBe(false);
+    expect(result.error).toContain('resolves to an address that is not allowed');
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it('should return invalid for URLs with credentials before fetching', async () => {
+    const urlWithCredentials = new URL('https://gitlab.example.com');
+    urlWithCredentials.username = 'user';
+    urlWithCredentials.password = 'pass';
+
+    const result = await validateGitLabInstance(urlWithCredentials.toString());
+
+    expect(result.valid).toBe(false);
+    expect(result.error).toContain('must not include credentials');
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
   it('should handle network errors gracefully', async () => {
-    mockFetch.mockRejectedValueOnce(new TypeError('fetch failed'));
+    mockSelfHostedGitLabError(new TypeError('fetch failed'));
 
     const result = await validateGitLabInstance('https://unreachable.example.com');
 
@@ -259,7 +407,7 @@ describe('validateGitLabInstance', () => {
   it('should handle timeout errors', async () => {
     const timeoutError = new Error('Timeout');
     timeoutError.name = 'TimeoutError';
-    mockFetch.mockRejectedValueOnce(timeoutError);
+    mockSelfHostedGitLabError(timeoutError);
 
     const result = await validateGitLabInstance('https://slow.example.com');
 
@@ -326,16 +474,16 @@ describe('searchGitLabProjects', () => {
   });
 
   it('should use custom instance URL', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => [],
-    });
+    mockSelfHostedGitLabResponse({ status: 200, json: [] });
 
     await searchGitLabProjects('test-token', 'query', 'https://gitlab.example.com');
 
-    expect(mockFetch).toHaveBeenCalledWith(
-      'https://gitlab.example.com/api/v4/projects?membership=true&search=query&per_page=20&archived=false',
-      expect.anything()
+    expect(mockHttpsRequest).toHaveBeenCalledWith(
+      expect.objectContaining({
+        hostname: 'gitlab.example.com',
+        path: '/api/v4/projects?membership=true&search=query&per_page=20&archived=false',
+      }),
+      expect.any(Function)
     );
   });
 
@@ -554,10 +702,9 @@ describe('fetchGitLabRootTextFileAtRef', () => {
   });
 
   it('fetches root text file content from the requested ref', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
+    mockSelfHostedGitLabResponse({
       status: 200,
-      text: async () => '# Review policy\n\nFlag only regressions.',
+      body: '# Review policy\n\nFlag only regressions.',
     });
 
     const result = await fetchGitLabRootTextFileAtRef(
@@ -569,13 +716,15 @@ describe('fetchGitLabRootTextFileAtRef', () => {
     );
 
     expect(result).toBe('# Review policy\n\nFlag only regressions.');
-    expect(mockFetch).toHaveBeenCalledWith(
-      'https://gitlab.example.com/api/v4/projects/group%2Fsubgroup%2Fproject/repository/files/REVIEW.md/raw?ref=main',
+    expect(mockHttpsRequest).toHaveBeenCalledWith(
       expect.objectContaining({
+        hostname: 'gitlab.example.com',
+        path: '/api/v4/projects/group%2Fsubgroup%2Fproject/repository/files/REVIEW.md/raw?ref=main',
         headers: {
-          Authorization: 'Bearer test-token',
+          authorization: 'Bearer test-token',
         },
-      })
+      }),
+      expect.any(Function)
     );
   });
 
@@ -632,17 +781,20 @@ describe('Review Memory GitLab write helpers', () => {
   });
 
   it('fetches project details from a self-hosted instance', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ id: 123, default_branch: 'main', path_with_namespace: 'group/project' }),
+    mockSelfHostedGitLabResponse({
+      status: 200,
+      json: { id: 123, default_branch: 'main', path_with_namespace: 'group/project' },
     });
 
     await expect(
       fetchGitLabProjectDetails('test-token', 'group/project', 'https://gitlab.example.com/')
     ).resolves.toEqual(expect.objectContaining({ default_branch: 'main' }));
-    expect(mockFetch).toHaveBeenCalledWith(
-      'https://gitlab.example.com/api/v4/projects/group%2Fproject',
-      expect.objectContaining({ headers: { Authorization: 'Bearer test-token' } })
+    expect(mockHttpsRequest).toHaveBeenCalledWith(
+      expect.objectContaining({
+        headers: expect.objectContaining({ authorization: 'Bearer test-token' }),
+        path: '/api/v4/projects/group%2Fproject',
+      }),
+      expect.any(Function)
     );
   });
 
@@ -702,6 +854,86 @@ describe('Review Memory GitLab write helpers', () => {
         'body'
       )
     ).resolves.toEqual({ number: 4, url: 'https://gitlab.com/group/project/-/merge_requests/4' });
+  });
+});
+
+describe('deleteProjectWebhook', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+  });
+
+  it('handles self-hosted 204 no-content responses', async () => {
+    mockSelfHostedGitLabResponse({ status: 204, body: '' });
+
+    await expect(
+      deleteProjectWebhook('test-token', 123, 456, 'https://gitlab.example.com')
+    ).resolves.toBeUndefined();
+
+    expect(mockHttpsRequest).toHaveBeenCalledWith(
+      expect.objectContaining({
+        method: 'DELETE',
+        path: '/api/v4/projects/123/hooks/456',
+      }),
+      expect.any(Function)
+    );
+  });
+
+  it('rejects self-hosted response stream errors', async () => {
+    mockSelfHostedGitLabResponse({
+      status: 200,
+      responseError: new Error('response interrupted'),
+    });
+
+    await expect(
+      deleteProjectWebhook('test-token', 123, 456, 'https://gitlab.example.com')
+    ).rejects.toThrow('response interrupted');
+  });
+
+  it('rejects oversized self-hosted responses', async () => {
+    mockSelfHostedGitLabResponse({ status: 200, body: 'x'.repeat(10 * 1024 * 1024 + 1) });
+
+    await expect(
+      deleteProjectWebhook('test-token', 123, 456, 'https://gitlab.example.com')
+    ).rejects.toThrow('GitLab response exceeded size limit');
+  });
+
+  it('strips authorization headers when redirects change origin', async () => {
+    mockSelfHostedGitLabResponse({
+      status: 307,
+      headers: { location: 'https://gitlab.example.com:8443/api/v4/projects/123/hooks/456' },
+    });
+    mockSelfHostedGitLabResponse({ status: 204, body: '' });
+
+    await expect(
+      deleteProjectWebhook('test-token', 123, 456, 'https://gitlab.example.com')
+    ).resolves.toBeUndefined();
+
+    expect(mockHttpsRequest).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        headers: expect.not.objectContaining({ authorization: 'Bearer test-token' }),
+        port: '8443',
+      }),
+      expect.any(Function)
+    );
+  });
+
+  it('preserves DELETE methods across 302 redirects', async () => {
+    mockSelfHostedGitLabResponse({
+      status: 302,
+      headers: { location: 'https://gitlab.example.com/api/v4/projects/123/hooks/456' },
+    });
+    mockSelfHostedGitLabResponse({ status: 204, body: '' });
+
+    await expect(
+      deleteProjectWebhook('test-token', 123, 456, 'https://gitlab.example.com')
+    ).resolves.toBeUndefined();
+
+    expect(mockHttpsRequest).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ method: 'DELETE' }),
+      expect.any(Function)
+    );
   });
 });
 
@@ -795,5 +1027,68 @@ describe('GitLab webhook management', () => {
         emoji_events: true,
       })
     );
+  });
+});
+
+describe('createProjectWebhook', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+  });
+
+  it('rejects cross-origin 307 redirects before replaying request bodies', async () => {
+    mockSelfHostedGitLabResponse({
+      status: 307,
+      headers: { location: 'https://redirect.example/api/v4/projects/123/hooks' },
+    });
+
+    await expect(
+      createProjectWebhook(
+        'test-token',
+        123,
+        'https://example.com/webhook',
+        'webhook-secret',
+        'https://gitlab.example.com'
+      )
+    ).rejects.toThrow('GitLab request refused cross-origin redirect with request body');
+
+    expect(mockHttpsRequest).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('validatePersonalAccessToken', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+  });
+
+  it('rejects http instance URLs before fetching', async () => {
+    const result = await validatePersonalAccessToken('pat-token', 'http://gitlab.example.com');
+
+    expect(result).toEqual({
+      valid: false,
+      error: 'Invalid URL protocol. GitLab instance URLs must use https.',
+    });
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it('rejects unsafe instance URLs before fetching', async () => {
+    const result = await validatePersonalAccessToken('pat-token', 'http://169.254.169.254');
+
+    expect(result).toEqual({
+      valid: false,
+      error: 'GitLab instance URL host is not allowed.',
+    });
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it('rejects instance URLs that resolve to unsafe addresses before fetching', async () => {
+    mockLookup.mockResolvedValueOnce([{ address: '10.0.0.1', family: 4 }]);
+
+    const result = await validatePersonalAccessToken('pat-token', 'https://gitlab.example.com');
+
+    expect(result).toEqual({
+      valid: false,
+      error: 'GitLab instance URL host resolves to an address that is not allowed.',
+    });
+    expect(mockFetch).not.toHaveBeenCalled();
   });
 });

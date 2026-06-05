@@ -34,7 +34,13 @@ export function useOrganizationModels(organizationId?: string): UseOrganizationM
 
   // Format models for the combobox
   const modelOptions = useMemo<ModelOption[]>(() => {
-    return openRouterModels?.data.map(model => ({ id: model.id, name: model.name })) ?? [];
+    return (
+      openRouterModels?.data.map(model => ({
+        id: model.id,
+        name: model.name,
+        isFree: model.isFree,
+      })) ?? []
+    );
   }, [openRouterModels]);
 
   return {

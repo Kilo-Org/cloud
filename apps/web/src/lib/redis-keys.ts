@@ -33,6 +33,9 @@ export const posthogQueryRedisKey = (name: string) => redisKey(`posthog-query:${
 
 export const requestLogRedisKey = (hash: string) => redisKey(`ai-gateway.request-log:${hash}`);
 
+export const abuseRulesClassificationRedisKey = (identityKey: string) =>
+  redisKey(`ai-gateway.abuse-rules:last-classification:${identityKey}`);
+
 export const botIdentityRedisKey = (platform: string, teamId: string, userId: string) =>
   redisKey(`identity:${platform}:${teamId}:${userId}`);
 
@@ -50,3 +53,6 @@ export const EXPERIMENTED_PUBLIC_IDS_REDIS_KEY = redisKey(
 
 export const gitLabOAuthCredentialsRedisKey = (credentialRef: string) =>
   redisKey(`auth-credentials:gitlab:${credentialRef}`);
+
+export const githubUserAuthorizationPkceRedisKey = (verifierRef: string) =>
+  redisKey(`auth-pkce:github-user:${verifierRef}`);

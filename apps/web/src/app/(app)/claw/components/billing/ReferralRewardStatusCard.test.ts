@@ -81,8 +81,8 @@ describe('ReferralRewardStatusCard', () => {
               application: {
                 appliedAt: '2026-04-10T00:05:00.000Z',
                 subscriptionId: '11111111-1111-4111-8111-111111111111',
-                previousRenewalBoundary: '2026-05-01T00:00:00.000Z',
-                newRenewalBoundary: '2026-06-01T00:00:00.000Z',
+                previousRenewalBoundary: '2026-05-01T12:00:00.000Z',
+                newRenewalBoundary: '2026-06-01T12:00:00.000Z',
               },
             },
             {

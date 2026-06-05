@@ -42,6 +42,7 @@ const createMockKiloClient = (): WrapperKiloClient => ({
   getSession: vi.fn(),
   sendPromptAsync: vi.fn(),
   abortSession: vi.fn(),
+  summarizeSession: vi.fn(),
   sendCommand: vi.fn(),
   answerPermission: vi.fn(),
   answerQuestion: vi.fn(),
@@ -283,7 +284,31 @@ describe('runAutoCommit', () => {
     );
   });
 
-  it('uses fallback commit message and still pushes when generation times out', async () => {
+  it('appends the supplied co-author trailer to generated commit messages', async () => {
+    mockGetCurrentBranch.mockResolvedValue('feature/cool-stuff');
+    setupHappyPathGit();
+    const commitMessage =
+      'test commit\n\nCo-authored-by: kiloconnect[bot] <240665456+kiloconnect[bot]@users.noreply.github.com>';
+
+    const { opts, events } = createOpts({
+      commitCoAuthor: {
+        name: 'kiloconnect[bot]',
+        email: '240665456+kiloconnect[bot]@users.noreply.github.com',
+      },
+    });
+    const result = await runAutoCommit(opts);
+
+    expect(result).toEqual({ success: true });
+    expect(mockGit).toHaveBeenNthCalledWith(
+      3,
+      ['commit', '-m', commitMessage],
+      expect.objectContaining({ cwd: '/workspace', timeoutMs: 30_000 })
+    );
+    const completed = events.find(e => e.streamEventType === 'autocommit_completed');
+    expect(completed?.data).toEqual(expect.objectContaining({ commitMessage }));
+  });
+
+  it('uses fallback commit message with a supplied co-author trailer when generation times out', async () => {
     vi.useFakeTimers();
     try {
       mockGetCurrentBranch.mockResolvedValue('feature/cool-stuff');
@@ -295,7 +320,15 @@ describe('runAutoCommit', () => {
         .mockResolvedValueOnce(ok());
       const kiloClient = createMockKiloClient();
       vi.mocked(kiloClient.generateCommitMessage).mockReturnValue(new Promise(() => {}));
-      const { opts, events } = createOpts({ kiloClient });
+      const commitMessage =
+        'wip\n\nCo-authored-by: kiloconnect[bot] <240665456+kiloconnect[bot]@users.noreply.github.com>';
+      const { opts, events } = createOpts({
+        kiloClient,
+        commitCoAuthor: {
+          name: 'kiloconnect[bot]',
+          email: '240665456+kiloconnect[bot]@users.noreply.github.com',
+        },
+      });
 
       const resultPromise = runAutoCommit(opts);
       await vi.advanceTimersByTimeAsync(30_000);
@@ -304,7 +337,7 @@ describe('runAutoCommit', () => {
       expect(result).toEqual({ success: true });
       expect(mockGit).toHaveBeenNthCalledWith(
         3,
-        ['commit', '-m', 'wip'],
+        ['commit', '-m', commitMessage],
         expect.objectContaining({ cwd: '/workspace', timeoutMs: 30_000 })
       );
       expect(mockGit).toHaveBeenLastCalledWith(
@@ -317,7 +350,7 @@ describe('runAutoCommit', () => {
           success: true,
           message: 'Changes committed and pushed',
           commitHash: 'abc1234',
-          commitMessage: 'wip',
+          commitMessage,
         })
       );
       expect(vi.getTimerCount()).toBe(0);
@@ -344,6 +377,28 @@ describe('runAutoCommit', () => {
         data: expect.objectContaining({ message: 'git status aborted' }),
       })
     );
+  });
+
+  it('redacts authenticated GitHub remotes from push failure events', async () => {
+    mockGetCurrentBranch.mockResolvedValue('feature/cool-stuff');
+    mockGit
+      .mockResolvedValueOnce(ok(' M file.ts'))
+      .mockResolvedValueOnce(ok())
+      .mockResolvedValueOnce(ok('[feature/cool-stuff abc1234] test commit'))
+      .mockResolvedValueOnce(ok('abc1234'))
+      .mockResolvedValueOnce({
+        stdout: '',
+        stderr:
+          'fatal: unable to access https://x-access-token:user-secret@github.com/acme/repo.git',
+        exitCode: 1,
+      });
+
+    const { opts, events } = createOpts();
+    await runAutoCommit(opts);
+
+    const completed = events.find(e => e.streamEventType === 'autocommit_completed');
+    expect(completed?.data.message).toContain('x-access-token:***@github.com');
+    expect(completed?.data.message).not.toContain('user-secret');
   });
 
   it('clears commit message timeout when lifecycle signal aborts generation', async () => {

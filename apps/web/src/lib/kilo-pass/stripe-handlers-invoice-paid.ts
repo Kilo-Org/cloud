@@ -17,6 +17,7 @@ import { KILO_PASS_TIER_CONFIG } from '@/lib/kilo-pass/constants';
 import { KiloPassError } from '@/lib/kilo-pass/errors';
 import {
   appendKiloPassAuditLog,
+  applyPendingKiloPassReferralBonusForIssuance,
   createOrGetIssuanceHeader,
   issueBaseCreditsForIssuance,
 } from '@/lib/kilo-pass/issuance';
@@ -45,6 +46,11 @@ import {
   KiloPassWelcomePromoEligibilityReason,
 } from '@/lib/kilo-pass/enums';
 import { isStripeSubscriptionEnded } from '@/lib/kilo-pass/stripe-subscription-status';
+import { captureException } from '@sentry/nextjs';
+import {
+  checkDuplicateCardFingerprintGate,
+  maybeSendDuplicateCardCanceledEmail,
+} from '@/lib/kilo-pass/card-fingerprint-gate';
 import { processTopUp } from '@/lib/credits';
 import { randomUUID } from 'node:crypto';
 import { releaseScheduledChangeForSubscription } from '@/lib/kilo-pass/scheduled-change-release';
@@ -54,8 +60,10 @@ import {
 } from '@/lib/kilo-pass/subscription-accounting';
 import {
   enqueueKiloPassAffiliateSaleForInvoice,
+  getKiloPassAffiliateSaleReportingFields,
   type KiloPassAffiliateSaleContext,
 } from '@/lib/kilo-pass/affiliate-sale';
+import { processPersonalKiloPassStripePaidConversion } from '@/lib/impact/kilo-pass-referrals';
 import type { SupportedReusablePaymentMethodType } from '@/lib/kilo-pass/stripe-handlers-utils';
 
 function getPaymentFingerprintType(
@@ -355,17 +363,35 @@ export async function handleKiloPassInvoicePaid(params: {
 
   let didMutateBalance = false;
   let kiloUserIdForCache: string | null = null;
-  const affiliateSaleState: { context: KiloPassAffiliateSaleContext | null } = {
+  const affiliateSaleState: {
+    context: KiloPassAffiliateSaleContext | null;
+    shouldEnqueueAffiliateSale: boolean;
+  } = {
     context: null,
+    shouldEnqueueAffiliateSale: true,
+  };
+  const referralConversionState: {
+    kiloPassSubscriptionId: string | null;
+    userId: string | null;
+    tier: KiloPassAffiliateSaleContext['tier'] | null;
+    cadence: KiloPassAffiliateSaleContext['cadence'] | null;
+    welcomePromoEligibilityReason: KiloPassWelcomePromoEligibilityReason | null;
+  } = {
+    kiloPassSubscriptionId: null,
+    userId: null,
+    tier: null,
+    cadence: null,
+    welcomePromoEligibilityReason: null,
   };
 
   // Track context for failure audit logging
   let kiloUserIdForAudit: string | null = null;
-  let kiloPassSubscriptionIdForAudit: string | null = null;
   let stripeSubscriptionIdForAudit: string | null = null;
 
+  let blockedEmailParams: { kiloUserId: string; stripeInvoiceId: string } | null = null;
+
   try {
-    await db.transaction(async tx => {
+    blockedEmailParams = await db.transaction(async tx => {
       const subscription = await getInvoiceSubscription({ invoice, stripe });
       if (!subscription) {
         throw new KiloPassError('Kilo Pass invoice has no subscription reference', {
@@ -483,8 +509,61 @@ export async function handleKiloPassInvoicePaid(params: {
       }
 
       const kiloPassSubscriptionId = row.id;
-      kiloPassSubscriptionIdForAudit = kiloPassSubscriptionId;
       const priorStatus = existingSubscription?.status ?? null;
+
+      // Card fingerprint gate: block if another user already has an active
+      // Kilo Pass subscription on the same card fingerprint. This runs after
+      // the Stripe charge succeeds (so we can refund it) and after the
+      // upsert (so we have a kiloPassSubscriptionId for audit logging).
+      // If blocked, the subscription is canceled on Stripe, the invoice is
+      // refunded, and credits are NOT issued.
+      const gateResult = await checkDuplicateCardFingerprintGate({
+        invoice,
+        stripe,
+        kiloUserId,
+        stripeSubscriptionId: subscription.id,
+        stripeInvoiceId: invoice.id,
+      });
+
+      if (gateResult.blocked) {
+        await appendKiloPassAuditLog(tx, {
+          action: KiloPassAuditLogAction.DuplicateCardSubscriptionCanceled,
+          result: KiloPassAuditLogResult.Success,
+          kiloUserId,
+          kiloPassSubscriptionId,
+          stripeEventId: eventId,
+          stripeInvoiceId: invoice.id,
+          stripeSubscriptionId: subscription.id,
+          payload: {
+            fingerprint: gateResult.fingerprint,
+            otherKiloUserId: gateResult.otherKiloUserId,
+            otherSubscriptionId: gateResult.otherSubscriptionId,
+            otherStripeSubscriptionId: gateResult.otherStripeSubscriptionId,
+          },
+        });
+
+        await tx
+          .update(kilo_pass_subscriptions)
+          .set({ status: 'canceled', ended_at: dayjs().utc().toISOString() })
+          .where(eq(kilo_pass_subscriptions.id, kiloPassSubscriptionId));
+
+        await tx
+          .update(kilocode_users)
+          .set({
+            blocked_reason: 'kilo_pass_duplicate_card',
+            blocked_at: new Date().toISOString(),
+          })
+          .where(and(eq(kilocode_users.id, kiloUserId), isNull(kilocode_users.blocked_reason)));
+
+        affiliateSaleState.context = null;
+        kiloUserIdForCache = null;
+        return { kiloUserId, stripeInvoiceId: invoice.id };
+      }
+
+      referralConversionState.kiloPassSubscriptionId = kiloPassSubscriptionId;
+      referralConversionState.userId = kiloUserId;
+      referralConversionState.tier = tier;
+      referralConversionState.cadence = cadence;
 
       const issuanceHeader = await createOrGetIssuanceHeader(tx, {
         subscriptionId: kiloPassSubscriptionId,
@@ -497,6 +576,7 @@ export async function handleKiloPassInvoicePaid(params: {
         cadence === KiloPassCadence.Monthly && hasPositiveSettlement
           ? await claimMonthlyPaymentFingerprint({ tx, stripe, invoice })
           : null;
+      referralConversionState.welcomePromoEligibilityReason = positiveSettlementReason;
       const initialWelcomePromoEligibilityReason =
         cadence === KiloPassCadence.Monthly
           ? await getOrCreateInitialMonthlyWelcomePromoReason({
@@ -546,7 +626,20 @@ export async function handleKiloPassInvoicePaid(params: {
       });
       didMutateBalance ||= baseCreditsResult.wasIssued;
 
-      if (baseCreditsResult.wasIssued) {
+      let referralBonusBlocksNormalBonus = false;
+      if (cadence === KiloPassCadence.Monthly) {
+        const referralBonusResult = await applyPendingKiloPassReferralBonusForIssuance(tx, {
+          issuanceId: issuanceHeader.issuanceId,
+          subscriptionId: kiloPassSubscriptionId,
+          kiloUserId,
+          stripeInvoiceId: invoice.id,
+        });
+        referralBonusBlocksNormalBonus =
+          referralBonusResult.wasIssued || referralBonusResult.issuanceItemId !== null;
+        didMutateBalance ||= referralBonusResult.wasIssued;
+      }
+
+      if (baseCreditsResult.wasIssued && !referralBonusBlocksNormalBonus) {
         await updateKiloPassThresholdAfterBaseCredits(tx, {
           kiloUserId,
           baseAmountUsd: tierConfig.monthlyPriceUsd,
@@ -579,7 +672,7 @@ export async function handleKiloPassInvoicePaid(params: {
             current_streak_months: 0,
           })
           .where(eq(kilo_pass_subscriptions.id, kiloPassSubscriptionId));
-        return;
+        return null;
       }
 
       const wasInactivePreviously = priorStatus !== null && isStripeSubscriptionEnded(priorStatus);
@@ -594,32 +687,86 @@ export async function handleKiloPassInvoicePaid(params: {
         .update(kilo_pass_subscriptions)
         .set({ current_streak_months: newStreakMonths, next_yearly_issue_at: null })
         .where(eq(kilo_pass_subscriptions.id, kiloPassSubscriptionId));
+
+      return null;
     });
   } catch (error) {
     // Write failure audit log outside the transaction (non-transactional)
-    // so it persists even when the transaction rolls back.
-    await appendKiloPassAuditLog(db, {
-      action: KiloPassAuditLogAction.KiloPassInvoicePaidHandled,
-      result: KiloPassAuditLogResult.Failed,
-      kiloUserId: kiloUserIdForAudit,
-      kiloPassSubscriptionId: kiloPassSubscriptionIdForAudit,
-      stripeEventId: eventId,
-      stripeInvoiceId: invoice.id,
-      stripeSubscriptionId: stripeSubscriptionIdForAudit,
-      payload: {
-        error: error instanceof Error ? error.message : String(error),
-      },
-    });
+    // so it persists even when the transaction rolls back. Omit
+    // kiloPassSubscriptionId because the row may not exist after rollback.
+    try {
+      await appendKiloPassAuditLog(db, {
+        action: KiloPassAuditLogAction.KiloPassInvoicePaidHandled,
+        result: KiloPassAuditLogResult.Failed,
+        kiloUserId: kiloUserIdForAudit,
+        stripeEventId: eventId,
+        stripeInvoiceId: invoice.id,
+        stripeSubscriptionId: stripeSubscriptionIdForAudit,
+        payload: {
+          error: error instanceof Error ? error.message : String(error),
+        },
+      });
+    } catch (auditError) {
+      captureException(auditError, {
+        tags: { source: 'kilo_pass_invoice_paid_failure_audit' },
+        extra: { stripeEventId: eventId, stripeInvoiceId: invoice.id },
+      });
+    }
 
     throw error;
   }
 
-  await enqueueKiloPassAffiliateSaleForInvoice({
-    eventId,
-    invoice,
-    stripe,
-    context: affiliateSaleState.context,
-  });
+  if (
+    affiliateSaleState.context &&
+    referralConversionState.kiloPassSubscriptionId &&
+    referralConversionState.userId &&
+    referralConversionState.tier &&
+    referralConversionState.cadence
+  ) {
+    const convertedAt =
+      invoice.status_transitions?.paid_at != null
+        ? new Date(invoice.status_transitions.paid_at * 1000)
+        : invoice.created != null
+          ? new Date(invoice.created * 1000)
+          : invoice.period_start != null
+            ? new Date(invoice.period_start * 1000)
+            : new Date();
+    const reportingFields = getKiloPassAffiliateSaleReportingFields(affiliateSaleState.context);
+    const referralDisposition = await processPersonalKiloPassStripePaidConversion({
+      userId: referralConversionState.userId,
+      kiloPassSubscriptionId: referralConversionState.kiloPassSubscriptionId,
+      sourcePaymentId: invoice.id,
+      orderId: invoice.id,
+      amount: invoice.amount_paid / 100,
+      currencyCode: invoice.currency ?? 'usd',
+      itemCategory: reportingFields.itemCategory,
+      itemName: reportingFields.itemName,
+      ...('itemSku' in reportingFields && reportingFields.itemSku
+        ? { itemSku: reportingFields.itemSku }
+        : {}),
+      sourceTier: referralConversionState.tier,
+      cadence: referralConversionState.cadence,
+      welcomePromoEligibilityReason: referralConversionState.welcomePromoEligibilityReason,
+      convertedAt,
+    });
+    affiliateSaleState.shouldEnqueueAffiliateSale = referralDisposition.shouldEnqueueAffiliateSale;
+  }
+
+  if (affiliateSaleState.shouldEnqueueAffiliateSale) {
+    await enqueueKiloPassAffiliateSaleForInvoice({
+      eventId,
+      invoice,
+      stripe,
+      context: affiliateSaleState.context,
+    });
+  }
+
+  if (blockedEmailParams) {
+    await maybeSendDuplicateCardCanceledEmail({
+      kiloUserId: blockedEmailParams.kiloUserId,
+      stripeInvoiceId: blockedEmailParams.stripeInvoiceId,
+    });
+  }
 
   if (didMutateBalance && kiloUserIdForCache !== null) {
     await forceImmediateExpirationRecomputation(kiloUserIdForCache);

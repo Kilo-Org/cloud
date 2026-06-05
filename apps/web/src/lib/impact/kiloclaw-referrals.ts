@@ -22,6 +22,7 @@ import {
 } from '@/lib/impact/advocate';
 import { logImpactReferralDebug } from '@/lib/impact/debug';
 import { hashNormalizedEmailForDeletionTombstone } from '@/lib/impact/referral';
+import { IMPACT_REFERRAL_TOUCH_VALIDITY_MS } from '@/lib/impact/referral-utils';
 import { resolveCurrentPersonalSubscriptionRow } from '@/lib/kiloclaw/current-personal-subscription';
 import { client as stripe } from '@/lib/stripe-client';
 import { insertKiloClawSubscriptionChangeLog } from '@kilocode/db';
@@ -51,6 +52,7 @@ import {
   ImpactReferralPaymentProvider,
   ImpactReferralProduct,
   ImpactReferralRewardKind,
+  ImpactReferralRewardStatus,
   ImpactAttributionTouchType,
   KiloClawReferralBeneficiaryRole,
   KiloClawReferralDecisionOutcome,
@@ -126,7 +128,8 @@ const REFERRAL_REWARD_ACTOR = {
 } as const;
 
 const SIGNUP_REFERRAL_TOUCH_CAPTURE_GRACE_MS = 10 * 60 * 1000;
-const IMPACT_ADVOCATE_REWARD_UNIT = 'MONTH';
+const IMPACT_ADVOCATE_KILOCLAW_REWARD_UNIT = 'MONTH';
+const IMPACT_ADVOCATE_KILO_PASS_REWARD_UNIT = 'Kilo Pass Bonus Credits';
 
 function getDatabaseClient(database?: DatabaseClient): DatabaseClient {
   return database ?? db;
@@ -155,25 +158,32 @@ function hasAcceptedTrackingValue(touch: ImpactAttributionTouch): boolean {
 }
 
 function isTouchValidAtConversion(touch: ImpactAttributionTouch, convertedAt: Date): boolean {
+  const touchedAt = new Date(touch.touched_at).getTime();
+  const convertedAtMs = convertedAt.getTime();
+  // Qualification intentionally ignores the denormalized expires_at column: the referral
+  // spec defines validity as touched_at + 30 * 24h using server UTC timestamps.
+  const exactExpiration = touchedAt + IMPACT_REFERRAL_TOUCH_VALIDITY_MS;
   return (
-    hasAcceptedTrackingValue(touch) &&
-    new Date(touch.touched_at).getTime() <= convertedAt.getTime() &&
-    convertedAt.getTime() < new Date(touch.expires_at).getTime()
+    hasAcceptedTrackingValue(touch) && touchedAt <= convertedAtMs && convertedAtMs < exactExpiration
   );
 }
 
 export function resolveWinningAttributionTouch(params: {
+  product?: ImpactReferralProduct | null;
   touches: ImpactAttributionTouch[];
   convertedAt: Date;
 }): WinningAttributionResolution {
-  const validReferralTouches = params.touches
+  const scopedTouches = params.product
+    ? params.touches.filter(touch => touch.product === params.product)
+    : params.touches;
+  const validReferralTouches = scopedTouches
     .filter(
       touch =>
         touch.touch_type === ImpactAttributionTouchType.Referral &&
         isTouchValidAtConversion(touch, params.convertedAt)
     )
     .sort((a, b) => new Date(a.touched_at).getTime() - new Date(b.touched_at).getTime());
-  const validAffiliateTouches = params.touches
+  const validAffiliateTouches = scopedTouches
     .filter(
       touch =>
         touch.touch_type === ImpactAttributionTouchType.Affiliate &&
@@ -990,7 +1000,7 @@ export async function processQueuedKiloClawReferralRewards(params?: {
   return summary;
 }
 
-async function queueImpactAdvocateRewardRedemption(params: {
+export async function queueImpactAdvocateRewardRedemption(params: {
   rewardId: string;
   database: DatabaseClient;
 }): Promise<void> {
@@ -999,6 +1009,7 @@ async function queueImpactAdvocateRewardRedemption(params: {
       id: impact_referral_rewards.id,
       beneficiaryUserId: impact_referral_rewards.beneficiary_user_id,
       monthsGranted: impact_referral_rewards.months_granted,
+      rewardAmountUsd: impact_referral_rewards.reward_amount_usd,
       status: impact_referral_rewards.status,
       product: impact_referral_rewards.product,
       rewardKind: impact_referral_rewards.reward_kind,
@@ -1009,18 +1020,40 @@ async function queueImpactAdvocateRewardRedemption(params: {
     .where(eq(impact_referral_rewards.id, params.rewardId))
     .limit(1);
 
+  if (!reward) {
+    return;
+  }
+
+  let programKey: ImpactAdvocateProgramKey | null = null;
+  let amount: number | null = null;
+  let unit: string | null = null;
+
   if (
-    !reward ||
-    reward.status !== KiloClawReferralRewardStatus.Applied ||
-    reward.product !== ImpactReferralProduct.KiloClaw ||
-    reward.rewardKind !== ImpactReferralRewardKind.KiloClawFreeMonth
+    reward.status === KiloClawReferralRewardStatus.Applied &&
+    reward.product === ImpactReferralProduct.KiloClaw &&
+    reward.rewardKind === ImpactReferralRewardKind.KiloClawFreeMonth
   ) {
+    amount = reward.monthsGranted;
+    unit = IMPACT_ADVOCATE_KILOCLAW_REWARD_UNIT;
+  } else if (
+    reward.product === ImpactReferralProduct.KiloPass &&
+    reward.rewardKind === ImpactReferralRewardKind.KiloPassBonus &&
+    (reward.status === ImpactReferralRewardStatus.Pending ||
+      reward.status === ImpactReferralRewardStatus.Earned ||
+      reward.status === ImpactReferralRewardStatus.Applied) &&
+    reward.rewardAmountUsd !== null &&
+    reward.rewardAmountUsd > 0
+  ) {
+    programKey = ImpactAdvocateProgramKey.KiloPass;
+    amount = reward.rewardAmountUsd;
+    unit = IMPACT_ADVOCATE_KILO_PASS_REWARD_UNIT;
+  } else {
     return;
   }
 
   const accountId = reward.email.trim();
   if (!accountId) {
-    console.error('[kiloclaw-referrals] missing beneficiary email for Impact reward redemption', {
+    console.error('[impact-referrals] missing beneficiary email for Impact reward redemption', {
       rewardId: params.rewardId,
       beneficiaryUserId: reward.beneficiaryUserId,
     });
@@ -1035,14 +1068,15 @@ async function queueImpactAdvocateRewardRedemption(params: {
       beneficiary_user_id: reward.beneficiaryUserId,
       state: ImpactAdvocateRewardRedemptionState.Queued,
       request_payload: {
+        ...(programKey ? { programKey } : {}),
         lookup: {
           accountId,
           userId: accountId,
           rewardTypeFilter: 'CREDIT',
         },
         redemption: {
-          amount: reward.monthsGranted,
-          unit: IMPACT_ADVOCATE_REWARD_UNIT,
+          amount,
+          unit,
         },
       } satisfies Record<string, unknown>,
     })
@@ -1050,6 +1084,7 @@ async function queueImpactAdvocateRewardRedemption(params: {
 }
 
 type ImpactAdvocateRewardRedemptionRequestPayload = {
+  programKey?: ImpactAdvocateProgramKey;
   lookup: {
     accountId: string;
     userId: string;
@@ -1077,17 +1112,27 @@ function isRewardRedemptionRequestPayload(
 ): payload is ImpactAdvocateRewardRedemptionRequestPayload {
   const lookup = getObjectProperty(payload, 'lookup');
   const redemption = getObjectProperty(payload, 'redemption');
+  const programKey = getObjectProperty(payload, 'programKey');
   return (
     typeof lookup === 'object' &&
     lookup !== null &&
     typeof redemption === 'object' &&
     redemption !== null &&
+    (programKey === undefined ||
+      programKey === ImpactAdvocateProgramKey.KiloClaw ||
+      programKey === ImpactAdvocateProgramKey.KiloPass) &&
     typeof getObjectProperty(lookup, 'accountId') === 'string' &&
     typeof getObjectProperty(lookup, 'userId') === 'string' &&
     getObjectProperty(lookup, 'rewardTypeFilter') === 'CREDIT' &&
     typeof getObjectProperty(redemption, 'amount') === 'number' &&
     typeof getObjectProperty(redemption, 'unit') === 'string'
   );
+}
+
+function getRewardRedemptionProgramKey(
+  payload: ImpactAdvocateRewardRedemptionRequestPayload
+): ImpactAdvocateProgramKey {
+  return payload.programKey ?? ImpactAdvocateProgramKey.KiloClaw;
 }
 
 function buildFailurePayload(result: ImpactAdvocateDispatchResult): Record<string, unknown> {
@@ -1162,9 +1207,13 @@ async function dispatchImpactAdvocateRewardRedemptionById(
     return 'failed';
   }
 
-  const lookupResult = await sendImpactAdvocateRewardLookupPayload(
-    redemption.request_payload.lookup
-  );
+  const programKey = getRewardRedemptionProgramKey(redemption.request_payload);
+  const advocateScope =
+    programKey === ImpactAdvocateProgramKey.KiloClaw ? undefined : { programKey };
+
+  const lookupResult = advocateScope
+    ? await sendImpactAdvocateRewardLookupPayload(redemption.request_payload.lookup, advocateScope)
+    : await sendImpactAdvocateRewardLookupPayload(redemption.request_payload.lookup);
   if (!lookupResult.ok) {
     return await persistRewardRedemptionFailure({
       redemptionId: redemption.id,
@@ -1212,10 +1261,13 @@ async function dispatchImpactAdvocateRewardRedemptionById(
       .where(eq(impact_advocate_reward_redemptions.id, redemption.id));
   }
 
-  const redeemResult = await sendImpactAdvocateRewardRedemptionPayload({
+  const redemptionPayload = {
     rewardId: impactRewardId,
     ...redemption.request_payload.redemption,
-  });
+  };
+  const redeemResult = advocateScope
+    ? await sendImpactAdvocateRewardRedemptionPayload(redemptionPayload, advocateScope)
+    : await sendImpactAdvocateRewardRedemptionPayload(redemptionPayload);
   const isIdempotentAlreadyRedeemed =
     !redeemResult.ok &&
     persistedImpactRewardId === impactRewardId &&
@@ -1254,10 +1306,49 @@ async function dispatchImpactAdvocateRewardRedemptionById(
   return 'redeemed';
 }
 
+async function queueMissingImpactAdvocateRewardRedemptions(limit: number): Promise<void> {
+  const rows = await db
+    .select({ id: impact_referral_rewards.id })
+    .from(impact_referral_rewards)
+    .where(
+      and(
+        or(
+          and(
+            eq(impact_referral_rewards.product, ImpactReferralProduct.KiloClaw),
+            eq(impact_referral_rewards.reward_kind, ImpactReferralRewardKind.KiloClawFreeMonth),
+            eq(impact_referral_rewards.status, ImpactReferralRewardStatus.Applied)
+          ),
+          and(
+            eq(impact_referral_rewards.product, ImpactReferralProduct.KiloPass),
+            eq(impact_referral_rewards.reward_kind, ImpactReferralRewardKind.KiloPassBonus),
+            inArray(impact_referral_rewards.status, [
+              ImpactReferralRewardStatus.Pending,
+              ImpactReferralRewardStatus.Earned,
+              ImpactReferralRewardStatus.Applied,
+            ]),
+            sql`${impact_referral_rewards.reward_amount_usd} > 0`
+          )
+        ),
+        sql`NOT EXISTS (
+          SELECT 1
+          FROM ${impact_advocate_reward_redemptions}
+          WHERE ${impact_advocate_reward_redemptions.reward_id} = ${impact_referral_rewards.id}
+        )`
+      )
+    )
+    .orderBy(asc(impact_referral_rewards.earned_at), asc(impact_referral_rewards.created_at))
+    .limit(limit);
+
+  for (const row of rows) {
+    await queueImpactAdvocateRewardRedemption({ rewardId: row.id, database: db });
+  }
+}
+
 export async function dispatchQueuedImpactAdvocateRewardRedemptions(params?: {
   limit?: number;
 }): Promise<ImpactAdvocateRewardRedemptionDispatchSummary> {
   const limit = params?.limit ?? 100;
+  await queueMissingImpactAdvocateRewardRedemptions(limit);
   const nowIso = new Date().toISOString();
   const rows = await db
     .update(impact_advocate_reward_redemptions)
@@ -1584,7 +1675,7 @@ async function persistImpactConversionReportResult(params: {
     .where(eq(impact_conversion_reports.id, params.reportId));
 }
 
-async function dispatchImpactConversionReportById(
+export async function dispatchImpactConversionReportById(
   reportId: string
 ): Promise<'delivered' | 'retried' | 'failed'> {
   logImpactReferralDebug('Dispatching Impact referral conversion report', {
@@ -1847,6 +1938,7 @@ export async function processPersonalKiloClawPaidConversion(params: {
       database: tx,
     });
     const resolution = resolveWinningAttributionTouch({
+      product: ImpactReferralProduct.KiloClaw,
       touches,
       convertedAt: params.convertedAt,
     });

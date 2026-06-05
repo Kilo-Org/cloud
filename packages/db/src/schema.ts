@@ -73,6 +73,10 @@ import {
   ImpactReferralPaymentProvider,
   ImpactConversionReportState,
   ImpactAdvocateRewardRedemptionState,
+  BYOKManagementSource,
+  CodingPlanCredentialStatus,
+  CodingPlanSubscriptionStatus,
+  CodingPlanTermKind,
 } from './schema-types';
 import type {
   CustomLlmDefinition,
@@ -196,6 +200,10 @@ export const SCHEMA_CHECK_ENUMS = {
   ImpactReferralPaymentProvider,
   ImpactConversionReportState,
   ImpactAdvocateRewardRedemptionState,
+  BYOKManagementSource,
+  CodingPlanCredentialStatus,
+  CodingPlanSubscriptionStatus,
+  CodingPlanTermKind,
 } as const;
 
 export type AffiliateEventPayloadJson = {
@@ -362,7 +370,10 @@ export const kilocode_users = pgTable(
     completed_welcome_form: boolean().default(false).notNull(),
     linkedin_url: text(),
     github_url: text(),
-    discord_server_membership_verified_at: timestamp({ withTimezone: true, mode: 'string' }),
+    discord_server_membership_verified_at: timestamp({
+      withTimezone: true,
+      mode: 'string',
+    }),
     openrouter_upstream_safety_identifier: text(),
     vercel_downstream_safety_identifier: text(),
     customer_source: text(),
@@ -1466,7 +1477,10 @@ export const kilo_pass_issuances = pgTable(
       .notNull(),
     kilo_pass_subscription_id: uuid()
       .notNull()
-      .references(() => kilo_pass_subscriptions.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+      .references(() => kilo_pass_subscriptions.id, {
+        onDelete: 'cascade',
+        onUpdate: 'cascade',
+      }),
     issue_month: date().notNull(),
     source: text().notNull().$type<KiloPassIssuanceSource>(),
     stripe_invoice_id: text(),
@@ -1574,12 +1588,18 @@ export const kilo_pass_issuance_items = pgTable(
       .notNull(),
     kilo_pass_issuance_id: uuid()
       .notNull()
-      .references(() => kilo_pass_issuances.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+      .references(() => kilo_pass_issuances.id, {
+        onDelete: 'cascade',
+        onUpdate: 'cascade',
+      }),
     kind: text().notNull().$type<KiloPassIssuanceItemKind>(),
     credit_transaction_id: uuid()
       .notNull()
       .unique()
-      .references(() => credit_transactions.id, { onDelete: 'restrict', onUpdate: 'cascade' }),
+      .references(() => credit_transactions.id, {
+        onDelete: 'restrict',
+        onUpdate: 'cascade',
+      }),
     amount_usd: decimal({ precision: 12, scale: 2, mode: 'number' }).notNull(),
     bonus_percent_applied: decimal({ precision: 6, scale: 4, mode: 'number' }),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
@@ -1668,7 +1688,10 @@ export const kilo_pass_scheduled_changes = pgTable(
       .primaryKey(),
     kilo_user_id: text()
       .notNull()
-      .references(() => kilocode_users.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+      .references(() => kilocode_users.id, {
+        onDelete: 'cascade',
+        onUpdate: 'cascade',
+      }),
     stripe_subscription_id: text()
       .notNull()
       .references(() => kilo_pass_subscriptions.stripe_subscription_id, {
@@ -1945,6 +1968,8 @@ export const microdollar_usage_metadata = pgTable(
     auto_model_id: integer(),
     market_cost: bigint({ mode: 'number' }),
     is_free: boolean(),
+    abuse_delay: integer(),
+    abuse_downgraded_from: text(),
   },
   table => [
     index('idx_microdollar_usage_metadata_created_at').on(table.created_at),
@@ -1961,6 +1986,7 @@ export const api_request_log = pgTable(
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     kilo_user_id: text(),
     organization_id: text(),
+    session_id: text(),
     provider: text(),
     model: text(),
     status_code: integer(),
@@ -2140,6 +2166,8 @@ export const microdollar_usage_view = pgView('microdollar_usage_view', {
   auto_model: text(),
   market_cost: bigint({ mode: 'number' }),
   is_free: boolean(),
+  abuse_delay: integer(),
+  abuse_downgraded_from: text(),
 }).as(sql`
   SELECT
     mu.id,
@@ -2191,7 +2219,9 @@ export const microdollar_usage_view = pgView('microdollar_usage_view', {
     md.mode,
     am.auto_model,
     meta.market_cost,
-    meta.is_free
+    meta.is_free,
+    meta.abuse_delay,
+    meta.abuse_downgraded_from
   FROM ${microdollar_usage} mu
   LEFT JOIN ${microdollar_usage_metadata} meta ON mu.id = meta.id
   LEFT JOIN ${http_ip} ip ON meta.http_ip_id = ip.http_ip_id
@@ -2383,7 +2413,10 @@ export const organizations = pgTable(
     total_microdollars_acquired: bigint({ mode: 'number' })
       .default(sql`'0'`)
       .notNull(),
-    next_credit_expiration_at: timestamp({ withTimezone: true, mode: 'string' }),
+    next_credit_expiration_at: timestamp({
+      withTimezone: true,
+      mode: 'string',
+    }),
     stripe_customer_id: text(),
     auto_top_up_enabled: boolean().default(false).notNull(),
     settings: jsonb().default({}).$type<OrganizationSettings>().notNull(),
@@ -2712,8 +2745,12 @@ export const platform_integrations = pgTable(
   'platform_integrations',
   {
     id: idPrimaryKeyColumn,
-    owned_by_organization_id: uuid().references(() => organizations.id, { onDelete: 'cascade' }),
-    owned_by_user_id: text().references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    owned_by_organization_id: uuid().references(() => organizations.id, {
+      onDelete: 'cascade',
+    }),
+    owned_by_user_id: text().references(() => kilocode_users.id, {
+      onDelete: 'cascade',
+    }),
     created_by_user_id: text(),
 
     // Platform (examples: 'github', 'gitlab', 'bitbucket', 'azure_devops')
@@ -2812,6 +2849,46 @@ export const platform_integrations = pgTable(
 );
 
 export type PlatformIntegration = typeof platform_integrations.$inferSelect;
+
+export const user_github_app_tokens = pgTable(
+  'user_github_app_tokens',
+  {
+    id: idPrimaryKeyColumn,
+    kilo_user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    github_app_type: text().$type<'standard' | 'lite'>().notNull().default('standard'),
+    github_user_id: text().notNull(),
+    github_login: text().notNull(),
+    access_token_encrypted: text().notNull(),
+    access_token_expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    refresh_token_encrypted: text().notNull(),
+    refresh_token_expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    credential_version: integer().notNull().default(1),
+    revoked_at: timestamp({ withTimezone: true, mode: 'string' }),
+    revocation_reason: text(),
+    last_used_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    uniqueIndex('UQ_user_github_app_tokens_user_app').on(table.kilo_user_id, table.github_app_type),
+    uniqueIndex('UQ_user_github_app_tokens_github_user_app').on(
+      table.github_user_id,
+      table.github_app_type
+    ),
+    check(
+      'user_github_app_tokens_app_type_check',
+      sql`${table.github_app_type} IN ('standard', 'lite')`
+    ),
+  ]
+);
+
+export type UserGitHubAppToken = typeof user_github_app_tokens.$inferSelect;
+export type NewUserGitHubAppToken = typeof user_github_app_tokens.$inferInsert;
 
 // User Deployments
 
@@ -2944,7 +3021,9 @@ export const deployment_threat_detections = pgTable(
     deployment_id: uuid()
       .notNull()
       .references(() => deployments.id, { onDelete: 'cascade' }),
-    build_id: uuid().references(() => deployment_builds.id, { onDelete: 'set null' }),
+    build_id: uuid().references(() => deployment_builds.id, {
+      onDelete: 'set null',
+    }),
     threat_type: text().notNull(), // 'MALWARE' | 'SOCIAL_ENGINEERING' | 'UNWANTED_SOFTWARE' or comma-separated
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
   },
@@ -3027,8 +3106,12 @@ export const agent_configs = pgTable(
   {
     id: idPrimaryKeyColumn,
     // Ownership: exactly one must be set (org OR user)
-    owned_by_organization_id: uuid().references(() => organizations.id, { onDelete: 'cascade' }),
-    owned_by_user_id: text().references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    owned_by_organization_id: uuid().references(() => organizations.id, {
+      onDelete: 'cascade',
+    }),
+    owned_by_user_id: text().references(() => kilocode_users.id, {
+      onDelete: 'cascade',
+    }),
 
     // Agent type (examples: 'code_review', 'security_scan')
     agent_type: text().notNull(),
@@ -3096,8 +3179,12 @@ export const webhook_events = pgTable(
   'webhook_events',
   {
     id: idPrimaryKeyColumn,
-    owned_by_organization_id: uuid().references(() => organizations.id, { onDelete: 'cascade' }),
-    owned_by_user_id: text().references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    owned_by_organization_id: uuid().references(() => organizations.id, {
+      onDelete: 'cascade',
+    }),
+    owned_by_user_id: text().references(() => kilocode_users.id, {
+      onDelete: 'cascade',
+    }),
 
     // Platform (examples: 'github', 'gitlab', 'bitbucket')
     platform: text().notNull(),
@@ -3150,7 +3237,9 @@ export const cloud_agent_webhook_triggers = pgTable(
   {
     id: uuid('id').primaryKey().defaultRandom(),
     trigger_id: text('trigger_id').notNull(),
-    user_id: text('user_id').references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    user_id: text('user_id').references(() => kilocode_users.id, {
+      onDelete: 'cascade',
+    }),
     organization_id: uuid('organization_id').references(() => organizations.id, {
       onDelete: 'cascade',
     }),
@@ -3355,7 +3444,10 @@ export const modelStats = pgTable(
 
     // Performance (from Artificial Analysis)
     codingIndex: decimal('coding_index', { precision: 5, scale: 2 }),
-    speedTokensPerSec: decimal('speed_tokens_per_sec', { precision: 8, scale: 2 }),
+    speedTokensPerSec: decimal('speed_tokens_per_sec', {
+      precision: 8,
+      scale: 2,
+    }),
 
     // Technical specs (from OpenRouter)
     contextLength: integer('context_length'),
@@ -3581,8 +3673,12 @@ export const cloud_agent_code_reviews = pgTable(
   {
     id: idPrimaryKeyColumn,
     // Ownership: exactly one must be set (org OR user)
-    owned_by_organization_id: uuid().references(() => organizations.id, { onDelete: 'cascade' }),
-    owned_by_user_id: text().references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    owned_by_organization_id: uuid().references(() => organizations.id, {
+      onDelete: 'cascade',
+    }),
+    owned_by_user_id: text().references(() => kilocode_users.id, {
+      onDelete: 'cascade',
+    }),
 
     // Platform integration (optional - for linking to integration)
     platform_integration_id: uuid().references(() => platform_integrations.id, {
@@ -4082,7 +4178,9 @@ export const cliSessions = pgTable(
       onDelete: 'set null',
     }),
     cloud_agent_session_id: text().unique(),
-    organization_id: uuid().references(() => organizations.id, { onDelete: 'set null' }),
+    organization_id: uuid().references(() => organizations.id, {
+      onDelete: 'set null',
+    }),
     last_mode: text(),
     last_model: text(),
     version: integer().notNull().default(0),
@@ -4110,7 +4208,9 @@ export const sharedCliSessions = pgTable(
       .default(sql`pg_catalog.gen_random_uuid()`)
       .primaryKey()
       .notNull(),
-    session_id: uuid().references(() => cliSessions.session_id, { onDelete: 'set null' }),
+    session_id: uuid().references(() => cliSessions.session_id, {
+      onDelete: 'set null',
+    }),
     kilo_user_id: text()
       .notNull()
       .references(() => kilocode_users.id, { onDelete: 'restrict' }),
@@ -4145,7 +4245,9 @@ export const cli_sessions_v2 = pgTable(
     title: text(),
     public_id: uuid(),
     parent_session_id: text(),
-    organization_id: uuid().references(() => organizations.id, { onDelete: 'set null' }),
+    organization_id: uuid().references(() => organizations.id, {
+      onDelete: 'set null',
+    }),
     cloud_agent_session_id: text(),
     created_on_platform: text().notNull().default('unknown'),
     git_url: text(),
@@ -4186,6 +4288,176 @@ export const cli_sessions_v2 = pgTable(
 
 export type CliSessionV2 = typeof cli_sessions_v2.$inferSelect;
 export type NewCliSessionV2 = typeof cli_sessions_v2.$inferInsert;
+
+export type CloudAgentSessionFailureStage =
+  | 'sandbox_identity'
+  | 'registration'
+  | 'initial_admission'
+  | 'transport';
+export type CloudAgentSessionFailureCode =
+  | 'sandbox_id_derivation_failed'
+  | 'do_registration_rejected'
+  | 'initial_admission_rejected'
+  | 'initial_queue_full'
+  | 'invalid_initial_intent'
+  | 'do_rpc_outcome_unknown';
+
+export const cloud_agent_sessions = pgTable(
+  'cloud_agent_sessions',
+  {
+    cloud_agent_session_id: text().primaryKey().notNull(),
+    kilo_session_id: text().notNull(),
+    initial_message_id: text().notNull(),
+    sandbox_id: text(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    failure_at: timestamp({ withTimezone: true, mode: 'string' }),
+    failure_stage: text().$type<CloudAgentSessionFailureStage>(),
+    failure_code: text().$type<CloudAgentSessionFailureCode>(),
+    error_message_redacted: text(),
+    error_expires_at: timestamp({ withTimezone: true, mode: 'string' }),
+  },
+  table => [
+    uniqueIndex('UQ_cloud_agent_sessions_kilo_session_id').on(table.kilo_session_id),
+    uniqueIndex('UQ_cloud_agent_sessions_initial_message_id').on(table.initial_message_id),
+    index('IDX_cloud_agent_sessions_sandbox_id')
+      .on(table.sandbox_id)
+      .where(isNotNull(table.sandbox_id)),
+    index('IDX_cloud_agent_sessions_created_at').on(table.created_at),
+    index('IDX_cloud_agent_sessions_failure_created').on(
+      table.failure_stage,
+      table.failure_code,
+      table.created_at
+    ),
+    index('IDX_cloud_agent_sessions_failure_at')
+      .on(table.failure_at)
+      .where(isNotNull(table.failure_at)),
+    index('IDX_cloud_agent_sessions_failure_classification_at')
+      .on(table.failure_stage, table.failure_code, table.failure_at)
+      .where(isNotNull(table.failure_at)),
+    index('IDX_cloud_agent_sessions_error_expires_at')
+      .on(table.error_expires_at)
+      .where(isNotNull(table.error_expires_at)),
+    check(
+      'cloud_agent_sessions_failure_classification_check',
+      sql`(${table.failure_at} IS NULL AND ${table.failure_stage} IS NULL AND ${table.failure_code} IS NULL) OR
+        (${table.failure_at} IS NOT NULL AND ${table.failure_stage} = 'sandbox_identity' AND ${table.failure_code} = 'sandbox_id_derivation_failed') OR
+        (${table.failure_at} IS NOT NULL AND ${table.failure_stage} = 'registration' AND ${table.failure_code} = 'do_registration_rejected') OR
+        (${table.failure_at} IS NOT NULL AND ${table.failure_stage} = 'initial_admission' AND ${table.failure_code} IN ('initial_admission_rejected', 'initial_queue_full', 'invalid_initial_intent')) OR
+        (${table.failure_at} IS NOT NULL AND ${table.failure_stage} = 'transport' AND ${table.failure_code} = 'do_rpc_outcome_unknown')`
+    ),
+    check(
+      'cloud_agent_sessions_error_message_bounded_check',
+      sql`${table.error_message_redacted} IS NULL OR char_length(${table.error_message_redacted}) <= 4096`
+    ),
+    check(
+      'cloud_agent_sessions_error_expiry_check',
+      sql`(${table.error_message_redacted} IS NULL AND ${table.error_expires_at} IS NULL) OR
+        (${table.error_message_redacted} IS NOT NULL AND ${table.error_expires_at} IS NOT NULL)`
+    ),
+  ]
+);
+
+export type CloudAgentSession = typeof cloud_agent_sessions.$inferSelect;
+export type NewCloudAgentSession = typeof cloud_agent_sessions.$inferInsert;
+
+export type CloudAgentSessionRunStatus =
+  | 'queued'
+  | 'accepted'
+  | 'completed'
+  | 'failed'
+  | 'interrupted';
+export type CloudAgentSessionRunFailureStage =
+  | 'pre_dispatch'
+  | 'post_dispatch_no_activity'
+  | 'agent_activity'
+  | 'interruption'
+  | 'unknown';
+export type CloudAgentSessionRunFailureCode =
+  | 'sandbox_connect_failed'
+  | 'workspace_setup_failed'
+  | 'kilo_server_failed'
+  | 'wrapper_start_failed'
+  | 'invalid_delivery_request'
+  | 'session_metadata_missing'
+  | 'model_missing'
+  | 'delivery_failure_unknown'
+  | 'wrapper_disconnected'
+  | 'wrapper_no_output'
+  | 'wrapper_ping_timeout'
+  | 'wrapper_error_before_activity'
+  | 'assistant_error'
+  | 'wrapper_error_after_activity'
+  | 'missing_assistant_reply'
+  | 'user_interrupt'
+  | 'container_shutdown'
+  | 'system_interrupt'
+  | 'unclassified';
+
+export const cloud_agent_session_runs = pgTable(
+  'cloud_agent_session_runs',
+  {
+    cloud_agent_session_id: text()
+      .notNull()
+      .references(() => cloud_agent_sessions.cloud_agent_session_id, { onDelete: 'cascade' }),
+    message_id: text().notNull(),
+    wrapper_run_id: text(),
+    status: text().notNull().$type<CloudAgentSessionRunStatus>(),
+    queued_at: timestamp({ withTimezone: true, mode: 'string' }),
+    dispatch_accepted_at: timestamp({ withTimezone: true, mode: 'string' }),
+    agent_activity_observed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    terminal_at: timestamp({ withTimezone: true, mode: 'string' }),
+    failure_stage: text().$type<CloudAgentSessionRunFailureStage>(),
+    failure_code: text().$type<CloudAgentSessionRunFailureCode>(),
+    error_message_redacted: text(),
+    error_expires_at: timestamp({ withTimezone: true, mode: 'string' }),
+  },
+  table => [
+    primaryKey({ columns: [table.cloud_agent_session_id, table.message_id] }),
+    index('IDX_cloud_agent_session_runs_wrapper_run_id')
+      .on(table.wrapper_run_id)
+      .where(isNotNull(table.wrapper_run_id)),
+    index('IDX_cloud_agent_session_runs_session_queued').on(
+      table.cloud_agent_session_id,
+      table.queued_at
+    ),
+    index('IDX_cloud_agent_session_runs_queued_at').on(table.queued_at),
+    index('IDX_cloud_agent_session_runs_terminal_at').on(table.terminal_at),
+    index('IDX_cloud_agent_session_runs_status_terminal').on(table.status, table.terminal_at),
+    index('IDX_cloud_agent_session_runs_failure_terminal').on(
+      table.failure_stage,
+      table.failure_code,
+      table.terminal_at
+    ),
+    index('IDX_cloud_agent_session_runs_error_expires_at')
+      .on(table.error_expires_at)
+      .where(isNotNull(table.error_expires_at)),
+    check(
+      'cloud_agent_session_runs_status_check',
+      sql`${table.status} IN ('queued', 'accepted', 'completed', 'failed', 'interrupted')`
+    ),
+    check(
+      'cloud_agent_session_runs_failure_classification_check',
+      sql`(${table.failure_stage} IS NULL AND ${table.failure_code} IS NULL) OR
+        (${table.failure_stage} = 'pre_dispatch' AND ${table.failure_code} IN ('sandbox_connect_failed', 'workspace_setup_failed', 'kilo_server_failed', 'wrapper_start_failed', 'invalid_delivery_request', 'session_metadata_missing', 'model_missing', 'delivery_failure_unknown')) OR
+        (${table.failure_stage} = 'post_dispatch_no_activity' AND ${table.failure_code} IN ('wrapper_disconnected', 'wrapper_no_output', 'wrapper_ping_timeout', 'wrapper_error_before_activity', 'missing_assistant_reply')) OR
+        (${table.failure_stage} = 'agent_activity' AND ${table.failure_code} IN ('assistant_error', 'wrapper_error_after_activity')) OR
+        (${table.failure_stage} = 'interruption' AND ${table.failure_code} IN ('user_interrupt', 'container_shutdown', 'system_interrupt')) OR
+        (${table.failure_stage} = 'unknown' AND ${table.failure_code} = 'unclassified')`
+    ),
+    check(
+      'cloud_agent_session_runs_error_message_bounded_check',
+      sql`${table.error_message_redacted} IS NULL OR char_length(${table.error_message_redacted}) <= 4096`
+    ),
+    check(
+      'cloud_agent_session_runs_error_expiry_check',
+      sql`(${table.error_message_redacted} IS NULL AND ${table.error_expires_at} IS NULL) OR
+        (${table.error_message_redacted} IS NOT NULL AND ${table.error_expires_at} IS NOT NULL)`
+    ),
+  ]
+);
+
+export type CloudAgentSessionRun = typeof cloud_agent_session_runs.$inferSelect;
+export type NewCloudAgentSessionRun = typeof cloud_agent_session_runs.$inferInsert;
 
 /**
  * Per-tenant cache of the latest GitHub pull request observed for a
@@ -4264,7 +4536,9 @@ export const device_auth_requests = pgTable(
       .primaryKey()
       .notNull(),
     code: text().notNull(),
-    kilo_user_id: text().references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    kilo_user_id: text().references(() => kilocode_users.id, {
+      onDelete: 'cascade',
+    }),
     status: text()
       .$type<'pending' | 'approved' | 'denied' | 'expired'>()
       .notNull()
@@ -4304,7 +4578,9 @@ export const app_builder_projects = pgTable(
     title: text().notNull(),
     model_id: text().notNull(),
     template: text(), // nullable - null means default template (nextjs-starter)
-    deployment_id: uuid().references(() => deployments.id, { onDelete: 'set null' }),
+    deployment_id: uuid().references(() => deployments.id, {
+      onDelete: 'set null',
+    }),
     last_message_at: timestamp({ withTimezone: true, mode: 'string' }),
     // Git platform migration fields (GitHub, GitLab, etc.)
     git_repo_full_name: text(), // "owner/repo" after migration
@@ -4381,7 +4657,9 @@ export const app_reported_messages = pgTable('app_reported_messages', {
   signature: jsonb().$type<Record<string, unknown>>().notNull(),
   message: jsonb().$type<Record<string, unknown>>().notNull(),
   created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-  cli_session_id: uuid().references(() => cliSessions.session_id, { onDelete: 'set null' }),
+  cli_session_id: uuid().references(() => cliSessions.session_id, {
+    onDelete: 'set null',
+  }),
   mode: text(),
   model: text(),
 });
@@ -4392,10 +4670,15 @@ export const byok_api_keys = pgTable(
   'byok_api_keys',
   {
     id: idPrimaryKeyColumn,
-    organization_id: uuid().references(() => organizations.id, { onDelete: 'cascade' }),
-    kilo_user_id: text().references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    organization_id: uuid().references(() => organizations.id, {
+      onDelete: 'cascade',
+    }),
+    kilo_user_id: text().references(() => kilocode_users.id, {
+      onDelete: 'cascade',
+    }),
     provider_id: text().notNull(),
     encrypted_api_key: jsonb().$type<EncryptedData>().notNull(),
+    management_source: text().$type<BYOKManagementSource>().notNull().default('user'),
     is_enabled: boolean().default(true).notNull(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
@@ -4412,6 +4695,11 @@ export const byok_api_keys = pgTable(
     index('IDX_byok_api_keys_organization_id').on(table.organization_id),
     index('IDX_byok_api_keys_kilo_user_id').on(table.kilo_user_id),
     index('IDX_byok_api_keys_provider_id').on(table.provider_id),
+    enumCheck(
+      'byok_api_keys_management_source_check',
+      table.management_source,
+      BYOKManagementSource
+    ),
     // Owner check constraint (exactly one must be set)
     check(
       'byok_api_keys_owner_check',
@@ -4432,8 +4720,12 @@ export const security_findings = pgTable(
     id: idPrimaryKeyColumn,
 
     // Ownership (same pattern as cloud_agent_code_reviews)
-    owned_by_organization_id: uuid().references(() => organizations.id, { onDelete: 'cascade' }),
-    owned_by_user_id: text().references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    owned_by_organization_id: uuid().references(() => organizations.id, {
+      onDelete: 'cascade',
+    }),
+    owned_by_user_id: text().references(() => kilocode_users.id, {
+      onDelete: 'cascade',
+    }),
 
     // Platform integration reference
     platform_integration_id: uuid().references(() => platform_integrations.id, {
@@ -4547,8 +4839,12 @@ export const security_analysis_queue = pgTable(
     finding_id: uuid()
       .notNull()
       .references(() => security_findings.id, { onDelete: 'cascade' }),
-    owned_by_organization_id: uuid().references(() => organizations.id, { onDelete: 'cascade' }),
-    owned_by_user_id: text().references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    owned_by_organization_id: uuid().references(() => organizations.id, {
+      onDelete: 'cascade',
+    }),
+    owned_by_user_id: text().references(() => kilocode_users.id, {
+      onDelete: 'cascade',
+    }),
     queue_status: text().notNull(),
     severity_rank: smallint().notNull(),
     queued_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
@@ -4663,13 +4959,20 @@ export const security_analysis_owner_state = pgTable(
   'security_analysis_owner_state',
   {
     id: idPrimaryKeyColumn,
-    owned_by_organization_id: uuid().references(() => organizations.id, { onDelete: 'cascade' }),
-    owned_by_user_id: text().references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    owned_by_organization_id: uuid().references(() => organizations.id, {
+      onDelete: 'cascade',
+    }),
+    owned_by_user_id: text().references(() => kilocode_users.id, {
+      onDelete: 'cascade',
+    }),
     auto_analysis_enabled_at: timestamp({ withTimezone: true, mode: 'string' }),
     blocked_until: timestamp({ withTimezone: true, mode: 'string' }),
     block_reason: text(),
     consecutive_actor_resolution_failures: integer().notNull().default(0),
-    last_actor_resolution_failure_at: timestamp({ withTimezone: true, mode: 'string' }),
+    last_actor_resolution_failure_at: timestamp({
+      withTimezone: true,
+      mode: 'string',
+    }),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()
@@ -4705,8 +5008,12 @@ export const security_audit_log = pgTable(
   {
     id: idPrimaryKeyColumn,
     // XOR ownership: exactly one of owned_by_organization_id or owned_by_user_id must be set.
-    owned_by_organization_id: uuid().references(() => organizations.id, { onDelete: 'cascade' }),
-    owned_by_user_id: text().references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    owned_by_organization_id: uuid().references(() => organizations.id, {
+      onDelete: 'cascade',
+    }),
+    owned_by_user_id: text().references(() => kilocode_users.id, {
+      onDelete: 'cascade',
+    }),
     // actor_id is text to match kilocode_users.id; nullable for system-initiated actions
     actor_id: text(),
     actor_email: text(),
@@ -4748,8 +5055,12 @@ export const slack_bot_requests = pgTable(
     id: idPrimaryKeyColumn,
 
     // Ownership (from the platform_integration)
-    owned_by_organization_id: uuid().references(() => organizations.id, { onDelete: 'cascade' }),
-    owned_by_user_id: text().references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    owned_by_organization_id: uuid().references(() => organizations.id, {
+      onDelete: 'cascade',
+    }),
+    owned_by_user_id: text().references(() => kilocode_users.id, {
+      onDelete: 'cascade',
+    }),
 
     // Platform integration reference
     platform_integration_id: uuid().references(() => platform_integrations.id, {
@@ -4817,8 +5128,12 @@ export const auto_triage_tickets = pgTable(
     id: idPrimaryKeyColumn,
 
     // Ownership (exactly one must be set)
-    owned_by_organization_id: uuid().references(() => organizations.id, { onDelete: 'cascade' }),
-    owned_by_user_id: text().references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    owned_by_organization_id: uuid().references(() => organizations.id, {
+      onDelete: 'cascade',
+    }),
+    owned_by_user_id: text().references(() => kilocode_users.id, {
+      onDelete: 'cascade',
+    }),
 
     // Platform integration
     platform_integration_id: uuid().references(() => platform_integrations.id, {
@@ -4947,8 +5262,12 @@ export const auto_fix_tickets = pgTable(
     id: idPrimaryKeyColumn,
 
     // Ownership (exactly one must be set)
-    owned_by_organization_id: uuid().references(() => organizations.id, { onDelete: 'cascade' }),
-    owned_by_user_id: text().references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    owned_by_organization_id: uuid().references(() => organizations.id, {
+      onDelete: 'cascade',
+    }),
+    owned_by_user_id: text().references(() => kilocode_users.id, {
+      onDelete: 'cascade',
+    }),
 
     // Platform integration
     platform_integration_id: uuid().references(() => platform_integrations.id, {
@@ -4956,7 +5275,9 @@ export const auto_fix_tickets = pgTable(
     }),
 
     // Link to triage ticket (optional)
-    triage_ticket_id: uuid().references(() => auto_triage_tickets.id, { onDelete: 'set null' }),
+    triage_ticket_id: uuid().references(() => auto_triage_tickets.id, {
+      onDelete: 'set null',
+    }),
 
     // GitHub metadata
     platform: text().notNull().default('github'),
@@ -4989,7 +5310,9 @@ export const auto_fix_tickets = pgTable(
 
     // Cloud Agent session
     session_id: text(), // Cloud agent session ID (agent_xxx)
-    cli_session_id: uuid().references(() => cliSessions.session_id, { onDelete: 'set null' }),
+    cli_session_id: uuid().references(() => cliSessions.session_id, {
+      onDelete: 'set null',
+    }),
 
     // PR information
     pr_number: integer(),
@@ -5925,7 +6248,9 @@ export const kiloclaw_version_pins = pgTable('kiloclaw_version_pins', {
     .unique(),
   image_tag: text()
     .notNull()
-    .references(() => kiloclaw_image_catalog.image_tag, { onDelete: 'restrict' }),
+    .references(() => kiloclaw_image_catalog.image_tag, {
+      onDelete: 'restrict',
+    }),
   pinned_by: text()
     .notNull()
     .references(() => kilocode_users.id),
@@ -6487,7 +6812,9 @@ export const bot_requests = pgTable(
     created_by: text()
       .notNull()
       .references(() => kilocode_users.id, { onDelete: 'cascade' }),
-    organization_id: uuid().references(() => organizations.id, { onDelete: 'cascade' }),
+    organization_id: uuid().references(() => organizations.id, {
+      onDelete: 'cascade',
+    }),
 
     platform_integration_id: uuid().references(() => platform_integrations.id, {
       onDelete: 'set null',
@@ -6634,6 +6961,163 @@ export const kiloclaw_cli_runs = pgTable(
 
 export type KiloClawCliRun = typeof kiloclaw_cli_runs.$inferSelect;
 export type NewKiloClawCliRun = typeof kiloclaw_cli_runs.$inferInsert;
+
+// =============================================================================
+// Coding Plans
+// =============================================================================
+
+export const coding_plan_key_inventory = pgTable(
+  'coding_plan_key_inventory',
+  {
+    id: uuid()
+      .default(sql`gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    plan_id: text().notNull(),
+    provider_id: text().notNull(),
+    upstream_plan_id: text().notNull(),
+    encrypted_api_key: jsonb().$type<EncryptedData>(),
+    credential_fingerprint: text().notNull(),
+    status: text().$type<CodingPlanCredentialStatus>().notNull().default('available'),
+    assigned_to_user_id: text().references(() => kilocode_users.id, {
+      onDelete: 'set null',
+    }),
+    assigned_at: timestamp({ withTimezone: true, mode: 'string' }),
+    revocation_requested_at: timestamp({ withTimezone: true, mode: 'string' }),
+    revoked_at: timestamp({ withTimezone: true, mode: 'string' }),
+    revocation_attempt_count: integer().notNull().default(0),
+    last_revocation_error: text(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    uniqueIndex('UQ_coding_plan_key_inv_fingerprint').on(table.credential_fingerprint),
+    index('IDX_coding_plan_key_inv_plan_status').on(table.plan_id, table.status),
+    index('IDX_coding_plan_key_inv_available')
+      .on(table.plan_id)
+      .where(sql`${table.status} = 'available'`),
+    enumCheck('coding_plan_key_inventory_status_check', table.status, CodingPlanCredentialStatus),
+  ]
+);
+
+export type CodingPlanKeyInventory = typeof coding_plan_key_inventory.$inferSelect;
+
+export const coding_plan_subscriptions = pgTable(
+  'coding_plan_subscriptions',
+  {
+    id: uuid()
+      .default(sql`gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    plan_id: text().notNull(),
+    provider_id: text().notNull(),
+    key_inventory_id: uuid().references(() => coding_plan_key_inventory.id, {
+      onDelete: 'set null',
+    }),
+    installed_byok_key_id: uuid().references(() => byok_api_keys.id, {
+      onDelete: 'set null',
+    }),
+    status: text().notNull().$type<CodingPlanSubscriptionStatus>(),
+    cost_microdollars: bigint({ mode: 'number' }).notNull(),
+    billing_period_days: integer().notNull(),
+    current_period_start: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    current_period_end: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    credit_renewal_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    cancel_at_period_end: boolean().notNull().default(false),
+    past_due_started_at: timestamp({ withTimezone: true, mode: 'string' }),
+    payment_grace_expires_at: timestamp({ withTimezone: true, mode: 'string' }),
+    auto_top_up_attempted_for_due: timestamp({ withTimezone: true, mode: 'string' }),
+    canceled_at: timestamp({ withTimezone: true, mode: 'string' }),
+    cancellation_reason: text(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    uniqueIndex('UQ_coding_plan_sub_live_user_plan')
+      .on(table.user_id, table.plan_id)
+      .where(sql`${table.status} IN ('active', 'past_due')`),
+    index('IDX_coding_plan_sub_status').on(table.status),
+    index('IDX_coding_plan_sub_renewal').on(table.credit_renewal_at),
+    index('IDX_coding_plan_sub_inventory').on(table.key_inventory_id),
+    enumCheck('coding_plan_subscriptions_status_check', table.status, CodingPlanSubscriptionStatus),
+    check(
+      'coding_plan_subscriptions_live_access_check',
+      sql`${table.status} = 'canceled' OR ${table.key_inventory_id} IS NOT NULL`
+    ),
+  ]
+);
+
+export type CodingPlanSubscription = typeof coding_plan_subscriptions.$inferSelect;
+export type NewCodingPlanSubscription = typeof coding_plan_subscriptions.$inferInsert;
+
+export const coding_plan_terms = pgTable(
+  'coding_plan_terms',
+  {
+    id: uuid()
+      .default(sql`gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    subscription_id: uuid()
+      .notNull()
+      .references(() => coding_plan_subscriptions.id, { onDelete: 'cascade' }),
+    user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    plan_id: text().notNull(),
+    kind: text().$type<CodingPlanTermKind>().notNull(),
+    idempotency_key: text().notNull(),
+    period_start: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    period_end: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    cost_microdollars: bigint({ mode: 'number' }).notNull(),
+    credit_transaction_id: uuid()
+      .notNull()
+      .references(() => credit_transactions.id),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    uniqueIndex('UQ_coding_plan_terms_request').on(
+      table.user_id,
+      table.plan_id,
+      table.idempotency_key
+    ),
+    index('IDX_coding_plan_terms_subscription').on(table.subscription_id),
+    enumCheck('coding_plan_terms_kind_check', table.kind, CodingPlanTermKind),
+  ]
+);
+
+export type CodingPlanTerm = typeof coding_plan_terms.$inferSelect;
+export type NewCodingPlanTerm = typeof coding_plan_terms.$inferInsert;
+
+export const coding_plan_availability_intents = pgTable(
+  'coding_plan_availability_intents',
+  {
+    id: uuid()
+      .default(sql`gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    plan_id: text().notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    uniqueIndex('UQ_coding_plan_availability_intents_user_plan').on(table.user_id, table.plan_id),
+    index('IDX_coding_plan_availability_intents_plan').on(table.plan_id),
+  ]
+);
+
+export type CodingPlanAvailabilityIntent = typeof coding_plan_availability_intents.$inferSelect;
+export type NewCodingPlanAvailabilityIntent = typeof coding_plan_availability_intents.$inferInsert;
 
 // ─── Push Notification Tokens ────────────────────────────────────────
 

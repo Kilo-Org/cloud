@@ -5,6 +5,8 @@ export type AnalysisErrorCode =
   | 'AUTH_FAILED'
   | 'REPO_NOT_FOUND'
   | 'SANDBOX_FAILED'
+  | 'FINDING_NOT_ELIGIBLE'
+  | 'ANALYSIS_IN_PROGRESS'
   | 'UNKNOWN';
 
 type ClassifiedError = {
@@ -90,6 +92,8 @@ export function isUserActionableError(code: AnalysisErrorCode): boolean {
     case 'CLONE_FAILED':
     case 'AUTH_FAILED':
     case 'REPO_NOT_FOUND':
+    case 'FINDING_NOT_ELIGIBLE':
+    case 'ANALYSIS_IN_PROGRESS':
       return true;
     case 'SANDBOX_FAILED':
     case 'UNKNOWN':
@@ -105,6 +109,9 @@ export function trpcCodeForAnalysisError(code: AnalysisErrorCode | undefined): T
       return 'PRECONDITION_FAILED';
     case 'REPO_NOT_FOUND':
       return 'NOT_FOUND';
+    case 'FINDING_NOT_ELIGIBLE':
+    case 'ANALYSIS_IN_PROGRESS':
+      return 'CONFLICT';
     case 'SANDBOX_FAILED':
     case 'UNKNOWN':
     default:

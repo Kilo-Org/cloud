@@ -10,6 +10,7 @@
  */
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useCallback } from 'react';
 
 import { useTRPC } from '@/lib/trpc/utils';
 import { useClawContext } from '../components/ClawContext';
@@ -348,24 +349,52 @@ export function useClawGatewayReady(enabled: boolean) {
 
 // File operations
 
-export function useClawFileTree(enabled: boolean) {
+export function useClawFileTree(enabled: boolean, path?: string) {
   const trpc = useTRPC();
   const { organizationId } = useClawContext();
 
   const personal = useQuery({
-    ...trpc.kiloclaw.fileTree.queryOptions(undefined, { refetchOnWindowFocus: false }),
+    ...trpc.kiloclaw.fileTree.queryOptions(path === undefined ? undefined : { path }, {
+      refetchOnWindowFocus: false,
+    }),
     enabled: enabled && !organizationId,
   });
 
   const org = useQuery({
     ...trpc.organizations.kiloclaw.fileTree.queryOptions(
-      { organizationId: organizationId ?? '' },
+      { organizationId: organizationId ?? '', ...(path === undefined ? {} : { path }) },
       { refetchOnWindowFocus: false }
     ),
     enabled: enabled && !!organizationId,
   });
 
   return organizationId ? org : personal;
+}
+
+export function useClawFileTreeLoader(enabled: boolean) {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  const { organizationId } = useClawContext();
+
+  return useCallback(
+    async (path: string) => {
+      if (!enabled) return [];
+
+      if (organizationId) {
+        return await queryClient.fetchQuery(
+          trpc.organizations.kiloclaw.fileTree.queryOptions(
+            { organizationId, path },
+            { refetchOnWindowFocus: false }
+          )
+        );
+      }
+
+      return await queryClient.fetchQuery(
+        trpc.kiloclaw.fileTree.queryOptions({ path }, { refetchOnWindowFocus: false })
+      );
+    },
+    [enabled, organizationId, queryClient, trpc]
+  );
 }
 
 export function useClawReadFile(path: string | null, enabled: boolean) {
@@ -388,31 +417,6 @@ export function useClawReadFile(path: string | null, enabled: boolean) {
       { refetchOnWindowFocus: false, refetchOnMount: 'always' }
     ),
     enabled: enabled && path !== null && !!organizationId,
-  });
-
-  return organizationId ? org : personal;
-}
-
-// Google integration
-
-export function useClawGoogleSetupCommand(enabled: boolean) {
-  const trpc = useTRPC();
-  const { organizationId } = useClawContext();
-
-  const personal = useQuery({
-    ...trpc.kiloclaw.getGoogleSetupCommand.queryOptions(undefined, {
-      refetchInterval: 50 * 60 * 1000,
-      refetchOnWindowFocus: false,
-    }),
-    enabled: enabled && !organizationId,
-  });
-
-  const org = useQuery({
-    ...trpc.organizations.kiloclaw.getGoogleSetupCommand.queryOptions(
-      { organizationId: organizationId ?? '' },
-      { refetchInterval: 50 * 60 * 1000, refetchOnWindowFocus: false }
-    ),
-    enabled: enabled && !!organizationId,
   });
 
   return organizationId ? org : personal;

@@ -39,11 +39,13 @@ function createTestFetch(overrides?: {
   ptyCalls?: PtyCall[];
   resizeCalls?: Array<{ ptyId: string; cols: number; rows: number }>;
   deleteCalls?: string[];
+  runtimeEnvironmentUpdates?: Array<Record<string, string>>;
   resizeError?: Error;
 }) {
   const ptyCalls = overrides?.ptyCalls ?? [];
   const resizeCalls = overrides?.resizeCalls ?? [];
   const deleteCalls = overrides?.deleteCalls ?? [];
+  const runtimeEnvironmentUpdates = overrides?.runtimeEnvironmentUpdates ?? [];
 
   const pty: WrapperPty = {
     id: 'pty_123',
@@ -79,6 +81,8 @@ function createTestFetch(overrides?: {
       sessionId: 'kilo_sess_test',
       agentSessionId: 'agent_00000000-0000-0000-0000-000000000000',
       userId: 'user_test',
+      wrapperInstanceId: 'instance_test',
+      wrapperInstanceGeneration: 8,
     },
     {
       state: new WrapperState(),
@@ -88,14 +92,32 @@ function createTestFetch(overrides?: {
       setAborted: () => {},
       resetLifecycle: () => {},
       setPerTurnConfig: () => {},
+      updateRuntimeEnvironment: async env => {
+        runtimeEnvironmentUpdates.push(env);
+      },
     },
     () => {}
   );
-  return { fetchHandler, ptyCalls, resizeCalls, deleteCalls };
+  return { fetchHandler, ptyCalls, resizeCalls, deleteCalls, runtimeEnvironmentUpdates };
 }
 
 afterEach(async () => {
   await Promise.all(servers.splice(0).map(server => server.stop()));
+});
+
+describe('wrapper health', () => {
+  it('reports leased physical wrapper identity separately from session identity', async () => {
+    const { fetchHandler } = createTestFetch();
+    const response = await fetchHandler(new Request('http://wrapper.test/health'));
+    if (!response) throw new Error('Expected health response');
+
+    const body = await response.json();
+    expect(body).toMatchObject({
+      sessionId: 'kilo_sess_test',
+      wrapperInstanceId: 'instance_test',
+      wrapperInstanceGeneration: 8,
+    });
+  });
 });
 
 describe('wrapper PTY routes', () => {
@@ -237,7 +259,222 @@ describe('wrapper PTY routes', () => {
   });
 });
 
+describe('wrapper runtime environment', () => {
+  it('delegates environment updates to the active runtime updater', async () => {
+    const runtimeEnvironmentUpdates: Array<Record<string, string>> = [];
+    const { fetchHandler } = createTestFetch({ runtimeEnvironmentUpdates });
+
+    const response = await fetchHandler(
+      new Request('http://wrapper.test/session/environment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ env: { GH_TOKEN: 'next-token' } }),
+      })
+    );
+
+    expect(response).toBeDefined();
+    if (!response) throw new Error('Expected runtime environment response');
+    expect(response.status).toBe(200);
+    expect(runtimeEnvironmentUpdates).toEqual([{ GH_TOKEN: 'next-token' }]);
+  });
+});
+
+describe('wrapper Kilo proxy route', () => {
+  it('requests an identity response from private Kilo even when the client accepts gzip', async () => {
+    const upstreamPort = await getFreePort();
+    const wrapperPort = await getFreePort();
+    const upstreamAcceptEncodings: Array<string | null> = [];
+    const upstream = Bun.serve({
+      port: upstreamPort,
+      fetch(req) {
+        upstreamAcceptEncodings.push(req.headers.get('accept-encoding'));
+        return new Response('proxied');
+      },
+    });
+    const kiloClient = {
+      serverUrl: `http://127.0.0.1:${upstreamPort}`,
+    } as unknown as WrapperKiloClient;
+    const wrapper = createServer(
+      {
+        port: wrapperPort,
+        workspacePath: '/workspace/repo',
+        version: 'test',
+        sessionId: 'kilo_sess_test',
+        agentSessionId: 'agent_00000000-0000-0000-0000-000000000000',
+        userId: 'user_test',
+      },
+      {
+        state: new WrapperState(),
+        kiloClient,
+        openConnection: async () => {},
+        closeConnection: async () => {},
+        setAborted: () => {},
+        resetLifecycle: () => {},
+      },
+      () => {}
+    );
+
+    try {
+      const response = await fetch(`http://127.0.0.1:${wrapperPort}/kilo-proxy/session/ses_123`, {
+        headers: { 'Accept-Encoding': 'gzip' },
+      });
+
+      expect(response.status).toBe(200);
+      expect(upstreamAcceptEncodings).toEqual(['identity']);
+    } finally {
+      await wrapper.server.stop(true);
+      await upstream.stop(true);
+    }
+  });
+});
+
 describe('wrapper session binding', () => {
+  it('keeps bootstrap rebindings close-only until runtime readiness is verified', async () => {
+    const state = new WrapperState();
+    state.bindSession({
+      kiloSessionId: 'kilo_sess_test',
+      ingestUrl: 'ws://worker.test/ingest',
+      workerAuthToken: 'worker-token',
+      wrapperRunId: 'run_1',
+      wrapperGeneration: 1,
+      wrapperConnectionId: 'conn_1',
+      agentSessionId: 'agent_00000000-0000-0000-0000-000000000000',
+    });
+    state.setConnections({ readyState: WebSocket.OPEN } as WebSocket, new AbortController());
+
+    const closeOrder: string[] = [];
+    const response = await bindSessionContext(
+      {
+        ingestUrl: 'ws://worker.test/ingest',
+        workerAuthToken: 'worker-token',
+        wrapperRunId: 'run_2',
+        wrapperGeneration: 2,
+        wrapperConnectionId: 'conn_2',
+      },
+      {
+        port: 5000,
+        workspacePath: '/workspace/repo',
+        version: 'test',
+        sessionId: 'kilo_sess_test',
+        agentSessionId: 'agent_00000000-0000-0000-0000-000000000000',
+        userId: 'user_test',
+      },
+      {
+        state,
+        kiloClient: {} as WrapperKiloClient,
+        openConnection: async () => {},
+        closeConnection: async () => {
+          closeOrder.push('ingest');
+        },
+        setAborted: () => {},
+        resetLifecycle: () => {},
+        onSessionBound: feedPolicy => {
+          closeOrder.push(feedPolicy);
+        },
+      },
+      'close-until-runtime-ready'
+    );
+
+    expect(response).toBeNull();
+    expect(closeOrder).toEqual(['close-until-runtime-ready', 'ingest']);
+  });
+
+  it('closes the bootstrap feed for an unchanged binding until runtime readiness is verified', async () => {
+    const state = new WrapperState();
+    const sessionBinding = {
+      kiloSessionId: 'kilo_sess_test',
+      ingestUrl: 'ws://worker.test/ingest',
+      workerAuthToken: 'worker-token',
+      wrapperRunId: 'run_1',
+      wrapperGeneration: 1,
+      wrapperConnectionId: 'conn_1',
+      agentSessionId: 'agent_00000000-0000-0000-0000-000000000000',
+    };
+    state.bindSession(sessionBinding);
+
+    const feedPolicies: string[] = [];
+    let closeConnectionCalls = 0;
+    let resetLifecycleCalls = 0;
+    const response = await bindSessionContext(
+      sessionBinding,
+      {
+        port: 5000,
+        workspacePath: '/workspace/repo',
+        version: 'test',
+        sessionId: 'kilo_sess_test',
+        agentSessionId: 'agent_00000000-0000-0000-0000-000000000000',
+        userId: 'user_test',
+      },
+      {
+        state,
+        kiloClient: {} as WrapperKiloClient,
+        openConnection: async () => {},
+        closeConnection: async () => {
+          closeConnectionCalls += 1;
+        },
+        setAborted: () => {},
+        resetLifecycle: () => {
+          resetLifecycleCalls += 1;
+        },
+        onSessionBound: feedPolicy => {
+          feedPolicies.push(feedPolicy);
+        },
+      },
+      'close-until-runtime-ready'
+    );
+
+    expect(response).toBeNull();
+    expect(feedPolicies).toEqual(['close-until-runtime-ready']);
+    expect(closeConnectionCalls).toBe(0);
+    expect(resetLifecycleCalls).toBe(0);
+  });
+
+  it('keeps restart behavior for legacy direct rebindings', async () => {
+    const state = new WrapperState();
+    state.bindSession({
+      kiloSessionId: 'kilo_sess_test',
+      ingestUrl: 'ws://worker.test/ingest',
+      workerAuthToken: 'worker-token',
+      wrapperRunId: 'run_1',
+      wrapperGeneration: 1,
+      wrapperConnectionId: 'conn_1',
+      agentSessionId: 'agent_00000000-0000-0000-0000-000000000000',
+    });
+
+    const feedPolicies: string[] = [];
+    const response = await bindSessionContext(
+      {
+        ingestUrl: 'ws://worker.test/ingest',
+        workerAuthToken: 'worker-token',
+        wrapperRunId: 'run_2',
+        wrapperGeneration: 2,
+        wrapperConnectionId: 'conn_2',
+      },
+      {
+        port: 5000,
+        workspacePath: '/workspace/repo',
+        version: 'test',
+        sessionId: 'kilo_sess_test',
+        agentSessionId: 'agent_00000000-0000-0000-0000-000000000000',
+        userId: 'user_test',
+      },
+      {
+        state,
+        kiloClient: {} as WrapperKiloClient,
+        openConnection: async () => {},
+        closeConnection: async () => {},
+        setAborted: () => {},
+        resetLifecycle: () => {},
+        onSessionBound: feedPolicy => {
+          feedPolicies.push(feedPolicy);
+        },
+      }
+    );
+
+    expect(response).toBeNull();
+    expect(feedPolicies).toEqual(['restart']);
+  });
+
   it('resets lifecycle state when warm rebinding an existing connected session', async () => {
     const state = new WrapperState();
     state.bindSession({

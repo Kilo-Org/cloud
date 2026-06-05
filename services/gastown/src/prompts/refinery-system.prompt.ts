@@ -73,13 +73,15 @@ ${gateList}
 
 ### Step 2: Code Review
 If all gates pass (or no gates are configured), review the diff:
-1. Run \`git diff ${params.targetBranch}...HEAD\` to see all changes
-2. Check for:
-   - Correctness — does the code do what the bead title/description asked?
-   - Style — consistent with the existing codebase?
-   - Test coverage — are new features tested?
-   - Security — no secrets, no injection vulnerabilities, no unsafe patterns?
-   - Build artifacts — no compiled files, node_modules, or other generated content?
+
+- First, check for REVIEW.md in the workspace root. If it exists, read and follow its guidance for what to flag, severity calibration, skip rules, and summary format.
+- If REVIEW.md is absent, use these default review rules:
+  - Correctness — does the code do what the bead title/description asked?
+  - Style — consistent with the existing codebase?
+  - Test coverage — are new features tested?
+  - Security — no secrets, no injection vulnerabilities, no unsafe patterns?
+  - Build artifacts — no compiled files, node_modules, or other generated content?
+- Then, run \`git diff ${params.targetBranch}...HEAD\` to see all changes
 
 ### Step 3: Decision
 
@@ -197,13 +199,15 @@ ${params.gateList}
 
 ### Step 2: Code Review
 Review the diff on the PR:
-1. Run \`gh pr diff ${params.prUrl}\` or \`git diff ${params.targetBranch}...HEAD\` to see all changes
-2. Check for:
-   - Correctness — does the code do what the bead title/description asked?
-   - Style — consistent with the existing codebase?
-   - Test coverage — are new features tested?
-   - Security — no secrets, no injection vulnerabilities, no unsafe patterns?
-   - Build artifacts — no compiled files, node_modules, or other generated content?
+
+- First, check for REVIEW.md in the workspace root. If it exists, read and follow its guidance for what to flag, severity calibration, skip rules, and summary format.
+- If REVIEW.md is absent, use these default review rules:
+  - Correctness — does the code do what the bead title/description asked?
+  - Style — consistent with the existing codebase?
+  - Test coverage — are new features tested?
+  - Security — no secrets, no injection vulnerabilities, no unsafe patterns?
+  - Build artifacts — no compiled files, node_modules, or other generated content?
+- Then, run \`gh pr diff ${params.prUrl}\` or \`git diff ${params.targetBranch}...HEAD\` to see all changes
 
 ### Step 3: Submit Your Review
 

@@ -248,13 +248,7 @@ describe('mapToUsageStats approval tests', () => {
   test(claudeSonnetGeneration, async () => {
     const inputFile = join(sampleDir, claudeSonnetGeneration);
     const generationData = JSON.parse(await readFile(inputFile, 'utf-8')) as OpenRouterGeneration;
-    const result = mapToUsageStats(
-      generationData,
-      'nonsense',
-      'fake-user-id',
-      'fake-model',
-      'openrouter'
-    );
+    const result = mapToUsageStats(generationData, 'nonsense', 'fake-user-id', 'openrouter');
     const resultString = JSON.stringify(result, null, 2);
     const approvalFilePath = inputFile + '.mapToUsageStats.approved.json';
     await verifyApproval(resultString, approvalFilePath);
@@ -292,13 +286,7 @@ describe('mapToUsageStats', () => {
     };
 
     // Call mapToUsageStats with the BYOK generation
-    const result = mapToUsageStats(
-      byokGeneration,
-      'test response',
-      'fake-user-id',
-      'fake-model',
-      'openrouter'
-    );
+    const result = mapToUsageStats(byokGeneration, 'test response', 'fake-user-id', 'openrouter');
 
     // Verify that the cost is multiplied by OPENROUTER_BYOK_COST_MULTIPLIER
     expect(result.cost_mUsd).toBe(toMicrodollars(0.1 * 20.0)); // 0.1 * 20 = 2, then convert to microdollars
@@ -326,7 +314,6 @@ describe('mapToUsageStats', () => {
       nonByokGeneration,
       'test response',
       ' fake-user-id',
-      'fake-model',
       'openrouter'
     );
 
@@ -457,6 +444,34 @@ describe('logMicrodollarUsage', () => {
     });
     expect(metadataRecord).toBeTruthy();
     expect(metadataRecord?.session_id).toBe('task-abc123');
+  });
+
+  test('stores abuse delay and original model when a request is quarantined', async () => {
+    const user = await insertTestUser({
+      id: 'test-log-user-abuse',
+      microdollars_used: 0,
+      google_user_email: 'abuse-test@example.com',
+    });
+
+    const usageStats: MicrodollarUsageStats = {
+      ...BASE_USAGE_STATS,
+      messageId: 'test-msg-abuse',
+      model: 'nvidia/nemotron-3-super-120b-a12b:free',
+    };
+    const usageContext: MicrodollarUsageContext = {
+      ...createBaseUsageContext(user),
+      requested_model: 'nvidia/nemotron-3-super-120b-a12b:free',
+      abuse_delay: 6000,
+      abuse_downgraded_from: 'openai/gpt-4o',
+    };
+
+    await logMicrodollarUsage(usageStats, usageContext);
+
+    const metadataRecord = await db.query.microdollar_usage_metadata.findFirst({
+      where: eq(microdollar_usage_metadata.message_id, 'test-msg-abuse'),
+    });
+    expect(metadataRecord?.abuse_delay).toBe(6000);
+    expect(metadataRecord?.abuse_downgraded_from).toBe('openai/gpt-4o');
   });
 
   test('stores usage data without incrementing user microdollars for zero cost', async () => {

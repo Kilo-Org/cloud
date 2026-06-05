@@ -28,6 +28,18 @@ services:
       - redis_data:/data
     restart: unless-stopped
 
+  redis-http:
+    image: hiett/serverless-redis-http:latest
+    ports:
+      - '8079:80'
+    environment:
+      SRH_MODE: env
+      SRH_TOKEN: example_token
+      SRH_CONNECTION_STRING: redis://redis:6379
+    depends_on:
+      - redis
+    restart: unless-stopped
+
   grafana:
     image: grafana/grafana-oss:13.0.1
     container_name: grafana

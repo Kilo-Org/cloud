@@ -9,20 +9,21 @@
  */
 
 import type { SandboxInstance } from '../types.js';
+import type { ObservedWrapper, WrapperObservation } from '../agent-sandbox/protocol.js';
 import { logger } from '../logger.js';
-import {
-  getDevContainerOverridePath,
-  KILO_AGENT_SESSION_LABEL,
-  KILO_WRAPPER_PORT_LABEL,
-} from './devcontainer.js';
+import { KILO_AGENT_SESSION_LABEL, KILO_WRAPPER_PORT_LABEL } from './devcontainer.js';
 import { dockerSocketEnv, resolveDockerSocketPath } from './sandbox-runtime.js';
 import { shellQuote } from './utils.js';
 
 // Re-export Process type from sandbox for consumers
 type Process = Awaited<ReturnType<SandboxInstance['listProcesses']>>[number];
 
-/** Command-line marker to identify which session owns a wrapper */
+/** Command markers identifying the logical session and leased physical wrapper. */
 const KILO_WRAPPER_SESSION_FLAG = '--agent-session';
+const KILO_WRAPPER_INSTANCE_FLAG = '--wrapper-instance-id';
+const KILO_WRAPPER_INSTANCE_GENERATION_FLAG = '--wrapper-instance-generation';
+const KILO_WRAPPER_INSTANCE_ENV = 'WRAPPER_INSTANCE_ID=';
+const KILO_WRAPPER_INSTANCE_GENERATION_ENV = 'WRAPPER_INSTANCE_GENERATION=';
 
 /**
  * Information about a running wrapper.
@@ -64,18 +65,41 @@ export function extractWrapperPortFromCommand(command: string): number | null {
  * @param command - The full command string
  * @returns The session ID, or null if not found
  */
-export function extractWrapperSessionIdFromCommand(command: string): string | null {
-  const flagIndex = command.indexOf(KILO_WRAPPER_SESSION_FLAG);
+function extractFlagValueFromCommand(command: string, flag: string): string | null {
+  const flagIndex = command.indexOf(flag);
   if (flagIndex === -1) return null;
 
-  const afterFlag = command.slice(flagIndex + KILO_WRAPPER_SESSION_FLAG.length).trimStart();
+  const afterFlag = command.slice(flagIndex + flag.length).trimStart();
   if (!afterFlag) return null;
 
-  const endIdx = afterFlag.indexOf(' ');
-  if (endIdx === -1) {
-    return afterFlag;
+  const quote = afterFlag[0];
+  if (quote === "'" || quote === '"') {
+    const closingQuoteIndex = afterFlag.indexOf(quote, 1);
+    return closingQuoteIndex === -1 ? null : afterFlag.slice(1, closingQuoteIndex);
   }
-  return afterFlag.slice(0, endIdx);
+
+  const endIdx = afterFlag.indexOf(' ');
+  return endIdx === -1 ? afterFlag : afterFlag.slice(0, endIdx);
+}
+
+export function extractWrapperSessionIdFromCommand(command: string): string | null {
+  return extractFlagValueFromCommand(command, KILO_WRAPPER_SESSION_FLAG);
+}
+
+export function extractWrapperInstanceIdFromCommand(command: string): string | null {
+  return (
+    extractFlagValueFromCommand(command, KILO_WRAPPER_INSTANCE_FLAG) ??
+    extractFlagValueFromCommand(command, KILO_WRAPPER_INSTANCE_ENV)
+  );
+}
+
+export function extractWrapperInstanceGenerationFromCommand(command: string): number | null {
+  const value =
+    extractFlagValueFromCommand(command, KILO_WRAPPER_INSTANCE_GENERATION_FLAG) ??
+    extractFlagValueFromCommand(command, KILO_WRAPPER_INSTANCE_GENERATION_ENV);
+  if (!value) return null;
+  const generation = Number.parseInt(value, 10);
+  return Number.isInteger(generation) && generation >= 0 ? generation : null;
 }
 
 /**
@@ -140,11 +164,15 @@ export async function findWrapperForSession(
  * `kilo.agentSession=<id>`. The published port we want is buried in the
  * `Ports` column (`0.0.0.0:5xxx->5xxx/tcp` or `127.0.0.1:5xxx->5xxx/tcp`).
  */
-type LabeledWrapperRow = {
+export type LabeledWrapperRow = {
   containerId: string;
   agentSessionId: string;
-  port: number;
+  port?: number;
 };
+
+export type WrapperContainerInspection =
+  | { status: 'ok'; containers: LabeledWrapperRow[] }
+  | { status: 'inspection-failed'; error: string };
 
 /** Minimal exec surface — both `SandboxInstance` and `ExecutionSession` satisfy this. */
 type DockerExecutor = {
@@ -179,28 +207,29 @@ export function extractPublishedWrapperPort(portsField: string): number | null {
  * spaces and arrows — survives intact. Each label key/value pair is emitted as
  * `Labels=k1=v1,k2=v2` so we can pull `kilo.agentSession` and the wrapper port.
  */
-export async function listWrapperContainers(
+export async function inspectWrapperContainers(
   executor: DockerExecutor,
   options?: { dockerEnv?: Record<string, string> }
-): Promise<LabeledWrapperRow[]> {
+): Promise<WrapperContainerInspection> {
   const cmd = `docker ps --filter label=${KILO_AGENT_SESSION_LABEL} --format '{{.ID}}\\t{{.Ports}}\\t{{.Labels}}'`;
-  let result: { exitCode: number; stdout?: string; stderr?: string } | undefined;
+  let result: { exitCode: number; stdout?: string; stderr?: string };
   try {
     const dockerEnv =
       options?.dockerEnv ?? dockerSocketEnv(await resolveDockerSocketPath(executor));
     result = await executor.exec(cmd, { env: dockerEnv });
   } catch (error) {
-    logger
-      .withFields({ error: error instanceof Error ? error.message : String(error) })
-      .debug('docker ps for wrapper containers failed');
-    return [];
+    const message = error instanceof Error ? error.message : String(error);
+    logger.withFields({ error: message }).debug('docker ps for wrapper containers failed');
+    return { status: 'inspection-failed', error: message };
   }
-  // Defensive: a missing/undefined response (or non-zero exit) means docker
-  // isn't reachable on this image — fall through and let process-list lookup
-  // (or absence of wrapper) drive the decision.
-  if (!result || result.exitCode !== 0) return [];
+  if (result.exitCode !== 0) {
+    return {
+      status: 'inspection-failed',
+      error: result.stderr?.trim() || `docker ps exited with code ${result.exitCode}`,
+    };
+  }
 
-  const rows: LabeledWrapperRow[] = [];
+  const containers: LabeledWrapperRow[] = [];
   for (const line of (result.stdout ?? '').split('\n')) {
     const trimmed = line.trim();
     if (!trimmed) continue;
@@ -210,10 +239,21 @@ export async function listWrapperContainers(
     if (!agentSessionId) continue;
     const port =
       extractPublishedWrapperPortFromLabel(labels) ?? extractPublishedWrapperPort(ports ?? '');
-    if (port === null) continue;
-    rows.push({ containerId, agentSessionId, port });
+    containers.push({
+      containerId,
+      agentSessionId,
+      ...(port === null ? {} : { port }),
+    });
   }
-  return rows;
+  return { status: 'ok', containers };
+}
+
+export async function listWrapperContainers(
+  executor: DockerExecutor,
+  options?: { dockerEnv?: Record<string, string> }
+): Promise<LabeledWrapperRow[]> {
+  const inspection = await inspectWrapperContainers(executor, options);
+  return inspection.status === 'ok' ? inspection.containers : [];
 }
 
 function extractLabelValue(labelsField: string, labelKey: string): string | null {
@@ -244,13 +284,123 @@ function extractPublishedWrapperPortFromLabel(labelsField: string): number | nul
  * shape — `id` is the container ID, `command` carries the agent-session marker
  * for diagnostics.
  */
+export async function discoverSessionWrappers(
+  sandbox: SandboxInstance,
+  sessionId: string,
+  options?: { dockerEnv?: Record<string, string>; inspectContainers?: boolean }
+): Promise<WrapperObservation> {
+  let processes: Process[];
+  try {
+    processes = await sandbox.listProcesses();
+  } catch (error) {
+    return {
+      status: 'inspection-failed',
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+
+  const observed: ObservedWrapper[] = [];
+  const marker = `${KILO_WRAPPER_SESSION_FLAG} ${sessionId}`;
+  for (const proc of processes) {
+    if (proc.command.includes('devcontainer exec')) continue;
+    if (!proc.command.includes(marker) || !proc.command.includes('kilocode-wrapper')) continue;
+    if (proc.status !== 'running' && proc.status !== 'starting') continue;
+    const port = extractWrapperPortFromCommand(proc.command) ?? undefined;
+    const instanceId = extractWrapperInstanceIdFromCommand(proc.command) ?? undefined;
+    const instanceGeneration =
+      extractWrapperInstanceGenerationFromCommand(proc.command) ?? undefined;
+    observed.push({
+      representation: 'process',
+      id: proc.id,
+      ...(port !== undefined ? { port } : {}),
+      ...(instanceId ? { instanceId } : {}),
+      ...(instanceGeneration !== undefined ? { instanceGeneration } : {}),
+    });
+  }
+
+  if (options?.inspectContainers === false) {
+    return observed.length === 0 ? { status: 'absent' } : { status: 'present', observed };
+  }
+
+  const containerInspection = await inspectWrapperContainers(sandbox, options);
+  if (containerInspection.status === 'inspection-failed') return containerInspection;
+  for (const container of containerInspection.containers) {
+    if (container.agentSessionId !== sessionId) continue;
+    let result: { exitCode: number; stdout?: string; stderr?: string };
+    let dockerEnv: Record<string, string>;
+    try {
+      dockerEnv = options?.dockerEnv ?? dockerSocketEnv(await resolveDockerSocketPath(sandbox));
+      result = await sandbox.exec(
+        `docker exec ${shellQuote(container.containerId)} sh -c ${shellQuote('ps -eo pid=,args=')}`,
+        { env: dockerEnv }
+      );
+    } catch (error) {
+      return {
+        status: 'inspection-failed',
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+    if (result.exitCode !== 0) {
+      return {
+        status: 'inspection-failed',
+        error: result.stderr?.trim() || `docker exec exited with code ${result.exitCode}`,
+      };
+    }
+    for (const row of (result.stdout ?? '').split('\n')) {
+      const parsedRow = row.match(/^\s*(\d+)\s+(.*)$/);
+      const pid = parsedRow?.[1];
+      const command = parsedRow?.[2] ?? row;
+      if (!command.includes(marker) || !command.includes('kilocode-wrapper')) continue;
+
+      let identitySource = command;
+      if (pid) {
+        let environmentResult: { exitCode: number; stdout?: string; stderr?: string };
+        try {
+          environmentResult = await sandbox.exec(
+            `docker exec ${shellQuote(container.containerId)} sh -c ${shellQuote(
+              `tr '\\000' ' ' < /proc/${pid}/environ`
+            )}`,
+            { env: dockerEnv }
+          );
+        } catch (error) {
+          return {
+            status: 'inspection-failed',
+            error: error instanceof Error ? error.message : String(error),
+          };
+        }
+        if (environmentResult.exitCode !== 0) {
+          return {
+            status: 'inspection-failed',
+            error:
+              environmentResult.stderr?.trim() ||
+              `docker exec environment inspection exited with code ${environmentResult.exitCode}`,
+          };
+        }
+        identitySource = `${environmentResult.stdout ?? ''} ${command}`;
+      }
+      const port = extractWrapperPortFromCommand(command) ?? container.port;
+      const instanceId = extractWrapperInstanceIdFromCommand(identitySource) ?? undefined;
+      const instanceGeneration =
+        extractWrapperInstanceGenerationFromCommand(identitySource) ?? undefined;
+      observed.push({
+        representation: 'container',
+        id: container.containerId,
+        ...(port !== undefined ? { port } : {}),
+        ...(instanceId ? { instanceId } : {}),
+        ...(instanceGeneration !== undefined ? { instanceGeneration } : {}),
+      });
+    }
+  }
+  return observed.length === 0 ? { status: 'absent' } : { status: 'present', observed };
+}
+
 export async function findWrapperContainerForSession(
   executor: DockerExecutor,
   sessionId: string
 ): Promise<WrapperInfo | null> {
   const containers = await listWrapperContainers(executor);
-  const match = containers.find(c => c.agentSessionId === sessionId);
-  if (!match) return null;
+  const match = containers.find(c => c.agentSessionId === sessionId && c.port !== undefined);
+  if (!match || match.port === undefined) return null;
 
   // Synthesise a Process-shaped record so existing call sites that read
   // `proc.id` / `proc.command` still work.
@@ -279,7 +429,14 @@ export function isWrapperLiveInProcessesOrContainers(
   containers: LabeledWrapperRow[],
   sessionId: string
 ): boolean {
-  if (findWrapperForSessionInProcesses(processes, sessionId)) return true;
+  const marker = `${KILO_WRAPPER_SESSION_FLAG} ${sessionId}`;
+  const hasDirectWrapper = processes.some(
+    process =>
+      process.command.includes(marker) &&
+      process.command.includes('kilocode-wrapper') &&
+      (process.status === 'running' || process.status === 'starting')
+  );
+  if (hasDirectWrapper) return true;
   return containers.some(c => c.agentSessionId === sessionId);
 }
 
@@ -290,73 +447,30 @@ export function getWrapperSessionMarker(sessionId: string): string {
   return `${KILO_WRAPPER_SESSION_FLAG} ${sessionId}`;
 }
 
-/**
- * Stop a running wrapper for the given session.
- * Finds the wrapper process and sends SIGTERM.
- *
- * @param sandbox - The sandbox instance to search in
- * @param sessionId - The cloud-agent session ID
- */
-export async function stopWrapper(
+export async function stopObservedWrappers(
   sandbox: SandboxInstance,
   sessionId: string,
-  options?: { devcontainer?: { workspacePath: string; configPath?: string } }
+  observed: ObservedWrapper[],
+  options?: { force?: boolean; devcontainer?: { workspacePath: string; configPath?: string } }
 ): Promise<void> {
-  const existing = await findWrapperForSession(sandbox, sessionId);
-  if (!existing) {
-    logger.withFields({ sessionId }).debug('No wrapper found to stop');
-    return;
+  const dockerRows = observed.filter(wrapper => wrapper.representation === 'container');
+  const processRows = observed.filter(wrapper => wrapper.representation === 'process');
+  const sessionMarker = getWrapperSessionMarker(sessionId);
+  if (processRows.length > 0) {
+    await sandbox.exec(
+      `${options?.force ? 'pkill -9' : 'pkill'} -f -- ${shellQuote(sessionMarker)}`
+    );
   }
-  const { process: proc, port, kind } = existing;
-  logger.withFields({ sessionId, port, processId: proc.id, kind }).info('Stopping wrapper');
-  try {
-    if (kind === 'container') {
-      const sessionMarker = getWrapperSessionMarker(sessionId);
-      const dockerEnv = dockerSocketEnv(await resolveDockerSocketPath(sandbox));
-      if (options?.devcontainer) {
-        // The wrapper is inside a dev container — outer pkill can't see it.
-        // Prefer killing just the wrapper process so follow-up executions keep
-        // using the same devcontainer instead of falling back to the outer image.
-        // `--config` is required so the CLI keeps applying our remoteUser/
-        // remoteEnv overrides; the path is reconstructed from sessionId
-        // since the override is written deterministically in
-        // `bringUpDevContainer`.
-        await sandbox.exec(
-          [
-            'devcontainer exec',
-            `--workspace-folder ${shellQuote(options.devcontainer.workspacePath)}`,
-            `--config ${shellQuote(
-              getDevContainerOverridePath(
-                sessionId,
-                options.devcontainer.workspacePath,
-                options.devcontainer.configPath
-              )
-            )}`,
-            `--id-label ${shellQuote(`${KILO_AGENT_SESSION_LABEL}=${sessionId}`)}`,
-            '--',
-            'sh -c',
-            shellQuote(`pkill -f -- ${shellQuote(sessionMarker)}`),
-          ].join(' '),
-          { env: dockerEnv }
-        );
-      } else {
-        // No devcontainer metadata is available (e.g. older sessions). Kill the
-        // container as a last-resort cleanup rather than leaving it leaked.
-        await sandbox.exec(`docker kill ${shellQuote(proc.id)}`, { env: dockerEnv });
-      }
-    } else {
-      const sessionMarker = getWrapperSessionMarker(sessionId);
-      await sandbox.exec(`pkill -f -- ${shellQuote(sessionMarker)}`);
+  if (dockerRows.length > 0) {
+    const dockerEnv = dockerSocketEnv(await resolveDockerSocketPath(sandbox));
+    for (const wrapper of dockerRows) {
+      const pkill = options?.force ? 'pkill -9' : 'pkill';
+      await sandbox.exec(
+        `docker exec ${shellQuote(wrapper.id)} sh -c ${shellQuote(
+          `${pkill} -f -- ${shellQuote(sessionMarker)}`
+        )}`,
+        { env: dockerEnv }
+      );
     }
-    logger.withFields({ sessionId, port, kind }).info('Wrapper stopped');
-  } catch (error) {
-    logger
-      .withFields({
-        sessionId,
-        port,
-        kind,
-        error: error instanceof Error ? error.message : String(error),
-      })
-      .warn('Error stopping wrapper');
   }
 }

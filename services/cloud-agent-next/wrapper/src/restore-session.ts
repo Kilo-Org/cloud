@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { logToFile } from './utils.js';
+import { logToFile, runProcess } from './utils.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -20,6 +20,13 @@ type SnapshotDiff = {
   after: string;
   status: string;
 };
+
+export type RestoreSessionOptions = {
+  importTimeoutMs?: number;
+  importTerminationGraceMs?: number;
+};
+
+const KILO_IMPORT_TIMEOUT_MS = 120_000;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -411,10 +418,12 @@ async function extractDiffsWithBun(snapshotPath: string): Promise<SnapshotDiff[]
 export async function restoreSession(
   kiloSessionId: string,
   workspacePath: string,
-  filePath?: string
+  filePath?: string,
+  options: RestoreSessionOptions = {}
 ): Promise<RestoreResult> {
   const tmpPath = filePath ?? `/tmp/kilo-session-export-${kiloSessionId}.json`;
   const downloaded = !filePath;
+  const importTimeoutMs = options.importTimeoutMs ?? KILO_IMPORT_TIMEOUT_MS;
 
   log(
     `starting kiloSessionId=${kiloSessionId} workspace=${workspacePath} input=${downloaded ? 'downloaded' : 'provided'} tmpPath=${tmpPath} home=${process.env.HOME ?? '(unset)'}`
@@ -506,23 +515,28 @@ export async function restoreSession(
     log(
       `running kilo import kiloSessionId=${kiloSessionId} input=${downloaded ? 'downloaded' : 'provided'} cwd=${workspacePath} home=${process.env.HOME ?? '(unset)'} tmpPath=${tmpPath}`
     );
-    const importProc = Bun.spawn(['kilo', 'import', tmpPath], {
-      stdout: 'pipe',
-      stderr: 'pipe',
+    const importResult = await runProcess('kilo', ['import', tmpPath], {
       cwd: workspacePath,
-      env: process.env,
+      timeoutMs: importTimeoutMs,
+      terminationGraceMs: options.importTerminationGraceMs,
     });
-    const exitCode = await importProc.exited;
     const importElapsedMs = Date.now() - importStartedAt;
 
-    if (exitCode !== 0) {
+    if (importResult.terminationReason === 'timeout') {
       log(
-        `kilo import finished outcome=error exitCode=${exitCode} kiloSessionId=${kiloSessionId} input=${downloaded ? 'downloaded' : 'provided'} cwd=${workspacePath} home=${process.env.HOME ?? '(unset)'} elapsedMs=${importElapsedMs}`
+        `kilo import finished outcome=timeout kiloSessionId=${kiloSessionId} input=${downloaded ? 'downloaded' : 'provided'} cwd=${workspacePath} home=${process.env.HOME ?? '(unset)'} elapsedMs=${importElapsedMs} timeoutMs=${importTimeoutMs}`
       );
-      return fail(`kilo import failed exitCode=${exitCode}`, null, 'import');
+      return fail(`kilo import timed out after ${importTimeoutMs}ms`, null, 'import');
+    }
+
+    if (importResult.exitCode !== 0) {
+      log(
+        `kilo import finished outcome=error exitCode=${importResult.exitCode} kiloSessionId=${kiloSessionId} input=${downloaded ? 'downloaded' : 'provided'} cwd=${workspacePath} home=${process.env.HOME ?? '(unset)'} elapsedMs=${importElapsedMs}`
+      );
+      return fail(`kilo import failed exitCode=${importResult.exitCode}`, null, 'import');
     }
     log(
-      `kilo import finished outcome=ok exitCode=${exitCode} kiloSessionId=${kiloSessionId} input=${downloaded ? 'downloaded' : 'provided'} cwd=${workspacePath} home=${process.env.HOME ?? '(unset)'} elapsedMs=${importElapsedMs}`
+      `kilo import finished outcome=ok exitCode=${importResult.exitCode} kiloSessionId=${kiloSessionId} input=${downloaded ? 'downloaded' : 'provided'} cwd=${workspacePath} home=${process.env.HOME ?? '(unset)'} elapsedMs=${importElapsedMs}`
     );
 
     // ---- Step 3: Apply diffs ----

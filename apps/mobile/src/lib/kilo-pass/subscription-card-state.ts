@@ -239,6 +239,17 @@ export function getKiloPassSubscriptionCardState(
     });
   }
 
+  if (options.platformOS === 'ios') {
+    return {
+      action: 'none',
+      actionLabel: null,
+      description: subscription.cancelAtPeriodEnd
+        ? `${credits} · Ends ${formatSubscriptionEndDate(subscription.refillAt)} · This Kilo Pass is managed on web`
+        : `${credits} · This Kilo Pass is managed on web`,
+      title: subscription.cancelAtPeriodEnd ? 'Kilo Pass canceling' : 'Kilo Pass active',
+    };
+  }
+
   if (subscription.cancelAtPeriodEnd) {
     return {
       action: 'open-web-management',

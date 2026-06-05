@@ -128,10 +128,7 @@ describe('review memory aggregation', () => {
       tokensOut: 50,
     }));
 
-    const summary = await dispatchManualReviewMemoryAggregation({
-      now: new Date('2026-06-01T00:00:00.000Z'),
-      generateOpportunities,
-    });
+    const summary = await dispatchManualReviewMemoryAggregation({ generateOpportunities });
 
     expect(summary).toEqual({ claimed: 1, completed: 1, skipped: 0, failed: 0, proposals: 1 });
     expect(generateOpportunities).toHaveBeenCalledWith(
@@ -199,6 +196,7 @@ describe('review memory aggregation', () => {
     const user = await insertTestUser();
     const owner = { type: 'user' as const, id: user.id };
     const events = await seedActionableFeedback(owner, 'acme/expired');
+    const now = new Date('2026-06-01T00:00:00.000Z');
     const expiredCreatedAt = '2026-05-01T00:00:00.000Z';
     await db
       .update(code_review_feedback_events)
@@ -209,10 +207,14 @@ describe('review memory aggregation', () => {
           events.map(event => event.id)
         )
       );
+    await db
+      .update(code_review_memory_aggregation_state)
+      .set({ next_eligible_at: now.toISOString() })
+      .where(eq(code_review_memory_aggregation_state.repo_full_name, 'acme/expired'));
     const generateOpportunities = jest.fn();
 
     const summary = await dispatchManualReviewMemoryAggregation({
-      now: new Date('2026-06-01T00:00:00.000Z'),
+      now,
       generateOpportunities,
     });
 

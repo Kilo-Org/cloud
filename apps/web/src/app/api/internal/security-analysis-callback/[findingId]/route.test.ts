@@ -105,10 +105,18 @@ jest.mock('@/lib/utils.server', () => ({
 }));
 
 jest.mock('@/lib/drizzle', () => {
+  let selectedTable: unknown;
   const chain = {
-    from: jest.fn().mockReturnThis(),
+    from: jest.fn((table: unknown) => {
+      selectedTable = table;
+      return chain;
+    }),
     where: jest.fn().mockReturnThis(),
-    limit: jest.fn(() => mockDbSelect()),
+    limit: jest.fn(() =>
+      (selectedTable as { __name?: string } | undefined)?.__name === 'security_analysis_queue'
+        ? Promise.resolve([{ claimToken: 'attempt-token-123' }])
+        : mockDbSelect()
+    ),
   };
   return {
     db: {
@@ -119,16 +127,25 @@ jest.mock('@/lib/drizzle', () => {
 
 jest.mock('@kilocode/db/schema', () => ({
   kilocode_users: { id: 'id' },
+  security_analysis_queue: {
+    __name: 'security_analysis_queue',
+    claim_token: 'claim_token',
+    finding_id: 'finding_id',
+    queue_status: 'queue_status',
+  },
 }));
 
 jest.mock('drizzle-orm', () => ({
+  and: jest.fn(),
   eq: jest.fn(),
+  inArray: jest.fn(),
 }));
 
 // --- Helpers ---
 
 const CALLBACK_SECRET = 'test-callback-token-secret';
 const FINDING_ID = 'finding-abc-123';
+const ATTEMPT_TOKEN = 'attempt-token-123';
 let defaultCallbackToken: string;
 
 function makeRequest(
@@ -137,6 +154,9 @@ function makeRequest(
   callbackToken: string | null = defaultCallbackToken
 ): NextRequest {
   return {
+    nextUrl: new URL(
+      `https://app.kilo.ai/api/internal/security-analysis-callback/${findingId}?attempt=${ATTEMPT_TOKEN}`
+    ),
     headers: {
       get: (name: string) => {
         if (name === 'X-Callback-Token') return callbackToken;
@@ -248,7 +268,7 @@ beforeEach(async () => {
   defaultCallbackToken = await deriveCallbackToken({
     secret: CALLBACK_SECRET,
     scope: 'security-analysis-callback',
-    resourceParts: [FINDING_ID],
+    resourceParts: [FINDING_ID, ATTEMPT_TOKEN],
   });
   mockUpdateAnalysisStatus.mockResolvedValue(true);
   mockTransitionAutoAnalysisQueueFromCallback.mockResolvedValue(undefined);
@@ -292,7 +312,7 @@ describe('POST /api/internal/security-analysis-callback/[findingId]', () => {
       const callbackToken = await deriveCallbackToken({
         secret: CALLBACK_SECRET,
         scope: 'security-analysis-callback',
-        resourceParts: ['different-finding'],
+        resourceParts: ['different-finding', ATTEMPT_TOKEN],
       });
       const req = makeRequest(FINDING_ID, completedPayload, callbackToken);
       const response = await POST(req, makeParams(FINDING_ID));
@@ -366,6 +386,7 @@ describe('POST /api/internal/security-analysis-callback/[findingId]', () => {
       expect(body.message).toBe('Superseded finding ignored');
       expect(mockTransitionAutoAnalysisQueueFromCallback).toHaveBeenCalledWith({
         findingId: FINDING_ID,
+        attemptToken: ATTEMPT_TOKEN,
         toStatus: 'completed',
         failureCode: 'SKIPPED_NO_LONGER_ELIGIBLE',
       });

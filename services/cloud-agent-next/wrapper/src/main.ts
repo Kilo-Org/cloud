@@ -19,6 +19,8 @@ import { createWrapperKiloClient, type WrapperKiloClient } from './kilo-api.js';
 import { createConnectionManager, openIngestProgressChannel } from './connection.js';
 import { createLifecycleManager } from './lifecycle.js';
 import { bindSessionContext, createServer } from './server.js';
+import { openKiloGlobalFeed } from './global-feed.js';
+import { createGlobalFeedManager, type SessionBoundFeedPolicy } from './global-feed-manager.js';
 import { logToFile } from './utils.js';
 import type { WrapperCommand } from '../../src/shared/protocol.js';
 import type {
@@ -65,12 +67,16 @@ type StartupArgs = {
   agentSessionId: string;
   userId: string;
   sessionId?: string;
+  wrapperInstanceId?: string;
+  wrapperInstanceGeneration?: number;
 };
 
 function parseStartupArgs(argv: string[]): StartupArgs {
   let agentSessionId: string | undefined;
   let userId: string | undefined;
   let sessionId: string | undefined;
+  let wrapperInstanceId: string | undefined;
+  let wrapperInstanceGeneration: number | undefined;
 
   for (let index = 0; index < argv.length; index++) {
     const arg = argv[index];
@@ -103,6 +109,28 @@ function parseStartupArgs(argv: string[]): StartupArgs {
       continue;
     }
 
+    if (arg === '--wrapper-instance-id') {
+      if (!value) {
+        failStartup('Missing value for --wrapper-instance-id');
+      }
+      wrapperInstanceId = value;
+      index++;
+      continue;
+    }
+
+    if (arg === '--wrapper-instance-generation') {
+      if (!value) {
+        failStartup('Missing value for --wrapper-instance-generation');
+      }
+      const generation = Number.parseInt(value, 10);
+      if (!Number.isInteger(generation) || generation < 0) {
+        failStartup('Invalid value for --wrapper-instance-generation');
+      }
+      wrapperInstanceGeneration = generation;
+      index++;
+      continue;
+    }
+
     failStartup(`Unknown argument: ${arg}`);
   }
 
@@ -114,7 +142,11 @@ function parseStartupArgs(argv: string[]): StartupArgs {
     failStartup('Missing required --user-id argument');
   }
 
-  return { agentSessionId, userId, sessionId };
+  if ((wrapperInstanceId === undefined) !== (wrapperInstanceGeneration === undefined)) {
+    failStartup('Wrapper instance identity requires both id and generation');
+  }
+
+  return { agentSessionId, userId, sessionId, wrapperInstanceId, wrapperInstanceGeneration };
 }
 
 // ---------------------------------------------------------------------------
@@ -129,11 +161,41 @@ async function main() {
   // is now passed in the POST /job/prompt body.
   const wrapperPort = getOptionalEnvInt('WRAPPER_PORT', 5000);
   const initialWorkspacePath = process.env.WORKSPACE_PATH;
-  const {
-    agentSessionId,
-    userId,
-    sessionId: configuredSessionId,
-  } = parseStartupArgs(process.argv.slice(2));
+  const startupArgs = parseStartupArgs(process.argv.slice(2));
+  // New bundles report env-based identity; old bundles safely ignore these rolling-deploy markers.
+  const envWrapperInstanceId = process.env.WRAPPER_INSTANCE_ID;
+  const envWrapperInstanceGenerationValue = process.env.WRAPPER_INSTANCE_GENERATION;
+  let envWrapperInstanceGeneration: number | undefined;
+  if (envWrapperInstanceGenerationValue !== undefined) {
+    const parsedGeneration = Number.parseInt(envWrapperInstanceGenerationValue, 10);
+    if (!Number.isInteger(parsedGeneration) || parsedGeneration < 0) {
+      failStartup('Invalid value for WRAPPER_INSTANCE_GENERATION');
+    }
+    envWrapperInstanceGeneration = parsedGeneration;
+  }
+  if (
+    startupArgs.wrapperInstanceId !== undefined &&
+    envWrapperInstanceId !== undefined &&
+    startupArgs.wrapperInstanceId !== envWrapperInstanceId
+  ) {
+    failStartup('Conflicting wrapper instance id configuration');
+  }
+  if (
+    startupArgs.wrapperInstanceGeneration !== undefined &&
+    envWrapperInstanceGeneration !== undefined &&
+    startupArgs.wrapperInstanceGeneration !== envWrapperInstanceGeneration
+  ) {
+    failStartup('Conflicting wrapper instance generation configuration');
+  }
+  const agentSessionId = startupArgs.agentSessionId;
+  const userId = startupArgs.userId;
+  const configuredSessionId = startupArgs.sessionId;
+  const wrapperInstanceId = startupArgs.wrapperInstanceId ?? envWrapperInstanceId;
+  const wrapperInstanceGeneration =
+    startupArgs.wrapperInstanceGeneration ?? envWrapperInstanceGeneration;
+  if ((wrapperInstanceId === undefined) !== (wrapperInstanceGeneration === undefined)) {
+    failStartup('Wrapper instance identity requires both id and generation');
+  }
 
   if (!SESSION_ID_RE.test(agentSessionId)) {
     failStartup(`Invalid agent session ID: ${agentSessionId}`);
@@ -149,6 +211,11 @@ async function main() {
   );
   if (configuredSessionId) {
     logToFile(`config: sessionId=${configuredSessionId}`);
+  }
+  if (wrapperInstanceId !== undefined && wrapperInstanceGeneration !== undefined) {
+    logToFile(
+      `config: wrapperInstanceId=${wrapperInstanceId} wrapperInstanceGeneration=${wrapperInstanceGeneration}`
+    );
   }
 
   // ---------------------------------------------------------------------------
@@ -178,6 +245,8 @@ async function main() {
     sessionId: kiloSessionId,
     agentSessionId,
     userId,
+    wrapperInstanceId,
+    wrapperInstanceGeneration,
     platform: process.env.KILO_PLATFORM,
   };
 
@@ -191,8 +260,12 @@ async function main() {
     closeConnection: () => connectionManager?.close() ?? Promise.resolve(),
     setAborted: () => lifecycleManager?.setAborted(),
     resetLifecycle: () => lifecycleManager?.reset(),
+    onMessageComplete: (messageId: string) => lifecycleManager?.onMessageComplete(messageId),
     readySession: readySession,
+    updateRuntimeEnvironment: updateRuntimeEnvironment,
     materializePromptAttachments,
+    onSessionBound: (feedPolicy: SessionBoundFeedPolicy) =>
+      globalFeedManager.onSessionBound(feedPolicy),
   };
 
   async function verifyExistingKiloSession(
@@ -218,14 +291,37 @@ async function main() {
     }
   }
 
+  const globalFeedManager = createGlobalFeedManager({
+    canOpen: () => Boolean(kiloClient && state.currentSession),
+    open: () => {
+      if (!kiloClient) {
+        throw new Error('Cannot open Kilo global feed: no Kilo client');
+      }
+      return openKiloGlobalFeed({ state, kiloClient });
+    },
+    onConnectionError: error => {
+      logToFile(
+        `kilo global feed failed: ${error instanceof Error ? error.message : String(error)}`
+      );
+    },
+    onOpenError: error => {
+      logToFile(
+        `failed to start kilo global feed: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+    },
+  });
+
   async function startKiloRuntime(
     workspacePath: string,
-    expectedSessionId?: string
+    expectedSessionId?: string,
+    forceRestart = false
   ): Promise<void> {
     logToFile(
       `startKiloRuntime requested workspacePath=${workspacePath} expectedSessionId=${expectedSessionId ?? '(none)'} currentSessionId=${kiloSessionId || '(unset)'} hasClient=${Boolean(kiloClient)} runtimeWorkspacePath=${runtimeWorkspacePath ?? '(unset)'} home=${process.env.HOME ?? '(unset)'}`
     );
-    if (kiloClient && runtimeWorkspacePath === workspacePath) {
+    if (!forceRestart && kiloClient && runtimeWorkspacePath === workspacePath) {
       if (expectedSessionId && expectedSessionId !== kiloSessionId) {
         await verifyExistingKiloSession(kiloClient, expectedSessionId, 'reused', workspacePath);
         kiloSessionId = expectedSessionId;
@@ -236,18 +332,22 @@ async function main() {
           `startKiloRuntime reused existing runtime without session rebinding sessionId=${kiloSessionId || '(unset)'}`
         );
       }
+      globalFeedManager.onRuntimeReady();
       return;
     }
 
     logToFile(
       `startKiloRuntime preparing new runtime workspacePath=${workspacePath} previousWorkspacePath=${runtimeWorkspacePath ?? '(unset)'} hadLifecycle=${Boolean(lifecycleManager)} hadConnection=${Boolean(connectionManager)} hadServer=${Boolean(closeKiloServer)}`
     );
+    globalFeedManager.close();
     lifecycleManager?.stop();
     await connectionManager?.close();
     if (closeKiloServer) {
       closeKiloServer();
       closeKiloServer = undefined;
     }
+    kiloClient = undefined;
+    serverDeps.kiloClient = unavailableKiloClient;
 
     process.chdir(workspacePath);
     logToFile('starting kilo server in-process via @kilocode/sdk');
@@ -372,6 +472,7 @@ async function main() {
         },
         onReconnected: () => {
           logToFile('ingest WS reconnected');
+          lifecycleManager?.onConnectionRestored();
           const lastError = state.getLastError();
           if (lastError?.code === 'DISCONNECT') {
             state.clearLastError();
@@ -394,6 +495,17 @@ async function main() {
       }
     );
     lifecycleManager.start();
+    globalFeedManager.onRuntimeReady();
+  }
+
+  async function updateRuntimeEnvironment(env: Record<string, string>): Promise<void> {
+    const environmentChanged = Object.entries(env).some(
+      ([name, value]) => process.env[name] !== value
+    );
+    Object.assign(process.env, env);
+    if (runtimeWorkspacePath && (environmentChanged || !kiloClient)) {
+      await startKiloRuntime(runtimeWorkspacePath, kiloSessionId || undefined, true);
+    }
   }
 
   async function readySession(
@@ -409,7 +521,12 @@ async function main() {
       serverConfig.sessionId = request.kiloSessionId;
       serverConfig.platform = request.materialized.env.KILO_PLATFORM ?? process.env.KILO_PLATFORM;
 
-      const bindError = await bindSessionContext(request.session, serverConfig, serverDeps);
+      const bindError = await bindSessionContext(
+        request.session,
+        serverConfig,
+        serverDeps,
+        'close-until-runtime-ready'
+      );
       if (bindError) {
         const error = (await bindError.json()) as { error?: string; message?: string };
         logToFile(
@@ -520,6 +637,7 @@ async function main() {
 
     // Stop lifecycle timers
     lifecycleManager?.stop();
+    globalFeedManager.close();
 
     // Force exit after timeout
     setTimeout(() => {

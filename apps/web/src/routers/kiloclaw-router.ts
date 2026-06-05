@@ -5,6 +5,7 @@ import { TRPCError } from '@trpc/server';
 import { baseProcedure, createTRPCRouter, UpstreamApiError } from '@/lib/trpc/init';
 import { generateApiToken, TOKEN_EXPIRY } from '@/lib/tokens';
 import { KiloClawInternalClient, KiloClawApiError } from '@/lib/kiloclaw/kiloclaw-internal-client';
+import { kiloclawFilePathSchema } from '@/lib/kiloclaw/file-path-schema';
 import { pushPinToWorker } from '@/lib/kiloclaw/pin-sync';
 import { KiloClawUserClient } from '@/lib/kiloclaw/kiloclaw-user-client';
 import { encryptKiloClawSecret } from '@/lib/kiloclaw/encryption';
@@ -72,11 +73,8 @@ import {
   workerInstanceId,
   type ActiveKiloClawInstance,
 } from '@/lib/kiloclaw/instance-registry';
-import {
-  getPersonalProvisionLockKey,
-  withKiloclawProvisionContextLock,
-} from '@/lib/kiloclaw/provision-lock';
 import { encryptProvisionSecretsForWorker } from '@/lib/kiloclaw/provision-secrets';
+import { handleProvisionError } from '@/lib/kiloclaw/provision-error-handler';
 import {
   clearSubscriptionLifecycleAfterInstanceDestroy,
   clearTrialInactivityStopAfterStart,
@@ -95,6 +93,8 @@ import {
   enqueueAffiliateEventForUser,
 } from '@/lib/impact/affiliate-events';
 import { clawAccessProcedure } from '@/lib/kiloclaw/access-gate';
+import { dispatchInstallFromSource } from '@/lib/kiloclaw/install-dispatch';
+import { INSTALL_SOURCE_KEYS } from '@/lib/kiloclaw/install-sources';
 import { cancelCliRun, createCliRun, getCliRunStatus } from '@/lib/kiloclaw/cli-runs';
 import { KILOCLAW_EARLYBIRD_EXPIRY_DATE } from '@/lib/kiloclaw/constants';
 import {
@@ -1112,28 +1112,30 @@ async function provisionInstance(
     : undefined;
 
   const client = new KiloClawInternalClient();
-  const result = await client.provision(
-    user.id,
-    {
-      envVars: input.envVars,
-      encryptedSecrets,
-      channels: buildWorkerChannels(input.channels),
-      kilocodeApiKey,
-      kilocodeApiKeyExpiresAt,
-      kilocodeDefaultModel: input.kilocodeDefaultModel ?? undefined,
-      userTimezone: input.userTimezone === undefined ? undefined : input.userTimezone,
-      userLocation: input.userLocation === undefined ? undefined : input.userLocation,
-      pinnedImageTag,
-    },
-    params.instanceId
-      ? {
-          instanceId: params.instanceId,
-          bootstrapSubscription: params.bootstrapSubscription,
-        }
-      : undefined
-  );
-
-  return result;
+  try {
+    return await client.provision(
+      user.id,
+      {
+        envVars: input.envVars,
+        encryptedSecrets,
+        channels: buildWorkerChannels(input.channels),
+        kilocodeApiKey,
+        kilocodeApiKeyExpiresAt,
+        kilocodeDefaultModel: input.kilocodeDefaultModel ?? undefined,
+        userTimezone: input.userTimezone === undefined ? undefined : input.userTimezone,
+        userLocation: input.userLocation === undefined ? undefined : input.userLocation,
+        pinnedImageTag,
+      },
+      params.instanceId
+        ? {
+            instanceId: params.instanceId,
+            bootstrapSubscription: params.bootstrapSubscription,
+          }
+        : undefined
+    );
+  } catch (error) {
+    handleProvisionError(error, getKiloClawApiErrorPayload);
+  }
 }
 
 async function emitProvisionTrialStartSideEffects(params: {
@@ -2857,25 +2859,11 @@ export const kiloclawRouter = createTRPCRouter({
   latestVersion: baseProcedure
     .input(z.object({ currentImageTag: z.string().min(1).optional() }).optional())
     .query(async ({ ctx, input }) => {
-      // Pass instance + currentImageTag through; Early Access is resolved
-      // server-side from the instance's owning user (the platform endpoint
-      // does the kilocode_users lookup itself, so callers can't fake it).
-      const [instance] = await db
-        .select({ id: kiloclaw_instances.id })
-        .from(kiloclaw_instances)
-        .where(
-          and(
-            eq(kiloclaw_instances.user_id, ctx.user.id),
-            isNull(kiloclaw_instances.organization_id),
-            isNull(kiloclaw_instances.destroyed_at)
-          )
-        )
-        .limit(1);
-
+      const instance = await getActiveInstance(ctx.user.id);
       const client = new KiloClawInternalClient();
       if (!instance) return client.getLatestVersion();
 
-      return client.getLatestVersion({
+      return client.getLatestVersionForInstance({
         instanceId: instance.id,
         currentImageTag: input?.currentImageTag ?? null,
       });
@@ -2985,6 +2973,13 @@ export const kiloclawRouter = createTRPCRouter({
     } satisfies KiloClawDashboardStatus;
   }),
 
+  getNavState: baseProcedure.query(async ({ ctx }) => {
+    const instance = await getActiveInstance(ctx.user.id);
+    return {
+      hasActiveInstance: instance !== null,
+    };
+  }),
+
   getDiskUsage: baseProcedure.query(async ({ ctx }) => {
     const instance = await getActiveInstance(ctx.user.id);
     if (!instance) {
@@ -3029,6 +3024,25 @@ export const kiloclawRouter = createTRPCRouter({
     const instance = await getActiveInstance(ctx.user.id);
     return instance ? { instanceId: instance.id } : null;
   }),
+
+  installFromSource: clawAccessProcedure
+    .input(
+      z.object({
+        source: z.enum(INSTALL_SOURCE_KEYS),
+        slug: z.string().min(1).max(200),
+        // Signature of the payload the user reviewed; the dispatch re-verifies
+        // and requires the re-fetched payload to still match this.
+        signature: z.string().min(1).max(200),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      return await dispatchInstallFromSource({
+        userId: ctx.user.id,
+        source: input.source,
+        slug: input.slug,
+        expectedSignature: input.signature,
+      });
+    }),
 
   getMorningBriefingStatus: clawAccessProcedure.query(async ({ ctx }) => {
     const instance = await getActiveInstance(ctx.user.id);
@@ -3280,25 +3294,20 @@ export const kiloclawRouter = createTRPCRouter({
 
   // Explicit lifecycle APIs
   provision: baseProcedure.input(updateConfigSchema).mutation(async ({ ctx, input }) => {
-    return await withKiloclawProvisionContextLock(
-      getPersonalProvisionLockKey(ctx.user.id),
-      async () => {
-        const { instanceId, bootstrapSubscription, shouldEnqueueTrialStartAffiliate } =
-          await ensureProvisionAccess(ctx.user.id, ctx.user.google_user_email);
-        const result = await provisionInstance(ctx.user, input, {
-          instanceId,
-          bootstrapSubscription,
-        });
-        if (shouldEnqueueTrialStartAffiliate) {
-          await emitProvisionTrialStartSideEffects({
-            userId: ctx.user.id,
-            userEmail: ctx.user.google_user_email,
-            instanceId: result.instanceId,
-          });
-        }
-        return result;
-      }
-    );
+    const { instanceId, bootstrapSubscription, shouldEnqueueTrialStartAffiliate } =
+      await ensureProvisionAccess(ctx.user.id, ctx.user.google_user_email);
+    const result = await provisionInstance(ctx.user, input, {
+      instanceId,
+      bootstrapSubscription,
+    });
+    if (shouldEnqueueTrialStartAffiliate) {
+      await emitProvisionTrialStartSideEffects({
+        userId: ctx.user.id,
+        userEmail: ctx.user.google_user_email,
+        instanceId: result.instanceId,
+      });
+    }
+    return result;
   }),
 
   patchConfig: clawAccessProcedure
@@ -3310,25 +3319,20 @@ export const kiloclawRouter = createTRPCRouter({
   // Backward-compatible alias — uses the same trial-bootstrap flow as provision
   // so first-time callers can create a trial row (clawAccessProcedure would reject them).
   updateConfig: baseProcedure.input(updateConfigSchema).mutation(async ({ ctx, input }) => {
-    return await withKiloclawProvisionContextLock(
-      getPersonalProvisionLockKey(ctx.user.id),
-      async () => {
-        const { instanceId, bootstrapSubscription, shouldEnqueueTrialStartAffiliate } =
-          await ensureProvisionAccess(ctx.user.id, ctx.user.google_user_email);
-        const result = await provisionInstance(ctx.user, input, {
-          instanceId,
-          bootstrapSubscription,
-        });
-        if (shouldEnqueueTrialStartAffiliate) {
-          await emitProvisionTrialStartSideEffects({
-            userId: ctx.user.id,
-            userEmail: ctx.user.google_user_email,
-            instanceId: result.instanceId,
-          });
-        }
-        return result;
-      }
-    );
+    const { instanceId, bootstrapSubscription, shouldEnqueueTrialStartAffiliate } =
+      await ensureProvisionAccess(ctx.user.id, ctx.user.google_user_email);
+    const result = await provisionInstance(ctx.user, input, {
+      instanceId,
+      bootstrapSubscription,
+    });
+    if (shouldEnqueueTrialStartAffiliate) {
+      await emitProvisionTrialStartSideEffects({
+        userId: ctx.user.id,
+        userEmail: ctx.user.google_user_email,
+        instanceId: result.instanceId,
+      });
+    }
+    return result;
   }),
 
   updateKiloCodeConfig: clawAccessProcedure
@@ -4176,19 +4180,24 @@ export const kiloclawRouter = createTRPCRouter({
     return { success: true, deleted: !!deleted, worker_sync: workerSync };
   }),
 
-  fileTree: clawAccessProcedure.query(async ({ ctx }) => {
-    try {
-      const instance = await getActiveInstance(ctx.user.id);
-      const client = new KiloClawInternalClient();
-      const result = await client.getFileTree(ctx.user.id, workerInstanceId(instance));
-      return result.tree;
-    } catch (err) {
-      handleFileOperationError(err, 'fetch file tree');
-    }
-  }),
+  fileTree: clawAccessProcedure
+    .input(z.object({ path: kiloclawFilePathSchema.optional() }).optional())
+    .query(async ({ ctx, input }) => {
+      try {
+        const instance = await getActiveInstance(ctx.user.id);
+        const client = new KiloClawInternalClient();
+        const result = await client.getFileTree(ctx.user.id, {
+          instanceId: workerInstanceId(instance),
+          path: input?.path,
+        });
+        return result.tree;
+      } catch (err) {
+        handleFileOperationError(err, 'fetch file tree');
+      }
+    }),
 
   readFile: clawAccessProcedure
-    .input(z.object({ path: z.string().min(1) }))
+    .input(z.object({ path: kiloclawFilePathSchema }))
     .query(async ({ ctx, input }) => {
       try {
         const instance = await getActiveInstance(ctx.user.id);
@@ -4202,7 +4211,7 @@ export const kiloclawRouter = createTRPCRouter({
   writeFile: clawAccessProcedure
     .input(
       z.object({
-        path: z.string().min(1),
+        path: kiloclawFilePathSchema,
         content: z.string(),
         etag: z.string().min(1),
         openclawValidation: z.enum(['warn-before-write', 'allow-invalid']).optional(),
@@ -4266,7 +4275,7 @@ export const kiloclawRouter = createTRPCRouter({
         files: z
           .array(
             z.object({
-              path: z.string().min(1),
+              path: kiloclawFilePathSchema,
               content: z.string(),
             })
           )

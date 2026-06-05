@@ -17,14 +17,19 @@ import type { WrapperState, SessionContext } from './state.js';
 import type { WrapperKiloClient, WrapperPtySize } from './kilo-api.js';
 import type { PerTurnConfig } from './lifecycle.js';
 import { createLogUploader } from './log-uploader.js';
+import { configureCommitCoAuthorHook } from './commit-co-author-hook.js';
 import { logToFile } from './utils.js';
 import { materializePromptAttachments as defaultMaterializePromptAttachments } from './session-bootstrap.js';
 import {
   isWrapperSessionReadyRequest,
+  type WrapperCommitCoAuthor,
+  type WrapperPromptAgent,
   type WrapperPromptRequest,
   type WrapperSessionReadyRequest,
   type WrapperSessionReadyResponse,
 } from '../../src/shared/wrapper-bootstrap.js';
+import { createProxyRequest } from '../../src/shared/http-proxy.js';
+import type { SessionBoundFeedPolicy } from './global-feed-manager.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -40,6 +45,9 @@ export type ServerConfig = {
   agentSessionId: string;
   /** Stable Cloud Agent user ID, passed at wrapper startup */
   userId: string;
+  /** Stable physical wrapper identity, present after leased startup. */
+  wrapperInstanceId?: string;
+  wrapperInstanceGeneration?: number;
   /** Product surface that created the session, e.g. code-review. */
   platform?: string;
 };
@@ -54,12 +62,23 @@ export type ServerDependencies = {
   setAborted: () => void;
   /** Reset lifecycle state for a new execution */
   resetLifecycle: () => void;
+  /** Mark a submitted message complete when the wrapper handles a synchronous session action. */
+  onMessageComplete?: (messageId: string) => void;
   /** Compatibility hook for callers that still construct wrapper server test deps. */
   setPerTurnConfig?: (config: PerTurnConfig) => void;
   /** Workspace/Kilo readiness path */
   readySession?: (request: WrapperSessionReadyRequest) => Promise<WrapperSessionReadyResponse>;
+  /** Apply refreshed runtime variables to the active Kilo runtime. */
+  updateRuntimeEnvironment?: (env: Record<string, string>) => Promise<void>;
   /** Materialize signed prompt attachments into local file parts. */
   materializePromptAttachments?: (prompt: WrapperPromptRequest) => Promise<WrapperPromptRequest>;
+  /** Apply Git commit attribution before Kilo may execute git commands. */
+  configureCommitCoAuthor?: (
+    workspacePath: string,
+    commitCoAuthor: WrapperCommitCoAuthor | undefined
+  ) => Promise<void>;
+  /** Called after a fresh or changed session binding has been stored. */
+  onSessionBound?: (feedPolicy: SessionBoundFeedPolicy) => void | Promise<void>;
 };
 
 export type SessionBinding = {
@@ -78,8 +97,10 @@ type CommandBody = {
   command: string;
   args?: string;
   messageId?: string;
+  agent?: WrapperPromptAgent;
   autoCommit?: boolean;
   condenseOnComplete?: boolean;
+  commitCoAuthor?: WrapperCommitCoAuthor;
   session?: SessionBinding;
   execution?: SessionBinding;
 };
@@ -139,6 +160,22 @@ function errorResponse(error: string, message: string, status: number): Response
   return jsonResponse({ error, message }, status);
 }
 
+async function applyCommitAttribution(
+  workspacePath: string,
+  commitCoAuthor: WrapperCommitCoAuthor | undefined,
+  configureCommitCoAuthor: NonNullable<ServerDependencies['configureCommitCoAuthor']>
+): Promise<Response | null> {
+  try {
+    await configureCommitCoAuthor(workspacePath, commitCoAuthor);
+    return null;
+  } catch (error) {
+    logToFile(
+      `commit-co-author: failed to configure git hook: ${error instanceof Error ? error.message : String(error)}`
+    );
+    return errorResponse('SEND_ERROR', 'Failed to configure git commit attribution', 500);
+  }
+}
+
 async function readJsonBody<T>(req: Request, defaultValue: T): Promise<T> {
   const text = await req.text();
   if (!text.trim()) return defaultValue;
@@ -187,10 +224,25 @@ function parsePtyPath(path: string): { ptyId: string; action?: 'connect' } | nul
   };
 }
 
+async function notifySessionBound(
+  deps: ServerDependencies,
+  feedPolicy: SessionBoundFeedPolicy
+): Promise<void> {
+  if (!deps.onSessionBound) return;
+  try {
+    await deps.onSessionBound(feedPolicy);
+  } catch (error) {
+    logToFile(
+      `session-bound callback failed: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+}
+
 export async function bindSessionContext(
   binding: SessionBinding | undefined,
   config: ServerConfig,
-  deps: ServerDependencies
+  deps: ServerDependencies,
+  feedPolicy: SessionBoundFeedPolicy = 'restart'
 ): Promise<Response | null> {
   const { state } = deps;
 
@@ -260,6 +312,7 @@ export async function bindSessionContext(
     state.setLogUploader(logUploader);
     logUploader.start();
     logToFile(`session bound: sessionId=${config.sessionId}`);
+    await notifySessionBound(deps, feedPolicy);
     return null;
   }
 
@@ -275,6 +328,9 @@ export async function bindSessionContext(
     agentSessionId: config.agentSessionId,
   };
   const result = state.bindSession(sessionContext);
+  if (feedPolicy === 'close-until-runtime-ready') {
+    await notifySessionBound(deps, feedPolicy);
+  }
   if (result.changed) {
     logToFile(
       `session binding refreshed: generation=${binding.wrapperGeneration ?? 'none'} connectionId=${binding.wrapperConnectionId ?? 'none'}`
@@ -283,6 +339,9 @@ export async function bindSessionContext(
       await deps.closeConnection();
     }
     deps.resetLifecycle();
+    if (feedPolicy === 'restart') {
+      await notifySessionBound(deps, feedPolicy);
+    }
   }
   return null;
 }
@@ -298,6 +357,10 @@ function createHealthHandler(config: ServerConfig, state: WrapperState) {
       state: state.isActive ? 'active' : 'idle',
       version: config.version,
       sessionId: config.sessionId,
+      ...(config.wrapperInstanceId ? { wrapperInstanceId: config.wrapperInstanceId } : {}),
+      ...(config.wrapperInstanceGeneration !== undefined
+        ? { wrapperInstanceGeneration: config.wrapperInstanceGeneration }
+        : {}),
       pendingMessages: state.pendingMessageIds.length,
     });
   };
@@ -354,6 +417,13 @@ export function createPromptHandler(config: ServerConfig, deps: ServerDependenci
       }
     }
 
+    const attributionError = await applyCommitAttribution(
+      config.workspacePath,
+      prompt.finalization?.commitCoAuthor,
+      deps.configureCommitCoAuthor ?? configureCommitCoAuthorHook
+    );
+    if (attributionError) return attributionError;
+
     if (!state.isConnected) {
       try {
         await openConnection();
@@ -370,6 +440,9 @@ export function createPromptHandler(config: ServerConfig, deps: ServerDependenci
       condenseOnComplete: prompt.finalization?.condenseOnComplete ?? false,
       model: prompt.agent?.model?.modelID,
       upstreamBranch: binding?.upstreamBranch,
+      ...(prompt.finalization?.commitCoAuthor
+        ? { commitCoAuthor: prompt.finalization.commitCoAuthor }
+        : {}),
     });
 
     try {
@@ -396,7 +469,7 @@ export function createPromptHandler(config: ServerConfig, deps: ServerDependenci
   };
 }
 
-function createCommandHandler(config: ServerConfig, deps: ServerDependencies) {
+export function createCommandHandler(config: ServerConfig, deps: ServerDependencies) {
   return async (req: Request): Promise<Response> => {
     const { state, kiloClient, openConnection } = deps;
 
@@ -418,6 +491,17 @@ function createCommandHandler(config: ServerConfig, deps: ServerDependencies) {
     if (!body.command) {
       return errorResponse('INVALID_REQUEST', 'command is required', 400);
     }
+    const compactModel = body.command === 'compact' ? body.agent?.model : undefined;
+    if (body.command === 'compact' && !compactModel?.modelID) {
+      return errorResponse('INVALID_REQUEST', 'model is required for compact', 400);
+    }
+
+    const attributionError = await applyCommitAttribution(
+      config.workspacePath,
+      body.commitCoAuthor,
+      deps.configureCommitCoAuthor ?? configureCommitCoAuthorHook
+    );
+    if (attributionError) return attributionError;
 
     const binding = body.session ?? body.execution;
     const messageId = body.messageId;
@@ -425,7 +509,9 @@ function createCommandHandler(config: ServerConfig, deps: ServerDependencies) {
       state.acceptMessage(messageId, {
         autoCommit: body.autoCommit ?? false,
         condenseOnComplete: body.condenseOnComplete ?? false,
+        model: body.agent?.model?.modelID,
         upstreamBranch: binding?.upstreamBranch,
+        ...(body.commitCoAuthor ? { commitCoAuthor: body.commitCoAuthor } : {}),
       });
     }
 
@@ -442,12 +528,31 @@ function createCommandHandler(config: ServerConfig, deps: ServerDependencies) {
     }
 
     try {
-      const result = await kiloClient.sendCommand({
-        sessionId: session.kiloSessionId,
-        command: body.command,
-        args: body.args,
-        messageId,
-      });
+      let result: unknown;
+      if (compactModel) {
+        result = await kiloClient.summarizeSession({
+          sessionId: session.kiloSessionId,
+          model: compactModel,
+        });
+        if (messageId) {
+          state.sendToIngest({
+            streamEventType: 'cloud.message.completed',
+            data: {
+              messageId,
+              completionSource: 'manual_compact_summarize',
+            },
+            timestamp: new Date().toISOString(),
+          });
+          deps.onMessageComplete?.(messageId);
+        }
+      } else {
+        result = await kiloClient.sendCommand({
+          sessionId: session.kiloSessionId,
+          command: body.command,
+          args: body.args,
+          messageId,
+        });
+      }
       state.updateActivity();
       logToFile(`job/command: sent command=${body.command}`);
       return jsonResponse({ status: 'sent', result });
@@ -836,6 +941,80 @@ export function createSessionReadyHandler(deps: ServerDependencies) {
   };
 }
 
+export function createRuntimeEnvironmentHandler(deps: ServerDependencies) {
+  return async (req: Request): Promise<Response> => {
+    if (!deps.updateRuntimeEnvironment) {
+      return errorResponse('NOT_READY', 'Runtime environment updater is not configured', 503);
+    }
+
+    let body: unknown;
+    try {
+      body = await req.json();
+    } catch {
+      return errorResponse('INVALID_REQUEST', 'Invalid JSON body', 400);
+    }
+    if (
+      typeof body !== 'object' ||
+      body === null ||
+      !('env' in body) ||
+      typeof body.env !== 'object' ||
+      body.env === null ||
+      Array.isArray(body.env)
+    ) {
+      return errorResponse('INVALID_REQUEST', 'Invalid runtime environment request', 400);
+    }
+
+    const env: Record<string, string> = {};
+    for (const [name, value] of Object.entries(body.env)) {
+      if (typeof value !== 'string') {
+        return errorResponse('INVALID_REQUEST', 'Invalid runtime environment request', 400);
+      }
+      env[name] = value;
+    }
+
+    try {
+      await deps.updateRuntimeEnvironment(env);
+    } catch {
+      return errorResponse(
+        'RUNTIME_ENVIRONMENT_UPDATE_FAILED',
+        'Failed to update runtime environment',
+        500
+      );
+    }
+    return jsonResponse({ status: 'updated' });
+  };
+}
+
+export function isKiloProxyPath(path: string): boolean {
+  return path === '/kilo-proxy' || path.startsWith('/kilo-proxy/');
+}
+
+export function createKiloProxyHandler(deps: ServerDependencies) {
+  return async (req: Request): Promise<Response> => {
+    let serverUrl: string;
+    try {
+      serverUrl = deps.kiloClient.serverUrl;
+    } catch {
+      return errorResponse('KILO_RUNTIME_UNAVAILABLE', 'Kilo runtime is not bootstrapped', 503);
+    }
+
+    if (!serverUrl) {
+      return errorResponse('KILO_RUNTIME_UNAVAILABLE', 'Kilo runtime is not bootstrapped', 503);
+    }
+
+    const url = new URL(req.url);
+    const upstreamUrl = new URL(serverUrl);
+    const strippedPath =
+      url.pathname === '/kilo-proxy' ? '/' : url.pathname.slice('/kilo-proxy'.length);
+    upstreamUrl.pathname = strippedPath || '/';
+    upstreamUrl.search = url.search;
+
+    const upstreamRequest = createProxyRequest(req, upstreamUrl);
+    upstreamRequest.headers.set('Accept-Encoding', 'identity');
+    return fetch(upstreamRequest);
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Server Creation
 // ---------------------------------------------------------------------------
@@ -863,6 +1042,8 @@ export function createFetchHandler(
   const abortHandler = createAbortHandler(deps, triggerDrainAndClose);
   const ptyCreateHandler = createPtyCreateHandler(config, deps);
   const sessionReadyHandler = createSessionReadyHandler(deps);
+  const runtimeEnvironmentHandler = createRuntimeEnvironmentHandler(deps);
+  const kiloProxyHandler = createKiloProxyHandler(deps);
 
   // Route table
   type RouteHandler = (req: Request) => Response | Promise<Response>;
@@ -880,6 +1061,7 @@ export function createFetchHandler(
       '/job/abort': abortHandler,
       '/pty': ptyCreateHandler,
       '/session/ready': sessionReadyHandler,
+      '/session/environment': runtimeEnvironmentHandler,
     },
   };
 
@@ -913,6 +1095,14 @@ export function createFetchHandler(
       if (method === 'DELETE') {
         return createPtyDeleteHandler(deps, ptyPath.ptyId)(req);
       }
+    }
+
+    if (isKiloProxyPath(path)) {
+      return kiloProxyHandler(req).catch(error => {
+        const msg = error instanceof Error ? error.message : String(error);
+        logToFile(`kilo proxy error: ${msg}`);
+        return errorResponse('KILO_PROXY_ERROR', msg, 502);
+      });
     }
 
     // Look up route

@@ -1048,8 +1048,50 @@
     {
       "idx": 149,
       "version": "7",
-      "when": 1780067415349,
-      "tag": "0149_lowly_martin_li",
+      "when": 1780080850427,
+      "tag": "0149_pink_tag",
+      "breakpoints": true
+    },
+    {
+      "idx": 150,
+      "version": "7",
+      "when": 1780085204443,
+      "tag": "0150_typical_scorpion",
+      "breakpoints": true
+    },
+    {
+      "idx": 151,
+      "version": "7",
+      "when": 1780313423049,
+      "tag": "0151_shiny_bullseye",
+      "breakpoints": true
+    },
+    {
+      "idx": 152,
+      "version": "7",
+      "when": 1780319034603,
+      "tag": "0152_giant_wendell_vaughn",
+      "breakpoints": true
+    },
+    {
+      "idx": 153,
+      "version": "7",
+      "when": 1780333010122,
+      "tag": "0153_perpetual_bromley",
+      "breakpoints": true
+    },
+    {
+      "idx": 154,
+      "version": "7",
+      "when": 1780401682134,
+      "tag": "0154_familiar_franklin_richards",
+      "breakpoints": true
+    },
+    {
+      "idx": 155,
+      "version": "7",
+      "when": 1780656469384,
+      "tag": "0155_daffy_gabe_jones",
       "breakpoints": true
     }
   ]

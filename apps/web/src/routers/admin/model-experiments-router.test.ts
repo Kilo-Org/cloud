@@ -68,23 +68,50 @@ describe('admin.modelExperiments — basic CRUD', () => {
   it('creates a draft experiment owned by the calling admin', async () => {
     const caller = await createCallerForUser(admin.id);
     const created = await caller.admin.modelExperiments.create({
-      public_model_id: 'kilo/preview-foo',
+      public_model_id: 'partner/preview-foo',
       name: 'Preview Foo',
       description: 'partner test',
     });
     expect(created.status).toBe('draft');
-    expect(created.public_model_id).toBe('kilo/preview-foo');
+    expect(created.public_model_id).toBe('partner/preview-foo');
     expect(created.created_by_user_id).toBe(admin.id);
+  });
+
+  it.each(['kilo/preview-foo', 'kilocode/preview-foo', 'kilo-internal/preview-foo'])(
+    'rejects creating an experiment with reserved public_model_id %s',
+    async reservedPublicId => {
+      const caller = await createCallerForUser(admin.id);
+      await expect(
+        caller.admin.modelExperiments.create({
+          public_model_id: reservedPublicId,
+          name: 'Reserved',
+        })
+      ).rejects.toThrow(/reserved prefix/);
+    }
+  );
+
+  it('rejects updating an experiment to a reserved public_model_id', async () => {
+    const caller = await createCallerForUser(admin.id);
+    const created = await caller.admin.modelExperiments.create({
+      public_model_id: 'partner/preview-update-reserved',
+      name: 'Update Reserved',
+    });
+    await expect(
+      caller.admin.modelExperiments.update({
+        id: created.id,
+        public_model_id: 'kilo/preview-foo',
+      })
+    ).rejects.toThrow(/reserved prefix/);
   });
 
   it('list excludes archived by default and includes when requested', async () => {
     const caller = await createCallerForUser(admin.id);
     const a = await caller.admin.modelExperiments.create({
-      public_model_id: 'kilo/preview-a',
+      public_model_id: 'partner/preview-a',
       name: 'A',
     });
     const b = await caller.admin.modelExperiments.create({
-      public_model_id: 'kilo/preview-b',
+      public_model_id: 'partner/preview-b',
       name: 'B',
     });
     await caller.admin.modelExperiments.setArchived({ id: b.id, archived: true });
@@ -97,8 +124,9 @@ describe('admin.modelExperiments — basic CRUD', () => {
   });
 
   it('lists the last experiment attribution requests with usage and variant metadata', async () => {
-    const { caller, experimentId, variantA } =
-      await makeDraftWithTwoVariants('kilo/preview-requests');
+    const { caller, experimentId, variantA } = await makeDraftWithTwoVariants(
+      'partner/preview-requests'
+    );
     await caller.admin.modelExperiments.activate({ id: experimentId });
     const [version] = await db
       .select({ id: model_experiment_variant_version.id })
@@ -118,7 +146,7 @@ describe('admin.modelExperiments — basic CRUD', () => {
       cache_hit_tokens: 7,
       provider: 'custom',
       model: 'partner-checkpoint-rc1',
-      requested_model: 'kilo/preview-requests',
+      requested_model: 'partner/preview-requests',
       inference_provider: 'partner',
       organization_id: null,
     });
@@ -139,8 +167,8 @@ describe('admin.modelExperiments — basic CRUD', () => {
       expect.objectContaining({
         usageId,
         experimentId,
-        experimentName: 'exp-kilo/preview-requests',
-        publicModelId: 'kilo/preview-requests',
+        experimentName: 'exp-partner/preview-requests',
+        publicModelId: 'partner/preview-requests',
         variantId: variantA.id,
         variantLabel: 'control',
         variantVersionId: version.id,
@@ -150,7 +178,7 @@ describe('admin.modelExperiments — basic CRUD', () => {
         requestBodySha256: '__failed__',
         wasTruncated: true,
         userId: 'request-user',
-        requestedModel: 'kilo/preview-requests',
+        requestedModel: 'partner/preview-requests',
         upstreamModel: 'partner-checkpoint-rc1',
         inputTokens: 123,
         outputTokens: 45,
@@ -159,8 +187,8 @@ describe('admin.modelExperiments — basic CRUD', () => {
   });
 
   it('paginates and filters request attribution rows for investigation', async () => {
-    const first = await makeDraftWithTwoVariants('kilo/preview-filter-first');
-    const second = await makeDraftWithTwoVariants('kilo/preview-filter-second');
+    const first = await makeDraftWithTwoVariants('partner/preview-filter-first');
+    const second = await makeDraftWithTwoVariants('partner/preview-filter-second');
     const [firstVersion] = await db
       .select({ id: model_experiment_variant_version.id })
       .from(model_experiment_variant_version)
@@ -271,7 +299,7 @@ describe('admin.modelExperiments — basic CRUD', () => {
   });
 
   it('rejects delete unless status is draft', async () => {
-    const { caller, experimentId } = await makeDraftWithTwoVariants('kilo/preview-delete');
+    const { caller, experimentId } = await makeDraftWithTwoVariants('partner/preview-delete');
     await caller.admin.modelExperiments.activate({ id: experimentId });
     await expect(caller.admin.modelExperiments.delete({ id: experimentId })).rejects.toMatchObject({
       message: expect.stringContaining('draft'),
@@ -283,7 +311,7 @@ describe('admin.modelExperiments — activation guards', () => {
   it('allows activation with one variant for sequential testing', async () => {
     const caller = await createCallerForUser(admin.id);
     const exp = await caller.admin.modelExperiments.create({
-      public_model_id: 'kilo/preview-thin',
+      public_model_id: 'partner/preview-thin',
       name: 'thin',
     });
     const v = await caller.admin.modelExperiments.addVariant({
@@ -304,7 +332,7 @@ describe('admin.modelExperiments — activation guards', () => {
   it('rejects activation with no variants', async () => {
     const caller = await createCallerForUser(admin.id);
     const exp = await caller.admin.modelExperiments.create({
-      public_model_id: 'kilo/preview-empty',
+      public_model_id: 'partner/preview-empty',
       name: 'empty',
     });
 
@@ -316,7 +344,7 @@ describe('admin.modelExperiments — activation guards', () => {
   it('rejects activation when a variant has no version row', async () => {
     const caller = await createCallerForUser(admin.id);
     const exp = await caller.admin.modelExperiments.create({
-      public_model_id: 'kilo/preview-noversion',
+      public_model_id: 'partner/preview-noversion',
       name: 'noversion',
     });
     const a = await caller.admin.modelExperiments.addVariant({
@@ -336,10 +364,10 @@ describe('admin.modelExperiments — activation guards', () => {
   });
 
   it('rejects a second active experiment on the same public_model_id', async () => {
-    const first = await makeDraftWithTwoVariants('kilo/preview-conflict');
+    const first = await makeDraftWithTwoVariants('partner/preview-conflict');
     await first.caller.admin.modelExperiments.activate({ id: first.experimentId });
 
-    const second = await makeDraftWithTwoVariants('kilo/preview-conflict');
+    const second = await makeDraftWithTwoVariants('partner/preview-conflict');
     await expect(
       second.caller.admin.modelExperiments.activate({ id: second.experimentId })
     ).rejects.toMatchObject({ message: expect.stringContaining('Another active or paused') });
@@ -347,7 +375,7 @@ describe('admin.modelExperiments — activation guards', () => {
 
   it('maps a concurrent unique-violation on activate to CONFLICT (TOCTOU safety net)', async () => {
     // Build a ready-to-activate draft.
-    const target = await makeDraftWithTwoVariants('kilo/preview-toctou');
+    const target = await makeDraftWithTwoVariants('partner/preview-toctou');
 
     // Simulate a racing admin: between the friendly pre-check and the
     // UPDATE, sneak a sibling active experiment into the DB so the
@@ -355,7 +383,7 @@ describe('admin.modelExperiments — activation guards', () => {
     // directly INSERTing a sibling instead of going through the API,
     // because the API would reject it with the same friendly CONFLICT.
     await db.insert(model_experiment).values({
-      public_model_id: 'kilo/preview-toctou',
+      public_model_id: 'partner/preview-toctou',
       name: 'sibling-active',
       status: 'active',
     });
@@ -370,19 +398,19 @@ describe('admin.modelExperiments — activation guards', () => {
   });
 
   it('allows a draft to coexist with an active experiment on the same public_id', async () => {
-    const first = await makeDraftWithTwoVariants('kilo/preview-stack');
+    const first = await makeDraftWithTwoVariants('partner/preview-stack');
     await first.caller.admin.modelExperiments.activate({ id: first.experimentId });
 
     // Just verifying the draft can exist and be listed; uniqueness is only on
     // (active|paused).
-    const second = await makeDraftWithTwoVariants('kilo/preview-stack');
+    const second = await makeDraftWithTwoVariants('partner/preview-stack');
     expect(second.experimentId).not.toBe(first.experimentId);
   });
 });
 
 describe('admin.modelExperiments — state machine', () => {
   it('walks draft → active → paused → active → completed', async () => {
-    const { caller, experimentId } = await makeDraftWithTwoVariants('kilo/preview-sm');
+    const { caller, experimentId } = await makeDraftWithTwoVariants('partner/preview-sm');
     let row = await caller.admin.modelExperiments.activate({ id: experimentId });
     expect(row.status).toBe('active');
     expect(row.started_at).not.toBeNull();
@@ -399,14 +427,14 @@ describe('admin.modelExperiments — state machine', () => {
   });
 
   it('rejects pausing a non-active experiment', async () => {
-    const { caller, experimentId } = await makeDraftWithTwoVariants('kilo/preview-pause');
+    const { caller, experimentId } = await makeDraftWithTwoVariants('partner/preview-pause');
     await expect(caller.admin.modelExperiments.pause({ id: experimentId })).rejects.toMatchObject({
       message: expect.stringContaining('Only active'),
     });
   });
 
   it('rejects activation of a completed experiment', async () => {
-    const { caller, experimentId } = await makeDraftWithTwoVariants('kilo/preview-done');
+    const { caller, experimentId } = await makeDraftWithTwoVariants('partner/preview-done');
     await caller.admin.modelExperiments.activate({ id: experimentId });
     await caller.admin.modelExperiments.complete({ id: experimentId });
     await expect(
@@ -417,7 +445,7 @@ describe('admin.modelExperiments — state machine', () => {
 
 describe('admin.modelExperiments — archive', () => {
   it('forbids archiving an active experiment', async () => {
-    const { caller, experimentId } = await makeDraftWithTwoVariants('kilo/preview-arch');
+    const { caller, experimentId } = await makeDraftWithTwoVariants('partner/preview-arch');
     await caller.admin.modelExperiments.activate({ id: experimentId });
     await expect(
       caller.admin.modelExperiments.setArchived({ id: experimentId, archived: true })
@@ -425,15 +453,15 @@ describe('admin.modelExperiments — archive', () => {
   });
 
   it('allows archiving paused / completed / draft', async () => {
-    const a = await makeDraftWithTwoVariants('kilo/preview-arch-a');
+    const a = await makeDraftWithTwoVariants('partner/preview-arch-a');
     await a.caller.admin.modelExperiments.setArchived({ id: a.experimentId, archived: true });
 
-    const b = await makeDraftWithTwoVariants('kilo/preview-arch-b');
+    const b = await makeDraftWithTwoVariants('partner/preview-arch-b');
     await b.caller.admin.modelExperiments.activate({ id: b.experimentId });
     await b.caller.admin.modelExperiments.pause({ id: b.experimentId });
     await b.caller.admin.modelExperiments.setArchived({ id: b.experimentId, archived: true });
 
-    const c = await makeDraftWithTwoVariants('kilo/preview-arch-c');
+    const c = await makeDraftWithTwoVariants('partner/preview-arch-c');
     await c.caller.admin.modelExperiments.activate({ id: c.experimentId });
     await c.caller.admin.modelExperiments.complete({ id: c.experimentId });
     await c.caller.admin.modelExperiments.setArchived({ id: c.experimentId, archived: true });
@@ -442,7 +470,7 @@ describe('admin.modelExperiments — archive', () => {
 
 describe('admin.modelExperiments — variant ops', () => {
   it('rejects addVariant after activation (structural edit)', async () => {
-    const { caller, experimentId } = await makeDraftWithTwoVariants('kilo/preview-add');
+    const { caller, experimentId } = await makeDraftWithTwoVariants('partner/preview-add');
     await caller.admin.modelExperiments.activate({ id: experimentId });
     await expect(
       caller.admin.modelExperiments.addVariant({
@@ -454,7 +482,7 @@ describe('admin.modelExperiments — variant ops', () => {
   });
 
   it('rejects removeVariant after activation', async () => {
-    const { caller, experimentId, variantA } = await makeDraftWithTwoVariants('kilo/preview-rm');
+    const { caller, experimentId, variantA } = await makeDraftWithTwoVariants('partner/preview-rm');
     await caller.admin.modelExperiments.activate({ id: experimentId });
     await expect(
       caller.admin.modelExperiments.removeVariant({ variantId: variantA.id })
@@ -462,7 +490,8 @@ describe('admin.modelExperiments — variant ops', () => {
   });
 
   it('allows updateVariantLabel in non-terminal state', async () => {
-    const { caller, experimentId, variantA } = await makeDraftWithTwoVariants('kilo/preview-label');
+    const { caller, experimentId, variantA } =
+      await makeDraftWithTwoVariants('partner/preview-label');
     await caller.admin.modelExperiments.activate({ id: experimentId });
     const renamed = await caller.admin.modelExperiments.updateVariantLabel({
       variantId: variantA.id,
@@ -472,8 +501,9 @@ describe('admin.modelExperiments — variant ops', () => {
   });
 
   it('rejects updateVariantLabel on completed', async () => {
-    const { caller, experimentId, variantA } =
-      await makeDraftWithTwoVariants('kilo/preview-label-done');
+    const { caller, experimentId, variantA } = await makeDraftWithTwoVariants(
+      'partner/preview-label-done'
+    );
     await caller.admin.modelExperiments.activate({ id: experimentId });
     await caller.admin.modelExperiments.complete({ id: experimentId });
     await expect(
@@ -489,7 +519,7 @@ describe('admin.modelExperiments — versions and api keys', () => {
   it('encrypts the api key on swapVariantVersion and never returns it', async () => {
     const caller = await createCallerForUser(admin.id);
     const exp = await caller.admin.modelExperiments.create({
-      public_model_id: 'kilo/preview-key',
+      public_model_id: 'partner/preview-key',
       name: 'k',
     });
     const v = await caller.admin.modelExperiments.addVariant({
@@ -516,7 +546,7 @@ describe('admin.modelExperiments — versions and api keys', () => {
   });
 
   it('hot-swap inserts a new version row; old rows remain', async () => {
-    const { caller, variantA } = await makeDraftWithTwoVariants('kilo/preview-hotswap');
+    const { caller, variantA } = await makeDraftWithTwoVariants('partner/preview-hotswap');
 
     const before = await db
       .select()
@@ -539,7 +569,7 @@ describe('admin.modelExperiments — versions and api keys', () => {
 
   it('allows hot-swap on active and paused', async () => {
     const { caller, experimentId, variantA } =
-      await makeDraftWithTwoVariants('kilo/preview-livehot');
+      await makeDraftWithTwoVariants('partner/preview-livehot');
     await caller.admin.modelExperiments.activate({ id: experimentId });
     await caller.admin.modelExperiments.swapVariantVersion({
       variantId: variantA.id,
@@ -562,8 +592,9 @@ describe('admin.modelExperiments — versions and api keys', () => {
   });
 
   it('rejects hot-swap on completed', async () => {
-    const { caller, experimentId, variantA } =
-      await makeDraftWithTwoVariants('kilo/preview-hot-done');
+    const { caller, experimentId, variantA } = await makeDraftWithTwoVariants(
+      'partner/preview-hot-done'
+    );
     await caller.admin.modelExperiments.activate({ id: experimentId });
     await caller.admin.modelExperiments.complete({ id: experimentId });
     await expect(
@@ -576,7 +607,7 @@ describe('admin.modelExperiments — versions and api keys', () => {
   });
 
   it('rotateApiKey copies prior upstream and inserts new encrypted key', async () => {
-    const { caller, variantA } = await makeDraftWithTwoVariants('kilo/preview-rot');
+    const { caller, variantA } = await makeDraftWithTwoVariants('partner/preview-rot');
     const rotated = await caller.admin.modelExperiments.rotateApiKey({
       variantId: variantA.id,
       apiKey: 'sk-rotated',
@@ -595,7 +626,7 @@ describe('admin.modelExperiments — versions and api keys', () => {
   it('rotateApiKey rejects when variant has no prior version', async () => {
     const caller = await createCallerForUser(admin.id);
     const exp = await caller.admin.modelExperiments.create({
-      public_model_id: 'kilo/preview-rot-empty',
+      public_model_id: 'partner/preview-rot-empty',
       name: 'r',
     });
     const v = await caller.admin.modelExperiments.addVariant({
@@ -609,7 +640,7 @@ describe('admin.modelExperiments — versions and api keys', () => {
   });
 
   it('rejects swap with invalid upstream (extra fields)', async () => {
-    const { caller, variantA } = await makeDraftWithTwoVariants('kilo/preview-bad');
+    const { caller, variantA } = await makeDraftWithTwoVariants('partner/preview-bad');
     await expect(
       caller.admin.modelExperiments.swapVariantVersion({
         variantId: variantA.id,
@@ -621,7 +652,7 @@ describe('admin.modelExperiments — versions and api keys', () => {
   });
 
   it('swapVariantVersion without apiKey reuses the prior encrypted key', async () => {
-    const { caller, variantA } = await makeDraftWithTwoVariants('kilo/preview-reuse');
+    const { caller, variantA } = await makeDraftWithTwoVariants('partner/preview-reuse');
     const before = await db.query.model_experiment_variant_version.findFirst({
       where: eq(model_experiment_variant_version.variant_id, variantA.id),
     });
@@ -647,7 +678,7 @@ describe('admin.modelExperiments — versions and api keys', () => {
   it('swapVariantVersion without apiKey rejects when variant has no prior version', async () => {
     const caller = await createCallerForUser(admin.id);
     const exp = await caller.admin.modelExperiments.create({
-      public_model_id: 'kilo/preview-firstver',
+      public_model_id: 'partner/preview-firstver',
       name: 'f',
     });
     const v = await caller.admin.modelExperiments.addVariant({
@@ -667,7 +698,7 @@ describe('admin.modelExperiments — versions and api keys', () => {
 
 describe('admin.modelExperiments — privacy and shape', () => {
   it('get(id) never returns encrypted_api_key on any version row', async () => {
-    const { caller, experimentId } = await makeDraftWithTwoVariants('kilo/preview-priv');
+    const { caller, experimentId } = await makeDraftWithTwoVariants('partner/preview-priv');
     const detail = await caller.admin.modelExperiments.get({ id: experimentId });
 
     expect(detail.experiment).not.toHaveProperty('encrypted_api_key');
@@ -683,7 +714,7 @@ describe('admin.modelExperiments — privacy and shape', () => {
     // Use a draft so delete is allowed.
     const caller = await createCallerForUser(admin.id);
     const exp = await caller.admin.modelExperiments.create({
-      public_model_id: 'kilo/preview-cascade',
+      public_model_id: 'partner/preview-cascade',
       name: 'c',
     });
     const v = await caller.admin.modelExperiments.addVariant({

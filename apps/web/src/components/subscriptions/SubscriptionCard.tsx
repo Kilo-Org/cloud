@@ -20,8 +20,8 @@ export function SubscriptionCard({
   statusNote,
 }: {
   icon: ReactNode;
-  title: string;
-  subtitle: string;
+  title: ReactNode;
+  subtitle?: string;
   status: string;
   price: string;
   billingDate: string;
@@ -44,7 +44,7 @@ export function SubscriptionCard({
       >
         <CardContent className="flex flex-col gap-4 p-5 md:flex-row md:items-start md:justify-between">
           <div className="flex min-w-0 gap-3">
-            <div className="bg-muted flex h-11 w-11 shrink-0 items-center justify-center rounded-xl">
+            <div className="bg-muted flex size-11 shrink-0 items-center justify-center rounded-xl">
               {icon}
             </div>
             <div className="min-w-0 space-y-2">
@@ -55,7 +55,7 @@ export function SubscriptionCard({
                   variant={isTerminal ? 'muted' : 'default'}
                 />
               </div>
-              <p className="text-muted-foreground text-sm">{subtitle}</p>
+              {subtitle ? <p className="text-muted-foreground text-sm">{subtitle}</p> : null}
               {statusNote ? (
                 <p
                   className={cn(
@@ -80,7 +80,7 @@ export function SubscriptionCard({
               </div>
             </div>
           </div>
-          <ChevronRight className="text-muted-foreground h-5 w-5 shrink-0 self-center md:mt-3" />
+          <ChevronRight className="text-muted-foreground size-5 shrink-0 self-center md:mt-3" />
         </CardContent>
       </Card>
     </Link>

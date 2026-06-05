@@ -36,9 +36,11 @@ function getShowKiloPassTwoMonthPromo(showFirstMonthPromo: boolean): boolean {
 export function KiloPassGroup({
   showTerminal,
   accordionValue,
+  hideHeader = false,
 }: {
   showTerminal: boolean;
   accordionValue?: string;
+  hideHeader?: boolean;
 }) {
   const trpc = useTRPC();
   const query = useQuery(trpc.kiloPass.getState.queryOptions());
@@ -60,7 +62,7 @@ export function KiloPassGroup({
           toast.error('Failed to create Stripe checkout session');
           return;
         }
-        window.location.href = result.url;
+        window.location.assign(result.url);
       },
       onError: error => {
         toast.error(error.message || 'Failed to start checkout');
@@ -98,16 +100,18 @@ export function KiloPassGroup({
     <SubscriptionGroup
       title="Kilo Pass"
       description="Manage your Kilo Pass subscription and credit entitlements."
-      headerIcon={<Crown className="h-5 w-5" />}
+      headerIcon={<Crown className="size-5" />}
       isLoading={query.isLoading}
       isError={query.isError}
       error={query.error}
       onRetry={() => void query.refetch()}
       accordionValue={accordionValue}
+      hideHeader={hideHeader}
+      unframed={hideHeader}
     >
       {shouldShowSubscription && subscriptionDisplay && providerManagement ? (
         <SubscriptionCard
-          icon={<Crown className="h-5 w-5" />}
+          icon={<Crown className="size-5" />}
           title={`Kilo Pass ${formatKiloPassTierLabel(subscription.tier)}`}
           subtitle={`${formatKiloPassTierLabel(subscription.tier)} tier • ${formatKiloPassCadenceLabel(subscription.cadence)}`}
           status={subscriptionDisplay.status}
@@ -138,7 +142,7 @@ export function KiloPassGroup({
           recommendedTier={recommendedTier}
           onSelectTier={tier => void startCheckout(tier)}
           showHeader={false}
-          contentClassName="p-6"
+          unframed
         />
       )}
     </SubscriptionGroup>

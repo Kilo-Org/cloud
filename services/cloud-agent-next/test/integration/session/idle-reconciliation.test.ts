@@ -12,10 +12,12 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { createEventQueries } from '../../../src/session/queries/events.js';
 import {
+  getWrapperLease,
   getWrapperRuntimeState,
   allocateWrapperRuntimeState,
 } from '../../../src/session/wrapper-runtime-state.js';
 import {
+  getSessionMessageState,
   listNonTerminalAcceptedMessages,
   putSessionMessageState,
   type SessionMessageState,
@@ -25,7 +27,13 @@ import { registerReadySession } from '../../helpers/session-setup.js';
 describe('idle reconciliation scheduling', () => {
   beforeEach(async () => {
     const ids = await listDurableObjectIds(env.CLOUD_AGENT_SESSION);
-    await Promise.all(ids.map(id => env.CLOUD_AGENT_SESSION.get(id).deleteSession()));
+    await Promise.all(
+      ids.map(id =>
+        runInDurableObject(env.CLOUD_AGENT_SESSION.get(id), instance =>
+          instance.ctx.storage.deleteAll()
+        )
+      )
+    );
   });
 
   it('root session.idle records lastWrapperIdleAt and idleReconcileAfter', async () => {
@@ -103,8 +111,6 @@ describe('idle reconciliation scheduling', () => {
     const stub = env.CLOUD_AGENT_SESSION.get(doId);
 
     const result = await runInDurableObject(stub, async instance => {
-      instance['stopCurrentWrapperProcess'] = async () => {};
-
       await registerReadySession(instance, {
         sessionId,
         userId,
@@ -159,8 +165,6 @@ describe('idle reconciliation scheduling', () => {
     const stub = env.CLOUD_AGENT_SESSION.get(doId);
 
     const result = await runInDurableObject(stub, async (instance, state) => {
-      instance['stopCurrentWrapperProcess'] = async () => {};
-
       await registerReadySession(instance, {
         sessionId,
         userId,
@@ -171,68 +175,70 @@ describe('idle reconciliation scheduling', () => {
         model: 'test-model',
         kilocodeToken: 'token-idle-after',
       });
-
       const { state: wrapperState } = await allocateWrapperRuntimeState(instance.ctx.storage);
-      const { wrapperRunId, wrapperConnectionId } = wrapperState;
-
-      const acceptedMessage: SessionMessageState = {
-        messageId: 'msg_018f1e2d3c4b00000000000002',
+      const messageId = 'msg_018f1e2d3c4b00000000000002';
+      await putSessionMessageState(instance.ctx.storage, {
+        messageId,
         status: 'accepted',
         prompt: 'hello',
         createdAt: Date.now(),
         acceptedAt: Date.now(),
-        wrapperRunId: wrapperRunId!,
-      };
-      await putSessionMessageState(instance.ctx.storage, acceptedMessage);
-
+        wrapperRunId: wrapperState.wrapperRunId!,
+      });
       const past = Date.now() - 1;
       await instance.ctx.storage.put('wrapper_runtime_state', {
         wrapperGeneration: wrapperState.wrapperGeneration,
-        wrapperConnectionId,
-        wrapperRunId,
+        wrapperConnectionId: wrapperState.wrapperConnectionId,
+        wrapperRunId: wrapperState.wrapperRunId,
         lastWrapperIdleAt: past - 15_000,
         idleReconcileAfter: past,
       });
-
       await instance.alarm();
 
       const nonTerminalMessages = await listNonTerminalAcceptedMessages(
         instance.ctx.storage,
-        wrapperRunId!
+        wrapperState.wrapperRunId!
+      );
+      const failedMessage = await getSessionMessageState(instance.ctx.storage, messageId);
+      const events = createEventQueries(
+        drizzle(state.storage, { logger: false }),
+        state.storage.sql
       );
 
-      const db = drizzle(state.storage, { logger: false });
-      const eventQueries = createEventQueries(db, state.storage.sql);
-      const allEvents = eventQueries.findByFilters({});
-
-      return { nonTerminalMessages, allEvents };
+      return {
+        nonTerminalMessages,
+        failedMessage,
+        failedEvents: events.findByFilters({ eventTypes: ['cloud.message.failed'] }),
+        lease: await getWrapperLease(instance.ctx.storage),
+      };
     });
 
     expect(result.nonTerminalMessages).toHaveLength(0);
+    expect(result.failedMessage).toMatchObject({
+      failureStage: 'post_dispatch_no_activity',
+      failureCode: 'missing_assistant_reply',
+    });
 
-    const failedEvents = result.allEvents.filter(
-      event => event.stream_event_type === 'cloud.message.failed'
-    );
-    expect(failedEvents).toHaveLength(1);
-    const payload = JSON.parse(failedEvents[0].payload);
-    expect(payload).toMatchObject({
+    expect(result.failedEvents).toHaveLength(1);
+    expect(JSON.parse(result.failedEvents[0].payload)).toMatchObject({
       messageId: 'msg_018f1e2d3c4b00000000000002',
       status: 'failed',
-      error: 'No assistant reply found after idle timeout',
+      error: 'No assistant reply found during reconciliation',
       delivery: 'sent',
       accepted: true,
+      completionSource: 'idle_reconciliation',
     });
-    expect(payload.completionSource).toBe('idle_reconciliation');
+    expect(result.lease).toMatchObject({ state: 'stop_needed', reason: 'terminal-failed' });
   });
 
   it('idle reconciliation treats object-shaped assistant errors as failed replies', async () => {
     const userId = 'user_idle_object_error';
     const sessionId = 'agent_idle_object_error';
-    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
-    const stub = env.CLOUD_AGENT_SESSION.get(doId);
+    const stub = env.CLOUD_AGENT_SESSION.get(
+      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
+    );
 
     const result = await runInDurableObject(stub, async (instance, state) => {
-      instance['stopCurrentWrapperProcess'] = async () => {};
       await registerReadySession(instance, {
         sessionId,
         userId,
@@ -243,7 +249,6 @@ describe('idle reconciliation scheduling', () => {
         model: 'test-model',
         kilocodeToken: 'token-idle-object-error',
       });
-
       const { state: wrapperState } = await allocateWrapperRuntimeState(instance.ctx.storage);
       const messageId = 'msg_018f1e2d3c4bObjErrIdleAbCd';
       await putSessionMessageState(instance.ctx.storage, {
@@ -254,7 +259,6 @@ describe('idle reconciliation scheduling', () => {
         acceptedAt: Date.now(),
         wrapperRunId: wrapperState.wrapperRunId!,
       });
-
       const events = createEventQueries(
         drizzle(state.storage, { logger: false }),
         state.storage.sql
@@ -278,7 +282,6 @@ describe('idle reconciliation scheduling', () => {
         timestamp: Date.now(),
         entityId: 'message/assistant_obj_error_idle',
       });
-
       const past = Date.now() - 1;
       await instance.ctx.storage.put('wrapper_runtime_state', {
         wrapperGeneration: wrapperState.wrapperGeneration,
@@ -287,28 +290,26 @@ describe('idle reconciliation scheduling', () => {
         lastWrapperIdleAt: past - 15_000,
         idleReconcileAfter: past,
       });
-
       await instance.alarm();
-      return events.findByFilters({
-        eventTypes: ['cloud.message.failed', 'cloud.message.completed'],
-      });
+      return {
+        failedEvents: events.findByFilters({ eventTypes: ['cloud.message.failed'] }),
+        completedEvents: events.findByFilters({ eventTypes: ['cloud.message.completed'] }),
+        lease: await getWrapperLease(instance.ctx.storage),
+      };
     });
 
-    const failedEvents = result.filter(event => event.stream_event_type === 'cloud.message.failed');
-    const completedEvents = result.filter(
-      event => event.stream_event_type === 'cloud.message.completed'
-    );
-    expect(failedEvents).toHaveLength(1);
-    expect(completedEvents).toHaveLength(0);
-    expect(JSON.parse(failedEvents[0].payload)).toMatchObject({
+    expect(result.failedEvents).toHaveLength(1);
+    expect(JSON.parse(result.failedEvents[0].payload)).toMatchObject({
       messageId: 'msg_018f1e2d3c4bObjErrIdleAbCd',
       status: 'failed',
       error: 'provider failed during idle',
       completionSource: 'idle_reconciliation',
     });
+    expect(result.completedEvents).toHaveLength(0);
+    expect(result.lease).toMatchObject({ state: 'stop_needed', reason: 'terminal-failed' });
   });
 
-  it('meaningful wrapper output clears idle state', async () => {
+  it('meaningful wrapper output refreshes liveness without clearing idle state', async () => {
     const userId = 'user_idle_output';
     const sessionId = 'agent_idle_output';
     const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
@@ -330,13 +331,16 @@ describe('idle reconciliation scheduling', () => {
       const { wrapperRunId, wrapperConnectionId, wrapperGeneration } = wrapperState;
 
       // Set idle state
+      const idleAt = Date.now();
+      const reconcileAt = idleAt + 15_000;
+      const keepWarmAt = idleAt + 5 * 60 * 1000;
       await instance.ctx.storage.put('wrapper_runtime_state', {
         wrapperGeneration,
         wrapperConnectionId,
         wrapperRunId,
-        lastWrapperIdleAt: Date.now(),
-        idleReconcileAfter: Date.now() + 15_000,
-        wrapperIdleDeadlineAt: Date.now() + 5 * 60 * 1000,
+        lastWrapperIdleAt: idleAt,
+        idleReconcileAfter: reconcileAt,
+        wrapperIdleDeadlineAt: keepWarmAt,
       });
 
       const handler = await (instance as any).getIngestHandler();
@@ -355,7 +359,9 @@ describe('idle reconciliation scheduling', () => {
         send: () => {},
       } as unknown as WebSocket;
 
-      // Simulate a non-fatal error event (meaningful output that clears idle)
+      // Simulate a non-fatal error event. This is post-completion infrastructure
+      // output: it must refresh wrapper liveness but must NOT disarm the idle
+      // reconciler that is about to finalize the in-flight message.
       await handler.handleIngestMessage(
         ws,
         JSON.stringify({
@@ -366,12 +372,15 @@ describe('idle reconciliation scheduling', () => {
       );
 
       const runtimeState = await getWrapperRuntimeState(instance.ctx.storage);
-      return { runtimeState };
+      return { runtimeState, idleAt, reconcileAt, keepWarmAt };
     });
 
-    expect(result.runtimeState.lastWrapperIdleAt).toBeUndefined();
-    expect(result.runtimeState.idleReconcileAfter).toBeUndefined();
-    expect(result.runtimeState.wrapperIdleDeadlineAt).toBeUndefined();
+    // Idle reconciliation fields stay armed so the reconciler still fires.
+    expect(result.runtimeState.lastWrapperIdleAt).toBe(result.idleAt);
+    expect(result.runtimeState.idleReconcileAfter).toBe(result.reconcileAt);
+    expect(result.runtimeState.wrapperIdleDeadlineAt).toBe(result.keepWarmAt);
+    // Liveness is refreshed by the output.
+    expect(result.runtimeState.lastWrapperMessageAt).toBeDefined();
   });
 
   it('root session.idle records wrapperIdleDeadlineAt for keep-warm', async () => {
@@ -449,8 +458,9 @@ describe('idle reconciliation scheduling', () => {
     let stopWrapperCalled = false;
 
     const result = await runInDurableObject(stub, async instance => {
-      instance['stopCurrentWrapperProcess'] = async () => {
+      instance['physicalWrapperStopper'] = async () => {
         stopWrapperCalled = true;
+        return { status: 'absent' };
       };
 
       await registerReadySession(instance, {
@@ -495,8 +505,9 @@ describe('idle reconciliation scheduling', () => {
     let stopWrapperCalled = false;
 
     const result = await runInDurableObject(stub, async instance => {
-      instance['stopCurrentWrapperProcess'] = async () => {
+      instance['physicalWrapperStopper'] = async () => {
         stopWrapperCalled = true;
+        return { status: 'absent' };
       };
 
       await registerReadySession(instance, {
@@ -524,11 +535,16 @@ describe('idle reconciliation scheduling', () => {
       await instance.alarm();
 
       const runtimeState = await getWrapperRuntimeState(instance.ctx.storage);
-      return { runtimeState, stopWrapperCalled };
+      return {
+        runtimeState,
+        lease: await getWrapperLease(instance.ctx.storage),
+        stopWrapperCalled,
+      };
     });
 
-    expect(result.stopWrapperCalled).toBe(true);
+    expect(result.stopWrapperCalled).toBe(false);
     expect(result.runtimeState.wrapperConnectionId).toBeUndefined();
+    expect(result.lease).toMatchObject({ state: 'stop_needed', reason: 'keep-warm-expired' });
   });
 
   it('keep-warm cleanup clears idle state when work exists after deadline', async () => {
@@ -540,8 +556,9 @@ describe('idle reconciliation scheduling', () => {
     let stopWrapperCalled = false;
 
     const result = await runInDurableObject(stub, async instance => {
-      instance['stopCurrentWrapperProcess'] = async () => {
+      instance['physicalWrapperStopper'] = async () => {
         stopWrapperCalled = true;
+        return { status: 'absent' };
       };
 
       await registerReadySession(instance, {

@@ -5,13 +5,12 @@ import { CustomLlmDefinitionSchema } from '@kilocode/db/schema-types';
 import { asc, eq } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
-
-const KILO_INTERNAL_PREFIX = 'kilo-internal/';
+import { CUSTOM_LLM_PREFIX } from '@/lib/ai-gateway/model-utils';
 
 const publicIdSchema = z
   .string()
   .min(1, 'public_id is required')
-  .startsWith(KILO_INTERNAL_PREFIX, `public_id must start with "${KILO_INTERNAL_PREFIX}"`);
+  .startsWith(CUSTOM_LLM_PREFIX, `public_id must start with "${CUSTOM_LLM_PREFIX}"`);
 
 const UpsertCustomLlmSchema = z.object({
   public_id: publicIdSchema,

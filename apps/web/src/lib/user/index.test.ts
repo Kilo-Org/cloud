@@ -67,6 +67,7 @@ import {
   impact_advocate_reward_redemptions,
   impact_conversion_reports,
   github_branch_pull_requests,
+  user_github_app_tokens,
   model_eval_ingestions,
   code_review_feedback_subjects,
   code_review_feedback_events,
@@ -81,7 +82,12 @@ import {
   model_experiment_request,
   stripe_early_fraud_warning_cases,
   stripe_early_fraud_warning_actions,
+  coding_plan_availability_intents,
+  coding_plan_key_inventory,
+  coding_plan_subscriptions,
+  byok_api_keys,
 } from '@kilocode/db/schema';
+
 import { eq, count, sql } from 'drizzle-orm';
 import {
   softDeleteUser,
@@ -185,6 +191,10 @@ describe('User', () => {
     await db.delete(magic_link_tokens);
     await db.delete(bot_request_cloud_agent_sessions);
     await db.delete(bot_requests);
+    await db.delete(coding_plan_availability_intents);
+    await db.delete(coding_plan_subscriptions);
+    await db.delete(byok_api_keys);
+    await db.delete(coding_plan_key_inventory);
     await db.delete(stytch_fingerprints);
     await db.delete(kiloclaw_cli_runs);
     await db.delete(kiloclaw_email_log);
@@ -198,6 +208,7 @@ describe('User', () => {
     await db.delete(agent_environment_profile_mcp_servers);
     await db.delete(agent_environment_profiles);
     await db.delete(github_branch_pull_requests);
+    await db.delete(user_github_app_tokens);
     await db.delete(organizations);
     await db.delete(kilocode_users);
   });
@@ -803,6 +814,7 @@ describe('User', () => {
       });
       const touchId = randomUUID();
       const participantId = randomUUID();
+      const kiloPassParticipantId = randomUUID();
       const conversionId = randomUUID();
       const decisionId = randomUUID();
       const rewardId = randomUUID();
@@ -819,21 +831,46 @@ describe('User', () => {
         touched_at: '2026-04-23T00:00:00.000Z',
         expires_at: '2026-05-23T00:00:00.000Z',
       });
-      await db.insert(impact_advocate_participants).values({
-        id: participantId,
-        user_id: user.id,
-        advocate_id: user.id,
-        advocate_account_id: user.id,
-        contact_email: user.google_user_email,
-        registration_state: 'pending',
-      });
-      await db.insert(impact_advocate_registration_attempts).values({
-        participant_id: participantId,
-        dedupe_key: 'registration-dedupe',
-        opaque_cookie_value: 'sq-cookie',
-        cookie_value_length: 9,
-        delivery_state: 'queued',
-      });
+      await db.insert(impact_advocate_participants).values([
+        {
+          id: participantId,
+          program_key: 'kiloclaw',
+          user_id: user.id,
+          advocate_id: user.google_user_email,
+          advocate_account_id: user.google_user_email,
+          contact_email: user.google_user_email,
+          registration_state: 'pending',
+        },
+        {
+          id: kiloPassParticipantId,
+          program_key: 'kilo_pass',
+          user_id: user.id,
+          advocate_id: user.google_user_email,
+          advocate_account_id: user.google_user_email,
+          contact_email: user.google_user_email,
+          registration_state: 'pending',
+        },
+      ]);
+      await db.insert(impact_advocate_registration_attempts).values([
+        {
+          program_key: 'kiloclaw',
+          participant_id: participantId,
+          dedupe_key: 'registration-dedupe-kiloclaw',
+          opaque_cookie_value: 'sq-cookie',
+          cookie_value_length: 9,
+          delivery_state: 'queued',
+          request_payload: { id: user.google_user_email, email: user.google_user_email },
+        },
+        {
+          program_key: 'kilo_pass',
+          participant_id: kiloPassParticipantId,
+          dedupe_key: 'registration-dedupe-kilo-pass',
+          opaque_cookie_value: 'sq-cookie-kilo-pass',
+          cookie_value_length: 19,
+          delivery_state: 'queued',
+          request_payload: { id: user.google_user_email, email: user.google_user_email },
+        },
+      ]);
       await db.insert(impact_referrals).values({
         referee_user_id: user.id,
         referrer_user_id: referrer.id,
@@ -921,6 +958,11 @@ describe('User', () => {
         .where(eq(impact_advocate_participants.user_id, user.id));
       expect(participantCount.count).toBe(0);
 
+      const [registrationAttemptCount] = await db
+        .select({ count: count() })
+        .from(impact_advocate_registration_attempts);
+      expect(registrationAttemptCount.count).toBe(0);
+
       const [redemptionCount] = await db
         .select({ count: count() })
         .from(impact_advocate_reward_redemptions)
@@ -932,6 +974,15 @@ describe('User', () => {
         .from(impact_referral_conversions)
         .where(eq(impact_referral_conversions.referee_user_id, user.id));
       expect(conversionCount.count).toBe(0);
+
+      expect((await db.select({ count: count() }).from(impact_referrals))[0].count).toBe(0);
+      expect((await db.select({ count: count() }).from(impact_referral_rewards))[0].count).toBe(0);
+      expect(
+        (await db.select({ count: count() }).from(impact_referral_reward_applications))[0].count
+      ).toBe(0);
+      expect((await db.select({ count: count() }).from(impact_conversion_reports))[0].count).toBe(
+        0
+      );
     });
 
     it('falls back to google_user_email when normalized_email is null', async () => {
@@ -2050,6 +2101,22 @@ describe('User', () => {
       expect(tokens).toHaveLength(0);
     });
 
+    it('should delete Coding Plan availability notification intents', async () => {
+      const user = await insertTestUser();
+      await db.insert(coding_plan_availability_intents).values({
+        user_id: user.id,
+        plan_id: 'minimax-token-plan-plus',
+      });
+
+      await softDeleteUser(user.id);
+
+      const intents = await db
+        .select()
+        .from(coding_plan_availability_intents)
+        .where(eq(coding_plan_availability_intents.user_id, user.id));
+      expect(intents).toHaveLength(0);
+    });
+
     it('should delete github_branch_pull_requests owned by user', async () => {
       const user = await insertTestUser();
       await db.insert(github_branch_pull_requests).values({
@@ -2066,6 +2133,48 @@ describe('User', () => {
         .from(github_branch_pull_requests)
         .where(eq(github_branch_pull_requests.owned_by_user_id, user.id));
       expect(rows).toHaveLength(0);
+    });
+
+    it('should delete stored GitHub user authorization credentials', async () => {
+      const user = await insertTestUser();
+      const otherUser = await insertTestUser();
+
+      await db.insert(user_github_app_tokens).values([
+        {
+          kilo_user_id: user.id,
+          github_app_type: 'standard',
+          github_user_id: '101',
+          github_login: 'deleted-user',
+          access_token_encrypted: 'encrypted-access-deleted',
+          access_token_expires_at: '2026-06-01T00:00:00.000Z',
+          refresh_token_encrypted: 'encrypted-refresh-deleted',
+          refresh_token_expires_at: '2026-11-01T00:00:00.000Z',
+        },
+        {
+          kilo_user_id: otherUser.id,
+          github_app_type: 'standard',
+          github_user_id: '102',
+          github_login: 'retained-user',
+          access_token_encrypted: 'encrypted-access-retained',
+          access_token_expires_at: '2026-06-01T00:00:00.000Z',
+          refresh_token_encrypted: 'encrypted-refresh-retained',
+          refresh_token_expires_at: '2026-11-01T00:00:00.000Z',
+        },
+      ]);
+
+      await softDeleteUser(user.id);
+
+      const deletedCredentials = await db
+        .select()
+        .from(user_github_app_tokens)
+        .where(eq(user_github_app_tokens.kilo_user_id, user.id));
+      const retainedCredentials = await db
+        .select()
+        .from(user_github_app_tokens)
+        .where(eq(user_github_app_tokens.kilo_user_id, otherUser.id));
+
+      expect(deletedCredentials).toHaveLength(0);
+      expect(retainedCredentials).toHaveLength(1);
     });
 
     it('should nullify free_model_usage FK', async () => {
@@ -2772,6 +2881,77 @@ describe('User', () => {
       await expect(softDeleteUser(user.id)).rejects.toThrow(SoftDeletePreconditionError);
       const userAfter = await findUserById(user.id);
       expect(userAfter!.google_user_email).toBe(user.google_user_email);
+    });
+
+    it('should terminate managed Coding Plan access and anonymize inventory on soft delete', async () => {
+      const { encryptApiKey } = await import('@/lib/ai-gateway/byok/encryption');
+      const { BYOK_ENCRYPTION_KEY } = await import('@/lib/config.server');
+      const user = await insertTestUser();
+      const encrypted = encryptApiKey('test-key-for-gdpr', BYOK_ENCRYPTION_KEY);
+      const [inventoryKey] = await db
+        .insert(coding_plan_key_inventory)
+        .values({
+          plan_id: 'minimax-token-plan-plus',
+          provider_id: 'minimax',
+          upstream_plan_id: 'minimax-gdpr-plan',
+          encrypted_api_key: encrypted,
+          credential_fingerprint: `gdpr-${randomUUID()}`,
+          status: 'assigned',
+          assigned_to_user_id: user.id,
+          assigned_at: new Date().toISOString(),
+        })
+        .returning();
+      const [byokKey] = await db
+        .insert(byok_api_keys)
+        .values({
+          kilo_user_id: user.id,
+          provider_id: 'minimax',
+          encrypted_api_key: encrypted,
+          management_source: 'coding_plan',
+          created_by: user.id,
+        })
+        .returning();
+
+      await db.insert(coding_plan_subscriptions).values({
+        user_id: user.id,
+        plan_id: 'minimax-token-plan-plus',
+        provider_id: 'minimax',
+        key_inventory_id: inventoryKey.id,
+        installed_byok_key_id: byokKey.id,
+        status: 'active',
+        cost_microdollars: 20_000_000,
+        billing_period_days: 30,
+        current_period_start: new Date().toISOString(),
+        current_period_end: new Date(Date.now() + 30 * 86_400_000).toISOString(),
+        credit_renewal_at: new Date(Date.now() + 30 * 86_400_000).toISOString(),
+      });
+
+      await softDeleteUser(user.id);
+
+      const [subscription] = await db
+        .select()
+        .from(coding_plan_subscriptions)
+        .where(eq(coding_plan_subscriptions.user_id, user.id));
+      expect(subscription.status).toBe('canceled');
+      expect(subscription.cancellation_reason).toBe('account_deleted');
+      expect(subscription.canceled_at).not.toBeNull();
+      expect(subscription.installed_byok_key_id).toBeNull();
+
+      const [retainedInventory] = await db
+        .select()
+        .from(coding_plan_key_inventory)
+        .where(eq(coding_plan_key_inventory.id, inventoryKey.id));
+      expect(retainedInventory.status).toBe('revocation_pending');
+      expect(retainedInventory.upstream_plan_id).toBe('minimax-gdpr-plan');
+      expect(retainedInventory.encrypted_api_key).toBeNull();
+      expect(retainedInventory.assigned_to_user_id).toBeNull();
+      expect(retainedInventory.revocation_requested_at).not.toBeNull();
+
+      const byokKeys = await db
+        .select()
+        .from(byok_api_keys)
+        .where(eq(byok_api_keys.kilo_user_id, user.id));
+      expect(byokKeys).toHaveLength(0);
     });
 
     it('should throw SoftDeletePreconditionError for active KiloClaw instance even without live subscription', async () => {

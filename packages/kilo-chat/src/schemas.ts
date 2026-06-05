@@ -39,6 +39,15 @@ const trimmedNonEmptyString = (max: number) =>
 
 export const conversationTitleSchema = trimmedNonEmptyString(CONVERSATION_TITLE_MAX_CHARS);
 
+/**
+ * Validation for a single message text body. Shared source of truth so every
+ * boundary that accepts message text (the `textBlockSchema` used at message
+ * creation, and the `postMessageAsUserParamsSchema` HTTP boundary) enforces
+ * the SAME rule (trimmed, non-empty, max MESSAGE_TEXT_MAX_CHARS), so they
+ * cannot drift apart.
+ */
+export const messageTextSchema = trimmedNonEmptyString(MESSAGE_TEXT_MAX_CHARS);
+
 // 1-64 bytes UTF-8, no C0 (0x00-0x1F) or C1 (0x7F-0x9F) control chars.
 export const emojiSchema = z
   .string()
@@ -90,7 +99,7 @@ export const actionsBlockSchema = z
 
 export const textBlockSchema = z.object({
   type: z.literal('text'),
-  text: trimmedNonEmptyString(MESSAGE_TEXT_MAX_CHARS),
+  text: messageTextSchema,
 });
 
 const attachmentMetadataShape = {

@@ -40,6 +40,12 @@ const groups: ServiceGroup[] = [
     sectionBreakBefore: true,
   },
   { id: 'auto-fix', label: 'Auto Fix', alwaysOn: false, groupDependsOn: ['cloud-agent'] },
+  {
+    id: 'security-agent',
+    label: 'Security Agent',
+    alwaysOn: false,
+    groupDependsOn: ['cloud-agent'],
+  },
   { id: 'deploy', label: 'Deploy', alwaysOn: false },
   { id: 'observability', label: 'Observability', alwaysOn: false },
   { id: 'mobile', label: 'Mobile', alwaysOn: false, sectionBreakBefore: true },
@@ -66,9 +72,10 @@ type ServiceMeta = {
 
 const serviceMeta: Record<string, ServiceMeta> = {
   // core
-  nextjs: { group: 'core', dependsOn: ['postgres', 'redis', 'stripe'] },
+  nextjs: { group: 'core', dependsOn: ['postgres', 'redis', 'redis-http', 'stripe'] },
   postgres: { group: 'core', dependsOn: [] },
   redis: { group: 'core', dependsOn: [] },
+  'redis-http': { group: 'core', dependsOn: ['redis'] },
   stripe: { group: 'core', dependsOn: [] },
   // cloud-agent
   'cloud-agent-next': {
@@ -134,6 +141,23 @@ const serviceMeta: Record<string, ServiceMeta> = {
     group: 'auto-fix',
     dependsOn: ['cloud-agent-next', 'nextjs'],
     dir: 'services/auto-fix-infra',
+  },
+  // security-agent
+  'cloudflare-security-sync': {
+    group: 'security-agent',
+    dependsOn: ['postgres', 'cloudflare-git-token-service'],
+    dir: 'services/security-sync',
+  },
+  'cloudflare-security-auto-analysis': {
+    group: 'security-agent',
+    dependsOn: [
+      'postgres',
+      'nextjs',
+      'cloud-agent-next',
+      'cloudflare-git-token-service',
+      'cloudflare-session-ingest',
+    ],
+    dir: 'services/security-auto-analysis',
   },
   // deploy
   'cloudflare-deploy-builder': {
@@ -311,7 +335,12 @@ function readWranglerPort(dir: string): number {
 // Build service definitions from serviceMeta + wrangler.jsonc
 // ---------------------------------------------------------------------------
 
-const INFRA_PORTS: Record<string, number> = { postgres: 5432, redis: 6379, grafana: 4000 };
+const INFRA_PORTS: Record<string, number> = {
+  postgres: 5432,
+  redis: 6379,
+  'redis-http': 8079,
+  grafana: 4000,
+};
 
 // Docker Compose profile that gates each infra service, if any. Services not
 // listed here are part of the default profile and start with a plain `up -d`.

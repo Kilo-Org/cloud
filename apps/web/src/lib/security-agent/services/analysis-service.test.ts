@@ -27,7 +27,7 @@ const mockPrepareSession = jest.fn<any>();
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const mockInitiateFromPreparedSession = jest.fn<any>();
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const mockDeleteSession = jest.fn<any>();
+const mockCleanupSession = jest.fn<any>();
 const mockInfoLogger = jest.fn();
 const mockErrorLogger = jest.fn();
 
@@ -39,19 +39,13 @@ const mockClearAnalysisStatus = jest.fn() as jest.MockedFunction<
   typeof securityAnalysisModule.clearAnalysisStatus
 >;
 
-jest.mock('@/lib/security-agent/db/security-analysis', () => {
-  const actual: { isFindingEligibleForAutoAnalysis: unknown } = jest.requireActual(
-    '@/lib/security-agent/db/security-analysis'
-  );
-  return {
-    updateAnalysisStatus: mockUpdateAnalysisStatus,
-    clearAnalysisStatus: mockClearAnalysisStatus,
-    tryAcquireAnalysisStartLease: mockTryAcquireAnalysisStartLease,
-    isFindingEligibleForAutoAnalysis: actual.isFindingEligibleForAutoAnalysis,
-    AUTO_ANALYSIS_MAX_ATTEMPTS: 5,
-    AUTO_ANALYSIS_OWNER_CAP: 2,
-  };
-});
+jest.mock('@/lib/security-agent/db/security-analysis', () => ({
+  updateAnalysisStatus: mockUpdateAnalysisStatus,
+  clearAnalysisStatus: mockClearAnalysisStatus,
+  tryAcquireAnalysisStartLease: mockTryAcquireAnalysisStartLease,
+  AUTO_ANALYSIS_MAX_ATTEMPTS: 5,
+  AUTO_ANALYSIS_OWNER_CAP: 2,
+}));
 
 jest.mock('@/lib/config.server', () => ({
   CALLBACK_TOKEN_SECRET: 'test-callback-token-secret',
@@ -69,7 +63,7 @@ jest.mock('@/lib/cloud-agent-next/cloud-agent-client', () => ({
   createCloudAgentNextClient: jest.fn(() => ({
     prepareSession: mockPrepareSession,
     initiateFromPreparedSession: mockInitiateFromPreparedSession,
-    deleteSession: mockDeleteSession,
+    cleanupSession: mockCleanupSession,
   })),
   InsufficientCreditsError: class InsufficientCreditsError extends Error {
     readonly httpStatus = 402;
@@ -128,6 +122,33 @@ describe('analysis-service', () => {
     expect(result).toEqual({
       started: false,
       error: "Finding status is 'fixed', analysis requires 'open' status",
+      errorCode: 'FINDING_NOT_ELIGIBLE',
+    });
+    expect(mockUpdateAnalysisStatus).not.toHaveBeenCalledWith(findingId, 'pending');
+  });
+
+  it('reports analysis in progress when lease is held for an open finding', async () => {
+    const findingId = 'finding-lease-busy';
+    const user = { id: 'user-1', google_user_email: 'test@example.com' } as User;
+
+    mockGetSecurityFindingById.mockResolvedValue({
+      id: findingId,
+      status: 'open',
+      analysis_status: 'running',
+    } as Awaited<ReturnType<typeof mockGetSecurityFindingById>>);
+    mockTryAcquireAnalysisStartLease.mockResolvedValue(false);
+
+    const result = await startSecurityAnalysis({
+      findingId,
+      user,
+      githubRepo: 'acme/repo',
+      githubToken: 'gh-token',
+    });
+
+    expect(result).toEqual({
+      started: false,
+      error: 'Analysis already in progress',
+      errorCode: 'ANALYSIS_IN_PROGRESS',
     });
     expect(mockUpdateAnalysisStatus).not.toHaveBeenCalledWith(findingId, 'pending');
   });
@@ -419,7 +440,7 @@ describe('analysis-service', () => {
       kiloSessionId: 'ses_kilo-xyz',
     });
     mockInitiateFromPreparedSession.mockRejectedValue(new Error('Sandbox unavailable'));
-    mockDeleteSession.mockResolvedValue({ success: true });
+    mockCleanupSession.mockResolvedValue({ success: true });
 
     const result = await startSecurityAnalysis({
       findingId,
@@ -432,7 +453,7 @@ describe('analysis-service', () => {
     expect(result.error).toBe('Sandbox analysis failed to start. Please try again.');
     expect(result.errorCode).toBe('SANDBOX_FAILED');
     // Should attempt to clean up the prepared session
-    expect(mockDeleteSession).toHaveBeenCalledWith('agent-session-xyz');
+    expect(mockCleanupSession).toHaveBeenCalledWith('agent-session-xyz');
     // Should mark finding as failed
     expect(mockUpdateAnalysisStatus).toHaveBeenCalledWith(findingId, 'failed', {
       error: 'Sandbox analysis failed to start. Please try again.',

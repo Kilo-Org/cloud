@@ -6,7 +6,7 @@ import { model_experiment, model_experiment_variant_version } from '@kilocode/db
 import { eq } from 'drizzle-orm';
 import { isPublicIdExperimented } from './membership';
 import { pickModelExperimentVariant } from './pick-variant';
-import { redisDel, redisSet } from '@/lib/redis';
+import { redisClient } from '@/lib/redis';
 import { EXPERIMENTED_PUBLIC_IDS_REDIS_KEY } from '@/lib/redis-keys';
 import type { User } from '@kilocode/db/schema';
 
@@ -20,7 +20,8 @@ const upstreamB = {
   internal_id: 'partner-checkpoint-b',
   base_url: 'https://partner.example.com/v1',
 };
-const redisIt = process.env.REDIS_URL ? it : it.skip;
+const redisIt =
+  process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN ? it : it.skip;
 
 beforeEach(async () => {
   await cleanupDbForTest();
@@ -33,15 +34,15 @@ beforeEach(async () => {
 async function clearRoutingCaches() {
   // Tests share the dev Redis instance across runs; flush the membership key
   // so each test sees a fresh load path.
-  await redisDel(EXPERIMENTED_PUBLIC_IDS_REDIS_KEY);
+  await redisClient.del(EXPERIMENTED_PUBLIC_IDS_REDIS_KEY);
 }
 
-async function seedExperimentedPublicIds(ids: string[]): Promise<boolean> {
-  return await redisSet(EXPERIMENTED_PUBLIC_IDS_REDIS_KEY, JSON.stringify(ids));
+async function seedExperimentedPublicIds(ids: string[]): Promise<string | null> {
+  return await redisClient.set(EXPERIMENTED_PUBLIC_IDS_REDIS_KEY, JSON.stringify(ids));
 }
 
 afterEach(async () => {
-  await redisDel(EXPERIMENTED_PUBLIC_IDS_REDIS_KEY);
+  await redisClient.del(EXPERIMENTED_PUBLIC_IDS_REDIS_KEY);
 });
 
 async function makeActiveExperiment(opts: {
@@ -82,21 +83,23 @@ async function makeActiveExperiment(opts: {
 describe('isPublicIdExperimented', () => {
   it('returns false for an unknown public id', async () => {
     await clearRoutingCaches();
-    expect(await isPublicIdExperimented('kilo/preview-not-experimented')).toBe(false);
+    expect(await isPublicIdExperimented('partner/preview-not-experimented')).toBe(false);
   });
 
   redisIt('returns true when the public id has an active experiment', async () => {
-    await makeActiveExperiment({ publicId: 'kilo/preview-iset-active' });
-    expect(await seedExperimentedPublicIds(['kilo/preview-iset-active'])).toBe(true);
-    expect(await isPublicIdExperimented('kilo/preview-iset-active')).toBe(true);
+    await makeActiveExperiment({ publicId: 'partner/preview-iset-active' });
+    expect(await seedExperimentedPublicIds(['partner/preview-iset-active'])).toBe('OK');
+    expect(await isPublicIdExperimented('partner/preview-iset-active')).toBe(true);
   });
 
   redisIt('returns true when the public id has only a paused experiment', async () => {
-    const { experimentId } = await makeActiveExperiment({ publicId: 'kilo/preview-iset-paused' });
+    const { experimentId } = await makeActiveExperiment({
+      publicId: 'partner/preview-iset-paused',
+    });
     const caller = await createCallerForUser(admin.id);
     await caller.admin.modelExperiments.pause({ id: experimentId });
-    expect(await seedExperimentedPublicIds(['kilo/preview-iset-paused'])).toBe(true);
-    expect(await isPublicIdExperimented('kilo/preview-iset-paused')).toBe(true);
+    expect(await seedExperimentedPublicIds(['partner/preview-iset-paused'])).toBe('OK');
+    expect(await isPublicIdExperimented('partner/preview-iset-paused')).toBe(true);
   });
 });
 
@@ -104,7 +107,7 @@ describe('pickModelExperimentVariant', () => {
   it('returns null for a public id with no routing-relevant experiment', async () => {
     await clearRoutingCaches();
     const result = await pickModelExperimentVariant({
-      publicModelId: 'kilo/preview-pick-none',
+      publicModelId: 'partner/preview-pick-none',
       userId: 'user-1',
       machineId: null,
       clientIp: null,
@@ -113,15 +116,15 @@ describe('pickModelExperimentVariant', () => {
   });
 
   it('produces stable assignments for the same userId', async () => {
-    await makeActiveExperiment({ publicId: 'kilo/preview-stable' });
+    await makeActiveExperiment({ publicId: 'partner/preview-stable' });
     const first = await pickModelExperimentVariant({
-      publicModelId: 'kilo/preview-stable',
+      publicModelId: 'partner/preview-stable',
       userId: 'user-1',
       machineId: null,
       clientIp: null,
     });
     const second = await pickModelExperimentVariant({
-      publicModelId: 'kilo/preview-stable',
+      publicModelId: 'partner/preview-stable',
       userId: 'user-1',
       machineId: null,
       clientIp: null,
@@ -135,11 +138,11 @@ describe('pickModelExperimentVariant', () => {
 
   it('decrypts and returns the partner-issued api key for the chosen variant', async () => {
     const { variantA, variantB } = await makeActiveExperiment({
-      publicId: 'kilo/preview-key',
+      publicId: 'partner/preview-key',
       apiKeys: ['sk-control-secret', 'sk-treatment-secret'],
     });
     const result = await pickModelExperimentVariant({
-      publicModelId: 'kilo/preview-key',
+      publicModelId: 'partner/preview-key',
       userId: 'user-key',
       machineId: null,
       clientIp: null,
@@ -151,21 +154,21 @@ describe('pickModelExperimentVariant', () => {
   });
 
   it('respects allocation-subject precedence: user > machine > ip', async () => {
-    await makeActiveExperiment({ publicId: 'kilo/preview-alloc' });
+    await makeActiveExperiment({ publicId: 'partner/preview-alloc' });
     const userPick = await pickModelExperimentVariant({
-      publicModelId: 'kilo/preview-alloc',
+      publicModelId: 'partner/preview-alloc',
       userId: 'user-z',
       machineId: 'machine-z',
       clientIp: '1.2.3.4',
     });
     const machinePick = await pickModelExperimentVariant({
-      publicModelId: 'kilo/preview-alloc',
+      publicModelId: 'partner/preview-alloc',
       userId: null,
       machineId: 'machine-z',
       clientIp: '1.2.3.4',
     });
     const ipPick = await pickModelExperimentVariant({
-      publicModelId: 'kilo/preview-alloc',
+      publicModelId: 'partner/preview-alloc',
       userId: null,
       machineId: null,
       clientIp: '1.2.3.4',
@@ -182,9 +185,9 @@ describe('pickModelExperimentVariant', () => {
   });
 
   it('returns unavailable when no allocation subject is available', async () => {
-    await makeActiveExperiment({ publicId: 'kilo/preview-noalloc' });
+    await makeActiveExperiment({ publicId: 'partner/preview-noalloc' });
     const result = await pickModelExperimentVariant({
-      publicModelId: 'kilo/preview-noalloc',
+      publicModelId: 'partner/preview-noalloc',
       userId: null,
       machineId: null,
       clientIp: null,
@@ -193,12 +196,12 @@ describe('pickModelExperimentVariant', () => {
   });
 
   it('returns not-found for a paused experiment so traffic does not silently fall through', async () => {
-    const { experimentId } = await makeActiveExperiment({ publicId: 'kilo/preview-paused' });
+    const { experimentId } = await makeActiveExperiment({ publicId: 'partner/preview-paused' });
     const caller = await createCallerForUser(admin.id);
     await caller.admin.modelExperiments.pause({ id: experimentId });
     await clearRoutingCaches();
     const result = await pickModelExperimentVariant({
-      publicModelId: 'kilo/preview-paused',
+      publicModelId: 'partner/preview-paused',
       userId: 'user-q',
       machineId: null,
       clientIp: null,
@@ -208,11 +211,11 @@ describe('pickModelExperimentVariant', () => {
 
   it('hot-swap: serves the new variant_version_id but keeps the same bucket', async () => {
     const { experimentId, variantA, variantB } = await makeActiveExperiment({
-      publicId: 'kilo/preview-hotswap',
+      publicId: 'partner/preview-hotswap',
     });
     const caller = await createCallerForUser(admin.id);
     const before = await pickModelExperimentVariant({
-      publicModelId: 'kilo/preview-hotswap',
+      publicModelId: 'partner/preview-hotswap',
       userId: 'user-pinned',
       machineId: null,
       clientIp: null,
@@ -229,7 +232,7 @@ describe('pickModelExperimentVariant', () => {
     await clearRoutingCaches();
 
     const after = await pickModelExperimentVariant({
-      publicModelId: 'kilo/preview-hotswap',
+      publicModelId: 'partner/preview-hotswap',
       userId: 'user-pinned',
       machineId: null,
       clientIp: null,
@@ -249,13 +252,13 @@ describe('pickModelExperimentVariant', () => {
   it('weighted distribution lands roughly on configured weights', async () => {
     // 1:3 split. With 200 distinct seeds, control should be near 25%.
     await makeActiveExperiment({
-      publicId: 'kilo/preview-weighted',
+      publicId: 'partner/preview-weighted',
       weights: [1, 3],
     });
     const counts = { control: 0, treatment: 0 };
     for (let i = 0; i < 200; i++) {
       const r = await pickModelExperimentVariant({
-        publicModelId: 'kilo/preview-weighted',
+        publicModelId: 'partner/preview-weighted',
         userId: `user-${i}`,
         machineId: null,
         clientIp: null,
@@ -272,10 +275,10 @@ describe('pickModelExperimentVariant', () => {
 
   it('historical attribution survives hot-swap: old variant_version_id still resolves to old upstream via DB', async () => {
     const { experimentId } = await makeActiveExperiment({
-      publicId: 'kilo/preview-attr',
+      publicId: 'partner/preview-attr',
     });
     const before = await pickModelExperimentVariant({
-      publicModelId: 'kilo/preview-attr',
+      publicModelId: 'partner/preview-attr',
       userId: 'user-attr',
       machineId: null,
       clientIp: null,
@@ -308,13 +311,13 @@ describe('pickModelExperimentVariant', () => {
 
   it('completed experiments are not returned by the picker (status none after completion)', async () => {
     const { experimentId } = await makeActiveExperiment({
-      publicId: 'kilo/preview-completed',
+      publicId: 'partner/preview-completed',
     });
     const caller = await createCallerForUser(admin.id);
     await caller.admin.modelExperiments.complete({ id: experimentId });
     await clearRoutingCaches();
     const result = await pickModelExperimentVariant({
-      publicModelId: 'kilo/preview-completed',
+      publicModelId: 'partner/preview-completed',
       userId: 'user-c',
       machineId: null,
       clientIp: null,

@@ -465,6 +465,88 @@ describe('handleKiloPassInvoicePaid', () => {
     );
   });
 
+  test('monthly: referral conversion processor suppresses affiliate SALE when referral wins', async () => {
+    const processPersonalKiloPassStripePaidConversion = jest.fn(async (_params: unknown) => ({
+      shouldEnqueueAffiliateSale: false,
+      winningTouchType: 'referral',
+      conversionId: 'conversion_referral_winner',
+      disqualificationReason: null,
+    }));
+
+    try {
+      jest.resetModules();
+      jest.doMock('@/lib/impact/kilo-pass-referrals', () => ({
+        __esModule: true,
+        processPersonalKiloPassStripePaidConversion,
+      }));
+
+      const { handleKiloPassInvoicePaid } =
+        await import('@/lib/kilo-pass/stripe-handlers-invoice-paid');
+      const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
+      await seedDeliveredImpactSignupEvent(user.id, user.google_user_email);
+      const stripeSubId = `sub_referral_suppresses_affiliate_${Math.random()}`;
+      const meta = kiloPassMetadata({
+        kiloUserId: user.id,
+        tier: KiloPassTier.Tier49,
+        cadence: KiloPassCadence.Monthly,
+      });
+      const subscription = makeStripeSubscription({
+        id: stripeSubId,
+        start_date_seconds: 1_767_225_600,
+        metadata: meta,
+      });
+      const priceId = await getKiloPassPriceId({
+        tier: KiloPassTier.Tier49,
+        cadence: KiloPassCadence.Monthly,
+      });
+      const invoiceId = `inv_referral_suppresses_affiliate_${Math.random()}`;
+
+      await handleKiloPassInvoicePaid({
+        eventId: 'evt_referral_suppresses_affiliate',
+        invoice: makeStripeInvoice({
+          id: invoiceId,
+          amount_paid_cents: 4900,
+          period_start_seconds: 1_767_225_600,
+          created_seconds: 1_767_225_600,
+          paid_seconds: 1_767_225_660,
+          priceId,
+          subscriptionIdOrExpanded: stripeSubId,
+          metadata: meta,
+        }),
+        stripe: {
+          subscriptions: {
+            retrieve: jest.fn(async () => subscription),
+          },
+        } as unknown as Stripe,
+      });
+
+      expect(processPersonalKiloPassStripePaidConversion).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: user.id,
+          sourcePaymentId: invoiceId,
+          amount: 49,
+          itemCategory: 'kilo-pass-tier-49-monthly',
+          sourceTier: KiloPassTier.Tier49,
+          cadence: KiloPassCadence.Monthly,
+          welcomePromoEligibilityReason: KiloPassWelcomePromoEligibilityReason.SettlementUnresolved,
+        })
+      );
+      const saleEvents = await db
+        .select()
+        .from(user_affiliate_events)
+        .where(
+          and(
+            eq(user_affiliate_events.user_id, user.id),
+            eq(user_affiliate_events.event_type, 'sale')
+          )
+        );
+      expect(saleEvents).toHaveLength(0);
+    } finally {
+      jest.dontMock('@/lib/impact/kilo-pass-referrals');
+      jest.resetModules();
+    }
+  });
+
   test('monthly: sale fallback occurrence time preserves recoverable Stripe charge identity', async () => {
     const observedBeforeHandling = Date.now();
     const { handleKiloPassInvoicePaid } =

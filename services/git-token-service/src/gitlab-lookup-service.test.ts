@@ -15,6 +15,9 @@ function integration(
 ): AuthorizedGitLabIntegration {
   return {
     integrationId,
+    integrationType: 'oauth',
+    accountId: '42',
+    accountLogin: 'octocat',
     metadata: { gitlab_instance_url: instanceUrl },
   };
 }
@@ -40,6 +43,16 @@ describe('buildAuthorizedGitLabIntegrationQuery', () => {
     expect(query.params).toContain(orgId);
     expect(query.params).toContain(params.userId);
   });
+
+  it('filters a pinned integration while retaining requester ownership', () => {
+    const integrationId = '123e4567-e89b-12d3-a456-426614174011';
+    const query = buildAuthorizedGitLabIntegrationQuery(db, params, integrationId).toSQL();
+
+    expect(query.sql).toMatch(/"platform_integrations"\."id" = \$\d+/);
+    expect(query.sql).toMatch(/"platform_integrations"\."owned_by_user_id" = \$\d+/);
+    expect(query.params).toContain(integrationId);
+    expect(query.params).toContain(params.userId);
+  });
 });
 
 describe('matchGitLabRepositoryToIntegration', () => {
@@ -52,19 +65,28 @@ describe('matchGitLabRepositoryToIntegration', () => {
   it('extracts a project path below a self-hosted instance base path', () => {
     expect(
       matchGitLabRepositoryToIntegration(
-        'https://gitlab.example.com/gitlab/platform/backend.git',
-        integration('https://gitlab.example.com/gitlab/')
+        'https://gitlab.example.com:8443/gitlab/platform/backend.git',
+        integration('https://gitlab.example.com:8443/gitlab/')
       )
     ).toMatchObject({
-      instanceUrl: 'https://gitlab.example.com/gitlab',
+      instanceUrl: 'https://gitlab.example.com:8443/gitlab',
       projectPath: 'platform/backend',
     });
     expect(
       matchGitLabRepositoryToIntegration(
-        'https://gitlab.example.com/gitlab//platform/backend.git',
-        integration('https://gitlab.example.com/gitlab/')
+        'https://gitlab.example.com:8443/gitlab//platform/backend.git',
+        integration('https://gitlab.example.com:8443/gitlab/')
       )
-    ).toMatchObject({ projectPath: 'platform/backend' });
+    ).toMatchObject({
+      instanceUrl: 'https://gitlab.example.com:8443/gitlab',
+      projectPath: 'platform/backend',
+    });
+    expect(
+      matchGitLabRepositoryToIntegration(
+        'https://gitlab.example.com:8443/gitlab/platform//backend.git',
+        integration('https://gitlab.example.com:8443/gitlab/')
+      )
+    ).toBeNull();
   });
 
   it('does not match another instance or a base-path prefix collision', () => {

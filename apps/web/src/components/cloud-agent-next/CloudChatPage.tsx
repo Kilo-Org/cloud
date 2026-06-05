@@ -6,6 +6,7 @@ import { useSearchParams } from 'next/navigation';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { ArrowDown, GitBranch } from 'lucide-react';
+import { v4 as uuidv4 } from 'uuid';
 
 import type { KiloSessionId } from '@/lib/cloud-agent-sdk';
 import { useManager } from './CloudAgentProvider';
@@ -37,6 +38,8 @@ import {
 } from './terminal-tabs';
 import { isMessageStreaming } from './types';
 import { useOrganizationModels } from './hooks/useOrganizationModels';
+import { ContextUsageIndicator } from './ContextUsageIndicator';
+import { resolveContextWindow } from './model-context-lengths';
 import { useSlashCommandSets } from '@/hooks/useSlashCommandSets';
 import { useCelebrationSound } from '@/hooks/useCelebrationSound';
 import type { CloudAgentAttachments } from '@/lib/cloud-agent/constants';
@@ -216,12 +219,13 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
   const dynamicMessages = useAtomValue(manager.atoms.dynamicMessages);
   const pendingMessages = useAtomValue(manager.atoms.pendingMessages);
   const totalCost = useAtomValue(manager.atoms.totalCost);
+  const contextUsage = useAtomValue(manager.atoms.contextUsage);
   const getChildMessages = useAtomValue(manager.atoms.childMessages);
   const fetchedSessionData = useAtomValue(manager.atoms.fetchedSessionData);
 
   const setSessionConfig = useSetAtom(manager.atoms.sessionConfig);
 
-  const [attachmentMessageUuid] = useState(() => crypto.randomUUID());
+  const [attachmentMessageUuid] = useState(() => uuidv4());
   const [workspaceTabs, setWorkspaceTabs] = useState(createWorkspaceTabsState);
   const [terminalStatuses, setTerminalStatuses] = useState<
     Record<string, TerminalStatusSummary | undefined>
@@ -234,7 +238,9 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
   }, [sessionId]);
 
   // -- Organization models --------------------------------------------------
-  const { modelOptions, isLoadingModels } = useOrganizationModels(organizationId);
+  const { modelOptions, isLoadingModels, contextLengthByModelId } =
+    useOrganizationModels(organizationId);
+  const contextWindow = resolveContextWindow(contextUsage, contextLengthByModelId);
   const { availableCommands } = useSlashCommandSets();
 
   // -- Sound effects --------------------------------------------------------
@@ -444,7 +450,7 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
   }, [setSoundEnabled]);
 
   const handleCreateTerminalTab = useCallback(() => {
-    const terminalId = crypto.randomUUID();
+    const terminalId = uuidv4();
     setWorkspaceTabs(state => addTerminalTab(state, terminalId));
   }, []);
 
@@ -826,17 +832,30 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
                                   },
                                 }}
                               />
-                              {sessionConfig?.repository && (
-                                <div className="text-muted-foreground flex items-center gap-1.5 px-[max(1rem,calc(50%_-_27rem))] pb-3 text-xs md:pb-4">
-                                  <GitBranch className="h-3 w-3 shrink-0" />
-                                  <span className="truncate">{sessionConfig.repository}</span>
-                                  {fetchedSessionData?.gitBranch && (
-                                    <>
-                                      <span>·</span>
-                                      <span className="truncate">
-                                        {fetchedSessionData.gitBranch}
-                                      </span>
-                                    </>
+                              {(sessionConfig?.repository ||
+                                (contextUsage !== undefined && contextWindow !== undefined)) && (
+                                <div className="text-muted-foreground flex items-center gap-3 px-[max(1rem,calc(50%_-_27rem))] pb-3 text-xs md:pb-4">
+                                  {sessionConfig?.repository && (
+                                    <div className="flex min-w-0 items-center gap-1.5">
+                                      <GitBranch className="h-3 w-3 shrink-0" />
+                                      <span className="truncate">{sessionConfig.repository}</span>
+                                      {fetchedSessionData?.gitBranch && (
+                                        <>
+                                          <span>·</span>
+                                          <span className="truncate">
+                                            {fetchedSessionData.gitBranch}
+                                          </span>
+                                        </>
+                                      )}
+                                    </div>
+                                  )}
+                                  {contextUsage !== undefined && contextWindow !== undefined && (
+                                    <div className="ml-auto shrink-0">
+                                      <ContextUsageIndicator
+                                        contextTokens={contextUsage.contextTokens}
+                                        contextWindow={contextWindow}
+                                      />
+                                    </div>
                                   )}
                                 </div>
                               )}

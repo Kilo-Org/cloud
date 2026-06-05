@@ -56,6 +56,25 @@ function writeMockKilo(binDir: string, exitCode: number): void {
   fs.writeFileSync(kiloPath, script, { mode: 0o755 });
 }
 
+function writeSlowMockKilo(binDir: string): void {
+  const script = '#!/bin/sh\nsleep 1\nexit 0\n';
+  const kiloPath = path.join(binDir, 'kilo');
+  fs.writeFileSync(kiloPath, script, { mode: 0o755 });
+}
+
+function writeSignalTerminatedMockKilo(binDir: string): void {
+  const script = '#!/bin/sh\nkill -TERM $$\n';
+  const kiloPath = path.join(binDir, 'kilo');
+  fs.writeFileSync(kiloPath, script, { mode: 0o755 });
+}
+
+function writeSignalIgnoringDescendantMockKilo(binDir: string, descendantMarker: string): void {
+  const readyMarker = `${descendantMarker}.ready`;
+  const script = `#!/bin/sh\ntrap 'exit 0' TERM\nnode -e 'const fs = require("node:fs"); process.on("SIGTERM", () => {}); fs.writeFileSync(process.argv[1], "ready"); setTimeout(() => fs.writeFileSync(process.argv[2], "alive"), 800); setInterval(() => {}, 1000);' "${readyMarker}" "${descendantMarker}" </dev/null >/dev/null 2>&1 &\nwhile [ ! -f "${readyMarker}" ]; do sleep 0.01; done\nsleep 2\n`;
+  const kiloPath = path.join(binDir, 'kilo');
+  fs.writeFileSync(kiloPath, script, { mode: 0o755 });
+}
+
 // ---------------------------------------------------------------------------
 // Test suite
 // ---------------------------------------------------------------------------
@@ -305,6 +324,54 @@ describe('restoreSession', () => {
       expect(result.step).toBe('import');
       expect(result.error).toContain('kilo import failed');
     }
+  });
+
+  it('terminates and returns import error when kilo import exceeds its deadline', async () => {
+    mockFetchOk(makeSnapshot([]));
+    writeSlowMockKilo(binDir);
+
+    const result = await restoreSession(SESSION_ID, workspace, undefined, { importTimeoutMs: 50 });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.step).toBe('import');
+      expect(result.error).toContain('kilo import timed out');
+    }
+    expect(fs.existsSync(TMP_PATH)).toBe(false);
+  });
+
+  it('returns import error when kilo import is terminated by a signal', async () => {
+    mockFetchOk(makeSnapshot([]));
+    writeSignalTerminatedMockKilo(binDir);
+
+    const result = await restoreSession(SESSION_ID, workspace);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.step).toBe('import');
+      expect(result.error).toContain('kilo import failed');
+    }
+  });
+
+  it('kills signal-ignoring descendants after a kilo import timeout grace period', async () => {
+    mockFetchOk(makeSnapshot([]));
+    const descendantMarker = path.join(tmpDir, 'import-descendant-survived');
+    writeSignalIgnoringDescendantMockKilo(binDir, descendantMarker);
+    const startedAt = Date.now();
+
+    const result = await restoreSession(SESSION_ID, workspace, undefined, {
+      importTimeoutMs: 500,
+      importTerminationGraceMs: 150,
+    });
+    const elapsedMs = Date.now() - startedAt;
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.step).toBe('import');
+      expect(result.error).toContain('kilo import timed out');
+    }
+    expect(elapsedMs).toBeGreaterThanOrEqual(600);
+    expect(fs.existsSync(descendantMarker)).toBe(false);
   });
 
   // ---- Happy paths ----

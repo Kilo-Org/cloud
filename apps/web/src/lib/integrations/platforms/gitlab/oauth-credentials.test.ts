@@ -1,16 +1,15 @@
 import { beforeEach, describe, expect, test } from '@jest/globals';
 import { OAUTH_STATE_TTL_SECONDS } from '@/lib/integrations/oauth-state';
-import { redisGet, redisSet } from '@/lib/redis';
+import { redisClient } from '@/lib/redis';
 import { gitLabOAuthCredentialsRedisKey } from '@/lib/redis-keys';
 import { getGitLabOAuthCredentials, storeGitLabOAuthCredentials } from './oauth-credentials';
 
 jest.mock('@/lib/redis', () => ({
-  redisGet: jest.fn(),
-  redisSet: jest.fn(),
+  redisClient: { get: jest.fn(), set: jest.fn() },
 }));
 
-const mockedRedisGet = jest.mocked(redisGet);
-const mockedRedisSet = jest.mocked(redisSet);
+const mockedRedisGet = jest.mocked(redisClient.get);
+const mockedRedisSet = jest.mocked(redisClient.set);
 
 const customCredentials = {
   clientId: 'gitlab-client-id',
@@ -23,7 +22,7 @@ describe('GitLab OAuth credential cache', () => {
   });
 
   test('stores custom credentials in Redis for the OAuth state lifetime', async () => {
-    mockedRedisSet.mockResolvedValue(true);
+    mockedRedisSet.mockResolvedValue('OK');
 
     const credentialRef = await storeGitLabOAuthCredentials(customCredentials);
 
@@ -32,12 +31,12 @@ describe('GitLab OAuth credential cache', () => {
     expect(mockedRedisSet).toHaveBeenCalledWith(
       gitLabOAuthCredentialsRedisKey(credentialRef),
       JSON.stringify(customCredentials),
-      OAUTH_STATE_TTL_SECONDS + 5
+      { ex: OAUTH_STATE_TTL_SECONDS + 5 }
     );
   });
 
   test('returns null when Redis is unavailable for credential storage', async () => {
-    mockedRedisSet.mockResolvedValue(false);
+    mockedRedisSet.mockResolvedValue(null);
 
     await expect(storeGitLabOAuthCredentials(customCredentials)).resolves.toBeNull();
   });

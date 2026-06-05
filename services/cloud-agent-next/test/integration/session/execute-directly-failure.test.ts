@@ -13,12 +13,14 @@ import { createEventQueries } from '../../../src/session/queries/events.js';
 import type { FencedWrapperDispatchRequest } from '../../../src/execution/types.js';
 import { listPendingSessionMessages } from '../../../src/session/pending-messages.js';
 import {
+  getWrapperLease,
   getWrapperRuntimeState,
   recordWrapperPong,
   allocateWrapperRuntimeState,
   recordWrapperAcceptedMessage,
 } from '../../../src/session/wrapper-runtime-state.js';
 import {
+  getSessionMessageState,
   listNonTerminalAcceptedMessages,
   putSessionMessageState,
   type SessionMessageState,
@@ -28,7 +30,13 @@ import { queueUserMessageInput, registerReadySession } from '../../helpers/sessi
 describe('executeDirectly failure handling', () => {
   beforeEach(async () => {
     const ids = await listDurableObjectIds(env.CLOUD_AGENT_SESSION);
-    await Promise.all(ids.map(id => env.CLOUD_AGENT_SESSION.get(id).deleteSession()));
+    await Promise.all(
+      ids.map(id =>
+        runInDurableObject(env.CLOUD_AGENT_SESSION.get(id), instance =>
+          instance.ctx.storage.deleteAll()
+        )
+      )
+    );
   });
 
   it('wrapper heartbeat does not reset the no-output deadline', async () => {
@@ -38,10 +46,6 @@ describe('executeDirectly failure handling', () => {
     const stub = env.CLOUD_AGENT_SESSION.get(doId);
 
     const result = await runInDurableObject(stub, async instance => {
-      instance['stopCurrentWrapperProcess'] = async () => {
-        throw new Error('should not stop wrapper');
-      };
-
       await registerReadySession(instance, {
         sessionId,
         userId,
@@ -200,7 +204,10 @@ describe('executeDirectly failure handling', () => {
       const pendingAfterAlarm = await listPendingSessionMessages(instance.ctx.storage);
       const executionsAfterFirstAlarm = await instance.getExecutions();
       const wrapperRuntimeState = await getWrapperRuntimeState(instance.ctx.storage);
+      const wrapperLeaseAfterFailure = await getWrapperLease(instance.ctx.storage);
 
+      await instance.alarm();
+      const wrapperLeaseAfterCleanup = await getWrapperLease(instance.ctx.storage);
       const retriableMessage = pendingAfterAlarm[0];
       if (retriableMessage) {
         await instance.ctx.storage.put('pending_message:0000000000000001:retry-fix', {
@@ -239,6 +246,8 @@ describe('executeDirectly failure handling', () => {
         executionsAfterRetry,
         acceptedMessages,
         wrapperRuntimeState,
+        wrapperLeaseAfterFailure,
+        wrapperLeaseAfterCleanup,
         retryEvents,
       };
     });
@@ -258,6 +267,11 @@ describe('executeDirectly failure handling', () => {
     expect(result.executionsAfterFirstAlarm).toEqual([]);
     expect(result.wrapperRuntimeState.wrapperGeneration).toBe(2);
     expect(result.wrapperRuntimeState.wrapperConnectionId).toBeUndefined();
+    expect(result.wrapperLeaseAfterFailure).toMatchObject({
+      state: 'stop_needed',
+      reason: 'startup-failed',
+    });
+    expect(result.wrapperLeaseAfterCleanup).toMatchObject({ state: 'none' });
 
     expect(result.attemptCount).toBe(2);
     expect(result.pendingAfterRetry).toHaveLength(0);
@@ -272,10 +286,16 @@ describe('executeDirectly failure handling', () => {
 describe('handleWrapperTerminalEvent — new-path identity and message preservation', () => {
   beforeEach(async () => {
     const ids = await listDurableObjectIds(env.CLOUD_AGENT_SESSION);
-    await Promise.all(ids.map(id => env.CLOUD_AGENT_SESSION.get(id).deleteSession()));
+    await Promise.all(
+      ids.map(id =>
+        runInDurableObject(env.CLOUD_AGENT_SESSION.get(id), instance =>
+          instance.ctx.storage.deleteAll()
+        )
+      )
+    );
   });
 
-  it('wrapper complete does not clear wrapper runtime identity when accepted messages remain', async () => {
+  it('wrapper complete reconciles still-accepted messages instead of stranding them', async () => {
     const userId = 'user_wrapper_complete_identity';
     const sessionId = 'agent_wrapper_complete_identity';
     const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
@@ -296,9 +316,10 @@ describe('handleWrapperTerminalEvent — new-path identity and message preservat
       const { state: wrapperState } = await allocateWrapperRuntimeState(instance.ctx.storage);
       const { wrapperRunId, wrapperConnectionId } = wrapperState;
 
+      const messageId = 'msg_018f1e2d3c4bWrpCmpAbCdEfGh';
       // Store an accepted (non-terminal) session message state
       const acceptedMessage: SessionMessageState = {
-        messageId: 'msg_018f1e2d3c4bWrpCmpAbCdEfGh',
+        messageId,
         status: 'accepted',
         prompt: 'hello',
         createdAt: Date.now(),
@@ -307,7 +328,11 @@ describe('handleWrapperTerminalEvent — new-path identity and message preservat
       };
       await putSessionMessageState(instance.ctx.storage, acceptedMessage);
 
-      // Fire wrapper complete — with accepted non-terminal messages present
+      // Fire wrapper complete with an accepted non-terminal message present.
+      // `complete` is the race-free terminal signal, so the message must be
+      // settled here rather than left stranded (which would hang the callback).
+      // This session has no kiloSessionId, so no assistant reply can be found
+      // and the message settles as failed (missing_assistant_reply).
       await instance.handleWrapperTerminalEvent({
         wrapperRunId: wrapperRunId!,
         status: 'completed',
@@ -318,26 +343,33 @@ describe('handleWrapperTerminalEvent — new-path identity and message preservat
         instance.ctx.storage,
         wrapperRunId!
       );
+      const settledMessage = await getSessionMessageState(instance.ctx.storage, messageId);
 
-      return { wrapperRuntimeState, wrapperConnectionId, acceptedMessages };
+      return { wrapperRuntimeState, wrapperConnectionId, acceptedMessages, settledMessage };
     });
 
-    // Identity must NOT be cleared while accepted work remains
-    expect(result.wrapperRuntimeState.wrapperConnectionId).toBe(result.wrapperConnectionId);
-    // Accepted message must still be non-terminal
-    expect(result.acceptedMessages).toHaveLength(1);
-    expect(result.acceptedMessages[0]?.status).toBe('accepted');
+    // The message is settled rather than left accepted.
+    expect(result.acceptedMessages).toHaveLength(0);
+    expect(result.settledMessage).toMatchObject({
+      status: 'failed',
+      failureCode: 'missing_assistant_reply',
+      completionSource: 'idle_reconciliation',
+    });
+    // Identity is released once the run has no remaining accepted work.
+    expect(result.wrapperRuntimeState.wrapperConnectionId).toBeUndefined();
   });
-
-  // NOTE: Per Phase 6 (keep-warm cleanup), wrapper `complete` will eventually NOT clear
-  // identity even when no accepted messages remain — keep-warm alarm cleanup owns that.
-  // The current behavior (clearing when idle) is interim and will be superseded by Phase 6.
 });
 
 describe('new-path liveness without executionId', () => {
   beforeEach(async () => {
     const ids = await listDurableObjectIds(env.CLOUD_AGENT_SESSION);
-    await Promise.all(ids.map(id => env.CLOUD_AGENT_SESSION.get(id).deleteSession()));
+    await Promise.all(
+      ids.map(id =>
+        runInDurableObject(env.CLOUD_AGENT_SESSION.get(id), instance =>
+          instance.ctx.storage.deleteAll()
+        )
+      )
+    );
   });
 
   it('schedules liveness deadlines for accepted messages and fails them on no-output timeout', async () => {
@@ -347,8 +379,6 @@ describe('new-path liveness without executionId', () => {
     const stub = env.CLOUD_AGENT_SESSION.get(doId);
 
     const result = await runInDurableObject(stub, async (instance, state) => {
-      instance['stopCurrentWrapperProcess'] = async () => {};
-
       await registerReadySession(instance, {
         sessionId,
         userId,
@@ -431,8 +461,6 @@ describe('new-path liveness without executionId', () => {
     const stub = env.CLOUD_AGENT_SESSION.get(doId);
 
     const result = await runInDurableObject(stub, async (instance, state) => {
-      instance['stopCurrentWrapperProcess'] = async () => {};
-
       await registerReadySession(instance, {
         sessionId,
         userId,
@@ -505,7 +533,13 @@ describe('new-path liveness without executionId', () => {
 describe('hot delivery failure preserves existing wrapper identity', () => {
   beforeEach(async () => {
     const ids = await listDurableObjectIds(env.CLOUD_AGENT_SESSION);
-    await Promise.all(ids.map(id => env.CLOUD_AGENT_SESSION.get(id).deleteSession()));
+    await Promise.all(
+      ids.map(id =>
+        runInDurableObject(env.CLOUD_AGENT_SESSION.get(id), instance =>
+          instance.ctx.storage.deleteAll()
+        )
+      )
+    );
   });
 
   it('failed hot delivery does not clear wrapper identity for already accepted work', async () => {
@@ -538,6 +572,23 @@ describe('hot delivery failure preserves existing wrapper identity', () => {
       const originalRunId = wrapperState.wrapperRunId!;
       const originalConnectionId = wrapperState.wrapperConnectionId!;
       const originalGeneration = wrapperState.wrapperGeneration;
+      await instance.ctx.storage.put('wrapper_lease', {
+        state: 'owns_wrapper',
+        nextInstanceGeneration: 2,
+        instance: { instanceId: 'instance_hot_failure', instanceGeneration: 1 },
+      });
+      instance['physicalWrapperObserver'] = async () => ({
+        status: 'present',
+        observed: [
+          {
+            representation: 'process',
+            id: 'wrapper-hot-failure',
+            port: 5000,
+            instanceId: 'instance_hot_failure',
+            instanceGeneration: 1,
+          },
+        ],
+      });
 
       const acceptedMsg: SessionMessageState = {
         messageId: 'msg_018f1e2d3c4bHotFailAccAbCd',
@@ -594,7 +645,7 @@ describe('hot delivery failure preserves existing wrapper identity', () => {
     expect(result.acceptedMessages[0]?.status).toBe('accepted');
   });
 
-  it('failed cold delivery clears newly allocated wrapper identity', async () => {
+  it('failed cold delivery fences its run and retains physical cleanup responsibility', async () => {
     const userId = 'user_cold_fail_identity';
     const sessionId = 'agent_cold_fail_identity';
     const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
@@ -633,10 +684,12 @@ describe('hot delivery failure preserves existing wrapper identity', () => {
       await instance.alarm();
 
       const wrapperRuntimeState = await getWrapperRuntimeState(instance.ctx.storage);
+      const wrapperLease = await getWrapperLease(instance.ctx.storage);
 
       return {
         preAlarmState,
         wrapperRuntimeState,
+        wrapperLease,
       };
     });
 
@@ -645,5 +698,9 @@ describe('hot delivery failure preserves existing wrapper identity', () => {
     expect(result.wrapperRuntimeState.wrapperGeneration).toBeGreaterThan(
       result.preAlarmState.wrapperGeneration
     );
+    expect(result.wrapperLease).toMatchObject({
+      state: 'stop_needed',
+      reason: 'startup-failed',
+    });
   });
 });

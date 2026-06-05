@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { CloudAgentRunStateReport } from '@kilocode/worker-utils/cloud-agent-queue-report';
 import type { CallbackTarget } from '../callbacks/index.js';
 import type { ExecutionMode, SessionMessageIntent } from '../execution/types.js';
 import { renderExecutionTurnContent } from '../execution/types.js';
@@ -9,12 +10,64 @@ const SESSION_MESSAGE_STATE_PREFIX = 'session_message:';
 
 export type SessionMessageStatus = 'queued' | 'accepted' | 'completed' | 'failed' | 'interrupted';
 
-export type SessionMessageCompletionSource =
-  | 'assistant_message_event'
-  | 'idle_reconciliation'
-  | 'wrapper_failure'
-  | 'interrupt'
-  | 'delivery_failure';
+export const SessionMessageCompletionSourceSchema = z.enum([
+  'assistant_message_event',
+  'manual_compact_summarize',
+  'idle_reconciliation',
+  'wrapper_failure',
+  'interrupt',
+  'delivery_failure',
+]);
+export type SessionMessageCompletionSource = z.infer<typeof SessionMessageCompletionSourceSchema>;
+
+type AssertTrue<T extends true> = T;
+type CloudAgentRunFailureStage = NonNullable<CloudAgentRunStateReport['run']['failureStage']>;
+type CloudAgentRunFailureCode = NonNullable<CloudAgentRunStateReport['run']['failureCode']>;
+
+export const SessionMessageFailureStageSchema = z.enum([
+  'pre_dispatch',
+  'post_dispatch_no_activity',
+  'agent_activity',
+  'interruption',
+  'unknown',
+] as const satisfies readonly CloudAgentRunFailureStage[]);
+export type SessionMessageFailureStage =
+  AssertTrue<
+    CloudAgentRunFailureStage extends z.infer<typeof SessionMessageFailureStageSchema>
+      ? true
+      : false
+  > extends true
+    ? z.infer<typeof SessionMessageFailureStageSchema>
+    : never;
+
+export const SessionMessageFailureCodeSchema = z.enum([
+  'sandbox_connect_failed',
+  'workspace_setup_failed',
+  'kilo_server_failed',
+  'wrapper_start_failed',
+  'invalid_delivery_request',
+  'session_metadata_missing',
+  'model_missing',
+  'delivery_failure_unknown',
+  'wrapper_disconnected',
+  'wrapper_no_output',
+  'wrapper_ping_timeout',
+  'wrapper_error_before_activity',
+  'assistant_error',
+  'wrapper_error_after_activity',
+  'missing_assistant_reply',
+  'user_interrupt',
+  'container_shutdown',
+  'system_interrupt',
+  'unclassified',
+] as const satisfies readonly CloudAgentRunFailureCode[]);
+export type SessionMessageFailureCode =
+  AssertTrue<
+    CloudAgentRunFailureCode extends z.infer<typeof SessionMessageFailureCodeSchema> ? true : false
+  > extends true
+    ? z.infer<typeof SessionMessageFailureCodeSchema>
+    : never;
+export type SessionMessageDispatchAcceptanceKind = 'observed' | 'inferred_from_terminal';
 
 export type LegacyAdmissionConstraints = {
   turn?: SessionMessageIntent['turn'];
@@ -49,11 +102,15 @@ export type SessionMessageState = {
   createdAt: number;
   queuedAt?: number;
   acceptedAt?: number;
+  dispatchAcceptanceKind?: SessionMessageDispatchAcceptanceKind;
+  agentActivityObservedAt?: number;
   terminalAt?: number;
   wrapperRunId?: string;
   assistantMessageId?: string;
   assistantCompletedAt?: number;
   completionSource?: SessionMessageCompletionSource;
+  failureStage?: SessionMessageFailureStage;
+  failureCode?: SessionMessageFailureCode;
   error?: string;
   failureReason?: string;
   attempts?: number;
@@ -147,19 +204,15 @@ export const SessionMessageStateSchema = z
     createdAt: z.number(),
     queuedAt: z.number().optional(),
     acceptedAt: z.number().optional(),
+    dispatchAcceptanceKind: z.enum(['observed', 'inferred_from_terminal']).optional(),
+    agentActivityObservedAt: z.number().optional(),
     terminalAt: z.number().optional(),
     wrapperRunId: z.string().optional(),
     assistantMessageId: z.string().optional(),
     assistantCompletedAt: z.number().optional(),
-    completionSource: z
-      .enum([
-        'assistant_message_event',
-        'idle_reconciliation',
-        'wrapper_failure',
-        'interrupt',
-        'delivery_failure',
-      ])
-      .optional(),
+    completionSource: SessionMessageCompletionSourceSchema.optional(),
+    failureStage: SessionMessageFailureStageSchema.optional(),
+    failureCode: SessionMessageFailureCodeSchema.optional(),
     error: z.string().optional(),
     failureReason: z.string().optional(),
     attempts: z.number().int().nonnegative().optional(),
@@ -310,21 +363,41 @@ function normalizeParsedSessionMessageState(
   return { ...currentState, legacyAdmissionConstraints: constraints };
 }
 
-export async function getSessionMessageState(
+export type SessionMessageStateLookup =
+  | { type: 'missing' }
+  | { type: 'invalid' }
+  | { type: 'found'; state: SessionMessageState };
+
+export async function lookupSessionMessageState(
   storage: SessionMessageStorage,
   messageId: string
-): Promise<SessionMessageState | undefined> {
+): Promise<SessionMessageStateLookup> {
   const raw = await storage.get<unknown>(sessionMessageStateKey(messageId));
-  if (raw === undefined) return undefined;
+  if (raw === undefined) return { type: 'missing' };
   const result = SessionMessageStateSchema.safeParse(raw);
   if (!result.success) {
     console.warn('Invalid session message state', {
       messageId,
       issues: result.error.issues,
     });
-    return undefined;
+    return { type: 'invalid' };
   }
-  return normalizeParsedSessionMessageState(result.data);
+  if (result.data.messageId !== messageId) {
+    console.warn('Mismatched session message state identity', {
+      messageId,
+      storedMessageId: result.data.messageId,
+    });
+    return { type: 'invalid' };
+  }
+  return { type: 'found', state: normalizeParsedSessionMessageState(result.data) };
+}
+
+export async function getSessionMessageState(
+  storage: SessionMessageStorage,
+  messageId: string
+): Promise<SessionMessageState | undefined> {
+  const lookup = await lookupSessionMessageState(storage, messageId);
+  return lookup.type === 'found' ? lookup.state : undefined;
 }
 
 export async function putSessionMessageState(
@@ -358,7 +431,8 @@ export async function markMessageAccepted(
   storage: SessionMessageStorage,
   messageId: string,
   wrapperRunId: string,
-  now = Date.now()
+  now = Date.now(),
+  dispatchAcceptanceKind: SessionMessageDispatchAcceptanceKind = 'observed'
 ): Promise<SessionMessageState | null> {
   const state = await getSessionMessageState(storage, messageId);
   if (!state) return null;
@@ -367,8 +441,23 @@ export async function markMessageAccepted(
     ...state,
     status: 'accepted',
     acceptedAt: now,
+    dispatchAcceptanceKind,
     wrapperRunId,
   };
+  await putSessionMessageState(storage, updated);
+  return updated;
+}
+
+export async function markAgentActivityObserved(
+  storage: SessionMessageStorage,
+  messageId: string,
+  now = Date.now()
+): Promise<SessionMessageState | null> {
+  const state = await getSessionMessageState(storage, messageId);
+  if (!state || state.agentActivityObservedAt !== undefined || state.acceptedAt === undefined) {
+    return null;
+  }
+  const updated: SessionMessageState = { ...state, agentActivityObservedAt: now };
   await putSessionMessageState(storage, updated);
   return updated;
 }
@@ -404,6 +493,8 @@ export type MarkMessageFailedParams = {
   reason: string;
   error?: string;
   completionSource: SessionMessageCompletionSource;
+  failureStage?: SessionMessageFailureStage;
+  failureCode?: SessionMessageFailureCode;
   attempts?: number;
 };
 
@@ -423,6 +514,8 @@ export async function markMessageFailed(
     failureReason: params.reason,
     error: params.error,
     completionSource: params.completionSource,
+    failureStage: params.failureStage,
+    failureCode: params.failureCode,
     attempts: params.attempts,
   };
   await putSessionMessageState(storage, updated);
@@ -432,6 +525,8 @@ export async function markMessageFailed(
 export type MarkMessageInterruptedParams = {
   error?: string;
   completionSource?: SessionMessageCompletionSource;
+  failureStage?: 'interruption';
+  failureCode?: 'user_interrupt' | 'container_shutdown' | 'system_interrupt';
 };
 
 export async function markMessageInterrupted(
@@ -450,6 +545,8 @@ export async function markMessageInterrupted(
     failureReason: 'interrupted',
     error: params.error,
     completionSource: params.completionSource ?? 'interrupt',
+    failureStage: params.failureStage,
+    failureCode: params.failureCode,
   };
   await putSessionMessageState(storage, updated);
   return updated;
@@ -569,9 +666,17 @@ export type TerminalizeParams =
       reason: string;
       error?: string;
       completionSource: SessionMessageCompletionSource;
+      failureStage?: SessionMessageFailureStage;
+      failureCode?: SessionMessageFailureCode;
       attempts?: number;
     }
-  | { kind: 'interrupted'; error?: string; completionSource?: SessionMessageCompletionSource };
+  | {
+      kind: 'interrupted';
+      error?: string;
+      completionSource?: SessionMessageCompletionSource;
+      failureStage?: 'interruption';
+      failureCode?: 'user_interrupt' | 'container_shutdown' | 'system_interrupt';
+    };
 
 export async function terminalizeMessageOnce(
   storage: SessionMessageStorage,
@@ -598,10 +703,14 @@ export async function terminalizeMessageOnce(
         : { disposition: 'not-required' },
     push: effects.suppressPush ? { disposition: 'suppressed' } : { disposition: 'pending' },
   };
+  const stateForTerminal: SessionMessageState =
+    state.acceptedAt !== undefined && state.dispatchAcceptanceKind === undefined
+      ? { ...state, dispatchAcceptanceKind: 'inferred_from_terminal' }
+      : state;
   let updated: SessionMessageState;
   if (params.kind === 'completed') {
     updated = {
-      ...state,
+      ...stateForTerminal,
       status: 'completed',
       terminalAt: now,
       assistantMessageId: params.assistantMessageId,
@@ -611,23 +720,27 @@ export async function terminalizeMessageOnce(
     };
   } else if (params.kind === 'failed') {
     updated = {
-      ...state,
+      ...stateForTerminal,
       status: 'failed',
       terminalAt: now,
       failureReason: params.reason,
       error: params.error,
       completionSource: params.completionSource,
+      failureStage: params.failureStage,
+      failureCode: params.failureCode,
       attempts: params.attempts,
       terminalEffects,
     };
   } else {
     updated = {
-      ...state,
+      ...stateForTerminal,
       status: 'interrupted',
       terminalAt: now,
       failureReason: 'interrupted',
       error: params.error,
       completionSource: params.completionSource ?? 'interrupt',
+      failureStage: params.failureStage,
+      failureCode: params.failureCode,
       terminalEffects,
     };
   }

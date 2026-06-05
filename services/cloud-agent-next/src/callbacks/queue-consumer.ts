@@ -12,6 +12,7 @@ export function createCallbackQueueConsumer() {
 
 async function processMessage(message: Message<CallbackJob>): Promise<void> {
   const job = message.body;
+
   const result = await deliverCallbackJob(job.target, job.payload, message.attempts);
 
   switch (result.type) {

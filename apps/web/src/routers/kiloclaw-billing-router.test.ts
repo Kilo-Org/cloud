@@ -188,6 +188,9 @@ const stripePriceIdsMock = jest.requireMock<{
 const kiloclawInternalClientMock = jest.requireMock<KiloclawInternalClientMockShape>(
   '@/lib/kiloclaw/kiloclaw-internal-client'
 );
+const { KiloClawApiError: MockKiloClawApiError } = jest.requireMock<{
+  KiloClawApiError: new (statusCode: number, responseBody: string) => Error;
+}>('@/lib/kiloclaw/kiloclaw-internal-client');
 
 beforeAll(async () => {
   const mod = await import('@/routers/test-utils');
@@ -816,6 +819,46 @@ describe('provision detached personal billing recovery', () => {
 
     expect(kiloclawInternalClientMock.__provisionMock).not.toHaveBeenCalled();
   });
+
+  it.each(['provision', 'updateConfig'] as const)(
+    'maps Worker admission conflicts from kiloclaw.%s',
+    async procedure => {
+      kiloclawInternalClientMock.__provisionMock.mockRejectedValueOnce(
+        new MockKiloClawApiError(
+          409,
+          JSON.stringify({
+            error:
+              'An instance is already being created. Wait for setup to finish, then try again.',
+            code: 'provision_in_progress',
+          })
+        )
+      );
+
+      const caller = await createCallerForUser(user.id);
+      await expect(caller.kiloclaw[procedure]({})).rejects.toMatchObject({
+        code: 'CONFLICT',
+        message: 'An instance is already being created. Wait for setup to finish, then try again.',
+      });
+    }
+  );
+
+  it.each(['provision', 'updateConfig'] as const)(
+    'maps missing Worker instances from kiloclaw.%s',
+    async procedure => {
+      kiloclawInternalClientMock.__provisionMock.mockRejectedValueOnce(
+        new MockKiloClawApiError(
+          404,
+          JSON.stringify({ error: 'Active instance not found', code: 'instance_not_found' })
+        )
+      );
+
+      const caller = await createCallerForUser(user.id);
+      await expect(caller.kiloclaw[procedure]({})).rejects.toMatchObject({
+        code: 'NOT_FOUND',
+        message: 'Active instance not found',
+      });
+    }
+  );
 });
 
 describe('requireKiloClawAccess', () => {

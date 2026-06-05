@@ -145,8 +145,8 @@ async function insertActivePersonalSubscription(
       plan: 'standard',
       status: 'active',
       current_period_start: '2026-04-01T00:00:00.000Z',
-      current_period_end: '2026-05-01T00:00:00.000Z',
-      credit_renewal_at: '2026-05-01T00:00:00.000Z',
+      current_period_end: '2026-05-01T12:00:00.000Z',
+      credit_renewal_at: '2026-05-01T12:00:00.000Z',
       cancel_at_period_end: false,
       ...overrides,
     })
@@ -486,7 +486,8 @@ describe('kiloclaw referrals', () => {
         id: 'affiliate-touch',
         touch_type: 'affiliate',
         im_ref: 'im-ref',
-        expires_at: '2026-04-05T00:00:00.000Z',
+        touched_at: '2026-03-01T00:00:00.000Z',
+        expires_at: '2026-03-31T00:00:00.000Z',
       });
       const invalidReferralTouch = makeTouch({
         id: 'referral-touch',
@@ -500,6 +501,63 @@ describe('kiloclaw referrals', () => {
         resolveWinningAttributionTouch({
           touches: [expiredAffiliateTouch, invalidReferralTouch],
           convertedAt,
+        })
+      ).toEqual({
+        winner: 'none',
+        affiliateTouch: null,
+        referralTouch: null,
+      });
+    });
+
+    it('filters touches by product for mirrored Kilo Pass attribution', () => {
+      const kiloClawReferralTouch = makeTouch({
+        id: 'kiloclaw-referral-touch',
+        product: 'kiloclaw',
+        touch_type: 'referral',
+        touched_at: '2026-04-01T00:00:00.000Z',
+        rs_code: 'claw-ref-code',
+      });
+      const kiloPassAffiliateTouch = makeTouch({
+        id: 'kilo-pass-affiliate-touch',
+        product: 'kilo_pass',
+        program_key: null,
+        touch_type: 'affiliate',
+        touched_at: '2026-04-02T00:00:00.000Z',
+        im_ref: 'pass-im-ref',
+      });
+
+      expect(
+        resolveWinningAttributionTouch({
+          product: 'kilo_pass',
+          touches: [kiloClawReferralTouch, kiloPassAffiliateTouch],
+          convertedAt,
+        })
+      ).toMatchObject({
+        winner: 'affiliate',
+        affiliateTouch: { id: 'kilo-pass-affiliate-touch' },
+        referralTouch: null,
+      });
+    });
+
+    it('uses the exact 30-day UTC expiration boundary', () => {
+      const referralTouch = makeTouch({
+        id: 'boundary-referral-touch',
+        touch_type: 'referral',
+        touched_at: '2026-04-01T00:00:00.000Z',
+        expires_at: '2026-06-01T00:00:00.000Z',
+        rs_code: 'ref-code',
+      });
+
+      expect(
+        resolveWinningAttributionTouch({
+          touches: [referralTouch],
+          convertedAt: new Date('2026-04-30T23:59:59.999Z'),
+        })
+      ).toMatchObject({ winner: 'referral' });
+      expect(
+        resolveWinningAttributionTouch({
+          touches: [referralTouch],
+          convertedAt: new Date('2026-05-01T00:00:00.000Z'),
         })
       ).toEqual({
         winner: 'none',
@@ -636,7 +694,7 @@ describe('kiloclaw referrals', () => {
       expect(applications).toHaveLength(2);
       expect(
         applications.map(application => String(application.new_renewal_boundary)).sort()
-      ).toEqual(['2026-06-01 00:00:00+00', '2026-06-01 00:00:00+00']);
+      ).toEqual(['2026-06-01 12:00:00+00', '2026-06-01 12:00:00+00']);
 
       const subscriptions = await db
         .select({
@@ -650,13 +708,13 @@ describe('kiloclaw referrals', () => {
         expect.arrayContaining([
           expect.objectContaining({
             userId: referrer.id,
-            currentPeriodEnd: '2026-06-01 00:00:00+00',
-            creditRenewalAt: '2026-06-01 00:00:00+00',
+            currentPeriodEnd: '2026-06-01 12:00:00+00',
+            creditRenewalAt: '2026-06-01 12:00:00+00',
           }),
           expect.objectContaining({
             userId: referee.id,
-            currentPeriodEnd: '2026-06-01 00:00:00+00',
-            creditRenewalAt: '2026-06-01 00:00:00+00',
+            currentPeriodEnd: '2026-06-01 12:00:00+00',
+            creditRenewalAt: '2026-06-01 12:00:00+00',
           }),
         ])
       );
@@ -1573,7 +1631,7 @@ describe('kiloclaw referrals', () => {
         .select()
         .from(kiloclaw_subscriptions)
         .where(eq(kiloclaw_subscriptions.user_id, referee.id));
-      expect(subscription.current_period_end).toBe('2026-05-01 00:00:00+00');
+      expect(subscription.current_period_end).toBe('2026-05-01 12:00:00+00');
 
       const refereeRewards = await db
         .select({
@@ -1646,7 +1704,7 @@ describe('kiloclaw referrals', () => {
         'sub_referee_123',
         expect.objectContaining({
           proration_behavior: 'none',
-          trial_end: Math.floor(new Date('2026-06-01T00:00:00.000Z').getTime() / 1000),
+          trial_end: Math.floor(new Date('2026-06-01T12:00:00.000Z').getTime() / 1000),
         }),
         expect.objectContaining({
           idempotencyKey: expect.stringContaining('stripe-apply'),

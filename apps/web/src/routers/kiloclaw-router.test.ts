@@ -43,6 +43,9 @@ type AnyMock = jest.Mock<(...args: any[]) => any>;
 type KiloClawClientMock = {
   KiloClawInternalClient: AnyMock;
   __getStatusMock: AnyMock;
+  __getLatestVersionMock: AnyMock;
+  __getLatestVersionForInstanceMock: AnyMock;
+  __getFileTreeMock: AnyMock;
   __destroyMock: AnyMock;
   __startMock: AnyMock;
 };
@@ -109,11 +112,17 @@ jest.mock('@/lib/config.server', () => {
 
 jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => {
   const getStatusMock = jest.fn();
+  const getLatestVersionMock = jest.fn();
+  const getLatestVersionForInstanceMock = jest.fn();
+  const getFileTreeMock = jest.fn();
   const destroyMock = jest.fn();
   const startMock = jest.fn();
   return {
     KiloClawInternalClient: jest.fn().mockImplementation(() => ({
       getStatus: getStatusMock,
+      getLatestVersion: getLatestVersionMock,
+      getLatestVersionForInstance: getLatestVersionForInstanceMock,
+      getFileTree: getFileTreeMock,
       start: startMock,
       destroy: destroyMock,
     })),
@@ -127,13 +136,27 @@ jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => {
       }
     },
     __getStatusMock: getStatusMock,
+    __getLatestVersionMock: getLatestVersionMock,
+    __getLatestVersionForInstanceMock: getLatestVersionForInstanceMock,
+    __getFileTreeMock: getFileTreeMock,
     __destroyMock: destroyMock,
     __startMock: startMock,
   };
 });
 
+// Mock the install dispatch lib so installFromSource tests exercise the
+// procedure (auth gate + input validation + wiring) without the real
+// fetch/verify/kilo-chat path (covered by install-dispatch.test.ts).
+jest.mock('@/lib/kiloclaw/install-dispatch', () => {
+  const dispatchInstallFromSource = jest.fn();
+  return { dispatchInstallFromSource, __dispatchInstallFromSource: dispatchInstallFromSource };
+});
+
 let createCaller: (ctx: { user: Awaited<ReturnType<typeof insertTestUser>> }) => {
   getStatus: () => Promise<unknown>;
+  latestVersion: (input?: { currentImageTag?: string }) => Promise<unknown>;
+  fileTree: (input?: { path?: string }) => Promise<unknown>;
+  getNavState: () => Promise<{ hasActiveInstance: boolean }>;
   validateWeatherLocation: (input: { location: string }) => Promise<{
     location: string;
     currentWeatherText: string;
@@ -201,6 +224,17 @@ let createCaller: (ctx: { user: Awaited<ReturnType<typeof insertTestUser>> }) =>
       pendingRewardCount: number;
     };
   }>;
+  // Method syntax (bivariant params) so the real caller's narrower
+  // `source: 'byte'` input stays assignable while tests can pass an arbitrary
+  // string for the input-validation case.
+  installFromSource(input: {
+    source: string;
+    slug: string;
+    signature: string;
+  }): Promise<
+    | { ok: true; conversationId: string; messageId: string; conversationCreated: boolean }
+    | { ok: false; code: 'no_instance' }
+  >;
 };
 const kiloclawClientMock = jest.requireMock<KiloClawClientMock>(
   '@/lib/kiloclaw/kiloclaw-internal-client'
@@ -210,6 +244,16 @@ beforeAll(async () => {
   const mod = await import('@/routers/kiloclaw-router');
   createCaller = createCallerFactory(mod.kiloclawRouter);
 });
+
+async function createActivePersonalInstance(userId: string): Promise<string> {
+  const instanceId = crypto.randomUUID();
+  await db.insert(kiloclaw_instances).values({
+    id: instanceId,
+    user_id: userId,
+    sandbox_id: `ki_${instanceId.replace(/-/g, '')}`,
+  });
+  return instanceId;
+}
 
 function wttrFormat3Response(text: string, status = 200): Response {
   return new Response(text, { status, headers: { 'Content-Type': 'text/plain' } });
@@ -486,6 +530,143 @@ describe('kiloclawRouter getStatus', () => {
       .where(eq(kiloclaw_inbound_email_aliases.instance_id, instanceId));
     expect(rows.find(row => row.alias === alias)?.retired_at).not.toBeNull();
     expect(rows.filter(row => row.retired_at === null)).toHaveLength(1);
+  });
+});
+
+describe('kiloclawRouter latestVersion', () => {
+  beforeEach(async () => {
+    await cleanupDbForTest();
+    kiloclawClientMock.KiloClawInternalClient.mockClear();
+    kiloclawClientMock.__getLatestVersionMock.mockReset();
+    kiloclawClientMock.__getLatestVersionForInstanceMock.mockReset();
+  });
+
+  it('passes the active instance row for server-derived rollout lookup', async () => {
+    kiloclawClientMock.__getLatestVersionForInstanceMock.mockResolvedValue({
+      imageTag: 'candidate-tag',
+    });
+    const user = await insertTestUser({
+      google_user_email: `kiloclaw-latest-version-${crypto.randomUUID()}@example.com`,
+    });
+    const instanceId = crypto.randomUUID();
+    await db.insert(kiloclaw_instances).values({
+      id: instanceId,
+      user_id: user.id,
+      sandbox_id: `ki_${instanceId.replace(/-/g, '')}`,
+    });
+
+    const caller = createCaller({ user });
+    await caller.latestVersion({ currentImageTag: 'current-tag' });
+
+    expect(kiloclawClientMock.__getLatestVersionForInstanceMock).toHaveBeenCalledWith({
+      instanceId,
+      currentImageTag: 'current-tag',
+    });
+    expect(kiloclawClientMock.__getLatestVersionMock).not.toHaveBeenCalled();
+  });
+
+  it('uses anonymous latest version lookup when the user has no active instance', async () => {
+    kiloclawClientMock.__getLatestVersionMock.mockResolvedValue({
+      imageTag: 'anonymous-tag',
+    });
+    const user = await insertTestUser({
+      google_user_email: `kiloclaw-latest-version-${crypto.randomUUID()}@example.com`,
+    });
+
+    const caller = createCaller({ user });
+    const result = await caller.latestVersion({ currentImageTag: 'current-tag' });
+
+    expect(result).toEqual({ imageTag: 'anonymous-tag' });
+    expect(kiloclawClientMock.__getLatestVersionMock).toHaveBeenCalledWith();
+    expect(kiloclawClientMock.__getLatestVersionForInstanceMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('kiloclawRouter fileTree', () => {
+  beforeEach(async () => {
+    await cleanupDbForTest();
+    kiloclawClientMock.__getFileTreeMock.mockReset();
+  });
+
+  it('forwards path-scoped tree requests to the active instance', async () => {
+    kiloclawClientMock.__getFileTreeMock.mockResolvedValue({ tree: [] });
+    const user = await insertTestUser({
+      google_user_email: `kiloclaw-file-tree-${crypto.randomUUID()}@example.com`,
+    });
+    const instanceId = await createActivePersonalInstance(user.id);
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: user.id,
+      instance_id: instanceId,
+      plan: 'trial',
+      status: 'trialing',
+      trial_ends_at: '2026-07-01T00:00:00.000Z',
+    });
+
+    const caller = createCaller({ user });
+    await caller.fileTree({ path: 'workspace/nested' });
+
+    expect(kiloclawClientMock.__getFileTreeMock).toHaveBeenCalledWith(user.id, {
+      instanceId,
+      path: 'workspace/nested',
+    });
+  });
+});
+
+describe('kiloclawRouter getNavState', () => {
+  beforeEach(async () => {
+    await cleanupDbForTest();
+    kiloclawClientMock.KiloClawInternalClient.mockClear();
+    kiloclawClientMock.__getStatusMock.mockReset();
+  });
+
+  it('returns absent without querying the KiloClaw worker', async () => {
+    const user = await insertTestUser({
+      google_user_email: `kiloclaw-nav-absent-${Math.random()}@example.com`,
+    });
+    const caller = createCaller({ user });
+
+    const result = await caller.getNavState();
+
+    expect(result).toEqual({ hasActiveInstance: false });
+    expect(kiloclawClientMock.KiloClawInternalClient).not.toHaveBeenCalled();
+    expect(kiloclawClientMock.__getStatusMock).not.toHaveBeenCalled();
+  });
+
+  it('returns active personal instance presence without requiring subscription access', async () => {
+    const user = await insertTestUser({
+      google_user_email: `kiloclaw-nav-present-${Math.random()}@example.com`,
+    });
+    const instanceId = crypto.randomUUID();
+    await db.insert(kiloclaw_instances).values({
+      id: instanceId,
+      user_id: user.id,
+      sandbox_id: `ki_${instanceId.replace(/-/g, '')}`,
+    });
+    const caller = createCaller({ user });
+
+    const result = await caller.getNavState();
+
+    expect(result).toEqual({ hasActiveInstance: true });
+    expect(kiloclawClientMock.KiloClawInternalClient).not.toHaveBeenCalled();
+    expect(kiloclawClientMock.__getStatusMock).not.toHaveBeenCalled();
+  });
+
+  it('ignores destroyed personal instances', async () => {
+    const user = await insertTestUser({
+      google_user_email: `kiloclaw-nav-destroyed-${Math.random()}@example.com`,
+    });
+    const instanceId = crypto.randomUUID();
+    await db.insert(kiloclaw_instances).values({
+      id: instanceId,
+      user_id: user.id,
+      sandbox_id: `ki_${instanceId.replace(/-/g, '')}`,
+      destroyed_at: '2026-05-29T00:00:00.000Z',
+    });
+    const caller = createCaller({ user });
+
+    const result = await caller.getNavState();
+
+    expect(result).toEqual({ hasActiveInstance: false });
   });
 });
 
@@ -1136,5 +1317,112 @@ describe('kiloclawRouter destroy', () => {
         destruction_deadline: null,
       })
     );
+  });
+});
+
+describe('kiloclawRouter installFromSource', () => {
+  const installDispatchMock = jest.requireMock<{ __dispatchInstallFromSource: AnyMock }>(
+    '@/lib/kiloclaw/install-dispatch'
+  );
+
+  beforeEach(async () => {
+    await cleanupDbForTest();
+    installDispatchMock.__dispatchInstallFromSource.mockReset();
+  });
+
+  // Grant active KiloClaw access (a trialing subscription) so the
+  // clawAccessProcedure gate passes. Mirrors the `start` tests' fixture.
+  async function grantClawAccess(userId: string): Promise<void> {
+    const instanceId = crypto.randomUUID();
+    await db.insert(kiloclaw_instances).values({
+      id: instanceId,
+      user_id: userId,
+      sandbox_id: `ki_${instanceId.replace(/-/g, '')}`,
+    });
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: userId,
+      instance_id: instanceId,
+      plan: 'trial',
+      status: 'trialing',
+      trial_ends_at: '2026-12-31T23:59:59.000Z',
+    });
+  }
+
+  it('rejects a caller without active KiloClaw access (FORBIDDEN) and never dispatches', async () => {
+    const user = await insertTestUser({
+      google_user_email: `install-noaccess-${Math.random()}@example.com`,
+    });
+    const caller = createCaller({ user });
+
+    await expect(
+      caller.installFromSource({ source: 'byte', slug: 'deep-research', signature: 'sig' })
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect(installDispatchMock.__dispatchInstallFromSource).not.toHaveBeenCalled();
+  });
+
+  it('dispatches for an entitled caller and returns the dispatch result', async () => {
+    const user = await insertTestUser({
+      google_user_email: `install-access-${Math.random()}@example.com`,
+    });
+    await grantClawAccess(user.id);
+    installDispatchMock.__dispatchInstallFromSource.mockResolvedValue({
+      ok: true,
+      conversationId: 'conv_1',
+      messageId: 'msg_1',
+      conversationCreated: true,
+    });
+    const caller = createCaller({ user });
+
+    const result = await caller.installFromSource({
+      source: 'byte',
+      slug: 'deep-research',
+      signature: 'sig',
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      conversationId: 'conv_1',
+      messageId: 'msg_1',
+      conversationCreated: true,
+    });
+    expect(installDispatchMock.__dispatchInstallFromSource).toHaveBeenCalledWith({
+      userId: user.id,
+      source: 'byte',
+      slug: 'deep-research',
+      expectedSignature: 'sig',
+    });
+  });
+
+  it('passes through the no_instance outcome', async () => {
+    const user = await insertTestUser({
+      google_user_email: `install-noinstance-${Math.random()}@example.com`,
+    });
+    await grantClawAccess(user.id);
+    installDispatchMock.__dispatchInstallFromSource.mockResolvedValue({
+      ok: false,
+      code: 'no_instance',
+    });
+    const caller = createCaller({ user });
+
+    const result = await caller.installFromSource({
+      source: 'byte',
+      slug: 'deep-research',
+      signature: 'sig',
+    });
+
+    expect(result).toEqual({ ok: false, code: 'no_instance' });
+  });
+
+  it('rejects an unregistered source via input validation, without dispatching', async () => {
+    const user = await insertTestUser({
+      google_user_email: `install-badsource-${Math.random()}@example.com`,
+    });
+    await grantClawAccess(user.id);
+    const caller = createCaller({ user });
+
+    await expect(
+      caller.installFromSource({ source: 'hacker', slug: 'deep-research', signature: 'sig' })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    expect(installDispatchMock.__dispatchInstallFromSource).not.toHaveBeenCalled();
   });
 });

@@ -5,6 +5,7 @@ import {
   Users,
   DollarSign,
   Building2,
+  Clock,
   Shield,
   Ban,
   Database,
@@ -65,6 +66,11 @@ const userManagementItems: MenuItem[] = [
     title: () => 'Organizations',
     url: '/admin/organizations',
     icon: () => <Building2 />,
+  },
+  {
+    title: () => 'Trial Organizations',
+    url: '/admin/organizations/trials',
+    icon: () => <Clock />,
   },
   {
     title: () => 'Bulk Block',
@@ -177,6 +183,11 @@ const productEngineeringItems: MenuItem[] = [
     url: '/admin/gateway',
     icon: () => <Network />,
   },
+  {
+    title: () => 'Coding plans',
+    url: '/admin/coding-plans',
+    icon: () => <KeyRound />,
+  },
 ];
 
 const analyticsObservabilityItems: MenuItem[] = [
@@ -189,6 +200,11 @@ const analyticsObservabilityItems: MenuItem[] = [
     title: () => 'Model Benchmarks',
     url: '/admin/model-eval-ingest',
     icon: () => <FileSearch />,
+  },
+  {
+    title: () => 'Cloud Agent health',
+    url: '/admin/cloud-agent-next',
+    icon: () => <BarChart />,
   },
   {
     title: () => 'Session Traces',

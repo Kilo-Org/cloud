@@ -1,3 +1,5 @@
+import { ImpactAdvocateProgramKey, ImpactReferralProduct } from '@kilocode/db/schema-types';
+
 export const IMPACT_OPAQUE_TRACKING_VALUE_MAX_LENGTH = 512;
 export const IMPACT_REFERRAL_TOUCH_VALIDITY_MS = 30 * 24 * 60 * 60 * 1000;
 export const IMPACT_CUSTOM_PROFILE_ID_STORAGE_KEY = 'impact_custom_profile_id';
@@ -9,6 +11,8 @@ export type SanitizedOpaqueTrackingValue = {
 };
 
 export type ParsedImpactReferralTouch = {
+  product?: ImpactReferralProduct;
+  programKey?: ImpactAdvocateProgramKey;
   opaqueTrackingValue: string | null;
   trackingValueLength: number;
   isTrackingValueAccepted: boolean;
@@ -26,6 +30,7 @@ export type ParsedImpactReferralTouch = {
 };
 
 export type ParsedImpactAffiliateTouch = {
+  product?: ImpactReferralProduct;
   trackingId: string | null;
   trackingValueLength: number;
   isTrackingValueAccepted: boolean;
@@ -55,6 +60,38 @@ function sanitizeMetadataValue(value: string | null | undefined): string | null 
 function landingPathFromUrl(url: URL): string | null {
   const path = `${url.pathname}${url.search}`.trim();
   return path ? path : null;
+}
+
+function pathTargetsKiloPass(path: string | null | undefined): boolean {
+  const pathname = path?.split(/[?#]/, 1)[0];
+  return (
+    pathname === '/subscriptions/kilo-pass' ||
+    Boolean(pathname?.startsWith('/subscriptions/kilo-pass/'))
+  );
+}
+
+function getCallbackPath(url: URL): string | null {
+  const callbackPath = url.searchParams.get('callbackPath')?.trim();
+  if (!callbackPath?.startsWith('/')) return null;
+  return callbackPath;
+}
+
+function resolveImpactTouchScope(url: URL): {
+  product: ImpactReferralProduct;
+  programKey: ImpactAdvocateProgramKey;
+} {
+  const callbackPath = getCallbackPath(url);
+  if (pathTargetsKiloPass(url.pathname) || pathTargetsKiloPass(callbackPath)) {
+    return {
+      product: ImpactReferralProduct.KiloPass,
+      programKey: ImpactAdvocateProgramKey.KiloPass,
+    };
+  }
+
+  return {
+    product: ImpactReferralProduct.KiloClaw,
+    programKey: ImpactAdvocateProgramKey.KiloClaw,
+  };
 }
 
 export function sanitizeOpaqueTrackingValue(
@@ -131,8 +168,10 @@ export function parseImpactReferralTouchFromUrl(
   }
 
   const trackingValue = sanitizeOpaqueTrackingValue(searchParams.get('_saasquatch'));
+  const scope = resolveImpactTouchScope(url);
 
   return {
+    ...scope,
     opaqueTrackingValue: trackingValue.acceptedValue,
     trackingValueLength: trackingValue.originalLength,
     isTrackingValueAccepted: trackingValue.isAccepted,
@@ -166,7 +205,10 @@ export function parseImpactAffiliateTouchFromUrl(
     return null;
   }
 
+  const scope = resolveImpactTouchScope(url);
+
   return {
+    product: scope.product,
     trackingId: trackingValue.acceptedValue,
     trackingValueLength: trackingValue.originalLength,
     isTrackingValueAccepted: trackingValue.isAccepted,

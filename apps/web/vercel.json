@@ -29,6 +29,10 @@
       "schedule": "*/15 * * * *"
     },
     {
+      "path": "/api/cron/kilo-pass-expire-referral-rewards",
+      "schedule": "0 * * * *"
+    },
+    {
       "path": "/api/cron/deployment-threat-scan",
       "schedule": "*/5 * * * *"
     },
@@ -39,6 +43,10 @@
     {
       "path": "/api/discord/gateway",
       "schedule": "*/9 * * * *"
+    },
+    {
+      "path": "/api/cron/coding-plans-billing",
+      "schedule": "0 * * * *"
     },
     {
       "path": "/api/cron/db-pool-metrics",

@@ -96,6 +96,57 @@ export const qwen37_max_model: KiloExclusiveModel = {
   inference_provider_restriction: [],
 };
 
+export const qwen37_plus_model: KiloExclusiveModel = {
+  public_id: 'qwen/qwen3.7-plus',
+  display_name: 'Qwen: Qwen3.7 Plus',
+  description:
+    "Qwen3.7-Plus is Alibaba's native multimodal agent model for visual-language reasoning, agentic coding, tool use, and productivity workflows. It supports text, image, and video inputs. Note: a surcharge applies to long-context workloads exceeding 256K input tokens.",
+  context_length: 1_000_000,
+  max_completion_tokens: 65_536,
+  status: 'public',
+  flags: ['reasoning', 'vision'],
+  gateway: 'alibaba',
+  internal_id: 'qwen3.7-plus',
+  pricing: makeTieredPricing([
+    {
+      maxInputTokens: TOKENS_256K,
+      undiscounted: {
+        prompt_per_million: 0.4,
+        completion_per_million: 1.6,
+        input_cache_read_per_million: 0.04,
+        input_cache_write_per_million: 0.5,
+      },
+    },
+    {
+      maxInputTokens: TOKENS_1M,
+      undiscounted: {
+        prompt_per_million: 1.2,
+        completion_per_million: 4.8,
+        input_cache_read_per_million: 0.12,
+        input_cache_write_per_million: 1.5,
+      },
+    },
+  ]),
+  exclusive_to: [],
+  inference_provider_restriction: [],
+};
+
+export const qwen37_plus_free_model: KiloExclusiveModel = {
+  public_id: 'qwen/qwen3.7-plus:free',
+  display_name: 'Qwen: Qwen3.7 Plus (free)',
+  description:
+    "Qwen3.7-Plus is Alibaba's native multimodal agent model for visual-language reasoning, agentic coding, tool use, and productivity workflows. It supports text, image, and video inputs. For this free endpoint, your prompts and completions may be retained and used to train or improve the provider's services.",
+  context_length: 1_000_000,
+  max_completion_tokens: 65_536,
+  status: 'disabled',
+  flags: ['reasoning', 'vision', 'requires-data-collection'],
+  gateway: 'vercel',
+  internal_id: 'alibaba/qwen3.7-plus',
+  pricing: null,
+  exclusive_to: [],
+  inference_provider_restriction: [],
+};
+
 export const qwen36_plus_model: KiloExclusiveModel = {
   public_id: 'qwen/qwen3.6-plus',
   display_name: 'Qwen: Qwen3.6 Plus',
@@ -262,6 +313,7 @@ export const qwen36_27b_model: KiloExclusiveModel = {
 
 export const alibabaDirectModels: ReadonlyArray<KiloExclusiveModel> = [
   qwen37_max_model,
+  qwen37_plus_model,
   qwen36_plus_model,
   qwen36_flash_model,
   qwen36_max_preview_model,

@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { deriveGatewayToken } from '../../auth/gateway-token';
 import { createMutableState } from './state';
 import {
+  getFileTree,
   getGatewayProcessStatus,
   getMorningBriefingStatus,
   runMorningBriefing,
@@ -79,6 +80,36 @@ describe('gateway controller routing', () => {
       Accept: 'application/json',
       'fly-force-instance-id': 'machine-1',
     });
+  });
+
+  it('encodes file tree directory paths in controller requests', async () => {
+    const state = createMutableState();
+    state.provider = 'fly';
+    state.status = 'running';
+    state.sandboxId = 'sandbox-1';
+    state.flyAppName = 'test-app';
+    state.flyMachineId = 'machine-1';
+
+    const fetchMock: FetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ tree: [] }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await getFileTree(
+      state,
+      {
+        GATEWAY_TOKEN_SECRET: 'gateway-secret',
+        FLY_APP_NAME: 'fallback-app',
+      } as never,
+      'workspace/nested config'
+    );
+
+    const { input, init } = getFetchCall(fetchMock);
+    expect(input).toBe('https://test-app.fly.dev/_kilo/files/tree?path=workspace%2Fnested+config');
+    expect(init?.method).toBe('GET');
   });
 
   it('uses provider routing for health probes', async () => {

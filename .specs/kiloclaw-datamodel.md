@@ -392,11 +392,6 @@ not yet enforced in the current codebase:
    across all services that mutate subscription records. Some
    subscription-creation paths may already write change-log entries;
    complete cross-service coverage remains the intended invariant.
-4. Fresh Provision Admission SHOULD be implemented in the Registry-backed
-   Worker admission flow before the existing web advisory lock is removed.
-   (Currently, web requests use transitional PostgreSQL advisory-lock
-   coordination that is being replaced because it is unsafe through
-   transaction-pooled production connections.)
 
 ## Changelog
 

@@ -16,7 +16,41 @@ These are non-negotiable. Do not reintroduce shared/fallback paths.
 - **Env var name constraints.** User-provided `envVars` and `encryptedSecrets` keys must be valid shell identifiers (`/^[A-Za-z_][A-Za-z0-9_]*$/`) and must not use reserved prefixes `KILOCLAW_ENC_` or `KILOCLAW_ENV_`. Validated at schema level (ingest) and runtime (decrypt block).
 - **Token comparisons must be timing-safe.** Never compare auth/proxy tokens with `===`/`!==`. Use `timingSafeTokenEqual` from `controller/src/auth.ts` (or an equivalent `crypto.timingSafeEqual`-based helper) for bearer/proxy token validation.
 - **`kiloclaw_instances` write split.** The Worker is the sole inserter of rows (`insertProvisionedInstanceRecord`, enforced by `.specs/kiloclaw-datamodel.md` rule 21) — infrastructure is provisioned first, the row reflects it. The Worker also owns updates to a small set of DO-mirrored columns: destroy finalization (`markDestroyedInPostgresHelper`) and denormalized operational metadata (`tracked_image_tag`, `instance_type`, `admin_size_override`) written via `syncTrackedImageTagToPostgresHelper` / `syncInstanceTypeToPostgresHelper` / `syncAdminSizeOverrideToPostgresHelper`. The DO is the source of truth for these columns; the Postgres copy is a denormalized read cache for SQL-filterable admin tooling. `tracked_image_tag` and `instance_type` are written by the alarm reconciler when DO state changes; `admin_size_override` is written only on explicit admin RPC paths (set/clear/auto-clear-on-tier-resize) — there is no observation path. Next.js owns updates to ownership, lifecycle, and billing columns (`organization_id`, `name`, `inbound_email_enabled`, soft-delete via `markActiveInstanceDestroyed`, etc. in `apps/web/src/lib/kiloclaw/instance-registry.ts` and `instance-lifecycle.ts`). Next.js never inserts `kiloclaw_instances` rows. New Worker writes beyond the DO-mirrored carve-out require explicit justification — prefer a Next.js tRPC procedure unless the data fundamentally lives in the DO and is being denormalized for query-shape reasons.
-- **Fresh-provision admission reservations (required rollout target).** Once the Registry reservation rollout lands, fresh instance creation MUST acquire durable, non-routable context admission in `KiloClawRegistry` before invoking `KiloClawInstance.provision()` or provider allocation. A reservation is not a Postgres instance record and grants no access. Personal admission is per user; organization admission is per assigned user within `org:{orgId}`. Pending or reconciliation-required attempts fail closed and MUST NOT be exposed through routable registry entry reads. Until that rollout is deployed, the existing web provision lock is transitional protection and must not be removed.
+- **Fresh-provision admission reservations.** Fresh instance creation MUST acquire durable, non-routable context admission in `KiloClawRegistry` before invoking `KiloClawInstance.provision()` or provider allocation. A reservation is not a Postgres instance record and grants no access. Personal admission is per user; organization admission is per assigned user within `org:{orgId}`. Pending or reconciliation-required attempts fail closed and MUST NOT be exposed through routable registry entry reads. Registry admission and finalization are correctness-critical; do not treat reservation publication failure as best-effort routing metadata.
+
+### Fresh Provision Admission State
+
+```
+fresh create request
+  |
+  | beginFreshProvision (atomic unresolved-scope insert)
+  v
+in_progress
+  |\
+  | \ provider/row/bootstrap succeeds
+  |  v
+  |  completed + routable Registry entry
+  |       |
+  |       | finalized destroy
+  |       v
+  |    released + tombstone
+  |
+  \ ambiguous provider/row/bootstrap failure
+     v
+  failed_requires_reconciliation
+       |
+       | confirmed cleanup / destroy finalization
+       v
+    released + tombstone or no route
+```
+
+- `beginFreshProvision()` is the only entry to `in_progress`; the partial unique unresolved-scope index prevents a second fresh executor for the same owner/user context.
+- `completeFreshProvision()` publishes the routable entry only after canonical instance insertion and subscription bootstrap succeed. `repairCompletedProvision()` is the idempotent recovery path when that completion acknowledgement is lost.
+- `failFreshProvision()` is used only when provider side effects may exist and cleanup is not yet confirmed. `releaseFreshProvision()` is used only after confirmed cleanup or active-instance reconciliation proves the candidate is safe to abandon.
+- `finalizeDestroyedInstance()` atomically tombstones the routable entry and transitions any unresolved/completed reservation to terminal `released`, so delayed repair cannot revive a destroyed route.
+- `publishRecoveredInstance()` is limited to explicit subscription-recovery flows after bootstrap succeeds and refuses to publish if a destroy tombstone already exists.
+- `createInstance()` remains legacy/lazy routing publication and must not be used to complete a fresh reservation.
+
 - **DO restore from Postgres.** If DO SQLite is wiped, `start(userId)` reads the active instance row from Postgres and repopulates the DO state. This is the backup path for development mistakes that corrupt DO storage.
 - **Two-phase destroy.** Fly resource IDs (`pendingDestroyMachineId`, `pendingDestroyVolumeId`) are persisted before deletion attempts. DO state is only cleared when both are confirmed deleted. The alarm retries on failure.
 - **No machine recreation on transient errors.** `startExistingMachine()` only creates a new machine on 404 (confirmed gone). Transient Fly API errors (500, timeout) are re-thrown, not masked by duplicate creation.

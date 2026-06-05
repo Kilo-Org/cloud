@@ -253,10 +253,12 @@ export function handleWebSocketUpgrade(
   // isLocalDirectRequest check doesn't conclude the request came from a remote client.
   forwardedHeaders['host'] = `${backendHost}:${backendPort}`;
   delete forwardedHeaders['forwarded'];
-  delete forwardedHeaders['x-forwarded-for'];
-  delete forwardedHeaders['x-forwarded-proto'];
   delete forwardedHeaders['x-real-ip'];
-  delete forwardedHeaders['x-forwarded-host'];
+  for (const headerName of Object.keys(forwardedHeaders)) {
+    if (headerName.toLowerCase().startsWith('x-forwarded-')) {
+      delete forwardedHeaders[headerName];
+    }
+  }
 
   const backendReq = http.request({
     hostname: backendHost,

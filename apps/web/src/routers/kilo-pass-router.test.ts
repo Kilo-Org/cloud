@@ -6,6 +6,9 @@ import {
   kilo_pass_issuance_items,
   kilo_pass_issuances,
   kilo_pass_pause_events,
+  impact_referral_conversions,
+  impact_referral_reward_decisions,
+  impact_referral_rewards,
   kilo_pass_scheduled_changes,
   kilo_pass_store_purchases,
   kilo_pass_subscriptions,
@@ -22,6 +25,15 @@ import {
   KiloPassTier,
   KiloPassWelcomePromoEligibilityReason,
 } from '@/lib/kilo-pass/enums';
+import {
+  ImpactReferralBeneficiaryRole,
+  ImpactReferralDecisionOutcome,
+  ImpactReferralPaymentProvider,
+  ImpactReferralProduct,
+  ImpactReferralRewardKind,
+  ImpactReferralRewardStatus,
+  ImpactReferralWinningTouchType,
+} from '@kilocode/db/schema-types';
 import { and, eq, isNull } from 'drizzle-orm';
 import crypto from 'crypto';
 import {
@@ -182,6 +194,31 @@ type KiloPassCaller = {
     }>;
     hasMore: boolean;
     cursor: string | null;
+  }>;
+  getReferralRewardSummary: () => Promise<{
+    totals: {
+      totalRewards: number;
+      pendingRewards: number;
+      appliedRewards: number;
+      totalRewardAmountUsd: number;
+      pendingRewardAmountUsd: number;
+      appliedRewardAmountUsd: number;
+    };
+    referrerCap: {
+      grantedRewards: number;
+      limit: number;
+      reached: boolean;
+    };
+    rewards: Array<{
+      role: 'referrer' | 'referee';
+      status: string;
+      rewardAmountUsd: number;
+      earnedAt: string;
+      appliedAt: string | null;
+      expiresAt: string | null;
+      sourceTier: string | null;
+      reviewReason: string | null;
+    }>;
   }>;
 };
 
@@ -351,9 +388,12 @@ async function insertBaseCreditsIssuance(params: {
   subscriptionId: string;
   kiloUserId: string;
   welcomePromoEligibilityReason?: KiloPassWelcomePromoEligibilityReason;
+  issueMonth?: string;
+  stripeInvoiceId?: string;
+  createdAt?: string;
 }): Promise<void> {
   const issuedMonth = new Date().toISOString().slice(0, 7);
-  const issueMonth = `${issuedMonth}-01`;
+  const issueMonth = params.issueMonth ?? `${issuedMonth}-01`;
 
   const [issuance] = await db
     .insert(kilo_pass_issuances)
@@ -361,8 +401,9 @@ async function insertBaseCreditsIssuance(params: {
       kilo_pass_subscription_id: params.subscriptionId,
       issue_month: issueMonth,
       source: KiloPassIssuanceSource.StripeInvoice,
-      stripe_invoice_id: `in_test_${Date.now()}`,
+      stripe_invoice_id: params.stripeInvoiceId ?? `in_test_${Date.now()}`,
       initial_welcome_promo_eligibility_reason: params.welcomePromoEligibilityReason,
+      created_at: params.createdAt,
     })
     .returning({ id: kilo_pass_issuances.id });
 
@@ -378,6 +419,7 @@ async function insertBaseCreditsIssuance(params: {
       amount_microdollars: 1_000_000,
       is_free: false,
       description: `kilo-pass-base-test-${Date.now()}`,
+      created_at: params.createdAt,
     })
     .returning({ id: credit_transactions.id });
 
@@ -393,12 +435,82 @@ async function insertBaseCreditsIssuance(params: {
       credit_transaction_id: creditTxn.id,
       amount_usd: 10,
       bonus_percent_applied: null,
+      created_at: params.createdAt,
     })
     .returning({ id: kilo_pass_issuance_items.id });
 
   if (!issuanceItem) {
     throw new Error('Failed to insert kilo_pass_issuance_items row for test');
   }
+}
+
+async function insertKiloPassReferralReward(params: {
+  beneficiaryUserId: string;
+  role: ImpactReferralBeneficiaryRole;
+  status: ImpactReferralRewardStatus;
+  rewardAmountUsd: number;
+  sourceTier: KiloPassTier;
+  earnedAt: string;
+  appliedAt?: string | null;
+  expiresAt?: string | null;
+  sourcePaymentId?: string;
+}): Promise<void> {
+  const otherUser = await insertTestUser();
+  const isReferrerReward = params.role === ImpactReferralBeneficiaryRole.Referrer;
+  const [conversion] = await db
+    .insert(impact_referral_conversions)
+    .values({
+      product: ImpactReferralProduct.KiloPass,
+      referee_user_id: isReferrerReward ? otherUser.id : params.beneficiaryUserId,
+      referrer_user_id: isReferrerReward ? params.beneficiaryUserId : otherUser.id,
+      winning_touch_type: ImpactReferralWinningTouchType.Referral,
+      payment_provider: ImpactReferralPaymentProvider.Stripe,
+      source_payment_id: params.sourcePaymentId ?? `in_referral_${crypto.randomUUID()}`,
+      qualified: true,
+      converted_at: params.earnedAt,
+    })
+    .returning({ id: impact_referral_conversions.id });
+
+  if (!conversion) {
+    throw new Error('Failed to insert impact_referral_conversions row for test');
+  }
+
+  const [decision] = await db
+    .insert(impact_referral_reward_decisions)
+    .values({
+      product: ImpactReferralProduct.KiloPass,
+      conversion_id: conversion.id,
+      beneficiary_user_id: params.beneficiaryUserId,
+      beneficiary_role: params.role,
+      outcome: ImpactReferralDecisionOutcome.Granted,
+      reward_kind: ImpactReferralRewardKind.KiloPassBonus,
+      months_granted: 0,
+      reward_percent: 0.5,
+      source_tier: params.sourceTier,
+      reward_amount_usd: params.rewardAmountUsd,
+    })
+    .returning({ id: impact_referral_reward_decisions.id });
+
+  if (!decision) {
+    throw new Error('Failed to insert impact_referral_reward_decisions row for test');
+  }
+
+  await db.insert(impact_referral_rewards).values({
+    product: ImpactReferralProduct.KiloPass,
+    conversion_id: conversion.id,
+    decision_id: decision.id,
+    beneficiary_user_id: params.beneficiaryUserId,
+    beneficiary_role: params.role,
+    reward_kind: ImpactReferralRewardKind.KiloPassBonus,
+    months_granted: 0,
+    reward_percent: 0.5,
+    source_tier: params.sourceTier,
+    reward_amount_usd: params.rewardAmountUsd,
+    status: params.status,
+    earned_at: params.earnedAt,
+    applied_at: params.appliedAt ?? null,
+    expires_at: params.expiresAt ?? null,
+  });
 }
 
 describe('kiloPassRouter', () => {
@@ -734,6 +846,115 @@ describe('kiloPassRouter', () => {
       expect(result.subscription?.currentPeriodUsageUsd).toBe(0);
       expect(result.subscription?.isBonusUnlocked).toBe(false);
       expect(result.subscription?.refillAt).toBe(expectedNextBillingAt);
+    });
+
+    it('keeps first-month current bonus visible for first-time subscribers with a new card', async () => {
+      const stripeMock = getStripeMock();
+      const currentPeriodEndSeconds = 1_700_123_456;
+      const currentPeriodStartSeconds = currentPeriodEndSeconds - 2_592_000;
+      stripeMock.subscriptions.retrieve.mockResolvedValue({
+        id: 'sub_test_monthly_new_card_current_bonus',
+        status: 'active',
+        items: {
+          data: [
+            {
+              current_period_end: currentPeriodEndSeconds,
+              current_period_start: currentPeriodStartSeconds,
+            },
+          ],
+        },
+      });
+
+      const user = await insertTestUser({
+        google_user_email: 'kilo-pass-get-state-new-card-current-bonus@example.com',
+      });
+      const { id: subscriptionId } = await insertSubscription({
+        kiloUserId: user.id,
+        stripeSubscriptionId: 'sub_test_monthly_new_card_current_bonus',
+        tier: KiloPassTier.Tier199,
+        cadence: KiloPassCadence.Monthly,
+        status: 'active',
+        currentStreakMonths: 1,
+        startedAt: '2026-06-01T00:00:00.000Z',
+      });
+      await insertBaseCreditsIssuance({
+        subscriptionId,
+        kiloUserId: user.id,
+        welcomePromoEligibilityReason:
+          KiloPassWelcomePromoEligibilityReason.FirstPaymentFingerprintClaim,
+      });
+
+      const caller = await createCallerForUser(user.id);
+      const result = await caller.kiloPass.getState();
+
+      const baseAmountUsd = getMonthlyPriceUsd(KiloPassTier.Tier199);
+      const expectedCurrentBonusUsd =
+        Math.round(baseAmountUsd * KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_BONUS_PERCENT * 100) /
+        100;
+
+      expect(result.subscription?.currentPeriodBonusCreditsUsd).toBe(expectedCurrentBonusUsd);
+    });
+
+    it('uses ramp current bonus instead of grandfathered month-2 promo for reused cards', async () => {
+      const stripeMock = getStripeMock();
+      const currentPeriodEndSeconds = 1_700_123_456;
+      const currentPeriodStartSeconds = currentPeriodEndSeconds - 2_592_000;
+      stripeMock.subscriptions.retrieve.mockResolvedValue({
+        id: 'sub_test_monthly_reused_card_month2_current_bonus',
+        status: 'active',
+        items: {
+          data: [
+            {
+              current_period_end: currentPeriodEndSeconds,
+              current_period_start: currentPeriodStartSeconds,
+            },
+          ],
+        },
+      });
+
+      const user = await insertTestUser({
+        google_user_email: 'kilo-pass-get-state-reused-card-month2-current-bonus@example.com',
+      });
+      const { id: subscriptionId } = await insertSubscription({
+        kiloUserId: user.id,
+        stripeSubscriptionId: 'sub_test_monthly_reused_card_month2_current_bonus',
+        tier: KiloPassTier.Tier199,
+        cadence: KiloPassCadence.Monthly,
+        status: 'active',
+        currentStreakMonths: 2,
+        startedAt: '2026-01-01T00:00:00.000Z',
+      });
+      await insertBaseCreditsIssuance({
+        subscriptionId,
+        kiloUserId: user.id,
+        issueMonth: '2026-01-01',
+        stripeInvoiceId: 'in_test_reused_card_month1',
+        welcomePromoEligibilityReason:
+          KiloPassWelcomePromoEligibilityReason.FingerprintPreviouslyClaimed,
+      });
+      await insertBaseCreditsIssuance({
+        subscriptionId,
+        kiloUserId: user.id,
+        issueMonth: '2026-02-01',
+        stripeInvoiceId: 'in_test_reused_card_month2',
+      });
+
+      const caller = await createCallerForUser(user.id);
+      const result = await caller.kiloPass.getState();
+
+      const baseAmountUsd = getMonthlyPriceUsd(KiloPassTier.Tier199);
+      const rampBonusPercent = computeMonthlyCadenceBonusPercent({
+        tier: KiloPassTier.Tier199,
+        streakMonths: 2,
+        isFirstTimeSubscriberEver: false,
+        subscriptionStartedAtIso: '2026-01-01T00:00:00.000Z',
+      });
+      const expectedCurrentBonusUsd = Math.round(baseAmountUsd * rampBonusPercent * 100) / 100;
+
+      expect(result.subscription?.currentPeriodBonusCreditsUsd).toBe(expectedCurrentBonusUsd);
+      expect(result.subscription?.currentPeriodBonusCreditsUsd).not.toBe(
+        Math.round(baseAmountUsd * KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_BONUS_PERCENT * 100) / 100
+      );
     });
 
     it('uses the latest App Store purchase period and reports current usage, hosting, and bonus', async () => {
@@ -1215,6 +1436,63 @@ describe('kiloPassRouter', () => {
       expect(result.subscription?.nextBonusCreditsUsd).toBe(expectedNextBonusUsd);
     });
 
+    it('predicts monthly nextBonusCreditsUsd with ramp for reused-card month 2', async () => {
+      const stripeMock = getStripeMock();
+      const currentPeriodEndSeconds = 1_700_123_456;
+      const currentPeriodStartSeconds = currentPeriodEndSeconds - 2_592_000;
+      stripeMock.subscriptions.retrieve.mockResolvedValue({
+        id: 'sub_test_monthly_reused_card_month2_next',
+        status: 'active',
+        items: {
+          data: [
+            {
+              current_period_end: currentPeriodEndSeconds,
+              current_period_start: currentPeriodStartSeconds,
+            },
+          ],
+        },
+      });
+
+      const user = await insertTestUser({
+        google_user_email: 'kilo-pass-get-state-reused-card-month2-next@example.com',
+      });
+
+      const { id: subscriptionId } = await insertSubscription({
+        kiloUserId: user.id,
+        stripeSubscriptionId: 'sub_test_monthly_reused_card_month2_next',
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+        status: 'active',
+        currentStreakMonths: 1,
+        startedAt: '2026-01-01T00:00:00.000Z',
+      });
+      await insertBaseCreditsIssuance({
+        subscriptionId,
+        kiloUserId: user.id,
+        issueMonth: '2026-01-01',
+        stripeInvoiceId: 'in_test_reused_card_month2_next_initial',
+        welcomePromoEligibilityReason:
+          KiloPassWelcomePromoEligibilityReason.FingerprintPreviouslyClaimed,
+      });
+
+      const caller = await createCallerForUser(user.id);
+      const result = await caller.kiloPass.getState();
+
+      const baseAmountUsd = getMonthlyPriceUsd(KiloPassTier.Tier19);
+      const expectedPercent = computeMonthlyCadenceBonusPercent({
+        tier: KiloPassTier.Tier19,
+        streakMonths: 2,
+        isFirstTimeSubscriberEver: false,
+        subscriptionStartedAtIso: '2026-01-01T00:00:00.000Z',
+      });
+      const expectedNextBonusUsd = Math.round(baseAmountUsd * expectedPercent * 100) / 100;
+
+      expect(result.subscription?.nextBonusCreditsUsd).toBe(expectedNextBonusUsd);
+      expect(result.subscription?.nextBonusCreditsUsd).not.toBe(
+        Math.round(baseAmountUsd * KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_BONUS_PERCENT * 100) / 100
+      );
+    });
+
     it('computes monthly currentPeriodBonusCreditsUsd as 50% for promo month 2 (streak=2)', async () => {
       const stripeMock = getStripeMock();
       const currentPeriodEndSeconds = 1_700_123_456;
@@ -1236,7 +1514,7 @@ describe('kiloPassRouter', () => {
         google_user_email: 'kilo-pass-get-state-monthly-grandfathered-month2-current@example.com',
       });
 
-      await insertSubscription({
+      const { id: subscriptionId } = await insertSubscription({
         kiloUserId: user.id,
         stripeSubscriptionId: 'sub_test_monthly_grandfathered_month2_current',
         tier: KiloPassTier.Tier19,
@@ -1244,6 +1522,20 @@ describe('kiloPassRouter', () => {
         status: 'active',
         currentStreakMonths: 2,
         startedAt: '2026-01-01T00:00:00.000Z',
+      });
+      await insertBaseCreditsIssuance({
+        subscriptionId,
+        kiloUserId: user.id,
+        issueMonth: '2026-01-01',
+        stripeInvoiceId: 'in_test_grandfathered_month2_current_initial',
+        welcomePromoEligibilityReason:
+          KiloPassWelcomePromoEligibilityReason.FirstPaymentFingerprintClaim,
+      });
+      await insertBaseCreditsIssuance({
+        subscriptionId,
+        kiloUserId: user.id,
+        issueMonth: '2026-02-01',
+        stripeInvoiceId: 'in_test_grandfathered_month2_current_current',
       });
 
       const caller = await createCallerForUser(user.id);
@@ -1279,7 +1571,7 @@ describe('kiloPassRouter', () => {
         google_user_email: 'kilo-pass-get-state-monthly-grandfathered-month2-cutoff@example.com',
       });
 
-      await insertSubscription({
+      const { id: subscriptionId } = await insertSubscription({
         kiloUserId: user.id,
         stripeSubscriptionId: 'sub_test_monthly_grandfathered_month2_cutoff_ineligible',
         tier: KiloPassTier.Tier19,
@@ -1287,6 +1579,20 @@ describe('kiloPassRouter', () => {
         status: 'active',
         currentStreakMonths: 2,
         startedAt: KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF.toISOString(),
+      });
+      await insertBaseCreditsIssuance({
+        subscriptionId,
+        kiloUserId: user.id,
+        issueMonth: '2026-01-01',
+        stripeInvoiceId: 'in_test_grandfathered_month2_cutoff_initial',
+        welcomePromoEligibilityReason:
+          KiloPassWelcomePromoEligibilityReason.FirstPaymentFingerprintClaim,
+      });
+      await insertBaseCreditsIssuance({
+        subscriptionId,
+        kiloUserId: user.id,
+        issueMonth: '2026-02-01',
+        stripeInvoiceId: 'in_test_grandfathered_month2_cutoff_current',
       });
 
       const caller = await createCallerForUser(user.id);
@@ -1329,7 +1635,7 @@ describe('kiloPassRouter', () => {
         google_user_email: 'kilo-pass-get-state-monthly-grandfathered-month3@example.com',
       });
 
-      await insertSubscription({
+      const { id: subscriptionId } = await insertSubscription({
         kiloUserId: user.id,
         stripeSubscriptionId: 'sub_test_monthly_grandfathered_month3_regression',
         tier: KiloPassTier.Tier19,
@@ -1337,6 +1643,20 @@ describe('kiloPassRouter', () => {
         status: 'active',
         currentStreakMonths: 3,
         startedAt: '2026-01-01T00:00:00.000Z',
+      });
+      await insertBaseCreditsIssuance({
+        subscriptionId,
+        kiloUserId: user.id,
+        issueMonth: '2026-01-01',
+        stripeInvoiceId: 'in_test_grandfathered_month3_initial',
+        welcomePromoEligibilityReason:
+          KiloPassWelcomePromoEligibilityReason.FirstPaymentFingerprintClaim,
+      });
+      await insertBaseCreditsIssuance({
+        subscriptionId,
+        kiloUserId: user.id,
+        issueMonth: '2026-03-01',
+        stripeInvoiceId: 'in_test_grandfathered_month3_current',
       });
 
       const caller = await createCallerForUser(user.id);
@@ -2937,6 +3257,156 @@ describe('kiloPassRouter', () => {
         { amountUsd: -9.5, kind: KiloPassIssuanceItemKind.Base },
         { amountUsd: 19, kind: KiloPassIssuanceItemKind.Base },
       ]);
+    });
+  });
+
+  describe('getReferralRewardSummary', () => {
+    it('returns an empty Kilo Pass referral summary without KiloClaw fallback state', async () => {
+      const user = await insertTestUser({
+        google_user_email: 'kilo-pass-referral-empty@example.com',
+      });
+      const caller = await createCallerForUser(user.id);
+
+      const result = await caller.kiloPass.getReferralRewardSummary();
+
+      expect(result).toEqual({
+        totals: {
+          totalRewards: 0,
+          pendingRewards: 0,
+          appliedRewards: 0,
+          totalRewardAmountUsd: 0,
+          pendingRewardAmountUsd: 0,
+          appliedRewardAmountUsd: 0,
+        },
+        referrerCap: {
+          grantedRewards: 0,
+          limit: 5,
+          reached: false,
+        },
+        rewards: [],
+      });
+    });
+
+    it('summarizes pending, applied, history, and cap-reached Kilo Pass rewards', async () => {
+      const user = await insertTestUser({
+        google_user_email: 'kilo-pass-referral-summary@example.com',
+      });
+
+      await insertKiloPassReferralReward({
+        beneficiaryUserId: user.id,
+        role: ImpactReferralBeneficiaryRole.Referrer,
+        status: ImpactReferralRewardStatus.Pending,
+        rewardAmountUsd: 24.5,
+        sourceTier: KiloPassTier.Tier49,
+        earnedAt: '2026-05-10T00:00:00.000Z',
+        expiresAt: '2027-05-10T00:00:00.000Z',
+      });
+      await insertKiloPassReferralReward({
+        beneficiaryUserId: user.id,
+        role: ImpactReferralBeneficiaryRole.Referee,
+        status: ImpactReferralRewardStatus.Applied,
+        rewardAmountUsd: 9.5,
+        sourceTier: KiloPassTier.Tier19,
+        earnedAt: '2026-05-11T00:00:00.000Z',
+        appliedAt: '2026-06-01T00:00:00.000Z',
+      });
+      await insertKiloPassReferralReward({
+        beneficiaryUserId: user.id,
+        role: ImpactReferralBeneficiaryRole.Referrer,
+        status: ImpactReferralRewardStatus.ReviewRequired,
+        rewardAmountUsd: 24.5,
+        sourceTier: KiloPassTier.Tier49,
+        earnedAt: '2026-05-12T00:00:00.000Z',
+      });
+      await insertKiloPassReferralReward({
+        beneficiaryUserId: user.id,
+        role: ImpactReferralBeneficiaryRole.Referrer,
+        status: ImpactReferralRewardStatus.Expired,
+        rewardAmountUsd: 99.5,
+        sourceTier: KiloPassTier.Tier199,
+        earnedAt: '2026-05-13T00:00:00.000Z',
+      });
+      await insertKiloPassReferralReward({
+        beneficiaryUserId: user.id,
+        role: ImpactReferralBeneficiaryRole.Referrer,
+        status: ImpactReferralRewardStatus.Canceled,
+        rewardAmountUsd: 99.5,
+        sourceTier: KiloPassTier.Tier199,
+        earnedAt: '2026-05-14T00:00:00.000Z',
+      });
+      await insertKiloPassReferralReward({
+        beneficiaryUserId: user.id,
+        role: ImpactReferralBeneficiaryRole.Referrer,
+        status: ImpactReferralRewardStatus.Reversed,
+        rewardAmountUsd: 0,
+        sourceTier: KiloPassTier.Tier19,
+        earnedAt: '2026-05-15T00:00:00.000Z',
+      });
+
+      const caller = await createCallerForUser(user.id);
+      const result = await caller.kiloPass.getReferralRewardSummary();
+
+      expect(result.totals).toEqual({
+        totalRewards: 6,
+        pendingRewards: 1,
+        appliedRewards: 1,
+        totalRewardAmountUsd: 257.5,
+        pendingRewardAmountUsd: 24.5,
+        appliedRewardAmountUsd: 9.5,
+      });
+      expect(result.referrerCap).toEqual({
+        grantedRewards: 5,
+        limit: 5,
+        reached: true,
+      });
+      expect(result.rewards.map(reward => reward.status)).toEqual([
+        'reversed',
+        'canceled',
+        'expired',
+        'review_required',
+        'applied',
+        'pending',
+      ]);
+      expect(result.rewards[1]).toEqual(
+        expect.objectContaining({
+          role: 'referrer',
+          rewardAmountUsd: 99.5,
+          sourceTier: 'tier_199',
+        })
+      );
+    });
+
+    it('does not count expired pending rewards as pending future rewards', async () => {
+      const user = await insertTestUser({
+        google_user_email: 'kilo-pass-referral-expired-pending@example.com',
+      });
+
+      await insertKiloPassReferralReward({
+        beneficiaryUserId: user.id,
+        role: ImpactReferralBeneficiaryRole.Referrer,
+        status: ImpactReferralRewardStatus.Pending,
+        rewardAmountUsd: 24.5,
+        sourceTier: KiloPassTier.Tier49,
+        earnedAt: '2025-01-01T00:00:00.000Z',
+        expiresAt: '2025-12-31T00:00:00.000Z',
+      });
+
+      const caller = await createCallerForUser(user.id);
+      const result = await caller.kiloPass.getReferralRewardSummary();
+
+      expect(result.totals).toEqual(
+        expect.objectContaining({
+          totalRewards: 1,
+          pendingRewards: 0,
+          pendingRewardAmountUsd: 0,
+        })
+      );
+      expect(result.rewards[0]).toEqual(
+        expect.objectContaining({
+          status: ImpactReferralRewardStatus.Pending,
+          expiresAt: '2025-12-31T00:00:00.000Z',
+        })
+      );
     });
   });
 

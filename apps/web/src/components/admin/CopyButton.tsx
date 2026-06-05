@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Copy, Check } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 type CopyButtonProps = {
   text: string;
@@ -52,16 +53,17 @@ export function CopyButton({ text, className = '', showText = false, label }: Co
 
   return (
     <button
+      type="button"
       onClick={handleCopy}
-      className={`pointer-events-auto inline-flex cursor-pointer items-center gap-1 rounded p-1 transition-all duration-200 hover:bg-gray-100 focus:outline-none ${className}`}
+      className={cn(
+        'text-muted-foreground hover:bg-accent hover:text-accent-foreground focus-visible:ring-ring focus-visible:ring-offset-background pointer-events-auto inline-flex cursor-pointer items-center gap-1 rounded p-1 transition-all duration-200 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none',
+        className
+      )}
       title={title}
+      aria-label={title}
     >
       <div className={`transition-all duration-200 ${copied ? 'scale-110' : 'scale-100'}`}>
-        {copied ? (
-          <Check className="h-4 w-4 text-green-600" />
-        ) : (
-          <Copy className="h-4 w-4 text-gray-500 hover:text-gray-700" />
-        )}
+        {copied ? <Check className="h-4 w-4 text-green-400" /> : <Copy className="h-4 w-4" />}
       </div>
       {showText && (
         <span className="text-muted-foreground text-sm">{copied ? 'Copied!' : 'Copy'}</span>

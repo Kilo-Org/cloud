@@ -22,6 +22,7 @@
     "db:empty-database": "tsx --tsconfig tsconfig.scripts.json src/db/empty-database.ts",
     "knip": "knip",
     "test:e2e": "playwright test",
+    "test:setup-smoke": "playwright test --config=playwright.setup-smoke.config.ts",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:debug": "playwright test --debug",
     "promo": "pnpm -s script src/scripts/encrypt-promo-codes.ts"

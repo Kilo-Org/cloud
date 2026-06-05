@@ -12,11 +12,11 @@ async function authenticatedClient(request: NextRequest) {
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ clientId: string }> }
+  { params }: { params: Promise<{ scope: string }> }
 ) {
   try {
     const auth = await authenticatedClient(request);
-    const { clientId } = await params;
+    const { scope: clientId } = await params;
     if (!auth?.client || auth.client.client_id !== clientId) {
       return NextResponse.json({ error: 'invalid_client' }, { status: 401 });
     }
@@ -36,11 +36,11 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: Promise<{ clientId: string }> }
+  { params }: { params: Promise<{ scope: string }> }
 ) {
   try {
     const auth = await authenticatedClient(request);
-    const { clientId } = await params;
+    const { scope: clientId } = await params;
     if (!auth?.client || auth.client.client_id !== clientId) {
       return NextResponse.json({ error: 'invalid_client' }, { status: 401 });
     }
@@ -63,11 +63,11 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ clientId: string }> }
+  { params }: { params: Promise<{ scope: string }> }
 ) {
   try {
     const auth = await authenticatedClient(request);
-    const { clientId } = await params;
+    const { scope: clientId } = await params;
     if (!auth?.client || auth.client.client_id !== clientId) {
       return NextResponse.json({ error: 'invalid_client' }, { status: 401 });
     }

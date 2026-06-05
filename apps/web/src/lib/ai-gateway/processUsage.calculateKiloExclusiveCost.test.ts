@@ -22,7 +22,7 @@ const makeUsage = (overrides: Partial<JustTheCostsUsageStats> = {}): JustTheCost
   ...overrides,
 });
 
-describe('calculatKiloExclusiveCost_mUsd with qwen3.7-max', () => {
+describe('calculateKiloExclusiveCost_mUsd with qwen3.7-max', () => {
   test('uses direct Alibaba pricing with the 50% discount', () => {
     const result = calculateKiloExclusiveCost_mUsd(
       qwen37_max_model,
@@ -42,7 +42,7 @@ describe('calculatKiloExclusiveCost_mUsd with qwen3.7-max', () => {
   });
 });
 
-describe('calculatKiloExclusiveCost_mUsd with qwen3.7-plus', () => {
+describe('calculateKiloExclusiveCost_mUsd with qwen3.7-plus', () => {
   test('uses direct Alibaba pricing with the 20% discount in the <=256k tier', () => {
     const result = calculateKiloExclusiveCost_mUsd(
       qwen37_plus_model,
@@ -80,7 +80,7 @@ describe('calculatKiloExclusiveCost_mUsd with qwen3.7-plus', () => {
   });
 });
 
-describe('calculatKiloExclusiveCost_mUsd with qwen3.6-plus', () => {
+describe('calculateKiloExclusiveCost_mUsd with qwen3.6-plus', () => {
   // Qwen pricing page values with no discount applied in code:
   //
   // Input<=256k tier:
@@ -290,7 +290,7 @@ describe('calculatKiloExclusiveCost_mUsd with qwen3.6-plus', () => {
   });
 });
 
-describe('calculatKiloExclusiveCost_mUsd with qwen3.6-flash', () => {
+describe('calculateKiloExclusiveCost_mUsd with qwen3.6-flash', () => {
   // Qwen pricing page values with no discount applied in code:
   //
   // Input<=256k tier:
@@ -384,7 +384,7 @@ describe('calculatKiloExclusiveCost_mUsd with qwen3.6-flash', () => {
   });
 });
 
-describe('calculatKiloExclusiveCost_mUsd with qwen3.6-max-preview', () => {
+describe('calculateKiloExclusiveCost_mUsd with qwen3.6-max-preview', () => {
   // Qwen pricing page values with no discount applied in code:
   //
   // Input<=128k tier:
@@ -458,7 +458,7 @@ describe('calculatKiloExclusiveCost_mUsd with qwen3.6-max-preview', () => {
   });
 });
 
-describe('calculatKiloExclusiveCost_mUsd with stealth Claude Opus 4.7', () => {
+describe('calculateKiloExclusiveCost_mUsd with stealth Claude Opus 4.7', () => {
   test('uses the 20% lower flat price for uncached tokens', () => {
     const result = calculateKiloExclusiveCost_mUsd(
       claude_opus_4_7_stealth_model,
@@ -481,7 +481,7 @@ describe('calculatKiloExclusiveCost_mUsd with stealth Claude Opus 4.7', () => {
   });
 });
 
-describe('calculatKiloExclusiveCost_mUsd with qwen3.6-27b', () => {
+describe('calculateKiloExclusiveCost_mUsd with qwen3.6-27b', () => {
   // Qwen pricing page values with no discount applied in code:
   //   Input: $0.5/1M → $0.5/1M   Output: $5/1M → $5/1M
 

@@ -423,6 +423,19 @@ describe('updateAgentBindings', () => {
     ).rejects.toMatchObject({ code: 'agent_not_found', status: 404 });
   });
 
+  it('binds the implicit main agent when other agents are configured', async () => {
+    // main has no agents.list entry, but the list is non-empty (research), so the
+    // post-write summary lookup must use the implicit-main fallback (not 500).
+    const configPath = await configFixture({ agents: { list: [{ id: 'research' }] } });
+
+    const { agent } = await updateAgentBindings('main', { channels: ['slack'] }, { configPath });
+
+    expect(agent.id).toBe('main');
+    expect(agent.configured).toBe(false);
+    expect(agent.bindings).toEqual([{ channel: 'slack', accountId: null, advanced: false }]);
+    expect(channelsOf(configPath, 'main')).toEqual(['slack']);
+  });
+
   it('fails closed when the bindings array is an unexpected shape', async () => {
     const configPath = await configFixture({
       agents: { list: [{ id: 'research' }] },

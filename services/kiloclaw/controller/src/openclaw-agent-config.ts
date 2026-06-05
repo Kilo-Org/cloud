@@ -723,7 +723,16 @@ export async function updateAgentBindings(
     options
   );
 
-  const agent = summarizeAgentConfig(snapshot.config).agents.find(a => a.id === normalized);
+  // Summarize via the implicit-main fallback (same as readAgentSummary): binding
+  // `main` does not materialize an agents.list entry, and summarizeAgentConfig
+  // only synthesizes implicit main when the list is empty — so look it up against
+  // a single synthetic entry rather than the full list.
+  const entry = findConfiguredEntry(snapshot.config, normalized);
+  const summarizedEntry = entry ?? { id: DEFAULT_AGENT_ID };
+  const agent = summarizeAgentConfig({
+    ...snapshot.config,
+    agents: { ...snapshot.config.agents, list: [summarizedEntry] },
+  }).agents[0];
   if (!agent) {
     throw new AgentConfigError(
       500,
@@ -731,5 +740,5 @@ export async function updateAgentBindings(
       'Unable to summarize agent after binding update'
     );
   }
-  return { snapshot, agent };
+  return { snapshot, agent: { ...agent, configured: entry !== undefined } };
 }

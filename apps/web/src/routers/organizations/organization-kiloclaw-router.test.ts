@@ -26,6 +26,7 @@ type AnyMock = jest.Mock<(...args: any[]) => any>;
 
 type KiloClawClientMock = {
   __destroyMock: AnyMock;
+  __getFileTreeMock: AnyMock;
   __getLatestVersionMock: AnyMock;
   __getLatestVersionForInstanceMock: AnyMock;
   __patchWebSearchConfigMock: AnyMock;
@@ -76,6 +77,7 @@ jest.mock('@/lib/config.server', () => {
 
 jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => {
   const destroyMock = jest.fn();
+  const getFileTreeMock = jest.fn();
   const getLatestVersionMock = jest.fn();
   const getLatestVersionForInstanceMock = jest.fn();
   const patchWebSearchConfigMock = jest.fn();
@@ -88,6 +90,7 @@ jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => {
   return {
     KiloClawInternalClient: jest.fn().mockImplementation(() => ({
       destroy: destroyMock,
+      getFileTree: getFileTreeMock,
       getLatestVersion: getLatestVersionMock,
       getLatestVersionForInstance: getLatestVersionForInstanceMock,
       patchWebSearchConfig: patchWebSearchConfigMock,
@@ -108,6 +111,7 @@ jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => {
       }
     },
     __destroyMock: destroyMock,
+    __getFileTreeMock: getFileTreeMock,
     __getLatestVersionMock: getLatestVersionMock,
     __getLatestVersionForInstanceMock: getLatestVersionForInstanceMock,
     __patchWebSearchConfigMock: patchWebSearchConfigMock,
@@ -788,6 +792,33 @@ describe('organizations.kiloclaw.writeFile validation mode', () => {
       instanceId,
       'warn-before-write'
     );
+  });
+});
+
+describe('organizations.kiloclaw.fileTree', () => {
+  beforeEach(async () => {
+    await cleanupDbForTest();
+    kiloclawClientMock.__getFileTreeMock.mockReset();
+  });
+
+  it('forwards path-scoped tree requests to the active org instance', async () => {
+    kiloclawClientMock.__getFileTreeMock.mockResolvedValue({ tree: [] });
+    const user = await insertTestUser({
+      google_user_email: `org-kiloclaw-file-tree-${crypto.randomUUID()}@example.com`,
+    });
+    const organization = await createOrganization('Org KiloClaw File Tree Test', user.id);
+    const instanceId = await createActiveOrgInstance(user.id, organization.id);
+
+    const caller = await createCallerForUser(user.id);
+    await caller.organizations.kiloclaw.fileTree({
+      organizationId: organization.id,
+      path: 'workspace/nested',
+    });
+
+    expect(kiloclawClientMock.__getFileTreeMock).toHaveBeenCalledWith(user.id, {
+      instanceId,
+      path: 'workspace/nested',
+    });
   });
 });
 

@@ -74,6 +74,7 @@ import {
   kilocode_users,
   auto_top_up_configs,
   pending_impact_sale_reversals,
+  stripe_dispute_cases,
   stripe_early_fraud_warning_actions,
   stripe_early_fraud_warning_cases,
   user_affiliate_attributions,
@@ -103,6 +104,8 @@ import {
   ImpactReferralRewardKind,
   ImpactReferralRewardStatus,
   ImpactReferralWinningTouchType,
+  StripeDisputeCaseStatus,
+  StripeDisputeOwnerClassification,
 } from '@kilocode/db/schema-types';
 import type * as kiloclawStripeHandlersModule from '@/lib/kiloclaw/stripe-handlers';
 import type * as kiloPassStripeHandlersModule from '@/lib/kilo-pass/stripe-handlers';
@@ -1408,6 +1411,24 @@ describe('processStripePaymentEventHook', () => {
     await processStripePaymentEventHook(event);
     await waitForReportEventsCall();
 
+    const [disputeCase] = await db.select().from(stripe_dispute_cases);
+    expect(disputeCase).toEqual(
+      expect.objectContaining({
+        stripe_dispute_id: 'dp_created_123',
+        stripe_event_id: 'evt_dispute_created_abuse',
+        stripe_charge_id: 'ch_dispute_created_123',
+        stripe_payment_intent_id: 'pi_dispute_created_123',
+        stripe_customer_id: testUser.stripe_customer_id,
+        amount_minor_units: 2900,
+        currency: 'usd',
+        dispute_reason: 'fraudulent',
+        stripe_status: 'warning_needs_response',
+        owner_classification: StripeDisputeOwnerClassification.Personal,
+        kilo_user_id: testUser.id,
+        status: StripeDisputeCaseStatus.NeedsAction,
+      })
+    );
+
     expect(reportEventsMock).toHaveBeenCalledWith({
       events: [
         {
@@ -1424,6 +1445,108 @@ describe('processStripePaymentEventHook', () => {
         },
       ],
     });
+
+    retrieveSpy.mockRestore();
+  });
+
+  test('charge.dispute.created persists dispute case when charge enrichment fails', async () => {
+    await cleanupDbForTest();
+
+    const { client } = await import('@/lib/stripe-client');
+    const retrieveSpy = jest
+      .spyOn(client.charges, 'retrieve')
+      .mockRejectedValue(new Error('charge retrieve failed'));
+    const event: Stripe.Event = {
+      ...baseStripeEvent(),
+      id: 'evt_dispute_created_enrichment_failed',
+      data: {
+        object: sampleStripeDispute({
+          id: 'dp_created_enrichment_failed',
+          charge: 'ch_dispute_enrichment_failed',
+          payment_intent: 'pi_dispute_enrichment_failed',
+          status: 'needs_response',
+        }),
+        previous_attributes: {},
+      },
+      type: 'charge.dispute.created',
+    };
+
+    await expect(processStripePaymentEventHook(event)).rejects.toThrow('charge retrieve failed');
+
+    const [disputeCase] = await db.select().from(stripe_dispute_cases);
+    expect(disputeCase).toEqual(
+      expect.objectContaining({
+        stripe_dispute_id: 'dp_created_enrichment_failed',
+        stripe_event_id: 'evt_dispute_created_enrichment_failed',
+        stripe_charge_id: 'ch_dispute_enrichment_failed',
+        stripe_payment_intent_id: 'pi_dispute_enrichment_failed',
+        stripe_customer_id: null,
+        stripe_status: 'needs_response',
+        owner_classification: StripeDisputeOwnerClassification.Unmatched,
+        kilo_user_id: null,
+        organization_id: null,
+        status: StripeDisputeCaseStatus.ReviewRequired,
+      })
+    );
+
+    retrieveSpy.mockRestore();
+  });
+
+  test('charge.dispute.closed updates an existing dispute case', async () => {
+    await cleanupDbForTest();
+    testUser = await insertTestUser();
+
+    await db.insert(stripe_dispute_cases).values({
+      stripe_dispute_id: 'dp_closed_123',
+      stripe_event_id: 'evt_dispute_created_original',
+      stripe_charge_id: 'ch_dispute_closed_123',
+      stripe_customer_id: testUser.stripe_customer_id,
+      owner_classification: StripeDisputeOwnerClassification.Personal,
+      kilo_user_id: testUser.id,
+      status: StripeDisputeCaseStatus.NeedsAction,
+      status_reason: 'Canonical personal owner matched; admin action required',
+      stripe_status: 'needs_response',
+    });
+
+    const { client } = await import('@/lib/stripe-client');
+    const retrieveSpy = jest.spyOn(client.charges, 'retrieve').mockResolvedValue(
+      sampleStripeChargeResponse(
+        sampleStripeCharge({
+          id: 'ch_dispute_closed_123',
+          customer: testUser.stripe_customer_id,
+          payment_intent: 'pi_dispute_closed_123',
+        })
+      )
+    );
+    const event: Stripe.Event = {
+      ...baseStripeEvent(),
+      id: 'evt_dispute_closed',
+      data: {
+        object: sampleStripeDispute({
+          id: 'dp_closed_123',
+          charge: 'ch_dispute_closed_123',
+          payment_intent: 'pi_dispute_closed_123',
+          status: 'lost',
+        }),
+        previous_attributes: {},
+      },
+      type: 'charge.dispute.closed',
+    };
+
+    await processStripePaymentEventHook(event);
+
+    const [disputeCase] = await db
+      .select()
+      .from(stripe_dispute_cases)
+      .where(eq(stripe_dispute_cases.stripe_dispute_id, 'dp_closed_123'));
+    expect(disputeCase).toEqual(
+      expect.objectContaining({
+        stripe_event_id: 'evt_dispute_closed',
+        stripe_payment_intent_id: 'pi_dispute_closed_123',
+        stripe_status: 'lost',
+        status: StripeDisputeCaseStatus.Closed,
+      })
+    );
 
     retrieveSpy.mockRestore();
   });
@@ -2088,6 +2211,16 @@ describe('processStripePaymentEventHook', () => {
       impact_action_id: '1000.2000.3000',
     });
 
+    const { client } = await import('@/lib/stripe-client');
+    const retrieveSpy = jest.spyOn(client.charges, 'retrieve').mockResolvedValue(
+      sampleStripeChargeResponse(
+        sampleStripeCharge({
+          id: 'ch_kilo_pass_won_dispute',
+          customer: testUser.stripe_customer_id,
+        })
+      )
+    );
+
     const event: Stripe.Event = {
       ...baseStripeEvent(),
       id: 'evt_dispute_kilo_pass_won_resolution',
@@ -2114,6 +2247,8 @@ describe('processStripePaymentEventHook', () => {
       dedupe_key: 'affiliate:impact:sale_reversal:ch_kilo_pass_won_dispute',
     });
     expect(pendingRows).toHaveLength(0);
+
+    retrieveSpy.mockRestore();
   });
 
   test('charge.dispute.created skips unrelated invoice charge disputes', async () => {

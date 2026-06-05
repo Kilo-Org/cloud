@@ -5,6 +5,8 @@ export type PeriodOption = 'today' | 'yesterday' | '7d' | '30d' | '1y';
 
 export type Granularity = 'hour' | 'day' | 'week' | 'month';
 
+export type CostSource = 'cost' | 'market';
+
 export type Dimension = 'feature' | 'model' | 'mode' | 'user' | 'provider' | 'project';
 
 export type MetricKey =
@@ -63,6 +65,18 @@ export const GRANULARITY_LABELS: Record<Granularity, string> = {
   month: 'Month',
 };
 
+export const COST_SOURCE_LABELS: Record<CostSource, string> = {
+  cost: 'Cost',
+  market: 'Estimated Market Cost',
+};
+
+export function parseCostSource(
+  value: string | null | undefined,
+  fallback: CostSource = 'cost'
+): CostSource {
+  return value === 'cost' || value === 'market' ? value : fallback;
+}
+
 export const METRIC_LABELS: Record<MetricKey, string> = {
   cost: 'Cost',
   requests: 'Requests',
@@ -77,3 +91,11 @@ export const METRIC_LABELS: Record<MetricKey, string> = {
   cacheHitRatio: 'Cache Hit Ratio',
   outputInputRatio: 'Output / Input Ratio',
 };
+
+export function metricLabelForCostSource(metric: MetricKey, costSource: CostSource): string {
+  if (costSource === 'market') {
+    if (metric === 'cost') return 'Estimated Market Cost';
+    if (metric === 'costPerRequest') return 'Estimated Market Cost / Request';
+  }
+  return METRIC_LABELS[metric];
+}

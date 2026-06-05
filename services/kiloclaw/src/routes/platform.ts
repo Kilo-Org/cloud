@@ -135,6 +135,16 @@ const ProvisionReservationRepairSchema = z.object({
   orgId: z.uuid().nullable().optional(),
 });
 
+const ProvisionReservationReleaseSchema = z.object({
+  userId: z.string().min(1),
+  instanceId: z.uuid(),
+  orgId: z.uuid().nullable().optional(),
+  // Break-glass: the operator must explicitly assert they have confirmed the
+  // attempt is dead and any provider resources are cleaned up. `z.literal(true)`
+  // makes the request fail validation unless the flag is present and true.
+  acknowledgeCleanupVerified: z.literal(true),
+});
+
 const KILOCLAW_WORKER_DESTROY_ACTOR = {
   actorType: 'system',
   actorId: 'kiloclaw-worker',
@@ -1940,6 +1950,95 @@ platform.post('/provision/repair-reservation', async c => {
   }
 });
 
+// POST /api/platform/provision/release-reservation
+// Admin break-glass: release a stuck provision reservation (`in_progress` or
+// `failed_requires_reconciliation`) so the user can provision again. A failed
+// fresh provision can leave such a row behind (e.g. `provider_provision_failed`
+// during a provider outage); the partial unique index then rejects every new
+// provision with `provision_in_progress` ("An instance is already being
+// created"), and nothing auto-heals it because no instance/DO exists to finalize
+// a destroy.
+//
+// This is an OPERATOR action, not an autonomous safety decision. The admin must
+// have already confirmed the attempt is dead and any provider resources are
+// cleaned up; `acknowledgeCleanupVerified: true` records that assertion (and the
+// admin identity is captured in the tRPC audit log upstream). It mutates only
+// the registry bookkeeping row — no provider (Fly/Northflank) or Postgres
+// changes. Guards: refuses a reservation backing a live active instance, refuses
+// non-releasable statuses, and releases atomically via a compare-and-set on the
+// validated status so a concurrent completion is reported, not clobbered.
+platform.post('/provision/release-reservation', async c => {
+  const result = await parseBody(c, ProvisionReservationReleaseSchema);
+  if ('error' in result) return result.error;
+  const { userId, instanceId, orgId } = result.data;
+
+  try {
+    // Never release a reservation that belongs to a currently-active instance.
+    const activeInstance = await getActiveProvisionContextInstance(c.env, userId, orgId);
+    if (activeInstance?.id === instanceId) {
+      return jsonError(
+        'Reservation belongs to an active instance; refusing to release',
+        409,
+        'reservation_active'
+      );
+    }
+
+    const { registryKey, stub } = getProvisionRegistryStub(c.env, userId, orgId);
+    const { reservations } = await stub.listAllInstances(registryKey);
+    const reservation = reservations.find(r => r.instanceId === instanceId);
+    if (!reservation) {
+      return jsonError('No provision reservation found for instance', 404, 'reservation_not_found');
+    }
+    if (
+      reservation.status !== 'in_progress' &&
+      reservation.status !== 'failed_requires_reconciliation'
+    ) {
+      return jsonError(
+        `Reservation is not in a releasable state (status=${reservation.status})`,
+        409,
+        'reservation_not_releasable'
+      );
+    }
+
+    // Atomic compare-and-set on the exact status we validated.
+    const release = await stub.adminReleaseStuckReservation(
+      registryKey,
+      userId,
+      instanceId,
+      reservation.status,
+      'manual_admin_release'
+    );
+    switch (release.outcome) {
+      case 'not_found':
+        return jsonError(
+          'No provision reservation found for instance',
+          404,
+          'reservation_not_found'
+        );
+      case 'status_changed':
+        return jsonError(
+          `Reservation status changed to ${release.status} during release; re-check and retry`,
+          409,
+          'reservation_status_changed'
+        );
+      case 'released':
+        writeEvent(c.env, {
+          event: 'instance.provision_reservation_released',
+          delivery: 'http',
+          route: '/api/platform/provision/release-reservation',
+          userId,
+          instanceId,
+          orgId: orgId ?? undefined,
+          label: release.previousStatus,
+        });
+        return c.json({ ok: true, previousStatus: release.previousStatus });
+    }
+  } catch (error) {
+    const { message, status } = sanitizeError(error, 'provision reservation release');
+    return jsonError(message, status);
+  }
+});
+
 // PATCH /api/platform/kilocode-config
 
 platform.patch('/kilocode-config', async c => {
@@ -3359,9 +3458,10 @@ platform.get('/morning-briefing/read/:day', async c => {
   }
 });
 
-// GET /api/platform/files/tree?userId=...
+// GET /api/platform/files/tree?userId=...[&path=...]
 platform.get('/files/tree', async c => {
   const userId = setValidatedQueryUserId(c);
+  const filePath = c.req.query('path');
   if (!userId) {
     return c.json({ error: 'userId query parameter is required' }, 400);
   }
@@ -3374,7 +3474,7 @@ platform.get('/files/tree', async c => {
       c.env,
       userId,
       iidResult.instanceId,
-      stub => stub.getFileTree(),
+      stub => stub.getFileTree(filePath),
       'getFileTree'
     );
     if (!result) {

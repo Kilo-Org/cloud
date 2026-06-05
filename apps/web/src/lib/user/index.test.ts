@@ -74,6 +74,8 @@ import {
   model_experiment_variant,
   model_experiment_variant_version,
   model_experiment_request,
+  stripe_dispute_actions,
+  stripe_dispute_cases,
   stripe_early_fraud_warning_cases,
   stripe_early_fraud_warning_actions,
   coding_plan_availability_intents,
@@ -138,6 +140,8 @@ describe('User', () => {
     await db.delete(impact_referral_conversions);
     await db.delete(impact_referrals);
     await db.delete(deleted_user_email_tombstones);
+    await db.delete(stripe_dispute_actions);
+    await db.delete(stripe_dispute_cases);
     await db.delete(stripe_early_fraud_warning_actions);
     await db.delete(stripe_early_fraud_warning_cases);
     await db.delete(payment_methods);
@@ -1932,6 +1936,101 @@ describe('User', () => {
         .from(stripe_early_fraud_warning_cases)
         .where(eq(stripe_early_fraud_warning_cases.id, unaffectedCase.id));
       expect(unaffectedCaseRows[0].kilo_user_id).toBe(unaffectedUser.id);
+    });
+
+    it('should nullify Stripe dispute case user links while retaining action history', async () => {
+      const user = await insertTestUser();
+      const unaffectedUser = await insertTestUser();
+      const [disputeCase] = await db
+        .insert(stripe_dispute_cases)
+        .values({
+          stripe_dispute_id: 'dp_deleted_user',
+          stripe_event_id: 'evt_deleted_user',
+          stripe_charge_id: 'ch_deleted_user',
+          stripe_customer_id: user.stripe_customer_id,
+          amount_minor_units: 1900,
+          currency: 'usd',
+          dispute_reason: 'fraudulent',
+          stripe_status: 'lost',
+          owner_classification: 'personal',
+          kilo_user_id: user.id,
+          status: 'accepted',
+          status_reason: 'accepted by admin',
+          accepted_by_kilo_user_id: user.id,
+        })
+        .returning({ id: stripe_dispute_cases.id });
+      const [unaffectedCase] = await db
+        .insert(stripe_dispute_cases)
+        .values({
+          stripe_dispute_id: 'dp_unaffected_user',
+          stripe_event_id: 'evt_unaffected_user',
+          stripe_charge_id: 'ch_unaffected_user',
+          stripe_customer_id: unaffectedUser.stripe_customer_id,
+          amount_minor_units: 4900,
+          currency: 'usd',
+          dispute_reason: 'general',
+          stripe_status: 'needs_response',
+          owner_classification: 'personal',
+          kilo_user_id: unaffectedUser.id,
+          status: 'needs_action',
+          accepted_by_kilo_user_id: unaffectedUser.id,
+        })
+        .returning({ id: stripe_dispute_cases.id });
+
+      await db.insert(stripe_dispute_actions).values({
+        case_id: disputeCase.id,
+        action_type: 'stripe_acceptance',
+        target_key: 'stripe_dispute:dp_deleted_user',
+        status: 'completed',
+        result_code: 'lost',
+        result_reference_id: 'dp_deleted_user',
+      });
+      await db.insert(stripe_dispute_actions).values({
+        case_id: disputeCase.id,
+        action_type: 'user_block',
+        target_key: `user:${user.id}`,
+        status: 'completed',
+        result_code: 'blocked',
+        result_reference_id: user.id,
+      });
+
+      await softDeleteUser(user.id);
+
+      const retainedCase = await db
+        .select()
+        .from(stripe_dispute_cases)
+        .where(eq(stripe_dispute_cases.id, disputeCase.id));
+      expect(retainedCase).toHaveLength(1);
+      expect(retainedCase[0].kilo_user_id).toBeNull();
+      expect(retainedCase[0].accepted_by_kilo_user_id).toBeNull();
+      expect(retainedCase[0].stripe_dispute_id).toBe('dp_deleted_user');
+
+      const retainedActions = await db
+        .select()
+        .from(stripe_dispute_actions)
+        .where(eq(stripe_dispute_actions.case_id, disputeCase.id));
+      expect(retainedActions).toHaveLength(2);
+      expect(retainedActions).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            action_type: 'stripe_acceptance',
+            target_key: 'stripe_dispute:dp_deleted_user',
+            result_reference_id: 'dp_deleted_user',
+          }),
+          expect.objectContaining({
+            action_type: 'user_block',
+            target_key: 'user:deleted_user',
+            result_reference_id: null,
+          }),
+        ])
+      );
+
+      const unaffectedCaseRows = await db
+        .select()
+        .from(stripe_dispute_cases)
+        .where(eq(stripe_dispute_cases.id, unaffectedCase.id));
+      expect(unaffectedCaseRows[0].kilo_user_id).toBe(unaffectedUser.id);
+      expect(unaffectedCaseRows[0].accepted_by_kilo_user_id).toBe(unaffectedUser.id);
     });
 
     it('should delete user_push_tokens', async () => {

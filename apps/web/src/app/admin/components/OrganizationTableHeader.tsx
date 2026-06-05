@@ -37,10 +37,28 @@ export function OrganizationTableHeader({
               Name
             </SortableButton>
           </TableHead>
-          <TableHead>Plan</TableHead>
-          <TableHead>Kilo Pass</TableHead>
-          {showStripeStatus && <TableHead>Stripe Status</TableHead>}
-          <TableHead>Subscription</TableHead>
+          <TableHead>
+            <SortableButton field="plan" sortConfig={sortConfig} onSort={onSort}>
+              Plan
+            </SortableButton>
+          </TableHead>
+          <TableHead>
+            <SortableButton field="kilo_pass_tier" sortConfig={sortConfig} onSort={onSort}>
+              Kilo Pass
+            </SortableButton>
+          </TableHead>
+          {showStripeStatus && (
+            <TableHead>
+              <SortableButton field="latest_stripe_status" sortConfig={sortConfig} onSort={onSort}>
+                Stripe Status
+              </SortableButton>
+            </TableHead>
+          )}
+          <TableHead>
+            <SortableButton field="subscription_amount_usd" sortConfig={sortConfig} onSort={onSort}>
+              Subscription
+            </SortableButton>
+          </TableHead>
           <TableHead>Links</TableHead>
           {showDeleted && <TableHead>Deleted</TableHead>}
         </TableRow>

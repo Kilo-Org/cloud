@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { skipToken, useQuery } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
-import type { Dimension, Granularity, MetricKey, PeriodOption } from './types';
+import type { CostSource, Dimension, Granularity, MetricKey, PeriodOption } from './types';
 
 export type DateRange = {
   startDate: string; // ISO
@@ -121,6 +121,7 @@ type CommonArgs = {
   organizationId: string | null;
   dateRange: DateRange;
   granularity: Granularity;
+  costSource: CostSource;
   filters: UsageFilters;
   /** Personal-context narrowing; ignored when `organizationId` is set. */
   personalScope?: PersonalScope;
@@ -151,6 +152,7 @@ function commonFilters(args: CommonArgs) {
     startDate: args.dateRange.startDate,
     endDate: args.dateRange.endDate,
     granularity: args.granularity,
+    costSource: args.costSource,
     organizationId: args.organizationId ?? undefined,
     personalScope: args.personalScope ?? 'personal-only',
     viewAs: args.viewAs ?? 'self',

@@ -11,6 +11,7 @@ import {
   AgentUpdateInputSchema,
   AgentDefaultsUpdateInputSchema,
 } from '@/lib/kiloclaw/agent-schemas';
+import { kiloclawFilePathSchema } from '@/lib/kiloclaw/file-path-schema';
 import { pushPinToWorker } from '@/lib/kiloclaw/pin-sync';
 import { KiloClawUserClient } from '@/lib/kiloclaw/kiloclaw-user-client';
 import { encryptKiloClawSecret } from '@/lib/kiloclaw/encryption';
@@ -1486,19 +1487,24 @@ export const organizationKiloclawRouter = createTRPCRouter({
 
   // ── File operations ───────────────────────────────────────────
 
-  fileTree: organizationMemberProcedure.query(async ({ ctx, input }) => {
-    try {
-      const instance = await getActiveOrgInstance(ctx.user.id, input.organizationId);
-      const client = new KiloClawInternalClient();
-      const result = await client.getFileTree(ctx.user.id, workerInstanceId(instance));
-      return result.tree;
-    } catch (err) {
-      handleFileOperationError(err, 'fetch file tree');
-    }
-  }),
+  fileTree: organizationMemberProcedure
+    .input(z.object({ organizationId: z.uuid(), path: kiloclawFilePathSchema.optional() }))
+    .query(async ({ ctx, input }) => {
+      try {
+        const instance = await getActiveOrgInstance(ctx.user.id, input.organizationId);
+        const client = new KiloClawInternalClient();
+        const result = await client.getFileTree(ctx.user.id, {
+          instanceId: workerInstanceId(instance),
+          path: input.path,
+        });
+        return result.tree;
+      } catch (err) {
+        handleFileOperationError(err, 'fetch file tree');
+      }
+    }),
 
   readFile: organizationMemberProcedure
-    .input(z.object({ organizationId: z.uuid(), path: z.string().min(1) }))
+    .input(z.object({ organizationId: z.uuid(), path: kiloclawFilePathSchema }))
     .query(async ({ ctx, input }) => {
       try {
         const instance = await getActiveOrgInstance(ctx.user.id, input.organizationId);
@@ -1513,7 +1519,7 @@ export const organizationKiloclawRouter = createTRPCRouter({
     .input(
       z.object({
         organizationId: z.uuid(),
-        path: z.string().min(1),
+        path: kiloclawFilePathSchema,
         content: z.string(),
         etag: z.string().min(1),
         openclawValidation: z.enum(['warn-before-write', 'allow-invalid']).optional(),
@@ -1578,7 +1584,7 @@ export const organizationKiloclawRouter = createTRPCRouter({
         files: z
           .array(
             z.object({
-              path: z.string().min(1),
+              path: kiloclawFilePathSchema,
               content: z.string(),
             })
           )

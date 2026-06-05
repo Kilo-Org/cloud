@@ -33,7 +33,7 @@ import { getXKiloCodeVersionNumber } from '@/lib/userAgent';
 import { normalizeModelId } from '@/lib/ai-gateway/providers/openrouter';
 import { createParser, type EventSourceMessage } from 'eventsource-parser';
 import { sentryRootSpan } from '../getRootSpan';
-import { findKiloExclusiveModel, isKiloStealthModel } from '@/lib/ai-gateway/models';
+import { findKiloExclusiveModel, shouldRedactErrorResponse } from '@/lib/ai-gateway/models';
 import type {
   MicrodollarUsageContext,
   MicrodollarUsageStats,
@@ -157,11 +157,11 @@ export function apiKindNotSupportedResponse(
   );
 }
 
-async function stealthModelError(response: Response) {
-  const error = 'Stealth model unable to process request';
+async function redactedErrorResponse(response: Response) {
+  const error = 'The upstream provider was unable to process the request';
   warnExceptInTest(`Responding with ${response.status} ${error}`);
   return NextResponse.json(
-    { error, error_type: ProxyErrorType.stealth_model_error, message: error },
+    { error, error_type: ProxyErrorType.upstream_error, message: error },
     { status: response.status }
   );
 }
@@ -178,11 +178,13 @@ function byokErrorMessage(status: number): string | undefined {
 }
 
 export async function makeErrorReadable({
+  providerId,
   requestedModel,
   request,
   response,
   isUserByok,
 }: {
+  providerId: ProviderId;
   requestedModel: string;
   request: GatewayRequest;
   response: Response;
@@ -210,8 +212,8 @@ export async function makeErrorReadable({
   const overflowResponse = await detectContextOverflow({ requestedModel, request, response });
   if (overflowResponse) return overflowResponse;
 
-  if (isKiloStealthModel(requestedModel)) {
-    return await stealthModelError(response);
+  if (shouldRedactErrorResponse(providerId, requestedModel)) {
+    return await redactedErrorResponse(response);
   }
 
   return undefined;

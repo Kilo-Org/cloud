@@ -56,6 +56,10 @@ import {
   StripeEarlyFraudWarningCaseStatus,
   StripeEarlyFraudWarningActionType,
   StripeEarlyFraudWarningActionStatus,
+  StripeDisputeOwnerClassification,
+  StripeDisputeCaseStatus,
+  StripeDisputeActionType,
+  StripeDisputeActionStatus,
   AffiliateProvider,
   AffiliateEventType,
   AffiliateEventDeliveryState,
@@ -168,6 +172,10 @@ export const SCHEMA_CHECK_ENUMS = {
   StripeEarlyFraudWarningCaseStatus,
   StripeEarlyFraudWarningActionType,
   StripeEarlyFraudWarningActionStatus,
+  StripeDisputeOwnerClassification,
+  StripeDisputeCaseStatus,
+  StripeDisputeActionType,
+  StripeDisputeActionStatus,
   AffiliateProvider,
   AffiliateEventType,
   AffiliateEventDeliveryState,
@@ -646,6 +654,153 @@ export const stripe_early_fraud_warning_actions = pgTable(
 export type StripeEarlyFraudWarningAction = typeof stripe_early_fraud_warning_actions.$inferSelect;
 export type NewStripeEarlyFraudWarningAction =
   typeof stripe_early_fraud_warning_actions.$inferInsert;
+
+export const stripe_dispute_cases = pgTable(
+  'stripe_dispute_cases',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    stripe_dispute_id: text().notNull(),
+    stripe_event_id: text(),
+    stripe_event_created_at: timestamp({ withTimezone: true, mode: 'string' }),
+    stripe_charge_id: text(),
+    stripe_payment_intent_id: text(),
+    stripe_customer_id: text(),
+    amount_minor_units: integer(),
+    currency: text(),
+    dispute_reason: text(),
+    stripe_status: text(),
+    owner_classification: text().notNull().$type<StripeDisputeOwnerClassification>(),
+    kilo_user_id: text().references(() => kilocode_users.id, {
+      onDelete: 'set null',
+      onUpdate: 'cascade',
+    }),
+    organization_id: uuid().references(() => organizations.id, {
+      onDelete: 'set null',
+      onUpdate: 'cascade',
+    }),
+    status: text()
+      .notNull()
+      .$type<StripeDisputeCaseStatus>()
+      .default(StripeDisputeCaseStatus.NeedsAction),
+    status_reason: text(),
+    failure_context: text(),
+    stripe_created_at: timestamp({ withTimezone: true, mode: 'string' }),
+    evidence_due_by: timestamp({ withTimezone: true, mode: 'string' }),
+    synced_at: timestamp({ withTimezone: true, mode: 'string' }),
+    accepted_by_kilo_user_id: text().references(() => kilocode_users.id, {
+      onDelete: 'set null',
+      onUpdate: 'cascade',
+    }),
+    acceptance_started_at: timestamp({ withTimezone: true, mode: 'string' }),
+    next_retry_at: timestamp({ withTimezone: true, mode: 'string' }),
+    accepted_at: timestamp({ withTimezone: true, mode: 'string' }),
+    enforcement_completed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    review_required_at: timestamp({ withTimezone: true, mode: 'string' }),
+    closed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    unique('UQ_stripe_dispute_cases_dispute_id').on(table.stripe_dispute_id),
+    index('IDX_stripe_dispute_cases_event_id').on(table.stripe_event_id),
+    index('IDX_stripe_dispute_cases_charge_id').on(table.stripe_charge_id),
+    index('IDX_stripe_dispute_cases_payment_intent_id').on(table.stripe_payment_intent_id),
+    index('IDX_stripe_dispute_cases_customer_id').on(table.stripe_customer_id),
+    index('IDX_stripe_dispute_cases_kilo_user_id').on(table.kilo_user_id),
+    index('IDX_stripe_dispute_cases_organization_id').on(table.organization_id),
+    index('IDX_stripe_dispute_cases_status_due_by').on(
+      table.status,
+      table.evidence_due_by,
+      table.stripe_created_at
+    ),
+    enumCheck(
+      'stripe_dispute_cases_owner_classification_check',
+      table.owner_classification,
+      StripeDisputeOwnerClassification
+    ),
+    enumCheck('stripe_dispute_cases_status_check', table.status, StripeDisputeCaseStatus),
+    check(
+      'stripe_dispute_cases_amount_minor_units_non_negative_check',
+      sql`${table.amount_minor_units} IS NULL OR ${table.amount_minor_units} >= 0`
+    ),
+  ]
+);
+
+export type StripeDisputeCase = typeof stripe_dispute_cases.$inferSelect;
+export type NewStripeDisputeCase = typeof stripe_dispute_cases.$inferInsert;
+
+export const stripe_dispute_actions = pgTable(
+  'stripe_dispute_actions',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    case_id: uuid()
+      .notNull()
+      .references(() => stripe_dispute_cases.id, {
+        onDelete: 'restrict',
+        onUpdate: 'cascade',
+      }),
+    action_type: text().notNull().$type<StripeDisputeActionType>(),
+    target_key: text().notNull(),
+    status: text()
+      .notNull()
+      .$type<StripeDisputeActionStatus>()
+      .default(StripeDisputeActionStatus.Queued),
+    attempt_count: integer().notNull().default(0),
+    next_retry_at: timestamp({ withTimezone: true, mode: 'string' }),
+    claimed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    last_attempt_at: timestamp({ withTimezone: true, mode: 'string' }),
+    completed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    terminal_at: timestamp({ withTimezone: true, mode: 'string' }),
+    result_code: text(),
+    result_reference_id: text(),
+    failure_context: text(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    unique('UQ_stripe_dispute_actions_case_type_target').on(
+      table.case_id,
+      table.action_type,
+      table.target_key
+    ),
+    index('IDX_stripe_dispute_actions_case_id').on(table.case_id),
+    index('IDX_stripe_dispute_actions_claim_path').on(
+      table.status,
+      sql`coalesce(${table.next_retry_at}, '-infinity'::timestamptz)`,
+      table.created_at,
+      table.id
+    ),
+    enumCheck(
+      'stripe_dispute_actions_action_type_check',
+      table.action_type,
+      StripeDisputeActionType
+    ),
+    enumCheck('stripe_dispute_actions_status_check', table.status, StripeDisputeActionStatus),
+    check(
+      'stripe_dispute_actions_attempt_count_non_negative_check',
+      sql`${table.attempt_count} >= 0`
+    ),
+    check(
+      'stripe_dispute_actions_target_key_not_empty_check',
+      sql`length(${table.target_key}) > 0`
+    ),
+  ]
+);
+
+export type StripeDisputeAction = typeof stripe_dispute_actions.$inferSelect;
+export type NewStripeDisputeAction = typeof stripe_dispute_actions.$inferInsert;
 
 export const deleted_user_email_tombstones = pgTable('deleted_user_email_tombstones', {
   normalized_email_hash: text().primaryKey().notNull(),

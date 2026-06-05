@@ -24,6 +24,7 @@ export function inferSupportedChatApis(
   if (
     aiSdkProvider === 'openai-compatible' ||
     aiSdkProvider === 'alibaba' ||
+    aiSdkProvider === 'mistral' ||
     aiSdkProvider === 'openrouter' ||
     aiSdkProvider === undefined
   ) {

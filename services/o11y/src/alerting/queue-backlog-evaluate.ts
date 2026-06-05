@@ -1,6 +1,10 @@
-import { evaluateQueueBacklog, type QueueBacklogMetrics } from './queue-backlog';
+import type { QueueBacklogMetrics } from './queue-backlog';
+import {
+  readQueueBacklogState,
+  transitionQueueBacklogState,
+  writeQueueBacklogState,
+} from './queue-backlog-state';
 import { queryQueueBacklog } from './queue-backlog-query';
-import { shouldSuppress, recordAlertFired } from './dedup';
 import { sendAlertNotification, type AlertPayload } from './notify';
 
 type QueueBacklogEnv = {
@@ -22,42 +26,28 @@ export async function evaluateQueueBacklogAlert(
   queryFn: QueryFn = queryQueueBacklog,
   notifyFn: NotifyFn = sendAlertNotification
 ): Promise<void> {
-  const alert = evaluateQueueBacklog(await queryFn(env));
-  if (alert === null) return;
+  const metrics = await queryFn(env);
+  const currentState = await readQueueBacklogState(env.O11Y_ALERT_STATE, metrics.queueId);
+  const transition = transitionQueueBacklogState(currentState, metrics.backlogCount);
 
-  const provider = 'cloudflare';
-  const clientName = 'queues';
-  const suppressed = await shouldSuppress(
-    env.O11Y_ALERT_STATE,
-    alert.severity,
-    'queue_backlog',
-    provider,
-    alert.queueId,
-    clientName
-  );
-  if (suppressed) return;
+  if (transition.alert !== null) {
+    await notifyFn(
+      {
+        alertType: 'queue_backlog',
+        severity: transition.alert.severity,
+        provider: 'cloudflare',
+        model: metrics.queueId,
+        clientName: 'queues',
+        backlogCount: metrics.backlogCount,
+        backlogBytes: metrics.backlogBytes,
+        thresholdCount: transition.alert.thresholdCount,
+        oldestMessageTimestamp: metrics.oldestMessageTimestamp,
+      },
+      env
+    );
+  }
 
-  await notifyFn(
-    {
-      alertType: 'queue_backlog',
-      severity: alert.severity,
-      provider,
-      model: alert.queueId,
-      clientName,
-      backlogCount: alert.backlogCount,
-      backlogBytes: alert.backlogBytes,
-      thresholdCount: alert.thresholdCount,
-      oldestMessageTimestamp: alert.oldestMessageTimestamp,
-    },
-    env
-  );
-
-  await recordAlertFired(
-    env.O11Y_ALERT_STATE,
-    alert.severity,
-    'queue_backlog',
-    provider,
-    alert.queueId,
-    clientName
-  );
+  if (transition.stateChanged) {
+    await writeQueueBacklogState(env.O11Y_ALERT_STATE, metrics.queueId, transition.state);
+  }
 }

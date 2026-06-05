@@ -6,7 +6,7 @@ import {
 export const MINIMAX_CURRENT_MODEL_ID = 'minimax/minimax-m3';
 
 export const minimax_m3_discounted_model: KiloExclusiveModel = {
-  public_id: MINIMAX_CURRENT_MODEL_ID,
+  public_id: MINIMAX_CURRENT_MODEL_ID + ':discounted',
   display_name: 'MiniMax: MiniMax M3 (50% off through 2026-06-07)',
   description: `MiniMax-M3 is a multimodal foundation model from MiniMax. It supports text, image, and video inputs with text output, a 1M-token context window, and is suited for long-horizon agentic work, coding, and tool use. It is built on MiniMax Sparse Attention (MSA), which replaces full attention with KV-block selection to cut per-token compute at long context — roughly 1/20 the cost of the previous generation at 1M tokens, with substantially faster prefill and decode while retaining quality across most tasks.
 

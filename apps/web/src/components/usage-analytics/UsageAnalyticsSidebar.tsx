@@ -12,10 +12,12 @@ import {
 import { X } from 'lucide-react';
 import { FilterGeneratorPopover } from './FilterGeneratorPopover';
 import {
+  COST_SOURCE_LABELS,
   DIMENSION_LABELS,
   GRANULARITY_LABELS,
-  METRIC_LABELS,
   PERIOD_LABELS,
+  metricLabelForCostSource,
+  type CostSource,
   type Dimension,
   type FilterDirection,
   type Granularity,
@@ -90,6 +92,10 @@ type UsageAnalyticsSidebarProps = {
   onGranularityChange: (value: Granularity) => void;
   granularityOptions: Granularity[];
 
+  // Cost source
+  costSource: CostSource;
+  onCostSourceChange: (value: CostSource) => void;
+
   // Trends controls
   chartMetric: MetricKey;
   onChartMetricChange: (value: MetricKey) => void;
@@ -124,6 +130,8 @@ export function UsageAnalyticsSidebar({
   granularity,
   onGranularityChange,
   granularityOptions,
+  costSource,
+  onCostSourceChange,
   chartMetric,
   onChartMetricChange,
   metricOptions,
@@ -230,6 +238,21 @@ export function UsageAnalyticsSidebar({
           </Select>
         </Section>
 
+        <Section title="Cost">
+          <Select value={costSource} onValueChange={v => onCostSourceChange(v as CostSource)}>
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {(Object.keys(COST_SOURCE_LABELS) as CostSource[]).map(source => (
+                <SelectItem key={source} value={source}>
+                  {COST_SOURCE_LABELS[source]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </Section>
+
         <Section title="View">
           <div className="flex flex-col gap-2">
             <LabeledRow label="Metric">
@@ -240,7 +263,7 @@ export function UsageAnalyticsSidebar({
                 <SelectContent>
                   {metricOptions.map(o => (
                     <SelectItem key={o} value={o}>
-                      {METRIC_LABELS[o]}
+                      {metricLabelForCostSource(o, costSource)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -289,6 +312,7 @@ export function UsageAnalyticsSidebar({
               onAdd={onAddFilter}
               labelForDimensionValue={labelForDimensionValue}
               metric="cost"
+              costSource={costSource}
               granularity={granularity}
             />
             {activeFilters.length === 0 ? (

@@ -94,6 +94,7 @@ export function OrganizationsTable({
   // unchecked". Trial filters do nothing when `showTrialFilters` is false.
   const rawHasUsage = searchParams.get('has_usage');
   const rawHasMultipleUsers = searchParams.get('has_multiple_users');
+  const rawTrialEndingInFuture = searchParams.get('trial_ending_in_future');
   const currentHasUsage = showTrialFilters
     ? rawHasUsage === null
       ? true
@@ -103,6 +104,11 @@ export function OrganizationsTable({
     ? rawHasMultipleUsers === null
       ? true
       : rawHasMultipleUsers === 'true'
+    : false;
+  const currentTrialEndingInFuture = showTrialFilters
+    ? rawTrialEndingInFuture === null
+      ? true
+      : rawTrialEndingInFuture === 'true'
     : false;
 
   const sortConfig: OrganizationSortConfig = useMemo(
@@ -125,6 +131,7 @@ export function OrganizationsTable({
     plan: currentPlan,
     has_usage: currentHasUsage,
     has_multiple_users: currentHasMultipleUsers,
+    trial_ending_in_future: currentTrialEndingInFuture,
   });
 
   const updateUrl = useCallback(
@@ -155,10 +162,12 @@ export function OrganizationsTable({
       stripe_status: rawStripeStatus ?? '',
       plan: currentPlan === 'all' ? '' : currentPlan,
       tab: currentTab,
-      // Preserve whatever's currently in the URL. `has_usage`/`has_multiple_users`
-      // can be absent (= default true on trials), or explicitly 'true' / 'false'.
+      // Preserve whatever's currently in the URL. `has_usage`/`has_multiple_users`/
+      // `trial_ending_in_future` can be absent (= default true on trials), or
+      // explicitly 'true' / 'false'.
       has_usage: rawHasUsage ?? '',
       has_multiple_users: rawHasMultipleUsers ?? '',
+      trial_ending_in_future: rawTrialEndingInFuture ?? '',
     }),
     [
       currentPageSize,
@@ -170,6 +179,7 @@ export function OrganizationsTable({
       currentTab,
       rawHasUsage,
       rawHasMultipleUsers,
+      rawTrialEndingInFuture,
     ]
   );
 
@@ -228,6 +238,18 @@ export function OrganizationsTable({
     [sharedParams, currentSearch, updateUrl]
   );
 
+  const handleTrialEndingInFutureChange = useCallback(
+    (value: boolean) => {
+      updateUrl({
+        ...sharedParams(),
+        trial_ending_in_future: value ? 'true' : 'false',
+        search: currentSearch,
+        page: '1',
+      });
+    },
+    [sharedParams, currentSearch, updateUrl]
+  );
+
   const handlePlanChange = useCallback(
     (value: string) => {
       updateUrl({
@@ -254,6 +276,7 @@ export function OrganizationsTable({
       // trials page (and to inert/false elsewhere).
       has_usage: '',
       has_multiple_users: '',
+      trial_ending_in_future: '',
       tab: currentTab,
     });
   }, [currentSearch, currentPageSize, currentSortBy, currentSortOrder, currentTab, updateUrl]);
@@ -370,6 +393,7 @@ export function OrganizationsTable({
             plan={currentPlan}
             hasUsage={currentHasUsage}
             hasMultipleUsers={currentHasMultipleUsers}
+            trialEndingInFuture={currentTrialEndingInFuture}
             showStripeStatus={showStripeStatus}
             showTrialFilters={showTrialFilters}
             onIncludeDeletedChange={handleIncludeDeletedChange}
@@ -377,6 +401,7 @@ export function OrganizationsTable({
             onPlanChange={handlePlanChange}
             onHasUsageChange={handleHasUsageChange}
             onHasMultipleUsersChange={handleHasMultipleUsersChange}
+            onTrialEndingInFutureChange={handleTrialEndingInFutureChange}
             onResetFilters={handleResetFilters}
             totalCount={data?.pagination.total}
             filteredCount={data?.pagination.total}

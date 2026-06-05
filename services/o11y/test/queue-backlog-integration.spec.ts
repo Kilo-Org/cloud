@@ -71,8 +71,6 @@ describe('evaluateAlerts queue backlog integration', () => {
 
     expect(slackMessages).toHaveLength(1);
     expect(JSON.stringify(slackMessages[0])).toContain('Queue Backlog Alert');
-    expect(
-      kv.store.has(`o11y:alert:page:queue_backlog:cloudflare:${MONITORED_QUEUE_ID}:queues`)
-    ).toBe(true);
+    expect(kv.store.has(`o11y:queue_backlog:${MONITORED_QUEUE_ID}`)).toBe(true);
   });
 });

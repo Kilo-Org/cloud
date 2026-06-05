@@ -137,6 +137,14 @@ export function AdminFileEditor({
       error={error}
       refetch={refetch}
       height="600px"
+      loadChildren={path =>
+        queryClient.fetchQuery(
+          trpc.admin.kiloclawInstances.fileTree.queryOptions(
+            { userId, instanceId, path },
+            { refetchOnWindowFocus: false }
+          )
+        )
+      }
       renderPane={(selectedPath, onDirtyChange) => (
         <AdminFileEditorPaneInner
           key={selectedPath}

@@ -3947,9 +3947,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     return gateway.deleteAgent(this.s, this.env, agentId);
   }
 
-  async getFileTree() {
+  async getFileTree(filePath?: string) {
     await this.loadState();
-    return gateway.getFileTree(this.s, this.env);
+    return gateway.getFileTree(this.s, this.env, filePath);
   }
 
   async readFile(filePath: string) {

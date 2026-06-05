@@ -23,6 +23,7 @@ import { UpstreamApiError } from '@/lib/trpc/init';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const mockGetDebugStatus: jest.Mock<any, any> = jest.fn();
+const mockGetFileTree: jest.Mock<any, any> = jest.fn();
 const mockDestroyFlyMachine: jest.Mock<any, any> = jest.fn();
 const mockDestroyOrphanVolume: jest.Mock<any, any> = jest.fn();
 const mockScanOrphanVolumes: jest.Mock<any, any> = jest.fn();
@@ -44,6 +45,7 @@ function mockKiloClawInternalClient() {
   const { KiloClawInternalClient } = jest.requireMock('@/lib/kiloclaw/kiloclaw-internal-client');
   KiloClawInternalClient.mockImplementation(() => ({
     getDebugStatus: mockGetDebugStatus,
+    getFileTree: mockGetFileTree,
     destroyFlyMachine: mockDestroyFlyMachine,
     destroyOrphanVolume: mockDestroyOrphanVolume,
     scanOrphanVolumes: mockScanOrphanVolumes,
@@ -58,6 +60,7 @@ function mockKiloClawInternalClient() {
 jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => ({
   KiloClawInternalClient: jest.fn().mockImplementation(() => ({
     getDebugStatus: mockGetDebugStatus,
+    getFileTree: mockGetFileTree,
     destroyFlyMachine: mockDestroyFlyMachine,
     destroyOrphanVolume: mockDestroyOrphanVolume,
     scanOrphanVolumes: mockScanOrphanVolumes,
@@ -161,6 +164,7 @@ beforeEach(async () => {
 
   cliRunId = run.id;
   mockGetDebugStatus.mockReset();
+  mockGetFileTree.mockReset();
   mockDestroyFlyMachine.mockReset();
   mockDestroyOrphanVolume.mockReset();
   mockScanOrphanVolumes.mockReset();
@@ -327,6 +331,30 @@ describe('admin.kiloclawInstances.list and stats', () => {
     expect(stats.overview.inactiveTrialStoppedInstances).toBe(
       baselineStats.overview.inactiveTrialStoppedInstances + 1
     );
+  });
+});
+
+describe('admin.kiloclawInstances.fileTree', () => {
+  it('forwards path-scoped tree requests to the resolved instance', async () => {
+    mockGetFileTree.mockResolvedValue({ tree: [] });
+    const instanceId = crypto.randomUUID();
+    await db.insert(kiloclaw_instances).values({
+      id: instanceId,
+      user_id: regularUser.id,
+      sandbox_id: `ki_${instanceId.replace(/-/g, '')}`,
+    });
+
+    const caller = await createCallerForUser(adminUser.id);
+    await caller.admin.kiloclawInstances.fileTree({
+      userId: regularUser.id,
+      instanceId,
+      path: 'workspace/nested',
+    });
+
+    expect(mockGetFileTree).toHaveBeenCalledWith(regularUser.id, {
+      instanceId,
+      path: 'workspace/nested',
+    });
   });
 });
 

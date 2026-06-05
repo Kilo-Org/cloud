@@ -86,6 +86,13 @@ const INGEST_META_EXTRACTORS: Array<{
 
 type Changes = Array<{ name: ExtractableMetaKey; value: string | null }>;
 
+type IngestLifecycleEvent =
+  | { type: 'session_open' }
+  | {
+      type: 'session_close';
+      reason: Extract<SessionDataItem, { type: 'session_close' }>['data']['reason'];
+    };
+
 export type IngestOrderCursor = { ingestedAt: number | null; id: number };
 
 export function afterIngestOrderCursor(cursor: IngestOrderCursor) {
@@ -164,8 +171,7 @@ export class SessionIngestDO extends DurableObject<Env> {
       status: undefined,
     };
 
-    let hasSessionOpen = false;
-    let closeReason: string | undefined;
+    const lifecycleEvents: IngestLifecycleEvent[] = [];
     const orphanedR2Keys: string[] = [];
 
     for (const item of payload) {
@@ -231,15 +237,40 @@ export class SessionIngestDO extends DurableObject<Env> {
         }
       }
 
-      if (item.type === 'session_open') {
-        hasSessionOpen = true;
-      } else if (item.type === 'session_close') {
-        closeReason = item.data.reason;
+      if (ingestVersion >= 1) {
+        if (item.type === 'session_open') {
+          lifecycleEvents.push({ type: 'session_open' });
+        } else if (item.type === 'session_close') {
+          lifecycleEvents.push({ type: 'session_close', reason: item.data.reason });
+        }
       }
     }
 
-    const changes: Changes = [];
+    if (ingestVersion >= 1) {
+      // v1 clients send explicit open/close pairs. Only those events drive alarms.
+      for (const event of lifecycleEvents) {
+        if (event.type === 'session_open') {
+          // New turn starting — clear prior emission so metrics are re-computed.
+          this.db
+            .delete(ingestMeta)
+            .where(inArray(ingestMeta.key, ['metricsEmitted', 'closeReason']))
+            .run();
+          await this.ctx.storage.setAlarm(Date.now() + INACTIVITY_TIMEOUT_MS);
+        } else {
+          writeIngestMetaIfChanged(this.db, {
+            key: 'closeReason',
+            incomingValue: event.reason,
+          });
+          await this.ctx.storage.setAlarm(Date.now() + POST_CLOSE_DRAIN_MS);
+        }
+      }
+      // Events without open/close (stragglers) don't touch the alarm.
+    } else {
+      // v0 (legacy): no open/close signals, rely on inactivity timeout.
+      await this.ctx.storage.setAlarm(Date.now() + INACTIVITY_TIMEOUT_MS);
+    }
 
+    const changes: Changes = [];
     for (const key of Object.keys(incomingByKey) as ExtractableMetaKey[]) {
       const incoming = incomingByKey[key];
       if (incoming === undefined) continue;
@@ -252,29 +283,20 @@ export class SessionIngestDO extends DurableObject<Env> {
       }
     }
 
-    // Clean up orphaned R2 blobs (e.g. replaced or stale oversized items)
+    // Clean up orphaned R2 blobs after metadata is persisted. R2 is external I/O,
+    // so awaiting it before metadata writes can let another DO request interleave
+    // and then be overwritten by stale pre-await metadata from this request.
     if (orphanedR2Keys.length > 0) {
-      await this.env.SESSION_INGEST_R2.delete(orphanedR2Keys);
-    }
-
-    if (ingestVersion >= 1) {
-      // v1 clients send explicit open/close pairs. Only those events drive alarms.
-      if (hasSessionOpen) {
-        // New turn starting — clear prior emission so metrics are re-computed.
-        this.db
-          .delete(ingestMeta)
-          .where(inArray(ingestMeta.key, ['metricsEmitted', 'closeReason']))
-          .run();
-        await this.ctx.storage.setAlarm(Date.now() + INACTIVITY_TIMEOUT_MS);
-      }
-      if (closeReason) {
-        writeIngestMetaIfChanged(this.db, { key: 'closeReason', incomingValue: closeReason });
-        await this.ctx.storage.setAlarm(Date.now() + POST_CLOSE_DRAIN_MS);
-      }
-      // Events without open/close (stragglers) don't touch the alarm.
-    } else {
-      // v0 (legacy): no open/close signals, rely on inactivity timeout.
-      await this.ctx.storage.setAlarm(Date.now() + INACTIVITY_TIMEOUT_MS);
+      this.ctx.waitUntil(
+        this.env.SESSION_INGEST_R2.delete(orphanedR2Keys).catch(error => {
+          console.error('Failed to delete orphaned session-ingest R2 blobs', {
+            kiloUserId,
+            sessionId,
+            count: orphanedR2Keys.length,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        })
+      );
     }
 
     return {

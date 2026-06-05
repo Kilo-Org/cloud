@@ -378,7 +378,11 @@ function enablePaneBorders(sessionName: string, windowTarget: string | number): 
     stdio: 'ignore',
   });
   // Prevent shells from overwriting pane titles via OSC escape sequences
-  execSync(`tmux set-window-option -t ${target} allow-set-title off`, { stdio: 'ignore' });
+  try {
+    execSync(`tmux set-window-option -t ${target} allow-set-title off`, { stdio: 'ignore' });
+  } catch {
+    // Older tmux versions do not support this cosmetic option.
+  }
 }
 
 // ---------------------------------------------------------------------------

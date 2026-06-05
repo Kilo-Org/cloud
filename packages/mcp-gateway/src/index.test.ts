@@ -41,8 +41,8 @@ describe('scoped routes', () => {
     expect(buildScopedConnectRootPath(route)).toBe(
       '/mcp-connect/org/11111111-1111-4111-8111-111111111111/22222222-2222-4222-8222-222222222222/abcdefghijklmnopqrstuvwxyzABCDEF'
     );
-    expect(buildScopedConnectCanonicalUrl('https://mcp.kilo.ai', route)).toBe(
-      'https://mcp.kilo.ai/mcp-connect/org/11111111-1111-4111-8111-111111111111/22222222-2222-4222-8222-222222222222/abcdefghijklmnopqrstuvwxyzABCDEF'
+    expect(buildScopedConnectCanonicalUrl('https://mcp.kilosessions.ai', route)).toBe(
+      'https://mcp.kilosessions.ai/mcp-connect/org/11111111-1111-4111-8111-111111111111/22222222-2222-4222-8222-222222222222/abcdefghijklmnopqrstuvwxyzABCDEF'
     );
     expect(buildMCPID(route)).toBe(
       'organization:11111111-1111-4111-8111-111111111111:22222222-2222-4222-8222-222222222222:abcdefghijklmnopqrstuvwxyzABCDEF'

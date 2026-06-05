@@ -466,7 +466,7 @@ describe('User', () => {
           owner_scope: 'personal',
           owner_id: user.id,
           route_key: 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_',
-          canonical_url: 'https://mcp.kilo.ai/mcp-connect/user/test/config/key',
+          canonical_url: 'https://mcp.kilosessions.ai/mcp-connect/user/test/config/key',
           route_status: 'active',
         })
         .returning();

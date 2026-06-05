@@ -25,7 +25,7 @@ describe('proxyUpstream', () => {
     };
     const response = await proxyUpstream({
       env: {} as Env,
-      request: new Request('https://mcp.kilo.ai/mcp-connect/user/u/c/r?mode=test', {
+      request: new Request('https://mcp.kilosessions.ai/mcp-connect/user/u/c/r?mode=test', {
         method: 'POST',
         headers: {
           Accept: 'application/json',
@@ -73,7 +73,7 @@ describe('proxyUpstream', () => {
     };
     const response = await proxyUpstream({
       env: {} as Env,
-      request: new Request('https://mcp.kilo.ai/mcp-connect/user/u/c/r'),
+      request: new Request('https://mcp.kilosessions.ai/mcp-connect/user/u/c/r'),
       remoteUrl: 'https://remote.example/mcp',
       descendantPath: null,
       pathPassthrough: false,
@@ -99,7 +99,7 @@ describe('proxyUpstream', () => {
     await expect(
       proxyUpstream({
         env: {} as Env,
-        request: new Request('https://mcp.kilo.ai/mcp-connect/user/u/c/r'),
+        request: new Request('https://mcp.kilosessions.ai/mcp-connect/user/u/c/r'),
         remoteUrl: 'https://remote.example/base',
         descendantPath: '/%2e%2e/admin',
         pathPassthrough: true,
@@ -125,7 +125,7 @@ describe('proxyUpstream', () => {
     await expect(
       proxyUpstream({
         env: {} as Env,
-        request: new Request('https://mcp.kilo.ai/mcp-connect/user/u/c/r'),
+        request: new Request('https://mcp.kilosessions.ai/mcp-connect/user/u/c/r'),
         remoteUrl: 'https://remote.example/mcp',
         descendantPath: null,
         pathPassthrough: false,

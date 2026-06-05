@@ -97,7 +97,7 @@ export function getGatewayAppConfig(): GatewayAppConfig {
 
   return {
     appBaseUrl: getEnvVariable('MCP_GATEWAY_APP_BASE_URL') || 'https://app.kilo.ai',
-    gatewayBaseUrl: getEnvVariable('MCP_GATEWAY_BASE_URL') || 'https://mcp.kilo.ai',
+    gatewayBaseUrl: getEnvVariable('MCP_GATEWAY_BASE_URL') || 'https://mcp.kilosessions.ai',
     issuer: jwtKeyset.issuer,
     accessTokenTtlSeconds: Number(getEnvVariable('MCP_GATEWAY_ACCESS_TOKEN_TTL_SECONDS') || '900'),
     authorizationRequestTtlSeconds: 30 * 60,

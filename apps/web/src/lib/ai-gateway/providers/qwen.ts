@@ -1,18 +1,16 @@
 import type {
   KiloExclusiveModel,
   Pricing,
-  Usage,
+  PricingTiers,
 } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 
 const KILO_DISCOUNT_FACTOR = 0.65;
 const KILO_STEALTH_DISCOUNT_FACTOR = 0.5;
 
-type PricePerMillion = Omit<Pricing, 'calculate_mUsd'>;
-
 function applyKiloDiscount(
-  price: PricePerMillion,
+  price: Pricing,
   discountFactor: number = KILO_DISCOUNT_FACTOR
-): PricePerMillion {
+): Pricing {
   return {
     prompt_per_million: price.prompt_per_million * discountFactor,
     completion_per_million: price.completion_per_million * discountFactor,
@@ -27,53 +25,34 @@ function applyKiloDiscount(
   };
 }
 
-function costForTier(usage: Usage, tier: PricePerMillion): number {
-  return (
-    usage.uncachedInputTokens * tier.prompt_per_million +
-    usage.totalOutputTokens * tier.completion_per_million +
-    usage.cacheHitTokens * (tier.input_cache_read_per_million ?? tier.prompt_per_million) +
-    usage.cacheWriteTokens * (tier.input_cache_write_per_million ?? tier.prompt_per_million)
-  );
-}
+type UndiscountedPricingTier = {
+  start_context_length: number;
+  pricing: Pricing;
+};
 
-/**
- * Builds a Pricing with tiered input brackets.
- *
- * `tiers` must be ordered by ascending `maxInputTokens`. Each tier's prices are
- * the pre-discount Alibaba Model Studio numbers; the Kilo discount is applied
- * here. Inputs that exceed every declared bracket fall through to the last tier.
- */
 function makeTieredPricing(
-  tiers: ReadonlyArray<{ maxInputTokens: number; undiscounted: PricePerMillion }>,
+  tiers: readonly [UndiscountedPricingTier, ...UndiscountedPricingTier[]],
   discountFactor: number = KILO_DISCOUNT_FACTOR
-): Pricing {
-  const discounted = tiers.map(t => ({
-    maxInputTokens: t.maxInputTokens,
-    price: applyKiloDiscount(t.undiscounted, discountFactor),
-  }));
-  const firstTier = discounted[0].price;
-  const lastTier = discounted[discounted.length - 1].price;
-  return {
-    ...firstTier,
-    calculate_mUsd: (usage: Usage) => {
-      const totalInput = usage.uncachedInputTokens + usage.cacheWriteTokens + usage.cacheHitTokens;
-      const bracket = discounted.find(t => totalInput <= t.maxInputTokens);
-      return costForTier(usage, bracket ? bracket.price : lastTier);
+): PricingTiers {
+  const [firstTier, ...remainingTiers] = tiers;
+  return [
+    {
+      start_context_length: firstTier.start_context_length,
+      pricing: applyKiloDiscount(firstTier.pricing, discountFactor),
     },
-  };
+    ...remainingTiers.map(tier => ({
+      start_context_length: tier.start_context_length,
+      pricing: applyKiloDiscount(tier.pricing, discountFactor),
+    })),
+  ];
 }
 
-function makeFlatPricing(undiscounted: PricePerMillion): Pricing {
-  const price = applyKiloDiscount(undiscounted);
-  return {
-    ...price,
-    calculate_mUsd: (usage: Usage) => costForTier(usage, price),
-  };
+function makeFlatPricing(pricing: Pricing): PricingTiers {
+  return [{ start_context_length: 0, pricing: applyKiloDiscount(pricing) }];
 }
 
 const TOKENS_128K = 128 * 1024;
 const TOKENS_256K = 256 * 1024;
-const TOKENS_1M = 1024 * 1024;
 
 export const qwen37_max_model: KiloExclusiveModel = {
   public_id: 'qwen/qwen3.7-max',
@@ -109,8 +88,8 @@ export const qwen37_plus_model: KiloExclusiveModel = {
   internal_id: 'qwen3.7-plus',
   pricing: makeTieredPricing([
     {
-      maxInputTokens: TOKENS_256K,
-      undiscounted: {
+      start_context_length: 0,
+      pricing: {
         prompt_per_million: 0.4,
         completion_per_million: 1.6,
         input_cache_read_per_million: 0.04,
@@ -118,8 +97,8 @@ export const qwen37_plus_model: KiloExclusiveModel = {
       },
     },
     {
-      maxInputTokens: TOKENS_1M,
-      undiscounted: {
+      start_context_length: TOKENS_256K + 1,
+      pricing: {
         prompt_per_million: 1.2,
         completion_per_million: 4.8,
         input_cache_read_per_million: 0.12,
@@ -160,8 +139,8 @@ export const qwen36_plus_model: KiloExclusiveModel = {
   internal_id: 'qwen3.6-plus',
   pricing: makeTieredPricing([
     {
-      maxInputTokens: TOKENS_256K,
-      undiscounted: {
+      start_context_length: 0,
+      pricing: {
         prompt_per_million: 0.5,
         completion_per_million: 3,
         input_cache_read_per_million: 0.05,
@@ -169,8 +148,8 @@ export const qwen36_plus_model: KiloExclusiveModel = {
       },
     },
     {
-      maxInputTokens: TOKENS_1M,
-      undiscounted: {
+      start_context_length: TOKENS_256K + 1,
+      pricing: {
         prompt_per_million: 2,
         completion_per_million: 6,
         input_cache_read_per_million: 0.2,
@@ -196,8 +175,8 @@ export const qwen36_plus_stealth_model: KiloExclusiveModel = {
   pricing: makeTieredPricing(
     [
       {
-        maxInputTokens: TOKENS_256K,
-        undiscounted: {
+        start_context_length: 0,
+        pricing: {
           prompt_per_million: 0.5,
           completion_per_million: 3,
           input_cache_read_per_million: 0.05,
@@ -205,8 +184,8 @@ export const qwen36_plus_stealth_model: KiloExclusiveModel = {
         },
       },
       {
-        maxInputTokens: TOKENS_1M,
-        undiscounted: {
+        start_context_length: TOKENS_256K + 1,
+        pricing: {
           prompt_per_million: 2,
           completion_per_million: 6,
           input_cache_read_per_million: 0.2,
@@ -233,8 +212,8 @@ export const qwen36_flash_model: KiloExclusiveModel = {
   internal_id: 'qwen3.6-flash',
   pricing: makeTieredPricing([
     {
-      maxInputTokens: TOKENS_256K,
-      undiscounted: {
+      start_context_length: 0,
+      pricing: {
         prompt_per_million: 0.25,
         completion_per_million: 1.5,
         input_cache_read_per_million: 0.025,
@@ -242,8 +221,8 @@ export const qwen36_flash_model: KiloExclusiveModel = {
       },
     },
     {
-      maxInputTokens: TOKENS_1M,
-      undiscounted: {
+      start_context_length: TOKENS_256K + 1,
+      pricing: {
         prompt_per_million: 1,
         completion_per_million: 4,
         input_cache_read_per_million: 0.1,
@@ -268,8 +247,8 @@ export const qwen36_max_preview_model: KiloExclusiveModel = {
   internal_id: 'qwen3.6-max-preview',
   pricing: makeTieredPricing([
     {
-      maxInputTokens: TOKENS_128K,
-      undiscounted: {
+      start_context_length: 0,
+      pricing: {
         prompt_per_million: 1.3,
         completion_per_million: 7.8,
         input_cache_read_per_million: 0.13,
@@ -277,8 +256,8 @@ export const qwen36_max_preview_model: KiloExclusiveModel = {
       },
     },
     {
-      maxInputTokens: TOKENS_256K,
-      undiscounted: {
+      start_context_length: TOKENS_128K + 1,
+      pricing: {
         prompt_per_million: 2,
         completion_per_million: 12,
         input_cache_read_per_million: 0.2,

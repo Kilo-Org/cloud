@@ -61,7 +61,10 @@ import {
   drainSseStream,
   extractVercelIsByok,
 } from '@/lib/ai-gateway/processUsage.shared';
-import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
+import {
+  calculateCost_mUsd,
+  type KiloExclusiveModel,
+} from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 
 const posthogClient = PostHogClient();
 
@@ -945,7 +948,7 @@ export function calculateKiloExclusiveCost_mUsd(
     });
   }
   return Math.round(
-    pricing.calculate_mUsd(
+    calculateCost_mUsd(
       {
         uncachedInputTokens: uncachedInputTokens >= 0 ? uncachedInputTokens : usage.inputTokens,
         totalOutputTokens: usage.outputTokens,

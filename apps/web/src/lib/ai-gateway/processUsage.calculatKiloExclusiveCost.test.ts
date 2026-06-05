@@ -252,8 +252,8 @@ describe('calculatKiloExclusiveCost_mUsd with qwen3.6-plus', () => {
   test('negative uncached input tokens falls back to total inputTokens', () => {
     // inputTokens=100, cacheHit=80, cacheWrite=50 → uncached = 100-80-50 = -30 (negative)
     // falls back to using inputTokens=100 as uncachedInputTokens
-    // calculate_mUsd receives uncachedInputTokens=100 (fallback), cacheHit=80, cacheWrite=50
-    // totalInput in calculate_mUsd = 100 + 50 + 80 = 230 (<=256k)
+    // The calculator receives uncachedInputTokens=100 (fallback), cacheHit=80, cacheWrite=50
+    // total input for tier selection = 100 + 50 + 80 = 230 (<=256k)
     // cost = 100*0.325 + 80*0.0325 + 50*0.40625 = 32.5 + 2.6 + 20.3125 = 55.4125 → 55
     const result = calculateKiloExclusiveCost_mUsd(
       qwen36_plus_model,

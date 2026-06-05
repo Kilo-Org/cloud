@@ -1,7 +1,4 @@
-import {
-  calculateSimpleCost_mUsd,
-  type KiloExclusiveModel,
-} from '@/lib/ai-gateway/providers/kilo-exclusive-model';
+import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 
 export const MINIMAX_CURRENT_MODEL_ID = 'minimax/minimax-m3';
 
@@ -17,13 +14,17 @@ Trained as a native multimodal model on interleaved data and tuned for multi-tur
   flags: ['reasoning', 'vercel-routing', 'vision'],
   gateway: 'openrouter',
   internal_id: MINIMAX_CURRENT_MODEL_ID,
-  pricing: {
-    prompt_per_million: 0.3,
-    completion_per_million: 1.2,
-    input_cache_read_per_million: 0.06,
-    input_cache_write_per_million: null,
-    calculate_mUsd: calculateSimpleCost_mUsd,
-  },
+  pricing: [
+    {
+      start_context_length: 0,
+      pricing: {
+        prompt_per_million: 0.3,
+        completion_per_million: 1.2,
+        input_cache_read_per_million: 0.06,
+        input_cache_write_per_million: null,
+      },
+    },
+  ],
   exclusive_to: [],
   inference_provider_restriction: [],
 };

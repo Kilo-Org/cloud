@@ -84,6 +84,8 @@ function gitLabTokenLookupFailureMessage(reason: string): string {
     case 'no_integration_found':
     case 'invalid_org_id':
       return `No GitLab integration found (${reason}). Please connect your GitLab account first.`;
+    case 'integration_identity_missing':
+      return `GitLab token lookup failed (${reason}). The connected GitLab integration is missing its account identity. Reconnect or reconfigure the integration.`;
     case 'no_token':
     case 'token_refresh_failed':
     case 'token_expired_no_refresh':

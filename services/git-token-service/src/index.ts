@@ -150,7 +150,13 @@ export type IssueGitLabSessionCapabilitySuccess = {
 export type IssueGitLabSessionCapabilityResult =
   | IssueGitLabSessionCapabilitySuccess
   | GetGitLabTokenFailure
-  | { success: false; reason: GitLabCloneUrlFailureReason | 'capability_configuration_error' };
+  | {
+      success: false;
+      reason:
+        | GitLabCloneUrlFailureReason
+        | 'integration_identity_missing'
+        | 'capability_configuration_error';
+    };
 export type RedeemGitLabSessionCapabilityParams = {
   capability: string;
   outboundContainerId?: string;
@@ -823,7 +829,7 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
     const repository = parseGitLabCloneUrl(params.gitUrl, instanceOrigin);
     if (!repository.success) return repository;
     const identity = this.getGitLabSessionIdentity(integration);
-    if (!identity) return { success: false, reason: 'no_token' };
+    if (!identity) return { success: false, reason: 'integration_identity_missing' };
 
     let capability: string;
     try {

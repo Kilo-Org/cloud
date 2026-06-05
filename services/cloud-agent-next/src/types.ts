@@ -241,6 +241,7 @@ type IssueGitLabSessionCapabilityResult =
         | GetGitLabTokenFailureReason
         | 'invalid_gitlab_url'
         | 'unsupported_gitlab_instance'
+        | 'integration_identity_missing'
         | 'capability_configuration_error';
     };
 

@@ -1962,6 +1962,10 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
 
   it.each([
     [
+      'integration_identity_missing',
+      'GitLab token lookup failed (integration_identity_missing). The connected GitLab integration is missing its account identity. Reconnect or reconfigure the integration.',
+    ],
+    [
       'no_project_token',
       'GitLab token lookup failed (no_project_token). No GitLab project access token is configured for this repository. Reconfigure or reinstall the GitLab code-review bot for the project.',
     ],

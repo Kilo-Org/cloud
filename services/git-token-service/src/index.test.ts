@@ -1245,6 +1245,28 @@ describe('GitTokenRPCEntrypoint GitLab session capability RPCs', () => {
     }
   );
 
+  it('reports a missing GitLab integration identity distinctly from a missing token', async () => {
+    serviceMocks.findGitLabIntegration.mockResolvedValue({
+      success: true,
+      integrationId: 'ef2eb5c7-27ce-4f43-b6d3-8f282abc145c',
+      integrationType: 'oauth',
+      accountId: null,
+      accountLogin: null,
+      metadata: {
+        access_token: 'gitlab-oauth-token',
+        auth_type: 'oauth',
+      },
+    });
+
+    await expect(
+      createService().issueGitLabSessionCapability({
+        gitUrl: 'https://gitlab.com/acme/widgets.git',
+        userId: 'user_1',
+        outboundContainerId,
+      })
+    ).resolves.toEqual({ success: false, reason: 'integration_identity_missing' });
+  });
+
   it('does not redeem a capability from another outbound container or resolve its source', async () => {
     const service = createService();
     const issued = await service.issueGitLabSessionCapability({

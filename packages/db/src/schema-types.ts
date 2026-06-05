@@ -1241,6 +1241,7 @@ export const CustomLlmProviderSchema = z.enum([
   'openai-compatible', // uses Chat Completions API with reasoning_content
   'openrouter', // uses Chat Completions API with reasoning_details
   'alibaba', // identical to openai-compatible, but reports cache write tokens that alibaba bills separately
+  'mistral', // uses Chat Completions API with possibly complex content objects for e.g. thinking
 ]);
 
 export type CustomLlmProvider = z.infer<typeof CustomLlmProviderSchema>;

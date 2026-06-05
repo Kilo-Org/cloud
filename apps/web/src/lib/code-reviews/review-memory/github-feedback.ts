@@ -3,7 +3,6 @@ import type {
   PullRequestReviewCommentPayload,
   PullRequestReviewPayload,
   PullRequestReviewThreadPayload,
-  ReactionPayload,
 } from '@/lib/integrations/platforms/github/webhook-schemas';
 import {
   createReviewMemoryDedupeHash,
@@ -25,9 +24,6 @@ type GitHubActor =
     }
   | null
   | undefined;
-
-const POSITIVE_REACTIONS = new Set(['+1', 'heart', 'hooray', 'rocket']);
-const NEGATIVE_REACTIONS = new Set(['-1', 'confused']);
 
 function ownerFromIntegration(integration: PlatformIntegration): ReviewMemoryOwner | null {
   if (integration.owned_by_organization_id) {
@@ -52,28 +48,6 @@ function ownerFromAutoFixTicket(ticket: AutoFixTicket): ReviewMemoryOwner | null
 function isLikelyKiloBotActor(actor: GitHubActor): boolean {
   const login = actor?.login?.toLowerCase() ?? '';
   return actor?.type === 'Bot' || login.endsWith('[bot]') || login.includes('kilo');
-}
-
-function pullNumberFromUrl(url: string | undefined): number | null {
-  if (!url) return null;
-  const match = url.match(/\/pull\/(\d+)/);
-  if (!match?.[1]) return null;
-  const parsed = Number(match[1]);
-  return Number.isInteger(parsed) ? parsed : null;
-}
-
-function reactionSentiment(content: string): {
-  signalKind: 'positive_reaction' | 'negative_reaction';
-  sentiment: 'positive' | 'negative';
-  strength: number;
-} | null {
-  if (POSITIVE_REACTIONS.has(content)) {
-    return { signalKind: 'positive_reaction', sentiment: 'positive', strength: 2 };
-  }
-  if (NEGATIVE_REACTIONS.has(content)) {
-    return { signalKind: 'negative_reaction', sentiment: 'negative', strength: 3 };
-  }
-  return null;
 }
 
 function classifyGitHubAutoFixFailure(errorMessage: string | undefined): {
@@ -199,68 +173,6 @@ async function findOrUpsertCommentSubject(params: {
     findingFingerprint: metadata?.findingFingerprint ?? null,
     state: 'active',
   });
-}
-
-export async function handleGitHubReactionFeedback(input: {
-  payload: ReactionPayload;
-  integration: PlatformIntegration;
-  deliveryId: string;
-}): Promise<GitHubFeedbackResult> {
-  if (input.payload.action !== 'created')
-    return { recorded: false, reason: 'reaction-not-created' };
-  if (isLikelyKiloBotActor(input.payload.sender ?? input.payload.reaction.user)) {
-    return { recorded: false, reason: 'bot-authored-reaction' };
-  }
-
-  const owner = ownerFromIntegration(input.integration);
-  if (!owner) return { recorded: false, reason: 'missing-owner' };
-
-  const sentiment = reactionSentiment(input.payload.reaction.content);
-  if (!sentiment) return { recorded: false, reason: 'unsupported-reaction' };
-  if (!input.payload.comment) return { recorded: false, reason: 'missing-comment' };
-
-  const prNumber =
-    input.payload.pull_request?.number ??
-    input.payload.issue?.number ??
-    pullNumberFromUrl(input.payload.comment.html_url);
-  const prUrl =
-    input.payload.pull_request?.html_url ??
-    input.payload.issue?.html_url ??
-    input.payload.comment.html_url ??
-    null;
-  const subject = await findOrUpsertCommentSubject({
-    owner,
-    integration: input.integration,
-    repoFullName: input.payload.repository.full_name,
-    prNumber,
-    prUrl,
-    headSha: input.payload.pull_request?.head?.sha ?? null,
-    comment: input.payload.comment,
-  });
-
-  if (!subject) return { recorded: false, reason: 'not-kilo-subject' };
-
-  const result = await recordFeedbackEvent({
-    owner,
-    platform: 'github',
-    platformIntegrationId: input.integration.id,
-    subjectId: subject.id,
-    codeReviewId: subject.code_review_id,
-    repoFullName: input.payload.repository.full_name,
-    prNumber,
-    prUrl,
-    eventSource: 'github_webhook',
-    signalKind: sentiment.signalKind,
-    sentiment: sentiment.sentiment,
-    strength: sentiment.strength,
-    externalEventId: `github:${input.deliveryId}:reaction:${input.payload.reaction.id}`,
-    externalUrl: input.payload.comment.html_url ?? prUrl,
-    evidenceExcerpt: `Reaction: ${input.payload.reaction.content}`,
-    metadata: { reaction: input.payload.reaction.content },
-    occurredAt: input.payload.reaction.created_at ?? null,
-  });
-
-  return { recorded: result.created, eventId: result.event.id };
 }
 
 export async function handleGitHubReviewCommentFeedback(input: {

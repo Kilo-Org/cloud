@@ -5,7 +5,6 @@ import type {
   PullRequestReviewCommentPayload,
   PullRequestReviewPayload,
   PullRequestReviewThreadPayload,
-  ReactionPayload,
 } from '@/lib/integrations/platforms/github/webhook-schemas';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import {
@@ -18,7 +17,6 @@ import {
 } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import {
-  handleGitHubReactionFeedback,
   handleGitHubReviewCommentFeedback,
   handleGitHubReviewFeedback,
   handleGitHubReviewThreadFeedback,
@@ -83,47 +81,6 @@ describe('GitHub review memory feedback', () => {
       state: 'active',
     });
   }
-
-  it('records reactions on Kilo review comments', async () => {
-    const { integration } = await seedIntegration();
-    const payload = {
-      action: 'created',
-      reaction: {
-        id: 900,
-        content: '-1',
-        created_at: '2026-01-01T00:00:00.000Z',
-        user: { login: 'maintainer', type: 'User' },
-      },
-      comment: {
-        id: 500,
-        body: '**WARNING**: Avoid this pattern',
-        html_url: 'https://github.com/acme/widgets/pull/42#discussion_r500',
-        path: 'src/widget.ts',
-        line: 12,
-        diff_hunk: '@@ -1 +1 @@',
-      },
-      pull_request: pullRequest(),
-      repository: repository(),
-      installation: { id: 98765 },
-      sender: { login: 'maintainer', type: 'User' },
-    } satisfies ReactionPayload;
-
-    const result = await handleGitHubReactionFeedback({
-      payload,
-      integration,
-      deliveryId: 'delivery-reaction-negative',
-    });
-
-    expect(result.recorded).toBe(true);
-    const [event] = await db.select().from(code_review_feedback_events);
-    expect(event.signal_kind).toBe('negative_reaction');
-    expect(event.sentiment).toBe('negative');
-    expect(event.strength).toBe(3);
-
-    const [subject] = await db.select().from(code_review_feedback_subjects);
-    expect(subject.external_id).toBe('500');
-    expect(subject.severity).toBe('warning');
-  });
 
   it('records corrective and supportive replies to Kilo inline comments', async () => {
     const { owner, integration } = await seedIntegration();

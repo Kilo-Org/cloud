@@ -297,44 +297,6 @@ export const PullRequestReviewPayloadSchema = z.object({
   installation: z.object({ id: z.number() }),
 });
 
-export const ReactionPayloadSchema = z.object({
-  action: z.enum(['created', 'deleted']),
-  reaction: z.object({
-    id: z.number().int(),
-    content: z.string(),
-    created_at: z.string().optional(),
-    user: z.object({ login: z.string(), type: z.string().optional() }).optional(),
-  }),
-  comment: z
-    .object({
-      id: z.number().int(),
-      body: z.string().optional().default(''),
-      html_url: z.string().optional(),
-      path: z.string().optional(),
-      line: z.number().nullable().optional(),
-      diff_hunk: z.string().optional(),
-      user: z.object({ login: z.string(), type: z.string().optional() }).optional(),
-    })
-    .optional(),
-  issue: z
-    .object({
-      number: z.number(),
-      html_url: z.string().optional(),
-      pull_request: z.object({ url: z.string().optional() }).optional(),
-    })
-    .optional(),
-  pull_request: z
-    .object({
-      number: z.number(),
-      html_url: z.string().optional(),
-      head: z.object({ sha: z.string().optional(), ref: z.string().optional() }).optional(),
-    })
-    .optional(),
-  repository: GitHubRepositorySchema,
-  installation: z.object({ id: z.number() }),
-  sender: z.object({ login: z.string(), type: z.string().optional() }).optional(),
-});
-
 export const PullRequestReviewThreadPayloadSchema = z.object({
   action: z.enum(['resolved', 'unresolved']),
   thread: z.object({
@@ -381,6 +343,5 @@ export type PullRequestPayload = z.infer<typeof PullRequestPayloadSchema>;
 export type IssuePayload = z.infer<typeof IssuePayloadSchema>;
 export type PullRequestReviewCommentPayload = z.infer<typeof PullRequestReviewCommentPayloadSchema>;
 export type PullRequestReviewPayload = z.infer<typeof PullRequestReviewPayloadSchema>;
-export type ReactionPayload = z.infer<typeof ReactionPayloadSchema>;
 export type PullRequestReviewThreadPayload = z.infer<typeof PullRequestReviewThreadPayloadSchema>;
 export type GitHubAuthorAssociation = z.infer<typeof GitHubAuthorAssociationSchema>;

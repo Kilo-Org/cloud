@@ -9,7 +9,6 @@ const mockUpdateWebhookEvent = jest.fn();
 const mockHandlePullRequest = jest.fn();
 const mockHandlePRReviewComment = jest.fn();
 const mockHandleInstallationTargetRenamed = jest.fn();
-const mockHandleGitHubReactionFeedback = jest.fn();
 const mockHandleGitHubReviewCommentFeedback = jest.fn();
 const mockHandleGitHubReviewFeedback = jest.fn();
 const mockHandleGitHubReviewThreadFeedback = jest.fn();
@@ -56,7 +55,6 @@ jest.mock('@/lib/integrations/platforms/github/webhook-handlers', () => ({
 }));
 
 jest.mock('@/lib/code-reviews/review-memory/github-feedback', () => ({
-  handleGitHubReactionFeedback: (input: unknown) => mockHandleGitHubReactionFeedback(input),
   handleGitHubReviewCommentFeedback: (input: unknown) =>
     mockHandleGitHubReviewCommentFeedback(input),
   handleGitHubReviewFeedback: (input: unknown) => mockHandleGitHubReviewFeedback(input),
@@ -192,40 +190,6 @@ function pullRequestReviewPayload(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function reactionPayload(overrides: Record<string, unknown> = {}) {
-  return {
-    action: 'created',
-    installation: { id: 98765 },
-    repository: {
-      id: 123,
-      name: 'widgets',
-      full_name: 'acme/widgets',
-      owner: { login: 'acme' },
-    },
-    reaction: {
-      id: 654,
-      content: '-1',
-      created_at: '2026-01-01T00:00:00.000Z',
-      user: { login: 'alice', type: 'User' },
-    },
-    comment: {
-      id: 456,
-      body: '**WARNING**: Check this path',
-      html_url: 'https://github.com/acme/widgets/pull/42#discussion_r456',
-      path: 'src/widget.ts',
-      line: 10,
-      diff_hunk: '@@ -1 +1 @@',
-    },
-    pull_request: {
-      number: 42,
-      html_url: 'https://github.com/acme/widgets/pull/42',
-      head: { sha: 'abc123', ref: 'feature/widgets' },
-    },
-    sender: { login: 'alice', type: 'User' },
-    ...overrides,
-  };
-}
-
 function reviewThreadPayload(overrides: Record<string, unknown> = {}) {
   return {
     action: 'resolved',
@@ -301,7 +265,6 @@ describe('handleGitHubWebhook', () => {
     mockHandleInstallationTargetRenamed.mockResolvedValue(
       Response.json({ message: 'Installation target updated' })
     );
-    mockHandleGitHubReactionFeedback.mockResolvedValue({ recorded: true, eventId: 'event_1' });
     mockHandleGitHubReviewCommentFeedback.mockResolvedValue({ recorded: true, eventId: 'event_1' });
     mockHandleGitHubReviewFeedback.mockResolvedValue({ recorded: true, eventId: 'event_1' });
     mockHandleGitHubReviewThreadFeedback.mockResolvedValue({ recorded: true, eventId: 'event_1' });
@@ -460,25 +423,6 @@ describe('handleGitHubWebhook', () => {
       expect.objectContaining({
         handlers_triggered: ['cli_session_pr_review_upsert', 'review_memory_feedback'],
       })
-    );
-  });
-
-  it('routes reaction events to review memory feedback', async () => {
-    const response = await handleGitHubWebhook(
-      signedGitHubRequest('reaction', reactionPayload()),
-      'standard'
-    );
-    await flushAfterCallbacks();
-
-    expect(response.status).toBe(200);
-    expect(mockHandleGitHubReactionFeedback).toHaveBeenCalledWith({
-      payload: expect.objectContaining({ action: 'created' }),
-      integration,
-      deliveryId: 'delivery-reaction',
-    });
-    expect(mockUpdateWebhookEvent).toHaveBeenCalledWith(
-      'we_1',
-      expect.objectContaining({ handlers_triggered: ['review_memory_feedback'] })
     );
   });
 

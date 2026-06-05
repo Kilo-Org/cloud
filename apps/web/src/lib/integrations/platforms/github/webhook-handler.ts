@@ -15,7 +15,6 @@ import {
   PullRequestReviewCommentPayloadSchema,
   PullRequestReviewPayloadSchema,
   PullRequestReviewThreadPayloadSchema,
-  ReactionPayloadSchema,
   GitHubAppAuthorizationRevokedPayloadSchema,
 } from '@/lib/integrations/platforms/github/webhook-schemas';
 import { findIntegrationByInstallationId } from '@/lib/integrations/db/platform-integrations';
@@ -41,7 +40,6 @@ import type { GitHubAppType } from './app-selector';
 import { revokeStoredGitHubUserAuthorization } from './user-authorization';
 import { redactSensitiveHeaders } from '@kilocode/worker-utils/redact-headers';
 import {
-  handleGitHubReactionFeedback,
   handleGitHubReviewCommentFeedback,
   handleGitHubReviewFeedback,
   handleGitHubReviewThreadFeedback,
@@ -708,58 +706,6 @@ export async function handleGitHubWebhook(
               processed: true,
               processed_at: new Date().toISOString(),
               handlers_triggered: ['pr_review_comment_fix', 'review_memory_feedback'],
-              errors: errors.length > 0 ? errors : null,
-            });
-          } catch (error) {
-            logExceptInTest(`Error updating webhook event${logSuffix}:`, error);
-          }
-        }
-      });
-
-      return NextResponse.json({ message: 'Event received' }, { status: 200 });
-    }
-
-    // Handle reaction events for review memory feedback
-    if (eventType === GITHUB_EVENT.REACTION) {
-      const parseResult = ReactionPayloadSchema.safeParse(payload);
-      if (!parseResult.success) {
-        logExceptInTest(`Invalid reaction payload${logSuffix}:`, parseResult.error);
-        captureMessage('Invalid GitHub webhook payload structure', {
-          level: 'error',
-          tags: { source: `${sentryPrefix}webhook_validation`, event: 'reaction' },
-          extra: { errors: parseResult.error.issues },
-        });
-        return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
-      }
-
-      const action = parseResult.data.action;
-      const logResult = await logWebhook(integration, action);
-      if (logResult.isDuplicate) {
-        return NextResponse.json({ message: 'Duplicate event' }, { status: 200 });
-      }
-
-      after(async () => {
-        const errors: WebhookHandlerError[] = [];
-        try {
-          await handleGitHubReactionFeedback({
-            payload: parseResult.data,
-            integration,
-            deliveryId: eventSignature,
-          });
-        } catch (error) {
-          logExceptInTest(`Error recording reaction feedback${logSuffix}:`, error);
-          captureException(error, {
-            tags: { source: `${sentryPrefix}webhook_review_memory_feedback` },
-          });
-          errors.push(toWebhookHandlerError('review_memory_feedback', error));
-        }
-
-        if (logResult.webhookEventId) {
-          try {
-            await updateWebhookEvent(logResult.webhookEventId, {
-              processed: true,
-              processed_at: new Date().toISOString(),
-              handlers_triggered: ['review_memory_feedback'],
               errors: errors.length > 0 ? errors : null,
             });
           } catch (error) {

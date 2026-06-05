@@ -148,6 +148,42 @@ describe('GitHub review memory feedback', () => {
     );
   });
 
+  it('records replies from maintainers with kilo in their login', async () => {
+    const { owner, integration } = await seedIntegration();
+    await seedInlineSubject(owner);
+    const payload = {
+      action: 'created',
+      comment: {
+        id: 503,
+        in_reply_to_id: 500,
+        body: 'This is a false positive in this repository.',
+        user: { login: 'kilodev', type: 'User' },
+        html_url: 'https://github.com/acme/widgets/pull/42#discussion_r503',
+        path: 'src/widget.ts',
+        line: 12,
+        diff_hunk: '@@ -1 +1 @@',
+        author_association: 'MEMBER',
+      },
+      pull_request: {
+        ...pullRequest(),
+        title: 'Add widgets',
+        user: { login: 'author' },
+        base: { ref: 'main' },
+      },
+      repository: repository(),
+      installation: { id: 98765 },
+      sender: { login: 'kilodev', type: 'User' },
+    } satisfies PullRequestReviewCommentPayload;
+
+    const result = await handleGitHubReviewCommentFeedback({
+      payload,
+      integration,
+      deliveryId: 'delivery-kilodev-reply',
+    });
+
+    expect(result.recorded).toBe(true);
+  });
+
   it('records Kilo review dismissals and review-thread resolution', async () => {
     const { integration } = await seedIntegration();
     const dismissedReview = {

@@ -31,6 +31,13 @@ type GitLabActor =
 const POSITIVE_EMOJI = new Set(['thumbsup', '+1', 'heart', 'rocket', 'tada']);
 const NEGATIVE_EMOJI = new Set(['thumbsdown', '-1', 'confused']);
 const CREATE_EMOJI_ACTIONS = new Set(['award', 'create', 'created']);
+const KILO_GITLAB_ACTOR_NAMES = new Set(['kilo code review bot', 'kilo code reviews']);
+const KILO_GITLAB_ACTOR_USERNAMES = new Set([
+  'kilo-code-review-bot',
+  'kilo-code-reviews',
+  'kilo_code_review_bot',
+  'kilo_code_reviews',
+]);
 
 function skipped(reason: string): GitLabFeedbackResult {
   return { recorded: false, eventIds: [], reason };
@@ -47,9 +54,9 @@ function ownerFromIntegration(integration: PlatformIntegration): ReviewMemoryOwn
 }
 
 function isLikelyKiloActor(actor: GitLabActor): boolean {
-  const username = actor?.username?.toLowerCase() ?? '';
-  const name = actor?.name?.toLowerCase() ?? '';
-  return username.includes('kilo') || name.includes('kilo') || username.endsWith('bot');
+  const username = actor?.username?.toLowerCase().trim() ?? '';
+  const name = actor?.name?.toLowerCase().replace(/\s+/g, ' ').trim() ?? '';
+  return KILO_GITLAB_ACTOR_USERNAMES.has(username) || KILO_GITLAB_ACTOR_NAMES.has(name);
 }
 
 function classifyGitLabNoteFeedback(body: string): {

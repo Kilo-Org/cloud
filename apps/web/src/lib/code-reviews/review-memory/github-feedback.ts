@@ -25,6 +25,16 @@ type GitHubActor =
   | null
   | undefined;
 
+const KILO_GITHUB_BOT_LOGINS = new Set([
+  'kilo-code',
+  'kilo-code[bot]',
+  'kilo-code-bot',
+  'kilo-code-bot[bot]',
+  'kilo-code-review-bot',
+  'kilo-code-review-bot[bot]',
+  'kilocode[bot]',
+]);
+
 function ownerFromIntegration(integration: PlatformIntegration): ReviewMemoryOwner | null {
   if (integration.owned_by_organization_id) {
     return { type: 'org', id: integration.owned_by_organization_id };
@@ -47,7 +57,7 @@ function ownerFromAutoFixTicket(ticket: AutoFixTicket): ReviewMemoryOwner | null
 
 function isLikelyKiloBotActor(actor: GitHubActor): boolean {
   const login = actor?.login?.toLowerCase() ?? '';
-  return actor?.type === 'Bot' || login.endsWith('[bot]') || login.includes('kilo');
+  return KILO_GITHUB_BOT_LOGINS.has(login);
 }
 
 function classifyGitHubAutoFixFailure(errorMessage: string | undefined): {

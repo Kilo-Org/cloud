@@ -150,6 +150,40 @@ describe('GitLab review memory feedback', () => {
     );
   });
 
+  it('records notes from maintainers with kilo in their username', async () => {
+    const { owner, integration } = await seedIntegration();
+    await seedDiscussionSubject(owner);
+    const payload = {
+      object_kind: 'note',
+      event_type: 'note',
+      user: { id: 8, name: 'Kilo Developer', username: 'kilodev' },
+      project_id: 123,
+      project: project(),
+      object_attributes: {
+        id: 502,
+        note: 'This is a false positive for this MR.',
+        action: 'create',
+        discussion_id: 'discussion-1',
+        noteable_type: 'MergeRequest',
+        author_id: 8,
+        created_at: '2026-01-01T00:02:00.000Z',
+        updated_at: '2026-01-01T00:02:00.000Z',
+        project_id: 123,
+        system: false,
+        url: 'https://gitlab.example.com/acme/widgets/-/merge_requests/42#note_502',
+      },
+      merge_request: mergeRequestAttributes(),
+    } satisfies NoteEventPayload;
+
+    const result = await handleGitLabNoteFeedback({
+      payload,
+      integration,
+      deliveryId: 'delivery-note-kilodev',
+    });
+
+    expect(result.recorded).toBe(true);
+  });
+
   it('records emoji reactions on Kilo notes', async () => {
     const { integration } = await seedIntegration();
     const payload = {

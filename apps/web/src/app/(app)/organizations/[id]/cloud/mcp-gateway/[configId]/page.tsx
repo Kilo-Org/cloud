@@ -11,8 +11,8 @@ export default async function OrganizationMcpGatewayDetailPage({
   return (
     <OrganizationByPageLayout
       params={Promise.resolve({ id })}
-      render={({ organization, isGlobalAdmin }) => {
-        if (!isGlobalAdmin) notFound();
+      render={({ organization, role, isGlobalAdmin }) => {
+        if (!isGlobalAdmin && role !== 'owner') notFound();
         return <McpGatewayDetailContent organizationId={organization.id} configId={configId} />;
       }}
     />

@@ -10,8 +10,8 @@ export default async function OrganizationMcpGatewaySetupPage({
   return (
     <OrganizationByPageLayout
       params={params}
-      render={({ organization, isGlobalAdmin }) => {
-        if (!isGlobalAdmin) notFound();
+      render={({ organization, role, isGlobalAdmin }) => {
+        if (!isGlobalAdmin && role !== 'owner') notFound();
         return <McpGatewaySetupContent organizationId={organization.id} />;
       }}
     />

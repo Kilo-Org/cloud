@@ -5,6 +5,8 @@ import {
   mcp_gateway_configs,
   mcp_gateway_connect_resources,
   mcp_gateway_connection_instances,
+  organization_memberships,
+  organizations,
 } from '@kilocode/db/schema';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createCallerFactory, createTRPCRouter } from '@/lib/trpc/init';
@@ -19,17 +21,15 @@ async function createCallerForUser(userId: string) {
   return createCaller({ user });
 }
 
-describe('mcpGateway admin rollout', () => {
+describe('mcpGateway management authorization', () => {
   beforeEach(async () => {
     await cleanupDbForTest();
   });
 
-  it('denies non-admin users', async () => {
+  it('allows personal owners to list their own connections', async () => {
     const user = await insertTestUser({ is_admin: false });
     const caller = await createCallerForUser(user.id);
-    await expect(caller.mcpGateway.listPersonal(undefined)).rejects.toThrow(
-      'Admin access required'
-    );
+    await expect(caller.mcpGateway.listPersonal(undefined)).resolves.toEqual([]);
   });
 
   it('allows admin users to list personal connections', async () => {
@@ -42,6 +42,12 @@ describe('mcpGateway admin rollout', () => {
     const user = await insertTestUser({ is_admin: true });
     const caller = await createCallerForUser(user.id);
     const organizationId = crypto.randomUUID();
+    await db.insert(organizations).values({ id: organizationId, name: 'Gateway Org' });
+    await db.insert(organization_memberships).values({
+      organization_id: organizationId,
+      kilo_user_id: user.id,
+      role: 'owner',
+    });
     const rawTimestamp = '2026-04-29 01:16:12.945+00';
     const [config] = await db
       .insert(mcp_gateway_configs)
@@ -86,6 +92,51 @@ describe('mcpGateway admin rollout', () => {
     expect(detail.updatedAt).toBe('2026-04-29T01:16:12.945Z');
     expect(detail.assignments[0]?.createdAt).toBe('2026-04-29T01:16:12.945Z');
     expect(detail.instances[0]?.lastUsedAt).toBe('2026-04-29T01:16:12.945Z');
+  });
+
+  it('requires org ownership for organization management', async () => {
+    const owner = await insertTestUser({ is_admin: false });
+    const member = await insertTestUser({ is_admin: false });
+    const caller = await createCallerForUser(member.id);
+    const organizationId = crypto.randomUUID();
+    await db.insert(organizations).values({ id: organizationId, name: 'Gateway Org' });
+    await db.insert(organization_memberships).values([
+      { organization_id: organizationId, kilo_user_id: owner.id, role: 'owner' },
+      { organization_id: organizationId, kilo_user_id: member.id, role: 'member' },
+    ]);
+
+    await expect(caller.mcpGateway.listOrganization({ organizationId })).rejects.toThrow(
+      'Organization owner access required'
+    );
+  });
+
+  it('keeps disabled connections available to the dashboard', async () => {
+    const user = await insertTestUser({ is_admin: false });
+    const caller = await createCallerForUser(user.id);
+    const [config] = await db
+      .insert(mcp_gateway_configs)
+      .values({
+        owner_scope: 'personal',
+        owner_id: user.id,
+        name: 'Disabled MCP',
+        remote_url: 'https://example.com/mcp',
+        auth_mode: 'none',
+        sharing_mode: 'single_user',
+        enabled: false,
+        created_by_kilo_user_id: user.id,
+      })
+      .returning();
+    await db.insert(mcp_gateway_connect_resources).values({
+      config_id: config.config_id,
+      owner_scope: 'personal',
+      owner_id: user.id,
+      route_key: 'abcdefghijklmnopqrstuvwxyzABCDEF',
+      canonical_url: `https://mcp.kilo.ai/mcp-connect/user/${user.id}/${config.config_id}/abcdefghijklmnopqrstuvwxyzABCDEF`,
+    });
+
+    const detail = await caller.mcpGateway.getPersonal({ configId: config.config_id });
+
+    expect(detail.enabled).toBe(false);
   });
 
   it('does not allow an admin to mutate another admins personal connection', async () => {

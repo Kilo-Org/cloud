@@ -165,7 +165,7 @@ export function McpGatewayListContent({ organizationId }: McpGatewayListContentP
                   Clear filter
                 </Button>
               ) : (
-                <Button asChild>
+                <Button asChild variant="outline">
                   <Link href={routes.create}>
                     <Plus />
                     Create connection

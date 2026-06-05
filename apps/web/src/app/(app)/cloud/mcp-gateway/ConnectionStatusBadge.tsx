@@ -4,6 +4,7 @@ type ConnectionStatusInput = {
   enabled: boolean;
   authMode: string;
   activeGrantCount: number;
+  assignmentCount: number;
 };
 
 type StatusTone = 'positive' | 'attention' | 'neutral';
@@ -22,7 +23,21 @@ export function getConnectionStatus(connection: ConnectionStatusInput): Connecti
     return { label: 'Ready', description: 'No provider sign-in required', tone: 'positive' };
   }
   if (connection.activeGrantCount > 0) {
-    return { label: 'Signed in', description: 'A user has an active grant', tone: 'positive' };
+    if (connection.assignmentCount > connection.activeGrantCount) {
+      return {
+        label: 'Partially signed in',
+        description: `${connection.activeGrantCount} of ${connection.assignmentCount} assigned users have active grants`,
+        tone: 'attention',
+      };
+    }
+    return {
+      label: 'Signed in',
+      description:
+        connection.assignmentCount > 0
+          ? `${connection.activeGrantCount} assigned users have active grants`
+          : 'A user has an active grant',
+      tone: 'positive',
+    };
   }
   return { label: 'Needs sign-in', description: 'No active provider grant yet', tone: 'attention' };
 }

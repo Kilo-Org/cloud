@@ -4,7 +4,7 @@ import { PageContainer } from '@/components/layouts/PageContainer';
 import { McpGatewayListContent } from './McpGatewayListContent';
 
 export default async function McpGatewayPage() {
-  const { user } = await getUserFromAuth({ adminOnly: true });
+  const { user } = await getUserFromAuth({ adminOnly: false });
   if (!user) notFound();
   return (
     <PageContainer>

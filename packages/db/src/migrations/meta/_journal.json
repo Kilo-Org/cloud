@@ -1100,6 +1100,13 @@
       "when": 1780579983706,
       "tag": "0156_low_mauler",
       "breakpoints": true
+    },
+    {
+      "idx": 157,
+      "version": "7",
+      "when": 1780655449096,
+      "tag": "0157_aspiring_dreadnoughts",
+      "breakpoints": true
     }
   ]
 }

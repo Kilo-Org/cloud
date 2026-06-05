@@ -73,6 +73,7 @@ type OwnerResolution = {
 
 type DisputeCaseValues = {
   eventId: string;
+  eventCreatedAt: string;
   disputeId: string;
   chargeId: string | null;
   paymentIntentId: string | null;
@@ -121,6 +122,16 @@ function stripeTimestampToIso(timestamp: number | null | undefined): string | nu
   }
 
   return new Date(timestamp * 1000).toISOString();
+}
+
+function isAlreadyClosedStripeDisputeError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  const normalizedMessage = message.toLowerCase();
+  return (
+    (normalizedMessage.includes('already') && normalizedMessage.includes('closed')) ||
+    normalizedMessage.includes('already been closed') ||
+    normalizedMessage.includes('not open')
+  );
 }
 
 function statusForObservedDispute(params: {
@@ -239,6 +250,7 @@ async function upsertDisputeCase(
   const caseValues = {
     stripe_dispute_id: values.disputeId,
     stripe_event_id: values.eventId,
+    stripe_event_created_at: values.eventCreatedAt,
     stripe_charge_id: values.chargeId,
     stripe_payment_intent_id: values.paymentIntentId,
     stripe_customer_id: values.customerId,
@@ -263,40 +275,20 @@ async function upsertDisputeCase(
     .values(caseValues)
     .onConflictDoNothing({ target: [stripe_dispute_cases.stripe_dispute_id] });
 
-  const updateFilter =
-    values.status === StripeDisputeCaseStatus.NeedsAction
-      ? and(
-          eq(stripe_dispute_cases.stripe_dispute_id, values.disputeId),
-          not(
-            inArray(stripe_dispute_cases.status, [
-              StripeDisputeCaseStatus.Processing,
-              StripeDisputeCaseStatus.Accepted,
-              StripeDisputeCaseStatus.AcceptanceFailed,
-              StripeDisputeCaseStatus.EnforcementFailed,
-              StripeDisputeCaseStatus.Closed,
-            ])
-          ),
-          not(
-            sql`${stripe_dispute_cases.status} = ${StripeDisputeCaseStatus.ReviewRequired}
-              AND (${stripe_dispute_cases.stripe_status} IS NULL
-                OR ${stripe_dispute_cases.stripe_status} NOT IN (${sql.join(
-                  actionableStripeStatusValues.map(value => sql`${value}`),
-                  sql`, `
-                )}))`
-          )
-        )
-      : and(
-          eq(stripe_dispute_cases.stripe_dispute_id, values.disputeId),
-          not(
-            inArray(stripe_dispute_cases.status, [
-              StripeDisputeCaseStatus.Processing,
-              StripeDisputeCaseStatus.Accepted,
-              StripeDisputeCaseStatus.AcceptanceFailed,
-              StripeDisputeCaseStatus.EnforcementFailed,
-              StripeDisputeCaseStatus.Closed,
-            ])
-          )
-        );
+  const updateFilter = and(
+    eq(stripe_dispute_cases.stripe_dispute_id, values.disputeId),
+    not(
+      inArray(stripe_dispute_cases.status, [
+        StripeDisputeCaseStatus.Processing,
+        StripeDisputeCaseStatus.Accepted,
+        StripeDisputeCaseStatus.AcceptanceFailed,
+        StripeDisputeCaseStatus.EnforcementFailed,
+        StripeDisputeCaseStatus.Closed,
+      ])
+    ),
+    sql`${stripe_dispute_cases.stripe_event_created_at} IS NULL
+      OR ${stripe_dispute_cases.stripe_event_created_at} <= ${values.eventCreatedAt}`
+  );
 
   await database.update(stripe_dispute_cases).set(caseValues).where(updateFilter);
 }
@@ -308,12 +300,12 @@ export async function observeStripeDisputeCreated({
   preFetchedCharge,
 }: ObserveStripeDisputeCreatedParams): Promise<void> {
   const chargeId = stripeReferenceId(dispute.charge);
+  const eventCreatedAt = new Date(eventCreated * 1000).toISOString();
   const paymentIntentId =
     stripeReferenceId(dispute.payment_intent) ??
     stripeReferenceId(preFetchedCharge?.payment_intent);
   const customerId = stripeReferenceId(preFetchedCharge?.customer);
-  const stripeCreatedAt =
-    stripeTimestampToIso(dispute.created) ?? new Date(eventCreated * 1000).toISOString();
+  const stripeCreatedAt = stripeTimestampToIso(dispute.created) ?? eventCreatedAt;
   const evidenceDueBy = stripeTimestampToIso(dispute.evidence_details?.due_by);
 
   await db.transaction(async tx => {
@@ -324,6 +316,7 @@ export async function observeStripeDisputeCreated({
     });
     await upsertDisputeCase(tx, {
       eventId,
+      eventCreatedAt,
       disputeId: dispute.id,
       chargeId,
       paymentIntentId,
@@ -672,6 +665,10 @@ async function cancelKiloPassForAcceptedDispute(params: {
   });
 
   if (result.status === 'skipped') {
+    if (result.reason.kind === 'store_managed_subscription') {
+      throw new Error('Store-managed Kilo Pass subscription requires manual cancellation');
+    }
+
     return {
       status: StripeDisputeActionStatus.Skipped,
       resultCode: result.reason.kind,
@@ -1128,19 +1125,27 @@ async function closeStripeDispute(caseRow: StripeDisputeCase): Promise<void> {
     actionType: StripeDisputeActionType.StripeAcceptance,
     targetKey: `stripe_dispute:${caseRow.stripe_dispute_id}`,
     run: async () => {
-      const dispute = await client.disputes.close(caseRow.stripe_dispute_id);
+      let dispute: Stripe.Dispute | null = null;
+      try {
+        dispute = await client.disputes.close(caseRow.stripe_dispute_id);
+      } catch (error) {
+        if (!isAlreadyClosedStripeDisputeError(error)) {
+          throw error;
+        }
+      }
+
       await db
         .update(stripe_dispute_cases)
         .set({
-          stripe_status: dispute.status,
+          stripe_status: dispute?.status ?? caseRow.stripe_status,
           accepted_at: new Date().toISOString(),
         })
         .where(eq(stripe_dispute_cases.id, caseRow.id));
 
       return {
         status: StripeDisputeActionStatus.Completed,
-        resultCode: dispute.status,
-        resultReferenceId: dispute.id,
+        resultCode: dispute?.status ?? 'already_closed',
+        resultReferenceId: dispute?.id ?? caseRow.stripe_dispute_id,
       };
     },
   });

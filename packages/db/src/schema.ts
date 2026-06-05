@@ -664,6 +664,7 @@ export const stripe_dispute_cases = pgTable(
       .notNull(),
     stripe_dispute_id: text().notNull(),
     stripe_event_id: text(),
+    stripe_event_created_at: timestamp({ withTimezone: true, mode: 'string' }),
     stripe_charge_id: text(),
     stripe_payment_intent_id: text(),
     stripe_customer_id: text(),

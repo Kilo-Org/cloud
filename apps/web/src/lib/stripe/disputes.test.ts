@@ -8,6 +8,7 @@ import { insertTestUser } from '@/tests/helpers/user.helper';
 import {
   auto_top_up_configs,
   credit_transactions,
+  kilo_pass_subscriptions,
   kilocode_users,
   kiloclaw_instances,
   kiloclaw_subscriptions,
@@ -17,6 +18,9 @@ import {
   stripe_dispute_cases,
 } from '@kilocode/db/schema';
 import {
+  KiloPassCadence,
+  KiloPassPaymentProvider,
+  KiloPassTier,
   KiloClawPlan,
   KiloClawSubscriptionStatus,
   StripeDisputeActionStatus,
@@ -246,6 +250,104 @@ describe('acceptStripeDisputeCase', () => {
         failure_context: 'Stripe close failed',
       }),
     ]);
+  });
+
+  it('continues enforcement when retrying an already closed Stripe dispute', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const user = await insertTestUser();
+    const retryAt = new Date(Date.now() - 60 * 1000).toISOString();
+    const [caseRow] = await db
+      .insert(stripe_dispute_cases)
+      .values({
+        stripe_dispute_id: 'dp_already_closed_retry',
+        stripe_event_id: 'evt_already_closed_retry',
+        stripe_customer_id: user.stripe_customer_id,
+        owner_classification: StripeDisputeOwnerClassification.Personal,
+        kilo_user_id: user.id,
+        status: StripeDisputeCaseStatus.AcceptanceFailed,
+        status_reason: 'Canonical personal owner matched; admin action required',
+        next_retry_at: retryAt,
+      })
+      .returning({ id: stripe_dispute_cases.id });
+    closeDisputeMock.mockRejectedValue(new Error('This dispute has already been closed.'));
+
+    const result = await acceptStripeDisputeCase({ caseId: caseRow.id, actor: admin });
+
+    expect(result).toEqual({ status: 'accepted', failures: [] });
+    const [updatedCase] = await db
+      .select()
+      .from(stripe_dispute_cases)
+      .where(eq(stripe_dispute_cases.id, caseRow.id));
+    expect(updatedCase.status).toBe(StripeDisputeCaseStatus.Accepted);
+    expect(updatedCase.accepted_at).not.toBeNull();
+
+    const actions = await db.select().from(stripe_dispute_actions);
+    expect(actions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          action_type: StripeDisputeActionType.StripeAcceptance,
+          status: StripeDisputeActionStatus.Completed,
+          result_code: 'already_closed',
+        }),
+        expect.objectContaining({
+          action_type: StripeDisputeActionType.UserBlock,
+          status: StripeDisputeActionStatus.Completed,
+        }),
+      ])
+    );
+  });
+
+  it('fails enforcement when Kilo Pass is store-managed', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const user = await insertTestUser();
+    await db.insert(kilo_pass_subscriptions).values({
+      kilo_user_id: user.id,
+      payment_provider: KiloPassPaymentProvider.AppStore,
+      provider_subscription_id: 'app_store_dispute_subscription',
+      tier: KiloPassTier.Tier19,
+      cadence: KiloPassCadence.Monthly,
+      status: 'active',
+    });
+    const [caseRow] = await db
+      .insert(stripe_dispute_cases)
+      .values({
+        stripe_dispute_id: 'dp_store_managed_kilo_pass',
+        stripe_event_id: 'evt_store_managed_kilo_pass',
+        stripe_customer_id: user.stripe_customer_id,
+        owner_classification: StripeDisputeOwnerClassification.Personal,
+        kilo_user_id: user.id,
+        status: StripeDisputeCaseStatus.NeedsAction,
+        status_reason: 'Canonical personal owner matched; admin action required',
+      })
+      .returning({ id: stripe_dispute_cases.id });
+    closeDisputeMock.mockResolvedValue({
+      id: 'dp_store_managed_kilo_pass',
+      status: 'lost',
+    } as Stripe.Response<Stripe.Dispute>);
+
+    const result = await acceptStripeDisputeCase({ caseId: caseRow.id, actor: admin });
+
+    expect(result.status).toBe('enforcement_failed');
+    expect(result.failures).toEqual(
+      expect.arrayContaining(['Store-managed Kilo Pass subscription requires manual cancellation'])
+    );
+    const [updatedCase] = await db
+      .select()
+      .from(stripe_dispute_cases)
+      .where(eq(stripe_dispute_cases.id, caseRow.id));
+    expect(updatedCase.status).toBe(StripeDisputeCaseStatus.EnforcementFailed);
+
+    const actions = await db.select().from(stripe_dispute_actions);
+    expect(actions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          action_type: StripeDisputeActionType.SubscriptionCancellation,
+          target_key: 'personal_kilo_pass',
+          status: StripeDisputeActionStatus.Failed,
+          failure_context: 'Store-managed Kilo Pass subscription requires manual cancellation',
+        }),
+      ])
+    );
   });
 
   it('allows stale processing cases to be retried', async () => {
@@ -573,6 +675,72 @@ describe('acceptStripeDisputeCase', () => {
 });
 
 describe('observeStripeDisputeCreated', () => {
+  it('reopens review-required cases after a newer actionable observation', async () => {
+    const user = await insertTestUser({ stripe_customer_id: 'cus_review_required_reopen_owner' });
+
+    await observeStripeDisputeCreated({
+      eventId: 'evt_dispute_under_review_first',
+      eventCreated: 1_717_243_100,
+      dispute: {
+        id: 'dp_review_required_reopen',
+        amount: 2900,
+        charge: 'ch_review_required_reopen',
+        created: 1_717_243_100,
+        currency: 'usd',
+        evidence_details: {
+          due_by: null,
+          enhanced_eligibility: {},
+          has_evidence: false,
+          past_due: false,
+          submission_count: 0,
+        },
+        payment_intent: 'pi_review_required_reopen',
+        reason: 'fraudulent',
+        status: 'under_review',
+      },
+      preFetchedCharge: {
+        id: 'ch_review_required_reopen',
+        customer: user.stripe_customer_id,
+        payment_intent: 'pi_review_required_reopen',
+      } as Stripe.Charge,
+    });
+
+    await observeStripeDisputeCreated({
+      eventId: 'evt_dispute_needs_response_later',
+      eventCreated: 1_717_243_200,
+      dispute: {
+        id: 'dp_review_required_reopen',
+        amount: 2900,
+        charge: 'ch_review_required_reopen',
+        created: 1_717_243_100,
+        currency: 'usd',
+        evidence_details: {
+          due_by: null,
+          enhanced_eligibility: {},
+          has_evidence: false,
+          past_due: false,
+          submission_count: 0,
+        },
+        payment_intent: 'pi_review_required_reopen',
+        reason: 'fraudulent',
+        status: 'needs_response',
+      },
+      preFetchedCharge: {
+        id: 'ch_review_required_reopen',
+        customer: user.stripe_customer_id,
+        payment_intent: 'pi_review_required_reopen',
+      } as Stripe.Charge,
+    });
+
+    const [caseRow] = await db
+      .select()
+      .from(stripe_dispute_cases)
+      .where(eq(stripe_dispute_cases.stripe_dispute_id, 'dp_review_required_reopen'));
+    expect(caseRow.status).toBe(StripeDisputeCaseStatus.NeedsAction);
+    expect(caseRow.stripe_status).toBe('needs_response');
+    expect(caseRow.stripe_event_id).toBe('evt_dispute_needs_response_later');
+  });
+
   it('does not reopen review-required cases after an older actionable observation', async () => {
     const user = await insertTestUser({ stripe_customer_id: 'cus_review_required_dispute_owner' });
 

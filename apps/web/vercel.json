@@ -62,7 +62,7 @@
     },
     {
       "path": "/api/cron/cleanup-review-memory",
-      "schedule": "0 * * * *"
+      "schedule": "0 */12 * * *"
     },
     {
       "path": "/api/cron/exa-partition-maintenance",

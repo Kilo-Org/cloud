@@ -103,7 +103,8 @@ const DISPUTE_ACTION_RETRY_DELAY_MS = 5 * 60 * 1000;
 const DISPUTE_KILOCLAW_DESTRUCTION_GRACE_DAYS = 7;
 const DISPUTE_ENFORCEMENT_REASON = 'stripe_dispute_accepted';
 
-const actionableStripeStatuses = new Set(['needs_response', 'warning_needs_response']);
+const actionableStripeStatusValues = ['needs_response', 'warning_needs_response'];
+const actionableStripeStatuses = new Set(actionableStripeStatusValues);
 const closedStripeStatuses = new Set(['lost', 'won', 'prevented', 'warning_closed']);
 
 function stripeReferenceId(reference: StripeReference): string | null {
@@ -262,23 +263,42 @@ async function upsertDisputeCase(
     .values(caseValues)
     .onConflictDoNothing({ target: [stripe_dispute_cases.stripe_dispute_id] });
 
-  await database
-    .update(stripe_dispute_cases)
-    .set(caseValues)
-    .where(
-      and(
-        eq(stripe_dispute_cases.stripe_dispute_id, values.disputeId),
-        not(
-          inArray(stripe_dispute_cases.status, [
-            StripeDisputeCaseStatus.Processing,
-            StripeDisputeCaseStatus.Accepted,
-            StripeDisputeCaseStatus.AcceptanceFailed,
-            StripeDisputeCaseStatus.EnforcementFailed,
-            StripeDisputeCaseStatus.Closed,
-          ])
+  const updateFilter =
+    values.status === StripeDisputeCaseStatus.NeedsAction
+      ? and(
+          eq(stripe_dispute_cases.stripe_dispute_id, values.disputeId),
+          not(
+            inArray(stripe_dispute_cases.status, [
+              StripeDisputeCaseStatus.Processing,
+              StripeDisputeCaseStatus.Accepted,
+              StripeDisputeCaseStatus.AcceptanceFailed,
+              StripeDisputeCaseStatus.EnforcementFailed,
+              StripeDisputeCaseStatus.Closed,
+            ])
+          ),
+          not(
+            sql`${stripe_dispute_cases.status} = ${StripeDisputeCaseStatus.ReviewRequired}
+              AND (${stripe_dispute_cases.stripe_status} IS NULL
+                OR ${stripe_dispute_cases.stripe_status} NOT IN (${sql.join(
+                  actionableStripeStatusValues.map(value => sql`${value}`),
+                  sql`, `
+                )}))`
+          )
         )
-      )
-    );
+      : and(
+          eq(stripe_dispute_cases.stripe_dispute_id, values.disputeId),
+          not(
+            inArray(stripe_dispute_cases.status, [
+              StripeDisputeCaseStatus.Processing,
+              StripeDisputeCaseStatus.Accepted,
+              StripeDisputeCaseStatus.AcceptanceFailed,
+              StripeDisputeCaseStatus.EnforcementFailed,
+              StripeDisputeCaseStatus.Closed,
+            ])
+          )
+        );
+
+  await database.update(stripe_dispute_cases).set(caseValues).where(updateFilter);
 }
 
 export async function observeStripeDisputeCreated({

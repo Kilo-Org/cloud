@@ -573,6 +573,72 @@ describe('acceptStripeDisputeCase', () => {
 });
 
 describe('observeStripeDisputeCreated', () => {
+  it('does not reopen review-required cases after an older actionable observation', async () => {
+    const user = await insertTestUser({ stripe_customer_id: 'cus_review_required_dispute_owner' });
+
+    await observeStripeDisputeCreated({
+      eventId: 'evt_dispute_under_review',
+      eventCreated: 1_717_243_200,
+      dispute: {
+        id: 'dp_review_required_no_reopen',
+        amount: 2900,
+        charge: 'ch_review_required_no_reopen',
+        created: 1_717_243_200,
+        currency: 'usd',
+        evidence_details: {
+          due_by: null,
+          enhanced_eligibility: {},
+          has_evidence: false,
+          past_due: false,
+          submission_count: 0,
+        },
+        payment_intent: 'pi_review_required_no_reopen',
+        reason: 'fraudulent',
+        status: 'under_review',
+      },
+      preFetchedCharge: {
+        id: 'ch_review_required_no_reopen',
+        customer: user.stripe_customer_id,
+        payment_intent: 'pi_review_required_no_reopen',
+      } as Stripe.Charge,
+    });
+
+    await observeStripeDisputeCreated({
+      eventId: 'evt_dispute_created_stale',
+      eventCreated: 1_717_243_100,
+      dispute: {
+        id: 'dp_review_required_no_reopen',
+        amount: 2900,
+        charge: 'ch_review_required_no_reopen',
+        created: 1_717_243_100,
+        currency: 'usd',
+        evidence_details: {
+          due_by: null,
+          enhanced_eligibility: {},
+          has_evidence: false,
+          past_due: false,
+          submission_count: 0,
+        },
+        payment_intent: 'pi_review_required_no_reopen',
+        reason: 'fraudulent',
+        status: 'needs_response',
+      },
+      preFetchedCharge: {
+        id: 'ch_review_required_no_reopen',
+        customer: user.stripe_customer_id,
+        payment_intent: 'pi_review_required_no_reopen',
+      } as Stripe.Charge,
+    });
+
+    const [caseRow] = await db
+      .select()
+      .from(stripe_dispute_cases)
+      .where(eq(stripe_dispute_cases.stripe_dispute_id, 'dp_review_required_no_reopen'));
+    expect(caseRow.status).toBe(StripeDisputeCaseStatus.ReviewRequired);
+    expect(caseRow.stripe_status).toBe('under_review');
+    expect(caseRow.stripe_event_id).toBe('evt_dispute_under_review');
+  });
+
   it('does not downgrade a terminal closed case after an older open observation', async () => {
     const user = await insertTestUser({ stripe_customer_id: 'cus_closed_dispute_owner' });
 

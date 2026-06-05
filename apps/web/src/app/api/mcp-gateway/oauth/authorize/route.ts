@@ -246,10 +246,10 @@ function consentDocument(params: {
         <div class="brand"><span class="brand-mark" aria-hidden="true"></span>Kilo Code</div>
         <section class="card" aria-labelledby="authorization-title">
           <h1 id="authorization-title">Authorize access</h1>
-          <p class="lead">${params.clientName} wants access to this Kilo Code MCP connection.</p>
+          <p class="lead">${escapeHtml(params.clientName)} wants access to this Kilo Code MCP connection.</p>
           <div class="section">
             <span class="label">Requested resource</span>
-            <code class="resource">${params.resource}</code>
+            <code class="resource">${escapeHtml(params.resource)}</code>
           </div>
           <div class="section">
             <span class="label">Scopes</span>
@@ -257,9 +257,9 @@ function consentDocument(params: {
               .map(scope => `<span class="scope">${escapeHtml(scope)}</span>`)
               .join('')}</div>
           </div>
-          <form method="post" action="${params.action}">
+          <form method="post" action="${escapeHtml(params.action)}">
             ${params.inputs}
-            <input type="hidden" name="approval_state" value="${params.approvalState}">
+            <input type="hidden" name="approval_state" value="${escapeHtml(params.approvalState)}">
             <button type="submit">Approve access</button>
           </form>
         </section>
@@ -308,10 +308,10 @@ async function consentResponse(request: NextRequest, route?: ScopedConnectRoute)
     .join('');
   const response = new NextResponse(
     consentDocument({
-      action: escapeHtml(request.nextUrl.pathname),
-      approvalState: escapeHtml(approvalState),
-      clientName: escapeHtml(preview.clientName ?? preview.clientId),
-      resource: escapeHtml(preview.resource),
+      action: request.nextUrl.pathname,
+      approvalState,
+      clientName: preview.clientName ?? preview.clientId,
+      resource: preview.resource,
       scopes: preview.scopes,
       inputs,
     }),

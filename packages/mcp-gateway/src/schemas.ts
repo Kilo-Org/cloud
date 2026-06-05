@@ -60,7 +60,10 @@ export const OAuthClientMetadataSchema = z
     ]),
     grant_types: z.array(z.enum(['authorization_code', 'refresh_token'])).min(1),
     response_types: z.array(z.literal('code')).min(1),
-    scope: z.string().optional(),
+    scope: z
+      .string()
+      .min(1)
+      .refine(value => value.trim().length > 0, 'Scope is required'),
   })
   .strip();
 

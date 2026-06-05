@@ -76,6 +76,7 @@ describe('OAuth client metadata', () => {
       token_endpoint_auth_method: 'none',
       grant_types: ['authorization_code'],
       response_types: ['code'],
+      scope: 'profile',
       client_uri: 'https://client.example',
       logo_uri: 'https://client.example/logo.svg',
       software_id: 'codex',
@@ -87,7 +88,20 @@ describe('OAuth client metadata', () => {
       token_endpoint_auth_method: 'none',
       grant_types: ['authorization_code'],
       response_types: ['code'],
+      scope: 'profile',
     });
+  });
+
+  test.each([undefined, '', '   '])('requires a non-empty scope declaration: %p', scope => {
+    expect(
+      OAuthClientMetadataSchema.safeParse({
+        redirect_uris: ['http://localhost:3000/callback'],
+        token_endpoint_auth_method: 'none',
+        grant_types: ['authorization_code'],
+        response_types: ['code'],
+        scope,
+      }).success
+    ).toBe(false);
   });
 });
 
@@ -99,6 +113,7 @@ describe('OAuth redirect URI policy', () => {
         token_endpoint_auth_method: 'none',
         grant_types: ['authorization_code'],
         response_types: ['code'],
+        scope: 'profile',
       }).success
     ).toBe(true);
     expect(
@@ -107,6 +122,7 @@ describe('OAuth redirect URI policy', () => {
         token_endpoint_auth_method: 'none',
         grant_types: ['authorization_code'],
         response_types: ['code'],
+        scope: 'profile',
       }).success
     ).toBe(true);
     expect(

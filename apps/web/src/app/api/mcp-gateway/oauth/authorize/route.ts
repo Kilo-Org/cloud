@@ -1,10 +1,6 @@
 import 'server-only';
 import { NextResponse, type NextRequest } from 'next/server';
-import {
-  OAuthAuthorizationQuerySchema,
-  type GatewayExecutionContext,
-  type OAuthAuthorizationQuery,
-} from '@kilocode/mcp-gateway';
+import { OAuthAuthorizationQuerySchema, type OAuthAuthorizationQuery } from '@kilocode/mcp-gateway';
 import { timingSafeEqual } from '@kilocode/encryption';
 import { getUserFromAuth } from '@/lib/user/server';
 import { createGatewayServices } from '@/lib/mcp-gateway/services';
@@ -13,8 +9,22 @@ import type { ScopedConnectRoute } from '@kilocode/mcp-gateway';
 import { executionContextFromAuth } from '@/lib/mcp-gateway/context';
 import { hmacValue, randomToken } from '@/lib/mcp-gateway/crypto';
 import { OAuthAuthorizationRedirectError } from '@/lib/mcp-gateway/authorization-service';
+import {
+  hasDuplicateSingletonParams,
+  stringFormParams,
+} from '@/lib/mcp-gateway/oauth-request-params';
 
 const consentCookieName = 'mcp_gateway_authorization_approval';
+const authorizationSingletonParams = [
+  'client_id',
+  'redirect_uri',
+  'response_type',
+  'scope',
+  'state',
+  'resource',
+  'code_challenge',
+  'code_challenge_method',
+] as const;
 
 function escapeHtml(value: string): string {
   return value
@@ -33,15 +43,6 @@ function stringParams(entries: IterableIterator<[string, string]>): Record<strin
   return params;
 }
 
-function formParams(form: FormData): Record<string, string> {
-  const params: Record<string, string> = {};
-  for (const [key, value] of form.entries()) {
-    if (key === 'approval_state' || typeof value !== 'string') continue;
-    params[key] = value;
-  }
-  return params;
-}
-
 export function redirectOAuthError(error: OAuthAuthorizationRedirectError) {
   const redirect = new URL(error.redirectUri);
   redirect.searchParams.set('error', error.code);
@@ -55,22 +56,6 @@ async function authorizationIdentity() {
   if (authFailedResponse) return { response: authFailedResponse };
   if (!user) return { response: NextResponse.json({ error: 'access_denied' }, { status: 401 }) };
   return { user, executionContext: executionContextFromAuth(organizationId) };
-}
-
-export function authorizationExecutionContext(params: {
-  query: OAuthAuthorizationQuery;
-  route?: ScopedConnectRoute;
-  defaultExecutionContext: GatewayExecutionContext;
-  parseResource: (resource: string) => ScopedConnectRoute;
-}): GatewayExecutionContext {
-  const route =
-    params.route ??
-    (params.query.resource ? params.parseResource(params.query.resource) : undefined);
-  if (!route) return params.defaultExecutionContext;
-  if (route.ownerScope === 'organization') {
-    return { type: 'organization', organizationId: route.ownerId };
-  }
-  return { type: 'personal' };
 }
 
 async function authorizeRequest(
@@ -288,6 +273,9 @@ function consentDocument(params: {
 async function consentResponse(request: NextRequest, route?: ScopedConnectRoute) {
   const identity = await authorizationIdentity();
   if ('response' in identity) return identity.response;
+  if (hasDuplicateSingletonParams(request.nextUrl.searchParams, authorizationSingletonParams)) {
+    return NextResponse.json({ error: 'invalid_request' }, { status: 400 });
+  }
   const parsed = OAuthAuthorizationQuerySchema.safeParse(
     stringParams(request.nextUrl.searchParams.entries())
   );
@@ -295,12 +283,7 @@ async function consentResponse(request: NextRequest, route?: ScopedConnectRoute)
     return NextResponse.json({ error: 'invalid_request' }, { status: 400 });
   }
   const services = createGatewayServices();
-  const executionContext = authorizationExecutionContext({
-    query: parsed.data,
-    route,
-    defaultExecutionContext: identity.executionContext,
-    parseResource: services.routeService.parseResource,
-  });
+  const executionContext = identity.executionContext;
   const preview = await services.authorizationService.previewAuthorization({
     query: parsed.data,
     route,
@@ -348,19 +331,17 @@ async function approveRequest(request: NextRequest, route?: ScopedConnectRoute) 
   const identity = await authorizationIdentity();
   if ('response' in identity) return identity.response;
   const form = await request.formData();
+  if (hasDuplicateSingletonParams(form, [...authorizationSingletonParams, 'approval_state'])) {
+    return NextResponse.json({ error: 'invalid_request' }, { status: 400 });
+  }
   const approvalState = form.get('approval_state');
-  const raw = formParams(form);
+  const raw = stringFormParams(form, authorizationSingletonParams, ['approval_state']);
   const parsed = OAuthAuthorizationQuerySchema.safeParse(raw);
   if (!parsed.success) {
     return NextResponse.json({ error: 'invalid_request' }, { status: 400 });
   }
   const services = createGatewayServices();
-  const executionContext = authorizationExecutionContext({
-    query: parsed.data,
-    route,
-    defaultExecutionContext: identity.executionContext,
-    parseResource: services.routeService.parseResource,
-  });
+  const executionContext = identity.executionContext;
   const preview = await services.authorizationService.previewAuthorization({
     query: parsed.data,
     route,

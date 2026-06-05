@@ -74,6 +74,7 @@ describe('POST /api/mcp-gateway/oauth/register', () => {
         token_endpoint_auth_method: tokenEndpointAuthMethod,
         grant_types: ['authorization_code'],
         response_types: ['code'],
+        scope: 'profile',
       },
       declaredScopes: ['profile'],
     });

@@ -201,6 +201,16 @@ export function createAuthorizationService(params: {
     return { code, redirectUrl: redirect.toString() };
   }
 
+  function executionContextMatchesRoute(
+    executionContext: GatewayExecutionContext,
+    route: ScopedConnectRoute
+  ): boolean {
+    if (route.ownerScope === 'personal') return executionContext.type === 'personal';
+    return (
+      executionContext.type === 'organization' && executionContext.organizationId === route.ownerId
+    );
+  }
+
   async function prepareAuthorization(input: {
     query: OAuthAuthorizationQuery;
     route?: ScopedConnectRoute;
@@ -250,6 +260,12 @@ export function createAuthorizationService(params: {
       });
       route = resolvedRoute.route;
       resolved = resolvedRoute.resolved;
+      if (!executionContextMatchesRoute(input.executionContext, route)) {
+        redirectError(
+          GatewayErrorCode.AccessDenied,
+          'Execution context does not match resource owner'
+        );
+      }
       await params.routeService.authorize({
         resolved,
         route,

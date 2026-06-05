@@ -4,10 +4,28 @@ import { OAuthTokenRequestSchema } from '@kilocode/mcp-gateway';
 import { createGatewayServices } from '@/lib/mcp-gateway/services';
 import { gatewayErrorResponse } from '@/lib/mcp-gateway/http';
 import type { ScopedConnectRoute } from '@kilocode/mcp-gateway';
+import {
+  hasDuplicateSingletonParams,
+  stringFormParams,
+} from '@/lib/mcp-gateway/oauth-request-params';
+
+const tokenSingletonParams = [
+  'grant_type',
+  'code',
+  'refresh_token',
+  'redirect_uri',
+  'client_id',
+  'client_secret',
+  'code_verifier',
+  'resource',
+] as const;
 
 async function exchangeToken(request: NextRequest, route?: ScopedConnectRoute) {
   const form = await request.formData();
-  const raw = Object.fromEntries(form.entries());
+  if (hasDuplicateSingletonParams(form, tokenSingletonParams)) {
+    return NextResponse.json({ error: 'invalid_request' }, { status: 400 });
+  }
+  const raw = stringFormParams(form, tokenSingletonParams);
   const parsed = OAuthTokenRequestSchema.safeParse(raw);
   if (!parsed.success) {
     return NextResponse.json({ error: 'invalid_request' }, { status: 400 });

@@ -1,7 +1,6 @@
 import 'server-only';
 import {
   GatewayOAuthClientAuthMethod,
-  GatewaySupportedScopes,
   OAuthClientMetadataSchema,
   filterSupportedScopes,
   parseScopeString,
@@ -64,13 +63,20 @@ export function createOAuthClientService(params: {
     }
   }
 
-  function validateDeclaredScopes(scope: string | undefined): string[] {
+  function validateDeclaredScopes(scope: string): string[] {
     const requestedScopes = parseScopeString(scope);
+    if (requestedScopes.length === 0) {
+      throw createGatewayError(
+        GatewayErrorCode.InvalidClientMetadata,
+        'At least one scope is required',
+        400
+      );
+    }
     const declaredScopes = filterSupportedScopes(requestedScopes);
-    if (scope && declaredScopes.length !== requestedScopes.length) {
+    if (declaredScopes.length !== requestedScopes.length) {
       throw createGatewayError(GatewayErrorCode.InvalidClientMetadata, 'Unsupported scopes', 400);
     }
-    return declaredScopes.length > 0 ? declaredScopes : [...GatewaySupportedScopes];
+    return declaredScopes;
   }
 
   async function registerClient(input: {

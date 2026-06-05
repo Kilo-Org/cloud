@@ -69,6 +69,24 @@ const DeleteResultSchema = z.object({
 export type CreateAgentCliResult = z.infer<typeof CreateResultSchema>;
 export type DeleteAgentCliResult = z.infer<typeof DeleteResultSchema>;
 
+const BindResultSchema = z.object({
+  agentId: NormalizedCliAgentIdSchema,
+  added: z.array(z.string()),
+  updated: z.array(z.string()),
+  skipped: z.array(z.string()),
+  conflicts: z.array(z.string()),
+});
+
+const UnbindResultSchema = z.object({
+  agentId: NormalizedCliAgentIdSchema,
+  removed: z.array(z.string()),
+  missing: z.array(z.string()),
+  conflicts: z.array(z.string()),
+});
+
+export type BindAgentCliResult = z.infer<typeof BindResultSchema>;
+export type UnbindAgentCliResult = z.infer<typeof UnbindResultSchema>;
+
 type CliProcessResult = {
   stdout: string;
   stderr: string;
@@ -184,4 +202,41 @@ export async function deleteAgentViaCli(
 ): Promise<DeleteAgentCliResult> {
   const result = await deps.run(['agents', 'delete', agentId, '--force', '--json']);
   return parseCliJson(result.stdout, DeleteResultSchema);
+}
+
+// Each spec is a `channel[:accountId]` binding (e.g. `slack` or `slack:team`).
+export async function bindAgentViaCli(
+  agentId: string,
+  specs: string[],
+  deps: OpenClawAgentCliDeps = defaultDeps
+): Promise<BindAgentCliResult> {
+  const args = [
+    'agents',
+    'bind',
+    '--agent',
+    agentId,
+    ...specs.flatMap(spec => ['--bind', spec]),
+    '--json',
+  ];
+  const result = await deps.run(args);
+  return parseCliJson(result.stdout, BindResultSchema);
+}
+
+export async function unbindAgentViaCli(
+  agentId: string,
+  specs: string[],
+  deps: OpenClawAgentCliDeps = defaultDeps
+): Promise<UnbindAgentCliResult> {
+  // Always target specific `--bind` specs (never `--all`) so advanced bindings
+  // (peer/guild/account-scoped) the simple editor doesn't manage are preserved.
+  const args = [
+    'agents',
+    'unbind',
+    '--agent',
+    agentId,
+    ...specs.flatMap(spec => ['--bind', spec]),
+    '--json',
+  ];
+  const result = await deps.run(args);
+  return parseCliJson(result.stdout, UnbindResultSchema);
 }

@@ -67,6 +67,7 @@ function createDeps(overrides: Partial<AgentRouteDeps> = {}): AgentRouteDeps {
       removedBindings: 1,
       removedAllow: 0,
     })),
+    setBindings: vi.fn(async () => ({ snapshot, agent })),
     ...overrides,
   };
 }
@@ -179,6 +180,52 @@ describe('agent config mutation routes', () => {
       agentId: 'research',
       filesystemDisposition: 'unverified',
     });
+  });
+
+  it('sets agent bindings declaratively and returns the normalized summary', async () => {
+    const deps = createDeps();
+    const response = await makeApp(deps).request('/_kilo/config/agents/research/bindings', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ channels: ['slack', 'discord'] }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(deps.setBindings).toHaveBeenCalledWith('research', { channels: ['slack', 'discord'] });
+    expect(await response.json()).toMatchObject({
+      ok: true,
+      etag: 'etag-1',
+      agent: { id: 'research' },
+    });
+  });
+
+  it('rejects an invalid bindings body', async () => {
+    const deps = createDeps();
+    const response = await makeApp(deps).request('/_kilo/config/agents/research/bindings', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ channels: 'slack' }),
+    });
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ code: 'invalid_agent_request' });
+    expect(deps.setBindings).not.toHaveBeenCalled();
+  });
+
+  it('maps a binding conflict to 409', async () => {
+    const deps = createDeps({
+      setBindings: vi.fn(async () => {
+        throw new AgentConfigError(409, 'agent_binding_conflict', 'Channel routed elsewhere');
+      }),
+    });
+    const response = await makeApp(deps).request('/_kilo/config/agents/research/bindings', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ channels: ['slack'] }),
+    });
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ code: 'agent_binding_conflict' });
   });
 
   it('rejects unsupported settings fields and removed target expectation guards', async () => {

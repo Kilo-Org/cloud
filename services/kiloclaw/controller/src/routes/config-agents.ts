@@ -16,6 +16,7 @@ import {
   createAgentViaCli,
   deleteAgentViaCli,
 } from '../openclaw-agent-cli';
+import { AgentBindingsPutBodySchema, setAgentBindings } from '../openclaw-agent-bindings';
 
 export type AgentRouteDeps = {
   readSnapshot: typeof readAgentConfigSnapshot;
@@ -26,6 +27,7 @@ export type AgentRouteDeps = {
   updateDefaults: typeof updateAgentDefaults;
   createViaCli: typeof createAgentViaCli;
   deleteViaCli: typeof deleteAgentViaCli;
+  setBindings: typeof setAgentBindings;
 };
 
 const defaultDeps: AgentRouteDeps = {
@@ -37,6 +39,7 @@ const defaultDeps: AgentRouteDeps = {
   updateDefaults: updateAgentDefaults,
   createViaCli: createAgentViaCli,
   deleteViaCli: deleteAgentViaCli,
+  setBindings: setAgentBindings,
 };
 
 function errorStatus(status: number): 400 | 404 | 409 | 422 | 500 | 502 | 504 {
@@ -149,6 +152,22 @@ export function registerAgentConfigRoutes(app: Hono, deps: AgentRouteDeps = defa
     try {
       const deleted = await deps.serializeMutation(() => deps.deleteViaCli(c.req.param('agentId')));
       return c.json({ ok: true, ...deleted, filesystemDisposition: 'unverified' });
+    } catch (error) {
+      return respondError(c, error);
+    }
+  });
+
+  app.put('/_kilo/config/agents/:agentId/bindings', async c => {
+    try {
+      const parsed = AgentBindingsPutBodySchema.safeParse(await readJsonBody(c));
+      if (!parsed.success) {
+        return c.json(
+          { code: 'invalid_agent_request', error: 'Invalid agent bindings request' },
+          400
+        );
+      }
+      const result = await deps.setBindings(c.req.param('agentId'), parsed.data);
+      return c.json({ ok: true, etag: result.snapshot.etag, agent: result.agent });
     } catch (error) {
       return respondError(c, error);
     }

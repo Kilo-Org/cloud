@@ -530,6 +530,17 @@ describe('review memory db helpers', () => {
       dedupeKey: 'retention-retained-prune-proposal',
       evidence: [{ feedbackEventId: retainedEvent.event.id, role: 'primary' }],
     });
+    const openedProposal = await upsertReviewMemoryProposal({
+      owner,
+      platform: 'github',
+      repoFullName: 'owner/expired',
+      scopeKind: 'repository',
+      proposalType: 'clarify',
+      title: 'Retained opened proposal',
+      rationale: 'It backs an opened change request.',
+      proposedMarkdown: '### Retained opened proposal',
+      dedupeKey: 'retention-opened-prune-proposal',
+    });
     await db
       .update(code_review_feedback_subjects)
       .set({
@@ -551,6 +562,16 @@ describe('review memory db helpers', () => {
       .update(code_review_memory_proposals)
       .set({ created_at: expiredCreatedAt, updated_at: expiredCreatedAt })
       .where(eq(code_review_memory_proposals.id, expiredProposal.id));
+    await db
+      .update(code_review_memory_proposals)
+      .set({
+        created_at: expiredCreatedAt,
+        updated_at: expiredCreatedAt,
+        status: 'change_request_opened',
+        change_request_number: 12,
+        change_request_url: 'https://github.com/owner/expired/pull/12',
+      })
+      .where(eq(code_review_memory_proposals.id, openedProposal.id));
 
     const summary = await pruneExpiredReviewMemoryData({ now });
 
@@ -572,9 +593,14 @@ describe('review memory db helpers', () => {
     await expect(db.select().from(code_review_memory_aggregation_runs)).resolves.toEqual([
       expect.objectContaining({ id: retainedRun.id }),
     ]);
-    await expect(db.select().from(code_review_memory_proposals)).resolves.toEqual([
-      expect.objectContaining({ id: retainedProposal.id }),
-    ]);
+    const proposals = await db.select().from(code_review_memory_proposals);
+    expect(proposals).toHaveLength(2);
+    expect(proposals).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: openedProposal.id }),
+        expect.objectContaining({ id: retainedProposal.id }),
+      ])
+    );
     await expect(db.select().from(code_review_memory_proposal_evidence)).resolves.toHaveLength(1);
 
     const [state] = await listAggregationStates({ owner, platform: 'github' });

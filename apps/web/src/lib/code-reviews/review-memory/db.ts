@@ -45,6 +45,15 @@ export const ACTIONABLE_REVIEW_MEMORY_PROPOSAL_STATUSES = [
   'change_request_failed',
 ] as const satisfies readonly ReviewMemoryProposalStatus[];
 
+const PRUNABLE_REVIEW_MEMORY_PROPOSAL_STATUSES = [
+  'open',
+  'edited',
+  'approved',
+  'rejected',
+  'change_request_failed',
+  'superseded',
+] as const satisfies readonly ReviewMemoryProposalStatus[];
+
 const DEFAULT_EXCERPT_LIMIT = 500;
 
 function databaseOrDefault(database?: ReviewMemoryDatabase): ReviewMemoryDatabase {
@@ -631,7 +640,12 @@ export async function pruneExpiredReviewMemoryData(
     const expiredProposalIds = await database
       .select({ id: code_review_memory_proposals.id })
       .from(code_review_memory_proposals)
-      .where(lt(code_review_memory_proposals.created_at, cutoff))
+      .where(
+        and(
+          lt(code_review_memory_proposals.created_at, cutoff),
+          inArray(code_review_memory_proposals.status, PRUNABLE_REVIEW_MEMORY_PROPOSAL_STATUSES)
+        )
+      )
       .orderBy(asc(code_review_memory_proposals.created_at), asc(code_review_memory_proposals.id))
       .limit(batchSize);
     if (expiredProposalIds.length === 0) break;

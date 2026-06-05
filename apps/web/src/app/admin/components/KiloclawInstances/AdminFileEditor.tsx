@@ -112,7 +112,7 @@ export function AdminFileEditor({
       onSuccess: async result => {
         if ('outcome' in result) return;
         await queryClient.invalidateQueries({
-          queryKey: trpc.admin.kiloclawInstances.fileTree.queryKey(),
+          queryKey: trpc.admin.kiloclawInstances.fileTree.queryKey({ userId, instanceId }),
         });
         await queryClient.invalidateQueries({
           queryKey: trpc.admin.kiloclawInstances.readFile.queryKey({ userId, instanceId }),

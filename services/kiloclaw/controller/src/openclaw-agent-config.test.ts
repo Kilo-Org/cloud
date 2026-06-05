@@ -424,6 +424,17 @@ describe('updateAgentBindings', () => {
     expect(channelsOf(configPath, 'research')).toEqual([]);
   });
 
+  it('detects a conflict against a differently-cased or padded stored channel', async () => {
+    const configPath = await configFixture({
+      agents: { list: [{ id: 'research' }, { id: 'ops' }] },
+      bindings: [{ type: 'route', agentId: 'ops', match: { channel: '  Slack ' } }],
+    });
+
+    await expect(
+      updateAgentBindings('research', { channels: ['slack'] }, { configPath })
+    ).rejects.toMatchObject({ code: 'agent_binding_conflict', status: 409 });
+  });
+
   it('rejects a stale etag without writing', async () => {
     const configPath = await configFixture({ agents: { list: [{ id: 'research' }] } });
 

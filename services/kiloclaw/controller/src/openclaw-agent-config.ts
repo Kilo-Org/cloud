@@ -330,9 +330,15 @@ const ConfigBindingSchema = z
 // Match keys that make a binding more specific than a channel(/account) route.
 const ADVANCED_MATCH_KEYS = ['peer', 'parentPeer', 'guildId', 'teamId', 'roles'];
 
+function normalizeChannel(channel: string): string {
+  return channel.trim().toLowerCase();
+}
+
 // Classify a raw binding entry as a "managed" channel-level default-account route
 // (the only kind the declarative set touches), or null for anything else
 // (advanced match, account-scoped, non-route type, or unparseable — all preserved).
+// The returned channel is normalized so conflict/diff comparisons match the
+// equally-normalized requested channels regardless of stored casing/whitespace.
 function classifyManagedChannelRoute(item: unknown): { agentId: string; channel: string } | null {
   const parsed = ConfigBindingSchema.safeParse(item);
   if (!parsed.success) {
@@ -349,7 +355,10 @@ function classifyManagedChannelRoute(item: unknown): { agentId: string; channel:
   if (ADVANCED_MATCH_KEYS.some(key => match[key] !== undefined)) {
     return null;
   }
-  return { agentId: normalizeAgentId(binding.agentId), channel: binding.match.channel };
+  return {
+    agentId: normalizeAgentId(binding.agentId),
+    channel: normalizeChannel(binding.match.channel),
+  };
 }
 
 // Parse the top-level bindings array once and group summaries by normalized
@@ -673,7 +682,7 @@ export async function updateAgentBindings(
   options: AgentConfigOptions = {}
 ): Promise<{ snapshot: AgentConfigSnapshot; agent: AgentSummary }> {
   const normalized = requireAgentId(agentId);
-  const desired = [...new Set(body.channels.map(channel => channel.trim().toLowerCase()))];
+  const desired = [...new Set(body.channels.map(normalizeChannel))];
 
   const { snapshot } = await mutateAgentConfig(
     body.etag,

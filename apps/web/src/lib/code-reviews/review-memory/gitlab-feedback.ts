@@ -12,6 +12,7 @@ import {
   upsertFeedbackSubject,
   type ReviewMemoryOwner,
 } from './db';
+import { classifyReviewCommentReply } from './reply-classification';
 import { isLikelyKiloInlineReviewBody, parseReviewFindingMetadata } from './sync-subjects';
 
 type GitLabFeedbackResult = {
@@ -57,44 +58,6 @@ function isLikelyKiloActor(actor: GitLabActor): boolean {
   const username = actor?.username?.toLowerCase().trim() ?? '';
   const name = actor?.name?.toLowerCase().replace(/\s+/g, ' ').trim() ?? '';
   return KILO_GITLAB_ACTOR_USERNAMES.has(username) || KILO_GITLAB_ACTOR_NAMES.has(name);
-}
-
-function classifyGitLabNoteFeedback(body: string): {
-  signalKind: 'corrective_reply' | 'supportive_reply';
-  sentiment: 'positive' | 'negative' | 'neutral';
-  strength: number;
-} {
-  const normalized = body.toLowerCase();
-  const correctivePatterns = [
-    'false positive',
-    'not an issue',
-    'incorrect',
-    'wrong',
-    'this is expected',
-    'expected behavior',
-    'does not apply',
-    'please remove',
-    'unhelpful',
-  ];
-  if (correctivePatterns.some(pattern => normalized.includes(pattern))) {
-    return { signalKind: 'corrective_reply', sentiment: 'negative', strength: 3 };
-  }
-
-  const supportivePatterns = [
-    'good catch',
-    'nice catch',
-    'thanks',
-    'thank you',
-    'fixed',
-    'resolved',
-    'agreed',
-    'makes sense',
-  ];
-  if (supportivePatterns.some(pattern => normalized.includes(pattern))) {
-    return { signalKind: 'supportive_reply', sentiment: 'positive', strength: 2 };
-  }
-
-  return { signalKind: 'supportive_reply', sentiment: 'neutral', strength: 1 };
 }
 
 function emojiSentiment(name: string): {
@@ -247,7 +210,7 @@ export async function handleGitLabNoteFeedback(input: {
 
   if (!subject) return skipped('not-kilo-subject');
 
-  const classification = classifyGitLabNoteFeedback(note.note);
+  const classification = classifyReviewCommentReply(note.note);
   const result = await recordFeedbackEvent({
     owner,
     platform: 'gitlab',

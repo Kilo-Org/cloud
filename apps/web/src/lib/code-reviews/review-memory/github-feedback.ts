@@ -11,6 +11,7 @@ import {
   upsertFeedbackSubject,
   type ReviewMemoryOwner,
 } from './db';
+import { classifyReviewCommentReply } from './reply-classification';
 import { isLikelyKiloInlineReviewBody, parseReviewFindingMetadata } from './sync-subjects';
 
 type GitHubFeedbackResult =
@@ -85,41 +86,11 @@ export function classifyGitHubReviewCommentReply(body: string): {
   sentiment: 'positive' | 'negative' | 'neutral';
   strength: number;
 } {
-  const normalized = body.toLowerCase();
   if (/@kilo\s+(fix|patch)\b/i.test(body)) {
     return { signalKind: 'autofix_requested', sentiment: 'negative', strength: 5 };
   }
 
-  const correctivePatterns = [
-    'false positive',
-    'not an issue',
-    'incorrect',
-    'wrong',
-    'this is expected',
-    'expected behavior',
-    'does not apply',
-    'please remove',
-    'unhelpful',
-  ];
-  if (correctivePatterns.some(pattern => normalized.includes(pattern))) {
-    return { signalKind: 'corrective_reply', sentiment: 'negative', strength: 3 };
-  }
-
-  const supportivePatterns = [
-    'good catch',
-    'nice catch',
-    'thanks',
-    'thank you',
-    'fixed',
-    'resolved',
-    'agreed',
-    'makes sense',
-  ];
-  if (supportivePatterns.some(pattern => normalized.includes(pattern))) {
-    return { signalKind: 'supportive_reply', sentiment: 'positive', strength: 2 };
-  }
-
-  return { signalKind: 'supportive_reply', sentiment: 'neutral', strength: 1 };
+  return classifyReviewCommentReply(body);
 }
 
 async function findOrUpsertCommentSubject(params: {

@@ -466,17 +466,73 @@ describe('updateAgentBindings', () => {
     ).rejects.toMatchObject({ code: 'agent_not_found', status: 404 });
   });
 
-  it('binds the implicit main agent when other agents are configured', async () => {
-    // main has no agents.list entry, but the list is non-empty (research), so the
-    // post-write summary lookup must use the implicit-main fallback (not 500).
+  it('materializes implicit main when binding it alongside other agents', async () => {
+    // A binding targeting an agent absent from a non-empty list would resolve to
+    // the first agent at runtime, so main must be materialized into agents.list.
     const configPath = await configFixture({ agents: { list: [{ id: 'research' }] } });
 
     const { agent } = await updateAgentBindings('main', { channels: ['slack'] }, { configPath });
 
     expect(agent.id).toBe('main');
-    expect(agent.configured).toBe(false);
+    expect(agent.configured).toBe(true);
     expect(agent.bindings).toEqual([{ channel: 'slack', accountId: null, advanced: false }]);
     expect(channelsOf(configPath, 'main')).toEqual(['slack']);
+    const list = readAgentConfigSnapshot({ configPath }).config.agents?.list ?? [];
+    expect(list.some(entry => entry.id === 'main')).toBe(true);
+  });
+
+  it('preserves a route carrying a session/dmScope override (treats it as advanced)', async () => {
+    const configPath = await configFixture({
+      agents: { list: [{ id: 'research' }] },
+      bindings: [
+        {
+          type: 'route',
+          agentId: 'research',
+          match: { channel: 'whatsapp' },
+          session: { dmScope: 'isolated' },
+        },
+      ],
+    });
+
+    // Clearing research's channel routes must NOT drop the session-scoped binding.
+    await updateAgentBindings('research', { channels: [] }, { configPath });
+
+    const remaining = (readAgentConfigSnapshot({ configPath }).config as { bindings: unknown[] })
+      .bindings;
+    expect(remaining).toHaveLength(1);
+    // And it is surfaced as advanced on reads.
+    const research = summarizeAgentConfig(
+      readAgentConfigSnapshot({ configPath }).config
+    ).agents.find(a => a.id === 'research');
+    expect(research?.bindings).toEqual([{ channel: 'whatsapp', accountId: null, advanced: true }]);
+  });
+
+  it('treats empty guildId / roles as no constraint (managed, removable)', async () => {
+    const configPath = await configFixture({
+      agents: { list: [{ id: 'research' }] },
+      bindings: [
+        { type: 'route', agentId: 'research', match: { channel: 'slack', guildId: '', roles: [] } },
+      ],
+    });
+
+    // Empty constraints are no constraint → a default-account route → removable.
+    await updateAgentBindings('research', { channels: [] }, { configPath });
+
+    const remaining = (readAgentConfigSnapshot({ configPath }).config as { bindings: unknown[] })
+      .bindings;
+    expect(remaining).toHaveLength(0);
+  });
+
+  it('detects a conflict against a blank-accountId default route on another agent', async () => {
+    const configPath = await configFixture({
+      agents: { list: [{ id: 'research' }, { id: 'ops' }] },
+      bindings: [{ type: 'route', agentId: 'ops', match: { channel: 'slack', accountId: '  ' } }],
+    });
+
+    // A blank accountId normalizes to the default account, so it conflicts.
+    await expect(
+      updateAgentBindings('research', { channels: ['slack'] }, { configPath })
+    ).rejects.toMatchObject({ code: 'agent_binding_conflict', status: 409 });
   });
 
   it('fails closed when the bindings array is an unexpected shape', async () => {

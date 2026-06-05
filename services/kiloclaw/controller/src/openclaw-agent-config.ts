@@ -329,6 +329,10 @@ const ConfigBindingSchema = z
   })
   .passthrough();
 
+// Binding-level keys (alongside match keys) that take a binding off the simple
+// channel-route surface and MUST be preserved. `session` carries DM-scope /
+// isolation overrides; `acp` is for persistent ACP bindings.
+const ADVANCED_BINDING_KEYS = ['session', 'acp'];
 // Match keys that make a binding more specific than a channel(/account) route.
 const ADVANCED_MATCH_KEYS = ['peer', 'parentPeer', 'guildId', 'teamId', 'roles'];
 
@@ -336,31 +340,60 @@ function normalizeChannel(channel: string): string {
   return channel.trim().toLowerCase();
 }
 
-// Classify a raw binding entry as a "managed" channel-level default-account route
-// (the only kind the declarative set touches), or null for anything else
-// (advanced match, account-scoped, non-route type, or unparseable — all preserved).
-// The returned channel is normalized so conflict/diff comparisons match the
-// equally-normalized requested channels regardless of stored casing/whitespace.
-function classifyManagedChannelRoute(item: unknown): { agentId: string; channel: string } | null {
+// OpenClaw treats empty/whitespace strings, empty arrays, and empty objects as
+// "no constraint" — so a key only counts as advanced when it is effectively set.
+function isEffectivelyPresent(value: unknown): boolean {
+  if (value === undefined || value === null) {
+    return false;
+  }
+  if (typeof value === 'string') {
+    return value.trim().length > 0;
+  }
+  if (Array.isArray(value)) {
+    return value.length > 0;
+  }
+  if (typeof value === 'object') {
+    return Object.keys(value).length > 0;
+  }
+  return true;
+}
+
+type ClassifiedBinding = {
+  agentId: string;
+  channel: string;
+  // null = the OpenClaw default account (absent or blank accountId).
+  accountId: string | null;
+  advanced: boolean;
+};
+
+// Single source of truth for classifying a raw binding entry, used by both the
+// read summary and the declarative-set diff so they never disagree. Returns null
+// for entries that fail parsing (skipped on read, preserved on write).
+function classifyBinding(item: unknown): ClassifiedBinding | null {
   const parsed = ConfigBindingSchema.safeParse(item);
   if (!parsed.success) {
     return null;
   }
   const binding = parsed.data;
+  const bindingRecord = binding as Record<string, unknown>;
   const match = binding.match as Record<string, unknown>;
-  if (typeof match.accountId === 'string') {
-    return null;
-  }
-  if (binding.type !== undefined && binding.type !== 'route') {
-    return null;
-  }
-  if (ADVANCED_MATCH_KEYS.some(key => match[key] !== undefined)) {
-    return null;
-  }
+  const accountIdTrimmed = typeof match.accountId === 'string' ? match.accountId.trim() : '';
+  const advanced =
+    (binding.type !== undefined && binding.type !== 'route') ||
+    ADVANCED_BINDING_KEYS.some(key => isEffectivelyPresent(bindingRecord[key])) ||
+    ADVANCED_MATCH_KEYS.some(key => isEffectivelyPresent(match[key]));
   return {
     agentId: normalizeAgentId(binding.agentId),
     channel: normalizeChannel(binding.match.channel),
+    accountId: accountIdTrimmed === '' ? null : accountIdTrimmed,
+    advanced,
   };
+}
+
+// A binding the declarative channel-route set is allowed to add/remove: a simple
+// default-account route with no advanced overrides.
+function isManagedDefaultRoute(binding: ClassifiedBinding): boolean {
+  return !binding.advanced && binding.accountId === null;
 }
 
 // Parse the top-level bindings array once and group summaries by normalized
@@ -373,20 +406,17 @@ function summarizeBindingsByAgent(config: OpenClawAgentConfig): Map<string, Agen
     return byAgent;
   }
   for (const item of raw) {
-    const parsed = ConfigBindingSchema.safeParse(item);
-    if (!parsed.success) {
+    const classified = classifyBinding(item);
+    if (!classified) {
       continue;
     }
-    const binding = parsed.data;
-    const agentId = normalizeAgentId(binding.agentId);
-    const match = binding.match as Record<string, unknown>;
-    const accountId = typeof match.accountId === 'string' ? match.accountId : null;
-    const advanced =
-      (binding.type !== undefined && binding.type !== 'route') ||
-      ADVANCED_MATCH_KEYS.some(key => match[key] !== undefined);
-    const summaries = byAgent.get(agentId) ?? [];
-    summaries.push({ channel: binding.match.channel, accountId, advanced });
-    byAgent.set(agentId, summaries);
+    const summaries = byAgent.get(classified.agentId) ?? [];
+    summaries.push({
+      channel: classified.channel,
+      accountId: classified.accountId,
+      advanced: classified.advanced,
+    });
+    byAgent.set(classified.agentId, summaries);
   }
   return byAgent;
 }
@@ -689,11 +719,16 @@ export async function updateAgentBindings(
   const { snapshot } = await mutateAgentConfig(
     body.etag,
     config => {
-      if (
-        findConfiguredEntry(config, normalized) === undefined &&
-        normalized !== DEFAULT_AGENT_ID
-      ) {
-        throw new AgentConfigError(404, 'agent_not_found', `Agent "${normalized}" not found`);
+      if (findConfiguredEntry(config, normalized) === undefined) {
+        if (normalized !== DEFAULT_AGENT_ID) {
+          throw new AgentConfigError(404, 'agent_not_found', `Agent "${normalized}" not found`);
+        }
+        // Materialize implicit main: a binding targeting an agent not in
+        // agents.list resolves to the default/first agent at runtime, so main
+        // must be a real entry for its route to actually reach main.
+        config.agents ??= {};
+        config.agents.list ??= [];
+        config.agents.list.push({ id: DEFAULT_AGENT_ID });
       }
 
       const rawBindings = (config as { bindings?: unknown }).bindings;
@@ -709,8 +744,13 @@ export async function updateAgentBindings(
       // Reject any requested channel already routed (default account) to another agent.
       for (const channel of desired) {
         const conflicted = existing.some(item => {
-          const route = classifyManagedChannelRoute(item);
-          return route !== null && route.channel === channel && route.agentId !== normalized;
+          const route = classifyBinding(item);
+          return (
+            route !== null &&
+            isManagedDefaultRoute(route) &&
+            route.channel === channel &&
+            route.agentId !== normalized
+          );
         });
         if (conflicted) {
           throw new AgentConfigError(
@@ -723,8 +763,8 @@ export async function updateAgentBindings(
 
       // Drop only this agent's managed channel routes; keep everything else.
       const preserved = existing.filter(item => {
-        const route = classifyManagedChannelRoute(item);
-        return !(route !== null && route.agentId === normalized);
+        const route = classifyBinding(item);
+        return !(route !== null && isManagedDefaultRoute(route) && route.agentId === normalized);
       });
       const added = desired.map(channel => ({
         type: 'route',

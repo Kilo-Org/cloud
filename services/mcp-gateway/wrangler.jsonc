@@ -9,8 +9,8 @@
   "preview_urls": false,
   "routes": [
     {
-      "pattern": "mcp.kilo.ai/*",
-      "zone_name": "kilo.ai",
+      "pattern": "mcp.kilosessions.ai",
+      "custom_domain": true,
     },
   ],
   "dev": {
@@ -57,7 +57,7 @@
   "vars": {
     "ENVIRONMENT": "production",
     "APP_BASE_URL": "https://app.kilo.ai",
-    "MCP_GATEWAY_BASE_URL": "https://mcp.kilo.ai",
+    "MCP_GATEWAY_BASE_URL": "https://mcp.kilosessions.ai",
     "SUPPORTED_SCOPES": "profile",
     "GATEWAY_ACCESS_TOKEN_TTL_SECONDS": "900",
     "AUDIT_RETENTION_DAYS": "60",

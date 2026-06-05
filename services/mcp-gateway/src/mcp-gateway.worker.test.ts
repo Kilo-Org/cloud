@@ -26,11 +26,11 @@ const userMetadataRoute = `/.well-known/oauth-protected-resource${userRoute}`;
 const orgMetadataRoute = `/.well-known/oauth-protected-resource${orgRoute}`;
 const env = {
   APP_BASE_URL: 'https://app.kilo.ai',
-  MCP_GATEWAY_BASE_URL: 'https://mcp.kilo.ai',
+  MCP_GATEWAY_BASE_URL: 'https://mcp.kilosessions.ai',
 } as Env;
 
 async function request(path: string, method = 'GET') {
-  return app.request(`https://mcp.kilo.ai${path}`, { method }, env);
+  return app.request(`https://mcp.kilosessions.ai${path}`, { method }, env);
 }
 
 describe('MCP gateway route surface', () => {
@@ -55,7 +55,7 @@ describe('MCP gateway route surface', () => {
       const challenge = response.headers.get('www-authenticate');
       expect(challenge).toContain('authorization_uri=');
       expect(challenge).toContain(
-        `resource_metadata="https://mcp.kilo.ai/.well-known/oauth-protected-resource${expectedRoutes[index]}"`
+        `resource_metadata="https://mcp.kilosessions.ai/.well-known/oauth-protected-resource${expectedRoutes[index]}"`
       );
       expect(challenge).toContain('scope="profile"');
     }
@@ -83,7 +83,7 @@ describe('MCP gateway route surface', () => {
 
     expect(responses[0].status).toBe(200);
     await expect(responses[0].json()).resolves.toEqual({
-      resource: 'https://mcp.kilo.ai/mcp-connect',
+      resource: 'https://mcp.kilosessions.ai/mcp-connect',
       authorization_servers: ['https://app.kilo.ai'],
       scopes_supported: ['profile'],
     });
@@ -125,7 +125,7 @@ describe('MCP gateway route surface', () => {
 
   it('rejects requests with an untrusted Origin before proxying', async () => {
     const response = await app.request(
-      `https://mcp.kilo.ai${userRoute}`,
+      `https://mcp.kilosessions.ai${userRoute}`,
       { headers: { Origin: 'https://attacker.example' } },
       env
     );

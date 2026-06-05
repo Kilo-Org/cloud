@@ -41,7 +41,7 @@ function createTestConfig(): Promise<GatewayAppConfig> {
   const publicJwk = createPublicKey(jwtKeys.publicKey).export({ format: 'jwk' });
   return Promise.resolve({
     appBaseUrl: 'https://app.kilo.ai',
-    gatewayBaseUrl: 'https://mcp.kilo.ai',
+    gatewayBaseUrl: 'https://mcp.kilosessions.ai',
     issuer: 'https://app.kilo.ai',
     accessTokenTtlSeconds: 900,
     authorizationRequestTtlSeconds: 1_800,

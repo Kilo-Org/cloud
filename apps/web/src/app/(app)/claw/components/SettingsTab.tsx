@@ -2211,6 +2211,7 @@ export function SettingsTab({
     supportsExaSearchUi && kiloExaSearchMode === null ? 'kilo-proxy' : kiloExaSearchMode;
   const braveSearchEnabled = braveSearchConfigured && !exaSearchConfigured;
   const toolEntries = getEntriesByCategory('tool');
+  const byokHref = organizationId ? `/organizations/${organizationId}/byok` : '/byok';
 
   function handleCycleInboundEmailAddress() {
     mutations.cycleInboundEmailAddress.mutate(undefined, {
@@ -2393,7 +2394,7 @@ export function SettingsTab({
               </p>
               <p className="text-muted-foreground mt-2 text-xs">
                 Configure your own model provider keys in{' '}
-                <Link href="/byok" target="_blank" className="underline">
+                <Link href={byokHref} target="_blank" className="underline">
                   Kilo BYOK settings
                 </Link>
                 .

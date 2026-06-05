@@ -775,15 +775,14 @@ describe('acceptStripeDisputeCase', () => {
 
 describe('stripeDisputeDashboardUrl', () => {
   it('uses the test dashboard prefix in development', () => {
-    const originalNodeEnv = process.env.NODE_ENV;
-    process.env.NODE_ENV = 'development';
+    const nodeEnv = jest.replaceProperty(process.env, 'NODE_ENV', 'development');
 
     try {
       expect(stripeDisputeDashboardUrl('dp_test id')).toBe(
         'https://dashboard.stripe.com/test/disputes/dp_test%20id'
       );
     } finally {
-      process.env.NODE_ENV = originalNodeEnv;
+      nodeEnv.restore();
     }
   });
 });

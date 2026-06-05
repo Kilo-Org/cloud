@@ -106,6 +106,12 @@ describe('AgentUpdateInputSchema', () => {
     ).toBe(true);
   });
 
+  it('rejects a model with an empty fallbacks array', () => {
+    expect(AgentUpdateInputSchema.safeParse({ set: { model: { fallbacks: [] } } }).success).toBe(
+      false
+    );
+  });
+
   it('rejects an unknown set field (strict)', () => {
     expect(AgentUpdateInputSchema.safeParse({ set: { nope: true } }).success).toBe(false);
   });

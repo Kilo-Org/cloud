@@ -34,8 +34,10 @@ const ModelInputSchema = z
     fallbacks: z.array(z.string().trim().min(1).max(256)).max(20).optional(),
   })
   .strict()
-  .refine(model => model.primary !== undefined || model.fallbacks !== undefined, {
-    message: 'Model must include primary or fallbacks',
+  // Require at least one actual value: `{ fallbacks: [] }` carries no model and
+  // must be rejected (clear fallbacks via `unset: ['model.fallbacks']` instead).
+  .refine(model => model.primary !== undefined || (model.fallbacks?.length ?? 0) > 0, {
+    message: 'Model must set a primary or at least one fallback',
   });
 
 // Per-agent editable settings (PATCH /_kilo/config/agents/:id).

@@ -131,6 +131,8 @@ describe('MCP gateway route surface', () => {
     );
 
     expect(response.status).toBe(403);
+    expect(response.headers.get('content-type')).toBeNull();
+    await expect(response.text()).resolves.toBe('');
   });
 
   it('does not expose app-owned OAuth or management routes', async () => {

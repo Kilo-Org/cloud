@@ -16,6 +16,6 @@ export function challengeResponse(c: Context<MCPGatewayEnv>, resource: string) {
   });
 }
 
-export function forbiddenResponse(c: Context<MCPGatewayEnv>) {
-  return c.json({ error: 'forbidden' }, 403);
+export function forbiddenResponse(_c: Context<MCPGatewayEnv>) {
+  return new Response(null, { status: 403 });
 }

@@ -81,6 +81,7 @@ const revokeWebSessionsMock = revokeWebSessions;
 beforeEach(async () => {
   await cleanupDbForTest();
   jest.clearAllMocks();
+  cancelSubscriptionMock.mockResolvedValue({ id: 'sub_default' });
   stopKiloClawMock.mockResolvedValue(undefined);
 });
 
@@ -396,6 +397,7 @@ describe('acceptStripeDisputeCase', () => {
       .insert(kiloclaw_subscriptions)
       .values({
         user_id: user.id,
+        stripe_subscription_id: 'sub_kiloclaw_stop_retry',
         instance_id: instanceId,
         kiloclaw_price_version: '2026-05-10',
         plan: KiloClawPlan.Standard,
@@ -424,6 +426,7 @@ describe('acceptStripeDisputeCase', () => {
 
     expect(result.status).toBe('enforcement_failed');
     expect(result.failures).toEqual(expect.arrayContaining(['stop failed']));
+    expect(cancelSubscriptionMock).toHaveBeenCalledTimes(1);
     expect(stopKiloClawMock).toHaveBeenCalledTimes(1);
 
     const [updatedCase] = await db
@@ -454,6 +457,7 @@ describe('acceptStripeDisputeCase', () => {
     const retryResult = await acceptStripeDisputeCase({ caseId: caseRow.id, actor: admin });
 
     expect(retryResult).toEqual({ status: 'accepted', failures: [] });
+    expect(cancelSubscriptionMock).toHaveBeenCalledTimes(1);
     expect(stopKiloClawMock).toHaveBeenCalledTimes(2);
     const retriedActions = await db.select().from(stripe_dispute_actions);
     expect(retriedActions).toEqual(
@@ -531,12 +535,26 @@ describe('acceptStripeDisputeCase', () => {
       .select()
       .from(organization_seats_purchases)
       .where(eq(organization_seats_purchases.subscription_stripe_id, 'sub_disputed_org_seats'));
-    expect(updatedPurchases).toHaveLength(2);
-    expect(
-      updatedPurchases.every(
-        purchase => purchase.seat_count === 0 && purchase.subscription_status === 'ended'
-      )
-    ).toBe(true);
+    expect(updatedPurchases).toHaveLength(3);
+    const endedPurchases = updatedPurchases.filter(
+      purchase => purchase.subscription_status === 'ended'
+    );
+    const retainedPurchases = updatedPurchases.filter(
+      purchase => purchase.subscription_status !== 'ended'
+    );
+    expect(endedPurchases).toEqual([
+      expect.objectContaining({
+        amount_usd: 0,
+        seat_count: 0,
+        subscription_status: 'ended',
+      }),
+    ]);
+    expect(retainedPurchases).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ seat_count: 3, subscription_status: 'active' }),
+        expect.objectContaining({ seat_count: 5, subscription_status: 'past_due' }),
+      ])
+    );
     const [updatedOrganization] = await db
       .select()
       .from(organizations)

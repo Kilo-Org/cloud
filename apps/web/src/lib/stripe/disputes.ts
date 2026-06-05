@@ -28,7 +28,7 @@ import {
   type StripeDisputeCaseStatus as DisputeCaseStatus,
   type StripeDisputeOwnerClassification as OwnerClassification,
 } from '@kilocode/db/schema-types';
-import { and, eq, inArray, isNotNull, isNull, like, lt, not, or, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNotNull, isNull, like, lt, not, or, sql } from 'drizzle-orm';
 import type Stripe from 'stripe';
 
 import { reportEvents } from '@/lib/ai-gateway/abuse-service';
@@ -691,10 +691,22 @@ async function cancelStripeSubscriptionIfPresent(subscriptionId: string | null):
     return false;
   }
 
-  await client.subscriptions.cancel(subscriptionId, {
-    invoice_now: false,
-    prorate: false,
-  });
+  try {
+    await client.subscriptions.cancel(subscriptionId, {
+      invoice_now: false,
+      prorate: false,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const normalizedMessage = message.toLowerCase();
+    const alreadyCanceled =
+      (normalizedMessage.includes('already') && normalizedMessage.includes('cancel')) ||
+      normalizedMessage.includes('has been canceled') ||
+      normalizedMessage.includes('is canceled');
+    if (!alreadyCanceled) {
+      throw error;
+    }
+  }
   return true;
 }
 
@@ -708,12 +720,23 @@ async function suspendKiloClawSubscriptionForAcceptedDispute(params: {
     new Date(),
     DISPUTE_KILOCLAW_DESTRUCTION_GRACE_DAYS
   ).toISOString();
-  const scheduleReleased = await releaseKiloClawScheduleIfPresent(
-    params.subscription.stripe_schedule_id
-  );
-  const stripeCanceled = await cancelStripeSubscriptionIfPresent(
-    params.subscription.stripe_subscription_id
-  );
+  const [existing] = await db
+    .select()
+    .from(kiloclaw_subscriptions)
+    .where(eq(kiloclaw_subscriptions.id, params.subscription.id))
+    .limit(1);
+
+  if (!existing) {
+    return { status: StripeDisputeActionStatus.Skipped, resultCode: 'subscription_missing' };
+  }
+
+  const alreadyLocallySuspended = existing.status === 'canceled' && existing.destruction_deadline;
+  const scheduleReleased = alreadyLocallySuspended
+    ? false
+    : await releaseKiloClawScheduleIfPresent(existing.stripe_schedule_id);
+  const stripeCanceled = alreadyLocallySuspended
+    ? false
+    : await cancelStripeSubscriptionIfPresent(existing.stripe_subscription_id);
 
   const updated = await db.transaction(async tx => {
     const [current] = await tx
@@ -959,6 +982,7 @@ async function enforcePersonalDisputeCase(params: {
 async function cancelOrganizationSeatsForAcceptedDispute(params: {
   caseRow: StripeDisputeCase;
   subscriptionStripeId: string;
+  billingCycle: 'monthly' | 'yearly';
 }): Promise<ActionOutcome> {
   const organizationId = params.caseRow.organization_id;
   if (!organizationId) {
@@ -967,32 +991,23 @@ async function cancelOrganizationSeatsForAcceptedDispute(params: {
 
   await cancelStripeSubscriptionIfPresent(params.subscriptionStripeId);
   const now = new Date().toISOString();
-  const updatedPurchase = await db.transaction(async tx => {
+  const idempotencyKey = `stripe_dispute:${params.caseRow.id}:organization_seats:${params.subscriptionStripeId}`;
+  const insertedPurchase = await db.transaction(async tx => {
     const [purchase] = await tx
-      .update(organization_seats_purchases)
-      .set({
+      .insert(organization_seats_purchases)
+      .values({
+        organization_id: organizationId,
+        subscription_stripe_id: params.subscriptionStripeId,
         seat_count: 0,
-        subscription_status: 'ended',
+        amount_usd: 0,
+        starts_at: now,
         expires_at: now,
+        subscription_status: 'ended',
+        billing_cycle: params.billingCycle,
+        idempotency_key: idempotencyKey,
       })
-      .where(
-        and(
-          eq(organization_seats_purchases.organization_id, organizationId),
-          eq(organization_seats_purchases.subscription_stripe_id, params.subscriptionStripeId),
-          not(
-            inArray(organization_seats_purchases.subscription_status, [
-              'ended',
-              'canceled',
-              'incomplete_expired',
-            ])
-          )
-        )
-      )
+      .onConflictDoNothing({ target: [organization_seats_purchases.idempotency_key] })
       .returning({ id: organization_seats_purchases.id });
-
-    if (!purchase) {
-      return null;
-    }
 
     await tx
       .update(organizations)
@@ -1003,10 +1018,8 @@ async function cancelOrganizationSeatsForAcceptedDispute(params: {
   });
 
   return {
-    status: updatedPurchase
-      ? StripeDisputeActionStatus.Completed
-      : StripeDisputeActionStatus.Skipped,
-    resultCode: updatedPurchase ? 'ended' : 'purchase_missing',
+    status: StripeDisputeActionStatus.Completed,
+    resultCode: insertedPurchase ? 'ended' : 'already_ended',
     resultReferenceId: params.subscriptionStripeId,
   };
 }
@@ -1036,6 +1049,7 @@ async function enforceOrganizationDisputeCase(params: {
     .select({
       id: organization_seats_purchases.id,
       subscriptionStripeId: organization_seats_purchases.subscription_stripe_id,
+      billingCycle: organization_seats_purchases.billing_cycle,
     })
     .from(organization_seats_purchases)
     .where(
@@ -1049,11 +1063,17 @@ async function enforceOrganizationDisputeCase(params: {
           ])
         )
       )
-    );
+    )
+    .orderBy(desc(organization_seats_purchases.created_at));
 
-  for (const subscriptionStripeId of new Set(
-    seatPurchases.map(purchase => purchase.subscriptionStripeId)
-  )) {
+  const subscriptionBillingCycles = new Map<string, 'monthly' | 'yearly'>();
+  for (const purchase of seatPurchases) {
+    if (!subscriptionBillingCycles.has(purchase.subscriptionStripeId)) {
+      subscriptionBillingCycles.set(purchase.subscriptionStripeId, purchase.billingCycle);
+    }
+  }
+
+  for (const [subscriptionStripeId, billingCycle] of subscriptionBillingCycles) {
     actionRuns.push({
       actionType: StripeDisputeActionType.SubscriptionCancellation,
       targetKey: `organization_seats_subscription:${subscriptionStripeId}`,
@@ -1061,6 +1081,7 @@ async function enforceOrganizationDisputeCase(params: {
         cancelOrganizationSeatsForAcceptedDispute({
           caseRow: params.caseRow,
           subscriptionStripeId,
+          billingCycle,
         }),
     });
   }

@@ -116,6 +116,7 @@ describe('admin disputes router', () => {
     });
 
     const caller = await createCallerForUser(admin.id);
+    const summary = await caller.admin.disputes.summary();
     const needsAction = await caller.admin.disputes.list({ page: 1, limit: 25 });
     const organizationReview = await caller.admin.disputes.list({
       page: 1,
@@ -124,6 +125,7 @@ describe('admin disputes router', () => {
       ownerClassification: 'organization',
     });
 
+    expect(summary).toEqual({ pendingCount: 1 });
     expect(needsAction.pagination).toEqual({ page: 1, limit: 25, total: 1, totalPages: 1 });
     expect(needsAction.rows[0]).toEqual(
       expect.objectContaining({

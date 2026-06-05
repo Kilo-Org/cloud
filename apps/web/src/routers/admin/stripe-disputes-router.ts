@@ -6,7 +6,7 @@ import {
   stripe_dispute_cases,
 } from '@kilocode/db/schema';
 import { StripeDisputeCaseStatus } from '@kilocode/db/schema-types';
-import { and, desc, eq, inArray, sql } from 'drizzle-orm';
+import { and, count, desc, eq, inArray, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import * as z from 'zod';
 
@@ -65,6 +65,15 @@ function normalizeTimestamp(value: string | null): string | null {
 }
 
 export const adminStripeDisputesRouter = createTRPCRouter({
+  summary: adminProcedure.query(async () => {
+    const [pendingRow] = await db
+      .select({ pendingCount: count() })
+      .from(stripe_dispute_cases)
+      .where(eq(stripe_dispute_cases.status, StripeDisputeCaseStatus.NeedsAction));
+
+    return { pendingCount: pendingRow?.pendingCount ?? 0 };
+  }),
+
   list: adminProcedure.input(DisputesListInputSchema).query(async ({ input }) => {
     const offset = (input.page - 1) * input.limit;
     const acceptedByUser = alias(kilocode_users, 'accepted_by_user');

@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useCallback, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { inferRouterOutputs } from '@trpc/server';
 import { AlertTriangle, ExternalLink, ShieldCheck } from 'lucide-react';
 import Link from 'next/link';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 
 import type { RootRouter } from '@/routers/root-router';
@@ -75,11 +76,57 @@ const ownerOptions: Array<{ value: OwnerFilter; label: string }> = [
   { value: 'unmatched', label: 'Unmatched' },
 ];
 
+function parsePage(value: string | null): number {
+  const page = Number.parseInt(value ?? '', 10);
+  return Number.isFinite(page) && page > 0 ? page : 1;
+}
+
+function parseStatusFilter(value: string | null): DisputeStatusFilter {
+  switch (value) {
+    case 'all':
+    case 'needs_action':
+    case 'processing':
+    case 'accepted':
+    case 'acceptance_failed':
+    case 'enforcement_failed':
+    case 'review_required':
+    case 'closed':
+      return value;
+    default:
+      return 'needs_action';
+  }
+}
+
+function parseOwnerFilter(value: string | null): OwnerFilter {
+  switch (value) {
+    case 'all':
+    case 'personal':
+    case 'organization':
+    case 'ambiguous':
+    case 'unmatched':
+      return value;
+    default:
+      return 'all';
+  }
+}
+
+function setDisputesParam(params: URLSearchParams, key: string, value: string | null) {
+  if (value) {
+    params.set(key, value);
+  } else {
+    params.delete(key);
+  }
+}
+
 export function DisputesContent() {
   const trpc = useTRPC();
-  const [page, setPage] = useState(1);
-  const [status, setStatus] = useState<DisputeStatusFilter>('needs_action');
-  const [ownerClassification, setOwnerClassification] = useState<OwnerFilter>('all');
+  const queryClient = useQueryClient();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const page = parsePage(searchParams.get('page'));
+  const status = parseStatusFilter(searchParams.get('status'));
+  const ownerClassification = parseOwnerFilter(searchParams.get('owner'));
   const [selectedCase, setSelectedCase] = useState<DisputeRow | null>(null);
   const [confirmationText, setConfirmationText] = useState('');
   const casesQuery = useQuery(
@@ -101,6 +148,7 @@ export function DisputesContent() {
         setSelectedCase(null);
         setConfirmationText('');
         void casesQuery.refetch();
+        void queryClient.invalidateQueries({ queryKey: trpc.admin.disputes.summary.queryKey() });
       },
       onError: error => toast.error(error.message || 'Dispute acceptance failed'),
     })
@@ -116,15 +164,41 @@ export function DisputesContent() {
   const canConfirmSelectedCase =
     !selectedCaseNeedsTypedConfirm || confirmationText === selectedCase?.stripeDisputeId;
 
-  function updateStatus(nextStatus: DisputeStatusFilter) {
-    setStatus(nextStatus);
-    setPage(1);
-  }
+  const updateFilters = useCallback(
+    (nextState: {
+      page?: number;
+      status?: DisputeStatusFilter;
+      ownerClassification?: OwnerFilter;
+    }) => {
+      const nextPage = nextState.page ?? page;
+      const nextStatus = nextState.status ?? status;
+      const nextOwnerClassification = nextState.ownerClassification ?? ownerClassification;
+      const params = new URLSearchParams(searchParams.toString());
 
-  function updateOwnerClassification(nextOwnerClassification: OwnerFilter) {
-    setOwnerClassification(nextOwnerClassification);
-    setPage(1);
-  }
+      setDisputesParam(params, 'page', nextPage > 1 ? String(nextPage) : null);
+      setDisputesParam(params, 'status', nextStatus === 'needs_action' ? null : nextStatus);
+      setDisputesParam(
+        params,
+        'owner',
+        nextOwnerClassification === 'all' ? null : nextOwnerClassification
+      );
+
+      const queryString = params.toString();
+      router.push(`${pathname}${queryString ? `?${queryString}` : ''}`, { scroll: false });
+    },
+    [ownerClassification, page, pathname, router, searchParams, status]
+  );
+
+  const updateStatus = useCallback(
+    (nextStatus: DisputeStatusFilter) => updateFilters({ page: 1, status: nextStatus }),
+    [updateFilters]
+  );
+
+  const updateOwnerClassification = useCallback(
+    (nextOwnerClassification: OwnerFilter) =>
+      updateFilters({ page: 1, ownerClassification: nextOwnerClassification }),
+    [updateFilters]
+  );
 
   return (
     <div className="flex w-full flex-col gap-6">
@@ -155,7 +229,7 @@ export function DisputesContent() {
               <span className="text-muted-foreground text-xs font-medium">Status</span>
               <Select
                 value={status}
-                onValueChange={value => updateStatus(value as DisputeStatusFilter)}
+                onValueChange={value => updateStatus(parseStatusFilter(value))}
               >
                 <SelectTrigger className="w-full md:w-52">
                   <SelectValue />
@@ -173,7 +247,7 @@ export function DisputesContent() {
               <span className="text-muted-foreground text-xs font-medium">Owner</span>
               <Select
                 value={ownerClassification}
-                onValueChange={value => updateOwnerClassification(value as OwnerFilter)}
+                onValueChange={value => updateOwnerClassification(parseOwnerFilter(value))}
               >
                 <SelectTrigger className="w-full md:w-52">
                   <SelectValue />
@@ -214,7 +288,7 @@ export function DisputesContent() {
                   <Button
                     variant="secondary"
                     size="sm"
-                    onClick={() => setPage(current => Math.max(1, current - 1))}
+                    onClick={() => updateFilters({ page: Math.max(1, page - 1) })}
                     disabled={page <= 1 || casesQuery.isFetching}
                   >
                     Previous
@@ -222,7 +296,7 @@ export function DisputesContent() {
                   <Button
                     variant="secondary"
                     size="sm"
-                    onClick={() => setPage(current => current + 1)}
+                    onClick={() => updateFilters({ page: page + 1 })}
                     disabled={!pagination || page >= pagination.totalPages || casesQuery.isFetching}
                   >
                     Next
@@ -276,6 +350,7 @@ function DisputesTable({
             <TableHead>Deadline</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Owner</TableHead>
+            <TableHead>Dispute type</TableHead>
             <TableHead>Amount</TableHead>
             <TableHead>Linked account</TableHead>
             <TableHead>Stripe identifiers</TableHead>
@@ -286,7 +361,7 @@ function DisputesTable({
         <TableBody>
           {rows.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={8} className="text-muted-foreground h-24 text-center">
+              <TableCell colSpan={9} className="text-muted-foreground h-24 text-center">
                 {isLoading ? 'Loading disputes...' : 'No disputes match these filters.'}
               </TableCell>
             </TableRow>
@@ -318,13 +393,16 @@ function DisputesTable({
                     {formatOwnerClassification(row.ownerClassification)}
                   </Badge>
                 </TableCell>
+                <TableCell>
+                  <Badge variant="outline" className={disputeReasonBadgeClass(row.disputeReason)}>
+                    {row.disputeReason === 'fraudulent' ? (
+                      <AlertTriangle className="size-3" />
+                    ) : null}
+                    {formatDisputeReason(row.disputeReason)}
+                  </Badge>
+                </TableCell>
                 <TableCell className="whitespace-nowrap font-mono text-sm tabular-nums">
-                  <div className="flex flex-col gap-1">
-                    <span>{formatAmount(row.amountMinorUnits, row.currency)}</span>
-                    <span className="text-muted-foreground text-xs">
-                      {row.disputeReason ?? 'No reason'}
-                    </span>
-                  </div>
+                  {formatAmount(row.amountMinorUnits, row.currency)}
                 </TableCell>
                 <TableCell className="min-w-52 text-sm">{renderLinkedAccount(row)}</TableCell>
                 <TableCell className="min-w-64 text-xs">
@@ -569,6 +647,12 @@ function formatOwnerClassification(classification: string): string {
   return classification.replace(/^./, value => value.toUpperCase());
 }
 
+function formatDisputeReason(reason: string | null): string {
+  return reason
+    ? reason.replaceAll('_', ' ').replace(/^./, value => value.toUpperCase())
+    : 'No reason';
+}
+
 function formatActionLabel(actionType: string): string {
   return actionType.replaceAll('_', ' ').replace(/^./, value => value.toUpperCase());
 }
@@ -591,6 +675,17 @@ function statusBadgeClass(status: string): string {
     return 'border-destructive/30 bg-destructive/10 text-destructive';
   }
   if (status === 'review_required') return 'border-orange-500/20 bg-orange-500/10 text-orange-400';
+  return 'border-border bg-secondary text-secondary-foreground';
+}
+
+function disputeReasonBadgeClass(reason: string | null): string {
+  if (reason === 'fraudulent') return 'border-destructive/30 bg-destructive/10 text-destructive';
+  if (reason === 'product_unacceptable')
+    return 'border-orange-500/20 bg-orange-500/10 text-orange-400';
+  if (reason === 'product_not_received')
+    return 'border-yellow-500/20 bg-yellow-500/10 text-yellow-400';
+  if (reason === 'duplicate') return 'border-purple-500/20 bg-purple-500/10 text-purple-400';
+  if (reason === 'credit_not_processed') return 'border-blue-500/20 bg-blue-500/10 text-blue-400';
   return 'border-border bg-secondary text-secondary-foreground';
 }
 

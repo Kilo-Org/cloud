@@ -1408,3 +1408,100 @@ export const CODE_REVIEW_BENIGN_TERMINAL_REASONS = [
 ] as const satisfies readonly CodeReviewTerminalReason[];
 
 export type CodeReviewBenignTerminalReason = (typeof CODE_REVIEW_BENIGN_TERMINAL_REASONS)[number];
+
+// --- MCP Gateway enums ---
+
+export const MCPGatewayOwnerScope = {
+  Personal: 'personal',
+  Organization: 'organization',
+} as const;
+
+export type MCPGatewayOwnerScope = (typeof MCPGatewayOwnerScope)[keyof typeof MCPGatewayOwnerScope];
+
+export const MCPGatewayAuthMode = {
+  None: 'none',
+  StaticHeaders: 'static_headers',
+  OAuthDynamic: 'oauth_dynamic',
+  OAuthStatic: 'oauth_static',
+} as const;
+
+export type MCPGatewayAuthMode = (typeof MCPGatewayAuthMode)[keyof typeof MCPGatewayAuthMode];
+
+export const MCPGatewaySharingMode = {
+  SingleUser: 'single_user',
+  MultiUser: 'multi_user',
+} as const;
+
+export type MCPGatewaySharingMode =
+  (typeof MCPGatewaySharingMode)[keyof typeof MCPGatewaySharingMode];
+
+export const MCPGatewayRouteStatus = {
+  Active: 'active',
+  Rotated: 'rotated',
+  Revoked: 'revoked',
+} as const;
+
+export type MCPGatewayRouteStatus =
+  (typeof MCPGatewayRouteStatus)[keyof typeof MCPGatewayRouteStatus];
+
+export const MCPGatewayInstanceStatus = {
+  Active: 'active',
+  NeedsReauth: 'needs_reauth',
+  Revoked: 'revoked',
+  Removed: 'removed',
+} as const;
+
+export type MCPGatewayInstanceStatus =
+  (typeof MCPGatewayInstanceStatus)[keyof typeof MCPGatewayInstanceStatus];
+
+export const MCPGatewayProviderGrantStatus = {
+  Active: 'active',
+  Revoked: 'revoked',
+} as const;
+
+export type MCPGatewayProviderGrantStatus =
+  (typeof MCPGatewayProviderGrantStatus)[keyof typeof MCPGatewayProviderGrantStatus];
+
+export const MCPGatewaySecretKind = {
+  StaticProviderCredentials: 'static_provider_credentials',
+  DynamicRegistration: 'dynamic_registration',
+  StaticHeaders: 'static_headers',
+} as const;
+
+export type MCPGatewaySecretKind = (typeof MCPGatewaySecretKind)[keyof typeof MCPGatewaySecretKind];
+
+export const MCPGatewayOAuthClientAuthMethod = {
+  None: 'none',
+  ClientSecretPost: 'client_secret_post',
+  ClientSecretBasic: 'client_secret_basic',
+} as const;
+
+export type MCPGatewayOAuthClientAuthMethod =
+  (typeof MCPGatewayOAuthClientAuthMethod)[keyof typeof MCPGatewayOAuthClientAuthMethod];
+
+export const MCPGatewayAuthorizationRequestStatus = {
+  Pending: 'pending',
+  Completed: 'completed',
+  Error: 'error',
+} as const;
+
+export type MCPGatewayAuthorizationRequestStatus =
+  (typeof MCPGatewayAuthorizationRequestStatus)[keyof typeof MCPGatewayAuthorizationRequestStatus];
+
+export const MCPGatewayPendingProviderAuthorizationStatus = {
+  Pending: 'pending',
+  Completed: 'completed',
+  Error: 'error',
+} as const;
+
+export type MCPGatewayPendingProviderAuthorizationStatus =
+  (typeof MCPGatewayPendingProviderAuthorizationStatus)[keyof typeof MCPGatewayPendingProviderAuthorizationStatus];
+
+export const MCPGatewayAuditOutcome = {
+  Success: 'success',
+  Failure: 'failure',
+  Blocked: 'blocked',
+} as const;
+
+export type MCPGatewayAuditOutcome =
+  (typeof MCPGatewayAuditOutcome)[keyof typeof MCPGatewayAuditOutcome];

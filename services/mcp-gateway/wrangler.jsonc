@@ -7,6 +7,12 @@
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": false,
   "preview_urls": false,
+  "routes": [
+    {
+      "pattern": "mcp.kilosessions.ai",
+      "custom_domain": true,
+    },
+  ],
   "dev": {
     "port": 8806,
   },
@@ -40,13 +46,26 @@
       "dataset": "mcp_gateway_events",
     },
   ],
+  "secrets": {
+    "required": [
+      "MCP_GATEWAY_JWT_PUBLIC_KEYSET_JSON",
+      "MCP_GATEWAY_CREDENTIAL_KEYSET_JSON",
+      "MCP_GATEWAY_RATE_LIMIT_SECRET",
+    ],
+  },
+
   "vars": {
     "ENVIRONMENT": "production",
     "APP_BASE_URL": "https://app.kilo.ai",
-    "MCP_GATEWAY_BASE_URL": "https://mcp.kilo.ai",
+    "MCP_GATEWAY_BASE_URL": "https://mcp.kilosessions.ai",
     "SUPPORTED_SCOPES": "profile",
     "GATEWAY_ACCESS_TOKEN_TTL_SECONDS": "900",
     "AUDIT_RETENTION_DAYS": "60",
+    "UPSTREAM_REQUIRE_HTTPS": "true",
+    "MCP_GATEWAY_JWT_ISSUER": "https://app.kilo.ai",
+  },
+  "triggers": {
+    "crons": ["0 3 * * *"],
   },
   "env": {
     "dev": {
@@ -59,6 +78,8 @@
         "SUPPORTED_SCOPES": "profile",
         "GATEWAY_ACCESS_TOKEN_TTL_SECONDS": "900",
         "AUDIT_RETENTION_DAYS": "60",
+        "UPSTREAM_REQUIRE_HTTPS": "true",
+        "MCP_GATEWAY_JWT_ISSUER": "http://localhost:3000",
       },
       "durable_objects": {
         "bindings": [
@@ -81,6 +102,13 @@
           "dataset": "mcp_gateway_events",
         },
       ],
+      "secrets": {
+        "required": [
+          "MCP_GATEWAY_JWT_PUBLIC_KEYSET_JSON",
+          "MCP_GATEWAY_CREDENTIAL_KEYSET_JSON",
+          "MCP_GATEWAY_RATE_LIMIT_SECRET",
+        ],
+      },
     },
   },
 }

@@ -49,6 +49,7 @@
     "@kilocode/event-service": "workspace:*",
     "@kilocode/kilo-chat": "workspace:*",
     "@kilocode/kilo-chat-hooks": "workspace:*",
+    "@kilocode/mcp-gateway": "workspace:*",
     "@kilocode/kiloclaw-instance-tiers": "workspace:*",
     "@kilocode/kiloclaw-secret-catalog": "workspace:*",
     "@kilocode/organization-entitlement": "workspace:*",

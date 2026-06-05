@@ -28,7 +28,7 @@ import {
   type StripeDisputeCaseStatus as DisputeCaseStatus,
   type StripeDisputeOwnerClassification as OwnerClassification,
 } from '@kilocode/db/schema-types';
-import { and, eq, inArray, isNull, like, lt, not, or, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, isNull, like, lt, not, or, sql } from 'drizzle-orm';
 import type Stripe from 'stripe';
 
 import { reportEvents } from '@/lib/ai-gateway/abuse-service';
@@ -820,11 +820,7 @@ async function suspendKiloClawSubscriptionForAcceptedDispute(params: {
             instance_id: instance.id,
           },
         });
-        return {
-          status: StripeDisputeActionStatus.Completed,
-          resultCode: 'canceled_stop_failed_best_effort',
-          resultReferenceId: updated.after.id,
-        };
+        throw error;
       }
     }
   }
@@ -921,7 +917,14 @@ async function enforcePersonalDisputeCase(params: {
         eq(kiloclaw_subscriptions.user_id, userId),
         isNull(kiloclaw_instances.organization_id),
         isNull(kiloclaw_subscriptions.transferred_to_subscription_id),
-        inArray(kiloclaw_subscriptions.status, ['active', 'past_due', 'unpaid', 'trialing'])
+        or(
+          inArray(kiloclaw_subscriptions.status, ['active', 'past_due', 'unpaid', 'trialing']),
+          and(
+            eq(kiloclaw_subscriptions.status, 'canceled'),
+            isNotNull(kiloclaw_subscriptions.suspended_at),
+            isNotNull(kiloclaw_subscriptions.destruction_deadline)
+          )
+        )
       )
     );
   for (const { subscription } of kiloClawSubscriptions) {
@@ -955,7 +958,6 @@ async function enforcePersonalDisputeCase(params: {
 
 async function cancelOrganizationSeatsForAcceptedDispute(params: {
   caseRow: StripeDisputeCase;
-  purchaseId: string;
   subscriptionStripeId: string;
 }): Promise<ActionOutcome> {
   const organizationId = params.caseRow.organization_id;
@@ -975,8 +977,15 @@ async function cancelOrganizationSeatsForAcceptedDispute(params: {
       })
       .where(
         and(
-          eq(organization_seats_purchases.id, params.purchaseId),
-          eq(organization_seats_purchases.organization_id, organizationId)
+          eq(organization_seats_purchases.organization_id, organizationId),
+          eq(organization_seats_purchases.subscription_stripe_id, params.subscriptionStripeId),
+          not(
+            inArray(organization_seats_purchases.subscription_status, [
+              'ended',
+              'canceled',
+              'incomplete_expired',
+            ])
+          )
         )
       )
       .returning({ id: organization_seats_purchases.id });
@@ -998,7 +1007,7 @@ async function cancelOrganizationSeatsForAcceptedDispute(params: {
       ? StripeDisputeActionStatus.Completed
       : StripeDisputeActionStatus.Skipped,
     resultCode: updatedPurchase ? 'ended' : 'purchase_missing',
-    resultReferenceId: params.purchaseId,
+    resultReferenceId: params.subscriptionStripeId,
   };
 }
 
@@ -1042,15 +1051,16 @@ async function enforceOrganizationDisputeCase(params: {
       )
     );
 
-  for (const purchase of seatPurchases) {
+  for (const subscriptionStripeId of new Set(
+    seatPurchases.map(purchase => purchase.subscriptionStripeId)
+  )) {
     actionRuns.push({
       actionType: StripeDisputeActionType.SubscriptionCancellation,
-      targetKey: `organization_seats:${purchase.id}`,
+      targetKey: `organization_seats_subscription:${subscriptionStripeId}`,
       run: () =>
         cancelOrganizationSeatsForAcceptedDispute({
           caseRow: params.caseRow,
-          purchaseId: purchase.id,
-          subscriptionStripeId: purchase.subscriptionStripeId,
+          subscriptionStripeId,
         }),
     });
   }

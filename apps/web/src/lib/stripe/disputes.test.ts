@@ -45,6 +45,16 @@ jest.mock('@/lib/web-session-revocation', () => ({
   revokeWebSessions: jest.fn(async () => undefined),
 }));
 
+jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => {
+  const stopMock = jest.fn(async () => undefined);
+  return {
+    KiloClawInternalClient: jest.fn().mockImplementation(() => ({
+      stop: stopMock,
+    })),
+    __stopMock: stopMock,
+  };
+});
+
 type AnyMock = ReturnType<typeof jest.fn>;
 
 const { acceptStripeDisputeCase, observeStripeDisputeCreated } =
@@ -58,15 +68,20 @@ const { reportEvents } = jest.requireMock('@/lib/ai-gateway/abuse-service') as {
 const { revokeWebSessions } = jest.requireMock('@/lib/web-session-revocation') as {
   revokeWebSessions: AnyMock;
 };
+const kiloclawClientMock = jest.requireMock('@/lib/kiloclaw/kiloclaw-internal-client') as {
+  __stopMock: AnyMock;
+};
 
 const closeDisputeMock = stripeClientMock.client.disputes.close;
 const cancelSubscriptionMock = stripeClientMock.client.subscriptions.cancel;
+const stopKiloClawMock = kiloclawClientMock.__stopMock;
 const reportEventsMock = reportEvents;
 const revokeWebSessionsMock = revokeWebSessions;
 
 beforeEach(async () => {
   await cleanupDbForTest();
   jest.clearAllMocks();
+  stopKiloClawMock.mockResolvedValue(undefined);
 });
 
 describe('acceptStripeDisputeCase', () => {
@@ -368,6 +383,90 @@ describe('acceptStripeDisputeCase', () => {
     );
   });
 
+  it('keeps KiloClaw suspension retryable when stopping compute fails', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const user = await insertTestUser();
+    const instanceId = crypto.randomUUID();
+    await db.insert(kiloclaw_instances).values({
+      id: instanceId,
+      user_id: user.id,
+      sandbox_id: `ki_${instanceId.replaceAll('-', '')}`,
+    });
+    const [subscription] = await db
+      .insert(kiloclaw_subscriptions)
+      .values({
+        user_id: user.id,
+        instance_id: instanceId,
+        kiloclaw_price_version: '2026-05-10',
+        plan: KiloClawPlan.Standard,
+        status: KiloClawSubscriptionStatus.Active,
+      })
+      .returning({ id: kiloclaw_subscriptions.id });
+    const [caseRow] = await db
+      .insert(stripe_dispute_cases)
+      .values({
+        stripe_dispute_id: 'dp_kiloclaw_stop_retry',
+        stripe_event_id: 'evt_kiloclaw_stop_retry',
+        stripe_customer_id: user.stripe_customer_id,
+        owner_classification: StripeDisputeOwnerClassification.Personal,
+        kilo_user_id: user.id,
+        status: StripeDisputeCaseStatus.NeedsAction,
+        status_reason: 'Canonical personal owner matched; admin action required',
+      })
+      .returning({ id: stripe_dispute_cases.id });
+    closeDisputeMock.mockResolvedValue({
+      id: 'dp_kiloclaw_stop_retry',
+      status: 'lost',
+    } as Stripe.Response<Stripe.Dispute>);
+    stopKiloClawMock.mockRejectedValueOnce(new Error('stop failed'));
+
+    const result = await acceptStripeDisputeCase({ caseId: caseRow.id, actor: admin });
+
+    expect(result.status).toBe('enforcement_failed');
+    expect(result.failures).toEqual(expect.arrayContaining(['stop failed']));
+    expect(stopKiloClawMock).toHaveBeenCalledTimes(1);
+
+    const [updatedCase] = await db
+      .select()
+      .from(stripe_dispute_cases)
+      .where(eq(stripe_dispute_cases.id, caseRow.id));
+    expect(updatedCase.status).toBe(StripeDisputeCaseStatus.EnforcementFailed);
+    expect(updatedCase.next_retry_at).not.toBeNull();
+
+    const [updatedSubscription] = await db
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.id, subscription.id));
+    expect(updatedSubscription.status).toBe(KiloClawSubscriptionStatus.Canceled);
+    expect(updatedSubscription.destruction_deadline).not.toBeNull();
+
+    const actions = await db.select().from(stripe_dispute_actions);
+    expect(actions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          action_type: StripeDisputeActionType.KiloClawSuspension,
+          status: StripeDisputeActionStatus.Failed,
+          failure_context: 'stop failed',
+        }),
+      ])
+    );
+
+    const retryResult = await acceptStripeDisputeCase({ caseId: caseRow.id, actor: admin });
+
+    expect(retryResult).toEqual({ status: 'accepted', failures: [] });
+    expect(stopKiloClawMock).toHaveBeenCalledTimes(2);
+    const retriedActions = await db.select().from(stripe_dispute_actions);
+    expect(retriedActions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          action_type: StripeDisputeActionType.KiloClawSuspension,
+          status: StripeDisputeActionStatus.Completed,
+          result_code: 'already_canceled',
+        }),
+      ])
+    );
+  });
+
   it('ends organization seat purchases and clears organization seat count', async () => {
     const admin = await insertTestUser({ is_admin: true });
     const owner = await insertTestUser();
@@ -382,18 +481,26 @@ describe('acceptStripeDisputeCase', () => {
       .update(organizations)
       .set({ seat_count: 5 })
       .where(eq(organizations.id, organization.id));
-    const [purchase] = await db
-      .insert(organization_seats_purchases)
-      .values({
+    await db.insert(organization_seats_purchases).values([
+      {
+        organization_id: organization.id,
+        subscription_stripe_id: 'sub_disputed_org_seats',
+        seat_count: 3,
+        amount_usd: 216,
+        starts_at: '2026-05-01T00:00:00.000Z',
+        expires_at: '2026-06-01T00:00:00.000Z',
+        subscription_status: 'active',
+      },
+      {
         organization_id: organization.id,
         subscription_stripe_id: 'sub_disputed_org_seats',
         seat_count: 5,
         amount_usd: 360,
         starts_at: '2026-06-01T00:00:00.000Z',
         expires_at: '2026-07-01T00:00:00.000Z',
-        subscription_status: 'active',
-      })
-      .returning({ id: organization_seats_purchases.id });
+        subscription_status: 'past_due',
+      },
+    ]);
     const [caseRow] = await db
       .insert(stripe_dispute_cases)
       .values({
@@ -415,25 +522,35 @@ describe('acceptStripeDisputeCase', () => {
     const result = await acceptStripeDisputeCase({ caseId: caseRow.id, actor: admin });
 
     expect(result).toEqual({ status: 'accepted', failures: [] });
+    expect(cancelSubscriptionMock).toHaveBeenCalledTimes(1);
     expect(cancelSubscriptionMock).toHaveBeenCalledWith('sub_disputed_org_seats', {
       invoice_now: false,
       prorate: false,
     });
-    const [updatedPurchase] = await db
+    const updatedPurchases = await db
       .select()
       .from(organization_seats_purchases)
-      .where(eq(organization_seats_purchases.id, purchase.id));
-    expect(updatedPurchase).toEqual(
-      expect.objectContaining({
-        seat_count: 0,
-        subscription_status: 'ended',
-      })
-    );
+      .where(eq(organization_seats_purchases.subscription_stripe_id, 'sub_disputed_org_seats'));
+    expect(updatedPurchases).toHaveLength(2);
+    expect(
+      updatedPurchases.every(
+        purchase => purchase.seat_count === 0 && purchase.subscription_status === 'ended'
+      )
+    ).toBe(true);
     const [updatedOrganization] = await db
       .select()
       .from(organizations)
       .where(eq(organizations.id, organization.id));
     expect(updatedOrganization.seat_count).toBe(0);
+
+    const actions = await db.select().from(stripe_dispute_actions);
+    expect(
+      actions.filter(
+        action =>
+          action.action_type === StripeDisputeActionType.SubscriptionCancellation &&
+          action.target_key === 'organization_seats_subscription:sub_disputed_org_seats'
+      )
+    ).toHaveLength(1);
   });
 });
 

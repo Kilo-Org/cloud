@@ -149,6 +149,15 @@ type NormalizedModel = {
   fallbacks: string[];
 };
 
+export type AgentBindingSummary = {
+  channel: string;
+  accountId: string | null;
+  // True when the binding is more specific than a channel(/account) route
+  // (peer/guild/team/roles match, or a non-route binding type). The simple
+  // channel-level editor surfaces these but must not clobber them.
+  advanced: boolean;
+};
+
 export type AgentSummary = {
   id: string;
   name: string | null;
@@ -163,6 +172,7 @@ export type AgentSummary = {
     reasoningDefault: string | null;
     fastModeDefault: boolean | null;
   };
+  bindings: AgentBindingSummary[];
 };
 
 export type AgentConfigSummary = {
@@ -277,6 +287,49 @@ function findConfiguredEntry(config: OpenClawAgentConfig, agentId: string): Agen
   return config.agents?.list?.find(entry => normalizeAgentId(entry.id) === agentId);
 }
 
+// The top-level `bindings` array is not modeled by OpenClawAgentConfigSchema
+// (it round-trips via .passthrough()), so read it leniently at runtime — a
+// malformed binding entry is skipped, never fatal to a read.
+const BindingMatchSchema = z.object({ channel: z.string().min(1) }).passthrough();
+const ConfigBindingSchema = z
+  .object({
+    type: z.string().optional(),
+    agentId: z.string().min(1),
+    match: BindingMatchSchema,
+  })
+  .passthrough();
+
+// Match keys that make a binding more specific than a channel(/account) route.
+const ADVANCED_MATCH_KEYS = ['peer', 'parentPeer', 'guildId', 'teamId', 'roles'];
+
+function summarizeBindingsForAgent(
+  config: OpenClawAgentConfig,
+  agentId: string
+): AgentBindingSummary[] {
+  const raw = (config as { bindings?: unknown }).bindings;
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  const bindings: AgentBindingSummary[] = [];
+  for (const item of raw) {
+    const parsed = ConfigBindingSchema.safeParse(item);
+    if (!parsed.success) {
+      continue;
+    }
+    const binding = parsed.data;
+    if (normalizeAgentId(binding.agentId) !== agentId) {
+      continue;
+    }
+    const match = binding.match as Record<string, unknown>;
+    const accountId = typeof match.accountId === 'string' ? match.accountId : null;
+    const advanced =
+      (binding.type !== undefined && binding.type !== 'route') ||
+      ADVANCED_MATCH_KEYS.some(key => match[key] !== undefined);
+    bindings.push({ channel: binding.match.channel, accountId, advanced });
+  }
+  return bindings;
+}
+
 function assertUniqueAgentIds(config: OpenClawAgentConfig): void {
   const seen = new Set<string>();
   for (const entry of config.agents?.list ?? []) {
@@ -341,6 +394,7 @@ export function summarizeAgentConfig(config: OpenClawAgentConfig): AgentConfigSu
         },
         rawModel: entry.model ?? null,
         settings: settingsOf(entry),
+        bindings: summarizeBindingsForAgent(config, id),
       };
     }),
   };

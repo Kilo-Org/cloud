@@ -59,6 +59,71 @@ describe('agent config summaries', () => {
     expect(result.defaults.settings.thinkingDefault).toBe('medium');
   });
 
+  it('surfaces channel-level bindings per agent, filtered by agent id', async () => {
+    const configPath = await configFixture({
+      agents: { list: [{ id: 'research' }, { id: 'ops' }] },
+      bindings: [
+        { agentId: 'research', match: { channel: 'slack' } },
+        { agentId: 'research', match: { channel: 'discord', accountId: 'team' } },
+        { agentId: 'ops', match: { channel: 'telegram' } },
+      ],
+    });
+    const result = summarizeAgentConfig(readAgentConfigSnapshot({ configPath }).config);
+
+    const research = result.agents.find(a => a.id === 'research');
+    const ops = result.agents.find(a => a.id === 'ops');
+    expect(research?.bindings).toEqual([
+      { channel: 'slack', accountId: null, advanced: false },
+      { channel: 'discord', accountId: 'team', advanced: false },
+    ]);
+    expect(ops?.bindings).toEqual([{ channel: 'telegram', accountId: null, advanced: false }]);
+  });
+
+  it('flags peer/guild/non-route bindings as advanced', async () => {
+    const configPath = await configFixture({
+      agents: { list: [{ id: 'research' }] },
+      bindings: [
+        { agentId: 'research', match: { channel: 'whatsapp', peer: { kind: 'direct', id: '+1' } } },
+        { agentId: 'research', type: 'acp', match: { channel: 'slack' } },
+      ],
+    });
+    const research = summarizeAgentConfig(
+      readAgentConfigSnapshot({ configPath }).config
+    ).agents.find(a => a.id === 'research');
+
+    expect(research?.bindings).toEqual([
+      { channel: 'whatsapp', accountId: null, advanced: true },
+      { channel: 'slack', accountId: null, advanced: true },
+    ]);
+  });
+
+  it('skips malformed binding entries instead of failing the read', async () => {
+    const configPath = await configFixture({
+      agents: { list: [{ id: 'research' }] },
+      bindings: [
+        { agentId: 'research', match: { channel: 'slack' } },
+        { match: { channel: 'discord' } }, // no agentId
+        { agentId: 'research' }, // no match
+        'not-an-object',
+        { agentId: 'research', match: {} }, // no channel
+      ],
+    });
+    const research = summarizeAgentConfig(
+      readAgentConfigSnapshot({ configPath }).config
+    ).agents.find(a => a.id === 'research');
+
+    expect(research?.bindings).toEqual([{ channel: 'slack', accountId: null, advanced: false }]);
+  });
+
+  it('returns an empty bindings array when none are configured', async () => {
+    const configPath = await configFixture({ agents: { list: [{ id: 'research' }] } });
+    const research = summarizeAgentConfig(
+      readAgentConfigSnapshot({ configPath }).config
+    ).agents.find(a => a.id === 'research');
+
+    expect(research?.bindings).toEqual([]);
+  });
+
   it('reads implicit main but rejects an absent non-default agent', async () => {
     const configPath = await configFixture({ agents: { defaults: {} } });
 

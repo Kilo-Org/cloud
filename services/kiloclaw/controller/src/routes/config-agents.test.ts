@@ -25,6 +25,7 @@ const agent: AgentSummary = {
     reasoningDefault: null,
     fastModeDefault: null,
   },
+  bindings: [],
 };
 
 function createDeps(overrides: Partial<AgentRouteDeps> = {}): AgentRouteDeps {

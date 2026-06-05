@@ -17,7 +17,7 @@ import {
   GatewayError,
   parseStaticHeaders,
 } from '@kilocode/mcp-gateway';
-import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
+import { adminProcedure, baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import { createGatewayServices } from '@/lib/mcp-gateway/services';
 import { db } from '@/lib/drizzle';
 import { createGatewayRepository } from '@/lib/mcp-gateway/repository';
@@ -58,6 +58,7 @@ const ManagedConfigInputSchema = z.object({
   organizationId: OrganizationIdSchema.optional(),
 });
 const mcpGatewayProcedure = baseProcedure;
+const mcpGatewayAdminProcedure = adminProcedure;
 
 function isGatewayError(error: unknown): error is GatewayError {
   return (
@@ -343,6 +344,9 @@ async function requireManagedConfig(params: {
   if (!belongsToScope) {
     throw new TRPCError({ code: 'NOT_FOUND', message: 'Connection not found' });
   }
+  if (!params.organizationId && !params.isGlobalAdmin) {
+    throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
+  }
   if (params.organizationId) {
     await requireOrganizationManager({
       organizationId: params.organizationId,
@@ -371,7 +375,7 @@ export const mcpGatewayRouter = createTRPCRouter({
         };
       })
     ),
-  listPersonal: mcpGatewayProcedure.query(async ({ ctx }) =>
+  listPersonal: mcpGatewayAdminProcedure.query(async ({ ctx }) =>
     listConfigs({ ownerScope: GatewayOwnerScope.Personal, ownerId: ctx.user.id })
   ),
   listOrganization: mcpGatewayProcedure
@@ -387,7 +391,7 @@ export const mcpGatewayRouter = createTRPCRouter({
         ownerId: input.organizationId,
       });
     }),
-  getPersonal: mcpGatewayProcedure
+  getPersonal: mcpGatewayAdminProcedure
     .input(z.object({ configId: ConfigIdSchema }))
     .query(async ({ input, ctx }) =>
       getConfigDetail({
@@ -410,7 +414,7 @@ export const mcpGatewayRouter = createTRPCRouter({
         ownerId: input.organizationId,
       });
     }),
-  createPersonal: mcpGatewayProcedure
+  createPersonal: mcpGatewayAdminProcedure
     .input(
       z.object({
         name: z.string().min(1).max(200),

@@ -26,10 +26,12 @@ describe('mcpGateway management authorization', () => {
     await cleanupDbForTest();
   });
 
-  it('allows personal owners to list their own connections', async () => {
+  it('rejects non-admin users from the personal dashboard', async () => {
     const user = await insertTestUser({ is_admin: false });
     const caller = await createCallerForUser(user.id);
-    await expect(caller.mcpGateway.listPersonal(undefined)).resolves.toEqual([]);
+    await expect(caller.mcpGateway.listPersonal(undefined)).rejects.toThrow(
+      'Admin access required'
+    );
   });
 
   it('allows admin users to list personal connections', async () => {
@@ -39,7 +41,7 @@ describe('mcpGateway management authorization', () => {
   });
 
   it('maps invalid remote URLs to bad requests', async () => {
-    const user = await insertTestUser({ is_admin: false });
+    const user = await insertTestUser({ is_admin: true });
     const caller = await createCallerForUser(user.id);
     const gatewayEnvKeys = [
       'MCP_GATEWAY_JWT_PRIVATE_KEYSET_JSON',
@@ -87,7 +89,7 @@ describe('mcpGateway management authorization', () => {
   });
 
   it('rejects invalid static header names and values as bad requests', async () => {
-    const user = await insertTestUser({ is_admin: false });
+    const user = await insertTestUser({ is_admin: true });
     const caller = await createCallerForUser(user.id);
 
     return expect(
@@ -173,7 +175,7 @@ describe('mcpGateway management authorization', () => {
   });
 
   it('keeps disabled connections available to the dashboard', async () => {
-    const user = await insertTestUser({ is_admin: false });
+    const user = await insertTestUser({ is_admin: true });
     const caller = await createCallerForUser(user.id);
     const [config] = await db
       .insert(mcp_gateway_configs)
@@ -199,6 +201,34 @@ describe('mcpGateway management authorization', () => {
     const detail = await caller.mcpGateway.getPersonal({ configId: config.config_id });
 
     expect(detail.enabled).toBe(false);
+  });
+
+  it('rejects non-admin mutations of personal connections', async () => {
+    const user = await insertTestUser({ is_admin: false });
+    const caller = await createCallerForUser(user.id);
+    const [config] = await db
+      .insert(mcp_gateway_configs)
+      .values({
+        owner_scope: 'personal',
+        owner_id: user.id,
+        name: 'Personal MCP',
+        remote_url: 'https://example.com/mcp',
+        auth_mode: 'none',
+        sharing_mode: 'single_user',
+        created_by_kilo_user_id: user.id,
+      })
+      .returning();
+    await db.insert(mcp_gateway_connect_resources).values({
+      config_id: config.config_id,
+      owner_scope: 'personal',
+      owner_id: user.id,
+      route_key: 'abcdefghijklmnopqrstuvwxyzABCDEF',
+      canonical_url: `https://mcp.kilo.ai/mcp-connect/user/${user.id}/${config.config_id}/abcdefghijklmnopqrstuvwxyzABCDEF`,
+    });
+
+    await expect(caller.mcpGateway.rotateRoute({ configId: config.config_id })).rejects.toThrow(
+      'Admin access required'
+    );
   });
 
   it('does not allow an admin to mutate another admins personal connection', async () => {

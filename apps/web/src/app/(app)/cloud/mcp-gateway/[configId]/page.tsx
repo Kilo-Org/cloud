@@ -8,7 +8,7 @@ export default async function McpGatewayDetailPage({
 }: {
   params: Promise<{ configId: string }>;
 }) {
-  const { user } = await getUserFromAuth({ adminOnly: false });
+  const { user } = await getUserFromAuth({ adminOnly: true });
   if (!user) notFound();
   const { configId } = await params;
   return (

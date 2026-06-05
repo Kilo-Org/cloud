@@ -1132,6 +1132,12 @@ async function closeStripeDispute(caseRow: StripeDisputeCase): Promise<void> {
         if (!isAlreadyClosedStripeDisputeError(error)) {
           throw error;
         }
+        dispute = await client.disputes.retrieve(caseRow.stripe_dispute_id);
+        if (dispute.status !== 'lost') {
+          throw new Error(
+            `Stripe dispute is already closed with status ${dispute.status}; manual review required`
+          );
+        }
       }
 
       await db

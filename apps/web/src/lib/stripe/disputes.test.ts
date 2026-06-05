@@ -31,7 +31,7 @@ import {
 
 jest.mock('@/lib/stripe-client', () => ({
   client: {
-    disputes: { close: jest.fn() },
+    disputes: { close: jest.fn(), retrieve: jest.fn() },
     invoices: { list: jest.fn() },
     invoicePayments: { list: jest.fn() },
     refunds: { create: jest.fn() },
@@ -64,7 +64,7 @@ type AnyMock = ReturnType<typeof jest.fn>;
 const { acceptStripeDisputeCase, observeStripeDisputeCreated } =
   jest.requireActual<typeof StripeDisputesModule>('@/lib/stripe/disputes');
 const stripeClientMock = jest.requireMock('@/lib/stripe-client') as {
-  client: { disputes: { close: AnyMock }; subscriptions: { cancel: AnyMock } };
+  client: { disputes: { close: AnyMock; retrieve: AnyMock }; subscriptions: { cancel: AnyMock } };
 };
 const { reportEvents } = jest.requireMock('@/lib/ai-gateway/abuse-service') as {
   reportEvents: AnyMock;
@@ -77,6 +77,7 @@ const kiloclawClientMock = jest.requireMock('@/lib/kiloclaw/kiloclaw-internal-cl
 };
 
 const closeDisputeMock = stripeClientMock.client.disputes.close;
+const retrieveDisputeMock = stripeClientMock.client.disputes.retrieve;
 const cancelSubscriptionMock = stripeClientMock.client.subscriptions.cancel;
 const stopKiloClawMock = kiloclawClientMock.__stopMock;
 const reportEventsMock = reportEvents;
@@ -270,6 +271,10 @@ describe('acceptStripeDisputeCase', () => {
       })
       .returning({ id: stripe_dispute_cases.id });
     closeDisputeMock.mockRejectedValue(new Error('This dispute has already been closed.'));
+    retrieveDisputeMock.mockResolvedValue({
+      id: 'dp_already_closed_retry',
+      status: 'lost',
+    } as Stripe.Response<Stripe.Dispute>);
 
     const result = await acceptStripeDisputeCase({ caseId: caseRow.id, actor: admin });
 
@@ -287,7 +292,7 @@ describe('acceptStripeDisputeCase', () => {
         expect.objectContaining({
           action_type: StripeDisputeActionType.StripeAcceptance,
           status: StripeDisputeActionStatus.Completed,
-          result_code: 'already_closed',
+          result_code: 'lost',
         }),
         expect.objectContaining({
           action_type: StripeDisputeActionType.UserBlock,
@@ -295,6 +300,44 @@ describe('acceptStripeDisputeCase', () => {
         }),
       ])
     );
+  });
+
+  it('does not enforce when an already closed Stripe dispute was not lost', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const user = await insertTestUser();
+    const [caseRow] = await db
+      .insert(stripe_dispute_cases)
+      .values({
+        stripe_dispute_id: 'dp_already_closed_won',
+        stripe_event_id: 'evt_already_closed_won',
+        stripe_customer_id: user.stripe_customer_id,
+        owner_classification: StripeDisputeOwnerClassification.Personal,
+        kilo_user_id: user.id,
+        status: StripeDisputeCaseStatus.NeedsAction,
+        status_reason: 'Canonical personal owner matched; admin action required',
+      })
+      .returning({ id: stripe_dispute_cases.id });
+    closeDisputeMock.mockRejectedValue(new Error('This dispute has already been closed.'));
+    retrieveDisputeMock.mockResolvedValue({
+      id: 'dp_already_closed_won',
+      status: 'won',
+    } as Stripe.Response<Stripe.Dispute>);
+
+    await expect(acceptStripeDisputeCase({ caseId: caseRow.id, actor: admin })).rejects.toThrow(
+      'Stripe dispute is already closed with status won; manual review required'
+    );
+
+    const [updatedCase] = await db
+      .select()
+      .from(stripe_dispute_cases)
+      .where(eq(stripe_dispute_cases.id, caseRow.id));
+    expect(updatedCase.status).toBe(StripeDisputeCaseStatus.AcceptanceFailed);
+    const [updatedUser] = await db
+      .select()
+      .from(kilocode_users)
+      .where(eq(kilocode_users.id, user.id));
+    expect(updatedUser.blocked_reason).toBeNull();
+    expect(revokeWebSessionsMock).not.toHaveBeenCalled();
   });
 
   it('fails enforcement when Kilo Pass is store-managed', async () => {

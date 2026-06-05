@@ -421,7 +421,7 @@ describe('calculatKiloExclusiveCost_mUsd with qwen3.6-max-preview', () => {
         cacheWriteTokens: 30_000,
       })
     );
-    expect(result).toBe(Math.round(50_000 * 1.3 + 5_000 * 7.8 + 20_000 * 0.2 + 30_000 * 2.5));
+    expect(result).toBe(Math.round(50_000 * 1.3 + 5_000 * 7.8 + 20_000 * 0.13 + 30_000 * 1.625));
   });
 
   test('input-only cost in >128k tier', () => {

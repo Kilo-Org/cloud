@@ -8,7 +8,6 @@ export const proxyErrorTypeSchema = z.enum([
   'usage_limit_exceeded',
   'data_collection_required',
   'api_kind_not_supported',
-  'stealth_model_error',
   'byok_error',
   'context_length_exceeded',
   'model_not_allowed',

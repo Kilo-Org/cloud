@@ -12,12 +12,7 @@ import {
   claude_sonnet_4_6_stealth_model,
   claude_opus_4_6_stealth_model,
 } from './providers/anthropic.constants';
-import {
-  isAlibabaDirectModel,
-  qwen36_plus_model,
-  qwen37_max_model,
-  qwen37_plus_model,
-} from './providers/qwen';
+import { isAlibabaDirectModel, qwen37_max_model, qwen37_plus_model } from './providers/qwen';
 
 describe('isFreeModel', () => {
   describe('free models', () => {
@@ -102,7 +97,6 @@ describe('isFreeModel', () => {
       expect(
         isKiloExclusiveModelRequiringDataCollection(claude_opus_4_6_stealth_model.public_id)
       ).toBe(true);
-      expect(isKiloExclusiveModelRequiringDataCollection(qwen36_plus_model.public_id)).toBe(false);
     });
 
     test('all Kilo exclusive models should have either no pricing or valid pricing', () => {

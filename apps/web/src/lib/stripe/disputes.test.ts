@@ -61,7 +61,7 @@ jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => {
 
 type AnyMock = ReturnType<typeof jest.fn>;
 
-const { acceptStripeDisputeCase, observeStripeDisputeCreated } =
+const { acceptStripeDisputeCase, observeStripeDisputeCreated, stripeDisputeDashboardUrl } =
   jest.requireActual<typeof StripeDisputesModule>('@/lib/stripe/disputes');
 const stripeClientMock = jest.requireMock('@/lib/stripe-client') as {
   client: {
@@ -770,6 +770,21 @@ describe('acceptStripeDisputeCase', () => {
           action.target_key === 'organization_seats_subscription:sub_disputed_org_seats'
       )
     ).toHaveLength(1);
+  });
+});
+
+describe('stripeDisputeDashboardUrl', () => {
+  it('uses the test dashboard prefix in development', () => {
+    const originalNodeEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'development';
+
+    try {
+      expect(stripeDisputeDashboardUrl('dp_test id')).toBe(
+        'https://dashboard.stripe.com/test/disputes/dp_test%20id'
+      );
+    } finally {
+      process.env.NODE_ENV = originalNodeEnv;
+    }
   });
 });
 

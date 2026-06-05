@@ -1306,5 +1306,6 @@ export async function acceptStripeDisputeCase(params: {
 }
 
 export function stripeDisputeDashboardUrl(stripeDisputeId: string): string {
-  return `https://dashboard.stripe.com/disputes/${encodeURIComponent(stripeDisputeId)}`;
+  const envPrefix = process.env.NODE_ENV === 'development' ? 'test/' : '';
+  return `https://dashboard.stripe.com/${envPrefix}disputes/${encodeURIComponent(stripeDisputeId)}`;
 }

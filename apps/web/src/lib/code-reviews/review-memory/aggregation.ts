@@ -448,6 +448,7 @@ async function processClaimedAggregationScope(
       ),
     });
     const eventById = new Map(events.map(event => [event.id, event]));
+    const processedEventIds = [...new Set(clusters.flatMap(cluster => cluster.eventIds))];
     const generation = await options.generateOpportunities({
       owner,
       platform: state.platform,
@@ -501,7 +502,7 @@ async function processClaimedAggregationScope(
       proposalCount += 1;
     }
 
-    await markFeedbackEventsIncluded({ eventIds: events.map(event => event.id) });
+    await markFeedbackEventsIncluded({ eventIds: processedEventIds });
     await updateAggregationRunStatus({
       runId: run.id,
       status: 'completed',

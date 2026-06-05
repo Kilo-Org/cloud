@@ -192,6 +192,45 @@ describe('review memory aggregation', () => {
     expect(otherState.status).toBe('eligible');
   });
 
+  it('keeps events outside processed clusters fresh', async () => {
+    const user = await insertTestUser();
+    const owner = { type: 'user' as const, id: user.id };
+    for (let i = 0; i < 21; i += 1) {
+      const subject = await seedSubject(owner, `cluster-limit-${i}`, i + 1);
+      await recordFeedbackEvent({
+        owner,
+        platform: 'github',
+        subjectId: subject.id,
+        repoFullName: 'acme/widgets',
+        prNumber: subject.pr_number,
+        prUrl: subject.pr_url,
+        eventSource: 'github_webhook',
+        signalKind: 'corrective_reply',
+        sentiment: 'negative',
+        strength: 21 - i,
+        externalEventId: `aggregation-cluster-limit-${i}`,
+        evidenceExcerpt: `False positive cluster ${i}`,
+      });
+    }
+    const generateOpportunities = jest.fn(async () => ({ opportunities: [] }));
+
+    const summary = await dispatchManualReviewMemoryAggregation({ generateOpportunities });
+
+    expect(summary).toEqual({ claimed: 1, completed: 1, skipped: 0, failed: 0, proposals: 0 });
+    expect(generateOpportunities).toHaveBeenCalledWith(
+      expect.objectContaining({ clusters: expect.arrayContaining([expect.any(Object)]) })
+    );
+    expect(generateOpportunities.mock.calls[0]?.[0].clusters).toHaveLength(20);
+
+    const persistedEvents = await db.select().from(code_review_feedback_events);
+    expect(persistedEvents.filter(event => event.aggregation_state === 'included')).toHaveLength(
+      20
+    );
+    expect(persistedEvents.filter(event => event.aggregation_state === 'fresh')).toEqual([
+      expect.objectContaining({ external_event_id: 'aggregation-cluster-limit-20' }),
+    ]);
+  });
+
   it('does not aggregate feedback outside the retention window', async () => {
     const user = await insertTestUser();
     const owner = { type: 'user' as const, id: user.id };

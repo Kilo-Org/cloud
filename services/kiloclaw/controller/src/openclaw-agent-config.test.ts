@@ -11,6 +11,7 @@ import {
   readAgentSummary,
   serializeAgentConfigMutation,
   summarizeAgentConfig,
+  updateAgentBindings,
   updateAgentDefaults,
   updateAgentSettings,
 } from './openclaw-agent-config';
@@ -309,5 +310,127 @@ describe('native agent config mutations', () => {
       code: 'invalid_agent_config',
       status: 422,
     });
+  });
+});
+
+describe('updateAgentBindings', () => {
+  function channelsOf(configPath: string, agentId: string): string[] {
+    const raw = (readAgentConfigSnapshot({ configPath }).config as { bindings?: unknown[] })
+      .bindings;
+    return (raw ?? [])
+      .map(item => item as { agentId?: string; match?: { channel?: string; accountId?: string } })
+      .filter(b => b.agentId === agentId && b.match?.accountId === undefined)
+      .map(b => b.match?.channel as string);
+  }
+
+  it('adds the channels missing from the current set', async () => {
+    const configPath = await configFixture({
+      agents: { list: [{ id: 'research' }] },
+      bindings: [{ type: 'route', agentId: 'research', match: { channel: 'slack' } }],
+    });
+
+    const { agent } = await updateAgentBindings(
+      'research',
+      { channels: ['slack', 'discord'] },
+      { configPath }
+    );
+
+    expect(channelsOf(configPath, 'research').sort()).toEqual(['discord', 'slack']);
+    expect(agent.bindings.map(b => b.channel).sort()).toEqual(['discord', 'slack']);
+  });
+
+  it('removes channels no longer in the desired set', async () => {
+    const configPath = await configFixture({
+      agents: { list: [{ id: 'research' }] },
+      bindings: [
+        { type: 'route', agentId: 'research', match: { channel: 'slack' } },
+        { type: 'route', agentId: 'research', match: { channel: 'discord' } },
+      ],
+    });
+
+    await updateAgentBindings('research', { channels: ['slack'] }, { configPath });
+
+    expect(channelsOf(configPath, 'research')).toEqual(['slack']);
+  });
+
+  it('preserves advanced, account-scoped, and other agents bindings', async () => {
+    const configPath = await configFixture({
+      agents: { list: [{ id: 'research' }, { id: 'ops' }] },
+      bindings: [
+        { type: 'route', agentId: 'research', match: { channel: 'slack' } },
+        {
+          type: 'route',
+          agentId: 'research',
+          match: { channel: 'whatsapp', peer: { kind: 'direct', id: '+1' } },
+        },
+        { type: 'route', agentId: 'research', match: { channel: 'discord', accountId: 'team' } },
+        { type: 'route', agentId: 'ops', match: { channel: 'telegram' } },
+      ],
+    });
+
+    // Clear research's channel-level routes entirely.
+    await updateAgentBindings('research', { channels: [] }, { configPath });
+
+    const remaining = (
+      readAgentConfigSnapshot({ configPath }).config as { bindings: unknown[] }
+    ).bindings.map(item => item as { agentId: string; match: Record<string, unknown> });
+    // research's plain slack route is gone…
+    expect(
+      remaining.some(
+        b =>
+          b.agentId === 'research' &&
+          b.match.channel === 'slack' &&
+          b.match.accountId === undefined &&
+          b.match.peer === undefined
+      )
+    ).toBe(false);
+    // …but the peer-scoped, account-scoped, and ops bindings remain.
+    expect(remaining.some(b => b.agentId === 'research' && b.match.peer !== undefined)).toBe(true);
+    expect(remaining.some(b => b.agentId === 'research' && b.match.accountId === 'team')).toBe(
+      true
+    );
+    expect(remaining.some(b => b.agentId === 'ops' && b.match.channel === 'telegram')).toBe(true);
+  });
+
+  it('rejects a channel already routed to another agent', async () => {
+    const configPath = await configFixture({
+      agents: { list: [{ id: 'research' }, { id: 'ops' }] },
+      bindings: [{ type: 'route', agentId: 'ops', match: { channel: 'slack' } }],
+    });
+
+    await expect(
+      updateAgentBindings('research', { channels: ['slack'] }, { configPath })
+    ).rejects.toMatchObject({ code: 'agent_binding_conflict', status: 409 });
+    // The conflicting config was not modified.
+    expect(channelsOf(configPath, 'ops')).toEqual(['slack']);
+    expect(channelsOf(configPath, 'research')).toEqual([]);
+  });
+
+  it('rejects a stale etag without writing', async () => {
+    const configPath = await configFixture({ agents: { list: [{ id: 'research' }] } });
+
+    await expect(
+      updateAgentBindings('research', { channels: ['slack'], etag: 'stale' }, { configPath })
+    ).rejects.toMatchObject({ code: 'config_etag_conflict', status: 409 });
+    expect(channelsOf(configPath, 'research')).toEqual([]);
+  });
+
+  it('rejects an unknown agent', async () => {
+    const configPath = await configFixture({ agents: { list: [{ id: 'research' }] } });
+
+    await expect(
+      updateAgentBindings('ghost', { channels: ['slack'] }, { configPath })
+    ).rejects.toMatchObject({ code: 'agent_not_found', status: 404 });
+  });
+
+  it('fails closed when the bindings array is an unexpected shape', async () => {
+    const configPath = await configFixture({
+      agents: { list: [{ id: 'research' }] },
+      bindings: { not: 'an-array' },
+    });
+
+    await expect(
+      updateAgentBindings('research', { channels: ['slack'] }, { configPath })
+    ).rejects.toMatchObject({ code: 'invalid_agent_config', status: 422 });
   });
 });

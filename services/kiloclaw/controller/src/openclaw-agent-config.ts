@@ -137,8 +137,30 @@ export const AgentDefaultsPatchBodySchema = z
     message: 'Patch must set or unset at least one field',
   });
 
+// Declarative channel-route set: this agent's channel-level default-account
+// routes should become exactly `channels`. Advanced and account-scoped bindings
+// are preserved.
+export const AgentBindingsPutBodySchema = z
+  .object({
+    etag: z.string().min(1).optional(),
+    channels: z
+      .array(
+        z
+          .string()
+          .trim()
+          .min(1)
+          .max(64)
+          .refine(value => !value.startsWith('-'), {
+            message: 'Channel must not begin with a dash',
+          })
+      )
+      .max(50),
+  })
+  .strict();
+
 export type AgentSettingsPatchBody = z.infer<typeof AgentSettingsPatchBodySchema>;
 export type AgentDefaultsPatchBody = z.infer<typeof AgentDefaultsPatchBodySchema>;
+export type AgentBindingsPutBody = z.infer<typeof AgentBindingsPutBodySchema>;
 type OpenClawAgentConfig = z.infer<typeof OpenClawAgentConfigSchema>;
 type AgentEntry = z.infer<typeof AgentEntrySchema>;
 type AgentDefaults = z.infer<typeof AgentDefaultsSchema>;
@@ -301,6 +323,28 @@ const ConfigBindingSchema = z
 
 // Match keys that make a binding more specific than a channel(/account) route.
 const ADVANCED_MATCH_KEYS = ['peer', 'parentPeer', 'guildId', 'teamId', 'roles'];
+
+// Classify a raw binding entry as a "managed" channel-level default-account route
+// (the only kind the declarative set touches), or null for anything else
+// (advanced match, account-scoped, non-route type, or unparseable — all preserved).
+function classifyManagedChannelRoute(item: unknown): { agentId: string; channel: string } | null {
+  const parsed = ConfigBindingSchema.safeParse(item);
+  if (!parsed.success) {
+    return null;
+  }
+  const binding = parsed.data;
+  const match = binding.match as Record<string, unknown>;
+  if (typeof match.accountId === 'string') {
+    return null;
+  }
+  if (binding.type !== undefined && binding.type !== 'route') {
+    return null;
+  }
+  if (ADVANCED_MATCH_KEYS.some(key => match[key] !== undefined)) {
+    return null;
+  }
+  return { agentId: normalizeAgentId(binding.agentId), channel: binding.match.channel };
+}
 
 // Parse the top-level bindings array once and group summaries by normalized
 // agent id, so summarizing the fleet stays O(agents + bindings) rather than
@@ -606,4 +650,86 @@ export async function updateAgentDefaults(
     options
   );
   return { snapshot, defaults: summarizeAgentConfig(snapshot.config).defaults };
+}
+
+/**
+ * Declaratively set an agent's channel-level (default-account) routes via a
+ * single guarded, atomic config write. Surgically replaces only this agent's
+ * managed channel routes; advanced bindings (peer/guild/team/roles, non-route
+ * types), account-scoped routes, and other agents' bindings are preserved
+ * untouched. Fails closed (422) if the bindings array is an unexpected shape,
+ * and rejects (409 agent_binding_conflict) a channel already routed to another
+ * agent — all before any write.
+ */
+export async function updateAgentBindings(
+  agentId: string,
+  body: AgentBindingsPutBody,
+  options: AgentConfigOptions = {}
+): Promise<{ snapshot: AgentConfigSnapshot; agent: AgentSummary }> {
+  const normalized = requireAgentId(agentId);
+  const desired = [...new Set(body.channels.map(channel => channel.trim().toLowerCase()))];
+
+  const { snapshot } = await mutateAgentConfig(
+    body.etag,
+    config => {
+      if (
+        findConfiguredEntry(config, normalized) === undefined &&
+        normalized !== DEFAULT_AGENT_ID
+      ) {
+        throw new AgentConfigError(404, 'agent_not_found', `Agent "${normalized}" not found`);
+      }
+
+      const rawBindings = (config as { bindings?: unknown }).bindings;
+      if (rawBindings !== undefined && !Array.isArray(rawBindings)) {
+        throw new AgentConfigError(
+          422,
+          'invalid_agent_config',
+          'Unexpected bindings shape in config'
+        );
+      }
+      const existing: unknown[] = Array.isArray(rawBindings) ? rawBindings : [];
+
+      // Reject any requested channel already routed (default account) to another agent.
+      for (const channel of desired) {
+        const conflicted = existing.some(item => {
+          const route = classifyManagedChannelRoute(item);
+          return route !== null && route.channel === channel && route.agentId !== normalized;
+        });
+        if (conflicted) {
+          throw new AgentConfigError(
+            409,
+            'agent_binding_conflict',
+            `Channel "${channel}" is already routed to another agent`
+          );
+        }
+      }
+
+      // Drop only this agent's managed channel routes; keep everything else.
+      const preserved = existing.filter(item => {
+        const route = classifyManagedChannelRoute(item);
+        return !(route !== null && route.agentId === normalized);
+      });
+      const added = desired.map(channel => ({
+        type: 'route',
+        agentId: normalized,
+        match: { channel },
+      }));
+      const next = [...preserved, ...added];
+
+      if (next.length > 0 || Array.isArray(rawBindings)) {
+        (config as { bindings?: unknown }).bindings = next;
+      }
+    },
+    options
+  );
+
+  const agent = summarizeAgentConfig(snapshot.config).agents.find(a => a.id === normalized);
+  if (!agent) {
+    throw new AgentConfigError(
+      500,
+      'agent_config_read_failed',
+      'Unable to summarize agent after binding update'
+    );
+  }
+  return { snapshot, agent };
 }

@@ -1,5 +1,6 @@
 import type { Context, Hono } from 'hono';
 import {
+  AgentBindingsPutBodySchema,
   AgentConfigError,
   AgentDefaultsPatchBodySchema,
   AgentSettingsPatchBodySchema,
@@ -7,6 +8,7 @@ import {
   readAgentSummary,
   serializeAgentConfigMutation,
   summarizeAgentConfig,
+  updateAgentBindings,
   updateAgentDefaults,
   updateAgentSettings,
 } from '../openclaw-agent-config';
@@ -16,7 +18,6 @@ import {
   createAgentViaCli,
   deleteAgentViaCli,
 } from '../openclaw-agent-cli';
-import { AgentBindingsPutBodySchema, setAgentBindings } from '../openclaw-agent-bindings';
 
 export type AgentRouteDeps = {
   readSnapshot: typeof readAgentConfigSnapshot;
@@ -27,7 +28,7 @@ export type AgentRouteDeps = {
   updateDefaults: typeof updateAgentDefaults;
   createViaCli: typeof createAgentViaCli;
   deleteViaCli: typeof deleteAgentViaCli;
-  setBindings: typeof setAgentBindings;
+  setBindings: typeof updateAgentBindings;
 };
 
 const defaultDeps: AgentRouteDeps = {
@@ -39,7 +40,7 @@ const defaultDeps: AgentRouteDeps = {
   updateDefaults: updateAgentDefaults,
   createViaCli: createAgentViaCli,
   deleteViaCli: deleteAgentViaCli,
-  setBindings: setAgentBindings,
+  setBindings: updateAgentBindings,
 };
 
 function errorStatus(status: number): 400 | 404 | 409 | 422 | 500 | 502 | 504 {

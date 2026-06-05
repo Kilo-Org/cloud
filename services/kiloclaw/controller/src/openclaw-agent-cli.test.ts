@@ -2,10 +2,8 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   BasicAgentCreateBodySchema,
   OpenClawAgentCliError,
-  bindAgentViaCli,
   createAgentViaCli,
   deleteAgentViaCli,
-  unbindAgentViaCli,
 } from './openclaw-agent-cli';
 
 describe('createAgentViaCli', () => {
@@ -103,63 +101,5 @@ describe('deleteAgentViaCli', () => {
         },
       })
     ).rejects.toMatchObject({ code: 'reserved_agent_id', status: 400 });
-  });
-});
-
-describe('bindAgentViaCli', () => {
-  it('builds repeatable --bind JSON arguments and parses the result', async () => {
-    const run = vi.fn(async () => ({
-      stdout: JSON.stringify({
-        agentId: 'research',
-        added: ['slack'],
-        updated: [],
-        skipped: [],
-        conflicts: [],
-      }),
-      stderr: '',
-    }));
-
-    const result = await bindAgentViaCli('research', ['slack', 'discord:team'], { run });
-
-    expect(run).toHaveBeenCalledWith([
-      'agents',
-      'bind',
-      '--agent',
-      'research',
-      '--bind',
-      'slack',
-      '--bind',
-      'discord:team',
-      '--json',
-    ]);
-    expect(result.added).toEqual(['slack']);
-  });
-});
-
-describe('unbindAgentViaCli', () => {
-  it('targets specific --bind specs (never --all) and parses the result', async () => {
-    const run = vi.fn(async (_args: string[]) => ({
-      stdout: JSON.stringify({
-        agentId: 'research',
-        removed: ['discord'],
-        missing: [],
-        conflicts: [],
-      }),
-      stderr: '',
-    }));
-
-    const result = await unbindAgentViaCli('research', ['discord'], { run });
-
-    expect(run).toHaveBeenCalledWith([
-      'agents',
-      'unbind',
-      '--agent',
-      'research',
-      '--bind',
-      'discord',
-      '--json',
-    ]);
-    expect(run.mock.calls[0][0]).not.toContain('--all');
-    expect(result.removed).toEqual(['discord']);
   });
 });

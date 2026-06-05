@@ -4,10 +4,13 @@ import {
   organizations,
   credit_transactions,
   organization_seats_purchases,
+  organization_memberships,
+  kilo_pass_subscriptions,
 } from '@kilocode/db/schema';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, inArray } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
-import { createOrganization } from '@/lib/organizations/organizations';
+import { createOrganization, addUserToOrganization } from '@/lib/organizations/organizations';
+import { KiloPassCadence, KiloPassTier } from '@/lib/kilo-pass/enums';
 import type { User, Organization } from '@kilocode/db/schema';
 
 let adminUser: User;
@@ -594,6 +597,227 @@ describe('organization admin router', () => {
       expect(result.organizations).toBeDefined();
       expect(result.pagination).toBeDefined();
       expect(typeof result.pagination.total).toBe('number');
+    });
+
+    it('does not overcount multi-member orgs when has_multiple_users is off', async () => {
+      const searchName = `Admin Count No Member Join ${crypto.randomUUID()}`;
+      const org = await createOrganization(searchName, adminUser.id);
+      const member = await insertTestUser({
+        google_user_email: `${crypto.randomUUID()}@count-no-member-join.example.com`,
+      });
+
+      try {
+        await addUserToOrganization(org.id, member.id, 'member');
+
+        const caller = await createCallerForUser(adminUser.id);
+        const result = await caller.organizations.admin.list({
+          page: 1,
+          limit: 25,
+          sortBy: 'name',
+          sortOrder: 'desc',
+          search: searchName,
+          mode: 'all',
+          include_deleted: false,
+          has_multiple_users: false,
+        });
+
+        expect(result.organizations.map(organization => organization.id)).toEqual([org.id]);
+        expect(result.pagination.total).toBe(1);
+      } finally {
+        await db.delete(organizations).where(eq(organizations.id, org.id));
+      }
+    });
+
+    it('counts only non-bot non-billing-manager users for has_multiple_users totals', async () => {
+      const searchName = `Admin Count Excluded Members ${crypto.randomUUID()}`;
+      const org = await createOrganization(searchName, adminUser.id);
+      const billingManager = await insertTestUser({
+        google_user_email: `${crypto.randomUUID()}@billing-manager.example.com`,
+      });
+      const bot = await insertTestUser({
+        google_user_email: `${crypto.randomUUID()}@bot.example.com`,
+        is_bot: true,
+      });
+      const member = await insertTestUser({
+        google_user_email: `${crypto.randomUUID()}@regular-member.example.com`,
+      });
+
+      try {
+        await addUserToOrganization(org.id, billingManager.id, 'billing_manager');
+        await addUserToOrganization(org.id, bot.id, 'member');
+
+        const caller = await createCallerForUser(adminUser.id);
+        const resultBeforeRegularMember = await caller.organizations.admin.list({
+          page: 1,
+          limit: 25,
+          sortBy: 'name',
+          sortOrder: 'desc',
+          search: searchName,
+          mode: 'all',
+          include_deleted: false,
+          has_multiple_users: true,
+        });
+
+        expect(resultBeforeRegularMember.organizations).toEqual([]);
+        expect(resultBeforeRegularMember.pagination.total).toBe(0);
+
+        await addUserToOrganization(org.id, member.id, 'member');
+
+        const resultAfterRegularMember = await caller.organizations.admin.list({
+          page: 1,
+          limit: 25,
+          sortBy: 'name',
+          sortOrder: 'desc',
+          search: searchName,
+          mode: 'all',
+          include_deleted: false,
+          has_multiple_users: true,
+        });
+
+        expect(resultAfterRegularMember.organizations.map(organization => organization.id)).toEqual(
+          [org.id]
+        );
+        expect(resultAfterRegularMember.pagination.total).toBe(1);
+      } finally {
+        await db.delete(organizations).where(eq(organizations.id, org.id));
+      }
+    });
+  });
+
+  describe('list — trial active filter', () => {
+    it('uses effective trial end date and trial_active threshold', async () => {
+      const searchPrefix = `Admin Trial Active ${crypto.randomUUID()}`;
+      const fallbackActiveOrg = await createOrganization(`${searchPrefix} fallback`, adminUser.id);
+      const explicitActiveOrg = await createOrganization(
+        `${searchPrefix} explicit active`,
+        adminUser.id
+      );
+      const endingSoonOrg = await createOrganization(`${searchPrefix} ending soon`, adminUser.id);
+
+      try {
+        await db
+          .update(organizations)
+          .set({
+            free_trial_end_at: null,
+            created_at: new Date().toISOString(),
+          })
+          .where(eq(organizations.id, fallbackActiveOrg.id));
+        await db
+          .update(organizations)
+          .set({
+            free_trial_end_at: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString(),
+          })
+          .where(eq(organizations.id, explicitActiveOrg.id));
+        await db
+          .update(organizations)
+          .set({
+            free_trial_end_at: new Date(Date.now() + 6 * 24 * 60 * 60 * 1000).toISOString(),
+          })
+          .where(eq(organizations.id, endingSoonOrg.id));
+
+        const caller = await createCallerForUser(adminUser.id);
+        const result = await caller.organizations.admin.list({
+          page: 1,
+          limit: 25,
+          sortBy: 'name',
+          sortOrder: 'asc',
+          search: searchPrefix,
+          mode: 'trial',
+          include_deleted: false,
+          trial_ending_in_future: true,
+        });
+
+        expect(result.organizations.map(organization => organization.id).sort()).toEqual(
+          [explicitActiveOrg.id, fallbackActiveOrg.id].sort()
+        );
+        expect(result.pagination.total).toBe(2);
+      } finally {
+        await db
+          .delete(organizations)
+          .where(
+            inArray(organizations.id, [
+              fallbackActiveOrg.id,
+              explicitActiveOrg.id,
+              endingSoonOrg.id,
+            ])
+          );
+      }
+    });
+  });
+
+  describe('list — Kilo Pass tier sorting', () => {
+    it('sorts by the joined active Kilo Pass tier selected for display', async () => {
+      const searchPrefix = `Admin Kilo Pass Sort ${crypto.randomUUID()}`;
+      const tier19User = await insertTestUser({
+        google_user_email: `${crypto.randomUUID()}@tier19.example.com`,
+      });
+      const tier49User = await insertTestUser({
+        google_user_email: `${crypto.randomUUID()}@tier49.example.com`,
+      });
+      const tier19Org = await createOrganization(`${searchPrefix} tier 19`, tier19User.id);
+      const tier49Org = await createOrganization(`${searchPrefix} tier 49`, tier49User.id);
+      const stripeSubscriptionIds = [
+        `sub_admin_org_tier19_${crypto.randomUUID()}`,
+        `sub_admin_org_tier49_${crypto.randomUUID()}`,
+      ];
+
+      try {
+        const now = new Date().toISOString();
+        await db.insert(kilo_pass_subscriptions).values([
+          {
+            kilo_user_id: tier19User.id,
+            provider_subscription_id: stripeSubscriptionIds[0],
+            stripe_subscription_id: stripeSubscriptionIds[0],
+            tier: KiloPassTier.Tier19,
+            cadence: KiloPassCadence.Monthly,
+            status: 'active',
+            cancel_at_period_end: false,
+            current_streak_months: 1,
+            started_at: now,
+            ended_at: null,
+            next_yearly_issue_at: null,
+          },
+          {
+            kilo_user_id: tier49User.id,
+            provider_subscription_id: stripeSubscriptionIds[1],
+            stripe_subscription_id: stripeSubscriptionIds[1],
+            tier: KiloPassTier.Tier49,
+            cadence: KiloPassCadence.Monthly,
+            status: 'active',
+            cancel_at_period_end: false,
+            current_streak_months: 1,
+            started_at: now,
+            ended_at: null,
+            next_yearly_issue_at: null,
+          },
+        ]);
+
+        const caller = await createCallerForUser(adminUser.id);
+        const result = await caller.organizations.admin.list({
+          page: 1,
+          limit: 1,
+          sortBy: 'kilo_pass_tier',
+          sortOrder: 'asc',
+          search: searchPrefix,
+          mode: 'all',
+          include_deleted: false,
+        });
+
+        expect(result.organizations).toHaveLength(1);
+        expect(result.organizations[0]?.id).toBe(tier19Org.id);
+        expect(result.organizations[0]?.kilo_pass_tier).toBe(KiloPassTier.Tier19);
+        expect(result.pagination.total).toBe(2);
+      } finally {
+        await db
+          .delete(kilo_pass_subscriptions)
+          .where(inArray(kilo_pass_subscriptions.stripe_subscription_id, stripeSubscriptionIds));
+        await db
+          .delete(organization_memberships)
+          .where(inArray(organization_memberships.organization_id, [tier19Org.id, tier49Org.id]));
+        await db
+          .delete(organizations)
+          .where(inArray(organizations.id, [tier19Org.id, tier49Org.id]));
+      }
     });
   });
 });

@@ -168,11 +168,11 @@ export function useOrgKiloClawMyPin(organizationId: string, opts: { enabled?: bo
   );
 }
 
-export function useOrgFileTree(organizationId: string, enabled: boolean) {
+export function useOrgFileTree(organizationId: string, enabled: boolean, path?: string) {
   const trpc = useTRPC();
   return useQuery(
     trpc.organizations.kiloclaw.fileTree.queryOptions(
-      { organizationId },
+      { organizationId, ...(path === undefined ? {} : { path }) },
       { enabled, refetchOnWindowFocus: false }
     )
   );

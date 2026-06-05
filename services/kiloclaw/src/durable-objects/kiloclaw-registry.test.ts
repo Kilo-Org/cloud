@@ -326,3 +326,85 @@ describe('KiloClawRegistry fresh provision reservations', () => {
     expect(await registry.listInstances('user:user-1')).toEqual([]);
   });
 });
+
+describe('KiloClawRegistry.adminReleaseStuckReservation', () => {
+  beforeEach(() => {
+    databaseRows.instances.length = 0;
+    databaseRows.reservations.length = 0;
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('releases a failed_requires_reconciliation reservation and unblocks new provisions', async () => {
+    const registry = new KiloClawRegistry(createState() as never, {} as never);
+    await registry.beginFreshProvision('user:user-1', 'user-1', 'instance-1', 'do-1');
+    await registry.failFreshProvision('user:user-1', 'user-1', 'instance-1', 'provider_failed');
+
+    const result = await registry.adminReleaseStuckReservation(
+      'user:user-1',
+      'user-1',
+      'instance-1',
+      'failed_requires_reconciliation',
+      'manual_admin_release'
+    );
+    expect(result).toEqual({
+      outcome: 'released',
+      previousStatus: 'failed_requires_reconciliation',
+    });
+
+    // Admission lock is gone — a fresh provision is admitted again.
+    const retry = await registry.beginFreshProvision('user:user-1', 'user-1', 'instance-2', 'do-2');
+    expect(retry.outcome).toBe('admitted');
+  });
+
+  it('releases an in_progress reservation matching the expected status', async () => {
+    const registry = new KiloClawRegistry(createState() as never, {} as never);
+    await registry.beginFreshProvision('user:user-1', 'user-1', 'instance-1', 'do-1');
+
+    const result = await registry.adminReleaseStuckReservation(
+      'user:user-1',
+      'user-1',
+      'instance-1',
+      'in_progress',
+      'manual_admin_release'
+    );
+    expect(result).toEqual({ outcome: 'released', previousStatus: 'in_progress' });
+  });
+
+  it('reports status_changed when the row no longer matches the expected status', async () => {
+    const registry = new KiloClawRegistry(createState() as never, {} as never);
+    await registry.beginFreshProvision('user:user-1', 'user-1', 'instance-1', 'do-1');
+    // Caller validated in_progress, but it completed before the release landed.
+    await registry.completeFreshProvision('user:user-1', 'user-1', 'instance-1', 'do-1');
+
+    const result = await registry.adminReleaseStuckReservation(
+      'user:user-1',
+      'user-1',
+      'instance-1',
+      'in_progress',
+      'manual_admin_release'
+    );
+    expect(result).toEqual({ outcome: 'status_changed', status: 'completed' });
+
+    // The completed reservation is untouched.
+    const all = await registry.listAllInstances('user:user-1');
+    expect(all.reservations).toEqual([
+      expect.objectContaining({ instanceId: 'instance-1', status: 'completed' }),
+    ]);
+  });
+
+  it('returns not_found when no reservation exists for the instance', async () => {
+    const registry = new KiloClawRegistry(createState() as never, {} as never);
+
+    const result = await registry.adminReleaseStuckReservation(
+      'user:user-1',
+      'user-1',
+      'missing-instance',
+      'failed_requires_reconciliation',
+      'manual_admin_release'
+    );
+    expect(result).toEqual({ outcome: 'not_found' });
+  });
+});

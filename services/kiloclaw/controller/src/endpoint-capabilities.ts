@@ -15,6 +15,7 @@ export const CONTROLLER_ENDPOINT_CAPABILITIES = [
   'doctor.run',
   'kilo-cli.run',
   'files.tree',
+  'files.tree.path',
   'files.read',
   'files.write',
   'files.write-openclaw-config',

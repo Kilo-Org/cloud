@@ -554,6 +554,7 @@ export const KiloClawAdminAuditAction = z.enum([
   'kiloclaw.scheduled_action.created',
   'kiloclaw.fleet_upgrade.created',
   'kiloclaw.scheduled_action.cancelled',
+  'kiloclaw.provision_reservation.release',
 ]);
 
 export type KiloClawAdminAuditAction = z.infer<typeof KiloClawAdminAuditAction>;

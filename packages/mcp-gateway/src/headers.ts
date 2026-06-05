@@ -31,6 +31,8 @@ const blockedExactHeaders = new Set([
   'x-api-key',
 ]);
 
+const transportIdentityHeaders = new Set(['host', 'forwarded']);
+
 export function isAllowedTransientHeader(name: string): boolean {
   const normalized = name.toLowerCase();
   return allowedTransientHeaders.has(normalized) || normalized.startsWith('mcp-param-');
@@ -42,6 +44,15 @@ export function isCredentialLikeHeader(name: string): boolean {
     blockedExactHeaders.has(normalized) ||
     normalized.startsWith('x-auth-') ||
     normalized.startsWith('x-token-')
+  );
+}
+
+function isTransportIdentityHeader(name: string): boolean {
+  const normalized = name.toLowerCase();
+  return (
+    transportIdentityHeaders.has(normalized) ||
+    normalized.startsWith('x-forwarded-') ||
+    normalized.startsWith('cf-')
   );
 }
 
@@ -64,6 +75,13 @@ const staticHeadersSchema = z.record(z.string(), headerValueSchema).superRefine(
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: 'Static header cannot be hop-by-hop',
+        path: [name],
+      });
+    }
+    if (isTransportIdentityHeader(normalized)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Static header cannot be transport identity metadata',
         path: [name],
       });
     }

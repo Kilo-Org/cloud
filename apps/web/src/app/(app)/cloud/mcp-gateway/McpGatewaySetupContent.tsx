@@ -695,17 +695,17 @@ function DiscoveryStatus({
   const hasProvider = providerCount > 0;
   return (
     <div className="rounded-lg border p-4" aria-live="polite">
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-foreground inline-flex items-center gap-2 text-sm font-medium">
-          <ShieldCheck className="size-4 text-green-400" />
-          {host} is reachable
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-foreground flex min-w-0 items-center gap-2 text-sm font-medium">
+          <ShieldCheck className="size-4 shrink-0 text-green-400" />
+          <span className="min-w-0 break-all">{host} is reachable</span>
         </p>
         <Button
           variant="ghost"
           size="sm"
           type="button"
           onClick={onRetry}
-          className="text-muted-foreground hover:text-foreground -mr-2"
+          className="text-muted-foreground hover:text-foreground -mr-2 shrink-0"
         >
           <RotateCcw className="size-4" />
           Re-check

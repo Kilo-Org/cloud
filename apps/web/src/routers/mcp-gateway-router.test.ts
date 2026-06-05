@@ -38,6 +38,68 @@ describe('mcpGateway management authorization', () => {
     await expect(caller.mcpGateway.listPersonal(undefined)).resolves.toEqual([]);
   });
 
+  it('maps invalid remote URLs to bad requests', async () => {
+    const user = await insertTestUser({ is_admin: false });
+    const caller = await createCallerForUser(user.id);
+    const gatewayEnvKeys = [
+      'MCP_GATEWAY_JWT_PRIVATE_KEYSET_JSON',
+      'MCP_GATEWAY_CREDENTIAL_KEYSET_JSON',
+      'MCP_GATEWAY_RATE_LIMIT_SECRET',
+    ] as const;
+    const originalGatewayEnv = Object.fromEntries(
+      gatewayEnvKeys.map(key => [key, process.env[key]])
+    );
+    try {
+      process.env.MCP_GATEWAY_JWT_PRIVATE_KEYSET_JSON = JSON.stringify({
+        issuer: 'https://app.kilo.ai',
+        activeKeyId: 'jwt-active',
+        keys: [
+          {
+            keyId: 'jwt-active',
+            publicJwk: { kty: 'RSA', n: 'test-modulus', e: 'AQAB' },
+            privateKeyPem: 'test-private-key',
+          },
+        ],
+      });
+      process.env.MCP_GATEWAY_CREDENTIAL_KEYSET_JSON = JSON.stringify({
+        active: { keyId: 'credential-active', publicKeyPem: 'credential-public-key' },
+        decrypt: [{ keyId: 'credential-active', privateKeyPem: 'credential-private-key' }],
+      });
+      process.env.MCP_GATEWAY_RATE_LIMIT_SECRET = 'test-rate-limit-secret';
+
+      await expect(
+        caller.mcpGateway.createPersonal({
+          name: 'Invalid MCP',
+          remoteUrl: 'http://example.com/mcp',
+          authMode: 'none',
+        })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: 'Remote endpoint must use HTTPS' });
+    } finally {
+      for (const key of gatewayEnvKeys) {
+        const value = originalGatewayEnv[key];
+        if (value === undefined) {
+          delete process.env[key];
+        } else {
+          process.env[key] = value;
+        }
+      }
+    }
+  });
+
+  it('rejects invalid static header names and values as bad requests', async () => {
+    const user = await insertTestUser({ is_admin: false });
+    const caller = await createCallerForUser(user.id);
+
+    return expect(
+      caller.mcpGateway.createPersonal({
+        name: 'Invalid headers',
+        remoteUrl: 'https://example.com/mcp',
+        authMode: 'static_headers',
+        staticHeaders: { Host: 'example.com', 'X-Test': 'line\nbreak' },
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+  });
+
   it('serializes dashboard timestamps as ISO strings', async () => {
     const user = await insertTestUser({ is_admin: true });
     const caller = await createCallerForUser(user.id);

@@ -3,10 +3,38 @@ import { APP_URL } from '@/lib/constants';
 import { getEnvVariable } from '@/lib/dotenvx';
 import { z } from 'zod';
 
+type GatewayPublicJwk = Pick<
+  JsonWebKey,
+  | 'alg'
+  | 'crv'
+  | 'd'
+  | 'dp'
+  | 'dq'
+  | 'e'
+  | 'ext'
+  | 'k'
+  | 'key_ops'
+  | 'kty'
+  | 'n'
+  | 'oth'
+  | 'p'
+  | 'q'
+  | 'qi'
+  | 'use'
+  | 'x'
+  | 'y'
+>;
+
+const PublicJwkSchema = z
+  .object({
+    kty: z.string().min(1),
+  })
+  .passthrough();
+
 const JWTKeySchema = z.object({
   keyId: z.string().min(1),
-  publicJwk: z.record(z.string(), z.unknown()),
-  publicKeyPem: z.string().min(1),
+  publicJwk: PublicJwkSchema,
+  publicKeyPem: z.string().min(1).optional(),
   privateKeyPem: z.string().min(1).optional(),
 });
 
@@ -33,8 +61,8 @@ const CredentialKeysetSchema = z.object({
 
 export type GatewayJWTKey = {
   keyId: string;
-  publicJwk: Record<string, unknown>;
-  publicKeyPem: string;
+  publicJwk: GatewayPublicJwk;
+  publicKeyPem?: string;
   privateKeyPem?: string;
 };
 

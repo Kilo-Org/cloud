@@ -14,6 +14,8 @@ import {
   GatewayOwnerScope,
   GatewaySharingMode,
   GatewaySecretKind,
+  GatewayError,
+  parseStaticHeaders,
 } from '@kilocode/mcp-gateway';
 import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import { createGatewayServices } from '@/lib/mcp-gateway/services';
@@ -31,12 +33,87 @@ const AuthModeSchema = z.enum([
   GatewayAuthMode.OAuthStatic,
 ]);
 const SharingModeSchema = z.enum([GatewaySharingMode.SingleUser, GatewaySharingMode.MultiUser]);
-const StaticHeadersSchema = z.record(z.string(), z.string().min(1));
+const StaticHeadersSchema = z.record(z.string(), z.string().min(1)).superRefine((headers, ctx) => {
+  try {
+    parseStaticHeaders(headers);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      for (const issue of error.issues) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: issue.message,
+          path: issue.path,
+        });
+      }
+      return;
+    }
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Invalid static headers',
+    });
+  }
+});
 const ManagedConfigInputSchema = z.object({
   configId: ConfigIdSchema,
   organizationId: OrganizationIdSchema.optional(),
 });
 const mcpGatewayProcedure = baseProcedure;
+
+function isGatewayError(error: unknown): error is GatewayError {
+  return (
+    error instanceof GatewayError ||
+    (typeof error === 'object' &&
+      error !== null &&
+      'status' in error &&
+      typeof error.status === 'number' &&
+      'code' in error &&
+      typeof error.code === 'string' &&
+      'message' in error &&
+      typeof error.message === 'string')
+  );
+}
+
+function gatewayErrorToTRPCCode(error: GatewayError): TRPCError['code'] {
+  switch (error.status) {
+    case 400:
+      return 'BAD_REQUEST';
+    case 401:
+      return 'UNAUTHORIZED';
+    case 403:
+      return 'FORBIDDEN';
+    case 404:
+      return 'NOT_FOUND';
+    case 409:
+      return 'CONFLICT';
+    case 429:
+      return 'TOO_MANY_REQUESTS';
+    default:
+      return 'INTERNAL_SERVER_ERROR';
+  }
+}
+
+async function withGatewayErrorMapping<T>(operation: () => Promise<T>): Promise<T> {
+  try {
+    return await operation();
+  } catch (error) {
+    if (error instanceof TRPCError) throw error;
+    if (isGatewayError(error)) {
+      throw new TRPCError({
+        code: gatewayErrorToTRPCCode(error),
+        message: error.message,
+        cause: error,
+      });
+    }
+    if (error instanceof z.ZodError) {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: 'Invalid gateway request',
+        cause: error,
+      });
+    }
+    throw error;
+  }
+}
 
 async function requireOrganizationManager(params: {
   organizationId: string;
@@ -279,19 +356,21 @@ async function requireManagedConfig(params: {
 export const mcpGatewayRouter = createTRPCRouter({
   discover: mcpGatewayProcedure
     .input(z.object({ remoteUrl: RemoteUrlSchema }))
-    .mutation(async ({ input }) => {
-      const services = createGatewayServices();
-      const discovery = await services.discoveryService.discoverRemoteProvider(input.remoteUrl);
-      return {
-        remoteUrl: discovery.remoteUrl,
-        providerCandidates: discovery.providerCandidates.map(candidate => ({
-          issuer: candidate.issuer,
-          authorizationEndpoint: candidate.authorization_endpoint,
-          tokenEndpoint: candidate.token_endpoint,
-          hasRegistrationEndpoint: Boolean(candidate.registration_endpoint),
-        })),
-      };
-    }),
+    .mutation(async ({ input }) =>
+      withGatewayErrorMapping(async () => {
+        const services = createGatewayServices();
+        const discovery = await services.discoveryService.discoverRemoteProvider(input.remoteUrl);
+        return {
+          remoteUrl: discovery.remoteUrl,
+          providerCandidates: discovery.providerCandidates.map(candidate => ({
+            issuer: candidate.issuer,
+            authorizationEndpoint: candidate.authorization_endpoint,
+            tokenEndpoint: candidate.token_endpoint,
+            hasRegistrationEndpoint: Boolean(candidate.registration_endpoint),
+          })),
+        };
+      })
+    ),
   listPersonal: mcpGatewayProcedure.query(async ({ ctx }) =>
     listConfigs({ ownerScope: GatewayOwnerScope.Personal, ownerId: ctx.user.id })
   ),
@@ -344,21 +423,23 @@ export const mcpGatewayRouter = createTRPCRouter({
         pathPassthrough: z.boolean().optional(),
       })
     )
-    .mutation(async ({ input, ctx }) => {
-      const services = createGatewayServices();
-      const created = await services.configService.createPersonalConfig({
-        userId: ctx.user.id,
-        name: input.name,
-        remoteUrl: input.remoteUrl,
-        authMode: input.authMode,
-        providerIssuer: input.providerIssuer,
-        staticProviderClientId: input.staticProviderClientId,
-        staticProviderClientSecret: input.staticProviderClientSecret,
-        staticHeaders: input.staticHeaders,
-        pathPassthrough: input.pathPassthrough,
-      });
-      return { configId: created.config.config_id };
-    }),
+    .mutation(async ({ input, ctx }) =>
+      withGatewayErrorMapping(async () => {
+        const services = createGatewayServices();
+        const created = await services.configService.createPersonalConfig({
+          userId: ctx.user.id,
+          name: input.name,
+          remoteUrl: input.remoteUrl,
+          authMode: input.authMode,
+          providerIssuer: input.providerIssuer,
+          staticProviderClientId: input.staticProviderClientId,
+          staticProviderClientSecret: input.staticProviderClientSecret,
+          staticHeaders: input.staticHeaders,
+          pathPassthrough: input.pathPassthrough,
+        });
+        return { configId: created.config.config_id };
+      })
+    ),
   createOrganization: mcpGatewayProcedure
     .input(
       z.object({
@@ -375,54 +456,72 @@ export const mcpGatewayRouter = createTRPCRouter({
         pathPassthrough: z.boolean().optional(),
       })
     )
-    .mutation(async ({ input, ctx }) => {
-      await requireOrganizationManager({
-        organizationId: input.organizationId,
-        userId: ctx.user.id,
-        isGlobalAdmin: ctx.user.is_admin,
-      });
-      const services = createGatewayServices();
-      const created = await services.configService.createOrganizationConfig({
-        organizationId: input.organizationId,
-        actorUserId: ctx.user.id,
-        name: input.name,
-        remoteUrl: input.remoteUrl,
-        authMode: input.authMode,
-        providerIssuer: input.providerIssuer,
-        staticProviderClientId: input.staticProviderClientId,
-        staticProviderClientSecret: input.staticProviderClientSecret,
-        staticHeaders: input.staticHeaders,
-        sharingMode: input.sharingMode,
-        initialAssignedUserId: input.initialAssignedUserId,
-        pathPassthrough: input.pathPassthrough,
-      });
-      return { configId: created.config.config_id };
-    }),
+    .mutation(async ({ input, ctx }) =>
+      withGatewayErrorMapping(async () => {
+        await requireOrganizationManager({
+          organizationId: input.organizationId,
+          userId: ctx.user.id,
+          isGlobalAdmin: ctx.user.is_admin,
+        });
+        const services = createGatewayServices();
+        const created = await services.configService.createOrganizationConfig({
+          organizationId: input.organizationId,
+          actorUserId: ctx.user.id,
+          name: input.name,
+          remoteUrl: input.remoteUrl,
+          authMode: input.authMode,
+          providerIssuer: input.providerIssuer,
+          staticProviderClientId: input.staticProviderClientId,
+          staticProviderClientSecret: input.staticProviderClientSecret,
+          staticHeaders: input.staticHeaders,
+          sharingMode: input.sharingMode,
+          initialAssignedUserId: input.initialAssignedUserId,
+          pathPassthrough: input.pathPassthrough,
+        });
+        return { configId: created.config.config_id };
+      })
+    ),
   startProviderSignIn: mcpGatewayProcedure
     .input(ManagedConfigInputSchema)
-    .mutation(async ({ input, ctx }) => {
-      const resolved = await requireManagedConfig({
-        configId: input.configId,
-        organizationId: input.organizationId,
-        userId: ctx.user.id,
-        isGlobalAdmin: ctx.user.is_admin,
-      });
-      const services = createGatewayServices();
-      const route = services.routeService.parseResource(resolved.route.canonical_url);
-      const provider = await services.providerOAuthService.startDashboardProviderSignIn({
-        resolved,
-        route,
-        userId: ctx.user.id,
-        executionContext:
-          resolved.config.owner_scope === GatewayOwnerScope.Organization
-            ? { type: 'organization', organizationId: resolved.config.owner_id }
-            : { type: 'personal' },
-      });
-      return { authorizationUrl: provider.authorizationUrl };
-    }),
+    .mutation(async ({ input, ctx }) =>
+      withGatewayErrorMapping(async () => {
+        const resolved = await requireManagedConfig({
+          configId: input.configId,
+          organizationId: input.organizationId,
+          userId: ctx.user.id,
+          isGlobalAdmin: ctx.user.is_admin,
+        });
+        const services = createGatewayServices();
+        const route = services.routeService.parseResource(resolved.route.canonical_url);
+        const provider = await services.providerOAuthService.startDashboardProviderSignIn({
+          resolved,
+          route,
+          userId: ctx.user.id,
+          executionContext:
+            resolved.config.owner_scope === GatewayOwnerScope.Organization
+              ? { type: 'organization', organizationId: resolved.config.owner_id }
+              : { type: 'personal' },
+        });
+        return { authorizationUrl: provider.authorizationUrl };
+      })
+    ),
   rotateRoute: mcpGatewayProcedure
     .input(ManagedConfigInputSchema)
-    .mutation(async ({ input, ctx }) => {
+    .mutation(async ({ input, ctx }) =>
+      withGatewayErrorMapping(async () => {
+        await requireManagedConfig({
+          configId: input.configId,
+          organizationId: input.organizationId,
+          userId: ctx.user.id,
+          isGlobalAdmin: ctx.user.is_admin,
+        });
+        const services = createGatewayServices();
+        const route = await services.configService.rotateRoute({ configId: input.configId });
+        return { routeKey: route.route_key, canonicalUrl: route.canonical_url };
+      })
+    ),
+  disable: mcpGatewayProcedure.input(ManagedConfigInputSchema).mutation(async ({ input, ctx }) =>
+    withGatewayErrorMapping(async () => {
       await requireManagedConfig({
         configId: input.configId,
         organizationId: input.organizationId,
@@ -430,56 +529,50 @@ export const mcpGatewayRouter = createTRPCRouter({
         isGlobalAdmin: ctx.user.is_admin,
       });
       const services = createGatewayServices();
-      const route = await services.configService.rotateRoute({ configId: input.configId });
-      return { routeKey: route.route_key, canonicalUrl: route.canonical_url };
-    }),
-  disable: mcpGatewayProcedure.input(ManagedConfigInputSchema).mutation(async ({ input, ctx }) => {
-    await requireManagedConfig({
-      configId: input.configId,
-      organizationId: input.organizationId,
-      userId: ctx.user.id,
-      isGlobalAdmin: ctx.user.is_admin,
-    });
-    const services = createGatewayServices();
-    const config = await services.configService.disableConfig(input.configId);
-    if (!config) throw new TRPCError({ code: 'NOT_FOUND', message: 'Connection not found' });
-    return { configId: config.config_id, enabled: config.enabled };
-  }),
-  delete: mcpGatewayProcedure.input(ManagedConfigInputSchema).mutation(async ({ input, ctx }) => {
-    await requireManagedConfig({
-      configId: input.configId,
-      organizationId: input.organizationId,
-      userId: ctx.user.id,
-      isGlobalAdmin: ctx.user.is_admin,
-    });
-    const services = createGatewayServices();
-    const config = await services.configService.deleteConfig(input.configId);
-    if (!config) throw new TRPCError({ code: 'NOT_FOUND', message: 'Connection not found' });
-    return { configId: config.config_id };
-  }),
-  upsertStaticHeaders: mcpGatewayProcedure
-    .input(ManagedConfigInputSchema.extend({ headers: StaticHeadersSchema }))
-    .mutation(async ({ input, ctx }) => {
-      const resolved = await requireManagedConfig({
+      const config = await services.configService.disableConfig(input.configId);
+      if (!config) throw new TRPCError({ code: 'NOT_FOUND', message: 'Connection not found' });
+      return { configId: config.config_id, enabled: config.enabled };
+    })
+  ),
+  delete: mcpGatewayProcedure.input(ManagedConfigInputSchema).mutation(async ({ input, ctx }) =>
+    withGatewayErrorMapping(async () => {
+      await requireManagedConfig({
         configId: input.configId,
         organizationId: input.organizationId,
         userId: ctx.user.id,
         isGlobalAdmin: ctx.user.is_admin,
       });
-      if (resolved.config.auth_mode !== GatewayAuthMode.StaticHeaders) {
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: 'Connection does not use static headers',
-        });
-      }
       const services = createGatewayServices();
-      const secret = await services.configService.upsertSecret({
-        configId: input.configId,
-        kind: GatewaySecretKind.StaticHeaders,
-        value: { headers: input.headers },
-      });
-      return { secretId: secret.config_secret_id };
-    }),
+      const config = await services.configService.deleteConfig(input.configId);
+      if (!config) throw new TRPCError({ code: 'NOT_FOUND', message: 'Connection not found' });
+      return { configId: config.config_id };
+    })
+  ),
+  upsertStaticHeaders: mcpGatewayProcedure
+    .input(ManagedConfigInputSchema.extend({ headers: StaticHeadersSchema }))
+    .mutation(async ({ input, ctx }) =>
+      withGatewayErrorMapping(async () => {
+        const resolved = await requireManagedConfig({
+          configId: input.configId,
+          organizationId: input.organizationId,
+          userId: ctx.user.id,
+          isGlobalAdmin: ctx.user.is_admin,
+        });
+        if (resolved.config.auth_mode !== GatewayAuthMode.StaticHeaders) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Connection does not use static headers',
+          });
+        }
+        const services = createGatewayServices();
+        const secret = await services.configService.upsertSecret({
+          configId: input.configId,
+          kind: GatewaySecretKind.StaticHeaders,
+          value: { headers: input.headers },
+        });
+        return { secretId: secret.config_secret_id };
+      })
+    ),
   upsertStaticProviderCredentials: mcpGatewayProcedure
     .input(
       ManagedConfigInputSchema.extend({
@@ -487,60 +580,68 @@ export const mcpGatewayRouter = createTRPCRouter({
         clientSecret: z.string().min(1),
       })
     )
-    .mutation(async ({ input, ctx }) => {
-      const resolved = await requireManagedConfig({
-        configId: input.configId,
-        organizationId: input.organizationId,
-        userId: ctx.user.id,
-        isGlobalAdmin: ctx.user.is_admin,
-      });
-      if (resolved.config.auth_mode !== GatewayAuthMode.OAuthStatic) {
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: 'Connection does not use manual provider credentials',
+    .mutation(async ({ input, ctx }) =>
+      withGatewayErrorMapping(async () => {
+        const resolved = await requireManagedConfig({
+          configId: input.configId,
+          organizationId: input.organizationId,
+          userId: ctx.user.id,
+          isGlobalAdmin: ctx.user.is_admin,
         });
-      }
-      const services = createGatewayServices();
-      const secret = await services.configService.upsertSecret({
-        configId: input.configId,
-        kind: GatewaySecretKind.StaticProviderCredentials,
-        value: { clientId: input.clientId, clientSecret: input.clientSecret },
-      });
-      return { secretId: secret.config_secret_id };
-    }),
+        if (resolved.config.auth_mode !== GatewayAuthMode.OAuthStatic) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Connection does not use manual provider credentials',
+          });
+        }
+        const services = createGatewayServices();
+        const secret = await services.configService.upsertSecret({
+          configId: input.configId,
+          kind: GatewaySecretKind.StaticProviderCredentials,
+          value: { clientId: input.clientId, clientSecret: input.clientSecret },
+        });
+        return { secretId: secret.config_secret_id };
+      })
+    ),
   assignUser: mcpGatewayProcedure
     .input(ManagedConfigInputSchema.extend({ userId: z.string().min(1) }))
-    .mutation(async ({ input, ctx }) => {
-      await requireManagedConfig({
-        configId: input.configId,
-        organizationId: input.organizationId,
-        userId: ctx.user.id,
-        isGlobalAdmin: ctx.user.is_admin,
-      });
-      const services = createGatewayServices();
-      const assignment = await services.configService.assignUser({
-        configId: input.configId,
-        userId: input.userId,
-        actorUserId: ctx.user.id,
-      });
-      if (!assignment) throw new TRPCError({ code: 'NOT_FOUND', message: 'Connection not found' });
-      return { assignmentId: assignment.assignment_id };
-    }),
+    .mutation(async ({ input, ctx }) =>
+      withGatewayErrorMapping(async () => {
+        await requireManagedConfig({
+          configId: input.configId,
+          organizationId: input.organizationId,
+          userId: ctx.user.id,
+          isGlobalAdmin: ctx.user.is_admin,
+        });
+        const services = createGatewayServices();
+        const assignment = await services.configService.assignUser({
+          configId: input.configId,
+          userId: input.userId,
+          actorUserId: ctx.user.id,
+        });
+        if (!assignment)
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'Connection not found' });
+        return { assignmentId: assignment.assignment_id };
+      })
+    ),
   revokeAssignment: mcpGatewayProcedure
     .input(ManagedConfigInputSchema.extend({ userId: z.string().min(1) }))
-    .mutation(async ({ input, ctx }) => {
-      await requireManagedConfig({
-        configId: input.configId,
-        organizationId: input.organizationId,
-        userId: ctx.user.id,
-        isGlobalAdmin: ctx.user.is_admin,
-      });
-      const services = createGatewayServices();
-      const assignment = await services.configService.revokeAssignment({
-        configId: input.configId,
-        userId: input.userId,
-      });
-      if (!assignment) throw new TRPCError({ code: 'NOT_FOUND', message: 'Assignment not found' });
-      return { assignmentId: assignment.assignment_id };
-    }),
+    .mutation(async ({ input, ctx }) =>
+      withGatewayErrorMapping(async () => {
+        await requireManagedConfig({
+          configId: input.configId,
+          organizationId: input.organizationId,
+          userId: ctx.user.id,
+          isGlobalAdmin: ctx.user.is_admin,
+        });
+        const services = createGatewayServices();
+        const assignment = await services.configService.revokeAssignment({
+          configId: input.configId,
+          userId: input.userId,
+        });
+        if (!assignment)
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'Assignment not found' });
+        return { assignmentId: assignment.assignment_id };
+      })
+    ),
 });

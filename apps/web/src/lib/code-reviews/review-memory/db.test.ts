@@ -587,7 +587,7 @@ describe('review memory db helpers', () => {
     );
   });
 
-  it('bounds review memory pruning by batch size', async () => {
+  it('continues review memory pruning until the batch is short', async () => {
     const user = await insertTestUser();
     const owner = { type: 'user' as const, id: user.id };
     const expiredCreatedAt = '2026-05-01T00:00:00.000Z';
@@ -625,7 +625,7 @@ describe('review memory db helpers', () => {
 
     const summary = await pruneExpiredReviewMemoryData({ now, batchSize: 1 });
 
-    expect(summary.feedbackEventsDeleted).toBe(1);
-    await expect(db.select().from(code_review_feedback_events)).resolves.toHaveLength(1);
+    expect(summary.feedbackEventsDeleted).toBe(2);
+    await expect(db.select().from(code_review_feedback_events)).resolves.toHaveLength(0);
   });
 });

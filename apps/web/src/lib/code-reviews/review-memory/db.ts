@@ -626,129 +626,159 @@ export async function pruneExpiredReviewMemoryData(
       MAX_REVIEW_MEMORY_PRUNE_BATCH_SIZE
     )
   );
-  const expiredEventRows = await database
-    .select({
-      id: code_review_feedback_events.id,
-      ownedByOrganizationId: code_review_feedback_events.owned_by_organization_id,
-      ownedByUserId: code_review_feedback_events.owned_by_user_id,
-      platform: code_review_feedback_events.platform,
-      repoFullName: code_review_feedback_events.repo_full_name,
-      platformProjectId: code_review_feedback_events.platform_project_id,
-    })
-    .from(code_review_feedback_events)
-    .where(lt(code_review_feedback_events.created_at, cutoff))
-    .orderBy(asc(code_review_feedback_events.created_at), asc(code_review_feedback_events.id))
-    .limit(batchSize);
-  const expiredEventIds = expiredEventRows.map(row => row.id);
+  let proposalsDeleted = 0;
+  while (true) {
+    const expiredProposalIds = await database
+      .select({ id: code_review_memory_proposals.id })
+      .from(code_review_memory_proposals)
+      .where(lt(code_review_memory_proposals.created_at, cutoff))
+      .orderBy(asc(code_review_memory_proposals.created_at), asc(code_review_memory_proposals.id))
+      .limit(batchSize);
+    if (expiredProposalIds.length === 0) break;
 
-  const expiredProposalIds = await database
-    .select({ id: code_review_memory_proposals.id })
-    .from(code_review_memory_proposals)
-    .where(lt(code_review_memory_proposals.created_at, cutoff))
-    .orderBy(asc(code_review_memory_proposals.created_at), asc(code_review_memory_proposals.id))
-    .limit(batchSize);
-
-  const deletedProposals = expiredProposalIds.length
-    ? await database
-        .delete(code_review_memory_proposals)
-        .where(
-          inArray(
-            code_review_memory_proposals.id,
-            expiredProposalIds.map(row => row.id)
-          )
-        )
-        .returning({ id: code_review_memory_proposals.id })
-    : [];
-
-  const expiredAggregationRunIds = await database
-    .select({ id: code_review_memory_aggregation_runs.id })
-    .from(code_review_memory_aggregation_runs)
-    .where(lt(code_review_memory_aggregation_runs.created_at, cutoff))
-    .orderBy(
-      asc(code_review_memory_aggregation_runs.created_at),
-      asc(code_review_memory_aggregation_runs.id)
-    )
-    .limit(batchSize);
-
-  const deletedAggregationRuns = expiredAggregationRunIds.length
-    ? await database
-        .delete(code_review_memory_aggregation_runs)
-        .where(
-          inArray(
-            code_review_memory_aggregation_runs.id,
-            expiredAggregationRunIds.map(row => row.id)
-          )
-        )
-        .returning({ id: code_review_memory_aggregation_runs.id })
-    : [];
-
-  const deletedFeedbackEvents = expiredEventIds.length
-    ? await database
-        .delete(code_review_feedback_events)
-        .where(inArray(code_review_feedback_events.id, expiredEventIds))
-        .returning({ id: code_review_feedback_events.id })
-    : [];
-
-  await refreshAggregationScopes({ scopes: expiredEventRows, now, database });
-
-  const expiredSubjectIds = await database
-    .select({ id: code_review_feedback_subjects.id })
-    .from(code_review_feedback_subjects)
-    .where(
-      and(
-        lt(code_review_feedback_subjects.last_seen_at, cutoff),
-        notExists(
-          database
-            .select({ one: sql`1` })
-            .from(code_review_feedback_events)
-            .where(eq(code_review_feedback_events.subject_id, code_review_feedback_subjects.id))
+    const deletedProposals = await database
+      .delete(code_review_memory_proposals)
+      .where(
+        inArray(
+          code_review_memory_proposals.id,
+          expiredProposalIds.map(row => row.id)
         )
       )
-    )
-    .orderBy(asc(code_review_feedback_subjects.last_seen_at), asc(code_review_feedback_subjects.id))
-    .limit(batchSize);
+      .returning({ id: code_review_memory_proposals.id });
+    proposalsDeleted += deletedProposals.length;
+    if (expiredProposalIds.length < batchSize || deletedProposals.length === 0) break;
+  }
 
-  const deletedSubjects = expiredSubjectIds.length
-    ? await database
-        .delete(code_review_feedback_subjects)
-        .where(
-          inArray(
-            code_review_feedback_subjects.id,
-            expiredSubjectIds.map(row => row.id)
+  let aggregationRunsDeleted = 0;
+  while (true) {
+    const expiredAggregationRunIds = await database
+      .select({ id: code_review_memory_aggregation_runs.id })
+      .from(code_review_memory_aggregation_runs)
+      .where(lt(code_review_memory_aggregation_runs.created_at, cutoff))
+      .orderBy(
+        asc(code_review_memory_aggregation_runs.created_at),
+        asc(code_review_memory_aggregation_runs.id)
+      )
+      .limit(batchSize);
+    if (expiredAggregationRunIds.length === 0) break;
+
+    const deletedAggregationRuns = await database
+      .delete(code_review_memory_aggregation_runs)
+      .where(
+        inArray(
+          code_review_memory_aggregation_runs.id,
+          expiredAggregationRunIds.map(row => row.id)
+        )
+      )
+      .returning({ id: code_review_memory_aggregation_runs.id });
+    aggregationRunsDeleted += deletedAggregationRuns.length;
+    if (expiredAggregationRunIds.length < batchSize || deletedAggregationRuns.length === 0) break;
+  }
+
+  let feedbackEventsDeleted = 0;
+  const expiredEventScopes: ReviewMemoryScopeRow[] = [];
+  while (true) {
+    const expiredEventRows = await database
+      .select({
+        id: code_review_feedback_events.id,
+        ownedByOrganizationId: code_review_feedback_events.owned_by_organization_id,
+        ownedByUserId: code_review_feedback_events.owned_by_user_id,
+        platform: code_review_feedback_events.platform,
+        repoFullName: code_review_feedback_events.repo_full_name,
+        platformProjectId: code_review_feedback_events.platform_project_id,
+      })
+      .from(code_review_feedback_events)
+      .where(lt(code_review_feedback_events.created_at, cutoff))
+      .orderBy(asc(code_review_feedback_events.created_at), asc(code_review_feedback_events.id))
+      .limit(batchSize);
+    if (expiredEventRows.length === 0) break;
+
+    const deletedFeedbackEvents = await database
+      .delete(code_review_feedback_events)
+      .where(
+        inArray(
+          code_review_feedback_events.id,
+          expiredEventRows.map(row => row.id)
+        )
+      )
+      .returning({ id: code_review_feedback_events.id });
+    feedbackEventsDeleted += deletedFeedbackEvents.length;
+    expiredEventScopes.push(...expiredEventRows);
+    if (expiredEventRows.length < batchSize || deletedFeedbackEvents.length === 0) break;
+  }
+
+  await refreshAggregationScopes({ scopes: expiredEventScopes, now, database });
+
+  let subjectsDeleted = 0;
+  while (true) {
+    const expiredSubjectIds = await database
+      .select({ id: code_review_feedback_subjects.id })
+      .from(code_review_feedback_subjects)
+      .where(
+        and(
+          lt(code_review_feedback_subjects.last_seen_at, cutoff),
+          notExists(
+            database
+              .select({ one: sql`1` })
+              .from(code_review_feedback_events)
+              .where(eq(code_review_feedback_events.subject_id, code_review_feedback_subjects.id))
           )
         )
-        .returning({ id: code_review_feedback_subjects.id })
-    : [];
+      )
+      .orderBy(
+        asc(code_review_feedback_subjects.last_seen_at),
+        asc(code_review_feedback_subjects.id)
+      )
+      .limit(batchSize);
+    if (expiredSubjectIds.length === 0) break;
 
-  const expiredAggregationStateIds = await database
-    .select({ id: code_review_memory_aggregation_state.id })
-    .from(code_review_memory_aggregation_state)
-    .where(sql`NOT ${aggregationStateHasRetainedDataWhere(cutoff)}`)
-    .orderBy(
-      asc(code_review_memory_aggregation_state.updated_at),
-      asc(code_review_memory_aggregation_state.id)
-    )
-    .limit(batchSize);
-
-  const deletedAggregationStates = expiredAggregationStateIds.length
-    ? await database
-        .delete(code_review_memory_aggregation_state)
-        .where(
-          inArray(
-            code_review_memory_aggregation_state.id,
-            expiredAggregationStateIds.map(row => row.id)
-          )
+    const deletedSubjects = await database
+      .delete(code_review_feedback_subjects)
+      .where(
+        inArray(
+          code_review_feedback_subjects.id,
+          expiredSubjectIds.map(row => row.id)
         )
-        .returning({ id: code_review_memory_aggregation_state.id })
-    : [];
+      )
+      .returning({ id: code_review_feedback_subjects.id });
+    subjectsDeleted += deletedSubjects.length;
+    if (expiredSubjectIds.length < batchSize || deletedSubjects.length === 0) break;
+  }
+
+  let aggregationStatesDeleted = 0;
+  while (true) {
+    const expiredAggregationStateIds = await database
+      .select({ id: code_review_memory_aggregation_state.id })
+      .from(code_review_memory_aggregation_state)
+      .where(sql`NOT ${aggregationStateHasRetainedDataWhere(cutoff)}`)
+      .orderBy(
+        asc(code_review_memory_aggregation_state.updated_at),
+        asc(code_review_memory_aggregation_state.id)
+      )
+      .limit(batchSize);
+    if (expiredAggregationStateIds.length === 0) break;
+
+    const deletedAggregationStates = await database
+      .delete(code_review_memory_aggregation_state)
+      .where(
+        inArray(
+          code_review_memory_aggregation_state.id,
+          expiredAggregationStateIds.map(row => row.id)
+        )
+      )
+      .returning({ id: code_review_memory_aggregation_state.id });
+    aggregationStatesDeleted += deletedAggregationStates.length;
+    if (expiredAggregationStateIds.length < batchSize || deletedAggregationStates.length === 0)
+      break;
+  }
 
   return {
     cutoff,
-    proposalsDeleted: deletedProposals.length,
-    aggregationRunsDeleted: deletedAggregationRuns.length,
-    feedbackEventsDeleted: deletedFeedbackEvents.length,
-    subjectsDeleted: deletedSubjects.length,
-    aggregationStatesDeleted: deletedAggregationStates.length,
+    proposalsDeleted,
+    aggregationRunsDeleted,
+    feedbackEventsDeleted,
+    subjectsDeleted,
+    aggregationStatesDeleted,
   };
 }
 

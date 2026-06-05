@@ -240,7 +240,8 @@ export async function refreshProviderGrant(params: {
     return { status: 'refreshed' as const, grantVersion: input.expectedGrantVersion + 1 };
   } catch {
     await markRefreshFailure(
-      params,
+      db,
+      params.sqlite,
       input.instanceId,
       input.instanceKey,
       input.grantId,
@@ -252,13 +253,13 @@ export async function refreshProviderGrant(params: {
 }
 
 async function markRefreshFailure(
-  params: { env: MCPGatewayEnv['Bindings']; sqlite: MCPGatewayInstanceSQLite },
+  db: ReturnType<typeof getWorkerDb>,
+  sqlite: MCPGatewayInstanceSQLite,
   instanceId: string,
   instanceKey: string,
   grantId: string,
   expectedGrantVersion: number
 ) {
-  const db = getWorkerDb(params.env.HYPERDRIVE.connectionString, { statement_timeout: 5_000 });
   await db
     .update(mcp_gateway_connection_instances)
     .set({
@@ -278,11 +279,11 @@ async function markRefreshFailure(
       )
     );
   const failedAt = new Date().toISOString();
-  await params.sqlite
+  await sqlite
     .update(mcpGatewayInstanceState)
     .set({ refreshFailedAt: failedAt, updatedAt: failedAt })
     .where(eq(mcpGatewayInstanceState.instanceKey, instanceKey));
-  const rows = await params.sqlite
+  const rows = await sqlite
     .select()
     .from(mcpGatewayInstanceState)
     .where(eq(mcpGatewayInstanceState.instanceKey, instanceKey))

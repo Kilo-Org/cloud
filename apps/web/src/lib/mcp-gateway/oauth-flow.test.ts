@@ -206,9 +206,17 @@ describe('MCP gateway app OAuth flow', () => {
     });
     expect(tokenResponse.token_type).toBe('bearer');
     expect(tokenResponse.refresh_token).toBeTruthy();
-    const claims = await services.tokenService.verifyAccessToken(tokenResponse.access_token);
+    const claims = await services.tokenService.verifyUserInfoToken(tokenResponse.access_token);
     expect(claims.sub).toBe(user.id);
     expect(claims.aud).toBe(created.route.canonical_url);
+    await expect(services.tokenService.userInfo(tokenResponse.access_token)).resolves.toEqual({
+      sub: user.id,
+      name: user.google_user_name,
+      preferred_username: user.google_user_email,
+      picture: user.google_user_image_url,
+      updated_at: expect.any(String),
+      email: user.google_user_email,
+    });
 
     const refreshed = await services.tokenService.exchangeToken({
       request: {

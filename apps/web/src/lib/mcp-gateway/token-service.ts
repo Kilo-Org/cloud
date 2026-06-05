@@ -113,7 +113,7 @@ export function createTokenService(params: {
     return { token, expiresAt: new Date(exp * 1000).toISOString() };
   }
 
-  async function verifyAccessToken(token: string) {
+  async function verifyUserInfoToken(token: string) {
     const decoded = jwt.decode(token, { complete: true });
     const kid = decoded && typeof decoded === 'object' ? decoded.header.kid : undefined;
     if (!kid) {
@@ -560,7 +560,7 @@ export function createTokenService(params: {
   }
 
   async function userInfo(token: string) {
-    const claims = await verifyAccessToken(token);
+    const claims = await verifyUserInfoToken(token);
     if (!parseScopeString(claims.scope).includes('profile')) {
       throw createGatewayError(GatewayErrorCode.InvalidScope, 'profile scope is required', 401);
     }
@@ -576,13 +576,12 @@ export function createTokenService(params: {
       picture: user.google_user_image_url,
       updated_at: Number.isNaN(updatedAt.getTime()) ? undefined : updatedAt.toISOString(),
       email: user.google_user_email,
-      email_verified: true,
     };
   }
 
   return {
     mintAccessToken,
-    verifyAccessToken,
+    verifyUserInfoToken,
     exchangeToken,
     mintDerivedConnectToken,
     userInfo,

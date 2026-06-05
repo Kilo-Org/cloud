@@ -4,6 +4,7 @@ import { db, cleanupDbForTest } from '@/lib/drizzle';
 import {
   credit_transactions,
   kilocode_users,
+  kilo_pass_accepted_card_purchases,
   kilo_pass_audit_log,
   kilo_pass_issuance_items,
   kilo_pass_issuances,
@@ -25,6 +26,7 @@ import { and, eq } from 'drizzle-orm';
 import type Stripe from 'stripe';
 import type * as affiliateEventsModule from '@/lib/impact/affiliate-events';
 import { randomUUID } from 'node:crypto';
+import { digestCardFingerprint } from '@/lib/kilo-pass/card-fingerprint-gate';
 
 function ensureKiloPassStripePriceIdEnv(): void {
   // These env vars are required at module-load time by [`getKnownStripePriceIdsForKiloPass()`](src/lib/kilo-pass/stripe-price-ids.server.ts:24).
@@ -83,6 +85,7 @@ function makeStripeInvoice(params: {
   paymentIntentId?: string;
   invoicePayment?: Stripe.InvoicePayment.Payment;
   promotionCode?: string;
+  billingReason?: Stripe.Invoice['billing_reason'];
 }): Stripe.Invoice {
   const subscriptionUnion = params.subscriptionIdOrExpanded ?? null;
   const metadata = params.metadata ?? null;
@@ -95,6 +98,7 @@ function makeStripeInvoice(params: {
     id: params.id,
     object: 'invoice',
     amount_paid: params.amount_paid_cents,
+    billing_reason: params.billingReason ?? null,
     currency: params.currency ?? 'usd',
     period_start: params.period_start_seconds,
     created: params.created_seconds,
@@ -393,6 +397,318 @@ describe('handleKiloPassInvoicePaid', () => {
     ).rejects.toThrow('Kilo Pass invoice has no subscription reference');
 
     expect(retrieve).not.toHaveBeenCalled();
+  });
+
+  test('positive initial exact-card purchase stores accepted evidence and shares settlement resolution', async () => {
+    const { handleKiloPassInvoicePaid } =
+      await import('@/lib/kilo-pass/stripe-handlers-invoice-paid');
+    const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
+    const stripeSubscriptionId = `sub_accepted_${Math.random()}`;
+    const stripeInvoiceId = `in_accepted_${Math.random()}`;
+    const paymentIntentId = `pi_accepted_${Math.random()}`;
+    const fingerprint = `fp_accepted_${Math.random()}`;
+    const metadata = kiloPassMetadata({
+      kiloUserId: user.id,
+      tier: KiloPassTier.Tier19,
+      cadence: KiloPassCadence.Monthly,
+    });
+    const paymentIntentRetrieve = jest.fn(async (id: string, _options?: { expand?: string[] }) =>
+      makeFingerprintPaymentIntent(id, 'card', fingerprint)
+    );
+    const priceId = await getKiloPassPriceId({
+      tier: KiloPassTier.Tier19,
+      cadence: KiloPassCadence.Monthly,
+    });
+
+    await handleKiloPassInvoicePaid({
+      eventId: 'evt_accepted_initial',
+      invoice: makeStripeInvoice({
+        id: stripeInvoiceId,
+        amount_paid_cents: 1900,
+        created_seconds: 1_780_272_000,
+        paid_seconds: 1_780_272_000,
+        priceId,
+        subscriptionIdOrExpanded: stripeSubscriptionId,
+        metadata,
+        invoicePaymentId: `inpay_${Math.random()}`,
+        paymentIntentId,
+        billingReason: 'subscription_create',
+      }),
+      stripe: {
+        subscriptions: {
+          retrieve: jest.fn(async () =>
+            makeStripeSubscription({
+              id: stripeSubscriptionId,
+              start_date_seconds: 1_780_272_000,
+              metadata,
+            })
+          ),
+        },
+        paymentIntents: { retrieve: paymentIntentRetrieve },
+      } as unknown as Stripe,
+    });
+
+    const accepted = await db.query.kilo_pass_accepted_card_purchases.findFirst({
+      where: eq(kilo_pass_accepted_card_purchases.stripe_invoice_id, stripeInvoiceId),
+    });
+    expect(accepted).toMatchObject({
+      stripe_subscription_id: stripeSubscriptionId,
+      kilo_user_id: user.id,
+      fingerprint_digest: digestCardFingerprint(fingerprint),
+    });
+    expect(
+      paymentIntentRetrieve.mock.calls.filter(call => call[1]?.expand?.includes('payment_method'))
+    ).toHaveLength(1);
+  });
+
+  test('accepted-record replay bypasses settlement lookup and duplicate re-evaluation', async () => {
+    const { handleKiloPassInvoicePaid } =
+      await import('@/lib/kilo-pass/stripe-handlers-invoice-paid');
+    const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
+    const stripeSubscriptionId = `sub_accepted_replay_${Math.random()}`;
+    const stripeInvoiceId = `in_accepted_replay_${Math.random()}`;
+    const metadata = kiloPassMetadata({
+      kiloUserId: user.id,
+      tier: KiloPassTier.Tier19,
+      cadence: KiloPassCadence.Monthly,
+    });
+    const subscription = makeStripeSubscription({
+      id: stripeSubscriptionId,
+      start_date_seconds: 1_780_272_000,
+      metadata,
+    });
+    const invoice = makeStripeInvoice({
+      id: stripeInvoiceId,
+      amount_paid_cents: 1900,
+      created_seconds: 1_780_272_000,
+      paid_seconds: 1_780_272_000,
+      priceId: await getKiloPassPriceId({
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+      }),
+      subscriptionIdOrExpanded: stripeSubscriptionId,
+      metadata,
+      billingReason: 'subscription_create',
+    });
+    const invoicePayment = {
+      id: 'inpay_accepted_replay',
+      object: 'invoice_payment',
+      status: 'paid',
+      payment: {
+        type: 'charge',
+        charge: makeFingerprintCharge('ch_accepted_replay', 'card', 'fp_accepted_replay'),
+      },
+    } as unknown as Stripe.InvoicePayment;
+    const firstList = jest.fn(async () => ({
+      object: 'list',
+      data: [invoicePayment],
+      has_more: false,
+      url: `/v1/invoices/${stripeInvoiceId}/payments`,
+    }));
+    const replayList = jest.fn(async () => Promise.reject(new Error('must not resolve replay')));
+
+    await handleKiloPassInvoicePaid({
+      eventId: 'evt_accepted_replay_first',
+      invoice,
+      stripe: {
+        subscriptions: { retrieve: jest.fn(async () => subscription) },
+        invoicePayments: { list: firstList },
+      } as unknown as Stripe,
+    });
+    await handleKiloPassInvoicePaid({
+      eventId: 'evt_accepted_replay_second',
+      invoice,
+      stripe: {
+        subscriptions: { retrieve: jest.fn(async () => subscription) },
+        invoicePayments: { list: replayList },
+      } as unknown as Stripe,
+    });
+
+    expect(firstList).toHaveBeenCalledTimes(1);
+    expect(replayList).not.toHaveBeenCalled();
+    expect(
+      await db
+        .select()
+        .from(kilo_pass_accepted_card_purchases)
+        .where(eq(kilo_pass_accepted_card_purchases.stripe_invoice_id, stripeInvoiceId))
+    ).toHaveLength(1);
+  });
+
+  test('duplicate initial purchase blocks before credits, referrals, and affiliate processing', async () => {
+    const { handleKiloPassInvoicePaid } =
+      await import('@/lib/kilo-pass/stripe-handlers-invoice-paid');
+    const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
+    const fingerprint = `fp_blocked_${Math.random()}`;
+    await db.insert(kilo_pass_accepted_card_purchases).values({
+      stripe_invoice_id: 'in_existing_winner',
+      stripe_subscription_id: 'sub_existing_winner',
+      kilo_user_id: 'existing_winner_user',
+      fingerprint_digest: digestCardFingerprint(fingerprint),
+      purchased_at: '2026-05-31T23:59:00.000Z',
+    });
+    const stripeSubscriptionId = `sub_blocked_${Math.random()}`;
+    const stripeInvoiceId = `in_blocked_${Math.random()}`;
+    const metadata = kiloPassMetadata({
+      kiloUserId: user.id,
+      tier: KiloPassTier.Tier19,
+      cadence: KiloPassCadence.Monthly,
+    });
+    const cancel = jest.fn(async (...args: unknown[]) => {
+      void args;
+      return { id: stripeSubscriptionId };
+    });
+    const refund = jest.fn(async (...args: unknown[]) => {
+      void args;
+      return { id: 're_blocked' };
+    });
+    const priceId = await getKiloPassPriceId({
+      tier: KiloPassTier.Tier19,
+      cadence: KiloPassCadence.Monthly,
+    });
+
+    await handleKiloPassInvoicePaid({
+      eventId: 'evt_blocked_initial',
+      invoice: makeStripeInvoice({
+        id: stripeInvoiceId,
+        amount_paid_cents: 1900,
+        created_seconds: 1_780_272_000,
+        paid_seconds: 1_780_272_000,
+        priceId,
+        subscriptionIdOrExpanded: stripeSubscriptionId,
+        metadata,
+        invoicePaymentId: 'inpay_blocked',
+        invoicePayment: {
+          type: 'charge',
+          charge: makeFingerprintCharge('ch_blocked', 'card', fingerprint),
+        },
+        billingReason: 'subscription_create',
+      }),
+      stripe: {
+        subscriptions: {
+          retrieve: jest.fn(async () =>
+            makeStripeSubscription({
+              id: stripeSubscriptionId,
+              start_date_seconds: 1_780_272_000,
+              metadata,
+            })
+          ),
+          cancel,
+        },
+        refunds: { create: refund },
+      } as unknown as Stripe,
+    });
+
+    expect(cancel).toHaveBeenCalled();
+    expect(refund).toHaveBeenCalledWith(
+      expect.objectContaining({ charge: 'ch_blocked', reason: 'duplicate' }),
+      expect.objectContaining({
+        idempotencyKey: `kilo-pass-duplicate-card-refund:${stripeInvoiceId}`,
+      })
+    );
+    expect(
+      await db.query.kilo_pass_accepted_card_purchases.findFirst({
+        where: eq(kilo_pass_accepted_card_purchases.stripe_invoice_id, stripeInvoiceId),
+      })
+    ).toBeUndefined();
+    expect(
+      await db.query.kilo_pass_issuances.findFirst({
+        where: eq(kilo_pass_issuances.stripe_invoice_id, stripeInvoiceId),
+      })
+    ).toBeUndefined();
+    expect(
+      await db.query.credit_transactions.findFirst({
+        where: eq(credit_transactions.kilo_user_id, user.id),
+      })
+    ).toBeUndefined();
+    const subscription = await db.query.kilo_pass_subscriptions.findFirst({
+      where: eq(kilo_pass_subscriptions.stripe_subscription_id, stripeSubscriptionId),
+    });
+    expect(subscription?.status).toBe('canceled');
+    const blockedUser = await db.query.kilocode_users.findFirst({
+      where: eq(kilocode_users.id, user.id),
+    });
+    expect(blockedUser?.blocked_reason).toBe('kilo_pass_duplicate_card');
+    const audit = await db.query.kilo_pass_audit_log.findFirst({
+      where: and(
+        eq(kilo_pass_audit_log.stripe_invoice_id, stripeInvoiceId),
+        eq(kilo_pass_audit_log.action, KiloPassAuditLogAction.DuplicateCardSubscriptionCanceled)
+      ),
+    });
+    expect(audit?.payload_json).toMatchObject({
+      fingerprintDigest: digestCardFingerprint(fingerprint),
+      matchedStripeInvoiceId: 'in_existing_winner',
+      matchedStripeSubscriptionId: 'sub_existing_winner',
+    });
+    expect(JSON.stringify(audit?.payload_json)).not.toContain(fingerprint);
+  });
+
+  test('committed fail-open initial purchase cannot be retroactively reclassified on replay', async () => {
+    const { handleKiloPassInvoicePaid } =
+      await import('@/lib/kilo-pass/stripe-handlers-invoice-paid');
+    const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
+    const stripeSubscriptionId = `sub_fail_open_replay_${Math.random()}`;
+    const stripeInvoiceId = `in_fail_open_replay_${Math.random()}`;
+    const paymentIntentId = `pi_fail_open_replay_${Math.random()}`;
+    const fingerprint = `fp_fail_open_replay_${Math.random()}`;
+    const metadata = kiloPassMetadata({
+      kiloUserId: user.id,
+      tier: KiloPassTier.Tier19,
+      cadence: KiloPassCadence.Monthly,
+    });
+    const subscription = makeStripeSubscription({
+      id: stripeSubscriptionId,
+      start_date_seconds: 1_780_272_000,
+      metadata,
+    });
+    const invoice = makeStripeInvoice({
+      id: stripeInvoiceId,
+      amount_paid_cents: 1900,
+      created_seconds: 1_780_272_000,
+      paid_seconds: 1_780_272_000,
+      priceId: await getKiloPassPriceId({
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+      }),
+      subscriptionIdOrExpanded: stripeSubscriptionId,
+      metadata,
+      invoicePaymentId: 'inpay_fail_open_replay',
+      paymentIntentId,
+      billingReason: 'subscription_create',
+    });
+
+    await handleKiloPassInvoicePaid({
+      eventId: 'evt_fail_open_first',
+      invoice,
+      stripe: {
+        subscriptions: { retrieve: jest.fn(async () => subscription) },
+        paymentIntents: {
+          retrieve: jest.fn(async () => Promise.reject(new Error('lookup failed'))),
+        },
+      } as unknown as Stripe,
+    });
+    await handleKiloPassInvoicePaid({
+      eventId: 'evt_fail_open_replay',
+      invoice,
+      stripe: {
+        subscriptions: { retrieve: jest.fn(async () => subscription) },
+        paymentIntents: {
+          retrieve: jest.fn(async () =>
+            makeFingerprintPaymentIntent(paymentIntentId, 'card', fingerprint)
+          ),
+        },
+      } as unknown as Stripe,
+    });
+
+    expect(
+      await db.query.kilo_pass_accepted_card_purchases.findFirst({
+        where: eq(kilo_pass_accepted_card_purchases.stripe_invoice_id, stripeInvoiceId),
+      })
+    ).toBeUndefined();
+    expect(
+      await db.query.kilo_pass_issuances.findFirst({
+        where: eq(kilo_pass_issuances.stripe_invoice_id, stripeInvoiceId),
+      })
+    ).toBeTruthy();
   });
 
   test('monthly: attributed paid invoice queues Impact sale from settled invoice facts', async () => {
@@ -1438,6 +1754,7 @@ describe('handleKiloPassInvoicePaid', () => {
         priceId,
         subscriptionIdOrExpanded: stripeSubscriptionId,
         metadata,
+        billingReason: 'subscription_create',
       }),
       stripe,
     });
@@ -1468,6 +1785,7 @@ describe('handleKiloPassInvoicePaid', () => {
         metadata,
         invoicePaymentId: 'inpay_paid_after_zero',
         paymentIntentId: 'pi_paid_after_zero',
+        billingReason: 'subscription_cycle',
       }),
       stripe,
     });
@@ -1482,6 +1800,11 @@ describe('handleKiloPassInvoicePaid', () => {
     expect(preservedInitialIssuance?.initial_welcome_promo_eligibility_reason).toBe(
       KiloPassWelcomePromoEligibilityReason.NoPositiveSettlement
     );
+    expect(
+      await db.query.kilo_pass_accepted_card_purchases.findFirst({
+        where: eq(kilo_pass_accepted_card_purchases.stripe_subscription_id, stripeSubscriptionId),
+      })
+    ).toBeUndefined();
   });
 
   test('monthly: retry of first invoice is idempotent (does not double-issue base credits)', async () => {

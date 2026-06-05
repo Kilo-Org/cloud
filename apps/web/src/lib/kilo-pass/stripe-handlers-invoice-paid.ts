@@ -31,8 +31,9 @@ import { invoiceLooksLikeKiloPassByPriceId } from '@/lib/kilo-pass/stripe-invoic
 import {
   getInvoiceIssueMonth,
   getInvoiceSubscription,
-  getSettledInvoicePaymentMethod,
+  resolveSettledInvoicePayment,
   getStripeEndedAtIso,
+  type SettledInvoicePaymentResolution,
 } from '@/lib/kilo-pass/stripe-handlers-utils';
 import type Stripe from 'stripe';
 import { dayjs } from '@/lib/kilo-pass/dayjs';
@@ -48,8 +49,12 @@ import {
 import { isStripeSubscriptionEnded } from '@/lib/kilo-pass/stripe-subscription-status';
 import { captureException } from '@sentry/nextjs';
 import {
+  acquireDuplicateCardSubscriptionLock,
+  attemptDuplicateCardProviderEnforcement,
   checkDuplicateCardFingerprintGate,
+  loadDuplicateCardReplayAuthority,
   maybeSendDuplicateCardCanceledEmail,
+  type DuplicateCardGateResult,
 } from '@/lib/kilo-pass/card-fingerprint-gate';
 import { processTopUp } from '@/lib/credits';
 import { randomUUID } from 'node:crypto';
@@ -85,17 +90,14 @@ function getPaymentFingerprintType(
 
 async function claimMonthlyPaymentFingerprint(params: {
   tx: DrizzleTransaction;
-  stripe: Stripe;
   invoice: Stripe.Invoice;
+  settlement: SettledInvoicePaymentResolution;
 }): Promise<KiloPassWelcomePromoEligibilityReason> {
-  const settledPaymentMethod = await getSettledInvoicePaymentMethod({
-    invoice: params.invoice,
-    stripe: params.stripe,
-  });
-
-  if (settledPaymentMethod.kind === 'unknown') {
+  if (params.settlement.kind !== 'settled') {
     return KiloPassWelcomePromoEligibilityReason.SettlementUnresolved;
   }
+
+  const settledPaymentMethod = params.settlement.paymentMethod;
   if (settledPaymentMethod.kind === 'without_supported_fingerprint') {
     return KiloPassWelcomePromoEligibilityReason.NoSupportedFingerprint;
   }
@@ -409,28 +411,6 @@ export async function handleKiloPassInvoicePaid(params: {
         });
       }
 
-      if (metadata.kiloPassScheduledChangeId) {
-        const didIssueYearlyRemainingCredits = await maybeIssueYearlyRemainingCredits({
-          tx,
-          stripe,
-          stripeEventId: eventId,
-          stripeInvoiceId: invoice.id,
-          scheduledChangeId: metadata.kiloPassScheduledChangeId,
-        });
-
-        // After the scheduled-change invoice is paid, release the schedule so the subscription
-        // continues without a pending schedule.
-        await releaseScheduledChangeForSubscription({
-          dbOrTx: tx,
-          stripe,
-          stripeEventId: eventId,
-          stripeSubscriptionId: subscription.id,
-          reason: didIssueYearlyRemainingCredits
-            ? 'issue_yearly_remaining_credits'
-            : 'invoice_paid',
-        });
-      }
-
       const priceMetadata = getKiloPassPriceMetadataFromInvoice(invoice);
 
       const kiloUserId = metadata.kiloUserId;
@@ -457,11 +437,39 @@ export async function handleKiloPassInvoicePaid(params: {
         payload: { type: 'invoice.paid' },
       });
 
-      const issueMonth = getInvoiceIssueMonth(invoice);
+      const isPositiveInitialPurchase =
+        invoice.amount_paid > 0 && invoice.billing_reason === 'subscription_create';
+      if (isPositiveInitialPurchase) {
+        await acquireDuplicateCardSubscriptionLock(tx, subscription.id);
+      }
 
+      const issueMonth = getInvoiceIssueMonth(invoice);
       const existingSubscription = await tx.query.kilo_pass_subscriptions.findFirst({
         where: eq(kilo_pass_subscriptions.stripe_subscription_id, subscription.id),
       });
+      if (
+        isPositiveInitialPurchase &&
+        existingSubscription &&
+        existingSubscription.kilo_user_id !== kiloUserId
+      ) {
+        const conflict = new KiloPassError('Kilo Pass Stripe subscription attribution conflict', {
+          stripe_event_id: eventId,
+          stripe_invoice_id: invoice.id,
+          stripe_subscription_id: subscription.id,
+          kilo_user_id: kiloUserId,
+        });
+        captureException(conflict, {
+          tags: { source: 'kilo_pass_duplicate_card_gate', stage: 'subscription_owner_conflict' },
+          extra: {
+            stripeEventId: eventId,
+            stripeInvoiceId: invoice.id,
+            stripeSubscriptionId: subscription.id,
+            kiloUserId,
+            conflictingKiloUserId: existingSubscription.kilo_user_id,
+          },
+        });
+        throw conflict;
+      }
 
       // Derive status and ended_at from the actual Stripe subscription to avoid
       // out-of-order events incorrectly "resurrecting" a canceled subscription.
@@ -511,19 +519,30 @@ export async function handleKiloPassInvoicePaid(params: {
       const kiloPassSubscriptionId = row.id;
       const priorStatus = existingSubscription?.status ?? null;
 
-      // Card fingerprint gate: block if another user already has an active
-      // Kilo Pass subscription on the same card fingerprint. This runs after
-      // the Stripe charge succeeds (so we can refund it) and after the
-      // upsert (so we have a kiloPassSubscriptionId for audit logging).
-      // If blocked, the subscription is canceled on Stripe, the invoice is
-      // refunded, and credits are NOT issued.
-      const gateResult = await checkDuplicateCardFingerprintGate({
-        invoice,
-        stripe,
-        kiloUserId,
-        stripeSubscriptionId: subscription.id,
-        stripeInvoiceId: invoice.id,
-      });
+      let settledPaymentResolutionPromise: Promise<SettledInvoicePaymentResolution> | null = null;
+      const getSettledPaymentResolution = (): Promise<SettledInvoicePaymentResolution> => {
+        settledPaymentResolutionPromise ??= resolveSettledInvoicePayment({ invoice, stripe });
+        return settledPaymentResolutionPromise;
+      };
+
+      const replayAuthority = isPositiveInitialPurchase
+        ? await loadDuplicateCardReplayAuthority({
+            tx,
+            stripeInvoiceId: invoice.id,
+            stripeSubscriptionId: subscription.id,
+            kiloUserId,
+          })
+        : null;
+      const gateResult: DuplicateCardGateResult =
+        isPositiveInitialPurchase && replayAuthority === null
+          ? await checkDuplicateCardFingerprintGate({
+              tx,
+              invoice,
+              kiloUserId,
+              stripeSubscriptionId: subscription.id,
+              getSettledPaymentResolution,
+            })
+          : { blocked: false, accepted: replayAuthority === 'accepted' };
 
       if (gateResult.blocked) {
         await appendKiloPassAuditLog(tx, {
@@ -535,10 +554,11 @@ export async function handleKiloPassInvoicePaid(params: {
           stripeInvoiceId: invoice.id,
           stripeSubscriptionId: subscription.id,
           payload: {
-            fingerprint: gateResult.fingerprint,
-            otherKiloUserId: gateResult.otherKiloUserId,
-            otherSubscriptionId: gateResult.otherSubscriptionId,
-            otherStripeSubscriptionId: gateResult.otherStripeSubscriptionId,
+            fingerprintDigest: gateResult.fingerprintDigest,
+            matchedKiloUserId: gateResult.matchedKiloUserId,
+            matchedStripeSubscriptionId: gateResult.matchedStripeSubscriptionId,
+            matchedStripeInvoiceId: gateResult.matchedStripeInvoiceId,
+            matchedPurchasedAt: gateResult.matchedPurchasedAt,
           },
         });
 
@@ -555,9 +575,36 @@ export async function handleKiloPassInvoicePaid(params: {
           })
           .where(and(eq(kilocode_users.id, kiloUserId), isNull(kilocode_users.blocked_reason)));
 
+        await attemptDuplicateCardProviderEnforcement({
+          stripe,
+          stripeInvoiceId: invoice.id,
+          stripeSubscriptionId: subscription.id,
+          kiloUserId,
+          gateResult,
+        });
+
         affiliateSaleState.context = null;
         kiloUserIdForCache = null;
         return { kiloUserId, stripeInvoiceId: invoice.id };
+      }
+
+      if (metadata.kiloPassScheduledChangeId) {
+        const didIssueYearlyRemainingCredits = await maybeIssueYearlyRemainingCredits({
+          tx,
+          stripe,
+          stripeEventId: eventId,
+          stripeInvoiceId: invoice.id,
+          scheduledChangeId: metadata.kiloPassScheduledChangeId,
+        });
+        await releaseScheduledChangeForSubscription({
+          dbOrTx: tx,
+          stripe,
+          stripeEventId: eventId,
+          stripeSubscriptionId: subscription.id,
+          reason: didIssueYearlyRemainingCredits
+            ? 'issue_yearly_remaining_credits'
+            : 'invoice_paid',
+        });
       }
 
       referralConversionState.kiloPassSubscriptionId = kiloPassSubscriptionId;
@@ -573,8 +620,14 @@ export async function handleKiloPassInvoicePaid(params: {
       });
       const hasPositiveSettlement = invoice.amount_paid > 0;
       const positiveSettlementReason =
-        cadence === KiloPassCadence.Monthly && hasPositiveSettlement
-          ? await claimMonthlyPaymentFingerprint({ tx, stripe, invoice })
+        cadence === KiloPassCadence.Monthly &&
+        hasPositiveSettlement &&
+        replayAuthority !== 'accepted'
+          ? await claimMonthlyPaymentFingerprint({
+              tx,
+              invoice,
+              settlement: await getSettledPaymentResolution(),
+            })
           : null;
       referralConversionState.welcomePromoEligibilityReason = positiveSettlementReason;
       const initialWelcomePromoEligibilityReason =

@@ -83,6 +83,22 @@ async function insertKiloPassStorePurchase(values: {
   });
 }
 
+async function insertAcceptedCardPurchase(values: {
+  stripeInvoiceId: string;
+  stripeSubscriptionId: string;
+  kiloUserId: string;
+  fingerprintDigest?: string;
+  purchasedAt?: string;
+}): Promise<void> {
+  await schemaTestDb.db.insert(schema.kilo_pass_accepted_card_purchases).values({
+    stripe_invoice_id: values.stripeInvoiceId,
+    stripe_subscription_id: values.stripeSubscriptionId,
+    kilo_user_id: values.kiloUserId,
+    fingerprint_digest: values.fingerprintDigest ?? 'a'.repeat(64),
+    purchased_at: values.purchasedAt ?? '2026-06-05T12:00:00.000Z',
+  });
+}
+
 async function expectProviderIdsCheckViolation(insertPromise: Promise<unknown>): Promise<void> {
   await expect(insertPromise).rejects.toMatchObject({
     cause: {
@@ -365,6 +381,89 @@ describe('database schema', () => {
   it('exposes provider-aware Kilo Pass store tables', () => {
     expect(Object.hasOwn(schema, 'kilo_pass_store_events')).toBe(true);
     expect(Object.hasOwn(schema, 'kilo_pass_store_purchases')).toBe(true);
+  });
+
+  describe('Kilo Pass accepted card purchases', () => {
+    it('retains digest-only purchase evidence without related rows', async () => {
+      const kiloUserId = `deleted-user-${crypto.randomUUID()}`;
+      const stripeInvoiceId = `in_${crypto.randomUUID()}`;
+      try {
+        await insertAcceptedCardPurchase({
+          stripeInvoiceId,
+          stripeSubscriptionId: `sub_${crypto.randomUUID()}`,
+          kiloUserId,
+        });
+
+        const record = await schemaTestDb.db.query.kilo_pass_accepted_card_purchases.findFirst({
+          where: eq(schema.kilo_pass_accepted_card_purchases.stripe_invoice_id, stripeInvoiceId),
+        });
+        expect(record?.kilo_user_id).toBe(kiloUserId);
+        expect(record?.fingerprint_digest).toBe('a'.repeat(64));
+      } finally {
+        await schemaTestDb.db
+          .delete(schema.kilo_pass_accepted_card_purchases)
+          .where(eq(schema.kilo_pass_accepted_card_purchases.kilo_user_id, kiloUserId));
+      }
+    });
+
+    it.each(['A'.repeat(64), 'a'.repeat(63), 'a'.repeat(65), `${'a'.repeat(63)}g`])(
+      'rejects invalid fingerprint digest %s',
+      async fingerprintDigest => {
+        await expect(
+          insertAcceptedCardPurchase({
+            stripeInvoiceId: `in_${crypto.randomUUID()}`,
+            stripeSubscriptionId: `sub_${crypto.randomUUID()}`,
+            kiloUserId: `user_${crypto.randomUUID()}`,
+            fingerprintDigest,
+          })
+        ).rejects.toMatchObject({
+          cause: {
+            constraint: 'kilo_pass_accepted_card_purchases_digest_format_check',
+          },
+        });
+      }
+    );
+
+    it('enforces invoice and subscription identity while allowing repeated digests', async () => {
+      const kiloUserId = `accepted-user-${crypto.randomUUID()}`;
+      const firstInvoiceId = `in_${crypto.randomUUID()}`;
+      const firstSubscriptionId = `sub_${crypto.randomUUID()}`;
+      try {
+        await insertAcceptedCardPurchase({
+          stripeInvoiceId: firstInvoiceId,
+          stripeSubscriptionId: firstSubscriptionId,
+          kiloUserId,
+        });
+        await insertAcceptedCardPurchase({
+          stripeInvoiceId: `in_${crypto.randomUUID()}`,
+          stripeSubscriptionId: `sub_${crypto.randomUUID()}`,
+          kiloUserId,
+        });
+
+        await expect(
+          insertAcceptedCardPurchase({
+            stripeInvoiceId: firstInvoiceId,
+            stripeSubscriptionId: `sub_${crypto.randomUUID()}`,
+            kiloUserId,
+          })
+        ).rejects.toBeTruthy();
+        await expect(
+          insertAcceptedCardPurchase({
+            stripeInvoiceId: `in_${crypto.randomUUID()}`,
+            stripeSubscriptionId: firstSubscriptionId,
+            kiloUserId,
+          })
+        ).rejects.toMatchObject({
+          cause: {
+            constraint: 'UQ_kilo_pass_accepted_card_purchases_stripe_subscription_id',
+          },
+        });
+      } finally {
+        await schemaTestDb.db
+          .delete(schema.kilo_pass_accepted_card_purchases)
+          .where(eq(schema.kilo_pass_accepted_card_purchases.kilo_user_id, kiloUserId));
+      }
+    });
   });
 
   describe('Kilo Pass subscription provider IDs', () => {

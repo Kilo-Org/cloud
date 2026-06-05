@@ -134,6 +134,21 @@ describe('subjects map', () => {
   });
 });
 
+describe('kiloPassDuplicateCardCanceled template', () => {
+  test('keeps cancellation reason and refund outcome generic', () => {
+    const html = renderTemplate('kiloPassDuplicateCardCanceled', {
+      support_url: 'https://kilo.ai/support',
+      year: '2026',
+    });
+
+    expect(html).toContain('could not be activated and has been canceled');
+    expect(html).toContain('https://kilo.ai/support');
+    expect(html).not.toContain('another Kilo');
+    expect(html).not.toContain('24-hour');
+    expect(html).not.toContain('refunded');
+  });
+});
+
 describe('codeReviewDisabled template', () => {
   test('renders reason and recovery link', () => {
     const html = renderTemplate('codeReviewDisabled', {

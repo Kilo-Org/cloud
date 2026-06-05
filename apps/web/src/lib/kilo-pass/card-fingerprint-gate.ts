@@ -1,224 +1,389 @@
 import 'server-only';
 
 import {
-  kilocode_users,
+  kilo_pass_accepted_card_purchases,
+  kilo_pass_issuances,
   kilo_pass_subscriptions,
-  payment_methods,
+  kilocode_users,
   transactional_email_log,
 } from '@kilocode/db/schema';
+import type { DrizzleTransaction } from '@/lib/drizzle';
 import { db } from '@/lib/drizzle';
-import { and, eq, inArray, isNotNull, isNull, ne, notInArray } from 'drizzle-orm';
+import { KiloPassError } from '@/lib/kilo-pass/errors';
+import type {
+  RefundableSettlementTarget,
+  SettledInvoicePaymentResolution,
+} from '@/lib/kilo-pass/stripe-handlers-utils';
+import { and, asc, eq, gt, isNotNull, lt, ne, or, sql } from 'drizzle-orm';
 import type Stripe from 'stripe';
 import { captureException } from '@sentry/nextjs';
 import { sendKiloPassDuplicateCardCanceledEmail } from '@/lib/email';
+import { createHash } from 'node:crypto';
 
 const KILO_PASS_DUPLICATE_CARD_EMAIL_TYPE = 'kilo_pass_duplicate_card_canceled';
+const DUPLICATE_CARD_WINDOW_MS = 24 * 60 * 60 * 1000;
+const MAX_PROVIDER_CLOCK_SKEW_MS = 5 * 60 * 1000;
 
-export type ActiveKiloPassByFingerprint = {
-  kiloUserId: string;
-  subscriptionId: string;
-  stripeSubscriptionId: string | null;
-};
-
-export async function findActiveKiloPassByCardFingerprint(
-  fingerprint: string | null | undefined,
-  excludingUserId: string
-): Promise<ActiveKiloPassByFingerprint | null> {
-  if (!fingerprint) return null;
-
-  const otherPaymentMethods = await db
-    .select({
-      userId: payment_methods.user_id,
-    })
-    .from(payment_methods)
-    .where(
-      and(
-        eq(payment_methods.stripe_fingerprint, fingerprint),
-        ne(payment_methods.user_id, excludingUserId)
-      )
-    )
-    .limit(10);
-
-  const otherUserIds = [...new Set(otherPaymentMethods.map(pm => pm.userId))];
-  if (otherUserIds.length === 0) return null;
-
-  const activeSub = await db
-    .select({
-      kiloUserId: kilo_pass_subscriptions.kilo_user_id,
-      id: kilo_pass_subscriptions.id,
-      stripeSubscriptionId: kilo_pass_subscriptions.stripe_subscription_id,
-    })
-    .from(kilo_pass_subscriptions)
-    .where(
-      and(
-        inArray(kilo_pass_subscriptions.kilo_user_id, otherUserIds),
-        isNull(kilo_pass_subscriptions.ended_at),
-        notInArray(kilo_pass_subscriptions.status, ['canceled', 'unpaid', 'incomplete_expired'])
-      )
-    )
-    .limit(1);
-
-  if (activeSub.length === 0) return null;
-
-  return {
-    kiloUserId: activeSub[0].kiloUserId,
-    subscriptionId: activeSub[0].id,
-    stripeSubscriptionId: activeSub[0].stripeSubscriptionId,
-  };
-}
-
-type InvoiceWithPaymentIntent = Stripe.Invoice & {
-  payment_intent?: Stripe.PaymentIntent | string | null;
-};
+export type DuplicateCardReplayAuthority = 'accepted' | 'fail_open' | null;
 
 export type DuplicateCardGateResult =
-  | { blocked: false }
+  | { blocked: false; accepted: boolean }
   | {
       blocked: true;
-      otherKiloUserId: string;
-      otherSubscriptionId: string;
-      otherStripeSubscriptionId: string | null;
-      fingerprint: string;
-      stripeInvoiceId: string;
+      fingerprintDigest: string;
+      matchedKiloUserId: string;
+      matchedStripeSubscriptionId: string;
+      matchedStripeInvoiceId: string;
+      matchedPurchasedAt: string;
+      refundableTarget: RefundableSettlementTarget | null;
     };
 
-async function resolveCardFingerprint(params: {
-  invoice: InvoiceWithPaymentIntent;
-  stripe: Stripe;
+function reportAttributionConflict(params: {
+  stripeInvoiceId: string;
+  stripeSubscriptionId: string;
   kiloUserId: string;
-}): Promise<string | null> {
-  const { invoice, stripe, kiloUserId } = params;
-
-  const paymentIntentUnion = invoice.payment_intent;
-  let paymentMethodId: string | null = null;
-
-  if (typeof paymentIntentUnion === 'string') {
-    try {
-      const pi = await stripe.paymentIntents.retrieve(paymentIntentUnion);
-      const pmUnion = pi.payment_method;
-      paymentMethodId = typeof pmUnion === 'string' ? pmUnion : (pmUnion?.id ?? null);
-    } catch {
-      paymentMethodId = null;
-    }
-  } else if (paymentIntentUnion && typeof paymentIntentUnion === 'object') {
-    const pmUnion = paymentIntentUnion.payment_method;
-    paymentMethodId = typeof pmUnion === 'string' ? pmUnion : (pmUnion?.id ?? null);
-  }
-
-  if (paymentMethodId) {
-    const localPm = await db.query.payment_methods.findFirst({
-      columns: { stripe_fingerprint: true },
-      where: and(
-        eq(payment_methods.stripe_id, paymentMethodId),
-        eq(payment_methods.user_id, kiloUserId)
-      ),
-    });
-    if (localPm?.stripe_fingerprint) {
-      return localPm.stripe_fingerprint;
-    }
-
-    try {
-      const stripePm = await stripe.paymentMethods.retrieve(paymentMethodId);
-      return stripePm.card?.fingerprint ?? null;
-    } catch {
-      return null;
-    }
-  }
-
-  const customerPms = await db.query.payment_methods.findMany({
-    columns: { stripe_fingerprint: true },
-    where: and(
-      eq(payment_methods.user_id, kiloUserId),
-      isNotNull(payment_methods.stripe_fingerprint)
-    ),
-    limit: 1,
+  conflictingStripeInvoiceId?: string | null;
+  conflictingStripeSubscriptionId?: string | null;
+  conflictingKiloUserId?: string | null;
+}): never {
+  const error = new KiloPassError('Kilo Pass duplicate-card replay attribution conflict', {
+    stripe_invoice_id: params.stripeInvoiceId,
+    stripe_subscription_id: params.stripeSubscriptionId,
+    kilo_user_id: params.kiloUserId,
   });
-  return customerPms[0]?.stripe_fingerprint ?? null;
+  captureException(error, {
+    tags: { source: 'kilo_pass_duplicate_card_gate', stage: 'attribution_conflict' },
+    extra: {
+      stripeInvoiceId: params.stripeInvoiceId,
+      stripeSubscriptionId: params.stripeSubscriptionId,
+      kiloUserId: params.kiloUserId,
+      conflictingStripeInvoiceId: params.conflictingStripeInvoiceId ?? null,
+      conflictingStripeSubscriptionId: params.conflictingStripeSubscriptionId ?? null,
+      conflictingKiloUserId: params.conflictingKiloUserId ?? null,
+    },
+  });
+  throw error;
 }
 
-// Card fingerprint gate for Kilo Pass subscriptions. Ensures a single card
-// fingerprint can be attached to at most one active (non-canceled, non-ended)
-// Kilo Pass subscription across all Kilo users at any time. When a duplicate
-// is detected, the new subscription is canceled, the invoice refunded, and
-// the offending user's account is blocked (if not already blocked).
-//
-// This gate is only applied to Stripe subscriptions (invoice.paid webhook path).
-// App Store and Google Play purchases are not gated here because:
-// - App Store purchases bind to an appAccountToken that already enforces one
-//   Apple ID per Kilo account via the completeAppStorePurchase flow.
-// - Google Play purchases similarly have their own subscription model.
-// Those store paths do not go through the Stripe invoice.paid handler at all,
-// so the card fingerprint check is inherently skipped for them.
+export async function acquireDuplicateCardSubscriptionLock(
+  tx: DrizzleTransaction,
+  stripeSubscriptionId: string
+): Promise<void> {
+  const lockKey = `kilo-pass:duplicate-card:subscription:${stripeSubscriptionId}`;
+  await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`);
+}
+
+async function acquireDuplicateCardDigestLock(
+  tx: DrizzleTransaction,
+  fingerprintDigest: string
+): Promise<void> {
+  const lockKey = `kilo-pass:duplicate-card:digest:${fingerprintDigest}`;
+  await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`);
+}
+
+export async function loadDuplicateCardReplayAuthority(params: {
+  tx: DrizzleTransaction;
+  stripeInvoiceId: string;
+  stripeSubscriptionId: string;
+  kiloUserId: string;
+}): Promise<DuplicateCardReplayAuthority> {
+  const acceptedRecords = await params.tx
+    .select()
+    .from(kilo_pass_accepted_card_purchases)
+    .where(
+      or(
+        eq(kilo_pass_accepted_card_purchases.stripe_invoice_id, params.stripeInvoiceId),
+        eq(kilo_pass_accepted_card_purchases.stripe_subscription_id, params.stripeSubscriptionId)
+      )
+    );
+
+  for (const record of acceptedRecords) {
+    if (
+      record.stripe_invoice_id === params.stripeInvoiceId &&
+      record.stripe_subscription_id === params.stripeSubscriptionId &&
+      record.kilo_user_id === params.kiloUserId
+    ) {
+      return 'accepted';
+    }
+
+    reportAttributionConflict({
+      ...params,
+      conflictingStripeInvoiceId: record.stripe_invoice_id,
+      conflictingStripeSubscriptionId: record.stripe_subscription_id,
+      conflictingKiloUserId: record.kilo_user_id,
+    });
+  }
+
+  const issuanceByInvoice = await params.tx
+    .select({
+      stripeInvoiceId: kilo_pass_issuances.stripe_invoice_id,
+      stripeSubscriptionId: kilo_pass_subscriptions.stripe_subscription_id,
+      kiloUserId: kilo_pass_subscriptions.kilo_user_id,
+    })
+    .from(kilo_pass_issuances)
+    .innerJoin(
+      kilo_pass_subscriptions,
+      eq(kilo_pass_subscriptions.id, kilo_pass_issuances.kilo_pass_subscription_id)
+    )
+    .where(eq(kilo_pass_issuances.stripe_invoice_id, params.stripeInvoiceId))
+    .limit(1);
+  const invoiceAuthority = issuanceByInvoice[0];
+  if (invoiceAuthority) {
+    if (
+      invoiceAuthority.stripeSubscriptionId === params.stripeSubscriptionId &&
+      invoiceAuthority.kiloUserId === params.kiloUserId
+    ) {
+      return 'fail_open';
+    }
+
+    reportAttributionConflict({
+      ...params,
+      conflictingStripeInvoiceId: invoiceAuthority.stripeInvoiceId,
+      conflictingStripeSubscriptionId: invoiceAuthority.stripeSubscriptionId,
+      conflictingKiloUserId: invoiceAuthority.kiloUserId,
+    });
+  }
+
+  const recordedSubscriptionInvoice = await params.tx
+    .select({
+      stripeInvoiceId: kilo_pass_issuances.stripe_invoice_id,
+      stripeSubscriptionId: kilo_pass_subscriptions.stripe_subscription_id,
+      kiloUserId: kilo_pass_subscriptions.kilo_user_id,
+    })
+    .from(kilo_pass_issuances)
+    .innerJoin(
+      kilo_pass_subscriptions,
+      eq(kilo_pass_subscriptions.id, kilo_pass_issuances.kilo_pass_subscription_id)
+    )
+    .where(
+      and(
+        eq(kilo_pass_subscriptions.stripe_subscription_id, params.stripeSubscriptionId),
+        isNotNull(kilo_pass_issuances.stripe_invoice_id)
+      )
+    )
+    .orderBy(asc(kilo_pass_issuances.created_at))
+    .limit(1);
+  const recordedInvoice = recordedSubscriptionInvoice[0];
+  if (recordedInvoice) {
+    reportAttributionConflict({
+      ...params,
+      conflictingStripeInvoiceId: recordedInvoice.stripeInvoiceId,
+      conflictingStripeSubscriptionId: recordedInvoice.stripeSubscriptionId,
+      conflictingKiloUserId: recordedInvoice.kiloUserId,
+    });
+  }
+
+  return null;
+}
+
+export function getDuplicateCardPurchaseTimestamp(invoice: Stripe.Invoice): string | null {
+  const timestampSeconds = invoice.status_transitions?.paid_at ?? invoice.created ?? null;
+  if (typeof timestampSeconds !== 'number' || !Number.isFinite(timestampSeconds)) return null;
+
+  const timestampMs = timestampSeconds * 1000;
+  if (!Number.isFinite(timestampMs)) return null;
+  if (timestampMs > Date.now() + MAX_PROVIDER_CLOCK_SKEW_MS) {
+    captureException(
+      new Error('Kilo Pass invoice purchase timestamp is implausibly in the future'),
+      {
+        tags: { source: 'kilo_pass_duplicate_card_gate', stage: 'future_purchase_timestamp' },
+        extra: { stripeInvoiceId: invoice.id, purchaseTimestampSeconds: timestampSeconds },
+      }
+    );
+    return null;
+  }
+
+  const purchasedAt = new Date(timestampMs);
+  return Number.isNaN(purchasedAt.getTime()) ? null : purchasedAt.toISOString();
+}
+
+export function digestCardFingerprint(fingerprint: string): string {
+  return createHash('sha256').update(fingerprint).digest('hex');
+}
+
+async function insertAcceptedPurchase(params: {
+  tx: DrizzleTransaction;
+  stripeInvoiceId: string;
+  stripeSubscriptionId: string;
+  kiloUserId: string;
+  fingerprintDigest: string;
+  purchasedAt: string;
+}): Promise<void> {
+  const inserted = await params.tx
+    .insert(kilo_pass_accepted_card_purchases)
+    .values({
+      stripe_invoice_id: params.stripeInvoiceId,
+      stripe_subscription_id: params.stripeSubscriptionId,
+      kilo_user_id: params.kiloUserId,
+      fingerprint_digest: params.fingerprintDigest,
+      purchased_at: params.purchasedAt,
+    })
+    .onConflictDoNothing()
+    .returning({ stripeInvoiceId: kilo_pass_accepted_card_purchases.stripe_invoice_id });
+  if (inserted.length > 0) return;
+
+  const conflicts = await params.tx
+    .select()
+    .from(kilo_pass_accepted_card_purchases)
+    .where(
+      or(
+        eq(kilo_pass_accepted_card_purchases.stripe_invoice_id, params.stripeInvoiceId),
+        eq(kilo_pass_accepted_card_purchases.stripe_subscription_id, params.stripeSubscriptionId)
+      )
+    );
+  const exactReplay = conflicts.find(
+    record =>
+      record.stripe_invoice_id === params.stripeInvoiceId &&
+      record.stripe_subscription_id === params.stripeSubscriptionId &&
+      record.kilo_user_id === params.kiloUserId
+  );
+  if (exactReplay) return;
+
+  const conflict = conflicts[0];
+  reportAttributionConflict({
+    ...params,
+    conflictingStripeInvoiceId: conflict?.stripe_invoice_id,
+    conflictingStripeSubscriptionId: conflict?.stripe_subscription_id,
+    conflictingKiloUserId: conflict?.kilo_user_id,
+  });
+}
 
 export async function checkDuplicateCardFingerprintGate(params: {
+  tx: DrizzleTransaction;
   invoice: Stripe.Invoice;
-  stripe: Stripe;
   kiloUserId: string;
   stripeSubscriptionId: string;
-  stripeInvoiceId: string;
+  getSettledPaymentResolution: () => Promise<SettledInvoicePaymentResolution>;
 }): Promise<DuplicateCardGateResult> {
-  const { invoice, stripe, kiloUserId, stripeSubscriptionId, stripeInvoiceId } = params;
+  const purchasedAt = getDuplicateCardPurchaseTimestamp(params.invoice);
+  if (purchasedAt === null) return { blocked: false, accepted: false };
 
-  const invoiceWithPi = invoice as InvoiceWithPaymentIntent;
+  const settlement = await params.getSettledPaymentResolution();
+  if (
+    settlement.kind !== 'settled' ||
+    settlement.paymentMethod.kind !== 'reusable' ||
+    settlement.paymentMethod.paymentMethodType !== 'card' ||
+    settlement.paymentMethod.fingerprint === null
+  ) {
+    return { blocked: false, accepted: false };
+  }
 
-  const fingerprint = await resolveCardFingerprint({
-    invoice: invoiceWithPi,
-    stripe,
-    kiloUserId,
+  const fingerprintDigest = digestCardFingerprint(settlement.paymentMethod.fingerprint);
+  await acquireDuplicateCardDigestLock(params.tx, fingerprintDigest);
+
+  const windowStart = new Date(
+    new Date(purchasedAt).getTime() - DUPLICATE_CARD_WINDOW_MS
+  ).toISOString();
+  const windowEnd = new Date(
+    new Date(purchasedAt).getTime() + DUPLICATE_CARD_WINDOW_MS
+  ).toISOString();
+  const nearestMatches = await params.tx
+    .select()
+    .from(kilo_pass_accepted_card_purchases)
+    .where(
+      and(
+        eq(kilo_pass_accepted_card_purchases.fingerprint_digest, fingerprintDigest),
+        ne(kilo_pass_accepted_card_purchases.kilo_user_id, params.kiloUserId),
+        gt(kilo_pass_accepted_card_purchases.purchased_at, windowStart),
+        lt(kilo_pass_accepted_card_purchases.purchased_at, windowEnd)
+      )
+    )
+    .orderBy(
+      sql`ABS(EXTRACT(EPOCH FROM (${kilo_pass_accepted_card_purchases.purchased_at} - ${purchasedAt}::timestamptz)))`,
+      asc(kilo_pass_accepted_card_purchases.stripe_invoice_id)
+    )
+    .limit(1);
+  const matchedPurchase = nearestMatches[0];
+  if (matchedPurchase) {
+    return {
+      blocked: true,
+      fingerprintDigest,
+      matchedKiloUserId: matchedPurchase.kilo_user_id,
+      matchedStripeSubscriptionId: matchedPurchase.stripe_subscription_id,
+      matchedStripeInvoiceId: matchedPurchase.stripe_invoice_id,
+      matchedPurchasedAt: matchedPurchase.purchased_at,
+      refundableTarget: settlement.refundableTarget,
+    };
+  }
+
+  await insertAcceptedPurchase({
+    tx: params.tx,
+    stripeInvoiceId: params.invoice.id,
+    stripeSubscriptionId: params.stripeSubscriptionId,
+    kiloUserId: params.kiloUserId,
+    fingerprintDigest,
+    purchasedAt,
   });
-  if (!fingerprint) {
-    return { blocked: false };
-  }
+  return { blocked: false, accepted: true };
+}
 
-  const existingActiveKiloPass = await findActiveKiloPassByCardFingerprint(fingerprint, kiloUserId);
-  if (!existingActiveKiloPass) {
-    return { blocked: false };
-  }
+export async function attemptDuplicateCardProviderEnforcement(params: {
+  stripe: Stripe;
+  stripeInvoiceId: string;
+  stripeSubscriptionId: string;
+  kiloUserId: string;
+  gateResult: Extract<DuplicateCardGateResult, { blocked: true }>;
+}): Promise<void> {
+  const operationalContext = {
+    stripeInvoiceId: params.stripeInvoiceId,
+    stripeSubscriptionId: params.stripeSubscriptionId,
+    kiloUserId: params.kiloUserId,
+    fingerprintDigest: params.gateResult.fingerprintDigest,
+    matchedStripeInvoiceId: params.gateResult.matchedStripeInvoiceId,
+    matchedStripeSubscriptionId: params.gateResult.matchedStripeSubscriptionId,
+    matchedKiloUserId: params.gateResult.matchedKiloUserId,
+  };
 
-  // Duplicate detected — cancel the subscription and refund.
   try {
-    await stripe.subscriptions.cancel(stripeSubscriptionId, {
-      invoice_now: false,
-      prorate: false,
-    });
-  } catch (cancelError) {
-    captureException(cancelError, {
-      tags: { source: 'kilo_pass_duplicate_card_gate' },
-      extra: { stripeSubscriptionId, kiloUserId },
+    await params.stripe.subscriptions.cancel(
+      params.stripeSubscriptionId,
+      { invoice_now: false, prorate: false },
+      { idempotencyKey: `kilo-pass-duplicate-card-cancel:${params.stripeInvoiceId}` }
+    );
+  } catch (error) {
+    captureException(error, {
+      tags: { source: 'kilo_pass_duplicate_card_gate', stage: 'subscription_cancel' },
+      extra: operationalContext,
     });
   }
 
-  const paymentIntentUnion = invoiceWithPi.payment_intent;
-  const paymentIntentId =
-    typeof paymentIntentUnion === 'string' ? paymentIntentUnion : (paymentIntentUnion?.id ?? null);
+  const refundableTarget = params.gateResult.refundableTarget;
+  if (refundableTarget === null) {
+    captureException(
+      new Error('Kilo Pass duplicate-card purchase has no refundable settlement target'),
+      {
+        tags: { source: 'kilo_pass_duplicate_card_gate', stage: 'missing_refund_target' },
+        extra: operationalContext,
+      }
+    );
+    return;
+  }
 
-  if (paymentIntentId) {
-    try {
-      await stripe.refunds.create({
-        payment_intent: paymentIntentId,
+  try {
+    await params.stripe.refunds.create(
+      {
+        ...(refundableTarget.kind === 'payment_intent'
+          ? { payment_intent: refundableTarget.id }
+          : { charge: refundableTarget.id }),
         reason: 'duplicate',
         metadata: {
           kilo_pass_duplicate_card_gate: 'true',
-          other_kilo_user_id: existingActiveKiloPass.kiloUserId,
-          canceled_subscription_id: stripeSubscriptionId,
+          canceled_subscription_id: params.stripeSubscriptionId,
+          source_invoice_id: params.stripeInvoiceId,
         },
-      });
-    } catch (refundError) {
-      captureException(refundError, {
-        tags: { source: 'kilo_pass_duplicate_card_gate' },
-        extra: { paymentIntentId, stripeSubscriptionId, kiloUserId },
-      });
-    }
+      },
+      { idempotencyKey: `kilo-pass-duplicate-card-refund:${params.stripeInvoiceId}` }
+    );
+  } catch (error) {
+    captureException(error, {
+      tags: { source: 'kilo_pass_duplicate_card_gate', stage: 'refund' },
+      extra: {
+        ...operationalContext,
+        refundableTargetKind: refundableTarget.kind,
+        refundableTargetId: refundableTarget.id,
+      },
+    });
   }
-
-  return {
-    blocked: true,
-    otherKiloUserId: existingActiveKiloPass.kiloUserId,
-    otherSubscriptionId: existingActiveKiloPass.subscriptionId,
-    otherStripeSubscriptionId: existingActiveKiloPass.stripeSubscriptionId,
-    fingerprint,
-    stripeInvoiceId,
-  };
 }
 
 export async function maybeSendDuplicateCardCanceledEmail(params: {
@@ -237,9 +402,7 @@ export async function maybeSendDuplicateCardCanceledEmail(params: {
       })
       .onConflictDoNothing();
 
-    if ((insertResult.rowCount ?? 0) === 0) {
-      return;
-    }
+    if ((insertResult.rowCount ?? 0) === 0) return;
 
     const user = await db.query.kilocode_users.findFirst({
       columns: { google_user_email: true },
@@ -259,7 +422,6 @@ export async function maybeSendDuplicateCardCanceledEmail(params: {
     }
 
     const sendResult = await sendKiloPassDuplicateCardCanceledEmail(user.google_user_email, {});
-
     if (!sendResult.sent && sendResult.reason === 'provider_not_configured') {
       await db
         .delete(transactional_email_log)

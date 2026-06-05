@@ -312,7 +312,13 @@ function findConfiguredEntry(config: OpenClawAgentConfig, agentId: string): Agen
 // The top-level `bindings` array is not modeled by OpenClawAgentConfigSchema
 // (it round-trips via .passthrough()), so read it leniently at runtime — a
 // malformed binding entry is skipped, never fatal to a read.
-const BindingMatchSchema = z.object({ channel: z.string().min(1) }).passthrough();
+// `accountId` is validated (string) so a malformed value (e.g. a number) fails
+// parsing and the entry is treated as unmanaged: skipped on read, preserved on
+// write, never mistaken for a default-account route. Other match keys
+// (peer/guild/team/roles) pass through and are detected by presence.
+const BindingMatchSchema = z
+  .object({ channel: z.string().min(1), accountId: z.string().optional() })
+  .passthrough();
 const ConfigBindingSchema = z
   .object({
     type: z.string().optional(),

@@ -107,6 +107,7 @@ describe('agent config summaries', () => {
         { agentId: 'research' }, // no match
         'not-an-object',
         { agentId: 'research', match: {} }, // no channel
+        { agentId: 'research', match: { channel: 'irc', accountId: 123 } }, // non-string accountId
       ],
     });
     const research = summarizeAgentConfig(
@@ -390,6 +391,23 @@ describe('updateAgentBindings', () => {
       true
     );
     expect(remaining.some(b => b.agentId === 'ops' && b.match.channel === 'telegram')).toBe(true);
+  });
+
+  it('preserves a binding with a malformed accountId (treated as unmanaged)', async () => {
+    const configPath = await configFixture({
+      agents: { list: [{ id: 'research' }] },
+      bindings: [
+        { type: 'route', agentId: 'research', match: { channel: 'slack', accountId: 123 } },
+      ],
+    });
+
+    // Clearing research's channel routes must NOT remove the malformed entry —
+    // it is not a valid default-account route.
+    await updateAgentBindings('research', { channels: [] }, { configPath });
+
+    const remaining = (readAgentConfigSnapshot({ configPath }).config as { bindings: unknown[] })
+      .bindings;
+    expect(remaining).toHaveLength(1);
   });
 
   it('rejects a channel already routed to another agent', async () => {

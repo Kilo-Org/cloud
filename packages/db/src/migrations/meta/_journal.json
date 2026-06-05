@@ -1086,6 +1086,20 @@
       "when": 1780401682134,
       "tag": "0154_familiar_franklin_richards",
       "breakpoints": true
+    },
+    {
+      "idx": 155,
+      "version": "7",
+      "when": 1780577198085,
+      "tag": "0155_married_fallen_one",
+      "breakpoints": true
+    },
+    {
+      "idx": 156,
+      "version": "7",
+      "when": 1780579983706,
+      "tag": "0156_low_mauler",
+      "breakpoints": true
     }
   ]
 }

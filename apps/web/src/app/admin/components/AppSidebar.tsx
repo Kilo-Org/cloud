@@ -25,6 +25,7 @@ import {
   Copy,
   Megaphone,
   Coins,
+  Scale,
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import type { Session } from 'next-auth';
@@ -114,6 +115,11 @@ const financialItems: MenuItem[] = [
     title: () => 'Kilo Pass Bulk Cancel',
     url: '/admin/kilo-pass/bulk-cancel',
     icon: () => <Coins />,
+  },
+  {
+    title: () => 'Disputes',
+    url: '/admin/disputes',
+    icon: () => <Scale />,
   },
   {
     title: () => 'Early Fraud Warnings',

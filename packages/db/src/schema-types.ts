@@ -317,6 +317,53 @@ export const StripeEarlyFraudWarningActionStatus = {
 export type StripeEarlyFraudWarningActionStatus =
   (typeof StripeEarlyFraudWarningActionStatus)[keyof typeof StripeEarlyFraudWarningActionStatus];
 
+export const StripeDisputeOwnerClassification = {
+  Personal: 'personal',
+  Organization: 'organization',
+  Ambiguous: 'ambiguous',
+  Unmatched: 'unmatched',
+} as const;
+
+export type StripeDisputeOwnerClassification =
+  (typeof StripeDisputeOwnerClassification)[keyof typeof StripeDisputeOwnerClassification];
+
+export const StripeDisputeCaseStatus = {
+  NeedsAction: 'needs_action',
+  Processing: 'processing',
+  Accepted: 'accepted',
+  AcceptanceFailed: 'acceptance_failed',
+  EnforcementFailed: 'enforcement_failed',
+  ReviewRequired: 'review_required',
+  Closed: 'closed',
+} as const;
+
+export type StripeDisputeCaseStatus =
+  (typeof StripeDisputeCaseStatus)[keyof typeof StripeDisputeCaseStatus];
+
+export const StripeDisputeActionType = {
+  StripeAcceptance: 'stripe_acceptance',
+  UserBlock: 'user_block',
+  AutoTopUpDisable: 'auto_top_up_disable',
+  CreditBalanceReset: 'credit_balance_reset',
+  SubscriptionCancellation: 'subscription_cancellation',
+  AccessTermination: 'access_termination',
+  KiloClawSuspension: 'kiloclaw_suspension',
+} as const;
+
+export type StripeDisputeActionType =
+  (typeof StripeDisputeActionType)[keyof typeof StripeDisputeActionType];
+
+export const StripeDisputeActionStatus = {
+  Queued: 'queued',
+  Processing: 'processing',
+  Completed: 'completed',
+  Failed: 'failed',
+  Skipped: 'skipped',
+} as const;
+
+export type StripeDisputeActionStatus =
+  (typeof StripeDisputeActionStatus)[keyof typeof StripeDisputeActionStatus];
+
 export const AffiliateProvider = {
   Impact: 'impact',
 } as const;

@@ -1,0 +1,1 @@
+ALTER TABLE "stripe_dispute_cases" ADD COLUMN "next_retry_at" timestamp with time zone;

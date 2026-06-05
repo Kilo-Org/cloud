@@ -71,6 +71,30 @@ describe('SessionIngestDO integration', () => {
       expect(snapshot.sessionDiff).toEqual(diffs);
     });
 
+    it('exports an empty array for a missing R2-backed session diff', async () => {
+      const sessionId = 'ses_roundtrip_diff_missing_r2_001';
+      const stub = getStub(kiloUserId, sessionId);
+
+      await stub.ingest(
+        [
+          { type: 'session', data: { title: 'Missing R2 Diff Export' } },
+          { type: 'session_diff', data: [{ file: 'missing.txt', additions: 1, deletions: 0 }] },
+        ],
+        kiloUserId,
+        sessionId,
+        1,
+        1000,
+        { session_diff: `items/${sessionId}/session_diff/missing` }
+      );
+
+      const raw = await stub.getAllStream().then(s => new Response(s).text());
+      const snapshot = JSON.parse(raw);
+
+      expect(snapshot.info).toEqual({ title: 'Missing R2 Diff Export' });
+      expect(snapshot.messages).toEqual([]);
+      expect(snapshot.sessionDiff).toEqual([]);
+    });
+
     it('ingests multiple items and exports a full snapshot', async () => {
       const sessionId = 'ses_roundtrip_multi_000000002';
       const stub = getStub(kiloUserId, sessionId);

@@ -419,7 +419,7 @@ export class SessionIngestDO extends DurableObject<Env> {
             .limit(1)
             .get();
           if (diffRow) {
-            await enqueueItemData(controller, diffRow, r2, encoder);
+            await enqueueItemData(controller, diffRow, r2, encoder, '[]');
           } else {
             controller.enqueue(encoder.encode('[]'));
           }
@@ -604,7 +604,8 @@ async function enqueueItemData(
   controller: ReadableStreamDefaultController<Uint8Array>,
   ref: ItemDataRef,
   r2: R2Bucket,
-  encoder: TextEncoder
+  encoder: TextEncoder,
+  missingFallback = '{}'
 ): Promise<void> {
   if (ref.item_data_r2_key) {
     const obj = await r2.get(ref.item_data_r2_key);
@@ -616,10 +617,10 @@ async function enqueueItemData(
         controller.enqueue(result.value);
       }
     } else {
-      console.error('R2 blob missing during export, falling back to empty object', {
+      console.error('R2 blob missing during export, using fallback item data', {
         r2Key: ref.item_data_r2_key,
       });
-      controller.enqueue(encoder.encode('{}'));
+      controller.enqueue(encoder.encode(missingFallback));
     }
   } else {
     controller.enqueue(encoder.encode(ref.item_data));

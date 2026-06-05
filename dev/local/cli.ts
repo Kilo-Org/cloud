@@ -201,8 +201,12 @@ async function cmdUp(args: string[], repoRoot: string): Promise<void> {
   const wranglerRegistryPath = getWranglerRegistryPath(repoRoot);
   const sessionEnv: Record<string, string> = {
     KILO_PORT_OFFSET: String(portOffset),
+    PATH: process.env.PATH ?? '',
     WRANGLER_REGISTRY_PATH: wranglerRegistryPath,
   };
+  if (process.env.PNPM_HOME !== undefined && process.env.PNPM_HOME !== '') {
+    sessionEnv.PNPM_HOME = process.env.PNPM_HOME;
+  }
   if (process.env.PORT !== undefined && process.env.PORT !== '') {
     sessionEnv.PORT = String(getService('nextjs').port);
   }

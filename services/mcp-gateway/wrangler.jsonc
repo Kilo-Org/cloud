@@ -9,8 +9,8 @@
   "preview_urls": false,
   "routes": [
     {
-      "pattern": "mcp.kilosessions.ai/*",
-      "zone_name": "kilosessions.ai",
+      "pattern": "mcp.kilosessions.ai",
+      "custom_domain": true,
     },
   ],
   "dev": {

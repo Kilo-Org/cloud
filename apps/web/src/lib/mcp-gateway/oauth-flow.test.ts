@@ -20,6 +20,7 @@ import {
 } from '@kilocode/db/schema';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createGatewayServices } from './services';
+import { revokeGatewayStateForOrganizationMember } from './lifecycle-service';
 import type { GatewayAppConfig } from './config';
 import { createHash, generateKeyPairSync, createPublicKey } from 'node:crypto';
 import { OAuthAuthorizationQuerySchema, parseScopedConnectPath } from '@kilocode/mcp-gateway';
@@ -918,6 +919,119 @@ describe('MCP gateway app OAuth flow', () => {
         executionContext: { type: 'personal' },
       })
     ).rejects.toMatchObject({ code: 'access_denied' });
+  });
+
+  it('revokes organization-scoped OAuth artifacts when a member is removed', async () => {
+    const config = await createTestConfig();
+    const services = createGatewayServices({ config });
+    const user = await insertTestUser({ id: `gateway-user-${crypto.randomUUID()}` });
+    const organizationId = crypto.randomUUID();
+    await db.insert(organizations).values({ id: organizationId, name: 'Gateway Org' });
+    await db.insert(organization_memberships).values({
+      organization_id: organizationId,
+      kilo_user_id: user.id,
+      role: 'owner',
+    });
+    const created = await services.configService.createOrganizationConfig({
+      organizationId,
+      actorUserId: user.id,
+      name: 'Org MCP',
+      remoteUrl: 'https://example.com/mcp',
+      authMode: 'none',
+      sharingMode: 'single_user',
+      initialAssignedUserId: user.id,
+    });
+    const instance = await services.repository.ensureConnectionInstance({
+      ownerScope: 'organization',
+      ownerId: organizationId,
+      configId: created.config.config_id,
+      userId: user.id,
+    });
+    const registration = await services.clientService.registerClient({
+      metadata: {
+        redirect_uris: ['http://localhost:3000/callback'],
+        token_endpoint_auth_method: 'none',
+        grant_types: ['authorization_code', 'refresh_token'],
+        response_types: ['code'],
+        scope: 'profile',
+      },
+      headers: new Headers({ 'x-vercel-forwarded-for': '203.0.113.22' }),
+    });
+    const client = await services.clientService.findClientById(registration.clientId);
+    if (!client) throw new Error('Expected registered OAuth client');
+    const [authorizationRequest] = await db
+      .insert(mcp_gateway_authorization_requests)
+      .values({
+        request_state_hash: `request-${crypto.randomUUID()}`,
+        oauth_client_id: client.oauth_client_id,
+        client_id: client.client_id,
+        owner_scope: 'organization',
+        owner_id: organizationId,
+        config_id: created.config.config_id,
+        route_key: created.route.route_key,
+        canonical_resource_url: created.route.canonical_url,
+        redirect_uri: 'http://localhost:3000/callback',
+        requested_scopes: ['profile'],
+        granted_scopes: ['profile'],
+        execution_context: { type: 'organization', organizationId },
+        kilo_user_id: user.id,
+        instance_id: instance.instance_id,
+        expires_at: new Date(Date.now() + 60_000).toISOString(),
+      })
+      .returning();
+    if (!authorizationRequest) throw new Error('Expected authorization request');
+    await db.insert(mcp_gateway_authorization_codes).values({
+      code_hash: `code-${crypto.randomUUID()}`,
+      authorization_request_id: authorizationRequest.authorization_request_id,
+      oauth_client_id: client.oauth_client_id,
+      client_id: client.client_id,
+      owner_scope: 'organization',
+      owner_id: organizationId,
+      config_id: created.config.config_id,
+      route_key: created.route.route_key,
+      canonical_resource_url: created.route.canonical_url,
+      redirect_uri: 'http://localhost:3000/callback',
+      granted_scopes: ['profile'],
+      execution_context: { type: 'organization', organizationId },
+      kilo_user_id: user.id,
+      instance_id: instance.instance_id,
+      expires_at: new Date(Date.now() + 60_000).toISOString(),
+    });
+    await db.insert(mcp_gateway_refresh_tokens).values({
+      token_hash: `refresh-${crypto.randomUUID()}`,
+      oauth_client_id: client.oauth_client_id,
+      client_id: client.client_id,
+      owner_scope: 'organization',
+      owner_id: organizationId,
+      config_id: created.config.config_id,
+      route_key: created.route.route_key,
+      canonical_resource_url: created.route.canonical_url,
+      granted_scopes: ['profile'],
+      execution_context: { type: 'organization', organizationId },
+      kilo_user_id: user.id,
+      instance_id: instance.instance_id,
+    });
+
+    await revokeGatewayStateForOrganizationMember(db, organizationId, user.id);
+
+    await expect(
+      db
+        .select()
+        .from(mcp_gateway_authorization_requests)
+        .where(eq(mcp_gateway_authorization_requests.kilo_user_id, user.id))
+    ).resolves.toHaveLength(0);
+    await expect(
+      db
+        .select()
+        .from(mcp_gateway_authorization_codes)
+        .where(eq(mcp_gateway_authorization_codes.kilo_user_id, user.id))
+    ).resolves.toHaveLength(0);
+    await expect(
+      db
+        .select()
+        .from(mcp_gateway_refresh_tokens)
+        .where(eq(mcp_gateway_refresh_tokens.kilo_user_id, user.id))
+    ).resolves.toHaveLength(0);
   });
 
   it('does not list unassigned org configs in the current execution context', async () => {

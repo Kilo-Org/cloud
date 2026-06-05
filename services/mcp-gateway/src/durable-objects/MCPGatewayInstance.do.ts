@@ -35,7 +35,7 @@ export class MCPGatewayInstance extends DurableObject<Env> {
   async refreshProviderGrant(input: unknown) {
     const parsed = RefreshProviderGrantInputSchema.safeParse(input);
     if (!parsed.success) {
-      return await runRefreshProviderGrant({ env: this.env, sqlite: this.sqlite, input });
+      throw new Error('Invalid refreshProviderGrant input');
     }
     const attemptKey = `${parsed.data.instanceId}:${parsed.data.grantId}:${parsed.data.expectedGrantVersion}`;
     const existing = this.refreshInFlight.get(attemptKey);

@@ -170,4 +170,28 @@ export async function revokeGatewayStateForOrganizationMember(
         inArray(mcp_gateway_pending_provider_authorizations.config_id, configIds)
       )
     );
+  await database
+    .delete(mcp_gateway_authorization_codes)
+    .where(
+      and(
+        eq(mcp_gateway_authorization_codes.kilo_user_id, userId),
+        inArray(mcp_gateway_authorization_codes.config_id, configIds)
+      )
+    );
+  await database
+    .delete(mcp_gateway_authorization_requests)
+    .where(
+      and(
+        eq(mcp_gateway_authorization_requests.kilo_user_id, userId),
+        inArray(mcp_gateway_authorization_requests.config_id, configIds)
+      )
+    );
+  await database
+    .delete(mcp_gateway_refresh_tokens)
+    .where(
+      and(
+        eq(mcp_gateway_refresh_tokens.kilo_user_id, userId),
+        inArray(mcp_gateway_refresh_tokens.config_id, configIds)
+      )
+    );
 }

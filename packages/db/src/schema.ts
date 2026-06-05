@@ -84,6 +84,7 @@ import {
   MCPGatewayOwnerScope,
   MCPGatewayAuthMode,
   MCPGatewaySharingMode,
+  MCPGatewayProviderScopeSource,
   MCPGatewayRouteStatus,
   MCPGatewayInstanceStatus,
   MCPGatewayProviderGrantStatus,
@@ -211,6 +212,7 @@ export const SCHEMA_CHECK_ENUMS = {
   MCPGatewayOwnerScope,
   MCPGatewayAuthMode,
   MCPGatewaySharingMode,
+  MCPGatewayProviderScopeSource,
   MCPGatewayRouteStatus,
   MCPGatewayInstanceStatus,
   MCPGatewayProviderGrantStatus,
@@ -7332,6 +7334,12 @@ export const mcp_gateway_configs = pgTable(
     remote_url: text().notNull(),
     auth_mode: text().$type<MCPGatewayAuthMode>().notNull(),
     sharing_mode: text().$type<MCPGatewaySharingMode>().notNull(),
+    provider_scopes: text().array(),
+    provider_scope_source: text()
+      .$type<MCPGatewayProviderScopeSource>()
+      .notNull()
+      .default(MCPGatewayProviderScopeSource.None),
+    provider_resource: text(),
     enabled: boolean().notNull().default(true),
     path_passthrough: boolean().notNull().default(false),
     config_version: integer().notNull().default(1),
@@ -7359,6 +7367,11 @@ export const mcp_gateway_configs = pgTable(
     enumCheck('mcp_gateway_configs_owner_scope', table.owner_scope, MCPGatewayOwnerScope),
     enumCheck('mcp_gateway_configs_auth_mode', table.auth_mode, MCPGatewayAuthMode),
     enumCheck('mcp_gateway_configs_sharing_mode', table.sharing_mode, MCPGatewaySharingMode),
+    enumCheck(
+      'mcp_gateway_configs_provider_scope_source',
+      table.provider_scope_source,
+      MCPGatewayProviderScopeSource
+    ),
   ]
 );
 

@@ -250,36 +250,35 @@ when they appear in all capitals.
    configs.
 2. `none` and `static_headers` configs complete first-level authorization without
    provider OAuth.
-3. A provider grant belongs to exactly one connection instance and MUST NOT be
+3. Gateway client scopes and upstream provider scopes are separate scope systems.
+   Gateway client scopes come from the Kilo gateway vocabulary; upstream provider
+   scopes come from explicit admin override or the remote MCP server's
+   `WWW-Authenticate` challenge.
+4. Upstream provider scopes MUST NOT be derived from `scopes_supported`.
+5. When no upstream provider scope is known, the provider authorization request
+   MUST omit `scope` rather than inventing a gateway scope such as `profile`.
+6. The remote protected-resource `resource` value, when available, MUST be
+   preserved in upstream provider authorization and token exchange requests.
+7. A provider grant belongs to exactly one connection instance and MUST NOT be
    shared across users, configs, owners, or scopes.
-4. Provider access tokens, refresh tokens, provider client IDs, client secrets,
-   static header secrets, pending state, authorization codes, refresh tokens,
-   and PKCE verifiers are sensitive material.
-5. Provider grants and pending provider authorization state MUST be encrypted at
-   rest.
-6. Pending provider authorization MUST bind owner scope, owner ID, user ID,
-   config ID, config version, instance ID, canonical route, remote URL, auth
-   mode, provider credentials, authorization endpoint, token endpoint, redirect
-   URI, scopes, PKCE verifier, execution context, and first-level authorization
-   request ID when applicable.
-7. Sensitive provider credentials, including provider client ID, MUST be inside
-   encrypted pending state rather than stored as plaintext pending columns.
-8. Pending state is opaque, one-time, expires within 30 minutes, and MUST be
-   consumed atomically on success, provider error, expiry, or invalid callback.
-9. Provider error callbacks MUST consume pending state and MUST NOT create a grant.
-10. Provider callback success MUST persist the grant before the app issues a final
-    authorization code.
-11. Provider responses MUST be size-capped before JSON parsing and validated with
-    the relevant schema.
-12. Only bearer provider tokens are supported in v1. Non-bearer provider token
-    types MUST be rejected.
-13. Grant versioning is monotonic per instance. Creating, replacing, revoking, or
-    deleting a grant MUST advance the version; replacement MUST NOT reset it.
-14. Provider refresh is lazy and happens only during runtime proxying.
-15. Refresh failure MUST move the instance to `needs_reauth` without overwriting a
-    newer app-side revoke/replacement.
-16. A provider grant may be restored only by a successful provider authorization
+8. Provider access tokens, refresh tokens, provider client IDs, client secrets,
+9. Provider grants and pending provider authorization state MUST be encrypted at
+10. Pending provider authorization MUST bind owner scope, owner ID, user ID,
+11. Sensitive provider credentials, including provider client ID, MUST be inside
+12. Pending state is opaque, one-time, expires within 30 minutes, and MUST be
+13. Provider error callbacks MUST consume pending state and MUST NOT create a grant.
+14. Provider callback success MUST persist the grant before the app issues a final
+15. Provider responses MUST be size-capped before JSON parsing and validated with
+16. Only bearer provider tokens are supported in v1. Non-bearer provider token
+17. Grant versioning is monotonic per instance. Creating, replacing, revoking, or
+18. Provider refresh is lazy and happens only during runtime proxying.
+19. Refresh failure MUST move the instance to `needs_reauth` without overwriting a
+20. A provider grant may be restored only by a successful provider authorization
     for the same non-terminal instance.
+21. Changing upstream provider scopes, provider scope source, provider resource,
+    provider authorization endpoint, provider token endpoint, or provider credentials
+    is a material config change and MUST revoke pending provider authorization state,
+    revoke active grants, and advance config version.
 
 ## Worker Runtime Proxy
 

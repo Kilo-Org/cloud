@@ -69,9 +69,24 @@ function createTestConfig(): Promise<GatewayAppConfig> {
 
 function providerDiscoveryResponse(url: string): Response | null {
   if (url === 'https://example.com/.well-known/oauth-protected-resource') {
-    return new Response(JSON.stringify({ authorization_servers: ['https://example.com'] }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
+    return new Response(
+      JSON.stringify({
+        resource: 'https://example.com/mcp',
+        authorization_servers: ['https://example.com'],
+      }),
+      {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }
+    );
+  }
+  if (url === 'https://example.com/mcp') {
+    return new Response(null, {
+      status: 401,
+      headers: {
+        'WWW-Authenticate':
+          'Bearer authorization_uri="https://example.com", scope="openid email", resource_metadata="https://example.com/.well-known/oauth-protected-resource"',
+      },
     });
   }
   if (
@@ -459,6 +474,57 @@ describe('MCP gateway app OAuth flow', () => {
       authorization_endpoint: 'https://example.com/authorize',
       token_endpoint: 'https://example.com/token',
     });
+    expect(created.config.provider_scopes).toEqual(['openid', 'email']);
+    expect(created.config.provider_scope_source).toBe('discovered');
+    expect(created.config.provider_resource).toBe('https://example.com/mcp');
+  });
+
+  it('prefers explicit provider scopes over discovered challenge scopes', async () => {
+    const config = await createTestConfig();
+    const services = createGatewayServices({ config, fetchImpl: providerDiscoveryFetch });
+    const user = await insertTestUser({ id: `gateway-user-${crypto.randomUUID()}` });
+    const created = await services.configService.createPersonalConfig({
+      userId: user.id,
+      name: 'OAuth MCP',
+      remoteUrl: 'https://example.com/mcp',
+      authMode: 'oauth_static',
+      providerScopes: ['repo'],
+    });
+    expect(created.config.provider_scopes).toEqual(['repo']);
+    expect(created.config.provider_scope_source).toBe('override');
+  });
+
+  it('revokes existing grants when provider scopes change', async () => {
+    const config = await createTestConfig();
+    const services = createGatewayServices({ config, fetchImpl: providerDiscoveryFetch });
+    const user = await insertTestUser({ id: `gateway-user-${crypto.randomUUID()}` });
+    const created = await services.configService.createPersonalConfig({
+      userId: user.id,
+      name: 'OAuth MCP',
+      remoteUrl: 'https://example.com/mcp',
+      authMode: 'oauth_static',
+    });
+    const instance = await services.repository.ensureConnectionInstance({
+      ownerScope: 'personal',
+      ownerId: user.id,
+      configId: created.config.config_id,
+      userId: user.id,
+    });
+    await services.grantService.replaceGrant({
+      instanceId: instance.instance_id,
+      bundle: { accessToken: 'provider-access', expiresAt: null, tokenType: 'bearer' },
+    });
+
+    const updated = await services.configService.updateProviderScopes({
+      configId: created.config.config_id,
+      providerScopes: ['repo'],
+    });
+    const grant = await services.repository.findActiveGrant(instance.instance_id);
+
+    expect(updated.provider_scopes).toEqual(['repo']);
+    expect(updated.provider_scope_source).toBe('override');
+    expect(updated.config_version).toBe(2);
+    expect(grant).toBeNull();
   });
 
   it('persists initial static provider credentials atomically without a version rotation', async () => {
@@ -510,6 +576,9 @@ describe('MCP gateway app OAuth flow', () => {
         return new Response(JSON.stringify({ authorization_servers: ['https://example.com'] }), {
           status: 200,
         });
+      }
+      if (url === 'https://example.com/mcp') {
+        return new Response(null, { status: 401 });
       }
       if (url === 'https://example.com/.well-known/oauth-authorization-server') {
         return new Response(
@@ -586,6 +655,10 @@ describe('MCP gateway app OAuth flow', () => {
     });
 
     expect(authorization.kind).toBe('provider_redirect');
+    if (authorization.kind !== 'provider_redirect') return;
+    const providerAuthorizationUrl = new URL(authorization.authorizationUrl);
+    expect(providerAuthorizationUrl.searchParams.get('scope')).toBe('openid email');
+    expect(providerAuthorizationUrl.searchParams.get('resource')).toBe('https://example.com/mcp');
     expect(registrationBody).toMatchObject({
       client_name: 'Kilo MCP Gateway',
       redirect_uris: ['https://app.kilo.ai/api/mcp-gateway/oauth/mcp/callback'],
@@ -593,6 +666,41 @@ describe('MCP gateway app OAuth flow', () => {
       response_types: ['code'],
       token_endpoint_auth_method: 'client_secret_post',
     });
+  });
+
+  it('uses resolved provider scopes for dashboard sign-in', async () => {
+    const config = await createTestConfig();
+    const services = createGatewayServices({ config, fetchImpl: providerDiscoveryFetch });
+    const user = await insertTestUser({ id: `gateway-user-${crypto.randomUUID()}` });
+    const created = await services.configService.createPersonalConfig({
+      userId: user.id,
+      name: 'OAuth MCP',
+      remoteUrl: 'https://example.com/mcp',
+      authMode: 'oauth_static',
+    });
+    await services.configService.upsertSecret({
+      configId: created.config.config_id,
+      kind: 'static_provider_credentials',
+      value: { clientId: 'provider-client', clientSecret: 'provider-secret' },
+    });
+    const resolved = await services.repository.findActiveRouteByRoute({
+      ownerScope: 'personal',
+      ownerId: user.id,
+      configId: created.config.config_id,
+      routeKey: created.route.route_key,
+    });
+    if (!resolved) throw new Error('Expected resolved route');
+    const route = parseScopedConnectPath(new URL(created.route.canonical_url).pathname);
+    if (!route) throw new Error('Expected parsed route');
+    const authorization = await services.providerOAuthService.startDashboardProviderSignIn({
+      resolved,
+      route,
+      userId: user.id,
+      executionContext: { type: 'personal' },
+    });
+    const providerAuthorizationUrl = new URL(authorization.authorizationUrl);
+    expect(providerAuthorizationUrl.searchParams.get('scope')).toBe('openid email');
+    expect(providerAuthorizationUrl.searchParams.get('resource')).toBe('https://example.com/mcp');
   });
 
   it('consumes provider state when the provider returns an error', async () => {
@@ -770,12 +878,14 @@ describe('MCP gateway app OAuth flow', () => {
 
   it('persists a provider grant before final authorization code issuance', async () => {
     const config = await createTestConfig();
-    const fetchImpl: typeof fetch = async input => {
+    let tokenRequestBody = '';
+    const fetchImpl: typeof fetch = async (input, init) => {
       const url =
         typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
       const discovery = providerDiscoveryResponse(url);
       if (discovery) return discovery;
       if (url === 'https://example.com/token') {
+        tokenRequestBody = String(init?.body);
         return new Response(
           JSON.stringify({
             access_token: 'provider-access',
@@ -852,6 +962,13 @@ describe('MCP gateway app OAuth flow', () => {
       userId: user.id,
     });
     expect(callback.grant.grant_status).toBe('active');
+    expect(new URLSearchParams(tokenRequestBody).get('resource')).toBe('https://example.com/mcp');
+    expect(
+      services.grantService.decryptGrant(
+        callback.grant.encrypted_grant,
+        callback.instance.instance_id
+      ).scope
+    ).toBe('openid email');
     const grants = await db
       .select()
       .from(mcp_gateway_provider_grants)

@@ -325,6 +325,9 @@ export function createGatewayRepository(database: GatewayDatabase = db) {
     createdByUserId: string;
     gatewayBaseUrl: string;
     discoveredProviderMetadata: Record<string, unknown> | null;
+    providerScopes: string[] | null;
+    providerScopeSource: 'none' | 'discovered' | 'override';
+    providerResource: string | null;
   }) {
     const [config] = await database
       .insert(mcp_gateway_configs)
@@ -337,6 +340,9 @@ export function createGatewayRepository(database: GatewayDatabase = db) {
         sharing_mode: params.sharingMode,
         path_passthrough: params.pathPassthrough,
         discovered_provider_metadata: params.discoveredProviderMetadata,
+        provider_scopes: params.providerScopes,
+        provider_scope_source: params.providerScopeSource,
+        provider_resource: params.providerResource,
         created_by_kilo_user_id: params.createdByUserId,
       })
       .returning();

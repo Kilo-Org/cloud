@@ -25,6 +25,8 @@ import { createGatewayRepository, type GatewayRepository } from './repository';
 import { configSecretAad, nowIso, randomToken } from './crypto';
 import { validatePublicHttpsDestination } from './discovery-service';
 import type { GatewayDiscoveryService } from './discovery-service';
+
+type ProviderScopeSource = 'none' | 'discovered' | 'override';
 import { createAuditService } from './audit-service';
 
 const secretScheme = 'mcp-gateway-credential-rsa-aes-256-gcm';
@@ -38,6 +40,7 @@ export function createConfigService(params: {
     remoteUrl: string;
     authMode: GatewayAuthMode;
     providerIssuer?: string;
+    providerScopes?: string[];
   }) {
     if (input.authMode !== 'oauth_dynamic' && input.authMode !== 'oauth_static') return null;
     const discovery = await params.discoveryService.discoverRemoteProvider(input.remoteUrl);
@@ -58,7 +61,14 @@ export function createConfigService(params: {
         400
       );
     }
-    return provider;
+    return {
+      metadata: provider,
+      providerScopes: input.providerScopes ?? discovery.providerScopes,
+      providerScopeSource: (input.providerScopes
+        ? 'override'
+        : discovery.providerScopeSource) as ProviderScopeSource,
+      providerResource: discovery.providerResource,
+    };
   }
 
   function initialStaticProviderCredentials(input: {
@@ -155,6 +165,7 @@ export function createConfigService(params: {
     remoteUrl: string;
     authMode: GatewayAuthMode;
     providerIssuer?: string;
+    providerScopes?: string[];
     staticProviderClientId?: string;
     staticProviderClientSecret?: string;
     staticHeaders?: Record<string, string>;
@@ -175,7 +186,10 @@ export function createConfigService(params: {
         authMode: input.authMode,
         sharingMode: GatewaySharingMode.SingleUser,
         pathPassthrough: input.pathPassthrough ?? false,
-        discoveredProviderMetadata,
+        discoveredProviderMetadata: discoveredProviderMetadata?.metadata ?? null,
+        providerScopes: discoveredProviderMetadata?.providerScopes ?? null,
+        providerScopeSource: discoveredProviderMetadata?.providerScopeSource ?? 'none',
+        providerResource: discoveredProviderMetadata?.providerResource ?? null,
         createdByUserId: input.userId,
         gatewayBaseUrl: params.config.gatewayBaseUrl,
       });
@@ -227,6 +241,7 @@ export function createConfigService(params: {
     remoteUrl: string;
     authMode: GatewayAuthMode;
     providerIssuer?: string;
+    providerScopes?: string[];
     staticProviderClientId?: string;
     staticProviderClientSecret?: string;
     staticHeaders?: Record<string, string>;
@@ -269,7 +284,10 @@ export function createConfigService(params: {
         authMode: input.authMode,
         sharingMode: input.sharingMode,
         pathPassthrough: input.pathPassthrough ?? false,
-        discoveredProviderMetadata,
+        discoveredProviderMetadata: discoveredProviderMetadata?.metadata ?? null,
+        providerScopes: discoveredProviderMetadata?.providerScopes ?? null,
+        providerScopeSource: discoveredProviderMetadata?.providerScopeSource ?? 'none',
+        providerResource: discoveredProviderMetadata?.providerResource ?? null,
         createdByUserId: input.actorUserId,
         gatewayBaseUrl: params.config.gatewayBaseUrl,
       });
@@ -428,6 +446,59 @@ export function createConfigService(params: {
         });
       }
       return secret;
+    });
+  }
+
+  async function updateProviderScopes(input: {
+    configId: string;
+    providerScopes: string[] | null;
+  }) {
+    return await params.repository.database.transaction(async tx => {
+      const [config] = await tx
+        .select()
+        .from(mcp_gateway_configs)
+        .where(eq(mcp_gateway_configs.config_id, input.configId))
+        .limit(1);
+      if (!config) {
+        throw createGatewayError(GatewayErrorCode.NotFound, 'Config not found', 404);
+      }
+      if (
+        config.auth_mode !== GatewayAuthMode.OAuthDynamic &&
+        config.auth_mode !== GatewayAuthMode.OAuthStatic
+      ) {
+        throw createGatewayError(
+          GatewayErrorCode.InvalidRequest,
+          'Provider scopes require OAuth provider sign-in',
+          400
+        );
+      }
+      const currentScopes = config.provider_scopes ?? null;
+      const sameScopes =
+        currentScopes === null && input.providerScopes === null
+          ? true
+          : currentScopes?.length === input.providerScopes?.length &&
+            currentScopes?.every((scope, index) => scope === input.providerScopes?.[index]);
+      const nextSource: ProviderScopeSource = input.providerScopes ? 'override' : 'none';
+      if (sameScopes && config.provider_scope_source === nextSource) return config;
+      await revokeConfigGrants(tx, input.configId);
+      const [updated] = await tx
+        .update(mcp_gateway_configs)
+        .set({
+          provider_scopes: input.providerScopes,
+          provider_scope_source: nextSource,
+          config_version: sql`${mcp_gateway_configs.config_version} + 1`,
+        })
+        .where(eq(mcp_gateway_configs.config_id, input.configId))
+        .returning();
+      await createAuditService(createGatewayRepository(tx)).record({
+        ownerScope: updated.owner_scope,
+        ownerId: updated.owner_id,
+        configId: updated.config_id,
+        eventType: 'config_updated',
+        outcome: 'success',
+        metadata: { providerScopes: input.providerScopes, providerScopeSource: nextSource },
+      });
+      return updated;
     });
   }
 
@@ -695,6 +766,7 @@ export function createConfigService(params: {
     createPersonalConfig,
     createOrganizationConfig,
     upsertSecret,
+    updateProviderScopes,
     rotateRoute,
     revokeAssignment,
     assignUser,

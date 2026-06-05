@@ -34,6 +34,7 @@ type SetupDraft = {
   remoteUrl: string;
   authMode: 'none' | 'static_headers' | 'oauth_dynamic' | 'oauth_static';
   providerIssuer: string;
+  providerScopes: string;
   staticProviderClientId: string;
   staticProviderClientSecret: string;
   staticHeaderName: string;
@@ -130,6 +131,7 @@ export function McpGatewaySetupContent({ organizationId }: McpGatewaySetupConten
     remoteUrl: '',
     authMode: 'oauth_dynamic',
     providerIssuer: '',
+    providerScopes: '',
     staticProviderClientId: '',
     staticProviderClientSecret: '',
     staticHeaderName: 'Authorization',
@@ -187,6 +189,7 @@ export function McpGatewaySetupContent({ organizationId }: McpGatewaySetupConten
     defaultProvider;
   const selectedProviderIssuer = selectedProvider?.issuer ?? '';
   const dynamicAvailable = selectedProvider?.hasRegistrationEndpoint ?? false;
+  const discoveredProviderScopes = discovery?.providerScopes?.join(' ') ?? '';
   const selectedAuthMode = useMemo(() => {
     if (!discovery) return draft.authMode;
     if (!hasProvider && (draft.authMode === 'oauth_dynamic' || draft.authMode === 'oauth_static')) {
@@ -208,6 +211,11 @@ export function McpGatewaySetupContent({ organizationId }: McpGatewaySetupConten
   // Auto-probe a valid URL shortly after the user stops typing. Triggering
   // discovery (onBlur / Re-check) sets discoveryAttemptedUrl, which makes this
   // effect re-run, hit the early return, and cancel the pending debounce.
+  useEffect(() => {
+    if (!discoveredProviderScopes || draft.providerScopes) return;
+    updateDraft({ providerScopes: discoveredProviderScopes });
+  }, [discoveredProviderScopes, draft.providerScopes]);
+
   useEffect(() => {
     if (!currentRemoteUrl) return;
     if (discovery || discoveryAttemptedUrl === currentRemoteUrl) return;
@@ -242,6 +250,9 @@ export function McpGatewaySetupContent({ organizationId }: McpGatewaySetupConten
     draft.staticHeaderValue.trim()
       ? { [draft.staticHeaderName.trim()]: draft.staticHeaderValue }
       : undefined;
+  const providerScopes = draft.providerScopes.trim()
+    ? draft.providerScopes.trim().split(/\s+/)
+    : undefined;
 
   function createConnection() {
     if (organizationId) {
@@ -251,6 +262,7 @@ export function McpGatewaySetupContent({ organizationId }: McpGatewaySetupConten
         remoteUrl: draft.remoteUrl,
         authMode: selectedAuthMode,
         providerIssuer: selectedProviderIssuer || undefined,
+        providerScopes,
         staticProviderClientId: draft.staticProviderClientId || undefined,
         staticProviderClientSecret: draft.staticProviderClientSecret || undefined,
         staticHeaders,
@@ -319,7 +331,11 @@ export function McpGatewaySetupContent({ organizationId }: McpGatewaySetupConten
                     onChange={event => {
                       discoveryMutation.reset();
                       setDiscoveryAttemptedUrl(null);
-                      updateDraft({ remoteUrl: event.target.value, providerIssuer: '' });
+                      updateDraft({
+                        remoteUrl: event.target.value,
+                        providerIssuer: '',
+                        providerScopes: '',
+                      });
                     }}
                     onBlur={() => {
                       if (currentRemoteUrl && discoveryAttemptedUrl !== currentRemoteUrl) {
@@ -408,6 +424,23 @@ export function McpGatewaySetupContent({ organizationId }: McpGatewaySetupConten
                     </Select>
                     <p className="text-muted-foreground text-xs">
                       {hostOf(currentRemoteUrl ?? '')} advertises more than one sign-in provider.
+                    </p>
+                  </div>
+                )}
+
+                {(selectedAuthMode === 'oauth_dynamic' || selectedAuthMode === 'oauth_static') && (
+                  <div className="space-y-2">
+                    <Label htmlFor="provider-scopes">Provider scopes</Label>
+                    <Input
+                      id="provider-scopes"
+                      className="h-11 sm:h-9"
+                      value={draft.providerScopes}
+                      onChange={event => updateDraft({ providerScopes: event.target.value })}
+                      placeholder="openid email"
+                    />
+                    <p className="text-muted-foreground text-xs">
+                      Optional upstream provider scopes. Leave blank when the server does not
+                      advertise a required scope set.
                     </p>
                   </div>
                 )}

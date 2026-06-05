@@ -345,7 +345,6 @@ export function createAuthorizationService(params: {
             authorizationRequest: request,
             resolved,
             instanceId: instance.instance_id,
-            scopes,
           });
           await createAuditService(params.repository).record({
             actorUserId: input.userId,

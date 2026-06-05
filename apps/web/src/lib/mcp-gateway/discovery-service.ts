@@ -134,11 +134,28 @@ async function fetchJson(url: URL, fetchImpl: typeof fetch): Promise<unknown> {
   return await readCappedJson(response);
 }
 
-function parseAuthorizationServers(header: string | null): string[] {
-  if (!header) return [];
-  const match = header.match(/authorization_uri="([^"]+)"|authorization_server="([^"]+)"/i);
-  const value = match?.[1] ?? match?.[2];
-  return value ? [value] : [];
+type ProviderChallenge = {
+  authorizationServers: string[];
+  providerScopes: string[] | null;
+  resourceMetadataUrl: string | null;
+};
+
+function parseProviderChallenge(header: string | null): ProviderChallenge {
+  if (!header) {
+    return { authorizationServers: [], providerScopes: null, resourceMetadataUrl: null };
+  }
+  const authorizationServers = Array.from(
+    header.matchAll(/(?:authorization_uri|authorization_server)="([^"]+)"/gi),
+    match => match[1]
+  );
+  const scopeMatch = header.match(/\bscope="([^"]*)"/i);
+  const providerScopes = scopeMatch?.[1] ? scopeMatch[1].split(/\s+/).filter(Boolean) : null;
+  const resourceMetadataMatch = header.match(/\bresource_metadata="([^"]+)"/i);
+  return {
+    authorizationServers,
+    providerScopes,
+    resourceMetadataUrl: resourceMetadataMatch?.[1] ?? null,
+  };
 }
 
 export function createDiscoveryService(params: { fetchImpl?: typeof fetch }) {
@@ -148,13 +165,24 @@ export function createDiscoveryService(params: { fetchImpl?: typeof fetch }) {
     const endpoint = await validatePublicHttpsDestination(remoteUrl);
     const metadataUrl = new URL('/.well-known/oauth-protected-resource', endpoint.origin);
     const metadataRaw = await fetchJson(metadataUrl, fetchImpl);
-    const metadata = metadataRaw ? RemoteProtectedResourceMetadataSchema.parse(metadataRaw) : null;
-    let authorizationServers = metadata?.authorization_servers ?? [];
-
-    if (authorizationServers.length === 0) {
-      const response = await fetchImpl(endpoint.toString(), { method: 'GET', redirect: 'manual' });
-      authorizationServers = parseAuthorizationServers(response.headers.get('www-authenticate'));
+    let metadata = metadataRaw ? RemoteProtectedResourceMetadataSchema.parse(metadataRaw) : null;
+    const endpointResponse = await fetchImpl(endpoint.toString(), {
+      method: 'GET',
+      redirect: 'manual',
+    });
+    const challenge = parseProviderChallenge(endpointResponse.headers.get('www-authenticate'));
+    if (!metadata && challenge.resourceMetadataUrl) {
+      const challengeMetadataUrl = await validatePublicHttpsDestination(
+        challenge.resourceMetadataUrl
+      );
+      const challengeMetadataRaw = await fetchJson(challengeMetadataUrl, fetchImpl);
+      metadata = challengeMetadataRaw
+        ? RemoteProtectedResourceMetadataSchema.parse(challengeMetadataRaw)
+        : null;
     }
+    const authorizationServers = metadata?.authorization_servers?.length
+      ? metadata.authorization_servers
+      : challenge.authorizationServers;
 
     const candidates = await Promise.all(
       authorizationServers.map(async issuer => {
@@ -178,6 +206,9 @@ export function createDiscoveryService(params: { fetchImpl?: typeof fetch }) {
     return {
       remoteUrl: endpoint.toString(),
       protectedResourceMetadata: metadata,
+      providerScopes: challenge.providerScopes,
+      providerScopeSource: challenge.providerScopes ? 'discovered' : 'none',
+      providerResource: metadata?.resource ?? null,
       providerCandidates: candidates.filter(candidate => candidate !== null),
     };
   }

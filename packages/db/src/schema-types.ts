@@ -1435,6 +1435,15 @@ export const MCPGatewaySharingMode = {
 export type MCPGatewaySharingMode =
   (typeof MCPGatewaySharingMode)[keyof typeof MCPGatewaySharingMode];
 
+export const MCPGatewayProviderScopeSource = {
+  None: 'none',
+  Discovered: 'discovered',
+  Override: 'override',
+} as const;
+
+export type MCPGatewayProviderScopeSource =
+  (typeof MCPGatewayProviderScopeSource)[keyof typeof MCPGatewayProviderScopeSource];
+
 export const MCPGatewayRouteStatus = {
   Active: 'active',
   Rotated: 'rotated',

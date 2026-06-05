@@ -81,6 +81,7 @@ export function McpGatewayDetailContent({
   const [staticHeaderValue, setStaticHeaderValue] = useState('');
   const [providerClientId, setProviderClientId] = useState('');
   const [providerClientSecret, setProviderClientSecret] = useState('');
+  const [providerScopes, setProviderScopes] = useState('');
   const [assignedUserId, setAssignedUserId] = useState('');
   const [rotateDialogOpen, setRotateDialogOpen] = useState(false);
   const [disableDialogOpen, setDisableDialogOpen] = useState(false);
@@ -181,6 +182,15 @@ export function McpGatewayDetailContent({
       onError: error => toast.error(error.message || 'Could not start provider sign-in'),
     })
   );
+  const providerScopesMutation = useMutation(
+    trpc.mcpGateway.updateProviderScopes.mutationOptions({
+      onSuccess: () => {
+        toast.success('Provider scopes saved');
+        refresh();
+      },
+      onError: error => toast.error(error.message || 'Could not save provider scopes'),
+    })
+  );
   const staticProviderMutation = useMutation(
     trpc.mcpGateway.upsertStaticProviderCredentials.mutationOptions({
       onSuccess: () => {
@@ -272,6 +282,19 @@ export function McpGatewayDetailContent({
               {organizationId ? 'Assigned organization members' : 'Personal owner'}
             </Field>
             <Field label="Provider sign-in">{authLabel(connection.authMode)}</Field>
+            {connection.providerScopes && (
+              <Field label="Provider scopes">
+                <span className="font-mono text-xs">{connection.providerScopes.join(' ')}</span>
+                <span className="text-muted-foreground ml-2 text-xs">
+                  {connection.providerScopeSource === 'override' ? 'Admin override' : 'Discovered'}
+                </span>
+              </Field>
+            )}
+            {connection.providerResource && (
+              <Field label="Provider resource">
+                <span className="font-mono text-xs break-all">{connection.providerResource}</span>
+              </Field>
+            )}
             <Field label="Descendant paths">
               {connection.pathPassthrough ? 'Allowed' : 'Exact endpoint only'}
             </Field>
@@ -421,6 +444,32 @@ export function McpGatewayDetailContent({
                     : 'Start provider sign-in'}
               </Button>
             )}
+            <div className="max-w-lg space-y-2 border-t pt-4">
+              <Label htmlFor="provider-scopes">Provider scopes</Label>
+              <Input
+                id="provider-scopes"
+                value={providerScopes}
+                onChange={event => setProviderScopes(event.target.value)}
+                placeholder={connection.providerScopes?.join(' ') || 'No provider scopes'}
+              />
+              <p className="text-muted-foreground text-xs">
+                Optional upstream provider scopes. Leave blank and save to clear an override.
+              </p>
+              <Button
+                variant="outline"
+                onClick={() =>
+                  providerScopesMutation.mutate({
+                    ...managedConfigInput,
+                    providerScopes: providerScopes.trim()
+                      ? providerScopes.trim().split(/\s+/)
+                      : null,
+                  })
+                }
+                disabled={providerScopesMutation.isPending}
+              >
+                {providerScopesMutation.isPending ? 'Saving...' : 'Save provider scopes'}
+              </Button>
+            </div>
           </CardContent>
         </Card>
       )}

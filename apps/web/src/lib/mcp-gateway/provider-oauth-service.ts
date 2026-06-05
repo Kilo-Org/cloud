@@ -27,6 +27,7 @@ import type { GatewayAppConfig } from './config';
 import type { GatewayRepository, ResolvedGatewayRoute } from './repository';
 import type { GatewayRouteService } from './route-service';
 import type { GatewayGrantService } from './grant-service';
+import type { GatewayDiscoveryService } from './discovery-service';
 import { configSecretAad, expiresAtIso, hashToken, pkceChallenge, randomToken } from './crypto';
 import { validatePublicHttpsDestination } from './discovery-service';
 import { createAuditService } from './audit-service';
@@ -51,7 +52,9 @@ const PendingProviderStateSchema = z.object({
   clientSecret: z.string().min(1).optional(),
   tokenEndpoint: z.string().url(),
   redirectUri: z.string().url(),
-  scopes: z.array(z.string()),
+  providerScopes: z.array(z.string()).nullable().optional(),
+  providerResource: z.string().url().optional(),
+  scopes: z.array(z.string()).optional(),
 });
 
 const maxProviderResponseBytes = 128 * 1024;
@@ -60,6 +63,16 @@ type ProviderCredentials = {
   metadata: z.infer<typeof ProviderAuthorizationServerMetadataSchema>;
   clientId: string;
   clientSecret?: string;
+};
+
+type ResolvedProviderOAuthConfig = {
+  authorizationEndpoint: URL;
+  tokenEndpoint: URL;
+  providerResource: URL | null;
+  clientId: string;
+  clientSecret?: string;
+  redirectUri: string;
+  providerScopes: string[] | null;
 };
 
 type ProviderCallbackResult = {
@@ -119,6 +132,7 @@ export function createProviderOAuthService(params: {
   repository: GatewayRepository;
   routeService: GatewayRouteService;
   grantService: GatewayGrantService;
+  discoveryService: GatewayDiscoveryService;
   config: GatewayAppConfig;
   fetchImpl?: typeof fetch;
 }) {
@@ -249,13 +263,10 @@ export function createProviderOAuthService(params: {
     return { metadata: metadata.data, ...bundle.data.value } satisfies ProviderCredentials;
   }
 
-  async function initiateProviderAuthorization(paramsInput: {
-    authorizationRequest: typeof mcp_gateway_authorization_requests.$inferSelect;
-    resolved: NonNullable<Awaited<ReturnType<GatewayRepository['findActiveRouteByRoute']>>>;
-    instanceId: string;
-    scopes: string[];
-  }) {
-    const credentials = await getProviderCredentials(paramsInput.resolved);
+  async function resolveProviderOAuthConfig(
+    resolved: NonNullable<Awaited<ReturnType<GatewayRepository['findActiveRouteByRoute']>>>
+  ): Promise<ResolvedProviderOAuthConfig> {
+    const credentials = await getProviderCredentials(resolved);
     if (!credentials) {
       throw createGatewayError(
         GatewayErrorCode.InvalidRequest,
@@ -267,20 +278,54 @@ export function createProviderOAuthService(params: {
       credentials.metadata.authorization_endpoint
     );
     const tokenEndpoint = await validatePublicHttpsDestination(credentials.metadata.token_endpoint);
+    let providerScopes = resolved.config.provider_scopes;
+    let providerResource = resolved.config.provider_resource
+      ? await validatePublicHttpsDestination(resolved.config.provider_resource)
+      : null;
+    if (providerScopes === null || providerResource === null) {
+      const discovery = await params.discoveryService.discoverRemoteProvider(
+        resolved.config.remote_url
+      );
+      if (providerScopes === null) {
+        providerScopes = discovery.providerScopes;
+      }
+      if (providerResource === null && discovery.providerResource) {
+        providerResource = await validatePublicHttpsDestination(discovery.providerResource);
+      }
+    }
+    return {
+      authorizationEndpoint,
+      tokenEndpoint,
+      providerResource,
+      clientId: credentials.clientId,
+      clientSecret: credentials.clientSecret,
+      redirectUri: new URL(
+        '/api/mcp-gateway/oauth/mcp/callback',
+        params.config.appBaseUrl
+      ).toString(),
+      providerScopes,
+    };
+  }
+
+  async function createProviderAuthorizationAttempt(paramsInput: {
+    authorizationRequest: typeof mcp_gateway_authorization_requests.$inferSelect | null;
+    resolved: NonNullable<Awaited<ReturnType<GatewayRepository['findActiveRouteByRoute']>>>;
+    instanceId: string;
+    userId: string;
+    executionContext: GatewayExecutionContext;
+    oauthConfig: ResolvedProviderOAuthConfig;
+  }) {
     const codeVerifier = randomToken(48);
     const state = randomToken(32);
-    const redirectUri = new URL(
-      '/api/mcp-gateway/oauth/mcp/callback',
-      params.config.appBaseUrl
-    ).toString();
     const encryptedState = encryptKeyedEnvelope(
       JSON.stringify({
         codeVerifier,
-        clientId: credentials.clientId,
-        clientSecret: credentials.clientSecret,
-        tokenEndpoint: tokenEndpoint.toString(),
-        redirectUri,
-        scopes: paramsInput.scopes,
+        clientId: paramsInput.oauthConfig.clientId,
+        clientSecret: paramsInput.oauthConfig.clientSecret,
+        tokenEndpoint: paramsInput.oauthConfig.tokenEndpoint.toString(),
+        redirectUri: paramsInput.oauthConfig.redirectUri,
+        providerScopes: paramsInput.oauthConfig.providerScopes,
+        providerResource: paramsInput.oauthConfig.providerResource?.toString(),
       }),
       pendingStateScheme,
       params.config.credentialKeyset.active,
@@ -290,38 +335,58 @@ export function createProviderOAuthService(params: {
       .insert(mcp_gateway_pending_provider_authorizations)
       .values({
         state_hash: hashToken(state),
-        authorization_request_id: paramsInput.authorizationRequest.authorization_request_id,
+        authorization_request_id:
+          paramsInput.authorizationRequest?.authorization_request_id ?? null,
         config_id: paramsInput.resolved.config.config_id,
         instance_id: paramsInput.instanceId,
         owner_scope: paramsInput.resolved.config.owner_scope,
         owner_id: paramsInput.resolved.config.owner_id,
-        kilo_user_id: paramsInput.authorizationRequest.kilo_user_id,
+        kilo_user_id: paramsInput.userId,
         route_key: paramsInput.resolved.route.route_key,
         canonical_resource_url: paramsInput.resolved.route.canonical_url,
         remote_url: paramsInput.resolved.config.remote_url,
         auth_mode: paramsInput.resolved.config.auth_mode,
-        provider_authorization_endpoint: authorizationEndpoint.toString(),
-        provider_token_endpoint: tokenEndpoint.toString(),
+        provider_authorization_endpoint: paramsInput.oauthConfig.authorizationEndpoint.toString(),
+        provider_token_endpoint: paramsInput.oauthConfig.tokenEndpoint.toString(),
         encrypted_state: encryptedState,
-        execution_context: paramsInput.authorizationRequest.execution_context,
+        execution_context: paramsInput.executionContext,
         config_version: paramsInput.resolved.config.config_version,
         pending_status: GatewayPendingProviderAuthorizationStatus.Pending,
         expires_at: expiresAtIso(30 * 60),
       })
       .returning();
-
-    const url = new URL(authorizationEndpoint.toString());
+    const url = new URL(paramsInput.oauthConfig.authorizationEndpoint.toString());
     url.searchParams.set('response_type', 'code');
-    url.searchParams.set('client_id', credentials.clientId);
-    url.searchParams.set('redirect_uri', redirectUri);
+    url.searchParams.set('client_id', paramsInput.oauthConfig.clientId);
+    url.searchParams.set('redirect_uri', paramsInput.oauthConfig.redirectUri);
     url.searchParams.set('state', state);
     url.searchParams.set('code_challenge', pkceChallenge(codeVerifier));
     url.searchParams.set('code_challenge_method', 'S256');
-    if (paramsInput.scopes.length > 0) {
-      url.searchParams.set('scope', paramsInput.scopes.join(' '));
+    if (paramsInput.oauthConfig.providerScopes?.length) {
+      url.searchParams.set('scope', paramsInput.oauthConfig.providerScopes.join(' '));
     }
-
+    if (paramsInput.oauthConfig.providerResource) {
+      url.searchParams.set('resource', paramsInput.oauthConfig.providerResource.toString());
+    }
     return { pending, authorizationUrl: url.toString() };
+  }
+
+  async function initiateProviderAuthorization(paramsInput: {
+    authorizationRequest: typeof mcp_gateway_authorization_requests.$inferSelect;
+    resolved: NonNullable<Awaited<ReturnType<GatewayRepository['findActiveRouteByRoute']>>>;
+    instanceId: string;
+  }) {
+    const oauthConfig = await resolveProviderOAuthConfig(paramsInput.resolved);
+    return await createProviderAuthorizationAttempt({
+      authorizationRequest: paramsInput.authorizationRequest,
+      resolved: paramsInput.resolved,
+      instanceId: paramsInput.instanceId,
+      userId: paramsInput.authorizationRequest.kilo_user_id,
+      executionContext: GatewayExecutionContextSchema.parse(
+        paramsInput.authorizationRequest.execution_context
+      ),
+      oauthConfig,
+    });
   }
 
   async function startDashboardProviderSignIn(paramsInput: {
@@ -342,67 +407,16 @@ export function createProviderOAuthService(params: {
       configId: paramsInput.resolved.config.config_id,
       userId: paramsInput.userId,
     });
-    const credentials = await getProviderCredentials(paramsInput.resolved);
-    if (!credentials) {
-      throw createGatewayError(
-        GatewayErrorCode.InvalidRequest,
-        'Config does not require provider OAuth',
-        400
-      );
-    }
-    const authorizationEndpoint = await validatePublicHttpsDestination(
-      credentials.metadata.authorization_endpoint
-    );
-    const tokenEndpoint = await validatePublicHttpsDestination(credentials.metadata.token_endpoint);
-    const codeVerifier = randomToken(48);
-    const state = randomToken(32);
-    const redirectUri = new URL(
-      '/api/mcp-gateway/oauth/mcp/callback',
-      params.config.appBaseUrl
-    ).toString();
-    const scopes = ['profile'];
-    const encryptedState = encryptKeyedEnvelope(
-      JSON.stringify({
-        codeVerifier,
-        clientId: credentials.clientId,
-        clientSecret: credentials.clientSecret,
-        tokenEndpoint: tokenEndpoint.toString(),
-        redirectUri,
-        scopes,
-      }),
-      pendingStateScheme,
-      params.config.credentialKeyset.active,
-      pendingStateAad(state)
-    );
-    await params.repository.database.insert(mcp_gateway_pending_provider_authorizations).values({
-      state_hash: hashToken(state),
-      authorization_request_id: null,
-      config_id: paramsInput.resolved.config.config_id,
-      instance_id: instance.instance_id,
-      owner_scope: paramsInput.resolved.config.owner_scope,
-      owner_id: paramsInput.resolved.config.owner_id,
-      kilo_user_id: paramsInput.userId,
-      route_key: paramsInput.resolved.route.route_key,
-      canonical_resource_url: paramsInput.resolved.route.canonical_url,
-      remote_url: paramsInput.resolved.config.remote_url,
-      auth_mode: paramsInput.resolved.config.auth_mode,
-      provider_authorization_endpoint: authorizationEndpoint.toString(),
-      provider_token_endpoint: tokenEndpoint.toString(),
-      encrypted_state: encryptedState,
-      execution_context: paramsInput.executionContext,
-      config_version: paramsInput.resolved.config.config_version,
-      pending_status: GatewayPendingProviderAuthorizationStatus.Pending,
-      expires_at: expiresAtIso(30 * 60),
+    const oauthConfig = await resolveProviderOAuthConfig(paramsInput.resolved);
+    const attempt = await createProviderAuthorizationAttempt({
+      authorizationRequest: null,
+      resolved: paramsInput.resolved,
+      instanceId: instance.instance_id,
+      userId: paramsInput.userId,
+      executionContext: paramsInput.executionContext,
+      oauthConfig,
     });
-    const url = new URL(authorizationEndpoint.toString());
-    url.searchParams.set('response_type', 'code');
-    url.searchParams.set('client_id', credentials.clientId);
-    url.searchParams.set('redirect_uri', redirectUri);
-    url.searchParams.set('state', state);
-    url.searchParams.set('code_challenge', pkceChallenge(codeVerifier));
-    url.searchParams.set('code_challenge_method', 'S256');
-    url.searchParams.set('scope', scopes.join(' '));
-    return { authorizationUrl: url.toString() };
+    return { authorizationUrl: attempt.authorizationUrl };
   }
 
   async function consumeProviderError(paramsInput: { state: string; userId: string }) {
@@ -528,6 +542,7 @@ export function createProviderOAuthService(params: {
       );
     }
     const state = PendingProviderStateSchema.parse(rawState);
+    const providerScopes = state.providerScopes ?? state.scopes ?? null;
     const authorizationRequest = pending.authorization_request_id
       ? await params.repository.database
           .select()
@@ -548,16 +563,6 @@ export function createProviderOAuthService(params: {
         400
       );
     }
-    if (
-      authorizationRequest &&
-      authorizationRequest.granted_scopes.join(' ') !== state.scopes.join(' ')
-    ) {
-      throw createGatewayError(
-        GatewayErrorCode.AccessDenied,
-        'Provider authorization scope mismatch',
-        403
-      );
-    }
     await validatePublicHttpsDestination(state.tokenEndpoint);
     const body = new URLSearchParams({
       grant_type: 'authorization_code',
@@ -568,6 +573,9 @@ export function createProviderOAuthService(params: {
     });
     if (state.clientSecret) {
       body.set('client_secret', state.clientSecret);
+    }
+    if (state.providerResource) {
+      body.set('resource', state.providerResource);
     }
     const response = await fetchImpl(state.tokenEndpoint, {
       method: 'POST',
@@ -601,7 +609,7 @@ export function createProviderOAuthService(params: {
         accessToken: tokenResponse.access_token,
         refreshToken: tokenResponse.refresh_token,
         expiresAt,
-        scope: tokenResponse.scope,
+        scope: tokenResponse.scope ?? providerScopes?.join(' '),
         tokenType,
       },
       providerSubject: null,

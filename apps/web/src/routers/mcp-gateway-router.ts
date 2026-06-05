@@ -33,6 +33,8 @@ const AuthModeSchema = z.enum([
   GatewayAuthMode.OAuthStatic,
 ]);
 const SharingModeSchema = z.enum([GatewaySharingMode.SingleUser, GatewaySharingMode.MultiUser]);
+const ProviderScopesSchema = z.array(z.string().min(1)).optional();
+const ProviderScopeUpdateSchema = z.array(z.string().min(1)).nullable();
 const StaticHeadersSchema = z.record(z.string(), z.string().min(1)).superRefine((headers, ctx) => {
   try {
     parseStaticHeaders(headers);
@@ -164,6 +166,9 @@ function configProjection(params: {
     routeStatus: params.route.route_status,
     registryMetadata: params.config.registry_metadata,
     auxiliaryHeaders: params.config.auxiliary_headers,
+    providerScopes: params.config.provider_scopes,
+    providerScopeSource: params.config.provider_scope_source,
+    providerResource: params.config.provider_resource,
     createdAt: serializeTimestamp(params.config.created_at),
     updatedAt: serializeTimestamp(params.config.updated_at),
     assignmentCount: params.assignments.length,
@@ -366,6 +371,8 @@ export const mcpGatewayRouter = createTRPCRouter({
         const discovery = await services.discoveryService.discoverRemoteProvider(input.remoteUrl);
         return {
           remoteUrl: discovery.remoteUrl,
+          providerScopes: discovery.providerScopes,
+          providerResource: discovery.providerResource,
           providerCandidates: discovery.providerCandidates.map(candidate => ({
             issuer: candidate.issuer,
             authorizationEndpoint: candidate.authorization_endpoint,
@@ -421,6 +428,7 @@ export const mcpGatewayRouter = createTRPCRouter({
         remoteUrl: RemoteUrlSchema,
         authMode: AuthModeSchema,
         providerIssuer: z.string().url().optional(),
+        providerScopes: ProviderScopesSchema,
         staticProviderClientId: z.string().min(1).optional(),
         staticProviderClientSecret: z.string().min(1).optional(),
         staticHeaders: StaticHeadersSchema.optional(),
@@ -436,6 +444,7 @@ export const mcpGatewayRouter = createTRPCRouter({
           remoteUrl: input.remoteUrl,
           authMode: input.authMode,
           providerIssuer: input.providerIssuer,
+          providerScopes: input.providerScopes,
           staticProviderClientId: input.staticProviderClientId,
           staticProviderClientSecret: input.staticProviderClientSecret,
           staticHeaders: input.staticHeaders,
@@ -452,6 +461,7 @@ export const mcpGatewayRouter = createTRPCRouter({
         remoteUrl: RemoteUrlSchema,
         authMode: AuthModeSchema,
         providerIssuer: z.string().url().optional(),
+        providerScopes: ProviderScopesSchema,
         staticProviderClientId: z.string().min(1).optional(),
         staticProviderClientSecret: z.string().min(1).optional(),
         staticHeaders: StaticHeadersSchema.optional(),
@@ -475,6 +485,7 @@ export const mcpGatewayRouter = createTRPCRouter({
           remoteUrl: input.remoteUrl,
           authMode: input.authMode,
           providerIssuer: input.providerIssuer,
+          providerScopes: input.providerScopes,
           staticProviderClientId: input.staticProviderClientId,
           staticProviderClientSecret: input.staticProviderClientSecret,
           staticHeaders: input.staticHeaders,
@@ -575,6 +586,28 @@ export const mcpGatewayRouter = createTRPCRouter({
           value: { headers: input.headers },
         });
         return { secretId: secret.config_secret_id };
+      })
+    ),
+  updateProviderScopes: mcpGatewayProcedure
+    .input(ManagedConfigInputSchema.extend({ providerScopes: ProviderScopeUpdateSchema }))
+    .mutation(async ({ input, ctx }) =>
+      withGatewayErrorMapping(async () => {
+        await requireManagedConfig({
+          configId: input.configId,
+          organizationId: input.organizationId,
+          userId: ctx.user.id,
+          isGlobalAdmin: ctx.user.is_admin,
+        });
+        const services = createGatewayServices();
+        const config = await services.configService.updateProviderScopes({
+          configId: input.configId,
+          providerScopes: input.providerScopes,
+        });
+        return {
+          configId: config.config_id,
+          providerScopes: config.provider_scopes,
+          providerScopeSource: config.provider_scope_source,
+        };
       })
     ),
   upsertStaticProviderCredentials: mcpGatewayProcedure

@@ -74,10 +74,14 @@ import {
   kilocode_users,
   auto_top_up_configs,
   pending_impact_sale_reversals,
+  stripe_dispute_cases,
   stripe_early_fraud_warning_actions,
   stripe_early_fraud_warning_cases,
   user_affiliate_attributions,
   user_affiliate_events,
+  impact_referral_conversions,
+  impact_referral_reward_decisions,
+  impact_referral_rewards,
 } from '@kilocode/db/schema';
 import { db, auto_deleted_at } from '@/lib/drizzle';
 import { insertTestUser } from '@/tests/helpers/user.helper';
@@ -92,6 +96,17 @@ import {
   KiloPassScheduledChangeStatus,
   KiloPassTier,
 } from '@/lib/kilo-pass/enums';
+import {
+  ImpactReferralBeneficiaryRole,
+  ImpactReferralDecisionOutcome,
+  ImpactReferralPaymentProvider,
+  ImpactReferralProduct,
+  ImpactReferralRewardKind,
+  ImpactReferralRewardStatus,
+  ImpactReferralWinningTouchType,
+  StripeDisputeCaseStatus,
+  StripeDisputeOwnerClassification,
+} from '@kilocode/db/schema-types';
 import type * as kiloclawStripeHandlersModule from '@/lib/kiloclaw/stripe-handlers';
 import type * as kiloPassStripeHandlersModule from '@/lib/kilo-pass/stripe-handlers';
 import { cleanupDbForTest } from '@/lib/drizzle';
@@ -210,6 +225,90 @@ async function mockChargeRetrieveForKiloClaw(priceId: string) {
     invoice,
     lastResponse: { headers: {}, requestId: 'req_test', statusCode: 200 },
   } as unknown as Stripe.Response<Stripe.Charge>);
+}
+
+async function mockChargeRetrieveForKiloPass(invoiceId: string, userId: string) {
+  const { client } = await import('@/lib/stripe-client');
+  const invoice = {
+    id: invoiceId,
+    object: 'invoice',
+    parent: {
+      subscription_details: {
+        metadata: {
+          type: 'kilo-pass',
+          kiloUserId: userId,
+          tier: KiloPassTier.Tier19,
+          cadence: KiloPassCadence.Monthly,
+        },
+      },
+    },
+    lines: { data: [] },
+  } as unknown as Stripe.Invoice;
+  return jest.spyOn(client.charges, 'retrieve').mockResolvedValue({
+    invoice,
+    lastResponse: { headers: {}, requestId: 'req_test', statusCode: 200 },
+  } as unknown as Stripe.Response<Stripe.Charge>);
+}
+
+async function seedKiloPassReferralReward(params: {
+  userId: string;
+  invoiceId: string;
+  status: ImpactReferralRewardStatus;
+}) {
+  const [conversion] = await db
+    .insert(impact_referral_conversions)
+    .values({
+      product: ImpactReferralProduct.KiloPass,
+      referee_user_id: params.userId,
+      winning_touch_type: ImpactReferralWinningTouchType.Referral,
+      payment_provider: ImpactReferralPaymentProvider.Stripe,
+      source_payment_id: params.invoiceId,
+      qualified: true,
+      converted_at: '2026-01-03T00:00:00.000Z',
+    })
+    .returning({ id: impact_referral_conversions.id });
+  if (!conversion) throw new Error('Failed to insert Kilo Pass referral conversion');
+
+  const [decision] = await db
+    .insert(impact_referral_reward_decisions)
+    .values({
+      product: ImpactReferralProduct.KiloPass,
+      conversion_id: conversion.id,
+      beneficiary_user_id: params.userId,
+      beneficiary_role: ImpactReferralBeneficiaryRole.Referee,
+      outcome: ImpactReferralDecisionOutcome.Granted,
+      reward_kind: ImpactReferralRewardKind.KiloPassBonus,
+      months_granted: 0,
+      reward_percent: 0.5,
+      source_tier: KiloPassTier.Tier19,
+      reward_amount_usd: 9.5,
+    })
+    .returning({ id: impact_referral_reward_decisions.id });
+  if (!decision) throw new Error('Failed to insert Kilo Pass referral decision');
+
+  const [reward] = await db
+    .insert(impact_referral_rewards)
+    .values({
+      product: ImpactReferralProduct.KiloPass,
+      conversion_id: conversion.id,
+      decision_id: decision.id,
+      beneficiary_user_id: params.userId,
+      beneficiary_role: ImpactReferralBeneficiaryRole.Referee,
+      reward_kind: ImpactReferralRewardKind.KiloPassBonus,
+      months_granted: 0,
+      reward_percent: 0.5,
+      source_tier: KiloPassTier.Tier19,
+      reward_amount_usd: 9.5,
+      status: params.status,
+      earned_at: '2026-01-03T00:00:00.000Z',
+      applied_at:
+        params.status === ImpactReferralRewardStatus.Applied ? '2026-02-01T00:00:00.000Z' : null,
+      expires_at: '2027-01-03T00:00:00.000Z',
+    })
+    .returning({ id: impact_referral_rewards.id });
+  if (!reward) throw new Error('Failed to insert Kilo Pass referral reward');
+
+  return reward.id;
 }
 
 const sampleStripeDispute = (
@@ -1312,6 +1411,24 @@ describe('processStripePaymentEventHook', () => {
     await processStripePaymentEventHook(event);
     await waitForReportEventsCall();
 
+    const [disputeCase] = await db.select().from(stripe_dispute_cases);
+    expect(disputeCase).toEqual(
+      expect.objectContaining({
+        stripe_dispute_id: 'dp_created_123',
+        stripe_event_id: 'evt_dispute_created_abuse',
+        stripe_charge_id: 'ch_dispute_created_123',
+        stripe_payment_intent_id: 'pi_dispute_created_123',
+        stripe_customer_id: testUser.stripe_customer_id,
+        amount_minor_units: 2900,
+        currency: 'usd',
+        dispute_reason: 'fraudulent',
+        stripe_status: 'warning_needs_response',
+        owner_classification: StripeDisputeOwnerClassification.Personal,
+        kilo_user_id: testUser.id,
+        status: StripeDisputeCaseStatus.NeedsAction,
+      })
+    );
+
     expect(reportEventsMock).toHaveBeenCalledWith({
       events: [
         {
@@ -1328,6 +1445,108 @@ describe('processStripePaymentEventHook', () => {
         },
       ],
     });
+
+    retrieveSpy.mockRestore();
+  });
+
+  test('charge.dispute.created persists dispute case when charge enrichment fails', async () => {
+    await cleanupDbForTest();
+
+    const { client } = await import('@/lib/stripe-client');
+    const retrieveSpy = jest
+      .spyOn(client.charges, 'retrieve')
+      .mockRejectedValue(new Error('charge retrieve failed'));
+    const event: Stripe.Event = {
+      ...baseStripeEvent(),
+      id: 'evt_dispute_created_enrichment_failed',
+      data: {
+        object: sampleStripeDispute({
+          id: 'dp_created_enrichment_failed',
+          charge: 'ch_dispute_enrichment_failed',
+          payment_intent: 'pi_dispute_enrichment_failed',
+          status: 'needs_response',
+        }),
+        previous_attributes: {},
+      },
+      type: 'charge.dispute.created',
+    };
+
+    await expect(processStripePaymentEventHook(event)).rejects.toThrow('charge retrieve failed');
+
+    const [disputeCase] = await db.select().from(stripe_dispute_cases);
+    expect(disputeCase).toEqual(
+      expect.objectContaining({
+        stripe_dispute_id: 'dp_created_enrichment_failed',
+        stripe_event_id: 'evt_dispute_created_enrichment_failed',
+        stripe_charge_id: 'ch_dispute_enrichment_failed',
+        stripe_payment_intent_id: 'pi_dispute_enrichment_failed',
+        stripe_customer_id: null,
+        stripe_status: 'needs_response',
+        owner_classification: StripeDisputeOwnerClassification.Unmatched,
+        kilo_user_id: null,
+        organization_id: null,
+        status: StripeDisputeCaseStatus.ReviewRequired,
+      })
+    );
+
+    retrieveSpy.mockRestore();
+  });
+
+  test('charge.dispute.closed updates an existing dispute case', async () => {
+    await cleanupDbForTest();
+    testUser = await insertTestUser();
+
+    await db.insert(stripe_dispute_cases).values({
+      stripe_dispute_id: 'dp_closed_123',
+      stripe_event_id: 'evt_dispute_created_original',
+      stripe_charge_id: 'ch_dispute_closed_123',
+      stripe_customer_id: testUser.stripe_customer_id,
+      owner_classification: StripeDisputeOwnerClassification.Personal,
+      kilo_user_id: testUser.id,
+      status: StripeDisputeCaseStatus.NeedsAction,
+      status_reason: 'Canonical personal owner matched; admin action required',
+      stripe_status: 'needs_response',
+    });
+
+    const { client } = await import('@/lib/stripe-client');
+    const retrieveSpy = jest.spyOn(client.charges, 'retrieve').mockResolvedValue(
+      sampleStripeChargeResponse(
+        sampleStripeCharge({
+          id: 'ch_dispute_closed_123',
+          customer: testUser.stripe_customer_id,
+          payment_intent: 'pi_dispute_closed_123',
+        })
+      )
+    );
+    const event: Stripe.Event = {
+      ...baseStripeEvent(),
+      id: 'evt_dispute_closed',
+      data: {
+        object: sampleStripeDispute({
+          id: 'dp_closed_123',
+          charge: 'ch_dispute_closed_123',
+          payment_intent: 'pi_dispute_closed_123',
+          status: 'lost',
+        }),
+        previous_attributes: {},
+      },
+      type: 'charge.dispute.closed',
+    };
+
+    await processStripePaymentEventHook(event);
+
+    const [disputeCase] = await db
+      .select()
+      .from(stripe_dispute_cases)
+      .where(eq(stripe_dispute_cases.stripe_dispute_id, 'dp_closed_123'));
+    expect(disputeCase).toEqual(
+      expect.objectContaining({
+        stripe_event_id: 'evt_dispute_closed',
+        stripe_payment_intent_id: 'pi_dispute_closed_123',
+        stripe_status: 'lost',
+        status: StripeDisputeCaseStatus.Closed,
+      })
+    );
 
     retrieveSpy.mockRestore();
   });
@@ -1521,6 +1740,124 @@ describe('processStripePaymentEventHook', () => {
       dedupe_key: 'affiliate:impact:sale_reversal:ch_kilo_pass_metadata_dispute',
     });
     expect(reversalEvents[0]?.payload_json.disputeId).toBe('dp_kilo_pass_metadata_partial');
+  });
+
+  test('charge.dispute.created marks applied Kilo Pass referral rewards for support review', async () => {
+    await cleanupDbForTest();
+    testUser = await insertTestUser();
+    const invoiceId = 'in_kilo_pass_referral_dispute';
+    const rewardId = await seedKiloPassReferralReward({
+      userId: testUser.id,
+      invoiceId,
+      status: ImpactReferralRewardStatus.Applied,
+    });
+    const retrieveSpy = await mockChargeRetrieveForKiloPass(invoiceId, testUser.id);
+
+    const event: Stripe.Event = {
+      ...baseStripeEvent(),
+      id: 'evt_dispute_kilo_pass_referral_reward',
+      type: 'charge.dispute.created',
+      data: {
+        object: sampleStripeDispute({
+          id: 'dp_kilo_pass_referral_reward',
+          charge: 'ch_kilo_pass_referral_dispute',
+        }),
+        previous_attributes: {},
+      },
+    };
+
+    await processStripePaymentEventHook(event);
+    retrieveSpy.mockRestore();
+
+    const reward = await db.query.impact_referral_rewards.findFirst({
+      where: eq(impact_referral_rewards.id, rewardId),
+    });
+    expect(reward).toEqual(
+      expect.objectContaining({
+        status: ImpactReferralRewardStatus.ReviewRequired,
+        review_reason: 'referral_payment_chargeback',
+      })
+    );
+  });
+
+  test('charge.refunded cancels pending Kilo Pass referral rewards by Stripe invoice identity', async () => {
+    await cleanupDbForTest();
+    testUser = await insertTestUser();
+    const invoiceId = 'in_kilo_pass_referral_refund';
+    const rewardId = await seedKiloPassReferralReward({
+      userId: testUser.id,
+      invoiceId,
+      status: ImpactReferralRewardStatus.Pending,
+    });
+    const retrieveSpy = await mockChargeRetrieveForKiloPass(invoiceId, testUser.id);
+
+    const event: Stripe.Event = {
+      ...baseStripeEvent(),
+      id: 'evt_refund_kilo_pass_referral_reward',
+      type: 'charge.refunded',
+      data: {
+        object: {
+          id: 'ch_kilo_pass_referral_refund',
+          object: 'charge',
+          amount_refunded: 1900,
+          created: 1712743200,
+        } as unknown as Stripe.Charge,
+        previous_attributes: {},
+      },
+    };
+
+    await processStripePaymentEventHook(event);
+    retrieveSpy.mockRestore();
+
+    const reward = await db.query.impact_referral_rewards.findFirst({
+      where: eq(impact_referral_rewards.id, rewardId),
+    });
+    expect(reward).toEqual(
+      expect.objectContaining({
+        status: ImpactReferralRewardStatus.Canceled,
+        review_reason: 'referral_payment_refund',
+      })
+    );
+  });
+
+  test('charge.updated fraud marking cancels earned Kilo Pass referral rewards by Stripe invoice identity', async () => {
+    await cleanupDbForTest();
+    testUser = await insertTestUser();
+    const invoiceId = 'in_kilo_pass_referral_fraud';
+    const rewardId = await seedKiloPassReferralReward({
+      userId: testUser.id,
+      invoiceId,
+      status: ImpactReferralRewardStatus.Earned,
+    });
+    const retrieveSpy = await mockChargeRetrieveForKiloPass(invoiceId, testUser.id);
+
+    const event: Stripe.Event = {
+      ...baseStripeEvent(),
+      id: 'evt_fraud_kilo_pass_referral_reward',
+      type: 'charge.updated',
+      data: {
+        object: {
+          id: 'ch_kilo_pass_referral_fraud',
+          object: 'charge',
+          created: 1712743200,
+          fraud_details: { stripe_report: 'fraudulent' },
+        } as unknown as Stripe.Charge,
+        previous_attributes: {},
+      },
+    };
+
+    await processStripePaymentEventHook(event);
+    retrieveSpy.mockRestore();
+
+    const reward = await db.query.impact_referral_rewards.findFirst({
+      where: eq(impact_referral_rewards.id, rewardId),
+    });
+    expect(reward).toEqual(
+      expect.objectContaining({
+        status: ImpactReferralRewardStatus.Canceled,
+        review_reason: 'referral_payment_fraud',
+      })
+    );
   });
 
   test('charge.dispute.created persists pending row for unmatched KiloClaw charge', async () => {
@@ -1874,6 +2211,16 @@ describe('processStripePaymentEventHook', () => {
       impact_action_id: '1000.2000.3000',
     });
 
+    const { client } = await import('@/lib/stripe-client');
+    const retrieveSpy = jest.spyOn(client.charges, 'retrieve').mockResolvedValue(
+      sampleStripeChargeResponse(
+        sampleStripeCharge({
+          id: 'ch_kilo_pass_won_dispute',
+          customer: testUser.stripe_customer_id,
+        })
+      )
+    );
+
     const event: Stripe.Event = {
       ...baseStripeEvent(),
       id: 'evt_dispute_kilo_pass_won_resolution',
@@ -1900,6 +2247,8 @@ describe('processStripePaymentEventHook', () => {
       dedupe_key: 'affiliate:impact:sale_reversal:ch_kilo_pass_won_dispute',
     });
     expect(pendingRows).toHaveLength(0);
+
+    retrieveSpy.mockRestore();
   });
 
   test('charge.dispute.created skips unrelated invoice charge disputes', async () => {

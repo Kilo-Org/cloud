@@ -4,14 +4,16 @@ import type {
   Usage,
 } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 
-const KILO_DISCOUNT_FACTOR = 0.65;
+const DEFAULT_QWEN_DISCOUNT_FACTOR = 1;
+const QWEN37_PLUS_DISCOUNT_FACTOR = 0.8;
+const QWEN37_MAX_DISCOUNT_FACTOR = 0.5;
 const KILO_STEALTH_DISCOUNT_FACTOR = 0.5;
 
 type PricePerMillion = Omit<Pricing, 'calculate_mUsd'>;
 
 function applyKiloDiscount(
   price: PricePerMillion,
-  discountFactor: number = KILO_DISCOUNT_FACTOR
+  discountFactor: number = DEFAULT_QWEN_DISCOUNT_FACTOR
 ): PricePerMillion {
   return {
     prompt_per_million: price.prompt_per_million * discountFactor,
@@ -45,7 +47,7 @@ function costForTier(usage: Usage, tier: PricePerMillion): number {
  */
 function makeTieredPricing(
   tiers: ReadonlyArray<{ maxInputTokens: number; undiscounted: PricePerMillion }>,
-  discountFactor: number = KILO_DISCOUNT_FACTOR
+  discountFactor: number = DEFAULT_QWEN_DISCOUNT_FACTOR
 ): Pricing {
   const discounted = tiers.map(t => ({
     maxInputTokens: t.maxInputTokens,
@@ -63,8 +65,11 @@ function makeTieredPricing(
   };
 }
 
-function makeFlatPricing(undiscounted: PricePerMillion): Pricing {
-  const price = applyKiloDiscount(undiscounted);
+function makeFlatPricing(
+  undiscounted: PricePerMillion,
+  discountFactor: number = DEFAULT_QWEN_DISCOUNT_FACTOR
+): Pricing {
+  const price = applyKiloDiscount(undiscounted, discountFactor);
   return {
     ...price,
     calculate_mUsd: (usage: Usage) => costForTier(usage, price),
@@ -86,12 +91,15 @@ export const qwen37_max_model: KiloExclusiveModel = {
   flags: ['reasoning'],
   gateway: 'alibaba',
   internal_id: 'qwen3.7-max',
-  pricing: makeFlatPricing({
-    prompt_per_million: 2.5,
-    completion_per_million: 7.5,
-    input_cache_read_per_million: 0.25,
-    input_cache_write_per_million: 3.125,
-  }),
+  pricing: makeFlatPricing(
+    {
+      prompt_per_million: 2.5,
+      completion_per_million: 7.5,
+      input_cache_read_per_million: 0.25,
+      input_cache_write_per_million: 3.125,
+    },
+    QWEN37_MAX_DISCOUNT_FACTOR
+  ),
   exclusive_to: [],
   inference_provider_restriction: [],
 };
@@ -107,26 +115,45 @@ export const qwen37_plus_model: KiloExclusiveModel = {
   flags: ['reasoning', 'vision'],
   gateway: 'alibaba',
   internal_id: 'qwen3.7-plus',
-  pricing: makeTieredPricing([
-    {
-      maxInputTokens: TOKENS_256K,
-      undiscounted: {
-        prompt_per_million: 0.4,
-        completion_per_million: 1.6,
-        input_cache_read_per_million: 0.04,
-        input_cache_write_per_million: 0.5,
+  pricing: makeTieredPricing(
+    [
+      {
+        maxInputTokens: TOKENS_256K,
+        undiscounted: {
+          prompt_per_million: 0.4,
+          completion_per_million: 1.6,
+          input_cache_read_per_million: 0.04,
+          input_cache_write_per_million: 0.5,
+        },
       },
-    },
-    {
-      maxInputTokens: TOKENS_1M,
-      undiscounted: {
-        prompt_per_million: 1.2,
-        completion_per_million: 4.8,
-        input_cache_read_per_million: 0.12,
-        input_cache_write_per_million: 1.5,
+      {
+        maxInputTokens: TOKENS_1M,
+        undiscounted: {
+          prompt_per_million: 1.2,
+          completion_per_million: 4.8,
+          input_cache_read_per_million: 0.12,
+          input_cache_write_per_million: 1.5,
+        },
       },
-    },
-  ]),
+    ],
+    QWEN37_PLUS_DISCOUNT_FACTOR
+  ),
+  exclusive_to: [],
+  inference_provider_restriction: [],
+};
+
+export const qwen37_plus_free_model: KiloExclusiveModel = {
+  public_id: 'qwen/qwen3.7-plus:free',
+  display_name: 'Qwen: Qwen3.7 Plus (free)',
+  description:
+    "Qwen3.7-Plus is Alibaba's native multimodal agent model for visual-language reasoning, agentic coding, tool use, and productivity workflows. It supports text, image, and video inputs. For this free endpoint, your prompts and completions may be retained and used to train or improve the provider's services.",
+  context_length: 1_000_000,
+  max_completion_tokens: 65_536,
+  status: 'disabled',
+  flags: ['reasoning', 'vision', 'requires-data-collection'],
+  gateway: 'vercel',
+  internal_id: 'alibaba/qwen3.7-plus',
+  pricing: null,
   exclusive_to: [],
   inference_provider_restriction: [],
 };

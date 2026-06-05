@@ -14,9 +14,22 @@
   "observability": {
     "enabled": true,
   },
+  "routes": [
+    {
+      "pattern": "security-auto-analysis.kilosessions.ai",
+      "custom_domain": true,
+    },
+  ],
   "vars": {
     "ENVIRONMENT": "production",
     "KILOCODE_BACKEND_BASE_URL": "https://api.kilo.ai",
+    "SESSION_INGEST_WORKER_URL": "https://ingest.kilosessions.ai",
+    "SECURITY_ANALYSIS_CALLBACK_ROUTING_MODE": "worker",
+    "SECURITY_ANALYSIS_CALLBACK_WEB_BASE_URL": "https://app.kilo.ai",
+    "SECURITY_ANALYSIS_CALLBACK_WORKER_BASE_URL": "https://security-auto-analysis.kilosessions.ai",
+    "SECURITY_ANALYSIS_CALLBACK_WORKER_INGRESS_ENABLED": "true",
+    "MANUAL_ANALYSIS_COMMAND_ROUTING_ENABLED": "true",
+    "NEXT_PUBLIC_POSTHOG_KEY": "phc_GK2Pxl0HPj5ZPfwhLRjXrtdz8eD7e9MKnXiFrOqnB6z",
   },
   "triggers": {
     "crons": ["* * * * *"],
@@ -34,6 +47,14 @@
         "binding": "OWNER_QUEUE",
         "queue": "security-auto-analysis-owner-queue",
       },
+      {
+        "binding": "CALLBACK_QUEUE",
+        "queue": "security-auto-analysis-callback-queue",
+      },
+      {
+        "binding": "MANUAL_ANALYSIS_QUEUE",
+        "queue": "security-manual-analysis-command-queue",
+      },
     ],
     "consumers": [
       {
@@ -41,6 +62,20 @@
         "max_batch_size": 1,
         "max_retries": 3,
         "dead_letter_queue": "security-auto-analysis-owner-dlq",
+        "max_concurrency": 50,
+      },
+      {
+        "queue": "security-auto-analysis-callback-queue",
+        "max_batch_size": 1,
+        "max_retries": 3,
+        "dead_letter_queue": "security-auto-analysis-callback-dlq",
+        "max_concurrency": 50,
+      },
+      {
+        "queue": "security-manual-analysis-command-queue",
+        "max_batch_size": 1,
+        "max_retries": 3,
+        "dead_letter_queue": "security-manual-analysis-command-dlq",
         "max_concurrency": 50,
       },
     ],
@@ -80,6 +115,13 @@
       "vars": {
         "ENVIRONMENT": "development",
         "KILOCODE_BACKEND_BASE_URL": "http://localhost:3000",
+        "SESSION_INGEST_WORKER_URL": "http://localhost:8800",
+        "SECURITY_ANALYSIS_CALLBACK_ROUTING_MODE": "worker",
+        "SECURITY_ANALYSIS_CALLBACK_WEB_BASE_URL": "http://localhost:3000",
+        "SECURITY_ANALYSIS_CALLBACK_WORKER_BASE_URL": "http://localhost:8797",
+        "SECURITY_ANALYSIS_CALLBACK_WORKER_INGRESS_ENABLED": "true",
+        "MANUAL_ANALYSIS_COMMAND_ROUTING_ENABLED": "true",
+        "NEXT_PUBLIC_POSTHOG_KEY": "phc_GK2Pxl0HPj5ZPfwhLRjXrtdz8eD7e9MKnXiFrOqnB6z",
       },
       "hyperdrive": [
         {
@@ -94,6 +136,14 @@
             "binding": "OWNER_QUEUE",
             "queue": "security-auto-analysis-owner-queue-dev",
           },
+          {
+            "binding": "CALLBACK_QUEUE",
+            "queue": "security-auto-analysis-callback-queue-dev",
+          },
+          {
+            "binding": "MANUAL_ANALYSIS_QUEUE",
+            "queue": "security-manual-analysis-command-queue-dev",
+          },
         ],
         "consumers": [
           {
@@ -101,6 +151,20 @@
             "max_batch_size": 1,
             "max_retries": 3,
             "dead_letter_queue": "security-auto-analysis-owner-dlq-dev",
+            "max_concurrency": 50,
+          },
+          {
+            "queue": "security-auto-analysis-callback-queue-dev",
+            "max_batch_size": 1,
+            "max_retries": 3,
+            "dead_letter_queue": "security-auto-analysis-callback-dlq-dev",
+            "max_concurrency": 50,
+          },
+          {
+            "queue": "security-manual-analysis-command-queue-dev",
+            "max_batch_size": 1,
+            "max_retries": 3,
+            "dead_letter_queue": "security-manual-analysis-command-dlq-dev",
             "max_concurrency": 50,
           },
         ],

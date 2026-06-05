@@ -7,8 +7,9 @@ import { Section } from '@/components/consent/section';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
+import { WEB_BASE_URL } from '@/lib/config';
 
-const PRIVACY_URL = 'https://kilo.ai/privacy';
+const PRIVACY_URL = `${WEB_BASE_URL}/privacy-app`;
 
 export function ConsentDetails() {
   const router = useRouter();

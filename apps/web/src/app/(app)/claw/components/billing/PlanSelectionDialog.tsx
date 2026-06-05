@@ -20,9 +20,6 @@ import {
   type KiloClawSignupDisplay,
   type KiloPassUpsellActivationPreview,
 } from './billing-types';
-import { KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF } from '@/lib/kilo-pass/constants';
-import { dayjs } from '@/lib/kilo-pass/dayjs';
-
 type Cadence = 'monthly' | 'yearly';
 type Tier = '19' | '49' | '199';
 
@@ -137,7 +134,7 @@ function TierCard({
           Up to <span className="text-emerald-300">40%</span> free bonus credits
         </div>
         <div className="text-xs leading-relaxed text-emerald-300">
-          First 2 months: +50% free bonus credits
+          First month: +50% free bonus credits
         </div>
       </div>
 
@@ -293,8 +290,6 @@ function HostingOnlyPlanCard({
 
 function CreditsHowItWorks() {
   const [open, setOpen] = useState(false);
-  const showTwoMonthPromo = dayjs().utc().isBefore(KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF);
-
   return (
     <div className="border-border/50 mb-3.5 overflow-hidden rounded-lg border">
       <button
@@ -320,15 +315,13 @@ function CreditsHowItWorks() {
               expire monthly.
             </span>
           </div>
-          {showTwoMonthPromo ? (
-            <div className="text-muted-foreground flex items-start gap-2 py-0.5 text-xs">
-              <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-400" />
-              <span>
-                First-time subscribers receive <span className="text-emerald-300">50%</span> free
-                bonus credits for the first two months.
-              </span>
-            </div>
-          ) : null}
+          <div className="text-muted-foreground flex items-start gap-2 py-0.5 text-xs">
+            <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-400" />
+            <span>
+              First-time subscribers receive <span className="text-emerald-300">50%</span> free
+              bonus credits for the first month.
+            </span>
+          </div>
         </div>
       )}
     </div>
@@ -519,7 +512,7 @@ export function PlanSelectionDialog({ open, onOpenChange }: PlanSelectionDialogP
   const kiloPassUpsell = useMutation(
     trpc.kiloclaw.createKiloPassUpsellCheckout.mutationOptions({
       onSuccess: data => {
-        if (data.url) window.location.href = data.url;
+        if (data.url) window.location.assign(data.url);
       },
     })
   );

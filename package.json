@@ -29,6 +29,7 @@
     "dev:restart": "tsx dev/local/cli.ts restart",
     "dev:env": "tsx dev/local/cli.ts env",
     "dev:env:mobile": "tsx dev/local/mobile-env.ts",
+    "dev:setup-env": "tsx dev/local/setup-env.ts",
     "dev:seed": "tsx dev/seed/index.ts",
     "dev:discord-gateway-cron": "tsx dev/discord-gateway-cron.ts",
     "dev:kiloclaw-fly-instances": "tsx services/kiloclaw/scripts/dev-fly-instances.ts"

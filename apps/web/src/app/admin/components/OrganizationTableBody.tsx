@@ -154,7 +154,7 @@ function EntitlementsRow({
       <TableCell className="min-w-28">
         {organization.subscription_amount_usd ? (
           <span className="font-mono text-sm">
-            ${organization.subscription_amount_usd.toFixed(2)}
+            ${Math.round(organization.subscription_amount_usd).toLocaleString('en-US')}
           </span>
         ) : (
           <span className="text-muted-foreground text-sm">-</span>
@@ -204,13 +204,14 @@ function UsageRow({
       )}
       <TableCell className="min-w-28">
         <span className="font-mono text-sm">
-          {formatMicrodollars(organization.microdollars_used)}
+          {formatMicrodollars(organization.microdollars_used, 0)}
         </span>
       </TableCell>
       <TableCell className="min-w-28">
         <span className="font-mono text-sm">
           {formatMicrodollars(
-            organization.total_microdollars_acquired - organization.microdollars_used
+            organization.total_microdollars_acquired - organization.microdollars_used,
+            0
           )}
         </span>
       </TableCell>

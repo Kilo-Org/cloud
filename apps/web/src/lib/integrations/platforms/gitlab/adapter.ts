@@ -11,12 +11,246 @@ import type { PlatformRepository } from '@/lib/integrations/core/types';
 import { getPlatformOAuthCallbackUrl } from '@/lib/integrations/oauth/urls';
 import { logExceptInTest } from '@/lib/utils.server';
 import crypto from 'crypto';
+import * as http from 'http';
+import * as https from 'https';
+import {
+  buildGitLabUrl,
+  DEFAULT_GITLAB_INSTANCE_URL,
+  type GitLabResolvedUrl,
+  GitLabInstanceUrlError,
+  isDefaultGitLabInstanceUrl,
+  normalizeGitLabInstanceUrl,
+  resolveGitLabUrlSafely,
+} from './instance-url';
 
 const GITLAB_CLIENT_ID = process.env.GITLAB_CLIENT_ID;
 const GITLAB_CLIENT_SECRET = getEnvVariable('GITLAB_CLIENT_SECRET');
 const GITLAB_REDIRECT_URI = getPlatformOAuthCallbackUrl(PLATFORM.GITLAB);
 
-const DEFAULT_GITLAB_URL = 'https://gitlab.com';
+const DEFAULT_GITLAB_URL = DEFAULT_GITLAB_INSTANCE_URL;
+const MAX_GITLAB_REDIRECTS = 5;
+const MAX_GITLAB_RESPONSE_BYTES = 10 * 1024 * 1024;
+const GITLAB_REQUEST_TIMEOUT_MS = 30_000;
+
+async function fetchGitLab(url: string, init?: RequestInit, redirectCount = 0): Promise<Response> {
+  const response = await fetchGitLabOnce(url, init);
+  if (!isGitLabRedirect(response.status)) {
+    return response;
+  }
+
+  const location = response.headers.get('location');
+  if (!location) {
+    return response;
+  }
+
+  if (redirectCount >= MAX_GITLAB_REDIRECTS) {
+    throw new Error('GitLab request exceeded redirect limit');
+  }
+
+  const redirectUrl = new URL(location, url).toString();
+  return fetchGitLab(
+    redirectUrl,
+    buildRedirectRequestInit(init, response.status, url, redirectUrl),
+    redirectCount + 1
+  );
+}
+
+async function fetchGitLabOnce(url: string, init?: RequestInit): Promise<Response> {
+  const resolvedUrl = await resolveGitLabUrlSafely(url);
+  if (!resolvedUrl.address) {
+    return fetch(url, { ...init, redirect: 'manual' });
+  }
+
+  return fetchGitLabBoundToAddress({ ...resolvedUrl, address: resolvedUrl.address }, init);
+}
+
+function isGitLabRedirect(status: number): boolean {
+  return status === 301 || status === 302 || status === 303 || status === 307 || status === 308;
+}
+
+function buildRedirectRequestInit(
+  init: RequestInit | undefined,
+  status: number,
+  fromUrl: string,
+  toUrl: string
+): RequestInit | undefined {
+  if (!init) {
+    return undefined;
+  }
+
+  const headers = new Headers(init.headers);
+  const from = new URL(fromUrl);
+  const to = new URL(toUrl);
+  if (from.protocol === 'https:' && to.protocol === 'http:') {
+    throw new Error('GitLab request refused HTTPS-to-HTTP redirect');
+  }
+
+  if (from.origin !== to.origin) {
+    if ((status === 307 || status === 308) && init.body != null) {
+      throw new Error('GitLab request refused cross-origin redirect with request body');
+    }
+
+    headers.delete('authorization');
+    headers.delete('cookie');
+  }
+
+  const method = init.method?.toUpperCase() ?? 'GET';
+  if (
+    ((status === 301 || status === 302) && method === 'POST') ||
+    (status === 303 && method !== 'GET' && method !== 'HEAD')
+  ) {
+    headers.delete('content-length');
+    headers.delete('content-type');
+    return { ...init, body: undefined, headers, method: 'GET' };
+  }
+
+  return { ...init, headers };
+}
+
+function fetchGitLabBoundToAddress(
+  { url, address, family }: GitLabResolvedUrl & { address: string },
+  init?: RequestInit
+): Promise<Response> {
+  const request = url.protocol === 'https:' ? https.request : http.request;
+  const headers = headersInitToRecord(init?.headers);
+  const body = bodyInitToBuffer(init?.body);
+
+  if (body && !hasHeader(headers, 'content-length')) {
+    headers['content-length'] = String(Buffer.byteLength(body));
+  }
+
+  return new Promise((resolve, reject) => {
+    const req = request(
+      {
+        protocol: url.protocol,
+        hostname: url.hostname,
+        port: url.port,
+        path: `${url.pathname}${url.search}`,
+        method: init?.method ?? 'GET',
+        headers,
+        family,
+        lookup: (_hostname, _options, callback) => callback(null, address, family ?? 0),
+        ...(url.protocol === 'https:' ? { servername: url.hostname } : {}),
+      },
+      response => {
+        const chunks: Buffer[] = [];
+        let responseBytes = 0;
+        response.on('data', chunk => {
+          const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+          responseBytes += buffer.byteLength;
+          if (responseBytes > MAX_GITLAB_RESPONSE_BYTES) {
+            const error = new Error('GitLab response exceeded size limit');
+            response.destroy(error);
+            req.destroy(error);
+            reject(error);
+            return;
+          }
+
+          chunks.push(buffer);
+        });
+        response.on('error', reject);
+        response.on('end', () => {
+          try {
+            const status = response.statusCode ?? 500;
+            const body = responseStatusForbidsBody(status) ? null : Buffer.concat(chunks);
+            resolve(
+              new Response(body, {
+                status,
+                statusText: response.statusMessage,
+                headers: responseHeadersToHeaders(response.headers),
+              })
+            );
+          } catch (error) {
+            reject(error);
+          }
+        });
+      }
+    );
+
+    req.on('error', reject);
+    req.setTimeout(GITLAB_REQUEST_TIMEOUT_MS, () => {
+      req.destroy(new Error('GitLab request timed out'));
+    });
+
+    const signal = init?.signal;
+    if (signal) {
+      if (signal.aborted) {
+        req.destroy(signal.reason);
+        reject(signal.reason);
+        return;
+      }
+
+      signal.addEventListener(
+        'abort',
+        () => {
+          req.destroy(signal.reason);
+          reject(signal.reason);
+        },
+        { once: true }
+      );
+    }
+
+    if (body) {
+      req.write(body);
+    }
+    req.end();
+  });
+}
+
+function headersInitToRecord(headers: HeadersInit | undefined): Record<string, string> {
+  const record: Record<string, string> = {};
+  new Headers(headers).forEach((value, key) => {
+    record[key] = value;
+  });
+  return record;
+}
+
+function hasHeader(headers: Record<string, string>, header: string): boolean {
+  const lowerHeader = header.toLowerCase();
+  return Object.keys(headers).some(key => key.toLowerCase() === lowerHeader);
+}
+
+function bodyInitToBuffer(body: BodyInit | null | undefined): Buffer | undefined {
+  if (body == null) {
+    return undefined;
+  }
+
+  if (typeof body === 'string') {
+    return Buffer.from(body);
+  }
+
+  if (body instanceof URLSearchParams) {
+    return Buffer.from(body.toString());
+  }
+
+  if (body instanceof ArrayBuffer) {
+    return Buffer.from(body);
+  }
+
+  if (ArrayBuffer.isView(body)) {
+    return Buffer.from(body.buffer, body.byteOffset, body.byteLength);
+  }
+
+  throw new Error('Unsupported GitLab request body type');
+}
+
+function responseStatusForbidsBody(status: number): boolean {
+  return status === 204 || status === 205 || status === 304;
+}
+
+function responseHeadersToHeaders(headers: http.IncomingHttpHeaders): Headers {
+  const responseHeaders = new Headers();
+  for (const [key, value] of Object.entries(headers)) {
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        responseHeaders.append(key, item);
+      }
+    } else if (value !== undefined) {
+      responseHeaders.set(key, value);
+    }
+  }
+  return responseHeaders;
+}
 
 /**
  * GitLab OAuth scopes required for the integration
@@ -85,7 +319,8 @@ export function buildGitLabOAuthUrl(
   instanceUrl: string = DEFAULT_GITLAB_URL,
   customCredentials?: GitLabOAuthCredentials
 ): string {
-  if (instanceUrl !== DEFAULT_GITLAB_URL && !customCredentials) {
+  const normalizedInstanceUrl = normalizeGitLabInstanceUrl(instanceUrl);
+  if (!isDefaultGitLabInstanceUrl(normalizedInstanceUrl) && !customCredentials) {
     throw new Error('Custom GitLab OAuth credentials are required for self-hosted instances');
   }
 
@@ -103,7 +338,7 @@ export function buildGitLabOAuthUrl(
     scope: GITLAB_OAUTH_SCOPES.join(' '),
   });
 
-  return `${instanceUrl}/oauth/authorize?${params.toString()}`;
+  return buildGitLabUrl(normalizedInstanceUrl, '/oauth/authorize', Object.fromEntries(params));
 }
 
 /**
@@ -118,7 +353,8 @@ export async function exchangeGitLabOAuthCode(
   instanceUrl: string = DEFAULT_GITLAB_URL,
   customCredentials?: GitLabOAuthCredentials
 ): Promise<GitLabOAuthTokens> {
-  if (instanceUrl !== DEFAULT_GITLAB_URL && !customCredentials) {
+  const normalizedInstanceUrl = normalizeGitLabInstanceUrl(instanceUrl);
+  if (!isDefaultGitLabInstanceUrl(normalizedInstanceUrl) && !customCredentials) {
     throw new Error('Custom GitLab OAuth credentials are required for self-hosted instances');
   }
 
@@ -129,7 +365,7 @@ export async function exchangeGitLabOAuthCode(
     throw new Error('GitLab OAuth credentials not configured');
   }
 
-  const response = await fetch(`${instanceUrl}/oauth/token`, {
+  const response = await fetchGitLab(buildGitLabUrl(normalizedInstanceUrl, '/oauth/token'), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -173,7 +409,8 @@ export async function refreshGitLabOAuthToken(
   instanceUrl: string = DEFAULT_GITLAB_URL,
   customCredentials?: GitLabOAuthCredentials
 ): Promise<GitLabOAuthTokens> {
-  if (instanceUrl !== DEFAULT_GITLAB_URL && !customCredentials) {
+  const normalizedInstanceUrl = normalizeGitLabInstanceUrl(instanceUrl);
+  if (!isDefaultGitLabInstanceUrl(normalizedInstanceUrl) && !customCredentials) {
     throw new Error('Custom GitLab OAuth credentials are required for self-hosted instances');
   }
 
@@ -184,7 +421,7 @@ export async function refreshGitLabOAuthToken(
     throw new Error('GitLab OAuth credentials not configured');
   }
 
-  const response = await fetch(`${instanceUrl}/oauth/token`, {
+  const response = await fetchGitLab(buildGitLabUrl(normalizedInstanceUrl, '/oauth/token'), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -224,7 +461,7 @@ export async function fetchGitLabUser(
   accessToken: string,
   instanceUrl: string = DEFAULT_GITLAB_URL
 ): Promise<GitLabUser> {
-  const response = await fetch(`${instanceUrl}/api/v4/user`, {
+  const response = await fetchGitLab(buildGitLabUrl(instanceUrl, '/api/v4/user'), {
     headers: {
       Authorization: `Bearer ${accessToken}`,
     },
@@ -254,8 +491,13 @@ export async function fetchGitLabProjects(
   const perPage = 100;
 
   while (true) {
-    const response = await fetch(
-      `${instanceUrl}/api/v4/projects?membership=true&per_page=${perPage}&page=${page}&archived=false`,
+    const response = await fetchGitLab(
+      buildGitLabUrl(instanceUrl, '/api/v4/projects', {
+        membership: true,
+        per_page: perPage,
+        page,
+        archived: false,
+      }),
       {
         headers: {
           Authorization: `Bearer ${accessToken}`,
@@ -346,11 +588,14 @@ async function fetchProjectByPath(
 ): Promise<PlatformRepository | null> {
   const encodedPath = encodeURIComponent(projectPath);
 
-  const response = await fetch(`${instanceUrl}/api/v4/projects/${encodedPath}`, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
-  });
+  const response = await fetchGitLab(
+    buildGitLabUrl(instanceUrl, `/api/v4/projects/${encodedPath}`),
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    }
+  );
 
   if (!response.ok) {
     // 404 means project not found or no access - this is expected
@@ -432,8 +677,13 @@ export async function searchGitLabProjects(
     });
   }
 
-  const response = await fetch(
-    `${instanceUrl}/api/v4/projects?membership=true&search=${encodeURIComponent(normalizedQuery)}&per_page=${limit}&archived=false`,
+  const response = await fetchGitLab(
+    buildGitLabUrl(instanceUrl, '/api/v4/projects', {
+      membership: true,
+      search: normalizedQuery,
+      per_page: limit,
+      archived: false,
+    }),
     {
       headers: {
         Authorization: `Bearer ${accessToken}`,
@@ -484,8 +734,11 @@ export async function fetchGitLabBranches(
   const perPage = 100;
 
   while (true) {
-    const response = await fetch(
-      `${instanceUrl}/api/v4/projects/${encodedProjectId}/repository/branches?per_page=${perPage}&page=${page}`,
+    const response = await fetchGitLab(
+      buildGitLabUrl(instanceUrl, `/api/v4/projects/${encodedProjectId}/repository/branches`, {
+        per_page: perPage,
+        page,
+      }),
       {
         headers: {
           Authorization: `Bearer ${accessToken}`,
@@ -526,9 +779,12 @@ export async function fetchGitLabRootTextFileAtRef(
 ): Promise<string | null> {
   const encodedProjectPath = encodeURIComponent(projectPath);
   const encodedFilePath = encodeURIComponent(filePath);
-  const baseUrl = instanceUrl.replace(/\/$/, '');
-  const response = await fetch(
-    `${baseUrl}/api/v4/projects/${encodedProjectPath}/repository/files/${encodedFilePath}/raw?ref=${encodeURIComponent(ref)}`,
+  const response = await fetchGitLab(
+    buildGitLabUrl(
+      instanceUrl,
+      `/api/v4/projects/${encodedProjectPath}/repository/files/${encodedFilePath}/raw`,
+      { ref }
+    ),
     {
       headers: {
         Authorization: `Bearer ${accessToken}`,
@@ -665,11 +921,14 @@ export async function listProjectWebhooks(
   const encodedProjectId =
     typeof projectId === 'string' ? encodeURIComponent(projectId) : projectId;
 
-  const response = await fetch(`${instanceUrl}/api/v4/projects/${encodedProjectId}/hooks`, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
-  });
+  const response = await fetchGitLab(
+    buildGitLabUrl(instanceUrl, `/api/v4/projects/${encodedProjectId}/hooks`),
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    }
+  );
 
   if (!response.ok) {
     const error = await response.text();
@@ -714,32 +973,35 @@ export async function createProjectWebhook(
   const encodedProjectId =
     typeof projectId === 'string' ? encodeURIComponent(projectId) : projectId;
 
-  const response = await fetch(`${instanceUrl}/api/v4/projects/${encodedProjectId}/hooks`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      name: 'Kilo Code Reviews',
-      description: 'Auto-configured webhook for Kilo AI code reviews',
-      url: webhookUrl,
-      token: webhookSecret,
-      merge_requests_events: true,
-      push_events: false,
-      issues_events: false,
-      confidential_issues_events: false,
-      tag_push_events: false,
-      note_events: false,
-      confidential_note_events: false,
-      job_events: false,
-      pipeline_events: false,
-      wiki_page_events: false,
-      deployment_events: false,
-      releases_events: false,
-      enable_ssl_verification: true,
-    }),
-  });
+  const response = await fetchGitLab(
+    buildGitLabUrl(instanceUrl, `/api/v4/projects/${encodedProjectId}/hooks`),
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        name: 'Kilo Code Reviews',
+        description: 'Auto-configured webhook for Kilo AI code reviews',
+        url: webhookUrl,
+        token: webhookSecret,
+        merge_requests_events: true,
+        push_events: false,
+        issues_events: false,
+        confidential_issues_events: false,
+        tag_push_events: false,
+        note_events: false,
+        confidential_note_events: false,
+        job_events: false,
+        pipeline_events: false,
+        wiki_page_events: false,
+        deployment_events: false,
+        releases_events: false,
+        enable_ssl_verification: true,
+      }),
+    }
+  );
 
   if (!response.ok) {
     const error = await response.text();
@@ -794,8 +1056,8 @@ export async function updateProjectWebhook(
   const encodedProjectId =
     typeof projectId === 'string' ? encodeURIComponent(projectId) : projectId;
 
-  const response = await fetch(
-    `${instanceUrl}/api/v4/projects/${encodedProjectId}/hooks/${hookId}`,
+  const response = await fetchGitLab(
+    buildGitLabUrl(instanceUrl, `/api/v4/projects/${encodedProjectId}/hooks/${hookId}`),
     {
       method: 'PUT',
       headers: {
@@ -873,8 +1135,8 @@ export async function deleteProjectWebhook(
   const encodedProjectId =
     typeof projectId === 'string' ? encodeURIComponent(projectId) : projectId;
 
-  const response = await fetch(
-    `${instanceUrl}/api/v4/projects/${encodedProjectId}/hooks/${hookId}`,
+  const response = await fetchGitLab(
+    buildGitLabUrl(instanceUrl, `/api/v4/projects/${encodedProjectId}/hooks/${hookId}`),
     {
       method: 'DELETE',
       headers: {
@@ -977,8 +1239,11 @@ export async function isMergeCommit(
     const encodedProjectId =
       typeof projectId === 'string' ? encodeURIComponent(projectId) : projectId;
 
-    const response = await fetch(
-      `${instanceUrl}/api/v4/projects/${encodedProjectId}/repository/commits/${commitSha}`,
+    const response = await fetchGitLab(
+      buildGitLabUrl(
+        instanceUrl,
+        `/api/v4/projects/${encodedProjectId}/repository/commits/${commitSha}`
+      ),
       {
         headers: {
           Authorization: `Bearer ${accessToken}`,
@@ -1112,8 +1377,12 @@ export async function findKiloReviewNote(
   const perPage = 100;
 
   while (true) {
-    const response = await fetch(
-      `${instanceUrl}/api/v4/projects/${encodedProjectId}/merge_requests/${mrIid}/notes?per_page=${perPage}&page=${page}`,
+    const response = await fetchGitLab(
+      buildGitLabUrl(
+        instanceUrl,
+        `/api/v4/projects/${encodedProjectId}/merge_requests/${mrIid}/notes`,
+        { per_page: perPage, page }
+      ),
       {
         headers: {
           Authorization: `Bearer ${accessToken}`,
@@ -1184,8 +1453,11 @@ export async function updateKiloReviewNote(
   const encodedProjectId =
     typeof projectId === 'string' ? encodeURIComponent(projectId) : projectId;
 
-  const response = await fetch(
-    `${instanceUrl}/api/v4/projects/${encodedProjectId}/merge_requests/${mrIid}/notes/${noteId}`,
+  const response = await fetchGitLab(
+    buildGitLabUrl(
+      instanceUrl,
+      `/api/v4/projects/${encodedProjectId}/merge_requests/${mrIid}/notes/${noteId}`
+    ),
     {
       method: 'PUT',
       headers: {
@@ -1221,8 +1493,11 @@ export async function createMRNote(
   const encodedProjectId =
     typeof projectId === 'string' ? encodeURIComponent(projectId) : projectId;
 
-  const response = await fetch(
-    `${instanceUrl}/api/v4/projects/${encodedProjectId}/merge_requests/${mrIid}/notes`,
+  const response = await fetchGitLab(
+    buildGitLabUrl(
+      instanceUrl,
+      `/api/v4/projects/${encodedProjectId}/merge_requests/${mrIid}/notes`
+    ),
     {
       method: 'POST',
       headers: {
@@ -1259,8 +1534,12 @@ export async function hasMRNoteWithMarker(
   const perPage = 100;
 
   while (true) {
-    const response = await fetch(
-      `${instanceUrl}/api/v4/projects/${encodedProjectId}/merge_requests/${mrIid}/notes?per_page=${perPage}&page=${page}`,
+    const response = await fetchGitLab(
+      buildGitLabUrl(
+        instanceUrl,
+        `/api/v4/projects/${encodedProjectId}/merge_requests/${mrIid}/notes`,
+        { per_page: perPage, page }
+      ),
       {
         headers: {
           Authorization: `Bearer ${accessToken}`,
@@ -1319,8 +1598,12 @@ export async function fetchMRInlineComments(
   const perPage = 100;
 
   while (true) {
-    const response = await fetch(
-      `${instanceUrl}/api/v4/projects/${encodedProjectId}/merge_requests/${mrIid}/discussions?per_page=${perPage}&page=${page}`,
+    const response = await fetchGitLab(
+      buildGitLabUrl(
+        instanceUrl,
+        `/api/v4/projects/${encodedProjectId}/merge_requests/${mrIid}/discussions`,
+        { per_page: perPage, page }
+      ),
       {
         headers: {
           Authorization: `Bearer ${accessToken}`,
@@ -1401,8 +1684,8 @@ export async function getMRHeadCommit(
   const encodedProjectId =
     typeof projectId === 'string' ? encodeURIComponent(projectId) : projectId;
 
-  const response = await fetch(
-    `${instanceUrl}/api/v4/projects/${encodedProjectId}/merge_requests/${mrIid}`,
+  const response = await fetchGitLab(
+    buildGitLabUrl(instanceUrl, `/api/v4/projects/${encodedProjectId}/merge_requests/${mrIid}`),
     {
       headers: {
         Authorization: `Bearer ${accessToken}`,
@@ -1445,8 +1728,8 @@ export async function getMRDiffRefs(
   const encodedProjectId =
     typeof projectId === 'string' ? encodeURIComponent(projectId) : projectId;
 
-  const response = await fetch(
-    `${instanceUrl}/api/v4/projects/${encodedProjectId}/merge_requests/${mrIid}`,
+  const response = await fetchGitLab(
+    buildGitLabUrl(instanceUrl, `/api/v4/projects/${encodedProjectId}/merge_requests/${mrIid}`),
     {
       headers: {
         Authorization: `Bearer ${accessToken}`,
@@ -1497,8 +1780,11 @@ export async function addReactionToMR(
   const encodedProjectId =
     typeof projectId === 'string' ? encodeURIComponent(projectId) : projectId;
 
-  const response = await fetch(
-    `${instanceUrl}/api/v4/projects/${encodedProjectId}/merge_requests/${mrIid}/award_emoji`,
+  const response = await fetchGitLab(
+    buildGitLabUrl(
+      instanceUrl,
+      `/api/v4/projects/${encodedProjectId}/merge_requests/${mrIid}/award_emoji`
+    ),
     {
       method: 'POST',
       headers: {
@@ -1546,11 +1832,14 @@ export async function getGitLabProject(
 ): Promise<GitLabProject> {
   const encodedPath = encodeURIComponent(projectPath);
 
-  const response = await fetch(`${instanceUrl}/api/v4/projects/${encodedPath}`, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
-  });
+  const response = await fetchGitLab(
+    buildGitLabUrl(instanceUrl, `/api/v4/projects/${encodedPath}`),
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    }
+  );
 
   if (!response.ok) {
     const error = await response.text();
@@ -1602,44 +1891,29 @@ export type GitLabInstanceValidationResult = {
 export async function validateGitLabInstance(
   instanceUrl: string
 ): Promise<GitLabInstanceValidationResult> {
-  // Normalize the URL
-  let normalizedUrl = instanceUrl.trim();
-
-  // Remove trailing slash if present
-  if (normalizedUrl.endsWith('/')) {
-    normalizedUrl = normalizedUrl.slice(0, -1);
-  }
-
-  // Validate URL format
+  let normalizedUrl: string;
   try {
-    const url = new URL(normalizedUrl);
-    if (!['http:', 'https:'].includes(url.protocol)) {
-      return {
-        valid: false,
-        error: 'Invalid URL protocol. Must be http or https.',
-      };
-    }
-  } catch {
+    normalizedUrl = normalizeGitLabInstanceUrl(instanceUrl);
+  } catch (error) {
     return {
       valid: false,
-      error: 'Invalid URL format.',
+      error: error instanceof GitLabInstanceUrlError ? error.message : 'Invalid URL format.',
     };
   }
 
   try {
     // The /api/v4/version endpoint is public and doesn't require authentication
-    const response = await fetch(`${normalizedUrl}/api/v4/version`, {
+    const response = await fetchGitLab(buildGitLabUrl(normalizedUrl, '/api/v4/version'), {
       method: 'GET',
       headers: {
         Accept: 'application/json',
       },
+      redirect: 'manual',
       // Set a reasonable timeout for the request
       signal: AbortSignal.timeout(10000),
     });
 
     if (!response.ok) {
-      // 401/403 still indicates a valid GitLab instance (just requires auth for version)
-      // Some self-hosted instances may restrict the version endpoint
       if (response.status === 401 || response.status === 403) {
         logExceptInTest(
           '[validateGitLabInstance] Version endpoint requires auth, but instance is valid',
@@ -1688,6 +1962,13 @@ export async function validateGitLabInstance(
       enterprise: data.enterprise,
     };
   } catch (error) {
+    if (error instanceof GitLabInstanceUrlError) {
+      return {
+        valid: false,
+        error: error.message,
+      };
+    }
+
     // Handle timeout
     if (error instanceof Error && error.name === 'TimeoutError') {
       return {
@@ -1802,19 +2083,22 @@ export async function createProjectAccessToken(
   const encodedProjectId =
     typeof projectId === 'string' ? encodeURIComponent(projectId) : projectId;
 
-  const response = await fetch(`${instanceUrl}/api/v4/projects/${encodedProjectId}/access_tokens`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      name: tokenName,
-      scopes,
-      access_level: accessLevel,
-      expires_at: expiresAt,
-    }),
-  });
+  const response = await fetchGitLab(
+    buildGitLabUrl(instanceUrl, `/api/v4/projects/${encodedProjectId}/access_tokens`),
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        name: tokenName,
+        scopes,
+        access_level: accessLevel,
+        expires_at: expiresAt,
+      }),
+    }
+  );
 
   if (!response.ok) {
     const error = await response.text();
@@ -1875,11 +2159,14 @@ export async function listProjectAccessTokens(
   const encodedProjectId =
     typeof projectId === 'string' ? encodeURIComponent(projectId) : projectId;
 
-  const response = await fetch(`${instanceUrl}/api/v4/projects/${encodedProjectId}/access_tokens`, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
-  });
+  const response = await fetchGitLab(
+    buildGitLabUrl(instanceUrl, `/api/v4/projects/${encodedProjectId}/access_tokens`),
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    }
+  );
 
   if (!response.ok) {
     const error = await response.text();
@@ -1929,8 +2216,8 @@ export async function getProjectAccessToken(
   const encodedProjectId =
     typeof projectId === 'string' ? encodeURIComponent(projectId) : projectId;
 
-  const response = await fetch(
-    `${instanceUrl}/api/v4/projects/${encodedProjectId}/access_tokens/${tokenId}`,
+  const response = await fetchGitLab(
+    buildGitLabUrl(instanceUrl, `/api/v4/projects/${encodedProjectId}/access_tokens/${tokenId}`),
     {
       headers: {
         Authorization: `Bearer ${accessToken}`,
@@ -1985,8 +2272,11 @@ export async function rotateProjectAccessToken(
   const encodedProjectId =
     typeof projectId === 'string' ? encodeURIComponent(projectId) : projectId;
 
-  const response = await fetch(
-    `${instanceUrl}/api/v4/projects/${encodedProjectId}/access_tokens/${tokenId}/rotate`,
+  const response = await fetchGitLab(
+    buildGitLabUrl(
+      instanceUrl,
+      `/api/v4/projects/${encodedProjectId}/access_tokens/${tokenId}/rotate`
+    ),
     {
       method: 'POST',
       headers: {
@@ -2055,8 +2345,8 @@ export async function revokeProjectAccessToken(
   const encodedProjectId =
     typeof projectId === 'string' ? encodeURIComponent(projectId) : projectId;
 
-  const response = await fetch(
-    `${instanceUrl}/api/v4/projects/${encodedProjectId}/access_tokens/${tokenId}`,
+  const response = await fetchGitLab(
+    buildGitLabUrl(instanceUrl, `/api/v4/projects/${encodedProjectId}/access_tokens/${tokenId}`),
     {
       method: 'DELETE',
       headers: {
@@ -2182,7 +2472,7 @@ export async function validateProjectAccessToken(
   try {
     // Use the /user endpoint to validate the token
     // This is a lightweight call that works with any valid token
-    const response = await fetch(`${instanceUrl}/api/v4/user`, {
+    const response = await fetchGitLab(buildGitLabUrl(instanceUrl, '/api/v4/user'), {
       headers: {
         Authorization: `Bearer ${token}`,
       },
@@ -2204,6 +2494,13 @@ export async function validateProjectAccessToken(
     });
     return true;
   } catch (error) {
+    if (error instanceof GitLabInstanceUrlError) {
+      logExceptInTest('[validateProjectAccessToken] Invalid GitLab instance URL', {
+        error: error.message,
+      });
+      return false;
+    }
+
     // Network errors - assume token might still be valid
     logExceptInTest('[validateProjectAccessToken] Error validating token', {
       error: error instanceof Error ? error.message : String(error),
@@ -2282,13 +2579,37 @@ export async function validatePersonalAccessToken(
 ): Promise<GitLabPATValidationResult> {
   const warnings: string[] = [];
 
+  let tokenInfoUrl: string;
+  let userUrl: string;
+  try {
+    tokenInfoUrl = buildGitLabUrl(instanceUrl, '/api/v4/personal_access_tokens/self');
+    userUrl = buildGitLabUrl(instanceUrl, '/api/v4/user');
+  } catch (error) {
+    return {
+      valid: false,
+      error: error instanceof GitLabInstanceUrlError ? error.message : 'Invalid URL format.',
+    };
+  }
+
   // Step 1: Get token info from /api/v4/personal_access_tokens/self
   // This endpoint requires GitLab 14.0+
-  const tokenInfoResponse = await fetch(`${instanceUrl}/api/v4/personal_access_tokens/self`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
+  let tokenInfoResponse: Response;
+  try {
+    tokenInfoResponse = await fetchGitLab(tokenInfoUrl, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+  } catch (error) {
+    if (error instanceof GitLabInstanceUrlError) {
+      return {
+        valid: false,
+        error: error.message,
+      };
+    }
+
+    throw error;
+  }
 
   if (!tokenInfoResponse.ok) {
     if (tokenInfoResponse.status === 401) {
@@ -2377,11 +2698,23 @@ export async function validatePersonalAccessToken(
   }
 
   // Step 4: Fetch user info
-  const userResponse = await fetch(`${instanceUrl}/api/v4/user`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
+  let userResponse: Response;
+  try {
+    userResponse = await fetchGitLab(userUrl, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+  } catch (error) {
+    if (error instanceof GitLabInstanceUrlError) {
+      return {
+        valid: false,
+        error: error.message,
+      };
+    }
+
+    throw error;
+  }
 
   if (!userResponse.ok) {
     const errorText = await userResponse.text();
@@ -2463,8 +2796,8 @@ export async function setCommitStatus(
   const encodedProjectId =
     typeof projectId === 'string' ? encodeURIComponent(projectId) : projectId;
 
-  const response = await fetch(
-    `${instanceUrl}/api/v4/projects/${encodedProjectId}/statuses/${sha}`,
+  const response = await fetchGitLab(
+    buildGitLabUrl(instanceUrl, `/api/v4/projects/${encodedProjectId}/statuses/${sha}`),
     {
       method: 'POST',
       headers: {

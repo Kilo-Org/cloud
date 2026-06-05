@@ -18,6 +18,7 @@ import { sendAlertNotification, type AlertPayload } from './notify';
 import { listAlertingConfigs, type AlertingConfig } from './config-store';
 import { listTtfbAlertingConfigs, type TtfbAlertingConfig } from './ttfb-config-store';
 import { evaluateContainerCapacity } from './container-capacity-evaluate';
+import { evaluateQueueBacklogAlert } from './queue-backlog-evaluate';
 
 /**
  * Compute the burn rate from an observed bad-event fraction and the SLO.
@@ -265,17 +266,25 @@ async function evaluateTtfbWindow(
  * can suppress lower-severity alerts for the same dimension.
  */
 export async function evaluateAlerts(env: Env): Promise<void> {
-  const configs = await listAlertingConfigs(env);
-  const enabledConfigs = configs.filter(config => config.enabled);
-  const configByModel: ConfigByModel = new Map(
-    enabledConfigs.map(config => [config.model, config])
-  );
+  const errors: unknown[] = [];
+  let configByModel: ConfigByModel = new Map();
+  let ttfbConfigByModel: TtfbConfigByModel = new Map();
 
-  const ttfbConfigs = await listTtfbAlertingConfigs(env);
-  const enabledTtfbConfigs = ttfbConfigs.filter(config => config.enabled);
-  const ttfbConfigByModel: TtfbConfigByModel = new Map(
-    enabledTtfbConfigs.map(config => [config.model, config])
-  );
+  try {
+    const configs = await listAlertingConfigs(env);
+    const enabledConfigs = configs.filter(config => config.enabled);
+    configByModel = new Map(enabledConfigs.map(config => [config.model, config]));
+  } catch (err) {
+    errors.push(new Error('error_rate config loading', { cause: err }));
+  }
+
+  try {
+    const ttfbConfigs = await listTtfbAlertingConfigs(env);
+    const enabledTtfbConfigs = ttfbConfigs.filter(config => config.enabled);
+    ttfbConfigByModel = new Map(enabledTtfbConfigs.map(config => [config.model, config]));
+  } catch (err) {
+    errors.push(new Error('ttfb config loading', { cause: err }));
+  }
 
   // Sort windows by severity: pages first, then tickets.
   // Within the same severity, higher burn rate first.
@@ -283,8 +292,6 @@ export async function evaluateAlerts(env: Env): Promise<void> {
     if (a.severity !== b.severity) return a.severity === 'page' ? -1 : 1;
     return b.burnRate - a.burnRate;
   });
-
-  const errors: unknown[] = [];
 
   for (const window of sortedWindows) {
     try {
@@ -300,11 +307,17 @@ export async function evaluateAlerts(env: Env): Promise<void> {
     }
   }
 
-  // Container capacity evaluation runs once per cron tick, independent of burn-rate windows.
+  // Infrastructure evaluations run once per cron tick, independent of burn-rate windows.
   try {
     await evaluateContainerCapacity(env);
   } catch (err) {
     errors.push(new Error('container_capacity evaluation', { cause: err }));
+  }
+
+  try {
+    await evaluateQueueBacklogAlert(env);
+  } catch (err) {
+    errors.push(new Error('queue_backlog evaluation', { cause: err }));
   }
 
   if (errors.length > 0) {

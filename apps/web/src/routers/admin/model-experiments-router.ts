@@ -19,7 +19,7 @@ import {
   KILOCLAW_KILO_PROVIDER_PREFIX,
   KILOCODE_KILO_PROVIDER_PREFIX,
 } from '@/lib/ai-gateway/model-utils';
-import { redisSet } from '@/lib/redis';
+import { redisClient } from '@/lib/redis';
 import { TRPCError } from '@trpc/server';
 import { and, asc, count, desc, eq, inArray, sql } from 'drizzle-orm';
 import * as z from 'zod';
@@ -84,7 +84,7 @@ async function recomputeExperimentedPublicIds() {
     .from(model_experiment)
     .where(inArray(model_experiment.status, ROUTING_STATUSES));
   const ids = Array.from(new Set(rows.map(r => r.public_model_id))).sort();
-  await redisSet(EXPERIMENTED_PUBLIC_IDS_REDIS_KEY, JSON.stringify(ids));
+  await redisClient.set(EXPERIMENTED_PUBLIC_IDS_REDIS_KEY, JSON.stringify(ids));
 }
 
 /**

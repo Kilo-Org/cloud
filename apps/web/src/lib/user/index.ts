@@ -78,6 +78,8 @@ import {
   github_branch_pull_requests,
   user_github_app_tokens,
   model_eval_ingestions,
+  stripe_dispute_actions,
+  stripe_dispute_cases,
   stripe_early_fraud_warning_cases,
   coding_plan_availability_intents,
   coding_plan_subscriptions,
@@ -113,6 +115,7 @@ import {
   type ParsedImpactReferralTouch,
 } from '@/lib/impact/referral-utils';
 import { redactStoreAccountLinkedJson } from '@/lib/kilo-pass/store-payload-redaction';
+import { revokeGatewayStateForUser } from '@/lib/mcp-gateway/lifecycle-service';
 
 const workos = new WorkOS(WORKOS_API_KEY);
 
@@ -818,7 +821,7 @@ export class SoftDeletePreconditionError extends Error {
  * - payment_methods (soft-deleted, address/name/IP fields nulled)
  * - App Store account token and retained Kilo Pass store purchase/event token fields
  * - user_feedback / app_builder_feedback / free_model_usage (FK nulled)
- * - stripe_early_fraud_warning_cases direct user ownership link (FK nulled)
+ * - Stripe early-fraud-warning/dispute retained user links (FK nulled)
  * - Various user-owned resources (platform_integrations, byok_api_keys,
  *   agent_configs, webhook_events, code_indexing_*, source_embeddings,
  *   cloud_agent_webhook_triggers, agent_environment_profiles,
@@ -904,6 +907,9 @@ export async function softDeleteUser(userId: string) {
       database: tx,
       normalizedEmail: user.normalized_email ?? user.google_user_email ?? null,
     });
+
+    // ── Gateway cleanup ───────────────────────────────────────────────────
+    await revokeGatewayStateForUser(tx, userId);
 
     // ── 1. Anonymize the user row ────────────────────────────────────────
     await tx
@@ -1308,6 +1314,32 @@ export async function softDeleteUser(userId: string) {
       .update(stripe_early_fraud_warning_cases)
       .set({ kilo_user_id: null })
       .where(eq(stripe_early_fraud_warning_cases.kilo_user_id, userId));
+    await tx.execute(sql`
+      UPDATE ${stripe_dispute_actions}
+      SET target_key = replace(${stripe_dispute_actions.target_key}, ${userId}, 'deleted_user'),
+          result_reference_id = CASE
+            WHEN ${stripe_dispute_actions.result_reference_id} = ${userId} THEN NULL
+            ELSE ${stripe_dispute_actions.result_reference_id}
+          END,
+          updated_at = now()
+      WHERE case_id IN (
+        SELECT id FROM ${stripe_dispute_cases}
+        WHERE kilo_user_id = ${userId}
+          OR accepted_by_kilo_user_id = ${userId}
+      )
+      AND (
+        position(${userId} in ${stripe_dispute_actions.target_key}) > 0
+        OR ${stripe_dispute_actions.result_reference_id} = ${userId}
+      )
+    `);
+    await tx
+      .update(stripe_dispute_cases)
+      .set({ kilo_user_id: null })
+      .where(eq(stripe_dispute_cases.kilo_user_id, userId));
+    await tx
+      .update(stripe_dispute_cases)
+      .set({ accepted_by_kilo_user_id: null })
+      .where(eq(stripe_dispute_cases.accepted_by_kilo_user_id, userId));
     await tx
       .update(security_advisor_scans)
       .set({ kilo_user_id: 'deleted', public_ip: null })

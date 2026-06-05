@@ -1,6 +1,5 @@
 import { createTRPCRouter, baseProcedure } from '@/lib/trpc/init';
 import { getIntegrationForOwner } from '@/lib/integrations/db/platform-integrations';
-import { getGitHubTokenForUser } from '@/lib/cloud-agent/github-integration-helpers';
 import { createSecurityAgentHandlers } from '@/lib/security-agent/router/shared-handlers';
 
 const handlers = createSecurityAgentHandlers({
@@ -17,9 +16,6 @@ const handlers = createSecurityAgentHandlers({
   getIntegration: async ctx => {
     const owner = { type: 'user' as const, id: ctx.user.id, userId: ctx.user.id };
     return await getIntegrationForOwner(owner, 'github');
-  },
-  getGitHubToken: async ctx => {
-    return (await getGitHubTokenForUser(ctx.user.id)) ?? null;
   },
   trackingExtras: () => ({}),
 });

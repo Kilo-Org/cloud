@@ -1,27 +1,29 @@
 import { createHash } from 'node:crypto';
-import { redisGetDel, redisSet } from '@/lib/redis';
+import { redisClient } from '@/lib/redis';
 import {
   consumeGitHubUserAuthorizationState,
   createGitHubUserAuthorizationState,
 } from './user-authorization-state';
 
 jest.mock('@/lib/redis', () => ({
-  redisGetDel: jest.fn(),
-  redisSet: jest.fn(),
+  redisClient: { set: jest.fn(), getdel: jest.fn() },
 }));
 
-const mockedRedisGetDel = jest.mocked(redisGetDel);
-const mockedRedisSet = jest.mocked(redisSet);
+const mockedRedisGetDel = jest.mocked(redisClient.getdel);
+const mockedRedisSet = jest.mocked(redisClient.set);
 
 describe('GitHub user authorization state', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockedRedisSet.mockResolvedValue(true);
+    mockedRedisSet.mockResolvedValue('OK');
   });
 
   test('round-trips a single-use PKCE verifier bound to the Kilo user', async () => {
     const created = await createGitHubUserAuthorizationState('user_123');
     const codeVerifier = mockedRedisSet.mock.calls[0][1];
+    if (typeof codeVerifier !== 'string') {
+      throw new Error('Expected Redis PKCE value to be a string');
+    }
     mockedRedisGetDel.mockResolvedValueOnce(codeVerifier).mockResolvedValueOnce(null);
 
     expect(created.codeChallenge).toBe(
@@ -45,7 +47,7 @@ describe('GitHub user authorization state', () => {
   });
 
   test('fails closed if transient PKCE storage is unavailable', async () => {
-    mockedRedisSet.mockResolvedValue(false);
+    mockedRedisSet.mockResolvedValue(null);
 
     await expect(createGitHubUserAuthorizationState('user_123')).rejects.toThrow(
       'configured transient state storage'

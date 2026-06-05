@@ -20,6 +20,7 @@ import {
   recordWrapperAcceptedMessage,
 } from '../../../src/session/wrapper-runtime-state.js';
 import {
+  getSessionMessageState,
   listNonTerminalAcceptedMessages,
   putSessionMessageState,
   type SessionMessageState,
@@ -294,7 +295,7 @@ describe('handleWrapperTerminalEvent — new-path identity and message preservat
     );
   });
 
-  it('wrapper complete does not clear wrapper runtime identity when accepted messages remain', async () => {
+  it('wrapper complete reconciles still-accepted messages instead of stranding them', async () => {
     const userId = 'user_wrapper_complete_identity';
     const sessionId = 'agent_wrapper_complete_identity';
     const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
@@ -315,9 +316,10 @@ describe('handleWrapperTerminalEvent — new-path identity and message preservat
       const { state: wrapperState } = await allocateWrapperRuntimeState(instance.ctx.storage);
       const { wrapperRunId, wrapperConnectionId } = wrapperState;
 
+      const messageId = 'msg_018f1e2d3c4bWrpCmpAbCdEfGh';
       // Store an accepted (non-terminal) session message state
       const acceptedMessage: SessionMessageState = {
-        messageId: 'msg_018f1e2d3c4bWrpCmpAbCdEfGh',
+        messageId,
         status: 'accepted',
         prompt: 'hello',
         createdAt: Date.now(),
@@ -326,7 +328,11 @@ describe('handleWrapperTerminalEvent — new-path identity and message preservat
       };
       await putSessionMessageState(instance.ctx.storage, acceptedMessage);
 
-      // Fire wrapper complete — with accepted non-terminal messages present
+      // Fire wrapper complete with an accepted non-terminal message present.
+      // `complete` is the race-free terminal signal, so the message must be
+      // settled here rather than left stranded (which would hang the callback).
+      // This session has no kiloSessionId, so no assistant reply can be found
+      // and the message settles as failed (missing_assistant_reply).
       await instance.handleWrapperTerminalEvent({
         wrapperRunId: wrapperRunId!,
         status: 'completed',
@@ -337,20 +343,21 @@ describe('handleWrapperTerminalEvent — new-path identity and message preservat
         instance.ctx.storage,
         wrapperRunId!
       );
+      const settledMessage = await getSessionMessageState(instance.ctx.storage, messageId);
 
-      return { wrapperRuntimeState, wrapperConnectionId, acceptedMessages };
+      return { wrapperRuntimeState, wrapperConnectionId, acceptedMessages, settledMessage };
     });
 
-    // Identity must NOT be cleared while accepted work remains
-    expect(result.wrapperRuntimeState.wrapperConnectionId).toBe(result.wrapperConnectionId);
-    // Accepted message must still be non-terminal
-    expect(result.acceptedMessages).toHaveLength(1);
-    expect(result.acceptedMessages[0]?.status).toBe('accepted');
+    // The message is settled rather than left accepted.
+    expect(result.acceptedMessages).toHaveLength(0);
+    expect(result.settledMessage).toMatchObject({
+      status: 'failed',
+      failureCode: 'missing_assistant_reply',
+      completionSource: 'idle_reconciliation',
+    });
+    // Identity is released once the run has no remaining accepted work.
+    expect(result.wrapperRuntimeState.wrapperConnectionId).toBeUndefined();
   });
-
-  // NOTE: Per Phase 6 (keep-warm cleanup), wrapper `complete` will eventually NOT clear
-  // identity even when no accepted messages remain — keep-warm alarm cleanup owns that.
-  // The current behavior (clearing when idle) is interim and will be superseded by Phase 6.
 });
 
 describe('new-path liveness without executionId', () => {

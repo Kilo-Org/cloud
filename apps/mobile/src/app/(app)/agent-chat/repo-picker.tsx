@@ -2,15 +2,18 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { Check, Lock, Search, Unlock } from 'lucide-react-native';
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { Pressable, ScrollView, TextInput, View } from 'react-native';
+import { FlatList, Pressable, TextInput, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { clearRepoPickerBridge, getRepoPickerBridge } from '@/lib/picker-bridge';
+import { filterRepoPickerOptions } from '@/lib/repo-picker-filter';
 
 export default function RepoPickerScreen() {
   const router = useRouter();
   const colors = useThemeColors();
+  const { bottom } = useSafeAreaInsets();
   const [search, setSearch] = useState('');
   const [bridge, setBridge] = useState(() => getRepoPickerBridge());
 
@@ -34,16 +37,10 @@ export default function RepoPickerScreen() {
     }, [])
   );
 
-  const filtered = useMemo(() => {
-    if (!bridge) {
-      return [];
-    }
-    if (!search) {
-      return bridge.repositories;
-    }
-    const q = search.toLowerCase();
-    return bridge.repositories.filter(r => r.fullName.toLowerCase().includes(q));
-  }, [bridge, search]);
+  const filtered = useMemo(
+    () => filterRepoPickerOptions({ repositories: bridge?.repositories ?? [], search }),
+    [bridge, search]
+  );
 
   const handleSelect = useCallback(
     (repo: string) => {
@@ -65,71 +62,72 @@ export default function RepoPickerScreen() {
   }
 
   return (
-    <ScrollView
+    <FlatList
       className="flex-1 bg-background"
+      data={filtered}
+      keyExtractor={repo => repo.fullName}
       keyboardShouldPersistTaps="handled"
       keyboardDismissMode="on-drag"
-    >
-      <View className="border-b border-border bg-background px-4 pb-3 pt-4">
-        <View className="h-11 flex-row items-center justify-center">
-          <Text className="text-lg font-semibold text-foreground">Select Repository</Text>
-          <Pressable
-            onPress={closePicker}
-            hitSlop={8}
-            accessibilityRole="button"
-            accessibilityLabel="Close repository picker"
-            className="absolute right-0 rounded-full bg-secondary px-4 py-2 active:opacity-70 will-change-pressable"
-          >
-            <Text className="text-base font-medium text-foreground">Done</Text>
-          </Pressable>
+      contentContainerStyle={{ paddingBottom: bottom }}
+      ListHeaderComponent={
+        <View className="border-b border-border bg-background px-4 pb-3 pt-4">
+          <View className="h-11 flex-row items-center justify-center">
+            <Text className="text-lg font-semibold text-foreground">Select Repository</Text>
+            <Pressable
+              onPress={closePicker}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Close repository picker"
+              className="absolute right-0 rounded-full bg-secondary px-4 py-2 active:opacity-70 will-change-pressable"
+            >
+              <Text className="text-base font-medium text-foreground">Done</Text>
+            </Pressable>
+          </View>
+          <View className="mt-2 flex-row items-center gap-2 rounded-full bg-secondary px-3 py-2">
+            <Search size={18} color={colors.mutedForeground} />
+            <TextInput
+              placeholder="Search repositories..."
+              placeholderTextColor={colors.mutedForeground}
+              autoCapitalize="none"
+              autoCorrect={false}
+              clearButtonMode="while-editing"
+              returnKeyType="search"
+              className="h-8 flex-1 p-0 text-base text-foreground"
+              style={{ color: colors.foreground }}
+              onChangeText={setSearch}
+            />
+          </View>
         </View>
-        <View className="mt-2 flex-row items-center gap-2 rounded-full bg-secondary px-3 py-2">
-          <Search size={18} color={colors.mutedForeground} />
-          <TextInput
-            placeholder="Search repositories..."
-            placeholderTextColor={colors.mutedForeground}
-            autoCapitalize="none"
-            autoCorrect={false}
-            clearButtonMode="while-editing"
-            returnKeyType="search"
-            className="h-8 flex-1 p-0 text-base text-foreground"
-            style={{ color: colors.foreground }}
-            onChangeText={setSearch}
-          />
-        </View>
-      </View>
-
-      {filtered.length === 0 ? (
+      }
+      ListEmptyComponent={
         <View className="items-center justify-center px-6 py-16">
           <Text className="text-center text-sm text-muted-foreground">
             {search.trim() ? 'No repositories match your search' : 'No repositories available'}
           </Text>
         </View>
-      ) : (
-        filtered.map(repo => (
-          <Pressable
-            key={repo.fullName}
-            className="flex-row items-center gap-3 border-b border-border px-4 py-3 active:bg-secondary will-change-pressable"
-            onPress={() => {
-              handleSelect(repo.fullName);
-            }}
-            accessibilityRole="button"
-            accessibilityLabel={repo.fullName}
-          >
-            {repo.isPrivate ? (
-              <Lock size={14} color={colors.mutedForeground} />
-            ) : (
-              <Unlock size={14} color={colors.mutedForeground} />
-            )}
-            <Text className="flex-1 text-base text-foreground" numberOfLines={1}>
-              {repo.fullName}
-            </Text>
-            {bridge.currentValue === repo.fullName ? (
-              <Check size={18} color={colors.primary} />
-            ) : null}
-          </Pressable>
-        ))
+      }
+      renderItem={({ item: repo }) => (
+        <Pressable
+          className="flex-row items-center gap-3 border-b border-border px-4 py-3 active:bg-secondary will-change-pressable"
+          onPress={() => {
+            handleSelect(repo.fullName);
+          }}
+          accessibilityRole="button"
+          accessibilityLabel={repo.fullName}
+        >
+          {repo.isPrivate ? (
+            <Lock size={14} color={colors.mutedForeground} />
+          ) : (
+            <Unlock size={14} color={colors.mutedForeground} />
+          )}
+          <Text className="flex-1 text-base text-foreground" numberOfLines={1}>
+            {repo.fullName}
+          </Text>
+          {bridge.currentValue === repo.fullName ? (
+            <Check size={18} color={colors.primary} />
+          ) : null}
+        </Pressable>
       )}
-    </ScrollView>
+    />
   );
 }

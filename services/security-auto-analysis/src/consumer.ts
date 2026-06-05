@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto';
 import { getWorkerDb, type WorkerDb } from '@kilocode/db/client';
+import { decideAutoAnalysisEligibility } from '@kilocode/worker-utils/security-auto-analysis-policy';
 import {
   claimRowsForOwner,
   clearOwnerActorResolutionFailure,
@@ -10,12 +11,14 @@ import {
   updateQueueFromPending,
   type ClaimedQueueRow,
 } from './db/queries.js';
+import { transitionAnalysisStartLifecycle } from './analysis-start-lifecycle.js';
 import { logger } from './logger.js';
 import { InsufficientCreditsError, startSecurityAnalysis } from './launch.js';
 import {
   AutoAnalysisOwnerMessageSchema,
   AUTO_ANALYSIS_MAX_ATTEMPTS,
   AUTO_ANALYSIS_OWNER_CAP,
+  resolveSecurityAgentModels,
   type ActorResolutionMode,
   type AutoAnalysisFailureCode,
   type ProcessCounters,
@@ -146,23 +149,6 @@ function ownerFromQueueRow(row: ClaimedQueueRow): QueueOwner | null {
   return null;
 }
 
-function getSeverityRankForAutoAnalysis(severity: string | null): number | null {
-  if (severity === 'critical') return 0;
-  if (severity === 'high') return 1;
-  if (severity === 'medium') return 2;
-  if (severity === 'low') return 3;
-  return null;
-}
-
-function maxSeverityRankForThreshold(
-  minSeverity: SecurityAgentConfig['auto_analysis_min_severity']
-): number {
-  if (minSeverity === 'critical') return 0;
-  if (minSeverity === 'high') return 1;
-  if (minSeverity === 'medium') return 2;
-  return 3;
-}
-
 function isEligibleForAutoLaunch(params: {
   findingCreatedAt: string;
   findingStatus: string;
@@ -171,27 +157,16 @@ function isEligibleForAutoLaunch(params: {
   config: SecurityAgentConfig;
   isAgentEnabled: boolean;
 }): boolean {
-  if (!params.isAgentEnabled || !params.config.auto_analysis_enabled) {
-    return false;
-  }
-  if (params.findingStatus !== 'open') {
-    return false;
-  }
-  if (!params.autoAnalysisEnabledAt) {
-    return false;
-  }
-  if (
-    !params.config.auto_analysis_include_existing &&
-    Date.parse(params.findingCreatedAt) < Date.parse(params.autoAnalysisEnabledAt)
-  ) {
-    return false;
-  }
-
-  // Treat null/unknown severity as low (rank 3) so these findings are not
-  // silently skipped. They still respect the severity threshold.
-  const severityRank = getSeverityRankForAutoAnalysis(params.findingSeverity) ?? 3;
-
-  return severityRank <= maxSeverityRankForThreshold(params.config.auto_analysis_min_severity);
+  return decideAutoAnalysisEligibility({
+    findingCreatedAt: params.findingCreatedAt,
+    findingStatus: params.findingStatus,
+    findingSeverity: params.findingSeverity,
+    autoAnalysisEnabledAt: params.autoAnalysisEnabledAt,
+    isAgentEnabled: params.isAgentEnabled,
+    autoAnalysisEnabled: params.config.auto_analysis_enabled,
+    autoAnalysisMinSeverity: params.config.auto_analysis_min_severity,
+    autoAnalysisIncludeExisting: params.config.auto_analysis_include_existing,
+  }).eligible;
 }
 
 function nextRetryAt(attemptCount: number): Date {
@@ -479,54 +454,32 @@ async function processOwnerMessage(params: {
         continue;
       }
 
+      const models = resolveSecurityAgentModels(claim.config);
       const startResult = await startSecurityAnalysis({
         db,
         env: params.env,
         findingId: finding.id,
         actorUser: actorResolution.user,
         githubToken,
-        model: claim.config.model_slug ?? 'anthropic/claude-opus-4.6',
+        triageModel: models.triageModel,
+        analysisModel: models.analysisModel,
         analysisMode: claim.config.analysis_mode,
         organizationId: launchOwner.type === 'org' ? launchOwner.id : undefined,
         nextAuthSecret,
         internalApiSecret,
         callbackTokenSecret,
+        lifecycleClaim: {
+          source: 'scheduled',
+          findingId: row.finding_id,
+          queueRowId: row.id,
+          claimToken: row.claim_token,
+        },
       });
 
       if (startResult.started) {
         if (startResult.triageOnly) {
-          await markQueuePendingState({
-            db,
-            rowId: row.id,
-            claimToken: row.claim_token,
-            status: 'completed',
-            incrementAttempt: true,
-            logContext: {
-              jobId,
-              owner: launchOwner,
-              findingId: row.finding_id,
-              attemptCount: row.attempt_count + 1,
-              actorUserId: actorResolution.user.id,
-              actorResolutionMode: actorResolution.mode,
-            },
-          });
           counters.completed += 1;
         } else {
-          await markQueuePendingState({
-            db,
-            rowId: row.id,
-            claimToken: row.claim_token,
-            status: 'running',
-            incrementAttempt: true,
-            logContext: {
-              jobId,
-              owner: launchOwner,
-              findingId: row.finding_id,
-              attemptCount: row.attempt_count + 1,
-              actorUserId: actorResolution.user.id,
-              actorResolutionMode: actorResolution.mode,
-            },
-          });
           counters.launched += 1;
         }
         continue;
@@ -556,8 +509,31 @@ async function processOwnerMessage(params: {
       const nextAttemptCount = row.attempt_count + 1;
       const isRetryable = classification.class === 'retryable';
       const terminal = !isRetryable || nextAttemptCount >= AUTO_ANALYSIS_MAX_ATTEMPTS;
+      const retryAt = terminal ? null : nextRetryAt(nextAttemptCount);
 
-      if (terminal) {
+      if (startResult.failureNeedsLifecycleTransition) {
+        await transitionAnalysisStartLifecycle(db, {
+          claim: {
+            source: 'scheduled',
+            findingId: row.finding_id,
+            queueRowId: row.id,
+            claimToken: row.claim_token,
+          },
+          outcome: {
+            type: 'start-failed',
+            errorMessage: startResult.error ?? 'Security analysis start failed',
+            queueStatus: terminal ? 'failed' : 'queued',
+            failureCode: classification.code,
+            incrementAttempt: true,
+            nextRetryAt: retryAt?.toISOString() ?? null,
+          },
+        });
+        if (terminal) {
+          counters.failed += 1;
+        } else {
+          counters.requeued += 1;
+        }
+      } else if (terminal) {
         await markQueuePendingState({
           db,
           rowId: row.id,
@@ -585,7 +561,7 @@ async function processOwnerMessage(params: {
           failureCode: classification.code,
           errorMessage: startResult.error,
           incrementAttempt: true,
-          nextRetryAt: nextRetryAt(nextAttemptCount),
+          nextRetryAt: retryAt,
           logContext: {
             jobId,
             owner: launchOwner,
@@ -604,19 +580,20 @@ async function processOwnerMessage(params: {
       if (classification.class === 'credit_gated') {
         await markOwnerCreditFailure(db, catchOwner);
 
-        await markQueuePendingState({
-          db,
-          rowId: row.id,
-          claimToken: row.claim_token,
-          status: 'queued',
-          failureCode: classification.code,
-          errorMessage: error instanceof Error ? error.message : String(error),
-          nextRetryAt: new Date(Date.now() + 30 * 60 * 1000),
-          logContext: {
-            jobId,
-            owner: catchOwner,
+        await transitionAnalysisStartLifecycle(db, {
+          claim: {
+            source: 'scheduled',
             findingId: row.finding_id,
-            attemptCount: row.attempt_count,
+            queueRowId: row.id,
+            claimToken: row.claim_token,
+          },
+          outcome: {
+            type: 'start-failed',
+            errorMessage: error instanceof Error ? error.message : String(error),
+            queueStatus: 'queued',
+            failureCode: classification.code,
+            incrementAttempt: false,
+            nextRetryAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
           },
         });
 

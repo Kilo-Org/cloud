@@ -58,7 +58,12 @@ import {
 } from '../websocket/ingest.js';
 import type { StoredEvent } from '../websocket/types.js';
 import type { WrapperCommand, CloudStatusData } from '../shared/protocol.js';
+import {
+  isPublicCloudAgentExtensionSourceType,
+  projectPublicCloudAgentExtensionEvent,
+} from '../kilo-facade/cloud-agent-extension-events.js';
 import { commandsOrDefault, type SlashCommandInfo } from '../shared/slash-commands.js';
+import { withDORetry } from '../utils/do-retry.js';
 import type {
   AcceptedExecutionTurn,
   AgentSelection,
@@ -93,8 +98,14 @@ import {
   clearWrapperRuntimeIdentity,
   getWrapperLease,
   getWrapperRuntimeState,
+  nextWrapperCleanupDeadline,
   nextWrapperLeaseDeadline,
 } from '../session/wrapper-runtime-state.js';
+import {
+  kiloGlobalFeedValidationSchema,
+  validateKiloGlobalFeedProducerIdentity,
+  type KiloGlobalFeedValidationResult,
+} from '../session/wrapper-global-feed-validation.js';
 import {
   getSessionMessageState,
   listNonTerminalAcceptedMessages,
@@ -108,6 +119,10 @@ import {
   createMessageSettlementOutbox,
   type MessageSettlementOutbox,
 } from '../session/message-settlement-outbox.js';
+import {
+  resolveSessionMessageResult,
+  type MessageResultRPCResponse,
+} from '../session/message-result.js';
 import {
   createAgentRuntime,
   type AgentRuntime,
@@ -276,6 +291,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
   private messageSettlementOutbox?: MessageSettlementOutbox;
   private sessionMessageQueue?: SessionMessageQueue;
   private wrapperSupervisor?: WrapperSupervisor;
+  private publicExtensionPublicationTail: Promise<void> = Promise.resolve();
   private isTerminalStatus(
     status: ExecutionStatus
   ): status is 'completed' | 'failed' | 'interrupted' {
@@ -356,6 +372,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
           error: err instanceof Error ? err.message : String(err),
         })
         .error('Failed to enqueue callback job');
+      throw err;
     }
   }
 
@@ -582,6 +599,10 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         requireSessionId: () => this.requireSessionId(),
         validateModeAgainstRuntimeAgents,
         getDeliveryContext: () => this.getPendingMessageDeliveryContext(),
+        getDeliveryBlock: async () => {
+          const retryAt = nextWrapperCleanupDeadline(await getWrapperLease(this.ctx.storage));
+          return retryAt === undefined ? null : { retryAt };
+        },
         deliver: plan => this.executeDirectly(plan),
         ensureQueuedMessageEvent: event => {
           this.ensureQueuedMessageEvent({
@@ -806,6 +827,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
    * @param event - The stored event to broadcast
    */
   broadcastEvent(event: StoredEvent): void {
+    this.publishPublicCloudAgentExtensionEvent(event);
     if (this.streamHandler) {
       this.streamHandler.broadcastEvent(event);
       return;
@@ -822,6 +844,39 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
           })
           .warn('Failed to broadcast event - stream handler unavailable');
       });
+  }
+
+  private publishPublicCloudAgentExtensionEvent(event: StoredEvent): void {
+    if (!isPublicCloudAgentExtensionSourceType(event.stream_event_type)) return;
+    const publication = this.publicExtensionPublicationTail
+      .catch(() => undefined)
+      .then(async () => {
+        const metadata = await this.getMetadata();
+        const kiloSessionId = metadata?.auth.kiloSessionId;
+        if (!metadata || !kiloSessionId) return;
+        const projected = projectPublicCloudAgentExtensionEvent(event, kiloSessionId);
+        if (!projected) return;
+        const facadeId = this.env.USER_KILO_FACADE.idFromName(metadata.identity.userId);
+        await withDORetry(
+          () => this.env.USER_KILO_FACADE.get(facadeId),
+          facade =>
+            facade.publishCloudAgentExtensionEvent({
+              kiloUserId: metadata.identity.userId,
+              cloudAgentSessionId: metadata.identity.sessionId,
+              kiloSessionId,
+              organizationId: metadata.identity.orgId,
+              event: projected,
+            }),
+          'publishCloudAgentExtensionEvent'
+        );
+      })
+      .catch(error => {
+        logger
+          .withFields({ error: error instanceof Error ? error.message : String(error) })
+          .warn('Failed to publish public Cloud Agent extension event');
+      });
+    this.publicExtensionPublicationTail = publication;
+    this.ctx.waitUntil(publication);
   }
 
   private insertAndBroadcastEvent(params: {
@@ -972,11 +1027,66 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     return metadata ? parseSessionMetadata(metadata) : null;
   }
 
+  async validateKiloGlobalFeedProducer(params: {
+    kiloSessionId: string;
+    wrapperRunId: string;
+    wrapperGeneration: number;
+    wrapperConnectionId: string;
+  }): Promise<KiloGlobalFeedValidationResult> {
+    const parsed = kiloGlobalFeedValidationSchema.safeParse(params);
+    if (!parsed.success) {
+      return { success: false, status: 400, message: 'Invalid global feed producer identity' };
+    }
+
+    const metadata = await this.getMetadata();
+    const runtimeState = await getWrapperRuntimeState(this.ctx.storage);
+    return validateKiloGlobalFeedProducerIdentity({
+      metadata,
+      runtimeState,
+      producer: parsed.data,
+    });
+  }
+
   async getLatestAssistantMessage(): Promise<LatestAssistantMessage | null> {
     const sessionId = await this.requireSessionId();
     const metadata = await this.getMetadata();
     if (!metadata?.auth.kiloSessionId) return null;
     return this.eventQueries.getLatestAssistantMessage(sessionId, metadata.auth.kiloSessionId);
+  }
+
+  async getMessageResult(messageId: string): Promise<MessageResultRPCResponse> {
+    const metadata = await this.getMetadata();
+    if (!metadata) return { type: 'session-not-found' };
+
+    const resolved = await resolveSessionMessageResult(this.ctx.storage, messageId);
+    if (!resolved) return { type: 'message-not-found' };
+    if (resolved.type === 'state-invalid') return resolved;
+
+    const sessionId = await this.requireSessionId();
+    const assistantMessage =
+      metadata.auth.kiloSessionId && resolved.assistantLookup
+        ? this.eventQueries.getAssistantMessageById(
+            sessionId,
+            metadata.auth.kiloSessionId,
+            resolved.assistantLookup.messageId,
+            resolved.assistantLookup.parentMessageId
+          )
+        : null;
+    const assistant = assistantMessage
+      ? {
+          messageId: assistantMessage.info.id,
+          text: extractAssistantTextFromParts(assistantMessage.parts) || undefined,
+        }
+      : undefined;
+
+    return {
+      type: 'found',
+      result: {
+        cloudAgentSessionId: sessionId,
+        ...resolved.result,
+        ...(assistant ? { assistant } : {}),
+      },
+    };
   }
 
   private async getLatestAssistantMessageText(): Promise<string | undefined> {

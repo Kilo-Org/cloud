@@ -6,7 +6,6 @@ export { FindingDetailDialog } from './FindingDetailDialog';
 export { DismissFindingDialog, type DismissReason } from './DismissFindingDialog';
 export { SecurityConfigForm, type SlaConfig } from './SecurityConfigForm';
 export { RepositoryFilter } from './RepositoryFilter';
-export { SecurityAgentPageClient } from './SecurityAgentPageClient';
 export { MarkdownProse } from './MarkdownProse';
 export { FindingStatusBadge } from './FindingStatusBadge';
 export { ClearFindingsCard } from './ClearFindingsCard';

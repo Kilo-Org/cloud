@@ -56,6 +56,7 @@ The recommended V2 flow is:
 - `prepareSession` - Create a fully prepared session with workspace, git clone, and configuration
 - `updateSession` - Update a prepared (not yet initiated) session
 - `getSession` - Query session metadata (no secrets)
+- `getMessageResult` - Poll lifecycle state and terminal assistant text for one submitted turn
 - `initiateFromKilocodeSessionV2` - Start execution on a prepared session
 - `sendMessageV2` - Send follow-up messages (output via `/stream` WebSocket)
 - `deleteSession` - Delete a session and clean up resources
@@ -66,6 +67,28 @@ The recommended V2 flow is:
 ### Authentication
 
 All endpoints require a kilocode api token except `/stream` which uses short lived ws tickets.
+
+### Message Result Retrieval
+
+Use the bearer-protected `GET /trpc/getMessageResult` query to poll one durably submitted Cloud Agent turn. Supply `cloudAgentSessionId` and the submitted `messageId`.
+
+```text
+GET /trpc/getMessageResult?input={"cloudAgentSessionId":"agent_<uuid>","messageId":"msg_<id>"}
+Authorization: Bearer <kilocode-api-token>
+```
+
+The response includes only safe fields: `cloudAgentSessionId`, `messageId`, lifecycle status and timestamps, optional structured `completionSource`, `failure`, `gateResult`, and assistant text correlated to the selected submitted turn. It never returns prompts, tokens, callback details, or raw diagnostics.
+
+| Stored lifecycle state | Public status |
+|---|---|
+| `queued` | `queued` |
+| `accepted` | `running` |
+| `completed` | `completed` |
+| `failed` | `failed` |
+| `interrupted` | `interrupted` |
+| Pending-only compatibility row | `queued` |
+
+The query returns `NOT_FOUND` for missing sessions, cross-user session lookups, and unknown message IDs.
 
 ## Usage Examples
 

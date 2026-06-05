@@ -22,6 +22,7 @@ import React, {
 } from 'react';
 import { User, ArrowDown, ChevronRight, ChevronDown, SquarePen } from 'lucide-react';
 import { format } from 'date-fns';
+import { v4 as uuidv4 } from 'uuid';
 import { TimeAgo } from '@/components/shared/TimeAgo';
 import AssistantLogo from '@/components/AssistantLogo';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
@@ -455,7 +456,7 @@ export function AppBuilderChat({ organizationId }: AppBuilderChatProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
-  const [messageUuid, setMessageUuid] = useState(() => crypto.randomUUID());
+  const [messageUuid, setMessageUuid] = useState(() => uuidv4());
   const [selectedModel, setSelectedModel] = useState<string>(projectModel ?? '');
   const [hasImages, setHasImages] = useState(false);
   // Track the initial projectModel to detect when a new project loads
@@ -627,7 +628,7 @@ export function AppBuilderChat({ organizationId }: AppBuilderChatProps) {
       }
       manager.sendMessage(value, images, selectedModel || undefined);
       // PromptInput clears itself internally after successful submit
-      setMessageUuid(crypto.randomUUID());
+      setMessageUuid(uuidv4());
     },
     [manager, selectedModel, pendingNewSession, sessions.length]
   );

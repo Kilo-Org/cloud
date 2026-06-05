@@ -52,10 +52,16 @@ export const IMPACT_ACCOUNT_SID = getEnvVariable('IMPACT_ACCOUNT_SID') || '';
 export const IMPACT_AUTH_TOKEN = getEnvVariable('IMPACT_AUTH_TOKEN') || '';
 export const IMPACT_CAMPAIGN_ID = getEnvVariable('IMPACT_CAMPAIGN_ID') || '';
 export const IMPACT_ADVOCATE_TENANT_ALIAS = getEnvVariable('IMPACT_ADVOCATE_TENANT_ALIAS') || '';
-export const IMPACT_ADVOCATE_PROGRAM_ID = getEnvVariable('IMPACT_ADVOCATE_PROGRAM_ID') || '';
 export const IMPACT_ADVOCATE_ACCOUNT_SID = getEnvVariable('IMPACT_ADVOCATE_ACCOUNT_SID') || '';
 export const IMPACT_ADVOCATE_AUTH_TOKEN = getEnvVariable('IMPACT_ADVOCATE_AUTH_TOKEN') || '';
-export const IMPACT_ADVOCATE_WIDGET_ID = getEnvVariable('IMPACT_ADVOCATE_WIDGET_ID') || '';
+export const IMPACT_ADVOCATE_KILOCLAW_PROGRAM_ID =
+  getEnvVariable('IMPACT_ADVOCATE_KILOCLAW_PROGRAM_ID') || '';
+export const IMPACT_ADVOCATE_KILOCLAW_WIDGET_ID =
+  getEnvVariable('IMPACT_ADVOCATE_KILOCLAW_WIDGET_ID') || '';
+export const IMPACT_ADVOCATE_KILO_PASS_PROGRAM_ID =
+  getEnvVariable('IMPACT_ADVOCATE_KILO_PASS_PROGRAM_ID') || '';
+export const IMPACT_ADVOCATE_KILO_PASS_WIDGET_ID =
+  getEnvVariable('IMPACT_ADVOCATE_KILO_PASS_WIDGET_ID') || '';
 export const IMPACT_ADVOCATE_API_BASE_URL =
   getEnvVariable('IMPACT_ADVOCATE_API_BASE_URL') || 'https://app.referralsaasquatch.com';
 export const IMPACT_ADVOCATE_DEBUG_LOGGING =
@@ -359,6 +365,12 @@ export const MODEL_EVAL_INGEST_URL = getEnvVariable('MODEL_EVAL_INGEST_URL') || 
 
 // Session ingest worker (public share proxy)
 export const SESSION_INGEST_WORKER_URL = getEnvVariable('SESSION_INGEST_WORKER_URL') || '';
+
+// Security Agent sync Worker command ingress
+export const SECURITY_SYNC_WORKER_URL = getEnvVariable('SECURITY_SYNC_WORKER_URL') || '';
+// Security Agent auto-analysis Worker command ingress
+export const SECURITY_AUTO_ANALYSIS_WORKER_URL =
+  getEnvVariable('SECURITY_AUTO_ANALYSIS_WORKER_URL') || '';
 
 // Google Web Risk API
 export const GOOGLE_WEB_RISK_API_KEY = getEnvVariable('GOOGLE_WEB_RISK_API_KEY');

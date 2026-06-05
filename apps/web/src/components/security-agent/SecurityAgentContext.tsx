@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState, useCallback, useMemo, useRef } from 'react';
+import { createContext, use, useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useTRPC } from '@/lib/trpc/utils';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -8,6 +8,7 @@ import type { SecurityFinding } from '@kilocode/db/schema';
 import { isGitHubIntegrationError } from '@/lib/security-agent/core/error-display';
 import type { DismissReason } from './DismissFindingDialog';
 import type { SlaConfig } from './SecurityConfigForm';
+import { manualAnalysisAdmissionCopy } from './manual-analysis-admission-copy';
 
 type SecurityAgentContextValue = {
   organizationId: string | undefined;
@@ -94,7 +95,7 @@ type SecurityAgentContextValue = {
 const SecurityAgentContext = createContext<SecurityAgentContextValue | null>(null);
 
 export function useSecurityAgent() {
-  const ctx = useContext(SecurityAgentContext);
+  const ctx = use(SecurityAgentContext);
   if (!ctx) {
     throw new Error('useSecurityAgent must be used within a SecurityAgentProvider');
   }
@@ -107,6 +108,25 @@ function getOptionalStringField(source: unknown, key: string): string | undefine
   }
   const value = Reflect.get(source, key);
   return typeof value === 'string' ? value : undefined;
+}
+
+const ACCEPTED_QUEUE_POLL_INTERVAL_MS = 3000;
+const ACCEPTED_QUEUE_POLL_TIMEOUT_MS = 18000;
+
+function listFindingsDataHasActiveAnalysis(data: unknown): boolean {
+  if (typeof data !== 'object' || data === null) return false;
+
+  const runningCount = Reflect.get(data, 'runningCount');
+  if (typeof runningCount === 'number' && runningCount > 0) return true;
+
+  const findings = Reflect.get(data, 'findings');
+  if (!Array.isArray(findings)) return false;
+
+  return findings.some(finding => {
+    if (typeof finding !== 'object' || finding === null) return false;
+    const analysisStatus = Reflect.get(finding, 'analysis_status');
+    return analysisStatus === 'pending' || analysisStatus === 'running';
+  });
 }
 
 type SecurityAgentProviderProps = {
@@ -122,6 +142,103 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
   const [startingAnalysisIds, setStartingAnalysisIds] = useState<Set<string>>(new Set());
   const [gitHubError, setGitHubError] = useState<string | null>(null);
   const toggleEnabledInFlightRef = useRef(false);
+  const acceptedQueuePollRef = useRef<{ intervalId: number; timeoutId: number } | null>(null);
+  const acceptedQueuePollHasSeenActiveRef = useRef(false);
+
+  const clearAcceptedQueuePoll = useCallback(() => {
+    const activePoll = acceptedQueuePollRef.current;
+    if (!activePoll) return;
+    window.clearInterval(activePoll.intervalId);
+    window.clearTimeout(activePoll.timeoutId);
+    acceptedQueuePollRef.current = null;
+  }, []);
+
+  useEffect(() => clearAcceptedQueuePoll, [clearAcceptedQueuePoll]);
+
+  const invalidateAcceptedQueueQueries = useCallback(() => {
+    if (isOrg && organizationId) {
+      const ownerInput = { organizationId };
+      void Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: trpc.organizations.securityAgent.listFindings.queryKey(ownerInput),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: trpc.organizations.securityAgent.getFinding.queryKey(ownerInput),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: trpc.organizations.securityAgent.getAnalysis.queryKey(ownerInput),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: trpc.organizations.securityAgent.getStats.queryKey(ownerInput),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: trpc.organizations.securityAgent.getDashboardStats.queryKey(ownerInput),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: trpc.organizations.securityAgent.getLastSyncTime.queryKey(ownerInput),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: trpc.organizations.securityAgent.getRepositories.queryKey(ownerInput),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: trpc.organizations.securityAgent.getOrphanedRepositories.queryKey(ownerInput),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: trpc.organizations.securityAgent.getAutoDismissEligible.queryKey(ownerInput),
+        }),
+      ]);
+      return;
+    }
+
+    void Promise.all([
+      queryClient.invalidateQueries({ queryKey: trpc.securityAgent.listFindings.queryKey() }),
+      queryClient.invalidateQueries({ queryKey: trpc.securityAgent.getFinding.queryKey() }),
+      queryClient.invalidateQueries({ queryKey: trpc.securityAgent.getAnalysis.queryKey() }),
+      queryClient.invalidateQueries({ queryKey: trpc.securityAgent.getStats.queryKey() }),
+      queryClient.invalidateQueries({ queryKey: trpc.securityAgent.getDashboardStats.queryKey() }),
+      queryClient.invalidateQueries({ queryKey: trpc.securityAgent.getLastSyncTime.queryKey() }),
+      queryClient.invalidateQueries({ queryKey: trpc.securityAgent.getRepositories.queryKey() }),
+      queryClient.invalidateQueries({
+        queryKey: trpc.securityAgent.getOrphanedRepositories.queryKey(),
+      }),
+      queryClient.invalidateQueries({
+        queryKey: trpc.securityAgent.getAutoDismissEligible.queryKey(),
+      }),
+    ]);
+  }, [isOrg, organizationId, queryClient, trpc]);
+
+  const cachedListFindingsHasActiveAnalysis = useCallback(() => {
+    const queryKey = isOrg
+      ? trpc.organizations.securityAgent.listFindings.queryKey(
+          organizationId ? { organizationId } : undefined
+        )
+      : trpc.securityAgent.listFindings.queryKey();
+
+    return queryClient
+      .getQueriesData({ queryKey })
+      .some(([, data]) => listFindingsDataHasActiveAnalysis(data));
+  }, [isOrg, organizationId, queryClient, trpc]);
+
+  const pollAcceptedQueueMutation = useCallback(() => {
+    clearAcceptedQueuePoll();
+    acceptedQueuePollHasSeenActiveRef.current = false;
+    invalidateAcceptedQueueQueries();
+
+    const intervalId = window.setInterval(() => {
+      invalidateAcceptedQueueQueries();
+      const hasActiveAnalysis = cachedListFindingsHasActiveAnalysis();
+      if (hasActiveAnalysis) {
+        acceptedQueuePollHasSeenActiveRef.current = true;
+        return;
+      }
+      if (acceptedQueuePollHasSeenActiveRef.current) {
+        clearAcceptedQueuePoll();
+      }
+    }, ACCEPTED_QUEUE_POLL_INTERVAL_MS);
+
+    const timeoutId = window.setTimeout(clearAcceptedQueuePoll, ACCEPTED_QUEUE_POLL_TIMEOUT_MS);
+    acceptedQueuePollRef.current = { intervalId, timeoutId };
+  }, [cachedListFindingsHasActiveAnalysis, clearAcceptedQueuePoll, invalidateAcceptedQueueQueries]);
 
   // Permission status query
   const { data: permissionData, isLoading: isLoadingPermission } = useQuery(
@@ -160,8 +277,8 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
     trpc.organizations.securityAgent.triggerSync.mutationOptions({
       onSuccess: () => {
         setGitHubError(null);
-        toast.success('Sync completed successfully');
-        void queryClient.invalidateQueries();
+        toast.success('Sync queued');
+        pollAcceptedQueueMutation();
       },
       onError: error => {
         const message = error instanceof Error ? error.message : String(error);
@@ -182,7 +299,7 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
     trpc.organizations.securityAgent.dismissFinding.mutationOptions({
       onSuccess: () => {
         toast.success('Finding dismissed');
-        void queryClient.invalidateQueries();
+        pollAcceptedQueueMutation();
       },
       onError: error => {
         toast.error('Failed to dismiss finding', { description: error.message });
@@ -205,9 +322,9 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
   const { mutate: orgSetEnabledMutate, isPending: isOrgSetEnabledPending } = useMutation(
     trpc.organizations.securityAgent.setEnabled.mutationOptions({
       onSuccess: async data => {
-        if ('syncResult' in data && data.syncResult) {
+        if ('initialSync' in data && data.initialSync) {
           toast.success('Security Agent enabled', {
-            description: `Initial sync completed: ${data.syncResult.synced} alerts synced${data.syncResult.errors > 0 ? `, ${data.syncResult.errors} errors` : ''}`,
+            description: 'Initial sync queued. Findings update as processing completes.',
           });
         } else {
           toast.success('Security Agent setting updated');
@@ -228,8 +345,8 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
     trpc.organizations.securityAgent.startAnalysis.mutationOptions({
       onSuccess: async (_data, variables) => {
         setGitHubError(null);
-        toast.success('Analysis started');
-        void queryClient.invalidateQueries();
+        toast.success(manualAnalysisAdmissionCopy.successTitle);
+        pollAcceptedQueueMutation();
         setStartingAnalysisIds(prev => {
           const next = new Set(prev);
           next.delete(variables.findingId);
@@ -245,7 +362,10 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
               'The GitHub App may have been uninstalled. Please check your integrations.',
           });
         } else {
-          toast.error('Failed to start analysis', { description: message, duration: 8000 });
+          toast.error(manualAnalysisAdmissionCopy.failureTitle, {
+            description: message,
+            duration: 8000,
+          });
         }
         void queryClient.invalidateQueries();
         setStartingAnalysisIds(prev => {
@@ -276,8 +396,8 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
     trpc.securityAgent.triggerSync.mutationOptions({
       onSuccess: () => {
         setGitHubError(null);
-        toast.success('Sync completed successfully');
-        void queryClient.invalidateQueries();
+        toast.success('Sync queued');
+        pollAcceptedQueueMutation();
       },
       onError: error => {
         const message = error instanceof Error ? error.message : String(error);
@@ -298,7 +418,7 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
     trpc.securityAgent.dismissFinding.mutationOptions({
       onSuccess: () => {
         toast.success('Finding dismissed');
-        void queryClient.invalidateQueries();
+        pollAcceptedQueueMutation();
       },
       onError: error => {
         toast.error('Failed to dismiss finding', { description: error.message });
@@ -321,9 +441,9 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
   const { mutate: personalSetEnabledMutate, isPending: isPersonalSetEnabledPending } = useMutation(
     trpc.securityAgent.setEnabled.mutationOptions({
       onSuccess: async data => {
-        if ('syncResult' in data && data.syncResult) {
+        if ('initialSync' in data && data.initialSync) {
           toast.success('Security Agent enabled', {
-            description: `Initial sync completed: ${data.syncResult.synced} alerts synced${data.syncResult.errors > 0 ? `, ${data.syncResult.errors} errors` : ''}`,
+            description: 'Initial sync queued. Findings update as processing completes.',
           });
         } else {
           toast.success('Security Agent setting updated');
@@ -344,8 +464,8 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
     trpc.securityAgent.startAnalysis.mutationOptions({
       onSuccess: async (_data, variables) => {
         setGitHubError(null);
-        toast.success('Analysis started');
-        void queryClient.invalidateQueries();
+        toast.success(manualAnalysisAdmissionCopy.successTitle);
+        pollAcceptedQueueMutation();
         setStartingAnalysisIds(prev => {
           const next = new Set(prev);
           next.delete(variables.findingId);
@@ -361,7 +481,10 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
               'The GitHub App may have been uninstalled. Please check your integrations.',
           });
         } else {
-          toast.error('Failed to start analysis', { description: message, duration: 8000 });
+          toast.error(manualAnalysisAdmissionCopy.failureTitle, {
+            description: message,
+            duration: 8000,
+          });
         }
         void queryClient.invalidateQueries();
         setStartingAnalysisIds(prev => {

@@ -27,12 +27,13 @@ async function deliverToTarget(
   };
 
   try {
-    const response = await fetch(target.url, {
+    const requestInit: RequestInit = {
       method: 'POST',
       headers,
       body: JSON.stringify(payload),
       signal: AbortSignal.timeout(DELIVERY_TIMEOUT_MS),
-    });
+    };
+    const response = await fetch(target.url, requestInit);
 
     logger
       .withFields({

@@ -18,6 +18,7 @@ Updated 2026-05-06 -- require Impact Advocate reward redemption after local Kilo
 Updated 2026-05-12 -- note price-versioned KiloClaw billing preserves referral semantics.
 Updated 2026-05-22 -- renamed to `.specs/impact-referrals.md` and expanded to Kilo Pass referrals.
 Updated 2026-05-28 -- classify enforced Stripe EFW refunds as adverse payments.
+Updated 2026-05-29 -- name the Impact-facing Kilo Pass reward unit `Kilo Pass Bonus Credits`.
 
 ## Conventions
 
@@ -143,6 +144,8 @@ not stack with, the normal Kilo Pass monthly/promo bonus for that issuance.
 Existing Impact Performance conversion events drive Impact Advocate conversion state. The system uses `Sale (71659)` as
 the paid-conversion event for referral conversion and renewal reporting. When referral wins attribution for a paid
 conversion, local referral rewards are authoritative and affiliate SALE reporting for the same conversion is suppressed.
+Impact Advocate reward redemption is used only for reporting synchronization: KiloClaw redeems after local free-month
+application, and Kilo Pass redeems after local referral bonus allocation.
 
 ## Rules
 
@@ -157,8 +160,9 @@ conversion, local referral rewards are authoritative and affiliate SALE reportin
    - UTT UUID: `A7138521-9724-4b8f-95f4-1db2fbae81141`
    - Advocate widget ID: `p/51699/w/referrerWidget`
 
-3. Existing unscoped Impact Advocate configuration MAY remain as KiloClaw fallback configuration only. Kilo Pass MUST
-   require explicit Kilo Pass Advocate program/widget configuration and MUST NOT fall back to KiloClaw configuration.
+3. Impact Advocate account SID, auth token, and tenant alias MAY be shared across Advocate programs. KiloClaw and Kilo
+   Pass MUST each require explicit product-scoped Advocate program ID and widget ID configuration. Products MUST NOT
+   fall back to unscoped or other-product program/widget configuration.
 
 4. Kilo Pass MUST use a different Impact Advocate program ID and widget ID than KiloClaw.
 
@@ -627,6 +631,16 @@ conversion, local referral rewards are authoritative and affiliate SALE reportin
 158. Impact reward redemption state is for reporting and reconciliation only. It MUST NOT be the source of truth for
      local reward eligibility, application, cancellation, or reversal.
 
+158a. For Kilo Pass, when a local referral bonus reward is allocated/granted, the system MUST queue asynchronous Impact
+      Advocate reward lookup and single-reward redemption using the USD-denominated reward amount and the
+      `Kilo Pass Bonus Credits` unit so Impact reporting matches Kilo allocation state.
+
+158b. Kilo Pass Impact Advocate reward redemption MUST be idempotently queued per local reward and MUST NOT block paid
+      conversion processing, reward ledger creation, reward application, billing settlement, or user access.
+
+158c. Kilo Pass Impact reward lookup and redemption state is for reporting and reconciliation only. It MUST NOT be the
+      source of truth for local reward eligibility, application, cancellation, or reversal.
+
 ### Refunds, Reversals, and Fraud
 
 159. Rewards from a qualifying Stripe payment MUST be treated as adverse when Stripe reports a chargeback or when
@@ -762,6 +776,10 @@ conversion, local referral rewards are authoritative and affiliate SALE reportin
 
 ## Changelog
 
+### 2026-05-29 -- Name the Kilo Pass Impact reward unit
+
+Kilo Pass reward synchronization sends the `Kilo Pass Bonus Credits` unit to Impact Advocate while retaining the USD-denominated local reward amount.
+
 ### 2026-05-28 -- Enforced EFW refunds are adverse payments
 
 Classified an enforced Stripe Early Fraud Warning refund as an adverse qualifying payment for both covered products. Pending or earned-but-unapplied rewards cancel, already-applied rewards require support review, and later refund or chargeback delivery must remain idempotent.
@@ -772,6 +790,16 @@ Added the Kilo Pass reusable Stripe payment-fingerprint guard for monthly introd
 conversions. The first positively paid settlement using a supported fingerprintable instrument permanently claims that
 instrument opportunity; reused instruments retain ordinary monthly-ramp bonus behavior but do not receive the
 introductory promo or create Kilo Pass referral rewards. Annual behavior remains outside this restriction.
+
+### 2026-05-26 -- Redeem allocated Kilo Pass rewards in Impact Advocate
+
+Kilo Pass referral bonus allocation now queues Impact Advocate reward lookup and redemption using the USD reward amount,
+for reporting synchronization only. The local reward ledger remains authoritative.
+
+### 2026-05-25 -- Require product-scoped Advocate program/widget configuration
+
+Removed KiloClaw fallback to unscoped Impact Advocate program/widget configuration. KiloClaw and Kilo Pass now both
+require explicit product-scoped Advocate program ID and widget ID while sharing account SID, auth token, and tenant alias.
 
 ### 2026-05-22 -- Rename and expand to Kilo Pass
 

@@ -25,6 +25,10 @@ declare type GitTokenService = {
   getToken(installationId: string, appType?: 'standard' | 'lite'): Promise<string>;
 };
 
+declare type SecretBinding = {
+  get(): Promise<string>;
+};
+
 declare type ScheduledController = {
   scheduledTime: number;
   cron: string;
@@ -38,7 +42,10 @@ declare type ExecutionContext = {
 
 declare type CloudflareEnv = {
   SECURITY_SYNC_BETTERSTACK_HEARTBEAT_URL: string | undefined;
-  SYNC_QUEUE: Queue<import('./src/index').SecuritySyncMessage>;
+  INTERNAL_API_SECRET: SecretBinding;
+  SYNC_QUEUE: Queue<import('./src/index').SecuritySyncQueueMessage>;
   HYPERDRIVE: Hyperdrive;
   GIT_TOKEN_SERVICE: GitTokenService;
+  MANUAL_SYNC_COMMAND_ROUTING_ENABLED: string | undefined;
+  DISMISS_FINDING_COMMAND_ROUTING_ENABLED: string | undefined;
 };

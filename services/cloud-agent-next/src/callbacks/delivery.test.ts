@@ -117,6 +117,26 @@ describe('deliverCallbackJob', () => {
   });
 
   describe('successful delivery', () => {
+    it('delivers Security Agent callbacks through the configured HTTP target', async () => {
+      const callbackFetch = vi.fn().mockResolvedValue(new Response('', { status: 202 }));
+      globalThis.fetch = callbackFetch;
+      const target: CallbackTarget = {
+        url: 'https://security-analysis.test/internal/security-analysis-callback/finding-123',
+        headers: { 'X-Internal-Secret': 'secret' },
+      };
+
+      const result = await deliverCallbackJob(target, mockPayload, 1);
+
+      expect(result.type).toBe('success');
+      expect(callbackFetch).toHaveBeenCalledWith(
+        'https://security-analysis.test/internal/security-analysis-callback/finding-123',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify(mockPayload),
+        })
+      );
+    });
+
     it('should succeed on 200 response', async () => {
       globalThis.fetch = vi.fn().mockResolvedValue(new Response('', { status: 200 }));
       const target: CallbackTarget = { url: 'https://example.com/callback' };

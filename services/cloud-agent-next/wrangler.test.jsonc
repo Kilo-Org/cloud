@@ -11,12 +11,20 @@
         "class_name": "CloudAgentSession",
         "name": "CLOUD_AGENT_SESSION",
       },
+      {
+        "class_name": "UserKiloFacade",
+        "name": "USER_KILO_FACADE",
+      },
     ],
   },
   "migrations": [
     {
       "new_sqlite_classes": ["CloudAgentSession"],
       "tag": "v2",
+    },
+    {
+      "new_sqlite_classes": ["UserKiloFacade"],
+      "tag": "v5",
     },
   ],
   "queues": {

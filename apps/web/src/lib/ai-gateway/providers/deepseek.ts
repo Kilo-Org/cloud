@@ -1,22 +1,10 @@
-import type {
-  KiloExclusiveModel,
-  Pricing,
-  Usage,
+import {
+  calculateSimpleCost_mUsd,
+  type KiloExclusiveModel,
 } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 
 export function isDeepseekModel(model: string) {
   return model.includes('deepseek');
-}
-
-function calculate_mUsd(usage: Usage, basePricing: Pricing) {
-  return (
-    usage.uncachedInputTokens * basePricing.prompt_per_million +
-    usage.cacheWriteTokens *
-      (basePricing.input_cache_write_per_million ?? basePricing.prompt_per_million) +
-    usage.cacheHitTokens *
-      (basePricing.input_cache_read_per_million ?? basePricing.prompt_per_million) +
-    usage.totalOutputTokens * basePricing.completion_per_million
-  );
 }
 
 const deepseek_v4_pro_discounted_model: KiloExclusiveModel = {
@@ -35,7 +23,7 @@ const deepseek_v4_pro_discounted_model: KiloExclusiveModel = {
     completion_per_million: 0.87,
     input_cache_read_per_million: 0.003625,
     input_cache_write_per_million: null,
-    calculate_mUsd,
+    calculate_mUsd: calculateSimpleCost_mUsd,
   },
   exclusive_to: [],
   inference_provider_restriction: ['deepseek'],
@@ -57,7 +45,7 @@ const deepseek_v4_flash_discounted_model: KiloExclusiveModel = {
     completion_per_million: 0.28,
     input_cache_read_per_million: 0.0028,
     input_cache_write_per_million: null,
-    calculate_mUsd,
+    calculate_mUsd: calculateSimpleCost_mUsd,
   },
   exclusive_to: [],
   inference_provider_restriction: ['deepseek'],

@@ -2,13 +2,14 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   type LayoutChangeEvent,
+  Platform,
   ScrollView,
   TextInput,
   type TextStyle,
   View,
 } from 'react-native';
 import { type Href, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { generateMessageId } from 'cloud-agent-sdk/message-id';
 import * as Haptics from 'expo-haptics';
 import { toast } from 'sonner-native';
@@ -20,6 +21,7 @@ import { useTextHeight } from '@/components/agents/use-text-height';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { ScreenHeader } from '@/components/screen-header';
+import { invalidateAgentSessionQueries } from '@/lib/agent-session-cache';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { trpcClient, useTRPC } from '@/lib/trpc';
@@ -28,7 +30,8 @@ const PROMPT_INPUT_DEFAULT_LINES = 3;
 const PROMPT_INPUT_MAX_LINES = 6;
 const PROMPT_INPUT_LINE_HEIGHT = 24;
 const PROMPT_INPUT_VERTICAL_PADDING = 32;
-const PROMPT_INPUT_HORIZONTAL_PADDING = 32;
+const PROMPT_INPUT_HORIZONTAL_PADDING = Platform.OS === 'android' ? 48 : 32;
+const PROMPT_INPUT_ANDROID_HORIZONTAL_INSET = 24;
 const PROMPT_INPUT_MIN_HEIGHT =
   PROMPT_INPUT_LINE_HEIGHT * PROMPT_INPUT_DEFAULT_LINES + PROMPT_INPUT_VERTICAL_PADDING;
 const PROMPT_INPUT_MAX_HEIGHT =
@@ -44,6 +47,7 @@ export default function NewSessionScreen() {
   const router = useRouter();
   const navigation = useNavigation();
   const colors = useThemeColors();
+  const queryClient = useQueryClient();
   const { organizationId } = useLocalSearchParams<{ organizationId?: string }>();
 
   // ── Selectors state ──────────────────────────────────────────────
@@ -137,6 +141,7 @@ export default function NewSessionScreen() {
           })
         : await trpcClient.cloudAgentNext.prepareSession.mutate(baseInput);
 
+      await invalidateAgentSessionQueries(queryClient, trpc);
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       const path = organizationId
         ? `/(app)/agent-chat/${result.kiloSessionId}?organizationId=${organizationId}`
@@ -161,7 +166,7 @@ export default function NewSessionScreen() {
     } finally {
       setIsCreating(false);
     }
-  }, [selectedRepo, model, mode, variant, organizationId, router, navigation]);
+  }, [selectedRepo, model, mode, variant, organizationId, queryClient, trpc, router, navigation]);
 
   const canStart = hasPrompt && selectedRepo.length > 0 && model.length > 0 && !isCreating;
 
@@ -187,7 +192,13 @@ export default function NewSessionScreen() {
             placeholderTextColor={colors.mutedForeground}
             multiline
             className="px-4 py-4 text-base leading-6 text-foreground"
-            style={[promptInputStyle, { height: promptMeasure.height }]}
+            style={[
+              promptInputStyle,
+              { height: promptMeasure.height },
+              Platform.OS === 'android'
+                ? { paddingHorizontal: PROMPT_INPUT_ANDROID_HORIZONTAL_INSET }
+                : undefined,
+            ]}
             onChangeText={text => {
               promptRef.current = text;
               promptMeasure.setText(text);

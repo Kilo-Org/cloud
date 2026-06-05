@@ -10,18 +10,63 @@ const SESSION_MESSAGE_STATE_PREFIX = 'session_message:';
 
 export type SessionMessageStatus = 'queued' | 'accepted' | 'completed' | 'failed' | 'interrupted';
 
-export type SessionMessageCompletionSource =
-  | 'assistant_message_event'
-  | 'manual_compact_summarize'
-  | 'idle_reconciliation'
-  | 'wrapper_failure'
-  | 'interrupt'
-  | 'delivery_failure';
+export const SessionMessageCompletionSourceSchema = z.enum([
+  'assistant_message_event',
+  'manual_compact_summarize',
+  'idle_reconciliation',
+  'wrapper_failure',
+  'interrupt',
+  'delivery_failure',
+]);
+export type SessionMessageCompletionSource = z.infer<typeof SessionMessageCompletionSourceSchema>;
 
-export type SessionMessageFailureStage = NonNullable<
-  CloudAgentRunStateReport['run']['failureStage']
->;
-export type SessionMessageFailureCode = NonNullable<CloudAgentRunStateReport['run']['failureCode']>;
+type AssertTrue<T extends true> = T;
+type CloudAgentRunFailureStage = NonNullable<CloudAgentRunStateReport['run']['failureStage']>;
+type CloudAgentRunFailureCode = NonNullable<CloudAgentRunStateReport['run']['failureCode']>;
+
+export const SessionMessageFailureStageSchema = z.enum([
+  'pre_dispatch',
+  'post_dispatch_no_activity',
+  'agent_activity',
+  'interruption',
+  'unknown',
+] as const satisfies readonly CloudAgentRunFailureStage[]);
+export type SessionMessageFailureStage =
+  AssertTrue<
+    CloudAgentRunFailureStage extends z.infer<typeof SessionMessageFailureStageSchema>
+      ? true
+      : false
+  > extends true
+    ? z.infer<typeof SessionMessageFailureStageSchema>
+    : never;
+
+export const SessionMessageFailureCodeSchema = z.enum([
+  'sandbox_connect_failed',
+  'workspace_setup_failed',
+  'kilo_server_failed',
+  'wrapper_start_failed',
+  'invalid_delivery_request',
+  'session_metadata_missing',
+  'model_missing',
+  'delivery_failure_unknown',
+  'wrapper_disconnected',
+  'wrapper_no_output',
+  'wrapper_ping_timeout',
+  'wrapper_error_before_activity',
+  'assistant_error',
+  'wrapper_error_after_activity',
+  'missing_assistant_reply',
+  'user_interrupt',
+  'container_shutdown',
+  'system_interrupt',
+  'unclassified',
+] as const satisfies readonly CloudAgentRunFailureCode[]);
+export type SessionMessageFailureCode =
+  AssertTrue<
+    CloudAgentRunFailureCode extends z.infer<typeof SessionMessageFailureCodeSchema> ? true : false
+  > extends true
+    ? z.infer<typeof SessionMessageFailureCodeSchema>
+    : never;
 export type SessionMessageDispatchAcceptanceKind = 'observed' | 'inferred_from_terminal';
 
 export type LegacyAdmissionConstraints = {
@@ -165,48 +210,9 @@ export const SessionMessageStateSchema = z
     wrapperRunId: z.string().optional(),
     assistantMessageId: z.string().optional(),
     assistantCompletedAt: z.number().optional(),
-    completionSource: z
-      .enum([
-        'assistant_message_event',
-        'manual_compact_summarize',
-        'idle_reconciliation',
-        'wrapper_failure',
-        'interrupt',
-        'delivery_failure',
-      ])
-      .optional(),
-    failureStage: z
-      .enum([
-        'pre_dispatch',
-        'post_dispatch_no_activity',
-        'agent_activity',
-        'interruption',
-        'unknown',
-      ])
-      .optional(),
-    failureCode: z
-      .enum([
-        'sandbox_connect_failed',
-        'workspace_setup_failed',
-        'kilo_server_failed',
-        'wrapper_start_failed',
-        'invalid_delivery_request',
-        'session_metadata_missing',
-        'model_missing',
-        'delivery_failure_unknown',
-        'wrapper_disconnected',
-        'wrapper_no_output',
-        'wrapper_ping_timeout',
-        'wrapper_error_before_activity',
-        'assistant_error',
-        'wrapper_error_after_activity',
-        'missing_assistant_reply',
-        'user_interrupt',
-        'container_shutdown',
-        'system_interrupt',
-        'unclassified',
-      ])
-      .optional(),
+    completionSource: SessionMessageCompletionSourceSchema.optional(),
+    failureStage: SessionMessageFailureStageSchema.optional(),
+    failureCode: SessionMessageFailureCodeSchema.optional(),
     error: z.string().optional(),
     failureReason: z.string().optional(),
     attempts: z.number().int().nonnegative().optional(),
@@ -357,21 +363,41 @@ function normalizeParsedSessionMessageState(
   return { ...currentState, legacyAdmissionConstraints: constraints };
 }
 
-export async function getSessionMessageState(
+export type SessionMessageStateLookup =
+  | { type: 'missing' }
+  | { type: 'invalid' }
+  | { type: 'found'; state: SessionMessageState };
+
+export async function lookupSessionMessageState(
   storage: SessionMessageStorage,
   messageId: string
-): Promise<SessionMessageState | undefined> {
+): Promise<SessionMessageStateLookup> {
   const raw = await storage.get<unknown>(sessionMessageStateKey(messageId));
-  if (raw === undefined) return undefined;
+  if (raw === undefined) return { type: 'missing' };
   const result = SessionMessageStateSchema.safeParse(raw);
   if (!result.success) {
     console.warn('Invalid session message state', {
       messageId,
       issues: result.error.issues,
     });
-    return undefined;
+    return { type: 'invalid' };
   }
-  return normalizeParsedSessionMessageState(result.data);
+  if (result.data.messageId !== messageId) {
+    console.warn('Mismatched session message state identity', {
+      messageId,
+      storedMessageId: result.data.messageId,
+    });
+    return { type: 'invalid' };
+  }
+  return { type: 'found', state: normalizeParsedSessionMessageState(result.data) };
+}
+
+export async function getSessionMessageState(
+  storage: SessionMessageStorage,
+  messageId: string
+): Promise<SessionMessageState | undefined> {
+  const lookup = await lookupSessionMessageState(storage, messageId);
+  return lookup.type === 'found' ? lookup.state : undefined;
 }
 
 export async function putSessionMessageState(

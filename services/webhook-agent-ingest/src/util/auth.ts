@@ -39,6 +39,17 @@ export function validateInternalApiKey(
  * Does NOT set user context - routes extract userId/orgId from URL path.
  */
 export const internalApiMiddleware = createMiddleware<HonoContext>(async (c, next) => {
+  // The /api/callbacks subtree authenticates with a scoped X-Callback-Token
+  // (see routes/callbacks.ts via verifyCallbackToken), NOT the internal API key.
+  // It is mounted under /api, so the `/api/*` matcher for this middleware would
+  // otherwise 401 completion callbacks before they reach the token-validating
+  // handler — orphaning the webhook request in `inprogress`. Exempt the subtree
+  // here; every route under it self-authenticates. (c.req.path is the full
+  // request path under Hono's app.route() mounting, verified for hono@4.12.18.)
+  if (c.req.path.startsWith('/api/callbacks/')) {
+    return next();
+  }
+
   const apiKeyHeader = c.req.header(INTERNAL_API_KEY_HEADER);
   const secret = await c.env.INTERNAL_API_SECRET.get();
 

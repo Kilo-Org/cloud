@@ -18,6 +18,7 @@ fly auth docker
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 KILOCLAW_DIR="$(dirname "$SCRIPT_DIR")"
+REPO_ROOT="$(cd "$KILOCLAW_DIR/../.." && pwd)"
 
 # shellcheck source=services/kiloclaw/scripts/dev-image-mode.sh
 . "$SCRIPT_DIR/dev-image-mode.sh"
@@ -78,6 +79,7 @@ docker buildx build \
   -f "$DOCKERFILE" \
   --build-arg "CONTROLLER_COMMIT=$GIT_SHA" \
   --build-arg "CONTROLLER_CACHE_BUST=$(date +%s)" \
+  --build-context "workspace=$REPO_ROOT" \
   -t "$IMAGE" \
   --push \
   --metadata-file "$METADATA_FILE" \

@@ -21,5 +21,12 @@ export type { KiloChatEvent, KiloChatEventName, KiloChatEventOf } from './events
 export * from './schemas';
 export * from './webhook-schemas';
 export type * from './rpc-types';
+export {
+  postMessageAsUserOkSchema,
+  postMessageAsUserErrSchema,
+  postMessageAsUserResultSchema,
+  postMessageAsUserParamsSchema,
+  postMessageAsUserCorrelationSchema,
+} from './rpc-types';
 export * from './events';
 export * from './route-helpers';

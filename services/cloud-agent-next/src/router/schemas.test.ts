@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   ExecutionResponse,
+  GetMessageResultInput,
+  GetMessageResultOutput,
   GetSessionOutput,
   InitiateFromPreparedSessionInput,
   LegacyExecutionResponse,
@@ -328,6 +330,111 @@ describe('message ID schema validation', () => {
     });
 
     expect(result.success).toBe(false);
+  });
+});
+
+describe('getMessageResult contract', () => {
+  const baseOutput = {
+    cloudAgentSessionId: validSessionId,
+    messageId: validMessageId,
+    status: 'completed' as const,
+    createdAt: 1,
+  };
+
+  it('requires an exact lookup input while rejecting invalid or unknown fields', () => {
+    expect(GetMessageResultInput.safeParse({ cloudAgentSessionId: validSessionId }).success).toBe(
+      false
+    );
+    expect(
+      GetMessageResultInput.safeParse({
+        cloudAgentSessionId: validSessionId,
+        messageId: validMessageId,
+      }).success
+    ).toBe(true);
+    expect(GetMessageResultInput.safeParse({ cloudAgentSessionId: 'agent_invalid' }).success).toBe(
+      false
+    );
+    expect(
+      GetMessageResultInput.safeParse({ cloudAgentSessionId: validSessionId, messageId: 'msg_bad' })
+        .success
+    ).toBe(false);
+    expect(
+      GetMessageResultInput.safeParse({ cloudAgentSessionId: validSessionId, unknown: true })
+        .success
+    ).toBe(false);
+  });
+
+  it('accepts public statuses and allowlisted structured result fields', () => {
+    for (const status of ['queued', 'running', 'completed', 'failed', 'interrupted']) {
+      expect(GetMessageResultOutput.safeParse({ ...baseOutput, status }).success).toBe(true);
+    }
+    expect(
+      GetMessageResultOutput.safeParse({
+        ...baseOutput,
+        queuedAt: 2,
+        acceptedAt: 3,
+        terminalAt: 4,
+        completionSource: 'assistant_message_event',
+        gateResult: 'fail',
+        assistant: { messageId: 'assistant_1', text: 'safe answer' },
+      }).success
+    ).toBe(true);
+    expect(
+      GetMessageResultOutput.safeParse({
+        ...baseOutput,
+        status: 'failed',
+        queuedAt: 2,
+        acceptedAt: 3,
+        terminalAt: 4,
+        completionSource: 'wrapper_failure',
+        failure: { stage: 'agent_activity', code: 'assistant_error', attempts: 2 },
+      }).success
+    ).toBe(true);
+  });
+
+  it('fails closed on contradictory lifecycle result fields', () => {
+    for (const output of [
+      { ...baseOutput, status: 'queued', acceptedAt: 2 },
+      { ...baseOutput, status: 'queued', terminalAt: 2 },
+      { ...baseOutput, status: 'running', completionSource: 'assistant_message_event' },
+      { ...baseOutput, status: 'queued', failure: { attempts: 1 } },
+      { ...baseOutput, status: 'failed', assistant: { messageId: 'assistant_1', text: 'wrong' } },
+      { ...baseOutput, status: 'interrupted', gateResult: 'fail' },
+    ]) {
+      expect(GetMessageResultOutput.safeParse(output).success).toBe(false);
+    }
+  });
+
+  it('fails closed on extra top-level and nested fields', () => {
+    for (const extra of [
+      { error: 'token' },
+      { failureReason: 'token' },
+      { callbackTarget: { url: 'https://example.com', headers: { Authorization: 'token' } } },
+    ]) {
+      expect(GetMessageResultOutput.safeParse({ ...baseOutput, ...extra }).success).toBe(false);
+    }
+    expect(
+      GetMessageResultOutput.safeParse({
+        ...baseOutput,
+        status: 'failed',
+        failure: { attempts: -1 },
+      }).success
+    ).toBe(false);
+    expect(
+      GetMessageResultOutput.safeParse({
+        ...baseOutput,
+        status: 'failed',
+        failure: { error: 'token' },
+      }).success
+    ).toBe(false);
+    expect(
+      GetMessageResultOutput.safeParse({ ...baseOutput, assistant: { text: 'missing identity' } })
+        .success
+    ).toBe(false);
+    expect(
+      GetMessageResultOutput.safeParse({ ...baseOutput, assistant: { parts: [], info: {} } })
+        .success
+    ).toBe(false);
   });
 });
 

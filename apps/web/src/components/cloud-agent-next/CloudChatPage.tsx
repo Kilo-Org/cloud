@@ -6,6 +6,7 @@ import { useSearchParams } from 'next/navigation';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { ArrowDown, GitBranch } from 'lucide-react';
+import { v4 as uuidv4 } from 'uuid';
 
 import type { KiloSessionId } from '@/lib/cloud-agent-sdk';
 import { useManager } from './CloudAgentProvider';
@@ -224,7 +225,7 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
 
   const setSessionConfig = useSetAtom(manager.atoms.sessionConfig);
 
-  const [attachmentMessageUuid] = useState(() => crypto.randomUUID());
+  const [attachmentMessageUuid] = useState(() => uuidv4());
   const [workspaceTabs, setWorkspaceTabs] = useState(createWorkspaceTabsState);
   const [terminalStatuses, setTerminalStatuses] = useState<
     Record<string, TerminalStatusSummary | undefined>
@@ -449,7 +450,7 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
   }, [setSoundEnabled]);
 
   const handleCreateTerminalTab = useCallback(() => {
-    const terminalId = crypto.randomUUID();
+    const terminalId = uuidv4();
     setWorkspaceTabs(state => addTerminalTab(state, terminalId));
   }, []);
 

@@ -1,17 +1,29 @@
-import { type KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
+import {
+  calculateSimpleCost_mUsd,
+  type KiloExclusiveModel,
+} from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 
-export const minimax_m25_free_model: KiloExclusiveModel = {
-  public_id: 'minimax/minimax-m2.5:free',
-  display_name: 'MiniMax: MiniMax M2.5 (free)',
-  description:
-    'MiniMax-M2.5 is a SOTA large language model designed for real-world productivity. Trained in a diverse range of complex real-world digital working environments, M2.5 builds upon the coding expertise of M2.1 to extend into general office work, reaching fluency in generating and operating Word, Excel, and Powerpoint files, context switching between diverse software environments, and working across different agent and human teams. Scoring 80.2% on SWE-Bench Verified, 51.3% on Multi-SWE-Bench, and 76.3% on BrowseComp, M2.5 is also more token efficient than previous generations, having been trained to optimize its actions and output through planning.',
-  context_length: 204800,
-  max_completion_tokens: 131072,
-  status: 'disabled',
-  flags: ['reasoning', 'vercel-routing'],
+export const MINIMAX_CURRENT_MODEL_ID = 'minimax/minimax-m3';
+
+export const minimax_m3_discounted_model: KiloExclusiveModel = {
+  public_id: MINIMAX_CURRENT_MODEL_ID + ':discounted',
+  display_name: 'MiniMax: MiniMax M3 (50% off through 2026-06-07)',
+  description: `MiniMax-M3 is a multimodal foundation model from MiniMax. It supports text, image, and video inputs with text output, a 1M-token context window, and is suited for long-horizon agentic work, coding, and tool use. It is built on MiniMax Sparse Attention (MSA), which replaces full attention with KV-block selection to cut per-token compute at long context — roughly 1/20 the cost of the previous generation at 1M tokens, with substantially faster prefill and decode while retaining quality across most tasks.
+
+Trained as a native multimodal model on interleaved data and tuned for multi-turn, production-like collaboration via an interactive user-simulator framework, the model is oriented toward sustained, multi-step tasks rather than single-turn execution.`,
+  context_length: 524288,
+  max_completion_tokens: 512000,
+  status: 'public',
+  flags: ['reasoning', 'vercel-routing', 'vision'],
   gateway: 'openrouter',
-  internal_id: 'minimax/minimax-m2.5',
-  pricing: null,
+  internal_id: MINIMAX_CURRENT_MODEL_ID,
+  pricing: {
+    prompt_per_million: 0.3,
+    completion_per_million: 1.2,
+    input_cache_read_per_million: 0.06,
+    input_cache_write_per_million: null,
+    calculate_mUsd: calculateSimpleCost_mUsd,
+  },
   exclusive_to: [],
   inference_provider_restriction: [],
 };
@@ -19,7 +31,3 @@ export const minimax_m25_free_model: KiloExclusiveModel = {
 export function isMinimaxModel(model: string) {
   return model.includes('minimax');
 }
-
-export const MINIMAX_CURRENT_MODEL_ID = 'minimax/minimax-m3';
-
-export const MINIMAX_CURRENT_MODEL_NAME = 'MiniMax M3';

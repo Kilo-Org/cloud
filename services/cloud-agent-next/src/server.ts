@@ -17,6 +17,13 @@ import {
 import { authMiddleware } from './middleware/auth.js';
 import { balanceMiddleware } from './middleware/balance.js';
 import { resolveTerminalWrapperClient } from './terminal/access.js';
+import { requestMethodAllowsBody } from './shared/http-proxy.js';
+import { hasDuplicateQueryParameters } from './shared/http-query.js';
+import {
+  KILO_FACADE_AUTH_TOKEN_HEADER,
+  KILO_FACADE_GLOBAL_FEED_PATH,
+  KILO_FACADE_USER_ID_HEADER,
+} from './kilo-facade/user-kilo-facade.js';
 
 const app = new Hono<HonoContext>();
 
@@ -126,6 +133,59 @@ app.get('/health', (c: Context<HonoContext>) => {
   });
 });
 
+function createSanitizedForwardRequest(
+  request: Request,
+  url: string | URL,
+  headers: Headers
+): Request {
+  const init: RequestInit & { duplex?: 'half' } = {
+    method: request.method,
+    headers,
+  };
+  if (request.body && requestMethodAllowsBody(request.method)) {
+    init.body = request.body;
+    init.duplex = 'half';
+  }
+  return new Request(url, init);
+}
+
+function stripPublicCredentialHeaders(headers: Headers): Headers {
+  const sanitized = new Headers(headers);
+  sanitized.delete('Authorization');
+  sanitized.delete('Cookie');
+  sanitized.delete(KILO_FACADE_USER_ID_HEADER);
+  sanitized.delete(KILO_FACADE_AUTH_TOKEN_HEADER);
+  return sanitized;
+}
+
+async function routeToUserKiloFacade(
+  c: Context<HonoContext>,
+  userId: string,
+  authToken: string
+): Promise<Response> {
+  const doId = c.env.USER_KILO_FACADE.idFromName(userId);
+  const stub = c.env.USER_KILO_FACADE.get(doId);
+  const headers = stripPublicCredentialHeaders(c.req.raw.headers);
+  headers.set(KILO_FACADE_USER_ID_HEADER, userId);
+  headers.set(KILO_FACADE_AUTH_TOKEN_HEADER, authToken);
+  const request = createSanitizedForwardRequest(c.req.raw, c.req.url, headers);
+  return stub.fetch(request);
+}
+
+async function routeAuthenticatedKiloFacade(c: Context<HonoContext>): Promise<Response> {
+  const authResult = await validateKiloToken(
+    c.req.header('Authorization') ?? null,
+    c.env.NEXTAUTH_SECRET
+  );
+  if (!authResult.success) {
+    return c.text(authResult.error, 401);
+  }
+  return routeToUserKiloFacade(c, authResult.userId, authResult.token);
+}
+
+app.all('/kilo', routeAuthenticatedKiloFacade);
+app.all('/kilo/*', routeAuthenticatedKiloFacade);
+
 // TODO: I think this and /terminal share a bit of code. Could be worth extracting to middleware or just a common method?
 app.get('/stream', async (c: Context<HonoContext>) => {
   const upgradeHeader = c.req.header('Upgrade');
@@ -183,6 +243,85 @@ app.get('/stream', async (c: Context<HonoContext>) => {
 
 app.get('/terminal', async (c: Context<HonoContext>) => {
   return handleTerminalWebSocket(c.req.raw, c.env);
+});
+
+app.all('/sessions/:userId/:sessionId/kilo-global-ingest', async (c: Context<HonoContext>) => {
+  const upgradeHeader = c.req.header('Upgrade');
+  if (upgradeHeader?.toLowerCase() !== 'websocket') {
+    return c.text('Expected WebSocket upgrade', 426);
+  }
+
+  const rawUserId = c.req.param('userId');
+  const cloudAgentSessionId = c.req.param('sessionId');
+  if (!rawUserId || !cloudAgentSessionId) {
+    return c.text('Missing route params', 400);
+  }
+
+  let userId: string;
+  try {
+    userId = decodeURIComponent(rawUserId);
+  } catch {
+    return c.text('Invalid userId encoding', 400);
+  }
+
+  const authResult = await validateKiloToken(
+    c.req.header('Authorization') ?? null,
+    c.env.NEXTAUTH_SECRET
+  );
+  if (!authResult.success) {
+    return c.text(authResult.error, 401);
+  }
+  if (authResult.userId !== userId) {
+    return c.text('Token does not match session user', 403);
+  }
+
+  const url = new URL(c.req.url);
+  if (hasDuplicateQueryParameters(url.searchParams)) {
+    return c.text('Invalid global feed producer identity', 400);
+  }
+  const kiloSessionId = url.searchParams.get('kiloSessionId');
+  const wrapperRunId = url.searchParams.get('wrapperRunId');
+  const wrapperGenerationParam = url.searchParams.get('wrapperGeneration');
+  const wrapperConnectionId = url.searchParams.get('wrapperConnectionId');
+  const wrapperGeneration = wrapperGenerationParam ? Number(wrapperGenerationParam) : NaN;
+
+  if (
+    !kiloSessionId ||
+    !wrapperRunId ||
+    !Number.isInteger(wrapperGeneration) ||
+    wrapperGeneration < 0 ||
+    !wrapperConnectionId
+  ) {
+    return c.text('Invalid global feed producer identity', 400);
+  }
+
+  const sessionDoId = c.env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${cloudAgentSessionId}`);
+  const sessionStub = c.env.CLOUD_AGENT_SESSION.get(sessionDoId);
+  const validation = await sessionStub.validateKiloGlobalFeedProducer({
+    kiloSessionId,
+    wrapperRunId,
+    wrapperGeneration,
+    wrapperConnectionId,
+  });
+  if (!validation.success) {
+    return new Response(validation.message, { status: validation.status });
+  }
+
+  const facadeId = c.env.USER_KILO_FACADE.idFromName(userId);
+  const facadeStub = c.env.USER_KILO_FACADE.get(facadeId);
+  const facadeUrl = new URL(c.req.url);
+  facadeUrl.pathname = KILO_FACADE_GLOBAL_FEED_PATH;
+  facadeUrl.search = '';
+  facadeUrl.searchParams.set('userId', userId);
+  facadeUrl.searchParams.set('cloudAgentSessionId', cloudAgentSessionId);
+  facadeUrl.searchParams.set('kiloSessionId', kiloSessionId);
+  facadeUrl.searchParams.set('wrapperRunId', wrapperRunId);
+  facadeUrl.searchParams.set('wrapperGeneration', String(wrapperGeneration));
+  facadeUrl.searchParams.set('wrapperConnectionId', wrapperConnectionId);
+
+  const headers = stripPublicCredentialHeaders(c.req.raw.headers);
+  const request = createSanitizedForwardRequest(c.req.raw, facadeUrl, headers);
+  return facadeStub.fetch(request);
 });
 
 app.all('/sessions/:userId/:sessionId/ingest', async (c: Context<HonoContext>) => {
@@ -350,3 +489,4 @@ export default {
 
 export { Sandbox } from '@cloudflare/sandbox';
 export { CloudAgentSession } from './persistence/CloudAgentSession.js';
+export { UserKiloFacade } from './kilo-facade/user-kilo-facade.js';

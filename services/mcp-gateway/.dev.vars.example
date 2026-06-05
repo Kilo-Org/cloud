@@ -1,0 +1,30 @@
+# MCP Gateway Worker local development secrets and values.
+#
+# These values are test-only and are intentionally safe to commit in the example.
+# Wrangler loads these as ordinary local Worker secrets from .dev.vars.
+# Replace them before using a local gateway against anything other than local fixtures.
+#
+# Copy this file to .dev.vars to boot the Worker locally:
+#   cp .dev.vars.example .dev.vars
+#
+# Generate a fresh matching bundle with:
+#   pnpm --filter cloudflare-mcp-gateway keys:generate -- --format env --target worker --issuer http://localhost:3000
+#
+# For end-to-end app + Worker smoke tests, configure apps/web/.env.local with a
+# matching MCP_GATEWAY_JWT_PRIVATE_KEYSET_JSON, MCP_GATEWAY_CREDENTIAL_KEYSET_JSON,
+# and MCP_GATEWAY_RATE_LIMIT_SECRET. The Worker only needs the public JWKS and
+# decrypt-capable credential keyset below.
+#
+# Hyperdrive is configured in wrangler.jsonc. For local Postgres development,
+# the binding uses the local connection string declared there.
+
+# Local app origin that owns the first-level OAuth authorization server.
+APP_BASE_URL='http://localhost:3000'
+
+# Local Worker origin used for canonical MCP resources and JWT audiences.
+# apps/web must use the same value for MCP_GATEWAY_BASE_URL in local end-to-end flows.
+MCP_GATEWAY_BASE_URL='http://localhost:8806'
+
+MCP_GATEWAY_JWT_PUBLIC_KEYSET_JSON='{"keys":[{"kty":"RSA","n":"uyQHO7_Rena1Bm6SfdMALlwhA6W6SBDvE3hujGf8qSJb4luLZbETSYOVIteSrzstkNIG3JZLfZYqsstTYrgB9VDgg9w8ut2MpH5k9rCH4GJulElS876USgd28busMdZcDHOBjTCGiMBxWZPDuPTG8RkBg-Vl4Jh5JwTNB45GqloYl1M6rDHQI25oQQYMVDUKS68MWxlMNVFVHgIqvnM9QnQfcQdaCYWuEaAUGNJ6YNJovJqtwIQSHESxsgRVcvFZoqGVg_7hWzHgrk1OcSqDE_V4-rzDux4z3eErPp8CbQfc96VLn_TbW0WkXWosGnIFIKQmQh5ZnQ9iiU7uJ6xBDQ","e":"AQAB","kid":"local-test-jwt"}]}'
+MCP_GATEWAY_CREDENTIAL_KEYSET_JSON='{"active":{"keyId":"local-test-credential","publicKeyPem":"-----BEGIN PUBLIC KEY-----\\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAuyQHO7/Rena1Bm6SfdMA\\nLlwhA6W6SBDvE3hujGf8qSJb4luLZbETSYOVIteSrzstkNIG3JZLfZYqsstTYrgB\\n9VDgg9w8ut2MpH5k9rCH4GJulElS876USgd28busMdZcDHOBjTCGiMBxWZPDuPTG\\n8RkBg+Vl4Jh5JwTNB45GqloYl1M6rDHQI25oQQYMVDUKS68MWxlMNVFVHgIqvnM9\\nQnQfcQdaCYWuEaAUGNJ6YNJovJqtwIQSHESxsgRVcvFZoqGVg/7hWzHgrk1OcSqD\\nE/V4+rzDux4z3eErPp8CbQfc96VLn/TbW0WkXWosGnIFIKQmQh5ZnQ9iiU7uJ6xB\\nDQIDAQAB\\n-----END PUBLIC KEY-----\\n"},"decrypt":[{"keyId":"local-test-credential","privateKeyPem":"-----BEGIN PRIVATE KEY-----\\nMIIEvwIBADANBgkqhkiG9w0BAQEFAASCBKkwggSlAgEAAoIBAQC7JAc7v9F6drUG\\nbpJ90wAuXCEDpbpIEO8TeG6MZ/ypIlviW4tlsRNJg5Ui15KvOy2Q0gbclkt9liqy\\ny1NiuAH1UOCD3Dy63YykfmT2sIfgYm6USVLzvpRKB3bxu6wx1lwMc4GNMIaIwHFZ\\nk8O49MbxGQGD5WXgmHknBM0HjkaqWhiXUzqsMdAjbmhBBgxUNQpLrwxbGUw1UVUe\\nAiq+cz1CdB9xB1oJha4RoBQY0npg0mi8mq3AhBIcRLGyBFVy8VmioZWD/uFbMeCu\\nTU5xKoMT9Xj6vMO7HjPd4Ss+nwJtB9z3pUuf9NtbRaRdaiwacgUgpCZCHlmdD2KJ\\nTu4nrEENAgMBAAECggEAEcFB6NRMTpJTa6nMvwboauP79qzTKjuZD/LXVWQXeTO0\\nt5qFDjMPp/2sH5ZUtciNv48XOyrZoxYLm2z/aBiAu9wrGoRbRET5LzFJHCXBe0A7\\nffKHxG8qm7kIYVGzhs+8nSqarWEsnzrXrKHNUI+NdGbLJjVhRguRRJ3Ulsi6QZ0i\\nwhWCoFHNRWEawjT65v0UB9AukwaVQXcFWZS9Eq7BAIZQPL43qKG9ulyJTZYr2oaQ\\n5U2l2tkQH/K9mD2x3zm6TfjZCry1K0fzjSZl2S6JswMCk2E6kwNVpxHT+8Z2Qpi+\\nFmWfZZO5r98ASgGg1Udn9N833jQ6plU/0s6Jdth1rQKBgQD6RqwPbAi/rQngHJ2K\\nJLDKi/ZqMp5wyiEm08jRtozccXyLKiW9fhJy+3qT2h772hyTYpVFzuP4H+6SQpUV\\nnqjpmE41nXXoKN0HhtBspOxo3QhAlaRVFO0b5oJTXrjImDwrZ9HKh7dG3ftFly8Z\\nH8KysEy9tS3GkCC9w54llCMVfwKBgQC/a7VghJQ+c9dORjrDBlZInzHaV15UZ7XK\\nvnDnONYDTYyXRZpLB7c/sY1XtcSSHsITvbN94Fx3DxVgvCrfz5bfmKBwpEhvlVht\\nzEK/PzykPfZrLVC1SmPSvUPbW43FMC5jUAV2eOhb/kEiAQUL5KoVXn+cgCfqb49f\\nhtKGdnzncwKBgQDJ+K5x46VLycDmczFPgjyJuFmrah4it3v5cX/mfYM/gvYW+HRs\\nb4lD8V4CY0wNwv68khoUs9mVK2/D6KeXQurdWGQFMIUuTYvRvyIECzQdjAJU3G45\\nmyGeGm+iCBbnCrPD84yB/PQS5KEaj98aT184BL5pegTu8PD7Mxo1CU8m0QKBgQCS\\nCAyGBn7FqkAuIdvAXrxCiNhSduaqw7fnZSPi8fQq7uV7ngjYhplhCQYITM4an0Z2\\nIvmk5R4FYkdv1f1rYwX5rIlxhZMRNUER+otNNWQA9JhiKV7x/z9qTSNQXGcqcNhi\\nwXB5ckHptG1iEJ8V9KtgxAfcj9RjwBoDyWogVJJzSwKBgQC1ypzewolhE9FysQs6\\n5E2Jo/0lvYdyzooWkmsv0yLrcsDSF9H/iSyzM8mmYGAmoBAkpL4gKAWYoe+TRWX0\\n3HkrrNTMp4800L/zFwKx/vlMEFiKdNdufbKHxy3RSascOM++/niuMI+8QRN8D0p3\\nXG7IdOHXynXsTGtu9GQEEzI49A==\\n-----END PRIVATE KEY-----\\n"}]}'
+MCP_GATEWAY_RATE_LIMIT_SECRET='local-test-rate-limit-secret'

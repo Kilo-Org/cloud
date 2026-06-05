@@ -38,6 +38,18 @@ describe('gitlab oauth state', () => {
     });
   });
 
+  test('rejects signed state for an http instance URL', () => {
+    const state = createGitLabOAuthState(
+      {
+        owner: { type: 'user', id: 'user_123' },
+        instanceUrl: 'http://gitlab.example.com',
+      },
+      'user_123'
+    );
+
+    expect(verifyGitLabOAuthState(state)).toBeNull();
+  });
+
   test('round-trips a validated return path', () => {
     const state = createGitLabOAuthState(
       {

@@ -28,6 +28,8 @@ import {
   type WrapperSessionReadyRequest,
   type WrapperSessionReadyResponse,
 } from '../../src/shared/wrapper-bootstrap.js';
+import { createProxyRequest } from '../../src/shared/http-proxy.js';
+import type { SessionBoundFeedPolicy } from './global-feed-manager.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -75,6 +77,8 @@ export type ServerDependencies = {
     workspacePath: string,
     commitCoAuthor: WrapperCommitCoAuthor | undefined
   ) => Promise<void>;
+  /** Called after a fresh or changed session binding has been stored. */
+  onSessionBound?: (feedPolicy: SessionBoundFeedPolicy) => void | Promise<void>;
 };
 
 export type SessionBinding = {
@@ -220,10 +224,25 @@ function parsePtyPath(path: string): { ptyId: string; action?: 'connect' } | nul
   };
 }
 
+async function notifySessionBound(
+  deps: ServerDependencies,
+  feedPolicy: SessionBoundFeedPolicy
+): Promise<void> {
+  if (!deps.onSessionBound) return;
+  try {
+    await deps.onSessionBound(feedPolicy);
+  } catch (error) {
+    logToFile(
+      `session-bound callback failed: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+}
+
 export async function bindSessionContext(
   binding: SessionBinding | undefined,
   config: ServerConfig,
-  deps: ServerDependencies
+  deps: ServerDependencies,
+  feedPolicy: SessionBoundFeedPolicy = 'restart'
 ): Promise<Response | null> {
   const { state } = deps;
 
@@ -293,6 +312,7 @@ export async function bindSessionContext(
     state.setLogUploader(logUploader);
     logUploader.start();
     logToFile(`session bound: sessionId=${config.sessionId}`);
+    await notifySessionBound(deps, feedPolicy);
     return null;
   }
 
@@ -308,6 +328,9 @@ export async function bindSessionContext(
     agentSessionId: config.agentSessionId,
   };
   const result = state.bindSession(sessionContext);
+  if (feedPolicy === 'close-until-runtime-ready') {
+    await notifySessionBound(deps, feedPolicy);
+  }
   if (result.changed) {
     logToFile(
       `session binding refreshed: generation=${binding.wrapperGeneration ?? 'none'} connectionId=${binding.wrapperConnectionId ?? 'none'}`
@@ -316,6 +339,9 @@ export async function bindSessionContext(
       await deps.closeConnection();
     }
     deps.resetLifecycle();
+    if (feedPolicy === 'restart') {
+      await notifySessionBound(deps, feedPolicy);
+    }
   }
   return null;
 }
@@ -959,6 +985,36 @@ export function createRuntimeEnvironmentHandler(deps: ServerDependencies) {
   };
 }
 
+export function isKiloProxyPath(path: string): boolean {
+  return path === '/kilo-proxy' || path.startsWith('/kilo-proxy/');
+}
+
+export function createKiloProxyHandler(deps: ServerDependencies) {
+  return async (req: Request): Promise<Response> => {
+    let serverUrl: string;
+    try {
+      serverUrl = deps.kiloClient.serverUrl;
+    } catch {
+      return errorResponse('KILO_RUNTIME_UNAVAILABLE', 'Kilo runtime is not bootstrapped', 503);
+    }
+
+    if (!serverUrl) {
+      return errorResponse('KILO_RUNTIME_UNAVAILABLE', 'Kilo runtime is not bootstrapped', 503);
+    }
+
+    const url = new URL(req.url);
+    const upstreamUrl = new URL(serverUrl);
+    const strippedPath =
+      url.pathname === '/kilo-proxy' ? '/' : url.pathname.slice('/kilo-proxy'.length);
+    upstreamUrl.pathname = strippedPath || '/';
+    upstreamUrl.search = url.search;
+
+    const upstreamRequest = createProxyRequest(req, upstreamUrl);
+    upstreamRequest.headers.set('Accept-Encoding', 'identity');
+    return fetch(upstreamRequest);
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Server Creation
 // ---------------------------------------------------------------------------
@@ -987,6 +1043,7 @@ export function createFetchHandler(
   const ptyCreateHandler = createPtyCreateHandler(config, deps);
   const sessionReadyHandler = createSessionReadyHandler(deps);
   const runtimeEnvironmentHandler = createRuntimeEnvironmentHandler(deps);
+  const kiloProxyHandler = createKiloProxyHandler(deps);
 
   // Route table
   type RouteHandler = (req: Request) => Response | Promise<Response>;
@@ -1038,6 +1095,14 @@ export function createFetchHandler(
       if (method === 'DELETE') {
         return createPtyDeleteHandler(deps, ptyPath.ptyId)(req);
       }
+    }
+
+    if (isKiloProxyPath(path)) {
+      return kiloProxyHandler(req).catch(error => {
+        const msg = error instanceof Error ? error.message : String(error);
+        logToFile(`kilo proxy error: ${msg}`);
+        return errorResponse('KILO_PROXY_ERROR', msg, 502);
+      });
     }
 
     // Look up route

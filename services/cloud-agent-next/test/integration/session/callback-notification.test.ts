@@ -143,6 +143,34 @@ describe('Callback notification with latest assistant message', () => {
     expect(job.target.url).toBe('https://example.com/callback');
   });
 
+  it('surfaces callback queue enqueue failures to terminal status updates', async () => {
+    const userId = 'user_cb_enqueue_failure';
+    const sessionId = 'agent_cb_enqueue_failure';
+    const executionId = 'exec_cb_enqueue_failure' as ExecutionId;
+    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
+    const stub = env.CLOUD_AGENT_SESSION.get(doId);
+
+    await runInDurableObject(stub, async (instance: CloudAgentSession) => {
+      injectCallbackQueue(instance, {
+        captured: [],
+        send: async () => {
+          throw new Error('callback queue unavailable');
+        },
+      });
+
+      await prepareSessionWithCallback(instance, sessionId, userId);
+      await instance.addExecution({
+        executionId,
+        mode: 'followup',
+        streamingMode: 'websocket',
+      });
+      await instance.updateExecutionStatus({ executionId, status: 'running' });
+      await expect(
+        instance.updateExecutionStatus({ executionId, status: 'completed' })
+      ).rejects.toThrow('callback queue unavailable');
+    });
+  });
+
   it('omits lastAssistantMessageText on failed callbacks', async () => {
     const userId = 'user_cb_2';
     const sessionId = 'agent_cb_2';

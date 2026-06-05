@@ -10,11 +10,12 @@ import { type ConsentMode, getConsentActions } from '@/components/consent/consen
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { useAuth } from '@/lib/auth/auth-context';
+import { WEB_BASE_URL } from '@/lib/config';
 import { acceptConsent, revokeConsent } from '@/lib/consent';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
-const PRIVACY_URL = 'https://kilo.ai/privacy';
+const PRIVACY_URL = `${WEB_BASE_URL}/privacy-app`;
 
 type ConsentCardProps = {
   readonly mode?: ConsentMode;

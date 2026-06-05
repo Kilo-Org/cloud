@@ -74,12 +74,23 @@ import {
   model_experiment_variant,
   model_experiment_variant_version,
   model_experiment_request,
+  stripe_dispute_actions,
+  stripe_dispute_cases,
   stripe_early_fraud_warning_cases,
   stripe_early_fraud_warning_actions,
   coding_plan_availability_intents,
   coding_plan_key_inventory,
   coding_plan_subscriptions,
   byok_api_keys,
+  mcp_gateway_configs,
+  mcp_gateway_authorization_codes,
+  mcp_gateway_authorization_requests,
+  mcp_gateway_config_secrets,
+  mcp_gateway_connect_resources,
+  mcp_gateway_connection_instances,
+  mcp_gateway_provider_grants,
+  mcp_gateway_pending_provider_authorizations,
+  mcp_gateway_oauth_clients,
 } from '@kilocode/db/schema';
 
 import { eq, count, sql } from 'drizzle-orm';
@@ -138,6 +149,8 @@ describe('User', () => {
     await db.delete(impact_referral_conversions);
     await db.delete(impact_referrals);
     await db.delete(deleted_user_email_tombstones);
+    await db.delete(stripe_dispute_actions);
+    await db.delete(stripe_dispute_cases);
     await db.delete(stripe_early_fraud_warning_actions);
     await db.delete(stripe_early_fraud_warning_cases);
     await db.delete(payment_methods);
@@ -195,6 +208,14 @@ describe('User', () => {
     await db.delete(agent_environment_profile_skills);
     await db.delete(agent_environment_profile_mcp_servers);
     await db.delete(agent_environment_profiles);
+    await db.delete(mcp_gateway_pending_provider_authorizations);
+    await db.delete(mcp_gateway_authorization_codes);
+    await db.delete(mcp_gateway_authorization_requests);
+    await db.delete(mcp_gateway_oauth_clients);
+    await db.delete(mcp_gateway_provider_grants);
+    await db.delete(mcp_gateway_connection_instances);
+    await db.delete(mcp_gateway_connect_resources);
+    await db.delete(mcp_gateway_configs);
     await db.delete(github_branch_pull_requests);
     await db.delete(user_github_app_tokens);
     await db.delete(organizations);
@@ -420,6 +441,154 @@ describe('User', () => {
   });
 
   describe('softDeleteUser', () => {
+    it('deletes gateway provider grants and pending provider state', async () => {
+      const user = await insertTestUser();
+      const [config] = await db
+        .insert(mcp_gateway_configs)
+        .values({
+          owner_scope: 'personal',
+          owner_id: user.id,
+          name: 'Gateway config',
+          remote_url: 'https://example.com/mcp',
+          auth_mode: 'oauth_static',
+          sharing_mode: 'single_user',
+        })
+        .returning();
+      await db.insert(mcp_gateway_config_secrets).values({
+        config_id: config.config_id,
+        secret_kind: 'static_headers',
+        encrypted_secret: 'encrypted-config-secret',
+      });
+      const [route] = await db
+        .insert(mcp_gateway_connect_resources)
+        .values({
+          config_id: config.config_id,
+          owner_scope: 'personal',
+          owner_id: user.id,
+          route_key: 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_',
+          canonical_url: 'https://mcp.kilosessions.ai/mcp-connect/user/test/config/key',
+          route_status: 'active',
+        })
+        .returning();
+      const [instance] = await db
+        .insert(mcp_gateway_connection_instances)
+        .values({
+          config_id: config.config_id,
+          owner_scope: 'personal',
+          owner_id: user.id,
+          kilo_user_id: user.id,
+          instance_status: 'active',
+        })
+        .returning();
+      await db.insert(mcp_gateway_provider_grants).values({
+        instance_id: instance.instance_id,
+        encrypted_grant: 'encrypted-provider-token',
+        provider_subject: 'provider-user',
+        grant_status: 'active',
+      });
+      const [oauthClient] = await db
+        .insert(mcp_gateway_oauth_clients)
+        .values({
+          client_id: 'mcp:test-client',
+          registration_token_hash: 'registration-token-hash',
+          token_endpoint_auth_method: 'none',
+          redirect_uris: ['https://client.example/callback'],
+          grant_types: ['authorization_code'],
+          response_types: ['code'],
+          declared_scopes: ['profile'],
+        })
+        .returning();
+      const [authorizationRequest] = await db
+        .insert(mcp_gateway_authorization_requests)
+        .values({
+          request_state_hash: 'request-state-hash',
+          oauth_client_id: oauthClient.oauth_client_id,
+          client_id: 'mcp:test-client',
+          owner_scope: 'personal',
+          owner_id: user.id,
+          config_id: config.config_id,
+          route_key: route.route_key,
+          canonical_resource_url: route.canonical_url,
+          redirect_uri: 'https://client.example/callback',
+          requested_scopes: ['profile'],
+          granted_scopes: ['profile'],
+          code_challenge: 'challenge',
+          code_challenge_method: 'S256',
+          execution_context: { type: 'personal' },
+          kilo_user_id: user.id,
+          instance_id: instance.instance_id,
+          request_status: 'pending',
+          expires_at: new Date(Date.now() + 60_000).toISOString(),
+        })
+        .returning();
+      await db.insert(mcp_gateway_authorization_codes).values({
+        code_hash: 'authorization-code-hash',
+        authorization_request_id: authorizationRequest.authorization_request_id,
+        oauth_client_id: authorizationRequest.oauth_client_id,
+        client_id: authorizationRequest.client_id,
+        owner_scope: 'personal',
+        owner_id: user.id,
+        config_id: config.config_id,
+        route_key: route.route_key,
+        canonical_resource_url: route.canonical_url,
+        redirect_uri: authorizationRequest.redirect_uri,
+        granted_scopes: ['profile'],
+        code_challenge: 'challenge',
+        code_challenge_method: 'S256',
+        execution_context: { type: 'personal' },
+        kilo_user_id: user.id,
+        instance_id: instance.instance_id,
+        expires_at: new Date(Date.now() + 60_000).toISOString(),
+      });
+      await db.insert(mcp_gateway_pending_provider_authorizations).values({
+        state_hash: 'pending-state-hash',
+        config_id: config.config_id,
+        instance_id: instance.instance_id,
+        owner_scope: 'personal',
+        owner_id: user.id,
+        kilo_user_id: user.id,
+        route_key: route.route_key,
+        canonical_resource_url: route.canonical_url,
+        remote_url: config.remote_url,
+        auth_mode: 'oauth_static',
+        provider_authorization_endpoint: 'https://example.com/authorize',
+        provider_token_endpoint: 'https://example.com/token',
+        encrypted_state: 'encrypted-provider-state',
+        execution_context: { type: 'personal' },
+        config_version: 1,
+        pending_status: 'pending',
+        expires_at: new Date(Date.now() + 60_000).toISOString(),
+      });
+
+      await softDeleteUser(user.id);
+
+      const grants = await db
+        .select()
+        .from(mcp_gateway_provider_grants)
+        .where(eq(mcp_gateway_provider_grants.instance_id, instance.instance_id));
+      const configSecrets = await db
+        .select()
+        .from(mcp_gateway_config_secrets)
+        .where(eq(mcp_gateway_config_secrets.config_id, config.config_id));
+      const pending = await db
+        .select()
+        .from(mcp_gateway_pending_provider_authorizations)
+        .where(eq(mcp_gateway_pending_provider_authorizations.kilo_user_id, user.id));
+      const authorizationCodes = await db
+        .select()
+        .from(mcp_gateway_authorization_codes)
+        .where(eq(mcp_gateway_authorization_codes.kilo_user_id, user.id));
+      const authorizationRequests = await db
+        .select()
+        .from(mcp_gateway_authorization_requests)
+        .where(eq(mcp_gateway_authorization_requests.kilo_user_id, user.id));
+      expect(grants).toHaveLength(0);
+      expect(configSecrets).toHaveLength(0);
+      expect(pending).toHaveLength(0);
+      expect(authorizationCodes).toHaveLength(0);
+      expect(authorizationRequests).toHaveLength(0);
+    });
+
     it('should anonymize the user row and preserve it', async () => {
       const user = await insertTestUser({
         google_user_email: 'real-email@example.com',
@@ -664,6 +833,7 @@ describe('User', () => {
       });
       const touchId = randomUUID();
       const participantId = randomUUID();
+      const kiloPassParticipantId = randomUUID();
       const conversionId = randomUUID();
       const decisionId = randomUUID();
       const rewardId = randomUUID();
@@ -680,21 +850,46 @@ describe('User', () => {
         touched_at: '2026-04-23T00:00:00.000Z',
         expires_at: '2026-05-23T00:00:00.000Z',
       });
-      await db.insert(impact_advocate_participants).values({
-        id: participantId,
-        user_id: user.id,
-        advocate_id: user.id,
-        advocate_account_id: user.id,
-        contact_email: user.google_user_email,
-        registration_state: 'pending',
-      });
-      await db.insert(impact_advocate_registration_attempts).values({
-        participant_id: participantId,
-        dedupe_key: 'registration-dedupe',
-        opaque_cookie_value: 'sq-cookie',
-        cookie_value_length: 9,
-        delivery_state: 'queued',
-      });
+      await db.insert(impact_advocate_participants).values([
+        {
+          id: participantId,
+          program_key: 'kiloclaw',
+          user_id: user.id,
+          advocate_id: user.google_user_email,
+          advocate_account_id: user.google_user_email,
+          contact_email: user.google_user_email,
+          registration_state: 'pending',
+        },
+        {
+          id: kiloPassParticipantId,
+          program_key: 'kilo_pass',
+          user_id: user.id,
+          advocate_id: user.google_user_email,
+          advocate_account_id: user.google_user_email,
+          contact_email: user.google_user_email,
+          registration_state: 'pending',
+        },
+      ]);
+      await db.insert(impact_advocate_registration_attempts).values([
+        {
+          program_key: 'kiloclaw',
+          participant_id: participantId,
+          dedupe_key: 'registration-dedupe-kiloclaw',
+          opaque_cookie_value: 'sq-cookie',
+          cookie_value_length: 9,
+          delivery_state: 'queued',
+          request_payload: { id: user.google_user_email, email: user.google_user_email },
+        },
+        {
+          program_key: 'kilo_pass',
+          participant_id: kiloPassParticipantId,
+          dedupe_key: 'registration-dedupe-kilo-pass',
+          opaque_cookie_value: 'sq-cookie-kilo-pass',
+          cookie_value_length: 19,
+          delivery_state: 'queued',
+          request_payload: { id: user.google_user_email, email: user.google_user_email },
+        },
+      ]);
       await db.insert(impact_referrals).values({
         referee_user_id: user.id,
         referrer_user_id: referrer.id,
@@ -782,6 +977,11 @@ describe('User', () => {
         .where(eq(impact_advocate_participants.user_id, user.id));
       expect(participantCount.count).toBe(0);
 
+      const [registrationAttemptCount] = await db
+        .select({ count: count() })
+        .from(impact_advocate_registration_attempts);
+      expect(registrationAttemptCount.count).toBe(0);
+
       const [redemptionCount] = await db
         .select({ count: count() })
         .from(impact_advocate_reward_redemptions)
@@ -793,6 +993,15 @@ describe('User', () => {
         .from(impact_referral_conversions)
         .where(eq(impact_referral_conversions.referee_user_id, user.id));
       expect(conversionCount.count).toBe(0);
+
+      expect((await db.select({ count: count() }).from(impact_referrals))[0].count).toBe(0);
+      expect((await db.select({ count: count() }).from(impact_referral_rewards))[0].count).toBe(0);
+      expect(
+        (await db.select({ count: count() }).from(impact_referral_reward_applications))[0].count
+      ).toBe(0);
+      expect((await db.select({ count: count() }).from(impact_conversion_reports))[0].count).toBe(
+        0
+      );
     });
 
     it('falls back to google_user_email when normalized_email is null', async () => {
@@ -1892,6 +2101,101 @@ describe('User', () => {
         .from(stripe_early_fraud_warning_cases)
         .where(eq(stripe_early_fraud_warning_cases.id, unaffectedCase.id));
       expect(unaffectedCaseRows[0].kilo_user_id).toBe(unaffectedUser.id);
+    });
+
+    it('should nullify Stripe dispute case user links while retaining action history', async () => {
+      const user = await insertTestUser();
+      const unaffectedUser = await insertTestUser();
+      const [disputeCase] = await db
+        .insert(stripe_dispute_cases)
+        .values({
+          stripe_dispute_id: 'dp_deleted_user',
+          stripe_event_id: 'evt_deleted_user',
+          stripe_charge_id: 'ch_deleted_user',
+          stripe_customer_id: user.stripe_customer_id,
+          amount_minor_units: 1900,
+          currency: 'usd',
+          dispute_reason: 'fraudulent',
+          stripe_status: 'lost',
+          owner_classification: 'personal',
+          kilo_user_id: user.id,
+          status: 'accepted',
+          status_reason: 'accepted by admin',
+          accepted_by_kilo_user_id: user.id,
+        })
+        .returning({ id: stripe_dispute_cases.id });
+      const [unaffectedCase] = await db
+        .insert(stripe_dispute_cases)
+        .values({
+          stripe_dispute_id: 'dp_unaffected_user',
+          stripe_event_id: 'evt_unaffected_user',
+          stripe_charge_id: 'ch_unaffected_user',
+          stripe_customer_id: unaffectedUser.stripe_customer_id,
+          amount_minor_units: 4900,
+          currency: 'usd',
+          dispute_reason: 'general',
+          stripe_status: 'needs_response',
+          owner_classification: 'personal',
+          kilo_user_id: unaffectedUser.id,
+          status: 'needs_action',
+          accepted_by_kilo_user_id: unaffectedUser.id,
+        })
+        .returning({ id: stripe_dispute_cases.id });
+
+      await db.insert(stripe_dispute_actions).values({
+        case_id: disputeCase.id,
+        action_type: 'stripe_acceptance',
+        target_key: 'stripe_dispute:dp_deleted_user',
+        status: 'completed',
+        result_code: 'lost',
+        result_reference_id: 'dp_deleted_user',
+      });
+      await db.insert(stripe_dispute_actions).values({
+        case_id: disputeCase.id,
+        action_type: 'user_block',
+        target_key: `user:${user.id}`,
+        status: 'completed',
+        result_code: 'blocked',
+        result_reference_id: user.id,
+      });
+
+      await softDeleteUser(user.id);
+
+      const retainedCase = await db
+        .select()
+        .from(stripe_dispute_cases)
+        .where(eq(stripe_dispute_cases.id, disputeCase.id));
+      expect(retainedCase).toHaveLength(1);
+      expect(retainedCase[0].kilo_user_id).toBeNull();
+      expect(retainedCase[0].accepted_by_kilo_user_id).toBeNull();
+      expect(retainedCase[0].stripe_dispute_id).toBe('dp_deleted_user');
+
+      const retainedActions = await db
+        .select()
+        .from(stripe_dispute_actions)
+        .where(eq(stripe_dispute_actions.case_id, disputeCase.id));
+      expect(retainedActions).toHaveLength(2);
+      expect(retainedActions).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            action_type: 'stripe_acceptance',
+            target_key: 'stripe_dispute:dp_deleted_user',
+            result_reference_id: 'dp_deleted_user',
+          }),
+          expect.objectContaining({
+            action_type: 'user_block',
+            target_key: 'user:deleted_user',
+            result_reference_id: null,
+          }),
+        ])
+      );
+
+      const unaffectedCaseRows = await db
+        .select()
+        .from(stripe_dispute_cases)
+        .where(eq(stripe_dispute_cases.id, unaffectedCase.id));
+      expect(unaffectedCaseRows[0].kilo_user_id).toBe(unaffectedUser.id);
+      expect(unaffectedCaseRows[0].accepted_by_kilo_user_id).toBe(unaffectedUser.id);
     });
 
     it('should delete user_push_tokens', async () => {

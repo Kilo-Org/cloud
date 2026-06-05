@@ -42,6 +42,11 @@ jest.mock('@/lib/credit-campaigns', () => ({
 
 import { getAffiliateAttribution } from '@/lib/affiliate-attribution';
 import { recordAffiliateAttributionAndQueueParentEvent } from '@/lib/impact/affiliate-events';
+import {
+  queueImpactAdvocateParticipantRegistration,
+  recordImpactAffiliateTouch,
+  recordImpactReferralTouch,
+} from '@/lib/impact/referral';
 import { getUserFromAuth } from '@/lib/user/server';
 import { GET } from './route';
 
@@ -50,6 +55,11 @@ const mockRecordAffiliateAttributionAndQueueParentEvent = jest.mocked(
   recordAffiliateAttributionAndQueueParentEvent
 );
 const mockGetUserFromAuth = jest.mocked(getUserFromAuth);
+const mockQueueImpactAdvocateParticipantRegistration = jest.mocked(
+  queueImpactAdvocateParticipantRegistration
+);
+const mockRecordImpactAffiliateTouch = jest.mocked(recordImpactAffiliateTouch);
+const mockRecordImpactReferralTouch = jest.mocked(recordImpactReferralTouch);
 
 describe('GET /users/after-sign-in', () => {
   beforeEach(() => {
@@ -62,6 +72,81 @@ describe('GET /users/after-sign-in', () => {
         has_validation_stytch: true,
       },
     } as Awaited<ReturnType<typeof getUserFromAuth>>);
+  });
+
+  it('records and queues Kilo Pass referral touches from Kilo Pass referral-page callback paths', async () => {
+    const response = await GET(
+      new NextRequest(
+        'http://localhost:3000/users/after-sign-in?callbackPath=%2Fsubscriptions%2Fkilo-pass%2Frefer&_saasquatch=pass-cookie&rsCode=PASSCODE'
+      )
+    );
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get('location')).toBe(
+      'http://localhost:3000/subscriptions/kilo-pass/refer'
+    );
+    expect(mockRecordImpactReferralTouch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: 'user-after-sign-in',
+        touch: expect.objectContaining({
+          product: 'kilo_pass',
+          programKey: 'kilo_pass',
+          opaqueTrackingValue: 'pass-cookie',
+        }),
+      })
+    );
+    expect(mockQueueImpactAdvocateParticipantRegistration).toHaveBeenCalledWith(
+      expect.objectContaining({
+        user: expect.objectContaining({ id: 'user-after-sign-in' }),
+        referralTouch: expect.objectContaining({
+          product: 'kilo_pass',
+          programKey: 'kilo_pass',
+          opaqueTrackingValue: 'pass-cookie',
+        }),
+      })
+    );
+  });
+
+  it('records Kilo Pass affiliate touches from Kilo Pass callback paths', async () => {
+    const response = await GET(
+      new NextRequest(
+        'http://localhost:3000/users/after-sign-in?callbackPath=%2Fsubscriptions%2Fkilo-pass&im_ref=impact-click'
+      )
+    );
+
+    expect(response.status).toBe(307);
+    expect(mockRecordImpactAffiliateTouch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: 'user-after-sign-in',
+        product: 'kilo_pass',
+        touch: expect.objectContaining({
+          product: 'kilo_pass',
+          trackingId: 'impact-click',
+        }),
+      })
+    );
+  });
+
+  it('preserves Impact tracking parameters through unauthenticated OAuth redirects', async () => {
+    mockGetUserFromAuth.mockResolvedValueOnce({ user: null } as Awaited<
+      ReturnType<typeof getUserFromAuth>
+    >);
+
+    const response = await GET(
+      new NextRequest(
+        'http://localhost:3000/users/after-sign-in?callbackPath=%2Fsubscriptions%2Fkilo-pass%2Frefer&signup=true&_saasquatch=pass-cookie&rsCode=PASSCODE&im_ref=impact-click&utm_campaign=launch'
+      )
+    );
+
+    expect(response.status).toBe(307);
+    const location = new URL(response.headers.get('location') ?? '');
+    expect(location.pathname).toBe('/users/sign_in');
+    expect(location.searchParams.get('callbackPath')).toBe('/subscriptions/kilo-pass/refer');
+    expect(location.searchParams.get('signup')).toBe('true');
+    expect(location.searchParams.get('_saasquatch')).toBe('pass-cookie');
+    expect(location.searchParams.get('rsCode')).toBe('PASSCODE');
+    expect(location.searchParams.get('im_ref')).toBe('impact-click');
+    expect(location.searchParams.get('utm_campaign')).toBe('launch');
   });
 
   it('continues redirect flow when affiliate attribution lookup fails', async () => {

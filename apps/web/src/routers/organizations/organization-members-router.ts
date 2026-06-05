@@ -26,6 +26,7 @@ import { findUserById } from '@/lib/user';
 import { successResult } from '@/lib/maybe-result';
 import { destroyOrgInstancesForUser } from '@/lib/kiloclaw/instance-registry';
 import { KiloClawInternalClient } from '@/lib/kiloclaw/kiloclaw-internal-client';
+import { revokeGatewayStateForOrganizationMember } from '@/lib/mcp-gateway/lifecycle-service';
 
 const MAX_DAILY_LIMIT_USD = 2000;
 
@@ -179,7 +180,10 @@ export const organizationsMembersRouter = createTRPCRouter({
         });
       }
 
+      await revokeGatewayStateForOrganizationMember(db, organizationId, memberId);
+
       // KiloClaw cleanup: destroy org instances assigned to the removed member.
+
       // Runs after the membership deletion transaction commits.
       // Fire-and-forget worker calls — Postgres rows are already soft-deleted,
       // so even if worker calls fail the instance is "dead" from the platform

@@ -4,6 +4,7 @@ import { eq } from 'drizzle-orm';
 import * as z from 'zod';
 import { DEFAULT_GITLAB_INSTANCE_URL } from './gitlab-constants.js';
 import type { GitLabIntegrationMetadata } from './gitlab-lookup-service.js';
+import { normalizeGitLabInstanceUrl } from './gitlab-url.js';
 
 const GitLabOAuthTokenResponseSchema = z.object({
   access_token: z.string(),
@@ -24,10 +25,15 @@ export type GitLabTokenSuccess = {
 
 export type GitLabTokenFailure = {
   success: false;
-  reason: 'no_token' | 'token_refresh_failed' | 'token_expired_no_refresh';
+  reason: 'no_token' | 'token_refresh_failed' | 'token_expired_no_refresh' | 'invalid_instance_url';
 };
 
 export type GitLabTokenResult = GitLabTokenSuccess | GitLabTokenFailure;
+
+type GitLabTokenEnv = CloudflareEnv & {
+  GITLAB_CLIENT_ID?: string;
+  GITLAB_CLIENT_SECRET?: string;
+};
 
 function isTokenExpired(expiresAt: string | null | undefined): boolean {
   if (!expiresAt) return true;
@@ -42,15 +48,16 @@ function calculateTokenExpiry(createdAt: number, expiresIn: number): string {
 }
 
 export class GitLabTokenService {
-  private db: WorkerDb | null = null;
-
-  constructor(private env: CloudflareEnv) {}
+  constructor(private env: GitLabTokenEnv) {}
 
   async getToken(
     integrationId: string,
     metadata: GitLabIntegrationMetadata
   ): Promise<GitLabTokenResult> {
-    const instanceUrl = metadata.gitlab_instance_url || DEFAULT_GITLAB_INSTANCE_URL;
+    const instanceUrl = normalizeGitLabInstanceUrl(
+      metadata.gitlab_instance_url || DEFAULT_GITLAB_INSTANCE_URL
+    );
+    if (!instanceUrl) return { success: false, reason: 'invalid_instance_url' };
 
     if (!metadata.access_token) {
       return { success: false, reason: 'no_token' };
@@ -111,19 +118,18 @@ export class GitLabTokenService {
       });
 
       if (!response.ok) {
-        const error = await response.text();
-        console.error('GitLab OAuth token refresh failed:', { status: response.status, error });
+        console.error('GitLab OAuth token refresh failed:', { status: response.status });
         return null;
       }
 
       const parsed = GitLabOAuthTokenResponseSchema.safeParse(await response.json());
       if (!parsed.success) {
-        console.error('Unexpected GitLab token response shape:', parsed.error);
+        console.error('Unexpected GitLab token response shape');
         return null;
       }
       return parsed.data;
-    } catch (error) {
-      console.error('GitLab OAuth token refresh error:', error);
+    } catch {
+      console.error('GitLab OAuth token refresh request failed');
       return null;
     }
   }
@@ -151,12 +157,9 @@ export class GitLabTokenService {
   }
 
   private getDb(): WorkerDb {
-    if (!this.db) {
-      if (!this.env.HYPERDRIVE) {
-        throw new Error('Hyperdrive not configured');
-      }
-      this.db = getWorkerDb(this.env.HYPERDRIVE.connectionString, { statement_timeout: 10_000 });
+    if (!this.env.HYPERDRIVE) {
+      throw new Error('Hyperdrive not configured');
     }
-    return this.db;
+    return getWorkerDb(this.env.HYPERDRIVE.connectionString, { statement_timeout: 10_000 });
   }
 }

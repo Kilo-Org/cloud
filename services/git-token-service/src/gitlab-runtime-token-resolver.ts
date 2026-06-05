@@ -5,6 +5,10 @@ import {
   type GitLabLookupService,
   type GitLabRepositoryMatch,
 } from './gitlab-lookup-service.js';
+import {
+  sha256Digest,
+  type GitLabCapabilityCredentialSource,
+} from './gitlab-session-capability.js';
 import type { GitLabTokenService } from './gitlab-token-service.js';
 
 export type GetGitLabTokenParams = {
@@ -19,6 +23,8 @@ export type GetGitLabTokenSuccess = {
   token: string;
   instanceUrl: string;
   glabIsOAuth2: boolean;
+  integrationId: string;
+  source: GitLabCapabilityCredentialSource;
 };
 
 export type GetGitLabTokenFailure = {
@@ -30,6 +36,7 @@ export type GetGitLabTokenFailure = {
     | 'no_token'
     | 'token_refresh_failed'
     | 'token_expired_no_refresh'
+    | 'invalid_instance_url'
     | 'repository_url_required'
     | 'invalid_repository_url'
     | 'no_matching_integration'
@@ -51,6 +58,8 @@ type GitLabRuntimeTokenDependencies = {
 type GitLabProjectTokenCandidate = {
   token: string;
   instanceUrl: string;
+  integrationId: string;
+  projectId: number;
 };
 
 type GitLabCandidateEvaluation =
@@ -112,6 +121,8 @@ async function evaluateGitLabProjectTokenCandidate(
     candidate: {
       token: projectToken.token,
       instanceUrl: match.instanceUrl,
+      integrationId: match.integrationId,
+      projectId,
     },
   };
 }
@@ -134,7 +145,12 @@ export async function resolveGitLabRuntimeToken(
       return tokenResult;
     }
 
-    return { ...tokenResult, glabIsOAuth2: true };
+    return {
+      ...tokenResult,
+      glabIsOAuth2: true,
+      integrationId: integration.integrationId,
+      source: { type: 'integration' },
+    };
   }
 
   if (!params.repositoryUrl) {
@@ -191,5 +207,11 @@ export async function resolveGitLabRuntimeToken(
     token: candidate.token,
     instanceUrl: candidate.instanceUrl,
     glabIsOAuth2: false,
+    integrationId: candidate.integrationId,
+    source: {
+      type: 'project',
+      projectId: candidate.projectId,
+      tokenDigest: await sha256Digest(candidate.token),
+    },
   };
 }

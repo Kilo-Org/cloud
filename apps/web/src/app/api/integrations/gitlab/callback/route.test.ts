@@ -8,7 +8,7 @@ import { getGitLabOAuthCredentials } from '@/lib/integrations/platforms/gitlab/o
 jest.mock('@/lib/user/server');
 jest.mock('@/lib/drizzle', () => ({ db: {} }));
 jest.mock('@/lib/integrations/gitlab-service', () => ({
-  normalizeInstanceUrl: jest.fn(),
+  instanceUrlChanged: jest.fn(),
 }));
 jest.mock('@/routers/organizations/utils', () => ({
   ensureOrganizationAccess: jest.fn(),
@@ -161,6 +161,27 @@ describe('GET /api/integrations/gitlab/callback', () => {
 
     expectRedirectLocation(response, '/integrations/gitlab?error=connection_failed');
     expect(mockedGetGitLabOAuthCredentials).toHaveBeenCalledWith('expired-credentials-ref');
+    expect(mockedExchangeGitLabOAuthCode).not.toHaveBeenCalled();
+  });
+
+  test('rejects signed state with an http instance URL before exchanging an OAuth code', async () => {
+    const state = createGitLabOAuthState(
+      {
+        owner: { type: 'user', id: USER_ID },
+        instanceUrl: 'http://gitlab.example.com',
+        customCredentialsRef: 'cached-credentials-ref',
+      },
+      USER_ID
+    );
+
+    const response = await callGitLabCallback(
+      makeRequest(
+        `/api/integrations/gitlab/callback?code=anything&state=${encodeURIComponent(state)}`
+      )
+    );
+
+    expectRedirectLocation(response, '/integrations?error=invalid_state');
+    expect(mockedGetGitLabOAuthCredentials).not.toHaveBeenCalled();
     expect(mockedExchangeGitLabOAuthCode).not.toHaveBeenCalled();
   });
 

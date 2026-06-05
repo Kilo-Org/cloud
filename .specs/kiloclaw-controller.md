@@ -726,11 +726,19 @@ running. When forwarding, it MUST authenticate to gog with
 |---|---|---|
 | POST | `/_kilo/bot-identity` | Write bot identity metadata |
 | POST | `/_kilo/user-profile` | Write user profile metadata |
-| GET | `/_kilo/files/tree` | List the safe file tree under controller root |
+| GET | `/_kilo/files/tree` | List immediate safe file-tree children under controller root, or under `?path=<directory>` when `files.tree.path` is advertised |
 | GET | `/_kilo/files/read` | Read a safe file path |
 | POST | `/_kilo/files/import-openclaw-workspace` | Import OpenClaw workspace files |
 | POST | `/_kilo/files/write` | Write a safe file path |
 | POST | `/_kilo/files/write-openclaw-config` | Validate and write `openclaw.json`, with explicit invalid override support |
+
+##### File tree listing
+
+1. `GET /_kilo/files/tree` MUST return only the immediate children of the requested directory; it MUST NOT recursively serialize the full descendant tree in a single response.
+2. Without `?path=...`, the endpoint MUST list immediate children under the controller root.
+3. When the controller advertises `files.tree.path`, clients MAY pass `?path=<directory>` to list immediate children under that safe relative directory.
+4. Requested directory paths MUST use the same safe-path protections as file reads and writes: reject absolute paths, root escapes, symlinks, non-directory paths, and controller-owned internal validation artifacts.
+5. Directory nodes MAY omit `children`; clients MUST treat omitted `children` as not loaded yet, not as proof that the directory is empty.
 
 ##### Validation-aware `openclaw.json` file writes
 

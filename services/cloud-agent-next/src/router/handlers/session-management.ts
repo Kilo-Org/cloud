@@ -18,12 +18,15 @@ import {
   GetSessionOutput,
   GetSessionHealthInput,
   GetSessionHealthOutput,
+  GetMessageResultInput,
+  GetMessageResultOutput,
   GetLatestAssistantMessageInput,
   GetLatestAssistantMessageOutput,
 } from '../schemas.js';
 import { readProfileBundle } from '../../session-profile.js';
 import type { CloudAgentSession } from '../../persistence/CloudAgentSession.js';
 import type { CloudAgentSessionState } from '../../persistence/types.js';
+import type { MessageResultRPCResponse } from '../../session/message-result.js';
 
 function publicRepositoryFields(metadata: CloudAgentSessionState): {
   githubRepo?: string;
@@ -399,6 +402,42 @@ export function createSessionManagementHandlers() {
             activeExecutionId: activeExecutionId ?? undefined,
             activeExecutionStatus,
           };
+        });
+      }),
+
+    getMessageResult: protectedProcedure
+      .input(GetMessageResultInput)
+      .output(GetMessageResultOutput)
+      .query(async ({ input, ctx }) => {
+        return withLogTags({ source: 'getMessageResult' }, async () => {
+          const sessionId = input.cloudAgentSessionId as SessionId;
+          const { userId, env } = ctx;
+          const doKey = `${userId}:${sessionId}`;
+          const getStub = () =>
+            env.CLOUD_AGENT_SESSION.get(env.CLOUD_AGENT_SESSION.idFromName(doKey));
+
+          const response = await withDORetry<
+            DurableObjectStub<CloudAgentSession>,
+            MessageResultRPCResponse
+          >(
+            getStub,
+            async stub => await stub.getMessageResult(input.messageId),
+            'getMessageResult'
+          );
+          if (response.type === 'session-not-found') {
+            throw new TRPCError({ code: 'NOT_FOUND', message: 'Session not found' });
+          }
+          if (response.type === 'message-not-found') {
+            throw new TRPCError({ code: 'NOT_FOUND', message: 'Message not found' });
+          }
+          if (response.type === 'state-invalid') {
+            throw new TRPCError({
+              code: 'INTERNAL_SERVER_ERROR',
+              message: 'Message result unavailable',
+            });
+          }
+
+          return response.result;
         });
       }),
 

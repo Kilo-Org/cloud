@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -29,8 +30,13 @@ import type { SecurityFinding } from '@kilocode/db/schema';
 import { useTRPC } from '@/lib/trpc/utils';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
+import { toast } from 'sonner';
+import { manualAnalysisAdmissionCopy } from './manual-analysis-admission-copy';
 
 type Severity = 'critical' | 'high' | 'medium' | 'low';
+
+const ACCEPTED_QUEUE_POLL_INTERVAL_MS = 3000;
+const ACCEPTED_QUEUE_POLL_TIMEOUT_MS = 18_000;
 
 function isSeverity(value: string): value is Severity {
   return ['critical', 'high', 'medium', 'low'].includes(value);
@@ -77,12 +83,16 @@ export function FindingDetailDialog({
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const isOrg = !!organizationId;
+  const [queuedFindingId, setQueuedFindingId] = useState<string | null>(null);
+  const isAwaitingAnalysisStart = queuedFindingId === finding?.id;
 
-  // Poll for analysis status when running.
+  // Poll while queued admission is crossing the Worker boundary or analysis is active.
   // Two separate queries for org/personal to avoid type-union issues with useQuery.
   const pollWhileActive = (query: { state: { data?: { status?: string | null } } }) => {
     const status = query.state.data?.status;
-    if (status === 'pending' || status === 'running') return 3000;
+    if (isAwaitingAnalysisStart || status === 'pending' || status === 'running') {
+      return ACCEPTED_QUEUE_POLL_INTERVAL_MS;
+    }
     return false as const;
   };
   const orgAnalysisQuery = useQuery({
@@ -102,11 +112,30 @@ export function FindingDetailDialog({
   });
   const analysisData = isOrg ? orgAnalysisQuery.data : personalAnalysisQuery.data;
 
+  useEffect(() => {
+    if (!queuedFindingId) return;
+    const intervalId = window.setInterval(() => {
+      void queryClient.invalidateQueries();
+    }, ACCEPTED_QUEUE_POLL_INTERVAL_MS);
+    const timeoutId = window.setTimeout(() => {
+      setQueuedFindingId(current => (current === queuedFindingId ? null : current));
+    }, ACCEPTED_QUEUE_POLL_TIMEOUT_MS);
+    return () => {
+      window.clearInterval(intervalId);
+      window.clearTimeout(timeoutId);
+    };
+  }, [queryClient, queuedFindingId]);
+
   // Start analysis mutation (organization)
   const startOrgAnalysisMutation = useMutation(
     trpc.organizations.securityAgent.startAnalysis.mutationOptions({
       onSuccess: async () => {
+        toast.success(manualAnalysisAdmissionCopy.successTitle);
         await queryClient.invalidateQueries();
+      },
+      onError: (error, variables) => {
+        toast.error(manualAnalysisAdmissionCopy.failureTitle, { description: error.message });
+        setQueuedFindingId(current => (current === variables.findingId ? null : current));
       },
     })
   );
@@ -115,7 +144,12 @@ export function FindingDetailDialog({
   const startUserAnalysisMutation = useMutation(
     trpc.securityAgent.startAnalysis.mutationOptions({
       onSuccess: async () => {
+        toast.success(manualAnalysisAdmissionCopy.successTitle);
         await queryClient.invalidateQueries();
+      },
+      onError: (error, variables) => {
+        toast.error(manualAnalysisAdmissionCopy.failureTitle, { description: error.message });
+        setQueuedFindingId(current => (current === variables.findingId ? null : current));
       },
     })
   );
@@ -131,9 +165,13 @@ export function FindingDetailDialog({
   const cliSessionId = analysisData?.cliSessionId ?? finding.cli_session_id;
 
   const isAnalyzing =
-    startAnalysisMutation.isPending || analysisStatus === 'pending' || analysisStatus === 'running';
+    isAwaitingAnalysisStart ||
+    startAnalysisMutation.isPending ||
+    analysisStatus === 'pending' ||
+    analysisStatus === 'running';
 
   const handleStartAnalysis = ({ retrySandboxOnly }: { retrySandboxOnly?: boolean } = {}) => {
+    setQueuedFindingId(finding.id);
     if (isOrg) {
       if (!organizationId) return;
       startOrgAnalysisMutation.mutate({
@@ -331,12 +369,16 @@ export function FindingDetailDialog({
                   />
                 )}
               </div>
-            ) : analysisStatus === 'running' || analysisStatus === 'pending' ? (
+            ) : isAwaitingAnalysisStart ||
+              analysisStatus === 'running' ||
+              analysisStatus === 'pending' ? (
               <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-3">
                 <div className="flex items-center gap-2">
                   <Loader2 className="h-4 w-4 animate-spin text-yellow-400" />
                   <p className="text-sm text-yellow-400">
-                    {analysisStatus === 'pending' ? 'Queued...' : 'Triage in progress...'}
+                    {isAwaitingAnalysisStart || analysisStatus === 'pending'
+                      ? `${manualAnalysisAdmissionCopy.pendingLabel}...`
+                      : 'Triage in progress...'}
                   </p>
                 </div>
               </div>
@@ -459,13 +501,15 @@ export function FindingDetailDialog({
               <div className="space-y-4">
                 <MarkdownProse markdown={analysis.rawMarkdown} className="text-muted-foreground" />
               </div>
-            ) : analysisStatus === 'running' || analysisStatus === 'pending' ? (
+            ) : isAwaitingAnalysisStart ||
+              analysisStatus === 'running' ||
+              analysisStatus === 'pending' ? (
               <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-3">
                 <div className="flex items-center gap-2">
                   <Loader2 className="h-4 w-4 animate-spin text-yellow-400" />
                   <p className="text-sm text-yellow-400">
-                    {analysisStatus === 'pending'
-                      ? 'Queued...'
+                    {isAwaitingAnalysisStart || analysisStatus === 'pending'
+                      ? `${manualAnalysisAdmissionCopy.pendingLabel}...`
                       : 'Codebase analysis in progress...'}
                   </p>
                 </div>

@@ -25,7 +25,7 @@ import { seed_20_code_free_model } from '@/lib/ai-gateway/providers/seed';
 import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 import {
   MINIMAX_CURRENT_MODEL_ID,
-  minimax_m25_free_model,
+  minimax_m3_discounted_model,
 } from '@/lib/ai-gateway/providers/minimax';
 import { KIMI_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/moonshotai';
 import { morph_warp_grep_free_model } from '@/lib/ai-gateway/providers/morph';
@@ -35,8 +35,9 @@ import {
 } from '@/lib/ai-gateway/providers/google';
 import {
   alibabaDirectModels,
-  qwen36_plus_model,
   qwen36_plus_stealth_model,
+  qwen37_plus_free_model,
+  qwen37_plus_model,
 } from '@/lib/ai-gateway/providers/qwen';
 import { stepfun_37_flash_free_model } from '@/lib/ai-gateway/providers/stepfun';
 import { isGrokModel } from '@/lib/ai-gateway/providers/xai';
@@ -44,11 +45,11 @@ import { isClaudeModel } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { GPT_CURRENT_MODEL_ID, isOpenAiModel } from '@/lib/ai-gateway/providers/openai';
 import { GLM_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/zai';
 import { deepseekDiscountedModels } from '@/lib/ai-gateway/providers/deepseek';
+import { type ProviderId } from '@/lib/ai-gateway/providers/types';
 
 export const PRIMARY_DEFAULT_MODEL = CLAUDE_SONNET_CURRENT_MODEL_ID;
 
 export const autoFreeModels = [
-  'nvidia/nemotron-3-super-120b-a12b:free',
   'poolside/laguna-m.1:free',
   stepfun_37_flash_free_model.status === 'public' ? stepfun_37_flash_free_model.public_id : null,
 ].filter(m => m !== null);
@@ -68,7 +69,7 @@ export const preferredModels = [
   GPT_CURRENT_MODEL_ID,
   GEMINI_PRO_CURRENT_MODEL_ID,
   MINIMAX_CURRENT_MODEL_ID,
-  qwen36_plus_model.public_id,
+  qwen37_plus_model.public_id,
   qwen36_plus_stealth_model.public_id,
   GLM_CURRENT_MODEL_ID,
 ];
@@ -89,12 +90,13 @@ export function isKiloExclusiveModel(model: string): boolean {
 
 export const kiloExclusiveModels = [
   gemma_4_26b_a4b_it_free_model,
-  minimax_m25_free_model,
+  minimax_m3_discounted_model,
   morph_warp_grep_free_model,
   seed_20_code_free_model,
   ...alibabaDirectModels,
   ...deepseekDiscountedModels,
   qwen36_plus_stealth_model,
+  qwen37_plus_free_model,
   claude_sonnet_clawsetup_model,
   claude_opus_4_8_stealth_model,
   claude_opus_4_7_stealth_model,
@@ -114,6 +116,25 @@ export function isKiloExclusiveModelRequiringDataCollection(model: string): bool
 
 export function isKiloStealthModel(model: string): boolean {
   return kiloExclusiveModels.some(m => m.public_id === model && m.flags.includes('stealth'));
+}
+
+export function shouldRedactModelNameInMicrodollarUsage(
+  provider: ProviderId,
+  model: string
+): boolean {
+  return provider === 'custom' || provider === 'experiment' || isKiloStealthModel(model);
+}
+
+export function shouldRedactErrorResponse(provider: ProviderId, model: string): boolean {
+  return provider === 'custom' || provider === 'experiment' || isKiloStealthModel(model);
+}
+
+export function shouldRedactModelNameInResponse(provider: ProviderId, model: string): boolean {
+  // custom is only used internally so we don't have to risk the perf or reliablity impact of rewriting the response
+  return (
+    provider !== 'martian' && // this is a stealth provider, but the models aren't stealth, so we can keep the model name in place
+    (provider === 'experiment' || isKiloStealthModel(model))
+  );
 }
 
 export function isOpenRouterStealthModel(model: string): boolean {

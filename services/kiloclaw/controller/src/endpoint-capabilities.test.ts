@@ -32,6 +32,10 @@ describe('getControllerEndpointCapabilities', () => {
     expect(getControllerEndpointCapabilities()).toContain('files.write-openclaw-config');
   });
 
+  it('advertises path-scoped file tree listing', () => {
+    expect(getControllerEndpointCapabilities()).toContain('files.tree.path');
+  });
+
   it('includes conditional Kilo Chat capabilities only when requested', () => {
     const defaultCapabilities = getControllerEndpointCapabilities();
     const kiloChatCapabilities = getControllerEndpointCapabilities({

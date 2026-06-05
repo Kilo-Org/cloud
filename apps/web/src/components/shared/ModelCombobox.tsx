@@ -13,7 +13,7 @@ import {
   CommandItem,
   CommandList,
 } from '@/components/ui/command';
-import { AlertTriangle, ChevronsUpDown, Check, Image } from 'lucide-react';
+import { BookOpenCheck, ChevronsUpDown, Check, Image } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { preferredModels } from '@/lib/ai-gateway/models';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -446,11 +446,11 @@ function FreeModelDataIcon() {
       <TooltipTrigger asChild>
         <span
           aria-label={FREE_MODEL_DATA_LABEL}
-          className="inline-flex shrink-0 items-center rounded-sm text-yellow-500 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+          className="inline-flex shrink-0 items-center rounded-sm text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
           role="img"
           tabIndex={0}
         >
-          <AlertTriangle className="h-3.5 w-3.5" />
+          <BookOpenCheck className="h-3.5 w-3.5" />
         </span>
       </TooltipTrigger>
       <TooltipContent>{getFreeModelDataTooltip()}</TooltipContent>
@@ -468,11 +468,11 @@ function FreeModelDataBadge() {
         <TooltipTrigger asChild>
           <span
             aria-label={FREE_MODEL_DATA_LABEL}
-            className="inline-flex shrink-0 items-center rounded-sm text-yellow-500 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+            className="inline-flex shrink-0 items-center rounded-sm text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
             role="img"
             tabIndex={0}
           >
-            <AlertTriangle className="h-3 w-3" />
+            <BookOpenCheck className="h-3 w-3" />
           </span>
         </TooltipTrigger>
         <TooltipContent>{getFreeModelDataTooltip()}</TooltipContent>

@@ -3,7 +3,7 @@ import 'server-only';
 import { randomBytes } from 'node:crypto';
 import { z } from 'zod';
 import { OAUTH_STATE_TTL_SECONDS } from '@/lib/integrations/oauth-state';
-import { redisGet, redisSet } from '@/lib/redis';
+import { redisClient } from '@/lib/redis';
 import { gitLabOAuthCredentialsRedisKey } from '@/lib/redis-keys';
 import type { GitLabOAuthCredentials } from './adapter';
 
@@ -21,10 +21,10 @@ export async function storeGitLabOAuthCredentials(
   credentials: GitLabOAuthCredentials
 ): Promise<string | null> {
   const credentialRef = randomBytes(GITLAB_OAUTH_CREDENTIAL_REF_BYTES).toString('base64url');
-  const stored = await redisSet(
+  const stored = await redisClient.set(
     gitLabOAuthCredentialsRedisKey(credentialRef),
     JSON.stringify(credentials),
-    GITLAB_OAUTH_CREDENTIALS_TTL_SECONDS
+    { ex: GITLAB_OAUTH_CREDENTIALS_TTL_SECONDS }
   );
 
   return stored ? credentialRef : null;
@@ -33,7 +33,9 @@ export async function storeGitLabOAuthCredentials(
 export async function getGitLabOAuthCredentials(
   credentialRef: string
 ): Promise<GitLabOAuthCredentials | null> {
-  const rawCredentials = await redisGet(gitLabOAuthCredentialsRedisKey(credentialRef));
+  const rawCredentials = await redisClient.get<string>(
+    gitLabOAuthCredentialsRedisKey(credentialRef)
+  );
   if (!rawCredentials) return null;
 
   try {

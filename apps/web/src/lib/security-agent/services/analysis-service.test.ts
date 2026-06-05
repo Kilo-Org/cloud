@@ -39,19 +39,13 @@ const mockClearAnalysisStatus = jest.fn() as jest.MockedFunction<
   typeof securityAnalysisModule.clearAnalysisStatus
 >;
 
-jest.mock('@/lib/security-agent/db/security-analysis', () => {
-  const actual: { isFindingEligibleForAutoAnalysis: unknown } = jest.requireActual(
-    '@/lib/security-agent/db/security-analysis'
-  );
-  return {
-    updateAnalysisStatus: mockUpdateAnalysisStatus,
-    clearAnalysisStatus: mockClearAnalysisStatus,
-    tryAcquireAnalysisStartLease: mockTryAcquireAnalysisStartLease,
-    isFindingEligibleForAutoAnalysis: actual.isFindingEligibleForAutoAnalysis,
-    AUTO_ANALYSIS_MAX_ATTEMPTS: 5,
-    AUTO_ANALYSIS_OWNER_CAP: 2,
-  };
-});
+jest.mock('@/lib/security-agent/db/security-analysis', () => ({
+  updateAnalysisStatus: mockUpdateAnalysisStatus,
+  clearAnalysisStatus: mockClearAnalysisStatus,
+  tryAcquireAnalysisStartLease: mockTryAcquireAnalysisStartLease,
+  AUTO_ANALYSIS_MAX_ATTEMPTS: 5,
+  AUTO_ANALYSIS_OWNER_CAP: 2,
+}));
 
 jest.mock('@/lib/config.server', () => ({
   CALLBACK_TOKEN_SECRET: 'test-callback-token-secret',

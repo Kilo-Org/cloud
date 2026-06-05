@@ -26,7 +26,7 @@ const forbiddenFreeModelIds: ReadonlySet<string> = new Set([
   'meta-llama/llama-3.3-70b-instruct:free',
   'mistralai/mistral-small-3.1-24b-instruct:free',
   'minimax/minimax-m2.1:free',
-  'minimax/minimax-m2.5:free', // usable through kilo-auto
+  'minimax/minimax-m2.5:free',
   'moonshotai/kimi-k2.5:free',
   'moonshotai/kimi-k2.6:free',
   'nousresearch/hermes-3-llama-3.1-405b:free',
@@ -40,6 +40,7 @@ const forbiddenFreeModelIds: ReadonlySet<string> = new Set([
   'qwen/qwen3-next-80b-a3b-instruct:free',
   'qwen/qwen3.6-plus-preview:free',
   'qwen/qwen3.6-plus:free',
+  'qwen/qwen3.7-plus:free',
   'upstage/solar-pro-3:free',
   'x-ai/grok-code-fast-1:optimized:free',
   'xiaomi/mimo-v2-omni:free',

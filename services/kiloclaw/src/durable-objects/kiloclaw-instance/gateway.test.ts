@@ -11,6 +11,7 @@ import {
   listAgents,
   runMorningBriefing,
   updateAgent,
+  updateAgentBindings,
   updateAgentDefaults,
   waitForHealthy,
   writeOpenclawConfigFile,
@@ -595,5 +596,38 @@ describe('agent config mutation timeouts', () => {
     expect(result).toEqual({
       agentError: { status: 409, code: 'config_etag_conflict', message: 'Config changed' },
     });
+  });
+
+  it('updateAgentBindings returns an agent_binding_conflict envelope when the controller 409s', async () => {
+    const fetchMock: FetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(versionResponse(['config.agents.bindings.update']))
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({ code: 'agent_binding_conflict', error: 'Channel routed elsewhere' }),
+          { status: 409, headers: { 'content-type': 'application/json' } }
+        )
+      );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await updateAgentBindings(runningState(), ENV, 'work', { channels: ['slack'] });
+
+    expect(result).toEqual({
+      agentError: {
+        status: 409,
+        code: 'agent_binding_conflict',
+        message: 'Channel routed elsewhere',
+      },
+    });
+  });
+
+  it('updateAgentBindings fails closed when the controller lacks the capability', async () => {
+    const fetchMock: FetchMock = vi.fn().mockResolvedValueOnce(versionResponse([]));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await updateAgentBindings(runningState(), ENV, 'work', { channels: ['slack'] });
+
+    expect(result).toMatchObject({ agentError: { status: 501, code: 'capability_unavailable' } });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });

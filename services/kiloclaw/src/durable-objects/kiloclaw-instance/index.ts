@@ -3947,6 +3947,20 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     return gateway.deleteAgent(this.s, this.env, agentId);
   }
 
+  /**
+   * Declaratively set an agent's channel-level routes ({ etag?, channels[] }).
+   * Returns an error envelope for stale etag (`config_etag_conflict`), unknown
+   * agent (`agent_not_found`), channel conflict (`agent_binding_conflict`), or
+   * missing capability (`capability_unavailable`).
+   */
+  async updateAgentBindings(
+    agentId: string,
+    body: Record<string, unknown>
+  ): Promise<AgentMutationResponse | AgentConfigErrorEnvelope> {
+    await this.loadState();
+    return gateway.updateAgentBindings(this.s, this.env, agentId, body);
+  }
+
   async getFileTree(filePath?: string) {
     await this.loadState();
     return gateway.getFileTree(this.s, this.env, filePath);

@@ -89,7 +89,7 @@ export async function callGatewayController<T>(
   state: InstanceMutableState,
   env: KiloClawEnv,
   path: string,
-  method: 'GET' | 'POST' | 'PATCH' | 'DELETE',
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
   responseSchema: ZodType<T>,
   jsonBody?: unknown,
   options?: { timeoutMs?: number }
@@ -543,6 +543,32 @@ export async function deleteAgent(
       'DELETE',
       AgentDeleteResponseSchema,
       undefined,
+      { timeoutMs: AGENT_MUTATION_REQUEST_TIMEOUT_MS }
+    );
+  });
+}
+
+/**
+ * PUT /_kilo/config/agents/:id/bindings — declaratively set an agent's
+ * channel-level routes. Body ({ etag?, channels[] }) forwarded opaquely; native
+ * guarded write on the controller. Conflicts surface as a returned envelope
+ * (409 agent_binding_conflict); stale etag → 409 config_etag_conflict.
+ */
+export async function updateAgentBindings(
+  state: InstanceMutableState,
+  env: KiloClawEnv,
+  agentId: string,
+  body: Record<string, unknown>
+): Promise<AgentMutationResponse | AgentConfigErrorEnvelope> {
+  return callAgentEndpoint(async () => {
+    await requireControllerCapability(state, env, 'config.agents.bindings.update');
+    return callGatewayController(
+      state,
+      env,
+      `/_kilo/config/agents/${encodeURIComponent(agentId)}/bindings`,
+      'PUT',
+      AgentMutationResponseSchema,
+      body,
       { timeoutMs: AGENT_MUTATION_REQUEST_TIMEOUT_MS }
     );
   });

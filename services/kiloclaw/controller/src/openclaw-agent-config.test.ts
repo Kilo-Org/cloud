@@ -393,6 +393,20 @@ describe('updateAgentBindings', () => {
     expect(remaining.some(b => b.agentId === 'ops' && b.match.channel === 'telegram')).toBe(true);
   });
 
+  it('preserves a binding with a whitespace-only agentId (not treated as main)', async () => {
+    const configPath = await configFixture({
+      agents: { list: [{ id: 'research' }] },
+      bindings: [{ type: 'route', agentId: '   ', match: { channel: 'slack' } }],
+    });
+
+    // Editing main must not delete the malformed entry (it does not normalize to main).
+    await updateAgentBindings('main', { channels: [] }, { configPath });
+
+    const remaining = (readAgentConfigSnapshot({ configPath }).config as { bindings: unknown[] })
+      .bindings;
+    expect(remaining).toHaveLength(1);
+  });
+
   it('preserves a binding with a malformed accountId (treated as unmanaged)', async () => {
     const configPath = await configFixture({
       agents: { list: [{ id: 'research' }] },

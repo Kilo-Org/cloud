@@ -10,6 +10,7 @@ import {
   AgentCreateInputSchema,
   AgentUpdateInputSchema,
   AgentDefaultsUpdateInputSchema,
+  AgentBindingsInputSchema,
 } from '@/lib/kiloclaw/agent-schemas';
 import { kiloclawFilePathSchema } from '@/lib/kiloclaw/file-path-schema';
 import { pushPinToWorker } from '@/lib/kiloclaw/pin-sync';
@@ -4411,6 +4412,23 @@ export const kiloclawRouter = createTRPCRouter({
         return await client.deleteAgent(ctx.user.id, input.agentId, workerInstanceId(instance));
       } catch (err) {
         handleFileOperationError(err, 'delete agent');
+      }
+    }),
+
+  updateAgentBindings: clawAccessProcedure
+    .input(z.object({ agentId: AgentIdSchema, bindings: AgentBindingsInputSchema }))
+    .mutation(async ({ ctx, input }) => {
+      try {
+        const instance = await getActiveInstance(ctx.user.id);
+        const client = new KiloClawInternalClient();
+        return await client.updateAgentBindings(
+          ctx.user.id,
+          input.agentId,
+          input.bindings,
+          workerInstanceId(instance)
+        );
+      } catch (err) {
+        handleFileOperationError(err, 'update agent bindings');
       }
     }),
 

@@ -118,6 +118,16 @@ const AbsolutePathSchema = z
   .max(1024)
   .refine(value => value.startsWith('/'), { message: 'Path must be absolute' });
 
+// Declarative channel-route set (PUT /_kilo/config/agents/:id/bindings).
+// `channels` is the agent's full channel-level route set (single-account cloud).
+export const AgentBindingsInputSchema = z
+  .object({
+    etag: z.string().min(1).max(128).optional(),
+    channels: z.array(z.string().trim().min(1).max(64)).max(50),
+  })
+  .strict();
+export type AgentBindingsInput = z.infer<typeof AgentBindingsInputSchema>;
+
 // Create body (POST /_kilo/config/agents).
 export const AgentCreateInputSchema = z
   .object({

@@ -316,13 +316,15 @@ function findConfiguredEntry(config: OpenClawAgentConfig, agentId: string): Agen
 // parsing and the entry is treated as unmanaged: skipped on read, preserved on
 // write, never mistaken for a default-account route. Other match keys
 // (peer/guild/team/roles) pass through and are detected by presence.
+// `agentId`/`channel` are trimmed and required so whitespace-only values (which
+// would otherwise normalize to `main`/empty) fail parsing and stay unmanaged.
 const BindingMatchSchema = z
-  .object({ channel: z.string().min(1), accountId: z.string().optional() })
+  .object({ channel: z.string().trim().min(1), accountId: z.string().optional() })
   .passthrough();
 const ConfigBindingSchema = z
   .object({
     type: z.string().optional(),
-    agentId: z.string().min(1),
+    agentId: z.string().trim().min(1),
     match: BindingMatchSchema,
   })
   .passthrough();

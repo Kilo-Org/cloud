@@ -141,6 +141,34 @@ describe('platform agent config routes', () => {
     });
   });
 
+  it('PUT /agents/:agentId/bindings forwards the bindings payload to the DO', async () => {
+    const updateAgentBindings = vi
+      .fn()
+      .mockResolvedValue({ ok: true, etag: 'e2', agent: AGENT_SUMMARY });
+    const response = await platform.request(
+      '/agents/work/bindings',
+      jsonInit('PUT', { userId: 'user-1', bindings: { etag: 'e1', channels: ['slack'] } }),
+      baseEnv({ updateAgentBindings })
+    );
+
+    expect(response.status).toBe(200);
+    expect(updateAgentBindings).toHaveBeenCalledWith('work', { etag: 'e1', channels: ['slack'] });
+  });
+
+  it('PUT /agents/:agentId/bindings maps an agent_binding_conflict envelope to 409', async () => {
+    const updateAgentBindings = vi
+      .fn()
+      .mockResolvedValue(errorEnvelope(409, 'agent_binding_conflict', 'Channel routed elsewhere'));
+    const response = await platform.request(
+      '/agents/work/bindings',
+      jsonInit('PUT', { userId: 'user-1', bindings: { channels: ['slack'] } }),
+      baseEnv({ updateAgentBindings })
+    );
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ code: 'agent_binding_conflict' });
+  });
+
   it('PATCH /agent-defaults forwards the patch to the DO', async () => {
     const updateAgentDefaults = vi
       .fn()

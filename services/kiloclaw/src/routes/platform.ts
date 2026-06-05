@@ -3043,6 +3043,45 @@ platform.delete('/agents/:agentId', async c => {
   }
 });
 
+// PUT /api/platform/agents/:agentId/bindings — declaratively set channel routes.
+const UpdateAgentBindingsSchema = z.object({
+  userId: z.string().min(1),
+  bindings: z.record(z.string(), z.unknown()),
+});
+
+platform.put('/agents/:agentId/bindings', async c => {
+  const result = await parseBody(c, UpdateAgentBindingsSchema);
+  if ('error' in result) return result.error;
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
+  const agentId = c.req.param('agentId');
+  const { userId, bindings } = result.data;
+
+  try {
+    const response = await withResolvedDORetry(
+      c.env,
+      userId,
+      iidResult.instanceId,
+      stub => stub.updateAgentBindings(agentId, bindings).then(r => r),
+      'updateAgentBindings',
+      NO_DO_RETRY
+    );
+    if (isAgentConfigErrorEnvelope(response)) {
+      const { message, status, code } = reconstructAgentError(
+        'agent bindings update',
+        response.agentError
+      );
+      return jsonError(message, status, code);
+    }
+    return c.json(response, 200);
+  } catch (err) {
+    const { message, status, code } = sanitizeAgentConfigError(err, 'agent bindings update');
+    return jsonError(message, status, code);
+  }
+});
+
 const MorningBriefingSetupSchema = z.object({
   userId: z.string().min(1),
   cron: z.string().min(1).optional(),

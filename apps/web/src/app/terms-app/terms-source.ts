@@ -1,3 +1,5 @@
+import { extractLegalMainHtml } from '@/app/legal-page-source';
+
 export const TERMS_SOURCE_URL = 'https://kilo.ai/terms';
 
 const TERMS_CONTACT_EMAIL = ['support', 'kilo.ai'].join('@');
@@ -8,24 +10,12 @@ export const TERMS_FALLBACK_HTML = `
 <p>For terms questions, contact <a href="mailto:${TERMS_CONTACT_EMAIL}">${TERMS_CONTACT_EMAIL}</a>.</p>
 `.trim();
 
-function absolutizeKiloLinks(html: string): string {
-  return html.replaceAll(/(href|src)="\/(?!\/)/g, `$1="${new URL('/', TERMS_SOURCE_URL)}`);
-}
-
-function removeSourceAttributes(html: string): string {
-  return html
-    .replaceAll(/\sclass="[^"]*"/g, '')
-    .replaceAll(/\sdata-sentry-[a-z-]+="[^"]*"/g, '')
-    .replaceAll(/\sstyle="[^"]*"/g, '');
-}
-
 export function extractTermsMainHtml(html: string): string {
-  const match = html.match(/<main\b[^>]*>([\s\S]*?)<\/main>/i);
-  if (!match?.[1]) {
-    throw new Error('Could not find terms content.');
-  }
-
-  return removeSourceAttributes(absolutizeKiloLinks(match[1])).trim();
+  return extractLegalMainHtml({
+    html,
+    sourceUrl: TERMS_SOURCE_URL,
+    missingMessage: 'Could not find terms content.',
+  });
 }
 
 export async function fetchTermsMainHtml(): Promise<string> {

@@ -32,6 +32,40 @@ describe('extractPrivacyPolicyMainHtml', () => {
     expect(result).not.toContain('Pricing');
     expect(result).not.toContain('Terms');
   });
+
+  test('strips active content from the extracted privacy policy HTML', () => {
+    const html = `
+      <main>
+        <h1 onclick="alert('xss')">Privacy Policy</h1>
+        <img src="/logo.png" onerror="alert('xss')" />
+        <script>alert('xss')</script>
+        <iframe src="https://example.com"></iframe>
+      </main>
+    `;
+
+    const result = extractPrivacyPolicyMainHtml(html);
+
+    expect(result).toContain('Privacy Policy');
+    expect(result).toContain('src="https://kilo.ai/logo.png"');
+    expect(result).not.toContain('onclick');
+    expect(result).not.toContain('onerror');
+    expect(result).not.toContain('<script');
+    expect(result).not.toContain('<iframe');
+  });
+
+  test('keeps content after an inner closing main marker', () => {
+    const html = `
+      <main>
+        <h1>Privacy Policy</h1>
+        <template></main></template>
+        <p>Final privacy section</p>
+      </main>
+    `;
+
+    const result = extractPrivacyPolicyMainHtml(html);
+
+    expect(result).toContain('Final privacy section');
+  });
 });
 
 describe('fetchPrivacyPolicyMainHtml', () => {

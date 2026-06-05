@@ -1,5 +1,5 @@
 export const KILO_PASS_LEGAL_DISCLOSURE =
-  'Subscriptions renew monthly until canceled. Manage or cancel anytime in your App Store account settings.';
+  'Subscriptions renew monthly until canceled. Manage or cancel anytime through your app store account settings.';
 
 type KiloPassLegalLink = {
   label: 'Privacy Policy' | 'Terms of Use (EULA)';

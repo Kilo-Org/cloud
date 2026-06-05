@@ -16,9 +16,9 @@ describe('Kilo Pass legal disclosure links', () => {
     ]);
   });
 
-  it('uses App Store subscription disclosure copy', () => {
+  it('uses platform-neutral subscription disclosure copy', () => {
     expect(KILO_PASS_LEGAL_DISCLOSURE).toBe(
-      'Subscriptions renew monthly until canceled. Manage or cancel anytime in your App Store account settings.'
+      'Subscriptions renew monthly until canceled. Manage or cancel anytime through your app store account settings.'
     );
   });
 });

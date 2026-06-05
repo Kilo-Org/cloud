@@ -1618,32 +1618,23 @@ describe('credit renewal fanout queue processing', () => {
     );
   });
 
-  it('resolves a terminal failure when an operator retry finalizes a duplicate boundary', async () => {
+  it('skips duplicate side effects when guarded reconciliation loses the current boundary', async () => {
     const row = creditRenewalRow({
+      status: 'past_due',
+      suspended_at: '2026-05-15T00:00:00.000Z',
       credit_renewal_at: '2026-06-01T00:00:00.000Z',
     });
-    const { db, updates } = createMockDb([[row], [row], []], {
+    const { db, inserts, txInserts, updates } = createMockDb([[row], [row], [row]], {
       txInsertRowCounts: [0],
       txUpdateReturningRows: [[]],
     });
     mockGetWorkerDb.mockReturnValue(db);
-    vi.spyOn(globalThis, 'fetch').mockImplementation(async (_request, init) => {
-      const body = JSON.parse(typeof init?.body === 'string' ? init.body : '{}') as {
-        action?: string;
-      };
-      if (body.action === 'process_paid_conversion') {
-        return Response.json({
-          affiliateSaleEnqueued: false,
-          winningTouchType: null,
-          conversionId: null,
-          disqualificationReason: 'no_touch',
-        });
-      }
-      return Response.json({ ok: true });
-    });
+    const sideEffectFetch = vi.fn();
+    vi.spyOn(globalThis, 'fetch').mockImplementation(sideEffectFetch);
+    const platformFetch = vi.fn();
 
     const summary = await processCreditRenewalItem(
-      createEnvWithQueueMocks(vi.fn()).env,
+      createEnvWithQueueMocks(platformFetch).env,
       {
         kind: 'credit_renewal_item',
         runId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
@@ -1656,15 +1647,18 @@ describe('credit renewal fanout queue processing', () => {
       1
     );
 
-    expect(summary.credit_renewals_skipped_duplicate).toBe(1);
-    expect(updates).toContainEqual(
+    expect(summary.credit_renewals_skipped_duplicate).toBe(0);
+    expect(summary.credit_renewals).toBe(0);
+    expect(summary.errors).toBe(0);
+    expect(sideEffectFetch).not.toHaveBeenCalled();
+    expect(platformFetch).not.toHaveBeenCalled();
+    expect(updates).toHaveLength(0);
+    expect(inserts).toHaveLength(0);
+    expect(txInserts).toEqual([
       expect.objectContaining({
-        status: 'resolved',
-        resolution_actor_type: 'system',
-        resolution_actor_id: 'billing-lifecycle-job',
-        resolution_reason: 'credit_renewal_duplicate_idempotency_reconciled',
-      })
-    );
+        credit_category: 'kiloclaw-subscription:22222222-2222-4222-8222-222222222222:2026-06',
+      }),
+    ]);
   });
 
   it('serializes same-user item decisions against the current locked credit balance', async () => {

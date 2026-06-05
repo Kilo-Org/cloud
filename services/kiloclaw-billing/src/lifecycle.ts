@@ -2062,26 +2062,28 @@ async function processCreditRenewalRow(
           )
           .returning();
 
-        if (updatedSubscription) {
-          await insertKiloClawSubscriptionChangeLog(tx, {
-            subscriptionId: current.id,
-            actor: LIFECYCLE_ACTOR,
-            action: changeAction,
-            reason: 'credit_renewal_duplicate_idempotency_reconciled',
-            before: beforeSubscription,
-            after: updatedSubscription,
-          });
-
-          await supersedeTerminalRenewalFailuresForBoundary(tx, {
-            subscriptionId: current.id,
-            currentBoundary: newPeriodEnd,
-            actor: {
-              type: LIFECYCLE_ACTOR.actorType,
-              id: LIFECYCLE_ACTOR.actorId,
-            },
-            supersededAt: new Date().toISOString(),
-          });
+        if (!updatedSubscription) {
+          return { kind: 'skipped' } satisfies CreditRenewalTransactionOutcome;
         }
+
+        await insertKiloClawSubscriptionChangeLog(tx, {
+          subscriptionId: current.id,
+          actor: LIFECYCLE_ACTOR,
+          action: changeAction,
+          reason: 'credit_renewal_duplicate_idempotency_reconciled',
+          before: beforeSubscription,
+          after: updatedSubscription,
+        });
+
+        await supersedeTerminalRenewalFailuresForBoundary(tx, {
+          subscriptionId: current.id,
+          currentBoundary: newPeriodEnd,
+          actor: {
+            type: LIFECYCLE_ACTOR.actorType,
+            id: LIFECYCLE_ACTOR.actorId,
+          },
+          supersededAt: new Date().toISOString(),
+        });
 
         return {
           kind: 'duplicate',
@@ -2091,7 +2093,7 @@ async function processCreditRenewalRow(
           effectivePlan,
           priceVersion: current.kiloclaw_price_version,
           costMicrodollars,
-          wasPastDue: wasPastDue && updatedSubscription !== undefined,
+          wasPastDue,
           row: current,
           newPeriodEnd,
         } satisfies CreditRenewalTransactionOutcome;

@@ -727,6 +727,29 @@ async function cancelStripeSubscriptionIfPresent(subscriptionId: string | null):
   return true;
 }
 
+async function releaseAttachedSubscriptionScheduleIfPresent(
+  subscriptionId: string
+): Promise<boolean> {
+  const subscription = await client.subscriptions.retrieve(subscriptionId, {
+    expand: ['schedule'],
+  });
+  const scheduleRef = subscription.schedule;
+  if (!scheduleRef) {
+    return false;
+  }
+
+  const schedule =
+    typeof scheduleRef === 'string'
+      ? await client.subscriptionSchedules.retrieve(scheduleRef)
+      : scheduleRef;
+  if (schedule.status !== 'active' && schedule.status !== 'not_started') {
+    return false;
+  }
+
+  await client.subscriptionSchedules.release(schedule.id);
+  return true;
+}
+
 async function suspendKiloClawSubscriptionForAcceptedDispute(params: {
   caseRow: StripeDisputeCase;
   actor: AdminActor;
@@ -1006,6 +1029,7 @@ async function cancelOrganizationSeatsForAcceptedDispute(params: {
     return { status: StripeDisputeActionStatus.Skipped, resultCode: 'organization_missing' };
   }
 
+  await releaseAttachedSubscriptionScheduleIfPresent(params.subscriptionStripeId);
   await cancelStripeSubscriptionIfPresent(params.subscriptionStripeId);
   const now = new Date().toISOString();
   const idempotencyKey = `stripe_dispute:${params.caseRow.id}:organization_seats:${params.subscriptionStripeId}`;

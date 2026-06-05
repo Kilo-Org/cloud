@@ -35,8 +35,8 @@ jest.mock('@/lib/stripe-client', () => ({
     invoices: { list: jest.fn() },
     invoicePayments: { list: jest.fn() },
     refunds: { create: jest.fn() },
-    subscriptions: { cancel: jest.fn() },
-    subscriptionSchedules: { release: jest.fn() },
+    subscriptions: { cancel: jest.fn(), retrieve: jest.fn() },
+    subscriptionSchedules: { release: jest.fn(), retrieve: jest.fn() },
     errors: { StripeInvalidRequestError: class StripeInvalidRequestError extends Error {} },
   },
 }));
@@ -64,7 +64,11 @@ type AnyMock = ReturnType<typeof jest.fn>;
 const { acceptStripeDisputeCase, observeStripeDisputeCreated } =
   jest.requireActual<typeof StripeDisputesModule>('@/lib/stripe/disputes');
 const stripeClientMock = jest.requireMock('@/lib/stripe-client') as {
-  client: { disputes: { close: AnyMock; retrieve: AnyMock }; subscriptions: { cancel: AnyMock } };
+  client: {
+    disputes: { close: AnyMock; retrieve: AnyMock };
+    subscriptions: { cancel: AnyMock; retrieve: AnyMock };
+    subscriptionSchedules: { release: AnyMock; retrieve: AnyMock };
+  };
 };
 const { reportEvents } = jest.requireMock('@/lib/ai-gateway/abuse-service') as {
   reportEvents: AnyMock;
@@ -79,6 +83,8 @@ const kiloclawClientMock = jest.requireMock('@/lib/kiloclaw/kiloclaw-internal-cl
 const closeDisputeMock = stripeClientMock.client.disputes.close;
 const retrieveDisputeMock = stripeClientMock.client.disputes.retrieve;
 const cancelSubscriptionMock = stripeClientMock.client.subscriptions.cancel;
+const retrieveSubscriptionMock = stripeClientMock.client.subscriptions.retrieve;
+const releaseSubscriptionScheduleMock = stripeClientMock.client.subscriptionSchedules.release;
 const stopKiloClawMock = kiloclawClientMock.__stopMock;
 const reportEventsMock = reportEvents;
 const revokeWebSessionsMock = revokeWebSessions;
@@ -87,6 +93,8 @@ beforeEach(async () => {
   await cleanupDbForTest();
   jest.clearAllMocks();
   cancelSubscriptionMock.mockResolvedValue({ id: 'sub_default' });
+  retrieveSubscriptionMock.mockResolvedValue({ id: 'sub_default', schedule: null });
+  releaseSubscriptionScheduleMock.mockResolvedValue({});
   stopKiloClawMock.mockResolvedValue(undefined);
 });
 
@@ -393,6 +401,49 @@ describe('acceptStripeDisputeCase', () => {
     );
   });
 
+  it('reconciles Kilo Pass locally when Stripe subscription was already canceled', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const user = await insertTestUser();
+    await db.insert(kilo_pass_subscriptions).values({
+      kilo_user_id: user.id,
+      payment_provider: KiloPassPaymentProvider.Stripe,
+      provider_subscription_id: 'sub_kilo_pass_already_canceled',
+      stripe_subscription_id: 'sub_kilo_pass_already_canceled',
+      tier: KiloPassTier.Tier19,
+      cadence: KiloPassCadence.Monthly,
+      status: 'active',
+    });
+    const [caseRow] = await db
+      .insert(stripe_dispute_cases)
+      .values({
+        stripe_dispute_id: 'dp_kilo_pass_already_canceled',
+        stripe_event_id: 'evt_kilo_pass_already_canceled',
+        stripe_customer_id: user.stripe_customer_id,
+        owner_classification: StripeDisputeOwnerClassification.Personal,
+        kilo_user_id: user.id,
+        status: StripeDisputeCaseStatus.NeedsAction,
+        status_reason: 'Canonical personal owner matched; admin action required',
+      })
+      .returning({ id: stripe_dispute_cases.id });
+    closeDisputeMock.mockResolvedValue({
+      id: 'dp_kilo_pass_already_canceled',
+      status: 'lost',
+    } as Stripe.Response<Stripe.Dispute>);
+    cancelSubscriptionMock.mockRejectedValueOnce(
+      new Error('This subscription has already been canceled.')
+    );
+
+    const result = await acceptStripeDisputeCase({ caseId: caseRow.id, actor: admin });
+
+    expect(result).toEqual({ status: 'accepted', failures: [] });
+    const [subscription] = await db
+      .select()
+      .from(kilo_pass_subscriptions)
+      .where(eq(kilo_pass_subscriptions.stripe_subscription_id, 'sub_kilo_pass_already_canceled'));
+    expect(subscription.status).toBe('canceled');
+    expect(subscription.ended_at).not.toBeNull();
+  });
+
   it('allows stale processing cases to be retried', async () => {
     const admin = await insertTestUser({ is_admin: true });
     const user = await insertTestUser();
@@ -667,11 +718,16 @@ describe('acceptStripeDisputeCase', () => {
       status: 'lost',
     } as Stripe.Response<Stripe.Dispute>);
     cancelSubscriptionMock.mockResolvedValue({ id: 'sub_disputed_org_seats' });
+    retrieveSubscriptionMock.mockResolvedValueOnce({
+      id: 'sub_disputed_org_seats',
+      schedule: { id: 'sched_disputed_org_seats', status: 'active' },
+    });
 
     const result = await acceptStripeDisputeCase({ caseId: caseRow.id, actor: admin });
 
     expect(result).toEqual({ status: 'accepted', failures: [] });
     expect(cancelSubscriptionMock).toHaveBeenCalledTimes(1);
+    expect(releaseSubscriptionScheduleMock).toHaveBeenCalledWith('sched_disputed_org_seats');
     expect(cancelSubscriptionMock).toHaveBeenCalledWith('sub_disputed_org_seats', {
       invoice_now: false,
       prorate: false,

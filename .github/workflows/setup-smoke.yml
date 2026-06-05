@@ -41,6 +41,11 @@ jobs:
           node-version-file: '.nvmrc'
           cache: 'pnpm'
 
+      - name: Enable Corepack
+        run: |
+          corepack enable
+          corepack prepare pnpm@11.1.2 --activate
+
       - name: Install tmux
         run: |
           sudo apt-get update

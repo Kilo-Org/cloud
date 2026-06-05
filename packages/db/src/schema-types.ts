@@ -1286,12 +1286,14 @@ export const CustomLlmPricingSchema = z.object({
 
 export type CustomLlmPricing = z.infer<typeof CustomLlmPricingSchema>;
 
-export const CustomLlmMetadata = z.object({
+export const CustomLlmMetadataSchema = z.object({
   context_length: z.number(),
   max_completion_tokens: z.number(),
   supports_image_input: z.boolean().optional(),
   opencode_settings: OpenCodeSettingsSchema.optional(),
 });
+
+export type CustomLlmMetadata = z.infer<typeof CustomLlmMetadataSchema>;
 
 export const CustomLlmDefinitionSchema = z
   .object({
@@ -1308,7 +1310,7 @@ export const CustomLlmDefinitionSchema = z
     remove_from_body: z.array(z.string()).optional(),
     pricing: CustomLlmPricingSchema.optional(),
   })
-  .and(CustomLlmMetadata);
+  .and(CustomLlmMetadataSchema);
 
 export type CustomLlmDefinition = z.infer<typeof CustomLlmDefinitionSchema>;
 

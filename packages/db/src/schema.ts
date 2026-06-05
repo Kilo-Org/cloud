@@ -102,6 +102,7 @@ import type {
   KiloClawScheduledActionNotificationStatus,
   KiloClawScheduledActionNotificationChannel,
   KiloClawScheduledActionNotificationKind,
+  CustomLlmMetadata,
 } from './schema-types';
 import { KILOCLAW_PRICE_VERSIONS, type KiloClawPriceVersion } from './kiloclaw-pricing-catalog';
 import type {
@@ -7174,6 +7175,7 @@ export const model_experiment = pgTable(
     public_model_id: text().notNull(),
     name: text().notNull(),
     description: text(),
+    metadata: jsonb().$type<CustomLlmMetadata>(),
     // status: draft | active | paused | completed
     status: text().notNull().default('draft'),
     is_archived: boolean().notNull().default(false),

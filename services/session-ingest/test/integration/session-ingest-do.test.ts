@@ -37,6 +37,38 @@ describe('SessionIngestDO integration', () => {
 
       expect(snapshot.info).toEqual({ title: 'Test Session' });
       expect(snapshot.messages).toEqual([]);
+      expect(snapshot.sessionDiff).toEqual([]);
+    });
+
+    it('exports the latest session diff as a top-level field', async () => {
+      const sessionId = 'ses_roundtrip_diff_000000004';
+      const stub = getStub(kiloUserId, sessionId);
+      const diffs = [
+        {
+          file: 'src/index.ts',
+          patch: 'diff --git a/src/index.ts b/src/index.ts\n',
+          additions: 1,
+          deletions: 0,
+          status: 'modified',
+        },
+      ];
+
+      await stub.ingest(
+        [
+          { type: 'session', data: { title: 'Session Diff Export' } },
+          { type: 'session_diff', data: diffs },
+        ],
+        kiloUserId,
+        sessionId,
+        1
+      );
+
+      const raw = await stub.getAllStream().then(s => new Response(s).text());
+      const snapshot = JSON.parse(raw);
+
+      expect(snapshot.info).toEqual({ title: 'Session Diff Export' });
+      expect(snapshot.messages).toEqual([]);
+      expect(snapshot.sessionDiff).toEqual(diffs);
     });
 
     it('ingests multiple items and exports a full snapshot', async () => {
@@ -2181,6 +2213,41 @@ describe('SessionIngestDO integration', () => {
       const snapshot = JSON.parse(raw);
 
       expect(snapshot.info).toEqual({ title: 'Big Session Info' });
+    });
+
+    it('exports R2-backed session diffs with resolved data', async () => {
+      const sessionId = 'ses_r2_backed_diff_0000016';
+      const stub = getStub(kiloUserId, sessionId);
+      const diffs = [
+        {
+          file: 'large.txt',
+          patch: 'diff --git a/large.txt b/large.txt\n',
+          additions: 1,
+          deletions: 0,
+          status: 'modified',
+        },
+      ];
+      const itemData = JSON.stringify(diffs);
+      const r2Key = `items/${kiloUserId}/${sessionId}/session_diff/3000`;
+      await env.SESSION_INGEST_R2.put(r2Key, itemData);
+
+      await stub.ingest(
+        [
+          { type: 'session', data: { title: 'R2 Diff Test' } },
+          { type: 'session_diff', data: diffs },
+        ],
+        kiloUserId,
+        sessionId,
+        1,
+        3000,
+        { session_diff: r2Key }
+      );
+
+      const raw = await stub.getAllStream().then(s => new Response(s).text());
+      const snapshot = JSON.parse(raw);
+
+      expect(snapshot.info).toEqual({ title: 'R2 Diff Test' });
+      expect(snapshot.sessionDiff).toEqual(diffs);
     });
   });
 

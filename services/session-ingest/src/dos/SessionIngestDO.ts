@@ -407,7 +407,23 @@ export class SessionIngestDO extends DurableObject<Env> {
             }
           }
 
-          controller.enqueue(encoder.encode(']}'));
+          controller.enqueue(encoder.encode(']'));
+          controller.enqueue(encoder.encode(',"sessionDiff":'));
+          const diffRow = db
+            .select({
+              item_data: ingestItems.item_data,
+              item_data_r2_key: ingestItems.item_data_r2_key,
+            })
+            .from(ingestItems)
+            .where(eq(ingestItems.item_type, 'session_diff'))
+            .limit(1)
+            .get();
+          if (diffRow) {
+            await enqueueItemData(controller, diffRow, r2, encoder);
+          } else {
+            controller.enqueue(encoder.encode('[]'));
+          }
+          controller.enqueue(encoder.encode('}'));
           controller.close();
         } catch (err) {
           controller.error(err);

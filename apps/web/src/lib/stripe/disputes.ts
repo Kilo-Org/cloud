@@ -201,7 +201,8 @@ async function resolveOwner(
     .select({ id: organizations.id })
     .from(organizations)
     .where(and(eq(organizations.stripe_customer_id, customerId), isNull(organizations.deleted_at)))
-    .limit(2);
+    .limit(2)
+    .for('update');
 
   if (personalOwners.length === 1 && organizationOwners.length === 0) {
     return {

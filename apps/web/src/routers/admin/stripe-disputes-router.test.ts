@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it } from '@jest/globals';
+import { StripeDisputeCaseActionError } from '@/lib/stripe/disputes';
 
 import { cleanupDbForTest, db } from '@/lib/drizzle';
+import { disputeAcceptTRPCError } from '@/routers/admin/stripe-disputes-router';
 import { createCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import {
@@ -41,6 +43,22 @@ describe('admin disputes router', () => {
     await expect(caller.admin.disputes.list({ page: 1, limit: 25 })).rejects.toMatchObject({
       code: 'FORBIDDEN',
     });
+  });
+
+  it('maps admin-actionable accept errors to bad request', () => {
+    const error = disputeAcceptTRPCError(
+      new StripeDisputeCaseActionError('Dispute case is not actionable')
+    );
+
+    expect(error.code).toBe('BAD_REQUEST');
+    expect(error.message).toBe('Dispute case is not actionable');
+  });
+
+  it('maps unexpected accept failures to internal server error', () => {
+    const error = disputeAcceptTRPCError(new Error('Stripe close failed'));
+
+    expect(error.code).toBe('INTERNAL_SERVER_ERROR');
+    expect(error.message).toBe('Stripe close failed');
   });
 
   it('lists dispute cases with owner joins, filters, and action history', async () => {

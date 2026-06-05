@@ -100,6 +100,16 @@ export type AcceptStripeDisputeResult = {
   failures: string[];
 };
 
+export class StripeDisputeCaseActionError extends Error {
+  name = 'StripeDisputeCaseActionError';
+}
+
+export function isStripeDisputeCaseActionError(
+  error: unknown
+): error is StripeDisputeCaseActionError {
+  return error instanceof StripeDisputeCaseActionError;
+}
+
 const DISPUTE_ACTION_RETRY_DELAY_MS = 5 * 60 * 1000;
 const DISPUTE_KILOCLAW_DESTRUCTION_GRACE_DAYS = 7;
 const DISPUTE_ENFORCEMENT_REASON = 'stripe_dispute_accepted';
@@ -1161,7 +1171,7 @@ async function closeStripeDispute(caseRow: StripeDisputeCase): Promise<void> {
         }
         dispute = await client.disputes.retrieve(caseRow.stripe_dispute_id);
         if (dispute.status !== 'lost') {
-          throw new Error(
+          throw new StripeDisputeCaseActionError(
             `Stripe dispute is already closed with status ${dispute.status}; manual review required`
           );
         }
@@ -1225,7 +1235,7 @@ export async function acceptStripeDisputeCase(params: {
     .returning();
 
   if (!caseRow) {
-    throw new Error('Dispute case is not actionable');
+    throw new StripeDisputeCaseActionError('Dispute case is not actionable');
   }
 
   if (
@@ -1241,7 +1251,7 @@ export async function acceptStripeDisputeCase(params: {
         next_retry_at: null,
       })
       .where(eq(stripe_dispute_cases.id, caseRow.id));
-    throw new Error('Dispute case does not have exactly one matched owner');
+    throw new StripeDisputeCaseActionError('Dispute case does not have exactly one matched owner');
   }
 
   if (
@@ -1259,7 +1269,7 @@ export async function acceptStripeDisputeCase(params: {
         next_retry_at: null,
       })
       .where(eq(stripe_dispute_cases.id, caseRow.id));
-    throw new Error('Dispute case owner link is missing');
+    throw new StripeDisputeCaseActionError('Dispute case owner link is missing');
   }
 
   try {

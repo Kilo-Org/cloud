@@ -11,7 +11,11 @@ import { alias } from 'drizzle-orm/pg-core';
 import * as z from 'zod';
 
 import { db } from '@/lib/drizzle';
-import { acceptStripeDisputeCase, stripeDisputeDashboardUrl } from '@/lib/stripe/disputes';
+import {
+  acceptStripeDisputeCase,
+  isStripeDisputeCaseActionError,
+  stripeDisputeDashboardUrl,
+} from '@/lib/stripe/disputes';
 import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
 
 const DisputeQueueStatusSchema = z.enum([
@@ -39,6 +43,20 @@ const DisputesListInputSchema = z.object({
   status: DisputeQueueStatusSchema.default('needs_action'),
   ownerClassification: DisputeOwnerClassificationSchema.default('all'),
 });
+
+export function disputeAcceptTRPCError(error: unknown): TRPCError {
+  if (isStripeDisputeCaseActionError(error)) {
+    return new TRPCError({
+      code: 'BAD_REQUEST',
+      message: error.message,
+    });
+  }
+
+  return new TRPCError({
+    code: 'INTERNAL_SERVER_ERROR',
+    message: error instanceof Error ? error.message : String(error),
+  });
+}
 
 function normalizeTimestamp(value: string | null): string | null {
   if (!value) return null;
@@ -218,10 +236,7 @@ export const adminStripeDisputesRouter = createTRPCRouter({
       try {
         return await acceptStripeDisputeCase({ caseId: input.caseId, actor: ctx.user });
       } catch (error) {
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: error instanceof Error ? error.message : String(error),
-        });
+        throw disputeAcceptTRPCError(error);
       }
     }),
 });

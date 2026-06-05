@@ -60,6 +60,8 @@ type MenuSection = {
   items: MenuItem[];
 };
 
+const DISPUTES_SUMMARY_STALE_TIME_MS = 60_000;
+
 const userManagementItems: MenuItem[] = [
   {
     title: () => 'Users',
@@ -267,7 +269,10 @@ export function AppSidebar({
 }: { children: React.ReactNode } & React.ComponentProps<typeof Sidebar>) {
   const session = useSession();
   const trpc = useTRPC();
-  const disputesSummaryQuery = useQuery(trpc.admin.disputes.summary.queryOptions());
+  const disputesSummaryQuery = useQuery({
+    ...trpc.admin.disputes.summary.queryOptions(),
+    staleTime: DISPUTES_SUMMARY_STALE_TIME_MS,
+  });
   const pendingDisputesCount = disputesSummaryQuery.data?.pendingCount ?? 0;
 
   return (

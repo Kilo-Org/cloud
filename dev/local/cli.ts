@@ -213,6 +213,9 @@ async function cmdUp(args: string[], repoRoot: string): Promise<void> {
   if (process.env.DEBUG_SHOW_DEV_UI !== undefined && process.env.DEBUG_SHOW_DEV_UI !== '') {
     sessionEnv.DEBUG_SHOW_DEV_UI = process.env.DEBUG_SHOW_DEV_UI;
   }
+  if (process.env.SKIP_STRIPE_API !== undefined && process.env.SKIP_STRIPE_API !== '') {
+    sessionEnv.SKIP_STRIPE_API = process.env.SKIP_STRIPE_API;
+  }
   if (
     process.env.NEXT_PUBLIC_POSTHOG_KEY !== undefined &&
     process.env.NEXT_PUBLIC_POSTHOG_KEY !== ''

@@ -25,6 +25,7 @@ jobs:
       POSTGRES_URL: postgresql://postgres:postgres@localhost:5432/postgres
       POSTGRES_CONNECT_TIMEOUT: '30000'
       POSTGRES_MAX_QUERY_TIME: '30000'
+      SKIP_STRIPE_API: 'true'
       NEXT_PUBLIC_POSTHOG_KEY: fake-token
       PLAYWRIGHT_BASE_URL: http://localhost:3000
 

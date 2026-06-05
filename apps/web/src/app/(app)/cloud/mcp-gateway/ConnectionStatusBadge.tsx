@@ -49,8 +49,8 @@ const toneDot: Record<StatusTone, string> = {
 };
 
 const toneClassName: Record<StatusTone, string> = {
-  positive: 'bg-green-500/10 text-green-400 ring-green-500/20',
-  attention: 'bg-yellow-500/10 text-yellow-300 ring-yellow-500/20',
+  positive: 'bg-green-500/20 text-green-400 ring-green-500/20',
+  attention: 'bg-yellow-500/20 text-yellow-400 ring-yellow-500/20',
   neutral: 'bg-secondary text-muted-foreground ring-border',
 };
 

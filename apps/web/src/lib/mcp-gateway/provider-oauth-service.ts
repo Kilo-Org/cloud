@@ -118,7 +118,9 @@ async function readCappedJson(response: Response): Promise<unknown> {
   }
 }
 
-function requireBearerTokenType(tokenResponse: z.infer<typeof ProviderTokenResponseSchema>) {
+function requireBearerTokenType(
+  tokenResponse: z.infer<typeof ProviderTokenResponseSchema>
+): string {
   if (!tokenResponse.token_type || tokenResponse.token_type.toLowerCase() !== 'bearer') {
     throw createGatewayError(
       GatewayErrorCode.InvalidGrant,
@@ -126,6 +128,7 @@ function requireBearerTokenType(tokenResponse: z.infer<typeof ProviderTokenRespo
       400
     );
   }
+  return tokenResponse.token_type;
 }
 
 export function createProviderOAuthService(params: {
@@ -591,15 +594,7 @@ export function createProviderOAuthService(params: {
       );
     }
     const tokenResponse = ProviderTokenResponseSchema.parse(await readCappedJson(response));
-    requireBearerTokenType(tokenResponse);
-    const tokenType = tokenResponse.token_type;
-    if (!tokenType) {
-      throw createGatewayError(
-        GatewayErrorCode.InvalidGrant,
-        'Provider token type is not supported',
-        400
-      );
-    }
+    const tokenType = requireBearerTokenType(tokenResponse);
     const expiresAt = tokenResponse.expires_in
       ? new Date(Date.now() + tokenResponse.expires_in * 1000).toISOString()
       : null;

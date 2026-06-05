@@ -61,12 +61,15 @@ export function createConfigService(params: {
         400
       );
     }
+    const providerScopeSource: ProviderScopeSource = input.providerScopes
+      ? 'override'
+      : discovery.providerScopeSource === 'discovered'
+        ? 'discovered'
+        : 'none';
     return {
       metadata: provider,
       providerScopes: input.providerScopes ?? discovery.providerScopes,
-      providerScopeSource: (input.providerScopes
-        ? 'override'
-        : discovery.providerScopeSource) as ProviderScopeSource,
+      providerScopeSource,
       providerResource: discovery.providerResource,
     };
   }

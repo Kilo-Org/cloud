@@ -35,6 +35,7 @@ type SetupDraft = {
   authMode: 'none' | 'static_headers' | 'oauth_dynamic' | 'oauth_static';
   providerIssuer: string;
   providerScopes: string;
+  providerScopesEdited: boolean;
   staticProviderClientId: string;
   staticProviderClientSecret: string;
   staticHeaderName: string;
@@ -132,6 +133,7 @@ export function McpGatewaySetupContent({ organizationId }: McpGatewaySetupConten
     authMode: 'oauth_dynamic',
     providerIssuer: '',
     providerScopes: '',
+    providerScopesEdited: false,
     staticProviderClientId: '',
     staticProviderClientSecret: '',
     staticHeaderName: 'Authorization',
@@ -212,9 +214,9 @@ export function McpGatewaySetupContent({ organizationId }: McpGatewaySetupConten
   // discovery (onBlur / Re-check) sets discoveryAttemptedUrl, which makes this
   // effect re-run, hit the early return, and cancel the pending debounce.
   useEffect(() => {
-    if (!discoveredProviderScopes || draft.providerScopes) return;
+    if (!discoveredProviderScopes || draft.providerScopesEdited) return;
     updateDraft({ providerScopes: discoveredProviderScopes });
-  }, [discoveredProviderScopes, draft.providerScopes]);
+  }, [discoveredProviderScopes, draft.providerScopesEdited]);
 
   useEffect(() => {
     if (!currentRemoteUrl) return;
@@ -250,8 +252,10 @@ export function McpGatewaySetupContent({ organizationId }: McpGatewaySetupConten
     draft.staticHeaderValue.trim()
       ? { [draft.staticHeaderName.trim()]: draft.staticHeaderValue }
       : undefined;
-  const providerScopes = draft.providerScopes.trim()
-    ? draft.providerScopes.trim().split(/\s+/)
+  const providerScopes = draft.providerScopesEdited
+    ? draft.providerScopes.trim()
+      ? draft.providerScopes.trim().split(/\s+/)
+      : []
     : undefined;
 
   function createConnection() {
@@ -276,6 +280,7 @@ export function McpGatewaySetupContent({ organizationId }: McpGatewaySetupConten
       remoteUrl: draft.remoteUrl,
       authMode: selectedAuthMode,
       providerIssuer: selectedProviderIssuer || undefined,
+      providerScopes,
       staticProviderClientId: draft.staticProviderClientId || undefined,
       staticProviderClientSecret: draft.staticProviderClientSecret || undefined,
       staticHeaders,
@@ -335,6 +340,7 @@ export function McpGatewaySetupContent({ organizationId }: McpGatewaySetupConten
                         remoteUrl: event.target.value,
                         providerIssuer: '',
                         providerScopes: '',
+                        providerScopesEdited: false,
                       });
                     }}
                     onBlur={() => {
@@ -435,7 +441,12 @@ export function McpGatewaySetupContent({ organizationId }: McpGatewaySetupConten
                       id="provider-scopes"
                       className="h-11 sm:h-9"
                       value={draft.providerScopes}
-                      onChange={event => updateDraft({ providerScopes: event.target.value })}
+                      onChange={event =>
+                        updateDraft({
+                          providerScopes: event.target.value,
+                          providerScopesEdited: true,
+                        })
+                      }
                       placeholder="openid email"
                     />
                     <p className="text-muted-foreground text-xs">
@@ -455,12 +466,8 @@ export function McpGatewaySetupContent({ organizationId }: McpGatewaySetupConten
                   >
                     <SelectTrigger
                       id="auth-mode"
-                      aria-describedby={
-                        discovery && (!hasProvider || (hasProvider && !dynamicAvailable))
-                          ? 'auth-mode-hint'
-                          : undefined
-                      }
-                      className="h-11 w-full sm:h-9"
+                      aria-describedby="auth-mode-hint"
+                      className="h-11 sm:h-9"
                     >
                       <SelectValue />
                     </SelectTrigger>
@@ -481,14 +488,17 @@ export function McpGatewaySetupContent({ organizationId }: McpGatewaySetupConten
                       provider sign-in.
                     </p>
                   )}
-                  {discovery && hasProvider && !dynamicAvailable && (
-                    <p id="auth-mode-hint" className="text-muted-foreground text-xs">
-                      Automatic provider sign-in is unavailable because this provider does not
-                      advertise dynamic registration.
-                    </p>
-                  )}
+                  {discovery &&
+                    hasProvider &&
+                    !dynamicAvailable &&
+                    selectedAuthMode !== 'oauth_static' && (
+                      <p id="auth-mode-hint" className="text-muted-foreground text-xs">
+                        Automatic provider sign-in is unavailable because this provider does not
+                        advertise dynamic registration.
+                      </p>
+                    )}
                   {selectedAuthMode === 'oauth_dynamic' && (
-                    <p className="text-muted-foreground text-xs">
+                    <p id="auth-mode-hint" className="text-muted-foreground text-xs">
                       {selectedProviderIssuer
                         ? `${hostOf(selectedProviderIssuer)} registers Kilo Code automatically. ${
                             organizationId
@@ -502,7 +512,7 @@ export function McpGatewaySetupContent({ organizationId }: McpGatewaySetupConten
                   )}
                   {selectedAuthMode === 'oauth_static' && (
                     <div className="space-y-2 pt-1">
-                      <p className="text-muted-foreground text-xs">
+                      <p id="auth-mode-hint" className="text-muted-foreground text-xs">
                         {dynamicAvailable
                           ? organizationId
                             ? 'Use a provider app you registered yourself. Each assigned user still signs in with their own account.'

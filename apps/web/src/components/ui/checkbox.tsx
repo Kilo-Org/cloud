@@ -37,7 +37,7 @@ const Checkbox = React.forwardRef<HTMLInputElement, CheckboxProps>(
         checked={checked === true}
         onChange={handleChange}
         className={cn(
-          'border-input accent-primary h-4 w-4 rounded bg-input/30 text-primary focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50',
+          'border-input accent-muted-foreground h-4 w-4 rounded bg-input/30 text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50',
           className
         )}
         {...props}

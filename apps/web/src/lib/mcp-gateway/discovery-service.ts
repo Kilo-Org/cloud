@@ -166,10 +166,13 @@ export function createDiscoveryService(params: { fetchImpl?: typeof fetch }) {
     const metadataUrl = new URL('/.well-known/oauth-protected-resource', endpoint.origin);
     const metadataRaw = await fetchJson(metadataUrl, fetchImpl);
     let metadata = metadataRaw ? RemoteProtectedResourceMetadataSchema.parse(metadataRaw) : null;
-    const endpointResponse = await fetchImpl(endpoint.toString(), {
-      method: 'GET',
-      redirect: 'manual',
-    });
+    const endpointResponse = await fetchImpl(
+      (await validatePublicHttpsDestination(endpoint.toString())).toString(),
+      {
+        method: 'GET',
+        redirect: 'manual',
+      }
+    );
     const challenge = parseProviderChallenge(endpointResponse.headers.get('www-authenticate'));
     if (!metadata && challenge.resourceMetadataUrl) {
       const challengeMetadataUrl = await validatePublicHttpsDestination(

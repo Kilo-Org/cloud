@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { getMcpGatewayRoutes } from '@/lib/mcp-gateway/routes';
@@ -74,6 +75,7 @@ export function McpGatewayDetailContent({
   organizationId,
 }: McpGatewayDetailContentProps) {
   const trpc = useTRPC();
+  const router = useRouter();
   const queryClient = useQueryClient();
   const routes = getMcpGatewayRoutes(organizationId);
   const managedConfigInput = { configId, organizationId };
@@ -95,6 +97,10 @@ export function McpGatewayDetailContent({
     ...trpc.organizations.withMembers.queryOptions({ organizationId: organizationId ?? '' }),
     enabled: Boolean(organizationId),
   });
+  const excludedUserIds = useMemo(
+    () => detailQuery.data?.assignments.map(assignment => assignment.userId) ?? [],
+    [detailQuery.data?.assignments]
+  );
   const memberById = useMemo(() => {
     const map = new Map<string, { name: string; email: string }>();
     for (const member of membersQuery.data?.members ?? []) {
@@ -140,7 +146,7 @@ export function McpGatewayDetailContent({
       onSuccess: () => {
         toast.success('Connection deleted');
         setDeleteDialogOpen(false);
-        window.location.assign(routes.list);
+        router.push(routes.list);
       },
       onError: error => toast.error(error.message || 'Could not delete the connection'),
     })
@@ -324,7 +330,7 @@ export function McpGatewayDetailContent({
                       organizationId={organizationId}
                       value={assignedUserId}
                       onValueChange={setAssignedUserId}
-                      excludeUserIds={connection.assignments.map(assignment => assignment.userId)}
+                      excludeUserIds={excludedUserIds}
                     />
                   )}
                   <Button

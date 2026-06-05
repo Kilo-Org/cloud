@@ -59,8 +59,6 @@ const ManagedConfigInputSchema = z.object({
   configId: ConfigIdSchema,
   organizationId: OrganizationIdSchema.optional(),
 });
-const mcpGatewayProcedure = baseProcedure;
-const mcpGatewayAdminProcedure = adminProcedure;
 
 function isGatewayError(error: unknown): error is GatewayError {
   return (
@@ -363,7 +361,7 @@ async function requireManagedConfig(params: {
 }
 
 export const mcpGatewayRouter = createTRPCRouter({
-  discover: mcpGatewayProcedure
+  discover: baseProcedure
     .input(z.object({ remoteUrl: RemoteUrlSchema }))
     .mutation(async ({ input }) =>
       withGatewayErrorMapping(async () => {
@@ -382,10 +380,10 @@ export const mcpGatewayRouter = createTRPCRouter({
         };
       })
     ),
-  listPersonal: mcpGatewayAdminProcedure.query(async ({ ctx }) =>
+  listPersonal: adminProcedure.query(async ({ ctx }) =>
     listConfigs({ ownerScope: GatewayOwnerScope.Personal, ownerId: ctx.user.id })
   ),
-  listOrganization: mcpGatewayProcedure
+  listOrganization: baseProcedure
     .input(z.object({ organizationId: OrganizationIdSchema }))
     .query(async ({ input, ctx }) => {
       await requireOrganizationManager({
@@ -398,7 +396,7 @@ export const mcpGatewayRouter = createTRPCRouter({
         ownerId: input.organizationId,
       });
     }),
-  getPersonal: mcpGatewayAdminProcedure
+  getPersonal: adminProcedure
     .input(z.object({ configId: ConfigIdSchema }))
     .query(async ({ input, ctx }) =>
       getConfigDetail({
@@ -407,7 +405,7 @@ export const mcpGatewayRouter = createTRPCRouter({
         ownerId: ctx.user.id,
       })
     ),
-  getOrganization: mcpGatewayProcedure
+  getOrganization: baseProcedure
     .input(z.object({ organizationId: OrganizationIdSchema, configId: ConfigIdSchema }))
     .query(async ({ input, ctx }) => {
       await requireOrganizationManager({
@@ -421,7 +419,7 @@ export const mcpGatewayRouter = createTRPCRouter({
         ownerId: input.organizationId,
       });
     }),
-  createPersonal: mcpGatewayAdminProcedure
+  createPersonal: adminProcedure
     .input(
       z.object({
         name: z.string().min(1).max(200),
@@ -453,7 +451,7 @@ export const mcpGatewayRouter = createTRPCRouter({
         return { configId: created.config.config_id };
       })
     ),
-  createOrganization: mcpGatewayProcedure
+  createOrganization: baseProcedure
     .input(
       z.object({
         organizationId: OrganizationIdSchema,
@@ -496,7 +494,7 @@ export const mcpGatewayRouter = createTRPCRouter({
         return { configId: created.config.config_id };
       })
     ),
-  startProviderSignIn: mcpGatewayProcedure
+  startProviderSignIn: baseProcedure
     .input(ManagedConfigInputSchema)
     .mutation(async ({ input, ctx }) =>
       withGatewayErrorMapping(async () => {
@@ -520,22 +518,20 @@ export const mcpGatewayRouter = createTRPCRouter({
         return { authorizationUrl: provider.authorizationUrl };
       })
     ),
-  rotateRoute: mcpGatewayProcedure
-    .input(ManagedConfigInputSchema)
-    .mutation(async ({ input, ctx }) =>
-      withGatewayErrorMapping(async () => {
-        await requireManagedConfig({
-          configId: input.configId,
-          organizationId: input.organizationId,
-          userId: ctx.user.id,
-          isGlobalAdmin: ctx.user.is_admin,
-        });
-        const services = createGatewayServices();
-        const route = await services.configService.rotateRoute({ configId: input.configId });
-        return { routeKey: route.route_key, canonicalUrl: route.canonical_url };
-      })
-    ),
-  disable: mcpGatewayProcedure.input(ManagedConfigInputSchema).mutation(async ({ input, ctx }) =>
+  rotateRoute: baseProcedure.input(ManagedConfigInputSchema).mutation(async ({ input, ctx }) =>
+    withGatewayErrorMapping(async () => {
+      await requireManagedConfig({
+        configId: input.configId,
+        organizationId: input.organizationId,
+        userId: ctx.user.id,
+        isGlobalAdmin: ctx.user.is_admin,
+      });
+      const services = createGatewayServices();
+      const route = await services.configService.rotateRoute({ configId: input.configId });
+      return { routeKey: route.route_key, canonicalUrl: route.canonical_url };
+    })
+  ),
+  disable: baseProcedure.input(ManagedConfigInputSchema).mutation(async ({ input, ctx }) =>
     withGatewayErrorMapping(async () => {
       await requireManagedConfig({
         configId: input.configId,
@@ -549,7 +545,7 @@ export const mcpGatewayRouter = createTRPCRouter({
       return { configId: config.config_id, enabled: config.enabled };
     })
   ),
-  delete: mcpGatewayProcedure.input(ManagedConfigInputSchema).mutation(async ({ input, ctx }) =>
+  delete: baseProcedure.input(ManagedConfigInputSchema).mutation(async ({ input, ctx }) =>
     withGatewayErrorMapping(async () => {
       await requireManagedConfig({
         configId: input.configId,
@@ -563,7 +559,7 @@ export const mcpGatewayRouter = createTRPCRouter({
       return { configId: config.config_id };
     })
   ),
-  upsertStaticHeaders: mcpGatewayProcedure
+  upsertStaticHeaders: baseProcedure
     .input(ManagedConfigInputSchema.extend({ headers: StaticHeadersSchema }))
     .mutation(async ({ input, ctx }) =>
       withGatewayErrorMapping(async () => {
@@ -588,7 +584,7 @@ export const mcpGatewayRouter = createTRPCRouter({
         return { secretId: secret.config_secret_id };
       })
     ),
-  updateProviderScopes: mcpGatewayProcedure
+  updateProviderScopes: baseProcedure
     .input(ManagedConfigInputSchema.extend({ providerScopes: ProviderScopeUpdateSchema }))
     .mutation(async ({ input, ctx }) =>
       withGatewayErrorMapping(async () => {
@@ -610,7 +606,7 @@ export const mcpGatewayRouter = createTRPCRouter({
         };
       })
     ),
-  upsertStaticProviderCredentials: mcpGatewayProcedure
+  upsertStaticProviderCredentials: baseProcedure
     .input(
       ManagedConfigInputSchema.extend({
         clientId: z.string().min(1),
@@ -640,7 +636,7 @@ export const mcpGatewayRouter = createTRPCRouter({
         return { secretId: secret.config_secret_id };
       })
     ),
-  assignUser: mcpGatewayProcedure
+  assignUser: baseProcedure
     .input(ManagedConfigInputSchema.extend({ userId: z.string().min(1) }))
     .mutation(async ({ input, ctx }) =>
       withGatewayErrorMapping(async () => {
@@ -661,7 +657,7 @@ export const mcpGatewayRouter = createTRPCRouter({
         return { assignmentId: assignment.assignment_id };
       })
     ),
-  revokeAssignment: mcpGatewayProcedure
+  revokeAssignment: baseProcedure
     .input(ManagedConfigInputSchema.extend({ userId: z.string().min(1) }))
     .mutation(async ({ input, ctx }) =>
       withGatewayErrorMapping(async () => {

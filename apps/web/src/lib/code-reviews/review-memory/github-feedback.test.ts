@@ -172,7 +172,7 @@ describe('GitHub review memory feedback', () => {
       },
       repository: repository(),
       installation: { id: 98765 },
-      sender: { login: 'kilodev', type: 'User' },
+      sender: { login: 'kilodev' },
     } satisfies PullRequestReviewCommentPayload;
 
     const result = await handleGitHubReviewCommentFeedback({

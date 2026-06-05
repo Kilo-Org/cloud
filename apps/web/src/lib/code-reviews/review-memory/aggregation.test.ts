@@ -11,7 +11,10 @@ import {
   kilocode_users,
 } from '@kilocode/db/schema';
 import { eq, inArray } from 'drizzle-orm';
-import { dispatchManualReviewMemoryAggregation } from './aggregation';
+import {
+  dispatchManualReviewMemoryAggregation,
+  type ReviewMemoryAggregationGeneratorInput,
+} from './aggregation';
 import {
   listProposalEvidence,
   recordFeedbackEvent,
@@ -212,7 +215,11 @@ describe('review memory aggregation', () => {
         evidenceExcerpt: `False positive cluster ${i}`,
       });
     }
-    const generateOpportunities = jest.fn(async () => ({ opportunities: [] }));
+    const generatedInputs: ReviewMemoryAggregationGeneratorInput[] = [];
+    const generateOpportunities = jest.fn(async (input: ReviewMemoryAggregationGeneratorInput) => {
+      generatedInputs.push(input);
+      return { opportunities: [] };
+    });
 
     const summary = await dispatchManualReviewMemoryAggregation({ generateOpportunities });
 
@@ -220,7 +227,8 @@ describe('review memory aggregation', () => {
     expect(generateOpportunities).toHaveBeenCalledWith(
       expect.objectContaining({ clusters: expect.arrayContaining([expect.any(Object)]) })
     );
-    expect(generateOpportunities.mock.calls[0]?.[0].clusters).toHaveLength(20);
+    expect(generatedInputs).toHaveLength(1);
+    expect(generatedInputs[0]?.clusters).toHaveLength(20);
 
     const persistedEvents = await db.select().from(code_review_feedback_events);
     expect(persistedEvents.filter(event => event.aggregation_state === 'included')).toHaveLength(

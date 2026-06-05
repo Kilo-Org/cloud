@@ -656,6 +656,7 @@ Version capability hint rules:
 | POST | `/_kilo/config/agents` | Create a basic agent through non-interactive OpenClaw CLI behavior |
 | PATCH | `/_kilo/config/agents/:agentId` | Update approved agent model/settings fields |
 | DELETE | `/_kilo/config/agents/:agentId` | Delete a configured agent through non-interactive OpenClaw CLI behavior |
+| PUT | `/_kilo/config/agents/:agentId/bindings` | Declaratively set an agent's channel-level (default-account) route bindings |
 | PATCH | `/_kilo/config/agent-defaults` | Update approved inherited agent-default fields |
 | POST | `/_kilo/config/tools-md/google-workspace` | Enable/disable managed Google Workspace `TOOLS.md` section |
 
@@ -675,11 +676,16 @@ Other values MUST return 400.
 9. Native agent resource lookup and update requests MUST reject non-empty IDs that collapse to the reserved implicit `main` identifier rather than silently targeting `main`.
 10. `DELETE /_kilo/config/agents/:agentId` MUST delegate deletion to non-interactive OpenClaw CLI behavior and MUST reject deletion of `main`.
 11. The delete response MUST NOT claim verified filesystem deletion or verified file retention. Filesystem disposition is controlled by the installed OpenClaw CLI/runtime behavior and is not represented by the controller response.
-12. The following capability hints MUST be advertised when the corresponding CRUD routes are registered: `config.agents.read`, `config.agents.create.basic.cli`, `config.agents.update`, `config.agents.delete.cli`, and `config.agent-defaults.update`.
+12. The following capability hints MUST be advertised when the corresponding CRUD routes are registered: `config.agents.read`, `config.agents.create.basic.cli`, `config.agents.update`, `config.agents.delete.cli`, `config.agents.bindings.update`, and `config.agent-defaults.update`.
 13. Native updates MUST report stale config etags or config changes observed before commit as `409 config_etag_conflict`.
 14. Controller-originated agent create, update, defaults-update, and delete mutations MUST be serialized per config path so a lifecycle CLI mutation cannot be overwritten by a concurrent native controller update.
 15. CLI lifecycle operations MUST report known reserved/not-found/conflict validation failures using stable HTTP error codes, and MUST report timeout or malformed/process failures without exposing secret environment values.
 16. Controller server errors from agent-config reads MUST NOT expose filesystem error details in HTTP responses.
+17. Agent read summaries MUST include the agent's channel route bindings (channel and, when present, account id), and MUST flag bindings that are more specific than a channel(/account) route (peer/guild/team/roles match, or a non-`route` binding type) so consumers can distinguish them. Malformed binding entries MUST be skipped rather than failing the read.
+18. `PUT /_kilo/config/agents/:agentId/bindings` MUST declaratively set the agent's channel-level default-account route bindings to exactly the requested channel set, using guarded read-modify-write behavior (one atomic config write; stale etags reported as `409 config_etag_conflict`). It MUST be serialized per config path with the other agent mutations.
+19. The binding set MUST preserve bindings it does not manage — advanced bindings (peer/guild/team/roles or non-`route` type), account-scoped routes, and other agents' bindings MUST be left intact.
+20. The binding set MUST reject a requested channel already routed (default account) to another agent with `409 agent_binding_conflict`, before writing any change.
+21. The binding set MUST fail closed (`422 invalid_agent_config`) when the configuration's `bindings` value is present but not an array, rather than overwriting an unexpected structure.
 
 #### Environment (bearer token)
 

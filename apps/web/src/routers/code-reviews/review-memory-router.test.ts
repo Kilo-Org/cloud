@@ -33,9 +33,7 @@ import {
   agent_configs,
   code_review_feedback_events,
   code_review_feedback_subjects,
-  code_review_memory_aggregation_runs,
   code_review_memory_aggregation_state,
-  code_review_memory_proposal_evidence,
   code_review_memory_proposals,
   kilocode_users,
   organization_memberships,
@@ -49,9 +47,7 @@ import {
 
 describe('reviewMemoryRouter', () => {
   afterEach(async () => {
-    await db.delete(code_review_memory_proposal_evidence);
     await db.delete(code_review_memory_proposals);
-    await db.delete(code_review_memory_aggregation_runs);
     await db.delete(code_review_feedback_events);
     await db.delete(code_review_feedback_subjects);
     await db.delete(code_review_memory_aggregation_state);
@@ -118,11 +114,10 @@ describe('reviewMemoryRouter', () => {
       platform: 'github',
       repoFullName: 'acme/widgets',
       prNumber: 1,
-      eventSource: 'github_webhook',
       signalKind: 'corrective_reply',
       sentiment: 'negative',
       strength: 3,
-      externalEventId: 'router-dashboard-event',
+      dedupeHash: 'router-dashboard-event',
     });
     const caller = await createCallerForUser(user.id);
 
@@ -174,7 +169,6 @@ describe('reviewMemoryRouter', () => {
       expect.objectContaining({
         status: 'edited',
         title: 'Edited widget guidance',
-        edited_by_user_id: user.id,
       })
     );
 
@@ -182,7 +176,6 @@ describe('reviewMemoryRouter', () => {
     expect(rejected).toEqual(
       expect.objectContaining({
         status: 'rejected',
-        rejected_by_user_id: user.id,
       })
     );
   });

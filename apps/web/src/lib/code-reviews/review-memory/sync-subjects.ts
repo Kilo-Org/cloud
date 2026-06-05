@@ -22,27 +22,20 @@ type ReviewSubjectSyncReview = Pick<
   | 'id'
   | 'owned_by_organization_id'
   | 'owned_by_user_id'
-  | 'platform_integration_id'
   | 'repo_full_name'
   | 'platform_project_id'
   | 'pr_number'
-  | 'pr_url'
-  | 'head_sha'
 >;
 
 export type FetchedReviewSummarySubject = {
   externalId: string;
   body: string;
-  externalUrl?: string | null;
 };
 
 export type FetchedInlineReviewSubject = {
   externalId: string;
   externalThreadId?: string | null;
-  externalUrl?: string | null;
   filePath?: string | null;
-  lineNumber?: number | null;
-  diffHunk?: string | null;
   body: string;
   isOutdated?: boolean;
 };
@@ -123,18 +116,6 @@ export function isLikelyKiloInlineReviewBody(body: string): boolean {
   return /```suggestion/.test(body) && /\b(CRITICAL|WARNING|SUGGESTION|NITPICK)\b/i.test(body);
 }
 
-function githubSummaryUrl(review: ReviewSubjectSyncReview, commentId: string): string {
-  return `${review.pr_url}#issuecomment-${commentId}`;
-}
-
-function githubInlineUrl(review: ReviewSubjectSyncReview, commentId: string): string {
-  return `${review.pr_url}#discussion_r${commentId}`;
-}
-
-function gitlabNoteUrl(review: ReviewSubjectSyncReview, noteId: string): string {
-  return `${review.pr_url}#note_${noteId}`;
-}
-
 export async function syncFetchedReviewMemorySubjects(
   input: SyncFetchedReviewMemorySubjectsInput
 ): Promise<SyncReviewMemorySubjectsResult> {
@@ -149,17 +130,11 @@ export async function syncFetchedReviewMemorySubjects(
     await upsertFeedbackSubject({
       owner,
       platform: input.platform,
-      platformIntegrationId: input.review.platform_integration_id,
-      codeReviewId: input.review.id,
       subjectType: 'summary_comment',
       externalId: input.summary.externalId,
-      externalUrl: input.summary.externalUrl ?? null,
       repoFullName: input.review.repo_full_name,
       platformProjectId: input.review.platform_project_id,
       prNumber: input.review.pr_number,
-      prUrl: input.review.pr_url,
-      headSha: input.review.head_sha,
-      bodyExcerpt: input.summary.body,
       state: 'active',
       database: input.database,
     });
@@ -173,22 +148,13 @@ export async function syncFetchedReviewMemorySubjects(
     await upsertFeedbackSubject({
       owner,
       platform: input.platform,
-      platformIntegrationId: input.review.platform_integration_id,
-      codeReviewId: input.review.id,
       subjectType: input.platform === 'gitlab' ? 'discussion' : 'inline_comment',
       externalId: comment.externalId,
       externalThreadId: comment.externalThreadId ?? null,
-      externalUrl: comment.externalUrl ?? null,
       repoFullName: input.review.repo_full_name,
       platformProjectId: input.review.platform_project_id,
       prNumber: input.review.pr_number,
-      prUrl: input.review.pr_url,
-      headSha: input.review.head_sha,
       filePath: comment.filePath ?? null,
-      lineNumber: comment.lineNumber ?? null,
-      diffHunk: comment.diffHunk ?? null,
-      bodyExcerpt: comment.body,
-      severity: metadata.severity,
       findingTitle: metadata.findingTitle,
       findingFingerprint: metadata.findingFingerprint,
       state: comment.isOutdated ? 'outdated' : 'active',
@@ -235,15 +201,11 @@ export async function syncGitHubReviewMemorySubjects(input: {
       ? {
           externalId: String(summaryComment.commentId),
           body: summaryComment.body,
-          externalUrl: githubSummaryUrl(input.review, String(summaryComment.commentId)),
         }
       : null,
     inlineComments: inlineComments.map(comment => ({
       externalId: String(comment.id),
-      externalUrl: comment.htmlUrl ?? githubInlineUrl(input.review, String(comment.id)),
       filePath: comment.path,
-      lineNumber: comment.line,
-      diffHunk: comment.diffHunk,
       body: comment.body,
       isOutdated: comment.isOutdated,
     })),
@@ -288,15 +250,12 @@ export async function syncGitLabReviewMemorySubjects(input: {
       ? {
           externalId: String(summaryNote.noteId),
           body: summaryNote.body,
-          externalUrl: gitlabNoteUrl(input.review, String(summaryNote.noteId)),
         }
       : null,
     inlineComments: inlineComments.map(comment => ({
       externalId: String(comment.id),
       externalThreadId: comment.discussionId,
-      externalUrl: gitlabNoteUrl(input.review, String(comment.id)),
       filePath: comment.path,
-      lineNumber: comment.line,
       body: comment.body,
       isOutdated: comment.isOutdated,
     })),

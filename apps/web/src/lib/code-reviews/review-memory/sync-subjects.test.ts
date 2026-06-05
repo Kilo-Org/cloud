@@ -54,15 +54,11 @@ describe('review memory subject sync', () => {
       summary: {
         externalId: '1001',
         body: '<!-- kilo-review -->\n## Code Review Summary\n\n**Status:** 1 Issues Found',
-        externalUrl: 'https://github.com/owner/repo/pull/42#issuecomment-1001',
       },
       inlineComments: [
         {
           externalId: '2001',
-          externalUrl: 'https://github.com/owner/repo/pull/42#discussion_r2001',
           filePath: 'src/example.ts',
-          lineNumber: 12,
-          diffHunk: '@@ -10,3 +10,3 @@',
           body: '**WARNING:** Missing error handling for failed requests.',
           isOutdated: false,
         },
@@ -74,7 +70,6 @@ describe('review memory subject sync', () => {
         {
           externalId: '2002',
           filePath: 'src/other.ts',
-          lineNumber: 20,
           body: '**CRITICAL:** Null pointer when the payload is empty.',
           isOutdated: true,
         },
@@ -88,22 +83,24 @@ describe('review memory subject sync', () => {
       .from(code_review_feedback_subjects)
       .where(eq(code_review_feedback_subjects.repo_full_name, 'owner/repo'));
     expect(subjects).toHaveLength(3);
-    expect(subjects.find(subject => subject.external_id === '1001')).toEqual(
+    expect(subjects.find(subject => subject.subject_type === 'summary_comment')).toEqual(
       expect.objectContaining({ subject_type: 'summary_comment', state: 'active' })
     );
-    expect(subjects.find(subject => subject.external_id === '2001')).toEqual(
+    expect(subjects.find(subject => subject.file_path === 'src/example.ts')).toEqual(
       expect.objectContaining({
         subject_type: 'inline_comment',
         file_path: 'src/example.ts',
-        line_number: 12,
-        severity: 'warning',
+        finding_title: 'Missing error handling for failed requests.',
         state: 'active',
       })
     );
-    expect(subjects.find(subject => subject.external_id === '2002')).toEqual(
-      expect.objectContaining({ severity: 'critical', state: 'outdated' })
+    expect(subjects.find(subject => subject.file_path === 'src/other.ts')).toEqual(
+      expect.objectContaining({
+        finding_title: 'Null pointer when the payload is empty.',
+        state: 'outdated',
+      })
     );
-    expect(subjects.find(subject => subject.external_id === 'human-comment')).toBeUndefined();
+    expect(subjects.map(subject => subject.external_id_hash)).not.toContain('human-comment');
   });
 
   it('updates existing GitLab discussion subjects when resolved state changes', async () => {
@@ -134,7 +131,6 @@ describe('review memory subject sync', () => {
           externalId: '3001',
           externalThreadId: 'discussion-1',
           filePath: 'src/gitlab.ts',
-          lineNumber: 5,
           body: '**SUGGESTION:** Prefer a narrower guard here.',
           isOutdated: false,
         },
@@ -149,7 +145,6 @@ describe('review memory subject sync', () => {
           externalId: '3001',
           externalThreadId: 'discussion-1',
           filePath: 'src/gitlab.ts',
-          lineNumber: 5,
           body: '**SUGGESTION:** Prefer a narrower validation guard here.',
           isOutdated: true,
         },
@@ -161,8 +156,8 @@ describe('review memory subject sync', () => {
     expect(subjects[0]).toEqual(
       expect.objectContaining({
         subject_type: 'discussion',
-        external_thread_id: 'discussion-1',
-        body_excerpt: '**SUGGESTION:** Prefer a narrower validation guard here.',
+        external_thread_id_hash: expect.any(String),
+        finding_title: 'Prefer a narrower validation guard here.',
         state: 'outdated',
       })
     );

@@ -1,5 +1,5 @@
 {
-  "id": "af3a02a4-1eb8-4d12-b1ec-958b4f7956d2",
+  "id": "a1f76a75-996a-40fc-806c-9197bbcce382",
   "prevId": "d40941dd-841f-4dda-9eed-2d1033586afa",
   "version": "7",
   "dialect": "postgresql",
@@ -6255,20 +6255,8 @@
           "primaryKey": false,
           "notNull": true
         },
-        "platform_integration_id": {
-          "name": "platform_integration_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
         "subject_id": {
           "name": "subject_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "code_review_id": {
-          "name": "code_review_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": false
@@ -6291,18 +6279,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "pr_url": {
-          "name": "pr_url",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "event_source": {
-          "name": "event_source",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
         "signal_kind": {
           "name": "signal_kind",
           "type": "text",
@@ -6322,36 +6298,17 @@
           "notNull": true,
           "default": 1
         },
-        "external_event_id": {
-          "name": "external_event_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "dedupe_hash": {
           "name": "dedupe_hash",
           "type": "text",
           "primaryKey": false,
           "notNull": true
         },
-        "external_url": {
-          "name": "external_url",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "evidence_excerpt": {
           "name": "evidence_excerpt",
           "type": "text",
           "primaryKey": false,
           "notNull": false
-        },
-        "metadata": {
-          "name": "metadata",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'{}'::jsonb"
         },
         "aggregation_state": {
           "name": "aggregation_state",
@@ -6376,22 +6333,6 @@
         }
       },
       "indexes": {
-        "UQ_code_review_feedback_events_external_event_id": {
-          "name": "UQ_code_review_feedback_events_external_event_id",
-          "columns": [
-            {
-              "expression": "external_event_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"code_review_feedback_events\".\"external_event_id\" is not null",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
         "UQ_code_review_feedback_events_dedupe_hash": {
           "name": "UQ_code_review_feedback_events_dedupe_hash",
           "columns": [
@@ -6463,21 +6404,6 @@
           "columns": [
             {
               "expression": "subject_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "idx_code_review_feedback_events_code_review_id": {
-          "name": "idx_code_review_feedback_events_code_review_id",
-          "columns": [
-            {
-              "expression": "code_review_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -6576,38 +6502,12 @@
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
-        "code_review_feedback_events_platform_integration_id_platform_integrations_id_fk": {
-          "name": "code_review_feedback_events_platform_integration_id_platform_integrations_id_fk",
-          "tableFrom": "code_review_feedback_events",
-          "tableTo": "platform_integrations",
-          "columnsFrom": [
-            "platform_integration_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        },
         "code_review_feedback_events_subject_id_code_review_feedback_subjects_id_fk": {
           "name": "code_review_feedback_events_subject_id_code_review_feedback_subjects_id_fk",
           "tableFrom": "code_review_feedback_events",
           "tableTo": "code_review_feedback_subjects",
           "columnsFrom": [
             "subject_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        },
-        "code_review_feedback_events_code_review_id_cloud_agent_code_reviews_id_fk": {
-          "name": "code_review_feedback_events_code_review_id_cloud_agent_code_reviews_id_fk",
-          "tableFrom": "code_review_feedback_events",
-          "tableTo": "cloud_agent_code_reviews",
-          "columnsFrom": [
-            "code_review_id"
           ],
           "columnsTo": [
             "id"
@@ -6660,38 +6560,20 @@
           "primaryKey": false,
           "notNull": true
         },
-        "platform_integration_id": {
-          "name": "platform_integration_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "code_review_id": {
-          "name": "code_review_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
         "subject_type": {
           "name": "subject_type",
           "type": "text",
           "primaryKey": false,
           "notNull": true
         },
-        "external_id": {
-          "name": "external_id",
+        "external_id_hash": {
+          "name": "external_id_hash",
           "type": "text",
           "primaryKey": false,
           "notNull": true
         },
-        "external_thread_id": {
-          "name": "external_thread_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "external_url": {
-          "name": "external_url",
+        "external_thread_id_hash": {
+          "name": "external_thread_id_hash",
           "type": "text",
           "primaryKey": false,
           "notNull": false
@@ -6714,44 +6596,8 @@
           "primaryKey": false,
           "notNull": false
         },
-        "pr_url": {
-          "name": "pr_url",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "head_sha": {
-          "name": "head_sha",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "file_path": {
           "name": "file_path",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "line_number": {
-          "name": "line_number",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "diff_hunk": {
-          "name": "diff_hunk",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "body_excerpt": {
-          "name": "body_excerpt",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "severity": {
-          "name": "severity",
           "type": "text",
           "primaryKey": false,
           "notNull": false
@@ -6833,7 +6679,7 @@
               "nulls": "last"
             },
             {
-              "expression": "external_id",
+              "expression": "external_id_hash",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -6873,7 +6719,7 @@
               "nulls": "last"
             },
             {
-              "expression": "external_id",
+              "expression": "external_id_hash",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -6957,21 +6803,6 @@
           "method": "btree",
           "with": {}
         },
-        "idx_code_review_feedback_subjects_code_review_id": {
-          "name": "idx_code_review_feedback_subjects_code_review_id",
-          "columns": [
-            {
-              "expression": "code_review_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
         "idx_code_review_feedback_subjects_fingerprint": {
           "name": "idx_code_review_feedback_subjects_fingerprint",
           "columns": [
@@ -7006,7 +6837,7 @@
           "name": "idx_code_review_feedback_subjects_thread",
           "columns": [
             {
-              "expression": "external_thread_id",
+              "expression": "external_thread_id_hash",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -7059,32 +6890,6 @@
           ],
           "onDelete": "cascade",
           "onUpdate": "no action"
-        },
-        "code_review_feedback_subjects_platform_integration_id_platform_integrations_id_fk": {
-          "name": "code_review_feedback_subjects_platform_integration_id_platform_integrations_id_fk",
-          "tableFrom": "code_review_feedback_subjects",
-          "tableTo": "platform_integrations",
-          "columnsFrom": [
-            "platform_integration_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        },
-        "code_review_feedback_subjects_code_review_id_cloud_agent_code_reviews_id_fk": {
-          "name": "code_review_feedback_subjects_code_review_id_cloud_agent_code_reviews_id_fk",
-          "tableFrom": "code_review_feedback_subjects",
-          "tableTo": "cloud_agent_code_reviews",
-          "columnsFrom": [
-            "code_review_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -7094,266 +6899,6 @@
         "code_review_feedback_subjects_owner_check": {
           "name": "code_review_feedback_subjects_owner_check",
           "value": "(\n        (\"code_review_feedback_subjects\".\"owned_by_user_id\" IS NOT NULL AND \"code_review_feedback_subjects\".\"owned_by_organization_id\" IS NULL) OR\n        (\"code_review_feedback_subjects\".\"owned_by_user_id\" IS NULL AND \"code_review_feedback_subjects\".\"owned_by_organization_id\" IS NOT NULL)\n      )"
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "public.code_review_memory_aggregation_runs": {
-      "name": "code_review_memory_aggregation_runs",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "pg_catalog.gen_random_uuid()"
-        },
-        "owned_by_organization_id": {
-          "name": "owned_by_organization_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "owned_by_user_id": {
-          "name": "owned_by_user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "platform": {
-          "name": "platform",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "repo_full_name": {
-          "name": "repo_full_name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "platform_project_id": {
-          "name": "platform_project_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "model_slug": {
-          "name": "model_slug",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "trigger": {
-          "name": "trigger",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "input_event_count": {
-          "name": "input_event_count",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "input_subject_count": {
-          "name": "input_subject_count",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "input_cluster_count": {
-          "name": "input_cluster_count",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "fresh_event_cutoff_at": {
-          "name": "fresh_event_cutoff_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "status": {
-          "name": "status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'running'"
-        },
-        "skip_reason": {
-          "name": "skip_reason",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "tokens_in": {
-          "name": "tokens_in",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "tokens_out": {
-          "name": "tokens_out",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "total_cost_musd": {
-          "name": "total_cost_musd",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "error_message": {
-          "name": "error_message",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "started_at": {
-          "name": "started_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "completed_at": {
-          "name": "completed_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "idx_code_review_memory_aggregation_runs_owned_by_org_id": {
-          "name": "idx_code_review_memory_aggregation_runs_owned_by_org_id",
-          "columns": [
-            {
-              "expression": "owned_by_organization_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "idx_code_review_memory_aggregation_runs_owned_by_user_id": {
-          "name": "idx_code_review_memory_aggregation_runs_owned_by_user_id",
-          "columns": [
-            {
-              "expression": "owned_by_user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "idx_code_review_memory_aggregation_runs_scope": {
-          "name": "idx_code_review_memory_aggregation_runs_scope",
-          "columns": [
-            {
-              "expression": "platform",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "repo_full_name",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "idx_code_review_memory_aggregation_runs_status": {
-          "name": "idx_code_review_memory_aggregation_runs_status",
-          "columns": [
-            {
-              "expression": "status",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "idx_code_review_memory_aggregation_runs_created_at": {
-          "name": "idx_code_review_memory_aggregation_runs_created_at",
-          "columns": [
-            {
-              "expression": "created_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "code_review_memory_aggregation_runs_owned_by_organization_id_organizations_id_fk": {
-          "name": "code_review_memory_aggregation_runs_owned_by_organization_id_organizations_id_fk",
-          "tableFrom": "code_review_memory_aggregation_runs",
-          "tableTo": "organizations",
-          "columnsFrom": [
-            "owned_by_organization_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "code_review_memory_aggregation_runs_owned_by_user_id_kilocode_users_id_fk": {
-          "name": "code_review_memory_aggregation_runs_owned_by_user_id_kilocode_users_id_fk",
-          "tableFrom": "code_review_memory_aggregation_runs",
-          "tableTo": "kilocode_users",
-          "columnsFrom": [
-            "owned_by_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "code_review_memory_aggregation_runs_owner_check": {
-          "name": "code_review_memory_aggregation_runs_owner_check",
-          "value": "(\n        (\"code_review_memory_aggregation_runs\".\"owned_by_user_id\" IS NOT NULL AND \"code_review_memory_aggregation_runs\".\"owned_by_organization_id\" IS NULL) OR\n        (\"code_review_memory_aggregation_runs\".\"owned_by_user_id\" IS NULL AND \"code_review_memory_aggregation_runs\".\"owned_by_organization_id\" IS NOT NULL)\n      )"
         }
       },
       "isRLSEnabled": false
@@ -7396,24 +6941,6 @@
         "platform_project_id": {
           "name": "platform_project_id",
           "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "last_successful_run_at": {
-          "name": "last_successful_run_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "last_attempted_run_at": {
-          "name": "last_attempted_run_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "last_included_event_created_at": {
-          "name": "last_included_event_created_at",
-          "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
         },
@@ -7467,18 +6994,6 @@
         },
         "claim_token": {
           "name": "claim_token",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "last_model_slug": {
-          "name": "last_model_slug",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "last_error_message": {
-          "name": "last_error_message",
           "type": "text",
           "primaryKey": false,
           "notNull": false
@@ -7646,111 +7161,6 @@
       },
       "isRLSEnabled": false
     },
-    "public.code_review_memory_proposal_evidence": {
-      "name": "code_review_memory_proposal_evidence",
-      "schema": "",
-      "columns": {
-        "proposal_id": {
-          "name": "proposal_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "feedback_event_id": {
-          "name": "feedback_event_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "evidence_role": {
-          "name": "evidence_role",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'supporting'"
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "idx_code_review_memory_proposal_evidence_feedback_event_id": {
-          "name": "idx_code_review_memory_proposal_evidence_feedback_event_id",
-          "columns": [
-            {
-              "expression": "feedback_event_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "idx_code_review_memory_proposal_evidence_role": {
-          "name": "idx_code_review_memory_proposal_evidence_role",
-          "columns": [
-            {
-              "expression": "evidence_role",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "code_review_memory_proposal_evidence_proposal_id_code_review_memory_proposals_id_fk": {
-          "name": "code_review_memory_proposal_evidence_proposal_id_code_review_memory_proposals_id_fk",
-          "tableFrom": "code_review_memory_proposal_evidence",
-          "tableTo": "code_review_memory_proposals",
-          "columnsFrom": [
-            "proposal_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "code_review_memory_proposal_evidence_feedback_event_id_code_review_feedback_events_id_fk": {
-          "name": "code_review_memory_proposal_evidence_feedback_event_id_code_review_feedback_events_id_fk",
-          "tableFrom": "code_review_memory_proposal_evidence",
-          "tableTo": "code_review_feedback_events",
-          "columnsFrom": [
-            "feedback_event_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "code_review_memory_proposal_evidence_proposal_id_feedback_event_id_pk": {
-          "name": "code_review_memory_proposal_evidence_proposal_id_feedback_event_id_pk",
-          "columns": [
-            "proposal_id",
-            "feedback_event_id"
-          ]
-        }
-      },
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
     "public.code_review_memory_proposals": {
       "name": "code_review_memory_proposals",
       "schema": "",
@@ -7780,12 +7190,6 @@
           "primaryKey": false,
           "notNull": true
         },
-        "platform_integration_id": {
-          "name": "platform_integration_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
         "repo_full_name": {
           "name": "repo_full_name",
           "type": "text",
@@ -7797,19 +7201,6 @@
           "type": "integer",
           "primaryKey": false,
           "notNull": false
-        },
-        "aggregation_run_id": {
-          "name": "aggregation_run_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "target_file_path": {
-          "name": "target_file_path",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'REVIEW.md'"
         },
         "scope_kind": {
           "name": "scope_kind",
@@ -7908,54 +7299,6 @@
           "primaryKey": false,
           "notNull": true,
           "default": 0
-        },
-        "edited_by_user_id": {
-          "name": "edited_by_user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "approved_by_user_id": {
-          "name": "approved_by_user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "rejected_by_user_id": {
-          "name": "rejected_by_user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "approved_at": {
-          "name": "approved_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "rejected_at": {
-          "name": "rejected_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "change_request_type": {
-          "name": "change_request_type",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "branch_name": {
-          "name": "branch_name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "change_request_number": {
-          "name": "change_request_number",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
         },
         "change_request_url": {
           "name": "change_request_url",
@@ -8166,71 +7509,6 @@
             "id"
           ],
           "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "code_review_memory_proposals_platform_integration_id_platform_integrations_id_fk": {
-          "name": "code_review_memory_proposals_platform_integration_id_platform_integrations_id_fk",
-          "tableFrom": "code_review_memory_proposals",
-          "tableTo": "platform_integrations",
-          "columnsFrom": [
-            "platform_integration_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        },
-        "code_review_memory_proposals_aggregation_run_id_code_review_memory_aggregation_runs_id_fk": {
-          "name": "code_review_memory_proposals_aggregation_run_id_code_review_memory_aggregation_runs_id_fk",
-          "tableFrom": "code_review_memory_proposals",
-          "tableTo": "code_review_memory_aggregation_runs",
-          "columnsFrom": [
-            "aggregation_run_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        },
-        "code_review_memory_proposals_edited_by_user_id_kilocode_users_id_fk": {
-          "name": "code_review_memory_proposals_edited_by_user_id_kilocode_users_id_fk",
-          "tableFrom": "code_review_memory_proposals",
-          "tableTo": "kilocode_users",
-          "columnsFrom": [
-            "edited_by_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        },
-        "code_review_memory_proposals_approved_by_user_id_kilocode_users_id_fk": {
-          "name": "code_review_memory_proposals_approved_by_user_id_kilocode_users_id_fk",
-          "tableFrom": "code_review_memory_proposals",
-          "tableTo": "kilocode_users",
-          "columnsFrom": [
-            "approved_by_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        },
-        "code_review_memory_proposals_rejected_by_user_id_kilocode_users_id_fk": {
-          "name": "code_review_memory_proposals_rejected_by_user_id_kilocode_users_id_fk",
-          "tableFrom": "code_review_memory_proposals",
-          "tableTo": "kilocode_users",
-          "columnsFrom": [
-            "rejected_by_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
           "onUpdate": "no action"
         }
       },

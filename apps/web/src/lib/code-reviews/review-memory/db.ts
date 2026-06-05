@@ -3,25 +3,17 @@ import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import {
   code_review_feedback_events,
   code_review_feedback_subjects,
-  code_review_memory_aggregation_runs,
   code_review_memory_aggregation_state,
-  code_review_memory_proposal_evidence,
   code_review_memory_proposals,
 } from '@kilocode/db/schema';
 import type {
   CodeReviewFeedbackEvent,
   CodeReviewFeedbackSubject,
-  CodeReviewMemoryAggregationRun,
   CodeReviewMemoryAggregationState,
   CodeReviewMemoryProposal,
 } from '@kilocode/db/schema';
 import type {
   ReviewMemoryAggregationScopeStatus,
-  ReviewMemoryAggregationRunStatus,
-  ReviewMemoryAggregationRunTrigger,
-  ReviewMemoryChangeRequestType,
-  ReviewMemoryEvidenceRole,
-  ReviewMemoryFeedbackEventSource,
   ReviewMemoryEventAggregationState,
   ReviewMemoryPlatform,
   ReviewMemoryProposalScopeKind,
@@ -45,16 +37,7 @@ export const ACTIONABLE_REVIEW_MEMORY_PROPOSAL_STATUSES = [
   'change_request_failed',
 ] as const satisfies readonly ReviewMemoryProposalStatus[];
 
-const PRUNABLE_REVIEW_MEMORY_PROPOSAL_STATUSES = [
-  'open',
-  'edited',
-  'approved',
-  'rejected',
-  'change_request_failed',
-  'superseded',
-] as const satisfies readonly ReviewMemoryProposalStatus[];
-
-const DEFAULT_EXCERPT_LIMIT = 500;
+const DEFAULT_EXCERPT_LIMIT = 300;
 
 function databaseOrDefault(database?: ReviewMemoryDatabase): ReviewMemoryDatabase {
   return database ?? db;
@@ -171,25 +154,35 @@ export function createReviewMemoryDedupeHash(parts: readonly unknown[]): string 
     .digest('hex');
 }
 
+export function createFeedbackSubjectExternalIdHash(input: {
+  owner: ReviewMemoryOwner;
+  platform: ReviewMemoryPlatform;
+  repoFullName: string;
+  subjectType: ReviewMemorySubjectType;
+  idKind: 'subject' | 'thread';
+  externalId: string;
+}): string {
+  return createReviewMemoryDedupeHash([
+    'review-memory-subject-id',
+    ownerScope(input.owner),
+    input.platform,
+    input.repoFullName,
+    input.subjectType,
+    input.idKind,
+    input.externalId,
+  ]);
+}
+
 export type UpsertFeedbackSubjectInput = {
   owner: ReviewMemoryOwner;
   platform: ReviewMemoryPlatform;
-  platformIntegrationId?: string | null;
-  codeReviewId?: string | null;
   subjectType: ReviewMemorySubjectType;
   externalId: string;
   externalThreadId?: string | null;
-  externalUrl?: string | null;
   repoFullName: string;
   platformProjectId?: number | null;
   prNumber?: number | null;
-  prUrl?: string | null;
-  headSha?: string | null;
   filePath?: string | null;
-  lineNumber?: number | null;
-  diffHunk?: string | null;
-  bodyExcerpt?: string | null;
-  severity?: string | null;
   findingTitle?: string | null;
   findingFingerprint?: string | null;
   state?: ReviewMemorySubjectState;
@@ -201,6 +194,24 @@ export async function upsertFeedbackSubject(
 ): Promise<CodeReviewFeedbackSubject> {
   const database = databaseOrDefault(input.database);
   const now = new Date().toISOString();
+  const externalIdHash = createFeedbackSubjectExternalIdHash({
+    owner: input.owner,
+    platform: input.platform,
+    repoFullName: input.repoFullName,
+    subjectType: input.subjectType,
+    idKind: 'subject',
+    externalId: input.externalId,
+  });
+  const externalThreadIdHash = input.externalThreadId
+    ? createFeedbackSubjectExternalIdHash({
+        owner: input.owner,
+        platform: input.platform,
+        repoFullName: input.repoFullName,
+        subjectType: input.subjectType,
+        idKind: 'thread',
+        externalId: input.externalThreadId,
+      })
+    : null;
   const conflictTarget =
     input.owner.type === 'org'
       ? [
@@ -208,14 +219,14 @@ export async function upsertFeedbackSubject(
           code_review_feedback_subjects.platform,
           code_review_feedback_subjects.repo_full_name,
           code_review_feedback_subjects.subject_type,
-          code_review_feedback_subjects.external_id,
+          code_review_feedback_subjects.external_id_hash,
         ]
       : [
           code_review_feedback_subjects.owned_by_user_id,
           code_review_feedback_subjects.platform,
           code_review_feedback_subjects.repo_full_name,
           code_review_feedback_subjects.subject_type,
-          code_review_feedback_subjects.external_id,
+          code_review_feedback_subjects.external_id_hash,
         ];
   const conflictTargetWhere =
     input.owner.type === 'org'
@@ -226,22 +237,13 @@ export async function upsertFeedbackSubject(
     .values({
       ...ownerColumns(input.owner),
       platform: input.platform,
-      platform_integration_id: input.platformIntegrationId ?? null,
-      code_review_id: input.codeReviewId ?? null,
       subject_type: input.subjectType,
-      external_id: input.externalId,
-      external_thread_id: input.externalThreadId ?? null,
-      external_url: input.externalUrl ?? null,
+      external_id_hash: externalIdHash,
+      external_thread_id_hash: externalThreadIdHash,
       repo_full_name: input.repoFullName,
       platform_project_id: input.platformProjectId ?? null,
       pr_number: input.prNumber ?? null,
-      pr_url: input.prUrl ?? null,
-      head_sha: input.headSha ?? null,
       file_path: input.filePath ?? null,
-      line_number: input.lineNumber ?? null,
-      diff_hunk: compactText(input.diffHunk, 1_000),
-      body_excerpt: compactText(input.bodyExcerpt),
-      severity: input.severity ?? null,
       finding_title: input.findingTitle ?? null,
       finding_fingerprint: input.findingFingerprint ?? null,
       state: input.state ?? 'unknown',
@@ -253,19 +255,10 @@ export async function upsertFeedbackSubject(
       target: conflictTarget,
       targetWhere: conflictTargetWhere,
       set: {
-        platform_integration_id: input.platformIntegrationId ?? null,
-        code_review_id: input.codeReviewId ?? null,
-        external_thread_id: input.externalThreadId ?? null,
-        external_url: input.externalUrl ?? null,
+        external_thread_id_hash: externalThreadIdHash,
         platform_project_id: input.platformProjectId ?? null,
         pr_number: input.prNumber ?? null,
-        pr_url: input.prUrl ?? null,
-        head_sha: input.headSha ?? null,
         file_path: input.filePath ?? null,
-        line_number: input.lineNumber ?? null,
-        diff_hunk: compactText(input.diffHunk, 1_000),
-        body_excerpt: compactText(input.bodyExcerpt),
-        severity: input.severity ?? null,
         finding_title: input.findingTitle ?? null,
         finding_fingerprint: input.findingFingerprint ?? null,
         state: input.state ?? 'unknown',
@@ -295,6 +288,14 @@ export async function findFeedbackSubject(
   input: FindFeedbackSubjectInput
 ): Promise<CodeReviewFeedbackSubject | null> {
   const database = databaseOrDefault(input.database);
+  const externalIdHash = createFeedbackSubjectExternalIdHash({
+    owner: input.owner,
+    platform: input.platform,
+    repoFullName: input.repoFullName,
+    subjectType: input.subjectType,
+    idKind: 'subject',
+    externalId: input.externalId,
+  });
   const [subject] = await database
     .select()
     .from(code_review_feedback_subjects)
@@ -304,7 +305,7 @@ export async function findFeedbackSubject(
         eq(code_review_feedback_subjects.platform, input.platform),
         eq(code_review_feedback_subjects.repo_full_name, input.repoFullName),
         eq(code_review_feedback_subjects.subject_type, input.subjectType),
-        eq(code_review_feedback_subjects.external_id, input.externalId)
+        eq(code_review_feedback_subjects.external_id_hash, externalIdHash)
       )
     )
     .limit(1);
@@ -325,6 +326,14 @@ export async function findFeedbackSubjectByExternalThreadId(
   input: FindFeedbackSubjectByExternalThreadInput
 ): Promise<CodeReviewFeedbackSubject | null> {
   const database = databaseOrDefault(input.database);
+  const externalThreadIdHash = createFeedbackSubjectExternalIdHash({
+    owner: input.owner,
+    platform: input.platform,
+    repoFullName: input.repoFullName,
+    subjectType: input.subjectType,
+    idKind: 'thread',
+    externalId: input.externalThreadId,
+  });
   const [subject] = await database
     .select()
     .from(code_review_feedback_subjects)
@@ -334,7 +343,7 @@ export async function findFeedbackSubjectByExternalThreadId(
         eq(code_review_feedback_subjects.platform, input.platform),
         eq(code_review_feedback_subjects.repo_full_name, input.repoFullName),
         eq(code_review_feedback_subjects.subject_type, input.subjectType),
-        eq(code_review_feedback_subjects.external_thread_id, input.externalThreadId)
+        eq(code_review_feedback_subjects.external_thread_id_hash, externalThreadIdHash)
       )
     )
     .limit(1);
@@ -373,25 +382,34 @@ export async function listFeedbackSubjectsForPullRequest(
     .orderBy(desc(code_review_feedback_subjects.last_seen_at));
 }
 
+export async function updateFeedbackSubjectState(input: {
+  subjectId: string;
+  state: ReviewMemorySubjectState;
+  database?: ReviewMemoryDatabase;
+}): Promise<CodeReviewFeedbackSubject | null> {
+  const database = databaseOrDefault(input.database);
+  const now = new Date().toISOString();
+  const [subject] = await database
+    .update(code_review_feedback_subjects)
+    .set({ state: input.state, last_seen_at: now, updated_at: now })
+    .where(eq(code_review_feedback_subjects.id, input.subjectId))
+    .returning();
+
+  return subject ?? null;
+}
+
 export type RecordFeedbackEventInput = {
   owner: ReviewMemoryOwner;
   platform: ReviewMemoryPlatform;
-  platformIntegrationId?: string | null;
   subjectId?: string | null;
-  codeReviewId?: string | null;
   repoFullName: string;
   platformProjectId?: number | null;
   prNumber?: number | null;
-  prUrl?: string | null;
-  eventSource: ReviewMemoryFeedbackEventSource;
   signalKind: ReviewMemorySignalKind;
   sentiment: ReviewMemorySentiment;
   strength: number;
-  externalEventId?: string | null;
-  dedupeHash?: string | null;
-  externalUrl?: string | null;
+  dedupeHash: string;
   evidenceExcerpt?: string | null;
-  metadata?: Record<string, unknown>;
   occurredAt?: string | Date | null;
   refreshAggregationState?: boolean;
   database?: ReviewMemoryDatabase;
@@ -410,40 +428,21 @@ export async function recordFeedbackEvent(
     ? new Date(input.occurredAt).toISOString()
     : new Date().toISOString();
   const evidenceExcerpt = compactText(input.evidenceExcerpt);
-  const dedupeHash =
-    input.dedupeHash ??
-    createReviewMemoryDedupeHash([
-      ownerScope(input.owner),
-      input.platform,
-      input.repoFullName,
-      input.externalEventId,
-      input.subjectId,
-      input.signalKind,
-      evidenceExcerpt,
-      occurredAt,
-    ]);
 
   const [inserted] = await database
     .insert(code_review_feedback_events)
     .values({
       ...ownerColumns(input.owner),
       platform: input.platform,
-      platform_integration_id: input.platformIntegrationId ?? null,
       subject_id: input.subjectId ?? null,
-      code_review_id: input.codeReviewId ?? null,
       repo_full_name: input.repoFullName,
       platform_project_id: input.platformProjectId ?? null,
       pr_number: input.prNumber ?? null,
-      pr_url: input.prUrl ?? null,
-      event_source: input.eventSource,
       signal_kind: input.signalKind,
       sentiment: input.sentiment,
       strength: input.strength,
-      external_event_id: input.externalEventId ?? null,
-      dedupe_hash: dedupeHash,
-      external_url: input.externalUrl ?? null,
+      dedupe_hash: input.dedupeHash,
       evidence_excerpt: evidenceExcerpt,
-      metadata: input.metadata ?? {},
       aggregation_state: 'fresh',
       occurred_at: occurredAt,
     })
@@ -467,7 +466,7 @@ export async function recordFeedbackEvent(
   const [existing] = await database
     .select()
     .from(code_review_feedback_events)
-    .where(eq(code_review_feedback_events.dedupe_hash, dedupeHash))
+    .where(eq(code_review_feedback_events.dedupe_hash, input.dedupeHash))
     .limit(1);
 
   if (!existing) {
@@ -515,7 +514,6 @@ export async function refreshAggregationStateForScope(
       freshWeight: sql<number>`COALESCE(SUM(${code_review_feedback_events.strength}), 0)::int`,
       distinctSubjectCount: sql<number>`COUNT(DISTINCT ${code_review_feedback_events.subject_id}) FILTER (WHERE ${code_review_feedback_events.subject_id} IS NOT NULL)::int`,
       distinctPrCount: sql<number>`COUNT(DISTINCT ${code_review_feedback_events.pr_number}) FILTER (WHERE ${code_review_feedback_events.pr_number} IS NOT NULL)::int`,
-      lastFreshEventCreatedAt: sql<string | null>`MAX(${code_review_feedback_events.created_at})`,
     })
     .from(code_review_feedback_events)
     .where(and(...conditions));
@@ -541,7 +539,6 @@ export async function refreshAggregationStateForScope(
     fresh_weight: rollup?.freshWeight ?? 0,
     fresh_distinct_subject_count: rollup?.distinctSubjectCount ?? 0,
     fresh_distinct_pr_count: rollup?.distinctPrCount ?? 0,
-    last_included_event_created_at: rollup?.lastFreshEventCreatedAt ?? null,
     platform_project_id: input.platformProjectId ?? existing?.platform_project_id ?? null,
     status,
     updated_at: now,
@@ -576,7 +573,6 @@ export async function refreshAggregationStateForScope(
 export type PruneExpiredReviewMemoryDataSummary = {
   cutoff: string;
   proposalsDeleted: number;
-  aggregationRunsDeleted: number;
   feedbackEventsDeleted: number;
   subjectsDeleted: number;
   aggregationStatesDeleted: number;
@@ -646,12 +642,7 @@ export async function pruneExpiredReviewMemoryData(
     const expiredProposalIds = await database
       .select({ id: code_review_memory_proposals.id })
       .from(code_review_memory_proposals)
-      .where(
-        and(
-          lt(code_review_memory_proposals.created_at, cutoff),
-          inArray(code_review_memory_proposals.status, PRUNABLE_REVIEW_MEMORY_PROPOSAL_STATUSES)
-        )
-      )
+      .where(lt(code_review_memory_proposals.created_at, cutoff))
       .orderBy(asc(code_review_memory_proposals.created_at), asc(code_review_memory_proposals.id))
       .limit(batchSize);
     if (expiredProposalIds.length === 0) break;
@@ -667,32 +658,6 @@ export async function pruneExpiredReviewMemoryData(
       .returning({ id: code_review_memory_proposals.id });
     proposalsDeleted += deletedProposals.length;
     if (expiredProposalIds.length < batchSize || deletedProposals.length === 0) break;
-  }
-
-  let aggregationRunsDeleted = 0;
-  while (true) {
-    const expiredAggregationRunIds = await database
-      .select({ id: code_review_memory_aggregation_runs.id })
-      .from(code_review_memory_aggregation_runs)
-      .where(lt(code_review_memory_aggregation_runs.created_at, cutoff))
-      .orderBy(
-        asc(code_review_memory_aggregation_runs.created_at),
-        asc(code_review_memory_aggregation_runs.id)
-      )
-      .limit(batchSize);
-    if (expiredAggregationRunIds.length === 0) break;
-
-    const deletedAggregationRuns = await database
-      .delete(code_review_memory_aggregation_runs)
-      .where(
-        inArray(
-          code_review_memory_aggregation_runs.id,
-          expiredAggregationRunIds.map(row => row.id)
-        )
-      )
-      .returning({ id: code_review_memory_aggregation_runs.id });
-    aggregationRunsDeleted += deletedAggregationRuns.length;
-    if (expiredAggregationRunIds.length < batchSize || deletedAggregationRuns.length === 0) break;
   }
 
   let feedbackEventsDeleted = 0;
@@ -795,83 +760,10 @@ export async function pruneExpiredReviewMemoryData(
   return {
     cutoff,
     proposalsDeleted,
-    aggregationRunsDeleted,
     feedbackEventsDeleted,
     subjectsDeleted,
     aggregationStatesDeleted,
   };
-}
-
-export type CreateAggregationRunInput = {
-  owner: ReviewMemoryOwner;
-  platform: ReviewMemoryPlatform;
-  repoFullName: string;
-  platformProjectId?: number | null;
-  modelSlug: string;
-  trigger: ReviewMemoryAggregationRunTrigger;
-  inputEventCount?: number;
-  inputSubjectCount?: number;
-  inputClusterCount?: number;
-  freshEventCutoffAt?: string | null;
-  database?: ReviewMemoryDatabase;
-};
-
-export async function createAggregationRun(
-  input: CreateAggregationRunInput
-): Promise<CodeReviewMemoryAggregationRun> {
-  const database = databaseOrDefault(input.database);
-  const [run] = await database
-    .insert(code_review_memory_aggregation_runs)
-    .values({
-      ...ownerColumns(input.owner),
-      platform: input.platform,
-      repo_full_name: input.repoFullName,
-      platform_project_id: input.platformProjectId ?? null,
-      model_slug: input.modelSlug,
-      trigger: input.trigger,
-      input_event_count: input.inputEventCount ?? 0,
-      input_subject_count: input.inputSubjectCount ?? 0,
-      input_cluster_count: input.inputClusterCount ?? 0,
-      fresh_event_cutoff_at: input.freshEventCutoffAt ?? null,
-      status: 'running',
-    })
-    .returning();
-
-  if (!run) throw new Error('Failed to create review memory aggregation run');
-  return run;
-}
-
-export async function updateAggregationRunStatus(input: {
-  runId: string;
-  status: ReviewMemoryAggregationRunStatus;
-  skipReason?: string | null;
-  tokensIn?: number | null;
-  tokensOut?: number | null;
-  totalCostMusd?: number | null;
-  errorMessage?: string | null;
-  database?: ReviewMemoryDatabase;
-}): Promise<CodeReviewMemoryAggregationRun> {
-  const database = databaseOrDefault(input.database);
-  const updateValues: Partial<typeof code_review_memory_aggregation_runs.$inferInsert> = {
-    status: input.status,
-    skip_reason: input.skipReason ?? null,
-    tokens_in: input.tokensIn ?? null,
-    tokens_out: input.tokensOut ?? null,
-    error_message: input.errorMessage ?? null,
-    completed_at: input.status === 'running' ? null : new Date().toISOString(),
-  };
-  if (input.totalCostMusd !== undefined) {
-    updateValues.total_cost_musd = input.totalCostMusd;
-  }
-
-  const [run] = await database
-    .update(code_review_memory_aggregation_runs)
-    .set(updateValues)
-    .where(eq(code_review_memory_aggregation_runs.id, input.runId))
-    .returning();
-
-  if (!run) throw new Error('Failed to update review memory aggregation run');
-  return run;
 }
 
 export type ClaimEligibleAggregationStatesInput = {
@@ -929,8 +821,6 @@ export async function claimEligibleAggregationStates(
       status = 'running',
       claimed_at = ${now.toISOString()},
       claim_token = gen_random_uuid()::text,
-      last_attempted_run_at = ${now.toISOString()},
-      last_error_message = NULL,
       updated_at = ${now.toISOString()}
     FROM candidates
     WHERE state.id = candidates.id
@@ -945,9 +835,6 @@ export async function finishClaimedAggregationState(input: {
   claimToken: string;
   status: Extract<ReviewMemoryAggregationScopeStatus, 'idle' | 'failed'>;
   nextEligibleAt: string;
-  lastSuccessfulRunAt?: string | null;
-  lastModelSlug?: string | null;
-  lastErrorMessage?: string | null;
   database?: ReviewMemoryDatabase;
 }): Promise<CodeReviewMemoryAggregationState | null> {
   const database = databaseOrDefault(input.database);
@@ -958,15 +845,6 @@ export async function finishClaimedAggregationState(input: {
     next_eligible_at: input.nextEligibleAt,
     updated_at: new Date().toISOString(),
   };
-  if (input.lastSuccessfulRunAt !== undefined) {
-    updateValues.last_successful_run_at = input.lastSuccessfulRunAt;
-  }
-  if (input.lastModelSlug !== undefined) {
-    updateValues.last_model_slug = input.lastModelSlug;
-  }
-  if (input.lastErrorMessage !== undefined) {
-    updateValues.last_error_message = input.lastErrorMessage;
-  }
 
   const [state] = await database
     .update(code_review_memory_aggregation_state)
@@ -985,11 +863,8 @@ export async function finishClaimedAggregationState(input: {
 export type UpsertProposalInput = {
   owner: ReviewMemoryOwner;
   platform: ReviewMemoryPlatform;
-  platformIntegrationId?: string | null;
   repoFullName: string;
   platformProjectId?: number | null;
-  aggregationRunId?: string | null;
-  targetFilePath?: string;
   scopeKind: ReviewMemoryProposalScopeKind;
   scopeValue?: string | null;
   proposalType: ReviewMemoryProposalType;
@@ -1004,7 +879,6 @@ export type UpsertProposalInput = {
   distinctPrCount?: number;
   distinctSubjectCount?: number;
   contradictoryCount?: number;
-  evidence?: { feedbackEventId: string; role: ReviewMemoryEvidenceRole }[];
   database?: ReviewMemoryDatabase;
 };
 
@@ -1036,10 +910,7 @@ export async function upsertReviewMemoryProposal(
     .limit(1);
 
   const values = {
-    platform_integration_id: input.platformIntegrationId ?? null,
     platform_project_id: input.platformProjectId ?? null,
-    aggregation_run_id: input.aggregationRunId ?? null,
-    target_file_path: input.targetFilePath ?? 'REVIEW.md',
     scope_kind: input.scopeKind,
     scope_value: input.scopeValue ?? null,
     proposal_type: input.proposalType,
@@ -1059,14 +930,6 @@ export async function upsertReviewMemoryProposal(
   const proposal = existing
     ? await updateProposalById(database, existing.id, values)
     : await insertProposal(database, input, values);
-
-  if (input.evidence?.length) {
-    await linkProposalEvidence({
-      proposalId: proposal.id,
-      evidence: input.evidence,
-      database,
-    });
-  }
 
   return proposal;
 }
@@ -1108,25 +971,6 @@ async function updateProposalById(
 
   if (!proposal) throw new Error('Failed to update review memory proposal');
   return proposal;
-}
-
-export async function linkProposalEvidence(input: {
-  proposalId: string;
-  evidence: { feedbackEventId: string; role: ReviewMemoryEvidenceRole }[];
-  database?: ReviewMemoryDatabase;
-}): Promise<void> {
-  if (input.evidence.length === 0) return;
-  const database = databaseOrDefault(input.database);
-  await database
-    .insert(code_review_memory_proposal_evidence)
-    .values(
-      input.evidence.map(item => ({
-        proposal_id: input.proposalId,
-        feedback_event_id: item.feedbackEventId,
-        evidence_role: item.role,
-      }))
-    )
-    .onConflictDoNothing();
 }
 
 export async function listFeedbackEventsForAggregation(input: {
@@ -1313,51 +1157,9 @@ export async function getReviewMemoryProposal(input: {
   return proposal ?? null;
 }
 
-export async function listProposalEvidence(input: {
-  proposalId: string;
-  database?: ReviewMemoryDatabase;
-}): Promise<
-  {
-    feedbackEvent: CodeReviewFeedbackEvent;
-    subject: CodeReviewFeedbackSubject | null;
-    role: ReviewMemoryEvidenceRole;
-  }[]
-> {
-  const database = databaseOrDefault(input.database);
-  const rows = await database
-    .select({
-      evidenceRole: code_review_memory_proposal_evidence.evidence_role,
-      feedbackEvent: code_review_feedback_events,
-      subject: code_review_feedback_subjects,
-    })
-    .from(code_review_memory_proposal_evidence)
-    .innerJoin(
-      code_review_feedback_events,
-      eq(code_review_memory_proposal_evidence.feedback_event_id, code_review_feedback_events.id)
-    )
-    .leftJoin(
-      code_review_feedback_subjects,
-      eq(code_review_feedback_events.subject_id, code_review_feedback_subjects.id)
-    )
-    .where(
-      and(
-        eq(code_review_memory_proposal_evidence.proposal_id, input.proposalId),
-        gte(code_review_feedback_events.created_at, reviewMemoryRetentionCutoff())
-      )
-    )
-    .orderBy(desc(code_review_feedback_events.created_at));
-
-  return rows.map(row => ({
-    feedbackEvent: row.feedbackEvent,
-    subject: row.subject,
-    role: row.evidenceRole,
-  }));
-}
-
 export async function updateReviewMemoryProposal(input: {
   owner: ReviewMemoryOwner;
   proposalId: string;
-  editedByUserId: string;
   title: string;
   rationale: string;
   proposedMarkdown: string;
@@ -1375,7 +1177,6 @@ export async function updateReviewMemoryProposal(input: {
       scope_kind: input.scopeKind,
       scope_value: input.scopeValue ?? null,
       status: 'edited',
-      edited_by_user_id: input.editedByUserId,
       updated_at: new Date().toISOString(),
     })
     .where(
@@ -1394,7 +1195,6 @@ export async function updateReviewMemoryProposal(input: {
 export async function rejectReviewMemoryProposal(input: {
   owner: ReviewMemoryOwner;
   proposalId: string;
-  rejectedByUserId: string;
   database?: ReviewMemoryDatabase;
 }): Promise<CodeReviewMemoryProposal | null> {
   const database = databaseOrDefault(input.database);
@@ -1402,8 +1202,6 @@ export async function rejectReviewMemoryProposal(input: {
     .update(code_review_memory_proposals)
     .set({
       status: 'rejected',
-      rejected_by_user_id: input.rejectedByUserId,
-      rejected_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     })
     .where(
@@ -1422,9 +1220,6 @@ export async function rejectReviewMemoryProposal(input: {
 export async function markProposalOpeningChangeRequest(input: {
   owner: ReviewMemoryOwner;
   proposalId: string;
-  approvedByUserId: string;
-  changeRequestType: ReviewMemoryChangeRequestType;
-  branchName: string;
   database?: ReviewMemoryDatabase;
 }): Promise<CodeReviewMemoryProposal | null> {
   const database = databaseOrDefault(input.database);
@@ -1432,10 +1227,6 @@ export async function markProposalOpeningChangeRequest(input: {
     .update(code_review_memory_proposals)
     .set({
       status: 'opening_change_request',
-      approved_by_user_id: input.approvedByUserId,
-      approved_at: new Date().toISOString(),
-      change_request_type: input.changeRequestType,
-      branch_name: input.branchName,
       change_request_error_message: null,
       updated_at: new Date().toISOString(),
     })
@@ -1454,7 +1245,6 @@ export async function markProposalOpeningChangeRequest(input: {
 
 export async function markProposalChangeRequestOpened(input: {
   proposalId: string;
-  changeRequestNumber: number;
   changeRequestUrl: string;
   database?: ReviewMemoryDatabase;
 }): Promise<CodeReviewMemoryProposal> {
@@ -1463,7 +1253,6 @@ export async function markProposalChangeRequestOpened(input: {
     .update(code_review_memory_proposals)
     .set({
       status: 'change_request_opened',
-      change_request_number: input.changeRequestNumber,
       change_request_url: input.changeRequestUrl,
       change_request_error_message: null,
       updated_at: new Date().toISOString(),

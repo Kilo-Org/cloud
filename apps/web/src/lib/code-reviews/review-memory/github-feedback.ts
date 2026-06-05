@@ -128,24 +128,18 @@ export async function handleGitHubReviewCommentFeedback(input: {
     return { recorded: false, reason: 'not-kilo-subject' };
   }
 
-  const prUrl = input.payload.pull_request.html_url ?? null;
+  const eventKey = `github:${input.deliveryId}:review-comment:${input.payload.comment.id}`;
   const result = await recordFeedbackEvent({
     owner,
     platform: 'github',
-    platformIntegrationId: input.integration.id,
     subjectId: subject?.id ?? null,
-    codeReviewId: subject?.code_review_id ?? null,
     repoFullName: input.payload.repository.full_name,
     prNumber: input.payload.pull_request.number,
-    prUrl,
-    eventSource: 'github_webhook',
     signalKind: classification.signalKind,
     sentiment: classification.sentiment,
     strength: classification.strength,
-    externalEventId: `github:${input.deliveryId}:review-comment:${input.payload.comment.id}`,
-    externalUrl: input.payload.comment.html_url,
+    dedupeHash: createReviewMemoryDedupeHash([eventKey]),
     evidenceExcerpt: input.payload.comment.body,
-    metadata: parentCommentId ? { parent_review_comment_id: parentCommentId } : {},
   });
 
   return { recorded: result.created, eventId: result.event.id };
@@ -169,30 +163,23 @@ export async function handleGitHubReviewFeedback(input: {
     const subject = await upsertFeedbackSubject({
       owner,
       platform: 'github',
-      platformIntegrationId: input.integration.id,
       subjectType: 'review',
       externalId: String(input.payload.review.id),
-      externalUrl: input.payload.pull_request.html_url,
       repoFullName: input.payload.repository.full_name,
       prNumber: input.payload.pull_request.number,
-      prUrl: input.payload.pull_request.html_url,
-      headSha: input.payload.pull_request.head.sha,
       state: 'dismissed',
     });
+    const eventKey = `github:${input.deliveryId}:review-dismissed:${input.payload.review.id}`;
     const result = await recordFeedbackEvent({
       owner,
       platform: 'github',
-      platformIntegrationId: input.integration.id,
       subjectId: subject.id,
       repoFullName: input.payload.repository.full_name,
       prNumber: input.payload.pull_request.number,
-      prUrl: input.payload.pull_request.html_url,
-      eventSource: 'github_webhook',
       signalKind: 'review_dismissed',
       sentiment: 'negative',
       strength: 4,
-      externalEventId: `github:${input.deliveryId}:review-dismissed:${input.payload.review.id}`,
-      externalUrl: input.payload.pull_request.html_url,
+      dedupeHash: createReviewMemoryDedupeHash([eventKey]),
       evidenceExcerpt: 'Kilo review was dismissed.',
     });
     return { recorded: result.created, eventId: result.event.id };
@@ -203,21 +190,17 @@ export async function handleGitHubReviewFeedback(input: {
     if (state !== 'approved' && state !== 'changes_requested') {
       return { recorded: false, reason: 'unsupported-review-state' };
     }
+    const eventKey = `github:${input.deliveryId}:review:${input.payload.review.id}:${state}`;
     const result = await recordFeedbackEvent({
       owner,
       platform: 'github',
-      platformIntegrationId: input.integration.id,
       repoFullName: input.payload.repository.full_name,
       prNumber: input.payload.pull_request.number,
-      prUrl: input.payload.pull_request.html_url,
-      eventSource: 'github_webhook',
       signalKind: state === 'approved' ? 'pr_approved' : 'pr_changes_requested',
       sentiment: state === 'approved' ? 'positive' : 'negative',
       strength: 1,
-      externalEventId: `github:${input.deliveryId}:review:${input.payload.review.id}:${state}`,
-      externalUrl: input.payload.pull_request.html_url,
+      dedupeHash: createReviewMemoryDedupeHash([eventKey]),
       evidenceExcerpt: state === 'approved' ? 'Pull request approved.' : 'Changes requested.',
-      metadata: { review_state: state },
     });
     return { recorded: result.created, eventId: result.event.id };
   }
@@ -248,44 +231,31 @@ export async function handleGitHubReviewThreadFeedback(input: {
   const subject = await upsertFeedbackSubject({
     owner,
     platform: 'github',
-    platformIntegrationId: input.integration.id,
     subjectType: 'discussion',
     externalId: input.payload.thread.id,
     externalThreadId: input.payload.thread.id,
-    externalUrl: kiloComment.html_url ?? input.payload.pull_request.html_url ?? null,
     repoFullName: input.payload.repository.full_name,
     prNumber: input.payload.pull_request.number,
-    prUrl: input.payload.pull_request.html_url ?? null,
-    headSha: input.payload.pull_request.head?.sha ?? null,
     filePath: kiloComment.path ?? null,
-    lineNumber: kiloComment.line ?? null,
-    diffHunk: kiloComment.diff_hunk ?? null,
-    bodyExcerpt: kiloComment.body,
-    severity: metadata.severity,
     findingTitle: metadata.findingTitle,
     findingFingerprint: metadata.findingFingerprint,
     state: input.payload.action === 'resolved' ? 'resolved' : 'active',
   });
 
   const signalKind = input.payload.action === 'resolved' ? 'thread_resolved' : 'thread_unresolved';
+  const eventKey = `github:${input.deliveryId}:thread:${input.payload.thread.id}:${input.payload.action}`;
   const result = await recordFeedbackEvent({
     owner,
     platform: 'github',
-    platformIntegrationId: input.integration.id,
     subjectId: subject.id,
-    codeReviewId: subject.code_review_id,
     repoFullName: input.payload.repository.full_name,
     prNumber: input.payload.pull_request.number,
-    prUrl: input.payload.pull_request.html_url ?? null,
-    eventSource: 'github_webhook',
     signalKind,
     sentiment: input.payload.action === 'resolved' ? 'positive' : 'negative',
     strength: 2,
-    externalEventId: `github:${input.deliveryId}:thread:${input.payload.thread.id}:${input.payload.action}`,
-    externalUrl: kiloComment.html_url ?? input.payload.pull_request.html_url ?? null,
+    dedupeHash: createReviewMemoryDedupeHash([eventKey]),
     evidenceExcerpt:
       input.payload.action === 'resolved' ? 'Review thread resolved.' : 'Review thread reopened.',
-    metadata: { thread_id: input.payload.thread.id },
   });
 
   return { recorded: result.created, eventId: result.event.id };
@@ -316,34 +286,23 @@ export async function recordGitHubAutoFixFeedback(input: {
   const failure =
     input.outcome === 'failed' ? classifyGitHubAutoFixFailure(input.errorMessage) : null;
   const signalKind = input.outcome === 'success' ? 'autofix_completed' : 'autofix_failed';
-  const externalEventId = `github:auto-fix:${input.ticket.id}:${signalKind}`;
+  const eventKey = `github:auto-fix:${input.ticket.id}:${signalKind}`;
   const result = await recordFeedbackEvent({
     owner,
     platform: 'github',
-    platformIntegrationId: input.ticket.platform_integration_id,
     subjectId: subject?.id ?? null,
-    codeReviewId: subject?.code_review_id ?? null,
     repoFullName: input.ticket.repo_full_name,
     prNumber: input.ticket.issue_number,
-    prUrl: input.ticket.issue_url,
-    eventSource: 'auto_fix',
     signalKind,
     sentiment: input.outcome === 'success' ? 'positive' : (failure?.sentiment ?? 'negative'),
     strength: input.outcome === 'success' ? 2 : (failure?.strength ?? 2),
-    externalEventId,
-    dedupeHash: createReviewMemoryDedupeHash([externalEventId]),
-    externalUrl: input.ticket.issue_url,
+    dedupeHash: createReviewMemoryDedupeHash([eventKey]),
     evidenceExcerpt:
       input.outcome === 'success'
         ? 'Auto Fix completed for requested review feedback.'
         : input.errorMessage
           ? `Auto Fix failed: ${input.errorMessage}`
           : 'Auto Fix failed for requested review feedback.',
-    metadata: {
-      ticket_id: input.ticket.id,
-      review_comment_id: input.ticket.review_comment_id,
-      failure_category: failure?.category,
-    },
     occurredAt: input.ticket.completed_at ?? null,
   });
 

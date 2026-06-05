@@ -111,10 +111,7 @@ describe('GitLab review memory feedback', () => {
       subjectType: 'discussion',
       externalId: '500',
       externalThreadId: 'discussion-1',
-      externalUrl: 'https://gitlab.example.com/acme/widgets/-/merge_requests/42#note_500',
       prNumber: 42,
-      prUrl: 'https://gitlab.example.com/acme/widgets/-/merge_requests/42',
-      bodyExcerpt: '**WARNING**: Avoid this pattern',
       state: 'active',
     });
   }
@@ -277,8 +274,8 @@ describe('GitLab review memory feedback', () => {
     );
 
     const [subject] = await db.select().from(code_review_feedback_subjects);
-    expect(subject.external_id).toBe('500');
-    expect(subject.severity).toBe('warning');
+    expect(subject.external_id_hash).toEqual(expect.any(String));
+    expect(subject.finding_title).toBe('Avoid this pattern');
   });
 
   it('records MR-level approval evidence and discussion resolution', async () => {

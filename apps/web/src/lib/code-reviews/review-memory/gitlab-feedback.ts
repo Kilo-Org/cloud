@@ -5,11 +5,13 @@ import type {
   NoteEventPayload,
 } from '@/lib/integrations/platforms/gitlab/webhook-schemas';
 import {
+  createReviewMemoryDedupeHash,
   findFeedbackSubject,
   findFeedbackSubjectByExternalThreadId,
   listFeedbackSubjectsForPullRequest,
   recordFeedbackEvent,
   refreshAggregationStateForScope,
+  updateFeedbackSubjectState,
   upsertFeedbackSubject,
   type ReviewMemoryOwner,
 } from './db';
@@ -101,20 +103,14 @@ async function findExistingGitLabNoteSubject(params: {
 
 async function upsertKiloNoteSubject(params: {
   owner: ReviewMemoryOwner;
-  integration: PlatformIntegration;
   repoFullName: string;
   platformProjectId: number;
   prNumber: number | null;
-  prUrl: string | null;
-  headSha?: string | null;
   note: {
     id: number;
     body: string;
-    url?: string | null;
     discussionId?: string | null;
     filePath?: string | null;
-    lineNumber?: number | null;
-    diffHunk?: string | null;
   };
 }): Promise<CodeReviewFeedbackSubject | null> {
   const isSummary = params.note.body.includes('<!-- kilo-review -->');
@@ -125,21 +121,13 @@ async function upsertKiloNoteSubject(params: {
   return await upsertFeedbackSubject({
     owner: params.owner,
     platform: 'gitlab',
-    platformIntegrationId: params.integration.id,
     subjectType: isSummary ? 'summary_comment' : 'discussion',
     externalId: String(params.note.id),
     externalThreadId: params.note.discussionId ?? null,
-    externalUrl: params.note.url ?? null,
     repoFullName: params.repoFullName,
     platformProjectId: params.platformProjectId,
     prNumber: params.prNumber,
-    prUrl: params.prUrl,
-    headSha: params.headSha,
     filePath: params.note.filePath ?? null,
-    lineNumber: params.note.lineNumber ?? null,
-    diffHunk: params.note.diffHunk ?? null,
-    bodyExcerpt: params.note.body,
-    severity: metadata?.severity ?? null,
     findingTitle: metadata?.findingTitle ?? null,
     findingFingerprint: metadata?.findingFingerprint ?? null,
     state: 'active',
@@ -150,10 +138,6 @@ function positionFilePath(
   position: NoteEventPayload['object_attributes']['position']
 ): string | null {
   return position?.new_path ?? position?.old_path ?? null;
-}
-
-function positionLine(position: NoteEventPayload['object_attributes']['position']): number | null {
-  return position?.new_line ?? position?.old_line ?? null;
 }
 
 export async function handleGitLabNoteFeedback(input: {
@@ -174,26 +158,19 @@ export async function handleGitLabNoteFeedback(input: {
 
   const repoFullName = input.payload.project.path_with_namespace;
   const prNumber = input.payload.merge_request.iid;
-  const prUrl = input.payload.merge_request.url;
   const action = note.action ?? 'create';
 
   if (action === 'update') {
     const subject = await upsertKiloNoteSubject({
       owner,
-      integration: input.integration,
       repoFullName,
       platformProjectId: input.payload.project.id,
       prNumber,
-      prUrl,
-      headSha: input.payload.merge_request.last_commit?.id ?? null,
       note: {
         id: note.id,
         body: note.note,
-        url: note.url,
         discussionId: note.discussion_id ?? null,
         filePath: positionFilePath(note.position),
-        lineNumber: positionLine(note.position),
-        diffHunk: note.st_diff?.diff ?? null,
       },
     });
     return subject ? skipped('subject-synced') : skipped('not-kilo-subject');
@@ -216,27 +193,19 @@ export async function handleGitLabNoteFeedback(input: {
   if (!subject) return skipped('not-kilo-subject');
 
   const classification = classifyReviewCommentReply(note.note);
+  const eventKey = `gitlab:${input.deliveryId}:note:${note.id}`;
   const result = await recordFeedbackEvent({
     owner,
     platform: 'gitlab',
-    platformIntegrationId: input.integration.id,
     subjectId: subject.id,
-    codeReviewId: subject.code_review_id,
     repoFullName,
     platformProjectId: input.payload.project.id,
     prNumber,
-    prUrl,
-    eventSource: 'gitlab_webhook',
     signalKind: classification.signalKind,
     sentiment: classification.sentiment,
     strength: classification.strength,
-    externalEventId: `gitlab:${input.deliveryId}:note:${note.id}`,
-    externalUrl: note.url,
+    dedupeHash: createReviewMemoryDedupeHash([eventKey]),
     evidenceExcerpt: note.note,
-    metadata: {
-      note_id: note.id,
-      discussion_id: note.discussion_id,
-    },
     occurredAt: note.created_at,
   });
 
@@ -270,43 +239,32 @@ export async function handleGitLabEmojiFeedback(input: {
   if (!subject && noteBody) {
     subject = await upsertKiloNoteSubject({
       owner,
-      integration: input.integration,
       repoFullName,
       platformProjectId: input.payload.project.id,
       prNumber: input.payload.merge_request?.iid ?? null,
-      prUrl: input.payload.merge_request?.url ?? null,
-      headSha: input.payload.merge_request?.last_commit?.id ?? null,
       note: {
         id: noteId,
         body: noteBody,
-        url: input.payload.note?.url ?? null,
         filePath: input.payload.note?.position?.new_path ?? input.payload.note?.position?.old_path,
-        lineNumber:
-          input.payload.note?.position?.new_line ?? input.payload.note?.position?.old_line,
       },
     });
   }
 
   if (!subject) return skipped('not-kilo-subject');
 
+  const eventKey = `gitlab:${input.deliveryId}:emoji:${emoji.id}`;
   const result = await recordFeedbackEvent({
     owner,
     platform: 'gitlab',
-    platformIntegrationId: input.integration.id,
     subjectId: subject.id,
-    codeReviewId: subject.code_review_id,
     repoFullName,
     platformProjectId: input.payload.project.id,
     prNumber: input.payload.merge_request?.iid ?? subject.pr_number,
-    prUrl: input.payload.merge_request?.url ?? subject.pr_url,
-    eventSource: 'gitlab_webhook',
     signalKind: sentiment.signalKind,
     sentiment: sentiment.sentiment,
     strength: sentiment.strength,
-    externalEventId: `gitlab:${input.deliveryId}:emoji:${emoji.id}`,
-    externalUrl: input.payload.note?.url ?? subject.external_url,
+    dedupeHash: createReviewMemoryDedupeHash([eventKey]),
     evidenceExcerpt: `Emoji: ${emoji.name}`,
-    metadata: { emoji: emoji.name, note_id: noteId },
     occurredAt: emoji.created_at ?? null,
   });
 
@@ -315,29 +273,24 @@ export async function handleGitLabEmojiFeedback(input: {
 
 async function recordGitLabMrLevelSignal(input: {
   payload: MergeRequestPayload;
-  integration: PlatformIntegration;
   owner: ReviewMemoryOwner;
   deliveryId: string;
   signalKind: 'mr_approved' | 'mr_unapproved';
   sentiment: 'positive' | 'negative';
   evidenceExcerpt: string;
 }) {
+  const eventKey = `gitlab:${input.deliveryId}:merge-request:${input.payload.object_attributes.id}:${input.signalKind}`;
   return await recordFeedbackEvent({
     owner: input.owner,
     platform: 'gitlab',
-    platformIntegrationId: input.integration.id,
     repoFullName: input.payload.project.path_with_namespace,
     platformProjectId: input.payload.project.id,
     prNumber: input.payload.object_attributes.iid,
-    prUrl: input.payload.object_attributes.url,
-    eventSource: 'gitlab_webhook',
     signalKind: input.signalKind,
     sentiment: input.sentiment,
     strength: 1,
-    externalEventId: `gitlab:${input.deliveryId}:merge-request:${input.payload.object_attributes.id}:${input.signalKind}`,
-    externalUrl: input.payload.object_attributes.url,
+    dedupeHash: createReviewMemoryDedupeHash([eventKey]),
     evidenceExcerpt: input.evidenceExcerpt,
-    metadata: { weak_mr_level_signal: true },
     occurredAt: input.payload.object_attributes.updated_at,
   });
 }
@@ -358,7 +311,6 @@ export async function handleGitLabMergeRequestFeedback(input: {
   if (action === 'approved' || action === 'approval') {
     const result = await recordGitLabMrLevelSignal({
       payload: input.payload,
-      integration: input.integration,
       owner,
       deliveryId: input.deliveryId,
       signalKind: 'mr_approved',
@@ -371,7 +323,6 @@ export async function handleGitLabMergeRequestFeedback(input: {
   if (action === 'unapproved' || action === 'unapproval') {
     const result = await recordGitLabMrLevelSignal({
       payload: input.payload,
-      integration: input.integration,
       owner,
       deliveryId: input.deliveryId,
       signalKind: 'mr_unapproved',
@@ -398,49 +349,25 @@ export async function handleGitLabMergeRequestFeedback(input: {
     const sentiment = blockingDiscussionChange.current ? 'positive' : 'negative';
 
     for (const subject of subjects) {
-      await upsertFeedbackSubject({
-        owner,
-        platform: 'gitlab',
-        platformIntegrationId: input.integration.id,
-        codeReviewId: subject.code_review_id,
-        subjectType: subject.subject_type,
-        externalId: subject.external_id,
-        externalThreadId: subject.external_thread_id,
-        externalUrl: subject.external_url,
-        repoFullName: subject.repo_full_name,
-        platformProjectId: subject.platform_project_id,
-        prNumber: subject.pr_number,
-        prUrl: subject.pr_url,
-        headSha: input.payload.object_attributes.last_commit?.id ?? subject.head_sha,
-        filePath: subject.file_path,
-        lineNumber: subject.line_number,
-        diffHunk: subject.diff_hunk,
-        bodyExcerpt: subject.body_excerpt,
-        severity: subject.severity,
-        findingTitle: subject.finding_title,
-        findingFingerprint: subject.finding_fingerprint,
+      await updateFeedbackSubjectState({
+        subjectId: subject.id,
         state: blockingDiscussionChange.current ? 'resolved' : 'active',
       });
+      const eventKey = `gitlab:${input.deliveryId}:discussion:${subject.id}:${signalKind}`;
       const result = await recordFeedbackEvent({
         owner,
         platform: 'gitlab',
-        platformIntegrationId: input.integration.id,
         subjectId: subject.id,
-        codeReviewId: subject.code_review_id,
         repoFullName: input.payload.project.path_with_namespace,
         platformProjectId: input.payload.project.id,
         prNumber: input.payload.object_attributes.iid,
-        prUrl: input.payload.object_attributes.url,
-        eventSource: 'gitlab_webhook',
         signalKind,
         sentiment,
         strength: 2,
-        externalEventId: `gitlab:${input.deliveryId}:discussion:${subject.external_id}:${signalKind}`,
-        externalUrl: subject.external_url ?? input.payload.object_attributes.url,
+        dedupeHash: createReviewMemoryDedupeHash([eventKey]),
         evidenceExcerpt: blockingDiscussionChange.current
           ? 'Review discussion resolved.'
           : 'Review discussion reopened.',
-        metadata: { discussion_id: subject.external_thread_id },
         occurredAt: input.payload.object_attributes.updated_at,
         refreshAggregationState: false,
       });

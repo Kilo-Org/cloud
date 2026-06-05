@@ -44,7 +44,6 @@ describe('GET /api/cron/cleanup-review-memory', () => {
     mockPruneExpiredReviewMemoryData.mockResolvedValue({
       cutoff: '2026-05-14T00:00:00.000Z',
       proposalsDeleted: 1,
-      aggregationRunsDeleted: 2,
       feedbackEventsDeleted: 3,
       subjectsDeleted: 4,
       aggregationStatesDeleted: 5,
@@ -59,7 +58,6 @@ describe('GET /api/cron/cleanup-review-memory', () => {
       summary: {
         cutoff: '2026-05-14T00:00:00.000Z',
         proposalsDeleted: 1,
-        aggregationRunsDeleted: 2,
         feedbackEventsDeleted: 3,
         subjectsDeleted: 4,
         aggregationStatesDeleted: 5,

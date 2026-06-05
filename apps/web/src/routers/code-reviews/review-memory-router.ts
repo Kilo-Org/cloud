@@ -11,7 +11,6 @@ import {
   countActionableProposals,
   getReviewMemoryProposal,
   listAggregationStates,
-  listProposalEvidence,
   listReviewMemoryProposals,
   listReviewMemoryRepositories,
   refreshAggregationStateForScope,
@@ -158,8 +157,7 @@ export const reviewMemoryRouter = createTRPCRouter({
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Review memory proposal not found' });
       }
 
-      const evidence = await listProposalEvidence({ proposalId: proposal.id });
-      return { proposal, evidence };
+      return { proposal, evidence: [] };
     }),
 
   updateProposal: baseProcedure
@@ -186,7 +184,6 @@ export const reviewMemoryRouter = createTRPCRouter({
       const proposal = await updateReviewMemoryProposal({
         owner,
         proposalId: input.proposalId,
-        editedByUserId: ctx.user.id,
         title: input.title,
         rationale: input.rationale,
         proposedMarkdown: input.proposedMarkdown,
@@ -214,7 +211,6 @@ export const reviewMemoryRouter = createTRPCRouter({
       const proposal = await rejectReviewMemoryProposal({
         owner,
         proposalId: input.proposalId,
-        rejectedByUserId: ctx.user.id,
       });
       if (!proposal) {
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Review memory proposal not found' });

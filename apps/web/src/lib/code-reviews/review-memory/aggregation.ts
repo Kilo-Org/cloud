@@ -26,14 +26,12 @@ import type {
 } from '@kilocode/db/schema-types';
 import {
   claimEligibleAggregationStates,
-  createAggregationRun,
   finishClaimedAggregationState,
   listFeedbackEventsForAggregation,
   listReviewMemoryProposals,
   markFeedbackEventsAggregationState,
   markFeedbackEventsIncluded,
   refreshAggregationStateForScope,
-  updateAggregationRunStatus,
   upsertReviewMemoryProposal,
   type ReviewMemoryOwner,
 } from './db';
@@ -386,7 +384,6 @@ async function processClaimedAggregationScope(
       claimToken: state.claim_token,
       status: 'idle',
       nextEligibleAt: addMs(options.now, REVIEW_MEMORY_AGGREGATION_THRESHOLDS.cooldownMs),
-      lastErrorMessage: null,
     });
     return { status: 'skipped', proposals: 0, reason: 'review-memory-disabled' };
   }
@@ -399,20 +396,6 @@ async function processClaimedAggregationScope(
     limit: REVIEW_MEMORY_AGGREGATION_THRESHOLDS.maxEventsPerScope,
   });
   const clusters = buildFeedbackClusters(events);
-  const run = await createAggregationRun({
-    owner,
-    platform: state.platform,
-    repoFullName: state.repo_full_name,
-    platformProjectId: state.platform_project_id,
-    modelSlug,
-    trigger: 'manual',
-    inputEventCount: events.length,
-    inputSubjectCount: new Set(
-      events.flatMap(event => (event.subject_id ? [event.subject_id] : []))
-    ).size,
-    inputClusterCount: clusters.length,
-    freshEventCutoffAt: events[0]?.created_at ?? null,
-  });
 
   try {
     if (events.length === 0 || !hasActionableCommentEvidence(events) || clusters.length === 0) {
@@ -420,19 +403,11 @@ async function processClaimedAggregationScope(
         eventIds: events.map(event => event.id),
         aggregationState: 'ignored',
       });
-      await updateAggregationRunStatus({
-        runId: run.id,
-        status: 'skipped',
-        skipReason: 'no_actionable_comment_evidence',
-      });
       await finishClaimedAggregationState({
         stateId: state.id,
         claimToken: state.claim_token,
         status: 'idle',
         nextEligibleAt: addMs(options.now, REVIEW_MEMORY_AGGREGATION_THRESHOLDS.cooldownMs),
-        lastSuccessfulRunAt: options.now.toISOString(),
-        lastModelSlug: modelSlug,
-        lastErrorMessage: null,
       });
       await refreshAggregationStateForScope({
         owner,
@@ -479,7 +454,6 @@ async function processClaimedAggregationScope(
         platform: state.platform,
         repoFullName: state.repo_full_name,
         platformProjectId: state.platform_project_id,
-        aggregationRunId: run.id,
         scopeKind: opportunity.scopeKind,
         scopeValue: opportunity.scopeValue,
         proposalType: opportunity.proposalType,
@@ -500,35 +474,16 @@ async function processClaimedAggregationScope(
         distinctPrCount: rollups.distinctPrCount,
         distinctSubjectCount: rollups.distinctSubjectCount,
         contradictoryCount: rollups.contradictoryIds.length,
-        evidence: [
-          ...rollups.evidenceIds.map(feedbackEventId => ({
-            feedbackEventId,
-            role: 'primary' as const,
-          })),
-          ...rollups.contradictoryIds.map(feedbackEventId => ({
-            feedbackEventId,
-            role: 'contradictory' as const,
-          })),
-        ],
       });
       proposalCount += 1;
     }
 
     await markFeedbackEventsIncluded({ eventIds: processedEventIds });
-    await updateAggregationRunStatus({
-      runId: run.id,
-      status: 'completed',
-      tokensIn: generation.tokensIn,
-      tokensOut: generation.tokensOut,
-    });
     await finishClaimedAggregationState({
       stateId: state.id,
       claimToken: state.claim_token,
       status: 'idle',
       nextEligibleAt: addMs(options.now, REVIEW_MEMORY_AGGREGATION_THRESHOLDS.cooldownMs),
-      lastSuccessfulRunAt: options.now.toISOString(),
-      lastModelSlug: modelSlug,
-      lastErrorMessage: null,
     });
     await refreshAggregationStateForScope({
       owner,
@@ -541,17 +496,11 @@ async function processClaimedAggregationScope(
     return { status: 'completed', proposals: proposalCount };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    await updateAggregationRunStatus({
-      runId: run.id,
-      status: 'failed',
-      errorMessage: message,
-    });
     await finishClaimedAggregationState({
       stateId: state.id,
       claimToken: state.claim_token,
       status: 'failed',
       nextEligibleAt: addMs(options.now, REVIEW_MEMORY_AGGREGATION_THRESHOLDS.failureRetryMs),
-      lastErrorMessage: message,
     });
     captureException(error, {
       tags: { source: 'review-memory-aggregation' },

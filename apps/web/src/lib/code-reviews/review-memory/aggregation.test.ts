@@ -5,9 +5,7 @@ import {
   agent_configs,
   code_review_feedback_events,
   code_review_feedback_subjects,
-  code_review_memory_aggregation_runs,
   code_review_memory_aggregation_state,
-  code_review_memory_proposal_evidence,
   code_review_memory_proposals,
   kilocode_users,
 } from '@kilocode/db/schema';
@@ -16,18 +14,11 @@ import {
   dispatchManualReviewMemoryAggregation,
   type ReviewMemoryAggregationGeneratorInput,
 } from './aggregation';
-import {
-  listProposalEvidence,
-  recordFeedbackEvent,
-  upsertFeedbackSubject,
-  type ReviewMemoryOwner,
-} from './db';
+import { recordFeedbackEvent, upsertFeedbackSubject, type ReviewMemoryOwner } from './db';
 
 describe('review memory aggregation', () => {
   afterEach(async () => {
-    await db.delete(code_review_memory_proposal_evidence);
     await db.delete(code_review_memory_proposals);
-    await db.delete(code_review_memory_aggregation_runs);
     await db.delete(code_review_feedback_events);
     await db.delete(code_review_feedback_subjects);
     await db.delete(code_review_memory_aggregation_state);
@@ -64,9 +55,7 @@ describe('review memory aggregation', () => {
       subjectType: 'inline_comment',
       externalId,
       prNumber,
-      prUrl: `https://github.com/acme/widgets/pull/${prNumber}`,
       filePath: 'src/widget.ts',
-      bodyExcerpt: '**WARNING**: Avoid this pattern',
       findingTitle: 'Avoid this pattern',
       findingFingerprint: `fingerprint-${externalId}`,
       state: 'active',
@@ -88,12 +77,10 @@ describe('review memory aggregation', () => {
         subjectId: subject.id,
         repoFullName,
         prNumber: subject.pr_number,
-        prUrl: subject.pr_url,
-        eventSource: 'github_webhook',
         signalKind: 'corrective_reply',
         sentiment: 'negative',
         strength: 3,
-        externalEventId: `aggregation-actionable-${repoFullName}-${i}`,
+        dedupeHash: `aggregation-actionable-${repoFullName}-${i}`,
         evidenceExcerpt: `False positive feedback ${i}`,
       });
       events.push(result.event);
@@ -111,11 +98,10 @@ describe('review memory aggregation', () => {
       subjectId: subject.id,
       repoFullName: 'acme/widgets',
       prNumber: 1,
-      eventSource: 'github_webhook',
       signalKind: 'corrective_reply',
       sentiment: 'negative',
       strength: 3,
-      externalEventId: 'aggregation-below-threshold',
+      dedupeHash: 'aggregation-below-threshold',
     });
 
     const generateOpportunities = jest.fn();
@@ -125,7 +111,7 @@ describe('review memory aggregation', () => {
     expect(generateOpportunities).not.toHaveBeenCalled();
   });
 
-  it('aggregates actionable feedback into proposals and included evidence', async () => {
+  it('aggregates actionable feedback into proposals and included events', async () => {
     const user = await insertTestUser();
     const owner = { type: 'user' as const, id: user.id };
     await enableReviewMemory(owner);
@@ -170,16 +156,8 @@ describe('review memory aggregation', () => {
         negative_count: 2,
       })
     );
-    const evidence = await listProposalEvidence({ proposalId: proposals[0].id });
-    expect(evidence).toHaveLength(2);
-
     const includedEvents = await db.select().from(code_review_feedback_events);
     expect(includedEvents.every(event => event.aggregation_state === 'included')).toBe(true);
-
-    const [run] = await db.select().from(code_review_memory_aggregation_runs);
-    expect(run).toEqual(
-      expect.objectContaining({ status: 'completed', tokens_in: 100, trigger: 'manual' })
-    );
   });
 
   it('claims only the requested aggregation state', async () => {
@@ -227,12 +205,10 @@ describe('review memory aggregation', () => {
         subjectId: subject.id,
         repoFullName: 'acme/widgets',
         prNumber: subject.pr_number,
-        prUrl: subject.pr_url,
-        eventSource: 'github_webhook',
         signalKind: 'corrective_reply',
         sentiment: 'negative',
         strength: 21 - i,
-        externalEventId: `aggregation-cluster-limit-${i}`,
+        dedupeHash: `aggregation-cluster-limit-${i}`,
         evidenceExcerpt: `False positive cluster ${i}`,
       });
     }
@@ -256,7 +232,7 @@ describe('review memory aggregation', () => {
       20
     );
     expect(persistedEvents.filter(event => event.aggregation_state === 'fresh')).toEqual([
-      expect.objectContaining({ external_event_id: 'aggregation-cluster-limit-20' }),
+      expect.objectContaining({ dedupe_hash: 'aggregation-cluster-limit-20' }),
     ]);
   });
 
@@ -303,11 +279,10 @@ describe('review memory aggregation', () => {
         repoFullName: 'acme/widgets',
         platformProjectId: 123,
         prNumber: i % 2 === 0 ? 1 : 2,
-        eventSource: 'gitlab_webhook',
         signalKind: 'mr_approved',
         sentiment: 'positive',
         strength: 2,
-        externalEventId: `aggregation-weak-${i}`,
+        dedupeHash: `aggregation-weak-${i}`,
       });
     }
 
@@ -319,10 +294,6 @@ describe('review memory aggregation', () => {
 
     const ignoredEvents = await db.select().from(code_review_feedback_events);
     expect(ignoredEvents.every(event => event.aggregation_state === 'ignored')).toBe(true);
-
-    const [run] = await db.select().from(code_review_memory_aggregation_runs);
-    expect(run.status).toBe('skipped');
-    expect(run.trigger).toBe('manual');
 
     const [state] = await db
       .select()
@@ -342,7 +313,6 @@ describe('review memory aggregation', () => {
     expect(summary).toEqual({ claimed: 1, completed: 0, skipped: 1, failed: 0, proposals: 0 });
     expect(generateOpportunities).not.toHaveBeenCalled();
     await expect(db.select().from(code_review_memory_proposals)).resolves.toHaveLength(0);
-    await expect(db.select().from(code_review_memory_aggregation_runs)).resolves.toHaveLength(0);
     const events = await db.select().from(code_review_feedback_events);
     expect(events.every(event => event.aggregation_state === 'fresh')).toBe(true);
     const [state] = await db

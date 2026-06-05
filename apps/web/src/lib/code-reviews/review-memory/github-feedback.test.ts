@@ -88,8 +88,6 @@ describe('GitHub review memory feedback', () => {
       subjectType: 'inline_comment',
       externalId,
       prNumber: 42,
-      prUrl: 'https://github.com/acme/widgets/pull/42',
-      bodyExcerpt: '**WARNING**: Avoid this pattern',
       state: 'active',
     });
   }
@@ -305,7 +303,7 @@ describe('GitHub review memory feedback', () => {
     const [threadSubject] = await db
       .select()
       .from(code_review_feedback_subjects)
-      .where(eq(code_review_feedback_subjects.external_id, 'thread-1'));
+      .where(eq(code_review_feedback_subjects.file_path, 'src/widget.ts'));
     expect(threadSubject.state).toBe('resolved');
   });
 

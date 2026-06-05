@@ -4,18 +4,15 @@ import { insertTestUser } from '@/tests/helpers/user.helper';
 import {
   code_review_feedback_events,
   code_review_feedback_subjects,
-  code_review_memory_aggregation_runs,
   code_review_memory_aggregation_state,
-  code_review_memory_proposal_evidence,
   code_review_memory_proposals,
   kilocode_users,
 } from '@kilocode/db/schema';
 import { count, eq } from 'drizzle-orm';
 import {
-  createAggregationRun,
+  createFeedbackSubjectExternalIdHash,
   countActionableProposals,
   listAggregationStates,
-  listProposalEvidence,
   listReviewMemoryProposals,
   listReviewMemoryRepositories,
   markProposalOpeningChangeRequest,
@@ -30,9 +27,7 @@ import {
 
 describe('review memory db helpers', () => {
   afterEach(async () => {
-    await db.delete(code_review_memory_proposal_evidence);
     await db.delete(code_review_memory_proposals);
-    await db.delete(code_review_memory_aggregation_runs);
     await db.delete(code_review_feedback_events);
     await db.delete(code_review_feedback_subjects);
     await db.delete(code_review_memory_aggregation_state);
@@ -51,7 +46,6 @@ describe('review memory db helpers', () => {
       externalId: 'comment-123',
       externalThreadId: 'thread-123',
       prNumber: 10,
-      bodyExcerpt: 'Initial finding body',
       state: 'active',
     });
 
@@ -63,18 +57,26 @@ describe('review memory db helpers', () => {
       externalId: 'comment-123',
       externalThreadId: 'thread-123',
       prNumber: 10,
-      bodyExcerpt: 'Updated finding body',
       state: 'resolved',
     });
 
     expect(second.id).toBe(first.id);
     expect(second.state).toBe('resolved');
-    expect(second.body_excerpt).toBe('Updated finding body');
+    expect(second.external_id_hash).toBe(
+      createFeedbackSubjectExternalIdHash({
+        owner,
+        platform: 'github',
+        repoFullName: 'owner/repo',
+        subjectType: 'inline_comment',
+        idKind: 'subject',
+        externalId: 'comment-123',
+      })
+    );
 
     const rows = await db
       .select({ count: count() })
       .from(code_review_feedback_subjects)
-      .where(eq(code_review_feedback_subjects.external_id, 'comment-123'));
+      .where(eq(code_review_feedback_subjects.external_id_hash, second.external_id_hash));
     expect(rows[0].count).toBe(1);
   });
 
@@ -90,7 +92,6 @@ describe('review memory db helpers', () => {
       repoFullName: 'owner/repo',
       subjectType: 'inline_comment',
       externalId: 'shared-comment-id',
-      bodyExcerpt: 'First owner finding body',
       state: 'active',
     });
     const second = await upsertFeedbackSubject({
@@ -99,7 +100,6 @@ describe('review memory db helpers', () => {
       repoFullName: 'owner/repo',
       subjectType: 'inline_comment',
       externalId: 'shared-comment-id',
-      bodyExcerpt: 'Second owner finding body',
       state: 'resolved',
     });
 
@@ -108,20 +108,18 @@ describe('review memory db helpers', () => {
     const rows = await db
       .select()
       .from(code_review_feedback_subjects)
-      .where(eq(code_review_feedback_subjects.external_id, 'shared-comment-id'));
+      .where(eq(code_review_feedback_subjects.repo_full_name, 'owner/repo'));
     expect(rows).toHaveLength(2);
     expect(rows).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           id: first.id,
           owned_by_user_id: user.id,
-          body_excerpt: 'First owner finding body',
           state: 'active',
         }),
         expect.objectContaining({
           id: second.id,
           owned_by_user_id: otherUser.id,
-          body_excerpt: 'Second owner finding body',
           state: 'resolved',
         }),
       ])
@@ -147,7 +145,6 @@ describe('review memory db helpers', () => {
       subjectId: subject.id,
       repoFullName: 'owner/repo',
       prNumber: 12,
-      eventSource: 'github_webhook',
       signalKind: 'negative_reaction',
       sentiment: 'negative',
       strength: 3,
@@ -159,7 +156,6 @@ describe('review memory db helpers', () => {
       subjectId: subject.id,
       repoFullName: 'owner/repo',
       prNumber: 12,
-      eventSource: 'github_webhook',
       signalKind: 'negative_reaction',
       sentiment: 'negative',
       strength: 3,
@@ -178,20 +174,9 @@ describe('review memory db helpers', () => {
     expect(state.status).toBe('eligible');
   });
 
-  it('updates active proposals by dedupe key and links evidence once', async () => {
+  it('updates active proposals by dedupe key', async () => {
     const user = await insertTestUser();
     const owner = { type: 'user' as const, id: user.id };
-    const event = await recordFeedbackEvent({
-      owner,
-      platform: 'github',
-      repoFullName: 'owner/repo',
-      prNumber: 14,
-      eventSource: 'github_webhook',
-      signalKind: 'corrective_reply',
-      sentiment: 'negative',
-      strength: 4,
-      dedupeHash: 'proposal-evidence-event',
-    });
 
     const first = await upsertReviewMemoryProposal({
       owner,
@@ -206,7 +191,6 @@ describe('review memory db helpers', () => {
       negativeCount: 1,
       distinctPrCount: 1,
       distinctSubjectCount: 1,
-      evidence: [{ feedbackEventId: event.event.id, role: 'primary' }],
     });
 
     const second = await upsertReviewMemoryProposal({
@@ -222,7 +206,6 @@ describe('review memory db helpers', () => {
       negativeCount: 2,
       distinctPrCount: 1,
       distinctSubjectCount: 1,
-      evidence: [{ feedbackEventId: event.event.id, role: 'primary' }],
     });
 
     expect(second.id).toBe(first.id);
@@ -231,11 +214,6 @@ describe('review memory db helpers', () => {
 
     const proposals = await db.select().from(code_review_memory_proposals);
     expect(proposals).toHaveLength(1);
-
-    const evidence = await listProposalEvidence({ proposalId: second.id });
-    expect(evidence).toHaveLength(1);
-    expect(evidence[0].feedbackEvent.id).toBe(event.event.id);
-    expect(evidence[0].role).toBe('primary');
   });
 
   it('does not mark a proposal opening twice', async () => {
@@ -256,16 +234,10 @@ describe('review memory db helpers', () => {
     const opening = await markProposalOpeningChangeRequest({
       owner,
       proposalId: proposal.id,
-      approvedByUserId: user.id,
-      changeRequestType: 'github_pr',
-      branchName: 'kilo/review-memory/test',
     });
     const duplicateOpening = await markProposalOpeningChangeRequest({
       owner,
       proposalId: proposal.id,
-      approvedByUserId: user.id,
-      changeRequestType: 'github_pr',
-      branchName: 'kilo/review-memory/test-again',
     });
 
     expect(opening?.status).toBe('opening_change_request');
@@ -289,15 +261,11 @@ describe('review memory db helpers', () => {
     const opening = await markProposalOpeningChangeRequest({
       owner,
       proposalId: proposal.id,
-      approvedByUserId: user.id,
-      changeRequestType: 'github_pr',
-      branchName: 'kilo/review-memory/test',
     });
 
     const edited = await updateReviewMemoryProposal({
       owner,
       proposalId: proposal.id,
-      editedByUserId: user.id,
       title: 'Edited title',
       rationale: 'Edited rationale',
       proposedMarkdown: '### Edited guidance',
@@ -331,15 +299,11 @@ describe('review memory db helpers', () => {
     await markProposalOpeningChangeRequest({
       owner,
       proposalId: proposal.id,
-      approvedByUserId: user.id,
-      changeRequestType: 'github_pr',
-      branchName: 'kilo/review-memory/test',
     });
 
     const rejected = await rejectReviewMemoryProposal({
       owner,
       proposalId: proposal.id,
-      rejectedByUserId: user.id,
     });
     const [stored] = await db
       .select()
@@ -348,7 +312,6 @@ describe('review memory db helpers', () => {
 
     expect(rejected).toBeNull();
     expect(stored.status).toBe('opening_change_request');
-    expect(stored.rejected_by_user_id).toBeNull();
   });
 
   it('refreshes aggregation state from retained fresh events only', async () => {
@@ -362,22 +325,20 @@ describe('review memory db helpers', () => {
       platform: 'github',
       repoFullName: 'owner/repo',
       prNumber: 1,
-      eventSource: 'github_webhook',
       signalKind: 'corrective_reply',
       sentiment: 'negative',
       strength: 3,
-      externalEventId: 'retention-expired-refresh',
+      dedupeHash: 'retention-expired-refresh',
     });
     await recordFeedbackEvent({
       owner,
       platform: 'github',
       repoFullName: 'owner/repo',
       prNumber: 2,
-      eventSource: 'github_webhook',
       signalKind: 'corrective_reply',
       sentiment: 'negative',
       strength: 4,
-      externalEventId: 'retention-retained-refresh',
+      dedupeHash: 'retention-retained-refresh',
     });
     await db
       .update(code_review_feedback_events)
@@ -406,11 +367,10 @@ describe('review memory db helpers', () => {
       platform: 'github',
       repoFullName: 'owner/repo',
       prNumber: 1,
-      eventSource: 'github_webhook',
       signalKind: 'corrective_reply',
       sentiment: 'negative',
       strength: 3,
-      externalEventId: 'retention-expired-read-event',
+      dedupeHash: 'retention-expired-read-event',
     });
     const proposal = await upsertReviewMemoryProposal({
       owner,
@@ -422,7 +382,6 @@ describe('review memory db helpers', () => {
       rationale: 'This proposal is outside the retention window.',
       proposedMarkdown: '### Clarify stale guidance',
       dedupeKey: 'retention-expired-read-proposal',
-      evidence: [{ feedbackEventId: event.event.id, role: 'primary' }],
     });
     await db
       .update(code_review_feedback_events)
@@ -470,11 +429,10 @@ describe('review memory db helpers', () => {
       subjectId: expiredSubject.id,
       repoFullName: 'owner/expired',
       prNumber: 1,
-      eventSource: 'github_webhook',
       signalKind: 'corrective_reply',
       sentiment: 'negative',
       strength: 3,
-      externalEventId: 'retention-expired-prune-event',
+      dedupeHash: 'retention-expired-prune-event',
     });
     const retainedEvent = await recordFeedbackEvent({
       owner,
@@ -482,53 +440,32 @@ describe('review memory db helpers', () => {
       subjectId: retainedSubject.id,
       repoFullName: 'owner/retained',
       prNumber: 2,
-      eventSource: 'github_webhook',
       signalKind: 'corrective_reply',
       sentiment: 'negative',
       strength: 4,
-      externalEventId: 'retention-retained-prune-event',
-    });
-    const expiredRun = await createAggregationRun({
-      owner,
-      platform: 'github',
-      repoFullName: 'owner/expired',
-      modelSlug: 'test-model',
-      trigger: 'manual',
-      inputEventCount: 1,
-    });
-    const retainedRun = await createAggregationRun({
-      owner,
-      platform: 'github',
-      repoFullName: 'owner/retained',
-      modelSlug: 'test-model',
-      trigger: 'manual',
-      inputEventCount: 1,
+      dedupeHash: 'retention-retained-prune-event',
     });
     const expiredProposal = await upsertReviewMemoryProposal({
       owner,
       platform: 'github',
       repoFullName: 'owner/expired',
-      aggregationRunId: expiredRun.id,
       proposalType: 'clarify',
       scopeKind: 'repository',
       title: 'Clarify expired guidance',
       rationale: 'This proposal should be pruned.',
       proposedMarkdown: '### Clarify expired guidance',
       dedupeKey: 'retention-expired-prune-proposal',
-      evidence: [{ feedbackEventId: expiredEvent.event.id, role: 'primary' }],
     });
     const retainedProposal = await upsertReviewMemoryProposal({
       owner,
       platform: 'github',
       repoFullName: 'owner/retained',
-      aggregationRunId: retainedRun.id,
       proposalType: 'clarify',
       scopeKind: 'repository',
       title: 'Clarify retained guidance',
       rationale: 'This proposal should remain.',
       proposedMarkdown: '### Clarify retained guidance',
       dedupeKey: 'retention-retained-prune-proposal',
-      evidence: [{ feedbackEventId: retainedEvent.event.id, role: 'primary' }],
     });
     const openedProposal = await upsertReviewMemoryProposal({
       owner,
@@ -536,9 +473,9 @@ describe('review memory db helpers', () => {
       repoFullName: 'owner/expired',
       scopeKind: 'repository',
       proposalType: 'clarify',
-      title: 'Retained opened proposal',
+      title: 'Expired opened proposal',
       rationale: 'It backs an opened change request.',
-      proposedMarkdown: '### Retained opened proposal',
+      proposedMarkdown: '### Expired opened proposal',
       dedupeKey: 'retention-opened-prune-proposal',
     });
     await db
@@ -555,10 +492,6 @@ describe('review memory db helpers', () => {
       .set({ created_at: expiredCreatedAt, occurred_at: expiredCreatedAt })
       .where(eq(code_review_feedback_events.id, expiredEvent.event.id));
     await db
-      .update(code_review_memory_aggregation_runs)
-      .set({ started_at: expiredCreatedAt, created_at: expiredCreatedAt })
-      .where(eq(code_review_memory_aggregation_runs.id, expiredRun.id));
-    await db
       .update(code_review_memory_proposals)
       .set({ created_at: expiredCreatedAt, updated_at: expiredCreatedAt })
       .where(eq(code_review_memory_proposals.id, expiredProposal.id));
@@ -568,7 +501,6 @@ describe('review memory db helpers', () => {
         created_at: expiredCreatedAt,
         updated_at: expiredCreatedAt,
         status: 'change_request_opened',
-        change_request_number: 12,
         change_request_url: 'https://github.com/owner/expired/pull/12',
       })
       .where(eq(code_review_memory_proposals.id, openedProposal.id));
@@ -577,8 +509,7 @@ describe('review memory db helpers', () => {
 
     expect(summary).toEqual({
       cutoff: '2026-05-18T00:00:00.000Z',
-      proposalsDeleted: 1,
-      aggregationRunsDeleted: 1,
+      proposalsDeleted: 2,
       feedbackEventsDeleted: 1,
       subjectsDeleted: 1,
       aggregationStatesDeleted: 1,
@@ -590,18 +521,8 @@ describe('review memory db helpers', () => {
     await expect(db.select().from(code_review_feedback_subjects)).resolves.toEqual([
       expect.objectContaining({ id: retainedSubject.id }),
     ]);
-    await expect(db.select().from(code_review_memory_aggregation_runs)).resolves.toEqual([
-      expect.objectContaining({ id: retainedRun.id }),
-    ]);
     const proposals = await db.select().from(code_review_memory_proposals);
-    expect(proposals).toHaveLength(2);
-    expect(proposals).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ id: openedProposal.id }),
-        expect.objectContaining({ id: retainedProposal.id }),
-      ])
-    );
-    await expect(db.select().from(code_review_memory_proposal_evidence)).resolves.toHaveLength(1);
+    expect(proposals).toEqual([expect.objectContaining({ id: retainedProposal.id })]);
 
     const [state] = await listAggregationStates({ owner, platform: 'github' });
     expect(state).toEqual(
@@ -623,22 +544,20 @@ describe('review memory db helpers', () => {
       platform: 'github',
       repoFullName: 'owner/repo',
       prNumber: 1,
-      eventSource: 'github_webhook',
       signalKind: 'corrective_reply',
       sentiment: 'negative',
       strength: 3,
-      externalEventId: 'retention-batch-prune-one',
+      dedupeHash: 'retention-batch-prune-one',
     });
     const second = await recordFeedbackEvent({
       owner,
       platform: 'github',
       repoFullName: 'owner/repo',
       prNumber: 2,
-      eventSource: 'github_webhook',
       signalKind: 'corrective_reply',
       sentiment: 'negative',
       strength: 3,
-      externalEventId: 'retention-batch-prune-two',
+      dedupeHash: 'retention-batch-prune-two',
     });
     await db
       .update(code_review_feedback_events)

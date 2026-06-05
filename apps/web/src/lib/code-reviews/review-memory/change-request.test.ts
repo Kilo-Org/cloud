@@ -125,11 +125,10 @@ describe('review memory change requests', () => {
   it('opens a GitHub pull request for an approved proposal', async () => {
     const user = await insertTestUser();
     const owner = { type: 'user' as const, id: user.id };
-    const integration = await seedGitHubIntegration(owner);
+    await seedGitHubIntegration(owner);
     const proposal = await upsertReviewMemoryProposal({
       owner,
       platform: 'github',
-      platformIntegrationId: integration.id,
       repoFullName: 'acme/widgets',
       scopeKind: 'repository',
       proposalType: 'clarify',
@@ -144,23 +143,20 @@ describe('review memory change requests', () => {
       proposalId: proposal.id,
       approvedByUser: { id: user.id, email: user.google_user_email, name: user.google_user_name },
     });
+    const branchName = `kilo/review-memory/${proposal.id.slice(0, 8)}`;
 
     expect(opened).toEqual(
       expect.objectContaining({
         status: 'change_request_opened',
-        change_request_type: 'github_pr',
-        branch_name: `kilo/review-memory/${proposal.id.slice(0, 8)}`,
-        change_request_number: 7,
         change_request_url: 'https://github.com/acme/widgets/pull/7',
-        approved_by_user_id: user.id,
       })
     );
     expect(mockCreateGitHubBranch).toHaveBeenCalledWith(
-      expect.objectContaining({ baseBranch: 'main', branchName: opened.branch_name })
+      expect.objectContaining({ baseBranch: 'main', branchName })
     );
     expect(mockCreateOrUpdateGitHubRootTextFile).toHaveBeenCalledWith(
       expect.objectContaining({
-        branch: opened.branch_name,
+        branch: branchName,
         content: expect.stringContaining('### Clarify widget guidance'),
       })
     );
@@ -169,13 +165,12 @@ describe('review memory change requests', () => {
   it('marks proposals superseded when REVIEW.md already includes the draft', async () => {
     const user = await insertTestUser();
     const owner = { type: 'user' as const, id: user.id };
-    const integration = await seedGitHubIntegration(owner);
+    await seedGitHubIntegration(owner);
     const proposedMarkdown = '### Existing guidance\n\nAvoid duplicate changes.';
     mockFetchGitHubRootTextFileAtRef.mockResolvedValueOnce(`# Existing\n\n${proposedMarkdown}\n`);
     const proposal = await upsertReviewMemoryProposal({
       owner,
       platform: 'github',
-      platformIntegrationId: integration.id,
       repoFullName: 'acme/widgets',
       scopeKind: 'repository',
       proposalType: 'clarify',
@@ -199,11 +194,10 @@ describe('review memory change requests', () => {
   it('opens a GitLab merge request for an approved proposal', async () => {
     const user = await insertTestUser();
     const owner = { type: 'user' as const, id: user.id };
-    const integration = await seedGitLabIntegration(owner);
+    await seedGitLabIntegration(owner);
     const proposal = await upsertReviewMemoryProposal({
       owner,
       platform: 'gitlab',
-      platformIntegrationId: integration.id,
       repoFullName: 'group/project',
       platformProjectId: 123,
       scopeKind: 'repository',
@@ -219,26 +213,25 @@ describe('review memory change requests', () => {
       proposalId: proposal.id,
       approvedByUser: { id: user.id, email: user.google_user_email, name: user.google_user_name },
     });
+    const branchName = `kilo/review-memory/${proposal.id.slice(0, 8)}`;
 
     expect(opened).toEqual(
       expect.objectContaining({
         status: 'change_request_opened',
-        change_request_type: 'gitlab_mr',
-        change_request_number: 5,
         change_request_url: 'https://gitlab.example.com/group/project/-/merge_requests/5',
       })
     );
     expect(mockCreateGitLabBranch).toHaveBeenCalledWith(
       'gitlab-token',
       123,
-      opened.branch_name,
+      branchName,
       'main',
       'https://gitlab.example.com'
     );
     expect(mockCreateOrUpdateGitLabTextFile).toHaveBeenCalledWith(
       'gitlab-token',
       123,
-      opened.branch_name,
+      branchName,
       'REVIEW.md',
       expect.stringContaining('### Generated files'),
       'docs(review): update REVIEW.md guidance',
@@ -250,11 +243,10 @@ describe('review memory change requests', () => {
   it('records a failed status when external creation fails', async () => {
     const user = await insertTestUser();
     const owner = { type: 'user' as const, id: user.id };
-    const integration = await seedGitHubIntegration(owner);
+    await seedGitHubIntegration(owner);
     const proposal = await upsertReviewMemoryProposal({
       owner,
       platform: 'github',
-      platformIntegrationId: integration.id,
       repoFullName: 'acme/widgets',
       scopeKind: 'repository',
       proposalType: 'clarify',

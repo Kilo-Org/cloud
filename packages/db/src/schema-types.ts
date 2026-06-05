@@ -1433,15 +1433,6 @@ export const REVIEW_MEMORY_SUBJECT_STATES = [
 ] as const;
 export type ReviewMemorySubjectState = (typeof REVIEW_MEMORY_SUBJECT_STATES)[number];
 
-export const REVIEW_MEMORY_FEEDBACK_EVENT_SOURCES = [
-  'github_webhook',
-  'gitlab_webhook',
-  'auto_fix',
-  'backfill',
-  'sync',
-] as const;
-export type ReviewMemoryFeedbackEventSource = (typeof REVIEW_MEMORY_FEEDBACK_EVENT_SOURCES)[number];
-
 export const REVIEW_MEMORY_SIGNAL_KINDS = [
   'positive_reaction',
   'negative_reaction',
@@ -1477,19 +1468,6 @@ export const REVIEW_MEMORY_AGGREGATION_SCOPE_STATUSES = [
 export type ReviewMemoryAggregationScopeStatus =
   (typeof REVIEW_MEMORY_AGGREGATION_SCOPE_STATUSES)[number];
 
-export const REVIEW_MEMORY_AGGREGATION_RUN_TRIGGERS = ['manual', 'backfill'] as const;
-export type ReviewMemoryAggregationRunTrigger =
-  (typeof REVIEW_MEMORY_AGGREGATION_RUN_TRIGGERS)[number];
-
-export const REVIEW_MEMORY_AGGREGATION_RUN_STATUSES = [
-  'running',
-  'completed',
-  'failed',
-  'skipped',
-] as const;
-export type ReviewMemoryAggregationRunStatus =
-  (typeof REVIEW_MEMORY_AGGREGATION_RUN_STATUSES)[number];
-
 export const REVIEW_MEMORY_PROPOSAL_SCOPE_KINDS = [
   'repository',
   'path_glob',
@@ -1512,9 +1490,3 @@ export const REVIEW_MEMORY_PROPOSAL_STATUSES = [
   'superseded',
 ] as const;
 export type ReviewMemoryProposalStatus = (typeof REVIEW_MEMORY_PROPOSAL_STATUSES)[number];
-
-export const REVIEW_MEMORY_CHANGE_REQUEST_TYPES = ['github_pr', 'gitlab_mr'] as const;
-export type ReviewMemoryChangeRequestType = (typeof REVIEW_MEMORY_CHANGE_REQUEST_TYPES)[number];
-
-export const REVIEW_MEMORY_EVIDENCE_ROLES = ['primary', 'supporting', 'contradictory'] as const;
-export type ReviewMemoryEvidenceRole = (typeof REVIEW_MEMORY_EVIDENCE_ROLES)[number];

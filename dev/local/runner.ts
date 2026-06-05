@@ -92,7 +92,7 @@ export function buildStartCommand(serviceName: string): string {
   // would try to descend into <dir>/<dir> which doesn't exist.
   if (svc.dir !== '.' && svc.command[0] === 'pnpm') {
     const [, ...rest] = svc.command;
-    return `pnpm --filter {./${svc.dir}} ${rest.join(' ')}`;
+    return `${getPnpmCommand()} --filter {./${svc.dir}} ${rest.join(' ')}`;
   }
 
   const parts: string[] = [];
@@ -100,6 +100,21 @@ export function buildStartCommand(serviceName: string): string {
   parts.push(svc.command.join(' '));
 
   return parts.join(' && ');
+}
+
+function getPnpmCommand(): string {
+  const pnpmHome = process.env.PNPM_HOME;
+  if (pnpmHome) {
+    const pnpmPath = path.join(pnpmHome, 'pnpm');
+    if (fs.existsSync(pnpmPath)) return shellQuote(pnpmPath);
+  }
+
+  const npmExecPath = process.env.npm_execpath;
+  if (npmExecPath && npmExecPath.includes('pnpm')) {
+    return `node ${shellQuote(npmExecPath)}`;
+  }
+
+  return 'pnpm';
 }
 
 // ---------------------------------------------------------------------------

@@ -71,7 +71,7 @@ import type { OrganizationPlan, BillingCycle } from '@/lib/organizations/organiz
 import { isSeatLineItem } from '@/lib/organizations/stripe-seat-line-items';
 import { successResult } from '@/lib/maybe-result';
 import { observeStripeEarlyFraudWarningCreated } from '@/lib/stripe/early-fraud-warning';
-import { logStripeDisputeSyncError, observeStripeDisputeCreated } from '@/lib/stripe/disputes';
+import { observeStripeDisputeCreated } from '@/lib/stripe/disputes';
 
 type KiloClawChargeContext = {
   chargeId: string;
@@ -762,39 +762,22 @@ async function syncStripeDisputeCaseFromWebhook(params: {
 }): Promise<{ chargeId: string | undefined; disputeCharge: DisputeChargeWithInvoice | null }> {
   const chargeId = stripeReferenceId(params.dispute.charge);
 
-  try {
+  if (!chargeId) {
     await observeStripeDisputeCreated({
       eventId: params.eventId,
       eventCreated: params.eventCreated,
       dispute: params.dispute,
     });
-  } catch (error) {
-    logStripeDisputeSyncError(error, {
-      stripe_event_id: params.eventId,
-      stripe_dispute_id: params.dispute.id,
-      stripe_charge_id: chargeId,
-    });
-  }
-
-  if (!chargeId) {
     return { chargeId, disputeCharge: null };
   }
 
   const disputeCharge = await client.charges.retrieve(chargeId, { expand: ['invoice'] });
-  try {
-    await observeStripeDisputeCreated({
-      eventId: params.eventId,
-      eventCreated: params.eventCreated,
-      dispute: params.dispute,
-      preFetchedCharge: disputeCharge,
-    });
-  } catch (error) {
-    logStripeDisputeSyncError(error, {
-      stripe_event_id: params.eventId,
-      stripe_dispute_id: params.dispute.id,
-      stripe_charge_id: chargeId,
-    });
-  }
+  await observeStripeDisputeCreated({
+    eventId: params.eventId,
+    eventCreated: params.eventCreated,
+    dispute: params.dispute,
+    preFetchedCharge: disputeCharge,
+  });
 
   return { chargeId, disputeCharge };
 }

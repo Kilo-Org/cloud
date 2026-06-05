@@ -40,7 +40,6 @@ import { workerInstanceId } from '@/lib/kiloclaw/instance-registry';
 import { KiloClawInternalClient } from '@/lib/kiloclaw/kiloclaw-internal-client';
 import { client } from '@/lib/stripe-client';
 import { fromMicrodollars } from '@/lib/utils';
-import { sentryLogger } from '@/lib/utils.server';
 import { revokeWebSessions } from '@/lib/web-session-revocation';
 
 type StripeReference = string | { id: string } | null | undefined;
@@ -275,6 +274,7 @@ async function upsertDisputeCase(
             StripeDisputeCaseStatus.Accepted,
             StripeDisputeCaseStatus.AcceptanceFailed,
             StripeDisputeCaseStatus.EnforcementFailed,
+            StripeDisputeCaseStatus.Closed,
           ])
         )
       )
@@ -527,7 +527,6 @@ async function blockUserForAcceptedDispute(params: {
   return {
     status: StripeDisputeActionStatus.Completed,
     resultCode: didBlock ? 'blocked' : 'already_blocked',
-    resultReferenceId: userId,
   };
 }
 
@@ -876,22 +875,22 @@ async function enforcePersonalDisputeCase(params: {
   }> = [
     {
       actionType: StripeDisputeActionType.UserBlock,
-      targetKey: `user:${userId}`,
+      targetKey: 'personal_owner',
       run: () => blockUserForAcceptedDispute(params),
     },
     {
       actionType: StripeDisputeActionType.AutoTopUpDisable,
-      targetKey: `auto_top_up:user:${userId}`,
+      targetKey: 'personal_auto_top_up',
       run: () => disableAutoTopUpForAcceptedDispute({ caseRow: params.caseRow }),
     },
     {
       actionType: StripeDisputeActionType.SubscriptionCancellation,
-      targetKey: `kilo_pass:user:${userId}`,
+      targetKey: 'personal_kilo_pass',
       run: () => cancelKiloPassForAcceptedDispute(params),
     },
     {
       actionType: StripeDisputeActionType.CreditBalanceReset,
-      targetKey: `credits:user:${userId}`,
+      targetKey: 'personal_credits',
       run: () => resetUserCreditBalanceForAcceptedDispute({ caseRow: params.caseRow }),
     },
   ];
@@ -1130,6 +1129,24 @@ export async function acceptStripeDisputeCase(params: {
     throw new Error('Dispute case does not have exactly one matched owner');
   }
 
+  if (
+    (caseRow.owner_classification === StripeDisputeOwnerClassification.Personal &&
+      !caseRow.kilo_user_id) ||
+    (caseRow.owner_classification === StripeDisputeOwnerClassification.Organization &&
+      !caseRow.organization_id)
+  ) {
+    await db
+      .update(stripe_dispute_cases)
+      .set({
+        status: StripeDisputeCaseStatus.ReviewRequired,
+        review_required_at: new Date().toISOString(),
+        failure_context: 'Accept requires the matched owner link to still exist',
+        next_retry_at: null,
+      })
+      .where(eq(stripe_dispute_cases.id, caseRow.id));
+    throw new Error('Dispute case owner link is missing');
+  }
+
   try {
     await closeStripeDispute(caseRow);
   } catch (error) {
@@ -1176,11 +1193,4 @@ export async function acceptStripeDisputeCase(params: {
 
 export function stripeDisputeDashboardUrl(stripeDisputeId: string): string {
   return `https://dashboard.stripe.com/disputes/${encodeURIComponent(stripeDisputeId)}`;
-}
-
-export function logStripeDisputeSyncError(error: unknown, context: Record<string, unknown>): void {
-  sentryLogger('stripe', 'warning')('Stripe dispute case persistence failed', {
-    ...context,
-    error: error instanceof Error ? error.message : String(error),
-  });
 }

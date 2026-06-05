@@ -521,7 +521,8 @@ function renderLinkedAccount(row: DisputeRow) {
 
 function canAccept(row: DisputeRow): boolean {
   const ownerCanBeAccepted =
-    row.ownerClassification === 'personal' || row.ownerClassification === 'organization';
+    (row.ownerClassification === 'personal' && row.user !== null) ||
+    (row.ownerClassification === 'organization' && row.organization !== null);
   if (!ownerCanBeAccepted) {
     return false;
   }

@@ -1985,6 +1985,14 @@ describe('User', () => {
         result_code: 'lost',
         result_reference_id: 'dp_deleted_user',
       });
+      await db.insert(stripe_dispute_actions).values({
+        case_id: disputeCase.id,
+        action_type: 'user_block',
+        target_key: `user:${user.id}`,
+        status: 'completed',
+        result_code: 'blocked',
+        result_reference_id: user.id,
+      });
 
       await softDeleteUser(user.id);
 
@@ -2001,8 +2009,21 @@ describe('User', () => {
         .select()
         .from(stripe_dispute_actions)
         .where(eq(stripe_dispute_actions.case_id, disputeCase.id));
-      expect(retainedActions).toHaveLength(1);
-      expect(retainedActions[0].result_reference_id).toBe('dp_deleted_user');
+      expect(retainedActions).toHaveLength(2);
+      expect(retainedActions).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            action_type: 'stripe_acceptance',
+            target_key: 'stripe_dispute:dp_deleted_user',
+            result_reference_id: 'dp_deleted_user',
+          }),
+          expect.objectContaining({
+            action_type: 'user_block',
+            target_key: 'user:deleted_user',
+            result_reference_id: null,
+          }),
+        ])
+      );
 
       const unaffectedCaseRows = await db
         .select()

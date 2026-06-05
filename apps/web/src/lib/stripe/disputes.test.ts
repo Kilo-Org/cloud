@@ -40,7 +40,7 @@ jest.mock('@/lib/web-session-revocation', () => ({
 
 type AnyMock = ReturnType<typeof jest.fn>;
 
-const { acceptStripeDisputeCase } =
+const { acceptStripeDisputeCase, observeStripeDisputeCreated } =
   jest.requireActual<typeof StripeDisputesModule>('@/lib/stripe/disputes');
 const stripeClientMock = jest.requireMock('@/lib/stripe-client') as {
   client: { disputes: { close: AnyMock } };
@@ -276,5 +276,98 @@ describe('acceptStripeDisputeCase', () => {
       'Dispute case is not actionable'
     );
     expect(closeDisputeMock).not.toHaveBeenCalled();
+  });
+
+  it('does not close Stripe when a personal case has lost its user link', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const [caseRow] = await db
+      .insert(stripe_dispute_cases)
+      .values({
+        stripe_dispute_id: 'dp_missing_user_link',
+        stripe_event_id: 'evt_missing_user_link',
+        owner_classification: StripeDisputeOwnerClassification.Personal,
+        status: StripeDisputeCaseStatus.NeedsAction,
+        status_reason: 'Canonical personal owner matched; admin action required',
+      })
+      .returning({ id: stripe_dispute_cases.id });
+
+    await expect(acceptStripeDisputeCase({ caseId: caseRow.id, actor: admin })).rejects.toThrow(
+      'Dispute case owner link is missing'
+    );
+    expect(closeDisputeMock).not.toHaveBeenCalled();
+
+    const [updatedCase] = await db
+      .select()
+      .from(stripe_dispute_cases)
+      .where(eq(stripe_dispute_cases.id, caseRow.id));
+    expect(updatedCase.status).toBe(StripeDisputeCaseStatus.ReviewRequired);
+  });
+});
+
+describe('observeStripeDisputeCreated', () => {
+  it('does not downgrade a terminal closed case after an older open observation', async () => {
+    const user = await insertTestUser({ stripe_customer_id: 'cus_closed_dispute_owner' });
+
+    await observeStripeDisputeCreated({
+      eventId: 'evt_dispute_closed',
+      eventCreated: 1_717_243_200,
+      dispute: {
+        id: 'dp_closed_no_reopen',
+        amount: 2900,
+        charge: 'ch_closed_no_reopen',
+        created: 1_717_243_200,
+        currency: 'usd',
+        evidence_details: {
+          due_by: null,
+          enhanced_eligibility: {},
+          has_evidence: false,
+          past_due: false,
+          submission_count: 0,
+        },
+        payment_intent: 'pi_closed_no_reopen',
+        reason: 'fraudulent',
+        status: 'lost',
+      },
+      preFetchedCharge: {
+        id: 'ch_closed_no_reopen',
+        customer: user.stripe_customer_id,
+        payment_intent: 'pi_closed_no_reopen',
+      } as Stripe.Charge,
+    });
+
+    await observeStripeDisputeCreated({
+      eventId: 'evt_dispute_created_older',
+      eventCreated: 1_717_243_100,
+      dispute: {
+        id: 'dp_closed_no_reopen',
+        amount: 2900,
+        charge: 'ch_closed_no_reopen',
+        created: 1_717_243_100,
+        currency: 'usd',
+        evidence_details: {
+          due_by: null,
+          enhanced_eligibility: {},
+          has_evidence: false,
+          past_due: false,
+          submission_count: 0,
+        },
+        payment_intent: 'pi_closed_no_reopen',
+        reason: 'fraudulent',
+        status: 'needs_response',
+      },
+      preFetchedCharge: {
+        id: 'ch_closed_no_reopen',
+        customer: user.stripe_customer_id,
+        payment_intent: 'pi_closed_no_reopen',
+      } as Stripe.Charge,
+    });
+
+    const [caseRow] = await db
+      .select()
+      .from(stripe_dispute_cases)
+      .where(eq(stripe_dispute_cases.stripe_dispute_id, 'dp_closed_no_reopen'));
+    expect(caseRow.status).toBe(StripeDisputeCaseStatus.Closed);
+    expect(caseRow.stripe_status).toBe('lost');
+    expect(caseRow.stripe_event_id).toBe('evt_dispute_closed');
   });
 });

@@ -78,6 +78,7 @@ import {
   github_branch_pull_requests,
   user_github_app_tokens,
   model_eval_ingestions,
+  stripe_dispute_actions,
   stripe_dispute_cases,
   stripe_early_fraud_warning_cases,
   coding_plan_availability_intents,
@@ -1309,6 +1310,24 @@ export async function softDeleteUser(userId: string) {
       .update(stripe_early_fraud_warning_cases)
       .set({ kilo_user_id: null })
       .where(eq(stripe_early_fraud_warning_cases.kilo_user_id, userId));
+    await tx.execute(sql`
+      UPDATE ${stripe_dispute_actions}
+      SET target_key = replace(${stripe_dispute_actions.target_key}, ${userId}, 'deleted_user'),
+          result_reference_id = CASE
+            WHEN ${stripe_dispute_actions.result_reference_id} = ${userId} THEN NULL
+            ELSE ${stripe_dispute_actions.result_reference_id}
+          END,
+          updated_at = now()
+      WHERE case_id IN (
+        SELECT id FROM ${stripe_dispute_cases}
+        WHERE kilo_user_id = ${userId}
+          OR accepted_by_kilo_user_id = ${userId}
+      )
+      AND (
+        position(${userId} in ${stripe_dispute_actions.target_key}) > 0
+        OR ${stripe_dispute_actions.result_reference_id} = ${userId}
+      )
+    `);
     await tx
       .update(stripe_dispute_cases)
       .set({ kilo_user_id: null })

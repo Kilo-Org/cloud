@@ -286,8 +286,10 @@ async function upsertDisputeCase(
         StripeDisputeCaseStatus.Closed,
       ])
     ),
-    sql`${stripe_dispute_cases.stripe_event_created_at} IS NULL
-      OR ${stripe_dispute_cases.stripe_event_created_at} <= ${values.eventCreatedAt}`
+    or(
+      isNull(stripe_dispute_cases.stripe_event_created_at),
+      sql`${stripe_dispute_cases.stripe_event_created_at} <= ${values.eventCreatedAt}`
+    )
   );
 
   await database.update(stripe_dispute_cases).set(caseValues).where(updateFilter);

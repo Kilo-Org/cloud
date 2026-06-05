@@ -771,7 +771,18 @@ async function syncStripeDisputeCaseFromWebhook(params: {
     return { chargeId, disputeCharge: null };
   }
 
-  const disputeCharge = await client.charges.retrieve(chargeId, { expand: ['invoice'] });
+  let disputeCharge: DisputeChargeWithInvoice;
+  try {
+    disputeCharge = await client.charges.retrieve(chargeId, { expand: ['invoice'] });
+  } catch (error) {
+    await observeStripeDisputeCreated({
+      eventId: params.eventId,
+      eventCreated: params.eventCreated,
+      dispute: params.dispute,
+    });
+    throw error;
+  }
+
   await observeStripeDisputeCreated({
     eventId: params.eventId,
     eventCreated: params.eventCreated,

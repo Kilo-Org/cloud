@@ -1449,6 +1449,49 @@ describe('processStripePaymentEventHook', () => {
     retrieveSpy.mockRestore();
   });
 
+  test('charge.dispute.created persists dispute case when charge enrichment fails', async () => {
+    await cleanupDbForTest();
+
+    const { client } = await import('@/lib/stripe-client');
+    const retrieveSpy = jest
+      .spyOn(client.charges, 'retrieve')
+      .mockRejectedValue(new Error('charge retrieve failed'));
+    const event: Stripe.Event = {
+      ...baseStripeEvent(),
+      id: 'evt_dispute_created_enrichment_failed',
+      data: {
+        object: sampleStripeDispute({
+          id: 'dp_created_enrichment_failed',
+          charge: 'ch_dispute_enrichment_failed',
+          payment_intent: 'pi_dispute_enrichment_failed',
+          status: 'needs_response',
+        }),
+        previous_attributes: {},
+      },
+      type: 'charge.dispute.created',
+    };
+
+    await expect(processStripePaymentEventHook(event)).rejects.toThrow('charge retrieve failed');
+
+    const [disputeCase] = await db.select().from(stripe_dispute_cases);
+    expect(disputeCase).toEqual(
+      expect.objectContaining({
+        stripe_dispute_id: 'dp_created_enrichment_failed',
+        stripe_event_id: 'evt_dispute_created_enrichment_failed',
+        stripe_charge_id: 'ch_dispute_enrichment_failed',
+        stripe_payment_intent_id: 'pi_dispute_enrichment_failed',
+        stripe_customer_id: null,
+        stripe_status: 'needs_response',
+        owner_classification: StripeDisputeOwnerClassification.Unmatched,
+        kilo_user_id: null,
+        organization_id: null,
+        status: StripeDisputeCaseStatus.ReviewRequired,
+      })
+    );
+
+    retrieveSpy.mockRestore();
+  });
+
   test('charge.dispute.closed updates an existing dispute case', async () => {
     await cleanupDbForTest();
     testUser = await insertTestUser();

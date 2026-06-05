@@ -913,16 +913,18 @@ async function enforcePersonalDisputeCase(params: {
   }
 
   const kiloClawSubscriptions = await db
-    .select()
+    .select({ subscription: kiloclaw_subscriptions })
     .from(kiloclaw_subscriptions)
+    .innerJoin(kiloclaw_instances, eq(kiloclaw_instances.id, kiloclaw_subscriptions.instance_id))
     .where(
       and(
         eq(kiloclaw_subscriptions.user_id, userId),
+        isNull(kiloclaw_instances.organization_id),
         isNull(kiloclaw_subscriptions.transferred_to_subscription_id),
         inArray(kiloclaw_subscriptions.status, ['active', 'past_due', 'unpaid', 'trialing'])
       )
     );
-  for (const subscription of kiloClawSubscriptions) {
+  for (const { subscription } of kiloClawSubscriptions) {
     actionRuns.push({
       actionType: StripeDisputeActionType.KiloClawSuspension,
       targetKey: `kiloclaw_subscription:${subscription.id}`,
@@ -956,22 +958,46 @@ async function cancelOrganizationSeatsForAcceptedDispute(params: {
   purchaseId: string;
   subscriptionStripeId: string;
 }): Promise<ActionOutcome> {
+  const organizationId = params.caseRow.organization_id;
+  if (!organizationId) {
+    return { status: StripeDisputeActionStatus.Skipped, resultCode: 'organization_missing' };
+  }
+
   await cancelStripeSubscriptionIfPresent(params.subscriptionStripeId);
   const now = new Date().toISOString();
-  const result = await db
-    .update(organization_seats_purchases)
-    .set({
-      subscription_status: 'ended',
-      expires_at: now,
-    })
-    .where(eq(organization_seats_purchases.id, params.purchaseId));
+  const updatedPurchase = await db.transaction(async tx => {
+    const [purchase] = await tx
+      .update(organization_seats_purchases)
+      .set({
+        seat_count: 0,
+        subscription_status: 'ended',
+        expires_at: now,
+      })
+      .where(
+        and(
+          eq(organization_seats_purchases.id, params.purchaseId),
+          eq(organization_seats_purchases.organization_id, organizationId)
+        )
+      )
+      .returning({ id: organization_seats_purchases.id });
+
+    if (!purchase) {
+      return null;
+    }
+
+    await tx
+      .update(organizations)
+      .set({ seat_count: 0 })
+      .where(eq(organizations.id, organizationId));
+
+    return purchase;
+  });
 
   return {
-    status:
-      (result.rowCount ?? 0) > 0
-        ? StripeDisputeActionStatus.Completed
-        : StripeDisputeActionStatus.Skipped,
-    resultCode: (result.rowCount ?? 0) > 0 ? 'ended' : 'purchase_missing',
+    status: updatedPurchase
+      ? StripeDisputeActionStatus.Completed
+      : StripeDisputeActionStatus.Skipped,
+    resultCode: updatedPurchase ? 'ended' : 'purchase_missing',
     resultReferenceId: params.purchaseId,
   };
 }

@@ -340,8 +340,22 @@ function normalizeChannel(channel: string): string {
   return channel.trim().toLowerCase();
 }
 
+// Resolve an accountId to the OpenClaw routing bucket: absent, blank, or the
+// literal "default" all map to the default account (null). Everything else
+// (including "*") is an explicit account scope.
+function normalizeAccountId(value: unknown): string | null {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const trimmed = value.trim();
+  if (trimmed === '' || trimmed.toLowerCase() === 'default') {
+    return null;
+  }
+  return trimmed;
+}
+
 // OpenClaw treats empty/whitespace strings, empty arrays, and empty objects as
-// "no constraint" — so a key only counts as advanced when it is effectively set.
+// "no constraint" — so a key only counts when it is effectively set.
 function isEffectivelyPresent(value: unknown): boolean {
   if (value === undefined || value === null) {
     return false;
@@ -361,9 +375,13 @@ function isEffectivelyPresent(value: unknown): boolean {
 type ClassifiedBinding = {
   agentId: string;
   channel: string;
-  // null = the OpenClaw default account (absent or blank accountId).
+  // null = the OpenClaw default account (absent, blank, or "default").
   accountId: string | null;
-  advanced: boolean;
+  isRoute: boolean;
+  // A match constraint that narrows which messages the binding captures.
+  hasAdvancedMatch: boolean;
+  // A behavior override (session/dmScope, acp) that does NOT narrow the match.
+  hasBehaviorOverride: boolean;
 };
 
 // Single source of truth for classifying a raw binding entry, used by both the
@@ -377,23 +395,34 @@ function classifyBinding(item: unknown): ClassifiedBinding | null {
   const binding = parsed.data;
   const bindingRecord = binding as Record<string, unknown>;
   const match = binding.match as Record<string, unknown>;
-  const accountIdTrimmed = typeof match.accountId === 'string' ? match.accountId.trim() : '';
-  const advanced =
-    (binding.type !== undefined && binding.type !== 'route') ||
-    ADVANCED_BINDING_KEYS.some(key => isEffectivelyPresent(bindingRecord[key])) ||
-    ADVANCED_MATCH_KEYS.some(key => isEffectivelyPresent(match[key]));
   return {
     agentId: normalizeAgentId(binding.agentId),
     channel: normalizeChannel(binding.match.channel),
-    accountId: accountIdTrimmed === '' ? null : accountIdTrimmed,
-    advanced,
+    accountId: normalizeAccountId(match.accountId),
+    isRoute: binding.type === undefined || binding.type === 'route',
+    hasAdvancedMatch: ADVANCED_MATCH_KEYS.some(key => isEffectivelyPresent(match[key])),
+    hasBehaviorOverride: ADVANCED_BINDING_KEYS.some(key =>
+      isEffectivelyPresent(bindingRecord[key])
+    ),
   };
 }
 
-// A binding the declarative channel-route set is allowed to add/remove: a simple
-// default-account route with no advanced overrides.
+// Surfaced `advanced` flag: anything beyond a plain channel(/account) route.
+function isAdvancedBinding(binding: ClassifiedBinding): boolean {
+  return !binding.isRoute || binding.hasAdvancedMatch || binding.hasBehaviorOverride;
+}
+
+// Occupies the default-account channel route slot — what conflict detection keys
+// on. A route with a session/acp override still matches the same default-account
+// traffic, so it conflicts even though it is NOT removable.
+function occupiesDefaultChannelRoute(binding: ClassifiedBinding): boolean {
+  return binding.isRoute && binding.accountId === null && !binding.hasAdvancedMatch;
+}
+
+// A binding the declarative set may add/remove: a fully-simple default-account
+// route with no behavior overrides.
 function isManagedDefaultRoute(binding: ClassifiedBinding): boolean {
-  return !binding.advanced && binding.accountId === null;
+  return occupiesDefaultChannelRoute(binding) && !binding.hasBehaviorOverride;
 }
 
 // Parse the top-level bindings array once and group summaries by normalized
@@ -414,7 +443,7 @@ function summarizeBindingsByAgent(config: OpenClawAgentConfig): Map<string, Agen
     summaries.push({
       channel: classified.channel,
       accountId: classified.accountId,
-      advanced: classified.advanced,
+      advanced: isAdvancedBinding(classified),
     });
     byAgent.set(classified.agentId, summaries);
   }
@@ -741,13 +770,15 @@ export async function updateAgentBindings(
       }
       const existing: unknown[] = Array.isArray(rawBindings) ? rawBindings : [];
 
-      // Reject any requested channel already routed (default account) to another agent.
+      // Reject any requested channel whose default-account route slot another
+      // agent already occupies — including routes with behavior overrides
+      // (session/acp) that we preserve but must not double-bind.
       for (const channel of desired) {
         const conflicted = existing.some(item => {
           const route = classifyBinding(item);
           return (
             route !== null &&
-            isManagedDefaultRoute(route) &&
+            occupiesDefaultChannelRoute(route) &&
             route.channel === channel &&
             route.agentId !== normalized
           );

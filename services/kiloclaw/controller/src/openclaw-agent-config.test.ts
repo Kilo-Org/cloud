@@ -535,6 +535,42 @@ describe('updateAgentBindings', () => {
     ).rejects.toMatchObject({ code: 'agent_binding_conflict', status: 409 });
   });
 
+  it('detects a conflict against an explicit accountId "default" route on another agent', async () => {
+    const configPath = await configFixture({
+      agents: { list: [{ id: 'research' }, { id: 'ops' }] },
+      bindings: [
+        { type: 'route', agentId: 'ops', match: { channel: 'slack', accountId: 'default' } },
+      ],
+    });
+
+    await expect(
+      updateAgentBindings('research', { channels: ['slack'] }, { configPath })
+    ).rejects.toMatchObject({ code: 'agent_binding_conflict', status: 409 });
+  });
+
+  it('conflicts with a session-only route on another agent while preserving it', async () => {
+    const configPath = await configFixture({
+      agents: { list: [{ id: 'research' }, { id: 'ops' }] },
+      bindings: [
+        {
+          type: 'route',
+          agentId: 'ops',
+          match: { channel: 'slack' },
+          session: { dmScope: 'isolated' },
+        },
+      ],
+    });
+
+    // A session override does not narrow the match, so the route still occupies
+    // the default-account slack slot → conflict (and it must stay intact).
+    await expect(
+      updateAgentBindings('research', { channels: ['slack'] }, { configPath })
+    ).rejects.toMatchObject({ code: 'agent_binding_conflict', status: 409 });
+    const remaining = (readAgentConfigSnapshot({ configPath }).config as { bindings: unknown[] })
+      .bindings;
+    expect(remaining).toHaveLength(1);
+  });
+
   it('fails closed when the bindings array is an unexpected shape', async () => {
     const configPath = await configFixture({
       agents: { list: [{ id: 'research' }] },

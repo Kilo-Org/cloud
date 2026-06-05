@@ -785,8 +785,7 @@ export class SoftDeletePreconditionError extends Error {
  * - Stripe link (stripe_customer_id unchanged)
  * - credit_transactions, microdollar_usage (billing records)
  * - kilo_pass_subscriptions/issuances/issuance_items (financial)
- * - kilo_pass_welcome_promo_payment_fingerprint_claims and kilo_pass_accepted_card_purchases
- *   (minimal retained payment anti-abuse evidence)
+ * - kilo_pass_welcome_promo_payment_fingerprint_claims (minimal retained payment anti-abuse evidence)
  * - cli_sessions, shared_cli_sessions, cli_sessions_v2 (session history)
  * - deployments, app_builder_projects (user assets)
  * - stytch_fingerprints (abuse detection)

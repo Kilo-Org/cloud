@@ -13,7 +13,6 @@ import {
   kilo_pass_issuances,
   kilo_pass_issuance_items,
   kilo_pass_welcome_promo_payment_fingerprint_claims,
-  kilo_pass_accepted_card_purchases,
   enrichment_data,
   referral_codes,
   referral_code_usages,
@@ -1775,34 +1774,6 @@ describe('User', () => {
       });
       expect(claim?.stripe_fingerprint).toBe(stripeFingerprint);
       expect(claim?.source_stripe_invoice_id).toBe(sourceStripeInvoiceId);
-    });
-
-    it('should retain accepted Kilo Pass card-purchase evidence unchanged', async () => {
-      const user = await insertTestUser();
-      const stripeInvoiceId = `in_deleted_user_accepted_${randomUUID()}`;
-      const stripeSubscriptionId = `sub_deleted_user_accepted_${randomUUID()}`;
-      const fingerprintDigest = 'b'.repeat(64);
-      const purchasedAt = '2026-06-05T12:00:00.000Z';
-      await db.insert(kilo_pass_accepted_card_purchases).values({
-        stripe_invoice_id: stripeInvoiceId,
-        stripe_subscription_id: stripeSubscriptionId,
-        kilo_user_id: user.id,
-        fingerprint_digest: fingerprintDigest,
-        purchased_at: purchasedAt,
-      });
-
-      await softDeleteUser(user.id);
-
-      const acceptedPurchase = await db.query.kilo_pass_accepted_card_purchases.findFirst({
-        where: eq(kilo_pass_accepted_card_purchases.stripe_invoice_id, stripeInvoiceId),
-      });
-      expect(acceptedPurchase).toMatchObject({
-        stripe_invoice_id: stripeInvoiceId,
-        stripe_subscription_id: stripeSubscriptionId,
-        kilo_user_id: user.id,
-        fingerprint_digest: fingerprintDigest,
-      });
-      expect(new Date(acceptedPurchase?.purchased_at ?? '').toISOString()).toBe(purchasedAt);
     });
 
     it('should cascade-delete agent environment profile MCPs and skills', async () => {

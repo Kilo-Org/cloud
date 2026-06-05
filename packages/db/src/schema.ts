@@ -1530,35 +1530,6 @@ export type KiloPassWelcomePromoPaymentFingerprintClaim =
 export type NewKiloPassWelcomePromoPaymentFingerprintClaim =
   typeof kilo_pass_welcome_promo_payment_fingerprint_claims.$inferInsert;
 
-export const kilo_pass_accepted_card_purchases = pgTable(
-  'kilo_pass_accepted_card_purchases',
-  {
-    stripe_invoice_id: text().primaryKey().notNull(),
-    stripe_subscription_id: text().notNull(),
-    kilo_user_id: text().notNull(),
-    fingerprint_digest: text().notNull(),
-    purchased_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
-    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-  },
-  table => [
-    unique('UQ_kilo_pass_accepted_card_purchases_stripe_subscription_id').on(
-      table.stripe_subscription_id
-    ),
-    index('IDX_kilo_pass_accepted_card_purchases_digest_purchase_invoice').on(
-      table.fingerprint_digest,
-      table.purchased_at,
-      table.stripe_invoice_id
-    ),
-    check(
-      'kilo_pass_accepted_card_purchases_digest_format_check',
-      sql`${table.fingerprint_digest} ~ '^[0-9a-f]{64}$'`
-    ),
-  ]
-);
-
-export type KiloPassAcceptedCardPurchase = typeof kilo_pass_accepted_card_purchases.$inferSelect;
-export type NewKiloPassAcceptedCardPurchase = typeof kilo_pass_accepted_card_purchases.$inferInsert;
-
 export const kilo_pass_pause_events = pgTable(
   'kilo_pass_pause_events',
   {

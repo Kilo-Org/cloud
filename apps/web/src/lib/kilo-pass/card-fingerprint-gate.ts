@@ -1,42 +1,79 @@
 import 'server-only';
 
 import {
-  kilo_pass_accepted_card_purchases,
+  kilo_pass_audit_log,
   kilo_pass_issuances,
   kilo_pass_subscriptions,
+  kilo_pass_welcome_promo_payment_fingerprint_claims,
   kilocode_users,
   transactional_email_log,
 } from '@kilocode/db/schema';
 import type { DrizzleTransaction } from '@/lib/drizzle';
 import { db } from '@/lib/drizzle';
 import { KiloPassError } from '@/lib/kilo-pass/errors';
+import {
+  KiloPassAuditLogAction,
+  KiloPassAuditLogResult,
+  KiloPassWelcomePromoEligibilityReason,
+  KiloPassWelcomePromoPaymentFingerprintType,
+} from '@/lib/kilo-pass/enums';
 import type {
   RefundableSettlementTarget,
   SettledInvoicePaymentResolution,
+  SupportedReusablePaymentMethodType,
 } from '@/lib/kilo-pass/stripe-handlers-utils';
-import { and, asc, eq, gt, isNotNull, lt, ne, or, sql } from 'drizzle-orm';
+import { and, eq, or, sql } from 'drizzle-orm';
 import type Stripe from 'stripe';
 import { captureException } from '@sentry/nextjs';
 import { sendKiloPassDuplicateCardCanceledEmail } from '@/lib/email';
 import { createHash } from 'node:crypto';
 
 const KILO_PASS_DUPLICATE_CARD_EMAIL_TYPE = 'kilo_pass_duplicate_card_canceled';
-const DUPLICATE_CARD_WINDOW_MS = 24 * 60 * 60 * 1000;
-const MAX_PROVIDER_CLOCK_SKEW_MS = 5 * 60 * 1000;
 
-export type DuplicateCardReplayAuthority = 'accepted' | 'fail_open' | null;
+export type MonthlyPaymentFingerprintClaimResult = {
+  welcomePromoReason: KiloPassWelcomePromoEligibilityReason;
+  cardClaim: {
+    ownership: 'current_invoice' | 'other_invoice';
+    sourceStripeInvoiceId: string;
+    claimedAt: string;
+    fingerprintDigest: string;
+    refundableTarget: RefundableSettlementTarget | null;
+  } | null;
+};
 
 export type DuplicateCardGateResult =
-  | { blocked: false; accepted: boolean }
+  | { blocked: false }
   | {
       blocked: true;
-      fingerprintDigest: string;
-      matchedKiloUserId: string;
-      matchedStripeSubscriptionId: string;
-      matchedStripeInvoiceId: string;
-      matchedPurchasedAt: string;
+      fingerprintDigest: string | null;
+      firstClaimSourceStripeInvoiceId: string | null;
+      firstClaimedAt: string | null;
+      matchedKiloUserId: string | null;
+      matchedStripeSubscriptionId: string | null;
       refundableTarget: RefundableSettlementTarget | null;
     };
+
+export type DuplicateCardReplayAuthority =
+  | { kind: 'none' }
+  | { kind: 'allowed'; issuanceId: string }
+  | { kind: 'blocked'; gateResult: Extract<DuplicateCardGateResult, { blocked: true }> };
+
+function getPaymentFingerprintType(
+  type: SupportedReusablePaymentMethodType
+): KiloPassWelcomePromoPaymentFingerprintType {
+  switch (type) {
+    case 'card':
+      return KiloPassWelcomePromoPaymentFingerprintType.Card;
+    case 'sepa_debit':
+      return KiloPassWelcomePromoPaymentFingerprintType.SepaDebit;
+    case 'us_bank_account':
+      return KiloPassWelcomePromoPaymentFingerprintType.UsBankAccount;
+    case 'bacs_debit':
+      return KiloPassWelcomePromoPaymentFingerprintType.BacsDebit;
+    case 'au_becs_debit':
+      return KiloPassWelcomePromoPaymentFingerprintType.AuBecsDebit;
+  }
+}
 
 function reportAttributionConflict(params: {
   stripeInvoiceId: string;
@@ -65,6 +102,15 @@ function reportAttributionConflict(params: {
   throw error;
 }
 
+function payloadString(payload: Record<string, unknown>, key: string): string | null {
+  const value = payload[key];
+  return typeof value === 'string' ? value : null;
+}
+
+export function digestCardFingerprint(fingerprint: string): string {
+  return createHash('sha256').update(fingerprint).digest('hex');
+}
+
 export async function acquireDuplicateCardSubscriptionLock(
   tx: DrizzleTransaction,
   stripeSubscriptionId: string
@@ -73,12 +119,95 @@ export async function acquireDuplicateCardSubscriptionLock(
   await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`);
 }
 
-async function acquireDuplicateCardDigestLock(
-  tx: DrizzleTransaction,
-  fingerprintDigest: string
-): Promise<void> {
-  const lockKey = `kilo-pass:duplicate-card:digest:${fingerprintDigest}`;
-  await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`);
+export async function claimMonthlyPaymentFingerprint(params: {
+  tx: DrizzleTransaction;
+  stripeInvoiceId: string;
+  settlement: SettledInvoicePaymentResolution;
+}): Promise<MonthlyPaymentFingerprintClaimResult> {
+  if (params.settlement.kind !== 'settled') {
+    return {
+      welcomePromoReason: KiloPassWelcomePromoEligibilityReason.SettlementUnresolved,
+      cardClaim: null,
+    };
+  }
+
+  const settledPaymentMethod = params.settlement.paymentMethod;
+  if (settledPaymentMethod.kind === 'without_supported_fingerprint') {
+    return {
+      welcomePromoReason: KiloPassWelcomePromoEligibilityReason.NoSupportedFingerprint,
+      cardClaim: null,
+    };
+  }
+  if (settledPaymentMethod.fingerprint === null) {
+    return {
+      welcomePromoReason: KiloPassWelcomePromoEligibilityReason.MissingFingerprint,
+      cardClaim: null,
+    };
+  }
+
+  const paymentFingerprintType = getPaymentFingerprintType(settledPaymentMethod.paymentMethodType);
+  const insertedClaims = await params.tx
+    .insert(kilo_pass_welcome_promo_payment_fingerprint_claims)
+    .values({
+      stripe_payment_method_type: paymentFingerprintType,
+      stripe_fingerprint: settledPaymentMethod.fingerprint,
+      source_stripe_invoice_id: params.stripeInvoiceId,
+    })
+    .onConflictDoNothing()
+    .returning({
+      sourceStripeInvoiceId:
+        kilo_pass_welcome_promo_payment_fingerprint_claims.source_stripe_invoice_id,
+      claimedAt: kilo_pass_welcome_promo_payment_fingerprint_claims.claimed_at,
+    });
+  const insertedClaim = insertedClaims[0];
+  const existingClaim = insertedClaim
+    ? null
+    : await params.tx.query.kilo_pass_welcome_promo_payment_fingerprint_claims.findFirst({
+        columns: { source_stripe_invoice_id: true, claimed_at: true },
+        where: and(
+          eq(
+            kilo_pass_welcome_promo_payment_fingerprint_claims.stripe_payment_method_type,
+            paymentFingerprintType
+          ),
+          eq(
+            kilo_pass_welcome_promo_payment_fingerprint_claims.stripe_fingerprint,
+            settledPaymentMethod.fingerprint
+          )
+        ),
+      });
+
+  const sourceStripeInvoiceId =
+    insertedClaim?.sourceStripeInvoiceId ?? existingClaim?.source_stripe_invoice_id;
+  const claimedAt = insertedClaim?.claimedAt ?? existingClaim?.claimed_at;
+  if (!sourceStripeInvoiceId || !claimedAt) {
+    const conflict = new KiloPassError('Kilo Pass fingerprint claim attribution conflict', {
+      stripe_invoice_id: params.stripeInvoiceId,
+    });
+    captureException(conflict, {
+      tags: { source: 'kilo_pass_duplicate_card_gate', stage: 'fingerprint_claim_conflict' },
+      extra: { stripeInvoiceId: params.stripeInvoiceId, paymentFingerprintType },
+    });
+    throw conflict;
+  }
+
+  const ownership =
+    sourceStripeInvoiceId === params.stripeInvoiceId ? 'current_invoice' : 'other_invoice';
+  return {
+    welcomePromoReason:
+      ownership === 'current_invoice'
+        ? KiloPassWelcomePromoEligibilityReason.FirstPaymentFingerprintClaim
+        : KiloPassWelcomePromoEligibilityReason.FingerprintPreviouslyClaimed,
+    cardClaim:
+      paymentFingerprintType === KiloPassWelcomePromoPaymentFingerprintType.Card
+        ? {
+            ownership,
+            sourceStripeInvoiceId,
+            claimedAt,
+            fingerprintDigest: digestCardFingerprint(settledPaymentMethod.fingerprint),
+            refundableTarget: params.settlement.refundableTarget,
+          }
+        : null,
+  };
 }
 
 export async function loadDuplicateCardReplayAuthority(params: {
@@ -87,234 +216,145 @@ export async function loadDuplicateCardReplayAuthority(params: {
   stripeSubscriptionId: string;
   kiloUserId: string;
 }): Promise<DuplicateCardReplayAuthority> {
-  const acceptedRecords = await params.tx
-    .select()
-    .from(kilo_pass_accepted_card_purchases)
-    .where(
-      or(
-        eq(kilo_pass_accepted_card_purchases.stripe_invoice_id, params.stripeInvoiceId),
-        eq(kilo_pass_accepted_card_purchases.stripe_subscription_id, params.stripeSubscriptionId)
-      )
-    );
-
-  for (const record of acceptedRecords) {
-    if (
-      record.stripe_invoice_id === params.stripeInvoiceId &&
-      record.stripe_subscription_id === params.stripeSubscriptionId &&
-      record.kilo_user_id === params.kiloUserId
-    ) {
-      return 'accepted';
-    }
-
-    reportAttributionConflict({
-      ...params,
-      conflictingStripeInvoiceId: record.stripe_invoice_id,
-      conflictingStripeSubscriptionId: record.stripe_subscription_id,
-      conflictingKiloUserId: record.kilo_user_id,
-    });
-  }
-
-  const issuanceByInvoice = await params.tx
+  const blockAudits = await params.tx
     .select({
-      stripeInvoiceId: kilo_pass_issuances.stripe_invoice_id,
-      stripeSubscriptionId: kilo_pass_subscriptions.stripe_subscription_id,
-      kiloUserId: kilo_pass_subscriptions.kilo_user_id,
+      stripeInvoiceId: kilo_pass_audit_log.stripe_invoice_id,
+      stripeSubscriptionId: kilo_pass_audit_log.stripe_subscription_id,
+      kiloUserId: kilo_pass_audit_log.kilo_user_id,
+      payload: kilo_pass_audit_log.payload_json,
     })
-    .from(kilo_pass_issuances)
-    .innerJoin(
-      kilo_pass_subscriptions,
-      eq(kilo_pass_subscriptions.id, kilo_pass_issuances.kilo_pass_subscription_id)
-    )
-    .where(eq(kilo_pass_issuances.stripe_invoice_id, params.stripeInvoiceId))
-    .limit(1);
-  const invoiceAuthority = issuanceByInvoice[0];
-  if (invoiceAuthority) {
-    if (
-      invoiceAuthority.stripeSubscriptionId === params.stripeSubscriptionId &&
-      invoiceAuthority.kiloUserId === params.kiloUserId
-    ) {
-      return 'fail_open';
-    }
-
-    reportAttributionConflict({
-      ...params,
-      conflictingStripeInvoiceId: invoiceAuthority.stripeInvoiceId,
-      conflictingStripeSubscriptionId: invoiceAuthority.stripeSubscriptionId,
-      conflictingKiloUserId: invoiceAuthority.kiloUserId,
-    });
-  }
-
-  const recordedSubscriptionInvoice = await params.tx
-    .select({
-      stripeInvoiceId: kilo_pass_issuances.stripe_invoice_id,
-      stripeSubscriptionId: kilo_pass_subscriptions.stripe_subscription_id,
-      kiloUserId: kilo_pass_subscriptions.kilo_user_id,
-    })
-    .from(kilo_pass_issuances)
-    .innerJoin(
-      kilo_pass_subscriptions,
-      eq(kilo_pass_subscriptions.id, kilo_pass_issuances.kilo_pass_subscription_id)
-    )
+    .from(kilo_pass_audit_log)
     .where(
       and(
-        eq(kilo_pass_subscriptions.stripe_subscription_id, params.stripeSubscriptionId),
-        isNotNull(kilo_pass_issuances.stripe_invoice_id)
+        eq(kilo_pass_audit_log.action, KiloPassAuditLogAction.DuplicateCardSubscriptionCanceled),
+        eq(kilo_pass_audit_log.result, KiloPassAuditLogResult.Success),
+        or(
+          eq(kilo_pass_audit_log.stripe_invoice_id, params.stripeInvoiceId),
+          eq(kilo_pass_audit_log.stripe_subscription_id, params.stripeSubscriptionId)
+        )
       )
-    )
-    .orderBy(asc(kilo_pass_issuances.created_at))
-    .limit(1);
-  const recordedInvoice = recordedSubscriptionInvoice[0];
-  if (recordedInvoice) {
-    reportAttributionConflict({
-      ...params,
-      conflictingStripeInvoiceId: recordedInvoice.stripeInvoiceId,
-      conflictingStripeSubscriptionId: recordedInvoice.stripeSubscriptionId,
-      conflictingKiloUserId: recordedInvoice.kiloUserId,
-    });
-  }
-
-  return null;
-}
-
-export function getDuplicateCardPurchaseTimestamp(invoice: Stripe.Invoice): string | null {
-  const timestampSeconds = invoice.status_transitions?.paid_at ?? invoice.created ?? null;
-  if (typeof timestampSeconds !== 'number' || !Number.isFinite(timestampSeconds)) return null;
-
-  const timestampMs = timestampSeconds * 1000;
-  if (!Number.isFinite(timestampMs)) return null;
-  if (timestampMs > Date.now() + MAX_PROVIDER_CLOCK_SKEW_MS) {
-    captureException(
-      new Error('Kilo Pass invoice purchase timestamp is implausibly in the future'),
-      {
-        tags: { source: 'kilo_pass_duplicate_card_gate', stage: 'future_purchase_timestamp' },
-        extra: { stripeInvoiceId: invoice.id, purchaseTimestampSeconds: timestampSeconds },
-      }
     );
-    return null;
-  }
-
-  const purchasedAt = new Date(timestampMs);
-  return Number.isNaN(purchasedAt.getTime()) ? null : purchasedAt.toISOString();
-}
-
-export function digestCardFingerprint(fingerprint: string): string {
-  return createHash('sha256').update(fingerprint).digest('hex');
-}
-
-async function insertAcceptedPurchase(params: {
-  tx: DrizzleTransaction;
-  stripeInvoiceId: string;
-  stripeSubscriptionId: string;
-  kiloUserId: string;
-  fingerprintDigest: string;
-  purchasedAt: string;
-}): Promise<void> {
-  const inserted = await params.tx
-    .insert(kilo_pass_accepted_card_purchases)
-    .values({
-      stripe_invoice_id: params.stripeInvoiceId,
-      stripe_subscription_id: params.stripeSubscriptionId,
-      kilo_user_id: params.kiloUserId,
-      fingerprint_digest: params.fingerprintDigest,
-      purchased_at: params.purchasedAt,
+  const issuanceRecords = await params.tx
+    .select({
+      issuanceId: kilo_pass_issuances.id,
+      stripeInvoiceId: kilo_pass_issuances.stripe_invoice_id,
+      stripeSubscriptionId: kilo_pass_subscriptions.stripe_subscription_id,
+      kiloUserId: kilo_pass_subscriptions.kilo_user_id,
     })
-    .onConflictDoNothing()
-    .returning({ stripeInvoiceId: kilo_pass_accepted_card_purchases.stripe_invoice_id });
-  if (inserted.length > 0) return;
-
-  const conflicts = await params.tx
-    .select()
-    .from(kilo_pass_accepted_card_purchases)
+    .from(kilo_pass_issuances)
+    .innerJoin(
+      kilo_pass_subscriptions,
+      eq(kilo_pass_subscriptions.id, kilo_pass_issuances.kilo_pass_subscription_id)
+    )
     .where(
       or(
-        eq(kilo_pass_accepted_card_purchases.stripe_invoice_id, params.stripeInvoiceId),
-        eq(kilo_pass_accepted_card_purchases.stripe_subscription_id, params.stripeSubscriptionId)
+        eq(kilo_pass_issuances.stripe_invoice_id, params.stripeInvoiceId),
+        eq(kilo_pass_subscriptions.stripe_subscription_id, params.stripeSubscriptionId)
       )
     );
-  const exactReplay = conflicts.find(
-    record =>
-      record.stripe_invoice_id === params.stripeInvoiceId &&
-      record.stripe_subscription_id === params.stripeSubscriptionId &&
-      record.kilo_user_id === params.kiloUserId
-  );
-  if (exactReplay) return;
 
-  const conflict = conflicts[0];
-  reportAttributionConflict({
-    ...params,
-    conflictingStripeInvoiceId: conflict?.stripe_invoice_id,
-    conflictingStripeSubscriptionId: conflict?.stripe_subscription_id,
-    conflictingKiloUserId: conflict?.kilo_user_id,
-  });
+  for (const record of [...blockAudits, ...issuanceRecords]) {
+    if (
+      record.stripeInvoiceId !== params.stripeInvoiceId ||
+      record.stripeSubscriptionId !== params.stripeSubscriptionId ||
+      record.kiloUserId !== params.kiloUserId
+    ) {
+      reportAttributionConflict({
+        ...params,
+        conflictingStripeInvoiceId: record.stripeInvoiceId,
+        conflictingStripeSubscriptionId: record.stripeSubscriptionId,
+        conflictingKiloUserId: record.kiloUserId,
+      });
+    }
+  }
+
+  const blockAudit = blockAudits[0];
+  if (blockAudit) {
+    return {
+      kind: 'blocked',
+      gateResult: {
+        blocked: true,
+        fingerprintDigest: payloadString(blockAudit.payload, 'fingerprintDigest'),
+        firstClaimSourceStripeInvoiceId: payloadString(
+          blockAudit.payload,
+          'firstClaimSourceStripeInvoiceId'
+        ),
+        firstClaimedAt: payloadString(blockAudit.payload, 'firstClaimedAt'),
+        matchedKiloUserId: payloadString(blockAudit.payload, 'matchedKiloUserId'),
+        matchedStripeSubscriptionId: payloadString(
+          blockAudit.payload,
+          'matchedStripeSubscriptionId'
+        ),
+        refundableTarget: null,
+      },
+    };
+  }
+
+  const issuanceRecord = issuanceRecords[0];
+  return issuanceRecord
+    ? { kind: 'allowed', issuanceId: issuanceRecord.issuanceId }
+    : { kind: 'none' };
 }
 
 export async function checkDuplicateCardFingerprintGate(params: {
   tx: DrizzleTransaction;
-  invoice: Stripe.Invoice;
   kiloUserId: string;
-  stripeSubscriptionId: string;
-  getSettledPaymentResolution: () => Promise<SettledInvoicePaymentResolution>;
+  claimResult: MonthlyPaymentFingerprintClaimResult;
 }): Promise<DuplicateCardGateResult> {
-  const purchasedAt = getDuplicateCardPurchaseTimestamp(params.invoice);
-  if (purchasedAt === null) return { blocked: false, accepted: false };
+  const cardClaim = params.claimResult.cardClaim;
+  if (cardClaim === null || cardClaim.ownership === 'current_invoice') return { blocked: false };
 
-  const settlement = await params.getSettledPaymentResolution();
-  if (
-    settlement.kind !== 'settled' ||
-    settlement.paymentMethod.kind !== 'reusable' ||
-    settlement.paymentMethod.paymentMethodType !== 'card' ||
-    settlement.paymentMethod.fingerprint === null
-  ) {
-    return { blocked: false, accepted: false };
-  }
-
-  const fingerprintDigest = digestCardFingerprint(settlement.paymentMethod.fingerprint);
-  await acquireDuplicateCardDigestLock(params.tx, fingerprintDigest);
-
-  const windowStart = new Date(
-    new Date(purchasedAt).getTime() - DUPLICATE_CARD_WINDOW_MS
-  ).toISOString();
-  const windowEnd = new Date(
-    new Date(purchasedAt).getTime() + DUPLICATE_CARD_WINDOW_MS
-  ).toISOString();
-  const nearestMatches = await params.tx
-    .select()
-    .from(kilo_pass_accepted_card_purchases)
-    .where(
-      and(
-        eq(kilo_pass_accepted_card_purchases.fingerprint_digest, fingerprintDigest),
-        ne(kilo_pass_accepted_card_purchases.kilo_user_id, params.kiloUserId),
-        gt(kilo_pass_accepted_card_purchases.purchased_at, windowStart),
-        lt(kilo_pass_accepted_card_purchases.purchased_at, windowEnd)
+  const attributions = await params.tx
+    .select({
+      claimedAt: kilo_pass_welcome_promo_payment_fingerprint_claims.claimed_at,
+      withinCooldown: sql<boolean>`${kilo_pass_welcome_promo_payment_fingerprint_claims.claimed_at} > transaction_timestamp() - interval '24 hours'`,
+      kiloUserId: kilo_pass_subscriptions.kilo_user_id,
+      stripeSubscriptionId: kilo_pass_subscriptions.stripe_subscription_id,
+    })
+    .from(kilo_pass_welcome_promo_payment_fingerprint_claims)
+    .leftJoin(
+      kilo_pass_issuances,
+      eq(
+        kilo_pass_issuances.stripe_invoice_id,
+        kilo_pass_welcome_promo_payment_fingerprint_claims.source_stripe_invoice_id
       )
     )
-    .orderBy(
-      sql`ABS(EXTRACT(EPOCH FROM (${kilo_pass_accepted_card_purchases.purchased_at} - ${purchasedAt}::timestamptz)))`,
-      asc(kilo_pass_accepted_card_purchases.stripe_invoice_id)
+    .leftJoin(
+      kilo_pass_subscriptions,
+      eq(kilo_pass_subscriptions.id, kilo_pass_issuances.kilo_pass_subscription_id)
+    )
+    .where(
+      eq(
+        kilo_pass_welcome_promo_payment_fingerprint_claims.source_stripe_invoice_id,
+        cardClaim.sourceStripeInvoiceId
+      )
     )
     .limit(1);
-  const matchedPurchase = nearestMatches[0];
-  if (matchedPurchase) {
-    return {
-      blocked: true,
-      fingerprintDigest,
-      matchedKiloUserId: matchedPurchase.kilo_user_id,
-      matchedStripeSubscriptionId: matchedPurchase.stripe_subscription_id,
-      matchedStripeInvoiceId: matchedPurchase.stripe_invoice_id,
-      matchedPurchasedAt: matchedPurchase.purchased_at,
-      refundableTarget: settlement.refundableTarget,
-    };
+  const attribution = attributions[0];
+  if (!attribution?.kiloUserId || !attribution.stripeSubscriptionId) {
+    captureException(new Error('Kilo Pass first fingerprint claim has no user attribution'), {
+      tags: { source: 'kilo_pass_duplicate_card_gate', stage: 'missing_first_claim_attribution' },
+      extra: {
+        firstClaimSourceStripeInvoiceId: cardClaim.sourceStripeInvoiceId,
+        fingerprintDigest: cardClaim.fingerprintDigest,
+      },
+    });
+    return { blocked: false };
   }
 
-  await insertAcceptedPurchase({
-    tx: params.tx,
-    stripeInvoiceId: params.invoice.id,
-    stripeSubscriptionId: params.stripeSubscriptionId,
-    kiloUserId: params.kiloUserId,
-    fingerprintDigest,
-    purchasedAt,
-  });
-  return { blocked: false, accepted: true };
+  if (attribution.kiloUserId === params.kiloUserId || !attribution.withinCooldown) {
+    return { blocked: false };
+  }
+
+  return {
+    blocked: true,
+    fingerprintDigest: cardClaim.fingerprintDigest,
+    firstClaimSourceStripeInvoiceId: cardClaim.sourceStripeInvoiceId,
+    firstClaimedAt: attribution.claimedAt,
+    matchedKiloUserId: attribution.kiloUserId,
+    matchedStripeSubscriptionId: attribution.stripeSubscriptionId,
+    refundableTarget: cardClaim.refundableTarget,
+  };
 }
 
 export async function attemptDuplicateCardProviderEnforcement(params: {
@@ -329,7 +369,8 @@ export async function attemptDuplicateCardProviderEnforcement(params: {
     stripeSubscriptionId: params.stripeSubscriptionId,
     kiloUserId: params.kiloUserId,
     fingerprintDigest: params.gateResult.fingerprintDigest,
-    matchedStripeInvoiceId: params.gateResult.matchedStripeInvoiceId,
+    firstClaimSourceStripeInvoiceId: params.gateResult.firstClaimSourceStripeInvoiceId,
+    firstClaimedAt: params.gateResult.firstClaimedAt,
     matchedStripeSubscriptionId: params.gateResult.matchedStripeSubscriptionId,
     matchedKiloUserId: params.gateResult.matchedKiloUserId,
   };

@@ -2,39 +2,36 @@ import { beforeEach, describe, expect, jest, test } from '@jest/globals';
 
 import { cleanupDbForTest, db } from '@/lib/drizzle';
 import {
-  kilo_pass_accepted_card_purchases,
+  kilo_pass_audit_log,
   kilo_pass_issuances,
   kilo_pass_subscriptions,
+  kilo_pass_welcome_promo_payment_fingerprint_claims,
   transactional_email_log,
 } from '@kilocode/db/schema';
 import {
+  KiloPassAuditLogAction,
+  KiloPassAuditLogResult,
   KiloPassCadence,
   KiloPassIssuanceSource,
   KiloPassPaymentProvider,
   KiloPassTier,
+  KiloPassWelcomePromoEligibilityReason,
+  KiloPassWelcomePromoPaymentFingerprintType,
 } from '@/lib/kilo-pass/enums';
 import type { SettledInvoicePaymentResolution } from '@/lib/kilo-pass/stripe-handlers-utils';
 import { insertTestUser } from '@/tests/helpers/user.helper';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import type Stripe from 'stripe';
 import {
   acquireDuplicateCardSubscriptionLock,
   attemptDuplicateCardProviderEnforcement,
   checkDuplicateCardFingerprintGate,
+  claimMonthlyPaymentFingerprint,
   digestCardFingerprint,
   loadDuplicateCardReplayAuthority,
   maybeSendDuplicateCardCanceledEmail,
   type DuplicateCardGateResult,
 } from './card-fingerprint-gate';
-
-function makeInvoice(params: { id: string; purchasedAt: string }): Stripe.Invoice {
-  const timestampSeconds = Math.floor(new Date(params.purchasedAt).getTime() / 1000);
-  return {
-    id: params.id,
-    created: timestampSeconds,
-    status_transitions: { paid_at: timestampSeconds },
-  } as unknown as Stripe.Invoice;
-}
 
 function cardSettlement(
   fingerprint: string,
@@ -50,21 +47,60 @@ function cardSettlement(
   };
 }
 
-async function runGate(params: {
-  invoiceId: string;
-  stripeSubscriptionId: string;
+async function insertSubscriptionAttribution(params: {
   kiloUserId: string;
-  purchasedAt: string;
-  settlement: SettledInvoicePaymentResolution;
+  stripeSubscriptionId: string;
+  stripeInvoiceId: string;
+}): Promise<void> {
+  const [subscription] = await db
+    .insert(kilo_pass_subscriptions)
+    .values({
+      kilo_user_id: params.kiloUserId,
+      payment_provider: KiloPassPaymentProvider.Stripe,
+      provider_subscription_id: params.stripeSubscriptionId,
+      stripe_subscription_id: params.stripeSubscriptionId,
+      tier: KiloPassTier.Tier19,
+      cadence: KiloPassCadence.Monthly,
+      status: 'active',
+    })
+    .returning({ id: kilo_pass_subscriptions.id });
+  await db.insert(kilo_pass_issuances).values({
+    kilo_pass_subscription_id: subscription.id,
+    issue_month: '2026-06-01',
+    source: KiloPassIssuanceSource.StripeInvoice,
+    stripe_invoice_id: params.stripeInvoiceId,
+  });
+}
+
+async function insertFirstClaim(params: {
+  fingerprint: string;
+  kiloUserId: string;
+  stripeSubscriptionId: string;
+  stripeInvoiceId: string;
+}): Promise<void> {
+  await insertSubscriptionAttribution(params);
+  await db.insert(kilo_pass_welcome_promo_payment_fingerprint_claims).values({
+    stripe_payment_method_type: KiloPassWelcomePromoPaymentFingerprintType.Card,
+    stripe_fingerprint: params.fingerprint,
+    source_stripe_invoice_id: params.stripeInvoiceId,
+  });
+}
+
+async function evaluateExistingClaim(params: {
+  fingerprint: string;
+  candidateKiloUserId: string;
+  candidateStripeInvoiceId: string;
 }): Promise<DuplicateCardGateResult> {
   return await db.transaction(async tx => {
-    await acquireDuplicateCardSubscriptionLock(tx, params.stripeSubscriptionId);
+    const claimResult = await claimMonthlyPaymentFingerprint({
+      tx,
+      stripeInvoiceId: params.candidateStripeInvoiceId,
+      settlement: cardSettlement(params.fingerprint),
+    });
     return await checkDuplicateCardFingerprintGate({
       tx,
-      invoice: makeInvoice({ id: params.invoiceId, purchasedAt: params.purchasedAt }),
-      stripeSubscriptionId: params.stripeSubscriptionId,
-      kiloUserId: params.kiloUserId,
-      getSettledPaymentResolution: async () => params.settlement,
+      kiloUserId: params.candidateKiloUserId,
+      claimResult,
     });
   });
 }
@@ -73,271 +109,375 @@ beforeEach(async () => {
   await cleanupDbForTest();
 });
 
-describe('accepted-purchase duplicate-card arbitration', () => {
-  test('accepts exact-card purchases and stores only fingerprint digest', async () => {
-    const fingerprint = 'fp_transient_raw_value';
-    const result = await runGate({
-      invoiceId: 'in_first',
-      stripeSubscriptionId: 'sub_first',
-      kiloUserId: 'user_first',
-      purchasedAt: '2026-06-05T12:00:00.000Z',
-      settlement: cardSettlement(fingerprint),
+describe('first-fingerprint-claim cooldown', () => {
+  test('first exact-card claim is allowed and supplies welcome-promo decision', async () => {
+    const fingerprint = 'fp_first_claim';
+    const result = await db.transaction(async tx => {
+      const claimResult = await claimMonthlyPaymentFingerprint({
+        tx,
+        stripeInvoiceId: 'in_first_claim',
+        settlement: cardSettlement(fingerprint),
+      });
+      return {
+        claimResult,
+        gateResult: await checkDuplicateCardFingerprintGate({
+          tx,
+          kiloUserId: 'first_user',
+          claimResult,
+        }),
+      };
     });
 
-    expect(result).toEqual({ blocked: false, accepted: true });
-    const record = await db.query.kilo_pass_accepted_card_purchases.findFirst({
-      where: eq(kilo_pass_accepted_card_purchases.stripe_invoice_id, 'in_first'),
+    expect(result.gateResult).toEqual({ blocked: false });
+    expect(result.claimResult).toMatchObject({
+      welcomePromoReason: KiloPassWelcomePromoEligibilityReason.FirstPaymentFingerprintClaim,
+      cardClaim: {
+        ownership: 'current_invoice',
+        sourceStripeInvoiceId: 'in_first_claim',
+        fingerprintDigest: digestCardFingerprint(fingerprint),
+      },
     });
-    expect(record).toMatchObject({
-      stripe_subscription_id: 'sub_first',
-      kilo_user_id: 'user_first',
-      fingerprint_digest: digestCardFingerprint(fingerprint),
+    const claim = await db.query.kilo_pass_welcome_promo_payment_fingerprint_claims.findFirst({
+      where: eq(kilo_pass_welcome_promo_payment_fingerprint_claims.stripe_fingerprint, fingerprint),
     });
-    expect(new Date(record?.purchased_at ?? '').toISOString()).toBe('2026-06-05T12:00:00.000Z');
-    expect(JSON.stringify(record)).not.toContain(fingerprint);
+    expect(claim?.source_stripe_invoice_id).toBe('in_first_claim');
   });
 
-  test('allows same-user purchases and records newer evidence', async () => {
-    const settlement = cardSettlement('fp_same_user');
-    await runGate({
-      invoiceId: 'in_same_user_first',
+  test('allows same-user reuse without refreshing permanent claim', async () => {
+    const user = await insertTestUser();
+    await insertFirstClaim({
+      fingerprint: 'fp_same_user',
+      kiloUserId: user.id,
       stripeSubscriptionId: 'sub_same_user_first',
-      kiloUserId: 'same_user',
-      purchasedAt: '2026-06-05T12:00:00.000Z',
-      settlement,
+      stripeInvoiceId: 'in_same_user_first',
     });
-    const second = await runGate({
-      invoiceId: 'in_same_user_second',
-      stripeSubscriptionId: 'sub_same_user_second',
-      kiloUserId: 'same_user',
-      purchasedAt: '2026-06-05T12:01:00.000Z',
-      settlement,
+    const before = await db.query.kilo_pass_welcome_promo_payment_fingerprint_claims.findFirst({
+      where: eq(
+        kilo_pass_welcome_promo_payment_fingerprint_claims.stripe_fingerprint,
+        'fp_same_user'
+      ),
     });
 
-    expect(second).toEqual({ blocked: false, accepted: true });
-    const records = await db.select().from(kilo_pass_accepted_card_purchases);
-    expect(records).toHaveLength(2);
+    const result = await evaluateExistingClaim({
+      fingerprint: 'fp_same_user',
+      candidateKiloUserId: user.id,
+      candidateStripeInvoiceId: 'in_same_user_second',
+    });
+
+    expect(result).toEqual({ blocked: false });
+    const after = await db.query.kilo_pass_welcome_promo_payment_fingerprint_claims.findFirst({
+      where: eq(
+        kilo_pass_welcome_promo_payment_fingerprint_claims.stripe_fingerprint,
+        'fp_same_user'
+      ),
+    });
+    expect(after).toEqual(before);
   });
 
-  test('blocks different-user purchase less than 24 hours apart', async () => {
-    const settlement = cardSettlement('fp_cross_user');
-    await runGate({
-      invoiceId: 'in_winner',
-      stripeSubscriptionId: 'sub_winner',
-      kiloUserId: 'winner_user',
-      purchasedAt: '2026-06-04T12:00:00.000Z',
-      settlement,
-    });
-    const blocked = await runGate({
-      invoiceId: 'in_blocked',
-      stripeSubscriptionId: 'sub_blocked',
-      kiloUserId: 'blocked_user',
-      purchasedAt: '2026-06-05T11:59:59.000Z',
-      settlement,
+  test('blocks different-user reuse while first claim is under 24 hours old', async () => {
+    const firstUser = await insertTestUser();
+    const candidateUser = await insertTestUser();
+    await insertFirstClaim({
+      fingerprint: 'fp_cross_user',
+      kiloUserId: firstUser.id,
+      stripeSubscriptionId: 'sub_first_claimant',
+      stripeInvoiceId: 'in_first_claimant',
     });
 
-    expect(blocked).toMatchObject({
+    const result = await evaluateExistingClaim({
+      fingerprint: 'fp_cross_user',
+      candidateKiloUserId: candidateUser.id,
+      candidateStripeInvoiceId: 'in_candidate',
+    });
+
+    expect(result).toMatchObject({
       blocked: true,
       fingerprintDigest: digestCardFingerprint('fp_cross_user'),
-      matchedKiloUserId: 'winner_user',
-      matchedStripeSubscriptionId: 'sub_winner',
-      matchedStripeInvoiceId: 'in_winner',
+      firstClaimSourceStripeInvoiceId: 'in_first_claimant',
+      matchedKiloUserId: firstUser.id,
+      matchedStripeSubscriptionId: 'sub_first_claimant',
     });
-    expect(await db.select().from(kilo_pass_accepted_card_purchases)).toHaveLength(1);
   });
 
-  test('allows different-user purchase exactly 24 hours apart', async () => {
-    const settlement = cardSettlement('fp_boundary');
-    await runGate({
-      invoiceId: 'in_boundary_first',
-      stripeSubscriptionId: 'sub_boundary_first',
-      kiloUserId: 'boundary_user_first',
-      purchasedAt: '2026-06-04T12:00:00.000Z',
-      settlement,
-    });
-    const result = await runGate({
-      invoiceId: 'in_boundary_second',
-      stripeSubscriptionId: 'sub_boundary_second',
-      kiloUserId: 'boundary_user_second',
-      purchasedAt: '2026-06-05T12:00:00.000Z',
-      settlement,
+  test.each([
+    ['exactly 24 hours', sql`transaction_timestamp() - interval '24 hours'`],
+    ['more than 24 hours', sql`transaction_timestamp() - interval '25 hours'`],
+  ])('allows different-user reuse at %s without refreshing claim', async (_label, claimedAt) => {
+    const firstUser = await insertTestUser();
+    const candidateUser = await insertTestUser();
+    await insertFirstClaim({
+      fingerprint: 'fp_elapsed',
+      kiloUserId: firstUser.id,
+      stripeSubscriptionId: 'sub_elapsed_first',
+      stripeInvoiceId: 'in_elapsed_first',
     });
 
-    expect(result).toEqual({ blocked: false, accepted: true });
-    expect(await db.select().from(kilo_pass_accepted_card_purchases)).toHaveLength(2);
-  });
-
-  test('chooses nearest purchase then invoice ID as deterministic tiebreaker', async () => {
-    const fingerprintDigest = digestCardFingerprint('fp_nearest');
-    await db.insert(kilo_pass_accepted_card_purchases).values([
-      {
-        stripe_invoice_id: 'in_z_far',
-        stripe_subscription_id: 'sub_z_far',
-        kilo_user_id: 'user_z_far',
-        fingerprint_digest: fingerprintDigest,
-        purchased_at: '2026-06-05T10:00:00.000Z',
-      },
-      {
-        stripe_invoice_id: 'in_b_near',
-        stripe_subscription_id: 'sub_b_near',
-        kilo_user_id: 'user_b_near',
-        fingerprint_digest: fingerprintDigest,
-        purchased_at: '2026-06-05T11:59:00.000Z',
-      },
-      {
-        stripe_invoice_id: 'in_a_near',
-        stripe_subscription_id: 'sub_a_near',
-        kilo_user_id: 'user_a_near',
-        fingerprint_digest: fingerprintDigest,
-        purchased_at: '2026-06-05T12:01:00.000Z',
-      },
-    ]);
-
-    const result = await runGate({
-      invoiceId: 'in_candidate',
-      stripeSubscriptionId: 'sub_candidate',
-      kiloUserId: 'candidate_user',
-      purchasedAt: '2026-06-05T12:00:00.000Z',
-      settlement: cardSettlement('fp_nearest'),
-    });
-
-    expect(result).toMatchObject({ blocked: true, matchedStripeInvoiceId: 'in_a_near' });
-  });
-
-  test('fails open without history for unsupported evidence and future timestamps', async () => {
-    const futureTimestamp = new Date(Date.now() + 6 * 60 * 1000).toISOString();
-    const futureResolution = jest.fn(async () => cardSettlement('fp_future'));
-    const futureResult = await db.transaction(async tx => {
-      await acquireDuplicateCardSubscriptionLock(tx, 'sub_future');
-      return await checkDuplicateCardFingerprintGate({
+    const result = await db.transaction(async tx => {
+      await tx
+        .update(kilo_pass_welcome_promo_payment_fingerprint_claims)
+        .set({ claimed_at: claimedAt })
+        .where(
+          eq(kilo_pass_welcome_promo_payment_fingerprint_claims.stripe_fingerprint, 'fp_elapsed')
+        );
+      const claimResult = await claimMonthlyPaymentFingerprint({
         tx,
-        invoice: makeInvoice({ id: 'in_future', purchasedAt: futureTimestamp }),
-        stripeSubscriptionId: 'sub_future',
-        kiloUserId: 'user_future',
-        getSettledPaymentResolution: futureResolution,
+        stripeInvoiceId: 'in_elapsed_candidate',
+        settlement: cardSettlement('fp_elapsed'),
       });
-    });
-    const bankResult = await runGate({
-      invoiceId: 'in_bank',
-      stripeSubscriptionId: 'sub_bank',
-      kiloUserId: 'user_bank',
-      purchasedAt: '2026-06-05T12:00:00.000Z',
-      settlement: {
-        kind: 'settled',
-        paymentMethod: {
-          kind: 'reusable',
-          paymentMethodType: 'sepa_debit',
-          fingerprint: 'bank_fp',
-        },
-        refundableTarget: { kind: 'payment_intent', id: 'pi_bank' },
-      },
+      const gateResult = await checkDuplicateCardFingerprintGate({
+        tx,
+        kiloUserId: candidateUser.id,
+        claimResult,
+      });
+      return { claimResult, gateResult };
     });
 
-    expect(futureResult).toEqual({ blocked: false, accepted: false });
-    expect(futureResolution).not.toHaveBeenCalled();
-    expect(bankResult).toEqual({ blocked: false, accepted: false });
-    expect(await db.select().from(kilo_pass_accepted_card_purchases)).toHaveLength(0);
+    expect(result.gateResult).toEqual({ blocked: false });
+    expect(result.claimResult.welcomePromoReason).toBe(
+      KiloPassWelcomePromoEligibilityReason.FingerprintPreviouslyClaimed
+    );
+    const claim = await db.query.kilo_pass_welcome_promo_payment_fingerprint_claims.findFirst({
+      where: eq(
+        kilo_pass_welcome_promo_payment_fingerprint_claims.stripe_fingerprint,
+        'fp_elapsed'
+      ),
+    });
+    expect(claim?.source_stripe_invoice_id).toBe('in_elapsed_first');
   });
 
-  test('serializes concurrent cross-user purchases so one purchase wins', async () => {
-    const settlement = cardSettlement('fp_concurrent');
-    const results = await Promise.all([
-      runGate({
-        invoiceId: 'in_concurrent_a',
-        stripeSubscriptionId: 'sub_concurrent_a',
-        kiloUserId: 'user_concurrent_a',
-        purchasedAt: '2026-06-05T12:00:00.000Z',
-        settlement,
-      }),
-      runGate({
-        invoiceId: 'in_concurrent_b',
-        stripeSubscriptionId: 'sub_concurrent_b',
-        kiloUserId: 'user_concurrent_b',
-        purchasedAt: '2026-06-05T12:00:00.000Z',
-        settlement,
-      }),
+  test('fails open when first claim cannot be attributed through an issuance', async () => {
+    await db.insert(kilo_pass_welcome_promo_payment_fingerprint_claims).values({
+      stripe_payment_method_type: KiloPassWelcomePromoPaymentFingerprintType.Card,
+      stripe_fingerprint: 'fp_unattributed',
+      source_stripe_invoice_id: 'in_unattributed',
+    });
+
+    await expect(
+      evaluateExistingClaim({
+        fingerprint: 'fp_unattributed',
+        candidateKiloUserId: 'candidate_user',
+        candidateStripeInvoiceId: 'in_candidate',
+      })
+    ).resolves.toEqual({ blocked: false });
+  });
+
+  test('non-card claims retain welcome-promo behavior without cancellation enforcement', async () => {
+    const result = await db.transaction(async tx => {
+      const claimResult = await claimMonthlyPaymentFingerprint({
+        tx,
+        stripeInvoiceId: 'in_bank',
+        settlement: {
+          kind: 'settled',
+          paymentMethod: {
+            kind: 'reusable',
+            paymentMethodType: 'sepa_debit',
+            fingerprint: 'bank_fp',
+          },
+          refundableTarget: { kind: 'payment_intent', id: 'pi_bank' },
+        },
+      });
+      return {
+        claimResult,
+        gateResult: await checkDuplicateCardFingerprintGate({
+          tx,
+          kiloUserId: 'bank_user',
+          claimResult,
+        }),
+      };
+    });
+
+    expect(result.gateResult).toEqual({ blocked: false });
+    expect(result.claimResult).toEqual({
+      welcomePromoReason: KiloPassWelcomePromoEligibilityReason.FirstPaymentFingerprintClaim,
+      cardClaim: null,
+    });
+  });
+
+  test('serializes concurrent different-user claims so one first claimant wins', async () => {
+    const firstUser = await insertTestUser();
+    const secondUser = await insertTestUser();
+    const [firstSubscription, secondSubscription] = await Promise.all([
+      db
+        .insert(kilo_pass_subscriptions)
+        .values({
+          kilo_user_id: firstUser.id,
+          payment_provider: KiloPassPaymentProvider.Stripe,
+          provider_subscription_id: 'sub_concurrent_first',
+          stripe_subscription_id: 'sub_concurrent_first',
+          tier: KiloPassTier.Tier19,
+          cadence: KiloPassCadence.Monthly,
+          status: 'active',
+        })
+        .returning({ id: kilo_pass_subscriptions.id }),
+      db
+        .insert(kilo_pass_subscriptions)
+        .values({
+          kilo_user_id: secondUser.id,
+          payment_provider: KiloPassPaymentProvider.Stripe,
+          provider_subscription_id: 'sub_concurrent_second',
+          stripe_subscription_id: 'sub_concurrent_second',
+          tier: KiloPassTier.Tier19,
+          cadence: KiloPassCadence.Monthly,
+          status: 'active',
+        })
+        .returning({ id: kilo_pass_subscriptions.id }),
     ]);
+    const candidates = [
+      {
+        kiloUserId: firstUser.id,
+        subscriptionId: firstSubscription[0].id,
+        stripeSubscriptionId: 'sub_concurrent_first',
+        stripeInvoiceId: 'in_concurrent_first',
+      },
+      {
+        kiloUserId: secondUser.id,
+        subscriptionId: secondSubscription[0].id,
+        stripeSubscriptionId: 'sub_concurrent_second',
+        stripeInvoiceId: 'in_concurrent_second',
+      },
+    ];
+
+    const results = await Promise.all(
+      candidates.map(
+        async candidate =>
+          await db.transaction(async tx => {
+            await acquireDuplicateCardSubscriptionLock(tx, candidate.stripeSubscriptionId);
+            const claimResult = await claimMonthlyPaymentFingerprint({
+              tx,
+              stripeInvoiceId: candidate.stripeInvoiceId,
+              settlement: cardSettlement('fp_concurrent'),
+            });
+            const gateResult = await checkDuplicateCardFingerprintGate({
+              tx,
+              kiloUserId: candidate.kiloUserId,
+              claimResult,
+            });
+            if (!gateResult.blocked) {
+              await tx.insert(kilo_pass_issuances).values({
+                kilo_pass_subscription_id: candidate.subscriptionId,
+                issue_month: '2026-06-01',
+                source: KiloPassIssuanceSource.StripeInvoice,
+                stripe_invoice_id: candidate.stripeInvoiceId,
+              });
+            }
+            return gateResult;
+          })
+      )
+    );
 
     expect(results.filter(result => result.blocked)).toHaveLength(1);
-    expect(results.filter(result => !result.blocked && result.accepted)).toHaveLength(1);
-    expect(await db.select().from(kilo_pass_accepted_card_purchases)).toHaveLength(1);
+    expect(results.filter(result => !result.blocked)).toHaveLength(1);
+    expect(await db.select().from(kilo_pass_welcome_promo_payment_fingerprint_claims)).toHaveLength(
+      1
+    );
   });
 });
 
 describe('duplicate-card replay authority', () => {
-  test('accepts exact accepted-record replay without settlement re-resolution', async () => {
-    await db.insert(kilo_pass_accepted_card_purchases).values({
-      stripe_invoice_id: 'in_replay',
-      stripe_subscription_id: 'sub_replay',
-      kilo_user_id: 'user_replay',
-      fingerprint_digest: digestCardFingerprint('fp_replay'),
-      purchased_at: '2026-06-05T12:00:00.000Z',
-    });
-
-    const authority = await db.transaction(async tx => {
-      await acquireDuplicateCardSubscriptionLock(tx, 'sub_replay');
-      return await loadDuplicateCardReplayAuthority({
-        tx,
-        stripeInvoiceId: 'in_replay',
-        stripeSubscriptionId: 'sub_replay',
-        kiloUserId: 'user_replay',
-      });
-    });
-    expect(authority).toBe('accepted');
-  });
-
-  test('uses matching committed issuance as fail-open replay authority', async () => {
+  test('uses matching committed issuance as allowed replay authority', async () => {
     const user = await insertTestUser();
-    const [subscription] = await db
-      .insert(kilo_pass_subscriptions)
-      .values({
-        kilo_user_id: user.id,
-        payment_provider: KiloPassPaymentProvider.Stripe,
-        provider_subscription_id: 'sub_fail_open',
-        stripe_subscription_id: 'sub_fail_open',
-        tier: KiloPassTier.Tier19,
-        cadence: KiloPassCadence.Monthly,
-        status: 'active',
-      })
-      .returning({ id: kilo_pass_subscriptions.id });
-    await db.insert(kilo_pass_issuances).values({
-      kilo_pass_subscription_id: subscription.id,
-      issue_month: '2026-06-01',
-      source: KiloPassIssuanceSource.StripeInvoice,
-      stripe_invoice_id: 'in_fail_open',
+    await insertSubscriptionAttribution({
+      kiloUserId: user.id,
+      stripeSubscriptionId: 'sub_allowed_replay',
+      stripeInvoiceId: 'in_allowed_replay',
     });
 
-    const authority = await db.transaction(async tx => {
-      await acquireDuplicateCardSubscriptionLock(tx, 'sub_fail_open');
-      return await loadDuplicateCardReplayAuthority({
-        tx,
-        stripeInvoiceId: 'in_fail_open',
-        stripeSubscriptionId: 'sub_fail_open',
-        kiloUserId: user.id,
-      });
-    });
-    expect(authority).toBe('fail_open');
+    const authority = await db.transaction(
+      async tx =>
+        await loadDuplicateCardReplayAuthority({
+          tx,
+          stripeInvoiceId: 'in_allowed_replay',
+          stripeSubscriptionId: 'sub_allowed_replay',
+          kiloUserId: user.id,
+        })
+    );
+
+    expect(authority).toMatchObject({ kind: 'allowed' });
   });
 
-  test('throws on accepted-record attribution conflicts', async () => {
-    await db.insert(kilo_pass_accepted_card_purchases).values({
-      stripe_invoice_id: 'in_recorded',
-      stripe_subscription_id: 'sub_recorded',
-      kilo_user_id: 'recorded_user',
-      fingerprint_digest: digestCardFingerprint('fp_recorded'),
-      purchased_at: '2026-06-05T12:00:00.000Z',
+  test('uses successful duplicate-block audit as permanent blocked replay authority', async () => {
+    const user = await insertTestUser();
+    await db.insert(kilo_pass_audit_log).values({
+      action: KiloPassAuditLogAction.DuplicateCardSubscriptionCanceled,
+      result: KiloPassAuditLogResult.Success,
+      kilo_user_id: user.id,
+      stripe_invoice_id: 'in_blocked_replay',
+      stripe_subscription_id: 'sub_blocked_replay',
+      payload_json: {
+        fingerprintDigest: 'd'.repeat(64),
+        firstClaimSourceStripeInvoiceId: 'in_first_claim',
+        firstClaimedAt: '2026-06-01T00:00:00.000Z',
+        matchedKiloUserId: 'first_user',
+        matchedStripeSubscriptionId: 'sub_first_user',
+      },
+    });
+
+    const authority = await db.transaction(
+      async tx =>
+        await loadDuplicateCardReplayAuthority({
+          tx,
+          stripeInvoiceId: 'in_blocked_replay',
+          stripeSubscriptionId: 'sub_blocked_replay',
+          kiloUserId: user.id,
+        })
+    );
+
+    expect(authority).toMatchObject({
+      kind: 'blocked',
+      gateResult: {
+        blocked: true,
+        fingerprintDigest: 'd'.repeat(64),
+        firstClaimSourceStripeInvoiceId: 'in_first_claim',
+      },
+    });
+  });
+
+  test('blocked audit takes precedence over matching issuance', async () => {
+    const user = await insertTestUser();
+    await insertSubscriptionAttribution({
+      kiloUserId: user.id,
+      stripeSubscriptionId: 'sub_both_authorities',
+      stripeInvoiceId: 'in_both_authorities',
+    });
+    await db.insert(kilo_pass_audit_log).values({
+      action: KiloPassAuditLogAction.DuplicateCardSubscriptionCanceled,
+      result: KiloPassAuditLogResult.Success,
+      kilo_user_id: user.id,
+      stripe_invoice_id: 'in_both_authorities',
+      stripe_subscription_id: 'sub_both_authorities',
+    });
+
+    const authority = await db.transaction(
+      async tx =>
+        await loadDuplicateCardReplayAuthority({
+          tx,
+          stripeInvoiceId: 'in_both_authorities',
+          stripeSubscriptionId: 'sub_both_authorities',
+          kiloUserId: user.id,
+        })
+    );
+
+    expect(authority.kind).toBe('blocked');
+  });
+
+  test('throws when replay records share subscription with conflicting invoice attribution', async () => {
+    const user = await insertTestUser();
+    await insertSubscriptionAttribution({
+      kiloUserId: user.id,
+      stripeSubscriptionId: 'sub_conflict',
+      stripeInvoiceId: 'in_recorded',
     });
 
     await expect(
-      db.transaction(async tx => {
-        await acquireDuplicateCardSubscriptionLock(tx, 'sub_recorded');
-        return await loadDuplicateCardReplayAuthority({
-          tx,
-          stripeInvoiceId: 'in_conflict',
-          stripeSubscriptionId: 'sub_recorded',
-          kiloUserId: 'recorded_user',
-        });
-      })
+      db.transaction(
+        async tx =>
+          await loadDuplicateCardReplayAuthority({
+            tx,
+            stripeInvoiceId: 'in_conflict',
+            stripeSubscriptionId: 'sub_conflict',
+            kiloUserId: user.id,
+          })
+      )
     ).rejects.toThrow('replay attribution conflict');
   });
 });
@@ -346,10 +486,10 @@ describe('duplicate-card provider enforcement and email', () => {
   const gateResult: Extract<DuplicateCardGateResult, { blocked: true }> = {
     blocked: true,
     fingerprintDigest: 'c'.repeat(64),
+    firstClaimSourceStripeInvoiceId: 'in_first_claim',
+    firstClaimedAt: '2026-06-05T12:00:00.000Z',
     matchedKiloUserId: 'matched_user',
     matchedStripeSubscriptionId: 'sub_matched',
-    matchedStripeInvoiceId: 'in_matched',
-    matchedPurchasedAt: '2026-06-05T12:00:00.000Z',
     refundableTarget: { kind: 'charge', id: 'ch_exact' },
   };
 

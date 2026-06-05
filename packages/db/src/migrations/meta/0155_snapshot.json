@@ -1,5 +1,5 @@
 {
-  "id": "535e80bb-0e83-46eb-ad62-8c1a85d01357",
+  "id": "d40941dd-841f-4dda-9eed-2d1033586afa",
   "prevId": "0e5b90ef-1e99-40be-814c-b7a30f51804b",
   "version": "7",
   "dialect": "postgresql",
@@ -23081,6 +23081,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "stripe_event_created_at": {
+          "name": "stripe_event_created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
         "stripe_charge_id": {
           "name": "stripe_charge_id",
           "type": "text",
@@ -23186,6 +23192,12 @@
         },
         "acceptance_started_at": {
           "name": "acceptance_started_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "next_retry_at": {
+          "name": "next_retry_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false

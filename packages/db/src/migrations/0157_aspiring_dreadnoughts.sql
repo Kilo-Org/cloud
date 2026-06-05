@@ -1,1 +1,0 @@
-ALTER TABLE "stripe_dispute_cases" ADD COLUMN "stripe_event_created_at" timestamp with time zone;

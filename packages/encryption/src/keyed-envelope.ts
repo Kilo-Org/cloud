@@ -25,6 +25,7 @@ export type EnvelopePrivateKeySlot = {
 
 export type EnvelopePrivateKeySlots = {
   active: EnvelopePrivateKeySlot;
+  decrypt?: readonly EnvelopePrivateKeySlot[];
 };
 
 export function serializeKeyedEnvelope<Scheme extends string>(
@@ -111,8 +112,13 @@ export function decryptKeyedEnvelope<Scheme extends string>(
 }
 
 function selectPrivateKey(keyId: string, keys: EnvelopePrivateKeySlots): EnvelopePrivateKeySlot {
+  const decryptSlot = keys.decrypt?.find(slot => slot.keyId === keyId);
   if (keys.active.keyId === keyId) {
-    return keys.active;
+    if (keys.active.privateKeyPem) return keys.active;
+    return decryptSlot ?? keys.active;
+  }
+  if (decryptSlot) {
+    return decryptSlot;
   }
 
   throw new EncryptionFormatError(`Unknown keyed envelope key ID: ${keyId}`);

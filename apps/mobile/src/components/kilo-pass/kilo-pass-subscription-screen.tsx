@@ -1,4 +1,5 @@
 import * as Haptics from 'expo-haptics';
+import * as WebBrowser from 'expo-web-browser';
 import { useRouter } from 'expo-router';
 import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -7,7 +8,9 @@ import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { WEB_BASE_URL } from '@/lib/config';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { getKiloPassLegalLinks, KILO_PASS_LEGAL_DISCLOSURE } from '@/lib/kilo-pass/legal-links';
 import { ensureProfileAfterKiloPassPurchase } from '@/lib/kilo-pass/navigation';
 import { type AppStoreKiloPassProduct } from '@/lib/kilo-pass/store-products';
 import { useStoreKiloPassProducts } from '@/lib/kilo-pass/use-store-kilo-pass-products';
@@ -28,6 +31,7 @@ export function KiloPassSubscriptionScreen() {
   const productsQuery = useStoreKiloPassProducts();
   const purchase = useStoreKiloPassPurchase();
   const isRetryDisabled = purchase.isPending || productsQuery.isRefetching;
+  const [privacyPolicyLink, termsOfUseLink] = getKiloPassLegalLinks(WEB_BASE_URL);
   const handleProductPress = (product: AppStoreKiloPassProduct) => {
     void Haptics.selectionAsync();
     void purchase.purchase(product, {
@@ -102,6 +106,31 @@ export function KiloPassSubscriptionScreen() {
                 </View>
               </Pressable>
             ))}
+
+          <Text className="px-1 pt-1 text-xs leading-5 text-muted-foreground">
+            {KILO_PASS_LEGAL_DISCLOSURE}
+            {' By subscribing, you agree to the '}
+            <Text
+              accessibilityRole="link"
+              className="text-xs text-primary underline"
+              onPress={() => {
+                void WebBrowser.openBrowserAsync(termsOfUseLink.url);
+              }}
+            >
+              {termsOfUseLink.label}
+            </Text>
+            {' and acknowledge the '}
+            <Text
+              accessibilityRole="link"
+              className="text-xs text-primary underline"
+              onPress={() => {
+                void WebBrowser.openBrowserAsync(privacyPolicyLink.url);
+              }}
+            >
+              {privacyPolicyLink.label}
+            </Text>
+            .
+          </Text>
         </ScrollView>
 
         {purchase.isPending && (

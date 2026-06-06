@@ -119,6 +119,7 @@ import {
   type ParsedImpactReferralTouch,
 } from '@/lib/impact/referral-utils';
 import { redactStoreAccountLinkedJson } from '@/lib/kilo-pass/store-payload-redaction';
+import { revokeGatewayStateForUser } from '@/lib/mcp-gateway/lifecycle-service';
 
 const workos = new WorkOS(WORKOS_API_KEY);
 
@@ -910,6 +911,9 @@ export async function softDeleteUser(userId: string) {
       database: tx,
       normalizedEmail: user.normalized_email ?? user.google_user_email ?? null,
     });
+
+    // ── Gateway cleanup ───────────────────────────────────────────────────
+    await revokeGatewayStateForUser(tx, userId);
 
     // ── 1. Anonymize the user row ────────────────────────────────────────
     await tx

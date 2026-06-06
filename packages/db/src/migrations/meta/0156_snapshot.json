@@ -1,5 +1,5 @@
 {
-  "id": "a1f76a75-996a-40fc-806c-9197bbcce382",
+  "id": "e600f125-9593-4920-bd40-d8d07bbb9a55",
   "prevId": "d40941dd-841f-4dda-9eed-2d1033586afa",
   "version": "7",
   "dialect": "postgresql",
@@ -6224,1303 +6224,6 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.code_review_feedback_events": {
-      "name": "code_review_feedback_events",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "pg_catalog.gen_random_uuid()"
-        },
-        "owned_by_organization_id": {
-          "name": "owned_by_organization_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "owned_by_user_id": {
-          "name": "owned_by_user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "platform": {
-          "name": "platform",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "subject_id": {
-          "name": "subject_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "repo_full_name": {
-          "name": "repo_full_name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "platform_project_id": {
-          "name": "platform_project_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "pr_number": {
-          "name": "pr_number",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "signal_kind": {
-          "name": "signal_kind",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "sentiment": {
-          "name": "sentiment",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "strength": {
-          "name": "strength",
-          "type": "smallint",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 1
-        },
-        "dedupe_hash": {
-          "name": "dedupe_hash",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "evidence_excerpt": {
-          "name": "evidence_excerpt",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "aggregation_state": {
-          "name": "aggregation_state",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'fresh'"
-        },
-        "occurred_at": {
-          "name": "occurred_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "UQ_code_review_feedback_events_dedupe_hash": {
-          "name": "UQ_code_review_feedback_events_dedupe_hash",
-          "columns": [
-            {
-              "expression": "dedupe_hash",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "idx_code_review_feedback_events_owned_by_org_id": {
-          "name": "idx_code_review_feedback_events_owned_by_org_id",
-          "columns": [
-            {
-              "expression": "owned_by_organization_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "idx_code_review_feedback_events_owned_by_user_id": {
-          "name": "idx_code_review_feedback_events_owned_by_user_id",
-          "columns": [
-            {
-              "expression": "owned_by_user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "idx_code_review_feedback_events_platform_repo": {
-          "name": "idx_code_review_feedback_events_platform_repo",
-          "columns": [
-            {
-              "expression": "platform",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "repo_full_name",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "idx_code_review_feedback_events_subject_id": {
-          "name": "idx_code_review_feedback_events_subject_id",
-          "columns": [
-            {
-              "expression": "subject_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "idx_code_review_feedback_events_sentiment": {
-          "name": "idx_code_review_feedback_events_sentiment",
-          "columns": [
-            {
-              "expression": "sentiment",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "idx_code_review_feedback_events_signal_kind": {
-          "name": "idx_code_review_feedback_events_signal_kind",
-          "columns": [
-            {
-              "expression": "signal_kind",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "idx_code_review_feedback_events_aggregation_state": {
-          "name": "idx_code_review_feedback_events_aggregation_state",
-          "columns": [
-            {
-              "expression": "aggregation_state",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "idx_code_review_feedback_events_created_at": {
-          "name": "idx_code_review_feedback_events_created_at",
-          "columns": [
-            {
-              "expression": "created_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "code_review_feedback_events_owned_by_organization_id_organizations_id_fk": {
-          "name": "code_review_feedback_events_owned_by_organization_id_organizations_id_fk",
-          "tableFrom": "code_review_feedback_events",
-          "tableTo": "organizations",
-          "columnsFrom": [
-            "owned_by_organization_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "code_review_feedback_events_owned_by_user_id_kilocode_users_id_fk": {
-          "name": "code_review_feedback_events_owned_by_user_id_kilocode_users_id_fk",
-          "tableFrom": "code_review_feedback_events",
-          "tableTo": "kilocode_users",
-          "columnsFrom": [
-            "owned_by_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "code_review_feedback_events_subject_id_code_review_feedback_subjects_id_fk": {
-          "name": "code_review_feedback_events_subject_id_code_review_feedback_subjects_id_fk",
-          "tableFrom": "code_review_feedback_events",
-          "tableTo": "code_review_feedback_subjects",
-          "columnsFrom": [
-            "subject_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "code_review_feedback_events_owner_check": {
-          "name": "code_review_feedback_events_owner_check",
-          "value": "(\n        (\"code_review_feedback_events\".\"owned_by_user_id\" IS NOT NULL AND \"code_review_feedback_events\".\"owned_by_organization_id\" IS NULL) OR\n        (\"code_review_feedback_events\".\"owned_by_user_id\" IS NULL AND \"code_review_feedback_events\".\"owned_by_organization_id\" IS NOT NULL)\n      )"
-        },
-        "code_review_feedback_events_strength_check": {
-          "name": "code_review_feedback_events_strength_check",
-          "value": "\"code_review_feedback_events\".\"strength\" > 0"
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "public.code_review_feedback_subjects": {
-      "name": "code_review_feedback_subjects",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "pg_catalog.gen_random_uuid()"
-        },
-        "owned_by_organization_id": {
-          "name": "owned_by_organization_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "owned_by_user_id": {
-          "name": "owned_by_user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "platform": {
-          "name": "platform",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "subject_type": {
-          "name": "subject_type",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "external_id_hash": {
-          "name": "external_id_hash",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "external_thread_id_hash": {
-          "name": "external_thread_id_hash",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "repo_full_name": {
-          "name": "repo_full_name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "platform_project_id": {
-          "name": "platform_project_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "pr_number": {
-          "name": "pr_number",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "file_path": {
-          "name": "file_path",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "finding_title": {
-          "name": "finding_title",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "finding_fingerprint": {
-          "name": "finding_fingerprint",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "state": {
-          "name": "state",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'unknown'"
-        },
-        "first_seen_at": {
-          "name": "first_seen_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "last_seen_at": {
-          "name": "last_seen_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "UQ_code_review_feedback_subjects_org_platform_external": {
-          "name": "UQ_code_review_feedback_subjects_org_platform_external",
-          "columns": [
-            {
-              "expression": "owned_by_organization_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "platform",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "repo_full_name",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "subject_type",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "external_id_hash",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"code_review_feedback_subjects\".\"owned_by_organization_id\" is not null",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "UQ_code_review_feedback_subjects_user_platform_external": {
-          "name": "UQ_code_review_feedback_subjects_user_platform_external",
-          "columns": [
-            {
-              "expression": "owned_by_user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "platform",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "repo_full_name",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "subject_type",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "external_id_hash",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"code_review_feedback_subjects\".\"owned_by_user_id\" is not null",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "idx_code_review_feedback_subjects_owned_by_org_id": {
-          "name": "idx_code_review_feedback_subjects_owned_by_org_id",
-          "columns": [
-            {
-              "expression": "owned_by_organization_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "idx_code_review_feedback_subjects_owned_by_user_id": {
-          "name": "idx_code_review_feedback_subjects_owned_by_user_id",
-          "columns": [
-            {
-              "expression": "owned_by_user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "idx_code_review_feedback_subjects_platform_repo": {
-          "name": "idx_code_review_feedback_subjects_platform_repo",
-          "columns": [
-            {
-              "expression": "platform",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "repo_full_name",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "idx_code_review_feedback_subjects_pr": {
-          "name": "idx_code_review_feedback_subjects_pr",
-          "columns": [
-            {
-              "expression": "repo_full_name",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "pr_number",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "idx_code_review_feedback_subjects_fingerprint": {
-          "name": "idx_code_review_feedback_subjects_fingerprint",
-          "columns": [
-            {
-              "expression": "finding_fingerprint",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "idx_code_review_feedback_subjects_state": {
-          "name": "idx_code_review_feedback_subjects_state",
-          "columns": [
-            {
-              "expression": "state",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "idx_code_review_feedback_subjects_thread": {
-          "name": "idx_code_review_feedback_subjects_thread",
-          "columns": [
-            {
-              "expression": "external_thread_id_hash",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "idx_code_review_feedback_subjects_last_seen_at": {
-          "name": "idx_code_review_feedback_subjects_last_seen_at",
-          "columns": [
-            {
-              "expression": "last_seen_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "code_review_feedback_subjects_owned_by_organization_id_organizations_id_fk": {
-          "name": "code_review_feedback_subjects_owned_by_organization_id_organizations_id_fk",
-          "tableFrom": "code_review_feedback_subjects",
-          "tableTo": "organizations",
-          "columnsFrom": [
-            "owned_by_organization_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "code_review_feedback_subjects_owned_by_user_id_kilocode_users_id_fk": {
-          "name": "code_review_feedback_subjects_owned_by_user_id_kilocode_users_id_fk",
-          "tableFrom": "code_review_feedback_subjects",
-          "tableTo": "kilocode_users",
-          "columnsFrom": [
-            "owned_by_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "code_review_feedback_subjects_owner_check": {
-          "name": "code_review_feedback_subjects_owner_check",
-          "value": "(\n        (\"code_review_feedback_subjects\".\"owned_by_user_id\" IS NOT NULL AND \"code_review_feedback_subjects\".\"owned_by_organization_id\" IS NULL) OR\n        (\"code_review_feedback_subjects\".\"owned_by_user_id\" IS NULL AND \"code_review_feedback_subjects\".\"owned_by_organization_id\" IS NOT NULL)\n      )"
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "public.code_review_memory_aggregation_state": {
-      "name": "code_review_memory_aggregation_state",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "pg_catalog.gen_random_uuid()"
-        },
-        "owned_by_organization_id": {
-          "name": "owned_by_organization_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "owned_by_user_id": {
-          "name": "owned_by_user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "platform": {
-          "name": "platform",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "repo_full_name": {
-          "name": "repo_full_name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "platform_project_id": {
-          "name": "platform_project_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "fresh_event_count": {
-          "name": "fresh_event_count",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "fresh_weight": {
-          "name": "fresh_weight",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "fresh_distinct_subject_count": {
-          "name": "fresh_distinct_subject_count",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "fresh_distinct_pr_count": {
-          "name": "fresh_distinct_pr_count",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "next_eligible_at": {
-          "name": "next_eligible_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "status": {
-          "name": "status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'idle'"
-        },
-        "claimed_at": {
-          "name": "claimed_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "claim_token": {
-          "name": "claim_token",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "UQ_code_review_memory_aggregation_state_org_scope": {
-          "name": "UQ_code_review_memory_aggregation_state_org_scope",
-          "columns": [
-            {
-              "expression": "owned_by_organization_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "platform",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "repo_full_name",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"code_review_memory_aggregation_state\".\"owned_by_organization_id\" is not null",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "UQ_code_review_memory_aggregation_state_user_scope": {
-          "name": "UQ_code_review_memory_aggregation_state_user_scope",
-          "columns": [
-            {
-              "expression": "owned_by_user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "platform",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "repo_full_name",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"code_review_memory_aggregation_state\".\"owned_by_user_id\" is not null",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "idx_code_review_memory_aggregation_state_status": {
-          "name": "idx_code_review_memory_aggregation_state_status",
-          "columns": [
-            {
-              "expression": "status",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "idx_code_review_memory_aggregation_state_next_eligible_at": {
-          "name": "idx_code_review_memory_aggregation_state_next_eligible_at",
-          "columns": [
-            {
-              "expression": "next_eligible_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "idx_code_review_memory_aggregation_state_fresh_counts": {
-          "name": "idx_code_review_memory_aggregation_state_fresh_counts",
-          "columns": [
-            {
-              "expression": "fresh_event_count",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "fresh_weight",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "code_review_memory_aggregation_state_owned_by_organization_id_organizations_id_fk": {
-          "name": "code_review_memory_aggregation_state_owned_by_organization_id_organizations_id_fk",
-          "tableFrom": "code_review_memory_aggregation_state",
-          "tableTo": "organizations",
-          "columnsFrom": [
-            "owned_by_organization_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "code_review_memory_aggregation_state_owned_by_user_id_kilocode_users_id_fk": {
-          "name": "code_review_memory_aggregation_state_owned_by_user_id_kilocode_users_id_fk",
-          "tableFrom": "code_review_memory_aggregation_state",
-          "tableTo": "kilocode_users",
-          "columnsFrom": [
-            "owned_by_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "code_review_memory_aggregation_state_owner_check": {
-          "name": "code_review_memory_aggregation_state_owner_check",
-          "value": "(\n        (\"code_review_memory_aggregation_state\".\"owned_by_user_id\" IS NOT NULL AND \"code_review_memory_aggregation_state\".\"owned_by_organization_id\" IS NULL) OR\n        (\"code_review_memory_aggregation_state\".\"owned_by_user_id\" IS NULL AND \"code_review_memory_aggregation_state\".\"owned_by_organization_id\" IS NOT NULL)\n      )"
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "public.code_review_memory_proposals": {
-      "name": "code_review_memory_proposals",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "pg_catalog.gen_random_uuid()"
-        },
-        "owned_by_organization_id": {
-          "name": "owned_by_organization_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "owned_by_user_id": {
-          "name": "owned_by_user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "platform": {
-          "name": "platform",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "repo_full_name": {
-          "name": "repo_full_name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "platform_project_id": {
-          "name": "platform_project_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "scope_kind": {
-          "name": "scope_kind",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'repository'"
-        },
-        "scope_value": {
-          "name": "scope_value",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "proposal_type": {
-          "name": "proposal_type",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "status": {
-          "name": "status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'open'"
-        },
-        "title": {
-          "name": "title",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "rationale": {
-          "name": "rationale",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "proposed_markdown": {
-          "name": "proposed_markdown",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "dedupe_key": {
-          "name": "dedupe_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "llm_confidence": {
-          "name": "llm_confidence",
-          "type": "real",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "positive_count": {
-          "name": "positive_count",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "negative_count": {
-          "name": "negative_count",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "neutral_count": {
-          "name": "neutral_count",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "distinct_pr_count": {
-          "name": "distinct_pr_count",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "distinct_subject_count": {
-          "name": "distinct_subject_count",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "contradictory_count": {
-          "name": "contradictory_count",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "change_request_url": {
-          "name": "change_request_url",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "change_request_error_message": {
-          "name": "change_request_error_message",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "idx_code_review_memory_proposals_owned_by_org_id": {
-          "name": "idx_code_review_memory_proposals_owned_by_org_id",
-          "columns": [
-            {
-              "expression": "owned_by_organization_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "idx_code_review_memory_proposals_owned_by_user_id": {
-          "name": "idx_code_review_memory_proposals_owned_by_user_id",
-          "columns": [
-            {
-              "expression": "owned_by_user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "idx_code_review_memory_proposals_platform_repo_status": {
-          "name": "idx_code_review_memory_proposals_platform_repo_status",
-          "columns": [
-            {
-              "expression": "platform",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "repo_full_name",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "status",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "idx_code_review_memory_proposals_proposal_type": {
-          "name": "idx_code_review_memory_proposals_proposal_type",
-          "columns": [
-            {
-              "expression": "proposal_type",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "idx_code_review_memory_proposals_created_at": {
-          "name": "idx_code_review_memory_proposals_created_at",
-          "columns": [
-            {
-              "expression": "created_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "UQ_code_review_memory_proposals_org_active_dedupe": {
-          "name": "UQ_code_review_memory_proposals_org_active_dedupe",
-          "columns": [
-            {
-              "expression": "owned_by_organization_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "platform",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "repo_full_name",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "dedupe_key",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"code_review_memory_proposals\".\"owned_by_organization_id\" IS NOT NULL AND \"code_review_memory_proposals\".\"status\" IN ('open', 'edited', 'approved', 'opening_change_request', 'change_request_opened')",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "UQ_code_review_memory_proposals_user_active_dedupe": {
-          "name": "UQ_code_review_memory_proposals_user_active_dedupe",
-          "columns": [
-            {
-              "expression": "owned_by_user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "platform",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "repo_full_name",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "dedupe_key",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"code_review_memory_proposals\".\"owned_by_user_id\" IS NOT NULL AND \"code_review_memory_proposals\".\"status\" IN ('open', 'edited', 'approved', 'opening_change_request', 'change_request_opened')",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "code_review_memory_proposals_owned_by_organization_id_organizations_id_fk": {
-          "name": "code_review_memory_proposals_owned_by_organization_id_organizations_id_fk",
-          "tableFrom": "code_review_memory_proposals",
-          "tableTo": "organizations",
-          "columnsFrom": [
-            "owned_by_organization_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "code_review_memory_proposals_owned_by_user_id_kilocode_users_id_fk": {
-          "name": "code_review_memory_proposals_owned_by_user_id_kilocode_users_id_fk",
-          "tableFrom": "code_review_memory_proposals",
-          "tableTo": "kilocode_users",
-          "columnsFrom": [
-            "owned_by_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "code_review_memory_proposals_owner_check": {
-          "name": "code_review_memory_proposals_owner_check",
-          "value": "(\n        (\"code_review_memory_proposals\".\"owned_by_user_id\" IS NOT NULL AND \"code_review_memory_proposals\".\"owned_by_organization_id\" IS NULL) OR\n        (\"code_review_memory_proposals\".\"owned_by_user_id\" IS NULL AND \"code_review_memory_proposals\".\"owned_by_organization_id\" IS NOT NULL)\n      )"
-        }
-      },
       "isRLSEnabled": false
     },
     "public.coding_plan_availability_intents": {
@@ -17955,6 +16658,2527 @@
         "check_expires_at_future": {
           "name": "check_expires_at_future",
           "value": "\"magic_link_tokens\".\"expires_at\" > \"magic_link_tokens\".\"created_at\""
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.mcp_gateway_assignments": {
+      "name": "mcp_gateway_assignments",
+      "schema": "",
+      "columns": {
+        "assignment_id": {
+          "name": "assignment_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "config_id": {
+          "name": "config_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "kilo_user_id": {
+          "name": "kilo_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "assigned_by_kilo_user_id": {
+          "name": "assigned_by_kilo_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "single_user_slot": {
+          "name": "single_user_slot",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "revoked_at": {
+          "name": "revoked_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "UQ_mcp_gateway_assignments_active": {
+          "name": "UQ_mcp_gateway_assignments_active",
+          "columns": [
+            {
+              "expression": "config_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "kilo_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"mcp_gateway_assignments\".\"revoked_at\" is null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "UQ_mcp_gateway_assignments_single_user_slot": {
+          "name": "UQ_mcp_gateway_assignments_single_user_slot",
+          "columns": [
+            {
+              "expression": "config_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "single_user_slot",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"mcp_gateway_assignments\".\"revoked_at\" is null and \"mcp_gateway_assignments\".\"single_user_slot\" is not null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_mcp_gateway_assignments_config": {
+          "name": "IDX_mcp_gateway_assignments_config",
+          "columns": [
+            {
+              "expression": "config_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_mcp_gateway_assignments_user": {
+          "name": "IDX_mcp_gateway_assignments_user",
+          "columns": [
+            {
+              "expression": "kilo_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "mcp_gateway_assignments_config_id_mcp_gateway_configs_config_id_fk": {
+          "name": "mcp_gateway_assignments_config_id_mcp_gateway_configs_config_id_fk",
+          "tableFrom": "mcp_gateway_assignments",
+          "tableTo": "mcp_gateway_configs",
+          "columnsFrom": [
+            "config_id"
+          ],
+          "columnsTo": [
+            "config_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "mcp_gateway_assignments_kilo_user_id_kilocode_users_id_fk": {
+          "name": "mcp_gateway_assignments_kilo_user_id_kilocode_users_id_fk",
+          "tableFrom": "mcp_gateway_assignments",
+          "tableTo": "kilocode_users",
+          "columnsFrom": [
+            "kilo_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "mcp_gateway_assignments_assigned_by_kilo_user_id_kilocode_users_id_fk": {
+          "name": "mcp_gateway_assignments_assigned_by_kilo_user_id_kilocode_users_id_fk",
+          "tableFrom": "mcp_gateway_assignments",
+          "tableTo": "kilocode_users",
+          "columnsFrom": [
+            "assigned_by_kilo_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.mcp_gateway_audit_events": {
+      "name": "mcp_gateway_audit_events",
+      "schema": "",
+      "columns": {
+        "audit_event_id": {
+          "name": "audit_event_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "actor_kilo_user_id": {
+          "name": "actor_kilo_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "owner_scope": {
+          "name": "owner_scope",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "owner_id": {
+          "name": "owner_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "config_id": {
+          "name": "config_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "connect_resource_id": {
+          "name": "connect_resource_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "instance_id": {
+          "name": "instance_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "event_type": {
+          "name": "event_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "outcome": {
+          "name": "outcome",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "correlation_metadata": {
+          "name": "correlation_metadata",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "IDX_mcp_gateway_audit_events_config": {
+          "name": "IDX_mcp_gateway_audit_events_config",
+          "columns": [
+            {
+              "expression": "config_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_mcp_gateway_audit_events_owner": {
+          "name": "IDX_mcp_gateway_audit_events_owner",
+          "columns": [
+            {
+              "expression": "owner_scope",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "owner_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_mcp_gateway_audit_events_created_at": {
+          "name": "IDX_mcp_gateway_audit_events_created_at",
+          "columns": [
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "mcp_gateway_audit_events_actor_kilo_user_id_kilocode_users_id_fk": {
+          "name": "mcp_gateway_audit_events_actor_kilo_user_id_kilocode_users_id_fk",
+          "tableFrom": "mcp_gateway_audit_events",
+          "tableTo": "kilocode_users",
+          "columnsFrom": [
+            "actor_kilo_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "mcp_gateway_audit_events_config_id_mcp_gateway_configs_config_id_fk": {
+          "name": "mcp_gateway_audit_events_config_id_mcp_gateway_configs_config_id_fk",
+          "tableFrom": "mcp_gateway_audit_events",
+          "tableTo": "mcp_gateway_configs",
+          "columnsFrom": [
+            "config_id"
+          ],
+          "columnsTo": [
+            "config_id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "mcp_gateway_audit_events_connect_resource_id_mcp_gateway_connect_resources_connect_resource_id_fk": {
+          "name": "mcp_gateway_audit_events_connect_resource_id_mcp_gateway_connect_resources_connect_resource_id_fk",
+          "tableFrom": "mcp_gateway_audit_events",
+          "tableTo": "mcp_gateway_connect_resources",
+          "columnsFrom": [
+            "connect_resource_id"
+          ],
+          "columnsTo": [
+            "connect_resource_id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "mcp_gateway_audit_events_instance_id_mcp_gateway_connection_instances_instance_id_fk": {
+          "name": "mcp_gateway_audit_events_instance_id_mcp_gateway_connection_instances_instance_id_fk",
+          "tableFrom": "mcp_gateway_audit_events",
+          "tableTo": "mcp_gateway_connection_instances",
+          "columnsFrom": [
+            "instance_id"
+          ],
+          "columnsTo": [
+            "instance_id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "mcp_gateway_audit_events_owner_scope": {
+          "name": "mcp_gateway_audit_events_owner_scope",
+          "value": "\"mcp_gateway_audit_events\".\"owner_scope\" IN ('personal', 'organization')"
+        },
+        "mcp_gateway_audit_events_outcome": {
+          "name": "mcp_gateway_audit_events_outcome",
+          "value": "\"mcp_gateway_audit_events\".\"outcome\" IN ('success', 'failure', 'blocked')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.mcp_gateway_authorization_codes": {
+      "name": "mcp_gateway_authorization_codes",
+      "schema": "",
+      "columns": {
+        "authorization_code_id": {
+          "name": "authorization_code_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "code_hash": {
+          "name": "code_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "authorization_request_id": {
+          "name": "authorization_request_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "oauth_client_id": {
+          "name": "oauth_client_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "client_id": {
+          "name": "client_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "owner_scope": {
+          "name": "owner_scope",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "owner_id": {
+          "name": "owner_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "config_id": {
+          "name": "config_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "route_key": {
+          "name": "route_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "canonical_resource_url": {
+          "name": "canonical_resource_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "redirect_uri": {
+          "name": "redirect_uri",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "granted_scopes": {
+          "name": "granted_scopes",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "code_challenge": {
+          "name": "code_challenge",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "code_challenge_method": {
+          "name": "code_challenge_method",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'S256'"
+        },
+        "execution_context": {
+          "name": "execution_context",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "kilo_user_id": {
+          "name": "kilo_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "instance_id": {
+          "name": "instance_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "consumed_at": {
+          "name": "consumed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "UQ_mcp_gateway_authorization_codes_code_hash": {
+          "name": "UQ_mcp_gateway_authorization_codes_code_hash",
+          "columns": [
+            {
+              "expression": "code_hash",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_mcp_gateway_authorization_codes_expires_at": {
+          "name": "IDX_mcp_gateway_authorization_codes_expires_at",
+          "columns": [
+            {
+              "expression": "expires_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_mcp_gateway_authorization_codes_client": {
+          "name": "IDX_mcp_gateway_authorization_codes_client",
+          "columns": [
+            {
+              "expression": "oauth_client_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "mcp_gateway_authorization_codes_authorization_request_id_mcp_gateway_authorization_requests_authorization_request_id_fk": {
+          "name": "mcp_gateway_authorization_codes_authorization_request_id_mcp_gateway_authorization_requests_authorization_request_id_fk",
+          "tableFrom": "mcp_gateway_authorization_codes",
+          "tableTo": "mcp_gateway_authorization_requests",
+          "columnsFrom": [
+            "authorization_request_id"
+          ],
+          "columnsTo": [
+            "authorization_request_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "mcp_gateway_authorization_codes_oauth_client_id_mcp_gateway_oauth_clients_oauth_client_id_fk": {
+          "name": "mcp_gateway_authorization_codes_oauth_client_id_mcp_gateway_oauth_clients_oauth_client_id_fk",
+          "tableFrom": "mcp_gateway_authorization_codes",
+          "tableTo": "mcp_gateway_oauth_clients",
+          "columnsFrom": [
+            "oauth_client_id"
+          ],
+          "columnsTo": [
+            "oauth_client_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "mcp_gateway_authorization_codes_config_id_mcp_gateway_configs_config_id_fk": {
+          "name": "mcp_gateway_authorization_codes_config_id_mcp_gateway_configs_config_id_fk",
+          "tableFrom": "mcp_gateway_authorization_codes",
+          "tableTo": "mcp_gateway_configs",
+          "columnsFrom": [
+            "config_id"
+          ],
+          "columnsTo": [
+            "config_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "mcp_gateway_authorization_codes_kilo_user_id_kilocode_users_id_fk": {
+          "name": "mcp_gateway_authorization_codes_kilo_user_id_kilocode_users_id_fk",
+          "tableFrom": "mcp_gateway_authorization_codes",
+          "tableTo": "kilocode_users",
+          "columnsFrom": [
+            "kilo_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "mcp_gateway_authorization_codes_instance_id_mcp_gateway_connection_instances_instance_id_fk": {
+          "name": "mcp_gateway_authorization_codes_instance_id_mcp_gateway_connection_instances_instance_id_fk",
+          "tableFrom": "mcp_gateway_authorization_codes",
+          "tableTo": "mcp_gateway_connection_instances",
+          "columnsFrom": [
+            "instance_id"
+          ],
+          "columnsTo": [
+            "instance_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "mcp_gateway_authorization_codes_owner_scope": {
+          "name": "mcp_gateway_authorization_codes_owner_scope",
+          "value": "\"mcp_gateway_authorization_codes\".\"owner_scope\" IN ('personal', 'organization')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.mcp_gateway_authorization_requests": {
+      "name": "mcp_gateway_authorization_requests",
+      "schema": "",
+      "columns": {
+        "authorization_request_id": {
+          "name": "authorization_request_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "request_state_hash": {
+          "name": "request_state_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "oauth_client_id": {
+          "name": "oauth_client_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "client_id": {
+          "name": "client_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "owner_scope": {
+          "name": "owner_scope",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "owner_id": {
+          "name": "owner_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "config_id": {
+          "name": "config_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "route_key": {
+          "name": "route_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "canonical_resource_url": {
+          "name": "canonical_resource_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "redirect_uri": {
+          "name": "redirect_uri",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "requested_scopes": {
+          "name": "requested_scopes",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "granted_scopes": {
+          "name": "granted_scopes",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "oauth_state": {
+          "name": "oauth_state",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "code_challenge": {
+          "name": "code_challenge",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "code_challenge_method": {
+          "name": "code_challenge_method",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'S256'"
+        },
+        "execution_context": {
+          "name": "execution_context",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "kilo_user_id": {
+          "name": "kilo_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "instance_id": {
+          "name": "instance_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "request_status": {
+          "name": "request_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pending'"
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "consumed_at": {
+          "name": "consumed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "UQ_mcp_gateway_authorization_requests_state_hash": {
+          "name": "UQ_mcp_gateway_authorization_requests_state_hash",
+          "columns": [
+            {
+              "expression": "request_state_hash",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_mcp_gateway_authorization_requests_config": {
+          "name": "IDX_mcp_gateway_authorization_requests_config",
+          "columns": [
+            {
+              "expression": "config_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_mcp_gateway_authorization_requests_user": {
+          "name": "IDX_mcp_gateway_authorization_requests_user",
+          "columns": [
+            {
+              "expression": "kilo_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_mcp_gateway_authorization_requests_expires_at": {
+          "name": "IDX_mcp_gateway_authorization_requests_expires_at",
+          "columns": [
+            {
+              "expression": "expires_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "mcp_gateway_authorization_requests_oauth_client_id_mcp_gateway_oauth_clients_oauth_client_id_fk": {
+          "name": "mcp_gateway_authorization_requests_oauth_client_id_mcp_gateway_oauth_clients_oauth_client_id_fk",
+          "tableFrom": "mcp_gateway_authorization_requests",
+          "tableTo": "mcp_gateway_oauth_clients",
+          "columnsFrom": [
+            "oauth_client_id"
+          ],
+          "columnsTo": [
+            "oauth_client_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "mcp_gateway_authorization_requests_config_id_mcp_gateway_configs_config_id_fk": {
+          "name": "mcp_gateway_authorization_requests_config_id_mcp_gateway_configs_config_id_fk",
+          "tableFrom": "mcp_gateway_authorization_requests",
+          "tableTo": "mcp_gateway_configs",
+          "columnsFrom": [
+            "config_id"
+          ],
+          "columnsTo": [
+            "config_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "mcp_gateway_authorization_requests_kilo_user_id_kilocode_users_id_fk": {
+          "name": "mcp_gateway_authorization_requests_kilo_user_id_kilocode_users_id_fk",
+          "tableFrom": "mcp_gateway_authorization_requests",
+          "tableTo": "kilocode_users",
+          "columnsFrom": [
+            "kilo_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "mcp_gateway_authorization_requests_instance_id_mcp_gateway_connection_instances_instance_id_fk": {
+          "name": "mcp_gateway_authorization_requests_instance_id_mcp_gateway_connection_instances_instance_id_fk",
+          "tableFrom": "mcp_gateway_authorization_requests",
+          "tableTo": "mcp_gateway_connection_instances",
+          "columnsFrom": [
+            "instance_id"
+          ],
+          "columnsTo": [
+            "instance_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "mcp_gateway_authorization_requests_owner_scope": {
+          "name": "mcp_gateway_authorization_requests_owner_scope",
+          "value": "\"mcp_gateway_authorization_requests\".\"owner_scope\" IN ('personal', 'organization')"
+        },
+        "mcp_gateway_authorization_requests_status": {
+          "name": "mcp_gateway_authorization_requests_status",
+          "value": "\"mcp_gateway_authorization_requests\".\"request_status\" IN ('pending', 'completed', 'error')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.mcp_gateway_config_secrets": {
+      "name": "mcp_gateway_config_secrets",
+      "schema": "",
+      "columns": {
+        "config_secret_id": {
+          "name": "config_secret_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "config_id": {
+          "name": "config_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "secret_kind": {
+          "name": "secret_kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "encrypted_secret": {
+          "name": "encrypted_secret",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "secret_version": {
+          "name": "secret_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "revoked_at": {
+          "name": "revoked_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "UQ_mcp_gateway_config_secrets_active_kind": {
+          "name": "UQ_mcp_gateway_config_secrets_active_kind",
+          "columns": [
+            {
+              "expression": "config_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "secret_kind",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"mcp_gateway_config_secrets\".\"revoked_at\" is null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_mcp_gateway_config_secrets_config": {
+          "name": "IDX_mcp_gateway_config_secrets_config",
+          "columns": [
+            {
+              "expression": "config_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "mcp_gateway_config_secrets_config_id_mcp_gateway_configs_config_id_fk": {
+          "name": "mcp_gateway_config_secrets_config_id_mcp_gateway_configs_config_id_fk",
+          "tableFrom": "mcp_gateway_config_secrets",
+          "tableTo": "mcp_gateway_configs",
+          "columnsFrom": [
+            "config_id"
+          ],
+          "columnsTo": [
+            "config_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "mcp_gateway_config_secrets_version_positive": {
+          "name": "mcp_gateway_config_secrets_version_positive",
+          "value": "\"mcp_gateway_config_secrets\".\"secret_version\" > 0"
+        },
+        "mcp_gateway_config_secrets_kind": {
+          "name": "mcp_gateway_config_secrets_kind",
+          "value": "\"mcp_gateway_config_secrets\".\"secret_kind\" IN ('static_provider_credentials', 'dynamic_registration', 'static_headers')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.mcp_gateway_configs": {
+      "name": "mcp_gateway_configs",
+      "schema": "",
+      "columns": {
+        "config_id": {
+          "name": "config_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "owner_scope": {
+          "name": "owner_scope",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "owner_id": {
+          "name": "owner_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "remote_url": {
+          "name": "remote_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "auth_mode": {
+          "name": "auth_mode",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sharing_mode": {
+          "name": "sharing_mode",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "enabled": {
+          "name": "enabled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "path_passthrough": {
+          "name": "path_passthrough",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "config_version": {
+          "name": "config_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "discovered_provider_metadata": {
+          "name": "discovered_provider_metadata",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "registry_metadata": {
+          "name": "registry_metadata",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "auxiliary_headers": {
+          "name": "auxiliary_headers",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "created_by_kilo_user_id": {
+          "name": "created_by_kilo_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "IDX_mcp_gateway_configs_owner": {
+          "name": "IDX_mcp_gateway_configs_owner",
+          "columns": [
+            {
+              "expression": "owner_scope",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "owner_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_mcp_gateway_configs_enabled": {
+          "name": "IDX_mcp_gateway_configs_enabled",
+          "columns": [
+            {
+              "expression": "enabled",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_mcp_gateway_configs_remote_url": {
+          "name": "IDX_mcp_gateway_configs_remote_url",
+          "columns": [
+            {
+              "expression": "remote_url",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "mcp_gateway_configs_created_by_kilo_user_id_kilocode_users_id_fk": {
+          "name": "mcp_gateway_configs_created_by_kilo_user_id_kilocode_users_id_fk",
+          "tableFrom": "mcp_gateway_configs",
+          "tableTo": "kilocode_users",
+          "columnsFrom": [
+            "created_by_kilo_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "mcp_gateway_configs_name_not_empty": {
+          "name": "mcp_gateway_configs_name_not_empty",
+          "value": "length(trim(\"mcp_gateway_configs\".\"name\")) > 0"
+        },
+        "mcp_gateway_configs_config_version_positive": {
+          "name": "mcp_gateway_configs_config_version_positive",
+          "value": "\"mcp_gateway_configs\".\"config_version\" > 0"
+        },
+        "mcp_gateway_configs_personal_single_user": {
+          "name": "mcp_gateway_configs_personal_single_user",
+          "value": "\"mcp_gateway_configs\".\"owner_scope\" <> 'personal' OR \"mcp_gateway_configs\".\"sharing_mode\" = 'single_user'"
+        },
+        "mcp_gateway_configs_owner_scope": {
+          "name": "mcp_gateway_configs_owner_scope",
+          "value": "\"mcp_gateway_configs\".\"owner_scope\" IN ('personal', 'organization')"
+        },
+        "mcp_gateway_configs_auth_mode": {
+          "name": "mcp_gateway_configs_auth_mode",
+          "value": "\"mcp_gateway_configs\".\"auth_mode\" IN ('none', 'static_headers', 'oauth_dynamic', 'oauth_static')"
+        },
+        "mcp_gateway_configs_sharing_mode": {
+          "name": "mcp_gateway_configs_sharing_mode",
+          "value": "\"mcp_gateway_configs\".\"sharing_mode\" IN ('single_user', 'multi_user')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.mcp_gateway_connect_resources": {
+      "name": "mcp_gateway_connect_resources",
+      "schema": "",
+      "columns": {
+        "connect_resource_id": {
+          "name": "connect_resource_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "config_id": {
+          "name": "config_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "owner_scope": {
+          "name": "owner_scope",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "owner_id": {
+          "name": "owner_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "route_key": {
+          "name": "route_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "canonical_url": {
+          "name": "canonical_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "route_status": {
+          "name": "route_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'active'"
+        },
+        "route_version": {
+          "name": "route_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "rotated_at": {
+          "name": "rotated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "revoked_at": {
+          "name": "revoked_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "UQ_mcp_gateway_connect_resources_route_key": {
+          "name": "UQ_mcp_gateway_connect_resources_route_key",
+          "columns": [
+            {
+              "expression": "route_key",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "UQ_mcp_gateway_connect_resources_active_config": {
+          "name": "UQ_mcp_gateway_connect_resources_active_config",
+          "columns": [
+            {
+              "expression": "config_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"mcp_gateway_connect_resources\".\"route_status\" = 'active'",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_mcp_gateway_connect_resources_config": {
+          "name": "IDX_mcp_gateway_connect_resources_config",
+          "columns": [
+            {
+              "expression": "config_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_mcp_gateway_connect_resources_canonical_url": {
+          "name": "IDX_mcp_gateway_connect_resources_canonical_url",
+          "columns": [
+            {
+              "expression": "canonical_url",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "mcp_gateway_connect_resources_config_id_mcp_gateway_configs_config_id_fk": {
+          "name": "mcp_gateway_connect_resources_config_id_mcp_gateway_configs_config_id_fk",
+          "tableFrom": "mcp_gateway_connect_resources",
+          "tableTo": "mcp_gateway_configs",
+          "columnsFrom": [
+            "config_id"
+          ],
+          "columnsTo": [
+            "config_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "mcp_gateway_connect_resources_route_key_format": {
+          "name": "mcp_gateway_connect_resources_route_key_format",
+          "value": "\"mcp_gateway_connect_resources\".\"route_key\" ~ '^[A-Za-z0-9_-]{32,}$'"
+        },
+        "mcp_gateway_connect_resources_route_version_positive": {
+          "name": "mcp_gateway_connect_resources_route_version_positive",
+          "value": "\"mcp_gateway_connect_resources\".\"route_version\" > 0"
+        },
+        "mcp_gateway_connect_resources_owner_scope": {
+          "name": "mcp_gateway_connect_resources_owner_scope",
+          "value": "\"mcp_gateway_connect_resources\".\"owner_scope\" IN ('personal', 'organization')"
+        },
+        "mcp_gateway_connect_resources_route_status": {
+          "name": "mcp_gateway_connect_resources_route_status",
+          "value": "\"mcp_gateway_connect_resources\".\"route_status\" IN ('active', 'rotated', 'revoked')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.mcp_gateway_connection_instances": {
+      "name": "mcp_gateway_connection_instances",
+      "schema": "",
+      "columns": {
+        "instance_id": {
+          "name": "instance_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "config_id": {
+          "name": "config_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "owner_scope": {
+          "name": "owner_scope",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "owner_id": {
+          "name": "owner_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "kilo_user_id": {
+          "name": "kilo_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "instance_status": {
+          "name": "instance_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'active'"
+        },
+        "instance_version": {
+          "name": "instance_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "last_used_at": {
+          "name": "last_used_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "revoked_at": {
+          "name": "revoked_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "removed_at": {
+          "name": "removed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "UQ_mcp_gateway_connection_instances_non_terminal": {
+          "name": "UQ_mcp_gateway_connection_instances_non_terminal",
+          "columns": [
+            {
+              "expression": "owner_scope",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "owner_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "kilo_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "config_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"mcp_gateway_connection_instances\".\"instance_status\" IN ('active', 'needs_reauth')",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_mcp_gateway_connection_instances_config": {
+          "name": "IDX_mcp_gateway_connection_instances_config",
+          "columns": [
+            {
+              "expression": "config_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_mcp_gateway_connection_instances_user": {
+          "name": "IDX_mcp_gateway_connection_instances_user",
+          "columns": [
+            {
+              "expression": "kilo_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "mcp_gateway_connection_instances_config_id_mcp_gateway_configs_config_id_fk": {
+          "name": "mcp_gateway_connection_instances_config_id_mcp_gateway_configs_config_id_fk",
+          "tableFrom": "mcp_gateway_connection_instances",
+          "tableTo": "mcp_gateway_configs",
+          "columnsFrom": [
+            "config_id"
+          ],
+          "columnsTo": [
+            "config_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "mcp_gateway_connection_instances_kilo_user_id_kilocode_users_id_fk": {
+          "name": "mcp_gateway_connection_instances_kilo_user_id_kilocode_users_id_fk",
+          "tableFrom": "mcp_gateway_connection_instances",
+          "tableTo": "kilocode_users",
+          "columnsFrom": [
+            "kilo_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "mcp_gateway_connection_instances_version_positive": {
+          "name": "mcp_gateway_connection_instances_version_positive",
+          "value": "\"mcp_gateway_connection_instances\".\"instance_version\" > 0"
+        },
+        "mcp_gateway_connection_instances_owner_scope": {
+          "name": "mcp_gateway_connection_instances_owner_scope",
+          "value": "\"mcp_gateway_connection_instances\".\"owner_scope\" IN ('personal', 'organization')"
+        },
+        "mcp_gateway_connection_instances_status": {
+          "name": "mcp_gateway_connection_instances_status",
+          "value": "\"mcp_gateway_connection_instances\".\"instance_status\" IN ('active', 'needs_reauth', 'revoked', 'removed')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.mcp_gateway_oauth_clients": {
+      "name": "mcp_gateway_oauth_clients",
+      "schema": "",
+      "columns": {
+        "oauth_client_id": {
+          "name": "oauth_client_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "client_id": {
+          "name": "client_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "client_name": {
+          "name": "client_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "registration_token_hash": {
+          "name": "registration_token_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "client_secret_hash": {
+          "name": "client_secret_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "token_endpoint_auth_method": {
+          "name": "token_endpoint_auth_method",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "redirect_uris": {
+          "name": "redirect_uris",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "grant_types": {
+          "name": "grant_types",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "response_types": {
+          "name": "response_types",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "declared_scopes": {
+          "name": "declared_scopes",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "registration_access_token_expires_at": {
+          "name": "registration_access_token_expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "UQ_mcp_gateway_oauth_clients_client_id": {
+          "name": "UQ_mcp_gateway_oauth_clients_client_id",
+          "columns": [
+            {
+              "expression": "client_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "UQ_mcp_gateway_oauth_clients_registration_token_hash": {
+          "name": "UQ_mcp_gateway_oauth_clients_registration_token_hash",
+          "columns": [
+            {
+              "expression": "registration_token_hash",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_mcp_gateway_oauth_clients_deleted_at": {
+          "name": "IDX_mcp_gateway_oauth_clients_deleted_at",
+          "columns": [
+            {
+              "expression": "deleted_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "mcp_gateway_oauth_clients_client_id_format": {
+          "name": "mcp_gateway_oauth_clients_client_id_format",
+          "value": "\"mcp_gateway_oauth_clients\".\"client_id\" ~ '^[A-Za-z0-9._-]+:[A-Za-z0-9._-]+$'"
+        },
+        "mcp_gateway_oauth_clients_auth_method": {
+          "name": "mcp_gateway_oauth_clients_auth_method",
+          "value": "\"mcp_gateway_oauth_clients\".\"token_endpoint_auth_method\" IN ('none', 'client_secret_post', 'client_secret_basic')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.mcp_gateway_pending_provider_authorizations": {
+      "name": "mcp_gateway_pending_provider_authorizations",
+      "schema": "",
+      "columns": {
+        "pending_provider_authorization_id": {
+          "name": "pending_provider_authorization_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "state_hash": {
+          "name": "state_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "authorization_request_id": {
+          "name": "authorization_request_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "config_id": {
+          "name": "config_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "instance_id": {
+          "name": "instance_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "owner_scope": {
+          "name": "owner_scope",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "owner_id": {
+          "name": "owner_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "kilo_user_id": {
+          "name": "kilo_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "route_key": {
+          "name": "route_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "canonical_resource_url": {
+          "name": "canonical_resource_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "remote_url": {
+          "name": "remote_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "auth_mode": {
+          "name": "auth_mode",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "provider_authorization_endpoint": {
+          "name": "provider_authorization_endpoint",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "provider_token_endpoint": {
+          "name": "provider_token_endpoint",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "encrypted_state": {
+          "name": "encrypted_state",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "execution_context": {
+          "name": "execution_context",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "config_version": {
+          "name": "config_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pending_status": {
+          "name": "pending_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pending'"
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "consumed_at": {
+          "name": "consumed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "UQ_mcp_gateway_pending_provider_authorizations_state_hash": {
+          "name": "UQ_mcp_gateway_pending_provider_authorizations_state_hash",
+          "columns": [
+            {
+              "expression": "state_hash",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_mcp_gateway_pending_provider_authorizations_config": {
+          "name": "IDX_mcp_gateway_pending_provider_authorizations_config",
+          "columns": [
+            {
+              "expression": "config_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_mcp_gateway_pending_provider_authorizations_expires_at": {
+          "name": "IDX_mcp_gateway_pending_provider_authorizations_expires_at",
+          "columns": [
+            {
+              "expression": "expires_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "mcp_gateway_pending_provider_authorizations_authorization_request_id_mcp_gateway_authorization_requests_authorization_request_id_fk": {
+          "name": "mcp_gateway_pending_provider_authorizations_authorization_request_id_mcp_gateway_authorization_requests_authorization_request_id_fk",
+          "tableFrom": "mcp_gateway_pending_provider_authorizations",
+          "tableTo": "mcp_gateway_authorization_requests",
+          "columnsFrom": [
+            "authorization_request_id"
+          ],
+          "columnsTo": [
+            "authorization_request_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "mcp_gateway_pending_provider_authorizations_config_id_mcp_gateway_configs_config_id_fk": {
+          "name": "mcp_gateway_pending_provider_authorizations_config_id_mcp_gateway_configs_config_id_fk",
+          "tableFrom": "mcp_gateway_pending_provider_authorizations",
+          "tableTo": "mcp_gateway_configs",
+          "columnsFrom": [
+            "config_id"
+          ],
+          "columnsTo": [
+            "config_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "mcp_gateway_pending_provider_authorizations_instance_id_mcp_gateway_connection_instances_instance_id_fk": {
+          "name": "mcp_gateway_pending_provider_authorizations_instance_id_mcp_gateway_connection_instances_instance_id_fk",
+          "tableFrom": "mcp_gateway_pending_provider_authorizations",
+          "tableTo": "mcp_gateway_connection_instances",
+          "columnsFrom": [
+            "instance_id"
+          ],
+          "columnsTo": [
+            "instance_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "mcp_gateway_pending_provider_authorizations_kilo_user_id_kilocode_users_id_fk": {
+          "name": "mcp_gateway_pending_provider_authorizations_kilo_user_id_kilocode_users_id_fk",
+          "tableFrom": "mcp_gateway_pending_provider_authorizations",
+          "tableTo": "kilocode_users",
+          "columnsFrom": [
+            "kilo_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "mcp_gateway_pending_provider_authorizations_config_version_positive": {
+          "name": "mcp_gateway_pending_provider_authorizations_config_version_positive",
+          "value": "\"mcp_gateway_pending_provider_authorizations\".\"config_version\" > 0"
+        },
+        "mcp_gateway_pending_provider_authorizations_owner_scope": {
+          "name": "mcp_gateway_pending_provider_authorizations_owner_scope",
+          "value": "\"mcp_gateway_pending_provider_authorizations\".\"owner_scope\" IN ('personal', 'organization')"
+        },
+        "mcp_gateway_pending_provider_authorizations_auth_mode": {
+          "name": "mcp_gateway_pending_provider_authorizations_auth_mode",
+          "value": "\"mcp_gateway_pending_provider_authorizations\".\"auth_mode\" IN ('none', 'static_headers', 'oauth_dynamic', 'oauth_static')"
+        },
+        "mcp_gateway_pending_provider_authorizations_status": {
+          "name": "mcp_gateway_pending_provider_authorizations_status",
+          "value": "\"mcp_gateway_pending_provider_authorizations\".\"pending_status\" IN ('pending', 'completed', 'error')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.mcp_gateway_provider_grants": {
+      "name": "mcp_gateway_provider_grants",
+      "schema": "",
+      "columns": {
+        "provider_grant_id": {
+          "name": "provider_grant_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "instance_id": {
+          "name": "instance_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "encrypted_grant": {
+          "name": "encrypted_grant",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "provider_subject": {
+          "name": "provider_subject",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "grant_scope": {
+          "name": "grant_scope",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "grant_status": {
+          "name": "grant_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'active'"
+        },
+        "grant_version": {
+          "name": "grant_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "last_used_at": {
+          "name": "last_used_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "revoked_at": {
+          "name": "revoked_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "UQ_mcp_gateway_provider_grants_active_instance": {
+          "name": "UQ_mcp_gateway_provider_grants_active_instance",
+          "columns": [
+            {
+              "expression": "instance_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"mcp_gateway_provider_grants\".\"grant_status\" = 'active'",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_mcp_gateway_provider_grants_instance": {
+          "name": "IDX_mcp_gateway_provider_grants_instance",
+          "columns": [
+            {
+              "expression": "instance_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "mcp_gateway_provider_grants_instance_id_mcp_gateway_connection_instances_instance_id_fk": {
+          "name": "mcp_gateway_provider_grants_instance_id_mcp_gateway_connection_instances_instance_id_fk",
+          "tableFrom": "mcp_gateway_provider_grants",
+          "tableTo": "mcp_gateway_connection_instances",
+          "columnsFrom": [
+            "instance_id"
+          ],
+          "columnsTo": [
+            "instance_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "mcp_gateway_provider_grants_version_positive": {
+          "name": "mcp_gateway_provider_grants_version_positive",
+          "value": "\"mcp_gateway_provider_grants\".\"grant_version\" > 0"
+        },
+        "mcp_gateway_provider_grants_status": {
+          "name": "mcp_gateway_provider_grants_status",
+          "value": "\"mcp_gateway_provider_grants\".\"grant_status\" IN ('active', 'revoked')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.mcp_gateway_rate_limit_windows": {
+      "name": "mcp_gateway_rate_limit_windows",
+      "schema": "",
+      "columns": {
+        "rate_limit_window_id": {
+          "name": "rate_limit_window_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "ip_hash": {
+          "name": "ip_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "window_started_at": {
+          "name": "window_started_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "attempt_count": {
+          "name": "attempt_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "UQ_mcp_gateway_rate_limit_windows_ip_window": {
+          "name": "UQ_mcp_gateway_rate_limit_windows_ip_window",
+          "columns": [
+            {
+              "expression": "ip_hash",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "window_started_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_mcp_gateway_rate_limit_windows_window": {
+          "name": "IDX_mcp_gateway_rate_limit_windows_window",
+          "columns": [
+            {
+              "expression": "window_started_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "mcp_gateway_rate_limit_windows_attempt_count_non_negative": {
+          "name": "mcp_gateway_rate_limit_windows_attempt_count_non_negative",
+          "value": "\"mcp_gateway_rate_limit_windows\".\"attempt_count\" >= 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.mcp_gateway_refresh_tokens": {
+      "name": "mcp_gateway_refresh_tokens",
+      "schema": "",
+      "columns": {
+        "refresh_token_id": {
+          "name": "refresh_token_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "token_hash": {
+          "name": "token_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "rotated_from_refresh_token_id": {
+          "name": "rotated_from_refresh_token_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "oauth_client_id": {
+          "name": "oauth_client_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "client_id": {
+          "name": "client_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "owner_scope": {
+          "name": "owner_scope",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "owner_id": {
+          "name": "owner_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "config_id": {
+          "name": "config_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "route_key": {
+          "name": "route_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "canonical_resource_url": {
+          "name": "canonical_resource_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "granted_scopes": {
+          "name": "granted_scopes",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "execution_context": {
+          "name": "execution_context",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "kilo_user_id": {
+          "name": "kilo_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "instance_id": {
+          "name": "instance_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "consumed_at": {
+          "name": "consumed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "revoked_at": {
+          "name": "revoked_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "UQ_mcp_gateway_refresh_tokens_token_hash": {
+          "name": "UQ_mcp_gateway_refresh_tokens_token_hash",
+          "columns": [
+            {
+              "expression": "token_hash",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_mcp_gateway_refresh_tokens_user": {
+          "name": "IDX_mcp_gateway_refresh_tokens_user",
+          "columns": [
+            {
+              "expression": "kilo_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_mcp_gateway_refresh_tokens_config": {
+          "name": "IDX_mcp_gateway_refresh_tokens_config",
+          "columns": [
+            {
+              "expression": "config_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_mcp_gateway_refresh_tokens_consumed_at": {
+          "name": "IDX_mcp_gateway_refresh_tokens_consumed_at",
+          "columns": [
+            {
+              "expression": "consumed_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "mcp_gateway_refresh_tokens_oauth_client_id_mcp_gateway_oauth_clients_oauth_client_id_fk": {
+          "name": "mcp_gateway_refresh_tokens_oauth_client_id_mcp_gateway_oauth_clients_oauth_client_id_fk",
+          "tableFrom": "mcp_gateway_refresh_tokens",
+          "tableTo": "mcp_gateway_oauth_clients",
+          "columnsFrom": [
+            "oauth_client_id"
+          ],
+          "columnsTo": [
+            "oauth_client_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "mcp_gateway_refresh_tokens_config_id_mcp_gateway_configs_config_id_fk": {
+          "name": "mcp_gateway_refresh_tokens_config_id_mcp_gateway_configs_config_id_fk",
+          "tableFrom": "mcp_gateway_refresh_tokens",
+          "tableTo": "mcp_gateway_configs",
+          "columnsFrom": [
+            "config_id"
+          ],
+          "columnsTo": [
+            "config_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "mcp_gateway_refresh_tokens_kilo_user_id_kilocode_users_id_fk": {
+          "name": "mcp_gateway_refresh_tokens_kilo_user_id_kilocode_users_id_fk",
+          "tableFrom": "mcp_gateway_refresh_tokens",
+          "tableTo": "kilocode_users",
+          "columnsFrom": [
+            "kilo_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "mcp_gateway_refresh_tokens_instance_id_mcp_gateway_connection_instances_instance_id_fk": {
+          "name": "mcp_gateway_refresh_tokens_instance_id_mcp_gateway_connection_instances_instance_id_fk",
+          "tableFrom": "mcp_gateway_refresh_tokens",
+          "tableTo": "mcp_gateway_connection_instances",
+          "columnsFrom": [
+            "instance_id"
+          ],
+          "columnsTo": [
+            "instance_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "mcp_gateway_refresh_tokens_owner_scope": {
+          "name": "mcp_gateway_refresh_tokens_owner_scope",
+          "value": "\"mcp_gateway_refresh_tokens\".\"owner_scope\" IN ('personal', 'organization')"
         }
       },
       "isRLSEnabled": false

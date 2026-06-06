@@ -33,24 +33,3 @@ syft reads `pnpm-lock.yaml` directly (no `pnpm install` needed) and picks up the
 ```sh
 syft scan dir:. -o cyclonedx-json=cloud-sbom.cyclonedx.json
 ```
-
-## Other repos (kilocode, abuse) — bun caveat
-
-syft cannot parse `bun.lock` (its lock cataloger only handles `package-lock.json`, `yarn.lock`, and
-`pnpm-lock.yaml`). For bun repos you must scan an **installed** tree and explicitly enable the
-package cataloger (it is tagged `image,installed` and is off by default for directory scans):
-
-```sh
-bun install --frozen-lockfile
-syft scan dir:. \
-  --select-catalogers '+javascript-package-cataloger' \
-  --exclude './.git/**' --exclude './**/.turbo/**' --exclude './**/dist/**' \
-  -o cyclonedx-json=sbom.cyclonedx.json
-```
-
-## Follow-ups (not yet implemented)
-
-- **Vulnerability scanning** — pair each SBOM with Grype and upload SARIF to the GitHub Security tab,
-  surfacing OS-package and shipped-image CVEs that Dependabot/CodeQL don't see.
-- **Additional container images** — extend the `deploy-kiloclaw.yml` attestation pattern to gastown,
-  cloud-agent, and other images once each has a registry-push path to attest against.

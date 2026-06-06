@@ -47,16 +47,21 @@ export function OrgMemberPicker({
   const [open, setOpen] = useState(false);
   const membersQuery = useQuery(trpc.organizations.withMembers.queryOptions({ organizationId }));
 
+  const activeMembers = useMemo(
+    () =>
+      (membersQuery.data?.members ?? []).flatMap(member =>
+        member.status === 'active'
+          ? [{ id: member.id, name: member.name, email: member.email }]
+          : []
+      ),
+    [membersQuery.data]
+  );
   const members = useMemo(() => {
     const excluded = new Set(excludeUserIds ?? []);
-    return (membersQuery.data?.members ?? []).flatMap(member =>
-      member.status === 'active' && !excluded.has(member.id)
-        ? [{ id: member.id, name: member.name, email: member.email }]
-        : []
-    );
-  }, [membersQuery.data, excludeUserIds]);
+    return activeMembers.filter(member => !excluded.has(member.id));
+  }, [activeMembers, excludeUserIds]);
 
-  const selected = members.find(member => member.id === value);
+  const selected = activeMembers.find(member => member.id === value);
 
   return (
     <Popover open={open} onOpenChange={setOpen}>

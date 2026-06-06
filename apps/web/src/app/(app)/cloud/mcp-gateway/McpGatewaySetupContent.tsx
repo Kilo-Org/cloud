@@ -200,6 +200,44 @@ export function McpGatewaySetupContent({ organizationId }: McpGatewaySetupConten
     if (draft.authMode === 'oauth_dynamic' && !dynamicAvailable) return 'oauth_static';
     return draft.authMode;
   }, [draft.authMode, discovery, dynamicAvailable, hasProvider]);
+  const authModeHint = useMemo(() => {
+    if (discovery && !hasProvider) {
+      return 'This server did not advertise an OAuth provider, so use static headers or no provider sign-in.';
+    }
+    if (selectedAuthMode === 'oauth_dynamic') {
+      return selectedProviderIssuer
+        ? `${hostOf(selectedProviderIssuer)} registers Kilo Code automatically. ${
+            organizationId
+              ? 'Each assigned user signs in with their own provider account after the connection is created.'
+              : 'You sign in with your provider account after the connection is created.'
+          }`
+        : organizationId
+          ? 'The server registers Kilo Code automatically. Each assigned user signs in with their own provider account after the connection is created.'
+          : 'The server registers Kilo Code automatically. You sign in with your provider account after the connection is created.';
+    }
+    if (selectedAuthMode === 'oauth_static') {
+      return `${
+        dynamicAvailable
+          ? organizationId
+            ? 'Use a provider app you registered yourself. Each assigned user still signs in with their own account.'
+            : 'Use a provider app you registered yourself. You still sign in with your own account.'
+          : organizationId
+            ? "This server doesn't advertise automatic registration, so register a provider app and add its credentials here. Each assigned user still signs in with their own account."
+            : "This server doesn't advertise automatic registration, so register a provider app and add its credentials here. You still sign in with your own account."
+      } Credentials are encrypted and not shown again after saving.`;
+    }
+    if (selectedAuthMode === 'static_headers') {
+      return `${organizationId ? 'Sent on every upstream request and shared by all assigned users.' : 'Sent on every upstream request.'} Encrypted and not shown again after saving.`;
+    }
+    return 'Kilo Code forwards requests without any credentials. Nobody signs in.';
+  }, [
+    discovery,
+    dynamicAvailable,
+    hasProvider,
+    organizationId,
+    selectedAuthMode,
+    selectedProviderIssuer,
+  ]);
 
   function updateDraft(values: Partial<SetupDraft>) {
     setDraft(current => ({ ...current, ...values }));
@@ -252,11 +290,10 @@ export function McpGatewaySetupContent({ organizationId }: McpGatewaySetupConten
     draft.staticHeaderValue.trim()
       ? { [draft.staticHeaderName.trim()]: draft.staticHeaderValue }
       : undefined;
-  const providerScopes = draft.providerScopesEdited
-    ? draft.providerScopes.trim()
+  const providerScopes =
+    draft.providerScopesEdited && draft.providerScopes.trim()
       ? draft.providerScopes.trim().split(/\s+/)
-      : []
-    : undefined;
+      : undefined;
 
   function createConnection() {
     if (organizationId) {
@@ -344,7 +381,11 @@ export function McpGatewaySetupContent({ organizationId }: McpGatewaySetupConten
                       });
                     }}
                     onBlur={() => {
-                      if (currentRemoteUrl && discoveryAttemptedUrl !== currentRemoteUrl) {
+                      if (
+                        currentRemoteUrl &&
+                        discoveryAttemptedUrl !== currentRemoteUrl &&
+                        !discoveryMutation.isPending
+                      ) {
                         runDiscovery(currentRemoteUrl);
                       }
                     }}
@@ -482,46 +523,11 @@ export function McpGatewaySetupContent({ organizationId }: McpGatewaySetupConten
                       <SelectItem value="none">No provider sign-in</SelectItem>
                     </SelectContent>
                   </Select>
-                  {discovery && !hasProvider && (
-                    <p id="auth-mode-hint" className="text-muted-foreground text-xs">
-                      This server did not advertise an OAuth provider, so use static headers or no
-                      provider sign-in.
-                    </p>
-                  )}
-                  {discovery &&
-                    hasProvider &&
-                    !dynamicAvailable &&
-                    selectedAuthMode !== 'oauth_static' && (
-                      <p id="auth-mode-hint" className="text-muted-foreground text-xs">
-                        Automatic provider sign-in is unavailable because this provider does not
-                        advertise dynamic registration.
-                      </p>
-                    )}
-                  {selectedAuthMode === 'oauth_dynamic' && (
-                    <p id="auth-mode-hint" className="text-muted-foreground text-xs">
-                      {selectedProviderIssuer
-                        ? `${hostOf(selectedProviderIssuer)} registers Kilo Code automatically. ${
-                            organizationId
-                              ? 'Each assigned user signs in with their own provider account after the connection is created.'
-                              : 'You sign in with your provider account after the connection is created.'
-                          }`
-                        : organizationId
-                          ? 'The server registers Kilo Code automatically. Each assigned user signs in with their own provider account after the connection is created.'
-                          : 'The server registers Kilo Code automatically. You sign in with your provider account after the connection is created.'}
-                    </p>
-                  )}
+                  <p id="auth-mode-hint" className="text-muted-foreground text-xs">
+                    {authModeHint}
+                  </p>
                   {selectedAuthMode === 'oauth_static' && (
                     <div className="space-y-2 pt-1">
-                      <p id="auth-mode-hint" className="text-muted-foreground text-xs">
-                        {dynamicAvailable
-                          ? organizationId
-                            ? 'Use a provider app you registered yourself. Each assigned user still signs in with their own account.'
-                            : 'Use a provider app you registered yourself. You still sign in with your own account.'
-                          : organizationId
-                            ? "This server doesn't advertise automatic registration, so register a provider app and add its credentials here. Each assigned user still signs in with their own account."
-                            : "This server doesn't advertise automatic registration, so register a provider app and add its credentials here. You still sign in with your own account."}{' '}
-                        Credentials are encrypted and not shown again after saving.
-                      </p>
                       <div className="grid gap-3 sm:grid-cols-2">
                         <div className="space-y-2">
                           <Label htmlFor="static-provider-client-id">Provider client ID</Label>
@@ -556,12 +562,6 @@ export function McpGatewaySetupContent({ organizationId }: McpGatewaySetupConten
                   )}
                   {selectedAuthMode === 'static_headers' && (
                     <div className="space-y-2 pt-1">
-                      <p className="text-muted-foreground text-xs">
-                        {organizationId
-                          ? 'Sent on every upstream request and shared by all assigned users.'
-                          : 'Sent on every upstream request.'}{' '}
-                        Encrypted and not shown again after saving.
-                      </p>
                       <div className="grid gap-3 sm:grid-cols-2">
                         <div className="space-y-2">
                           <Label htmlFor="static-header-name">Header name</Label>
@@ -590,11 +590,6 @@ export function McpGatewaySetupContent({ organizationId }: McpGatewaySetupConten
                         </div>
                       </div>
                     </div>
-                  )}
-                  {selectedAuthMode === 'none' && (
-                    <p className="text-muted-foreground text-xs">
-                      Kilo Code forwards requests without any credentials. Nobody signs in.
-                    </p>
                   )}
                 </div>
 

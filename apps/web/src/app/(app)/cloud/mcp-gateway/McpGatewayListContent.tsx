@@ -118,7 +118,7 @@ export function McpGatewayListContent({ organizationId }: McpGatewayListContentP
               <CardTitle className="text-base">Connections</CardTitle>
               {!listQuery.isLoading && !listQuery.isError && (
                 <span className="text-muted-foreground text-xs tabular-nums">
-                  {listQuery.data?.length ?? 0}
+                  {filteredConnections.length}
                 </span>
               )}
             </div>

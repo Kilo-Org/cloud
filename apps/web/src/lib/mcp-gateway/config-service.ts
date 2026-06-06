@@ -49,7 +49,9 @@ export function createConfigService(params: {
     if (!provider) {
       throw createGatewayError(
         GatewayErrorCode.InvalidRequest,
-        'Remote provider metadata could not be discovered',
+        input.providerIssuer
+          ? 'Requested provider issuer was not discovered by the remote MCP server'
+          : 'Remote provider metadata could not be discovered',
         400
       );
     }

@@ -2,8 +2,9 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { skipToken, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
+import type { OrganizationWithMembers } from '@/lib/organizations/organization-types';
 import { getMcpGatewayRoutes } from '@/lib/mcp-gateway/routes';
 import { Button } from '@/components/ui/button';
 import { ConnectionStatusBadge } from './ConnectionStatusBadge';
@@ -93,12 +94,19 @@ export function McpGatewayDetailContent({
       ? trpc.mcpGateway.getOrganization.queryOptions({ organizationId, configId })
       : trpc.mcpGateway.getPersonal.queryOptions({ configId })
   );
-  const membersQueryOptions = organizationId
-    ? trpc.organizations.withMembers.queryOptions({ organizationId })
-    : null;
-  const membersQuery = useQuery({
-    queryKey: membersQueryOptions?.queryKey ?? [['organizations', 'withMembers']],
-    queryFn: membersQueryOptions ? () => queryClient.fetchQuery(membersQueryOptions) : skipToken,
+  const membersQuery = useQuery<OrganizationWithMembers>({
+    queryKey: organizationId
+      ? trpc.organizations.withMembers.queryKey({ organizationId })
+      : [['organizations', 'withMembers', 'disabled']],
+    queryFn: async () => {
+      if (!organizationId) {
+        throw new Error('Organization ID is required');
+      }
+      return await queryClient.fetchQuery(
+        trpc.organizations.withMembers.queryOptions({ organizationId })
+      );
+    },
+    enabled: Boolean(organizationId),
   });
   const excludedUserIds = useMemo(
     () => detailQuery.data?.assignments.map(assignment => assignment.userId) ?? [],
@@ -107,8 +115,9 @@ export function McpGatewayDetailContent({
   const memberById = useMemo(() => {
     const map = new Map<string, { name: string; email: string }>();
     for (const member of membersQuery.data?.members ?? []) {
-      if (member.status === 'active')
+      if (member.status === 'active') {
         map.set(member.id, { name: member.name, email: member.email });
+      }
     }
     return map;
   }, [membersQuery.data]);
@@ -436,7 +445,7 @@ export function McpGatewayDetailContent({
               </div>
             )}
             {missingStaticCredentials && (
-              <p className="text-xs text-yellow-300">
+              <p className="text-xs text-yellow-400">
                 Add provider credentials in the Credentials section below before signing in.
               </p>
             )}

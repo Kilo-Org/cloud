@@ -262,17 +262,32 @@ when they appear in all capitals.
 7. A provider grant belongs to exactly one connection instance and MUST NOT be
    shared across users, configs, owners, or scopes.
 8. Provider access tokens, refresh tokens, provider client IDs, client secrets,
+   static header secrets, pending state, authorization codes, refresh tokens,
+   and PKCE verifiers are sensitive material.
 9. Provider grants and pending provider authorization state MUST be encrypted at
+   rest.
 10. Pending provider authorization MUST bind owner scope, owner ID, user ID,
+    config ID, config version, instance ID, canonical route, remote URL, auth
+    mode, provider credentials, authorization endpoint, token endpoint, redirect
+    URI, upstream provider scopes, upstream provider resource when present, PKCE
+    verifier, execution context, and first-level authorization request ID when
+    applicable.
 11. Sensitive provider credentials, including provider client ID, MUST be inside
+    encrypted pending state rather than stored as plaintext pending columns.
 12. Pending state is opaque, one-time, expires within 30 minutes, and MUST be
+    consumed atomically on success, provider error, expiry, or invalid callback.
 13. Provider error callbacks MUST consume pending state and MUST NOT create a grant.
 14. Provider callback success MUST persist the grant before the app issues a final
+    authorization code.
 15. Provider responses MUST be size-capped before JSON parsing and validated with
+    the relevant schema.
 16. Only bearer provider tokens are supported in v1. Non-bearer provider token
+    types MUST be rejected.
 17. Grant versioning is monotonic per instance. Creating, replacing, revoking, or
+    deleting a grant MUST advance the version; replacement MUST NOT reset it.
 18. Provider refresh is lazy and happens only during runtime proxying.
 19. Refresh failure MUST move the instance to `needs_reauth` without overwriting a
+    newer app-side revoke/replacement.
 20. A provider grant may be restored only by a successful provider authorization
     for the same non-terminal instance.
 21. Changing upstream provider scopes, provider scope source, provider resource,

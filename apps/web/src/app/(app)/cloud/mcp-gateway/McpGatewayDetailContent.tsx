@@ -414,65 +414,68 @@ export function McpGatewayDetailContent({
                 : 'Sign in so Kilo Code can call this server on your behalf.'}
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            {signedIn ? (
-              <div className="flex max-w-3xl items-start gap-3 rounded-lg border border-green-500/20 bg-green-500/5 p-4">
-                <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-green-400" />
-                <div className="space-y-0.5">
-                  <p className="text-sm font-medium">
-                    {organizationId ? 'Provider sign-in active' : "You're signed in"}
-                  </p>
-                  <p className="text-muted-foreground text-sm">
-                    {organizationId
-                      ? connection.activeGrantCount === 1
-                        ? '1 assigned user has an active provider grant.'
-                        : `${connection.activeGrantCount} assigned users have active provider grants.`
-                      : 'Kilo Code can reach this server now.'}
-                  </p>
+          <CardContent className="space-y-5">
+            <div className="space-y-3">
+              {signedIn ? (
+                <div className="flex max-w-2xl items-start gap-3 rounded-lg border border-green-500/20 bg-green-500/5 p-4">
+                  <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-green-400" />
+                  <div className="space-y-0.5">
+                    <p className="text-sm font-medium">
+                      {organizationId ? 'Provider sign-in active' : "You're signed in"}
+                    </p>
+                    <p className="text-muted-foreground text-sm">
+                      {organizationId
+                        ? connection.activeGrantCount === 1
+                          ? '1 assigned user has an active provider grant.'
+                          : `${connection.activeGrantCount} assigned users have active provider grants.`
+                        : 'Kilo Code can reach this server now.'}
+                    </p>
+                  </div>
                 </div>
-              </div>
-            ) : (
-              <div className="flex max-w-3xl items-start gap-3 rounded-lg border border-yellow-500/20 bg-yellow-500/5 p-4">
-                <span aria-hidden className="mt-1.5 size-2 shrink-0 rounded-full bg-yellow-400" />
-                <div className="space-y-0.5">
-                  <p className="text-sm font-medium">Not signed in yet</p>
-                  <p className="text-muted-foreground text-sm">
-                    {organizationId
-                      ? 'Assigned users complete sign-in when they first use this connection.'
-                      : 'Sign in to start using this connection.'}
-                  </p>
+              ) : (
+                <div className="flex max-w-2xl items-start gap-3 rounded-lg border border-yellow-500/20 bg-yellow-500/5 p-4">
+                  <span aria-hidden className="mt-1.5 size-2 shrink-0 rounded-full bg-yellow-400" />
+                  <div className="space-y-0.5">
+                    <p className="text-sm font-medium">Not signed in yet</p>
+                    <p className="text-muted-foreground text-sm">
+                      {organizationId
+                        ? 'Assigned users complete sign-in when they first use this connection.'
+                        : 'Sign in to start using this connection.'}
+                    </p>
+                  </div>
                 </div>
+              )}
+              {missingStaticCredentials && (
+                <p className="text-xs text-yellow-400">
+                  Add provider credentials in the Credentials section below before signing in.
+                </p>
+              )}
+              {!organizationId && (
+                <Button
+                  onClick={() => providerSignInMutation.mutate(managedConfigInput)}
+                  disabled={providerSignInMutation.isPending || missingStaticCredentials}
+                >
+                  {providerSignInMutation.isPending
+                    ? 'Starting...'
+                    : signedIn
+                      ? 'Re-authenticate'
+                      : 'Start provider sign-in'}
+                </Button>
+              )}
+            </div>
+            <div className="max-w-lg space-y-3 border-t pt-5">
+              <div className="space-y-1.5">
+                <Label htmlFor="provider-scopes">Provider scopes</Label>
+                <p className="text-muted-foreground text-xs">
+                  Optional upstream provider scopes. Leave blank and save to clear an override.
+                </p>
               </div>
-            )}
-            {missingStaticCredentials && (
-              <p className="text-xs text-yellow-400">
-                Add provider credentials in the Credentials section below before signing in.
-              </p>
-            )}
-            {!organizationId && (
-              <Button
-                variant="outline"
-                onClick={() => providerSignInMutation.mutate(managedConfigInput)}
-                disabled={providerSignInMutation.isPending || missingStaticCredentials}
-              >
-                {providerSignInMutation.isPending
-                  ? 'Starting...'
-                  : signedIn
-                    ? 'Re-authenticate'
-                    : 'Start provider sign-in'}
-              </Button>
-            )}
-            <div className="max-w-lg space-y-2 border-t pt-4">
-              <Label htmlFor="provider-scopes">Provider scopes</Label>
               <Input
                 id="provider-scopes"
                 value={providerScopes}
                 onChange={event => setProviderScopes(event.target.value)}
                 placeholder={connection.providerScopes?.join(' ') || 'No provider scopes'}
               />
-              <p className="text-muted-foreground text-xs">
-                Optional upstream provider scopes. Leave blank and save to clear an override.
-              </p>
               <Button
                 variant="outline"
                 onClick={() =>

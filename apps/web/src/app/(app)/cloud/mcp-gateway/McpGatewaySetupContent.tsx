@@ -21,7 +21,15 @@ import {
 } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
-import { ArrowLeft, ArrowRight, Check, RotateCcw, ShieldCheck, TriangleAlert } from 'lucide-react';
+import {
+  ArrowLeft,
+  ArrowRight,
+  Check,
+  Plus,
+  RotateCcw,
+  ShieldCheck,
+  TriangleAlert,
+} from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'sonner';
 
@@ -36,6 +44,7 @@ type SetupDraft = {
   providerIssuer: string;
   providerScopes: string;
   providerScopesEdited: boolean;
+  providerScopesExpanded: boolean;
   staticProviderClientId: string;
   staticProviderClientSecret: string;
   staticHeaderName: string;
@@ -52,19 +61,6 @@ const DISCOVERY_DEBOUNCE_MS = 600;
 
 function isAuthMode(value: string): value is SetupDraft['authMode'] {
   return ['none', 'static_headers', 'oauth_dynamic', 'oauth_static'].includes(value);
-}
-
-function authModeLabel(authMode: SetupDraft['authMode']) {
-  switch (authMode) {
-    case 'oauth_dynamic':
-      return 'Automatic provider sign-in';
-    case 'oauth_static':
-      return 'Manual provider credentials';
-    case 'static_headers':
-      return 'Static headers';
-    case 'none':
-      return 'No provider sign-in';
-  }
 }
 
 function hostOf(value: string) {
@@ -134,6 +130,7 @@ export function McpGatewaySetupContent({ organizationId }: McpGatewaySetupConten
     providerIssuer: '',
     providerScopes: '',
     providerScopesEdited: false,
+    providerScopesExpanded: false,
     staticProviderClientId: '',
     staticProviderClientSecret: '',
     staticHeaderName: 'Authorization',
@@ -335,7 +332,7 @@ export function McpGatewaySetupContent({ organizationId }: McpGatewaySetupConten
   }
 
   return (
-    <div className="mx-auto w-full max-w-5xl space-y-6">
+    <div className="mx-auto w-full max-w-3xl space-y-6">
       <div className="space-y-1.5">
         <Link
           href={routes.list}
@@ -344,7 +341,7 @@ export function McpGatewaySetupContent({ organizationId }: McpGatewaySetupConten
           <ArrowLeft className="size-4" />
           Back to connections
         </Link>
-        <h1 className="text-2xl font-semibold tracking-tight">Create connection</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Create connection</h1>
         <p className="text-muted-foreground max-w-prose text-sm">
           Connect Kilo Code to a remote MCP server and choose how it signs in.
         </p>
@@ -378,6 +375,7 @@ export function McpGatewaySetupContent({ organizationId }: McpGatewaySetupConten
                         providerIssuer: '',
                         providerScopes: '',
                         providerScopesEdited: false,
+                        providerScopesExpanded: false,
                       });
                     }}
                     onBlur={() => {
@@ -475,28 +473,6 @@ export function McpGatewaySetupContent({ organizationId }: McpGatewaySetupConten
                   </div>
                 )}
 
-                {(selectedAuthMode === 'oauth_dynamic' || selectedAuthMode === 'oauth_static') && (
-                  <div className="space-y-2">
-                    <Label htmlFor="provider-scopes">Provider scopes</Label>
-                    <Input
-                      id="provider-scopes"
-                      className="h-11 sm:h-9"
-                      value={draft.providerScopes}
-                      onChange={event =>
-                        updateDraft({
-                          providerScopes: event.target.value,
-                          providerScopesEdited: true,
-                        })
-                      }
-                      placeholder="openid email"
-                    />
-                    <p className="text-muted-foreground text-xs">
-                      Optional upstream provider scopes. Leave blank when the server does not
-                      advertise a required scope set.
-                    </p>
-                  </div>
-                )}
-
                 <div className="space-y-2">
                   <Label htmlFor="auth-mode">Provider sign-in</Label>
                   <Select
@@ -526,6 +502,45 @@ export function McpGatewaySetupContent({ organizationId }: McpGatewaySetupConten
                   <p id="auth-mode-hint" className="text-muted-foreground text-xs">
                     {authModeHint}
                   </p>
+                  {(selectedAuthMode === 'oauth_dynamic' || selectedAuthMode === 'oauth_static') &&
+                    (draft.providerScopesExpanded ||
+                      draft.providerScopes ||
+                      draft.providerScopesEdited) && (
+                      <div className="space-y-2 pt-1">
+                        <Label htmlFor="provider-scopes">Provider scopes</Label>
+                        <Input
+                          id="provider-scopes"
+                          className="h-11 sm:h-9"
+                          value={draft.providerScopes}
+                          onChange={event =>
+                            updateDraft({
+                              providerScopes: event.target.value,
+                              providerScopesEdited: true,
+                            })
+                          }
+                          placeholder="Leave blank unless required"
+                        />
+                        <p className="text-muted-foreground text-xs">
+                          Optional upstream provider scopes. Leave blank unless the server
+                          advertises a required scope set.
+                        </p>
+                      </div>
+                    )}
+                  {(selectedAuthMode === 'oauth_dynamic' || selectedAuthMode === 'oauth_static') &&
+                    !draft.providerScopesExpanded &&
+                    !draft.providerScopes &&
+                    !draft.providerScopesEdited && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        type="button"
+                        className="text-muted-foreground hover:text-foreground -ml-3"
+                        onClick={() => updateDraft({ providerScopesExpanded: true })}
+                      >
+                        <Plus className="size-4" />
+                        Add provider scopes
+                      </Button>
+                    )}
                   {selectedAuthMode === 'oauth_static' && (
                     <div className="space-y-2 pt-1">
                       <div className="grid gap-3 sm:grid-cols-2">
@@ -593,10 +608,9 @@ export function McpGatewaySetupContent({ organizationId }: McpGatewaySetupConten
                   )}
                 </div>
 
-                <dl className="rounded-lg border text-sm">
+                <dl className="max-w-xl rounded-md border text-sm">
                   <ReviewRow label="Name" value={draft.name} />
                   <ReviewRow label="Remote server" value={draft.remoteUrl} mono />
-                  <ReviewRow label="Provider sign-in" value={authModeLabel(selectedAuthMode)} />
                   {organizationId && (
                     <ReviewRow label="Org access" value="Assign members later" last />
                   )}
@@ -627,14 +641,26 @@ export function McpGatewaySetupContent({ organizationId }: McpGatewaySetupConten
                   <ArrowRight className="size-4" />
                 </Button>
               ) : (
-                <Button
-                  type="submit"
-                  className="h-11 sm:h-9"
-                  disabled={accessIncomplete || isCreating}
-                >
-                  <Check className="size-4" />
-                  {isCreating ? 'Creating...' : 'Create connection'}
-                </Button>
+                <div className="flex flex-col items-end gap-1.5">
+                  <Button
+                    type="submit"
+                    className="h-11 sm:h-9"
+                    disabled={accessIncomplete || isCreating}
+                  >
+                    <Check className="size-4" />
+                    {isCreating ? 'Creating...' : 'Create connection'}
+                  </Button>
+                  {accessIncomplete && selectedAuthMode === 'oauth_static' && (
+                    <p className="text-muted-foreground text-right text-xs">
+                      Add the provider client ID and secret to continue.
+                    </p>
+                  )}
+                  {accessIncomplete && selectedAuthMode === 'static_headers' && (
+                    <p className="text-muted-foreground text-right text-xs">
+                      Add a header name and value to continue.
+                    </p>
+                  )}
+                </div>
               )}
             </div>
           </form>
@@ -658,7 +684,7 @@ function ReviewRow({
   return (
     <div
       className={cn(
-        'flex flex-col gap-1 px-4 py-3 sm:flex-row sm:items-baseline sm:justify-between sm:gap-4',
+        'flex flex-col gap-1 px-4 py-3 sm:grid sm:grid-cols-[9rem_minmax(0,1fr)] sm:items-baseline sm:gap-4',
         !last && 'border-b'
       )}
     >
@@ -693,83 +719,73 @@ function DiscoveryStatus({
 }) {
   if (!hasUrl) return null;
 
-  if (pending) {
-    return (
-      <div className="rounded-lg border p-4" aria-live="polite">
-        <p className="text-muted-foreground mb-3 text-xs">Checking {host}...</p>
-        <div className="space-y-2">
-          <Skeleton className="h-4 w-40" />
-          <Skeleton className="h-4 w-56" />
-        </div>
-      </div>
-    );
-  }
+  if (providerCount === null && !pending && !failed) return null;
 
-  if (failed) {
-    return (
-      <div
-        className="border-destructive/30 bg-destructive/5 rounded-lg border p-4"
-        aria-live="polite"
-      >
-        <div className="flex items-start gap-2">
-          <TriangleAlert className="text-destructive mt-0.5 size-4 shrink-0" />
+  const hasProvider = (providerCount ?? 0) > 0;
+  return (
+    <div aria-live="polite">
+      {pending ? (
+        <div className="rounded-lg border p-4">
+          <p className="text-muted-foreground mb-3 text-xs">Checking {host}...</p>
           <div className="space-y-2">
-            <p className="text-foreground text-sm font-medium">Couldn't reach {host}</p>
-            <p className="text-muted-foreground text-xs">
-              {errorMessage || 'Check that the server uses public HTTPS, then try again.'}
-            </p>
-            <Button variant="outline" size="sm" type="button" onClick={onRetry}>
-              <RotateCcw className="size-4" />
-              Try again
-            </Button>
+            <Skeleton className="h-4 w-40" />
+            <Skeleton className="h-4 w-56" />
           </div>
         </div>
-      </div>
-    );
-  }
-
-  if (providerCount === null) return null;
-
-  const hasProvider = providerCount > 0;
-  return (
-    <div className="rounded-lg border p-4" aria-live="polite">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-foreground flex min-w-0 items-center gap-2 text-sm font-medium">
-          <ShieldCheck className="size-4 shrink-0 text-green-400" />
-          <span className="min-w-0 break-all">{host} is reachable</span>
-        </p>
-        <Button
-          variant="ghost"
-          size="sm"
-          type="button"
-          onClick={onRetry}
-          className="text-muted-foreground hover:text-foreground -mr-2 shrink-0"
-        >
-          <RotateCcw className="size-4" />
-          Re-check
-        </Button>
-      </div>
-      <div className="mt-3 flex flex-wrap items-center gap-2">
-        {hasProvider ? (
-          <>
-            <Badge variant="secondary">
-              {providerCount > 1 ? `${providerCount} sign-in providers` : 'Sign-in provider found'}
-            </Badge>
-            <Badge variant={dynamicAvailable ? 'secondary' : 'outline'}>
-              {dynamicAvailable ? 'Automatic sign-in' : 'Manual credentials'}
-            </Badge>
-            {providerHost && (
-              <span className="text-muted-foreground font-mono text-xs">{providerHost}</span>
+      ) : failed ? (
+        <div className="border-destructive/30 bg-destructive/5 rounded-lg border p-4">
+          <div className="flex items-start gap-2">
+            <TriangleAlert className="text-destructive mt-0.5 size-4 shrink-0" />
+            <div className="space-y-2">
+              <p className="text-foreground text-sm font-medium">Couldn't reach {host}</p>
+              <p className="text-muted-foreground text-xs">
+                {errorMessage || 'Check that the server uses public HTTPS, then try again.'}
+              </p>
+              <Button variant="outline" size="sm" type="button" onClick={onRetry}>
+                <RotateCcw className="size-4" />
+                Try again
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="rounded-lg border p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-foreground flex min-w-0 items-center gap-2 text-sm font-medium">
+              <ShieldCheck className="size-4 shrink-0 text-muted-foreground" />
+              <span className="min-w-0 break-all">{host} is reachable</span>
+            </p>
+            <Button
+              variant="ghost"
+              size="sm"
+              type="button"
+              onClick={onRetry}
+              className="text-muted-foreground hover:text-foreground -mr-2 shrink-0"
+            >
+              <RotateCcw className="size-4" />
+              Re-check
+            </Button>
+          </div>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            {hasProvider ? (
+              <>
+                <Badge variant="secondary">
+                  {providerCount && providerCount > 1
+                    ? `${providerCount} sign-in providers`
+                    : 'Sign-in provider found'}
+                </Badge>
+                <Badge variant={dynamicAvailable ? 'secondary' : 'outline'}>
+                  {dynamicAvailable ? 'Automatic sign-in' : 'Manual credentials'}
+                </Badge>
+                {providerHost && (
+                  <span className="text-muted-foreground font-mono text-xs">{providerHost}</span>
+                )}
+              </>
+            ) : (
+              <Badge variant="outline">No OAuth provider advertised</Badge>
             )}
-          </>
-        ) : (
-          <Badge variant="outline">No OAuth provider advertised</Badge>
-        )}
-      </div>
-      {!hasProvider && (
-        <p className="text-muted-foreground mt-2 text-xs">
-          Choose static headers or no sign-in on the next step.
-        </p>
+          </div>
+        </div>
       )}
     </div>
   );

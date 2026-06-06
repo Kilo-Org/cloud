@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { skipToken, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { getMcpGatewayRoutes } from '@/lib/mcp-gateway/routes';
 import { Button } from '@/components/ui/button';
@@ -93,9 +93,12 @@ export function McpGatewayDetailContent({
       ? trpc.mcpGateway.getOrganization.queryOptions({ organizationId, configId })
       : trpc.mcpGateway.getPersonal.queryOptions({ configId })
   );
+  const membersQueryOptions = organizationId
+    ? trpc.organizations.withMembers.queryOptions({ organizationId })
+    : null;
   const membersQuery = useQuery({
-    ...trpc.organizations.withMembers.queryOptions({ organizationId: organizationId ?? '' }),
-    enabled: Boolean(organizationId),
+    queryKey: membersQueryOptions?.queryKey ?? [['organizations', 'withMembers']],
+    queryFn: membersQueryOptions ? () => queryClient.fetchQuery(membersQueryOptions) : skipToken,
   });
   const excludedUserIds = useMemo(
     () => detailQuery.data?.assignments.map(assignment => assignment.userId) ?? [],

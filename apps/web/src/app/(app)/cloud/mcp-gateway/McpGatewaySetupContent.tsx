@@ -210,14 +210,14 @@ export function McpGatewaySetupContent({ organizationId }: McpGatewaySetupConten
     discoveryMutation.mutate({ remoteUrl });
   }
 
-  // Auto-probe a valid URL shortly after the user stops typing. Triggering
-  // discovery (onBlur / Re-check) sets discoveryAttemptedUrl, which makes this
-  // effect re-run, hit the early return, and cancel the pending debounce.
   useEffect(() => {
     if (!discoveredProviderScopes || draft.providerScopesEdited) return;
     updateDraft({ providerScopes: discoveredProviderScopes });
   }, [discoveredProviderScopes, draft.providerScopesEdited]);
 
+  // Auto-probe a valid URL shortly after the user stops typing. Triggering
+  // discovery (onBlur / Re-check) sets discoveryAttemptedUrl, which makes this
+  // effect re-run, hit the early return, and cancel the pending debounce.
   useEffect(() => {
     if (!currentRemoteUrl) return;
     if (discovery || discoveryAttemptedUrl === currentRemoteUrl) return;
@@ -226,7 +226,7 @@ export function McpGatewaySetupContent({ organizationId }: McpGatewaySetupConten
       discoveryMutation.mutate({ remoteUrl: currentRemoteUrl });
     }, DISCOVERY_DEBOUNCE_MS);
     return () => clearTimeout(handle);
-  }, [currentRemoteUrl, discovery, discoveryAttemptedUrl, discoveryMutation]);
+  }, [currentRemoteUrl, discovery, discoveryAttemptedUrl, discoveryMutation.mutate]);
 
   function checkNow() {
     if (!currentRemoteUrl) {

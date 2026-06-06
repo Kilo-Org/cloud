@@ -9,6 +9,7 @@ import {
   GatewayErrorCode,
   GatewayAuthMode,
 } from '@kilocode/mcp-gateway';
+import type { MCPGatewayProviderScopeSource } from '@kilocode/db/schema-types';
 import {
   mcp_gateway_assignments,
   mcp_gateway_config_secrets,
@@ -25,8 +26,6 @@ import { createGatewayRepository, type GatewayRepository } from './repository';
 import { configSecretAad, nowIso, randomToken } from './crypto';
 import { validatePublicHttpsDestination } from './discovery-service';
 import type { GatewayDiscoveryService } from './discovery-service';
-
-type ProviderScopeSource = 'none' | 'discovered' | 'override';
 import { createAuditService } from './audit-service';
 
 const secretScheme = 'mcp-gateway-credential-rsa-aes-256-gcm';
@@ -61,7 +60,7 @@ export function createConfigService(params: {
         400
       );
     }
-    const providerScopeSource: ProviderScopeSource = input.providerScopes
+    const providerScopeSource: MCPGatewayProviderScopeSource = input.providerScopes
       ? 'override'
       : discovery.providerScopeSource === 'discovered'
         ? 'discovered'
@@ -481,7 +480,7 @@ export function createConfigService(params: {
           ? true
           : currentScopes?.length === input.providerScopes?.length &&
             currentScopes?.every((scope, index) => scope === input.providerScopes?.[index]);
-      const nextSource: ProviderScopeSource = input.providerScopes ? 'override' : 'none';
+      const nextSource: MCPGatewayProviderScopeSource = input.providerScopes ? 'override' : 'none';
       if (sameScopes && config.provider_scope_source === nextSource) return config;
       await revokeConfigGrants(tx, input.configId);
       const [updated] = await tx

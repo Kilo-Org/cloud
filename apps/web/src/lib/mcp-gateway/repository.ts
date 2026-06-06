@@ -25,6 +25,7 @@ import {
   GatewayRouteStatus,
   buildScopedConnectCanonicalUrl,
 } from '@kilocode/mcp-gateway';
+import type { MCPGatewayProviderScopeSource } from '@kilocode/db/schema-types';
 import { and, eq, inArray, isNull } from 'drizzle-orm';
 import { randomToken } from './crypto';
 
@@ -326,7 +327,7 @@ export function createGatewayRepository(database: GatewayDatabase = db) {
     gatewayBaseUrl: string;
     discoveredProviderMetadata: Record<string, unknown> | null;
     providerScopes: string[] | null;
-    providerScopeSource: 'none' | 'discovered' | 'override';
+    providerScopeSource: MCPGatewayProviderScopeSource;
     providerResource: string | null;
   }) {
     const [config] = await database

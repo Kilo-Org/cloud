@@ -133,6 +133,7 @@ type ConfigRow = typeof mcp_gateway_configs.$inferSelect;
 type RouteRow = typeof mcp_gateway_connect_resources.$inferSelect;
 type AssignmentRow = typeof mcp_gateway_assignments.$inferSelect;
 type InstanceRow = typeof mcp_gateway_connection_instances.$inferSelect;
+type GrantRow = typeof mcp_gateway_provider_grants.$inferSelect;
 
 function serializeTimestamp(value: string): string;
 function serializeTimestamp(value: string | null): string | null;
@@ -280,25 +281,44 @@ async function listConfigs(params: {
     .orderBy(desc(mcp_gateway_configs.updated_at));
   const configIds = rows.map(row => row.config.config_id);
   const related = await loadConfigRows(configIds);
-  return rows.map(({ config, route }) =>
-    configProjection({
+  const assignmentsByConfigId = new Map<string, AssignmentRow[]>();
+  const instancesByConfigId = new Map<string, InstanceRow[]>();
+  const grantsByInstanceId = new Map<string, GrantRow[]>();
+  const secretsByConfigId = new Map<string, typeof related.secrets>();
+  function appendToMap<T>(map: Map<string, T[]>, key: string, value: T) {
+    const values = map.get(key);
+    if (values) {
+      values.push(value);
+    } else {
+      map.set(key, [value]);
+    }
+  }
+  for (const assignment of related.assignments) {
+    appendToMap(assignmentsByConfigId, assignment.config_id, assignment);
+  }
+  for (const instance of related.instances) {
+    appendToMap(instancesByConfigId, instance.config_id, instance);
+  }
+  for (const grant of related.grants) {
+    appendToMap(grantsByInstanceId, grant.instance_id, grant);
+  }
+  for (const secret of related.secrets) {
+    appendToMap(secretsByConfigId, secret.configId, secret);
+  }
+  return rows.map(({ config, route }) => {
+    const instances = instancesByConfigId.get(config.config_id) ?? [];
+    return configProjection({
       config,
       route,
-      assignments: related.assignments.filter(
-        assignment => assignment.config_id === config.config_id
+      assignments: assignmentsByConfigId.get(config.config_id) ?? [],
+      instances,
+      activeGrantCount: instances.reduce(
+        (count, instance) => count + (grantsByInstanceId.get(instance.instance_id)?.length ?? 0),
+        0
       ),
-      instances: related.instances.filter(instance => instance.config_id === config.config_id),
-      activeGrantCount: related.grants.filter(grant =>
-        related.instances.some(
-          instance =>
-            instance.instance_id === grant.instance_id && instance.config_id === config.config_id
-        )
-      ).length,
-      secretKinds: related.secrets
-        .filter(secret => secret.configId === config.config_id)
-        .map(secret => secret.kind),
-    })
-  );
+      secretKinds: (secretsByConfigId.get(config.config_id) ?? []).map(secret => secret.kind),
+    });
+  });
 }
 
 async function getConfigDetail(params: {
@@ -316,21 +336,28 @@ async function getConfigDetail(params: {
     throw new TRPCError({ code: 'NOT_FOUND', message: 'Connection not found' });
   }
   const related = await loadConfigRows([params.configId]);
+  const assignments = related.assignments.filter(
+    assignment => assignment.config_id === params.configId
+  );
+  const instances = related.instances.filter(instance => instance.config_id === params.configId);
+  const instanceIds = new Set(instances.map(instance => instance.instance_id));
+  const grants = related.grants.filter(grant => instanceIds.has(grant.instance_id));
+  const secrets = related.secrets.filter(secret => secret.configId === params.configId);
   return detailProjection({
     projection: configProjection({
       config: resolved.config,
       route: resolved.route,
-      assignments: related.assignments,
-      instances: related.instances,
-      activeGrantCount: related.grants.length,
-      secretKinds: related.secrets.map(secret => secret.kind),
+      assignments,
+      instances,
+      activeGrantCount: grants.length,
+      secretKinds: secrets.map(secret => secret.kind),
     }),
-    assignments: related.assignments,
-    instances: related.instances,
+    assignments,
+    instances,
   });
 }
 
-async function requireManagedConfig(params: {
+async function resolveScopedConfig(params: {
   configId: string;
   organizationId?: string;
   userId: string;
@@ -350,6 +377,16 @@ async function requireManagedConfig(params: {
   if (!params.organizationId && !params.isGlobalAdmin) {
     throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
   }
+  return resolved;
+}
+
+async function requireManagedConfig(params: {
+  configId: string;
+  organizationId?: string;
+  userId: string;
+  isGlobalAdmin: boolean;
+}) {
+  const resolved = await resolveScopedConfig(params);
   if (params.organizationId) {
     await requireOrganizationManager({
       organizationId: params.organizationId,
@@ -498,7 +535,7 @@ export const mcpGatewayRouter = createTRPCRouter({
     .input(ManagedConfigInputSchema)
     .mutation(async ({ input, ctx }) =>
       withGatewayErrorMapping(async () => {
-        const resolved = await requireManagedConfig({
+        const resolved = await resolveScopedConfig({
           configId: input.configId,
           organizationId: input.organizationId,
           userId: ctx.user.id,

@@ -50,10 +50,14 @@ const PlatformOwnerInputSchema = OwnerInputSchema.extend({
 async function ownerFromInput(
   ctx: TRPCContext,
   input: z.infer<typeof OwnerInputSchema>,
-  organizationRoles?: OrganizationRole[]
+  organizationRoles?: OrganizationRole[],
+  requireOrganizationSubscription = false
 ): Promise<ReviewMemoryOwner> {
   if (input.organizationId) {
     await ensureOrganizationAccess(ctx, input.organizationId, organizationRoles);
+    if (requireOrganizationSubscription) {
+      await requireActiveSubscriptionOrTrial(input.organizationId);
+    }
     return { type: 'org', id: input.organizationId };
   }
 
@@ -148,18 +152,6 @@ export const reviewMemoryRouter = createTRPCRouter({
       });
     }),
 
-  getProposal: baseProcedure
-    .input(OwnerInputSchema.extend({ proposalId: z.uuid() }))
-    .query(async ({ ctx, input }) => {
-      const owner = await ownerFromInput(ctx, input);
-      const proposal = await getReviewMemoryProposal({ owner, proposalId: input.proposalId });
-      if (!proposal) {
-        throw new TRPCError({ code: 'NOT_FOUND', message: 'Review memory proposal not found' });
-      }
-
-      return { proposal, evidence: [] };
-    }),
-
   updateProposal: baseProcedure
     .input(
       OwnerInputSchema.extend({
@@ -172,7 +164,7 @@ export const reviewMemoryRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const owner = await ownerFromInput(ctx, input);
+      const owner = await ownerFromInput(ctx, input, ['owner', 'billing_manager'], true);
       const existingProposal = await getReviewMemoryProposal({
         owner,
         proposalId: input.proposalId,
@@ -199,7 +191,7 @@ export const reviewMemoryRouter = createTRPCRouter({
   rejectProposal: baseProcedure
     .input(OwnerInputSchema.extend({ proposalId: z.uuid() }))
     .mutation(async ({ ctx, input }) => {
-      const owner = await ownerFromInput(ctx, input);
+      const owner = await ownerFromInput(ctx, input, ['owner', 'billing_manager'], true);
       const existingProposal = await getReviewMemoryProposal({
         owner,
         proposalId: input.proposalId,
@@ -221,7 +213,7 @@ export const reviewMemoryRouter = createTRPCRouter({
   approveAndOpenChangeRequest: baseProcedure
     .input(OwnerInputSchema.extend({ proposalId: z.uuid() }))
     .mutation(async ({ ctx, input }) => {
-      const owner = await ownerFromInput(ctx, input, ['owner']);
+      const owner = await ownerFromInput(ctx, input, ['owner'], true);
       const proposal = await getReviewMemoryProposal({ owner, proposalId: input.proposalId });
       if (!proposal) {
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Review memory proposal not found' });
@@ -253,7 +245,7 @@ export const reviewMemoryRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const owner = await ownerFromInput(ctx, input);
+      const owner = await ownerFromInput(ctx, input, ['owner', 'billing_manager'], true);
       await assertReviewMemoryEnabled({ owner, platform: input.platform });
       const state = await refreshAggregationStateForScope({
         owner,

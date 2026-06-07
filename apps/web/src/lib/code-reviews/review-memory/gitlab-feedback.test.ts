@@ -116,7 +116,7 @@ describe('GitLab review memory feedback', () => {
     });
   }
 
-  it('records corrective notes in Kilo discussions', async () => {
+  it('records only the first note reply in a Kilo discussion', async () => {
     const { owner, integration } = await seedIntegration();
     const subject = await seedDiscussionSubject(owner);
     const payload = {
@@ -141,20 +141,41 @@ describe('GitLab review memory feedback', () => {
       merge_request: mergeRequestAttributes(),
     } satisfies NoteEventPayload;
 
-    const result = await handleGitLabNoteFeedback({
+    const firstResult = await handleGitLabNoteFeedback({
       payload,
       integration,
       deliveryId: 'delivery-note-corrective',
     });
+    const secondResult = await handleGitLabNoteFeedback({
+      payload: {
+        ...payload,
+        object_attributes: {
+          ...payload.object_attributes,
+          id: 502,
+          note: 'Good catch, fixed this now.',
+          url: 'https://gitlab.example.com/acme/widgets/-/merge_requests/42#note_502',
+        },
+      },
+      integration,
+      deliveryId: 'delivery-note-supportive',
+    });
 
-    expect(result.recorded).toBe(true);
-    const [event] = await db.select().from(code_review_feedback_events);
+    expect(firstResult.recorded).toBe(true);
+    expect(secondResult).toEqual({
+      recorded: false,
+      eventIds: [],
+      reason: 'subject-already-has-reply-feedback',
+    });
+    const events = await db.select().from(code_review_feedback_events);
+    expect(events).toHaveLength(1);
+    const [event] = events;
     expect(event).toEqual(
       expect.objectContaining({
         subject_id: subject.id,
         signal_kind: 'corrective_reply',
         sentiment: 'negative',
         strength: 3,
+        evidence_excerpt: 'This is a false positive for this MR.',
       })
     );
   });
@@ -270,6 +291,7 @@ describe('GitLab review memory feedback', () => {
         signal_kind: 'negative_reaction',
         sentiment: 'negative',
         strength: 3,
+        evidence_excerpt: null,
       })
     );
 
@@ -305,7 +327,12 @@ describe('GitLab review memory feedback', () => {
     const events = await db.select().from(code_review_feedback_events);
     expect(events).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ signal_kind: 'mr_approved', sentiment: 'positive', strength: 1 }),
+        expect.objectContaining({
+          signal_kind: 'mr_approved',
+          sentiment: 'positive',
+          strength: 1,
+          evidence_excerpt: null,
+        }),
         expect.objectContaining({
           subject_id: subject.id,
           signal_kind: 'thread_resolved',

@@ -92,7 +92,7 @@ describe('GitHub review memory feedback', () => {
     });
   }
 
-  it('records corrective and supportive replies to Kilo inline comments', async () => {
+  it('records only the first reply to a Kilo inline comment', async () => {
     const { owner, integration } = await seedIntegration();
     const subject = await seedInlineSubject(owner);
 
@@ -130,31 +130,31 @@ describe('GitHub review memory feedback', () => {
       },
     } satisfies PullRequestReviewCommentPayload;
 
-    await handleGitHubReviewCommentFeedback({
+    const correctiveResult = await handleGitHubReviewCommentFeedback({
       payload: correctivePayload,
       integration,
       deliveryId: 'delivery-corrective-reply',
     });
-    await handleGitHubReviewCommentFeedback({
+    const supportiveResult = await handleGitHubReviewCommentFeedback({
       payload: supportivePayload,
       integration,
       deliveryId: 'delivery-supportive-reply',
     });
 
+    expect(correctiveResult.recorded).toBe(true);
+    expect(supportiveResult).toEqual({
+      recorded: false,
+      reason: 'subject-already-has-reply-feedback',
+    });
     const events = await db.select().from(code_review_feedback_events);
-    expect(events).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          subject_id: subject.id,
-          signal_kind: 'corrective_reply',
-          sentiment: 'negative',
-        }),
-        expect.objectContaining({
-          subject_id: subject.id,
-          signal_kind: 'supportive_reply',
-          sentiment: 'positive',
-        }),
-      ])
+    expect(events).toHaveLength(1);
+    expect(events[0]).toEqual(
+      expect.objectContaining({
+        subject_id: subject.id,
+        signal_kind: 'corrective_reply',
+        sentiment: 'negative',
+        evidence_excerpt: 'This is a false positive in this repository.',
+      })
     );
   });
 
@@ -229,6 +229,42 @@ describe('GitHub review memory feedback', () => {
     });
 
     expect(result.recorded).toBe(true);
+  });
+
+  it('skips @kilo fix replies without a resolved Kilo subject', async () => {
+    const { integration } = await seedIntegration();
+    const payload = {
+      action: 'created',
+      comment: {
+        id: 504,
+        in_reply_to_id: 999,
+        body: '@kilo fix this false positive',
+        user: { login: 'maintainer', type: 'User' },
+        html_url: 'https://github.com/acme/widgets/pull/42#discussion_r504',
+        path: 'src/widget.ts',
+        line: 12,
+        diff_hunk: '@@ -1 +1 @@',
+        author_association: 'MEMBER',
+      },
+      pull_request: {
+        ...pullRequest(),
+        title: 'Add widgets',
+        user: { login: 'author' },
+        base: { ref: 'main' },
+      },
+      repository: repository(),
+      installation: { id: 98765 },
+      sender: { login: 'maintainer' },
+    } satisfies PullRequestReviewCommentPayload;
+
+    await expect(
+      handleGitHubReviewCommentFeedback({
+        payload,
+        integration,
+        deliveryId: 'delivery-unmatched-autofix-reply',
+      })
+    ).resolves.toEqual({ recorded: false, reason: 'not-kilo-subject' });
+    await expect(db.select().from(code_review_feedback_events)).resolves.toHaveLength(0);
   });
 
   it('records Kilo review dismissals and review-thread resolution', async () => {

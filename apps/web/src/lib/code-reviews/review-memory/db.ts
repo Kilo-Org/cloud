@@ -398,6 +398,28 @@ export async function updateFeedbackSubjectState(input: {
   return subject ?? null;
 }
 
+export async function hasFeedbackEventForSubject(input: {
+  owner: ReviewMemoryOwner;
+  subjectId: string;
+  signalKinds: ReviewMemorySignalKind[];
+  database?: ReviewMemoryDatabase;
+}): Promise<boolean> {
+  const database = databaseOrDefault(input.database);
+  const [event] = await database
+    .select({ id: code_review_feedback_events.id })
+    .from(code_review_feedback_events)
+    .where(
+      and(
+        eventOwnerWhere(input.owner),
+        eq(code_review_feedback_events.subject_id, input.subjectId),
+        inArray(code_review_feedback_events.signal_kind, input.signalKinds)
+      )
+    )
+    .limit(1);
+
+  return Boolean(event);
+}
+
 export type RecordFeedbackEventInput = {
   owner: ReviewMemoryOwner;
   platform: ReviewMemoryPlatform;

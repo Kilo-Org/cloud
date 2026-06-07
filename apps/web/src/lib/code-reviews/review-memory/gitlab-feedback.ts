@@ -8,6 +8,7 @@ import {
   createReviewMemoryDedupeHash,
   findFeedbackSubject,
   findFeedbackSubjectByExternalThreadId,
+  hasFeedbackEventForSubject,
   listFeedbackSubjectsForPullRequest,
   recordFeedbackEvent,
   refreshAggregationStateForScope,
@@ -43,6 +44,7 @@ const KILO_GITLAB_ACTOR_USERNAMES = new Set([
   'kilo_code_review_bot',
   'kilo_code_reviews',
 ]);
+const REPLY_STYLE_SIGNAL_KINDS = ['corrective_reply', 'supportive_reply'] as const;
 
 function skipped(reason: string): GitLabFeedbackResult {
   return { recorded: false, eventIds: [], reason };
@@ -192,6 +194,16 @@ export async function handleGitLabNoteFeedback(input: {
 
   if (!subject) return skipped('not-kilo-subject');
 
+  if (
+    await hasFeedbackEventForSubject({
+      owner,
+      subjectId: subject.id,
+      signalKinds: [...REPLY_STYLE_SIGNAL_KINDS],
+    })
+  ) {
+    return skipped('subject-already-has-reply-feedback');
+  }
+
   const classification = classifyReviewCommentReply(note.note);
   const eventKey = `gitlab:${input.deliveryId}:note:${note.id}`;
   const result = await recordFeedbackEvent({
@@ -264,7 +276,7 @@ export async function handleGitLabEmojiFeedback(input: {
     sentiment: sentiment.sentiment,
     strength: sentiment.strength,
     dedupeHash: createReviewMemoryDedupeHash([eventKey]),
-    evidenceExcerpt: `Emoji: ${emoji.name}`,
+    evidenceExcerpt: null,
     occurredAt: emoji.created_at ?? null,
   });
 
@@ -290,7 +302,7 @@ async function recordGitLabMrLevelSignal(input: {
     sentiment: input.sentiment,
     strength: 1,
     dedupeHash: createReviewMemoryDedupeHash([eventKey]),
-    evidenceExcerpt: input.evidenceExcerpt,
+    evidenceExcerpt: null,
     occurredAt: input.payload.object_attributes.updated_at,
   });
 }

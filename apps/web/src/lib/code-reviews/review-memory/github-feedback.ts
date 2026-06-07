@@ -7,6 +7,7 @@ import type {
 import {
   createReviewMemoryDedupeHash,
   findFeedbackSubject,
+  hasFeedbackEventForSubject,
   recordFeedbackEvent,
   upsertFeedbackSubject,
   type ReviewMemoryOwner,
@@ -36,6 +37,11 @@ const KILO_GITHUB_BOT_LOGINS = new Set([
   'kilo-code-review-bot[bot]',
   'kilocode[bot]',
 ]);
+const REPLY_STYLE_SIGNAL_KINDS = [
+  'corrective_reply',
+  'supportive_reply',
+  'autofix_requested',
+] as const;
 
 function ownerFromIntegration(integration: PlatformIntegration): ReviewMemoryOwner | null {
   if (integration.owned_by_organization_id) {
@@ -124,22 +130,35 @@ export async function handleGitHubReviewCommentFeedback(input: {
       })
     : null;
 
-  if (!subject && classification.signalKind !== 'autofix_requested') {
+  if (!subject) {
     return { recorded: false, reason: 'not-kilo-subject' };
+  }
+
+  if (
+    await hasFeedbackEventForSubject({
+      owner,
+      subjectId: subject.id,
+      signalKinds: [...REPLY_STYLE_SIGNAL_KINDS],
+    })
+  ) {
+    return { recorded: false, reason: 'subject-already-has-reply-feedback' };
   }
 
   const eventKey = `github:${input.deliveryId}:review-comment:${input.payload.comment.id}`;
   const result = await recordFeedbackEvent({
     owner,
     platform: 'github',
-    subjectId: subject?.id ?? null,
+    subjectId: subject.id,
     repoFullName: input.payload.repository.full_name,
     prNumber: input.payload.pull_request.number,
     signalKind: classification.signalKind,
     sentiment: classification.sentiment,
     strength: classification.strength,
     dedupeHash: createReviewMemoryDedupeHash([eventKey]),
-    evidenceExcerpt: input.payload.comment.body,
+    evidenceExcerpt:
+      classification.signalKind === 'autofix_requested'
+        ? 'Auto Fix requested from review comment reply.'
+        : input.payload.comment.body,
   });
 
   return { recorded: result.created, eventId: result.event.id };
@@ -200,7 +219,7 @@ export async function handleGitHubReviewFeedback(input: {
       sentiment: state === 'approved' ? 'positive' : 'negative',
       strength: 1,
       dedupeHash: createReviewMemoryDedupeHash([eventKey]),
-      evidenceExcerpt: state === 'approved' ? 'Pull request approved.' : 'Changes requested.',
+      evidenceExcerpt: null,
     });
     return { recorded: result.created, eventId: result.event.id };
   }

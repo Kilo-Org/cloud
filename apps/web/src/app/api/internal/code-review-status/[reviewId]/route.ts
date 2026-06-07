@@ -17,7 +17,7 @@
  */
 
 import type { NextRequest } from 'next/server';
-import { NextResponse } from 'next/server';
+import { after, NextResponse } from 'next/server';
 import {
   updateCodeReviewStatus,
   updateCodeReviewStatusIfNonTerminal,
@@ -145,11 +145,121 @@ async function getReviewMemoryFooterData(review: CloudAgentCodeReview) {
   return { proposalCount, url: `${APP_URL}${path}?${params.toString()}` };
 }
 
-async function shouldSyncReviewMemorySubjects(review: CloudAgentCodeReview): Promise<boolean> {
-  const owner = reviewMemoryOwnerFromReview(review);
-  if (!owner) return false;
-  const platform = review.platform === PLATFORM.GITLAB ? 'gitlab' : 'github';
-  return await isReviewMemoryEnabled({ owner, platform });
+type ReviewUsageFooterData = {
+  model: string;
+  tokensIn: number;
+  tokensOut: number;
+};
+
+type ReviewGuidanceFooterData = ReturnType<typeof getReviewGuidanceFooterData>;
+
+function scheduleGitHubReviewMemoryPostCompletion(input: {
+  reviewId: string;
+  review: CloudAgentCodeReview;
+  installationId: string;
+  repoOwner: string;
+  repoName: string;
+  appType: GitHubAppType;
+  usage?: ReviewUsageFooterData;
+  reviewGuidance: ReviewGuidanceFooterData;
+}) {
+  after(async () => {
+    try {
+      const reviewMemory = await getReviewMemoryFooterData(input.review);
+      if (reviewMemory) {
+        const existing = await findKiloReviewComment(
+          input.installationId,
+          input.repoOwner,
+          input.repoName,
+          input.review.pr_number,
+          input.appType
+        );
+        if (existing) {
+          const updatedBody = appendReviewSummaryFooter(existing.body, {
+            usage: input.usage,
+            reviewGuidance: input.reviewGuidance,
+            reviewMemory,
+          });
+          await updateKiloReviewComment(
+            input.installationId,
+            input.repoOwner,
+            input.repoName,
+            existing.commentId,
+            updatedBody,
+            input.appType
+          );
+        }
+      }
+
+      await syncGitHubReviewMemorySubjects({
+        review: input.review,
+        installationId: input.installationId,
+        appType: input.appType,
+      });
+    } catch (error) {
+      logExceptInTest('[code-review-status] Failed GitHub review memory post-processing:', {
+        reviewId: input.reviewId,
+        error,
+      });
+      captureException(error, {
+        tags: { source: 'code-review-status-review-memory-post-completion' },
+        extra: { reviewId: input.reviewId, platform: PLATFORM.GITHUB },
+      });
+    }
+  });
+}
+
+function scheduleGitLabReviewMemoryPostCompletion(input: {
+  reviewId: string;
+  review: CloudAgentCodeReview;
+  accessToken: string;
+  instanceUrl: string;
+  usage?: ReviewUsageFooterData;
+  reviewGuidance: ReviewGuidanceFooterData;
+}) {
+  after(async () => {
+    try {
+      const reviewMemory = await getReviewMemoryFooterData(input.review);
+      if (reviewMemory) {
+        const existing = await findKiloReviewNote(
+          input.accessToken,
+          input.review.repo_full_name,
+          input.review.pr_number,
+          input.instanceUrl
+        );
+        if (existing) {
+          const updatedBody = appendReviewSummaryFooter(existing.body, {
+            usage: input.usage,
+            reviewGuidance: input.reviewGuidance,
+            reviewMemory,
+          });
+          await updateKiloReviewNote(
+            input.accessToken,
+            input.review.repo_full_name,
+            input.review.pr_number,
+            existing.noteId,
+            updatedBody,
+            input.instanceUrl
+          );
+        }
+      }
+
+      await syncGitLabReviewMemorySubjects({
+        review: input.review,
+        accessToken: input.accessToken,
+        instanceUrl: input.instanceUrl,
+      });
+    } catch (error) {
+      logExceptInTest('[code-review-status] Failed GitLab review memory post-processing:', {
+        reviewId: input.reviewId,
+        error,
+      });
+      captureException(error, {
+        tags: { source: 'code-review-status-review-memory-post-completion' },
+        extra: { reviewId: input.reviewId, platform: PLATFORM.GITLAB },
+      });
+    }
+  });
 }
 
 type StatusUpdatePayload = OrchestratorPayload | CloudAgentNextCallbackPayload;
@@ -1232,9 +1342,8 @@ export async function POST(
                     ? { model, tokensIn, tokensOut }
                     : undefined;
                 const reviewGuidance = getReviewGuidanceFooterData(review);
-                const reviewMemory = await getReviewMemoryFooterData(review);
 
-                if (usage || reviewGuidance.used || reviewMemory) {
+                if (usage || reviewGuidance.used) {
                   const existing = await findKiloReviewComment(
                     integration.platform_installation_id,
                     repoOwner,
@@ -1246,7 +1355,6 @@ export async function POST(
                     const footer = {
                       usage,
                       reviewGuidance,
-                      ...(reviewMemory ? { reviewMemory } : {}),
                     };
                     const updatedBody = appendReviewSummaryFooter(existing.body, footer);
                     await updateKiloReviewComment(
@@ -1273,24 +1381,16 @@ export async function POST(
                   );
                 }
 
-                if (await shouldSyncReviewMemorySubjects(review)) {
-                  try {
-                    await syncGitHubReviewMemorySubjects({
-                      review,
-                      installationId: integration.platform_installation_id,
-                      appType,
-                    });
-                  } catch (subjectSyncError) {
-                    logExceptInTest('[code-review-status] Failed to sync GitHub review subjects:', {
-                      reviewId,
-                      error: subjectSyncError,
-                    });
-                    captureException(subjectSyncError, {
-                      tags: { source: 'code-review-status-review-memory-sync' },
-                      extra: { reviewId, platform },
-                    });
-                  }
-                }
+                scheduleGitHubReviewMemoryPostCompletion({
+                  reviewId,
+                  review,
+                  installationId: integration.platform_installation_id,
+                  repoOwner,
+                  repoName,
+                  appType,
+                  usage,
+                  reviewGuidance,
+                });
               }
             } else if (platform === PLATFORM.GITLAB) {
               const instanceUrl = getGitLabInstanceUrl(integration);
@@ -1345,9 +1445,8 @@ export async function POST(
                     ? { model, tokensIn, tokensOut }
                     : undefined;
                 const reviewGuidance = getReviewGuidanceFooterData(review);
-                const reviewMemory = await getReviewMemoryFooterData(review);
 
-                if (usage || reviewGuidance.used || reviewMemory) {
+                if (usage || reviewGuidance.used) {
                   const existing = await findKiloReviewNote(
                     accessToken,
                     review.repo_full_name,
@@ -1358,7 +1457,6 @@ export async function POST(
                     const footer = {
                       usage,
                       reviewGuidance,
-                      ...(reviewMemory ? { reviewMemory } : {}),
                     };
                     const updatedBody = appendReviewSummaryFooter(existing.body, footer);
                     await updateKiloReviewNote(
@@ -1385,24 +1483,14 @@ export async function POST(
                   );
                 }
 
-                if (await shouldSyncReviewMemorySubjects(review)) {
-                  try {
-                    await syncGitLabReviewMemorySubjects({
-                      review,
-                      accessToken,
-                      instanceUrl,
-                    });
-                  } catch (subjectSyncError) {
-                    logExceptInTest('[code-review-status] Failed to sync GitLab review subjects:', {
-                      reviewId,
-                      error: subjectSyncError,
-                    });
-                    captureException(subjectSyncError, {
-                      tags: { source: 'code-review-status-review-memory-sync' },
-                      extra: { reviewId, platform },
-                    });
-                  }
-                }
+                scheduleGitLabReviewMemoryPostCompletion({
+                  reviewId,
+                  review,
+                  accessToken,
+                  instanceUrl,
+                  usage,
+                  reviewGuidance,
+                });
               }
             }
           } catch (postCompletionError) {

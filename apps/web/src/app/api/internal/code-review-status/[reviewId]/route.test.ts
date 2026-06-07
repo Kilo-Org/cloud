@@ -82,8 +82,22 @@ const mockSyncGitLabReviewMemorySubjects = jest.fn<any>();
 const mockDisableCodeReviewForActionRequiredFailure = jest.fn<any>();
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const mockIsReviewMemoryEnabled = jest.fn<any>();
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const mockCountActionableProposals = jest.fn<any>();
+const mockAfterCallbacks: (() => Promise<void>)[] = [];
+
+async function flushAfter() {
+  await Promise.all(mockAfterCallbacks.splice(0).map(callback => callback()));
+}
 
 // --- Module mocks ---
+
+jest.mock('next/server', () => ({
+  ...(jest.requireActual('next/server') as Record<string, unknown>),
+  after: (fn: () => Promise<void>) => {
+    mockAfterCallbacks.push(fn);
+  },
+}));
 
 jest.mock('@/lib/config.server', () => ({
   CALLBACK_TOKEN_SECRET: 'test-callback-token-secret',
@@ -159,6 +173,10 @@ jest.mock('@/lib/code-reviews/review-memory/sync-subjects', () => ({
 
 jest.mock('@/lib/code-reviews/review-memory/settings', () => ({
   isReviewMemoryEnabled: (...args: unknown[]) => mockIsReviewMemoryEnabled(...args),
+}));
+
+jest.mock('@/lib/code-reviews/review-memory/db', () => ({
+  countActionableProposals: (...args: unknown[]) => mockCountActionableProposals(...args),
 }));
 
 jest.mock('@/lib/code-reviews/action-required', () => {
@@ -317,6 +335,7 @@ let POST: typeof POSTType;
 
 beforeEach(async () => {
   jest.clearAllMocks();
+  mockAfterCallbacks.splice(0);
   defaultCallbackToken = await deriveCallbackToken({
     secret: CALLBACK_SECRET,
     scope: 'code-review-status-callback',
@@ -366,6 +385,7 @@ beforeEach(async () => {
   mockSyncGitLabReviewMemorySubjects.mockResolvedValue({ summarySynced: true, inlineSynced: 0 });
   mockDisableCodeReviewForActionRequiredFailure.mockResolvedValue(undefined);
   mockIsReviewMemoryEnabled.mockResolvedValue(true);
+  mockCountActionableProposals.mockResolvedValue(0);
   ({ POST } = await import('./route'));
 });
 
@@ -1894,6 +1914,10 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         'body with footer',
         'standard'
       );
+      expect(mockSyncGitHubReviewMemorySubjects).not.toHaveBeenCalled();
+
+      await flushAfter();
+
       expect(mockSyncGitHubReviewMemorySubjects).toHaveBeenCalledWith({
         review,
         installationId: 'inst-1',
@@ -1935,6 +1959,10 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         'body with footer',
         'https://gitlab.com'
       );
+      expect(mockSyncGitLabReviewMemorySubjects).not.toHaveBeenCalled();
+
+      await flushAfter();
+
       expect(mockSyncGitLabReviewMemorySubjects).toHaveBeenCalledWith({
         review,
         accessToken: 'mock-token',
@@ -1977,6 +2005,10 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
 
       expect(mockAppendReviewSummaryFooter).not.toHaveBeenCalled();
       expect(mockUpdateKiloReviewComment).not.toHaveBeenCalled();
+      expect(mockSyncGitHubReviewMemorySubjects).not.toHaveBeenCalled();
+
+      await flushAfter();
+
       expect(mockSyncGitHubReviewMemorySubjects).toHaveBeenCalledWith({
         review,
         installationId: 'inst-1',
@@ -1984,7 +2016,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       });
     });
 
-    it('does not append memory footer links or sync subjects when review memory is disabled', async () => {
+    it('does not append memory footer links when review memory is disabled', async () => {
       mockIsReviewMemoryEnabled.mockResolvedValue(false);
       const review = makeReview({
         repository_review_instructions_used: false,
@@ -2001,10 +2033,22 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       expect(mockAppendReviewSummaryFooter).not.toHaveBeenCalled();
       expect(mockUpdateKiloReviewComment).not.toHaveBeenCalled();
       expect(mockSyncGitHubReviewMemorySubjects).not.toHaveBeenCalled();
+      expect(mockIsReviewMemoryEnabled).not.toHaveBeenCalled();
+
+      await flushAfter();
+
+      expect(mockAppendReviewSummaryFooter).not.toHaveBeenCalled();
+      expect(mockUpdateKiloReviewComment).not.toHaveBeenCalled();
+      expect(mockSyncGitHubReviewMemorySubjects).toHaveBeenCalledWith({
+        review,
+        installationId: 'inst-1',
+        appType: 'standard',
+      });
       expect(mockIsReviewMemoryEnabled).toHaveBeenCalledWith({
         owner: { type: 'user', id: 'user-1' },
         platform: 'github',
       });
+      expect(mockIsReviewMemoryEnabled).toHaveBeenCalledTimes(1);
     });
   });
 });

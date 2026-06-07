@@ -121,12 +121,21 @@ export async function syncFetchedReviewMemorySubjects(
 ): Promise<SyncReviewMemorySubjectsResult> {
   const owner = ownerFromReview(input.review);
   if (!owner) return { summarySynced: false, inlineSynced: 0 };
+
+  const shouldSyncSummary = input.summary?.body.includes(KILO_REVIEW_MARKER) ?? false;
+  const inlineCandidates = input.inlineComments.filter(comment =>
+    isLikelyKiloInlineReviewBody(comment.body)
+  );
+  if (!shouldSyncSummary && inlineCandidates.length === 0) {
+    return { summarySynced: false, inlineSynced: 0 };
+  }
+
   if (!(await isReviewMemoryEnabled({ owner, platform: input.platform }))) {
     return { summarySynced: false, inlineSynced: 0 };
   }
 
   let summarySynced = false;
-  if (input.summary?.body.includes(KILO_REVIEW_MARKER)) {
+  if (shouldSyncSummary && input.summary) {
     await upsertFeedbackSubject({
       owner,
       platform: input.platform,
@@ -142,8 +151,7 @@ export async function syncFetchedReviewMemorySubjects(
   }
 
   let inlineSynced = 0;
-  for (const comment of input.inlineComments) {
-    if (!isLikelyKiloInlineReviewBody(comment.body)) continue;
+  for (const comment of inlineCandidates) {
     const metadata = parseReviewFindingMetadata(comment.body);
     await upsertFeedbackSubject({
       owner,

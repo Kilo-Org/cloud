@@ -196,6 +196,7 @@ describe('reviewMemoryRouter', () => {
     expect(mockDispatchManualReviewMemoryAggregation).toHaveBeenCalledWith({
       limit: 1,
       stateId: expect.any(String),
+      bypassEligibleCooldown: true,
     });
   });
 

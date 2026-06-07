@@ -124,6 +124,7 @@ type ProcessAggregationScopeResult = {
 export type DispatchReviewMemoryAggregationOptions = {
   limit?: number;
   stateId?: string;
+  bypassEligibleCooldown?: boolean;
   now?: Date;
   generateOpportunities?: (
     input: ReviewMemoryAggregationGeneratorInput
@@ -524,6 +525,7 @@ export async function dispatchManualReviewMemoryAggregation(
     minDistinctSubjects: REVIEW_MEMORY_AGGREGATION_THRESHOLDS.minDistinctSubjects,
     minDistinctPrs: REVIEW_MEMORY_AGGREGATION_THRESHOLDS.minDistinctPrs,
     staleAfterMs: REVIEW_MEMORY_AGGREGATION_THRESHOLDS.staleClaimMs,
+    bypassEligibleCooldown: options.bypassEligibleCooldown,
     now,
   });
 

@@ -66,7 +66,12 @@ export function ReviewMemoryPanel({ organizationId, platform }: ReviewMemoryPane
     setRationale(selectedProposal.rationale);
     setProposedMarkdown(selectedProposal.proposed_markdown);
     setIsEditing(false);
-  }, [selectedProposal?.id]);
+  }, [
+    selectedProposal?.id,
+    selectedProposal?.proposed_markdown,
+    selectedProposal?.rationale,
+    selectedProposal?.title,
+  ]);
 
   const invalidateReviewMemory = async () => {
     await Promise.all([
@@ -100,8 +105,21 @@ export function ReviewMemoryPanel({ organizationId, platform }: ReviewMemoryPane
 
   const triggerAnalysis = useMutation(
     trpc.reviewMemory.triggerAnalysis.mutationOptions({
-      onSuccess: async () => {
-        toast.success('Review memory analysis queued');
+      onSuccess: async result => {
+        if (result.summary.failed > 0) {
+          toast.error('Could not analyze feedback', {
+            description: 'Review memory analysis failed. Try again in a minute.',
+          });
+        } else if (result.summary.completed > 0) {
+          toast.success('Review memory analysis completed', {
+            description:
+              result.summary.proposals > 0
+                ? `Created ${result.summary.proposals} memory proposal${result.summary.proposals === 1 ? '' : 's'}.`
+                : 'No new memory proposals were created.',
+          });
+        } else {
+          toast.info('No eligible feedback to analyze');
+        }
         await invalidateReviewMemory();
       },
       onError: error => toast.error('Could not analyze feedback', { description: error.message }),

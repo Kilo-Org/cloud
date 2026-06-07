@@ -478,6 +478,17 @@ describe('review memory db helpers', () => {
       proposedMarkdown: '### Expired opened proposal',
       dedupeKey: 'retention-opened-prune-proposal',
     });
+    const approvedProposal = await upsertReviewMemoryProposal({
+      owner,
+      platform: 'github',
+      repoFullName: 'owner/expired',
+      scopeKind: 'repository',
+      proposalType: 'clarify',
+      title: 'Expired approved proposal',
+      rationale: 'It has been approved by a maintainer.',
+      proposedMarkdown: '### Expired approved proposal',
+      dedupeKey: 'retention-approved-prune-proposal',
+    });
     await db
       .update(code_review_feedback_subjects)
       .set({
@@ -504,15 +515,23 @@ describe('review memory db helpers', () => {
         change_request_url: 'https://github.com/owner/expired/pull/12',
       })
       .where(eq(code_review_memory_proposals.id, openedProposal.id));
+    await db
+      .update(code_review_memory_proposals)
+      .set({
+        created_at: expiredCreatedAt,
+        updated_at: expiredCreatedAt,
+        status: 'approved',
+      })
+      .where(eq(code_review_memory_proposals.id, approvedProposal.id));
 
     const summary = await pruneExpiredReviewMemoryData({ now });
 
     expect(summary).toEqual({
       cutoff: '2026-05-18T00:00:00.000Z',
-      proposalsDeleted: 2,
+      proposalsDeleted: 1,
       feedbackEventsDeleted: 1,
       subjectsDeleted: 1,
-      aggregationStatesDeleted: 1,
+      aggregationStatesDeleted: 0,
     });
 
     await expect(db.select().from(code_review_feedback_events)).resolves.toEqual([
@@ -522,15 +541,25 @@ describe('review memory db helpers', () => {
       expect.objectContaining({ id: retainedSubject.id }),
     ]);
     const proposals = await db.select().from(code_review_memory_proposals);
-    expect(proposals).toEqual([expect.objectContaining({ id: retainedProposal.id })]);
+    expect(proposals).toHaveLength(3);
+    expect(proposals).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: retainedProposal.id }),
+        expect.objectContaining({ id: openedProposal.id }),
+        expect.objectContaining({ id: approvedProposal.id }),
+      ])
+    );
 
-    const [state] = await listAggregationStates({ owner, platform: 'github' });
-    expect(state).toEqual(
-      expect.objectContaining({
-        repo_full_name: 'owner/retained',
-        fresh_event_count: 1,
-        fresh_weight: 4,
-      })
+    const states = await listAggregationStates({ owner, platform: 'github' });
+    expect(states).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          repo_full_name: 'owner/retained',
+          fresh_event_count: 1,
+          fresh_weight: 4,
+        }),
+        expect.objectContaining({ repo_full_name: 'owner/expired' }),
+      ])
     );
   });
 
@@ -572,5 +601,34 @@ describe('review memory db helpers', () => {
 
     expect(summary.feedbackEventsDeleted).toBe(2);
     await expect(db.select().from(code_review_feedback_events)).resolves.toHaveLength(0);
+  });
+
+  it('stops review memory pruning at the global max batch cap', async () => {
+    const user = await insertTestUser();
+    const owner = { type: 'user' as const, id: user.id };
+    const expiredCreatedAt = '2026-05-01T00:00:00.000Z';
+    const now = new Date('2026-06-01T00:00:00.000Z');
+
+    for (let i = 0; i < 3; i += 1) {
+      const result = await recordFeedbackEvent({
+        owner,
+        platform: 'github',
+        repoFullName: 'owner/repo',
+        prNumber: i + 1,
+        signalKind: 'corrective_reply',
+        sentiment: 'negative',
+        strength: 3,
+        dedupeHash: `retention-max-batches-${i}`,
+      });
+      await db
+        .update(code_review_feedback_events)
+        .set({ created_at: expiredCreatedAt, occurred_at: expiredCreatedAt })
+        .where(eq(code_review_feedback_events.id, result.event.id));
+    }
+
+    const summary = await pruneExpiredReviewMemoryData({ now, batchSize: 1, maxBatches: 2 });
+
+    expect(summary.feedbackEventsDeleted).toBe(2);
+    await expect(db.select().from(code_review_feedback_events)).resolves.toHaveLength(1);
   });
 });

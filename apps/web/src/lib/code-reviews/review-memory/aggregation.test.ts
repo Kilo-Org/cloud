@@ -14,7 +14,12 @@ import {
   dispatchManualReviewMemoryAggregation,
   type ReviewMemoryAggregationGeneratorInput,
 } from './aggregation';
-import { recordFeedbackEvent, upsertFeedbackSubject, type ReviewMemoryOwner } from './db';
+import {
+  recordFeedbackEvent,
+  refreshAggregationStateForScope,
+  upsertFeedbackSubject,
+  type ReviewMemoryOwner,
+} from './db';
 
 describe('review memory aggregation', () => {
   afterEach(async () => {
@@ -191,6 +196,69 @@ describe('review memory aggregation', () => {
       .from(code_review_memory_aggregation_state)
       .where(eq(code_review_memory_aggregation_state.repo_full_name, 'acme/other'));
     expect(otherState.status).toBe('eligible');
+  });
+
+  it('can bypass successful cooldown for eligible manual aggregation', async () => {
+    const user = await insertTestUser();
+    const owner = { type: 'user' as const, id: user.id };
+    const now = new Date('2026-06-01T00:00:00.000Z');
+    await enableReviewMemory(owner);
+    await seedActionableFeedback(owner, 'acme/cooldown');
+    await db
+      .update(code_review_memory_aggregation_state)
+      .set({
+        status: 'eligible',
+        next_eligible_at: '2026-06-02T00:00:00.000Z',
+      })
+      .where(eq(code_review_memory_aggregation_state.repo_full_name, 'acme/cooldown'));
+    const generateOpportunities = jest.fn(async () => ({ opportunities: [] }));
+
+    await expect(
+      dispatchManualReviewMemoryAggregation({ now, generateOpportunities })
+    ).resolves.toEqual({ claimed: 0, completed: 0, skipped: 0, failed: 0, proposals: 0 });
+    await expect(
+      dispatchManualReviewMemoryAggregation({
+        now,
+        bypassEligibleCooldown: true,
+        generateOpportunities,
+      })
+    ).resolves.toEqual({ claimed: 1, completed: 1, skipped: 0, failed: 0, proposals: 0 });
+  });
+
+  it('does not bypass failed retry backoff during manual aggregation', async () => {
+    const user = await insertTestUser();
+    const owner = { type: 'user' as const, id: user.id };
+    const now = new Date('2026-06-01T00:00:00.000Z');
+    await enableReviewMemory(owner);
+    await seedActionableFeedback(owner, 'acme/failed-backoff');
+    await db
+      .update(code_review_memory_aggregation_state)
+      .set({
+        status: 'failed',
+        next_eligible_at: '2026-06-02T00:00:00.000Z',
+      })
+      .where(eq(code_review_memory_aggregation_state.repo_full_name, 'acme/failed-backoff'));
+    await refreshAggregationStateForScope({
+      owner,
+      platform: 'github',
+      repoFullName: 'acme/failed-backoff',
+      now,
+    });
+    const generateOpportunities = jest.fn(async () => ({ opportunities: [] }));
+
+    const summary = await dispatchManualReviewMemoryAggregation({
+      now,
+      bypassEligibleCooldown: true,
+      generateOpportunities,
+    });
+
+    expect(summary).toEqual({ claimed: 0, completed: 0, skipped: 0, failed: 0, proposals: 0 });
+    expect(generateOpportunities).not.toHaveBeenCalled();
+    const [state] = await db
+      .select()
+      .from(code_review_memory_aggregation_state)
+      .where(eq(code_review_memory_aggregation_state.repo_full_name, 'acme/failed-backoff'));
+    expect(state.status).toBe('failed');
   });
 
   it('keeps events outside processed clusters fresh', async () => {

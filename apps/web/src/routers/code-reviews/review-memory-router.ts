@@ -261,7 +261,11 @@ export const reviewMemoryRouter = createTRPCRouter({
         repoFullName: input.repoFullName,
         platformProjectId: input.platformProjectId,
       });
-      const summary = await dispatchManualReviewMemoryAggregation({ limit: 1, stateId: state.id });
+      const summary = await dispatchManualReviewMemoryAggregation({
+        limit: 1,
+        stateId: state.id,
+        bypassEligibleCooldown: true,
+      });
       const refreshedState = await refreshAggregationStateForScope({
         owner,
         platform: input.platform,

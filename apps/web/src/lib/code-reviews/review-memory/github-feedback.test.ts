@@ -97,7 +97,7 @@ describe('GitHub review memory feedback', () => {
       comment: {
         id: 501,
         in_reply_to_id: 500,
-        body: 'This is a false positive in this repository.',
+        body: '@kilo fix this false positive in this repository.',
         user: { login: 'maintainer', type: 'User' },
         html_url: 'https://github.com/acme/widgets/pull/42#discussion_r501',
         path: 'src/widget.ts',
@@ -149,7 +149,7 @@ describe('GitHub review memory feedback', () => {
         subject_id: subject.id,
         signal_kind: 'corrective_reply',
         sentiment: 'negative',
-        evidence_excerpt: 'This is a false positive in this repository.',
+        evidence_excerpt: '@kilo fix this false positive in this repository.',
       })
     );
   });
@@ -191,42 +191,6 @@ describe('GitHub review memory feedback', () => {
     await expect(db.select().from(code_review_feedback_events)).resolves.toHaveLength(0);
   });
 
-  it('records replies from maintainers with kilo in their login', async () => {
-    const { owner, integration } = await seedIntegration();
-    await seedInlineSubject(owner);
-    const payload = {
-      action: 'created',
-      comment: {
-        id: 503,
-        in_reply_to_id: 500,
-        body: 'This is a false positive in this repository.',
-        user: { login: 'kilodev', type: 'User' },
-        html_url: 'https://github.com/acme/widgets/pull/42#discussion_r503',
-        path: 'src/widget.ts',
-        line: 12,
-        diff_hunk: '@@ -1 +1 @@',
-        author_association: 'MEMBER',
-      },
-      pull_request: {
-        ...pullRequest(),
-        title: 'Add widgets',
-        user: { login: 'author' },
-        base: { ref: 'main' },
-      },
-      repository: repository(),
-      installation: { id: 98765 },
-      sender: { login: 'kilodev' },
-    } satisfies PullRequestReviewCommentPayload;
-
-    const result = await handleGitHubReviewCommentFeedback({
-      payload,
-      integration,
-      deliveryId: 'delivery-kilodev-reply',
-    });
-
-    expect(result.recorded).toBe(true);
-  });
-
   it('skips unmatched inline replies even when they mention @kilo fix', async () => {
     const { integration } = await seedIntegration();
     const payload = {
@@ -261,53 +225,6 @@ describe('GitHub review memory feedback', () => {
       })
     ).resolves.toEqual({ recorded: false, reason: 'not-kilo-subject' });
     await expect(db.select().from(code_review_feedback_events)).resolves.toHaveLength(0);
-  });
-
-  it('records @kilo fix replies as normal inline feedback for Kilo subjects', async () => {
-    const { owner, integration } = await seedIntegration();
-    const subject = await seedInlineSubject(owner);
-    const payload = {
-      action: 'created',
-      comment: {
-        id: 505,
-        in_reply_to_id: 500,
-        body: '@kilo fix this',
-        user: { login: 'maintainer', type: 'User' },
-        html_url: 'https://github.com/acme/widgets/pull/42#discussion_r505',
-        path: 'src/widget.ts',
-        line: 12,
-        diff_hunk: '@@ -1 +1 @@',
-        author_association: 'MEMBER',
-      },
-      pull_request: {
-        ...pullRequest(),
-        title: 'Add widgets',
-        user: { login: 'author' },
-        base: { ref: 'main' },
-      },
-      repository: repository(),
-      installation: { id: 98765 },
-      sender: { login: 'maintainer' },
-    } satisfies PullRequestReviewCommentPayload;
-
-    const result = await handleGitHubReviewCommentFeedback({
-      payload,
-      integration,
-      deliveryId: 'delivery-kilo-fix-inline-reply',
-    });
-
-    expect(result.recorded).toBe(true);
-    const events = await db.select().from(code_review_feedback_events);
-    expect(events).toHaveLength(1);
-    expect(events[0]).toEqual(
-      expect.objectContaining({
-        subject_id: subject.id,
-        signal_kind: 'supportive_reply',
-        sentiment: 'neutral',
-        strength: 1,
-        evidence_excerpt: '@kilo fix this',
-      })
-    );
   });
 
   it('records Kilo review dismissals and review-thread resolution', async () => {

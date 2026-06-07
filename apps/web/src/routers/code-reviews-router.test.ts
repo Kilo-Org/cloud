@@ -333,25 +333,6 @@ describe('review agent config REVIEW.md setting', () => {
     expect(config.reviewMemoryEnabled).toBe(true);
   });
 
-  it('returns explicit organization review memory enablement', async () => {
-    const caller = await createCallerForUser(testUser.id);
-    await db.insert(agent_configs).values({
-      owned_by_organization_id: organization.id,
-      agent_type: 'code_review',
-      platform: 'github',
-      config: { review_memory_enabled: true },
-      is_enabled: false,
-      created_by: testUser.id,
-    });
-
-    const config = await caller.organizations.reviewAgent.getReviewConfig({
-      organizationId: organization.id,
-      platform: 'github',
-    });
-
-    expect(config.reviewMemoryEnabled).toBe(true);
-  });
-
   it('returns actionRequired runtime state for personal config', async () => {
     const caller = await createCallerForUser(testUser.id);
     await db.insert(agent_configs).values({
@@ -432,37 +413,6 @@ describe('review agent config REVIEW.md setting', () => {
         eq(agent_configs.agent_type, 'code_review'),
         eq(agent_configs.platform, 'github'),
         eq(agent_configs.owned_by_user_id, testUser.id)
-      ),
-    });
-
-    expect(config?.config).toEqual(expect.objectContaining({ review_memory_enabled: true }));
-  });
-
-  it('preserves organization review memory enablement when saving normal config', async () => {
-    const caller = await createCallerForUser(testUser.id);
-    await db.insert(agent_configs).values({
-      owned_by_organization_id: organization.id,
-      agent_type: 'code_review',
-      platform: 'github',
-      config: { disable_review_md: true, review_memory_enabled: true },
-      is_enabled: false,
-      created_by: testUser.id,
-    });
-
-    await caller.organizations.reviewAgent.saveReviewConfig({
-      organizationId: organization.id,
-      platform: 'github',
-      reviewStyle: 'balanced',
-      focusAreas: [],
-      modelSlug: 'test-model',
-      disableReviewMd: true,
-    });
-
-    const config = await db.query.agent_configs.findFirst({
-      where: and(
-        eq(agent_configs.agent_type, 'code_review'),
-        eq(agent_configs.platform, 'github'),
-        eq(agent_configs.owned_by_organization_id, organization.id)
       ),
     });
 

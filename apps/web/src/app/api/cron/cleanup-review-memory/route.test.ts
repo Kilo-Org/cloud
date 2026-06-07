@@ -24,21 +24,16 @@ describe('GET /api/cron/cleanup-review-memory', () => {
     jest.clearAllMocks();
   });
 
-  it('rejects requests without cron authorization', async () => {
-    const response = await GET(makeRequest());
+  it.each([undefined, { authorization: 'Bearer wrong-secret' }])(
+    'rejects requests without valid cron authorization',
+    async headers => {
+      const response = await GET(makeRequest(headers));
 
-    expect(response.status).toBe(401);
-    await expect(response.json()).resolves.toEqual({ error: 'Unauthorized' });
-    expect(mockPruneExpiredReviewMemoryData).not.toHaveBeenCalled();
-  });
-
-  it('rejects requests with invalid cron authorization', async () => {
-    const response = await GET(makeRequest({ authorization: 'Bearer wrong-secret' }));
-
-    expect(response.status).toBe(401);
-    await expect(response.json()).resolves.toEqual({ error: 'Unauthorized' });
-    expect(mockPruneExpiredReviewMemoryData).not.toHaveBeenCalled();
-  });
+      expect(response.status).toBe(401);
+      await expect(response.json()).resolves.toEqual({ error: 'Unauthorized' });
+      expect(mockPruneExpiredReviewMemoryData).not.toHaveBeenCalled();
+    }
+  );
 
   it('prunes review memory data when authorized', async () => {
     mockPruneExpiredReviewMemoryData.mockResolvedValue({

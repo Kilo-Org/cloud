@@ -21,9 +21,6 @@ describe('review memory settings', () => {
 
     await expect(isReviewMemoryEnabled({ owner, platform: 'github' })).resolves.toBe(false);
     expect(getReviewMemoryEnabledFromConfig({ disable_review_md: true })).toBe(false);
-  });
-
-  it('reads explicit enabled and disabled values', async () => {
     expect(getReviewMemoryEnabledFromConfig({ review_memory_enabled: true })).toBe(true);
     expect(getReviewMemoryEnabledFromConfig({ review_memory_enabled: false })).toBe(false);
   });

@@ -1,7 +1,6 @@
 import {
   appendReviewSummaryFooter,
   appendUsageFooter,
-  buildReviewMemoryFooter,
   buildReviewGuidanceFooter,
   buildUsageFooter,
   stripReviewSummaryFooter,
@@ -72,17 +71,18 @@ describe('appendReviewSummaryFooter', () => {
     expect(result.match(/^---$/gm)?.length).toBe(1);
   });
 
-  it('appends review memory proposal links in the managed footer', () => {
+  it('appends escaped review memory proposal links in the managed footer', () => {
     const result = appendReviewSummaryFooter('body', {
       reviewMemory: {
-        proposalCount: 2,
-        url: 'https://app.kilo.ai/code-reviews?platform=github&tab=memory&repo=owner%2Frepo',
+        proposalCount: 1,
+        url: 'https://x.test/?a=<tag>&b=1',
       },
     });
 
     expect(result).toContain('<!-- kilo-review-memory -->');
-    expect(result).toContain('2 open proposals');
-    expect(result).toContain('tab=memory');
+    expect(result).toContain('1 open proposal');
+    expect(result).toContain('&lt;tag&gt;&amp;b=1');
+    expect(result).not.toContain('<tag>');
   });
 
   it('replaces old footer content with exactly one usage marker and one guidance marker', () => {
@@ -174,19 +174,6 @@ describe('appendUsageFooter', () => {
     expect(result).toContain('org/model-name');
     expect(result).toContain('300 tokens');
     expect(result).toContain('<!-- kilo-usage -->');
-  });
-});
-
-describe('buildReviewMemoryFooter', () => {
-  it('escapes review memory URLs', () => {
-    const footer = buildReviewMemoryFooter({
-      proposalCount: 1,
-      url: 'https://x.test/?a=<tag>&b=1',
-    });
-
-    expect(footer).toContain('<!-- kilo-review-memory -->');
-    expect(footer).toContain('1 open proposal');
-    expect(footer).toContain('&lt;tag&gt;&amp;b=1');
   });
 });
 

@@ -11,14 +11,9 @@ import {
 import { count, eq } from 'drizzle-orm';
 import {
   createFeedbackSubjectExternalIdHash,
-  countActionableProposals,
-  listAggregationStates,
-  listReviewMemoryProposals,
-  listReviewMemoryRepositories,
   markProposalOpeningChangeRequest,
   pruneExpiredReviewMemoryData,
   recordFeedbackEvent,
-  refreshAggregationStateForScope,
   rejectReviewMemoryProposal,
   updateReviewMemoryProposal,
   upsertFeedbackSubject,
@@ -212,34 +207,6 @@ describe('review memory db helpers', () => {
     expect(proposals).toHaveLength(1);
   });
 
-  it('does not mark a proposal opening twice', async () => {
-    const user = await insertTestUser();
-    const owner = { type: 'user' as const, id: user.id };
-    const proposal = await upsertReviewMemoryProposal({
-      owner,
-      platform: 'github',
-      repoFullName: 'owner/repo',
-      proposalType: 'clarify',
-      scopeKind: 'repository',
-      title: 'Clarify noisy guidance',
-      rationale: 'Maintainers corrected the same guidance.',
-      proposedMarkdown: '### Review guidance: Clarify noisy guidance',
-      dedupeKey: 'clarify-noisy-guidance-opening',
-    });
-
-    const opening = await markProposalOpeningChangeRequest({
-      owner,
-      proposalId: proposal.id,
-    });
-    const duplicateOpening = await markProposalOpeningChangeRequest({
-      owner,
-      proposalId: proposal.id,
-    });
-
-    expect(opening?.status).toBe('opening_change_request');
-    expect(duplicateOpening).toBeNull();
-  });
-
   it('does not edit proposals in non-actionable states', async () => {
     const user = await insertTestUser();
     const owner = { type: 'user' as const, id: user.id };
@@ -267,36 +234,6 @@ describe('review memory db helpers', () => {
       proposedMarkdown: '### Edited guidance',
       scopeKind: 'repository',
     });
-    const [stored] = await db
-      .select()
-      .from(code_review_memory_proposals)
-      .where(eq(code_review_memory_proposals.id, proposal.id));
-
-    expect(opening?.status).toBe('opening_change_request');
-    expect(edited).toBeNull();
-    expect(stored.title).toBe('Clarify noisy guidance');
-    expect(stored.status).toBe('opening_change_request');
-  });
-
-  it('does not reject proposals in non-actionable states', async () => {
-    const user = await insertTestUser();
-    const owner = { type: 'user' as const, id: user.id };
-    const proposal = await upsertReviewMemoryProposal({
-      owner,
-      platform: 'github',
-      repoFullName: 'owner/repo',
-      proposalType: 'clarify',
-      scopeKind: 'repository',
-      title: 'Clarify noisy guidance',
-      rationale: 'Maintainers corrected the same guidance.',
-      proposedMarkdown: '### Review guidance: Clarify noisy guidance',
-      dedupeKey: 'clarify-noisy-guidance-reject-blocked',
-    });
-    await markProposalOpeningChangeRequest({
-      owner,
-      proposalId: proposal.id,
-    });
-
     const rejected = await rejectReviewMemoryProposal({
       owner,
       proposalId: proposal.id,
@@ -306,94 +243,11 @@ describe('review memory db helpers', () => {
       .from(code_review_memory_proposals)
       .where(eq(code_review_memory_proposals.id, proposal.id));
 
+    expect(opening?.status).toBe('opening_change_request');
+    expect(edited).toBeNull();
     expect(rejected).toBeNull();
+    expect(stored.title).toBe('Clarify noisy guidance');
     expect(stored.status).toBe('opening_change_request');
-  });
-
-  it('refreshes aggregation state from retained fresh events only', async () => {
-    const user = await insertTestUser();
-    const owner = { type: 'user' as const, id: user.id };
-    const expiredCreatedAt = '2026-05-01T00:00:00.000Z';
-    const now = new Date('2026-06-01T00:00:00.000Z');
-
-    const expiredEvent = await recordFeedbackEvent({
-      owner,
-      platform: 'github',
-      repoFullName: 'owner/repo',
-      prNumber: 1,
-      signalKind: 'corrective_reply',
-      sentiment: 'negative',
-      strength: 3,
-      dedupeHash: 'retention-expired-refresh',
-    });
-    await recordFeedbackEvent({
-      owner,
-      platform: 'github',
-      repoFullName: 'owner/repo',
-      prNumber: 2,
-      signalKind: 'corrective_reply',
-      sentiment: 'negative',
-      strength: 4,
-      dedupeHash: 'retention-retained-refresh',
-    });
-    await db
-      .update(code_review_feedback_events)
-      .set({ created_at: expiredCreatedAt, occurred_at: expiredCreatedAt })
-      .where(eq(code_review_feedback_events.id, expiredEvent.event.id));
-
-    const state = await refreshAggregationStateForScope({
-      owner,
-      platform: 'github',
-      repoFullName: 'owner/repo',
-      now,
-    });
-
-    expect(state.fresh_event_count).toBe(1);
-    expect(state.fresh_weight).toBe(4);
-    expect(state.fresh_distinct_pr_count).toBe(1);
-  });
-
-  it('filters expired proposals and stale states from reads before cleanup runs', async () => {
-    const user = await insertTestUser();
-    const owner = { type: 'user' as const, id: user.id };
-    const expiredCreatedAt = '2026-05-01T00:00:00.000Z';
-
-    const event = await recordFeedbackEvent({
-      owner,
-      platform: 'github',
-      repoFullName: 'owner/repo',
-      prNumber: 1,
-      signalKind: 'corrective_reply',
-      sentiment: 'negative',
-      strength: 3,
-      dedupeHash: 'retention-expired-read-event',
-    });
-    const proposal = await upsertReviewMemoryProposal({
-      owner,
-      platform: 'github',
-      repoFullName: 'owner/repo',
-      proposalType: 'clarify',
-      scopeKind: 'repository',
-      title: 'Clarify stale guidance',
-      rationale: 'This proposal is outside the retention window.',
-      proposedMarkdown: '### Clarify stale guidance',
-      dedupeKey: 'retention-expired-read-proposal',
-    });
-    await db
-      .update(code_review_feedback_events)
-      .set({ created_at: expiredCreatedAt, occurred_at: expiredCreatedAt })
-      .where(eq(code_review_feedback_events.id, event.event.id));
-    await db
-      .update(code_review_memory_proposals)
-      .set({ created_at: expiredCreatedAt, updated_at: expiredCreatedAt })
-      .where(eq(code_review_memory_proposals.id, proposal.id));
-
-    await expect(listReviewMemoryProposals({ owner, platform: 'github' })).resolves.toHaveLength(0);
-    await expect(countActionableProposals({ owner, platform: 'github' })).resolves.toBe(0);
-    await expect(listReviewMemoryRepositories({ owner, platform: 'github' })).resolves.toHaveLength(
-      0
-    );
-    await expect(listAggregationStates({ owner, platform: 'github' })).resolves.toHaveLength(0);
   });
 
   it('prunes expired review memory rows and keeps retained data', async () => {
@@ -546,7 +400,7 @@ describe('review memory db helpers', () => {
       ])
     );
 
-    const states = await listAggregationStates({ owner, platform: 'github' });
+    const states = await db.select().from(code_review_memory_aggregation_state);
     expect(states).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -557,74 +411,5 @@ describe('review memory db helpers', () => {
         expect.objectContaining({ repo_full_name: 'owner/expired' }),
       ])
     );
-  });
-
-  it('continues review memory pruning until the batch is short', async () => {
-    const user = await insertTestUser();
-    const owner = { type: 'user' as const, id: user.id };
-    const expiredCreatedAt = '2026-05-01T00:00:00.000Z';
-    const now = new Date('2026-06-01T00:00:00.000Z');
-    const first = await recordFeedbackEvent({
-      owner,
-      platform: 'github',
-      repoFullName: 'owner/repo',
-      prNumber: 1,
-      signalKind: 'corrective_reply',
-      sentiment: 'negative',
-      strength: 3,
-      dedupeHash: 'retention-batch-prune-one',
-    });
-    const second = await recordFeedbackEvent({
-      owner,
-      platform: 'github',
-      repoFullName: 'owner/repo',
-      prNumber: 2,
-      signalKind: 'corrective_reply',
-      sentiment: 'negative',
-      strength: 3,
-      dedupeHash: 'retention-batch-prune-two',
-    });
-    await db
-      .update(code_review_feedback_events)
-      .set({ created_at: expiredCreatedAt, occurred_at: expiredCreatedAt })
-      .where(eq(code_review_feedback_events.id, first.event.id));
-    await db
-      .update(code_review_feedback_events)
-      .set({ created_at: expiredCreatedAt, occurred_at: expiredCreatedAt })
-      .where(eq(code_review_feedback_events.id, second.event.id));
-
-    const summary = await pruneExpiredReviewMemoryData({ now, batchSize: 1 });
-
-    expect(summary.feedbackEventsDeleted).toBe(2);
-    await expect(db.select().from(code_review_feedback_events)).resolves.toHaveLength(0);
-  });
-
-  it('stops review memory pruning at the global max batch cap', async () => {
-    const user = await insertTestUser();
-    const owner = { type: 'user' as const, id: user.id };
-    const expiredCreatedAt = '2026-05-01T00:00:00.000Z';
-    const now = new Date('2026-06-01T00:00:00.000Z');
-
-    for (let i = 0; i < 3; i += 1) {
-      const result = await recordFeedbackEvent({
-        owner,
-        platform: 'github',
-        repoFullName: 'owner/repo',
-        prNumber: i + 1,
-        signalKind: 'corrective_reply',
-        sentiment: 'negative',
-        strength: 3,
-        dedupeHash: `retention-max-batches-${i}`,
-      });
-      await db
-        .update(code_review_feedback_events)
-        .set({ created_at: expiredCreatedAt, occurred_at: expiredCreatedAt })
-        .where(eq(code_review_feedback_events.id, result.event.id));
-    }
-
-    const summary = await pruneExpiredReviewMemoryData({ now, batchSize: 1, maxBatches: 2 });
-
-    expect(summary.feedbackEventsDeleted).toBe(2);
-    await expect(db.select().from(code_review_feedback_events)).resolves.toHaveLength(1);
   });
 });

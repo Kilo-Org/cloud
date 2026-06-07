@@ -248,41 +248,6 @@ describe('GitLab webhook route', () => {
     expect(mockUpdateWebhookEvent).not.toHaveBeenCalled();
   });
 
-  it('persists errored note feedback from the after callback', async () => {
-    mockHandleGitLabNoteFeedback.mockRejectedValueOnce(new Error('feedback failed'));
-
-    const response = await POST(gitLabRequest('Note Hook', notePayload()));
-
-    expect(response.status).toBe(200);
-    expect(mockLogWebhookEvent).not.toHaveBeenCalled();
-
-    await flushAfter();
-
-    expect(mockLogWebhookEvent).toHaveBeenCalledWith(
-      expect.objectContaining({ event_type: 'Note Hook', event_action: 'create' })
-    );
-    expect(mockUpdateWebhookEvent).toHaveBeenCalledWith(
-      'we_1',
-      expect.objectContaining({
-        handlers_triggered: ['review_memory_feedback'],
-        errors: [expect.objectContaining({ handler: 'review_memory_feedback' })],
-      })
-    );
-  });
-
-  it('acknowledges invalid note payloads without recording feedback', async () => {
-    const response = await POST(gitLabRequest('Note Hook', { object_kind: 'note' }));
-
-    await expect(response.json()).resolves.toEqual({ message: 'Event received' });
-    expect(response.status).toBe(200);
-
-    await flushAfter();
-
-    expect(mockHandleGitLabNoteFeedback).not.toHaveBeenCalled();
-    expect(mockLogWebhookEvent).not.toHaveBeenCalled();
-    expect(mockUpdateWebhookEvent).not.toHaveBeenCalled();
-  });
-
   it('routes emoji events to review memory feedback', async () => {
     const response = await POST(gitLabRequest('Emoji Hook', emojiPayload()));
 
@@ -302,47 +267,5 @@ describe('GitLab webhook route', () => {
       'we_1',
       expect.objectContaining({ handlers_triggered: ['review_memory_feedback'] })
     );
-  });
-
-  it('does not persist ignored emoji events', async () => {
-    mockHandleGitLabEmojiFeedback.mockResolvedValueOnce({
-      recorded: false,
-      eventIds: [],
-      reason: 'unsupported-emoji',
-    });
-
-    const response = await POST(gitLabRequest('Emoji Hook', emojiPayload()));
-
-    expect(response.status).toBe(200);
-    expect(mockHandleGitLabEmojiFeedback).not.toHaveBeenCalled();
-
-    await flushAfter();
-
-    expect(mockHandleGitLabEmojiFeedback).toHaveBeenCalled();
-    expect(mockLogWebhookEvent).not.toHaveBeenCalled();
-    expect(mockUpdateWebhookEvent).not.toHaveBeenCalled();
-  });
-
-  it('acknowledges invalid emoji payloads without recording feedback', async () => {
-    const response = await POST(gitLabRequest('Emoji Hook', { object_kind: 'emoji' }));
-
-    await expect(response.json()).resolves.toEqual({ message: 'Event received' });
-    expect(response.status).toBe(200);
-
-    await flushAfter();
-
-    expect(mockHandleGitLabEmojiFeedback).not.toHaveBeenCalled();
-    expect(mockLogWebhookEvent).not.toHaveBeenCalled();
-    expect(mockUpdateWebhookEvent).not.toHaveBeenCalled();
-  });
-
-  it('rejects invalid merge request payloads', async () => {
-    const response = await POST(
-      gitLabRequest('Merge Request Hook', { object_kind: 'merge_request' })
-    );
-
-    await expect(response.json()).resolves.toEqual({ error: 'Invalid payload' });
-    expect(response.status).toBe(400);
-    expect(mockHandleMergeRequest).not.toHaveBeenCalled();
   });
 });

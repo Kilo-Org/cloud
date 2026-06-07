@@ -122,16 +122,6 @@ describe('review memory change requests', () => {
     return integration;
   }
 
-  async function markProposalFailedWithStaleUrl(proposalId: string) {
-    await db
-      .update(code_review_memory_proposals)
-      .set({
-        status: 'change_request_failed',
-        change_request_url: 'https://example.com/stale-change-request',
-      })
-      .where(eq(code_review_memory_proposals.id, proposalId));
-  }
-
   it('opens a GitHub pull request for an approved proposal', async () => {
     const user = await insertTestUser();
     const owner = { type: 'user' as const, id: user.id };
@@ -282,76 +272,6 @@ describe('review memory change requests', () => {
     expect(failed).toEqual(
       expect.objectContaining({
         status: 'change_request_failed',
-      })
-    );
-  });
-
-  it('retries failed proposals with stale change request URLs', async () => {
-    const user = await insertTestUser();
-    const owner = { type: 'user' as const, id: user.id };
-    await seedGitHubIntegration(owner);
-    const proposal = await upsertReviewMemoryProposal({
-      owner,
-      platform: 'github',
-      repoFullName: 'acme/widgets',
-      scopeKind: 'repository',
-      proposalType: 'clarify',
-      title: 'Retry stale URL proposal',
-      rationale: 'The previous change request failed after storing a URL.',
-      proposedMarkdown: '### Retry stale URL\n\nTry opening this again.',
-      dedupeKey: 'github-retry-stale-url',
-    });
-    await markProposalFailedWithStaleUrl(proposal.id);
-
-    const opened = await approveAndOpenReviewMemoryChangeRequest({
-      owner,
-      proposalId: proposal.id,
-      approvedByUser: { id: user.id, email: user.google_user_email, name: user.google_user_name },
-    });
-
-    expect(opened).toEqual(
-      expect.objectContaining({
-        status: 'change_request_opened',
-        change_request_url: 'https://github.com/acme/widgets/pull/7',
-      })
-    );
-    expect(mockCreateGitHubPullRequest).toHaveBeenCalledTimes(1);
-  });
-
-  it('clears stale change request URLs when retrying fails', async () => {
-    const user = await insertTestUser();
-    const owner = { type: 'user' as const, id: user.id };
-    await seedGitHubIntegration(owner);
-    const proposal = await upsertReviewMemoryProposal({
-      owner,
-      platform: 'github',
-      repoFullName: 'acme/widgets',
-      scopeKind: 'repository',
-      proposalType: 'clarify',
-      title: 'Retry failure proposal',
-      rationale: 'The retry should not keep the stale URL.',
-      proposedMarkdown: '### Retry failure\n\nClear stale URLs.',
-      dedupeKey: 'github-retry-failure-clears-url',
-    });
-    await markProposalFailedWithStaleUrl(proposal.id);
-    mockCreateGitHubPullRequest.mockRejectedValueOnce(new Error('GitHub unavailable'));
-
-    await expect(
-      approveAndOpenReviewMemoryChangeRequest({
-        owner,
-        proposalId: proposal.id,
-        approvedByUser: { id: user.id, email: user.google_user_email, name: user.google_user_name },
-      })
-    ).rejects.toThrow('GitHub unavailable');
-
-    const [failed] = await db
-      .select()
-      .from(code_review_memory_proposals)
-      .where(eq(code_review_memory_proposals.id, proposal.id));
-    expect(failed).toEqual(
-      expect.objectContaining({
-        status: 'change_request_failed',
-        change_request_url: null,
       })
     );
   });

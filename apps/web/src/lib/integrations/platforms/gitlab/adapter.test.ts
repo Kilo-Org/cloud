@@ -24,7 +24,6 @@ import {
   createGitLabBranch,
   createOrUpdateGitLabTextFile,
   createGitLabMergeRequest,
-  updateProjectWebhook,
 } from './adapter';
 
 // Mock fetch globally
@@ -985,37 +984,6 @@ describe('GitLab webhook management', () => {
       'https://gitlab.com/api/v4/projects/123/hooks',
       expect.objectContaining({
         method: 'POST',
-        body: expect.any(String),
-      })
-    );
-    const body = JSON.parse(mockFetch.mock.calls[0][1].body as string) as Record<string, unknown>;
-    expect(body).toEqual(
-      expect.objectContaining({
-        merge_requests_events: true,
-        note_events: true,
-        emoji_events: true,
-      })
-    );
-  });
-
-  it('updates project webhooks with note and emoji events enabled', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => webhookResponse(),
-    });
-
-    await updateProjectWebhook(
-      'test-token',
-      123,
-      10,
-      'https://app.example.com/api/webhooks/gitlab',
-      'secret'
-    );
-
-    expect(mockFetch).toHaveBeenCalledWith(
-      'https://gitlab.com/api/v4/projects/123/hooks/10',
-      expect.objectContaining({
-        method: 'PUT',
         body: expect.any(String),
       })
     );

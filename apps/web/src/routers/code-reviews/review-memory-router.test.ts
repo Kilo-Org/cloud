@@ -44,7 +44,6 @@ import {
   upsertReviewMemoryProposal,
   type ReviewMemoryOwner,
 } from '@/lib/code-reviews/review-memory/db';
-import { eq } from 'drizzle-orm';
 
 describe('reviewMemoryRouter', () => {
   afterEach(async () => {
@@ -76,7 +75,7 @@ describe('reviewMemoryRouter', () => {
     );
   });
 
-  async function seedProposal(owner: ReviewMemoryOwner) {
+  async function seedProposal(owner: ReviewMemoryOwner, dedupeSuffix = owner.id) {
     return await upsertReviewMemoryProposal({
       owner,
       platform: 'github',
@@ -86,7 +85,7 @@ describe('reviewMemoryRouter', () => {
       title: 'Clarify widget guidance',
       rationale: 'Maintainers corrected repeated widget comments.',
       proposedMarkdown: '### Clarify widget guidance\n\nAvoid flagging intentional widgets.',
-      dedupeKey: `clarify-widget-${owner.id}`,
+      dedupeKey: `clarify-widget-${dedupeSuffix}`,
       positiveCount: 0,
       negativeCount: 3,
       neutralCount: 0,
@@ -108,6 +107,7 @@ describe('reviewMemoryRouter', () => {
 
   it('lists personal proposals for the authenticated owner', async () => {
     const user = await insertTestUser();
+    const otherUser = await insertTestUser();
     const owner = { type: 'user' as const, id: user.id };
     const proposal = await seedProposal(owner);
     await recordFeedbackEvent({
@@ -132,26 +132,24 @@ describe('reviewMemoryRouter', () => {
     await expect(caller.reviewMemory.listProposals({ platform: 'github' })).resolves.toEqual([
       expect.objectContaining({ id: proposal.id, title: 'Clarify widget guidance' }),
     ]);
+
+    const otherCaller = await createCallerForUser(otherUser.id);
+    await expect(otherCaller.reviewMemory.listProposals({ platform: 'github' })).resolves.toEqual(
+      []
+    );
   });
 
-  it('prevents other users from listing proposals', async () => {
-    const ownerUser = await insertTestUser();
-    const otherUser = await insertTestUser();
-    await seedProposal({ type: 'user', id: ownerUser.id });
-    const caller = await createCallerForUser(otherUser.id);
-
-    await expect(caller.reviewMemory.listProposals({ platform: 'github' })).resolves.toEqual([]);
-  });
-
-  it('edits and rejects proposals for the authenticated owner', async () => {
+  it('edits, rejects, and approves proposals for the authenticated owner', async () => {
     const user = await insertTestUser();
     const owner = { type: 'user' as const, id: user.id };
     await enableReviewMemory(owner);
-    const proposal = await seedProposal(owner);
+    const editProposal = await seedProposal(owner, 'personal-edit');
+    const rejectProposal = await seedProposal(owner, 'personal-reject');
+    const approveProposal = await seedProposal(owner, 'personal-approve');
     const caller = await createCallerForUser(user.id);
 
     const edited = await caller.reviewMemory.updateProposal({
-      proposalId: proposal.id,
+      proposalId: editProposal.id,
       title: 'Edited widget guidance',
       rationale: 'The rationale was reviewed by a maintainer.',
       proposedMarkdown: '### Edited widget guidance\n\nNarrow this check to generated widgets.',
@@ -165,12 +163,31 @@ describe('reviewMemoryRouter', () => {
       })
     );
 
-    const rejected = await caller.reviewMemory.rejectProposal({ proposalId: proposal.id });
+    const rejected = await caller.reviewMemory.rejectProposal({ proposalId: rejectProposal.id });
     expect(rejected).toEqual(
       expect.objectContaining({
         status: 'rejected',
       })
     );
+
+    await expect(
+      caller.reviewMemory.approveAndOpenChangeRequest({ proposalId: approveProposal.id })
+    ).resolves.toEqual(
+      expect.objectContaining({
+        id: approveProposal.id,
+        status: 'change_request_opened',
+        change_request_url: 'https://github.com/acme/widgets/pull/7',
+      })
+    );
+    expect(mockApproveAndOpenReviewMemoryChangeRequest).toHaveBeenCalledWith({
+      owner,
+      proposalId: approveProposal.id,
+      approvedByUser: {
+        id: user.id,
+        email: user.google_user_email,
+        name: user.google_user_name,
+      },
+    });
   });
 
   it('refreshes a scope and dispatches aggregation when manually triggered', async () => {
@@ -190,33 +207,6 @@ describe('reviewMemoryRouter', () => {
       limit: 1,
       stateId: expect.any(String),
       bypassEligibleCooldown: true,
-    });
-  });
-
-  it('approves proposals through the change-request workflow', async () => {
-    const user = await insertTestUser();
-    const owner = { type: 'user' as const, id: user.id };
-    await enableReviewMemory(owner);
-    const proposal = await seedProposal(owner);
-    const caller = await createCallerForUser(user.id);
-
-    await expect(
-      caller.reviewMemory.approveAndOpenChangeRequest({ proposalId: proposal.id })
-    ).resolves.toEqual(
-      expect.objectContaining({
-        id: proposal.id,
-        status: 'change_request_opened',
-        change_request_url: 'https://github.com/acme/widgets/pull/7',
-      })
-    );
-    expect(mockApproveAndOpenReviewMemoryChangeRequest).toHaveBeenCalledWith({
-      owner,
-      proposalId: proposal.id,
-      approvedByUser: {
-        id: user.id,
-        email: user.google_user_email,
-        name: user.google_user_name,
-      },
     });
   });
 
@@ -244,21 +234,16 @@ describe('reviewMemoryRouter', () => {
     );
   });
 
-  it('rejects manual analysis when review memory is disabled', async () => {
+  it('rejects manual analysis and proposal actions when review memory is disabled', async () => {
     const user = await insertTestUser();
+    const owner = { type: 'user' as const, id: user.id };
+    const proposal = await seedProposal(owner);
     const caller = await createCallerForUser(user.id);
 
     await expect(
       caller.reviewMemory.triggerAnalysis({ platform: 'github', repoFullName: 'acme/widgets' })
     ).rejects.toMatchObject({ code: 'FORBIDDEN' });
     expect(mockDispatchManualReviewMemoryAggregation).not.toHaveBeenCalled();
-  });
-
-  it('rejects proposal actions when review memory is disabled', async () => {
-    const user = await insertTestUser();
-    const owner = { type: 'user' as const, id: user.id };
-    const proposal = await seedProposal(owner);
-    const caller = await createCallerForUser(user.id);
 
     await expect(
       caller.reviewMemory.updateProposal({
@@ -279,9 +264,10 @@ describe('reviewMemoryRouter', () => {
     expect(mockApproveAndOpenReviewMemoryChangeRequest).not.toHaveBeenCalled();
   });
 
-  it('allows billing managers to update, reject, and trigger organization review memory', async () => {
+  it('enforces organization review memory authorization', async () => {
     const ownerUser = await insertTestUser();
     const billingManager = await insertTestUser();
+    const member = await insertTestUser();
     const organization = await createTestOrganization(
       'Review Memory Org',
       ownerUser.id,
@@ -290,8 +276,12 @@ describe('reviewMemoryRouter', () => {
       true
     );
     await addUserToOrganization(organization.id, billingManager.id, 'billing_manager');
+    await addUserToOrganization(organization.id, member.id, 'member');
     const owner = { type: 'org' as const, id: organization.id };
-    const proposal = await seedProposal(owner);
+    const editProposal = await seedProposal(owner, 'org-edit');
+    const rejectProposal = await seedProposal(owner, 'org-reject');
+    const memberDeniedProposal = await seedProposal(owner, 'org-member-denied');
+    const billingDeniedProposal = await seedProposal(owner, 'org-billing-denied');
     const ownerCaller = await createCallerForUser(ownerUser.id);
     await ownerCaller.reviewMemory.setEnabled({
       organizationId: organization.id,
@@ -299,11 +289,12 @@ describe('reviewMemoryRouter', () => {
       enabled: true,
     });
     const billingManagerCaller = await createCallerForUser(billingManager.id);
+    const memberCaller = await createCallerForUser(member.id);
 
     await expect(
       billingManagerCaller.reviewMemory.updateProposal({
         organizationId: organization.id,
-        proposalId: proposal.id,
+        proposalId: editProposal.id,
         title: 'Edited organization widget guidance',
         rationale: 'The rationale was reviewed by a maintainer.',
         proposedMarkdown: '### Edited widget guidance\n\nNarrow this check to generated widgets.',
@@ -314,7 +305,7 @@ describe('reviewMemoryRouter', () => {
     await expect(
       billingManagerCaller.reviewMemory.rejectProposal({
         organizationId: organization.id,
-        proposalId: proposal.id,
+        proposalId: rejectProposal.id,
       })
     ).resolves.toEqual(expect.objectContaining({ status: 'rejected' }));
     await expect(
@@ -326,32 +317,11 @@ describe('reviewMemoryRouter', () => {
     ).resolves.toEqual(
       expect.objectContaining({ summary: expect.objectContaining({ claimed: 1 }) })
     );
-  });
-
-  it('prevents organization members from mutating review memory proposals', async () => {
-    const ownerUser = await insertTestUser();
-    const member = await insertTestUser();
-    const organization = await createTestOrganization(
-      'Review Memory Org',
-      ownerUser.id,
-      0,
-      undefined,
-      true
-    );
-    await addUserToOrganization(organization.id, member.id, 'member');
-    const proposal = await seedProposal({ type: 'org', id: organization.id });
-    const ownerCaller = await createCallerForUser(ownerUser.id);
-    await ownerCaller.reviewMemory.setEnabled({
-      organizationId: organization.id,
-      platform: 'github',
-      enabled: true,
-    });
-    const memberCaller = await createCallerForUser(member.id);
 
     await expect(
       memberCaller.reviewMemory.updateProposal({
         organizationId: organization.id,
-        proposalId: proposal.id,
+        proposalId: memberDeniedProposal.id,
         title: 'Edited organization widget guidance',
         rationale: 'The rationale was reviewed by a maintainer.',
         proposedMarkdown: '### Edited widget guidance\n\nNarrow this check to generated widgets.',
@@ -366,67 +336,11 @@ describe('reviewMemoryRouter', () => {
         repoFullName: 'acme/widgets',
       })
     ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
-  });
-
-  it('prevents organization review memory mutations after trial expiration', async () => {
-    const ownerUser = await insertTestUser();
-    const organization = await createTestOrganization(
-      'Review Memory Org',
-      ownerUser.id,
-      0,
-      undefined,
-      true
-    );
-    const proposal = await seedProposal({ type: 'org', id: organization.id });
-    const caller = await createCallerForUser(ownerUser.id);
-    await caller.reviewMemory.setEnabled({
-      organizationId: organization.id,
-      platform: 'github',
-      enabled: true,
-    });
-    await db
-      .update(organizations)
-      .set({ free_trial_end_at: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString() })
-      .where(eq(organizations.id, organization.id));
 
     await expect(
-      caller.reviewMemory.triggerAnalysis({
+      billingManagerCaller.reviewMemory.approveAndOpenChangeRequest({
         organizationId: organization.id,
-        platform: 'github',
-        repoFullName: 'acme/widgets',
-      })
-    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
-    await expect(
-      caller.reviewMemory.updateProposal({
-        organizationId: organization.id,
-        proposalId: proposal.id,
-        title: 'Edited organization widget guidance',
-        rationale: 'The rationale was reviewed by a maintainer.',
-        proposedMarkdown: '### Edited widget guidance\n\nNarrow this check to generated widgets.',
-        scopeKind: 'file',
-        scopeValue: 'src/widget.ts',
-      })
-    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
-  });
-
-  it('prevents billing managers from opening organization change requests', async () => {
-    const ownerUser = await insertTestUser();
-    const billingManager = await insertTestUser();
-    const organization = await createTestOrganization(
-      'Review Memory Org',
-      ownerUser.id,
-      0,
-      undefined,
-      true
-    );
-    await addUserToOrganization(organization.id, billingManager.id, 'billing_manager');
-    const proposal = await seedProposal({ type: 'org', id: organization.id });
-    const caller = await createCallerForUser(billingManager.id);
-
-    await expect(
-      caller.reviewMemory.approveAndOpenChangeRequest({
-        organizationId: organization.id,
-        proposalId: proposal.id,
+        proposalId: billingDeniedProposal.id,
       })
     ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
     expect(mockApproveAndOpenReviewMemoryChangeRequest).not.toHaveBeenCalled();

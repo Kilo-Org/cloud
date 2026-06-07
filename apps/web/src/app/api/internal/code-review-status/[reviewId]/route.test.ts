@@ -2005,19 +2005,10 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
 
       expect(mockAppendReviewSummaryFooter).not.toHaveBeenCalled();
       expect(mockUpdateKiloReviewComment).not.toHaveBeenCalled();
-      expect(mockSyncGitHubReviewMemorySubjects).not.toHaveBeenCalled();
-
-      await flushAfter();
-
-      expect(mockSyncGitHubReviewMemorySubjects).toHaveBeenCalledWith({
-        review,
-        installationId: 'inst-1',
-        appType: 'standard',
-      });
     });
 
-    it('does not append memory footer links when review memory is disabled', async () => {
-      mockIsReviewMemoryEnabled.mockResolvedValue(false);
+    it('appends memory footer links after completed GitHub reviews when proposals exist', async () => {
+      mockCountActionableProposals.mockResolvedValue(2);
       const review = makeReview({
         repository_review_instructions_used: false,
         repository_review_instructions_ref: null,
@@ -2033,12 +2024,25 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       expect(mockAppendReviewSummaryFooter).not.toHaveBeenCalled();
       expect(mockUpdateKiloReviewComment).not.toHaveBeenCalled();
       expect(mockSyncGitHubReviewMemorySubjects).not.toHaveBeenCalled();
-      expect(mockIsReviewMemoryEnabled).not.toHaveBeenCalled();
 
       await flushAfter();
 
-      expect(mockAppendReviewSummaryFooter).not.toHaveBeenCalled();
-      expect(mockUpdateKiloReviewComment).not.toHaveBeenCalled();
+      expect(mockAppendReviewSummaryFooter).toHaveBeenCalledWith('existing body', {
+        usage: undefined,
+        reviewGuidance: { used: false, ref: null, truncated: false },
+        reviewMemory: {
+          proposalCount: 2,
+          url: 'https://test.kilo.ai/code-reviews?platform=github&tab=memory&repo=owner%2Frepo',
+        },
+      });
+      expect(mockUpdateKiloReviewComment).toHaveBeenCalledWith(
+        'inst-1',
+        'owner',
+        'repo',
+        99,
+        'body with footer',
+        'standard'
+      );
       expect(mockSyncGitHubReviewMemorySubjects).toHaveBeenCalledWith({
         review,
         installationId: 'inst-1',

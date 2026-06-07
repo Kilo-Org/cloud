@@ -1,4 +1,4 @@
-import type { AutoFixTicket, PlatformIntegration } from '@kilocode/db/schema';
+import type { PlatformIntegration } from '@kilocode/db/schema';
 import type {
   PullRequestReviewCommentPayload,
   PullRequestReviewPayload,
@@ -37,11 +37,7 @@ const KILO_GITHUB_BOT_LOGINS = new Set([
   'kilo-code-review-bot[bot]',
   'kilocode[bot]',
 ]);
-const REPLY_STYLE_SIGNAL_KINDS = [
-  'corrective_reply',
-  'supportive_reply',
-  'autofix_requested',
-] as const;
+const REPLY_STYLE_SIGNAL_KINDS = ['corrective_reply', 'supportive_reply'] as const;
 
 function ownerFromIntegration(integration: PlatformIntegration): ReviewMemoryOwner | null {
   if (integration.owned_by_organization_id) {
@@ -53,50 +49,16 @@ function ownerFromIntegration(integration: PlatformIntegration): ReviewMemoryOwn
   return null;
 }
 
-function ownerFromAutoFixTicket(ticket: AutoFixTicket): ReviewMemoryOwner | null {
-  if (ticket.owned_by_organization_id) {
-    return { type: 'org', id: ticket.owned_by_organization_id };
-  }
-  if (ticket.owned_by_user_id) {
-    return { type: 'user', id: ticket.owned_by_user_id };
-  }
-  return null;
-}
-
 function isLikelyKiloBotActor(actor: GitHubActor): boolean {
   const login = actor?.login?.toLowerCase() ?? '';
   return KILO_GITHUB_BOT_LOGINS.has(login);
 }
 
-function classifyGitHubAutoFixFailure(errorMessage: string | undefined): {
-  sentiment: 'negative' | 'neutral';
-  strength: number;
-  category: string;
-} {
-  const normalized = errorMessage?.toLowerCase() ?? '';
-  if (
-    normalized.includes('balance') ||
-    normalized.includes('permission') ||
-    normalized.includes('timeout') ||
-    normalized.includes('timed out') ||
-    normalized.includes('internal_server_error') ||
-    normalized.includes('cloud agent returned 500')
-  ) {
-    return { sentiment: 'neutral', strength: 1, category: 'operational' };
-  }
-
-  return { sentiment: 'negative', strength: 2, category: 'unclassified' };
-}
-
 export function classifyGitHubReviewCommentReply(body: string): {
-  signalKind: 'corrective_reply' | 'supportive_reply' | 'autofix_requested';
+  signalKind: 'corrective_reply' | 'supportive_reply';
   sentiment: 'positive' | 'negative' | 'neutral';
   strength: number;
 } {
-  if (/@kilo\s+(fix|patch)\b/i.test(body)) {
-    return { signalKind: 'autofix_requested', sentiment: 'negative', strength: 5 };
-  }
-
   return classifyReviewCommentReply(body);
 }
 
@@ -155,10 +117,7 @@ export async function handleGitHubReviewCommentFeedback(input: {
     sentiment: classification.sentiment,
     strength: classification.strength,
     dedupeHash: createReviewMemoryDedupeHash([eventKey]),
-    evidenceExcerpt:
-      classification.signalKind === 'autofix_requested'
-        ? 'Auto Fix requested from review comment reply.'
-        : input.payload.comment.body,
+    evidenceExcerpt: input.payload.comment.body,
   });
 
   return { recorded: result.created, eventId: result.event.id };
@@ -275,54 +234,6 @@ export async function handleGitHubReviewThreadFeedback(input: {
     dedupeHash: createReviewMemoryDedupeHash([eventKey]),
     evidenceExcerpt:
       input.payload.action === 'resolved' ? 'Review thread resolved.' : 'Review thread reopened.',
-  });
-
-  return { recorded: result.created, eventId: result.event.id };
-}
-
-export async function recordGitHubAutoFixFeedback(input: {
-  ticket: AutoFixTicket;
-  outcome: 'success' | 'failed';
-  errorMessage?: string;
-}): Promise<GitHubFeedbackResult> {
-  if (!input.ticket.review_comment_id) {
-    return { recorded: false, reason: 'missing-review-comment-id' };
-  }
-
-  const owner = ownerFromAutoFixTicket(input.ticket);
-  if (!owner) return { recorded: false, reason: 'missing-owner' };
-  if (!(await isReviewMemoryEnabled({ owner, platform: 'github' }))) {
-    return { recorded: false, reason: 'review-memory-disabled' };
-  }
-
-  const subject = await findFeedbackSubject({
-    owner,
-    platform: 'github',
-    repoFullName: input.ticket.repo_full_name,
-    subjectType: 'inline_comment',
-    externalId: String(input.ticket.review_comment_id),
-  });
-  const failure =
-    input.outcome === 'failed' ? classifyGitHubAutoFixFailure(input.errorMessage) : null;
-  const signalKind = input.outcome === 'success' ? 'autofix_completed' : 'autofix_failed';
-  const eventKey = `github:auto-fix:${input.ticket.id}:${signalKind}`;
-  const result = await recordFeedbackEvent({
-    owner,
-    platform: 'github',
-    subjectId: subject?.id ?? null,
-    repoFullName: input.ticket.repo_full_name,
-    prNumber: input.ticket.issue_number,
-    signalKind,
-    sentiment: input.outcome === 'success' ? 'positive' : (failure?.sentiment ?? 'negative'),
-    strength: input.outcome === 'success' ? 2 : (failure?.strength ?? 2),
-    dedupeHash: createReviewMemoryDedupeHash([eventKey]),
-    evidenceExcerpt:
-      input.outcome === 'success'
-        ? 'Auto Fix completed for requested review feedback.'
-        : input.errorMessage
-          ? `Auto Fix failed: ${input.errorMessage}`
-          : 'Auto Fix failed for requested review feedback.',
-    occurredAt: input.ticket.completed_at ?? null,
   });
 
   return { recorded: result.created, eventId: result.event.id };

@@ -15,7 +15,6 @@ import {
   getPRHeadCommit,
 } from '@/lib/integrations/platforms/github/adapter';
 import { getIntegrationById } from '@/lib/integrations/db/platform-integrations';
-import { recordGitHubAutoFixFeedback } from '@/lib/code-reviews/review-memory/github-feedback';
 import { z } from 'zod';
 
 export const CommentReplyPayloadSchema = z.object({
@@ -54,28 +53,6 @@ function buildSuccessReplyBody(params: {
   }
 
   return `Implemented the requested fix around ${params.fixTarget} and pushed it to this PR branch.`;
-}
-
-async function recordAutoFixFeedbackSafely(input: {
-  ticket: Awaited<ReturnType<typeof getFixTicketById>>;
-  outcome: 'success' | 'failed';
-  errorMessage?: string;
-}) {
-  if (!input.ticket) return;
-
-  try {
-    await recordGitHubAutoFixFeedback({
-      ticket: input.ticket,
-      outcome: input.outcome,
-      errorMessage: input.errorMessage,
-    });
-  } catch (error) {
-    errorExceptInTest('[auto-fix-comment-reply] Failed to record review memory feedback:', error);
-    captureException(error, {
-      tags: { operation: 'auto-fix-comment-reply', step: 'review-memory-feedback' },
-      extra: { ticketId: input.ticket.id, outcome: input.outcome },
-    });
-  }
 }
 
 const PUBLIC_ERROR_MAX_LENGTH = 500;
@@ -279,8 +256,6 @@ export async function handleCommentReply(
         completedAt: new Date(),
       });
 
-      await recordAutoFixFeedbackSafely({ ticket, outcome: 'success' });
-
       return { ok: true, action: 'reaction_and_reply' };
     }
 
@@ -341,12 +316,6 @@ export async function handleCommentReply(
       completedAt: new Date(),
     });
 
-    await recordAutoFixFeedbackSafely({
-      ticket,
-      outcome: 'failed',
-      errorMessage: sanitizedReason,
-    });
-
     return { ok: true, action: 'reply' };
   } catch (replyError) {
     errorExceptInTest('[auto-fix-comment-reply] Failed to notify review comment:', replyError);
@@ -373,12 +342,6 @@ export async function handleCommentReply(
       sessionId,
       errorMessage: notificationFailureMessage,
       completedAt: new Date(),
-    });
-
-    await recordAutoFixFeedbackSafely({
-      ticket,
-      outcome: 'failed',
-      errorMessage: sanitizePublicErrorMessage(notificationFailureMessage),
     });
 
     return {

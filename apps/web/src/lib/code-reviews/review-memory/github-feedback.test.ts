@@ -1,5 +1,4 @@
 /* eslint-disable drizzle/enforce-delete-with-where */
-import { createFixTicket, getFixTicketById } from '@/lib/auto-fix/db/fix-tickets';
 import { db } from '@/lib/drizzle';
 import type {
   PullRequestReviewCommentPayload,
@@ -9,7 +8,6 @@ import type {
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import {
   agent_configs,
-  auto_fix_tickets,
   code_review_feedback_events,
   code_review_feedback_subjects,
   code_review_memory_aggregation_state,
@@ -21,7 +19,6 @@ import {
   handleGitHubReviewCommentFeedback,
   handleGitHubReviewFeedback,
   handleGitHubReviewThreadFeedback,
-  recordGitHubAutoFixFeedback,
 } from './github-feedback';
 import { upsertFeedbackSubject, type ReviewMemoryOwner } from './db';
 
@@ -30,7 +27,6 @@ describe('GitHub review memory feedback', () => {
     await db.delete(code_review_feedback_events);
     await db.delete(code_review_feedback_subjects);
     await db.delete(code_review_memory_aggregation_state);
-    await db.delete(auto_fix_tickets);
     await db.delete(agent_configs);
     await db.delete(platform_integrations);
     await db.delete(kilocode_users);
@@ -231,7 +227,7 @@ describe('GitHub review memory feedback', () => {
     expect(result.recorded).toBe(true);
   });
 
-  it('skips @kilo fix replies without a resolved Kilo subject', async () => {
+  it('skips unmatched inline replies even when they mention @kilo fix', async () => {
     const { integration } = await seedIntegration();
     const payload = {
       action: 'created',
@@ -261,10 +257,57 @@ describe('GitHub review memory feedback', () => {
       handleGitHubReviewCommentFeedback({
         payload,
         integration,
-        deliveryId: 'delivery-unmatched-autofix-reply',
+        deliveryId: 'delivery-unmatched-inline-reply',
       })
     ).resolves.toEqual({ recorded: false, reason: 'not-kilo-subject' });
     await expect(db.select().from(code_review_feedback_events)).resolves.toHaveLength(0);
+  });
+
+  it('records @kilo fix replies as normal inline feedback for Kilo subjects', async () => {
+    const { owner, integration } = await seedIntegration();
+    const subject = await seedInlineSubject(owner);
+    const payload = {
+      action: 'created',
+      comment: {
+        id: 505,
+        in_reply_to_id: 500,
+        body: '@kilo fix this',
+        user: { login: 'maintainer', type: 'User' },
+        html_url: 'https://github.com/acme/widgets/pull/42#discussion_r505',
+        path: 'src/widget.ts',
+        line: 12,
+        diff_hunk: '@@ -1 +1 @@',
+        author_association: 'MEMBER',
+      },
+      pull_request: {
+        ...pullRequest(),
+        title: 'Add widgets',
+        user: { login: 'author' },
+        base: { ref: 'main' },
+      },
+      repository: repository(),
+      installation: { id: 98765 },
+      sender: { login: 'maintainer' },
+    } satisfies PullRequestReviewCommentPayload;
+
+    const result = await handleGitHubReviewCommentFeedback({
+      payload,
+      integration,
+      deliveryId: 'delivery-kilo-fix-inline-reply',
+    });
+
+    expect(result.recorded).toBe(true);
+    const events = await db.select().from(code_review_feedback_events);
+    expect(events).toHaveLength(1);
+    expect(events[0]).toEqual(
+      expect.objectContaining({
+        subject_id: subject.id,
+        signal_kind: 'supportive_reply',
+        sentiment: 'neutral',
+        strength: 1,
+        evidence_excerpt: '@kilo fix this',
+      })
+    );
   });
 
   it('records Kilo review dismissals and review-thread resolution', async () => {
@@ -341,62 +384,5 @@ describe('GitHub review memory feedback', () => {
       .from(code_review_feedback_subjects)
       .where(eq(code_review_feedback_subjects.file_path, 'src/widget.ts'));
     expect(threadSubject.state).toBe('resolved');
-  });
-
-  it('records Auto Fix completion and operational failure evidence', async () => {
-    const { owner, integration } = await seedIntegration();
-    await seedInlineSubject(owner, '800');
-    const successTicketId = await createFixTicket({
-      owner: { type: 'user', id: owner.id, userId: owner.id },
-      platformIntegrationId: integration.id,
-      repoFullName: 'acme/widgets',
-      issueNumber: 42,
-      issueUrl: 'https://github.com/acme/widgets/pull/42',
-      issueTitle: 'Add widgets',
-      issueBody: null,
-      issueAuthor: 'author',
-      issueLabels: [],
-      triggerSource: 'review_comment',
-      reviewCommentId: 800,
-      reviewCommentBody: '@kilo fix this',
-      filePath: 'src/widget.ts',
-      lineNumber: 12,
-      diffHunk: '@@ -1 +1 @@',
-    });
-    const failedTicketId = await createFixTicket({
-      owner: { type: 'user', id: owner.id, userId: owner.id },
-      platformIntegrationId: integration.id,
-      repoFullName: 'acme/widgets',
-      issueNumber: 43,
-      issueUrl: 'https://github.com/acme/widgets/pull/43',
-      issueTitle: 'Add more widgets',
-      issueBody: null,
-      issueAuthor: 'author',
-      issueLabels: [],
-      triggerSource: 'review_comment',
-      reviewCommentId: 801,
-      reviewCommentBody: '@kilo fix this',
-      filePath: 'src/widget.ts',
-      lineNumber: 14,
-      diffHunk: '@@ -1 +1 @@',
-    });
-    const successTicket = await getFixTicketById(successTicketId);
-    const failedTicket = await getFixTicketById(failedTicketId);
-    if (!successTicket || !failedTicket) throw new Error('Failed to read seeded fix tickets');
-
-    await recordGitHubAutoFixFeedback({ ticket: successTicket, outcome: 'success' });
-    await recordGitHubAutoFixFeedback({
-      ticket: failedTicket,
-      outcome: 'failed',
-      errorMessage: 'The auto-fix run timed out.',
-    });
-
-    const events = await db.select().from(code_review_feedback_events);
-    expect(events).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ signal_kind: 'autofix_completed', sentiment: 'positive' }),
-        expect.objectContaining({ signal_kind: 'autofix_failed', sentiment: 'neutral' }),
-      ])
-    );
   });
 });

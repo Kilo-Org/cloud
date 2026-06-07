@@ -66,6 +66,10 @@ function isLikelyKiloActor(actor: GitLabActor): boolean {
   return KILO_GITLAB_ACTOR_USERNAMES.has(username) || KILO_GITLAB_ACTOR_NAMES.has(name);
 }
 
+function isKiloNoteSubjectBody(body: string): boolean {
+  return body.includes('<!-- kilo-review -->') || isLikelyKiloInlineReviewBody(body);
+}
+
 function emojiSentiment(name: string): {
   signalKind: 'positive_reaction' | 'negative_reaction';
   sentiment: 'positive' | 'negative';
@@ -115,11 +119,10 @@ async function upsertKiloNoteSubject(params: {
     filePath?: string | null;
   };
 }): Promise<CodeReviewFeedbackSubject | null> {
-  const isSummary = params.note.body.includes('<!-- kilo-review -->');
-  const isDiscussion = isLikelyKiloInlineReviewBody(params.note.body);
-  if (!isSummary && !isDiscussion) return null;
+  if (!isKiloNoteSubjectBody(params.note.body)) return null;
 
-  const metadata = isDiscussion ? parseReviewFindingMetadata(params.note.body) : null;
+  const isSummary = params.note.body.includes('<!-- kilo-review -->');
+  const metadata = isSummary ? null : parseReviewFindingMetadata(params.note.body);
   return await upsertFeedbackSubject({
     owner: params.owner,
     platform: 'gitlab',
@@ -152,6 +155,14 @@ export async function handleGitLabNoteFeedback(input: {
     return skipped('not-merge-request-note');
   }
 
+  const action = note.action ?? 'create';
+  if (action !== 'create' && action !== 'update') return skipped('unsupported-note-action');
+  if (action === 'update' && !isKiloNoteSubjectBody(note.note)) return skipped('not-kilo-subject');
+  if (action === 'create' && note.system) return skipped('system-note');
+  if (action === 'create' && isLikelyKiloActor(input.payload.user)) {
+    return skipped('bot-authored-note');
+  }
+
   const owner = ownerFromIntegration(input.integration);
   if (!owner) return skipped('missing-owner');
   if (!(await isReviewMemoryEnabled({ owner, platform: 'gitlab' }))) {
@@ -160,7 +171,6 @@ export async function handleGitLabNoteFeedback(input: {
 
   const repoFullName = input.payload.project.path_with_namespace;
   const prNumber = input.payload.merge_request.iid;
-  const action = note.action ?? 'create';
 
   if (action === 'update') {
     const subject = await upsertKiloNoteSubject({
@@ -177,10 +187,6 @@ export async function handleGitLabNoteFeedback(input: {
     });
     return subject ? skipped('subject-synced') : skipped('not-kilo-subject');
   }
-
-  if (action !== 'create') return skipped('unsupported-note-action');
-  if (note.system) return skipped('system-note');
-  if (isLikelyKiloActor(input.payload.user)) return skipped('bot-authored-note');
 
   const subject = note.discussion_id
     ? await findFeedbackSubjectByExternalThreadId({
@@ -234,15 +240,14 @@ export async function handleGitLabEmojiFeedback(input: {
   if (!CREATE_EMOJI_ACTIONS.has(action)) return skipped('emoji-not-created');
   if (isLikelyKiloActor(input.payload.user)) return skipped('bot-authored-emoji');
   if (emoji.awardable_type.toLowerCase() !== 'note') return skipped('unsupported-awardable-type');
+  const sentiment = emojiSentiment(emoji.name);
+  if (!sentiment) return skipped('unsupported-emoji');
 
   const owner = ownerFromIntegration(input.integration);
   if (!owner) return skipped('missing-owner');
   if (!(await isReviewMemoryEnabled({ owner, platform: 'gitlab' }))) {
     return skipped('review-memory-disabled');
   }
-
-  const sentiment = emojiSentiment(emoji.name);
-  if (!sentiment) return skipped('unsupported-emoji');
 
   const repoFullName = input.payload.project.path_with_namespace;
   const noteId = input.payload.note?.id ?? emoji.awardable_id;

@@ -9,6 +9,19 @@ const mockHandleGitLabEmojiFeedback = jest.fn();
 const mockHandleGitLabMergeRequestFeedback = jest.fn();
 const mockHandleGitLabNoteFeedback = jest.fn();
 
+const mockAfterCallbacks: (() => Promise<void>)[] = [];
+
+async function flushAfter() {
+  await Promise.all(mockAfterCallbacks.splice(0).map(callback => callback()));
+}
+
+jest.mock('next/server', () => ({
+  ...(jest.requireActual('next/server') as Record<string, unknown>),
+  after: (fn: () => Promise<void>) => {
+    mockAfterCallbacks.push(fn);
+  },
+}));
+
 jest.mock('@/lib/integrations/platforms/gitlab/adapter', () => ({
   verifyGitLabWebhookToken: (token: string, expected?: string) =>
     mockVerifyGitLabWebhookToken(token, expected),
@@ -162,6 +175,7 @@ function emojiPayload(overrides: Record<string, unknown> = {}) {
 describe('GitLab webhook route', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockAfterCallbacks.splice(0);
     mockVerifyGitLabWebhookToken.mockReturnValue(true);
     mockFindGitLabIntegrationByWebhookToken.mockResolvedValue(integration);
     mockHandleMergeRequest.mockResolvedValue(Response.json({ message: 'Event received' }));
@@ -199,6 +213,11 @@ describe('GitLab webhook route', () => {
 
     expect(response.status).toBe(200);
     expect(mockHandleMergeRequest).not.toHaveBeenCalled();
+    expect(mockHandleGitLabNoteFeedback).not.toHaveBeenCalled();
+    expect(mockLogWebhookEvent).not.toHaveBeenCalled();
+
+    await flushAfter();
+
     expect(mockHandleGitLabNoteFeedback).toHaveBeenCalledWith({
       payload: expect.objectContaining({ object_kind: 'note' }),
       integration,
@@ -220,7 +239,46 @@ describe('GitLab webhook route', () => {
     const response = await POST(gitLabRequest('Note Hook', notePayload()));
 
     expect(response.status).toBe(200);
+    expect(mockHandleGitLabNoteFeedback).not.toHaveBeenCalled();
+
+    await flushAfter();
+
     expect(mockHandleGitLabNoteFeedback).toHaveBeenCalled();
+    expect(mockLogWebhookEvent).not.toHaveBeenCalled();
+    expect(mockUpdateWebhookEvent).not.toHaveBeenCalled();
+  });
+
+  it('persists errored note feedback from the after callback', async () => {
+    mockHandleGitLabNoteFeedback.mockRejectedValueOnce(new Error('feedback failed'));
+
+    const response = await POST(gitLabRequest('Note Hook', notePayload()));
+
+    expect(response.status).toBe(200);
+    expect(mockLogWebhookEvent).not.toHaveBeenCalled();
+
+    await flushAfter();
+
+    expect(mockLogWebhookEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ event_type: 'Note Hook', event_action: 'create' })
+    );
+    expect(mockUpdateWebhookEvent).toHaveBeenCalledWith(
+      'we_1',
+      expect.objectContaining({
+        handlers_triggered: ['review_memory_feedback'],
+        errors: [expect.objectContaining({ handler: 'review_memory_feedback' })],
+      })
+    );
+  });
+
+  it('acknowledges invalid note payloads without recording feedback', async () => {
+    const response = await POST(gitLabRequest('Note Hook', { object_kind: 'note' }));
+
+    await expect(response.json()).resolves.toEqual({ message: 'Event received' });
+    expect(response.status).toBe(200);
+
+    await flushAfter();
+
+    expect(mockHandleGitLabNoteFeedback).not.toHaveBeenCalled();
     expect(mockLogWebhookEvent).not.toHaveBeenCalled();
     expect(mockUpdateWebhookEvent).not.toHaveBeenCalled();
   });
@@ -230,6 +288,11 @@ describe('GitLab webhook route', () => {
 
     expect(response.status).toBe(200);
     expect(mockHandleMergeRequest).not.toHaveBeenCalled();
+    expect(mockHandleGitLabEmojiFeedback).not.toHaveBeenCalled();
+    expect(mockLogWebhookEvent).not.toHaveBeenCalled();
+
+    await flushAfter();
+
     expect(mockHandleGitLabEmojiFeedback).toHaveBeenCalledWith({
       payload: expect.objectContaining({ object_kind: 'emoji' }),
       integration,
@@ -251,8 +314,35 @@ describe('GitLab webhook route', () => {
     const response = await POST(gitLabRequest('Emoji Hook', emojiPayload()));
 
     expect(response.status).toBe(200);
+    expect(mockHandleGitLabEmojiFeedback).not.toHaveBeenCalled();
+
+    await flushAfter();
+
     expect(mockHandleGitLabEmojiFeedback).toHaveBeenCalled();
     expect(mockLogWebhookEvent).not.toHaveBeenCalled();
     expect(mockUpdateWebhookEvent).not.toHaveBeenCalled();
+  });
+
+  it('acknowledges invalid emoji payloads without recording feedback', async () => {
+    const response = await POST(gitLabRequest('Emoji Hook', { object_kind: 'emoji' }));
+
+    await expect(response.json()).resolves.toEqual({ message: 'Event received' });
+    expect(response.status).toBe(200);
+
+    await flushAfter();
+
+    expect(mockHandleGitLabEmojiFeedback).not.toHaveBeenCalled();
+    expect(mockLogWebhookEvent).not.toHaveBeenCalled();
+    expect(mockUpdateWebhookEvent).not.toHaveBeenCalled();
+  });
+
+  it('rejects invalid merge request payloads', async () => {
+    const response = await POST(
+      gitLabRequest('Merge Request Hook', { object_kind: 'merge_request' })
+    );
+
+    await expect(response.json()).resolves.toEqual({ error: 'Invalid payload' });
+    expect(response.status).toBe(400);
+    expect(mockHandleMergeRequest).not.toHaveBeenCalled();
   });
 });

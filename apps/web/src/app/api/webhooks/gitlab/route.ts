@@ -1,5 +1,5 @@
 import type { NextRequest } from 'next/server';
-import { NextResponse } from 'next/server';
+import { after, NextResponse } from 'next/server';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { verifyGitLabWebhookToken } from '@/lib/integrations/platforms/gitlab/adapter';
 import {
@@ -26,12 +26,60 @@ type WebhookHandlerError = {
   stack?: string;
 };
 
+type GitLabFeedbackResult = {
+  recorded: boolean;
+};
+
 function toWebhookHandlerError(handler: string, error: unknown): WebhookHandlerError {
   return {
     message: error instanceof Error ? error.message : String(error),
     handler,
     stack: error instanceof Error ? error.stack : undefined,
   };
+}
+
+async function processGitLabSideChannelFeedback(input: {
+  action: string;
+  logWebhook: (action: string) => Promise<{
+    isDuplicate: boolean;
+    webhookEventId: string | undefined;
+  }>;
+  handleFeedback: () => Promise<GitLabFeedbackResult>;
+  errorMessage: string;
+}) {
+  const errors: WebhookHandlerError[] = [];
+  let shouldLogWebhook = false;
+
+  try {
+    const feedbackResult = await input.handleFeedback();
+    shouldLogWebhook = feedbackResult.recorded;
+  } catch (error) {
+    logExceptInTest(input.errorMessage, error);
+    captureException(error, {
+      tags: { source: 'gitlab_webhook_review_memory_feedback' },
+    });
+    errors.push(toWebhookHandlerError('review_memory_feedback', error));
+  }
+
+  if (!shouldLogWebhook && errors.length === 0) {
+    return;
+  }
+
+  const logResult = await input.logWebhook(input.action);
+  if (logResult.isDuplicate || !logResult.webhookEventId) {
+    return;
+  }
+
+  try {
+    await updateWebhookEvent(logResult.webhookEventId, {
+      processed: true,
+      processed_at: new Date().toISOString(),
+      handlers_triggered: ['review_memory_feedback'],
+      errors: errors.length > 0 ? errors : null,
+    });
+  } catch (error) {
+    logExceptInTest('Error updating webhook event:', error);
+  }
 }
 
 /**
@@ -216,48 +264,23 @@ export async function POST(request: NextRequest) {
           tags: { source: 'gitlab_webhook_validation', event: 'note' },
           extra: { errors: parseResult.error.issues },
         });
-        return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
-      }
-
-      const action = parseResult.data.object_attributes.action ?? 'note';
-      const errors: WebhookHandlerError[] = [];
-      let shouldLogWebhook = false;
-      try {
-        const feedbackResult = await handleGitLabNoteFeedback({
-          payload: parseResult.data,
-          integration,
-          deliveryId: eventSignature,
-        });
-        shouldLogWebhook = feedbackResult.recorded;
-      } catch (error) {
-        logExceptInTest('Error recording GitLab note feedback:', error);
-        captureException(error, {
-          tags: { source: 'gitlab_webhook_review_memory_feedback' },
-        });
-        errors.push(toWebhookHandlerError('review_memory_feedback', error));
-      }
-
-      if (!shouldLogWebhook && errors.length === 0) {
         return NextResponse.json({ message: 'Event received' }, { status: 200 });
       }
 
-      const logResult = await logWebhook(action);
-      if (logResult.isDuplicate) {
-        return NextResponse.json({ message: 'Duplicate event' }, { status: 200 });
-      }
-
-      if (logResult.webhookEventId) {
-        try {
-          await updateWebhookEvent(logResult.webhookEventId, {
-            processed: true,
-            processed_at: new Date().toISOString(),
-            handlers_triggered: ['review_memory_feedback'],
-            errors: errors.length > 0 ? errors : null,
-          });
-        } catch (error) {
-          logExceptInTest('Error updating webhook event:', error);
-        }
-      }
+      const action = parseResult.data.object_attributes.action ?? 'note';
+      after(async () => {
+        await processGitLabSideChannelFeedback({
+          action,
+          logWebhook,
+          errorMessage: 'Error recording GitLab note feedback:',
+          handleFeedback: () =>
+            handleGitLabNoteFeedback({
+              payload: parseResult.data,
+              integration,
+              deliveryId: eventSignature,
+            }),
+        });
+      });
 
       return NextResponse.json({ message: 'Event received' }, { status: 200 });
     }
@@ -272,48 +295,23 @@ export async function POST(request: NextRequest) {
           tags: { source: 'gitlab_webhook_validation', event: 'emoji' },
           extra: { errors: parseResult.error.issues },
         });
-        return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
-      }
-
-      const action = parseResult.data.object_attributes.action ?? 'emoji';
-      const errors: WebhookHandlerError[] = [];
-      let shouldLogWebhook = false;
-      try {
-        const feedbackResult = await handleGitLabEmojiFeedback({
-          payload: parseResult.data,
-          integration,
-          deliveryId: eventSignature,
-        });
-        shouldLogWebhook = feedbackResult.recorded;
-      } catch (error) {
-        logExceptInTest('Error recording GitLab emoji feedback:', error);
-        captureException(error, {
-          tags: { source: 'gitlab_webhook_review_memory_feedback' },
-        });
-        errors.push(toWebhookHandlerError('review_memory_feedback', error));
-      }
-
-      if (!shouldLogWebhook && errors.length === 0) {
         return NextResponse.json({ message: 'Event received' }, { status: 200 });
       }
 
-      const logResult = await logWebhook(action);
-      if (logResult.isDuplicate) {
-        return NextResponse.json({ message: 'Duplicate event' }, { status: 200 });
-      }
-
-      if (logResult.webhookEventId) {
-        try {
-          await updateWebhookEvent(logResult.webhookEventId, {
-            processed: true,
-            processed_at: new Date().toISOString(),
-            handlers_triggered: ['review_memory_feedback'],
-            errors: errors.length > 0 ? errors : null,
-          });
-        } catch (error) {
-          logExceptInTest('Error updating webhook event:', error);
-        }
-      }
+      const action = parseResult.data.object_attributes.action ?? 'emoji';
+      after(async () => {
+        await processGitLabSideChannelFeedback({
+          action,
+          logWebhook,
+          errorMessage: 'Error recording GitLab emoji feedback:',
+          handleFeedback: () =>
+            handleGitLabEmojiFeedback({
+              payload: parseResult.data,
+              integration,
+              deliveryId: eventSignature,
+            }),
+        });
+      });
 
       return NextResponse.json({ message: 'Event received' }, { status: 200 });
     }

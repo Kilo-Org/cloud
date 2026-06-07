@@ -946,13 +946,9 @@ export type UpsertProposalInput = {
   rationale: string;
   proposedMarkdown: string;
   dedupeKey: string;
-  llmConfidence?: number | null;
   positiveCount?: number;
   negativeCount?: number;
   neutralCount?: number;
-  distinctPrCount?: number;
-  distinctSubjectCount?: number;
-  contradictoryCount?: number;
   database?: ReviewMemoryDatabase;
 };
 
@@ -991,13 +987,9 @@ export async function upsertReviewMemoryProposal(
     title: input.title,
     rationale: input.rationale,
     proposed_markdown: input.proposedMarkdown,
-    llm_confidence: input.llmConfidence ?? null,
     positive_count: input.positiveCount ?? 0,
     negative_count: input.negativeCount ?? 0,
     neutral_count: input.neutralCount ?? 0,
-    distinct_pr_count: input.distinctPrCount ?? 0,
-    distinct_subject_count: input.distinctSubjectCount ?? 0,
-    contradictory_count: input.contradictoryCount ?? 0,
     updated_at: new Date().toISOString(),
   };
 
@@ -1301,7 +1293,7 @@ export async function markProposalOpeningChangeRequest(input: {
     .update(code_review_memory_proposals)
     .set({
       status: 'opening_change_request',
-      change_request_error_message: null,
+      change_request_url: null,
       updated_at: new Date().toISOString(),
     })
     .where(
@@ -1328,7 +1320,6 @@ export async function markProposalChangeRequestOpened(input: {
     .set({
       status: 'change_request_opened',
       change_request_url: input.changeRequestUrl,
-      change_request_error_message: null,
       updated_at: new Date().toISOString(),
     })
     .where(eq(code_review_memory_proposals.id, input.proposalId))
@@ -1348,7 +1339,7 @@ export async function markProposalChangeRequestFailed(input: {
     .update(code_review_memory_proposals)
     .set({
       status: 'change_request_failed',
-      change_request_error_message: compactText(input.errorMessage, 1_000),
+      change_request_url: null,
       updated_at: new Date().toISOString(),
     })
     .where(eq(code_review_memory_proposals.id, input.proposalId))

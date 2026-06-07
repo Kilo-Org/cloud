@@ -21,6 +21,7 @@ import {
   getStoredProjectAccessToken,
   getValidGitLabToken,
 } from '@/lib/integrations/gitlab-service';
+import * as z from 'zod';
 import type { CodeReviewMemoryProposal, PlatformIntegration } from '@kilocode/db/schema';
 import {
   getReviewMemoryProposal,
@@ -36,6 +37,12 @@ const REVIEW_MEMORY_TARGET_FILE_PATH = 'REVIEW.md';
 const REVIEW_MEMORY_CHANGE_REQUEST_TITLE = 'docs(review): update REVIEW.md guidance';
 const REVIEW_MEMORY_CHANGE_REQUEST_MARKER = '<!-- kilo-review-memory-change-request -->';
 const APPROVABLE_STATUSES = new Set(['open', 'edited', 'change_request_failed']);
+const GitLabIntegrationMetadataSchema = z
+  .object({
+    gitlab_instance_url: z.string().url().optional(),
+  })
+  .passthrough()
+  .nullable();
 
 export class ReviewMemoryChangeRequestError extends Error {
   constructor(
@@ -57,6 +64,15 @@ export type ApproveReviewMemoryChangeRequestInput = {
   };
 };
 
+type PrepareReviewMemoryChangeBranchInput = {
+  proposal: CodeReviewMemoryProposal;
+  defaultBranch: string;
+  branchName: string;
+  fetchContent: (ref: string) => Promise<string | null>;
+  createBranch: () => Promise<void>;
+  writeContent: (content: string, fileExists: boolean) => Promise<void>;
+};
+
 export async function approveAndOpenReviewMemoryChangeRequest(
   input: ApproveReviewMemoryChangeRequestInput
 ): Promise<CodeReviewMemoryProposal> {
@@ -68,7 +84,7 @@ export async function approveAndOpenReviewMemoryChangeRequest(
     throw new ReviewMemoryChangeRequestError('NOT_FOUND', 'Review memory proposal not found');
   }
 
-  if (proposal.change_request_url) {
+  if (proposal.status === 'change_request_opened' && proposal.change_request_url) {
     return proposal;
   }
 
@@ -148,42 +164,39 @@ async function openGitHubReviewMemoryPullRequest(
   );
   const defaultBranch = await fetchGitHubRepositoryDefaultBranch({ token: token.token, ...repo });
   const branchName = branchNameForProposal(proposal);
-  const existingContent = await fetchGitHubRootTextFileAtRef({
-    token: token.token,
-    ...repo,
-    path: REVIEW_MEMORY_TARGET_FILE_PATH,
-    ref: defaultBranch,
+  const prepared = await prepareReviewMemoryChangeBranch({
+    proposal,
+    defaultBranch,
+    branchName,
+    fetchContent: ref =>
+      fetchGitHubRootTextFileAtRef({
+        token: token.token,
+        ...repo,
+        path: REVIEW_MEMORY_TARGET_FILE_PATH,
+        ref,
+      }),
+    createBranch: () =>
+      createGitHubBranch({
+        token: token.token,
+        ...repo,
+        branchName,
+        baseBranch: defaultBranch,
+      }),
+    writeContent: content =>
+      createOrUpdateGitHubRootTextFile({
+        token: token.token,
+        ...repo,
+        path: REVIEW_MEMORY_TARGET_FILE_PATH,
+        branch: branchName,
+        message: REVIEW_MEMORY_CHANGE_REQUEST_TITLE,
+        content,
+      }),
   });
 
-  if (contentIncludesProposal(existingContent, proposal.proposed_markdown)) {
+  if (prepared.superseded) {
     return { superseded: true };
   }
 
-  await createGitHubBranch({
-    token: token.token,
-    ...repo,
-    branchName,
-    baseBranch: defaultBranch,
-  });
-  const branchContent = await fetchGitHubRootTextFileAtRef({
-    token: token.token,
-    ...repo,
-    path: REVIEW_MEMORY_TARGET_FILE_PATH,
-    ref: branchName,
-  });
-  if (!contentIncludesProposal(branchContent, proposal.proposed_markdown)) {
-    await createOrUpdateGitHubRootTextFile({
-      token: token.token,
-      ...repo,
-      path: REVIEW_MEMORY_TARGET_FILE_PATH,
-      branch: branchName,
-      message: REVIEW_MEMORY_CHANGE_REQUEST_TITLE,
-      content: buildReviewMemoryFileContent(
-        branchContent ?? existingContent,
-        proposal.proposed_markdown
-      ),
-    });
-  }
   const pullRequest = await createGitHubPullRequest({
     token: token.token,
     ...repo,
@@ -209,39 +222,37 @@ async function openGitLabReviewMemoryMergeRequest(
   const project = await fetchGitLabProjectDetails(token, projectId, instanceUrl);
   const defaultBranch = project.default_branch;
   const branchName = branchNameForProposal(proposal);
-  const existingContent = await fetchGitLabRootTextFileAtRef(
-    token,
-    proposal.repo_full_name,
-    REVIEW_MEMORY_TARGET_FILE_PATH,
+  const prepared = await prepareReviewMemoryChangeBranch({
+    proposal,
     defaultBranch,
-    instanceUrl
-  );
+    branchName,
+    fetchContent: ref =>
+      fetchGitLabRootTextFileAtRef(
+        token,
+        proposal.repo_full_name,
+        REVIEW_MEMORY_TARGET_FILE_PATH,
+        ref,
+        instanceUrl
+      ),
+    createBranch: () =>
+      createGitLabBranch(token, projectId, branchName, defaultBranch, instanceUrl),
+    writeContent: (content, fileExists) =>
+      createOrUpdateGitLabTextFile(
+        token,
+        projectId,
+        branchName,
+        REVIEW_MEMORY_TARGET_FILE_PATH,
+        content,
+        REVIEW_MEMORY_CHANGE_REQUEST_TITLE,
+        fileExists ? 'update' : 'create',
+        instanceUrl
+      ),
+  });
 
-  if (contentIncludesProposal(existingContent, proposal.proposed_markdown)) {
+  if (prepared.superseded) {
     return { superseded: true };
   }
 
-  await createGitLabBranch(token, projectId, branchName, defaultBranch, instanceUrl);
-  const branchContent = await fetchGitLabRootTextFileAtRef(
-    token,
-    proposal.repo_full_name,
-    REVIEW_MEMORY_TARGET_FILE_PATH,
-    branchName,
-    instanceUrl
-  );
-  if (!contentIncludesProposal(branchContent, proposal.proposed_markdown)) {
-    const fileExistsOnBranch = branchContent ?? existingContent;
-    await createOrUpdateGitLabTextFile(
-      token,
-      projectId,
-      branchName,
-      REVIEW_MEMORY_TARGET_FILE_PATH,
-      buildReviewMemoryFileContent(fileExistsOnBranch, proposal.proposed_markdown),
-      REVIEW_MEMORY_CHANGE_REQUEST_TITLE,
-      fileExistsOnBranch ? 'update' : 'create',
-      instanceUrl
-    );
-  }
   const mergeRequest = await createGitLabMergeRequest(
     token,
     projectId,
@@ -310,15 +321,33 @@ function resolveStoredGitLabToken(
   return getStoredProjectAccessToken(integration, projectId)?.token ?? null;
 }
 
-function gitLabInstanceUrl(metadata: unknown): string {
-  const record = objectRecord(metadata);
-  const instanceUrl = record?.gitlab_instance_url;
-  return typeof instanceUrl === 'string' && instanceUrl ? instanceUrl : 'https://gitlab.com';
+async function prepareReviewMemoryChangeBranch(
+  input: PrepareReviewMemoryChangeBranchInput
+): Promise<{ superseded: boolean }> {
+  const existingContent = await input.fetchContent(input.defaultBranch);
+  if (contentIncludesProposal(existingContent, input.proposal.proposed_markdown)) {
+    return { superseded: true };
+  }
+
+  await input.createBranch();
+  const branchContent = await input.fetchContent(input.branchName);
+  if (!contentIncludesProposal(branchContent, input.proposal.proposed_markdown)) {
+    const fileExistsOnBranch = branchContent ?? existingContent;
+    await input.writeContent(
+      buildReviewMemoryFileContent(fileExistsOnBranch, input.proposal.proposed_markdown),
+      Boolean(fileExistsOnBranch)
+    );
+  }
+
+  return { superseded: false };
 }
 
-function objectRecord(value: unknown): Record<string, unknown> | null {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
-  return value as Record<string, unknown>;
+function gitLabInstanceUrl(metadata: unknown): string {
+  const parsed = GitLabIntegrationMetadataSchema.safeParse(metadata ?? null);
+  if (!parsed.success) {
+    throw new Error('GitLab integration metadata is malformed. Reconnect GitLab and try again.');
+  }
+  return parsed.data?.gitlab_instance_url ?? 'https://gitlab.com';
 }
 
 function branchNameForProposal(proposal: CodeReviewMemoryProposal): string {

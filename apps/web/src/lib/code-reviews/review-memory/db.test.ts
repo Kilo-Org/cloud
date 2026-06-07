@@ -189,8 +189,6 @@ describe('review memory db helpers', () => {
       proposedMarkdown: '### Review guidance: Clarify noisy guidance',
       dedupeKey: 'clarify-noisy-guidance',
       negativeCount: 1,
-      distinctPrCount: 1,
-      distinctSubjectCount: 1,
     });
 
     const second = await upsertReviewMemoryProposal({
@@ -204,8 +202,6 @@ describe('review memory db helpers', () => {
       proposedMarkdown: '### Review guidance: Clarify review guidance',
       dedupeKey: 'clarify-noisy-guidance',
       negativeCount: 2,
-      distinctPrCount: 1,
-      distinctSubjectCount: 1,
     });
 
     expect(second.id).toBe(first.id);

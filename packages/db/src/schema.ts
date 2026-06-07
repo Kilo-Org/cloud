@@ -4166,15 +4166,10 @@ export const code_review_memory_proposals = pgTable(
     rationale: text().notNull(),
     proposed_markdown: text().notNull(),
     dedupe_key: text().notNull(),
-    llm_confidence: real(),
     positive_count: integer().notNull().default(0),
     negative_count: integer().notNull().default(0),
     neutral_count: integer().notNull().default(0),
-    distinct_pr_count: integer().notNull().default(0),
-    distinct_subject_count: integer().notNull().default(0),
-    contradictory_count: integer().notNull().default(0),
     change_request_url: text(),
-    change_request_error_message: text(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()

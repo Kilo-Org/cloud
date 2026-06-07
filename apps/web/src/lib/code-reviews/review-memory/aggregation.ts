@@ -1,14 +1,11 @@
 import { APP_URL } from '@/lib/constants';
 import { DEFAULT_CODE_REVIEW_MODEL } from '@/lib/code-reviews/core/constants';
 import { getAgentConfigForOwner } from '@/lib/agent-config/db/agent-configs';
-import {
-  CodeReviewAgentConfigSchema,
-  type CodeReviewAgentConfig,
-} from '@/lib/agent-config/core/types';
 import { FEATURE_HEADER } from '@/lib/feature-detection';
 import { ensureBotUserForOrg } from '@/lib/bot-users/bot-user-service';
 import { findUserById } from '@/lib/user';
 import { generateApiToken } from '@/lib/tokens';
+import { isReviewMemoryEnabled } from './settings';
 import { captureException } from '@sentry/nextjs';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import { generateText } from 'ai';
@@ -35,7 +32,10 @@ import {
   upsertReviewMemoryProposal,
   type ReviewMemoryOwner,
 } from './db';
-import { isReviewMemoryEnabled } from './settings';
+
+const AggregationModelConfigSchema = z.object({
+  model_slug: z.string().optional(),
+});
 
 export const REVIEW_MEMORY_AGGREGATION_THRESHOLDS = {
   minFreshEvents: 5,
@@ -139,12 +139,6 @@ function ownerFromState(state: CodeReviewMemoryAggregationState): ReviewMemoryOw
     return { type: 'user', id: state.owned_by_user_id };
   }
   return null;
-}
-
-function confidenceToScore(confidence: ReviewMemoryAggregationOpportunity['confidence']): number {
-  if (confidence === 'high') return 0.9;
-  if (confidence === 'medium') return 0.66;
-  return 0.33;
 }
 
 function createDedupeKey(input: {
@@ -330,18 +324,14 @@ export async function generateReviewMemoryOpportunitiesWithGateway(
 async function resolveAggregationModel(input: {
   owner: ReviewMemoryOwner;
   platform: ReviewMemoryPlatform;
-}): Promise<{ modelSlug: string; config: CodeReviewAgentConfig | null }> {
-  const ownerForConfig =
-    input.owner.type === 'org'
-      ? { type: 'org' as const, id: input.owner.id, userId: input.owner.id }
-      : { type: 'user' as const, id: input.owner.id, userId: input.owner.id };
-  const agentConfig = await getAgentConfigForOwner(ownerForConfig, 'code_review', input.platform);
-  const parsed = CodeReviewAgentConfigSchema.safeParse(agentConfig?.config);
+}): Promise<{ modelSlug: string }> {
+  const agentConfig = await getAgentConfigForOwner(input.owner, 'code_review', input.platform);
+  const parsed = AggregationModelConfigSchema.safeParse(agentConfig?.config);
   if (!parsed.success) {
-    return { modelSlug: DEFAULT_CODE_REVIEW_MODEL, config: null };
+    return { modelSlug: DEFAULT_CODE_REVIEW_MODEL };
   }
 
-  return { modelSlug: parsed.data.model_slug || DEFAULT_CODE_REVIEW_MODEL, config: parsed.data };
+  return { modelSlug: parsed.data.model_slug || DEFAULT_CODE_REVIEW_MODEL };
 }
 
 function proposalRollups(
@@ -352,21 +342,12 @@ function proposalRollups(
   const contradictoryIds = opportunity.contradictoryEventIds.filter(id => eventById.has(id));
   const allIds = [...new Set([...evidenceIds, ...contradictoryIds])];
   const events = allIds.map(id => eventById.get(id)).filter(event => event != null);
-  const distinctPrs = new Set(
-    events.flatMap(event => (event.pr_number == null ? [] : [event.pr_number]))
-  );
-  const distinctSubjects = new Set(
-    events.flatMap(event => (event.subject_id == null ? [] : [event.subject_id]))
-  );
 
   return {
     evidenceIds,
-    contradictoryIds,
     positiveCount: events.filter(event => event.sentiment === 'positive').length,
     negativeCount: events.filter(event => event.sentiment === 'negative').length,
     neutralCount: events.filter(event => event.sentiment === 'neutral').length,
-    distinctPrCount: distinctPrs.size,
-    distinctSubjectCount: distinctSubjects.size,
   };
 }
 
@@ -468,13 +449,9 @@ async function processClaimedAggregationScope(
           scopeValue: opportunity.scopeValue,
           dedupeHint: opportunity.dedupeHint,
         }),
-        llmConfidence: confidenceToScore(opportunity.confidence),
         positiveCount: rollups.positiveCount,
         negativeCount: rollups.negativeCount,
         neutralCount: rollups.neutralCount,
-        distinctPrCount: rollups.distinctPrCount,
-        distinctSubjectCount: rollups.distinctSubjectCount,
-        contradictoryCount: rollups.contradictoryIds.length,
       });
       proposalCount += 1;
     }

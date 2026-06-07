@@ -33,7 +33,8 @@ describe('review memory aggregation', () => {
 
   async function enableReviewMemory(
     owner: ReviewMemoryOwner,
-    platform: 'github' | 'gitlab' = 'github'
+    platform: 'github' | 'gitlab' = 'github',
+    config: Record<string, unknown> = { review_memory_enabled: true }
   ) {
     await db.insert(agent_configs).values({
       ...(owner.type === 'org'
@@ -41,7 +42,7 @@ describe('review memory aggregation', () => {
         : { owned_by_user_id: owner.id }),
       agent_type: 'code_review',
       platform,
-      config: { review_memory_enabled: true },
+      config,
       is_enabled: false,
       created_by: owner.id,
     });
@@ -163,6 +164,24 @@ describe('review memory aggregation', () => {
     );
     const includedEvents = await db.select().from(code_review_feedback_events);
     expect(includedEvents.every(event => event.aggregation_state === 'included')).toBe(true);
+  });
+
+  it('uses model slug from partial review memory config', async () => {
+    const user = await insertTestUser();
+    const owner = { type: 'user' as const, id: user.id };
+    await enableReviewMemory(owner, 'github', {
+      review_memory_enabled: true,
+      model_slug: 'openai/gpt-5.1-code-review',
+    });
+    await seedActionableFeedback(owner);
+    const generateOpportunities = jest.fn(async () => ({ opportunities: [] }));
+
+    const summary = await dispatchManualReviewMemoryAggregation({ generateOpportunities });
+
+    expect(summary).toEqual({ claimed: 1, completed: 1, skipped: 0, failed: 0, proposals: 0 });
+    expect(generateOpportunities).toHaveBeenCalledWith(
+      expect.objectContaining({ modelSlug: 'openai/gpt-5.1-code-review' })
+    );
   });
 
   it('claims only the requested aggregation state', async () => {

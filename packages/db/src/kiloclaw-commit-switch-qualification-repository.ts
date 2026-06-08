@@ -41,11 +41,35 @@ export async function findLatestPreCutoffUserCommitSwitchQualification(
     FROM ${kiloclaw_subscription_change_log} change
     INNER JOIN subscription_lineage lineage
       ON change.${sql.identifier(kiloclaw_subscription_change_log.subscription_id.name)} = lineage.${sql.identifier(kiloclaw_subscriptions.id.name)}
-    WHERE change.${sql.identifier(kiloclaw_subscription_change_log.action.name)} = ${KiloClawSubscriptionChangeAction.ScheduleChanged}
-      AND change.${sql.identifier(kiloclaw_subscription_change_log.actor_type.name)} = ${KiloClawSubscriptionChangeActorType.User}
-      AND change.${sql.identifier(kiloclaw_subscription_change_log.created_at.name)} < ${cutoff}
+    WHERE change.${sql.identifier(kiloclaw_subscription_change_log.created_at.name)} < ${cutoff}
       AND change.${sql.identifier(kiloclaw_subscription_change_log.after_state.name)}->>'scheduled_plan' = 'commit'
-      AND COALESCE(change.${sql.identifier(kiloclaw_subscription_change_log.before_state.name)}->>'scheduled_plan', '') <> 'commit'
+      AND (
+        (
+          change.${sql.identifier(kiloclaw_subscription_change_log.action.name)} = ${KiloClawSubscriptionChangeAction.ScheduleChanged}
+          AND change.${sql.identifier(kiloclaw_subscription_change_log.actor_type.name)} = ${KiloClawSubscriptionChangeActorType.User}
+          AND COALESCE(change.${sql.identifier(kiloclaw_subscription_change_log.before_state.name)}->>'scheduled_plan', '') <> 'commit'
+        )
+        OR (
+          change.${sql.identifier(kiloclaw_subscription_change_log.action.name)} = ${KiloClawSubscriptionChangeAction.Backfilled}
+          AND change.${sql.identifier(kiloclaw_subscription_change_log.actor_type.name)} = ${KiloClawSubscriptionChangeActorType.System}
+          AND change.${sql.identifier(kiloclaw_subscription_change_log.actor_id.name)} = 'kiloclaw-subscription-alignment'
+          AND change.${sql.identifier(kiloclaw_subscription_change_log.reason.name)} IN (
+            'baseline_subscription_snapshot',
+            'baseline_subscription_snapshot_from_earliest_mutation'
+          )
+          AND change.${sql.identifier(kiloclaw_subscription_change_log.before_state.name)} IS NULL
+          AND change.${sql.identifier(kiloclaw_subscription_change_log.after_state.name)}->>'scheduled_by' = 'user'
+        )
+        OR (
+          change.${sql.identifier(kiloclaw_subscription_change_log.action.name)} = ${KiloClawSubscriptionChangeAction.StatusChanged}
+          AND change.${sql.identifier(kiloclaw_subscription_change_log.actor_type.name)} = ${KiloClawSubscriptionChangeActorType.System}
+          AND change.${sql.identifier(kiloclaw_subscription_change_log.actor_id.name)} = 'billing-lifecycle-job'
+          AND change.${sql.identifier(kiloclaw_subscription_change_log.reason.name)} = 'credit_renewal_insufficient_credits'
+          AND change.${sql.identifier(kiloclaw_subscription_change_log.before_state.name)}->>'scheduled_plan' = 'commit'
+          AND change.${sql.identifier(kiloclaw_subscription_change_log.before_state.name)}->>'scheduled_by' = 'user'
+          AND change.${sql.identifier(kiloclaw_subscription_change_log.after_state.name)}->>'scheduled_by' = 'user'
+        )
+      )
     ORDER BY
       change.${sql.identifier(kiloclaw_subscription_change_log.created_at.name)} DESC,
       change.${sql.identifier(kiloclaw_subscription_change_log.id.name)} DESC

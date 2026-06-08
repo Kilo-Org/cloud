@@ -22,7 +22,7 @@ import type {
   SettledInvoicePaymentResolution,
   SupportedReusablePaymentMethodType,
 } from '@/lib/kilo-pass/stripe-handlers-utils';
-import { and, eq, or, sql } from 'drizzle-orm';
+import { and, eq, isNotNull, or, sql } from 'drizzle-orm';
 import type Stripe from 'stripe';
 import { captureException } from '@sentry/nextjs';
 import { sendKiloPassDuplicateCardCanceledEmail } from '@/lib/email';
@@ -246,12 +246,8 @@ export async function loadDuplicateCardReplayAuthority(params: {
       kilo_pass_subscriptions,
       eq(kilo_pass_subscriptions.id, kilo_pass_issuances.kilo_pass_subscription_id)
     )
-    .where(
-      or(
-        eq(kilo_pass_issuances.stripe_invoice_id, params.stripeInvoiceId),
-        eq(kilo_pass_subscriptions.stripe_subscription_id, params.stripeSubscriptionId)
-      )
-    );
+    .where(eq(kilo_pass_issuances.stripe_invoice_id, params.stripeInvoiceId))
+    .limit(1);
 
   for (const record of [...blockAudits, ...issuanceRecords]) {
     if (
@@ -269,31 +265,61 @@ export async function loadDuplicateCardReplayAuthority(params: {
   }
 
   const blockAudit = blockAudits[0];
-  if (blockAudit) {
-    return {
-      kind: 'blocked',
-      gateResult: {
-        blocked: true,
-        fingerprintDigest: payloadString(blockAudit.payload, 'fingerprintDigest'),
-        firstClaimSourceStripeInvoiceId: payloadString(
-          blockAudit.payload,
-          'firstClaimSourceStripeInvoiceId'
-        ),
-        firstClaimedAt: payloadString(blockAudit.payload, 'firstClaimedAt'),
-        matchedKiloUserId: payloadString(blockAudit.payload, 'matchedKiloUserId'),
-        matchedStripeSubscriptionId: payloadString(
-          blockAudit.payload,
-          'matchedStripeSubscriptionId'
-        ),
-        refundableTarget: null,
-      },
-    };
+  const blockedAuthority: DuplicateCardReplayAuthority | null = blockAudit
+    ? {
+        kind: 'blocked',
+        gateResult: {
+          blocked: true,
+          fingerprintDigest: payloadString(blockAudit.payload, 'fingerprintDigest'),
+          firstClaimSourceStripeInvoiceId: payloadString(
+            blockAudit.payload,
+            'firstClaimSourceStripeInvoiceId'
+          ),
+          firstClaimedAt: payloadString(blockAudit.payload, 'firstClaimedAt'),
+          matchedKiloUserId: payloadString(blockAudit.payload, 'matchedKiloUserId'),
+          matchedStripeSubscriptionId: payloadString(
+            blockAudit.payload,
+            'matchedStripeSubscriptionId'
+          ),
+          refundableTarget: null,
+        },
+      }
+    : null;
+  const issuanceRecord = issuanceRecords[0];
+  if (issuanceRecord) {
+    return blockedAuthority ?? { kind: 'allowed', issuanceId: issuanceRecord.issuanceId };
   }
 
-  const issuanceRecord = issuanceRecords[0];
-  return issuanceRecord
-    ? { kind: 'allowed', issuanceId: issuanceRecord.issuanceId }
-    : { kind: 'none' };
+  const conflictingSubscriptionIssuance = (
+    await params.tx
+      .select({
+        stripeInvoiceId: kilo_pass_issuances.stripe_invoice_id,
+        stripeSubscriptionId: kilo_pass_subscriptions.stripe_subscription_id,
+        kiloUserId: kilo_pass_subscriptions.kilo_user_id,
+      })
+      .from(kilo_pass_issuances)
+      .innerJoin(
+        kilo_pass_subscriptions,
+        eq(kilo_pass_subscriptions.id, kilo_pass_issuances.kilo_pass_subscription_id)
+      )
+      .where(
+        and(
+          eq(kilo_pass_subscriptions.stripe_subscription_id, params.stripeSubscriptionId),
+          isNotNull(kilo_pass_issuances.stripe_invoice_id)
+        )
+      )
+      .limit(1)
+  )[0];
+  if (conflictingSubscriptionIssuance) {
+    reportAttributionConflict({
+      ...params,
+      conflictingStripeInvoiceId: conflictingSubscriptionIssuance.stripeInvoiceId,
+      conflictingStripeSubscriptionId: conflictingSubscriptionIssuance.stripeSubscriptionId,
+      conflictingKiloUserId: conflictingSubscriptionIssuance.kiloUserId,
+    });
+  }
+
+  return blockedAuthority ?? { kind: 'none' };
 }
 
 export async function checkDuplicateCardFingerprintGate(params: {

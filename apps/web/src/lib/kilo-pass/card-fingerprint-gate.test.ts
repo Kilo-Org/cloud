@@ -422,6 +422,38 @@ describe('duplicate-card replay authority', () => {
     expect(authority).toMatchObject({ kind: 'allowed' });
   });
 
+  test('uses exact invoice authority after later subscription issuances', async () => {
+    const user = await insertTestUser();
+    await insertSubscriptionAttribution({
+      kiloUserId: user.id,
+      stripeSubscriptionId: 'sub_late_replay',
+      stripeInvoiceId: 'in_initial',
+    });
+    const subscription = await db.query.kilo_pass_subscriptions.findFirst({
+      columns: { id: true },
+      where: eq(kilo_pass_subscriptions.stripe_subscription_id, 'sub_late_replay'),
+    });
+    if (!subscription) throw new Error('Expected late-replay test subscription');
+    await db.insert(kilo_pass_issuances).values({
+      kilo_pass_subscription_id: subscription.id,
+      issue_month: '2026-07-01',
+      source: KiloPassIssuanceSource.StripeInvoice,
+      stripe_invoice_id: 'in_renewal',
+    });
+
+    const authority = await db.transaction(
+      async tx =>
+        await loadDuplicateCardReplayAuthority({
+          tx,
+          stripeInvoiceId: 'in_initial',
+          stripeSubscriptionId: 'sub_late_replay',
+          kiloUserId: user.id,
+        })
+    );
+
+    expect(authority).toMatchObject({ kind: 'allowed' });
+  });
+
   test('uses successful duplicate-block audit as permanent blocked replay authority', async () => {
     const user = await insertTestUser();
     await db.insert(kilo_pass_audit_log).values({

@@ -156,6 +156,62 @@ describe('updateAgentBindings', () => {
     ).rejects.toMatchObject({ code: 'agent_binding_conflict', status: 409 });
   });
 
+  it('accepts a bare bind that yields a channel-key-only route (guard no-op)', async () => {
+    let call = 0;
+    const listBindings = vi.fn(async () => {
+      call += 1;
+      return call === 1 ? [] : [route('research', 'discord')];
+    });
+    const deps = makeDeps({ listBindings });
+
+    await updateAgentBindings('research', { channels: ['discord'] }, deps);
+
+    expect(deps.bind).toHaveBeenCalledWith('research', ['discord']);
+    expect(deps.unbind).not.toHaveBeenCalled();
+  });
+
+  it('fails closed (422) and rolls back when a bare bind resolves to an account-scoped route', async () => {
+    let call = 0;
+    const listBindings = vi.fn(async () => {
+      call += 1;
+      // before: empty; after the bind: OpenClaw produced an account-scoped route.
+      return call === 1 ? [] : [route('research', 'whatsapp', { accountId: 'default' })];
+    });
+    const unbind = vi.fn(async (agentId: string, specs: string[]) => ({
+      agentId,
+      removed: specs,
+      missing: [],
+      conflicts: [],
+    }));
+    const deps = makeDeps({ listBindings, unbind });
+
+    await expect(
+      updateAgentBindings('research', { channels: ['whatsapp'] }, deps)
+    ).rejects.toMatchObject({ code: 'invalid_agent_config', status: 422 });
+
+    // Rolls back exactly the route OpenClaw created, by its canonical spec.
+    expect(unbind).toHaveBeenCalledWith('research', ['whatsapp:default']);
+  });
+
+  it('does not flag a pre-existing account-scoped route as produced by the bind', async () => {
+    let call = 0;
+    const listBindings = vi.fn(async () => {
+      call += 1;
+      // A pre-existing account-scoped slack route exists throughout; binding
+      // discord adds a clean default route. The guard must diff against the
+      // pre-bind snapshot and NOT flag slack (it wasn't produced by this call).
+      return call === 1
+        ? [route('research', 'slack', { accountId: 'team' })]
+        : [route('research', 'slack', { accountId: 'team' }), route('research', 'discord')];
+    });
+    const deps = makeDeps({ listBindings });
+
+    await updateAgentBindings('research', { channels: ['discord'] }, deps);
+
+    expect(deps.bind).toHaveBeenCalledWith('research', ['discord']);
+    expect(deps.unbind).not.toHaveBeenCalled();
+  });
+
   it('rejects a stale etag without touching the CLI', async () => {
     const deps = makeDeps();
 

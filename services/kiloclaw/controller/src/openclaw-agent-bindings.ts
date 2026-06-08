@@ -89,6 +89,23 @@ function isManagedDefaultRoute(binding: CliBinding): boolean {
   return keys.length === 1 && keys[0] === 'channel';
 }
 
+// Stable identity for a binding's match, used to diff an agent's routes before
+// and after a bind so we can isolate exactly what that invocation produced.
+function routeKey(binding: CliBinding): string {
+  const match = binding.match as Record<string, unknown>;
+  return Object.keys(match)
+    .sort()
+    .map(key => `${key}=${JSON.stringify(match[key])}`)
+    .join('&');
+}
+
+// The `--bind` spec that removes a given route: bare `channel` for a default
+// route, `channel:accountId` for an account-scoped one.
+function routeToUnbindSpec(binding: CliBinding): string {
+  const summary = toBindingSummary(binding);
+  return summary.accountId === null ? summary.channel : `${summary.channel}:${summary.accountId}`;
+}
+
 /** Per-agent binding summaries, sourced from the CLI (the routing source of truth). */
 export async function listAgentBindingSummaries(
   agentId: string | undefined,
@@ -134,7 +151,8 @@ export async function updateAgentBindings(
       throw new AgentConfigError(404, 'agent_not_found', `Agent "${normalized}" not found`);
     }
 
-    const current = (await deps.listBindings(normalized))
+    const before = await deps.listBindings(normalized);
+    const current = before
       .filter(isManagedDefaultRoute)
       .map(binding => toBindingSummary(binding).channel);
     const currentSet = new Set(current);
@@ -164,6 +182,38 @@ export async function updateAgentBindings(
           409,
           'agent_binding_conflict',
           `Channel already routed to another agent: ${result.conflicts.join(', ')}`
+        );
+      }
+
+      // Defense-in-depth: a channel's bare bind could (for some channel plugin)
+      // resolve into an account-scoped route this endpoint can't manage as a
+      // default route — a later `channels: []` clear would then silently leave
+      // it. Diff the agent's routes against the pre-bind snapshot and confirm
+      // every route this invocation produced is a channel-key-only default
+      // route. If not, roll back exactly the routes it created (never the
+      // pre-existing ones) and fail closed. The cloud channels all bind cleanly,
+      // so this only guards a future channel whose bare bind auto-resolves.
+      const beforeKeys = new Set(before.map(routeKey));
+      const created = (await deps.listBindings(normalized)).filter(
+        binding => !beforeKeys.has(routeKey(binding))
+      );
+      const unmanageable = created.filter(binding => !isManagedDefaultRoute(binding));
+      if (unmanageable.length > 0) {
+        try {
+          await deps.unbind(normalized, created.map(routeToUnbindSpec));
+        } catch (rollbackError) {
+          console.error(
+            '[controller] Failed to roll back unmanageable agent bindings:',
+            rollbackError instanceof Error ? rollbackError.message : String(rollbackError)
+          );
+        }
+        const channels = [
+          ...new Set(unmanageable.map(binding => toBindingSummary(binding).channel)),
+        ];
+        throw new AgentConfigError(
+          422,
+          'invalid_agent_config',
+          `OpenClaw resolved a bind to an account-scoped route this endpoint cannot manage as a default route: ${channels.join(', ')}`
         );
       }
     }

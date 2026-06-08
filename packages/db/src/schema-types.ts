@@ -317,6 +317,53 @@ export const StripeEarlyFraudWarningActionStatus = {
 export type StripeEarlyFraudWarningActionStatus =
   (typeof StripeEarlyFraudWarningActionStatus)[keyof typeof StripeEarlyFraudWarningActionStatus];
 
+export const StripeDisputeOwnerClassification = {
+  Personal: 'personal',
+  Organization: 'organization',
+  Ambiguous: 'ambiguous',
+  Unmatched: 'unmatched',
+} as const;
+
+export type StripeDisputeOwnerClassification =
+  (typeof StripeDisputeOwnerClassification)[keyof typeof StripeDisputeOwnerClassification];
+
+export const StripeDisputeCaseStatus = {
+  NeedsAction: 'needs_action',
+  Processing: 'processing',
+  Accepted: 'accepted',
+  AcceptanceFailed: 'acceptance_failed',
+  EnforcementFailed: 'enforcement_failed',
+  ReviewRequired: 'review_required',
+  Closed: 'closed',
+} as const;
+
+export type StripeDisputeCaseStatus =
+  (typeof StripeDisputeCaseStatus)[keyof typeof StripeDisputeCaseStatus];
+
+export const StripeDisputeActionType = {
+  StripeAcceptance: 'stripe_acceptance',
+  UserBlock: 'user_block',
+  AutoTopUpDisable: 'auto_top_up_disable',
+  CreditBalanceReset: 'credit_balance_reset',
+  SubscriptionCancellation: 'subscription_cancellation',
+  AccessTermination: 'access_termination',
+  KiloClawSuspension: 'kiloclaw_suspension',
+} as const;
+
+export type StripeDisputeActionType =
+  (typeof StripeDisputeActionType)[keyof typeof StripeDisputeActionType];
+
+export const StripeDisputeActionStatus = {
+  Queued: 'queued',
+  Processing: 'processing',
+  Completed: 'completed',
+  Failed: 'failed',
+  Skipped: 'skipped',
+} as const;
+
+export type StripeDisputeActionStatus =
+  (typeof StripeDisputeActionStatus)[keyof typeof StripeDisputeActionStatus];
+
 export const AffiliateProvider = {
   Impact: 'impact',
 } as const;
@@ -554,6 +601,7 @@ export const KiloClawAdminAuditAction = z.enum([
   'kiloclaw.scheduled_action.created',
   'kiloclaw.fleet_upgrade.created',
   'kiloclaw.scheduled_action.cancelled',
+  'kiloclaw.provision_reservation.release',
 ]);
 
 export type KiloClawAdminAuditAction = z.infer<typeof KiloClawAdminAuditAction>;
@@ -1193,6 +1241,7 @@ export const CustomLlmProviderSchema = z.enum([
   'openai-compatible', // uses Chat Completions API with reasoning_content
   'openrouter', // uses Chat Completions API with reasoning_details
   'alibaba', // identical to openai-compatible, but reports cache write tokens that alibaba bills separately
+  'mistral', // uses Chat Completions API with possibly complex content objects for e.g. thinking
 ]);
 
 export type CustomLlmProvider = z.infer<typeof CustomLlmProviderSchema>;
@@ -1359,3 +1408,100 @@ export const CODE_REVIEW_BENIGN_TERMINAL_REASONS = [
 ] as const satisfies readonly CodeReviewTerminalReason[];
 
 export type CodeReviewBenignTerminalReason = (typeof CODE_REVIEW_BENIGN_TERMINAL_REASONS)[number];
+
+// --- MCP Gateway enums ---
+
+export const MCPGatewayOwnerScope = {
+  Personal: 'personal',
+  Organization: 'organization',
+} as const;
+
+export type MCPGatewayOwnerScope = (typeof MCPGatewayOwnerScope)[keyof typeof MCPGatewayOwnerScope];
+
+export const MCPGatewayAuthMode = {
+  None: 'none',
+  StaticHeaders: 'static_headers',
+  OAuthDynamic: 'oauth_dynamic',
+  OAuthStatic: 'oauth_static',
+} as const;
+
+export type MCPGatewayAuthMode = (typeof MCPGatewayAuthMode)[keyof typeof MCPGatewayAuthMode];
+
+export const MCPGatewaySharingMode = {
+  SingleUser: 'single_user',
+  MultiUser: 'multi_user',
+} as const;
+
+export type MCPGatewaySharingMode =
+  (typeof MCPGatewaySharingMode)[keyof typeof MCPGatewaySharingMode];
+
+export const MCPGatewayRouteStatus = {
+  Active: 'active',
+  Rotated: 'rotated',
+  Revoked: 'revoked',
+} as const;
+
+export type MCPGatewayRouteStatus =
+  (typeof MCPGatewayRouteStatus)[keyof typeof MCPGatewayRouteStatus];
+
+export const MCPGatewayInstanceStatus = {
+  Active: 'active',
+  NeedsReauth: 'needs_reauth',
+  Revoked: 'revoked',
+  Removed: 'removed',
+} as const;
+
+export type MCPGatewayInstanceStatus =
+  (typeof MCPGatewayInstanceStatus)[keyof typeof MCPGatewayInstanceStatus];
+
+export const MCPGatewayProviderGrantStatus = {
+  Active: 'active',
+  Revoked: 'revoked',
+} as const;
+
+export type MCPGatewayProviderGrantStatus =
+  (typeof MCPGatewayProviderGrantStatus)[keyof typeof MCPGatewayProviderGrantStatus];
+
+export const MCPGatewaySecretKind = {
+  StaticProviderCredentials: 'static_provider_credentials',
+  DynamicRegistration: 'dynamic_registration',
+  StaticHeaders: 'static_headers',
+} as const;
+
+export type MCPGatewaySecretKind = (typeof MCPGatewaySecretKind)[keyof typeof MCPGatewaySecretKind];
+
+export const MCPGatewayOAuthClientAuthMethod = {
+  None: 'none',
+  ClientSecretPost: 'client_secret_post',
+  ClientSecretBasic: 'client_secret_basic',
+} as const;
+
+export type MCPGatewayOAuthClientAuthMethod =
+  (typeof MCPGatewayOAuthClientAuthMethod)[keyof typeof MCPGatewayOAuthClientAuthMethod];
+
+export const MCPGatewayAuthorizationRequestStatus = {
+  Pending: 'pending',
+  Completed: 'completed',
+  Error: 'error',
+} as const;
+
+export type MCPGatewayAuthorizationRequestStatus =
+  (typeof MCPGatewayAuthorizationRequestStatus)[keyof typeof MCPGatewayAuthorizationRequestStatus];
+
+export const MCPGatewayPendingProviderAuthorizationStatus = {
+  Pending: 'pending',
+  Completed: 'completed',
+  Error: 'error',
+} as const;
+
+export type MCPGatewayPendingProviderAuthorizationStatus =
+  (typeof MCPGatewayPendingProviderAuthorizationStatus)[keyof typeof MCPGatewayPendingProviderAuthorizationStatus];
+
+export const MCPGatewayAuditOutcome = {
+  Success: 'success',
+  Failure: 'failure',
+  Blocked: 'blocked',
+} as const;
+
+export type MCPGatewayAuditOutcome =
+  (typeof MCPGatewayAuditOutcome)[keyof typeof MCPGatewayAuditOutcome];

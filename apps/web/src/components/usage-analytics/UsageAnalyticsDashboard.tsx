@@ -44,6 +44,7 @@ import {
 import { useUsageDashboardState } from './useUsageDashboardState';
 import {
   DIMENSION_LABELS,
+  type CostSource,
   type Dimension,
   type FilterDirection,
   type Granularity,
@@ -109,7 +110,8 @@ export function UsageAnalyticsDashboard({
 }: UsageAnalyticsDashboardProps) {
   const trpc = useTRPC();
   const { state, setState } = useUsageDashboardState();
-  const { period, granularity, chartMetric, filters, groupBy, personalView, viewAs } = state;
+  const { period, granularity, costSource, chartMetric, filters, groupBy, personalView, viewAs } =
+    state;
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   // `organizations.list` is always available to the caller and returns the
@@ -213,11 +215,20 @@ export function UsageAnalyticsDashboard({
       organizationId: effectiveOrgId,
       dateRange,
       granularity,
+      costSource,
       filters,
       personalScope: effectivePersonalScope,
       viewAs: effectiveViewAs,
     }),
-    [effectiveOrgId, dateRange, granularity, filters, effectivePersonalScope, effectiveViewAs]
+    [
+      effectiveOrgId,
+      dateRange,
+      granularity,
+      costSource,
+      filters,
+      effectivePersonalScope,
+      effectiveViewAs,
+    ]
   );
 
   const { data: summary, isLoading: summaryLoading } = useUsageSummary(commonArgs);
@@ -400,7 +411,7 @@ export function UsageAnalyticsDashboard({
       ),
       {
         key: 'costMicrodollars',
-        label: 'Cost',
+        label: costSource === 'market' ? 'Estimated Market Cost' : 'Cost',
         align: 'right',
         render: value => formatDollarsFromMicrodollars(value as number),
         sortAccessor: row => (row.costMicrodollars as number) ?? 0,
@@ -428,7 +439,7 @@ export function UsageAnalyticsDashboard({
       },
     ];
     return cols;
-  }, [granularity, period, tableGroupBy, labelForDimensionValue]);
+  }, [granularity, period, tableGroupBy, labelForDimensionValue, costSource]);
 
   const tableRows = useMemo(() => {
     return (tableData?.rows ?? []).map((row, idx) => ({
@@ -451,9 +462,10 @@ export function UsageAnalyticsDashboard({
       groupBy: tableGroupBy,
       granularity,
       period,
+      costSource,
       labelForDimensionValue,
     });
-  }, [tableData, tableGroupBy, granularity, period, labelForDimensionValue]);
+  }, [tableData, tableGroupBy, granularity, period, costSource, labelForDimensionValue]);
 
   const isOrgContext = context === 'organization';
 
@@ -476,6 +488,8 @@ export function UsageAnalyticsDashboard({
       granularity={granularity}
       onGranularityChange={(v: Granularity) => setState({ granularity: v })}
       granularityOptions={granularityOptions}
+      costSource={costSource}
+      onCostSourceChange={(v: CostSource) => setState({ costSource: v })}
       chartMetric={chartMetric}
       onChartMetricChange={(v: MetricKey) => setState({ chartMetric: v })}
       metricOptions={METRIC_OPTIONS}
@@ -531,6 +545,7 @@ export function UsageAnalyticsDashboard({
             <SummarySection
               summary={summary}
               loading={summaryLoading}
+              costSource={costSource}
               showActiveUsers={isOrgWideView}
             />
 
@@ -574,6 +589,7 @@ export function UsageAnalyticsDashboard({
               <CardContent>
                 <PrimaryChart
                   metric={chartMetric}
+                  costSource={costSource}
                   data={timeseries}
                   loading={timeseriesLoading}
                   splitByLabel={

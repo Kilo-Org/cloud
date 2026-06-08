@@ -21,7 +21,7 @@ import {
 } from '@/components/ui/select';
 import { Check, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { DIMENSION_LABELS, type Dimension, type FilterDirection } from './types';
+import { DIMENSION_LABELS, type CostSource, type Dimension, type FilterDirection } from './types';
 import { useResolveOrgUsers, type DateRange, type PersonalScope, type UsageFilters } from './hooks';
 import type { Granularity } from './types';
 
@@ -49,6 +49,7 @@ type FilterGeneratorPopoverProps = {
   labelForDimensionValue?: (dim: Dimension, value: string) => string;
   /** Metric used to rank breakdown suggestions (defaults to 'cost'). */
   metric?: 'cost' | 'requests' | 'tokens';
+  costSource: CostSource;
   /** Granularity for the breakdown query (defaults to 'day'). */
   granularity?: Granularity;
 };
@@ -66,6 +67,7 @@ export function FilterGeneratorPopover({
   onAdd,
   labelForDimensionValue,
   metric = 'cost',
+  costSource,
   granularity = 'day',
 }: FilterGeneratorPopoverProps) {
   const [open, setOpen] = useState(false);
@@ -80,6 +82,7 @@ export function FilterGeneratorPopover({
       startDate: dateRange.startDate,
       endDate: dateRange.endDate,
       granularity,
+      costSource,
       organizationId: organizationId ?? undefined,
       personalScope,
       viewAs,

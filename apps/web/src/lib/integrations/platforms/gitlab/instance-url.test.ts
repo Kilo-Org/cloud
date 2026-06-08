@@ -39,6 +39,7 @@ describe('GitLab instance URL safety', () => {
 
   it.each([
     ['ftp://gitlab.example.com', 'Invalid URL protocol'],
+    ['http://gitlab.example.com', 'must use https'],
     [urlWithCredentials.toString(), 'must not include credentials'],
     ['https://gitlab.example.com?next=/api', 'must not include query strings'],
     ['https://gitlab.example.com#fragment', 'must not include query strings'],

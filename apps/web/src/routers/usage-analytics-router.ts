@@ -16,6 +16,9 @@ import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 export const GranularitySchema = z.enum(['hour', 'day', 'week', 'month']);
 export type Granularity = z.infer<typeof GranularitySchema>;
 
+export const CostSourceSchema = z.enum(['cost', 'market']);
+export type CostSource = z.infer<typeof CostSourceSchema>;
+
 export const DimensionSchema = z.enum(['feature', 'model', 'mode', 'user', 'provider', 'project']);
 export type Dimension = z.infer<typeof DimensionSchema>;
 
@@ -39,6 +42,7 @@ const FiltersShape = {
   startDate: z.iso.datetime(),
   endDate: z.iso.datetime(),
   granularity: GranularitySchema,
+  costSource: CostSourceSchema.default('cost'),
   organizationId: z.uuid().optional(),
   /**
    * Personal-scope narrowing:
@@ -68,7 +72,7 @@ const FiltersShape = {
   excludedProjects: z.array(z.string()).optional(),
 } as const;
 
-const UsageAnalyticsFiltersSchema = z.object(FiltersShape);
+export const UsageAnalyticsFiltersSchema = z.object(FiltersShape);
 export type UsageAnalyticsFilters = z.infer<typeof UsageAnalyticsFiltersSchema>;
 
 // ---------------------------------------------------------------------------
@@ -341,10 +345,24 @@ function buildWhereClause(
 // Metric SQL expression
 // ---------------------------------------------------------------------------
 
-function metricExprSql(metric: Metric, tier: GranularityTier): string {
+export function costColumnFor(costSource: CostSource): string {
+  switch (costSource) {
+    case 'cost':
+      return 'total_cost_microdollars';
+    case 'market':
+      return 'total_market_cost_microdollars';
+  }
+}
+
+export function costSumExprSql(costSource: CostSource): string {
+  return `COALESCE(SUM(${costColumnFor(costSource)}), 0)`;
+}
+
+function metricExprSql(metric: Metric, tier: GranularityTier, costSource: CostSource): string {
+  const costSumExpr = costSumExprSql(costSource);
   switch (metric) {
     case 'cost':
-      return 'COALESCE(SUM(total_cost_microdollars), 0)';
+      return costSumExpr;
     case 'requests':
       return 'COALESCE(SUM(request_count), 0)';
     case 'inputTokens':
@@ -362,7 +380,7 @@ function metricExprSql(metric: Metric, tier: GranularityTier): string {
       return `CASE WHEN COALESCE(SUM(${countExpr}), 0) = 0 THEN 0 ELSE COALESCE(SUM(total_generation_time_ms), 0)::FLOAT / SUM(${countExpr})::FLOAT END`;
     }
     case 'costPerRequest':
-      return 'CASE WHEN COALESCE(SUM(request_count), 0) = 0 THEN 0 ELSE COALESCE(SUM(total_cost_microdollars), 0)::FLOAT / SUM(request_count)::FLOAT END';
+      return `CASE WHEN COALESCE(SUM(request_count), 0) = 0 THEN 0 ELSE ${costSumExpr}::FLOAT / SUM(request_count)::FLOAT END`;
     case 'tokensPerRequest':
       return 'CASE WHEN COALESCE(SUM(request_count), 0) = 0 THEN 0 ELSE COALESCE(SUM(total_tokens), 0)::FLOAT / SUM(request_count)::FLOAT END';
     case 'cacheHitRatio':
@@ -729,10 +747,11 @@ export const usageAnalyticsRouter = createTRPCRouter({
       const table = getTableName(meta.tier);
       const where = buildWhereClause(meta.tier, input, ctx.user.id, true);
       const generationTimeCountExpr = generationTimeCountExprSql(meta.tier);
+      const costSumExpr = costSumExprSql(input.costSource);
 
       const statement = `
         SELECT
-          COALESCE(SUM(total_cost_microdollars), 0),
+          ${costSumExpr},
           COALESCE(SUM(request_count), 0),
           COALESCE(SUM(total_input_tokens), 0),
           COALESCE(SUM(total_output_tokens), 0),
@@ -831,7 +850,7 @@ export const usageAnalyticsRouter = createTRPCRouter({
       }
       const table = getTableName(meta.tier);
       const bucketExpr = bucketExprSql(meta.effectiveGranularity, meta.tier);
-      const metricExpr = metricExprSql(input.metric, meta.tier);
+      const metricExpr = metricExprSql(input.metric, meta.tier, input.costSource);
       const where = buildWhereClause(meta.tier, input, ctx.user.id, true);
 
       let statement: string;
@@ -901,7 +920,7 @@ export const usageAnalyticsRouter = createTRPCRouter({
       }
       const table = getTableName(meta.tier);
       const dimCol = dimensionColumn(input.dimension);
-      const metricExpr = metricExprSql(input.metric, meta.tier);
+      const metricExpr = metricExprSql(input.metric, meta.tier, input.costSource);
       const where = buildWhereClause(meta.tier, input, ctx.user.id, true);
 
       const statement = `
@@ -969,6 +988,7 @@ export const usageAnalyticsRouter = createTRPCRouter({
       const table = getTableName(meta.tier);
       const bucketExpr = bucketExprSql(meta.effectiveGranularity, meta.tier);
       const where = buildWhereClause(meta.tier, input, ctx.user.id, true);
+      const costSumExpr = costSumExprSql(input.costSource);
 
       const requestedDims = input.groupBy;
 
@@ -996,7 +1016,7 @@ export const usageAnalyticsRouter = createTRPCRouter({
           ${userExpr} AS dim_user,
           ${providerExpr} AS dim_provider,
           ${projectExpr} AS dim_project,
-          COALESCE(SUM(total_cost_microdollars), 0),
+          ${costSumExpr},
           COALESCE(SUM(request_count), 0),
           COALESCE(SUM(total_input_tokens), 0),
           COALESCE(SUM(total_output_tokens), 0),

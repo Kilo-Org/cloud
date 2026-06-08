@@ -28,6 +28,7 @@ interface OrganizationFiltersProps {
   plan: string;
   hasUsage: boolean;
   hasMultipleUsers: boolean;
+  trialEndingInFuture: boolean;
   showStripeStatus?: boolean;
   showTrialFilters?: boolean;
   onIncludeDeletedChange: (value: boolean) => void;
@@ -35,6 +36,7 @@ interface OrganizationFiltersProps {
   onPlanChange: (value: string) => void;
   onHasUsageChange: (value: boolean) => void;
   onHasMultipleUsersChange: (value: boolean) => void;
+  onTrialEndingInFutureChange: (value: boolean) => void;
   onResetFilters: () => void;
   totalCount?: number;
   filteredCount?: number;
@@ -49,6 +51,7 @@ export function OrganizationFilters({
   plan,
   hasUsage,
   hasMultipleUsers,
+  trialEndingInFuture,
   showStripeStatus = true,
   showTrialFilters = false,
   onIncludeDeletedChange,
@@ -56,6 +59,7 @@ export function OrganizationFilters({
   onPlanChange,
   onHasUsageChange,
   onHasMultipleUsersChange,
+  onTrialEndingInFutureChange,
   onResetFilters,
   totalCount,
   filteredCount,
@@ -64,7 +68,7 @@ export function OrganizationFilters({
     includeDeleted ||
     !!stripeStatus ||
     (!!plan && plan !== 'all') ||
-    (showTrialFilters && (hasUsage || hasMultipleUsers));
+    (showTrialFilters && (hasUsage || hasMultipleUsers || trialEndingInFuture));
 
   const stripeStatusLabel = stripeStatus ? getStripeStatusLabel(stripeStatus) : undefined;
 
@@ -143,6 +147,19 @@ export function OrganizationFilters({
           <>
             <div className="flex items-center gap-2 pb-1">
               <Checkbox
+                id="trial-ending-in-future"
+                checked={trialEndingInFuture}
+                onCheckedChange={checked => onTrialEndingInFutureChange(checked === true)}
+              />
+              <Label
+                htmlFor="trial-ending-in-future"
+                className="cursor-pointer text-sm font-medium"
+              >
+                Trial active
+              </Label>
+            </div>
+            <div className="flex items-center gap-2 pb-1">
+              <Checkbox
                 id="has-usage"
                 checked={hasUsage}
                 onCheckedChange={checked => onHasUsageChange(checked === true)}
@@ -209,6 +226,17 @@ export function OrganizationFilters({
                   Includes deleted
                   <button
                     onClick={() => onIncludeDeletedChange(false)}
+                    className="hover:bg-secondary-foreground/20 ml-1 rounded-full p-0.5"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </Badge>
+              )}
+              {showTrialFilters && trialEndingInFuture && (
+                <Badge variant="secondary" className="text-xs">
+                  Trial active
+                  <button
+                    onClick={() => onTrialEndingInFutureChange(false)}
                     className="hover:bg-secondary-foreground/20 ml-1 rounded-full p-0.5"
                   >
                     <X className="h-3 w-3" />

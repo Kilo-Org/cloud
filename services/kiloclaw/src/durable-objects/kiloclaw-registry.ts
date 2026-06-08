@@ -39,6 +39,13 @@ export type BeginFreshProvisionResult =
   | { outcome: 'admitted'; reservation: ProvisionReservationEntry }
   | { outcome: 'conflict'; reservation: ProvisionReservationEntry };
 
+export type ReleasableReservationStatus = 'in_progress' | 'failed_requires_reconciliation';
+
+export type AdminReleaseReservationResult =
+  | { outcome: 'released'; previousStatus: ReleasableReservationStatus }
+  | { outcome: 'not_found' }
+  | { outcome: 'status_changed'; status: ProvisionReservationStatus };
+
 function rowToEntry(row: typeof registryInstances.$inferSelect): RegistryEntry {
   return {
     instanceId: row.instance_id,
@@ -277,6 +284,58 @@ export class KiloClawRegistry extends DurableObject<KiloClawEnv> {
         )
       )
       .run();
+  }
+
+  /**
+   * Atomically release a stuck reservation as an explicit admin/operator
+   * break-glass action. This is NOT an autonomous safety decision: the caller
+   * (an authenticated admin) is asserting they have already confirmed the
+   * attempt is dead and any provider resources are cleaned up. The audit log on
+   * the route records that assertion.
+   *
+   * Validation + transition happen in a single `transactionSync` so the read
+   * and write cannot be split across RPCs. The release is a compare-and-set on
+   * `expectedStatus` — the exact status the caller validated — so a reservation
+   * that changed underneath (e.g. a concurrent `completeFreshProvision`) is
+   * reported as `status_changed` rather than silently released.
+   */
+  async adminReleaseStuckReservation(
+    ownerKey: string,
+    assignedUserId: string,
+    instanceId: string,
+    expectedStatus: ReleasableReservationStatus,
+    reason: string
+  ): Promise<AdminReleaseReservationResult> {
+    await this.ensureOwnerKey(ownerKey);
+    const now = new Date().toISOString();
+    return this.ctx.storage.transactionSync(() => {
+      const row = this.db
+        .select()
+        .from(registryProvisionReservations)
+        .where(
+          and(
+            eq(registryProvisionReservations.instance_id, instanceId),
+            eq(registryProvisionReservations.assigned_user_id, assignedUserId)
+          )
+        )
+        .get();
+      if (!row) return { outcome: 'not_found' };
+      if (row.status !== expectedStatus) {
+        return { outcome: 'status_changed', status: row.status };
+      }
+      this.db
+        .update(registryProvisionReservations)
+        .set({ status: 'released', updated_at: now, resolution_reason: reason })
+        .where(
+          and(
+            eq(registryProvisionReservations.instance_id, instanceId),
+            eq(registryProvisionReservations.assigned_user_id, assignedUserId),
+            eq(registryProvisionReservations.status, expectedStatus)
+          )
+        )
+        .run();
+      return { outcome: 'released', previousStatus: expectedStatus };
+    });
   }
 
   async listProvisionReservations(ownerKey: string): Promise<ProvisionReservationEntry[]> {

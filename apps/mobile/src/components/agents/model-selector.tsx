@@ -1,6 +1,6 @@
 import { Pressable, View } from 'react-native';
 import { type Href, useRouter } from 'expo-router';
-import { Brain, BrainCircuit, ChevronDown } from 'lucide-react-native';
+import { BookOpenCheck, Brain, ChevronDown } from 'lucide-react-native';
 
 import { Text } from '@/components/ui/text';
 import {
@@ -82,7 +82,7 @@ export function ModelSelector({
         >
           {label}
         </Text>
-        {collectsData ? <BrainCircuit size={12} color={colors.warn} /> : null}
+        {collectsData ? <BookOpenCheck size={12} color={colors.warn} /> : null}
         {hasVariants && compactVariantLabel ? (
           <View className="flex-row items-center gap-1 rounded-full bg-neutral-200 px-1.5 py-0.5 dark:bg-neutral-800">
             <Brain size={12} color={colors.mutedForeground} />

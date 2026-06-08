@@ -24,7 +24,7 @@ import { logAutoModelChangesForAllOrgs } from '@/lib/organizations/auto-model-ch
 import type { Provider } from '@/lib/ai-gateway/providers/types';
 import type { StoredModel } from '@kilocode/db/schema-types';
 import { EndpointsSchema, ModelsSchema } from '@kilocode/db/schema-types';
-import { redisSet } from '@/lib/redis';
+import { redisClient } from '@/lib/redis';
 import { GATEWAY_METADATA_REDIS_KEYS, type RedisKey } from '@/lib/redis-keys';
 import { syncDirectByokModels } from '@/lib/ai-gateway/providers/direct-byok/sync-direct-byok';
 import { ATTRIBUTION_HEADERS } from '@/lib/ai-gateway/providers/openrouter/attribution-headers';
@@ -312,7 +312,7 @@ async function mirrorToRedis(values: {
   if (values.openrouterProviders) {
     entries.push([GATEWAY_METADATA_REDIS_KEYS.openrouterProviders, values.openrouterProviders]);
   }
-  await Promise.all(entries.map(([key, value]) => redisSet(key, JSON.stringify(value))));
+  await Promise.all(entries.map(([key, value]) => redisClient.set(key, JSON.stringify(value))));
 }
 
 /**

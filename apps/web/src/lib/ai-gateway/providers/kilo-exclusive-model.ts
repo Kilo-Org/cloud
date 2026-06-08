@@ -28,6 +28,17 @@ export type Pricing = {
   calculate_mUsd(usage: Usage, basePricing: Pricing): number;
 };
 
+export function calculateSimpleCost_mUsd(usage: Usage, basePricing: Pricing) {
+  return (
+    usage.uncachedInputTokens * basePricing.prompt_per_million +
+    usage.cacheWriteTokens *
+      (basePricing.input_cache_write_per_million ?? basePricing.prompt_per_million) +
+    usage.cacheHitTokens *
+      (basePricing.input_cache_read_per_million ?? basePricing.prompt_per_million) +
+    usage.totalOutputTokens * basePricing.completion_per_million
+  );
+}
+
 export type KiloExclusiveModel = {
   public_id: string;
   display_name: string;

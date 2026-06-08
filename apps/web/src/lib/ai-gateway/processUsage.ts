@@ -21,7 +21,10 @@ import { eq, sql } from 'drizzle-orm';
 import { sentryRootSpan } from '../getRootSpan';
 import { ingestOrganizationTokenUsage } from '@/lib/organizations/organization-usage';
 import type { ProviderId } from '@/lib/ai-gateway/providers/types';
-import { findKiloExclusiveModel, isKiloStealthModel } from '@/lib/ai-gateway/models';
+import {
+  findKiloExclusiveModel,
+  shouldRedactModelNameInMicrodollarUsage,
+} from '@/lib/ai-gateway/models';
 import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
 import { sentryLogger } from '@/lib/utils.server';
 import { maybeIssueKiloPassBonusFromUsageThreshold } from '@/lib/kilo-pass/usage-triggered-bonus';
@@ -1015,7 +1018,7 @@ export async function processTokenData(
 
   if (
     !usageStats.model || // fallback for failure cases
-    isKiloStealthModel(usageContext.requested_model) // this can probably be removed once we're sure we only present requested_model to users
+    shouldRedactModelNameInMicrodollarUsage(usageContext.provider, usageContext.requested_model)
   ) {
     usageStats.model = usageContext.requested_model;
   }

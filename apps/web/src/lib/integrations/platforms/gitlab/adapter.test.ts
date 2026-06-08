@@ -350,6 +350,15 @@ describe('validateGitLabInstance', () => {
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
+  it('should return invalid for http instances before fetching', async () => {
+    const result = await validateGitLabInstance('http://gitlab.example.com');
+
+    expect(result.valid).toBe(false);
+    expect(result.error).toContain('must use https');
+    expect(mockLookup).not.toHaveBeenCalled();
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
   it('should return invalid for unsafe hosts before fetching', async () => {
     const result = await validateGitLabInstance('http://127.0.0.1:8080');
 
@@ -869,6 +878,16 @@ describe('createProjectWebhook', () => {
 describe('validatePersonalAccessToken', () => {
   beforeEach(() => {
     mockFetch.mockReset();
+  });
+
+  it('rejects http instance URLs before fetching', async () => {
+    const result = await validatePersonalAccessToken('pat-token', 'http://gitlab.example.com');
+
+    expect(result).toEqual({
+      valid: false,
+      error: 'Invalid URL protocol. GitLab instance URLs must use https.',
+    });
+    expect(mockFetch).not.toHaveBeenCalled();
   });
 
   it('rejects unsafe instance URLs before fetching', async () => {

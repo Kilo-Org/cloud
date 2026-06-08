@@ -4,6 +4,7 @@ import { type UserWebConnection } from 'cloud-agent-sdk';
 
 const mocks = vi.hoisted(() => ({
   createSessionManager: vi.fn(config => ({ config })),
+  createNativeUserWebConnectionLifecycleHooks: vi.fn(() => ({ marker: 'native-lifecycle-hooks' })),
   getWithRuntimeStateQuery: vi.fn(),
 }));
 
@@ -50,6 +51,10 @@ vi.mock('@/components/agents/mobile-session-diagnostics', () => ({
   ),
 }));
 
+vi.mock('@/lib/user-web-connection-lifecycle', () => ({
+  createNativeUserWebConnectionLifecycleHooks: mocks.createNativeUserWebConnectionLifecycleHooks,
+}));
+
 vi.mock('@/lib/config', () => ({
   API_BASE_URL: 'https://api.example.com',
   CLOUD_AGENT_WS_URL: 'wss://agent.example.com',
@@ -68,6 +73,7 @@ type CapturedSessionManagerConfig = {
   userWebConnection: unknown;
   cliWebsocketUrl?: string;
   getAuthToken?: () => Promise<string>;
+  lifecycleHooks?: unknown;
   fetchSession: (kiloSessionId: string) => Promise<{ associatedPr: unknown }>;
 };
 
@@ -89,6 +95,20 @@ describe('createMobileAgentSessionManager', () => {
     expect(config.userWebConnection).toBe(userWebConnection);
     expect(config.cliWebsocketUrl).toBeUndefined();
     expect(config.getAuthToken).toBeUndefined();
+  });
+
+  it('passes native lifecycle hooks to Cloud Agent stream connections', async () => {
+    const { createMobileAgentSessionManager } =
+      await import('@/components/agents/mobile-session-manager');
+
+    createMobileAgentSessionManager({
+      store: createStore(),
+      userWebConnection,
+    });
+
+    const config = mocks.createSessionManager.mock.calls[0]?.[0] as CapturedSessionManagerConfig;
+    expect(mocks.createNativeUserWebConnectionLifecycleHooks).toHaveBeenCalledTimes(1);
+    expect(config.lifecycleHooks).toEqual({ marker: 'native-lifecycle-hooks' });
   });
 
   it('propagates associatedPr from fetched session data', async () => {

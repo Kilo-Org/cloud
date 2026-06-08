@@ -199,6 +199,7 @@ export async function GET(request: NextRequest) {
         isTrackingValueAccepted: affiliateTouch.isTrackingValueAccepted,
       });
       await recordImpactAffiliateTouch({
+        product: affiliateTouch.product,
         userId: user.id,
         touch: affiliateTouch,
       });

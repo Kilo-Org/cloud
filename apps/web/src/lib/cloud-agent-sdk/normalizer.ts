@@ -96,7 +96,7 @@ export type ServiceEvent =
   | { type: 'suggestion.dismissed'; requestId: string }
   | {
       type: 'stopped';
-      reason: 'complete' | 'interrupted' | 'disconnected' | 'error';
+      reason: 'complete' | 'interrupted' | 'disconnected' | 'transport-disconnected' | 'error';
       branch?: string;
     }
   | { type: 'warning' }

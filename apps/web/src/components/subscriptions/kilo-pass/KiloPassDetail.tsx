@@ -21,6 +21,7 @@ import { cn } from '@/lib/utils';
 import { useRawTRPCClient, useTRPC } from '@/lib/trpc/utils';
 import { formatDollars, formatIsoDateString_UsaDateOnlyFormat } from '@/lib/utils';
 import { DetailPageHeader } from '@/components/subscriptions/DetailPageHeader';
+import { KiloPassReferralButton } from '@/components/referrals/KiloPassReferralButton';
 import { BillingHistoryTable } from '@/components/subscriptions/BillingHistoryTable';
 import { CreditHistory } from './CreditHistory';
 import {
@@ -181,6 +182,7 @@ export function KiloPassDetail() {
           backLabel="Back to subscriptions"
           title="Kilo Pass"
           status={subscriptionDisplay.status}
+          actions={isKiloPassTerminal(subscription.status) ? null : <KiloPassReferralButton />}
         />
 
         {subscriptionDisplay.detailAlert ? (

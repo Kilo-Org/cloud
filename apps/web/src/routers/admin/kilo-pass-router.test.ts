@@ -317,6 +317,64 @@ describe('admin.kiloPass.cancelAndRefundKiloPassBulk', () => {
     expect(noteRows[0].note_content).toContain('[bulk]');
   });
 
+  it('cancels and blocks without refunding when refundLatestPayment is false', async () => {
+    const stripeMock = getStripeMock();
+    stripeMock.subscriptions.cancel.mockResolvedValue({});
+
+    const target = await insertTestUser({
+      google_user_email: 'bulk-no-refund@example.com',
+      total_microdollars_acquired: 5_000_000,
+      microdollars_used: 1_000_000,
+    });
+    await insertActiveKiloPass(target.id, 'sub_no_refund');
+
+    const caller = await createCallerForUser(adminUser.id);
+    const result = await caller.admin.kiloPass.cancelAndRefundKiloPassBulk({
+      emails: ['bulk-no-refund@example.com'],
+      reason: 'policy',
+      refundLatestPayment: false,
+    });
+
+    expect(result.summary).toEqual({
+      total: 1,
+      cancelled: 1,
+      skipped: 0,
+      errored: 0,
+      totalRefundedCents: 0,
+    });
+    expect(result.results[0].status).toBe('cancelled');
+    expect(result.results[0].refundedAmountCents).toBeNull();
+    expect(stripeMock.subscriptions.cancel).toHaveBeenCalledWith('sub_no_refund');
+    expect(stripeMock.invoices.list).not.toHaveBeenCalled();
+    expect(stripeMock.invoicePayments.list).not.toHaveBeenCalled();
+    expect(stripeMock.refunds.create).not.toHaveBeenCalled();
+
+    const subRow = await db.query.kilo_pass_subscriptions.findFirst({
+      where: eq(kilo_pass_subscriptions.stripe_subscription_id, 'sub_no_refund'),
+    });
+    expect(subRow?.status).toBe('canceled');
+
+    const userRow = await db.query.kilocode_users.findFirst({
+      where: eq(kilocode_users.id, target.id),
+    });
+    expect(userRow?.blocked_reason).toBe('policy');
+    expect(userRow?.blocked_by_kilo_user_id).toBe(adminUser.id);
+
+    const txnRows = await db.query.credit_transactions.findMany({
+      where: eq(credit_transactions.kilo_user_id, target.id),
+    });
+    expect(txnRows).toHaveLength(1);
+    expect(txnRows[0].credit_category).toBe('admin-cancel-kilo-pass-no-refund');
+
+    const noteRows = await db.query.user_admin_notes.findMany({
+      where: eq(user_admin_notes.kilo_user_id, target.id),
+    });
+    expect(noteRows).toHaveLength(1);
+    expect(noteRows[0].note_content).toContain('Kilo Pass cancelled by admin.');
+    expect(noteRows[0].note_content).toContain('Stripe refund skipped.');
+    expect(noteRows[0].note_content).toContain('[bulk]');
+  });
+
   it('handles no-invoice users as cancelled with null refund', async () => {
     const stripeMock = getStripeMock();
     setupNoInvoiceStripe(stripeMock);

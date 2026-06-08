@@ -1,0 +1,36 @@
+{
+  "name": "cloudflare-mcp-gateway",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "description": "Kilo MCP Gateway runtime worker",
+  "scripts": {
+    "dev": "wrangler dev --env dev --ip 0.0.0.0",
+    "start": "wrangler dev --env dev --ip 0.0.0.0",
+    "deploy": "wrangler deploy",
+    "keys:generate": "node scripts/generate-keys.mjs",
+    "types": "wrangler types --include-runtime=false",
+    "typecheck": "tsgo --noEmit",
+    "lint": "pnpm -w exec oxlint --config .oxlintrc.json services/mcp-gateway/src",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@kilocode/mcp-gateway": "workspace:*",
+    "@kilocode/db": "workspace:*",
+    "@kilocode/encryption": "workspace:*",
+    "@kilocode/worker-utils": "workspace:*",
+    "drizzle-orm": "catalog:",
+    "hono": "catalog:",
+    "jose": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "catalog:",
+    "@types/node": "catalog:",
+    "@typescript/native-preview": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:",
+    "wrangler": "catalog:"
+  }
+}

@@ -23,6 +23,8 @@ export function isValidCallbackPath(path: string): boolean {
     path === '/claw' ||
     path.startsWith('/claw/') ||
     path.startsWith('/cloud') ||
+    path === '/subscriptions/kilo-pass' ||
+    path.startsWith('/subscriptions/kilo-pass/') ||
     path.startsWith('/integrations/') ||
     // Admin-managed URL bonus campaigns. Stricter shape enforcement
     // (slug format, prefix-match guard) happens in

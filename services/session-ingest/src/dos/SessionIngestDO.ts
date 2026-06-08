@@ -1,5 +1,5 @@
 import { DurableObject } from 'cloudflare:workers';
-import { eq, ne, gt, gte, lt, and, inArray, isNotNull } from 'drizzle-orm';
+import { eq, ne, gt, gte, lt, and, or, inArray, isNull, isNotNull } from 'drizzle-orm';
 import { drizzle, type DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 
@@ -86,6 +86,36 @@ const INGEST_META_EXTRACTORS: Array<{
 
 type Changes = Array<{ name: ExtractableMetaKey; value: string | null }>;
 
+type IngestLifecycleEvent =
+  | { type: 'session_open' }
+  | {
+      type: 'session_close';
+      reason: Extract<SessionDataItem, { type: 'session_close' }>['data']['reason'];
+    };
+
+export type IngestOrderCursor = { ingestedAt: number | null; id: number };
+
+export function afterIngestOrderCursor(cursor: IngestOrderCursor) {
+  if (cursor.ingestedAt === null) {
+    return or(
+      and(isNull(ingestItems.ingested_at), gt(ingestItems.id, cursor.id)),
+      isNotNull(ingestItems.ingested_at)
+    );
+  }
+
+  return or(
+    gt(ingestItems.ingested_at, cursor.ingestedAt),
+    and(eq(ingestItems.ingested_at, cursor.ingestedAt), gt(ingestItems.id, cursor.id))
+  );
+}
+
+export function ingestOrderCursor(row: {
+  ingested_at: number | null;
+  id: number;
+}): IngestOrderCursor {
+  return { ingestedAt: row.ingested_at, id: row.id };
+}
+
 export class SessionIngestDO extends DurableObject<Env> {
   private db: DrizzleSqliteDODatabase;
 
@@ -141,8 +171,7 @@ export class SessionIngestDO extends DurableObject<Env> {
       status: undefined,
     };
 
-    let hasSessionOpen = false;
-    let closeReason: string | undefined;
+    const lifecycleEvents: IngestLifecycleEvent[] = [];
     const orphanedR2Keys: string[] = [];
 
     for (const item of payload) {
@@ -208,15 +237,40 @@ export class SessionIngestDO extends DurableObject<Env> {
         }
       }
 
-      if (item.type === 'session_open') {
-        hasSessionOpen = true;
-      } else if (item.type === 'session_close') {
-        closeReason = item.data.reason;
+      if (ingestVersion >= 1) {
+        if (item.type === 'session_open') {
+          lifecycleEvents.push({ type: 'session_open' });
+        } else if (item.type === 'session_close') {
+          lifecycleEvents.push({ type: 'session_close', reason: item.data.reason });
+        }
       }
     }
 
-    const changes: Changes = [];
+    if (ingestVersion >= 1) {
+      // v1 clients send explicit open/close pairs. Only those events drive alarms.
+      for (const event of lifecycleEvents) {
+        if (event.type === 'session_open') {
+          // New turn starting — clear prior emission so metrics are re-computed.
+          this.db
+            .delete(ingestMeta)
+            .where(inArray(ingestMeta.key, ['metricsEmitted', 'closeReason']))
+            .run();
+          await this.ctx.storage.setAlarm(Date.now() + INACTIVITY_TIMEOUT_MS);
+        } else {
+          writeIngestMetaIfChanged(this.db, {
+            key: 'closeReason',
+            incomingValue: event.reason,
+          });
+          await this.ctx.storage.setAlarm(Date.now() + POST_CLOSE_DRAIN_MS);
+        }
+      }
+      // Events without open/close (stragglers) don't touch the alarm.
+    } else {
+      // v0 (legacy): no open/close signals, rely on inactivity timeout.
+      await this.ctx.storage.setAlarm(Date.now() + INACTIVITY_TIMEOUT_MS);
+    }
 
+    const changes: Changes = [];
     for (const key of Object.keys(incomingByKey) as ExtractableMetaKey[]) {
       const incoming = incomingByKey[key];
       if (incoming === undefined) continue;
@@ -229,29 +283,20 @@ export class SessionIngestDO extends DurableObject<Env> {
       }
     }
 
-    // Clean up orphaned R2 blobs (e.g. replaced or stale oversized items)
+    // Clean up orphaned R2 blobs after metadata is persisted. R2 is external I/O,
+    // so awaiting it before metadata writes can let another DO request interleave
+    // and then be overwritten by stale pre-await metadata from this request.
     if (orphanedR2Keys.length > 0) {
-      await this.env.SESSION_INGEST_R2.delete(orphanedR2Keys);
-    }
-
-    if (ingestVersion >= 1) {
-      // v1 clients send explicit open/close pairs. Only those events drive alarms.
-      if (hasSessionOpen) {
-        // New turn starting — clear prior emission so metrics are re-computed.
-        this.db
-          .delete(ingestMeta)
-          .where(inArray(ingestMeta.key, ['metricsEmitted', 'closeReason']))
-          .run();
-        await this.ctx.storage.setAlarm(Date.now() + INACTIVITY_TIMEOUT_MS);
-      }
-      if (closeReason) {
-        writeIngestMetaIfChanged(this.db, { key: 'closeReason', incomingValue: closeReason });
-        await this.ctx.storage.setAlarm(Date.now() + POST_CLOSE_DRAIN_MS);
-      }
-      // Events without open/close (stragglers) don't touch the alarm.
-    } else {
-      // v0 (legacy): no open/close signals, rely on inactivity timeout.
-      await this.ctx.storage.setAlarm(Date.now() + INACTIVITY_TIMEOUT_MS);
+      this.ctx.waitUntil(
+        this.env.SESSION_INGEST_R2.delete(orphanedR2Keys).catch(error => {
+          console.error('Failed to delete orphaned session-ingest R2 blobs', {
+            kiloUserId,
+            sessionId,
+            count: orphanedR2Keys.length,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        })
+      );
     }
 
     return {
@@ -295,25 +340,31 @@ export class SessionIngestDO extends DurableObject<Env> {
           // --- messages ---
           const CURSOR_BATCH = 10;
           controller.enqueue(encoder.encode(',"messages":['));
-          let msgCursor = 0;
+          let msgCursor: IngestOrderCursor | undefined;
           let firstMsg = true;
 
           while (true) {
             const msgBatch = db
               .select({
                 id: ingestItems.id,
+                ingested_at: ingestItems.ingested_at,
                 item_id: ingestItems.item_id,
                 item_data: ingestItems.item_data,
                 item_data_r2_key: ingestItems.item_data_r2_key,
               })
               .from(ingestItems)
-              .where(and(eq(ingestItems.item_type, 'message'), gt(ingestItems.id, msgCursor)))
-              .orderBy(ingestItems.id)
+              .where(
+                and(
+                  eq(ingestItems.item_type, 'message'),
+                  msgCursor ? afterIngestOrderCursor(msgCursor) : undefined
+                )
+              )
+              .orderBy(ingestItems.ingested_at, ingestItems.id)
               .limit(CURSOR_BATCH)
               .all();
 
             if (msgBatch.length === 0) break;
-            msgCursor = msgBatch[msgBatch.length - 1].id;
+            msgCursor = ingestOrderCursor(msgBatch[msgBatch.length - 1]);
 
             for (const msgRow of msgBatch) {
               if (!firstMsg) controller.enqueue(encoder.encode(','));
@@ -327,13 +378,14 @@ export class SessionIngestDO extends DurableObject<Env> {
               const msgId = msgRow.item_id.slice('message/'.length);
               const partRange = getPartItemIdentityRange(msgId);
               controller.enqueue(encoder.encode(',"parts":['));
-              let partCursor = 0;
+              let partCursor: IngestOrderCursor | undefined;
               let firstPart = true;
 
               while (true) {
                 const partBatch = db
                   .select({
                     id: ingestItems.id,
+                    ingested_at: ingestItems.ingested_at,
                     item_data: ingestItems.item_data,
                     item_data_r2_key: ingestItems.item_data_r2_key,
                   })
@@ -343,15 +395,15 @@ export class SessionIngestDO extends DurableObject<Env> {
                       eq(ingestItems.item_type, 'part'),
                       gte(ingestItems.item_id, partRange.start),
                       lt(ingestItems.item_id, partRange.end),
-                      gt(ingestItems.id, partCursor)
+                      partCursor ? afterIngestOrderCursor(partCursor) : undefined
                     )
                   )
-                  .orderBy(ingestItems.id)
+                  .orderBy(ingestItems.ingested_at, ingestItems.id)
                   .limit(CURSOR_BATCH)
                   .all();
 
                 if (partBatch.length === 0) break;
-                partCursor = partBatch[partBatch.length - 1].id;
+                partCursor = ingestOrderCursor(partBatch[partBatch.length - 1]);
 
                 for (const partRow of partBatch) {
                   if (!firstPart) controller.enqueue(encoder.encode(','));
@@ -404,7 +456,7 @@ export class SessionIngestDO extends DurableObject<Env> {
       })
       .from(ingestItems)
       .where(ne(ingestItems.item_type, 'session_diff'))
-      .orderBy(ingestItems.id)
+      .orderBy(ingestItems.ingested_at, ingestItems.id)
       .all();
 
     if (rows.length === 0) {

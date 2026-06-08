@@ -183,9 +183,15 @@ export function reduceWrapperLease(state: WrapperLease, event: WrapperLeaseEvent
   }
 }
 
-export function nextWrapperLeaseDeadline(lease: WrapperLease): number | undefined {
+export function nextWrapperCleanupDeadline(lease: WrapperLease): number | undefined {
   if (lease.state === 'stop_needed') return lease.nextAttemptAt;
   if (lease.state === 'stopping') return lease.attemptDeadlineAt;
+  return undefined;
+}
+
+export function nextWrapperLeaseDeadline(lease: WrapperLease): number | undefined {
+  const cleanupDeadline = nextWrapperCleanupDeadline(lease);
+  if (cleanupDeadline !== undefined) return cleanupDeadline;
   if (lease.state !== 'owns_wrapper') return undefined;
   return lease.startupDeadlineAt ?? lease.keepWarmUntil;
 }
@@ -451,6 +457,15 @@ export async function recordRootSessionIdle(
  * this, the deadline would be cleared forever after the first event, and a
  * wrapper whose kilo-server SSE subscription silently stalls would remain
  * live without failing its accepted messages.
+ *
+ * This intentionally does NOT clear the idle-reconciliation fields
+ * (`lastWrapperIdleAt`/`idleReconcileAfter`/`wrapperIdleDeadlineAt`). Those are
+ * only ever armed by `recordRootSessionIdle` once the root session goes idle,
+ * so any wrapper output observed afterwards is post-completion infrastructure
+ * work (autocommit, condense, log upload) — not a new agent turn. Clearing the
+ * idle deadline here would disarm the reconciler that finalizes the in-flight
+ * message, stranding it non-terminal and hanging the callback. A genuinely new
+ * turn clears idle via `recordWrapperAcceptedMessage` instead.
  */
 export async function recordMeaningfulWrapperOutput(
   storage: DurableObjectStorage,
@@ -465,9 +480,6 @@ export async function recordMeaningfulWrapperOutput(
     lastWrapperMessageAt: now,
     noOutputDeadlineAt,
     nextPingAt: current.pingDeadlineAt === undefined ? nextPingAt : undefined,
-    lastWrapperIdleAt: undefined,
-    idleReconcileAfter: undefined,
-    wrapperIdleDeadlineAt: undefined,
   }));
 }
 

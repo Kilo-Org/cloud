@@ -13,7 +13,10 @@ import {
 } from '@/lib/organizations/organization-types';
 import { errorExceptInTest } from '@/lib/utils.server';
 import { captureException, captureMessage } from '@sentry/nextjs';
-import { convertFromKiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
+import {
+  convertFromKiloExclusiveModel,
+  type KiloExclusiveModel,
+} from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 import { isForbiddenFreeModel } from '@/lib/ai-gateway/forbidden-free-models';
 import { getOpenCodeSettings } from '@/lib/ai-gateway/providers/model-settings';
 import { AUTO_MODELS } from '@/lib/ai-gateway/auto-model';
@@ -21,6 +24,7 @@ import { ATTRIBUTION_HEADERS } from '@/lib/ai-gateway/providers/openrouter/attri
 import { getOpenRouterModelsMetadata } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import { getPreferredProviderOrder } from '@/lib/ai-gateway/providers/apply-provider-specific-logic';
 import { normalizeInferenceProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import { isFreeNemotronModel, NVIDIA_TRIAL_TOS } from '@/lib/ai-gateway/providers/nvidia';
 
 // Re-export from shared module for backwards compatibility
 export { normalizeModelId } from '@/lib/ai-gateway/model-utils';
@@ -108,6 +112,10 @@ export function undoPricingDiscount(pricing: EndpointPricing): EndpointPricing {
   return result;
 }
 
+export function shouldSuppressOpenRouterModel(model: KiloExclusiveModel): boolean {
+  return model.status !== 'disabled' || model.pricing === null;
+}
+
 async function enhancedModelList(models: OpenRouterModel[]) {
   const autoModels = buildAutoModels();
   const endpointsMetadata = await getOpenRouterModelsMetadata();
@@ -115,8 +123,9 @@ async function enhancedModelList(models: OpenRouterModel[]) {
     models
       .filter(
         (model: OpenRouterModel) =>
-          !kiloExclusiveModels.some(m => m.public_id === model.id) &&
-          !isForbiddenFreeModel(model.id)
+          !kiloExclusiveModels.some(
+            m => m.public_id === model.id && shouldSuppressOpenRouterModel(m)
+          ) && !isForbiddenFreeModel(model.id)
       )
       .map(model => {
         const preferredProvider = getPreferredProviderOrder(model.id).at(0);
@@ -142,9 +151,13 @@ async function enhancedModelList(models: OpenRouterModel[]) {
         const preferredIndex = preferredModels.indexOf(model.id);
         const addPdf =
           isPdfSupportingModel(model.id) && !model.architecture.input_modalities.includes('pdf');
+        const description = isFreeNemotronModel(model.id)
+          ? model.description + '\n\n**Terms of service** ' + NVIDIA_TRIAL_TOS
+          : model.description;
         return {
           ...model,
           name: formatName(model, preferredIndex),
+          description,
           preferredIndex: preferredIndex >= 0 ? preferredIndex : undefined,
           isFree: await isFreeModel(model.id),
           opencode: model.opencode ?? getOpenCodeSettings(model.id),

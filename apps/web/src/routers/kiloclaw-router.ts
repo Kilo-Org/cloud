@@ -5,6 +5,13 @@ import { TRPCError } from '@trpc/server';
 import { baseProcedure, createTRPCRouter, UpstreamApiError } from '@/lib/trpc/init';
 import { generateApiToken, TOKEN_EXPIRY } from '@/lib/tokens';
 import { KiloClawInternalClient, KiloClawApiError } from '@/lib/kiloclaw/kiloclaw-internal-client';
+import {
+  AgentIdSchema,
+  AgentCreateInputSchema,
+  AgentUpdateInputSchema,
+  AgentDefaultsUpdateInputSchema,
+} from '@/lib/kiloclaw/agent-schemas';
+import { kiloclawFilePathSchema } from '@/lib/kiloclaw/file-path-schema';
 import { pushPinToWorker } from '@/lib/kiloclaw/pin-sync';
 import { KiloClawUserClient } from '@/lib/kiloclaw/kiloclaw-user-client';
 import { encryptKiloClawSecret } from '@/lib/kiloclaw/encryption';
@@ -538,6 +545,25 @@ function handleFileOperationError(err: unknown, operation: string): never {
     throw new TRPCError({
       code: 'CONFLICT',
       message: message ?? 'File was modified externally',
+      cause: code ? new UpstreamApiError(code) : undefined,
+    });
+  }
+  // 422: controller rejected the resulting config (e.g. invalid_agent_config).
+  // tRPC has no 422, so BAD_REQUEST is the closest mapping.
+  if (err instanceof KiloClawApiError && err.statusCode === 422) {
+    const { message } = getKiloClawApiErrorPayload(err);
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: message ?? `Failed to ${operation}`,
+    });
+  }
+  // 501: the controller image does not advertise the required capability
+  // (capability_unavailable) — treat like a missing route: needs redeploy.
+  if (err instanceof KiloClawApiError && err.statusCode === 501) {
+    const { code, message } = getKiloClawApiErrorPayload(err);
+    throw new TRPCError({
+      code: 'NOT_FOUND',
+      message: message ?? `Instance needs redeploy to support ${operation}`,
       cause: code ? new UpstreamApiError(code) : undefined,
     });
   }
@@ -4179,19 +4205,24 @@ export const kiloclawRouter = createTRPCRouter({
     return { success: true, deleted: !!deleted, worker_sync: workerSync };
   }),
 
-  fileTree: clawAccessProcedure.query(async ({ ctx }) => {
-    try {
-      const instance = await getActiveInstance(ctx.user.id);
-      const client = new KiloClawInternalClient();
-      const result = await client.getFileTree(ctx.user.id, workerInstanceId(instance));
-      return result.tree;
-    } catch (err) {
-      handleFileOperationError(err, 'fetch file tree');
-    }
-  }),
+  fileTree: clawAccessProcedure
+    .input(z.object({ path: kiloclawFilePathSchema.optional() }).optional())
+    .query(async ({ ctx, input }) => {
+      try {
+        const instance = await getActiveInstance(ctx.user.id);
+        const client = new KiloClawInternalClient();
+        const result = await client.getFileTree(ctx.user.id, {
+          instanceId: workerInstanceId(instance),
+          path: input?.path,
+        });
+        return result.tree;
+      } catch (err) {
+        handleFileOperationError(err, 'fetch file tree');
+      }
+    }),
 
   readFile: clawAccessProcedure
-    .input(z.object({ path: z.string().min(1) }))
+    .input(z.object({ path: kiloclawFilePathSchema }))
     .query(async ({ ctx, input }) => {
       try {
         const instance = await getActiveInstance(ctx.user.id);
@@ -4205,7 +4236,7 @@ export const kiloclawRouter = createTRPCRouter({
   writeFile: clawAccessProcedure
     .input(
       z.object({
-        path: z.string().min(1),
+        path: kiloclawFilePathSchema,
         content: z.string(),
         etag: z.string().min(1),
         openclawValidation: z.enum(['warn-before-write', 'allow-invalid']).optional(),
@@ -4269,7 +4300,7 @@ export const kiloclawRouter = createTRPCRouter({
         files: z
           .array(
             z.object({
-              path: z.string().min(1),
+              path: kiloclawFilePathSchema,
               content: z.string(),
             })
           )
@@ -4304,6 +4335,82 @@ export const kiloclawRouter = createTRPCRouter({
         );
       } catch (err) {
         handleFileOperationError(err, 'patch openclaw config');
+      }
+    }),
+
+  // ── Agent config CRUD ─────────────────────────────────────────────────
+  listAgents: clawAccessProcedure.query(async ({ ctx }) => {
+    try {
+      const instance = await getActiveInstance(ctx.user.id);
+      const client = new KiloClawInternalClient();
+      return await client.listAgents(ctx.user.id, workerInstanceId(instance));
+    } catch (err) {
+      handleFileOperationError(err, 'list agents');
+    }
+  }),
+
+  getAgent: clawAccessProcedure
+    .input(z.object({ agentId: AgentIdSchema }))
+    .query(async ({ ctx, input }) => {
+      try {
+        const instance = await getActiveInstance(ctx.user.id);
+        const client = new KiloClawInternalClient();
+        return await client.getAgent(ctx.user.id, input.agentId, workerInstanceId(instance));
+      } catch (err) {
+        handleFileOperationError(err, 'read agent');
+      }
+    }),
+
+  createAgent: clawAccessProcedure
+    .input(AgentCreateInputSchema)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        const instance = await getActiveInstance(ctx.user.id);
+        const client = new KiloClawInternalClient();
+        return await client.createAgent(ctx.user.id, input, workerInstanceId(instance));
+      } catch (err) {
+        handleFileOperationError(err, 'create agent');
+      }
+    }),
+
+  updateAgent: clawAccessProcedure
+    .input(z.object({ agentId: AgentIdSchema, patch: AgentUpdateInputSchema }))
+    .mutation(async ({ ctx, input }) => {
+      try {
+        const instance = await getActiveInstance(ctx.user.id);
+        const client = new KiloClawInternalClient();
+        return await client.updateAgent(
+          ctx.user.id,
+          input.agentId,
+          input.patch,
+          workerInstanceId(instance)
+        );
+      } catch (err) {
+        handleFileOperationError(err, 'update agent');
+      }
+    }),
+
+  updateAgentDefaults: clawAccessProcedure
+    .input(AgentDefaultsUpdateInputSchema)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        const instance = await getActiveInstance(ctx.user.id);
+        const client = new KiloClawInternalClient();
+        return await client.updateAgentDefaults(ctx.user.id, input, workerInstanceId(instance));
+      } catch (err) {
+        handleFileOperationError(err, 'update agent defaults');
+      }
+    }),
+
+  deleteAgent: clawAccessProcedure
+    .input(z.object({ agentId: AgentIdSchema }))
+    .mutation(async ({ ctx, input }) => {
+      try {
+        const instance = await getActiveInstance(ctx.user.id);
+        const client = new KiloClawInternalClient();
+        return await client.deleteAgent(ctx.user.id, input.agentId, workerInstanceId(instance));
+      } catch (err) {
+        handleFileOperationError(err, 'delete agent');
       }
     }),
 

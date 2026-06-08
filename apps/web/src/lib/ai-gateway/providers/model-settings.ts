@@ -2,7 +2,11 @@ import { isClaudeModel, isOpusModel } from '@/lib/ai-gateway/providers/anthropic
 import { isGemini3Model, isGemmaModel } from '@/lib/ai-gateway/providers/google';
 import { isKimiModel } from '@/lib/ai-gateway/providers/moonshotai';
 import { isOpenAiModel } from '@/lib/ai-gateway/providers/openai';
-import { isAlibabaDirectModel, qwen36_plus_stealth_model } from '@/lib/ai-gateway/providers/qwen';
+import {
+  isAlibabaDirectModel,
+  isQwenModel,
+  qwen36_plus_stealth_model,
+} from '@/lib/ai-gateway/providers/qwen';
 import { seed_20_code_free_model } from '@/lib/ai-gateway/providers/seed';
 import { isGrokModel, isGrokToggleableReasoningModel } from '@/lib/ai-gateway/providers/xai';
 import { isGlmModel } from '@/lib/ai-gateway/providers/zai';
@@ -91,8 +95,7 @@ export function getModelVariants(model: string): OpenCodeSettings['variants'] {
     isKimiModel(model) ||
     isGlmModel(model) ||
     isGrokToggleableReasoningModel(model) ||
-    isAlibabaDirectModel(model) ||
-    model === qwen36_plus_stealth_model.public_id ||
+    isQwenModel(model) ||
     isGemmaModel(model)
   ) {
     return REASONING_VARIANTS_BINARY;

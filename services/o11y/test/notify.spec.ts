@@ -3,6 +3,7 @@ import {
   buildSlackMessage,
   type SloAlertPayload,
   type ContainerCapacityAlertPayload,
+  type QueueBacklogAlertPayload,
 } from '../src/alerting/notify';
 
 describe('buildSlackMessage — SLO error_rate alert', () => {
@@ -63,6 +64,35 @@ describe('buildSlackMessage — SLO ttfb alert', () => {
   it('includes TICKET severity label in header', () => {
     const msg = buildSlackMessage(alert) as { blocks: Array<{ text?: { text: string } }> };
     expect(msg.blocks[0].text?.text).toContain('TICKET');
+  });
+});
+
+describe('buildSlackMessage — queue_backlog alert', () => {
+  const alert: QueueBacklogAlertPayload = {
+    alertType: 'queue_backlog',
+    severity: 'page',
+    provider: 'cloudflare',
+    model: '965459cfc1a349c190bb813855a65b02',
+    clientName: 'queues',
+    backlogCount: 50_000,
+    backlogBytes: 12_345_678,
+    thresholdCount: 50_000,
+    oldestMessageTimestamp: new Date('2026-06-04T08:00:00.000Z'),
+  };
+
+  it('includes queue backlog details and oldest-message timestamp', () => {
+    const msg = buildSlackMessage(alert) as {
+      blocks: Array<{ fields?: Array<{ text: string }>; text?: { text: string } }>;
+    };
+    const allText = msg.blocks.flatMap(block => [
+      block.text?.text ?? '',
+      ...(block.fields?.map(field => field.text) ?? []),
+    ]);
+
+    expect(allText.some(text => text.includes('Queue Backlog'))).toBe(true);
+    expect(allText.some(text => text.includes('50,000'))).toBe(true);
+    expect(allText.some(text => text.includes('12,345,678'))).toBe(true);
+    expect(allText.some(text => text.includes('2026-06-04T08:00:00.000Z'))).toBe(true);
   });
 });
 

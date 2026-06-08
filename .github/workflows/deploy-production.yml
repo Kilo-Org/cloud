@@ -179,8 +179,13 @@ jobs:
 
   deploy-kiloclaw:
     needs: [check-production-db-startup, run-migrations]
+    # Ceiling for the reusable workflow's GITHUB_TOKEN (a called workflow cannot
+    # exceed the caller). The reusable workflow restricts further per job — only
+    # its isolated attest-sbom job actually uses id-token/attestations.
     permissions:
       contents: read
       packages: write
+      id-token: write
+      attestations: write
     uses: ./.github/workflows/deploy-kiloclaw.yml
     secrets: inherit

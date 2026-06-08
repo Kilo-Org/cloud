@@ -15,6 +15,7 @@ import { logger } from '../logger.js';
 import { dispatchedKilocodeModelId } from '../persistence/model-utils.js';
 import type { SessionMetadata } from '../persistence/session-metadata.js';
 import { isSandboxWorkspaceProbeTimeoutError } from '../sandbox-recovery.js';
+import { WrapperCleanupBlockedError } from './wrapper-cleanup-blocked-error.js';
 import {
   MESSAGE_ID_FORMAT_DESCRIPTION,
   createMessageId,
@@ -124,6 +125,7 @@ export type SessionMessageQueueDependencies = {
   requireSessionId: () => Promise<string>;
   validateModeAgainstRuntimeAgents: (metadata: SessionMetadata, mode: string) => string | null;
   getDeliveryContext: () => Promise<ExecutionDeliveryContext | null>;
+  getDeliveryBlock: () => Promise<{ retryAt: number } | null>;
   deliver: (plan: MessageDeliveryRequest) => Promise<MessageDeliveryResult>;
   ensureQueuedMessageEvent: (event: PersistedQueuedMessageEvent & { entityId: string }) => void;
   reportQueuedState?: (state: SessionMessageState) => void;
@@ -269,9 +271,11 @@ export async function flushNextPendingSessionMessage(params: {
   storage: SessionMessageQueueStorage;
   now: number;
   getDeliveryContext: () => Promise<ExecutionDeliveryContext | null>;
+  getDeliveryBlock?: SessionMessageQueueDependencies['getDeliveryBlock'];
   validateModeAgainstRuntimeAgents: SessionMessageQueueDependencies['validateModeAgainstRuntimeAgents'];
   deliver: (plan: MessageDeliveryRequest) => Promise<MessageDeliveryResult>;
   repairQueuedMessageEffects?: (intent: SessionMessageIntent) => Promise<void>;
+  prepareQueuedMessageDelivery?: (intent: SessionMessageIntent) => Promise<void>;
   ensureAcceptedMessageEffects?: (messageId: string) => Promise<void>;
 }): Promise<PendingFlushResult> {
   const context = await params.getDeliveryContext();
@@ -369,7 +373,19 @@ export async function flushNextPendingSessionMessage(params: {
       createQueuedSessionMessageState(intent, callbackSnapshot, message.createdAt)
     );
   }
+
   await params.repairQueuedMessageEffects?.(intent);
+
+  const deliveryBlock = await params.getDeliveryBlock?.();
+  if (deliveryBlock) {
+    return {
+      type: 'skipped',
+      nextFlushAttemptAt: deliveryBlock.retryAt,
+      remainingCount: totalCount,
+    };
+  }
+
+  await params.prepareQueuedMessageDelivery?.(intent);
 
   try {
     const plan = buildMessageDeliveryRequest(
@@ -383,7 +399,7 @@ export async function flushNextPendingSessionMessage(params: {
         params.storage,
         message,
         startResult.error,
-        params.now,
+        Date.now(),
         { policy, code: startResult.code }
       );
       throw new PendingFlushRecordedError(failure);
@@ -393,6 +409,13 @@ export async function flushNextPendingSessionMessage(params: {
   } catch (error) {
     if (error instanceof PendingFlushRecordedError) {
       return toFailureResult(error.failure, totalCount);
+    }
+    if (error instanceof WrapperCleanupBlockedError) {
+      return {
+        type: 'skipped',
+        nextFlushAttemptAt: error.retryAt,
+        remainingCount: totalCount,
+      };
     }
     const code =
       error instanceof MessageDeliveryRequestValidationError
@@ -404,7 +427,7 @@ export async function flushNextPendingSessionMessage(params: {
       params.storage,
       message,
       error instanceof Error ? error.message : String(error),
-      params.now,
+      Date.now(),
       { policy, code: code ?? 'UNKNOWN' }
     );
     return toFailureResult(failure, totalCount);
@@ -452,6 +475,7 @@ export function createSessionMessageQueue(
     requireSessionId,
     validateModeAgainstRuntimeAgents,
     getDeliveryContext,
+    getDeliveryBlock,
     deliver,
     ensureQueuedMessageEvent,
     reportQueuedState,
@@ -501,7 +525,7 @@ export function createSessionMessageQueue(
     return true;
   }
 
-  async function completeQueuedAdmissionEffects(intent: SessionMessageIntent): Promise<void> {
+  async function repairQueuedAdmissionEffects(intent: SessionMessageIntent): Promise<void> {
     const sessionId = await requireSessionId();
     ensureQueuedMessageEvent({
       entityId: `queued-message/${intent.turn.messageId}`,
@@ -516,10 +540,18 @@ export function createSessionMessageQueue(
     });
     const queuedState = await getSessionMessageState(storage, intent.turn.messageId);
     if (queuedState?.status === 'queued') reportQueuedState?.(queuedState);
+  }
+
+  async function prepareQueuedMessageDelivery(intent: SessionMessageIntent): Promise<void> {
     await requestPendingDrain();
     logger
-      .withFields({ sessionId, messageId: intent.turn.messageId })
+      .withFields({ sessionId: getSessionIdForLogs(), messageId: intent.turn.messageId })
       .info('Queued message event persisted and pending flush scheduled');
+  }
+
+  async function completeQueuedAdmissionEffects(intent: SessionMessageIntent): Promise<void> {
+    await repairQueuedAdmissionEffects(intent);
+    await prepareQueuedMessageDelivery(intent);
   }
 
   async function hasMessageAdmission(messageId: string): Promise<boolean> {
@@ -819,9 +851,11 @@ export function createSessionMessageQueue(
       storage,
       now,
       getDeliveryContext,
+      getDeliveryBlock,
       validateModeAgainstRuntimeAgents,
       deliver,
-      repairQueuedMessageEffects: completeQueuedAdmissionEffects,
+      repairQueuedMessageEffects: repairQueuedAdmissionEffects,
+      prepareQueuedMessageDelivery,
       ensureAcceptedMessageEffects,
     });
 

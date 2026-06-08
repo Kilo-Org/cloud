@@ -324,14 +324,14 @@ function computeEtag(content: string): string {
 }
 
 /** Keep in sync with: kiloclaw/src/.../gateway.ts (Zod), src/lib/kiloclaw/kiloclaw-internal-client.ts */
-interface FileNode {
+type FileNode = {
   name: string;
   path: string;
   type: 'file' | 'directory';
   children?: FileNode[];
-}
+};
 
-function buildTree(dir: string, rootDir: string): FileNode[] {
+function buildDirectoryChildren(dir: string, rootDir: string): FileNode[] {
   let entries: fs.Dirent[];
   try {
     entries = fs.readdirSync(dir, { withFileTypes: true });
@@ -351,7 +351,6 @@ function buildTree(dir: string, rootDir: string): FileNode[] {
         name: entry.name,
         path: relativePath,
         type: 'directory',
-        children: buildTree(path.join(dir, entry.name), rootDir),
       });
     } else {
       nodes.push({
@@ -366,6 +365,53 @@ function buildTree(dir: string, rootDir: string): FileNode[] {
 }
 
 type FileValidationError = { error: string; code?: string; status: 400 | 404 };
+
+function resolveAndValidateDirectory(
+  relativePath: string,
+  rootDir: string
+): string | FileValidationError {
+  let resolved: string;
+  try {
+    resolved = resolveSafePath(relativePath, rootDir);
+  } catch (e) {
+    if (e instanceof SafePathError) {
+      return { error: e.message, status: 400 };
+    }
+    throw e;
+  }
+
+  if (isOpenclawValidationArtifactPath(path.relative(rootDir, resolved))) {
+    return { code: 'file_not_found', error: 'Directory does not exist', status: 404 };
+  }
+
+  if (!fs.existsSync(resolved)) {
+    return { code: 'file_not_found', error: 'Directory does not exist', status: 404 };
+  }
+
+  let canonicalPath: string;
+  try {
+    canonicalPath = fs.realpathSync(resolved);
+    verifyCanonicalized(canonicalPath, rootDir);
+  } catch (e) {
+    if (e instanceof SafePathError) {
+      return { error: e.message, status: 400 };
+    }
+    throw e;
+  }
+  if (isOpenclawValidationArtifactPath(path.relative(rootDir, canonicalPath))) {
+    return { code: 'file_not_found', error: 'Directory does not exist', status: 404 };
+  }
+
+  const stat = fs.lstatSync(resolved);
+  if (stat.isSymbolicLink()) {
+    return { error: 'Symlinks are not allowed', status: 400 };
+  }
+  if (!stat.isDirectory()) {
+    return { error: 'Not a directory', status: 400 };
+  }
+
+  return resolved;
+}
 
 /**
  * Resolve a relative file path within the root directory and validate it:
@@ -581,7 +627,21 @@ export function registerFileRoutes(app: Hono, expectedToken: string, rootDir: st
   });
 
   app.get('/_kilo/files/tree', c => {
-    const tree = buildTree(rootDir, rootDir);
+    const relativePath = c.req.query('path');
+    let directory = rootDir;
+
+    if (relativePath !== undefined) {
+      const result = resolveAndValidateDirectory(relativePath, rootDir);
+      if (typeof result !== 'string') {
+        return c.json(
+          { error: result.error, ...(result.code && { code: result.code }) },
+          result.status
+        );
+      }
+      directory = result;
+    }
+
+    const tree = buildDirectoryChildren(directory, rootDir);
     return c.json({ tree });
   });
 

@@ -13,7 +13,7 @@ import {
   fetchGitLabProjects,
   calculateTokenExpiry,
 } from '@/lib/integrations/platforms/gitlab/adapter';
-import { normalizeInstanceUrl } from '@/lib/integrations/gitlab-service';
+import { instanceUrlChanged } from '@/lib/integrations/gitlab-service';
 import {
   isDefaultGitLabInstanceUrl,
   normalizeGitLabInstanceUrl,
@@ -187,8 +187,10 @@ export async function handleGitLabOAuthCallback(request: NextRequest) {
     // Detect if the GitLab instance URL changed (e.g. gitlab.com -> self-hosted)
     const isInstanceChange =
       existing !== undefined &&
-      normalizeInstanceUrl(existingMetadata?.gitlab_instance_url as string | undefined) !==
-        normalizeInstanceUrl(normalizedInstanceUrl);
+      instanceUrlChanged(
+        existingMetadata?.gitlab_instance_url as string | undefined,
+        normalizedInstanceUrl
+      );
 
     const webhookSecret = isInstanceChange
       ? generateWebhookSecret()

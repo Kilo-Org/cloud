@@ -6,7 +6,7 @@ import { model_experiment, model_experiment_variant_version } from '@kilocode/db
 import { eq } from 'drizzle-orm';
 import { isPublicIdExperimented } from './membership';
 import { pickModelExperimentVariant } from './pick-variant';
-import { redisDel, redisSet } from '@/lib/redis';
+import { redisClient } from '@/lib/redis';
 import { EXPERIMENTED_PUBLIC_IDS_REDIS_KEY } from '@/lib/redis-keys';
 import type { User } from '@kilocode/db/schema';
 
@@ -20,7 +20,8 @@ const upstreamB = {
   internal_id: 'partner-checkpoint-b',
   base_url: 'https://partner.example.com/v1',
 };
-const redisIt = process.env.REDIS_URL ? it : it.skip;
+const redisIt =
+  process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN ? it : it.skip;
 
 beforeEach(async () => {
   await cleanupDbForTest();
@@ -33,15 +34,15 @@ beforeEach(async () => {
 async function clearRoutingCaches() {
   // Tests share the dev Redis instance across runs; flush the membership key
   // so each test sees a fresh load path.
-  await redisDel(EXPERIMENTED_PUBLIC_IDS_REDIS_KEY);
+  await redisClient.del(EXPERIMENTED_PUBLIC_IDS_REDIS_KEY);
 }
 
-async function seedExperimentedPublicIds(ids: string[]): Promise<boolean> {
-  return await redisSet(EXPERIMENTED_PUBLIC_IDS_REDIS_KEY, JSON.stringify(ids));
+async function seedExperimentedPublicIds(ids: string[]): Promise<string | null> {
+  return await redisClient.set(EXPERIMENTED_PUBLIC_IDS_REDIS_KEY, JSON.stringify(ids));
 }
 
 afterEach(async () => {
-  await redisDel(EXPERIMENTED_PUBLIC_IDS_REDIS_KEY);
+  await redisClient.del(EXPERIMENTED_PUBLIC_IDS_REDIS_KEY);
 });
 
 async function makeActiveExperiment(opts: {
@@ -87,7 +88,7 @@ describe('isPublicIdExperimented', () => {
 
   redisIt('returns true when the public id has an active experiment', async () => {
     await makeActiveExperiment({ publicId: 'partner/preview-iset-active' });
-    expect(await seedExperimentedPublicIds(['partner/preview-iset-active'])).toBe(true);
+    expect(await seedExperimentedPublicIds(['partner/preview-iset-active'])).toBe('OK');
     expect(await isPublicIdExperimented('partner/preview-iset-active')).toBe(true);
   });
 
@@ -97,7 +98,7 @@ describe('isPublicIdExperimented', () => {
     });
     const caller = await createCallerForUser(admin.id);
     await caller.admin.modelExperiments.pause({ id: experimentId });
-    expect(await seedExperimentedPublicIds(['partner/preview-iset-paused'])).toBe(true);
+    expect(await seedExperimentedPublicIds(['partner/preview-iset-paused'])).toBe('OK');
     expect(await isPublicIdExperimented('partner/preview-iset-paused')).toBe(true);
   });
 });

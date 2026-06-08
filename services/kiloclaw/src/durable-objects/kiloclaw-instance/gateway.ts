@@ -24,6 +24,19 @@ import {
   MorningBriefingReadResponseSchema,
   OpenclawWorkspaceImportResponseSchema,
   GatewayControllerError,
+  AgentConfigListResponseSchema,
+  type AgentConfigListResponse,
+  AgentReadResponseSchema,
+  type AgentReadResponse,
+  AgentMutationResponseSchema,
+  type AgentMutationResponse,
+  AgentDefaultsMutationResponseSchema,
+  type AgentDefaultsMutationResponse,
+  AgentCreateResponseSchema,
+  type AgentCreateResponse,
+  AgentDeleteResponseSchema,
+  type AgentDeleteResponse,
+  type AgentConfigErrorEnvelope,
 } from '../gateway-controller-types';
 import { HEALTH_PROBE_TIMEOUT_SECONDS, HEALTH_PROBE_INTERVAL_MS } from '../../config';
 import type { InstanceMutableState } from './types';
@@ -76,7 +89,7 @@ export async function callGatewayController<T>(
   state: InstanceMutableState,
   env: KiloClawEnv,
   path: string,
-  method: 'GET' | 'POST',
+  method: 'GET' | 'POST' | 'PATCH' | 'DELETE',
   responseSchema: ZodType<T>,
   jsonBody?: unknown,
   options?: { timeoutMs?: number }
@@ -324,6 +337,217 @@ export async function getControllerVersion(
   }
 }
 
+/**
+ * Server-side fail-closed capability gate. Throws a typed GatewayControllerError
+ * (501 `capability_unavailable`) when the controller image does not advertise the
+ * required capability — so newer cloud code never silently proxies an agent
+ * operation to an older controller that can't honor it. This is the real
+ * enforcement boundary (UI gating is cosmetic; see plan §3c).
+ */
+async function requireControllerCapability(
+  state: InstanceMutableState,
+  env: KiloClawEnv,
+  capability: string
+): Promise<void> {
+  const version = await getControllerVersion(state, env);
+  if (!version?.capabilities?.includes(capability)) {
+    throw new GatewayControllerError(
+      501,
+      `Controller does not advertise required capability "${capability}"`,
+      'capability_unavailable'
+    );
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────
+// Agent config CRUD wrappers (controller: /_kilo/config/agents*)
+// Each is capability-gated and fails closed on older controllers.
+//
+// Typed errors are RETURNED as an AgentConfigErrorEnvelope rather than thrown:
+// GatewayControllerError's .status/.code are stripped crossing the DO RPC
+// boundary (only .message survives), so the platform route reconstructs the
+// HTTP response from the returned envelope. Unexpected non-controller errors
+// still throw (→ generic 500 at the route). Same pattern as kilo-cli-run.ts.
+// ──────────────────────────────────────────────────────────────────────
+
+/**
+ * Run an agent gateway call, converting any GatewayControllerError (capability
+ * gate or controller response) into a serializable error envelope. Non-controller
+ * errors propagate (the route maps them to a generic 500).
+ */
+async function callAgentEndpoint<T>(fn: () => Promise<T>): Promise<T | AgentConfigErrorEnvelope> {
+  try {
+    return await fn();
+  } catch (error) {
+    if (error instanceof GatewayControllerError) {
+      return { agentError: { status: error.status, code: error.code, message: error.message } };
+    }
+    throw error;
+  }
+}
+
+/**
+ * Timeout for the mutating agent endpoints. The controller serializes ALL agent
+ * mutations (CLI create/delete AND native update/update-defaults) through one
+ * per-config queue, and the CLI ops have their own 30s timeout. The default
+ * 30s gateway timeout equals the CLI timeout, so the outer request can abort
+ * (→ 503) before a queued or in-flight mutation finishes — masking the
+ * controller's own typed outcome (e.g. 504 openclaw_cli_timeout) and leaving
+ * the caller with ambiguous agent_exists/agent_not_found state.
+ *
+ * 180s budgets for several queued 30s CLI ops plus our own op, the post-CLI
+ * config read, and network, so the controller's typed response wins the race
+ * in realistic conditions. NOTE: the controller queue is unbounded, so this is
+ * a pragmatic bound, not a guarantee — under pathological concurrency to a
+ * single instance's config (many simultaneous mutations, which the single-user
+ * isPending-gated UI does not produce) the queue wait could still exceed it.
+ * Eliminating that entirely would require async operation IDs / stable replay
+ * across Worker→DO→controller (deferred). Reads are not queued → 30s default.
+ */
+const AGENT_MUTATION_REQUEST_TIMEOUT_MS = 180_000;
+
+/** GET /_kilo/config/agents — list the fleet (+ inherited defaults). */
+export async function listAgents(
+  state: InstanceMutableState,
+  env: KiloClawEnv
+): Promise<AgentConfigListResponse | AgentConfigErrorEnvelope> {
+  return callAgentEndpoint(async () => {
+    await requireControllerCapability(state, env, 'config.agents.read');
+    return callGatewayController(
+      state,
+      env,
+      '/_kilo/config/agents',
+      'GET',
+      AgentConfigListResponseSchema
+    );
+  });
+}
+
+/**
+ * GET /_kilo/config/agents/:id — read one agent's normalized config.
+ * The controller 404s (`agent_not_found`) for an unknown id; that surfaces as a
+ * returned envelope { status: 404, code: 'agent_not_found' } — distinct from an
+ * old controller missing the route entirely (which the capability gate rejects).
+ */
+export async function getAgent(
+  state: InstanceMutableState,
+  env: KiloClawEnv,
+  agentId: string
+): Promise<AgentReadResponse | AgentConfigErrorEnvelope> {
+  return callAgentEndpoint(async () => {
+    await requireControllerCapability(state, env, 'config.agents.read');
+    return callGatewayController(
+      state,
+      env,
+      `/_kilo/config/agents/${encodeURIComponent(agentId)}`,
+      'GET',
+      AgentReadResponseSchema
+    );
+  });
+}
+
+/**
+ * PATCH /_kilo/config/agents/:id — surgical edit of one agent's model & behavior.
+ * The body ({ etag?, set, unset }) is forwarded opaquely; the tRPC layer (PR B)
+ * supplies Zod-validated input and the controller re-validates. A stale etag
+ * surfaces as GatewayControllerError(409, code='config_etag_conflict').
+ */
+export async function updateAgent(
+  state: InstanceMutableState,
+  env: KiloClawEnv,
+  agentId: string,
+  patch: Record<string, unknown>
+): Promise<AgentMutationResponse | AgentConfigErrorEnvelope> {
+  return callAgentEndpoint(async () => {
+    await requireControllerCapability(state, env, 'config.agents.update');
+    return callGatewayController(
+      state,
+      env,
+      `/_kilo/config/agents/${encodeURIComponent(agentId)}`,
+      'PATCH',
+      AgentMutationResponseSchema,
+      patch,
+      { timeoutMs: AGENT_MUTATION_REQUEST_TIMEOUT_MS }
+    );
+  });
+}
+
+/**
+ * PATCH /_kilo/config/agent-defaults — edit the fleet-wide inherited defaults
+ * (model + thinking/verbose only; no reasoning/fastMode at the defaults level).
+ * Body ({ etag?, set, unset }) forwarded opaquely; stale etag →
+ * GatewayControllerError(409, code='config_etag_conflict').
+ */
+export async function updateAgentDefaults(
+  state: InstanceMutableState,
+  env: KiloClawEnv,
+  patch: Record<string, unknown>
+): Promise<AgentDefaultsMutationResponse | AgentConfigErrorEnvelope> {
+  return callAgentEndpoint(async () => {
+    await requireControllerCapability(state, env, 'config.agent-defaults.update');
+    return callGatewayController(
+      state,
+      env,
+      '/_kilo/config/agent-defaults',
+      'PATCH',
+      AgentDefaultsMutationResponseSchema,
+      patch,
+      { timeoutMs: AGENT_MUTATION_REQUEST_TIMEOUT_MS }
+    );
+  });
+}
+
+/**
+ * POST /_kilo/config/agents — create an agent end-to-end (config + workspace +
+ * session dirs) by delegating to the OpenClaw CLI. Body
+ * ({ name, workspace, agentDir?, model?, bindings?[] }) forwarded opaquely.
+ * Distinct error surface: 409 agent_exists, 400 reserved_agent_id,
+ * 502 openclaw_cli_failed, 504 openclaw_cli_timeout.
+ */
+export async function createAgent(
+  state: InstanceMutableState,
+  env: KiloClawEnv,
+  body: Record<string, unknown>
+): Promise<AgentCreateResponse | AgentConfigErrorEnvelope> {
+  return callAgentEndpoint(async () => {
+    await requireControllerCapability(state, env, 'config.agents.create.basic.cli');
+    return callGatewayController(
+      state,
+      env,
+      '/_kilo/config/agents',
+      'POST',
+      AgentCreateResponseSchema,
+      body,
+      { timeoutMs: AGENT_MUTATION_REQUEST_TIMEOUT_MS }
+    );
+  });
+}
+
+/**
+ * DELETE /_kilo/config/agents/:id — remove an agent + clean up references
+ * (bindings, agent-to-agent allow rules) via the OpenClaw CLI. Does NOT confirm
+ * on-disk files are gone (filesystemDisposition: 'unverified'). Rejects `main`
+ * (400 reserved_agent_id). 502/504 on CLI failure/timeout.
+ */
+export async function deleteAgent(
+  state: InstanceMutableState,
+  env: KiloClawEnv,
+  agentId: string
+): Promise<AgentDeleteResponse | AgentConfigErrorEnvelope> {
+  return callAgentEndpoint(async () => {
+    await requireControllerCapability(state, env, 'config.agents.delete.cli');
+    return callGatewayController(
+      state,
+      env,
+      `/_kilo/config/agents/${encodeURIComponent(agentId)}`,
+      'DELETE',
+      AgentDeleteResponseSchema,
+      undefined,
+      { timeoutMs: AGENT_MUTATION_REQUEST_TIMEOUT_MS }
+    );
+  });
+}
+
 export async function getGatewayReady(
   state: InstanceMutableState,
   env: KiloClawEnv
@@ -416,16 +640,15 @@ const FileTreeResponseSchema = z.object({
 
 export async function getFileTree(
   state: InstanceMutableState,
-  env: KiloClawEnv
+  env: KiloClawEnv,
+  filePath?: string
 ): Promise<{ tree: unknown[] } | null> {
+  const params = new URLSearchParams();
+  if (filePath !== undefined) params.set('path', filePath);
+  const path = `/_kilo/files/tree${params.toString() ? `?${params.toString()}` : ''}`;
+
   try {
-    return await callGatewayController(
-      state,
-      env,
-      '/_kilo/files/tree',
-      'GET',
-      FileTreeResponseSchema
-    );
+    return await callGatewayController(state, env, path, 'GET', FileTreeResponseSchema);
   } catch (error) {
     if (isErrorUnknownRoute(error)) return null;
     throw error;

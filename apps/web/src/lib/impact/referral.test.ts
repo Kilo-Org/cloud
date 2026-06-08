@@ -9,6 +9,7 @@ import { insertTestUser } from '@/tests/helpers/user.helper';
 import {
   impact_advocate_participants,
   impact_advocate_registration_attempts,
+  impact_attribution_touches,
   kilocode_users,
 } from '@kilocode/db/schema';
 
@@ -19,14 +20,18 @@ describe('impact referral participant registration dispatch', () => {
     process.env.IMPACT_ACCOUNT_SID = 'impact-account-sid';
     process.env.IMPACT_ADVOCATE_ACCOUNT_SID = 'impact-advocate-account-sid';
     process.env.IMPACT_ADVOCATE_AUTH_TOKEN = 'impact-advocate-auth-token';
-    process.env.IMPACT_ADVOCATE_PROGRAM_ID = '51699';
     process.env.IMPACT_ADVOCATE_TENANT_ALIAS = 'tenant-alias';
+    process.env.IMPACT_ADVOCATE_KILOCLAW_PROGRAM_ID = '51699';
+    process.env.IMPACT_ADVOCATE_KILOCLAW_WIDGET_ID = 'p/51699/w/referrerWidget';
+    delete process.env.IMPACT_ADVOCATE_KILO_PASS_PROGRAM_ID;
+    delete process.env.IMPACT_ADVOCATE_KILO_PASS_WIDGET_ID;
   });
 
   afterEach(async () => {
     jest.restoreAllMocks();
     await db.delete(impact_advocate_registration_attempts).where(sql`true`);
     await db.delete(impact_advocate_participants).where(sql`true`);
+    await db.delete(impact_attribution_touches).where(sql`true`);
     await db.delete(kilocode_users).where(sql`true`);
   });
 
@@ -129,6 +134,220 @@ describe('impact referral participant registration dispatch', () => {
       locale: 'en_US',
       countryCode: 'US',
     });
+  });
+
+  it('delivers Kilo Pass participant registrations through Kilo Pass-scoped config', async () => {
+    process.env.IMPACT_ADVOCATE_ACCOUNT_SID = 'kilo-pass-account-sid';
+    process.env.IMPACT_ADVOCATE_AUTH_TOKEN = 'kilo-pass-auth-token';
+    process.env.IMPACT_ADVOCATE_KILO_PASS_PROGRAM_ID = '52766';
+    process.env.IMPACT_ADVOCATE_TENANT_ALIAS = 'kilo-pass-tenant';
+    process.env.IMPACT_ADVOCATE_KILO_PASS_WIDGET_ID = 'p/52766/w/referrerWidget';
+
+    const fetchMock = jest.fn<typeof fetch>().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          id: 'sq-kilo-pass-id',
+          email: 'pass-participant@example.com',
+          referralCodes: { '52766': 'PASS9001' },
+          referable: true,
+        }),
+        { status: 200 }
+      )
+    );
+    global.fetch = fetchMock;
+
+    const user = await insertTestUser({
+      google_user_email: 'pass-participant@example.com',
+      normalized_email: 'pass-participant@example.com',
+    });
+
+    const {
+      dispatchQueuedImpactAdvocateRegistrationAttempts,
+      queueImpactAdvocateParticipantRegistration,
+    } = await import('@/lib/impact/referral');
+
+    await queueImpactAdvocateParticipantRegistration({
+      programKey: 'kilo_pass',
+      user,
+      referralTouch: {
+        opaqueTrackingValue: 'pass-sq-cookie',
+        trackingValueLength: 14,
+        isTrackingValueAccepted: true,
+        rsCode: 'pass-ref-code',
+        rsShareMedium: 'email',
+        rsEngagementMedium: 'link',
+        landingPath: '/subscriptions/kilo-pass?_saasquatch=pass-sq-cookie',
+        utmSource: null,
+        utmMedium: null,
+        utmCampaign: null,
+        utmTerm: null,
+        utmContent: null,
+        touchedAt: new Date('2026-05-23T00:00:00.000Z'),
+        expiresAt: new Date('2026-06-22T00:00:00.000Z'),
+      },
+    });
+
+    const summary = await dispatchQueuedImpactAdvocateRegistrationAttempts();
+    expect(summary).toEqual({ claimed: 1, delivered: 1, retried: 0, failed: 0 });
+
+    const [participant] = await db.select().from(impact_advocate_participants);
+    expect(participant.program_key).toBe('kilo_pass');
+    expect(participant.registration_state).toBe('registered');
+    expect(participant.opaque_referral_identifier).toBe('PASS9001');
+
+    const [attempt] = await db.select().from(impact_advocate_registration_attempts);
+    expect(attempt.program_key).toBe('kilo_pass');
+    expect(attempt.delivery_state).toBe('succeeded');
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      'https://app.referralsaasquatch.com/api/v1/kilo-pass-tenant/open/account/pass-participant%40example.com/user/pass-participant%40example.com'
+    );
+    expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({
+      headers: expect.objectContaining({
+        Authorization:
+          'Basic ' + Buffer.from('kilo-pass-account-sid:kilo-pass-auth-token').toString('base64'),
+      }),
+    });
+  });
+
+  it('allows the same SaaSquatch referral code in different Advocate programs', async () => {
+    process.env.IMPACT_ADVOCATE_ACCOUNT_SID = 'kilo-pass-account-sid';
+    process.env.IMPACT_ADVOCATE_AUTH_TOKEN = 'kilo-pass-auth-token';
+    process.env.IMPACT_ADVOCATE_KILO_PASS_PROGRAM_ID = '52766';
+    process.env.IMPACT_ADVOCATE_TENANT_ALIAS = 'kilo-pass-tenant';
+    process.env.IMPACT_ADVOCATE_KILO_PASS_WIDGET_ID = 'p/52766/w/referrerWidget';
+
+    const clawUser = await insertTestUser({
+      google_user_email: 'claw-holder@example.com',
+      normalized_email: 'claw-holder@example.com',
+    });
+    await db.insert(impact_advocate_participants).values({
+      program_key: 'kiloclaw',
+      user_id: clawUser.id,
+      advocate_id: clawUser.google_user_email,
+      advocate_account_id: clawUser.google_user_email,
+      opaque_referral_identifier: 'SHARED_CODE',
+      registration_state: 'registered',
+    });
+
+    const fetchMock = jest
+      .fn<typeof fetch>()
+      .mockResolvedValue(
+        new Response(JSON.stringify({ referralCodes: { '52766': 'SHARED_CODE' } }), { status: 200 })
+      );
+    global.fetch = fetchMock;
+
+    const passUser = await insertTestUser({
+      google_user_email: 'pass-holder@example.com',
+      normalized_email: 'pass-holder@example.com',
+    });
+
+    const {
+      dispatchQueuedImpactAdvocateRegistrationAttempts,
+      queueImpactAdvocateParticipantRegistration,
+    } = await import('@/lib/impact/referral');
+
+    await queueImpactAdvocateParticipantRegistration({
+      programKey: 'kilo_pass',
+      user: passUser,
+      referralTouch: {
+        opaqueTrackingValue: 'pass-cookie',
+        trackingValueLength: 11,
+        isTrackingValueAccepted: true,
+        rsCode: null,
+        rsShareMedium: null,
+        rsEngagementMedium: null,
+        landingPath: '/subscriptions/kilo-pass',
+        utmSource: null,
+        utmMedium: null,
+        utmCampaign: null,
+        utmTerm: null,
+        utmContent: null,
+        touchedAt: new Date('2026-05-23T00:00:00.000Z'),
+        expiresAt: new Date('2026-06-22T00:00:00.000Z'),
+      },
+    });
+
+    await dispatchQueuedImpactAdvocateRegistrationAttempts();
+
+    const passParticipant = await db.query.impact_advocate_participants.findFirst({
+      where: eq(impact_advocate_participants.user_id, passUser.id),
+    });
+    expect(passParticipant?.program_key).toBe('kilo_pass');
+    expect(passParticipant?.opaque_referral_identifier).toBe('SHARED_CODE');
+  });
+
+  it('records Kilo Pass-scoped affiliate and referral touches without KiloClaw defaults', async () => {
+    const user = await insertTestUser({
+      google_user_email: 'kilo-pass-touch@example.com',
+      normalized_email: 'kilo-pass-touch@example.com',
+    });
+
+    const { recordImpactAffiliateTouch, recordImpactReferralTouch } =
+      await import('@/lib/impact/referral');
+
+    await recordImpactAffiliateTouch({
+      product: 'kilo_pass',
+      userId: user.id,
+      touch: {
+        product: 'kilo_pass',
+        trackingId: 'impact-click-pass',
+        trackingValueLength: 17,
+        isTrackingValueAccepted: true,
+        landingPath: '/subscriptions/kilo-pass?im_ref=impact-click-pass',
+        utmSource: 'impact',
+        utmMedium: null,
+        utmCampaign: null,
+        utmTerm: null,
+        utmContent: null,
+        touchedAt: new Date('2026-05-23T00:00:00.000Z'),
+        expiresAt: new Date('2026-06-22T00:00:00.000Z'),
+      },
+    });
+    await recordImpactReferralTouch({
+      userId: user.id,
+      touch: {
+        product: 'kilo_pass',
+        programKey: 'kilo_pass',
+        opaqueTrackingValue: 'pass-cookie',
+        trackingValueLength: 11,
+        isTrackingValueAccepted: true,
+        rsCode: 'PASSCODE',
+        rsShareMedium: 'email',
+        rsEngagementMedium: 'link',
+        landingPath: '/subscriptions/kilo-pass?_saasquatch=pass-cookie&rsCode=PASSCODE',
+        utmSource: null,
+        utmMedium: null,
+        utmCampaign: null,
+        utmTerm: null,
+        utmContent: null,
+        touchedAt: new Date('2026-05-23T00:01:00.000Z'),
+        expiresAt: new Date('2026-06-22T00:01:00.000Z'),
+      },
+    });
+
+    const touches = await db
+      .select()
+      .from(impact_attribution_touches)
+      .orderBy(impact_attribution_touches.touch_type);
+    expect(touches).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          product: 'kilo_pass',
+          program_key: null,
+          touch_type: 'affiliate',
+          provider: 'impact_performance',
+          im_ref: 'impact-click-pass',
+        }),
+        expect.objectContaining({
+          product: 'kilo_pass',
+          program_key: 'kilo_pass',
+          touch_type: 'referral',
+          provider: 'impact_advocate',
+          rs_code: 'PASSCODE',
+        }),
+      ])
+    );
   });
 
   it('keeps transient failures retryable until a later dispatch succeeds', async () => {

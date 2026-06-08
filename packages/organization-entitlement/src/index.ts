@@ -1,5 +1,10 @@
 export { classifyOrganizationEntitlement } from './classification';
-export { getDaysRemainingInTrial, getOrgTrialStatusFromDays } from './trial';
+export {
+  getDaysRemainingInTrial,
+  getOrgTrialStatusFromDays,
+  ORGANIZATION_TRIAL_ACTIVE_MIN_DAYS_REMAINING,
+  ORGANIZATION_TRIAL_DURATION_DAYS,
+} from './trial';
 export type {
   OrganizationEntitlementBypassReason,
   OrganizationEntitlementClassification,

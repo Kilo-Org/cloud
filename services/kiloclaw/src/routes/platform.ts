@@ -10,6 +10,7 @@ import type { Context } from 'hono';
 import * as fly from '../fly/client';
 import type { InstanceStatus } from '../durable-objects/kiloclaw-instance/types';
 import type { FileWriteResponse } from '../durable-objects/gateway-controller-types';
+import { isAgentConfigErrorEnvelope } from '../durable-objects/gateway-controller-types';
 import type { AppEnv } from '../types';
 import {
   ProvisionRequestSchema,
@@ -48,6 +49,7 @@ import {
   KiloclawStartReasonSchema,
   KiloclawStopReasonSchema,
   withDORetry,
+  type DORetryConfig,
 } from '@kilocode/worker-utils';
 import { readBillingCorrelationHeaders } from '@kilocode/worker-utils/kiloclaw-billing-observability';
 import {
@@ -131,6 +133,16 @@ const ProvisionReservationRepairSchema = z.object({
   userId: z.string().min(1),
   instanceId: z.uuid(),
   orgId: z.uuid().nullable().optional(),
+});
+
+const ProvisionReservationReleaseSchema = z.object({
+  userId: z.string().min(1),
+  instanceId: z.uuid(),
+  orgId: z.uuid().nullable().optional(),
+  // Break-glass: the operator must explicitly assert they have confirmed the
+  // attempt is dead and any provider resources are cleaned up. `z.literal(true)`
+  // makes the request fail validation unless the flag is present and true.
+  acknowledgeCleanupVerified: z.literal(true),
 });
 
 const KILOCLAW_WORKER_DESTROY_ACTOR = {
@@ -417,10 +429,28 @@ async function withResolvedDORetry<TResult>(
   userId: string,
   instanceId: string | undefined,
   operation: (stub: KiloClawInstanceStub) => Promise<TResult>,
-  operationName: string
+  operationName: string,
+  config?: DORetryConfig
 ): Promise<TResult> {
-  return withDORetry(await instanceStubFactory(env, userId, instanceId), operation, operationName);
+  return withDORetry(
+    await instanceStubFactory(env, userId, instanceId),
+    operation,
+    operationName,
+    config
+  );
 }
+
+/**
+ * Opt non-idempotent operations out of automatic DO retries. Cloudflare's
+ * `.retryable` retries are only safe for idempotent operations: agent
+ * create/delete are non-idempotent, and etag-guarded updates are not
+ * response-idempotent, so an auto-replay after a lost-but-committed success
+ * would surface a misleading agent_exists / agent_not_found / config_etag_conflict
+ * for an action that already succeeded. With retries disabled, a transient DO
+ * failure surfaces to the caller, who retries explicitly once state has settled
+ * and the typed outcome is accurate. Reads keep the default retry.
+ */
+const NO_DO_RETRY: DORetryConfig = { maxAttempts: 1, baseBackoffMs: 0, maxBackoffMs: 0 };
 
 type ProvisionedInstanceRecord = {
   id: string;
@@ -1066,6 +1096,27 @@ const OPENCLAW_CONFIG_ERROR_CODES = new Set([
   'invalid_request_body',
 ]);
 
+const FILE_TREE_RPC_LIMIT_ERROR_PREFIX =
+  'Serialized RPC arguments or return values are limited to 32MiB';
+
+function sanitizeFileTreeRpcLimitError(message: string): {
+  message: string;
+  status: number;
+  code: string;
+} | null {
+  if (!message.startsWith(FILE_TREE_RPC_LIMIT_ERROR_PREFIX)) return null;
+
+  const sizeMatch = message.match(/size of this value was: (\d+) bytes/);
+  const returnedSize = sizeMatch?.[1];
+  const returnedSizeSegment = returnedSize ? `; returned ${returnedSize} bytes` : '';
+
+  return {
+    message: `File tree is too large to load through the Cloudflare RPC limit (32 MiB${returnedSizeSegment}).`,
+    status: 413,
+    code: 'file_tree_too_large',
+  };
+}
+
 function isSafeOpenclawConfigCode(code: string): boolean {
   return OPENCLAW_CONFIG_ERROR_CODES.has(code) || code.startsWith('openclaw_import_');
 }
@@ -1081,6 +1132,11 @@ function sanitizeOpenclawConfigError(
 
   console.error(`[platform] ${operation} failed:`, raw);
 
+  if (operation === 'files/tree') {
+    const fileTreeRpcLimitError = sanitizeFileTreeRpcLimitError(normalized);
+    if (fileTreeRpcLimitError) return fileTreeRpcLimitError;
+  }
+
   if (code && isSafeOpenclawConfigCode(code)) {
     return { message: normalized, status, code };
   }
@@ -1093,6 +1149,60 @@ function sanitizeOpenclawConfigError(
     };
   }
 
+  return { message: `${operation} failed`, status, ...(code ? { code } : {}) };
+}
+
+// Agent config CRUD error codes that are safe to forward verbatim to the caller.
+// Mirrors OPENCLAW_CONFIG_ERROR_CODES; the controller's messages for these are
+// generic (no internal paths/PII), so the message + status + code pass through.
+const AGENT_CONFIG_ERROR_CODES = new Set([
+  'controller_route_unavailable', // old controller missing the route entirely
+  'capability_unavailable', // gateway capability gate (501) — old controller image
+  'config_etag_conflict', // stale config-wide etag
+  'agent_not_found',
+  'agent_exists',
+  'reserved_agent_id',
+  'invalid_agent_id',
+  'invalid_agent_request',
+  'invalid_agent_config',
+  'invalid_config_after_patch',
+  'openclaw_cli_failed', // 502 — controller CLI message is generic
+  'openclaw_cli_timeout', // 504
+]);
+
+function sanitizeAgentConfigError(
+  err: unknown,
+  operation: string
+): { message: string; status: number; code?: string } {
+  const raw = err instanceof Error ? err.message : 'Unknown error';
+  const status = statusCodeFromError(err);
+  const normalized = raw.replace(/^(?:[A-Za-z]+Error:\s*)+/, '');
+  const code = getErrorCode(err);
+
+  console.error(`[platform] ${operation} failed:`, raw);
+
+  if (code && AGENT_CONFIG_ERROR_CODES.has(code)) {
+    return { message: normalized, status, code };
+  }
+
+  return { message: `${operation} failed`, status, ...(code ? { code } : {}) };
+}
+
+/**
+ * Reconstruct an HTTP error from the serializable envelope a DO agent method
+ * RETURNS (typed errors can't be thrown across the DO RPC boundary; see
+ * gateway.ts). Forwards the message only for known-safe codes; otherwise redacts
+ * the message but preserves the status.
+ */
+function reconstructAgentError(
+  operation: string,
+  agentError: { status: number; code: string | null; message: string }
+): { message: string; status: number; code?: string } {
+  const { status, code, message } = agentError;
+  if (code && AGENT_CONFIG_ERROR_CODES.has(code)) {
+    return { message, status, code };
+  }
+  console.error(`[platform] ${operation} returned error envelope:`, { status, code, message });
   return { message: `${operation} failed`, status, ...(code ? { code } : {}) };
 }
 
@@ -1836,6 +1946,95 @@ platform.post('/provision/repair-reservation', async c => {
     return c.json({ ok: true });
   } catch (error) {
     const { message, status } = sanitizeError(error, 'provision reservation repair');
+    return jsonError(message, status);
+  }
+});
+
+// POST /api/platform/provision/release-reservation
+// Admin break-glass: release a stuck provision reservation (`in_progress` or
+// `failed_requires_reconciliation`) so the user can provision again. A failed
+// fresh provision can leave such a row behind (e.g. `provider_provision_failed`
+// during a provider outage); the partial unique index then rejects every new
+// provision with `provision_in_progress` ("An instance is already being
+// created"), and nothing auto-heals it because no instance/DO exists to finalize
+// a destroy.
+//
+// This is an OPERATOR action, not an autonomous safety decision. The admin must
+// have already confirmed the attempt is dead and any provider resources are
+// cleaned up; `acknowledgeCleanupVerified: true` records that assertion (and the
+// admin identity is captured in the tRPC audit log upstream). It mutates only
+// the registry bookkeeping row — no provider (Fly/Northflank) or Postgres
+// changes. Guards: refuses a reservation backing a live active instance, refuses
+// non-releasable statuses, and releases atomically via a compare-and-set on the
+// validated status so a concurrent completion is reported, not clobbered.
+platform.post('/provision/release-reservation', async c => {
+  const result = await parseBody(c, ProvisionReservationReleaseSchema);
+  if ('error' in result) return result.error;
+  const { userId, instanceId, orgId } = result.data;
+
+  try {
+    // Never release a reservation that belongs to a currently-active instance.
+    const activeInstance = await getActiveProvisionContextInstance(c.env, userId, orgId);
+    if (activeInstance?.id === instanceId) {
+      return jsonError(
+        'Reservation belongs to an active instance; refusing to release',
+        409,
+        'reservation_active'
+      );
+    }
+
+    const { registryKey, stub } = getProvisionRegistryStub(c.env, userId, orgId);
+    const { reservations } = await stub.listAllInstances(registryKey);
+    const reservation = reservations.find(r => r.instanceId === instanceId);
+    if (!reservation) {
+      return jsonError('No provision reservation found for instance', 404, 'reservation_not_found');
+    }
+    if (
+      reservation.status !== 'in_progress' &&
+      reservation.status !== 'failed_requires_reconciliation'
+    ) {
+      return jsonError(
+        `Reservation is not in a releasable state (status=${reservation.status})`,
+        409,
+        'reservation_not_releasable'
+      );
+    }
+
+    // Atomic compare-and-set on the exact status we validated.
+    const release = await stub.adminReleaseStuckReservation(
+      registryKey,
+      userId,
+      instanceId,
+      reservation.status,
+      'manual_admin_release'
+    );
+    switch (release.outcome) {
+      case 'not_found':
+        return jsonError(
+          'No provision reservation found for instance',
+          404,
+          'reservation_not_found'
+        );
+      case 'status_changed':
+        return jsonError(
+          `Reservation status changed to ${release.status} during release; re-check and retry`,
+          409,
+          'reservation_status_changed'
+        );
+      case 'released':
+        writeEvent(c.env, {
+          event: 'instance.provision_reservation_released',
+          delivery: 'http',
+          route: '/api/platform/provision/release-reservation',
+          userId,
+          instanceId,
+          orgId: orgId ?? undefined,
+          label: release.previousStatus,
+        });
+        return c.json({ ok: true, previousStatus: release.previousStatus });
+    }
+  } catch (error) {
+    const { message, status } = sanitizeError(error, 'provision reservation release');
     return jsonError(message, status);
   }
 });
@@ -2634,6 +2833,216 @@ platform.patch('/openclaw-config', async c => {
   }
 });
 
+// ──────────────────────────────────────────────────────────────────────
+// Agent config CRUD (controller: /_kilo/config/agents*)
+// Mirrors the openclaw-config proxy: x-internal-api-key auth (mount-level),
+// userId + optional instanceId resolution, opaque payload forwarding (deep
+// validation lives at the tRPC layer and the controller), and typed
+// error-code passthrough via sanitizeAgentConfigError. Each DO method fails
+// closed (501 capability_unavailable) on controllers that lack the capability.
+// ──────────────────────────────────────────────────────────────────────
+
+// GET /api/platform/agents?userId=...&instanceId=...
+platform.get('/agents', async c => {
+  const userId = setValidatedQueryUserId(c);
+  if (!userId) {
+    return c.json({ error: 'userId query parameter is required' }, 400);
+  }
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
+  try {
+    const response = await withResolvedDORetry(
+      c.env,
+      userId,
+      iidResult.instanceId,
+      stub => stub.listAgents().then(r => r),
+      'listAgents'
+    );
+    if (isAgentConfigErrorEnvelope(response)) {
+      const { message, status, code } = reconstructAgentError('agents list', response.agentError);
+      return jsonError(message, status, code);
+    }
+    return c.json(response, 200);
+  } catch (err) {
+    const { message, status, code } = sanitizeAgentConfigError(err, 'agents list');
+    return jsonError(message, status, code);
+  }
+});
+
+// GET /api/platform/agents/:agentId?userId=...&instanceId=...
+platform.get('/agents/:agentId', async c => {
+  const userId = setValidatedQueryUserId(c);
+  if (!userId) {
+    return c.json({ error: 'userId query parameter is required' }, 400);
+  }
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
+  const agentId = c.req.param('agentId');
+
+  try {
+    const response = await withResolvedDORetry(
+      c.env,
+      userId,
+      iidResult.instanceId,
+      stub => stub.getAgent(agentId).then(r => r),
+      'getAgent'
+    );
+    if (isAgentConfigErrorEnvelope(response)) {
+      const { message, status, code } = reconstructAgentError('agent read', response.agentError);
+      return jsonError(message, status, code);
+    }
+    return c.json(response, 200);
+  } catch (err) {
+    const { message, status, code } = sanitizeAgentConfigError(err, 'agent read');
+    return jsonError(message, status, code);
+  }
+});
+
+// POST /api/platform/agents — create an agent (payload forwarded opaquely).
+const CreateAgentSchema = z.object({
+  userId: z.string().min(1),
+  agent: z.record(z.string(), z.unknown()),
+});
+
+platform.post('/agents', async c => {
+  const result = await parseBody(c, CreateAgentSchema);
+  if ('error' in result) return result.error;
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
+  const { userId, agent } = result.data;
+
+  try {
+    const response = await withResolvedDORetry(
+      c.env,
+      userId,
+      iidResult.instanceId,
+      stub => stub.createAgent(agent).then(r => r),
+      'createAgent',
+      NO_DO_RETRY
+    );
+    if (isAgentConfigErrorEnvelope(response)) {
+      const { message, status, code } = reconstructAgentError('agent create', response.agentError);
+      return jsonError(message, status, code);
+    }
+    return c.json(response, 200);
+  } catch (err) {
+    const { message, status, code } = sanitizeAgentConfigError(err, 'agent create');
+    return jsonError(message, status, code);
+  }
+});
+
+// PATCH /api/platform/agents/:agentId — edit one agent (payload forwarded opaquely).
+const UpdateAgentSchema = z.object({
+  userId: z.string().min(1),
+  patch: z.record(z.string(), z.unknown()),
+});
+
+platform.patch('/agents/:agentId', async c => {
+  const result = await parseBody(c, UpdateAgentSchema);
+  if ('error' in result) return result.error;
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
+  const agentId = c.req.param('agentId');
+  const { userId, patch } = result.data;
+
+  try {
+    const response = await withResolvedDORetry(
+      c.env,
+      userId,
+      iidResult.instanceId,
+      stub => stub.updateAgent(agentId, patch).then(r => r),
+      'updateAgent',
+      NO_DO_RETRY
+    );
+    if (isAgentConfigErrorEnvelope(response)) {
+      const { message, status, code } = reconstructAgentError('agent update', response.agentError);
+      return jsonError(message, status, code);
+    }
+    return c.json(response, 200);
+  } catch (err) {
+    const { message, status, code } = sanitizeAgentConfigError(err, 'agent update');
+    return jsonError(message, status, code);
+  }
+});
+
+// PATCH /api/platform/agent-defaults — edit the fleet-wide defaults.
+const UpdateAgentDefaultsSchema = z.object({
+  userId: z.string().min(1),
+  patch: z.record(z.string(), z.unknown()),
+});
+
+platform.patch('/agent-defaults', async c => {
+  const result = await parseBody(c, UpdateAgentDefaultsSchema);
+  if ('error' in result) return result.error;
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
+  const { userId, patch } = result.data;
+
+  try {
+    const response = await withResolvedDORetry(
+      c.env,
+      userId,
+      iidResult.instanceId,
+      stub => stub.updateAgentDefaults(patch).then(r => r),
+      'updateAgentDefaults',
+      NO_DO_RETRY
+    );
+    if (isAgentConfigErrorEnvelope(response)) {
+      const { message, status, code } = reconstructAgentError(
+        'agent-defaults update',
+        response.agentError
+      );
+      return jsonError(message, status, code);
+    }
+    return c.json(response, 200);
+  } catch (err) {
+    const { message, status, code } = sanitizeAgentConfigError(err, 'agent-defaults update');
+    return jsonError(message, status, code);
+  }
+});
+
+// DELETE /api/platform/agents/:agentId?userId=...&instanceId=...
+platform.delete('/agents/:agentId', async c => {
+  const userId = setValidatedQueryUserId(c);
+  if (!userId) {
+    return c.json({ error: 'userId query parameter is required' }, 400);
+  }
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
+  const agentId = c.req.param('agentId');
+
+  try {
+    const response = await withResolvedDORetry(
+      c.env,
+      userId,
+      iidResult.instanceId,
+      stub => stub.deleteAgent(agentId).then(r => r),
+      'deleteAgent',
+      NO_DO_RETRY
+    );
+    if (isAgentConfigErrorEnvelope(response)) {
+      const { message, status, code } = reconstructAgentError('agent delete', response.agentError);
+      return jsonError(message, status, code);
+    }
+    return c.json(response, 200);
+  } catch (err) {
+    const { message, status, code } = sanitizeAgentConfigError(err, 'agent delete');
+    return jsonError(message, status, code);
+  }
+});
+
 const MorningBriefingSetupSchema = z.object({
   userId: z.string().min(1),
   cron: z.string().min(1).optional(),
@@ -3049,9 +3458,10 @@ platform.get('/morning-briefing/read/:day', async c => {
   }
 });
 
-// GET /api/platform/files/tree?userId=...
+// GET /api/platform/files/tree?userId=...[&path=...]
 platform.get('/files/tree', async c => {
   const userId = setValidatedQueryUserId(c);
+  const filePath = c.req.query('path');
   if (!userId) {
     return c.json({ error: 'userId query parameter is required' }, 400);
   }
@@ -3064,7 +3474,7 @@ platform.get('/files/tree', async c => {
       c.env,
       userId,
       iidResult.instanceId,
-      stub => stub.getFileTree(),
+      stub => stub.getFileTree(filePath),
       'getFileTree'
     );
     if (!result) {

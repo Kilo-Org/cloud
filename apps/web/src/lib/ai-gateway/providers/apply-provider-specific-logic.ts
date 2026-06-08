@@ -21,9 +21,11 @@ import { applyTrackingIds } from '@/lib/ai-gateway/providerHash';
 import { repairTools, sanitizeBinaryToolResults } from '@/lib/ai-gateway/tool-calling';
 import { fixOpenCodeDuplicateReasoning } from '@/lib/ai-gateway/providers/fixOpenCodeDuplicateReasoning';
 import {
+  addCacheBreakpoints,
   enableReasoningSummaries,
   fixResponsesRequest,
 } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
+import { isQwenExplicitCacheModel, isQwenModel } from '@/lib/ai-gateway/providers/qwen';
 
 export function getPreferredProviderOrder(requestedModel: string): string[] {
   if (isClaudeModel(requestedModel)) {
@@ -55,6 +57,9 @@ export function getPreferredProviderOrder(requestedModel: string): string[] {
       OpenRouterInferenceProviderIdSchema.enum.novita,
       OpenRouterInferenceProviderIdSchema.enum['z-ai'],
     ];
+  }
+  if (isQwenModel(requestedModel)) {
+    return [OpenRouterInferenceProviderIdSchema.enum.alibaba];
   }
   return [];
 }
@@ -129,6 +134,10 @@ export function applyProviderSpecificLogic(
 
   if (isMistralModel(requestedModel)) {
     applyMistralModelSettings(requestToMutate);
+  }
+
+  if (isQwenExplicitCacheModel(requestedModel)) {
+    addCacheBreakpoints(requestToMutate);
   }
 
   provider.transformRequest({

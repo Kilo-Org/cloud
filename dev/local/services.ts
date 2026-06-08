@@ -72,9 +72,10 @@ type ServiceMeta = {
 
 const serviceMeta: Record<string, ServiceMeta> = {
   // core
-  nextjs: { group: 'core', dependsOn: ['postgres', 'redis', 'stripe'] },
+  nextjs: { group: 'core', dependsOn: ['postgres', 'redis', 'redis-http', 'stripe'] },
   postgres: { group: 'core', dependsOn: [] },
   redis: { group: 'core', dependsOn: [] },
+  'redis-http': { group: 'core', dependsOn: ['redis'] },
   stripe: { group: 'core', dependsOn: [] },
   // cloud-agent
   'cloud-agent-next': {
@@ -334,7 +335,12 @@ function readWranglerPort(dir: string): number {
 // Build service definitions from serviceMeta + wrangler.jsonc
 // ---------------------------------------------------------------------------
 
-const INFRA_PORTS: Record<string, number> = { postgres: 5432, redis: 6379, grafana: 4000 };
+const INFRA_PORTS: Record<string, number> = {
+  postgres: 5432,
+  redis: 6379,
+  'redis-http': 8079,
+  grafana: 4000,
+};
 
 // Docker Compose profile that gates each infra service, if any. Services not
 // listed here are part of the default profile and start with a plain `up -d`.

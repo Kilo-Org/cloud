@@ -113,7 +113,8 @@ export function createAiSdkProvider(directByokProvider: DirectByokProvider, apiK
   if (
     directByokProvider.default_ai_sdk_provider === 'openai-compatible' ||
     directByokProvider.default_ai_sdk_provider === 'openrouter' ||
-    directByokProvider.default_ai_sdk_provider === 'alibaba'
+    directByokProvider.default_ai_sdk_provider === 'alibaba' ||
+    directByokProvider.ai_sdk_provider === 'mistral'
   ) {
     return createOpenAICompatible({
       baseURL: directByokProvider.base_url,

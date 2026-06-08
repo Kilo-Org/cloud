@@ -1,6 +1,7 @@
 import { csvField, downloadCsv } from '@/lib/admin-csv';
 import {
   DIMENSION_LABELS,
+  type CostSource,
   type Dimension,
   type Granularity,
   type PeriodOption,
@@ -61,6 +62,7 @@ type ExportArgs = {
   groupBy: Dimension[];
   granularity: Granularity;
   period: PeriodOption;
+  costSource: CostSource;
   labelForDimensionValue: (dim: Dimension, value: string) => string;
 };
 
@@ -76,6 +78,7 @@ export function exportUsageTableToCsv({
   groupBy,
   granularity,
   period,
+  costSource,
   labelForDimensionValue,
 }: ExportArgs): void {
   if (rows.length === 0) return;
@@ -83,7 +86,7 @@ export function exportUsageTableToCsv({
   const headers = [
     datetimeHeaderFor(granularity),
     ...groupBy.map(d => DIMENSION_LABELS[d]),
-    'Cost (USD)',
+    costSource === 'market' ? 'Estimated Market Cost (USD)' : 'Cost (USD)',
     'Requests',
     'Input Tokens',
     'Output Tokens',

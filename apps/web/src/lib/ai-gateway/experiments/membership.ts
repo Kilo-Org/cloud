@@ -1,4 +1,4 @@
-import { redisGet } from '@/lib/redis';
+import { redisClient } from '@/lib/redis';
 import { EXPERIMENTED_PUBLIC_IDS_REDIS_KEY } from '@/lib/redis-keys';
 import { createCachedFetch } from '@/lib/cached-fetch';
 
@@ -17,7 +17,7 @@ const EXPERIMENTED_PUBLIC_IDS_LOCAL_CACHE_TTL_MS = process.env.NODE_ENV === 'tes
 const getExperimentedPublicIds = createCachedFetch<string[]>(
   async () => {
     try {
-      const cached = await redisGet(EXPERIMENTED_PUBLIC_IDS_REDIS_KEY);
+      const cached = await redisClient.get<string>(EXPERIMENTED_PUBLIC_IDS_REDIS_KEY);
       if (cached === null) return [];
       return parseStringArray(cached) ?? [];
     } catch {

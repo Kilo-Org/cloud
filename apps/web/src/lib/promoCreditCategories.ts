@@ -316,6 +316,12 @@ const nonSelfServicePromos: readonly NonSelfServicePromoCreditCategoryConfig[] =
     expect_negative_amount: true,
   },
   {
+    credit_category: 'admin-cancel-kilo-pass-no-refund',
+    description: 'Balance zeroed by admin during Kilo Pass cancellation without refund',
+    is_idempotent: false,
+    expect_negative_amount: true,
+  },
+  {
     credit_category: 'organization_custom',
     description: 'Custom credit grant for organization',
     is_idempotent: false,

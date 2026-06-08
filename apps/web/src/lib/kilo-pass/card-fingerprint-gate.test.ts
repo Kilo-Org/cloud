@@ -613,6 +613,7 @@ describe('duplicate-card provider enforcement and email', () => {
           cancel: jest.fn(async () =>
             Promise.reject(new Error('Subscription sub_replay is already canceled'))
           ),
+          retrieve: jest.fn(async () => ({ id: 'sub_replay', status: 'canceled' })),
         },
         refunds: { create: createRefund },
       } as unknown as Stripe,
@@ -630,6 +631,28 @@ describe('duplicate-card provider enforcement and email', () => {
       expect.objectContaining({ charge: 'ch_exact', reason: 'duplicate' }),
       { idempotencyKey: 'kilo-pass-duplicate-card-refund:in_replay' }
     );
+  });
+
+  test('already canceled message still throws when Stripe status is active', async () => {
+    const createRefund = jest.fn();
+    await expect(
+      attemptDuplicateCardProviderEnforcement({
+        stripe: {
+          subscriptions: {
+            cancel: jest.fn(async () =>
+              Promise.reject(new Error('Subscription sub_active is already canceled'))
+            ),
+            retrieve: jest.fn(async () => ({ id: 'sub_active', status: 'active' })),
+          },
+          refunds: { create: createRefund },
+        } as unknown as Stripe,
+        stripeInvoiceId: 'in_active',
+        stripeSubscriptionId: 'sub_active',
+        kiloUserId: 'user_active',
+        gateResult,
+      })
+    ).rejects.toThrow('already canceled');
+    expect(createRefund).not.toHaveBeenCalled();
   });
 
   test('refund failure is returned separately after successful cancellation', async () => {

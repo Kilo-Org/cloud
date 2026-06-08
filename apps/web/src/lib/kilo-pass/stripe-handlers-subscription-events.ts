@@ -50,6 +50,8 @@ export async function handleKiloPassSubscriptionEvent(params: {
 
   let finalStatus: string | undefined;
   let finalStreakMonths: number | undefined;
+  let finalKiloUserId: string | undefined;
+  let finalTier: string | undefined;
   let wasDuplicateDelivery = false;
 
   try {
@@ -142,6 +144,8 @@ export async function handleKiloPassSubscriptionEvent(params: {
 
       finalStatus = stripeStatus;
       finalStreakMonths = row.current_streak_months;
+      finalKiloUserId = kiloUserId;
+      finalTier = tier;
 
       const pauseCollection = currentSubscription.pause_collection;
       if (pauseCollection?.behavior) {
@@ -199,8 +203,8 @@ export async function handleKiloPassSubscriptionEvent(params: {
       {
         type: 'billing.kilo_pass_changed',
         data: {
-          kilo_user_id: eventMetadata.kiloUserId,
-          tier: eventMetadata.tier,
+          kilo_user_id: finalKiloUserId ?? eventMetadata.kiloUserId,
+          tier: finalTier ?? eventMetadata.tier,
           status: finalStatus ?? null,
           streak_months: finalStreakMonths,
         },

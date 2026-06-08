@@ -15,6 +15,7 @@ import {
   user_affiliate_events,
 } from '@kilocode/db/schema';
 import { KiloPassAuditLogAction } from './enums';
+import { KiloPassAuditLogResult } from './enums';
 import { KiloPassIssuanceItemKind } from './enums';
 import { KiloPassIssuanceSource } from './enums';
 import { KiloPassCadence } from './enums';
@@ -587,6 +588,107 @@ describe('handleKiloPassInvoicePaid', () => {
       expect(JSON.stringify(audit?.payload_json)).not.toContain(fingerprint);
     }
   );
+
+  test('duplicate-card replay retries refund when cancellation audit exists without refund audit', async () => {
+    const { handleKiloPassInvoicePaid } =
+      await import('@/lib/kilo-pass/stripe-handlers-invoice-paid');
+    const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
+    const stripeSubscriptionId = `sub_refund_retry_${Math.random()}`;
+    const stripeInvoiceId = `in_refund_retry_${Math.random()}`;
+    const metadata = kiloPassMetadata({
+      kiloUserId: user.id,
+      tier: KiloPassTier.Tier19,
+      cadence: KiloPassCadence.Monthly,
+    });
+    await db.insert(kilo_pass_audit_log).values([
+      {
+        action: KiloPassAuditLogAction.DuplicateCardSubscriptionCanceled,
+        result: KiloPassAuditLogResult.SkippedIdempotent,
+        kilo_user_id: user.id,
+        stripe_event_id: 'evt_existing_block',
+        stripe_invoice_id: stripeInvoiceId,
+        stripe_subscription_id: stripeSubscriptionId,
+        payload_json: {
+          outcome: 'duplicate_card_blocked',
+          fingerprintDigest: 'd'.repeat(64),
+          firstClaimSourceStripeInvoiceId: 'in_existing_winner',
+          firstClaimedAt: '2026-06-05T12:00:00.000Z',
+          matchedKiloUserId: 'first_claimant',
+          matchedStripeSubscriptionId: 'sub_existing_winner',
+        },
+      },
+      {
+        action: KiloPassAuditLogAction.DuplicateCardSubscriptionCanceled,
+        result: KiloPassAuditLogResult.Success,
+        kilo_user_id: user.id,
+        stripe_event_id: 'evt_existing_cancel',
+        stripe_invoice_id: stripeInvoiceId,
+        stripe_subscription_id: stripeSubscriptionId,
+        payload_json: {
+          outcome: 'subscription_cancellation',
+          canceledStripeSubscriptionId: stripeSubscriptionId,
+        },
+      },
+    ]);
+    const cancel = jest.fn();
+    const refund = jest.fn(async (...args: unknown[]) => {
+      void args;
+      return { id: 're_refund_retry' };
+    });
+    const priceId = await getKiloPassPriceId({
+      tier: KiloPassTier.Tier19,
+      cadence: KiloPassCadence.Monthly,
+    });
+
+    await handleKiloPassInvoicePaid({
+      eventId: 'evt_refund_retry',
+      invoice: makeStripeInvoice({
+        id: stripeInvoiceId,
+        amount_paid_cents: 1900,
+        created_seconds: 1_780_272_000,
+        paid_seconds: 1_780_272_000,
+        priceId,
+        subscriptionIdOrExpanded: stripeSubscriptionId,
+        metadata,
+        invoicePaymentId: 'inpay_refund_retry',
+        invoicePayment: {
+          type: 'charge',
+          charge: makeFingerprintCharge('ch_refund_retry', 'card', 'fp_refund_retry'),
+        },
+        billingReason: 'subscription_create',
+      }),
+      stripe: {
+        subscriptions: {
+          retrieve: jest.fn(async () =>
+            makeStripeSubscription({
+              id: stripeSubscriptionId,
+              start_date_seconds: 1_780_272_000,
+              metadata,
+            })
+          ),
+          cancel,
+        },
+        refunds: { create: refund },
+      } as unknown as Stripe,
+    });
+
+    expect(cancel).not.toHaveBeenCalled();
+    expect(refund).toHaveBeenCalledWith(
+      expect.objectContaining({ charge: 'ch_refund_retry', reason: 'duplicate' }),
+      expect.objectContaining({
+        idempotencyKey: `kilo-pass-duplicate-card-refund:${stripeInvoiceId}`,
+      })
+    );
+    const auditRows = await db
+      .select({ payload: kilo_pass_audit_log.payload_json })
+      .from(kilo_pass_audit_log)
+      .where(eq(kilo_pass_audit_log.stripe_invoice_id, stripeInvoiceId));
+    expect(
+      auditRows.some(
+        row => row.payload.outcome === 'refund' && row.payload.stripeRefundId === 're_refund_retry'
+      )
+    ).toBe(true);
+  });
 
   test('committed fail-open initial purchase cannot be retroactively reclassified on replay', async () => {
     const { handleKiloPassInvoicePaid } =

@@ -16,6 +16,9 @@ import type Stripe from 'stripe';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const mockStripeSubscriptionsRetrieve = jest.fn<any>();
+const mockReportEvents = jest.fn(async (...args: unknown[]) => {
+  void args;
+});
 
 jest.mock('@/lib/stripe-client', () => ({
   client: {
@@ -23,6 +26,10 @@ jest.mock('@/lib/stripe-client', () => ({
       retrieve: (...args: unknown[]) => mockStripeSubscriptionsRetrieve(...args),
     },
   },
+}));
+
+jest.mock('@/lib/ai-gateway/abuse-service', () => ({
+  reportEvents: (...args: unknown[]) => mockReportEvents(...args),
 }));
 
 function ensureKiloPassStripePriceIdEnv(): void {
@@ -84,6 +91,7 @@ beforeEach(async () => {
   await cleanupDbForTest();
   // Default: no pause_collection
   mockStripeSubscriptionsRetrieve.mockResolvedValue({ pause_collection: null });
+  mockReportEvents.mockClear();
 });
 
 afterEach(() => {
@@ -510,6 +518,62 @@ describe('handleKiloPassSubscriptionEvent', () => {
       eventStatus: 'active',
       appliedStatus: 'canceled',
       staleDelivery: true,
+    });
+  });
+
+  test('stale delivery reports reconciled current Stripe metadata', async () => {
+    const { handleKiloPassSubscriptionEvent } =
+      await import('@/lib/kilo-pass/stripe-handlers-subscription-events');
+    const staleUser = await insertTestUser();
+    const currentUser = await insertTestUser();
+    const stripeSubId = `sub_stale_metadata_${Math.random()}`;
+    const staleMetadata = kiloPassMetadata({
+      kiloUserId: staleUser.id,
+      tier: KiloPassTier.Tier19,
+      cadence: KiloPassCadence.Monthly,
+    });
+    const currentMetadata = kiloPassMetadata({
+      kiloUserId: currentUser.id,
+      tier: KiloPassTier.Tier49,
+      cadence: KiloPassCadence.Monthly,
+    });
+    mockStripeSubscriptionsRetrieve.mockResolvedValue(
+      makeStripeSubscription({
+        id: stripeSubId,
+        start_date_seconds: 1_767_225_600,
+        status: 'active',
+        metadata: currentMetadata,
+      })
+    );
+
+    await handleKiloPassSubscriptionEvent({
+      eventId: 'evt_stale_metadata',
+      eventType: 'customer.subscription.updated',
+      subscription: makeStripeSubscription({
+        id: stripeSubId,
+        start_date_seconds: 1_767_225_600,
+        status: 'past_due',
+        metadata: staleMetadata,
+      }),
+    });
+
+    const row = await db.query.kilo_pass_subscriptions.findFirst({
+      where: eq(kilo_pass_subscriptions.stripe_subscription_id, stripeSubId),
+    });
+    expect(row?.kilo_user_id).toBe(currentUser.id);
+    expect(row?.tier).toBe(KiloPassTier.Tier49);
+    expect(mockReportEvents).toHaveBeenCalledWith({
+      events: [
+        {
+          type: 'billing.kilo_pass_changed',
+          data: {
+            kilo_user_id: currentUser.id,
+            tier: KiloPassTier.Tier49,
+            status: 'active',
+            streak_months: 0,
+          },
+        },
+      ],
     });
   });
 

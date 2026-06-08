@@ -3487,7 +3487,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
           previousOverride ? `${previousOverride.cpus}/${previousOverride.memory_mb}MB` : 'none'
         } ` +
         `new=${input.size.cpus}/${input.size.memory_mb}MB cpu_kind=${input.size.cpu_kind ?? 'shared'} ` +
-        `reason="${input.reason.replace(/"/g, '\\"')}"`
+        `reason=${JSON.stringify(input.reason)}`
     );
 
     return { previousOverride, newOverride: input.size };
@@ -3527,7 +3527,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       }
       console.log(
         `[admin-size-override] clear (no-op) userId=${this.s.userId} actor=${input.actorEmail} ` +
-          `reason="${input.reason.replace(/"/g, '\\"')}"`
+          `reason=${JSON.stringify(input.reason)}`
       );
       return { previousOverride: null };
     }
@@ -3560,7 +3560,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       : 'metadata-only (skewed state)';
     console.log(
       `[admin-size-override] clear userId=${this.s.userId} actor=${input.actorEmail} ` +
-        `previous=${previousLabel} reason="${input.reason.replace(/"/g, '\\"')}"`
+        `previous=${previousLabel} reason=${JSON.stringify(input.reason)}`
     );
 
     return { previousOverride };

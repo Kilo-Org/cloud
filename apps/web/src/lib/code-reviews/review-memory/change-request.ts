@@ -31,8 +31,11 @@ import {
   markProposalSuperseded,
   type ReviewMemoryOwner,
 } from './db';
+import {
+  generateIntegratedReviewGuidanceWithGateway,
+  type ReviewMdIntegrationResult,
+} from './review-md-integration';
 
-const REVIEW_MEMORY_SECTION_HEADING = '## Review memory';
 const REVIEW_MEMORY_TARGET_FILE_PATH = 'REVIEW.md';
 const REVIEW_MEMORY_CHANGE_REQUEST_TITLE = 'docs(review): update REVIEW.md guidance';
 const REVIEW_MEMORY_CHANGE_REQUEST_MARKER = '<!-- kilo-review-memory-change-request -->';
@@ -65,12 +68,21 @@ export type ApproveReviewMemoryChangeRequestInput = {
 };
 
 type PrepareReviewMemoryChangeBranchInput = {
+  owner: ReviewMemoryOwner;
   proposal: CodeReviewMemoryProposal;
+  platform: CodeReviewMemoryProposal['platform'];
   defaultBranch: string;
   branchName: string;
   fetchContent: (ref: string) => Promise<string | null>;
   createBranch: () => Promise<void>;
   writeContent: (content: string, fileExists: boolean) => Promise<void>;
+  generateIntegratedReviewGuidance?: (input: {
+    owner: ReviewMemoryOwner;
+    platform: CodeReviewMemoryProposal['platform'];
+    repoFullName: string;
+    existingReviewMd: string | null;
+    proposal: CodeReviewMemoryProposal;
+  }) => Promise<ReviewMdIntegrationResult>;
 };
 
 export async function approveAndOpenReviewMemoryChangeRequest(
@@ -111,8 +123,8 @@ export async function approveAndOpenReviewMemoryChangeRequest(
   try {
     const result =
       proposal.platform === 'github'
-        ? await openGitHubReviewMemoryPullRequest(openingProposal, integration)
-        : await openGitLabReviewMemoryMergeRequest(openingProposal, integration);
+        ? await openGitHubReviewMemoryPullRequest(input.owner, openingProposal, integration)
+        : await openGitLabReviewMemoryMergeRequest(input.owner, openingProposal, integration);
 
     if (result.superseded) {
       return await markProposalSuperseded({ proposalId: proposal.id });
@@ -145,6 +157,7 @@ export async function approveAndOpenReviewMemoryChangeRequest(
 }
 
 async function openGitHubReviewMemoryPullRequest(
+  owner: ReviewMemoryOwner,
   proposal: CodeReviewMemoryProposal,
   integration: PlatformIntegration
 ): Promise<
@@ -165,7 +178,9 @@ async function openGitHubReviewMemoryPullRequest(
   const defaultBranch = await fetchGitHubRepositoryDefaultBranch({ token: token.token, ...repo });
   const branchName = branchNameForProposal(proposal);
   const prepared = await prepareReviewMemoryChangeBranch({
+    owner,
     proposal,
+    platform: 'github',
     defaultBranch,
     branchName,
     fetchContent: ref =>
@@ -210,6 +225,7 @@ async function openGitHubReviewMemoryPullRequest(
 }
 
 async function openGitLabReviewMemoryMergeRequest(
+  owner: ReviewMemoryOwner,
   proposal: CodeReviewMemoryProposal,
   integration: PlatformIntegration
 ): Promise<
@@ -223,7 +239,9 @@ async function openGitLabReviewMemoryMergeRequest(
   const defaultBranch = project.default_branch;
   const branchName = branchNameForProposal(proposal);
   const prepared = await prepareReviewMemoryChangeBranch({
+    owner,
     proposal,
+    platform: 'gitlab',
     defaultBranch,
     branchName,
     fetchContent: ref =>
@@ -329,14 +347,32 @@ async function prepareReviewMemoryChangeBranch(
     return { superseded: true };
   }
 
+  const generateIntegratedReviewGuidance =
+    input.generateIntegratedReviewGuidance ?? generateIntegratedReviewGuidanceWithGateway;
+  const integration = await generateIntegratedReviewGuidance({
+    owner: input.owner,
+    platform: input.platform,
+    repoFullName: input.proposal.repo_full_name,
+    existingReviewMd: existingContent,
+    proposal: input.proposal,
+  });
+
+  if (integration.status === 'already_present') {
+    return { superseded: true };
+  }
+
+  if (!integration.updatedReviewMd) {
+    throw new Error('Integration generator did not return updated REVIEW.md content.');
+  }
+
   await input.createBranch();
   const branchContent = await input.fetchContent(input.branchName);
-  if (!contentIncludesProposal(branchContent, input.proposal.proposed_markdown)) {
+  if (
+    !contentIncludesProposal(branchContent, input.proposal.proposed_markdown) &&
+    !contentIncludesProposal(branchContent, integration.updatedReviewMd)
+  ) {
     const fileExistsOnBranch = branchContent ?? existingContent;
-    await input.writeContent(
-      buildReviewMemoryFileContent(fileExistsOnBranch, input.proposal.proposed_markdown),
-      Boolean(fileExistsOnBranch)
-    );
+    await input.writeContent(integration.updatedReviewMd, Boolean(fileExistsOnBranch));
   }
 
   return { superseded: false };
@@ -364,36 +400,6 @@ function normalizeMarkdown(value: string): string {
 function contentIncludesProposal(content: string | null, proposedMarkdown: string): boolean {
   if (!content) return false;
   return normalizeMarkdown(content).includes(normalizeMarkdown(proposedMarkdown));
-}
-
-export function buildReviewMemoryFileContent(
-  existingContent: string | null,
-  proposedMarkdown: string
-): string {
-  const proposal = normalizeMarkdown(proposedMarkdown);
-  const existing = normalizeMarkdown(existingContent ?? '');
-  if (!existing) {
-    return `${REVIEW_MEMORY_SECTION_HEADING}\n\n${proposal}\n`;
-  }
-
-  const lines = existing.split('\n');
-  const headingIndex = lines.findIndex(
-    line => line.trim().toLowerCase() === REVIEW_MEMORY_SECTION_HEADING.toLowerCase()
-  );
-  if (headingIndex === -1) {
-    return `${existing}\n\n${REVIEW_MEMORY_SECTION_HEADING}\n\n${proposal}\n`;
-  }
-
-  const nextSectionIndex = lines.findIndex(
-    (line, index) => index > headingIndex && /^##\s+\S/.test(line.trim())
-  );
-  const insertAt = nextSectionIndex === -1 ? lines.length : nextSectionIndex;
-  const before = lines.slice(0, insertAt).join('\n').trimEnd();
-  const after = lines.slice(insertAt).join('\n').trimStart();
-  if (!after) {
-    return `${before}\n\n${proposal}\n`;
-  }
-  return `${before}\n\n${proposal}\n\n${after}\n`;
 }
 
 function buildChangeRequestBody(

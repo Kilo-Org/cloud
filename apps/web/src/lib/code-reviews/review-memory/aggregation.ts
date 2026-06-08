@@ -1,20 +1,11 @@
-import { APP_URL } from '@/lib/constants';
-import { DEFAULT_CODE_REVIEW_MODEL } from '@/lib/code-reviews/core/constants';
-import { getAgentConfigForOwner } from '@/lib/agent-config/db/agent-configs';
-import { FEATURE_HEADER } from '@/lib/feature-detection';
-import { ensureBotUserForOrg } from '@/lib/bot-users/bot-user-service';
-import { findUserById } from '@/lib/user';
-import { generateApiToken } from '@/lib/tokens';
 import { isReviewMemoryEnabled } from './settings';
 import { captureException } from '@sentry/nextjs';
-import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import { generateText } from 'ai';
 import * as z from 'zod';
 import type {
   CodeReviewFeedbackEvent,
   CodeReviewFeedbackSubject,
   CodeReviewMemoryAggregationState,
-  User,
 } from '@kilocode/db/schema';
 import type {
   ReviewMemoryPlatform,
@@ -32,10 +23,12 @@ import {
   upsertReviewMemoryProposal,
   type ReviewMemoryOwner,
 } from './db';
-
-const AggregationModelConfigSchema = z.object({
-  model_slug: z.string().optional(),
-});
+import {
+  createReviewMemoryGatewayProvider,
+  extractReviewMemoryJsonObject,
+  resolveReviewMemoryActor,
+  resolveReviewMemoryModel,
+} from './llm';
 
 export const REVIEW_MEMORY_AGGREGATION_THRESHOLDS = {
   minFreshEvents: 5,
@@ -254,7 +247,10 @@ Rules:
 - Do not create proposals from isolated weak PR/MR-level signals.
 - Negative feedback should produce suppress, clarify, or narrow guidance.
 - Positive feedback should produce reinforce guidance.
-- Draft concise REVIEW.md markdown with a heading, scope, guidance, and why.
+- Draft markdown as candidate repository guidance, not as a final file placement.
+- Do not mention Review Memory or Kilo Review Memory.
+- Do not create a catch-all Review Memory section.
+- Include enough concrete wording that a later integration step can merge it into REVIEW.md.
 - Use only evidenceEventIds from the provided clusters.
 - If feedback is too weak or contradictory, return an empty opportunities array.
 
@@ -268,70 +264,27 @@ Feedback clusters:
 ${JSON.stringify(input.clusters, null, 2)}`;
 }
 
-function extractJsonObject(text: string): unknown {
-  const trimmed = text.trim();
-  if (trimmed.startsWith('{') && trimmed.endsWith('}')) return JSON.parse(trimmed);
-  const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  if (fenced?.[1]) return JSON.parse(fenced[1]);
-  const start = trimmed.indexOf('{');
-  const end = trimmed.lastIndexOf('}');
-  if (start >= 0 && end > start) return JSON.parse(trimmed.slice(start, end + 1));
-  throw new Error('Aggregation model did not return JSON');
-}
-
-async function resolveAggregationActor(owner: ReviewMemoryOwner): Promise<User> {
-  if (owner.type === 'org') {
-    return await ensureBotUserForOrg(owner.id, 'code-review');
-  }
-
-  const user = await findUserById(owner.id);
-  if (!user) throw new Error('Review Memory aggregation owner user not found');
-  return user;
-}
-
 export async function generateReviewMemoryOpportunitiesWithGateway(
   input: ReviewMemoryAggregationGeneratorInput
 ): Promise<ReviewMemoryAggregationGeneratorResult> {
-  const actor = await resolveAggregationActor(input.owner);
-  const headers: Record<string, string> = {
-    'User-Agent': 'Kilo Review Memory Aggregator',
-    [FEATURE_HEADER]: 'code-review-memory',
-  };
-  if (input.owner.type === 'org') {
-    headers['X-KiloCode-OrganizationId'] = input.owner.id;
-  }
-
-  const provider = createOpenAICompatible({
-    name: 'kilo-gateway',
-    baseURL: `${APP_URL}/api/openrouter`,
-    apiKey: generateApiToken(actor, { internalApiUse: true }),
-    headers,
+  const actor = await resolveReviewMemoryActor(input.owner);
+  const provider = createReviewMemoryGatewayProvider({
+    owner: input.owner,
+    actor,
+    userAgent: 'Kilo Review Memory Aggregator',
   });
   const result = await generateText({
     model: provider.chatModel(input.modelSlug),
     prompt: input.prompt,
     maxOutputTokens: 4_000,
   });
-  const parsed = AggregationOutputSchema.parse(extractJsonObject(result.text));
+  const parsed = AggregationOutputSchema.parse(extractReviewMemoryJsonObject(result.text));
 
   return {
     opportunities: parsed.opportunities,
     tokensIn: result.usage.inputTokens ?? null,
     tokensOut: result.usage.outputTokens ?? null,
   };
-}
-
-async function resolveAggregationModel(input: {
-  owner: ReviewMemoryOwner;
-  platform: ReviewMemoryPlatform;
-}): Promise<{ modelSlug: string }> {
-  const agentConfig = await getAgentConfigForOwner(input.owner, 'code_review', input.platform);
-  const parsed = AggregationModelConfigSchema.safeParse(agentConfig?.config);
-  if (!parsed.success) {
-    return { modelSlug: DEFAULT_CODE_REVIEW_MODEL };
-  }
-
-  return { modelSlug: parsed.data.model_slug || DEFAULT_CODE_REVIEW_MODEL };
 }
 
 function proposalRollups(
@@ -370,7 +323,7 @@ async function processClaimedAggregationScope(
     return { status: 'skipped', proposals: 0, reason: 'review-memory-disabled' };
   }
 
-  const { modelSlug } = await resolveAggregationModel({ owner, platform: state.platform });
+  const { modelSlug } = await resolveReviewMemoryModel({ owner, platform: state.platform });
   const events = await listFeedbackEventsForAggregation({
     owner,
     platform: state.platform,

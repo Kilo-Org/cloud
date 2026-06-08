@@ -12,6 +12,7 @@ const mockCreateOrUpdateGitLabTextFile = jest.fn();
 const mockCreateGitLabMergeRequest = jest.fn();
 const mockGetStoredProjectAccessToken = jest.fn();
 const mockGetValidGitLabToken = jest.fn();
+const mockGenerateIntegratedReviewGuidanceWithGateway = jest.fn();
 
 jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
   generateGitHubInstallationToken: (...args: unknown[]) =>
@@ -38,6 +39,11 @@ jest.mock('@/lib/integrations/gitlab-service', () => ({
   getValidGitLabToken: (...args: unknown[]) => mockGetValidGitLabToken(...args),
 }));
 
+jest.mock('./review-md-integration', () => ({
+  generateIntegratedReviewGuidanceWithGateway: (...args: unknown[]) =>
+    mockGenerateIntegratedReviewGuidanceWithGateway(...args),
+}));
+
 import { db } from '@/lib/drizzle';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import {
@@ -45,11 +51,9 @@ import {
   kilocode_users,
   platform_integrations,
 } from '@kilocode/db/schema';
+import type { CodeReviewMemoryProposal } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
-import {
-  approveAndOpenReviewMemoryChangeRequest,
-  buildReviewMemoryFileContent,
-} from './change-request';
+import { approveAndOpenReviewMemoryChangeRequest } from './change-request';
 import { upsertReviewMemoryProposal, type ReviewMemoryOwner } from './db';
 
 describe('review memory change requests', () => {
@@ -83,6 +87,15 @@ describe('review memory change requests', () => {
     });
     mockGetStoredProjectAccessToken.mockReturnValue(null);
     mockGetValidGitLabToken.mockResolvedValue('gitlab-token');
+    mockGenerateIntegratedReviewGuidanceWithGateway.mockImplementation(
+      async (input: { existingReviewMd: string | null; proposal: CodeReviewMemoryProposal }) => ({
+        status: 'updated',
+        updatedReviewMd: `${input.existingReviewMd?.trimEnd() || '# REVIEW'}\n\n${input.proposal.proposed_markdown}\n`,
+        integrationSummary: `Integrated ${input.proposal.title}.`,
+        tokensIn: null,
+        tokensOut: null,
+      })
+    );
   });
 
   async function seedGitHubIntegration(owner: ReviewMemoryOwner) {
@@ -126,6 +139,13 @@ describe('review memory change requests', () => {
     const user = await insertTestUser();
     const owner = { type: 'user' as const, id: user.id };
     await seedGitHubIntegration(owner);
+    const integratedReviewMd =
+      '# Existing review guidance\n\n## Widget guidance\n\nAvoid flagging intentional widgets.\n';
+    mockGenerateIntegratedReviewGuidanceWithGateway.mockResolvedValueOnce({
+      status: 'updated',
+      updatedReviewMd: integratedReviewMd,
+      integrationSummary: 'Integrated widget guidance.',
+    });
     const proposal = await upsertReviewMemoryProposal({
       owner,
       platform: 'github',
@@ -154,12 +174,22 @@ describe('review memory change requests', () => {
     expect(mockCreateGitHubBranch).toHaveBeenCalledWith(
       expect.objectContaining({ baseBranch: 'main', branchName })
     );
-    expect(mockCreateOrUpdateGitHubRootTextFile).toHaveBeenCalledWith(
+    expect(mockGenerateIntegratedReviewGuidanceWithGateway).toHaveBeenCalledWith(
       expect.objectContaining({
-        branch: branchName,
-        content: expect.stringContaining('### Clarify widget guidance'),
+        owner,
+        platform: 'github',
+        repoFullName: 'acme/widgets',
+        existingReviewMd: '# Existing review guidance\n',
+        proposal: expect.objectContaining({ id: proposal.id }),
       })
     );
+    const writeInput = mockCreateOrUpdateGitHubRootTextFile.mock.calls[0]?.[0] as {
+      branch: string;
+      content: string;
+    };
+    expect(writeInput.branch).toBe(branchName);
+    expect(writeInput.content).toBe(integratedReviewMd);
+    expect(writeInput.content).not.toMatch(/^##\s+Review memory\b/im);
   });
 
   it('marks proposals superseded when REVIEW.md already includes the draft', async () => {
@@ -187,14 +217,22 @@ describe('review memory change requests', () => {
     });
 
     expect(result.status).toBe('superseded');
+    expect(mockGenerateIntegratedReviewGuidanceWithGateway).not.toHaveBeenCalled();
     expect(mockCreateGitHubBranch).not.toHaveBeenCalled();
     expect(mockCreateGitHubPullRequest).not.toHaveBeenCalled();
   });
 
-  it('opens a GitLab merge request for an approved proposal', async () => {
+  it('opens a GitLab merge request with native REVIEW.md content when the file is missing', async () => {
     const user = await insertTestUser();
     const owner = { type: 'user' as const, id: user.id };
     await seedGitLabIntegration(owner);
+    const integratedReviewMd =
+      '# REVIEW\n\n## Generated files\n\nSkip generated fixtures unless behavior changes.\n';
+    mockGenerateIntegratedReviewGuidanceWithGateway.mockResolvedValueOnce({
+      status: 'updated',
+      updatedReviewMd: integratedReviewMd,
+      integrationSummary: 'Created generated file guidance.',
+    });
     const proposal = await upsertReviewMemoryProposal({
       owner,
       platform: 'gitlab',
@@ -233,11 +271,85 @@ describe('review memory change requests', () => {
       123,
       branchName,
       'REVIEW.md',
-      expect.stringContaining('### Generated files'),
+      integratedReviewMd,
       'docs(review): update REVIEW.md guidance',
       'create',
       'https://gitlab.example.com'
     );
+    expect(integratedReviewMd).not.toMatch(/^##\s+Review memory\b/im);
+  });
+
+  it('marks proposals superseded when the integration model says guidance is already present', async () => {
+    const user = await insertTestUser();
+    const owner = { type: 'user' as const, id: user.id };
+    await seedGitHubIntegration(owner);
+    mockGenerateIntegratedReviewGuidanceWithGateway.mockResolvedValueOnce({
+      status: 'already_present',
+      updatedReviewMd: null,
+      integrationSummary: 'Existing guidance already covers the proposal.',
+    });
+    const proposal = await upsertReviewMemoryProposal({
+      owner,
+      platform: 'github',
+      repoFullName: 'acme/widgets',
+      scopeKind: 'repository',
+      proposalType: 'clarify',
+      title: 'Already integrated guidance',
+      rationale: 'The model found equivalent guidance.',
+      proposedMarkdown: '### Equivalent guidance\n\nAvoid duplicate comments.',
+      dedupeKey: 'github-model-already-present',
+    });
+
+    const result = await approveAndOpenReviewMemoryChangeRequest({
+      owner,
+      proposalId: proposal.id,
+      approvedByUser: { id: user.id, email: user.google_user_email, name: user.google_user_name },
+    });
+
+    expect(result.status).toBe('superseded');
+    expect(mockCreateGitHubBranch).not.toHaveBeenCalled();
+    expect(mockCreateOrUpdateGitHubRootTextFile).not.toHaveBeenCalled();
+    expect(mockCreateGitHubPullRequest).not.toHaveBeenCalled();
+  });
+
+  it('records a failed status when integration output is rejected', async () => {
+    const user = await insertTestUser();
+    const owner = { type: 'user' as const, id: user.id };
+    await seedGitHubIntegration(owner);
+    mockGenerateIntegratedReviewGuidanceWithGateway.mockRejectedValueOnce(
+      new Error('Integrated REVIEW.md must not mention Review Memory.')
+    );
+    const proposal = await upsertReviewMemoryProposal({
+      owner,
+      platform: 'github',
+      repoFullName: 'acme/widgets',
+      scopeKind: 'repository',
+      proposalType: 'clarify',
+      title: 'Rejected integration',
+      rationale: 'The model returned branded content.',
+      proposedMarkdown: '### Rejected guidance\n\nAvoid noisy comments.',
+      dedupeKey: 'github-rejected-integration',
+    });
+
+    await expect(
+      approveAndOpenReviewMemoryChangeRequest({
+        owner,
+        proposalId: proposal.id,
+        approvedByUser: { id: user.id, email: user.google_user_email, name: user.google_user_name },
+      })
+    ).rejects.toThrow('Integrated REVIEW.md must not mention Review Memory.');
+
+    const [failed] = await db
+      .select()
+      .from(code_review_memory_proposals)
+      .where(eq(code_review_memory_proposals.id, proposal.id));
+    expect(failed).toEqual(
+      expect.objectContaining({
+        status: 'change_request_failed',
+      })
+    );
+    expect(mockCreateGitHubBranch).not.toHaveBeenCalled();
+    expect(mockCreateGitHubPullRequest).not.toHaveBeenCalled();
   });
 
   it('records a failed status when external creation fails', async () => {
@@ -305,17 +417,7 @@ describe('review memory change requests', () => {
       })
     ).rejects.toThrow('GitLab integration metadata is malformed');
 
+    expect(mockGenerateIntegratedReviewGuidanceWithGateway).not.toHaveBeenCalled();
     expect(mockFetchGitLabProjectDetails).not.toHaveBeenCalled();
-  });
-
-  it('inserts proposal markdown under an existing Review memory section', () => {
-    expect(
-      buildReviewMemoryFileContent(
-        '# REVIEW\n\n## Review memory\n\nExisting item.\n\n## Other guidance\n\nKeep this.',
-        '### New item\n\nAvoid noisy comments.'
-      )
-    ).toBe(
-      '# REVIEW\n\n## Review memory\n\nExisting item.\n\n### New item\n\nAvoid noisy comments.\n\n## Other guidance\n\nKeep this.\n'
-    );
   });
 });

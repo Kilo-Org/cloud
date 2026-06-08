@@ -24,6 +24,7 @@ type SubmitManualFindingDismissalParams = {
 
 type AcceptedManualFindingDismissal = {
   accepted: true;
+  commandId: string;
   runId: string;
   messageId: string;
 };
@@ -31,6 +32,7 @@ type AcceptedManualFindingDismissal = {
 type ManualFindingDismissalWorkerResponse = {
   success?: boolean;
   accepted?: boolean;
+  commandId?: string;
   runId?: string;
   messageId?: string;
   error?: string;
@@ -74,6 +76,7 @@ export async function submitManualFindingDismissal(
   if (
     body.success !== true ||
     body.accepted !== true ||
+    typeof body.commandId !== 'string' ||
     typeof body.runId !== 'string' ||
     typeof body.messageId !== 'string'
   ) {
@@ -82,6 +85,7 @@ export async function submitManualFindingDismissal(
 
   return {
     accepted: true,
+    commandId: body.commandId,
     runId: body.runId,
     messageId: body.messageId,
   };

@@ -20,12 +20,13 @@ type ManualAnalysisStartParams = {
 type ManualAnalysisResponse = {
   success?: boolean;
   accepted?: boolean;
+  commandId?: string;
   error?: string;
 };
 
 export async function submitManualAnalysisStart(
   params: ManualAnalysisStartParams
-): Promise<{ queued: true }> {
+): Promise<{ queued: true; commandId: string }> {
   if (!SECURITY_AUTO_ANALYSIS_WORKER_URL) {
     throw new Error('SECURITY_AUTO_ANALYSIS_WORKER_URL is not configured');
   }
@@ -57,8 +58,8 @@ export async function submitManualAnalysisStart(
       body.error ?? `Security analysis Worker request failed with ${response.status}`
     );
   }
-  if (body.success !== true || body.accepted !== true) {
+  if (body.success !== true || body.accepted !== true || typeof body.commandId !== 'string') {
     throw new Error('Security analysis Worker returned an invalid accepted response');
   }
-  return { queued: true };
+  return { queued: true, commandId: body.commandId };
 }

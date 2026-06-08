@@ -17,7 +17,12 @@ describe('submitManualAnalysisStart', () => {
     mockFetch.mockResolvedValue({
       ok: true,
       status: 202,
-      json: () => Promise.resolve({ success: true, accepted: true }),
+      json: () =>
+        Promise.resolve({
+          success: true,
+          accepted: true,
+          commandId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+        }),
     });
 
     await expect(
@@ -28,7 +33,10 @@ describe('submitManualAnalysisStart', () => {
         requestedModels: { analysisModel: 'analysis/model' },
         retrySandboxOnly: true,
       })
-    ).resolves.toEqual({ queued: true });
+    ).resolves.toEqual({
+      queued: true,
+      commandId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+    });
 
     expect(mockFetch).toHaveBeenCalledWith(
       'https://security-auto-analysis.test/internal/manual-analysis-start',

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { SecurityFindingsCard } from './SecurityFindingsCard';
 import { FindingDetailDialog } from './FindingDetailDialog';
@@ -223,29 +223,17 @@ export function SecurityFindingsPage() {
     setDismissDialogOpen(true);
   }, []);
 
-  // Track whether we've submitted a dismiss so we can close the dialog when the
-  // mutation settles (success or failure), rather than closing eagerly and losing
-  // the user's reason/comment on failure.
-  const dismissSubmittedRef = useRef(false);
-
   const handleDismissSubmit = useCallback(
     (reason: DismissReason, comment?: string) => {
       if (!selectedFinding) return;
-      dismissSubmittedRef.current = true;
-      handleDismiss(selectedFinding, reason, comment);
+      handleDismiss(selectedFinding, reason, comment, () => {
+        setDismissDialogOpen(false);
+        setDetailDialogOpen(false);
+        setSelectedFinding(null);
+      });
     },
     [selectedFinding, handleDismiss]
   );
-
-  // Close dismiss dialog after the mutation finishes (isDismissing: true → false).
-  useEffect(() => {
-    if (!isDismissing && dismissSubmittedRef.current) {
-      dismissSubmittedRef.current = false;
-      setDismissDialogOpen(false);
-      setDetailDialogOpen(false);
-      setSelectedFinding(null);
-    }
-  }, [isDismissing]);
 
   const handleEnableClick = useCallback(() => {
     const basePath = isOrg ? `/organizations/${organizationId}/security-agent` : '/security-agent';
@@ -261,7 +249,7 @@ export function SecurityFindingsPage() {
       {/* GitHub Integration Error Alert */}
       {gitHubError && (
         <Alert variant="destructive">
-          <AlertTriangle className="h-4 w-4" />
+          <AlertTriangle className="size-4" />
           <AlertTitle>GitHub Integration Error</AlertTitle>
           <AlertDescription className="space-y-3">
             <p>Failed to access GitHub: {gitHubError}</p>
@@ -272,7 +260,7 @@ export function SecurityFindingsPage() {
             <Link href={isOrg ? `/organizations/${organizationId}/integrations` : '/integrations'}>
               <Button variant="outline" size="sm">
                 Go to Integrations
-                <ExternalLink className="ml-2 h-3 w-3" />
+                <ExternalLink className="ml-2 size-3" />
               </Button>
             </Link>
           </AlertDescription>

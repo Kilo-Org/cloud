@@ -21,6 +21,7 @@ describe('submitManualFindingDismissal', () => {
         Promise.resolve({
           success: true,
           accepted: true,
+          commandId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
           runId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
           messageId: 'dismiss-message-123',
         }),
@@ -37,6 +38,7 @@ describe('submitManualFindingDismissal', () => {
       })
     ).resolves.toEqual({
       accepted: true,
+      commandId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
       runId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
       messageId: 'dismiss-message-123',
     });

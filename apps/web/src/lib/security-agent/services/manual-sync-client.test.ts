@@ -21,6 +21,7 @@ describe('submitManualSecuritySync', () => {
         Promise.resolve({
           success: true,
           accepted: true,
+          commandId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
           runId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
           messageId: 'message-123',
         }),
@@ -34,6 +35,7 @@ describe('submitManualSecuritySync', () => {
       })
     ).resolves.toEqual({
       accepted: true,
+      commandId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
       runId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
       messageId: 'message-123',
     });

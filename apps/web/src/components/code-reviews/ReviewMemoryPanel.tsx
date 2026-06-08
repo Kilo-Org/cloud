@@ -428,17 +428,40 @@ export function ReviewMemoryPanel({ organizationId, platform }: ReviewMemoryPane
                         <p className="text-muted-foreground text-sm">No evidence excerpts saved.</p>
                       ) : (
                         <div className="space-y-2">
-                          {selectedProposal.evidence.map((item, index) => (
-                            <div
-                              key={`${item.prNumber ?? 'pr'}-${index}`}
-                              className="bg-muted/30 rounded-lg border p-3"
-                            >
-                              <div className="text-muted-foreground mb-1 text-xs">
-                                {item.prNumber ? `PR #${item.prNumber}` : 'PR unknown'}
+                          {selectedProposal.evidence.map((item, index) => {
+                            const prLabel = item.prNumber ? `PR #${item.prNumber}` : 'PR unknown';
+                            const prUrl = item.prNumber
+                              ? `https://github.com/${selectedProposal.repo_full_name}/pull/${item.prNumber}`
+                              : null;
+                            const content = (
+                              <>
+                                <div className="text-muted-foreground mb-1 flex items-center gap-1 text-xs">
+                                  {prLabel}
+                                  {prUrl && <ExternalLink className="h-3 w-3" aria-hidden="true" />}
+                                </div>
+                                <p className="text-sm whitespace-pre-wrap">{item.excerpt}</p>
+                              </>
+                            );
+
+                            return prUrl ? (
+                              <a
+                                key={`${item.prNumber}-${index}`}
+                                href={prUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="bg-muted/30 hover:bg-muted/50 focus-visible:ring-ring/50 block rounded-lg border p-3 transition-colors focus-visible:ring-[3px] focus-visible:outline-none"
+                              >
+                                {content}
+                              </a>
+                            ) : (
+                              <div
+                                key={`pr-${index}`}
+                                className="bg-muted/30 rounded-lg border p-3"
+                              >
+                                {content}
                               </div>
-                              <p className="text-sm whitespace-pre-wrap">{item.excerpt}</p>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       )}
                     </div>

@@ -7,8 +7,6 @@ const stripeSecretKey = getEnvVariable('STRIPE_SECRET_KEY');
 if (!stripeSecretKey) {
   throw new Error('STRIPE_SECRET_KEY environment variable is not set');
 }
-const skipStripeApi =
-  process.env.NODE_ENV !== 'production' && process.env.SKIP_STRIPE_API === 'true';
 
 export const client: Stripe = new Stripe(stripeSecretKey);
 
@@ -28,23 +26,11 @@ type UserConstrainedMetadata = {
 
 type CreateParams = Omit<Stripe.CustomerCreateParams, 'metadata'> & ConstrainedMetadata;
 
-export async function createStripeCustomer(
-  customer: CreateParams
-): Promise<Pick<Stripe.Customer, 'id'>> {
-  if (skipStripeApi) {
-    const metadataId =
-      'kiloUserId' in customer.metadata
-        ? customer.metadata.kiloUserId
-        : customer.metadata.organizationId;
-    return { id: `cus_local_${metadataId}` };
-  }
-
+export async function createStripeCustomer(customer: CreateParams) {
   return client.customers.create(customer);
 }
 
 export async function deleteStripeCustomer(stripeCustomerId: string) {
-  if (skipStripeApi) return;
-
   await client.customers.del(stripeCustomerId);
 }
 
@@ -70,8 +56,6 @@ export async function hasPaymentMethodInStripe({
 }: {
   stripeCustomerId: string;
 }): Promise<boolean> {
-  if (skipStripeApi) return false;
-
   // This function may become redundant if our in-db administration is accurate.
   const paymentMethods = await client.paymentMethods.list({
     customer: stripeCustomerId,

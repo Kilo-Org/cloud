@@ -143,6 +143,7 @@ type CloudAgentNextFreshRetryFailureCategory =
   | 'non_5xx'
   | 'cancelled'
   | 'sandbox_api_or_storage_failure'
+  | 'wrapper_version_mismatch'
   | 'wrapper_wait_for_port_timeout'
   | 'wrapper_kilo_server_start_timeout'
   | 'configured_session_lookup_failure'
@@ -169,12 +170,15 @@ function cloudAgentNextFreshRetryClassification(
     failureCategory,
     retryClassificationReason,
     retryableWrapperReadinessFailure:
+      failureCategory === 'wrapper_version_mismatch' ||
       failureCategory === 'wrapper_wait_for_port_timeout' ||
       failureCategory === 'wrapper_kilo_server_start_timeout',
     cloudAgentNextProcedure: error?.procedure,
     cloudAgentNextStatus: error?.status,
   };
 }
+
+const RETRYABLE_WRAPPER_VERSION_MISMATCH_PHRASE = 'Wrapper version mismatch'.toLowerCase();
 
 function classifyCloudAgentNextFreshSessionRetry(
   error: unknown
@@ -224,6 +228,15 @@ function classifyCloudAgentNextFreshSessionRetry(
       false,
       'repo_clone_or_checkout_failure',
       'repo_clone_or_checkout_not_retryable'
+    );
+  }
+
+  if (body.includes(RETRYABLE_WRAPPER_VERSION_MISMATCH_PHRASE)) {
+    return cloudAgentNextFreshRetryClassification(
+      error,
+      true,
+      'wrapper_version_mismatch',
+      'wrapper_version_mismatch'
     );
   }
 

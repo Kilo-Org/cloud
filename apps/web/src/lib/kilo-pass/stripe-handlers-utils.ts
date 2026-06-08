@@ -1,5 +1,6 @@
 import { computeIssueMonth } from '@/lib/kilo-pass/issuance';
 import { dayjs } from '@/lib/kilo-pass/dayjs';
+import { captureException } from '@sentry/nextjs';
 import type Stripe from 'stripe';
 
 /**
@@ -92,8 +93,28 @@ export type SettledInvoicePaymentMethod =
       paymentMethodType: SupportedReusablePaymentMethodType;
       fingerprint: string | null;
     }
-  | { kind: 'without_supported_fingerprint' }
-  | { kind: 'unknown' };
+  | { kind: 'without_supported_fingerprint' };
+
+export type RefundableSettlementTarget =
+  | { kind: 'payment_intent'; id: string }
+  | { kind: 'charge'; id: string };
+
+export type SettledInvoicePaymentResolution =
+  | { kind: 'none' }
+  | { kind: 'multiple' }
+  | {
+      kind: 'unresolved';
+      reason:
+        | 'missing_provider_capability'
+        | 'provider_lookup_failed'
+        | 'missing_settlement_reference'
+        | 'missing_payment_instrument';
+    }
+  | {
+      kind: 'settled';
+      paymentMethod: SettledInvoicePaymentMethod;
+      refundableTarget: RefundableSettlementTarget | null;
+    };
 
 function normalizedFingerprint(value: string | null | undefined): string | null {
   const fingerprint = value?.trim() ?? '';
@@ -139,9 +160,9 @@ function getReusablePaymentMethodResult(
   }
 }
 
-function getReusableChargeResult(charge: Stripe.Charge): SettledInvoicePaymentMethod {
+function getReusableChargeResult(charge: Stripe.Charge): SettledInvoicePaymentMethod | null {
   const details = charge.payment_method_details;
-  if (!details) return { kind: 'unknown' };
+  if (!details) return null;
 
   switch (details.type) {
     case 'card':
@@ -179,77 +200,199 @@ function getReusableChargeResult(charge: Stripe.Charge): SettledInvoicePaymentMe
   }
 }
 
-async function getExpandedPaymentMethod(params: {
-  stripe: Stripe;
-  paymentMethod: string | Stripe.PaymentMethod | null;
-}): Promise<Stripe.PaymentMethod | null> {
-  if (params.paymentMethod === null) return null;
-  if (typeof params.paymentMethod !== 'string') return params.paymentMethod;
-  if (!params.stripe.paymentMethods?.retrieve) return null;
-  return await params.stripe.paymentMethods.retrieve(params.paymentMethod);
+function reportSettlementLookupFailure(params: {
+  error: unknown;
+  stripeInvoiceId: string;
+  stage: string;
+  providerPaymentId?: string;
+}): void {
+  captureException(params.error, {
+    tags: { source: 'kilo_pass_settled_payment_resolution', stage: params.stage },
+    extra: {
+      stripeInvoiceId: params.stripeInvoiceId,
+      ...(params.providerPaymentId ? { providerPaymentId: params.providerPaymentId } : {}),
+    },
+  });
 }
 
-async function getExpandedCharge(params: {
+function reportMultipleSettlements(stripeInvoiceId: string): void {
+  captureException(new Error('Kilo Pass invoice has multiple paid settlements'), {
+    tags: { source: 'kilo_pass_settled_payment_resolution', stage: 'multiple_paid_settlements' },
+    extra: { stripeInvoiceId },
+  });
+}
+
+async function loadPaidInvoicePayments(params: {
+  invoice: Stripe.Invoice;
+  stripe: Stripe;
+}): Promise<Stripe.InvoicePayment[] | SettledInvoicePaymentResolution> {
+  if (params.invoice.payments?.has_more === false) {
+    return params.invoice.payments.data.filter(payment => payment.status === 'paid');
+  }
+
+  if (!params.stripe.invoicePayments?.list) {
+    return { kind: 'unresolved', reason: 'missing_provider_capability' };
+  }
+
+  try {
+    const listed = await params.stripe.invoicePayments.list({
+      invoice: params.invoice.id,
+      status: 'paid',
+      limit: 2,
+    });
+    const paidPayments = listed.data.filter(payment => payment.status === 'paid');
+    if (listed.has_more || paidPayments.length > 1) {
+      reportMultipleSettlements(params.invoice.id);
+      return { kind: 'multiple' };
+    }
+    return paidPayments;
+  } catch (error) {
+    reportSettlementLookupFailure({
+      error,
+      stripeInvoiceId: params.invoice.id,
+      stage: 'invoice_payments_list',
+    });
+    return { kind: 'unresolved', reason: 'provider_lookup_failed' };
+  }
+}
+
+async function resolvePaymentIntentSettlement(params: {
+  invoice: Stripe.Invoice;
+  stripe: Stripe;
+  paymentIntent: string | Stripe.PaymentIntent | null | undefined;
+}): Promise<SettledInvoicePaymentResolution> {
+  if (!params.paymentIntent) {
+    return { kind: 'unresolved', reason: 'missing_settlement_reference' };
+  }
+
+  const paymentIntentId =
+    typeof params.paymentIntent === 'string' ? params.paymentIntent : params.paymentIntent.id;
+  let paymentIntent: Stripe.PaymentIntent;
+  if (typeof params.paymentIntent !== 'string') {
+    paymentIntent = params.paymentIntent;
+  } else {
+    if (!params.stripe.paymentIntents?.retrieve) {
+      return { kind: 'unresolved', reason: 'missing_provider_capability' };
+    }
+    try {
+      paymentIntent = await params.stripe.paymentIntents.retrieve(params.paymentIntent, {
+        expand: ['payment_method'],
+      });
+    } catch (error) {
+      reportSettlementLookupFailure({
+        error,
+        stripeInvoiceId: params.invoice.id,
+        stage: 'payment_intent_retrieve',
+        providerPaymentId: paymentIntentId,
+      });
+      return { kind: 'unresolved', reason: 'provider_lookup_failed' };
+    }
+  }
+
+  const paymentMethodReference = paymentIntent.payment_method;
+  if (!paymentMethodReference) {
+    return { kind: 'unresolved', reason: 'missing_payment_instrument' };
+  }
+
+  let paymentMethod: Stripe.PaymentMethod;
+  if (typeof paymentMethodReference !== 'string') {
+    paymentMethod = paymentMethodReference;
+  } else {
+    if (!params.stripe.paymentMethods?.retrieve) {
+      return { kind: 'unresolved', reason: 'missing_provider_capability' };
+    }
+    try {
+      paymentMethod = await params.stripe.paymentMethods.retrieve(paymentMethodReference);
+    } catch (error) {
+      reportSettlementLookupFailure({
+        error,
+        stripeInvoiceId: params.invoice.id,
+        stage: 'payment_method_retrieve',
+        providerPaymentId: paymentIntentId,
+      });
+      return { kind: 'unresolved', reason: 'provider_lookup_failed' };
+    }
+  }
+
+  return {
+    kind: 'settled',
+    paymentMethod: getReusablePaymentMethodResult(paymentMethod),
+    refundableTarget: paymentIntentId ? { kind: 'payment_intent', id: paymentIntentId } : null,
+  };
+}
+
+async function resolveChargeSettlement(params: {
+  invoice: Stripe.Invoice;
   stripe: Stripe;
   charge: string | Stripe.Charge | undefined;
-}): Promise<Stripe.Charge | null> {
-  if (!params.charge) return null;
-  if (typeof params.charge !== 'string') return params.charge;
-  if (!params.stripe.charges?.retrieve) return null;
-  return await params.stripe.charges.retrieve(params.charge);
+}): Promise<SettledInvoicePaymentResolution> {
+  if (!params.charge) {
+    return { kind: 'unresolved', reason: 'missing_settlement_reference' };
+  }
+
+  const chargeId = typeof params.charge === 'string' ? params.charge : params.charge.id;
+  let charge: Stripe.Charge;
+  if (typeof params.charge !== 'string') {
+    charge = params.charge;
+  } else {
+    if (!params.stripe.charges?.retrieve) {
+      return { kind: 'unresolved', reason: 'missing_provider_capability' };
+    }
+    try {
+      charge = await params.stripe.charges.retrieve(params.charge);
+    } catch (error) {
+      reportSettlementLookupFailure({
+        error,
+        stripeInvoiceId: params.invoice.id,
+        stage: 'charge_retrieve',
+        providerPaymentId: chargeId,
+      });
+      return { kind: 'unresolved', reason: 'provider_lookup_failed' };
+    }
+  }
+
+  const paymentMethod = getReusableChargeResult(charge);
+  if (!paymentMethod) {
+    return { kind: 'unresolved', reason: 'missing_payment_instrument' };
+  }
+
+  return {
+    kind: 'settled',
+    paymentMethod,
+    refundableTarget: chargeId ? { kind: 'charge', id: chargeId } : null,
+  };
 }
 
 /**
- * Resolves the payment instrument that settled an invoice. This deliberately uses the paid
- * invoice payment rather than a customer's attached or default payment method.
+ * Resolves exactly one paid invoice settlement without inspecting attached, default, or local
+ * payment methods. Provider lookup failures are reported and returned as unresolved so invoice
+ * processing can fail open.
  */
-export async function getSettledInvoicePaymentMethod(params: {
+export async function resolveSettledInvoicePayment(params: {
   invoice: Stripe.Invoice;
   stripe: Stripe;
-}): Promise<SettledInvoicePaymentMethod> {
-  const embeddedPaidPayments = (params.invoice.payments?.data ?? []).filter(
-    payment => payment.status === 'paid'
-  );
-  const paidPayments =
-    embeddedPaidPayments.length > 0
-      ? embeddedPaidPayments
-      : params.stripe.invoicePayments?.list
-        ? (
-            await params.stripe.invoicePayments.list({
-              invoice: params.invoice.id,
-              status: 'paid',
-              limit: 1,
-            })
-          ).data
-        : [];
+}): Promise<SettledInvoicePaymentResolution> {
+  const paidPayments = await loadPaidInvoicePayments(params);
+  if (!Array.isArray(paidPayments)) return paidPayments;
 
-  for (const invoicePayment of paidPayments) {
-    const payment = invoicePayment.payment;
-    if (payment.type === 'charge') {
-      const charge = await getExpandedCharge({ stripe: params.stripe, charge: payment.charge });
-      if (charge) return getReusableChargeResult(charge);
-      continue;
-    }
-    if (payment.type !== 'payment_intent' || !payment.payment_intent) continue;
-
-    const paymentIntent =
-      typeof payment.payment_intent === 'string'
-        ? params.stripe.paymentIntents?.retrieve
-          ? await params.stripe.paymentIntents.retrieve(payment.payment_intent, {
-              expand: ['payment_method'],
-            })
-          : null
-        : payment.payment_intent;
-    if (!paymentIntent) continue;
-
-    const paymentMethod = await getExpandedPaymentMethod({
-      stripe: params.stripe,
-      paymentMethod: paymentIntent.payment_method,
-    });
-    if (paymentMethod) return getReusablePaymentMethodResult(paymentMethod);
+  if (paidPayments.length === 0) return { kind: 'none' };
+  if (paidPayments.length > 1) {
+    reportMultipleSettlements(params.invoice.id);
+    return { kind: 'multiple' };
   }
 
-  return { kind: 'unknown' };
+  const payment = paidPayments[0]?.payment;
+  if (!payment) return { kind: 'unresolved', reason: 'missing_settlement_reference' };
+  if (payment.type === 'payment_intent') {
+    return await resolvePaymentIntentSettlement({
+      ...params,
+      paymentIntent: payment.payment_intent,
+    });
+  }
+  if (payment.type === 'charge') {
+    return await resolveChargeSettlement({ ...params, charge: payment.charge });
+  }
+  return { kind: 'unresolved', reason: 'missing_settlement_reference' };
 }
 
 /**

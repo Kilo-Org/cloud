@@ -705,13 +705,14 @@ application, and Kilo Pass redeems after local referral bonus allocation.
 
 ### Kilo Pass Reusable Payment-Fingerprint Welcome-Promo Guard
 
-176. The Kilo Pass introductory welcome promo MUST be claimable at most once per reusable Stripe payment-instrument
-     fingerprint that the system supports. Initial supported instrument types are `card`, `sepa_debit`,
-     `us_bank_account`, `bacs_debit`, and `au_becs_debit`. Annual subscriptions are excluded.
+176. The Kilo Pass introductory welcome promo MUST be available at most once per supported reusable Stripe payment
+     instrument. Initial supported instrument types are `card`, `sepa_debit`, `us_bank_account`, `bacs_debit`, and
+     `au_becs_debit`. Annual subscriptions MUST NOT receive the welcome promo. An instrument used for a first paid annual
+     purchase MUST count as previously used when later monthly welcome-promo or referral eligibility is evaluated.
 
-177. An instrument fingerprint opportunity MUST be claimed only when a personal monthly Kilo Pass Stripe payment with
-     `amount_paid > 0` settles using that instrument, not when the instrument is merely attached, when a zero-value
-     invoice is finalized, when usage crosses the bonus threshold, or when welcome-promo credits are later issued.
+177. A reusable payment instrument MUST count as used only after it settles either a positive personal monthly Kilo Pass
+     Stripe payment or a first positive personal annual Kilo Pass Stripe payment. Merely attaching the instrument, issuing
+     a zero-value invoice, crossing the usage threshold, or later issuing welcome-promo credits MUST NOT count as use.
 
 178. A first-time account whose positively paid monthly Kilo Pass settlement uses a previously claimed reusable instrument
      fingerprint MUST NOT receive the introductory `50%` welcome promo. It MAY receive the ordinary monthly-ramp bonus

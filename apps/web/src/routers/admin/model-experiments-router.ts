@@ -13,7 +13,9 @@ import {
 import { encryptApiKey } from '@/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
 import { ExperimentUpstreamSchema } from '@/lib/ai-gateway/experiments/upstream-schema';
+import { deepStrict } from '@/lib/zod/deep-strict';
 import { EXPERIMENTED_PUBLIC_IDS_REDIS_KEY } from '@/lib/redis-keys';
+import { CustomLlmMetadataSchema } from '@kilocode/db/schema-types';
 import {
   CUSTOM_LLM_PREFIX,
   KILOCLAW_KILO_PROVIDER_PREFIX,
@@ -250,15 +252,19 @@ async function assertActivatable(experimentId: string, publicModelId: string) {
 
 // ---- Router -------------------------------------------------------------
 
+const StrictCustomLlmMetadataSchema = deepStrict(CustomLlmMetadataSchema);
+
 const CreateExperimentSchema = z.object({
   public_model_id: publicModelIdSchema,
   name: z.string().min(1).max(200),
   description: z.string().max(2000).optional(),
+  metadata: StrictCustomLlmMetadataSchema.optional(),
 });
 
 const UpdateExperimentSchema = idSchema.extend({
   name: z.string().min(1).max(200).optional(),
   description: z.string().max(2000).nullable().optional(),
+  metadata: StrictCustomLlmMetadataSchema.nullable().optional(),
   // public_model_id is editable only on draft.
   public_model_id: publicModelIdSchema.optional(),
 });
@@ -464,6 +470,7 @@ export const adminModelExperimentsRouter = createTRPCRouter({
         public_model_id: input.public_model_id,
         name: input.name,
         description: input.description ?? null,
+        metadata: input.metadata ?? null,
         status: 'draft',
         created_by_user_id: ctx.user.id,
       })
@@ -476,6 +483,7 @@ export const adminModelExperimentsRouter = createTRPCRouter({
     const next: Partial<typeof model_experiment.$inferInsert> = {};
     if (input.name !== undefined) next.name = input.name;
     if (input.description !== undefined) next.description = input.description;
+    if (input.metadata !== undefined) next.metadata = input.metadata;
     if (input.public_model_id !== undefined) {
       assertDraft(existing.status as Status, 'Changing public_model_id');
       next.public_model_id = input.public_model_id;

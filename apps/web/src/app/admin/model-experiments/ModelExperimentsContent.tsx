@@ -29,6 +29,7 @@ import {
   useModelExperiments,
   useModelExperiment,
   useCreateExperiment,
+  useUpdateExperiment,
   useDeleteExperiment,
   useActivateExperiment,
   usePauseExperiment,
@@ -43,14 +44,46 @@ import {
   ExperimentUpstreamSchema,
   type ExperimentUpstream,
 } from '@/lib/ai-gateway/experiments/upstream-schema';
+import { CustomLlmMetadataSchema, type CustomLlmMetadata } from '@kilocode/db/schema-types';
+import { deepStrict } from '@/lib/zod/deep-strict';
 import { toast } from 'sonner';
-import { Plus, ChevronLeft, KeyRound, RefreshCw } from 'lucide-react';
+import { Plus, ChevronLeft, KeyRound, RefreshCw, Pencil } from 'lucide-react';
 import Editor from '@monaco-editor/react';
+
+const StrictCustomLlmMetadataSchema = deepStrict(CustomLlmMetadataSchema);
+
+const INITIAL_METADATA: CustomLlmMetadata = {
+  context_length: 200_000,
+  max_completion_tokens: 32_000,
+};
 
 const INITIAL_UPSTREAM: ExperimentUpstream = {
   internal_id: '',
   base_url: '',
 };
+
+function parseMetadataJson(value: string):
+  | { success: true; data: CustomLlmMetadata }
+  | { success: false; error: string } {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    return { success: false, error: 'Invalid JSON syntax' };
+  }
+
+  const result = StrictCustomLlmMetadataSchema.safeParse(parsed);
+  if (!result.success) {
+    return {
+      success: false,
+      error: result.error.issues
+        .map(issue => `${issue.path.join('.') || '(root)'}: ${issue.message}`)
+        .join('\n'),
+    };
+  }
+
+  return { success: true, data: result.data };
+}
 
 type Status = 'draft' | 'active' | 'paused' | 'completed';
 
@@ -249,21 +282,31 @@ function CreateExperimentDialog({
   const [name, setName] = useState('');
   const [publicModelId, setPublicModelId] = useState('');
   const [description, setDescription] = useState('');
+  const [metadataJson, setMetadataJson] = useState(() => JSON.stringify(INITIAL_METADATA, null, 2));
+  const [metadataError, setMetadataError] = useState<string | null>(null);
   const create = useCreateExperiment();
 
   const reset = useCallback(() => {
     setName('');
     setPublicModelId('');
     setDescription('');
+    setMetadataJson(JSON.stringify(INITIAL_METADATA, null, 2));
+    setMetadataError(null);
   }, []);
 
   const handleSave = useCallback(async () => {
     if (!name.trim() || !publicModelId.trim()) return;
+    const metadata = parseMetadataJson(metadataJson);
+    if (!metadata.success) {
+      setMetadataError(metadata.error);
+      return;
+    }
     try {
       const created = await create.mutateAsync({
         name: name.trim(),
         public_model_id: publicModelId.trim(),
         description: description.trim() || undefined,
+        metadata: metadata.data,
       });
       toast.success('Experiment created');
       reset();
@@ -271,7 +314,7 @@ function CreateExperimentDialog({
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to create');
     }
-  }, [create, name, publicModelId, description, reset, onCreated]);
+  }, [create, name, publicModelId, description, metadataJson, reset, onCreated]);
 
   return (
     <Dialog
@@ -281,7 +324,7 @@ function CreateExperimentDialog({
         onOpenChange(v);
       }}
     >
-      <DialogContent>
+      <DialogContent className="max-w-3xl">
         <DialogHeader>
           <DialogTitle>New experiment</DialogTitle>
           <DialogDescription>
@@ -318,6 +361,14 @@ function CreateExperimentDialog({
               rows={3}
             />
           </div>
+          <MetadataJsonEditor
+            value={metadataJson}
+            error={metadataError}
+            onChange={value => {
+              setMetadataJson(value);
+              setMetadataError(null);
+            }}
+          />
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
@@ -335,12 +386,138 @@ function CreateExperimentDialog({
   );
 }
 
+function MetadataJsonEditor({
+  value,
+  error,
+  onChange,
+}: {
+  value: string;
+  error: string | null;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div>
+      <Label>Model metadata (JSON)</Label>
+      <div className="border-input mt-1 overflow-hidden rounded-md border">
+        <Editor
+          height="240px"
+          defaultLanguage="json"
+          value={value}
+          onChange={nextValue => onChange(nextValue ?? '')}
+          theme="vs-dark"
+          options={{
+            minimap: { enabled: false },
+            fontSize: 13,
+            lineNumbers: 'on',
+            scrollBeyondLastLine: false,
+            automaticLayout: true,
+            tabSize: 2,
+            formatOnPaste: true,
+            ariaLabel: 'Model metadata JSON',
+          }}
+        />
+      </div>
+      <p className="text-muted-foreground mt-1 text-xs">
+        Sets context length, completion limit, image support, and optional OpenCode settings.
+        Validated against <code>CustomLlmMetadataSchema</code>.
+      </p>
+      {error && (
+        <pre
+          role="alert"
+          className="bg-destructive/10 text-destructive mt-2 rounded-md p-3 text-sm whitespace-pre-wrap"
+        >
+          {error}
+        </pre>
+      )}
+    </div>
+  );
+}
+
+function EditMetadataDialog({
+  experimentId,
+  metadata,
+  open,
+  onOpenChange,
+}: {
+  experimentId: string;
+  metadata: unknown;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const initialMetadata = useMemo(() => {
+    const result = StrictCustomLlmMetadataSchema.safeParse(metadata);
+    return result.success ? result.data : INITIAL_METADATA;
+  }, [metadata]);
+  const [metadataJson, setMetadataJson] = useState(() =>
+    JSON.stringify(initialMetadata, null, 2)
+  );
+  const [error, setError] = useState<string | null>(null);
+  const update = useUpdateExperiment();
+
+  const reset = useCallback(() => {
+    setMetadataJson(JSON.stringify(initialMetadata, null, 2));
+    setError(null);
+  }, [initialMetadata]);
+
+  const handleSave = useCallback(async () => {
+    const result = parseMetadataJson(metadataJson);
+    if (!result.success) {
+      setError(result.error);
+      return;
+    }
+
+    try {
+      await update.mutateAsync({ id: experimentId, metadata: result.data });
+      toast.success('Experiment metadata updated');
+      onOpenChange(false);
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : 'Failed to update metadata');
+    }
+  }, [experimentId, metadataJson, onOpenChange, update]);
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={nextOpen => {
+        if (!nextOpen) reset();
+        onOpenChange(nextOpen);
+      }}
+    >
+      <DialogContent className="max-w-3xl">
+        <DialogHeader>
+          <DialogTitle>Edit experiment metadata</DialogTitle>
+          <DialogDescription>
+            These properties describe the public model and apply to every experiment variant.
+          </DialogDescription>
+        </DialogHeader>
+        <MetadataJsonEditor
+          value={metadataJson}
+          error={error}
+          onChange={value => {
+            setMetadataJson(value);
+            setError(null);
+          }}
+        />
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button onClick={handleSave} disabled={update.isPending}>
+            {update.isPending ? 'Saving…' : 'Save metadata'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // -------------------------------------------------------------------------
 // Detail view
 // -------------------------------------------------------------------------
 
 function ExperimentDetail({ id, onBack }: { id: string; onBack: () => void }) {
   const { data, isLoading } = useModelExperiment(id);
+  const [metadataEditorOpen, setMetadataEditorOpen] = useState(false);
   const activate = useActivateExperiment();
   const pause = usePauseExperiment();
   const complete = useCompleteExperiment();
@@ -391,6 +568,12 @@ function ExperimentDetail({ id, onBack }: { id: string; onBack: () => void }) {
         </div>
 
         <div className="flex flex-wrap items-center justify-end gap-2">
+          {status !== 'completed' && (
+            <Button variant="outline" onClick={() => setMetadataEditorOpen(true)}>
+              <Pencil className="mr-2 size-4" />
+              Edit metadata
+            </Button>
+          )}
           {status === 'draft' && (
             <ActivationButton
               label="Activate"
@@ -462,6 +645,13 @@ function ExperimentDetail({ id, onBack }: { id: string; onBack: () => void }) {
           )}
         </div>
       </div>
+
+      <EditMetadataDialog
+        experimentId={experiment.id}
+        metadata={experiment.metadata}
+        open={metadataEditorOpen}
+        onOpenChange={setMetadataEditorOpen}
+      />
 
       <VariantsSection
         experimentId={experiment.id}

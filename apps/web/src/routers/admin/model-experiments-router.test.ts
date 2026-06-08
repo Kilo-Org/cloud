@@ -77,6 +77,51 @@ describe('admin.modelExperiments — basic CRUD', () => {
     expect(created.created_by_user_id).toBe(admin.id);
   });
 
+  it('creates and updates experiment metadata', async () => {
+    const caller = await createCallerForUser(admin.id);
+    const created = await caller.admin.modelExperiments.create({
+      public_model_id: 'partner/preview-metadata',
+      name: 'Metadata experiment',
+      metadata: {
+        context_length: 128_000,
+        max_completion_tokens: 16_000,
+        supports_image_input: true,
+      },
+    });
+    expect(created.metadata).toEqual({
+      context_length: 128_000,
+      max_completion_tokens: 16_000,
+      supports_image_input: true,
+    });
+
+    const updated = await caller.admin.modelExperiments.update({
+      id: created.id,
+      metadata: {
+        context_length: 200_000,
+        max_completion_tokens: 32_000,
+      },
+    });
+    expect(updated.metadata).toEqual({
+      context_length: 200_000,
+      max_completion_tokens: 32_000,
+    });
+  });
+
+  it('rejects invalid experiment metadata', async () => {
+    const caller = await createCallerForUser(admin.id);
+    await expect(
+      caller.admin.modelExperiments.create({
+        public_model_id: 'partner/preview-invalid-metadata',
+        name: 'Invalid metadata',
+        metadata: {
+          context_length: 128_000,
+          max_completion_tokens: 16_000,
+          unsupported_property: true,
+        },
+      } as Parameters<typeof caller.admin.modelExperiments.create>[0])
+    ).rejects.toThrow();
+  });
+
   it.each(['kilo/preview-foo', 'kilocode/preview-foo', 'kilo-internal/preview-foo'])(
     'rejects creating an experiment with reserved public_model_id %s',
     async reservedPublicId => {

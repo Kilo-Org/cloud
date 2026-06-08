@@ -62,9 +62,9 @@ const INITIAL_UPSTREAM: ExperimentUpstream = {
   base_url: '',
 };
 
-function parseMetadataJson(value: string):
-  | { success: true; data: CustomLlmMetadata }
-  | { success: false; error: string } {
+function parseMetadataJson(
+  value: string
+): { success: true; data: CustomLlmMetadata } | { success: false; error: string } {
   let parsed: unknown;
   try {
     parsed = JSON.parse(value);
@@ -448,9 +448,7 @@ function EditMetadataDialog({
     const result = StrictCustomLlmMetadataSchema.safeParse(metadata);
     return result.success ? result.data : INITIAL_METADATA;
   }, [metadata]);
-  const [metadataJson, setMetadataJson] = useState(() =>
-    JSON.stringify(initialMetadata, null, 2)
-  );
+  const [metadataJson, setMetadataJson] = useState(() => JSON.stringify(initialMetadata, null, 2));
   const [error, setError] = useState<string | null>(null);
   const update = useUpdateExperiment();
 
